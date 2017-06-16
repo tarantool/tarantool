@@ -260,6 +260,18 @@ int
 vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt);
 
 /**
+ * Insert an upsert statement into the mem.
+ *
+ * @param mem Mem to insert to.
+ * @param stmt Upsert statement to insert.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt);
+
+/**
  * Confirm insertion of a statement into the in-memory level.
  * @param mem        vy_mem.
  * @param stmt       Vinyl statement.

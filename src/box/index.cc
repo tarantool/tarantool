@@ -135,8 +135,10 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 
 		/* Partial keys are allowed only for TREE index type. */
 		if (index_def->type != TREE && part_count < index_def->key_def.part_count) {
-			diag_set(ClientError, ER_EXACT_MATCH,
-				 index_def->key_def.part_count, part_count);
+			diag_set(ClientError, ER_PARTIAL_KEY,
+				 index_type_strs[index_def->type],
+				 index_def->key_def.part_count,
+				 part_count);
 			return -1;
 		}
 		if (key_validate_parts(&index_def->key_def, key,

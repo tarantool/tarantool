@@ -31,67 +31,20 @@
  * SUCH DAMAGE.
  */
 
+#include <stddef.h>
 #include <stdint.h>
-
-#include "vclock.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-/** Checkpoint info. */
-struct checkpoint_info {
-	/** Checkpoint vclock, linked in gc_state.checkpoints. */
-	struct vclock vclock;
-	/**
-	 * Number of active users of this checkpoint.
-	 * A checkpoint can't be collected unless @refs is 0.
-	 */
-	int refs;
-};
-
-/** Iterator over checkpoints tracked by gc. */
-struct checkpoint_iterator {
-	struct vclock *curr;
-};
-
-/** Init a checkpoint iterator. */
-static inline void
-checkpoint_iterator_init(struct checkpoint_iterator *it)
-{
-	it->curr = NULL;
-}
-
-/**
- * Iterate to the next checkpoint.
- * Returns NULL to stop.
- */
-const struct checkpoint_info *
-checkpoint_iterator_next(struct checkpoint_iterator *it);
-
-#define checkpoint_foreach(it, cpt) \
-	for (cpt = checkpoint_iterator_next(it); cpt != NULL; \
-	     cpt = checkpoint_iterator_next(it))
-
-/**
- * Pin a given checkpoint so that it cannot be removed by
- * garbage collection.
- */
-void
-checkpoint_ref(struct checkpoint_info *cpt);
-
-/**
- */
-void
-checkpoint_unref(struct checkpoint_info *cpt);
+struct gc_consumer;
 
 /**
  * Initialize the garbage collection state.
- * @snap_dirname is a path to the snapshot directory.
- * Return 0 on success, -1 on failure.
  */
-int
-gc_init(const char *snap_dirname);
+void
+gc_init(void);
 
 /**
  * Destroy the garbage collection state.
@@ -100,46 +53,78 @@ void
 gc_free(void);
 
 /**
- * Add a new checkpoint to the garbage collection state.
- * Returns 0 on success, -1 on OOM.
- */
-int
-gc_add_checkpoint(const struct vclock *vclock);
-
-/**
- * Return the last registered checkpoint or NULL if there
- * are no checkpoints.
- *
- * Note, the object returned by this function may be freed by
- * gc_run(). If you need to dereference it in the code that
- * may yield, pin it with the aid of checkpoint_ref().
- */
-struct checkpoint_info *
-gc_last_checkpoint(void);
-
-/**
- * Lookup the newest checkpoint that is needed to recover to
- * a given vclock or NULL if there's no such checkpoint.
- *
- * See also gc_last_checkpoint().
- */
-struct checkpoint_info *
-gc_lookup_checkpoint(struct vclock *vclock);
-
-/**
- * Invoke garbage collection in order to remove files left from
- * checkpoints older than @signature.
+ * Invoke garbage collection in order to remove files left
+ * from old checkpoints. The number of checkpoints saved by
+ * this function is specified by box.cfg.checkpoint_count.
  */
 void
-gc_run(int64_t signature);
+gc_run(void);
 
 /**
- * Return max signature garbage collection has been called for
- * since the server start, or -1 if garbage collection hasn't
- * been called at all.
+ * Update the checkpoint_count configuration option and
+ * rerun garbage collection.
  */
+void
+gc_set_checkpoint_count(int checkpoint_count);
+
+/**
+ * Register a consumer.
+ *
+ * This will stop garbage collection of objects newer than
+ * @signature until the consumer is unregistered or advanced.
+ * @name is a human-readable name of the consumer, it will
+ * be used for reporting the consumer to the user.
+ *
+ * Returns a pointer to the new consumer object or NULL on
+ * memory allocation failure.
+ */
+struct gc_consumer *
+gc_consumer_register(const char *name, int64_t signature);
+
+/**
+ * Unregister a consumer and invoke garbage collection
+ * if needed.
+ */
+void
+gc_consumer_unregister(struct gc_consumer *consumer);
+
+/**
+ * Advance the vclock signature tracked by a consumer and
+ * invoke garbage collection if needed.
+ */
+void
+gc_consumer_advance(struct gc_consumer *consumer, int64_t signature);
+
+/** Return the name of a consumer. */
+const char *
+gc_consumer_name(const struct gc_consumer *consumer);
+
+/** Return the signature a consumer tracks. */
 int64_t
-gc_signature(void);
+gc_consumer_signature(const struct gc_consumer *consumer);
+
+/**
+ * Iterator over registered consumers. The iterator is valid
+ * as long as the caller doesn't yield.
+ */
+struct gc_consumer_iterator {
+	struct gc_consumer *curr;
+};
+
+/** Init an iterator over consumers. */
+static inline void
+gc_consumer_iterator_init(struct gc_consumer_iterator *it)
+{
+	it->curr = NULL;
+}
+
+/**
+ * Iterate to the next registered consumer. Return a pointer
+ * to the next consumer object or NULL if there is no more
+ * consumers.
+ */
+struct gc_consumer *
+gc_consumer_iterator_next(struct gc_consumer_iterator *it);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -30,186 +30,257 @@
  */
 #include "gc.h"
 
-#include <errno.h>
+#include <trivia/util.h>
+
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "coio_file.h"
+#define RB_COMPACT 1
+#include <small/rb.h>
+#include <small/rlist.h>
+
 #include "diag.h"
-#include "errcode.h"
 #include "say.h"
 #include "vclock.h"
-#include "xlog.h"
-
+#include "checkpoint.h"
 #include "engine.h"		/* engine_collect_garbage() */
-#include "replication.h"	/* INSTANCE_UUID */
 #include "wal.h"		/* wal_collect_garbage() */
+
+typedef rb_node(struct gc_consumer) gc_node_t;
+
+/**
+ * The object of this type is used to prevent garbage
+ * collection from removing files that are still in use.
+ */
+struct gc_consumer {
+	/** Link in gc_state::consumers. */
+	gc_node_t node;
+	/** Human-readable name. */
+	char *name;
+	/** The vclock signature tracked by this consumer. */
+	int64_t signature;
+};
+
+typedef rb_tree(struct gc_consumer) gc_tree_t;
 
 /** Garbage collection state. */
 struct gc_state {
+	/** Number of checkpoints to maintain. */
+	int checkpoint_count;
 	/** Max signature garbage collection has been called for. */
 	int64_t signature;
-	/** Uncollected checkpoints, see checkpoint_info. */
-	vclockset_t checkpoints;
-	/** Snapshot directory. */
-	struct xdir snap_dir;
+	/** Registered consumers, linked by gc_consumer::node. */
+	gc_tree_t consumers;
 };
 static struct gc_state gc;
 
-const struct checkpoint_info *
-checkpoint_iterator_next(struct checkpoint_iterator *it)
+/**
+ * Comparator used for ordering gc_consumer objects by signature
+ * in a binary tree.
+ */
+static inline int
+gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 {
-	it->curr = (it->curr == NULL ?
-		    vclockset_first(&gc.checkpoints) :
-		    vclockset_next(&gc.checkpoints, it->curr));
-	return (it->curr == NULL ? NULL :
-		container_of(it->curr, struct checkpoint_info, vclock));
+	if (a->signature < b->signature)
+		return -1;
+	if (a->signature > b->signature)
+		return 1;
+	if ((intptr_t)a < (intptr_t)b)
+		return -1;
+	if ((intptr_t)a > (intptr_t)b)
+		return 1;
+	return 0;
+}
+
+rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
+       struct gc_consumer, node, gc_consumer_cmp);
+
+/** Allocate a consumer object. */
+static struct gc_consumer *
+gc_consumer_new(const char *name, int64_t signature)
+{
+	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
+	if (consumer == NULL) {
+		diag_set(OutOfMemory, sizeof(*consumer),
+			 "malloc", "struct gc_consumer");
+		return NULL;
+	}
+	consumer->name = strdup(name);
+	if (consumer->name == NULL) {
+		diag_set(OutOfMemory, strlen(name) + 1,
+			 "malloc", "struct gc_consumer");
+		free(consumer);
+		return NULL;
+	}
+	consumer->signature = signature;
+	return consumer;
+}
+
+/** Free a consumer object. */
+static void
+gc_consumer_delete(struct gc_consumer *consumer)
+{
+	free(consumer->name);
+	TRASH(consumer);
+	free(consumer);
 }
 
 void
-checkpoint_ref(struct checkpoint_info *cpt)
-{
-	assert(cpt->refs >= 0);
-	cpt->refs++;
-}
-
-void
-checkpoint_unref(struct checkpoint_info *cpt)
-{
-	assert(cpt->refs > 0);
-	cpt->refs--;
-	/* Retry gc when a checkpoint is unpinned. */
-	if (cpt->refs == 0)
-		gc_run(gc.signature);
-}
-
-int
-gc_init(const char *snap_dirname)
+gc_init(void)
 {
 	gc.signature = -1;
-	vclockset_new(&gc.checkpoints);
-	xdir_create(&gc.snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
-
-	if (xdir_scan(&gc.snap_dir) < 0)
-		goto fail;
-
-	struct vclock *vclock;
-	for (vclock = vclockset_first(&gc.snap_dir.index); vclock != NULL;
-	     vclock = vclockset_next(&gc.snap_dir.index, vclock)) {
-		if (gc_add_checkpoint(vclock) < 0)
-			goto fail;
-	}
-	return 0;
-fail:
-	gc_free();
-	return -1;
+	gc_tree_new(&gc.consumers);
 }
 
 void
 gc_free(void)
 {
-	struct vclock *vclock = vclockset_first(&gc.checkpoints);
-	while (vclock != NULL) {
-		struct vclock *next = vclockset_next(&gc.checkpoints, vclock);
-		vclockset_remove(&gc.checkpoints, vclock);
-		struct checkpoint_info *cpt = container_of(vclock,
-				struct checkpoint_info, vclock);
-		free(cpt);
-		vclock = next;
+	/* Free all registered consumers. */
+	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	while (consumer != NULL) {
+		struct gc_consumer *next = gc_tree_next(&gc.consumers,
+							consumer);
+		gc_tree_remove(&gc.consumers, consumer);
+		gc_consumer_delete(consumer);
+		consumer = next;
 	}
-	xdir_destroy(&gc.snap_dir);
-}
-
-int
-gc_add_checkpoint(const struct vclock *vclock)
-{
-	struct checkpoint_info *last = gc_last_checkpoint();
-	if (last != NULL && vclock_compare(vclock, &last->vclock) == 0)
-		return 0;
-
-	struct checkpoint_info *cpt;
-	cpt = (struct checkpoint_info *)malloc(sizeof(*cpt));
-	if (cpt == NULL) {
-		diag_set(OutOfMemory, sizeof(*cpt),
-			 "malloc", "struct checkpoint_info");
-		return -1;
-	}
-
-	/*
-	 * Do not allow to remove the last checkpoint,
-	 * because we need it for recovery.
-	 */
-	cpt->refs = 1;
-	vclock_copy(&cpt->vclock, vclock);
-	vclockset_insert(&gc.checkpoints, &cpt->vclock);
-
-	if (last != NULL) {
-		assert(vclock_compare(vclock, &last->vclock) > 0);
-		checkpoint_unref(last);
-	}
-	return 0;
-}
-
-struct checkpoint_info *
-gc_last_checkpoint(void)
-{
-	struct vclock *last = vclockset_last(&gc.checkpoints);
-	return (last == NULL ? NULL :
-		container_of(last, struct checkpoint_info, vclock));
-}
-
-struct checkpoint_info *
-gc_lookup_checkpoint(struct vclock *vclock)
-{
-	struct vclock *found = vclockset_psearch(&gc.checkpoints, vclock);
-	return (found == NULL ? NULL :
-		container_of(found, struct checkpoint_info, vclock));
 }
 
 void
-gc_run(int64_t signature)
+gc_run(void)
 {
-	if (gc.signature < signature)
-		gc.signature = signature;
+	int checkpoint_count = gc.checkpoint_count;
+	assert(checkpoint_count > 0);
 
+	/* Look up the consumer that uses the oldest snapshot. */
+	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
+
+	/*
+	 * Find the oldest checkpoint that must be preserved.
+	 * We have to maintain @checkpoint_count oldest snapshots,
+	 * plus we can't remove snapshots that are still in use.
+	 */
 	int64_t gc_signature = -1;
 
-	struct vclock *vclock = vclockset_first(&gc.checkpoints);
-	while (vclock != NULL) {
-		if (vclock_sum(vclock) >= signature)
-			break; /* all eligible checkpoints removed */
+	struct checkpoint_iterator checkpoints;
+	checkpoint_iterator_init(&checkpoints);
 
-		struct checkpoint_info *cpt = container_of(vclock,
-				struct checkpoint_info, vclock);
-		if (cpt->refs > 0)
-			break; /* checkpoint still in use */
-
-		const char *filename = xdir_format_filename(&gc.snap_dir,
-						vclock_sum(vclock), NONE);
-		say_info("removing %s", filename);
-		if (coio_unlink(filename) < 0 && errno != ENOENT) {
-			say_syserror("error while removing %s", filename);
-			break;
-		}
-
-		struct vclock *next = vclockset_next(&gc.checkpoints, vclock);
-		vclockset_remove(&gc.checkpoints, vclock);
-		free(cpt);
-		vclock = next;
-
-		/* Include this checkpoint to gc. */
-		gc_signature = (vclock != NULL ?
-				vclock_sum(vclock) : signature);
+	const struct vclock *vclock;
+	while ((vclock = checkpoint_iterator_prev(&checkpoints)) != NULL) {
+		if (--checkpoint_count > 0)
+			continue;
+		if (leftmost != NULL &&
+		    leftmost->signature < vclock_sum(vclock))
+			continue;
+		gc_signature = vclock_sum(vclock);
+		break;
 	}
 
-	if (gc_signature >= 0) {
-		wal_collect_garbage(gc_signature);
-		engine_collect_garbage(gc_signature);
+	if (gc_signature <= gc.signature)
+		return; /* nothing to do */
+
+	gc.signature = gc_signature;
+
+	/*
+	 * Run garbage collection.
+	 *
+	 * The order is important here: we must invoke garbage
+	 * collection for memtx snapshots first and abort if it
+	 * fails - see the comment to MemtxEngine::collectGarbage.
+	 */
+	if (engine_collect_garbage(gc_signature) != 0) {
+		say_error("box garbage collection failed: %s",
+			  diag_last_error(diag_get())->errmsg);
+		return;
 	}
+	wal_collect_garbage(gc_signature);
+}
+
+void
+gc_set_checkpoint_count(int checkpoint_count)
+{
+	gc.checkpoint_count = checkpoint_count;
+	gc_run();
+}
+
+struct gc_consumer *
+gc_consumer_register(const char *name, int64_t signature)
+{
+	struct gc_consumer *consumer = gc_consumer_new(name, signature);
+	if (consumer != NULL)
+		gc_tree_insert(&gc.consumers, consumer);
+	return consumer;
+}
+
+void
+gc_consumer_unregister(struct gc_consumer *consumer)
+{
+	int64_t signature = consumer->signature;
+
+	gc_tree_remove(&gc.consumers, consumer);
+	gc_consumer_delete(consumer);
+
+	/*
+	 * Rerun garbage collection after removing the consumer
+	 * if it referenced the oldest vclock.
+	 */
+	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
+	if (leftmost == NULL || leftmost->signature > signature)
+		gc_run();
+}
+
+void
+gc_consumer_advance(struct gc_consumer *consumer, int64_t signature)
+{
+	int64_t prev_signature = consumer->signature;
+
+	assert(signature >= prev_signature);
+	if (signature == prev_signature)
+		return; /* nothing to do */
+
+	/*
+	 * Do not update the tree unless the tree invariant
+	 * is violated.
+	 */
+	struct gc_consumer *next = gc_tree_next(&gc.consumers, consumer);
+	bool update_tree = (next != NULL && signature >= next->signature);
+
+	if (update_tree)
+		gc_tree_remove(&gc.consumers, consumer);
+
+	consumer->signature = signature;
+
+	if (update_tree)
+		gc_tree_insert(&gc.consumers, consumer);
+
+	/*
+	 * Rerun garbage collection after advancing the consumer
+	 * if it referenced the oldest vclock.
+	 */
+	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
+	if (leftmost == NULL || leftmost->signature > prev_signature)
+		gc_run();
+}
+
+const char *
+gc_consumer_name(const struct gc_consumer *consumer)
+{
+	return consumer->name;
 }
 
 int64_t
-gc_signature(void)
+gc_consumer_signature(const struct gc_consumer *consumer)
 {
-	return gc.signature;
+	return consumer->signature;
+}
+
+struct gc_consumer *
+gc_consumer_iterator_next(struct gc_consumer_iterator *it)
+{
+	if (it->curr != NULL)
+		it->curr = gc_tree_next(&gc.consumers, it->curr);
+	else
+		it->curr = gc_tree_first(&gc.consumers);
+	return it->curr;
 }

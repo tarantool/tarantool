@@ -773,7 +773,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 	/* All rows in request have the same replica id. */
 	struct xrow_header *last = entry->rows[entry->n_rows - 1];
 	/* Promote replica set vclock with local writes. */
-	if (last->replica_id == instance_id)
+	if (entry->res > 0 && last->replica_id == instance_id)
 		vclock_follow(&replicaset_vclock, instance_id, last->lsn);
 	return entry->res;
 }

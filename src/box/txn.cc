@@ -134,6 +134,7 @@ txn_begin_stmt(struct space *space)
 	else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
 		tnt_raise(ClientError, ER_SUB_STMT_MAX);
 
+	trigger_run(&space->on_stmt_begin, txn);
 	Engine *engine = space->handler->engine;
 	txn_begin_in_engine(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);

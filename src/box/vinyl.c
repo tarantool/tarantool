@@ -60,6 +60,7 @@
 #include "info.h"
 #include "request.h"
 #include "tuple_hash.h" /* for bloom filter */
+#include "column_mask.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -505,7 +506,7 @@ struct vy_index {
 	 * Tree of all ranges of this index, linked by
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
-	vy_range_tree_t tree;
+	vy_range_tree_t *tree;
 	/**
 	 * List of all runs created for this index,
 	 * linked by vy_run->in_index.
@@ -596,6 +597,15 @@ struct vy_index {
 	 * Used to make sure that the primary index is dumped last.
 	 */
 	int pin_count;
+	/**
+	 * The number of times the index was truncated.
+	 *
+	 * After recovery is complete, it equals space->truncate_count.
+	 * On local recovery, it is loaded from the metadata log and may
+	 * be greater than space->truncate_count, which indicates that
+	 * the space is truncated in WAL.
+	 */
+	uint64_t truncate_count;
 };
 
 /** Return index name. Used for logging. */
@@ -1682,9 +1692,9 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 	if (curr == NULL) {
 		/* First iteration */
 		if (unlikely(index->range_count == 1))
-			next = vy_range_tree_first(&index->tree);
+			next = vy_range_tree_first(index->tree);
 		else
-			next = vy_range_tree_find_by_key(&index->tree,
+			next = vy_range_tree_find_by_key(index->tree,
 							 itr->iterator_type,
 							 itr->key, key_def);
 		goto out;
@@ -1692,18 +1702,18 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 	switch (itr->iterator_type) {
 	case ITER_LT:
 	case ITER_LE:
-		next = vy_range_tree_prev(&index->tree, curr);
+		next = vy_range_tree_prev(index->tree, curr);
 		break;
 	case ITER_GT:
 	case ITER_GE:
-		next = vy_range_tree_next(&index->tree, curr);
+		next = vy_range_tree_next(index->tree, curr);
 		break;
 	case ITER_EQ:
 		if (curr->end != NULL &&
 		    vy_stmt_compare_with_key(itr->key, curr->end,
 					     key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
-			next = vy_range_tree_next(&index->tree, curr);
+			next = vy_range_tree_next(index->tree, curr);
 		} else {
 			next = NULL;
 		}
@@ -1726,7 +1736,7 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 			  struct vy_range **result)
 {
 	struct vy_index *index = itr->index;
-	struct vy_range *curr = vy_range_tree_find_by_key(&index->tree,
+	struct vy_range *curr = vy_range_tree_find_by_key(index->tree,
 				itr->iterator_type,
 				last_stmt != NULL ? last_stmt : itr->key,
 				index->key_def);
@@ -1736,14 +1746,14 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 static void
 vy_index_add_range(struct vy_index *index, struct vy_range *range)
 {
-	vy_range_tree_insert(&index->tree, range);
+	vy_range_tree_insert(index->tree, range);
 	index->range_count++;
 }
 
 static void
 vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 {
-	vy_range_tree_remove(&index->tree, range);
+	vy_range_tree_remove(index->tree, range);
 	index->range_count--;
 }
 
@@ -2154,17 +2164,17 @@ vy_range_needs_coalesce(struct vy_range *range,
 	assert(!vy_range_is_scheduled(range));
 
 	*p_first = *p_last = range;
-	for (it = vy_range_tree_next(&index->tree, range);
+	for (it = vy_range_tree_next(index->tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
-	     it = vy_range_tree_next(&index->tree, it)) {
+	     it = vy_range_tree_next(index->tree, it)) {
 		if (total_size + it->size > max_size)
 			break;
 		total_size += it->size;
 		*p_last = it;
 	}
-	for (it = vy_range_tree_prev(&index->tree, range);
+	for (it = vy_range_tree_prev(index->tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
-	     it = vy_range_tree_prev(&index->tree, it)) {
+	     it = vy_range_tree_prev(index->tree, it)) {
 		if (total_size + it->size > max_size)
 			break;
 		total_size += it->size;
@@ -2200,7 +2210,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 		goto fail_range;
 
 	struct vy_range *it;
-	struct vy_range *end = vy_range_tree_next(&index->tree, last);
+	struct vy_range *end = vy_range_tree_next(index->tree, last);
 
 	/*
 	 * Log change in metadata.
@@ -2209,7 +2219,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	vy_log_insert_range(index->opts.lsn, result->id,
 			    tuple_data_or_null(result->begin),
 			    tuple_data_or_null(result->end));
-	for (it = first; it != end; it = vy_range_tree_next(&index->tree, it)) {
+	for (it = first; it != end; it = vy_range_tree_next(index->tree, it)) {
 		struct vy_slice *slice;
 		rlist_foreach_entry(slice, &it->slices, in_range)
 			vy_log_delete_slice(slice->id);
@@ -2229,7 +2239,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	 */
 	it = first;
 	while (it != end) {
-		struct vy_range *next = vy_range_tree_next(&index->tree, it);
+		struct vy_range *next = vy_range_tree_next(index->tree, it);
 		vy_scheduler_remove_range(scheduler, it);
 		vy_index_unacct_range(index, it);
 		vy_index_remove_range(index, it);
@@ -2395,6 +2405,10 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(record->index_lsn == index->opts.lsn);
 		index->dump_lsn = record->dump_lsn;
 		break;
+	case VY_LOG_TRUNCATE_INDEX:
+		assert(record->index_lsn == index->opts.lsn);
+		index->truncate_count = record->truncate_count;
+		break;
 	case VY_LOG_DROP_INDEX:
 		assert(record->index_lsn == index->opts.lsn);
 		index->is_dropped = true;
@@ -2529,8 +2543,8 @@ vy_index_recover(struct vy_index *index)
 	 * does not have holes or overlaps.
 	 */
 	struct vy_range *range, *prev = NULL;
-	for (range = vy_range_tree_first(&index->tree); range != NULL;
-	     prev = range, range = vy_range_tree_next(&index->tree, range)) {
+	for (range = vy_range_tree_first(index->tree); range != NULL;
+	     prev = range, range = vy_range_tree_next(index->tree, range)) {
 		if (prev == NULL && range->begin != NULL) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Range %lld is leftmost but "
@@ -2607,10 +2621,10 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	/* We can't free region_stmt below, so let's add it to the stats */
 	index->mem_used += tuple_size(stmt);
 
-	if (vy_mem_insert(mem, *region_stmt))
-		return -1;
-
-	return 0;
+	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
+		return vy_mem_insert(mem, *region_stmt);
+	else
+		return vy_mem_insert_upsert(mem, *region_stmt);
 }
 
 static void
@@ -2682,8 +2696,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	struct vy_stat *stat = index->env->stat;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
-	older = vy_mem_older_lsn(mem, stmt);
-
+	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
 	/*
 	 * If there are a lot of successive upserts for the same key,
 	 * select might take too long to squash them all. So once the
@@ -2691,37 +2704,46 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	 * a fiber to merge them and insert the resulting statement
 	 * after the latest upsert.
 	 */
-	enum {
-		VY_UPSERT_THRESHOLD = 128,
-		VY_UPSERT_INF = 128,
-	};
-	if (older != NULL && vy_stmt_type(older) == IPROTO_UPSERT) {
-		uint8_t n_upserts = vy_stmt_n_upserts(older);
-		if (n_upserts != VY_UPSERT_INF) {
-			n_upserts++;
-			if (n_upserts == VY_UPSERT_THRESHOLD) {
-				struct tuple *dup =
-					vy_stmt_dup(stmt, index->upsert_format);
-				vy_index_squash_upserts(index, dup);
-			}
+	if (n_upserts == VY_UPSERT_INF) {
+		/*
+		 * If UPSERT has n_upserts > VY_UPSERT_THRESHOLD,
+		 * it means the mem has older UPSERTs for the same
+		 * key which already are beeing processed in the
+		 * squashing task. At the end, the squashing task
+		 * will merge its result with this UPSERT
+		 * automatically.
+		 */
+		return;
+	}
+	if (n_upserts == VY_UPSERT_THRESHOLD) {
+		/*
+		 * Start single squashing task per one-mem and
+		 * one-key continous UPSERTs sequence.
+		 */
+#ifndef NDEBUG
+		older = vy_mem_older_lsn(mem, stmt);
+		assert(older != NULL && vy_stmt_type(older) == IPROTO_UPSERT &&
+		       vy_stmt_n_upserts(older) == VY_UPSERT_THRESHOLD - 1);
+#endif
+		struct tuple *dup = vy_stmt_dup(stmt, index->upsert_format);
+		if (dup != NULL) {
+			vy_index_squash_upserts(index, dup);
+			tuple_unref(dup);
 		}
-		vy_stmt_set_n_upserts((struct tuple *)stmt, n_upserts);
+		/*
+		 * Ignore dup == NULL, because the optimization is
+		 * good, but is not necessary.
+		 */
+		return;
 	}
 
-	if ((older != NULL && vy_stmt_type(older) != IPROTO_UPSERT) ||
-	    (older == NULL &&
-	     index->mem_used == index->mem->used && index->run_count == 0)) {
-		/*
-		 * Optimization:
-		 *
-		 *  1. An older non-UPSERT statement for the key has been
-		 *     found in the active memory index.
-		 *  2. Active memory index doesn't have statements for the
-		 *     key, but there are no more mems and runs.
-		 *
-		 *  => apply UPSERT to the older statement and save
-		 *     resulted REPLACE instead of original UPSERT.
-		 */
+	/*
+	 * If there are no other mems and runs and n_upserts == 0,
+	 * then we can turn the UPSERT into the REPLACE.
+	 */
+	if (n_upserts == 0 && index->mem_used == index->mem->used &&
+	    index->run_count == 0) {
+		older = vy_mem_older_lsn(mem, stmt);
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, index->key_def,
@@ -3015,8 +3037,8 @@ vy_task_dump_complete(struct vy_task *task)
 		tuple_unref(min_key);
 		goto fail;
 	}
-	begin_range = vy_range_tree_psearch(&index->tree, min_key);
-	end_range = vy_range_tree_nsearch(&index->tree, max_key);
+	begin_range = vy_range_tree_psearch(index->tree, min_key);
+	end_range = vy_range_tree_nsearch(index->tree, max_key);
 	tuple_unref(min_key);
 	tuple_unref(max_key);
 
@@ -3030,7 +3052,7 @@ vy_task_dump_complete(struct vy_task *task)
 		goto fail;
 	}
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(&index->tree, range), i++) {
+	     range = vy_range_tree_next(index->tree, range), i++) {
 		slice = vy_slice_new(vy_log_next_id(), new_run,
 				     range->begin, range->end, index->key_def);
 		if (slice == NULL)
@@ -3052,7 +3074,7 @@ vy_task_dump_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	vy_log_create_run(index->opts.lsn, new_run->id, dump_lsn);
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(&index->tree, range), i++) {
+	     range = vy_range_tree_next(index->tree, range), i++) {
 		assert(i < index->range_count);
 		slice = new_slices[i];
 		vy_log_insert_slice(range->id, new_run->id, slice->id,
@@ -3078,7 +3100,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Add new slices to ranges.
 	 */
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(&index->tree, range), i++) {
+	     range = vy_range_tree_next(index->tree, range), i++) {
 		assert(i < index->range_count);
 		slice = new_slices[i];
 		vy_index_unacct_range(index, range);
@@ -4059,7 +4081,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
-	scheduler->worker_pool_size = cfg_geti("vinyl_threads");
+	scheduler->worker_pool_size = cfg_geti("vinyl_write_threads");
 	/* One thread is reserved for dumps, see vy_schedule(). */
 	assert(scheduler->worker_pool_size >= 2);
 	scheduler->workers_available = scheduler->worker_pool_size;
@@ -4500,7 +4522,7 @@ vy_index_commit_create(struct vy_index *index)
 	}
 
 	assert(index->range_count == 1);
-	struct vy_range *range = vy_range_tree_first(&index->tree);
+	struct vy_range *range = vy_range_tree_first(index->tree);
 
 	/*
 	 * Since it's too late to fail now, in case of vylog write
@@ -4525,6 +4547,32 @@ vy_index_commit_create(struct vy_index *index)
 	vy_scheduler_add_index(env->scheduler, index);
 }
 
+/*
+ * Delete all runs, ranges, and slices of a given index
+ * from the metadata log.
+ */
+static void
+vy_log_index_prune(struct vy_index *index)
+{
+	int loops = 0;
+	for (struct vy_range *range = vy_range_tree_first(index->tree);
+	     range != NULL; range = vy_range_tree_next(index->tree, range)) {
+		struct vy_slice *slice;
+		rlist_foreach_entry(slice, &range->slices, in_range)
+			vy_log_delete_slice(slice->id);
+		vy_log_delete_range(range->id);
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
+	}
+	struct vy_run *run;
+	int64_t gc_lsn = vclock_sum(&index->env->scheduler->last_checkpoint);
+	rlist_foreach_entry(run, &index->runs, in_index) {
+		vy_log_drop_run(run->id, gc_lsn);
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
+	}
+}
+
 void
 vy_index_commit_drop(struct vy_index *index)
 {
@@ -4544,27 +4592,159 @@ vy_index_commit_drop(struct vy_index *index)
 	index->is_dropped = true;
 
 	vy_log_tx_begin();
-	int loops = 0;
-	for (struct vy_range *range = vy_range_tree_first(&index->tree);
-	     range != NULL; range = vy_range_tree_next(&index->tree, range)) {
-		struct vy_slice *slice;
-		rlist_foreach_entry(slice, &range->slices, in_range)
-			vy_log_delete_slice(slice->id);
-		vy_log_delete_range(range->id);
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
-	}
-	struct vy_run *run;
-	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
-	rlist_foreach_entry(run, &index->runs, in_index) {
-		vy_log_drop_run(run->id, gc_lsn);
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
-	}
+	vy_log_index_prune(index);
 	vy_log_drop_index(index->opts.lsn);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
 			 diag_last_error(diag_get())->errmsg);
+}
+
+/**
+ * Swap disk contents (ranges, runs, and corresponding stats)
+ * between two indexes. Used only on recovery, to skip reloading
+ * indexes of a truncated space. The in-memory tree of the index
+ * can't be populated - see vy_is_committed_one().
+ */
+static void
+vy_index_swap(struct vy_index *old_index, struct vy_index *new_index)
+{
+	assert(old_index->mem_used == 0);
+	assert(new_index->mem_used == 0);
+
+	SWAP(old_index->dump_lsn, new_index->dump_lsn);
+	SWAP(old_index->range_count, new_index->range_count);
+	SWAP(old_index->run_count, new_index->run_count);
+	SWAP(old_index->page_count, new_index->page_count);
+	SWAP(old_index->stmt_count, new_index->stmt_count);
+	SWAP(old_index->size, new_index->size);
+	SWAP(old_index->run_hist, new_index->run_hist);
+	SWAP(old_index->tree, new_index->tree);
+	rlist_swap(&old_index->runs, &new_index->runs);
+}
+
+int
+vy_prepare_truncate_space(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->index_count == new_space->index_count);
+	uint32_t index_count = new_space->index_count;
+	if (index_count == 0)
+		return 0;
+
+	struct vy_index *pk = vy_index(old_space->index[0]);
+	struct vy_env *env = pk->env;
+
+	/*
+	 * On local recovery, we need to handle the following
+	 * scenarios:
+	 *
+	 * - Space truncation was successfully logged before restart.
+	 *   In this case indexes of the old space contain data added
+	 *   after truncation (recovered by vy_index_recover()) and
+	 *   hence we just need to swap contents between old and new
+	 *   spaces.
+	 *
+	 * - We failed to log space truncation before restart.
+	 *   In this case we have to replay space truncation the
+	 *   same way we handle it during normal operation.
+	 *
+	 * See also vy_commit_truncate_space().
+	 */
+	bool truncate_done = (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
+			      pk->truncate_count > old_space->truncate_count);
+
+	for (uint32_t i = 0; i < index_count; i++) {
+		struct vy_index *old_index = vy_index(old_space->index[i]);
+		struct vy_index *new_index = vy_index(new_space->index[i]);
+
+		if (truncate_done) {
+			/*
+			 * We are replaying truncate from WAL and the
+			 * old space already contains data added after
+			 * truncate (recovered from vylog). Avoid
+			 * reloading the space content from vylog,
+			 * simply swap the contents of old and new
+			 * spaces instead.
+			 */
+			vy_index_swap(old_index, new_index);
+			new_index->is_dropped = old_index->is_dropped;
+			new_index->truncate_count = old_index->truncate_count;
+			vy_scheduler_add_index(env->scheduler, new_index);
+			continue;
+		}
+
+		if (vy_index_create(new_index) != 0)
+			return -1;
+
+		new_index->truncate_count = new_space->truncate_count;
+	}
+	return 0;
+}
+
+void
+vy_commit_truncate_space(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->index_count == new_space->index_count);
+	uint32_t index_count = new_space->index_count;
+	if (index_count == 0)
+		return;
+
+	struct vy_index *pk = vy_index(old_space->index[0]);
+	struct vy_env *env = pk->env;
+
+	/*
+	 * See the comment in vy_prepare_truncate_space().
+	 */
+	if (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
+	    pk->truncate_count > old_space->truncate_count)
+		return;
+
+	/*
+	 * Mark old indexes as dropped. After this point no task can
+	 * be scheduled or completed for any of them (only aborted).
+	 */
+	for (uint32_t i = 0; i < index_count; i++) {
+		struct vy_index *index = vy_index(old_space->index[i]);
+		index->is_dropped = true;
+	}
+
+	/*
+	 * Log change in metadata.
+	 *
+	 * Since we can't fail here, in case of vylog write failure
+	 * we leave records we failed to write in vylog buffer so
+	 * that they get flushed along with the next write. If they
+	 * don't, we will replay them during WAL recovery.
+	 */
+	vy_log_tx_begin();
+	for (uint32_t i = 0; i < index_count; i++) {
+		struct vy_index *old_index = vy_index(old_space->index[i]);
+		struct vy_index *new_index = vy_index(new_space->index[i]);
+		struct vy_range *range = vy_range_tree_first(new_index->tree);
+
+		assert(!new_index->is_dropped);
+		assert(new_index->truncate_count == new_space->truncate_count);
+		assert(new_index->range_count == 1);
+
+		vy_log_index_prune(old_index);
+		vy_log_insert_range(new_index->opts.lsn, range->id, NULL, NULL);
+		vy_log_truncate_index(new_index->opts.lsn,
+				      new_index->truncate_count);
+	}
+	if (vy_log_tx_try_commit() < 0)
+		say_warn("failed to log index truncation: %s",
+			 diag_last_error(diag_get())->errmsg);
+
+	/*
+	 * After we committed space truncation in the metadata log,
+	 * we can make new indexes eligible for dump and compaction.
+	 */
+	for (uint32_t i = 0; i < index_count; i++) {
+		struct vy_index *index = vy_index(new_space->index[i]);
+		struct vy_range *range = vy_range_tree_first(index->tree);
+
+		vy_scheduler_add_range(env->scheduler, range);
+		vy_scheduler_add_index(env->scheduler, index);
+	}
 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
@@ -4589,9 +4769,16 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(struct vy_index),
 			 "calloc", "struct vy_index");
-		return NULL;
+		goto fail;
 	}
 	index->env = e;
+
+	index->tree = malloc(sizeof(*index->tree));
+	if (index->tree == NULL) {
+		diag_set(OutOfMemory, sizeof(*index->tree),
+			 "malloc", "vy_range_tree_t");
+		goto fail_tree;
+	}
 
 	struct key_def *user_key_def = key_def_dup(&user_index_def->key_def);
 	if (user_key_def == NULL)
@@ -4649,7 +4836,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	index->dump_lsn = -1;
 	vy_cache_create(&index->cache, &e->cache_env, key_def);
 	rlist_create(&index->sealed);
-	vy_range_tree_new(&index->tree);
+	vy_range_tree_new(index->tree);
 	rlist_create(&index->runs);
 	read_set_new(&index->read_set);
 	index->pk = pk;
@@ -4680,7 +4867,10 @@ fail_format:
 fail_key_def:
 	free(user_key_def);
 fail_user_key_def:
+	free(index->tree);
+fail_tree:
 	free(index);
+fail:
 	return NULL;
 }
 
@@ -4875,7 +5065,7 @@ vy_index_delete(struct vy_index *index)
 	}
 
 	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
-	vy_range_tree_iter(&index->tree, NULL,
+	vy_range_tree_iter(index->tree, NULL,
 			   vy_range_tree_free_cb, scheduler);
 	tuple_format_ref(index->surrogate_format, -1);
 	tuple_format_ref(index->space_format_with_colmask, -1);
@@ -4886,6 +5076,7 @@ vy_index_delete(struct vy_index *index)
 	histogram_delete(index->run_hist);
 	vy_cache_destroy(&index->cache);
 	tuple_format_ref(index->space_format, -1);
+	free(index->tree);
 	TRASH(index);
 	free(index);
 }
@@ -4972,16 +5163,20 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
  * replaying records already present in the database. In this
  * case avoid overwriting a newer version with an older one.
  *
- * If the index is going to be dropped on WAL recovery,
- * there's no point in replaying statements for it either.
+ * If the index is going to be dropped or truncated on WAL
+ * recovery, there's no point in replaying statements for it,
+ * either.
  */
 static inline bool
-vy_is_committed_one(struct vy_tx *tx, struct vy_index *index)
+vy_is_committed_one(struct vy_tx *tx, struct space *space,
+		    struct vy_index *index)
 {
 	struct vy_env *env = tx->xm->env;
 	if (likely(env->status != VINYL_FINAL_RECOVERY_LOCAL))
 		return false;
 	if (index->is_dropped)
+		return true;
+	if (index->truncate_count > space->truncate_count)
 		return true;
 	if (vclock_sum(env->recovery_vclock) <= index->dump_lsn)
 		return true;
@@ -5000,7 +5195,7 @@ vy_is_committed(struct vy_tx *tx, struct space *space)
 		return false;
 	for (uint32_t iid = 0; iid < space->index_count; iid++) {
 		struct vy_index *index = vy_index(space->index[iid]);
-		if (!vy_is_committed_one(tx, index))
+		if (!vy_is_committed_one(tx, space, index))
 			return false;
 	}
 	return true;
@@ -5247,7 +5442,7 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	if (pk == NULL) /* space has no primary key */
 		return -1;
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(tx, pk));
+	assert(!vy_is_committed_one(tx, space, pk));
 	assert(pk->id == 0);
 	new_stmt = vy_stmt_new_replace(space->format, request->tuple,
 				       request->tuple_end);
@@ -5279,7 +5474,7 @@ vy_replace_impl(struct vy_tx *tx, struct space *space, struct request *request,
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index;
 		index = vy_index(space->index[iid]);
-		if (vy_is_committed_one(tx, index))
+		if (vy_is_committed_one(tx, space, index))
 			continue;
 		/*
 		 * Delete goes first, so if old and new keys
@@ -5432,7 +5627,7 @@ vy_delete_impl(struct vy_tx *tx, struct space *space,
 	if (pk == NULL)
 		return -1;
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(tx, pk));
+	assert(!vy_is_committed_one(tx, space, pk));
 	struct tuple *delete =
 		vy_stmt_new_surrogate_delete(space->format, tuple);
 	if (delete == NULL)
@@ -5444,7 +5639,7 @@ vy_delete_impl(struct vy_tx *tx, struct space *space,
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_is_committed_one(tx, index))
+		if (vy_is_committed_one(tx, space, index))
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
@@ -5530,34 +5725,13 @@ vy_check_update(struct space *space, const struct vy_index *pk,
 		const struct tuple *old_tuple, const struct tuple *new_tuple,
 		uint64_t column_mask)
 {
-	if ((pk->key_def->column_mask & column_mask) != 0 &&
+	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
 	    vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 index_name_by_id(space, pk->id), space_name(space));
 		return -1;
 	}
 	return 0;
-}
-
-/**
- * Don't modify indexes whose fields were not changed by update.
- * If there is at least one bit in the column mask
- * (@sa update_read_ops in tuple_update.cc) set that corresponds
- * to one of the columns from key_def->parts, then the update
- * operation changes at least one indexed field and the
- * optimization is inapplicable. Otherwise, we can skip the
- * update.
- * @param index_column_mask Mask of index we try to update.
- * @param stmt_column_mask  Maks of the update operations.
- */
-static bool
-vy_can_skip_update(uint64_t index_column_mask, uint64_t stmt_column_mask)
-{
-	/*
-	 * Update of the primary index can't be skipped, since it
-	 * stores not indexes tuple fields besides indexed.
-	 */
-	return (index_column_mask & stmt_column_mask) == 0;
 }
 
 /**
@@ -5572,7 +5746,8 @@ vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
 {
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_index *index = vy_index(space->index[i]);
-		if (vy_can_skip_update(index->key_def->column_mask, column_mask))
+		if (key_update_can_be_skipped(index->key_def->column_mask,
+					      column_mask))
 			return false;
 	}
 	return true;
@@ -5604,7 +5779,7 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	assert(pk != NULL);
 	assert(pk->id == 0);
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(tx, pk));
+	assert(!vy_is_committed_one(tx, space, pk));
 	uint64_t column_mask = 0;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
@@ -5668,7 +5843,7 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	assert(delete != NULL);
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_is_committed_one(tx, index))
+		if (vy_is_committed_one(tx, space, index))
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
@@ -5770,7 +5945,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	if (pk == NULL)
 		return -1;
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(tx, pk));
+	assert(!vy_is_committed_one(tx, space, pk));
 	if (tuple_validate_raw(space->format, tuple))
 		return -1;
 
@@ -5875,7 +6050,7 @@ vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 	assert(delete != NULL);
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_is_committed_one(tx, index))
+		if (vy_is_committed_one(tx, space, index))
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
@@ -6152,7 +6327,8 @@ vy_tx_prepare(struct vy_tx *tx)
 	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
 	int count = 0, write_count = 0;
-	const struct tuple *delete = NULL, *replace = NULL;
+	/* repsert - REPLACE/UPSERT */
+	const struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	struct txv *v;
 	int rc = 0;
@@ -6170,7 +6346,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (index->id == 0) {
 			/* The beginning of the new txn_stmt is met. */
 			current_space_id = index->space_id;
-			replace = NULL;
+			repsert = NULL;
 			delete = NULL;
 		}
 		assert(index->space_id == current_space_id);
@@ -6179,7 +6355,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
 		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
-			(type == IPROTO_DELETE) ? &delete : &replace;
+			(type == IPROTO_DELETE) ? &delete : &repsert;
 		rc = vy_tx_write(index, v->mem, v->stmt, region_stmt);
 		if (rc != 0)
 			break;
@@ -8268,6 +8444,7 @@ vy_squash_process(struct vy_squash *squash)
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
 	struct vy_stat *stat = env->stat;
+	struct key_def *def = index->key_def;
 
 	/* Upserts enabled only in the primary index. */
 	assert(index->id == 0);
@@ -8309,17 +8486,59 @@ vy_squash_process(struct vy_squash *squash)
 		tuple_unref(result);
 		return 0;
 	}
+	/**
+	 * Algorithm of the squashing.
+	 * Assume, during building the non-UPSERT statement
+	 * 'result' in the mem some new UPSERTs were inserted, and
+	 * some of them were commited, while the other were just
+	 * prepared. And lets UPSERT_THRESHOLD to be equal to 3,
+	 * for example.
+	 *                    Mem
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = 1, n_ups = 0           |
+	 *    UPSERT, lsn = 2, n_ups = 1           | Commited
+	 *    UPSERT, lsn = 3, n_ups = 2           |
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = MAX,     n_ups = 3     |
+	 *    UPSERT, lsn = MAX + 1, n_ups = 4     | Prepared
+	 *    UPSERT, lsn = MAX + 2, n_ups = 5     |
+	 *    -------------------------------------+
+	 * In such a case the UPSERT statements with
+	 * lsns = {1, 2, 3} are squashed. But now the n_upsert
+	 * values in the prepared statements are not correct.
+	 * If we will not update values, then the
+	 * vy_index_commit_upsert will not be able to squash them.
+	 *
+	 * So after squashing it is necessary to update n_upsert
+	 * value in the prepared statements:
+	 *                    Mem
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = 1, n_ups = 0           |
+	 *    UPSERT, lsn = 2, n_ups = 1           | Commited
+	 *    REPLACE, lsn = 3                     |
+	 *    -------------------------------------+
+	 *    UPSERT, lsn = MAX,     n_ups = 0 !!! |
+	 *    UPSERT, lsn = MAX + 1, n_ups = 1 !!! | Prepared
+	 *    UPSERT, lsn = MAX + 2, n_ups = 2 !!! |
+	 *    -------------------------------------+
+	 */
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+	const struct tuple *mem_stmt;
+	int64_t stmt_lsn;
+	/*
+	 * According to the described algorithm, squash the
+	 * commited UPSERTs at first.
+	 */
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-		const struct tuple *mem_stmt =
-			*vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_tuple_compare(result, mem_stmt, index->key_def) != 0)
+		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
+		stmt_lsn = vy_stmt_lsn(mem_stmt);
+		if (vy_tuple_compare(result, mem_stmt, def) != 0)
 			break;
 		/**
 		 * Leave alone prepared statements; they will be handled
 		 * in vy_range_commit_stmt.
 		 */
-		if (vy_stmt_lsn(mem_stmt) >= MAX_LSN)
+		if (stmt_lsn >= MAX_LSN)
 			break;
 		if (vy_stmt_type(mem_stmt) != IPROTO_UPSERT) {
 			/**
@@ -8331,8 +8550,8 @@ vy_squash_process(struct vy_squash *squash)
 		}
 		assert(index->id == 0);
 		struct tuple *applied =
-			vy_apply_upsert(mem_stmt, result, index->key_def,
-					mem->format, mem->upsert_format, true);
+			vy_apply_upsert(mem_stmt, result, def, mem->format,
+					mem->upsert_format, true);
 		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
 		tuple_unref(result);
 		if (applied == NULL)
@@ -8347,8 +8566,28 @@ vy_squash_process(struct vy_squash *squash)
 		 * exactly mem_stmt in general and the buggy upsert
 		 * in particular.
 		 */
-		vy_stmt_set_lsn(result, vy_stmt_lsn(mem_stmt));
+		vy_stmt_set_lsn(result, stmt_lsn);
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+	}
+	/*
+	 * The second step of the algorithm above is updating of
+	 * n_upsert values of the prepared UPSERTs.
+	 */
+	if (stmt_lsn >= MAX_LSN) {
+		uint8_t n_upserts = 0;
+		while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
+			mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree,
+								  &mem_itr);
+			if (vy_tuple_compare(result, mem_stmt, def) != 0 ||
+			    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
+				break;
+			assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
+			vy_stmt_set_n_upserts((struct tuple *)mem_stmt,
+					      n_upserts);
+			if (n_upserts <= VY_UPSERT_THRESHOLD)
+				++n_upserts;
+			vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
+		}
 	}
 
 	rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
@@ -8379,8 +8618,10 @@ static struct vy_squash_queue *
 vy_squash_queue_new(void)
 {
 	struct vy_squash_queue *sq = malloc(sizeof(*sq));
-	if (sq == NULL)
+	if (sq == NULL) {
+		diag_set(OutOfMemory, sizeof(*sq), "malloc", "sq");
 		return NULL;
+	}
 	sq->fiber = NULL;
 	ipc_cond_create(&sq->cond);
 	stailq_create(&sq->queue);

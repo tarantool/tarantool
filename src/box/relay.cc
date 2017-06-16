@@ -239,10 +239,8 @@ tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
-	struct checkpoint_info *checkpoint;
-	checkpoint = gc_lookup_checkpoint(&status->vclock);
-	assert(checkpoint != NULL);
-	replica_set_checkpoint(status->relay->replica, checkpoint);
+	gc_consumer_advance(status->relay->replica->gc,
+			    vclock_sum(&status->vclock));
 	static const struct cmsg_hop route[] = {
 		{relay_status_update, NULL}
 	};
@@ -399,10 +397,18 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 			  "duplicate connection with the same replica UUID");
 	}
 
-	struct checkpoint_info *checkpoint;
-	checkpoint = gc_lookup_checkpoint(replica_clock);
-	if (checkpoint == NULL)
-		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+	/*
+	 * Register the replica with the garbage collector
+	 * unless it has already been registered by initial
+	 * join.
+	 */
+	if (replica->gc == NULL) {
+		replica->gc = gc_consumer_register(
+			tt_sprintf("replica %s", tt_uuid_str(&replica->uuid)),
+			vclock_sum(replica_clock));
+		if (replica->gc == NULL)
+			diag_raise();
+	}
 
 	struct relay relay;
 	relay_create(&relay, fd, sync, relay_send_row);
@@ -413,7 +419,6 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	relay.replica = replica;
 	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	replica_set_relay(replica, &relay);
-	replica_set_checkpoint(replica, checkpoint);
 
 	auto scope_guard = make_scoped_guard([&]{
 		replica_clear_relay(replica);

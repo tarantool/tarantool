@@ -37,7 +37,7 @@
 #include "reflection.h"
 #include "diag.h"
 
-extern const struct type type_Exception;
+extern const struct type_info type_Exception;
 
 class Exception: public error {
 public:
@@ -56,10 +56,10 @@ public:
 	Exception(const Exception &) = delete;
 	Exception& operator=(const Exception&) = delete;
 protected:
-	Exception(const struct type *type, const char *file, unsigned line);
+	Exception(const struct type_info *type, const char *file, unsigned line);
 };
 
-extern const struct type type_SystemError;
+extern const struct type_info type_SystemError;
 class SystemError: public Exception {
 public:
 	virtual void raise() { throw this; }
@@ -71,13 +71,13 @@ public:
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
 protected:
-	SystemError(const struct type *type, const char *file, unsigned line);
+	SystemError(const struct type_info *type, const char *file, unsigned line);
 protected:
 	/* system errno */
 	int m_errno;
 };
 
-extern const struct type type_OutOfMemory;
+extern const struct type_info type_OutOfMemory;
 class OutOfMemory: public SystemError {
 public:
 	OutOfMemory(const char *file, unsigned line,
@@ -86,21 +86,21 @@ public:
 	virtual void raise() { throw this; }
 };
 
-extern const struct type type_TimedOut;
+extern const struct type_info type_TimedOut;
 class TimedOut: public SystemError {
 public:
 	TimedOut(const char *file, unsigned line);
 	virtual void raise() { throw this; }
 };
 
-extern const struct type type_ChannelIsClosed;
+extern const struct type_info type_ChannelIsClosed;
 class ChannelIsClosed: public Exception {
 public:
 	ChannelIsClosed(const char *file, unsigned line);
 	virtual void raise() { throw this; }
 };
 
-extern const struct type type_FiberIsCancelled;
+extern const struct type_info type_FiberIsCancelled;
 /**
  * This is thrown by fiber_* API calls when the fiber is
  * cancelled.
@@ -112,7 +112,7 @@ public:
 	virtual void raise() { throw this; }
 };
 
-extern const struct type type_LuajitError;
+extern const struct type_info type_LuajitError;
 
 class LuajitError: public Exception {
 public:
@@ -139,8 +139,8 @@ exception_init();
 } while (0)
 
 extern "C" const char *
-exception_get_string(struct error *e, const struct method *method);
+exception_get_string(struct error *e, const struct method_info *method);
 extern "C" int
-exception_get_int(struct error *e, const struct method *method);
+exception_get_int(struct error *e, const struct method_info *method);
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

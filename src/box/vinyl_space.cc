@@ -221,6 +221,21 @@ VinylSpace::buildSecondaryKey(struct space *old_space,
 }
 
 void
+VinylSpace::prepareTruncateSpace(struct space *old_space,
+				 struct space *new_space)
+{
+	if (vy_prepare_truncate_space(old_space, new_space) != 0)
+		diag_raise();
+}
+
+void
+VinylSpace::commitTruncateSpace(struct space *old_space,
+				struct space *new_space)
+{
+	vy_commit_truncate_space(old_space, new_space);
+}
+
+void
 VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
 	if (vy_prepare_alter_space(old_space, new_space) != 0)

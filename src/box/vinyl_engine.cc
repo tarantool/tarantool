@@ -224,10 +224,11 @@ VinylEngine::abortCheckpoint()
 	vy_end_checkpoint(env);
 }
 
-void
+int
 VinylEngine::collectGarbage(int64_t lsn)
 {
 	vy_collect_garbage(env, lsn);
+	return 0;
 }
 
 int

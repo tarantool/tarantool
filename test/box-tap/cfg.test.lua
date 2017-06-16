@@ -239,19 +239,34 @@ os.exit(0)
 test:is(run_script(code), 0, "page size equal with range")
 
 --
+-- there is at least one vinyl reader thread.
+--
+code = [[
+box.cfg{vinyl_read_threads = 0}
+os.exit(0)
+]]
+test:is(run_script(code), PANIC, "vinyl_read_threads = 0")
+
+code = [[
+box.cfg{vinyl_read_threads = 1}
+os.exit(0)
+]]
+test:is(run_script(code), 0, "vinyl_read_threads = 1")
+
+--
 -- gh-2150 one vinyl worker thread is reserved for dumps
 --
 code = [[
-box.cfg{vinyl_threads=1}
+box.cfg{vinyl_write_threads = 1}
 os.exit(0)
 ]]
-test:is(run_script(code), PANIC, "vinyl_threads = 1")
+test:is(run_script(code), PANIC, "vinyl_write_threads = 1")
 
 code = [[
-box.cfg{vinyl_threads=2}
+box.cfg{vinyl_write_threads = 2}
 os.exit(0)
 ]]
-test:is(run_script(code), 0, "vinyl_threads = 2")
+test:is(run_script(code), 0, "vinyl_write_threads = 2")
 
 -- test memtx options upgrade
 code = [[

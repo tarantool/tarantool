@@ -257,6 +257,21 @@ void
 vy_index_unref(struct vy_index *index);
 
 /**
+ * Handle vinyl space truncation.
+ *
+ * This function initializes indexes of the new space
+ * so that it can replace the old space on truncation.
+ */
+int
+vy_prepare_truncate_space(struct space *old_space, struct space *new_space);
+
+/**
+ * Commit space truncation in the metadata log.
+ */
+void
+vy_commit_truncate_space(struct space *old_space, struct space *new_space);
+
+/**
  * Hook on an preparation of space alter event.
  * @param old_space Old space.
  * @param new_space New space.

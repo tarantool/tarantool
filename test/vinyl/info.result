@@ -61,7 +61,7 @@ box.snapshot()
 ...
 box_info_sort(box.info.vinyl())
 ---
-- - lsn: 5
+- - lsn: 6
   - memory:
     - limit: 536870912
     - ratio: 0%

@@ -38,14 +38,11 @@
 #include "space.h"
 
 void
-MemtxIndex::commitDrop()
+MemtxIndex::truncate()
 {
 	if (index_def->iid != 0)
 		return; /* nothing to do for secondary keys */
-	/*
-	 * Delete all tuples in the old space if dropping
-	 * the primary key.
-	 */
+
 	struct iterator *it = position();
 	initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;

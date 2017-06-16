@@ -652,11 +652,15 @@ stat2 = box.info.vinyl().performance
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- squashed: 872
-  applied: 1000
+- squashed: 7
+  applied: 903
 ...
 stat1 = stat2
 ---
+...
+space:get{3}
+---
+- [3, 999, 0]
 ...
 space.index.primary:info().count
 ---

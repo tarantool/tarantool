@@ -68,6 +68,7 @@
 #include "authentication.h"
 #include "path_lock.h"
 #include "gc.h"
+#include "checkpoint.h"
 #include "sql.h"
 #include "systemd.h"
 
@@ -83,8 +84,12 @@ static void title(const char *new_status)
 
 bool box_snapshot_is_in_progress = false;
 
-/** The checkpoint that is currently being backed up. */
-static struct checkpoint_info *box_backup_checkpoint;
+/**
+ * If backup is in progress, this points to the gc consumer
+ * object that prevents the garbage collector from deleting
+ * the snapshot that is currently being backed up.
+ */
+static struct gc_consumer *backup_gc;
 
 /**
  * The instance is in read-write mode: the local checkpoint
@@ -387,6 +392,15 @@ box_check_readahead(int readahead)
 	}
 }
 
+static void
+box_check_checkpoint_count(int checkpoint_count)
+{
+	if (checkpoint_count < 1) {
+		tnt_raise(ClientError, ER_CFG, "checkpoint_count",
+			  "the value must not be less than one");
+	}
+}
+
 static int64_t
 box_check_wal_max_rows(int64_t wal_max_rows)
 {
@@ -416,6 +430,7 @@ box_check_config()
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication();
 	box_check_readahead(cfg_geti("readahead"));
+	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
@@ -423,8 +438,12 @@ box_check_config()
 	if (cfg_geti64("vinyl_page_size") > cfg_geti64("vinyl_range_size"))
 		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
 			  "can't be greater than vinyl_range_size");
-	if (cfg_geti("vinyl_threads") < 2)
-		tnt_raise(ClientError, ER_CFG, "vinyl_threads", "must be >= 2");
+	if (cfg_geti("vinyl_read_threads") < 1)
+		tnt_raise(ClientError, ER_CFG,
+			  "vinyl_read_threads", "must be >= 1");
+	if (cfg_geti("vinyl_write_threads") < 2)
+		tnt_raise(ClientError, ER_CFG,
+			  "vinyl_write_threads", "must be >= 2");
 }
 
 /*
@@ -555,6 +574,14 @@ box_set_readahead(void)
 }
 
 void
+box_set_checkpoint_count(void)
+{
+	int checkpoint_count = cfg_geti("checkpoint_count");
+	box_check_checkpoint_count(checkpoint_count);
+	gc_set_checkpoint_count(checkpoint_count);
+}
+
+void
 box_update_vinyl_options(void)
 {
 	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
@@ -655,7 +682,10 @@ box_space_id_by_name(const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	return box_tuple_field_u32(tuple, 0, BOX_ID_NIL);
+	uint32_t result;
+	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &result) != 0)
+		return BOX_ID_NIL;
+	return result;
 }
 
 uint32_t
@@ -677,7 +707,10 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	return box_tuple_field_u32(tuple, 1, BOX_ID_NIL);
+	uint32_t result;
+	if (tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, &result) != 0)
+		return BOX_ID_NIL;
+	return result;
 }
 /** \endcond public */
 
@@ -802,71 +835,31 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	return box_process1(request, result);
 }
 
+/**
+ * Trigger space truncation by bumping a counter
+ * in _truncate space.
+ */
 static void
 space_truncate(struct space *space)
 {
-	if (!space_index(space, 0)) {
-		/* empty space without indexes, nothing to truncate */
-		return;
-	}
+	char key_buf[16];
+	char *key_buf_end = key_buf;
+	key_buf_end = mp_encode_array(key_buf_end, 1);
+	key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
+	assert(key_buf_end < key_buf + sizeof(key_buf));
 
-	char key_buf[20];
-	char *key_buf_end;
-	key_buf_end = mp_encode_uint(key_buf, space_id(space));
-	assert(key_buf_end <= key_buf + sizeof(key_buf));
+	char ops_buf[128];
+	char *ops_buf_end = ops_buf;
+	ops_buf_end = mp_encode_array(ops_buf_end, 1);
+	ops_buf_end = mp_encode_array(ops_buf_end, 3);
+	ops_buf_end = mp_encode_str(ops_buf_end, "+", 1);
+	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
+	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
+	assert(ops_buf_end < ops_buf + sizeof(ops_buf));
 
-	/* BOX_INDEX_ID is id of _index space, we need 0 index of that space */
-	struct space *space_index = space_cache_find(BOX_INDEX_ID);
-	Index *index = index_find_xc(space_index, 0);
-	struct iterator *it = index->allocIterator();
-	auto guard_it_free = make_scoped_guard([=]{
-		it->free(it);
-	});
-	index->initIterator(it, ITER_EQ, key_buf, 1);
-	int index_count = 0;
-	struct tuple *indexes[BOX_INDEX_MAX] = { NULL };
-	struct tuple *tuple;
-
-	/* select all indexes of given space */
-	auto guard_indexes_unref = make_scoped_guard([=]{
-		for (int i = 0; i < index_count; i++)
-			tuple_unref(indexes[i]);
-	});
-	while ((tuple = it->next(it)) != NULL) {
-		tuple_ref_xc(tuple);
-		indexes[index_count++] = tuple;
-	}
-	assert(index_count <= BOX_INDEX_MAX);
-
-	/* box_delete() invalidates space pointer */
-	uint32_t x_space_id = space_id(space);
-	space = NULL;
-
-	/* drop all selected indexes */
-	for (int i = index_count - 1; i >= 0; --i) {
-		uint32_t index_id = tuple_field_u32_xc(indexes[i], 1);
-		key_buf_end = mp_encode_array(key_buf, 2);
-		key_buf_end = mp_encode_uint(key_buf_end, x_space_id);
-		key_buf_end = mp_encode_uint(key_buf_end, index_id);
-		assert(key_buf_end <= key_buf + sizeof(key_buf));
-		if (box_delete(BOX_INDEX_ID, 0, key_buf, key_buf_end, NULL))
-			diag_raise();
-	}
-
-	/* create all indexes again, now they are empty */
-	for (int i = 0; i < index_count; i++) {
-		int64_t lsn = vclock_sum(&replicaset_vclock);
-		/*
-		 * The returned tuple is blessed and will be
-		 * collected automatically.
-		 */
-		tuple = index_def_tuple_update_lsn(indexes[i], lsn);
-		TupleRefNil ref(tuple);
-		uint32_t bsize;
-		const char *data = tuple_data_range(tuple, &bsize);
-		if (box_insert(BOX_INDEX_ID, data, data + bsize, NULL))
-			diag_raise();
-	}
+	if (box_update(BOX_TRUNCATE_ID, 0, key_buf, key_buf_end,
+		       ops_buf, ops_buf_end, 0, NULL) != 0)
+		diag_raise();
 }
 
 int
@@ -914,7 +907,8 @@ box_on_join(const tt_uuid *instance_uuid)
 	/** Assign a new replica id. */
 	uint32_t replica_id = 1;
 	while ((tuple = it->next(it))) {
-		if (tuple_field_u32_xc(tuple, 0) != replica_id)
+		if (tuple_field_u32_xc(tuple,
+				       BOX_CLUSTER_FIELD_ID) != replica_id)
 			break;
 		replica_id++;
 	}
@@ -1187,22 +1181,26 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
+	/* Remember start vclock. */
+	struct vclock start_vclock;
 	/*
 	 * The only case when the directory index is empty is
 	 * when someone has deleted a snapshot and tries to join
 	 * as a replica. Our best effort is to not crash in such
 	 * case: raise ER_MISSING_SNAPSHOT.
 	 */
-	struct checkpoint_info *checkpoint = gc_last_checkpoint();
-	if (checkpoint == NULL)
+	if (checkpoint_last(&start_vclock) < 0)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
 
-	checkpoint_ref(checkpoint);
-	auto guard = make_scoped_guard([=]{ checkpoint_unref(checkpoint); });
-
-	/* Remember start vclock. */
-	struct vclock start_vclock;
-	vclock_copy(&start_vclock, &checkpoint->vclock);
+	/* Register the replica with the garbage collector. */
+	struct gc_consumer *gc = gc_consumer_register(
+		tt_sprintf("replica %s", tt_uuid_str(&instance_uuid)),
+		vclock_sum(&start_vclock));
+	if (gc == NULL)
+		diag_raise();
+	auto gc_guard = make_scoped_guard([=]{
+		gc_consumer_unregister(gc);
+	});
 
 	/* Respond to JOIN request with start_vclock. */
 	struct xrow_header row;
@@ -1226,7 +1224,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	struct replica *replica = replica_by_uuid(&instance_uuid);
 	assert(replica != NULL);
-	replica_set_checkpoint(replica, checkpoint);
+	replica->gc = gc;
+	gc_guard.is_active = false;
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -1443,7 +1442,7 @@ bootstrap_from_master(struct replica *master)
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
 	assert(applier->state == APPLIER_READY);
 
-	say_info("bootstraping replica from %s",
+	say_info("bootstrapping replica from %s",
 		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/*
@@ -1547,13 +1546,9 @@ box_cfg_xc(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
-	if (gc_init(cfg_gets("memtx_dir")) < 0)
-		diag_raise();
-
+	gc_init();
 	engine_init();
-
 	schema_init();
-
 	replication_init();
 	port_init();
 	iproto_init();
@@ -1562,11 +1557,14 @@ box_cfg_xc(void)
 
 	title("loading");
 
+	box_set_checkpoint_count();
 	box_set_too_long_threshold();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
-	struct checkpoint_info *checkpoint = gc_last_checkpoint();
+	struct vclock last_checkpoint_vclock;
+	int64_t last_checkpoint_lsn = checkpoint_last(&last_checkpoint_vclock);
+
 	/*
 	 * Lock the write ahead log directory to avoid multiple
 	 * instances running in the same dir.
@@ -1579,7 +1577,7 @@ box_cfg_xc(void)
 		 * refuse to start. In hot standby mode, a busy
 		 * WAL dir must contain at least one xlog.
 		 */
-		if (!cfg_geti("hot_standby") || checkpoint == NULL)
+		if (!cfg_geti("hot_standby") || last_checkpoint_lsn < 0)
 			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
 	} else {
 		/*
@@ -1589,14 +1587,14 @@ box_cfg_xc(void)
 		 */
 		box_bind();
 	}
-	if (checkpoint != NULL) {
+	if (last_checkpoint_lsn >= 0) {
 		struct wal_stream wal_stream;
 		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
 		struct recovery *recovery;
 		recovery = recovery_new(cfg_gets("wal_dir"),
 					cfg_geti("force_recovery"),
-					&checkpoint->vclock);
+					&last_checkpoint_vclock);
 		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
 
 		/*
@@ -1617,7 +1615,7 @@ box_cfg_xc(void)
 		 * recovery of system spaces issue DDL events in
 		 * other engines.
 		 */
-		memtx->recoverSnapshot(&checkpoint->vclock);
+		memtx->recoverSnapshot(&last_checkpoint_vclock);
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, &recovery->vclock);
@@ -1758,6 +1756,8 @@ box_snapshot()
 end:
 	if (rc)
 		engine_abort_checkpoint();
+	else
+		gc_run();
 	latch_unlock(&schema_lock);
 	box_snapshot_is_in_progress = false;
 	return rc;
@@ -1766,20 +1766,22 @@ end:
 int
 box_backup_start(box_backup_cb cb, void *cb_arg)
 {
-	if (box_backup_checkpoint != NULL) {
+	if (backup_gc != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	box_backup_checkpoint = gc_last_checkpoint();
-	if (box_backup_checkpoint == NULL) {
+	struct vclock vclock;
+	if (checkpoint_last(&vclock) < 0) {
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return -1;
 	}
-	checkpoint_ref(box_backup_checkpoint);
-	int rc = engine_backup(&box_backup_checkpoint->vclock, cb, cb_arg);
+	backup_gc = gc_consumer_register("backup", vclock_sum(&vclock));
+	if (backup_gc == NULL)
+		return -1;
+	int rc = engine_backup(&vclock, cb, cb_arg);
 	if (rc != 0) {
-		checkpoint_unref(box_backup_checkpoint);
-		box_backup_checkpoint = NULL;
+		gc_consumer_unregister(backup_gc);
+		backup_gc = NULL;
 	}
 	return rc;
 }
@@ -1787,9 +1789,9 @@ box_backup_start(box_backup_cb cb, void *cb_arg)
 void
 box_backup_stop(void)
 {
-	if (box_backup_checkpoint != NULL) {
-		checkpoint_unref(box_backup_checkpoint);
-		box_backup_checkpoint = NULL;
+	if (backup_gc != NULL) {
+		gc_consumer_unregister(backup_gc);
+		backup_gc = NULL;
 	}
 }
 

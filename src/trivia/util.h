@@ -56,6 +56,12 @@ extern "C" {
 # define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+#define SWAP(a, b) do {							\
+	typeof(a) tmp = (a);						\
+	(a) = (b);							\
+	(b) = tmp;							\
+} while (0)
+
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
 /* Macros to define enum and corresponding strings. */
@@ -436,14 +442,22 @@ tt_cstr(const char *str, uint32_t len)
  * the static buffer returned by tt_static_buf().
  */
 static inline const char *
+tt_vsprintf(const char *format, va_list ap)
+{
+	char *buf = tt_static_buf();
+	vsnprintf(buf, TT_STATIC_BUF_LEN, format, ap);
+	return buf;
+}
+
+/** @copydoc tt_vsprintf() */
+static inline const char *
 tt_sprintf(const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	char *buf = tt_static_buf();
-	vsnprintf(buf, TT_STATIC_BUF_LEN, format, ap);
+	const char *result = tt_vsprintf(format, ap);
 	va_end(ap);
-	return buf;
+	return result;
 }
 
 /**
@@ -460,6 +474,10 @@ tt_sprintf(const char *format, ...)
 		_buf = NULL, _size = 0;						\
 	}									\
 } while(0)
+
+#if !defined(__cplusplus) && !defined(static_assert)
+# define static_assert _Static_assert
+#endif
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -44,6 +44,7 @@
 #undef Index
 #undef likely
 #undef unlikely
+#undef SWAP
 
 #include "index.h"
 #include "schema.h"
@@ -736,8 +737,8 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 
 	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
 		struct index_def *def;
-
-		uint32_t id = box_tuple_field_u32(tuple, 0, 0);
+		uint32_t id = 0;
+		(void) tuple_field_u32(tuple, 0, &id);
 		struct space *space = space_by_id(id);
 		def = index_def_new_from_tuple(tuple, space);
 		if (def->opts.sql != NULL) {

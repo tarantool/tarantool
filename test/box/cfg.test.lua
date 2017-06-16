@@ -24,7 +24,7 @@ box.cfg{replication = {}}
 
 box.cfg{memtx_memory = "100500"}
 box.cfg{vinyl = "vinyl"}
-box.cfg{vinyl_threads = "threads"}
+box.cfg{vinyl_write_threads = "threads"}
 
 
 --------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ box.cfg{vinyl_threads = "threads"}
 test_run:cmd('create server cfg_tester1 with script = "box/lua/cfg_test1.lua"')
 test_run:cmd("start server cfg_tester1")
 test_run:cmd('switch cfg_tester1')
-box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 test_run:cmd("switch default")
 test_run:cmd("stop server cfg_tester1")
 test_run:cmd("cleanup server cfg_tester1")
@@ -42,7 +42,7 @@ test_run:cmd("cleanup server cfg_tester1")
 test_run:cmd('create server cfg_tester2 with script = "box/lua/cfg_test2.lua"')
 test_run:cmd("start server cfg_tester2")
 test_run:cmd('switch cfg_tester2')
-box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 test_run:cmd("switch default")
 test_run:cmd("stop server cfg_tester2")
 test_run:cmd("cleanup server cfg_tester2")
@@ -50,7 +50,7 @@ test_run:cmd("cleanup server cfg_tester2")
 test_run:cmd('create server cfg_tester3 with script = "box/lua/cfg_test3.lua"')
 test_run:cmd("start server cfg_tester3")
 test_run:cmd('switch cfg_tester3')
-box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 test_run:cmd("switch default")
 test_run:cmd("stop server cfg_tester3")
 test_run:cmd("cleanup server cfg_tester3")
@@ -58,7 +58,7 @@ test_run:cmd("cleanup server cfg_tester3")
 test_run:cmd('create server cfg_tester4 with script = "box/lua/cfg_test4.lua"')
 test_run:cmd("start server cfg_tester4")
 test_run:cmd('switch cfg_tester4')
-box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_threads
+box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 test_run:cmd("switch default")
 test_run:cmd("stop server cfg_tester4")
 test_run:cmd("cleanup server cfg_tester4")

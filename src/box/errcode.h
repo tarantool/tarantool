@@ -188,6 +188,7 @@ struct errcode_record {
 	/*133 */_(ER_INVALID_VYLOG_FILE,	"Invalid VYLOG file: %s") \
 	/*134 */_(ER_CHECKPOINT_ROLLBACK,	"Can't start a checkpoint while in cascading rollback") \
 	/*135 */_(ER_VY_QUOTA_TIMEOUT,		"Timed out waiting for Vinyl memory quota") \
+	/*136 */_(ER_PARTIAL_KEY,		"%s index  does not support selects via a partial key (expected %u parts, got %u). Please Consider changing index type to TREE.") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

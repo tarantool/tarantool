@@ -285,6 +285,12 @@ find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
 add_custom_target(build_bundled_libs)
 
 #
+# Curl
+#
+set(Curl_FIND_REQUIRED ON)
+find_package(CURL)
+
+#
 # ReadLine
 #
 

@@ -118,7 +118,8 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
 			/* Get space id, primary key, field 0. */
-			uint32_t id = tuple_field_u32_xc(tuple, 0);
+			uint32_t id =
+				tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
 			space = space_cache_find(id);
 			if (! space_is_system(space))
 				break;
@@ -176,15 +177,18 @@ space_cache_replace(struct space *space)
 struct space *
 sc_space_new(struct space_def *space_def,
 	     struct index_def *index_def,
-	     struct trigger *trigger)
+	     struct trigger *replace_trigger,
+	     struct trigger *stmt_begin_trigger)
 {
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
 	struct space *space = space_new(space_def, &key_list);
 	(void) space_cache_replace(space);
-	if (trigger)
-		trigger_add(&space->on_replace, trigger);
+	if (replace_trigger)
+		trigger_add(&space->on_replace, replace_trigger);
+	if (stmt_begin_trigger)
+		trigger_add(&space->on_stmt_begin, stmt_begin_trigger);
 	/*
 	 * Data dictionary spaces are fully built since:
 	 * - they contain data right from the start
@@ -251,28 +255,26 @@ schema_init()
 	 */
 	/* _schema - key/value space with schema description */
 	struct space_def def = {
-		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx",
-		{false, NULL}
+		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", space_opts_default
 	};
-	struct index_opts opts = index_opts_default;
 	struct index_def *index_def = index_def_new(def.id,
 						    "_schema",
 						    0 /* index id */,
 						    "primary", /* name */
 						    TREE /* index type */,
-						    &opts,
+						    &index_opts_default,
 						    1); /* part count */
 	if (index_def == NULL)
 		diag_raise();
 	struct key_def *key_def = &index_def->key_def;
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
-	(void) sc_space_new(&def, index_def, &on_replace_schema);
+	(void) sc_space_new(&def, index_def, &on_replace_schema, NULL);
 
         /* _trigger - all existing SQL triggers */
 	index_def->space_id = def.id = BOX_TRIGGER_ID;
 	snprintf(def.name, sizeof(def.name), "_trigger");
-	(void) sc_space_new(&def, index_def, NULL);
+	(void) sc_space_new(&def, index_def, NULL, NULL);
 
 	/* _space - home for all spaces. */
 	index_def->space_id = def.id = BOX_SPACE_ID;
@@ -280,32 +282,37 @@ schema_init()
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 
-	(void) sc_space_new(&def, index_def, &alter_space_on_replace_space);
+	(void) sc_space_new(&def, index_def, &alter_space_on_replace_space,
+			    &on_stmt_begin_space);
+
+	/* _truncate - auxiliary space for triggering space truncation. */
+	index_def->space_id = def.id = BOX_TRUNCATE_ID;
+	snprintf(def.name, sizeof(def.name), "_truncate");
+	(void) sc_space_new(&def, index_def, &on_replace_truncate, NULL);
 
 	/* _user - all existing users */
 	index_def->space_id = def.id = BOX_USER_ID;
 	snprintf(def.name, sizeof(def.name), "_user");
-	(void) sc_space_new(&def, index_def, &on_replace_user);
+	(void) sc_space_new(&def, index_def, &on_replace_user, NULL);
 
 	/* _func - all executable objects on which one can have grants */
 	index_def->space_id = def.id = BOX_FUNC_ID;
 	snprintf(def.name, sizeof(def.name), "_func");
-	(void) sc_space_new(&def, index_def, &on_replace_func);
+	(void) sc_space_new(&def, index_def, &on_replace_func, NULL);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
 	index_def->space_id = def.id = BOX_PRIV_ID;
 	snprintf(def.name, sizeof(def.name), "_priv");
-	(void) sc_space_new(&def, index_def, &on_replace_priv);
+	(void) sc_space_new(&def, index_def, &on_replace_priv, NULL);
 	/*
 	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
 	index_def->space_id = def.id = BOX_CLUSTER_ID;
 	snprintf(def.name, sizeof(def.name), "_cluster");
-	(void) sc_space_new(&def, index_def, &on_replace_cluster);
-
+	(void) sc_space_new(&def, index_def, &on_replace_cluster, NULL);
 	index_def_delete(index_def);
 
 	/* _index - definition of indexes in all spaces */
@@ -316,7 +323,7 @@ schema_init()
 				  0 /* index id */,
 				  "primary",
 				  TREE /* index type */,
-				  &opts,
+				  &index_opts_default,
 				  2); /* part count */
 	if (index_def == NULL)
 		diag_raise();
@@ -327,7 +334,8 @@ schema_init()
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
-	(void) sc_space_new(&def, index_def, &alter_space_on_replace_index);
+	(void) sc_space_new(&def, index_def, &alter_space_on_replace_index,
+			    &on_stmt_begin_index);
 	index_def_delete(index_def);
 }
 

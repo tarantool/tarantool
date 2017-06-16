@@ -78,7 +78,7 @@ box.cfg {
     vinyl_cache = 128 * 1024 * 1024; -- 128Mb
 
     -- The maximum number of background workers for compaction.
-    vinyl_threads = 2;
+    vinyl_write_threads = 2;
 
     ------------------------------
     -- Binary logging and recovery

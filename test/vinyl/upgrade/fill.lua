@@ -4,7 +4,7 @@
 --
 fiber = require 'fiber'
 
-box.cfg{vinyl_memory = 1024 * 1024, vinyl_timeout = 0.1}
+box.cfg{vinyl_memory = 1024 * 1024, vinyl_timeout = 0.1, checkpoint_count = 1}
 
 dump_trigger = box.schema.space.create('dump_trigger', {engine = 'vinyl'})
 dump_trigger:create_index('pk')
@@ -49,9 +49,10 @@ s:insert{3, 'c'}
 dump()
 
 --
--- Make a snapshot:
+-- Make a snapshot and collect garbage:
 --
 --   VY_LOG_SNAPSHOT
+--   VY_LOG_FORGET_RUN
 --
 -- Note, this purges:
 --
@@ -59,13 +60,6 @@ dump()
 --   VY_LOG_DELETE_SLICE
 --
 box.snapshot()
-
---
--- Collect garbage:
---
--- VY_LOG_FORGET_RUN
---
-box.internal.gc.run(box.info.signature)
 
 --
 -- Space drop:
@@ -91,7 +85,10 @@ s:drop()
 --
 -- Space truncation.
 --
--- Currently, implemented as index drop/create.
+-- Before 1.7.4-126-g2ba51ab2, implemented as index drop/create.
+-- In newer versions, writes a special record:
+--
+-- VY_LOG_TRUNCATE_INDEX
 --
 s = box.schema.space.create('test_truncate', {engine = 'vinyl'})
 s:create_index('i1', {parts = {1, 'unsigned'}})

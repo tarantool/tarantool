@@ -1,6 +1,6 @@
 --
 -- 1. Create a space which has more indexes that can be scheduled
---    for dump simultaneously (> vinyl_threads).
+--    for dump simultaneously (> vinyl_write_threads).
 --
 -- 2. Insert tuples and then update values of secondary keys.
 --
@@ -10,7 +10,7 @@
 --
 test_run = require('test_run').new()
 
-INDEX_COUNT = box.cfg.vinyl_threads * 3
+INDEX_COUNT = box.cfg.vinyl_write_threads * 3
 assert(INDEX_COUNT < 100)
 
 s = box.schema.space.create('test', {engine='vinyl'})
@@ -37,7 +37,7 @@ box.error.injection.set('ERRINJ_VY_INDEX_DUMP', -1)
 
 test_run:cmd('restart server default')
 
-INDEX_COUNT = box.cfg.vinyl_threads * 3
+INDEX_COUNT = box.cfg.vinyl_write_threads * 3
 assert(INDEX_COUNT < 100)
 
 s = box.space.test

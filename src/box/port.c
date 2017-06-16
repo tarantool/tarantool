@@ -30,9 +30,11 @@
  */
 #include "port.h"
 #include "tuple.h"
+#include <small/obuf.h>
 #include <small/slab_cache.h>
 #include <small/mempool.h>
 #include <fiber.h>
+#include "errinj.h"
 
 static struct mempool port_entry_pool;
 
@@ -89,22 +91,55 @@ port_destroy(struct port *port)
 	}
 }
 
-void
+int
 port_dump(struct port *port, struct obuf *out)
 {
-	struct port_entry *e = port->first;
-	if (e == NULL)
-		return;
-	tuple_to_obuf(e->tuple, out);
-	tuple_unref(e->tuple);
-	e = e->next;
-	while (e != NULL) {
-		struct port_entry *cur = e;
-		tuple_to_obuf(e->tuple, out);
-		e = e->next;
-		tuple_unref(cur->tuple);
-		mempool_free(&port_entry_pool, cur);
+	struct port_entry *pe = port->first;
+	struct port_entry *tmp;
+	if (pe == NULL)
+		return 0;
+	if (tuple_to_obuf(pe->tuple, out) != 0) {
+		/*
+		 * The first port entry is pre-allocated,
+		 * no need to destroy it, only unref
+		 * the tuple.
+		 */
+		tuple_unref(pe->tuple);
+		return -1;
 	}
+	tuple_unref(pe->tuple);
+	pe = pe->next;
+
+	while (pe != NULL) {
+		if (tuple_to_obuf(pe->tuple, out) != 0) {
+			/*
+			 * After the first error we can only
+			 * destroy the port.
+			 */
+			goto error;
+		}
+
+		ERROR_INJECT(ERRINJ_PORT_DUMP, {
+			diag_set(OutOfMemory, tuple_size(pe->tuple), "obuf_dup",
+				 "data");
+			goto error;
+		});
+		tmp = pe->next;
+		tuple_unref(pe->tuple);
+		mempool_free(&port_entry_pool, pe);
+		pe = tmp;
+	}
+	return 0;
+
+	/* Free the port */
+	while (pe != NULL) {
+error:
+		tmp = pe->next;
+		tuple_unref(pe->tuple);
+		mempool_free(&port_entry_pool, pe);
+		pe = tmp;
+	}
+	return -1;
 }
 
 void

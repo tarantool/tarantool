@@ -40,8 +40,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct type;
-struct method;
+struct type_info;
+struct method_info;
 
 /**
  * Primitive C types
@@ -52,14 +52,14 @@ enum ctype {
 	CTYPE_CONST_CHAR_PTR
 };
 
-struct type {
+struct type_info {
 	const char *name;
-	const struct type *parent;
-	const struct method *methods;
+	const struct type_info *parent;
+	const struct method_info *methods;
 };
 
 inline bool
-type_assignable(const struct type *type, const struct type *object)
+type_assignable(const struct type_info *type, const struct type_info *object)
 {
 	assert(object != NULL);
 	do {
@@ -84,13 +84,13 @@ type_assignable(const struct type *type, const struct type *object)
 
 #if defined(__cplusplus)
 /* Pointer to arbitrary C++ member function */
-typedef void (type::*method_thiscall_f)(void);
+typedef void (type_info::*method_thiscall_f)(void);
 #endif
 
 enum { METHOD_ARG_MAX = 8 };
 
-struct method {
-	const struct type *owner;
+struct method_info {
+	const struct type_info *owner;
 	const char *name;
 	enum ctype rtype;
 	enum ctype atype[METHOD_ARG_MAX];
@@ -107,12 +107,12 @@ struct method {
 };
 
 #define type_foreach_method(m, method)					\
-	for(const struct type *_m = (m); _m != NULL; _m = _m->parent)	\
-		for (const struct method *(method) = _m->methods;	\
+	for(const struct type_info *_m = (m); _m != NULL; _m = _m->parent)	\
+		for (const struct method_info *(method) = _m->methods;	\
 		     (method)->name != NULL; (method)++)
 
-inline const struct method *
-type_method_by_name(const struct type *type, const char *name)
+inline const struct method_info *
+type_method_by_name(const struct type_info *type, const char *name)
 {
 	type_foreach_method(type, method) {
 		if (strcmp(method->name, name) == 0)
@@ -121,26 +121,26 @@ type_method_by_name(const struct type *type, const char *name)
 	return NULL;
 }
 
-extern const struct method METHODS_SENTINEL;
+extern const struct method_info METHODS_SENTINEL;
 
 #if defined(__cplusplus)
 } /* extern "C" */
 
-static_assert(sizeof(((struct method *) 0)->thiscall) <=
-	      sizeof(((struct method *) 0)->_spacer), "sizeof(thiscall)");
+static_assert(sizeof(((struct method_info *) 0)->thiscall) <=
+	      sizeof(((struct method_info *) 0)->_spacer), "sizeof(thiscall)");
 
 /*
  * Begin of C++ syntax sugar
  */
 
 /*
- * Initializer for struct type without methods
+ * Initializer for struct type_info without methods
  */
-inline type
-make_type(const char *name, const type *parent)
+inline struct type_info
+make_type(const char *name, const struct type_info *parent)
 {
 	/* TODO: sorry, unimplemented: non-trivial designated initializers */
-	type t;
+	struct type_info t;
 	t.name = name;
 	t.parent = parent;
 	t.methods = &METHODS_SENTINEL;
@@ -148,13 +148,14 @@ make_type(const char *name, const type *parent)
 }
 
 /*
- * Initializer for struct type with methods
+ * Initializer for struct type_info with methods
  */
-inline struct type
-make_type(const char *name, const type *parent, const method *methods)
+inline struct type_info
+make_type(const char *name, const struct type_info *parent,
+	  const struct method_info *methods)
 {
 	/* TODO: sorry, unimplemented: non-trivial designated initializers */
-	type t;
+	struct type_info t;
 	t.name = name;
 	t.parent = parent;
 	t.methods = methods;
@@ -177,7 +178,7 @@ struct method_helper;
 template <int N, typename A, typename... Args>
 struct method_helper<N, A, Args... >  {
 	static bool
-	invokable(const method *method)
+	invokable(const struct method_info *method)
 	{
 		if (method->atype[N] != ctypeof<A>())
 			return false;
@@ -185,7 +186,7 @@ struct method_helper<N, A, Args... >  {
 	}
 
 	static void
-	init(struct method *method)
+	init(struct method_info *method)
 	{
 		method->atype[N] = ctypeof<A>();
 		return method_helper<N + 1, Args... >::init(method);
@@ -195,13 +196,13 @@ struct method_helper<N, A, Args... >  {
 template <int N>
 struct method_helper<N> {
 	static bool
-	invokable(const method *)
+	invokable(const struct method_info *)
 	{
 		return true;
 	}
 
 	static void
-	init(struct method *method)
+	init(struct method_info *method)
 	{
 		method->nargs = N;
 	}
@@ -214,11 +215,11 @@ struct method_helper<N> {
 /**
  * Initializer for R (T::*)(void) C++ member methods
  */
-template<typename R, typename... Args, typename T> inline method
-make_method(const struct type *owner, const char *name,
+template<typename R, typename... Args, typename T> inline struct method_info
+make_method(const struct type_info *owner, const char *name,
 	R (T::*method_arg)(Args...))
 {
-	struct method m;
+	struct method_info m;
 	m.owner = owner;
 	m.name = name;
 	m.thiscall = (method_thiscall_f) method_arg;
@@ -229,11 +230,11 @@ make_method(const struct type *owner, const char *name,
 	return m;
 }
 
-template<typename R, typename... Args, typename T> inline method
-make_method(const struct type *owner, const char *name,
+template<typename R, typename... Args, typename T> inline struct method_info
+make_method(const struct type_info *owner, const char *name,
 	R (T::*method_arg)(Args...) const)
 {
-	struct method m = make_method(owner, name, (R (T::*)(Args...)) method_arg);
+	struct method_info m = make_method(owner, name, (R (T::*)(Args...)) method_arg);
 	m.isconst = true;
 	return m;
 }
@@ -242,7 +243,7 @@ make_method(const struct type *owner, const char *name,
  * Check if method is invokable with provided argument types
  */
 template<typename R, typename... Args, typename T> inline bool
-method_invokable(const struct method *method, T *object)
+method_invokable(const struct method_info *method, T *object)
 {
 	static_assert(sizeof...(Args) <= METHOD_ARG_MAX, "too many arguments");
 	if (!type_assignable(method->owner, object->type))
@@ -255,7 +256,7 @@ method_invokable(const struct method *method, T *object)
 }
 
 template<typename R, typename... Args, typename T> inline bool
-method_invokable(const struct method *method, const T *object)
+method_invokable(const struct method_info *method, const T *object)
 {
 	if (!method->isconst)
 		return false;
@@ -266,7 +267,7 @@ method_invokable(const struct method *method, const T *object)
  * Invoke method with object and provided arguments.
  */
 template<typename R, typename... Args, typename T > inline R
-method_invoke(const struct method *method, T *object, Args... args)
+method_invoke(const struct method_info *method, T *object, Args... args)
 {
 	assert((method_invokable<R, Args...>(method, object)));
 	typedef R (T::*MemberFunction)(Args...);

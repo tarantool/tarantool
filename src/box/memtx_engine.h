@@ -93,12 +93,45 @@ struct MemtxEngine: public Engine {
 	virtual int waitCheckpoint(struct vclock *vclock) override;
 	virtual void commitCheckpoint(struct vclock *vclock) override;
 	virtual void abortCheckpoint() override;
+	virtual int collectGarbage(int64_t lsn) override;
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *arg) override;
 	/* Update snap_io_rate_limit. */
 	void setSnapIoRateLimit(double new_limit)
 	{
 		m_snap_io_rate_limit = new_limit * 1024 * 1024;
+	}
+	/**
+	 * Return LSN and vclock of the most recent snapshot
+	 * or -1 if there is no snapshot.
+	 */
+	int64_t lastSnapshot(struct vclock *vclock)
+	{
+		return xdir_last_vclock(&m_snap_dir, vclock);
+	}
+	/**
+	 * Return the vclock of the snapshot following the
+	 * given one or NULL if the given snapshot is last.
+	 * Pass NULL to get the oldest snapshot.
+	 */
+	const struct vclock *nextSnapshot(const struct vclock *vclock)
+	{
+		if (vclock == NULL)
+			return vclockset_first(&m_snap_dir.index);
+		return vclockset_next(&m_snap_dir.index,
+				      (struct vclock *)vclock);
+	}
+	/**
+	 * Return the vclock of the snapshot preceding the
+	 * given one or NULL if the given snapshot is oldest.
+	 * Pass NULL to get the newest snapshot.
+	 */
+	const struct vclock *prevSnapshot(const struct vclock *vclock)
+	{
+		if (vclock == NULL)
+			return vclockset_last(&m_snap_dir.index);
+		return vclockset_prev(&m_snap_dir.index,
+				      (struct vclock *)vclock);
 	}
 	void recoverSnapshot(const struct vclock *vclock);
 public:

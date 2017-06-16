@@ -52,6 +52,8 @@ struct space {
 
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
+	/** Triggers fired before space statement */
+	struct rlist on_stmt_begin;
 	/* Number of bytes used in memory by tuples in the space. */
 	size_t bsize;
 	/**
@@ -70,6 +72,12 @@ struct space {
 	uint32_t index_id_max;
 	/** Space meta. */
 	struct space_def def;
+	/**
+	 * Number of times the space has been truncated.
+	 * Updating this counter via _truncate space triggers
+	 * space truncation.
+	 */
+	uint64_t truncate_count;
 	/** Enable/disable triggers. */
 	bool run_triggers;
 

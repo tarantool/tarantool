@@ -5,6 +5,10 @@ fiber = require('fiber')
 
 test_run:cleanup_cluster()
 
+-- Make each snapshot trigger garbage collection.
+default_checkpoint_count = box.cfg.checkpoint_count
+box.cfg{checkpoint_count = 1}
+
 -- Grant permissions needed for replication.
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'replication')
@@ -32,7 +36,6 @@ test_run:cmd("setopt delimiter ';'")
 fiber.create(function()
     fiber.sleep(0.1)
     box.snapshot()
-    box.internal.gc.run(box.info.signature)
     box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
 end)
 test_run:cmd("setopt delimiter ''");
@@ -66,7 +69,6 @@ for i = 1, 100 do s:auto_increment{} end
 -- Invoke garbage collection. Check that it doesn't remove
 -- xlogs needed by the replica.
 box.snapshot()
-box.internal.gc.run(box.info.signature)
 #box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
 
 -- Remove the timeout injection so that the replica catches
@@ -92,7 +94,6 @@ test_run:cmd("cleanup server replica")
 -- the checkpoint last used by the replica.
 _ = s:auto_increment{}
 box.snapshot()
-box.internal.gc.run(box.info.signature)
 #box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
 
 -- The checkpoint should only be deleted after the replica
@@ -105,3 +106,5 @@ s:drop()
 box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
 box.schema.user.revoke('guest', 'replication')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+box.cfg{checkpoint_count = default_checkpoint_count}

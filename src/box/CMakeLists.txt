@@ -7,7 +7,7 @@ lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/tuple.lua)
 lua_source(lua_sources lua/session.lua)
-lua_source(lua_sources lua/snapshot_daemon.lua)
+lua_source(lua_sources lua/checkpoint_daemon.lua)
 lua_source(lua_sources lua/net_box.lua)
 lua_source(lua_sources lua/upgrade.lua)
 lua_source(lua_sources lua/console.lua)
@@ -69,6 +69,7 @@ add_library(box STATIC
     txn.cc
     box.cc
     gc.c
+    checkpoint.cc
     user_def.c
     user.cc
     authentication.cc

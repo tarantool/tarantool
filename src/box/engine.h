@@ -140,8 +140,16 @@ public:
 	/**
 	 * Remove files that are not needed to recover
 	 * from snapshot with @lsn or newer.
+	 *
+	 * If this function returns a non-zero value, garbage
+	 * collection is aborted, i.e. this method isn't called
+	 * for other engines and xlog files aren't deleted.
+	 *
+	 * Used to abort garbage collection in case MemtxEngine
+	 * failes to delete a snapshot file, because we recover
+	 * checkpoint list by scanning snapshot directory.
 	 */
-	virtual void collectGarbage(int64_t lsn);
+	virtual int collectGarbage(int64_t lsn);
 	/**
 	 * Backup callback. It is supposed to call @cb for each file
 	 * that needs to be backed up in order to restore from the
@@ -230,6 +238,23 @@ public:
 				       struct space *new_space,
 				       Index *new_index);
 	/**
+	 * Notify the enigne about upcoming space truncation
+	 * so that it can prepare new_space object.
+	 */
+	virtual void prepareTruncateSpace(struct space *old_space,
+					  struct space *new_space);
+	/**
+	 * Commit space truncation. Called after space truncate
+	 * record was written to WAL hence must not fail.
+	 *
+	 * The old_space is the space that was replaced with the
+	 * new_space as a result of truncation. The callback is
+	 * supposed to release resources associated with the
+	 * old_space and commit the new_space.
+	 */
+	virtual void commitTruncateSpace(struct space *old_space,
+					 struct space *new_space);
+	/**
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space'
 	 * object.
@@ -314,7 +339,7 @@ engine_commit_checkpoint(struct vclock *vclock);
 void
 engine_abort_checkpoint();
 
-void
+int
 engine_collect_garbage(int64_t lsn);
 
 int

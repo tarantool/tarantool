@@ -286,11 +286,7 @@ struct key_def {
 	tuple_hash_t tuple_hash;
 	/** @see key_hash() */
 	key_hash_t key_hash;
-	/**
-	 * Bitmask in that bit 'n' is set if parts contains a
-	 * part with fieldno equal to 'n'. This mask is used for
-	 * update and upsert optimizations.
-	 */
+	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
@@ -706,20 +702,6 @@ void
 space_def_check(struct space_def *def, uint32_t namelen,
                 uint32_t engine_namelen,
                 int32_t errcode);
-
-/**
- * Given a tuple with an index definition, update the LSN stored
- * in the index options.
- *
- * @return a tuple with updated lsn in key def. The returned tuple
- *         is blessed (referenced by box_tuple_bless()).
- *
- * Throws an exception if error.
- *
- * @note Implemented in alter.cc
- */
-extern struct tuple *
-index_def_tuple_update_lsn(struct tuple *tuple, int64_t lsn);
 
 /**
  * Check object identifier for invalid symbols.

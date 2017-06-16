@@ -61,11 +61,80 @@ enum {
 	BOX_CLUSTER_ID = 320,
 	/** Space id of _trigger. */
 	BOX_TRIGGER_ID = 328,
+	/** Space if of _truncate. */
+	BOX_TRUNCATE_ID = 330,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
 };
 /** \endcond public */
+
+/** _space fields. */
+enum {
+	BOX_SPACE_FIELD_ID = 0,
+	BOX_SPACE_FIELD_UID = 1,
+	BOX_SPACE_FIELD_NAME = 2,
+	BOX_SPACE_FIELD_ENGINE = 3,
+	BOX_SPACE_FIELD_FIELD_COUNT = 4,
+	BOX_SPACE_FIELD_OPTS = 5,
+};
+
+/** _index fields. */
+enum {
+	BOX_INDEX_FIELD_SPACE_ID = 0,
+	BOX_INDEX_FIELD_ID = 1,
+	BOX_INDEX_FIELD_NAME = 2,
+	BOX_INDEX_FIELD_TYPE = 3,
+	BOX_INDEX_FIELD_OPTS = 4,
+	BOX_INDEX_FIELD_IS_UNIQUE_165 = 4,
+	BOX_INDEX_FIELD_PARTS = 5,
+	BOX_INDEX_FIELD_PART_COUNT_165 = 5,
+	BOX_INDEX_FIELD_PARTS_165 = 6,
+};
+
+/** _user fields. */
+enum {
+	BOX_USER_FIELD_ID = 0,
+	BOX_USER_FIELD_UID = 1,
+	BOX_USER_FIELD_NAME = 2,
+	BOX_USER_FIELD_TYPE = 3,
+	BOX_USER_FIELD_AUTH_MECH_LIST = 4,
+};
+
+/** _priv fields. */
+enum {
+	BOX_PRIV_FIELD_ID = 0,
+	BOX_PRIV_FIELD_UID = 1,
+	BOX_PRIV_FIELD_OBJECT_TYPE = 2,
+	BOX_PRIV_FIELD_OBJECT_ID = 3,
+	BOX_PRIV_FIELD_ACCESS = 4,
+};
+
+/** _func fields. */
+enum {
+	BOX_FUNC_FIELD_ID = 0,
+	BOX_FUNC_FIELD_UID = 1,
+	BOX_FUNC_FIELD_NAME = 2,
+	BOX_FUNC_FIELD_SETUID = 3,
+	BOX_FUNC_FIELD_LANGUAGE = 4,
+};
+
+/** _schema fields. */
+enum {
+	BOX_SCHEMA_FIELD_KEY = 0,
+};
+
+/** _cluster fields. */
+enum {
+	BOX_CLUSTER_FIELD_ID = 0,
+	BOX_CLUSTER_FIELD_UUID = 1,
+};
+
+/** _truncate fields. */
+enum {
+	BOX_TRUNCATE_FIELD_SPACE_ID = 0,
+	BOX_TRUNCATE_FIELD_COUNT = 1,
+};
 
 #include <stdint.h>
 

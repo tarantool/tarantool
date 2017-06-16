@@ -47,7 +47,7 @@ enum {
 	DIAG_FILENAME_MAX = 256
 };
 
-struct type;
+struct type_info;
 struct error;
 struct error_factory;
 extern struct error_factory *error_factory;
@@ -72,7 +72,7 @@ struct error {
 	error_f destroy;
 	error_f raise;
 	error_f log;
-	const struct type *type;
+	const struct type_info *type;
 	int refs;
 	/** Line number. */
 	unsigned line;
@@ -113,7 +113,8 @@ error_log(struct error *e)
 void
 error_create(struct error *e,
 	     error_f create, error_f raise, error_f log,
-	     const struct type *type, const char *file, unsigned line);
+	     const struct type_info *type, const char *file,
+	     unsigned line);
 
 void
 error_format_msg(struct error *e, const char *format, ...);

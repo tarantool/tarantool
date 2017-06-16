@@ -29,9 +29,9 @@ cfg_filter(box.cfg)
 - - - background
     - false
   - - checkpoint_count
-    - 6
+    - 2
   - - checkpoint_interval
-    - 0
+    - 3600
   - - coredump
     - false
   - - force_recovery
@@ -78,14 +78,16 @@ cfg_filter(box.cfg)
     - 8192
   - - vinyl_range_size
     - 1073741824
+  - - vinyl_read_threads
+    - 1
   - - vinyl_run_count_per_level
     - 2
   - - vinyl_run_size_ratio
     - 3.5
-  - - vinyl_threads
-    - 2
   - - vinyl_timeout
     - 60
+  - - vinyl_write_threads
+    - 2
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay

@@ -32,12 +32,12 @@
 
 #include <zstd.h>
 
-#include "coio_task.h"
-
 #include "fiber.h"
 #include "fio.h"
 #include "ipc.h"
+#include "cbus.h"
 #include "memory.h"
+#include "cfg.h"
 
 #include "replication.h"
 #include "tuple_hash.h" /* for bloom filter */
@@ -71,11 +71,22 @@ const char *vy_file_suffix[] = {
 };
 
 /**
- * coio task for vinyl page read
+ * We read runs in background threads so as not to stall tx.
+ * This structure represents such a thread.
  */
+struct vy_run_reader {
+	/** Thread that processes read requests. */
+	struct cord cord;
+	/** Pipe from tx to the reader thread. */
+	struct cpipe reader_pipe;
+	/** Pipe from the reader thread to tx. */
+	struct cpipe tx_pipe;
+};
+
+/** Cbus task for vinyl page read. */
 struct vy_page_read_task {
 	/** parent */
-	struct coio_task base;
+	struct cbus_call_msg base;
 	/** vinyl page metadata */
 	struct vy_page_info page_info;
 	/** vy_slice with fd - ref. counted */
@@ -84,8 +95,6 @@ struct vy_page_read_task {
 	struct vy_run_env *run_env;
 	/** [out] resulting vinyl page */
 	struct vy_page *page;
-	/** [out] result code */
-	int rc;
 };
 
 /** Destructor for env->zdctx_key thread-local variable */
@@ -94,6 +103,62 @@ vy_free_zdctx(void *arg)
 {
 	assert(arg != NULL);
 	ZSTD_freeDStream(arg);
+}
+
+/** Run reader thread function. */
+static int
+vy_run_reader_f(va_list ap)
+{
+	struct vy_run_reader *reader = va_arg(ap, struct vy_run_reader *);
+	struct cbus_endpoint endpoint;
+
+	cpipe_create(&reader->tx_pipe, "tx_prio");
+	cbus_endpoint_create(&endpoint, cord_name(cord()),
+			     fiber_schedule_cb, fiber());
+	cbus_loop(&endpoint);
+	cbus_endpoint_destroy(&endpoint, cbus_process);
+	cpipe_destroy(&reader->tx_pipe);
+	return 0;
+}
+
+/** Start run reader threads. */
+static void
+vy_run_env_start_readers(struct vy_run_env *env)
+{
+	env->reader_pool_size = cfg_geti("vinyl_read_threads");
+	assert(env->reader_pool_size > 0);
+
+	env->reader_pool = calloc(env->reader_pool_size,
+				  sizeof(*env->reader_pool));
+	if (env->reader_pool == NULL)
+		panic("failed to allocate vinyl reader thread pool");
+
+	for (int i = 0; i < env->reader_pool_size; i++) {
+		struct vy_run_reader *reader = &env->reader_pool[i];
+		char name[FIBER_NAME_MAX];
+
+		snprintf(name, sizeof(name), "vinyl.reader.%d", i);
+		if (cord_costart(&reader->cord, name,
+				 vy_run_reader_f, reader) != 0)
+			panic("failed to start vinyl reader thread");
+		cpipe_create(&reader->reader_pipe, name);
+	}
+	env->next_reader = 0;
+}
+
+/** Join run reader threads. */
+static void
+vy_run_env_stop_readers(struct vy_run_env *env)
+{
+	for (int i = 0; i < env->reader_pool_size; i++) {
+		struct vy_run_reader *reader = &env->reader_pool[i];
+
+		cbus_stop_loop(&reader->reader_pipe);
+		cpipe_destroy(&reader->reader_pipe);
+		if (cord_join(&reader->cord) != 0)
+			panic("failed to join vinyl reader thread");
+	}
+	free(env->reader_pool);
 }
 
 /**
@@ -107,6 +172,8 @@ vy_run_env_create(struct vy_run_env *env)
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&env->read_task_pool, slab_cache,
 		       sizeof(struct vy_page_read_task));
+
+	vy_run_env_start_readers(env);
 }
 
 /**
@@ -115,6 +182,7 @@ vy_run_env_create(struct vy_run_env *env)
 void
 vy_run_env_destroy(struct vy_run_env *env)
 {
+	vy_run_env_stop_readers(env);
 	mempool_destroy(&env->read_task_pool);
 	tt_pthread_key_delete(env->zdctx_key);
 }
@@ -837,27 +905,25 @@ vy_env_get_zdctx(struct vy_run_env *env)
  * vinyl read task callback
  */
 static int
-vy_page_read_cb(struct coio_task *base)
+vy_page_read_cb(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run_env);
 	if (zdctx == NULL)
 		return -1;
-	task->rc = vy_page_read(task->page, &task->page_info,
-				task->slice->run->fd, zdctx);
-	return task->rc;
+	return vy_page_read(task->page, &task->page_info,
+			    task->slice->run->fd, zdctx);
 }
 
 /**
  * vinyl read task cleanup callback
  */
 static int
-vy_page_read_cb_free(struct coio_task *base)
+vy_page_read_cb_free(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	vy_page_delete(task->page);
 	vy_slice_unpin(task->slice);
-	coio_task_destroy(&task->base);
 	mempool_free(&task->run_env->read_task_pool, task);
 	return 0;
 }
@@ -872,6 +938,7 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
+	struct vy_run_env *env = itr->run_env;
 	struct vy_slice *slice = itr->slice;
 
 	/* Check cache */
@@ -888,56 +955,54 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	/* Read page data from the disk */
 	int rc;
 	if (itr->coio_read) {
-		/*
-		 * Use coio for TX thread **after recovery**.
-		 */
-
-		/* Allocate a coio task */
-		struct vy_page_read_task *task =
-			(struct vy_page_read_task *)mempool_alloc(&itr->run_env->read_task_pool);
+		/* Allocate a cbus task. */
+		struct vy_page_read_task *task;
+		task = mempool_alloc(&env->read_task_pool);
 		if (task == NULL) {
-			diag_set(OutOfMemory, sizeof(*task), "malloc",
+			diag_set(OutOfMemory, sizeof(*task), "mempool",
 				 "vy_page_read_task");
 			vy_page_delete(page);
 			return -1;
 		}
-		coio_task_create(&task->base, vy_page_read_cb,
-				 vy_page_read_cb_free);
+
+		/* Pick a reader thread. */
+		struct vy_run_reader *reader;
+		reader = &env->reader_pool[env->next_reader++];
+		env->next_reader %= env->reader_pool_size;
 
 		/*
 		 * Make sure the run file descriptor won't be closed
-		 * (even worse, reopened) while a coio thread is
+		 * (even worse, reopened) while a reader thread is
 		 * reading it.
 		 */
 		vy_slice_pin(slice);
 
 		task->slice = slice;
 		task->page_info = *page_info;
-		task->run_env = itr->run_env;
+		task->run_env = env;
 		task->page = page;
 
-		/* Post task to coio */
-		rc = coio_task_post(&task->base, TIMEOUT_INFINITY);
-		if (rc < 0)
+		/* Post task to the reader thread. */
+		rc = cbus_call(&reader->reader_pipe, &reader->tx_pipe,
+			       &task->base, vy_page_read_cb,
+			       vy_page_read_cb_free, TIMEOUT_INFINITY);
+		if (!task->base.complete)
 			return -1; /* timed out or cancelled */
 
-		if (task->rc != 0) {
+		mempool_free(&env->read_task_pool, task);
+		vy_slice_unpin(slice);
+
+		if (rc != 0) {
 			/* posted, but failed */
-			diag_move(&task->base.diag, &fiber()->diag);
-			vy_page_read_cb_free(&task->base);
+			vy_page_delete(page);
 			return -1;
 		}
-
-		coio_task_destroy(&task->base);
-		mempool_free(&task->run_env->read_task_pool, task);
-
-		vy_slice_unpin(slice);
 	} else {
 		/*
 		 * Optimization: use blocked I/O for non-TX threads or
 		 * during WAL recovery (env->status != VINYL_ONLINE).
 		 */
-		ZSTD_DStream *zdctx = vy_env_get_zdctx(itr->run_env);
+		ZSTD_DStream *zdctx = vy_env_get_zdctx(env);
 		if (zdctx == NULL) {
 			vy_page_delete(page);
 			return -1;

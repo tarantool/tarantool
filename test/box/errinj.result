@@ -34,6 +34,8 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
+  ERRINJ_PORT_DUMP:
+    state: false
   ERRINJ_RELAY_REPORT_INTERVAL:
     state: 0
   ERRINJ_RELAY_TIMEOUT:
@@ -426,6 +428,10 @@ box.commit();
 ---
 - error: Failed to allocate 18 bytes in slab allocator for memtx_tuple
 ...
+errinj.set("ERRINJ_TUPLE_ALLOC", false);
+---
+- ok
+...
 s:select{};
 ---
 - []
@@ -433,9 +439,9 @@ s:select{};
 box.rollback();
 ---
 ...
-errinj.set("ERRINJ_TUPLE_ALLOC", false);
+s:select{};
 ---
-- ok
+- []
 ...
 box.begin()
     s:insert{1}
@@ -734,6 +740,42 @@ test_run:cmd('setopt delimiter ""');
 ---
 - true
 ...
+-- Port_dump can fail.
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+cn = net_box.connect(box.cfg.listen)
+---
+...
+cn:ping()
+---
+- true
+...
+errinj.set('ERRINJ_PORT_DUMP', true)
+---
+- ok
+...
+ok, ret = pcall(cn.space._space.select, cn.space._space)
+---
+...
+assert(not ok)
+---
+- true
+...
+assert(string.match(tostring(ret), 'Failed to allocate'))
+---
+- Failed to allocate
+...
+errinj.set('ERRINJ_PORT_DUMP', false)
+---
+- ok
+...
+cn:close()
+---
+...
+box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+---
+...
 run()
 ---
 - error: Can't start a checkpoint while in cascading rollback
@@ -752,5 +794,57 @@ box.space.test:select()
 - []
 ...
 box.space.test:drop()
+---
+...
+errinj = box.error.injection
+---
+...
+net_box = require('net.box')
+---
+...
+fiber = require'fiber'
+---
+...
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+ch = fiber.channel(2)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function test(tuple)
+   ch:put({pcall(s.replace, s, tuple)})
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+errinj.set("ERRINJ_WAL_WRITE", true)
+---
+- ok
+...
+_ = {fiber.create(test, {1, 2, 3}), fiber.create(test, {3, 4, 5})}
+---
+...
+{ch:get(), ch:get()}
+---
+- - - false
+    - Failed to write to disk
+  - - false
+    - Failed to write to disk
+...
+errinj.set("ERRINJ_WAL_WRITE", false)
+---
+- ok
+...
+s:drop()
 ---
 ...

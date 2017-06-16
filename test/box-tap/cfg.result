@@ -51,8 +51,10 @@ ok - invalid replication
 ok - page size greather than range
 ok - page size less than range
 ok - page size equal with range
-ok - vinyl_threads = 1
-ok - vinyl_threads = 2
+ok - vinyl_read_threads = 0
+ok - vinyl_read_threads = 1
+ok - vinyl_write_threads = 1
+ok - vinyl_write_threads = 2
 ok - upgrade memtx memory options
 ok - equal new and old memtx options
 ok - different new and old memtx_memory
@@ -63,4 +65,4 @@ ok - panic_on_snap_error
 ok - setup checkpoint params
 ok - update checkpoint params
 ok - wal_max_size xlog rotation
-# bad plan: planned 62 run 63
+# bad plan: planned 62 run 65

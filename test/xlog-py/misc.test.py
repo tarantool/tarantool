@@ -26,7 +26,7 @@ if os.access(wal, os.F_OK):
 server.admin("index = space:create_index('primary', { type = 'hash' })")
 
 server.stop()
-lsn += 2
+lsn += 3
 
 print """
 # a new xlog must be opened after regular termination.

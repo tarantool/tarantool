@@ -86,7 +86,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct checkpoint_info;
+struct gc_consumer;
 
 void
 replication_init(void);
@@ -115,9 +115,8 @@ struct replica {
 	struct tt_uuid uuid;
 	struct applier *applier;
 	struct relay *relay;
+	struct gc_consumer *gc;
 	uint32_t id;
-	/** Checkpoint used by this replica. */
-	struct checkpoint_info *checkpoint;
 };
 
 enum {
@@ -172,17 +171,6 @@ replica_set_relay(struct replica *replica, struct relay *relay);
  */
 void
 replica_clear_relay(struct replica *replica);
-
-/**
- * Update checkpoint needed by a replica.
- *
- * This function references the given checkpoint so that garbage
- * collection cannot delete it. The checkpoint used by the replica
- * before is unreferenced.
- */
-void
-replica_set_checkpoint(struct replica *replica,
-		       struct checkpoint_info *checkpoint);
 
 #if defined(__cplusplus)
 } /* extern "C" */

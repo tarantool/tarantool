@@ -39,8 +39,10 @@ struct func *
 func_new(struct func_def *def)
 {
 	struct func *func = (struct func *) malloc(sizeof(struct func));
-	if (func == NULL)
+	if (func == NULL) {
+		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
 		return NULL;
+	}
 	func->def = *def;
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));

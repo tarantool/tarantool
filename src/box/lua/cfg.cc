@@ -143,6 +143,17 @@ lbox_cfg_set_snap_io_rate_limit(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_checkpoint_count(struct lua_State *L)
+{
+	try {
+		box_set_checkpoint_count();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
+static int
 lbox_cfg_set_read_only(struct lua_State *L)
 {
 	try {
@@ -179,6 +190,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_io_collect_interval", lbox_cfg_set_io_collect_interval},
 		{"cfg_set_too_long_threshold", lbox_cfg_set_too_long_threshold},
 		{"cfg_set_snap_io_rate_limit", lbox_cfg_set_snap_io_rate_limit},
+		{"cfg_set_checkpoint_count", lbox_cfg_set_checkpoint_count},
 		{"cfg_set_read_only", lbox_cfg_set_read_only},
 		{"cfg_update_vinyl_options", lbox_cfg_update_vinyl_options},
 		{NULL, NULL}

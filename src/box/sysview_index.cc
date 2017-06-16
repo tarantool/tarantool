@@ -152,7 +152,7 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	uint32_t space_id = tuple_field_u32_xc(tuple, 0);
+	uint32_t space_id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
 	struct space *space = space_cache_find(space_id);
 	uint8_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
@@ -178,8 +178,8 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	uint32_t uid = tuple_field_u32_xc(tuple, 0);
-	uint32_t owner_id = tuple_field_u32_xc(tuple, 1);
+	uint32_t uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
+	uint32_t owner_id = tuple_field_u32_xc(tuple, BOX_USER_FIELD_UID);
 	return uid == cr->uid || owner_id == cr->uid;
 }
 
@@ -197,8 +197,8 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	uint32_t grantor_id = tuple_field_u32_xc(tuple, 0);
-	uint32_t grantee_id = tuple_field_u32_xc(tuple, 1);
+	uint32_t grantor_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_ID);
+	uint32_t grantee_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_UID);
 	return grantor_id == cr->uid || grantee_id == cr->uid;
 }
 
@@ -216,7 +216,7 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	const char *name = tuple_field_cstr_xc(tuple, 2);
+	const char *name = tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_NAME);
 	uint32_t name_len = strlen(name);
 	struct func *func = func_by_name(name, name_len);
 	assert(func != NULL);

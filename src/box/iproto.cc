@@ -924,7 +924,11 @@ tx_process_select(struct cmsg *m)
 		port_destroy(&port);
 		goto error;
 	}
-	port_dump(&port, out);
+	if (port_dump(&port, out) != 0) {
+		/* Discard the prepared select. */
+		obuf_rollback_to_svp(out, &svp);
+		goto error;
+	}
 	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
 			    port.size);
 	msg->write_end = obuf_create_svp(out);

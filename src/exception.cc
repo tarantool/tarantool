@@ -60,7 +60,7 @@ exception_log(struct error *error)
 }
 
 const char *
-exception_get_string(struct error *e, const struct method *method)
+exception_get_string(struct error *e, const struct method_info *method)
 {
 	/* A workaround for for vtable */
 	Exception *ex = (Exception *) e;
@@ -70,7 +70,7 @@ exception_get_string(struct error *e, const struct method *method)
 }
 
 int
-exception_get_int(struct error *e, const struct method *method)
+exception_get_int(struct error *e, const struct method_info *method)
 {
 	/* A workaround for vtable  */
 	Exception *ex = (Exception *) e;
@@ -85,12 +85,12 @@ exception_get_int(struct error *e, const struct method *method)
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
 				 sizeof(OutOfMemory), "malloc", "exception");
 
-static const struct method exception_methods[] = {
+static const struct method_info exception_methods[] = {
 	make_method(&type_Exception, "message", &Exception::get_errmsg),
 	make_method(&type_Exception, "log", &Exception::log),
 	METHODS_SENTINEL
 };
-const struct type type_Exception = make_type("Exception", NULL,
+const struct type_info type_Exception = make_type("Exception", NULL,
 	exception_methods);
 
 void *
@@ -116,7 +116,7 @@ Exception::~Exception()
 	}
 }
 
-Exception::Exception(const struct type *type_arg, const char *file,
+Exception::Exception(const struct type_info *type_arg, const char *file,
 		     unsigned line)
 {
 	error_create(this, exception_destroy, exception_raise,
@@ -129,15 +129,15 @@ Exception::log() const
 	_say(S_ERROR, file, line, errmsg, "%s", type->name);
 }
 
-static const struct method systemerror_methods[] = {
+static const struct method_info systemerror_methods[] = {
 	make_method(&type_SystemError, "errno", &SystemError::get_errno),
 	METHODS_SENTINEL
 };
 
-const struct type type_SystemError = make_type("SystemError", &type_Exception,
-	systemerror_methods);
+const struct type_info type_SystemError =
+	make_type("SystemError", &type_Exception, systemerror_methods);
 
-SystemError::SystemError(const struct type *type,
+SystemError::SystemError(const struct type_info *type,
 			 const char *file, unsigned line)
 	:Exception(type, file, line),
 	m_errno(errno)
@@ -163,7 +163,7 @@ SystemError::log() const
 	     errmsg);
 }
 
-const struct type type_OutOfMemory =
+const struct type_info type_OutOfMemory =
 	make_type("OutOfMemory", &type_SystemError);
 
 OutOfMemory::OutOfMemory(const char *file, unsigned line,
@@ -176,7 +176,7 @@ OutOfMemory::OutOfMemory(const char *file, unsigned line,
 			 (unsigned) amount, allocator, object);
 }
 
-const struct type type_TimedOut =
+const struct type_info type_TimedOut =
 	make_type("TimedOut", &type_SystemError);
 
 TimedOut::TimedOut(const char *file, unsigned line)
@@ -186,7 +186,7 @@ TimedOut::TimedOut(const char *file, unsigned line)
 	error_format_msg(this, "timed out");
 }
 
-const struct type type_ChannelIsClosed =
+const struct type_info type_ChannelIsClosed =
 	make_type("ChannelIsClosed", &type_Exception);
 
 ChannelIsClosed::ChannelIsClosed(const char *file, unsigned line)
@@ -195,7 +195,7 @@ ChannelIsClosed::ChannelIsClosed(const char *file, unsigned line)
 	error_format_msg(this, "channel is closed");
 }
 
-const struct type type_FiberIsCancelled =
+const struct type_info type_FiberIsCancelled =
 	make_type("FiberIsCancelled", &type_Exception);
 
 FiberIsCancelled::FiberIsCancelled(const char *file, unsigned line)
@@ -212,7 +212,8 @@ FiberIsCancelled::log() const
 	say_info("fiber `%s': exiting", fiber_name(fiber()));
 }
 
-const struct type type_LuajitError = make_type("LuajitError", &type_Exception);
+const struct type_info type_LuajitError =
+	make_type("LuajitError", &type_Exception);
 
 LuajitError::LuajitError(const char *file, unsigned line,
 			 const char *msg)

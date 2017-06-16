@@ -39,7 +39,6 @@
 #include "small/rlist.h"
 #include "scoped_guard.h"
 #include "vclock.h"
-#include "gc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errinj.h>
@@ -111,10 +110,11 @@ Engine::abortCheckpoint()
 {
 }
 
-void
+int
 Engine::collectGarbage(int64_t lsn)
 {
 	(void) lsn;
+	return 0;
 }
 
 int
@@ -176,7 +176,6 @@ Handler::executeUpsert(struct txn *, struct space *, struct request *)
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
 }
-
 
 void
 Handler::executeSelect(struct txn *, struct space *space,
@@ -250,6 +249,16 @@ Handler::buildSecondaryKey(struct space *, struct space *, Index *)
 }
 
 void
+Handler::prepareTruncateSpace(struct space *, struct space *)
+{
+}
+
+void
+Handler::commitTruncateSpace(struct space *, struct space *)
+{
+}
+
+void
 Handler::prepareAlterSpace(struct space *, struct space *)
 {
 }
@@ -304,7 +313,6 @@ engine_bootstrap()
 void
 engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 {
-	/* recover engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
 		engine->beginInitialRecovery(recovery_vclock);
@@ -334,7 +342,6 @@ engine_end_recovery()
 int
 engine_begin_checkpoint()
 {
-	/* create engine snapshot */
 	Engine *engine;
 	engine_foreach(engine) {
 		if (engine->beginCheckpoint() < 0)
@@ -347,14 +354,10 @@ int
 engine_commit_checkpoint(struct vclock *vclock)
 {
 	Engine *engine;
-	/* wait for engine snapshot completion */
 	engine_foreach(engine) {
 		if (engine->waitCheckpoint(vclock) < 0)
 			return -1;
 	}
-	if (gc_add_checkpoint(vclock) < 0)
-		return -1;
-	/* remove previous snapshot reference */
 	engine_foreach(engine) {
 		engine->commitCheckpoint(vclock);
 	}
@@ -365,17 +368,19 @@ void
 engine_abort_checkpoint()
 {
 	Engine *engine;
-	/* rollback snapshot creation */
 	engine_foreach(engine)
 		engine->abortCheckpoint();
 }
 
-void
+int
 engine_collect_garbage(int64_t lsn)
 {
 	Engine *engine;
-	engine_foreach(engine)
-		engine->collectGarbage(lsn);
+	engine_foreach(engine) {
+		if (engine->collectGarbage(lsn) < 0)
+			return -1;
+	}
+	return 0;
 }
 
 int
