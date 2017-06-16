@@ -1934,6 +1934,28 @@ static void createSpace(
 }
 
 /*
+ * Generate code to initialize _truncate space
+ * iSpaceId is a register storing the id of the space.
+ * iCursor is a cursor to access _space.
+ */
+static void createTruncateCounter(
+  Parse *pParse,
+  int iSpaceId,
+  int iCursor,
+  Table *pSysTruncate
+){
+  Vdbe *v = sqlite3GetVdbe(pParse);
+  int iFirstCol = ++pParse->nMem;
+  int iRecord = (pParse->nMem += 2); /* 2 total columns */
+
+  sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */);
+  sqlite3VdbeAddOp2(v, OP_Integer, 0, iFirstCol+1 /* count */);
+  sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 2, iRecord);
+  sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 2);
+  sqlite3TableAffinity(v, pSysTruncate, 0);
+}
+
+/*
  * Generate code to create implicit indexes in the new table.
  * iSpaceId is a register storing the id of the space.
  * iCursor is a cursor to access _index.
@@ -2108,7 +2130,7 @@ void sqlite3EndTable(
     Vdbe *v;
     char *zType;   /* "VIEW" or "TABLE" */
     char *zStmt;    /* Text of the CREATE TABLE or CREATE VIEW statement */
-    Table *pSysSchema, *pSysSpace, *pSysIndex;
+    Table *pSysSchema, *pSysSpace, *pSysIndex, *pSysTruncate;
     int iCursor = pParse->nTab++;
     int iSpaceId;
 
@@ -2132,6 +2154,12 @@ void sqlite3EndTable(
       TARANTOOL_SYS_INDEX_NAME
     );
     if( NEVER(!pSysIndex) ) return;
+
+    pSysTruncate = sqlite3HashFind(
+      &pParse->db->aDb[0].pSchema->tblHash,
+      TARANTOOL_SYS_TRUNCATE_NAME
+    );
+    if( NEVER(!pSysTruncate) ) return;
 
     /*
     ** Initialize zType for the new view or table.
@@ -2219,6 +2247,8 @@ void sqlite3EndTable(
     iSpaceId = getNewSpaceId(pParse, iCursor);
     sqlite3OpenTable(pParse, iCursor, iDb, pSysSpace, OP_OpenWrite);
     createSpace(pParse, iSpaceId, zStmt, iCursor, pSysSpace);
+    sqlite3OpenTable(pParse, iCursor, iDb, pSysTruncate, OP_OpenWrite);
+    createTruncateCounter(pParse, iSpaceId, iCursor, pSysTruncate);
     sqlite3OpenTable(pParse, iCursor, iDb, pSysIndex, OP_OpenWrite);
     createImplicitIndices(pParse, iSpaceId, iCursor, pSysIndex);
     sqlite3VdbeAddOp1(v, OP_Close, iCursor);

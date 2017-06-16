@@ -702,6 +702,13 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		"name TEXT, opts, PRIMARY KEY(name))"
 	);
 
+	sql_schema_put(
+		init, TARANTOOL_SYS_TRUNCATE_NAME,
+		BOX_TRUNCATE_ID, 0,
+		"CREATE TABLE "TARANTOOL_SYS_TRUNCATE_NAME
+		" (id INT PRIMARY KEY, count INT NOT NULL)"
+	);
+
 	/* Read _space */
 	it = box_index_iterator(BOX_SPACE_ID, 0, ITER_GE,
 				nil_key, nil_key + sizeof(nil_key));
