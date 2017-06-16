@@ -113,17 +113,19 @@ error:
 /**
  * @pre pos points at a valid msgpack
  */
-void
+static inline int
 xrow_decode_uuid(const char **pos, struct tt_uuid *out)
 {
 	if (mp_typeof(**pos) != MP_STR) {
 error:
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "UUID");
+		diag_set(ClientError, ER_INVALID_MSGPACK, "UUID");
+		return -1;
 	}
 	uint32_t len = mp_decode_strl(pos);
 	if (tt_uuid_from_strl(*pos, len, out) != 0)
 		goto error;
 	*pos += len;
+	return 0;
 }
 
 int
@@ -183,7 +185,7 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 	return 1 + header->bodycnt; /* new iovcnt */
 }
 
-char *
+static inline char *
 xrow_encode_uuid(char *pos, const struct tt_uuid *in)
 {
 	return mp_encode_str(pos, tt_uuid_str(in), UUID_STR_LEN);
@@ -251,12 +253,18 @@ iproto_encode_error(uint32_t error)
 	return error | IPROTO_TYPE_ERROR;
 }
 
-void
+int
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 {
-	char *buf = (char *)obuf_alloc_xc(out, IPROTO_HEADER_LEN + 1);
+	char *buf = (char *)obuf_alloc(out, IPROTO_HEADER_LEN + 1);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, IPROTO_HEADER_LEN + 1, "obuf_alloc",
+			 "buf");
+		return -1;
+	}
 	iproto_header_encode(buf, IPROTO_OK, sync, schema_version, 1);
 	buf[IPROTO_HEADER_LEN] = 0x80; /* empty MessagePack Map */
+	return 0;
 }
 
 int
@@ -264,7 +272,7 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint32_t schema_version)
 {
 	uint32_t msg_len = strlen(e->errmsg);
-	uint32_t errcode = ClientError::get_errcode(e);
+	uint32_t errcode = box_error_code(e);
 
 	struct iproto_body_bin body = iproto_error_bin;
 	char *header = (char *)obuf_alloc(out, IPROTO_HEADER_LEN);
@@ -284,7 +292,7 @@ void
 iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
 {
 	uint32_t msg_len = strlen(e->errmsg);
-	uint32_t errcode = ClientError::get_errcode(e);
+	uint32_t errcode = box_error_code(e);
 
 	char header[IPROTO_HEADER_LEN];
 	struct iproto_body_bin body = iproto_error_bin;
@@ -360,7 +368,7 @@ request_decode(struct request *request, const char *data, uint32_t len,
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
-		tnt_error(ClientError, ER_INVALID_MSGPACK, "packet body");
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
 	uint32_t size = mp_decode_map(&data);
@@ -417,14 +425,14 @@ error:
 	}
 #ifndef NDEBUG
 	if (data != end) {
-		tnt_error(ClientError, ER_INVALID_MSGPACK, "packet end");
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
 		return -1;
 	}
 #endif
 	if (key_map) {
 		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);
-		tnt_error(ClientError, ER_MISSING_REQUEST_FIELD,
-			  iproto_key_name(key));
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 iproto_key_name(key));
 		return -1;
 	}
 	return 0;
@@ -438,7 +446,11 @@ request_encode(struct request *request, struct iovec *iov)
 	uint32_t key_len = request->key_end - request->key;
 	uint32_t ops_len = request->ops_end - request->ops;
 	uint32_t len = MAP_LEN_MAX + key_len + ops_len;
-	char *begin = (char *) region_alloc_xc(&fiber()->gc, len);
+	char *begin = (char *) region_alloc(&fiber()->gc, len);
+	if (begin == NULL) {
+		diag_set(OutOfMemory, len, "region_alloc", "begin");
+		return -1;
+	}
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
 	if (request->space_id) {
@@ -487,12 +499,21 @@ request_encode(struct request *request, struct iovec *iov)
 struct request *
 xrow_decode_request(struct xrow_header *row)
 {
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	struct request *request = region_alloc_object(region, struct request);
+	if (request == NULL) {
+		diag_set(OutOfMemory, sizeof(*request), "region_alloc_object",
+			 "request");
+		return NULL;
+	}
 	request_create(request, row->type);
-	request_decode_xc(request, (const char *) row->body[0].iov_base,
-			  row->body[0].iov_len,
-			  request_key_map(row->type));
+	if (request_decode(request, (const char *) row->body[0].iov_base,
+			   row->body[0].iov_len,
+			   request_key_map(row->type)) != 0) {
+		region_truncate(region, used);
+		return NULL;
+	}
 	request->header = row;
 	return request;
 }
@@ -500,9 +521,11 @@ xrow_decode_request(struct xrow_header *row)
 int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {
-	static const int iov0_len = mp_sizeof_uint(UINT32_MAX);
-	int iovcnt = xrow_header_encode_xc(row, out, iov0_len);
-	ssize_t len = -iov0_len;
+	assert(mp_sizeof_uint(UINT32_MAX) == 5);
+	int iovcnt = xrow_header_encode(row, out, 5);
+	if (iovcnt < 0)
+		return -1;
+	ssize_t len = -5;
 	for (int i = 0; i < iovcnt; i++)
 		len += out[i].iov_len;
 
@@ -515,7 +538,7 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 	return iovcnt;
 }
 
-void
+int
 xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len,
 		 const char *password, size_t password_len)
@@ -524,7 +547,11 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 	memset(packet, 0, sizeof(*packet));
 
 	size_t buf_size = XROW_BODY_LEN_MAX + login_len + SCRAMBLE_SIZE;
-	char *buf = (char *) region_alloc_xc(&fiber()->gc, buf_size);
+	char *buf = (char *) region_alloc(&fiber()->gc, buf_size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, buf_size, "region_alloc", "buf");
+		return -1;
+	}
 
 	char *d = buf;
 	d = mp_encode_map(d, password != NULL ? 2 : 1);
@@ -546,6 +573,7 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 	packet->body[0].iov_len = (d - buf);
 	packet->bodycnt = 1;
 	packet->type = IPROTO_AUTH;
+	return 0;
 }
 
 void
@@ -558,14 +586,14 @@ xrow_decode_error(struct xrow_header *row)
 	uint32_t map_size;
 
 	if (row->bodycnt == 0)
-		goto raise;
+		goto error;
 	pos = (char *) row->body[0].iov_base;
 	if (mp_check(&pos, pos + row->body[0].iov_len))
-		goto raise;
+		goto error;
 
 	pos = (char *) row->body[0].iov_base;
 	if (mp_typeof(*pos) != MP_MAP)
-		goto raise;
+		goto error;
 	map_size = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*pos) != MP_UINT) {
@@ -584,12 +612,11 @@ xrow_decode_error(struct xrow_header *row)
 		snprintf(error, sizeof(error), "%.*s", len, str);
 	}
 
-raise:
+error:
 	box_error_set(__FILE__, __LINE__, code, error);
-	diag_raise();
 }
 
-void
+int
 xrow_encode_subscribe(struct xrow_header *row,
 		      const struct tt_uuid *replicaset_uuid,
 		      const struct tt_uuid *instance_uuid,
@@ -599,7 +626,11 @@ xrow_encode_subscribe(struct xrow_header *row,
 	uint32_t replicaset_size = vclock_size(vclock);
 	size_t size = XROW_BODY_LEN_MAX + replicaset_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
 	char *data = buf;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
@@ -619,20 +650,25 @@ xrow_encode_subscribe(struct xrow_header *row,
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
 	row->type = IPROTO_SUBSCRIBE;
+	return 0;
 }
 
-void
+int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock)
 {
-	if (row->bodycnt == 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
+		return -1;
+	}
 	assert(row->bodycnt == 1);
 	const char *data = (const char *) row->body[0].iov_base;
 	const char *end = data + row->body[0].iov_len;
 	const char *d = data;
-	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
+	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
+		return -1;
+	}
 
 	const char *lsnmap = NULL;
 	d = data;
@@ -648,19 +684,22 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		case IPROTO_CLUSTER_UUID:
 			if (replicaset_uuid == NULL)
 				goto skip;
-			xrow_decode_uuid(&d, replicaset_uuid);
+			if (xrow_decode_uuid(&d, replicaset_uuid) != 0)
+				return -1;
 			break;
 		case IPROTO_INSTANCE_UUID:
 			if (instance_uuid == NULL)
 				goto skip;
-			xrow_decode_uuid(&d, instance_uuid);
+			if (xrow_decode_uuid(&d, instance_uuid) != 0)
+				return -1;
 			break;
 		case IPROTO_VCLOCK:
 			if (vclock == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_MAP) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid VCLOCK");
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "invalid VCLOCK");
+				return -1;
 			}
 			lsnmap = d;
 			mp_next(&d);
@@ -671,7 +710,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 	}
 
 	if (lsnmap == NULL)
-		return;
+		return 0;
 
 	/* Check & save LSNMAP */
 	d = lsnmap;
@@ -679,7 +718,8 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 	for (uint32_t i = 0; i < lsnmap_size; i++) {
 		if (mp_typeof(*d) != MP_UINT) {
 		map_error:
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
+			diag_set(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
+			return -1;
 		}
 		uint32_t id = mp_decode_uint(&d);
 		if (mp_typeof(*d) != MP_UINT)
@@ -688,15 +728,20 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		if (lsn > 0)
 			vclock_follow(vclock, id, lsn);
 	}
+	return 0;
 }
 
-void
+int
 xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid)
 {
 	memset(row, 0, sizeof(*row));
 
 	size_t size = 64;
-	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
@@ -708,9 +753,10 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid)
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
 	row->type = IPROTO_JOIN;
+	return 0;
 }
 
-void
+int
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 {
 	memset(row, 0, sizeof(*row));
@@ -719,7 +765,11 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	uint32_t replicaset_size = vclock_size(vclock);
 	size_t size = 8 + replicaset_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc_xc(&fiber()->gc, size);
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
@@ -735,11 +785,12 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
 	row->type = IPROTO_OK;
+	return 0;
 }
 
 void
-greeting_encode(char *greetingbuf, uint32_t version_id, const tt_uuid *uuid,
-		const char *salt, uint32_t salt_len)
+greeting_encode(char *greetingbuf, uint32_t version_id,
+		const struct tt_uuid *uuid, const char *salt, uint32_t salt_len)
 {
 	int h = IPROTO_GREETING_SIZE / 2;
 	int r = snprintf(greetingbuf, h + 1, "Tarantool %u.%u.%u (Binary) ",

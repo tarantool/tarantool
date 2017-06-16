@@ -65,7 +65,7 @@ void
 coio_write_xrow(struct ev_io *coio, const struct xrow_header *row)
 {
 	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec(row, iov);
+	int iovcnt = xrow_to_iovec_xc(row, iov);
 	coio_writev(coio, iov, iovcnt, 0);
 }
 

@@ -288,7 +288,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
-	struct request *request = xrow_decode_request(row);
+	struct request *request = xrow_decode_request_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	process_rw(request, space, NULL);
 }
@@ -326,7 +326,7 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request = xrow_decode_request(row);
+	struct request *request = xrow_decode_request_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
@@ -1106,7 +1106,7 @@ box_process_auth(struct request *request, struct obuf *out)
 	uint32_t len = mp_decode_strl(&user);
 	authenticate(user, len, request->tuple, request->tuple_end);
 	assert(request->header != NULL);
-	iproto_reply_ok(out, request->header->sync, ::schema_version);
+	iproto_reply_ok_xc(out, request->header->sync, ::schema_version);
 }
 
 void
@@ -1203,7 +1203,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Respond to JOIN request with start_vclock. */
 	struct xrow_header row;
-	xrow_encode_vclock(&row, &start_vclock);
+	xrow_encode_vclock_xc(&row, &start_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1231,7 +1231,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	wal_checkpoint(&stop_vclock, false);
 
 	/* Send end of initial stage data marker */
-	xrow_encode_vclock(&row, &stop_vclock);
+	xrow_encode_vclock_xc(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1245,7 +1245,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Send end of WAL stream marker */
 	struct vclock current_vclock;
 	wal_checkpoint(&current_vclock, false);
-	xrow_encode_vclock(&row, &current_vclock);
+	xrow_encode_vclock_xc(&row, &current_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -1262,8 +1262,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct tt_uuid replicaset_uuid = uuid_nil, replica_uuid = uuid_nil;
 	struct vclock replica_clock;
 	vclock_create(&replica_clock);
-	xrow_decode_subscribe(header, &replicaset_uuid, &replica_uuid,
-			      &replica_clock);
+	xrow_decode_subscribe_xc(header, &replicaset_uuid, &replica_uuid,
+				 &replica_clock);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
@@ -1306,7 +1306,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct xrow_header row;
 	struct vclock current_vclock;
 	wal_checkpoint(&current_vclock, true);
-	xrow_encode_vclock(&row, &current_vclock);
+	xrow_encode_vclock_xc(&row, &current_vclock);
 	/*
 	 * Identify the message with the replica id of this
 	 * instance, this is the only way for a replica to find
