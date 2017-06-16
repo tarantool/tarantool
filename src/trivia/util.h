@@ -475,6 +475,10 @@ tt_sprintf(const char *format, ...)
 	}									\
 } while(0)
 
+#if !defined(__cplusplus) && !defined(static_assert)
+# define static_assert _Static_assert
+#endif
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
