@@ -268,8 +268,11 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 		tuple_unref(itr->last_stmt);
 	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, tuple_format(itr->curr_stmt));
 	*ret = itr->last_stmt;
-	if (itr->last_stmt != NULL)
+	if (itr->last_stmt != NULL) {
+		itr->stat->get.rows++;
+		itr->stat->get.bytes += tuple_size(*ret);
 		return 0;
+	}
 	return -1;
 }
 
@@ -291,7 +294,6 @@ static int
 vy_mem_iterator_step(struct vy_mem_iterator *itr,
 		     enum iterator_type iterator_type)
 {
-	itr->stat->step_count++;
 	if (iterator_type == ITER_LE || iterator_type == ITER_LT)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	else
@@ -360,7 +362,7 @@ vy_mem_iterator_start_from(struct vy_mem_iterator *itr,
 			   const struct tuple *key)
 {
 	assert(! itr->search_started);
-	itr->stat->lookup_count++;
+	itr->stat->lookup++;
 	itr->version = itr->mem->version;
 	itr->search_started = true;
 
@@ -465,7 +467,7 @@ vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
 static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 
 void
-vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_iterator_stat *stat,
+vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     struct tuple *before_first)

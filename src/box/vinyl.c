@@ -232,8 +232,6 @@ struct vy_stat {
 	/* iterators statistics */
 	struct vy_iterator_stat txw_stat;
 	struct vy_iterator_stat cache_stat;
-	struct vy_iterator_stat mem_stat;
-	struct vy_iterator_stat run_stat;
 };
 
 static struct vy_stat *
@@ -4485,8 +4483,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_table_begin(h, "iterator");
 	vy_info_append_iterator_stat(h, "txw", &stat->txw_stat);
 	vy_info_append_iterator_stat(h, "cache", &stat->cache_stat);
-	vy_info_append_iterator_stat(h, "mem", &stat->mem_stat);
-	vy_info_append_iterator_stat(h, "run", &stat->run_stat);
 	info_table_end(h);
 
 	info_table_end(h);
@@ -4506,22 +4502,26 @@ static void
 vy_info_append_stmt_counter(struct info_handler *h, const char *name,
 			    const struct vy_stmt_counter *count)
 {
-	info_table_begin(h, name);
+	if (name != NULL)
+		info_table_begin(h, name);
 	info_append_int(h, "rows", count->rows);
 	info_append_int(h, "bytes", count->bytes);
-	info_table_end(h);
+	if (name != NULL)
+		info_table_end(h);
 }
 
 static void
 vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 				 const struct vy_disk_stmt_counter *count)
 {
-	info_table_begin(h, name);
+	if (name != NULL)
+		info_table_begin(h, name);
 	info_append_int(h, "rows", count->rows);
 	info_append_int(h, "bytes", count->bytes);
 	info_append_int(h, "bytes_compressed", count->bytes_compressed);
 	info_append_int(h, "pages", count->pages);
-	info_table_end(h);
+	if (name != NULL)
+		info_table_end(h);
 }
 
 void
@@ -4531,20 +4531,43 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	struct vy_index_stat *stat = &index->stat;
 
 	info_begin(h);
+
 	info_append_int(h, "rows", stat->disk.count.rows +
 				   stat->memory.count.rows);
 	info_append_int(h, "bytes", stat->disk.count.bytes +
 				    stat->memory.count.bytes);
-	vy_info_append_stmt_counter(h, "memory", &stat->memory.count);
-	vy_info_append_disk_stmt_counter(h, "disk", &stat->disk.count);
-	info_append_int(h, "range_size", index->opts.range_size);
-	info_append_int(h, "page_size", index->opts.page_size);
+
+	info_table_begin(h, "memory");
+	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
+	info_table_begin(h, "iterator");
+	info_append_int(h, "lookup", stat->memory.iterator.lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
+	info_table_end(h);
+	info_table_end(h);
+
+	info_table_begin(h, "disk");
+	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
+	info_table_begin(h, "iterator");
+	info_append_int(h, "lookup", stat->disk.iterator.lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->disk.iterator.get);
+	vy_info_append_disk_stmt_counter(h, "read", &stat->disk.iterator.read);
+	info_table_begin(h, "bloom");
+	info_append_int(h, "hit", stat->disk.iterator.bloom_hit);
+	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
+	info_table_end(h);
+	info_table_end(h);
+	info_table_end(h);
+
 	info_append_int(h, "range_count", index->range_count);
 	info_append_int(h, "run_count", index->run_count);
 	info_append_int(h, "run_avg", index->run_count / index->range_count);
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
+
 	info_append_double(h, "bloom_fpr", index->opts.bloom_fpr);
+	info_append_int(h, "range_size", index->opts.range_size);
+	info_append_int(h, "page_size", index->opts.page_size);
+
 	info_end(h);
 }
 
@@ -7656,22 +7679,23 @@ static void
 vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 {
 	struct vy_index *index = itr->index;
-	struct vy_iterator_stat *stat = &index->env->stat->mem_stat;
 	struct vy_merge_src *sub_src;
 
 	/* Add the active in-memory index. */
 	assert(index->mem != NULL);
 	sub_src = vy_merge_iterator_add(&itr->merge_iterator, true, false);
-	vy_mem_iterator_open(&sub_src->mem_iterator, stat, index->mem,
-			     itr->iterator_type, itr->key,
+	vy_mem_iterator_open(&sub_src->mem_iterator,
+			     &index->stat.memory.iterator,
+			     index->mem, itr->iterator_type, itr->key,
 			     itr->read_view, itr->curr_stmt);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						false, false);
-		vy_mem_iterator_open(&sub_src->mem_iterator, stat, mem,
-				     itr->iterator_type, itr->key,
+		vy_mem_iterator_open(&sub_src->mem_iterator,
+				     &index->stat.memory.iterator,
+				     mem, itr->iterator_type, itr->key,
 				     itr->read_view, itr->curr_stmt);
 	}
 }
@@ -7681,7 +7705,6 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
 	struct vy_index *index = itr->index;
-	struct vy_iterator_stat *stat = &index->env->stat->run_stat;
 	struct tuple_format *format;
 	struct vy_slice *slice;
 	/*
@@ -7708,7 +7731,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		assert(slice->run->info.max_lsn <= index->dump_lsn);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
-		vy_run_iterator_open(&sub_src->run_iterator, coio_read, stat,
+		vy_run_iterator_open(&sub_src->run_iterator, coio_read,
+				     &index->stat.disk.iterator,
 				     &index->env->run_env, slice,
 				     itr->iterator_type, itr->key,
 				     itr->read_view, index->key_def,

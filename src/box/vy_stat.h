@@ -57,17 +57,54 @@ struct vy_disk_stmt_counter {
 	int64_t pages;
 };
 
+/** Memory iterator statistics. */
+struct vy_mem_iterator_stat {
+	/** Number of lookups in the memory tree. */
+	int64_t lookup;
+	/** Number of statements returned by the iterator. */
+	struct vy_stmt_counter get;
+};
+
+/** Run iterator statistics. */
+struct vy_run_iterator_stat {
+	/** Number of lookups in the page index. */
+	int64_t lookup;
+	/** Number of statements returned by the iterator. */
+	struct vy_stmt_counter get;
+	/**
+	 * Number of times the bloom filter allowed to
+	 * avoid a disk read.
+	 */
+	int64_t bloom_hit;
+	/**
+	 * Number of times the bloom filter failed to
+	 * prevent a disk read.
+	 */
+	int64_t bloom_miss;
+	/**
+	 * Number of statements actually read from the disk.
+	 * It may be greater than the number of statements
+	 * returned by the iterator, because of page granularity
+	 * of disk reads.
+	 */
+	struct vy_disk_stmt_counter read;
+};
+
 /** Vinyl index statistics. */
 struct vy_index_stat {
 	/** Memory related statistics. */
 	struct {
 		/** Number of statements stored in memory. */
 		struct vy_stmt_counter count;
+		/** Memory iterator statistics. */
+		struct vy_mem_iterator_stat iterator;
 	} memory;
 	/** Disk related statistics. */
 	struct {
 		/** Number of statements stored on disk. */
 		struct vy_disk_stmt_counter count;
+		/** Run iterator statistics. */
+		struct vy_run_iterator_stat iterator;
 	} disk;
 };
 
