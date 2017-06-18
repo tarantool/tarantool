@@ -3108,6 +3108,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Account the new run.
 	 */
 	vy_index_add_run(index, new_run);
+	vy_stmt_counter_add_disk(&index->stat.disk.dump.out, &new_run->count);
 
 	/* Drop the reference held by the task. */
 	vy_run_unref(new_run);
@@ -3149,12 +3150,14 @@ delete_mems:
 			continue;
 		rlist_del_entry(mem, in_sealed);
 		vy_stmt_counter_sub(&index->stat.memory.count, &mem->count);
+		vy_stmt_counter_add(&index->stat.disk.dump.in, &mem->count);
 		vy_scheduler_remove_mem(scheduler, mem);
 		vy_mem_delete(mem);
 	}
 	index->version++;
 	index->dump_lsn = dump_lsn;
 	index->generation = task->generation;
+	index->stat.disk.dump.count++;
 
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
@@ -3425,6 +3428,8 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	if (new_slice != NULL) {
 		vy_index_add_run(index, new_run);
+		vy_stmt_counter_add_disk(&index->stat.disk.compact.out,
+					 &new_run->count);
 		/* Drop the reference held by the task. */
 		vy_run_unref(new_run);
 	} else
@@ -3446,6 +3451,8 @@ vy_task_compact_complete(struct vy_task *task)
 		next_slice = rlist_next_entry(slice, in_range);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
+		vy_stmt_counter_add_disk(&index->stat.disk.compact.in,
+					 &slice->count);
 		if (slice == last_slice)
 			break;
 	}
@@ -3453,6 +3460,7 @@ vy_task_compact_complete(struct vy_task *task)
 	range->version++;
 	vy_index_acct_range(index, range);
 	vy_range_update_compact_priority(range);
+	index->stat.disk.compact.count++;
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.
@@ -4524,6 +4532,17 @@ vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 		info_table_end(h);
 }
 
+static void
+vy_info_append_compact_stat(struct info_handler *h, const char *name,
+			    const struct vy_compact_stat *stat)
+{
+	info_table_begin(h, name);
+	info_append_int(h, "count", stat->count);
+	vy_info_append_stmt_counter(h, "in", &stat->in);
+	vy_info_append_stmt_counter(h, "out", &stat->out);
+	info_table_end(h);
+}
+
 void
 vy_index_info(struct vy_index *index, struct info_handler *h)
 {
@@ -4532,10 +4551,9 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 
 	info_begin(h);
 
-	info_append_int(h, "rows", stat->disk.count.rows +
-				   stat->memory.count.rows);
-	info_append_int(h, "bytes", stat->disk.count.bytes +
-				    stat->memory.count.bytes);
+	struct vy_stmt_counter count = stat->memory.count;
+	vy_stmt_counter_add_disk(&count, &stat->disk.count);
+	vy_info_append_stmt_counter(h, NULL, &count);
 
 	info_table_begin(h, "memory");
 	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
@@ -4556,6 +4574,8 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
 	info_table_end(h);
 	info_table_end(h);
+	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
+	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
 	info_table_end(h);
 
 	info_append_int(h, "range_count", index->range_count);

@@ -90,6 +90,15 @@ struct vy_run_iterator_stat {
 	struct vy_disk_stmt_counter read;
 };
 
+/** Dump/compaction statistics. */
+struct vy_compact_stat {
+	int32_t count;
+	/** Number of input statements. */
+	struct vy_stmt_counter in;
+	/** Number of output statements. */
+	struct vy_stmt_counter out;
+};
+
 /** Vinyl index statistics. */
 struct vy_index_stat {
 	/** Memory related statistics. */
@@ -105,6 +114,10 @@ struct vy_index_stat {
 		struct vy_disk_stmt_counter count;
 		/** Run iterator statistics. */
 		struct vy_run_iterator_stat iterator;
+		/** Dump statistics. */
+		struct vy_compact_stat dump;
+		/** Compaction statistics. */
+		struct vy_compact_stat compact;
 	} disk;
 };
 
@@ -122,6 +135,14 @@ vy_stmt_counter_sub(struct vy_stmt_counter *c1,
 {
 	c1->rows -= c2->rows;
 	c1->bytes -= c2->bytes;
+}
+
+static inline void
+vy_stmt_counter_add_disk(struct vy_stmt_counter *c1,
+			 const struct vy_disk_stmt_counter *c2)
+{
+	c1->rows += c2->rows;
+	c1->bytes += c2->bytes;
 }
 
 static inline void
