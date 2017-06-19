@@ -49,8 +49,8 @@ authenticate(const char *user_name, uint32_t len,
 	 * pooling.
 	 */
 	part_count = mp_decode_array(&tuple);
-	if (part_count == 0 && user->def.uid == GUEST &&
-	    memcmp(user->def.hash2, zero_hash, SCRAMBLE_SIZE) == 0) {
+	if (part_count == 0 && user->def->uid == GUEST &&
+	    memcmp(user->def->hash2, zero_hash, SCRAMBLE_SIZE) == 0) {
 		/* No password is set for GUEST, OK. */
 		goto ok;
 	}
@@ -79,14 +79,14 @@ authenticate(const char *user_name, uint32_t len,
 			   "invalid scramble size");
 	}
 
-	if (scramble_check(scramble, session->salt, user->def.hash2))
-		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def.name);
+	if (scramble_check(scramble, session->salt, user->def->hash2))
+		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def->name);
 
 	/* check and run auth triggers on success */
 	if (! rlist_empty(&session_on_auth) &&
-	    session_run_on_auth_triggers(user->def.name) != 0)
+	    session_run_on_auth_triggers(user->def->name) != 0)
 		diag_raise();
 ok:
 	credentials_init(&session->credentials, user->auth_token,
-			 user->def.uid);
+			 user->def->uid);
 }

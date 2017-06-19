@@ -73,7 +73,7 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
 			  "Create, drop or alter", schema_object_name(type),
-			  user->def.name);
+			  user->def->name);
 	}
 }
 
@@ -1516,7 +1516,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 bool
 user_has_data(struct user *user)
 {
-	uint32_t uid = user->def.uid;
+	uint32_t uid = user->def->uid;
 	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_PRIV_ID, BOX_PRIV_ID };
 	/*
 	 * owner index id #1 for _space and _func and _priv.
@@ -1593,9 +1593,19 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 	}
 }
 
-void
-user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
+static struct user_def *
+user_def_new_from_tuple(struct tuple *tuple)
 {
+	uint32_t len;
+	const char *name = tuple_field_str_xc(tuple, BOX_USER_FIELD_NAME, &len);
+	if (len > BOX_NAME_MAX)
+		tnt_raise(ClientError, ER_CREATE_USER,
+			  tt_cstr(name, len), "user name is too long");
+	size_t size = user_def_sizeof(len);
+	struct user_def *user = (struct user_def *) malloc(size);
+	if (user == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "user");
+	auto def_guard = make_scoped_guard([=] { free(user); });
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
@@ -1603,17 +1613,12 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 	const char *user_type =
 		tuple_field_cstr_xc(tuple, BOX_USER_FIELD_TYPE);
 	user->type= schema_object_type(user_type);
-	const char *name = tuple_field_cstr_xc(tuple, BOX_USER_FIELD_NAME);
-	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
-	if (len >= sizeof(user->name)) {
-		tnt_raise(ClientError, ER_CREATE_USER,
-			  name, "user name is too long");
-	}
-	if (user->type != SC_ROLE && user->type != SC_USER) {
+	memcpy(user->name, name, len);
+	user->name[len] = 0;
+	if (user->type != SC_ROLE && user->type != SC_USER)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
-	}
-	identifier_check(name);
+	identifier_check(user->name);
 	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain
@@ -1624,14 +1629,14 @@ user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 	if (tuple_field_count(tuple) > BOX_USER_FIELD_AUTH_MECH_LIST) {
 		const char *auth_data =
 			tuple_field(tuple, BOX_USER_FIELD_AUTH_MECH_LIST);
-		if (strlen(auth_data)) {
-			if (user->type == SC_ROLE)
-				tnt_raise(ClientError, ER_CREATE_ROLE,
-					  user->name, "authentication "
-					  "data can not be set for a role");
-		}
+		if (strlen(auth_data) != 0 && user->type == SC_ROLE)
+			tnt_raise(ClientError, ER_CREATE_ROLE, user->name,
+				  "authentication data can not be set for a "\
+				  "role");
 		user_def_fill_auth_data(user, auth_data);
 	}
+	def_guard.is_active = false;
+	return user;
 }
 
 static void
@@ -1650,9 +1655,10 @@ user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_last_stmt(txn);
-	struct user_def user;
-	user_def_create_from_tuple(&user, stmt->new_tuple);
-	user_cache_replace(&user);
+	struct user_def *user = user_def_new_from_tuple(stmt->new_tuple);
+	auto def_guard = make_scoped_guard([=] { free(user); });
+	user_cache_replace(user);
+	def_guard.is_active = false;
 }
 
 /**
@@ -1671,18 +1677,19 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 					  BOX_USER_FIELD_ID);
 	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
-		struct user_def user;
-		user_def_create_from_tuple(&user, new_tuple);
-		(void) user_cache_replace(&user);
+		struct user_def *user = user_def_new_from_tuple(new_tuple);
+		auto def_guard = make_scoped_guard([=] { free(user); });
+		(void) user_cache_replace(user);
+		def_guard.is_active = false;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_user->def.owner, SC_USER);
+		access_check_ddl(old_user->def->owner, SC_USER);
 		/* Can't drop guest or super user */
 		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->def.name,
+				  old_user->def->name,
 				  "the user or the role is a system");
 		}
 		/*
@@ -1691,7 +1698,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 */
 		if (user_has_data(old_user)) {
 			tnt_raise(ClientError, ER_DROP_USER,
-				  old_user->def.name, "the user has objects");
+				  old_user->def->name, "the user has objects");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
@@ -1703,8 +1710,8 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * password) but first check that the change is
 		 * correct.
 		 */
-		struct user_def user;
-		user_def_create_from_tuple(&user, new_tuple);
+		struct user_def *user = user_def_new_from_tuple(new_tuple);
+		auto def_guard = make_scoped_guard([=] { free(user); });
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_alter_user, NULL);
 		txn_on_commit(txn, on_commit);
@@ -1874,54 +1881,54 @@ priv_def_check(struct priv_def *priv)
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));
 	}
-	access_check_ddl(grantor->def.uid, priv->object_type);
+	access_check_ddl(grantor->def->uid, priv->object_type);
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		if (grantor->def.uid != ADMIN) {
+		if (grantor->def->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  "Grant", schema_object_name(priv->object_type),
-				  grantor->def.name);
+				  grantor->def->name);
 		}
 		break;
 	case SC_SPACE:
 	{
 		struct space *space = space_cache_find(priv->object_id);
-		if (space->def.uid != grantor->def.uid &&
-		    grantor->def.uid != ADMIN) {
+		if (space->def.uid != grantor->def->uid &&
+		    grantor->def->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  "Grant", schema_object_name(priv->object_type),
-				  grantor->def.name);
+				  grantor->def->name);
 		}
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func *func = func_cache_find(priv->object_id);
-		if (func->def->uid != grantor->def.uid &&
-		    grantor->def.uid != ADMIN) {
+		if (func->def->uid != grantor->def->uid &&
+		    grantor->def->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  "Grant", schema_object_name(priv->object_type),
-				  grantor->def.name);
+				  grantor->def->name);
 		}
 		break;
 	}
 	case SC_ROLE:
 	{
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->def.type != SC_ROLE) {
+		if (role == NULL || role->def->type != SC_ROLE) {
 			tnt_raise(ClientError, ER_NO_SUCH_ROLE,
-				  role ? role->def.name :
+				  role ? role->def->name :
 				  int2str(priv->object_id));
 		}
 		/*
 		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
 		 */
-		if (role->def.owner != grantor->def.uid &&
-		    grantor->def.uid != ADMIN &&
-		    (role->def.uid != PUBLIC || priv->access < PRIV_X)) {
+		if (role->def->owner != grantor->def->uid &&
+		    grantor->def->uid != ADMIN &&
+		    (role->def->uid != PUBLIC || priv->access < PRIV_X)) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
-				  "Grant", role->def.name, grantor->def.name);
+				  "Grant", role->def->name, grantor->def->name);
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
@@ -1947,7 +1954,7 @@ grant_or_revoke(struct priv_def *priv)
 		return;
 	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->def.type != SC_ROLE)
+		if (role == NULL || role->def->type != SC_ROLE)
 			return;
 		if (priv->access)
 			role_grant(grantee, role);

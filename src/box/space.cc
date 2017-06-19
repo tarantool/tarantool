@@ -62,7 +62,7 @@ access_check_space(struct space *space, uint8_t access)
 		 */
 		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->def.name, space->def.name);
+			  priv_name(access), user->def->name, space->def.name);
 	}
 }
 

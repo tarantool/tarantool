@@ -935,7 +935,7 @@ access_check_func(const char *name, uint32_t name_len)
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
 		struct user *user = user_find_xc(credentials->uid);
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->def.name, name_buf);
+			  priv_name(access), user->def->name, name_buf);
 	}
 
 	return func;
@@ -1044,7 +1044,7 @@ box_process_call(struct request *request, struct obuf *out)
 			struct user *owner = user_find_xc(func->def->uid);
 			credentials_init(&func->owner_credentials,
 					 owner->auth_token,
-					 owner->def.uid);
+					 owner->def->uid);
 		}
 		fiber_set_user(fiber(), &func->owner_credentials);
 	}

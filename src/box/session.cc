@@ -86,7 +86,7 @@ session_create(int fd)
 	session->sync = 0;
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user->auth_token,
-			 guest_user->def.uid);
+			 guest_user->def->uid);
 	if (fd >= 0)
 		random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i64ptr_node_t node;
@@ -118,7 +118,7 @@ session_create_on_demand(int fd)
 	/* Add a trigger to destroy session on fiber stop */
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
 	credentials_init(&s->credentials, admin_user->auth_token,
-			 admin_user->def.uid);
+			 admin_user->def->uid);
 	fiber_set_session(fiber(), s);
 	fiber_set_user(fiber(), &s->credentials);
 	return s;
