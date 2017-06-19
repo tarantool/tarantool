@@ -60,7 +60,7 @@ add_executable(vclock.test vclock.cc unit.c
     ${CMAKE_SOURCE_DIR}/src/histogram.c)
 target_link_libraries(vclock.test core salad small)
 add_executable(xrow.test xrow.cc unit.c
-    ${CMAKE_SOURCE_DIR}/src/box/xrow.cc
+    ${CMAKE_SOURCE_DIR}/src/box/xrow.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c
     ${CMAKE_SOURCE_DIR}/src/box/iproto_constants.c
     ${CMAKE_SOURCE_DIR}/src/box/errcode.c
