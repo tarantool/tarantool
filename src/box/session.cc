@@ -31,8 +31,6 @@
 #include "session.h"
 #include "fiber.h"
 #include "memory.h"
-
-#include "user_def.h"
 #include "assoc.h"
 #include "trigger.h"
 #include "random.h"

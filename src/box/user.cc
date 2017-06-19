@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "user.h"
-#include "user_def.h"
 #include "assoc.h"
 #include "schema.h"
 #include "space.h"

@@ -34,7 +34,6 @@
 #include "tuple.h"
 #include "say.h"
 #include "schema.h"
-#include "user_def.h"
 #include "space.h"
 
 void

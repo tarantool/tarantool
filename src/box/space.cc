@@ -36,7 +36,6 @@
 #include "tuple_compare.h"
 #include "scoped_guard.h"
 #include "trigger.h"
-#include "user_def.h"
 #include "user.h"
 #include "session.h"
 

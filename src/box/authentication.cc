@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "user.h"
-#include "user_def.h"
 #include "session.h"
 
 static char zero_hash[SCRAMBLE_SIZE];
