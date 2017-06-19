@@ -33,6 +33,8 @@
 
 #include <stdint.h>
 
+#include "tuple.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -120,6 +122,44 @@ struct vy_index_stat {
 		struct vy_compact_stat compact;
 	} disk;
 };
+
+/** Tuple cache statistics. */
+struct vy_cache_stat {
+	/** Number of statements in the cache. */
+	struct vy_stmt_counter count;
+	/** Number of lookups in the cache. */
+	int64_t lookup;
+	/** Number of reads from the cache. */
+	struct vy_stmt_counter get;
+	/** Number of writes to the cache. */
+	struct vy_stmt_counter put;
+	/**
+	 * Number of statements removed from the cache
+	 * due to overwrite.
+	 */
+	struct vy_stmt_counter invalidate;
+	/**
+	 * Number of statements removed from the cache
+	 * due to memory shortage.
+	 */
+	struct vy_stmt_counter evict;
+};
+
+static inline void
+vy_stmt_counter_acct_tuple(struct vy_stmt_counter *c,
+			   const struct tuple *tuple)
+{
+	c->rows++;
+	c->bytes += tuple_size(tuple);
+}
+
+static inline void
+vy_stmt_counter_unacct_tuple(struct vy_stmt_counter *c,
+			     const struct tuple *tuple)
+{
+	c->rows--;
+	c->bytes -= tuple_size(tuple);
+}
 
 static inline void
 vy_stmt_counter_add(struct vy_stmt_counter *c1,

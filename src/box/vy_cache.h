@@ -39,6 +39,7 @@
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_stat.h"
 #include "small/mempool.h"
 
 #if defined(__cplusplus)
@@ -153,6 +154,8 @@ struct vy_cache {
 	uint32_t version;
 	/* Saved pointer to common cache environment */
 	struct vy_cache_env *env;
+	/* Cache statistics. */
+	struct vy_cache_stat stat;
 };
 
 /**
@@ -205,8 +208,6 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 struct vy_cache_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
-	/** Iterator usage statistics */
-	struct vy_iterator_stat *stat;
 	/* The cache */
 	struct vy_cache *cache;
 
@@ -242,8 +243,7 @@ struct vy_cache_iterator {
  * @param vlsn - LSN visibility, iterator shows values with lsn <= vlsn
  */
 void
-vy_cache_iterator_open(struct vy_cache_iterator *itr,
-		       struct vy_iterator_stat *stat, struct vy_cache *cache,
+vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key, const struct vy_read_view **rv);
 

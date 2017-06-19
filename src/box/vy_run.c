@@ -1551,8 +1551,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
 	if (rc == 0) {
 		itr->curr_stmt_pos = itr->curr_pos;
 		itr->curr_stmt = *result;
-		itr->stat->get.rows++;
-		itr->stat->get.bytes += tuple_size(*result);
+		vy_stmt_counter_acct_tuple(&itr->stat->get, *result);
 	}
 	return rc;
 }

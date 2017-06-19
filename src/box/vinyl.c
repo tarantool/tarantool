@@ -232,7 +232,6 @@ struct vy_stat {
 	int64_t dump_total;
 	/* iterators statistics */
 	struct vy_iterator_stat txw_stat;
-	struct vy_iterator_stat cache_stat;
 };
 
 static struct vy_stat *
@@ -4491,7 +4490,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 
 	info_table_begin(h, "iterator");
 	vy_info_append_iterator_stat(h, "txw", &stat->txw_stat);
-	vy_info_append_iterator_stat(h, "cache", &stat->cache_stat);
 	info_table_end(h);
 
 	info_table_end(h);
@@ -4549,6 +4547,7 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 {
 	char buf[1024];
 	struct vy_index_stat *stat = &index->stat;
+	struct vy_cache_stat *cache_stat = &index->cache.stat;
 
 	info_begin(h);
 
@@ -4577,6 +4576,15 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	info_table_end(h);
 	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
 	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
+	info_table_end(h);
+
+	info_table_begin(h, "cache");
+	vy_info_append_stmt_counter(h, NULL, &cache_stat->count);
+	info_append_int(h, "lookup", cache_stat->lookup);
+	vy_info_append_stmt_counter(h, "get", &cache_stat->get);
+	vy_info_append_stmt_counter(h, "put", &cache_stat->put);
+	vy_info_append_stmt_counter(h, "invalidate", &cache_stat->invalidate);
+	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
 	info_table_end(h);
 
 	info_append_int(h, "range_count", index->range_count);
@@ -7679,8 +7687,7 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 {
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
-	struct vy_iterator_stat *stat = &itr->index->env->stat->cache_stat;
-	vy_cache_iterator_open(&sub_src->cache_iterator, stat,
+	vy_cache_iterator_open(&sub_src->cache_iterator,
 			       &itr->index->cache, itr->iterator_type,
 			       itr->key, itr->read_view);
 	if (itr->curr_stmt != NULL) {
