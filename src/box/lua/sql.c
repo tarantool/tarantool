@@ -155,7 +155,7 @@ lua_push_row(struct lua_State *L, struct prep_stmt_list *l)
 		switch (type) {
 		case SQLITE_INTEGER:
 			typestr[i] = 'i';
-			lua_pushinteger(L, sqlite3_column_int(stmt, i));
+            luaL_pushint64(L, sqlite3_column_int64(stmt, i));
 			break;
 		case SQLITE_FLOAT:
 			typestr[i] = 'f';
