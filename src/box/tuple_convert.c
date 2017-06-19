@@ -30,6 +30,12 @@
  */
 #include "tuple.h"
 #include "iobuf.h"
+#include <msgpuck/msgpuck.h>
+#include <yaml.h>
+#include "third_party/base64.h"
+#include <small/region.h>
+#include "fiber.h"
+#include <trivia/util.h>
 
 int
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
@@ -52,4 +58,225 @@ tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
 		memcpy(buf, data, bsize);
 	}
 	return bsize;
+}
+
+int
+append_output(void *arg, unsigned char *buf, size_t len)
+{
+	(void) arg;
+	char *buf_out = region_alloc(&fiber()->gc, len);
+	if (!buf_out) {
+		diag_set(OutOfMemory, len , "region_alloc", "append_output");
+		return 0;
+	}
+	memcpy(buf_out, buf, len);
+	return 1;
+}
+
+static int
+encode_node(yaml_emitter_t *emitter, const char **data);
+
+static int
+encode_table(yaml_emitter_t *emitter, const char **data)
+{
+	yaml_event_t ev;
+	yaml_mapping_style_t yaml_style = YAML_FLOW_MAPPING_STYLE;
+	if (!yaml_mapping_start_event_initialize(&ev, NULL, NULL, 0, yaml_style)
+			|| !yaml_emitter_emit(emitter, &ev)) {
+		diag_set(SystemError, "failed to init event libyaml");
+		return 0;
+	}
+
+	uint32_t size = mp_decode_map(data);
+	for (uint32_t i = 0; i < size; i++) {
+		if (!encode_node(emitter, data))
+			return 0;
+		if (!encode_node(emitter, data))
+			return 0;
+	}
+
+	if (!yaml_mapping_end_event_initialize(&ev) ||
+	    !yaml_emitter_emit(emitter, &ev)) {
+		diag_set(SystemError, "failed to end event libyaml");
+		return 0;
+	}
+
+	return 1;
+}
+
+
+static int
+encode_array(yaml_emitter_t *emitter, const char **data)
+{
+	yaml_event_t ev;
+	yaml_sequence_style_t yaml_style = YAML_FLOW_SEQUENCE_STYLE;
+	if (!yaml_sequence_start_event_initialize(&ev, NULL, NULL, 0,
+				yaml_style) ||
+			!yaml_emitter_emit(emitter, &ev)) {
+		diag_set(SystemError, "failed to init event libyaml");
+		return 0;
+	}
+
+	uint32_t size = mp_decode_array(data);
+	for (uint32_t i = 0; i < size; i++) {
+		if (!encode_node(emitter, data))
+		   return 0;
+	}
+
+	if (!yaml_sequence_end_event_initialize(&ev) ||
+	    !yaml_emitter_emit(emitter, &ev)) {
+		diag_set(SystemError, "failed to end event libyaml");
+		return 0;
+	}
+
+	return 1;
+}
+
+static int
+encode_node(yaml_emitter_t *emitter, const char **data)
+{
+	size_t len = 0;
+	const char *str = "";
+	yaml_char_t *tag = NULL;
+	yaml_event_t ev;
+	yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
+	int is_binary = 0;
+	char buf[FPCONV_G_FMT_BUFSIZE];
+	char *binary_encode = NULL;
+	int type = mp_typeof(**data);
+	switch(type) {
+	case MP_UINT:
+		len = snprintf(buf, sizeof(buf), "%llu",
+			       (unsigned long long) mp_decode_uint(data));
+		buf[len] = 0;
+		str = buf;
+		break;
+	case MP_INT:
+		len = snprintf(buf, sizeof(buf), "%lld",
+			       (long long) mp_decode_int(data));
+		buf[len] = 0;
+		str = buf;
+		break;
+	case MP_FLOAT:
+		fpconv_g_fmt(buf, mp_decode_float(data),
+			     FPCONV_G_FMT_MAX_PRECISION);
+		str = buf;
+		len = strlen(buf);
+		break;
+	case MP_DOUBLE:
+		fpconv_g_fmt(buf, mp_decode_double(data),
+			     FPCONV_G_FMT_MAX_PRECISION);
+		str = buf;
+		len = strlen(buf);
+		break;
+	case MP_ARRAY:
+		return encode_array(emitter, data);
+	case MP_MAP:
+		return encode_table(emitter, data);
+	case MP_STR:
+	case MP_BIN:
+		len = mp_decode_strbinl(data);
+		str = *data;
+		*data += len;
+		if (type == MP_STR && utf8_check_printable(str, len)) {
+			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			break;
+		}
+		style = YAML_ANY_SCALAR_STYLE;
+		/* Binary or not UTF8 */
+		is_binary = 1;
+		binary_encode = (char *) malloc(base64_bufsize(len));
+		if (binary_encode == NULL) {
+			diag_set(OutOfMemory, base64_bufsize(len),
+				 "malloc", "tuple_to_yaml");
+			return 0;
+		}
+		base64_encode(str, len, binary_encode, base64_bufsize(len));
+		str = binary_encode;
+		tag = (yaml_char_t *) "binary";
+		break;
+	case MP_BOOL:
+		if (mp_decode_bool(data)) {
+			str = "true";
+			len = 4;
+		} else {
+			str = "false";
+			len = 5;
+		}
+		break;
+	case MP_NIL:
+	case MP_EXT:
+		mp_decode_nil(data);
+		style = YAML_PLAIN_SCALAR_STYLE;
+		str = "null";
+		len = 4;
+		break;
+	default:
+		unreachable();
+	}
+
+	int rc = 1;
+	if (!yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str,
+					  len, !is_binary, !is_binary,
+					  style) ||
+	    !yaml_emitter_emit(emitter, &ev)) {
+		diag_set(OutOfMemory, len, "malloc", "tuple_to_yaml");
+		rc = 0;
+	}
+	if (is_binary)
+		free(binary_encode);
+
+	return rc;
+}
+
+char *
+tuple_to_yaml(const struct tuple *tuple)
+{
+	const char *data = tuple_data(tuple);
+	yaml_emitter_t emitter;
+	yaml_event_t ev;
+
+	size_t used = region_used(&fiber()->gc);
+
+	if (!yaml_emitter_initialize(&emitter)) {
+		diag_set(SystemError, "failed to init libyaml");
+		return NULL;
+	}
+	yaml_emitter_set_unicode(&emitter, 1);
+	yaml_emitter_set_indent(&emitter, 2);
+	yaml_emitter_set_width(&emitter, 2);
+	yaml_emitter_set_break(&emitter, YAML_LN_BREAK);
+	yaml_emitter_set_output(&emitter, &append_output, NULL);
+
+	if (!yaml_stream_start_event_initialize(&ev, YAML_UTF8_ENCODING) ||
+	    !yaml_emitter_emit(&emitter, &ev) ||
+	    !yaml_document_start_event_initialize(&ev, NULL, NULL, NULL, 1) ||
+	    !yaml_emitter_emit(&emitter, &ev)) {
+		diag_set(SystemError, "failed to init event libyaml");
+		goto error;
+	}
+	if (!encode_node(&emitter, &data))
+		goto error;
+
+	if (!yaml_document_end_event_initialize(&ev, 1) ||
+	    !yaml_emitter_emit(&emitter, &ev) ||
+	    !yaml_stream_end_event_initialize(&ev) ||
+	    !yaml_emitter_emit(&emitter, &ev) ||
+	    !yaml_emitter_flush(&emitter)) {
+		diag_set(SystemError, "failed to end event libyaml");
+		goto error;
+	}
+
+	yaml_emitter_delete(&emitter);
+
+	size_t total_len = region_used(&fiber()->gc) - used;
+	char *buf = (char *) region_join(&fiber()->gc, total_len);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, total_len, "region", "tuple_to_yaml");
+		return NULL;
+	}
+	return buf;
+error:
+	yaml_emitter_delete(&emitter);
+	return NULL;
 }

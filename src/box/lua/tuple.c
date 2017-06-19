@@ -34,6 +34,8 @@
 #include "lua/msgpack.h" /* luamp_encode_XXX() */
 #include "diag.h" /* diag_set() */
 #include <small/ibuf.h>
+#include <small/region.h>
+#include <fiber.h>
 
 #include "box/tuple.h"
 #include "box/errcode.h"
@@ -358,6 +360,22 @@ lbox_tuple_transform(struct lua_State *L)
 	return 1;
 }
 
+
+static int
+lbox_tuple_to_string(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	size_t used = region_used(&fiber()->gc);
+	char *res = tuple_to_yaml(tuple);
+	if (res == NULL) {
+		region_truncate(&fiber()->gc, used);
+		return luaT_error(L);
+	}
+	lua_pushstring(L, res);
+	region_truncate(&fiber()->gc, used);
+	return 1;
+}
+
 void
 luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 {
@@ -376,6 +394,7 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 
 static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
+	{"tostring", lbox_tuple_to_string},
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
 	{NULL, NULL}

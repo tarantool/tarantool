@@ -722,6 +722,16 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 ssize_t
 tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
 
+/**
+ * Convert tuple to yaml string
+ *
+ * \param tuple tuple
+ * \retval NULL in case of error written in diag
+ * \retval pointer to string allocated on fiber()->gc region
+ */
+char *
+tuple_to_yaml(const struct tuple *tuple);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
