@@ -272,12 +272,28 @@ space:drop()
 
 -- fix behaviour after https://github.com/tarantool/tarantool/issues/2104
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i = s:create_index('test')
+i = s:create_index('test', { run_count_per_level = 20 })
 
 s:replace({1, 1})
 box.snapshot()
 s:upsert({1, 1}, {{'+', 1, 1}})
 s:upsert({1, 1}, {{'+', 2, 1}})
 s:select() --both upserts are ignored due to primary key change
+
+-- gh-2520 use cache as a hint for upserts applying.
+old_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+s:upsert({100}, {{'=', 2, 200}})
+box.snapshot()
+s:get{100}
+new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+new_stat - old_stat
+old_stat = new_stat
+box.snapshot()
+s:upsert({100}, {{'=', 2, 300}})
+box.snapshot()
+s:get{100}
+new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+new_stat - old_stat
+old_stat = new_stat
 
 s:drop()

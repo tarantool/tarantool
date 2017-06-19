@@ -673,7 +673,7 @@ space:drop()
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
-i = s:create_index('test')
+i = s:create_index('test', { run_count_per_level = 20 })
 ---
 ...
 s:replace({1, 1})
@@ -693,6 +693,56 @@ s:upsert({1, 1}, {{'+', 2, 1}})
 s:select() --both upserts are ignored due to primary key change
 ---
 - - [1, 1]
+...
+-- gh-2520 use cache as a hint for upserts applying.
+old_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+---
+...
+s:upsert({100}, {{'=', 2, 200}})
+---
+...
+box.snapshot()
+---
+- ok
+...
+s:get{100}
+---
+- [100]
+...
+new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+---
+...
+new_stat - old_stat
+---
+- 1
+...
+old_stat = new_stat
+---
+...
+box.snapshot()
+---
+- ok
+...
+s:upsert({100}, {{'=', 2, 300}})
+---
+...
+box.snapshot()
+---
+- ok
+...
+s:get{100}
+---
+- [100, 300]
+...
+new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+---
+...
+new_stat - old_stat
+---
+- 2
+...
+old_stat = new_stat
+---
 ...
 s:drop()
 ---
