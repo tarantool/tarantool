@@ -349,7 +349,8 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 }
 
 void
-vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt)
+vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
+		  struct tuple **deleted)
 {
 	vy_cache_gc(cache->env);
 	bool exact = false;
@@ -409,6 +410,11 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt)
 	if (exact) {
 		cache->version++;
 		struct vy_cache_entry *to_delete = *entry;
+		assert(vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
+		if (deleted != NULL) {
+			*deleted = to_delete->stmt;
+			tuple_ref(to_delete->stmt);
+		}
 		vy_cache_tree_delete(&cache->cache_tree, to_delete);
 		vy_cache_entry_delete(cache->env, to_delete);
 	}

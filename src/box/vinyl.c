@@ -2644,7 +2644,7 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 		vy_index_commit_upsert(index, mem, stmt);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(&index->cache, stmt);
+	vy_cache_on_write(&index->cache, stmt, NULL);
 }
 
 /*
@@ -2660,7 +2660,7 @@ vy_index_rollback_stmt(struct vy_index *index, struct vy_mem *mem,
 	vy_mem_rollback_stmt(mem, stmt);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(&index->cache, stmt);
+	vy_cache_on_write(&index->cache, stmt, NULL);
 }
 
 /**
@@ -2848,13 +2848,40 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 	assert(*region_stmt == NULL ||
 	       vy_stmt_is_region_allocated(*region_stmt));
 
-	int rc = vy_index_set(index, mem, stmt, region_stmt);
-
 	/*
-	 * Invalidate cache element.
+	 * The UPSERT statement can be applied to the cached
+	 * statement, because the cache always contains only
+	 * newest REPLACE statements. In such a case the UPSERT,
+	 * applied to the cached statement, can be inserted
+	 * instead of the original UPSERT.
 	 */
-	vy_cache_on_write(&index->cache, stmt);
-	return rc;
+	if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
+		struct tuple *deleted = NULL;
+		/* Invalidate cache element. */
+		vy_cache_on_write(&index->cache, stmt, &deleted);
+		if (deleted != NULL) {
+			struct tuple *applied =
+				vy_apply_upsert(stmt, deleted, mem->key_def,
+						mem->format, mem->upsert_format,
+						false);
+			tuple_unref(deleted);
+			if (applied != NULL) {
+				assert(vy_stmt_type(applied) == IPROTO_REPLACE);
+				int rc = vy_index_set(index, mem, applied,
+						      region_stmt);
+				tuple_unref(applied);
+				return rc;
+			}
+			/*
+			 * Ignore a memory error, because it is
+			 * not critical to apply the optimization.
+			 */
+		}
+	} else {
+		/* Invalidate cache element. */
+		vy_cache_on_write(&index->cache, stmt, NULL);
+	}
+	return vy_index_set(index, mem, stmt, region_stmt);
 }
 
 /* {{{ Scheduler Task */

@@ -190,9 +190,12 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
  * Invalidate possibly cached value due to its overwriting
  * @param cache - pointer to tuple cache.
  * @param stmt - overwritten statement.
+ * @param[out] deleted - If not NULL, then is set to deleted
+ *             statement.
  */
 void
-vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt);
+vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
+		  struct tuple **deleted);
 
 
 /**

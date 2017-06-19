@@ -739,7 +739,7 @@ new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
 ...
 new_stat - old_stat
 ---
-- 2
+- 1
 ...
 old_stat = new_stat
 ---
