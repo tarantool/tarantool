@@ -77,7 +77,7 @@ lbox_checkcursor(struct lua_State *L, int narg, const char *src)
 
 /**
  * Replaces whitespace with underscore for xlog key names, e.g.
- * "page index offset" => "page_index_offset".
+ * "row index offset" => "row_index_offset".
  */
 static void
 lbox_xlog_pushkey(lua_State *L, const char *key)
@@ -101,8 +101,8 @@ lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const c
 		lbox_xlog_pushkey(L, vy_run_info_key_name(v));
 	} else if (type == VY_INDEX_PAGE_INFO && vy_page_info_key_name(v)) {
 		lbox_xlog_pushkey(L, vy_page_info_key_name(v));
-	} else if (type == VY_RUN_PAGE_INDEX && vy_page_index_key_name(v)) {
-		lbox_xlog_pushkey(L, vy_page_index_key_name(v));
+	} else if (type == VY_RUN_ROW_INDEX && vy_row_index_key_name(v)) {
+		lbox_xlog_pushkey(L, vy_row_index_key_name(v));
 	} else {
 		lua_pushinteger(L, v); /* unknown key */
 	}

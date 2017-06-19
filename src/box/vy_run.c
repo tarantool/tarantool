@@ -49,7 +49,7 @@ static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
 					     (1 << VY_PAGE_INFO_UNPACKED_SIZE) |
 					     (1 << VY_PAGE_INFO_ROW_COUNT) |
 					     (1 << VY_PAGE_INFO_MIN_KEY) |
-					     (1 << VY_PAGE_INFO_PAGE_INDEX_OFFSET);
+					     (1 << VY_PAGE_INFO_ROW_INDEX_OFFSET);
 
 static const uint64_t vy_run_info_key_map = (1 << VY_RUN_INFO_MIN_KEY) |
 					    (1 << VY_RUN_INFO_MAX_KEY) |
@@ -491,8 +491,8 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 		case VY_PAGE_INFO_UNPACKED_SIZE:
 			page->unpacked_size = mp_decode_uint(&pos);
 			break;
-		case VY_PAGE_INFO_PAGE_INDEX_OFFSET:
-			page->page_index_offset = mp_decode_uint(&pos);
+		case VY_PAGE_INFO_ROW_INDEX_OFFSET:
+			page->row_index_offset = mp_decode_uint(&pos);
 			break;
 		default:
 			diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
@@ -647,10 +647,10 @@ vy_page_new(const struct vy_page_info *page_info)
 	}
 	page->unpacked_size = page_info->unpacked_size;
 	page->row_count = page_info->row_count;
-	page->page_index = calloc(page_info->row_count, sizeof(uint32_t));
-	if (page->page_index == NULL) {
+	page->row_index = calloc(page_info->row_count, sizeof(uint32_t));
+	if (page->row_index == NULL) {
 		diag_set(OutOfMemory, page_info->row_count * sizeof(uint32_t),
-			 "malloc", "page->page_index");
+			 "malloc", "page->row_index");
 		free(page);
 		return NULL;
 	}
@@ -659,7 +659,7 @@ vy_page_new(const struct vy_page_info *page_info)
 	if (page->data == NULL) {
 		diag_set(OutOfMemory, page_info->unpacked_size,
 			 "malloc", "page->data");
-		free(page->page_index);
+		free(page->row_index);
 		free(page);
 		return NULL;
 	}
@@ -669,14 +669,14 @@ vy_page_new(const struct vy_page_info *page_info)
 static void
 vy_page_delete(struct vy_page *page)
 {
-	uint32_t *page_index = page->page_index;
+	uint32_t *row_index = page->row_index;
 	char *data = page->data;
 #if !defined(NDEBUG)
-	memset(page_index, '#', sizeof(uint32_t) * page->row_count);
+	memset(row_index, '#', sizeof(uint32_t) * page->row_count);
 	memset(data, '#', page->unpacked_size);
 	memset(page, '#', sizeof(*page));
 #endif /* !defined(NDEBUG) */
-	free(page_index);
+	free(row_index);
 	free(data);
 	free(page);
 }
@@ -686,9 +686,9 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
 	     struct xrow_header *xrow)
 {
 	assert(stmt_no < page->row_count);
-	const char *data = page->data + page->page_index[stmt_no];
+	const char *data = page->data + page->row_index[stmt_no];
 	const char *data_end = stmt_no + 1 < page->row_count ?
-			       page->data + page->page_index[stmt_no + 1] :
+			       page->data + page->row_index[stmt_no + 1] :
 			       page->data + page->unpacked_size;
 	return xrow_header_decode(xrow, &data, data_end);
 }
@@ -790,10 +790,10 @@ vy_run_iterator_cache_clean(struct vy_run_iterator *itr)
 }
 
 static int
-vy_page_index_decode(uint32_t *page_index, uint32_t row_count,
+vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 		    struct xrow_header *xrow)
 {
-	assert(xrow->type == VY_RUN_PAGE_INDEX);
+	assert(xrow->type == VY_RUN_ROW_INDEX);
 	const char *pos = xrow->body->iov_base;
 	uint32_t map_size = mp_decode_map(&pos);
 	uint32_t map_item;
@@ -801,7 +801,7 @@ vy_page_index_decode(uint32_t *page_index, uint32_t row_count,
 	for (map_item = 0; map_item < map_size; ++map_item) {
 		uint32_t key = mp_decode_uint(&pos);
 		switch (key) {
-		case VY_PAGE_INDEX_DATA:
+		case VY_ROW_INDEX_DATA:
 			size = mp_decode_binl(&pos);
 			break;
 		}
@@ -809,14 +809,14 @@ vy_page_index_decode(uint32_t *page_index, uint32_t row_count,
 	if (size != sizeof(uint32_t) * row_count) {
 		/* TODO: report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
-			 tt_sprintf("Wrong page index size "
+			 tt_sprintf("Wrong row index size "
 				    "(expected %zu, got %u",
 				    sizeof(uint32_t) * row_count,
 				    (unsigned)size));
 		return -1;
 	}
 	for (uint32_t i = 0; i < row_count; ++i) {
-		page_index[i] = mp_load_u32(&pos);
+		row_index[i] = mp_load_u32(&pos);
 	}
 	assert(pos == xrow->body->iov_base + xrow->body->iov_len);
 	return 0;
@@ -863,19 +863,19 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 		goto error;
 
 	struct xrow_header xrow;
-	data_pos = page->data + page_info->page_index_offset;
+	data_pos = page->data + page_info->row_index_offset;
 	data_end = page->data + page_info->unpacked_size;
 	if (xrow_header_decode(&xrow, &data_pos, data_end) == -1)
 		goto error;
-	if (xrow.type != VY_RUN_PAGE_INDEX) {
+	if (xrow.type != VY_RUN_ROW_INDEX) {
 		/* TODO: report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
-			 tt_sprintf("Wrong page index type "
+			 tt_sprintf("Wrong row index type "
 				    "(expected %d, got %u)",
-				    VY_RUN_PAGE_INDEX, (unsigned)xrow.type));
+				    VY_RUN_ROW_INDEX, (unsigned)xrow.type));
 		goto error;
 	}
-	if (vy_page_index_decode(page->page_index, page->row_count, &xrow) != 0)
+	if (vy_row_index_decode(page->row_index, page->row_count, &xrow) != 0)
 		goto error;
 	region_truncate(&fiber()->gc, region_svp);
 	ERROR_INJECT(ERRINJ_VY_READ_PAGE, {
@@ -1981,23 +1981,23 @@ vy_run_dump_stmt(const struct tuple *value, struct xlog *data_xlog,
 }
 
 /**
- * Encode uint32_t array of row offsets (a page index) as xrow
+ * Encode uint32_t array of row offsets (row index) as xrow
  *
- * @param page_index row index
+ * @param row_index row index
  * @param row_count size of row index
  * @param[out] xrow xrow to fill.
  * @retval 0 for success
  * @retval -1 for error
  */
 static int
-vy_page_index_encode(const uint32_t *page_index, uint32_t row_count,
+vy_row_index_encode(const uint32_t *row_index, uint32_t row_count,
 		    struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
-	xrow->type = VY_RUN_PAGE_INDEX;
+	xrow->type = VY_RUN_ROW_INDEX;
 
 	size_t size = mp_sizeof_map(1) +
-		      mp_sizeof_uint(VY_PAGE_INDEX_DATA) +
+		      mp_sizeof_uint(VY_ROW_INDEX_DATA) +
 		      mp_sizeof_bin(sizeof(uint32_t) * row_count);
 	char *pos = region_alloc(&fiber()->gc, size);
 	if (pos == NULL) {
@@ -2006,10 +2006,10 @@ vy_page_index_encode(const uint32_t *page_index, uint32_t row_count,
 	}
 	xrow->body->iov_base = pos;
 	pos = mp_encode_map(pos, 1);
-	pos = mp_encode_uint(pos, VY_PAGE_INDEX_DATA);
+	pos = mp_encode_uint(pos, VY_ROW_INDEX_DATA);
 	pos = mp_encode_binl(pos, sizeof(uint32_t) * row_count);
 	for (uint32_t i = 0; i < row_count; ++i)
-		pos = mp_store_u32(pos, page_index[i]);
+		pos = mp_store_u32(pos, row_index[i]);
 	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
 	assert(xrow->body->iov_len == size);
 	xrow->bodycnt = 1;
@@ -2039,8 +2039,8 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	bool end_of_run = false;
 
 	/* row offsets accumulator */
-	struct ibuf page_index_buf;
-	ibuf_create(&page_index_buf, &cord()->slabc, sizeof(uint32_t) * 4096);
+	struct ibuf row_index_buf;
+	ibuf_create(&row_index_buf, &cord()->slabc, sizeof(uint32_t) * 4096);
 
 	if (run->info.page_count >= *page_info_capacity) {
 		uint32_t cap = *page_info_capacity > 0 ?
@@ -2050,7 +2050,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		if (page_info == NULL) {
 			diag_set(OutOfMemory, cap * sizeof(*page_info),
 				 "realloc", "struct vy_page_info");
-			goto error_page_index;
+			goto error_row_index;
 		}
 		run->page_info = page_info;
 		*page_info_capacity = cap;
@@ -2061,11 +2061,11 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		/* See comment to run_info->max_key allocation below. */
 		region_key = tuple_extract_key(*curr_stmt, key_def, NULL);
 		if (region_key == NULL)
-			goto error_page_index;
+			goto error_row_index;
 		assert(run->info.min_key == NULL);
 		run->info.min_key = vy_key_dup(region_key);
 		if (run->info.min_key == NULL)
-			goto error_page_index;
+			goto error_row_index;
 	}
 
 	page = run->page_info + run->info.page_count;
@@ -2075,7 +2075,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	/* Last written statement */
 	struct tuple *last_stmt = *curr_stmt;
 	do {
-		uint32_t *offset = (uint32_t *) ibuf_alloc(&page_index_buf,
+		uint32_t *offset = (uint32_t *) ibuf_alloc(&row_index_buf,
 							   sizeof(uint32_t));
 		if (offset == NULL) {
 			diag_set(OutOfMemory, sizeof(uint32_t),
@@ -2125,13 +2125,13 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	}
 
 	/* Save offset to row index  */
-	page->page_index_offset = page->unpacked_size;
+	page->row_index_offset = page->unpacked_size;
 
 	/* Write row index */
 	struct xrow_header xrow;
-	const uint32_t *page_index = (const uint32_t *) page_index_buf.rpos;
-	assert(ibuf_used(&page_index_buf) == sizeof(uint32_t) * page->row_count);
-	if (vy_page_index_encode(page_index, page->row_count, &xrow) < 0)
+	const uint32_t *row_index = (const uint32_t *) row_index_buf.rpos;
+	assert(ibuf_used(&row_index_buf) == sizeof(uint32_t) * page->row_count);
+	if (vy_row_index_encode(row_index, page->row_count, &xrow) < 0)
 		goto error_rollback;
 
 	ssize_t written = xlog_write_row(data_xlog, &xrow);
@@ -2144,7 +2144,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	if (written == 0)
 		written = xlog_flush(data_xlog);
 	if (written < 0)
-		goto error_page_index;
+		goto error_row_index;
 
 	page->size = written;
 
@@ -2153,13 +2153,13 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 	run->info.page_count++;
 	vy_run_acct_page(run, page);
 
-	ibuf_destroy(&page_index_buf);
+	ibuf_destroy(&row_index_buf);
 	return !end_of_run ? 0: 1;
 
 error_rollback:
 	xlog_tx_rollback(data_xlog);
-error_page_index:
-	ibuf_destroy(&page_index_buf);
+error_row_index:
+	ibuf_destroy(&row_index_buf);
 	return -1;
 }
 
@@ -2287,8 +2287,8 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 	       min_key_size +
 	       mp_sizeof_uint(VY_PAGE_INFO_UNPACKED_SIZE) +
 	       mp_sizeof_uint(page_info->unpacked_size) +
-	       mp_sizeof_uint(VY_PAGE_INFO_PAGE_INDEX_OFFSET) +
-	       mp_sizeof_uint(page_info->page_index_offset);
+	       mp_sizeof_uint(VY_PAGE_INFO_ROW_INDEX_OFFSET) +
+	       mp_sizeof_uint(page_info->row_index_offset);
 
 	char *pos = region_alloc(region, size);
 	if (pos == NULL) {
@@ -2311,8 +2311,8 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 	pos += min_key_size;
 	pos = mp_encode_uint(pos, VY_PAGE_INFO_UNPACKED_SIZE);
 	pos = mp_encode_uint(pos, page_info->unpacked_size);
-	pos = mp_encode_uint(pos, VY_PAGE_INFO_PAGE_INDEX_OFFSET);
-	pos = mp_encode_uint(pos, page_info->page_index_offset);
+	pos = mp_encode_uint(pos, VY_PAGE_INFO_ROW_INDEX_OFFSET);
+	pos = mp_encode_uint(pos, page_info->row_index_offset);
 	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
 	xrow->bodycnt = 1;
 

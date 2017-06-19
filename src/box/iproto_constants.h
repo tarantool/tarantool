@@ -156,7 +156,7 @@ enum iproto_type {
 	/** Vinyl page info stored in .index file */
 	VY_INDEX_PAGE_INFO = 101,
 	/** Vinyl row index stored in .run file */
-	VY_RUN_PAGE_INDEX = 102,
+	VY_RUN_ROW_INDEX = 102,
 
 	/**
 	 * Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h)
@@ -182,8 +182,8 @@ iproto_type_name(uint32_t type)
 		return "RUNINFO";
 	case VY_INDEX_PAGE_INFO:
 		return "PAGEINFO";
-	case VY_RUN_PAGE_INDEX:
-		return "PAGEINDEX";
+	case VY_RUN_ROW_INDEX:
+		return "ROWINDEX";
 	default:
 		return NULL;
 	}
@@ -318,7 +318,7 @@ enum vy_page_info_key {
 	/* Minimal key stored in the page. */
 	VY_PAGE_INFO_MIN_KEY = 5,
 	/** Offset of the row index in the page. */
-	VY_PAGE_INFO_PAGE_INDEX_OFFSET = 6,
+	VY_PAGE_INFO_ROW_INDEX_OFFSET = 6,
 	/** The last key in this enum + 1 */
 	VY_PAGE_INFO_KEY_MAX
 };
@@ -340,11 +340,11 @@ vy_page_info_key_name(enum vy_page_info_key key)
  * Xrow keys for Vinyl row index.
  * @sa struct vy_page_info.
  */
-enum vy_page_index_key {
+enum vy_row_index_key {
 	/** Array of row offsets. */
-	VY_PAGE_INDEX_DATA = 1,
+	VY_ROW_INDEX_DATA = 1,
 	/** The last key in this enum + 1 */
-	VY_PAGE_INDEX_KEY_MAX
+	VY_ROW_INDEX_KEY_MAX
 };
 
 /**
@@ -352,12 +352,12 @@ enum vy_page_index_key {
  * @param key key
  */
 static inline const char *
-vy_page_index_key_name(enum vy_page_index_key key)
+vy_row_index_key_name(enum vy_row_index_key key)
 {
-	if (key <= 0 || key >= VY_PAGE_INDEX_KEY_MAX)
+	if (key <= 0 || key >= VY_ROW_INDEX_KEY_MAX)
 		return NULL;
-	extern const char *vy_page_index_key_strs[];
-	return vy_page_index_key_strs[key];
+	extern const char *vy_row_index_key_strs[];
+	return vy_row_index_key_strs[key];
 }
 
 #if defined(__cplusplus)

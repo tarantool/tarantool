@@ -188,9 +188,9 @@ result
       - HEADER:
           type: PAGEINFO
         BODY:
+          row_index_offset: <offset>
           offset: <offset>
           size: 65
-          page_index_offset: <offset>
           unpacked_size: 46
           row_count: 3
           min_key: [1]
@@ -211,9 +211,9 @@ result
         BODY:
           tuple: [3]
       - HEADER:
-          type: PAGEINDEX
+          type: ROWINDEX
         BODY:
-          page_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
+          row_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
   - - 00000000000000000004.index
     - - HEADER:
           type: RUNINFO
@@ -227,9 +227,9 @@ result
       - HEADER:
           type: PAGEINFO
         BODY:
+          row_index_offset: <offset>
           offset: <offset>
           size: 65
-          page_index_offset: <offset>
           unpacked_size: 46
           row_count: 3
           min_key: [4]
@@ -250,9 +250,9 @@ result
         BODY:
           tuple: [6]
       - HEADER:
-          type: PAGEINDEX
+          type: ROWINDEX
         BODY:
-          page_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
+          row_index: "\0\0\0\0\0\0\0\t\0\0\0\x12"
 ...
 test_run:cmd("clear filter")
 ---

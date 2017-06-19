@@ -101,7 +101,7 @@ struct vy_page_info {
 	/** Minimal key stored in the page. */
 	char *min_key;
 	/** Offset of the row index in the page. */
-	uint32_t page_index_offset;
+	uint32_t row_index_offset;
 };
 
 /**
@@ -272,7 +272,7 @@ struct vy_page {
 	/** Number of statements in the page. */
 	uint32_t row_count;
 	/** Array of row offsets. */
-	uint32_t *page_index;
+	uint32_t *row_index;
 	/** Pointer to the page data. */
 	char *data;
 };
