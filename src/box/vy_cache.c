@@ -51,11 +51,11 @@ enum {
 
 void
 vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache,
-		    uint64_t mem_quota)
+		    size_t mem_quota)
 {
 	rlist_create(&e->cache_lru);
-	vy_quota_init(&e->quota, NULL, NULL, NULL);
-	vy_quota_set_limit(&e->quota, mem_quota);
+	e->mem_used = 0;
+	e->mem_quota = mem_quota;
 	mempool_create(&e->cache_entry_mempool, slab_cache,
 		       sizeof(struct vy_cache_entry));
 	e->cached_count = 0;
@@ -65,6 +65,12 @@ void
 vy_cache_env_destroy(struct vy_cache_env *e)
 {
 	mempool_destroy(&e->cache_entry_mempool);
+}
+
+static inline size_t
+vy_cache_entry_size(const struct vy_cache_entry *entry)
+{
+	return sizeof(*entry) + tuple_size(entry->stmt);
 }
 
 static struct vy_cache_entry *
@@ -82,8 +88,7 @@ vy_cache_entry_new(struct vy_cache_env *env, struct vy_cache *cache,
 	entry->left_boundary_level = cache->key_def->part_count;
 	entry->right_boundary_level = cache->key_def->part_count;
 	rlist_add(&env->cache_lru, &entry->in_lru);
-	size_t use = sizeof(struct vy_cache_entry) + tuple_size(stmt);
-	vy_quota_force_use(&env->quota, use);
+	env->mem_used += vy_cache_entry_size(entry);
 	env->cached_count++;
 	return entry;
 }
@@ -91,11 +96,11 @@ vy_cache_entry_new(struct vy_cache_env *env, struct vy_cache *cache,
 static void
 vy_cache_entry_delete(struct vy_cache_env *env, struct vy_cache_entry *entry)
 {
-	struct tuple *stmt = entry->stmt;
-	size_t put = sizeof(struct vy_cache_entry) + tuple_size(stmt);
+	assert(env->cached_count > 0);
 	env->cached_count--;
-	vy_quota_release(&env->quota, put);
-	tuple_unref(stmt);
+	assert(env->mem_used >= vy_cache_entry_size(entry));
+	env->mem_used -= vy_cache_entry_size(entry);
+	tuple_unref(entry->stmt);
 	rlist_del(&entry->in_lru);
 	TRASH(entry);
 	mempool_free(&env->cache_entry_mempool, entry);
@@ -190,9 +195,8 @@ vy_cache_gc_step(struct vy_cache_env *env)
 static void
 vy_cache_gc(struct vy_cache_env *env)
 {
-	struct vy_quota *q = &env->quota;
 	for (uint32_t i = 0;
-	     vy_quota_is_exceeded(q) && i < VY_CACHE_CLEANUP_MAX_STEPS;
+	     env->mem_used > env->mem_quota && i < VY_CACHE_CLEANUP_MAX_STEPS;
 	     i++) {
 		vy_cache_gc_step(env);
 	}

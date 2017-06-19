@@ -120,7 +120,7 @@ static inline void
 vy_quota_set_limit(struct vy_quota *q, size_t limit)
 {
 	q->limit = q->watermark = limit;
-	if (q->quota_exceeded_cb != NULL && q->used >= limit)
+	if (q->used >= limit)
 		q->quota_exceeded_cb(q);
 }
 
@@ -132,7 +132,7 @@ static inline void
 vy_quota_set_watermark(struct vy_quota *q, size_t watermark)
 {
 	q->watermark = watermark;
-	if (q->quota_exceeded_cb != NULL && q->used >= watermark)
+	if (q->used >= watermark)
 		q->quota_exceeded_cb(q);
 }
 
@@ -144,7 +144,7 @@ static inline void
 vy_quota_force_use(struct vy_quota *q, size_t size)
 {
 	q->used += size;
-	if (q->quota_exceeded_cb != NULL && q->used >= q->watermark)
+	if (q->used >= q->watermark)
 		q->quota_exceeded_cb(q);
 }
 
@@ -156,7 +156,7 @@ vy_quota_release(struct vy_quota *q, size_t size)
 {
 	assert(q->used >= size);
 	q->used -= size;
-	if (q->quota_released_cb != NULL && q->used < q->limit)
+	if (q->used < q->limit)
 		q->quota_released_cb(q);
 }
 
@@ -169,8 +169,7 @@ static inline int
 vy_quota_use(struct vy_quota *q, size_t size, ev_tstamp timeout)
 {
 	vy_quota_force_use(q, size);
-	while (q->quota_throttled_cb != NULL &&
-	       q->used >= q->limit && timeout > 0)
+	while (q->used >= q->limit && timeout > 0)
 		timeout = q->quota_throttled_cb(q, timeout);
 	if (q->used > q->limit) {
 		vy_quota_release(q, size);

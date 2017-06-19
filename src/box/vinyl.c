@@ -36,6 +36,7 @@
 #include "vy_log.h"
 #include "vy_upsert.h"
 #include "vy_write_iterator.h"
+#include "vy_quota.h"
 #include "vy_stat.h"
 
 #define RB_COMPACT 1
@@ -4485,7 +4486,7 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	struct vy_cache_env *ce = &env->cache_env;
 	info_table_begin(h, "cache");
 	info_append_int(h, "count", ce->cached_count);
-	info_append_int(h, "used", ce->quota.used);
+	info_append_int(h, "used", ce->mem_used);
 	info_table_end(h);
 
 	info_table_begin(h, "iterator");

@@ -39,7 +39,6 @@
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
-#include "vy_quota.h"
 #include "small/mempool.h"
 
 #if defined(__cplusplus)
@@ -115,12 +114,14 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a,
 struct vy_cache_env {
 	/** Common LRU list of read cache. The first element is the newest */
 	struct rlist cache_lru;
-	/** Common quota for read cache */
-	struct vy_quota quota;
 	/** Common mempool for vy_cache_entry struct */
 	struct mempool cache_entry_mempool;
 	/** Number of cached tuples */
 	size_t cached_count;
+	/** Size of memory occupied by cached tuples */
+	size_t mem_used;
+	/** Max memory size that can be used for cache */
+	size_t mem_quota;
 };
 
 /**
@@ -131,7 +132,7 @@ struct vy_cache_env {
  */
 void
 vy_cache_env_create(struct vy_cache_env *env, struct slab_cache *slab_cache,
-		    uint64_t mem_quota);
+		    size_t mem_quota);
 
 /**
  * Destroy and free resources of cache environment.
