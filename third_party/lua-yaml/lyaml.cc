@@ -45,8 +45,6 @@ extern "C" {
 
 #include "yaml.h"
 #include "b64.h"
-/* Use private header from bundled libyaml for IS_PRINTABLE() macro */
-#include "third_party/libyaml/src/yaml_private.h"
 } /* extern "C" */
 #include "lua/utils.h"
 
@@ -449,12 +447,11 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
    return 1;
 }
 
-/* Stolen from libyaml */
 static int
-yaml_check_utf8(const yaml_char_t *start, size_t length)
+utf8_check_printable(const char *start, size_t length)
 {
-    const yaml_char_t *end = start+length;
-    const yaml_char_t *pointer = start;
+    const unsigned char *end = (const unsigned char *) start + length;
+    const unsigned char *pointer = (const unsigned char *) start;
 
     while (pointer < end) {
         unsigned char octet;
@@ -483,11 +480,24 @@ yaml_check_utf8(const yaml_char_t *start, size_t length)
             (width == 3 && value >= 0x800) ||
             (width == 4 && value >= 0x10000))) return 0;
 
-        /* gh-354: yaml incorrectly escapes special characters in a string */
-        yaml_string_t ys; ys.pointer = (yaml_char_t *)pointer;
-        if (*pointer > 0x7F && !IS_PRINTABLE(ys))
-           return 0;
-
+        /*
+         * gh-354: yaml incorrectly escapes special characters in a string
+         * Check that the string can be actually printed unescaped.
+         */
+        if (*pointer > 0x7F && !(
+            (pointer[0] == 0x0A) ||
+            (pointer[0] >= 0x20 && pointer[0] <= 0x7E) ||
+            (pointer[0] == 0xC2 && pointer[1] >= 0xA0) ||
+            (pointer[0]  > 0xC2 && pointer[0]  < 0xED) ||
+            (pointer[0] == 0xED && pointer[1]  < 0xA0) ||
+            (pointer[0] == 0xEE) ||
+            (pointer[0] == 0xEF &&
+             !(pointer[1] == 0xBB && pointer[2] == 0xBF) &&
+             !(pointer[1] == 0xBF &&
+               (pointer[2] == 0xBE || pointer[2] == 0xBF)))
+            )) {
+            return 0;
+        }
         pointer += width;
     }
 
@@ -570,7 +580,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          break;
       }
       style = YAML_ANY_SCALAR_STYLE; // analyze_string(dumper, str, len, &is_binary);
-      if (yaml_check_utf8((const yaml_char_t *) str, len)) {
+      if (utf8_check_printable(str, len)) {
          if (yaml_is_flow_mode(dumper)) {
             style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
          } else if (strstr(str, "\n\n") != NULL) {
