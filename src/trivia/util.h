@@ -384,6 +384,15 @@ abspath(const char *filename);
 char *
 int2str(long long int val);
 
+/**
+ * Check that @a str is valid utf-8 sequence and can be printed
+ * unescaped.
+ * @param str string
+ * @param length string length
+ */
+int
+utf8_check_printable(const char *str, size_t length);
+
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */
 void *
