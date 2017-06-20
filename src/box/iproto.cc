@@ -266,6 +266,26 @@ iproto_connection_stop(struct iproto_connection *con)
 	rlist_add_tail(&stopped_connections, &con->in_stop_list);
 }
 
+/**
+ * Try to write an iproto error to a socket in the blocking mode.
+ * It is useful, when a connection is going to be closed and it is
+ * neccessary to response any error information to the user before
+ * closing.
+ * @param sock Socket to write to.
+ * @param error Error to write.
+ */
+static inline void
+iproto_write_error_blocking(int sock, const struct error *e)
+{
+	/* Set to blocking to write the error. */
+	int flags = fcntl(sock, F_GETFL, 0);
+	if (flags < 0)
+		return;
+	(void) fcntl(sock, F_SETFL, flags & (~O_NONBLOCK));
+	iproto_write_error(sock, e, ::schema_version);
+	(void) fcntl(sock, F_SETFL, flags);
+}
+
 static void
 iproto_connection_on_input(ev_loop * /* loop */, struct ev_io *watcher,
 			   int /* revents */);
@@ -773,7 +793,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		iproto_enqueue_batch(con, in);
 	} catch (Exception *e) {
 		/* Best effort at sending the error message to the client. */
-		iproto_write_error(fd, e, ::schema_version);
+		iproto_write_error_blocking(fd, e);
 		e->log();
 		iproto_connection_close(con);
 	}

@@ -30,7 +30,6 @@
  */
 #include "xrow.h"
 
-#include <fcntl.h>
 #include <msgpuck.h>
 #include <small/region.h>
 #include <small/obuf.h>
@@ -301,20 +300,9 @@ iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
 			     schema_version, sizeof(body) + msg_len);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
-
-	/* Set to blocking to write the error. */
-	int flags = fcntl(fd, F_GETFL, 0);
-	if (flags < 0)
-		return;
-
-	(void) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-
-	size_t r = write(fd, header, sizeof(header));
-	r = write(fd, &body, sizeof(body));
-	r = write(fd, e->errmsg, msg_len);
-	(void) r;
-
-	(void) fcntl(fd, F_SETFL, flags);
+	(void) write(fd, header, sizeof(header));
+	(void) write(fd, &body, sizeof(body));
+	(void) write(fd, e->errmsg, msg_len);
 }
 
 enum { SVP_SIZE = IPROTO_HEADER_LEN  + sizeof(iproto_body_bin) };
