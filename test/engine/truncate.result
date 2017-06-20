@@ -8,6 +8,35 @@ fiber =  require('fiber')
 ---
 ...
 --
+-- Check that space truncation is forbidden in a transaction.
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:insert{123}
+---
+...
+box.begin()
+---
+...
+s:truncate()
+---
+- error: Space _truncate does not support multi-statement transactions
+...
+box.commit()
+---
+...
+s:select()
+---
+- - [123]
+...
+s:drop()
+---
+...
+--
 -- Truncate space with no indexes.
 --
 s = box.schema.create_space('test', {engine = engine})

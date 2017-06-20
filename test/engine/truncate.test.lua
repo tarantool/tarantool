@@ -4,6 +4,18 @@ engine = test_run:get_cfg('engine')
 fiber =  require('fiber')
 
 --
+-- Check that space truncation is forbidden in a transaction.
+--
+s = box.schema.create_space('test', {engine = engine})
+_ = s:create_index('pk')
+_ = s:insert{123}
+box.begin()
+s:truncate()
+box.commit()
+s:select()
+s:drop()
+
+--
 -- Truncate space with no indexes.
 --
 s = box.schema.create_space('test', {engine = engine})
