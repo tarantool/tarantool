@@ -301,10 +301,6 @@ box.schema.space.create = function(name, options)
     }, { __serialize = 'map' })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
-
-    local _truncate = box.space[box.schema.TRUNCATE_ID]
-    _truncate:insert{id, 0}
-
     return box.space[id], "created"
 end
 

@@ -841,11 +841,12 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 static void
 space_truncate(struct space *space)
 {
-	char key_buf[16];
-	char *key_buf_end = key_buf;
-	key_buf_end = mp_encode_array(key_buf_end, 1);
-	key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
-	assert(key_buf_end < key_buf + sizeof(key_buf));
+	char tuple_buf[32];
+	char *tuple_buf_end = tuple_buf;
+	tuple_buf_end = mp_encode_array(tuple_buf_end, 2);
+	tuple_buf_end = mp_encode_uint(tuple_buf_end, space_id(space));
+	tuple_buf_end = mp_encode_uint(tuple_buf_end, 1);
+	assert(tuple_buf_end < tuple_buf + sizeof(tuple_buf));
 
 	char ops_buf[128];
 	char *ops_buf_end = ops_buf;
@@ -856,7 +857,7 @@ space_truncate(struct space *space)
 	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
 	assert(ops_buf_end < ops_buf + sizeof(ops_buf));
 
-	if (box_update(BOX_TRUNCATE_ID, 0, key_buf, key_buf_end,
+	if (box_upsert(BOX_TRUNCATE_ID, 0, tuple_buf, tuple_buf_end,
 		       ops_buf, ops_buf_end, 0, NULL) != 0)
 		diag_raise();
 }

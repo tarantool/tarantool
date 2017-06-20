@@ -45,6 +45,8 @@
 #include "replication.h" /* for replica_set_id() */
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
+#include "xrow.h"
+#include "iproto_constants.h"
 #include "memtx_tuple.h"
 
 /**
@@ -1398,7 +1400,6 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	txn_check_autocommit(txn, "Space _truncate");
-	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	if (new_tuple == NULL) {
@@ -1412,8 +1413,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		tuple_field_u64_xc(new_tuple, BOX_TRUNCATE_FIELD_COUNT);
 	struct space *old_space = space_cache_find(space_id);
 
-	if (old_tuple == NULL) {
-		/* Space create - initialize truncate_count. */
+	if (stmt->row->type == IPROTO_INSERT) {
+		/*
+		 * Space creation during initial recovery -
+		 * initialize truncate_count.
+		 */
 		old_space->truncate_count = truncate_count;
 		return;
 	}

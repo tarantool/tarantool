@@ -43,7 +43,7 @@ for i=1,10 do space:insert{i, 'tuple'..tostring(i)} end
 ...
 box.stat.INSERT.total
 ---
-- 13
+- 12
 ...
 box.stat.DELETE.total
 ---
