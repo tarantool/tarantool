@@ -64,12 +64,13 @@ int
 append_output(void *arg, unsigned char *buf, size_t len)
 {
 	(void) arg;
-	char *buf_out = region_alloc(&fiber()->gc, len);
+	char *buf_out = region_alloc(&fiber()->gc, len + 1);
 	if (!buf_out) {
-		diag_set(OutOfMemory, len , "region_alloc", "append_output");
+		diag_set(OutOfMemory, len , "region", "tuple_to_yaml");
 		return 0;
 	}
 	memcpy(buf_out, buf, len);
+	buf_out[len] = '\0';
 	return 1;
 }
 
@@ -132,17 +133,19 @@ encode_array(yaml_emitter_t *emitter, const char **data)
 	return 1;
 }
 
+#define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
+
 static int
 encode_node(yaml_emitter_t *emitter, const char **data)
 {
 	size_t len = 0;
 	const char *str = "";
+	size_t binlen = 0;
+	char *bin = NULL;
 	yaml_char_t *tag = NULL;
 	yaml_event_t ev;
 	yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
-	int is_binary = 0;
 	char buf[FPCONV_G_FMT_BUFSIZE];
-	char *binary_encode = NULL;
 	int type = mp_typeof(**data);
 	switch(type) {
 	case MP_UINT:
@@ -184,16 +187,17 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 		}
 		style = YAML_ANY_SCALAR_STYLE;
 		/* Binary or not UTF8 */
-		is_binary = 1;
-		binary_encode = (char *) malloc(base64_bufsize(len));
-		if (binary_encode == NULL) {
-			diag_set(OutOfMemory, base64_bufsize(len),
-				 "malloc", "tuple_to_yaml");
+		binlen = base64_bufsize(len);
+		bin = (char *) malloc(binlen);
+		if (bin == NULL) {
+			diag_set(OutOfMemory, binlen, "malloc",
+				 "tuple_to_yaml");
 			return 0;
 		}
-		base64_encode(str, len, binary_encode, base64_bufsize(len));
-		str = binary_encode;
-		tag = (yaml_char_t *) "binary";
+		binlen = base64_encode(str, len, bin, binlen);
+		str = bin;
+		len = binlen;
+		tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
 		break;
 	case MP_BOOL:
 		if (mp_decode_bool(data)) {
@@ -206,7 +210,11 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 		break;
 	case MP_NIL:
 	case MP_EXT:
-		mp_decode_nil(data);
+		if (type == MP_NIL) {
+			mp_decode_nil(data);
+		} else {
+			mp_next(data);
+		}
 		style = YAML_PLAIN_SCALAR_STYLE;
 		str = "null";
 		len = 4;
@@ -217,14 +225,14 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 
 	int rc = 1;
 	if (!yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str,
-					  len, !is_binary, !is_binary,
+					  len, bin == NULL, bin == NULL,
 					  style) ||
 	    !yaml_emitter_emit(emitter, &ev)) {
 		diag_set(OutOfMemory, len, "malloc", "tuple_to_yaml");
 		rc = 0;
 	}
-	if (is_binary)
-		free(binary_encode);
+	if (bin != NULL)
+		free(bin);
 
 	return rc;
 }
@@ -244,8 +252,7 @@ tuple_to_yaml(const struct tuple *tuple)
 	}
 	yaml_emitter_set_unicode(&emitter, 1);
 	yaml_emitter_set_indent(&emitter, 2);
-	yaml_emitter_set_width(&emitter, 2);
-	yaml_emitter_set_break(&emitter, YAML_LN_BREAK);
+	yaml_emitter_set_width(&emitter, INT_MAX);
 	yaml_emitter_set_output(&emitter, &append_output, NULL);
 
 	if (!yaml_stream_start_event_initialize(&ev, YAML_UTF8_ENCODING) ||
@@ -275,6 +282,10 @@ tuple_to_yaml(const struct tuple *tuple)
 		diag_set(OutOfMemory, total_len, "region", "tuple_to_yaml");
 		return NULL;
 	}
+	/* Remove trailing "\n\0" added by libyaml */
+	assert(total_len > 2);
+	assert(buf[total_len - 1] == '\0' && buf[total_len - 2] == '\n');
+	buf[total_len - 2] = '\0';
 	return buf;
 error:
 	yaml_emitter_delete(&emitter);

@@ -208,7 +208,6 @@ test_run:cmd("setopt delimiter ';'")
 t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
     -9223372036854775807LL});
 test_run:cmd("setopt delimiter ''");
-
 t:find('a')
 t:find(1, 'a')
 t:find('c')
@@ -321,4 +320,16 @@ ffi.typeof('struct tuple')
 box.tuple.new(string.rep('x', 100 * 1024 * 1024)) == nil
 collectgarbage('collect') -- collect huge string
 
+-- testing tostring
+test_run:cmd("setopt delimiter ';'")
+null = nil
+t = box.tuple.new({1, -2, 1.2, -1.2}, 'x', 'y', 'z', null, true, false,
+    {bin = "\x08\x5c\xc2\x80\x12\x2f",
+    big_num = tonumber64('18446744073709551615'),
+    map = {key = "value"},
+    double=1.0000000001,
+    utf8="Кудыкины горы"});
+tostring(t);
+t;
+test_run:cmd("setopt delimiter ''");
 test_run:cmd("clear filter")
