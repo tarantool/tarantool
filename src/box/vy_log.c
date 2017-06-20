@@ -659,6 +659,73 @@ fail:
 	return -1;
 }
 
+/**
+ * Duplicate a log record. All objects refered to by the record
+ * are duplicated as well.
+ */
+static struct vy_log_record *
+vy_log_record_dup(struct mempool *pool, const struct vy_log_record *src)
+{
+	struct vy_log_record *dst = mempool_alloc(pool);
+	if (dst == NULL) {
+		diag_set(OutOfMemory, sizeof(*dst),
+			 "malloc", "struct vy_log_record");
+		goto err;
+	}
+	*dst = *src;
+	if (src->begin != NULL) {
+		const char *data = src->begin;
+		mp_next(&data);
+		size_t size = data - src->begin;
+		dst->begin = malloc(size);
+		if (dst->begin == NULL) {
+			diag_set(OutOfMemory, size, "malloc",
+				 "struct vy_log_record");
+			goto err_begin;
+		}
+		memcpy((char *)dst->begin, src->begin, size);
+	}
+	if (src->end != NULL) {
+		const char *data = src->end;
+		mp_next(&data);
+		size_t size = data - src->end;
+		dst->end = malloc(size);
+		if (dst->end == NULL) {
+			diag_set(OutOfMemory, size, "malloc",
+				 "struct vy_log_record");
+			goto err_end;
+		}
+		memcpy((char *)dst->end, src->end, size);
+	}
+	if (src->key_def != NULL) {
+		dst->key_def = key_def_dup(src->key_def);
+		if (dst->key_def == NULL)
+			goto err_key_def;
+	}
+	return dst;
+
+err_key_def:
+	free((char *)dst->end);
+err_end:
+	free((char *)dst->begin);
+err_begin:
+	mempool_free(pool, dst);
+err:
+	return NULL;
+}
+
+/**
+ * Free a log record and all objects it refers to.
+ */
+static void
+vy_log_record_free(struct mempool *pool, struct vy_log_record *record)
+{
+	free((char *)record->begin);
+	free((char *)record->end);
+	free((struct key_def *)record->key_def);
+	mempool_free(pool, record);
+}
+
 void
 vy_log_init(const char *dir)
 {
@@ -725,7 +792,7 @@ vy_log_flush(void)
 	/* Success. Free flushed records. */
 	struct vy_log_record *next;
 	stailq_foreach_entry_safe(record, next, &vy_log.tx, in_tx)
-		mempool_free(&vy_log.record_pool, record);
+		vy_log_record_free(&vy_log.record_pool, record);
 	stailq_create(&vy_log.tx);
 	vy_log.tx_size = 0;
 	return 0;
@@ -1132,7 +1199,7 @@ rollback:
 	stailq_foreach_entry_safe(record, next, &rollback, in_tx) {
 		assert(vy_log.tx_size > 0);
 		vy_log.tx_size--;
-		mempool_free(&vy_log.record_pool, record);
+		vy_log_record_free(&vy_log.record_pool, record);
 	}
 	goto out;
 }
@@ -1156,16 +1223,14 @@ vy_log_write(const struct vy_log_record *record)
 
 	say_debug("%s: %s", __func__, vy_log_record_str(record));
 
-	struct vy_log_record *tx_record = mempool_alloc(&vy_log.record_pool);
+	struct vy_log_record *tx_record;
+	tx_record = vy_log_record_dup(&vy_log.record_pool, record);
 	if (tx_record == NULL) {
-		diag_set(OutOfMemory, sizeof(*tx_record),
-			 "malloc", "struct vy_log_record");
 		diag_move(diag_get(), &vy_log.tx_diag);
 		vy_log.tx_failed = true;
 		return;
 	}
 
-	*tx_record = *record;
 	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
 	vy_log.tx_size++;
 	if (vy_log.tx_begin == NULL)

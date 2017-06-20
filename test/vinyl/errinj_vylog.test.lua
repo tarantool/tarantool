@@ -107,6 +107,18 @@ s3 = box.schema.space.create('test3', {engine = 'vinyl'})
 _ = s3:create_index('pk')
 _ = s3:insert{666, 'fff'}
 
+-- gh-2532: replaying create/drop from xlog crashes tarantool
+test_run:cmd("setopt delimiter ';'")
+for i = 1, 10 do
+    s = box.schema.space.create('test', {engine = 'vinyl'})
+    s:create_index('primary')
+    s:create_index('secondary', {unique = false, parts = {2, 'string'}})
+    s:insert{i, 'test' .. i}
+    s:truncate()
+    s:drop()
+end
+test_run:cmd("setopt delimiter ''");
+
 test_run:cmd('restart server default')
 
 s1 = box.space.test1
