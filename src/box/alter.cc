@@ -1423,6 +1423,15 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	}
 
 	/*
+	 * System spaces use triggers to keep records in sync
+	 * with internal objects. Since space truncation doesn't
+	 * invoke triggers, we don't permit it for system spaces.
+	 */
+	if (space_is_system(old_space))
+		tnt_raise(ClientError, ER_TRUNCATE_SYSTEM_SPACE,
+			  space_name(old_space));
+
+	/*
 	 * Truncate counter is updated - truncate the space.
 	 */
 	struct truncate_space *truncate =

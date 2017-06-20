@@ -64,6 +64,17 @@ box.space.test:drop()
 ---
 ...
 --
+-- Check that truncation of system spaces is not permitted.
+--
+box.space._space:truncate()
+---
+- error: Can't truncate a system space, space '_space'
+...
+box.space._index:truncate()
+---
+- error: Can't truncate a system space, space '_index'
+...
+--
 -- Truncate space with no indexes.
 --
 s = box.schema.create_space('test', {engine = engine})

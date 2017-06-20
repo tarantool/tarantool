@@ -377,6 +377,7 @@ t;
   - 'box.error.SYSTEM : 115'
   - 'box.error.KEY_PART_IS_TOO_LONG : 118'
   - 'box.error.injection : table: <address>
+  - 'box.error.TRUNCATE_SYSTEM_SPACE : 137'
   - 'box.error.VY_QUOTA_TIMEOUT : 135'
   - 'box.error.USER_MAX : 56'
   - 'box.error.INVALID_XLOG_TYPE : 125'

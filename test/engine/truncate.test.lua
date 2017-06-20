@@ -28,6 +28,12 @@ box.space.test:select()
 box.space.test:drop()
 
 --
+-- Check that truncation of system spaces is not permitted.
+--
+box.space._space:truncate()
+box.space._index:truncate()
+
+--
 -- Truncate space with no indexes.
 --
 s = box.schema.create_space('test', {engine = engine})
