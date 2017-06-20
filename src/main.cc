@@ -526,6 +526,7 @@ main(int argc, char **argv)
 	    setlocale(LC_CTYPE, "en_US.UTF-8") == NULL &&
 	    setlocale(LC_CTYPE, "en_US.utf8") == NULL)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
+	fpconv_check();
 
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
 		if (argc == 2 && argv[1][0] != '-') {

@@ -653,29 +653,6 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		   lua_typename(L, lua_type(L, idx)));
 }
 
-const char *precision_fmts[] = {
-	"%.0lg", "%.1lg", "%.2lg", "%.3lg", "%.4lg", "%.5lg", "%.6lg", "%.7lg",
-	"%.8lg", "%.9lg", "%.10lg", "%.11lg", "%.12lg", "%.13lg", "%.14lg"
-};
-
-static void
-fpconv_init()
-{
-	char buf[8];
-
-	snprintf(buf, sizeof(buf), "%g", 0.5);
-
-	/* Failing this test might imply the platform has a buggy dtoa
-	 * implementation or wide characters */
-	assert(buf[0] == '0' && buf[2] == '5' && buf[3] == 0);
-
-	/*
-	 * Currently Tarantool doesn't support user locales (see main()).
-	 * Just check that locale decimal point is '.'.
-	 */
-	assert(buf[1] == '.');
-}
-
 /**
  * A helper to register a single type metatable.
  */
@@ -1005,7 +982,6 @@ tarantool_lua_utils_init(struct lua_State *L)
 	lua_setfield(L, -2, "__newindex");
 	luaL_array_metatable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-	fpconv_init();
 	return 0;
 }
 

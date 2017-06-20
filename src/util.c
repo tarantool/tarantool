@@ -261,3 +261,26 @@ utf8_check_printable(const char *start, size_t length)
 	}
 	return 1;
 }
+
+const char *precision_fmts[] = {
+	"%.0lg", "%.1lg", "%.2lg", "%.3lg", "%.4lg", "%.5lg", "%.6lg", "%.7lg",
+	"%.8lg", "%.9lg", "%.10lg", "%.11lg", "%.12lg", "%.13lg", "%.14lg"
+};
+
+void
+fpconv_check()
+{
+	char buf[8];
+
+	snprintf(buf, sizeof(buf), "%g", 0.5);
+
+	/* Failing this test might imply the platform has a buggy dtoa
+	 * implementation or wide characters */
+	assert(buf[0] == '0' && buf[2] == '5' && buf[3] == 0);
+
+	/*
+	 * Currently Tarantool doesn't support user locales (see main()).
+	 * Just check that locale decimal point is '.'.
+	 */
+	assert(buf[1] == '.');
+}
