@@ -327,13 +327,19 @@ httpc_request_new(struct httpc_env *env, const char *method,
 		curl_easy_setopt(req->easy, CURLOPT_HTTPGET, 1L);
 	} else if (strcmp(method, "HEAD") == 0) {
 		curl_easy_setopt(req->easy, CURLOPT_NOBODY, 1L);
-	} else if (strcmp(method, "POST") == 0) {
+	} else if (strcmp(method, "POST") == 0 ||
+		   strcmp(method, "PUT") == 0 ||
+		   strcmp(method, "PATCH")) {
+		/*
+		 * Set CURLOPT_POSTFIELDS to "" and CURLOPT_POSTFIELDSSIZE 0
+		 * to avoid the read callback in any cases even if user
+		 * forgot to call httpc_set_body() for POST request.
+		 * @see https://curl.haxx.se/libcurl/c/CURLOPT_POSTFIELDS.html
+		 */
 		curl_easy_setopt(req->easy, CURLOPT_POST, 1L);
-		if (httpc_set_header(req, "Accept: */*") < 0)
-			goto error;
-	} else if (strcmp(method, "PUT") == 0 || strcmp(method, "PATCH") == 0) {
+		curl_easy_setopt(req->easy, CURLOPT_POSTFIELDS, "");
+		curl_easy_setopt(req->easy, CURLOPT_POSTFIELDSIZE, 0);
 		curl_easy_setopt(req->easy, CURLOPT_CUSTOMREQUEST, method);
-		curl_easy_setopt(req->easy, CURLOPT_POST, 1L);
 		if (httpc_set_header(req, "Accept: */*") < 0)
 			goto error;
 	} else {

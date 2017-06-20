@@ -78,7 +78,7 @@ test:test("cancel and timeout", function(test)
 end)
 
 test:test("basic http post/get", function(test)
-    test:plan(16)
+    test:plan(19)
 
     local http = client.new()
     test:ok(http ~= nil, "client is created")
@@ -89,7 +89,7 @@ test:test("basic http post/get", function(test)
     local responses = {}
     local data = {a = 'b'}
     headers['Content-Type'] = 'application/json'
-    local fibers = 6
+    local fibers = 7
     local ch = fiber.channel(fibers)
     local _
     fiber.create(function()
@@ -102,6 +102,10 @@ test:test("basic http post/get", function(test)
     end)
     fiber.create(function()
         responses.good_post = http:post(URL, json_body, {headers = headers})
+        ch:put(1)
+    end)
+    fiber.create(function()
+        responses.empty_post = http:post(URL, nil, {headers = headers})
         ch:put(1)
     end)
     fiber.create(function()
@@ -132,6 +136,12 @@ test:test("basic http post/get", function(test)
     r = responses.absent_get
     test:is(r.status, 500, "GET: absent method http code page exists")
     test:is(r.body, "No such method", "GET: absent method right body")
+
+    r = responses.empty_post
+    test:is(r.status, 200, "POST: good status")
+    test:ok(r.headers['header1'] == headers.header1 and
+        r.headers['header2'] == headers.header2, "POST: good headers")
+    test:isnil(r.body, "POST: empty body")
 
     r = responses.good_post
     test:is(r.status, 200, "POST: good status")
