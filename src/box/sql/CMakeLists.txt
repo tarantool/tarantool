@@ -27,7 +27,7 @@ set(TEST_DEFINITIONS
     SQLITE_CORE=1
 )
 
-add_library(sql
+add_library(sql STATIC
     # Generated files
     opcodes.c
     parse.c
