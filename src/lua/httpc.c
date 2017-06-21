@@ -127,12 +127,12 @@ luaT_httpc_request(lua_State *L)
 
 	lua_getfield(L, 5, "keepalive_idle");
 	if (!lua_isnil(L, -1))
-		keepalive_idle = (long) lua_tointeger(L, -1);
+		keepalive_idle = (long) lua_tonumber(L, -1);
 	lua_pop(L, 1);
 
 	lua_getfield(L, 5, "keepalive_interval");
 	if (!lua_isnil(L, -1))
-		keepalive_interval = (long) lua_tointeger(L, -1);
+		keepalive_interval = (long) lua_tonumber(L, -1);
 	lua_pop(L, 1);
 
 	if (httpc_set_keepalive(req, keepalive_idle,
@@ -144,13 +144,13 @@ luaT_httpc_request(lua_State *L)
 	lua_getfield(L, 5, "low_speed_limit");
 	if (!lua_isnil(L, -1))
 		httpc_set_low_speed_limit(req,
-				(long) lua_tointeger(L, -1));
+				(long) lua_tonumber(L, -1));
 	lua_pop(L, 1);
 
 	lua_getfield(L, 5, "low_speed_time");
 	if (!lua_isnil(L, -1))
 		httpc_set_low_speed_time(req,
-				(long) lua_tointeger(L, -1));
+				(long) lua_tonumber(L, -1));
 	lua_pop(L, 1);
 
 	lua_getfield(L, 5, "timeout");

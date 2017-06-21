@@ -234,11 +234,11 @@ netbox_encode_select(lua_State *L)
 
 	luamp_encode_map(cfg, &stream, 6);
 
-	uint32_t space_id = lua_tointeger(L, 4);
-	uint32_t index_id = lua_tointeger(L, 5);
+	uint32_t space_id = lua_tonumber(L, 4);
+	uint32_t index_id = lua_tonumber(L, 5);
 	int iterator = lua_tointeger(L, 6);
-	uint32_t offset = lua_tointeger(L, 7);
-	uint32_t limit = lua_tointeger(L, 8);
+	uint32_t offset = lua_tonumber(L, 7);
+	uint32_t limit = lua_tonumber(L, 8);
 
 	/* encode space_id */
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
@@ -282,7 +282,7 @@ netbox_encode_insert_or_replace(lua_State *L, uint32_t reqtype)
 	luamp_encode_map(cfg, &stream, 2);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tointeger(L, 4);
+	uint32_t space_id = lua_tonumber(L, 4);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
@@ -319,12 +319,12 @@ netbox_encode_delete(lua_State *L)
 	luamp_encode_map(cfg, &stream, 3);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tointeger(L, 4);
+	uint32_t space_id = lua_tonumber(L, 4);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
 	/* encode space_id */
-	uint32_t index_id = lua_tointeger(L, 5);
+	uint32_t index_id = lua_tonumber(L, 5);
 	luamp_encode_uint(cfg, &stream, IPROTO_INDEX_ID);
 	luamp_encode_uint(cfg, &stream, index_id);
 
@@ -349,12 +349,12 @@ netbox_encode_update(lua_State *L)
 	luamp_encode_map(cfg, &stream, 5);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tointeger(L, 4);
+	uint32_t space_id = lua_tonumber(L, 4);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
 	/* encode index_id */
-	uint32_t index_id = lua_tointeger(L, 5);
+	uint32_t index_id = lua_tonumber(L, 5);
 	luamp_encode_uint(cfg, &stream, IPROTO_INDEX_ID);
 	luamp_encode_uint(cfg, &stream, index_id);
 
@@ -389,7 +389,7 @@ netbox_encode_upsert(lua_State *L)
 	luamp_encode_map(cfg, &stream, 4);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tointeger(L, 4);
+	uint32_t space_id = lua_tonumber(L, 4);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
@@ -462,7 +462,7 @@ netbox_decode_greeting(lua_State *L)
 static int
 netbox_communicate(lua_State *L)
 {
-	uint32_t fd = lua_tointeger(L, 1);
+	uint32_t fd = lua_tonumber(L, 1);
 	const int NETBOX_READAHEAD = 16320;
 	struct ibuf *send_buf = (struct ibuf *) lua_topointer(L, 2);
 	struct ibuf *recv_buf = (struct ibuf *) lua_topointer(L, 3);
@@ -475,7 +475,7 @@ netbox_communicate(lua_State *L)
 	if (lua_type(L, 4) == LUA_TSTRING)
 		boundary = lua_tolstring(L, 4, &boundary_len);
 	else
-		limit = lua_tointeger(L, 4);
+		limit = lua_tonumber(L, 4);
 
 	/* timeout */
 	ev_tstamp timeout = TIMEOUT_INFINITY;

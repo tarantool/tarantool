@@ -137,7 +137,7 @@ lbox_session_su(struct lua_State *L)
 		const char *name = lua_tolstring(L, 1, &len);
 		user = user_find_by_name(name, len);
 	} else {
-		user = user_find(lua_tointeger(L, 1));
+		user = user_find(lua_tonumber(L, 1));
 	}
 	if (user == NULL)
 		luaT_error(L);

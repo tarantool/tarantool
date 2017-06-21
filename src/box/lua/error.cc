@@ -58,7 +58,7 @@ luaT_error_raise(lua_State *L)
 			luaT_error(L);
 		return 0;
 	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
-		code = lua_tointeger(L, 2);
+		code = lua_tonumber(L, 2);
 		reason = tnt_errcode_desc(code);
 		if (top > 2) {
 			/* Call string.format(reason, ...) to format message */
@@ -80,7 +80,7 @@ luaT_error_raise(lua_State *L)
 	} else if (top == 2 && lua_istable(L, 2)) {
 		/* A special case that rethrows raw error (used by net.box) */
 		lua_getfield(L, 2, "code");
-		code = lua_tointeger(L, -1);
+		code = lua_tonumber(L, -1);
 		lua_pop(L, 1);
 		lua_getfield(L, 2, "reason");
 		reason = lua_tostring(L, -1);

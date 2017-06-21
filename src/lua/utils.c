@@ -752,7 +752,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 	 */
 	switch (lua_type(L, idx)) {
 	case LUA_TNUMBER:
-		*result = lua_tointeger(L, idx);
+		*result = lua_tonumber(L, idx);
 		return 0;
 	case LUA_TCDATA:
 		cdata = luaL_checkcdata(L, 1, &ctypeid);

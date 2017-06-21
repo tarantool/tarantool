@@ -156,7 +156,7 @@ lbox_checkfiber(struct lua_State *L, int index)
 {
 	uint32_t fid;
 	if (lua_type(L, index) == LUA_TNUMBER) {
-		fid = lua_tointeger(L, index);
+		fid = lua_tonumber(L, index);
 	} else {
 		fid = *(uint32_t *) luaL_checkudata(L, index, fiberlib_name);
 	}
@@ -433,7 +433,7 @@ lbox_fiber_find(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "fiber.find(id): bad arguments");
-	int fid = lua_tointeger(L, -1);
+	int fid = lua_tonumber(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)
 		lbox_pushfiber(L, f->fid);
