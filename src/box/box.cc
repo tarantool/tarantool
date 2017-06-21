@@ -719,7 +719,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	try {
 		/* Allow to write to temporary spaces in read-only mode. */
 		struct space *space = space_cache_find(request->space_id);
-		if (!space->def.opts.temporary)
+		if (!space->def->opts.temporary)
 			box_check_writable();
 		process_rw(request, space, result);
 		return 0;

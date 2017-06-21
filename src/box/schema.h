@@ -175,7 +175,7 @@ space_cache_find(uint32_t id)
 	static struct space *space = NULL;
 	if (prev_schema_version != schema_version)
 		space = NULL;
-	if (space && space->def.id == id)
+	if (space && space->def->id == id)
 		return space;
 	if ((space = space_by_id(id))) {
 		prev_schema_version = schema_version;

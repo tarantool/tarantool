@@ -51,6 +51,7 @@ enum {
 	BOX_FUNCTION_MAX = 32000,
 	BOX_INDEX_MAX = 128,
 	BOX_NAME_MAX = 64,
+	ENGINE_NAME_MAX = 16,
 	BOX_FIELD_MAX = INT32_MAX,
 	BOX_USER_MAX = 32,
 	/**
@@ -487,10 +488,31 @@ struct space_def {
 	 * must have exactly this many fields.
 	 */
 	uint32_t exact_field_count;
-	char name[BOX_NAME_MAX + 1];
-	char engine_name[BOX_NAME_MAX + 1];
+	char engine_name[ENGINE_NAME_MAX + 1];
 	struct space_opts opts;
+	char name[0];
 };
+
+/**
+ * Size of the space_def, calculated using its name.
+ * @param name_len Length of the space name.
+ * @retval Size in bytes.
+ */
+static inline size_t
+space_def_sizeof(uint32_t name_len)
+{
+	return sizeof(struct space_def) + name_len + 1;
+}
+
+/**
+ * Delete the space_def object.
+ * @param def Def to delete.
+ */
+static inline void
+space_def_delete(struct space_def *def)
+{
+	free(def);
+}
 
 /**
  * API of C stored function.
@@ -517,8 +539,8 @@ index_def_sizeof(uint32_t part_count)
  * @retval NULL     Memory error.
  */
 struct index_def *
-index_def_new(uint32_t space_id, const char *space_name, uint32_t iid,
-	      const char *name, uint32_t name_len, enum index_type type,
+index_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	      uint32_t name_len, enum index_type type,
 	      const struct index_opts *opts, uint32_t part_count);
 
 /**
@@ -648,6 +670,34 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 #if defined(__cplusplus)
 } /* extern "C" */
 
+/**
+ * Duplicate space_def object.
+ * @param src Def to duplicate.
+ * @retval Copy of the @src.
+ */
+struct space_def *
+space_def_dup(const struct space_def *src); /* throws */
+
+/**
+ * Create a new space definition.
+ * @param id Space identifier.
+ * @param uid Owner identifier.
+ * @param exact_field_count Space tuples field count.
+ *        0 for any count.
+ * @param name Space name.
+ * @param name_len Length of the @name.
+ * @param engine_name Engine name.
+ * @param engine_len Length of the @engine.
+ * @param opts Space options.
+ *
+ * @retval Space definition.
+ */
+struct space_def *
+space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
+	      const char *name, uint32_t name_len,
+	      const char *engine_name, uint32_t engine_len,
+	      const struct space_opts *opts); /* throws */
+
 /** Compare two key part arrays.
  *
  * This function is used to find out whether alteration
@@ -685,12 +735,6 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2);
  */
 void
 index_def_check(struct index_def *index_def, const char *space_name);
-
-/** Check space definition structure for errors. */
-void
-space_def_check(struct space_def *def, uint32_t namelen,
-                uint32_t engine_namelen,
-                int32_t errcode);
 
 /**
  * Check object identifier for invalid symbols.

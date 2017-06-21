@@ -71,7 +71,7 @@ struct space {
 	 */
 	uint32_t index_id_max;
 	/** Space meta. */
-	struct space_def def;
+	struct space_def *def;
 	/**
 	 * Number of times the space has been truncated.
 	 * Updating this counter via _truncate space triggers
@@ -99,18 +99,18 @@ struct space {
 
 /** Get space ordinal number. */
 static inline uint32_t
-space_id(struct space *space) { return space->def.id; }
+space_id(struct space *space) { return space->def->id; }
 
 /** Get space name. */
 static inline const char *
 space_name(const struct space *space)
 {
-	return space->def.name;
+	return space->def->name;
 }
 
 /** Return true if space is temporary. */
 static inline bool
-space_is_temporary(struct space *space) { return space->def.opts.temporary; }
+space_is_temporary(struct space *space) { return space->def->opts.temporary; }
 
 void
 space_run_triggers(struct space *space, bool yesno);
@@ -192,6 +192,10 @@ space_size(struct space *space);
  * Allocate and initialize a space. The space
  * needs to be loaded before it can be used
  * (see space->handler->recover()).
+ * @param space_def Space definition.
+ * @param key_list List of index_defs.
+ *
+ * @retval Space object.
  */
 struct space *
 space_new(struct space_def *space_def, struct rlist *key_list);

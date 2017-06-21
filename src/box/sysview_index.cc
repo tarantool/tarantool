@@ -156,7 +156,7 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	struct space *space = space_cache_find(space_id);
 	uint8_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
-		space->def.uid == cr->uid);
+		space->def->uid == cr->uid);
 }
 
 SysviewVspaceIndex::SysviewVspaceIndex(struct index_def *index_def)

@@ -65,7 +65,7 @@ lbox_push_on_replace_event(struct lua_State *L, void *event)
 		lua_pushnil(L);
 	}
 	/* @todo: maybe the space object has to be here */
-	lua_pushstring(L, stmt->space->def.name);
+	lua_pushstring(L, stmt->space->def->name);
 	return 3;
 }
 
@@ -102,7 +102,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 {
 	/* space.arity */
 	lua_pushstring(L, "field_count");
-	lua_pushnumber(L, space->def.exact_field_count);
+	lua_pushnumber(L, space->def->exact_field_count);
 	lua_settable(L, i);
 
 	/* space.n */
@@ -122,7 +122,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 	/* space.engine */
 	lua_pushstring(L, "engine");
-	lua_pushstring(L, space->def.engine_name);
+	lua_pushstring(L, space->def->engine_name);
 	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");
@@ -180,7 +180,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_pushnumber(L, index_def->iid);
 		lua_setfield(L, -2, "id");
 
-		lua_pushnumber(L, space->def.id);
+		lua_pushnumber(L, space->def->id);
 		lua_setfield(L, -2, "space_id");
 
 		lua_pushstring(L, index_def->name);

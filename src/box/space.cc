@@ -51,7 +51,7 @@ access_check_space(struct space *space, uint8_t access)
 	 * since ADMIN has universal access.
 	 */
 	access &= ~cr->universal_access;
-	if (access && space->def.uid != cr->uid &&
+	if (access && space->def->uid != cr->uid &&
 	    access & ~space->access[cr->auth_token].effective) {
 		/*
 		 * Report access violation. Throw "no such user"
@@ -61,7 +61,7 @@ access_check_space(struct space *space, uint8_t access)
 		 */
 		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->def->name, space->def.name);
+			  priv_name(access), user->def->name, space->def->name);
 	}
 }
 
@@ -85,6 +85,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	uint32_t index_count = 0;
 	struct index_def *index_def;
 	struct index_def *pk = NULL;
+	def = space_def_dup(def);
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
 		/* Find the primary key, we need to create it first. */
@@ -97,10 +98,11 @@ space_new(struct space_def *def, struct rlist *key_list)
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
 	struct space *space = (struct space *) calloc(1, sz);
-
-	if (space == NULL)
+	if (space == NULL) {
+		space_def_delete(def);
 		tnt_raise(OutOfMemory, sz, "malloc", "struct space");
-
+	}
+	space->def = def;
 	space->index_count = index_count;
 	space->index_id_max = index_id_max;
 	rlist_create(&space->on_replace);
@@ -109,7 +111,6 @@ space_new(struct space_def *def, struct rlist *key_list)
 
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
-	space->def = *def;
 	Engine *engine = engine_find(def->engine_name);
 	struct key_def **keys;
 	keys = (struct key_def **)region_alloc_xc(&fiber()->gc,
@@ -171,6 +172,7 @@ space_delete(struct space *space)
 
 	trigger_destroy(&space->on_replace);
 	trigger_destroy(&space->on_stmt_begin);
+	space_def_delete(space->def);
 	free(space);
 }
 

@@ -59,28 +59,28 @@ struct tuple *
 SysviewSpace::executeReplace(struct txn *, struct space *space,
 			      struct request *)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return NULL;
 }
 
 struct tuple *
 SysviewSpace::executeDelete(struct txn*, struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return NULL;
 }
 
 struct tuple *
 SysviewSpace::executeUpdate(struct txn*, struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return NULL;
 }
 
 void
 SysviewSpace::executeUpsert(struct txn *, struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def.name);
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
 }
 
 Index *
