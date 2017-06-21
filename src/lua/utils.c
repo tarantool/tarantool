@@ -499,10 +499,10 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 		if (isfinite(num) && modf(num, &intpart) != 0.0) {
 			field->type = MP_DOUBLE;
 			field->dval = num;
-		} else if (num >= 0 && num <= UINT64_MAX) {
+		} else if (num >= 0 && num < exp2(64)) {
 			field->type = MP_UINT;
 			field->ival = (uint64_t) num;
-		} else if (num >= INT64_MIN && num <= INT64_MAX) {
+		} else if (num > -exp2(63) && num < exp2(63)) {
 			field->type = MP_INT;
 			field->ival = (int64_t) num;
 		} else {
