@@ -740,10 +740,6 @@ tonumber64(ffi.new('unsigned int', 10))
 ---
 - 10
 ...
-tonumber64(ffi.new('unsigned long ', 10))
----
-- 10
-...
 tonumber64(ffi.new('uint8_t', 10))
 ---
 - 10
@@ -830,10 +826,6 @@ tonumber64(ffi.new('unsigned int', 10), 2)
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
 tonumber64(ffi.new('unsigned int', 10), 2)
----
-- error: 'bad argument #1 to ''?'' (string expected)'
-...
-tonumber64(ffi.new('unsigned long ', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
