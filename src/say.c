@@ -310,7 +310,13 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 			say_file_init(init_str);
 			break;
 		}
-    }
+		if (nonblock) {
+			int flags;
+			if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
+				fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+				say_syserror("fcntl, fd=%i", log_fd);
+		}
+	}
 
 	if (background) {
 		fflush(stderr);
@@ -326,12 +332,6 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 			dup2(log_fd, STDERR_FILENO);
 			dup2(log_fd, STDOUT_FILENO);
 		}
-	}
-	if (nonblock) {
-		int flags;
-		if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
-		    fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
-			say_syserror("fcntl, fd=%i", log_fd);
 	}
 	booting = false;
 }
