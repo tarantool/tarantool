@@ -49,6 +49,7 @@
 #include "coio_task.h"
 #include "diag.h"
 #include "errcode.h"
+#include "errinj.h"
 #include "fiber.h"
 #include "iproto_constants.h" /* IPROTO_INSERT */
 #include "key_def.h"
@@ -682,6 +683,11 @@ vy_log_flush(void)
 {
 	if (vy_log.tx_size == 0)
 		return 0; /* nothing to do */
+
+	ERROR_INJECT(ERRINJ_VY_LOG_FLUSH, {
+		diag_set(ClientError, ER_INJECTION, "vinyl log flush");
+		return -1;
+	});
 
 	struct journal_entry *entry = journal_entry_new(vy_log.tx_size);
 	if (entry == NULL)

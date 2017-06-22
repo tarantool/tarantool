@@ -36,6 +36,8 @@
  *       difficult to know object/array sizes ahead of time.
  */
 
+#include "trivia/util.h"
+
 #include <assert.h>
 #include <string.h>
 #include <math.h>

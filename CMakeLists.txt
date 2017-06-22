@@ -287,7 +287,7 @@ add_custom_target(build_bundled_libs)
 #
 # Curl
 #
-set(Curl_FIND_REQUIRED ON)
+set(CURL_FIND_REQUIRED ON)
 find_package(CURL)
 
 #

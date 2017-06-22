@@ -4,6 +4,36 @@ engine = test_run:get_cfg('engine')
 fiber =  require('fiber')
 
 --
+-- Check that space truncation is forbidden in a transaction.
+--
+s = box.schema.create_space('test', {engine = engine})
+_ = s:create_index('pk')
+_ = s:insert{123}
+box.begin()
+s:truncate()
+box.commit()
+s:select()
+s:drop()
+
+--
+-- Check that space truncation works for spaces created via
+-- the internal API.
+--
+_ = box.space._space:insert{512, 1, 'test', engine, 0, {temporary = false}}
+_ = box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
+_ = box.space.test:insert{123}
+box.space.test:select()
+box.space.test:truncate()
+box.space.test:select()
+box.space.test:drop()
+
+--
+-- Check that truncation of system spaces is not permitted.
+--
+box.space._space:truncate()
+box.space._index:truncate()
+
+--
 -- Truncate space with no indexes.
 --
 s = box.schema.create_space('test', {engine = engine})
@@ -112,6 +142,7 @@ _ = s2:insert{10, 30}
 _ = s2:insert{20, 20}
 _ = s2:insert{30, 10}
 box.snapshot()
+_ = s1:insert{321, 123}
 s2:truncate()
 _ = s2:insert{456, 654}
 s3 = box.schema.create_space('test3', {engine = engine})

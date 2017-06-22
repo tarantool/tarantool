@@ -289,7 +289,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
-	struct request *request = xrow_decode_request(row);
+	struct request *request = xrow_decode_request_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	process_rw(request, space, NULL);
 }
@@ -327,7 +327,7 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request = xrow_decode_request(row);
+	struct request *request = xrow_decode_request_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
@@ -842,11 +842,12 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 static void
 space_truncate(struct space *space)
 {
-	char key_buf[16];
-	char *key_buf_end = key_buf;
-	key_buf_end = mp_encode_array(key_buf_end, 1);
-	key_buf_end = mp_encode_uint(key_buf_end, space_id(space));
-	assert(key_buf_end < key_buf + sizeof(key_buf));
+	char tuple_buf[32];
+	char *tuple_buf_end = tuple_buf;
+	tuple_buf_end = mp_encode_array(tuple_buf_end, 2);
+	tuple_buf_end = mp_encode_uint(tuple_buf_end, space_id(space));
+	tuple_buf_end = mp_encode_uint(tuple_buf_end, 1);
+	assert(tuple_buf_end < tuple_buf + sizeof(tuple_buf));
 
 	char ops_buf[128];
 	char *ops_buf_end = ops_buf;
@@ -857,7 +858,7 @@ space_truncate(struct space *space)
 	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
 	assert(ops_buf_end < ops_buf + sizeof(ops_buf));
 
-	if (box_update(BOX_TRUNCATE_ID, 0, key_buf, key_buf_end,
+	if (box_upsert(BOX_TRUNCATE_ID, 0, tuple_buf, tuple_buf_end,
 		       ops_buf, ops_buf_end, 0, NULL) != 0)
 		diag_raise();
 }
@@ -928,7 +929,7 @@ access_check_func(const char *name, uint32_t name_len)
 	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL)
 		return func;
 	uint8_t access = PRIV_X & ~credentials->universal_access;
-	if (func == NULL || (func->def.uid != credentials->uid &&
+	if (func == NULL || (func->def->uid != credentials->uid &&
 	     access & ~func->access[credentials->auth_token].effective)) {
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
@@ -944,7 +945,7 @@ access_check_func(const char *name, uint32_t name_len)
 int
 func_call(struct func *func, struct request *request, struct obuf *out)
 {
-	assert(func != NULL && func->def.language == FUNC_LANGUAGE_C);
+	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
 	if (func->func == NULL)
 		func_load(func);
 
@@ -1031,7 +1032,7 @@ box_process_call(struct request *request, struct obuf *out)
 	 * defined, it's obviously not a setuid one.
 	 */
 	struct credentials *orig_credentials = NULL;
-	if (func && func->def.setuid) {
+	if (func && func->def->setuid) {
 		orig_credentials = current_user();
 		/* Remember and change the current user id. */
 		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
@@ -1041,7 +1042,7 @@ box_process_call(struct request *request, struct obuf *out)
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user *owner = user_find_xc(func->def.uid);
+			struct user *owner = user_find_xc(func->def->uid);
 			credentials_init(&func->owner_credentials,
 					 owner->auth_token,
 					 owner->def.uid);
@@ -1050,7 +1051,7 @@ box_process_call(struct request *request, struct obuf *out)
 	}
 
 	int rc;
-	if (func && func->def.language == FUNC_LANGUAGE_C) {
+	if (func && func->def->language == FUNC_LANGUAGE_C) {
 		rc = func_call(func, request, out);
 	} else {
 		rc = box_lua_call(request, out);
@@ -1107,7 +1108,7 @@ box_process_auth(struct request *request, struct obuf *out)
 	uint32_t len = mp_decode_strl(&user);
 	authenticate(user, len, request->tuple, request->tuple_end);
 	assert(request->header != NULL);
-	iproto_reply_ok(out, request->header->sync, ::schema_version);
+	iproto_reply_ok_xc(out, request->header->sync, ::schema_version);
 }
 
 void
@@ -1204,7 +1205,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Respond to JOIN request with start_vclock. */
 	struct xrow_header row;
-	xrow_encode_vclock(&row, &start_vclock);
+	xrow_encode_vclock_xc(&row, &start_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1232,7 +1233,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	wal_checkpoint(&stop_vclock, false);
 
 	/* Send end of initial stage data marker */
-	xrow_encode_vclock(&row, &stop_vclock);
+	xrow_encode_vclock_xc(&row, &stop_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
@@ -1246,7 +1247,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Send end of WAL stream marker */
 	struct vclock current_vclock;
 	wal_checkpoint(&current_vclock, false);
-	xrow_encode_vclock(&row, &current_vclock);
+	xrow_encode_vclock_xc(&row, &current_vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -1263,8 +1264,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct tt_uuid replicaset_uuid = uuid_nil, replica_uuid = uuid_nil;
 	struct vclock replica_clock;
 	vclock_create(&replica_clock);
-	xrow_decode_subscribe(header, &replicaset_uuid, &replica_uuid,
-			      &replica_clock);
+	xrow_decode_subscribe_xc(header, &replicaset_uuid, &replica_uuid,
+				 &replica_clock);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
@@ -1307,7 +1308,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	struct xrow_header row;
 	struct vclock current_vclock;
 	wal_checkpoint(&current_vclock, true);
-	xrow_encode_vclock(&row, &current_vclock);
+	xrow_encode_vclock_xc(&row, &current_vclock);
 	/*
 	 * Identify the message with the replica id of this
 	 * instance, this is the only way for a replica to find

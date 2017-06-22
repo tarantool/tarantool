@@ -36,6 +36,7 @@
 #include "vy_log.h"
 #include "vy_upsert.h"
 #include "vy_write_iterator.h"
+#include "vy_stat.h"
 
 #define RB_COMPACT 1
 #include <small/rb.h>
@@ -317,10 +318,9 @@ vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
 }
 
 static void
-vy_stat_dump(struct vy_stat *s, ev_tstamp time, size_t written,
+vy_stat_dump(struct vy_stat *s, size_t written,
 	     uint64_t dumped_statements)
 {
-	histogram_collect(s->dump_bw, written / time);
 	s->dump_total += written;
 	s->dumped_statements += dumped_statements;
 }
@@ -351,11 +351,8 @@ struct vy_range {
 	struct tuple *end;
 	/** The index this range belongs to. */
 	struct vy_index *index;
-	/*
-	 * An estimate of the size of data stored on disk for this range
-	 * (sum of slice->size).
-	 */
-	uint64_t size;
+	/** An estimate of the number of statements in this range. */
+	struct vy_disk_stmt_counter count;
 	/**
 	 * List of run slices in this range, linked by vy_slice->in_range.
 	 * The newer a slice, the closer it to the list head.
@@ -488,11 +485,6 @@ struct vy_index {
 	 */
 	struct rlist sealed;
 	/**
-	 * Total amount of memory used by this index
-	 * (sum of mem->used).
-	 */
-	size_t mem_used;
-	/**
 	 * Generation of in-memory data stored in this index
 	 * (min over mem->generation).
 	 */
@@ -516,13 +508,8 @@ struct vy_index {
 	int range_count;
 	/** Number of runs in all ranges. */
 	int run_count;
-	/** Number of pages in all runs. */
-	int page_count;
-	/**
-	 * Total number of statements in this index,
-	 * stored both in memory and on disk.
-	 */
-	uint64_t stmt_count;
+	/** Index statistics. */
+	struct vy_index_stat stat;
 	/** Size of data stored on disk. */
 	uint64_t size;
 	/** Histogram of number of runs in range. */
@@ -1218,9 +1205,7 @@ vy_index_add_run(struct vy_index *index, struct vy_run *run)
 	assert(rlist_empty(&run->in_index));
 	rlist_add_entry(&index->runs, run, in_index);
 	index->run_count++;
-	index->page_count += run->info.count;
-	index->stmt_count += run->info.keys;
-	index->size += vy_run_size(run);
+	vy_disk_stmt_counter_add(&index->stat.disk.count, &run->count);
 }
 
 static void
@@ -1230,9 +1215,7 @@ vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 	assert(!rlist_empty(&run->in_index));
 	rlist_del_entry(run, in_index);
 	index->run_count--;
-	index->page_count -= run->info.count;
-	index->stmt_count -= run->info.keys;
-	index->size -= vy_run_size(run);
+	vy_disk_stmt_counter_sub(&index->stat.disk.count, &run->count);
 }
 
 static void
@@ -1286,7 +1269,7 @@ vy_range_add_slice(struct vy_range *range, struct vy_slice *slice)
 {
 	rlist_add_entry(&range->slices, slice, in_range);
 	range->slice_count++;
-	range->size += slice->size;
+	vy_disk_stmt_counter_add(&range->count, &slice->count);
 }
 
 /** Add a run slice to a range's list before @next_slice. */
@@ -1296,7 +1279,7 @@ vy_range_add_slice_before(struct vy_range *range, struct vy_slice *slice,
 {
 	rlist_add_tail(&next_slice->in_range, &slice->in_range);
 	range->slice_count++;
-	range->size += slice->size;
+	vy_disk_stmt_counter_add(&range->count, &slice->count);
 }
 
 /** Remove a run slice from a range's list. */
@@ -1304,11 +1287,10 @@ static void
 vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 {
 	assert(range->slice_count > 0);
-	assert(range->size >= slice->size);
 	assert(!rlist_empty(&range->slices));
 	rlist_del_entry(slice, in_range);
 	range->slice_count--;
-	range->size -= slice->size;
+	vy_disk_stmt_counter_sub(&range->count, &slice->count);
 }
 
 /**
@@ -1489,6 +1471,13 @@ struct vy_scheduler {
 	 * in-memory trees.
 	 */
 	int64_t generation;
+	/**
+	 * Target generation for checkpoint. The scheduler will force
+	 * dumping of all in-memory trees whose generation is less.
+	 */
+	int64_t checkpoint_generation;
+	/** Time of dump start. */
+	ev_tstamp dump_start;
 	/**
 	 * List of all in-memory trees, scheduled for dump.
 	 * Older trees are closer to the tail of the list.
@@ -1869,7 +1858,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
 
 	/* The range is too small to be split. */
-	if (slice->size < (uint64_t)index->opts.range_size * 4 / 3)
+	if (slice->count.bytes_compressed < index->opts.range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
@@ -2085,16 +2074,17 @@ vy_range_update_compact_priority(struct vy_range *range)
 
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
+		uint64_t size = slice->count.bytes_compressed;
 		/*
 		 * The size of the first level is defined by
 		 * the size of the most recent run.
 		 */
 		if (target_run_size == 0)
-			target_run_size = slice->size;
-		total_size += slice->size;
+			target_run_size = size;
+		total_size += size;
 		level_run_count++;
 		total_run_count++;
-		while (slice->size > target_run_size) {
+		while (size > target_run_size) {
 			/*
 			 * The run size exceeds the threshold
 			 * set for the current level. Move this
@@ -2152,7 +2142,7 @@ vy_range_needs_coalesce(struct vy_range *range,
 	struct vy_range *it;
 
 	/* Size of the coalesced range. */
-	uint64_t total_size = range->size;
+	uint64_t total_size = range->count.bytes_compressed;
 	/* Coalesce ranges until total_size > max_size. */
 	uint64_t max_size = index->opts.range_size / 2;
 
@@ -2167,17 +2157,19 @@ vy_range_needs_coalesce(struct vy_range *range,
 	for (it = vy_range_tree_next(index->tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
 	     it = vy_range_tree_next(index->tree, it)) {
-		if (total_size + it->size > max_size)
+		uint64_t size = it->count.bytes_compressed;
+		if (total_size + size > max_size)
 			break;
-		total_size += it->size;
+		total_size += size;
 		*p_last = it;
 	}
 	for (it = vy_range_tree_prev(index->tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
 	     it = vy_range_tree_prev(index->tree, it)) {
-		if (total_size + it->size > max_size)
+		uint64_t size = it->count.bytes_compressed;
+		if (total_size + size > max_size)
 			break;
-		total_size += it->size;
+		total_size += size;
 		*p_first = it;
 	}
 	return *p_first != *p_last;
@@ -2245,7 +2237,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 		vy_index_remove_range(index, it);
 		rlist_splice(&result->slices, &it->slices);
 		result->slice_count += it->slice_count;
-		result->size += it->size;
+		vy_disk_stmt_counter_add(&result->count, &it->count);
 		vy_range_delete(it);
 		it = next;
 	}
@@ -2619,7 +2611,7 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	}
 
 	/* We can't free region_stmt below, so let's add it to the stats */
-	index->mem_used += tuple_size(stmt);
+	index->stat.memory.count.bytes += tuple_size(stmt);
 
 	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
 		return vy_mem_insert(mem, *region_stmt);
@@ -2646,7 +2638,7 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 {
 	vy_mem_commit_stmt(mem, stmt);
 
-	index->stmt_count++;
+	index->stat.memory.count.rows++;
 
 	if (vy_stmt_type(stmt) == IPROTO_UPSERT)
 		vy_index_commit_upsert(index, mem, stmt);
@@ -2741,7 +2733,8 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	 * If there are no other mems and runs and n_upserts == 0,
 	 * then we can turn the UPSERT into the REPLACE.
 	 */
-	if (n_upserts == 0 && index->mem_used == index->mem->used &&
+	if (n_upserts == 0 &&
+	    index->stat.memory.count.rows == index->mem->count.rows &&
 	    index->run_count == 0) {
 		older = vy_mem_older_lsn(mem, stmt);
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
@@ -2899,8 +2892,6 @@ struct vy_task {
 	struct diag diag;
 	/** Index this task is for. */
 	struct vy_index *index;
-	/** How long ->execute took, in nanoseconds. */
-	ev_tstamp exec_time;
 	/** Number of bytes written to disk by this task. */
 	size_t dump_size;
 	/** Number of statements dumped to the disk. */
@@ -3132,8 +3123,7 @@ delete_mems:
 		if (mem->generation >= task->generation)
 			continue;
 		rlist_del_entry(mem, in_sealed);
-		index->mem_used -= mem->used;
-		index->stmt_count -= mem->tree.size;
+		vy_stmt_counter_sub(&index->stat.memory.count, &mem->count);
 		vy_scheduler_remove_mem(scheduler, mem);
 		vy_mem_delete(mem);
 	}
@@ -3239,7 +3229,8 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 			 * The tree is empty so we can delete it
 			 * right away, without involving a worker.
 			 */
-			index->mem_used -= mem->used;
+			vy_stmt_counter_sub(&index->stat.memory.count,
+					    &mem->count);
 			rlist_del_entry(mem, in_sealed);
 			vy_scheduler_remove_mem(scheduler, mem);
 			vy_mem_delete(mem);
@@ -3530,7 +3521,7 @@ vy_task_compact_new(struct vy_range *range, struct vy_task **p_task)
 						&index->env->run_env) != 0)
 			goto err_wi_sub;
 
-		task->max_output_count += slice->keys;
+		task->max_output_count += slice->count.rows;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);
 
@@ -3759,31 +3750,8 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
 retry:
 	*ptask = NULL;
-	if (!vy_scheduler_needs_dump(scheduler)) {
-		/*
-		 * If all old in-memory trees have been dumped
-		 * and the quota is still exceeded, increment
-		 * the current generation to schedule another
-		 * dump.
-		 *
-		 * If checkpoint is in progress, do not touch
-		 * the generation, because in order to make a
-		 * consistent checkpoint we must not dump trees
-		 * created after checkpoint started.
-		 */
-		if (scheduler->checkpoint_in_progress)
-			return 0;
-		if (!vy_quota_is_exceeded(&scheduler->env->quota))
-			return 0;
-		if (lsregion_used(&scheduler->env->allocator) == 0) {
-			/*
-			 * Nothing to dump, quota is exceeded by
-			 * a pending transaction.
-			 */
-			return 0;
-		}
-		scheduler->generation++;
-	}
+	if (!vy_scheduler_needs_dump(scheduler))
+		return 0;
 	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
 	if (pn == NULL)
 		return 0; /* nothing to do */
@@ -3952,8 +3920,7 @@ vy_scheduler_f(va_list va)
 			else
 				tasks_done++;
 			if (task->dump_size > 0)
-				vy_stat_dump(env->stat, task->exec_time,
-					     task->dump_size,
+				vy_stat_dump(env->stat, task->dump_size,
 					     task->dumped_statements);
 			vy_task_delete(&scheduler->task_pool, task);
 			scheduler->workers_available++;
@@ -4057,9 +4024,7 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		uint64_t start = ev_now(loop());
 		task->status = task->ops->execute(task);
-		task->exec_time = ev_now(loop()) - start;
 		if (task->status != 0) {
 			struct diag *diag = diag_get();
 			assert(!diag_is_empty(diag));
@@ -4136,7 +4101,7 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
  * be dumped (are older than the current generation).
  */
 static bool
-vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
+vy_scheduler_dump_in_progress(struct vy_scheduler *scheduler)
 {
 	if (rlist_empty(&scheduler->dump_fifo))
 		return false;
@@ -4149,6 +4114,95 @@ vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
 	assert(mem->generation < scheduler->generation);
 	return true;
 
+}
+
+/** Called to trigger memory dump. */
+static void
+vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
+{
+	/*
+	 * Increment the generation to trigger dump of
+	 * all in-memory trees.
+	 */
+	scheduler->generation++;
+	scheduler->dump_start = ev_now(loop());
+}
+
+/** Called on memory dump completion. */
+static void
+vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
+{
+	/*
+	 * All old in-memory trees have been dumped.
+	 * Free memory, release quota, and signal
+	 * dump completion.
+	 */
+	struct lsregion *allocator = &scheduler->env->allocator;
+	struct vy_quota *quota = &scheduler->env->quota;
+	size_t mem_used_before = lsregion_used(allocator);
+	lsregion_gc(allocator, scheduler->generation - 1);
+	size_t mem_used_after = lsregion_used(allocator);
+	assert(mem_used_after <= mem_used_before);
+	size_t mem_dumped = mem_used_before - mem_used_after;
+	vy_quota_release(quota, mem_dumped);
+	ipc_cond_signal(&scheduler->dump_cond);
+
+	/* Account dump bandwidth. */
+	struct vy_stat *stat = scheduler->env->stat;
+	ev_tstamp dump_duration = ev_now(loop()) - scheduler->dump_start;
+	if (dump_duration > 0)
+		histogram_collect(stat->dump_bw, mem_dumped / dump_duration);
+}
+
+/** Check if memory dump is required. */
+static bool
+vy_scheduler_needs_dump(struct vy_scheduler *scheduler)
+{
+	if (vy_scheduler_dump_in_progress(scheduler)) {
+		/*
+		 * There are old in-memory trees to be dumped.
+		 * Do not increase the generation until all of
+		 * them are dumped to guarantee dump consistency.
+		 */
+		return true;
+	}
+
+	if (scheduler->checkpoint_in_progress) {
+		/*
+		 * If checkpoint is in progress, force dumping
+		 * all in-memory data that need to be included
+		 * in the snapshot.
+		 */
+		if (scheduler->generation < scheduler->checkpoint_generation)
+			goto trigger_dump;
+		/*
+		 * Do not trigger another dump until checkpoint
+		 * is complete so as to make sure no statements
+		 * inserted after WAL rotation are written to
+		 * the snapshot.
+		 */
+		return false;
+	}
+
+	if (!vy_quota_is_exceeded(&scheduler->env->quota)) {
+		/*
+		 * Memory consumption is below the watermark,
+		 * nothing to do.
+		 */
+		return false;
+	}
+
+	if (lsregion_used(&scheduler->env->allocator) == 0) {
+		/*
+		 * Quota must be exceeded by a pending transaction,
+		 * there's nothing we can do about that.
+		 */
+		return false;
+	}
+
+trigger_dump:
+	vy_scheduler_trigger_dump(scheduler);
+	return true;
 }
 
 static void
@@ -4166,22 +4220,14 @@ vy_scheduler_remove_mem(struct vy_scheduler *scheduler, struct vy_mem *mem)
 	assert(!rlist_empty(&mem->in_dump_fifo));
 	rlist_del_entry(mem, in_dump_fifo);
 
-	if (vy_scheduler_needs_dump(scheduler))
-		return;
-
-	/*
-	 * All old in-memory trees have been dumped.
-	 * Free memory, release quota, and signal
-	 * dump completion.
-	 */
-	struct lsregion *allocator = &scheduler->env->allocator;
-	struct vy_quota *quota = &scheduler->env->quota;
-	size_t mem_used_before = lsregion_used(allocator);
-	lsregion_gc(allocator, scheduler->generation - 1);
-	size_t mem_used_after = lsregion_used(allocator);
-	assert(mem_used_after <= mem_used_before);
-	vy_quota_release(quota, mem_used_before - mem_used_after);
-	ipc_cond_signal(&scheduler->dump_cond);
+	if (mem->generation < scheduler->generation &&
+	    !vy_scheduler_dump_in_progress(scheduler)) {
+		/*
+		 * The last in-memory tree left from the previous
+		 * generation has just been deleted, complete dump.
+		 */
+		vy_scheduler_complete_dump(scheduler);
+	}
 }
 
 /*
@@ -4209,9 +4255,8 @@ vy_begin_checkpoint(struct vy_env *env)
 		return -1;
 	}
 
-	scheduler->generation++;
 	scheduler->checkpoint_in_progress = true;
-
+	scheduler->checkpoint_generation = scheduler->generation + 1;
 	ipc_cond_signal(&scheduler->scheduler_cond);
 	return 0;
 }
@@ -4226,14 +4271,20 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 
 	assert(scheduler->checkpoint_in_progress);
 
-	while (!scheduler->is_throttled &&
-	       vy_scheduler_needs_dump(scheduler))
+	/*
+	 * Wait until all in-memory trees whose generation is
+	 * less than checkpoint_generation have been dumped.
+	 */
+	while (scheduler->generation < scheduler->checkpoint_generation ||
+	       vy_scheduler_dump_in_progress(scheduler)) {
+		if (scheduler->is_throttled) {
+			/* A dump error occurred, abort checkpoint. */
+			assert(!diag_is_empty(&scheduler->diag));
+			diag_add_error(diag_get(),
+				       diag_last_error(&scheduler->diag));
+			goto error;
+		}
 		ipc_cond_wait(&scheduler->dump_cond);
-
-	if (scheduler->is_throttled) {
-		assert(!diag_is_empty(&scheduler->diag));
-		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
-		goto error;
 	}
 
 	if (vy_log_rotate(vclock) != 0)
@@ -4326,9 +4377,9 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	char buf[16];
 	struct vy_quota *q = &env->quota;
 	info_table_begin(h, "memory");
-	info_append_u64(h, "used", q->used);
-	info_append_u64(h, "limit", q->limit);
-	info_append_u64(h, "watermark", q->watermark);
+	info_append_int(h, "used", q->used);
+	info_append_int(h, "limit", q->limit);
+	info_append_int(h, "watermark", q->watermark);
 	snprintf(buf, sizeof(buf), "%d%%", (int)(100 * q->used / q->limit));
 	info_append_str(h, "ratio", buf);
 	info_table_end(h);
@@ -4339,8 +4390,8 @@ vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 {
 	struct info_handler *h = ctx;
 	info_table_begin(h, name);
-	info_append_u32(h, "rps", rps);
-	info_append_u64(h, "total", total);
+	info_append_int(h, "rps", rps);
+	info_append_int(h, "total", total);
 	info_table_end(h);
 	return 0;
 }
@@ -4350,8 +4401,8 @@ vy_info_append_stat_latency(struct info_handler *h,
 			    const char *name, struct vy_latency *lat)
 {
 	info_table_begin(h, name);
-	info_append_u64(h, "max", lat->max * 1000000000);
-	info_append_u64(h, "avg", lat->count == 0 ? 0 :
+	info_append_int(h, "max", lat->max * 1000000000);
+	info_append_int(h, "avg", lat->count == 0 ? 0 :
 			   lat->total / lat->count * 1000000000);
 	info_table_end(h);
 }
@@ -4361,9 +4412,9 @@ vy_info_append_iterator_stat(struct info_handler *h, const char *name,
 			     struct vy_iterator_stat *stat)
 {
 	info_table_begin(h, name);
-	info_append_u64(h, "lookup_count", stat->lookup_count);
-	info_append_u64(h, "step_count", stat->step_count);
-	info_append_u64(h, "bloom_reflect_count", stat->bloom_reflections);
+	info_append_int(h, "lookup_count", stat->lookup_count);
+	info_append_int(h, "step_count", stat->step_count);
+	info_append_int(h, "bloom_reflect_count", stat->bloom_reflections);
 	info_table_end(h);
 }
 
@@ -4376,32 +4427,32 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 
 	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
 
-	info_append_u64(h, "write_count", stat->write_count);
+	info_append_int(h, "write_count", stat->write_count);
 
 	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
 	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
 	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
 
-	info_append_u64(h, "tx_rollback", stat->tx_rlb);
-	info_append_u64(h, "tx_conflict", stat->tx_conflict);
-	info_append_u32(h, "tx_active", env->xm->tx_count);
+	info_append_int(h, "tx_rollback", stat->tx_rlb);
+	info_append_int(h, "tx_conflict", stat->tx_conflict);
+	info_append_int(h, "tx_active", env->xm->tx_count);
 
 	struct mempool_stats mstats;
 	mempool_stats(&env->xm->tx_mempool, &mstats);
-	info_append_u32(h, "tx_allocated", mstats.objcount);
+	info_append_int(h, "tx_allocated", mstats.objcount);
 	mempool_stats(&env->xm->txv_mempool, &mstats);
-	info_append_u32(h, "txv_allocated", mstats.objcount);
+	info_append_int(h, "txv_allocated", mstats.objcount);
 	mempool_stats(&env->xm->read_view_mempool, &mstats);
-	info_append_u32(h, "read_view", mstats.objcount);
+	info_append_int(h, "read_view", mstats.objcount);
 
-	info_append_u64(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	info_append_u64(h, "dump_total", stat->dump_total);
-	info_append_u64(h, "dumped_statements", stat->dumped_statements);
+	info_append_int(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
+	info_append_int(h, "dump_total", stat->dump_total);
+	info_append_int(h, "dumped_statements", stat->dumped_statements);
 
 	struct vy_cache_env *ce = &env->cache_env;
 	info_table_begin(h, "cache");
-	info_append_u64(h, "count", ce->cached_count);
-	info_append_u64(h, "used", ce->quota.used);
+	info_append_int(h, "count", ce->cached_count);
+	info_append_int(h, "used", ce->quota.used);
 	info_table_end(h);
 
 	info_table_begin(h, "iterator");
@@ -4420,24 +4471,50 @@ vy_info(struct vy_env *env, struct info_handler *h)
 	info_begin(h);
 	vy_info_append_memory(env, h);
 	vy_info_append_performance(env, h);
-	info_append_u64(h, "lsn", env->xm->lsn);
+	info_append_int(h, "lsn", env->xm->lsn);
 	info_end(h);
+}
+
+static void
+vy_info_append_stmt_counter(struct info_handler *h, const char *name,
+			    const struct vy_stmt_counter *count)
+{
+	info_table_begin(h, name);
+	info_append_int(h, "rows", count->rows);
+	info_append_int(h, "bytes", count->bytes);
+	info_table_end(h);
+}
+
+static void
+vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
+				 const struct vy_disk_stmt_counter *count)
+{
+	info_table_begin(h, name);
+	info_append_int(h, "rows", count->rows);
+	info_append_int(h, "bytes", count->bytes);
+	info_append_int(h, "bytes_compressed", count->bytes_compressed);
+	info_append_int(h, "pages", count->pages);
+	info_table_end(h);
 }
 
 void
 vy_index_info(struct vy_index *index, struct info_handler *h)
 {
 	char buf[1024];
+	struct vy_index_stat *stat = &index->stat;
+
 	info_begin(h);
-	info_append_u64(h, "range_size", index->opts.range_size);
-	info_append_u64(h, "page_size", index->opts.page_size);
-	info_append_u64(h, "memory_used", index->mem_used);
-	info_append_u64(h, "size", index->size);
-	info_append_u64(h, "count", index->stmt_count);
-	info_append_u32(h, "page_count", index->page_count);
-	info_append_u32(h, "range_count", index->range_count);
-	info_append_u32(h, "run_count", index->run_count);
-	info_append_u32(h, "run_avg", index->run_count / index->range_count);
+	info_append_int(h, "rows", stat->disk.count.rows +
+				   stat->memory.count.rows);
+	info_append_int(h, "bytes", stat->disk.count.bytes +
+				    stat->memory.count.bytes);
+	vy_info_append_stmt_counter(h, "memory", &stat->memory.count);
+	vy_info_append_disk_stmt_counter(h, "disk", &stat->disk.count);
+	info_append_int(h, "range_size", index->opts.range_size);
+	info_append_int(h, "page_size", index->opts.page_size);
+	info_append_int(h, "range_count", index->range_count);
+	info_append_int(h, "run_count", index->run_count);
+	info_append_int(h, "run_avg", index->run_count / index->range_count);
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
 	info_append_double(h, "bloom_fpr", index->opts.bloom_fpr);
@@ -4608,15 +4685,13 @@ vy_index_commit_drop(struct vy_index *index)
 static void
 vy_index_swap(struct vy_index *old_index, struct vy_index *new_index)
 {
-	assert(old_index->mem_used == 0);
-	assert(new_index->mem_used == 0);
+	assert(old_index->stat.memory.count.rows == 0);
+	assert(new_index->stat.memory.count.rows == 0);
 
 	SWAP(old_index->dump_lsn, new_index->dump_lsn);
 	SWAP(old_index->range_count, new_index->range_count);
 	SWAP(old_index->run_count, new_index->run_count);
-	SWAP(old_index->page_count, new_index->page_count);
-	SWAP(old_index->stmt_count, new_index->stmt_count);
-	SWAP(old_index->size, new_index->size);
+	SWAP(old_index->stat, new_index->stat);
 	SWAP(old_index->run_hist, new_index->run_hist);
 	SWAP(old_index->tree, new_index->tree);
 	rlist_swap(&old_index->runs, &new_index->runs);
@@ -4892,7 +4967,8 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space)
 	if (pk->env->status != VINYL_ONLINE)
 		return 0;
 	/* The space is empty. Allow alter. */
-	if (pk->stmt_count == 0)
+	if (pk->stat.disk.count.rows == 0 &&
+	    pk->stat.memory.count.rows == 0)
 		return 0;
 	if (old_space->index_count < new_space->index_count) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
@@ -5084,7 +5160,7 @@ vy_index_delete(struct vy_index *index)
 size_t
 vy_index_bsize(struct vy_index *index)
 {
-	return index->mem_used;
+	return index->stat.memory.count.bytes;
 }
 
 /** True if the transaction is in a read view. */

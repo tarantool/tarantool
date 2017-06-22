@@ -48,7 +48,7 @@ lbox_insert(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
 		return luaL_error(L, "Usage space:insert(tuple)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
@@ -64,7 +64,7 @@ lbox_replace(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
 		return luaL_error(L, "Usage space:replace(tuple)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
@@ -82,8 +82,8 @@ lbox_index_update(lua_State *L)
 	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL))
 		return luaL_error(L, "Usage index:update(key, ops)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 	size_t ops_len;
@@ -104,7 +104,7 @@ lbox_upsert(lua_State *L)
 	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL))
 		return luaL_error(L, "Usage space:upsert(tuple_key, ops)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
+	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 	size_t ops_len;
@@ -124,8 +124,8 @@ lbox_index_delete(lua_State *L)
 	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL))
 		return luaL_error(L, "Usage space:delete(key)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
@@ -142,9 +142,9 @@ lbox_index_random(lua_State *L)
 	    !lua_isnumber(L, 3))
 		return luaL_error(L, "Usage index.random(space_id, index_id, rnd)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	uint32_t rnd = lua_tointeger(L, 3);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	uint32_t rnd = lua_tonumber(L, 3);
 
 	struct tuple *tuple;
 	if (box_index_random(space_id, index_id, rnd, &tuple) != 0)
@@ -158,8 +158,8 @@ lbox_index_get(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "Usage index.get(space_id, index_id, key)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
@@ -175,8 +175,8 @@ lbox_index_min(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "usage index.min(space_id, index_id, key)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
@@ -192,8 +192,8 @@ lbox_index_max(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "usage index.max(space_id, index_id, key)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
@@ -212,9 +212,9 @@ lbox_index_count(lua_State *L)
 		       "iterator, key)");
 	}
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	uint32_t iterator = lua_tointeger(L, 3);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	uint32_t iterator = lua_tonumber(L, 3);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 4, &key_len);
 
@@ -246,9 +246,9 @@ lbox_index_iterator(lua_State *L)
 	    !lua_isnumber(L, 3))
 		return luaL_error(L, "usage index.iterator(space_id, index_id, type, key)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	uint32_t iterator = lua_tointeger(L, 3);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	uint32_t iterator = lua_tonumber(L, 3);
 	size_t mpkey_len;
 	const char *mpkey = lua_tolstring(L, 4, &mpkey_len); /* Key encoded by Lua */
 	/* const char *key = lbox_encode_tuple_on_gc(L, 4, key_len); */
@@ -304,8 +304,8 @@ lbox_index_info(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "usage index.info(space_id, index_id)");
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
 
 	struct info_handler info;
 	luaT_info_handler_create(&info, L);

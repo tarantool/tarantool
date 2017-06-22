@@ -151,12 +151,12 @@ enum iproto_type {
 	/** Replication SUBSCRIBE command */
 	IPROTO_SUBSCRIBE = 66,
 
-	/** General information about Vinyl's runs stored in .index file */
+	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,
-	/** Information about Vinyl's page stored in .index file */
+	/** Vinyl page info stored in .index file */
 	VY_INDEX_PAGE_INFO = 101,
-	/** Offsets for Vinyl's pages stored in .run file */
-	VY_RUN_PAGE_INDEX = 102,
+	/** Vinyl row index stored in .run file */
+	VY_RUN_ROW_INDEX = 102,
 
 	/**
 	 * Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h)
@@ -182,8 +182,8 @@ iproto_type_name(uint32_t type)
 		return "RUNINFO";
 	case VY_INDEX_PAGE_INFO:
 		return "PAGEINFO";
-	case VY_RUN_PAGE_INDEX:
-		return "PAGEINDEX";
+	case VY_RUN_ROW_INDEX:
+		return "ROWINDEX";
 	default:
 		return NULL;
 	}
@@ -269,7 +269,7 @@ struct PACKED request_replace_body {
 };
 
 /**
- * Xrow keys for Vinyl's run information.
+ * Xrow keys for Vinyl run information.
  * @sa struct vy_run_info.
  */
 enum vy_run_info_key {
@@ -277,11 +277,11 @@ enum vy_run_info_key {
 	VY_RUN_INFO_MIN_KEY = 1,
 	/** Max key in the run. */
 	VY_RUN_INFO_MAX_KEY = 2,
-	/** Minimal LSN over all statements in a run. */
+	/** Min LSN over all statements in the run. */
 	VY_RUN_INFO_MIN_LSN = 3,
-	/** Maximal LSN over all statements in a run. */
+	/** Max LSN over all statements in the run. */
 	VY_RUN_INFO_MAX_LSN = 4,
-	/** Number of pages in a run. */
+	/** Number of pages in the run. */
 	VY_RUN_INFO_PAGE_COUNT = 5,
 	/** Bloom filter for keys. */
 	VY_RUN_INFO_BLOOM = 6,
@@ -296,28 +296,29 @@ enum vy_run_info_key {
 static inline const char *
 vy_run_info_key_name(enum vy_run_info_key key)
 {
-	if (key < VY_RUN_INFO_MIN_KEY || key >= VY_RUN_INFO_KEY_MAX)
+	if (key <= 0 || key >= VY_RUN_INFO_KEY_MAX)
 		return NULL;
 	extern const char *vy_run_info_key_strs[];
 	return vy_run_info_key_strs[key];
 }
 
 /**
- * Xrow keys for Vinyl's page information.
+ * Xrow keys for Vinyl page information.
  * @sa struct vy_run_info.
  */
 enum vy_page_info_key {
+	/** Offset of page data in the run file. */
 	VY_PAGE_INFO_OFFSET = 1,
-	/** Size of page data on the disk. */
+	/** Size of page data in the run file. */
 	VY_PAGE_INFO_SIZE = 2,
 	/** Size of page data in memory, i.e. unpacked. */
 	VY_PAGE_INFO_UNPACKED_SIZE = 3,
-	/* The number of rows in a page */
+	/* Number of statements in the page. */
 	VY_PAGE_INFO_ROW_COUNT = 4,
-	/* Minimal LSN of all keys in a page. */
+	/* Minimal key stored in the page. */
 	VY_PAGE_INFO_MIN_KEY = 5,
-	/* Page index offset in a page */
-	VY_PAGE_INFO_PAGE_INDEX_OFFSET = 6,
+	/** Offset of the row index in the page. */
+	VY_PAGE_INFO_ROW_INDEX_OFFSET = 6,
 	/** The last key in this enum + 1 */
 	VY_PAGE_INFO_KEY_MAX
 };
@@ -329,21 +330,21 @@ enum vy_page_info_key {
 static inline const char *
 vy_page_info_key_name(enum vy_page_info_key key)
 {
-	if (key < VY_PAGE_INFO_OFFSET || key >= VY_PAGE_INFO_KEY_MAX)
+	if (key <= 0 || key >= VY_PAGE_INFO_KEY_MAX)
 		return NULL;
 	extern const char *vy_page_info_key_strs[];
 	return vy_page_info_key_strs[key];
 }
 
 /**
- * Keys for Vinyl's page index.
- * @sa struct vy_page.
+ * Xrow keys for Vinyl row index.
+ * @sa struct vy_page_info.
  */
-enum vy_page_index_key {
-	/** An array of row offsets in a page data (a page index). */
-	VY_PAGE_INDEX_INDEX = 1,
+enum vy_row_index_key {
+	/** Array of row offsets. */
+	VY_ROW_INDEX_DATA = 1,
 	/** The last key in this enum + 1 */
-	VY_PAGE_INDEX_KEY_MAX = VY_PAGE_INDEX_INDEX + 1
+	VY_ROW_INDEX_KEY_MAX
 };
 
 /**
@@ -351,12 +352,12 @@ enum vy_page_index_key {
  * @param key key
  */
 static inline const char *
-vy_page_index_key_name(enum vy_page_index_key key)
+vy_row_index_key_name(enum vy_row_index_key key)
 {
-	if (key < VY_PAGE_INDEX_INDEX || key >= VY_PAGE_INDEX_KEY_MAX)
+	if (key <= 0 || key >= VY_ROW_INDEX_KEY_MAX)
 		return NULL;
-	extern const char *vy_page_index_key_strs[];
-	return vy_page_index_key_strs[key];
+	extern const char *vy_row_index_key_strs[];
+	return vy_row_index_key_strs[key];
 }
 
 #if defined(__cplusplus)

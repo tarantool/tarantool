@@ -34,6 +34,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
@@ -383,6 +384,49 @@ abspath(const char *filename);
 
 char *
 int2str(long long int val);
+
+void
+fpconv_check(void);
+
+enum {
+	FPCONV_G_FMT_BUFSIZE = 32,
+	FPCONV_G_FMT_MAX_PRECISION = 14
+};
+
+extern const char *precision_fmts[];
+
+/**
+ * @brief Locale-independent printf("%.(precision)lg")
+ * @sa snprintf()
+ */
+static inline int
+fpconv_g_fmt(char *str, double num, int precision)
+{
+	if (precision <= 0 || precision > FPCONV_G_FMT_MAX_PRECISION)
+		precision = FPCONV_G_FMT_MAX_PRECISION;
+
+	const char *fmt = precision_fmts[precision];
+	return snprintf(str, FPCONV_G_FMT_BUFSIZE, fmt, num);
+}
+
+/**
+ * @brief Locale-independent strtod.
+ * @sa strtod()
+ */
+static inline double
+fpconv_strtod(const char *nptr, char **endptr)
+{
+	return strtod(nptr, endptr);
+}
+
+/**
+ * Check that @a str is valid utf-8 sequence and can be printed
+ * unescaped.
+ * @param str string
+ * @param length string length
+ */
+int
+utf8_check_printable(const char *str, size_t length);
 
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */

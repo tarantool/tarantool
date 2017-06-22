@@ -26,7 +26,7 @@ add_library(box STATIC
     iproto_constants.c
     errcode.c
     error.cc
-    xrow.cc
+    xrow.c
     xrow_io.cc
     xlog.cc
     tuple_format.c

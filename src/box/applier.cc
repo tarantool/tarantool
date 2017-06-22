@@ -175,14 +175,13 @@ applier_connect(struct applier *applier)
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
 	struct xrow_header row;
-	xrow_encode_auth(&row, greeting.salt, greeting.salt_len, uri->login,
-			 uri->login_len, uri->password,
-			 uri->password_len);
+	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
+			    uri->login_len, uri->password, uri->password_len);
 	coio_write_xrow(coio, &row);
 	coio_read_xrow(coio, &iobuf->in, &row);
 	applier->last_row_time = ev_now(loop());
 	if (row.type != IPROTO_OK)
-		xrow_decode_error(&row); /* auth failed */
+		xrow_decode_error_xc(&row); /* auth failed */
 
 done:
 	/* auth succeeded */
@@ -200,7 +199,7 @@ applier_join(struct applier *applier)
 	struct ev_io *coio = &applier->io;
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
-	xrow_encode_join(&row, &INSTANCE_UUID);
+	xrow_encode_join_xc(&row, &INSTANCE_UUID);
 	coio_write_xrow(coio, &row);
 
 	/**
@@ -211,7 +210,7 @@ applier_join(struct applier *applier)
 		/* Decode JOIN response */
 		coio_read_xrow(coio, &iobuf->in, &row);
 		if (iproto_type_is_error(row.type)) {
-			return xrow_decode_error(&row); /* re-throw error */
+			xrow_decode_error_xc(&row); /* re-throw error */
 		} else if (row.type != IPROTO_OK) {
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
@@ -249,7 +248,7 @@ applier_join(struct applier *applier)
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
-			xrow_decode_error(&row);  /* rethrow error */
+			xrow_decode_error_xc(&row);  /* rethrow error */
 		} else {
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
@@ -282,7 +281,7 @@ applier_join(struct applier *applier)
 			 */
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
-			xrow_decode_error(&row);  /* rethrow error */
+			xrow_decode_error_xc(&row);  /* rethrow error */
 		} else {
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 				  (uint32_t) row.type);
@@ -308,8 +307,8 @@ applier_subscribe(struct applier *applier)
 	struct iobuf *iobuf = applier->iobuf;
 	struct xrow_header row;
 
-	xrow_encode_subscribe(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-			      &replicaset_vclock);
+	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
+				 &replicaset_vclock);
 	coio_write_xrow(coio, &row);
 	applier_set_state(applier, APPLIER_FOLLOW);
 
@@ -319,7 +318,7 @@ applier_subscribe(struct applier *applier)
 	if (applier->version_id >= version_id(1, 6, 7)) {
 		coio_read_xrow(coio, &iobuf->in, &row);
 		if (iproto_type_is_error(row.type)) {
-			return xrow_decode_error(&row);  /* error */
+			xrow_decode_error_xc(&row);  /* error */
 		} else if (row.type != IPROTO_OK) {
 			tnt_raise(ClientError, ER_PROTOCOL,
 				  "Invalid response to SUBSCRIBE");
@@ -352,7 +351,7 @@ applier_subscribe(struct applier *applier)
 		applier->last_row_time = ev_now(loop());
 
 		if (iproto_type_is_error(row.type))
-			xrow_decode_error(&row);  /* error */
+			xrow_decode_error_xc(&row);  /* error */
 		/* Replication request. */
 		if (row.replica_id == REPLICA_ID_NIL ||
 		    row.replica_id >= VCLOCK_MAX) {

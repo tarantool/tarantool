@@ -1176,11 +1176,15 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 		}
 	}
 
+	struct obuf_svp svp = obuf_create_svp(&log->obuf);
 	size_t page_offset = obuf_size(&log->obuf);
 	/** encode row into iovec */
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_header_encode(packet, iov, 0);
-	struct obuf_svp svp = obuf_create_svp(&log->obuf);
+	if (iovcnt < 0) {
+		obuf_rollback_to_svp(&log->obuf, &svp);
+		return -1;
+	}
 	for (int i = 0; i < iovcnt; ++i) {
 		struct errinj *inj = errinj(ERRINJ_WAL_WRITE_PARTIAL,
 					    ERRINJ_INT);

@@ -28,6 +28,8 @@
 
 #include "lyaml.h"
 
+#include "trivia/util.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -45,8 +47,6 @@ extern "C" {
 
 #include "yaml.h"
 #include "b64.h"
-/* Use private header from bundled libyaml for IS_PRINTABLE() macro */
-#include "third_party/libyaml/src/yaml_private.h"
 } /* extern "C" */
 #include "lua/utils.h"
 
@@ -449,51 +449,6 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
    return 1;
 }
 
-/* Stolen from libyaml */
-static int
-yaml_check_utf8(const yaml_char_t *start, size_t length)
-{
-    const yaml_char_t *end = start+length;
-    const yaml_char_t *pointer = start;
-
-    while (pointer < end) {
-        unsigned char octet;
-        unsigned int width;
-        unsigned int value;
-        size_t k;
-
-        octet = pointer[0];
-        width = (octet & 0x80) == 0x00 ? 1 :
-                (octet & 0xE0) == 0xC0 ? 2 :
-                (octet & 0xF0) == 0xE0 ? 3 :
-                (octet & 0xF8) == 0xF0 ? 4 : 0;
-        value = (octet & 0x80) == 0x00 ? octet & 0x7F :
-                (octet & 0xE0) == 0xC0 ? octet & 0x1F :
-                (octet & 0xF0) == 0xE0 ? octet & 0x0F :
-                (octet & 0xF8) == 0xF0 ? octet & 0x07 : 0;
-        if (!width) return 0;
-        if (pointer+width > end) return 0;
-        for (k = 1; k < width; k ++) {
-            octet = pointer[k];
-            if ((octet & 0xC0) != 0x80) return 0;
-            value = (value << 6) + (octet & 0x3F);
-        }
-        if (!((width == 1) ||
-            (width == 2 && value >= 0x80) ||
-            (width == 3 && value >= 0x800) ||
-            (width == 4 && value >= 0x10000))) return 0;
-
-        /* gh-354: yaml incorrectly escapes special characters in a string */
-        yaml_string_t ys; ys.pointer = (yaml_char_t *)pointer;
-        if (*pointer > 0x7F && !IS_PRINTABLE(ys))
-           return 0;
-
-        pointer += width;
-    }
-
-    return 1;
-}
-
 static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
    /*
     * Tarantool-specific: always quote strings in FLOW SEQUENCE
@@ -570,7 +525,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          break;
       }
       style = YAML_ANY_SCALAR_STYLE; // analyze_string(dumper, str, len, &is_binary);
-      if (yaml_check_utf8((const yaml_char_t *) str, len)) {
+      if (utf8_check_printable(str, len)) {
          if (yaml_is_flow_mode(dumper)) {
             style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
          } else if (strstr(str, "\n\n") != NULL) {

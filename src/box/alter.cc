@@ -45,6 +45,8 @@
 #include "replication.h" /* for replica_set_id() */
 #include "session.h" /* to fetch the current user. */
 #include "vclock.h" /* VCLOCK_MAX */
+#include "xrow.h"
+#include "iproto_constants.h"
 #include "memtx_tuple.h"
 
 /**
@@ -1415,23 +1417,41 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	struct tuple *old_tuple = stmt->old_tuple;
+	txn_check_autocommit(txn, "Space _truncate");
 	struct tuple *new_tuple = stmt->new_tuple;
 
-	if (old_tuple == NULL || new_tuple == NULL) {
-		/* Space create or drop. */
+	if (new_tuple == NULL) {
+		/* Space drop - nothing to do. */
 		return;
 	}
 
-	/*
-	 * Truncate counter is updated - truncate the space.
-	 */
 	uint32_t space_id =
 		tuple_field_u32_xc(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID);
 	uint64_t truncate_count =
 		tuple_field_u64_xc(new_tuple, BOX_TRUNCATE_FIELD_COUNT);
 	struct space *old_space = space_cache_find(space_id);
 
+	if (stmt->row->type == IPROTO_INSERT) {
+		/*
+		 * Space creation during initial recovery -
+		 * initialize truncate_count.
+		 */
+		old_space->truncate_count = truncate_count;
+		return;
+	}
+
+	/*
+	 * System spaces use triggers to keep records in sync
+	 * with internal objects. Since space truncation doesn't
+	 * invoke triggers, we don't permit it for system spaces.
+	 */
+	if (space_is_system(old_space))
+		tnt_raise(ClientError, ER_TRUNCATE_SYSTEM_SPACE,
+			  space_name(old_space));
+
+	/*
+	 * Truncate counter is updated - truncate the space.
+	 */
 	struct truncate_space *truncate =
 		region_calloc_object_xc(&fiber()->gc, struct truncate_space);
 
@@ -1699,19 +1719,37 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	}
 }
 
-/** Create a function definition from tuple. */
-static void
-func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
+/**
+ * Get function identifiers from a tuple.
+ *
+ * @param tuple Tuple to get ids from.
+ * @param[out] fid Function identifier.
+ * @param[out] uid Owner identifier.
+ */
+static inline void
+func_def_get_ids_from_tuple(const struct tuple *tuple, uint32_t *fid,
+			    uint32_t *uid)
 {
-	def->fid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_ID);
-	def->uid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_UID);
-	const char *name = tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_NAME);
-	uint32_t len = strlen(name);
-	if (len >= sizeof(def->name)) {
+	*fid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_ID);
+	*uid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_UID);
+}
+
+/** Create a function definition from tuple. */
+static struct func_def *
+func_def_new_from_tuple(const struct tuple *tuple)
+{
+	uint32_t len;
+	const char *name = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_NAME,
+					      &len);
+	if (len > BOX_NAME_MAX)
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
-			  name, "function name is too long");
-	}
-	snprintf(def->name, sizeof(def->name), "%s", name);
+			  tt_cstr(name, len), "function name is too long");
+	struct func_def *def = (struct func_def *) malloc(func_def_sizeof(len));
+	if (def == NULL)
+		tnt_raise(OutOfMemory, func_def_sizeof(len), "malloc", "def");
+	auto def_guard = make_scoped_guard([=] { free(def); });
+	func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid);
+	snprintf(def->name, len + 1, "%s", name);
 	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_SETUID)
 		def->setuid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_SETUID);
 	else
@@ -1722,12 +1760,14 @@ func_def_create_from_tuple(struct func_def *def, struct tuple *tuple)
 		def->language = STR2ENUM(func_language, language);
 		if (def->language == func_language_MAX) {
 			tnt_raise(ClientError, ER_FUNCTION_LANGUAGE,
-				  language, name);
+				  language, def->name);
 		}
 	} else {
 		/* Lua is the default. */
 		def->language = FUNC_LANGUAGE_LUA;
 	}
+	def_guard.is_active = false;
+	return def;
 }
 
 /** Remove a function from function cache */
@@ -1746,9 +1786,10 @@ static void
 func_cache_replace_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
-	struct func_def def;
-	func_def_create_from_tuple(&def, stmt->new_tuple);
-	func_cache_replace(&def);
+	struct func_def *def = func_def_new_from_tuple(stmt->new_tuple);
+	auto def_guard = make_scoped_guard([=] { free(def); });
+	func_cache_replace(def);
+	def_guard.is_active = false;
 }
 
 /**
@@ -1763,36 +1804,39 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	struct func_def def;
 
 	uint32_t fid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
 					  BOX_FUNC_FIELD_ID);
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
-		func_def_create_from_tuple(&def, new_tuple);
-		func_cache_replace(&def);
+		struct func_def *def = func_def_new_from_tuple(new_tuple);
+		auto def_guard = make_scoped_guard([=] { free(def); });
+		func_cache_replace(def);
+		def_guard.is_active = false;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) {         /* DELETE */
-		func_def_create_from_tuple(&def, old_tuple);
+		uint32_t uid;
+		func_def_get_ids_from_tuple(old_tuple, &fid, &uid);
 		/*
 		 * Can only delete func if you're the one
 		 * who created it or a superuser.
 		 */
-		access_check_ddl(def.uid, SC_FUNCTION);
+		access_check_ddl(uid, SC_FUNCTION);
 		/* Can only delete func if it has no grants. */
-		if (schema_find_grants("function", old_func->def.fid)) {
+		if (schema_find_grants("function", old_func->def->fid)) {
 			tnt_raise(ClientError, ER_DROP_FUNCTION,
-				  (unsigned) old_func->def.uid,
+				  (unsigned) old_func->def->uid,
 				  "function has grants");
 		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_remove_func, NULL);
 		txn_on_commit(txn, on_commit);
 	} else {                                /* UPDATE, REPLACE */
-		func_def_create_from_tuple(&def, new_tuple);
-		access_check_ddl(def.uid, SC_FUNCTION);
+		struct func_def *def = func_def_new_from_tuple(new_tuple);
+		auto def_guard = make_scoped_guard([=] { free(def); });
+		access_check_ddl(def->uid, SC_FUNCTION);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(func_cache_replace_func, NULL);
 		txn_on_commit(txn, on_commit);
@@ -1861,7 +1905,7 @@ priv_def_check(struct priv_def *priv)
 	case SC_FUNCTION:
 	{
 		struct func *func = func_cache_find(priv->object_id);
-		if (func->def.uid != grantor->def.uid &&
+		if (func->def->uid != grantor->def.uid &&
 		    grantor->def.uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  "Grant", schema_object_name(priv->object_type),

@@ -178,9 +178,9 @@ const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
 	"offset",
 	"size",
 	"unpacked size",
-	"count",
-	"min",
-	"page index offset"
+	"row count",
+	"min key",
+	"row index offset"
 };
 
 const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
@@ -193,7 +193,7 @@ const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
 	"bloom filter"
 };
 
-const char *vy_page_index_key_strs[VY_PAGE_INDEX_KEY_MAX] = {
+const char *vy_row_index_key_strs[VY_ROW_INDEX_KEY_MAX] = {
 	NULL,
-	"page index",
+	"row index",
 };

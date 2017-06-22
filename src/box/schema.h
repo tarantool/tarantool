@@ -216,6 +216,13 @@ uint32_t
 schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	       const char *name, uint32_t len);
 
+/**
+ * Insert a new function or update the old one.
+ *
+ * @param def Function definition. In a case of success the ownership
+ *        of @a def is transfered to the data dictionary, thus the caller
+ *        must not delete it.
+ */
 void
 func_cache_replace(struct func_def *def);
 

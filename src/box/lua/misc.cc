@@ -80,11 +80,11 @@ lbox_select(lua_State *L)
 				  "limit, key)");
 	}
 
-	uint32_t space_id = lua_tointeger(L, 1);
-	uint32_t index_id = lua_tointeger(L, 2);
-	int iterator = lua_tointeger(L, 3);
-	uint32_t offset = lua_tointeger(L, 4);
-	uint32_t limit = lua_tointeger(L, 5);
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	int iterator = lua_tonumber(L, 3);
+	uint32_t offset = lua_tonumber(L, 4);
+	uint32_t limit = lua_tonumber(L, 5);
 
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);

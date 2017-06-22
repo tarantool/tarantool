@@ -97,6 +97,87 @@ xrow_header_decode(struct xrow_header *header,
 		   const char **pos, const char *end);
 
 /**
+ * Decode a request from the @row.
+ * @param row Xrow.
+ * @retval not NULL Decoded request.
+ *
+ * @retval     NULL Memory or binary format error.
+ */
+struct request *
+xrow_decode_request(struct xrow_header *row);
+
+/**
+ * Encode AUTH command.
+ * @param[out] Row.
+ * @param salt Salt from IPROTO greeting.
+ * @param salt_len Length of @salt.
+ * @param login User login.
+ * @param login_len Length of @login.
+ * @param password User password.
+ * @param password_len Length of @password.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+*/
+int
+xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
+		 const char *login, size_t login_len, const char *password,
+		 size_t password_len);
+
+struct vclock;
+/**
+ * Encode SUBSCRIBE command.
+ * @param[out] Row.
+ * @param replicaset_uuid Replica set uuid.
+ * @param instance_uuid Instance uuid.
+ * @param vclock Replication clock.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+xrow_encode_subscribe(struct xrow_header *row,
+		      const struct tt_uuid *replicaset_uuid,
+		      const struct tt_uuid *instance_uuid,
+		      const struct vclock *vclock);
+
+/**
+ * Decode SUBSCRIBE command.
+ * @param row Row to decode.
+ * @param[out] replicaset_uuid.
+ * @param[out] instance_uuid.
+ * @param[out] vclock.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or format error.
+ */
+int
+xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
+		      struct tt_uuid *instance_uuid, struct vclock *vclock);
+
+/**
+ * Encode JOIN command.
+ * @param[out] row Row to encode into.
+ * @param instance_uuid.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
+
+/**
+ * Encode end of stream command (a response to JOIN command).
+ * @param row[out] Row to encode into.
+ * @param vclock.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+
+/**
  * Fast encode xrow header using the specified header fields.
  * It is faster than the xrow_header_encode, because uses
  * the predefined values for all fields of the header, defined
@@ -132,8 +213,16 @@ void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		    uint32_t schema_version, uint32_t count);
 
-/** Stack a reply to 'ping' packet. */
-void
+/*
+ * Encode iproto header with IPROTO_OK response code.
+ * @param out Encode to.
+ * @param sync Request sync.
+ * @param schema_version.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
 
 /**
@@ -239,10 +328,9 @@ struct greeting {
  *
  * \sa greeting_decode()
  */
-
 void
-greeting_encode(char *greetingbuf, uint32_t version_id, const
-		struct tt_uuid *uuid, const char *salt,
+greeting_encode(char *greetingbuf, uint32_t version_id,
+		const struct tt_uuid *uuid, const char *salt,
 		uint32_t salt_len);
 
 /**
@@ -259,6 +347,25 @@ greeting_encode(char *greetingbuf, uint32_t version_id, const
 int
 greeting_decode(const char *greetingbuf, struct greeting *greeting);
 
+/**
+ * Encode an xrow record into the specified iovec.
+ *
+ * @param row Record to encode.
+ * @param[out] out Encoded record.
+ *
+ * @retval >= 0 Used iovector components.
+ * @retval   -1 Error.
+ */
+int
+xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
+
+/**
+ * Decode ERROR and set it to diagnostics area.
+ * @param row Encoded error.
+ */
+void
+xrow_decode_error(struct xrow_header *row);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -273,33 +380,22 @@ xrow_header_decode_xc(struct xrow_header *header, const char **pos,
 		diag_raise();
 }
 
-void
-xrow_decode_uuid(const char **pos, struct tt_uuid *out);
-
-char *
-xrow_encode_uuid(char *pos, const struct tt_uuid *in);
-
-int
-xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
-
-/**
- * \brief Decode ERROR and re-throw it as ClientError exception
- * \param row
-*/
-void
-xrow_decode_error(struct xrow_header *row);
-
-/**
- * @copydoc xrow_header_encode()
- */
+/** @copydoc xrow_to_iovec. */
 static inline int
-xrow_header_encode_xc(const struct xrow_header *header,
-		      struct iovec *out, size_t fixheader_len)
+xrow_to_iovec_xc(const struct xrow_header *row, struct iovec *out)
 {
-	int iovcnt = xrow_header_encode(header, out, fixheader_len);
-	if (iovcnt < 0)
+	int rc = xrow_to_iovec(row, out);
+	if (rc < 0)
 		diag_raise();
-	return iovcnt;
+	return rc;
+}
+
+/** @copydoc xrow_decode_error. */
+static inline void
+xrow_decode_error_xc(struct xrow_header *row)
+{
+	xrow_decode_error(row);
+	diag_raise();
 }
 
 static inline void
@@ -319,55 +415,58 @@ request_encode_xc(struct request *request, struct iovec *iov)
 	return iovcnt;
 }
 
-struct request *
-xrow_decode_request(struct xrow_header *row);
+/** @copydoc xrow_decode_request. */
+static inline struct request *
+xrow_decode_request_xc(struct xrow_header *row)
+{
+	struct request *ret = xrow_decode_request(row);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
+}
 
-/**
- * \brief Encode AUTH command
- * \param[out] row
- * \param salt - salt from IPROTO greeting
- * \param salt_len length of \a salt
- * \param login - user login
- * \param login_len - length of \a login
- * \param password - user password
- * \param password_len - length of \a password
-*/
-void
-xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
-		 const char *login, size_t login_len,
-		 const char *password, size_t password_len);
+/** @copydoc xrow_encode_auth. */
+static inline void
+xrow_encode_auth_xc(struct xrow_header *row, const char *salt, size_t salt_len,
+		    const char *login, size_t login_len, const char *password,
+		    size_t password_len)
+{
+	if (xrow_encode_auth(row, salt, salt_len, login, login_len, password,
+			     password_len) != 0)
+		diag_raise();
+}
 
-/**
- * \brief Encode SUBSCRIBE command
- * \param row[out]
- * \param replicaset_uuid replica set uuid
- * \param instance_uuid instance uuid
- * \param vclock replication clock
-*/
-void
-xrow_encode_subscribe(struct xrow_header *row,
-		      const struct tt_uuid *replicaset_uuid,
-		      const struct tt_uuid *instance_uuid,
-		      const struct vclock *vclock);
+/** @copydoc xrow_encode_subscribe. */
+static inline void
+xrow_encode_subscribe_xc(struct xrow_header *row,
+			 const struct tt_uuid *replicaset_uuid,
+			 const struct tt_uuid *instance_uuid,
+			 const struct vclock *vclock)
+{
+	if (xrow_encode_subscribe(row, replicaset_uuid, instance_uuid,
+				  vclock) != 0)
+		diag_raise();
+}
 
-/**
- * \brief Decode SUBSCRIBE command
- * \param row
- * \param[out] replicaset_uuid
- * \param[out] instance_uuid
- * \param[out] vclock
-*/
-void
-xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
-		      struct tt_uuid *instance_uuid, struct vclock *vclock);
+/** @copydoc xrow_decode_subscribe. */
+static inline void
+xrow_decode_subscribe_xc(struct xrow_header *row,
+			 struct tt_uuid *replicaset_uuid,
+		         struct tt_uuid *instance_uuid, struct vclock *vclock)
+{
+	if (xrow_decode_subscribe(row, replicaset_uuid, instance_uuid,
+				  vclock) != 0)
+		diag_raise();
+}
 
-/**
- * \brief Encode JOIN command
- * \param[out] row
- * \param instance_uuid
-*/
-void
-xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
+/** @copydoc xrow_encode_join. */
+static inline void
+xrow_encode_join_xc(struct xrow_header *row,
+		    const struct tt_uuid *instance_uuid)
+{
+	if (xrow_encode_join(row, instance_uuid) != 0)
+		diag_raise();
+}
 
 /**
  * \brief Decode JOIN command
@@ -377,16 +476,16 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
 static inline void
 xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL);
+	xrow_decode_subscribe_xc(row, NULL, instance_uuid, NULL);
 }
 
-/**
- * \brief Encode end of stream command (a response to JOIN command)
- * \param row[out]
- * \param vclock
-*/
-void
-xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+/** @copydoc xrow_encode_vclock. */
+static inline void
+xrow_encode_vclock_xc(struct xrow_header *row, const struct vclock *vclock)
+{
+	if (xrow_encode_vclock(row, vclock) != 0)
+		diag_raise();
+}
 
 /**
  * \brief Decode end of stream command (a response to JOIN command)
@@ -396,7 +495,15 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 static inline void
 xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, NULL, NULL, vclock);
+	xrow_decode_subscribe_xc(row, NULL, NULL, vclock);
+}
+
+/** @copydoc iproto_reply_ok. */
+static inline void
+iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
+{
+	if (iproto_reply_ok(out, sync, schema_version) != 0)
+		diag_raise();
 }
 
 #endif

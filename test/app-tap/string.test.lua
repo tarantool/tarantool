@@ -3,7 +3,7 @@
 local tap = require('tap')
 local test = tap.test("string extensions")
 
-test:plan(3)
+test:plan(4)
 
 test:test("split", function(test)
     test:plan(10)
@@ -96,6 +96,12 @@ test:test("startswith/endswith", function(test)
     test:ok(("12345"):endswith("345", -3, -1)      , "endswith with good begin/end")
     test:ok(not ("12345"):endswith("345", 1, 4)    , "bad endswith with good begin/end")
     test:ok(not ("12345"):endswith("345", 4, 5)    , "bad endswith with good begin/end")
+end)
+
+test:test("hex", function(test)
+    test:plan(2)
+    test:is(string.hex("hello"), "68656c6c6f", "hex non-empty string")
+    test:is(string.hex(""), "", "hex empty string")
 end)
 
 os.exit(test:check() == true and 0 or -1)

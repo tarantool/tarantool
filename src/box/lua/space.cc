@@ -82,7 +82,7 @@ lbox_space_on_replace(struct lua_State *L)
 	   "usage: space:on_replace(function | nil, [function | nil])");
 	}
 	lua_getfield(L, 1, "id"); /* Get space id. */
-	uint32_t id = lua_tointeger(L, lua_gettop(L));
+	uint32_t id = lua_tonumber(L, lua_gettop(L));
 	struct space *space = space_cache_find(id);
 	lua_pop(L, 1);
 

@@ -531,7 +531,7 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
-space.index.primary:info().count
+space.index.primary:info().rows
 ---
 - 3
 ...
@@ -562,7 +562,7 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
-space.index.primary:info().count
+space.index.primary:info().rows
 ---
 - 4
 ...
@@ -570,7 +570,7 @@ box.snapshot()
 ---
 - ok
 ...
-space.index.primary:info().count
+space.index.primary:info().rows
 ---
 - 2
 ...
@@ -592,7 +592,7 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
-space.index.primary:info().count
+space.index.primary:info().rows
 ---
 - 4
 ...
@@ -662,7 +662,7 @@ space:get{3}
 ---
 - [3, 999, 0]
 ...
-space.index.primary:info().count
+space.index.primary:info().rows
 ---
 - 1004
 ...

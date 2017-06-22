@@ -198,7 +198,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 			  (uint32_t) row->type);
 	}
 
-	struct request *request = xrow_decode_request(row);
+	struct request *request = xrow_decode_request_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* memtx snapshot must contain only memtx spaces */
 	if (space->handler->engine != this)

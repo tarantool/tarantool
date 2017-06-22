@@ -341,34 +341,6 @@ luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	luaL_convertfield(L, cfg, idx, field);
 }
 
-enum { FPCONV_G_FMT_BUFSIZE = 32 };
-
-extern const char *precision_fmts[];
-
-/**
- * @brief Locale-independent printf("%.(precision)lg")
- * @sa snprintf()
- */
-static inline int
-fpconv_g_fmt(char *str, double num, int precision)
-{
-	if (precision <= 0 || precision > 14)
-		precision = 14;
-
-	const char *fmt = precision_fmts[precision];
-	return snprintf(str, FPCONV_G_FMT_BUFSIZE, fmt, num);
-}
-
-/**
- * @brief Locale-independent strtod.
- * @sa strtod()
- */
-static inline double
-fpconv_strtod(const char *nptr, char **endptr)
-{
-	return strtod(nptr, endptr);
-}
-
 void
 luaL_register_type(struct lua_State *L, const char *type_name,
 		   const struct luaL_Reg *methods);

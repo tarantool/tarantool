@@ -545,10 +545,6 @@ local function create_truncate_space()
 
     log.info("create index primary on _truncate")
     box.space._index:insert{_truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
-
-    for _, def in box.space._space:pairs() do
-        _truncate:insert{def[1], 0}
-    end
 end
 
 local function upgrade_to_1_7_5()

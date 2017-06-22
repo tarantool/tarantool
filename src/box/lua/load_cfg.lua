@@ -359,7 +359,9 @@ local function load_cfg(cfg)
             end
         end
     end
-    box.schema.upgrade{auto = true}
+    if not box.cfg.read_only then
+        box.schema.upgrade{auto = true}
+    end
 end
 box.cfg = load_cfg
 

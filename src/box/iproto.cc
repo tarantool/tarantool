@@ -966,8 +966,8 @@ tx_process_misc(struct cmsg *m)
 			box_process_auth(&msg->request, out);
 			break;
 		case IPROTO_PING:
-			iproto_reply_ok(out, msg->header.sync,
-					::schema_version);
+			iproto_reply_ok_xc(out, msg->header.sync,
+					   ::schema_version);
 			break;
 		default:
 			unreachable();

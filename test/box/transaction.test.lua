@@ -195,3 +195,45 @@ box.space.test:drop()
 --
 function gh_1638() box.begin(); box.rollback() end
 for i = 1, 1000 do fiber.create(function() gh_1638() end) end
+
+--
+--gh-818 add atomic()
+--
+space = box.schema.space.create('atomic')
+index = space:create_index('primary')
+test_run:cmd("setopt delimiter ';'")
+
+function args(...)
+    return 'args', ...
+end;
+box.atomic(args, 1, 2, 3, 4, 5);
+
+function tx()
+    space:auto_increment{'first row'}
+    space:auto_increment{'second row'}
+    return space:select{}
+end;
+box.atomic(tx);
+
+function tx_error(space)
+    space:auto_increment{'third'}
+    space:auto_increment{'fourth'}
+    error("some error")
+end;
+box.atomic(tx_error, space);
+
+function nested(space)
+    box.begin()
+end;
+box.atomic(nested, space);
+
+function rollback(space)
+    space:auto_increment{'fifth'}
+    box.rollback()
+end;
+box.atomic(rollback, space);
+
+test_run:cmd("setopt delimiter ''");
+space:select{}
+
+space:drop()

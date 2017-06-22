@@ -393,12 +393,12 @@ s5:insert({0xFFFFFFFFFFFFFFFFULL})
 ...
 s5:insert({ffi.new('double', ffi.C.exp2(64))}) -- success
 ---
-- [0]
+- [1.844674407371e+19]
 ...
 s5:select()
 ---
 - - [18446744073709551615]
-  - [0]
+  - [1.844674407371e+19]
 ...
 s5:truncate()
 ---

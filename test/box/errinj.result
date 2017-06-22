@@ -40,6 +40,8 @@ errinj.info()
     state: 0
   ERRINJ_RELAY_TIMEOUT:
     state: 0
+  ERRINJ_VY_LOG_FLUSH:
+    state: false
   ERRINJ_VY_TASK_COMPLETE:
     state: false
   ERRINJ_VY_RUN_WRITE_TIMEOUT:

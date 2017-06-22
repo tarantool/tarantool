@@ -40,7 +40,7 @@ extern "C" {
  * Stored function.
  */
 struct func {
-	struct func_def def;
+	struct func_def *def;
 	/**
 	 * For C functions, the body of the function.
 	 */

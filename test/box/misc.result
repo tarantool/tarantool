@@ -55,7 +55,8 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - backup
+- - atomic
+  - backup
   - begin
   - cfg
   - commit
@@ -377,6 +378,7 @@ t;
   - 'box.error.SYSTEM : 115'
   - 'box.error.KEY_PART_IS_TOO_LONG : 118'
   - 'box.error.injection : table: <address>
+  - 'box.error.TRUNCATE_SYSTEM_SPACE : 137'
   - 'box.error.VY_QUOTA_TIMEOUT : 135'
   - 'box.error.USER_MAX : 56'
   - 'box.error.INVALID_XLOG_TYPE : 125'
@@ -703,10 +705,6 @@ tonumber64(ffi.new('int', 10))
 ---
 - 10
 ...
-tonumber64(ffi.new('long ', 10))
----
-- 10
-...
 tonumber64(ffi.new('int8_t', 10))
 ---
 - 10
@@ -736,10 +734,6 @@ tonumber64(ffi.new('unsigned int', 10))
 - 10
 ...
 tonumber64(ffi.new('unsigned int', 10))
----
-- 10
-...
-tonumber64(ffi.new('unsigned long ', 10))
 ---
 - 10
 ...
@@ -796,10 +790,6 @@ tonumber64(ffi.new('int', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
-tonumber64(ffi.new('long ', 10), 2)
----
-- error: 'bad argument #1 to ''?'' (string expected)'
-...
 tonumber64(ffi.new('int8_t', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
@@ -829,10 +819,6 @@ tonumber64(ffi.new('unsigned int', 10), 2)
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...
 tonumber64(ffi.new('unsigned int', 10), 2)
----
-- error: 'bad argument #1 to ''?'' (string expected)'
-...
-tonumber64(ffi.new('unsigned long ', 10), 2)
 ---
 - error: 'bad argument #1 to ''?'' (string expected)'
 ...

@@ -426,8 +426,20 @@ struct func_def {
 	 */
 	enum func_language language;
 	/** Function name. */
-	char name[BOX_NAME_MAX + 1];
+	char name[0];
 };
+
+/**
+ * @param name_length length of func_def->name
+ * @returns size in bytes needed to allocate for struct func_def
+ * for a function of length @a a name_length.
+ */
+static inline size_t
+func_def_sizeof(uint32_t name_length)
+{
+	/* +1 for '\0' name terminating. */
+	return sizeof(struct func_def) + name_length + 1;
+}
 
 /**
  * Definition of a privilege

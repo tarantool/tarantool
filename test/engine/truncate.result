@@ -8,6 +8,73 @@ fiber =  require('fiber')
 ---
 ...
 --
+-- Check that space truncation is forbidden in a transaction.
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:insert{123}
+---
+...
+box.begin()
+---
+...
+s:truncate()
+---
+- error: Space _truncate does not support multi-statement transactions
+...
+box.commit()
+---
+...
+s:select()
+---
+- - [123]
+...
+s:drop()
+---
+...
+--
+-- Check that space truncation works for spaces created via
+-- the internal API.
+--
+_ = box.space._space:insert{512, 1, 'test', engine, 0, {temporary = false}}
+---
+...
+_ = box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
+---
+...
+_ = box.space.test:insert{123}
+---
+...
+box.space.test:select()
+---
+- - [123]
+...
+box.space.test:truncate()
+---
+...
+box.space.test:select()
+---
+- []
+...
+box.space.test:drop()
+---
+...
+--
+-- Check that truncation of system spaces is not permitted.
+--
+box.space._space:truncate()
+---
+- error: Can't truncate a system space, space '_space'
+...
+box.space._index:truncate()
+---
+- error: Can't truncate a system space, space '_index'
+...
+--
 -- Truncate space with no indexes.
 --
 s = box.schema.create_space('test', {engine = engine})
@@ -248,6 +315,9 @@ box.snapshot()
 ---
 - ok
 ...
+_ = s1:insert{321, 123}
+---
+...
 s2:truncate()
 ---
 ...
@@ -291,10 +361,12 @@ s3 = box.space.test3
 s1.index.i1:select()
 ---
 - - [123, 321]
+  - [321, 123]
 ...
 s1.index.i2:select()
 ---
-- - [123, 321]
+- - [321, 123]
+  - [123, 321]
 ...
 s2.index.i1:select()
 ---
