@@ -1,5 +1,13 @@
 #gh-1238: log uncaught errors
 SystemError Failed to allocate 42 bytes in allocator for exception: Cannot allocate memory
+	*** fiber_name_test ***
+# name of a new fiber: main.
+
+# set new region name: region.
+
+# fiber name is truncated: aaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
+
+	*** fiber_name_test: done ***
 	*** fiber_join_test ***
 # exception propagated
 # cancel dead has started
