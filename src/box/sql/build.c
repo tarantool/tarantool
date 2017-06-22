@@ -2629,6 +2629,7 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int iDb, int isView){
   ** created in the temp database that refers to a table in another
   ** database.
   */
+  int space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
   if( !isView && !IsVirtual(pTab) ){
     if( pTab->pIndex && pTab->pIndex->pNext ){
       /*  Remove all indexes, except for primary.
@@ -2636,23 +2637,23 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int iDb, int isView){
       sqlite3NestedParse(pParse,
                          "DELETE FROM %Q.%s WHERE id=%d AND iid>0",
                          pDb->zDbSName,
-                         TARANTOOL_SYS_INDEX_NAME,
-                         SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+                         TARANTOOL_SYS_INDEX_NAME, space_id);
     }
 
     /*  Remove primary index. */
     sqlite3NestedParse(pParse,
                        "DELETE FROM %Q.%s WHERE id=%d AND iid=0",
                        pDb->zDbSName,
-                       TARANTOOL_SYS_INDEX_NAME,
-                       SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+                       TARANTOOL_SYS_INDEX_NAME, space_id);
   }
+  /* Delete records about the space from the _truncate. */
+  sqlite3NestedParse(pParse, "DELETE FROM "\
+                     TARANTOOL_SYS_TRUNCATE_NAME " WHERE id = %d", space_id);
 
   sqlite3NestedParse(pParse,
                      "DELETE FROM %Q.%s WHERE id=%d",
                      pDb->zDbSName,
-                     TARANTOOL_SYS_SPACE_NAME,
-                     SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+                     TARANTOOL_SYS_SPACE_NAME, space_id);
 
   /* Remove the table entry from SQLite's internal schema and modify
   ** the schema cookie.
