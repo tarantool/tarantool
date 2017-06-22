@@ -345,7 +345,9 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	enum index_type type =
 		STR2ENUM(index_type, tuple_field_cstr_xc(tuple,
 							 BOX_INDEX_FIELD_TYPE));
-	const char *name = tuple_field_cstr_xc(tuple, BOX_INDEX_FIELD_NAME);
+	uint32_t name_length;
+	const char *name = tuple_field_str_xc(tuple, BOX_INDEX_FIELD_NAME,
+					      &name_length);
 	uint32_t part_count;
 	const char *parts;
 	if (is_166plus) {
@@ -368,7 +370,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	}
 
 	index_def = index_def_new(id, space_name(old_space), index_id, name,
-				  type, &opts, part_count);
+				  name_length, type, &opts, part_count);
 	if (index_def == NULL)
 		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
@@ -893,7 +895,6 @@ ModifyIndex::commit(struct alter_space *alter)
 
 ModifyIndex::~ModifyIndex()
 {
-	/* new_index_def is NULL if exception is raised before it's set. */
 	if (new_index_def)
 		index_def_delete(new_index_def);
 }

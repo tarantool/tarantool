@@ -334,7 +334,7 @@ struct index_def {
 	/* Space id. */
 	uint32_t space_id;
 	/** Index name. */
-	char name[BOX_NAME_MAX + 1];
+	char *name;
 	/** Index type. */
 	enum index_type type;
 	struct index_opts opts;
@@ -503,9 +503,10 @@ key_def_sizeof(uint32_t part_count)
 }
 
 static inline size_t
-index_def_sizeof(uint32_t part_count)
+index_def_sizeof(uint32_t part_count, uint32_t name_length)
 {
-	return sizeof(struct index_def) + sizeof(struct key_part) * (part_count + 1);
+	return sizeof(struct index_def) +
+	       sizeof(struct key_part) * (part_count + 1) + name_length + 1;
 }
 
 /**
@@ -514,8 +515,8 @@ index_def_sizeof(uint32_t part_count)
  * @retval NULL     Memory error.
  */
 struct index_def *
-index_def_new(uint32_t space_id, const char *space_name,
-	      uint32_t iid, const char *name, enum index_type type,
+index_def_new(uint32_t space_id, const char *space_name, uint32_t iid,
+	      const char *name, uint32_t name_length, enum index_type type,
 	      const struct index_opts *opts, uint32_t part_count);
 
 /**
@@ -702,6 +703,15 @@ identifier_is_valid(const char *str);
  */
 void
 identifier_check(const char *str);
+
+static inline struct index_def *
+index_def_dup_xc(const struct index_def *def)
+{
+	struct index_def *ret = index_def_dup(def);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
+}
 
 #endif /* defined(__cplusplus) */
 

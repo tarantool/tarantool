@@ -261,6 +261,7 @@ schema_init()
 						    "_schema",
 						    0 /* index id */,
 						    "primary", /* name */
+						    strlen("primary"),
 						    TREE /* index type */,
 						    &index_opts_default,
 						    1); /* part count */
@@ -317,6 +318,7 @@ schema_init()
 				  "_index",
 				  0 /* index id */,
 				  "primary",
+				  strlen("primary"),
 				  TREE /* index type */,
 				  &index_opts_default,
 				  2); /* part count */
