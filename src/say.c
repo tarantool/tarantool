@@ -295,7 +295,7 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		enum say_logger_type type;
 		if (say_parse_logger_type(&init_str, &type)) {
 			say_error("logger: bad initialization string: %s, %s",
-				init_str, logger_syntax_reminder);
+				  init_str, logger_syntax_reminder);
 			exit(EXIT_FAILURE);
 		}
 		switch (type) {
@@ -310,6 +310,12 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 			say_file_init(init_str);
 			break;
 		}
+		/*
+		 * Set non-blocking mode if a non-default log
+		 * output is set. Avoid setting stdout to
+		 * non-blocking: this will garble interactive
+		 * console output.
+		 */
 		if (nonblock) {
 			int flags;
 			if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
