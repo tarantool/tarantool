@@ -120,13 +120,25 @@ cpipe_destroy(struct cpipe *pipe)
 	static const struct cmsg_hop route[1] = {
 		{cbus_endpoint_poison_f, NULL}
 	};
+	struct cbus_endpoint *endpoint = pipe->endpoint;
 	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
-	poison->endpoint = pipe->endpoint;
 	cmsg_init(&poison->msg, route);
 	poison->endpoint = pipe->endpoint;
 
-	cpipe_push(pipe, &poison->msg);
-	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
+	pipe->max_input = INT_MAX;
+	cpipe_push_input(pipe, &poison->msg);
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	bool output_was_empty = stailq_empty(&endpoint->output);
+	/* Flush input */
+	stailq_concat(&endpoint->output, &pipe->input);
+	if (output_was_empty) {
+		/* Count statistics */
+		rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
+		ev_async_send(endpoint->consumer, &endpoint->async);
+	}
+	tt_pthread_mutex_unlock(&endpoint->mutex);
+
+	pipe->n_input = 0;
 
 	ev_async_stop(pipe->producer, &pipe->flush_input);
 	TRASH(pipe);
@@ -202,7 +214,7 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 	tt_pthread_mutex_lock(&cbus.mutex);
 	/*
 	 * Remove endpoint from cbus registry, so no new pipe can
-	 * be created for this endpoint
+	 * be created for this endpoint.
 	 */
 	rlist_del(&endpoint->in_cbus);
 	tt_pthread_mutex_unlock(&cbus.mutex);
@@ -212,7 +224,12 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 			process_cb(endpoint);
 	} while ((endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) &&
 		 ipc_cond_wait(&endpoint->cond));
-
+	/*
+	 * Pipe flush func can still lock mutex, so just lock and unlock
+	 * it.
+	 */
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
 	tt_pthread_mutex_destroy(&endpoint->mutex);
 	ev_async_stop(endpoint->consumer, &endpoint->async);
 	ipc_cond_destroy(&endpoint->cond);
