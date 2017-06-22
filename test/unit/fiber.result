@@ -3,7 +3,7 @@ SystemError Failed to allocate 42 bytes in allocator for exception: Cannot alloc
 	*** fiber_name_test ***
 # name of a new fiber: main.
 
-# set new region name: region.
+# set new fiber name: Horace.
 
 # fiber name is truncated: aaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
 
