@@ -882,10 +882,13 @@ ModifyIndex::alter_def(struct alter_space *alter)
 void
 ModifyIndex::commit(struct alter_space *alter)
 {
+	uint32_t old_id = old_index_def->iid, new_id = new_index_def->iid;
+	Index *old_index = index_find_xc(alter->old_space, old_id);
+	index_def_delete(old_index->index_def);
+	old_index->index_def = new_index_def;
+	new_index_def = NULL;
 	/* Move the old index to the new place but preserve */
-	space_swap_index(alter->old_space, alter->new_space,
-			 old_index_def->iid, new_index_def->iid);
-	index_def_copy(old_index_def, new_index_def);
+	space_swap_index(alter->old_space, alter->new_space, old_id, new_id);
 }
 
 ModifyIndex::~ModifyIndex()

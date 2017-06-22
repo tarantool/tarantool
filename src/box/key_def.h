@@ -519,23 +519,6 @@ index_def_new(uint32_t space_id, const char *space_name,
 	      const struct index_opts *opts, uint32_t part_count);
 
 /**
- * Copy one key def into another, preserving the membership
- * in rlist. This only works for key defs with equal number of
- * parts.
- */
-static inline void
-index_def_copy(struct index_def *to, const struct index_def *from)
-{
-	struct rlist save_link = to->link;
-	int part_count = (to->key_def.part_count < from->key_def.part_count ?
-			  to->key_def.part_count : from->key_def.part_count);
-	size_t size  = (sizeof(struct index_def) +
-			sizeof(struct key_part) * part_count);
-	memcpy(to, from, size);
-	to->link = save_link;
-}
-
-/**
  * Set a single key part in a key def.
  * @pre part_no < part_count
  */
