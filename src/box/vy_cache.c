@@ -357,6 +357,16 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 			      VY_CACHE_RIGHT_LINKED) ^ flag;
 }
 
+struct tuple *
+vy_cache_get(struct vy_cache *cache, const struct tuple *key)
+{
+	struct vy_cache_entry **entry =
+		vy_cache_tree_find(&cache->cache_tree, key);
+	if (entry == NULL)
+		return NULL;
+	return (*entry)->stmt;
+}
+
 void
 vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 		  struct tuple **deleted)
