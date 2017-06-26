@@ -889,18 +889,17 @@ ModifyIndex::commit(struct alter_space *alter)
 	 * Move the old index to the new space, but use the new
 	 * definition.
 	 */
-	Index *old_index = index_find_xc(alter->old_space, old_id);
-	index_def_delete(old_index->index_def);
-	old_index->index_def = new_index_def;
-	new_index_def = NULL;
-	/* Move the old index to the new place but preserve */
 	space_swap_index(alter->old_space, alter->new_space, old_id, new_id);
+	Index *old_index = index_find_xc(alter->old_space, old_id);
+	Index *new_index = index_find_xc(alter->new_space, new_id);
+	struct index_def *tmp = old_index->index_def;
+	old_index->index_def = new_index->index_def;
+	new_index->index_def = tmp;
 }
 
 ModifyIndex::~ModifyIndex()
 {
-	if (new_index_def)
-		index_def_delete(new_index_def);
+	index_def_delete(new_index_def);
 }
 
 /**
