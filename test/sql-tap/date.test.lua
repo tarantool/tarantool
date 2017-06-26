@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(1277)
+test:plan(1279)
 
 --!./tcltestrunner.lua
 -- 2003 October 31
@@ -482,38 +482,37 @@ datetest(13.34, "date('2001-01-01','-1.5 years')", "1999-07-02")
 -- functions always returns exactly the same value for multiple
 -- invocations within the same sqlite3_step() call.
 --
+local function sleeper()
+    -- after 100 ms
+    os.execute("sleep 0.1")
+end
+box.internal.sql_create_function("sleeper", sleeper)
+-- db("func", "sleeper", "sleeper")
+test:do_test(
+    "date-15.1",
+    function()
+        return test:execsql [[
+            SELECT c - a FROM (SELECT julianday('now') AS a,
+                                      sleeper(), julianday('now') AS c);
+        ]]
+    end, {
+        -- <date-15.1>
+        0.0
+        -- </date-15.1>
+    })
 
--- MUST_WORK_TEST built-in procedures
---local function sleeper()
---    X(542, "X!cmd", [=[["after","100"]]=])
---end
---
---test:do_test(
---    "date-15.1",
---    function()
---        db("func", "sleeper", "sleeper")
---        return test:execsql [[
---            SELECT c - a FROM (SELECT julianday('now') AS a,
---                                      sleeper(), julianday('now') AS c);
---        ]]
---    end, {
---        -- <date-15.1>
---        0.0
---        -- </date-15.1>
---    })
---
---test:do_test(
---    "date-15.2",
---    function()
---        return test:execsql [[
---            SELECT a==b FROM (SELECT current_timestamp AS a,
---                                      sleeper(), current_timestamp AS b);
---        ]]
---    end, {
---        -- <date-15.2>
---        1
---        -- </date-15.2>
---    })
+test:do_test(
+    "date-15.2",
+    function()
+        return test:execsql [[
+            SELECT a==b FROM (SELECT current_timestamp AS a,
+                                      sleeper(), current_timestamp AS b);
+        ]]
+    end, {
+        -- <date-15.2>
+        1
+        -- </date-15.2>
+    })
 
 
 

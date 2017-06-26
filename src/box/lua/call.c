@@ -41,6 +41,7 @@
 #include "box/lua/tuple.h"
 #include "box/schema.h"
 #include "small/obuf.h"
+#include "lua_sql.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -415,6 +416,7 @@ box_lua_eval(struct request *request, struct obuf *out)
 
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
+	{"sql_create_function",  lbox_sql_create_function},
 	{NULL, NULL}
 };
 

@@ -41,7 +41,8 @@ test:do_test(
         local start_time = os.time()
         test:execsql(sql)
         local end_time = os.time()
-        return test:execsql( "SELECT count(x), sum(x), avg(x), "..(end_time - start_time).."<10 FROM t1;")
+        -- max run time was increased because of parallel test run
+        return test:execsql( "SELECT count(x), sum(x), avg(x), "..(end_time - start_time).."<20 FROM t1;")
     end, {
         -- <100>
         100000, 5000050000, 50000.5, 1

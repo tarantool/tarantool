@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(58)
+test:plan(61)
 
 --!./tcltestrunner.lua
 -- 2005 November 2
@@ -730,86 +730,87 @@ test:do_execsql_test(
 -- Attempting to modify the table should fail (since the CHECK constraint
 -- cannot be tested).
 --
---    MUST_WORK_TEST relies on built-in procedures
---    reset_db()
---    local function myfunc(x)
---        return x < 10
---    end
---
---    db("func", "myfunc", "myfunc")
---    test:do_execsql_test(
---        7.1,
---        [[
---            CREATE TABLE t6(a CHECK (myfunc(a)))
---        ]])
---
---    test:do_execsql_test(
---        7.2,
---        [[
---            INSERT INTO t6 VALUES(9)
---        ]])
---
---    test:do_catchsql_test(
---        7.3,
---        " INSERT INTO t6 VALUES(11) ", {
---            -- <7.3>
---            1, "CHECK constraint failed: t6"
---            -- </7.3>
---        })
---
---    test:do_test(
---        7.4,
---        function()
---            sqlite3("db2", "test.db")
---            return test:execsql(" SELECT * FROM t6 ", "db2")
---        end, {
---            -- <7.4>
---            9
---            -- </7.4>
---        })
---
---    test:do_test(
---        7.5,
---        function()
---            return test:catchsql(" INSERT INTO t6 VALUES(8) ", "db2")
---        end, {
---            -- <7.5>
---            1, "unknown function: myfunc()"
---            -- </7.5>
---        })
---
---    test:do_test(
---        7.6,
---        function()
---            return test:catchsql(" CREATE TABLE t7(a CHECK (myfunc(a))) ", "db2")
---        end, {
---            -- <7.6>
---            1, "no such function: myfunc"
---            -- </7.6>
---        })
---
---    test:do_test(
---        7.7,
---        function()
---            db2("func", "myfunc", "myfunc")
---            return test:execsql(" INSERT INTO t6 VALUES(8) ", "db2")
---        end, {
---            -- <7.7>
---
---            -- </7.7>
---        })
---
---    test:do_test(
---        7.8,
---        function()
---            db2("func", "myfunc", "myfunc")
---            return test:catchsql(" INSERT INTO t6 VALUES(12) ", "db2")
---        end, {
---            -- <7.8>
---            1, "CHECK constraint failed: t6"
---            -- </7.8>
---        })
+--reset_db()
+local function myfunc(x)
+    return x < 10
+end
+box.internal.sql_create_function("myfunc", myfunc)
 
+test:do_execsql_test(
+    7.1,
+    [[
+        CREATE TABLE t6(a CHECK (myfunc(a)) primary key)
+    ]])
+
+test:do_execsql_test(
+    7.2,
+    [[
+        INSERT INTO t6 VALUES(9)
+    ]])
+
+test:do_catchsql_test(
+    7.3,
+    " INSERT INTO t6 VALUES(11) ", {
+        -- <7.3>
+        1, "CHECK constraint failed: t6"
+        -- </7.3>
+    })
+
+--MUST_WORK_TEST tarantool should be properly restarted
+if (0 > 0) then
+test:do_test(
+    7.4,
+    function()
+        --sqlite3("db2", "test.db")
+        return test:execsql(" SELECT * FROM t6 ") --, "db2")
+    end, {
+        -- <7.4>
+        9
+        -- </7.4>
+    })
+
+test:do_test(
+    7.5,
+    function()
+        return test:catchsql(" INSERT INTO t6 VALUES(8) ") --, "db2")
+    end, {
+        -- <7.5>
+        1, "unknown function: myfunc()"
+        -- </7.5>
+    })
+
+test:do_test(
+    7.6,
+    function()
+        return test:catchsql(" CREATE TABLE t7(a CHECK (myfunc(a))) ") --, "db2")
+    end, {
+        -- <7.6>
+        1, "no such function: myfunc"
+        -- </7.6>
+    })
+
+test:do_test(
+    7.7,
+    function()
+        --db2("func", "myfunc", "myfunc")
+        return test:execsql(" INSERT INTO t6 VALUES(8) ") --, "db2")
+    end, {
+        -- <7.7>
+
+        -- </7.7>
+    })
+
+test:do_test(
+    7.8,
+    function()
+        --db2("func", "myfunc", "myfunc")
+        return test:catchsql(" INSERT INTO t6 VALUES(12) ", "db2")
+    end, {
+        -- <7.8>
+        1, "CHECK constraint failed: t6"
+        -- </7.8>
+    })
+end
 
 -- 2013-08-02:  Silently ignore database name qualifiers in CHECK constraints.
 --
@@ -824,5 +825,5 @@ test:do_execsql_test(
         -- </8.1>
     })
 
-
 test:finish_test()
+

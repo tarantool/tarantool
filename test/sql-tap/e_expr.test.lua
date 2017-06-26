@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14482)
+test:plan(14750)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -35,6 +35,16 @@ local function do_qexpr_test(tn, expr, value)
         "SELECT quote("..expr..")",
         {value })
 end
+
+local function matchfunc(a, b)
+    return (a == b)
+end
+
+local function regexfunc(a, b)
+    return (a == b)
+end
+box.internal.sql_create_function("match", matchfunc)
+box.internal.sql_create_function("regexp", regexfunc)
 
 -- Set up three global variables:
 --
@@ -71,11 +81,8 @@ local operations = {
     {"GLOB", "glob"},
     {"AND", "and"},
     {"OR", "or"},
-    -- MUST_WORK_TEST built-in functions
-    --db("func", "match", "-argcount", 2, "matchfunc")
-    --db("func", "regexp", "-argcount", 2, "regexfunc")
-    --{"MATCH", "match"},
-    --{"REGEXP", "regexp"},
+    {"MATCH", "match"},
+    {"REGEXP", "regexp"},
     {"IS NOT", "isnt"}
 }
 local opname = {}
@@ -104,13 +111,6 @@ end
 -- Hook in definitions of MATCH and REGEX. The following implementations
 -- cause MATCH and REGEX to behave similarly to the == operator.
 --
-local function matchfunc(a, b)
-    return (a == b)
-end
-
-local function regexfunc(a, b)
-    return (a == b)
-end
 
 
 ---------------------------------------------------------------------------
@@ -686,19 +686,19 @@ end
 --
 --   string compare eno ruof
 --
--- MUST_WORK_TEST waiting for built-in functions
---local function reverse_str(zStr)
---    local out = ""
---    for _, c in ipairs(X(362, "X!cmd", [=[["split",["zStr"],""]]=])) do
---        out = string.format("%s%s", c, out)
---    end
---    return out
---end
---
---local function reverse_collate(zLeft, zRight)
---    X(365, "X!cmd", [=[["string","compare",[["reverse_str",["zLeft"]]],[["reverse_str",["zRight"]]]]]=])
---end
 
+local function reverse_str(zStr)
+    local out = ""
+    for i = 1, #zStr, 1 do
+        out = string.format("%s%s", string.sub(zStr, i, i), out)
+    end
+    return out
+end
+
+local function reverse_collate(zLeft, zRight)
+    return reverse_str(zLeft) > reverse_str(zRight)
+end
+box.internal.sql_create_function("reverse", reverse_collate)
 --db("collate", "reverse", "reverse_collate")
 -- EVIDENCE-OF: R-59577-33471 The COLLATE operator is a unary postfix
 -- operator that assigns a collating sequence to an expression.
@@ -707,7 +707,7 @@ end
 -- precedence (binds more tightly) than any binary operator and any unary
 -- prefix operator except "~".
 --
--- MUST_WORK_TEST waiting for built-in functions
+-- MUST_WORK_TEST waiting for collations?
 if (0>0) then
     test:do_execsql_test(
         "e_expr-9.1",
@@ -1489,243 +1489,248 @@ local function glob(args)
     return 1
 end
 
--- MUST_WORK_TEST uses built-in procedures
-if 0>0 then
-    db("function", "glob", "glob")
-    db("function", "match", "glob")
-    db("function", "regexp", "glob")
-    local test_cases12 ={
-        {1, 123},
-        {2, 123.4e05},
-        {3, "'abcde'"},
-        {4, "X'414243'"},
-        {5, "NULL"},
-        {6, "CURRENT_TIME"},
-        {7, "CURRENT_DATE"},
-        {8, "CURRENT_TIMESTAMP"},
+box.internal.sql_create_function("glob", glob)
+box.internal.sql_create_function("match", glob)
+box.internal.sql_create_function("regexp", glob)
+local test_cases12 ={
+    {1, 123},
+    {2, 123.4e05},
+    {3, "'abcde'"},
+    {4, "X'414243'"},
+    {5, "NULL"},
+    {6, "CURRENT_TIME"},
+    {7, "CURRENT_DATE"},
+    {8, "CURRENT_TIMESTAMP"},
 
-        {9, "?"},
-        {10, "?123"},
-        {11, "@hello"},
-        {12, ":world"},
-        {13, "$tcl"},
-        {14, "$tcl(array)"},
+    {9, "?"},
+    {10, "?123"},
+    {11, "@hello"},
+    {12, ":world"},
+    {13, "$tcl"},
+    {14, "$tcl(array)"},
 
-        {15, "cname"},
-        {16, "tblname.cname"},
+    {15, "cname"},
+    {16, "tblname.cname"},
 
-        {18, "+ EXPR"},
-        {19, "- EXPR"},
-        {20, "NOT EXPR"},
-        {21, "~ EXPR"},
+    {18, "+ EXPR"},
+    {19, "- EXPR"},
+    {20, "NOT EXPR"},
+    {21, "~ EXPR"},
 
-        {22, "EXPR1 || EXPR2"},
-        {23, "EXPR1 * EXPR2"},
-        {24, "EXPR1 / EXPR2"},
-        {25, "EXPR1 % EXPR2"},
-        {26, "EXPR1 + EXPR2"},
-        {27, "EXPR1 - EXPR2"},
-        {28, "EXPR1 << EXPR2"},
-        {29, "EXPR1 >> EXPR2"},
-        {30, "EXPR1 & EXPR2"},
+    {22, "EXPR1 || EXPR2"},
+    {23, "EXPR1 * EXPR2"},
+    {24, "EXPR1 / EXPR2"},
+    {25, "EXPR1 % EXPR2"},
+    {26, "EXPR1 + EXPR2"},
+    {27, "EXPR1 - EXPR2"},
+    {28, "EXPR1 << EXPR2"},
+    {29, "EXPR1 >> EXPR2"},
+    {30, "EXPR1 & EXPR2"},
 
-        {31, "EXPR1 | EXPR2"},
-        {32, "EXPR1 < EXPR2"},
-        {33, "EXPR1 <= EXPR2"},
-        {34, "EXPR1 > EXPR2"},
-        {35, "EXPR1 >= EXPR2"},
-        {36, "EXPR1 = EXPR2"},
-        {37, "EXPR1 == EXPR2"},
-        {38, "EXPR1 != EXPR2"},
-        {39, "EXPR1 <> EXPR2"},
-        {40, "EXPR1 IS EXPR2"},
-        {41, "EXPR1 IS NOT EXPR2"},
-        {42, "EXPR1 AND EXPR2"},
-        {43, "EXPR1 OR EXPR2"},
+    {31, "EXPR1 | EXPR2"},
+    {32, "EXPR1 < EXPR2"},
+    {33, "EXPR1 <= EXPR2"},
+    {34, "EXPR1 > EXPR2"},
+    {35, "EXPR1 >= EXPR2"},
+    {36, "EXPR1 = EXPR2"},
+    {37, "EXPR1 == EXPR2"},
+    {38, "EXPR1 != EXPR2"},
+    {39, "EXPR1 <> EXPR2"},
+    {40, "EXPR1 IS EXPR2"},
+    {41, "EXPR1 IS NOT EXPR2"},
+    {42, "EXPR1 AND EXPR2"},
+    {43, "EXPR1 OR EXPR2"},
 
-        {44, "count(*)"},
-        {45, "count(DISTINCT EXPR)"},
-        {46, "substr(EXPR, 10, 20)"},
-        {47, "changes()"},
+    {44, "count(*)"},
+    {45, "count(DISTINCT EXPR)"},
+    {46, "substr(EXPR, 10, 20)"},
+    {47, "changes()"},
 
-        {48, "( EXPR )"},
+    {48, "( EXPR )"},
 
-        {49, "CAST ( EXPR AS integer )"},
-        {50, "CAST ( EXPR AS 'abcd' )"},
-        {51, "CAST ( EXPR AS 'ab$ $cd' )"},
+    {49, "CAST ( EXPR AS integer )"},
+    {50, "CAST ( EXPR AS 'abcd' )"},
+    {51, "CAST ( EXPR AS 'ab$ $cd' )"},
 
-        {52, "EXPR COLLATE nocase"},
-        {53, "EXPR COLLATE binary"},
+    {52, "EXPR COLLATE nocase"},
+    {53, "EXPR COLLATE binary"},
 
-        {54, "EXPR1 LIKE EXPR2"},
-        {55, "EXPR1 LIKE EXPR2 ESCAPE EXPR"},
-        {56, "EXPR1 GLOB EXPR2"},
-        {57, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
-        {58, "EXPR1 REGEXP EXPR2"},
-        {59, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
-        {60, "EXPR1 MATCH EXPR2"},
-        {61, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
-        {62, "EXPR1 NOT LIKE EXPR2"},
-        {63, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
-        {64, "EXPR1 NOT GLOB EXPR2"},
-        {65, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
-        {66, "EXPR1 NOT REGEXP EXPR2"},
-        {67, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
-        {68, "EXPR1 NOT MATCH EXPR2"},
-        {69, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
+    {54, "EXPR1 LIKE EXPR2"},
+    {55, "EXPR1 LIKE EXPR2 ESCAPE EXPR"},
+    {56, "EXPR1 GLOB EXPR2"},
+    {57, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
+    {58, "EXPR1 REGEXP EXPR2"},
+    {59, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
+    {60, "EXPR1 MATCH EXPR2"},
+    {61, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
+    {62, "EXPR1 NOT LIKE EXPR2"},
+    {63, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
+    {64, "EXPR1 NOT GLOB EXPR2"},
+    {65, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
+    {66, "EXPR1 NOT REGEXP EXPR2"},
+    {67, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
+    {68, "EXPR1 NOT MATCH EXPR2"},
+    {69, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
 
-        {70, "EXPR ISNULL"},
-        {71, "EXPR NOTNULL"},
-        {72, "EXPR NOT NULL"},
+    {70, "EXPR ISNULL"},
+    {71, "EXPR NOTNULL"},
+    {72, "EXPR NOT NULL"},
 
-        {73, "EXPR1 IS EXPR2"},
-        {74, "EXPR1 IS NOT EXPR2"},
+    {73, "EXPR1 IS EXPR2"},
+    {74, "EXPR1 IS NOT EXPR2"},
 
-        {75, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
-        {76, "EXPR BETWEEN EXPR1 AND EXPR2"},
+    {75, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
+    {76, "EXPR BETWEEN EXPR1 AND EXPR2"},
 
-        {77, "EXPR NOT IN (SELECT cname FROM tblname)"},
-        {78, "EXPR NOT IN (1)"},
-        {79, "EXPR NOT IN (1, 2, 3)"},
-        {80, "EXPR NOT IN tblname"},
-        {82, "EXPR IN (SELECT cname FROM tblname)"},
-        {83, "EXPR IN (1)"},
-        {84, "EXPR IN (1, 2, 3)"},
-        {85, "EXPR IN tblname"},
-        {57, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
-        {58, "EXPR1 REGEXP EXPR2"},
-        {59, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
-        {60, "EXPR1 MATCH EXPR2"},
-        {61, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
-        {62, "EXPR1 NOT LIKE EXPR2"},
-        {63, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
-        {64, "EXPR1 NOT GLOB EXPR2"},
-        {65, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
-        {66, "EXPR1 NOT REGEXP EXPR2"},
-        {67, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
-        {68, "EXPR1 NOT MATCH EXPR2"},
-        {69, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
+    {77, "EXPR NOT IN (SELECT cname FROM tblname)"},
+    {78, "EXPR NOT IN (1)"},
+    {79, "EXPR NOT IN (1, 2, 3)"},
+    {80, "EXPR NOT IN tblname"},
+    {82, "EXPR IN (SELECT cname FROM tblname)"},
+    {83, "EXPR IN (1)"},
+    {84, "EXPR IN (1, 2, 3)"},
+    {85, "EXPR IN tblname"},
+    {57, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
+    {58, "EXPR1 REGEXP EXPR2"},
+    {59, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
+    {60, "EXPR1 MATCH EXPR2"},
+    {61, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
+    {62, "EXPR1 NOT LIKE EXPR2"},
+    {63, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
+    {64, "EXPR1 NOT GLOB EXPR2"},
+    {65, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
+    {66, "EXPR1 NOT REGEXP EXPR2"},
+    {67, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
+    {68, "EXPR1 NOT MATCH EXPR2"},
+    {69, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
 
-        {70, "EXPR ISNULL"},
-        {71, "EXPR NOTNULL"},
-        {72, "EXPR NOT NULL"},
+    {70, "EXPR ISNULL"},
+    {71, "EXPR NOTNULL"},
+    {72, "EXPR NOT NULL"},
 
-        {73, "EXPR1 IS EXPR2"},
-        {74, "EXPR1 IS NOT EXPR2"},
+    {73, "EXPR1 IS EXPR2"},
+    {74, "EXPR1 IS NOT EXPR2"},
 
-        {75, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
-        {76, "EXPR BETWEEN EXPR1 AND EXPR2"},
+    {75, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
+    {76, "EXPR BETWEEN EXPR1 AND EXPR2"},
 
-        {77, "EXPR NOT IN (SELECT cname FROM tblname)"},
-        {78, "EXPR NOT IN (1)"},
-        {79, "EXPR NOT IN (1, 2, 3)"},
-        {80, "EXPR NOT IN tblname"},
-        {82, "EXPR IN (SELECT cname FROM tblname)"},
-        {83, "EXPR IN (1)"},
-        {84, "EXPR IN (1, 2, 3)"},
-        {85, "EXPR IN tblname"},
+    {77, "EXPR NOT IN (SELECT cname FROM tblname)"},
+    {78, "EXPR NOT IN (1)"},
+    {79, "EXPR NOT IN (1, 2, 3)"},
+    {80, "EXPR NOT IN tblname"},
+    {82, "EXPR IN (SELECT cname FROM tblname)"},
+    {83, "EXPR IN (1)"},
+    {84, "EXPR IN (1, 2, 3)"},
+    {85, "EXPR IN tblname"},
 
-        {87, "EXISTS (SELECT cname FROM tblname)"},
-        {88, "NOT EXISTS (SELECT cname FROM tblname)"},
+    {87, "EXISTS (SELECT cname FROM tblname)"},
+    {88, "NOT EXISTS (SELECT cname FROM tblname)"},
 
-        {89, "CASE EXPR WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
-        {90, "CASE EXPR WHEN EXPR1 THEN EXPR2 END"},
-        {91, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
-        {92, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
-        {93, "CASE WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
-        {94, "CASE WHEN EXPR1 THEN EXPR2 END"},
-        {95, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
-        {96, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
-    }
+    {89, "CASE EXPR WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
+    {90, "CASE EXPR WHEN EXPR1 THEN EXPR2 END"},
+    {91, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
+    {92, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
+    {93, "CASE WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
+    {94, "CASE WHEN EXPR1 THEN EXPR2 END"},
+    {95, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
+    {96, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
+}
 
-    for _, val in ipairs(test_cases12) do
-        -- If the expression string being parsed contains "EXPR2", then replace
-        -- string "EXPR1" and "EXPR2" with arbitrary SQL expressions. If it
-        -- contains "EXPR", then replace EXPR with an arbitrary SQL expression.
-        --
-        local tn = val[1]
-        local expr = val[2]
-        local elist = { expr }
-        if X(690, "X!cmd", [=[["string","match","*EXPR2*",["expr"]]]=]) then
-            elist = {  }
-            for _ in X(0, "X!foreach", [=[["e1 e2"," cname \"34+22\" "]]=]) do
-                table.insert(elist,X(695, "X!cmd", [=[["string","map",[["list","EXPR1",["e1"],"EXPR2",["e2"]]],["expr"]]]=]))
+for _, val in ipairs(test_cases12) do
+    -- If the expression string being parsed contains "EXPR2", then replace
+    -- string "EXPR1" and "EXPR2" with arbitrary SQL expressions. If it
+    -- contains "EXPR", then replace EXPR with an arbitrary SQL expression.
+    --
+    local tn = val[1]
+    local expr = val[2]
+    local elist = { expr }
+    if string.find(expr, "EXPR2") then
+        elist = {}
+        local e1 = "cname"
+        local e2 = "34+22"
+        local result = expr
+        result = string.gsub(result, "EXPR1", e1)
+        result = string.gsub(result, "EXPR2", e2)
+        table.insert(elist, result)
+    end
+    if string.find(expr, "EXPR") then
+        local elist2 = {  }
+        for _, el in ipairs(elist) do
+            for _, e in ipairs({"cname", "34+22"}) do
+                local result = string.gsub(el, "EXPR", e)
+                table.insert(elist2, result)
             end
         end
-        if X(696, "X!cmd", [=[["string","match","*EXPR*",["expr"]]]=]) then
-            elist2 = {  }
-            for _, el in ipairs(elist) do
-                for _ in X(0, "X!foreach", [=[["e"," cname \"34+22\" "]]=]) do
-                    table.insert(elist2,X(703, "X!cmd", [=[["string","map",[["list","EXPR",["e"]]],["el"]]]=]))
-                end
-            end
-            elist = elist2
-        end
-        x = 0
-        for _, e in ipairs(elist) do
-            x = x + 1
-            test:do_test(
-                string.format("e_expr-12.3.%s.%s", tn, x),
-                function()
-                    return set("rc", X(712, "X!cmd", [=[["catch"," execsql \"SELECT $e FROM tblname\" ","msg"]]=]))
-                end, {
-                    0
-                })
-
-        end
+        elist = elist2
     end
-    -- # -- syntax diagram raise-function
-    -- #
-    -- foreach {tn raiseexpr} {
-    --   1 "RAISE(IGNORE)"
-    --   2 "RAISE(ROLLBACK, 'error message')"
-    --   3 "RAISE(ABORT, 'error message')"
-    --   4 "RAISE(FAIL, 'error message')"
-    -- } {
-    --   do_execsql_test e_expr-12.4.$tn "
-    --     CREATE TRIGGER dbname.tr$tn BEFORE DELETE ON tblname BEGIN
-    --       SELECT $raiseexpr ;
-    --     END;
-    --   " {}
-    -- }
-    ---------------------------------------------------------------------------
-    -- Test the statements related to the BETWEEN operator.
-    --
-    -- EVIDENCE-OF: R-40079-54503 The BETWEEN operator is logically
-    -- equivalent to a pair of comparisons. "x BETWEEN y AND z" is equivalent
-    -- to "x>=y AND x<=z" except that with BETWEEN, the x expression is
-    -- only evaluated once.
-    --
-    db("func", "x", "x")
-    local function x()
-        xcount = xcount + 1
-        return x
-    end
-    local test_cases13 = {
-        {1, 10, "x() >= 5 AND x() <= 15", 1, 2},
-        {2, 10, "x() BETWEEN 5 AND 15", 1, 1},
-
-        {3, 5, "x() >= 5 AND x() <= 5", 1, 2},
-        {4, 5, "x() BETWEEN 5 AND 5", 1, 1}
-    }
-
-    for _, val in ipairs(test_cases13) do
-        local tn = val[1]
-        local x = val[2]
-        local expr = val[3]
-        local res = val[4]
-        local nEval = val[5]
+    local x = 0
+    for _, e in ipairs(elist) do
+        x = x + 1
         test:do_test(
-            "e_expr-13.1."..tn,
+            string.format("e_expr-12.3.%s.%s", tn, x),
             function()
-                xcount = 0
-                local a = test:execsql("SELECT "..expr.."")[1]
-                return { xcount, a }
-            end, {
-                nEval, res
-            })
+                local rc = pcall( function()
+                    test:execsql("SELECT "..e.." FROM tblname")
+                end)
+                return rc
+                --return set("rc", X(712, "X!cmd", [=[["catch"," execsql \"SELECT $e FROM tblname\" ","msg"]]=]))
+            end, true)
 
     end
+end
+-- # -- syntax diagram raise-function
+-- #
+-- foreach {tn raiseexpr} {
+--   1 "RAISE(IGNORE)"
+--   2 "RAISE(ROLLBACK, 'error message')"
+--   3 "RAISE(ABORT, 'error message')"
+--   4 "RAISE(FAIL, 'error message')"
+-- } {
+--   do_execsql_test e_expr-12.4.$tn "
+--     CREATE TRIGGER dbname.tr$tn BEFORE DELETE ON tblname BEGIN
+--       SELECT $raiseexpr ;
+--     END;
+--   " {}
+-- }
+---------------------------------------------------------------------------
+-- Test the statements related to the BETWEEN operator.
+--
+-- EVIDENCE-OF: R-40079-54503 The BETWEEN operator is logically
+-- equivalent to a pair of comparisons. "x BETWEEN y AND z" is equivalent
+-- to "x>=y AND x<=z" except that with BETWEEN, the x expression is
+-- only evaluated once.
+--
+local xcount = 0
+local x = 0
+local function func_x()
+    xcount = xcount + 1
+    return x
+end
+box.internal.sql_create_function("x", func_x)
+local test_cases13 = {
+    {1, 10, "x() >= 5 AND x() <= 15", 1, 2},
+    {2, 10, "x() BETWEEN 5 AND 15", 1, 1},
+
+    {3, 5, "x() >= 5 AND x() <= 5", 1, 2},
+    {4, 5, "x() BETWEEN 5 AND 5", 1, 1}
+}
+
+for _, val in ipairs(test_cases13) do
+    local tn = val[1]
+    x = val[2]
+    local expr = val[3]
+    local res = val[4]
+    local nEval = val[5]
+    test:do_test(
+        "e_expr-13.1."..tn,
+        function()
+            xcount = 0
+            local a = test:execsql("SELECT "..expr.."")[1]
+            return { xcount, a }
+        end, {
+            nEval, res
+        })
+
 end
 -- EVIDENCE-OF: R-05155-34454 The precedence of the BETWEEN operator is
 -- the same as the precedence as operators == and != and LIKE and groups
@@ -2380,58 +2385,58 @@ test:do_execsql_test(
 -- EVIDENCE-OF: R-51359-17496 The infix LIKE operator is implemented by
 -- calling the application-defined SQL functions like(Y,X) or like(Y,X,Z).
 --
--- MUST_WORK_TEST built-in procedures
-if 0>0 then
-    local function likefunc(args)
-        X(999, "X!cmd", [=[["eval","lappend","::likeargs",["args"]]]=])
-        return 1
+local likeargs = {}
+function likefunc(...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        table.insert(likeargs, v)
     end
-
-    --db("func", "like", "-argcount", 2, "likefunc")
-    --db("func", "like", "-argcount", 3, "likefunc")
-    local likeargs = {  }
-    test:do_execsql_test(
-        "e_expr-15.1.1",
-        [[
-            SELECT 'abc' LIKE 'def'
-        ]], {
-            -- <e_expr-15.1.1>
-            1
-            -- </e_expr-15.1.1>
-        })
-
-    test:do_test(
-        "e_expr-15.1.2",
-        function()
-            return likeargs
-        end, {
-            -- <e_expr-15.1.2>
-            "def", "abc"
-            -- </e_expr-15.1.2>
-        })
-
-    likeargs = {  }
-    test:do_execsql_test(
-        "e_expr-15.1.3",
-        [[
-            SELECT 'abc' LIKE 'def' ESCAPE 'X'
-        ]], {
-            -- <e_expr-15.1.3>
-            1
-            -- </e_expr-15.1.3>
-        })
-
-    test:do_test(
-        "e_expr-15.1.4",
-        function()
-            return likeargs
-        end, {
-            -- <e_expr-15.1.4>
-            "def", "abc", "X"
-            -- </e_expr-15.1.4>
-        })
+    return 1
 end
 
+box.internal.sql_create_function("like", likefunc)
+--db("func", "like", "-argcount", 2, "likefunc")
+--db("func", "like", "-argcount", 3, "likefunc")
+test:do_execsql_test(
+    "e_expr-15.1.1",
+    [[
+        SELECT 'abc' LIKE 'def'
+    ]], {
+        -- <e_expr-15.1.1>
+        1
+        -- </e_expr-15.1.1>
+    })
+
+test:do_test(
+    "e_expr-15.1.2",
+    function()
+        return likeargs
+    end, {
+        -- <e_expr-15.1.2>
+        "def", "abc"
+        -- </e_expr-15.1.2>
+    })
+
+likeargs = {  }
+test:do_execsql_test(
+    "e_expr-15.1.3",
+    [[
+        SELECT 'abc' LIKE 'def' ESCAPE 'X'
+    ]], {
+        -- <e_expr-15.1.3>
+        1
+        -- </e_expr-15.1.3>
+    })
+
+test:do_test(
+    "e_expr-15.1.4",
+    function()
+        return likeargs
+    end, {
+        -- <e_expr-15.1.4>
+        "def", "abc", "X"
+        -- </e_expr-15.1.4>
+    })
 --db("close")
 --sqlite3("db", "test.db")
 -- EVIDENCE-OF: R-22868-25880 The LIKE operator can be made case
@@ -2679,123 +2684,133 @@ if 0>0 then
         })
 
     db("nullvalue", "")
-    -- EVIDENCE-OF: R-39414-35489 The infix GLOB operator is implemented by
-    -- calling the function glob(Y,X) and can be modified by overriding that
-    -- function.
-    local function globfunc(args)
-        X(1058, "X!cmd", [=[["eval","lappend","::globargs",["args"]]]=])
-        return 1
-    end
-
-    db("func", "glob", "-argcount", 2, "globfunc")
-    local globargs = {  }
-    test:do_execsql_test(
-        "e_expr-17.3.1",
-        [[
-            SELECT 'abc' GLOB 'def'
-        ]], {
-            -- <e_expr-17.3.1>
-            1
-            -- </e_expr-17.3.1>
-        })
-
-    test:do_test(
-        "e_expr-17.3.2",
-        function()
-            return globargs
-        end, {
-            -- <e_expr-17.3.2>
-            "def", "abc"
-            -- </e_expr-17.3.2>
-        })
-
-    globargs = {  }
-    test:do_execsql_test(
-        "e_expr-17.3.3",
-        [[
-            SELECT 'X' NOT GLOB 'Y'
-        ]], {
-            -- <e_expr-17.3.3>
-            0
-            -- </e_expr-17.3.3>
-        })
-
-    test:do_test(
-        "e_expr-17.3.4",
-        function()
-            return globargs
-        end, {
-            -- <e_expr-17.3.4>
-            "Y", "X"
-            -- </e_expr-17.3.4>
-        })
-
-    sqlite3("db", "test.db")
-    -- EVIDENCE-OF: R-41650-20872 No regexp() user function is defined by
-    -- default and so use of the REGEXP operator will normally result in an
-    -- error message.
-    --
-    --   There is a regexp function if ICU is enabled though.
-    --
-
-
-    -- EVIDENCE-OF: R-33693-50180 The REGEXP operator is a special syntax for
-    -- the regexp() user function.
-    --
-    -- EVIDENCE-OF: R-65524-61849 If an application-defined SQL function
-    -- named "regexp" is added at run-time, then the "X REGEXP Y" operator
-    -- will be implemented as a call to "regexp(Y,X)".
-    --
-    local function regexpfunc(args)
-        X(1093, "X!cmd", [=[["eval","lappend","::regexpargs",["args"]]]=])
-        return 1
-    end
-
-    db("func", "regexp", "-argcount", 2, "regexpfunc")
-    regexpargs = {  }
-    test:do_execsql_test(
-        "e_expr-18.2.1",
-        [[
-            SELECT 'abc' REGEXP 'def'
-        ]], {
-            -- <e_expr-18.2.1>
-            1
-            -- </e_expr-18.2.1>
-        })
-
-    test:do_test(
-        "e_expr-18.2.2",
-        function()
-            return regexpargs
-        end, {
-            -- <e_expr-18.2.2>
-            "def", "abc"
-            -- </e_expr-18.2.2>
-        })
-
-    regexpargs = {  }
-    test:do_execsql_test(
-        "e_expr-18.2.3",
-        [[
-            SELECT 'X' NOT REGEXP 'Y'
-        ]], {
-            -- <e_expr-18.2.3>
-            0
-            -- </e_expr-18.2.3>
-        })
-
-    test:do_test(
-        "e_expr-18.2.4",
-        function()
-            return regexpargs
-        end, {
-            -- <e_expr-18.2.4>
-            "Y", "X"
-            -- </e_expr-18.2.4>
-        })
-
-    sqlite3("db", "test.db")
 end
+
+-- EVIDENCE-OF: R-39414-35489 The infix GLOB operator is implemented by
+-- calling the function glob(Y,X) and can be modified by overriding that
+-- function.
+
+local globargs = {}
+local function globfunc(...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        table.insert(globargs, v)
+    end
+    return 1
+end
+box.internal.sql_create_function("glob", globfunc, 2)
+--db("func", "glob", "-argcount", 2, "globfunc")
+
+test:do_execsql_test(
+    "e_expr-17.3.1",
+    [[
+        SELECT 'abc' GLOB 'def'
+    ]], {
+        -- <e_expr-17.3.1>
+        1
+        -- </e_expr-17.3.1>
+    })
+
+test:do_test(
+    "e_expr-17.3.2",
+    function()
+        return globargs
+    end, {
+        -- <e_expr-17.3.2>
+        "def", "abc"
+        -- </e_expr-17.3.2>
+    })
+
+globargs = {  }
+test:do_execsql_test(
+    "e_expr-17.3.3",
+    [[
+        SELECT 'X' NOT GLOB 'Y'
+    ]], {
+        -- <e_expr-17.3.3>
+        0
+        -- </e_expr-17.3.3>
+    })
+
+test:do_test(
+    "e_expr-17.3.4",
+    function()
+        return globargs
+    end, {
+        -- <e_expr-17.3.4>
+        "Y", "X"
+        -- </e_expr-17.3.4>
+    })
+
+--sqlite3("db", "test.db")
+-- EVIDENCE-OF: R-41650-20872 No regexp() user function is defined by
+-- default and so use of the REGEXP operator will normally result in an
+-- error message.
+--
+--   There is a regexp function if ICU is enabled though.
+--
+
+
+-- EVIDENCE-OF: R-33693-50180 The REGEXP operator is a special syntax for
+-- the regexp() user function.
+--
+-- EVIDENCE-OF: R-65524-61849 If an application-defined SQL function
+-- named "regexp" is added at run-time, then the "X REGEXP Y" operator
+-- will be implemented as a call to "regexp(Y,X)".
+--
+local regexpargs = {}
+local function regexpfunc(...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        table.insert(regexpargs, v)
+    end
+    return 1
+end
+box.internal.sql_create_function("regexp", regexpfunc, 2)
+--db("func", "regexp", "-argcount", 2, "regexpfunc")
+
+test:do_execsql_test(
+    "e_expr-18.2.1",
+    [[
+        SELECT 'abc' REGEXP 'def'
+    ]], {
+        -- <e_expr-18.2.1>
+        1
+        -- </e_expr-18.2.1>
+    })
+
+test:do_test(
+    "e_expr-18.2.2",
+    function()
+        return regexpargs
+    end, {
+        -- <e_expr-18.2.2>
+        "def", "abc"
+        -- </e_expr-18.2.2>
+    })
+
+regexpargs = {  }
+test:do_execsql_test(
+    "e_expr-18.2.3",
+    [[
+        SELECT 'X' NOT REGEXP 'Y'
+    ]], {
+        -- <e_expr-18.2.3>
+        0
+        -- </e_expr-18.2.3>
+    })
+
+test:do_test(
+    "e_expr-18.2.4",
+    function()
+        return regexpargs
+    end, {
+        -- <e_expr-18.2.4>
+        "Y", "X"
+        -- </e_expr-18.2.4>
+    })
+
+--sqlite3("db", "test.db")
 -- EVIDENCE-OF: R-42037-37826 The default match() function implementation
 -- raises an exception and is not really useful for anything.
 --
@@ -2825,58 +2840,58 @@ test:do_catchsql_test(
 -- EVIDENCE-OF: R-06021-09373 But extensions can override the match()
 -- function with more helpful logic.
 --
--- MUST_WORK_TEST uses built in functions
-if 0>0 then
-    local function matchfunc(args)
-        X(1122, "X!cmd", [=[["eval","lappend","::matchargs",["args"]]]=])
-        return 1
+
+local matchargs = {  }
+local function matchfunc(...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        table.insert(matchargs, v)
     end
-
-    db("func", "match", "-argcount", 2, "matchfunc")
-    matchargs = {  }
-    test:do_execsql_test(
-        "e_expr-19.2.1",
-        [[
-            SELECT 'abc' MATCH 'def'
-        ]], {
-            -- <e_expr-19.2.1>
-            1
-            -- </e_expr-19.2.1>
-        })
-
-    test:do_test(
-        "e_expr-19.2.2",
-        function()
-            return matchargs
-        end, {
-            -- <e_expr-19.2.2>
-            "def", "abc"
-            -- </e_expr-19.2.2>
-        })
-
-    matchargs = {  }
-    test:do_execsql_test(
-        "e_expr-19.2.3",
-        [[
-            SELECT 'X' NOT MATCH 'Y'
-        ]], {
-            -- <e_expr-19.2.3>
-            0
-            -- </e_expr-19.2.3>
-        })
-
-    test:do_test(
-        "e_expr-19.2.4",
-        function()
-            return matchargs
-        end, {
-            -- <e_expr-19.2.4>
-            "Y", "X"
-            -- </e_expr-19.2.4>
-        })
-
-    sqlite3("db", "test.db")
+    return 1
 end
+box.internal.sql_create_function("match", matchfunc, 2)
+
+test:do_execsql_test(
+    "e_expr-19.2.1",
+    [[
+        SELECT 'abc' MATCH 'def'
+    ]], {
+        -- <e_expr-19.2.1>
+        1
+        -- </e_expr-19.2.1>
+    })
+
+test:do_test(
+    "e_expr-19.2.2",
+    function()
+        return matchargs
+    end, {
+        -- <e_expr-19.2.2>
+        "def", "abc"
+        -- </e_expr-19.2.2>
+    })
+
+matchargs = {  }
+test:do_execsql_test(
+    "e_expr-19.2.3",
+    [[
+        SELECT 'X' NOT MATCH 'Y'
+    ]], {
+        -- <e_expr-19.2.3>
+        0
+        -- </e_expr-19.2.3>
+    })
+
+test:do_test(
+    "e_expr-19.2.4",
+    function()
+        return matchargs
+    end, {
+        -- <e_expr-19.2.4>
+        "Y", "X"
+        -- </e_expr-19.2.4>
+    })
+--sqlite3("db", "test.db")
 ---------------------------------------------------------------------------
 -- Test cases for the testable statements related to the CASE expression.
 --
@@ -2903,148 +2918,148 @@ test:do_execsql_test(
         -- </e_expr-20.2>
     })
 
--- MUST_WORK_TEST uses built in functions
+a = 0
+b = 0
+c = 0
+local varlist = {  }
+local function var(nm)
+    table.insert(varlist,nm)
+    local result = loadstring("return "..nm)()
+    return result
+end
+box.internal.sql_create_function("var", var)
+--db("func", "var", "var")
+-- EVIDENCE-OF: R-30638-59954 In a CASE without a base expression, each
+-- WHEN expression is evaluated and the result treated as a boolean,
+-- starting with the leftmost and continuing to the right.
+--
+
+test:do_execsql_test(
+    "e_expr-21.1.1",
+    [[
+        SELECT CASE WHEN var('a') THEN 'A'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('c') THEN 'C' END
+    ]], {
+        -- <e_expr-21.1.1>
+        ""
+        -- </e_expr-21.1.1>
+    })
+
+test:do_test(
+    "e_expr-21.1.2",
+    function()
+        return varlist
+    end, {
+        -- <e_expr-21.1.2>
+        "a", "b", "c"
+        -- </e_expr-21.1.2>
+    })
+
+varlist = {  }
+test:do_execsql_test(
+    "e_expr-21.1.3",
+    [[
+        SELECT CASE WHEN var('c') THEN 'C'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('a') THEN 'A'
+                    ELSE 'no result'
+        END
+    ]], {
+        -- <e_expr-21.1.3>
+        "no result"
+        -- </e_expr-21.1.3>
+    })
+
+test:do_test(
+    "e_expr-21.1.4",
+    function()
+        return varlist
+    end, {
+        -- <e_expr-21.1.4>
+        "c", "b", "a"
+        -- </e_expr-21.1.4>
+    })
+
+-- EVIDENCE-OF: R-39009-25596 The result of the CASE expression is the
+-- evaluation of the THEN expression that corresponds to the first WHEN
+-- expression that evaluates to true.
+--
+a = 0
+b = 1
+c = 0
+test:do_execsql_test(
+    "e_expr-21.2.1",
+    [[
+        SELECT CASE WHEN var('a') THEN 'A'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('c') THEN 'C'
+                    ELSE 'no result'
+        END
+    ]], {
+        -- <e_expr-21.2.1>
+        "B"
+        -- </e_expr-21.2.1>
+    })
+a = 0
+b = 1
+c = 1
+test:do_execsql_test(
+    "e_expr-21.2.2",
+    [[
+        SELECT CASE WHEN var('a') THEN 'A'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('c') THEN 'C'
+                    ELSE 'no result'
+        END
+    ]], {
+        -- <e_expr-21.2.2>
+        "B"
+        -- </e_expr-21.2.2>
+    })
+a = 0
+b = 0
+c = 1
+test:do_execsql_test(
+    "e_expr-21.2.3",
+    [[
+        SELECT CASE WHEN var('a') THEN 'A'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('c') THEN 'C'
+                    ELSE 'no result'
+        END
+    ]], {
+        -- <e_expr-21.2.3>
+        "C"
+        -- </e_expr-21.2.3>
+    })
+
+-- EVIDENCE-OF: R-24227-04807 Or, if none of the WHEN expressions
+-- evaluate to true, the result of evaluating the ELSE expression, if
+-- any.
+--
+a = 0
+b = 0
+c = 0
+test:do_execsql_test(
+    "e_expr-21.3.1",
+    [[
+        SELECT CASE WHEN var('a') THEN 'A'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('c') THEN 'C'
+                    ELSE 'no result'
+        END
+    ]], {
+        -- <e_expr-21.3.1>
+        "no result"
+        -- </e_expr-21.3.1>
+    })
+
+-- EVIDENCE-OF: R-14168-07579 If there is no ELSE expression and none of
+-- the WHEN expressions are true, then the overall result is NULL.
+--
+-- MUST_WORK_TEST uses access to nullvalue
 if 0>0 then
-    local function var(nm)
-        table.insert(varlist,nm)
-        return X(1150, "X!cmd", [=[["set",["::",["nm"],""]]]=])
-    end
-
-    db("func", "var", "var")
-    -- EVIDENCE-OF: R-30638-59954 In a CASE without a base expression, each
-    -- WHEN expression is evaluated and the result treated as a boolean,
-    -- starting with the leftmost and continuing to the right.
-    --
-    for _ in X(0, "X!foreach", [=[["a b c","0 0 0"]]=]) do
-        break
-    end
-    varlist = {  }
-    test:do_execsql_test(
-        "e_expr-21.1.1",
-        [[
-            SELECT CASE WHEN var('a') THEN 'A'
-                        WHEN var('b') THEN 'B'
-                        WHEN var('c') THEN 'C' END
-        ]], {
-            -- <e_expr-21.1.1>
-            ""
-            -- </e_expr-21.1.1>
-        })
-
-    test:do_test(
-        "e_expr-21.1.2",
-        function()
-            return varlist
-        end, {
-            -- <e_expr-21.1.2>
-            "a", "b", "c"
-            -- </e_expr-21.1.2>
-        })
-
-    varlist = {  }
-    test:do_execsql_test(
-        "e_expr-21.1.3",
-        [[
-            SELECT CASE WHEN var('c') THEN 'C'
-                        WHEN var('b') THEN 'B'
-                        WHEN var('a') THEN 'A'
-                        ELSE 'no result'
-            END
-        ]], {
-            -- <e_expr-21.1.3>
-            "no result"
-            -- </e_expr-21.1.3>
-        })
-
-    test:do_test(
-        "e_expr-21.1.4",
-        function()
-            return varlist
-        end, {
-            -- <e_expr-21.1.4>
-            "c", "b", "a"
-            -- </e_expr-21.1.4>
-        })
-
-    -- EVIDENCE-OF: R-39009-25596 The result of the CASE expression is the
-    -- evaluation of the THEN expression that corresponds to the first WHEN
-    -- expression that evaluates to true.
-    --
-    for _ in X(0, "X!foreach", [=[["a b c","0 1 0"]]=]) do
-        break
-    end
-    test:do_execsql_test(
-        "e_expr-21.2.1",
-        [[
-            SELECT CASE WHEN var('a') THEN 'A'
-                        WHEN var('b') THEN 'B'
-                        WHEN var('c') THEN 'C'
-                        ELSE 'no result'
-            END
-        ]], {
-            -- <e_expr-21.2.1>
-            "B"
-            -- </e_expr-21.2.1>
-        })
-
-    for _ in X(0, "X!foreach", [=[["a b c","0 1 1"]]=]) do
-        break
-    end
-    test:do_execsql_test(
-        "e_expr-21.2.2",
-        [[
-            SELECT CASE WHEN var('a') THEN 'A'
-                        WHEN var('b') THEN 'B'
-                        WHEN var('c') THEN 'C'
-                        ELSE 'no result'
-            END
-        ]], {
-            -- <e_expr-21.2.2>
-            "B"
-            -- </e_expr-21.2.2>
-        })
-
-    for _ in X(0, "X!foreach", [=[["a b c","0 0 1"]]=]) do
-        break
-    end
-    test:do_execsql_test(
-        "e_expr-21.2.3",
-        [[
-            SELECT CASE WHEN var('a') THEN 'A'
-                        WHEN var('b') THEN 'B'
-                        WHEN var('c') THEN 'C'
-                        ELSE 'no result'
-            END
-        ]], {
-            -- <e_expr-21.2.3>
-            "C"
-            -- </e_expr-21.2.3>
-        })
-
-    -- EVIDENCE-OF: R-24227-04807 Or, if none of the WHEN expressions
-    -- evaluate to true, the result of evaluating the ELSE expression, if
-    -- any.
-    --
-    for _ in X(0, "X!foreach", [=[["a b c","0 0 0"]]=]) do
-        break
-    end
-    test:do_execsql_test(
-        "e_expr-21.3.1",
-        [[
-            SELECT CASE WHEN var('a') THEN 'A'
-                        WHEN var('b') THEN 'B'
-                        WHEN var('c') THEN 'C'
-                        ELSE 'no result'
-            END
-        ]], {
-            -- <e_expr-21.3.1>
-            "no result"
-            -- </e_expr-21.3.1>
-        })
-
-    -- EVIDENCE-OF: R-14168-07579 If there is no ELSE expression and none of
-    -- the WHEN expressions are true, then the overall result is NULL.
-    --
     db("nullvalue", "null")
     test:do_execsql_test(
         "e_expr-21.3.2",
@@ -3091,6 +3106,7 @@ if 0>0 then
     -- statement. Tests associated with the next two statements test that the
     -- comparisons take place.
     --
+
     for _ in X(0, "X!foreach", [=[["a b c",[["list",[["expr","3"]],[["expr","4"]],[["expr","5"]]]]]]=]) do
         break
     end
@@ -3260,150 +3276,140 @@ test:do_execsql_test(
 -- EVIDENCE-OF: R-56280-17369 Both forms of the CASE expression use lazy,
 -- or short-circuit, evaluation.
 --
--- MUST_WORK_TEST uses access to built-in functions (var func)
-if 0>0 then
-    varlist = {  }
-    for _ in X(0, "X!foreach", [=[["a b c","0 1 0"]]=]) do
-        break
-    end
-    test:do_execsql_test(
-        "e_expr-25.1.1",
-        [[
-            SELECT CASE WHEN var('a') THEN 'A'
+varlist = {}
+a = "0"
+b = "1"
+c = "0"
+test:do_execsql_test(
+    "e_expr-25.1.1",
+    [[
+        SELECT CASE WHEN var('a') THEN 'A'
+                    WHEN var('b') THEN 'B'
+                    WHEN var('c') THEN 'C'
+        END
+    ]], {
+        -- <e_expr-25.1.1>
+        "B"
+        -- </e_expr-25.1.1>
+    })
+
+test:do_test(
+    "e_expr-25.1.2",
+    function()
+        return varlist
+    end, {
+        -- <e_expr-25.1.2>
+        "a", "b"
+        -- </e_expr-25.1.2>
+    })
+
+varlist = {  }
+test:do_execsql_test(
+    "e_expr-25.1.3",
+    [[
+        SELECT CASE '0' WHEN var('a') THEN 'A'
                         WHEN var('b') THEN 'B'
                         WHEN var('c') THEN 'C'
-            END
-        ]], {
-            -- <e_expr-25.1.1>
-            "B"
-            -- </e_expr-25.1.1>
-        })
+        END
+    ]], {
+        -- <e_expr-25.1.3>
+        "A"
+        -- </e_expr-25.1.3>
+    })
 
-    test:do_test(
-        "e_expr-25.1.2",
-        function()
-            return varlist
-        end, {
-            -- <e_expr-25.1.2>
-            "a", "b"
-            -- </e_expr-25.1.2>
-        })
+test:do_test(
+    "e_expr-25.1.4",
+    function()
+        return varlist
+    end, {
+        -- <e_expr-25.1.4>
+        "a"
+        -- </e_expr-25.1.4>
+    })
 
-    varlist = {  }
-    test:do_execsql_test(
-        "e_expr-25.1.3",
-        [[
-            SELECT CASE '0' WHEN var('a') THEN 'A'
-                            WHEN var('b') THEN 'B'
-                            WHEN var('c') THEN 'C'
-            END
-        ]], {
-            -- <e_expr-25.1.3>
-            "A"
-            -- </e_expr-25.1.3>
-        })
-
-    test:do_test(
-        "e_expr-25.1.4",
-        function()
-            return varlist
-        end, {
-            -- <e_expr-25.1.4>
-            "a"
-            -- </e_expr-25.1.4>
-        })
-
-    -- EVIDENCE-OF: R-34773-62253 The only difference between the following
-    -- two CASE expressions is that the x expression is evaluated exactly
-    -- once in the first example but might be evaluated multiple times in the
-    -- second: CASE x WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END CASE WHEN
-    -- x=w1 THEN r1 WHEN x=w2 THEN r2 ELSE r3 END
-    --
-    local function ceval(x)
-        evalcount = evalcount + 1
-        return x
-    end
-
-    db("func", "ceval", "ceval")
-    evalcount = 0
-    test:do_execsql_test(
-        "e_expr-26.1.1",
-        [[
-            CREATE TABLE t2(x PRIMARY KEY, w1, r1, w2, r2, r3);
-            INSERT INTO t2 VALUES(1, 1, 'R1', 2, 'R2', 'R3');
-            INSERT INTO t2 VALUES(2, 1, 'R1', 2, 'R2', 'R3');
-            INSERT INTO t2 VALUES(3, 1, 'R1', 2, 'R2', 'R3');
-        ]], {
-            -- <e_expr-26.1.1>
-
-            -- </e_expr-26.1.1>
-        })
-
-    test:do_execsql_test(
-        "e_expr-26.1.2",
-        [[
-            SELECT CASE x WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END FROM t2
-        ]], {
-            -- <e_expr-26.1.2>
-            "R1", "R2", "R3"
-            -- </e_expr-26.1.2>
-        })
-
-    test:do_execsql_test(
-        "e_expr-26.1.3",
-        [[
-            SELECT CASE WHEN x=w1 THEN r1 WHEN x=w2 THEN r2 ELSE r3 END FROM t2
-        ]], {
-            -- <e_expr-26.1.3>
-            "R1", "R2", "R3"
-            -- </e_expr-26.1.3>
-        })
-
-    test:do_execsql_test(
-        "e_expr-26.1.4",
-        [[
-            SELECT CASE ceval(x) WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END FROM t2
-        ]], {
-            -- <e_expr-26.1.4>
-            "R1", "R2", "R3"
-            -- </e_expr-26.1.4>
-        })
-
-    test:do_test(
-        "e_expr-26.1.5",
-        function()
-            return evalcount
-        end, {
-            -- <e_expr-26.1.5>
-            3
-            -- </e_expr-26.1.5>
-        })
-
-    evalcount = 0
-    test:do_execsql_test(
-        "e_expr-26.1.6",
-        [[
-            SELECT CASE
-              WHEN ceval(x)=w1 THEN r1
-              WHEN ceval(x)=w2 THEN r2
-              ELSE r3 END
-            FROM t2
-        ]], {
-            -- <e_expr-26.1.6>
-            "R1", "R2", "R3"
-            -- </e_expr-26.1.6>
-        })
-
-    test:do_test(
-        "e_expr-26.1.6",
-        function()
-            return evalcount
-        end, {
-            -- <e_expr-26.1.6>
-            5
-            -- </e_expr-26.1.6>
-        })
+-- EVIDENCE-OF: R-34773-62253 The only difference between the following
+-- two CASE expressions is that the x expression is evaluated exactly
+-- once in the first example but might be evaluated multiple times in the
+-- second: CASE x WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END CASE WHEN
+-- x=w1 THEN r1 WHEN x=w2 THEN r2 ELSE r3 END
+--
+local evalcount = 0
+local function ceval(x)
+    evalcount = evalcount + 1
+    return x
 end
+box.internal.sql_create_function("ceval", ceval)
+evalcount = 0
+test:do_execsql_test(
+    "e_expr-26.1.1",
+    [[
+        CREATE TABLE t2(x PRIMARY KEY, w1, r1, w2, r2, r3);
+        INSERT INTO t2 VALUES(1, 1, 'R1', 2, 'R2', 'R3');
+        INSERT INTO t2 VALUES(2, 1, 'R1', 2, 'R2', 'R3');
+        INSERT INTO t2 VALUES(3, 1, 'R1', 2, 'R2', 'R3');
+    ]], {
+        -- <e_expr-26.1.1>
+
+        -- </e_expr-26.1.1>
+    })
+
+test:do_execsql_test(
+    "e_expr-26.1.2",
+    [[
+        SELECT CASE x WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END FROM t2
+    ]], {
+        -- <e_expr-26.1.2>
+        "R1", "R2", "R3"
+        -- </e_expr-26.1.2>
+    })
+
+test:do_execsql_test(
+    "e_expr-26.1.3",
+    [[
+        SELECT CASE WHEN x=w1 THEN r1 WHEN x=w2 THEN r2 ELSE r3 END FROM t2
+    ]], {
+        -- <e_expr-26.1.3>
+        "R1", "R2", "R3"
+        -- </e_expr-26.1.3>
+    })
+
+test:do_execsql_test(
+    "e_expr-26.1.4",
+    [[
+        SELECT CASE ceval(x) WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END FROM t2
+    ]], {
+        -- <e_expr-26.1.4>
+        "R1", "R2", "R3"
+        -- </e_expr-26.1.4>
+    })
+
+test:do_test(
+    "e_expr-26.1.5",
+    function()
+        return evalcount
+    end, 3)
+
+evalcount = 0
+test:do_execsql_test(
+    "e_expr-26.1.6",
+    [[
+        SELECT CASE
+          WHEN ceval(x)=w1 THEN r1
+          WHEN ceval(x)=w2 THEN r2
+          ELSE r3 END
+        FROM t2
+    ]], {
+        -- <e_expr-26.1.6>
+        "R1", "R2", "R3"
+        -- </e_expr-26.1.6>
+    })
+
+test:do_test(
+    "e_expr-26.1.6",
+    function()
+        return evalcount
+    end, 5)
+
 
 ---------------------------------------------------------------------------
 -- Test statements related to CAST expressions.

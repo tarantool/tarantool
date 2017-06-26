@@ -1006,8 +1006,8 @@ test:do_test(
 -- MUST_WORK_TEST database should be locked #2554
 if 0>0 then
 local function try_drop_t9()
-    local r, msg = pcall( function () box.sql.execute("DROP TABLE t9;") end)
-    return msg
+    box.sql.execute("DROP TABLE t9;")
+    return 1
 end
 box.internal.sql_create_function("try_drop_t9", try_drop_t9)
 -- Try to drop a table from within a callback:
@@ -1024,16 +1024,15 @@ test:do_test(
 --          ]
 --           set result [list $rc $msg]
 --         } {1 {database table is locked}}
-        local msg
-        local rc = pcall(function()
-            msg = test:execsql("SELECT *, try_drop_t9() FROM tablet8 LIMIT 1")
+        local rc, msg = pcall(function()
+            test:execsql("SELECT *, try_drop_t9() FROM tablet8 LIMIT 1")
             --test:execsql("DROP TABLE t9;")
             end)
         rc = rc == true and 0 or 1
         return { rc, msg }
     end, {
         -- <table-14.2>
-        0, {"database table is locked"}
+        1, "database table is locked"
         -- got ok
         -- </table-14.2>
     })

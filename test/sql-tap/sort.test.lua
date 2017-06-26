@@ -858,7 +858,7 @@ test:do_execsql_test(
 ---------------------------------------------------------------------------
 -- Sort some large ( > 4KiB) records.
 --
--- MUST_WORK_TEST built-in procedures
+-- MUST_WORK_TEST? special sqlite functions (sqlite3_soft_heap_limit, sqlite3_test_control...)
 if (0 > 0) then
 local function cksum(x)
     local i1 = 1
@@ -870,8 +870,7 @@ local function cksum(x)
     end
     return i1, i2
 end
-
-db("func", "cksum", "cksum")
+box.internal.sql_create_function("cksum", cksum)
 
     test:do_execsql_test(
         "sort-14.0",

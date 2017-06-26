@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(63)
+test:plan(69)
 
 --!./tcltestrunner.lua
 -- 2005 January 19
@@ -710,101 +710,86 @@ test:do_execsql_test(
 -- for a matching column name did not cause an otherwise static subquery
 -- to become a dynamic (correlated) subquery.
 --
--- MUST_WORK_TEST built in procedures
-if 0 > 0 then
-    test:do_test(
-        "subquery-5.1",
-        function()
-            local function callcntproc(n)
-                callcnt = callcnt + 1
-                return n
-            end
+local callcnt = 0
+test:do_test(
+    "subquery-5.1",
+    function()
+        local function callcntproc(n)
+            callcnt = callcnt + 1
+            return n
+        end
 
-            callcnt = 0
-            db("function", "callcnt", "callcntproc")
-            return test:execsql [[
-                CREATE TABLE t4(x,y PRIMARY KEY);
-                INSERT INTO t4 VALUES('one',1);
-                INSERT INTO t4 VALUES('two',2);
-                INSERT INTO t4 VALUES('three',3);
-                INSERT INTO t4 VALUES('four',4);
-                CREATE TABLE t5(a PRIMARY KEY,b);
-                INSERT INTO t5 VALUES(1,11);
-                INSERT INTO t5 VALUES(2,22);
-                INSERT INTO t5 VALUES(3,33);
-                INSERT INTO t5 VALUES(4,44);
-                SELECT b FROM t5 WHERE a IN
-                   (SELECT callcnt(y)+0 FROM t4 WHERE x="two")
-            ]]
-        end, {
-            -- <subquery-5.1>
-            22
-            -- </subquery-5.1>
-        })
+        callcnt = 0
+        box.internal.sql_create_function("callcnt", callcntproc)
+        return test:execsql [[
+            CREATE TABLE t4(x,y PRIMARY KEY);
+            INSERT INTO t4 VALUES('one',1);
+            INSERT INTO t4 VALUES('two',2);
+            INSERT INTO t4 VALUES('three',3);
+            INSERT INTO t4 VALUES('four',4);
+            CREATE TABLE t5(a PRIMARY KEY,b);
+            INSERT INTO t5 VALUES(1,11);
+            INSERT INTO t5 VALUES(2,22);
+            INSERT INTO t5 VALUES(3,33);
+            INSERT INTO t5 VALUES(4,44);
+            SELECT b FROM t5 WHERE a IN
+               (SELECT callcnt(y)+0 FROM t4 WHERE x="two")
+        ]]
+    end, {
+        -- <subquery-5.1>
+        22
+        -- </subquery-5.1>
+    })
 
-    test:do_test(
-        "subquery-5.2",
-        function()
-            -- This is the key test.  The subquery should have only run once.  If
-            -- The double-quoted identifier "two" were causing the subquery to be
-            -- processed as a correlated subquery, then it would have run 4 times.
-            return callcnt
-        end, {
-            -- <subquery-5.2>
-            1
-            -- </subquery-5.2>
-        })
+test:do_test(
+    "subquery-5.2",
+    function()
+        -- This is the key test.  The subquery should have only run once.  If
+        -- The double-quoted identifier "two" were causing the subquery to be
+        -- processed as a correlated subquery, then it would have run 4 times.
+        return callcnt
+    end, 1)
 
-    -- Ticket #1380.  Make sure correlated subqueries on an IN clause work
-    -- correctly when the left-hand side of the IN operator is constant.
-    --
-    test:do_test(
-        "subquery-6.1",
-        function()
-            callcnt = 0
-            return test:execsql [[
-                SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=y)
-            ]]
-        end, {
-            -- <subquery-6.1>
-            "one", "two", "three", "four"
-            -- </subquery-6.1>
-        })
+-- Ticket #1380.  Make sure correlated subqueries on an IN clause work
+-- correctly when the left-hand side of the IN operator is constant.
+--
+test:do_test(
+    "subquery-6.1",
+    function()
+        callcnt = 0
+        return test:execsql [[
+            SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=y)
+        ]]
+    end, {
+        -- <subquery-6.1>
+        "one", "two", "three", "four"
+        -- </subquery-6.1>
+    })
 
-    test:do_test(
-        "subquery-6.2",
-        function()
-            return callcnt
-        end, {
-            -- <subquery-6.2>
-            4
-            -- </subquery-6.2>
-        })
+test:do_test(
+    "subquery-6.2",
+    function()
+        return callcnt
+    end, 4)
 
-    test:do_test(
-        "subquery-6.3",
-        function()
-            callcnt = 0
-            return test:execsql [[
-                SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=1)
-            ]]
-        end, {
-            -- <subquery-6.3>
-            "one", "two", "three", "four"
-            -- </subquery-6.3>
-        })
+test:do_test(
+    "subquery-6.3",
+    function()
+        callcnt = 0
+        return test:execsql [[
+            SELECT x FROM t4 WHERE 1 IN (SELECT callcnt(count(*)) FROM t5 WHERE a=1)
+        ]]
+    end, {
+        -- <subquery-6.3>
+        "one", "two", "three", "four"
+        -- </subquery-6.3>
+    })
 
-    test:do_test(
-        "subquery-6.4",
-        function()
-            return callcnt
-        end, {
-            -- <subquery-6.4>
-            1
-            -- </subquery-6.4>
-        })
-end
-
+test:do_test(
+    "subquery-6.4",
+    function()
+        return callcnt
+    end, 1)
 
 --############  was disable until we get #2652 fixed
 -- Ticket #2652.  Allow aggregate functions of outer queries inside

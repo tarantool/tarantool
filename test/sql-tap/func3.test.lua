@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(19)
+test:plan(25)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -20,7 +20,7 @@ test:plan(19)
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- MUST_WORK_TEST built-in functions
+-- MUST_WORK_TEST built-in functions check desrtoy api of sqlite3_create_function_v2
 if 0>0 then
 --ifcapable utf16 {
 test:do_test(
