@@ -1456,6 +1456,9 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 
 	guard.is_active = false;
 
+	/* Preserve the access control lists during truncate. */
+	memcpy(new_space->access, old_space->access, sizeof(old_space->access));
+
 	/*
 	 * Replace the old space with the new one in the space
 	 * cache. Requests processed after this point will see
