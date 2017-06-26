@@ -562,6 +562,42 @@ t
 ---
 - []
 ...
+--
+-- Check that alter and truncate do not affect space access control.
+--
+session.su('admin')
+---
+...
+_ = s:create_index('secondary', {unique = false, parts = {2, 'string'}})
+---
+...
+session.su('testuser')
+---
+...
+s:select()
+---
+- - [1, 'A']
+  - [2, 'B']
+  - [3, 'C']
+  - [4, 'D']
+...
+session.su('admin')
+---
+...
+s:truncate()
+---
+...
+s:insert({1234, 'ABCD'})
+---
+- [1234, 'ABCD']
+...
+session.su('testuser')
+---
+...
+s:select()
+---
+- - [1234, 'ABCD']
+...
 session.su('admin')
 ---
 ...
