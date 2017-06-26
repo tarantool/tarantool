@@ -425,15 +425,15 @@ struct func_def {
 };
 
 /**
- * @param name_length length of func_def->name
+ * @param name_len length of func_def->name
  * @returns size in bytes needed to allocate for struct func_def
- * for a function of length @a a name_length.
+ * for a function of length @a a name_len.
  */
 static inline size_t
-func_def_sizeof(uint32_t name_length)
+func_def_sizeof(uint32_t name_len)
 {
 	/* +1 for '\0' name terminating. */
-	return sizeof(struct func_def) + name_length + 1;
+	return sizeof(struct func_def) + name_len + 1;
 }
 
 /**
@@ -503,10 +503,10 @@ key_def_sizeof(uint32_t part_count)
 }
 
 static inline size_t
-index_def_sizeof(uint32_t part_count, uint32_t name_length)
+index_def_sizeof(uint32_t part_count, uint32_t name_len)
 {
 	return sizeof(struct index_def) +
-	       sizeof(struct key_part) * (part_count + 1) + name_length + 1;
+	       sizeof(struct key_part) * (part_count + 1) + name_len + 1;
 }
 
 /**
@@ -516,7 +516,7 @@ index_def_sizeof(uint32_t part_count, uint32_t name_length)
  */
 struct index_def *
 index_def_new(uint32_t space_id, const char *space_name, uint32_t iid,
-	      const char *name, uint32_t name_length, enum index_type type,
+	      const char *name, uint32_t name_len, enum index_type type,
 	      const struct index_opts *opts, uint32_t part_count);
 
 /**

@@ -1596,28 +1596,30 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 static struct user_def *
 user_def_new_from_tuple(struct tuple *tuple)
 {
-	uint32_t len;
-	const char *name = tuple_field_str_xc(tuple, BOX_USER_FIELD_NAME, &len);
-	if (len > BOX_NAME_MAX)
+	uint32_t name_len;
+	const char *name = tuple_field_str_xc(tuple, BOX_USER_FIELD_NAME,
+					      &name_len);
+	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_CREATE_USER,
-			  tt_cstr(name, len), "user name is too long");
-	size_t size = user_def_sizeof(len);
-	struct user_def *user = (struct user_def *) malloc(size);
+			  tt_cstr(name, name_len), "user name is too long");
+	}
+	size_t sz = user_def_sizeof(name_len);
+	/* Use calloc: in case user password is empty, fill it with \0 */
+	struct user_def *user = (struct user_def *) calloc(1, sz);
 	if (user == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "user");
+		tnt_raise(OutOfMemory, sz, "malloc", "user");
 	auto def_guard = make_scoped_guard([=] { free(user); });
-	/* In case user password is empty, fill it with \0 */
-	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
 	user->owner = tuple_field_u32_xc(tuple, BOX_USER_FIELD_UID);
 	const char *user_type =
 		tuple_field_cstr_xc(tuple, BOX_USER_FIELD_TYPE);
 	user->type= schema_object_type(user_type);
-	memcpy(user->name, name, len);
-	user->name[len] = 0;
-	if (user->type != SC_ROLE && user->type != SC_USER)
+	/* The trailing zero is set by calloc */
+	memcpy(user->name, name, name_len);
+	if (user->type != SC_ROLE && user->type != SC_USER) {
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
+	}
 	identifier_check(user->name);
 	access_check_ddl(user->owner, SC_USER);
 	/*
@@ -1657,6 +1659,7 @@ user_cache_alter_user(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_last_stmt(txn);
 	struct user_def *user = user_def_new_from_tuple(stmt->new_tuple);
 	auto def_guard = make_scoped_guard([=] { free(user); });
+	/* Can throw if, e.g. too many users. */
 	user_cache_replace(user);
 	def_guard.is_active = false;
 }

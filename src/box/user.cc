@@ -466,43 +466,33 @@ user_cache_init()
 	 * updated with snapshot contents during recovery.
 	 */
 	size_t name_len = strlen("guest");
-	size_t size = user_def_sizeof(name_len);
-	struct user_def *def = (struct user_def *) malloc(size);
+	size_t sz = user_def_sizeof(name_len);
+	struct user_def *def = (struct user_def *) calloc(1, sz);
 	if (def == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "def");
+		tnt_raise(OutOfMemory, sz, "malloc", "def");
 	/* Free def in a case of exception. */
 	auto guest_def_guard = make_scoped_guard([=] { free(def); });
-	memset(def, 0, size);
 	memcpy(def->name, "guest", name_len);
-	def->name[name_len] = 0;
 	def->owner = ADMIN;
 	def->type = SC_USER;
 	struct user *user = user_cache_replace(def);
-	/*
-	 * Now the user cache owns the def. Create a new guard to
-	 * not free the def, but delete the user from the cache.
-	 */
+	/* Now the user cache owns the def. */
 	guest_def_guard.is_active = false;
-	auto user_cache_guard =
-		make_scoped_guard([=] { user_cache_delete(user->def->uid); });
 	/* 0 is the auth token and user id by default. */
 	assert(user->def->uid == GUEST && user->auth_token == GUEST);
-	(void)user;
+	(void) user;
 
 	name_len = strlen("admin");
-	size = user_def_sizeof(name_len);
-	def = (struct user_def *) malloc(size);
+	sz = user_def_sizeof(name_len);
+	def = (struct user_def *) calloc(1, sz);
 	if (def == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "def");
+		tnt_raise(OutOfMemory, sz, "malloc", "def");
 	auto admin_def_guard = make_scoped_guard([=] { free(def); });
-	memset(def, 0, size);
 	memcpy(def->name, "admin", name_len);
-	def->name[name_len] = 0;
 	def->uid = def->owner = ADMIN;
 	def->type = SC_USER;
 	user = user_cache_replace(def);
 	admin_def_guard.is_active = false;
-	user_cache_guard.is_active = false;
 	/* ADMIN is both the auth token and user id for 'admin' user. */
 	assert(user->def->uid == ADMIN && user->auth_token == ADMIN);
 }

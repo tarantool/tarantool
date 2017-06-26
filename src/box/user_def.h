@@ -73,9 +73,9 @@ struct user_def {
 };
 
 static inline size_t
-user_def_sizeof(uint32_t name_length)
+user_def_sizeof(uint32_t name_len)
 {
-	return sizeof(struct user_def) + name_length + 1;
+	return sizeof(struct user_def) + name_len + 1;
 }
 
 /** Predefined user ids. */
