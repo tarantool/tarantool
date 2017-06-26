@@ -493,10 +493,15 @@ struct vy_index {
 	 */
 	struct tuple_format *upsert_format;
 	/**
+	 * Incremented for each change of the mem list,
+	 * to invalidate iterators.
+	 */
+	uint32_t mem_list_version;
+	/**
 	 * Incremented for each change of the range list,
 	 * to invalidate iterators.
 	 */
-	uint32_t version;
+	uint32_t range_tree_version;
 	/**
 	 * Primary index of the same space or NULL if this index
 	 * is primary. Referenced by each secondary index.
@@ -714,10 +719,14 @@ struct vy_merge_iterator {
 	bool is_primary;
 
 	/* {{{ Range version checking */
-	/* pointer to index->version */
-	const uint32_t *p_index_version;
-	/* copy of index->version to track range tree changes */
-	uint32_t index_version;
+	/* pointer to index->range_tree_version */
+	const uint32_t *p_range_tree_version;
+	/* pointer to index->mem_list_version */
+	const uint32_t *p_mem_list_version;
+	/* copy of index->range_tree_version to track range tree changes */
+	uint32_t range_tree_version;
+	/* copy of index->mem_list_version to track range tree changes */
+	uint32_t mem_list_version;
 	/* pointer to range->version */
 	const uint32_t *p_range_version;
 	/* copy of curr_range->version to track mem/run lists changes */
@@ -1724,7 +1733,7 @@ vy_index_rotate_mem(struct vy_index *index)
 
 	rlist_add_entry(&index->sealed, index->mem, in_sealed);
 	index->mem = mem;
-	index->version++;
+	index->mem_list_version++;
 
 	vy_scheduler_add_mem(scheduler, mem);
 	return 0;
@@ -1923,7 +1932,7 @@ vy_range_maybe_split(struct vy_range *range)
 		vy_index_acct_range(index, part);
 		vy_scheduler_add_range(scheduler, part);
 	}
-	index->version++;
+	index->range_tree_version++;
 
 	say_info("%s: split range %s by key %s", vy_index_name(index),
 		 vy_range_str(range), vy_key_str(split_key_raw));
@@ -2173,7 +2182,7 @@ vy_range_maybe_coalesce(struct vy_range *range)
 	result->compact_priority = result->slice_count;
 	vy_index_acct_range(index, result);
 	vy_index_add_range(index, result);
-	index->version++;
+	index->range_tree_version++;
 	vy_scheduler_add_range(scheduler, result);
 
 	say_info("%s: coalesced ranges %s",
@@ -3075,7 +3084,7 @@ delete_mems:
 		vy_scheduler_remove_mem(scheduler, mem);
 		vy_mem_delete(mem);
 	}
-	index->version++;
+	index->mem_list_version++;
 	index->dump_lsn = dump_lsn;
 	index->generation = task->generation;
 	index->stat.disk.dump.count++;
@@ -7123,9 +7132,11 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr,
 	itr->format = format;
 	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
-	itr->index_version = 0;
+	itr->range_tree_version = 0;
+	itr->p_mem_list_version = 0;
 	itr->range_version = 0;
-	itr->p_index_version = NULL;
+	itr->p_range_tree_version = NULL;
+	itr->p_mem_list_version = NULL;
 	itr->p_range_version = NULL;
 	itr->key = key;
 	itr->iterator_type = iterator_type;
@@ -7167,9 +7178,11 @@ vy_merge_iterator_cleanup(struct vy_merge_iterator *itr)
 	}
 	itr->src_capacity = 0;
 	itr->range_version = 0;
-	itr->index_version = 0;
-	itr->p_index_version = NULL;
+	itr->range_tree_version = 0;
+	itr->mem_list_version = 0;
 	itr->p_range_version = NULL;
+	itr->p_range_tree_version = NULL;
+	itr->p_mem_list_version = NULL;
 }
 
 /**
@@ -7250,12 +7263,16 @@ vy_merge_iterator_add(struct vy_merge_iterator *itr,
  */
 static void
 vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
-			      const uint32_t *p_index_version,
+			      const uint32_t *p_range_tree_version,
+			      const uint32_t *p_mem_list_version,
 			      const uint32_t *p_range_version)
 {
-	itr->p_index_version = p_index_version;
-	if (itr->p_index_version != NULL)
-		itr->index_version = *p_index_version;
+	itr->p_range_tree_version = p_range_tree_version;
+	if (itr->p_range_tree_version != NULL)
+		itr->range_tree_version = *p_range_tree_version;
+	itr->p_mem_list_version = p_mem_list_version;
+	if (itr->p_mem_list_version != NULL)
+		itr->mem_list_version = *p_mem_list_version;
 	itr->p_range_version = p_range_version;
 	if (itr->p_range_version != NULL)
 		itr->range_version = *p_range_version;
@@ -7269,8 +7286,11 @@ vy_merge_iterator_set_version(struct vy_merge_iterator *itr,
 static NODISCARD int
 vy_merge_iterator_check_version(struct vy_merge_iterator *itr)
 {
-	if (itr->p_index_version != NULL &&
-	    *itr->p_index_version != itr->index_version)
+	if (itr->p_range_tree_version != NULL &&
+	    *itr->p_range_tree_version != itr->range_tree_version)
+		return -2;
+	if (itr->p_mem_list_version != NULL &&
+	    *itr->p_mem_list_version != itr->mem_list_version)
 		return -2;
 	if (itr->p_range_version != NULL &&
 	    *itr->p_range_version != itr->range_version)
@@ -7689,7 +7709,8 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 
 	/* Enable range and range index version checks */
 	vy_merge_iterator_set_version(&itr->merge_iterator,
-				      &itr->index->version,
+				      &itr->index->range_tree_version,
+				      &itr->index->mem_list_version,
 				      itr->curr_range != NULL ?
 				      &itr->curr_range->version : NULL);
 }
