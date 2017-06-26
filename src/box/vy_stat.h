@@ -92,6 +92,14 @@ struct vy_run_iterator_stat {
 	struct vy_disk_stmt_counter read;
 };
 
+/** TX write set iterator statistics. */
+struct vy_txw_iterator_stat {
+	/** Number of lookups in the write set. */
+	int64_t lookup;
+	/** Number of statements returned by the iterator. */
+	struct vy_stmt_counter get;
+};
+
 /** Dump/compaction statistics. */
 struct vy_compact_stat {
 	int32_t count;
@@ -121,6 +129,13 @@ struct vy_index_stat {
 		/** Compaction statistics. */
 		struct vy_compact_stat compact;
 	} disk;
+	/** TX write set statistics. */
+	struct {
+		/** Number of statements in the write set. */
+		struct vy_stmt_counter count;
+		/** TX write set iterator statistics. */
+		struct vy_txw_iterator_stat iterator;
+	} txw;
 };
 
 /** Tuple cache statistics. */

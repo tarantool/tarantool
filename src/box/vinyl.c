@@ -230,8 +230,6 @@ struct vy_stat {
 	 */
 	struct histogram *dump_bw;
 	int64_t dump_total;
-	/* iterators statistics */
-	struct vy_iterator_stat txw_stat;
 };
 
 static struct vy_stat *
@@ -4441,17 +4439,6 @@ vy_info_append_stat_latency(struct info_handler *h,
 }
 
 static void
-vy_info_append_iterator_stat(struct info_handler *h, const char *name,
-			     struct vy_iterator_stat *stat)
-{
-	info_table_begin(h, name);
-	info_append_int(h, "lookup_count", stat->lookup_count);
-	info_append_int(h, "step_count", stat->step_count);
-	info_append_int(h, "bloom_reflect_count", stat->bloom_reflections);
-	info_table_end(h);
-}
-
-static void
 vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_stat *stat = env->stat;
@@ -4486,10 +4473,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_table_begin(h, "cache");
 	info_append_int(h, "count", ce->cached_count);
 	info_append_int(h, "used", ce->mem_used);
-	info_table_end(h);
-
-	info_table_begin(h, "iterator");
-	vy_info_append_iterator_stat(h, "txw", &stat->txw_stat);
 	info_table_end(h);
 
 	info_table_end(h);
@@ -4585,6 +4568,14 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	vy_info_append_stmt_counter(h, "put", &cache_stat->put);
 	vy_info_append_stmt_counter(h, "invalidate", &cache_stat->invalidate);
 	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
+	info_table_end(h);
+
+	info_table_begin(h, "txw");
+	vy_info_append_stmt_counter(h, NULL, &stat->txw.count);
+	info_table_begin(h, "iterator");
+	info_append_int(h, "lookup", stat->txw.iterator.lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->txw.iterator.get);
+	info_table_end(h);
 	info_table_end(h);
 
 	info_append_int(h, "range_count", index->range_count);
@@ -5290,6 +5281,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		assert(tx->write_size >= tuple_size(old->stmt));
 		tx->write_size -= tuple_size(old->stmt);
 		tx->write_size += tuple_size(stmt);
+		vy_stmt_counter_unacct_tuple(&index->stat.txw.count, old->stmt);
+		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
 		tuple_unref(old->stmt);
 		tuple_ref(stmt);
 		old->stmt = stmt;
@@ -5301,6 +5294,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		write_set_insert(&tx->write_set, v);
 		tx->write_set_version++;
 		tx->write_size += tuple_size(stmt);
+		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
 	return 0;
@@ -6318,6 +6312,9 @@ vy_tx_destroy(struct vy_tx *tx)
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
+		else
+			vy_stmt_counter_unacct_tuple(&v->index->stat.txw.count,
+						     v->stmt);
 		txv_delete(v);
 	}
 
@@ -6906,6 +6903,8 @@ vy_end_recovery(struct vy_env *e)
 
 /** }}} Recovery */
 
+/* {{{ Iterator over transaction writes */
+
 /**
  * Return statements from the write set of the current
  * transactions.
@@ -6917,7 +6916,7 @@ struct vy_txw_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
 	/** Iterator usage statistics */
-	struct vy_iterator_stat *stat;
+	struct vy_txw_iterator_stat *stat;
 
 	struct vy_index *index;
 	struct vy_tx *tx;
@@ -6940,25 +6939,13 @@ struct vy_txw_iterator {
 	bool search_started;
 };
 
-static void
-vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_index *index, struct vy_tx *tx,
-		     enum iterator_type iterator_type,
-		     const struct tuple *key);
-
-static void
-vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
-
-/* }}} Iterator over transaction writes : forward declaration */
-
-/* {{{ Iterator over transaction writes : implementation */
-
 /** Vtable for vy_stmt_iterator - declared below */
 static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
 
 /* Open the iterator. */
 static void
-vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
+vy_txw_iterator_open(struct vy_txw_iterator *itr,
+		     struct vy_txw_iterator_stat *stat,
 		     struct vy_index *index, struct vy_tx *tx,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key)
@@ -6983,6 +6970,13 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
 	itr->search_started = false;
 }
 
+static void
+vy_txw_iterator_get(struct vy_txw_iterator *itr, struct tuple **ret)
+{
+	*ret = itr->curr_txv->stmt;
+	vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
+}
+
 /**
  * Find position in write set of transaction. Used once in first call of
  *  get/next.
@@ -6990,7 +6984,7 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
 static void
 vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 {
-	itr->stat->lookup_count++;
+	itr->stat->lookup++;
 	*ret = NULL;
 	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
@@ -7037,7 +7031,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 	if (txv == NULL || txv->index != index)
 		return;
 	itr->curr_txv = txv;
-	*ret = txv->stmt;
+	vy_txw_iterator_get(itr, ret);
 	return;
 }
 
@@ -7058,7 +7052,6 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 		vy_txw_iterator_start(itr, ret);
 		return 0;
 	}
-	itr->stat->step_count++;
 	itr->version = itr->tx->write_set_version;
 	if (itr->curr_txv == NULL)
 		return 0;
@@ -7073,7 +7066,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 			    itr->index->key_def) != 0)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL)
-		*ret = itr->curr_txv->stmt;
+		vy_txw_iterator_get(itr, ret);
 	return 0;
 }
 
@@ -7115,7 +7108,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	if (last_stmt == NULL || itr->version == itr->tx->write_set_version) {
 		if (itr->curr_txv)
-			*ret = itr->curr_txv->stmt;
+			vy_txw_iterator_get(itr, ret);
 		return 0;
 	}
 
@@ -7148,7 +7141,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 		return 0;
 	}
 	itr->curr_txv = txv;
-	*ret = txv->stmt;
+	vy_txw_iterator_get(itr, ret);
 	return txv->stmt != was_stmt;
 }
 
@@ -7172,7 +7165,7 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface = {
 	.close = vy_txw_iterator_close
 };
 
-/* }}} Iterator over transaction writes : implementation */
+/* }}} Iterator over transaction writes */
 
 /* {{{ Merge iterator */
 
@@ -7673,7 +7666,7 @@ static void
 vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 {
 	assert(itr->tx != NULL);
-	struct vy_iterator_stat *stat = &itr->index->env->stat->txw_stat;
+	struct vy_txw_iterator_stat *stat = &itr->index->stat.txw.iterator;
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_txw_iterator_open(&sub_src->txw_iterator, stat, itr->index, itr->tx,

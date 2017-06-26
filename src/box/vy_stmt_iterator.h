@@ -115,19 +115,6 @@ struct vy_stmt_iterator {
 };
 
 /**
- * Usage statisctics of one particular type of iterator
- */
-struct vy_iterator_stat {
-	/* Number of binary searches performed */
-	size_t lookup_count;
-	/* Number of sequential iterations */
-	size_t step_count;
-	/* Number of searches avoided using bloom filter */
-	size_t bloom_reflections;
-};
-
-
-/**
  * The stream is a very simple iterator (generally over a mem or a run)
  * that output all the tuples on increasing order.
  */
