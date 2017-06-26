@@ -90,8 +90,8 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a,
 #define BPS_TREE_NAME vy_cache_tree
 #define BPS_TREE_BLOCK_SIZE 512
 #define BPS_TREE_EXTENT_SIZE VY_CACHE_TREE_EXTENT_SIZE
-#define BPS_TREE_COMPARE(a, b, index) vy_cache_tree_cmp(a, b, index)
-#define BPS_TREE_COMPARE_KEY(a, b, index) vy_cache_tree_key_cmp(a, b, index)
+#define BPS_TREE_COMPARE(a, b, key_def) vy_cache_tree_cmp(a, b, key_def)
+#define BPS_TREE_COMPARE_KEY(a, b, key_def) vy_cache_tree_key_cmp(a, b, key_def)
 #define bps_tree_elem_t struct vy_cache_entry *
 #define bps_tree_key_t const struct tuple *
 #define bps_tree_arg_t struct key_def *
@@ -189,6 +189,13 @@ void
 vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	     struct tuple *prev_stmt, const struct tuple *key,
 	     enum iterator_type order);
+
+/**
+ * Find value in cache.
+ * @return A tuple equal to key or NULL if not found.
+ */
+struct tuple *
+vy_cache_get(struct vy_cache *cache, const struct tuple *key);
 
 /**
  * Invalidate possibly cached value due to its overwriting
