@@ -111,6 +111,12 @@ struct vy_compact_stat {
 
 /** Vinyl index statistics. */
 struct vy_index_stat {
+	/** Number of lookups in the index. */
+	int64_t lookup;
+	/** Number of statements read from this index. */
+	struct vy_stmt_counter get;
+	/** Number of statements written to this index. */
+	struct vy_stmt_counter put;
 	/** Memory related statistics. */
 	struct {
 		/** Number of statements stored in memory. */

@@ -2639,6 +2639,8 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 	if (vy_stmt_type(stmt) == IPROTO_UPSERT)
 		vy_index_commit_upsert(index, mem, stmt);
 
+	vy_stmt_counter_acct_tuple(&index->stat.put, stmt);
+
 	/* Invalidate cache element. */
 	vy_cache_on_write(&index->cache, stmt, NULL);
 }
@@ -4537,6 +4539,10 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	struct vy_stmt_counter count = stat->memory.count;
 	vy_stmt_counter_add_disk(&count, &stat->disk.count);
 	vy_info_append_stmt_counter(h, NULL, &count);
+
+	info_append_int(h, "lookup", stat->lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->get);
+	vy_info_append_stmt_counter(h, "put", &stat->put);
 
 	info_table_begin(h, "memory");
 	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
@@ -7821,6 +7827,8 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 			       itr->index->space_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
+
+	itr->index->stat.lookup++;
 }
 
 /**
@@ -8000,6 +8008,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 
 	*result = itr->curr_stmt;
 	assert(*result == NULL || vy_stmt_type(*result) == IPROTO_REPLACE);
+	if (*result != NULL)
+		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
 
 	/**
 	 * Add a statement to the cache
