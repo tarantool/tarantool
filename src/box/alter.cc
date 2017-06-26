@@ -345,9 +345,9 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	enum index_type type =
 		STR2ENUM(index_type, tuple_field_cstr_xc(tuple,
 							 BOX_INDEX_FIELD_TYPE));
-	uint32_t name_length;
+	uint32_t name_len;
 	const char *name = tuple_field_str_xc(tuple, BOX_INDEX_FIELD_NAME,
-					      &name_length);
+					      &name_len);
 	uint32_t part_count;
 	const char *parts;
 	if (is_166plus) {
@@ -370,7 +370,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	}
 
 	index_def = index_def_new(id, space_name(old_space), index_id, name,
-				  name_length, type, &opts, part_count);
+				  name_len, type, &opts, part_count);
 	if (index_def == NULL)
 		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
@@ -885,6 +885,10 @@ void
 ModifyIndex::commit(struct alter_space *alter)
 {
 	uint32_t old_id = old_index_def->iid, new_id = new_index_def->iid;
+	/*
+	 * Move the old index to the new space, but use the new
+	 * definition.
+	 */
 	Index *old_index = index_find_xc(alter->old_space, old_id);
 	index_def_delete(old_index->index_def);
 	old_index->index_def = new_index_def;
@@ -939,7 +943,7 @@ AddIndex::prepare(struct alter_space *alter)
 
 	if (drop == NULL ||
 	    index_def_change_requires_rebuild(drop->old_index_def,
-						   new_index_def)) {
+					      new_index_def)) {
 		/*
 		 * The new index is too distinct from the old one,
 		 * have to rebuild.

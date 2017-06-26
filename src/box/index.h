@@ -354,7 +354,8 @@ public:
 
 protected:
 	/**
-	 * Initialize index instance.
+	 * Initialize index instance. The created
+	 * object makes a copy of the index definition.
 	 *
 	 * @param index_def  key part description
 	 */

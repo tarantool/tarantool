@@ -212,29 +212,30 @@ box_key_def_delete(box_key_def_t *key_def)
 
 struct index_def *
 index_def_new(uint32_t space_id, const char *space_name,
-	      uint32_t iid, const char *name, uint32_t name_length,
+	      uint32_t iid, const char *name, uint32_t name_len,
 	      enum index_type type, const struct index_opts *opts,
 	      uint32_t part_count)
 {
-	if (name_length > BOX_NAME_MAX) {
+	if (name_len > BOX_NAME_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX,
-			 tt_cstr(name, name_length), space_name,
+			 tt_cstr(name, name_len), space_name,
 			 "index name is too long");
 		error_log(diag_last_error(diag_get()));
 		return NULL;
 	}
-	size_t sz = index_def_sizeof(part_count, name_length);
+	size_t sz = index_def_sizeof(part_count, name_len);
 	/*
-	 * Use calloc for nullifying all struct index_def attributes including
-	 * comparator pointers.
+	 * Use calloc to zero all struct index_def attributes
+	 * the comparator pointers.
 	 */
 	struct index_def *def = (struct index_def *) calloc(1, sz);
 	if (def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
-	def->name = (char *)def + sz - name_length - 1;
-	strncpy(def->name, name, name_length);
+	def->name = (char *)def + sz - name_len - 1;
+	/* The trailing zero is ensured by calloc() */
+	strncpy(def->name, name, name_len);
 	if (!identifier_is_valid(def->name)) {
 		diag_set(ClientError, ER_IDENTIFIER, def->name);
 		free(def);
@@ -251,8 +252,8 @@ index_def_new(uint32_t space_id, const char *space_name,
 struct index_def *
 index_def_dup(const struct index_def *def)
 {
-	uint32_t name_length = strlen(def->name);
-	size_t sz = index_def_sizeof(def->key_def.part_count, name_length);
+	uint32_t name_len = strlen(def->name);
+	size_t sz = index_def_sizeof(def->key_def.part_count, name_len);
 	struct index_def *dup = (struct index_def *) malloc(sz);
 	if (dup == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
@@ -260,7 +261,7 @@ index_def_dup(const struct index_def *def)
 	}
 	memcpy(dup, def, sz);
 	rlist_create(&dup->link);
-	dup->name = (char *)dup + sz - name_length - 1;
+	dup->name = (char *)dup + sz - name_len - 1;
 	return dup;
 }
 
