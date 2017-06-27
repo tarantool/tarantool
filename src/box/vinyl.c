@@ -4536,6 +4536,7 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	info_append_int(h, "lookup", stat->lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->get);
 	vy_info_append_stmt_counter(h, "put", &stat->put);
+	info_append_double(h, "latency", latency_get(&stat->latency));
 
 	info_table_begin(h, "upsert");
 	info_append_int(h, "squashed", stat->upsert.squashed);
@@ -4969,6 +4970,9 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 		tuple_format_ref(index->upsert_format, 1);
 	}
 
+	if (vy_index_stat_create(&index->stat) != 0)
+		goto fail_stat;
+
 	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
@@ -5005,6 +5009,8 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 fail_mem:
 	histogram_delete(index->run_hist);
 fail_run_hist:
+	vy_index_stat_destroy(&index->stat);
+fail_stat:
 	tuple_format_ref(index->space_format_with_colmask, -1);
 fail_space_format_with_colmask:
 	tuple_format_ref(index->upsert_format, -1);
@@ -5224,6 +5230,7 @@ vy_index_delete(struct vy_index *index)
 		free(index->key_def);
 	free(index->user_key_def);
 	histogram_delete(index->run_hist);
+	vy_index_stat_destroy(&index->stat);
 	vy_cache_destroy(&index->cache);
 	tuple_format_ref(index->space_format, -1);
 	free(index->tree);
@@ -7930,6 +7937,8 @@ restart:
 static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
+	ev_tstamp start_time = ev_now(loop());
+
 	*result = NULL;
 
 	if (!itr->search_started)
@@ -8028,6 +8037,7 @@ clear:
 		tuple_unref(prev_key);
 	}
 
+	latency_collect(&index->stat.latency, ev_now(loop()) - start_time);
 	return rc;
 }
 

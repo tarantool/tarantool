@@ -33,6 +33,7 @@
 
 #include <stdint.h>
 
+#include "latency.h"
 #include "tuple.h"
 
 #if defined(__cplusplus)
@@ -117,6 +118,8 @@ struct vy_index_stat {
 	struct vy_stmt_counter get;
 	/** Number of statements written to this index. */
 	struct vy_stmt_counter put;
+	/** Read latency. */
+	struct latency latency;
 	/** Upsert statistics. */
 	struct {
 		/** How many upsert chains have been squashed. */
@@ -172,6 +175,18 @@ struct vy_cache_stat {
 	 */
 	struct vy_stmt_counter evict;
 };
+
+static inline int
+vy_index_stat_create(struct vy_index_stat *stat)
+{
+	return latency_create(&stat->latency);
+}
+
+static inline void
+vy_index_stat_destroy(struct vy_index_stat *stat)
+{
+	latency_destroy(&stat->latency);
+}
 
 static inline void
 vy_stmt_counter_acct_tuple(struct vy_stmt_counter *c,
