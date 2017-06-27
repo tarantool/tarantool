@@ -280,18 +280,32 @@ s:upsert({1, 1}, {{'+', 1, 1}})
 s:upsert({1, 1}, {{'+', 2, 1}})
 s:select() --both upserts are ignored due to primary key change
 
--- gh-2520 use cache as a hint for upserts applying.
+--
+-- gh-2520 use cache as a hint when applying upserts.
+--
 old_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+-- insert the first upsert
 s:upsert({100}, {{'=', 2, 200}})
+-- force a dump, the inserted upsert is now on disk
 box.snapshot()
+-- populate the cache
 s:get{100}
+-- a lookup in a run was done to populate the cache
 new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
 new_stat - old_stat
 old_stat = new_stat
-box.snapshot()
+-- Add another upsert: the cached REPLACE will be used and the upsert will
+-- be applied immediately
 s:upsert({100}, {{'=', 2, 300}})
+-- force a new dump
 box.snapshot()
+-- lookup the key
 s:get{100}
+--
+-- since we converted upsert to replace on insert, we had to
+-- go no further than the latest dump to locate the latest
+-- value of the key
+--
 new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
 new_stat - old_stat
 old_stat = new_stat
