@@ -259,15 +259,15 @@ sec = space:create_index('sec', {bloom_fpr = 0.2})
 third = space:create_index('third', {bloom_fpr = 0.3})
 ---
 ...
-pk:info().bloom_fpr
+pk.options.bloom_fpr
 ---
 - 0.1
 ...
-sec:info().bloom_fpr
+sec.options.bloom_fpr
 ---
 - 0.2
 ...
-third:info().bloom_fpr
+third.options.bloom_fpr
 ---
 - 0.3
 ...
@@ -318,7 +318,7 @@ pk:info().disk.pages
 ---
 - 4
 ...
-pk:info().page_size
+space.index.pk.options.page_size
 ---
 - 8192
 ...
@@ -326,7 +326,7 @@ pk:info().run_count
 ---
 - 1
 ...
-pk:info().bloom_fpr
+space.index.pk.options.bloom_fpr
 ---
 - 0.1
 ...
@@ -365,7 +365,7 @@ pk:info().disk.pages
 ---
 - 6
 ...
-pk:info().page_size
+space.index.pk.options.page_size
 ---
 - 16384
 ...
@@ -373,7 +373,7 @@ pk:info().run_count
 ---
 - 1
 ...
-pk:info().bloom_fpr
+space.index.pk.options.bloom_fpr
 ---
 - 0.2
 ...

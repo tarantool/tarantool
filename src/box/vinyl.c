@@ -4589,10 +4589,6 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
 
-	info_append_double(h, "bloom_fpr", index->opts.bloom_fpr);
-	info_append_int(h, "range_size", index->opts.range_size);
-	info_append_int(h, "page_size", index->opts.page_size);
-
 	info_end(h);
 }
 

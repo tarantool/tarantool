@@ -162,14 +162,15 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		if (index == NULL)
 			continue;
 		struct index_def *index_def = index->index_def;
+		struct index_opts *index_opts = &index_def->opts;
 		lua_pushnumber(L, index_def->iid);
 		lua_newtable(L);		/* space.index[k] */
 
 		if (index_def->type == HASH || index_def->type == TREE) {
-			lua_pushboolean(L, index_def->opts.is_unique);
+			lua_pushboolean(L, index_opts->is_unique);
 			lua_setfield(L, -2, "unique");
 		} else if (index_def->type == RTREE) {
-			lua_pushnumber(L, index_def->opts.dimension);
+			lua_pushnumber(L, index_opts->dimension);
 			lua_setfield(L, -2, "dimension");
 		}
 
@@ -203,6 +204,28 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		}
 
 		lua_settable(L, -3); /* space.index[k].parts */
+
+		if (space_is_vinyl(space)) {
+			lua_pushstring(L, "options");
+			lua_newtable(L);
+
+			lua_pushnumber(L, index_opts->range_size);
+			lua_setfield(L, -2, "range_size");
+
+			lua_pushnumber(L, index_opts->page_size);
+			lua_setfield(L, -2, "page_size");
+
+			lua_pushnumber(L, index_opts->run_count_per_level);
+			lua_setfield(L, -2, "run_count_per_level");
+
+			lua_pushnumber(L, index_opts->run_size_ratio);
+			lua_setfield(L, -2, "run_size_ratio");
+
+			lua_pushnumber(L, index_opts->bloom_fpr);
+			lua_setfield(L, -2, "bloom_fpr");
+
+			lua_settable(L, -3);
+		}
 
 		lua_settable(L, -3); /* space.index[k] */
 		lua_rawgeti(L, -1, index_def->iid);
