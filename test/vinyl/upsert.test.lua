@@ -283,7 +283,8 @@ s:select() --both upserts are ignored due to primary key change
 --
 -- gh-2520 use cache as a hint when applying upserts.
 --
-old_stat = box.info.vinyl().performance["iterator"].run.lookup_count
+old_stat = box.info.vinyl().performance
+old_disk_lookup_count = s.index.test:info().disk.iterator.lookup
 -- insert the first upsert
 s:upsert({100}, {{'=', 2, 200}})
 -- force a dump, the inserted upsert is now on disk
@@ -291,9 +292,12 @@ box.snapshot()
 -- populate the cache
 s:get{100}
 -- a lookup in a run was done to populate the cache
-new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
-new_stat - old_stat
+new_stat = box.info.vinyl().performance
+new_disk_lookup_count = s.index.test:info().disk.iterator.lookup
+upsert_stat_diff(new_stat, old_stat)
 old_stat = new_stat
+new_disk_lookup_count - old_disk_lookup_count
+old_disk_lookup_count = new_disk_lookup_count
 -- Add another upsert: the cached REPLACE will be used and the upsert will
 -- be applied immediately
 s:upsert({100}, {{'=', 2, 300}})
@@ -306,8 +310,11 @@ s:get{100}
 -- go no further than the latest dump to locate the latest
 -- value of the key
 --
-new_stat = box.info.vinyl().performance["iterator"].run.lookup_count
-new_stat - old_stat
+new_stat = box.info.vinyl().performance
+new_disk_lookup_count = s.index.test:info().disk.iterator.lookup
+upsert_stat_diff(new_stat, old_stat)
 old_stat = new_stat
+new_disk_lookup_count - old_disk_lookup_count
+old_disk_lookup_count = new_disk_lookup_count
 
 s:drop()
