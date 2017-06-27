@@ -117,30 +117,37 @@ cbus_endpoint_poison_f(struct cmsg *msg)
 void
 cpipe_destroy(struct cpipe *pipe)
 {
+	ev_async_stop(pipe->producer, &pipe->flush_input);
+
 	static const struct cmsg_hop route[1] = {
 		{cbus_endpoint_poison_f, NULL}
 	};
+
 	struct cbus_endpoint *endpoint = pipe->endpoint;
 	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
 	cmsg_init(&poison->msg, route);
 	poison->endpoint = pipe->endpoint;
-
-	pipe->max_input = INT_MAX;
-	cpipe_push_input(pipe, &poison->msg);
+	/*
+	 * Avoid the general purpose cpipe_push_input() since
+	 * we want to control the way the poison message is
+	 * delivered.
+	 */
 	tt_pthread_mutex_lock(&endpoint->mutex);
-	bool output_was_empty = stailq_empty(&endpoint->output);
 	/* Flush input */
 	stailq_concat(&endpoint->output, &pipe->input);
-	if (output_was_empty) {
-		/* Count statistics */
-		rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
-		ev_async_send(endpoint->consumer, &endpoint->async);
-	}
+	/* Add the pipe shutdown message as the last one. */
+	stailq_add_tail_entry(&endpoint->output, poison, msg.fifo);
+	/* Count statistics */
+	rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
+	/*
+	 * Keep the lock for the duration of ev_async_send():
+	 * this will avoid a race condition between
+	 * ev_async_send() and execution of the poison
+	 * message, after which the endpoint may disappear.
+	 */
+	ev_async_send(endpoint->consumer, &endpoint->async);
 	tt_pthread_mutex_unlock(&endpoint->mutex);
 
-	pipe->n_input = 0;
-
-	ev_async_stop(pipe->producer, &pipe->flush_input);
 	TRASH(pipe);
 }
 
