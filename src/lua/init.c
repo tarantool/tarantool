@@ -93,6 +93,7 @@ extern char strict_lua[],
 	tap_lua[],
 	fio_lua[],
 	argparse_lua[],
+	iconv_lua[],
 	/* jit.* library */
 	vmdef_lua[],
 	bc_lua[],
@@ -141,6 +142,7 @@ static const char *lua_modules[] = {
 	"internal.trigger", trigger_lua,
 	"pwd", pwd_lua,
 	"http.client", httpc_lua,
+	"iconv", iconv_lua,
 	/* jit.* library */
 	"jit.vmdef", vmdef_lua,
 	"jit.bc", bc_lua,

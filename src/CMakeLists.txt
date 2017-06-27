@@ -45,6 +45,7 @@ lua_source(lua_sources lua/trigger.lua)
 lua_source(lua_sources lua/table.lua)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 lua_source(lua_sources lua/httpc.lua)
+lua_source(lua_sources lua/iconv.lua)
 # LuaJIT jit.* library
 lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bc.lua")
 lua_source(lua_sources "${CMAKE_BINARY_DIR}/third_party/luajit/src/jit/bcsave.lua")
