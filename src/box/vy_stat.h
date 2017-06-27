@@ -117,6 +117,13 @@ struct vy_index_stat {
 	struct vy_stmt_counter get;
 	/** Number of statements written to this index. */
 	struct vy_stmt_counter put;
+	/** Upsert statistics. */
+	struct {
+		/** How many upsert chains have been squashed. */
+		int64_t squashed;
+		/** How many upserts have been applied on read. */
+		int64_t applied;
+	} upsert;
 	/** Memory related statistics. */
 	struct {
 		/** Number of statements stored in memory. */

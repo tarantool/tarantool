@@ -183,10 +183,6 @@ enum vy_stat_name {
 	VY_STAT_TX_WRITE,
 	VY_STAT_CURSOR,
 	VY_STAT_CURSOR_OPS,
-	/* How many upsert chains was squashed */
-	VY_STAT_UPSERT_SQUASHED,
-	/* How many upserts was applied on read */
-	VY_STAT_UPSERT_APPLIED,
 	VY_STAT_LAST,
 };
 
@@ -197,8 +193,6 @@ static const char *vy_stat_strings[] = {
 	"tx_write",
 	"cursor",
 	"cursor_ops",
-	"upsert_squashed",
-	"upsert_applied"
 };
 
 struct vy_stat {
@@ -2683,7 +2677,6 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	 */
 	assert(index->id == 0);
 
-	struct vy_stat *stat = index->env->stat;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
 	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
@@ -2740,7 +2733,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 			vy_apply_upsert(stmt, older, index->key_def,
 					index->space_format,
 					index->upsert_format, false);
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+		index->stat.upsert.applied++;
 
 		if (upserted == NULL) {
 			/* OOM */
@@ -2789,7 +2782,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		assert(rc == 0); (void)rc;
 		tuple_unref(upserted);
 		vy_mem_commit_stmt(mem, region_stmt);
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+		index->stat.upsert.squashed++;
 	}
 }
 
@@ -4544,6 +4537,11 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 	vy_info_append_stmt_counter(h, "get", &stat->get);
 	vy_info_append_stmt_counter(h, "put", &stat->put);
 
+	info_table_begin(h, "upsert");
+	info_append_int(h, "squashed", stat->upsert.squashed);
+	info_append_int(h, "applied", stat->upsert.applied);
+	info_table_end(h);
+
 	info_table_begin(h, "memory");
 	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
 	info_table_begin(h, "iterator");
@@ -5256,7 +5254,6 @@ static int
 vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) != 0);
-	struct vy_stat *stat = index->env->stat;
 	/**
 	 * A statement in write set must have and unique lsn
 	 * in order to differ it from cachable statements in mem and run.
@@ -5278,11 +5275,11 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			stmt = vy_apply_upsert(stmt, old->stmt, index->key_def,
 					       index->space_format,
 					       index->upsert_format, true);
-			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+			index->stat.upsert.applied++;
 			if (stmt == NULL)
 				return -1;
 			assert(vy_stmt_type(stmt) != 0);
-			rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+			index->stat.upsert.squashed++;
 		}
 		assert(tx->write_size >= tuple_size(old->stmt));
 		tx->write_size -= tuple_size(old->stmt);
@@ -7605,7 +7602,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
 static NODISCARD int
 vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 				struct tuple **ret, bool suppress_error,
-				struct vy_stat *stat)
+				int64_t *upserts_applied)
 {
 	*ret = NULL;
 	struct tuple *t = itr->curr_stmt;
@@ -7628,8 +7625,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 		assert(itr->is_primary);
 		applied = vy_apply_upsert(t, next, itr->key_def, itr->format,
 					  itr->upsert_format, suppress_error);
-		if (stat != NULL)
-			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+		++*upserts_applied;
 		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
@@ -7946,7 +7942,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	struct tuple *t = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
 	struct vy_index *index = itr->index;
-	struct vy_stat *stat = index->env->stat;
 	int rc = 0;
 	while (true) {
 		if (vy_read_iterator_merge_next_key(itr, &t)) {
@@ -7966,7 +7961,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			rc = 0; /* No more data. */
 			break;
 		}
-		rc = vy_merge_iterator_squash_upsert(mi, &t, true, stat);
+		rc = vy_merge_iterator_squash_upsert(mi, &t, true,
+					&index->stat.upsert.applied);
 		if (rc != 0) {
 			if (rc == -1)
 				goto clear;
@@ -7991,8 +7987,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 							  mi->format,
 							  mi->upsert_format,
 							  true);
-				rmean_collect(stat->rmean,
-					      VY_STAT_UPSERT_APPLIED, 1);
+				index->stat.upsert.applied++;
 				tuple_unref(t);
 				t = applied;
 				assert(vy_stmt_type(t) == IPROTO_REPLACE);
@@ -8601,7 +8596,6 @@ vy_squash_process(struct vy_squash *squash)
 
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
-	struct vy_stat *stat = env->stat;
 	struct key_def *def = index->key_def;
 
 	/* Upserts enabled only in the primary index. */
@@ -8710,7 +8704,7 @@ vy_squash_process(struct vy_squash *squash)
 		struct tuple *applied =
 			vy_apply_upsert(mem_stmt, result, def, mem->format,
 					mem->upsert_format, true);
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+		index->stat.upsert.applied++;
 		tuple_unref(result);
 		if (applied == NULL)
 			return -1;
@@ -8748,7 +8742,7 @@ vy_squash_process(struct vy_squash *squash)
 		}
 	}
 
-	rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+	index->stat.upsert.squashed++;
 
 	/*
 	 * Insert the resulting REPLACE statement to the mem
