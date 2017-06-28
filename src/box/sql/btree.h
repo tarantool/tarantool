@@ -321,10 +321,6 @@ int sqlite3BtreeCursorInfo(BtCursor*, int*, int);
 void sqlite3BtreeCursorList(Btree*);
 #endif
 
-#ifndef SQLITE_OMIT_WAL
-  int sqlite3BtreeCheckpoint(Btree*, int, int *, int *);
-#endif
-
 /*
 ** If we are not using shared cache, then there is no need to
 ** use mutexes to access the BtShared structures.  So make the

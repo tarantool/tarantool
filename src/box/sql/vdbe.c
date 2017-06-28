@@ -6205,7 +6205,13 @@ case OP_Checkpoint: {
        || pOp->p2==SQLITE_CHECKPOINT_RESTART
        || pOp->p2==SQLITE_CHECKPOINT_TRUNCATE
   );
-  rc = sqlite3Checkpoint(db, pOp->p1, pOp->p2, &aRes[1], &aRes[2]);
+  /* Tarantool: SQLite native WAL is removed. Probably whole opcode
+     needs to be removed. Or adopt Tarantool's WAL for this op.  */
+  /* rc = sqlite3Checkpoint(db, pOp->p1, pOp->p2, &aRes[1], &aRes[2]); */
+  sqlite3VdbeError(p, "OP-code Checkpoint is not implemented yet.");
+  rc = SQLITE_ERROR;
+  goto abort_due_to_error;
+
   if( rc ){
     if( rc!=SQLITE_BUSY ) goto abort_due_to_error;
     rc = SQLITE_OK;
@@ -6257,58 +6263,6 @@ case OP_JournalMode: {    /* out2 */
   eOld = sqlite3PagerGetJournalMode(pPager);
   if( eNew==PAGER_JOURNALMODE_QUERY ) eNew = eOld;
   if( !sqlite3PagerOkToChangeJournalMode(pPager) ) eNew = eOld;
-
-#ifndef SQLITE_OMIT_WAL
-  zFilename = sqlite3PagerFilename(pPager, 1);
-
-  /* Do not allow a transition to journal_mode=WAL for a database
-  ** in temporary storage or if the VFS does not support shared memory 
-  */
-  if( eNew==PAGER_JOURNALMODE_WAL
-   && (sqlite3Strlen30(zFilename)==0           /* Temp file */
-       || !sqlite3PagerWalSupported(pPager))   /* No shared-memory support */
-  ){
-    eNew = eOld;
-  }
-
-  if( (eNew!=eOld)
-   && (eOld==PAGER_JOURNALMODE_WAL || eNew==PAGER_JOURNALMODE_WAL)
-  ){
-    if( !db->autoCommit || db->nVdbeRead>1 ){
-      rc = SQLITE_ERROR;
-      sqlite3VdbeError(p,
-          "cannot change %s wal mode from within a transaction",
-          (eNew==PAGER_JOURNALMODE_WAL ? "into" : "out of")
-      );
-      goto abort_due_to_error;
-    }else{
- 
-      if( eOld==PAGER_JOURNALMODE_WAL ){
-        /* If leaving WAL mode, close the log file. If successful, the call
-        ** to PagerCloseWal() checkpoints and deletes the write-ahead-log 
-        ** file. An EXCLUSIVE lock may still be held on the database file 
-        ** after a successful return. 
-        */
-        rc = sqlite3PagerCloseWal(pPager, db);
-        if( rc==SQLITE_OK ){
-          sqlite3PagerSetJournalMode(pPager, eNew);
-        }
-      }else if( eOld==PAGER_JOURNALMODE_MEMORY ){
-        /* Cannot transition directly from MEMORY to WAL.  Use mode OFF
-        ** as an intermediate */
-        sqlite3PagerSetJournalMode(pPager, PAGER_JOURNALMODE_OFF);
-      }
-  
-      /* Open a transaction on the database file. Regardless of the journal
-      ** mode, this transaction always uses a rollback journal.
-      */
-      assert( sqlite3BtreeIsInTrans(pBt)==0 );
-      if( rc==SQLITE_OK ){
-        rc = sqlite3BtreeSetVersion(pBt, (eNew==PAGER_JOURNALMODE_WAL ? 2 : 1));
-      }
-    }
-  }
-#endif /* ifndef SQLITE_OMIT_WAL */
 
   if( rc ) eNew = eOld;
   eNew = sqlite3PagerSetJournalMode(pPager, eNew);

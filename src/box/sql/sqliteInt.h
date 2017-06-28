@@ -1325,10 +1325,6 @@ struct sqlite3 {
   );
   PreUpdate *pPreUpdate;        /* Context for active pre-update callback */
 #endif /* SQLITE_ENABLE_PREUPDATE_HOOK */
-#ifndef SQLITE_OMIT_WAL
-  int (*xWalCallback)(void *, sqlite3 *, const char *, int);
-  void *pWalArg;
-#endif
   void(*xCollNeeded)(void*,sqlite3*,int eTextRep,const char*);
   void(*xCollNeeded16)(void*,sqlite3*,int eTextRep,const void*);
   void *pCollNeededArg;
@@ -4115,10 +4111,6 @@ void sqlite3ExprListCheckLength(Parse*, ExprList*, const char*);
 CollSeq *sqlite3BinaryCompareCollSeq(Parse *, Expr *, Expr *);
 int sqlite3TempInMemory(const sqlite3*);
 const char *sqlite3JournalModename(int);
-#ifndef SQLITE_OMIT_WAL
-  int sqlite3Checkpoint(sqlite3*, int, int, int*, int*);
-  int sqlite3WalDefaultHook(void*,sqlite3*,const char*,int);
-#endif
 #ifndef SQLITE_OMIT_CTE
   With *sqlite3WithAdd(Parse*,With*,Token*,ExprList*,Select*);
   void sqlite3WithDelete(sqlite3*,With*);

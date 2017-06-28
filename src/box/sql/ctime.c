@@ -353,9 +353,6 @@ static const char * const azCompileOpt[] = {
 #if SQLITE_OMIT_VIRTUALTABLE
   "OMIT_VIRTUALTABLE",
 #endif
-#if SQLITE_OMIT_WAL
-  "OMIT_WAL",
-#endif
 #if SQLITE_OMIT_WSD
   "OMIT_WSD",
 #endif

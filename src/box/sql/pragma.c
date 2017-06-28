@@ -259,9 +259,6 @@ static const char *actionName(u8 action){
 const char *sqlite3JournalModename(int eMode){
   static char * const azModeName[] = {
     "delete", "persist", "off", "truncate", "memory"
-#ifndef SQLITE_OMIT_WAL
-     , "wal"
-#endif
   };
   assert( PAGER_JOURNALMODE_DELETE==0 );
   assert( PAGER_JOURNALMODE_PERSIST==1 );
@@ -1769,7 +1766,9 @@ void sqlite3Pragma(
   break;
 #endif /* SQLITE_OMIT_COMPILEOPTION_DIAGS */
 
-#ifndef SQLITE_OMIT_WAL
+/* Tarantool: TODO: comment this so far, since native SQLite WAL was remoced.
+   This might be used with native Tarantool's WAL.  */
+#if 0 
   /*
   **   PRAGMA [schema.]wal_checkpoint = passive|full|restart|truncate
   **

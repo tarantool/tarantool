@@ -172,21 +172,7 @@ int sqlite3PagerOpenSavepoint(Pager *pPager, int n);
 int sqlite3PagerSavepoint(Pager *pPager, int op, int iSavepoint);
 int sqlite3PagerSharedLock(Pager *pPager);
 
-#ifndef SQLITE_OMIT_WAL
-  int sqlite3PagerCheckpoint(Pager *pPager, sqlite3*, int, int*, int*);
-  int sqlite3PagerWalSupported(Pager *pPager);
-  int sqlite3PagerWalCallback(Pager *pPager);
-  int sqlite3PagerOpenWal(Pager *pPager, int *pisOpen);
-  int sqlite3PagerCloseWal(Pager *pPager, sqlite3*);
-  int sqlite3PagerUseWal(Pager *pPager);
-# ifdef SQLITE_ENABLE_SNAPSHOT
-  int sqlite3PagerSnapshotGet(Pager *pPager, sqlite3_snapshot **ppSnapshot);
-  int sqlite3PagerSnapshotOpen(Pager *pPager, sqlite3_snapshot *pSnapshot);
-  int sqlite3PagerSnapshotRecover(Pager *pPager);
-# endif
-#else
-# define sqlite3PagerUseWal(x) 0
-#endif
+#define sqlite3PagerUseWal(x) 0
 
 #ifdef SQLITE_ENABLE_ZIPVFS
   int sqlite3PagerWalFramesize(Pager *pPager);
@@ -214,10 +200,6 @@ int sqlite3SectorSize(sqlite3_file *);
 void sqlite3PagerTruncateImage(Pager*,Pgno);
 
 void sqlite3PagerRekey(DbPage*, Pgno, u16);
-
-#if defined(SQLITE_HAS_CODEC) && !defined(SQLITE_OMIT_WAL)
-void *sqlite3PagerCodec(DbPage *);
-#endif
 
 /* Functions to support testing and debugging. */
 #if !defined(NDEBUG) || defined(SQLITE_TEST)

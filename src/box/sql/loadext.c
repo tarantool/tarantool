@@ -368,15 +368,9 @@ static const sqlite3_api_routines sqlite3Apis = {
 #else
   0,
 #endif
-#ifndef SQLITE_OMIT_WAL
-  sqlite3_wal_autocheckpoint,
-  sqlite3_wal_checkpoint,
-  sqlite3_wal_hook,
-#else
   0,
   0,
   0,
-#endif
   sqlite3_blob_reopen,
   sqlite3_vtab_config,
   sqlite3_vtab_on_conflict,

@@ -489,21 +489,6 @@ void sqlite3_result_error_nomem(sqlite3_context *pCtx){
 */
 static int doWalCallbacks(sqlite3 *db){
   int rc = SQLITE_OK;
-#ifndef SQLITE_OMIT_WAL
-  int i;
-  for(i=0; i<db->nDb; i++){
-    Btree *pBt = db->aDb[i].pBt;
-    if( pBt ){
-      int nEntry;
-      sqlite3BtreeEnter(pBt);
-      nEntry = sqlite3PagerWalCallback(sqlite3BtreePager(pBt));
-      sqlite3BtreeLeave(pBt);
-      if( db->xWalCallback && nEntry>0 && rc==SQLITE_OK ){
-        rc = db->xWalCallback(db->pWalArg, db, db->aDb[i].zDbSName, nEntry);
-      }
-    }
-  }
-#endif
   return rc;
 }
 

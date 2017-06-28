@@ -2859,57 +2859,12 @@ static int lockBtree(BtShared *pBt){
       goto page1_init_failed;
     }
 
-#ifdef SQLITE_OMIT_WAL
     if( page1[18]>1 ){
       pBt->btsFlags |= BTS_READ_ONLY;
     }
     if( page1[19]>1 ){
       goto page1_init_failed;
     }
-#else
-    if( page1[18]>2 ){
-      pBt->btsFlags |= BTS_READ_ONLY;
-    }
-    if( page1[19]>2 ){
-      goto page1_init_failed;
-    }
-
-    /* If the write version is set to 2, this database should be accessed
-    ** in WAL mode. If the log is not already open, open it now. Then 
-    ** return SQLITE_OK and return without populating BtShared.pPage1.
-    ** The caller detects this and calls this function again. This is
-    ** required as the version of page 1 currently in the page1 buffer
-    ** may not be the latest version - there may be a newer one in the log
-    ** file.
-    */
-    if( page1[19]==2 && (pBt->btsFlags & BTS_NO_WAL)==0 ){
-      int isOpen = 0;
-      rc = sqlite3PagerOpenWal(pBt->pPager, &isOpen);
-      if( rc!=SQLITE_OK ){
-        goto page1_init_failed;
-      }else{
-#if SQLITE_DEFAULT_SYNCHRONOUS!=SQLITE_DEFAULT_WAL_SYNCHRONOUS
-        sqlite3 *db;
-        Db *pDb;
-        if( (db=pBt->db)!=0 && (pDb=db->aDb)!=0 ){
-          while( pDb->pBt==0 || pDb->pBt->pBt!=pBt ){ pDb++; }
-          if( pDb->bSyncSet==0
-           && pDb->safety_level==SQLITE_DEFAULT_SYNCHRONOUS+1
-          ){
-            pDb->safety_level = SQLITE_DEFAULT_WAL_SYNCHRONOUS+1;
-            sqlite3PagerSetFlags(pBt->pPager,
-               pDb->safety_level | (db->flags & PAGER_FLAGS_MASK));
-          }
-        }
-#endif
-        if( isOpen==0 ){
-          releasePage(pPage1);
-          return SQLITE_OK;
-        }
-      }
-      rc = SQLITE_NOTADB;
-    }
-#endif
 
     /* EVIDENCE-OF: R-15465-20813 The maximum and minimum embedded payload
     ** fractions and the leaf payload fraction values must be 64, 32, and 32.
@@ -4636,7 +4591,6 @@ static int accessPayload(
          && (bEnd || a==ovflSize)                              /* (6) */
          && pBt->inTransaction==TRANS_READ                     /* (4) */
          && (fd = sqlite3PagerFile(pBt->pPager))->pMethods     /* (3) */
-         && 0==sqlite3PagerUseWal(pBt->pPager)                 /* (5) */
          && &pBuf[-4]>=pBufStart                               /* (7) */
         ){
           u8 aSave[4];
@@ -9549,31 +9503,6 @@ int sqlite3BtreeIsInTrans(Btree *p){
   assert( p==0 || sqlite3_mutex_held(p->db->mutex) );
   return (p && (p->inTrans==TRANS_WRITE));
 }
-
-#ifndef SQLITE_OMIT_WAL
-/*
-** Run a checkpoint on the Btree passed as the first argument.
-**
-** Return SQLITE_LOCKED if this or any other connection has an open 
-** transaction on the shared-cache the argument Btree is connected to.
-**
-** Parameter eMode is one of SQLITE_CHECKPOINT_PASSIVE, FULL or RESTART.
-*/
-int sqlite3BtreeCheckpoint(Btree *p, int eMode, int *pnLog, int *pnCkpt){
-  int rc = SQLITE_OK;
-  if( p ){
-    BtShared *pBt = p->pBt;
-    sqlite3BtreeEnter(p);
-    if( pBt->inTransaction!=TRANS_NONE ){
-      rc = SQLITE_LOCKED;
-    }else{
-      rc = sqlite3PagerCheckpoint(pBt->pPager, p->db, eMode, pnLog, pnCkpt);
-    }
-    sqlite3BtreeLeave(p);
-  }
-  return rc;
-}
-#endif
 
 /*
 ** Return non-zero if a read (or write) transaction is active.

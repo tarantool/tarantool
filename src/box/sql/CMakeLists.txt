@@ -98,7 +98,6 @@ add_library(sql STATIC
     vdbesort.c
     vdbetrace.c
     vtab.c
-    wal.c
     walker.c
     where.c
     wherecode.c
