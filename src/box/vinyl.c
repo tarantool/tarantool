@@ -153,21 +153,6 @@ static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
 
-struct vy_latency {
-	uint64_t count;
-	double total;
-	double max;
-};
-
-static void
-vy_latency_update(struct vy_latency *lat, double v)
-{
-	lat->count++;
-	lat->total += v;
-	if (v > lat->max)
-		lat->max = v;
-}
-
 static int
 path_exists(const char *path)
 {
@@ -197,20 +182,8 @@ static const char *vy_stat_strings[] = {
 
 struct vy_stat {
 	struct rmean *rmean;
-	uint64_t write_count;
-	/**
-	 * The total count of dumped statemnts.
-	 * Doesn't count compactions and splits.
-	 * Used to test optimization of UPDATE and UPSERT
-	 * optimization.
-	 * @sa vy_can_skip_update().
-	 */
-	uint64_t dumped_statements;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
-	struct vy_latency get_latency;
-	struct vy_latency tx_latency;
-	struct vy_latency cursor_latency;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o
@@ -223,7 +196,6 @@ struct vy_stat {
 	 * best result among 10% worst measurements.
 	 */
 	struct histogram *dump_bw;
-	int64_t dump_total;
 };
 
 static struct vy_stat *
@@ -276,43 +248,6 @@ vy_stat_delete(struct vy_stat *s)
 	histogram_delete(s->dump_bw);
 	rmean_delete(s->rmean);
 	free(s);
-}
-
-static void
-vy_stat_get(struct vy_stat *s, ev_tstamp start)
-{
-	ev_tstamp diff = ev_now(loop()) - start;
-	rmean_collect(s->rmean, VY_STAT_GET, 1);
-	vy_latency_update(&s->get_latency, diff);
-}
-
-static void
-vy_stat_tx(struct vy_stat *s, ev_tstamp start,
-	   int ops, int write_count, size_t write_size)
-{
-	ev_tstamp diff = ev_now(loop()) - start;
-	rmean_collect(s->rmean, VY_STAT_TX, 1);
-	rmean_collect(s->rmean, VY_STAT_TX_OPS, ops);
-	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
-	s->write_count += write_count;
-	vy_latency_update(&s->tx_latency, diff);
-}
-
-static void
-vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
-{
-	ev_tstamp diff = ev_now(loop()) - start;
-	rmean_collect(s->rmean, VY_STAT_CURSOR, 1);
-	rmean_collect(s->rmean, VY_STAT_CURSOR_OPS, ops);
-	vy_latency_update(&s->cursor_latency, diff);
-}
-
-static void
-vy_stat_dump(struct vy_stat *s, size_t written,
-	     uint64_t dumped_statements)
-{
-	s->dump_total += written;
-	s->dumped_statements += dumped_statements;
 }
 
 static int64_t
@@ -700,8 +635,6 @@ struct vy_tx {
 	 * the write set.
 	 */
 	size_t write_size;
-	/** Transaction start time saved in vy_begin() */
-	ev_tstamp start;
 	/** Current state of the transaction.*/
 	enum tx_state state;
 	/**
@@ -2910,10 +2843,6 @@ struct vy_task {
 	struct diag diag;
 	/** Index this task is for. */
 	struct vy_index *index;
-	/** Number of bytes written to disk by this task. */
-	size_t dump_size;
-	/** Number of statements dumped to the disk. */
-	uint64_t dumped_statements;
 	/** Range to compact. */
 	struct vy_range *range;
 	/** Run written by this task. */
@@ -2995,8 +2924,7 @@ vy_task_dump_execute(struct vy_task *task)
 			    index->space_id, index->id, task->wi,
 			    task->page_size, index->key_def,
 			    index->user_key_def, task->max_output_count,
-			    task->bloom_fpr, &task->dump_size,
-			    &task->dumped_statements);
+			    task->bloom_fpr);
 }
 
 static int
@@ -3341,8 +3269,7 @@ vy_task_compact_execute(struct vy_task *task)
 			    index->space_id, index->id, task->wi,
 			    task->page_size, index->key_def,
 			    index->user_key_def, task->max_output_count,
-			    task->bloom_fpr, &task->dump_size,
-			    &task->dumped_statements);
+			    task->bloom_fpr);
 }
 
 static int
@@ -3945,9 +3872,6 @@ vy_scheduler_f(va_list va)
 				tasks_failed++;
 			else
 				tasks_done++;
-			if (task->dump_size > 0)
-				vy_stat_dump(env->stat, task->dump_size,
-					     task->dumped_statements);
 			vy_task_delete(&scheduler->task_pool, task);
 			scheduler->workers_available++;
 			assert(scheduler->workers_available <=
@@ -4423,17 +4347,6 @@ vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 }
 
 static void
-vy_info_append_stat_latency(struct info_handler *h,
-			    const char *name, struct vy_latency *lat)
-{
-	info_table_begin(h, name);
-	info_append_int(h, "max", lat->max * 1000000000);
-	info_append_int(h, "avg", lat->count == 0 ? 0 :
-			   lat->total / lat->count * 1000000000);
-	info_table_end(h);
-}
-
-static void
 vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_stat *stat = env->stat;
@@ -4441,12 +4354,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_table_begin(h, "performance");
 
 	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
-
-	info_append_int(h, "write_count", stat->write_count);
-
-	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
-	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
-	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
 
 	info_append_int(h, "tx_rollback", stat->tx_rlb);
 	info_append_int(h, "tx_conflict", stat->tx_conflict);
@@ -4461,8 +4368,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "read_view", mstats.objcount);
 
 	info_append_int(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	info_append_int(h, "dump_total", stat->dump_total);
-	info_append_int(h, "dumped_statements", stat->dumped_statements);
 
 	struct vy_cache_env *ce = &env->cache_env;
 	info_table_begin(h, "cache");
@@ -5384,7 +5289,6 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	vykey = vy_stmt_new_select(e->key_format, key, part_count);
 	if (vykey == NULL)
 		return -1;
-	ev_tstamp start  = ev_now(loop());
 	const struct vy_read_view **p_read_view;
 	if (tx != NULL) {
 		p_read_view = (const struct vy_read_view **) &tx->read_view;
@@ -5404,7 +5308,7 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	if (*result != NULL)
 		tuple_ref(*result);
 	vy_read_iterator_close(&itr);
-	vy_stat_get(e->stat, start);
+	rmean_collect(e->stat->rmean, VY_STAT_GET, 1);
 	return 0;
 error:
 	tuple_unref(vykey);
@@ -6288,7 +6192,6 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
 	tx->write_size = 0;
-	tx->start = ev_now(loop());
 	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
 	tx->read_view = (struct vy_read_view *) xm->p_global_read_view;
@@ -6484,7 +6387,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	 * Sic: the loop below must not yield after recovery.
 	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
-	int count = 0, write_count = 0;
+	int write_count = 0;
 	/* repsert - REPLACE/UPSERT */
 	const struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
@@ -6540,7 +6443,9 @@ vy_tx_prepare(struct vy_tx *tx)
 		vy_quota_release(&env->quota, tx->write_size - write_size);
 	if (rc != 0)
 		return -1;
-	vy_stat_tx(env->stat, tx->start, count, write_count, write_size);
+	rmean_collect(env->stat->rmean, VY_STAT_TX, 1);
+	rmean_collect(env->stat->rmean, VY_STAT_TX_OPS, write_count);
+	rmean_collect(env->stat->rmean, VY_STAT_TX_WRITE, write_size);
 	xm->last_prepared_tx = tx;
 	return 0;
 }
@@ -8880,7 +8785,6 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		rlist_add(&tx->cursors, &c->next_in_tx);
 	}
 	c->tx = tx;
-	c->start = tx->start;
 	c->need_check_eq = false;
 	enum iterator_type iterator_type;
 	switch (type) {
@@ -8978,7 +8882,8 @@ vy_cursor_delete(struct vy_cursor *c)
 	}
 	if (c->key)
 		tuple_unref(c->key);
-	vy_stat_cursor(e->stat, c->start, c->n_reads);
+	rmean_collect(e->stat->rmean, VY_STAT_CURSOR, 1);
+	rmean_collect(e->stat->rmean, VY_STAT_CURSOR_OPS, c->n_reads);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
 }

@@ -8,6 +8,7 @@ fiber = require('fiber')
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', { run_count_per_level = 20 })
 index2 = space:create_index('secondary', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
+function dumped_stmt_count() return index:info().disk.dump.out.rows + index2:info().disk.dump.out.rows end
 box.snapshot()
 test_run:cmd("setopt delimiter ';'")
 function wait_for_dump(index, old_count)
@@ -20,7 +21,7 @@ test_run:cmd("setopt delimiter ''");
 
 index_run_count = index:info().run_count
 index2_run_count = index2:info().run_count
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 space:insert({1, 2, 3, 4, 5})
 space:insert({2, 3, 4, 5, 6})
 space:insert({3, 4, 5, 6, 7})
@@ -28,7 +29,7 @@ space:insert({4, 5, 6, 7, 8})
 box.snapshot()
 -- Wait for dump both indexes.
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 8
 old_stmt_count = new_stmt_count
 -- not optimized updates
@@ -45,7 +46,7 @@ index_run_count = wait_for_dump(index, index_run_count)
 space:update({1}, {{'#', 3, 1}}) -- same
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 9
 old_stmt_count = new_stmt_count
 space:select{}
@@ -62,7 +63,7 @@ index_run_count = wait_for_dump(index, index_run_count)
 space:update({2}, {{'#', 6, 1}}) -- same
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 3
 old_stmt_count = new_stmt_count
 space:select{}
@@ -75,18 +76,19 @@ space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', { parts = {2, 'unsigned'}, run_count_per_level = 20 } )
 index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'}, run_count_per_level = 20 })
 index3 = space:create_index('third', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
+function dumped_stmt_count() return index:info().disk.dump.out.rows + index2:info().disk.dump.out.rows + index3:info().disk.dump.out.rows end
 box.snapshot()
 index_run_count = index:info().run_count
 index2_run_count = index2:info().run_count
 index3_run_count = index3:info().run_count
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 space:insert({1, 2, 3, 4, 5})
 space:insert({2, 3, 4, 5, 6})
 space:insert({3, 4, 5, 6, 7})
 space:insert({4, 5, 6, 7, 8})
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 12
 old_stmt_count = new_stmt_count
 
@@ -100,7 +102,7 @@ index_run_count = wait_for_dump(index, index_run_count)
 index:update({2}, {{'=', 7, 100}, {'+', 5, 10}, {'#', 3, 1}}) -- change two cols but then move range with all indexed fields
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 15
 old_stmt_count = new_stmt_count
 space:select{}
@@ -111,21 +113,21 @@ index3:select{}
 index:update({3}, {{'+', 1, 10}, {'-', 5, 2}, {'!', 6, 100}}) -- change only index 'third'
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 3
 old_stmt_count = new_stmt_count
 -- optimize one 'third' index update
 index:update({3}, {{'=', 1, 20}, {'+', 3, 5}, {'=', 4, 30}, {'!', 6, 110}}) -- change only index 'secondary'
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 3
 old_stmt_count = new_stmt_count
 -- optimize both indexes
 index:update({3}, {{'+', 1, 10}, {'#', 6, 1}}) -- don't change any indexed fields
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 1
 old_stmt_count = new_stmt_count
 space:select{}
@@ -143,13 +145,13 @@ box.snapshot()
 
 -- Make update of not indexed field with pos > 64.
 index_run_count = wait_for_dump(index, index_run_count)
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 _ = index:update({2}, {{'=', 65, 1000}})
 box.snapshot()
 
 -- Check the only primary index to be changed.
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 1
 old_stmt_count = new_stmt_count
 space:get{2}[65]
@@ -160,7 +162,7 @@ space:get{2}[65]
 index:update({2}, {{'#', -65, 65}})
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 new_stmt_count - old_stmt_count == 1
 old_stmt_count = new_stmt_count
 index:select{}
@@ -171,12 +173,12 @@ index3:select{}
 space:replace{10, 20, 30, 40, 50}
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 
 index:update({20}, {{'=', -1, 500}})
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 -- 3 = REPLACE in index1 and DELETE + REPLACE in index3.
 new_stmt_count - old_stmt_count == 3
 old_stmt_count = new_stmt_count
@@ -190,7 +192,7 @@ space:replace{10, 100, 1000, 10000, 100000, 1000000}
 index:update({100}, {{'=', 6, 1}})
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 index:select{}
 index2:select{}
 index3:select{}

@@ -370,8 +370,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	     struct vy_stmt_stream *wi, uint64_t page_size,
 	     const struct key_def *key_def,
 	     const struct key_def *user_key_def,
-	     size_t max_output_count, double bloom_fpr,
-	     size_t *written, uint64_t *dumped_statements);
+	     size_t max_output_count, double bloom_fpr);
 
 /**
  * Allocate a new run slice.

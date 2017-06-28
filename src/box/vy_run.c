@@ -2494,8 +2494,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	     struct vy_stmt_stream *wi, uint64_t page_size,
 	     const struct key_def *key_def,
 	     const struct key_def *user_key_def,
-	     size_t max_output_count, double bloom_fpr,
-	     size_t *written, uint64_t *dumped_statements)
+	     size_t max_output_count, double bloom_fpr)
 {
 	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
 		     {diag_set(ClientError, ER_INJECTION,
@@ -2516,8 +2515,6 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
 		return -1;
 
-	*written += run->count.bytes_compressed;
-	*dumped_statements += run->count.rows;
 	return 0;
 }
 
