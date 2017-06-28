@@ -48,5 +48,7 @@ debug = nil
 log.info("debug is nil")
 debug = require('debug')
 
+test:ok(log.info(true) == nil, 'check tarantool crash (gh-2516)')
+
 test:check()
 os.exit()
