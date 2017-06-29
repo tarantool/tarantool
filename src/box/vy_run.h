@@ -206,7 +206,7 @@ struct vy_run_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
 	/** Usage statistics */
-	struct vy_iterator_stat *stat;
+	struct vy_run_iterator_stat *stat;
 	/** Vinyl run environment. */
 	struct vy_run_env *run_env;
 
@@ -370,8 +370,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	     struct vy_stmt_stream *wi, uint64_t page_size,
 	     const struct key_def *key_def,
 	     const struct key_def *user_key_def,
-	     size_t max_output_count, double bloom_fpr,
-	     size_t *written, uint64_t *dumped_statements);
+	     size_t max_output_count, double bloom_fpr);
 
 /**
  * Allocate a new run slice.
@@ -437,7 +436,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 
 void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
-		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *key_def,

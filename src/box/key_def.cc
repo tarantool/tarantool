@@ -196,16 +196,10 @@ key_def_set_cmp(struct key_def *def)
 	tuple_extract_key_set(def);
 }
 
-static size_t
-key_def_size(uint32_t part_count)
-{
-	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
-}
-
 box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 {
-	size_t sz = key_def_size(part_count);
+	size_t sz = key_def_sizeof(part_count);
 	box_key_def_t *key_def = (box_key_def_t *)malloc(sz);
 	if (key_def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
@@ -227,28 +221,30 @@ box_key_def_delete(box_key_def_t *key_def)
 
 struct index_def *
 index_def_new(uint32_t space_id, const char *space_name,
-	      uint32_t iid, const char *name,
+	      uint32_t iid, const char *name, uint32_t name_len,
 	      enum index_type type, const struct index_opts *opts,
 	      uint32_t part_count)
 {
-	size_t sz = index_def_sizeof(part_count);
+	if (name_len > BOX_NAME_MAX) {
+		diag_set(ClientError, ER_MODIFY_INDEX,
+			 tt_cstr(name, name_len), space_name,
+			 "index name is too long");
+		error_log(diag_last_error(diag_get()));
+		return NULL;
+	}
+	size_t sz = index_def_sizeof(part_count, name_len);
 	/*
-	 * Use calloc for nullifying all struct index_def attributes including
-	 * comparator pointers.
+	 * Use calloc to zero all struct index_def attributes
+	 * the comparator pointers.
 	 */
 	struct index_def *def = (struct index_def *) calloc(1, sz);
 	if (def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
-	unsigned n = snprintf(def->name, sizeof(def->name), "%s", name);
-	if (n >= sizeof(def->name)) {
-		free(def);
-		diag_set(ClientError, ER_MODIFY_INDEX, name, space_name,
-			 "index name is too long");
-		error_log(diag_last_error(diag_get()));
-		return NULL;
-	}
+	def->name = (char *)def + sz - name_len - 1;
+	/* The trailing zero is ensured by calloc() */
+	strncpy(def->name, name, name_len);
 	if (!identifier_is_valid(def->name)) {
 		diag_set(ClientError, ER_IDENTIFIER, def->name);
 		free(def);
@@ -276,15 +272,17 @@ index_opts_dup(struct index_opts *dst, const struct index_opts *src)
 struct index_def *
 index_def_dup(const struct index_def *def)
 {
-	size_t sz = index_def_sizeof(def->key_def.part_count);
+	uint32_t name_len = strlen(def->name);
+	size_t sz = index_def_sizeof(def->key_def.part_count, name_len);
 	struct index_def *dup = (struct index_def *) malloc(sz);
 	if (dup == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
-	memcpy(dup, def, index_def_sizeof(def->key_def.part_count));
+	memcpy(dup, def, sz);
 	rlist_create(&dup->link);
 	index_opts_dup(&dup->opts, &def->opts);
+	dup->name = (char *)dup + sz - name_len - 1;
 	return dup;
 }
 

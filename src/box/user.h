@@ -72,7 +72,7 @@ rb_proto(, privset_, privset_t, struct priv_def);
 
 struct user
 {
-	struct user_def def;
+	struct user_def *def;
 	/**
 	 * An id in privileges array to quickly find a
 	 * respective privilege.

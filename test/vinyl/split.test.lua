@@ -6,8 +6,8 @@ _= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_leve
 
 function vyinfo() return space.index.primary:info() end
 
-range_size = vyinfo().range_size
-tuple_size = vyinfo().page_size / 2
+range_size = space.index.primary.options.range_size
+tuple_size = space.index.primary.options.page_size / 2
 tuples_per_range = math.ceil(range_size / tuple_size + 1)
 
 test_run:cmd("setopt delimiter ';'")

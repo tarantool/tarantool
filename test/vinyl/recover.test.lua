@@ -14,10 +14,10 @@ _ = s:create_index('primary', {page_size=256, range_size=2048, run_count_per_lev
 function vyinfo() return box.space.test.index.primary:info() end
 
 range_count = 4
-tuple_size = math.ceil(vyinfo().page_size / 4)
+tuple_size = math.ceil(s.index.primary.options.page_size / 4)
 pad_size = tuple_size - 30
 assert(pad_size >= 16)
-keys_per_range = math.floor(vyinfo().range_size / tuple_size)
+keys_per_range = math.floor(s.index.primary.options.range_size / tuple_size)
 key_count = range_count * keys_per_range
 
 -- Add a number of tuples to the test space to trigger range splitting.

@@ -1,4 +1,4 @@
-1..19
+1..20
     1..135
     # *** test_uints ***
     # uint 0U
@@ -1816,3 +1816,11 @@ ok 18 - subtests
     ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
     # *** test_numbers: done ***
 ok 19 - subtests
+    1..4
+    # *** test_overflow ***
+    ok 1 - mp_check array overflow
+    ok 2 - mp_check map overflow
+    ok 3 - mp_check str overflow
+    ok 4 - mp_check bin overflow
+    # *** test_overflow: done ***
+ok 20 - subtests

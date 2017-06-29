@@ -39,7 +39,7 @@
 #include "index.h" /* enum iterator_type */
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
-#include "vy_quota.h"
+#include "vy_stat.h"
 #include "small/mempool.h"
 
 #if defined(__cplusplus)
@@ -115,12 +115,14 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a,
 struct vy_cache_env {
 	/** Common LRU list of read cache. The first element is the newest */
 	struct rlist cache_lru;
-	/** Common quota for read cache */
-	struct vy_quota quota;
 	/** Common mempool for vy_cache_entry struct */
 	struct mempool cache_entry_mempool;
 	/** Number of cached tuples */
 	size_t cached_count;
+	/** Size of memory occupied by cached tuples */
+	size_t mem_used;
+	/** Max memory size that can be used for cache */
+	size_t mem_quota;
 };
 
 /**
@@ -131,7 +133,7 @@ struct vy_cache_env {
  */
 void
 vy_cache_env_create(struct vy_cache_env *env, struct slab_cache *slab_cache,
-		    uint64_t mem_quota);
+		    size_t mem_quota);
 
 /**
  * Destroy and free resources of cache environment.
@@ -152,6 +154,8 @@ struct vy_cache {
 	uint32_t version;
 	/* Saved pointer to common cache environment */
 	struct vy_cache_env *env;
+	/* Cache statistics. */
+	struct vy_cache_stat stat;
 };
 
 /**
@@ -190,9 +194,12 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
  * Invalidate possibly cached value due to its overwriting
  * @param cache - pointer to tuple cache.
  * @param stmt - overwritten statement.
+ * @param[out] deleted - If not NULL, then is set to deleted
+ *             statement.
  */
 void
-vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt);
+vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
+		  struct tuple **deleted);
 
 
 /**
@@ -201,8 +208,6 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt);
 struct vy_cache_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
-	/** Iterator usage statistics */
-	struct vy_iterator_stat *stat;
 	/* The cache */
 	struct vy_cache *cache;
 
@@ -238,8 +243,7 @@ struct vy_cache_iterator {
  * @param vlsn - LSN visibility, iterator shows values with lsn <= vlsn
  */
 void
-vy_cache_iterator_open(struct vy_cache_iterator *itr,
-		       struct vy_iterator_stat *stat, struct vy_cache *cache,
+vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key, const struct vy_read_view **rv);
 

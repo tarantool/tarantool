@@ -69,8 +69,14 @@ struct user_def {
 	/** User password - hash2 */
 	char hash2[SCRAMBLE_SIZE];
 	/** User name - for error messages and debugging */
-	char name[BOX_NAME_MAX + 1];
+	char name[0];
 };
+
+static inline size_t
+user_def_sizeof(uint32_t name_len)
+{
+	return sizeof(struct user_def) + name_len + 1;
+}
 
 /** Predefined user ids. */
 enum {

@@ -36,7 +36,6 @@
 #include "tuple_compare.h"
 #include "scoped_guard.h"
 #include "trigger.h"
-#include "user_def.h"
 #include "user.h"
 #include "session.h"
 
@@ -62,7 +61,7 @@ access_check_space(struct space *space, uint8_t access)
 		 */
 		struct user *user = user_find_xc(cr->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->def.name, space->def.name);
+			  priv_name(access), user->def->name, space->def.name);
 	}
 }
 

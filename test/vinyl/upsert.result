@@ -491,8 +491,8 @@ test_run:cmd("setopt delimiter ';'")
 ...
 function upsert_stat_diff(stat2, stat1)
     return {
-        squashed = stat2.upsert_squashed.total - stat1.upsert_squashed.total,
-        applied = stat2.upsert_applied.total - stat1.upsert_applied.total
+        squashed = stat2.upsert.squashed - stat1.upsert.squashed,
+        applied = stat2.upsert.applied - stat1.upsert.applied
     }
 end;
 ---
@@ -501,13 +501,13 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-stat1 = box.info.vinyl().performance
----
-...
 space = box.schema.space.create('test', { engine = 'vinyl' })
 ---
 ...
 index = space:create_index('primary')
+---
+...
+stat1 = index:info()
 ---
 ...
 -- separate upserts w/o on disk data
@@ -520,7 +520,7 @@ space:upsert({1, 1, 1}, {{'-', 2, 20}})
 space:upsert({1, 1, 1}, {{'=', 2, 20}})
 ---
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -531,7 +531,7 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
-space.index.primary:info().rows
+stat1.rows
 ---
 - 3
 ...
@@ -551,7 +551,7 @@ space:upsert({2, 1, 1}, {{'=', 2, 20}})
 box.commit()
 ---
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -562,7 +562,7 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
-space.index.primary:info().rows
+stat1.rows
 ---
 - 4
 ...
@@ -570,7 +570,7 @@ box.snapshot()
 ---
 - ok
 ...
-space.index.primary:info().rows
+index:info().rows
 ---
 - 2
 ...
@@ -581,7 +581,7 @@ space:upsert({1, 1, 1}, {{'+', 2, 10}})
 space:upsert({1, 1, 1}, {{'-', 2, 20}})
 ---
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -592,7 +592,7 @@ upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 ---
 ...
-space.index.primary:info().rows
+stat1.rows
 ---
 - 4
 ...
@@ -601,7 +601,7 @@ space:get({1})
 ---
 - [1, 10, 1]
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -616,7 +616,7 @@ space:get({2})
 ---
 - [2, 20, 1]
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -632,7 +632,7 @@ space:select({})
 - - [1, 10, 1]
   - [2, 20, 1]
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -647,7 +647,7 @@ stat1 = stat2
 for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
 ---
 ...
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 ---
 ...
 upsert_stat_diff(stat2, stat1)
@@ -662,7 +662,7 @@ space:get{3}
 ---
 - [3, 999, 0]
 ...
-space.index.primary:info().rows
+stat1.rows
 ---
 - 1004
 ...
@@ -673,7 +673,7 @@ space:drop()
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
-i = s:create_index('test')
+i = s:create_index('test', { run_count_per_level = 20 })
 ---
 ...
 s:replace({1, 1})
@@ -693,6 +693,74 @@ s:upsert({1, 1}, {{'+', 2, 1}})
 s:select() --both upserts are ignored due to primary key change
 ---
 - - [1, 1]
+...
+--
+-- gh-2520 use cache as a hint when applying upserts.
+--
+old_stat = s.index.test:info()
+---
+...
+-- insert the first upsert
+s:upsert({100}, {{'=', 2, 200}})
+---
+...
+-- force a dump, the inserted upsert is now on disk
+box.snapshot()
+---
+- ok
+...
+-- populate the cache
+s:get{100}
+---
+- [100]
+...
+-- a lookup in a run was done to populate the cache
+new_stat = s.index.test:info()
+---
+...
+upsert_stat_diff(new_stat, old_stat)
+---
+- squashed: 0
+  applied: 1
+...
+new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
+---
+- 1
+...
+old_stat = new_stat
+---
+...
+-- Add another upsert: the cached REPLACE will be used and the upsert will
+-- be applied immediately
+s:upsert({100}, {{'=', 2, 300}})
+---
+...
+-- force a new dump
+box.snapshot()
+---
+- ok
+...
+-- lookup the key
+s:get{100}
+---
+- [100, 300]
+...
+--
+-- since we converted upsert to replace on insert, we had to
+-- go no further than the latest dump to locate the latest
+-- value of the key
+--
+new_stat = s.index.test:info()
+---
+...
+upsert_stat_diff(new_stat, old_stat)
+---
+- squashed: 0
+  applied: 0
+...
+new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
+---
+- 1
 ...
 s:drop()
 ---

@@ -76,6 +76,7 @@ set (core_sources
      reflection.c
      assoc.c
      rmean.c
+     latency.c
      histogram.c
      util.c
      path_lock.c

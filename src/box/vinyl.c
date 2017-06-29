@@ -36,6 +36,7 @@
 #include "vy_log.h"
 #include "vy_upsert.h"
 #include "vy_write_iterator.h"
+#include "vy_quota.h"
 #include "vy_stat.h"
 
 #define RB_COMPACT 1
@@ -152,21 +153,6 @@ static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
 
-struct vy_latency {
-	uint64_t count;
-	double total;
-	double max;
-};
-
-static void
-vy_latency_update(struct vy_latency *lat, double v)
-{
-	lat->count++;
-	lat->total += v;
-	if (v > lat->max)
-		lat->max = v;
-}
-
 static int
 path_exists(const char *path)
 {
@@ -182,10 +168,6 @@ enum vy_stat_name {
 	VY_STAT_TX_WRITE,
 	VY_STAT_CURSOR,
 	VY_STAT_CURSOR_OPS,
-	/* How many upsert chains was squashed */
-	VY_STAT_UPSERT_SQUASHED,
-	/* How many upserts was applied on read */
-	VY_STAT_UPSERT_APPLIED,
 	VY_STAT_LAST,
 };
 
@@ -196,26 +178,12 @@ static const char *vy_stat_strings[] = {
 	"tx_write",
 	"cursor",
 	"cursor_ops",
-	"upsert_squashed",
-	"upsert_applied"
 };
 
 struct vy_stat {
 	struct rmean *rmean;
-	uint64_t write_count;
-	/**
-	 * The total count of dumped statemnts.
-	 * Doesn't count compactions and splits.
-	 * Used to test optimization of UPDATE and UPSERT
-	 * optimization.
-	 * @sa vy_can_skip_update().
-	 */
-	uint64_t dumped_statements;
 	uint64_t tx_rlb;
 	uint64_t tx_conflict;
-	struct vy_latency get_latency;
-	struct vy_latency tx_latency;
-	struct vy_latency cursor_latency;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o
@@ -228,12 +196,6 @@ struct vy_stat {
 	 * best result among 10% worst measurements.
 	 */
 	struct histogram *dump_bw;
-	int64_t dump_total;
-	/* iterators statistics */
-	struct vy_iterator_stat txw_stat;
-	struct vy_iterator_stat cache_stat;
-	struct vy_iterator_stat mem_stat;
-	struct vy_iterator_stat run_stat;
 };
 
 static struct vy_stat *
@@ -286,43 +248,6 @@ vy_stat_delete(struct vy_stat *s)
 	histogram_delete(s->dump_bw);
 	rmean_delete(s->rmean);
 	free(s);
-}
-
-static void
-vy_stat_get(struct vy_stat *s, ev_tstamp start)
-{
-	ev_tstamp diff = ev_now(loop()) - start;
-	rmean_collect(s->rmean, VY_STAT_GET, 1);
-	vy_latency_update(&s->get_latency, diff);
-}
-
-static void
-vy_stat_tx(struct vy_stat *s, ev_tstamp start,
-	   int ops, int write_count, size_t write_size)
-{
-	ev_tstamp diff = ev_now(loop()) - start;
-	rmean_collect(s->rmean, VY_STAT_TX, 1);
-	rmean_collect(s->rmean, VY_STAT_TX_OPS, ops);
-	rmean_collect(s->rmean, VY_STAT_TX_WRITE, write_size);
-	s->write_count += write_count;
-	vy_latency_update(&s->tx_latency, diff);
-}
-
-static void
-vy_stat_cursor(struct vy_stat *s, ev_tstamp start, int ops)
-{
-	ev_tstamp diff = ev_now(loop()) - start;
-	rmean_collect(s->rmean, VY_STAT_CURSOR, 1);
-	rmean_collect(s->rmean, VY_STAT_CURSOR_OPS, ops);
-	vy_latency_update(&s->cursor_latency, diff);
-}
-
-static void
-vy_stat_dump(struct vy_stat *s, size_t written,
-	     uint64_t dumped_statements)
-{
-	s->dump_total += written;
-	s->dumped_statements += dumped_statements;
 }
 
 static int64_t
@@ -710,8 +635,6 @@ struct vy_tx {
 	 * the write set.
 	 */
 	size_t write_size;
-	/** Transaction start time saved in vy_begin() */
-	ev_tstamp start;
 	/** Current state of the transaction.*/
 	enum tx_state state;
 	/**
@@ -2643,8 +2566,10 @@ vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
 	if (vy_stmt_type(stmt) == IPROTO_UPSERT)
 		vy_index_commit_upsert(index, mem, stmt);
 
+	vy_stmt_counter_acct_tuple(&index->stat.put, stmt);
+
 	/* Invalidate cache element. */
-	vy_cache_on_write(&index->cache, stmt);
+	vy_cache_on_write(&index->cache, stmt, NULL);
 }
 
 /*
@@ -2660,7 +2585,7 @@ vy_index_rollback_stmt(struct vy_index *index, struct vy_mem *mem,
 	vy_mem_rollback_stmt(mem, stmt);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(&index->cache, stmt);
+	vy_cache_on_write(&index->cache, stmt, NULL);
 }
 
 /**
@@ -2685,7 +2610,6 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	 */
 	assert(index->id == 0);
 
-	struct vy_stat *stat = index->env->stat;
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
 	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
@@ -2742,7 +2666,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 			vy_apply_upsert(stmt, older, index->key_def,
 					index->space_format,
 					index->upsert_format, false);
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+		index->stat.upsert.applied++;
 
 		if (upserted == NULL) {
 			/* OOM */
@@ -2791,7 +2715,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		assert(rc == 0); (void)rc;
 		tuple_unref(upserted);
 		vy_mem_commit_stmt(mem, region_stmt);
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+		index->stat.upsert.squashed++;
 	}
 }
 
@@ -2848,13 +2772,40 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 	assert(*region_stmt == NULL ||
 	       vy_stmt_is_region_allocated(*region_stmt));
 
-	int rc = vy_index_set(index, mem, stmt, region_stmt);
-
 	/*
-	 * Invalidate cache element.
+	 * The UPSERT statement can be applied to the cached
+	 * statement, because the cache always contains only
+	 * newest REPLACE statements. In such a case the UPSERT,
+	 * applied to the cached statement, can be inserted
+	 * instead of the original UPSERT.
 	 */
-	vy_cache_on_write(&index->cache, stmt);
-	return rc;
+	if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
+		struct tuple *deleted = NULL;
+		/* Invalidate cache element. */
+		vy_cache_on_write(&index->cache, stmt, &deleted);
+		if (deleted != NULL) {
+			struct tuple *applied =
+				vy_apply_upsert(stmt, deleted, mem->key_def,
+						mem->format, mem->upsert_format,
+						false);
+			tuple_unref(deleted);
+			if (applied != NULL) {
+				assert(vy_stmt_type(applied) == IPROTO_REPLACE);
+				int rc = vy_index_set(index, mem, applied,
+						      region_stmt);
+				tuple_unref(applied);
+				return rc;
+			}
+			/*
+			 * Ignore a memory error, because it is
+			 * not critical to apply the optimization.
+			 */
+		}
+	} else {
+		/* Invalidate cache element. */
+		vy_cache_on_write(&index->cache, stmt, NULL);
+	}
+	return vy_index_set(index, mem, stmt, region_stmt);
 }
 
 /* {{{ Scheduler Task */
@@ -2892,10 +2843,6 @@ struct vy_task {
 	struct diag diag;
 	/** Index this task is for. */
 	struct vy_index *index;
-	/** Number of bytes written to disk by this task. */
-	size_t dump_size;
-	/** Number of statements dumped to the disk. */
-	uint64_t dumped_statements;
 	/** Range to compact. */
 	struct vy_range *range;
 	/** Run written by this task. */
@@ -2977,8 +2924,7 @@ vy_task_dump_execute(struct vy_task *task)
 			    index->space_id, index->id, task->wi,
 			    task->page_size, index->key_def,
 			    index->user_key_def, task->max_output_count,
-			    task->bloom_fpr, &task->dump_size,
-			    &task->dumped_statements);
+			    task->bloom_fpr);
 }
 
 static int
@@ -3083,6 +3029,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Account the new run.
 	 */
 	vy_index_add_run(index, new_run);
+	vy_stmt_counter_add_disk(&index->stat.disk.dump.out, &new_run->count);
 
 	/* Drop the reference held by the task. */
 	vy_run_unref(new_run);
@@ -3124,12 +3071,14 @@ delete_mems:
 			continue;
 		rlist_del_entry(mem, in_sealed);
 		vy_stmt_counter_sub(&index->stat.memory.count, &mem->count);
+		vy_stmt_counter_add(&index->stat.disk.dump.in, &mem->count);
 		vy_scheduler_remove_mem(scheduler, mem);
 		vy_mem_delete(mem);
 	}
 	index->version++;
 	index->dump_lsn = dump_lsn;
 	index->generation = task->generation;
+	index->stat.disk.dump.count++;
 
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
@@ -3320,8 +3269,7 @@ vy_task_compact_execute(struct vy_task *task)
 			    index->space_id, index->id, task->wi,
 			    task->page_size, index->key_def,
 			    index->user_key_def, task->max_output_count,
-			    task->bloom_fpr, &task->dump_size,
-			    &task->dumped_statements);
+			    task->bloom_fpr);
 }
 
 static int
@@ -3400,6 +3348,8 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	if (new_slice != NULL) {
 		vy_index_add_run(index, new_run);
+		vy_stmt_counter_add_disk(&index->stat.disk.compact.out,
+					 &new_run->count);
 		/* Drop the reference held by the task. */
 		vy_run_unref(new_run);
 	} else
@@ -3421,6 +3371,8 @@ vy_task_compact_complete(struct vy_task *task)
 		next_slice = rlist_next_entry(slice, in_range);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
+		vy_stmt_counter_add_disk(&index->stat.disk.compact.in,
+					 &slice->count);
 		if (slice == last_slice)
 			break;
 	}
@@ -3428,6 +3380,7 @@ vy_task_compact_complete(struct vy_task *task)
 	range->version++;
 	vy_index_acct_range(index, range);
 	vy_range_update_compact_priority(range);
+	index->stat.disk.compact.count++;
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.
@@ -3919,9 +3872,6 @@ vy_scheduler_f(va_list va)
 				tasks_failed++;
 			else
 				tasks_done++;
-			if (task->dump_size > 0)
-				vy_stat_dump(env->stat, task->dump_size,
-					     task->dumped_statements);
 			vy_task_delete(&scheduler->task_pool, task);
 			scheduler->workers_available++;
 			assert(scheduler->workers_available <=
@@ -4397,28 +4347,6 @@ vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
 }
 
 static void
-vy_info_append_stat_latency(struct info_handler *h,
-			    const char *name, struct vy_latency *lat)
-{
-	info_table_begin(h, name);
-	info_append_int(h, "max", lat->max * 1000000000);
-	info_append_int(h, "avg", lat->count == 0 ? 0 :
-			   lat->total / lat->count * 1000000000);
-	info_table_end(h);
-}
-
-static void
-vy_info_append_iterator_stat(struct info_handler *h, const char *name,
-			     struct vy_iterator_stat *stat)
-{
-	info_table_begin(h, name);
-	info_append_int(h, "lookup_count", stat->lookup_count);
-	info_append_int(h, "step_count", stat->step_count);
-	info_append_int(h, "bloom_reflect_count", stat->bloom_reflections);
-	info_table_end(h);
-}
-
-static void
 vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_stat *stat = env->stat;
@@ -4426,12 +4354,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_table_begin(h, "performance");
 
 	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
-
-	info_append_int(h, "write_count", stat->write_count);
-
-	vy_info_append_stat_latency(h, "tx_latency", &stat->tx_latency);
-	vy_info_append_stat_latency(h, "get_latency", &stat->get_latency);
-	vy_info_append_stat_latency(h, "cursor_latency", &stat->cursor_latency);
 
 	info_append_int(h, "tx_rollback", stat->tx_rlb);
 	info_append_int(h, "tx_conflict", stat->tx_conflict);
@@ -4446,20 +4368,11 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "read_view", mstats.objcount);
 
 	info_append_int(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-	info_append_int(h, "dump_total", stat->dump_total);
-	info_append_int(h, "dumped_statements", stat->dumped_statements);
 
 	struct vy_cache_env *ce = &env->cache_env;
 	info_table_begin(h, "cache");
 	info_append_int(h, "count", ce->cached_count);
-	info_append_int(h, "used", ce->quota.used);
-	info_table_end(h);
-
-	info_table_begin(h, "iterator");
-	vy_info_append_iterator_stat(h, "txw", &stat->txw_stat);
-	vy_info_append_iterator_stat(h, "cache", &stat->cache_stat);
-	vy_info_append_iterator_stat(h, "mem", &stat->mem_stat);
-	vy_info_append_iterator_stat(h, "run", &stat->run_stat);
+	info_append_int(h, "used", ce->mem_used);
 	info_table_end(h);
 
 	info_table_end(h);
@@ -4479,21 +4392,36 @@ static void
 vy_info_append_stmt_counter(struct info_handler *h, const char *name,
 			    const struct vy_stmt_counter *count)
 {
-	info_table_begin(h, name);
+	if (name != NULL)
+		info_table_begin(h, name);
 	info_append_int(h, "rows", count->rows);
 	info_append_int(h, "bytes", count->bytes);
-	info_table_end(h);
+	if (name != NULL)
+		info_table_end(h);
 }
 
 static void
 vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 				 const struct vy_disk_stmt_counter *count)
 {
-	info_table_begin(h, name);
+	if (name != NULL)
+		info_table_begin(h, name);
 	info_append_int(h, "rows", count->rows);
 	info_append_int(h, "bytes", count->bytes);
 	info_append_int(h, "bytes_compressed", count->bytes_compressed);
 	info_append_int(h, "pages", count->pages);
+	if (name != NULL)
+		info_table_end(h);
+}
+
+static void
+vy_info_append_compact_stat(struct info_handler *h, const char *name,
+			    const struct vy_compact_stat *stat)
+{
+	info_table_begin(h, name);
+	info_append_int(h, "count", stat->count);
+	vy_info_append_stmt_counter(h, "in", &stat->in);
+	vy_info_append_stmt_counter(h, "out", &stat->out);
 	info_table_end(h);
 }
 
@@ -4502,22 +4430,70 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 {
 	char buf[1024];
 	struct vy_index_stat *stat = &index->stat;
+	struct vy_cache_stat *cache_stat = &index->cache.stat;
 
 	info_begin(h);
-	info_append_int(h, "rows", stat->disk.count.rows +
-				   stat->memory.count.rows);
-	info_append_int(h, "bytes", stat->disk.count.bytes +
-				    stat->memory.count.bytes);
-	vy_info_append_stmt_counter(h, "memory", &stat->memory.count);
-	vy_info_append_disk_stmt_counter(h, "disk", &stat->disk.count);
-	info_append_int(h, "range_size", index->opts.range_size);
-	info_append_int(h, "page_size", index->opts.page_size);
+
+	struct vy_stmt_counter count = stat->memory.count;
+	vy_stmt_counter_add_disk(&count, &stat->disk.count);
+	vy_info_append_stmt_counter(h, NULL, &count);
+
+	info_append_int(h, "lookup", stat->lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->get);
+	vy_info_append_stmt_counter(h, "put", &stat->put);
+	info_append_double(h, "latency", latency_get(&stat->latency));
+
+	info_table_begin(h, "upsert");
+	info_append_int(h, "squashed", stat->upsert.squashed);
+	info_append_int(h, "applied", stat->upsert.applied);
+	info_table_end(h);
+
+	info_table_begin(h, "memory");
+	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
+	info_table_begin(h, "iterator");
+	info_append_int(h, "lookup", stat->memory.iterator.lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
+	info_table_end(h);
+	info_table_end(h);
+
+	info_table_begin(h, "disk");
+	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
+	info_table_begin(h, "iterator");
+	info_append_int(h, "lookup", stat->disk.iterator.lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->disk.iterator.get);
+	vy_info_append_disk_stmt_counter(h, "read", &stat->disk.iterator.read);
+	info_table_begin(h, "bloom");
+	info_append_int(h, "hit", stat->disk.iterator.bloom_hit);
+	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
+	info_table_end(h);
+	info_table_end(h);
+	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
+	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
+	info_table_end(h);
+
+	info_table_begin(h, "cache");
+	vy_info_append_stmt_counter(h, NULL, &cache_stat->count);
+	info_append_int(h, "lookup", cache_stat->lookup);
+	vy_info_append_stmt_counter(h, "get", &cache_stat->get);
+	vy_info_append_stmt_counter(h, "put", &cache_stat->put);
+	vy_info_append_stmt_counter(h, "invalidate", &cache_stat->invalidate);
+	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
+	info_table_end(h);
+
+	info_table_begin(h, "txw");
+	vy_info_append_stmt_counter(h, NULL, &stat->txw.count);
+	info_table_begin(h, "iterator");
+	info_append_int(h, "lookup", stat->txw.iterator.lookup);
+	vy_info_append_stmt_counter(h, "get", &stat->txw.iterator.get);
+	info_table_end(h);
+	info_table_end(h);
+
 	info_append_int(h, "range_count", index->range_count);
 	info_append_int(h, "run_count", index->run_count);
 	info_append_int(h, "run_avg", index->run_count / index->range_count);
 	histogram_snprint(buf, sizeof(buf), index->run_hist);
 	info_append_str(h, "run_histogram", buf);
-	info_append_double(h, "bloom_fpr", index->opts.bloom_fpr);
+
 	info_end(h);
 }
 
@@ -4895,6 +4871,9 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 		tuple_format_ref(index->upsert_format, 1);
 	}
 
+	if (vy_index_stat_create(&index->stat) != 0)
+		goto fail_stat;
+
 	index->run_hist = histogram_new(run_buckets, lengthof(run_buckets));
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
@@ -4931,6 +4910,8 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 fail_mem:
 	histogram_delete(index->run_hist);
 fail_run_hist:
+	vy_index_stat_destroy(&index->stat);
+fail_stat:
 	tuple_format_ref(index->space_format_with_colmask, -1);
 fail_space_format_with_colmask:
 	tuple_format_ref(index->upsert_format, -1);
@@ -5150,6 +5131,7 @@ vy_index_delete(struct vy_index *index)
 		free(index->key_def);
 	free(index->user_key_def);
 	histogram_delete(index->run_hist);
+	vy_index_stat_destroy(&index->stat);
 	vy_cache_destroy(&index->cache);
 	tuple_format_ref(index->space_format, -1);
 	free(index->tree);
@@ -5180,7 +5162,6 @@ static int
 vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) != 0);
-	struct vy_stat *stat = index->env->stat;
 	/**
 	 * A statement in write set must have and unique lsn
 	 * in order to differ it from cachable statements in mem and run.
@@ -5202,15 +5183,17 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 			stmt = vy_apply_upsert(stmt, old->stmt, index->key_def,
 					       index->space_format,
 					       index->upsert_format, true);
-			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+			index->stat.upsert.applied++;
 			if (stmt == NULL)
 				return -1;
 			assert(vy_stmt_type(stmt) != 0);
-			rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+			index->stat.upsert.squashed++;
 		}
 		assert(tx->write_size >= tuple_size(old->stmt));
 		tx->write_size -= tuple_size(old->stmt);
 		tx->write_size += tuple_size(stmt);
+		vy_stmt_counter_unacct_tuple(&index->stat.txw.count, old->stmt);
+		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
 		tuple_unref(old->stmt);
 		tuple_ref(stmt);
 		old->stmt = stmt;
@@ -5222,6 +5205,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		write_set_insert(&tx->write_set, v);
 		tx->write_set_version++;
 		tx->write_size += tuple_size(stmt);
+		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
 	}
 	return 0;
@@ -5305,7 +5289,6 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	vykey = vy_stmt_new_select(e->key_format, key, part_count);
 	if (vykey == NULL)
 		return -1;
-	ev_tstamp start  = ev_now(loop());
 	const struct vy_read_view **p_read_view;
 	if (tx != NULL) {
 		p_read_view = (const struct vy_read_view **) &tx->read_view;
@@ -5325,7 +5308,7 @@ vy_index_get(struct vy_tx *tx, struct vy_index *index, const char *key,
 	if (*result != NULL)
 		tuple_ref(*result);
 	vy_read_iterator_close(&itr);
-	vy_stat_get(e->stat, start);
+	rmean_collect(e->stat->rmean, VY_STAT_GET, 1);
 	return 0;
 error:
 	tuple_unref(vykey);
@@ -6209,7 +6192,6 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
 	tx->write_size = 0;
-	tx->start = ev_now(loop());
 	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
 	tx->read_view = (struct vy_read_view *) xm->p_global_read_view;
@@ -6239,6 +6221,9 @@ vy_tx_destroy(struct vy_tx *tx)
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		if (v->is_read)
 			read_set_remove(&v->index->read_set, v);
+		else
+			vy_stmt_counter_unacct_tuple(&v->index->stat.txw.count,
+						     v->stmt);
 		txv_delete(v);
 	}
 
@@ -6402,7 +6387,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	 * Sic: the loop below must not yield after recovery.
 	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
-	int count = 0, write_count = 0;
+	int write_count = 0;
 	/* repsert - REPLACE/UPSERT */
 	const struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
@@ -6458,7 +6443,9 @@ vy_tx_prepare(struct vy_tx *tx)
 		vy_quota_release(&env->quota, tx->write_size - write_size);
 	if (rc != 0)
 		return -1;
-	vy_stat_tx(env->stat, tx->start, count, write_count, write_size);
+	rmean_collect(env->stat->rmean, VY_STAT_TX, 1);
+	rmean_collect(env->stat->rmean, VY_STAT_TX_OPS, write_count);
+	rmean_collect(env->stat->rmean, VY_STAT_TX_WRITE, write_size);
 	xm->last_prepared_tx = tx;
 	return 0;
 }
@@ -6827,6 +6814,8 @@ vy_end_recovery(struct vy_env *e)
 
 /** }}} Recovery */
 
+/* {{{ Iterator over transaction writes */
+
 /**
  * Return statements from the write set of the current
  * transactions.
@@ -6838,7 +6827,7 @@ struct vy_txw_iterator {
 	/** Parent class, must be the first member */
 	struct vy_stmt_iterator base;
 	/** Iterator usage statistics */
-	struct vy_iterator_stat *stat;
+	struct vy_txw_iterator_stat *stat;
 
 	struct vy_index *index;
 	struct vy_tx *tx;
@@ -6861,25 +6850,13 @@ struct vy_txw_iterator {
 	bool search_started;
 };
 
-static void
-vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
-		     struct vy_index *index, struct vy_tx *tx,
-		     enum iterator_type iterator_type,
-		     const struct tuple *key);
-
-static void
-vy_txw_iterator_close(struct vy_stmt_iterator *vitr);
-
-/* }}} Iterator over transaction writes : forward declaration */
-
-/* {{{ Iterator over transaction writes : implementation */
-
 /** Vtable for vy_stmt_iterator - declared below */
 static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
 
 /* Open the iterator. */
 static void
-vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
+vy_txw_iterator_open(struct vy_txw_iterator *itr,
+		     struct vy_txw_iterator_stat *stat,
 		     struct vy_index *index, struct vy_tx *tx,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key)
@@ -6904,6 +6881,13 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
 	itr->search_started = false;
 }
 
+static void
+vy_txw_iterator_get(struct vy_txw_iterator *itr, struct tuple **ret)
+{
+	*ret = itr->curr_txv->stmt;
+	vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
+}
+
 /**
  * Find position in write set of transaction. Used once in first call of
  *  get/next.
@@ -6911,7 +6895,7 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr, struct vy_iterator_stat *stat,
 static void
 vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 {
-	itr->stat->lookup_count++;
+	itr->stat->lookup++;
 	*ret = NULL;
 	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
@@ -6958,7 +6942,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 	if (txv == NULL || txv->index != index)
 		return;
 	itr->curr_txv = txv;
-	*ret = txv->stmt;
+	vy_txw_iterator_get(itr, ret);
 	return;
 }
 
@@ -6979,7 +6963,6 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 		vy_txw_iterator_start(itr, ret);
 		return 0;
 	}
-	itr->stat->step_count++;
 	itr->version = itr->tx->write_set_version;
 	if (itr->curr_txv == NULL)
 		return 0;
@@ -6994,7 +6977,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 			    itr->index->key_def) != 0)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL)
-		*ret = itr->curr_txv->stmt;
+		vy_txw_iterator_get(itr, ret);
 	return 0;
 }
 
@@ -7036,7 +7019,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	if (last_stmt == NULL || itr->version == itr->tx->write_set_version) {
 		if (itr->curr_txv)
-			*ret = itr->curr_txv->stmt;
+			vy_txw_iterator_get(itr, ret);
 		return 0;
 	}
 
@@ -7069,7 +7052,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 		return 0;
 	}
 	itr->curr_txv = txv;
-	*ret = txv->stmt;
+	vy_txw_iterator_get(itr, ret);
 	return txv->stmt != was_stmt;
 }
 
@@ -7093,7 +7076,7 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface = {
 	.close = vy_txw_iterator_close
 };
 
-/* }}} Iterator over transaction writes : implementation */
+/* }}} Iterator over transaction writes */
 
 /* {{{ Merge iterator */
 
@@ -7527,7 +7510,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
 static NODISCARD int
 vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 				struct tuple **ret, bool suppress_error,
-				struct vy_stat *stat)
+				int64_t *upserts_applied)
 {
 	*ret = NULL;
 	struct tuple *t = itr->curr_stmt;
@@ -7550,8 +7533,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 		assert(itr->is_primary);
 		applied = vy_apply_upsert(t, next, itr->key_def, itr->format,
 					  itr->upsert_format, suppress_error);
-		if (stat != NULL)
-			rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+		++*upserts_applied;
 		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
@@ -7594,7 +7576,7 @@ static void
 vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 {
 	assert(itr->tx != NULL);
-	struct vy_iterator_stat *stat = &itr->index->env->stat->txw_stat;
+	struct vy_txw_iterator_stat *stat = &itr->index->stat.txw.iterator;
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_txw_iterator_open(&sub_src->txw_iterator, stat, itr->index, itr->tx,
@@ -7608,8 +7590,7 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 {
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
-	struct vy_iterator_stat *stat = &itr->index->env->stat->cache_stat;
-	vy_cache_iterator_open(&sub_src->cache_iterator, stat,
+	vy_cache_iterator_open(&sub_src->cache_iterator,
 			       &itr->index->cache, itr->iterator_type,
 			       itr->key, itr->read_view);
 	if (itr->curr_stmt != NULL) {
@@ -7629,22 +7610,23 @@ static void
 vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 {
 	struct vy_index *index = itr->index;
-	struct vy_iterator_stat *stat = &index->env->stat->mem_stat;
 	struct vy_merge_src *sub_src;
 
 	/* Add the active in-memory index. */
 	assert(index->mem != NULL);
 	sub_src = vy_merge_iterator_add(&itr->merge_iterator, true, false);
-	vy_mem_iterator_open(&sub_src->mem_iterator, stat, index->mem,
-			     itr->iterator_type, itr->key,
+	vy_mem_iterator_open(&sub_src->mem_iterator,
+			     &index->stat.memory.iterator,
+			     index->mem, itr->iterator_type, itr->key,
 			     itr->read_view, itr->curr_stmt);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
 		sub_src = vy_merge_iterator_add(&itr->merge_iterator,
 						false, false);
-		vy_mem_iterator_open(&sub_src->mem_iterator, stat, mem,
-				     itr->iterator_type, itr->key,
+		vy_mem_iterator_open(&sub_src->mem_iterator,
+				     &index->stat.memory.iterator,
+				     mem, itr->iterator_type, itr->key,
 				     itr->read_view, itr->curr_stmt);
 	}
 }
@@ -7654,7 +7636,6 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
 	struct vy_index *index = itr->index;
-	struct vy_iterator_stat *stat = &index->env->stat->run_stat;
 	struct tuple_format *format;
 	struct vy_slice *slice;
 	/*
@@ -7681,7 +7662,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		assert(slice->run->info.max_lsn <= index->dump_lsn);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
-		vy_run_iterator_open(&sub_src->run_iterator, coio_read, stat,
+		vy_run_iterator_open(&sub_src->run_iterator, coio_read,
+				     &index->stat.disk.iterator,
 				     &index->env->run_env, slice,
 				     itr->iterator_type, itr->key,
 				     itr->read_view, index->key_def,
@@ -7749,6 +7731,8 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 			       itr->index->space_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
+
+	itr->index->stat.lookup++;
 }
 
 /**
@@ -7854,6 +7838,8 @@ restart:
 static NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
+	ev_tstamp start_time = ev_now(loop());
+
 	*result = NULL;
 
 	if (!itr->search_started)
@@ -7866,7 +7852,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	struct tuple *t = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
 	struct vy_index *index = itr->index;
-	struct vy_stat *stat = index->env->stat;
 	int rc = 0;
 	while (true) {
 		if (vy_read_iterator_merge_next_key(itr, &t)) {
@@ -7886,7 +7871,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			rc = 0; /* No more data. */
 			break;
 		}
-		rc = vy_merge_iterator_squash_upsert(mi, &t, true, stat);
+		rc = vy_merge_iterator_squash_upsert(mi, &t, true,
+					&index->stat.upsert.applied);
 		if (rc != 0) {
 			if (rc == -1)
 				goto clear;
@@ -7911,8 +7897,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 							  mi->format,
 							  mi->upsert_format,
 							  true);
-				rmean_collect(stat->rmean,
-					      VY_STAT_UPSERT_APPLIED, 1);
+				index->stat.upsert.applied++;
 				tuple_unref(t);
 				t = applied;
 				assert(vy_stmt_type(t) == IPROTO_REPLACE);
@@ -7928,6 +7913,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 
 	*result = itr->curr_stmt;
 	assert(*result == NULL || vy_stmt_type(*result) == IPROTO_REPLACE);
+	if (*result != NULL)
+		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
 
 	/**
 	 * Add a statement to the cache
@@ -7951,6 +7938,7 @@ clear:
 		tuple_unref(prev_key);
 	}
 
+	latency_collect(&index->stat.latency, ev_now(loop()) - start_time);
 	return rc;
 }
 
@@ -8519,7 +8507,6 @@ vy_squash_process(struct vy_squash *squash)
 
 	struct vy_index *index = squash->index;
 	struct vy_env *env = index->env;
-	struct vy_stat *stat = env->stat;
 	struct key_def *def = index->key_def;
 
 	/* Upserts enabled only in the primary index. */
@@ -8628,7 +8615,7 @@ vy_squash_process(struct vy_squash *squash)
 		struct tuple *applied =
 			vy_apply_upsert(mem_stmt, result, def, mem->format,
 					mem->upsert_format, true);
-		rmean_collect(stat->rmean, VY_STAT_UPSERT_APPLIED, 1);
+		index->stat.upsert.applied++;
 		tuple_unref(result);
 		if (applied == NULL)
 			return -1;
@@ -8666,7 +8653,7 @@ vy_squash_process(struct vy_squash *squash)
 		}
 	}
 
-	rmean_collect(stat->rmean, VY_STAT_UPSERT_SQUASHED, 1);
+	index->stat.upsert.squashed++;
 
 	/*
 	 * Insert the resulting REPLACE statement to the mem
@@ -8798,7 +8785,6 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 		rlist_add(&tx->cursors, &c->next_in_tx);
 	}
 	c->tx = tx;
-	c->start = tx->start;
 	c->need_check_eq = false;
 	enum iterator_type iterator_type;
 	switch (type) {
@@ -8896,7 +8882,8 @@ vy_cursor_delete(struct vy_cursor *c)
 	}
 	if (c->key)
 		tuple_unref(c->key);
-	vy_stat_cursor(e->stat, c->start, c->n_reads);
+	rmean_collect(e->stat->rmean, VY_STAT_CURSOR, 1);
+	rmean_collect(e->stat->rmean, VY_STAT_CURSOR_OPS, c->n_reads);
 	TRASH(c);
 	mempool_free(&e->cursor_pool, c);
 }

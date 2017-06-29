@@ -141,9 +141,28 @@ fiber_join_test()
 	footer();
 }
 
+void
+fiber_name_test()
+{
+	header();
+	note("name of a new fiber: %s.\n", fiber_name(fiber()));
+
+	fiber_set_name(fiber(), "Horace");
+
+	note("set new fiber name: %s.\n", fiber_name(fiber()));
+
+	fiber_set_name(fiber(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+	note("fiber name is truncated: %s.\n", fiber_name(fiber()));
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
+	fiber_name_test();
 	fiber_join_test();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;

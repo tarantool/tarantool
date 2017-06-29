@@ -194,27 +194,27 @@ space:drop()
 test_run:cmd("setopt delimiter ';'")
 function upsert_stat_diff(stat2, stat1)
     return {
-        squashed = stat2.upsert_squashed.total - stat1.upsert_squashed.total,
-        applied = stat2.upsert_applied.total - stat1.upsert_applied.total
+        squashed = stat2.upsert.squashed - stat1.upsert.squashed,
+        applied = stat2.upsert.applied - stat1.upsert.applied
     }
 end;
 test_run:cmd("setopt delimiter ''");
 
-stat1 = box.info.vinyl().performance
-
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')
+
+stat1 = index:info()
 
 -- separate upserts w/o on disk data
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
 space:upsert({1, 1, 1}, {{'-', 2, 20}})
 space:upsert({1, 1, 1}, {{'=', 2, 20}})
 
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
-space.index.primary:info().rows
+stat1.rows
 
 -- in-tx upserts
 box.begin()
@@ -223,61 +223,92 @@ space:upsert({2, 1, 1}, {{'-', 2, 20}})
 space:upsert({2, 1, 1}, {{'=', 2, 20}})
 box.commit()
 
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
-space.index.primary:info().rows
+stat1.rows
 
 box.snapshot()
 
-space.index.primary:info().rows
+index:info().rows
 
 -- upsert with on disk data
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
 space:upsert({1, 1, 1}, {{'-', 2, 20}})
 
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
-space.index.primary:info().rows
+stat1.rows
 
 -- count of applied apserts
 space:get({1})
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 space:get({2})
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 space:select({})
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 -- start upsert optimizer
 for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
-stat2 = box.info.vinyl().performance
+stat2 = index:info()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 space:get{3}
 
-space.index.primary:info().rows
+stat1.rows
 
 space:drop()
 
 -- fix behaviour after https://github.com/tarantool/tarantool/issues/2104
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i = s:create_index('test')
+i = s:create_index('test', { run_count_per_level = 20 })
 
 s:replace({1, 1})
 box.snapshot()
 s:upsert({1, 1}, {{'+', 1, 1}})
 s:upsert({1, 1}, {{'+', 2, 1}})
 s:select() --both upserts are ignored due to primary key change
+
+--
+-- gh-2520 use cache as a hint when applying upserts.
+--
+old_stat = s.index.test:info()
+-- insert the first upsert
+s:upsert({100}, {{'=', 2, 200}})
+-- force a dump, the inserted upsert is now on disk
+box.snapshot()
+-- populate the cache
+s:get{100}
+-- a lookup in a run was done to populate the cache
+new_stat = s.index.test:info()
+upsert_stat_diff(new_stat, old_stat)
+new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
+old_stat = new_stat
+-- Add another upsert: the cached REPLACE will be used and the upsert will
+-- be applied immediately
+s:upsert({100}, {{'=', 2, 300}})
+-- force a new dump
+box.snapshot()
+-- lookup the key
+s:get{100}
+--
+-- since we converted upsert to replace on insert, we had to
+-- go no further than the latest dump to locate the latest
+-- value of the key
+--
+new_stat = s.index.test:info()
+upsert_stat_diff(new_stat, old_stat)
+new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
 
 s:drop()

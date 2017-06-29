@@ -16,6 +16,9 @@ index = space:create_index('primary', { run_count_per_level = 20 })
 index2 = space:create_index('secondary', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
 ---
 ...
+function dumped_stmt_count() return index:info().disk.dump.out.rows + index2:info().disk.dump.out.rows end
+---
+...
 box.snapshot()
 ---
 - ok
@@ -42,7 +45,7 @@ index_run_count = index:info().run_count
 index2_run_count = index2:info().run_count
 ---
 ...
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 ---
 ...
 space:insert({1, 2, 3, 4, 5})
@@ -69,7 +72,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 8
@@ -115,7 +118,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 9
@@ -174,7 +177,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 3
@@ -214,6 +217,9 @@ index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'
 index3 = space:create_index('third', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
 ---
 ...
+function dumped_stmt_count() return index:info().disk.dump.out.rows + index2:info().disk.dump.out.rows + index3:info().disk.dump.out.rows end
+---
+...
 box.snapshot()
 ---
 - ok
@@ -227,7 +233,7 @@ index2_run_count = index2:info().run_count
 index3_run_count = index3:info().run_count
 ---
 ...
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 ---
 ...
 space:insert({1, 2, 3, 4, 5})
@@ -253,7 +259,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 12
@@ -297,7 +303,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 15
@@ -340,7 +346,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 3
@@ -362,7 +368,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 3
@@ -384,7 +390,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 1
@@ -436,7 +442,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 ---
 ...
 _ = index:update({2}, {{'=', 65, 1000}})
@@ -450,7 +456,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 1
@@ -478,7 +484,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 new_stmt_count - old_stmt_count == 1
@@ -521,7 +527,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 ---
 ...
 index:update({20}, {{'=', -1, 500}})
@@ -535,7 +541,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-new_stmt_count = box.info.vinyl().performance.dumped_statements
+new_stmt_count = dumped_stmt_count()
 ---
 ...
 -- 3 = REPLACE in index1 and DELETE + REPLACE in index3.
@@ -587,7 +593,7 @@ box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 ---
 ...
-old_stmt_count = box.info.vinyl().performance.dumped_statements
+old_stmt_count = dumped_stmt_count()
 ---
 ...
 index:select{}

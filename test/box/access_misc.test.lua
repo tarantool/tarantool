@@ -217,6 +217,22 @@ s:select()
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
 t
 
+--
+-- Check that alter and truncate do not affect space access control.
+--
+session.su('admin')
+_ = s:create_index('secondary', {unique = false, parts = {2, 'string'}})
+
+session.su('testuser')
+s:select()
+
+session.su('admin')
+s:truncate()
+s:insert({1234, 'ABCD'})
+
+session.su('testuser')
+s:select()
+
 session.su('admin')
 box.schema.user.drop('testuser')
 

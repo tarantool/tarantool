@@ -117,18 +117,37 @@ cbus_endpoint_poison_f(struct cmsg *msg)
 void
 cpipe_destroy(struct cpipe *pipe)
 {
+	ev_async_stop(pipe->producer, &pipe->flush_input);
+
 	static const struct cmsg_hop route[1] = {
 		{cbus_endpoint_poison_f, NULL}
 	};
+
+	struct cbus_endpoint *endpoint = pipe->endpoint;
 	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
-	poison->endpoint = pipe->endpoint;
 	cmsg_init(&poison->msg, route);
 	poison->endpoint = pipe->endpoint;
+	/*
+	 * Avoid the general purpose cpipe_push_input() since
+	 * we want to control the way the poison message is
+	 * delivered.
+	 */
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	/* Flush input */
+	stailq_concat(&endpoint->output, &pipe->input);
+	/* Add the pipe shutdown message as the last one. */
+	stailq_add_tail_entry(&endpoint->output, poison, msg.fifo);
+	/* Count statistics */
+	rmean_collect(cbus.stats, CBUS_STAT_EVENTS, 1);
+	/*
+	 * Keep the lock for the duration of ev_async_send():
+	 * this will avoid a race condition between
+	 * ev_async_send() and execution of the poison
+	 * message, after which the endpoint may disappear.
+	 */
+	ev_async_send(endpoint->consumer, &endpoint->async);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
 
-	cpipe_push(pipe, &poison->msg);
-	ev_invoke(pipe->producer, &pipe->flush_input, EV_CUSTOM);
-
-	ev_async_stop(pipe->producer, &pipe->flush_input);
 	TRASH(pipe);
 }
 
@@ -202,7 +221,7 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 	tt_pthread_mutex_lock(&cbus.mutex);
 	/*
 	 * Remove endpoint from cbus registry, so no new pipe can
-	 * be created for this endpoint
+	 * be created for this endpoint.
 	 */
 	rlist_del(&endpoint->in_cbus);
 	tt_pthread_mutex_unlock(&cbus.mutex);
@@ -212,7 +231,12 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 			process_cb(endpoint);
 	} while ((endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) &&
 		 ipc_cond_wait(&endpoint->cond));
-
+	/*
+	 * Pipe flush func can still lock mutex, so just lock and unlock
+	 * it.
+	 */
+	tt_pthread_mutex_lock(&endpoint->mutex);
+	tt_pthread_mutex_unlock(&endpoint->mutex);
 	tt_pthread_mutex_destroy(&endpoint->mutex);
 	ev_async_stop(endpoint->consumer, &endpoint->async);
 	ipc_cond_destroy(&endpoint->cond);

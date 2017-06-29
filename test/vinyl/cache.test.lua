@@ -3,30 +3,21 @@
 test_run = require('test_run').new()
 
 test_run:cmd("setopt delimiter ';'")
-stat = {
-    run_step_count = 0,
-    run_lookup_count = 0,
-    mem_step_count = 0,
-}
+stat = nil
 function stat_changed()
     local old_stat = stat
-    local new_stat = box.info.vinyl().performance["iterator"]
-    stat = {
-        run_step_count=new_stat.run.step_count,
-        run_lookup_count=new_stat.run.lookup_count,
-        mem_step_count=new_stat.mem.step_count,
-    }
-    for k,v in pairs(stat) do
-        if old_stat[k] ~= v then
-            return true
-        end
-    end
-    return false
+    local new_stat = box.space.test.index.pk:info()
+    stat = new_stat
+    return (old_stat == nil or
+            old_stat.memory.iterator.lookup ~= new_stat.memory.iterator.lookup or
+            old_stat.memory.iterator.get.rows ~= new_stat.memory.iterator.get.rows or
+            old_stat.disk.iterator.lookup ~= new_stat.disk.iterator.lookup or
+            old_stat.disk.iterator.get.rows ~= new_stat.disk.iterator.get.rows)
 end;
 test_run:cmd("setopt delimiter ''");
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i = s:create_index('test')
+pk = s:create_index('pk')
 
 str = string.rep('!', 100)
 
@@ -47,7 +38,7 @@ t = s:replace{200, str}
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 str = ''
 
@@ -63,7 +54,7 @@ s:replace{2, 4, 2, str}
 s:replace{3, 3, 4}
 
 box.snapshot()
-a = stat_changed() -- init
+_ = stat_changed() -- init
 
 box.begin()
 s:get{1, 2}
@@ -92,7 +83,7 @@ stat_changed() -- cache hit, false
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 str = ''
 
@@ -108,7 +99,7 @@ s:replace{2, 4, 2, str}
 s:replace{3, 3, 4}
 
 box.snapshot()
-a = stat_changed() -- init
+_ = stat_changed() -- init
 
 box.begin()
 s:select{}
@@ -127,7 +118,7 @@ stat_changed() -- cache hit, false
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 str = ''
 
@@ -153,7 +144,7 @@ s:drop()
 
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 s:replace{1, 1, 1}
 s:replace{2, 2, 2}
@@ -162,22 +153,22 @@ s:replace{4, 4, 4}
 s:replace{5, 5, 5}
 
 box.begin()
-i1:min()
-i1:max()
+pk:min()
+pk:max()
 box.commit()
 
 s:replace{0, 0, 0}
 s:replace{6, 6, 6}
 
-i1:min()
-i1:max()
+pk:min()
+pk:max()
 
 s:drop()
 
 -- Same test w/o begin/end
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i = s:create_index('test')
+pk = s:create_index('pk')
 
 str = string.rep('!', 100)
 
@@ -197,7 +188,7 @@ t = s:replace{200, str}
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 str = ''
 
@@ -213,7 +204,7 @@ s:replace{2, 4, 2, str}
 s:replace{3, 3, 4}
 
 box.snapshot()
-a = stat_changed() -- init
+_ = stat_changed() -- init
 
 s:get{1, 2}
 stat_changed()  -- cache miss, true
@@ -236,7 +227,7 @@ stat_changed() -- cache hit, false
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 str = ''
 
@@ -252,7 +243,7 @@ s:replace{2, 4, 2, str}
 s:replace{3, 3, 4}
 
 box.snapshot()
-a = stat_changed() -- init
+_ = stat_changed() -- init
 
 s:select{}
 stat_changed()  -- cache miss, true
@@ -269,7 +260,7 @@ stat_changed() -- cache hit, false
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 str = ''
 
@@ -293,7 +284,7 @@ s:drop()
 
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-i1 = s:create_index('test1', {parts = {1, 'uint', 2, 'uint'}})
+pk = s:create_index('pk', {parts = {1, 'uint', 2, 'uint'}})
 
 s:replace{1, 1, 1}
 s:replace{2, 2, 2}
@@ -301,21 +292,21 @@ s:replace{3, 3, 3}
 s:replace{4, 4, 4}
 s:replace{5, 5, 5}
 
-i1:min()
-i1:max()
+pk:min()
+pk:max()
 
 s:replace{0, 0, 0}
 s:replace{6, 6, 6}
 
-i1:min()
-i1:max()
+pk:min()
+pk:max()
 
 s:drop()
 
 -- https://github.com/tarantool/tarantool/issues/2189
 
 local_space = box.schema.space.create('test', {engine='vinyl'})
-pk = local_space:create_index('primary')
+pk = local_space:create_index('pk')
 local_space:replace({1, 1})
 local_space:replace({2, 2})
 local_space:select{}

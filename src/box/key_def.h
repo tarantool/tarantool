@@ -339,7 +339,7 @@ struct index_def {
 	/* Space id. */
 	uint32_t space_id;
 	/** Index name. */
-	char name[BOX_NAME_MAX + 1];
+	char *name;
 	/** Index type. */
 	enum index_type type;
 	struct index_opts opts;
@@ -430,15 +430,15 @@ struct func_def {
 };
 
 /**
- * @param name_length length of func_def->name
+ * @param name_len length of func_def->name
  * @returns size in bytes needed to allocate for struct func_def
- * for a function of length @a a name_length.
+ * for a function of length @a a name_len.
  */
 static inline size_t
-func_def_sizeof(uint32_t name_length)
+func_def_sizeof(uint32_t name_len)
 {
 	/* +1 for '\0' name terminating. */
-	return sizeof(struct func_def) + name_length + 1;
+	return sizeof(struct func_def) + name_len + 1;
 }
 
 /**
@@ -512,9 +512,10 @@ key_def_sizeof(uint32_t part_count)
 }
 
 static inline size_t
-index_def_sizeof(uint32_t part_count)
+index_def_sizeof(uint32_t part_count, uint32_t name_len)
 {
-	return sizeof(struct index_def) + sizeof(struct key_part) * (part_count + 1);
+	return sizeof(struct index_def) +
+	       sizeof(struct key_part) * (part_count + 1) + name_len + 1;
 }
 
 /**
@@ -523,26 +524,9 @@ index_def_sizeof(uint32_t part_count)
  * @retval NULL     Memory error.
  */
 struct index_def *
-index_def_new(uint32_t space_id, const char *space_name,
-	      uint32_t iid, const char *name, enum index_type type,
+index_def_new(uint32_t space_id, const char *space_name, uint32_t iid,
+	      const char *name, uint32_t name_len, enum index_type type,
 	      const struct index_opts *opts, uint32_t part_count);
-
-/**
- * Copy one key def into another, preserving the membership
- * in rlist. This only works for key defs with equal number of
- * parts.
- */
-static inline void
-index_def_copy(struct index_def *to, const struct index_def *from)
-{
-	struct rlist save_link = to->link;
-	int part_count = (to->key_def.part_count < from->key_def.part_count ?
-			  to->key_def.part_count : from->key_def.part_count);
-	size_t size  = (sizeof(struct index_def) +
-			sizeof(struct key_part) * part_count);
-	memcpy(to, from, size);
-	to->link = save_link;
-}
 
 /**
  * Set a single key part in a key def.
@@ -728,6 +712,15 @@ identifier_is_valid(const char *str);
  */
 void
 identifier_check(const char *str);
+
+static inline struct index_def *
+index_def_dup_xc(const struct index_def *def)
+{
+	struct index_def *ret = index_def_dup(def);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
+}
 
 #endif /* defined(__cplusplus) */
 

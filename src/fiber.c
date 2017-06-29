@@ -617,7 +617,7 @@ fiber_recycle(struct fiber *fiber)
 	assert(rlist_empty(&fiber->state));
 	bool has_custom_stack = fiber->flags & FIBER_CUSTOM_STACK;
 	fiber_reset(fiber);
-	fiber->gc.name[0] = '\0';
+	fiber->name[0] = '\0';
 	fiber->f = NULL;
 	memset(fiber->fls, 0, sizeof(fiber->fls));
 	unregister_fid(fiber);
@@ -692,7 +692,7 @@ void
 fiber_set_name(struct fiber *fiber, const char *name)
 {
 	assert(name != NULL);
-	region_set_name(&fiber->gc, name);
+	snprintf(fiber->name, sizeof(fiber->name), "%s", name);
 }
 
 extern inline void

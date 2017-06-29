@@ -1024,6 +1024,12 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	/* Update cache */
 	vy_run_iterator_cache_put(itr, page, page_no);
 
+	/* Update read statistics. */
+	itr->stat->read.rows += page_info->row_count;
+	itr->stat->read.bytes += page_info->unpacked_size;
+	itr->stat->read.bytes_compressed += page_info->size;
+	itr->stat->read.pages++;
+
 	*result = page;
 	return 0;
 }
@@ -1140,7 +1146,6 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr,
 			 struct vy_run_iterator_pos *pos)
 {
 	struct vy_run *run = itr->slice->run;
-	itr->stat->step_count++;
 	*pos = itr->curr_pos;
 	assert(pos->page_no < run->info.page_count);
 	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
@@ -1311,8 +1316,8 @@ vy_run_iterator_start_from(struct vy_run_iterator *itr,
 	*ret = NULL;
 
 	const struct key_def *user_key_def = itr->user_key_def;
-	if (run->info.has_bloom && iterator_type == ITER_EQ &&
-	    tuple_field_count(key) >= user_key_def->part_count) {
+	bool is_full_key = (tuple_field_count(key) >= user_key_def->part_count);
+	if (run->info.has_bloom && iterator_type == ITER_EQ && is_full_key) {
 		uint32_t hash;
 		if (vy_stmt_type(key) == IPROTO_SELECT) {
 			const char *data = tuple_data(key);
@@ -1323,12 +1328,12 @@ vy_run_iterator_start_from(struct vy_run_iterator *itr,
 		}
 		if (!bloom_possible_has(&run->info.bloom, hash)) {
 			itr->search_ended = true;
-			itr->stat->bloom_reflections++;
+			itr->stat->bloom_hit++;
 			return 0;
 		}
 	}
 
-	itr->stat->lookup_count++;
+	itr->stat->lookup++;
 
 	if (run->info.page_count == 1) {
 		/* there can be a stupid bootstrap run in which it's EOF */
@@ -1367,6 +1372,8 @@ vy_run_iterator_start_from(struct vy_run_iterator *itr,
 	if (iterator_type == ITER_EQ && !equal_found) {
 		vy_run_iterator_cache_clean(itr);
 		itr->search_ended = true;
+		if (run->info.has_bloom && is_full_key)
+			itr->stat->bloom_miss++;
 		return 0;
 	}
 	if ((iterator_type == ITER_GE || iterator_type == ITER_GT) &&
@@ -1476,7 +1483,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
-		     struct vy_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *key_def,
@@ -1544,6 +1551,7 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
 	if (rc == 0) {
 		itr->curr_stmt_pos = itr->curr_pos;
 		itr->curr_stmt = *result;
+		vy_stmt_counter_acct_tuple(&itr->stat->get, *result);
 	}
 	return rc;
 }
@@ -2486,8 +2494,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	     struct vy_stmt_stream *wi, uint64_t page_size,
 	     const struct key_def *key_def,
 	     const struct key_def *user_key_def,
-	     size_t max_output_count, double bloom_fpr,
-	     size_t *written, uint64_t *dumped_statements)
+	     size_t max_output_count, double bloom_fpr)
 {
 	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
 		     {diag_set(ClientError, ER_INJECTION,
@@ -2508,8 +2515,6 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	if (vy_run_write_index(run, dirpath, space_id, iid) != 0)
 		return -1;
 
-	*written += run->count.bytes_compressed;
-	*dumped_statements += run->count.rows;
 	return 0;
 }
 

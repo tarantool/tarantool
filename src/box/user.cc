@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "user.h"
-#include "user_def.h"
 #include "assoc.h"
 #include "schema.h"
 #include "space.h"
@@ -38,6 +37,7 @@
 #include "index.h"
 #include "bit/bit.h"
 #include "session.h"
+#include "scoped_guard.h"
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];
@@ -171,6 +171,7 @@ user_destroy(struct user *user)
 	 * all privileges from them first.
 	 */
 	region_destroy(&user->pool);
+	free(user->def);
 	memset(user, 0, sizeof(*user));
 }
 
@@ -247,7 +248,7 @@ user_set_effective_access(struct user *user)
 		access->effective = access->granted | priv->access;
 		/** Update global access in the current session. */
 		if (priv->object_type == SC_UNIVERSE &&
-		    user->def.uid == cr->uid) {
+		    user->def->uid == cr->uid) {
 			cr->universal_access = access->effective;
 		}
 	}
@@ -281,7 +282,7 @@ user_reload_privs(struct user *user)
 		char key[6];
 		/** Primary key - by user id */
 		MemtxIndex *index = index_find_system(space, 0);
-		mp_encode_uint(key, user->def.uid);
+		mp_encode_uint(key, user->def->uid);
 
 		struct iterator *it = index->position();
 		index->initIterator(it, ITER_EQ, key, 1);
@@ -388,8 +389,10 @@ user_cache_replace(struct user_def *def)
 		user_create(user, auth_token);
 		struct mh_i32ptr_node_t node = { def->uid, user };
 		mh_i32ptr_put(user_registry, &node, NULL, NULL);
+	} else {
+		free(user->def);
 	}
-	*(struct user_def *) user = *def;
+	user->def = def;
 	return user;
 }
 
@@ -438,7 +441,7 @@ user_find_by_name(const char *name, uint32_t len)
 {
 	uint32_t uid = schema_find_id(BOX_USER_ID, 2, name, len);
 	struct user *user = user_by_id(uid);
-	if (user == NULL || user->def.type != SC_USER) {
+	if (user == NULL || user->def->type != SC_USER) {
 		char name_buf[BOX_NAME_MAX + 1];
 		/* \0 - to correctly print user name the error message. */
 		snprintf(name_buf, sizeof(name_buf), "%.*s", len, name);
@@ -462,23 +465,36 @@ user_cache_init()
 	 * for 'guest' and 'admin' users here, they will be
 	 * updated with snapshot contents during recovery.
 	 */
-	struct user_def def;
-	memset(&def, 0, sizeof(def));
-	snprintf(def.name, sizeof(def.name), "guest");
-	def.owner = ADMIN;
-	def.type = SC_USER;
-	struct user *user = user_cache_replace(&def);
+	size_t name_len = strlen("guest");
+	size_t sz = user_def_sizeof(name_len);
+	struct user_def *def = (struct user_def *) calloc(1, sz);
+	if (def == NULL)
+		tnt_raise(OutOfMemory, sz, "malloc", "def");
+	/* Free def in a case of exception. */
+	auto guest_def_guard = make_scoped_guard([=] { free(def); });
+	memcpy(def->name, "guest", name_len);
+	def->owner = ADMIN;
+	def->type = SC_USER;
+	struct user *user = user_cache_replace(def);
+	/* Now the user cache owns the def. */
+	guest_def_guard.is_active = false;
 	/* 0 is the auth token and user id by default. */
-	assert(user->def.uid == GUEST && user->auth_token == GUEST);
-	(void)user;
+	assert(user->def->uid == GUEST && user->auth_token == GUEST);
+	(void) user;
 
-	memset(&def, 0, sizeof(def));
-	snprintf(def.name, sizeof(def.name), "admin");
-	def.uid = def.owner = ADMIN;
-	def.type = SC_USER;
-	user = user_cache_replace(&def);
+	name_len = strlen("admin");
+	sz = user_def_sizeof(name_len);
+	def = (struct user_def *) calloc(1, sz);
+	if (def == NULL)
+		tnt_raise(OutOfMemory, sz, "malloc", "def");
+	auto admin_def_guard = make_scoped_guard([=] { free(def); });
+	memcpy(def->name, "admin", name_len);
+	def->uid = def->owner = ADMIN;
+	def->type = SC_USER;
+	user = user_cache_replace(def);
+	admin_def_guard.is_active = false;
 	/* ADMIN is both the auth token and user id for 'admin' user. */
-	assert(user->def.uid == ADMIN && user->auth_token == ADMIN);
+	assert(user->def->uid == ADMIN && user->auth_token == ADMIN);
 }
 
 void
@@ -526,7 +542,7 @@ role_check(struct user *grantee, struct user *role)
 	if (user_map_is_set(&transitive_closure,
 			    role->auth_token)) {
 		tnt_raise(ClientError, ER_ROLE_LOOP,
-			  role->def.name, grantee->def.name);
+			  role->def->name, grantee->def->name);
 	}
 }
 

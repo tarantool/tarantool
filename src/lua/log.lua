@@ -43,6 +43,8 @@ local function say(level, fmt, ...)
         if not stat then
             error(fmt, 3)
         end
+    elseif type(fmt) ~= 'string' then
+        fmt = tostring(fmt)
     end
     local frame = debug.getinfo(3, "Sl")
     local line, file = 0, 'eval'

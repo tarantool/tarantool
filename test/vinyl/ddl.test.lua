@@ -103,9 +103,9 @@ space = box.schema.space.create('test', {engine='vinyl'})
 pk = space:create_index('pk', {bloom_fpr = 0.1})
 sec = space:create_index('sec', {bloom_fpr = 0.2})
 third = space:create_index('third', {bloom_fpr = 0.3})
-pk:info().bloom_fpr
-sec:info().bloom_fpr
-third:info().bloom_fpr
+pk.options.bloom_fpr
+sec.options.bloom_fpr
+third.options.bloom_fpr
 space:drop()
 
 --
@@ -128,9 +128,9 @@ for i = 1, 20 do space:replace{i, pad} end
 est_bsize = pad_size * 20
 box.snapshot()
 pk:info().disk.pages
-pk:info().page_size
+space.index.pk.options.page_size
 pk:info().run_count
-pk:info().bloom_fpr
+space.index.pk.options.bloom_fpr
 
 -- Change page_size and trigger compaction
 page_size = page_size * 2
@@ -145,9 +145,9 @@ box.snapshot()
 -- Wait for compaction
 while pk:info().run_count ~= 1 do fiber.sleep(0.01) end
 pk:info().disk.pages
-pk:info().page_size
+space.index.pk.options.page_size
 pk:info().run_count
-pk:info().bloom_fpr
+space.index.pk.options.bloom_fpr
 est_bsize / page_size == pk:info().disk.pages
 space:drop()
 

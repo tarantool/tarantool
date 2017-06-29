@@ -18,25 +18,26 @@ for i = 1, 2000 do s:insert{i, pad} end
 -- Save the total number of committed and dumped statements.
 var = box.schema.space.create('var')
 _ = var:create_index('pk', {parts = {1, 'string'}})
-stat = box.info.vinyl()
-_ = var:insert{'committed', stat.performance.write_count}
-_ = var:insert{'dumped', stat.performance.dumped_statements}
+stat = box.space.test.index.pk:info()
+_ = var:insert{'put', stat.put.rows}
+_ = var:insert{'dump', stat.disk.dump.out.rows}
 test_run:cmd('switch default')
 
 test_run:cmd('restart server test')
 
 test_run:cmd('switch test')
-stat = box.info.vinyl()
 -- Check that we do not exceed quota.
+stat = box.info.vinyl()
 stat.memory.used <= stat.memory.limit or {stat.memory.used, stat.memory.limit}
 -- Check that we did not replay statements dumped before restart.
+stat = box.space.test.index.pk:info()
 var = box.space.var
-dumped_before = var:get('dumped')[2]
-dumped_after = stat.performance.dumped_statements
-committed_before = var:get('committed')[2]
-committed_after = stat.performance.write_count
-dumped_after == 0 or dumped_after
-committed_before - dumped_before == committed_after or {dumped_before, dumped_after, committed_before, committed_after}
+dump_before = var:get('dump')[2]
+dump_after = stat.disk.dump.out.rows
+put_before = var:get('put')[2]
+put_after = stat.put.rows
+dump_after == 0 or dump_after
+put_before - dump_before == put_after or {dump_before, dump_after, put_before, put_after}
 test_run:cmd('switch default')
 
 test_run:cmd('stop server test')

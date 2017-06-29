@@ -50,7 +50,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { FIBER_NAME_MAX = REGION_NAME_MAX };
+enum { FIBER_NAME_MAX = 30 };
 
 enum {
 	/**
@@ -384,6 +384,7 @@ struct fiber {
 	void *fls[FIBER_KEY_MAX];
 	/** Exception which caused this fiber's death. */
 	struct diag diag;
+	char name[FIBER_NAME_MAX];
 };
 
 enum { FIBER_CALL_STACK = 16 };
@@ -528,7 +529,7 @@ fiber_set_name(struct fiber *fiber, const char *name);
 static inline const char *
 fiber_name(struct fiber *f)
 {
-	return region_name(&f->gc);
+	return f->name;
 }
 
 bool
