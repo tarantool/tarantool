@@ -181,16 +181,10 @@ key_def_set_cmp(struct key_def *def)
 	tuple_extract_key_set(def);
 }
 
-static size_t
-key_def_size(uint32_t part_count)
-{
-	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
-}
-
 box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 {
-	size_t sz = key_def_size(part_count);
+	size_t sz = key_def_sizeof(part_count);
 	box_key_def_t *key_def = (box_key_def_t *)malloc(sz);
 	if (key_def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
