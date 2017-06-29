@@ -77,9 +77,13 @@
 ** if the number of terms is too large.  In practice, most SQL
 ** never has more than 3 or 4 terms.  Use a value of 0 to disable
 ** any limit on the number of terms in a compount SELECT.
+**
+** Tarantool: gh-2548: Fiber stack is 64KB by default, so maximum
+** number of entities should be less than 50 or stack guard will be
+** triggered.
 */
 #ifndef SQLITE_MAX_COMPOUND_SELECT
-# define SQLITE_MAX_COMPOUND_SELECT 500
+# define SQLITE_MAX_COMPOUND_SELECT 50
 #endif
 
 /*
