@@ -336,8 +336,18 @@ void
 index_def_delete(struct index_def *index_def)
 {
 	free(index_def->name);
-	free(index_def->key_def);
-	free(index_def->cmp_def);
+
+	if (index_def->key_def) {
+		TRASH(index_def->key_def);
+		free(index_def->key_def);
+	}
+
+	if (index_def->cmp_def) {
+		TRASH(index_def->cmp_def);
+		free(index_def->cmp_def);
+	}
+
+	TRASH(index_def);
 	free(index_def);
 }
 

@@ -46,27 +46,24 @@ struct key_data
 };
 
 int
-memtx_tree_compare(const tuple *a, const tuple *b, struct index_def *index_def)
+memtx_tree_compare(const tuple *a, const tuple *b, struct key_def *def)
 {
-	int r = tuple_compare(a, b, index_def->key_def);
-	if (r == 0 && !index_def->opts.is_unique)
-		r = a < b ? -1 : a > b;
-	return r;
+	return tuple_compare(a, b, def);
 }
 
 int
 memtx_tree_compare_key(const tuple *a, const struct key_data *key_data,
-		       struct index_def *index_def)
+		       struct key_def *def)
 {
 	return tuple_compare_with_key(a, key_data->key,
-				      key_data->part_count, index_def->key_def);
+				      key_data->part_count, def);
 }
 
 int
 memtx_tree_qcompare(const void* a, const void *b, void *c)
 {
 	return memtx_tree_compare(*(struct tuple **)a,
-		*(struct tuple **)b, (struct index_def *)c);
+		*(struct tuple **)b, (struct key_def *)c);
 }
 
 /* {{{ MemtxTree Iterators ****************************************/
@@ -130,7 +127,8 @@ tree_iterator_fwd_check_equality(struct iterator *iterator)
 	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
-	if (memtx_tree_compare_key(*res, &it->key_data, it->index_def) != 0) {
+	/* Use user key def to save a few loops. */
+	if (memtx_tree_compare_key(*res, &it->key_data, it->index_def->key_def) != 0) {
 		it->tree_iterator = memtx_tree_invalid_iterator();
 		return 0;
 	}
@@ -166,7 +164,8 @@ tree_iterator_bwd_check_equality(struct iterator *iterator)
 	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
 		return 0;
-	if (memtx_tree_compare_key(*res, &it->key_data, it->index_def) != 0) {
+	/* Use user key def to save a few loops. */
+	if (memtx_tree_compare_key(*res, &it->key_data, it->index_def->key_def) != 0) {
 		it->tree_iterator = memtx_tree_invalid_iterator();
 		return 0;
 	}
@@ -187,13 +186,18 @@ tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
 /* {{{ MemtxTree  **********************************************************/
 
 MemtxTree::MemtxTree(struct index_def *index_def_arg)
-	: MemtxIndex(index_def_arg), build_array(0), build_array_size(0),
-	  build_array_alloc_size(0)
+	: MemtxIndex(index_def_arg),
+	build_array(0),
+	build_array_size(0),
+	build_array_alloc_size(0)
 {
 	memtx_index_arena_init();
-	memtx_tree_create(&tree, index_def,
-			      memtx_index_extent_alloc,
-			      memtx_index_extent_free, NULL);
+	/** Use extended key def only for non-unique indexes. */
+	struct key_def *cmp_def = index_def->opts.is_unique ?
+		index_def->key_def : index_def->cmp_def;
+	memtx_tree_create(&tree, cmp_def,
+			  memtx_index_extent_alloc,
+			  memtx_index_extent_free, NULL);
 }
 
 MemtxTree::~MemtxTree()
@@ -406,7 +410,12 @@ MemtxTree::buildNext(struct tuple *tuple)
 void
 MemtxTree::endBuild()
 {
-	qsort_arg(build_array, build_array_size, sizeof(struct tuple *), memtx_tree_qcompare, index_def);
+	/** Use extended key def only for non-unique indexes. */
+	struct key_def *cmp_def = index_def->opts.is_unique ?
+		index_def->key_def : index_def->cmp_def;
+	qsort_arg(build_array, build_array_size,
+		  sizeof(struct tuple *),
+		  memtx_tree_qcompare, cmp_def);
 	memtx_tree_build(&tree, build_array, build_array_size);
 
 	free(build_array);

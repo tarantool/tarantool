@@ -38,10 +38,10 @@ struct tuple;
 struct key_data;
 
 int
-memtx_tree_compare(const struct tuple *a, const struct tuple *b, struct index_def *index_def);
+memtx_tree_compare(const struct tuple *a, const struct tuple *b, struct key_def *def);
 
 int
-memtx_tree_compare_key(const tuple *a, const key_data *b, struct index_def *index_def);
+memtx_tree_compare_key(const tuple *a, const key_data *b, struct key_def *def);
 
 #define BPS_TREE_NAME memtx_tree
 #define BPS_TREE_BLOCK_SIZE (512)
@@ -50,7 +50,7 @@ memtx_tree_compare_key(const tuple *a, const key_data *b, struct index_def *inde
 #define BPS_TREE_COMPARE_KEY(a, b, arg) memtx_tree_compare_key(a, b, arg)
 #define bps_tree_elem_t struct tuple *
 #define bps_tree_key_t struct key_data *
-#define bps_tree_arg_t struct index_def *
+#define bps_tree_arg_t struct key_def *
 
 #include "salad/bps_tree.h"
 
@@ -89,7 +89,7 @@ public:
 	 */
 	virtual void destroyReadViewForIterator(struct iterator *iterator) override;
 
-// protected:
+private:
 	struct memtx_tree tree;
 	struct tuple **build_array;
 	size_t build_array_size, build_array_alloc_size;

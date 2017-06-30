@@ -298,19 +298,16 @@ _ = s:insert{2, 3, 1, 2, 10, 10}
 _ = s:insert{3, 2, 2, 1, 10, 10}
 _ = s:insert{4, 1, 4, 3, 10, 10}
 
-
-function sum(select_res) local r = 0 for _,t in pairs(select_res) do r = r + t[1] end return r end
-
 i1:select{}
-sum(i2:select{})
-sum(i3:select{})
+i2:select{}
+i3:select{}
 
 i1:alter({parts={2, 'unsigned'}})
 
 _ = collectgarbage('collect')
 i1:select{}
-sum(i2:select{})
-sum(i3:select{})
+i2:select{}
+i3:select{}
 
 box.error.injection.set('ERRINJ_BUILD_SECONDARY', i2.id)
 
@@ -318,8 +315,8 @@ i1:alter{parts = {3, "unsigned"}}
 
 _ = collectgarbage('collect')
 i1:select{}
-sum(i2:select{})
-sum(i3:select{})
+i2:select{}
+i3:select{}
 
 box.error.injection.set('ERRINJ_BUILD_SECONDARY', i3.id)
 
@@ -327,8 +324,8 @@ i1:alter{parts = {4, "unsigned"}}
 
 _ = collectgarbage('collect')
 i1:select{}
-sum(i2:select{})
-sum(i3:select{})
+i2:select{}
+i3:select{}
 
 box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
 
