@@ -825,22 +825,6 @@ DropIndex::alter(struct alter_space *alter)
 	if (space_index(alter->new_space, 0) != NULL)
 		return;
 	/*
-	 * Deal with various cases of dropping of the primary key.
-	 */
-	/*
-	 * Dropping the primary key in a system space: off limits.
-	 */
-	if (space_is_system(alter->new_space))
-		tnt_raise(ClientError, ER_LAST_DROP,
-			  space_name(alter->new_space));
-	/*
-	 * Can't drop primary key before secondary keys.
-	 */
-	if (alter->new_space->index_count) {
-		tnt_raise(ClientError, ER_DROP_PRIMARY_KEY,
-			  space_name(alter->new_space));
-	}
-	/*
 	 * OK to drop the primary key. Inform the engine about it,
 	 * since it may have to reset handler->replace function,
 	 * so that:
@@ -1325,6 +1309,26 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct space *old_space = space_cache_find(id);
 	access_check_ddl(old_space->def.uid, SC_SPACE);
 	Index *old_index = space_index(old_space, iid);
+
+	/*
+	 * Deal with various cases of dropping of the primary key.
+	 */
+	if (iid == 0 && new_tuple == NULL) {
+		/*
+		 * Dropping the primary key in a system space: off limits.
+		 */
+		if (space_is_system(old_space))
+			tnt_raise(ClientError, ER_LAST_DROP,
+				  space_name(old_space));
+		/*
+		 * Can't drop primary key before secondary keys.
+		 */
+		if (old_space->index_count > 1) {
+			tnt_raise(ClientError, ER_DROP_PRIMARY_KEY,
+				  space_name(old_space));
+		}
+	}
+
 	struct alter_space *alter = alter_space_new();
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
