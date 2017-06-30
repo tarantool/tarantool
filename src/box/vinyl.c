@@ -7728,10 +7728,13 @@ vy_point_iterator_scan_txw(struct vy_point_iterator *itr, struct rlist *history)
 	struct vy_tx *tx = itr->tx;
 	if (tx == NULL)
 		return 0;
+	itr->index->stat.txw.iterator.lookup++;
 	struct txv *txv =
 		write_set_search_key(&tx->write_set, itr->index, itr->key);
 	if (txv == NULL)
 		return 0;
+	vy_stmt_counter_acct_tuple(&itr->index->stat.txw.iterator.get,
+				   txv->stmt);
 	struct vy_stmt_history_node *node = vy_point_iterator_new_node();
 	if (node == NULL)
 		return -1;
@@ -7749,11 +7752,13 @@ static int
 vy_point_iterator_scan_cache(struct vy_point_iterator *itr,
 			     struct rlist *history)
 {
+	itr->index->cache.stat.lookup++;
 	struct tuple *stmt = vy_cache_get(&itr->index->cache, itr->key);
 
 	if (stmt == NULL || vy_stmt_lsn(stmt) > (*itr->p_read_view)->vlsn)
 		return 0;
 
+	vy_stmt_counter_acct_tuple(&itr->index->cache.stat.get, stmt);
 	struct vy_stmt_history_node *node = vy_point_iterator_new_node();
 	if (node == NULL)
 		return -1;
@@ -7778,7 +7783,7 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
 	bool exact;
 	struct vy_mem_tree_iterator mem_itr =
 		vy_mem_tree_lower_bound(&mem->tree, &tree_key, &exact);
-	itr->index->env->stat->mem_stat.lookup_count++;
+	itr->index->stat.memory.iterator.lookup++;
 	const struct tuple *stmt = NULL;
 	if (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
 		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
@@ -7794,15 +7799,17 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
 		if (node == NULL)
 			return -1;
 
+		vy_stmt_counter_acct_tuple(&itr->index->stat.memory.iterator.get,
+					   stmt);
+
 		node->src_type = ITER_SRC_MEM;
 		node->stmt = (struct tuple *)stmt;
 		rlist_add_tail(history, &node->link);
-		if(vy_point_iterator_history_is_terminal(history))
+		if (vy_point_iterator_history_is_terminal(history))
 			break;
 
 		if (!vy_mem_tree_iterator_next(&mem->tree, &mem_itr))
 			break;
-		itr->index->env->stat->mem_stat.step_count++;
 
 		const struct tuple *prev_stmt = stmt;
 		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
@@ -7857,7 +7864,7 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	struct vy_run_iterator run_itr;
 	const struct vy_read_view **p_read_view;
 	p_read_view = itr->p_read_view;
-	vy_run_iterator_open(&run_itr, true, &env->stat->run_stat,
+	vy_run_iterator_open(&run_itr, true, &itr->index->stat.disk.iterator,
 			     &env->run_env, slice,
 			     ITER_EQ, itr->key, p_read_view,
 			     itr->index->key_def, itr->index->user_key_def,
@@ -7938,6 +7945,7 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 	assert(itr->curr_stmt == NULL);
 	if (rlist_empty(history))
 		return 0;
+
 	int64_t vlsn = (*itr->p_read_view)->vlsn;
 
 	struct vy_stmt_history_node *node =
@@ -7967,8 +7975,7 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 					itr->index->key_def,
 					itr->index->space_format,
 					itr->index->upsert_format, true);
-		rmean_collect(itr->index->env->stat->rmean,
-			      VY_STAT_UPSERT_APPLIED, 1);
+		itr->index->stat.upsert.applied++;
 		if (stmt == NULL)
 			return -1;
 		if (itr->curr_stmt)
@@ -7976,7 +7983,10 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 		itr->curr_stmt = stmt;
 		node = rlist_prev_entry_safe(node, history, link);
 	}
-
+	if (itr->curr_stmt) {
+		vy_stmt_counter_acct_tuple(&itr->index->stat.get,
+					   itr->curr_stmt);
+	}
 	/**
 	 * Add a statement to the cache
 	 */
@@ -7998,6 +8008,7 @@ vy_point_iterator_get(struct vy_point_iterator *itr, struct tuple **result)
 	size_t region_svp = region_used(&fiber()->gc);
 	int rc = 0;
 
+	itr->index->stat.lookup++;
 	/* History list */
 	struct rlist history;
 restart:
