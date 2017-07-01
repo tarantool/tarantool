@@ -56,6 +56,7 @@ add_library(box STATIC
     vy_stmt.c
     vy_mem.c
     vy_run.c
+    vy_range.c
     vy_write_iterator.c
     vy_cache.c
     vy_log.c
