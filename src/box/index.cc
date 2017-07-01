@@ -39,24 +39,6 @@
 #include "rmean.h"
 #include "info.h"
 
-const char *iterator_type_strs[] = {
-	/* [ITER_EQ]  = */ "EQ",
-	/* [ITER_REQ]  = */ "REQ",
-	/* [ITER_ALL] = */ "ALL",
-	/* [ITER_LT]  = */ "LT",
-	/* [ITER_LE]  = */ "LE",
-	/* [ITER_GE]  = */ "GE",
-	/* [ITER_GT]  = */ "GT",
-	/* [ITER_BITS_ALL_SET] = */ "BITS_ALL_SET",
-	/* [ITER_BITS_ANY_SET] = */ "BITS_ANY_SET",
-	/* [ITER_BITS_ALL_NOT_SET] = */ "BITS_ALL_NOT_SET",
-	/* [ITER_OVERLAPS] = */ "OVERLAPS",
-	/* [ITER_NEIGHBOR] = */ "NEIGHBOR",
-};
-
-static_assert(sizeof(iterator_type_strs) / sizeof(const char *) ==
-	iterator_type_MAX, "iterator_type_str constants");
-
 /* {{{ Utilities. **********************************************/
 
 UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,

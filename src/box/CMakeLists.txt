@@ -37,6 +37,7 @@ add_library(box STATIC
     tuple_hash.cc
     key_def.cc
     index.cc
+    iterator_type.c
     memtx_index.cc
     memtx_hash.cc
     memtx_tree.cc
