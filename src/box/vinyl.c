@@ -274,8 +274,8 @@ struct vy_range {
 	struct tuple *begin;
 	/** Range upper bound. NULL if range is rightmost. */
 	struct tuple *end;
-	/** The index this range belongs to. */
-	struct vy_index *index;
+	/** Key definition for comparing range boundaries. */
+	const struct key_def *key_def;
 	/** An estimate of the number of statements in this range. */
 	struct vy_disk_stmt_counter count;
 	/**
@@ -780,7 +780,7 @@ struct vy_merge_iterator {
 };
 
 struct vy_range_iterator {
-	struct vy_index *index;
+	vy_range_tree_t *tree;
 	enum iterator_type iterator_type;
 	const struct tuple *key;
 	struct vy_range *curr_range;
@@ -1508,9 +1508,9 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 	if (range_b->begin == NULL)
 		return 1;
 
-	assert(range_a->index == range_b->index);
+	assert(range_a->key_def == range_b->key_def);
 	return vy_key_compare(range_a->begin, range_b->begin,
-			      range_a->index->key_def);
+			      range_a->key_def);
 }
 
 static int
@@ -1519,16 +1519,15 @@ vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
 	/* Any key > -inf. */
 	if (range->begin == NULL)
 		return 1;
-	return vy_stmt_compare_with_key(stmt, range->begin,
-					range->index->key_def);
+	return vy_stmt_compare_with_key(stmt, range->begin, range->key_def);
 }
 
 static void
-vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
+vy_range_iterator_open(struct vy_range_iterator *itr, vy_range_tree_t *tree,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key)
 {
-	itr->index = index;
+	itr->tree = tree;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->curr_range = NULL;
@@ -1540,8 +1539,7 @@ vy_range_iterator_open(struct vy_range_iterator *itr, struct vy_index *index,
 static struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  const struct tuple *key,
-			  const struct key_def *key_def)
+			  const struct tuple *key)
 {
 	uint32_t key_field_count = tuple_field_count(key);
 	if (key_field_count == 0) {
@@ -1587,8 +1585,9 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
-		    key_field_count < key_def->part_count &&
-		    vy_stmt_compare_with_key(key, range->begin, key_def) == 0)
+		    key_field_count < range->key_def->part_count &&
+		    vy_stmt_compare_with_key(key, range->begin,
+					     range->key_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -1622,7 +1621,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
 			    vy_stmt_compare_with_key(key, range->begin,
-						     key_def) != 0) {
+						     range->key_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree,
 							  range);
@@ -1647,34 +1646,28 @@ vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
 {
 	struct vy_range *curr = itr->curr_range;
 	struct vy_range *next;
-	struct vy_index *index = itr->index;
-	const struct key_def *key_def = index->key_def;
 
 	if (curr == NULL) {
 		/* First iteration */
-		if (unlikely(index->range_count == 1))
-			next = vy_range_tree_first(index->tree);
-		else
-			next = vy_range_tree_find_by_key(index->tree,
-							 itr->iterator_type,
-							 itr->key, key_def);
+		next = vy_range_tree_find_by_key(itr->tree, itr->iterator_type,
+						 itr->key);
 		goto out;
 	}
 	switch (itr->iterator_type) {
 	case ITER_LT:
 	case ITER_LE:
-		next = vy_range_tree_prev(index->tree, curr);
+		next = vy_range_tree_prev(itr->tree, curr);
 		break;
 	case ITER_GT:
 	case ITER_GE:
-		next = vy_range_tree_next(index->tree, curr);
+		next = vy_range_tree_next(itr->tree, curr);
 		break;
 	case ITER_EQ:
 		if (curr->end != NULL &&
 		    vy_stmt_compare_with_key(itr->key, curr->end,
-					     key_def) >= 0) {
+					     curr->key_def) >= 0) {
 			/* A partial key can be found in more than one range. */
-			next = vy_range_tree_next(index->tree, curr);
+			next = vy_range_tree_next(itr->tree, curr);
 		} else {
 			next = NULL;
 		}
@@ -1696,11 +1689,9 @@ vy_range_iterator_restore(struct vy_range_iterator *itr,
 			  const struct tuple *last_stmt,
 			  struct vy_range **result)
 {
-	struct vy_index *index = itr->index;
-	struct vy_range *curr = vy_range_tree_find_by_key(index->tree,
+	struct vy_range *curr = vy_range_tree_find_by_key(itr->tree,
 				itr->iterator_type,
-				last_stmt != NULL ? last_stmt : itr->key,
-				index->key_def);
+				last_stmt != NULL ? last_stmt : itr->key);
 	*result = itr->curr_range = curr;
 }
 
@@ -1724,14 +1715,19 @@ vy_index_remove_range(struct vy_index *index, struct vy_range *range)
 
 /**
  * Allocate and initialize a range (either a new one or for
- * restore from disk). @begin and @end specify the range's
- * boundaries. If @id is >= 0, the range's ID is set to
- * the given value, otherwise a new unique ID is allocated
- * for the range.
+ * restore from disk).
+ *
+ * @param id         Range id.
+ * @param begin      Range begin (inclusive) or NULL for -inf.
+ * @param end        Range end (exclusive) or NULL for +inf.
+ * @param key_def    Key definition for comparing range boundaries.
+ *
+ * @retval not NULL  The new range.
+ * @retval NULL      Out of memory.
  */
 static struct vy_range *
-vy_range_new(struct vy_index *index, int64_t id,
-	     struct tuple *begin, struct tuple *end)
+vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
+	     const struct key_def *key_def)
 {
 	struct vy_range *range = (struct vy_range*) calloc(1, sizeof(*range));
 	if (range == NULL) {
@@ -1739,8 +1735,7 @@ vy_range_new(struct vy_index *index, int64_t id,
 			 "struct vy_range");
 		return NULL;
 	}
-	/* Allocate a new id unless specified. */
-	range->id = (id >= 0 ? id : vy_log_next_id());
+	range->id = id;
 	if (begin != NULL) {
 		tuple_ref(begin);
 		range->begin = begin;
@@ -1749,8 +1744,8 @@ vy_range_new(struct vy_index *index, int64_t id,
 		tuple_ref(end);
 		range->end = end;
 	}
+	range->key_def = key_def;
 	rlist_create(&range->slices);
-	range->index = index;
 	range->heap_node.pos = UINT32_MAX;
 	return range;
 }
@@ -1817,9 +1812,9 @@ vy_range_delete(struct vy_range *range)
  *   4/3 * range_size.
  */
 static bool
-vy_range_needs_split(struct vy_range *range, const char **p_split_key)
+vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
+		     const char **p_split_key)
 {
-	struct vy_index *index = range->index;
 	struct vy_slice *slice;
 
 	/* The range hasn't been merged yet - too early to split it. */
@@ -1831,7 +1826,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
 
 	/* The range is too small to be split. */
-	if (slice->count.bytes_compressed < index->opts.range_size * 4 / 3)
+	if (slice->count.bytes_compressed < opts->range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
@@ -1845,7 +1840,7 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 
 	/* No point in splitting if a new range is going to be empty. */
 	if (key_compare(first_page->min_key, mid_page->min_key,
-			index->key_def) == 0)
+			range->key_def) == 0)
 		return false;
 	/*
 	 * In extreme cases the median key can be < the beginning
@@ -1864,14 +1859,14 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
 	 * In such cases there's no point in splitting the range.
 	 */
 	if (slice->begin != NULL && key_compare(mid_page->min_key,
-			tuple_data(slice->begin), index->key_def) <= 0)
+			tuple_data(slice->begin), range->key_def) <= 0)
 		return false;
 	/*
 	 * The median key can't be >= the end of the slice as we
 	 * take the min key of a page for the median key.
 	 */
 	assert(slice->end == NULL || key_compare(mid_page->min_key,
-			tuple_data(slice->end), index->key_def) < 0);
+			tuple_data(slice->end), range->key_def) < 0);
 
 	*p_split_key = mid_page->min_key;
 	return true;
@@ -1885,14 +1880,13 @@ vy_range_needs_split(struct vy_range *range, const char **p_split_key)
  * operations, like writing a run file, and is done immediately.
  */
 static bool
-vy_range_maybe_split(struct vy_range *range)
+vy_index_split_range(struct vy_index *index, struct vy_range *range)
 {
-	struct vy_index *index = range->index;
 	struct tuple_format *key_format = index->env->key_format;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 
 	const char *split_key_raw;
-	if (!vy_range_needs_split(range, &split_key_raw))
+	if (!vy_range_needs_split(range, &index->opts, &split_key_raw))
 		return false;
 
 	/* Split a range in two parts. */
@@ -1918,7 +1912,8 @@ vy_range_maybe_split(struct vy_range *range)
 	struct vy_slice *slice, *new_slice;
 	struct vy_range *part, *parts[2] = {NULL, };
 	for (int i = 0; i < n_parts; i++) {
-		part = vy_range_new(index, -1, keys[i], keys[i + 1]);
+		part = vy_range_new(vy_log_next_id(), keys[i], keys[i + 1],
+				    index->key_def);
 		if (part == NULL)
 			goto fail;
 		parts[i] = part;
@@ -2020,10 +2015,9 @@ fail:
  * this level and all preceding levels.
  */
 static void
-vy_range_update_compact_priority(struct vy_range *range)
+vy_range_update_compact_priority(struct vy_range *range,
+				 const struct index_opts *opts)
 {
-	struct index_opts *opts = &range->index->opts;
-
 	assert(opts->run_count_per_level > 0);
 	assert(opts->run_size_ratio > 1);
 
@@ -2108,16 +2102,16 @@ vy_range_update_compact_priority(struct vy_range *range)
  * half the target range size to avoid split-coalesce oscillations.
  */
 static bool
-vy_range_needs_coalesce(struct vy_range *range,
+vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
+			const struct index_opts *opts,
 			struct vy_range **p_first, struct vy_range **p_last)
 {
-	struct vy_index *index = range->index;
 	struct vy_range *it;
 
 	/* Size of the coalesced range. */
 	uint64_t total_size = range->count.bytes_compressed;
 	/* Coalesce ranges until total_size > max_size. */
-	uint64_t max_size = index->opts.range_size / 2;
+	uint64_t max_size = opts->range_size / 2;
 
 	/*
 	 * We can't coalesce a range that was scheduled for dump
@@ -2127,18 +2121,18 @@ vy_range_needs_coalesce(struct vy_range *range,
 	assert(!vy_range_is_scheduled(range));
 
 	*p_first = *p_last = range;
-	for (it = vy_range_tree_next(index->tree, range);
+	for (it = vy_range_tree_next(tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
-	     it = vy_range_tree_next(index->tree, it)) {
+	     it = vy_range_tree_next(tree, it)) {
 		uint64_t size = it->count.bytes_compressed;
 		if (total_size + size > max_size)
 			break;
 		total_size += size;
 		*p_last = it;
 	}
-	for (it = vy_range_tree_prev(index->tree, range);
+	for (it = vy_range_tree_prev(tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
-	     it = vy_range_tree_prev(index->tree, it)) {
+	     it = vy_range_tree_prev(tree, it)) {
 		uint64_t size = it->count.bytes_compressed;
 		if (total_size + size > max_size)
 			break;
@@ -2159,18 +2153,18 @@ vy_range_needs_coalesce(struct vy_range *range,
  * case of merging key ranges.
  */
 static bool
-vy_range_maybe_coalesce(struct vy_range *range)
+vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 {
-	struct vy_index *index = range->index;
 	struct vy_scheduler *scheduler = index->env->scheduler;
 	struct error *e;
 
 	struct vy_range *first, *last;
-	if (!vy_range_needs_coalesce(range, &first, &last))
+	if (!vy_range_needs_coalesce(range, index->tree, &index->opts,
+				     &first, &last))
 		return false;
 
-	struct vy_range *result = vy_range_new(index, -1,
-					       first->begin, last->end);
+	struct vy_range *result = vy_range_new(vy_log_next_id(),
+			first->begin, last->end, index->key_def);
 	if (result == NULL)
 		goto fail_range;
 
@@ -2277,7 +2271,8 @@ vy_index_create(struct vy_index *index)
 	}
 
 	/* create initial range */
-	struct vy_range *range = vy_range_new(index, -1, NULL, NULL);
+	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
+					      index->key_def);
 	if (unlikely(range == NULL))
 		return -1;
 
@@ -2400,7 +2395,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		break;
 	case VY_LOG_INSERT_RANGE:
 		assert(record->index_lsn == index->opts.lsn);
-		range = vy_range_new(index, record->range_id, begin, end);
+		range = vy_range_new(record->range_id, begin, end,
+				     index->key_def);
 		if (range == NULL)
 			goto out;
 		if (range->begin != NULL && range->end != NULL &&
@@ -3094,7 +3090,7 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_index_unacct_range(index, range);
 		vy_range_add_slice(range, slice);
 		vy_index_acct_range(index, range);
-		vy_range_update_compact_priority(range);
+		vy_range_update_compact_priority(range, &index->opts);
 		if (!vy_range_is_scheduled(range))
 			vy_range_heap_update(&index->range_heap,
 					     &range->heap_node);
@@ -3433,7 +3429,7 @@ vy_task_compact_complete(struct vy_task *task)
 	range->n_compactions++;
 	range->version++;
 	vy_index_acct_range(index, range);
-	vy_range_update_compact_priority(range);
+	vy_range_update_compact_priority(range, &index->opts);
 	index->stat.disk.compact.count++;
 
 	/*
@@ -3503,10 +3499,10 @@ vy_task_compact_new(struct vy_index *index, struct vy_task **p_task)
 	range = container_of(range_node, struct vy_range, heap_node);
 	assert(range->compact_priority > 1);
 
-	if (vy_range_maybe_split(range))
+	if (vy_index_split_range(index, range))
 		return 0;
 
-	if (vy_range_maybe_coalesce(range))
+	if (vy_index_coalesce_range(index, range))
 		return 0;
 
 	struct vy_task *task = vy_task_new(&scheduler->task_pool,
@@ -7944,9 +7940,8 @@ static int
 vy_point_iterator_scan_slices(struct vy_point_iterator *itr,
 			      struct rlist *history)
 {
-	struct vy_range *range =
-		vy_range_tree_find_by_key(itr->index->tree, ITER_EQ,
-					  itr->key, itr->index->key_def);
+	struct vy_range *range = vy_range_tree_find_by_key(itr->index->tree,
+							   ITER_EQ, itr->key);
 	assert(range != NULL);
 	int slice_count = range->slice_count;
 	struct vy_slice **slices = (struct vy_slice **)
@@ -8252,7 +8247,7 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	assert(itr->curr_range == NULL);
 	itr->search_started = true;
 
-	vy_range_iterator_open(&itr->range_iterator, itr->index,
+	vy_range_iterator_open(&itr->range_iterator, itr->index->tree,
 			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
