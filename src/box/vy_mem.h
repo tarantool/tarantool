@@ -37,7 +37,7 @@
 #include <small/rlist.h>
 
 #include "ipc.h"
-#include "index.h" /* enum iterator_type */
+#include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
 #include "vy_stat.h"
