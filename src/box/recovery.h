@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "small/rlist.h"
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
 #include "xlog.h"
@@ -54,6 +55,8 @@ struct recovery {
 	 * locally or send to the replica.
 	 */
 	struct fiber *watcher;
+	/** List of triggers invoked when the current WAL is closed. */
+	struct rlist on_close_log;
 };
 
 struct recovery *
