@@ -14,6 +14,9 @@
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 
+/* See comment in sqliteInt.h */
+int sqlSubProgramsRemaining;
+
 #ifndef SQLITE_OMIT_TRIGGER
 /*
 ** Delete a linked list of TriggerStep structures.
@@ -748,6 +751,14 @@ static int codeTriggerProgram(
   assert( pParse->pTriggerTab && pParse->pToplevel );
   assert( pStepList );
   assert( v!=0 );
+
+  /* Tarantool: check if compile chain is not too long.  */
+  sqlSubProgramsRemaining--;
+
+  if (sqlSubProgramsRemaining == 0){
+	  sqlite3ErrorMsg(pParse, "Maximum number of chained trigger programs exceeded.");
+  }
+
   for(pStep=pStepList; pStep; pStep=pStep->pNext){
     /* Figure out the ON CONFLICT policy that will be used for this step
     ** of the trigger program. If the statement that caused this trigger
@@ -805,6 +816,8 @@ static int codeTriggerProgram(
     }
   }
 
+  /* Tarantool: check if compile chain is not too long.  */
+  sqlSubProgramsRemaining++;
   return 0;
 }
 

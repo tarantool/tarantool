@@ -125,7 +125,7 @@ if(SQL_MAINTAINER_MODE)
         DEPENDS mkkeywordhash)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/parse.h ${CMAKE_CURRENT_SOURCE_DIR}/parse.c
-        COMMAND ${CMAKE_BINARY_DIR}/extra/lemon -DSQLITE_OMIT_VACUUM parse.y
+        COMMAND ${CMAKE_BINARY_DIR}/extra/lemon -DSQLITE_OMIT_VACUUM -T${CMAKE_SOURCE_DIR}/extra/lempar.c parse.y
         COMMAND ${CMAKE_COMMAND} -E copy parse.h parse.h.tmp
         COMMAND ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/addopcodes.tcl parse.h.tmp > parse.h
         COMMAND ${CMAKE_COMMAND} -E remove parse.h.tmp parse.out

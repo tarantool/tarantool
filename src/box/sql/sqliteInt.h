@@ -4294,4 +4294,10 @@ Expr *sqlite3VectorFieldSubexpr(Expr*, int);
 Expr *sqlite3ExprForVectorField(Parse*,Expr*,int);
 void sqlite3VectorErrorMsg(Parse*, Expr*);
 
+/* Tarantool: right now query compilation is invoked on top of
+** fiber's stack. Need to limit number of nested programs under
+** compilation to avoid stack overflow.
+*/
+extern int sqlSubProgramsRemaining;
+
 #endif /* SQLITEINT_H */

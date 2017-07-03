@@ -213,3 +213,10 @@
 #ifndef SQLITE_MAX_TRIGGER_DEPTH
 # define SQLITE_MAX_TRIGGER_DEPTH 1000
 #endif
+
+/*
+** Tarantool: gh-2550: Fiber stack is 64KB by default, so maximum
+** number of entities (in chain of compiling trigger programs) should be less than
+** 40 or stack guard will be triggered.
+*/
+#define SQL_MAX_COMPILING_TRIGGERS 40
