@@ -51,6 +51,7 @@ include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
+include(cmake/lto.cmake)
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
@@ -269,6 +270,26 @@ find_package_message(MODULE_LUAPATH "Lua package.path: ${MODULE_LUAPATH}"
 find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
     "${MODULE_LIBPATH}")
 
+##
+## Inter-Procedural and Link-Time-Optimization stuff
+##
+if(CMAKE_CONFIGURATION_TYPES OR NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(INTERPROCEDURAL_OPTIMIZATION_DEFAULT ON)
+else()
+    set(INTERPROCEDURAL_OPTIMIZATION_DEFAULT OFF)
+endif()
+
+if(CMAKE_INTERPROCEDURAL_OPTIMIZATION_AVAILABLE OR CMAKE_LTO_AVAILABLE)
+    option(INTERPROCEDURAL_OPTIMIZATION "Enable Inter-Procedural or Link-Time Optimization." ${INTERPROCEDURAL_OPTIMIZATION_DEFAULT})
+endif()
+
+if(INTERPROCEDURAL_OPTIMIZATION)
+    #
+    # Internally may set CMAKE_INTERPROCEDURAL_OPTIMIZATION.
+    # Therefore should be called before the addition/creation of any "non-phony" target.
+    #
+    enable_lto_or_ipo()
+endif()
 
 ##
 ## Third-Party libraries
