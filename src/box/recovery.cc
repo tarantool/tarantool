@@ -246,39 +246,28 @@ void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
 		       struct vclock *stop_vclock)
 {
-	/*
-	 * Sic: it could be tempting to put xdir_scan() inside
-	 * this function. This would slow down relay quite a bit,
-	 * since xdir_scan() would be invoked on every relay
-	 * row.
-	 */
-	struct vclock *last = vclockset_last(&r->wal_dir.index);
-	if (last == NULL) {
-		if (r->cursor.state != XLOG_CURSOR_CLOSED) {
-			say_error("file `%s' was deleted under our feet",
-				  r->cursor.name);
-			recovery_close_log(r);
-		}
-		/** Nothing to do. */
-		return;
-	}
-	assert(vclockset_next(&r->wal_dir.index, last) == NULL);
-
-	/* If the caller already opened WAL for us, recover from it first */
 	struct vclock *clock;
+	int64_t old_signature, new_signature;
+
 	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
-		clock = vclockset_match(&r->wal_dir.index,
-					&r->cursor.meta.vclock);
-		if (clock != NULL &&
-		    vclock_compare(clock, &r->cursor.meta.vclock) == 0)
-			goto recover_current_wal;
-		/*
-		 * The current WAL has disappeared under our feet -
-		 * assume anything can happen in production and go
-		 * on.
-		 */
-		say_error("file `%s' was deleted under our feet",
-			  r->cursor.name);
+		/* If there's a WAL open, recover from it first. */
+		assert(r->cursor.state != XLOG_CURSOR_EOF);
+		clock = vclockset_match(&r->wal_dir.index, &r->vclock);
+		goto recover_current_wal;
+	}
+
+	/*
+	 * There is no current WAL or we reached the end of one.
+	 * Look for new WALs.
+	 */
+	clock = vclockset_last(&r->wal_dir.index);
+	old_signature = clock != NULL ? vclock_sum(clock) : -1;
+	xdir_scan_xc(&r->wal_dir);
+	clock = vclockset_last(&r->wal_dir.index);
+	new_signature = clock != NULL ? vclock_sum(clock) : -1;
+	if (new_signature <= old_signature) {
+		/* No new WAL appeared, nothing to do. */
+		return;
 	}
 
 	for (clock = vclockset_match(&r->wal_dir.index, &r->vclock);
@@ -311,15 +300,11 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 		say_info("recover from `%s'", r->cursor.name);
 
 recover_current_wal:
-		if (r->cursor.state != XLOG_CURSOR_EOF)
-			recover_xlog(r, stream, stop_vclock);
-		/**
-		 * Keep the last log open to remember recovery
-		 * position. This speeds up recovery in local hot
-		 * standby mode, since we don't have to re-open
-		 * and re-scan the last log in recovery_finalize().
-		 */
+		recover_xlog(r, stream, stop_vclock);
 	}
+
+	if (r->cursor.state == XLOG_CURSOR_EOF)
+		recovery_close_log(r);
 
 	if (stop_vclock != NULL && vclock_compare(&r->vclock, stop_vclock) != 0)
 		tnt_raise(XlogGapError, &r->vclock, stop_vclock);
@@ -332,7 +317,6 @@ recovery_finalize(struct recovery *r, struct xstream *stream)
 {
 	recovery_stop_local(r);
 
-	xdir_scan_xc(&r->wal_dir);
 	recover_remaining_wals(r, stream, NULL);
 
 	recovery_close_log(r);
@@ -489,29 +473,18 @@ recovery_follow_f(va_list ap)
 		 */
 		int64_t start, end;
 		do {
-			start = r->cursor.state != XLOG_CURSOR_CLOSED ?
-				vclock_sum(&r->cursor.meta.vclock) : 0;
-			/*
-			 * If there is no current WAL, or we reached
-			 * an end  of one, look for new WALs.
-			 */
-			if (r->cursor.state == XLOG_CURSOR_CLOSED
-			    || r->cursor.state == XLOG_CURSOR_EOF)
-				xdir_scan_xc(&r->wal_dir);
+			start = vclock_sum(&r->vclock);
 
 			recover_remaining_wals(r, stream, NULL);
 
-			end = r->cursor.state != XLOG_CURSOR_CLOSED ?
-			      vclock_sum(&r->cursor.meta.vclock) : 0;
+			end = vclock_sum(&r->vclock);
 			/*
 			 * Continue, given there's been progress *and* there is a
 			 * chance new WALs have appeared since.
 			 * Sic: end * is < start (is 0) if someone deleted all logs
 			 * on the filesystem.
 			 */
-		} while (end > start &&
-			 (r->cursor.state == XLOG_CURSOR_CLOSED ||
-			  r->cursor.state == XLOG_CURSOR_EOF));
+		} while (end > start && r->cursor.state == XLOG_CURSOR_CLOSED);
 
 		subscription.set_log_path(r->cursor.state != XLOG_CURSOR_CLOSED ?
 					  r->cursor.name: NULL);
@@ -539,7 +512,6 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 * Scan wal_dir and recover all existing at the moment xlogs.
 	 * Blocks until finished.
 	 */
-	xdir_scan_xc(&r->wal_dir);
 	recover_remaining_wals(r, stream, NULL);
 	/*
 	 * Start 'hot_standby' background fiber to follow xlog changes.

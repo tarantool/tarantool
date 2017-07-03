@@ -183,7 +183,6 @@ relay_final_join_f(va_list ap)
 
 	/* Send all WALs until stop_vclock */
 	assert(relay->stream.write != NULL);
-	xdir_scan_xc(&relay->r->wal_dir);
 	recover_remaining_wals(relay->r, &relay->stream, &relay->stop_vclock);
 	assert(vclock_compare(&relay->r->vclock, &relay->stop_vclock) == 0);
 	return 0;
