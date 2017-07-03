@@ -905,47 +905,11 @@ public:
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	struct trigger *on_replace;
-	virtual void prepare(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
 	virtual ~AddIndex();
 };
-
-/**
- * Optimize addition of a new index: try to either completely
- * remove it or at least avoid building from scratch.
- */
-void
-AddIndex::prepare(struct alter_space *alter)
-{
-	AlterSpaceOp *prev_op = rlist_prev_entry_safe(this, &alter->ops,
-						      link);
-	DropIndex *drop = dynamic_cast<DropIndex *>(prev_op);
-
-	if (drop == NULL ||
-	    index_def_change_requires_rebuild(drop->old_index_def,
-					      new_index_def)) {
-		/*
-		 * The new index is too distinct from the old one,
-		 * have to rebuild.
-		 */
-		return;
-	}
-	/* Only index meta has changed, no data change. */
-	rlist_del_entry(drop, link);
-	rlist_del_entry(this, link);
-	/* Add ModifyIndex only if the there is a change. */
-	if (index_def_cmp(drop->old_index_def, new_index_def) != 0) {
-		ModifyIndex *modify = AlterSpaceOp::create<ModifyIndex>();
-		alter_space_add_op(alter, modify);
-		modify->new_index_def = new_index_def;
-		new_index_def = NULL;
-		modify->old_index_def = drop->old_index_def;
-	}
-	AlterSpaceOp::destroy(drop);
-	AlterSpaceOp::destroy(this);
-}
 
 /** Add definition of the new key to the new space def. */
 void
@@ -1332,21 +1296,39 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct alter_space *alter = alter_space_new();
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
-	/*
-	 * The order of checks is important, DropIndex most be added
-	 * first, so that AddIndex::prepare() can change
-	 * Drop + Add to a Modify.
-	 */
-	if (old_index != NULL) {
+
+	bool add_drop = old_index != NULL;
+	bool add_add = new_tuple != NULL;
+	bool add_modify = false;
+	struct index_def *new_index_def = new_tuple == NULL ? NULL :
+		index_def_new_from_tuple(new_tuple, old_space);
+	if (old_index != NULL && new_tuple != NULL) {
+		if (!index_def_change_requires_rebuild(old_index->index_def,
+						       new_index_def)) {
+			/* No need to rebuild and thus to add/drop the index. */
+			add_drop = add_add = false;
+			/* Add ModifyIndex only if the there is a change. */
+			if (index_def_cmp(old_index->index_def,
+					  new_index_def) != 0)
+				add_modify = true;
+		}
+	}
+	if (add_drop) {
 		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
 		alter_space_add_op(alter, drop_index);
 		drop_index->old_index_def = old_index->index_def;
 	}
-	if (new_tuple != NULL) {
+	if (add_add) {
 		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
 		alter_space_add_op(alter, add_index);
-		add_index->new_index_def = index_def_new_from_tuple(new_tuple,
-								    old_space);
+		add_index->new_index_def = new_index_def;
+	}
+	if (add_modify) {
+		assert(!add_drop && !add_add);
+		ModifyIndex *modify = AlterSpaceOp::create<ModifyIndex>();
+		alter_space_add_op(alter, modify);
+		modify->new_index_def = new_index_def;
+		modify->old_index_def = old_index->index_def;
 	}
 	alter_space_do(txn, alter, old_space);
 	scoped_guard.is_active = false;
