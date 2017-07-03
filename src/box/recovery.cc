@@ -30,7 +30,9 @@
  */
 #include "recovery.h"
 
+#include "small/rlist.h"
 #include "scoped_guard.h"
+#include "trigger.h"
 #include "fiber.h"
 #include "xlog.h"
 #include "xrow.h"
@@ -131,6 +133,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 	xdir_check_xc(&r->wal_dir);
 
 	r->watcher = NULL;
+	rlist_create(&r->on_close_log);
 
 	guard.is_active = false;
 	return r;
@@ -148,6 +151,7 @@ recovery_close_log(struct recovery *r)
 			 r->cursor.name);
 	}
 	xlog_cursor_close(&r->cursor, false);
+	trigger_run(&r->on_close_log, NULL);
 }
 
 void
@@ -155,6 +159,7 @@ recovery_delete(struct recovery *r)
 {
 	recovery_stop_local(r);
 
+	trigger_destroy(&r->on_close_log);
 	xdir_destroy(&r->wal_dir);
 	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
 		/*

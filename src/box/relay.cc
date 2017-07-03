@@ -68,6 +68,18 @@ struct relay_status_msg {
 };
 
 /**
+ * Cbus message to update replica gc state in tx thread.
+ */
+struct relay_gc_msg {
+	/** Parent */
+	struct cmsg msg;
+	/** Relay instance */
+	struct relay *relay;
+	/** Vclock signature to advance to */
+	int64_t signature;
+};
+
+/**
  * Cbus message to notify tx thread that relay is stopping.
  */
 struct relay_exit_msg {
@@ -234,13 +246,40 @@ tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	vclock_copy(&status->relay->tx.vclock, &status->vclock);
-	gc_consumer_advance(status->relay->replica->gc,
-			    vclock_sum(&status->vclock));
 	static const struct cmsg_hop route[] = {
 		{relay_status_update, NULL}
 	};
 	cmsg_init(msg, route);
 	cpipe_push(&status->relay->relay_pipe, msg);
+}
+
+/**
+ * Update replica gc state in tx thread.
+ */
+static void
+tx_gc_advance(struct cmsg *msg)
+{
+	struct relay_gc_msg *m = (struct relay_gc_msg *)msg;
+	gc_consumer_advance(m->relay->replica->gc, m->signature);
+	free(m);
+}
+
+static void
+relay_on_close_log_f(struct trigger *trigger, void * /* event */)
+{
+	static const struct cmsg_hop route[] = {
+		{tx_gc_advance, NULL}
+	};
+	struct relay *relay = (struct relay *)trigger->data;
+	struct relay_gc_msg *m = (struct relay_gc_msg *)malloc(sizeof(*m));
+	if (m == NULL) {
+		say_warn("failed to allocate relay gc message");
+		return;
+	}
+	cmsg_init(&m->msg, route);
+	m->relay = relay;
+	m->signature = vclock_sum(&relay->r->vclock);
+	cpipe_push(&relay->tx_pipe, &m->msg);
 }
 
 static void
@@ -288,9 +327,17 @@ relay_subscribe_f(va_list ap)
 	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
 			     fiber_schedule_cb, fiber());
 	cpipe_create(&relay->tx_pipe, "tx");
-
-	/* Create a guard to detach the relay from cbus on exit */
-	auto cbus_guard = make_scoped_guard([&]{
+	/* Setup garbage collection trigger. */
+	struct trigger on_close_log = {
+		RLIST_LINK_INITIALIZER, relay_on_close_log_f, relay, NULL
+	};
+	trigger_add(&r->on_close_log, &on_close_log);
+	/*
+	 * Create a guard to detach the relay from cbus and
+	 * clear the garbage collection trigger on exit.
+	 */
+	auto guard = make_scoped_guard([&]{
+		trigger_clear(&on_close_log);
 		relay_cbus_detach(relay);
 	});
 	relay_set_cord_name(relay->io.fd);
