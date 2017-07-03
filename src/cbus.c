@@ -226,11 +226,14 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 	rlist_del(&endpoint->in_cbus);
 	tt_pthread_mutex_unlock(&cbus.mutex);
 
-	do {
+	while (true) {
 		if (process_cb)
 			process_cb(endpoint);
-	} while ((endpoint->n_pipes > 0 || !stailq_empty(&endpoint->output)) &&
-		 ipc_cond_wait(&endpoint->cond));
+		if (endpoint->n_pipes == 0 && stailq_empty(&endpoint->output))
+			break;
+		 ipc_cond_wait(&endpoint->cond);
+	}
+
 	/*
 	 * Pipe flush func can still lock mutex, so just lock and unlock
 	 * it.
