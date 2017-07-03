@@ -349,11 +349,6 @@ struct vy_index {
 	 */
 	struct rlist sealed;
 	/**
-	 * Generation of in-memory data stored in this index
-	 * (min over mem->generation).
-	 */
-	int64_t generation;
-	/**
 	 * LSN of the last dump or -1 if the index has not
 	 * been dumped yet.
 	 */
@@ -1157,6 +1152,18 @@ vy_run_discard(struct vy_run *run)
 	}
 }
 
+/**
+ * Return generation of in-memory data stored in an index
+ * (min over vy_mem->generation).
+ */
+static int64_t
+vy_index_generation(struct vy_index *index)
+{
+	struct vy_mem *oldest = rlist_empty(&index->sealed) ? index->mem :
+		rlist_last_entry(&index->sealed, struct vy_mem, in_sealed);
+	return oldest->generation;
+}
+
 /** Return max compact_priority among ranges of an index. */
 static int
 vy_index_compact_priority(struct vy_index *index)
@@ -1186,8 +1193,10 @@ vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
 		return i1->pin_count < i2->pin_count;
 
 	/* Older indexes are dumped first. */
-	if (i1->generation != i2->generation)
-		return i1->generation < i2->generation;
+	int64_t i1_generation = vy_index_generation(i1);
+	int64_t i2_generation = vy_index_generation(i2);
+	if (i1_generation != i2_generation)
+		return i1_generation < i2_generation;
 	/*
 	 * If a space has more than one index, appending a statement
 	 * to it requires reading the primary index to get the old
@@ -2478,7 +2487,6 @@ delete_mems:
 	}
 	index->mem_list_version++;
 	index->dump_lsn = dump_lsn;
-	index->generation = task->generation;
 	index->stat.disk.dump.count++;
 
 	/* The iterator has been cleaned up in a worker thread. */
@@ -2553,7 +2561,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 	assert(!index->is_dropped);
 	assert(!index->is_dumping);
 	assert(index->pin_count == 0);
-	assert(index->generation < generation);
+	assert(vy_index_generation(index) < generation);
 
 	struct errinj *inj = errinj(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)index->id) {
@@ -2595,7 +2603,6 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 
 	if (max_output_count == 0) {
 		/* Nothing to do, pick another index. */
-		index->generation = generation;
 		vy_scheduler_update_index(scheduler, index);
 		return 0;
 	}
@@ -3116,7 +3123,7 @@ retry:
 		return 0; /* nothing to do */
 	struct vy_index *index = container_of(pn, struct vy_index, in_dump);
 	if (index->is_dumping || index->pin_count > 0 ||
-	    index->generation == scheduler->generation)
+	    vy_index_generation(index) == scheduler->generation)
 		return 0; /* nothing to do */
 	if (vy_task_dump_new(index, ptask) != 0)
 		return -1;
@@ -4296,7 +4303,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	if (index->mem == NULL)
 		goto fail_mem;
 
-	index->generation = scheduler->generation;
 	index->dump_lsn = -1;
 	vy_cache_create(&index->cache, &e->cache_env, key_def);
 	rlist_create(&index->sealed);
