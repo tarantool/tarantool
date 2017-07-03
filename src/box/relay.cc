@@ -104,8 +104,6 @@ struct relay {
 	struct cpipe relay_pipe;
 	/** Status message */
 	struct relay_status_msg status_msg;
-	/** A condition to signal when status message is handled. */
-	struct ipc_cond status_cond;
 	/** Relay exit orchestration message */
 	struct relay_exit_msg exit_msg;
 
@@ -226,8 +224,6 @@ static void
 relay_status_update(struct cmsg *msg)
 {
 	msg->route = NULL;
-	struct relay_status_msg *status_msg = (struct relay_status_msg *)msg;
-	ipc_cond_signal(&status_msg->relay->status_cond);
 }
 
 /**
@@ -259,9 +255,7 @@ relay_cbus_detach(struct relay *relay)
 {
 	say_crit("exiting the relay loop");
 	/* Check that we have no in-flight status message */
-	while (relay->status_msg.msg.route != NULL) {
-		ipc_cond_wait(&relay->status_cond);
-	}
+	cbus_flush(&relay->tx_pipe, &relay->relay_pipe, cbus_process);
 
 	static const struct cmsg_hop exit_route[] = {
 		{tx_exit_cb, NULL}
@@ -277,7 +271,6 @@ relay_cbus_detach(struct relay *relay)
 	 */
 	cpipe_destroy(&relay->tx_pipe);
 	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
-	ipc_cond_destroy(&relay->status_cond);
 }
 
 /**
@@ -292,7 +285,6 @@ relay_subscribe_f(va_list ap)
 	struct recovery *r = relay->r;
 	coio_enable();
 	relay->stream.write = relay_send_row;
-	ipc_cond_create(&relay->status_cond);
 	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
 			     fiber_schedule_cb, fiber());
 	cpipe_create(&relay->tx_pipe, "tx");

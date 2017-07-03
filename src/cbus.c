@@ -398,6 +398,52 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 	return rc;
 }
 
+struct cbus_flush_msg {
+	struct cmsg cmsg;
+	bool complete;
+	struct ipc_cond cond;
+};
+
+static void
+cbus_flush_perform(struct cmsg *cmsg)
+{
+	(void)cmsg;
+}
+
+static void
+cbus_flush_complete(struct cmsg *cmsg)
+{
+	struct cbus_flush_msg *msg = container_of(cmsg,
+			struct cbus_flush_msg, cmsg);
+	msg->complete = true;
+	ipc_cond_signal(&msg->cond);
+}
+
+void
+cbus_flush(struct cpipe *callee, struct cpipe *caller,
+	   void (*process_cb)(struct cbus_endpoint *endpoint))
+{
+	struct cmsg_hop route[] = {
+		{cbus_flush_perform, caller},
+		{cbus_flush_complete, NULL},
+	};
+	struct cbus_flush_msg msg;
+
+	cmsg_init(&msg.cmsg, route);
+	msg.complete = false;
+	ipc_cond_create(&msg.cond);
+
+	cpipe_push(callee, &msg.cmsg);
+
+	while (true) {
+		if (process_cb != NULL)
+			process_cb(caller->endpoint);
+		if (msg.complete)
+			break;
+		ipc_cond_wait(&msg.cond);
+	}
+}
+
 void
 cbus_process(struct cbus_endpoint *endpoint)
 {
