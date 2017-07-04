@@ -132,12 +132,6 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 struct vy_mem {
 	/** Link in range->sealed list. */
 	struct rlist in_sealed;
-	/*
-	 * Link in scheduler->dump_fifo list. The mem is
-	 * added to the list when it has the first statement
-	 * allocated in it.
-	 */
-	struct rlist in_dump_fifo;
 	/** BPS tree */
 	struct vy_mem_tree tree;
 	/** Number of statements. */
