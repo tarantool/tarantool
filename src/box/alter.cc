@@ -460,7 +460,6 @@ struct alter_space;
 class AlterSpaceOp {
 public:
 	struct rlist link;
-	virtual void prepare(struct alter_space * /* alter */) {}
 	virtual void alter_def(struct alter_space * /* alter */) {}
 	virtual void alter(struct alter_space * /* alter */) {}
 	virtual void commit(struct alter_space * /* alter */) {}
@@ -554,30 +553,6 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 {
 	struct alter_space *alter = (struct alter_space *) trigger->data;
 	/*
-	 * If an index is unchanged, all its properties, including
-	 * ID are intact. Move this index here. If an index is
-	 * changed, even if this is a minor change, there is a
-	 * ModifyIndex instance which will move the index from an
-	 * old position to the new one.
-	 */
-	for (uint32_t i = 0; i < alter->new_space->index_count; i++) {
-		Index *new_index = alter->new_space->index[i];
-		Index *old_index = space_index(alter->old_space,
-					       index_id(new_index));
-		/*
-		 * Move unchanged index from the old space to the
-		 * new one.
-		 */
-		if (old_index != NULL &&
-		    index_def_cmp(new_index->index_def,
-				  old_index->index_def) == 0) {
-			space_swap_index(alter->old_space,
-					 alter->new_space,
-					 index_id(old_index),
-					 index_id(new_index));
-		}
-	}
-	/*
 	 * Commit alter ops, this will move the changed
 	 * indexes into their new places.
 	 */
@@ -645,8 +620,6 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
  * These are the major steps of alter defining the structure of
  * the algorithm and performed regardless of what is altered:
  *
- * - the input is checked for validity; each check is
- *   encapsulated in AlterSpaceOp::prepare() method.
  * - a copy of the definition of the old space is created
  * - the definition of the old space is altered, to get
  *   definition of a new space
@@ -687,13 +660,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	alter->space_def = old_space->def;
 	/* Create a definition of the new space. */
 	space_dump_def(old_space, &alter->key_list);
-	/*
-	 * Allow for a separate prepare step so that some ops
-	 * can be optimized.
-	 */
-	class AlterSpaceOp *op, *tmp;
-	rlist_foreach_entry_safe(op, &alter->ops, link, tmp)
-		op->prepare(alter);
+	class AlterSpaceOp *op;
 	/*
 	 * Alter the definition of the old space, so that
 	 * a new space can be created with a new definition.
@@ -746,42 +713,8 @@ class ModifySpace: public AlterSpaceOp
 public:
 	/* New space definition. */
 	struct space_def def;
-	virtual void prepare(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
 };
-
-/** Check that space properties are OK to change. */
-void
-ModifySpace::prepare(struct alter_space *alter)
-{
-	if (def.id != space_id(alter->old_space))
-		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  space_name(alter->old_space),
-			  "space id is immutable");
-
-	if (strcmp(def.engine_name, alter->old_space->def.engine_name) != 0)
-		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  space_name(alter->old_space),
-			  "can not change space engine");
-
-	if (def.exact_field_count != 0 &&
-	    def.exact_field_count != alter->old_space->def.exact_field_count &&
-	    space_index(alter->old_space, 0) != NULL &&
-	    space_size(alter->old_space) > 0) {
-
-		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  space_name(alter->old_space),
-			  "can not change field count on a non-empty space");
-	}
-
-	if (def.opts.temporary != alter->old_space->def.opts.temporary &&
-	    space_index(alter->old_space, 0) != NULL &&
-	    space_size(alter->old_space) > 0) {
-		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  space_name(alter->old_space),
-			  "can not switch temporary flag on a non-empty space");
-	}
-}
 
 /** Amend the definition of the new space. */
 void
@@ -791,8 +724,6 @@ ModifySpace::alter_def(struct alter_space *alter)
 }
 
 /** DropIndex - remove an index from space. */
-
-class AddIndex;
 
 class DropIndex: public AlterSpaceOp {
 public:
@@ -845,7 +776,23 @@ DropIndex::commit(struct alter_space *alter)
 	index->commitDrop();
 }
 
-/** Change non-essential (no data change) properties of an index. */
+class MoveIndex: public AlterSpaceOp
+{
+public:
+	struct index_def *index_def;
+	virtual void commit(struct alter_space *alter);
+};
+
+void
+MoveIndex::commit(struct alter_space *alter)
+{
+	space_swap_index(alter->old_space, alter->new_space,
+			 index_def->iid, index_def->iid);
+}
+
+/**
+ * Change non-essential (without data change) properties of an index.
+ */
 class ModifyIndex: public AlterSpaceOp
 {
 public:
@@ -876,7 +823,9 @@ ModifyIndex::commit(struct alter_space *alter)
 	space_swap_index(alter->old_space, alter->new_space,
 			 old_index_def->iid, new_index_def->iid);
 	Index *old_index = space_index(alter->old_space, old_index_def->iid);
+	assert(old_index != NULL);
 	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	assert(new_index != NULL);
 	index_def_swap(old_index->index_def, new_index->index_def);
 }
 
@@ -980,27 +929,18 @@ AddIndex::alter(struct alter_space *alter)
 {
 	Handler *handler = alter->new_space->handler;
 
-	if (space_index(alter->old_space, 0) == NULL) {
-		if (new_index_def->iid == 0) {
-			/*
-			 * Adding a primary key: bring the space
-			 * up to speed with the current recovery
-			 * state. During snapshot recovery it
-			 * means preparing the primary key for
-			 * build (beginBuild()). During xlog
-			 * recovery, it means building the primary
-			 * key. After recovery, it means building
-			 * all keys.
-			 */
-			handler->addPrimaryKey(alter->new_space);
-		} else {
-			/*
-			 * Adding a secondary key.
-			 */
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(alter->new_space),
-				  "can not add a secondary key before primary");
-		}
+	if (new_index_def->iid == 0) {
+		/*
+		 * Adding a primary key: bring the space
+		 * up to speed with the current recovery
+		 * state. During snapshot recovery it
+		 * means preparing the primary key for
+		 * build (beginBuild()). During xlog
+		 * recovery, it means building the primary
+		 * key. After recovery, it means building
+		 * all keys.
+		 */
+		handler->addPrimaryKey(alter->new_space);
 		return;
 	}
 	/**
@@ -1021,6 +961,63 @@ AddIndex::commit(struct alter_space *alter)
 }
 
 AddIndex::~AddIndex()
+{
+	/*
+	 * The trigger by now may reside in the new space (on
+	 * commit) or in the old space (rollback). Remove it
+	 * from the list, wherever it is.
+	 */
+	if (on_replace)
+		trigger_clear(on_replace);
+	if (new_index_def)
+		index_def_delete(new_index_def);
+}
+
+class RebuildIndex: public AlterSpaceOp {
+public:
+	/** New index index_def. */
+	struct index_def *new_index_def;
+	/** Old index index_def. */
+	struct index_def *old_index_def;
+	struct trigger *on_replace;
+	virtual void alter_def(struct alter_space *alter);
+	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter);
+	virtual ~RebuildIndex();
+};
+
+/** Add definition of the new key to the new space def. */
+void
+RebuildIndex::alter_def(struct alter_space *alter)
+{
+	rlist_del_entry(old_index_def, link);
+	rlist_add_entry(&alter->key_list, new_index_def, link);
+}
+
+void
+RebuildIndex::alter(struct alter_space *alter)
+{
+	Handler *handler = alter->new_space->handler;
+	/**
+	 * Get the new index and build it.
+	 */
+	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	assert(new_index != NULL);
+	handler->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
+	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
+					   new_index);
+	trigger_add(&alter->old_space->on_replace, on_replace);
+}
+
+void
+RebuildIndex::commit(struct alter_space *alter)
+{
+	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	assert(new_index != NULL);
+	new_index->commitCreate();
+}
+
+RebuildIndex::~RebuildIndex()
 {
 	/*
 	 * The trigger by now may reside in the new space (on
@@ -1205,6 +1202,34 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
+		struct space_def def;
+		space_def_create_from_tuple(&def, new_tuple, ER_ALTER_SPACE);
+		if (def.id != space_id(old_space))
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space), "space id is immutable");
+
+		if (strcmp(def.engine_name, old_space->def.engine_name) != 0)
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not change space engine");
+
+		if (def.exact_field_count != 0 &&
+		    def.exact_field_count != old_space->def.exact_field_count &&
+		    space_index(old_space, 0) != NULL &&
+		    space_size(old_space) > 0) {
+
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not change field count on a non-empty space");
+		}
+
+		if (def.opts.temporary != old_space->def.opts.temporary &&
+		    space_index(old_space, 0) != NULL &&
+		    space_size(old_space) > 0) {
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not switch temporary flag on a non-empty space");
+		}
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
@@ -1215,8 +1240,19 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		ModifySpace *modify =
 			AlterSpaceOp::create<ModifySpace>();
 		alter_space_add_op(alter, modify);
-		space_def_create_from_tuple(&modify->def, new_tuple,
-					    ER_ALTER_SPACE);
+		modify->def = def;
+		/* Create MoveIndex ops for all space indexes. */
+		uint32_t index_id;
+		for (index_id = 0; index_id <= old_space->index_id_max;
+		     ++index_id) {
+			Index *index = space_index(old_space, index_id);
+			if (index == NULL)
+				continue;
+			MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
+			alter_space_add_op(alter, move_index);
+			move_index->index_def = index->index_def;
+		}
+
 		alter_space_do(txn, alter, old_space);
 		scoped_guard.is_active = false;
 	}
@@ -1293,42 +1329,99 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		}
 	}
 
+	if (iid != 0 && space_index(old_space, 0) == NULL) {
+		/*
+		 * A secondary index can not be created without
+		 * a primary key.
+		 */
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  space_name(old_space),
+			  "can not add a secondary key before primary");
+	}
+
 	struct alter_space *alter = alter_space_new();
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
 
-	bool add_drop = old_index != NULL;
-	bool add_add = new_tuple != NULL;
-	bool add_modify = false;
-	struct index_def *new_index_def = new_tuple == NULL ? NULL :
-		index_def_new_from_tuple(new_tuple, old_space);
-	if (old_index != NULL && new_tuple != NULL) {
-		if (!index_def_change_requires_rebuild(old_index->index_def,
-						       new_index_def)) {
-			/* No need to rebuild and thus to add/drop the index. */
-			add_drop = add_add = false;
-			/* Add ModifyIndex only if the there is a change. */
-			if (index_def_cmp(old_index->index_def,
-					  new_index_def) != 0)
-				add_modify = true;
-		}
+	/*
+	 * We have some separate cases of space indexes alter:
+	 * 1. Simple drop an index.
+	 * 2. Add a new index with subcases:
+	 *    2.1. Add a new primary index.
+	 *    2.2. Add a secondary index.
+	 * 3. Alter index non data-sensitive definition.
+	 * 4. Alter index data-sensitive definition.
+	 */
+
+	/*
+	 * All not changing indexes should be moved from a old space
+	 * to a new one, use MoveIndex item.
+	 */
+	/* Create MoveIndex ops for first part of an old space indexes. */
+	uint32_t index_id;
+	for (index_id = 0; index_id < iid; ++index_id) {
+		Index *index = space_index(old_space, index_id);
+		if (index == NULL)
+			continue;
+		MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
+		alter_space_add_op(alter, move_index);
+		move_index->index_def = index->index_def;
 	}
-	if (add_drop) {
+
+	if (old_index != NULL && new_tuple == NULL) {
 		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
 		alter_space_add_op(alter, drop_index);
 		drop_index->old_index_def = old_index->index_def;
 	}
-	if (add_add) {
+
+	if (old_index == NULL && new_tuple != NULL) {
 		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
 		alter_space_add_op(alter, add_index);
-		add_index->new_index_def = new_index_def;
+		add_index->new_index_def =
+			index_def_new_from_tuple(new_tuple, old_space);
 	}
-	if (add_modify) {
-		assert(!add_drop && !add_add);
-		ModifyIndex *modify = AlterSpaceOp::create<ModifyIndex>();
-		alter_space_add_op(alter, modify);
-		modify->new_index_def = new_index_def;
-		modify->old_index_def = old_index->index_def;
+
+	if (old_index != NULL && new_tuple != NULL) {
+		struct index_def *index_def;
+		index_def = index_def_new_from_tuple(new_tuple, old_space);
+		auto index_def_guard =
+			make_scoped_guard([=] { index_def_delete(index_def); });
+		if (index_def_cmp(index_def, old_index->index_def) == 0) {
+			/* Index is not changed so just move it. */
+			MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
+			alter_space_add_op(alter, move_index);
+			move_index->index_def = old_index->index_def;
+		}
+		else if (!index_def_change_requires_rebuild(
+			old_index->index_def, index_def)) {
+			/*
+			 * Operation can be done without index rebuild.
+			 */
+			ModifyIndex *modify_index = AlterSpaceOp::create<ModifyIndex>();
+			alter_space_add_op(alter, modify_index);
+			modify_index->new_index_def = index_def;
+			modify_index->old_index_def = old_index->index_def;
+			index_def_guard.is_active = false;
+
+		} else {
+			/*
+			 * Operations needs for an index rebuild.
+			 */
+			RebuildIndex *rebuild_index = AlterSpaceOp::create<RebuildIndex>();
+			alter_space_add_op(alter, rebuild_index);
+			rebuild_index->new_index_def = index_def;
+			rebuild_index->old_index_def = old_index->index_def;
+			index_def_guard.is_active = false;
+		}
+	}
+	/* Create MoveIndex ops for last part of an old space indexes. */
+	for (index_id = iid + 1; index_id <= old_space->index_id_max; ++index_id) {
+		Index *index = space_index(old_space, index_id);
+		if (index == NULL)
+			continue;
+		MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
+		alter_space_add_op(alter, move_index);
+		move_index->index_def = index->index_def;
 	}
 	alter_space_do(txn, alter, old_space);
 	scoped_guard.is_active = false;
