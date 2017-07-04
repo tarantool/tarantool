@@ -54,6 +54,10 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#ifndef HAVE_OPENMP
+#error "HAVE_OPENMP macro is not defined"
+#endif
+
 #define min(a, b)   (a) < (b) ? a : b
 
 static char *med3(char *a, char *b, char *c,
@@ -218,8 +222,8 @@ qsort_arg_mt_internal(void *a, size_t n, intptr_t es,
 }
 
 void
-qsort_arg(void *a, size_t n, size_t es,
-	  int (*cmp)(const void *a, const void *b, void *arg), void *arg)
+qsort_arg_mt(void *a, size_t n, size_t es,
+	     int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 #pragma omp parallel
 	{

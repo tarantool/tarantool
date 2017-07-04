@@ -50,6 +50,16 @@
 #include <third_party/qsort_arg.h>
 #include <stdint.h>
 
+enum {
+	/*
+	 * The size of an array from which it is reasonable to start
+	 * multithread sort.
+	 * If the array size is less than the size below, a single-threaded
+	 * version of qsort will be started.S
+	 */
+	MULTITHREAD_SIZE_THRESHOLD = 128 * 1024,
+};
+
 #define min(a, b)   (a) < (b) ? a : b
 
 static char *med3(char *a, char *b, char *c,
@@ -105,8 +115,11 @@ med3(char *a, char *b, char *c, int (*cmp)(const void *a, const void *b, void *a
 		: (cmp(b, c, arg) > 0 ? b : (cmp(a, c, arg) < 0 ? a : c));
 }
 
-void
-qsort_arg(void *a, size_t n, size_t es, int (*cmp)(const void *a, const void *b, void *arg), void *arg)
+/**
+ * Single-thread version of qsort.
+ */
+static void
+qsort_arg_st(void *a, size_t n, size_t es, int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 	char	   *pa,
 			   *pb,
@@ -199,3 +212,31 @@ loop:SWAPINIT(a, es);
 	}
 /*		qsort_arg(pn - r, r / es, es, cmp, arg);*/
 }
+
+#ifdef HAVE_OPENMP
+/**
+ * Multi-thread version of qsort. Only present when target machine supports
+ * open MP.
+ */
+void qsort_arg_mt(void *a, size_t n, size_t es,
+		  int (*cmp)(const void *, const void *, void *), void *arg);
+#endif
+
+/**
+ * General version of qsort that calls single-threaded of multi-threaded
+ * qsort depending on open MP availability and given array size.
+ */
+void
+qsort_arg(void *a, size_t n, size_t es,
+	  int (*cmp)(const void *a, const void *b, void *arg), void *arg)
+{
+#ifdef HAVE_OPENMP
+	if (n >= MULTITHREAD_SIZE_THRESHOLD)
+		qsort_arg_mt(a, n, es, cmp, arg);
+	else
+		qsort_arg_st(a, n, es, cmp, arg);
+#else
+	qsort_arg_st(a, n, es, cmp, arg);
+#endif
+}
+
