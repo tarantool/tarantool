@@ -332,14 +332,6 @@ struct vy_index {
 	 * with continuation markers.
 	 */
 	struct vy_cache cache;
-	/**
-	 * Conflict manager index. Contains all changes
-	 * made by transaction before they commit. Is used
-	 * to implement read committed isolation level, i.e.
-	 * the changes made by a transaction are only present
-	 * in this tree, and thus not seen by other transactions.
-	 */
-	read_set_t read_set;
 	/** Active in-memory index, i.e. the one used for insertions. */
 	struct vy_mem *mem;
 	/**
@@ -534,6 +526,7 @@ enum tx_state {
 };
 
 struct read_set_key {
+	struct vy_index *index;
 	struct tuple *stmt;
 	struct vy_tx *tx;
 };
@@ -821,9 +814,11 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
 	       in_set, read_set_cmp, struct read_set_key *, read_set_key_cmp);
 
 static struct txv *
-read_set_search_key(read_set_t *rbtree, struct tuple *stmt, struct vy_tx *tx)
+read_set_search_key(read_set_t *rbtree, struct vy_index *index,
+		    struct tuple *stmt, struct vy_tx *tx)
 {
 	struct read_set_key key;
+	key.index = index;
 	key.stmt = stmt;
 	key.tx = tx;
 	return read_set_search(rbtree, &key);
@@ -832,8 +827,9 @@ read_set_search_key(read_set_t *rbtree, struct tuple *stmt, struct vy_tx *tx)
 static int
 read_set_cmp(struct txv *a, struct txv *b)
 {
-	assert(a->index == b->index);
-	int rc = vy_stmt_compare(a->stmt, b->stmt, a->index->key_def);
+	int rc = a->index < b->index ? -1 : a->index > b->index;
+	if (rc == 0)
+		rc = vy_stmt_compare(a->stmt, b->stmt, a->index->key_def);
 	/**
 	 * While in svindex older value are "bigger" than newer
 	 * ones, i.e. the newest value comes first, in
@@ -849,9 +845,11 @@ read_set_cmp(struct txv *a, struct txv *b)
 static int
 read_set_key_cmp(struct read_set_key *a, struct txv *b)
 {
-	int rc = vy_stmt_compare(a->stmt, b->stmt, b->index->key_def);
+	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0)
-		return a->tx < b->tx ? -1 : a->tx > b->tx;
+		rc = vy_stmt_compare(a->stmt, b->stmt, b->index->key_def);
+	if (rc == 0)
+		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
 	return rc;
 }
 
@@ -876,8 +874,15 @@ struct tx_manager {
 	 */
 	int64_t psn;
 	/**
+	 * Conflict manager index. Contains all changes
+	 * made by transaction before they commit. Is used
+	 * to implement read committed isolation level, i.e.
+	 * the changes made by a transaction are only present
+	 * in this tree, and thus not seen by other transactions.
+	 */
+	read_set_t read_set;
+	/**
 	 * The list of TXs with a read view in order of vlsn.
-	 *
 	 */
 	struct rlist read_views;
 	/**
@@ -962,6 +967,7 @@ tx_manager_new(struct vy_env *env)
 	m->last_prepared_tx = NULL;
 	m->psn = 0;
 	m->env = env;
+	read_set_new(&m->read_set);
 	rlist_create(&m->read_views);
 	vy_global_read_view_create((struct vy_read_view *) &m->global_read_view,
 				   INT64_MAX);
@@ -4312,7 +4318,6 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	vy_range_tree_new(index->tree);
 	vy_range_heap_create(&index->range_heap);
 	rlist_create(&index->runs);
-	read_set_new(&index->read_set);
 	index->pk = pk;
 	if (pk != NULL)
 		vy_index_ref(pk);
@@ -4481,15 +4486,6 @@ txv_delete(struct txv *v)
 	mempool_free(&v->tx->xm->txv_mempool, v);
 }
 
-static struct txv *
-read_set_delete_cb(read_set_t *t, struct txv *v, void *arg)
-{
-	(void) t;
-	(void) arg;
-	txv_delete(v);
-	return NULL;
-}
-
 static struct vy_range *
 vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 {
@@ -4521,7 +4517,6 @@ vy_index_delete(struct vy_index *index)
 		vy_mem_delete(mem);
 	}
 
-	read_set_iter(&index->read_set, NULL, read_set_delete_cb, NULL);
 	vy_range_tree_iter(index->tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&index->range_heap);
 	tuple_format_ref(index->surrogate_format, -1);
@@ -5620,7 +5615,7 @@ vy_tx_destroy(struct vy_tx *tx)
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		if (v->is_read)
-			read_set_remove(&v->index->read_set, v);
+			read_set_remove(&tx->xm->read_set, v);
 		else
 			vy_stmt_counter_unacct_tuple(&v->index->stat.txw.count,
 						     v->stmt);
@@ -5655,14 +5650,14 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 			return 0;
 		}
 	}
-	struct txv *v = read_set_search_key(&index->read_set, key, tx);
+	struct txv *v = read_set_search_key(&tx->xm->read_set, index, key, tx);
 	if (v == NULL) {
 		if ((v = txv_new(index, key, tx)) == NULL)
 			return -1;
 		v->is_read = true;
 		v->is_gap = is_gap;
 		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		read_set_insert(&index->read_set, v);
+		read_set_insert(&tx->xm->read_set, v);
 	}
 	return 0;
 }
@@ -5674,13 +5669,15 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 static int
 vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 {
-	read_set_t *tree = &v->index->read_set;
+	read_set_t *tree = &tx->xm->read_set;
 	struct read_set_key key;
+	key.index = v->index;
 	key.stmt = v->stmt;
 	key.tx = NULL;
 	/** Find the first value equal to or greater than key */
 	for (struct txv *abort = read_set_nsearch(tree, &key);
-	     abort != NULL; abort = read_set_next(tree, abort)) {
+	     abort != NULL && abort->index == v->index;
+	     abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
 				    v->index->key_def) != 0)
@@ -5712,13 +5709,15 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 static void
 vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 {
-	read_set_t *tree = &v->index->read_set;
+	read_set_t *tree = &tx->xm->read_set;
 	struct read_set_key key;
+	key.index = v->index;
 	key.stmt = v->stmt;
 	key.tx = NULL;
 	/** Find the first value equal to or greater than key */
 	for (struct txv *abort = read_set_nsearch(tree, &key);
-	     abort != NULL; abort = read_set_next(tree, abort)) {
+	     abort != NULL && abort->index == v->index;
+	     abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
 				    v->index->key_def) != 0)
@@ -5983,7 +5982,7 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* Remove from the conflict manager index */
 		if (v->is_read)
-			read_set_remove(&v->index->read_set, v);
+			read_set_remove(&tx->xm->read_set, v);
 		/* Remove from the transaction write log. */
 		if (!v->is_read) {
 			write_set_remove(&tx->write_set, v);
