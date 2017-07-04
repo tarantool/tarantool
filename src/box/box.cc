@@ -1554,7 +1554,6 @@ box_cfg_xc(void)
 	port_init();
 	iproto_init();
 	wal_thread_start();
-	sql_init();
 
 	title("loading");
 
@@ -1702,6 +1701,8 @@ box_cfg_xc(void)
 		if (replica->applier != NULL)
 			applier_resume(replica->applier);
 	}
+
+	sql_init();
 
 	title("running");
 	say_info("ready to accept requests");

@@ -62,10 +62,22 @@ void
 sql_init()
 {
 	int rc;
+	char *zErrMsg = 0;
 
 	rc = sqlite3_open("", &db);
 	if (rc != SQLITE_OK) {
 		panic("failed to initialize SQL subsystem");
+	} else {
+		/* XXX */
+	}
+
+	sqlite3_mutex_enter(db->mutex);
+	db->init.busy = 1;
+	rc = sqlite3InitOne(db, 0, &zErrMsg);
+	db->init.busy = 0;
+	sqlite3_mutex_leave(db->mutex);
+	if (rc != SQLITE_OK) {
+		panic(zErrMsg);
 	} else {
 		/* XXX */
 	}

@@ -4300,4 +4300,5 @@ void sqlite3VectorErrorMsg(Parse*, Expr*);
 */
 extern int sqlSubProgramsRemaining;
 
+int sqlite3InitOne(sqlite3 *db, int iDb, char **pzErrMsg);
 #endif /* SQLITEINT_H */

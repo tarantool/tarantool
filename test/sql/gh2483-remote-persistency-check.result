@@ -1,0 +1,35 @@
+-- Regression test for gh-2483
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+-- Create a table and insert a datum
+box.sql.execute([[CREATE TABLE t(id int PRIMARY KEY)]])
+---
+...
+box.sql.execute([[INSERT INTO t (id) VALUES (1)]])
+---
+...
+-- Sanity check
+box.sql.execute([[SELECT * FROM t]])
+---
+- - [1]
+...
+test_run:cmd('restart server default');
+-- Connect to ourself
+require('console').connect(os.getenv("LISTEN"))
+---
+- true
+...
+-- This segfaults due to gh-2483 since
+-- before the patch sql schema was read on-demand.
+-- Which could obviously lead to access denied error.
+box.sql.execute([[SELECT * FROM t]])
+---
+- - [1]
+...
