@@ -99,14 +99,18 @@ static const int64_t MAX_LSN = INT64_MAX / 2;
  * Global configuration of an entire vinyl instance (env object).
  */
 struct vy_conf {
-	/* path to vinyl_dir */
+	/** Path to the data directory. */
 	char *path;
-	/* memory */
-	uint64_t memory_limit;
-	/* read cache quota */
+	/** Max size of the memory level. */
+	uint64_t memory;
+	/** Max size of the tuple cache. */
 	uint64_t cache;
-	/* quota timeout */
+	/** Max time a transaction may wait for memory. */
 	double timeout;
+	/** Max number of threads used for reading. */
+	int read_threads;
+	/** Max number of threads used for writing. */
+	int write_threads;
 };
 
 struct vy_env {
@@ -3473,7 +3477,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
-	scheduler->worker_pool_size = cfg_geti("vinyl_write_threads");
+	scheduler->worker_pool_size = scheduler->env->conf->write_threads;
 	/* One thread is reserved for dumps, see vy_schedule(). */
 	assert(scheduler->worker_pool_size >= 2);
 	scheduler->workers_available = scheduler->worker_pool_size;
@@ -3696,9 +3700,11 @@ vy_conf_new()
 		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
 		return NULL;
 	}
-	conf->memory_limit = cfg_getd("vinyl_memory");
-	conf->cache = cfg_getd("vinyl_cache");
+	conf->memory = cfg_geti64("vinyl_memory");
+	conf->cache = cfg_geti64("vinyl_cache");
 	conf->timeout = cfg_getd("vinyl_timeout");
+	conf->read_threads = cfg_geti("vinyl_read_threads");
+	conf->write_threads = cfg_geti("vinyl_write_threads");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
@@ -6156,10 +6162,11 @@ int
 vy_bootstrap(struct vy_env *e)
 {
 	assert(e->status == VINYL_OFFLINE);
-	e->status = VINYL_ONLINE;
-	vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 	if (vy_log_bootstrap() != 0)
 		return -1;
+	vy_quota_set_limit(&e->quota, e->conf->memory);
+	vy_run_env_enable_coio(&e->run_env, e->conf->read_threads);
+	e->status = VINYL_ONLINE;
 	return 0;
 }
 
@@ -6170,16 +6177,16 @@ vy_begin_initial_recovery(struct vy_env *e,
 	assert(e->status == VINYL_OFFLINE);
 	if (recovery_vclock != NULL) {
 		e->xm->lsn = vclock_sum(recovery_vclock);
-		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 		e->recovery_vclock = recovery_vclock;
 		e->recovery = vy_log_begin_recovery(recovery_vclock);
 		if (e->recovery == NULL)
 			return -1;
+		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 	} else {
-		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
-		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 		if (vy_log_bootstrap() != 0)
 			return -1;
+		vy_quota_set_limit(&e->quota, e->conf->memory);
+		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
 	return 0;
 }
@@ -6205,7 +6212,6 @@ vy_end_recovery(struct vy_env *e)
 {
 	switch (e->status) {
 	case VINYL_FINAL_RECOVERY_LOCAL:
-		vy_quota_set_limit(&e->quota, e->conf->memory_limit);
 		if (vy_log_end_recovery() != 0)
 			return -1;
 		/*
@@ -6220,12 +6226,14 @@ vy_end_recovery(struct vy_env *e)
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
+		vy_quota_set_limit(&e->quota, e->conf->memory);
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;
 	default:
 		unreachable();
 	}
+	vy_run_env_enable_coio(&e->run_env, e->conf->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -7273,7 +7281,7 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	struct vy_run_iterator run_itr;
 	const struct vy_read_view **p_read_view;
 	p_read_view = itr->p_read_view;
-	vy_run_iterator_open(&run_itr, true, &itr->index->stat.disk.iterator,
+	vy_run_iterator_open(&run_itr, &itr->index->stat.disk.iterator,
 			     &env->run_env, slice,
 			     ITER_EQ, itr->key, p_read_view,
 			     itr->index->key_def, itr->index->user_key_def,
@@ -7544,7 +7552,6 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	 */
 	format = (index->space_index_count == 1 ?
 		  index->space_format : index->surrogate_format);
-	bool coio_read = cord_is_main() && index->env->status == VINYL_ONLINE;
 	rlist_foreach_entry(slice, &itr->curr_range->slices, in_range) {
 		/*
 		 * vy_task_dump_complete() may yield after adding
@@ -7561,7 +7568,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		assert(slice->run->info.max_lsn <= index->dump_lsn);
 		struct vy_merge_src *sub_src = vy_merge_iterator_add(
 			&itr->merge_iterator, false, true);
-		vy_run_iterator_open(&sub_src->run_iterator, coio_read,
+		vy_run_iterator_open(&sub_src->run_iterator,
 				     &index->stat.disk.iterator,
 				     &index->env->run_env, slice,
 				     itr->iterator_type, itr->key,

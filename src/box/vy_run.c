@@ -37,7 +37,6 @@
 #include "ipc.h"
 #include "cbus.h"
 #include "memory.h"
-#include "cfg.h"
 
 #include "replication.h"
 #include "tuple_hash.h" /* for bloom filter */
@@ -123,11 +122,12 @@ vy_run_reader_f(va_list ap)
 
 /** Start run reader threads. */
 static void
-vy_run_env_start_readers(struct vy_run_env *env)
+vy_run_env_start_readers(struct vy_run_env *env, int threads)
 {
-	env->reader_pool_size = cfg_geti("vinyl_read_threads");
-	assert(env->reader_pool_size > 0);
+	assert(threads > 0);
+	assert(env->reader_pool == NULL);
 
+	env->reader_pool_size = threads;
 	env->reader_pool = calloc(env->reader_pool_size,
 				  sizeof(*env->reader_pool));
 	if (env->reader_pool == NULL)
@@ -167,13 +167,10 @@ vy_run_env_stop_readers(struct vy_run_env *env)
 void
 vy_run_env_create(struct vy_run_env *env)
 {
+	memset(env, 0, sizeof(*env));
 	tt_pthread_key_create(&env->zdctx_key, vy_free_zdctx);
-
-	struct slab_cache *slab_cache = cord_slab_cache();
-	mempool_create(&env->read_task_pool, slab_cache,
+	mempool_create(&env->read_task_pool, cord_slab_cache(),
 		       sizeof(struct vy_page_read_task));
-
-	vy_run_env_start_readers(env);
 }
 
 /**
@@ -182,9 +179,19 @@ vy_run_env_create(struct vy_run_env *env)
 void
 vy_run_env_destroy(struct vy_run_env *env)
 {
-	vy_run_env_stop_readers(env);
+	if (env->reader_pool != NULL)
+		vy_run_env_stop_readers(env);
 	mempool_destroy(&env->read_task_pool);
 	tt_pthread_key_delete(env->zdctx_key);
+}
+
+/**
+ * Enable coio reads for a vinyl run environment.
+ */
+void
+vy_run_env_enable_coio(struct vy_run_env *env, int threads)
+{
+	vy_run_env_start_readers(env, threads);
 }
 
 /**
@@ -959,7 +966,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 
 	/* Read page data from the disk */
 	int rc;
-	if (itr->coio_read) {
+	if (env->reader_pool != NULL) {
 		/* Allocate a cbus task. */
 		struct vy_page_read_task *task;
 		task = mempool_alloc(&env->read_task_pool);
@@ -1482,7 +1489,7 @@ static struct vy_stmt_iterator_iface vy_run_iterator_iface;
  * Open the iterator.
  */
 void
-vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
+vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
@@ -1501,7 +1508,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
 	itr->is_primary = is_primary;
 	itr->run_env = run_env;
 	itr->slice = slice;
-	itr->coio_read = coio_read;
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;

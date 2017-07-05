@@ -215,8 +215,6 @@ struct vy_run_iterator {
 	const struct key_def *key_def;
 	/** Index key definition defined by the user. */
 	const struct key_def *user_key_def;
-	/** Should the iterator use coio task for reading or not */
-	bool coio_read;
 	/**
 	 * Format ot allocate REPLACE and DELETE tuples read from
 	 * pages.
@@ -288,6 +286,23 @@ vy_run_env_create(struct vy_run_env *env);
  */
 void
 vy_run_env_destroy(struct vy_run_env *env);
+
+/**
+ * Enable coio reads for a vinyl run environment.
+ *
+ * This functions starts @threads reader threads and makes
+ * the run iterator hand disk reads over to them rather than
+ * read run files directly blocking the current fiber.
+ */
+void
+vy_run_env_enable_coio(struct vy_run_env *env, int threads);
+
+/**
+ * Disable coio reads for a vinyl run environment.
+ * This function joins reader threads.
+ */
+void
+vy_run_env_disable_coio(struct vy_run_env *env);
 
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
@@ -435,7 +450,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 	     struct vy_slice **result);
 
 void
-vy_run_iterator_open(struct vy_run_iterator *itr, bool coio_read,
+vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
