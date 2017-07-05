@@ -1010,69 +1010,37 @@ test:do_execsql_test(
 
 
 --encoding = db("one", "PRAGMA encoding")
-if 0>0 then--(encoding == "UTF-16le") then
-    test:do_execsql_test(
-        "func-9.11-utf16le",
-        [[
-            SELECT hex(replace('abcdefg','ef','12'))
-        ]], {
-            -- <func-9.11-utf16le>
-            6100620063006400310032006700
-            -- </func-9.11-utf16le>
-        })
 
-    test:do_execsql_test(
-        "func-9.12-utf16le",
-        [[
-            SELECT hex(replace('abcdefg','','12'))
-        ]], {
-            -- <func-9.12-utf16le>
-            6100620063006400650066006700
-            -- </func-9.12-utf16le>
-        })
+test:do_execsql_test(
+    "func-9.11-utf8",
+    [[
+        SELECT hex(replace('abcdefg','ef','12'))
+    ]], {
+    -- <func-9.11-utf8>
+    "61626364313267"
+    -- </func-9.11-utf8>
+})
 
-    test:do_execsql_test(
-        "func-9.13-utf16le",
-        [[
-            SELECT hex(replace('aabcdefg','a','aaa'))
-        ]], {
-            -- <func-9.13-utf16le>
-            610061006100610061006100620063006400650066006700
-            -- </func-9.13-utf16le>
-        })
+test:do_execsql_test(
+    "func-9.12-utf8",
+    [[
+        SELECT hex(replace('abcdefg','','12'))
+    ]], {
+    -- <func-9.12-utf8>
+    "61626364656667"
+    -- </func-9.12-utf8>
+})
 
-else --elseif (encoding == "UTF-8") then
-    test:do_execsql_test(
-        "func-9.11-utf8",
-        [[
-            SELECT hex(replace('abcdefg','ef','12'))
-        ]], {
-            -- <func-9.11-utf8>
-            "61626364313267"
-            -- </func-9.11-utf8>
-        })
+test:do_execsql_test(
+    "func-9.13-utf8",
+    [[
+        SELECT hex(replace('aabcdefg','a','aaa'))
+    ]], {
+    -- <func-9.13-utf8>
+    "616161616161626364656667"
+    -- </func-9.13-utf8>
+})
 
-    test:do_execsql_test(
-        "func-9.12-utf8",
-        [[
-            SELECT hex(replace('abcdefg','','12'))
-        ]], {
-            -- <func-9.12-utf8>
-            "61626364656667"
-            -- </func-9.12-utf8>
-        })
-
-    test:do_execsql_test(
-        "func-9.13-utf8",
-        [[
-            SELECT hex(replace('aabcdefg','a','aaa'))
-        ]], {
-            -- <func-9.13-utf8>
-            "616161616161626364656667"
-            -- </func-9.13-utf8>
-        })
-
-end
 -- Use the "sqlite_register_test_function" TCL command which is part of
 -- the text fixture in order to verify correct operation of some of
 -- the user-defined SQL function APIs that are not used by the built-in

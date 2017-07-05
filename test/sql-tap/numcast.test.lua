@@ -21,7 +21,7 @@ test:plan(17)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
 -- MUST_WORK_TEST should we use
--- for _, enc in ipairs({"utf8", "utf16le", "utf16be"}) do
+-- for _, enc in ipairs({"utf8", }) do
 for _, enc in ipairs({"utf8"}) do
     test:do_test(
         "numcast-"..enc..".0",

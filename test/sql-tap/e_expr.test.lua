@@ -3467,42 +3467,6 @@ do_qexpr_test("e_expr-27.4.1", " CAST('ghi' AS blob) ", "X'676869'")
 do_qexpr_test("e_expr-27.4.2", " CAST(456 AS blob) ", "X'343536'")
 do_qexpr_test("e_expr-27.4.3", " CAST(1.78 AS blob) ", "X'312E3738'")
 
--- MUST_WORK_TEST bd should be restarted? is it necessary?
-if 0>0 then
-    X(1454, "X!cmd", [=[["rename","db","db2"]]=])
-    sqlite3("db", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16le' "
-    do_qexpr_test("e_expr-27.4.4", " CAST('ghi' AS blob) ", "X'670068006900'")
-    do_qexpr_test("e_expr-27.4.5", " CAST(456 AS blob) ", "X'340035003600'")
-    do_qexpr_test("e_expr-27.4.6", " CAST(1.78 AS blob) ", "X'31002E0037003800'")
-
-
-    db("close")
-    sqlite3("db", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16be' "
-    do_qexpr_test("e_expr-27.4.7", " CAST('ghi' AS blob) ", "X'006700680069'")
-    do_qexpr_test("e_expr-27.4.8", " CAST(456 AS blob) ", "X'003400350036'")
-    do_qexpr_test("e_expr-27.4.9", " CAST(1.78 AS blob) ", "X'0031002E00370038'")
-
-
-    db("close")
-    X(1471, "X!cmd", [=[["rename","db2","db"]]=])
-    -- EVIDENCE-OF: R-04207-37981 To cast a BLOB value to TEXT, the sequence
-    -- of bytes that make up the BLOB is interpreted as text encoded using
-    -- the database encoding.
-    --
-    do_expr_test("e_expr-28.1.1", " CAST (X'676869' AS text) ", "text", "ghi")
-    do_expr_test("e_expr-28.1.2", " CAST (X'670068006900' AS text) ", "text", "g")
-    X(1479, "X!cmd", [=[["rename","db","db2"]]=])
-    sqlite3("db", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16le' "
-    do_expr_test("e_expr-28.1.3", " CAST (X'676869' AS text) == 'ghi' ", "integer", 0)
-    do_expr_test("e_expr-28.1.4", " CAST (X'670068006900' AS text) ", "text", "ghi")
-
-
-    db("close")
-    X(1487, "X!cmd", [=[["rename","db2","db"]]=])
-end
 -- EVIDENCE-OF: R-22235-47006 Casting an INTEGER or REAL value into TEXT
 -- renders the value as if via sqlite3_snprintf() except that the
 -- resulting TEXT uses the encoding of the database connection.
@@ -3523,24 +3487,6 @@ do_expr_test("e_expr-29.1.2", " CAST (X'3233302E30' AS REAL) ", "real", 230.0)
 do_expr_test("e_expr-29.1.3", " CAST (X'2D392E3837' AS REAL) ", "real", -9.87)
 do_expr_test("e_expr-29.1.4", " CAST (X'302E30303031' AS REAL) ", "real", 0.0001)
 
--- MUST_WORK_TEST bd should be restarted? is it necessary?
-if 0>0 then
-    X(1509, "X!cmd", [=[["rename","db","db2"]]=])
-    sqlite3("db", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16le' "
-    do_expr_test("e_expr-29.1.5", [[
-        CAST (X'31002E0032003300' AS REAL) ]], "real", 1.23)
-    do_expr_test("e_expr-29.1.6", [[
-        CAST (X'3200330030002E003000' AS REAL) ]], "real", 230.0)
-    do_expr_test("e_expr-29.1.7", [[
-        CAST (X'2D0039002E0038003700' AS REAL) ]], "real", -9.87)
-    do_expr_test("e_expr-29.1.8", [[
-        CAST (X'30002E003000300030003100' AS REAL) ]], "real", 0.0001)
-
-
-    db("close")
-    X(1523, "X!cmd", [=[["rename","db2","db"]]=])
-end
 -- EVIDENCE-OF: R-54898-34554 When casting a TEXT value to REAL, the
 -- longest possible prefix of the value that can be interpreted as a real
 -- number is extracted from the TEXT value and the remainder ignored.
@@ -3573,24 +3519,7 @@ do_expr_test("e_expr-30.1.3", [[
 do_expr_test("e_expr-30.1.4", [[
   CAST(X'2D31313235383939393036383432363234' AS INTEGER)
 ]], "integer", -1125899906842624LL)
--- MUST_WORK_TEST bd should be restarted? is it necessary?
-if 0>0 then
-    X(1561, "X!cmd", [=[["rename","db","db2"]]=])
-    sqlite3("db", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16be' "
-    do_expr_test("e_expr-30.1.5", " CAST(X'003100320033' AS INTEGER) ", "integer", 123)
-    do_expr_test("e_expr-30.1.6", " CAST(X'002D003600370038' AS INTEGER) ", "integer", -678)
-    do_expr_test("e_expr-30.1.7", [[
-      CAST(X'0031003000300030003000300030' AS INTEGER)
-    ]], "integer", 1000000)
-    do_expr_test("e_expr-30.1.8", [[
-      CAST(X'002D0031003100320035003800390039003900300036003800340032003600320034' AS INTEGER)
-    ]], "integer", -1125899906842624)
 
-
-    db("close")
-    X(1575, "X!cmd", [=[["rename","db2","db"]]=])
-end
 -- EVIDENCE-OF: R-47612-45842 When casting a TEXT value to INTEGER, the
 -- longest possible prefix of the value that can be interpreted as an
 -- integer number is extracted from the TEXT value and the remainder
@@ -3666,42 +3595,8 @@ do_expr_test("e_expr-32.2.4", [[
 -- EVIDENCE-OF: R-64550-29191 Note that the result from casting any
 -- non-BLOB value into a BLOB and the result from casting any BLOB value
 -- into a non-BLOB value may be different depending on whether the
--- database encoding is UTF-8, UTF-16be, or UTF-16le.
+-- database encoding is UTF-8
 --
--- MUST_WORK_TEST bd should be restarted? is it necessary?
-if 0>0 then
-    sqlite3("db1", ":memory:")
-    X(1666, "X!cmd", [=[["db1","eval"," PRAGMA encoding = 'utf-8' "]]=])
-    sqlite3("db2", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16le' "
-    sqlite3("db3", ":memory:")
-    test:execsql " PRAGMA encoding = 'utf-16be' "
-    for _ in X(0, "X!foreach", [=[["tn castexpr differs","\n  1 { CAST(123 AS BLOB)    } 1\n  2 { CAST('' AS BLOB)     } 0\n  3 { CAST('abcd' AS BLOB) } 1\n\n  4 { CAST(X'abcd' AS TEXT) } 1\n  5 { CAST(X'' AS TEXT)     } 0\n"]]=]) do
-        r1 = X(1672, "X!cmd", [=[["db1","eval",["SELECT typeof(",["castexpr"],"), quote(",["castexpr"],")"]]]=])
-        r2 = test:execsql(string.format("SELECT typeof(%s), quote(%s)", castexpr, castexpr))
-        r3 = test:execsql(string.format("SELECT typeof(%s), quote(%s)", castexpr, castexpr))
-        if differs
-     then
-            res = ((r1 ~= r2) and (r2 ~= r3))
-        else
-            res = ((r1 == r2) and (r2 == r3))
-        end
-        test:do_test(
-            "e_expr-33.1."..tn,
-            function()
-                return res
-            end, {
-                1
-            })
-
-    end
-    X(1689, "X!cmd", [=[["db1","close"]]=])
-    db2("close")
-    db3("close")
-    X(1696, "X!cmd", [=[["catch"," db close "]]=])
-    forcedelete("test.db")
-end
-
 ---------------------------------------------------------------------------
 -- Test statements related to the EXISTS and NOT EXISTS operators.
 --

@@ -21,6 +21,14 @@
 #  endif
 #endif
 
+
+/*
+*************************************************************************
+** pragma.h contains several pragmas, including utf's pragmas.
+** All that is not utf-8 should be omitted
+*************************************************************************
+*/
+
 /***************************************************************************
 ** The "pragma.h" include file is an automatically generated file that
 ** that includes the PragType_XXXX macro definitions and the aPragmaName[]
@@ -1605,10 +1613,9 @@ void sqlite3Pragma(
   break;
 #endif /* SQLITE_OMIT_INTEGRITY_CHECK */
 
-#ifndef SQLITE_OMIT_UTF16
   /*
   **   PRAGMA encoding
-  **   PRAGMA encoding = "utf-8"|"utf-16"|"utf-16le"|"utf-16be"
+  **   PRAGMA encoding = "utf-8"
   **
   ** In its first form, this pragma returns the encoding of the main
   ** database. If the database is not initialized, it is initialized now.
@@ -1618,7 +1625,7 @@ void sqlite3Pragma(
   ** encoding that will be used for the main database file if a new file
   ** is created. If an existing main database file is opened, then the
   ** default text encoding for the existing database is used.
-  ** 
+  **
   ** In all cases new databases created using the ATTACH command are
   ** created to use the same default text encoding as the main database. If
   ** the main database has not been initialized and/or created when ATTACH
@@ -1635,20 +1642,12 @@ void sqlite3Pragma(
     } encnames[] = {
       { "UTF8",     SQLITE_UTF8        },
       { "UTF-8",    SQLITE_UTF8        },  /* Must be element [1] */
-      { "UTF-16le", SQLITE_UTF16LE     },  /* Must be element [2] */
-      { "UTF-16be", SQLITE_UTF16BE     },  /* Must be element [3] */
-      { "UTF16le",  SQLITE_UTF16LE     },
-      { "UTF16be",  SQLITE_UTF16BE     },
-      { "UTF-16",   0                  }, /* SQLITE_UTF16NATIVE */
-      { "UTF16",    0                  }, /* SQLITE_UTF16NATIVE */
       { 0, 0 }
     };
     const struct EncName *pEnc;
     if( !zRight ){    /* "PRAGMA encoding" */
       if( sqlite3ReadSchema(pParse) ) goto pragma_out;
       assert( encnames[SQLITE_UTF8].enc==SQLITE_UTF8 );
-      assert( encnames[SQLITE_UTF16LE].enc==SQLITE_UTF16LE );
-      assert( encnames[SQLITE_UTF16BE].enc==SQLITE_UTF16BE );
       returnSingleText(v, encnames[ENC(pParse->db)].zName);
     }else{                        /* "PRAGMA encoding = XXX" */
       /* Only change the value of sqlite.enc if the database handle is not
@@ -1656,14 +1655,14 @@ void sqlite3Pragma(
       ** will be overwritten when the schema is next loaded. If it does not
       ** already exists, it will be created to use the new encoding value.
       */
-      if( 
-        !(DbHasProperty(db, 0, DB_SchemaLoaded)) || 
-        DbHasProperty(db, 0, DB_Empty) 
+      if(
+        !(DbHasProperty(db, 0, DB_SchemaLoaded)) ||
+        DbHasProperty(db, 0, DB_Empty)
       ){
         for(pEnc=&encnames[0]; pEnc->zName; pEnc++){
           if( 0==sqlite3StrICmp(zRight, pEnc->zName) ){
             SCHEMA_ENC(db) = ENC(db) =
-                pEnc->enc ? pEnc->enc : SQLITE_UTF16NATIVE;
+                pEnc->enc;
             break;
           }
         }
@@ -1674,7 +1673,6 @@ void sqlite3Pragma(
     }
   }
   break;
-#endif /* SQLITE_OMIT_UTF16 */
 
 #ifndef SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS
   /*

@@ -462,26 +462,6 @@ test:do_test(
         return string.find(x, "\"SorterCompare\",%d+,%d+,%d+") > 0
     end, true)
 
---if X(284, "X!cmd", [=[["regexp","16",[["db","one","PRAGMA encoding"]]]]=])
--- then
---    test:do_test(
---        "misc3-6.11-utf16",
---        function()
---            x = test:execsql([[
---                EXPLAIN SELECT a+123456789012, b*4.5678, c FROM ex1 ORDER BY +a, b DESC
---            ]])
---            y = X(291, "X!cmd", [=[["regexp"," 123456789012 ",["x"]]]=])
---            table.insert(y,X(292, "X!cmd", [=[["regexp"," 4.5678 ",["x"]]]=]))
---            return table.insert(y,X(293, "X!cmd", [=[["regexp",",-B",["x"]]]=])) or y
---        end, {
---            -- <misc3-6.11-utf16>
---            1, 1, 1
---            -- </misc3-6.11-utf16>
---        })
---
---else
--- MUST_WORK_TEST
-
 test:do_test(
     "misc3-6.11-utf8",
     function()
