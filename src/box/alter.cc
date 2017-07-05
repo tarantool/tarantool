@@ -884,17 +884,16 @@ ModifyIndex::alter_def(struct alter_space *alter)
 void
 ModifyIndex::commit(struct alter_space *alter)
 {
-	uint32_t old_id = old_index_def->iid, new_id = new_index_def->iid;
+	assert(old_index_def->iid == new_index_def->iid);
 	/*
 	 * Move the old index to the new space, but use the new
 	 * definition.
 	 */
-	space_swap_index(alter->old_space, alter->new_space, old_id, new_id);
-	Index *old_index = index_find_xc(alter->old_space, old_id);
-	Index *new_index = index_find_xc(alter->new_space, new_id);
-	struct index_def *tmp = old_index->index_def;
-	old_index->index_def = new_index->index_def;
-	new_index->index_def = tmp;
+	space_swap_index(alter->old_space, alter->new_space,
+			 old_index_def->iid, new_index_def->iid);
+	Index *old_index = space_index(alter->old_space, old_index_def->iid);
+	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	index_def_swap(old_index->index_def, new_index->index_def);
 }
 
 ModifyIndex::~ModifyIndex()

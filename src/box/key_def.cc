@@ -217,7 +217,7 @@ index_def_new(uint32_t space_id, const char *space_name,
 		error_log(diag_last_error(diag_get()));
 		return NULL;
 	}
-	size_t sz = index_def_sizeof(part_count, name_len);
+	size_t sz = index_def_sizeof(part_count);
 	/*
 	 * Use calloc to zero all struct index_def attributes
 	 * the comparator pointers.
@@ -227,9 +227,12 @@ index_def_new(uint32_t space_id, const char *space_name,
 		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
-	def->name = (char *)def + sz - name_len - 1;
-	/* The trailing zero is ensured by calloc() */
-	strncpy(def->name, name, name_len);
+	def->name = strndup(name, name_len);
+	if (def->name == NULL) {
+		free(def);
+		diag_set(OutOfMemory, name_len + 1, "malloc", "index_def name");
+		return NULL;
+	}
 	if (!identifier_is_valid(def->name)) {
 		diag_set(ClientError, ER_IDENTIFIER, def->name);
 		free(def);
@@ -246,23 +249,45 @@ index_def_new(uint32_t space_id, const char *space_name,
 struct index_def *
 index_def_dup(const struct index_def *def)
 {
-	uint32_t name_len = strlen(def->name);
-	size_t sz = index_def_sizeof(def->key_def.part_count, name_len);
+	size_t sz = index_def_sizeof(def->key_def.part_count);
 	struct index_def *dup = (struct index_def *) malloc(sz);
 	if (dup == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
 		return NULL;
 	}
 	memcpy(dup, def, sz);
+	dup->name = strdup(def->name);
+	if (dup->name == NULL) {
+		free(dup);
+		diag_set(OutOfMemory, strlen(def->name) + 1, "malloc",
+			 "index_def name");
+		return NULL;
+	}
 	rlist_create(&dup->link);
-	dup->name = (char *)dup + sz - name_len - 1;
 	return dup;
+}
+
+void
+index_def_swap(struct index_def *def1, struct index_def *def2)
+{
+	/* Swap const-size items. */
+	struct index_def tmp_def;
+	tmp_def = *def1;
+	*def1 = *def2;
+	*def2 = tmp_def;
+	/*
+	 * Do not swap key_defs: index_def_swap() is used only
+	 * for indexes with identical key definitions.
+	 * @todo: remove key_def from index_def
+	 */
+	assert(def1->key_def.part_count == def2->key_def.part_count);
 }
 
 /** Free a key definition. */
 void
 index_def_delete(struct index_def *index_def)
 {
+	free(index_def->name);
 	free(index_def);
 }
 
