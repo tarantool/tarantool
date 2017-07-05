@@ -41,6 +41,7 @@ RPM
 *.src.rpm
 *.i386.rpm
 *.x86_64.rpm
+bin*
 tags
 extra/txt2c
 extra/bin2c
@@ -137,3 +138,5 @@ ftpscript.txt
 sftpscript.txt
 *.md5sum
 extra/deploy_key
+*./idea*
+cmake-build-debug
