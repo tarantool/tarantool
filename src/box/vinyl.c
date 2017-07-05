@@ -1912,8 +1912,6 @@ vy_index_recover(struct vy_index *index)
 				    (long long)prev->id));
 		return -1;
 	}
-	if (!index->is_dropped)
-		vy_scheduler_add_index(env->scheduler, index);
 	return 0;
 }
 
@@ -3054,7 +3052,6 @@ static void
 vy_scheduler_add_index(struct vy_scheduler *scheduler,
 		       struct vy_index *index)
 {
-	assert(!index->is_dropped);
 	assert(index->in_dump.pos == UINT32_MAX);
 	assert(index->in_compact.pos == UINT32_MAX);
 	vy_dump_heap_insert(&scheduler->dump_heap, &index->in_dump);
@@ -3985,16 +3982,17 @@ vy_index_commit_create(struct vy_index *index)
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
 		/*
 		 * Normally, if this is local recovery, the index
-		 * should have been logged before restart and added
-		 * to the scheduler by vy_index_recover(). There's
+		 * should have been logged before restart. There's
 		 * one exception though - we could've failed to log
 		 * index due to a vylog write error, in which case
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
 		if (vy_recovery_lookup_index(env->recovery,
-					     index->opts.lsn) != NULL)
+					     index->opts.lsn) != NULL) {
+			vy_scheduler_add_index(env->scheduler, index);
 			return;
+		}
 	}
 
 	assert(index->range_count == 1);
@@ -4053,6 +4051,8 @@ vy_index_commit_drop(struct vy_index *index)
 {
 	struct vy_env *env = index->env;
 
+	vy_scheduler_remove_index(env->scheduler, index);
+
 	/*
 	 * We can't abort here, because the index drop request has
 	 * already been written to WAL. So if we fail to write the
@@ -4065,7 +4065,6 @@ vy_index_commit_drop(struct vy_index *index)
 		return;
 
 	index->is_dropped = true;
-	vy_scheduler_remove_index(env->scheduler, index);
 
 	vy_log_tx_begin();
 	vy_log_index_prune(index);
@@ -4143,10 +4142,8 @@ vy_prepare_truncate_space(struct space *old_space, struct space *new_space)
 			vy_index_swap(old_index, new_index);
 			new_index->is_dropped = old_index->is_dropped;
 			new_index->truncate_count = old_index->truncate_count;
-			if (!new_index->is_dropped) {
-				vy_scheduler_remove_index(env->scheduler, old_index);
-				vy_scheduler_add_index(env->scheduler, new_index);
-			}
+			vy_scheduler_remove_index(env->scheduler, old_index);
+			vy_scheduler_add_index(env->scheduler, new_index);
 			continue;
 		}
 
