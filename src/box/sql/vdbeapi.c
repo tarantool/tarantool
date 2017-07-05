@@ -201,17 +201,6 @@ unsigned int sqlite3_value_subtype(sqlite3_value *pVal){
 const unsigned char *sqlite3_value_text(sqlite3_value *pVal){
   return (const unsigned char *)sqlite3ValueText(pVal, SQLITE_UTF8);
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_value_text16(sqlite3_value* pVal){
-  return sqlite3ValueText(pVal, SQLITE_UTF16NATIVE);
-}
-const void *sqlite3_value_text16be(sqlite3_value *pVal){
-  return sqlite3ValueText(pVal, SQLITE_UTF16BE);
-}
-const void *sqlite3_value_text16le(sqlite3_value *pVal){
-  return sqlite3ValueText(pVal, SQLITE_UTF16LE);
-}
-#endif /* SQLITE_OMIT_UTF16 */
 /* EVIDENCE-OF: R-12793-43283 Every value in SQLite has one of five
 ** fundamental datatypes: 64-bit signed integer 64-bit IEEE floating
 ** point number string BLOB NULL
@@ -356,14 +345,6 @@ void sqlite3_result_error(sqlite3_context *pCtx, const char *z, int n){
   pCtx->fErrorOrAux = 1;
   sqlite3VdbeMemSetStr(pCtx->pOut, z, n, SQLITE_UTF8, SQLITE_TRANSIENT);
 }
-#ifndef SQLITE_OMIT_UTF16
-void sqlite3_result_error16(sqlite3_context *pCtx, const void *z, int n){
-  assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
-  pCtx->isError = SQLITE_ERROR;
-  pCtx->fErrorOrAux = 1;
-  sqlite3VdbeMemSetStr(pCtx->pOut, z, n, SQLITE_UTF16NATIVE, SQLITE_TRANSIENT);
-}
-#endif
 void sqlite3_result_int(sqlite3_context *pCtx, int iVal){
   assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
   sqlite3VdbeMemSetInt64(pCtx->pOut, (i64)iVal);
@@ -407,35 +388,6 @@ void sqlite3_result_text64(
     setResultStrOrError(pCtx, z, (int)n, enc, xDel);
   }
 }
-#ifndef SQLITE_OMIT_UTF16
-void sqlite3_result_text16(
-  sqlite3_context *pCtx, 
-  const void *z, 
-  int n, 
-  void (*xDel)(void *)
-){
-  assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
-  setResultStrOrError(pCtx, z, n, SQLITE_UTF16NATIVE, xDel);
-}
-void sqlite3_result_text16be(
-  sqlite3_context *pCtx, 
-  const void *z, 
-  int n, 
-  void (*xDel)(void *)
-){
-  assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
-  setResultStrOrError(pCtx, z, n, SQLITE_UTF16BE, xDel);
-}
-void sqlite3_result_text16le(
-  sqlite3_context *pCtx, 
-  const void *z, 
-  int n, 
-  void (*xDel)(void *)
-){
-  assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
-  setResultStrOrError(pCtx, z, n, SQLITE_UTF16LE, xDel);
-}
-#endif /* SQLITE_OMIT_UTF16 */
 void sqlite3_result_value(sqlite3_context *pCtx, sqlite3_value *pValue){
   assert( sqlite3_mutex_held(pCtx->pOut->db->mutex) );
   sqlite3VdbeMemCopy(pCtx->pOut, pValue);
@@ -961,7 +913,6 @@ static Mem *columnMem(sqlite3_stmt *pStmt, int i){
 **     sqlite3_column_int()
 **     sqlite3_column_int64()
 **     sqlite3_column_text()
-**     sqlite3_column_text16()
 **     sqlite3_column_real()
 **     sqlite3_column_bytes()
 **     sqlite3_column_bytes16()
@@ -1036,13 +987,6 @@ sqlite3_value *sqlite3_column_value(sqlite3_stmt *pStmt, int i){
   columnMallocFailure(pStmt);
   return (sqlite3_value *)pOut;
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_column_text16(sqlite3_stmt *pStmt, int i){
-  const void *val = sqlite3_value_text16( columnMem(pStmt,i) );
-  columnMallocFailure(pStmt);
-  return val;
-}
-#endif /* SQLITE_OMIT_UTF16 */
 int sqlite3_column_type(sqlite3_stmt *pStmt, int i){
   int iType = sqlite3_value_type( columnMem(pStmt,i) );
   columnMallocFailure(pStmt);
@@ -1111,12 +1055,6 @@ const char *sqlite3_column_name(sqlite3_stmt *pStmt, int N){
   return columnName(
       pStmt, N, (const void*(*)(Mem*))sqlite3_value_text, COLNAME_NAME);
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_column_name16(sqlite3_stmt *pStmt, int N){
-  return columnName(
-      pStmt, N, (const void*(*)(Mem*))sqlite3_value_text16, COLNAME_NAME);
-}
-#endif
 
 /*
 ** Constraint:  If you have ENABLE_COLUMN_METADATA then you must
@@ -1136,12 +1074,6 @@ const char *sqlite3_column_decltype(sqlite3_stmt *pStmt, int N){
   return columnName(
       pStmt, N, (const void*(*)(Mem*))sqlite3_value_text, COLNAME_DECLTYPE);
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_column_decltype16(sqlite3_stmt *pStmt, int N){
-  return columnName(
-      pStmt, N, (const void*(*)(Mem*))sqlite3_value_text16, COLNAME_DECLTYPE);
-}
-#endif /* SQLITE_OMIT_UTF16 */
 #endif /* SQLITE_OMIT_DECLTYPE */
 
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
@@ -1154,12 +1086,6 @@ const char *sqlite3_column_database_name(sqlite3_stmt *pStmt, int N){
   return columnName(
       pStmt, N, (const void*(*)(Mem*))sqlite3_value_text, COLNAME_DATABASE);
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_column_database_name16(sqlite3_stmt *pStmt, int N){
-  return columnName(
-      pStmt, N, (const void*(*)(Mem*))sqlite3_value_text16, COLNAME_DATABASE);
-}
-#endif /* SQLITE_OMIT_UTF16 */
 
 /*
 ** Return the name of the table from which a result column derives.
@@ -1170,12 +1096,6 @@ const char *sqlite3_column_table_name(sqlite3_stmt *pStmt, int N){
   return columnName(
       pStmt, N, (const void*(*)(Mem*))sqlite3_value_text, COLNAME_TABLE);
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_column_table_name16(sqlite3_stmt *pStmt, int N){
-  return columnName(
-      pStmt, N, (const void*(*)(Mem*))sqlite3_value_text16, COLNAME_TABLE);
-}
-#endif /* SQLITE_OMIT_UTF16 */
 
 /*
 ** Return the name of the table column from which a result column derives.
@@ -1186,12 +1106,7 @@ const char *sqlite3_column_origin_name(sqlite3_stmt *pStmt, int N){
   return columnName(
       pStmt, N, (const void*(*)(Mem*))sqlite3_value_text, COLNAME_COLUMN);
 }
-#ifndef SQLITE_OMIT_UTF16
-const void *sqlite3_column_origin_name16(sqlite3_stmt *pStmt, int N){
-  return columnName(
-      pStmt, N, (const void*(*)(Mem*))sqlite3_value_text16, COLNAME_COLUMN);
-}
-#endif /* SQLITE_OMIT_UTF16 */
+*/
 #endif /* SQLITE_ENABLE_COLUMN_METADATA */
 
 
@@ -1371,17 +1286,6 @@ int sqlite3_bind_text64(
     return bindText(pStmt, i, zData, (int)nData, xDel, enc);
   }
 }
-#ifndef SQLITE_OMIT_UTF16
-int sqlite3_bind_text16(
-  sqlite3_stmt *pStmt, 
-  int i, 
-  const void *zData, 
-  int nData, 
-  void (*xDel)(void*)
-){
-  return bindText(pStmt, i, zData, nData, xDel, SQLITE_UTF16NATIVE);
-}
-#endif /* SQLITE_OMIT_UTF16 */
 int sqlite3_bind_value(sqlite3_stmt *pStmt, int i, const sqlite3_value *pValue){
   int rc;
   switch( sqlite3_value_type((sqlite3_value*)pValue) ){

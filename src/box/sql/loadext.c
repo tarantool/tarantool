@@ -28,49 +28,19 @@
 */
 #ifndef SQLITE_ENABLE_COLUMN_METADATA
 # define sqlite3_column_database_name   0
-# define sqlite3_column_database_name16 0
 # define sqlite3_column_table_name      0
-# define sqlite3_column_table_name16    0
 # define sqlite3_column_origin_name     0
-# define sqlite3_column_origin_name16   0
 #endif
 
 #ifdef SQLITE_OMIT_AUTHORIZATION
 # define sqlite3_set_authorizer         0
 #endif
 
-#ifdef SQLITE_OMIT_UTF16
-# define sqlite3_bind_text16            0
-# define sqlite3_collation_needed16     0
-# define sqlite3_column_decltype16      0
-# define sqlite3_column_name16          0
-# define sqlite3_column_text16          0
-# define sqlite3_complete16             0
-# define sqlite3_create_collation16     0
-# define sqlite3_create_function16      0
-# define sqlite3_errmsg16               0
-# define sqlite3_open16                 0
-# define sqlite3_prepare16              0
-# define sqlite3_prepare16_v2           0
-# define sqlite3_result_error16         0
-# define sqlite3_result_text16          0
-# define sqlite3_result_text16be        0
-# define sqlite3_result_text16le        0
-# define sqlite3_value_text16           0
-# define sqlite3_value_text16be         0
-# define sqlite3_value_text16le         0
-# define sqlite3_column_database_name16 0
-# define sqlite3_column_table_name16    0
-# define sqlite3_column_origin_name16   0
-#endif
-
 #ifdef SQLITE_OMIT_COMPLETE
 # define sqlite3_complete 0
-# define sqlite3_complete16 0
 #endif
 
 #ifdef SQLITE_OMIT_DECLTYPE
-# define sqlite3_column_decltype16      0
 # define sqlite3_column_decltype        0
 #endif
 
@@ -145,42 +115,32 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_bind_parameter_index,
   sqlite3_bind_parameter_name,
   sqlite3_bind_text,
-  sqlite3_bind_text16,
+//  sqlite3_bind_text16,
   sqlite3_bind_value,
   sqlite3_busy_handler,
   sqlite3_busy_timeout,
   sqlite3_changes,
   sqlite3_close,
   sqlite3_collation_needed,
-  sqlite3_collation_needed16,
   sqlite3_column_blob,
   sqlite3_column_bytes,
   sqlite3_column_bytes16,
   sqlite3_column_count,
   sqlite3_column_database_name,
-  sqlite3_column_database_name16,
   sqlite3_column_decltype,
-  sqlite3_column_decltype16,
   sqlite3_column_double,
   sqlite3_column_int,
   sqlite3_column_int64,
   sqlite3_column_name,
-  sqlite3_column_name16,
   sqlite3_column_origin_name,
-  sqlite3_column_origin_name16,
   sqlite3_column_table_name,
-  sqlite3_column_table_name16,
   sqlite3_column_text,
-  sqlite3_column_text16,
   sqlite3_column_type,
   sqlite3_column_value,
   sqlite3_commit_hook,
   sqlite3_complete,
-  sqlite3_complete16,
   sqlite3_create_collation,
-  sqlite3_create_collation16,
   sqlite3_create_function,
-  sqlite3_create_function16,
   sqlite3_create_module,
   sqlite3_data_count,
   sqlite3_db_handle,
@@ -188,7 +148,6 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_enable_shared_cache,
   sqlite3_errcode,
   sqlite3_errmsg,
-  sqlite3_errmsg16,
   sqlite3_exec,
 #ifndef SQLITE_OMIT_DEPRECATED
   sqlite3_expired,
@@ -209,9 +168,7 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_malloc,
   sqlite3_mprintf,
   sqlite3_open,
-  sqlite3_open16,
   sqlite3_prepare,
-  sqlite3_prepare16,
   sqlite3_profile,
   sqlite3_progress_handler,
   sqlite3_realloc,
@@ -219,14 +176,10 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_result_blob,
   sqlite3_result_double,
   sqlite3_result_error,
-  sqlite3_result_error16,
   sqlite3_result_int,
   sqlite3_result_int64,
   sqlite3_result_null,
   sqlite3_result_text,
-  sqlite3_result_text16,
-  sqlite3_result_text16be,
-  sqlite3_result_text16le,
   sqlite3_result_value,
   sqlite3_rollback_hook,
   sqlite3_set_authorizer,
@@ -256,9 +209,6 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_value_int64,
   sqlite3_value_numeric_type,
   sqlite3_value_text,
-  sqlite3_value_text16,
-  sqlite3_value_text16be,
-  sqlite3_value_text16le,
   sqlite3_value_type,
   sqlite3_vmprintf,
   /*
@@ -275,7 +225,6 @@ static const sqlite3_api_routines sqlite3Apis = {
   ** Added after 3.3.13
   */
   sqlite3_prepare_v2,
-  sqlite3_prepare16_v2,
   sqlite3_clear_bindings,
 
   /*
