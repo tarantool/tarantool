@@ -65,13 +65,13 @@ VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
 	int rc;
 	switch (request->type) {
 	case IPROTO_REPLACE:
-		rc = vy_replace(tx, &stmt, space, request);
+		rc = vy_replace(env, tx, &stmt, space, request);
 		break;
 	case IPROTO_UPSERT:
-		rc = vy_upsert(tx, &stmt, space, request);
+		rc = vy_upsert(env, tx, &stmt, space, request);
 		break;
 	case IPROTO_DELETE:
-		rc = vy_delete(tx, &stmt, space, request);
+		rc = vy_delete(env, tx, &stmt, space, request);
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
@@ -85,11 +85,11 @@ VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
 	if (stmt.new_tuple)
 		tuple_unref(stmt.new_tuple);
 
-	if (vy_prepare(tx)) {
-		vy_rollback(tx);
+	if (vy_prepare(env, tx)) {
+		vy_rollback(env, tx);
 		diag_raise();
 	}
-	vy_commit(tx, signature);
+	vy_commit(env, tx, signature);
 }
 
 /*
@@ -104,10 +104,11 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 			   struct request *request)
 {
 	assert(request->index_id == 0);
+	VinylEngine *engine = (VinylEngine *) this->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
-	if (vy_replace(tx, stmt, space, request))
+	if (vy_replace(engine->env, tx, stmt, space, request))
 		diag_raise();
 	return stmt->new_tuple;
 }
@@ -116,9 +117,10 @@ struct tuple *
 VinylSpace::executeDelete(struct txn *txn, struct space *space,
                           struct request *request)
 {
+	VinylEngine *engine = (VinylEngine *) this->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
-	if (vy_delete(tx, stmt, space, request))
+	if (vy_delete(engine->env, tx, stmt, space, request))
 		diag_raise();
 	/*
 	 * Delete may or may not set stmt->old_tuple, but we
@@ -131,9 +133,10 @@ struct tuple *
 VinylSpace::executeUpdate(struct txn *txn, struct space *space,
                           struct request *request)
 {
+	VinylEngine *engine = (VinylEngine *) this->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (vy_update(tx, stmt, space, request) != 0)
+	if (vy_update(engine->env, tx, stmt, space, request) != 0)
 		diag_raise();
 	return stmt->new_tuple;
 }
@@ -142,9 +145,10 @@ void
 VinylSpace::executeUpsert(struct txn *txn, struct space *space,
                            struct request *request)
 {
+	VinylEngine *engine = (VinylEngine *) this->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (vy_upsert(tx, stmt, space, request) != 0)
+	if (vy_upsert(engine->env, tx, stmt, space, request) != 0)
 		diag_raise();
 }
 
@@ -176,7 +180,7 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 		diag_raise();
 
 	auto guard = make_scoped_guard([=] { vy_index_delete(db); });
-	VinylIndex *index = new VinylIndex(index_def, db);
+	VinylIndex *index = new VinylIndex(index_def, engine->env, db);
 
 	/* @db will be destroyed by VinylIndex destructor. */
 	guard.is_active = false;
@@ -225,7 +229,8 @@ void
 VinylSpace::prepareTruncateSpace(struct space *old_space,
 				 struct space *new_space)
 {
-	if (vy_prepare_truncate_space(old_space, new_space) != 0)
+	VinylEngine *engine = (VinylEngine *) this->engine;
+	if (vy_prepare_truncate_space(engine->env, old_space, new_space) != 0)
 		diag_raise();
 }
 
@@ -233,24 +238,27 @@ void
 VinylSpace::commitTruncateSpace(struct space *old_space,
 				struct space *new_space)
 {
-	vy_commit_truncate_space(old_space, new_space);
+	VinylEngine *engine = (VinylEngine *) this->engine;
+	vy_commit_truncate_space(engine->env, old_space, new_space);
 }
 
 void
 VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
-	if (vy_prepare_alter_space(old_space, new_space) != 0)
+	VinylEngine *engine = (VinylEngine *) this->engine;
+	if (vy_prepare_alter_space(engine->env, old_space, new_space) != 0)
 		diag_raise();
 }
 
 void
 VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 {
+	VinylEngine *engine = (VinylEngine *) this->engine;
 	if (new_space == NULL || new_space->index_count == 0) {
 		/* This is a drop space. */
 		return;
 	}
-	if (vy_commit_alter_space(old_space, new_space) != 0)
+	if (vy_commit_alter_space(engine->env, old_space, new_space) != 0)
 		diag_raise();
 }
 

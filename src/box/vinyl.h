@@ -123,6 +123,7 @@ vy_begin(struct vy_env *e);
 
 /**
  * Get a tuple from the vinyl index.
+ * @param env         Vinyl environment.
  * @param tx          Current transaction.
  * @param index       Vinyl index.
  * @param key         MessagePack'ed data, the array without a
@@ -134,11 +135,12 @@ vy_begin(struct vy_env *e);
  * @retval -1 Memory or read error.
  */
 int
-vy_get(struct vy_tx *tx, struct vy_index *index,
+vy_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
        const char *key, uint32_t part_count, struct tuple **result);
 
 /**
  * Execute REPLACE in a vinyl space.
+ * @param env     Vinyl environment.
  * @param tx      Current transaction.
  * @param stmt    Statement for triggers filled with old
  *                statement.
@@ -151,11 +153,12 @@ vy_get(struct vy_tx *tx, struct vy_index *index,
  *            error.
  */
 int
-vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	   struct request *request);
+vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	   struct space *space, struct request *request);
 
 /**
  * Execute DELETE in a vinyl space.
+ * @param env     Vinyl environment.
  * @param tx      Current transaction.
  * @param stmt    Statement for triggers filled with deleted
  *                statement.
@@ -167,11 +170,12 @@ vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *            reference increment error.
  */
 int
-vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request);
+vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	  struct space *space, struct request *request);
 
 /**
  * Execute UPDATE in a vinyl space.
+ * @param env     Vinyl environment.
  * @param tx      Current transaction.
  * @param stmt    Statement for triggers filled with old and new
  *                statements.
@@ -183,11 +187,12 @@ vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *            reference increment error.
  */
 int
-vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request);
+vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	  struct space *space, struct request *request);
 
 /**
  * Execute UPSERT in a vinyl space.
+ * @param env     Vinyl environment.
  * @param tx      Current transaction.
  * @param stmt    Statement for triggers filled with old and new
  *                statements.
@@ -200,23 +205,23 @@ vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
  *            reference increment error.
  */
 int
-vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request);
+vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	  struct space *space, struct request *request);
 
 int
-vy_prepare(struct vy_tx *tx);
+vy_prepare(struct vy_env *env, struct vy_tx *tx);
 
 void
-vy_commit(struct vy_tx *tx, int64_t lsn);
+vy_commit(struct vy_env *env, struct vy_tx *tx, int64_t lsn);
 
 void
-vy_rollback(struct vy_tx *tx);
+vy_rollback(struct vy_env *env, struct vy_tx *tx);
 
 void *
-vy_savepoint(struct vy_tx *tx);
+vy_savepoint(struct vy_env *env, struct vy_tx *tx);
 
 void
-vy_rollback_to_savepoint(struct vy_tx *tx, void *svp);
+vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
 
 /*
  * Index
@@ -263,16 +268,19 @@ vy_index_unref(struct vy_index *index);
  * so that it can replace the old space on truncation.
  */
 int
-vy_prepare_truncate_space(struct space *old_space, struct space *new_space);
+vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
+			  struct space *new_space);
 
 /**
  * Commit space truncation in the metadata log.
  */
 void
-vy_commit_truncate_space(struct space *old_space, struct space *new_space);
+vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
+			 struct space *new_space);
 
 /**
  * Hook on an preparation of space alter event.
+ * @param env       Vinyl environment.
  * @param old_space Old space.
  * @param new_space New space.
  *
@@ -280,12 +288,14 @@ vy_commit_truncate_space(struct space *old_space, struct space *new_space);
  * @retval -1 Error.
  */
 int
-vy_prepare_alter_space(struct space *old_space, struct space *new_space);
+vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
+		       struct space *new_space);
 
 /**
  * Hook on an alter space commit event. It is called on each
  * create_index(), drop_index() and is used for update
  * vy_index.space attribute.
+ * @param env       Vinyl environment.
  * @param old_space Old space.
  * @param new_space New space.
  *
@@ -293,7 +303,8 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space);
  * @retval -1 Memory or new format register error.
  */
 int
-vy_commit_alter_space(struct space *old_space, struct space *new_space);
+vy_commit_alter_space(struct vy_env *env, struct space *old_space,
+		      struct space *new_space);
 
 /**
  * Open a vinyl index.
@@ -303,22 +314,22 @@ vy_commit_alter_space(struct space *old_space, struct space *new_space);
  * creates the index directory.
  */
 int
-vy_index_open(struct vy_index *index);
+vy_index_open(struct vy_env *env, struct vy_index *index);
 
 /**
  * Commit index creation in the metadata log.
  */
 void
-vy_index_commit_create(struct vy_index *index);
+vy_index_commit_create(struct vy_env *env, struct vy_index *index);
 
 /**
  * Commit index drop in the metadata log.
  */
 void
-vy_index_commit_drop(struct vy_index *index);
+vy_index_commit_drop(struct vy_env *env, struct vy_index *index);
 
 size_t
-vy_index_bsize(struct vy_index *db);
+vy_index_bsize(struct vy_index *index);
 
 /*
  * Index Cursor
@@ -330,14 +341,15 @@ vy_index_bsize(struct vy_index *db);
  * allocates its own transaction.
  */
 struct vy_cursor *
-vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
-	      uint32_t part_count, enum iterator_type type);
+vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
+	      const char *key, uint32_t part_count, enum iterator_type type);
 
 void
-vy_cursor_delete(struct vy_cursor *cursor);
+vy_cursor_delete(struct vy_env *env, struct vy_cursor *cursor);
 
 int
-vy_cursor_next(struct vy_cursor *cursor, struct tuple **result);
+vy_cursor_next(struct vy_env *env, struct vy_cursor *cursor,
+	       struct tuple **result);
 
 /*
  * Replication

@@ -56,8 +56,9 @@ struct vinyl_iterator {
 	struct vy_cursor *cursor;
 };
 
-VinylIndex::VinylIndex(struct index_def *index_def, struct vy_index *db)
-	: Index(index_def), db(db)
+VinylIndex::VinylIndex(struct index_def *index_def,
+		       struct vy_env *env, struct vy_index *db)
+	: Index(index_def), env(env), db(db)
 {
 	vy_index_ref(db);
 }
@@ -70,20 +71,20 @@ VinylIndex::~VinylIndex()
 void
 VinylIndex::open()
 {
-	if (vy_index_open(db) != 0)
+	if (vy_index_open(env, db) != 0)
 		diag_raise();
 }
 
 void
 VinylIndex::commitCreate()
 {
-	vy_index_commit_create(db);
+	vy_index_commit_create(env, db);
 }
 
 void
 VinylIndex::commitDrop()
 {
-	vy_index_commit_drop(db);
+	vy_index_commit_drop(env, db);
 }
 
 struct tuple*
@@ -97,7 +98,7 @@ VinylIndex::findByKey(const char *key, uint32_t part_count) const
 	struct vy_tx *transaction = in_txn() ?
 		(struct vy_tx *) in_txn()->engine_tx : NULL;
 	struct tuple *tuple = NULL;
-	if (vy_get(transaction, db, key, part_count, &tuple) != 0)
+	if (vy_get(env, transaction, db, key, part_count, &tuple) != 0)
 		diag_raise();
 	if (tuple != NULL) {
 		tuple = tuple_bless_xc(tuple);
@@ -154,12 +155,13 @@ static inline struct tuple *
 iterator_next(struct iterator *base_it)
 {
 	struct vinyl_iterator *it = (struct vinyl_iterator *) base_it;
+	struct vy_env *env = it->index->env;
 	struct tuple *tuple;
 
 	/* found */
-	if (vy_cursor_next(it->cursor, &tuple) != 0) {
+	if (vy_cursor_next(env, it->cursor, &tuple) != 0) {
 		/* immediately close the cursor */
-		vy_cursor_delete(it->cursor);
+		vy_cursor_delete(env, it->cursor);
 		it->cursor = NULL;
 		it->base.next = vinyl_iterator_last;
 		diag_raise();
@@ -171,7 +173,7 @@ iterator_next(struct iterator *base_it)
 	}
 
 	/* immediately close the cursor */
-	vy_cursor_delete(it->cursor);
+	vy_cursor_delete(env, it->cursor);
 	it->cursor = NULL;
 	it->base.next = vinyl_iterator_last;
 	return NULL;
@@ -183,7 +185,7 @@ vinyl_iterator_free(struct iterator *ptr)
 	assert(ptr->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
 	if (it->cursor) {
-		vy_cursor_delete(it->cursor);
+		vy_cursor_delete(it->index->env, it->cursor);
 		it->cursor = NULL;
 	}
 	free(ptr);
@@ -218,7 +220,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	if (type > ITER_GT || type < 0)
 		return Index::initIterator(ptr, type, key, part_count);
 
-	it->cursor = vy_cursor_new(tx, db, key, part_count, type);
+	it->cursor = vy_cursor_new(env, tx, db, key, part_count, type);
 	if (it->cursor == NULL)
 		diag_raise();
 }

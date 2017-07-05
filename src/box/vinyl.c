@@ -787,7 +787,6 @@ struct vy_cursor {
 	 */
 	struct vy_tx tx_autocommit;
 	struct vy_index *index;
-	struct vy_env *env;
 	struct tuple *key;
 	/**
 	 * Points either to tx_autocommit for autocommit mode or
@@ -3939,9 +3938,9 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
  * account.
  */
 int
-vy_index_open(struct vy_index *index)
+vy_index_open(struct vy_env *env, struct vy_index *index)
 {
-	switch (index->env->status) {
+	switch (env->status) {
 	case VINYL_ONLINE:
 		/*
 		 * The recovery is complete, simply
@@ -3987,10 +3986,8 @@ vy_index_unref(struct vy_index *index)
 }
 
 void
-vy_index_commit_create(struct vy_index *index)
+vy_index_commit_create(struct vy_env *env, struct vy_index *index)
 {
-	struct vy_env *env = index->env;
-
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
 		/*
@@ -4060,10 +4057,8 @@ vy_log_index_prune(struct vy_index *index)
 }
 
 void
-vy_index_commit_drop(struct vy_index *index)
+vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
 {
-	struct vy_env *env = index->env;
-
 	vy_scheduler_remove_index(env->scheduler, index);
 
 	/*
@@ -4110,7 +4105,8 @@ vy_index_swap(struct vy_index *old_index, struct vy_index *new_index)
 }
 
 int
-vy_prepare_truncate_space(struct space *old_space, struct space *new_space)
+vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
+			  struct space *new_space)
 {
 	assert(old_space->index_count == new_space->index_count);
 	uint32_t index_count = new_space->index_count;
@@ -4118,7 +4114,6 @@ vy_prepare_truncate_space(struct space *old_space, struct space *new_space)
 		return 0;
 
 	struct vy_index *pk = vy_index(old_space->index[0]);
-	struct vy_env *env = pk->env;
 
 	/*
 	 * On local recovery, we need to handle the following
@@ -4169,7 +4164,8 @@ vy_prepare_truncate_space(struct space *old_space, struct space *new_space)
 }
 
 void
-vy_commit_truncate_space(struct space *old_space, struct space *new_space)
+vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
+			 struct space *new_space)
 {
 	assert(old_space->index_count == new_space->index_count);
 	uint32_t index_count = new_space->index_count;
@@ -4177,7 +4173,6 @@ vy_commit_truncate_space(struct space *old_space, struct space *new_space)
 		return;
 
 	struct vy_index *pk = vy_index(old_space->index[0]);
-	struct vy_env *env = pk->env;
 
 	/*
 	 * See the comment in vy_prepare_truncate_space().
@@ -4363,7 +4358,8 @@ fail:
 }
 
 int
-vy_prepare_alter_space(struct space *old_space, struct space *new_space)
+vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
+		       struct space *new_space)
 {
 	/*
 	 * The space with no indexes can contain no rows.
@@ -4377,7 +4373,7 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space)
 	 * open existing indexes, not creating new ones. Allow
 	 * alter.
 	 */
-	if (pk->env->status != VINYL_ONLINE)
+	if (env->status != VINYL_ONLINE)
 		return 0;
 	/* The space is empty. Allow alter. */
 	if (pk->stat.disk.count.rows == 0 &&
@@ -4413,8 +4409,10 @@ vy_prepare_alter_space(struct space *old_space, struct space *new_space)
 }
 
 int
-vy_commit_alter_space(struct space *old_space, struct space *new_space)
+vy_commit_alter_space(struct vy_env *env, struct space *old_space,
+		      struct space *new_space)
 {
+	(void) env;
 	(void) old_space;
 	struct vy_index *pk = vy_index(new_space->index[0]);
 	struct index_def *new_user_def = space_index_def(new_space, 0);
@@ -4835,6 +4833,7 @@ vy_insert_secondary(struct vy_tx *tx, struct space *space,
  * Execute REPLACE in a space with a single index, possibly with
  * lookup for an old tuple if the space has at least one
  * on_replace trigger.
+ * @param env     Vinyl environment.
  * @param tx      Current transaction.
  * @param space   Space in which replace.
  * @param request Request with the tuple data.
@@ -4847,7 +4846,7 @@ vy_insert_secondary(struct vy_tx *tx, struct space *space,
  *            error.
  */
 static inline int
-vy_replace_one(struct vy_tx *tx, struct space *space,
+vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	       struct request *request, struct txn_stmt *stmt)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
@@ -4870,7 +4869,7 @@ vy_replace_one(struct vy_tx *tx, struct space *space,
 		if (key == NULL)
 			goto error_unref;
 		uint32_t part_count = mp_decode_array(&key);
-		if (vy_get(tx, pk, key, part_count, &stmt->old_tuple) != 0)
+		if (vy_get(env, tx, pk, key, part_count, &stmt->old_tuple) != 0)
 			goto error_unref;
 	}
 	if (vy_tx_set(tx, pk, new_tuple))
@@ -5124,9 +5123,10 @@ error:
 }
 
 int
-vy_delete(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request)
+vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	  struct space *space, struct request *request)
 {
+	(void)env;
 	if (vy_is_committed(tx, space))
 		return 0;
 	struct vy_index *pk = vy_index_find(space, 0);
@@ -5226,9 +5226,10 @@ vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
 }
 
 int
-vy_update(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request)
+vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	  struct space *space, struct request *request)
 {
+	(void)env;
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	if (vy_is_committed(tx, space))
 		return 0;
@@ -5392,9 +5393,10 @@ vy_index_upsert(struct vy_tx *tx, struct vy_index *index,
 }
 
 int
-vy_upsert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	  struct request *request)
+vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	  struct space *space, struct request *request)
 {
+	(void)env;
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	if (vy_is_committed(tx, space))
 		return 0;
@@ -5577,10 +5579,9 @@ vy_insert(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 }
 
 int
-vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
-	   struct request *request)
+vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+	   struct space *space, struct request *request)
 {
-	struct vy_env *env = tx->xm->env;
 	if (vy_is_committed(tx, space))
 		return 0;
 	/* Check the tuple fields. */
@@ -5591,7 +5592,7 @@ vy_replace(struct vy_tx *tx, struct txn_stmt *stmt, struct space *space,
 
 	if (space->index_count == 1) {
 		/* Replace in a space with a single index. */
-		return vy_replace_one(tx, space, request, stmt);
+		return vy_replace_one(env, tx, space, request, stmt);
 	} else {
 		/* Replace in a space with secondary indexes. */
 		return vy_replace_impl(tx, space, request, stmt);
@@ -5922,10 +5923,8 @@ vy_begin(struct vy_env *e)
 }
 
 int
-vy_prepare(struct vy_tx *tx)
+vy_prepare(struct vy_env *env, struct vy_tx *tx)
 {
-	struct vy_env *env = tx->xm->env;
-
 	/*
 	 * Reserve quota needed by the transaction before allocating
 	 * memory. Since this may yield, which opens a time window for
@@ -5971,9 +5970,8 @@ vy_prepare(struct vy_tx *tx)
 }
 
 void
-vy_commit(struct vy_tx *tx, int64_t lsn)
+vy_commit(struct vy_env *env, struct vy_tx *tx, int64_t lsn)
 {
-	struct vy_env *env = tx->xm->env;
 	/*
 	 * vy_tx_commit() may trigger an upsert squash.
 	 * If there is no memory for a created statement,
@@ -5993,22 +5991,25 @@ vy_commit(struct vy_tx *tx, int64_t lsn)
 }
 
 void
-vy_rollback(struct vy_tx *tx)
+vy_rollback(struct vy_env *env, struct vy_tx *tx)
 {
+	(void)env;
 	vy_tx_rollback(tx);
 	mempool_free(&tx->xm->tx_mempool, tx);
 }
 
 void *
-vy_savepoint(struct vy_tx *tx)
+vy_savepoint(struct vy_env *env, struct vy_tx *tx)
 {
+	(void)env;
 	assert(tx->state == VINYL_TX_READY);
 	return stailq_last(&tx->log);
 }
 
 void
-vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
+vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp)
 {
+	(void)env;
 	assert(tx->state == VINYL_TX_READY);
 	struct stailq_entry *last = svp;
 	/* Start from the first statement after the savepoint. */
@@ -6044,9 +6045,10 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 /* }}} Public API of transaction control */
 
 int
-vy_get(struct vy_tx *tx, struct vy_index *index, const char *key,
-       uint32_t part_count, struct tuple **result)
+vy_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
+       const char *key, uint32_t part_count, struct tuple **result)
 {
+	(void)env;
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	assert(result != NULL);
 	struct tuple *vyresult = NULL;
@@ -8723,27 +8725,25 @@ fail:
 /* {{{ Cursor */
 
 struct vy_cursor *
-vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
-	      uint32_t part_count, enum iterator_type type)
+vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
+	      const char *key, uint32_t part_count, enum iterator_type type)
 {
-	struct vy_env *e = index->env;
-	struct vy_cursor *c = mempool_alloc(&e->cursor_pool);
+	struct vy_cursor *c = mempool_alloc(&env->cursor_pool);
 	if (c == NULL) {
 		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
 		return NULL;
 	}
 	assert(part_count <= index->key_def->part_count);
-	c->key = vy_stmt_new_select(e->key_format, key, part_count);
+	c->key = vy_stmt_new_select(env->key_format, key, part_count);
 	if (c->key == NULL) {
-		mempool_free(&e->cursor_pool, c);
+		mempool_free(&env->cursor_pool, c);
 		return NULL;
 	}
 	c->index = index;
 	c->n_reads = 0;
-	c->env = e;
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
-		vy_tx_create(e->xm, tx);
+		vy_tx_create(env->xm, tx);
 	} else {
 		rlist_add(&tx->cursors, &c->next_in_tx);
 	}
@@ -8782,8 +8782,9 @@ vy_cursor_new(struct vy_tx *tx, struct vy_index *index, const char *key,
 }
 
 int
-vy_cursor_next(struct vy_cursor *c, struct tuple **result)
+vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
 {
+	(void)env;
 	struct tuple *vyresult = NULL;
 	struct vy_index *index = c->index;
 	assert(index->space_index_count > 0);
@@ -8827,10 +8828,9 @@ vy_cursor_next(struct vy_cursor *c, struct tuple **result)
 }
 
 void
-vy_cursor_delete(struct vy_cursor *c)
+vy_cursor_delete(struct vy_env *env, struct vy_cursor *c)
 {
 	vy_read_iterator_close(&c->iterator);
-	struct vy_env *e = c->env;
 	if (c->tx != NULL) {
 		if (c->tx == &c->tx_autocommit) {
 			/*
@@ -8850,10 +8850,10 @@ vy_cursor_delete(struct vy_cursor *c)
 	}
 	if (c->key)
 		tuple_unref(c->key);
-	rmean_collect(e->stat->rmean, VY_STAT_CURSOR, 1);
-	rmean_collect(e->stat->rmean, VY_STAT_CURSOR_OPS, c->n_reads);
+	rmean_collect(env->stat->rmean, VY_STAT_CURSOR, 1);
+	rmean_collect(env->stat->rmean, VY_STAT_CURSOR_OPS, c->n_reads);
 	TRASH(c);
-	mempool_free(&e->cursor_pool, c);
+	mempool_free(&env->cursor_pool, c);
 }
 
 /*** }}} Cursor */

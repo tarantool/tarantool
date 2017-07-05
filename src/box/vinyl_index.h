@@ -38,7 +38,8 @@
 struct VinylIndex: public Index
 {
 public:
-	VinylIndex(struct index_def *index_def, struct vy_index *db);
+	VinylIndex(struct index_def *index_def,
+		   struct vy_env *env, struct vy_index *db);
 	virtual ~VinylIndex() override;
 
 	/**
@@ -77,6 +78,7 @@ public:
 	virtual void
 	info(struct info_handler *handler) const override;
 
+	struct vy_env *env;
 	struct vy_index *db;
 };
 
