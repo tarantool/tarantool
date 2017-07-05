@@ -6980,8 +6980,8 @@ vy_merge_iterator_restore(struct vy_merge_iterator *itr,
 }
 
 /* }}} Merge iterator */
-
 /* {{{ Iterator over index */
+#if 0
 
 /**
  * ID of an iterator source type. Can be used in bitmaps.
@@ -7451,6 +7451,7 @@ done:
 	vy_point_iterator_cleanup(&history, region_svp);
 	return rc;
 }
+#endif
 
 static void
 vy_read_iterator_add_tx(struct vy_read_iterator *itr)
@@ -7727,6 +7728,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		*result = NULL;
 		return 0;
 	}
+#if 0
 	bool one_value = false;
 	if (itr->iterator_type == ITER_EQ) {
 		if (itr->index->opts.is_unique)
@@ -7750,6 +7752,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		itr->key = NULL;
 		return rc;
 	}
+#endif
 
 	*result = NULL;
 
