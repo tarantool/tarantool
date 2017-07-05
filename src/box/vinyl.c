@@ -183,8 +183,6 @@ static const char *vy_stat_strings[] = {
 
 struct vy_stat {
 	struct rmean *rmean;
-	uint64_t tx_rlb;
-	uint64_t tx_conflict;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o
@@ -854,8 +852,6 @@ read_set_key_cmp(struct read_set_key *a, struct txv *b)
 }
 
 struct tx_manager {
-	/** The number of active transactions. */
-	uint32_t tx_count;
 	/**
 	 * The last committed log sequence number known to
 	 * vinyl. Updated in vy_commit().
@@ -911,6 +907,8 @@ struct tx_manager {
 	 * transaction to use in such places.
 	 */
 	const struct vy_read_view *p_committed_read_view;
+	/** Transaction statistics. */
+	struct vy_tx_stat stat;
 	struct vy_env *env;
 	struct mempool tx_mempool;
 	struct mempool txv_mempool;
@@ -957,15 +955,11 @@ write_set_search_key(write_set_t *tree, struct vy_index *index,
 static struct tx_manager *
 tx_manager_new(struct vy_env *env)
 {
-	struct tx_manager *m = malloc(sizeof(*m));
+	struct tx_manager *m = calloc(1, sizeof(*m));
 	if (m == NULL) {
 		diag_set(OutOfMemory, sizeof(*m), "tx_manager", "struct");
 		return NULL;
 	}
-	m->tx_count = 0;
-	m->lsn = 0;
-	m->last_prepared_tx = NULL;
-	m->psn = 0;
 	m->env = env;
 	read_set_new(&m->read_set);
 	rlist_create(&m->read_views);
@@ -3775,10 +3769,6 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 
 	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
 
-	info_append_int(h, "tx_rollback", stat->tx_rlb);
-	info_append_int(h, "tx_conflict", stat->tx_conflict);
-	info_append_int(h, "tx_active", env->xm->tx_count);
-
 	struct mempool_stats mstats;
 	mempool_stats(&env->xm->tx_mempool, &mstats);
 	info_append_int(h, "tx_allocated", mstats.objcount);
@@ -3802,9 +3792,19 @@ void
 vy_info(struct vy_env *env, struct info_handler *h)
 {
 	info_begin(h);
+
 	vy_info_append_memory(env, h);
 	vy_info_append_performance(env, h);
 	info_append_int(h, "lsn", env->xm->lsn);
+
+	struct vy_tx_stat *tx_stat = &env->xm->stat;
+	info_table_begin(h, "tx");
+	info_append_int(h, "active", tx_stat->active);
+	info_append_int(h, "commit", tx_stat->commit);
+	info_append_int(h, "rollback", tx_stat->rollback);
+	info_append_int(h, "conflict", tx_stat->conflict);
+	info_table_end(h);
+
 	info_end(h);
 }
 
@@ -5587,7 +5587,7 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	tx->read_view = (struct vy_read_view *) xm->p_global_read_view;
 	tx->psn = 0;
 	rlist_create(&tx->cursors);
-	xm->tx_count++;
+	xm->stat.active++;
 }
 
 static void
@@ -5617,7 +5617,7 @@ vy_tx_destroy(struct vy_tx *tx)
 		txv_delete(v);
 	}
 
-	tx->xm->tx_count--;
+	tx->xm->stat.active--;
 }
 
 static bool
@@ -5756,7 +5756,7 @@ vy_tx_prepare(struct vy_tx *tx)
 
 	if (vy_tx_is_in_read_view(tx) || tx->state == VINYL_TX_ABORT) {
 		vy_quota_release(&env->quota, tx->write_size);
-		env->stat->tx_conflict++;
+		xm->stat.conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
@@ -5850,6 +5850,8 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	assert(tx->state == VINYL_TX_COMMIT);
 	struct tx_manager *xm = tx->xm;
 
+	xm->stat.commit++;
+
 	if (xm->last_prepared_tx == tx)
 		xm->last_prepared_tx = NULL;
 
@@ -5911,7 +5913,7 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 static void
 vy_tx_rollback(struct vy_tx *tx)
 {
-	tx->xm->env->stat->tx_rlb++;
+	tx->xm->stat.rollback++;
 
 	if (tx->state == VINYL_TX_COMMIT)
 		vy_tx_rollback_after_prepare(tx);
@@ -8779,7 +8781,7 @@ vy_cursor_delete(struct vy_cursor *c)
 	if (c->tx != NULL) {
 		if (c->tx == &c->tx_autocommit) {
 			/* Rollback the automatic transaction. */
-			vy_tx_rollback(c->tx);
+			vy_tx_destroy(c->tx);
 		} else {
 			/*
 			 * Delete itself from the list of open cursors
