@@ -62,6 +62,7 @@
 #include "info.h"
 #include "request.h"
 #include "column_mask.h"
+#include "trigger.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -373,12 +374,8 @@ struct vy_tx {
 	 * Is -1 if the transaction is not prepared.
 	 */
 	int64_t psn;
-	/*
-	 * For non-autocommit transactions, the list of open
-	 * cursors. When a transaction ends, all open cursors are
-	 * forcibly closed.
-	 */
-	struct rlist cursors;
+	/* List of triggers invoked when this transaction ends. */
+	struct rlist on_destroy;
 	struct tx_manager *xm;
 };
 
@@ -576,12 +573,8 @@ struct vy_cursor {
 	int n_reads;
 	/** Cursor creation time, used for statistics. */
 	ev_tstamp start;
-	/**
-	 * All open cursors are registered in a transaction
-	 * they belong to. When the transaction ends, the cursor
-	 * is closed.
-	 */
-	struct rlist next_in_tx;
+	/** Trigger invoked when tx ends to close the cursor. */
+	struct trigger on_tx_destroy;
 	/** Iterator over index */
 	struct vy_read_iterator iterator;
 	/** Set to true, if need to check statements to match the cursor key. */
@@ -4404,23 +4397,15 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	tx->state = VINYL_TX_READY;
 	tx->read_view = (struct vy_read_view *) xm->p_global_read_view;
 	tx->psn = 0;
-	rlist_create(&tx->cursors);
+	rlist_create(&tx->on_destroy);
 	xm->stat.active++;
-}
-
-static void
-vy_tx_abort_cursors(struct vy_tx *tx)
-{
-	struct vy_cursor *c;
-	rlist_foreach_entry(c, &tx->cursors, next_in_tx)
-		c->tx = NULL;
 }
 
 static void
 vy_tx_destroy(struct vy_tx *tx)
 {
-	/** Abort all open cursors. */
-	vy_tx_abort_cursors(tx);
+	trigger_run(&tx->on_destroy, NULL);
+	trigger_destroy(&tx->on_destroy);
 
 	tx_manager_destroy_read_view(tx->xm, tx->read_view);
 
@@ -7527,6 +7512,15 @@ fail:
 
 /* {{{ Cursor */
 
+static void
+vy_cursor_on_tx_destroy(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct vy_cursor *c = container_of(trigger, struct vy_cursor,
+					   on_tx_destroy);
+	c->tx = NULL;
+}
+
 struct vy_cursor *
 vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	      const char *key, uint32_t part_count, enum iterator_type type)
@@ -7544,11 +7538,16 @@ vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	}
 	c->index = index;
 	c->n_reads = 0;
+	trigger_create(&c->on_tx_destroy, vy_cursor_on_tx_destroy, NULL, NULL);
 	if (tx == NULL) {
 		tx = &c->tx_autocommit;
 		vy_tx_create(env->xm, tx);
 	} else {
-		rlist_add(&tx->cursors, &c->next_in_tx);
+		/*
+		 * Register a trigger that will abort this cursor
+		 * when the transaction ends.
+		 */
+		trigger_add(&tx->on_destroy, &c->on_tx_destroy);
 	}
 	c->tx = tx;
 	c->need_check_eq = false;
@@ -7644,11 +7643,7 @@ vy_cursor_delete(struct vy_env *env, struct vy_cursor *c)
 			 */
 			vy_tx_destroy(c->tx);
 		} else {
-			/*
-			 * Delete itself from the list of open cursors
-			 * in the transaction
-			 */
-			rlist_del(&c->next_in_tx);
+			trigger_clear(&c->on_tx_destroy);
 		}
 	}
 	if (c->key)
