@@ -14,9 +14,12 @@ box.sql.execute([[SELECT * FROM t]])
 test_run:cmd('restart server default');
 
 -- Connect to ourself
-require('console').connect(os.getenv("LISTEN"))
+c = require('net.box').connect(os.getenv("LISTEN"))
 
 -- This segfaults due to gh-2483 since
 -- before the patch sql schema was read on-demand.
 -- Which could obviously lead to access denied error.
-box.sql.execute([[SELECT * FROM t]])
+c:eval([[ return box.sql.execute('SELECT * FROM t') ]])
+-- sql.execute([[SELECT * FROM t]])
+
+box.sql.execute([[DROP TABLE t]])
