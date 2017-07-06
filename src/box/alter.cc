@@ -509,11 +509,13 @@ struct alter_space {
 };
 
 struct alter_space *
-alter_space_new()
+alter_space_new(struct space *old_space)
 {
 	struct alter_space *alter =
 		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
+	alter->old_space = old_space;
+	alter->space_def = alter->old_space->def;
 	return alter;
 }
 
@@ -635,31 +637,10 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
  *   On rollback, the new space is deleted.
  */
 static void
-alter_space_do(struct txn *txn, struct alter_space *alter,
-	       struct space *old_space)
+alter_space_do(struct txn *txn, struct alter_space *alter)
 {
-#if 0
-	/*
-	 * Mark the space as being altered, to abort
-	 * concurrent alter operations from while this
-	 * alter is being written to the write ahead log.
-	 * Must be the last, to make sure we reach commit and
-	 * remove it. It's removed only in comit/rollback.
-	 *
-	 * @todo This is, essentially, an implicit pessimistic
-	 * metadata lock on the space (ugly!), and it should be
-	 * replaced with an explicit lock, since there is nothing
-	 * worse than having to retry your alter -- usually alter
-	 * is done in a script without error-checking.
-	 * Plus, implicit locks are evil.
-	 */
-	if (space->on_replace == space_alter_on_replace)
-		tnt_raise(ER_ALTER_SPACE, space_name(space));
-#endif
-	alter->old_space = old_space;
-	alter->space_def = old_space->def;
 	/* Create a definition of the new space. */
-	space_dump_def(old_space, &alter->key_list);
+	space_dump_def(alter->old_space, &alter->key_list);
 	class AlterSpaceOp *op;
 	/*
 	 * Alter the definition of the old space, so that
@@ -770,28 +751,32 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter)
 {
-	if (space_index(alter->new_space, old_index_def->iid) != NULL)
-		return;
 	Index *index = index_find_xc(alter->old_space, old_index_def->iid);
 	index->commitDrop();
 }
 
+/**
+ * A no-op to preserve the old index data in the new space.
+ * Added to the alter specification when the index at hand
+ * is not affected by alter in any way.
+ */
 class MoveIndex: public AlterSpaceOp
 {
 public:
-	struct index_def *index_def;
+	/** id of the index on the move. */
+	uint32_t iid;
 	virtual void commit(struct alter_space *alter);
 };
 
 void
 MoveIndex::commit(struct alter_space *alter)
 {
-	space_swap_index(alter->old_space, alter->new_space,
-			 index_def->iid, index_def->iid);
+	space_swap_index(alter->old_space, alter->new_space, iid, iid);
 }
 
 /**
- * Change non-essential (without data change) properties of an index.
+ * Change non-essential properties of an index, i.e.
+ * properties not involving index data or layout on disk.
  */
 class ModifyIndex: public AlterSpaceOp
 {
@@ -817,8 +802,8 @@ ModifyIndex::commit(struct alter_space *alter)
 {
 	assert(old_index_def->iid == new_index_def->iid);
 	/*
-	 * Move the old index to the new space, but use the new
-	 * definition.
+	 * Move the old index to the new space to preserve the
+	 * original data, but use the new definition.
 	 */
 	space_swap_index(alter->old_space, alter->new_space,
 			 old_index_def->iid, new_index_def->iid);
@@ -834,22 +819,8 @@ ModifyIndex::~ModifyIndex()
 	index_def_delete(new_index_def);
 }
 
-/**
- * Add to index trigger -- invoked on any change in the old space,
- * while the AddIndex tuple is being written to the WAL. The job
- * of this trigger is to keep the added index up to date with the
- * state of the primary key in the old space.
- *
- * Initially it's installed as old_space->on_replace trigger, and
- * for each successfully replaced tuple in the new index,
- * a trigger is added to txn->on_rollback list to remove the tuple
- * from the new index if the transaction rolls back.
- *
- * The trigger is removed when alter operation commits/rolls back.
- */
-
-/** AddIndex - add a new index to the space. */
-class AddIndex: public AlterSpaceOp {
+/** CreateIndex - add a new index to the space. */
+class CreateIndex: public AlterSpaceOp {
 public:
 	/** New index index_def. */
 	struct index_def *new_index_def;
@@ -857,12 +828,12 @@ public:
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
-	virtual ~AddIndex();
+	virtual ~CreateIndex();
 };
 
 /** Add definition of the new key to the new space def. */
 void
-AddIndex::alter_def(struct alter_space *alter)
+CreateIndex::alter_def(struct alter_space *alter)
 {
 	rlist_add_tail_entry(&alter->key_list, new_index_def, link);
 }
@@ -887,8 +858,17 @@ on_rollback_in_old_space(struct trigger *trigger, void *event)
 }
 
 /**
- * A trigger invoked on replace in old space while
- * the record about alter is being written to the WAL.
+ * Add to index trigger -- invoked on any change in the old space,
+ * while the CreateIndex tuple is being written to the WAL. The job
+ * of this trigger is to keep the added index up to date with the
+ * state of the primary key in the old space.
+ *
+ * Initially it's installed as old_space->on_replace trigger, and
+ * for each successfully replaced tuple in the new index,
+ * a trigger is added to txn->on_rollback list to remove the tuple
+ * from the new index if the transaction rolls back.
+ *
+ * The trigger is removed when alter operation commits/rolls back.
  */
 static void
 on_replace_in_old_space(struct trigger *trigger, void *event)
@@ -925,7 +905,7 @@ on_replace_in_old_space(struct trigger *trigger, void *event)
  * they are fully enabled at all times.
  */
 void
-AddIndex::alter(struct alter_space *alter)
+CreateIndex::alter(struct alter_space *alter)
 {
 	Handler *handler = alter->new_space->handler;
 
@@ -954,13 +934,13 @@ AddIndex::alter(struct alter_space *alter)
 }
 
 void
-AddIndex::commit(struct alter_space *alter)
+CreateIndex::commit(struct alter_space *alter)
 {
 	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
 	new_index->commitCreate();
 }
 
-AddIndex::~AddIndex()
+CreateIndex::~CreateIndex()
 {
 	/*
 	 * The trigger by now may reside in the new space (on
@@ -973,6 +953,11 @@ AddIndex::~AddIndex()
 		index_def_delete(new_index_def);
 }
 
+/**
+ * RebuildIndex - drop the old index data and rebuild index
+ * from by reading the primary key. Used when key_def of
+ * an index is changed.
+ */
 class RebuildIndex: public AlterSpaceOp {
 public:
 	/** New index index_def. */
@@ -998,9 +983,8 @@ void
 RebuildIndex::alter(struct alter_space *alter)
 {
 	Handler *handler = alter->new_space->handler;
-	/**
-	 * Get the new index and build it.
-	 */
+
+	/* Get the new index and build it.  */
 	Index *new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
 	handler->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
@@ -1072,6 +1056,25 @@ on_create_space_rollback(struct trigger *trigger, void *event)
 	(void) cached;
 	assert(cached == space);
 	space_delete(space);
+}
+
+/**
+ * Create MoveIndex operation for a range of indexes in a space
+ * for range [begin, end)
+ */
+void
+alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
+			 uint32_t end)
+{
+	struct space *old_space = alter->old_space;
+	for (uint32_t index_id = begin; index_id < end; ++index_id) {
+		Index *index = space_index(old_space, index_id);
+		if (index == NULL)
+			continue;
+		MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
+		alter_space_add_op(alter, move_index);
+		move_index->iid = index->index_def->iid;
+	}
 }
 
 /**
@@ -1234,7 +1237,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
 		 */
-		struct alter_space *alter = alter_space_new();
+		struct alter_space *alter = alter_space_new(old_space);
 		auto scoped_guard =
 			make_scoped_guard([=] {alter_space_delete(alter);});
 		ModifySpace *modify =
@@ -1242,18 +1245,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		alter_space_add_op(alter, modify);
 		modify->def = def;
 		/* Create MoveIndex ops for all space indexes. */
-		uint32_t index_id;
-		for (index_id = 0; index_id <= old_space->index_id_max;
-		     ++index_id) {
-			Index *index = space_index(old_space, index_id);
-			if (index == NULL)
-				continue;
-			MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
-			alter_space_add_op(alter, move_index);
-			move_index->index_def = index->index_def;
-		}
-
-		alter_space_do(txn, alter, old_space);
+		alter_space_move_indexes(alter, 0, old_space->index_id_max + 1);
+		alter_space_do(txn, alter);
 		scoped_guard.is_active = false;
 	}
 }
@@ -1339,48 +1332,36 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			  "can not add a secondary key before primary");
 	}
 
-	struct alter_space *alter = alter_space_new();
+	struct alter_space *alter = alter_space_new(old_space);
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
 
 	/*
-	 * We have some separate cases of space indexes alter:
-	 * 1. Simple drop an index.
-	 * 2. Add a new index with subcases:
-	 *    2.1. Add a new primary index.
-	 *    2.2. Add a secondary index.
-	 * 3. Alter index non data-sensitive definition.
-	 * 4. Alter index data-sensitive definition.
+	 * Handle the following 4 cases:
+	 * 1. Simple drop of an index.
+	 * 2. Creation of a new index: primary or secondary.
+	 * 3. Change of an index which does not require a rebuild.
+	 * 4. Change of an index which does require a rebuild.
 	 */
-
 	/*
-	 * All not changing indexes should be moved from a old space
-	 * to a new one, use MoveIndex item.
+	 * First, move all unchanged indexes from the old space
+	 * to the new one.
 	 */
-	/* Create MoveIndex ops for first part of an old space indexes. */
-	uint32_t index_id;
-	for (index_id = 0; index_id < iid; ++index_id) {
-		Index *index = space_index(old_space, index_id);
-		if (index == NULL)
-			continue;
-		MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
-		alter_space_add_op(alter, move_index);
-		move_index->index_def = index->index_def;
-	}
-
+	alter_space_move_indexes(alter, 0, iid);
+	/* Case 1: drop the index, if it is dropped. */
 	if (old_index != NULL && new_tuple == NULL) {
 		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
 		alter_space_add_op(alter, drop_index);
 		drop_index->old_index_def = old_index->index_def;
 	}
-
+	/* Case 2: create an index, if it is simply created. */
 	if (old_index == NULL && new_tuple != NULL) {
-		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
-		alter_space_add_op(alter, add_index);
-		add_index->new_index_def =
+		CreateIndex *create_index = AlterSpaceOp::create<CreateIndex>();
+		alter_space_add_op(alter, create_index);
+		create_index->new_index_def =
 			index_def_new_from_tuple(new_tuple, old_space);
 	}
-
+	/* Case 3 and 4: check if we need to rebuild index data. */
 	if (old_index != NULL && new_tuple != NULL) {
 		struct index_def *index_def;
 		index_def = index_def_new_from_tuple(new_tuple, old_space);
@@ -1390,10 +1371,18 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			/* Index is not changed so just move it. */
 			MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
 			alter_space_add_op(alter, move_index);
-			move_index->index_def = old_index->index_def;
+			move_index->iid = old_index->index_def->iid;
 		}
-		else if (!index_def_change_requires_rebuild(
-			old_index->index_def, index_def)) {
+		else if (index_def_change_requires_rebuild(old_index->index_def, index_def)) {
+			/*
+			 * Operation demands an index rebuild.
+			 */
+			RebuildIndex *rebuild_index = AlterSpaceOp::create<RebuildIndex>();
+			alter_space_add_op(alter, rebuild_index);
+			rebuild_index->new_index_def = index_def;
+			rebuild_index->old_index_def = old_index->index_def;
+			index_def_guard.is_active = false;
+		} else {
 			/*
 			 * Operation can be done without index rebuild.
 			 */
@@ -1402,28 +1391,14 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			modify_index->new_index_def = index_def;
 			modify_index->old_index_def = old_index->index_def;
 			index_def_guard.is_active = false;
-
-		} else {
-			/*
-			 * Operations needs for an index rebuild.
-			 */
-			RebuildIndex *rebuild_index = AlterSpaceOp::create<RebuildIndex>();
-			alter_space_add_op(alter, rebuild_index);
-			rebuild_index->new_index_def = index_def;
-			rebuild_index->old_index_def = old_index->index_def;
-			index_def_guard.is_active = false;
 		}
 	}
-	/* Create MoveIndex ops for last part of an old space indexes. */
-	for (index_id = iid + 1; index_id <= old_space->index_id_max; ++index_id) {
-		Index *index = space_index(old_space, index_id);
-		if (index == NULL)
-			continue;
-		MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
-		alter_space_add_op(alter, move_index);
-		move_index->index_def = index->index_def;
-	}
-	alter_space_do(txn, alter, old_space);
+	/*
+	 * Create MoveIndex ops for the remaining indexes in the
+	 * old space.
+	 */
+	alter_space_move_indexes(alter, iid + 1, old_space->index_id_max + 1);
+	alter_space_do(txn, alter);
 	scoped_guard.is_active = false;
 }
 
