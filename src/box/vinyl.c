@@ -486,6 +486,16 @@ struct vy_index {
 	uint64_t truncate_count;
 };
 
+static struct vy_index *
+vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
+	     struct space *space, struct index_def *user_index_def);
+static void
+vy_index_delete(struct vy_index *index);
+static void
+vy_index_ref(struct vy_index *index);
+static void
+vy_index_unref(struct vy_index *index);
+
 /** Return index name. Used for logging. */
 static const char *
 vy_index_name(struct vy_index *index)
@@ -3939,6 +3949,26 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 
 /** }}} Introspection */
 
+struct vy_index *
+vy_new_index(struct vy_env *env, struct space *space,
+	     struct index_def *user_index_def)
+{
+	return vy_index_new(&env->index_env, &env->cache_env,
+			    space, user_index_def);
+}
+
+void
+vy_delete_index(struct vy_env *env, struct vy_index *index)
+{
+	(void)env;
+	/*
+	 * There still may be a task scheduled for this index
+	 * so postpone actual deletion until the last reference
+	 * is gone.
+	 */
+	vy_index_unref(index);
+}
+
 /**
  * Detect whether we already have non-garbage index files,
  * and open an existing index if that's the case. Otherwise,
@@ -3992,14 +4022,24 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 	}
 }
 
-void
+/**
+ * Increment the reference counter of a vinyl index.
+ * An index cannot be deleted if its reference counter
+ * is elevated.
+ */
+static void
 vy_index_ref(struct vy_index *index)
 {
 	assert(index->refs >= 0);
 	index->refs++;
 }
 
-void
+/**
+ * Decrement the reference counter of a vinyl index.
+ * If the reference counter reaches 0, the index is
+ * deleted with vy_index_delete().
+ */
+static void
 vy_index_unref(struct vy_index *index)
 {
 	assert(index->refs > 0);
@@ -4251,9 +4291,9 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 	}
 }
 
-struct vy_index *
-vy_index_new(struct vy_env *e, struct index_def *user_index_def,
-	     struct space *space)
+static struct vy_index *
+vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
+	     struct space *space, struct index_def *user_index_def)
 {
 	assert(space != NULL);
 	static int64_t run_buckets[] = {
@@ -4273,7 +4313,7 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 			 "calloc", "struct vy_index");
 		goto fail;
 	}
-	index->env = &e->index_env;
+	index->env = index_env;
 
 	index->tree = malloc(sizeof(*index->tree));
 	if (index->tree == NULL) {
@@ -4337,8 +4377,9 @@ vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	if (index->mem == NULL)
 		goto fail_mem;
 
+	index->refs = 1;
 	index->dump_lsn = -1;
-	vy_cache_create(&index->cache, &e->cache_env, key_def);
+	vy_cache_create(&index->cache, cache_env, key_def);
 	rlist_create(&index->sealed);
 	vy_range_tree_new(index->tree);
 	vy_range_heap_create(&index->range_heap);
@@ -4528,7 +4569,7 @@ vy_range_tree_free_cb(vy_range_tree_t *t, struct vy_range *range, void *arg)
 	return NULL;
 }
 
-void
+static void
 vy_index_delete(struct vy_index *index)
 {
 	assert(index->refs == 0);

@@ -56,16 +56,18 @@ struct vinyl_iterator {
 	struct vy_cursor *cursor;
 };
 
-VinylIndex::VinylIndex(struct index_def *index_def,
-		       struct vy_env *env, struct vy_index *db)
-	: Index(index_def), env(env), db(db)
+VinylIndex::VinylIndex(struct vy_env *env, struct space *space,
+		       struct index_def *index_def)
+	: Index(index_def), env(env)
 {
-	vy_index_ref(db);
+	db = vy_new_index(env, space, index_def);
+	if (db == NULL)
+		diag_raise();
 }
 
 VinylIndex::~VinylIndex()
 {
-	vy_index_unref(db);
+	vy_delete_index(env, db);
 }
 
 void

@@ -38,8 +38,8 @@
 struct VinylIndex: public Index
 {
 public:
-	VinylIndex(struct index_def *index_def,
-		   struct vy_env *env, struct vy_index *db);
+	VinylIndex(struct vy_env *env, struct space *space,
+		   struct index_def *index_def);
 	virtual ~VinylIndex() override;
 
 	/**

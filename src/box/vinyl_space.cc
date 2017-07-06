@@ -174,17 +174,7 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 		unreachable();
 		return NULL;
 	}
-
-	struct vy_index *db = vy_index_new(engine->env, index_def, space);
-	if (db == NULL)
-		diag_raise();
-
-	auto guard = make_scoped_guard([=] { vy_index_delete(db); });
-	VinylIndex *index = new VinylIndex(index_def, engine->env, db);
-
-	/* @db will be destroyed by VinylIndex destructor. */
-	guard.is_active = false;
-	return index;
+	return new VinylIndex(engine->env, space, index_def);
 }
 
 void

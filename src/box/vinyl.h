@@ -229,37 +229,21 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
 
 /**
  * Create a new vinyl index object without opening it.
- * @param e                    Vinyl environment.
- * @param user_index_def         Key definition declared by an user
- *                             with space:create_index().
- * @param space                Space for which the new index
- *                             belongs.
+ * @param env             Vinyl environment.
+ * @param space           Space the index is created for.
+ * @param user_index_def  Index definition set by the user.
  */
 struct vy_index *
-vy_index_new(struct vy_env *e, struct index_def *user_index_def,
-	     struct space *space);
+vy_new_index(struct vy_env *env, struct space *space,
+	     struct index_def *user_index_def);
 
 /**
  * Delete a vinyl index object.
+ * @param env    Vinyl environment.
+ * @param index  Index object.
  */
 void
-vy_index_delete(struct vy_index *index);
-
-/**
- * Increment the reference counter of a vinyl index.
- * An index cannot be deleted if its reference counter
- * is elevated.
- */
-void
-vy_index_ref(struct vy_index *index);
-
-/**
- * Decrement the reference counter of a vinyl index.
- * If the reference counter reaches 0, the index is
- * deleted with vy_index_delete().
- */
-void
-vy_index_unref(struct vy_index *index);
+vy_delete_index(struct vy_env *env, struct vy_index *index);
 
 /**
  * Handle vinyl space truncation.
