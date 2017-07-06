@@ -114,7 +114,7 @@ SysviewEngine::SysviewEngine()
 {
 }
 
-Handler *SysviewEngine::open()
+Handler *SysviewEngine::createSpace()
 {
 	return new SysviewSpace(this);
 }

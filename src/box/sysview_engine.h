@@ -35,7 +35,7 @@
 struct SysviewEngine: public Engine {
 public:
 	SysviewEngine();
-	virtual Handler *open() override;
+	virtual Handler *createSpace() override;
 };
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

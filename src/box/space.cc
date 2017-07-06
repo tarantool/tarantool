@@ -84,10 +84,16 @@ space_new(struct space_def *def, struct rlist *key_list)
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
 	struct index_def *index_def;
+	struct index_def *pk = NULL;
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
+		/* Find the primary key, we need to create it first. */
+		if (index_def->iid == 0)
+			pk = index_def;
 		index_id_max = MAX(index_id_max, index_def->iid);
 	}
+	/* A space with a secondary key without a primary is illegal. */
+	assert(index_count == 0 || pk != NULL);
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
 	struct space *space = (struct space *) calloc(1, sz);
@@ -108,25 +114,43 @@ space_new(struct space_def *def, struct rlist *key_list)
 	struct key_def **keys;
 	keys = (struct key_def **)region_alloc_xc(&fiber()->gc,
 						  sizeof(*keys) * index_count);
+	/**
+	 * In non-unique indexes, secondary keys must contain key parts
+	 * of the primary key. This is necessary to make ordered
+	 * retrieval from a secondary key useful to SQL
+	 * optimizer and make iterators over secondary keys stable
+	 * in presence of concurrent updates.
+	 * Since primary key fields may be used in a secondary key
+	 * too, we want add them to the field map in tuple_format_new().
+	 * Thus we always create the primary key first, and put
+	 * the primary key key_def first in the key_def array.
+	 * tuple_format_new() is a public API since 1.7.3 and
+	 * changing its signature by explicitly passing the
+	 * primary key key_def would unnecessarily break it.
+	 */
 	uint32_t key_no = 0;
 	rlist_foreach_entry(index_def, key_list, link) {
-		keys[key_no++] = &index_def->key_def;
+		keys[index_def == pk ? 0 : ++key_no] = &index_def->key_def;
 	}
+	/** Tuple format must be created before any other index. */
 	space->format = tuple_format_new(engine->format, keys, index_count, 0);
 	if (space->format == NULL)
 		diag_raise();
 	tuple_format_ref(space->format, 1);
 	space->format->exact_field_count = def->exact_field_count;
 	/* init space engine instance */
-	space->handler = engine->open();
+	space->handler = engine->createSpace();
 	/* Fill the space indexes. */
+	if (pk) {
+		space->index_map[0] = space->handler->createIndex(space, pk);
+	}
 	rlist_foreach_entry(index_def, key_list, link) {
+		if (index_def == pk)
+			continue;
 		space->index_map[index_def->iid] =
 			space->handler->createIndex(space, index_def);
 	}
 	space_fill_index_map(space);
-	/* An space with a secondary key without a primary is illegal. */
-	assert(index_count == 0 || space->index_map[0]);
 	space->run_triggers = true;
 	scoped_guard.is_active = false;
 	return space;
