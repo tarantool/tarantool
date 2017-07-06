@@ -125,6 +125,8 @@ space_new(struct space_def *def, struct rlist *key_list)
 			space->handler->createIndex(space, index_def);
 	}
 	space_fill_index_map(space);
+	/* An space with a secondary key without a primary is illegal. */
+	assert(index_count == 0 || space->index_map[0]);
 	space->run_triggers = true;
 	scoped_guard.is_active = false;
 	return space;
