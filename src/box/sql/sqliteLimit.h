@@ -219,4 +219,4 @@
 ** number of entities (in chain of compiling trigger programs) should be less than
 ** 40 or stack guard will be triggered.
 */
-#define SQL_MAX_COMPILING_TRIGGERS 40
+#define SQL_MAX_COMPILING_TRIGGERS 30
