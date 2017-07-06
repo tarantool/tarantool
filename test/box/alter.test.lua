@@ -228,3 +228,22 @@ opts = {parts={1, 'unsigned'}}
 _ = s:create_index('pk', opts)
 opts
 s:drop()
+
+--
+-- gh-2074: alter a primary key
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+s:insert{1, 1}
+s:insert{2, 2}
+s:insert{3, 3}
+s.index.pk:alter({parts={1, 'num', 2, 'num'}})
+s.index.pk
+s:select{}
+_ = s:create_index('secondary', {parts={2, 'num'}})
+s.index.pk:alter({parts={1, 'num'}})
+s:select{}
+s.index.pk
+s.index.secondary
+s.index.secondary:select{}
+s:drop()

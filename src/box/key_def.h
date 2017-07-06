@@ -349,6 +349,9 @@ struct index_def {
 struct index_def *
 index_def_dup(const struct index_def *def);
 
+void
+index_def_swap(struct index_def *def1, struct index_def *def2);
+
 /* Destroy and free an index_def. */
 void
 index_def_delete(struct index_def *def);
@@ -512,10 +515,9 @@ key_def_sizeof(uint32_t part_count)
 }
 
 static inline size_t
-index_def_sizeof(uint32_t part_count, uint32_t name_len)
+index_def_sizeof(uint32_t part_count)
 {
-	return sizeof(struct index_def) +
-	       sizeof(struct key_part) * (part_count + 1) + name_len + 1;
+	return sizeof(struct index_def) + key_def_sizeof(part_count);
 }
 
 /**

@@ -111,7 +111,7 @@ VinylEngine::endRecovery()
 }
 
 Handler *
-VinylEngine::open()
+VinylEngine::createSpace()
 {
 	return new VinylSpace(this);
 }

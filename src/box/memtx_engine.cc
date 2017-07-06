@@ -276,7 +276,7 @@ MemtxEngine::endRecovery()
 	}
 }
 
-Handler *MemtxEngine::open()
+Handler *MemtxEngine::createSpace()
 {
 	return new MemtxSpace(this);
 }

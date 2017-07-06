@@ -568,3 +568,89 @@ opts
 s:drop()
 ---
 ...
+--
+-- gh-2074: alter a primary key
+--
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+s:insert{1, 1}
+---
+- [1, 1]
+...
+s:insert{2, 2}
+---
+- [2, 2]
+...
+s:insert{3, 3}
+---
+- [3, 3]
+...
+s.index.pk:alter({parts={1, 'num', 2, 'num'}})
+---
+...
+s.index.pk
+---
+- unique: true
+  parts:
+  - type: unsigned
+    fieldno: 1
+  - type: unsigned
+    fieldno: 2
+  id: 0
+  space_id: 731
+  name: pk
+  type: TREE
+...
+s:select{}
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+...
+_ = s:create_index('secondary', {parts={2, 'num'}})
+---
+...
+s.index.pk:alter({parts={1, 'num'}})
+---
+...
+s:select{}
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+...
+s.index.pk
+---
+- unique: true
+  parts:
+  - type: unsigned
+    fieldno: 1
+  id: 0
+  space_id: 731
+  name: pk
+  type: TREE
+...
+s.index.secondary
+---
+- unique: true
+  parts:
+  - type: unsigned
+    fieldno: 2
+  id: 1
+  space_id: 731
+  name: secondary
+  type: TREE
+...
+s.index.secondary:select{}
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+...
+s:drop()
+---
+...
