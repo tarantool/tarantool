@@ -1,0 +1,392 @@
+#ifndef INCLUDES_TARANTOOL_BOX_VY_TX_H
+#define INCLUDES_TARANTOOL_BOX_VY_TX_H
+/*
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <small/mempool.h>
+#define RB_COMPACT 1
+#include <small/rb.h>
+#include <small/rlist.h>
+
+#include "iterator_type.h"
+#include "salad/stailq.h"
+#include "trivia/util.h"
+#include "vy_stat.h"
+#include "vy_stmt_iterator.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct tuple;
+struct tx_manager;
+struct vy_index;
+struct vy_mem;
+struct vy_tx;
+
+/** Transaction state. */
+enum tx_state {
+	/** Initial state. */
+	VINYL_TX_READY,
+	/**
+	 * Transaction is finished and validated in the engine.
+	 * It may still be rolled back if there is an error
+	 * writing the WAL.
+	 */
+	VINYL_TX_COMMIT,
+	/** Transaction is aborted by a conflict. */
+	VINYL_TX_ABORT,
+};
+
+/**
+ * A single operation made by a transaction:
+ * a single read or write in a vy_index.
+ */
+struct txv {
+	/** Transaction. */
+	struct vy_tx *tx;
+	/** Index this operation is for. */
+	struct vy_index *index;
+	/** In-memory tree to insert the statement into. */
+	struct vy_mem *mem;
+	/** Statement of this operation. */
+	struct tuple *stmt;
+	/** Statement allocated on vy_mem->allocator. */
+	const struct tuple *region_stmt;
+	/** Next in the transaction log. */
+	struct stailq_entry next_in_log;
+	/** Member of either read or write set. */
+	rb_node(struct txv) in_set;
+	/** True for read tx, false for write tx. */
+	bool is_read;
+	/**
+	 * True if this is a read statement and there was no
+	 * value found for the same key.
+	 */
+	bool is_gap;
+	/**
+	 * True if the txv was overwritten by another txv of
+	 * the same transaction.
+	 */
+	bool is_overwritten;
+	/** txv that was overwritten by the current txv. */
+	struct txv *overwritten;
+};
+
+/**
+ * Conflict manager index.
+ * Ordered by index, then by key, and finally by tx.
+ */
+struct read_set_key {
+	struct vy_index *index;
+	const struct tuple *stmt;
+	struct vy_tx *tx;
+};
+
+int
+read_set_cmp(struct txv *a, struct txv *b);
+int
+read_set_key_cmp(struct read_set_key *a, struct txv *b);
+
+typedef rb_tree(struct txv) read_set_t;
+rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
+	       in_set, read_set_cmp, struct read_set_key *, read_set_key_cmp);
+
+static inline struct txv *
+read_set_search_key(read_set_t *rbtree, struct vy_index *index,
+		    const struct tuple *stmt, struct vy_tx *tx)
+{
+	struct read_set_key key = { .index = index, .stmt = stmt, .tx = tx };
+	return read_set_search(rbtree, &key);
+}
+
+/**
+ * Index of all modifications made by a transaction.
+ * Ordered by index, then by key in the index.
+ */
+struct write_set_key {
+	struct vy_index *index;
+	const struct tuple *stmt;
+};
+
+int
+write_set_cmp(struct txv *a, struct txv *b);
+int
+write_set_key_cmp(struct write_set_key *a, struct txv *b);
+
+typedef rb_tree(struct txv) write_set_t;
+rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
+		in_set, write_set_cmp, struct write_set_key *, write_set_key_cmp);
+
+static inline struct txv *
+write_set_search_key(write_set_t *tree, struct vy_index *index,
+		     const struct tuple *stmt)
+{
+	struct write_set_key key = { .index = index, .stmt = stmt };
+	return write_set_search(tree, &key);
+}
+
+/** Transaction object. */
+struct vy_tx {
+	/** Transaction manager. */
+	struct tx_manager *xm;
+	/**
+	 * In memory transaction log. Contains both reads
+	 * and writes.
+	 */
+	struct stailq log;
+	/**
+	 * Writes of the transaction segregated by the changed
+	 * vy_index object.
+	 */
+	write_set_t write_set;
+	/**
+	 * Version of write_set state; if the state changes
+	 * (insert/remove), the version is incremented.
+	 */
+	uint32_t write_set_version;
+	/** Number of statements in the write set. */
+	int write_count;
+	/**
+	 * Total size of memory occupied by statements of
+	 * the write set.
+	 */
+	size_t write_size;
+	/** Current state of the transaction.*/
+	enum tx_state state;
+	/**
+	 * The read view of this transaction. When a transaction
+	 * is started, it is set to the "read committed" state,
+	 * or actually, "read prepared" state, in other words,
+	 * all changes of all prepared transactions are visible
+	 * to this transaction. Upon a conflict, the transaction's
+	 * read view is changed: it begins to point to the
+	 * last state of the database before the conflicting
+	 * change.
+	 */
+	struct vy_read_view *read_view;
+	/**
+	 * Prepare sequence number or -1 if the transaction
+	 * is not prepared.
+	 */
+	int64_t psn;
+	/* List of triggers invoked when this transaction ends. */
+	struct rlist on_destroy;
+};
+
+/** Transaction manager object. */
+struct tx_manager {
+	/**
+	 * The last committed log sequence number known to
+	 * vinyl. Updated in vy_commit().
+	 */
+	int64_t lsn;
+	/**
+	 * A global transaction prepare counter: a transaction
+	 * is assigned an id at the time of vy_prepare(). Is used
+	 * to order statements of prepared but not yet committed
+	 * transactions in vy_mem.
+	 */
+	int64_t psn;
+	/**
+	 * The last prepared (but not committed) transaction,
+	 * or NULL if there are no prepared transactions.
+	 */
+	struct vy_tx *last_prepared_tx;
+	/**
+	 * Conflict manager index. Contains all changes
+	 * made by transaction before they commit. Is used
+	 * to implement read committed isolation level, i.e.
+	 * the changes made by a transaction are only present
+	 * in this tree, and thus not seen by other transactions.
+	 */
+	read_set_t read_set;
+	/**
+	 * The list of TXs with a read view in order of vlsn.
+	 */
+	struct rlist read_views;
+	/**
+	 * Global read view - all prepared transactions are
+	 * visible in this view. The global read view
+	 * LSN is always INT64_MAX and it never changes.
+	 */
+	const struct vy_read_view global_read_view;
+	/**
+	 * It is possible to create a cursor without an active
+	 * transaction, e.g. a write iterator;
+	 * this pointer represents a skeleton
+	 * transaction to use in such places.
+	 */
+	const struct vy_read_view *p_global_read_view;
+	/**
+	 * Committed read view - all committed transactions are
+	 * visible in this view. The global read view
+	 * LSN is always (MAX_LSN - 1)  and it never changes.
+	 */
+	const struct vy_read_view committed_read_view;
+	/**
+	 * It is possible to create a cursor without an active
+	 * transaction, e.g. when squashing upserts;
+	 * this pointer represents a skeleton
+	 * transaction to use in such places.
+	 */
+	const struct vy_read_view *p_committed_read_view;
+	/** Transaction statistics. */
+	struct vy_tx_stat stat;
+	/** Memory pool for struct vy_tx allocations. */
+	struct mempool tx_mempool;
+	/** Memory pool for struct txv allocations. */
+	struct mempool txv_mempool;
+	/** Memory pool for struct vy_read_view allocations. */
+	struct mempool read_view_mempool;
+};
+
+/** Allocate a tx manager object. */
+struct tx_manager *
+tx_manager_new(void);
+
+/** Delete a tx manager object. */
+void
+tx_manager_delete(struct tx_manager *xm);
+
+/*
+ * Determine the lowest possible vlsn, i.e. the level below
+ * which the history could be compacted.
+ *
+ * If there are active read views, it is the first's vlsn.
+ * If there is no active read view, a read view could be
+ * created at any moment with vlsn = m->lsn, so m->lsn must
+ * be chosen.
+ */
+int64_t
+tx_manager_vlsn(struct tx_manager *xm);
+
+/** Initialize a tx object. */
+void
+vy_tx_create(struct tx_manager *xm, struct vy_tx *tx);
+
+/** Destroy a tx object. */
+void
+vy_tx_destroy(struct vy_tx *tx);
+
+/** Begin a new transaction. */
+struct vy_tx *
+vy_tx_begin(struct tx_manager *xm);
+
+/** Prepare a transaction to be committed. */
+int
+vy_tx_prepare(struct vy_tx *tx);
+
+/**
+ * Commit a transaction with a given LSN and destroy
+ * the tx object.
+ */
+void
+vy_tx_commit(struct vy_tx *tx, int64_t lsn);
+
+/**
+ * Rollback a transaction and destroy the tx object.
+ */
+void
+vy_tx_rollback(struct vy_tx *tx);
+
+/**
+ * Return the save point corresponding to the current
+ * transaction state. The transaction can be rolled back
+ * to a save point with vy_tx_rollback_to_savepoint().
+ */
+static inline void *
+vy_tx_savepoint(struct vy_tx *tx)
+{
+	assert(tx->state == VINYL_TX_READY);
+	return stailq_last(&tx->log);
+}
+
+/** Rollback a transaction to a given save point. */
+void
+vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp);
+
+/** Remember a read in the conflict manager index. */
+int
+vy_tx_track(struct vy_tx *tx, struct vy_index *index,
+	    struct tuple *key, bool is_gap);
+
+/** Add a statement to a transaction. */
+int
+vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt);
+
+/**
+ * Iterator over the write set of a transaction.
+ */
+struct vy_txw_iterator {
+	/** Parent class, must be the first member. */
+	struct vy_stmt_iterator base;
+	/** Iterator statistics. */
+	struct vy_txw_iterator_stat *stat;
+	/** Transaction whose write set is iterated. */
+	struct vy_tx *tx;
+	/** Index of interest. */
+	struct vy_index *index;
+	/**
+	 * Iterator type.
+	 *
+	 * Note if key is NULL, GT and EQ are changed to GE
+	 * while LT is changed to LE.
+	 */
+	enum iterator_type iterator_type;
+	/** Search key. */
+	const struct tuple *key;
+	/* Last seen value of the write set version. */
+	uint32_t version;
+	/* Current position in the write set. */
+	struct txv *curr_txv;
+	/* Is false until first .._get ot .._next_.. method is called */
+	bool search_started;
+};
+
+/**
+ * Initialize a txw iterator.
+ */
+void
+vy_txw_iterator_open(struct vy_txw_iterator *itr,
+		     struct vy_txw_iterator_stat *stat,
+		     struct vy_tx *tx, struct vy_index *index,
+		     enum iterator_type iterator_type,
+		     const struct tuple *key);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* INCLUDES_TARANTOOL_BOX_VY_TX_H */
