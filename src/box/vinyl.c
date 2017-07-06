@@ -4221,8 +4221,6 @@ vy_commit_truncate_space(struct space *old_space, struct space *new_space)
 	}
 }
 
-extern struct tuple_format_vtab vy_tuple_format_vtab;
-
 struct vy_index *
 vy_index_new(struct vy_env *e, struct index_def *user_index_def,
 	     struct space *space)

@@ -60,6 +60,8 @@ static_assert(VY_UPSERT_THRESHOLD <= UINT8_MAX, "n_upserts max value");
 static_assert(VY_UPSERT_INF == VY_UPSERT_THRESHOLD + 1,
 	      "inf must be threshold + 1");
 
+extern struct tuple_format_vtab vy_tuple_format_vtab;
+
 /**
  * There are two groups of statements:
  *

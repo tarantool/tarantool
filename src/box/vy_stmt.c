@@ -45,6 +45,10 @@
 #include "xrow.h"
 #include "fiber.h"
 
+struct tuple_format_vtab vy_tuple_format_vtab = {
+	vy_tuple_delete,
+};
+
 void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {

@@ -9,10 +9,6 @@
 #include <small/slab_cache.h>
 #include <small/lsregion.h>
 
-static struct tuple_format_vtab vy_tuple_format_vtab = {
-	vy_tuple_delete,
-};
-
 static struct tuple *
 vy_mem_insert_helper(struct vy_mem *mem, int key, int64_t lsn)
 {

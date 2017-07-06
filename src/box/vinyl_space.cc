@@ -33,7 +33,8 @@
 #include "xrow.h"
 #include "txn.h"
 #include "vinyl.h"
-#include "vy_stmt.h"
+#include "tuple.h"
+#include "iproto_constants.h"
 #include "scoped_guard.h"
 
 #include <stdlib.h>

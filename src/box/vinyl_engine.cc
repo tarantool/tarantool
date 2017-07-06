@@ -49,10 +49,6 @@
 #include "vinyl.h"
 #include "vy_stmt.h"
 
-struct tuple_format_vtab vy_tuple_format_vtab = {
-	vy_tuple_delete,
-};
-
 /* Used by lua/info.c */
 extern "C" struct vy_env *
 vinyl_engine_get_env()
