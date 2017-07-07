@@ -240,7 +240,8 @@ gen, param, state = space.index['i1']:pairs(nil, { iterator = box.index.GE })
 index_space = box.space[box.schema.INDEX_ID]
 _ = index_space:delete{space.id, space.index['i1'].id}
 type(_)
-gen(param, state)
+_, value = gen(param, state)
+value
 
 space:drop()
 
@@ -318,3 +319,308 @@ box.commit()
 
 s:select{}
 s:drop{}
+
+-- implement lazy iterator positioning
+s = box.schema.space.create('test' ,{engine=engine})
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
+for i = 1,3 do for j = 1,3 do s:replace{i, j} end end
+
+itr1,itr2,itr3 = s:pairs{2}
+_ = s:replace{1, 4}
+r = {}
+for k,v in itr1,itr2,itr3 do table.insert(r, v) end
+r
+
+itr1,itr2,itr3 = s:pairs({2}, {iterator = 'GE'})
+_ = s:replace{1, 5}
+r = {}
+for k,v in itr1,itr2,itr3 do table.insert(r, v) end
+r
+
+itr1,itr2,itr3 = s:pairs({2}, {iterator = 'REQ'})
+s:replace{2, 4}
+r = {}
+for k,v in itr1,itr2,itr3 do table.insert(r, v) end
+r
+
+r = nil
+s:drop()
+
+-- make tree iterators stable
+-- https://github.com/tarantool/tarantool/issues/1796
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+
+for i = 1,10 do s:replace{i} end
+r = {}
+for k,v in s:pairs{} do table.insert(r, v[1]) s:delete(v[1]) end
+r
+s:select{}
+
+for i = 1,10 do s:replace{i} end
+r = {}
+for k,v in s:pairs({}, {iterator = 'REQ'}) do table.insert(r, v[1]) s:delete(v[1]) end
+r
+s:select{}
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned', 2, 'unsigned'} })
+
+for i = 1,3 do for j = 1,3 do s:replace{i, j} end end
+r = {}
+for k,v in s:pairs{2} do table.insert(r, v) s:delete{v[1], v[2]} end
+r
+s:select{}
+
+for i = 1,3 do for j = 1,3 do s:replace{i, j} end end
+r = {}
+for k,v in s:pairs({3}, {iterator = 'REQ'}) do table.insert(r, v) s:delete{v[1], v[2]} end
+r
+s:select{}
+
+r = nil
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({25})
+s:replace{25}
+state, value = gen(param,state)
+value
+state, value = gen(param,state)
+value
+
+gen,param,state = i:pairs({35})
+state, value = gen(param,state)
+value
+s:replace{35}
+state, value = gen(param,state)
+value
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({30}, {iterator = 'GE'})
+state, value = gen(param, state)
+value
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+state
+value
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({40}, {iterator = 'LE'})
+state, value = gen(param, state)
+value
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{32}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+state
+value
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({28}, {iterator = 'GE'})
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{32}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+value
+gen(param, state)
+-- test iterator dummy function, invoked when it's out of bounds
+gen(param, state)
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({42}, {iterator = 'LE'})
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+s:replace{32}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+value
+gen(param, state)
+-- test iterator dummy function, invoked when it's out of bounds
+gen(param, state)
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({20}, {iterator = 'GT'})
+state, value = gen(param, state)
+value
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+value
+gen(param, state)
+-- test iterator dummy function, invoked when it's out of bounds
+gen(param, state)
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({50}, {iterator = 'LT'})
+state, value = gen(param, state)
+value
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{32}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+gen(param, state)
+-- test iterator dummy function, invoked when it's out of bounds
+gen(param, state)
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({28}, {iterator = 'GT'})
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{32}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+value
+gen(param, state)
+-- test iterator dummy function, invoked when it's out of bounds
+gen(param, state)
+
+s:drop()
+
+s = box.schema.space.create('test')
+i = s:create_index('i', { type = 'tree', parts = {1, 'unsigned'} })
+s:replace{10} s:replace{20} s:replace{30} s:replace{40} s:replace{50} s:replace{60}
+
+gen,param,state = i:pairs({42}, {iterator = 'LT'})
+s:replace{0}
+state, value = gen(param, state)
+value
+s:replace{42}
+state, value = gen(param, state)
+value
+s:replace{15}
+state, value = gen(param, state)
+value
+s:replace{32}
+state, value = gen(param, state)
+value
+s:replace{80}
+state, value = gen(param, state)
+value
+state, value = gen(param, state)
+value
+gen(param, state)
+-- test iterator dummy function, invoked when it's out of bounds
+gen(param, state)
+
+s:drop()
