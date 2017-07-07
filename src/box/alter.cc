@@ -535,6 +535,12 @@ struct alter_space {
 	struct space *old_space;
 	/** New space. */
 	struct space *new_space;
+	/**
+	 * Assigned to the new primary key definition if we're
+	 * rebuilding the primary key, i.e. changing its key parts
+	 * substantially.
+	 */
+	struct key_def *pk_def;
 };
 
 struct alter_space *
@@ -1017,7 +1023,12 @@ public:
 		     struct index_def *old_index_def_arg)
 		:AlterSpaceOp(alter),
 		new_index_def(new_index_def_arg),
-		old_index_def(old_index_def_arg) {}
+		old_index_def(old_index_def_arg)
+	{
+		/* We may want to rebuild secondary keys as well. */
+		if (new_index_def->iid == 0)
+			alter->pk_def = new_index_def->key_def;
+	}
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	/** Old index index_def. */
@@ -1108,10 +1119,29 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 {
 	struct space *old_space = alter->old_space;
 	for (uint32_t index_id = begin; index_id < end; ++index_id) {
-		Index *index = space_index(old_space, index_id);
-		if (index == NULL)
+		Index *old_index = space_index(old_space, index_id);
+		if (old_index == NULL)
 			continue;
-		(void) new MoveIndex(alter, index->index_def->iid);
+		struct index_def *old_def = old_index->index_def;
+		if (old_def->opts.is_unique || old_def->type != TREE ||
+		    alter->pk_def == NULL) {
+
+			(void) new MoveIndex(alter, old_def->iid);
+			continue;
+		}
+		/*
+		 * Rebuild non-unique secondary keys along with
+		 * the primary, since primary key parts have
+		 * changed.
+		 */
+		struct index_def *new_def =
+			index_def_new(old_def->space_id, old_def->iid,
+				      old_def->name, strlen(old_def->name),
+				      old_def->type, &old_def->opts,
+				      old_def->key_def, alter->pk_def);
+		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
+		(void) new RebuildIndex(alter, new_def, old_def);
+		guard.is_active = false;
 	}
 }
 

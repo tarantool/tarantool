@@ -285,3 +285,51 @@ _ = {fiber.create(test, {1, 2, 3}), fiber.create(test, {3, 4, 5})}
 {ch:get(), ch:get()}
 errinj.set("ERRINJ_WAL_WRITE", false)
 s:drop()
+
+-- rebuild some secondary indexes if the primary was changed
+s = box.schema.space.create('test')
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
+--i2 = s:create_index('i2', {parts = {5, 'unsigned'}, unique = false})
+--i3 = s:create_index('i3', {parts = {6, 'unsigned'}, unique = false})
+i2 = i1 i3 = i1
+
+_ = s:insert{1, 4, 3, 4, 10, 10}
+_ = s:insert{2, 3, 1, 2, 10, 10}
+_ = s:insert{3, 2, 2, 1, 10, 10}
+_ = s:insert{4, 1, 4, 3, 10, 10}
+
+
+function sum(select_res) local r = 0 for _,t in pairs(select_res) do r = r + t[1] end return r end
+
+i1:select{}
+sum(i2:select{})
+sum(i3:select{})
+
+i1:alter({parts={2, 'unsigned'}})
+
+_ = collectgarbage('collect')
+i1:select{}
+sum(i2:select{})
+sum(i3:select{})
+
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', i2.id)
+
+i1:alter{parts = {3, "unsigned"}}
+
+_ = collectgarbage('collect')
+i1:select{}
+sum(i2:select{})
+sum(i3:select{})
+
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', i3.id)
+
+i1:alter{parts = {4, "unsigned"}}
+
+_ = collectgarbage('collect')
+i1:select{}
+sum(i2:select{})
+sum(i3:select{})
+
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
+
+s:drop()

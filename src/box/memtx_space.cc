@@ -680,6 +680,11 @@ MemtxSpace::buildSecondaryKey(struct space *old_space,
 	}
 	Index *pk = index_find_xc(old_space, 0);
 
+	struct errinj *inj = errinj(ERRINJ_BUILD_SECONDARY, ERRINJ_INT);
+	if (inj != NULL && inj->iparam == (int)new_index->index_def->iid) {
+		tnt_raise(ClientError, ER_INJECTION, "buildSecondaryKey");
+	}
+
 	/* Now deal with any kind of add index during normal operation. */
 	struct iterator *it = pk->allocIterator();
 	IteratorGuard guard(it);
