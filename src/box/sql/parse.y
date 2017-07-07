@@ -103,9 +103,11 @@ static void disableLookaside(Parse *pParse){
 } // end %include
 
 // Input is a single SQL command
-input ::= ecmd.                   { sqlite3FinishCoding(pParse); }
-ecmd ::= SEMI.
-ecmd ::= explain cmdx SEMI.
+input ::= ecmd.
+ecmd ::= explain cmdx SEMI.       { sqlite3FinishCoding(pParse); }
+ecmd ::= SEMI. {
+  sqlite3ErrorMsg(pParse, "syntax error: empty request");
+}
 explain ::= .
 %ifndef SQLITE_OMIT_EXPLAIN
 explain ::= EXPLAIN.              { pParse->explain = 1; }

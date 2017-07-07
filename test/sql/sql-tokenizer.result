@@ -15,7 +15,7 @@ sql_tokenizer.split_sql('select 1; select 2; select 3;')
 ...
 sql_tokenizer.split_sql(';')
 ---
-- - ;
+- []
 ...
 sql_tokenizer.split_sql('')
 ---
@@ -33,7 +33,6 @@ sql_tokenizer.split_sql('select ";" from ";;;;"\'\' as ";"; select 100;     \n\n
 ---
 - - select ";" from ";;;;"'' as ";";
   - ' select 100;'
-  - "     \n\n"
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -58,7 +57,7 @@ test_run:cmd("setopt delimiter ''");
 ...
 sql_tokenizer.split_sql('-- comment comment comment; select 1; select 2;')
 ---
-- - -- comment comment comment; select 1; select 2;
+- []
 ...
 sql_tokenizer.split_sql('select 1; select /* comment comment select 100; select 1000; */ 3; select 2;')
 ---
@@ -91,4 +90,9 @@ sql_tokenizer.split_sql('create temp trigger begin\n'..
 test_run:cmd("setopt delimiter ''");
 ---
 - true
+...
+sql_tokenizer.split_sql('select 1; -- test comment\n; select 2;')
+---
+- - select 1;
+  - ' select 2;'
 ...

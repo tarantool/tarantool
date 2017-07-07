@@ -210,7 +210,7 @@ lua_sql_execute(struct lua_State *L)
 	sql_end = sql + length;
 
 	l = prep_stmt_list_init(&stock_l);
-	while (sql != sql_end) {
+	do {
 
 		struct prep_stmt *ps = prep_stmt_list_push(&l);
 		if (ps == NULL)
@@ -262,7 +262,7 @@ lua_sql_execute(struct lua_State *L)
 		}
         if (rc != SQLITE_OK && rc != SQLITE_DONE)
             goto sqlerror;
-	}
+	} while (sql != sql_end);
 	prep_stmt_list_free(l);
 	return lua_gettop(L) - 1;
 sqlerror:

@@ -27,3 +27,5 @@ sql_tokenizer.split_sql('create temp trigger begin\n'..
 				'insert into tst values v a l u e s;\n'..
 			'end;\n\n\n\t\t\n\n select 200..";select1000";');
 test_run:cmd("setopt delimiter ''");
+
+sql_tokenizer.split_sql('select 1; -- test comment\n; select 2;')
