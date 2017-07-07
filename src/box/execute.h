@@ -45,10 +45,8 @@ struct sql_bind;
 /** EXECUTE request. */
 struct sql_request {
 	uint64_t sync;
-	/** SQL query. */
-	const char *query;
-	/** End of the @query. */
-	const char *query_end;
+	/** SQL statement text. */
+	const char *sql_text;
 	/** Array of parameters. */
 	struct sql_bind *bind;
 	/** Length of the @bind. */

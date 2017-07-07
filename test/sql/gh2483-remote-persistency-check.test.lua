@@ -23,3 +23,4 @@ c:eval([[ return box.sql.execute('SELECT * FROM t') ]])
 -- sql.execute([[SELECT * FROM t]])
 
 box.sql.execute([[DROP TABLE t]])
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

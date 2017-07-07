@@ -100,6 +100,7 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	bind->pos = i + 1;
 	bind->name = NULL;
 	bind->name_len = 0;
+	bind->bytes = 0;
 	if (mp_typeof(**packet) == MP_MAP) {
 		uint32_t len = mp_decode_map(packet);
 		/*
@@ -124,11 +125,13 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 		}
 		bind->i64 = (int64_t) n;
 		bind->type = SQLITE_INTEGER;
+		bind->bytes = sizeof(bind->i64);
 		break;
 	}
 	case MP_INT:
 		bind->i64 = mp_decode_int(packet);
 		bind->type = SQLITE_INTEGER;
+		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_STR:
 		bind->s = mp_decode_str(packet, &bind->bytes);
@@ -137,19 +140,23 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	case MP_DOUBLE:
 		bind->d = mp_decode_double(packet);
 		bind->type = SQLITE_FLOAT;
+		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_FLOAT:
 		bind->d = mp_decode_float(packet);
 		bind->type = SQLITE_FLOAT;
+		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_NIL:
 		mp_decode_nil(packet);
 		bind->type = SQLITE_NULL;
+		bind->bytes = 1;
 		break;
 	case MP_BOOL:
 		/* SQLite doesn't support boolean. Use int instead. */
 		bind->i64 = mp_decode_bool(packet) ? 1 : 0;
 		bind->type = SQLITE_INTEGER;
+		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_BIN:
 		bind->s = mp_decode_bin(packet, &bind->bytes);
@@ -259,8 +266,7 @@ mp_error:
 		return -1;
 	}
 	uint32_t size = mp_decode_map(&data);
-	request->query = NULL;
-	request->query_end = NULL;
+	request->sql_text = NULL;
 	request->bind = NULL;
 	request->bind_count = 0;
 	request->sync = sync;
@@ -275,8 +281,7 @@ mp_error:
 					return -1;
 				break;
 			case IPROTO_SQL_TEXT:
-				request->query = value;
-				request->query_end = data;
+				request->sql_text = value;
 				break;
 			default:
 				break;
@@ -288,7 +293,7 @@ mp_error:
 		return -1;
 	}
 #endif
-	if (request->query == NULL) {
+	if (request->sql_text == NULL) {
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 			 iproto_key_name(IPROTO_SQL_TEXT));
 		return -1;
@@ -450,17 +455,19 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
 	default:
 		unreachable();
 	}
-
 	if (rc == SQLITE_OK)
 		return 0;
-	if (rc == SQLITE_TOOBIG)
+
+	switch (rc) {
+	case SQLITE_NOMEM:
+		diag_set(OutOfMemory, p->bytes, "vdbe", "bind value");
+		break;
+	case SQLITE_TOOBIG:
+	default:
 		diag_set(ClientError, ER_SQL_BIND_VALUE, sql_bind_name(p),
 			 sql_type_strs[p->type]);
-	else if (rc == SQLITE_NOMEM)
-		diag_set(ClientError, ER_SQL_BIND_NOMEM, sql_bind_name(p),
-			 sql_type_strs[p->type]);
-	else
-		unreachable();
+		break;
+	}
 	return -1;
 }
 
@@ -506,7 +513,7 @@ sql_prepare(sqlite3 *db, struct sqlite3_stmt **stmt, const char *sql,
 }
 
 /**
- * Get description of the prepared statement.
+ * Serialize a description of the prepared statement.
  * @param stmt Prepared statement.
  * @param out Out buffer.
  * @param[out] count Count of description pairs.
@@ -570,7 +577,7 @@ sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 	int rc;
 	if (column_count == 0) {
 		/*
-		 * Query without response:
+		 * A statement with no response:
 		 * CREATE/DELETE/INSERT ...
 		 */
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW);
@@ -587,14 +594,14 @@ sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 	return rc == SQLITE_OK ? 0 : -1;
 
 sql_error:
-	diag_set(ClientError, ER_SQL, sqlite3_errmsg(db));
+	diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
 	return -1;
 }
 
 int
 sql_prepare_and_execute(struct sql_request *request, struct obuf *out)
 {
-	const char *sql = request->query;
+	const char *sql = request->sql_text;
 	uint32_t length;
 	sql = mp_decode_str(&sql, &length);
 	struct sqlite3_stmt *stmt;

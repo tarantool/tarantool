@@ -166,7 +166,7 @@ struct errcode_record {
 	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options (field %u): %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		"View '%s' is read-only") \
-	/*114 */_(ER_SQL_BIND_NOMEM,		"Failed to allocate memory for the parameter %s") \
+	/*114 */_(ER_UNUSED114,			"") \
 	/*115 */_(ER_SYSTEM,			"%s") \
 	/*116 */_(ER_LOADING,			"Instance bootstrap hasn't finished yet") \
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
@@ -193,6 +193,7 @@ struct errcode_record {
 	/*138 */_(ER_SQL_BIND_VALUE,		"Bind value for parameter %s is out of range for type %s") \
 	/*139 */_(ER_SQL_BIND_TYPE,		"Bind value type %s for parameter %s is not supported") \
 	/*140 */_(ER_SQL_BIND_COUNT_MAX,	"Too many SQL variables") \
+	/*141 */_(ER_SQL_EXECUTE,		"%s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
