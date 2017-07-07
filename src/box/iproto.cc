@@ -642,6 +642,10 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 
 		try {
 			iproto_decode_msg(msg, &pos, reqend, &stop_input);
+			/*
+			 * This can't throw, but should not be
+			 * done in case of exception.
+			 */
 			cpipe_push_input(&tx_pipe, guard.release());
 			n_requests++;
 		} catch (Exception *e) {
@@ -651,6 +655,12 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			 * to proceed to the next one.
 			 */
 			struct obuf *out = &msg->iobuf->out;
+			/*
+			 * Advance read position right away: the
+			 * message is so no need to hold the input
+			 * buffer.
+			 */
+			in->rpos += msg->len;
 			iproto_reply_error(out, e, msg->header.sync,
 					   ::schema_version);
 			out->wend = obuf_create_svp(out);
