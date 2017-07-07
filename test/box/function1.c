@@ -49,6 +49,7 @@ args(box_function_ctx_t *ctx, const char *args, const char *args_end)
 int
 multi_inc(box_function_ctx_t *ctx, const char *args, const char *args_end)
 {
+	(void )ITER_ALL;
 	static const char *SPACE_NAME = "test";
 	static const char *INDEX_NAME = "primary";
 

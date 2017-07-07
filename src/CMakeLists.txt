@@ -169,6 +169,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/box/schema.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h
     ${CMAKE_SOURCE_DIR}/src/box/index.h
+    ${CMAKE_SOURCE_DIR}/src/box/iterator_type.h
     ${CMAKE_SOURCE_DIR}/src/box/error.h
     ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
     ${CMAKE_SOURCE_DIR}/src/box/lua/tuple.h

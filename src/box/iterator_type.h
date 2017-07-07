@@ -37,6 +37,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
 /**
  * Controls how to iterate over tuples in an index.
  * Different index types support different iterator types.
@@ -73,6 +75,8 @@ enum iterator_type {
 	ITER_NEIGHBOR         = 11, /* tuples in distance ascending order from specified point */
 	iterator_type_MAX
 };
+
+/** \endcond public */
 
 extern const char *iterator_type_strs[];
 
