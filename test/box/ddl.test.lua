@@ -11,13 +11,13 @@ ch = fiber.channel(2)
 test_run:cmd("setopt delimiter ';'")
 
 function f1()
-  box.space.test:create_index('sec', {parts = {2, 'num'}})
-  ch:put(true)
+    box.space.test:create_index('sec', {parts = {2, 'num'}})
+    ch:put(true)
 end;
 
 function f2()
-  box.space.test:create_index('third', {parts = {3, 'string'}})
-  ch:put(true)
+    box.space.test:create_index('third', {parts = {3, 'string'}})
+    ch:put(true)
 end;
 
 test_run:cmd("setopt delimiter ''");
@@ -59,4 +59,29 @@ space:replace({2, 3, 1})
 space:select()
 space:drop()
 
+
+ch = fiber.channel(3)
+
+_ = box.schema.space.create('test'):create_index('pk')
+
+test_run:cmd("setopt delimiter ';'")
+function add_index()
+    box.space.test:create_index('sec', {parts = {2, 'num'}})
+    ch:put(true)
+end;
+
+function insert_tuple(tuple)
+    ch:put({pcall(box.space.test.replace, box.space.test, tuple)})
+end;
+test_run:cmd("setopt delimiter ''");
+
+_ = {fiber.create(insert_tuple, {1, 2, 'a'}), fiber.create(add_index), fiber.create(insert_tuple, {2, '3', 'b'})}
+{ch:get(), ch:get(), ch:get()}
+
+box.space.test:select()
+
+test_run:cmd('restart server default')
+
+box.space.test:select()
+box.space.test:drop()
 
