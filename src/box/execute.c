@@ -205,8 +205,9 @@ sql_bind_list_decode(const char *data, uint32_t bind_count,
 {
 	assert(bind_count > 0);
 	assert(data != NULL);
-	if (bind_count > SQL_VARIABLE_NUMBER_MAX) {
-		diag_set(ClientError, ER_SQL_BIND_COUNT_MAX);
+	if (bind_count >= SQL_VARIABLE_NUMBER_MAX) {
+		diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
+			 (int) bind_count);
 		return NULL;
 	}
 	uint32_t used = region_used(region);
@@ -261,43 +262,39 @@ sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
 {
 	const char *end = data + len;
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
-mp_error:
+error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
-	uint32_t size = mp_decode_map(&data);
+	uint32_t map_size = mp_decode_map(&data);
 	request->sql_text = NULL;
 	request->bind = NULL;
 	request->bind_count = 0;
 	request->sync = sync;
-	for (uint32_t i = 0; i < size; ++i) {
-		uint64_t key = mp_decode_uint(&data);
-		const char *value = data;
-		if (mp_check(&data, end) != 0)
-			goto mp_error;
-		switch (key) {
-			case IPROTO_SQL_BIND:
-				if (sql_bind_parse(request, value, region) != 0)
-					return -1;
-				break;
-			case IPROTO_SQL_TEXT:
-				request->sql_text = value;
-				break;
-			default:
-				break;
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint8_t key = *data;
+		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT) {
+			mp_check(&data, end);   /* skip the key */
+			mp_check(&data, end);   /* skip the value */
+			continue;
+		}
+		const char *value = ++data;     /* skip the key */
+		if (mp_check(&data, end) != 0)  /* check the value */
+			goto error;
+		if (key == IPROTO_SQL_BIND) {
+			if (sql_bind_parse(request, value, region) != 0)
+				return -1;
+		} else {
+			request->sql_text = value;
 		}
 	}
-#ifndef NDEBUG
-	if (data != end) {
-		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
-		return -1;
-	}
-#endif
 	if (request->sql_text == NULL) {
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 			 iproto_key_name(IPROTO_SQL_TEXT));
 		return -1;
 	}
+	if (data != end)
+		goto error;
 	return 0;
 }
 
@@ -422,7 +419,7 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
 		pos = sqlite3_bind_parameter_lindex(stmt, p->name, p->name_len);
 		if (pos == 0) {
 			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
-				 tt_cstr(p->name, p->name_len));
+				 sql_bind_name(p));
 			return -1;
 		}
 	}
@@ -487,28 +484,6 @@ sql_bind(struct sql_request *request, struct sqlite3_stmt *stmt)
 	for (uint32_t i = 0; i < request->bind_count; pos = ++i + 1)
 		if (sql_bind_column(stmt, &request->bind[i], pos) != 0)
 			return -1;
-	return 0;
-}
-
-/**
- * Prepare an SQL query.
- * @param db SQLite engine.
- * @param[out] stmt SQL statement to prepare.
- * @param sql SQL query.
- * @param length Length of the @sql.
- *
- * @retval  0 Success.
- * @retval -1 Client or memory error.
- */
-static inline int
-sql_prepare(sqlite3 *db, struct sqlite3_stmt **stmt, const char *sql,
-	    uint32_t length)
-{
-	if (sqlite3_prepare_v2(db, sql, length, stmt, &sql) != SQLITE_OK) {
-		diag_set(ClientError, ER_SQL, sqlite3_errmsg(db));
-		sqlite3_finalize(*stmt);
-		return -1;
-	}
 	return 0;
 }
 
@@ -602,47 +577,48 @@ int
 sql_prepare_and_execute(struct sql_request *request, struct obuf *out)
 {
 	const char *sql = request->sql_text;
-	uint32_t length;
-	sql = mp_decode_str(&sql, &length);
+	uint32_t len;
+	sql = mp_decode_str(&sql, &len);
 	struct sqlite3_stmt *stmt;
 	sqlite3 *db = sql_get();
 	if (db == NULL) {
-		diag_set(ClientError, ER_SQL, "sql processor is not ready");
+		diag_set(ClientError, ER_LOADING);
 		return -1;
 	}
 
-	if (sql_prepare(db, &stmt, sql, length) != 0)
+	if (sqlite3_prepare_v2(db, sql, len, &stmt, NULL) != SQLITE_OK) {
+		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
 		return -1;
+	}
 	if (sql_bind(request, stmt) != 0)
-		goto bind_error;
+		goto err_stmt;
 
 	/* Prepare memory for the iproto header. */
-	struct obuf_svp svp;
-	if (iproto_prepare_header(out, &svp, PREPARE_SQL_SIZE) != 0)
-		goto error;
+	struct obuf_svp header_svp;
+	if (iproto_prepare_header(out, &header_svp, PREPARE_SQL_SIZE) != 0)
+		goto err_stmt;
 
 	/* Encode description. */
 	struct obuf_svp sql_svp;
 	if (iproto_prepare_body_key(out, &sql_svp) != 0)
-		goto error;
-	if (sql_get_description(stmt, out, &length) != 0)
-		goto error;
-	iproto_reply_body_key(out, &sql_svp, length, IPROTO_DESCRIPTION);
+		goto err_svp;
+	if (sql_get_description(stmt, out, &len) != 0)
+		goto err_svp;
+	iproto_reply_body_key(out, &sql_svp, len, IPROTO_DESCRIPTION);
 
 	/* Encode data set. */
 	if (iproto_prepare_body_key(out, &sql_svp) != 0)
-		goto error;
-	if (sql_execute(db, stmt, out, &length) != 0)
-		goto error;
+		goto err_svp;
+	if (sql_execute(db, stmt, out, &len) != 0)
+		goto err_svp;
+	iproto_reply_body_key(out, &sql_svp, len, IPROTO_DATA);
+
+	iproto_reply_sql(out, &header_svp, request->sync, schema_version);
 	sqlite3_finalize(stmt);
-	iproto_reply_body_key(out, &sql_svp, length, IPROTO_DATA);
-
-	iproto_reply_sql(out, &svp, request->sync, schema_version);
 	return 0;
-
-error:
-	obuf_rollback_to_svp(out, &svp);
-bind_error:
+err_svp:
+	obuf_rollback_to_svp(out, &header_svp);
+err_stmt:
 	sqlite3_finalize(stmt);
 	return -1;
 }

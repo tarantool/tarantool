@@ -58,11 +58,11 @@ cn:execute('delete from test where a = 5')
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
 ---
-- error: 'SQL error: no such table: not_existing_table'
+- error: 'Failed to execute SQL statement: no such table: not_existing_table'
 ...
 cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 ---
-- error: 'SQL error: near "qwerty": syntax error'
+- error: 'Failed to execute SQL statement: near "qwerty": syntax error'
 ...
 -- Empty result.
 cn:execute('select id as identifier from test where a = 5;')
@@ -73,7 +73,7 @@ cn:execute('select id as identifier from test where a = 5;')
 -- netbox API errors.
 cn:execute(100)
 ---
-- error: 'SQL error: near "100": syntax error'
+- error: 'Failed to execute SQL statement: near "100": syntax error'
 ...
 cn:execute('select 1', nil, {dry_run = true})
 ---
@@ -192,15 +192,15 @@ parameters[1]['name'] = 300
 ...
 cn:execute('select ? as kek', parameters)
 ---
-- error: Illegal named parameter 'name', the name was not found in the statement
+- error: Parameter 'name' was not found in the statement
 ...
--- Try too many parameters in the query.
-sql = 'select '..string.rep('?, ', box.schema.SQL_VARIABLE_NUMBER_MAX)..'?'
+-- Try too many parameters in a statement.
+sql = 'select '..string.rep('?, ', box.schema.SQL_BIND_PARAMETER_MAX)..'?'
 ---
 ...
 cn:execute(sql)
 ---
-- error: 'SQL error: too many SQL variables'
+- error: 'Failed to execute SQL statement: too many SQL variables'
 ...
 -- Try too many parameter values.
 sql = 'select ?'
@@ -209,12 +209,12 @@ sql = 'select ?'
 parameters = {}
 ---
 ...
-for i = 1, box.schema.SQL_VARIABLE_NUMBER_MAX + 1 do parameters[i] = i end
+for i = 1, box.schema.SQL_BIND_PARAMETER_MAX + 1 do parameters[i] = i end
 ---
 ...
 cn:execute(sql, parameters)
 ---
-- error: Too many SQL variables
+- error: 'SQL bind parameter limit reached: 65001'
 ...
 --
 -- Errors during parameters binding.

@@ -113,7 +113,7 @@ struct errcode_record {
 	/* 58 */_(ER_RELOAD_CFG,		"Can't set option '%s' dynamically") \
 	/* 59 */_(ER_CFG,			"Incorrect value for option '%s': %s") \
 	/* 60 */_(ER_SQL,			"SQL error: %s") \
-	/* 61 */_(ER_SQL_BIND_NOT_FOUND,	"Illegal named parameter '%s', the name was not found in the statement") \
+	/* 61 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
 	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %s") \
 	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
@@ -192,8 +192,8 @@ struct errcode_record {
 	/*137 */_(ER_TRUNCATE_SYSTEM_SPACE,	"Can't truncate a system space, space '%s'") \
 	/*138 */_(ER_SQL_BIND_VALUE,		"Bind value for parameter %s is out of range for type %s") \
 	/*139 */_(ER_SQL_BIND_TYPE,		"Bind value type %s for parameter %s is not supported") \
-	/*140 */_(ER_SQL_BIND_COUNT_MAX,	"Too many SQL variables") \
-	/*141 */_(ER_SQL_EXECUTE,		"%s") \
+	/*140 */_(ER_SQL_BIND_PARAMETER_MAX,	"SQL bind parameter limit reached: %d") \
+	/*141 */_(ER_SQL_EXECUTE,		"Failed to execute SQL statement: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

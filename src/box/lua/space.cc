@@ -363,6 +363,6 @@ box_lua_space_init(struct lua_State *L)
 	lua_pushnumber(L, VCLOCK_MAX);
 	lua_setfield(L, -2, "REPLICA_MAX");
 	lua_pushnumber(L, SQL_VARIABLE_NUMBER_MAX);
-	lua_setfield(L, -2, "SQL_VARIABLE_NUMBER_MAX");
+	lua_setfield(L, -2, "SQL_BIND_PARAMETER_MAX");
 	lua_pop(L, 2); /* box, schema */
 }

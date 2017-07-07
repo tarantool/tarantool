@@ -75,14 +75,14 @@ parameters[1] = {}
 parameters[1]['name'] = 300
 cn:execute('select ? as kek', parameters)
 
--- Try too many parameters in the query.
-sql = 'select '..string.rep('?, ', box.schema.SQL_VARIABLE_NUMBER_MAX)..'?'
+-- Try too many parameters in a statement.
+sql = 'select '..string.rep('?, ', box.schema.SQL_BIND_PARAMETER_MAX)..'?'
 cn:execute(sql)
 
 -- Try too many parameter values.
 sql = 'select ?'
 parameters = {}
-for i = 1, box.schema.SQL_VARIABLE_NUMBER_MAX + 1 do parameters[i] = i end
+for i = 1, box.schema.SQL_BIND_PARAMETER_MAX + 1 do parameters[i] = i end
 cn:execute(sql, parameters)
 
 --
