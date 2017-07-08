@@ -681,7 +681,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 		 */
 		while (op != rlist_first_entry(&alter->ops,
 					       class AlterSpaceOp, link)) {
-			op = rlist_prev_entry(prev, link);
+			op = rlist_prev_entry(op, link);
 			op->rollback(alter);
 		}
 		throw;
