@@ -1999,8 +1999,8 @@ vy_index_rollback_stmt(struct vy_index *index, struct vy_mem *mem,
 }
 
 /**
- * Calculate and record the number of seqential upserts, squash
- * immediatelly or schedule upsert process if needed.
+ * Calculate and record the number of sequential upserts, squash
+ * immediately or schedule upsert process if needed.
  * Additional handler used in vy_index_commit_stmt() for UPSERT
  * statements.
  *
