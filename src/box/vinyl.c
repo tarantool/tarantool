@@ -8780,7 +8780,12 @@ vy_cursor_delete(struct vy_cursor *c)
 	struct vy_env *e = c->env;
 	if (c->tx != NULL) {
 		if (c->tx == &c->tx_autocommit) {
-			/* Rollback the automatic transaction. */
+			/*
+			 * Rollback the automatic transaction,
+			 * use vy_tx_destroy() to not spoil
+			 * the statistics of rollbacks issued
+			 * by user transactions.
+			 */
 			vy_tx_destroy(c->tx);
 		} else {
 			/*
