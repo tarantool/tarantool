@@ -5943,12 +5943,19 @@ void
 vy_commit(struct vy_tx *tx, int64_t lsn)
 {
 	struct vy_env *env = tx->xm->env;
+	/*
+	 * vy_tx_commit() may trigger an upsert squash.
+	 * If there is no memory for a created statement,
+	 * it silently fails. But if it succeeds, we
+	 * need to account the memory in the quota.
+	 */
 	size_t mem_used_before = lsregion_used(&env->allocator);
 
 	vy_tx_commit(tx, lsn);
 
 	size_t mem_used_after = lsregion_used(&env->allocator);
 	assert(mem_used_after >= mem_used_before);
+	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
 
 	mempool_free(&tx->xm->tx_mempool, tx);
