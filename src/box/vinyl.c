@@ -1390,6 +1390,20 @@ vy_index_rotate_mem(struct vy_index *index)
 }
 
 /**
+ * Remove an in-memory tree from the sealed list of a vinyl index,
+ * unaccount and delete it.
+ */
+static void
+vy_index_delete_mem(struct vy_index *index, struct vy_mem *mem)
+{
+	assert(!rlist_empty(&mem->in_sealed));
+	rlist_del_entry(mem, in_sealed);
+	vy_stmt_counter_sub(&index->stat.memory.count, &mem->count);
+	vy_mem_delete(mem);
+	index->mem_list_version++;
+}
+
+/**
  * Split a range if it has grown too big, return true if the range
  * was split. Splitting is done by making slices of the runs used
  * by the original range, adding them to new ranges, and reflecting
@@ -2467,12 +2481,9 @@ delete_mems:
 	rlist_foreach_entry_safe(mem, &index->sealed, in_sealed, next_mem) {
 		if (mem->generation > scheduler->dump_generation)
 			continue;
-		rlist_del_entry(mem, in_sealed);
-		vy_stmt_counter_sub(&index->stat.memory.count, &mem->count);
 		vy_stmt_counter_add(&index->stat.disk.dump.in, &mem->count);
-		vy_mem_delete(mem);
+		vy_index_delete_mem(index, mem);
 	}
-	index->mem_list_version++;
 	index->dump_lsn = dump_lsn;
 	index->stat.disk.dump.count++;
 
@@ -2584,10 +2595,7 @@ vy_task_dump_new(struct vy_index *index, struct vy_task **p_task)
 			 * The tree is empty so we can delete it
 			 * right away, without involving a worker.
 			 */
-			vy_stmt_counter_sub(&index->stat.memory.count,
-					    &mem->count);
-			rlist_del_entry(mem, in_sealed);
-			vy_mem_delete(mem);
+			vy_index_delete_mem(index, mem);
 			continue;
 		}
 		dump_lsn = MAX(dump_lsn, mem->max_lsn);
