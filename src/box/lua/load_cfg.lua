@@ -112,23 +112,31 @@ local modify_cfg = {
     replication        = normalize_uri,
 }
 
-local function purge_login_frourilib(uri)
+local function purge_password_from_uri(uri)
+    local parsed = urilib.parse(uri)
+    if parsed ~= nil and parsed.password ~= nil then
+        return urilib.format(parsed, false)
+    end
+    return uri
+end
+
+local function purge_password_from_uris(uri)
     if uri == nil then
         return nil
     end
     if type(uri) == 'table' then
-    local new_table = {}
+        local new_table = {}
         for k, v in pairs(uri) do
-            new_table[k] = urilib.format(urilib.parse(v), false)
+            new_table[k] = purge_password_from_uri(uri)
         end
         return new_table
     end
-    return urilib.format(urilib.parse(uri), false)
+    return purge_password_from_uri(uri)
 end
 
 -- options that require modification for logging
 local log_cfg_option = {
-    replication = purge_login_frourilib,
+    replication = purge_password_from_uris,
 }
 
 -- dynamically settable options
