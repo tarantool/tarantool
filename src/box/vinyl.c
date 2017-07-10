@@ -287,6 +287,8 @@ struct txv {
 	/** true if that is a read statement,
 	 * and there was no value found for that key */
 	bool is_gap;
+	/** true if the txv was overwritten by another txv of the same tx */
+	bool is_overwritten;
 };
 
 typedef rb_tree(struct txv) read_set_t;
@@ -4480,6 +4482,7 @@ txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
 	tuple_ref(stmt);
 	v->region_stmt = NULL;
 	v->tx = tx;
+	v->is_overwritten = false;
 	return v;
 }
 
@@ -4566,51 +4569,54 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	 * in order to differ it from cachable statements in mem and run.
 	 */
 	vy_stmt_set_lsn(stmt, INT64_MAX);
+	struct tuple *applied = NULL;
 
 	/* Update concurrent index */
 	struct txv *old = write_set_search_key(&tx->write_set, index, stmt);
 	/* Found a match of the previous action of this transaction */
-	if (old != NULL) {
-		if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
-			assert(index->id == 0);
-			uint8_t old_type = vy_stmt_type(old->stmt);
-			assert(old_type == IPROTO_UPSERT ||
-			       old_type == IPROTO_REPLACE ||
-			       old_type == IPROTO_DELETE);
-			(void) old_type;
+	if (old != NULL && vy_stmt_type(stmt) == IPROTO_UPSERT) {
+		assert(index->id == 0);
+		uint8_t old_type = vy_stmt_type(old->stmt);
+		assert(old_type == IPROTO_UPSERT ||
+		       old_type == IPROTO_REPLACE ||
+		       old_type == IPROTO_DELETE);
+		(void) old_type;
 
-			stmt = vy_apply_upsert(stmt, old->stmt, index->key_def,
-					       index->space_format,
-					       index->upsert_format, true);
-			index->stat.upsert.applied++;
-			if (stmt == NULL)
-				return -1;
-			assert(vy_stmt_type(stmt) != 0);
-			index->stat.upsert.squashed++;
-		} else {
-			tuple_ref(stmt);
-		}
-		assert(tx->write_size >= tuple_size(old->stmt));
-		tx->write_size -= tuple_size(old->stmt);
-		tx->write_size += tuple_size(stmt);
-		vy_stmt_counter_unacct_tuple(&index->stat.txw.count, old->stmt);
-		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
-		tuple_unref(old->stmt);
-		old->stmt = stmt;
-	} else {
-		/* Allocate a MVCC container. */
-		struct txv *v = txv_new(index, stmt, tx);
-		if (v == NULL)
+		applied = vy_apply_upsert(stmt, old->stmt, index->key_def,
+					  index->space_format,
+					  index->upsert_format, true);
+		index->stat.upsert.applied++;
+		if (applied == NULL)
 			return -1;
-		v->is_read = false;
-		v->is_gap = false;
-		write_set_insert(&tx->write_set, v);
-		tx->write_set_version++;
-		tx->write_count++;
-		tx->write_size += tuple_size(stmt);
-		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
-		stailq_add_tail_entry(&tx->log, v, next_in_log);
+		stmt = applied;
+		assert(vy_stmt_type(stmt) != 0);
+		index->stat.upsert.squashed++;
 	}
+
+	/* Allocate a MVCC container. */
+	struct txv *v = txv_new(index, stmt, tx);
+	if (applied != NULL)
+		tuple_unref(applied);
+	if (v == NULL)
+		return -1;
+
+	if (old != NULL) {
+		/* Leave the old txv in TX log but remove it from write set */
+		assert(tx->write_size >= tuple_size(old->stmt));
+		tx->write_count--;
+		tx->write_size -= tuple_size(old->stmt);
+		write_set_remove(&tx->write_set, old);
+		old->is_overwritten = true;
+	}
+
+	v->is_read = false;
+	v->is_gap = false;
+	write_set_insert(&tx->write_set, v);
+	tx->write_set_version++;
+	tx->write_count++;
+	tx->write_size += tuple_size(stmt);
+	vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
+	stailq_add_tail_entry(&tx->log, v, next_in_log);
 	return 0;
 }
 
@@ -5787,11 +5793,6 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (v->is_read)
 			continue;
 
-		rc = vy_tx_write_prepare(v);
-		if (rc != 0)
-			break;
-		assert(v->mem != NULL);
-
 		struct vy_index *index = v->index;
 		if (index->id == 0) {
 			/* The beginning of the new txn_stmt is met. */
@@ -5800,6 +5801,15 @@ vy_tx_prepare(struct vy_tx *tx)
 			delete = NULL;
 		}
 		assert(index->space_id == current_space_id);
+
+		/* Do not save statements that was overwritten by the same tx */
+		if (v->is_overwritten)
+			continue;
+
+		rc = vy_tx_write_prepare(v);
+		if (rc != 0)
+			break;
+		assert(v->mem != NULL);
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);

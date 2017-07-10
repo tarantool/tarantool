@@ -245,3 +245,24 @@ _ = s:insert{1}
 _ = fiber.create(function() fiber.sleep(0.001) s:insert{2} end)
 box.snapshot()
 s:drop()
+
+s = box.schema.space.create("test", {engine='vinyl'})
+i1 = box.space.test:create_index('i1', {parts = {1, 'unsigned'}})
+i2 = box.space.test:create_index('i2', {unique = false, parts = {2, 'unsigned'}})
+
+count = 10000
+
+test_run:cmd("setopt delimiter ';'")
+box.begin()
+for i = 1, count do
+    s:replace({math.random(count), math.random(count)})
+    if i % 100 == 0 then
+        box.commit()
+        box.begin()
+    end
+end
+box.commit()
+test_run:cmd("setopt delimiter ''");
+
+s.index.i1:count() == s.index.i2:count()
+s:drop()
