@@ -44,8 +44,9 @@
 #include "scramble.h"
 #include "iproto_constants.h"
 
-static_assert(IPROTO_DATA < 0x7f && IPROTO_DESCRIPTION < 0x7f,
-	      "encoded IPROTO_BODY keys must fit into one byte");
+static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
+	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
+	      "one byte");
 
 /**
  * Globally unique identifier of this instance.
@@ -242,7 +243,7 @@ struct PACKED iproto_body_bin {
 };
 
 static_assert(sizeof(struct iproto_body_bin) + IPROTO_HEADER_LEN ==
-	      PREPARE_SELECT_SIZE, "size of the prepared select");
+	      IPROTO_SELECT_HEADER_LEN, "size of the prepared select");
 
 static const struct iproto_body_bin iproto_body_bin = {
 	0x81, IPROTO_DATA, 0xdd, 0
@@ -342,22 +343,44 @@ iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size)
 	return 0;
 }
 
-struct PACKED iproto_body_key_bin {
-	uint8_t key;       /* IPROTO_DATA/DESCRIPTION */
-	uint8_t value_len;
-	uint32_t value;
+struct PACKED iproto_key_bin {
+	uint8_t key;       /* IPROTO_DATA/METADATA/SQL_INFO */
+	uint8_t mp_type;
+	uint32_t mp_len;
 };
 
-void
-iproto_reply_body_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
-		      uint8_t key)
+/**
+ * Write the key to the buffer by the specified savepoint.
+ * @param buf Output buffer.
+ * @param svp Savepoint to write to.
+ * @param type Value type (MP_ARRAY32=0xdd, MP_MAP32=0xdf, ...).
+ * @param size Value size (array or map length).
+ * @param key Key value (IPROTO_DATA/DESCRIPTION/SQL_INFO).
+ */
+static inline void
+iproto_reply_key(struct obuf *buf, struct obuf_svp *svp, uint8_t type,
+		 uint32_t size, uint8_t key)
 {
 	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
-	struct iproto_body_key_bin bin;
+	struct iproto_key_bin bin;
 	bin.key = key;
-	bin.value_len = 0xdd;
-	bin.value = mp_bswap_u32(size);
+	bin.mp_type = type;
+	bin.mp_len = mp_bswap_u32(size);
 	memcpy(pos, &bin, sizeof(bin));
+}
+
+void
+iproto_reply_array_key(struct obuf *buf, struct obuf_svp *svp,
+		       uint32_t size, uint8_t key)
+{
+	iproto_reply_key(buf, svp, 0xdd, size, key);
+}
+
+void
+iproto_reply_map_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
+		     uint8_t key)
+{
+	iproto_reply_key(buf, svp, 0xdf, size, key);
 }
 
 void
@@ -377,13 +400,17 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 
 void
 iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		 uint32_t schema_version)
+		 uint32_t schema_version, int keys)
 {
 	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
 	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
 			     obuf_size(buf) - svp->used - IPROTO_HEADER_LEN);
-	/* mp_encode_map(2). */
-	*(pos + IPROTO_HEADER_LEN) = 0x82;
+	/*
+	 * MessagePack encodes value <= 15 as
+	 * bitwise OR with 0x80.
+	 */
+	assert(keys <= 15);
+	*(pos + IPROTO_HEADER_LEN) = 0x80 | keys;
 }
 
 void

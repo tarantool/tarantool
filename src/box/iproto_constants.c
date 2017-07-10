@@ -173,7 +173,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	NULL,               /* 0x2f */
 	"data",             /* 0x30 */
 	"error",            /* 0x31 */
-	"description",      /* 0x32 */
+	"metadata",         /* 0x32 */
 	NULL,               /* 0x33 */
 	NULL,               /* 0x34 */
 	NULL,               /* 0x35 */
@@ -190,6 +190,8 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"SQL text",         /* 0x40 */
 	"SQL bind",         /* 0x41 */
 	"SQL options",      /* 0x42 */
+	"SQL info",         /* 0x43 */
+	"SQL row count",    /* 0x44 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {

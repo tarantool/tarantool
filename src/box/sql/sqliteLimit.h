@@ -17,7 +17,7 @@ enum {
 	/*
 	** The maximum value of a ?nnn wildcard that the parser will accept.
 	*/
-	SQL_VARIABLE_NUMBER_MAX = 65000,
+	SQL_BIND_PARAMETER_MAX = 65000,
 };
 
 /*

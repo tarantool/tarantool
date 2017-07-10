@@ -48,6 +48,19 @@ enum {
 	XROW_HEADER_LEN_MAX = 40,
 	XROW_BODY_LEN_MAX = 128,
 	IPROTO_HEADER_LEN = 28,
+	/** 7 = sizeof(iproto_body_bin). */
+	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
+	/**
+	 * mp_sizeof(IPROTO_DATA/METADATA/SQL_INFO) +
+	 * mp_sizeof_array(UINT32_MAX).
+	 */
+	IPROTO_KEY_HEADER_LEN = 1 + 5,
+	/**
+	 * Header of message + header of body with one or two
+	 * keys: IPROTO_DATA and IPROTO_METADATA or
+	 * IPROTO_SQL_INFO. 1 == mp_sizeof_map(<=15).
+	 */
+	IPROTO_SQL_HEADER_LEN = IPROTO_HEADER_LEN + 1,
 };
 
 struct xrow_header {
@@ -202,22 +215,6 @@ iproto_header_encode(char *data, uint32_t type, uint64_t sync,
 struct obuf;
 struct obuf_svp;
 
-enum {
-	/** 7 = sizeof(iproto_body_bin). */
-	PREPARE_SELECT_SIZE = IPROTO_HEADER_LEN  + 7,
-	/**
-	 * mp_sizeof(IPROTO_DATA/IPROTO_DESCRIPTION) +
-	 * mp_sizeof_array(UINT32_MAX).
-	 */
-	PREPARE_BODY_KEY_SIZE = 1 + 5,
-	/**
-	 * Header of message + header of body with two keys:
-	 * IPROTO_DATA and IPROTO_DESCRIPTION.
-	 * 1 == mp_sizeof_map(2).
-	 */
-	PREPARE_SQL_SIZE = IPROTO_HEADER_LEN + 1,
-};
-
 /**
  * Reserve obuf space for the header, which depends on the
  * response size.
@@ -234,9 +231,9 @@ iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size);
  * @retval -1 Memory error.
  */
 static inline int
-iproto_prepare_body_key(struct obuf *buf, struct obuf_svp *svp)
+iproto_prepare_key(struct obuf *buf, struct obuf_svp *svp)
 {
-	return iproto_prepare_header(buf, svp, PREPARE_BODY_KEY_SIZE);
+	return iproto_prepare_header(buf, svp, IPROTO_KEY_HEADER_LEN);
 }
 
 /**
@@ -250,7 +247,7 @@ iproto_prepare_body_key(struct obuf *buf, struct obuf_svp *svp)
 static inline int
 iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 {
-	return iproto_prepare_header(buf, svp, PREPARE_SELECT_SIZE);
+	return iproto_prepare_header(buf, svp, IPROTO_SELECT_HEADER_LEN);
 }
 
 /**
@@ -262,16 +259,21 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		    uint32_t schema_version, uint32_t count);
 
 /**
- * Write header of the body key to a preallocated buffer by svp.
+ * Write header of the key to a preallocated buffer by svp.
  * @param buf Buffer to write to.
  * @param svp Savepoint by which write.
- * @param size Size of the body key (length of the array or of the
+ * @param size Size of the key (length of the array or of the
  *        string).
  * @param key Body key.
  */
 void
-iproto_reply_body_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
-		      uint8_t key);
+iproto_reply_array_key(struct obuf *buf, struct obuf_svp *svp,
+		       uint32_t size, uint8_t key);
+
+/** @copydoc iproto_reply_body_array_key. */
+void
+iproto_reply_map_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
+		     uint8_t key);
 
 /*
  * Encode iproto header with IPROTO_OK response code.
@@ -294,34 +296,16 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint32_t schema_version);
 
 /**
- * Write the description header.
- * @param buf Out buffer.
- * @param svp Savepoint of the header beginning.
- * @param count Count of description elements.
- */
-void
-iproto_reply_description(struct obuf *buf, struct obuf_svp *svp,
-			 uint32_t count);
-
-/**
- * Write the data header.
- * @param buf Out buffer.
- * @param svp Savepoint of the header beginning.
- * @param count Count of data elements.
- */
-void
-iproto_reply_data(struct obuf *buf, struct obuf_svp *svp, uint32_t count);
-
-/**
  * Write the SQL header.
  * @param buf Out buffer.
  * @param svp Savepoint of the header beginning.
  * @param sync Request sync.
  * @param schema_version Schema version.
+ * @param keys Count of keys in the body.
  */
 void
 iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		 uint32_t schema_version);
+		 uint32_t schema_version, int keys);
 
 /** Write error directly to a socket. */
 void

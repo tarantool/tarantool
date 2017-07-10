@@ -75,10 +75,10 @@ sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
  * +----------------------------------------------+
  * | IPROTO_OK, sync, schema_version   ...        | iproto_header
  * +----------------------------------------------+---------------
- * | Body - a map with two keys.                  |
+ * | Body - a map with one or two keys.           |
  * |                                              |
  * | IPROTO_BODY: {                               |
- * |     IPROTO_DESCRIPTION: [                    |
+ * |     IPROTO_METADATA: [                       |
  * |         {IPROTO_FIELD_NAME: column name1},   |
  * |         {IPROTO_FIELD_NAME: column name2},   | iproto_body
  * |         ...                                  |
@@ -87,6 +87,12 @@ sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
  * |     IPROTO_DATA: [                           |
  * |         tuple, tuple, tuple, ...             |
  * |     ]                                        |
+ * | }                                            |
+ * +-------------------- OR ----------------------+
+ * | IPROTO_BODY: {                               |
+ * |     IPROTO_SQL_INFO: {                       |
+ * |         IPROTO_SQL_ROW_COUNT: number         |
+ * |     }                                        |
  * | }                                            |
  * +----------------------------------------------+
  *
@@ -97,10 +103,20 @@ sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
  * @retval -1 Client or memory error.
  */
 int
-sql_prepare_and_execute(struct sql_request *request, struct obuf *out);
+sql_prepare_and_execute(const struct sql_request *request, struct obuf *out);
 
 #if defined(__cplusplus)
 } /* extern "C" { */
+#include "diag.h"
+
+/** @copydoc sql_request_decode. Throws on error. */
+static inline void
+sql_request_decode_xc(struct sql_request *request, const char *data,
+		      uint32_t len, struct region *region, uint64_t sync)
+{
+	if (sql_request_decode(request, data, len, region, sync) != 0)
+		diag_raise();
+}
 #endif
 
 #endif /* TARANTOOL_SQL_EXECUTE_H_INCLUDED */

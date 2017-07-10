@@ -41,19 +41,28 @@ cn:ping()
 -- Simple select.
 cn:execute('select * from test')
 ---
-- [{'name': id}, {'name': 'a'}, {'name': 'b'}]
-- - [1, 2, '3']
+- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+  rows:
+  - [1, 2, '3']
   - [4, 5, '6']
   - [7, 8.5, '9']
 ...
--- Operation with boolean result.
+-- Operation with rowcount result.
 cn:execute('insert into test values (10, 11, NULL)')
 ---
-- true
+- rowcount: 1
 ...
 cn:execute('delete from test where a = 5')
 ---
-- true
+- rowcount: 1
+...
+cn:execute('insert into test values (11, 12, NULL), (12, 12, NULL), (13, 12, NULL)')
+---
+- rowcount: 3
+...
+cn:execute('delete from test where a = 12')
+---
+- rowcount: 3
 ...
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
@@ -67,8 +76,8 @@ cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 -- Empty result.
 cn:execute('select id as identifier from test where a = 5;')
 ---
-- [{'name': identifier}]
-- []
+- metadata: [{'name': identifier}]
+  rows: []
 ...
 -- netbox API errors.
 cn:execute(100)
@@ -79,13 +88,23 @@ cn:execute('select 1', nil, {dry_run = true})
 ---
 - error: execute does not support options
 ...
+-- Empty request.
+cn:execute('')
+---
+- error: 'Failed to execute SQL statement: syntax error: empty request'
+...
+cn:execute('   ;')
+---
+- error: 'Failed to execute SQL statement: syntax error: empty request'
+...
 --
 -- Parmaeters bindig.
 --
 cn:execute('select * from test where id = ?', {1})
 ---
-- [{'name': id}, {'name': 'a'}, {'name': 'b'}]
-- - [1, 2, '3']
+- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+  rows:
+  - [1, 2, '3']
 ...
 parameters = {}
 ---
@@ -98,13 +117,15 @@ parameters[1][':value'] = 1
 ...
 cn:execute('select * from test where id = :value', parameters)
 ---
-- [{'name': id}, {'name': 'a'}, {'name': 'b'}]
-- - [1, 2, '3']
+- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+  rows:
+  - [1, 2, '3']
 ...
 cn:execute('select ?, ?, ?', {1, 2, 3})
 ---
-- [{'name': '?'}, {'name': '?'}, {'name': '?'}]
-- - [1, 2, 3]
+- metadata: [{'name': '?'}, {'name': '?'}, {'name': '?'}]
+  rows:
+  - [1, 2, 3]
 ...
 parameters = {}
 ---
@@ -126,8 +147,9 @@ parameters[3][':value1'] = 11
 ...
 cn:execute('select ?, :value1, @value2', parameters)
 ---
-- [{'name': '?'}, {'name': ':value1'}, {'name': '@value2'}]
-- - [10, 11, 12]
+- metadata: [{'name': '?'}, {'name': ':value1'}, {'name': '@value2'}]
+  rows:
+  - [10, 11, 12]
 ...
 parameters = {}
 ---
@@ -161,9 +183,10 @@ parameters[6]['@value2'] = 6
 ...
 cn:execute('select $value3, ?, :value1, ?, ?, @value2, ?, $value3', parameters)
 ---
-- [{'name': $value3}, {'name': '?'}, {'name': ':value1'}, {'name': '?'}, {'name': '?'},
-  {'name': '@value2'}, {'name': '?'}, {'name': '$value3'}]
-- - [1, 2, 3, 4, 5, 6, null, 1]
+- metadata: [{'name': $value3}, {'name': '?'}, {'name': ':value1'}, {'name': '?'},
+    {'name': '?'}, {'name': '@value2'}, {'name': '?'}, {'name': '$value3'}]
+  rows:
+  - [1, 2, 3, 4, 5, 6, null, 1]
 ...
 -- Try not-integer types.
 msgpack = require('msgpack')
@@ -171,14 +194,16 @@ msgpack = require('msgpack')
 ...
 cn:execute('select ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
 ---
-- [{'name': '?'}, {'name': '?'}, {'name': '?'}, {'name': '?'}, {'name': '?'}]
-- - ['abc', -123.456, null, 1, 0]
+- metadata: [{'name': '?'}, {'name': '?'}, {'name': '?'}, {'name': '?'}, {'name': '?'}]
+  rows:
+  - ['abc', -123.456, null, 1, 0]
 ...
 -- Try to replace '?' in meta with something meaningful.
 cn:execute('select ? as kek, ? as kek2', {1, 2})
 ---
-- [{'name': kek}, {'name': 'kek2'}]
-- - [1, 2]
+- metadata: [{'name': kek}, {'name': 'kek2'}]
+  rows:
+  - [1, 2]
 ...
 -- Try to bind not existing name.
 parameters = {}

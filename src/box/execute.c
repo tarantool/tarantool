@@ -52,21 +52,21 @@ const char *sql_type_strs[] = {
 
 /**
  * Name and value of an SQL prepared statement parameter.
- * @todo: merge with sqlite3_value
+ * @todo: merge with sqlite3_value.
  */
 struct sql_bind {
-	/** Parameter name. NULL for positioned parameters. */
+	/** Bind name. NULL for ordinal binds. */
 	const char *name;
 	/** Length of the @name. */
 	uint32_t name_len;
 	/** Ordinal position of the bind, for ordinal binds. */
 	uint32_t pos;
 
-	/** Length of the @s, if the @type is MP_STR or MP_BIN. */
+	/** Byte length of the value. */
 	uint32_t bytes;
 	/** SQL type of the value. */
 	uint8_t type;
-	/** Parameter value. */
+	/** Bind value. */
 	union {
 		double d;
 		int64_t i64;
@@ -76,31 +76,33 @@ struct sql_bind {
 };
 
 /**
- * Return a string name of a parameter marker
+ * Return a string name of a parameter marker.
+ * @param Bind to get name.
+ * @retval Zero terminated name.
  */
 static inline const char *
 sql_bind_name(const struct sql_bind *bind)
 {
-	char *buf = tt_static_buf();
-	if (bind->name) {
-		snprintf(buf, TT_STATIC_BUF_LEN, "'%.*s'", bind->name_len,
-			bind->name);
-	} else {
-		snprintf(buf, TT_STATIC_BUF_LEN, "%d", (int) bind->pos);
-	}
-	return buf;
+	if (bind->name)
+		return tt_sprintf("'%.*s'", bind->name_len, bind->name);
+	else
+		return tt_sprintf("%d", (int) bind->pos);
 }
 
 /**
  * Decode a single bind column from the binary protocol packet.
+ * @param[out] bind Bind to decode to.
+ * @param i Ordinal bind number.
+ * @param packet MessagePack encoded parameter value. Either
+ *        scalar or map: {string_name: scalar_value}.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or client error.
  */
 static inline int
 sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 {
 	bind->pos = i + 1;
-	bind->name = NULL;
-	bind->name_len = 0;
-	bind->bytes = 0;
 	if (mp_typeof(**packet) == MP_MAP) {
 		uint32_t len = mp_decode_map(packet);
 		/*
@@ -114,6 +116,9 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 			return -1;
 		}
 		bind->name = mp_decode_str(packet, &bind->name_len);
+	} else {
+		bind->name = NULL;
+		bind->name_len = 0;
 	}
 	switch (mp_typeof(**packet)) {
 	case MP_UINT: {
@@ -183,62 +188,24 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 }
 
 /**
- * Decode SQL parameter values and names. Named and positioned
- * parameters are supported.
- * @param data MessagePack array of parameters without a
- *        header. Each parameter either must have scalar type, or
- *        must be a map with the following format: {name: value}.
- *        Name - string name of the named parameter,
- *        value - scalar value of the parameter. Named and
- *        positioned parameters can be mixed. For more details
- *        @sa https://www.sqlite.org/lang_expr.html#varparam.
- * @param bind_count Length of @parameters.
- * @param region Allocator.
- *
- * @retval not NULL Array of parameters with @parameter_count
- *         length.
- * @retval     NULL Client or memory error.
- */
-static inline struct sql_bind *
-sql_bind_list_decode(const char *data, uint32_t bind_count,
-		     struct region *region)
-{
-	assert(bind_count > 0);
-	assert(data != NULL);
-	if (bind_count >= SQL_VARIABLE_NUMBER_MAX) {
-		diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
-			 (int) bind_count);
-		return NULL;
-	}
-	uint32_t used = region_used(region);
-	size_t size = sizeof(struct sql_bind) * bind_count;
-	struct sql_bind *bind = (struct sql_bind *) region_alloc(region, size);
-	if (bind == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "struct sql_bind");
-		return NULL;
-	}
-	for (uint32_t i = 0; i < bind_count; ++i) {
-		if (sql_bind_decode(&bind[i], i, &data)) {
-			region_truncate(region, used);
-			return NULL;
-		}
-	}
-	return bind;
-}
-
-/**
- * Parse MessagePack array of SQL parameters and remember a result
- * into the @request->tuple, tuple_end.
+ * Parse MessagePack array of SQL parameters and store a result
+ * into the @request->bind, bind_count.
  * @param request Request to save decoded parameters.
- * @param data MessagePack array of parameters.
+ * @param data MessagePack array of parameters. Each parameter
+ *        either must have scalar type, or must be a map with the
+ *        following format: {name: value}. Name - string name of
+ *        the named parameter, value - scalar value of the
+ *        parameter. Named and positioned parameters can be mixed.
+ *        For more details
+ *        @sa https://www.sqlite.org/lang_expr.html#varparam.
  * @param region Allocator.
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_bind_parse(struct sql_request *request, const char *data,
-	       struct region *region)
+sql_bind_list_decode(struct sql_request *request, const char *data,
+		     struct region *region)
 {
 	assert(request != NULL);
 	assert(data != NULL);
@@ -249,10 +216,26 @@ sql_bind_parse(struct sql_request *request, const char *data,
 	uint32_t bind_count = mp_decode_array(&data);
 	if (bind_count == 0)
 		return 0;
-	request->bind = sql_bind_list_decode(data, bind_count, region);
-	if (request->bind == NULL)
+	if (bind_count > SQL_BIND_PARAMETER_MAX) {
+		diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
+			 (int) bind_count);
 		return -1;
+	}
+	uint32_t used = region_used(region);
+	size_t size = sizeof(struct sql_bind) * bind_count;
+	struct sql_bind *bind = (struct sql_bind *) region_alloc(region, size);
+	if (bind == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "struct sql_bind");
+		return -1;
+	}
+	for (uint32_t i = 0; i < bind_count; ++i) {
+		if (sql_bind_decode(&bind[i], i, &data) != 0) {
+			region_truncate(region, used);
+			return -1;
+		}
+	}
 	request->bind_count = bind_count;
+	request->bind = bind;
 	return 0;
 }
 
@@ -282,7 +265,7 @@ error:
 		if (mp_check(&data, end) != 0)  /* check the value */
 			goto error;
 		if (key == IPROTO_SQL_BIND) {
-			if (sql_bind_parse(request, value, region) != 0)
+			if (sql_bind_list_decode(request, value, region) != 0)
 				return -1;
 		} else {
 			request->sql_text = value;
@@ -300,6 +283,11 @@ error:
 
 /**
  * Serialize a single column of a result set row.
+ * @param stmt Prepared and started statement. At least one
+ *        sqlite3_step must be called.
+ * @param i Column number.
+ * @param out Output buffer.
+ *
  * @retval  0 Success.
  * @retval -1 Out of memory when resizing the output buffer.
  */
@@ -376,15 +364,15 @@ oom:
  * Encode sqlite3 row into an obuf using MessagePack.
  * @param stmt Started prepared statement. At least one
  *        sqlite3_step must be done.
+ * @param column_count Statement's column count.
  * @param out Out buffer.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static inline int
-sql_row_to_obuf(struct sqlite3_stmt *stmt, struct obuf *out)
+sql_row_to_obuf(struct sqlite3_stmt *stmt, int column_count, struct obuf *out)
 {
-	int column_count = sqlite3_column_count(stmt);
 	assert(column_count > 0);
 	size_t size = mp_sizeof_array(column_count);
 	char *pos = (char *) obuf_alloc(out, size);
@@ -405,7 +393,7 @@ sql_row_to_obuf(struct sqlite3_stmt *stmt, struct obuf *out)
  * Bind SQL parameter value to its position.
  * @param stmt Prepared statement.
  * @param p Parameter value.
- * @param pos Position, if the parameter is positioned.
+ * @param pos Ordinal bind position.
  *
  * @retval  0 Success.
  * @retval -1 SQL error.
@@ -477,13 +465,14 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_bind(struct sql_request *request, struct sqlite3_stmt *stmt)
+sql_bind(const struct sql_request *request, struct sqlite3_stmt *stmt)
 {
 	assert(stmt != NULL);
 	uint32_t pos = 1;
-	for (uint32_t i = 0; i < request->bind_count; pos = ++i + 1)
+	for (uint32_t i = 0; i < request->bind_count; pos = ++i + 1) {
 		if (sql_bind_column(stmt, &request->bind[i], pos) != 0)
 			return -1;
+	}
 	return 0;
 }
 
@@ -491,18 +480,20 @@ sql_bind(struct sql_request *request, struct sqlite3_stmt *stmt)
  * Serialize a description of the prepared statement.
  * @param stmt Prepared statement.
  * @param out Out buffer.
- * @param[out] count Count of description pairs.
+ * @param column_count Statement's column count.
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 static inline int
 sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
-		    uint32_t *count)
+		    int column_count)
 {
-	assert(stmt != NULL);
-	assert(count != NULL);
-	int column_count = sqlite3_column_count(stmt);
+	assert(column_count > 0);
+	struct obuf_svp sql_svp;
+	if (iproto_prepare_key(out, &sql_svp) != 0)
+		return -1;
+
 	for (int i = 0; i < column_count; ++i) {
 		size_t size = mp_sizeof_map(1) +
 			      mp_sizeof_uint(IPROTO_FIELD_NAME);
@@ -523,58 +514,84 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		pos = mp_encode_uint(pos, IPROTO_FIELD_NAME);
 		pos = mp_encode_str(pos, name, strlen(name));
 	}
-	*count = (uint32_t) column_count;
+	iproto_reply_array_key(out, &sql_svp, column_count, IPROTO_METADATA);
 	return 0;
 }
 
 /**
- * Execute the prepred SQL query.
+ * Execute the prepared statement and write to the @out obuf the
+ * result. Result is either rows array in a case of not zero
+ * column count (SELECT), or SQL info in other cases.
  * @param db SQLite engine.
  * @param stmt Prepared statement.
  * @param out Out buffer.
- * @param[out] count Count of statements.
+ * @param column_count Statement's column count.
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 static inline int
 sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
-	    uint32_t *count)
+	    int column_count)
 {
-	if (stmt == NULL) {
-		/* Empty request. */
-		return 0;
-	}
-	assert(count != NULL);
-	assert(stmt != NULL);
-	*count = 0;
-	int column_count = sqlite3_column_count(stmt);
-	int rc;
-	if (column_count == 0) {
+	struct obuf_svp data_svp;
+	if (iproto_prepare_key(out, &data_svp) != 0)
+		return -1;
+	int rc, rows = 0;
+	char *buf;
+	/* Execute request. */
+	if (column_count > 0) {
+		/* Either ROW or DONE or ERROR. */
+		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+			++rows;
+			if (sql_row_to_obuf(stmt, column_count, out) != 0)
+				return -1;
+		}
+		assert(rc != SQLITE_OK);
+	} else {
 		/*
-		 * A statement with no response:
-		 * CREATE/DELETE/INSERT ...
+		 * Prealloc SQL info map. Nothing can fail after
+		 * successfull execution. Use the biggest possible
+		 * size.
 		 */
-		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW);
-		if (rc != SQLITE_OK && rc != SQLITE_DONE)
-			goto sql_error;
-		return 0;
-	}
-	assert(column_count > 0);
-	while ((rc = sqlite3_step(stmt) == SQLITE_ROW)) {
-		if (sql_row_to_obuf(stmt, out) != 0)
+		int size = mp_sizeof_uint(IPROTO_SQL_ROW_COUNT) +
+			   mp_sizeof_uint(UINT32_MAX);
+		buf = obuf_reserve(out, size);
+		if (buf == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
 			return -1;
-		++*count;
+		}
+		/* No rows. Either DONE or ERROR. */
+		rc = sqlite3_step(stmt);
+		assert(rc != SQLITE_ROW && rc != SQLITE_OK);
 	}
-	return rc == SQLITE_OK ? 0 : -1;
+	if (rc != SQLITE_DONE) {
+		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
+		return -1;
+	}
 
-sql_error:
-	diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
-	return -1;
+	/*
+	 * Write to the out buffer either result rows, or info.
+	 */
+	if (column_count > 0) {
+		iproto_reply_array_key(out, &data_svp, rows, IPROTO_DATA);
+	} else {
+		rows = sqlite3_changes(db);
+		/* Calculate actual size. */
+		int size = mp_sizeof_uint(IPROTO_SQL_ROW_COUNT) +
+			   mp_sizeof_uint(rows);
+		buf = obuf_alloc(out, size);
+		/* Memory is reserved above. */
+		assert(buf != NULL);
+		buf = mp_encode_uint(buf, IPROTO_SQL_ROW_COUNT);
+		buf = mp_encode_uint(buf, rows);
+		iproto_reply_map_key(out, &data_svp, 1, IPROTO_SQL_INFO);
+	}
+	return 0;
 }
 
 int
-sql_prepare_and_execute(struct sql_request *request, struct obuf *out)
+sql_prepare_and_execute(const struct sql_request *request, struct obuf *out)
 {
 	const char *sql = request->sql_text;
 	uint32_t len;
@@ -590,30 +607,33 @@ sql_prepare_and_execute(struct sql_request *request, struct obuf *out)
 		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
 		return -1;
 	}
+	assert(stmt != NULL);
 	if (sql_bind(request, stmt) != 0)
 		goto err_stmt;
 
 	/* Prepare memory for the iproto header. */
 	struct obuf_svp header_svp;
-	if (iproto_prepare_header(out, &header_svp, PREPARE_SQL_SIZE) != 0)
+	if (iproto_prepare_header(out, &header_svp,
+				  IPROTO_SQL_HEADER_LEN) != 0)
 		goto err_stmt;
+	int column_count = sqlite3_column_count(stmt);
+	int keys = 1;
 
-	/* Encode description. */
-	struct obuf_svp sql_svp;
-	if (iproto_prepare_body_key(out, &sql_svp) != 0)
-		goto err_svp;
-	if (sql_get_description(stmt, out, &len) != 0)
-		goto err_svp;
-	iproto_reply_body_key(out, &sql_svp, len, IPROTO_DESCRIPTION);
+	/*
+	 * If the column count is zero, there is nothing to
+	 * describe.
+	 */
+	if (column_count > 0) {
+		keys++;
+		if (sql_get_description(stmt, out, column_count) != 0)
+			goto err_svp;
+	}
 
-	/* Encode data set. */
-	if (iproto_prepare_body_key(out, &sql_svp) != 0)
+	if (sql_execute(db, stmt, out, column_count) != 0)
 		goto err_svp;
-	if (sql_execute(db, stmt, out, &len) != 0)
-		goto err_svp;
-	iproto_reply_body_key(out, &sql_svp, len, IPROTO_DATA);
 
-	iproto_reply_sql(out, &header_svp, request->sync, schema_version);
+	iproto_reply_sql(out, &header_svp, request->sync, schema_version, keys);
+
 	sqlite3_finalize(stmt);
 	return 0;
 err_svp:

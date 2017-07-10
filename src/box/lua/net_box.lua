@@ -36,7 +36,9 @@ local IPROTO_STATUS_KEY    = 0x00
 local IPROTO_ERRNO_MASK    = 0x7FFF
 local IPROTO_SYNC_KEY      = 0x01
 local IPROTO_SCHEMA_VERSION_KEY = 0x05
-local IPROTO_DESCRIPTION_KEY = 0x32
+local IPROTO_METADATA_KEY = 0x32
+local IPROTO_SQL_INFO_KEY = 0x43
+local IPROTO_SQL_ROW_COUNT_KEY = 0x44
 local IPROTO_FIELD_NAME_KEY = 0x29
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
@@ -235,9 +237,10 @@ local function create_transport(host, port, user, password, callback)
         local id = next_request_id
         method_codec[method](send_buf, id, schema_version, ...)
         next_request_id = next_id(id)
-        -- reserve space for 7 keys: client, method,
-        -- schema_version, buffer, errno, response, description.
-        local request = table_new(0, 7)
+        -- reserve space for 8 keys: client, method,
+        -- schema_version, buffer, errno, response, metadata,
+        -- sql_info.
+        local request = table_new(0, 8)
         request.client = fiber_self()
         request.method = method
         request.schema_version = schema_version
@@ -250,7 +253,7 @@ local function create_transport(host, port, user, password, callback)
                 return E_TIMEOUT, 'Timeout exceeded'
             end
         until requests[id] == nil -- i.e. completed (beware spurious wakeups)
-        return request.errno, request.response, request.description
+        return request.errno, request.response, request.metadata, request.info
     end
 
     local function wakeup_client(client)
@@ -294,7 +297,8 @@ local function create_transport(host, port, user, password, callback)
         body_end_check, body = ibuf_decode(body_rpos)
         assert(body_end == body_end_check, "invalid xrow length")
         request.response = body[IPROTO_DATA_KEY]
-        request.description = body[IPROTO_DESCRIPTION_KEY]
+        request.metadata = body[IPROTO_METADATA_KEY]
+        request.info = body[IPROTO_SQL_INFO_KEY]
         wakeup_client(request.client)
     end
 
@@ -721,15 +725,15 @@ function remote_methods:_request(method, opts, ...)
         deadline = self._deadlines[this_fiber]
     end
     local buffer = opts and opts.buffer
-    local err, res, description
+    local err, res
     repeat
         local timeout = deadline and max(0, deadline - fiber_time())
         if self.state ~= 'active' then
             wait_state('active', timeout)
             timeout = deadline and max(0, deadline - fiber_time())
         end
-        err, res, description = perform_request(timeout, buffer, method,
-                                                self.schema_version, ...)
+        err, res = perform_request(timeout, buffer, method,
+                                   self.schema_version, ...)
         if not err and buffer ~= nil then
             return res -- the length of xrow.body
         elseif not err then
@@ -741,11 +745,7 @@ function remote_methods:_request(method, opts, ...)
                     res[i] = tnew(v)
                 end
             end
-            if method ~= 'execute' then
-                return res
-            else
-                return res, description
-            end
+            return res
         elseif err == E_WRONG_SCHEMA_VERSION then
             err = nil
         end
@@ -810,7 +810,7 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     local buffer = netbox_opts and netbox_opts.buffer
     parameters = parameters or {}
     sql_opts = sql_opts or {}
-    local err, res, description = self._transport.perform_request(timeout,
+    local err, res, metadata, info = self._transport.perform_request(timeout,
                                     buffer, 'execute', self.schema_version,
                                     query, parameters, sql_opts)
     if err then
@@ -819,17 +819,19 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if buffer ~= nil then
         return res -- body length. Body is written to the buffer.
     end
-    assert(description == nil or type(description) == 'table')
-    if description == nil or #description == 0 then
-        return true -- Query with boolean result, no rows.
+    assert((info == nil and metadata ~= nil and res ~= nil) or
+           (info ~= nil and metadata == nil and res == nil))
+    if info ~= nil then
+        assert(info[IPROTO_SQL_ROW_COUNT_KEY] ~= nil)
+        return {rowcount = info[IPROTO_SQL_ROW_COUNT_KEY]}
     end
-    -- Set readable names for the description fields.
-    for i, field_meta in pairs(description) do
+    -- Set readable names for the metadata fields.
+    for i, field_meta in pairs(metadata) do
         field_meta["name"] = field_meta[IPROTO_FIELD_NAME_KEY]
         field_meta[IPROTO_FIELD_NAME_KEY] = nil
     end
     setmetatable(res, sequence_mt)
-    return description, res
+    return {metadata = metadata, rows = res}
 end
 
 function remote_methods:wait_state(state, timeout)

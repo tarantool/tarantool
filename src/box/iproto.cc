@@ -625,10 +625,9 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "missing request body");
 		body = (const char *) msg->header.body[0].iov_base;
-		if (sql_request_decode(&msg->sql_request, body,
-				       msg->header.body[0].iov_len,
-				       &fiber()->gc, msg->header.sync) != 0)
-			diag_raise();
+		sql_request_decode_xc(&msg->sql_request, body,
+				      msg->header.body[0].iov_len, &fiber()->gc,
+				      msg->header.sync);
 		cmsg_init(msg, sql_route);
 		break;
 	default:

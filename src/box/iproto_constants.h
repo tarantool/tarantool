@@ -93,18 +93,25 @@ enum iproto_key {
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
 	/**
-	 * IPROTO_DESCRIPTION: [
+	 * IPROTO_METADATA: [
 	 *      { IPROTO_FIELD_NAME: name },
 	 *      { ... },
 	 *      ...
 	 * ]
 	 */
-	IPROTO_DESCRIPTION = 0x32,
+	IPROTO_METADATA = 0x32,
 
 	/* Leave a gap between response keys and SQL keys. */
 	IPROTO_SQL_TEXT = 0x40,
 	IPROTO_SQL_BIND = 0x41,
 	IPROTO_SQL_OPTIONS = 0x42,
+	/**
+	 * IPROTO_SQL_INFO: {
+	 *     IPROTO_SQL_ROW_COUNT: number
+	 * }
+	 */
+	IPROTO_SQL_INFO = 0x43,
+	IPROTO_SQL_ROW_COUNT = 0x44,
 	IPROTO_KEY_MAX
 };
 

@@ -17,9 +17,11 @@ cn:ping()
 -- Simple select.
 cn:execute('select * from test')
 
--- Operation with boolean result.
+-- Operation with rowcount result.
 cn:execute('insert into test values (10, 11, NULL)')
 cn:execute('delete from test where a = 5')
+cn:execute('insert into test values (11, 12, NULL), (12, 12, NULL), (13, 12, NULL)')
+cn:execute('delete from test where a = 12')
 
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
@@ -31,6 +33,10 @@ cn:execute('select id as identifier from test where a = 5;')
 -- netbox API errors.
 cn:execute(100)
 cn:execute('select 1', nil, {dry_run = true})
+
+-- Empty request.
+cn:execute('')
+cn:execute('   ;')
 
 --
 -- Parmaeters bindig.
