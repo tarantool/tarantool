@@ -4587,6 +4587,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 				return -1;
 			assert(vy_stmt_type(stmt) != 0);
 			index->stat.upsert.squashed++;
+		} else {
+			tuple_ref(stmt);
 		}
 		assert(tx->write_size >= tuple_size(old->stmt));
 		tx->write_size -= tuple_size(old->stmt);
@@ -4594,11 +4596,12 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		vy_stmt_counter_unacct_tuple(&index->stat.txw.count, old->stmt);
 		vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
 		tuple_unref(old->stmt);
-		tuple_ref(stmt);
 		old->stmt = stmt;
 	} else {
 		/* Allocate a MVCC container. */
 		struct txv *v = txv_new(index, stmt, tx);
+		if (v == NULL)
+			return -1;
 		v->is_read = false;
 		v->is_gap = false;
 		write_set_insert(&tx->write_set, v);
