@@ -589,9 +589,26 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 
 	struct tx_manager *xm = tx->xm;
 
-	/* Expect cascading rollback in the reverse order. */
-	assert(xm->last_prepared_tx == tx);
-	xm->last_prepared_tx = NULL;
+	/*
+	 * There are two reasons of rollback_after_prepare:
+	 * 1) Fail in the middle of vy_tx_prepare call.
+	 * 2) Cascading rollback after WAL fail.
+	 *
+	 * If a TX is the latest prepared TX and the it is rollbacked,
+	 * it's certainly the case (2) and we should set xm->last_prepared_tx
+	 * to the previous prepared TX, if any.
+	 * But doesn't know the previous TX.
+	 * On the other hand we may expect that cascading rollback will
+	 * concern all the prepared TXs, all of them will be rollbacked
+	 * and xm->last_prepared_tx must be set to NULL in the end.
+	 * Thus we can set xm->last_prepared_tx to NULL now and it will be
+	 * correct in the end of the cascading rollback.
+	 *
+	 * We must not change xm->last_prepared_tx in all other cases,
+	 * it will be changed by the corresponding TX.
+	 */
+	if (xm->last_prepared_tx == tx)
+		xm->last_prepared_tx = NULL;
 
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
