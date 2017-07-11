@@ -481,6 +481,7 @@ public:
 	virtual void alter_def(struct alter_space * /* alter */) {}
 	virtual void alter(struct alter_space * /* alter */) {}
 	virtual void commit(struct alter_space * /* alter */) {}
+	virtual void rollback(struct alter_space * /* alter */) {}
 	virtual ~AlterSpaceOp() {}
 	template <typename T> static T *create();
 	static void destroy(AlterSpaceOp *op);
@@ -580,32 +581,13 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 	rlist_foreach_entry(op, &alter->ops, link) {
 		op->commit(alter);
 	}
-	/* Rebuild index maps once for all indexes. */
-	space_fill_index_map(alter->old_space);
-	space_fill_index_map(alter->new_space);
-	/*
-	 * Don't forget about space triggers.
-	 */
-	rlist_swap(&alter->new_space->on_replace,
-		   &alter->old_space->on_replace);
-	rlist_swap(&alter->new_space->on_stmt_begin,
-		   &alter->old_space->on_stmt_begin);
-	/*
-	 * Init space bsize.
-	 */
-	if (alter->new_space->index_count != 0)
-		alter->new_space->bsize = alter->old_space->bsize;
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
-	alter->old_space->handler->commitAlterSpace(alter->old_space,
-						    alter->new_space);
 
-	struct space *old_space = space_cache_replace(alter->new_space);
 	alter->new_space = NULL; /* for alter_space_delete(). */
-	assert(old_space == alter->old_space);
-	space_delete(old_space);
+	space_delete(alter->old_space);
 	alter_space_delete(alter);
 }
 
@@ -621,6 +603,23 @@ static void
 alter_space_rollback(struct trigger *trigger, void * /* event */)
 {
 	struct alter_space *alter = (struct alter_space *) trigger->data;
+	/* Rollback alter ops */
+	class AlterSpaceOp *op;
+	rlist_foreach_entry(op, &alter->ops, link) {
+		op->rollback(alter);
+	}
+	/* Rebuild index maps once for all indexes. */
+	space_fill_index_map(alter->old_space);
+	space_fill_index_map(alter->new_space);
+	/*
+	 * Don't forget about space triggers.
+	 */
+	rlist_swap(&alter->new_space->on_replace,
+		   &alter->old_space->on_replace);
+	rlist_swap(&alter->new_space->on_stmt_begin,
+		   &alter->old_space->on_stmt_begin);
+	struct space *new_space = space_cache_replace(alter->old_space);
+	assert(new_space == alter->new_space);
 	alter_space_delete(alter);
 }
 
@@ -687,8 +686,51 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * Change the new space: build the new index, rename,
 	 * change the fixed field count.
 	 */
-	rlist_foreach_entry(op, &alter->ops, link)
-		op->alter(alter);
+	try {
+		rlist_foreach_entry(op, &alter->ops, link)
+			op->alter(alter);
+	} catch (Exception *e) {
+		/*
+		 * Undo space changes from the last successful
+		 * operation back to the first. Skip the operation
+		 * which failed. An operation may fail during
+		 * alter if, e.g. if it adds a unique key and
+		 * there is a duplicate.
+		 */
+		while (op != rlist_first_entry(&alter->ops,
+					       class AlterSpaceOp, link)) {
+			op = rlist_prev_entry(op, link);
+			op->rollback(alter);
+		}
+		throw;
+	}
+
+	/* Rebuild index maps once for all indexes. */
+	space_fill_index_map(alter->old_space);
+	space_fill_index_map(alter->new_space);
+	/*
+	 * Don't forget about space triggers.
+	 */
+	rlist_swap(&alter->new_space->on_replace,
+		   &alter->old_space->on_replace);
+	rlist_swap(&alter->new_space->on_stmt_begin,
+		   &alter->old_space->on_stmt_begin);
+	/*
+	 * Init space bsize.
+	 */
+	if (alter->new_space->index_count != 0)
+		alter->new_space->bsize = alter->old_space->bsize;
+	/*
+	 * The new space is ready. Time to update the space
+	 * cache with it.
+	 */
+	alter->old_space->handler->commitAlterSpace(alter->old_space,
+						    alter->new_space);
+
+	struct space *old_space = space_cache_replace(alter->new_space);
+	(void) old_space;
+	assert(old_space == alter->old_space);
+
 	/*
 	 * Install transaction commit/rollback triggers to either
 	 * finish or rollback the DDL depending on the results of
@@ -783,11 +825,17 @@ class MoveIndex: public AlterSpaceOp
 public:
 	/** id of the index on the move. */
 	uint32_t iid;
-	virtual void commit(struct alter_space *alter);
+	virtual void alter(struct alter_space *alter);
+	virtual void rollback(struct alter_space *alter);
 };
+void
+MoveIndex::alter(struct alter_space *alter)
+{
+	space_swap_index(alter->old_space, alter->new_space, iid, iid);
+}
 
 void
-MoveIndex::commit(struct alter_space *alter)
+MoveIndex::rollback(struct alter_space *alter)
 {
 	space_swap_index(alter->old_space, alter->new_space, iid, iid);
 }
@@ -802,7 +850,8 @@ public:
 	struct index_def *new_index_def;
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter);
+	virtual void alter(struct alter_space *alter);
+	virtual void rollback(struct alter_space *alter);
 	virtual ~ModifyIndex();
 };
 
@@ -814,9 +863,8 @@ ModifyIndex::alter_def(struct alter_space *alter)
 	rlist_add_entry(&alter->key_list, new_index_def, link);
 }
 
-/** Move the index from the old space to the new one. */
 void
-ModifyIndex::commit(struct alter_space *alter)
+ModifyIndex::alter(struct alter_space *alter)
 {
 	assert(old_index_def->iid == new_index_def->iid);
 	/*
@@ -832,6 +880,24 @@ ModifyIndex::commit(struct alter_space *alter)
 	index_def_swap(old_index->index_def, new_index->index_def);
 }
 
+void
+ModifyIndex::rollback(struct alter_space *alter)
+{
+	assert(old_index_def->iid == new_index_def->iid);
+	/*
+	 * Restore indexes.
+	 */
+	space_swap_index(alter->old_space, alter->new_space,
+			 old_index_def->iid, new_index_def->iid);
+	Index *old_index = space_index(alter->old_space, old_index_def->iid);
+	assert(old_index != NULL);
+	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	assert(new_index != NULL);
+	struct index_def *tmp = old_index->index_def;
+	old_index->index_def = new_index->index_def;
+	new_index->index_def = tmp;
+}
+
 ModifyIndex::~ModifyIndex()
 {
 	index_def_delete(new_index_def);
@@ -842,7 +908,6 @@ class CreateIndex: public AlterSpaceOp {
 public:
 	/** New index index_def. */
 	struct index_def *new_index_def;
-	struct trigger *on_replace;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter);
@@ -854,62 +919,6 @@ void
 CreateIndex::alter_def(struct alter_space *alter)
 {
 	rlist_add_tail_entry(&alter->key_list, new_index_def, link);
-}
-
-/**
- * A trigger invoked on rollback in old space while the record
- * about alter is being written to the WAL.
- */
-static void
-on_rollback_in_old_space(struct trigger *trigger, void *event)
-{
-	struct txn *txn = (struct txn *) event;
-	Index *new_index = (Index *) trigger->data;
-	/* Remove the failed tuple from the new index. */
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->space->def.id != new_index->index_def->space_id)
-			continue;
-		new_index->replace(stmt->new_tuple, stmt->old_tuple,
-				   DUP_INSERT);
-	}
-}
-
-/**
- * Add to index trigger -- invoked on any change in the old space,
- * while the CreateIndex tuple is being written to the WAL. The job
- * of this trigger is to keep the added index up to date with the
- * state of the primary key in the old space.
- *
- * Initially it's installed as old_space->on_replace trigger, and
- * for each successfully replaced tuple in the new index,
- * a trigger is added to txn->on_rollback list to remove the tuple
- * from the new index if the transaction rolls back.
- *
- * The trigger is removed when alter operation commits/rolls back.
- */
-static void
-on_replace_in_old_space(struct trigger *trigger, void *event)
-{
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	Index *new_index = (Index *) trigger->data;
-	/*
-	 * First set a rollback trigger, then do replace, since
-	 * creating the trigger may fail.
-	 */
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(on_rollback_in_old_space, new_index);
-	/*
-	 * In a multi-statement transaction the same space
-	 * may be modified many times, but we need only one
-	 * on_rollback trigger.
-	 */
-	txn_init_triggers(txn);
-	trigger_add_unique(&txn->on_rollback, on_rollback);
-	/* Put the tuple into the new index. */
-	(void) new_index->replace(stmt->old_tuple, stmt->new_tuple,
-				  DUP_INSERT);
 }
 
 /**
@@ -945,10 +954,7 @@ CreateIndex::alter(struct alter_space *alter)
 	 * Get the new index and build it.
 	 */
 	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
-	handler->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
-	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
-					   new_index);
-	trigger_add(&alter->old_space->on_replace, on_replace);
+	handler->buildSecondaryKey(alter->new_space, alter->new_space, new_index);
 }
 
 void
@@ -960,13 +966,6 @@ CreateIndex::commit(struct alter_space *alter)
 
 CreateIndex::~CreateIndex()
 {
-	/*
-	 * The trigger by now may reside in the new space (on
-	 * commit) or in the old space (rollback). Remove it
-	 * from the list, wherever it is.
-	 */
-	if (on_replace)
-		trigger_clear(on_replace);
 	if (new_index_def)
 		index_def_delete(new_index_def);
 }
@@ -982,10 +981,8 @@ public:
 	struct index_def *new_index_def;
 	/** Old index index_def. */
 	struct index_def *old_index_def;
-	struct trigger *on_replace;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter);
 	virtual ~RebuildIndex();
 };
 
@@ -1005,29 +1002,13 @@ RebuildIndex::alter(struct alter_space *alter)
 	/* Get the new index and build it.  */
 	Index *new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	handler->buildSecondaryKey(alter->old_space, alter->new_space, new_index);
-	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
-					   new_index);
-	trigger_add(&alter->old_space->on_replace, on_replace);
-}
-
-void
-RebuildIndex::commit(struct alter_space *alter)
-{
-	Index *new_index = space_index(alter->new_space, new_index_def->iid);
-	assert(new_index != NULL);
-	new_index->commitCreate();
+	handler->buildSecondaryKey(new_index_def->iid != 0 ?
+				   alter->new_space : alter->old_space,
+				   alter->new_space, new_index);
 }
 
 RebuildIndex::~RebuildIndex()
 {
-	/*
-	 * The trigger by now may reside in the new space (on
-	 * commit) or in the old space (rollback). Remove it
-	 * from the list, wherever it is.
-	 */
-	if (on_replace)
-		trigger_clear(on_replace);
 	if (new_index_def)
 		index_def_delete(new_index_def);
 }

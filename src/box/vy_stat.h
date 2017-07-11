@@ -176,6 +176,18 @@ struct vy_cache_stat {
 	struct vy_stmt_counter evict;
 };
 
+/** Transaction statistics. */
+struct vy_tx_stat {
+	/** Number of active transactions. */
+	int32_t active;
+	/** Number of committed transactions. */
+	int64_t commit;
+	/** Number of rolled back transactions. */
+	int64_t rollback;
+	/** Number of transactions aborted on conflict. */
+	int64_t conflict;
+};
+
 static inline int
 vy_index_stat_create(struct vy_index_stat *stat)
 {

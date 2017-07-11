@@ -6,6 +6,7 @@ macro(libmisc_build)
         ${PROJECT_SOURCE_DIR}/third_party/sha1.c
         ${PROJECT_SOURCE_DIR}/third_party/PMurHash.c
         ${PROJECT_SOURCE_DIR}/third_party/base64.c
+        ${PROJECT_SOURCE_DIR}/third_party/qsort_arg.c
     )
 
     if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
@@ -35,9 +36,6 @@ macro(libmisc_build)
     if (HAVE_OPENMP)
         list(APPEND misc_src
              ${PROJECT_SOURCE_DIR}/third_party/qsort_arg_mt.c)
-    else()
-        list(APPEND misc_src
-             ${PROJECT_SOURCE_DIR}/third_party/qsort_arg.c)
     endif()
 
     add_library(misc STATIC ${misc_src})
