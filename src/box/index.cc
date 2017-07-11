@@ -50,7 +50,7 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 	m_errcode = ER_UNSUPPORTED_INDEX_FEATURE;
 	error_format_msg(this, tnt_errcode_desc(m_errcode), index_def->name,
 			 index_type_strs[index_def->type],
-			 space->def.name, space->def.engine_name, what);
+			 space->def->name, space->def->engine_name, what);
 }
 
 int

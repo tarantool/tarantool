@@ -1,4 +1,4 @@
-tarantool (1.7.3.353.g06ee320-1) unstable; urgency=medium
+tarantool (1.7.4.47.g06ee320-1) unstable; urgency=medium
 
   * Bump the minimum required version of tarantool-common.
 

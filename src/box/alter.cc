@@ -385,9 +385,11 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 						BOX_INDEX_FIELD_PART_COUNT_165);
 		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS_165);
 	}
-
-	index_def = index_def_new(id, space_name(old_space), index_id, name,
-				  name_len, type, &opts, part_count);
+	if (name_len > BOX_NAME_MAX)
+		tnt_raise(ClientError, ER_MODIFY_INDEX, tt_cstr(name, name_len),
+			  space_name(old_space), "index name is too long");
+	index_def = index_def_new(id, index_id, name, name_len, type, &opts,
+				  part_count);
 	if (index_def == NULL)
 		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
@@ -446,28 +448,44 @@ space_opts_create(struct space_opts *opts, struct tuple *tuple)
 /**
  * Fill space_def structure from struct tuple.
  */
-extern "C"
-void
-space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
-			    uint32_t errcode)
+extern "C" struct space_def *
+space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 {
+	uint32_t name_len;
+	const char *name =
+		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_NAME, &name_len);
+	if (name_len > BOX_NAME_MAX)
+		tnt_raise(ClientError, errcode, tt_cstr(name, BOX_NAME_MAX),
+			  "space name is too long");
+	size_t size = space_def_sizeof(name_len);
+	struct space_def *def = (struct space_def *) malloc(size);
+	if (def == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "def");
+	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
+	memcpy(def->name, name, name_len);
+	def->name[name_len] = 0;
+	identifier_check(def->name);
 	def->id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
+	if (def->id > BOX_SPACE_MAX)
+		tnt_raise(ClientError, errcode, def->name,
+			  "space id is too big");
 	def->uid = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_UID);
 	def->exact_field_count =
 		tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_FIELD_COUNT);
-	int namelen =
-		snprintf(def->name, sizeof(def->name), "%s",
-			 tuple_field_cstr_xc(tuple, BOX_SPACE_FIELD_NAME));
-	int engine_namelen =
-		snprintf(def->engine_name, sizeof(def->engine_name),
-			 "%s", tuple_field_cstr_xc(tuple,
-						   BOX_SPACE_FIELD_ENGINE));
-
+	const char *engine_name =
+		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_ENGINE, &name_len);
+	if (name_len > ENGINE_NAME_MAX)
+		tnt_raise(ClientError, errcode, def->name,
+			  "space engine name is too long");
+	memcpy(def->engine_name, engine_name, name_len);
+	def->engine_name[name_len] = 0;
+	identifier_check(def->engine_name);
 	space_opts_create(&def->opts, tuple);
-	space_def_check(def, namelen, engine_namelen, errcode);
 	Engine *engine = engine_find(def->engine_name);
 	engine->checkSpaceDef(def);
 	access_check_ddl(def->uid, SC_SPACE);
+	def_guard.is_active = false;
+	return def;
 }
 
 /* }}} */
@@ -518,7 +536,7 @@ struct alter_space {
 	/** List of alter operations */
 	struct rlist ops;
 	/** Definition of the new space - space_def. */
-	struct space_def space_def;
+	struct space_def *space_def;
 	/** Definition of the new space - keys. */
 	struct rlist key_list;
 	/** Old space. */
@@ -534,7 +552,7 @@ alter_space_new(struct space *old_space)
 		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
-	alter->space_def = alter->old_space->def;
+	alter->space_def = space_def_dup(alter->old_space->def);
 	return alter;
 }
 
@@ -551,6 +569,7 @@ alter_space_delete(struct alter_space *alter)
 	/* Delete the new space, if any. */
 	if (alter->new_space)
 		space_delete(alter->new_space);
+	space_def_delete(alter->space_def);
 }
 
 /** Add a single operation to the list of alter operations. */
@@ -669,7 +688,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * Create a new (empty) space for the new definition.
 	 * Sic: the triggers are not moved over yet.
 	 */
-	alter->new_space = space_new(&alter->space_def, &alter->key_list);
+	alter->new_space = space_new(alter->space_def, &alter->key_list);
 	/*
 	 * Copy the replace function, the new space is at the same recovery
 	 * phase as the old one. This hack is especially necessary for
@@ -753,15 +772,24 @@ class ModifySpace: public AlterSpaceOp
 {
 public:
 	/* New space definition. */
-	struct space_def def;
+	struct space_def *def;
 	virtual void alter_def(struct alter_space *alter);
+	virtual ~ModifySpace();
 };
 
 /** Amend the definition of the new space. */
 void
 ModifySpace::alter_def(struct alter_space *alter)
 {
+	space_def_delete(alter->space_def);
 	alter->space_def = def;
+	/* Now alter owns the def. */
+	def = NULL;
+}
+
+ModifySpace::~ModifySpace() {
+	if (def != NULL)
+		space_def_delete(def);
 }
 
 /** DropIndex - remove an index from space. */
@@ -1156,10 +1184,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 					     BOX_SPACE_FIELD_ID);
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
-		struct space_def def;
-		space_def_create_from_tuple(&def, new_tuple, ER_CREATE_SPACE);
+		struct space_def *def =
+			space_def_new_from_tuple(new_tuple, ER_CREATE_SPACE);
+		auto def_guard =
+			make_scoped_guard([=] { space_def_delete(def); });
 		RLIST_HEAD(empty_list);
-		struct space *space = space_new(&def, &empty_list);
+		struct space *space = space_new(def, &empty_list);
 		/**
 		 * The new space must be inserted in the space
 		 * cache right away to achieve linearisable
@@ -1178,14 +1208,14 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			txn_alter_trigger_new(on_create_space_rollback, space);
 		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(old_space->def.uid, SC_SPACE);
+		access_check_ddl(old_space->def->uid, SC_SPACE);
 		/* Verify that the space is empty (has no indexes) */
 		if (old_space->index_count) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has indexes");
 		}
-		if (schema_find_grants("space", old_space->def.id)) {
+		if (schema_find_grants("space", old_space->def->id)) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has grants");
@@ -1204,19 +1234,21 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
-		struct space_def def;
-		space_def_create_from_tuple(&def, new_tuple, ER_ALTER_SPACE);
-		if (def.id != space_id(old_space))
+		struct space_def *def =
+			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE);
+		auto def_guard =
+			make_scoped_guard([=] { space_def_delete(def); });
+		if (def->id != space_id(old_space))
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space), "space id is immutable");
 
-		if (strcmp(def.engine_name, old_space->def.engine_name) != 0)
+		if (strcmp(def->engine_name, old_space->def->engine_name) != 0)
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not change space engine");
 
-		if (def.exact_field_count != 0 &&
-		    def.exact_field_count != old_space->def.exact_field_count &&
+		if (def->exact_field_count != 0 &&
+		    def->exact_field_count != old_space->def->exact_field_count &&
 		    space_index(old_space, 0) != NULL &&
 		    space_size(old_space) > 0) {
 
@@ -1225,7 +1257,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "can not change field count on a non-empty space");
 		}
 
-		if (def.opts.temporary != old_space->def.opts.temporary &&
+		if (def->opts.temporary != old_space->def->opts.temporary &&
 		    space_index(old_space, 0) != NULL &&
 		    space_size(old_space) > 0) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,
@@ -1237,16 +1269,17 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * in WAL-error-safe mode.
 		 */
 		struct alter_space *alter = alter_space_new(old_space);
-		auto scoped_guard =
+		auto alter_guard =
 			make_scoped_guard([=] {alter_space_delete(alter);});
 		ModifySpace *modify =
 			AlterSpaceOp::create<ModifySpace>();
 		alter_space_add_op(alter, modify);
 		modify->def = def;
+		def_guard.is_active = false;
 		/* Create MoveIndex ops for all space indexes. */
 		alter_space_move_indexes(alter, 0, old_space->index_id_max + 1);
 		alter_space_do(txn, alter);
-		scoped_guard.is_active = false;
+		alter_guard.is_active = false;
 	}
 }
 
@@ -1299,7 +1332,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	uint32_t iid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
 					  BOX_INDEX_FIELD_ID);
 	struct space *old_space = space_cache_find(id);
-	access_check_ddl(old_space->def.uid, SC_SPACE);
+	access_check_ddl(old_space->def->uid, SC_SPACE);
 	Index *old_index = space_index(old_space, iid);
 
 	/*
@@ -1499,14 +1532,14 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/* Create an empty copy of the old space. */
 	struct rlist key_list;
 	space_dump_def(old_space, &key_list);
-	struct space *new_space = space_new(&old_space->def, &key_list);
+	struct space *new_space = space_new(old_space->def, &key_list);
 	new_space->truncate_count = truncate_count;
-	auto guard = make_scoped_guard([=] { space_delete(new_space); });
+	auto space_guard = make_scoped_guard([=] { space_delete(new_space); });
 
 	/* Notify the engine about upcoming space truncation. */
 	new_space->handler->prepareTruncateSpace(old_space, new_space);
 
-	guard.is_active = false;
+	space_guard.is_active = false;
 
 	/* Preserve the access control lists during truncate. */
 	memcpy(new_space->access, old_space->access, sizeof(old_space->access));
@@ -1655,19 +1688,19 @@ user_def_new_from_tuple(struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  tt_cstr(name, name_len), "user name is too long");
 	}
-	size_t sz = user_def_sizeof(name_len);
+	size_t size = user_def_sizeof(name_len);
 	/* Use calloc: in case user password is empty, fill it with \0 */
-	struct user_def *user = (struct user_def *) calloc(1, sz);
+	struct user_def *user = (struct user_def *) malloc(size);
 	if (user == NULL)
-		tnt_raise(OutOfMemory, sz, "malloc", "user");
+		tnt_raise(OutOfMemory, size, "malloc", "user");
 	auto def_guard = make_scoped_guard([=] { free(user); });
 	user->uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
 	user->owner = tuple_field_u32_xc(tuple, BOX_USER_FIELD_UID);
 	const char *user_type =
 		tuple_field_cstr_xc(tuple, BOX_USER_FIELD_TYPE);
 	user->type= schema_object_type(user_type);
-	/* The trailing zero is set by calloc */
 	memcpy(user->name, name, name_len);
+	user->name[name_len] = 0;
 	if (user->type != SC_ROLE && user->type != SC_USER) {
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
@@ -1803,7 +1836,8 @@ func_def_new_from_tuple(const struct tuple *tuple)
 		tnt_raise(OutOfMemory, func_def_sizeof(len), "malloc", "def");
 	auto def_guard = make_scoped_guard([=] { free(def); });
 	func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid);
-	snprintf(def->name, len + 1, "%s", name);
+	memcpy(def->name, name, len);
+	def->name[len] = 0;
 	if (tuple_field_count(tuple) > BOX_FUNC_FIELD_SETUID)
 		def->setuid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_SETUID);
 	else
@@ -1948,7 +1982,7 @@ priv_def_check(struct priv_def *priv)
 	case SC_SPACE:
 	{
 		struct space *space = space_cache_find(priv->object_id);
-		if (space->def.uid != grantor->def->uid &&
+		if (space->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  "Grant", schema_object_name(priv->object_type),

@@ -302,3 +302,19 @@ pk:count({3}, 'GT')
 space:count({3}, 'GT')
 
 space:drop()
+
+-- vinyl: broken rollback to savepoint
+-- https://github.com/tarantool/tarantool/issues/2589
+s = box.schema.create_space('s', { engine = engine})
+i1 = s:create_index('i1', { type = 'tree', parts = {1,'unsigned'}, unique = true })
+i2 = s:create_index('i2', { type = 'tree', parts = {2,'unsigned'}, unique = true })
+
+_ = s:replace{2, 2}
+
+box.begin()
+_ = s:replace{1, 1}
+_ = pcall(s.upsert, s, {1, 1}, {{"+", 2, 1}}) -- failed in unique secondary
+box.commit()
+
+s:select{}
+s:drop{}

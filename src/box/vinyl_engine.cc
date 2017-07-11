@@ -134,7 +134,7 @@ VinylEngine::beginStatement(struct txn *txn)
 	assert(txn != NULL);
 	struct vy_tx *tx = (struct vy_tx *)(txn->engine_tx);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	stmt->engine_savepoint = vy_savepoint(tx);
+	stmt->engine_savepoint = vy_savepoint(env, tx);
 }
 
 void
@@ -142,7 +142,7 @@ VinylEngine::prepare(struct txn *txn)
 {
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 
-	if (vy_prepare(tx))
+	if (vy_prepare(env, tx))
 		diag_raise();
 }
 
@@ -166,7 +166,7 @@ VinylEngine::commit(struct txn *txn, int64_t lsn)
 		txn_stmt_unref_tuples(stmt);
 	}
 	if (tx) {
-		vy_commit(tx, txn->n_rows ? lsn : 0);
+		vy_commit(env, tx, txn->n_rows ? lsn : 0);
 		txn->engine_tx = NULL;
 	}
 }
@@ -178,7 +178,7 @@ VinylEngine::rollback(struct txn *txn)
 		return;
 
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
-	vy_rollback(tx);
+	vy_rollback(env, tx);
 	txn->engine_tx = NULL;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
@@ -190,7 +190,7 @@ void
 VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
 {
 	txn_stmt_unref_tuples(stmt);
-	vy_rollback_to_savepoint((struct vy_tx *)txn->engine_tx,
+	vy_rollback_to_savepoint(env, (struct vy_tx *)txn->engine_tx,
 				 stmt->engine_savepoint);
 }
 

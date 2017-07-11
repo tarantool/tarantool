@@ -219,19 +219,46 @@ box_key_def_delete(box_key_def_t *key_def)
 	free(key_def);
 }
 
-struct index_def *
-index_def_new(uint32_t space_id, const char *space_name,
-	      uint32_t iid, const char *name, uint32_t name_len,
-	      enum index_type type, const struct index_opts *opts,
-	      uint32_t part_count)
+struct space_def *
+space_def_dup(const struct space_def *src)
 {
-	if (name_len > BOX_NAME_MAX) {
-		diag_set(ClientError, ER_MODIFY_INDEX,
-			 tt_cstr(name, name_len), space_name,
-			 "index name is too long");
-		error_log(diag_last_error(diag_get()));
-		return NULL;
-	}
+	size_t size = space_def_sizeof(strlen(src->name));
+	struct space_def *ret = (struct space_def *) malloc(size);
+	if (ret == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "ret");
+	memcpy(ret, src, size);
+	return ret;
+}
+
+struct space_def *
+space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
+	      const char *name, uint32_t name_len,
+	      const char *engine_name, uint32_t engine_len,
+	      const struct space_opts *opts)
+{
+	size_t size = space_def_sizeof(name_len);
+	struct space_def *def = (struct space_def *) malloc(size);
+	if (def == NULL)
+		tnt_raise(OutOfMemory, size, "malloc", "def");
+	assert(name_len <= BOX_NAME_MAX);
+	assert(engine_len <= ENGINE_NAME_MAX);
+	def->id = id;
+	def->uid = uid;
+	def->exact_field_count = exact_field_count;
+	memcpy(def->name, name, name_len);
+	def->name[name_len] = 0;
+	memcpy(def->engine_name, engine_name, engine_len);
+	def->engine_name[engine_len] = 0;
+	def->opts = *opts;
+	return def;
+}
+
+struct index_def *
+index_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	      uint32_t name_len, enum index_type type,
+	      const struct index_opts *opts, uint32_t part_count)
+{
+	assert(name_len <= BOX_NAME_MAX);
 	size_t sz = index_def_sizeof(part_count);
 	/*
 	 * Use calloc to zero all struct index_def attributes
@@ -641,29 +668,6 @@ const struct opt_def space_opts_reg[] = {
 	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
 	{ NULL, opt_type_MAX, 0, 0 }
 };
-
-void
-space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen,
-                int32_t errcode)
-{
-	if (def->id > BOX_SPACE_MAX) {
-		tnt_raise(ClientError, errcode,
-			  def->name,
-			  "space id is too big");
-	}
-	if (namelen >= sizeof(def->name)) {
-		tnt_raise(ClientError, errcode,
-			  def->name,
-			  "space name is too long");
-	}
-	identifier_check(def->name);
-	if (engine_namelen >= sizeof(def->engine_name)) {
-		tnt_raise(ClientError, errcode,
-			  def->name,
-			  "space engine name is too long");
-	}
-	identifier_check(def->engine_name);
-}
 
 bool
 identifier_is_valid(const char *str)

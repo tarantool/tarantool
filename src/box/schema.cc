@@ -69,8 +69,8 @@ struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 bool
 space_is_system(struct space *space)
 {
-	return space->def.id > BOX_SYSTEM_ID_MIN &&
-		space->def.id < BOX_SYSTEM_ID_MAX;
+	return space->def->id > BOX_SYSTEM_ID_MIN &&
+		space->def->id < BOX_SYSTEM_ID_MAX;
 }
 
 /** Return space by its number */
@@ -175,15 +175,18 @@ space_cache_replace(struct space *space)
 
 /** A wrapper around space_new() for data dictionary spaces. */
 struct space *
-sc_space_new(struct space_def *space_def,
-	     struct index_def *index_def,
+sc_space_new(uint32_t id, const char *name, struct index_def *index_def,
 	     struct trigger *replace_trigger,
 	     struct trigger *stmt_begin_trigger)
 {
+	struct space_def *def =
+		space_def_new(id, ADMIN, 0, name, strlen(name), "memtx",
+			      strlen("memtx"), &space_opts_default);
+	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
-	struct space *space = space_new(space_def, &key_list);
+	struct space *space = space_new(def, &key_list);
 	(void) space_cache_replace(space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);
@@ -254,11 +257,7 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct space_def def = {
-		BOX_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", space_opts_default
-	};
-	struct index_def *index_def = index_def_new(def.id,
-						    "_schema",
+	struct index_def *index_def = index_def_new(BOX_SCHEMA_ID,
 						    0 /* index id */,
 						    "primary", /* name */
 						    strlen("primary"),
@@ -267,10 +266,13 @@ schema_init()
 						    1); /* part count */
 	if (index_def == NULL)
 		diag_raise();
+	auto index_def_guard1 =
+		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct key_def *key_def = &index_def->key_def;
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
-	(void) sc_space_new(&def, index_def, &on_replace_schema, NULL);
+	(void) sc_space_new(BOX_SCHEMA_ID, "_schema", index_def,
+			    &on_replace_schema, NULL);
 
         /* _trigger - all existing SQL triggers */
 	index_def->space_id = def.id = BOX_TRIGGER_ID;
@@ -278,49 +280,47 @@ schema_init()
 	(void) sc_space_new(&def, index_def, NULL, NULL);
 
 	/* _space - home for all spaces. */
-	index_def->space_id = def.id = BOX_SPACE_ID;
-	snprintf(def.name, sizeof(def.name), "_space");
+	index_def->space_id = BOX_SPACE_ID;
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 
-	(void) sc_space_new(&def, index_def, &alter_space_on_replace_space,
+	(void) sc_space_new(BOX_SPACE_ID, "_space", index_def,
+			    &alter_space_on_replace_space,
 			    &on_stmt_begin_space);
 
 	/* _truncate - auxiliary space for triggering space truncation. */
-	index_def->space_id = def.id = BOX_TRUNCATE_ID;
-	snprintf(def.name, sizeof(def.name), "_truncate");
-	(void) sc_space_new(&def, index_def, &on_replace_truncate, NULL);
+	index_def->space_id = BOX_TRUNCATE_ID;
+	(void) sc_space_new(BOX_TRUNCATE_ID, "_truncate", index_def,
+			    &on_replace_truncate, NULL);
 
 	/* _user - all existing users */
-	index_def->space_id = def.id = BOX_USER_ID;
-	snprintf(def.name, sizeof(def.name), "_user");
-	(void) sc_space_new(&def, index_def, &on_replace_user, NULL);
+	index_def->space_id = BOX_USER_ID;
+	(void) sc_space_new(BOX_USER_ID, "_user", index_def, &on_replace_user,
+			    NULL);
 
 	/* _func - all executable objects on which one can have grants */
-	index_def->space_id = def.id = BOX_FUNC_ID;
-	snprintf(def.name, sizeof(def.name), "_func");
-	(void) sc_space_new(&def, index_def, &on_replace_func, NULL);
+	index_def->space_id = BOX_FUNC_ID;
+	(void) sc_space_new(BOX_FUNC_ID, "_func", index_def, &on_replace_func,
+			    NULL);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
-	index_def->space_id = def.id = BOX_PRIV_ID;
-	snprintf(def.name, sizeof(def.name), "_priv");
-	(void) sc_space_new(&def, index_def, &on_replace_priv, NULL);
+	index_def->space_id = BOX_PRIV_ID;
+	(void) sc_space_new(BOX_PRIV_ID, "_priv", index_def, &on_replace_priv,
+			    NULL);
 	/*
 	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
-	index_def->space_id = def.id = BOX_CLUSTER_ID;
-	snprintf(def.name, sizeof(def.name), "_cluster");
-	(void) sc_space_new(&def, index_def, &on_replace_cluster, NULL);
+	index_def->space_id = BOX_CLUSTER_ID;
+	(void) sc_space_new(BOX_CLUSTER_ID, "_cluster", index_def,
+			    &on_replace_cluster, NULL);
 	index_def_delete(index_def);
+	index_def_guard1.is_active = false;
 
 	/* _index - definition of indexes in all spaces */
-	def.id = BOX_INDEX_ID;
-	snprintf(def.name, sizeof(def.name), "_index");
-	index_def = index_def_new(def.id,
-				  "_index",
+	index_def = index_def_new(BOX_INDEX_ID,
 				  0 /* index id */,
 				  "primary",
 				  strlen("primary"),
@@ -329,6 +329,8 @@ schema_init()
 				  2); /* part count */
 	if (index_def == NULL)
 		diag_raise();
+	auto index_def_guard2 =
+		make_scoped_guard([=] { index_def_delete(index_def); });
 	key_def = &index_def->key_def;
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
@@ -336,9 +338,9 @@ schema_init()
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
-	(void) sc_space_new(&def, index_def, &alter_space_on_replace_index,
+	(void) sc_space_new(BOX_INDEX_ID, "_index", index_def,
+			    &alter_space_on_replace_index,
 			    &on_stmt_begin_index);
-	index_def_delete(index_def);
 }
 
 void

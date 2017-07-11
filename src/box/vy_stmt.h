@@ -52,6 +52,8 @@ struct region;
 struct tuple_format;
 struct iovec;
 
+#define MAX_LSN (INT64_MAX / 2)
+
 enum {
 	VY_UPSERT_THRESHOLD = 128,
 	VY_UPSERT_INF,
