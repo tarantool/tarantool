@@ -210,20 +210,19 @@ uint32_t
 schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	       const char *name, uint32_t len)
 {
+	if (len > BOX_NAME_MAX)
+		return BOX_ID_NIL;
 	struct space *space = space_cache_find(system_space_id);
 	MemtxIndex *index = index_find_system(space, index_id);
-	char buf[BOX_NAME_MAX * 2];
-	/**
-	 * This is an internal-only method, we should know the
-	 * max length in advance.
-	 */
-	if (len + 5 > sizeof(buf))
-		return BOX_ID_NIL;
-
-	mp_encode_str(buf, name, len);
+	uint32_t size = mp_sizeof_str(len);
+	struct region *region = &fiber()->gc;
+	uint32_t used = region_used(region);
+	char *key = (char *) region_alloc_xc(region, size);
+	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
+	mp_encode_str(key, name, len);
 
 	struct iterator *it = index->position();
-	index->initIterator(it, ITER_EQ, buf, 1);
+	index->initIterator(it, ITER_EQ, key, 1);
 
 	struct tuple *tuple = it->next(it);
 	if (tuple) {
@@ -440,7 +439,12 @@ schema_find_grants(const char *type, uint32_t id)
 	/** "object" index */
 	MemtxIndex *index = index_find_system(priv, 2);
 	struct iterator *it = index->position();
-	char key[10 + BOX_NAME_MAX];
+	/*
+	 * +10 = max(mp_sizeof_uint32) +
+	 *       max(mp_sizeof_strl(uint32)).
+	 */
+	char key[GRANT_NAME_MAX + 10];
+	assert(strlen(type) <= GRANT_NAME_MAX);
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
 	index->initIterator(it, ITER_EQ, key, 2);
 	return it->next(it);
