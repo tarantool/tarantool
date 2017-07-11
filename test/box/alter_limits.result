@@ -25,7 +25,7 @@ box.schema.INDEX_FIELD_MAX
 ...
 box.schema.NAME_MAX
 ---
-- 64
+- 65000
 ...
 box.schema.INDEX_ID
 ---
@@ -105,9 +105,9 @@ s:drop()
 ---
 ...
 -- too long space name
-box.schema.space.create(string.rep('tweedledee', 100))
+box.schema.space.create(string.rep('t', box.schema.NAME_MAX + 1))
 ---
-- error: 'Failed to create space ''tweedledeetweedledeetweedledeetweedledeetweedledeetweedledeetwee'':
+- error: 'Failed to create space ''tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt'':
     space name is too long'
 ...
 -- too long space engine name
@@ -124,9 +124,9 @@ box.schema.space.create(string.rep('t', box.schema.NAME_MAX)..'_')
 s = box.schema.space.create(string.rep('t', box.schema.NAME_MAX - 1)..'_')
 ---
 ...
-s.name
+s.name:len()
 ---
-- ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt_
+- 65000
 ...
 s:drop()
 ---
@@ -134,9 +134,9 @@ s:drop()
 s = box.schema.space.create(string.rep('t', box.schema.NAME_MAX - 2)..'_')
 ---
 ...
-s.name
+s.name:len()
 ---
-- tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt_
+- 64999
 ...
 s:drop()
 ---
@@ -626,7 +626,7 @@ s.index.new.name
 -- too long name
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
 ---
-- error: 'Can''t create or modify index ''tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt_''
+- error: 'Can''t create or modify index ''tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt''
     in space ''test'': index name is too long'
 ...
 s.index[0].name
@@ -636,16 +636,16 @@ s.index[0].name
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 1)..'_')
 ---
 ...
-s.index[0].name
+s.index[0].name:len()
 ---
-- ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt_
+- 65000
 ...
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 2)..'_')
 ---
 ...
-s.index[0].name
+s.index[0].name:len()
 ---
-- tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt_
+- 64999
 ...
 s.index[0]:rename('primary')
 ---

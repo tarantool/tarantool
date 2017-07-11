@@ -369,7 +369,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS_165);
 	}
 	if (name_len > BOX_NAME_MAX)
-		tnt_raise(ClientError, ER_MODIFY_INDEX, tt_cstr(name, name_len),
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
 	index_def = index_def_new(id, index_id, name, name_len, type, &opts,
 				  part_count);
@@ -438,7 +439,8 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	const char *name =
 		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_NAME, &name_len);
 	if (name_len > BOX_NAME_MAX)
-		tnt_raise(ClientError, errcode, tt_cstr(name, BOX_NAME_MAX),
+		tnt_raise(ClientError, errcode,
+			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "space name is too long");
 	size_t size = space_def_sizeof(name_len);
 	struct space_def *def = (struct space_def *) malloc(size);
@@ -1669,7 +1671,8 @@ user_def_new_from_tuple(struct tuple *tuple)
 					      &name_len);
 	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_CREATE_USER,
-			  tt_cstr(name, name_len), "user name is too long");
+			  tt_cstr(name, BOX_INVALID_NAME_MAX),
+			  "user name is too long");
 	}
 	size_t size = user_def_sizeof(name_len);
 	/* Use calloc: in case user password is empty, fill it with \0 */
@@ -1813,7 +1816,8 @@ func_def_new_from_tuple(const struct tuple *tuple)
 					      &len);
 	if (len > BOX_NAME_MAX)
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
-			  tt_cstr(name, len), "function name is too long");
+			  tt_cstr(name, BOX_INVALID_NAME_MAX),
+			  "function name is too long");
 	struct func_def *def = (struct func_def *) malloc(func_def_sizeof(len));
 	if (def == NULL)
 		tnt_raise(OutOfMemory, func_def_sizeof(len), "malloc", "def");

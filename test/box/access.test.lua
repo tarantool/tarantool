@@ -62,6 +62,16 @@ box.schema.user.revoke('rich', 'public')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 
+-- gh-944 name is too long
+name = string.rep('a', box.schema.NAME_MAX - 1)
+box.schema.user.create(name..'aa')
+
+box.schema.user.create(name..'a')
+box.schema.user.drop(name..'a')
+
+box.schema.user.create(name)
+box.schema.user.drop(name)
+
 -- sudo
 box.schema.user.create('tester')
 -- admin -> user
@@ -274,6 +284,16 @@ box.space._user.index.name:delete{'admin'}
 box.schema.role.drop('public')
 box.space._user.index.name:delete{'public'}
 #box.schema.role.info('public') > 0
+
+-- gh-944 name is too long
+name = string.rep('a', box.schema.NAME_MAX - 1)
+box.schema.func.create(name..'aa')
+
+box.schema.func.create(name..'a')
+box.schema.func.drop(name..'a')
+
+box.schema.func.create(name)
+box.schema.func.drop(name)
 
 -- A test case for: http://bugs.launchpad.net/bugs/712456
 -- Verify that when trying to access a non-existing or
