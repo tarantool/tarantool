@@ -1047,7 +1047,7 @@ tx_process_join_subscribe(struct cmsg *m)
 	} catch (SocketError *e) {
 		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
-		iproto_write_error(con->input.fd, e, ::schema_version);
+		iproto_write_error_blocking(con->input.fd, e);
 	}
 }
 
