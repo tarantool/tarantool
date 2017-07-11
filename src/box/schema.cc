@@ -274,11 +274,6 @@ schema_init()
 	(void) sc_space_new(BOX_SCHEMA_ID, "_schema", index_def,
 			    &on_replace_schema, NULL);
 
-        /* _trigger - all existing SQL triggers */
-	index_def->space_id = def.id = BOX_TRIGGER_ID;
-	snprintf(def.name, sizeof(def.name), "_trigger");
-	(void) sc_space_new(&def, index_def, NULL, NULL);
-
 	/* _space - home for all spaces. */
 	index_def->space_id = BOX_SPACE_ID;
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
@@ -316,6 +311,11 @@ schema_init()
 	index_def->space_id = BOX_CLUSTER_ID;
 	(void) sc_space_new(BOX_CLUSTER_ID, "_cluster", index_def,
 			    &on_replace_cluster, NULL);
+
+        /* _trigger - all existing SQL triggers */
+	index_def->space_id = BOX_TRIGGER_ID;
+	(void) sc_space_new(BOX_TRIGGER_ID, "_trigger", index_def, NULL, NULL);
+
 	index_def_delete(index_def);
 	index_def_guard1.is_active = false;
 

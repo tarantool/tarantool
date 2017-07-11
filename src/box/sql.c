@@ -666,9 +666,8 @@ sql_schema_put(InitData *init,
 }
 
 /* TODO move to public header */
-void
-space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
-			    uint32_t errcode);
+struct space_def *
+space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode);
 
 struct space;
 
@@ -731,16 +730,14 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 	}
 
 	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
-		struct space_def def;
+		struct space_def *def;
 
-		space_def_create_from_tuple(&def, tuple, 0);
-		if (def.opts.sql != NULL) {
-			sql_schema_put(
-				init, def.name,
-				def.id, 0,
-				def.opts.sql
-			);
+		def = space_def_new_from_tuple(tuple, 0);
+		if (def->opts.sql != NULL) {
+			sql_schema_put(init, def->name, def->id, 0,
+				       def->opts.sql);
 		}
+		space_def_delete(def);
 	}
 
 	box_iterator_free(it);
