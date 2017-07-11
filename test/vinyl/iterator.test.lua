@@ -679,3 +679,49 @@ s[3]:select({}, {iterator = 'LE'})
 box.rollback()
 
 for i=1,3 do s[i]:drop() end
+
+sm = box.schema.create_space('sm', { engine = 'memtx'})
+im1 = sm:create_index('i1', { type = 'tree', parts = {1,'unsigned'}, unique = true })
+im2 = sm:create_index('i2', { type = 'tree', parts = {2,'unsigned'}, unique = true })
+sv = box.schema.create_space('sv', { engine = 'vinyl'})
+iv1 = sv:create_index('i1', { type = 'tree', parts = {1,'unsigned'}, unique = true })
+iv2 = sv:create_index('i2', { type = 'tree', parts = {2,'unsigned'}, unique = true })
+
+test_run:cmd("setopt delimiter ';'")
+function f()
+    for i = 1,100 do
+        local arr = {}
+        for j = 1,100 do
+            table.insert(arr, {math.random(1000), math.random(1000)})
+        end
+        box.begin()
+        for _,t in pairs(arr) do
+            pcall(sm.replace, sm, t)
+        end
+        box.commit()
+        box.begin()
+        for _,t in pairs(arr) do
+            pcall(sv.replace, sv, t)
+        end
+        box.commit()
+    end
+end
+function compare(a, b)
+    if #a ~= #b then return "different sizes" end
+    local c = #a
+    for i = 1,c do
+        if a[i][1] ~= b[i][1] or a[i][2] ~= b[i][2] then
+            return "different data"
+        end
+    end
+    return "equal"
+end
+test_run:cmd("setopt delimiter ''");
+
+f()
+compare(sm:select{}, sv:select{})
+compare(im1:select{}, iv1:select{})
+compare(im2:select{}, iv2:select{})
+
+sv:drop()
+sm:drop()

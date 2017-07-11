@@ -289,6 +289,8 @@ struct txv {
 	bool is_gap;
 	/** true if the txv was overwritten by another txv of the same tx */
 	bool is_overwritten;
+	/** txv that was overwritten by current txv */
+	struct txv *overwritten;
 };
 
 typedef rb_tree(struct txv) read_set_t;
@@ -4483,6 +4485,7 @@ txv_new(struct vy_index *index, struct tuple *stmt, struct vy_tx *tx)
 	v->region_stmt = NULL;
 	v->tx = tx;
 	v->is_overwritten = false;
+	v->overwritten = NULL;
 	return v;
 }
 
@@ -4611,6 +4614,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 
 	v->is_read = false;
 	v->is_gap = false;
+	v->overwritten = old;
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
 	tx->write_count++;
@@ -6016,6 +6020,8 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 	struct stailq tail;
 	stailq_create(&tail);
 	stailq_splice(&tx->log, last, &tail);
+	/* rollback statements in LIFO order */
+	stailq_reverse(&tail);
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
 		/* Remove from the conflict manager index */
@@ -6024,6 +6030,11 @@ vy_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 		/* Remove from the transaction write log. */
 		if (!v->is_read) {
 			write_set_remove(&tx->write_set, v);
+			if (v->overwritten != NULL) {
+				/* restore overwritten statement */
+				write_set_insert(&tx->write_set, v->overwritten);
+				v->overwritten->is_overwritten = false;
+			}
 			tx->write_set_version++;
 		}
 		txv_delete(v);
