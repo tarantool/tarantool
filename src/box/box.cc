@@ -959,6 +959,7 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 	/* Create a call context */
 	struct port port;
 	port_create(&port);
+	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
 	box_function_ctx_t ctx = { request, &port };
 
 	/* Clear all previous errors */
@@ -981,12 +982,9 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 
 	if (request->type == IPROTO_CALL_16) {
 		/* Tarantool < 1.7.1 compatibility */
-		for (struct port_entry *entry = port.first;
-		     entry != NULL; entry = entry->next) {
-			if (tuple_to_obuf(entry->tuple, out) != 0) {
-				obuf_rollback_to_svp(out, &svp);
-				goto error;
-			}
+		if (port_dump(&port, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
 		}
 		iproto_reply_select(out, &svp, request->header->sync,
 				    ::schema_version, port.size);
@@ -997,23 +995,17 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 		if (size_buf == NULL)
 			goto error;
 		mp_encode_array(size_buf, port.size);
-		for (struct port_entry *entry = port.first;
-		     entry != NULL; entry = entry->next) {
-			if (tuple_to_obuf(entry->tuple, out) != 0) {
-				obuf_rollback_to_svp(out, &svp);
-				goto error;
-			}
+		if (port_dump(&port, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
 		}
 		iproto_reply_select(out, &svp, request->header->sync,
 				    ::schema_version, 1);
 	}
 
-	port_destroy(&port);
-
 	return 0;
 
 error:
-	port_destroy(&port);
 	txn_rollback();
 	return -1;
 }

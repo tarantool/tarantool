@@ -942,18 +942,18 @@ tx_process_select(struct cmsg *m)
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
+	port_create(&port);
+	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
+
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
-	port_create(&port);
-	rc = box_select((struct port *) &port,
+	rc = box_select(&port,
 			req->space_id, req->index_id,
 			req->iterator, req->offset, req->limit,
 			req->key, req->key_end);
-	if (rc < 0 || iproto_prepare_select(out, &svp) != 0) {
-		port_destroy(&port);
+	if (rc < 0 || iproto_prepare_select(out, &svp) != 0)
 		goto error;
-	}
 	if (port_dump(&port, out) != 0) {
 		/* Discard the prepared select. */
 		obuf_rollback_to_svp(out, &svp);
