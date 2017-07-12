@@ -220,6 +220,11 @@ struct vy_index {
 	 */
 	int64_t dump_lsn;
 	/**
+	 * This flag is set if the index creation was
+	 * committed to the metadata log.
+	 */
+	bool is_committed;
+	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index
 	 * will be dropped when WAL is replayed.

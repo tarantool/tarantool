@@ -1227,7 +1227,7 @@ vy_log_write(const struct vy_log_record *record)
 }
 
 /** Lookup a vinyl index in vy_recovery::index_hash map. */
-struct vy_index_recovery_info *
+static struct vy_index_recovery_info *
 vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_lsn)
 {
 	struct mh_i64ptr_t *h = recovery->index_hash;
@@ -2007,7 +2007,7 @@ vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
 	return cb(record, cb_arg);
 }
 
-int
+static int
 vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		bool include_deleted, vy_recovery_cb cb, void *cb_arg)
 {
@@ -2151,4 +2151,15 @@ vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 			return -1;
 	}
 	return 0;
+}
+
+int
+vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_lsn,
+		       vy_recovery_cb cb, void *cb_arg)
+{
+	struct vy_index_recovery_info *index;
+	index = vy_recovery_lookup_index(recovery, index_lsn);
+	if (index == NULL)
+		return 0;
+	return vy_recovery_iterate_index(index, false, cb, cb_arg);
 }

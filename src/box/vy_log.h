@@ -59,7 +59,6 @@ struct vclock;
 struct key_def;
 
 struct vy_recovery;
-struct vy_index_recovery_info;
 
 /** Type of a metadata log record. */
 enum vy_log_record_type {
@@ -354,30 +353,18 @@ vy_recovery_new(int64_t signature, bool only_snapshot);
 void
 vy_recovery_delete(struct vy_recovery *recovery);
 
-/**
- * Lookup a vinyl index in a recovery context.
- *
- * Returns the index handle that can be used for recovering the
- * index structure with the aid of vy_recovery_iterate_index()
- * or NULL if the index is not found.
- */
-struct vy_index_recovery_info *
-vy_recovery_lookup_index(struct vy_recovery *recovery, int64_t index_lsn);
-
 typedef int
 (*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
 
 /**
- * Recover a vinyl index from a recovery context.
+ * Iterate over all objects stored in a recovery context.
  *
- * For each range and run of the index, this function calls @cb passing
- * a log record and an optional @cb_arg to it. A log record type is
- * either VY_LOG_CREATE_INDEX, VY_LOG_CREATE_RUN, VY_LOG_INSERT_RANGE,
- * or VY_LOG_INSERT_SLICE unless the index was dropped. In the latter case,
- * a VY_LOG_DROP_INDEX record is issued in the end.
- * The callback is supposed to rebuild the index structure and open run
- * files. If the callback returns a non-zero value, the function stops
- * iteration over ranges and runs and returns error.
+ * This function invokes callback @cb for each object (index, run, etc)
+ * stored in the given recovery context. The callback is passed a record
+ * used to log the object and optional argument @cb_arg. If the callback
+ * returns a value different from 0, iteration stops and -1 is returned,
+ * otherwise the function returns 0.
+ *
  * To ease the work done by the callback, records corresponding to
  * slices of a range always go right after the range, in the
  * chronological order, while an index's runs go after the index
@@ -386,22 +373,24 @@ typedef int
  * If @include_deleted is set, this function will also iterate over
  * deleted objects, issuing the corresponding "delete" record for each
  * of them.
- *
- * Returns 0 on success, -1 on failure.
- */
-int
-vy_recovery_iterate_index(struct vy_index_recovery_info *index,
-		bool include_deleted, vy_recovery_cb cb, void *cb_arg);
-
-/**
- * Given a recovery context, iterate over all indexes stored in it.
- * See vy_recovery_iterate_index() for more details.
- *
- * Returns 0 on success, -1 on failure.
  */
 int
 vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 		    vy_recovery_cb cb, void *cb_arg);
+
+/**
+ * Load an index from a recovery context.
+ *
+ * Call @cb for each object related to the index. Break the loop and
+ * return -1 if @cb returned a non-zero value, otherwise return 0.
+ * Objects are loaded in the same order as by vy_recovery_iterate().
+ *
+ * Note, this function returns 0 if there's no index with the requested
+ * id in the recovery context. In this case, @cb isn't called at all.
+ */
+int
+vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_lsn,
+		       vy_recovery_cb cb, void *cb_arg);
 
 /**
  * Initialize a log record with default values.

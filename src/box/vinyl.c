@@ -2500,12 +2500,13 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (vy_recovery_lookup_index(env->recovery,
-					     index->opts.lsn) != NULL) {
+		if (index->is_committed) {
 			vy_scheduler_add_index(env->scheduler, index);
 			return;
 		}
 	}
+
+	index->is_committed = true;
 
 	assert(index->range_count == 1);
 	struct vy_range *range = vy_range_tree_first(index->tree);

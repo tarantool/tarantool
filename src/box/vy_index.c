@@ -366,7 +366,7 @@ struct vy_index_recovery_cb_arg {
 	struct mh_i64ptr_t *run_hash;
 };
 
-/** Index recovery callback, passed to vy_recovery_iterate_index(). */
+/** Index recovery callback, passed to vy_recovery_load_index(). */
 static int
 vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 {
@@ -379,6 +379,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_run *run;
 	struct vy_slice *slice;
 	bool success = false;
+
+	assert(record->type == VY_LOG_CREATE_INDEX || index->is_committed);
 
 	if (record->type == VY_LOG_INSERT_RANGE ||
 	    record->type == VY_LOG_INSERT_SLICE) {
@@ -397,6 +399,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
 		assert(record->index_lsn == index->opts.lsn);
+		index->is_committed = true;
 		break;
 	case VY_LOG_DUMP_INDEX:
 		assert(record->index_lsn == index->opts.lsn);
@@ -478,9 +481,44 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 {
 	assert(index->range_count == 0);
 
-	struct vy_index_recovery_info *ri;
-	ri = vy_recovery_lookup_index(recovery, index->opts.lsn);
-	if (ri == NULL) {
+	struct vy_index_recovery_cb_arg arg = { .index = index };
+	arg.run_hash = mh_i64ptr_new();
+	if (arg.run_hash == NULL) {
+		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
+		return -1;
+	}
+
+	int rc = vy_recovery_load_index(recovery, index->opts.lsn,
+					vy_index_recovery_cb, &arg);
+
+	mh_int_t k;
+	mh_foreach(arg.run_hash, k) {
+		struct vy_run *run = mh_i64ptr_node(arg.run_hash, k)->val;
+		if (run->refs > 1)
+			vy_index_add_run(index, run);
+		if (run->refs == 1 && rc == 0) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Unused run %lld in index %lld",
+					    (long long)run->id,
+					    (long long)index->opts.lsn));
+			rc = -1;
+			/*
+			 * Continue the loop to unreference
+			 * all runs in the hash.
+			 */
+		}
+		/* Drop the reference held by the hash. */
+		vy_run_unref(run);
+	}
+	mh_i64ptr_delete(arg.run_hash);
+
+	if (rc != 0) {
+		/* Recovery callback failed. */
+		return -1;
+	}
+
+	if (!index->is_committed) {
+		/* Index was not found in the metadata log. */
 		if (!allow_missing) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Index %lld not found",
@@ -489,35 +527,6 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		}
 		return vy_index_create(index);
 	}
-
-	struct vy_index_recovery_cb_arg arg = { .index = index };
-	arg.run_hash = mh_i64ptr_new();
-	if (arg.run_hash == NULL) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
-		return -1;
-	}
-
-	int rc = vy_recovery_iterate_index(ri, false,
-			vy_index_recovery_cb, &arg);
-
-	mh_int_t k;
-	mh_foreach(arg.run_hash, k) {
-		struct vy_run *run = mh_i64ptr_node(arg.run_hash, k)->val;
-		if (run->refs == 1) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Unused run %lld in index %lld",
-					    (long long)run->id,
-					    (long long)index->opts.lsn));
-			rc = -1;
-		} else
-			vy_index_add_run(index, run);
-		/* Drop the reference held by the hash. */
-		vy_run_unref(run);
-	}
-	mh_i64ptr_delete(arg.run_hash);
-
-	if (rc != 0)
-		return -1;
 
 	/*
 	 * Account ranges to the index and check that the range tree
