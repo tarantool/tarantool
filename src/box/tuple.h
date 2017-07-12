@@ -238,6 +238,16 @@ box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno);
 const char *
 box_tuple_next(box_tuple_iterator_t *it);
 
+/**
+ * Extract key from tuple according to key definition of given index.
+ * Returned buffer is allocated on box_txn_alloc() with this key.
+ * This function has O(n) complexity, where n is the number of key parts.
+ * @param tuple tuple from which need to extract key
+ * @param space_id space identifier
+ * @param index_id index identifier
+ * @retval not NULL Success
+ * @retval NULL Memory allocation error
+ */
 char *
 box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 		      uint32_t index_id, uint32_t *key_size);
