@@ -177,6 +177,12 @@ struct vy_log_record {
 	/** Unique ID of the run slice. */
 	int64_t slice_id;
 	/**
+	 * For VY_LOG_CREATE_RUN record: hint that the run
+	 * is dropped, i.e. there is a VY_LOG_DROP_RUN record
+	 * following this one.
+	 */
+	bool is_dropped;
+	/**
 	 * Msgpack key for start of the range/slice.
 	 * NULL if the range/slice starts from -inf.
 	 */
@@ -369,13 +375,9 @@ typedef int
  * slices of a range always go right after the range, in the
  * chronological order, while an index's runs go after the index
  * and before its ranges.
- *
- * If @include_deleted is set, this function will also iterate over
- * deleted objects, issuing the corresponding "delete" record for each
- * of them.
  */
 int
-vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+vy_recovery_iterate(struct vy_recovery *recovery,
 		    vy_recovery_cb cb, void *cb_arg);
 
 /**

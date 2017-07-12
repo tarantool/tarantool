@@ -975,8 +975,7 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 		.dir = &vy_log.dir,
 		.vclock = vclock,
 	};
-	if (vy_recovery_iterate(recovery, true,
-				vy_log_rotate_cb_func, &arg) < 0)
+	if (vy_recovery_iterate(recovery, vy_log_rotate_cb_func, &arg) < 0)
 		goto err_write_xlog;
 
 	if (!xlog_is_open(&xlog))
@@ -2009,7 +2008,7 @@ vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
 
 static int
 vy_recovery_iterate_index(struct vy_index_recovery_info *index,
-		bool include_deleted, vy_recovery_cb cb, void *cb_arg)
+			  vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_range_recovery_info *range;
 	struct vy_slice_recovery_info *slice;
@@ -2034,29 +2033,6 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 			return -1;
 	}
 
-	if (!include_deleted && index->is_dropped) {
-		/*
-		 * Do not load the index as it is going to be
-		 * dropped on WAL recovery anyway. Just create
-		 * an initial range to make vy_get() happy.
-		 */
-		vy_log_record_init(&record);
-		record.type = VY_LOG_INSERT_RANGE;
-		record.index_lsn = index->index_lsn;
-		record.range_id = INT64_MAX; /* fake id */
-		record.begin = record.end = NULL;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
-			return -1;
-
-		vy_log_record_init(&record);
-		record.type = VY_LOG_DROP_INDEX;
-		record.index_lsn = index->index_lsn;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
-			return -1;
-
-		return 0;
-	}
-
 	if (index->dump_lsn >= 0) {
 		vy_log_record_init(&record);
 		record.type = VY_LOG_DUMP_INDEX;
@@ -2067,10 +2043,6 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 	}
 
 	rlist_foreach_entry(run, &index->runs, in_index) {
-		if (!include_deleted &&
-		    (run->is_dropped || run->is_incomplete))
-			continue;
-
 		vy_log_record_init(&record);
 		if (run->is_incomplete) {
 			record.type = VY_LOG_PREPARE_RUN;
@@ -2080,6 +2052,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		}
 		record.index_lsn = index->index_lsn;
 		record.run_id = run->id;
+		record.is_dropped = run->is_dropped;
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 
@@ -2132,7 +2105,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 }
 
 int
-vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
+vy_recovery_iterate(struct vy_recovery *recovery,
 		    vy_recovery_cb cb, void *cb_arg)
 {
 	mh_int_t i;
@@ -2146,8 +2119,7 @@ vy_recovery_iterate(struct vy_recovery *recovery, bool include_deleted,
 		 */
 		if (index->is_dropped && rlist_empty(&index->runs))
 			continue;
-		if (vy_recovery_iterate_index(index, include_deleted,
-					      cb, cb_arg) < 0)
+		if (vy_recovery_iterate_index(index, cb, cb_arg) < 0)
 			return -1;
 	}
 	return 0;
@@ -2161,5 +2133,5 @@ vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_lsn,
 	index = vy_recovery_lookup_index(recovery, index_lsn);
 	if (index == NULL)
 		return 0;
-	return vy_recovery_iterate_index(index, false, cb, cb_arg);
+	return vy_recovery_iterate_index(index, cb, cb_arg);
 }

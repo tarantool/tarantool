@@ -5796,7 +5796,7 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	recovery = vy_recovery_new(vclock_sum(vclock), true);
 	if (recovery == NULL)
 		goto out_join_cord;
-	rc = vy_recovery_iterate(recovery, false, vy_join_cb, ctx);
+	rc = vy_recovery_iterate(recovery, vy_join_cb, ctx);
 	vy_recovery_delete(recovery);
 	/* Send the last range. */
 	if (rc == 0)
@@ -5923,7 +5923,7 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 		.gc_mask = gc_mask,
 		.gc_lsn = gc_lsn,
 	};
-	vy_recovery_iterate(recovery, true, vy_gc_cb, &arg);
+	vy_recovery_iterate(recovery, vy_gc_cb, &arg);
 }
 
 void
@@ -5977,7 +5977,7 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 		arg->index_id = record->index_id;
 	}
 
-	if (record->type != VY_LOG_CREATE_RUN)
+	if (record->type != VY_LOG_CREATE_RUN || record->is_dropped)
 		goto out;
 
 	char path[PATH_MAX];
@@ -6015,7 +6015,7 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 		.cb = cb,
 		.cb_arg = cb_arg,
 	};
-	int rc = vy_recovery_iterate(recovery, false, vy_backup_cb, &arg);
+	int rc = vy_recovery_iterate(recovery, vy_backup_cb, &arg);
 	vy_recovery_delete(recovery);
 	return rc;
 }

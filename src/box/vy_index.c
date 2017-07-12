@@ -416,7 +416,11 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(record->index_lsn == index->opts.lsn);
 		index->is_dropped = true;
 		break;
+	case VY_LOG_PREPARE_RUN:
+		break;
 	case VY_LOG_CREATE_RUN:
+		if (record->is_dropped)
+			break;
 		assert(record->index_lsn == index->opts.lsn);
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
@@ -435,6 +439,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			vy_run_unref(run);
 			goto out;
 		}
+		break;
+	case VY_LOG_DROP_RUN:
 		break;
 	case VY_LOG_INSERT_RANGE:
 		assert(record->index_lsn == index->opts.lsn);
@@ -528,6 +534,14 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 					    (long long)index->opts.lsn));
 			return -1;
 		}
+		return vy_index_init_range_tree(index);
+	}
+
+	if (index->is_dropped) {
+		/*
+		 * Initial range is not stored in the metadata log
+		 * for dropped indexes, but we need it for recovery.
+		 */
 		return vy_index_init_range_tree(index);
 	}
 
