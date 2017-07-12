@@ -2635,7 +2635,7 @@ vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
 			continue;
 		}
 
-		if (vy_index_create(new_index) != 0)
+		if (vy_index_init_range_tree(new_index) != 0)
 			return -1;
 
 		new_index->truncate_count = new_space->truncate_count;

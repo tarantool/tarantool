@@ -304,9 +304,20 @@ vy_index_swap(struct vy_index *old_index, struct vy_index *new_index)
 	rlist_swap(&old_index->runs, &new_index->runs);
 }
 
-/**
- * Create an index directory for a new index.
- */
+int
+vy_index_init_range_tree(struct vy_index *index)
+{
+	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
+					      index->key_def);
+	if (range == NULL)
+		return -1;
+
+	assert(index->range_count == 0);
+	vy_index_add_range(index, range);
+	vy_index_acct_range(index, range);
+	return 0;
+}
+
 int
 vy_index_create(struct vy_index *index)
 {
@@ -341,15 +352,7 @@ vy_index_create(struct vy_index *index)
 	}
 
 	/* Allocate initial range. */
-	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
-					      index->key_def);
-	if (unlikely(range == NULL))
-		return -1;
-
-	assert(index->range_count == 0);
-	vy_index_add_range(index, range);
-	vy_index_acct_range(index, range);
-	return 0;
+	return vy_index_init_range_tree(index);
 }
 
 /** vy_index_recovery_cb() argument. */
@@ -525,7 +528,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 					    (long long)index->opts.lsn));
 			return -1;
 		}
-		return vy_index_create(index);
+		return vy_index_init_range_tree(index);
 	}
 
 	/*
