@@ -99,7 +99,7 @@ static void disableLookaside(Parse *pParse){
         (mxSelect = pParse->db->aLimit[SQLITE_LIMIT_COMPOUND_SELECT])>0 &&
         cnt>mxSelect
       ){
-        sqlite3ErrorMsg(pParse, "too many terms in compound SELECT");
+        sqlite3ErrorMsg(pParse, "Too many UNION or EXCEPT or INTERSECT operations");
       }
     }
   }

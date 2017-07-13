@@ -756,7 +756,7 @@ static int codeTriggerProgram(
   sqlSubProgramsRemaining--;
 
   if (sqlSubProgramsRemaining == 0){
-	  sqlite3ErrorMsg(pParse, "Maximum number of chained trigger programs exceeded.");
+	  sqlite3ErrorMsg(pParse, "Maximum number of chained trigger activations exceeded.");
   }
 
   for(pStep=pStepList; pStep; pStep=pStep->pNext){

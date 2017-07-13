@@ -80,7 +80,7 @@ for _, table_count in ipairs({30, 31}) do
                      function()
                          return true
                      end,
-                     table_count <= 40 or msg == 'Maximum number of chained trigger programs exceeded.')
+                     table_count <= 30 or msg == 'Maximum number of chained trigger activations exceeded.')
     end
 
     -- Exceed check for UPDATE
