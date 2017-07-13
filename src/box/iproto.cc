@@ -124,15 +124,6 @@ iproto_msg_delete(struct cmsg *msg)
 	iproto_resume();
 }
 
-struct IprotoMsgGuard {
-	struct iproto_msg *msg;
-	IprotoMsgGuard(struct iproto_msg *msg_arg):msg(msg_arg) {}
-	~IprotoMsgGuard()
-	{ if (msg) iproto_msg_delete(msg); }
-	struct iproto_msg *release()
-	{ struct iproto_msg *tmp = msg; msg = NULL; return tmp; }
-};
-
 /* }}} */
 
 /* {{{ iproto connection and requests */
@@ -656,7 +647,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			break;
 		struct iproto_msg *msg = iproto_msg_new(con);
 		msg->iobuf = con->iobuf[0];
-		IprotoMsgGuard guard(msg);
+		auto guard = make_scoped_guard([=] { iproto_msg_delete(msg); });
 
 		msg->len = reqend - reqstart; /* total request length */
 
@@ -666,7 +657,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			 * This can't throw, but should not be
 			 * done in case of exception.
 			 */
-			cpipe_push_input(&tx_pipe, guard.release());
+			cpipe_push_input(&tx_pipe, msg);
+			guard.is_active = false;
 			n_requests++;
 		} catch (Exception *e) {
 			/*
