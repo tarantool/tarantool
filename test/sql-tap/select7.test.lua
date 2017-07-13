@@ -179,7 +179,7 @@ test:do_catchsql_test(
     "select7-6.2",
     sql, {
         -- <select7-6.2>
-        1, "too many terms in compound SELECT"
+        1, "Too many UNION or EXCEPT or INTERSECT operations"
         -- </select7-6.2>
     })
 

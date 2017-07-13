@@ -1141,16 +1141,33 @@ end
 -- destructor calls for values returned by test_destructor().
 --
 -- MUST_WORK_TEST test_destructor_count not implemented
-test:do_execsql_test(
-    "func-12.1-utf8",
-    [[
-        SELECT test_destructor('hello world'), test_destructor_count();
-    ]], {
-    -- <func-12.1-utf8>
-    "hello world", 1
-    -- </func-12.1-utf8>
-})
+if 0 > 0 then
+if X(595, "X!cmd", "[\"expr\",\"[db eval {PRAGMA encoding}]==\\\"UTF-8\\\"\"]")
+ then
+    test:do_execsql_test(
+        "func-12.1-utf8",
+        [[
+            SELECT test_destructor('hello world'), test_destructor_count();
+        ]], {
+            -- <func-12.1-utf8>
+            "hello world", 1
+            -- </func-12.1-utf8>
+        })
 
+else
+    test:do_execsql_test(
+        "func-12.1-utf16",
+        [[
+            SELECT test_destructor16('hello world'), test_destructor_count();
+        ]], {
+            -- <func-12.1-utf16>
+            "hello world", 1
+            -- </func-12.1-utf16>
+        })
+
+
+
+end
 test:do_execsql_test(
     "func-12.2",
     [[
