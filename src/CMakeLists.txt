@@ -116,6 +116,7 @@ set (server_sources
      coio_buf.cc
      pickle.c
      ipc.c
+     fiber_cond.c
      latch.c
      errinj.c
      fio.c
@@ -136,6 +137,7 @@ set (server_sources
      lua/digest.c
      lua/init.c
      lua/fiber.c
+     lua/fiber_cond.c
      lua/trigger.c
      lua/ipc.c
      lua/msgpack.c

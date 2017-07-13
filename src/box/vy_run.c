@@ -33,8 +33,8 @@
 #include <zstd.h>
 
 #include "fiber.h"
+#include "fiber_cond.h"
 #include "fio.h"
-#include "ipc.h"
 #include "cbus.h"
 #include "memory.h"
 

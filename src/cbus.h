@@ -31,8 +31,8 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
+#include "fiber_cond.h"
 #include "rmean.h"
-#include "ipc.h"
 #include "small/rlist.h"
 #include "salad/stailq.h"
 

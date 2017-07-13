@@ -483,47 +483,4 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 	}
 }
 
-void
-ipc_cond_create(struct ipc_cond *c)
-{
-	rlist_create(&c->waiters);
-}
 
-void
-ipc_cond_destroy(struct ipc_cond *c)
-{
-	(void)c;
-	assert(rlist_empty(&c->waiters));
-}
-
-void
-ipc_cond_signal(struct ipc_cond *e)
-{
-	if (! rlist_empty(&e->waiters)) {
-		struct fiber *f;
-		f = rlist_shift_entry(&e->waiters, struct fiber, state);
-		fiber_wakeup(f);
-	}
-}
-
-void
-ipc_cond_broadcast(struct ipc_cond *e)
-{
-	while (! rlist_empty(&e->waiters)) {
-		struct fiber *f;
-		f = rlist_shift_entry(&e->waiters, struct fiber, state);
-		fiber_wakeup(f);
-	}
-}
-
-int
-ipc_cond_wait_timeout(struct ipc_cond *c, ev_tstamp timeout)
-{
-	struct fiber *f = fiber();
-	rlist_add_tail_entry(&c->waiters, f, state);
-	if (fiber_yield_timeout(timeout)) {
-		diag_set(TimedOut);
-		return -1;
-	}
-	return 0;
-}

@@ -33,9 +33,10 @@
 #include <small/ibuf.h>
 #include <small/region.h>
 #include <small/mempool.h>
+#include <tarantool_ev.h>
 
 #include "diag.h"
-#include "ipc.h"
+#include "fiber_cond.h"
 
 /** {{{ Environment */
 

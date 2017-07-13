@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "ipc.h"
+#include "fiber_cond.h"
 #include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
