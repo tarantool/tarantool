@@ -1,4 +1,5 @@
 add_subdirectory(dist)
+add_subdirectory(luarocks)
 
 if (TARGET_OS_DARWIN)
 	# NOTE: need add execution 'plutil -lint org.tarantool.tarantool.plist

@@ -27,3 +27,7 @@
 	path = third_party/zstd
 	url = https://github.com/tarantool/zstd.git
 	ignore = dirty
+[submodule "third_party/luarocks"]
+	path = third_party/luarocks
+	url = https://github.com/tarantool/luarocks.git
+	branch = tarantool-1.7
