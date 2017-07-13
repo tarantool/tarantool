@@ -84,6 +84,14 @@ box.info.vinyl().memory.used
 ---
 - 0
 ...
+_ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
+---
+- error: Failed to allocate 5242924 bytes in lsregion_alloc for mem_stmt
+...
+box.info.vinyl().memory.used
+---
+- 0
+...
 space:drop()
 ---
 ...

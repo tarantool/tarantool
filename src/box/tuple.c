@@ -33,6 +33,13 @@
 #include "trivia/util.h"
 #include "fiber.h"
 #include "tt_uuid.h"
+#include "small/quota.h"
+
+enum {
+	/** Lowest allowed slab_alloc_maximal. */
+	TUPLE_MAX_SIZE_MIN = 16 * 1024,
+	SLAB_SIZE_MIN = 1024 * 1024,
+};
 
 static struct mempool tuple_iterator_pool;
 
@@ -315,6 +322,43 @@ tuple_init(void)
 		       sizeof(struct tuple_iterator));
 
 	box_tuple_last = NULL;
+}
+
+void
+tuple_arena_create(struct slab_arena *arena, struct quota *quota,
+		   uint64_t arena_max_size, uint32_t tuple_max_size,
+		   const char *arena_name)
+{
+	if (tuple_max_size < TUPLE_MAX_SIZE_MIN)
+		tuple_max_size = TUPLE_MAX_SIZE_MIN;
+
+	/* Calculate slab size for tuple arena. */
+	size_t slab_size = small_round(tuple_max_size * 4);
+	if (slab_size < SLAB_SIZE_MIN)
+		slab_size = SLAB_SIZE_MIN;
+
+	/*
+	 * Ensure that quota is a multiple of slab_size, to
+	 * have accurate value of quota_used_ratio.
+	 */
+	size_t prealloc = small_align(arena_max_size, slab_size);
+	/** Preallocate entire quota. */
+	quota_init(quota, prealloc);
+
+	say_info("mapping %zu bytes for %s tuple arena...", prealloc,
+		 arena_name);
+
+	if (slab_arena_create(arena, quota, prealloc, slab_size,
+			      MAP_PRIVATE) != 0) {
+		if (errno == ENOMEM) {
+			panic("failed to preallocate %zu bytes: Cannot "\
+			      "allocate memory, check option '%s_memory' in box.cfg(..)", prealloc,
+			      arena_name);
+		} else {
+			panic_syserror("failed to preallocate %zu bytes for %s"\
+				       " tuple arena", prealloc, arena_name);
+		}
+	}
 }
 
 void
