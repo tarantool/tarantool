@@ -42,6 +42,9 @@
 #include "tuple.h"
 #include "tuple_compare.h"
 #include "iproto_constants.h"
+#include "small/lsregion.h"
+#include "small/slab_arena.h"
+#include "small/quota.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -62,7 +65,29 @@ static_assert(VY_UPSERT_THRESHOLD <= UINT8_MAX, "n_upserts max value");
 static_assert(VY_UPSERT_INF == VY_UPSERT_THRESHOLD + 1,
 	      "inf must be threshold + 1");
 
+/** Vinyl statement vtable. */
 extern struct tuple_format_vtab vy_tuple_format_vtab;
+
+/** Vinyl statement environment. */
+struct vy_stmt_env {
+	struct lsregion allocator;
+	struct slab_arena arena;
+	struct quota quota;
+};
+
+/**
+ * Initialize vinyl statement environment.
+ * @param env[out] Vinyl statement environment.
+ * @param arena_max_size Memory limit for vinyl statement arena.
+ * @param tuple_max_size Memory limit for a single vinyl
+ *        statement.
+ */
+void
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
+		   uint32_t tuple_max_size);
+
+void
+vy_stmt_env_destroy(struct vy_stmt_env *env);
 
 /**
  * There are two groups of statements:

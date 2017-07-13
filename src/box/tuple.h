@@ -63,6 +63,9 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 		   uint64_t arena_max_size, uint32_t tuple_max_size,
 		   const char *arena_name);
 
+void
+tuple_arena_destroy(struct slab_arena *arena);
+
 /** Cleanup tuple library */
 void
 tuple_free(void);

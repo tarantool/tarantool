@@ -60,6 +60,8 @@ cfg_filter(box.cfg)
     - 134217728
   - - vinyl_dir
     - <hidden>
+  - - vinyl_max_tuple_size
+    - 1048576
   - - vinyl_memory
     - 134217728
   - - vinyl_page_size
@@ -137,6 +139,8 @@ cfg_filter(box.cfg)
     - 134217728
   - - vinyl_dir
     - <hidden>
+  - - vinyl_max_tuple_size
+    - 1048576
   - - vinyl_memory
     - 134217728
   - - vinyl_page_size

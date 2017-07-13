@@ -38,7 +38,6 @@
 
 #include "diag.h"
 #include <small/region.h>
-#include "small/lsregion.h"
 
 #include "error.h"
 #include "tuple_format.h"
@@ -48,6 +47,22 @@
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_delete,
 };
+
+void
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
+		   uint32_t tuple_max_size)
+{
+	tuple_arena_create(&env->arena, &env->quota, arena_max_size,
+			   tuple_max_size, "vinyl");
+	lsregion_create(&env->allocator, &env->arena);
+}
+
+void
+vy_stmt_env_destroy(struct vy_stmt_env *env)
+{
+	lsregion_destroy(&env->allocator);
+	tuple_arena_destroy(&env->arena);
+}
 
 void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)

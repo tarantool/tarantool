@@ -647,9 +647,9 @@ s = box.schema.space.create('vinyl', { engine = 'vinyl' })
 i = box.space.vinyl:create_index('primary')
 ---
 ...
-s:replace({1, string.rep('x', 10 * 1024 * 1024)})
+_ = s:replace({1, string.rep('x', 35 * 1024 * 1024)})
 ---
-- error: Failed to allocate 10485799 bytes in lsregion_alloc for mem_stmt
+- error: Failed to allocate 36700199 bytes in lsregion_alloc for mem_stmt
 ...
 s:drop()
 ---

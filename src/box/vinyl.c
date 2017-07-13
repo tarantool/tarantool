@@ -122,8 +122,6 @@ struct vy_env {
 	struct vy_squash_queue *squash_queue;
 	/** Mempool for struct vy_cursor */
 	struct mempool      cursor_pool;
-	/** Allocator for tuples */
-	struct lsregion     allocator;
 	/** Memory quota */
 	struct vy_quota     quota;
 	/** Timer for updating quota watermark. */
@@ -134,6 +132,8 @@ struct vy_env {
 	struct vy_cache_env cache_env;
 	/** Environment for run subsystem */
 	struct vy_run_env run_env;
+	/** Environment for statements subsystem. */
+	struct vy_stmt_env stmt_env;
 	/** Local recovery context. */
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
@@ -1505,7 +1505,7 @@ retry:
 		 */
 		return 0;
 	}
-	if (lsregion_used(&scheduler->env->allocator) == 0) {
+	if (lsregion_used(&scheduler->env->stmt_env.allocator) == 0) {
 		/*
 		 * Quota must be exceeded by a pending transaction,
 		 * there's nothing we can do about that.
@@ -1898,7 +1898,7 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	 * so the current dump round has been finished.
 	 * Free memory, release quota, and signal dump completion.
 	 */
-	struct lsregion *allocator = &scheduler->env->allocator;
+	struct lsregion *allocator = &scheduler->env->stmt_env.allocator;
 	struct vy_quota *quota = &scheduler->env->quota;
 	size_t mem_used_before = lsregion_used(allocator);
 	lsregion_gc(allocator, min_generation - 1);
@@ -3666,11 +3666,11 @@ vy_prepare(struct vy_env *env, struct vy_tx *tx)
 		return -1;
 	}
 
-	size_t mem_used_before = lsregion_used(&env->allocator);
+	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
 
 	int rc = vy_tx_prepare(tx);
 
-	size_t mem_used_after = lsregion_used(&env->allocator);
+	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t write_size = mem_used_after - mem_used_before;
 	/*
@@ -3707,11 +3707,11 @@ vy_commit(struct vy_env *env, struct vy_tx *tx, int64_t lsn)
 	 * it silently fails. But if it succeeds, we
 	 * need to account the memory in the quota.
 	 */
-	size_t mem_used_before = lsregion_used(&env->allocator);
+	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
 
 	vy_tx_commit(tx, lsn);
 
-	size_t mem_used_after = lsregion_used(&env->allocator);
+	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
@@ -3821,14 +3821,16 @@ vy_env_new(void)
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
-	struct slab_cache *slab_cache = cord_slab_cache();
-	lsregion_create(&e->allocator, slab_cache->arena);
+	vy_stmt_env_create(&e->stmt_env, e->conf->memory,
+			   cfg_geti("vinyl_max_tuple_size"));
 
 	if (vy_index_env_create(&e->index_env, e->conf->path,
-				&e->allocator, &e->scheduler->generation,
-				vy_squash_schedule, e) != 0)
+				&e->stmt_env.allocator,
+				&e->scheduler->generation, vy_squash_schedule,
+				e) != 0)
 		goto error_index_env;
 
+	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->cursor_pool, slab_cache,
 	               sizeof(struct vy_cursor));
 	vy_quota_init(&e->quota, vy_scheduler_quota_exceeded_cb,
@@ -3837,13 +3839,12 @@ vy_env_new(void)
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
-	vy_cache_env_create(&e->cache_env, slab_cache,
-			    e->conf->cache);
+	vy_cache_env_create(&e->cache_env, slab_cache, e->conf->cache);
 	vy_run_env_create(&e->run_env);
 	vy_log_init(e->conf->path);
 	return e;
 error_index_env:
-	lsregion_destroy(&e->allocator);
+	vy_stmt_env_destroy(&e->stmt_env);
 	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
 	vy_scheduler_delete(e->scheduler);
@@ -3870,7 +3871,7 @@ vy_env_delete(struct vy_env *e)
 	mempool_destroy(&e->cursor_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_index_env_destroy(&e->index_env);
-	lsregion_destroy(&e->allocator);
+	vy_stmt_env_destroy(&e->stmt_env);
 	vy_cache_env_destroy(&e->cache_env);
 	if (e->recovery != NULL)
 		vy_recovery_delete(e->recovery);
@@ -4666,11 +4667,11 @@ vy_squash_process(struct vy_squash *squash)
 	 * Insert the resulting REPLACE statement to the mem
 	 * and adjust the quota.
 	 */
-	size_t mem_used_before = lsregion_used(&env->allocator);
+	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
 	const struct tuple *region_stmt = NULL;
 	rc = vy_index_set(index, mem, result, &region_stmt);
 	tuple_unref(result);
-	size_t mem_used_after = lsregion_used(&env->allocator);
+	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	if (rc == 0) {
 		/*

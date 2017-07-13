@@ -362,6 +362,12 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 }
 
 void
+tuple_arena_destroy(struct slab_arena *arena)
+{
+	slab_arena_destroy(arena);
+}
+
+void
 tuple_free(void)
 {
 	/* Unref last tuple returned by public C API */
