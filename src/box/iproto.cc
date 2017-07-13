@@ -191,12 +191,12 @@ static struct mempool iproto_connection_pool;
 static RLIST_HEAD(stopped_connections);
 
 /**
- * Returns true if we have enough spare messages
+ * Return true if we have not enough spare messages
  * in the message pool. Disconnect messages are
  * discounted: they are mostly reserved and idle.
  */
 static inline bool
-iproto_stop_input()
+iproto_must_stop_input()
 {
 	size_t connection_count = mempool_count(&iproto_connection_pool);
 	size_t request_count = mempool_count(&iproto_msg_pool);
@@ -218,7 +218,7 @@ iproto_resume()
 	 */
 	if (rlist_empty(&stopped_connections))
 		return;
-	if (iproto_stop_input())
+	if (iproto_must_stop_input())
 		return;
 
 	struct iproto_connection *con;
@@ -751,7 +751,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	 * another fiber waiting for write to complete).
 	 * Ignore iproto_connection->disconnect messages.
 	 */
-	if (iproto_stop_input()) {
+	if (iproto_must_stop_input()) {
 		iproto_connection_stop(con);
 		return;
 	}
