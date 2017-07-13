@@ -72,9 +72,7 @@ sql_init()
 	}
 
 	sqlite3_mutex_enter(db->mutex);
-	db->init.busy = 1;
-	rc = sqlite3InitOne(db, 0, &zErrMsg);
-	db->init.busy = 0;
+	rc = sqlite3Init(db, &zErrMsg);
 	sqlite3_mutex_leave(db->mutex);
 	if (rc != SQLITE_OK) {
 		panic(zErrMsg);
