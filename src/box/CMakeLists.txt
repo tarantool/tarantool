@@ -58,6 +58,7 @@ add_library(box STATIC
     vy_index.c
     vy_tx.c
     vy_write_iterator.c
+    vy_read_iterator.c
     vy_cache.c
     vy_log.c
     vy_upsert.c
