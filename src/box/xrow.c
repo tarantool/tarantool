@@ -339,35 +339,40 @@ struct PACKED iproto_key_bin {
 /**
  * Write the key to the buffer by the specified savepoint.
  * @param buf Output buffer.
- * @param svp Savepoint to write to.
  * @param type Value type (MP_ARRAY32=0xdd, MP_MAP32=0xdf, ...).
  * @param size Value size (array or map length).
  * @param key Key value (IPROTO_DATA/DESCRIPTION/SQL_INFO).
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
  */
-static inline void
-iproto_reply_key(struct obuf *buf, struct obuf_svp *svp, uint8_t type,
-		 uint32_t size, uint8_t key)
+static inline int
+iproto_reply_key(struct obuf *buf, uint8_t type, uint32_t size, uint8_t key)
 {
-	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
+	char *pos = (char *) obuf_alloc(buf, IPROTO_KEY_HEADER_LEN);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, IPROTO_KEY_HEADER_LEN, "obuf_alloc",
+			 "pos");
+		return -1;
+	}
 	struct iproto_key_bin bin;
 	bin.key = key;
 	bin.mp_type = type;
 	bin.mp_len = mp_bswap_u32(size);
 	memcpy(pos, &bin, sizeof(bin));
+	return 0;
 }
 
-void
-iproto_reply_array_key(struct obuf *buf, struct obuf_svp *svp,
-		       uint32_t size, uint8_t key)
+int
+iproto_reply_array_key(struct obuf *buf, uint32_t size, uint8_t key)
 {
-	iproto_reply_key(buf, svp, 0xdd, size, key);
+	return iproto_reply_key(buf, 0xdd, size, key);
 }
 
-void
-iproto_reply_map_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
-		     uint8_t key)
+int
+iproto_reply_map_key(struct obuf *buf, uint32_t size, uint8_t key)
 {
-	iproto_reply_key(buf, svp, 0xdf, size, key);
+	return iproto_reply_key(buf, 0xdf, size, key);
 }
 
 void

@@ -40,6 +40,8 @@
 #include "sql.h"
 #include "xrow.h"
 #include "schema.h"
+#include "port.h"
+#include "memtx_tuple.h"
 
 const char *sql_type_strs[] = {
 	NULL,
@@ -361,21 +363,25 @@ oom:
 }
 
 /**
- * Encode sqlite3 row into an obuf using MessagePack.
+ * Convert sqlite3 row into a tuple and append to a port.
  * @param stmt Started prepared statement. At least one
  *        sqlite3_step must be done.
  * @param column_count Statement's column count.
- * @param out Out buffer.
+ * @param buf Temporary buffer for tuples construction.
+ * @param port Port to store tuples.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static inline int
-sql_row_to_obuf(struct sqlite3_stmt *stmt, int column_count, struct obuf *out)
+sql_row_to_port(struct sqlite3_stmt *stmt, int column_count, struct obuf *buf,
+		struct port *port)
 {
 	assert(column_count > 0);
 	size_t size = mp_sizeof_array(column_count);
-	char *pos = (char *) obuf_alloc(out, size);
+	/* Use obuf as a temporary storage for a raw tuple. */
+	struct obuf_svp svp = obuf_create_svp(buf);
+	char *pos = (char *) obuf_alloc(buf, size);
 	if (pos == NULL) {
 		diag_set(OutOfMemory, size, "obuf_alloc", "SQL row");
 		return -1;
@@ -383,10 +389,18 @@ sql_row_to_obuf(struct sqlite3_stmt *stmt, int column_count, struct obuf *out)
 	mp_encode_array(pos, column_count);
 
 	for (int i = 0; i < column_count; ++i) {
-		if (sql_column_to_obuf(stmt, i, out))
+		if (sql_column_to_obuf(stmt, i, buf) != 0) {
+			obuf_rollback_to_svp(buf, &svp);
 			return -1;
+		}
 	}
-	return 0;
+	size = obuf_size(buf) - svp.used;
+	struct tuple *tuple =
+		memtx_tuple_new(tuple_format_default, pos, pos + size);
+	obuf_rollback_to_svp(buf, &svp);
+	if (tuple == NULL)
+		return -1;
+	return port_add_tuple(port, tuple);
 }
 
 /**
@@ -490,8 +504,7 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		    int column_count)
 {
 	assert(column_count > 0);
-	struct obuf_svp sql_svp;
-	if (iproto_prepare_key(out, &sql_svp) != 0)
+	if (iproto_reply_array_key(out, column_count, IPROTO_METADATA) != 0)
 		return -1;
 
 	for (int i = 0; i < column_count; ++i) {
@@ -514,7 +527,6 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		pos = mp_encode_uint(pos, IPROTO_FIELD_NAME);
 		pos = mp_encode_str(pos, name, strlen(name));
 	}
-	iproto_reply_array_key(out, &sql_svp, column_count, IPROTO_METADATA);
 	return 0;
 }
 
@@ -525,69 +537,84 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
  * @param db SQLite engine.
  * @param stmt Prepared statement.
  * @param out Out buffer.
- * @param column_count Statement's column count.
+ * @param sync IProto request sync.
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
-	    int column_count)
+sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
+		       uint64_t sync)
 {
-	struct obuf_svp data_svp;
-	if (iproto_prepare_key(out, &data_svp) != 0)
-		return -1;
-	int rc, rows = 0;
-	char *buf;
-	/* Execute request. */
+	/*
+	 * Execute request.
+	 */
+	int rc;
+	struct port port;
+	port_create(&port);
+	int column_count = sqlite3_column_count(stmt);
 	if (column_count > 0) {
 		/* Either ROW or DONE or ERROR. */
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-			++rows;
-			if (sql_row_to_obuf(stmt, column_count, out) != 0)
-				return -1;
+			if (sql_row_to_port(stmt, column_count, out,
+					    &port) != 0)
+				goto err_execute;
 		}
-		assert(rc != SQLITE_OK);
+		assert(rc == SQLITE_DONE || rc != SQLITE_OK);
 	} else {
-		/*
-		 * Prealloc SQL info map. Nothing can fail after
-		 * successfull execution. Use the biggest possible
-		 * size.
-		 */
-		int size = mp_sizeof_uint(IPROTO_SQL_ROW_COUNT) +
-			   mp_sizeof_uint(UINT32_MAX);
-		buf = obuf_reserve(out, size);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
-			return -1;
-		}
 		/* No rows. Either DONE or ERROR. */
 		rc = sqlite3_step(stmt);
 		assert(rc != SQLITE_ROW && rc != SQLITE_OK);
 	}
 	if (rc != SQLITE_DONE) {
 		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
-		return -1;
+		goto err_execute;
 	}
 
 	/*
-	 * Write to the out buffer either result rows, or info.
+	 * Encode response.
 	 */
+	struct obuf_svp header_svp;
+	/* Prepare memory for the iproto header. */
+	if (iproto_prepare_header(out, &header_svp, IPROTO_SQL_HEADER_LEN) != 0)
+		goto err_execute;
+	int keys;
 	if (column_count > 0) {
-		iproto_reply_array_key(out, &data_svp, rows, IPROTO_DATA);
+		if (sql_get_description(stmt, out, column_count) != 0)
+			goto err_body;
+		keys = 2;
+		if (iproto_reply_array_key(out, port.size, IPROTO_DATA) != 0)
+			goto err_body;
+		if (port_dump(&port, out) != 0) {
+			/* Failed port dump destroyes the port. */
+			port_create(&port);
+			goto err_body;
+		}
 	} else {
-		rows = sqlite3_changes(db);
-		/* Calculate actual size. */
+		keys = 1;
+		assert(port.size == 0);
+		if (iproto_reply_map_key(out, 1, IPROTO_SQL_INFO) != 0)
+			goto err_body;
+		int changes = sqlite3_changes(db);
 		int size = mp_sizeof_uint(IPROTO_SQL_ROW_COUNT) +
-			   mp_sizeof_uint(rows);
-		buf = obuf_alloc(out, size);
-		/* Memory is reserved above. */
-		assert(buf != NULL);
+			   mp_sizeof_uint(changes);
+		char *buf = obuf_alloc(out, size);
+		if (buf == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
+			goto err_body;
+		}
 		buf = mp_encode_uint(buf, IPROTO_SQL_ROW_COUNT);
-		buf = mp_encode_uint(buf, rows);
-		iproto_reply_map_key(out, &data_svp, 1, IPROTO_SQL_INFO);
+		buf = mp_encode_uint(buf, changes);
 	}
+	/* Port already is destroyed during dump. */
+	iproto_reply_sql(out, &header_svp, sync, schema_version, keys);
 	return 0;
+
+err_body:
+	obuf_rollback_to_svp(out, &header_svp);
+err_execute:
+	port_destroy(&port);
+	return -1;
 }
 
 int
@@ -602,7 +629,6 @@ sql_prepare_and_execute(const struct sql_request *request, struct obuf *out)
 		diag_set(ClientError, ER_LOADING);
 		return -1;
 	}
-
 	if (sqlite3_prepare_v2(db, sql, len, &stmt, NULL) != SQLITE_OK) {
 		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
 		return -1;
@@ -610,34 +636,10 @@ sql_prepare_and_execute(const struct sql_request *request, struct obuf *out)
 	assert(stmt != NULL);
 	if (sql_bind(request, stmt) != 0)
 		goto err_stmt;
-
-	/* Prepare memory for the iproto header. */
-	struct obuf_svp header_svp;
-	if (iproto_prepare_header(out, &header_svp,
-				  IPROTO_SQL_HEADER_LEN) != 0)
+	if (sql_execute_and_encode(db, stmt, out, request->sync) != 0)
 		goto err_stmt;
-	int column_count = sqlite3_column_count(stmt);
-	int keys = 1;
-
-	/*
-	 * If the column count is zero, there is nothing to
-	 * describe.
-	 */
-	if (column_count > 0) {
-		keys++;
-		if (sql_get_description(stmt, out, column_count) != 0)
-			goto err_svp;
-	}
-
-	if (sql_execute(db, stmt, out, column_count) != 0)
-		goto err_svp;
-
-	iproto_reply_sql(out, &header_svp, request->sync, schema_version, keys);
-
 	sqlite3_finalize(stmt);
 	return 0;
-err_svp:
-	obuf_rollback_to_svp(out, &header_svp);
 err_stmt:
 	sqlite3_finalize(stmt);
 	return -1;

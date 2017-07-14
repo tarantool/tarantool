@@ -326,20 +326,6 @@ int
 iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size);
 
 /**
- * Reserve obuf space for one body key.
- * @param buf Buffer to reserve.
- * @param[out] svp Savepoint to the beginning of the key.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-static inline int
-iproto_prepare_key(struct obuf *buf, struct obuf_svp *svp)
-{
-	return iproto_prepare_header(buf, svp, IPROTO_KEY_HEADER_LEN);
-}
-
-/**
  * Prepare the iproto header for a select result set.
  * @param buf Out buffer.
  * @param svp Savepoint of the header beginning.
@@ -364,19 +350,16 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 /**
  * Write header of the key to a preallocated buffer by svp.
  * @param buf Buffer to write to.
- * @param svp Savepoint by which write.
  * @param size Size of the key (length of the array or of the
  *        string).
  * @param key Body key.
  */
-void
-iproto_reply_array_key(struct obuf *buf, struct obuf_svp *svp,
-		       uint32_t size, uint8_t key);
+int
+iproto_reply_array_key(struct obuf *buf, uint32_t size, uint8_t key);
 
 /** @copydoc iproto_reply_body_array_key. */
-void
-iproto_reply_map_key(struct obuf *buf, struct obuf_svp *svp, uint32_t size,
-		     uint8_t key);
+int
+iproto_reply_map_key(struct obuf *buf, uint32_t size, uint8_t key);
 
 /*
  * Encode iproto header with IPROTO_OK response code.
