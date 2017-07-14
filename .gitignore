@@ -34,6 +34,7 @@ doc/Makefile
 doc/*/Makefile
 extra/Makefile
 extra/*/Makefile
+extra/luarocks/site_config.lua
 test/Makefile
 test/*/Makefile
 Doxyfile.API
