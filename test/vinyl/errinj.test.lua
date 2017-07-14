@@ -353,3 +353,15 @@ errinj.set('ERRINJ_WAL_IO', false)
 _ = s:create_index('pk')
 box.snapshot()
 s:drop()
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+
+c = 10
+errinj.set("ERRINJ_WAL_WRITE_DISK", true)
+for i = 1,10 do fiber.create(function() pcall(s.replace, s, {i}) c = c - 1 end) end
+while c ~= 0 do fiber.sleep(0.001) end
+s:select{}
+errinj.set("ERRINJ_WAL_WRITE_DISK", false)
+
+s:drop()

@@ -220,6 +220,11 @@ struct vy_index {
 	 */
 	int64_t dump_lsn;
 	/**
+	 * This flag is set if the index creation was
+	 * committed to the metadata log.
+	 */
+	bool is_committed;
+	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index
 	 * will be dropped when WAL is replayed.
@@ -315,9 +320,16 @@ vy_index_unref(struct vy_index *index)
 void
 vy_index_swap(struct vy_index *old_index, struct vy_index *new_index);
 
+/** Initialize the range tree of a new index. */
+int
+vy_index_init_range_tree(struct vy_index *index);
+
 /**
- * Make the data directory and initialize the range tree
- * for a new index.
+ * Create a new vinyl index.
+ *
+ * This function is called when an index is created after recovery
+ * is complete or during remote recovery. It initializes the range
+ * tree and makes the index directory.
  */
 int
 vy_index_create(struct vy_index *index);

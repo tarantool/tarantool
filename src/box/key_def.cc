@@ -524,7 +524,7 @@ key_def_encode_parts(char *data, const struct key_def *key_def)
 int
 key_def_decode_parts(struct key_def *key_def, const char **data)
 {
-	char buf[BOX_NAME_MAX];
+	char buf[FIELD_TYPE_NAME_MAX];
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (mp_typeof(**data) != MP_ARRAY) {
 			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
@@ -572,7 +572,7 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 int
 key_def_decode_parts_165(struct key_def *key_def, const char **data)
 {
-	char buf[BOX_NAME_MAX];
+	char buf[FIELD_TYPE_NAME_MAX];
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		uint32_t field_no = (uint32_t) mp_decode_uint(data);
 		uint32_t len;

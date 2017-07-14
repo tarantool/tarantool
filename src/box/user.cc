@@ -442,10 +442,7 @@ user_find_by_name(const char *name, uint32_t len)
 	uint32_t uid = schema_find_id(BOX_USER_ID, 2, name, len);
 	struct user *user = user_by_id(uid);
 	if (user == NULL || user->def->type != SC_USER) {
-		char name_buf[BOX_NAME_MAX + 1];
-		/* \0 - to correctly print user name the error message. */
-		snprintf(name_buf, sizeof(name_buf), "%.*s", len, name);
-		diag_set(ClientError, ER_NO_SUCH_USER, name_buf);
+		diag_set(ClientError, ER_NO_SUCH_USER, tt_cstr(name, len));
 		return NULL;
 	}
 	return user;

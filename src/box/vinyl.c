@@ -2500,12 +2500,13 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (vy_recovery_lookup_index(env->recovery,
-					     index->opts.lsn) != NULL) {
+		if (index->is_committed) {
 			vy_scheduler_add_index(env->scheduler, index);
 			return;
 		}
 	}
+
+	index->is_committed = true;
 
 	assert(index->range_count == 1);
 	struct vy_range *range = vy_range_tree_first(index->tree);
@@ -2634,7 +2635,7 @@ vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
 			continue;
 		}
 
-		if (vy_index_create(new_index) != 0)
+		if (vy_index_init_range_tree(new_index) != 0)
 			return -1;
 
 		new_index->truncate_count = new_space->truncate_count;
@@ -5795,7 +5796,7 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	recovery = vy_recovery_new(vclock_sum(vclock), true);
 	if (recovery == NULL)
 		goto out_join_cord;
-	rc = vy_recovery_iterate(recovery, false, vy_join_cb, ctx);
+	rc = vy_recovery_iterate(recovery, vy_join_cb, ctx);
 	vy_recovery_delete(recovery);
 	/* Send the last range. */
 	if (rc == 0)
@@ -5922,7 +5923,7 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 		.gc_mask = gc_mask,
 		.gc_lsn = gc_lsn,
 	};
-	vy_recovery_iterate(recovery, true, vy_gc_cb, &arg);
+	vy_recovery_iterate(recovery, vy_gc_cb, &arg);
 }
 
 void
@@ -5976,7 +5977,7 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 		arg->index_id = record->index_id;
 	}
 
-	if (record->type != VY_LOG_CREATE_RUN)
+	if (record->type != VY_LOG_CREATE_RUN || record->is_dropped)
 		goto out;
 
 	char path[PATH_MAX];
@@ -6014,7 +6015,7 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 		.cb = cb,
 		.cb_arg = cb_arg,
 	};
-	int rc = vy_recovery_iterate(recovery, false, vy_backup_cb, &arg);
+	int rc = vy_recovery_iterate(recovery, vy_backup_cb, &arg);
 	vy_recovery_delete(recovery);
 	return rc;
 }

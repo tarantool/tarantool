@@ -50,8 +50,11 @@ enum {
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_FUNCTION_MAX = 32000,
 	BOX_INDEX_MAX = 128,
-	BOX_NAME_MAX = 64,
+	BOX_NAME_MAX = 65000,
+	BOX_INVALID_NAME_MAX = 64,
 	ENGINE_NAME_MAX = 16,
+	FIELD_TYPE_NAME_MAX = 16,
+	GRANT_NAME_MAX = 16,
 	BOX_FIELD_MAX = INT32_MAX,
 	BOX_USER_MAX = 32,
 	/**
@@ -64,6 +67,8 @@ enum {
 	 */
 	BOX_INDEX_PART_MAX = UINT8_MAX
 };
+static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
+	      "invalid name max is less than name max");
 
 /*
  * Different objects which can be subject to access

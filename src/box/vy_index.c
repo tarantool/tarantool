@@ -304,9 +304,20 @@ vy_index_swap(struct vy_index *old_index, struct vy_index *new_index)
 	rlist_swap(&old_index->runs, &new_index->runs);
 }
 
-/**
- * Create an index directory for a new index.
- */
+int
+vy_index_init_range_tree(struct vy_index *index)
+{
+	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
+					      index->key_def);
+	if (range == NULL)
+		return -1;
+
+	assert(index->range_count == 0);
+	vy_index_add_range(index, range);
+	vy_index_acct_range(index, range);
+	return 0;
+}
+
 int
 vy_index_create(struct vy_index *index)
 {
@@ -341,15 +352,7 @@ vy_index_create(struct vy_index *index)
 	}
 
 	/* Allocate initial range. */
-	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
-					      index->key_def);
-	if (unlikely(range == NULL))
-		return -1;
-
-	assert(index->range_count == 0);
-	vy_index_add_range(index, range);
-	vy_index_acct_range(index, range);
-	return 0;
+	return vy_index_init_range_tree(index);
 }
 
 /** vy_index_recovery_cb() argument. */
@@ -366,7 +369,7 @@ struct vy_index_recovery_cb_arg {
 	struct mh_i64ptr_t *run_hash;
 };
 
-/** Index recovery callback, passed to vy_recovery_iterate_index(). */
+/** Index recovery callback, passed to vy_recovery_load_index(). */
 static int
 vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 {
@@ -379,6 +382,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_run *run;
 	struct vy_slice *slice;
 	bool success = false;
+
+	assert(record->type == VY_LOG_CREATE_INDEX || index->is_committed);
 
 	if (record->type == VY_LOG_INSERT_RANGE ||
 	    record->type == VY_LOG_INSERT_SLICE) {
@@ -397,6 +402,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
 		assert(record->index_lsn == index->opts.lsn);
+		index->is_committed = true;
 		break;
 	case VY_LOG_DUMP_INDEX:
 		assert(record->index_lsn == index->opts.lsn);
@@ -410,7 +416,11 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(record->index_lsn == index->opts.lsn);
 		index->is_dropped = true;
 		break;
+	case VY_LOG_PREPARE_RUN:
+		break;
 	case VY_LOG_CREATE_RUN:
+		if (record->is_dropped)
+			break;
 		assert(record->index_lsn == index->opts.lsn);
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
@@ -429,6 +439,8 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			vy_run_unref(run);
 			goto out;
 		}
+		break;
+	case VY_LOG_DROP_RUN:
 		break;
 	case VY_LOG_INSERT_RANGE:
 		assert(record->index_lsn == index->opts.lsn);
@@ -478,18 +490,6 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 {
 	assert(index->range_count == 0);
 
-	struct vy_index_recovery_info *ri;
-	ri = vy_recovery_lookup_index(recovery, index->opts.lsn);
-	if (ri == NULL) {
-		if (!allow_missing) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Index %lld not found",
-					    (long long)index->opts.lsn));
-			return -1;
-		}
-		return vy_index_create(index);
-	}
-
 	struct vy_index_recovery_cb_arg arg = { .index = index };
 	arg.run_hash = mh_i64ptr_new();
 	if (arg.run_hash == NULL) {
@@ -497,27 +497,53 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		return -1;
 	}
 
-	int rc = vy_recovery_iterate_index(ri, false,
-			vy_index_recovery_cb, &arg);
+	int rc = vy_recovery_load_index(recovery, index->opts.lsn,
+					vy_index_recovery_cb, &arg);
 
 	mh_int_t k;
 	mh_foreach(arg.run_hash, k) {
 		struct vy_run *run = mh_i64ptr_node(arg.run_hash, k)->val;
-		if (run->refs == 1) {
+		if (run->refs > 1)
+			vy_index_add_run(index, run);
+		if (run->refs == 1 && rc == 0) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Unused run %lld in index %lld",
 					    (long long)run->id,
 					    (long long)index->opts.lsn));
 			rc = -1;
-		} else
-			vy_index_add_run(index, run);
+			/*
+			 * Continue the loop to unreference
+			 * all runs in the hash.
+			 */
+		}
 		/* Drop the reference held by the hash. */
 		vy_run_unref(run);
 	}
 	mh_i64ptr_delete(arg.run_hash);
 
-	if (rc != 0)
+	if (rc != 0) {
+		/* Recovery callback failed. */
 		return -1;
+	}
+
+	if (!index->is_committed) {
+		/* Index was not found in the metadata log. */
+		if (!allow_missing) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Index %lld not found",
+					    (long long)index->opts.lsn));
+			return -1;
+		}
+		return vy_index_init_range_tree(index);
+	}
+
+	if (index->is_dropped) {
+		/*
+		 * Initial range is not stored in the metadata log
+		 * for dropped indexes, but we need it for recovery.
+		 */
+		return vy_index_init_range_tree(index);
+	}
 
 	/*
 	 * Account ranges to the index and check that the range tree
@@ -665,9 +691,8 @@ int
 vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	     const struct tuple *stmt, const struct tuple **region_stmt)
 {
-	assert(!vy_stmt_is_region_allocated(stmt));
-	assert(*region_stmt == NULL ||
-	       vy_stmt_is_region_allocated(*region_stmt));
+	assert(vy_stmt_is_refable(stmt));
+	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
 
 	/* Allocate region_stmt on demand. */
 	if (*region_stmt == NULL) {

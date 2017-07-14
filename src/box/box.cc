@@ -667,49 +667,58 @@ box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 uint32_t
 box_space_id_by_name(const char *name, uint32_t len)
 {
-	char buf[1 + 5 + BOX_NAME_MAX + 5];
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
-
-	char *p = buf;
-	p = mp_encode_array(p, 1);
-	p = mp_encode_str(p, name, len);
-	assert(p < buf + sizeof(buf));
+	uint32_t size = mp_sizeof_array(1) + mp_sizeof_str(len);
+	struct region *region = &fiber()->gc;
+	uint32_t used = region_used(region);
+	char *begin = (char *) region_alloc(region, size);
+	if (begin == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "begin");
+		return BOX_ID_NIL;
+	}
+	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
+	char *end = mp_encode_array(begin, 1);
+	end = mp_encode_str(end, name, len);
 
 	/* NOTE: error and missing key cases are indistinguishable */
 	box_tuple_t *tuple;
-	if (box_index_get(BOX_VSPACE_ID, 2, buf, p, &tuple) != 0)
+	if (box_index_get(BOX_VSPACE_ID, 2, begin, end, &tuple) != 0)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	uint32_t result;
-	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &result) != 0)
-		return BOX_ID_NIL;
+	uint32_t result = BOX_ID_NIL;
+	(void) tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &result);
 	return result;
 }
 
 uint32_t
 box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 {
-	char buf[1 + 5 + BOX_NAME_MAX + 5];
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
-
-	char *p = buf;
-	p = mp_encode_array(p, 2);
-	p = mp_encode_uint(p, space_id);
-	p = mp_encode_str(p, name, len);
-	assert(p < buf + sizeof(buf));
+	uint32_t size = mp_sizeof_array(2) + mp_sizeof_uint(space_id) +
+			mp_sizeof_str(len);
+	struct region *region = &fiber()->gc;
+	uint32_t used = region_used(region);
+	char *begin = (char *) region_alloc(region, size);
+	if (begin == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "begin");
+		return BOX_ID_NIL;
+	}
+	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
+	char *end = mp_encode_array(begin, 2);
+	end = mp_encode_uint(end, space_id);
+	end = mp_encode_str(end, name, len);
 
 	/* NOTE: error and missing key cases are indistinguishable */
 	box_tuple_t *tuple;
-	if (box_index_get(BOX_VINDEX_ID, 2, buf, p, &tuple) != 0)
+	if (box_index_get(BOX_VINDEX_ID, 2, begin, end, &tuple) != 0)
 		return BOX_ID_NIL;
 	if (tuple == NULL)
 		return BOX_ID_NIL;
-	uint32_t result;
-	if (tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, &result) != 0)
-		return BOX_ID_NIL;
+	uint32_t result = BOX_ID_NIL;
+	(void) tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, &result);
 	return result;
 }
 /** \endcond public */
@@ -932,11 +941,10 @@ access_check_func(const char *name, uint32_t name_len)
 	if (func == NULL || (func->def->uid != credentials->uid &&
 	     access & ~func->access[credentials->auth_token].effective)) {
 		/* Access violation, report error. */
-		char name_buf[BOX_NAME_MAX + 1];
-		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
 		struct user *user = user_find_xc(credentials->uid);
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->def->name, name_buf);
+			  priv_name(access), user->def->name,
+			  tt_cstr(name, name_len));
 	}
 
 	return func;

@@ -40,16 +40,16 @@ box.schema.space.create('tweedledee', { id = 3000 })
 box.schema.space.create('tweedledee', { id = 'tweedledee' })
 s:drop()
 -- too long space name
-box.schema.space.create(string.rep('tweedledee', 100))
+box.schema.space.create(string.rep('t', box.schema.NAME_MAX + 1))
 -- too long space engine name
 box.schema.space.create('tweedleedee', { engine = string.rep('too-long', 100) })
 -- space name limit
 box.schema.space.create(string.rep('t', box.schema.NAME_MAX)..'_')
 s = box.schema.space.create(string.rep('t', box.schema.NAME_MAX - 1)..'_')
-s.name
+s.name:len()
 s:drop()
 s = box.schema.space.create(string.rep('t', box.schema.NAME_MAX - 2)..'_')
-s.name
+s.name:len()
 s:drop()
 -- space with no indexes - test update, delete, select, truncate
 s = box.schema.space.create('tweedledum')
@@ -226,9 +226,9 @@ s.index.new.name
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
 s.index[0].name
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 1)..'_')
-s.index[0].name
+s.index[0].name:len()
 s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 2)..'_')
-s.index[0].name
+s.index[0].name:len()
 s.index[0]:rename('primary')
 s.index.primary.name
 -- cleanup

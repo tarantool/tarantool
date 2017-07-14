@@ -2098,12 +2098,11 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		}
 		*offset = page->unpacked_size;
 
-		if (last_stmt != NULL &&
-		    !vy_stmt_is_region_allocated(last_stmt))
+		if (last_stmt != NULL && vy_stmt_is_refable(last_stmt))
 			tuple_unref(last_stmt);
 
 		last_stmt = *curr_stmt;
-		if (!vy_stmt_is_region_allocated(last_stmt))
+		if (vy_stmt_is_refable(last_stmt))
 			tuple_ref(last_stmt);
 
 		if (vy_run_dump_stmt(*curr_stmt, data_xlog, page,
@@ -2144,7 +2143,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 			goto error_rollback;
 	}
 
-	if (!vy_stmt_is_region_allocated(last_stmt))
+	if (vy_stmt_is_refable(last_stmt))
 		tuple_unref(last_stmt);
 
 	/* Save offset to row index  */
@@ -2181,8 +2180,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 
 error_rollback:
 	xlog_tx_rollback(data_xlog);
-	if (last_stmt != NULL &&
-	    !vy_stmt_is_region_allocated(last_stmt))
+	if (last_stmt != NULL && vy_stmt_is_refable(last_stmt))
 		tuple_unref(last_stmt);
 error_row_index:
 	ibuf_destroy(&row_index_buf);
