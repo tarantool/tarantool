@@ -80,6 +80,9 @@ endif ()
 add_executable(fiber_stress.test fiber_stress.cc)
 target_link_libraries(fiber_stress.test core)
 
+add_executable(fiber_cond.test fiber_cond.c unit.c)
+target_link_libraries(fiber_cond.test core)
+
 add_executable(fiber_channel.test fiber_channel.cc unit.c)
 target_link_libraries(fiber_channel.test core)
 

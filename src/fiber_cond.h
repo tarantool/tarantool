@@ -37,40 +37,96 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
+/**
+ * Conditional variable for cooperative multitasking (fibers).
+ *
+ * A cond (short for "condition variable") is a synchronization primitive
+ * that allow fibers to yield until some predicate is satisfied. Fiber
+ * conditions have two basic operations - wait() and signal(). wait()
+ * suspends execution of fiber (i.e. yields) until signal() is called.
+ * Unlike pthread_cond, fiber_cond doesn't require mutex/latch wrapping.
+ * 
+ */
+struct fiber_cond;
+
+/** \endcond public */
+
 struct fiber_cond {
+	/** Waiting fibers */
 	struct rlist waiters;
 };
 
 /**
- * Initialize a cond - semantics as in POSIX condition variable.
+ * Initialize the fiber condition variable.
+ *
+ * @param cond condition
  */
 void
-fiber_cond_create(struct fiber_cond *c);
+fiber_cond_create(struct fiber_cond *cond);
 
 /**
- * Finalize a cond. UB if there are fibers waiting for a cond.
+ * Finalize the cond.
+ * Behaviour is undefined if there are fiber waiting for the cond.
+ * @param cond condition
  */
 void
-fiber_cond_destroy(struct fiber_cond *c);
+fiber_cond_destroy(struct fiber_cond *cond);
+
+/** \cond public */
+
+/**
+ * Instantiate a new fiber cond object.
+ */
+struct fiber_cond *
+fiber_cond_new(void);
+
+/**
+ * Delete the fiber cond object.
+ * Behaviour is undefined if there are fiber waiting for the cond.
+ */
+void
+fiber_cond_delete(struct fiber_cond *cond);
 
 /**
  * Wake one fiber waiting for the cond.
  * Does nothing if no one is waiting.
+ * @param cond condition
  */
 void
-fiber_cond_signal(struct fiber_cond *c);
+fiber_cond_signal(struct fiber_cond *cond);
 
 /**
- * Wake all fibers waiting for the cond.
+ * Wake up all fibers waiting for the cond.
+ * @param cond condition
  */
 void
-fiber_cond_broadcast(struct fiber_cond *c);
+fiber_cond_broadcast(struct fiber_cond *cond);
 
+/**
+ * Suspend the execution of the current fiber (i.e. yield) until
+ * fiber_cond_signal() is called. Like pthread_cond, fiber_cond can issue
+ * spurious wake ups caused by explicit fiber_wakeup() or fiber_cancel()
+ * calls. It is highly recommended to wrap calls to this function into a loop
+ * and check an actual predicate and fiber_testcancel() on every iteration.
+ *
+ * @param cond condition
+ * @param timeout timeout in seconds
+ * @retval 0 on fiber_cond_signal() call or a spurious wake up
+ * @retval -1 on timeout, diag is set to TimedOut
+ */
 int
-fiber_cond_wait_timeout(struct fiber_cond *c, double timeout);
+fiber_cond_wait_timeout(struct fiber_cond *cond, double timeout);
 
+/**
+ * Shortcut for fiber_cond_wait_timeout().
+ * @see fiber_cond_wait_timeout()
+ */
 int
-fiber_cond_wait(struct fiber_cond *c);
+fiber_cond_wait(struct fiber_cond *cond);
+
+/** \endcond public */
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -160,6 +160,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/trivia/util.h
     ${CMAKE_SOURCE_DIR}/src/say.h
     ${CMAKE_SOURCE_DIR}/src/fiber.h
+    ${CMAKE_SOURCE_DIR}/src/fiber_cond.h
     ${CMAKE_SOURCE_DIR}/src/coio.h
     ${CMAKE_SOURCE_DIR}/src/coio_task.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h

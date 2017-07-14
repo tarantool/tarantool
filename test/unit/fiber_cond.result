@@ -1,0 +1,8 @@
+1..7
+ok 1 - timeout
+ok 2 - timeout
+ok 3 - signal
+ok 4 - signal
+ok 5 - order
+ok 6 - broadcast
+ok 7 - broadcast

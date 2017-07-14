@@ -31,6 +31,7 @@
 
 #include "fiber_cond.h"
 
+#include <small/mempool.h>
 #include <tarantool_ev.h>
 
 #include "fiber.h"
@@ -46,6 +47,36 @@ fiber_cond_destroy(struct fiber_cond *c)
 {
 	(void)c;
 	assert(rlist_empty(&c->waiters));
+}
+
+static __thread struct mempool cond_pool;
+
+struct fiber_cond *
+fiber_cond_new()
+{
+	struct fiber_cond *cond;
+	if (! mempool_is_initialized(&cond_pool)) {
+		/*
+		 * We don't need to bother with
+		 * destruction since the entire slab cache
+		 * is freed when the thread ends.
+		 */
+		mempool_create(&cond_pool, &cord()->slabc, sizeof(*cond));
+	}
+	cond = mempool_alloc(&cond_pool);
+	if (cond == NULL) {
+		diag_set(OutOfMemory, sizeof(*cond), "fiber_cond_pool",
+			 "struct fiber_cond");
+		return NULL;
+	}
+	fiber_cond_create(cond);
+	return cond;
+}
+
+void
+fiber_cond_delete(struct fiber_cond *cond)
+{
+	mempool_free(&cond_pool, cond);
 }
 
 void
