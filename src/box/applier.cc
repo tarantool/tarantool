@@ -516,7 +516,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 	applier->subscribe_stream = subscribe_stream;
 	applier->last_row_time = ev_now(loop());
 	rlist_create(&applier->on_state);
-	ipc_channel_create(&applier->pause, 0);
+	fiber_channel_create(&applier->pause, 0);
 
 	return applier;
 }
@@ -527,7 +527,7 @@ applier_delete(struct applier *applier)
 	assert(applier->reader == NULL);
 	iobuf_delete(applier->iobuf);
 	assert(applier->io.fd == -1);
-	ipc_channel_destroy(&applier->pause);
+	fiber_channel_destroy(&applier->pause);
 	trigger_destroy(&applier->on_state);
 	free(applier);
 }
@@ -537,7 +537,7 @@ applier_resume(struct applier *applier)
 {
 	assert(!fiber_is_dead(applier->reader));
 	void *data = NULL;
-	ipc_channel_put_xc(&applier->pause, data);
+	fiber_channel_put_xc(&applier->pause, data);
 }
 
 static inline void
@@ -545,14 +545,14 @@ applier_pause(struct applier *applier)
 {
 	/* Sleep until applier_resume() wake us up */
 	void *data;
-	ipc_channel_get_xc(&applier->pause, &data);
+	fiber_channel_get_xc(&applier->pause, &data);
 }
 
 struct applier_on_state {
 	struct trigger base;
 	struct applier *applier;
 	enum applier_state desired_state;
-	struct ipc_channel wakeup;
+	struct fiber_channel wakeup;
 };
 
 /** Used by applier_connect_all() */
@@ -571,7 +571,7 @@ applier_on_state_f(struct trigger *trigger, void *event)
 		return;
 
 	/* Wake up waiter */
-	ipc_channel_put_xc(&on_state->wakeup, applier);
+	fiber_channel_put_xc(&on_state->wakeup, applier);
 
 	applier_pause(applier);
 }
@@ -583,7 +583,7 @@ applier_add_on_state(struct applier *applier,
 {
 	trigger_create(&trigger->base, applier_on_state_f, NULL, NULL);
 	trigger->applier = applier;
-	ipc_channel_create(&trigger->wakeup, 0);
+	fiber_channel_create(&trigger->wakeup, 0);
 	trigger->desired_state = desired_state;
 	trigger_add(&applier->on_state, &trigger->base);
 }
@@ -591,7 +591,7 @@ applier_add_on_state(struct applier *applier,
 static inline void
 applier_clear_on_state(struct applier_on_state *trigger)
 {
-	ipc_channel_destroy(&trigger->wakeup);
+	fiber_channel_destroy(&trigger->wakeup);
 	trigger_clear(&trigger->base);
 }
 
@@ -599,7 +599,7 @@ static inline int
 applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 {
 	void *data = NULL;
-	if (ipc_channel_get_timeout(&trigger->wakeup, &data, timeout) != 0)
+	if (fiber_channel_get_timeout(&trigger->wakeup, &data, timeout) != 0)
 		return -1; /* ER_TIMEOUT */
 
 	struct applier *applier = trigger->applier;

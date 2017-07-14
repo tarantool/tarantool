@@ -119,11 +119,11 @@ ipc_value_new();
  * Channel structure has a fixed size. If a channel is created
  * with a buffer, the buffer must be allocated in a continuous
  * memory chunk, directly after the channel itself.
- * ipc_channel_memsize() can be used to find out the amount
+ * fiber_channel_memsize() can be used to find out the amount
  * of memory necessary to store a channel, given the desired
  * buffer size.
  */
-struct ipc_channel {
+struct fiber_channel {
 	/** Channel buffer size, if the channel is buffered. */
 	uint32_t size;
 	/** The number of messages in the buffer. */
@@ -148,9 +148,9 @@ struct ipc_channel {
  * buffer size.
  */
 static inline size_t
-ipc_channel_memsize(uint32_t size)
+fiber_channel_memsize(uint32_t size)
 {
-	return sizeof(struct ipc_channel) + sizeof(struct ipc_msg *) * size;
+	return sizeof(struct fiber_channel) + sizeof(struct ipc_msg *) * size;
 }
 
 /**
@@ -158,11 +158,11 @@ ipc_channel_memsize(uint32_t size)
  * been correctly allocated for the channel).
  */
 void
-ipc_channel_create(struct ipc_channel *ch, uint32_t size);
+fiber_channel_create(struct fiber_channel *ch, uint32_t size);
 
 /** Destroy a channel. Does not free allocated memory. */
 void
-ipc_channel_destroy(struct ipc_channel *ch);
+fiber_channel_destroy(struct fiber_channel *ch);
 
 /**
  * Allocate and construct a channel.
@@ -172,11 +172,11 @@ ipc_channel_destroy(struct ipc_channel *ch);
  * @param	size of the channel buffer
  * @return	new channel
  * @code
- *	struct ipc_channel *ch = ipc_channel_new(10);
+ *	struct fiber_channel *ch = fiber_channel_new(10);
  * @endcode
  */
-struct ipc_channel *
-ipc_channel_new(uint32_t size);
+struct fiber_channel *
+fiber_channel_new(uint32_t size);
 
 /**
  * Destroy and free an IPC channel.
@@ -184,7 +184,7 @@ ipc_channel_new(uint32_t size);
  * @param ch	channel
  */
 void
-ipc_channel_delete(struct ipc_channel *ch);
+fiber_channel_delete(struct fiber_channel *ch);
 
 /**
  * Check if the channel buffer is empty.
@@ -197,12 +197,12 @@ ipc_channel_delete(struct ipc_channel *ch);
  * @retval false	otherwise
  *
  * @code
- *	if (!ipc_channel_is_empty(ch))
- *		ipc_channel_get(ch, ...);
+ *	if (!fiber_channel_is_empty(ch))
+ *		fiber_channel_get(ch, ...);
  * @endcode
  */
 static inline bool
-ipc_channel_is_empty(struct ipc_channel *ch)
+fiber_channel_is_empty(struct fiber_channel *ch)
 {
 	return ch->count == 0;
 }
@@ -217,12 +217,12 @@ ipc_channel_is_empty(struct ipc_channel *ch)
  *
  * @return false	otherwise
  * @code
- *	if (!ipc_channel_is_full(ch))
- *		ipc_channel_put(ch, "message");
+ *	if (!fiber_channel_is_full(ch))
+ *		fiber_channel_put(ch, "message");
  * @endcode
  */
 static inline bool
-ipc_channel_is_full(struct ipc_channel *ch)
+fiber_channel_is_full(struct fiber_channel *ch)
 {
 	return ch->count >= ch->size;
 }
@@ -233,7 +233,7 @@ ipc_channel_is_full(struct ipc_channel *ch)
  * a custom destructor.
  */
 int
-ipc_channel_put_msg_timeout(struct ipc_channel *ch,
+fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 			    struct ipc_msg *msg,
 			    ev_tstamp timeout);
 
@@ -251,7 +251,7 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
  *
  */
 int
-ipc_channel_put_timeout(struct ipc_channel *ch,
+fiber_channel_put_timeout(struct fiber_channel *ch,
 			void *data,
 			ev_tstamp timeout);
 
@@ -266,14 +266,14 @@ ipc_channel_put_timeout(struct ipc_channel *ch,
  * @param data
  *
  * @code
- *	ipc_channel_put(ch, "message");
+ *	fiber_channel_put(ch, "message");
  * @endcode
  * @return  -1 if the channel is closed
  */
 static inline int
-ipc_channel_put(struct ipc_channel *ch, void *data)
+fiber_channel_put(struct fiber_channel *ch, void *data)
 {
-	return ipc_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
+	return fiber_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
 }
 
 /**
@@ -281,7 +281,7 @@ ipc_channel_put(struct ipc_channel *ch, void *data)
  * The caller is responsible for message destruction.
  */
 int
-ipc_channel_get_msg_timeout(struct ipc_channel *ch,
+fiber_channel_get_msg_timeout(struct fiber_channel *ch,
 			    struct ipc_msg **msg,
 			    ev_tstamp timeout);
 /**
@@ -295,13 +295,13 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
  * @code
  *	do {
  *		struct ipc_msg *msg;
- *		int rc = ipc_channel_get_timeout(ch, 0.5, );
+ *		int rc = fiber_channel_get_timeout(ch, 0.5, );
  *		printf("message: %p\n", msg);
  *	} while (msg);
  * @endcode
  */
 int
-ipc_channel_get_timeout(struct ipc_channel *ch,
+fiber_channel_get_timeout(struct fiber_channel *ch,
 			void **data,
 			ev_tstamp timeout);
 
@@ -313,9 +313,9 @@ ipc_channel_get_timeout(struct ipc_channel *ch,
  * @return 0 on success, -1 on error
  */
 static inline int
-ipc_channel_get(struct ipc_channel *ch, void **data)
+fiber_channel_get(struct fiber_channel *ch, void **data)
 {
-	return ipc_channel_get_timeout(ch, data, TIMEOUT_INFINITY);
+	return fiber_channel_get_timeout(ch, data, TIMEOUT_INFINITY);
 }
 
 /**
@@ -323,18 +323,18 @@ ipc_channel_get(struct ipc_channel *ch, void **data)
  * for new messages.
  */
 bool
-ipc_channel_has_readers(struct ipc_channel *ch);
+fiber_channel_has_readers(struct fiber_channel *ch);
 
 /**
  * Check if the channel has writer fibers that wait
  * for readers.
  */
 bool
-ipc_channel_has_writers(struct ipc_channel *ch);
+fiber_channel_has_writers(struct fiber_channel *ch);
 
 /** Channel buffer size. */
 static inline uint32_t
-ipc_channel_size(struct ipc_channel *ch)
+fiber_channel_size(struct fiber_channel *ch)
 {
 	return ch->size;
 }
@@ -345,7 +345,7 @@ ipc_channel_size(struct ipc_channel *ch)
  * if the buffer is full.
  */
 static inline uint32_t
-ipc_channel_count(struct ipc_channel *ch)
+fiber_channel_count(struct fiber_channel *ch)
 {
 	return ch->count;
 }
@@ -355,14 +355,14 @@ ipc_channel_count(struct ipc_channel *ch)
  * and wakes up all readers and writers.
  */
 void
-ipc_channel_close(struct ipc_channel *ch);
+fiber_channel_close(struct fiber_channel *ch);
 
 /**
  * True if the channel is closed for both for reading
  * and writing.
  */
 static inline bool
-ipc_channel_is_closed(struct ipc_channel *ch)
+fiber_channel_is_closed(struct fiber_channel *ch)
 {
 	return ch->is_closed;
 }
@@ -374,30 +374,30 @@ ipc_channel_is_closed(struct ipc_channel *ch)
 #include "fiber.h"
 
 struct IpcChannelGuard {
-	struct ipc_channel *ch;
+	struct fiber_channel *ch;
 
 	IpcChannelGuard(uint32_t size) {
-		ch = ipc_channel_new(size);
+		ch = fiber_channel_new(size);
 		if (ch == NULL)
 			diag_raise();
 	}
 
 	~IpcChannelGuard() {
-		ipc_channel_delete(ch);
+		fiber_channel_delete(ch);
 	}
 };
 
 static inline void
-ipc_channel_get_xc(struct ipc_channel *ch, void **data)
+fiber_channel_get_xc(struct fiber_channel *ch, void **data)
 {
-	if (ipc_channel_get(ch, data) != 0)
+	if (fiber_channel_get(ch, data) != 0)
 		diag_raise();
 }
 
 static inline void
-ipc_channel_put_xc(struct ipc_channel *ch, void *data)
+fiber_channel_put_xc(struct fiber_channel *ch, void *data)
 {
-	if (ipc_channel_put(ch, data) != 0)
+	if (fiber_channel_put(ch, data) != 0)
 		diag_raise();
 }
 

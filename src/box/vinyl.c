@@ -598,7 +598,7 @@ struct vy_scheduler {
 	/**
 	 * There is no pending tasks for workers, so scheduler
 	 * needs to create one, or we want to shutdown the
-	 * scheduler. Scheduler is a fiber in TX, so ev_async + ipc_channel
+	 * scheduler. Scheduler is a fiber in TX, so ev_async + fiber_channel
 	 * are used here instead of pthread_cond_t.
 	 */
 	struct ev_async scheduler_async;

@@ -100,7 +100,7 @@ struct applier {
 	/** Triggers invoked on state change */
 	struct rlist on_state;
 	/** Channel used by applier_connect_all() and applier_resume() */
-	struct ipc_channel pause;
+	struct fiber_channel pause;
 	/** xstream to process rows during initial JOIN */
 	struct xstream *join_stream;
 	/** xstream to process rows during final JOIN and SUBSCRIBE */

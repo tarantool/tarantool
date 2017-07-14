@@ -6,73 +6,73 @@
 int status;
 
 void
-ipc_basic()
+fiber_channel_basic()
 {
 	header();
 	plan(10);
 
-	struct ipc_channel *channel = ipc_channel_new(1);
-	ok(channel != NULL, "ipc_channel_new()");
+	struct fiber_channel *channel = fiber_channel_new(1);
+	ok(channel != NULL, "fiber_channel_new()");
 
-	ok(ipc_channel_size(channel) == 1, "ipc_channel_size()");
+	ok(fiber_channel_size(channel) == 1, "fiber_channel_size()");
 
-	ok(ipc_channel_count(channel) == 0, "ipc_channel_count()");
+	ok(fiber_channel_count(channel) == 0, "fiber_channel_count()");
 
-	ok(ipc_channel_is_full(channel) == false, "ipc_channel_is_full()");
+	ok(fiber_channel_is_full(channel) == false, "fiber_channel_is_full()");
 
-	ok(ipc_channel_is_empty(channel) == true, "ipc_channel_is_empty()");
+	ok(fiber_channel_is_empty(channel) == true, "fiber_channel_is_empty()");
 
 	char dummy;
 
-	ipc_channel_put(channel, &dummy);
+	fiber_channel_put(channel, &dummy);
 
-	ok(ipc_channel_size(channel) == 1, "ipc_channel_size(1)");
+	ok(fiber_channel_size(channel) == 1, "fiber_channel_size(1)");
 
-	ok(ipc_channel_count(channel) == 1, "ipc_channel_count(1)");
+	ok(fiber_channel_count(channel) == 1, "fiber_channel_count(1)");
 
-	ok(ipc_channel_is_full(channel) == true, "ipc_channel_is_full(1)");
+	ok(fiber_channel_is_full(channel) == true, "fiber_channel_is_full(1)");
 
-	ok(ipc_channel_is_empty(channel) == false, "ipc_channel_is_empty(1)");
+	ok(fiber_channel_is_empty(channel) == false, "fiber_channel_is_empty(1)");
 
 	void *ptr;
 
-	ipc_channel_get(channel, &ptr);
-	ok(ptr == &dummy, "ipc_channel_get()");
+	fiber_channel_get(channel, &ptr);
+	ok(ptr == &dummy, "fiber_channel_get()");
 
-	ipc_channel_delete(channel);
+	fiber_channel_delete(channel);
 
 	footer();
 	status = check_plan();
 }
 
 void
-ipc_get()
+fiber_channel_get()
 {
 	header();
 	plan(7);
 
-	struct ipc_channel *channel = ipc_channel_new(1);
+	struct fiber_channel *channel = fiber_channel_new(1);
 
 	char dummy;
-	ok(ipc_channel_put_timeout(channel, &dummy, 0) == 0,
-	   "ipc_channel_put(0)");
-	ok(ipc_channel_put_timeout(channel, &dummy, 0) == -1,
-	   "ipc_channel_put_timeout(0)");
+	ok(fiber_channel_put_timeout(channel, &dummy, 0) == 0,
+	   "fiber_channel_put(0)");
+	ok(fiber_channel_put_timeout(channel, &dummy, 0) == -1,
+	   "fiber_channel_put_timeout(0)");
 	void *ptr;
-	ipc_channel_get(channel, &ptr);
-	ok(ptr == &dummy, "ipc_channel_get(0)");
-	ok(ipc_channel_put_timeout(channel, &dummy, 0.01) == 0,
-	   "ipc_channel_put_timeout(1)");
-	ipc_channel_get(channel, &ptr);
-	ok(ptr == &dummy, "ipc_channel_get(1)");
+	fiber_channel_get(channel, &ptr);
+	ok(ptr == &dummy, "fiber_channel_get(0)");
+	ok(fiber_channel_put_timeout(channel, &dummy, 0.01) == 0,
+	   "fiber_channel_put_timeout(1)");
+	fiber_channel_get(channel, &ptr);
+	ok(ptr == &dummy, "fiber_channel_get(1)");
 
-	ipc_channel_close(channel);
+	fiber_channel_close(channel);
 
-	ok(ipc_channel_put(channel, &dummy) == -1, "ipc_channel_put(closed)");
+	ok(fiber_channel_put(channel, &dummy) == -1, "fiber_channel_put(closed)");
 
-	ok(ipc_channel_get(channel, &ptr) == -1, "ipc_channel_get(closed)");
+	ok(fiber_channel_get(channel, &ptr) == -1, "fiber_channel_get(closed)");
 
-	ipc_channel_delete(channel);
+	fiber_channel_delete(channel);
 
 	footer();
 	status = check_plan();
@@ -82,8 +82,8 @@ int
 main_f(va_list ap)
 {
 	(void) ap;
-	ipc_basic();
-	ipc_get();
+	fiber_channel_basic();
+	fiber_channel_get();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
