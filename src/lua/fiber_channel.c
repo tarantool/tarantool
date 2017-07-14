@@ -28,10 +28,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <trivia/util.h>
+#include "lua/fiber_channel.h"
 
-#include "lua/ipc.h"
 #include "lua/fiber.h"
+#include <trivia/util.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -42,9 +42,9 @@
 NORETURN int
 luaL_error(lua_State *L, const char *fmt, ...);
 
-#include <ipc.h>
 #include "lua/utils.h"
 #include <fiber.h>
+#include <fiber_channel.h>
 
 static const char channel_typename[] = "fiber.channel";
 
@@ -272,7 +272,7 @@ lbox_ipc_channel_to_string(struct lua_State *L)
 }
 
 void
-tarantool_lua_ipc_init(struct lua_State *L)
+tarantool_lua_fiber_channel_init(struct lua_State *L)
 {
 	static const struct luaL_Reg channel_meta[] = {
 		{"__gc",	lbox_ipc_channel_gc},

@@ -28,9 +28,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "ipc.h"
-#include "fiber.h"
+#include "fiber_channel.h"
+
 #include <stdlib.h>
+
+#include "fiber.h"
 
 enum ipc_wait_status {
 	IPC_WAIT_READER, /* A reader is waiting for writer */
@@ -482,5 +484,3 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 		timeout -= ev_now(loop()) - start_time;
 	}
 }
-
-

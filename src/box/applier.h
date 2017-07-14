@@ -33,14 +33,15 @@
 
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <tarantool_ev.h>
 
-#include "trivia/util.h"
-#include "uri.h"
-#include "tt_uuid.h"
+#include "fiber_channel.h"
 #include "trigger.h"
-#include "third_party/tarantool_ev.h"
+#include "trivia/util.h"
+#include "tt_uuid.h"
+#include "uri.h"
+
 #include "vclock.h"
-#include "ipc.h"
 
 struct xstream;
 

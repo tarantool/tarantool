@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_IPC_H_INCLUDED
-#define TARANTOOL_IPC_H_INCLUDED
+#ifndef TARANTOOL_FIBER_CHANNEL_H_INCLUDED
+#define TARANTOOL_FIBER_CHANNEL_H_INCLUDED 1
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -403,4 +403,4 @@ ipc_channel_put_xc(struct ipc_channel *ch, void *data)
 
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_IPC_H_INCLUDED */
+#endif /* TARANTOOL_FIBER_CHANNEL_H_INCLUDED */

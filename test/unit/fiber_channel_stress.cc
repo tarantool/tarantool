@@ -1,6 +1,6 @@
 #include "memory.h"
 #include "fiber.h"
-#include "ipc.h"
+#include "fiber_channel.h"
 #include "unit.h"
 
 enum {
