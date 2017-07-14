@@ -36,20 +36,20 @@
 #include "fiber.h"
 
 void
-ipc_cond_create(struct ipc_cond *c)
+fiber_cond_create(struct fiber_cond *c)
 {
 	rlist_create(&c->waiters);
 }
 
 void
-ipc_cond_destroy(struct ipc_cond *c)
+fiber_cond_destroy(struct fiber_cond *c)
 {
 	(void)c;
 	assert(rlist_empty(&c->waiters));
 }
 
 void
-ipc_cond_signal(struct ipc_cond *e)
+fiber_cond_signal(struct fiber_cond *e)
 {
 	if (! rlist_empty(&e->waiters)) {
 		struct fiber *f;
@@ -59,7 +59,7 @@ ipc_cond_signal(struct ipc_cond *e)
 }
 
 void
-ipc_cond_broadcast(struct ipc_cond *e)
+fiber_cond_broadcast(struct fiber_cond *e)
 {
 	while (! rlist_empty(&e->waiters)) {
 		struct fiber *f;
@@ -69,7 +69,7 @@ ipc_cond_broadcast(struct ipc_cond *e)
 }
 
 int
-ipc_cond_wait_timeout(struct ipc_cond *c, double timeout)
+fiber_cond_wait_timeout(struct fiber_cond *c, double timeout)
 {
 	struct fiber *f = fiber();
 	rlist_add_tail_entry(&c->waiters, f, state);
@@ -81,7 +81,7 @@ ipc_cond_wait_timeout(struct ipc_cond *c, double timeout)
 }
 
 int
-ipc_cond_wait(struct ipc_cond *c)
+fiber_cond_wait(struct fiber_cond *c)
 {
-	return ipc_cond_wait_timeout(c, TIMEOUT_INFINITY);
+	return fiber_cond_wait_timeout(c, TIMEOUT_INFINITY);
 }

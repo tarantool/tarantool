@@ -37,7 +37,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct ipc_cond {
+struct fiber_cond {
 	struct rlist waiters;
 };
 
@@ -45,32 +45,32 @@ struct ipc_cond {
  * Initialize a cond - semantics as in POSIX condition variable.
  */
 void
-ipc_cond_create(struct ipc_cond *c);
+fiber_cond_create(struct fiber_cond *c);
 
 /**
  * Finalize a cond. UB if there are fibers waiting for a cond.
  */
 void
-ipc_cond_destroy(struct ipc_cond *c);
+fiber_cond_destroy(struct fiber_cond *c);
 
 /**
  * Wake one fiber waiting for the cond.
  * Does nothing if no one is waiting.
  */
 void
-ipc_cond_signal(struct ipc_cond *c);
+fiber_cond_signal(struct fiber_cond *c);
 
 /**
  * Wake all fibers waiting for the cond.
  */
 void
-ipc_cond_broadcast(struct ipc_cond *c);
+fiber_cond_broadcast(struct fiber_cond *c);
 
 int
-ipc_cond_wait_timeout(struct ipc_cond *c, double timeout);
+fiber_cond_wait_timeout(struct fiber_cond *c, double timeout);
 
 int
-ipc_cond_wait(struct ipc_cond *c);
+fiber_cond_wait(struct fiber_cond *c);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -125,7 +125,7 @@ struct relay {
 		/** Current vclock sent by relay */
 		struct vclock vclock;
 		/** The condition is signaled at relay exit. */
-		struct ipc_cond exit_cond;
+		struct fiber_cond exit_cond;
 	} tx;
 };
 
@@ -286,7 +286,7 @@ static void
 tx_exit_cb(struct cmsg *msg)
 {
 	struct relay_exit_msg *m = (struct relay_exit_msg *)msg;
-	ipc_cond_signal(&m->relay->tx.exit_cond);
+	fiber_cond_signal(&m->relay->tx.exit_cond);
 }
 
 static void
@@ -467,15 +467,15 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	struct cord cord;
 	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "relay_%p", &relay);
-	ipc_cond_create(&relay.tx.exit_cond);
+	fiber_cond_create(&relay.tx.exit_cond);
 	cord_costart(&cord, name, relay_subscribe_f, &relay);
 	cpipe_create(&relay.relay_pipe, name);
 	/*
 	 * When relay exits, it sends a message which signals the
 	 * exit condition in tx thread.
 	 */
-	ipc_cond_wait(&relay.tx.exit_cond);
-	ipc_cond_destroy(&relay.tx.exit_cond);
+	fiber_cond_wait(&relay.tx.exit_cond);
+	fiber_cond_destroy(&relay.tx.exit_cond);
 	/*
 	 * Destroy the cpipe so that relay fiber can destroy
 	 * the corresponding endpoint and exit.

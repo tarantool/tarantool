@@ -110,7 +110,7 @@ cbus_endpoint_poison_f(struct cmsg *msg)
 {
 	struct cbus_endpoint *endpoint = ((struct cmsg_poison *)msg)->endpoint;
 	--endpoint->n_pipes;
-	ipc_cond_signal(&endpoint->cond);
+	fiber_cond_signal(&endpoint->cond);
 	free(msg);
 }
 
@@ -193,7 +193,7 @@ cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
 	snprintf(endpoint->name, sizeof(endpoint->name), "%s", name);
 	endpoint->consumer = loop();
 	endpoint->n_pipes = 0;
-	ipc_cond_create(&endpoint->cond);
+	fiber_cond_create(&endpoint->cond);
 	tt_pthread_mutex_init(&endpoint->mutex, NULL);
 	stailq_create(&endpoint->output);
 	ev_async_init(&endpoint->async,
@@ -231,7 +231,7 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 			process_cb(endpoint);
 		if (endpoint->n_pipes == 0 && stailq_empty(&endpoint->output))
 			break;
-		 ipc_cond_wait(&endpoint->cond);
+		 fiber_cond_wait(&endpoint->cond);
 	}
 
 	/*
@@ -242,7 +242,7 @@ cbus_endpoint_destroy(struct cbus_endpoint *endpoint,
 	tt_pthread_mutex_unlock(&endpoint->mutex);
 	tt_pthread_mutex_destroy(&endpoint->mutex);
 	ev_async_stop(endpoint->consumer, &endpoint->async);
-	ipc_cond_destroy(&endpoint->cond);
+	fiber_cond_destroy(&endpoint->cond);
 	TRASH(endpoint);
 	return 0;
 }
@@ -404,7 +404,7 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 struct cbus_flush_msg {
 	struct cmsg cmsg;
 	bool complete;
-	struct ipc_cond cond;
+	struct fiber_cond cond;
 };
 
 static void
@@ -419,7 +419,7 @@ cbus_flush_complete(struct cmsg *cmsg)
 	struct cbus_flush_msg *msg = container_of(cmsg,
 			struct cbus_flush_msg, cmsg);
 	msg->complete = true;
-	ipc_cond_signal(&msg->cond);
+	fiber_cond_signal(&msg->cond);
 }
 
 void
@@ -434,7 +434,7 @@ cbus_flush(struct cpipe *callee, struct cpipe *caller,
 
 	cmsg_init(&msg.cmsg, route);
 	msg.complete = false;
-	ipc_cond_create(&msg.cond);
+	fiber_cond_create(&msg.cond);
 
 	cpipe_push(callee, &msg.cmsg);
 
@@ -443,7 +443,7 @@ cbus_flush(struct cpipe *callee, struct cpipe *caller,
 			process_cb(caller->endpoint);
 		if (msg.complete)
 			break;
-		ipc_cond_wait(&msg.cond);
+		fiber_cond_wait(&msg.cond);
 	}
 }
 

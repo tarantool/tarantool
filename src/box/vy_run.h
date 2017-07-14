@@ -168,7 +168,7 @@ struct vy_slice {
 	 * Condition variable signaled by vy_slice_unpin()
 	 * if pin_count reaches 0.
 	 */
-	struct ipc_cond pin_cond;
+	struct fiber_cond pin_cond;
 	union {
 		/** Link in range->slices list. */
 		struct rlist in_range;
@@ -423,7 +423,7 @@ vy_slice_unpin(struct vy_slice *slice)
 {
 	assert(slice->pin_count > 0);
 	if (--slice->pin_count == 0)
-		ipc_cond_broadcast(&slice->pin_cond);
+		fiber_cond_broadcast(&slice->pin_cond);
 }
 
 /**
@@ -433,7 +433,7 @@ static inline void
 vy_slice_wait_pinned(struct vy_slice *slice)
 {
 	while (slice->pin_count > 0)
-		ipc_cond_wait(&slice->pin_cond);
+		fiber_cond_wait(&slice->pin_cond);
 }
 
 /**

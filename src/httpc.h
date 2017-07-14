@@ -262,7 +262,7 @@ struct httpc_response {
 	 * When request is given to curl-driver, client waits on this variable
 	 * until the handler (callback function) gives a signal within variable
 	 * */
-	struct ipc_cond cond;
+	struct fiber_cond cond;
 };
 
 /**

@@ -257,7 +257,7 @@ struct cbus_endpoint {
 	/** Count of connected pipes */
 	uint32_t n_pipes;
 	/** Condition for endpoint destroy */
-	struct ipc_cond cond;
+	struct fiber_cond cond;
 };
 
 /**

@@ -602,9 +602,9 @@ struct vy_scheduler {
 	 * are used here instead of pthread_cond_t.
 	 */
 	struct ev_async scheduler_async;
-	struct ipc_cond scheduler_cond;
+	struct fiber_cond scheduler_cond;
 	/** Used for throttling tx when quota is full. */
-	struct ipc_cond quota_cond;
+	struct fiber_cond quota_cond;
 	/**
 	 * A queue with all vy_task objects created by the
 	 * scheduler and not yet taken by a worker.
@@ -664,7 +664,7 @@ struct vy_scheduler {
 	/** Time when the current dump round started. */
 	ev_tstamp dump_start;
 	/** Signaled on dump round completion. */
-	struct ipc_cond dump_cond;
+	struct fiber_cond dump_cond;
 };
 
 static void
@@ -1450,7 +1450,7 @@ static void
 vy_scheduler_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	ipc_cond_signal(&env->scheduler->scheduler_cond);
+	fiber_cond_signal(&env->scheduler->scheduler_cond);
 }
 
 static ev_tstamp
@@ -1458,7 +1458,7 @@ vy_scheduler_quota_throttled_cb(struct vy_quota *quota, ev_tstamp timeout)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
 	ev_tstamp wait_start = ev_now(loop());
-	if (ipc_cond_wait_timeout(&env->scheduler->quota_cond, timeout) != 0)
+	if (fiber_cond_wait_timeout(&env->scheduler->quota_cond, timeout) != 0)
 		return 0; /* timed out */
 	ev_tstamp wait_end = ev_now(loop());
 	return timeout - (wait_end - wait_start);
@@ -1468,7 +1468,7 @@ static void
 vy_scheduler_quota_released_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	ipc_cond_broadcast(&env->scheduler->quota_cond);
+	fiber_cond_broadcast(&env->scheduler->quota_cond);
 }
 
 static void
@@ -1478,7 +1478,7 @@ vy_scheduler_async_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	(void) events;
 	struct vy_scheduler *scheduler =
 		container_of(watcher, struct vy_scheduler, scheduler_async);
-	ipc_cond_signal(&scheduler->scheduler_cond);
+	fiber_cond_signal(&scheduler->scheduler_cond);
 }
 
 static struct vy_scheduler *
@@ -1492,7 +1492,7 @@ vy_scheduler_new(struct vy_env *env)
 	}
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
 	diag_create(&scheduler->diag);
-	ipc_cond_create(&scheduler->dump_cond);
+	fiber_cond_create(&scheduler->dump_cond);
 	vclock_create(&scheduler->last_checkpoint);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
@@ -1500,8 +1500,8 @@ vy_scheduler_new(struct vy_env *env)
 	tt_pthread_cond_init(&scheduler->worker_cond, NULL);
 	scheduler->loop = loop();
 	ev_async_init(&scheduler->scheduler_async, vy_scheduler_async_cb);
-	ipc_cond_create(&scheduler->scheduler_cond);
-	ipc_cond_create(&scheduler->quota_cond);
+	fiber_cond_create(&scheduler->scheduler_cond);
+	fiber_cond_create(&scheduler->quota_cond);
 	mempool_create(&scheduler->task_pool, cord_slab_cache(),
 			sizeof(struct vy_task));
 	/* Start scheduler fiber. */
@@ -1518,7 +1518,7 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	/* Stop scheduler fiber. */
 	scheduler->scheduler = NULL;
 	/* Sic: fiber_cancel() can't be used here. */
-	ipc_cond_signal(&scheduler->scheduler_cond);
+	fiber_cond_signal(&scheduler->scheduler_cond);
 
 	if (scheduler->is_worker_pool_running)
 		vy_scheduler_stop_workers(scheduler);
@@ -1529,8 +1529,8 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	vy_dump_heap_destroy(&scheduler->dump_heap);
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
 	TRASH(&scheduler->scheduler_async);
-	ipc_cond_destroy(&scheduler->scheduler_cond);
-	ipc_cond_destroy(&scheduler->quota_cond);
+	fiber_cond_destroy(&scheduler->scheduler_cond);
+	fiber_cond_destroy(&scheduler->quota_cond);
 	tt_pthread_mutex_destroy(&scheduler->mutex);
 	free(scheduler);
 }
@@ -1800,7 +1800,7 @@ vy_scheduler_f(va_list va)
 	 * are not started and the scheduler is idle until
 	 * shutdown or checkpoint.
 	 */
-	ipc_cond_wait(&scheduler->scheduler_cond);
+	fiber_cond_wait(&scheduler->scheduler_cond);
 	if (scheduler->scheduler == NULL)
 		return 0; /* destroyed */
 
@@ -1886,7 +1886,7 @@ vy_scheduler_f(va_list va)
 		continue;
 error:
 		/* Abort pending checkpoint. */
-		ipc_cond_signal(&scheduler->dump_cond);
+		fiber_cond_signal(&scheduler->dump_cond);
 		/*
 		 * A task can fail either due to lack of memory or IO
 		 * error. In either case it is pointless to schedule
@@ -1911,7 +1911,7 @@ error:
 		continue;
 wait:
 		/* Wait for changes */
-		ipc_cond_wait(&scheduler->scheduler_cond);
+		fiber_cond_wait(&scheduler->scheduler_cond);
 	}
 
 	return 0;
@@ -2077,7 +2077,7 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	vy_quota_release(quota, mem_dumped);
 
 	scheduler->dump_generation = min_generation;
-	ipc_cond_signal(&scheduler->dump_cond);
+	fiber_cond_signal(&scheduler->dump_cond);
 
 	/* Account dump bandwidth. */
 	struct vy_stat *stat = scheduler->env->stat;
@@ -2115,7 +2115,7 @@ vy_begin_checkpoint(struct vy_env *env)
 
 	vy_scheduler_trigger_dump(scheduler);
 	scheduler->checkpoint_in_progress = true;
-	ipc_cond_signal(&scheduler->scheduler_cond);
+	fiber_cond_signal(&scheduler->scheduler_cond);
 	return 0;
 }
 
@@ -2141,7 +2141,7 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 				       diag_last_error(&scheduler->diag));
 			goto error;
 		}
-		ipc_cond_wait(&scheduler->dump_cond);
+		fiber_cond_wait(&scheduler->dump_cond);
 	}
 
 	if (vy_log_rotate(vclock) != 0)
@@ -2171,7 +2171,7 @@ vy_end_checkpoint(struct vy_env *env)
 	 * done so that it can catch up.
 	 */
 	scheduler->checkpoint_in_progress = false;
-	ipc_cond_signal(&scheduler->scheduler_cond);
+	fiber_cond_signal(&scheduler->scheduler_cond);
 }
 
 /* Scheduler }}} */
@@ -6042,7 +6042,7 @@ struct vy_squash_queue {
 	/** Fiber doing background upsert squashing. */
 	struct fiber *fiber;
 	/** Used to wake up the fiber to process more requests. */
-	struct ipc_cond cond;
+	struct fiber_cond cond;
 	/** Queue of vy_squash objects to be processed. */
 	struct stailq queue;
 	/** Mempool for struct vy_squash. */
@@ -6261,7 +6261,7 @@ vy_squash_queue_new(void)
 		return NULL;
 	}
 	sq->fiber = NULL;
-	ipc_cond_create(&sq->cond);
+	fiber_cond_create(&sq->cond);
 	stailq_create(&sq->queue);
 	mempool_create(&sq->pool, cord_slab_cache(),
 		       sizeof(struct vy_squash));
@@ -6274,7 +6274,7 @@ vy_squash_queue_delete(struct vy_squash_queue *sq)
 	if (sq->fiber != NULL) {
 		sq->fiber = NULL;
 		/* Sic: fiber_cancel() can't be used here */
-		ipc_cond_signal(&sq->cond);
+		fiber_cond_signal(&sq->cond);
 	}
 	struct vy_squash *squash, *next;
 	stailq_foreach_entry_safe(squash, next, &sq->queue, next)
@@ -6288,7 +6288,7 @@ vy_squash_queue_f(va_list va)
 	struct vy_squash_queue *sq = va_arg(va, struct vy_squash_queue *);
 	while (sq->fiber != NULL) {
 		if (stailq_empty(&sq->queue)) {
-			ipc_cond_wait(&sq->cond);
+			fiber_cond_wait(&sq->cond);
 			continue;
 		}
 		struct vy_squash *squash;
@@ -6326,7 +6326,7 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt, void *arg)
 		goto fail;
 
 	stailq_add_tail_entry(&sq->queue, squash, next);
-	ipc_cond_signal(&sq->cond);
+	fiber_cond_signal(&sq->cond);
 	return;
 fail:
 	error_log(diag_last_error(diag_get()));
