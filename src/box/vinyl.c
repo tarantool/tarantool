@@ -1790,7 +1790,7 @@ static int
 vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
-	struct vy_env *env = scheduler->env;
+	MAYBE_UNUSED struct vy_env *env = scheduler->env;
 
 	/*
 	 * Yield immediately, until the quota watermark is reached

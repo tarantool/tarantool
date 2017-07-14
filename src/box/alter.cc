@@ -624,6 +624,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 		   &alter->old_space->on_stmt_begin);
 	struct space *new_space = space_cache_replace(alter->old_space);
 	assert(new_space == alter->new_space);
+	(void) new_space;
 	alter_space_delete(alter);
 }
 
