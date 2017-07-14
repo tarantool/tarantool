@@ -127,7 +127,7 @@ local function purge_password_from_uris(uri)
     if type(uri) == 'table' then
         local new_table = {}
         for k, v in pairs(uri) do
-            new_table[k] = purge_password_from_uri(uri)
+            new_table[k] = purge_password_from_uri(v)
         end
         return new_table
     end
