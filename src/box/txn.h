@@ -90,6 +90,7 @@ struct txn {
 	bool has_triggers;
 	/** The number of active nested statement-level transactions. */
 	int in_sub_stmt;
+	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
 	Engine *engine;
 	/** Engine-specific transaction data */

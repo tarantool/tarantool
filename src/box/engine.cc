@@ -64,7 +64,7 @@ void Engine::beginStatement(struct txn *)
 void Engine::prepare(struct txn *)
 {}
 
-void Engine::commit(struct txn *, int64_t)
+void Engine::commit(struct txn *)
 {}
 
 void Engine::rollback(struct txn *)

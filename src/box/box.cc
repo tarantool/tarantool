@@ -1606,6 +1606,11 @@ box_cfg_xc(void)
 		 */
 		engine_begin_initial_recovery(&recovery->vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+
+		struct recovery_journal journal;
+		recovery_journal_create(&journal, &recovery->vclock);
+		journal_set(&journal.base);
+
 		/**
 		 * We explicitly request memtx to recover its
 		 * snapshot as a separate phase since it contains
@@ -1614,10 +1619,6 @@ box_cfg_xc(void)
 		 * other engines.
 		 */
 		memtx->recoverSnapshot(&last_checkpoint_vclock);
-
-		struct recovery_journal journal;
-		recovery_journal_create(&journal, &recovery->vclock);
-		journal_set(&journal.base);
 
 		engine_begin_final_recovery();
 		title("orphan");

@@ -2319,8 +2319,10 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 }
 
 void
-vy_index_commit_create(struct vy_env *env, struct vy_index *index)
+vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 {
+	(void)lsn;
+
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
 		/*

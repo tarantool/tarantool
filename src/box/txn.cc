@@ -102,6 +102,7 @@ txn_begin(bool is_autocommit)
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
 	txn->in_sub_stmt = 0;
+	txn->signature = -1;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
@@ -233,11 +234,10 @@ txn_commit(struct txn *txn)
 
 	/* Do transaction conflict resolving */
 	if (txn->engine) {
-		int64_t signature = -1;
 		txn->engine->prepare(txn);
 
 		if (txn->n_rows > 0)
-			signature = txn_write_to_wal(txn);
+			txn->signature = txn_write_to_wal(txn);
 		/*
 		 * The transaction is in the binary log. No action below
 		 * may throw. In case an error has happened, there is
@@ -246,7 +246,7 @@ txn_commit(struct txn *txn)
 		if (txn->has_triggers)
 			trigger_run(&txn->on_commit, txn);
 
-		txn->engine->commit(txn, signature);
+		txn->engine->commit(txn);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */

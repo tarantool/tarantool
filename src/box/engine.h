@@ -86,7 +86,7 @@ public:
 	 * This method can't throw: if any error happens here,
 	 * there is no better option than panic.
 	 */
-	virtual void commit(struct txn *, int64_t signature);
+	virtual void commit(struct txn *);
 	/*
 	 * Called to roll back effects of a statement if an
 	 * error happens, e.g., in a trigger.

@@ -313,8 +313,12 @@ public:
 	/**
 	 * Called after WAL write to commit index creation.
 	 * Must not fail.
+	 *
+	 * @signature is the LSN that was assigned to the row
+	 * that created the index. If the index was created by
+	 * a snapshot row, it is set to the snapshot signature.
 	 */
-	virtual void commitCreate();
+	virtual void commitCreate(int64_t signature);
 	/**
 	 * Called after WAL write to commit index drop.
 	 * Must not fail.

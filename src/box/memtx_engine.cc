@@ -163,6 +163,7 @@ MemtxEngine::recoverSnapshot(const struct vclock *vclock)
 	struct xrow_header row;
 	uint64_t row_count = 0;
 	while (xlog_cursor_next_xc(&cursor, &row, m_force_recovery) == 0) {
+		row.lsn = signature;
 		try {
 			recoverSnapshotRow(&row);
 		} catch (ClientError *e) {
@@ -364,9 +365,8 @@ MemtxEngine::rollback(struct txn *txn)
 }
 
 void
-MemtxEngine::commit(struct txn *txn, int64_t signature)
+MemtxEngine::commit(struct txn *txn)
 {
-	(void) signature;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)

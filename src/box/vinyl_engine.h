@@ -42,7 +42,7 @@ struct VinylEngine: public Engine {
 	virtual void beginStatement(struct txn *txn) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;
-	virtual void commit(struct txn *txn, int64_t signature) override;
+	virtual void commit(struct txn *txn) override;
 	virtual void rollback(struct txn *txn) override;
 	virtual void rollbackStatement(struct txn *txn,
 				       struct txn_stmt *stmt) override;

@@ -304,7 +304,7 @@ vy_index_open(struct vy_env *env, struct vy_index *index);
  * Commit index creation in the metadata log.
  */
 void
-vy_index_commit_create(struct vy_env *env, struct vy_index *index);
+vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn);
 
 /**
  * Commit index drop in the metadata log.
