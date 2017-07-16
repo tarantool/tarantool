@@ -768,7 +768,7 @@ luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result)
 		*result = lua_tointeger(L, idx);
 		return 0;
 	case LUA_TCDATA:
-		cdata = luaL_checkcdata(L, 1, &ctypeid);
+		cdata = luaL_checkcdata(L, idx, &ctypeid);
 		switch (ctypeid) {
 		case CTID_CCHAR:
 		case CTID_INT8:
