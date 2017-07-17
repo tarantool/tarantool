@@ -109,6 +109,16 @@ parameters[1] = {}
 parameters[1][':value'] = {kek = 300}
 cn:execute('select :value', parameters)
 
+-- gh-2608 SQL iproto DDL
+cn:execute('create table test2(id primary key, a, b, c)')
+box.space.test2.name
+cn:execute('insert into test2 values (1, 1, 1, 1)')
+cn:execute('select * from test2')
+cn:execute('create index test2_a_b_index on test2(a, b)')
+#box.space.test2.index
+cn:execute('drop table test2')
+box.space.test2
+
 cn:close()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.sql.execute('drop table test')

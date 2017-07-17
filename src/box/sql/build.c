@@ -25,6 +25,7 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/session.h"
 
 #ifndef SQLITE_OMIT_SHARED_CACHE
 /*
@@ -1917,7 +1918,8 @@ static void createSpace(
   }
 
   sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */);
-  sqlite3VdbeAddOp2(v, OP_Integer, 1, iFirstCol+1 /* owner */);
+  sqlite3VdbeAddOp2(v, OP_Integer, current_user()->uid,
+                    iFirstCol+1 /* owner */);
   sqlite3VdbeAddOp4(v,
     OP_String8, 0, iFirstCol+2 /* name */, 0,
     sqlite3DbStrDup(pParse->db, p->zName),
