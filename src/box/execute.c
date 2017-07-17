@@ -288,13 +288,14 @@ error:
  * @param stmt Prepared and started statement. At least one
  *        sqlite3_step must be called.
  * @param i Column number.
- * @param out Output buffer.
+ * @param region Allocator for column value.
  *
  * @retval  0 Success.
  * @retval -1 Out of memory when resizing the output buffer.
  */
 static inline int
-sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
+sql_column_to_messagepack(struct sqlite3_stmt *stmt, int i,
+			  struct region *region)
 {
 	size_t size;
 	int type = sqlite3_column_type(stmt, i);
@@ -305,7 +306,7 @@ sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
 			size = mp_sizeof_uint(n);
 		else
 			size = mp_sizeof_int(n);
-		char *pos = (char *) obuf_alloc(out, size);
+		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
 		if (n >= 0)
@@ -317,7 +318,7 @@ sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
 	case SQLITE_FLOAT: {
 		double d = sqlite3_column_double(stmt, i);
 		size = mp_sizeof_double(d);
-		char *pos = (char *) obuf_alloc(out, size);
+		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
 		mp_encode_double(pos, d);
@@ -326,7 +327,7 @@ sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
 	case SQLITE_TEXT: {
 		uint32_t len = sqlite3_column_bytes(stmt, i);
 		size = mp_sizeof_str(len);
-		char *pos = (char *) obuf_alloc(out, size);
+		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
 		const char *s;
@@ -337,7 +338,7 @@ sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
 	case SQLITE_BLOB: {
 		uint32_t len = sqlite3_column_bytes(stmt, i);
 		size = mp_sizeof_bin(len);
-		char *pos = (char *) obuf_alloc(out, size);
+		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
 		const char *s;
@@ -347,7 +348,7 @@ sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
 	}
 	case SQLITE_NULL: {
 		size = mp_sizeof_nil();
-		char *pos = (char *) obuf_alloc(out, size);
+		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
 		mp_encode_nil(pos);
@@ -358,7 +359,7 @@ sql_column_to_obuf(struct sqlite3_stmt *stmt, int i, struct obuf *out)
 	}
 	return 0;
 oom:
-	diag_set(OutOfMemory, size, "obuf_alloc", "SQL value");
+	diag_set(OutOfMemory, size, "region_alloc", "SQL value");
 	return -1;
 }
 
@@ -367,40 +368,46 @@ oom:
  * @param stmt Started prepared statement. At least one
  *        sqlite3_step must be done.
  * @param column_count Statement's column count.
- * @param buf Temporary buffer for tuples construction.
+ * @param region Runtime allocator for temporary objects.
  * @param port Port to store tuples.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static inline int
-sql_row_to_port(struct sqlite3_stmt *stmt, int column_count, struct obuf *buf,
-		struct port *port)
+sql_row_to_port(struct sqlite3_stmt *stmt, int column_count,
+		struct region *region, struct port *port)
 {
 	assert(column_count > 0);
 	size_t size = mp_sizeof_array(column_count);
-	/* Use obuf as a temporary storage for a raw tuple. */
-	struct obuf_svp svp = obuf_create_svp(buf);
-	char *pos = (char *) obuf_alloc(buf, size);
+	size_t svp = region_used(region);
+	char *pos = (char *) region_alloc(region, size);
 	if (pos == NULL) {
-		diag_set(OutOfMemory, size, "obuf_alloc", "SQL row");
+		diag_set(OutOfMemory, size, "region_alloc", "SQL row");
 		return -1;
 	}
 	mp_encode_array(pos, column_count);
 
 	for (int i = 0; i < column_count; ++i) {
-		if (sql_column_to_obuf(stmt, i, buf) != 0) {
-			obuf_rollback_to_svp(buf, &svp);
-			return -1;
-		}
+		if (sql_column_to_messagepack(stmt, i, region) != 0)
+			goto error;
 	}
-	size = obuf_size(buf) - svp.used;
+	size = region_used(region) - svp;
+	pos = (char *) region_join(region, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "region_join", "pos");
+		goto error;
+	}
 	struct tuple *tuple =
 		memtx_tuple_new(tuple_format_default, pos, pos + size);
-	obuf_rollback_to_svp(buf, &svp);
 	if (tuple == NULL)
-		return -1;
+		goto error;
+	region_truncate(region, svp);
 	return port_add_tuple(port, tuple);
+
+error:
+	region_truncate(region, svp);
+	return -1;
 }
 
 /**
@@ -538,13 +545,14 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
  * @param stmt Prepared statement.
  * @param out Out buffer.
  * @param sync IProto request sync.
+ * @param region Runtime allocator for temporary objects.
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 static inline int
 sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
-		       uint64_t sync)
+		       uint64_t sync, struct region *region)
 {
 	/*
 	 * Execute request.
@@ -556,7 +564,7 @@ sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 	if (column_count > 0) {
 		/* Either ROW or DONE or ERROR. */
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-			if (sql_row_to_port(stmt, column_count, out,
+			if (sql_row_to_port(stmt, column_count, region,
 					    &port) != 0)
 				goto err_execute;
 		}
@@ -618,7 +626,8 @@ err_execute:
 }
 
 int
-sql_prepare_and_execute(const struct sql_request *request, struct obuf *out)
+sql_prepare_and_execute(const struct sql_request *request, struct obuf *out,
+			struct region *region)
 {
 	const char *sql = request->sql_text;
 	uint32_t len;
@@ -636,7 +645,8 @@ sql_prepare_and_execute(const struct sql_request *request, struct obuf *out)
 	assert(stmt != NULL);
 	if (sql_bind(request, stmt) != 0)
 		goto err_stmt;
-	if (sql_execute_and_encode(db, stmt, out, request->sync) != 0)
+	if (sql_execute_and_encode(db, stmt, out, request->sync,
+				   region) != 0)
 		goto err_stmt;
 	sqlite3_finalize(stmt);
 	return 0;

@@ -1073,7 +1073,8 @@ tx_process_sql(struct cmsg *m)
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 	assert(msg->header.type == IPROTO_EXECUTE);
-	if (sql_prepare_and_execute(&msg->sql_request, out) == 0) {
+	if (sql_prepare_and_execute(&msg->sql_request, out,
+				    &fiber()->gc) == 0) {
 		msg->write_end = obuf_create_svp(out);
 		return;
 	}

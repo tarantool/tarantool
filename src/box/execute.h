@@ -98,12 +98,15 @@ sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
  *
  * @param request IProto request.
  * @param out Out buffer of the iproto message.
+ * @param region Runtime allocator for temporary objects
+ *        (columns, tuples ...).
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 int
-sql_prepare_and_execute(const struct sql_request *request, struct obuf *out);
+sql_prepare_and_execute(const struct sql_request *request, struct obuf *out,
+			struct region *region);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

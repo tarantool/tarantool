@@ -512,6 +512,17 @@ select_res
   rows:
   - [1]
 ...
+-- gh-2602 obuf_alloc breaks the tuple in different slabs
+_ = space:replace{1, 1, string.rep('a', 4 * 1024 * 1024)}
+---
+...
+res = cn:execute('select * from test')
+---
+...
+res.metadata
+---
+- [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+...
 cn:close()
 ---
 ...

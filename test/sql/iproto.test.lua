@@ -191,6 +191,11 @@ while f1:status() ~= 'dead' do fiber.sleep(0) end
 insert_res
 select_res
 
+-- gh-2602 obuf_alloc breaks the tuple in different slabs
+_ = space:replace{1, 1, string.rep('a', 4 * 1024 * 1024)}
+res = cn:execute('select * from test')
+res.metadata
+
 cn:close()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.sql.execute('drop table test')
