@@ -59,7 +59,7 @@ enum {
 	BOX_VPRIV_ID = 313,
 	/** Space id of _cluster. */
 	BOX_CLUSTER_ID = 320,
-	/** Space if of _truncate. */
+	/** Space id of _truncate. */
 	BOX_TRUNCATE_ID = 330,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,

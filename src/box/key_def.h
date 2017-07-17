@@ -313,10 +313,10 @@ typedef struct key_def box_key_def_t;
  * Create key definition with key fields with passed typed on passed positions.
  * May be used for tuple format creation and/or tuple comparation.
  *
- * \param key_def key definition to create
  * \param fields array with key field identifiers
  * \param types array with key field types (see enum field_type)
  * \param part_count the number of key fields
+ * \returns a new key definition object
  */
 box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
