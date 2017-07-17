@@ -154,7 +154,39 @@ enum rmean_net_name {
 
 const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
 
-/** Context of a single client connection. */
+/**
+ * Context of a single client connection.
+ * Interaction scheme:
+ *
+ *  Receive from the network.
+ *     |
+ * +---|---------------------+   +------------+
+ * |   |      IPROTO thread  |   | TX thread  |
+ * |   v                     |   |            |
+ * |iobuf[0].ibuf - - - - - -|- -|- - >+      |
+ * |                         |   |     |      |
+ * |          iobuf[1].ibuf  |   |     |      |
+ * |                         |   |     |      |
+ * |iobuf[0].out <- - - - - -|- -|- - -+      |
+ * |    |                    |   |     |      |
+ * |    |     iobuf[1].out <-|- -|- - -+      |
+ * +----|-----------|--------+   +------------+
+ *      |           v
+ *      |        Send to
+ *      |        network.
+ *      v
+ * Send to network after iobuf[1], i.e. older responses are sent first.
+ *
+ * ibuf structure:
+ *                   rpos             wpos           end
+ * +-------------------|----------------|-------------+
+ * \________/\________/ \________/\____/
+ *  \  msg       msg /    msg     parse
+ *   \______________/             size
+ *   response is sent,
+ *     messages are
+ *      discarded
+ */
 struct iproto_connection
 {
 	/**
