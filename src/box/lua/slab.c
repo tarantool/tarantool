@@ -141,7 +141,7 @@ lbox_slab_info(struct lua_State *L)
 
 	ratio = 100 * ((double) totals.used
 		/ ((double) totals.total + 0.0001));
-	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
+	snprintf(ratio_buf, sizeof(ratio_buf), "%0.2lf%%", ratio);
 
 	/** How much address space has been already touched */
 	lua_pushstring(L, "items_size");
@@ -209,7 +209,7 @@ lbox_slab_info(struct lua_State *L)
 	 */
 	ratio = 100 * ((double) quota_used(memtx_quota) /
 		 ((double) quota_total(memtx_quota) + 0.0001));
-	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
+	snprintf(ratio_buf, sizeof(ratio_buf), "%0.2lf%%", ratio);
 
 	lua_pushstring(L, "quota_used_ratio");
 	lua_pushstring(L, ratio_buf);
