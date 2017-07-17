@@ -25,6 +25,8 @@ int getppid(void);
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
 
+-- name of tarantoolctl binary
+local self_name = fio.basename(arg[0])
 -- command that we're executing
 local command_name = arg[1]
 -- true if we're running in user's HOME directory
@@ -43,6 +45,7 @@ local instance_dir
 local default_cfg
 local positional_arguments
 local keyword_arguments
+local lua_arguments = arg
 
 -- function for printing usage reference
 local usage
@@ -868,6 +871,37 @@ local function play()
     remote:close()
 end
 
+local function rocks()
+    local cfg = require("luarocks.cfg")
+    local util = require("luarocks.util")
+    local loader = require("luarocks.loader")
+    local command_line = require("luarocks.command_line")
+
+    -- Tweak help messages
+    util.see_help = function(command, program)
+        -- TODO: print extended help message here
+        return "See Tarantool documentation for help."
+    end
+
+    -- Enable only useful commands
+    commands = {
+       install = "luarocks.install",
+       search = "luarocks.search",
+       list = "luarocks.list",
+       remove = "luarocks.remove",
+       show = "luarocks.show",
+    }
+
+    -- Shift arguments in order to remove "rocks"
+    local luarocks_arguments = {}
+    for i=2,#lua_arguments do
+        luarocks_arguments[i - 1] = lua_arguments[i]
+    end
+
+    -- Call LuaRocks
+    command_line.run_command(unpack(luarocks_arguments))
+end
+
 local function exit_wrapper(func)
     return function() os.exit(func()) end
 end
@@ -1074,6 +1108,64 @@ local commands = setmetatable({
             weight = 100,
             deprecated = false,
         }
+    }, rocks = {
+        func = exit_wrapper(rocks), process = process_remote, help = {
+            header =
+                "%s rocks [install|remove|show|search|list]",
+            description =
+[=[
+        Package management.
+]=],
+            weight = 100,
+            deprecated = false,
+        },
+        subcommands = {
+            install = {
+                weight = 100,
+                help = {
+                    header = "%s rocks install ROCKNAME",
+                    description = [=[
+        Install a rock.
+]=],
+                }
+            },
+            remove = {
+                weight = 101,
+                help = {
+                    header = "%s rocks remove ROCKNAME",
+                    description = [=[
+        Uninstall a rock.
+]=],
+                }
+            },
+            show = {
+                weight = 110,
+                help = {
+                    header = "%s rocks list <FILTER>",
+                    description = [=[
+        Show information about an installed rock
+]=],
+                }
+            },
+            search = {
+                weight = 120,
+                help = {
+                    header = "%s rocks search <PATTERN>",
+                    description = [=[
+        Search the rocks list for a pattern.
+]=],
+                }
+            },
+            list = {
+                weight = 121,
+                help = {
+                    header = "%s rocks list <FILTER>",
+                    description = [=[
+        List all installed rocks.
+]=],
+                }
+            },
+        }
     }
 }, {
     __index = function()
@@ -1099,13 +1191,32 @@ local function usage_header()
     log.error("Tarantool client utility (%s)", _TARANTOOL)
 end
 
+local function usage_commands(commands, verbose)
+    local names = fun.iter(commands):map(
+        function(self_name, cmd) return {self_name, cmd.help.weight or 0} end
+    ):totable()
+    table.sort(names, function(left, right) return left[2] < right[2] end)
+    for _, cmd_name in ipairs(names) do
+        local cmd = commands[cmd_name[1]]
+        if cmd.help.deprecated ~= true then
+            usage_command(self_name, cmd, false)
+            if verbose then
+                log.error("")
+                log.error(cmd.help.description)
+            end
+            if cmd.subcommands then
+                usage_commands(cmd.subcommands, verbose)
+            end
+        end
+    end
+end
+
 usage = function(command, verbose)
-    local name = fio.basename(arg[0])
     do -- in case a command is passed and is a valid command
         local command_struct = rawget(commands, command)
         if command ~= nil and command_struct then
             log.error("Usage:\n")
-            usage_command(name, command_struct, true)
+            usage_command(self_name, command_struct, true)
             log.error("")
             log.error(command_struct.help.description)
             os.exit(1)
@@ -1117,20 +1228,7 @@ usage = function(command, verbose)
     end
     log.error("")
     log.error("Usage:")
-    local names = fun.iter(commands):map(
-        function(name, cmd) return {name, cmd.help.weight or 0} end
-    ):totable()
-    table.sort(names, function(left, right) return left[2] < right[2] end)
-    for _, cmd_name in ipairs(names) do
-        local cmd = commands[cmd_name[1]]
-        if cmd.help.deprecated ~= true then
-            usage_command(name, cmd, false)
-            if verbose then
-                log.error("")
-                log.error(cmd.help.description)
-            end
-        end
-    end
+    usage_commands(commands, verbose)
     os.exit(1)
 end
 -- parse parameters and put the result into positional/keyword_arguments

@@ -188,6 +188,7 @@ fi
 # tarantool package should own module directories
 %dir %{_libdir}/tarantool
 %dir %{_datadir}/tarantool
+%{_datadir}/tarantool/luarocks
 
 %if %{with systemd}
 %{_unitdir}/tarantool@.service

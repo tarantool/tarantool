@@ -45,7 +45,8 @@
 #include "version.h"
 #include "coio.h"
 #include "lua/fiber.h"
-#include "lua/ipc.h"
+#include "lua/fiber_cond.h"
+#include "lua/fiber_channel.h"
 #include "lua/errno.h"
 #include "lua/socket.h"
 #include "lua/utils.h"
@@ -275,10 +276,16 @@ static void
 tarantool_lua_setpaths(struct lua_State *L)
 {
 	const char *home = getenv("HOME");
+	char cwd[PATH_MAX] = {'\0'};
+	getcwd(cwd, sizeof(cwd));
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
 	lua_pushliteral(L, "./?.lua;");
 	lua_pushliteral(L, "./?/init.lua;");
+	lua_pushstring(L, cwd);
+	lua_pushliteral(L, "/.rocks/share/tarantool/?.lua;");
+	lua_pushstring(L, cwd);
+	lua_pushliteral(L, "/.rocks/share/tarantool/?/init.lua;");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
@@ -296,6 +303,8 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_setfield(L, top, "path");
 
 	lua_pushliteral(L, "./?" MODULE_LIBSUFFIX ";");
+	lua_pushstring(L, cwd);
+	lua_pushliteral(L, "/.rocks/lib/tarantool/?" MODULE_LIBSUFFIX ";");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?" MODULE_LIBSUFFIX ";");
@@ -380,7 +389,8 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 
 	tarantool_lua_utils_init(L);
 	tarantool_lua_fiber_init(L);
-	tarantool_lua_ipc_init(L);
+	tarantool_lua_fiber_cond_init(L);
+	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_socket_init(L);

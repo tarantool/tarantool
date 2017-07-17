@@ -33,14 +33,15 @@
 
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <tarantool_ev.h>
 
-#include "trivia/util.h"
-#include "uri.h"
-#include "tt_uuid.h"
+#include "fiber_channel.h"
 #include "trigger.h"
-#include "third_party/tarantool_ev.h"
+#include "trivia/util.h"
+#include "tt_uuid.h"
+#include "uri.h"
+
 #include "vclock.h"
-#include "ipc.h"
 
 struct xstream;
 
@@ -99,7 +100,7 @@ struct applier {
 	/** Triggers invoked on state change */
 	struct rlist on_state;
 	/** Channel used by applier_connect_all() and applier_resume() */
-	struct ipc_channel pause;
+	struct fiber_channel pause;
 	/** xstream to process rows during initial JOIN */
 	struct xstream *join_stream;
 	/** xstream to process rows during final JOIN and SUBSCRIBE */

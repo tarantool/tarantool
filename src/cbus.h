@@ -31,8 +31,8 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
+#include "fiber_cond.h"
 #include "rmean.h"
-#include "ipc.h"
 #include "small/rlist.h"
 #include "salad/stailq.h"
 
@@ -257,7 +257,7 @@ struct cbus_endpoint {
 	/** Count of connected pipes */
 	uint32_t n_pipes;
 	/** Condition for endpoint destroy */
-	struct ipc_cond cond;
+	struct fiber_cond cond;
 };
 
 /**

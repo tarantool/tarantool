@@ -65,7 +65,7 @@ struct fiber_pool {
 		/** Timer for idle workers */
 		struct ev_timer idle_timer;
 		/** Condition for worker exit signaling */
-		struct ipc_cond worker_cond;
+		struct fiber_cond worker_cond;
 	};
 	struct {
 		/** The consumer thread loop. */

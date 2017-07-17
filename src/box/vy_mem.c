@@ -86,7 +86,7 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 			   vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
 	rlist_create(&index->in_sealed);
-	ipc_cond_create(&index->pin_cond);
+	fiber_cond_create(&index->pin_cond);
 	return index;
 }
 
@@ -113,7 +113,7 @@ vy_mem_delete(struct vy_mem *index)
 	tuple_format_ref(index->format, -1);
 	tuple_format_ref(index->format_with_colmask, -1);
 	tuple_format_ref(index->upsert_format, -1);
-	ipc_cond_destroy(&index->pin_cond);
+	fiber_cond_destroy(&index->pin_cond);
 	TRASH(index);
 	free(index);
 }

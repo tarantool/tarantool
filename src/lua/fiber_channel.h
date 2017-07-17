@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_LUA_IPC_H_INCLUDED
-#define TARANTOOL_LUA_IPC_H_INCLUDED
+#ifndef TARANTOOL_LUA_FIBER_CHANNEL_H_INCLUDED
+#define TARANTOOL_LUA_FIBER_CHANNEL_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -35,10 +35,10 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
-void tarantool_lua_ipc_init(struct lua_State *L);
+void tarantool_lua_fiber_channel_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_LUA_IPC_H_INCLUDED */
+#endif /* TARANTOOL_LUA_FIBER_CHANNEL_H_INCLUDED */

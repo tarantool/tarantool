@@ -1,0 +1,69 @@
+fiber = require('fiber')
+---
+...
+-- fiber.cond
+c = fiber.cond()
+---
+...
+tostring(c)
+---
+- cond
+...
+-- args validation
+c.wait()
+---
+- error: 'usage: cond:wait([timeout])'
+...
+c.wait('1')
+---
+- error: 'bad argument #1 to ''?'' (fiber.cond expected, got string)'
+...
+c:wait('1')
+---
+- false
+...
+c:wait(-1)
+---
+- error: 'usage: cond:wait([timeout])'
+...
+-- timeout
+c:wait(0.1)
+---
+- false
+...
+-- wait success
+fiber.create(function() fiber.sleep(.5); c:broadcast() end) and c:wait(.6)
+---
+- true
+...
+-- signal
+t = {}
+---
+...
+for i = 1,4 do fiber.create(function() c:wait(); table.insert(t, '#') end) end
+---
+...
+c:signal()
+---
+...
+fiber.sleep(0.1)
+---
+...
+t
+---
+- - '#'
+...
+-- broadcast
+c:broadcast()
+---
+...
+fiber.sleep(0.1)
+---
+...
+t
+---
+- - '#'
+  - '#'
+  - '#'
+  - '#'
+...

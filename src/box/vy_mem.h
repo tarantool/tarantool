@@ -36,7 +36,7 @@
 
 #include <small/rlist.h>
 
-#include "ipc.h"
+#include "fiber_cond.h"
 #include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
@@ -173,7 +173,7 @@ struct vy_mem {
 	 * Condition variable signaled by vy_mem_unpin()
 	 * if pin_count reaches 0.
 	 */
-	struct ipc_cond pin_cond;
+	struct fiber_cond pin_cond;
 };
 
 /**
@@ -198,7 +198,7 @@ vy_mem_unpin(struct vy_mem *mem)
 	assert(mem->pin_count > 0);
 	mem->pin_count--;
 	if (mem->pin_count == 0)
-		ipc_cond_broadcast(&mem->pin_cond);
+		fiber_cond_broadcast(&mem->pin_cond);
 }
 
 /**
@@ -208,7 +208,7 @@ static inline void
 vy_mem_wait_pinned(struct vy_mem *mem)
 {
 	while (mem->pin_count > 0)
-		ipc_cond_wait(&mem->pin_cond);
+		fiber_cond_wait(&mem->pin_cond);
 }
 
 /**

@@ -100,6 +100,12 @@ fiber_is_cancelled
 fiber_time
 fiber_time64
 fiber_reschedule
+fiber_cond_new
+fiber_cond_delete
+fiber_cond_signal
+fiber_cond_broadcast
+fiber_cond_wait_timeout
+fiber_cond_wait
 cord_slab_cache
 coio_wait
 coio_close

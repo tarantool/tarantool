@@ -3,3 +3,6 @@
 	*** stat_notify_test ***
 # filename: 1.out
 	*** stat_notify_test: done ***
+	*** test_call_f ***
+# call done with res 0
+	*** test_call_f: done ***

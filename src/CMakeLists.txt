@@ -71,8 +71,10 @@ set (core_sources
      say.c
      memory.c
      fiber.c
-     cbus.c
      fiber_pool.c
+     fiber_cond.c
+     fiber_channel.c
+     cbus.c
      exception.cc
      reflection.c
      assoc.c
@@ -115,7 +117,6 @@ set (server_sources
      httpc.c
      coio_buf.cc
      pickle.c
-     ipc.c
      latch.c
      errinj.c
      fio.c
@@ -136,8 +137,9 @@ set (server_sources
      lua/digest.c
      lua/init.c
      lua/fiber.c
+     lua/fiber_cond.c
+     lua/fiber_channel.c
      lua/trigger.c
-     lua/ipc.c
      lua/msgpack.c
      lua/utils.c
      lua/errno.c
@@ -158,6 +160,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/trivia/util.h
     ${CMAKE_SOURCE_DIR}/src/say.h
     ${CMAKE_SOURCE_DIR}/src/fiber.h
+    ${CMAKE_SOURCE_DIR}/src/fiber_cond.h
     ${CMAKE_SOURCE_DIR}/src/coio.h
     ${CMAKE_SOURCE_DIR}/src/coio_task.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h

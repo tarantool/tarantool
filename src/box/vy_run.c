@@ -33,8 +33,8 @@
 #include <zstd.h>
 
 #include "fiber.h"
+#include "fiber_cond.h"
 #include "fio.h"
-#include "ipc.h"
 #include "cbus.h"
 #include "memory.h"
 
@@ -370,7 +370,7 @@ vy_slice_new(int64_t id, struct vy_run *run,
 		tuple_ref(end);
 	slice->end = end;
 	rlist_create(&slice->in_range);
-	ipc_cond_create(&slice->pin_cond);
+	fiber_cond_create(&slice->pin_cond);
 	/** Lookup the first and the last pages spanned by the slice. */
 	bool unused;
 	if (slice->begin == NULL) {
@@ -416,7 +416,7 @@ vy_slice_delete(struct vy_slice *slice)
 		tuple_unref(slice->begin);
 	if (slice->end != NULL)
 		tuple_unref(slice->end);
-	ipc_cond_destroy(&slice->pin_cond);
+	fiber_cond_destroy(&slice->pin_cond);
 	TRASH(slice);
 	free(slice);
 }

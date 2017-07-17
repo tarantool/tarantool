@@ -1,6 +1,6 @@
 #include "memory.h"
 #include "fiber.h"
-#include "ipc.h"
+#include "fiber_channel.h"
 #include "unit.h"
 
 enum {
@@ -10,21 +10,21 @@ enum {
 static int
 push_f(va_list ap)
 {
-	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
+	struct fiber_channel *channel = va_arg(ap, struct fiber_channel *);
 
 	for (int i = 0; i < ITERATIONS; i++)
-		ipc_channel_put(channel, NULL);
+		fiber_channel_put(channel, NULL);
 	return 0;
 }
 
 static int
 pop_f(va_list ap)
 {
-	struct ipc_channel *channel = va_arg(ap, struct ipc_channel *);
+	struct fiber_channel *channel = va_arg(ap, struct fiber_channel *);
 
 	for (int i = 0; i < ITERATIONS; i++) {
 		void *ptr;
-		ipc_channel_get(channel, &ptr);
+		fiber_channel_get(channel, &ptr);
 	}
 	return 0;
 }
@@ -37,12 +37,12 @@ main_f(va_list ap)
 	fiber_set_joinable(push, true);
 	struct fiber *pop = fiber_new_xc("pop_f", pop_f);
 	fiber_set_joinable(pop, true);
-	struct ipc_channel *channel = ipc_channel_new(1);
+	struct fiber_channel *channel = fiber_channel_new(1);
 	fiber_start(push, channel);
 	fiber_start(pop, channel);
 	fiber_join(push);
 	fiber_join(pop);
-	ipc_channel_delete(channel);
+	fiber_channel_delete(channel);
 	ev_break(loop(), EVBREAK_ALL);
 	footer();
 	return 0;

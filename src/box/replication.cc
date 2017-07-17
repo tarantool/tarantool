@@ -31,8 +31,8 @@
 
 #include "replication.h"
 
-#include <ipc.h>
 #include <fiber.h> /* &cord->slabc */
+#include <fiber_channel.h>
 #include <scoped_guard.h>
 #include <small/mempool.h>
 

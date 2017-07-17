@@ -163,6 +163,12 @@ test_touint64(lua_State *L)
 		return 0;
 	lua_pop(L, 1);
 
+	lua_pushliteral(L, "not a cdata");
+	luaL_pushuint64(L, 18446744073709551615ULL);
+	if (luaL_touint64(L, -1) != 18446744073709551615ULL)
+		return 0;
+	lua_pop(L, 2);
+
 	lua_pushboolean(L, 1);
 	return 1;
 }
@@ -179,6 +185,12 @@ test_toint64(lua_State *L)
 	if (luaL_toint64(L, -1) != 9223372036854775807)
 		return 0;
 	lua_pop(L, 1);
+
+	lua_pushliteral(L, "not a cdata");
+	luaL_pushuint64(L, 18446744073709551615ULL);
+	if (luaL_touint64(L, -1) != 18446744073709551615ULL)
+		return 0;
+	lua_pop(L, 2);
 
 	lua_pushboolean(L, 1);
 	return 1;

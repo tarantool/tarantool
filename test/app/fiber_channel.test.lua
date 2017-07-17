@@ -1,132 +1,39 @@
 fiber = require('fiber')
----
-...
 env = require('test_run')
----
-...
 test_run = env.new()
----
-...
+
 -- channel methods ignore extra arguments, as regular Lua functions do
 ignored_args = {'Extra', 'arguments', 'are', 'ignored'}
----
-...
+
 ch = fiber.channel(1)
----
-...
 ch:size()
----
-- 1
-...
 ch:count()
----
-- 0
-...
 ch:is_full()
----
-- false
-...
 ch:is_empty()
----
-- true
-...
 ch:size(unpack(ignored_args))
----
-- 1
-...
 ch:count(unpack(ignored_args))
----
-- 0
-...
 ch:is_full(unpack(ignored_args))
----
-- false
-...
 ch:is_empty(unpack(ignored_args))
----
-- true
-...
 ch:get(.1)
----
-- null
-...
 ch:get(.1, nil)
----
-- null
-...
 ch:get(.1, nil, unpack(ignored_args))
----
-- null
-...
 tostring(ch)
----
-- 'channel: 0'
-...
 ch:put()
----
-- error: 'usage: channel:put(var [, timeout])'
-...
 ch:count()
----
-- 0
-...
 ch:put('test')
----
-- true
-...
 tostring(ch)
----
-- 'channel: 1'
-...
 ch:get()
----
-- test
-...
 ch:put('test', nil), ch:get()
----
-- true
-- test
-...
 ch:put('test', nil, unpack(ignored_args)), ch:get()
----
-- true
-- test
-...
 ch:get('wrong timeout')
----
-- error: 'usage: channel:get([timeout])'
-...
 ch:get(-10)
----
-- error: 'usage: channel:get([timeout])'
-...
 ch:put(234)
----
-- true
-...
 ch:put(345, .1)
----
-- false
-...
 ch:count()
----
-- 1
-...
 ch:is_full()
----
-- true
-...
 ch:is_empty()
----
-- false
-...
 buffer = {}
----
-...
 test_run:cmd("setopt delimiter ';'")
----
-- true
-...
 tfbr = fiber.create(
     function()
         while true do
@@ -134,116 +41,31 @@ tfbr = fiber.create(
         end
     end
 );
----
-...
 t = {};
----
-...
 for i = 1, 10 do
     table.insert(t, {i, ch:put(i, 0.1)})
 end;
----
-...
 test_run:cmd("setopt delimiter ''");
----
-- true
-...
 t
----
-- - - 1
-    - true
-  - - 2
-    - true
-  - - 3
-    - true
-  - - 4
-    - true
-  - - 5
-    - true
-  - - 6
-    - true
-  - - 7
-    - true
-  - - 8
-    - true
-  - - 9
-    - true
-  - - 10
-    - true
-...
 ch:has_readers()
----
-- true
-...
 ch:has_writers()
----
-- false
-...
 fiber.cancel(tfbr)
----
-...
+
 ch:has_readers()
----
-- false
-...
 ch:has_writers()
----
-- false
-...
 ch:count()
----
-- 0
-...
 ch:put(box.info.pid)
----
-- true
-...
 ch:count()
----
-- 1
-...
 ch:is_full()
----
-- true
-...
 ch:is_empty()
----
-- false
-...
 ch:get(box.info.pid) == box.info.pid
----
-- true
-...
 buffer
----
-- - 234
-  - 1
-  - 2
-  - 3
-  - 4
-  - 5
-  - 6
-  - 7
-  - 8
-  - 9
-  - 10
-...
+
 ch:is_empty()
----
-- true
-...
+
 ch:is_full()
----
-- false
-...
 ch:is_empty()
----
-- true
-...
 test_run:cmd("setopt delimiter ';'")
----
-- true
-...
 tfbr = fiber.create(
     function()
         while true do
@@ -252,8 +74,6 @@ tfbr = fiber.create(
         end
     end
 );
----
-...
 tfbr2 = fiber.create(
     function()
         while true do
@@ -262,191 +82,58 @@ tfbr2 = fiber.create(
         end
     end
 );
----
-...
 test_run:cmd("setopt delimiter ''");
----
-- true
-...
+
 buffer = {}
----
-...
+
 buffer
----
-- []
-...
 ch:is_full()
----
-- false
-...
 ch:is_empty()
----
-- true
-...
 ch:put(1)
----
-- true
-...
 ch:put(2)
----
-- true
-...
 ch:put(3)
----
-- true
-...
 ch:put(4)
----
-- true
-...
 ch:put(5)
----
-- true
-...
 t = {}
----
-...
 for i = 35, 45 do table.insert(t, ch:put(i)) end
----
-...
 t
----
-- - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-...
 while #buffer < 15 do fiber.sleep(0.001) end
----
-...
 table.sort(buffer)
----
-...
 buffer
----
-- - 1
-  - 2
-  - 3
-  - 4
-  - 5
-  - 35
-  - 36
-  - 37
-  - 38
-  - 39
-  - 40
-  - 41
-  - 42
-  - 43
-  - 44
-  - 45
-...
+
 ch = fiber.channel(1)
----
-...
 ch:is_closed()
----
-- false
-...
 passed = false
----
-...
 type(fiber.create(function() if ch:get() == nil then passed = true end end))
----
-- userdata
-...
 ch:close()
----
-...
 fiber.yield()
----
-...
 passed
----
-- true
-...
 ch:get()
----
-- null
-...
 ch:get()
----
-- null
-...
 ch:put(10)
----
-- false
-...
 ch:is_closed()
----
-- true
-...
 tostring(ch)
----
-- 'channel: closed'
-...
+
 ch = fiber.channel(1)
----
-...
 ch:put(true)
----
-- true
-...
 ch:is_closed()
----
-- false
-...
 passed = false
----
-...
 type(fiber.create(function() if ch:put(true) == false then passed = true end end))
----
-- userdata
-...
 ch:close()
----
-...
 fiber.yield()
----
-...
 passed
----
-- true
-...
 ch:get()
----
-- null
-...
 ch:get()
----
-- null
-...
 ch:put(10)
----
-- false
-...
 ch:is_closed()
----
-- true
-...
+
+
+
 -- race conditions
 chs, test_res, count = {}, {}, 0
----
-...
 test_run:cmd("setopt delimiter ';'")
----
-- true
-...
 for i = 1, 10 do table.insert(chs, fiber.channel()) end;
----
-...
+
 fibers = {}
 
 for i = 1, 10 do
@@ -460,8 +147,7 @@ for i = 1, 10 do
         end, i)
     )
 end;
----
-...
+
 for i = 1, 10 do
     table.insert(fibers,
         fiber.create(function(no)
@@ -480,37 +166,19 @@ for i = 1, 10 do
         end, i)
     )
 end;
----
-...
+
 for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
----
-...
+
 count > 2000, #test_res, test_res;
----
-- true
-- 10
-- - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-  - true
-...
 for _, fiber in ipairs(fibers) do
     fiber:cancel()
 end;
----
-...
+
 --
 -- gh-756: channel:close() leaks memory
 --
+
 ffi = require('ffi');
----
-...
 do
     stat, err = pcall(ffi.cdef, [[struct gh756 { int k; }]])
     if not stat and not err:match('attempt to redefine') then
@@ -522,125 +190,23 @@ do
         error(err)
     end
 end;
----
-...
 test_run:cmd("setopt delimiter ''");
----
-- true
-...
 ct = ffi.typeof('struct gh756')
----
-...
+
 -- create 10 objects and put they to a channel
 refs = 10
----
-...
 ch = fiber.channel(refs)
----
-...
 for i=1,refs do ch:put(ffi.new(ct, i)) end
----
-...
+
 -- get an object from the channel, run GC and check the number of objects
 ch:get().k == 1
----
-- true
-...
 collectgarbage('collect')
----
-- 0
-...
 refs
----
-- 9
-...
 ch:get().k == 2
----
-- true
-...
 collectgarbage('collect')
----
-- 0
-...
 refs
----
-- 8
-...
+
 -- close the channel and check the number of objects
 ch:close()
----
-...
 collectgarbage('collect')
----
-- 0
-...
 refs -- must be zero
----
-- 0
-...
--- fiber.cond
-c = fiber.cond()
----
-...
-tostring(c)
----
-- cond
-...
--- args validation
-c.wait()
----
-- error: 'usage: cond:wait([timeout])'
-...
-c.wait('1')
----
-- error: 'bad argument #1 to ''?'' (fiber.cond expected, got string)'
-...
-c:wait('1')
----
-- false
-...
-c:wait(-1)
----
-- error: 'usage: cond:wait([timeout])'
-...
--- timeout
-c:wait(0.1)
----
-- false
-...
--- wait success
-fiber.create(function() fiber.sleep(.5); c:broadcast() end) and c:wait(.6)
----
-- true
-...
--- signal
-t = {}
----
-...
-for i = 1,4 do fiber.create(function() c:wait(); table.insert(t, '#') end) end
----
-...
-c:signal()
----
-...
-fiber.sleep(0.1)
----
-...
-t
----
-- - '#'
-...
--- broadcast
-c:broadcast()
----
-...
-fiber.sleep(0.1)
----
-...
-t
----
-- - '#'
-  - '#'
-  - '#'
-  - '#'
-...

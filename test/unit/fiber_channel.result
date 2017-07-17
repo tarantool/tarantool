@@ -1,0 +1,23 @@
+	*** fiber_channel_basic ***
+1..10
+ok 1 - fiber_channel_new()
+ok 2 - fiber_channel_size()
+ok 3 - fiber_channel_count()
+ok 4 - fiber_channel_is_full()
+ok 5 - fiber_channel_is_empty()
+ok 6 - fiber_channel_size(1)
+ok 7 - fiber_channel_count(1)
+ok 8 - fiber_channel_is_full(1)
+ok 9 - fiber_channel_is_empty(1)
+ok 10 - fiber_channel_get()
+	*** fiber_channel_basic: done ***
+	*** fiber_channel_get ***
+1..7
+ok 1 - fiber_channel_put(0)
+ok 2 - fiber_channel_put_timeout(0)
+ok 3 - fiber_channel_get(0)
+ok 4 - fiber_channel_put_timeout(1)
+ok 5 - fiber_channel_get(1)
+ok 6 - fiber_channel_put(closed)
+ok 7 - fiber_channel_get(closed)
+	*** fiber_channel_get: done ***

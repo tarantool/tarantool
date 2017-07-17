@@ -33,9 +33,10 @@
 #include <small/ibuf.h>
 #include <small/region.h>
 #include <small/mempool.h>
+#include <tarantool_ev.h>
 
 #include "diag.h"
-#include "ipc.h"
+#include "fiber_cond.h"
 
 /** {{{ Environment */
 
@@ -261,7 +262,7 @@ struct httpc_response {
 	 * When request is given to curl-driver, client waits on this variable
 	 * until the handler (callback function) gives a signal within variable
 	 * */
-	struct ipc_cond cond;
+	struct fiber_cond cond;
 };
 
 /**

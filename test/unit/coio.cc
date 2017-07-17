@@ -1,6 +1,7 @@
 #include "memory.h"
 #include "fiber.h"
 #include "coio.h"
+#include "coio_task.h"
 #include "fio.h"
 #include "unit.h"
 #include "unit.h"
@@ -50,6 +51,23 @@ stat_timeout_test(const char *filename)
 	footer();
 }
 
+static ssize_t
+coio_test_wakeup(va_list ap)
+{
+	usleep(1000);
+	return 0;
+}
+
+static int
+test_call_f(va_list ap)
+{
+	header();
+	int res = coio_call(coio_test_wakeup);
+	note("call done with res %i", res);
+	footer();
+	return res;
+}
+
 static int
 main_f(va_list ap)
 {
@@ -59,6 +77,15 @@ main_f(va_list ap)
 	stat_notify_test(f, filename);
 	fclose(f);
 	(void) remove(filename);
+
+	coio_enable();
+	struct fiber *call_fiber = fiber_new_xc("coio_call wakeup", test_call_f);
+	fiber_set_joinable(call_fiber, true);
+	fiber_start(call_fiber);
+	fiber_wakeup(call_fiber);
+	fiber_cancel(call_fiber);
+	fiber_join(call_fiber);
+
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }

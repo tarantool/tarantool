@@ -83,7 +83,7 @@ curl_multi_process(CURLM *multi, curl_socket_t sockfd, int events)
 		curl_easy_getinfo(easy, CURLINFO_PRIVATE, (void *) &resp);
 
 		resp->curl_code = (int) curl_code;
-		ipc_cond_signal(&resp->cond);
+		fiber_cond_signal(&resp->cond);
 	}
 }
 
@@ -488,7 +488,7 @@ httpc_response_new(struct httpc_env *ctx)
 	resp->curl_code = CURLE_OK;
 	region_create(&resp->headers, &cord()->slabc);
 	region_create(&resp->body, &cord()->slabc);
-	ipc_cond_create(&resp->cond);
+	fiber_cond_create(&resp->cond);
 	return resp;
 }
 
@@ -497,7 +497,7 @@ httpc_response_delete(struct httpc_response *resp)
 {
 	region_destroy(&resp->headers);
 	region_destroy(&resp->body);
-	ipc_cond_destroy(&resp->cond);
+	fiber_cond_destroy(&resp->cond);
 	mempool_free(&resp->ctx->resp_pool, resp);
 }
 
@@ -525,7 +525,7 @@ httpc_execute(struct httpc_request *req, double timeout)
 	/* Don't wait on a cond if request has already failed */
 	if (resp->curl_code == CURLE_OK) {
 		++env->stat.active_requests;
-		int rc = ipc_cond_wait_timeout(&resp->cond, timeout);
+		int rc = fiber_cond_wait_timeout(&resp->cond, timeout);
 		if (rc < 0 || fiber_is_cancelled())
 			resp->curl_code = CURLE_OPERATION_TIMEDOUT;
 		--env->stat.active_requests;

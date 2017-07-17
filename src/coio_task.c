@@ -274,18 +274,13 @@ coio_call(ssize_t (*func)(va_list ap), ...)
 	task->complete = 0;
 	diag_create(&task->diag);
 
-	bool cancellable = fiber_set_cancellable(false);
-
 	va_start(task->ap, func);
 	eio_submit(&task->base);
 
-	fiber_yield();
-	/* Spurious wakeup indicates a severe BUG, fail early. */
-	if (task->complete == 0)
-		panic("Wrong fiber woken");
+	do {
+		fiber_yield();
+	} while (task->complete == 0);
 	va_end(task->ap);
-
-	fiber_set_cancellable(cancellable);
 
 	ssize_t result = task->base.result;
 	int save_errno = errno;

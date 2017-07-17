@@ -76,7 +76,7 @@ restart:
 		goto restart;
 	}
 	pool->size--;
-	ipc_cond_signal(&pool->worker_cond);
+	fiber_cond_signal(&pool->worker_cond);
 
 	return 0;
 }
@@ -147,7 +147,7 @@ fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
 	pool->size = 0;
 	pool->max_size = max_pool_size;
 	stailq_create(&pool->output);
-	ipc_cond_create(&pool->worker_cond);
+	fiber_cond_create(&pool->worker_cond);
 	/* Join fiber pool to cbus */
 	cbus_endpoint_create(&pool->endpoint, name, fiber_pool_cb, pool);
 }
@@ -172,7 +172,7 @@ fiber_pool_destroy(struct fiber_pool *pool)
 	 * Just wait on fiber exit condition until all fibers are done
 	 */
 	while (pool->size > 0)
-		ipc_cond_wait(&pool->worker_cond);
-	ipc_cond_destroy(&pool->worker_cond);
+		fiber_cond_wait(&pool->worker_cond);
+	fiber_cond_destroy(&pool->worker_cond);
 }
 

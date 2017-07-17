@@ -28,15 +28,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "ipc.h"
-#include "fiber.h"
+#include "fiber_channel.h"
+
 #include <stdlib.h>
 
-enum ipc_wait_status {
-	IPC_WAIT_READER, /* A reader is waiting for writer */
-	IPC_WAIT_WRITER, /* A writer waiting for reader. */
-	IPC_WAIT_DONE, /* Wait is done, message sent/received. */
-	IPC_WAIT_CLOSED /* Wait is aborted, the channel is closed. */
+#include "fiber.h"
+
+enum fiber_channel_wait_status {
+	FIBER_CHANNEL_WAIT_READER, /* A reader is waiting for writer */
+	FIBER_CHANNEL_WAIT_WRITER, /* A writer waiting for reader. */
+	FIBER_CHANNEL_WAIT_DONE, /* Wait is done, message sent/received. */
+	FIBER_CHANNEL_WAIT_CLOSED /* Wait is aborted, the channel is closed. */
 };
 
 /**
@@ -45,11 +47,11 @@ enum ipc_wait_status {
  */
 struct ipc_wait_pad {
 	struct ipc_msg *msg;
-	enum ipc_wait_status status;
+	enum fiber_channel_wait_status status;
 };
 
 void
-ipc_channel_create(struct ipc_channel *ch, uint32_t size)
+fiber_channel_create(struct fiber_channel *ch, uint32_t size)
 {
 	ch->size = size;
 	ch->count = 0;
@@ -62,22 +64,23 @@ ipc_channel_create(struct ipc_channel *ch, uint32_t size)
 
 }
 
-struct ipc_channel *
-ipc_channel_new(uint32_t size)
+struct fiber_channel *
+fiber_channel_new(uint32_t size)
 {
-	struct ipc_channel *res = (struct ipc_channel *)
-		malloc(ipc_channel_memsize(size));
+	struct fiber_channel *res = (struct fiber_channel *)
+		malloc(fiber_channel_memsize(size));
 	if (res == NULL) {
 		diag_set(OutOfMemory, size,
-			 "malloc", "struct ipc_channel");
+			 "malloc", "struct fiber_channel");
 		return NULL;
 	}
-	ipc_channel_create(res, size);
+	fiber_channel_create(res, size);
 	return res;
 }
 
 bool
-ipc_channel_has_waiter(struct ipc_channel *ch, enum ipc_wait_status status)
+fiber_channel_has_waiter(struct fiber_channel *ch,
+			 enum fiber_channel_wait_status status)
 {
 	if (rlist_empty(&ch->waiters))
 		return false;
@@ -88,15 +91,15 @@ ipc_channel_has_waiter(struct ipc_channel *ch, enum ipc_wait_status status)
 }
 
 bool
-ipc_channel_has_readers(struct ipc_channel *ch)
+fiber_channel_has_readers(struct fiber_channel *ch)
 {
-	return ipc_channel_has_waiter(ch, IPC_WAIT_READER);
+	return fiber_channel_has_waiter(ch, FIBER_CHANNEL_WAIT_READER);
 }
 
 bool
-ipc_channel_has_writers(struct ipc_channel *ch)
+fiber_channel_has_writers(struct fiber_channel *ch)
 {
-	return ipc_channel_has_waiter(ch, IPC_WAIT_WRITER);
+	return fiber_channel_has_waiter(ch, FIBER_CHANNEL_WAIT_WRITER);
 }
 
 /**
@@ -105,7 +108,7 @@ ipc_channel_has_writers(struct ipc_channel *ch)
  * @pre The buffer has space for a message.
  */
 static inline void
-ipc_channel_buffer_push(struct ipc_channel *ch, struct ipc_msg *msg)
+fiber_channel_buffer_push(struct fiber_channel *ch, struct ipc_msg *msg)
 {
 	assert(ch->count < ch->size);
 	/* Find an empty slot in the ring buffer. */
@@ -117,7 +120,7 @@ ipc_channel_buffer_push(struct ipc_channel *ch, struct ipc_msg *msg)
 }
 
 static inline struct ipc_msg *
-ipc_channel_buffer_pop(struct ipc_channel *ch)
+fiber_channel_buffer_pop(struct fiber_channel *ch)
 {
 	assert(ch->count > 0);
 	struct ipc_msg *msg = ch->buf[ch->beg];
@@ -128,7 +131,8 @@ ipc_channel_buffer_pop(struct ipc_channel *ch)
 }
 
 static inline void
-ipc_channel_waiter_wakeup(struct fiber *f, enum ipc_wait_status status)
+fiber_channel_waiter_wakeup(struct fiber *f,
+			    enum fiber_channel_wait_status status)
 {
 	struct ipc_wait_pad *pad = (struct ipc_wait_pad *)
 		fiber_get_key(f, FIBER_KEY_MSG);
@@ -139,7 +143,7 @@ ipc_channel_waiter_wakeup(struct fiber *f, enum ipc_wait_status status)
 	 */
 	pad->status = status;
 	/*
-	 * ipc_channel allows an asynchronous cancel. If a fiber
+	 * fiber_channel allows an asynchronous cancel. If a fiber
 	 * is cancelled while waiting on a timeout, it is done via
 	 * fiber_wakeup(), which modifies fiber->state link.
 	 * This ensures that a fiber is never on two "state"
@@ -159,7 +163,7 @@ ipc_channel_waiter_wakeup(struct fiber *f, enum ipc_wait_status status)
 
 
 int
-ipc_channel_check_wait(struct ipc_channel *ch, ev_tstamp start_time,
+fiber_channel_check_wait(struct fiber_channel *ch, ev_tstamp start_time,
 		       ev_tstamp timeout)
 {
 	/*
@@ -189,34 +193,34 @@ ipc_channel_check_wait(struct ipc_channel *ch, ev_tstamp start_time,
 }
 
 void
-ipc_channel_close(struct ipc_channel *ch)
+fiber_channel_close(struct fiber_channel *ch)
 {
 	if (ch->is_closed)
 		return;
 
 	while (ch->count) {
-		struct ipc_msg *msg = ipc_channel_buffer_pop(ch);
+		struct ipc_msg *msg = fiber_channel_buffer_pop(ch);
 		msg->destroy(msg);
 	}
 
 	struct fiber *f;
 	while (! rlist_empty(&ch->waiters)) {
 		f = rlist_first_entry(&ch->waiters, struct fiber, state);
-		ipc_channel_waiter_wakeup(f, IPC_WAIT_CLOSED);
+		fiber_channel_waiter_wakeup(f, FIBER_CHANNEL_WAIT_CLOSED);
 	}
 	ch->is_closed = true;
 }
 
 void
-ipc_channel_destroy(struct ipc_channel *ch)
+fiber_channel_destroy(struct fiber_channel *ch)
 {
-	ipc_channel_close(ch);
+	fiber_channel_close(ch);
 }
 
 void
-ipc_channel_delete(struct ipc_channel *ch)
+fiber_channel_delete(struct fiber_channel *ch)
 {
-	ipc_channel_destroy(ch);
+	fiber_channel_destroy(ch);
 	free(ch);
 }
 
@@ -252,7 +256,7 @@ ipc_value_delete(struct ipc_msg *msg)
 }
 
 int
-ipc_channel_put_timeout(struct ipc_channel *ch,
+fiber_channel_put_timeout(struct fiber_channel *ch,
 			void *data,
 			ev_tstamp timeout)
 {
@@ -260,18 +264,18 @@ ipc_channel_put_timeout(struct ipc_channel *ch,
 	if (value == NULL)
 		return -1;
 	value->data = data;
-	int rc = ipc_channel_put_msg_timeout(ch, &value->base, timeout);
+	int rc = fiber_channel_put_msg_timeout(ch, &value->base, timeout);
 	if (rc < 0)
 		ipc_value_delete(&value->base);
 	return rc;
 }
 
 int
-ipc_channel_get_timeout(struct ipc_channel *ch, void **data,
+fiber_channel_get_timeout(struct fiber_channel *ch, void **data,
 			ev_tstamp timeout)
 {
 	struct ipc_value *value;
-	int rc = ipc_channel_get_msg_timeout(ch, (struct ipc_msg **) &value,
+	int rc = fiber_channel_get_msg_timeout(ch, (struct ipc_msg **) &value,
 					     timeout);
 	if (rc < 0)
 		return rc;
@@ -281,7 +285,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, void **data,
 }
 
 int
-ipc_channel_put_msg_timeout(struct ipc_channel *ch,
+fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 			    struct ipc_msg *msg,
 			    ev_tstamp timeout)
 {
@@ -295,7 +299,7 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 		 * only if there is no reader try to put a message
 		 * into the channel buffer.
 		 */
-		if (ipc_channel_has_readers(ch)) {
+		if (fiber_channel_has_readers(ch)) {
 			/**
 			 * There is a reader, push the message
 			 * immediately.
@@ -318,7 +322,7 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 
 			pad->msg = msg;
 
-			ipc_channel_waiter_wakeup(f, IPC_WAIT_DONE);
+			fiber_channel_waiter_wakeup(f, FIBER_CHANNEL_WAIT_DONE);
 			return 0;
 		}
 		if (ch->count < ch->size) {
@@ -335,7 +339,7 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 				diag_set(ChannelIsClosed);
 				return -1;
 			}
-			ipc_channel_buffer_push(ch, msg);
+			fiber_channel_buffer_push(ch, msg);
 			return 0;
 		}
 		/**
@@ -344,12 +348,12 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 		 */
 		struct fiber *f = fiber();
 
-		if (ipc_channel_check_wait(ch, start_time, timeout))
+		if (fiber_channel_check_wait(ch, start_time, timeout))
 			return -1;
 
 		/* Prepare a wait pad. */
 		struct ipc_wait_pad pad;
-		pad.status = IPC_WAIT_WRITER;
+		pad.status = FIBER_CHANNEL_WAIT_WRITER;
 		pad.msg = msg;
 		fiber_set_key(f, FIBER_KEY_MSG, &pad);
 
@@ -368,7 +372,7 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 		rlist_del_entry(f, state);
 		fiber_set_key(f, FIBER_KEY_MSG, NULL);
 
-		if (pad.status == IPC_WAIT_CLOSED) {
+		if (pad.status == FIBER_CHANNEL_WAIT_CLOSED) {
 			/*
 			 * The channel is closed.  Do not touch
 			 * the channel object. It might be gone
@@ -377,14 +381,14 @@ ipc_channel_put_msg_timeout(struct ipc_channel *ch,
 			diag_set(ChannelIsClosed);
 			return -1;
 		}
-		if (pad.status == IPC_WAIT_DONE)
+		if (pad.status == FIBER_CHANNEL_WAIT_DONE)
 			return 0;  /* OK, someone took the message. */
 		timeout -= ev_now(loop()) - start_time;
 	}
 }
 
 int
-ipc_channel_get_msg_timeout(struct ipc_channel *ch,
+fiber_channel_get_msg_timeout(struct fiber_channel *ch,
 			    struct ipc_msg **msg,
 			    ev_tstamp timeout)
 {
@@ -407,9 +411,9 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 			 */
 			assert(ch->is_closed == false);
 
-			*msg = ipc_channel_buffer_pop(ch);
+			*msg = fiber_channel_buffer_pop(ch);
 
-			if (ipc_channel_has_writers(ch)) {
+			if (fiber_channel_has_writers(ch)) {
 				/*
 				 * Move a waiting writer, if any,
 				 * from the wait list to the tail
@@ -422,12 +426,13 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 				struct ipc_wait_pad *pad =
 					(struct ipc_wait_pad *)
 					fiber_get_key(f, FIBER_KEY_MSG);
-				ipc_channel_buffer_push(ch, pad->msg);
-				ipc_channel_waiter_wakeup(f, IPC_WAIT_DONE);
+				fiber_channel_buffer_push(ch, pad->msg);
+				fiber_channel_waiter_wakeup(f,
+					FIBER_CHANNEL_WAIT_DONE);
 			}
 			return 0;
 		}
-		if (ipc_channel_has_writers(ch)) {
+		if (fiber_channel_has_writers(ch)) {
 			/**
 			 * There is no buffered messages, *but*
 			 * there is a writer. This is only
@@ -444,10 +449,10 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 				(struct ipc_wait_pad *)
 				fiber_get_key(f, FIBER_KEY_MSG);
 			*msg = pad->msg;
-			ipc_channel_waiter_wakeup(f, IPC_WAIT_DONE);
+			fiber_channel_waiter_wakeup(f, FIBER_CHANNEL_WAIT_DONE);
 			return 0;
 		}
-		if (ipc_channel_check_wait(ch, start_time, timeout))
+		if (fiber_channel_check_wait(ch, start_time, timeout))
 			return -1;
 		f = fiber();
 		/**
@@ -455,7 +460,7 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 		 * Have to wait.
 		 */
 		struct ipc_wait_pad pad;
-		pad.status = IPC_WAIT_READER;
+		pad.status = FIBER_CHANNEL_WAIT_READER;
 		fiber_set_key(f, FIBER_KEY_MSG, &pad);
 		if (first_try) {
 			rlist_add_tail_entry(&ch->waiters, f, state);
@@ -471,59 +476,14 @@ ipc_channel_get_msg_timeout(struct ipc_channel *ch,
 		 */
 		rlist_del_entry(f, state);
 		fiber_set_key(f, FIBER_KEY_MSG, NULL);
-		if (pad.status == IPC_WAIT_CLOSED) {
+		if (pad.status == FIBER_CHANNEL_WAIT_CLOSED) {
 			diag_set(ChannelIsClosed);
 			return -1;
 		}
-		if (pad.status == IPC_WAIT_DONE) {
+		if (pad.status == FIBER_CHANNEL_WAIT_DONE) {
 			*msg = pad.msg;
 			return 0;
 		}
 		timeout -= ev_now(loop()) - start_time;
 	}
-}
-
-void
-ipc_cond_create(struct ipc_cond *c)
-{
-	rlist_create(&c->waiters);
-}
-
-void
-ipc_cond_destroy(struct ipc_cond *c)
-{
-	(void)c;
-	assert(rlist_empty(&c->waiters));
-}
-
-void
-ipc_cond_signal(struct ipc_cond *e)
-{
-	if (! rlist_empty(&e->waiters)) {
-		struct fiber *f;
-		f = rlist_shift_entry(&e->waiters, struct fiber, state);
-		fiber_wakeup(f);
-	}
-}
-
-void
-ipc_cond_broadcast(struct ipc_cond *e)
-{
-	while (! rlist_empty(&e->waiters)) {
-		struct fiber *f;
-		f = rlist_shift_entry(&e->waiters, struct fiber, state);
-		fiber_wakeup(f);
-	}
-}
-
-int
-ipc_cond_wait_timeout(struct ipc_cond *c, ev_tstamp timeout)
-{
-	struct fiber *f = fiber();
-	rlist_add_tail_entry(&c->waiters, f, state);
-	if (fiber_yield_timeout(timeout)) {
-		diag_set(TimedOut);
-		return -1;
-	}
-	return 0;
 }
