@@ -286,6 +286,9 @@ cn:execute('create table test2(id primary key, a, b, c)')
 ---
 - rowcount: 3
 ...
+cn:reload_schema()
+---
+...
 box.space.test2.name
 ---
 - test2
@@ -304,6 +307,9 @@ cn:execute('create index test2_a_b_index on test2(a, b)')
 ---
 - rowcount: 1
 ...
+cn:reload_schema()
+---
+...
 #box.space.test2.index
 ---
 - 1
@@ -311,6 +317,9 @@ cn:execute('create index test2_a_b_index on test2(a, b)')
 cn:execute('drop table test2')
 ---
 - rowcount: 1
+...
+cn:reload_schema()
+---
 ...
 box.space.test2
 ---

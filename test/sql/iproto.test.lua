@@ -111,12 +111,15 @@ cn:execute('select :value', parameters)
 
 -- gh-2608 SQL iproto DDL
 cn:execute('create table test2(id primary key, a, b, c)')
+cn:reload_schema()
 box.space.test2.name
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 cn:execute('select * from test2')
 cn:execute('create index test2_a_b_index on test2(a, b)')
+cn:reload_schema()
 #box.space.test2.index
 cn:execute('drop table test2')
+cn:reload_schema()
 box.space.test2
 
 cn:close()
