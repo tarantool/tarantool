@@ -268,7 +268,7 @@ struct recovery_journal {
  * exact same signature during local recovery to properly mark
  * min/max LSN of created LSM levels.
  */
-int64_t
+static int64_t
 recovery_journal_write(struct journal *base,
 		       struct journal_entry * /* entry */)
 {
@@ -281,6 +281,30 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 {
 	journal_create(&journal->base, recovery_journal_write, NULL);
 	journal->vclock = v;
+}
+
+/**
+ * Dummy journal used to generate unique LSNs for rows received
+ * during initial join.
+ */
+struct join_journal {
+	struct journal base;
+	int64_t lsn;
+};
+
+static int64_t
+join_journal_write(struct journal *base,
+		   struct journal_entry * /* entry */)
+{
+	struct join_journal *journal = (struct join_journal *) base;
+	return ++journal->lsn;
+}
+
+static inline void
+join_journal_create(struct join_journal *journal)
+{
+	journal_create(&journal->base, join_journal_write, NULL);
+	journal->lsn = 0;
 }
 
 static inline void
@@ -1456,7 +1480,9 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery(NULL);
-
+	struct join_journal join_journal;
+	join_journal_create(&join_journal);
+	journal_set(&join_journal.base);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 	/*
