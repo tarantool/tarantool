@@ -6,7 +6,12 @@
 %endif
 
 BuildRequires: cmake >= 2.8
+BuildRequires: make
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
+# RHEL 6 requires devtoolset
 BuildRequires: gcc >= 4.5
+BuildRequires: gcc-c++ >= 4.5
+%endif
 BuildRequires: coreutils
 BuildRequires: sed
 BuildRequires: readline-devel
@@ -77,6 +82,20 @@ Obsoletes: tarantool-common < 1.6.8.434-1
 # https://github.com/tarantool/tarantool/issues/1794
 Requires: /etc/protocols
 Requires: /etc/services
+# Deps for built-in package manager
+# https://github.com/tarantool/tarantool/issues/2612
+Requires: openssl
+Requires: curl
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 8)
+# RHEL <= 7 doesn't support Recommends:
+Recommends: tarantool-devel
+Recommends: git-core
+Recommends: cmake >= 2.8
+Recommends: make
+Recommends: gcc >= 4.5
+Recommends: gcc-c++ >= 4.5
+%endif
+
 URL: http://tarantool.org
 Source0: http://download.tarantool.org/tarantool/1.7/src/tarantool-%{version}.tar.gz
 %description
