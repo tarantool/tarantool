@@ -202,6 +202,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		goto fail_mem;
 
 	index->refs = 1;
+	index->commit_lsn = -1;
 	index->dump_lsn = -1;
 	vy_cache_create(&index->cache, cache_env, key_def);
 	rlist_create(&index->sealed);
@@ -383,7 +384,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_slice *slice;
 	bool success = false;
 
-	assert(record->type == VY_LOG_CREATE_INDEX || index->is_committed);
+	assert(record->type == VY_LOG_CREATE_INDEX || index->commit_lsn >= 0);
 
 	if (record->type == VY_LOG_INSERT_RANGE ||
 	    record->type == VY_LOG_INSERT_SLICE) {
@@ -401,27 +402,35 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
-		assert(record->index_lsn == index->opts.lsn);
-		index->is_committed = true;
+		assert(record->index_id == index->id);
+		assert(record->space_id == index->space_id);
+		assert(index->commit_lsn < 0);
+		assert(record->index_lsn >= 0);
+		index->commit_lsn = record->index_lsn;
 		break;
 	case VY_LOG_DUMP_INDEX:
-		assert(record->index_lsn == index->opts.lsn);
+		assert(record->index_lsn == index->commit_lsn);
 		index->dump_lsn = record->dump_lsn;
 		break;
 	case VY_LOG_TRUNCATE_INDEX:
-		assert(record->index_lsn == index->opts.lsn);
+		assert(record->index_lsn == index->commit_lsn);
 		index->truncate_count = record->truncate_count;
 		break;
 	case VY_LOG_DROP_INDEX:
-		assert(record->index_lsn == index->opts.lsn);
+		assert(record->index_lsn == index->commit_lsn);
 		index->is_dropped = true;
+		/*
+		 * If the index was dropped, we don't need to replay
+		 * truncate (see vy_prepare_truncate_space()).
+		 */
+		index->truncate_count = UINT64_MAX;
 		break;
 	case VY_LOG_PREPARE_RUN:
 		break;
 	case VY_LOG_CREATE_RUN:
 		if (record->is_dropped)
 			break;
-		assert(record->index_lsn == index->opts.lsn);
+		assert(record->index_lsn == index->commit_lsn);
 		run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto out;
@@ -443,7 +452,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	case VY_LOG_DROP_RUN:
 		break;
 	case VY_LOG_INSERT_RANGE:
-		assert(record->index_lsn == index->opts.lsn);
+		assert(record->index_lsn == index->commit_lsn);
 		range = vy_range_new(record->range_id, begin, end,
 				     index->key_def);
 		if (range == NULL)
@@ -486,7 +495,7 @@ out:
 
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 bool allow_missing)
+		 int64_t lsn, bool snapshot_recovery)
 {
 	assert(index->range_count == 0);
 
@@ -497,7 +506,18 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		return -1;
 	}
 
-	int rc = vy_recovery_load_index(recovery, index->opts.lsn,
+	/*
+	 * Backward compatibility fixup: historically, we used
+	 * box.info.signature for LSN of index creation, which
+	 * lags behind the LSN of the record that created the
+	 * index by 1. So for legacy indexes use the LSN from
+	 * index options.
+	 */
+	if (index->opts.lsn != 0)
+		lsn = index->opts.lsn;
+
+	int rc = vy_recovery_load_index(recovery, index->space_id, index->id,
+					lsn, snapshot_recovery,
 					vy_index_recovery_cb, &arg);
 
 	mh_int_t k;
@@ -509,7 +529,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Unused run %lld in index %lld",
 					    (long long)run->id,
-					    (long long)index->opts.lsn));
+					    (long long)index->commit_lsn));
 			rc = -1;
 			/*
 			 * Continue the loop to unreference
@@ -526,14 +546,27 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		return -1;
 	}
 
-	if (!index->is_committed) {
+	if (index->commit_lsn < 0) {
 		/* Index was not found in the metadata log. */
-		if (!allow_missing) {
+		if (snapshot_recovery) {
+			/*
+			 * All indexes created from snapshot rows must
+			 * be present in vylog, because snapshot can
+			 * only succeed if vylog has been successfully
+			 * flushed.
+			 */
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Index %lld not found",
-					    (long long)index->opts.lsn));
+					    (long long)index->commit_lsn));
 			return -1;
 		}
+		/*
+		 * If we failed to log index creation before restart,
+		 * we won't find it in the log on recovery. This is
+		 * OK as the index doesn't have any runs in this case.
+		 * We will retry to log index in vy_index_commit_create().
+		 * For now, just create the initial range.
+		 */
 		return vy_index_init_range_tree(index);
 	}
 
@@ -578,7 +611,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 	if (prev == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Index %lld has empty range tree",
-				    (long long)index->opts.lsn));
+				    (long long)index->commit_lsn));
 		return -1;
 	}
 	if (prev->end != NULL) {
@@ -932,7 +965,7 @@ vy_index_split_range(struct vy_index *index, struct vy_range *range)
 	vy_log_delete_range(range->id);
 	for (int i = 0; i < n_parts; i++) {
 		part = parts[i];
-		vy_log_insert_range(index->opts.lsn, part->id,
+		vy_log_insert_range(index->commit_lsn, part->id,
 				    tuple_data_or_null(part->begin),
 				    tuple_data_or_null(part->end));
 		rlist_foreach_entry(slice, &part->slices, in_range)
@@ -999,7 +1032,7 @@ vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_insert_range(index->opts.lsn, result->id,
+	vy_log_insert_range(index->commit_lsn, result->id,
 			    tuple_data_or_null(result->begin),
 			    tuple_data_or_null(result->end));
 	for (it = first; it != end; it = vy_range_tree_next(index->tree, it)) {

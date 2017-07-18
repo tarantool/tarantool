@@ -220,10 +220,10 @@ struct vy_index {
 	 */
 	int64_t dump_lsn;
 	/**
-	 * This flag is set if the index creation was
-	 * committed to the metadata log.
+	 * LSN of the row that committed the index or -1 if
+	 * the index was not committed to the metadata log.
 	 */
-	bool is_committed;
+	int64_t commit_lsn;
 	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index
@@ -341,13 +341,22 @@ vy_index_create(struct vy_index *index);
  * metadata log, rebuilds the range tree, and opens run
  * files.
  *
- * If @allow_missing is set, the function will not fail
- * in case the index is not found in the recovery context,
- * instead it will initialize the index as brand new.
+ * If @snapshot_recovery is set, the index is recovered from
+ * the last snapshot. In particular, this means that the index
+ * must have been logged in the metadata log and so if the
+ * function does not find it in the recovery context, it will
+ * fail. If the flag is unset, the index is recovered from a
+ * WAL, in which case a missing index is OK - it just means we
+ * failed to log it before restart and have to retry during
+ * WAL replay.
+ *
+ * @lsn is the LSN of the row that created the index.
+ * If the index is recovered from a snapshot, it is set
+ * to the snapshot signature.
  */
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 bool allow_missing);
+		 int64_t lsn, bool snapshot_recovery);
 
 /**
  * Return generation of in-memory data stored in an index

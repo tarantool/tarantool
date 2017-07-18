@@ -301,7 +301,7 @@ vy_run_prepare(struct vy_index *index)
 	if (run == NULL)
 		return NULL;
 	vy_log_tx_begin();
-	vy_log_prepare_run(index->opts.lsn, run->id);
+	vy_log_prepare_run(index->commit_lsn, run->id);
 	if (vy_log_tx_commit() < 0) {
 		vy_run_unref(run);
 		return NULL;
@@ -681,7 +681,7 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		 * to log index dump anyway.
 		 */
 		vy_log_tx_begin();
-		vy_log_dump_index(index->opts.lsn, dump_lsn);
+		vy_log_dump_index(index->commit_lsn, dump_lsn);
 		if (vy_log_tx_commit() < 0)
 			goto fail;
 		vy_run_discard(new_run);
@@ -741,7 +741,7 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_run(index->opts.lsn, new_run->id, dump_lsn);
+	vy_log_create_run(index->commit_lsn, new_run->id, dump_lsn);
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(index->tree, range), i++) {
 		assert(i < index->range_count);
@@ -753,7 +753,7 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		if (++loops % VY_YIELD_LOOPS == 0)
 			fiber_sleep(0); /* see comment above */
 	}
-	vy_log_dump_index(index->opts.lsn, dump_lsn);
+	vy_log_dump_index(index->commit_lsn, dump_lsn);
 	if (vy_log_tx_commit() < 0)
 		goto fail_free_slices;
 
@@ -1065,7 +1065,7 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
-		vy_log_create_run(index->opts.lsn, new_run->id,
+		vy_log_create_run(index->commit_lsn, new_run->id,
 				  new_run->dump_lsn);
 		vy_log_insert_slice(range->id, new_run->id, new_slice->id,
 				    tuple_data_or_null(new_slice->begin),
@@ -2274,8 +2274,6 @@ vy_delete_index(struct vy_env *env, struct vy_index *index)
 int
 vy_index_open(struct vy_env *env, struct vy_index *index)
 {
-	bool allow_missing = false;
-
 	switch (env->status) {
 	case VINYL_ONLINE:
 		/*
@@ -2299,19 +2297,9 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 		 * have already been created, so try to load
 		 * the index files from it.
 		 */
-		if (env->status == VINYL_FINAL_RECOVERY_LOCAL) {
-			/*
-			 * If we failed to log index creation before
-			 * restart, we won't find it in the log on
-			 * recovery. This is OK as the index doesn't
-			 * have any runs in this case. We will retry
-			 * to log index in vy_index_commit_create().
-			 * For now, initialize the index as new.
-			 */
-			allow_missing = true;
-		}
 		return vy_index_recover(index, env->recovery,
-					allow_missing);
+				vclock_sum(env->recovery_vclock),
+				env->status == VINYL_INITIAL_RECOVERY_LOCAL);
 	default:
 		unreachable();
 		return -1;
@@ -2321,8 +2309,6 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 void
 vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 {
-	(void)lsn;
-
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
 		/*
@@ -2333,13 +2319,23 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (index->is_committed) {
+		if (index->commit_lsn >= 0) {
 			vy_scheduler_add_index(env->scheduler, index);
 			return;
 		}
 	}
 
-	index->is_committed = true;
+	/*
+	 * Backward compatibility fixup: historically, we used
+	 * box.info.signature for LSN of index creation, which
+	 * lags behind the LSN of the record that created the
+	 * index by 1. So for legacy indexes use the LSN from
+	 * index options.
+	 */
+	if (index->opts.lsn != 0)
+		lsn = index->opts.lsn;
+
+	index->commit_lsn = lsn;
 
 	assert(index->range_count == 1);
 	struct vy_range *range = vy_range_tree_first(index->tree);
@@ -2353,9 +2349,9 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 	 * recovery.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_index(index->opts.lsn, index->id,
+	vy_log_create_index(index->commit_lsn, index->id,
 			    index->space_id, index->user_key_def);
-	vy_log_insert_range(index->opts.lsn, range->id, NULL, NULL);
+	vy_log_insert_range(index->commit_lsn, range->id, NULL, NULL);
 	if (vy_log_tx_try_commit() != 0)
 		say_warn("failed to log index creation: %s",
 			 diag_last_error(diag_get())->errmsg);
@@ -2411,7 +2407,7 @@ vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
 
 	vy_log_tx_begin();
 	vy_log_index_prune(index, vclock_sum(&env->scheduler->last_checkpoint));
-	vy_log_drop_index(index->opts.lsn);
+	vy_log_drop_index(index->commit_lsn);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
 			 diag_last_error(diag_get())->errmsg);
@@ -2450,6 +2446,8 @@ vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct vy_index *old_index = vy_index(old_space->index[i]);
 		struct vy_index *new_index = vy_index(new_space->index[i]);
+
+		new_index->commit_lsn = old_index->commit_lsn;
 
 		if (truncate_done) {
 			/*
@@ -2525,8 +2523,9 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 		assert(new_index->range_count == 1);
 
 		vy_log_index_prune(old_index, gc_lsn);
-		vy_log_insert_range(new_index->opts.lsn, range->id, NULL, NULL);
-		vy_log_truncate_index(new_index->opts.lsn,
+		vy_log_insert_range(new_index->commit_lsn,
+				    range->id, NULL, NULL);
+		vy_log_truncate_index(new_index->commit_lsn,
 				      new_index->truncate_count);
 	}
 	if (vy_log_tx_try_commit() < 0)

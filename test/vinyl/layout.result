@@ -121,19 +121,19 @@ result
     - - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {0: 2, 7: [[0, 'unsigned']], 6: 512}]
+          tuple: [0, {0: 3, 7: [[0, 'unsigned']], 6: 512}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [10, {0: 2, 9: 8}]
+          tuple: [10, {0: 3, 9: 8}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 2, 9: 8}]
+          tuple: [5, {0: 3, 2: 2, 9: 8}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [4, {0: 2, 2: 1}]
+          tuple: [4, {0: 3, 2: 1}]
       - HEADER:
           type: INSERT
         BODY:
@@ -141,7 +141,7 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [2, {0: 2}]
+          tuple: [2, {0: 3}]
       - HEADER:
           type: INSERT
         BODY:
@@ -159,12 +159,12 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [4, {0: 2, 2: 4}]
+          tuple: [4, {0: 3, 2: 4}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 4, 9: 11}]
+          tuple: [5, {0: 3, 2: 4, 9: 11}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -174,7 +174,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {0: 2, 9: 11}]
+          tuple: [10, {0: 3, 9: 11}]
   - - 00000000000000000002.index
     - - HEADER:
           type: RUNINFO
