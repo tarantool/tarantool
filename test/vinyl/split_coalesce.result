@@ -4,6 +4,13 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 ---
 ...
+-- Temporary table to restore variables after restart.
+var = box.schema.space.create('var')
+---
+...
+_ = var:create_index('primary', {parts = {1, 'string'}})
+---
+...
 s = box.schema.space.create('test', {engine='vinyl'})
 ---
 ...
@@ -61,6 +68,48 @@ vyinfo().range_count
 ---
 - 4
 ...
+-- Remember the number of iterations and the number of keys
+-- so that we can check data validity after restart.
+_ = var:insert{'iter', iter}
+---
+...
+_ = var:insert{'key_count', key_count}
+---
+...
+_ = var:insert{'keys_per_range', keys_per_range}
+---
+...
+-- Check that the space can be recovered after splitting ranges.
+test_run:cmd('restart server default')
+fiber = require 'fiber'
+---
+...
+s = box.space.test
+---
+...
+var = box.space.var
+---
+...
+iter = var:get('iter')[2]
+---
+...
+key_count = var:get('key_count')[2]
+---
+...
+keys_per_range = var:get('keys_per_range')[2]
+---
+...
+function vyinfo() return box.space.test.index.primary:info() end
+---
+...
+-- Check the space content.
+s:count() == key_count
+---
+- true
+...
+for k = 1,key_count do v = s:get(k) assert(v[2] == k + iter) end
+---
+...
 -- Delete 90% keys, remove padding for the rest.
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -99,10 +148,45 @@ vyinfo().range_count
 ---
 - 1
 ...
--- Check the remaining keys.
-for k = 1,key_count do v = s:get(k) assert(v == nil or v[2] == k + iter) end
+-- Check that the space can be recovered after coalescing ranges.
+test_run:cmd('restart server default')
+s = box.space.test
 ---
 ...
+var = box.space.var
+---
+...
+iter = var:get('iter')[2]
+---
+...
+key_count = var:get('key_count')[2]
+---
+...
+-- Check the space content.
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+key_count_left = 0
+for k = 1,key_count do
+    v = s:get(k)
+    if k % 10 == 0 then
+        assert(v[2] == k + iter)
+        key_count_left = key_count_left + 1
+    else
+        assert(v == nil)
+    end
+end
+test_run:cmd("setopt delimiter ''");
+---
+...
+s:count() == key_count_left
+---
+- true
+...
 s:drop()
+---
+...
+var:drop()
 ---
 ...
