@@ -687,6 +687,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	alter->new_space->handler->prepareAlterSpace(alter->old_space,
 						     alter->new_space);
 
+	alter->new_space->truncate_count = alter->old_space->truncate_count;
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
 	/*
