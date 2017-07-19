@@ -4637,6 +4637,7 @@ u32 sqlite3VdbeMsgpackGet(
     case MP_MAP:
     case MP_EXT:
     default: {
+      pMem->flags = 0;
       return 0;
     }
     case MP_NIL: {

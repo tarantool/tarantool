@@ -2584,24 +2584,29 @@ case OP_Column: {
     sqlite3VdbeMemSetNull(pDest);
   }
 
-  if( sqlite3VdbeMsgpackGet(zData+aOffset[p2], pDest)==0 ) {
-    /* MsgPack map, array or extension. Wrap it in a blob verbatim. */
+  sqlite3VdbeMsgpackGet(zData+aOffset[p2], pDest);
+  /* MsgPack map, array or extension (unsupported in sqlite).
+   * Wrap it in a blob verbatim.
+   */
+  if (pDest->flags == 0){
     pDest->n = aOffset[p2+1]-aOffset[p2];
     pDest->z = (char *)zData+aOffset[p2];
     pDest->flags = MEM_Blob|MEM_Ephem|MEM_Subtype;
     pDest->eSubtype = MSGPACK_SUBTYPE;
   }
-
-  if( pDest->flags & MEM_Ephem ){
+  /*
+   * Add 0 termination (at most for strings)
+   * Not sure why do we check MEM_Ephem
+   */
+  if( (pDest->flags & (MEM_Ephem | MEM_Str)) == (MEM_Ephem | MEM_Str) ){
     int len = pDest->n;
-    if( pDest->szMalloc<len+2 ){
-      if( sqlite3VdbeMemGrow(pDest, len+2, 1) ) goto op_column_error;
+    if( pDest->szMalloc<len+1 ){
+      if( sqlite3VdbeMemGrow(pDest, len+1, 1) ) goto op_column_error;
     } else {
       pDest->z = memcpy(pDest->zMalloc, pDest->z, len);
       pDest->flags &= ~MEM_Ephem;
     }
     pDest->z[len] = 0;
-    pDest->z[len+1] = 0;
     pDest->flags |= MEM_Term;
     pDest->enc = encoding;
   }

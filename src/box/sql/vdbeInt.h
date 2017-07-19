@@ -122,7 +122,10 @@ struct VdbeCursor {
   u64 maskUsed;           /* Mask of columns used by this cursor */
 #endif
   u32 nRowField;        /* Number of fields in the current row */
-  u32 aOffset[1];       /* Offsets for all fields in the record [nField+1] */
+  /* Offsets for all fields in the record [nField+1]
+   * Order of fields is the same as it was passes to create table statement
+   */
+  u32 aOffset[1];
 };
 
 
