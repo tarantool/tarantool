@@ -574,6 +574,69 @@ delete_from_cleanup:
   sqlite3DbFree(db, aToOpen);
   return;
 }
+
+/* Generate VDBE code for
+** DELETE FROM <pTab.z> WHERE
+**        <columns[0]> = <values[0]>
+**    AND  ...
+**    AND <columns[nPairs - 1]> = <values[nPairs - 1]>;
+**
+** This function does not increment the nested counter and is
+** faster than nested parsing of the request above.
+** @param pParse Parser context.
+** @param pTab Table name.
+** @param columns Column names array.
+** @param values Column values array.
+** @param nPairs Length of @columns and @values.
+**
+** In case of error the @values elements are deleted.
+ */
+void
+sqlite3DeleteByKey(Parse *pParse, Token *pTab, const char **columns,
+                   Expr **values, int nPairs)
+{
+  assert(nPairs > 0);
+  if( pParse->nErr > 0 || pParse->db->mallocFailed )
+    goto error;
+  SrcList *src = sqlite3SrcListAppend(pParse->db, NULL, pTab, NULL);
+  if (src == NULL)
+    goto error;
+  /* Dummy init of INDEXED BY clause. */
+  Token t = { NULL, 0 };
+  sqlite3SrcListIndexedBy(pParse, src, &t);
+
+  Expr *where = NULL;
+  for (int i = 0; i < nPairs; ++i) {
+    Expr *col_expr = sqlite3Expr(pParse->db, TK_ID, columns[i]);
+    if (col_expr == NULL || values[i] == NULL)
+      goto error;
+    Expr *eq_expr = sqlite3PExpr(pParse, TK_EQ, col_expr, values[i]);
+    /* In case of error the values[i] had been deleted in
+    ** sqlite3PExpr already. Do not delete it second time in the
+    ** cycle below.
+    */
+    values[i] = NULL;
+    if (eq_expr == NULL)
+      goto error;
+    if (i == 0) {
+      where = eq_expr;
+    } else {
+      where = sqlite3ExprAnd(pParse->db, where, eq_expr);
+      if (where == NULL)
+        goto error;
+    }
+  }
+  /* DeleteFrom frees the src and exprs in case of error. */
+  sqlite3DeleteFrom(pParse, src, where);
+  return;
+
+error:
+  sqlite3ExprDelete(pParse->db, where);
+  for (int i = 0; i < nPairs; ++i)
+    sqlite3ExprDelete(pParse->db, values[i]);
+}
+
+
 /* Make sure "isView" and other macros defined above are undefined. Otherwise
 ** they may interfere with compilation of other functions in this file
 ** (or in another file, if this file becomes part of the amalgamation).  */

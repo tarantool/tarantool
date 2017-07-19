@@ -783,6 +783,23 @@ Expr *sqlite3Expr(
   return sqlite3ExprAlloc(db, op, &x, 0);
 }
 
+/* Allocate a new expression and initialize it as integer.
+** @param db SQLite engine.
+** @param value Value to initialize by.
+**
+** @retval not NULL Allocated and initialized expr.
+** @retval     NULL Memory error.
+*/
+Expr *sqlite3ExprInteger(sqlite3 *db, int value)
+{
+  Expr *ret = sqlite3Expr(db, TK_INTEGER, NULL);
+  if (ret != NULL) {
+    ret->flags = EP_IntValue;
+    ret->u.iValue = value;
+  }
+  return ret;
+}
+
 /*
 ** Attach subtrees pLeft and pRight to the Expr node pRoot.
 **

@@ -122,6 +122,58 @@ cn:execute('drop table test2')
 cn:reload_schema()
 box.space.test2
 
+-- gh-2617 DDL row_count either 0 or 1.
+
+-- Test CREATE [IF NOT EXISTS] TABLE.
+cn:execute('create table test3(id primary key, a, b)')
+-- Rowcount = 1, although two tuples were created:
+-- for _space and for _index.
+cn:reload_schema()
+cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
+cn:execute('create table if not exists test3(id primary key)')
+
+-- Test CREATE VIEW [IF NOT EXISTS] and
+--      DROP   VIEW [IF EXISTS].
+cn:execute('create view test3_view(id) as select id from test3')
+cn:reload_schema()
+cn:execute('create view if not exists test3_view(id) as select id from test3')
+cn:execute('drop view test3_view')
+cn:reload_schema()
+cn:execute('drop view if exists test3_view')
+
+-- Test CREATE INDEX [IF NOT EXISTS] and
+--      DROP   INDEX [IF EXISTS].
+cn:execute('create index test3_sec on test3(a, b)')
+cn:reload_schema()
+cn:execute('create index if not exists test3_sec on test3(a, b)')
+cn:execute('drop index test3_sec')
+cn:reload_schema()
+cn:execute('drop index if exists test3_sec')
+
+-- Test CREATE TRIGGER [IF NOT EXISTS] and
+--      DROP   TRIGGER [IF EXISTS].
+cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:reload_schema()
+cn:execute('create trigger if not exists trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:execute('drop trigger trig')
+cn:reload_schema()
+cn:execute('drop trigger if exists trig')
+
+-- Test DROP TABLE [IF EXISTS].
+-- Create more indexes, triggers and _truncate tuple.
+cn:execute('create index idx1 on test3(a)')
+cn:reload_schema()
+cn:execute('create index idx2 on test3(b)')
+cn:reload_schema()
+box.space.test3:truncate()
+cn:reload_schema()
+cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:reload_schema()
+cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
+cn:execute('drop table test3')
+cn:reload_schema()
+cn:execute('drop table if exists test3')
+
 cn:close()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.sql.execute('drop table test')

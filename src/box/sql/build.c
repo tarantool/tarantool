@@ -869,6 +869,16 @@ void sqlite3StartTable(
   int iDb;         /* Database number to create the table in */
   Token *pName;    /* Unqualified name of the table to create */
 
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces.
+  */
+  if ( !pParse->nested ) {
+    if ((v = sqlite3GetVdbe(pParse)) == NULL)
+      goto begin_table_error;
+    sqlite3VdbeCountChanges(v);
+  }
+
   if( db->init.busy && db->init.newTnum==1 ){
     /* Special case:  Parsing the sqlite_master or sqlite_temp_master schema */
     iDb = db->init.iDb;
@@ -1833,6 +1843,14 @@ static void createIndex(
   sqlite3VdbeAddOp4(v, OP_Blob, zPartsSz, iFirstCol+5, MSGPACK_SUBTYPE, zParts, P4_STATIC);
   sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
   sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 6);
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces. Also do not account
+  ** autoindexes - they had been accounted as a part of
+  ** CREATE TABLE already.
+  */
+  if ( !pParse->nested && pIndex->idxType == SQLITE_IDXTYPE_APPDEF )
+    sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
   sqlite3TableAffinity(v, pSysIndex, 0);
 }
 
@@ -1935,6 +1953,12 @@ static void createSpace(
   sqlite3VdbeAddOp4(v, OP_Blob, zFormatSz, iFirstCol+6, MSGPACK_SUBTYPE, zFormat, P4_STATIC);
   sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
   sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 7);
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces.
+  */
+  if ( !pParse->nested )
+    sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
   sqlite3TableAffinity(v, pSysSpace, 0);
 }
 
@@ -2576,12 +2600,17 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int iDb, int isView){
   ** sqlite_temp_master if required.
   */
   pTrigger = sqlite3TriggerList(pParse, pTab);
+  /* Do not account triggers deletion - they will be accounted
+  ** in DELETE from _space below.
+  */
+  pParse->nested++;
   while( pTrigger ){
     assert( pTrigger->pSchema==pTab->pSchema || 
         pTrigger->pSchema==db->aDb[1].pSchema );
     sqlite3DropTriggerPtr(pParse, pTrigger);
     pTrigger = pTrigger->pNext;
   }
+  pParse->nested--;
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
   /* Remove any entries of the sqlite_sequence table associated with
@@ -2625,10 +2654,13 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int iDb, int isView){
   sqlite3NestedParse(pParse, "DELETE FROM "\
                      TARANTOOL_SYS_TRUNCATE_NAME " WHERE id = %d", space_id);
 
-  sqlite3NestedParse(pParse,
-                     "DELETE FROM %Q.%s WHERE id=%d",
-                     pDb->zDbSName,
-                     TARANTOOL_SYS_SPACE_NAME, space_id);
+  Token _space = { TARANTOOL_SYS_SPACE_NAME, strlen(TARANTOOL_SYS_SPACE_NAME) };
+  Expr *id_value = sqlite3ExprInteger(db, space_id);
+  const char *column = "id";
+  /* Execute not nested DELETE of a space to account DROP TABLE
+  ** changes.
+  */
+  sqlite3DeleteByKey(pParse, &_space, &column, &id_value, 1);
 
   /* Remove the table entry from SQLite's internal schema and modify
   ** the schema cookie.
@@ -2647,13 +2679,18 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int iDb, int isView){
 */
 void sqlite3DropTable(Parse *pParse, SrcList *pName, int isView, int noErr){
   Table *pTab;
-  Vdbe *v;
+  Vdbe *v = sqlite3GetVdbe(pParse);
   sqlite3 *db = pParse->db;
   int iDb;
 
-  if( db->mallocFailed ){
+  if( v == NULL || db->mallocFailed ){
     goto exit_drop_table;
   }
+  /* Activate changes counting here to account
+  ** DROP TABLE IF NOT EXISTS, if the table really does not
+  ** exist.
+  */
+  if ( !pParse->nested ) sqlite3VdbeCountChanges(v);
   assert( pParse->nErr==0 );
   assert( pName->nSrc==1 );
   if( sqlite3ReadSchema(pParse) ) goto exit_drop_table;
@@ -2733,13 +2770,10 @@ void sqlite3DropTable(Parse *pParse, SrcList *pName, int isView, int noErr){
   /* Generate code to remove the table from the master table
   ** on disk.
   */
-  v = sqlite3GetVdbe(pParse);
-  if( v ){
-    sqlite3BeginWriteOperation(pParse, 1, iDb);
-    sqlite3ClearStatTables(pParse, iDb, "tbl", pTab->zName);
-    sqlite3FkDropTable(pParse, pName, pTab);
-    sqlite3CodeDropTable(pParse, pTab, iDb, isView);
-  }
+  sqlite3BeginWriteOperation(pParse, 1, iDb);
+  sqlite3ClearStatTables(pParse, iDb, "tbl", pTab->zName);
+  sqlite3FkDropTable(pParse, pName, pTab);
+  sqlite3CodeDropTable(pParse, pTab, iDb, isView);
 
 exit_drop_table:
   sqlite3SrcListDelete(db, pName);
@@ -3106,6 +3140,18 @@ void sqlite3CreateIndex(
 
   if( db->mallocFailed || pParse->nErr>0 ){
     goto exit_create_index;
+  }
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces. Also do not account
+  ** PRIMARY KEY and UNIQUE constraint - they had been accounted
+  ** in CREATE TABLE already.
+  */
+  if ( !pParse->nested && idxType == SQLITE_IDXTYPE_APPDEF ) {
+    Vdbe *v = sqlite3GetVdbe(pParse);
+    if (v == NULL)
+      goto exit_create_index;
+    sqlite3VdbeCountChanges(v);
   }
   if( IN_DECLARE_VTAB && idxType!=SQLITE_IDXTYPE_PRIMARYKEY ){
     goto exit_create_index;
@@ -3652,7 +3698,7 @@ void sqlite3DefaultRowEst(Index *pIdx){
 */
 void sqlite3DropIndex(Parse *pParse, SrcList *pName, int ifExists){
   Index *pIndex;
-  Vdbe *v;
+  Vdbe *v = sqlite3GetVdbe(pParse);
   sqlite3 *db = pParse->db;
   int iDb;
 
@@ -3660,6 +3706,12 @@ void sqlite3DropIndex(Parse *pParse, SrcList *pName, int ifExists){
   if( db->mallocFailed ){
     goto exit_drop_index;
   }
+  assert(v != NULL);
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces.
+  */
+  if ( !pParse->nested ) sqlite3VdbeCountChanges(v);
   assert( pName->nSrc==1 );
   if( SQLITE_OK!=sqlite3ReadSchema(pParse) ){
     goto exit_drop_index;
@@ -3697,20 +3749,18 @@ void sqlite3DropIndex(Parse *pParse, SrcList *pName, int ifExists){
 #endif
 
   /* Generate code to remove the index and from the master table */
-  v = sqlite3GetVdbe(pParse);
-  if( v ){
-    sqlite3BeginWriteOperation(pParse, 1, iDb);
+  sqlite3BeginWriteOperation(pParse, 1, iDb);
 
-    sqlite3NestedParse(pParse,
-                       "DELETE FROM %Q.%s WHERE id=%d AND iid=%d",
-                       db->aDb[iDb].zDbSName,
-                       TARANTOOL_SYS_INDEX_NAME,
-                       SQLITE_PAGENO_TO_SPACEID(pIndex->tnum),
-                       SQLITE_PAGENO_TO_INDEXID(pIndex->tnum));
-    sqlite3ClearStatTables(pParse, iDb, "idx", pIndex->zName);
-    sqlite3ChangeCookie(pParse, iDb);
-    sqlite3VdbeAddOp4(v, OP_DropIndex, iDb, 0, 0, pIndex->zName, 0);
-  }
+  Token _index = { TARANTOOL_SYS_INDEX_NAME, strlen(TARANTOOL_SYS_INDEX_NAME) };
+  const char *columns[2] = { "id", "iid" };
+  Expr *values[2];
+  values[0] = sqlite3ExprInteger(db, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum));
+  values[1] = sqlite3ExprInteger(db, SQLITE_PAGENO_TO_INDEXID(pIndex->tnum));
+  sqlite3DeleteByKey(pParse, &_index, columns, values, 2);
+
+  sqlite3ClearStatTables(pParse, iDb, "idx", pIndex->zName);
+  sqlite3ChangeCookie(pParse, iDb);
+  sqlite3VdbeAddOp4(v, OP_DropIndex, iDb, 0, 0, pIndex->zName, 0);
 
 exit_drop_index:
   sqlite3SrcListDelete(db, pName);

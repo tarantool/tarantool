@@ -103,6 +103,15 @@ void sqlite3BeginTrigger(
   Token *pName;           /* The unqualified db name */
   DbFixer sFix;           /* State vector for the DB fixer */
 
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces.
+  */
+  if ( !pParse->nested ) {
+    Vdbe *v = sqlite3GetVdbe(pParse);
+    if (v != NULL)
+      sqlite3VdbeCountChanges(v);
+  }
   assert( pName1!=0 );   /* pName1->z might be NULL, but not pName1 itself */
   assert( pName2!=0 );
   assert( op==TK_INSERT || op==TK_UPDATE || op==TK_DELETE );
@@ -355,6 +364,11 @@ void sqlite3FinishTrigger(
     sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol+1, MSGPACK_SUBTYPE, zOpts, P4_DYNAMIC);
     sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 2, iRecord);
     sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 7);
+    /* Do not account nested operations: the count of such
+    ** operations depends on Tarantool data dictionary internals,
+    ** such as data layout in system spaces.
+    */
+    if ( !pParse->nested ) sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
     sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
     /* parseschema3(reg(iFirstCol), ref(iFirstCol)+1) */
@@ -555,6 +569,17 @@ void sqlite3DropTrigger(Parse *pParse, SrcList *pName, int noErr){
   if( SQLITE_OK!=sqlite3ReadSchema(pParse) ){
     goto drop_trigger_cleanup;
   }
+  /* Do not account nested operations: the count of such
+  ** operations depends on Tarantool data dictionary internals,
+  ** such as data layout in system spaces. Activate the counter
+  ** here to account DROP TRIGGER IF EXISTS case if the trigger
+  ** actually does not exist.
+  */
+  if ( !pParse->nested ) {
+    Vdbe *v = sqlite3GetVdbe(pParse);
+    if (v != NULL)
+      sqlite3VdbeCountChanges(v);
+  }
 
   assert( pName->nSrc==1 );
   zDb = pName->a[0].zDatabase;
@@ -622,10 +647,11 @@ void sqlite3DropTriggerPtr(Parse *pParse, Trigger *pTrigger){
   */
   assert( pTable!=0 );
   if( (v = sqlite3GetVdbe(pParse))!=0 ){
-    sqlite3NestedParse(pParse,
-       "DELETE FROM %Q.%s WHERE name=%Q",
-       db->aDb[iDb].zDbSName, TARANTOOL_SYS_TRIGGER_NAME, pTrigger->zName
-    );
+    Token _trigger = { TARANTOOL_SYS_TRIGGER_NAME,
+                       strlen(TARANTOOL_SYS_TRIGGER_NAME) };
+    const char *column = "name";
+    Expr *value = sqlite3Expr(db, TK_STRING, pTrigger->zName);
+    sqlite3DeleteByKey(pParse, &_trigger, &column, &value, 1);
     sqlite3ChangeCookie(pParse, iDb);
     sqlite3VdbeAddOp4(v, OP_DropTrigger, iDb, 0, 0, pTrigger->zName, 0);
   }
