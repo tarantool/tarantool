@@ -1,45 +1,112 @@
 test_run = require('test_run').new()
 ---
 ...
-fiber = require('fiber')
----
-...
 -- Temporary table to restore variables after restart.
-tmp = box.schema.space.create('tmp')
+var = box.schema.space.create('var')
 ---
 ...
-_ = tmp:create_index('primary', {parts = {1, 'string'}})
+_ = var:create_index('primary', {parts = {1, 'string'}})
 ---
 ...
---
--- Check that vinyl stats are restored correctly.
---
-s = box.schema.space.create('test', {engine='vinyl'})
+-- Empty space.
+s1 = box.schema.space.create('test1', {engine = 'vinyl'})
 ---
 ...
-_ = s:create_index('primary', {run_count_per_level=10})
+_ = s1:create_index('pk')
 ---
 ...
--- Generate data.
-for i=1,2 do for j=1,10 do s:insert{i*100+j, 'test' .. j} end box.snapshot() end
+-- Truncated space.
+s2 = box.schema.space.create('test2', {engine = 'vinyl'})
+---
+...
+_ = s2:create_index('pk')
+---
+...
+_ = s2:insert{123}
+---
+...
+s2:truncate()
+---
+...
+-- Data space.
+s3 = box.schema.space.create('test3', {engine='vinyl'})
+---
+...
+_ = s3:create_index('primary')
+---
+...
+_ = s3:create_index('secondary', {unique = false, parts = {2, 'string'}})
+---
+...
+for i = 0, 4 do s3:insert{i, 'test' .. i} end
+---
+...
+-- Flush data to disk.
+box.snapshot()
+---
+- ok
+...
+-- Write some data to memory.
+for i = 5, 9 do s3:insert{i, 'test' .. i} end
 ---
 ...
 -- Remember stats before restarting the server.
-_ = tmp:insert{'vyinfo', s.index.primary:info()}
+_ = var:insert{'vyinfo', s3.index.primary:info()}
 ---
 ...
 test_run:cmd('restart server default')
-s = box.space.test
+s1 = box.space.test1
 ---
 ...
-tmp = box.space.tmp
+s2 = box.space.test2
 ---
+...
+s3 = box.space.test3
+---
+...
+var = box.space.var
+---
+...
+-- Check space contents.
+s1:select()
+---
+- []
+...
+s2:select()
+---
+- []
+...
+s3.index.primary:select()
+---
+- - [0, 'test0']
+  - [1, 'test1']
+  - [2, 'test2']
+  - [3, 'test3']
+  - [4, 'test4']
+  - [5, 'test5']
+  - [6, 'test6']
+  - [7, 'test7']
+  - [8, 'test8']
+  - [9, 'test9']
+...
+s3.index.secondary:select()
+---
+- - [0, 'test0']
+  - [1, 'test1']
+  - [2, 'test2']
+  - [3, 'test3']
+  - [4, 'test4']
+  - [5, 'test5']
+  - [6, 'test6']
+  - [7, 'test7']
+  - [8, 'test8']
+  - [9, 'test9']
 ...
 -- Check that stats didn't change after recovery.
-vyinfo1 = tmp:get('vyinfo')[2]
+vyinfo1 = var:get('vyinfo')[2]
 ---
 ...
-vyinfo2 = s.index.primary:info()
+vyinfo2 = s3.index.primary:info()
 ---
 ...
 vyinfo1.memory.rows == vyinfo2.memory.rows
@@ -74,9 +141,15 @@ vyinfo1.range_count == vyinfo2.range_count
 ---
 - true
 ...
-s:drop()
+s1:drop()
 ---
 ...
-tmp:drop()
+s2:drop()
+---
+...
+s3:drop()
+---
+...
+var:drop()
 ---
 ...
