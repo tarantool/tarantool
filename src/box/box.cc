@@ -695,14 +695,11 @@ box_space_id_by_name(const char *name, uint32_t len)
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
 	uint32_t size = mp_sizeof_array(1) + mp_sizeof_str(len);
-	struct region *region = &fiber()->gc;
-	uint32_t used = region_used(region);
-	char *begin = (char *) region_alloc(region, size);
+	char *begin = (char *) region_alloc(&fiber()->gc, size);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "begin");
 		return BOX_ID_NIL;
 	}
-	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
 	char *end = mp_encode_array(begin, 1);
 	end = mp_encode_str(end, name, len);
 
@@ -724,14 +721,11 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	uint32_t size = mp_sizeof_array(2) + mp_sizeof_uint(space_id) +
 			mp_sizeof_str(len);
-	struct region *region = &fiber()->gc;
-	uint32_t used = region_used(region);
-	char *begin = (char *) region_alloc(region, size);
+	char *begin = (char *) region_alloc(&fiber()->gc, size);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "begin");
 		return BOX_ID_NIL;
 	}
-	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
 	char *end = mp_encode_array(begin, 2);
 	end = mp_encode_uint(end, space_id);
 	end = mp_encode_str(end, name, len);
