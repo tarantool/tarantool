@@ -19,12 +19,12 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 include_directories(${ZSTD_INCLUDE_DIRS})
 
+add_library(xrow STATIC xrow.c iproto_constants.c vclock.c errcode.c)
+target_link_libraries(xrow server core small)
+
 add_library(box STATIC
     iproto.cc
-    iproto_constants.c
-    errcode.c
     error.cc
-    xrow.c
     xrow_io.cc
     xlog.cc
     tuple_format.c
@@ -76,7 +76,6 @@ add_library(box STATIC
     user_def.c
     user.cc
     authentication.cc
-    vclock.c
     replication.cc
     recovery.cc
     xstream.cc
@@ -102,5 +101,5 @@ add_library(box STATIC
     lua/xlog.c
     ${bin_sources})
 
-target_link_libraries(box ${ZSTD_LIBRARIES} ${common_libraries})
+target_link_libraries(box xrow ${ZSTD_LIBRARIES} ${common_libraries})
 add_dependencies(box build_bundled_libs)

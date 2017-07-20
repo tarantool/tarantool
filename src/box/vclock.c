@@ -34,7 +34,6 @@
 #include <stdarg.h>
 #include <ctype.h>
 
-#include "say.h"
 #include "diag.h"
 
 int64_t

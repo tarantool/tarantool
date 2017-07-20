@@ -53,19 +53,13 @@ target_link_libraries(light.test small)
 add_executable(bloom.test bloom.cc)
 target_link_libraries(bloom.test salad)
 add_executable(vclock.test vclock.cc unit.c
-    ${CMAKE_SOURCE_DIR}/src/box/vclock.c
-    ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc
     ${CMAKE_SOURCE_DIR}/src/rmean.c
     ${CMAKE_SOURCE_DIR}/src/histogram.c)
-target_link_libraries(vclock.test core salad small)
+target_link_libraries(vclock.test xrow core salad small)
 add_executable(xrow.test xrow.cc unit.c
-    ${CMAKE_SOURCE_DIR}/src/box/xrow.c
-    ${CMAKE_SOURCE_DIR}/src/box/vclock.c
-    ${CMAKE_SOURCE_DIR}/src/box/iproto_constants.c
-    ${CMAKE_SOURCE_DIR}/src/box/errcode.c
     ${CMAKE_SOURCE_DIR}/src/box/error.cc)
-target_link_libraries(xrow.test server misc ${MSGPUCK_LIBRARIES})
+target_link_libraries(xrow.test server misc xrow ${MSGPUCK_LIBRARIES})
 
 add_executable(fiber.test fiber.cc unit.c)
 set_source_files_properties(fiber.cc PROPERTIES COMPILE_FLAGS -O0)
