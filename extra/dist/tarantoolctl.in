@@ -63,7 +63,7 @@ end
 local function check_user_level()
     local uid = os.getenv('UID')
     local udir = nil
-    if uid == 0 then
+    if uid == 0 or os.getenv("NOTIFY_SOCKET") then
         return nil
     end
     -- local dir configuration
@@ -431,7 +431,7 @@ local function wrapper_cfg(cfg)
     else
         cfg.username = nil
     end
-    if under_systemd() then
+    if os.getenv("NOTIFY_SOCKET") then
         cfg.background = false
     elseif cfg.background == nil then
         cfg.background = true
