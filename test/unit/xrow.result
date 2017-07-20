@@ -1,4 +1,4 @@
-1..1
+1..2
     1..40
     ok 1 - round trip
     ok 2 - roundtrip.version_id
@@ -41,3 +41,14 @@
     ok 39 - invalid 10
     ok 40 - invalid 11
 ok 1 - subtests
+    1..9
+    ok 1 - bad msgpack end
+    ok 2 - encode
+    ok 3 - header map size
+    ok 4 - header decode
+    ok 5 - decoded type
+    ok 6 - decoded replica_id
+    ok 7 - decoded lsn
+    ok 8 - decoded tm
+    ok 9 - decoded bodycnt
+ok 2 - subtests

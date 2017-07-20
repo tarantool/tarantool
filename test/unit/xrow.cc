@@ -37,6 +37,8 @@ extern "C" {
 #include "tt_uuid.h"
 #include "version.h"
 #include "random.h"
+#include "memory.h"
+#include "fiber.h"
 
 int
 test_iproto_constants()
@@ -198,17 +200,59 @@ test_greeting()
 	return check_plan();
 }
 
+void
+test_xrow_header_encode_decode()
+{
+	plan(9);
+	struct xrow_header header;
+	char buffer[2048];
+	char *pos = mp_encode_uint(buffer, 300);
+	is(xrow_header_decode(&header, (const char **) &pos,
+			      buffer + 100), -1, "bad msgpack end");
+
+	header.type = 100;
+	header.replica_id = 200;
+	header.lsn = 400;
+	header.tm = 123.456;
+	header.bodycnt = 0;
+	struct iovec vec;
+	is(1, xrow_header_encode(&header, &vec, 200), "encode");
+	int fixheader_len = 200;
+	pos = (char *)vec.iov_base + fixheader_len;
+	is(mp_decode_map((const char **)&pos), 4, "header map size");
+
+	struct xrow_header decoded_header;
+	const char *begin = (const char *)vec.iov_base;
+	begin += fixheader_len;
+	const char *end = (const char *)vec.iov_base;
+	end += vec.iov_len;
+	is(xrow_header_decode(&decoded_header, &begin, end), 0,
+	   "header decode");
+	is(header.type, decoded_header.type, "decoded type");
+	is(header.replica_id, decoded_header.replica_id, "decoded replica_id");
+	is(header.lsn, decoded_header.lsn, "decoded lsn");
+	is(header.tm, decoded_header.tm, "decoded tm");
+	is(decoded_header.bodycnt, 0, "decoded bodycnt");
+
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(1);
+	memory_init();
+	fiber_init(fiber_c_invoke);
+	plan(2);
 
 	random_init();
 
 	test_iproto_constants();
 	test_greeting();
+	test_xrow_header_encode_decode();
 
 	random_free();
+	fiber_free();
+	memory_free();
 
 	return check_plan();
 }
