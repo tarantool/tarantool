@@ -268,7 +268,7 @@ vy_stmt_is_refable(const struct tuple *stmt)
 static inline void
 vy_stmt_ref_if_possible(struct tuple *stmt)
 {
-	if (stmt != NULL && vy_stmt_is_refable(stmt))
+	if (vy_stmt_is_refable(stmt))
 		tuple_ref(stmt);
 }
 
@@ -281,7 +281,7 @@ vy_stmt_ref_if_possible(struct tuple *stmt)
 static inline void
 vy_stmt_unref_if_possible(struct tuple *stmt)
 {
-	if (stmt != NULL && vy_stmt_is_refable(stmt))
+	if (vy_stmt_is_refable(stmt))
 		tuple_unref(stmt);
 }
 

@@ -105,8 +105,7 @@ vy_write_history_new(struct region *region, struct tuple *tuple,
 	assert(next == NULL || (next->tuple != NULL &&
 	       vy_stmt_lsn(next->tuple) > vy_stmt_lsn(tuple)));
 	h->next = next;
-	if (vy_stmt_is_refable(tuple))
-		tuple_ref(tuple);
+	vy_stmt_ref_if_possible(tuple);
 	return h;
 }
 
@@ -119,9 +118,8 @@ static inline void
 vy_write_history_destroy(struct vy_write_history *history)
 {
 	do {
-		if (history->tuple != NULL &&
-		    vy_stmt_is_refable(history->tuple))
-			tuple_unref(history->tuple);
+		if (history->tuple != NULL)
+			vy_stmt_unref_if_possible(history->tuple);
 		history = history->next;
 	} while (history != NULL);
 }
@@ -147,8 +145,8 @@ struct vy_read_view_stmt {
 static inline void
 vy_read_view_stmt_destroy(struct vy_read_view_stmt *rv)
 {
-	if (rv->tuple != NULL && vy_stmt_is_refable(rv->tuple))
-		tuple_unref(rv->tuple);
+	if (rv->tuple != NULL)
+		vy_stmt_unref_if_possible(rv->tuple);
 	rv->tuple = NULL;
 	if (rv->history != NULL)
 		vy_write_history_destroy(rv->history);
@@ -596,8 +594,7 @@ vy_write_iterator_build_history(struct region *region,
 			 "malloc", "write stream heap");
 		return rc;
 	}
-	if (vy_stmt_is_refable(src->tuple))
-		tuple_ref(src->tuple);
+	vy_stmt_ref_if_possible(src->tuple);
 	/*
 	 * For each pair (merge_until_lsn, current_rv_lsn] build
 	 * history of a corresponding read view.
@@ -690,8 +687,7 @@ next_step:
 	}
 
 	src_heap_delete(&stream->src_heap, &end_of_key_src.heap_node);
-	if (vy_stmt_is_refable(end_of_key_src.tuple))
-		tuple_unref(end_of_key_src.tuple);
+	vy_stmt_unref_if_possible(end_of_key_src.tuple);
 	return rc;
 }
 
@@ -735,8 +731,7 @@ vy_read_view_merge(struct vy_write_iterator *stream,
 					stream->upsert_format, false);
 		if (applied == NULL)
 			return -1;
-		if (vy_stmt_is_refable(h->tuple))
-			tuple_unref(h->tuple);
+		vy_stmt_unref_if_possible(h->tuple);
 		h->tuple = applied;
 	}
 	/* Squash rest of UPSERTs. */
@@ -752,8 +747,7 @@ vy_read_view_merge(struct vy_write_iterator *stream,
 					stream->upsert_format, false);
 		if (applied == NULL)
 			return -1;
-		if (vy_stmt_is_refable(result->tuple))
-			tuple_unref(result->tuple);
+		vy_stmt_unref_if_possible(result->tuple);
 		result->tuple = applied;
 		/*
 		 * Before:
@@ -764,8 +758,7 @@ vy_read_view_merge(struct vy_write_iterator *stream,
 		 *  result -.    h    .-> next
 		 *          \_ _ _ _ /
 		 */
-		if (vy_stmt_is_refable(h->tuple))
-			tuple_unref(h->tuple);
+		vy_stmt_unref_if_possible(h->tuple);
 		h = h->next;
 		result->next = h;
 	}

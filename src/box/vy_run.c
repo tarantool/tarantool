@@ -2180,7 +2180,8 @@ error_rollback:
 	xlog_tx_rollback(data_xlog);
 error_row_index:
 	ibuf_destroy(&row_index_buf);
-	vy_stmt_unref_if_possible(last_stmt);
+	if (last_stmt != NULL)
+		vy_stmt_unref_if_possible(last_stmt);
 	return -1;
 }
 
