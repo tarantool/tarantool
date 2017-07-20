@@ -45,7 +45,7 @@ compare_write_iterator_results(struct key_def *key_def,
 		vy_write_iterator_new(key_def, mem->format, mem->upsert_format,
 				      is_primary, is_last_level, &rv_list);
 	fail_if(wi == NULL);
-	fail_if(vy_write_iterator_add_mem(wi, mem) != 0);
+	fail_if(vy_write_iterator_new_mem(wi, mem) != 0);
 
 	struct tuple *ret;
 	fail_if(wi->iface->start(wi) != 0);

@@ -953,7 +953,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
 		if (mem->generation > scheduler->dump_generation)
 			continue;
-		if (vy_write_iterator_add_mem(wi, mem) != 0)
+		if (vy_write_iterator_new_mem(wi, mem) != 0)
 			goto err_wi_sub;
 	}
 
@@ -1210,7 +1210,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct vy_slice *slice;
 	int n = range->compact_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_add_slice(wi, slice,
+		if (vy_write_iterator_new_slice(wi, slice,
 						&scheduler->env->run_env) != 0)
 			goto err_wi_sub;
 
@@ -4067,7 +4067,7 @@ vy_send_range(struct vy_join_ctx *ctx)
 
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &ctx->slices, in_join) {
-		if (vy_write_iterator_add_slice(ctx->wi, slice,
+		if (vy_write_iterator_new_slice(ctx->wi, slice,
 						&ctx->env->run_env) != 0)
 			goto out_delete_wi;
 	}
