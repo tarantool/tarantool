@@ -31,12 +31,14 @@ function(rebuild_module_api)
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/module_footer.h >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${errcodefile} ${tmpfile}
-        DEPENDS ${srcfiles} ${CMAKE_SOURCE_DIR}/src/box/errcode.h
+        DEPENDS ${CMAKE_SOURCE_DIR}/extra/apigen
                 ${CMAKE_CURRENT_SOURCE_DIR}/module_header.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/module_footer.h
+                ${CMAKE_SOURCE_DIR}/src/box/errcode.h
+                ${headers}
         )
 
-    add_custom_target(api ALL DEPENDS ${srcfiles} ${dstfile})
+    add_custom_target(api ALL DEPENDS ${dstfile})
     install(FILES ${dstfile} DESTINATION ${MODULE_INCLUDEDIR})
 endfunction()
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/module.h" PROPERTIES GENERATED HEADER_FILE_ONLY)
