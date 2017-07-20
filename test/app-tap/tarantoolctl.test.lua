@@ -324,9 +324,11 @@ do
 
     local status, err = pcall(function()
         test:test("fill and test cat output", function(test_i)
-            test_i:plan(25)
+            test_i:plan(29)
             check_ok(test_i, dir, 'start', 'filler', 0)
             check_ctlcat_xlog(test_i, dir, nil, "---\n", 6)
+            check_ctlcat_xlog(test_i, dir, "--space=512", "---\n", 6)
+            check_ctlcat_xlog(test_i, dir, "--space=666", "---\n", 0)
             check_ctlcat_xlog(test_i, dir, "--show-system", "---\n", 9)
             check_ctlcat_xlog(test_i, dir, "--format=json", "\n", 6)
             check_ctlcat_xlog(test_i, dir, "--format=lua",  "\n", 6)
@@ -412,4 +414,4 @@ do
     end
 end
 
-test:check()
+os.exit(test:check() == true and 0 or -1)

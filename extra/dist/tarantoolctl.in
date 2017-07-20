@@ -783,22 +783,10 @@ local function cat()
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
             local rid = record.HEADER.replica_id
-            -- space filter rules
-            local is_space_filtered    = spaces ~= nil
-            local is_space_system      = (sid ~= nil and sid < 512 and
-                                          show_system == false)
-            local isnt_space_specified = not (is_space_filtered and
-                                              find_in_list(sid, spaces))
-            -- replica id filter rules
-            local is_replica_id_filtered    = replicas ~= nil
-            local isnt_replica_id_specified = not (is_replica_id_filtered and
-                                                   find_in_list(rid, replicas))
-
             if (lsn < from) or
-               (is_space_filtered and is_space_system and
-                isnt_space_specified) or
-               (is_space_system and isnt_space_specified) or
-               (is_replica_id_filtered and isnt_replica_id_specified) then
+               (not spaces and sid and sid < 512 and not show_system) or
+               (spaces and (sid == nil or not find_in_list(sid, spaces))) or
+               (replicas and not find_in_list(rid, replicas)) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to
@@ -836,21 +824,10 @@ local function play()
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
             local rid = record.HEADER.replica_id
-            -- space filter rules
-            local is_space_filtered    = spaces ~= nil
-            local is_space_system      = sid < 512 and show_system == false
-            local isnt_space_specified = not (is_space_filtered and
-                                              find_in_list(sid, spaces))
-            -- replica id filter rules
-            local is_replica_id_filtered    = replicas ~= nil
-            local isnt_replica_id_specified = not (is_replica_id_filtered and
-                                                   find_in_list(rid, replicas))
-
             if (lsn < from) or
-               (is_space_filtered and is_space_system and
-                isnt_space_specified) or
-               (is_space_system and isnt_space_specified) or
-               (is_replica_id_filtered and isnt_replica_id_specified) then
+               (not spaces and sid and sid < 512 and not show_system) or
+               (spaces and (sid == nil or not find_in_list(sid, spaces))) or
+               (replicas and not find_in_list(rid, replicas)) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to
