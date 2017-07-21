@@ -598,7 +598,7 @@ vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
  * Restore the current position (if necessary).
  * @sa struct vy_stmt_iterator comments.
  *
- * @param last_stmt the key the iterator was positioned on
+ * @param last_stmt the key the the read iterator was positioned on.
  *
  * @retval 0 nothing changed
  * @retval 1 iterator position was changed
@@ -714,6 +714,20 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 			vy_mem_iterator_start_from(itr, iterator_type,
 						   last_stmt);
 		}
+		if (itr->curr_stmt != NULL && last_stmt != NULL) {
+			if (vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0 &&
+			    vy_stmt_lsn(itr->curr_stmt) >= vy_stmt_lsn(last_stmt)) {
+				while (true) {
+					if (vy_mem_iterator_next_lsn_impl(itr)) {
+						int rc = vy_mem_iterator_next_key_impl(itr);
+						(void)rc;
+						break;
+					} else if (vy_stmt_lsn(itr->curr_stmt) < vy_stmt_lsn(last_stmt)) {
+						break;
+					}
+				}
+			}
+		}
 		if (itr->curr_stmt != NULL &&
 		    vy_mem_iterator_copy_to(itr, ret) < 0)
 			return -1;
@@ -817,7 +831,10 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	}
 	/* scan key by key */
 	assert(!curr_last);
-	bool is_last  = false;
+	int cmp = vy_stmt_compare(this_key, last_stmt, def);
+	if (cmp > 0)
+		goto done; /* (2) */
+	bool is_last = cmp == 0;
 	bool found = false; /* found within this key */
 	while (true) {
 		if (!found &&
@@ -839,6 +856,7 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 		int cmp = vy_stmt_compare(t, this_key, def);
 		assert(cmp >= 0);
 		if (cmp > 0) {
+			/* The next key starts */
 			if (is_last)
 				goto done; /* (2) */
 			cmp = vy_stmt_compare(t, last_stmt, def);

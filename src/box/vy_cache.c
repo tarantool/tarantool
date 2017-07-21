@@ -316,7 +316,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	} else {
 		vy_cache_tree_iterator_next(&cache->cache_tree, &inserted);
 	}
-	/* Check that there are not statements between prev_stmt and stmt */
+	/* Check that there are no statements between prev_stmt and stmt */
 	if (!vy_cache_tree_iterator_is_invalid(&inserted)) {
 		struct vy_cache_entry **prev_check_entry =
 			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
