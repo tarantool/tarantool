@@ -215,15 +215,7 @@ c = Connection('localhost', server.iproto.port)
 c.connect()
 s = c._socket
 
-def test_request(req_header, req_body):
-    query_header = msgpack.dumps(req_header)
-    query_body = msgpack.dumps(req_body)
-    packet_len = len(query_header) + len(query_body)
-    query = msgpack.dumps(packet_len) + query_header + query_body
-    try:
-        s.send(query)
-    except OSError as e:
-        print '   => ', 'Failed to send request'
+def receive_response():
     resp_len = ''
     resp_headerbody = ''
     resp_header = {}
@@ -242,6 +234,17 @@ def test_request(req_header, req_body):
     res['header'] = resp_header
     res['body'] = resp_body
     return res
+
+def test_request(req_header, req_body):
+    query_header = msgpack.dumps(req_header)
+    query_body = msgpack.dumps(req_body)
+    packet_len = len(query_header) + len(query_body)
+    query = msgpack.dumps(packet_len) + query_header + query_body
+    try:
+        s.send(query)
+    except OSError as e:
+        print '   => ', 'Failed to send request'
+    return receive_response()
 
 header = { IPROTO_CODE : REQUEST_TYPE_SELECT}
 body = { IPROTO_SPACE_ID: space_id,
@@ -276,6 +279,27 @@ header = { IPROTO_CODE : REQUEST_TYPE_SELECT, 5 : schema_id }
 resp = test_request(header, body)
 print 'Schema changed -> error:', resp['header'][0] != 0
 print 'Got another schema_id:', resp['header'][5] != schema_id
+
+#
+# gh-2334 Lost SYNC in JOIN response.
+#
+uuid = '0d5bd431-7f3e-4695-a5c2-82de0a9cbc95'
+header = { IPROTO_CODE: REQUEST_TYPE_JOIN, IPROTO_SYNC: 2334 }
+body = { IPROTO_SERVER_UUID: uuid }
+resp = test_request(header, body)
+if resp['header'][IPROTO_SYNC] == 2334:
+    i = 1
+    while i < 3:
+        resp = receive_response()
+        if resp['header'][IPROTO_SYNC] != 2334:
+            print 'Bad sync on response with number ', i
+            break
+        if resp['header'][IPROTO_CODE] == REQUEST_TYPE_OK:
+            i += 1
+    else:
+        print 'Sync ok'
+else:
+    print 'Bad first sync'
 
 c.close()
 
