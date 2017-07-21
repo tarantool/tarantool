@@ -143,6 +143,26 @@ box.sql.execute("SELECT * FROM _trigger");
 ---
 - - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
 ...
+-- Many entries
+box.sql.execute("CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));")
+---
+...
+box.sql.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
+---
+...
+box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
+---
+- - [840]
+  - [880]
+  - [920]
+  - [960]
+  - [1000]
+  - [1]
+  - [41]
+  - [81]
+  - [121]
+  - [161]
+...
 test_run:cmd('restart server default');
 -- prove that trigger survived
 box.sql.execute("SELECT * FROM _trigger");
@@ -195,10 +215,26 @@ box.sql.execute("SELECT * FROM foobar");
   - [1000, 'foobar']
   - ['foobar trigger test', 8888]
 ...
+box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
+---
+- - [840]
+  - [880]
+  - [920]
+  - [960]
+  - [1000]
+  - [1]
+  - [41]
+  - [81]
+  - [121]
+  - [161]
+...
 -- cleanup
 box.sql.execute("DROP TABLE foobar")
 ---
 ...
 box.sql.execute("DROP TABLE barfoo")
+---
+...
+box.sql.execute("DROP TABLE t1")
 ---
 ...

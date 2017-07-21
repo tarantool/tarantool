@@ -51,6 +51,11 @@ box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 box.sql.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
 box.sql.execute("SELECT * FROM _trigger");
 
+-- Many entries
+box.sql.execute("CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));")
+box.sql.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
+box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
+
 test_run:cmd('restart server default');
 
 -- prove that trigger survived
@@ -75,7 +80,9 @@ box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 
 box.sql.execute("SELECT * FROM barfoo")
 box.sql.execute("SELECT * FROM foobar");
+box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 
 -- cleanup
 box.sql.execute("DROP TABLE foobar")
 box.sql.execute("DROP TABLE barfoo")
+box.sql.execute("DROP TABLE t1")

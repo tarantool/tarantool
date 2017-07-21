@@ -322,8 +322,15 @@ int tarantoolSqlite3Insert(BtCursor *pCur, const BtreePayload *pX)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 
+	char *buf = (char*)region_alloc(&fiber()->gc, pX->nKey);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, pX->nKey, "malloc", "buf");
+		return SQLITE_TARANTOOL_ERROR;
+	}
+
+	memcpy(buf, pX->pKey, pX->nKey);
 	if (box_replace(SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot),
-			pX->pKey, (const char *)pX->pKey + pX->nKey,
+			buf, (const char *)buf + pX->nKey,
 			NULL)
 	    != 0) {
 		return SQLITE_TARANTOOL_ERROR;
@@ -339,8 +346,7 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 
 	struct ta_cursor *c = pCur->pTaCursor;
 	uint32_t space_id, index_id;
-	size_t original_size;
-	const char *key;
+	char *key;
 	uint32_t key_size;
 	int rc;
 
@@ -350,14 +356,14 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 
 	space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
 	index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
-	original_size = region_used(&fiber()->gc);
 	key = tuple_extract_key(c->tuple_last,
 				box_iterator_key_def(c->iter),
 				&key_size);
 	if (key == NULL)
 		return SQLITE_TARANTOOL_ERROR;
-	rc = box_delete(space_id, index_id, key, key+key_size, NULL);
-	region_truncate(&fiber()->gc, original_size);
+
+	rc = box_delete(space_id, index_id, key, key + key_size, NULL);
+
 	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
 }
 

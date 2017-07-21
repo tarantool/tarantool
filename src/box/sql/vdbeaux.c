@@ -2112,14 +2112,10 @@ int sqlite3VdbeFrameRestore(VdbeFrame *pFrame){
 }
 
 /*
-** Close all cursors.
+** Close top frame cursors.
 **
-** Also release any dynamic memory held by the VM in the Vdbe.aMem memory 
-** cell array. This is necessary as the memory cell array may contain
-** pointers to VdbeFrame objects, which may in turn contain pointers to
-** open cursors.
 */
-static void closeAllCursors(Vdbe *p){
+static void closeTopFrameCursors(Vdbe *p){
   if( p->pFrame ){
     VdbeFrame *pFrame;
     for(pFrame=p->pFrame; pFrame->pParent; pFrame=pFrame->pParent);
@@ -2129,6 +2125,19 @@ static void closeAllCursors(Vdbe *p){
   }
   assert( p->nFrame==0 );
   closeCursorsInFrame(p);
+}
+
+/*
+** Close cursors in frames marked for deletetion and free memory
+**
+** Delete all frames marked for deletion, which in turn will cause in-frame
+** cursors to be closed.
+** Also release any dynamic memory held by the VM in the Vdbe.aMem memory
+** cell array. This is necessary as the memory cell array may contain
+** pointers to VdbeFrame objects, which may in turn contain pointers to
+** open cursors.
+*/
+static void closeCursorsAndFree(Vdbe *p){
   if( p->aMem ){
     releaseMemArray(p->aMem, p->nMem);
   }
@@ -2632,7 +2641,7 @@ int sqlite3VdbeHalt(Vdbe *p){
   if( db->mallocFailed ){
     p->rc = SQLITE_NOMEM_BKPT;
   }
-  closeAllCursors(p);
+  closeTopFrameCursors(p);
   if( p->magic!=VDBE_MAGIC_RUN ){
     return SQLITE_OK;
   }
@@ -2672,6 +2681,8 @@ int sqlite3VdbeHalt(Vdbe *p){
           /* We are forced to roll back the active transaction. Before doing
           ** so, abort any other statements this handle currently has active.
           */
+          box_txn_rollback();
+          closeCursorsAndFree(p);
           sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
           sqlite3CloseSavepoints(db);
           db->autoCommit = 1;
@@ -2699,6 +2710,7 @@ int sqlite3VdbeHalt(Vdbe *p){
         rc = sqlite3VdbeCheckFk(p, 1);
         if( rc!=SQLITE_OK ){
           if( NEVER(p->readOnly) ){
+            closeCursorsAndFree(p);
             sqlite3VdbeLeave(p);
             return SQLITE_ERROR;
           }
@@ -2709,12 +2721,18 @@ int sqlite3VdbeHalt(Vdbe *p){
           ** key constraints to hold up the transaction. This means a commit 
           ** is required. */
           rc = vdbeCommit(db, p);
+          if (rc == SQLITE_OK)
+            rc = box_txn_commit() == 0? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+          closeCursorsAndFree(p);
         }
         if( rc==SQLITE_BUSY && p->readOnly ){
+          closeCursorsAndFree(p);
           sqlite3VdbeLeave(p);
           return SQLITE_BUSY;
         }else if( rc!=SQLITE_OK ){
           p->rc = rc;
+          box_txn_rollback();
+          closeCursorsAndFree(p);
           sqlite3RollbackAll(db, SQLITE_OK);
           p->nChange = 0;
         }else{
@@ -2724,6 +2742,8 @@ int sqlite3VdbeHalt(Vdbe *p){
           sqlite3CommitInternalChanges(db);
         }
       }else{
+        box_txn_rollback();
+        closeCursorsAndFree(p);
         sqlite3RollbackAll(db, SQLITE_OK);
         p->nChange = 0;
       }
@@ -2734,6 +2754,8 @@ int sqlite3VdbeHalt(Vdbe *p){
       }else if( p->errorAction==OE_Abort ){
         eStatementOp = SAVEPOINT_ROLLBACK;
       }else{
+        box_txn_rollback();
+        closeCursorsAndFree(p);
         sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
         sqlite3CloseSavepoints(db);
         db->autoCommit = 1;
@@ -2750,11 +2772,13 @@ int sqlite3VdbeHalt(Vdbe *p){
     if( eStatementOp ){
       rc = sqlite3VdbeCloseStatement(p, eStatementOp);
       if( rc ){
+        box_txn_rollback();
         if( p->rc==SQLITE_OK || (p->rc&0xff)==SQLITE_CONSTRAINT ){
           p->rc = rc;
           sqlite3DbFree(db, p->zErrMsg);
           p->zErrMsg = 0;
         }
+        closeCursorsAndFree(p);
         sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
         sqlite3CloseSavepoints(db);
         db->autoCommit = 1;
@@ -2777,6 +2801,8 @@ int sqlite3VdbeHalt(Vdbe *p){
     /* Release the locks */
     sqlite3VdbeLeave(p);
   }
+
+  closeCursorsAndFree(p);
 
   /* We have successfully halted and closed the VM.  Record this fact. */
   if( p->pc>=0 ){

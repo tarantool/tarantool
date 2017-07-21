@@ -3119,6 +3119,21 @@ case OP_Transaction: {
   break;
 }
 
+/* Opcode: TTransaction * * * * *
+**
+** Start Tarantool's transaction.
+** Only do that if auto commit mode is on. This should be no-op
+** if this opcode was emitted inside a transaction.
+** Auto commit mode is disabled by OP_Transaction.
+*/
+case OP_TTransaction:
+	{
+		int rc;
+		if (db->autoCommit)
+			rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+		break;
+	}
+	
 /* Opcode: ReadCookie P1 P2 P3 * *
 **
 ** Read cookie number P3 from database P1 and write it into register P2.

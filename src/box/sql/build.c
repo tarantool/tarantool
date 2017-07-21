@@ -188,6 +188,9 @@ void sqlite3FinishCoding(Parse *pParse){
           pSchema->schema_cookie,            /* P3 */
           pSchema->iGeneration               /* P4 */
         );
+	if (pParse->initiateTTrans)
+		sqlite3VdbeAddOp0(v, OP_TTransaction);
+
         if( db->init.busy==0 ) sqlite3VdbeChangeP5(v, 1);
         VdbeComment((v,
               "usesStmtJournal=%d", pParse->mayAbort && pParse->isMultiWrite));

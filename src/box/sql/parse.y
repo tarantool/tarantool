@@ -730,6 +730,8 @@ cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W)
   sqlite3SrcListIndexedBy(pParse, X, &I);
   W = sqlite3LimitWhere(pParse, X, W, O, L.pLimit, L.pOffset, "DELETE");
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+  /* Instruct SQL to initate Tarantool's transaction.  */
+  pParse->initiateTTrans = true;
   sqlite3DeleteFrom(pParse,X,W);
 }
 %endif
@@ -738,6 +740,8 @@ cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
   sqlite3WithPush(pParse, C, 1);
   sqlite3SrcListIndexedBy(pParse, X, &I);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+  /* Instruct SQL to initate Tarantool's transaction.  */
+  pParse->initiateTTrans = true;
   sqlite3DeleteFrom(pParse,X,W);
 }
 %endif
@@ -758,6 +762,8 @@ cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
   sqlite3ExprListCheckLength(pParse,Y,"set list"); 
   W = sqlite3LimitWhere(pParse, X, W, O, L.pLimit, L.pOffset, "UPDATE");
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+  /* Instruct SQL to initate Tarantool's transaction.  */
+  pParse->initiateTTrans = true;
   sqlite3Update(pParse,X,Y,W,R);
 }
 %endif
@@ -768,6 +774,8 @@ cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
   sqlite3SrcListIndexedBy(pParse, X, &I);
   sqlite3ExprListCheckLength(pParse,Y,"set list"); 
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+  /* Instruct SQL to initate Tarantool's transaction.  */
+  pParse->initiateTTrans = true;
   sqlite3Update(pParse,X,Y,W,R);
 }
 %endif
@@ -795,12 +803,16 @@ setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
 cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) select(S). {
   sqlite3WithPush(pParse, W, 1);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+  /* Instruct SQL to initate Tarantool's transaction.  */
+  pParse->initiateTTrans = true;
   sqlite3Insert(pParse, X, S, F, R);
 }
 cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
 {
   sqlite3WithPush(pParse, W, 1);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+  /* Instruct SQL to initate Tarantool's transaction.  */
+  pParse->initiateTTrans = true;
   sqlite3Insert(pParse, X, 0, F, R);
 }
 

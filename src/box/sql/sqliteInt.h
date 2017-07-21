@@ -42,6 +42,8 @@
 ** asterisks and the comment text.
 */
 
+#include <stdbool.h>
+
 /*
 ** Make sure the Tcl calling convention macro is defined.  This macro is
 ** only used by test code and Tcl integration code.
@@ -2961,6 +2963,8 @@ struct Parse {
   TriggerPrg *pTriggerPrg;  /* Linked list of coded triggers */
   With *pWith;              /* Current WITH clause, or NULL */
   With *pWithToFree;        /* Free this WITH object at the end of the parse */
+
+  bool initiateTTrans;      /* Initiate Tarantool transaction */
 };
 
 /*

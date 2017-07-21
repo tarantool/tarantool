@@ -10,6 +10,7 @@
 *************************************************************************
 ** This file contains the implementation for TRIGGERs
 */
+
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
@@ -778,25 +779,25 @@ static int codeTriggerProgram(
 
     switch( pStep->op ){
       case TK_UPDATE: {
-        sqlite3Update(pParse, 
+        sqlite3Update(pParse,
           targetSrcList(pParse, pStep),
-          sqlite3ExprListDup(db, pStep->pExprList, 0), 
-          sqlite3ExprDup(db, pStep->pWhere, 0), 
+          sqlite3ExprListDup(db, pStep->pExprList, 0),
+          sqlite3ExprDup(db, pStep->pWhere, 0),
           pParse->eOrconf
         );
         break;
       }
       case TK_INSERT: {
-        sqlite3Insert(pParse, 
+        sqlite3Insert(pParse,
           targetSrcList(pParse, pStep),
-          sqlite3SelectDup(db, pStep->pSelect, 0), 
-          sqlite3IdListDup(db, pStep->pIdList), 
+          sqlite3SelectDup(db, pStep->pSelect, 0),
+          sqlite3IdListDup(db, pStep->pIdList),
           pParse->eOrconf
         );
         break;
       }
       case TK_DELETE: {
-        sqlite3DeleteFrom(pParse, 
+        sqlite3DeleteFrom(pParse,
           targetSrcList(pParse, pStep),
           sqlite3ExprDup(db, pStep->pWhere, 0)
         );
