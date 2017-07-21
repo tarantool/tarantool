@@ -1,3 +1,6 @@
+fiber = require('fiber')
+---
+...
 test_run = require('test_run').new()
 ---
 ...
@@ -50,6 +53,38 @@ box.snapshot()
 for i = 5, 9 do s3:insert{i, 'test' .. i} end
 ---
 ...
+-- Concurrent index creation (gh-2288).
+ch = fiber.channel(2)
+---
+...
+s4 = box.schema.space.create('test4', {engine = 'vinyl'})
+---
+...
+s5 = box.schema.space.create('test5', {engine = 'vinyl'})
+---
+...
+_ = fiber.create(function() s4:create_index('i1') s4:create_index('i2') ch:put(true) end)
+---
+...
+_ = fiber.create(function() s5:create_index('i1') s5:create_index('i2') ch:put(true) end)
+---
+...
+ch:get()
+---
+- true
+...
+ch:get()
+---
+- true
+...
+s4:insert{44}
+---
+- [44]
+...
+s5:insert{55}
+---
+- [55]
+...
 -- Remember stats before restarting the server.
 _ = var:insert{'vyinfo', s3.index.primary:info()}
 ---
@@ -62,6 +97,12 @@ s2 = box.space.test2
 ---
 ...
 s3 = box.space.test3
+---
+...
+s4 = box.space.test4
+---
+...
+s5 = box.space.test5
 ---
 ...
 var = box.space.var
@@ -101,6 +142,22 @@ s3.index.secondary:select()
   - [7, 'test7']
   - [8, 'test8']
   - [9, 'test9']
+...
+s4.index.i1:select()
+---
+- - [44]
+...
+s4.index.i2:select()
+---
+- - [44]
+...
+s5.index.i1:select()
+---
+- - [55]
+...
+s5.index.i2:select()
+---
+- - [55]
 ...
 -- Check that stats didn't change after recovery.
 vyinfo1 = var:get('vyinfo')[2]
@@ -148,6 +205,12 @@ s2:drop()
 ---
 ...
 s3:drop()
+---
+...
+s4:drop()
+---
+...
+s5:drop()
 ---
 ...
 var:drop()

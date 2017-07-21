@@ -1,3 +1,4 @@
+fiber = require('fiber')
 test_run = require('test_run').new()
 
 -- Temporary table to restore variables after restart.
@@ -26,6 +27,18 @@ box.snapshot()
 -- Write some data to memory.
 for i = 5, 9 do s3:insert{i, 'test' .. i} end
 
+-- Concurrent index creation (gh-2288).
+ch = fiber.channel(2)
+s4 = box.schema.space.create('test4', {engine = 'vinyl'})
+s5 = box.schema.space.create('test5', {engine = 'vinyl'})
+_ = fiber.create(function() s4:create_index('i1') s4:create_index('i2') ch:put(true) end)
+_ = fiber.create(function() s5:create_index('i1') s5:create_index('i2') ch:put(true) end)
+ch:get()
+ch:get()
+
+s4:insert{44}
+s5:insert{55}
+
 -- Remember stats before restarting the server.
 _ = var:insert{'vyinfo', s3.index.primary:info()}
 
@@ -34,6 +47,8 @@ test_run:cmd('restart server default')
 s1 = box.space.test1
 s2 = box.space.test2
 s3 = box.space.test3
+s4 = box.space.test4
+s5 = box.space.test5
 var = box.space.var
 
 -- Check space contents.
@@ -41,6 +56,10 @@ s1:select()
 s2:select()
 s3.index.primary:select()
 s3.index.secondary:select()
+s4.index.i1:select()
+s4.index.i2:select()
+s5.index.i1:select()
+s5.index.i2:select()
 
 -- Check that stats didn't change after recovery.
 vyinfo1 = var:get('vyinfo')[2]
@@ -58,4 +77,6 @@ vyinfo1.range_count == vyinfo2.range_count
 s1:drop()
 s2:drop()
 s3:drop()
+s4:drop()
+s5:drop()
 var:drop()
