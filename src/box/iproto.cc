@@ -128,15 +128,6 @@ iproto_msg_delete(struct cmsg *msg)
 	iproto_resume();
 }
 
-struct IprotoMsgGuard {
-	struct iproto_msg *msg;
-	IprotoMsgGuard(struct iproto_msg *msg_arg):msg(msg_arg) {}
-	~IprotoMsgGuard()
-	{ if (msg) iproto_msg_delete(msg); }
-	struct iproto_msg *release()
-	{ struct iproto_msg *tmp = msg; msg = NULL; return tmp; }
-};
-
 /* }}} */
 
 /* {{{ iproto connection and requests */
@@ -167,7 +158,39 @@ enum rmean_net_name {
 
 const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
 
-/** Context of a single client connection. */
+/**
+ * Context of a single client connection.
+ * Interaction scheme:
+ *
+ *  Receive from the network.
+ *     |
+ * +---|---------------------+   +------------+
+ * |   |      IPROTO thread  |   | TX thread  |
+ * |   v                     |   |            |
+ * |iobuf[0].ibuf - - - - - -|- -|- - >+      |
+ * |                         |   |     |      |
+ * |          iobuf[1].ibuf  |   |     |      |
+ * |                         |   |     |      |
+ * |iobuf[0].out <- - - - - -|- -|- - -+      |
+ * |    |                    |   |     |      |
+ * |    |     iobuf[1].out <-|- -|- - -+      |
+ * +----|-----------|--------+   +------------+
+ *      |           v
+ *      |        Send to
+ *      |        network.
+ *      v
+ * Send to network after iobuf[1], i.e. older responses are sent first.
+ *
+ * ibuf structure:
+ *                   rpos             wpos           end
+ * +-------------------|----------------|-------------+
+ * \________/\________/ \________/\____/
+ *  \  msg       msg /    msg     parse
+ *   \______________/             size
+ *   response is sent,
+ *     messages are
+ *      discarded
+ */
 struct iproto_connection
 {
 	/**
@@ -204,12 +227,12 @@ static struct mempool iproto_connection_pool;
 static RLIST_HEAD(stopped_connections);
 
 /**
- * Returns true if we have enough spare messages
+ * Return true if we have not enough spare messages
  * in the message pool. Disconnect messages are
  * discounted: they are mostly reserved and idle.
  */
 static inline bool
-iproto_stop_input()
+iproto_must_stop_input()
 {
 	size_t connection_count = mempool_count(&iproto_connection_pool);
 	size_t request_count = mempool_count(&iproto_msg_pool);
@@ -231,7 +254,7 @@ iproto_resume()
 	 */
 	if (rlist_empty(&stopped_connections))
 		return;
-	if (iproto_stop_input())
+	if (iproto_must_stop_input())
 		return;
 
 	struct iproto_connection *con;
@@ -679,7 +702,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			break;
 		struct iproto_msg *msg = iproto_msg_new(con);
 		msg->iobuf = con->iobuf[0];
-		IprotoMsgGuard guard(msg);
+		auto guard = make_scoped_guard([=] { iproto_msg_delete(msg); });
 
 		msg->len = reqend - reqstart; /* total request length */
 
@@ -689,7 +712,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			 * This can't throw, but should not be
 			 * done in case of exception.
 			 */
-			cpipe_push_input(&tx_pipe, guard.release());
+			cpipe_push_input(&tx_pipe, msg);
+			guard.is_active = false;
 			n_requests++;
 		} catch (Exception *e) {
 			/*
@@ -782,7 +806,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	 * another fiber waiting for write to complete).
 	 * Ignore iproto_connection->disconnect messages.
 	 */
-	if (iproto_stop_input()) {
+	if (iproto_must_stop_input()) {
 		iproto_connection_stop(con);
 		return;
 	}
@@ -965,18 +989,18 @@ tx_process_select(struct cmsg *m)
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
+	port_create(&port);
+	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
+
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
-	port_create(&port);
-	rc = box_select((struct port *) &port,
+	rc = box_select(&port,
 			req->space_id, req->index_id,
 			req->iterator, req->offset, req->limit,
 			req->key, req->key_end);
-	if (rc < 0 || iproto_prepare_select(out, &svp) != 0) {
-		port_destroy(&port);
+	if (rc < 0 || iproto_prepare_select(out, &svp) != 0)
 		goto error;
-	}
 	if (port_dump(&port, out) != 0) {
 		/* Discard the prepared select. */
 		obuf_rollback_to_svp(out, &svp);

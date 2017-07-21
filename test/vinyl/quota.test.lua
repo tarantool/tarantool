@@ -44,4 +44,8 @@ space:select{}
 
 box.info.vinyl().memory.used
 
+_ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
+
+box.info.vinyl().memory.used
+
 space:drop()

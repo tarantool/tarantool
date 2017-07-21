@@ -63,10 +63,6 @@ uint32_t snapshot_version;
 enum {
 	/** Lowest allowed slab_alloc_minimal */
 	OBJSIZE_MIN = 16,
-	/** Lowest allowed slab_alloc_maximal */
-	OBJSIZE_MAX_MIN = 16 * 1024,
-	/** Lowest allowed slab size, for mmapped slabs */
-	SLAB_SIZE_MIN = 1024 * 1024
 };
 
 void
@@ -76,36 +72,8 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 	/* Apply lowest allowed objsize bounds */
 	if (objsize_min < OBJSIZE_MIN)
 		objsize_min = OBJSIZE_MIN;
-	if (objsize_max < OBJSIZE_MAX_MIN)
-		objsize_max = OBJSIZE_MAX_MIN;
-
-	/* Calculate slab size for tuple arena */
-	size_t slab_size = small_round(objsize_max * 4);
-	if (slab_size < SLAB_SIZE_MIN)
-		slab_size = SLAB_SIZE_MIN;
-
-	/*
-	 * Ensure that quota is a multiple of slab_size, to
-	 * have accurate value of quota_used_ratio
-	 */
-	size_t prealloc = small_align(tuple_arena_max_size, slab_size);
-	/** Preallocate entire quota. */
-	quota_init(&memtx_quota, prealloc);
-
-	say_info("mapping %zu bytes for tuple arena...", prealloc);
-
-	if (slab_arena_create(&memtx_arena, &memtx_quota,
-			      prealloc, slab_size, MAP_PRIVATE)) {
-		if (ENOMEM == errno) {
-			panic("failed to preallocate %zu bytes: "
-			      "Cannot allocate memory, check option "
-			      "'memtx_memory' in box.cfg(..)",
-			      prealloc);
-		} else {
-			panic_syserror("failed to preallocate %zu bytes",
-				       prealloc);
-		}
-	}
+	tuple_arena_create(&memtx_arena, &memtx_quota, tuple_arena_max_size,
+			 objsize_max, "memtx");
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);

@@ -40,104 +40,129 @@
  * or over a series of sorted runs on disk to create a new sorted
  * run (compaction).
  *
- * Use merge iterator to order the output and filter out
- * too old statements (older than the oldest active read view).
- *
- * Squash multiple UPSERT statements over the same key into one,
- * if possible.
- *
  * Background
  * ----------
- * Vinyl provides support for consistent read views. The oldest
- * active read view is maintained in the transaction manager.
- * To support it, when dumping or compacting statements on disk,
- * older versions need to be preserved, and versions outside
- * any active read view garbage collected. This task is handled
- * by the write iterator.
+ * The write iterator merges multiple data sources into one,
+ * ordering statements by key and then by LSN and purging
+ * unnecessary changes.
  *
- * Filtering
- * ---------
- * Let's call each transaction consistent read view LSN vlsn.
+ * The sources supply statements in ascending order of the
+ * key and descending order of LSN (newest changes first).
+ * A heap is used to preserve descending order of LSNs
+ * in the output.
  *
- *	oldest_vlsn = MIN(vlsn) over all active transactions
+ * There may be many statements for the same key, forming
+ * a history.
  *
- * Thus to preserve relevant data for every key and purge old
- * versions, the iterator works as follows:
+ * The iterator needs to preserve only the statements
+ * which are visible to the active read views, each represented
+ * by a view LSN (VLSN) and purge the rest.
  *
- *      If statement lsn is greater than oldest vlsn, the
- *      statement is preserved.
+ * The list of read views always contains at least the "current"
+ * read view, represented by INT64_MAX. 0 stands for the oldest
+ * possible LSN:
  *
- *      Otherwise, if statement type is REPLACE/DELETE, then
- *      it's returned, and the iterator can proceed to the
- *      next key: the readers do not need the history.
+ * [0, vlsn1, vlsn2, vlsn3, ... INT64_MAX].
  *
- *      Otherwise, the statement is UPSERT, and in order
- *      to restore the original tuple from UPSERT the reader
- *      does need the history: they need to look for an older
- *      statement to which the UPSERT can be applied to get
- *      a tuple. This older statement can be UPSERT as well,
- *      and so on.
- *	In other words, of statement type is UPSERT, the reader
- *	needs a range of statements from the youngest statement
- *	with lsn <= vlsn to the youngest non-UPSERT statement
- *	with lsn <= vlsn, borders included.
+ * The iterator splits a sequence of LSNs for the same key into
+ * a series of histories, one for each read view, and then merges
+ * each history into a single statement:
  *
- *	All other versions of this key can be skipped, and hence
- *	garbage collected.
+ *                         --------
+ *                         SAME KEY
+ *                         --------
+ * 0               VLSN1                 VLSN2       ...     INT64_MAX
+ * |                 |                     |                     |
+ * | LSN1 ... LSN(i) | LSN(i+1) ... LSN(j) | LSN(j+1) ... LSN(N) |
+ * \________________/ \___________________/ \____________________/
+ *       merge                merge                 merge
  *
- * Squashing and garbage collection
- * --------------------------------
- * Filtering and garbage collection, performed by write iterator,
- * must have no effect on read views of active transactions:
- * they should read the same data as before.
+ * The following optimizations are applicable, all aiming at
+ * purging unnecessary statements from the output. The
+ * optimizations are applied while reading the statements from
+ * the heap, from newest LSN to oldest.
  *
- * On the other hand, old version should be deleted as soon as possible;
- * multiple UPSERTs could be merged together to take up less
- * space, or substituted with REPLACE.
+ * ---------------------------------------------------------------
+ * Optimization #1: when merging the last level of the LSM tree,
+ * e.g. when doing a major compaction, skip DELETEs from the
+ * output as long as they are older than the oldest read view:
  *
- * Here's how it's done:
+ *                 ---------------------------
+ *                 SAME KEY, MAJOR COMPACTION
+ *                 ---------------------------
  *
+ * 0                          VLSN1          ...         INT64_MAX
+ * |                            |                            |
+ * | LSN1  LSN2   ...   DELETE  | LSNi   LSNi+1  ...  LSN_N  |
+ * \___________________________/ \___________________________/
+ *            skip                         merge
  *
- *	1) Every statement with lsn greater than oldest vlsn is preserved
- *	in the output, since there could be an active transaction
- *	that needs it.
+ * Indeed, we don't have to store absent data on disk, including
+ * the statements even older than the pruned delete.
+ * As for all other read views, if a DELETE is visible to a read
+ * view, it has to be preserved.
  *
- *	2) For all statements with lsn <= oldest_vlsn, only a single
- *	resultant statement is returned. Here's how.
+ * ---------------------------------------------------------------
+ * Optimization #2: once we found a REPLACE or DELETE, we can skip
+ * the rest of the stream until the next read view:
  *
- *	2.1) If the youngest statement with lsn <= oldest _vlsn is a
- *	REPLACE/DELETE, it becomes the resultant statement.
+ *                         --------
+ *                         SAME KEY
+ *                         --------
+ * VLSN1                    VLSN2                     INT64_MAX
+ *   |                        |                           |
+ *   | LSN1 LSN2 ...  REPLACE | LSNi ... DELETE ... LSN_N |
+ *   \______________/\_______/ \_______/\_________________/
+ *         skip        keep       skip         merge
  *
- *	2.2) Otherwise, it as an UPSERT. Then we must iterate over
- *	all older LSNs for this key until we find a REPLACE/DELETE
- *	or exhaust all input streams for this key.
+ * ---------------------------------------------------------------
+ * Optimization #3: when compacting runs of a secondary key, skip
+ * statements, which do not update this key.
  *
- *	If the older lsn is a yet another UPSERT, two upserts are
- *	squashed together into one. Otherwise we found an
- *	REPLACE/DELETE, so apply all preceding UPSERTs to it and
- *	get the resultant statement.
+ *                         --------
+ *                         SAME KEY
+ *                         --------
+ *            VLSN(i)                                    VLSN(i+1)
+ * Masks        |                                            |
+ * intersection:| not 0     0       0     not 0        not 0 |
+ *              |  ANY   DELETE  REPLACE   ANY  ...  REPLACE |
+ *              \______/\_______________/\___________________/
+ *               merge       skip              merge
  *
- * There is an extra twist to this algorithm, used when performing
- * compaction of the last LSM level (i.e. merging all existing
- * runs into one). The last level does not need to store DELETEs.
- * Thus we can:
- * 1) Completely skip the resultant statement from output if it's
- *    a DELETE.
- *     |      ...      |       |     ...      |
- *     |               |       |              |    ^
- *     +- oldest vlsn -+   =   +- oldest lsn -+    ^ lsn
- *     |               |       |              |    ^
- *     |    DELETE     |       +--------------+
- *     |      ...      |
- * 2) Replace an accumulated resultant UPSERT with an appropriate
- *    REPLACE.
- *     |      ...      |       |     ...      |
- *     |     UPSERT    |       |   REPLACE    |
- *     |               |       |              |    ^
- *     +- oldest vlsn -+   =   +- oldest lsn -+    ^ lsn
- *     |               |       |              |    ^
- *     |    DELETE     |       +--------------+
- *     |      ...      |
+ * Details: when UPDATE is executed by Tarantool, it is
+ * transformed into DELETE + REPLACE or a single REPLACE. But it
+ * is only necessary to write anything into the secondary key if
+ * such UPDATE changes any field, which is part of the key.
+ * All other UPDATEs can be simply skipped.
+ *
+ * ---------------------------------------------------------------
+ * Optimization #4: use older REPLACE/DELETE to apply UPSERTs and
+ * convert them into a single REPLACE. When compaction includes
+ * the last level, absence of REPLACE or DELETE is equivalent
+ * to a DELETE, and UPSERT can be converted to REPLACE as well.
+ * If REPLACE or DELETE is found in an older read view, it can
+ * be used as well.
+ *
+ *                         --------
+ *                         SAME KEY
+ *                         --------
+ * 0   VLSN1     VLSN2     VLSN3     VLSN4     VLSN5   INT64_MAX
+ * |     |         |         |         |         |        |
+ * |     | REPLACE | UPSERT  | UPSERT  | UPSERT  |   ...  |
+ * \_____|___^_____|_________|_________|_________|________/
+ *           ^ <  <  apply
+ *                    ^  <  <   apply
+ *                               ^  <  <  apply
+ *
+ * Result:
+ *
+ * 0   VLSN1     VLSN2     VLSN3     VLSN4     VLSN5   INT64_MAX
+ * |     |         |         |         |         |        |
+ * |     | REPLACE | REPLACE | REPLACE | REPLACE |   ...  |
+ * \_____|_________|_________|_________|_________|________/
+ *
+ * See implementation details in
+ * vy_write_iterator_build_read_views.
  */
 
 struct vy_write_iterator;
@@ -154,29 +179,29 @@ struct vy_run_env;
  * @param key_def - key definition for tuple compare.
  * @param format - dormat to allocate new REPLACE and DELETE tuples from vy_run.
  * @param upsert_format - same as format, but for UPSERT tuples.
- * @param is_primary - set if this iterator is for a primary index.
+ * @param LSM tree is_primary - set if this iterator is for a primary index.
  * @param is_last_level - there is no older level than the one we're writing to.
- * @param oldest_vlsn - the minimal VLSN among all active transactions.
+ * @param read_views - Opened read views.
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
 vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
-		      bool is_last_level, int64_t oldest_vlsn);
+		      bool is_last_level, struct rlist *read_views);
 
 /**
- * Add a mem as a source of iterator.
- * @return 0 on success or not 0 on error (diag is set).
+ * Add a mem as a source to the iterator.
+ * @return 0 on success, -1 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_add_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
+vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
 
 /**
- * Add a run slice as a source of iterator.
- * @return 0 on success or not 0 on error (diag is set).
+ * Add a run slice as a source to the iterator.
+ * @return 0 on success, -1 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_add_slice(struct vy_stmt_stream *stream,
+vy_write_iterator_new_slice(struct vy_stmt_stream *stream,
 			    struct vy_slice *slice, struct vy_run_env *run_env);
 
 #endif /* INCLUDES_TARANTOOL_BOX_VY_WRITE_STREAM_H */

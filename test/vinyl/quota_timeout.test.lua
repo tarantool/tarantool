@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 
-test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+test_run:cmd("create server test with script='vinyl/low_quota_1.lua'")
 test_run:cmd("start server test")
 test_run:cmd('switch test')
 

@@ -63,7 +63,7 @@ end
 local function check_user_level()
     local uid = os.getenv('UID')
     local udir = nil
-    if uid == 0 then
+    if uid == 0 or os.getenv("NOTIFY_SOCKET") then
         return nil
     end
     -- local dir configuration
@@ -415,6 +415,10 @@ local cat_formats = setmetatable({
 local orig_cfg = box.cfg
 
 local function wrapper_cfg(cfg)
+    fiber.name(instance_name)
+    log.info('Run console at %s', console_sock)
+    console.listen(console_sock)
+
     for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
             cfg[i] = v
@@ -427,7 +431,7 @@ local function wrapper_cfg(cfg)
     else
         cfg.username = nil
     end
-    if under_systemd() then
+    if os.getenv("NOTIFY_SOCKET") then
         cfg.background = false
     elseif cfg.background == nil then
         cfg.background = true
@@ -446,9 +450,6 @@ local function wrapper_cfg(cfg)
         os.exit(1)
     end
 
-    fiber.name(instance_name)
-    log.info('Run console at %s', console_sock)
-    console.listen(console_sock)
     -- gh-1293: members of `tarantool` group should be able to do `enter`
     local console_sock = uri.parse(console_sock).service
     local mode = '0664'
@@ -782,22 +783,10 @@ local function cat()
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
             local rid = record.HEADER.replica_id
-            -- space filter rules
-            local is_space_filtered    = spaces ~= nil
-            local is_space_system      = (sid ~= nil and sid < 512 and
-                                          show_system == false)
-            local isnt_space_specified = not (is_space_filtered and
-                                              find_in_list(sid, spaces))
-            -- replica id filter rules
-            local is_replica_id_filtered    = replicas ~= nil
-            local isnt_replica_id_specified = not (is_replica_id_filtered and
-                                                   find_in_list(rid, replicas))
-
             if (lsn < from) or
-               (is_space_filtered and is_space_system and
-                isnt_space_specified) or
-               (is_space_system and isnt_space_specified) or
-               (is_replica_id_filtered and isnt_replica_id_specified) then
+               (not spaces and sid and sid < 512 and not show_system) or
+               (spaces and (sid == nil or not find_in_list(sid, spaces))) or
+               (replicas and not find_in_list(rid, replicas)) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to
@@ -835,21 +824,10 @@ local function play()
         for lsn, record in xlog.pairs(file) do
             local sid = record.BODY.space_id
             local rid = record.HEADER.replica_id
-            -- space filter rules
-            local is_space_filtered    = spaces ~= nil
-            local is_space_system      = sid < 512 and show_system == false
-            local isnt_space_specified = not (is_space_filtered and
-                                              find_in_list(sid, spaces))
-            -- replica id filter rules
-            local is_replica_id_filtered    = replicas ~= nil
-            local isnt_replica_id_specified = not (is_replica_id_filtered and
-                                                   find_in_list(rid, replicas))
-
             if (lsn < from) or
-               (is_space_filtered and is_space_system and
-                isnt_space_specified) or
-               (is_space_system and isnt_space_specified) or
-               (is_replica_id_filtered and isnt_replica_id_specified) then
+               (not spaces and sid and sid < 512 and not show_system) or
+               (spaces and (sid == nil or not find_in_list(sid, spaces))) or
+               (replicas and not find_in_list(rid, replicas)) then
                 -- pass this tuple
             elseif lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to

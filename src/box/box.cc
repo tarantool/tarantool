@@ -269,7 +269,7 @@ struct recovery_journal {
  * exact same signature during local recovery to properly mark
  * min/max LSN of created LSM levels.
  */
-int64_t
+static int64_t
 recovery_journal_write(struct journal *base,
 		       struct journal_entry * /* entry */)
 {
@@ -282,6 +282,30 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 {
 	journal_create(&journal->base, recovery_journal_write, NULL);
 	journal->vclock = v;
+}
+
+/**
+ * Dummy journal used to generate unique LSNs for rows received
+ * during initial join.
+ */
+struct join_journal {
+	struct journal base;
+	int64_t lsn;
+};
+
+static int64_t
+join_journal_write(struct journal *base,
+		   struct journal_entry * /* entry */)
+{
+	struct join_journal *journal = (struct join_journal *) base;
+	return ++journal->lsn;
+}
+
+static inline void
+join_journal_create(struct join_journal *journal)
+{
+	journal_create(&journal->base, join_journal_write, NULL);
+	journal->lsn = 0;
 }
 
 static inline void
@@ -960,6 +984,7 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 	/* Create a call context */
 	struct port port;
 	port_create(&port);
+	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
 	box_function_ctx_t ctx = { request, &port };
 
 	/* Clear all previous errors */
@@ -982,12 +1007,9 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 
 	if (request->type == IPROTO_CALL_16) {
 		/* Tarantool < 1.7.1 compatibility */
-		for (struct port_entry *entry = port.first;
-		     entry != NULL; entry = entry->next) {
-			if (tuple_to_obuf(entry->tuple, out) != 0) {
-				obuf_rollback_to_svp(out, &svp);
-				goto error;
-			}
+		if (port_dump(&port, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
 		}
 		iproto_reply_select(out, &svp, request->header->sync,
 				    ::schema_version, port.size);
@@ -998,23 +1020,17 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 		if (size_buf == NULL)
 			goto error;
 		mp_encode_array(size_buf, port.size);
-		for (struct port_entry *entry = port.first;
-		     entry != NULL; entry = entry->next) {
-			if (tuple_to_obuf(entry->tuple, out) != 0) {
-				obuf_rollback_to_svp(out, &svp);
-				goto error;
-			}
+		if (port_dump(&port, out) != 0) {
+			obuf_rollback_to_svp(out, &svp);
+			goto error;
 		}
 		iproto_reply_select(out, &svp, request->header->sync,
 				    ::schema_version, 1);
 	}
 
-	port_destroy(&port);
-
 	return 0;
 
 error:
-	port_destroy(&port);
 	txn_rollback();
 	return -1;
 }
@@ -1466,7 +1482,9 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery(NULL);
-
+	struct join_journal join_journal;
+	join_journal_create(&join_journal);
+	journal_set(&join_journal.base);
 
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
 	/*
@@ -1616,6 +1634,11 @@ box_cfg_xc(void)
 		 */
 		engine_begin_initial_recovery(&recovery->vclock);
 		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+
+		struct recovery_journal journal;
+		recovery_journal_create(&journal, &recovery->vclock);
+		journal_set(&journal.base);
+
 		/**
 		 * We explicitly request memtx to recover its
 		 * snapshot as a separate phase since it contains
@@ -1624,10 +1647,6 @@ box_cfg_xc(void)
 		 * other engines.
 		 */
 		memtx->recoverSnapshot(&last_checkpoint_vclock);
-
-		struct recovery_journal journal;
-		recovery_journal_create(&journal, &recovery->vclock);
-		journal_set(&journal.base);
 
 		engine_begin_final_recovery();
 		title("orphan");

@@ -163,11 +163,8 @@ struct vy_log_record {
 	/** Type of the record. */
 	enum vy_log_record_type type;
 	/**
-	 * Unique ID of the vinyl index.
-	 *
-	 * The ID must be unique for different incarnations of
-	 * the same index, so we use LSN from the time of index
-	 * creation for it.
+	 * LSN from the time of index creation.
+	 * Used to identify indexes in vylog.
 	 */
 	int64_t index_lsn;
 	/** Unique ID of the vinyl range. */
@@ -389,9 +386,39 @@ vy_recovery_iterate(struct vy_recovery *recovery,
  *
  * Note, this function returns 0 if there's no index with the requested
  * id in the recovery context. In this case, @cb isn't called at all.
+ *
+ * The @snapshot_recovery flag indicates that the row that created
+ * the index was loaded from a snapshot, in which case @index_lsn is
+ * the snapshot signature. Otherwise @index_lsn is the LSN of the WAL
+ * row that created the index.
+ *
+ * The index is looked up by @space_id and @index_id while @index_lsn
+ * is used to discern different incarnations of the same index as
+ * follows. Let @record denote the vylog record corresponding to the
+ * last incarnation of the index. Then
+ *
+ * - If @snapshot_recovery is set and @index_lsn >= @record->index_lsn,
+ *   the last index incarnation was created before the snapshot and we
+ *   need to load it right now.
+ *
+ * - If @snapshot_recovery is set and @index_lsn < @record->index_lsn,
+ *   the last index incarnation was created after the snapshot, i.e.
+ *   the index loaded now is going to be dropped so load a dummy.
+ *
+ * - If @snapshot_recovery is unset and @index_lsn < @record->index_lsn,
+ *   the last index incarnation is created further in WAL, load a dummy.
+ *
+ * - If @snapshot_recovery is unset and @index_lsn == @record->index_lsn,
+ *   load the last index incarnation.
+ *
+ * - If @snapshot_recovery is unset and @index_lsn > @record->index_lsn,
+ *   it seems we failed to log index creation before restart. In this
+ *   case don't do anything. The caller is supposed to retry logging.
  */
 int
-vy_recovery_load_index(struct vy_recovery *recovery, int64_t index_lsn,
+vy_recovery_load_index(struct vy_recovery *recovery,
+		       uint32_t space_id, uint32_t index_id,
+		       int64_t index_lsn, bool snapshot_recovery,
 		       vy_recovery_cb cb, void *cb_arg);
 
 /**

@@ -94,52 +94,17 @@ port_destroy(struct port *port)
 int
 port_dump(struct port *port, struct obuf *out)
 {
-	struct port_entry *pe = port->first;
-	struct port_entry *tmp;
-	if (pe == NULL)
-		return 0;
-	if (tuple_to_obuf(pe->tuple, out) != 0) {
-		/*
-		 * The first port entry is pre-allocated,
-		 * no need to destroy it, only unref
-		 * the tuple.
-		 */
-		tuple_unref(pe->tuple);
-		return -1;
-	}
-	tuple_unref(pe->tuple);
-	pe = pe->next;
-
-	while (pe != NULL) {
-		if (tuple_to_obuf(pe->tuple, out) != 0) {
-			/*
-			 * After the first error we can only
-			 * destroy the port.
-			 */
-			goto error;
-		}
+	for (struct port_entry *pe = port->first; pe != NULL; pe = pe->next) {
+		if (tuple_to_obuf(pe->tuple, out) != 0)
+			return -1;
 
 		ERROR_INJECT(ERRINJ_PORT_DUMP, {
 			diag_set(OutOfMemory, tuple_size(pe->tuple), "obuf_dup",
 				 "data");
-			goto error;
+			return -1;
 		});
-		tmp = pe->next;
-		tuple_unref(pe->tuple);
-		mempool_free(&port_entry_pool, pe);
-		pe = tmp;
 	}
 	return 0;
-
-	/* Free the port */
-	while (pe != NULL) {
-error:
-		tmp = pe->next;
-		tuple_unref(pe->tuple);
-		mempool_free(&port_entry_pool, pe);
-		pe = tmp;
-	}
-	return -1;
 }
 
 void

@@ -44,7 +44,11 @@ Conflicts: tarantool-common (<< 1.5.3),
  tarantool-postgresql-module,
  libtarantool-dev (<< 1.6~)
 Replaces: tarantool-common (<< 1.5.3), tarantool-lts-common
-Depends: ${misc:Depends}, adduser, lsb-base
+Depends: ${misc:Depends}, adduser, lsb-base,
+# Deps for built-in package manager
+# https://github.com/tarantool/tarantool/issues/2612
+ openssl, curl
+Recommends: tarantool-dev, git, build-essential, cmake
 Description: Tarantool in-memory database - common files
  Tarantool is an in-memory database and Lua application server.
  This package provides scripts to work with tarantool configuration

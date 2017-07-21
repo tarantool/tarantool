@@ -84,6 +84,13 @@ box.info.vinyl().memory.used
 ---
 - 0
 ...
+_ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
+---
+...
+box.info.vinyl().memory.used
+---
+- 5341228
+...
 space:drop()
 ---
 ...

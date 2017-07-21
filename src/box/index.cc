@@ -175,7 +175,7 @@ Index::~Index()
 }
 
 void
-Index::commitCreate()
+Index::commitCreate(int64_t /* signature */)
 {
 }
 

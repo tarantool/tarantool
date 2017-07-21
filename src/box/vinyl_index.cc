@@ -78,9 +78,9 @@ VinylIndex::open()
 }
 
 void
-VinylIndex::commitCreate()
+VinylIndex::commitCreate(int64_t signature)
 {
-	vy_index_commit_create(env, db);
+	vy_index_commit_create(env, db, signature);
 }
 
 void

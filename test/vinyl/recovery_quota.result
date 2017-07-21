@@ -1,12 +1,15 @@
 test_run = require('test_run').new()
 ---
 ...
+fio = require 'fio'
+---
+...
 -- Upon start the test server creates a space and populates it with
 -- more tuples than can be stored in memory, which results in dumping
 -- some of them to disk. If on restart, during recovery from WAL,
 -- it replayed the dumped statements, it would exceed memory quota.
 -- Check that it does not.
-test_run:cmd('create server test with script = "vinyl/low_quota.lua"')
+test_run:cmd('create server test with script = "vinyl/low_quota_2.lua"')
 ---
 - true
 ...
@@ -18,17 +21,20 @@ test_run:cmd('switch test')
 ---
 - true
 ...
--- Create a vinyl space and trigger dump by exceeding memory quota (1 MB).
+-- Create a vinyl space and trigger dump by exceeding memory quota.
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
 _ = s:create_index('pk', {run_count_per_level = 10})
 ---
 ...
-pad = string.rep('x', 1000)
+pad_size = 1000
 ---
 ...
-for i = 1, 2000 do s:insert{i, pad} end
+pad = string.rep('x', pad_size)
+---
+...
+for i = 1, 2 * box.cfg.vinyl_memory / pad_size do s:insert{i, pad} end
 ---
 ...
 -- Save the total number of committed and dumped statements.
@@ -94,6 +100,28 @@ put_before - dump_before == put_after or {dump_before, dump_after, put_before, p
 ---
 - true
 ...
+-- Disable dump and use all memory up to the limit.
+box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
+---
+- ok
+...
+box.cfg{vinyl_timeout=0.001}
+---
+...
+pad_size = 1000
+---
+...
+pad = string.rep('x', pad_size)
+---
+...
+for i = 1, box.cfg.vinyl_memory / pad_size do box.space.test:replace{i, pad} end
+---
+- error: Timed out waiting for Vinyl memory quota
+...
+box.info.vinyl().memory.used > 1024 * 1024
+---
+- true
+...
 test_run:cmd('switch default')
 ---
 - true
@@ -102,7 +130,42 @@ test_run:cmd('stop server test')
 ---
 - true
 ...
+-- Check that tarantool can recover with a smaller memory limit.
+_ = test_run:cmd(string.format('create server test2 with script = "vinyl/low_quota_1.lua", workdir = "%s"', fio.pathjoin(fio.cwd(), 'low_quota_2')))
+---
+...
+_ = test_run:cmd('start server test2')
+---
+...
+_ = test_run:cmd('switch test2')
+---
+...
+fiber = require 'fiber'
+---
+...
+-- All memory above the limit must be dumped after recovery.
+while box.space.test.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.001) end
+---
+...
+stat = box.info.vinyl()
+---
+...
+stat.memory.used <= stat.memory.limit or {stat.memory.used, stat.memory.limit}
+---
+- true
+...
+_ = test_run:cmd('switch default')
+---
+...
+test_run:cmd('stop server test2')
+---
+- true
+...
 test_run:cmd('cleanup server test')
+---
+- true
+...
+test_run:cmd('cleanup server test2')
 ---
 - true
 ...

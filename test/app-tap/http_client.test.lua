@@ -50,7 +50,7 @@ end
 local server, URL = start_server()
 
 test:test("http.client", function(test)
-    test:plan(6)
+    test:plan(7)
 
     local r = client.get(URL)
     test:is(r.status, 200, 'simple 200')
@@ -60,6 +60,9 @@ test:test("http.client", function(test)
     test:ok(tonumber(r.headers["content-length"]) > 0,
         "content-length > 0")
     test:is(client.get("http://localhost:0/").status, 595, 'bad url')
+
+    local r = client.request('GET', URL)
+    test:is(r.status, 200, 'request')
 end)
 
 test:test("cancel and timeout", function(test)

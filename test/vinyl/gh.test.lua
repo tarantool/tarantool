@@ -270,5 +270,5 @@ s:drop()
 -- https://github.com/tarantool/tarantool/issues/2588
 s = box.schema.space.create('vinyl', { engine = 'vinyl' })
 i = box.space.vinyl:create_index('primary')
-s:replace({1, string.rep('x', 10 * 1024 * 1024)})
+_ = s:replace({1, string.rep('x', 35 * 1024 * 1024)})
 s:drop()

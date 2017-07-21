@@ -505,8 +505,6 @@ box.schema.index.create = function(space_id, name, options)
             run_count_per_level = options.run_count_per_level,
             run_size_ratio = options.run_size_ratio,
             bloom_fpr = options.bloom_fpr,
-            lsn = box.info.signature,
-            bloom_fpr = options.bloom_fpr
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2

@@ -42,6 +42,9 @@
 #include "tuple.h"
 #include "tuple_compare.h"
 #include "iproto_constants.h"
+#include "small/lsregion.h"
+#include "small/slab_arena.h"
+#include "small/quota.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -62,7 +65,29 @@ static_assert(VY_UPSERT_THRESHOLD <= UINT8_MAX, "n_upserts max value");
 static_assert(VY_UPSERT_INF == VY_UPSERT_THRESHOLD + 1,
 	      "inf must be threshold + 1");
 
+/** Vinyl statement vtable. */
 extern struct tuple_format_vtab vy_tuple_format_vtab;
+
+/** Vinyl statement environment. */
+struct vy_stmt_env {
+	struct lsregion allocator;
+	struct slab_arena arena;
+	struct quota quota;
+};
+
+/**
+ * Initialize vinyl statement environment.
+ * @param env[out] Vinyl statement environment.
+ * @param arena_max_size Memory limit for vinyl statement arena.
+ * @param tuple_max_size Memory limit for a single vinyl
+ *        statement.
+ */
+void
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
+		   uint32_t tuple_max_size);
+
+void
+vy_stmt_env_destroy(struct vy_stmt_env *env);
 
 /**
  * There are two groups of statements:
@@ -232,6 +257,32 @@ static inline bool
 vy_stmt_is_refable(const struct tuple *stmt)
 {
 	return stmt->refs > 0;
+}
+
+/**
+ * Ref tuple, if it exists (!= NULL) and can be referenced.
+ * @sa vy_stmt_is_refable.
+ *
+ * @param tuple Tuple to ref or NULL.
+ */
+static inline void
+vy_stmt_ref_if_possible(struct tuple *stmt)
+{
+	if (vy_stmt_is_refable(stmt))
+		tuple_ref(stmt);
+}
+
+/**
+ * Unref tuple, if it exists (!= NULL) and can be unreferenced.
+ * @sa vy_stmt_is_refable.
+ *
+ * @param tuple Tuple to unref or NULL.
+ */
+static inline void
+vy_stmt_unref_if_possible(struct tuple *stmt)
+{
+	if (vy_stmt_is_refable(stmt))
+		tuple_unref(stmt);
 }
 
 /**
