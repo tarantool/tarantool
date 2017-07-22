@@ -2320,4 +2320,8 @@ struct trigger on_stmt_begin_index = {
 	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
 };
 
+struct trigger on_stmt_begin_truncate = {
+	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
+};
+
 /* vim: set foldmethod=marker */
