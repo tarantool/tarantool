@@ -140,8 +140,8 @@ box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ...
 box.sql.execute("SELECT foo, bar FROM barfoo")
 ---
-- - [2, 'bar']
-  - [1, 'foo']
+- - [1, 'foo']
+  - [2, 'bar']
   - [1000, 'foobar']
 ...
 box.sql.execute("SELECT foo, bar FROM barfoo WHERE foo==2")

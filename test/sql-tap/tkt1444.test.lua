@@ -46,7 +46,7 @@ test:do_execsql_test(
         SELECT x,TextKey,DKey FROM DemoTable UNION ALL SELECT * FROM DemoView;
     ]], {
         -- <tkt1444-1.2>
-        9, "8", 7.0, 1, "2", 3.0, 1, "2", 3.0, 9, "8", 7.0
+        9,"8",7,1,"2",3,1,"2",3,9,"8",7
         -- </tkt1444-1.2>
     })
 
@@ -68,7 +68,7 @@ test:do_execsql_test(
         SELECT x,TextKey,DKey FROM DemoTable UNION ALL SELECT * FROM DemoView;
     ]], {
         -- <tkt1444-1.4>
-        9, "8", 7.0, 1, "2", 3.0, 9, "8", 7.0, 1, "2", 3.0
+        9,"8",7,1,"2",3,9,"8",7,1,"2",3
         -- </tkt1444-1.4>
     })
 

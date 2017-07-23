@@ -360,7 +360,7 @@ test:do_eqp_test(
     ]], {
         -- <index6-8.1>
     {0, 0, 0, "SCAN TABLE t8a"},
-    {0, 1, 1, "SEARCH TABLE t8b USING INDEX i8c (y=?)"}
+    {0, 1, 1, "SEARCH TABLE t8b USING COVERING INDEX i8c (y=?)"}
         -- </index6-8.1>
     })
 
@@ -434,7 +434,7 @@ test:do_execsql_test(
         SELECT e FROM t10 WHERE a=1 AND b=2 AND c=3 ORDER BY d;
     ]], {
         -- <index6-10.1eqp>
-        "/USING INDEX t10x/"
+        "/USING COVERING INDEX t10x/"
         -- </index6-10.1eqp>
     })
 
@@ -455,7 +455,7 @@ test:do_execsql_test(
         SELECT e FROM t10 WHERE c=3 AND 2=b AND a=1 ORDER BY d DESC;
     ]], {
         -- <index6-10.2eqp>
-        "/USING INDEX t10x/"
+        "/USING COVERING INDEX t10x/"
         -- </index6-10.2eqp>
     })
 

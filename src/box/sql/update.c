@@ -626,8 +626,7 @@ void sqlite3Update(
     }
   
     /* Insert the new index entries and the new record. */
-    sqlite3CompleteInsertion(pParse, pTab, iDataCur, iIdxCur,
-                             regNewRowid, aRegIdx, 1, 0, 0);
+    sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx, 0);
 
     /* Do any ON CASCADE, SET NULL or SET DEFAULT operations required to
     ** handle rows (possibly in other tables) that refer via a foreign key

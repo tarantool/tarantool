@@ -48,8 +48,12 @@ local eqps = {
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x", {1, 3, 2, 2, 3, 1}, {idxscan, sort}},
     {"SELECT x,y FROM t1 GROUP BY y, x ORDER BY y, x", {3, 1, 2, 2, 1, 3}, {idxscan, sort}},
     {"SELECT x,y FROM t1 GROUP BY x ORDER BY x", {1, 3, 2, 2, 3, 1}, {idxscan}},
-    {"SELECT x,y FROM t1 GROUP BY y ORDER BY y", {3, 1, 2, 2, 1, 3}, {idxscan, grpsort}},
-    {"SELECT x,y FROM t1 GROUP BY y ORDER BY x", {1, 3, 2, 2, 3, 1}, {idxscan, grpsort, sort}},
+    -- idxscan->tblscan after reorderind indexes list
+    -- but it does not matter
+    {"SELECT x,y FROM t1 GROUP BY y ORDER BY y", {3, 1, 2, 2, 1, 3}, {tblscan, grpsort}},
+    -- idxscan->tblscan after reorderind indexes list
+    -- but it does not matter (because it does full scan)
+    {"SELECT x,y FROM t1 GROUP BY y ORDER BY x", {1, 3, 2, 2, 3, 1}, {tblscan, grpsort, sort}},
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x, y DESC", {1, 3, 2, 2, 3, 1}, {idxscan, sort}},
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x DESC, y DESC", {3, 1, 2, 2, 1, 3}, {idxscan, sort}},
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x ASC, y ASC", {1, 3, 2, 2, 3, 1}, {idxscan}},

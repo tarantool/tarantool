@@ -1119,9 +1119,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 							sqlite3FkReferences
 							(pTab) == 0)
 				    ));
-			sqlite3CompleteInsertion(pParse, pTab, iDataCur,
-						 iIdxCur, regIns, aRegIdx, 0,
-						 appendFlag, bUseSeek);
+			sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx,
+						 bUseSeek);
 		}
 	}
 
@@ -1877,86 +1876,49 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 ** A consecutive range of registers starting at regNewData contains the
 ** rowid and the content to be inserted.
 **
-** The arguments to this routine should be the same as the first six
+** The arguments to this routine should be the same as corresponding
 ** arguments to sqlite3GenerateConstraintChecks.
 */
 void
-sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
-			 Table * pTab,	/* the table into which we are inserting */
-			 int iDataCur,	/* Cursor of the canonical data source */
-			 int iIdxCur,	/* First index cursor */
-			 int regNewData,	/* Range of content */
-			 int *aRegIdx,	/* Register used by each index.  0 for unused indices */
-			 int isUpdate,	/* True for UPDATE, False for INSERT */
-			 int appendBias,	/* True if this is likely to be an append */
-			 int useSeekResult	/* True to set the USESEEKRESULT flag on OP_[Idx]Insert */
+sqlite3CompleteInsertion(Parse *pParse,    /* The parser context */
+			 Table *pTab,      /* the table into which we are inserting */
+			 int iIdxCur,      /* Primary index cursor */
+			 int *aRegIdx,     /* Register used by each index.  0 for unused indices */
+			 int useSeekResult /* True to set the USESEEKRESULT flag on OP_[Idx]Insert */
     )
 {
 	Vdbe *v;		/* Prepared statements under construction */
 	Index *pIdx;		/* An index being inserted or updated */
 	u8 pik_flags;		/* flag values passed to the btree insert */
-	int regData;		/* Content registers (after the rowid) */
-	int regRec;		/* Register holding assembled record for the table */
-	int i;			/* Loop counter */
-	u8 bAffinityDone = 0;	/* True if OP_Affinity has been run already */
 
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
 	assert(pTab->pSelect == 0);	/* This table is not a VIEW */
-	for (i = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, i++) {
-		if (aRegIdx[i] == 0)
-			continue;
-		bAffinityDone = 1;
-		if (pIdx->pPartIdxWhere) {
-			sqlite3VdbeAddOp2(v, OP_IsNull, aRegIdx[i],
-					  sqlite3VdbeCurrentAddr(v) + 2);
-			VdbeCoverage(v);
-		}
-		pik_flags = 0;
-		if (useSeekResult)
-			pik_flags = OPFLAG_USESEEKRESULT;
-		if (IsPrimaryKeyIndex(pIdx) && !HasRowid(pTab)) {
-			assert(pParse->nested == 0);
-			pik_flags |= OPFLAG_NCHANGE;
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur + i,
-					     aRegIdx[i], aRegIdx[i] + 1,
-					     pIdx->
-					     uniqNotNull ? pIdx->nKeyCol :
-					     pIdx->nColumn);
-			sqlite3VdbeChangeP5(v, pik_flags);
-		} else {
-			/* kyukhin: do not update indices for Tarantool. This is done automatically.  */
-			/*
-			   sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur+i, aRegIdx[i],
-			   aRegIdx[i]+1,
-			   pIdx->uniqNotNull ? pIdx->nKeyCol: pIdx->nColumn); */
-		}
-	}
-	if (!HasRowid(pTab))
-		return;
-	regData = regNewData + 1;
-	regRec = sqlite3GetTempReg(pParse);
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, regData, pTab->nCol, regRec);
-	if (!bAffinityDone) {
-		sqlite3TableAffinity(v, pTab, 0);
-		sqlite3ExprCacheAffinityChange(pParse, regData, pTab->nCol);
-	}
-	if (pParse->nested) {
-		pik_flags = 0;
-	} else {
-		pik_flags = OPFLAG_NCHANGE;
-		pik_flags |= (isUpdate ? OPFLAG_ISUPDATE : OPFLAG_LASTROWID);
-	}
-	if (appendBias) {
-		pik_flags |= OPFLAG_APPEND;
-	}
-	if (useSeekResult) {
+	/*
+	 * The for loop which purpose in sqlite was to insert new
+	 * values to all indexes is replaced to inserting new
+	 * values only to pk in tarantool.
+	 */
+	pIdx = pTab->pIndex;
+	/* Each table have pk on top of the indexes list */
+	assert(IsPrimaryKeyIndex(pIdx));
+	/* Partial indexes should be implemented somewhere in tarantool
+	 * codebase to check it during inserting values to the pk #2626
+	 *
+	 */
+	/*if( pIdx->pPartIdxWhere ){
+	 *  sqlite3VdbeAddOp2(v, OP_IsNull, aRegIdx[i], sqlite3VdbeCurrentAddr(v)+2);
+	 *  VdbeCoverage(v);
+	 *}
+	 */
+	pik_flags = OPFLAG_NCHANGE;
+	if( useSeekResult ) {
 		pik_flags |= OPFLAG_USESEEKRESULT;
 	}
-	sqlite3VdbeAddOp3(v, OP_Insert, iDataCur, regRec, regNewData);
-	if (!pParse->nested) {
-		sqlite3VdbeAppendP4(v, pTab, P4_TABLE);
-	}
+	assert(!HasRowid(pTab));
+	assert( pParse->nested==0 );
+	sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur, aRegIdx[0], aRegIdx[0]+1,
+	                     pIdx->uniqNotNull ? pIdx->nKeyCol: pIdx->nColumn);
 	sqlite3VdbeChangeP5(v, pik_flags);
 }
 

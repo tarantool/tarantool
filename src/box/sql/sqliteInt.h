@@ -1869,7 +1869,6 @@ struct Table {
 #  define IsOrdinaryHiddenColumn(X) 0
 #endif
 
-
 /* Does the table have a rowid */
 #define HasRowid(X)     (((X)->tabFlags & TF_WithoutRowid)==0)
 #define VisibleRowid(X) (((X)->tabFlags & TF_NoVisibleRowid)==0)
@@ -3747,7 +3746,7 @@ int sqlite3GenerateIndexKey(Parse*, Index*, int, int, int, int*,Index*,int);
 void sqlite3ResolvePartIdxLabel(Parse*,int);
 void sqlite3GenerateConstraintChecks(Parse*,Table*,int*,int,int,int,int,
                                      u8,u8,int,int*,int*);
-void sqlite3CompleteInsertion(Parse*,Table*,int,int,int,int*,int,int,int);
+void sqlite3CompleteInsertion(Parse*,Table*,int,int*,int);
 int sqlite3OpenTableAndIndices(Parse*, Table*, int, u8, int, u8*, int*, int*);
 void sqlite3BeginWriteOperation(Parse*, int, int);
 void sqlite3MultiWrite(Parse*);

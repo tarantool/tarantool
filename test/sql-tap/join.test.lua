@@ -722,7 +722,9 @@ test:do_execsql_test(
         usuarios left outer join centros on usuarios.idcentro = centros.id;
     ]], {
         -- <join-5.1>
-        3, "c", "", 1, "a", "xxx", 2, "b", "xxx"
+        -- query plan changed because scan estimated cost changed for tarantool
+        --3, "c", "", 1, "a", "xxx", 2, "b", "xxx"
+        1,"a","xxx",2,"b","xxx",3,"c",""
         -- </join-5.1>
     })
 

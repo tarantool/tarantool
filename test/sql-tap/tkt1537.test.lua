@@ -97,7 +97,9 @@ test:do_execsql_test(
         SELECT * FROM t2 LEFT JOIN t1 ON a1=b OR a2=b;
     ]], {
         -- <tkt1537-1.7>
-        4, "", "", "", "", 3, 1, 2, 1, 3
+        -- order changed after reordering indexes (it is ok because order is not specified)
+        --4, "", "", "", "", 3, 1, 2, 1, 3
+        3,1,2,1,3,4,"","","",""
         -- </tkt1537-1.7>
     })
 
@@ -117,7 +119,9 @@ test:do_execsql_test(
         SELECT * FROM t2 LEFT JOIN t1 ON b IN (a2,a1);
     ]], {
         -- <tkt1537-1.9>
-        4, "", "", "", "", 3, 1, 2, 1, 3
+        -- order changed after reordering indexes (it is ok because order is not specified)
+        --4, "", "", "", "", 3, 1, 2, 1, 3
+        3,1,2,1,3,4,"","","",""
         -- </tkt1537-1.9>
     })
 
@@ -155,8 +159,13 @@ test:do_execsql_test(
         SELECT * FROM t2 LEFT JOIN t1 ON b BETWEEN a1 AND a2;
     ]], {
         -- <tkt1537-2.3>
-        4, "", "", "", "", 3, 1, 2, 1, 3
-        -- </tkt1537-2.3>
+        -- order changed after reordering indexes (it is ok because order is not specified)
+        --4, "", "", "", "", 3, 1, 2, 1, 3
+        3,1,2,1,3,4,"","","",""
+
+
+;
+    -- </tkt1537-2.3>
     })
 
 test:do_execsql_test(
@@ -167,7 +176,9 @@ test:do_execsql_test(
         SELECT * FROM t2 LEFT JOIN t1 ON b BETWEEN a1 AND a2;
     ]], {
         -- <tkt1537-2.4>
-        4, "", "", "", "", 3, 1, 2, 1, 3
+        -- order changed after reordering indexes (it is ok because order is not specified)
+        --4, "", "", "", "", 3, 1, 2, 1, 3
+        3,1,2,1,3,4,"","","",""
         -- </tkt1537-2.4>
     })
 

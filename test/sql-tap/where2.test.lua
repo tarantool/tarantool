@@ -582,8 +582,11 @@ test:do_test(
         -- </where2-6.2>
     })
 
-idx = "i1zyx"
-
+-- tarantool
+-- changed to * after reordering indexes
+-- actually it does not matter (because it uses full scan)
+--idx = "i1zyx"
+idx = "*"
 
 test:do_test(
     "where2-6.3",

@@ -2700,12 +2700,15 @@ static int whereUsablePartialIndex(int iTab, WhereClause *pWC, Expr *pWhere){
 **
 ** The costs (WhereLoop.rRun) of the b-tree loops added by this function
 ** are calculated as follows:
+** rRun = log2(cost) * 10
 **
 ** For a full scan, assuming the table (or index) contains nRow rows:
 **
-**     cost = nRow * 3.0                    // full-table scan
-**     cost = nRow * K                      // scan of covering index
-**     cost = nRow * (K+3.0)                // scan of non-covering index
+**     cost = nRow * 3.0                          // full-table scan
+**     cost = nRow * K -> 4.0 for Tarantool       // scan of covering index
+**     cost = nRow * (K+3.0) -> 4.0 for Tarantool // scan of non-covering index
+**
+** This formula forces usage of pk for full-table scan for Tarantool
 **
 ** where K is a value between 1.1 and 3.0 set based on the relative 
 ** estimated average size of the index and table records.
@@ -2895,40 +2898,21 @@ static int whereLoopAddBtree(
          && sqlite3GlobalConfig.bUseCis
          && OptimizationEnabled(pWInfo->pParse->db, SQLITE_CoverIdxScan)
           )
-      ){
+      ) {
         pNew->iSortIdx = b ? iSortIdx : 0;
 
         /* The cost of visiting the index rows is N*K, where K is
-        ** between 1.1 and 3.0, depending on the relative sizes of the
+        ** between 1.1 and 3.0 (3.0 and 4.0 for tarantool),
+        ** depending on the relative sizes of the
         ** index and table rows. */
-        pNew->rRun = rSize + 1 + (15*pProbe->szIdxRow)/pTab->szTabRow;
-        if( m!=0 ){
-          /* If this is a non-covering index scan, add in the cost of
-          ** doing table lookups.  The cost will be 3x the number of
-          ** lookups.  Take into account WHERE clause terms that can be
-          ** satisfied using just the index, and that do not require a
-          ** table lookup. */
-          LogEst nLookup = rSize + 16;  /* Base cost:  N*3 */
-          int ii;
-          int iCur = pSrc->iCursor;
-          WhereClause *pWC2 = &pWInfo->sWC;
-          for(ii=0; ii<pWC2->nTerm; ii++){
-            WhereTerm *pTerm = &pWC2->a[ii];
-            if( !sqlite3ExprCoveredByIndex(pTerm->pExpr, iCur, pProbe) ){
-              break;
-            }
-            /* pTerm can be evaluated using just the index.  So reduce
-            ** the expected number of table lookups accordingly */
-            if( pTerm->truthProb<=0 ){
-              nLookup += pTerm->truthProb;
-            }else{
-              nLookup--;
-              if( pTerm->eOperator & (WO_EQ|WO_IS) ) nLookup -= 19;
-            }
-          }
-          
-          pNew->rRun = sqlite3LogEstAdd(pNew->rRun, nLookup);
-        }
+        assert(!HasRowid(pTab));
+        /* In Tarantool we prefer perform full scan over pk instead
+         * of secondary indexes, because secondary indexes
+         * are not really store any data (only pointers to tuples).
+         */
+        int notPkPenalty =
+                IsPrimaryKeyIndex(pProbe) ? 0 : 4;
+        pNew->rRun = rSize + 16 + notPkPenalty;
         ApplyCostMultiplier(pNew->rRun, pTab->costMult);
         whereLoopOutputAdjust(pWC, pNew, rSize);
         rc = whereLoopInsert(pBuilder, pNew);

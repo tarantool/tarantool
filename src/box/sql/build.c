@@ -3097,6 +3097,45 @@ static int getNewIid(
 }
 
 /*
+** Add new index to pTab indexes list
+**
+** When adding an index to the list of indexes for a table, we
+** maintain special order of the indexes in the list:
+** 1. PK (go first just for simplicity)
+** 2. OE_Replace indexes
+** 3. OE_Ignore indexes
+** This is necessary for the correct constraint check
+** processing (in sqlite3GenerateConstraintChecks()) as part of
+** UPDATE and INSERT statements.
+*/
+static void addIndexToTable(Index *pIndex, Table *pTab){
+  if (IsPrimaryKeyIndex(pIndex)){
+    assert(sqlite3PrimaryKeyIndex(pTab) == NULL);
+    pIndex->pNext = pTab->pIndex;
+    pTab->pIndex = pIndex;
+    return;
+  }
+  if( pIndex->onError!=OE_Replace || pTab->pIndex==0
+      || pTab->pIndex->onError==OE_Replace){
+    Index *pk = sqlite3PrimaryKeyIndex(pTab);
+    if (pk){
+      pIndex->pNext = pk->pNext;
+      pk->pNext=pIndex;
+    }else {
+      pIndex->pNext = pTab->pIndex;
+      pTab->pIndex = pIndex;
+    }
+  }else{
+    Index *pOther = pTab->pIndex;
+    while( pOther->pNext && pOther->pNext->onError!=OE_Replace ){
+      pOther = pOther->pNext;
+    }
+    pIndex->pNext = pOther->pNext;
+    pOther->pNext = pIndex;
+  }
+}
+
+/*
 ** Create a new index for an SQL table.  pName1.pName2 is the name of the index 
 ** and pTblList is the name of the table that is to be indexed.  Both will 
 ** be NULL for a primary key or an index that is created to satisfy a
@@ -3352,6 +3391,10 @@ void sqlite3CreateIndex(
   pIndex->idxType = idxType;
   pIndex->pSchema = db->aDb[iDb].pSchema;
   pIndex->nKeyCol = pList->nExpr;
+  if (!HasRowid(pTab)){
+    /* Tarantool have access to each column by any index */
+    pIndex->isCovering = 1;
+  }
   if( pPIWhere ){
     sqlite3ResolveSelfReference(pParse, pTab, NC_PartIdx, pPIWhere, 0);
     pIndex->pPartIdxWhere = pPIWhere;
@@ -3618,27 +3661,19 @@ void sqlite3CreateIndex(
     sqlite3VdbeAddOp0(v, OP_Expire);
   }
 
-  /* When adding an index to the list of indices for a table, make
-  ** sure all indices labeled OE_Replace come after all those labeled
-  ** OE_Ignore.  This is necessary for the correct constraint check
+  /* When adding an index to the list of indexes for a table, we
+  ** maintain special order of the indexes in the list:
+  ** 1. PK (go first just for simplicity)
+  ** 2. OE_Replace indexes
+  ** 3. OE_Ignore indexes
+  ** This is necessary for the correct constraint check
   ** processing (in sqlite3GenerateConstraintChecks()) as part of
   ** UPDATE and INSERT statements.  
   */
-  if( db->init.busy || pTblName==0 ){
-    if( onError!=OE_Replace || pTab->pIndex==0
-         || pTab->pIndex->onError==OE_Replace){
-      pIndex->pNext = pTab->pIndex;
-      pTab->pIndex = pIndex;
-    }else{
-      Index *pOther = pTab->pIndex;
-      while( pOther->pNext && pOther->pNext->onError!=OE_Replace ){
-        pOther = pOther->pNext;
-      }
-      pIndex->pNext = pOther->pNext;
-      pOther->pNext = pIndex;
-    }
-    pIndex = 0;
-  }
+
+  if( !(db->init.busy || pTblName==0) ) goto exit_create_index;
+  addIndexToTable(pIndex, pTab);
+  pIndex = 0;
 
   /* Clean up before exiting */
 exit_create_index:

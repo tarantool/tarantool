@@ -45,8 +45,8 @@ test:do_eqp_test(
         SELECT * FROM t2, t1 WHERE t1.a=1 OR t1.b=2;
     ]], {
         -- <1.2>
-        {0, 0, 1, "SEARCH TABLE t1 USING INDEX i1 (a=?)"},
-        {0, 0, 1, "SEARCH TABLE t1 USING INDEX i2 (b=?)"},
+        {0, 0, 1, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"},
+        {0, 0, 1, "SEARCH TABLE t1 USING COVERING INDEX i2 (b=?)"},
         {0, 1, 0, "SCAN TABLE t2"}
         -- </1.2>
     })
@@ -58,8 +58,8 @@ test:do_eqp_test(
     ]], {
         -- <1.3>
         {0, 0, 0, "SCAN TABLE t2"},
-        {0, 1, 1, "SEARCH TABLE t1 USING INDEX i1 (a=?)"},
-        {0, 1, 1, "SEARCH TABLE t1 USING INDEX i2 (b=?)"}
+        {0, 1, 1, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"},
+        {0, 1, 1, "SEARCH TABLE t1 USING COVERING INDEX i2 (b=?)"}
         -- </1.3>
     })
 
@@ -79,7 +79,7 @@ test:do_eqp_test(
         SELECT a FROM t1 ORDER BY +a
     ]], {
         -- <1.4>
-        {0, 0, 0, "SCAN TABLE t1 USING COVERING INDEX i1"},
+        {0, 0, 0, "SCAN TABLE t1"},
         {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"}
         -- </1.4>
     })
@@ -205,7 +205,10 @@ test:do_eqp_test("2.2.2", "SELECT DISTINCT min(x), max(x) FROM t2 GROUP BY x ORD
 --})
 test:do_eqp_test("2.2.4", "SELECT DISTINCT * FROM t1, t2", {
     {0, 0, 0, "SCAN TABLE t1"},
-    {0, 1, 1, "SCAN TABLE t2 USING INDEX t2i1"},
+    -- changed after reordering indexes
+    -- actually it does not matter (in fact, it seems like pk should have been used in both cases)
+    --{0, 1, 1, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
+    {0, 1, 1, "SCAN TABLE t2"},
     {0, 0, 0, "USE TEMP B-TREE FOR DISTINCT"},
 })
 test:do_eqp_test("2.2.5", "SELECT DISTINCT * FROM t1, t2 ORDER BY t1.x", {
@@ -225,7 +228,7 @@ test:do_eqp_test("2.3.2", "SELECT min(x) FROM t2", {
     {0, 0, 0, "SEARCH TABLE t2 USING COVERING INDEX t2i1"},
 })
 test:do_eqp_test("2.3.3", "SELECT min(x), max(x) FROM t2", {
-    {0, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
+    {0, 0, 0, "SCAN TABLE t2"},
 })
 test:do_eqp_test("2.4.1", "SELECT * FROM t1 WHERE idt1=?", {
     {0, 0, 0, "SEARCH TABLE t1 USING PRIMARY KEY (idt1=?)"},
@@ -302,7 +305,7 @@ test:do_eqp_test("3.2.2", [[
 ]], {
     {1, 0, 0, "SCAN TABLE t1"}, 
     {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"}, 
-    {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+    {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
     {0, 0, 0, "SCAN SUBQUERY 1 AS x1"}, 
     {0, 1, 1, "SCAN SUBQUERY 2 AS x2"}, 
     {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
@@ -352,7 +355,7 @@ test:do_eqp_test(
         -- <4.1.2>
         {1, 0, 0, "SCAN TABLE t1"},
         {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
-        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION ALL)"},
         
         -- </4.1.2>
@@ -366,7 +369,7 @@ test:do_eqp_test(
         -- <4.1.3>
         {1, 0, 0, "SCAN TABLE t1"},
         {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
-        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
         {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION)"},
         
@@ -381,7 +384,7 @@ test:do_eqp_test(
         -- <4.1.4>
         {1, 0, 0, "SCAN TABLE t1"},
         {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
-        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
         {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (INTERSECT)"},
         
@@ -396,7 +399,7 @@ test:do_eqp_test(
         -- <4.1.5>
         {1, 0, 0, "SCAN TABLE t1"},
         {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
-        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
         {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)"}
         -- </4.1.5>
@@ -410,7 +413,7 @@ test:do_eqp_test(
 --        -- <4.2.2>
 --        {1, 0, 0, "SCAN TABLE t1"},
 --        {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
---        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+--        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
 --        {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION ALL)"},
 --
 --        -- </4.2.2>
@@ -425,7 +428,7 @@ test:do_eqp_test(
 --        -- <4.2.3>
 --        {1, 0, 0, "SCAN TABLE t1"},
 --        {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
---        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+--        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
 --        {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
 --        0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (UNION)"
 --        -- </4.2.3>
@@ -440,7 +443,7 @@ test:do_eqp_test(
 --        -- <4.2.4>
 --        {1, 0, 0, "SCAN TABLE t1"},
 --        {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
---        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+--        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
 --        {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
 --        0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (INTERSECT)"
 --        -- </4.2.4>
@@ -455,7 +458,7 @@ test:do_eqp_test(
 --        -- <4.2.5>
 --        {1, 0, 0, "SCAN TABLE t1"},
 --        {1, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
---        {2, 0, 0, "SCAN TABLE t2 USING INDEX t2i1"},
+--        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
 --        {2, 0, 0, "USE TEMP B-TREE FOR RIGHT PART OF ORDER BY"},
 --        {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)"}
 --        -- </4.2.5>
@@ -468,7 +471,7 @@ test:do_eqp_test(
     ]], {
         -- <4.3.1>
         {1, 0, 0, "SCAN TABLE t1"},
-        {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
+        {2, 0, 0, "SCAN TABLE t2"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 USING TEMP B-TREE (UNION)"},
         
         -- </4.3.1>
@@ -481,7 +484,7 @@ test:do_eqp_test(
     ]], {
         -- <4.3.2>
         {2, 0, 0, "SCAN TABLE t1"},
-        {3, 0, 0, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
+        {3, 0, 0, "SCAN TABLE t2"},
         {1, 0, 0, "COMPOUND SUBQUERIES 2 AND 3 USING TEMP B-TREE (UNION)"},
         {4, 0, 0, "SCAN TABLE t1"},
         {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 4 USING TEMP B-TREE (UNION)"}
@@ -524,7 +527,7 @@ test:do_eqp_test("5.1.1", "SELECT a, b FROM t1 WHERE a=1", {
 })
 -- EVIDENCE-OF: R-55852-17599 sqlite> CREATE INDEX i1 ON t1(a);
 -- sqlite> EXPLAIN QUERY PLAN SELECT a, b FROM t1 WHERE a=1;
--- 0|0|0|SEARCH TABLE t1 USING INDEX i1
+-- 0|0|0|SEARCH TABLE t1 USING COVERING INDEX i1
 --
 test:do_execsql_test(
     "5.2.0",
@@ -533,7 +536,7 @@ test:do_execsql_test(
     ]])
 
 test:do_eqp_test("5.2.1", "SELECT a, b FROM t1 WHERE a=1", {
-    {0, 0, 0, "SEARCH TABLE t1 USING INDEX i1 (a=?)"},
+    {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"},
 })
 -- EVIDENCE-OF: R-21179-11011 sqlite> CREATE INDEX i2 ON t1(a, b);
 -- sqlite> EXPLAIN QUERY PLAN SELECT a, b FROM t1 WHERE a=1;
@@ -546,7 +549,10 @@ test:do_execsql_test(
     ]])
 
 test:do_eqp_test("5.3.1", "SELECT a, b FROM t1 WHERE a=1", {
-    {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)"},
+    -- It is equal for tarantol wheather to use i1 or i2
+    -- because both of them are covering
+    --{0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)"},
+    {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"},
 })
 -- EVIDENCE-OF: R-09991-48941 sqlite> EXPLAIN QUERY PLAN
 -- SELECT t1.*, t2.* FROM t1, t2 WHERE t1.a=1 AND t1.b>2;
@@ -575,7 +581,7 @@ test:do_eqp_test(5.5, "SELECT t1.a, t2.c FROM t2, t1 WHERE t1.a=1 AND t1.b>2", {
 -- EVIDENCE-OF: R-04002-25654 sqlite> CREATE INDEX i3 ON t1(b);
 -- sqlite> EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=1 OR b=2;
 -- 0|0|0|SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)
--- 0|0|0|SEARCH TABLE t1 USING INDEX i3 (b=?)
+-- 0|0|0|SEARCH TABLE t1 USING COVERING INDEX i3 (b=?)
 --
 test:do_execsql_test(
     "5.5.0",
@@ -584,8 +590,11 @@ test:do_execsql_test(
     ]])
 
 test:do_eqp_test("5.6.1", "SELECT a, b FROM t1 WHERE a=1 OR b=2", {
-    {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)"},
-    {0, 0, 0, "SEARCH TABLE t1 USING INDEX i3 (b=?)"},
+    -- It is equal for tarantol wheather to use i1 or i2
+    -- because both of them are covering
+    --{0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)"},
+    {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"},
+    {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i3 (b=?)"},
 })
 -- EVIDENCE-OF: R-24577-38891 sqlite> EXPLAIN QUERY PLAN
 -- SELECT c, d FROM t2 ORDER BY c;
@@ -598,7 +607,7 @@ test:do_eqp_test(5.7, "SELECT c, d FROM t2 ORDER BY c", {
 })
 -- EVIDENCE-OF: R-58157-12355 sqlite> CREATE INDEX i4 ON t2(c);
 -- sqlite> EXPLAIN QUERY PLAN SELECT c, d FROM t2 ORDER BY c;
--- 0|0|0|SCAN TABLE t2 USING INDEX i4
+-- 0|0|0|SCAN TABLE t2 USING COVERING INDEX i4
 --
 test:do_execsql_test(
     "5.8.0",
@@ -607,7 +616,7 @@ test:do_execsql_test(
     ]])
 
 test:do_eqp_test("5.8.1", "SELECT c, d FROM t2 ORDER BY c", {
-    {0, 0, 0, "SCAN TABLE t2 USING INDEX i4"},
+    {0, 0, 0, "SCAN TABLE t2 USING COVERING INDEX i4"},
 })
 -- EVIDENCE-OF: R-13931-10421 sqlite> EXPLAIN QUERY PLAN SELECT
 -- (SELECT b FROM t1 WHERE a=0), (SELECT a FROM t1 WHERE b=t2.c) FROM t2;
@@ -615,16 +624,19 @@ test:do_eqp_test("5.8.1", "SELECT c, d FROM t2 ORDER BY c", {
 -- 0|0|0|EXECUTE SCALAR SUBQUERY 1
 -- 1|0|0|SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)
 -- 0|0|0|EXECUTE CORRELATED SCALAR SUBQUERY 2
--- 2|0|0|SEARCH TABLE t1 USING INDEX i3 (b=?)
+-- 2|0|0|SEARCH TABLE t1 USING COVERING INDEX i3 (b=?)
 --
 test:do_eqp_test(5.9, [[
   SELECT (SELECT b FROM t1 WHERE a=0), (SELECT a FROM t1 WHERE b=t2.c) FROM t2
 ]], {
-    {0, 0, 0, "SCAN TABLE t2 USING COVERING INDEX i4"},
+    {0, 0, 0, "SCAN TABLE t2"},
     {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
-    {1, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)"},
+    -- It is equally for tarantol wheather to use i1 or i2
+    -- because both of them are covering
+    --{1, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (a=?)"},
+    {1, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"},
     {0, 0, 0, "EXECUTE CORRELATED SCALAR SUBQUERY 2"},
-    {2, 0, 0, "SEARCH TABLE t1 USING INDEX i3 (b=?)"},
+    {2, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i3 (b=?)"},
 })
 -- EVIDENCE-OF: R-50892-45943 sqlite> EXPLAIN QUERY PLAN
 -- SELECT count(*) FROM (SELECT max(b) AS x FROM t1 GROUP BY a) GROUP BY x;
@@ -641,12 +653,12 @@ test:do_eqp_test(5.10, [[
 })
 -- EVIDENCE-OF: R-46219-33846 sqlite> EXPLAIN QUERY PLAN
 -- SELECT * FROM (SELECT * FROM t2 WHERE c=1), t1;
--- 0|0|0|SEARCH TABLE t2 USING INDEX i4 (c=?)
+-- 0|0|0|SEARCH TABLE t2 USING COVERING INDEX i4 (c=?)
 -- 0|1|1|SCAN TABLE t1
 --
 test:do_eqp_test(5.11, "SELECT a, b FROM (SELECT * FROM t2 WHERE c=1), t1", {
-    {0, 0, 0, "SEARCH TABLE t2 USING INDEX i4 (c=?)"},
-    {0, 1, 1, "SCAN TABLE t1 USING COVERING INDEX i2"},
+    {0, 0, 0, "SEARCH TABLE t2 USING COVERING INDEX i4 (c=?)"},
+    {0, 1, 1, "SCAN TABLE t1"},
 })
 -- EVIDENCE-OF: R-37879-39987 sqlite> EXPLAIN QUERY PLAN
 -- SELECT a FROM t1 UNION SELECT c FROM t2;
@@ -655,8 +667,8 @@ test:do_eqp_test(5.11, "SELECT a, b FROM (SELECT * FROM t2 WHERE c=1), t1", {
 -- 0|0|0|COMPOUND SUBQUERIES 1 AND 2 USING TEMP B-TREE (UNION)
 --
 test:do_eqp_test(5.12, "SELECT a,b FROM t1 UNION SELECT c, 99 FROM t2", {
-    {1, 0, 0, "SCAN TABLE t1 USING COVERING INDEX i2"},
-    {2, 0, 0, "SCAN TABLE t2 USING COVERING INDEX i4"},
+    {1, 0, 0, "SCAN TABLE t1"},
+    {2, 0, 0, "SCAN TABLE t2"},
     {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 USING TEMP B-TREE (UNION)"},
 })
 -- EVIDENCE-OF: R-44864-63011 sqlite> EXPLAIN QUERY PLAN
@@ -666,7 +678,7 @@ test:do_eqp_test(5.12, "SELECT a,b FROM t1 UNION SELECT c, 99 FROM t2", {
 -- 0|0|0|COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)
 --
 test:do_eqp_test(5.13, "SELECT a FROM t1 EXCEPT SELECT d FROM t2 ORDER BY 1", {
-    {1, 0, 0, "SCAN TABLE t1 USING COVERING INDEX i1"},
+    {1, 0, 0, "SCAN TABLE t1 USING COVERING INDEX i2"},
     {2, 0, 0, "SCAN TABLE t2"},
     {2, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
     {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)"},
