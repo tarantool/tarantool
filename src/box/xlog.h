@@ -403,7 +403,7 @@ xlog_rename(struct xlog *l);
  * @retval -1 for error
  */
 ssize_t
-xlog_write_row(struct xlog *log, const struct xrow_header *packet);
+xlog_write_row(struct xlog *log, struct xrow_header *packet);
 
 /**
  * Prevent xlog row buffer offloading, should be use
