@@ -221,7 +221,7 @@ __asm__(
 	"\tstr r0, [sp, #4]\n"
 	"\tstr r1, [sp, #0]\n"
 	"\tmov r7, sp\n"
-	"\tbl unw_getcontext_f\n"
+	"\tbl %2\n"
 	/* Old sp is returned via r0 */
 	"\tmov sp, r0\n"
 	"\tpop {r4-r11,lr}\n"
@@ -260,7 +260,7 @@ __asm__(
 	"\tmov sp, x2\n"
 	/* Setup fisrst arg */
 	"\tmov x0, %0\n"
-	"\tbl unw_getcontext_f\n"
+	"\tbl %2\n"
 	/* Restore context (old sp in x0) */
 	"\tldp x19, x20, [x0, #16 * 0]\n"
 	"\tldp x21, x22, [x0, #16 * 1]\n"
