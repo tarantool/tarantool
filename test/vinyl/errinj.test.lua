@@ -365,3 +365,29 @@ s:select{}
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 
 s:drop()
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+for i = 0, 9 do s:replace({i, i + 1}) end
+box.snapshot()
+errinj.set("ERRINJ_XLOG_GARBAGE", true)
+s:select()
+errinj.set("ERRINJ_XLOG_GARBAGE", false)
+errinj.set("ERRINJ_VYRUN_DATA_READ", true)
+s:select()
+errinj.set("ERRINJ_VYRUN_DATA_READ", false)
+s:select()
+s:drop()
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+for i = 0, 9 do s:replace({i, i + 1}) end
+errinj.set("ERRINJ_XLOG_GARBAGE", true)
+box.snapshot()
+for i = 10, 19 do s:replace({i, i + 1}) end
+errinj.set("ERRINJ_XLOG_GARBAGE", false)
+box.snapshot()
+s:select()
+
+s:drop()
+

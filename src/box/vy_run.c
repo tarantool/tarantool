@@ -852,6 +852,9 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	}
 	ssize_t readen = fio_pread(fd, data, page_info->size,
 				   page_info->offset);
+	ERROR_INJECT(ERRINJ_VYRUN_DATA_READ, {
+		readen = -1;
+		errno = EIO;});
 	if (readen < 0) {
 		/* TODO: report filename */
 		diag_set(SystemError, "failed to read from file");
@@ -1879,8 +1882,15 @@ vy_run_recover(struct vy_run *run, const char *dir,
 
 	/* Read run header. */
 	struct xrow_header xrow;
+	ERROR_INJECT(ERRINJ_VYRUN_INDEX_GARBAGE, {
+		errinj(ERRINJ_XLOG_GARBAGE, ERRINJ_BOOL)->bparam = true;
+	});
 	/* all rows should be in one tx */
 	int rc = xlog_cursor_next_tx(&cursor);
+	ERROR_INJECT(ERRINJ_VYRUN_INDEX_GARBAGE, {
+		errinj(ERRINJ_XLOG_GARBAGE, ERRINJ_BOOL)->bparam = false;
+	});
+
 	if (rc != 0) {
 		if (rc > 0)
 			diag_set(ClientError, ER_INVALID_INDEX_FILE,
@@ -1901,6 +1911,7 @@ vy_run_recover(struct vy_run *run, const char *dir,
 				    VY_INDEX_RUN_INFO, (unsigned)xrow.type));
 		goto fail_close;
 	}
+
 	if (vy_run_info_decode(&run->info, &xrow, path) != 0)
 		goto fail_close;
 

@@ -121,3 +121,28 @@ box.space.test2:select()
 box.space.test2.index.sec:select()
 test_run:cmd('switch default')
 test_run:cmd('stop server force_recovery')
+test_run:cmd('delete server force_recovery')
+
+-- garbaged vy run indexes
+test_run:cmd('create server force_recovery with script="vinyl/bad_run_indexes.lua"')
+test_run:cmd('start server force_recovery')
+test_run:cmd('switch force_recovery')
+test = box.schema.space.create('test', {engine = 'vinyl'})
+_ = test:create_index('pk')
+for i = 0, 9999 do test:replace({i, i, string.rep('a', 512)}) end
+box.snapshot()
+for i = 10000, 11999 do test:delete({i - 10000}) end
+box.snapshot()
+for i = 12000, 13999 do test:upsert({i - 10000, i, string.rep('a', 128)}, {{'+', 2, 5}}) end
+box.snapshot()
+test_run:cmd('switch default')
+test_run:cmd('stop server force_recovery')
+test_run:cmd('start server force_recovery')
+test_run:cmd('switch force_recovery')
+sum = 0
+for k, v in pairs(box.space.test:select()) do sum = sum + v[2] end
+-- should be a sum(2005 .. 4004) + sum(4000 .. 9999) = 48006000
+sum
+
+test_run:cmd('switch default')
+test_run:cmd('stop server force_recovery')

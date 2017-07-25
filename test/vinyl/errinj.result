@@ -908,3 +908,110 @@ errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 s:drop()
 ---
 ...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+---
+...
+for i = 0, 9 do s:replace({i, i + 1}) end
+---
+...
+box.snapshot()
+---
+- ok
+...
+errinj.set("ERRINJ_XLOG_GARBAGE", true)
+---
+- ok
+...
+s:select()
+---
+- error: tx checksum mismatch
+...
+errinj.set("ERRINJ_XLOG_GARBAGE", false)
+---
+- ok
+...
+errinj.set("ERRINJ_VYRUN_DATA_READ", true)
+---
+- ok
+...
+s:select()
+---
+- error: failed to read from file
+...
+errinj.set("ERRINJ_VYRUN_DATA_READ", false)
+---
+- ok
+...
+s:select()
+---
+- - [0, 1]
+  - [1, 2]
+  - [2, 3]
+  - [3, 4]
+  - [4, 5]
+  - [5, 6]
+  - [6, 7]
+  - [7, 8]
+  - [8, 9]
+  - [9, 10]
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+---
+...
+for i = 0, 9 do s:replace({i, i + 1}) end
+---
+...
+errinj.set("ERRINJ_XLOG_GARBAGE", true)
+---
+- ok
+...
+box.snapshot()
+---
+- error: tx checksum mismatch
+...
+for i = 10, 19 do s:replace({i, i + 1}) end
+---
+...
+errinj.set("ERRINJ_XLOG_GARBAGE", false)
+---
+- ok
+...
+box.snapshot()
+---
+- ok
+...
+s:select()
+---
+- - [0, 1]
+  - [1, 2]
+  - [2, 3]
+  - [3, 4]
+  - [4, 5]
+  - [5, 6]
+  - [6, 7]
+  - [7, 8]
+  - [8, 9]
+  - [9, 10]
+  - [10, 11]
+  - [11, 12]
+  - [12, 13]
+  - [13, 14]
+  - [14, 15]
+  - [15, 16]
+  - [16, 17]
+  - [17, 18]
+  - [18, 19]
+  - [19, 20]
+...
+s:drop()
+---
+...

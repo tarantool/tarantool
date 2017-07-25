@@ -271,6 +271,8 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			memcpy(vclock, val, val_end - val);
 			vclock[val_end - val] = '\0';
 			size_t off = vclock_from_string(&meta->vclock, vclock);
+			ERROR_INJECT(ERRINJ_XLOG_META, {
+				off = 1;});
 			if (off != 0) {
 				tnt_error(XlogError, "invalid vclock at "
 					  "offset %zd", off);
@@ -1389,6 +1391,12 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 	ssize_t readen;
 	readen = fio_pread(cursor->fd, dst, to_load,
 			   cursor->read_offset);
+	struct errinj *inj = errinj(ERRINJ_XLOG_READ, ERRINJ_INT);
+	if (inj != NULL && inj->iparam >= 0 &&
+	    inj->iparam < cursor->read_offset) {
+		readen = -1;
+		errno = EIO;
+	};
 	if (readen < 0) {
 		diag_set(SystemError, "failed to read '%s' file",
 			 cursor->name);
@@ -1537,6 +1545,10 @@ xlog_tx_decode(const char *data, const char *data_end,
 		return -1;
 	}
 
+	ERROR_INJECT(ERRINJ_XLOG_GARBAGE, {
+		*((char *)data + fixheader.len / 2) = ~*((char *)data + fixheader.len / 2);
+	});
+
 	/* Validate checksum */
 	if (crc32_calc(0, data, fixheader.len) != fixheader.crc32c) {
 		tnt_error(XlogError, "tx checksum mismatch");
@@ -1593,6 +1605,10 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 	/* Check that buffer has enough bytes */
 	if ((data_end - rpos) < (ptrdiff_t)fixheader.len)
 		return fixheader.len - (data_end - rpos);
+
+	ERROR_INJECT(ERRINJ_XLOG_GARBAGE, {
+		*((char *)rpos + fixheader.len / 2) = ~*((char *)rpos + fixheader.len / 2);
+	});
 
 	/* Validate checksum */
 	if (crc32_calc(0, rpos, fixheader.len) != fixheader.crc32c) {

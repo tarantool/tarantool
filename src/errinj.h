@@ -96,7 +96,12 @@ struct errinj {
 	_(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_RELAY_REPORT_INTERVAL, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_RELAY_FINAL_SLEEP, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_PORT_DUMP, ERRINJ_BOOL, {.bparam = false})
+	_(ERRINJ_PORT_DUMP, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_GARBAGE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_META, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_XLOG_READ, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_VYRUN_INDEX_GARBAGE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VYRUN_DATA_READ, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

@@ -18,8 +18,18 @@ errinj.info()
     state: false
   ERRINJ_VY_READ_PAGE_TIMEOUT:
     state: false
+  ERRINJ_XLOG_META:
+    state: false
+  ERRINJ_VYRUN_DATA_READ:
+    state: false
+  ERRINJ_VYRUN_INDEX_GARBAGE:
+    state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
+  ERRINJ_XLOG_READ:
+    state: -1
+  ERRINJ_VY_SCHED_TIMEOUT:
+    state: 0
   ERRINJ_VY_RUN_WRITE:
     state: false
   ERRINJ_VY_GC:
@@ -48,8 +58,8 @@ errinj.info()
     state: false
   ERRINJ_VY_RUN_WRITE_TIMEOUT:
     state: 0
-  ERRINJ_VY_SCHED_TIMEOUT:
-    state: 0
+  ERRINJ_XLOG_GARBAGE:
+    state: false
   ERRINJ_WAL_IO:
     state: false
   ERRINJ_VY_SQUASH_TIMEOUT:
