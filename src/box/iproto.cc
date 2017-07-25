@@ -50,6 +50,7 @@
 #include "port.h"
 #include "iobuf.h"
 #include "box.h"
+#include "call.h"
 #include "tuple.h"
 #include "session.h"
 #include "xrow.h"

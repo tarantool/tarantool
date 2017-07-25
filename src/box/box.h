@@ -128,12 +128,6 @@ void
 box_process_auth(struct request *request, struct obuf *out);
 
 void
-box_process_call(struct request *request, struct obuf *out);
-
-void
-box_process_eval(struct request *request, struct obuf *out);
-
-void
 box_process_join(struct ev_io *io, struct xrow_header *header);
 
 void
