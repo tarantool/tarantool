@@ -135,7 +135,7 @@ test_iterator_initial_restore()
 		struct tuple *stmt = vy_stmt_new_select(mem->format, data, 1);
 
 		struct vy_mem_iterator itr;
-		struct vy_mem_iterator_stat stats = {0};
+		struct vy_mem_iterator_stat stats = {0, {0, 0}};
 		struct vy_read_view rv;
 		rv.vlsn = lsn;
 		const struct vy_read_view *prv = &rv;
@@ -331,7 +331,7 @@ test_iterator_restore_after_insertion()
 		}
 
 		struct vy_mem_iterator itr;
-		struct vy_mem_iterator_stat stats = {0};
+		struct vy_mem_iterator_stat stats = {0, {0, 0}};
 		struct vy_read_view rv;
 		rv.vlsn = 100;
 		const struct vy_read_view *prv = &rv;
