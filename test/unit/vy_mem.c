@@ -83,31 +83,12 @@ test_iterator_initial_restore()
 	struct key_def *key_def = box_key_def_new(fields, types, 1);
 	assert(key_def != NULL);
 
-	/* Create format */
-	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       &key_def, 1, 0);
-	assert(format != NULL);
-
-	/* Create format with column mask */
-	struct tuple_format *format_with_colmask =
-		vy_tuple_format_new_with_colmask(format);
-	assert(format_with_colmask != NULL);
-
-	/* Create upsert format */
-	struct tuple_format *format_upsert =
-		vy_tuple_format_new_upsert(format);
-	assert(format_upsert != NULL);
-
 	/* Create lsregion */
 	struct lsregion lsregion;
 	struct slab_cache *slab_cache = cord_slab_cache();
 	lsregion_create(&lsregion, slab_cache->arena);
 
-	/* Create mem */
-	int64_t generation = 1;
-	struct vy_mem *mem = vy_mem_new(&lsregion, generation, key_def,
-					format, format_with_colmask,
-					format_upsert, 0);
+	struct vy_mem *mem = create_test_mem(&lsregion, key_def);
 
 	const uint64_t count = 100;
 	for (uint64_t i = 0; i < count; i++) {
@@ -219,18 +200,6 @@ test_iterator_restore_after_insertion()
 	assert(format != NULL);
 	tuple_format_ref(format, 1);
 
-	/* Create format with column mask */
-	struct tuple_format *format_with_colmask =
-		vy_tuple_format_new_with_colmask(format);
-	assert(format_with_colmask != NULL);
-	tuple_format_ref(format_with_colmask, 1);
-
-	/* Create upsert format */
-	struct tuple_format *format_upsert =
-		vy_tuple_format_new_upsert(format);
-	assert(format_upsert != NULL);
-	tuple_format_ref(format_upsert, 1);
-
 	/* Create lsregion */
 	struct lsregion lsregion;
 	struct slab_cache *slab_cache = cord_slab_cache();
@@ -308,10 +277,7 @@ test_iterator_restore_after_insertion()
 		}
 
 		/* Create mem */
-		int64_t generation = 1;
-		struct vy_mem *mem = vy_mem_new(&lsregion, generation, key_def,
-						format, format_with_colmask,
-						format_upsert, 0);
+		struct vy_mem *mem = create_test_mem(&lsregion, key_def);
 		if (has40_50) {
 			const struct vy_stmt_template temp =
 				STMT_TEMPLATE(50, REPLACE, 40);
@@ -451,8 +417,6 @@ test_iterator_restore_after_insertion()
 	tuple_unref(restore_on_key);
 	tuple_unref(restore_on_key_reverse);
 
-	tuple_format_ref(format_upsert, -1);
-	tuple_format_ref(format_with_colmask, -1);
 	tuple_format_ref(format, -1);
 	lsregion_destroy(&lsregion);
 	box_key_def_delete(key_def);
