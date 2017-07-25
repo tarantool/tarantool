@@ -28,14 +28,59 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "authentication.h"
 #include "user.h"
 #include "session.h"
+#include "iproto_constants.h"
 
 static char zero_hash[SCRAMBLE_SIZE];
 
 void
+auth_request_decode_xc(struct auth_request *request, uint64_t sync,
+		       const char *data, uint32_t len)
+{
+	const char *end = data + len;
+	uint32_t map_size;
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+
+	map_size = mp_decode_map(&data);
+	request->user_name = NULL;
+	request->scramble = NULL;
+	request->sync = sync;
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint8_t key = *data;
+		if (key != IPROTO_USER_NAME && key != IPROTO_TUPLE) {
+			/* Skip key + value. */
+			mp_check(&data, end);
+			mp_check(&data, end);
+			continue;
+		}
+		const char *value = ++data;
+		if (mp_check(&data, end) != 0) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "packet body");
+		}
+		if (key == IPROTO_USER_NAME)
+			request->user_name = value;
+		else
+			request->scramble = value;
+	}
+	if (request->user_name == NULL) {
+		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+			  iproto_key_name(IPROTO_USER_NAME));
+	}
+	if (request->scramble == NULL) {
+		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+			  iproto_key_name(IPROTO_TUPLE));
+	}
+	if (data != end)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+}
+
+void
 authenticate(const char *user_name, uint32_t len,
-	     const char *tuple, const char * /* tuple_end */)
+	     const char *tuple)
 {
 	struct user *user = user_find_by_name_xc(user_name, len);
 	struct session *session = current_session();

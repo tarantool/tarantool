@@ -31,7 +31,33 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
+/** Auth request details. */
+struct auth_request {
+	/**
+	 * MessagePack encoded name of the user to
+	 * authenticate.
+	 */
+	const char *user_name;
+	/** Auth scramble. @sa scramble.h */
+	const char *scramble;
+	/** Request sync. */
+	uint64_t sync;
+};
+
+/**
+ * Decode auth request from MessagePack.
+ * @param[out] request Request to decode to.
+ * @param sync Request sync.
+ * @param data Request MessagePack body.
+ * @param len @data length.
+ */
 void
-authenticate(const char *user_name, uint32_t len,
-	     const char *tuple, const char *tuple_end);
+auth_request_decode_xc(struct auth_request *request, uint64_t sync,
+		       const char *data, uint32_t len);
+
+void
+authenticate(const char *user_name, uint32_t len, const char *tuple);
+
 #endif /* INCLUDES_TARANTOOL_BOX_AUTHENTICATION_H */

@@ -49,6 +49,7 @@ struct request;
 struct xrow_header;
 struct obuf;
 struct ev_io;
+struct auth_request;
 
 /*
  * Initialize box library
@@ -125,7 +126,7 @@ const char *box_status(void);
 } /* extern "C" */
 
 void
-box_process_auth(struct request *request, struct obuf *out);
+box_process_auth(struct auth_request *request, struct obuf *out);
 
 void
 box_process_join(struct ev_io *io, struct xrow_header *header);

@@ -950,20 +950,18 @@ box_on_join(const tt_uuid *instance_uuid)
 }
 
 void
-box_process_auth(struct request *request, struct obuf *out)
+box_process_auth(struct auth_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
-	assert(request->type == IPROTO_AUTH);
 
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	const char *user = request->key;
+	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
-	authenticate(user, len, request->tuple, request->tuple_end);
-	assert(request->header != NULL);
-	iproto_reply_ok_xc(out, request->header->sync, ::schema_version);
+	authenticate(user, len, request->scramble);
+	iproto_reply_ok_xc(out, request->sync, ::schema_version);
 }
 
 void

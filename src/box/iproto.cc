@@ -51,6 +51,7 @@
 #include "iobuf.h"
 #include "box.h"
 #include "call.h"
+#include "authentication.h"
 #include "tuple.h"
 #include "session.h"
 #include "xrow.h"
@@ -81,6 +82,8 @@ struct iproto_msg: public cmsg
 		struct request dml_request;
 		/* Box request, if this is misc (call, eval). */
 		struct call_request call_request;
+		/* Authentication request. */
+		struct auth_request auth_request;
 	};
 	/*
 	 * Remember the active iobuf of the connection,
@@ -625,7 +628,6 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_REPLACE:
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
-	case IPROTO_AUTH:
 	case IPROTO_UPSERT:
 		request_create(&msg->dml_request, type);
 		msg->dml_request.header = &msg->header;
@@ -662,6 +664,14 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_SUBSCRIBE:
 		cmsg_init(msg, sync_route);
 		*stop_input = true;
+		break;
+	case IPROTO_AUTH:
+		if (msg->header.bodycnt == 0)
+			goto err_no_body;
+		body = (const char *) msg->header.body[0].iov_base;
+		auth_request_decode_xc(&msg->auth_request, sync, body,
+				       msg->header.body[0].iov_len);
+		cmsg_init(msg, misc_route);
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
@@ -1032,8 +1042,7 @@ tx_process_misc(struct cmsg *m)
 			box_process_eval(&msg->call_request, out);
 			break;
 		case IPROTO_AUTH:
-			assert(msg->dml_request.type == msg->header.type);
-			box_process_auth(&msg->dml_request, out);
+			box_process_auth(&msg->auth_request, out);
 			break;
 		case IPROTO_PING:
 			iproto_reply_ok_xc(out, msg->header.sync,
