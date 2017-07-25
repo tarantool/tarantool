@@ -154,11 +154,6 @@ void box_update_vinyl_options(void);
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct box_function_ctx {
-	struct request *request;
-	struct port *port;
-};
-
 typedef struct tuple box_tuple_t;
 
 /* box_select is private and used only by FFI */

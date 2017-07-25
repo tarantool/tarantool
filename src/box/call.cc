@@ -43,6 +43,71 @@
 #include "rmean.h"
 #include "small/obuf.h"
 
+static const char empty_args[] = { (char)0x90 };
+
+void
+call_request_decode_xc(struct call_request *request, uint8_t type,
+		       uint64_t sync, const char *data, uint32_t len)
+{
+	assert(type == IPROTO_CALL || type == IPROTO_CALL_16 || type == IPROTO_EVAL);
+	const char *end = data + len;
+	uint32_t map_size;
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+
+	map_size = mp_decode_map(&data);
+	request->name = NULL;
+	request->args = NULL;
+	request->args_end = NULL;
+	request->type = type;
+	request->sync = sync;
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint8_t key = *data;
+		if (key != IPROTO_EXPR && key != IPROTO_FUNCTION_NAME &&
+		    key != IPROTO_TUPLE) {
+			/* Skip key + value. */
+			mp_check(&data, end);
+			mp_check(&data, end);
+			continue;
+		}
+		const char *value = ++data;
+		if (mp_check(&data, end) != 0) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "packet body");
+		}
+		switch(key) {
+		case IPROTO_EXPR:
+			request->expr = value;
+			break;
+		case IPROTO_FUNCTION_NAME:
+			request->name = value;
+			break;
+		case IPROTO_TUPLE:
+			request->args = value;
+			request->args_end = data;
+			break;
+		default:
+			unreachable();
+		}
+	}
+	if (type == IPROTO_EVAL) {
+		if (request->expr == NULL) {
+			tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+				  iproto_key_name(IPROTO_EXPR));
+		}
+	} else if (request->name == NULL) {
+		assert(type == IPROTO_CALL_16 || type == IPROTO_CALL);
+		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+			  iproto_key_name(IPROTO_FUNCTION_NAME));
+	}
+	if (request->args == NULL) {
+		request->args = empty_args;
+		request->args_end = empty_args + sizeof(empty_args);
+	}
+	if (data != end)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+}
+
 static inline struct func *
 access_check_func(const char *name, uint32_t name_len)
 {
@@ -69,7 +134,7 @@ access_check_func(const char *name, uint32_t name_len)
 }
 
 static int
-func_call(struct func *func, struct request *request, struct obuf *out)
+func_call(struct func *func, struct call_request *request, struct obuf *out)
 {
 	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
 	if (func->func == NULL)
@@ -85,7 +150,7 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 	diag_clear(&fiber()->diag);
 	assert(!in_txn()); /* transaction is not started */
 	/* Call function from the shared library */
-	int rc = func->func(&ctx, request->tuple, request->tuple_end);
+	int rc = func->func(&ctx, request->args, request->args_end);
 	if (rc != 0) {
 		if (diag_last_error(&fiber()->diag) == NULL) {
 			/* Stored procedure forget to set diag  */
@@ -105,7 +170,7 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 			obuf_rollback_to_svp(out, &svp);
 			goto error;
 		}
-		iproto_reply_select(out, &svp, request->header->sync,
+		iproto_reply_select(out, &svp, request->sync,
 				    ::schema_version, port.size);
 	} else {
 		assert(request->type == IPROTO_CALL);
@@ -118,7 +183,7 @@ func_call(struct func *func, struct request *request, struct obuf *out)
 			obuf_rollback_to_svp(out, &svp);
 			goto error;
 		}
-		iproto_reply_select(out, &svp, request->header->sync,
+		iproto_reply_select(out, &svp, request->sync,
 				    ::schema_version, 1);
 	}
 
@@ -130,13 +195,14 @@ error:
 }
 
 void
-box_process_call(struct request *request, struct obuf *out)
+box_process_call(struct call_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_CALL, 1);
 	/**
 	 * Find the function definition and check access.
 	 */
-	const char *name = request->key;
+	const char *name = request->name;
+	assert(name != NULL);
 	uint32_t name_len = mp_decode_strl(&name);
 	struct func *func = access_check_func(name, name_len);
 	/*
@@ -192,7 +258,7 @@ box_process_call(struct request *request, struct obuf *out)
 }
 
 void
-box_process_eval(struct request *request, struct obuf *out)
+box_process_eval(struct call_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
@@ -204,7 +270,8 @@ box_process_eval(struct request *request, struct obuf *out)
 
 	if (in_txn()) {
 		/* The procedure forgot to call box.commit() */
-		const char *expr = request->key;
+		const char *expr = request->expr;
+		assert(expr != NULL);
 		uint32_t expr_len = mp_decode_strl(&expr);
 		say_warn("a transaction is active at return from EVAL '%.*s'",
 			expr_len, expr);

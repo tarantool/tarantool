@@ -31,13 +31,50 @@
  * SUCH DAMAGE.
  */
 
-struct request;
+#include <stdint.h>
+
 struct obuf;
 
+/** Request details of call and eval. */
+struct call_request {
+	/**
+	 * Set either name to function name of call request or
+	 * set expr to lua expression for eval request.
+	 */
+	union {
+		const char *name;
+		const char *expr;
+	};
+	/** Call/eval parameters. */
+	const char *args;
+	const char *args_end;
+	/** IPROTO_CALL/IPROTO_CALL_16/IPROTO_EVAL */
+	uint8_t type;
+	/** Request sync. @sa xrow_header. */
+	uint64_t sync;
+};
+
+struct box_function_ctx {
+	struct call_request *request;
+	struct port *port;
+};
+
+/**
+ * Decode call request from a given MessagePack map.
+ * @param[out] call_request Request to decode to.
+ * @param type Request type - either CALL or CALL_16 or EVAL.
+ * @param sync Request sync.
+ * @param data Request MessagePack encoded body.
+ * @param len @data length.
+ */
 void
-box_process_call(struct request *request, struct obuf *out);
+call_request_decode_xc(struct call_request *request, uint8_t type,
+		       uint64_t sync, const char *data, uint32_t len);
 
 void
-box_process_eval(struct request *request, struct obuf *out);
+box_process_call(struct call_request *request, struct obuf *out);
+
+void
+box_process_eval(struct call_request *request, struct obuf *out);
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_CALL_H */

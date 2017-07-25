@@ -67,6 +67,7 @@
 #include "gc.h"
 #include "checkpoint.h"
 #include "systemd.h"
+#include "call.h"
 
 static char status[64] = "unknown";
 

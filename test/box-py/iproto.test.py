@@ -390,5 +390,26 @@ response = Response(c, c._read_response())
 print response.__str__()
 
 c.close()
+
+#
+# gh-2619 follow up: allow empty args for call/eval.
+#
+admin("function kek() return 'kek' end")
+admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
+
+c = Connection('localhost', server.iproto.port)
+c.connect()
+s = c._socket
+
+header = { IPROTO_CODE: REQUEST_TYPE_CALL, IPROTO_SYNC: 100 }
+body = { IPROTO_FUNCTION_NAME: 'kek' }
+resp = test_request(header, body)
+print "Sync: ", resp['header'][IPROTO_SYNC]
+print "Retcode: ", resp['body'][IPROTO_DATA]
+
+c.close()
+
+admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")
+
 admin("space:drop()")
 

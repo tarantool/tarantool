@@ -43,7 +43,7 @@ struct lua_State;
 void
 box_lua_call_init(struct lua_State *L);
 
-struct request;
+struct call_request;
 struct obuf;
 
 /**
@@ -51,10 +51,10 @@ struct obuf;
  * (implementation of 'CALL' command code).
  */
 int
-box_lua_call(struct request *request, struct obuf *out);
+box_lua_call(struct call_request *request, struct obuf *out);
 
 int
-box_lua_eval(struct request *request, struct obuf *out);
+box_lua_eval(struct call_request *request, struct obuf *out);
 
 #if defined(__cplusplus)
 } /* extern "C" */

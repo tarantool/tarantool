@@ -254,7 +254,7 @@ struct request
 	uint32_t offset;
 	uint32_t limit;
 	uint32_t iterator;
-	/** Search key or proc name. */
+	/** Search key. */
 	const char *key;
 	const char *key_end;
 	/** Insert/replace/upsert tuple or proc argument or update operations. */

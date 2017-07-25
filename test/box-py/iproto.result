@@ -190,6 +190,17 @@ box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')
 
 - [1, 0, 2, -2]
 
+function kek() return 'kek' end
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+Sync:  100
+Retcode:  [['kek']]
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
 space:drop()
 ---
 ...

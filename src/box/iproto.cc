@@ -76,8 +76,12 @@ struct iproto_msg: public cmsg
 	/* --- Box msgs - actual requests for the transaction processor --- */
 	/* Request message code and sync. */
 	struct xrow_header header;
-	/* Box request, if this is a DML */
-	struct request request;
+	union {
+		/* Box request, if this is a DML */
+		struct request dml_request;
+		/* Box request, if this is misc (call, eval). */
+		struct call_request call_request;
+	};
 	/*
 	 * Remember the active iobuf of the connection,
 	 * in which the request is stored. The response
@@ -611,20 +615,20 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 {
 	xrow_header_decode_xc(&msg->header, pos, reqend);
 	assert(*pos == reqend);
-	request_create(&msg->request, msg->header.type);
-	msg->request.header = &msg->header;
+	const char *body;
+	uint8_t type = msg->header.type;
+	uint64_t sync = msg->header.sync;
 
-	switch (msg->header.type) {
+	switch (type) {
 	case IPROTO_SELECT:
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
-	case IPROTO_CALL_16:
-	case IPROTO_CALL:
 	case IPROTO_AUTH:
-	case IPROTO_EVAL:
 	case IPROTO_UPSERT:
+		request_create(&msg->dml_request, type);
+		msg->dml_request.header = &msg->header;
 		/*
 		 * This is a common request which can be parsed with
 		 * request_decode(). Parse it before putting it into
@@ -632,16 +636,24 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		 * requests are parsed in tx thread into request type-
 		 * specific objects.
 		 */
-		if (msg->header.bodycnt == 0) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "missing request body");
-		}
-		request_decode_xc(&msg->request,
-				 (const char *) msg->header.body[0].iov_base,
-				 msg->header.body[0].iov_len,
-				 request_key_map(msg->header.type));
-		assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
-		cmsg_init(msg, dml_route[msg->header.type]);
+		if (msg->header.bodycnt == 0)
+			goto err_no_body;
+		body = (const char *) msg->header.body[0].iov_base;
+		request_decode_xc(&msg->dml_request, body,
+				  msg->header.body[0].iov_len,
+				  request_key_map(type));
+		assert(type < sizeof(dml_route)/sizeof(*dml_route));
+		cmsg_init(msg, dml_route[type]);
+		break;
+	case IPROTO_CALL_16:
+	case IPROTO_CALL:
+	case IPROTO_EVAL:
+		if (msg->header.bodycnt == 0)
+			goto err_no_body;
+		body = (const char *) msg->header.body[0].iov_base;
+		call_request_decode_xc(&msg->call_request, type, sync, body,
+				       msg->header.body[0].iov_len);
+		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_PING:
 		cmsg_init(msg, misc_route);
@@ -653,9 +665,12 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) msg->header.type);
+			  (uint32_t) type);
 		break;
 	}
+	return;
+err_no_body:
+	tnt_raise(ClientError, ER_INVALID_MSGPACK, "missing request body");
 }
 
 /** Enqueue all requests which were read up. */
@@ -940,7 +955,7 @@ tx_process1(struct cmsg *m)
 
 	struct tuple *tuple;
 	struct obuf_svp svp;
-	if (box_process1(&msg->request, &tuple) ||
+	if (box_process1(&msg->dml_request, &tuple) ||
 	    iproto_prepare_select(out, &svp))
 		goto error;
 	if (tuple && tuple_to_obuf(tuple, out))
@@ -963,7 +978,7 @@ tx_process_select(struct cmsg *m)
 	struct obuf_svp svp;
 	struct port port;
 	int rc;
-	struct request *req = &msg->request;
+	struct request *req = &msg->dml_request;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
@@ -1009,16 +1024,16 @@ tx_process_misc(struct cmsg *m)
 		switch (msg->header.type) {
 		case IPROTO_CALL:
 		case IPROTO_CALL_16:
-			assert(msg->request.type == msg->header.type);
-			box_process_call(&msg->request, out);
+			assert(msg->call_request.type == msg->header.type);
+			box_process_call(&msg->call_request, out);
 			break;
 		case IPROTO_EVAL:
-			assert(msg->request.type == msg->header.type);
-			box_process_eval(&msg->request, out);
+			assert(msg->call_request.type == msg->header.type);
+			box_process_eval(&msg->call_request, out);
 			break;
 		case IPROTO_AUTH:
-			assert(msg->request.type == msg->header.type);
-			box_process_auth(&msg->request, out);
+			assert(msg->dml_request.type == msg->header.type);
+			box_process_auth(&msg->dml_request, out);
 			break;
 		case IPROTO_PING:
 			iproto_reply_ok_xc(out, msg->header.sync,
