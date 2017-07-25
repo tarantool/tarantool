@@ -41,7 +41,7 @@
     ok 39 - invalid 10
     ok 40 - invalid 11
 ok 1 - subtests
-    1..9
+    1..10
     ok 1 - bad msgpack end
     ok 2 - encode
     ok 3 - header map size
@@ -50,5 +50,6 @@ ok 1 - subtests
     ok 6 - decoded replica_id
     ok 7 - decoded lsn
     ok 8 - decoded tm
-    ok 9 - decoded bodycnt
+    ok 9 - decoded sync
+    ok 10 - decoded bodycnt
 ok 2 - subtests

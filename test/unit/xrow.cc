@@ -203,7 +203,7 @@ test_greeting()
 void
 test_xrow_header_encode_decode()
 {
-	plan(9);
+	plan(10);
 	struct xrow_header header;
 	char buffer[2048];
 	char *pos = mp_encode_uint(buffer, 300);
@@ -215,11 +215,12 @@ test_xrow_header_encode_decode()
 	header.lsn = 400;
 	header.tm = 123.456;
 	header.bodycnt = 0;
+	uint64_t sync = 100500;
 	struct iovec vec;
-	is(1, xrow_header_encode(&header, &vec, 200), "encode");
+	is(1, xrow_header_encode(&header, sync, &vec, 200), "encode");
 	int fixheader_len = 200;
 	pos = (char *)vec.iov_base + fixheader_len;
-	is(mp_decode_map((const char **)&pos), 4, "header map size");
+	is(mp_decode_map((const char **)&pos), 5, "header map size");
 
 	struct xrow_header decoded_header;
 	const char *begin = (const char *)vec.iov_base;
@@ -232,6 +233,7 @@ test_xrow_header_encode_decode()
 	is(header.replica_id, decoded_header.replica_id, "decoded replica_id");
 	is(header.lsn, decoded_header.lsn, "decoded lsn");
 	is(header.tm, decoded_header.tm, "decoded tm");
+	is(decoded_header.sync, sync, "decoded sync");
 	is(decoded_header.bodycnt, 0, "decoded bodycnt");
 
 	check_plan();

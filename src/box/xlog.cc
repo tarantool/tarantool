@@ -1161,7 +1161,7 @@ xlog_tx_write(struct xlog *log)
  * @retval >=0 the number of bytes written to buffer.
  */
 ssize_t
-xlog_write_row(struct xlog *log, struct xrow_header *packet)
+xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 {
 	/*
 	 * Automatically reserve space for a fixheader when adding
@@ -1181,9 +1181,7 @@ xlog_write_row(struct xlog *log, struct xrow_header *packet)
 	/** encode row into iovec */
 	struct iovec iov[XROW_IOVMAX];
 	/** don't write sync to the disk */
-	uint64_t sync = packet->sync;
-	int iovcnt = xrow_header_encode(packet, iov, 0);
-	packet->sync = sync;
+	int iovcnt = xrow_header_encode(packet, 0, iov, 0);
 	if (iovcnt < 0) {
 		obuf_rollback_to_svp(&log->obuf, &svp);
 		return -1;

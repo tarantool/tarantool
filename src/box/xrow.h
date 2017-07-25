@@ -78,7 +78,7 @@ struct xrow_header {
  * @post retval <= XROW_IOVMAX
  */
 int
-xrow_header_encode(const struct xrow_header *header,
+xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 		   struct iovec *out, size_t fixheader_len);
 
 /**

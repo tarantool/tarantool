@@ -128,8 +128,8 @@ error:
 }
 
 int
-xrow_header_encode(const struct xrow_header *header, struct iovec *out,
-		   size_t fixheader_len)
+xrow_header_encode(const struct xrow_header *header, uint64_t sync,
+		   struct iovec *out, size_t fixheader_len)
 {
 	/* allocate memory for sign + header */
 	out->iov_base = region_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
@@ -150,9 +150,9 @@ xrow_header_encode(const struct xrow_header *header, struct iovec *out,
 		map_size++;
 	}
 
-	if (header->sync) {
+	if (sync) {
 		d = mp_encode_uint(d, IPROTO_SYNC);
-		d = mp_encode_uint(d, header->sync);
+		d = mp_encode_uint(d, sync);
 		map_size++;
 	}
 
@@ -509,7 +509,7 @@ int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {
 	assert(mp_sizeof_uint(UINT32_MAX) == 5);
-	int iovcnt = xrow_header_encode(row, out, 5);
+	int iovcnt = xrow_header_encode(row, row->sync, out, 5);
 	if (iovcnt < 0)
 		return -1;
 	ssize_t len = -5;

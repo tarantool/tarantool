@@ -202,6 +202,11 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 		lua_pushnumber(L, row.type); /* unknown key */
 	}
 	lua_settable(L, -3); /* type */
+	if (row.sync != 0) {
+		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_SYNC));
+		lua_pushinteger(L, row.sync);
+		lua_settable(L, -3); /* sync */
+	}
 	if (row.lsn != 0) {
 		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_LSN));
 		lua_pushinteger(L, row.lsn);
