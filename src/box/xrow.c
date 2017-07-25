@@ -360,7 +360,7 @@ error:
 	}
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
-		if (! iproto_body_has_key(data, end)) {
+		if (! iproto_dml_body_has_key(data, end)) {
 			mp_check(&data, end);
 			mp_check(&data, end);
 			continue;
@@ -396,9 +396,6 @@ error:
 			request->tuple_end = data;
 			break;
 		case IPROTO_KEY:
-		case IPROTO_FUNCTION_NAME:
-		case IPROTO_USER_NAME:
-		case IPROTO_EXPR:
 			request->key = value;
 			request->key_end = data;
 			break;
@@ -497,7 +494,7 @@ xrow_decode_request(struct xrow_header *row)
 	request_create(request, row->type);
 	if (request_decode(request, (const char *) row->body[0].iov_base,
 			   row->body[0].iov_len,
-			   request_key_map(row->type)) != 0) {
+			   dml_request_key_map(row->type)) != 0) {
 		region_truncate(region, used);
 		return NULL;
 	}

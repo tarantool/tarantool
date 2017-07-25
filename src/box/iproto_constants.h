@@ -85,10 +85,9 @@ enum iproto_key {
 
 #define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(REPLICA_ID) |\
 			  bit(LSN) | bit(SCHEMA_VERSION))
-#define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
-			  bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
-			  bit(KEY) | bit(TUPLE) | bit(FUNCTION_NAME) | \
-			  bit(USER_NAME) | bit(EXPR) | bit(OPS))
+#define IPROTO_DML_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
+			      bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
+			      bit(KEY) | bit(TUPLE) | bit(OPS))
 
 static inline bool
 xrow_header_has_key(const char *pos, const char *end)
@@ -98,10 +97,10 @@ xrow_header_has_key(const char *pos, const char *end)
 }
 
 static inline bool
-iproto_body_has_key(const char *pos, const char *end)
+iproto_dml_body_has_key(const char *pos, const char *end)
 {
 	unsigned char key = pos < end ? *pos : (unsigned char) IPROTO_KEY_MAX;
-	return key < IPROTO_KEY_MAX && IPROTO_BODY_BMAP & (1ULL<<key);
+	return key < IPROTO_KEY_MAX && IPROTO_DML_BODY_BMAP & (1ULL<<key);
 }
 
 #undef bit
@@ -202,15 +201,23 @@ iproto_key_name(enum iproto_key key)
 	return iproto_key_strs[key];
 }
 
+/** A data manipulation request. */
+static inline bool
+iproto_type_is_dml(uint32_t type)
+{
+	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
+		type == IPROTO_UPSERT;
+}
+
 /**
  * Returns a map of mandatory members of IPROTO DML request.
  * @param type iproto type.
  */
 static inline uint64_t
-request_key_map(uint32_t type)
+dml_request_key_map(uint32_t type)
 {
 	/** Advanced requests don't have a defined key map. */
-	assert(type <= IPROTO_TYPE_STAT_MAX);
+	assert(iproto_type_is_dml(type));
 	extern const uint64_t iproto_body_key_map[];
 	return iproto_body_key_map[type];
 }
@@ -230,7 +237,7 @@ iproto_type_is_select(uint32_t type)
 static inline bool
 iproto_type_is_request(uint32_t type)
 {
-	return type > IPROTO_OK && type <= IPROTO_UPSERT;
+	return type > IPROTO_OK && type <= IPROTO_TYPE_STAT_MAX;
 }
 
 /**
@@ -242,14 +249,6 @@ static inline bool
 iproto_type_is_sync(uint32_t type)
 {
 	return type == IPROTO_JOIN || type == IPROTO_SUBSCRIBE;
-}
-
-/** A data manipulation request. */
-static inline bool
-iproto_type_is_dml(uint32_t type)
-{
-	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
-		type == IPROTO_UPSERT;
 }
 
 /** This is an error. */

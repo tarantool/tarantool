@@ -643,7 +643,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		body = (const char *) msg->header.body[0].iov_base;
 		request_decode_xc(&msg->dml_request, body,
 				  msg->header.body[0].iov_len,
-				  request_key_map(type));
+				  dml_request_key_map(type));
 		assert(type < sizeof(dml_route)/sizeof(*dml_route));
 		cmsg_init(msg, dml_route[type]);
 		break;

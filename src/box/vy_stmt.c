@@ -540,7 +540,7 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 {
 	struct request request;
 	request_create(&request, xrow->type);
-	uint64_t key_map = request_key_map(xrow->type);
+	uint64_t key_map = dml_request_key_map(xrow->type);
 	key_map &= ~(1ULL << IPROTO_SPACE_ID); /* space_id is optional */
 	if (request_decode(&request, xrow->body->iov_base, xrow->body->iov_len,
 			   key_map) < 0)
