@@ -4662,7 +4662,7 @@ WhereInfo *sqlite3WhereBegin(
         op = OP_OpenWrite;
         pWInfo->aiCurOnePass[0] = pTabItem->iCursor;
       };
-      sqlite3OpenTable(pParse, pTabItem->iCursor, iDb, pTab, op);
+      sqlite3OpenTable(pParse, pTabItem->iCursor, pTab, op);
       assert( pTabItem->iCursor==pLevel->iTabCur );
       testcase( pWInfo->eOnePass==ONEPASS_OFF && pTab->nCol==BMS-1 );
       testcase( pWInfo->eOnePass==ONEPASS_OFF && pTab->nCol==BMS );
@@ -4686,7 +4686,7 @@ WhereInfo *sqlite3WhereBegin(
                             (const u8*)&pTabItem->colUsed, P4_INT64);
 #endif
     }else{
-      sqlite3TableLock(pParse, iDb, pTab->tnum, 0, pTab->zName);
+      sqlite3TableLock(pParse, pTab->tnum, 0, pTab->zName);
     }
     if( pLoop->wsFlags & WHERE_INDEXED ){
       Index *pIx = pLoop->u.btree.pIndex;
@@ -4747,7 +4747,7 @@ WhereInfo *sqlite3WhereBegin(
 #endif /* SQLITE_ENABLE_COLUMN_USED_MASK */
       }
     }
-    if( iDb>=0 ) sqlite3CodeVerifySchema(pParse, iDb);
+    if( iDb==0 ) sqlite3CodeVerifySchema(pParse);
   }
   pWInfo->iTop = sqlite3VdbeCurrentAddr(v);
   if( db->mallocFailed ) goto whereBeginError;

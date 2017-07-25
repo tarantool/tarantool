@@ -220,13 +220,14 @@ static int lookupName(
       ** database name. */
       zDb = 0;
     }else{
-      for(i=0; i<db->nDb; i++){
-        assert( db->aDb[i].zDbSName );
-        if( sqlite3StrICmp(db->aDb[i].zDbSName,zDb)==0 ){
-          pSchema = db->aDb[i].pSchema;
-          break;
-        }
-      }
+      assert( db->mdb.zDbSName );
+      /* TODO: forbit names like db_name.column_names */
+      if( sqlite3StrICmp(db->mdb.zDbSName,zDb)!=0 ) {
+        cnt = 0;
+        cntTab = 0;
+        goto lookup_error;
+      }	
+      pSchema = db->mdb.pSchema;
     }
   }
 
@@ -442,6 +443,7 @@ static int lookupName(
   ** cnt==0 means there was not match.  cnt>1 means there were two or
   ** more matches.  Either way, we have an error.
   */
+lookup_error:
   if( cnt!=1 ){
     const char *zErr;
     zErr = cnt==0 ? "no such column" : "ambiguous column name";

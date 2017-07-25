@@ -115,6 +115,31 @@ explain ::= EXPLAIN QUERY PLAN.   { pParse->explain = 2; }
 %endif  SQLITE_OMIT_EXPLAIN
 cmdx ::= cmd.
 
+// Define operator precedence early so that this is the first occurrence
+// of the operator tokens in the grammer.  Keeping the operators together
+// causes them to be assigned integer values that are close together,
+// which keeps parser tables smaller.
+//
+// The token values assigned to these symbols is determined by the order
+// in which lemon first sees them.  It must be the case that ISNULL/NOTNULL,
+// NE/EQ, GT/LE, and GE/LT are separated by only a single value.  See
+// the sqlite3ExprIfFalse() routine for additional information on this
+// constraint.
+//
+%left OR.
+%left AND.
+%right NOT.
+%left IS MATCH LIKE_KW BETWEEN IN ISNULL NOTNULL NE EQ.
+%left GT LE LT GE.
+%right ESCAPE.
+%left BITAND BITOR LSHIFT RSHIFT.
+%left PLUS MINUS.
+%left STAR SLASH REM.
+%left CONCAT.
+%left COLLATE.
+%right BITNOT.
+
+
 ///////////////////// Begin and end transactions. ////////////////////////////
 //
 
@@ -146,19 +171,15 @@ cmd ::= ROLLBACK trans_opt TO savepoint_opt nm(X). {
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
 cmd ::= create_table create_table_args.
-create_table ::= createkw temp(T) TABLE ifnotexists(E) nm(Y) dbnm(Z). {
-   sqlite3StartTable(pParse,&Y,&Z,T,0,0,E);
+create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
+   sqlite3StartTable(pParse,&Y,0,0,0,E);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
 %type ifnotexists {int}
 ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
-%type temp {int}
-%ifndef SQLITE_OMIT_TEMPDB
-temp(A) ::= TEMP.  {A = 1;}
-%endif  SQLITE_OMIT_TEMPDB
-temp(A) ::= .      {A = 0;}
+
 create_table_args ::= LP columnlist conslist_opt(X) RP(E) table_options(F). {
   sqlite3EndTable(pParse,&X,&E,F,0);
 }
@@ -180,30 +201,6 @@ columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.
 columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 
-// Define operator precedence early so that this is the first occurrence
-// of the operator tokens in the grammer.  Keeping the operators together
-// causes them to be assigned integer values that are close together,
-// which keeps parser tables smaller.
-//
-// The token values assigned to these symbols is determined by the order
-// in which lemon first sees them.  It must be the case that ISNULL/NOTNULL,
-// NE/EQ, GT/LE, and GE/LT are separated by only a single value.  See
-// the sqlite3ExprIfFalse() routine for additional information on this
-// constraint.
-//
-%left OR.
-%left AND.
-%right NOT.
-%left IS MATCH LIKE_KW BETWEEN IN ISNULL NOTNULL NE EQ.
-%left GT LE LT GE.
-%right ESCAPE.
-%left BITAND BITOR LSHIFT RSHIFT.
-%left PLUS MINUS.
-%left STAR SLASH REM.
-%left CONCAT.
-%left COLLATE.
-%right BITNOT.
-
 // An IDENTIFIER can be a generic identifier, or one of several
 // keywords.  Any non-standard keyword can also be an identifier.
 //
@@ -218,7 +215,7 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
   CONFLICT DATABASE DEFERRED DESC DETACH EACH END EXCLUSIVE EXPLAIN FAIL FOR
   IGNORE IMMEDIATE INITIALLY INSTEAD LIKE_KW MATCH NO PLAN
   QUERY KEY OF OFFSET PRAGMA RAISE RECURSIVE RELEASE REPLACE RESTRICT ROW
-  ROLLBACK SAVEPOINT TEMP TRIGGER VACUUM VIEW VIRTUAL WITH WITHOUT
+  ROLLBACK SAVEPOINT TRIGGER VACUUM VIEW VIRTUAL WITH WITHOUT
 %ifdef SQLITE_OMIT_COMPOUND_SELECT
   EXCEPT INTERSECT UNION
 %endif SQLITE_OMIT_COMPOUND_SELECT
@@ -286,7 +283,7 @@ ccons ::= NULL onconf.
 ccons ::= NOT NULL onconf(R).    {sqlite3AddNotNull(pParse, R);}
 ccons ::= PRIMARY KEY sortorder(Z) onconf(R) autoinc(I).
                                  {sqlite3AddPrimaryKey(pParse,0,R,I,Z);}
-ccons ::= UNIQUE onconf(R).      {sqlite3CreateIndex(pParse,0,0,0,0,R,0,0,0,0,
+ccons ::= UNIQUE onconf(R).      {sqlite3CreateIndex(pParse,0,0,0,R,0,0,0,0,
                                    SQLITE_IDXTYPE_UNIQUE);}
 ccons ::= CHECK LP expr(X) RP.   {sqlite3AddCheckConstraint(pParse,X.pExpr);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
@@ -336,7 +333,7 @@ tcons ::= CONSTRAINT nm(X).      {pParse->constraintName = X;}
 tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP onconf(R).
                                  {sqlite3AddPrimaryKey(pParse,X,R,I,0);}
 tcons ::= UNIQUE LP sortlist(X) RP onconf(R).
-                                 {sqlite3CreateIndex(pParse,0,0,0,X,R,0,0,0,0,
+                                 {sqlite3CreateIndex(pParse,0,0,X,R,0,0,0,0,
                                        SQLITE_IDXTYPE_UNIQUE);}
 tcons ::= CHECK LP expr(E) RP onconf.
                                  {sqlite3AddCheckConstraint(pParse,E.pExpr);}
@@ -375,9 +372,9 @@ ifexists(A) ::= .            {A = 0;}
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
 %ifndef SQLITE_OMIT_VIEW
-cmd ::= createkw(X) temp(T) VIEW ifnotexists(E) nm(Y) dbnm(Z) eidlist_opt(C)
+cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
-  sqlite3CreateView(pParse, &X, &Y, &Z, C, S, T, E);
+  sqlite3CreateView(pParse, &X, &Y, C, S, E);
 }
 cmd ::= DROP VIEW ifexists(E) fullname(X). {
   sqlite3DropTable(pParse, X, 1, E);
@@ -580,14 +577,14 @@ stl_prefix(A) ::= seltablist(A) joinop(Y).    {
    if( ALWAYS(A && A->nSrc>0) ) A->a[A->nSrc-1].fg.jointype = (u8)Y;
 }
 stl_prefix(A) ::= .                           {A = 0;}
-seltablist(A) ::= stl_prefix(A) nm(Y) dbnm(D) as(Z) indexed_opt(I)
+seltablist(A) ::= stl_prefix(A) nm(Y) as(Z) indexed_opt(I)
                   on_opt(N) using_opt(U). {
-  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,&D,&Z,0,N,U);
+  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,0,&Z,0,N,U);
   sqlite3SrcListIndexedBy(pParse, A, &I);
 }
-seltablist(A) ::= stl_prefix(A) nm(Y) dbnm(D) LP exprlist(E) RP as(Z)
+seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
                   on_opt(N) using_opt(U). {
-  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,&D,&Z,0,N,U);
+  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,0,&Z,0,N,U);
   sqlite3SrcListFuncArgs(pParse, A, E);
 }
 %ifndef SQLITE_OMIT_SUBQUERY
@@ -620,14 +617,10 @@ seltablist(A) ::= stl_prefix(A) nm(Y) dbnm(D) LP exprlist(E) RP as(Z)
   }
 %endif  SQLITE_OMIT_SUBQUERY
 
-%type dbnm {Token}
-dbnm(A) ::= .          {A.z=0; A.n=0;}
-dbnm(A) ::= DOT nm(X). {A = X;}
-
 %type fullname {SrcList*}
 %destructor fullname {sqlite3SrcListDelete(pParse->db, $$);}
-fullname(A) ::= nm(X) dbnm(Y).  
-   {A = sqlite3SrcListAppend(pParse->db,0,&X,&Y); /*A-overwrites-X*/}
+fullname(A) ::= nm(X).  
+   {A = sqlite3SrcListAppend(pParse->db,0,&X,0); /*A-overwrites-X*/}
 
 %type joinop {int}
 joinop(X) ::= COMMA|JOIN.              { X = JT_INNER; }
@@ -1184,14 +1177,14 @@ expr(A) ::= expr(A) between_op(N) expr(X) AND expr(Y). [BETWEEN] {
     exprNot(pParse, N, &A);
     A.zEnd = &E.z[E.n];
   }
-  expr(A) ::= expr(A) in_op(N) nm(Y) dbnm(Z) paren_exprlist(E). [IN] {
-    SrcList *pSrc = sqlite3SrcListAppend(pParse->db, 0,&Y,&Z);
+  expr(A) ::= expr(A) in_op(N) nm(Y) paren_exprlist(E). [IN] {
+    SrcList *pSrc = sqlite3SrcListAppend(pParse->db, 0,&Y,0);
     Select *pSelect = sqlite3SelectNew(pParse, 0,pSrc,0,0,0,0,0,0,0);
     if( E )  sqlite3SrcListFuncArgs(pParse, pSelect ? pSrc : 0, E);
     A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
     sqlite3PExprAddSelect(pParse, A.pExpr, pSelect);
     exprNot(pParse, N, &A);
-    A.zEnd = Z.z ? &Z.z[Z.n] : &Y.z[Y.n];
+    A.zEnd = &Y.z[Y.n];
   }
   expr(A) ::= EXISTS(B) LP select(Y) RP(E). {
     Expr *p;
@@ -1256,9 +1249,9 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
-cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X) dbnm(D)
+cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP where_opt(W). {
-  sqlite3CreateIndex(pParse, &X, &D, 
+  sqlite3CreateIndex(pParse, &X, 
                      sqlite3SrcListAppend(pParse->db,0,&Y,0), Z, U,
                       &S, W, SQLITE_SO_ASC, NE, SQLITE_IDXTYPE_APPDEF);
 }
@@ -1334,22 +1327,18 @@ cmd ::= DROP INDEX ifexists(E) fullname(X).   {sqlite3DropIndex(pParse, X, E);}
 ///////////////////////////// The VACUUM command /////////////////////////////
 //
 %ifndef SQLITE_OMIT_VACUUM
-%ifndef SQLITE_OMIT_ATTACH
-cmd ::= VACUUM.                {sqlite3Vacuum(pParse,0);}
-cmd ::= VACUUM nm(X).          {sqlite3Vacuum(pParse,&X);}
-%endif  SQLITE_OMIT_ATTACH
 %endif  SQLITE_OMIT_VACUUM
 
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //
 %ifndef SQLITE_OMIT_PRAGMA
-cmd ::= PRAGMA nm(X) dbnm(Z).                {sqlite3Pragma(pParse,&X,&Z,0,0);}
-cmd ::= PRAGMA nm(X) dbnm(Z) EQ nmnum(Y).    {sqlite3Pragma(pParse,&X,&Z,&Y,0);}
-cmd ::= PRAGMA nm(X) dbnm(Z) LP nmnum(Y) RP. {sqlite3Pragma(pParse,&X,&Z,&Y,0);}
-cmd ::= PRAGMA nm(X) dbnm(Z) EQ minus_num(Y). 
-                                             {sqlite3Pragma(pParse,&X,&Z,&Y,1);}
-cmd ::= PRAGMA nm(X) dbnm(Z) LP minus_num(Y) RP.
-                                             {sqlite3Pragma(pParse,&X,&Z,&Y,1);}
+cmd ::= PRAGMA nm(X).                        {sqlite3Pragma(pParse,&X,0,0,0);}
+cmd ::= PRAGMA nm(X) EQ nmnum(Y).            {sqlite3Pragma(pParse,&X,0,&Y,0);}
+cmd ::= PRAGMA nm(X) LP nmnum(Y) RP.         {sqlite3Pragma(pParse,&X,0,&Y,0);}
+cmd ::= PRAGMA nm(X) EQ minus_num(Y). 
+                                             {sqlite3Pragma(pParse,&X,0,&Y,1);}
+cmd ::= PRAGMA nm(X) LP minus_num(Y) RP.
+                                             {sqlite3Pragma(pParse,&X,0,&Y,1);}
 
 nmnum(A) ::= plus_num(A).
 nmnum(A) ::= nm(A).
@@ -1372,11 +1361,11 @@ cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
   sqlite3FinishTrigger(pParse, S, &all);
 }
 
-trigger_decl(A) ::= temp(T) TRIGGER ifnotexists(NOERR) nm(B) dbnm(Z) 
+trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
                     trigger_time(C) trigger_event(D)
                     ON fullname(E) foreach_clause when_clause(G). {
-  sqlite3BeginTrigger(pParse, &B, &Z, C, D.a, D.b, E, G, T, NOERR);
-  A = (Z.n==0?B:Z); /*A-overwrites-T*/
+  sqlite3BeginTrigger(pParse, &B, C, D.a, D.b, E, G, NOERR);
+  A = B; /*A-overwrites-T*/
 }
 
 %type trigger_time {int}
@@ -1491,34 +1480,16 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
 }
 %endif  !SQLITE_OMIT_TRIGGER
 
-//////////////////////// ATTACH DATABASE file AS name /////////////////////////
-%ifndef SQLITE_OMIT_ATTACH
-cmd ::= ATTACH database_kw_opt expr(F) AS expr(D) key_opt(K). {
-  sqlite3Attach(pParse, F.pExpr, D.pExpr, K);
-}
-cmd ::= DETACH database_kw_opt expr(D). {
-  sqlite3Detach(pParse, D.pExpr);
-}
-
-%type key_opt {Expr*}
-%destructor key_opt {sqlite3ExprDelete(pParse->db, $$);}
-key_opt(A) ::= .                     { A = 0; }
-key_opt(A) ::= KEY expr(X).          { A = X.pExpr; }
-
-database_kw_opt ::= DATABASE.
-database_kw_opt ::= .
-%endif SQLITE_OMIT_ATTACH
-
 ////////////////////////// REINDEX collation //////////////////////////////////
 %ifndef SQLITE_OMIT_REINDEX
 cmd ::= REINDEX.                {sqlite3Reindex(pParse, 0, 0);}
-cmd ::= REINDEX nm(X) dbnm(Y).  {sqlite3Reindex(pParse, &X, &Y);}
+cmd ::= REINDEX nm(X).          {sqlite3Reindex(pParse, &X, 0);}
 %endif  SQLITE_OMIT_REINDEX
 
 /////////////////////////////////// ANALYZE ///////////////////////////////////
 %ifndef SQLITE_OMIT_ANALYZE
 cmd ::= ANALYZE.                {sqlite3Analyze(pParse, 0, 0);}
-cmd ::= ANALYZE nm(X) dbnm(Y).  {sqlite3Analyze(pParse, &X, &Y);}
+cmd ::= ANALYZE nm(X).          {sqlite3Analyze(pParse, &X, 0);}
 %endif
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
@@ -1544,8 +1515,8 @@ kwcolumn_opt ::= COLUMNKW.
 cmd ::= create_vtab.                       {sqlite3VtabFinishParse(pParse,0);}
 cmd ::= create_vtab LP vtabarglist RP(X).  {sqlite3VtabFinishParse(pParse,&X);}
 create_vtab ::= createkw VIRTUAL TABLE ifnotexists(E)
-                nm(X) dbnm(Y) USING nm(Z). {
-    sqlite3VtabBeginParse(pParse, &X, &Y, &Z, E);
+                nm(X) USING nm(Z). {
+    sqlite3VtabBeginParse(pParse, &X, 0, &Z, E);
 }
 vtabarglist ::= vtabarg.
 vtabarglist ::= vtabarglist COMMA vtabarg.

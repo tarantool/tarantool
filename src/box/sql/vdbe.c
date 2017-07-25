@@ -2772,7 +2772,6 @@ case OP_Savepoint: {
   Savepoint *pSavepoint;
   Savepoint *pTmp;
   int iSavepoint;
-  int ii;
 
   p1 = pOp->p1;
   zName = pOp->p4.z;
@@ -2876,20 +2875,16 @@ case OP_Savepoint: {
         iSavepoint = db->nSavepoint - iSavepoint - 1;
         if( p1==SAVEPOINT_ROLLBACK ){
           isSchemaChange = (db->flags & SQLITE_InternChanges)!=0;
-          for(ii=0; ii<db->nDb; ii++){
-            rc = sqlite3BtreeTripAllCursors(db->aDb[ii].pBt,
-                                       SQLITE_ABORT_ROLLBACK,
-                                       isSchemaChange==0);
-            if( rc!=SQLITE_OK ) goto abort_due_to_error;
-          }
+          rc = sqlite3BtreeTripAllCursors(db->mdb.pBt,
+                                     SQLITE_ABORT_ROLLBACK,
+                                     isSchemaChange==0);
+          if( rc!=SQLITE_OK ) goto abort_due_to_error;
         }else{
           isSchemaChange = 0;
         }
-        for(ii=0; ii<db->nDb; ii++){
-          rc = sqlite3BtreeSavepoint(db->aDb[ii].pBt, p1, iSavepoint);
-          if( rc!=SQLITE_OK ){
-            goto abort_due_to_error;
-          }
+        rc = sqlite3BtreeSavepoint(db->mdb.pBt, p1, iSavepoint);
+        if( rc!=SQLITE_OK ){
+          goto abort_due_to_error;
         }
         if( isSchemaChange ){
           sqlite3ExpirePreparedStatements(db);
@@ -3040,13 +3035,13 @@ case OP_Transaction: {
 
   assert( p->bIsReader );
   assert( p->readOnly==0 || pOp->p2==0 );
-  assert( pOp->p1>=0 && pOp->p1<db->nDb );
+  assert( pOp->p1==0 );
   assert( DbMaskTest(p->btreeMask, pOp->p1) );
   if( pOp->p2 && (db->flags & SQLITE_QueryOnly)!=0 ){
     rc = SQLITE_READONLY;
     goto abort_due_to_error;
   }
-  pBt = db->aDb[pOp->p1].pBt;
+  pBt = db->mdb.pBt;
 
   if( pBt ){
     rc = sqlite3BtreeBeginTrans(pBt, pOp->p2);
@@ -3089,7 +3084,7 @@ case OP_Transaction: {
     ** SQL statement was prepared.
     */
     sqlite3BtreeGetMeta(pBt, BTREE_SCHEMA_VERSION, (u32 *)&iMeta);
-    iGen = db->aDb[pOp->p1].pSchema->iGeneration;
+    iGen = db->mdb.pSchema->iGeneration;
   }else{
     iGen = iMeta = 0;
   }
@@ -3110,8 +3105,8 @@ case OP_Transaction: {
     ** to be invalidated whenever sqlite3_step() is called from within 
     ** a v-table method.
     */
-    if( db->aDb[pOp->p1].pSchema->schema_cookie!=iMeta ){
-      sqlite3ResetOneSchema(db, pOp->p1);
+    if( db->mdb.pSchema->schema_cookie!=iMeta ){
+      sqlite3ResetOneSchema(db);
     }
     p->expired = 1;
     rc = SQLITE_SCHEMA;
@@ -3156,11 +3151,11 @@ case OP_ReadCookie: {               /* out2 */
   iDb = pOp->p1;
   iCookie = pOp->p3;
   assert( pOp->p3<SQLITE_N_BTREE_META );
-  assert( iDb>=0 && iDb<db->nDb );
-  assert( db->aDb[iDb].pBt!=0 );
+  assert( iDb==0 );
+  assert( db->mdb.pBt!=0 );
   assert( DbMaskTest(p->btreeMask, iDb) );
 
-  sqlite3BtreeGetMeta(db->aDb[iDb].pBt, iCookie, (u32 *)&iMeta);
+  sqlite3BtreeGetMeta(db->mdb.pBt, iCookie, (u32 *)&iMeta);
   pOut = out2Prerelease(p, pOp);
   pOut->u.i = iMeta;
   break;
@@ -3179,12 +3174,12 @@ case OP_ReadCookie: {               /* out2 */
 case OP_SetCookie: {
   Db *pDb;
   assert( pOp->p2<SQLITE_N_BTREE_META );
-  assert( pOp->p1>=0 && pOp->p1<db->nDb );
+  assert( pOp->p1==0 );
   assert( DbMaskTest(p->btreeMask, pOp->p1) );
   assert( p->readOnly==0 );
-  pDb = &db->aDb[pOp->p1];
+  pDb = &db->mdb;
   assert( pDb->pBt!=0 );
-  assert( sqlite3SchemaMutexHeld(db, pOp->p1, 0) );
+  assert( sqlite3SchemaMutexHeld(db, 0) );
   /* See note about index shifting on OP_ReadCookie */
   rc = sqlite3BtreeUpdateMeta(pDb->pBt, pOp->p2, pOp->p3);
   if( pOp->p2==BTREE_SCHEMA_VERSION ){
@@ -3306,15 +3301,15 @@ case OP_OpenWrite:
   pKeyInfo = 0;
   p2 = pOp->p2;
   iDb = pOp->p3;
-  assert( iDb>=0 && iDb<db->nDb );
+  assert( iDb==0 );
   assert( DbMaskTest(p->btreeMask, iDb) );
-  pDb = &db->aDb[iDb];
+  pDb = &db->mdb;
   pX = pDb->pBt;
   assert( pX!=0 );
   if( pOp->opcode==OP_OpenWrite ){
     assert( OPFLAG_FORDELETE==BTREE_FORDELETE );
     wrFlag = BTREE_WRCSR | (pOp->p5 & OPFLAG_FORDELETE);
-    assert( sqlite3SchemaMutexHeld(db, iDb, 0) );
+    assert( sqlite3SchemaMutexHeld(db, 0) );
     if( pDb->pSchema->file_format < p->minWriteFileFormat ){
       p->minWriteFileFormat = pDb->pSchema->file_format;
     }
@@ -3704,7 +3699,7 @@ case OP_SeekGT: {       /* jump, in3 */
       **        (x <= 4.9)    ->     (x <  5)
       */
       if( pIn3->u.r<(double)iKey ){
-        assert( OP_SeekGE==(OP_SeekGT-1) );
+	assert( OP_SeekGE==(OP_SeekGT-1) );
         assert( OP_SeekLT==(OP_SeekLE-1) );
         assert( (OP_SeekLE & 0x0001)==(OP_SeekGT & 0x0001) );
         if( (oc & 0x0001)==(OP_SeekGT & 0x0001) ) oc--;
@@ -3745,13 +3740,6 @@ case OP_SeekGT: {       /* jump, in3 */
     r.pKeyInfo = pC->pKeyInfo;
     r.nField = (u16)nField;
 
-    /* The next line of code computes as follows, only faster:
-    **   if( oc==OP_SeekGT || oc==OP_SeekLE ){
-    **     r.default_rc = -1;
-    **   }else{
-    **     r.default_rc = +1;
-    **   }
-    */
     r.default_rc = ((1 & (oc - OP_SeekLT)) ? -1 : +1);
     assert( oc!=OP_SeekGT || r.default_rc==-1 );
     assert( oc!=OP_SeekLE || r.default_rc==-1 );
@@ -4276,8 +4264,8 @@ case OP_InsertInt: {
 
   if( pOp->p4type==P4_TABLE && HAS_UPDATE_HOOK(db) ){
     assert( pC->isTable );
-    assert( pC->iDb>=0 );
-    zDb = db->aDb[pC->iDb].zDbSName;
+    assert( pC->iDb==0 );
+    zDb = db->mdb.zDbSName;
     pTab = pOp->p4.pTab;
     assert( HasRowid(pTab) );
     op = ((pOp->p5 & OPFLAG_ISUPDATE) ? SQLITE_UPDATE : SQLITE_INSERT);
@@ -4392,9 +4380,9 @@ case OP_Delete: {
   ** last moved with OP_Next or OP_Prev, not Seek or NotFound, set 
   ** VdbeCursor.movetoTarget to the current rowid.  */
   if( pOp->p4type==P4_TABLE && HAS_UPDATE_HOOK(db) ){
-    assert( pC->iDb>=0 );
+    assert( pC->iDb==0 );
     assert( pOp->p4.pTab!=0 );
-    zDb = db->aDb[pC->iDb].zDbSName;
+    zDb = db->mdb.zDbSName;
     pTab = pOp->p4.pTab;
     if( (pOp->p5 & OPFLAG_SAVEPOSITION)!=0 && pC->isTable ){
       pC->movetoTarget = sqlite3BtreeIntegerKey(pC->uc.pCursor);
@@ -5230,13 +5218,13 @@ case OP_Destroy: {     /* out2 */
     iDb = pOp->p3;
     assert( DbMaskTest(p->btreeMask, iDb) );
     iMoved = 0;  /* Not needed.  Only to silence a warning. */
-    rc = sqlite3BtreeDropTable(db->aDb[iDb].pBt, pOp->p1, &iMoved);
+    rc = sqlite3BtreeDropTable(db->mdb.pBt, pOp->p1, &iMoved);
     pOut->flags = MEM_Int;
     pOut->u.i = iMoved;
     if( rc ) goto abort_due_to_error;
 #ifndef SQLITE_OMIT_AUTOVACUUM
     if( iMoved!=0 ){
-      sqlite3RootPageMoved(db, iDb, iMoved, pOp->p1);
+      sqlite3RootPageMoved(db, iMoved, pOp->p1);
       /* All OP_Destroy operations occur on the same btree */
       assert( resetSchemaOnFault==0 || resetSchemaOnFault==iDb+1 );
       resetSchemaOnFault = iDb+1;
@@ -5329,10 +5317,10 @@ case OP_CreateTable: {          /* out2 */
 
   pOut = out2Prerelease(p, pOp);
   pgno = 0;
-  assert( pOp->p1>=0 && pOp->p1<db->nDb );
+  assert( pOp->p1==0 );
   assert( DbMaskTest(p->btreeMask, pOp->p1) );
   assert( p->readOnly==0 );
-  pDb = &db->aDb[pOp->p1];
+  pDb = &db->mdb;
   assert( pDb->pBt!=0 );
   if( pOp->opcode==OP_CreateTable ){
     /* flags = BTREE_INTKEY; */
@@ -5365,14 +5353,12 @@ case OP_ParseSchema: {
   ** sqlite3InitCallback().
   */
 #ifdef SQLITE_DEBUG
-  for(iDb=0; iDb<db->nDb; iDb++){
-    assert( iDb==1 || sqlite3BtreeHoldsMutex(db->aDb[iDb].pBt) );
-  }
+  assert( sqlite3BtreeHoldsMutex(db->mdb.pBt) );
 #endif
 
   iDb = pOp->p1;
-  assert( iDb>=0 && iDb<db->nDb );
-  assert( DbHasProperty(db, iDb, DB_SchemaLoaded) );
+  assert( iDb==0 );
+  assert( DbHasProperty(db, DB_SchemaLoaded) );
   /* Used to be a conditional */ {
     zMaster = MASTER_NAME;
     initData.db = db;
@@ -5380,7 +5366,7 @@ case OP_ParseSchema: {
     initData.pzErrMsg = &p->zErrMsg;
     zSql = sqlite3MPrintf(db,
        "SELECT name, rootpage, sql FROM '%q'.%s WHERE %s ORDER BY rowid",
-       db->aDb[iDb].zDbSName, zMaster, pOp->p4.z);
+       db->mdb.zDbSName, zMaster, pOp->p4.z);
     if( zSql==0 ){
       rc = SQLITE_NOMEM_BKPT;
     }else{
@@ -5422,14 +5408,12 @@ case OP_ParseSchema2: {
   ** sqlite3InitCallback().
   */
 #ifdef SQLITE_DEBUG
-  for(iDb=0; iDb<db->nDb; iDb++){
-    assert( iDb==1 || sqlite3BtreeHoldsMutex(db->aDb[iDb].pBt) );
-  }
+  assert( sqlite3BtreeHoldsMutex(db->mdb.pBt) );
 #endif
 
   iDb = pOp->p3;
-  assert( iDb>=0 && iDb<db->nDb );
-  assert( DbHasProperty(db, iDb, DB_SchemaLoaded) );
+  assert( iDb==0 );
+  assert( DbHasProperty(db, DB_SchemaLoaded) );
 
   initData.db = db;
   initData.iDb = iDb;
@@ -5491,14 +5475,12 @@ case OP_ParseSchema3: {
   ** sqlite3InitCallback().
   */
 #ifdef SQLITE_DEBUG
-  for(iDb=0; iDb<db->nDb; iDb++){
-    assert( iDb==1 || sqlite3BtreeHoldsMutex(db->aDb[iDb].pBt) );
-  }
+  assert( sqlite3BtreeHoldsMutex(db->mdb.pBt) );
 #endif
 
   iDb = pOp->p2;
-  assert( iDb>=0 && iDb<db->nDb );
-  assert( DbHasProperty(db, iDb, DB_SchemaLoaded) );
+  assert( iDb==0 );
+  assert( DbHasProperty(db, DB_SchemaLoaded) );
 
   initData.db = db;
   initData.iDb = iDb;
@@ -5536,8 +5518,8 @@ case OP_ParseSchema3: {
 ** the analysis to be used when preparing all subsequent queries.
 */
 case OP_LoadAnalysis: {
-  assert( pOp->p1>=0 && pOp->p1<db->nDb );
-  rc = sqlite3AnalysisLoad(db, pOp->p1);
+  assert( pOp->p1==0  );
+  rc = sqlite3AnalysisLoad(db);
   if( rc ) goto abort_due_to_error;
   break;  
 }
@@ -5552,7 +5534,7 @@ case OP_LoadAnalysis: {
 ** schema consistent with what is on disk.
 */
 case OP_DropTable: {
-  sqlite3UnlinkAndDeleteTable(db, pOp->p1, pOp->p4.z);
+  sqlite3UnlinkAndDeleteTable(db, pOp->p4.z);
   break;
 }
 
@@ -5565,7 +5547,7 @@ case OP_DropTable: {
 ** schema consistent with what is on disk.
 */
 case OP_DropIndex: {
-  sqlite3UnlinkAndDeleteIndex(db, pOp->p1, pOp->p4.z);
+  sqlite3UnlinkAndDeleteIndex(db, pOp->p4.z);
   break;
 }
 
@@ -5578,7 +5560,7 @@ case OP_DropIndex: {
 ** schema consistent with what is on disk.
 */
 case OP_DropTrigger: {
-  sqlite3UnlinkAndDeleteTrigger(db, pOp->p1, pOp->p4.z);
+  sqlite3UnlinkAndDeleteTrigger(db, pOp->p4.z);
   break;
 }
 
@@ -5620,9 +5602,8 @@ case OP_IntegrityCk: {
   assert( (pnErr->flags & MEM_Int)!=0 );
   assert( (pnErr->flags & (MEM_Str|MEM_Blob))==0 );
   pIn1 = &aMem[pOp->p1];
-  assert( pOp->p5<db->nDb );
   assert( DbMaskTest(p->btreeMask, pOp->p5) );
-  z = sqlite3BtreeIntegrityCheck(db->aDb[pOp->p5].pBt, aRoot, nRoot,
+  z = sqlite3BtreeIntegrityCheck(db->mdb.pBt, aRoot, nRoot,
                                  (int)pnErr->u.i, &nErr);
   pnErr->u.i -= nErr;
   sqlite3VdbeMemSetNull(pIn1);
@@ -6271,10 +6252,10 @@ case OP_JournalMode: {    /* out2 */
        || eNew==PAGER_JOURNALMODE_WAL
        || eNew==PAGER_JOURNALMODE_QUERY
   );
-  assert( pOp->p1>=0 && pOp->p1<db->nDb );
+  assert( pOp->p1==0 );
   assert( p->readOnly==0 );
 
-  pBt = db->aDb[pOp->p1].pBt;
+  pBt = db->mdb.pBt;
   pPager = sqlite3BtreePager(pBt);
   eOld = sqlite3PagerGetJournalMode(pPager);
   if( eNew==PAGER_JOURNALMODE_QUERY ) eNew = eOld;
@@ -6317,10 +6298,10 @@ case OP_Vacuum: {
 case OP_IncrVacuum: {        /* jump */
   Btree *pBt;
 
-  assert( pOp->p1>=0 && pOp->p1<db->nDb );
+  assert( pOp->p1==0 );
   assert( DbMaskTest(p->btreeMask, pOp->p1) );
   assert( p->readOnly==0 );
-  pBt = db->aDb[pOp->p1].pBt;
+  pBt = db->mdb.pBt;
   rc = sqlite3BtreeIncrVacuum(pBt);
   VdbeBranchTaken(rc==SQLITE_DONE,2);
   if( rc ){
@@ -6371,10 +6352,10 @@ case OP_TableLock: {
   u8 isWriteLock = (u8)pOp->p3;
   if( isWriteLock || 0==(db->flags&SQLITE_ReadUncommitted) ){
     int p1 = pOp->p1; 
-    assert( p1>=0 && p1<db->nDb );
+    assert( p1==0 );
     assert( DbMaskTest(p->btreeMask, p1) );
     assert( isWriteLock==0 || isWriteLock==1 );
-    rc = sqlite3BtreeLockTable(db->aDb[p1].pBt, pOp->p2, isWriteLock);
+    rc = sqlite3BtreeLockTable(db->mdb.pBt, pOp->p2, isWriteLock);
     if( rc ){
       if( (rc&0xFF)==SQLITE_LOCKED ){
         const char *z = pOp->p4.z;
@@ -6767,7 +6748,7 @@ case OP_VUpdate: {
 */
 case OP_Pagecount: {            /* out2 */
   pOut = out2Prerelease(p, pOp);
-  pOut->u.i = sqlite3BtreeLastPage(db->aDb[pOp->p1].pBt);
+  pOut->u.i = sqlite3BtreeLastPage(db->mdb.pBt);
   break;
 }
 #endif
@@ -6787,7 +6768,7 @@ case OP_MaxPgcnt: {            /* out2 */
   Btree *pBt;
 
   pOut = out2Prerelease(p, pOp);
-  pBt = db->aDb[pOp->p1].pBt;
+  pBt = db->mdb.pBt;
   newMax = 0;
   if( pOp->p3 ){
     newMax = sqlite3BtreeLastPage(pBt);
@@ -6995,7 +6976,7 @@ abort_due_to_error:
   if( rc==SQLITE_IOERR_NOMEM ) sqlite3OomFault(db);
   rc = SQLITE_ERROR;
   if( resetSchemaOnFault>0 ){
-    sqlite3ResetOneSchema(db, resetSchemaOnFault-1);
+    sqlite3ResetOneSchema(db);
   }
 
   /* This is the only way out of this procedure.  We have to

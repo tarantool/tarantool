@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(7)
+test:plan(5)
 
 --!./tcltestrunner.lua
 -- 2005 August 18
@@ -24,35 +24,6 @@ test:plan(7)
 
 -- Error messages resulting from qualified trigger names.
 --
-test:do_test(
-    "trigger7-1.1",
-    function()
-        test:execsql [[
-            CREATE TABLE t1(x PRIMARY KEY, y);
-        ]]
-        return test:catchsql [[
-            CREATE TEMP TRIGGER main.r1 AFTER INSERT ON t1 BEGIN
-              SELECT 'no nothing';
-            END
-        ]]
-    end, {
-        -- <trigger7-1.1>
-        1, "temporary trigger may not have qualified name"
-        -- </trigger7-1.1>
-    })
-
-test:do_catchsql_test(
-    "trigger7-1.2",
-    [[
-        CREATE TRIGGER not_a_db.r1 AFTER INSERT ON t1 BEGIN
-          SELECT 'no nothing';
-        END
-    ]], {
-        -- <trigger7-1.2>
-        1, "unknown database not_a_db"
-        -- </trigger7-1.2>
-    })
-
 local function arr_match(array, str)
     for _, v in ipairs(array) do
         if type(v) == 'string' and string.find(v, str) then
@@ -69,6 +40,7 @@ test:do_test(
     "trigger7-2.1",
     function()
         test:execsql [[
+			CREATE TABLE t1(x PRIMARY KEY, y);
             CREATE TRIGGER r1 AFTER UPDATE OF x ON t1 BEGIN
               SELECT '___update_t1.x___';
             END;

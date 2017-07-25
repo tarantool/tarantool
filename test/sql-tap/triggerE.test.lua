@@ -70,7 +70,7 @@ for tn, defn in ipairs({
 
     test:do_catchsql_test(
         "1.2."..tn,
-        "CREATE TEMP TRIGGER tr1 "..defn.."", {
+        "CREATE TRIGGER tr1 "..defn.."", {
             1, errmsg
         })
 end

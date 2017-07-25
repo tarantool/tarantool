@@ -119,7 +119,6 @@ static int blobSeekToRow(Incrblob *p, sqlite3_int64 iRow, char **pzErr){
 */
 int sqlite3_blob_open(
   sqlite3* db,            /* The database connection */
-  const char *zDb,        /* The attached database containing the blob */
   const char *zTable,     /* The table containing the blob */
   const char *zColumn,    /* The column containing the blob */
   sqlite_int64 iRow,      /* The row containing the glob */
@@ -161,7 +160,7 @@ int sqlite3_blob_open(
     zErr = 0;
 
     sqlite3BtreeEnterAll(db);
-    pTab = sqlite3LocateTable(pParse, 0, zTable, zDb);
+    pTab = sqlite3LocateTable(pParse, 0, zTable);
     if( pTab && IsVirtual(pTab) ){
       pTab = 0;
       sqlite3ErrorMsg(pParse, "cannot open virtual table: %s", zTable);
@@ -187,7 +186,7 @@ int sqlite3_blob_open(
       goto blob_open_out;
     }
     pBlob->pTab = pTab;
-    pBlob->zDb = db->aDb[sqlite3SchemaToIndex(db, pTab->pSchema)].zDbSName;
+    pBlob->zDb = db->mdb.zDbSName;
 
     /* Now search pTab for the exact column. */
     for(iCol=0; iCol<pTab->nCol; iCol++) {
@@ -276,17 +275,16 @@ int sqlite3_blob_open(
         {OP_Halt,           0, 0, 0},  /* 7  */
       };
       Vdbe *v = (Vdbe *)pBlob->pStmt;
-      int iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
       VdbeOp *aOp;
 
-      sqlite3VdbeAddOp4Int(v, OP_Transaction, iDb, flags, 
+      sqlite3VdbeAddOp4Int(v, OP_Transaction, 0, flags, 
                            pTab->pSchema->schema_cookie,
                            pTab->pSchema->iGeneration);
       sqlite3VdbeChangeP5(v, 1);     
       aOp = sqlite3VdbeAddOpList(v, ArraySize(openBlob), openBlob, iLn);
 
       /* Make sure a mutex is held on the table to be accessed */
-      sqlite3VdbeUsesBtree(v, iDb); 
+      sqlite3VdbeUsesBtree(v); 
 
       if( db->mallocFailed==0 ){
         assert( aOp!=0 );
@@ -294,7 +292,7 @@ int sqlite3_blob_open(
 #ifdef SQLITE_OMIT_SHARED_CACHE
         aOp[0].opcode = OP_Noop;
 #else
-        aOp[0].p1 = iDb;
+        aOp[0].p1 = 0;
         aOp[0].p2 = pTab->tnum;
         aOp[0].p3 = flags;
         sqlite3VdbeChangeP4(v, 1, pTab->zName, P4_TRANSIENT);
@@ -306,7 +304,7 @@ int sqlite3_blob_open(
         ** parameter of the other to pTab->tnum.  */
         if( flags ) aOp[1].opcode = OP_OpenWrite;
         aOp[1].p2 = pTab->tnum;
-        aOp[1].p3 = iDb;   
+        aOp[1].p3 = 0;   
 
         /* Configure the number of columns. Configure the cursor to
         ** think that the table has one more column than it really

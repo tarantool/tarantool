@@ -104,11 +104,10 @@ static void sqliteAuthBadReturnCode(Parse *pParse){
 int sqlite3AuthReadCol(
   Parse *pParse,                  /* The parser context */
   const char *zTab,               /* Table name */
-  const char *zCol,               /* Column name */
-  int iDb                         /* Index of containing database. */
+  const char *zCol                /* Column name */
 ){
   sqlite3 *db = pParse->db;          /* Database handle */
-  char *zDb = db->aDb[iDb].zDbSName; /* Schema name of attached database */
+  char *zDb = db->mdb.zDbSName; /* Schema name of attached database */
   int rc;                            /* Auth callback return code */
 
   if( db->init.busy ) return SQLITE_OK;
@@ -118,11 +117,7 @@ int sqlite3AuthReadCol(
 #endif
                 );
   if( rc==SQLITE_DENY ){
-    if( db->nDb>2 || iDb!=0 ){
-      sqlite3ErrorMsg(pParse, "access to %s.%s.%s is prohibited",zDb,zTab,zCol);
-    }else{
-      sqlite3ErrorMsg(pParse, "access to %s.%s is prohibited", zTab, zCol);
-    }
+    sqlite3ErrorMsg(pParse, "access to %s.%s is prohibited", zTab, zCol);
     pParse->rc = SQLITE_AUTH;
   }else if( rc!=SQLITE_IGNORE && rc!=SQLITE_OK ){
     sqliteAuthBadReturnCode(pParse);
@@ -184,8 +179,8 @@ void sqlite3AuthRead(
   }else{
     zCol = "ROWID";
   }
-  assert( iDb>=0 && iDb<db->nDb );
-  if( SQLITE_IGNORE==sqlite3AuthReadCol(pParse, pTab->zName, zCol, iDb) ){
+  assert( iDb==0 );
+  if( SQLITE_IGNORE==sqlite3AuthReadCol(pParse, pTab->zName, zCol) ){
     pExpr->op = TK_NULL;
   }
 }

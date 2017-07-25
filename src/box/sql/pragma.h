@@ -37,17 +37,15 @@
 #define PragTyp_STATS                         29
 #define PragTyp_SYNCHRONOUS                   30
 #define PragTyp_TABLE_INFO                    31
-#define PragTyp_TEMP_STORE                    32
-#define PragTyp_TEMP_STORE_DIRECTORY          33
-#define PragTyp_THREADS                       34
-#define PragTyp_WAL_AUTOCHECKPOINT            35
-#define PragTyp_WAL_CHECKPOINT                36
-#define PragTyp_ACTIVATE_EXTENSIONS           37
-#define PragTyp_HEXKEY                        38
-#define PragTyp_KEY                           39
-#define PragTyp_REKEY                         40
-#define PragTyp_LOCK_STATUS                   41
-#define PragTyp_PARSER_TRACE                  42
+#define PragTyp_THREADS                       32
+#define PragTyp_WAL_AUTOCHECKPOINT            33
+#define PragTyp_WAL_CHECKPOINT                34
+#define PragTyp_ACTIVATE_EXTENSIONS           35
+#define PragTyp_HEXKEY                        36
+#define PragTyp_KEY                           37
+#define PragTyp_REKEY                         38
+#define PragTyp_LOCK_STATUS                   39
+#define PragTyp_PARSER_TRACE                  40
 
 /* Property flags associated with various pragma. */
 #define PragFlg_NeedSchema 0x01 /* Force schema load before running */
@@ -531,18 +529,6 @@ static const PragmaName aPragmaName[] = {
   /* ColNames:  */ 1, 6,
   /* iArg:      */ 0 },
 #endif
-#if !defined(SQLITE_OMIT_PAGER_PRAGMAS)
- {/* zName:     */ "temp_store",
-  /* ePragTyp:  */ PragTyp_TEMP_STORE,
-  /* ePragFlg:  */ PragFlg_Result0|PragFlg_NoColumns1,
-  /* ColNames:  */ 0, 0,
-  /* iArg:      */ 0 },
- {/* zName:     */ "temp_store_directory",
-  /* ePragTyp:  */ PragTyp_TEMP_STORE_DIRECTORY,
-  /* ePragFlg:  */ PragFlg_NoColumns1,
-  /* ColNames:  */ 0, 0,
-  /* iArg:      */ 0 },
-#endif
  {/* zName:     */ "threads",
   /* ePragTyp:  */ PragTyp_THREADS,
   /* ePragFlg:  */ PragFlg_Result0,
@@ -604,4 +590,4 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ SQLITE_WriteSchema|SQLITE_RecoveryMode },
 #endif
 };
-/* Number of pragmas: 60 on by default, 73 total. */
+/* Number of pragmas: 58 on by default, 71 total. */

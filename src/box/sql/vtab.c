@@ -185,7 +185,7 @@ static VTable *vtabDisconnectAll(sqlite3 *db, Table *p){
   ** this makes it safe to access the sqlite3.pDisconnect list of any
   ** database connection that may have an entry in the p->pVTable list.
   */
-  assert( db==0 || sqlite3SchemaMutexHeld(db, 0, p->pSchema) );
+  assert( db==0 || sqlite3SchemaMutexHeld(db, p->pSchema) );
 
   while( pVTable ){
     sqlite3 *db2 = pVTable->db;
@@ -330,14 +330,14 @@ void sqlite3VtabBeginParse(
   Table *pTable;        /* The new virtual table */
   sqlite3 *db;          /* Database connection */
 
-  sqlite3StartTable(pParse, pName1, pName2, 0, 0, 1, ifNotExists);
+  sqlite3StartTable(pParse, pName1, 0, 0, 1, ifNotExists);
   pTable = pParse->pNewTable;
   if( pTable==0 ) return;
   assert( 0==pTable->pIndex );
 
   db = pParse->db;
   iDb = sqlite3SchemaToIndex(db, pTable->pSchema);
-  assert( iDb>=0 );
+  assert( iDb==0 );
 
   pTable->tabFlags |= TF_Virtual;
   pTable->nModuleArg = 0;
@@ -359,7 +359,7 @@ void sqlite3VtabBeginParse(
   */
   if( pTable->azModuleArg ){
     sqlite3AuthCheck(pParse, SQLITE_CREATE_VTABLE, pTable->zName, 
-            pTable->azModuleArg[0], pParse->db->aDb[iDb].zDbSName);
+            pTable->azModuleArg[0], pParse->db->mdb.zDbSName);
   }
 #endif
 }
@@ -418,12 +418,12 @@ void sqlite3VtabFinishParse(Parse *pParse, Token *pEnd){
     ** entry in the sqlite_master table tht was created for this vtab
     ** by sqlite3StartTable().
     */
-    iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
+    assert( sqlite3SchemaToIndex(db, pTab->pSchema)==0 );
     sqlite3NestedParse(pParse,
-      "UPDATE %Q.%s "
+      "UPDATE %s "
          "SET type='table', name=%Q, tbl_name=%Q, rootpage=0, sql=%Q "
        "WHERE rowid=#%d",
-      db->aDb[iDb].zDbSName, MASTER_NAME,
+      MASTER_NAME,
       pTab->zName,
       pTab->zName,
       zStmt,
@@ -431,7 +431,7 @@ void sqlite3VtabFinishParse(Parse *pParse, Token *pEnd){
     );
     sqlite3DbFree(db, zStmt);
     v = sqlite3GetVdbe(pParse);
-    sqlite3ChangeCookie(pParse, iDb);
+    sqlite3ChangeCookie(pParse);
 
     sqlite3VdbeAddOp0(v, OP_Expire);
     zWhere = sqlite3MPrintf(db, "name='%q' AND type='table'", pTab->zName);
@@ -451,7 +451,7 @@ void sqlite3VtabFinishParse(Parse *pParse, Token *pEnd){
     Table *pOld;
     Schema *pSchema = pTab->pSchema;
     const char *zName = pTab->zName;
-    assert( sqlite3SchemaMutexHeld(db, 0, pSchema) );
+    assert( sqlite3SchemaMutexHeld(db, pSchema) );
     pOld = sqlite3HashInsert(&pSchema->tblHash, zName, pTab);
     if( pOld ){
       sqlite3OomFault(db);
@@ -532,8 +532,8 @@ static int vtabCallConstructor(
   pVTable->db = db;
   pVTable->pMod = pMod;
 
-  iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-  pTab->azModuleArg[1] = db->aDb[iDb].zDbSName;
+  assert( sqlite3SchemaToIndex(db, pTab->pSchema)==0 );
+  pTab->azModuleArg[1] = db->mdb.zDbSName;
 
   /* Invoke the virtual table constructor */
   assert( &db->pVtabCtx );
@@ -697,7 +697,9 @@ int sqlite3VtabCallCreate(sqlite3 *db, int iDb, const char *zTab, char **pzErr){
   Module *pMod;
   const char *zMod;
 
-  pTab = sqlite3FindTable(db, zTab, db->aDb[iDb].zDbSName);
+  assert( iDb==0 );
+
+  pTab = sqlite3FindTable(db, zTab);
   assert( pTab && (pTab->tabFlags & TF_Virtual)!=0 && !pTab->pVTable );
 
   /* Locate the required virtual table module */
@@ -821,7 +823,7 @@ int sqlite3VtabCallDestroy(sqlite3 *db, int iDb, const char *zTab){
   int rc = SQLITE_OK;
   Table *pTab;
 
-  pTab = sqlite3FindTable(db, zTab, db->aDb[iDb].zDbSName);
+  pTab = sqlite3FindTable(db, zTab);
   if( pTab!=0 && ALWAYS(pTab->pVTable!=0) ){
     VTable *p;
     int (*xDestroy)(sqlite3_vtab *);
@@ -1149,7 +1151,7 @@ int sqlite3VtabEponymousTableInit(Parse *pParse, Module *pMod){
   }
   pMod->pEpoTab = pTab;
   pTab->nTabRef = 1;
-  pTab->pSchema = db->aDb[0].pSchema;
+  pTab->pSchema = db->mdb.pSchema;
   pTab->tabFlags |= TF_Virtual;
   pTab->nModuleArg = 0;
   pTab->iPKey = -1;

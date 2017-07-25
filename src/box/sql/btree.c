@@ -2238,16 +2238,13 @@ int sqlite3BtreeOpen(
         assert( pBt->nRef>0 );
         if( 0==strcmp(zFullPathname, sqlite3PagerFilename(pBt->pPager, 0))
                  && sqlite3PagerVfs(pBt->pPager)==pVfs ){
-          int iDb;
-          for(iDb=db->nDb-1; iDb>=0; iDb--){
-            Btree *pExisting = db->aDb[iDb].pBt;
-            if( pExisting && pExisting->pBt==pBt ){
-              sqlite3_mutex_leave(mutexShared);
-              sqlite3_mutex_leave(mutexOpen);
-              sqlite3_free(zFullPathname);
-              sqlite3_free(p);
-              return SQLITE_CONSTRAINT;
-            }
+          Btree *pExisting = db->mdb.pBt;
+          if( pExisting && pExisting->pBt==pBt ){
+            sqlite3_mutex_leave(mutexShared);
+            sqlite3_mutex_leave(mutexOpen);
+            sqlite3_free(zFullPathname);
+            sqlite3_free(p);
+            return SQLITE_CONSTRAINT;
           }
           p->pBt = pBt;
           pBt->nRef++;
@@ -2370,27 +2367,23 @@ int sqlite3BtreeOpen(
   ** The list is kept in ascending order by pBt address.
   */
   if( p->sharable ){
-    int i;
     Btree *pSib;
-    for(i=0; i<db->nDb; i++){
-      if( (pSib = db->aDb[i].pBt)!=0 && pSib->sharable ){
-        while( pSib->pPrev ){ pSib = pSib->pPrev; }
-        if( (uptr)p->pBt<(uptr)pSib->pBt ){
-          p->pNext = pSib;
-          p->pPrev = 0;
-          pSib->pPrev = p;
-        }else{
-          while( pSib->pNext && (uptr)pSib->pNext->pBt<(uptr)p->pBt ){
-            pSib = pSib->pNext;
-          }
-          p->pNext = pSib->pNext;
-          p->pPrev = pSib;
-          if( p->pNext ){
-            p->pNext->pPrev = p;
-          }
-          pSib->pNext = p;
+    if( (pSib = db->mdb.pBt)!=0 && pSib->sharable ){
+      while( pSib->pPrev ){ pSib = pSib->pPrev; }
+      if( (uptr)p->pBt<(uptr)pSib->pBt ){
+        p->pNext = pSib;
+        p->pPrev = 0;
+        pSib->pPrev = p;
+      }else{
+        while( pSib->pNext && (uptr)pSib->pNext->pBt<(uptr)p->pBt ){
+          pSib = pSib->pNext;
         }
-        break;
+        p->pNext = pSib->pNext;
+        p->pPrev = pSib;
+        if( p->pNext ){
+          p->pNext->pPrev = p;
+        }
+        pSib->pNext = p;
       }
     }
   }
@@ -4127,7 +4120,7 @@ int sqlite3BtreeCursor(
   }else{
     sqlite3BtreeEnter(p);
     rc = btreeCursor(p, iTable, wrFlag, pKeyInfo, pCur);
-    if( iTable!=1 && (p->db->aDb[0].pBt==p || p->db->aDb[1].pBt==p) ) {
+    if( iTable!=1 && (p->db->mdb.pBt==p ) ) {
       /* Main database and temporary database "files" are backed by
       ** Tarantool, except for the sqlite_master table(s)
       ** (assuming it fits in 1 page).

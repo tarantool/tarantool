@@ -732,20 +732,15 @@ sqlite3_mutex *sqlite3_db_mutex(sqlite3 *db){
 ** connection.
 */
 int sqlite3_db_release_memory(sqlite3 *db){
-  int i;
-
 #ifdef SQLITE_ENABLE_API_ARMOR
   if( !sqlite3SafetyCheckOk(db) ) return SQLITE_MISUSE_BKPT;
 #endif
   sqlite3_mutex_enter(db->mutex);
   sqlite3BtreeEnterAll(db);
-  for(i=0; i<db->nDb; i++){
-    Btree *pBt = db->aDb[i].pBt;
-    if( pBt ){
-      Pager *pPager = sqlite3BtreePager(pBt);
-      sqlite3PagerShrink(pPager);
-    }
-  }
+  Btree *pBt = db->mdb.pBt;
+  assert( pBt );
+  Pager *pPager = sqlite3BtreePager(pBt);
+  sqlite3PagerShrink(pPager);
   sqlite3BtreeLeaveAll(db);
   sqlite3_mutex_leave(db->mutex);
   return SQLITE_OK;
@@ -756,7 +751,6 @@ int sqlite3_db_release_memory(sqlite3 *db){
 ** to disk.
 */
 int sqlite3_db_cacheflush(sqlite3 *db){
-  int i;
   int rc = SQLITE_OK;
   int bSeenBusy = 0;
 
@@ -765,15 +759,14 @@ int sqlite3_db_cacheflush(sqlite3 *db){
 #endif
   sqlite3_mutex_enter(db->mutex);
   sqlite3BtreeEnterAll(db);
-  for(i=0; rc==SQLITE_OK && i<db->nDb; i++){
-    Btree *pBt = db->aDb[i].pBt;
-    if( pBt && sqlite3BtreeIsInTrans(pBt) ){
-      Pager *pPager = sqlite3BtreePager(pBt);
-      rc = sqlite3PagerFlush(pPager);
-      if( rc==SQLITE_BUSY ){
-        bSeenBusy = 1;
-        rc = SQLITE_OK;
-      }
+  Btree *pBt = db->mdb.pBt;
+  assert( pBt );
+  if( sqlite3BtreeIsInTrans(pBt) ){
+    Pager *pPager = sqlite3BtreePager(pBt);
+    rc = sqlite3PagerFlush(pPager);
+    if( rc==SQLITE_BUSY ){
+      bSeenBusy = 1;
+      rc = SQLITE_OK;
     }
   }
   sqlite3BtreeLeaveAll(db);
@@ -790,7 +783,7 @@ int sqlite3_db_config(sqlite3 *db, int op, ...){
   va_start(ap, op);
   switch( op ){
     case SQLITE_DBCONFIG_MAINDBNAME: {
-      db->aDb[0].zDbSName = va_arg(ap,char*);
+      db->mdb.zDbSName = va_arg(ap,char*);
       rc = SQLITE_OK;
       break;
     }
@@ -986,17 +979,13 @@ static void functionDestroy(sqlite3 *db, FuncDef *p){
 */
 static void disconnectAllVtab(sqlite3 *db){
 #ifndef SQLITE_OMIT_VIRTUALTABLE
-  int i;
   HashElem *p;
   sqlite3BtreeEnterAll(db);
-  for(i=0; i<db->nDb; i++){
-    Schema *pSchema = db->aDb[i].pSchema;
-    if( db->aDb[i].pSchema ){
-      for(p=sqliteHashFirst(&pSchema->tblHash); p; p=sqliteHashNext(p)){
-        Table *pTab = (Table *)sqliteHashData(p);
-        if( IsVirtual(pTab) ) sqlite3VtabDisconnect(db, pTab);
-      }
-    }
+  Schema *pSchema = db->mdb.pSchema;
+  assert( pSchema );
+  for(p=sqliteHashFirst(&pSchema->tblHash); p; p=sqliteHashNext(p)){
+    Table *pTab = (Table *)sqliteHashData(p);
+    if( IsVirtual(pTab) ) sqlite3VtabDisconnect(db, pTab);
   }
   for(p=sqliteHashFirst(&db->aModule); p; p=sqliteHashNext(p)){
     Module *pMod = (Module *)sqliteHashData(p);
@@ -1016,13 +1005,11 @@ static void disconnectAllVtab(sqlite3 *db){
 ** statements or unfinished sqlite3_backup objects.  
 */
 static int connectionIsBusy(sqlite3 *db){
-  int j;
   assert( sqlite3_mutex_held(db->mutex) );
   if( db->pVdbe ) return 1;
-  for(j=0; j<db->nDb; j++){
-    Btree *pBt = db->aDb[j].pBt;
-    if( pBt && sqlite3BtreeIsInBackup(pBt) ) return 1;
-  }
+  Btree *pBt = db->mdb.pBt;
+  assert( pBt );
+  if( sqlite3BtreeIsInBackup(pBt) ) return 1;
   return 0;
 }
 
@@ -1075,7 +1062,7 @@ static int sqlite3Close(sqlite3 *db, int forceZombie){
   /* Convert the connection into a zombie and then close it.
   */
   db->magic = SQLITE_MAGIC_ZOMBIE;
-  sqlite3LeaveMutexAndCloseZombie(db);
+
   return SQLITE_OK;
 }
 
@@ -1091,131 +1078,6 @@ static int sqlite3Close(sqlite3 *db, int forceZombie){
 int sqlite3_close(sqlite3 *db){ return sqlite3Close(db,0); }
 int sqlite3_close_v2(sqlite3 *db){ return sqlite3Close(db,1); }
 
-
-/*
-** Close the mutex on database connection db.
-**
-** Furthermore, if database connection db is a zombie (meaning that there
-** has been a prior call to sqlite3_close(db) or sqlite3_close_v2(db)) and
-** every sqlite3_stmt has now been finalized and every sqlite3_backup has
-** finished, then free all resources.
-*/
-void sqlite3LeaveMutexAndCloseZombie(sqlite3 *db){
-  HashElem *i;                    /* Hash table iterator */
-  int j;
-
-  /* If there are outstanding sqlite3_stmt or sqlite3_backup objects
-  ** or if the connection has not yet been closed by sqlite3_close_v2(),
-  ** then just leave the mutex and return.
-  */
-  if( db->magic!=SQLITE_MAGIC_ZOMBIE || connectionIsBusy(db) ){
-    sqlite3_mutex_leave(db->mutex);
-    return;
-  }
-
-  /* If we reach this point, it means that the database connection has
-  ** closed all sqlite3_stmt and sqlite3_backup objects and has been
-  ** passed to sqlite3_close (meaning that it is a zombie).  Therefore,
-  ** go ahead and free all resources.
-  */
-
-  /* If a transaction is open, roll it back. This also ensures that if
-  ** any database schemas have been modified by an uncommitted transaction
-  ** they are reset. And that the required b-tree mutex is held to make
-  ** the pager rollback and schema reset an atomic operation. */
-  sqlite3RollbackAll(db, SQLITE_OK);
-
-  /* Free any outstanding Savepoint structures. */
-  sqlite3CloseSavepoints(db);
-
-  /* Close all database connections */
-  for(j=0; j<db->nDb; j++){
-    struct Db *pDb = &db->aDb[j];
-    if( pDb->pBt ){
-      sqlite3BtreeClose(pDb->pBt);
-      pDb->pBt = 0;
-      if( j!=1 ){
-        pDb->pSchema = 0;
-      }
-    }
-  }
-  /* Clear the TEMP schema separately and last */
-  if( db->aDb[1].pSchema ){
-    sqlite3SchemaClear(db->aDb[1].pSchema);
-  }
-  sqlite3VtabUnlockList(db);
-
-  /* Free up the array of auxiliary databases */
-  sqlite3CollapseDatabaseArray(db);
-  assert( db->nDb<=2 );
-  assert( db->aDb==db->aDbStatic );
-
-  /* Tell the code in notify.c that the connection no longer holds any
-  ** locks and does not require any further unlock-notify callbacks.
-  */
-  sqlite3ConnectionClosed(db);
-
-  for(i=sqliteHashFirst(&db->aFunc); i; i=sqliteHashNext(i)){
-    FuncDef *pNext, *p;
-    p = sqliteHashData(i);
-    do{
-      functionDestroy(db, p);
-      pNext = p->pNext;
-      sqlite3DbFree(db, p);
-      p = pNext;
-    }while( p );
-  }
-  sqlite3HashClear(&db->aFunc);
-  for(i=sqliteHashFirst(&db->aCollSeq); i; i=sqliteHashNext(i)){
-    CollSeq *pColl = (CollSeq *)sqliteHashData(i);
-    /* Invoke any destructors registered for collation sequence user data. */
-    for(j=0; j<3; j++){
-      if( pColl[j].xDel ){
-        pColl[j].xDel(pColl[j].pUser);
-      }
-    }
-    sqlite3DbFree(db, pColl);
-  }
-  sqlite3HashClear(&db->aCollSeq);
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-  for(i=sqliteHashFirst(&db->aModule); i; i=sqliteHashNext(i)){
-    Module *pMod = (Module *)sqliteHashData(i);
-    if( pMod->xDestroy ){
-      pMod->xDestroy(pMod->pAux);
-    }
-    sqlite3VtabEponymousTableClear(db, pMod);
-    sqlite3DbFree(db, pMod);
-  }
-  sqlite3HashClear(&db->aModule);
-#endif
-
-  sqlite3Error(db, SQLITE_OK); /* Deallocates any cached error strings. */
-  sqlite3ValueFree(db->pErr);
-  sqlite3CloseExtensions(db);
-#if SQLITE_USER_AUTHENTICATION
-  sqlite3_free(db->auth.zAuthUser);
-  sqlite3_free(db->auth.zAuthPW);
-#endif
-
-  db->magic = SQLITE_MAGIC_ERROR;
-
-  /* The temp-database schema is allocated differently from the other schema
-  ** objects (using sqliteMalloc() directly, instead of sqlite3BtreeSchema()).
-  ** So it needs to be freed here. Todo: Why not roll the temp schema into
-  ** the same sqliteMalloc() as the one that allocates the database 
-  ** structure?
-  */
-  sqlite3DbFree(db, db->aDb[1].pSchema);
-  sqlite3_mutex_leave(db->mutex);
-  db->magic = SQLITE_MAGIC_CLOSED;
-  sqlite3_mutex_free(db->mutex);
-  assert( db->lookaside.nOut==0 );  /* Fails on a lookaside memory leak */
-  if( db->lookaside.bMalloced ){
-    sqlite3_free(db->lookaside.pStart);
-  }
-  sqlite3_free(db);
-}
-
 /*
 ** Rollback all database files.  If tripCode is not SQLITE_OK, then
 ** any write cursors are invalidated ("tripped" - as in "tripping a circuit
@@ -1224,7 +1086,6 @@ void sqlite3LeaveMutexAndCloseZombie(sqlite3 *db){
 ** but are "saved" in case the table pages are moved around.
 */
 void sqlite3RollbackAll(sqlite3 *db, int tripCode){
-  int i;
   int inTrans = 0;
   int schemaChange;
   assert( sqlite3_mutex_held(db->mutex) );
@@ -1239,14 +1100,13 @@ void sqlite3RollbackAll(sqlite3 *db, int tripCode){
   sqlite3BtreeEnterAll(db);
   schemaChange = (db->flags & SQLITE_InternChanges)!=0 && db->init.busy==0;
 
-  for(i=0; i<db->nDb; i++){
-    Btree *p = db->aDb[i].pBt;
-    if( p ){
-      if( sqlite3BtreeIsInTrans(p) ){
-        inTrans = 1;
-      }
-      sqlite3BtreeRollback(p, tripCode, !schemaChange);
+  Btree *p = db->mdb.pBt;
+  assert( p );
+  if( p ){
+    if( sqlite3BtreeIsInTrans(p) ){
+      inTrans = 1;
     }
+    sqlite3BtreeRollback(p, tripCode, !schemaChange);
   }
   sqlite3VtabRollback(db);
   sqlite3EndBenignMalloc();
@@ -2645,9 +2505,7 @@ static int openDatabase(
   }
   sqlite3_mutex_enter(db->mutex);
   db->errMask = 0xff;
-  db->nDb = 2;
   db->magic = SQLITE_MAGIC_BUSY;
-  db->aDb = db->aDbStatic;
 
   assert( sizeof(db->aLimit)==sizeof(aHardLimit) );
   memcpy(db->aLimit, aHardLimit, sizeof(db->aLimit));
@@ -2699,8 +2557,6 @@ static int openDatabase(
   ** functions:
   */
   createCollation(db, sqlite3StrBINARY, SQLITE_UTF8, 0, binCollFunc, 0);
-  createCollation(db, sqlite3StrBINARY, SQLITE_UTF16BE, 0, binCollFunc, 0);
-  createCollation(db, sqlite3StrBINARY, SQLITE_UTF16LE, 0, binCollFunc, 0);
   createCollation(db, "NOCASE", SQLITE_UTF8, 0, nocaseCollatingFunc, 0);
   createCollation(db, "RTRIM", SQLITE_UTF8, (void*)1, binCollFunc, 0);
   if( db->mallocFailed ){
@@ -2723,7 +2579,7 @@ static int openDatabase(
   }
 
   /* Open the backend database driver */
-  rc = sqlite3BtreeOpen(db->pVfs, zOpen, db, &db->aDb[0].pBt, 0,
+  rc = sqlite3BtreeOpen(db->pVfs, zOpen, db, &db->mdb.pBt, 0,
                         flags | SQLITE_OPEN_MAIN_DB);
   if( rc!=SQLITE_OK ){
     if( rc==SQLITE_IOERR_NOMEM ){
@@ -2732,19 +2588,17 @@ static int openDatabase(
     sqlite3Error(db, rc);
     goto opendb_out;
   }
-  sqlite3BtreeEnter(db->aDb[0].pBt);
-  db->aDb[0].pSchema = sqlite3SchemaGet(db, db->aDb[0].pBt);
+  sqlite3BtreeEnter(db->mdb.pBt);
+  db->mdb.pSchema = sqlite3SchemaGet(db, db->mdb.pBt);
   if( !db->mallocFailed ) ENC(db) = SCHEMA_ENC(db);
-  sqlite3BtreeLeave(db->aDb[0].pBt);
-  db->aDb[1].pSchema = sqlite3SchemaGet(db, 0);
+  sqlite3BtreeLeave(db->mdb.pBt);
+  db->mdb.pSchema = sqlite3SchemaGet(db, 0);
 
   /* The default safety_level for the main database is FULL; for the temp
   ** database it is OFF. This matches the pager layer defaults.  
   */
-  db->aDb[0].zDbSName = "main";
-  db->aDb[0].safety_level = SQLITE_DEFAULT_SYNCHRONOUS+1;
-  db->aDb[1].zDbSName = "temp";
-  db->aDb[1].safety_level = PAGER_SYNCHRONOUS_OFF;
+  db->mdb.zDbSName = "main";
+  db->mdb.safety_level = SQLITE_DEFAULT_SYNCHRONOUS+1;
 
   db->magic = SQLITE_MAGIC_OPEN;
   if( db->mallocFailed ){
@@ -3129,7 +2983,7 @@ int sqlite3_table_column_metadata(
   }
 
   /* Locate the table in question */
-  pTab = sqlite3FindTable(db, zTableName, zDbName);
+  pTab = sqlite3FindTable(db, zTableName);
   if( !pTab || pTab->pSelect ){
     pTab = 0;
     goto error_out;
@@ -3468,7 +3322,7 @@ int sqlite3_test_control(int op, ...){
       sqlite3 *db = va_arg(ap, sqlite3*);
       int x = va_arg(ap,int);
       sqlite3_mutex_enter(db->mutex);
-      sqlite3BtreeSetPageSize(db->aDb[0].pBt, 0, x, 0);
+      sqlite3BtreeSetPageSize(db->mdb.pBt, 0, x, 0);
       sqlite3_mutex_leave(db->mutex);
       break;
     }
@@ -3674,7 +3528,7 @@ sqlite3_int64 sqlite3_uri_int64(
 */
 Btree *sqlite3DbNameToBtree(sqlite3 *db, const char *zDbName){
   int iDb = zDbName ? sqlite3FindDbName(db, zDbName) : 0;
-  return iDb<0 ? 0 : db->aDb[iDb].pBt;
+  return iDb<0 ? 0 : db->mdb.pBt;
 }
 
 /*

@@ -70,41 +70,6 @@ struct sqlite3_backup {
 **   associated mutexes.
 */
 
-/*
-** Return a pointer corresponding to database zDb (i.e. "main", "temp")
-** in connection handle pDb. If such a database cannot be found, return
-** a NULL pointer and write an error message to pErrorDb.
-**
-** If the "temp" database is requested, it may need to be opened by this 
-** function. If an error occurs while doing so, return 0 and write an 
-** error message to pErrorDb.
-*/
-static Btree *findBtree(sqlite3 *pErrorDb, sqlite3 *pDb, const char *zDb){
-  int i = sqlite3FindDbName(pDb, zDb);
-
-  if( i==1 ){
-    Parse sParse;
-    int rc = 0;
-    memset(&sParse, 0, sizeof(sParse));
-    sParse.db = pDb;
-    if( sqlite3OpenTempDatabase(&sParse) ){
-      sqlite3ErrorWithMsg(pErrorDb, sParse.rc, "%s", sParse.zErrMsg);
-      rc = SQLITE_ERROR;
-    }
-    sqlite3DbFree(pErrorDb, sParse.zErrMsg);
-    sqlite3ParserReset(&sParse);
-    if( rc ){
-      return 0;
-    }
-  }
-
-  if( i<0 ){
-    sqlite3ErrorWithMsg(pErrorDb, SQLITE_ERROR, "unknown database %s", zDb);
-    return 0;
-  }
-
-  return pDb->aDb[i].pBt;
-}
 
 /*
 ** Attempt to set the page size of the destination to match the page size
@@ -182,8 +147,8 @@ sqlite3_backup *sqlite3_backup_init(
 
   /* If the allocation succeeded, populate the new object. */
   if( p ){
-    p->pSrc = findBtree(pDestDb, pSrcDb, zSrcDb);
-    p->pDest = findBtree(pDestDb, pDestDb, zDestDb);
+    p->pSrc = pSrcDb->mdb.pBt;
+    p->pDest = pDestDb->mdb.pBt;
     p->pDestDb = pDestDb;
     p->pSrcDb = pSrcDb;
     p->iNext = 1;
@@ -634,7 +599,6 @@ int sqlite3_backup_finish(sqlite3_backup *p){
     sqlite3Error(p->pDestDb, rc);
 
     /* Exit the mutexes and free the backup context structure. */
-    sqlite3LeaveMutexAndCloseZombie(p->pDestDb);
   }
   sqlite3BtreeLeave(p->pSrc);
   if( p->pDestDb ){
@@ -643,7 +607,7 @@ int sqlite3_backup_finish(sqlite3_backup *p){
     ** sqlite3_backup_finish(). */
     sqlite3_free(p);
   }
-  sqlite3LeaveMutexAndCloseZombie(pSrcDb);
+
   return rc;
 }
 

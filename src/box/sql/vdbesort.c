@@ -847,7 +847,7 @@ int sqlite3VdbeSorterInit(
       pKeyInfo->nXField += (pKeyInfo->nField - nField);
       pKeyInfo->nField = nField;
     }
-    pSorter->pgsz = pgsz = sqlite3BtreeGetPageSize(db->aDb[0].pBt);
+    pSorter->pgsz = pgsz = sqlite3BtreeGetPageSize(db->mdb.pBt);
     pSorter->nTask = nWorker + 1;
     pSorter->iPrev = (u8)(nWorker - 1);
     pSorter->bUseThreads = (pSorter->nTask>1);
@@ -862,7 +862,7 @@ int sqlite3VdbeSorterInit(
       u32 szPma = sqlite3GlobalConfig.szPma;
       pSorter->mnPmaSize = szPma * pgsz;
 
-      mxCache = db->aDb[0].pSchema->cache_size;
+      mxCache = db->mdb.pSchema->cache_size;
       if( mxCache<0 ){
         /* A negative cache-size value C indicates that the cache is abs(C)
         ** KiB in size.  */

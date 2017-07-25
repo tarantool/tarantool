@@ -108,7 +108,6 @@ int sqlite3_finalize(sqlite3_stmt *pStmt){
     checkProfileCallback(db, v);
     rc = sqlite3VdbeFinalize(v);
     rc = sqlite3ApiExit(db, rc);
-    sqlite3LeaveMutexAndCloseZombie(db);
   }
   return rc;
 }

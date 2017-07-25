@@ -291,7 +291,7 @@ test:do_execsql_test("insert-4.7", [[
 --
 -- if X(0, "X!capable", [["tempdb"]]) then
   test:do_execsql_test("insert-5.1", [[
-    CREATE TEMP TABLE t4(x PRIMARY KEY);
+    CREATE TABLE t4(x PRIMARY KEY);
     INSERT INTO t4 VALUES(1);
     SELECT * FROM t4;
   ]], {

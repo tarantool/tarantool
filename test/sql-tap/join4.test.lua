@@ -25,13 +25,13 @@ test:do_test(
     "join4-1.1",
     function()
         test:execsql [[
-            create temp table t1(a integer primary key, b varchar(10));
+            create table t1(a integer primary key, b varchar(10));
             insert into t1 values(1,'one');
             insert into t1 values(2,'two');
             insert into t1 values(3,'three');
             insert into t1 values(4,'four');
 
-            create temp table t2(x integer primary key, y varchar(10), z varchar(10));
+            create table t2(x integer primary key, y varchar(10), z varchar(10));
             insert into t2 values(2,'niban','ok');
             insert into t2 values(4,'yonban','err');
         ]]

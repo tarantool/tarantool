@@ -96,13 +96,13 @@ void sqlite3MaterializeView(
   Select *pSel;
   SrcList *pFrom;
   sqlite3 *db = pParse->db;
-  int iDb = sqlite3SchemaToIndex(db, pView->pSchema);
+  assert( sqlite3SchemaToIndex(db, pView->pSchema)==0 );
   pWhere = sqlite3ExprDup(db, pWhere, 0);
   pFrom = sqlite3SrcListAppend(db, 0, 0, 0);
   if( pFrom ){
     assert( pFrom->nSrc==1 );
     pFrom->a[0].zName = sqlite3DbStrDup(db, pView->zName);
-    pFrom->a[0].zDatabase = sqlite3DbStrDup(db, db->aDb[iDb].zDbSName);
+    pFrom->a[0].zDatabase = sqlite3DbStrDup(db, db->mdb.zDbSName);
     assert( pFrom->a[0].pOn==0 );
     assert( pFrom->a[0].pUsing==0 );
   }
@@ -287,9 +287,9 @@ void sqlite3DeleteFrom(
     goto delete_from_cleanup;
   }
   iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-  assert( iDb<db->nDb );
+  assert( iDb==0 );
   rcauth = sqlite3AuthCheck(pParse, SQLITE_DELETE, pTab->zName, 0, 
-                            db->aDb[iDb].zDbSName);
+                            db->mdb.zDbSName);
   assert( rcauth==SQLITE_OK || rcauth==SQLITE_DENY || rcauth==SQLITE_IGNORE );
   if( rcauth==SQLITE_DENY ){
     goto delete_from_cleanup;
@@ -317,7 +317,7 @@ void sqlite3DeleteFrom(
     goto delete_from_cleanup;
   }
   if( pParse->nested==0 ) sqlite3VdbeCountChanges(v);
-  sqlite3BeginWriteOperation(pParse, 1, iDb);
+  sqlite3BeginWriteOperation(pParse, 1);
 
   /* If we are trying to delete from a view, realize that view into
   ** an ephemeral table.
@@ -360,7 +360,7 @@ void sqlite3DeleteFrom(
 #endif
   ){
     assert( !isView );
-    sqlite3TableLock(pParse, iDb, pTab->tnum, 1, pTab->zName);
+    sqlite3TableLock(pParse, pTab->tnum, 1, pTab->zName);
     if( HasRowid(pTab) ){
       sqlite3VdbeAddOp4(v, OP_Clear, pTab->tnum, iDb, memCnt,
                         pTab->zName, P4_STATIC);

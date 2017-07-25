@@ -83,7 +83,7 @@ test:do_catchsql_test(
         CREATE INDEX index1 ON test1(f1)
     ]], {
         -- <index-2.1>
-        1, "no such table: main.test1"
+        1, "no such table: test1"
         -- </index-2.1>
     })
 
@@ -1228,7 +1228,7 @@ test:do_catchsql_test(
         CREATE INDEX temp.i21 ON t6(c);
     ]], {
         -- <index-21.1>
-        1, [[cannot create a TEMP index on non-TEMP table "t6"]]
+        1, "near \".\": syntax error"
         -- </index-21.1>
     })
 
@@ -1238,7 +1238,7 @@ if (0 > 0)
     test:do_catchsql_test(
         "index-21.2",
         [[
-            CREATE TEMP TABLE t6(x primary key);
+            CREATE TABLE t6(x primary key);
             INSERT INTO temp.t6 values(1),(5),(9);
             CREATE INDEX temp.i21 ON t6(x);
             SELECT x FROM t6 ORDER BY x DESC;

@@ -410,7 +410,7 @@ static int statDecodePage(Btree *pBt, StatPage *p){
 */
 static void statSizeAndOffset(StatCursor *pCsr){
   StatTable *pTab = (StatTable *)((sqlite3_vtab_cursor *)pCsr)->pVtab;
-  Btree *pBt = pTab->db->aDb[pTab->iDb].pBt;
+  Btree *pBt = pTab->db->mdb.pBt;
   Pager *pPager = sqlite3BtreePager(pBt);
   sqlite3_file *fd;
   sqlite3_int64 x[2];
@@ -439,7 +439,8 @@ static int statNext(sqlite3_vtab_cursor *pCursor){
   char *z;
   StatCursor *pCsr = (StatCursor *)pCursor;
   StatTable *pTab = (StatTable *)pCursor->pVtab;
-  Btree *pBt = pTab->db->aDb[pCsr->iDb].pBt;
+  assert( pCsr->iDb==0 );
+  Btree *pBt = pTab->db->mdb.pBt;
   Pager *pPager = sqlite3BtreePager(pBt);
 
   sqlite3_free(pCsr->zPath);
@@ -597,12 +598,13 @@ static int statFilter(
   sqlite3_finalize(pCsr->pStmt);
   pCsr->pStmt = 0;
   zMaster = pCsr->iDb==1 ? "sqlite_temp_master" : "sqlite_master";
+  assert( pCsr->iDb==0 );
   zSql = sqlite3_mprintf(
       "SELECT 'sqlite_master' AS name, 1 AS rootpage, 'table' AS type"
       "  UNION ALL  "
       "SELECT name, rootpage, type"
       "  FROM \"%w\".%s WHERE rootpage!=0"
-      "  ORDER BY name", pTab->db->aDb[pCsr->iDb].zDbSName, zMaster);
+      "  ORDER BY name", pTab->db->mdb.zDbSName, zMaster);
   if( zSql==0 ){
     return SQLITE_NOMEM_BKPT;
   }else{
@@ -655,8 +657,8 @@ static int statColumn(
       break;
     default: {          /* schema */
       sqlite3 *db = sqlite3_context_db_handle(ctx);
-      int iDb = pCsr->iDb;
-      sqlite3_result_text(ctx, db->aDb[iDb].zDbSName, -1, SQLITE_STATIC);
+      assert( pCsr->iDb== 0);
+      sqlite3_result_text(ctx, db->mdb.zDbSName, -1, SQLITE_STATIC);
       break;
     }
   }

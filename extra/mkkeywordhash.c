@@ -254,8 +254,6 @@ static Keyword aKeywordTable[] = {
   { "SELECT",           "TK_SELECT",       ALWAYS                 },
   { "SET",              "TK_SET",          ALWAYS                 },
   { "TABLE",            "TK_TABLE",        ALWAYS                 },
-  { "TEMP",             "TK_TEMP",         ALWAYS                 },
-  { "TEMPORARY",        "TK_TEMP",         ALWAYS                 },
   { "THEN",             "TK_THEN",         ALWAYS                 },
   { "TO",               "TK_TO",           ALWAYS                 },
   { "TRANSACTION",      "TK_TRANSACTION",  ALWAYS                 },

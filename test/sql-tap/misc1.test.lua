@@ -943,8 +943,8 @@ if (0 > 0) then
         [[
             BEGIN;
             CREATE TABLE RealTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
-            CREATE TEMP TABLE TempTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
-            CREATE TEMP TRIGGER trigTest_1 AFTER UPDATE ON TempTable BEGIN
+            CREATE TABLE TempTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
+            CREATE TRIGGER trigTest_1 AFTER UPDATE ON TempTable BEGIN
               INSERT INTO RealTable(TestString) 
                  SELECT new.TestString FROM TempTable LIMIT 1;
             END;
@@ -958,9 +958,6 @@ if (0 > 0) then
             2, 3
             -- </misc1-17.1>
         })
-
-
-
 end
 
 -- Do not need sqlite3_sleep

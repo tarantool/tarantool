@@ -198,14 +198,6 @@ set pragma_def {
   FLAG: NeedSchema NoColumns
   IF:   !defined(SQLITE_OMIT_AUTOVACUUM)
 
-  NAME: temp_store
-  FLAG: Result0 NoColumns1
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: temp_store_directory
-  FLAG: NoColumns1
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
   NAME: data_store_directory
   FLAG: NoColumns1
   IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS) && SQLITE_OS_WIN

@@ -4436,7 +4436,7 @@ static int selectExpander(Walker *pWalker, Select *p){
               continue;
             }
             iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-            zSchemaName = iDb>=0 ? db->aDb[iDb].zDbSName : "*";
+            zSchemaName = iDb == 0 ? db->mdb.zDbSName : 0;
           }
           for(j=0; j<pTab->nCol; j++){
             char *zName = pTab->aCol[j].zName;
@@ -5563,8 +5563,8 @@ int sqlite3Select(
         Index *pBest = 0;                    /* Best index found so far */
         int iRoot = pTab->tnum;              /* Root page of scanned b-tree */
 
-        sqlite3CodeVerifySchema(pParse, iDb);
-        sqlite3TableLock(pParse, iDb, pTab->tnum, 0, pTab->zName);
+        sqlite3CodeVerifySchema(pParse);
+        sqlite3TableLock(pParse, pTab->tnum, 0, pTab->zName);
 
         /* Search for the index that has the lowest scan cost.
         **

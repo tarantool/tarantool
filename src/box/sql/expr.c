@@ -2199,8 +2199,8 @@ int sqlite3FindInIndex(
 
     /* Code an OP_Transaction and OP_TableLock for <table>. */
     iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-    sqlite3CodeVerifySchema(pParse, iDb);
-    sqlite3TableLock(pParse, iDb, pTab->tnum, 0, pTab->zName);
+    sqlite3CodeVerifySchema(pParse);
+    sqlite3TableLock(pParse, pTab->tnum, 0, pTab->zName);
 
     assert(v);  /* sqlite3GetVdbe() has always been previously called */
     if( nExpr==1 && pEList->a[0].pExpr->iColumn<0 ){
@@ -2208,7 +2208,7 @@ int sqlite3FindInIndex(
       int iAddr = sqlite3VdbeAddOp0(v, OP_Once);
       VdbeCoverage(v);
 
-      sqlite3OpenTable(pParse, iTab, iDb, pTab, OP_OpenRead);
+      sqlite3OpenTable(pParse, iTab, pTab, OP_OpenRead);
       eType = IN_INDEX_ROWID;
 
       sqlite3VdbeJumpHere(v, iAddr);

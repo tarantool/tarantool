@@ -184,22 +184,16 @@ int sqlite3BtreeHoldsMutex(Btree *p){
 ** at the same instant.
 */
 void sqlite3BtreeEnterAll(sqlite3 *db){
-  int i;
   Btree *p;
   assert( sqlite3_mutex_held(db->mutex) );
-  for(i=0; i<db->nDb; i++){
-    p = db->aDb[i].pBt;
-    if( p ) sqlite3BtreeEnter(p);
-  }
+  p = db->mdb.pBt;
+  if( p ) sqlite3BtreeEnter(p);
 }
 void sqlite3BtreeLeaveAll(sqlite3 *db){
-  int i;
   Btree *p;
   assert( sqlite3_mutex_held(db->mutex) );
-  for(i=0; i<db->nDb; i++){
-    p = db->aDb[i].pBt;
-    if( p ) sqlite3BtreeLeave(p);
-  }
+  p = db->mdb.pBt;
+  if( p ) sqlite3BtreeLeave(p);
 }
 
 #ifndef NDEBUG
@@ -214,13 +208,11 @@ int sqlite3BtreeHoldsAllMutexes(sqlite3 *db){
   if( !sqlite3_mutex_held(db->mutex) ){
     return 0;
   }
-  for(i=0; i<db->nDb; i++){
-    Btree *p;
-    p = db->aDb[i].pBt;
-    if( p && p->sharable &&
-         (p->wantToLock==0 || !sqlite3_mutex_held(p->pBt->mutex)) ){
-      return 0;
-    }
+  Btree *p;
+  p = db->mdb.pBt;
+  if( p && p->sharable &&
+      (p->wantToLock==0 || !sqlite3_mutex_held(p->pBt->mutex)) ){
+    return 0;
   }
   return 1;
 }
@@ -229,23 +221,16 @@ int sqlite3BtreeHoldsAllMutexes(sqlite3 *db){
 #ifndef NDEBUG
 /*
 ** Return true if the correct mutexes are held for accessing the
-** db->aDb[iDb].pSchema structure.  The mutexes required for schema
-** access are:
-**
-**   (1) The mutex on db
-**   (2) if iDb!=1, then the mutex on db->aDb[iDb].pBt.
-**
-** If pSchema is not NULL, then iDb is computed from pSchema and
-** db using sqlite3SchemaToIndex().
+** db->mdb.pSchema structure. For schema mutex on db is required.
 */
-int sqlite3SchemaMutexHeld(sqlite3 *db, int iDb, Schema *pSchema){
+int sqlite3SchemaMutexHeld(sqlite3 *db, Schema *pSchema){
   Btree *p;
   assert( db!=0 );
-  if( pSchema ) iDb = sqlite3SchemaToIndex(db, pSchema);
-  assert( iDb>=0 && iDb<db->nDb );
+  if( pSchema ) {
+    assert( sqlite3SchemaToIndex(db, pSchema)==0 );
+  }
   if( !sqlite3_mutex_held(db->mutex) ) return 0;
-  if( iDb==1 ) return 1;
-  p = db->aDb[iDb].pBt;
+  p = db->mdb.pBt;
   assert( p!=0 );
   return p->sharable==0 || p->locked==1;
 }

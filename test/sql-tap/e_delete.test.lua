@@ -90,7 +90,7 @@ test:do_delete_tests("e_delete-1.1", {
 --
 test:do_delete_tests("e_delete-1.2", {
     {1, "DELETE FROM t3 WHERE 1       ; SELECT x FROM t3", {}},
-    {2, "DELETE FROM main.t4 WHERE 0  ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
+    {2, "DELETE FROM t4 WHERE 0  ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
     {3, "DELETE FROM t4 WHERE 0.0     ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
     {4, "DELETE FROM t4 WHERE NULL    ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
     {5, "DELETE FROM t4 WHERE y!='two'; SELECT x FROM t4", {2}},
@@ -160,7 +160,7 @@ if (0 > 0) then
     --
     test:do_delete_tests("e_delete-2.2.1", "-error", " no such table: %s ", {
      {1, [[
-         CREATE TRIGGER main.tr1 AFTER INSERT ON main.t7 BEGIN
+         CREATE TRIGGER tr1 AFTER INSERT ON t7 BEGIN
            DELETE FROM t9;
          END;
          INSERT INTO main.t7 VALUES(1, 2);]], {"main.t9"}},

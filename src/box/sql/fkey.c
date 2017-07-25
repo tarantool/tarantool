@@ -372,7 +372,7 @@ static void fkLookupParent(
         sqlite3VdbeChangeP5(v, SQLITE_NOTNULL);
       }
   
-      sqlite3OpenTable(pParse, iCur, iDb, pTab, OP_OpenRead);
+      sqlite3OpenTable(pParse, iCur, pTab, OP_OpenRead);
       sqlite3VdbeAddOp3(v, OP_NotExists, iCur, 0, regTemp); VdbeCoverage(v);
       sqlite3VdbeGoto(v, iOk);
       sqlite3VdbeJumpHere(v, sqlite3VdbeCurrentAddr(v)-2);
@@ -871,7 +871,8 @@ void sqlite3FkCheck(
   if( (db->flags&SQLITE_ForeignKeys)==0 ) return;
 
   iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-  zDb = db->aDb[iDb].zDbSName;
+  assert( iDb==0 );
+  zDb = db->mdb.zDbSName;
 
   /* Loop through all the foreign key constraints for which pTab is the
   ** child table (the table that the foreign key definition is part of).  */
@@ -896,9 +897,9 @@ void sqlite3FkCheck(
     ** schema items cannot be located, set an error in pParse and return 
     ** early.  */
     if( pParse->disableTriggers ){
-      pTo = sqlite3FindTable(db, pFKey->zTo, zDb);
+      pTo = sqlite3FindTable(db, pFKey->zTo);
     }else{
-      pTo = sqlite3LocateTable(pParse, 0, pFKey->zTo, zDb);
+      pTo = sqlite3LocateTable(pParse, 0, pFKey->zTo);
     }
     if( !pTo || sqlite3FkLocateIndex(pParse, pTo, pFKey, &pIdx, &aiFree) ){
       assert( isIgnoreErrors==0 || (regOld!=0 && regNew==0) );
@@ -941,7 +942,7 @@ void sqlite3FkCheck(
       if( db->xAuth ){
         int rcauth;
         char *zCol = pTo->aCol[pIdx ? pIdx->aiColumn[i] : pTo->iPKey].zName;
-        rcauth = sqlite3AuthReadCol(pParse, pTo->zName, zCol, iDb);
+        rcauth = sqlite3AuthReadCol(pParse, pTo->zName, zCol);
         bIgnore = (rcauth==SQLITE_IGNORE);
       }
 #endif
@@ -950,7 +951,7 @@ void sqlite3FkCheck(
     /* Take a shared-cache advisory read-lock on the parent table. Allocate 
     ** a cursor to use to search the unique index on the parent key columns 
     ** in the parent table.  */
-    sqlite3TableLock(pParse, iDb, pTo->tnum, 0, pTo->zName);
+    sqlite3TableLock(pParse, pTo->tnum, 0, pTo->zName);
     pParse->nTab++;
 
     if( regOld!=0 ){
@@ -1369,7 +1370,7 @@ void sqlite3FkDelete(sqlite3 *db, Table *pTab){
   FKey *pNext;                    /* Copy of pFKey->pNextFrom */
 
   assert( db==0 || IsVirtual(pTab)
-         || sqlite3SchemaMutexHeld(db, 0, pTab->pSchema) );
+         || sqlite3SchemaMutexHeld(db, pTab->pSchema) );
   for(pFKey=pTab->pFKey; pFKey; pFKey=pNext){
 
     /* Remove the FK from the fkeyHash hash table. */

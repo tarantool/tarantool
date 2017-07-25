@@ -6151,7 +6151,6 @@ typedef struct sqlite3_blob sqlite3_blob;
 */
 SQLITE_API int sqlite3_blob_open(
   sqlite3*,
-  const char *zDb,
   const char *zTable,
   const char *zColumn,
   sqlite3_int64 iRow,

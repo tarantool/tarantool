@@ -26,7 +26,6 @@
 void
 sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 		 int iCur,	/* The cursor number of the table */
-		 int iDb,	/* The database index in sqlite3.aDb[] */
 		 Table * pTab,	/* The table to be opened */
 		 int opcode	/* OP_OpenRead or OP_OpenWrite */
     )
@@ -35,17 +34,17 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	assert(!IsVirtual(pTab));
 	v = sqlite3GetVdbe(pParse);
 	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
-	sqlite3TableLock(pParse, iDb, pTab->tnum,
+	sqlite3TableLock(pParse, pTab->tnum,
 			 (opcode == OP_OpenWrite) ? 1 : 0, pTab->zName);
 	if (HasRowid(pTab)) {
-		sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, iDb,
+		sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, 0,
 				     pTab->nCol);
 		VdbeComment((v, "%s", pTab->zName));
 	} else {
 		Index *pPk = sqlite3PrimaryKeyIndex(pTab);
 		assert(pPk != 0);
 		assert(pPk->tnum == pTab->tnum);
-		sqlite3VdbeAddOp3(v, opcode, iCur, pPk->tnum, iDb);
+		sqlite3VdbeAddOp3(v, opcode, iCur, pPk->tnum, 0);
 		sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 		VdbeComment((v, "%s", pTab->zName));
 	}
@@ -168,17 +167,18 @@ sqlite3TableAffinity(Vdbe * v, Table * pTab, int iReg)
 }
 
 /*
-** Return non-zero if the table pTab in database iDb or any of its indices
+** Return non-zero if the table pTab in database or any of its indices
 ** have been opened at any point in the VDBE program. This is used to see if
-** a statement of the form  "INSERT INTO <iDb, pTab> SELECT ..." can
-** run without using a temporary table for the results of the SELECT.
+** a statement of the form  "INSERT INTO <pTab> SELECT ..." can
+** run for the results of the SELECT.
 */
 static int
-readsTable(Parse * p, int iDb, Table * pTab)
+readsTable(Parse * p, Table * pTab)
 {
 	Vdbe *v = sqlite3GetVdbe(p);
 	int i;
 	int iEnd = sqlite3VdbeCurrentAddr(v);
+
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 	VTable *pVTab = IsVirtual(pTab) ? sqlite3GetVTable(p->db, pTab) : 0;
 #endif
@@ -186,7 +186,7 @@ readsTable(Parse * p, int iDb, Table * pTab)
 	for (i = 1; i < iEnd; i++) {
 		VdbeOp *pOp = sqlite3VdbeGetOp(v, i);
 		assert(pOp != 0);
-		if (pOp->opcode == OP_OpenRead && pOp->p3 == iDb) {
+		if (pOp->opcode == OP_OpenRead && pOp->p3 == 0) {
 			Index *pIndex;
 			int tnum = pOp->p2;
 			if (tnum == pTab->tnum) {
@@ -213,7 +213,7 @@ readsTable(Parse * p, int iDb, Table * pTab)
 #ifndef SQLITE_OMIT_AUTOINCREMENT
 /*
 ** Locate or create an AutoincInfo structure associated with table pTab
-** which is in database iDb.  Return the register number for the register
+** which is in database.  Return the register number for the register
 ** that holds the maximum rowid.  Return zero if pTab is not an AUTOINCREMENT
 ** table.  (Also return zero when doing a VACUUM since we do not want to
 ** update the AUTOINCREMENT counters during a VACUUM.)
@@ -235,7 +235,6 @@ readsTable(Parse * p, int iDb, Table * pTab)
 */
 static int
 autoIncBegin(Parse * pParse,	/* Parsing context */
-	     int iDb,		/* Index of the database holding pTab */
 	     Table * pTab	/* The table we are writing to */
     )
 {
@@ -257,7 +256,6 @@ autoIncBegin(Parse * pParse,	/* Parsing context */
 			pInfo->pNext = pToplevel->pAinc;
 			pToplevel->pAinc = pInfo;
 			pInfo->pTab = pTab;
-			pInfo->iDb = iDb;
 			pToplevel->nMem++;	/* Register to hold name of table */
 			pInfo->regCtr = ++pToplevel->nMem;	/* Max rowid register */
 			pToplevel->nMem++;	/* Rowid in sqlite_sequence */
@@ -301,10 +299,10 @@ sqlite3AutoincrementBegin(Parse * pParse)
 			/* 9  */ {OP_Close, 0, 0, 0}
 		};
 		VdbeOp *aOp;
-		pDb = &db->aDb[p->iDb];
+		pDb = &db->mdb;
 		memId = p->regCtr;
-		assert(sqlite3SchemaMutexHeld(db, 0, pDb->pSchema));
-		sqlite3OpenTable(pParse, 0, p->iDb, pDb->pSchema->pSeqTab,
+		assert(sqlite3SchemaMutexHeld(db, pDb->pSchema));
+		sqlite3OpenTable(pParse, 0, pDb->pSchema->pSeqTab,
 				 OP_OpenRead);
 		sqlite3VdbeLoadString(v, memId - 1, p->pTab->zName);
 		aOp = sqlite3VdbeAddOpList(v, ArraySize(autoInc), autoInc, iLn);
@@ -363,13 +361,13 @@ autoIncrementEnd(Parse * pParse)
 			/* 4 */ {OP_Close, 0, 0, 0}
 		};
 		VdbeOp *aOp;
-		Db *pDb = &db->aDb[p->iDb];
+		Db *pDb = &db->mdb;
 		int iRec;
 		int memId = p->regCtr;
 
 		iRec = sqlite3GetTempReg(pParse);
-		assert(sqlite3SchemaMutexHeld(db, 0, pDb->pSchema));
-		sqlite3OpenTable(pParse, 0, p->iDb, pDb->pSchema->pSeqTab,
+		assert(sqlite3SchemaMutexHeld(db, pDb->pSchema));
+		sqlite3OpenTable(pParse, 0, pDb->pSchema->pSeqTab,
 				 OP_OpenWrite);
 		aOp =
 		    sqlite3VdbeAddOpList(v, ArraySize(autoIncEnd), autoIncEnd,
@@ -406,8 +404,7 @@ sqlite3AutoincrementEnd(Parse * pParse)
 static int xferOptimization(Parse * pParse,	/* Parser context */
 			    Table * pDest,	/* The table we are inserting into */
 			    Select * pSelect,	/* A SELECT statement to use as the data source */
-			    int onError,	/* How to handle constraint errors */
-			    int iDbDest	/* The database of pDest */
+			    int onError	        /* How to handle constraint errors */
     );
 
 /*
@@ -531,7 +528,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	int addrInsTop = 0;	/* Jump to label "D" */
 	int addrCont = 0;	/* Top of insert loop. Label "C" in templates 3 and 4 */
 	SelectDest dest;	/* Destination for SELECT on rhs of INSERT */
-	int iDb;		/* Index of database holding TABLE */
 	u8 useTempTable = 0;	/* Store SELECT results in intermediate table */
 	u8 appendFlag = 0;	/* True if the insert is likely to be an append */
 	u8 withoutRowid;	/* 0 for normal table.  1 for WITHOUT ROWID table */
@@ -581,10 +577,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (pTab == 0) {
 		goto insert_cleanup;
 	}
-	iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-	assert(iDb < db->nDb);
 	if (sqlite3AuthCheck(pParse, SQLITE_INSERT, pTab->zName, 0,
-			     db->aDb[iDb].zDbSName)) {
+			     db->mdb.zDbSName)) {
 		goto insert_cleanup;
 	}
 	withoutRowid = !HasRowid(pTab);
@@ -626,7 +620,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		goto insert_cleanup;
 	if (pParse->nested == 0)
 		sqlite3VdbeCountChanges(v);
-	sqlite3BeginWriteOperation(pParse, pSelect || pTrigger, iDb);
+	sqlite3BeginWriteOperation(pParse, pSelect || pTrigger);
 
 #ifndef SQLITE_OMIT_XFER_OPT
 	/* If the statement is of the form
@@ -639,7 +633,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 ** This is the 2nd template.
 	 */
 	if (pColumn == 0
-	    && xferOptimization(pParse, pTab, pSelect, onError, iDb)) {
+	    && xferOptimization(pParse, pTab, pSelect, onError)) {
 		assert(!pTrigger);
 		assert(pList == 0);
 		goto insert_end;
@@ -649,7 +643,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* If this is an AUTOINCREMENT table, look up the sequence number in the
 	 ** sqlite_sequence table and store it in memory cell regAutoinc.
 	 */
-	regAutoinc = autoIncBegin(pParse, iDb, pTab);
+	regAutoinc = autoIncBegin(pParse, pTab);
 
 	/* Allocate registers for holding the rowid of the new row,
 	 ** the content of the new row, and the assembled row record.
@@ -746,7 +740,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 ** of the tables being read by the SELECT statement.  Also use a
 		 ** temp table in the case of row triggers.
 		 */
-		if (pTrigger || readsTable(pParse, iDb, pTab)) {
+		if (pTrigger || readsTable(pParse, pTab)) {
 			useTempTable = 1;
 		}
 
@@ -1076,9 +1070,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			}
 		}
 
-		/* Generate code to check constraints and generate index keys and
-		 ** do the insertion.
-		 */
+    /* Generate code to check constraints and generate index keys and
+    ** do the insertion.
+    */
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 		if (IsVirtual(pTab)) {
 			const char *pVTab =
@@ -1977,9 +1971,9 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 	if (piDataCur)
 		*piDataCur = iDataCur;
 	if (HasRowid(pTab) && (aToOpen == 0 || aToOpen[0])) {
-		sqlite3OpenTable(pParse, iDataCur, iDb, pTab, op);
+		sqlite3OpenTable(pParse, iDataCur, pTab, op);
 	} else {
-		sqlite3TableLock(pParse, iDb, pTab->tnum, op == OP_OpenWrite,
+		sqlite3TableLock(pParse, pTab->tnum, op == OP_OpenWrite,
 				 pTab->zName);
 	}
 	if (piIdxCur)
@@ -2092,27 +2086,26 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 */
 static int
 xferOptimization(Parse * pParse,	/* Parser context */
-		 Table * pDest,	/* The table we are inserting into */
+		 Table * pDest,         /* The table we are inserting into */
 		 Select * pSelect,	/* A SELECT statement to use as the data source */
-		 int onError,	/* How to handle constraint errors */
-		 int iDbDest	/* The database of pDest */
+		 int onError            /* How to handle constraint errors */
     )
 {
 	sqlite3 *db = pParse->db;
-	ExprList *pEList;	/* The result set of the SELECT */
-	Table *pSrc;		/* The table in the FROM clause of SELECT */
+	ExprList *pEList;	        /* The result set of the SELECT */
+	Table *pSrc;		        /* The table in the FROM clause of SELECT */
 	Index *pSrcIdx, *pDestIdx;	/* Source and destination indices */
 	struct SrcList_item *pItem;	/* An element of pSelect->pSrc */
-	int i;			/* Loop counter */
-	int iDbSrc;		/* The database of pSrc */
-	int iSrc, iDest;	/* Cursors from source and destination */
-	int addr1, addr2;	/* Loop addresses */
-	int emptyDestTest = 0;	/* Address of test for empty pDest */
-	int emptySrcTest = 0;	/* Address of test for empty pSrc */
-	Vdbe *v;		/* The VDBE we are building */
-	int regAutoinc;		/* Memory register used by AUTOINC */
+	int i;			        /* Loop counter */
+	int iDbSrc;		        /* The database of pSrc */
+	int iSrc, iDest;	        /* Cursors from source and destination */
+	int addr1, addr2;	        /* Loop addresses */
+	int emptyDestTest = 0;	        /* Address of test for empty pDest */
+	int emptySrcTest = 0;	        /* Address of test for empty pSrc */
+	Vdbe *v;		        /* The VDBE we are building */
+	int regAutoinc;		        /* Memory register used by AUTOINC */
 	int destHasUniqueIdx = 0;	/* True if pDest has a UNIQUE index */
-	int regData, regRowid;	/* Registers holding data and rowid */
+	int regData, regRowid;	        /* Registers holding data and rowid */
 
 	if (pSelect == 0) {
 		return 0;	/* Must be of the form  INSERT INTO ... SELECT ... */
@@ -2123,7 +2116,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		 ** error if pSelect reads from a CTE named "xxx".  */
 		return 0;
 	}
-	if (sqlite3TriggerList(pParse, pDest)) {
+	if (pDest->pTrigger) {
 		return 0;	/* tab1 must not have triggers */
 	}
 #ifndef SQLITE_OMIT_VIRTUALTABLE
@@ -2281,13 +2274,13 @@ xferOptimization(Parse * pParse,	/* Parser context */
 #endif
 	iDbSrc = sqlite3SchemaToIndex(db, pSrc->pSchema);
 	v = sqlite3GetVdbe(pParse);
-	sqlite3CodeVerifySchema(pParse, iDbSrc);
+	sqlite3CodeVerifySchema(pParse);
 	iSrc = pParse->nTab++;
 	iDest = pParse->nTab++;
-	regAutoinc = autoIncBegin(pParse, iDbDest, pDest);
+	regAutoinc = autoIncBegin(pParse, pDest);
 	regData = sqlite3GetTempReg(pParse);
 	regRowid = sqlite3GetTempReg(pParse);
-	sqlite3OpenTable(pParse, iDest, iDbDest, pDest, OP_OpenWrite);
+	sqlite3OpenTable(pParse, iDest, pDest, OP_OpenWrite);
 	assert(HasRowid(pDest) || destHasUniqueIdx);
 	if ((db->flags & SQLITE_Vacuum) == 0 && ((pDest->iPKey < 0 && pDest->pIndex != 0)	/* (1) */
 						 ||destHasUniqueIdx	/* (2) */
@@ -2317,7 +2310,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	}
 	if (HasRowid(pSrc)) {
 		u8 insFlags;
-		sqlite3OpenTable(pParse, iSrc, iDbSrc, pSrc, OP_OpenRead);
+		sqlite3OpenTable(pParse, iSrc, pSrc, OP_OpenRead);
 		emptySrcTest = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);
 		if (pDest->iPKey >= 0) {
@@ -2353,8 +2346,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		sqlite3VdbeAddOp2(v, OP_Close, iSrc, 0);
 		sqlite3VdbeAddOp2(v, OP_Close, iDest, 0);
 	} else {
-		sqlite3TableLock(pParse, iDbDest, pDest->tnum, 1, pDest->zName);
-		sqlite3TableLock(pParse, iDbSrc, pSrc->tnum, 0, pSrc->zName);
+		sqlite3TableLock(pParse, pDest->tnum, 1, pDest->zName);
+		sqlite3TableLock(pParse, pSrc->tnum, 0, pSrc->zName);
 	}
 	for (pDestIdx = pDest->pIndex; pDestIdx; pDestIdx = pDestIdx->pNext) {
 		u8 idxInsFlags = 0;
@@ -2368,7 +2361,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		sqlite3VdbeSetP4KeyInfo(pParse, pSrcIdx);
 		VdbeComment((v, "%s", pSrcIdx->zName));
 		sqlite3VdbeAddOp3(v, OP_OpenWrite, iDest, pDestIdx->tnum,
-				  iDbDest);
+				  0);
 		sqlite3VdbeSetP4KeyInfo(pParse, pDestIdx);
 		sqlite3VdbeChangeP5(v, OPFLAG_BULKCSR);
 		VdbeComment((v, "%s", pDestIdx->zName));

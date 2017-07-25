@@ -43,14 +43,14 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.1>
-        1, "no such table: main.no_such_table"
+        1, "no such table: no_such_table"
         -- </trigger1-1.1.1>
     })
 
 test:do_catchsql_test(
     "trigger1-1.1.2",
     [[
-        CREATE TEMP TRIGGER trig UPDATE ON no_such_table BEGIN
+        CREATE TRIGGER trig UPDATE ON no_such_table BEGIN
           SELECT * from sqlite_master;
         END;
     ]], {
@@ -797,44 +797,47 @@ test:do_test(
             CREATE INDEX t16b ON t16(b);
         ]]
         return test:catchsql [[
-            CREATE TRIGGER main.t16err1 AFTER INSERT ON tA BEGIN
-              INSERT INTO main.t16 VALUES(1,2,3);
+            CREATE TRIGGER t16err1 AFTER INSERT ON tA BEGIN
+              INSERT INTO t16 VALUES(1,2,3);
             END;
         ]]
     end, {
         -- <trigger1-16.1>
-        1, "qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+        --1, "near \".\": syntax error"
+	0
         -- </trigger1-16.1>
     })
 
 test:do_catchsql_test(
     "trigger1-16.2",
     [[
-        CREATE TRIGGER main.t16err2 AFTER INSERT ON tA BEGIN
-          UPDATE main.t16 SET rowid=rowid+1;
+        CREATE TRIGGER t16err2 AFTER INSERT ON tA BEGIN
+          UPDATE t16 SET rowid=rowid+1;
         END;
     ]], {
         -- <trigger1-16.2>
-        1, "qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+        --1, "near \".\": syntax error"
+	0
         -- </trigger1-16.2>
     })
 
 test:do_catchsql_test(
     "trigger1-16.3",
     [[
-        CREATE TRIGGER main.t16err3 AFTER INSERT ON tA BEGIN
-          DELETE FROM main.t16;
+        CREATE TRIGGER t16err3 AFTER INSERT ON tA BEGIN
+          DELETE FROM t16;
         END;
     ]], {
         -- <trigger1-16.3>
-        1, "qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+        --1, "near \".\": syntax error"
+	0
         -- </trigger1-16.3>
     })
 
 test:do_catchsql_test(
     "trigger1-16.4",
     [[
-        CREATE TRIGGER main.t16err4 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err4 AFTER INSERT ON tA BEGIN
           UPDATE t16 NOT INDEXED SET rowid=rowid+1;
         END;
     ]], {
@@ -846,7 +849,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.5",
     [[
-        CREATE TRIGGER main.t16err5 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err5 AFTER INSERT ON tA BEGIN
           UPDATE t16 INDEXED BY t16a SET rowid=rowid+1 WHERE a=1;
         END;
     ]], {
@@ -858,7 +861,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.6",
     [[
-        CREATE TRIGGER main.t16err6 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err6 AFTER INSERT ON tA BEGIN
           DELETE FROM t16 NOT INDEXED WHERE a=123;
         END;
     ]], {
@@ -870,7 +873,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.7",
     [[
-        CREATE TRIGGER main.t16err7 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err7 AFTER INSERT ON tA BEGIN
           DELETE FROM t16 INDEXED BY t16a WHERE a=123;
         END;
     ]], {

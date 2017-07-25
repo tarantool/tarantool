@@ -300,24 +300,21 @@ int sqlite3VdbeAddOp4Dup8(
 ** This routine will take ownership of the allocated memory.
 */
 void sqlite3VdbeAddParseSchemaOp(Vdbe *p, int iDb, char *zWhere){
-  int j;
   sqlite3VdbeAddOp4(p, OP_ParseSchema, iDb, 0, 0, zWhere, P4_DYNAMIC);
-  for(j=0; j<p->db->nDb; j++) sqlite3VdbeUsesBtree(p, j);
+  sqlite3VdbeUsesBtree(p);
 }
 
 void sqlite3VdbeAddParseSchema2Op(Vdbe *p, int iDb, int iRec, int n){
-  int j;
   sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, iDb);
-  for(j=0; j<p->db->nDb; j++) sqlite3VdbeUsesBtree(p, j);
+  sqlite3VdbeUsesBtree(p);
 }
 
 /*
 ** Add an OP_ParseSchema3 opcode which in turn will create a trigger
 */
 void sqlite3VdbeAddParseSchema3Op(Vdbe *p, int iDb, int iRec){
-  int j;
   sqlite3VdbeAddOp2(p, OP_ParseSchema3, iRec, iDb);
-  for(j=0; j<p->db->nDb; j++) sqlite3VdbeUsesBtree(p, j);
+  sqlite3VdbeUsesBtree(p);
 }
 
 /*
@@ -1413,19 +1410,17 @@ static char *displayP4(Op *pOp, char *zTemp, int nTemp){
 #endif /* VDBE_DISPLAY_P4 */
 
 /*
-** Declare to the Vdbe that the BTree object at db->aDb[i] is used.
+** Declare to the Vdbe that the BTree object at db->mdb is used.
 **
-** The prepared statements need to know in advance the complete set of
-** attached databases that will be use.  A mask of these databases
-** is maintained in p->btreeMask.  The p->lockMask value is the subset of
-** p->btreeMask of databases that will require a lock.
+** The prepared statements need to know in advance the database
+** that will be use.  A mask of this database is maintained in p->btreeMask.
+** The p->lockMask value is the subset of p->btreeMask of databases that
+** will require a lock.
 */
-void sqlite3VdbeUsesBtree(Vdbe *p, int i){
-  assert( i>=0 && i<p->db->nDb && i<(int)sizeof(yDbMask)*8 );
-  assert( i<(int)sizeof(p->btreeMask)*8 );
-  DbMaskSet(p->btreeMask, i);
-  if( i!=1 && sqlite3BtreeSharable(p->db->aDb[i].pBt) ){
-    DbMaskSet(p->lockMask, i);
+void sqlite3VdbeUsesBtree(Vdbe *p){
+  DbMaskSet(p->btreeMask, 0);
+  if( sqlite3BtreeSharable(p->db->mdb.pBt) ){
+    DbMaskSet(p->lockMask, 0);
   }
 }
 
@@ -1458,12 +1453,9 @@ void sqlite3VdbeEnter(Vdbe *p){
   int nDb;
   if( DbMaskAllZero(p->lockMask) ) return;  /* The common case */
   db = p->db;
-  aDb = db->aDb;
-  nDb = db->nDb;
-  for(i=0; i<nDb; i++){
-    if( i!=1 && DbMaskTest(p->lockMask,i) && ALWAYS(aDb[i].pBt!=0) ){
-      sqlite3BtreeEnter(aDb[i].pBt);
-    }
+  aDb = &db->mdb;
+  if( DbMaskTest(p->lockMask,0) && ALWAYS(aDb->pBt!=0) ){
+    sqlite3BtreeEnter(aDb[i].pBt);
   }
 }
 #endif
@@ -1478,12 +1470,9 @@ static SQLITE_NOINLINE void vdbeLeave(Vdbe *p){
   Db *aDb;
   int nDb;
   db = p->db;
-  aDb = db->aDb;
-  nDb = db->nDb;
-  for(i=0; i<nDb; i++){
-    if( i!=1 && DbMaskTest(p->lockMask,i) && ALWAYS(aDb[i].pBt!=0) ){
-      sqlite3BtreeLeave(aDb[i].pBt);
-    }
+  aDb = &db->mdb;
+  if( DbMaskTest(p->lockMask,0) && ALWAYS(aDb->pBt!=0) ){
+    sqlite3BtreeLeave(aDb[i].pBt);
   }
 }
 void sqlite3VdbeLeave(Vdbe *p){
@@ -2259,34 +2248,31 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
   ** including the temp database. (b) is important because if more than 
   ** one database file has an open write transaction, a master journal
   ** file is required for an atomic commit.
-  */ 
-  for(i=0; rc==SQLITE_OK && i<db->nDb; i++){ 
-    Btree *pBt = db->aDb[i].pBt;
-    if( sqlite3BtreeIsInTrans(pBt) ){
-      /* Whether or not a database might need a master journal depends upon
-      ** its journal mode (among other things).  This matrix determines which
-      ** journal modes use a master journal and which do not */
-      static const u8 aMJNeeded[] = {
-        /* DELETE   */  1,
-        /* PERSIST   */ 1,
-        /* OFF       */ 0,
-        /* TRUNCATE  */ 1,
-        /* MEMORY    */ 0,
-        /* WAL       */ 0
-      };
-      Pager *pPager;   /* Pager associated with pBt */
-      needXcommit = 1;
-      sqlite3BtreeEnter(pBt);
-      pPager = sqlite3BtreePager(pBt);
-      if( db->aDb[i].safety_level!=PAGER_SYNCHRONOUS_OFF
-       && aMJNeeded[sqlite3PagerGetJournalMode(pPager)]
-      ){ 
-        assert( i!=1 );
-        nTrans++;
-      }
-      rc = sqlite3PagerExclusiveLock(pPager);
-      sqlite3BtreeLeave(pBt);
+  */
+  Btree *pBt = db->mdb.pBt;
+  if( sqlite3BtreeIsInTrans(pBt) ){
+    /* Whether or not a database might need a master journal depends upon
+    ** its journal mode (among other things).  This matrix determines which
+    ** journal modes use a master journal and which do not */
+    static const u8 aMJNeeded[] = {
+            /* DELETE   */  1,
+            /* PERSIST   */ 1,
+            /* OFF       */ 0,
+            /* TRUNCATE  */ 1,
+            /* MEMORY    */ 0,
+            /* WAL       */ 0
+    };
+    Pager *pPager;   /* Pager associated with pBt */
+    needXcommit = 1;
+    sqlite3BtreeEnter(pBt);
+    pPager = sqlite3BtreePager(pBt);
+    if( db->mdb.safety_level!=PAGER_SYNCHRONOUS_OFF
+        && aMJNeeded[sqlite3PagerGetJournalMode(pPager)]
+            ){
+      nTrans++;
     }
+    rc = sqlite3PagerExclusiveLock(pPager);
+    sqlite3BtreeLeave(pBt);
   }
   if( rc!=SQLITE_OK ){
     return rc;
@@ -2309,26 +2295,21 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
   ** that case we do not support atomic multi-file commits, so use the 
   ** simple case then too.
   */
-  if( 0==sqlite3Strlen30(sqlite3BtreeGetFilename(db->aDb[0].pBt))
+  if( 0==sqlite3Strlen30(sqlite3BtreeGetFilename(db->mdb.pBt))
    || nTrans<=1
   ){
-    for(i=0; rc==SQLITE_OK && i<db->nDb; i++){
-      Btree *pBt = db->aDb[i].pBt;
-      if( pBt ){
-        rc = sqlite3BtreeCommitPhaseOne(pBt, 0);
-      }
+    Btree *pBt = db->mdb.pBt;
+    if( pBt ){
+      rc = sqlite3BtreeCommitPhaseOne(pBt, 0);
     }
 
-    /* Do the commit only if all databases successfully complete phase 1. 
+    /* Do the commit only if database successfully complete phase 1. 
     ** If one of the BtreeCommitPhaseOne() calls fails, this indicates an
     ** IO error while deleting or truncating a journal file. It is unlikely,
     ** but could happen. In this case abandon processing and return the error.
     */
-    for(i=0; rc==SQLITE_OK && i<db->nDb; i++){
-      Btree *pBt = db->aDb[i].pBt;
-      if( pBt ){
-        rc = sqlite3BtreeCommitPhaseTwo(pBt, 0);
-      }
+    if( pBt ){
+      rc = sqlite3BtreeCommitPhaseTwo(pBt, 0);
     }
     if( rc==SQLITE_OK ){
       sqlite3VtabCommit(db);
@@ -2343,7 +2324,7 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
   else{
     sqlite3_vfs *pVfs = db->pVfs;
     char *zMaster = 0;   /* File-name for the master journal */
-    char const *zMainFile = sqlite3BtreeGetFilename(db->aDb[0].pBt);
+    char const *zMainFile = sqlite3BtreeGetFilename(db->mdb.pBt);
     sqlite3_file *pMaster = 0;
     i64 offset = 0;
     int res;
@@ -2393,22 +2374,18 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
     ** still have 'null' as the master journal pointer, so they will roll
     ** back independently if a failure occurs.
     */
-    for(i=0; i<db->nDb; i++){
-      Btree *pBt = db->aDb[i].pBt;
-      if( sqlite3BtreeIsInTrans(pBt) ){
-        char const *zFile = sqlite3BtreeGetJournalname(pBt);
-        if( zFile==0 ){
-          continue;  /* Ignore TEMP and :memory: databases */
-        }
-        assert( zFile[0]!=0 );
-        rc = sqlite3OsWrite(pMaster, zFile, sqlite3Strlen30(zFile)+1, offset);
-        offset += sqlite3Strlen30(zFile)+1;
-        if( rc!=SQLITE_OK ){
-          sqlite3OsCloseFree(pMaster);
-          sqlite3OsDelete(pVfs, zMaster, 0);
-          sqlite3DbFree(db, zMaster);
-          return rc;
-        }
+    Btree *pBt = db->mdb.pBt;
+    if( sqlite3BtreeIsInTrans(pBt) ){
+      char const *zFile = sqlite3BtreeGetJournalname(pBt);
+      assert( zFile );
+      assert( zFile[0]!=0 );
+      rc = sqlite3OsWrite(pMaster, zFile, sqlite3Strlen30(zFile)+1, offset);
+      offset += sqlite3Strlen30(zFile)+1;
+      if( rc!=SQLITE_OK ){
+        sqlite3OsCloseFree(pMaster);
+        sqlite3OsDelete(pVfs, zMaster, 0);
+        sqlite3DbFree(db, zMaster);
+        return rc;
       }
     }
 
@@ -2434,11 +2411,9 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
     ** in case the master journal file name was written into the journal
     ** file before the failure occurred.
     */
-    for(i=0; rc==SQLITE_OK && i<db->nDb; i++){ 
-      Btree *pBt = db->aDb[i].pBt;
-      if( pBt ){
-        rc = sqlite3BtreeCommitPhaseOne(pBt, zMaster);
-      }
+    pBt = db->mdb.pBt;
+    if( pBt ){
+      rc = sqlite3BtreeCommitPhaseOne(pBt, zMaster);
     }
     sqlite3OsCloseFree(pMaster);
     assert( rc!=SQLITE_BUSY );
@@ -2467,11 +2442,9 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
     */
     disable_simulated_io_errors();
     sqlite3BeginBenignMalloc();
-    for(i=0; i<db->nDb; i++){ 
-      Btree *pBt = db->aDb[i].pBt;
-      if( pBt ){
-        sqlite3BtreeCommitPhaseTwo(pBt, 1);
-      }
+    pBt = db->mdb.pBt;
+    if( pBt ){
+      sqlite3BtreeCommitPhaseTwo(pBt, 1);
     }
     sqlite3EndBenignMalloc();
     enable_simulated_io_errors();
@@ -2535,26 +2508,23 @@ int sqlite3VdbeCloseStatement(Vdbe *p, int eOp){
   ** In this case (db->nStatement==0), and there is nothing to do.
   */
   if( db->nStatement && p->iStatement ){
-    int i;
     const int iSavepoint = p->iStatement-1;
 
     assert( eOp==SAVEPOINT_ROLLBACK || eOp==SAVEPOINT_RELEASE);
     assert( db->nStatement>0 );
     assert( p->iStatement==(db->nStatement+db->nSavepoint) );
 
-    for(i=0; i<db->nDb; i++){ 
-      int rc2 = SQLITE_OK;
-      Btree *pBt = db->aDb[i].pBt;
-      if( pBt ){
-        if( eOp==SAVEPOINT_ROLLBACK ){
-          rc2 = sqlite3BtreeSavepoint(pBt, SAVEPOINT_ROLLBACK, iSavepoint);
-        }
-        if( rc2==SQLITE_OK ){
-          rc2 = sqlite3BtreeSavepoint(pBt, SAVEPOINT_RELEASE, iSavepoint);
-        }
-        if( rc==SQLITE_OK ){
-          rc = rc2;
-        }
+    int rc2 = SQLITE_OK;
+    Btree *pBt = db->mdb.pBt;
+    if( pBt ){
+      if( eOp==SAVEPOINT_ROLLBACK ){
+        rc2 = sqlite3BtreeSavepoint(pBt, SAVEPOINT_ROLLBACK, iSavepoint);
+      }
+      if( rc2==SQLITE_OK ){
+        rc2 = sqlite3BtreeSavepoint(pBt, SAVEPOINT_RELEASE, iSavepoint);
+      }
+      if( rc==SQLITE_OK ){
+        rc = rc2;
       }
     }
     db->nStatement--;

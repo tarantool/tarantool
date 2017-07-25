@@ -128,7 +128,7 @@ test:do_catchsql_test(
         SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.6>
-        1, "no such table: main.t1"
+        1, "no such table: t1"
         -- </view-1.6>
     })
 
@@ -984,7 +984,7 @@ test:do_catchsql_test(
         DROP VIEW main.nosuchview
     ]], {
         -- <view-17.2>
-        1, "no such view: main.nosuchview"
+        1, "near \".\": syntax error"
         -- </view-17.2>
     })
 

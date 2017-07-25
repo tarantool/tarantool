@@ -28,8 +28,8 @@ test:do_execsql_test(
         CREATE TABLE x(x INTEGER PRIMARY KEY, y INT NOT NULL);
         INSERT INTO x VALUES(1, 1);
         INSERT INTO x VALUES(2, 1);
-        CREATE TEMP VIEW vx AS SELECT x, y, 0 AS yy FROM x;
-        CREATE TEMP TRIGGER tx INSTEAD OF UPDATE OF y ON vx
+        CREATE VIEW vx AS SELECT x, y, 0 AS yy FROM x;
+        CREATE TRIGGER tx INSTEAD OF UPDATE OF y ON vx
         BEGIN
           UPDATE x SET y = new.y WHERE x = new.x;
         END;

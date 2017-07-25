@@ -222,18 +222,15 @@ int sqlite3_db_status(
     case SQLITE_DBSTATUS_CACHE_USED_SHARED:
     case SQLITE_DBSTATUS_CACHE_USED: {
       int totalUsed = 0;
-      int i;
       sqlite3BtreeEnterAll(db);
-      for(i=0; i<db->nDb; i++){
-        Btree *pBt = db->aDb[i].pBt;
-        if( pBt ){
-          Pager *pPager = sqlite3BtreePager(pBt);
-          int nByte = sqlite3PagerMemUsed(pPager);
-          if( op==SQLITE_DBSTATUS_CACHE_USED_SHARED ){
-            nByte = nByte / sqlite3BtreeConnectionCount(pBt);
-          }
-          totalUsed += nByte;
+      Btree *pBt = db->mdb.pBt;
+      if( pBt ){
+        Pager *pPager = sqlite3BtreePager(pBt);
+        int nByte = sqlite3PagerMemUsed(pPager);
+        if( op==SQLITE_DBSTATUS_CACHE_USED_SHARED ){
+          nByte = nByte / sqlite3BtreeConnectionCount(pBt);
         }
+        totalUsed += nByte;
       }
       sqlite3BtreeLeaveAll(db);
       *pCurrent = totalUsed;
@@ -247,33 +244,30 @@ int sqlite3_db_status(
     ** databases.  *pHighwater is set to zero.
     */
     case SQLITE_DBSTATUS_SCHEMA_USED: {
-      int i;                      /* Used to iterate through schemas */
       int nByte = 0;              /* Used to accumulate return value */
 
       sqlite3BtreeEnterAll(db);
       db->pnBytesFreed = &nByte;
-      for(i=0; i<db->nDb; i++){
-        Schema *pSchema = db->aDb[i].pSchema;
-        if( ALWAYS(pSchema!=0) ){
-          HashElem *p;
+      Schema *pSchema = db->mdb.pSchema;
+      if( ALWAYS(pSchema!=0) ){
+        HashElem *p;
 
-          nByte += sqlite3GlobalConfig.m.xRoundup(sizeof(HashElem)) * (
-              pSchema->tblHash.count 
-            + pSchema->trigHash.count
-            + pSchema->idxHash.count
-            + pSchema->fkeyHash.count
-          );
-          nByte += sqlite3_msize(pSchema->tblHash.ht);
-          nByte += sqlite3_msize(pSchema->trigHash.ht);
-          nByte += sqlite3_msize(pSchema->idxHash.ht);
-          nByte += sqlite3_msize(pSchema->fkeyHash.ht);
+        nByte += sqlite3GlobalConfig.m.xRoundup(sizeof(HashElem)) * (
+            pSchema->tblHash.count
+          + pSchema->trigHash.count
+          + pSchema->idxHash.count
+          + pSchema->fkeyHash.count
+        );
+        nByte += sqlite3_msize(pSchema->tblHash.ht);
+        nByte += sqlite3_msize(pSchema->trigHash.ht);
+        nByte += sqlite3_msize(pSchema->idxHash.ht);
+        nByte += sqlite3_msize(pSchema->fkeyHash.ht);
 
-          for(p=sqliteHashFirst(&pSchema->trigHash); p; p=sqliteHashNext(p)){
-            sqlite3DeleteTrigger(db, (Trigger*)sqliteHashData(p));
-          }
-          for(p=sqliteHashFirst(&pSchema->tblHash); p; p=sqliteHashNext(p)){
-            sqlite3DeleteTable(db, (Table *)sqliteHashData(p));
-          }
+        for(p=sqliteHashFirst(&pSchema->trigHash); p; p=sqliteHashNext(p)){
+          sqlite3DeleteTrigger(db, (Trigger*)sqliteHashData(p));
+        }
+        for(p=sqliteHashFirst(&pSchema->tblHash); p; p=sqliteHashNext(p)){
+          sqlite3DeleteTable(db, (Table *)sqliteHashData(p));
         }
       }
       db->pnBytesFreed = 0;
@@ -314,16 +308,13 @@ int sqlite3_db_status(
     case SQLITE_DBSTATUS_CACHE_HIT:
     case SQLITE_DBSTATUS_CACHE_MISS:
     case SQLITE_DBSTATUS_CACHE_WRITE:{
-      int i;
       int nRet = 0;
       assert( SQLITE_DBSTATUS_CACHE_MISS==SQLITE_DBSTATUS_CACHE_HIT+1 );
       assert( SQLITE_DBSTATUS_CACHE_WRITE==SQLITE_DBSTATUS_CACHE_HIT+2 );
 
-      for(i=0; i<db->nDb; i++){
-        if( db->aDb[i].pBt ){
-          Pager *pPager = sqlite3BtreePager(db->aDb[i].pBt);
-          sqlite3PagerCacheStat(pPager, op, resetFlag, &nRet);
-        }
+      if( db->mdb.pBt ){
+        Pager *pPager = sqlite3BtreePager(db->mdb.pBt);
+        sqlite3PagerCacheStat(pPager, op, resetFlag, &nRet);
       }
       *pHighwater = 0; /* IMP: R-42420-56072 */
                        /* IMP: R-54100-20147 */
