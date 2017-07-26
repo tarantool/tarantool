@@ -65,7 +65,7 @@ enum vy_log_record_type {
 	/**
 	 * Create a new vinyl index.
 	 * Requires vy_log_record::index_lsn, index_id, space_id,
-	 * key_def.
+	 * key_def (with primary key parts).
 	 */
 	VY_LOG_CREATE_INDEX		= 0,
 	/**
@@ -193,7 +193,7 @@ struct vy_log_record {
 	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
-	/** Index key definition. */
+	/** Index key definition, as defined by the user. */
 	const struct key_def *key_def;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;

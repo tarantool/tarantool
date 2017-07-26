@@ -80,8 +80,11 @@ struct vy_merge_iterator {
 	uint32_t mutable_end;
 	/** The offset starting with which the sources were skipped */
 	uint32_t skipped_start;
-	/** Index key definition. */
-	const struct key_def *key_def;
+	/**
+	 * Index key definition for compare (extended with
+	 * primary key parts.
+	 */
+	const struct key_def *cmp_def;
 	/** Format to allocate REPLACE and DELETE tuples. */
 	struct tuple_format *format;
 	/** Format to allocate UPSERT tuples. */

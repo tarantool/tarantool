@@ -62,7 +62,7 @@ read_set_cmp(struct txv *a, struct txv *b)
 {
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0)
-		rc = vy_stmt_compare(a->stmt, b->stmt, a->index->key_def);
+		rc = vy_stmt_compare(a->stmt, b->stmt, a->index->cmp_def);
 	if (rc == 0)
 		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
 	return rc;
@@ -73,7 +73,7 @@ read_set_key_cmp(struct read_set_key *a, struct txv *b)
 {
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0)
-		rc = vy_stmt_compare(a->stmt, b->stmt, b->index->key_def);
+		rc = vy_stmt_compare(a->stmt, b->stmt, b->index->cmp_def);
 	if (rc == 0)
 		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
 	return rc;
@@ -84,7 +84,7 @@ write_set_cmp(struct txv *a, struct txv *b)
 {
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0)
-		return vy_stmt_compare(a->stmt, b->stmt, a->index->key_def);
+		return vy_stmt_compare(a->stmt, b->stmt, a->index->cmp_def);
 	return rc;
 }
 
@@ -93,7 +93,7 @@ write_set_key_cmp(struct write_set_key *a, struct txv *b)
 {
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0)
-		return vy_stmt_compare(a->stmt, b->stmt, a->index->key_def);
+		return vy_stmt_compare(a->stmt, b->stmt, a->index->cmp_def);
 	return rc;
 }
 
@@ -317,7 +317,7 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 	     abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
-				    v->index->key_def) != 0)
+				    v->index->cmp_def) != 0)
 			break;
 		/* Don't abort self. */
 		if (abort->tx == tx)
@@ -358,7 +358,7 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 	     abort = read_set_next(tree, abort)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
-				    v->index->key_def) != 0)
+				    v->index->cmp_def) != 0)
 			break;
 		/* Don't abort self. */
 		if (abort->tx == tx)
@@ -449,7 +449,7 @@ vy_tx_write(struct vy_index *index, struct vy_mem *mem,
 		vy_cache_on_write(&index->cache, stmt, &deleted);
 		if (deleted != NULL) {
 			struct tuple *applied =
-				vy_apply_upsert(stmt, deleted, mem->key_def,
+				vy_apply_upsert(stmt, deleted, mem->cmp_def,
 						mem->format, mem->upsert_format,
 						false);
 			tuple_unref(deleted);
@@ -686,7 +686,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 		return 0;
 	}
 	uint32_t part_count = tuple_field_count(key);
-	if (part_count >= index->key_def->part_count) {
+	if (part_count >= index->cmp_def->part_count) {
 		struct txv *v = write_set_search_key(&tx->write_set, index, key);
 		if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
 				  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
@@ -729,7 +729,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		       old_type == IPROTO_DELETE);
 		(void) old_type;
 
-		applied = vy_apply_upsert(stmt, old->stmt, index->key_def,
+		applied = vy_apply_upsert(stmt, old->stmt, index->cmp_def,
 					  index->space_format,
 					  index->upsert_format, true);
 		index->stat.upsert.applied++;
@@ -824,7 +824,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 			txv = write_set_psearch(&itr->tx->write_set, &key);
 		if (txv == NULL || txv->index != index)
 			return;
-		if (vy_stmt_compare(itr->key, txv->stmt, index->key_def) == 0) {
+		if (vy_stmt_compare(itr->key, txv->stmt, index->cmp_def) == 0) {
 			while (true) {
 				struct txv *next;
 				if (itr->iterator_type == ITER_LE ||
@@ -835,7 +835,7 @@ vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
 				if (next == NULL || next->index != index)
 					break;
 				if (vy_stmt_compare(itr->key, next->stmt,
-						    index->key_def) != 0)
+						    index->cmp_def) != 0)
 					break;
 				txv = next;
 			}
@@ -884,7 +884,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL && itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_txv->stmt,
-			    itr->index->key_def) != 0)
+			    itr->index->cmp_def) != 0)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL)
 		vy_txw_iterator_get(itr, ret);
@@ -937,7 +937,7 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 				 itr->curr_txv->stmt : NULL;
 	itr->curr_txv = NULL;
 	struct txv *txv;
-	struct key_def *def = itr->index->key_def;
+	struct key_def *def = itr->index->cmp_def;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		txv = write_set_psearch(&itr->tx->write_set, &key);
 	else

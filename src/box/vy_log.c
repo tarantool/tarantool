@@ -615,8 +615,8 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_DEF: {
 			uint32_t part_count = mp_decode_array(&pos);
-			struct key_def *key_def = region_alloc(&fiber()->gc,
-						key_def_sizeof(part_count));
+			struct key_def *key_def =
+				region_alloc(&fiber()->gc, key_def_sizeof(part_count));
 			if (key_def == NULL) {
 				diag_set(OutOfMemory,
 					 key_def_sizeof(part_count),

@@ -67,8 +67,12 @@ struct vy_range {
 	struct tuple *begin;
 	/** Range upper bound. NULL if range is rightmost. */
 	struct tuple *end;
-	/** Key definition for comparing range boundaries. */
-	const struct key_def *key_def;
+	/** Key definition for comparing range boundaries.
+	 * Contains secondary and primary key parts for secondary
+	 * keys, to ensure an always distinct result for
+	 * non-unique keys.
+	 */
+	const struct key_def *cmp_def;
 	/** An estimate of the number of statements in this range. */
 	struct vy_disk_stmt_counter count;
 	/**
@@ -176,14 +180,14 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
  * @param id        Range id.
  * @param begin     Range begin (inclusive) or NULL for -inf.
  * @param end       Range end (exclusive) or NULL for +inf.
- * @param key_def   Key definition for comparing range boundaries.
+ * @param cmp_def   Key definition for comparing range boundaries.
  *
  * @retval not NULL The new range.
  * @retval NULL     Out of memory.
  */
 struct vy_range *
 vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
-	     const struct key_def *key_def);
+	     const struct key_def *cmp_def);
 
 /**
  * Free a range and all its slices.

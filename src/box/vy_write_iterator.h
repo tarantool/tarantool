@@ -176,7 +176,7 @@ struct vy_run_env;
 /**
  * Open an empty write iterator. To add sources to the iterator
  * use vy_write_iterator_add_* functions.
- * @param key_def - key definition for tuple compare.
+ * @param cmp_def - key definition for tuple compare.
  * @param format - dormat to allocate new REPLACE and DELETE tuples from vy_run.
  * @param upsert_format - same as format, but for UPSERT tuples.
  * @param LSM tree is_primary - set if this iterator is for a primary index.
@@ -185,7 +185,7 @@ struct vy_run_env;
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
+vy_write_iterator_new(const struct key_def *cmp_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
 		      bool is_last_level, struct rlist *read_views);
 

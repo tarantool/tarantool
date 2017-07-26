@@ -338,7 +338,7 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 
 static struct tuple *
 vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
-			       const struct key_def *key_def,
+			       const struct key_def *cmp_def,
 			       struct tuple_format *format)
 {
 	/**
@@ -359,13 +359,13 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 	memset(iov, '#', sizeof(*iov) * field_count);
 #endif
 	uint32_t part_count = mp_decode_array(&key);
-	assert(part_count == key_def->part_count);
+	assert(part_count == cmp_def->part_count);
 	assert(part_count <= field_count);
-	uint32_t nulls_count = field_count - key_def->part_count;
+	uint32_t nulls_count = field_count - cmp_def->part_count;
 	uint32_t bsize = mp_sizeof_array(field_count) +
 		mp_sizeof_nil() * nulls_count;
 	for (uint32_t i = 0; i < part_count; ++i) {
-		const struct key_part *part = &key_def->parts[i];
+		const struct key_part *part = &cmp_def->parts[i];
 		assert(part->fieldno < field_count);
 		const char *svp = key;
 		iov[part->fieldno].iov_base = (char *) key;
@@ -403,11 +403,11 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 
 struct tuple *
 vy_stmt_new_surrogate_delete_from_key(const char *key,
-				      const struct key_def *key_def,
+				      const struct key_def *cmp_def,
 				      struct tuple_format *format)
 {
 	return vy_stmt_new_surrogate_from_key(key, IPROTO_DELETE,
-					      key_def, format);
+					      cmp_def, format);
 }
 
 static struct tuple *
@@ -506,7 +506,7 @@ vy_stmt_encode_primary(const struct tuple *value,
 
 int
 vy_stmt_encode_secondary(const struct tuple *value,
-			 const struct key_def *key_def,
+			 const struct key_def *cmp_def,
 			 struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
@@ -518,7 +518,7 @@ vy_stmt_encode_secondary(const struct tuple *value,
 	memset(&request, 0, sizeof(request));
 	request.type = type;
 	uint32_t size;
-	const char *extracted = tuple_extract_key(value, key_def, &size);
+	const char *extracted = tuple_extract_key(value, cmp_def, &size);
 	if (extracted == NULL)
 		return -1;
 	if (type == IPROTO_REPLACE) {

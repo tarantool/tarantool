@@ -168,7 +168,7 @@ struct vy_write_iterator {
 	/* A heap to order the sources, newest LSN at heap top. */
 	heap_t src_heap;
 	/** Index key definition used to store statements on disk. */
-	const struct key_def *key_def;
+	const struct key_def *cmp_def;
 	/** Format to allocate new REPLACE and DELETE tuples from vy_run */
 	struct tuple_format *format;
 	/** Same as format, but for UPSERT tuples. */
@@ -221,7 +221,7 @@ heap_less(heap_t *heap, struct heap_node *node1, struct heap_node *node2)
 	struct vy_write_src *src2 =
 		container_of(node2, struct vy_write_src, heap_node);
 
-	int cmp = tuple_compare(src1->tuple, src2->tuple, stream->key_def);
+	int cmp = tuple_compare(src1->tuple, src2->tuple, stream->cmp_def);
 	if (cmp != 0)
 		return cmp < 0;
 
@@ -330,7 +330,7 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface;
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format,
+vy_write_iterator_new(const struct key_def *cmp_def, struct tuple_format *format,
 		      struct tuple_format *upsert_format, bool is_primary,
 		      bool is_last_level, struct rlist *read_views)
 {
@@ -362,7 +362,7 @@ vy_write_iterator_new(const struct key_def *key_def, struct tuple_format *format
 	stream->base.iface = &vy_slice_stream_iface;
 	vy_source_heap_create(&stream->src_heap);
 	rlist_create(&stream->src_list);
-	stream->key_def = key_def;
+	stream->cmp_def = cmp_def;
 	stream->format = format;
 	tuple_format_ref(stream->format, 1);
 	stream->upsert_format = upsert_format;
@@ -446,7 +446,7 @@ vy_write_iterator_new_slice(struct vy_stmt_stream *vstream,
 	struct vy_write_src *src = vy_write_iterator_new_src(stream);
 	if (src == NULL)
 		return -1;
-	vy_slice_stream_open(&src->slice_stream, slice, stream->key_def,
+	vy_slice_stream_open(&src->slice_stream, slice, stream->cmp_def,
 			     stream->format, stream->upsert_format, run_env,
 			     stream->is_primary);
 	return 0;
@@ -612,7 +612,7 @@ vy_write_iterator_build_history(struct region *region,
 	int current_rv_i = 0;
 	int64_t current_rv_lsn = vy_write_iterator_get_vlsn(stream, 0);
 	int64_t merge_until_lsn = vy_write_iterator_get_vlsn(stream, 1);
-	uint64_t key_mask = stream->key_def->column_mask;
+	uint64_t key_mask = stream->cmp_def->column_mask;
 
 	while (true) {
 		if (vy_stmt_lsn(src->tuple) > current_rv_lsn) {
@@ -736,7 +736,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		       vy_stmt_type(hint) != IPROTO_UPSERT);
 		struct tuple *applied =
 			vy_apply_upsert(h->tuple, hint,
-					stream->key_def, stream->format,
+					stream->cmp_def, stream->format,
 					stream->upsert_format, false);
 		if (applied == NULL)
 			return -1;
@@ -752,7 +752,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		assert(result->tuple != NULL);
 		struct tuple *applied =
 			vy_apply_upsert(h->tuple, result->tuple,
-					stream->key_def, stream->format,
+					stream->cmp_def, stream->format,
 					stream->upsert_format, false);
 		if (applied == NULL)
 			return -1;

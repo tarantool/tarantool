@@ -144,7 +144,7 @@ struct vy_index {
 	/** Index options. */
 	struct index_opts opts;
 	/** Key definition used to compare tuples. */
-	struct key_def *key_def;
+	struct key_def *cmp_def;
 	/** Key definition passed by the user. */
 	struct key_def *user_key_def;
 	/** Tuple format corresponding to key_def. */
@@ -280,7 +280,7 @@ vy_index_find_unique(struct space *space, uint32_t id);
 /** Allocate a new index object. */
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct space *space, struct index_def *user_index_def);
+	     struct space *space, struct index_def *index_def);
 
 /** Free an index object. */
 void

@@ -117,16 +117,16 @@ vy_index_find_unique(struct space *space, uint32_t index_id)
 
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct space *space, struct index_def *user_index_def)
+	     struct space *space, struct index_def *index_def)
 {
 	assert(space != NULL);
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
 	};
 
-	assert(user_index_def->key_def.part_count > 0);
+	assert(index_def->key_def.part_count > 0);
 	struct vy_index *pk = NULL;
-	if (user_index_def->iid > 0) {
+	if (index_def->iid > 0) {
 		pk = vy_index_find(space, 0);
 		assert(pk != NULL);
 	}
@@ -146,27 +146,27 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		goto fail_tree;
 	}
 
-	struct key_def *user_key_def = key_def_dup(&user_index_def->key_def);
+	struct key_def *user_key_def = key_def_dup(&index_def->key_def);
 	if (user_key_def == NULL)
 		goto fail_user_key_def;
 
-	struct key_def *key_def = NULL;
-	if (user_index_def->iid == 0) {
-		key_def = user_key_def;
+	struct key_def *cmp_def = NULL;
+	if (index_def->iid == 0) {
+		cmp_def = user_key_def;
 	} else {
-		key_def = key_def_merge(user_key_def, pk->key_def);
-		if (key_def == NULL)
+		cmp_def = key_def_merge(user_key_def, pk->user_key_def);
+		if (cmp_def == NULL)
 			goto fail_key_def;
 	}
-	index->key_def = key_def;
+	index->cmp_def = cmp_def;
 	index->user_key_def = user_key_def;
 	index->surrogate_format = tuple_format_new(&vy_tuple_format_vtab,
-						   &key_def, 1, 0);
+						   &cmp_def, 1, 0);
 	if (index->surrogate_format == NULL)
 		goto fail_format;
 	tuple_format_ref(index->surrogate_format, 1);
 
-	if (user_index_def->iid == 0) {
+	if (index_def->iid == 0) {
 		index->upsert_format =
 			vy_tuple_format_new_upsert(space->format);
 		if (index->upsert_format == NULL)
@@ -195,7 +195,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 
 	index->mem = vy_mem_new(index->env->allocator,
 				*index->env->p_generation,
-				key_def, space->format,
+				cmp_def, space->format,
 				index->space_format_with_colmask,
 				index->upsert_format, schema_version);
 	if (index->mem == NULL)
@@ -204,7 +204,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->refs = 1;
 	index->commit_lsn = -1;
 	index->dump_lsn = -1;
-	vy_cache_create(&index->cache, cache_env, key_def);
+	vy_cache_create(&index->cache, cache_env, cmp_def);
 	rlist_create(&index->sealed);
 	vy_range_tree_new(index->tree);
 	vy_range_heap_create(&index->range_heap);
@@ -217,9 +217,9 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->space_index_count = space->index_count;
 	index->in_dump.pos = UINT32_MAX;
 	index->in_compact.pos = UINT32_MAX;
-	index->space_id = user_index_def->space_id;
-	index->id = user_index_def->iid;
-	index->opts = user_index_def->opts;
+	index->space_id = index_def->space_id;
+	index->id = index_def->iid;
+	index->opts = index_def->opts;
 	return index;
 
 fail_mem:
@@ -233,8 +233,8 @@ fail_space_format_with_colmask:
 fail_upsert_format:
 	tuple_format_ref(index->surrogate_format, -1);
 fail_format:
-	if (user_index_def->iid > 0)
-		free(key_def);
+	if (index_def->iid > 0)
+		free(cmp_def);
 fail_key_def:
 	free(user_key_def);
 fail_user_key_def:
@@ -278,7 +278,7 @@ vy_index_delete(struct vy_index *index)
 	tuple_format_ref(index->space_format_with_colmask, -1);
 	tuple_format_ref(index->upsert_format, -1);
 	if (index->id > 0)
-		free(index->key_def);
+		free(index->cmp_def);
 	free(index->user_key_def);
 	histogram_delete(index->run_hist);
 	vy_index_stat_destroy(&index->stat);
@@ -309,7 +309,7 @@ int
 vy_index_init_range_tree(struct vy_index *index)
 {
 	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
-					      index->key_def);
+					      index->cmp_def);
 	if (range == NULL)
 		return -1;
 
@@ -454,12 +454,12 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	case VY_LOG_INSERT_RANGE:
 		assert(record->index_lsn == index->commit_lsn);
 		range = vy_range_new(record->range_id, begin, end,
-				     index->key_def);
+				     index->cmp_def);
 		if (range == NULL)
 			goto out;
 		if (range->begin != NULL && range->end != NULL &&
 		    vy_key_compare(range->begin, range->end,
-				   index->key_def) >= 0) {
+				   index->cmp_def) >= 0) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("begin >= end for range id %lld",
 					    (long long)range->id));
@@ -476,7 +476,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		assert(k != mh_end(run_hash));
 		run = mh_i64ptr_node(run_hash, k)->val;
 		slice = vy_slice_new(record->slice_id, run, begin, end,
-				     index->key_def);
+				     index->cmp_def);
 		if (slice == NULL)
 			goto out;
 		vy_range_add_slice(range, slice);
@@ -596,7 +596,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		if (prev != NULL &&
 		    (prev->end == NULL || range->begin == NULL ||
 		     (cmp = vy_key_compare(prev->end, range->begin,
-					   index->key_def)) != 0)) {
+					   index->cmp_def)) != 0)) {
 			const char *errmsg = cmp > 0 ?
 				"Nearby ranges %lld and %lld overlap" :
 				"Keys between ranges %lld and %lld not spanned";
@@ -698,7 +698,7 @@ vy_index_rotate_mem(struct vy_index *index)
 
 	assert(index->mem != NULL);
 	mem = vy_mem_new(index->env->allocator, *index->env->p_generation,
-			 index->key_def, index->space_format,
+			 index->cmp_def, index->space_format,
 			 index->space_format_with_colmask,
 			 index->upsert_format, schema_version);
 	if (mem == NULL)
@@ -825,7 +825,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		older = vy_mem_older_lsn(mem, stmt);
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
-			vy_apply_upsert(stmt, older, index->key_def,
+			vy_apply_upsert(stmt, older, index->cmp_def,
 					index->space_format,
 					index->upsert_format, false);
 		index->stat.upsert.applied++;
@@ -934,7 +934,7 @@ vy_index_split_range(struct vy_index *index, struct vy_range *range)
 	struct vy_range *part, *parts[2] = {NULL, };
 	for (int i = 0; i < n_parts; i++) {
 		part = vy_range_new(vy_log_next_id(), keys[i], keys[i + 1],
-				    index->key_def);
+				    index->cmp_def);
 		if (part == NULL)
 			goto fail;
 		parts[i] = part;
@@ -945,7 +945,7 @@ vy_index_split_range(struct vy_index *index, struct vy_range *range)
 		 */
 		rlist_foreach_entry_reverse(slice, &range->slices, in_range) {
 			if (vy_slice_cut(slice, vy_log_next_id(), part->begin,
-					 part->end, index->key_def,
+					 part->end, index->cmp_def,
 					 &new_slice) != 0)
 				goto fail;
 			if (new_slice != NULL)
@@ -1021,7 +1021,7 @@ vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 		return false;
 
 	struct vy_range *result = vy_range_new(vy_log_next_id(),
-			first->begin, last->end, index->key_def);
+			first->begin, last->end, index->cmp_def);
 	if (result == NULL)
 		goto fail_range;
 
