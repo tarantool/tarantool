@@ -79,16 +79,6 @@ struct relay_gc_msg {
 	int64_t signature;
 };
 
-/**
- * Cbus message to notify tx thread that relay is stopping.
- */
-struct relay_exit_msg {
-	/** Parent */
-	struct cmsg msg;
-	/** Relay instance */
-	struct relay *relay;
-};
-
 /** State of a replication relay. */
 struct relay {
 	/** The thread in which we relay data to the replica. */
@@ -116,16 +106,12 @@ struct relay {
 	struct cpipe relay_pipe;
 	/** Status message */
 	struct relay_status_msg status_msg;
-	/** Relay exit orchestration message */
-	struct relay_exit_msg exit_msg;
 
 	struct {
 		/* Align to prevent false-sharing with tx thread */
 		alignas(CACHELINE_SIZE)
 		/** Current vclock sent by relay */
 		struct vclock vclock;
-		/** The condition is signaled at relay exit. */
-		struct fiber_cond exit_cond;
 	} tx;
 };
 
@@ -282,36 +268,6 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 	cpipe_push(&relay->tx_pipe, &m->msg);
 }
 
-static void
-tx_exit_cb(struct cmsg *msg)
-{
-	struct relay_exit_msg *m = (struct relay_exit_msg *)msg;
-	fiber_cond_signal(&m->relay->tx.exit_cond);
-}
-
-static void
-relay_cbus_detach(struct relay *relay)
-{
-	say_crit("exiting the relay loop");
-	/* Check that we have no in-flight status message */
-	cbus_flush(&relay->tx_pipe, &relay->relay_pipe, cbus_process);
-
-	static const struct cmsg_hop exit_route[] = {
-		{tx_exit_cb, NULL}
-	};
-	cmsg_init(&relay->exit_msg.msg, exit_route);
-	relay->exit_msg.relay = relay;
-	cpipe_push(&relay->tx_pipe, &relay->exit_msg.msg);
-	/*
-	 * The relay must not destroy its endpoint until the
-	 * corresponding callee's fiber/cord has destroyed its
-	 * counterpart, otherwise the callee will wait
-	 * indefinitely.
-	 */
-	cpipe_destroy(&relay->tx_pipe);
-	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
-}
-
 /**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
@@ -326,7 +282,8 @@ relay_subscribe_f(va_list ap)
 	relay->stream.write = relay_send_row;
 	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
 			     fiber_schedule_cb, fiber());
-	cpipe_create(&relay->tx_pipe, "tx");
+	cbus_pair("tx", cord_name(cord()), &relay->tx_pipe, &relay->relay_pipe,
+		  NULL, NULL, cbus_process);
 	/* Setup garbage collection trigger. */
 	struct trigger on_close_log = {
 		RLIST_LINK_INITIALIZER, relay_on_close_log_f, relay, NULL
@@ -338,7 +295,10 @@ relay_subscribe_f(va_list ap)
 	 */
 	auto guard = make_scoped_guard([&]{
 		trigger_clear(&on_close_log);
-		relay_cbus_detach(relay);
+		say_crit("exiting the relay loop");
+		cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
+			    NULL, NULL, cbus_process);
+		cbus_endpoint_destroy(&relay->endpoint, cbus_process);
 	});
 	relay_set_cord_name(relay->io.fd);
 	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),
@@ -467,20 +427,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	struct cord cord;
 	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "relay_%p", &relay);
-	fiber_cond_create(&relay.tx.exit_cond);
 	cord_costart(&cord, name, relay_subscribe_f, &relay);
-	cpipe_create(&relay.relay_pipe, name);
-	/*
-	 * When relay exits, it sends a message which signals the
-	 * exit condition in tx thread.
-	 */
-	fiber_cond_wait(&relay.tx.exit_cond);
-	fiber_cond_destroy(&relay.tx.exit_cond);
-	/*
-	 * Destroy the cpipe so that relay fiber can destroy
-	 * the corresponding endpoint and exit.
-	 */
-	cpipe_destroy(&relay.relay_pipe);
 	if (cord_cojoin(&cord) != 0) {
 		diag_raise();
 	}
