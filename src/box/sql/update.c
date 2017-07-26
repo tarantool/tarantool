@@ -592,7 +592,7 @@ void sqlite3Update(
       }
       VdbeCoverageNeverTaken(v);
     }
-    sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur, aRegIdx, -1);
+    sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur);
 
     /* If changing the rowid value, or if there are foreign key constraints
     ** to process, delete the old record. Otherwise, add a noop OP_Delete

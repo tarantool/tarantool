@@ -960,7 +960,13 @@ test:do_test(
                    select * from t8, t9 where a=1 and y=3 order by b, x]])
         end, {
             -- <where2-7.4>
-            1, 2, 3, 2, 3, "sort"
+            --1, 2, 3, 2, 3, "sort"
+            -- This is tahter strange, but when pk was deleted from secondary indexes
+            -- sqlite became able to optimize sort using information that i9y is unique and
+            -- there is nothing to sort here.
+            -- todo: It seems like this kind of optimization was appliable until removing pk and
+            -- it is a bug in sqlite optimizer.
+            1, 2, 3, 2, 3, "nosort"
             -- </where2-7.4>
         })
 

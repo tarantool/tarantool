@@ -1602,7 +1602,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 						sqlite3MultiWrite(pParse);
 						sqlite3GenerateRowIndexDelete
 						    (pParse, pTab, iDataCur,
-						     iIdxCur, 0, -1);
+						     iIdxCur);
 					}
 				}
 				seenReplace = 1;

@@ -87,7 +87,7 @@ test:do_execsql_test(
         SELECT a FROM t1 WHERE b='ab005xy' COLLATE nocase;
     ]], {
         -- <index3-2.2eqp>
-        "/USING COVERING INDEX/"
+        "/SEARCH TABLE t1/"
         -- </index3-2.2eqp>
     })
 

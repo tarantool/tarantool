@@ -1583,7 +1583,7 @@ static char *createTableStmt(sqlite3 *db, Table *p){
 static int resizeIndexObject(sqlite3 *db, Index *pIdx, int N){
   char *zExtra;
   int nByte;
-  if( pIdx->nColumn>=N ) return SQLITE_OK;
+  assert( pIdx->nColumn<N );
   assert( pIdx->isResized==0 );
   nByte = (sizeof(char*) + sizeof(i16) + 1)*N;
   zExtra = sqlite3DbMallocZero(db, nByte);
@@ -1718,32 +1718,6 @@ static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
 
   /* The root page of the PRIMARY KEY is the table root page */
   pPk->tnum = pTab->tnum;
-
-  /* Update the in-memory representation of all UNIQUE indices by converting
-  ** the final rowid column into one or more columns of the PRIMARY KEY.
-  */
-  for(pIdx=pTab->pIndex; pIdx; pIdx=pIdx->pNext){
-    int n;
-    if( IsPrimaryKeyIndex(pIdx) ) continue;
-    for(i=n=0; i<nPk; i++){
-      if( !hasColumn(pIdx->aiColumn, pIdx->nKeyCol, pPk->aiColumn[i]) ) n++;
-    }
-    if( n==0 ){
-      /* This index is a superset of the primary key */
-      pIdx->nColumn = pIdx->nKeyCol;
-      continue;
-    }
-    if( resizeIndexObject(db, pIdx, pIdx->nKeyCol+n) ) return;
-    for(i=0, j=pIdx->nKeyCol; i<nPk; i++){
-      if( !hasColumn(pIdx->aiColumn, pIdx->nKeyCol, pPk->aiColumn[i]) ){
-        pIdx->aiColumn[j] = pPk->aiColumn[i];
-        pIdx->azColl[j] = pPk->azColl[i];
-        j++;
-      }
-    }
-    assert( pIdx->nColumn>=pIdx->nKeyCol+n );
-    assert( pIdx->nColumn>=j );
-  }
 
   /* Add all table columns to the PRIMARY KEY index
   */
@@ -3046,7 +3020,7 @@ Index *sqlite3AllocateIndexObject(
     p->aiColumn = (i16*)pExtra;       pExtra += sizeof(i16)*nCol;
     p->aSortOrder = (u8*)pExtra;
     p->nColumn = nCol;
-    p->nKeyCol = nCol - 1;
+    p->nKeyCol = nCol;
     *ppExtra = ((char*)p) + nByte;
   }
   return p;
@@ -3374,8 +3348,7 @@ void sqlite3CreateIndex(
   ** Allocate the index structure. 
   */
   nName = sqlite3Strlen30(zName);
-  nExtraCol = pPk ? pPk->nKeyCol : 1;
-  pIndex = sqlite3AllocateIndexObject(db, pList->nExpr + nExtraCol,
+  pIndex = sqlite3AllocateIndexObject(db, pList->nExpr,
                                       nName + nExtra + 1, &zExtra);
   if( db->mallocFailed ){
     goto exit_create_index;
@@ -3391,10 +3364,8 @@ void sqlite3CreateIndex(
   pIndex->idxType = idxType;
   pIndex->pSchema = db->aDb[iDb].pSchema;
   pIndex->nKeyCol = pList->nExpr;
-  if (!HasRowid(pTab)){
-    /* Tarantool have access to each column by any index */
-    pIndex->isCovering = 1;
-  }
+  /* Tarantool have access to each column by any index */
+  pIndex->isCovering = 1;
   if( pPIWhere ){
     sqlite3ResolveSelfReference(pParse, pTab, NC_PartIdx, pPIWhere, 0);
     pIndex->pPartIdxWhere = pPIWhere;
@@ -3477,44 +3448,11 @@ void sqlite3CreateIndex(
     pIndex->aSortOrder[i] = (u8)requestedSortOrder;
   }
 
-  /* Append the table key to the end of the index.  For WITHOUT ROWID
-  ** tables (when pPk!=0) this will be the declared PRIMARY KEY.  For
-  ** normal tables (when pPk==0) this will be the rowid.
-  */
-  if( pPk ){
-    for(j=0; j<pPk->nKeyCol; j++){
-      int x = pPk->aiColumn[j];
-      assert( x>=0 );
-      if( hasColumn(pIndex->aiColumn, pIndex->nKeyCol, x) ){
-        pIndex->nColumn--; 
-      }else{
-        pIndex->aiColumn[i] = x;
-        pIndex->azColl[i] = pPk->azColl[j];
-        pIndex->aSortOrder[i] = pPk->aSortOrder[j];
-        i++;
-      }
-    }
-    assert( i==pIndex->nColumn );
-  }else{
-    pIndex->aiColumn[i] = XN_ROWID;
-    pIndex->azColl[i] = sqlite3StrBINARY;
-  }
   sqlite3DefaultRowEst(pIndex);
   if( pParse->pNewTable==0 ) estimateIndexWidth(pIndex);
 
-  /* If this index contains every column of its table, then mark
-  ** it as a covering index */
   assert( HasRowid(pTab) 
       || pTab->iPKey<0 || sqlite3ColumnOfIndex(pIndex, pTab->iPKey)>=0 );
-  if( pTblName!=0 && pIndex->nColumn>=pTab->nCol ){
-    pIndex->isCovering = 1;
-    for(j=0; j<pTab->nCol; j++){
-      if( j==pTab->iPKey ) continue;
-      if( sqlite3ColumnOfIndex(pIndex,j)>=0 ) continue;
-      pIndex->isCovering = 0;
-      break;
-    }
-  }
 
   if( pTab==pParse->pNewTable ){
     /* This routine has been called to create an automatic index as a

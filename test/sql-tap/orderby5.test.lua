@@ -183,7 +183,9 @@ test:do_execsql_test(
     3.0,
     [[
         CREATE TABLE t3(a INTEGER PRIMARY KEY, b, c, d, e, f);
-        CREATE INDEX t3bcde ON t3(b, c, d, e);
+        --CREATE INDEX t3bcde ON t3(b, c, d, e);
+        -- As pk is not necessary in Tarantool's secondary indexes 'a' should be added manually
+        CREATE INDEX t3bcde ON t3(b, c, d, e, a);
         EXPLAIN QUERY PLAN
         SELECT a FROM t3 WHERE b=2 AND c=3 ORDER BY d DESC, e DESC, b, c, a DESC;
     ]], {

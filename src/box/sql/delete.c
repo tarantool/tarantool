@@ -824,44 +824,33 @@ void sqlite3GenerateRowDelete(
 **       for rowid tables or to the primary key index for WITHOUT ROWID
 **       tables.)
 **
-**   2.  Read/write cursors for all indices of pTab must be open as
-**       cursor number iIdxCur+i for the i-th index.  (The pTab->pIndex
-**       index is the 0-th index.)
+**   2.  Read/write cursor for primary index of pTab must be open as
+**       cursor number iIdxCur.  (The pTab->pIndex index is the 0-th index.)
 **
-**   3.  The "iDataCur" cursor must be already be positioned on the row
+**   3.  The "iDataCur" cursor must be already positioned on the row
 **       that is to be deleted.
 */
 void sqlite3GenerateRowIndexDelete(
   Parse *pParse,     /* Parsing and code generating context */
   Table *pTab,       /* Table containing the row to be deleted */
   int iDataCur,      /* Cursor of table holding data. */
-  int iIdxCur,       /* First index cursor */
-  int *aRegIdx,      /* Only delete if aRegIdx!=0 && aRegIdx[i]>0 */
-  int iIdxNoSeek     /* Do not delete from this cursor */
+  int iIdxCur        /* Primary index cursor */
 ){
-  int i;             /* Index loop counter */
   int r1 = -1;       /* Register holding an index key */
   int iPartIdxLabel; /* Jump destination for skipping partial index entries */
-  Index *pIdx;       /* Current index */
-  Index *pPrior = 0; /* Prior index */
   Vdbe *v;           /* The prepared statement under construction */
   Index *pPk;        /* PRIMARY KEY index, or NULL for rowid tables */
 
   v = pParse->pVdbe;
-  pPk = HasRowid(pTab) ? 0 : sqlite3PrimaryKeyIndex(pTab);
-  for(i=0, pIdx=pTab->pIndex; pIdx; i++, pIdx=pIdx->pNext){
-    assert( iIdxCur+i!=iDataCur || pPk==pIdx );
-    if( aRegIdx!=0 && aRegIdx[i]==0 ) continue;
-    if( pIdx==pPk ) continue;
-    if( iIdxCur+i==iIdxNoSeek ) continue;
-    VdbeModuleComment((v, "GenRowIdxDel for %s", pIdx->zName));
-    r1 = sqlite3GenerateIndexKey(pParse, pIdx, iDataCur, 0, 1,
-        &iPartIdxLabel, pPrior, r1);
-    sqlite3VdbeAddOp3(v, OP_IdxDelete, iIdxCur+i, r1,
-        pIdx->uniqNotNull ? pIdx->nKeyCol : pIdx->nColumn);
-    sqlite3ResolvePartIdxLabel(pParse, iPartIdxLabel);
-    pPrior = pIdx;
-  }
+  assert(!HasRowid(pTab));
+  pPk = sqlite3PrimaryKeyIndex(pTab);
+  /* In Tarantool it is enough to delete row just from pk */
+  VdbeModuleComment((v, "GenRowIdxDel for %s", pPk->zName));
+  r1 = sqlite3GenerateIndexKey(pParse, pPk, iDataCur, 0, 1,
+                               &iPartIdxLabel, NULL, r1);
+  sqlite3VdbeAddOp3(v, OP_IdxDelete, iIdxCur, r1,
+                    pPk->uniqNotNull ? pPk->nKeyCol : pPk->nColumn);
+  sqlite3ResolvePartIdxLabel(pParse, iPartIdxLabel);
 }
 
 /*
