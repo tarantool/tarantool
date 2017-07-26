@@ -379,6 +379,62 @@ void
 cbus_flush(struct cpipe *callee, struct cpipe *caller,
 	   void (*process_cb)(struct cbus_endpoint *));
 
+/**
+ * Create a two-way channel between existing cbus endpoints.
+ * Blocks until both pipes are created.
+ *
+ * @param dest_name       Name of the destination endpoint, i.e.
+ *                        the endpoint at a remote cord we are
+ *                        connecting to.
+ * @param src_name        Name of the source endpoint, i.e.
+ *                        the endpoint at the caller's cord.
+ * @param[out] dest_pipe  Pipe from the source to the destination
+ *                        endpoint.
+ * @param[out] src_pipe   Pipe from the destination to the source
+ *                        endpoint.
+ * @param pair_cb         Callback invoked at the destination right
+ *                        after creating the channel to the source.
+ *                        May be NULL.
+ * @param pair_arg        Argument passed to @pair_cb.
+ * @param process_cb      Function invoked to process cbus messages
+ *                        at the source endpoint. Pass NULL if there
+ *                        is a fiber processing messages at the source.
+ */
+void
+cbus_pair(const char *dest_name, const char *src_name,
+	  struct cpipe *dest_pipe, struct cpipe *src_pipe,
+	  void (*pair_cb)(void *), void *pair_arg,
+	  void (*process_cb)(struct cbus_endpoint *));
+
+/**
+ * Destroy a two-way channel between cbus endpoints.
+ * Blocks until both pipes are destroyed.
+ *
+ * Before proceeding to pipe destruction, this function flushes
+ * all cbus messages queued at the destination endpoint by sending
+ * a message from the source to the destination and back. The
+ * caller may specify a callback to invoke when the message is
+ * at the destination endpoint. This can be used to notify the
+ * destination that the channel is about to be destroyed and so
+ * it must stop generating new messages for it.
+ *
+ * @param dest_pipe       Pipe from the source to the destination
+ *                        endpoint.
+ * @param src_pipe        Pipe from the destination to the source
+ *                        endpoint.
+ * @param unpair_cb       Callback invoked at the destination before
+ *                        proceeding to pipe destruction (see above).
+ *                        May be NULL.
+ * @param unpair_arg      Argument passed to @unpair_cb.
+ * @param process_cb      Function invoked to process cbus messages
+ *                        at the source endpoint. Pass NULL if there
+ *                        is a fiber processing messages at the source.
+ */
+void
+cbus_unpair(struct cpipe *dest_pipe, struct cpipe *src_pipe,
+	    void (*unpair_cb)(void *), void *unpair_arg,
+	    void (*process_cb)(struct cbus_endpoint *));
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
