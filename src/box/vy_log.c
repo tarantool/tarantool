@@ -2004,7 +2004,7 @@ vy_recovery_new_f(va_list ap)
 
 	int rc;
 	struct xrow_header row;
-	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
+	while ((rc = xlog_cursor_next(&cursor, &row, false)) == 0) {
 		struct vy_log_record record;
 		rc = vy_log_record_decode(&record, &row);
 		if (rc < 0)
