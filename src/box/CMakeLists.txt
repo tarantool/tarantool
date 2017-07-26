@@ -75,7 +75,6 @@ add_library(box STATIC
     schema.cc
     session.cc
     port.c
-    request.c
     txn.cc
     box.cc
     gc.c

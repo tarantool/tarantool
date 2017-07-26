@@ -52,7 +52,6 @@
 #include "vinyl_engine.h"
 #include "space.h"
 #include "port.h"
-#include "request.h"
 #include "txn.h"
 #include "user.h"
 #include "cfg.h"
@@ -70,6 +69,9 @@
 #include "systemd.h"
 
 static char status[64] = "unknown";
+
+/** box.stat rmean */
+struct rmean *rmean_box;
 
 static void title(const char *new_status)
 {
