@@ -51,7 +51,7 @@
 #include "iobuf.h"
 #include "box.h"
 #include "call.h"
-#include "tuple.h"
+#include "tuple_convert.h"
 #include "session.h"
 #include "xrow.h"
 #include "schema.h" /* schema_version */

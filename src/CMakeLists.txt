@@ -87,6 +87,7 @@ set (core_sources
      fio.c
      cbus.c
      exception.cc
+     errinj.c
      reflection.c
      assoc.c
      util.c
@@ -139,7 +140,6 @@ set (server_sources
      iobuf.cc
      httpc.c
      pickle.c
-     errinj.c
      opts.c
      cfg.c
      cpu_feature.c

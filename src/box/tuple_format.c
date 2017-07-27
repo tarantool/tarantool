@@ -33,6 +33,7 @@
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
 struct tuple_format *tuple_format_default;
+struct tuple_format_vtab *tuple_format_default_vtab = NULL;
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
@@ -280,18 +281,6 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	return 0;
 }
 
-int
-tuple_format_init()
-{
-	tuple_format_default = tuple_format_new(&memtx_tuple_format_vtab,
-						NULL, 0, 0);
-	if (tuple_format_default == NULL)
-		return -1;
-	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_default, 1);
-	return 0;
-}
-
 /** Destroy tuple format subsystem and free resourses */
 void
 tuple_format_free()
@@ -312,7 +301,9 @@ tuple_format_free()
 box_tuple_format_t *
 box_tuple_format_new(struct key_def **keys, uint16_t key_count)
 {
-	box_tuple_format_t *format = tuple_format_new(&memtx_tuple_format_vtab,
+	if (unlikely(tuple_format_default_vtab == NULL))
+		panic("Please call box.cfg() first");
+	box_tuple_format_t *format = tuple_format_new(tuple_format_default_vtab,
 						      keys, key_count, 0);
 	if (format != NULL)
 		tuple_format_ref(format, 1);

@@ -39,12 +39,6 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /**
- * Initialize tuple format subsystem
- */
-int
-tuple_format_init(void);
-
-/**
  * Destroy tuple format subsystem and free resourses
  */
 void
@@ -112,7 +106,7 @@ struct tuple_format_vtab {
  * Hack: tuple_format_default and sysview engine use this vtab,
  * but should use the runtime arena and runtime specific vtab.
  */
-extern struct tuple_format_vtab memtx_tuple_format_vtab;
+extern struct tuple_format_vtab *tuple_format_default_vtab;
 
 /**
  * @brief Tuple format

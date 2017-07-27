@@ -48,6 +48,10 @@ struct quota;
 void
 tuple_init(void);
 
+/** Cleanup tuple library */
+void
+tuple_free(void);
+
 /**
  * Initialize tuples arena.
  * @param arena[out] Arena to initialize.
@@ -65,10 +69,6 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 
 void
 tuple_arena_destroy(struct slab_arena *arena);
-
-/** Cleanup tuple library */
-void
-tuple_free(void);
 
 /** \cond public */
 
@@ -739,29 +739,11 @@ tuple_bless(struct tuple *tuple)
 	return tuple;
 }
 
-/** These functions are implemented in tuple_convert.cc. */
-
-struct obuf;
-
-/* Store tuple in the output buffer in iproto format. */
-int
-tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
-
 /**
  * \copydoc box_tuple_to_buf()
  */
 ssize_t
 tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
-
-/**
- * Convert tuple to yaml string
- *
- * \param tuple tuple
- * \retval NULL in case of error written in diag
- * \retval pointer to string allocated on fiber()->gc region
- */
-char *
-tuple_to_yaml(const struct tuple *tuple);
 
 #if defined(__cplusplus)
 } /* extern "C" */

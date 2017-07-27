@@ -316,8 +316,6 @@ tuple_extract_key_set(struct key_def *key_def)
 void
 tuple_init(void)
 {
-	tuple_format_init();
-
 	mempool_create(&tuple_iterator_pool, &cord()->slabc,
 		       sizeof(struct tuple_iterator));
 
@@ -413,6 +411,17 @@ box_tuple_bsize(const box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
 	return tuple->bsize;
+}
+
+ssize_t
+tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
+{
+	uint32_t bsize;
+	const char *data = tuple_data_range(tuple, &bsize);
+	if (likely(bsize <= size)) {
+		memcpy(buf, data, bsize);
+	}
+	return bsize;
 }
 
 ssize_t
