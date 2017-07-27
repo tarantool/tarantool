@@ -107,6 +107,54 @@ struct request *
 xrow_decode_request(struct xrow_header *row);
 
 /**
+ * CALL/EVAL request.
+ */
+struct call_request {
+	/** Request header */
+	const struct xrow_header *header;
+	/** Function name for CALL request. MessagePack String. */
+	const char *name;
+	/** Expression for EVAL request. MessagePack String. */
+	const char *expr;
+	/** CALL/EVAL parameters. MessagePack Array. */
+	const char *args;
+	const char *args_end;
+};
+
+/**
+ * Decode CALL/EVAL request from a given MessagePack map.
+ * @param[out] call_request Request to decode to.
+ * @param type Request type - either CALL or CALL_16 or EVAL.
+ * @param sync Request sync.
+ * @param data Request MessagePack encoded body.
+ * @param len @data length.
+ */
+int
+xrow_decode_call(const struct xrow_header *row, struct call_request *request);
+
+/**
+ * AUTH request
+ */
+struct auth_request {
+	/** Request header */
+	const struct xrow_header *header;
+	/** MessagePack encoded name of the user to authenticate. */
+	const char *user_name;
+	/** Auth scramble. @sa scramble.h */
+	const char *scramble;
+};
+
+/**
+ * Decode AUTH request from MessagePack.
+ * @param row request header.
+ * @param[out] request Request to decode.
+ * @retval  0 on success
+ * @retval -1 on error
+ */
+int
+xrow_decode_auth(const struct xrow_header *row, struct auth_request *request);
+
+/**
  * Encode AUTH command.
  * @param[out] Row.
  * @param salt Salt from IPROTO greeting.

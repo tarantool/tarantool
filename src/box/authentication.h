@@ -33,38 +33,6 @@
 
 #include <stdint.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-struct xrow_header;
-
-/**
- * AUTH request
- */
-struct auth_request {
-	/** Request header */
-	const struct xrow_header *header;
-	/** MessagePack encoded name of the user to authenticate. */
-	const char *user_name;
-	/** Auth scramble. @sa scramble.h */
-	const char *scramble;
-};
-
-/**
- * Decode AUTH request from MessagePack.
- * @param row request header.
- * @param[out] request Request to decode.
- * @retval  0 on success
- * @retval -1 on error
- */
-int
-xrow_decode_auth(const struct xrow_header *row, struct auth_request *request);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
 void
 authenticate(const char *user_name, uint32_t len, const char *tuple);
 

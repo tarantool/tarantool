@@ -33,40 +33,6 @@
 
 #include <stdint.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-/**
- * CALL/EVAL request.
- */
-struct call_request {
-	/** Request header */
-	const struct xrow_header *header;
-	/** Function name for CALL request. MessagePack String. */
-	const char *name;
-	/** Expression for EVAL request. MessagePack String. */
-	const char *expr;
-	/** CALL/EVAL parameters. MessagePack Array. */
-	const char *args;
-	const char *args_end;
-};
-
-/**
- * Decode CALL/EVAL request from a given MessagePack map.
- * @param[out] call_request Request to decode to.
- * @param type Request type - either CALL or CALL_16 or EVAL.
- * @param sync Request sync.
- * @param data Request MessagePack encoded body.
- * @param len @data length.
- */
-int
-xrow_decode_call(const struct xrow_header *row, struct call_request *request);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
 struct obuf;
 
 struct box_function_ctx {

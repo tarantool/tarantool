@@ -523,6 +523,150 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 }
 
 int
+xrow_decode_call(const struct xrow_header *row, struct call_request *request)
+{
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing request body");
+		return 1;
+	}
+
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	assert((end - data) > 0);
+
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+error:
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+		return 1;
+	}
+
+	memset(request, 0, sizeof(*request));
+	request->header = row;
+
+	uint32_t map_size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		if ((end - data) < 1 || mp_typeof(*data) != MP_UINT)
+			goto error;
+
+		uint64_t key = mp_decode_uint(&data);
+		const char *value = data;
+		if (mp_check(&data, end) != 0)
+			goto error;
+
+		switch (key) {
+		case IPROTO_FUNCTION_NAME:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->name = value;
+			break;
+		case IPROTO_EXPR:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->expr = value;
+			break;
+		case IPROTO_TUPLE:
+			if (mp_typeof(*value) != MP_ARRAY)
+				goto error;
+			request->args = value;
+			request->args_end = data;
+			break;
+		default:
+			continue; /* unknown key */
+		}
+	}
+	if (data != end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
+		return 1;
+	}
+	if (row->type == IPROTO_EVAL) {
+		if (request->expr == NULL) {
+			diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+				 iproto_key_name(IPROTO_EXPR));
+			return 1;
+		}
+	} else if (request->name == NULL) {
+		assert(row->type == IPROTO_CALL_16 ||
+		       row->type == IPROTO_CALL);
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 iproto_key_name(IPROTO_FUNCTION_NAME));
+		return 1;
+	}
+	if (request->args == NULL) {
+		static const char empty_args[] = { (char)0x90 };
+		request->args = empty_args;
+		request->args_end = empty_args + sizeof(empty_args);
+	}
+	return 0;
+}
+
+int
+xrow_decode_auth(const struct xrow_header *row, struct auth_request *request)
+{
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing request body");
+		return 1;
+	}
+
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	assert((end - data) > 0);
+
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+error:
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+		return 1;
+	}
+
+	memset(request, 0, sizeof(*request));
+	request->header = row;
+
+	uint32_t map_size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		if ((end - data) < 1 || mp_typeof(*data) != MP_UINT)
+			goto error;
+
+		uint64_t key = mp_decode_uint(&data);
+		const char *value = data;
+		if (mp_check(&data, end) != 0)
+			goto error;
+
+		switch (key) {
+		case IPROTO_USER_NAME:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->user_name = value;
+			break;
+		case IPROTO_TUPLE:
+			if (mp_typeof(*value) != MP_ARRAY)
+				goto error;
+			request->scramble = value;
+			break;
+		default:
+			continue; /* unknown key */
+		}
+	}
+	if (data != end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
+		return 1;
+	}
+	if (request->user_name == NULL) {
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			  iproto_key_name(IPROTO_USER_NAME));
+		return 1;
+	}
+	if (request->scramble == NULL) {
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 iproto_key_name(IPROTO_TUPLE));
+		return 1;
+	}
+	return 0;
+}
+
+int
 xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len,
 		 const char *password, size_t password_len)

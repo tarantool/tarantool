@@ -51,7 +51,6 @@
 #include "iobuf.h"
 #include "box.h"
 #include "call.h"
-#include "authentication.h"
 #include "tuple.h"
 #include "session.h"
 #include "xrow.h"
