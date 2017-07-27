@@ -218,7 +218,7 @@ txn_rollback_stmt();
  * transaction and must be run in autocommit mode.
  */
 void
-txn_check_autocommit(struct txn *txn, const char *where);
+txn_check_singlestatement(struct txn *txn, const char *where);
 
 /** The current statement of the transaction. */
 static inline struct txn_stmt *

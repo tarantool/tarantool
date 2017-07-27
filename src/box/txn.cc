@@ -298,9 +298,10 @@ txn_rollback()
 }
 
 void
-txn_check_autocommit(struct txn *txn, const char *where)
+txn_check_singlestatement(struct txn *txn, const char *where)
 {
-	if (txn->is_autocommit == false) {
+	if (!txn->is_autocommit ||
+	    stailq_last(&txn->stmts) != stailq_first(&txn->stmts)) {
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  where, "multi-statement transactions");
 	}
