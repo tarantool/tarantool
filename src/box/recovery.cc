@@ -350,12 +350,11 @@ recovery_finalize(struct recovery *r, struct xstream *stream)
 
 /* {{{ Local recovery: support of hot standby and replication relay */
 
-/*
- * Implements a subscription to WAL updates.
- * Attempts to register a WAL watcher; if it fails, falls back to fs events.
- * In the latter mode either a change to the WAL dir itself or a change
- * in the XLOG file triggers a wakeup. The WAL dir path is set in
- * constructor. XLOG file path is set via .set_log_path().
+/**
+ * Implements a subscription to WAL updates via fs events.
+ * Any change to the WAL dir itself or a change in the XLOG
+ * file triggers a wakeup. The WAL dir path is set in the
+ * constructor. XLOG file path is set with set_log_path().
  */
 class WalSubscription {
 public:
@@ -363,19 +362,12 @@ public:
 	bool signaled;
 	struct ev_stat dir_stat;
 	struct ev_stat file_stat;
-	struct ev_async async;
-	struct wal_watcher watcher;
 	char dir_path[PATH_MAX];
 	char file_path[PATH_MAX];
 
 	static void stat_cb(struct ev_loop *, struct ev_stat *stat, int)
 	{
 		((WalSubscription *)stat->data)->wakeup();
-	}
-
-	static void async_cb(struct ev_loop *, ev_async *async, int)
-	{
-		((WalSubscription *)async->data)->wakeup();
 	}
 
 	void wakeup()
@@ -397,40 +389,21 @@ public:
 
 		ev_stat_init(&dir_stat, stat_cb, "", 0.0);
 		ev_stat_init(&file_stat, stat_cb, "", 0.0);
-		ev_async_init(&async, async_cb);
 		dir_stat.data = this;
 		file_stat.data = this;
-		async.data = this;
 
-		ev_async_start(loop(), &async);
-		if (wal_set_watcher(&watcher, &async) == -1) {
-			/* Fallback to fs events. */
-			ev_async_stop(loop(), &async);
-			ev_stat_set(&dir_stat, dir_path, 0.0);
-			ev_stat_start(loop(), &dir_stat);
-			watcher.loop = NULL;
-			watcher.async = NULL;
-		}
+		ev_stat_set(&dir_stat, dir_path, 0.0);
+		ev_stat_start(loop(), &dir_stat);
 	}
 
 	~WalSubscription()
 	{
 		ev_stat_stop(loop(), &file_stat);
 		ev_stat_stop(loop(), &dir_stat);
-		wal_clear_watcher(&watcher);
-		ev_async_stop(loop(), &async);
 	}
 
 	void set_log_path(const char *path)
 	{
-		if (ev_is_active(&async)) {
-			/*
-			 * Notifications delivered via watcher, fs events
-			 * irrelevant.
-			 */
-			return;
-		}
-
 		/*
 		 * Avoid toggling ev_stat if the path didn't change.
 		 * Note: .file_path valid iff file_stat is active.

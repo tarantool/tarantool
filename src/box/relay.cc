@@ -51,6 +51,7 @@
 #include "xrow.h"
 #include "xrow_io.h"
 #include "xstream.h"
+#include "wal.h"
 
 /** Report relay status to tx thread at least once per this interval */
 static const int RELAY_REPORT_INTERVAL = 1;
@@ -93,10 +94,14 @@ struct relay {
 	struct xstream stream;
 	/** Vclock to stop playing xlogs */
 	struct vclock stop_vclock;
-	/** Directory rescan delay for recovery */
-	ev_tstamp wal_dir_rescan_delay;
 	/** Remote replica */
 	struct replica *replica;
+	/** WAL event watcher. */
+	struct wal_watcher wal_watcher;
+	/** Set before exiting the relay loop. */
+	bool exiting;
+	/** Set on relay error. */
+	bool failed;
 
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
@@ -208,12 +213,6 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 	});
 }
 
-static void
-feed_event_f(struct trigger *trigger, void * /* event */)
-{
-	ev_feed_event(loop(), (struct ev_io *) trigger->data, EV_CUSTOM);
-}
-
 /**
  * The message which updated tx thread with a new vclock has returned back
  * to the relay.
@@ -268,6 +267,24 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 	cpipe_push(&relay->tx_pipe, &m->msg);
 }
 
+static void
+relay_process_wal_event(struct wal_watcher *watcher)
+{
+	struct relay *relay = container_of(watcher, struct relay, wal_watcher);
+	if (relay->exiting) {
+		/*
+		 * Do not try to send anything to the replica
+		 * if it already closed its socket.
+		 */
+		return;
+	}
+	try {
+		recover_remaining_wals(relay->r, &relay->stream, NULL);
+	} catch (Exception *e) {
+		relay->failed = true;
+	}
+}
+
 /**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
@@ -289,6 +306,8 @@ relay_subscribe_f(va_list ap)
 		RLIST_LINK_INITIALIZER, relay_on_close_log_f, relay, NULL
 	};
 	trigger_add(&r->on_close_log, &on_close_log);
+	wal_set_watcher(&relay->wal_watcher, cord_name(cord()),
+			relay_process_wal_event, cbus_process);
 	/*
 	 * Create a guard to detach the relay from cbus and
 	 * clear the garbage collection trigger on exit.
@@ -296,13 +315,13 @@ relay_subscribe_f(va_list ap)
 	auto guard = make_scoped_guard([&]{
 		trigger_clear(&on_close_log);
 		say_crit("exiting the relay loop");
+		relay->exiting = true;
+		wal_clear_watcher(&relay->wal_watcher, cbus_process);
 		cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
 			    NULL, NULL, cbus_process);
 		cbus_endpoint_destroy(&relay->endpoint, cbus_process);
 	});
 	relay_set_cord_name(relay->io.fd);
-	recovery_follow_local(r, &relay->stream, fiber_name(fiber()),
-			      relay->wal_dir_rescan_delay);
 
 	/*
 	 * Init a read event: when replica closes its end
@@ -313,24 +332,8 @@ relay_subscribe_f(va_list ap)
 	read_ev.data = fiber();
 	ev_io_init(&read_ev, (ev_io_cb) fiber_schedule_cb,
 		   relay->io.fd, EV_READ);
-	/**
-	 * If there is an exception in the follower fiber, it's
-	 * sufficient to break the main fiber's wait on the read
-	 * event.
-	 * recovery_stop_local() will follow and raise the
-	 * original exception in the joined fiber.  This original
-	 * exception will reach cord_join() and will be raised
-	 * further up, eventually reaching iproto_process(), where
-	 * it'll get converted to an iproto message and sent to
-	 * the client.
-	 * It's safe to allocate the trigger on stack, the life of
-	 * the follower fiber is enclosed into life of this fiber.
-	 */
-	struct trigger on_follow_error = {
-		RLIST_LINK_INITIALIZER, feed_event_f, &read_ev, NULL
-	};
-	trigger_add(&r->watcher->on_stop, &on_follow_error);
-	while (! fiber_is_dead(r->watcher)) {
+
+	while (true) {
 		double timeout = RELAY_REPORT_INTERVAL;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
@@ -340,12 +343,15 @@ relay_subscribe_f(va_list ap)
 		ev_io_start(loop(), &read_ev);
 		fiber_yield_timeout(timeout);
 		ev_io_stop(loop(), &read_ev);
+
 		/*
-		 * The fiber can be woken by IO read event, by the timeout of
-		 * status messaging or by an acknowledge to status message.
-		 * Handle cbus messages first.
+		 * The fiber can be woken by IO read event, timeout,
+		 * or cbus message. Handle cbus messages first.
 		 */
 		cbus_process(&relay->endpoint);
+
+		if (relay->failed)
+			diag_raise();
 
 		uint8_t data;
 		int rc = recv(read_ev.fd, &data, sizeof(data), 0);
@@ -374,12 +380,6 @@ relay_subscribe_f(va_list ap)
 		relay->status_msg.relay = relay;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
-	/*
-	 * Avoid double wakeup: both from the on_stop and fiber
-	 * cancel events.
-	 */
-	trigger_clear(&on_follow_error);
-	recovery_stop_local(r);
 	return 0;
 }
 
@@ -415,7 +415,6 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 			       replica_clock);
 	vclock_copy(&relay.tx.vclock, replica_clock);
 	relay.replica = replica;
-	relay.wal_dir_rescan_delay = cfg_getd("wal_dir_rescan_delay");
 	replica_set_relay(replica, &relay);
 
 	auto scope_guard = make_scoped_guard([&]{

@@ -50,9 +50,9 @@ struct recovery {
 	struct xlog_cursor cursor;
 	struct xdir wal_dir;
 	/**
-	 * This is used in local hot standby or replication
-	 * relay mode: look for changes in the wal_dir and apply them
-	 * locally or send to the replica.
+	 * This fiber is used in local hot standby mode.
+	 * It looks for changes in the wal_dir and applies
+	 * them locally.
 	 */
 	struct fiber *watcher;
 	/** List of triggers invoked when the current WAL is closed. */
