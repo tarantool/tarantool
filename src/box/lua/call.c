@@ -311,11 +311,11 @@ execute_lua_call(lua_State *L)
 		      luamp_error, L);
 
 	int count;
-	if (request->type == IPROTO_CALL_16) {
+	if (request->header->type == IPROTO_CALL_16) {
 		/* Tarantool < 1.7.1 compatibility */
 		count = luamp_encode_call(L, cfg, &stream);
 	} else {
-		assert(request->type == IPROTO_CALL);
+		assert(request->header->type == IPROTO_CALL);
 		count = lua_gettop(L);
 		for (int k = 1; k <= count; ++k) {
 			luamp_encode(L, cfg, &stream, k);
@@ -323,7 +323,8 @@ execute_lua_call(lua_State *L)
 	}
 
 	mpstream_flush(&stream);
-	iproto_reply_select(out, svp, request->sync, schema_version, count);
+	iproto_reply_select(out, svp, request->header->sync, schema_version,
+			    count);
 	return 0; /* truncate Lua stack */
 }
 
@@ -368,7 +369,8 @@ execute_lua_eval(lua_State *L)
 		luamp_encode(L, luaL_msgpack_default, &stream, k);
 	}
 	mpstream_flush(&stream);
-	iproto_reply_select(out, svp, request->sync, schema_version, nrets);
+	iproto_reply_select(out, svp, request->header->sync, schema_version,
+			    nrets);
 
 	return 0;
 }

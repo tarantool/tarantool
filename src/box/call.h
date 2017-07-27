@@ -33,43 +33,46 @@
 
 #include <stdint.h>
 
-struct obuf;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-/** Request details of call and eval. */
+/**
+ * CALL/EVAL request.
+ */
 struct call_request {
-	/**
-	 * Set either name to function name of call request or
-	 * set expr to lua expression for eval request.
-	 */
-	union {
-		const char *name;
-		const char *expr;
-	};
-	/** Call/eval parameters. */
+	/** Request header */
+	const struct xrow_header *header;
+	/** Function name for CALL request. MessagePack String. */
+	const char *name;
+	/** Expression for EVAL request. MessagePack String. */
+	const char *expr;
+	/** CALL/EVAL parameters. MessagePack Array. */
 	const char *args;
 	const char *args_end;
-	/** IPROTO_CALL/IPROTO_CALL_16/IPROTO_EVAL */
-	uint8_t type;
-	/** Request sync. @sa xrow_header. */
-	uint64_t sync;
-};
-
-struct box_function_ctx {
-	struct call_request *request;
-	struct port *port;
 };
 
 /**
- * Decode call request from a given MessagePack map.
+ * Decode CALL/EVAL request from a given MessagePack map.
  * @param[out] call_request Request to decode to.
  * @param type Request type - either CALL or CALL_16 or EVAL.
  * @param sync Request sync.
  * @param data Request MessagePack encoded body.
  * @param len @data length.
  */
-void
-call_request_decode_xc(struct call_request *request, uint8_t type,
-		       uint64_t sync, const char *data, uint32_t len);
+int
+xrow_decode_call(const struct xrow_header *row, struct call_request *request);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+struct obuf;
+
+struct box_function_ctx {
+	struct call_request *request;
+	struct port *port;
+};
 
 void
 box_process_call(struct call_request *request, struct obuf *out);

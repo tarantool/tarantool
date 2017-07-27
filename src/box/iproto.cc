@@ -620,7 +620,6 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	assert(*pos == reqend);
 	const char *body;
 	uint8_t type = msg->header.type;
-	uint64_t sync = msg->header.sync;
 
 	switch (type) {
 	case IPROTO_SELECT:
@@ -650,11 +649,8 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
 	case IPROTO_EVAL:
-		if (msg->header.bodycnt == 0)
-			goto err_no_body;
-		body = (const char *) msg->header.body[0].iov_base;
-		call_request_decode_xc(&msg->call_request, type, sync, body,
-				       msg->header.body[0].iov_len);
+		if (xrow_decode_call(&msg->header, &msg->call_request) != 0)
+			diag_raise();
 		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_PING:
@@ -666,11 +662,8 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		*stop_input = true;
 		break;
 	case IPROTO_AUTH:
-		if (msg->header.bodycnt == 0)
-			goto err_no_body;
-		body = (const char *) msg->header.body[0].iov_base;
-		auth_request_decode_xc(&msg->auth_request, sync, body,
-				       msg->header.body[0].iov_len);
+		if (xrow_decode_auth(&msg->header, &msg->auth_request) != 0)
+			diag_raise();
 		cmsg_init(msg, misc_route);
 		break;
 	default:
@@ -1034,11 +1027,9 @@ tx_process_misc(struct cmsg *m)
 		switch (msg->header.type) {
 		case IPROTO_CALL:
 		case IPROTO_CALL_16:
-			assert(msg->call_request.type == msg->header.type);
 			box_process_call(&msg->call_request, out);
 			break;
 		case IPROTO_EVAL:
-			assert(msg->call_request.type == msg->header.type);
 			box_process_eval(&msg->call_request, out);
 			break;
 		case IPROTO_AUTH:

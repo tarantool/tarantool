@@ -45,67 +45,82 @@
 
 static const char empty_args[] = { (char)0x90 };
 
-void
-call_request_decode_xc(struct call_request *request, uint8_t type,
-		       uint64_t sync, const char *data, uint32_t len)
+int
+xrow_decode_call(const struct xrow_header *row, struct call_request *request)
 {
-	assert(type == IPROTO_CALL || type == IPROTO_CALL_16 || type == IPROTO_EVAL);
-	const char *end = data + len;
-	uint32_t map_size;
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing request body");
+		return 1;
+	}
 
-	map_size = mp_decode_map(&data);
-	request->name = NULL;
-	request->args = NULL;
-	request->args_end = NULL;
-	request->type = type;
-	request->sync = sync;
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	assert((end - data) > 0);
+
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+error:
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+		return 1;
+	}
+
+	memset(request, 0, sizeof(*request));
+	request->header = row;
+
+	uint32_t map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; ++i) {
-		uint8_t key = *data;
-		if (key != IPROTO_EXPR && key != IPROTO_FUNCTION_NAME &&
-		    key != IPROTO_TUPLE) {
-			/* Skip key + value. */
-			mp_check(&data, end);
-			mp_check(&data, end);
-			continue;
-		}
-		const char *value = ++data;
-		if (mp_check(&data, end) != 0) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "packet body");
-		}
-		switch(key) {
-		case IPROTO_EXPR:
-			request->expr = value;
-			break;
+		if ((end - data) < 1 || mp_typeof(*data) != MP_UINT)
+			goto error;
+
+		uint64_t key = mp_decode_uint(&data);
+		const char *value = data;
+		if (mp_check(&data, end) != 0)
+			goto error;
+
+		switch (key) {
 		case IPROTO_FUNCTION_NAME:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
 			request->name = value;
 			break;
+		case IPROTO_EXPR:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->expr = value;
+			break;
 		case IPROTO_TUPLE:
+			if (mp_typeof(*value) != MP_ARRAY)
+				goto error;
 			request->args = value;
 			request->args_end = data;
 			break;
 		default:
-			unreachable();
+			continue; /* unknown key */
 		}
 	}
-	if (type == IPROTO_EVAL) {
+	if (data != end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
+		return 1;
+	}
+	if (row->type == IPROTO_EVAL) {
 		if (request->expr == NULL) {
-			tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
-				  iproto_key_name(IPROTO_EXPR));
+			diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+				 iproto_key_name(IPROTO_EXPR));
+			return 1;
 		}
 	} else if (request->name == NULL) {
-		assert(type == IPROTO_CALL_16 || type == IPROTO_CALL);
-		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
-			  iproto_key_name(IPROTO_FUNCTION_NAME));
+		assert(row->type == IPROTO_CALL_16 ||
+		       row->type == IPROTO_CALL);
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 iproto_key_name(IPROTO_FUNCTION_NAME));
+		return 1;
 	}
 	if (request->args == NULL) {
 		request->args = empty_args;
 		request->args_end = empty_args + sizeof(empty_args);
 	}
-	if (data != end)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+	return 0;
 }
 
 static inline struct func *
@@ -164,16 +179,16 @@ func_call(struct func *func, struct call_request *request, struct obuf *out)
 	if (iproto_prepare_select(out, &svp) != 0)
 		goto error;
 
-	if (request->type == IPROTO_CALL_16) {
+	if (request->header->type == IPROTO_CALL_16) {
 		/* Tarantool < 1.7.1 compatibility */
 		if (port_dump(&port, out) != 0) {
 			obuf_rollback_to_svp(out, &svp);
 			goto error;
 		}
-		iproto_reply_select(out, &svp, request->sync,
+		iproto_reply_select(out, &svp, request->header->sync,
 				    ::schema_version, port.size);
 	} else {
-		assert(request->type == IPROTO_CALL);
+		assert(request->header->type == IPROTO_CALL);
 		char *size_buf = (char *)
 			obuf_alloc(out, mp_sizeof_array(port.size));
 		if (size_buf == NULL)
@@ -183,7 +198,7 @@ func_call(struct func *func, struct call_request *request, struct obuf *out)
 			obuf_rollback_to_svp(out, &svp);
 			goto error;
 		}
-		iproto_reply_select(out, &svp, request->sync,
+		iproto_reply_select(out, &svp, request->header->sync,
 				    ::schema_version, 1);
 	}
 

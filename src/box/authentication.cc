@@ -32,50 +32,73 @@
 #include "user.h"
 #include "session.h"
 #include "iproto_constants.h"
+#include "xrow.h"
 
 static char zero_hash[SCRAMBLE_SIZE];
 
-void
-auth_request_decode_xc(struct auth_request *request, uint64_t sync,
-		       const char *data, uint32_t len)
+int
+xrow_decode_auth(const struct xrow_header *row, struct auth_request *request)
 {
-	const char *end = data + len;
-	uint32_t map_size;
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing request body");
+		return 1;
+	}
 
-	map_size = mp_decode_map(&data);
-	request->user_name = NULL;
-	request->scramble = NULL;
-	request->sync = sync;
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	assert((end - data) > 0);
+
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+error:
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+		return 1;
+	}
+
+	memset(request, 0, sizeof(*request));
+	request->header = row;
+
+	uint32_t map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; ++i) {
-		uint8_t key = *data;
-		if (key != IPROTO_USER_NAME && key != IPROTO_TUPLE) {
-			/* Skip key + value. */
-			mp_check(&data, end);
-			mp_check(&data, end);
-			continue;
-		}
-		const char *value = ++data;
-		if (mp_check(&data, end) != 0) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "packet body");
-		}
-		if (key == IPROTO_USER_NAME)
+		if ((end - data) < 1 || mp_typeof(*data) != MP_UINT)
+			goto error;
+
+		uint64_t key = mp_decode_uint(&data);
+		const char *value = data;
+		if (mp_check(&data, end) != 0)
+			goto error;
+
+		switch (key) {
+		case IPROTO_USER_NAME:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
 			request->user_name = value;
-		else
+			break;
+		case IPROTO_TUPLE:
+			if (mp_typeof(*value) != MP_ARRAY)
+				goto error;
 			request->scramble = value;
+			break;
+		default:
+			continue; /* unknown key */
+		}
+	}
+	if (data != end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
+		return 1;
 	}
 	if (request->user_name == NULL) {
-		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 			  iproto_key_name(IPROTO_USER_NAME));
+		return 1;
 	}
 	if (request->scramble == NULL) {
-		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
-			  iproto_key_name(IPROTO_TUPLE));
+		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
+			 iproto_key_name(IPROTO_TUPLE));
+		return 1;
 	}
-	if (data != end)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
+	return 0;
 }
 
 void
