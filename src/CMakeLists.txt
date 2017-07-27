@@ -128,7 +128,11 @@ target_link_libraries(uuid core bit)
 add_library(scramble STATIC scramble.c)
 target_link_libraries(scramble core misc)
 
-add_library(crc32 STATIC crc32.c cpu_feature.c)
+add_library(crc32 STATIC
+    crc32.c
+    cpu_feature.c
+    ${PROJECT_SOURCE_DIR}/third_party/crc32.c
+)
 
 set (server_sources
      find_path.c

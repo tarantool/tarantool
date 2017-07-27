@@ -29,6 +29,8 @@
  * SUCH DAMAGE.
  */
 #include "crc32.h"
+
+#include <trivia/config.h>
 #include <third_party/crc32.h>
 #include <cpu_feature.h>
 /*
