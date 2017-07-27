@@ -819,7 +819,7 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator,
 			     itr->run_env, slice, ITER_EQ, itr->key,
 			     itr->p_read_view, index->cmp_def,
-			     index->user_key_def, format,
+			     index->key_def, format,
 			     index->upsert_format, index->id == 0);
 	while (true) {
 		struct tuple *stmt;
@@ -1108,7 +1108,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     itr->run_env, slice,
 				     itr->iterator_type, itr->key,
 				     itr->read_view, index->cmp_def,
-				     index->user_key_def, format,
+				     index->key_def, format,
 				     index->upsert_format, index->id == 0);
 	}
 }
@@ -1295,7 +1295,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	if (itr->iterator_type == ITER_EQ) {
 		if (itr->index->opts.is_unique)
 			one_value = tuple_field_count(itr->key) >=
-				    itr->index->user_key_def->part_count;
+				    itr->index->key_def->part_count;
 		else
 			one_value = tuple_field_count(itr->key) >=
 				    itr->index->cmp_def->part_count;

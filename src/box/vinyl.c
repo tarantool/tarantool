@@ -653,7 +653,7 @@ vy_task_dump_execute(struct vy_task *task)
 	return vy_run_write(task->new_run, index->env->path,
 			    index->space_id, index->id, task->wi,
 			    task->page_size, index->cmp_def,
-			    index->user_key_def, task->max_output_count,
+			    index->key_def, task->max_output_count,
 			    task->bloom_fpr);
 }
 
@@ -1003,7 +1003,7 @@ vy_task_compact_execute(struct vy_task *task)
 	return vy_run_write(task->new_run, index->env->path,
 			    index->space_id, index->id, task->wi,
 			    task->page_size, index->cmp_def,
-			    index->user_key_def, task->max_output_count,
+			    index->key_def, task->max_output_count,
 			    task->bloom_fpr);
 }
 
@@ -2349,7 +2349,7 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 	 */
 	vy_log_tx_begin();
 	vy_log_create_index(index->commit_lsn, index->id,
-			    index->space_id, index->user_key_def);
+			    index->space_id, index->key_def);
 	vy_log_insert_range(index->commit_lsn, range->id, NULL, NULL);
 	if (vy_log_tx_try_commit() != 0)
 		say_warn("failed to log index creation: %s",
@@ -2786,7 +2786,7 @@ vy_check_dup_key(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * up) to check for duplicates.
          */
 	assert(part_count == index->cmp_def->part_count);
-	if (vy_index_get(env, tx, index, key, index->user_key_def->part_count,
+	if (vy_index_get(env, tx, index, key, index->key_def->part_count,
 			 &found))
 		return -1;
 
@@ -2818,7 +2818,7 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	const char *key;
 	assert(pk->id == 0);
-	key = tuple_extract_key(stmt, pk->user_key_def, NULL);
+	key = tuple_extract_key(stmt, pk->key_def, NULL);
 	if (key == NULL)
 		return -1;
 	/*
@@ -2903,7 +2903,7 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 */
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
 		const char *key;
-		key = tuple_extract_key(new_tuple, pk->user_key_def, NULL);
+		key = tuple_extract_key(new_tuple, pk->key_def, NULL);
 		if (key == NULL)
 			goto error_unref;
 		uint32_t part_count = mp_decode_array(&key);
@@ -2958,7 +2958,7 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 				       request->tuple_end);
 	if (new_stmt == NULL)
 		return -1;
-	const char *key = tuple_extract_key(new_stmt, pk->user_key_def, NULL);
+	const char *key = tuple_extract_key(new_stmt, pk->key_def, NULL);
 	if (key == NULL) /* out of memory */
 		goto error;
 	uint32_t part_count = mp_decode_array(&key);
@@ -3045,7 +3045,7 @@ vy_unique_key_validate(struct vy_index *index, const char *key,
 	 * supplied key parts uniquely identify the tuple, as long
 	 * as the index is unique.
 	 */
-	uint32_t original_part_count = index->user_key_def->part_count;
+	uint32_t original_part_count = index->key_def->part_count;
 	if (original_part_count != part_count) {
 		diag_set(ClientError, ER_EXACT_MATCH,
 			 original_part_count, part_count);
@@ -3081,13 +3081,13 @@ vy_index_full_by_stmt(struct vy_env *env, struct vy_tx *tx,
 	uint32_t size;
 	const char *tuple = tuple_data_range(partial, &size);
 	const char *tuple_end = tuple + size;
-	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, pk->user_key_def,
+	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, pk->key_def,
 						 NULL);
 	if (pkey == NULL)
 		return -1;
 	/* Fetch the tuple from the primary index. */
 	uint32_t part_count = mp_decode_array(&pkey);
-	assert(part_count == pk->user_key_def->part_count);
+	assert(part_count == pk->key_def->part_count);
 	return vy_index_get(env, tx, pk, pkey, part_count, full);
 }
 
@@ -3207,7 +3207,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		assert(index->id == 0);
 		struct tuple *delete =
 			vy_stmt_new_surrogate_delete_from_key(request->key,
-							      pk->user_key_def,
+							      pk->key_def,
 							      space->format);
 		if (delete == NULL)
 			return -1;
@@ -3240,8 +3240,8 @@ vy_check_update(struct space *space, const struct vy_index *pk,
 		const struct tuple *old_tuple, const struct tuple *new_tuple,
 		uint64_t column_mask)
 {
-	if (!key_update_can_be_skipped(pk->user_key_def->column_mask, column_mask) &&
-	    vy_tuple_compare(old_tuple, new_tuple, pk->user_key_def) != 0) {
+	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
+	    vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 index_name_by_id(space, pk->id), space_name(space));
 		return -1;
@@ -3552,7 +3552,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 *   to delete old tuples from secondary indexes.
 	 */
 	/* Find the old tuple using the primary key. */
-	key = tuple_extract_key_raw(tuple, tuple_end, pk->user_key_def, NULL);
+	key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def, NULL);
 	if (key == NULL)
 		return -1;
 	part_count = mp_decode_array(&key);
@@ -4590,7 +4590,7 @@ vy_squash_process(struct vy_squash *squash)
 	struct vy_env *env = squash->env;
 	/*
 	 * vy_apply_upsert() is used for primary key only,
-	 * so this is the same as index->user_key_def
+	 * so this is the same as index->key_def
 	 */
 	struct key_def *def = index->cmp_def;
 

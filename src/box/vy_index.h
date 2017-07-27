@@ -121,7 +121,7 @@ vy_index_env_destroy(struct vy_index_env *env);
  *
  * - the first one is defined by the user. It contains the key
  *   parts of the secondary key, as present in the original tuple.
- *   This is user_key_def.
+ *   This is key_def.
  *
  * - the second one is used to fetch key parts of the secondary
  *   key, *augmented* with the parts of the primary key from the
@@ -146,7 +146,7 @@ struct vy_index {
 	/** Key definition used to compare tuples. */
 	struct key_def *cmp_def;
 	/** Key definition passed by the user. */
-	struct key_def *user_key_def;
+	struct key_def *key_def;
 	/** Tuple format corresponding to key_def. */
 	struct tuple_format *surrogate_format;
 	/** Tuple format of the space this index belongs to. */

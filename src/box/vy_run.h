@@ -214,7 +214,7 @@ struct vy_run_iterator {
 	/** Index key definition used for storing statements on disk. */
 	const struct key_def *cmp_def;
 	/** Index key definition defined by the user. */
-	const struct key_def *user_key_def;
+	const struct key_def *key_def;
 	/**
 	 * Format ot allocate REPLACE and DELETE tuples read from
 	 * pages.
@@ -384,7 +384,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	     uint32_t space_id, uint32_t iid,
 	     struct vy_stmt_stream *wi, uint64_t page_size,
 	     const struct key_def *cmp_def,
-	     const struct key_def *user_key_def,
+	     const struct key_def *key_def,
 	     size_t max_output_count, double bloom_fpr);
 
 /**
@@ -455,7 +455,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
-		     const struct key_def *user_key_def,
+		     const struct key_def *key_def,
 		     struct tuple_format *format,
 		     struct tuple_format *upsert_format,
 		     bool is_primary);

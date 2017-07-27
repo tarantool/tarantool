@@ -146,20 +146,20 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		goto fail_tree;
 	}
 
-	struct key_def *user_key_def = key_def_dup(&index_def->key_def);
-	if (user_key_def == NULL)
-		goto fail_user_key_def;
+	struct key_def *key_def = key_def_dup(&index_def->key_def);
+	if (key_def == NULL)
+		goto fail_key_def;
 
 	struct key_def *cmp_def = NULL;
 	if (index_def->iid == 0) {
-		cmp_def = user_key_def;
+		cmp_def = key_def;
 	} else {
-		cmp_def = key_def_merge(user_key_def, pk->user_key_def);
+		cmp_def = key_def_merge(key_def, pk->key_def);
 		if (cmp_def == NULL)
-			goto fail_key_def;
+			goto fail_cmp_def;
 	}
 	index->cmp_def = cmp_def;
-	index->user_key_def = user_key_def;
+	index->key_def = key_def;
 	index->surrogate_format = tuple_format_new(&vy_tuple_format_vtab,
 						   &cmp_def, 1, 0);
 	if (index->surrogate_format == NULL)
@@ -236,8 +236,8 @@ fail_format:
 	if (index_def->iid > 0)
 		free(cmp_def);
 fail_key_def:
-	free(user_key_def);
-fail_user_key_def:
+	free(key_def);
+fail_cmp_def:
 	free(index->tree);
 fail_tree:
 	free(index);
@@ -279,7 +279,7 @@ vy_index_delete(struct vy_index *index)
 	tuple_format_ref(index->upsert_format, -1);
 	if (index->id > 0)
 		free(index->cmp_def);
-	free(index->user_key_def);
+	free(index->key_def);
 	histogram_delete(index->run_hist);
 	vy_index_stat_destroy(&index->stat);
 	vy_cache_destroy(&index->cache);

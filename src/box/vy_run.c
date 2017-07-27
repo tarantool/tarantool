@@ -1323,16 +1323,16 @@ vy_run_iterator_start_from(struct vy_run_iterator *itr,
 	itr->search_started = true;
 	*ret = NULL;
 
-	const struct key_def *user_key_def = itr->user_key_def;
-	bool is_full_key = (tuple_field_count(key) >= user_key_def->part_count);
+	const struct key_def *key_def = itr->key_def;
+	bool is_full_key = (tuple_field_count(key) >= key_def->part_count);
 	if (run->info.has_bloom && iterator_type == ITER_EQ && is_full_key) {
 		uint32_t hash;
 		if (vy_stmt_type(key) == IPROTO_SELECT) {
 			const char *data = tuple_data(key);
 			mp_decode_array(&data);
-			hash = key_hash(data, user_key_def);
+			hash = key_hash(data, key_def);
 		} else {
-			hash = tuple_hash(key, user_key_def);
+			hash = tuple_hash(key, key_def);
 		}
 		if (!bloom_possible_has(&run->info.bloom, hash)) {
 			itr->search_ended = true;
@@ -1495,7 +1495,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
-		     const struct key_def *user_key_def,
+		     const struct key_def *key_def,
 		     struct tuple_format *format,
 		     struct tuple_format *upsert_format,
 		     bool is_primary)
@@ -1503,7 +1503,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 	itr->base.iface = &vy_run_iterator_iface;
 	itr->stat = stat;
 	itr->cmp_def = cmp_def;
-	itr->user_key_def = user_key_def;
+	itr->key_def = key_def;
 	itr->format = format;
 	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
@@ -2044,7 +2044,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 		  struct vy_stmt_stream *wi, struct tuple **curr_stmt,
 		  uint64_t page_size, struct bloom_spectrum *bs,
 		  const struct key_def *cmp_def,
-		  const struct key_def *user_key_def, bool is_primary,
+		  const struct key_def *key_def, bool is_primary,
 		  uint32_t *page_info_capacity)
 {
 	assert(curr_stmt != NULL);
@@ -2104,7 +2104,7 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 				     cmp_def, is_primary) != 0)
 			goto error_rollback;
 
-		bloom_spectrum_add(bs, tuple_hash(*curr_stmt, user_key_def));
+		bloom_spectrum_add(bs, tuple_hash(*curr_stmt, key_def));
 
 		int64_t lsn = vy_stmt_lsn(*curr_stmt);
 		run->info.min_lsn = MIN(run->info.min_lsn, lsn);
@@ -2196,8 +2196,8 @@ static int
 vy_run_write_data(struct vy_run *run, const char *dirpath,
 		  uint32_t space_id, uint32_t iid,
 		  struct vy_stmt_stream *wi, uint64_t page_size,
+		  const struct key_def *cmp_def,
 		  const struct key_def *key_def,
-		  const struct key_def *user_key_def,
 		  size_t max_output_count, double bloom_fpr)
 {
 	struct tuple *stmt;
@@ -2239,7 +2239,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	int rc;
 	do {
 		rc = vy_run_write_page(run, &data_xlog, wi, &stmt,
-				       page_size, &bs, key_def, user_key_def,
+				       page_size, &bs, cmp_def, key_def,
 				       iid == 0, &page_info_capacity);
 		if (rc < 0)
 			goto err_close_xlog;
@@ -2508,7 +2508,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 	     uint32_t space_id, uint32_t iid,
 	     struct vy_stmt_stream *wi, uint64_t page_size,
 	     const struct key_def *cmp_def,
-	     const struct key_def *user_key_def,
+	     const struct key_def *key_def,
 	     size_t max_output_count, double bloom_fpr)
 {
 	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
@@ -2520,7 +2520,7 @@ vy_run_write(struct vy_run *run, const char *dirpath,
 		usleep(inj->dparam * 1000000);
 
 	if (vy_run_write_data(run, dirpath, space_id, iid,
-			      wi, page_size, cmp_def, user_key_def,
+			      wi, page_size, cmp_def, key_def,
 			      max_output_count, bloom_fpr) != 0)
 		return -1;
 
