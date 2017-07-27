@@ -313,7 +313,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
-	struct request *request = xrow_decode_request_xc(row);
+	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	process_rw(request, space, NULL);
 }
@@ -351,7 +351,7 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request = xrow_decode_request_xc(row);
+	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
@@ -636,7 +636,8 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	request = region_alloc_object(&fiber()->gc, struct request);
 	if (request == NULL)
 		return -1;
-	request_create(request, type);
+	memset(request, 0, sizeof(*request));
+	request->type = type;
 	request->space_id = space_id;
 	va_start(ap, format);
 	size_t buf_size = mp_vformat(NULL, 0, format, ap);
@@ -791,7 +792,8 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	mp_tuple_assert(tuple, tuple_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_INSERT);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_INSERT;
 	request->space_id = space_id;
 	request->tuple = tuple;
 	request->tuple_end = tuple_end;
@@ -805,7 +807,8 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	mp_tuple_assert(tuple, tuple_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_REPLACE);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_REPLACE;
 	request->space_id = space_id;
 	request->tuple = tuple;
 	request->tuple_end = tuple_end;
@@ -819,7 +822,8 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_DELETE);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_DELETE;
 	request->space_id = space_id;
 	request->index_id = index_id;
 	request->key = key;
@@ -836,7 +840,8 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(ops, ops_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_UPDATE);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_UPDATE;
 	request->space_id = space_id;
 	request->index_id = index_id;
 	request->key = key;
@@ -857,7 +862,8 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	mp_tuple_assert(tuple, tuple_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_UPSERT);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_UPSERT;
 	request->space_id = space_id;
 	request->index_id = index_id;
 	request->ops = ops;

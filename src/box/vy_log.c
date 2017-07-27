@@ -535,12 +535,13 @@ vy_log_record_encode(const struct vy_log_record *record,
 	 * Store record in xrow.
 	 */
 	struct request req;
-	request_create(&req, IPROTO_INSERT);
+	memset(&req, 0, sizeof(req));
+	req.type = IPROTO_INSERT;
 	req.tuple = tuple;
 	req.tuple_end = pos;
 	memset(row, 0, sizeof(*row));
 	row->type = req.type;
-	row->bodycnt = request_encode(&req, row->body);
+	row->bodycnt = xrow_encode_dml(&req, row->body);
 	return 0;
 }
 
@@ -550,16 +551,14 @@ vy_log_record_encode(const struct vy_log_record *record,
  */
 static int
 vy_log_record_decode(struct vy_log_record *record,
-		     const struct xrow_header *row)
+		     struct xrow_header *row)
 {
 	char *buf;
 
 	memset(record, 0, sizeof(*record));
 
 	struct request req;
-	request_create(&req, row->type);
-	if (request_decode(&req, row->body->iov_base, row->body->iov_len,
-			   1ULL << IPROTO_TUPLE) < 0) {
+	if (xrow_decode_dml(row, &req, 1ULL << IPROTO_TUPLE) != 0) {
 		error_log(diag_last_error(diag_get()));
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 "Bad record: failed to decode request");

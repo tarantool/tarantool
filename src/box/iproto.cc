@@ -617,9 +617,13 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 {
 	xrow_header_decode_xc(&msg->header, pos, reqend);
 	assert(*pos == reqend);
-	const char *body;
 	uint8_t type = msg->header.type;
 
+	/*
+	 * Parse request before putting it into the queue
+	 * to save tx some CPU. More complicated requests are
+	 * parsed in tx thread into request type-specific objects.
+	 */
 	switch (type) {
 	case IPROTO_SELECT:
 	case IPROTO_INSERT:
@@ -627,29 +631,15 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
-		request_create(&msg->dml_request, type);
-		msg->dml_request.header = &msg->header;
-		/*
-		 * This is a common request which can be parsed with
-		 * request_decode(). Parse it before putting it into
-		 * the queue to save tx some CPU. More complicated
-		 * requests are parsed in tx thread into request type-
-		 * specific objects.
-		 */
-		if (msg->header.bodycnt == 0)
-			goto err_no_body;
-		body = (const char *) msg->header.body[0].iov_base;
-		request_decode_xc(&msg->dml_request, body,
-				  msg->header.body[0].iov_len,
-				  dml_request_key_map(type));
+		xrow_decode_dml_xc(&msg->header, &msg->dml_request,
+				   dml_request_key_map(type));
 		assert(type < sizeof(dml_route)/sizeof(*dml_route));
 		cmsg_init(msg, dml_route[type]);
 		break;
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
 	case IPROTO_EVAL:
-		if (xrow_decode_call(&msg->header, &msg->call_request) != 0)
-			diag_raise();
+		xrow_decode_call_xc(&msg->header, &msg->call_request);
 		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_PING:
@@ -661,8 +651,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		*stop_input = true;
 		break;
 	case IPROTO_AUTH:
-		if (xrow_decode_auth(&msg->header, &msg->auth_request) != 0)
-			diag_raise();
+		xrow_decode_auth_xc(&msg->header, &msg->auth_request);
 		cmsg_init(msg, misc_route);
 		break;
 	default:
@@ -671,8 +660,6 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		break;
 	}
 	return;
-err_no_body:
-	tnt_raise(ClientError, ER_INVALID_MSGPACK, "missing request body");
 }
 
 /** Enqueue all requests which were read up. */

@@ -470,7 +470,8 @@ vy_stmt_encode_primary(const struct tuple *value,
 	xrow->lsn = vy_stmt_lsn(value);
 
 	struct request request;
-	request_create(&request, type);
+	memset(&request, 0, sizeof(request));
+	request.type = type;
 	request.space_id = space_id;
 	uint32_t size;
 	const char *extracted = NULL;
@@ -497,7 +498,7 @@ vy_stmt_encode_primary(const struct tuple *value,
 	default:
 		unreachable();
 	}
-	xrow->bodycnt = request_encode(&request, xrow->body);
+	xrow->bodycnt = xrow_encode_dml(&request, xrow->body);
 	if (xrow->bodycnt < 0)
 		return -1;
 	return 0;
@@ -514,7 +515,8 @@ vy_stmt_encode_secondary(const struct tuple *value,
 	xrow->lsn = vy_stmt_lsn(value);
 
 	struct request request;
-	request_create(&request, type);
+	memset(&request, 0, sizeof(request));
+	request.type = type;
 	uint32_t size;
 	const char *extracted = tuple_extract_key(value, key_def, &size);
 	if (extracted == NULL)
@@ -527,7 +529,7 @@ vy_stmt_encode_secondary(const struct tuple *value,
 		request.key = extracted;
 		request.key_end = extracted + size;
 	}
-	xrow->bodycnt = request_encode(&request, xrow->body);
+	xrow->bodycnt = xrow_encode_dml(&request, xrow->body);
 	if (xrow->bodycnt < 0)
 		return -1;
 	else
@@ -539,11 +541,9 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	       struct tuple_format *format, bool is_primary)
 {
 	struct request request;
-	request_create(&request, xrow->type);
 	uint64_t key_map = dml_request_key_map(xrow->type);
 	key_map &= ~(1ULL << IPROTO_SPACE_ID); /* space_id is optional */
-	if (request_decode(&request, xrow->body->iov_base, xrow->body->iov_len,
-			   key_map) < 0)
+	if (xrow_decode_dml(xrow, &request, key_map) != 0)
 		return NULL;
 	struct tuple *stmt = NULL;
 	const char *key;

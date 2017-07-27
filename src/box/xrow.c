@@ -340,24 +340,31 @@ iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
 }
 
-void
-request_create(struct request *request, uint32_t type)
-{
-	memset(request, 0, sizeof(*request));
-	request->type = type;
-}
-
 int
-request_decode(struct request *request, const char *data, uint32_t len,
-	       uint64_t key_map)
+xrow_decode_dml(struct xrow_header *row, struct request *request,
+		uint64_t key_map)
 {
-	const char *end = data + len;
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing request body");
+		return 1;
+	}
+
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	assert((end - data) > 0);
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
+
+	memset(request, 0, sizeof(*request));
+	request->header = row;
+	request->type = row->type;
+
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
 		if (! iproto_dml_body_has_key(data, end)) {
@@ -407,12 +414,10 @@ error:
 			break;
 		}
 	}
-#ifndef NDEBUG
 	if (data != end) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
 		return -1;
 	}
-#endif
 	if (key_map) {
 		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
@@ -423,7 +428,7 @@ error:
 }
 
 int
-request_encode(struct request *request, struct iovec *iov)
+xrow_encode_dml(const struct request *request, struct iovec *iov)
 {
 	int iovcnt = 1;
 	const int MAP_LEN_MAX = 40;
@@ -481,7 +486,7 @@ request_encode(struct request *request, struct iovec *iov)
 }
 
 struct request *
-xrow_decode_request(struct xrow_header *row)
+xrow_decode_dml_gc(struct xrow_header *row)
 {
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
@@ -491,14 +496,11 @@ xrow_decode_request(struct xrow_header *row)
 			 "request");
 		return NULL;
 	}
-	request_create(request, row->type);
-	if (request_decode(request, (const char *) row->body[0].iov_base,
-			   row->body[0].iov_len,
-			   dml_request_key_map(row->type)) != 0) {
+	uint64_t key_map = dml_request_key_map(row->type);
+	if (xrow_decode_dml(row, request, key_map) != 0) {
 		region_truncate(region, used);
 		return NULL;
 	}
-	request->header = row;
 	return request;
 }
 

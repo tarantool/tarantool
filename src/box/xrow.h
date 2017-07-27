@@ -97,14 +97,69 @@ xrow_header_decode(struct xrow_header *header,
 		   const char **pos, const char *end);
 
 /**
- * Decode a request from the @row.
+ * DML request.
+ */
+struct request {
+	/*
+	 * Either log row, or network header, or NULL, depending
+	 * on where this packet originated from: the write ahead
+	 * log/snapshot, client request, or a Lua request.
+	 */
+	struct xrow_header *header;
+	/**
+	 * Request type - IPROTO type code
+	 */
+	uint32_t type;
+	uint32_t space_id;
+	uint32_t index_id;
+	uint32_t offset;
+	uint32_t limit;
+	uint32_t iterator;
+	/** Search key. */
+	const char *key;
+	const char *key_end;
+	/** Insert/replace/upsert tuple or proc argument or update operations. */
+	const char *tuple;
+	const char *tuple_end;
+	/** Upsert operations. */
+	const char *ops;
+	const char *ops_end;
+	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
+	int index_base;
+};
+
+/**
+ * Decode DML request from a given MessagePack map.
+ * @param row request header.
+ * @param[out] request DML request to decode to.
+ * @param key_map a bit map of keys that are required by the caller,
+ *        @sa request_key_map().
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+int
+xrow_decode_dml(struct xrow_header *xrow, struct request *request,
+		uint64_t key_map);
+
+/**
+ * Decode a request from the @row using fiber->gc.
  * @param row Xrow.
  * @retval not NULL Decoded request.
  *
  * @retval     NULL Memory or binary format error.
  */
 struct request *
-xrow_decode_request(struct xrow_header *row);
+xrow_decode_dml_gc(struct xrow_header *row);
+
+/**
+ * Encode the request fields to iovec using region_alloc().
+ * @param request request to encode
+ * @param iov[out] iovec to fill
+ * @retval -1 on error, see diag
+ * @retval > 0 the number of iovecs used
+ */
+int
+xrow_encode_dml(const struct request *request, struct iovec *iov);
 
 /**
  * CALL/EVAL request.
@@ -285,68 +340,6 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 void
 iproto_write_error(int fd, const struct error *e, uint32_t schema_version);
 
-struct request
-{
-	/*
-	 * Either log row, or network header, or NULL, depending
-	 * on where this packet originated from: the write ahead
-	 * log/snapshot, client request, or a Lua request.
-	 */
-	struct xrow_header *header;
-	/**
-	 * Request type - IPROTO type code
-	 */
-	uint32_t type;
-	uint32_t space_id;
-	uint32_t index_id;
-	uint32_t offset;
-	uint32_t limit;
-	uint32_t iterator;
-	/** Search key. */
-	const char *key;
-	const char *key_end;
-	/** Insert/replace/upsert tuple or proc argument or update operations. */
-	const char *tuple;
-	const char *tuple_end;
-	/** Upsert operations. */
-	const char *ops;
-	const char *ops_end;
-	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
-	int index_base;
-};
-
-/**
- * Initialize a request for @a code
- * @param request request
- * @param code see `enum iproto_type`
- */
-void
-request_create(struct request *request, uint32_t code);
-
-/**
- * Decode @a data buffer
- * @param request request to fill up
- * @param data a buffer
- * @param len a buffer size
- * @param key_map a bit map of keys that are required by the caller,
- *        @sa request_key_map().
- * @retval 0 on success
- * @retval -1 on error, see diag
- */
-int
-request_decode(struct request *request, const char *data, uint32_t len,
-	       uint64_t key_map);
-
-/**
- * Encode the request fields to iovec using region_alloc().
- * @param request request to encode
- * @param iov[out] iovec to fill
- * @retval -1 on error, see diag
- * @retval > 0 the number of iovecs used
- */
-int
-request_encode(struct request *request, struct iovec *iov);
-
 enum {
 	/* Maximal length of protocol name in handshake */
 	GREETING_PROTOCOL_LEN_MAX = 32,
@@ -447,30 +440,48 @@ xrow_decode_error_xc(struct xrow_header *row)
 }
 
 static inline void
-request_decode_xc(struct request *request, const char *data, uint32_t len,
-		  uint64_t key_map)
+xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
+		   uint64_t key_map)
 {
-	if (request_decode(request, data, len, key_map) < 0)
+	if (xrow_decode_dml(row, request, key_map) != 0)
 		diag_raise();
 }
 
-static inline int
-request_encode_xc(struct request *request, struct iovec *iov)
+/** @copydoc xrow_decode_request. */
+static inline struct request *
+xrow_decode_dml_gc_xc(struct xrow_header *row)
 {
-	int iovcnt = request_encode(request, iov);
+	struct request *ret = xrow_decode_dml_gc(row);
+	if (ret == NULL)
+		diag_raise();
+	return ret;
+}
+
+static inline int
+xrow_encode_dml_xc(const struct request *request, struct iovec *iov)
+{
+	int iovcnt = xrow_encode_dml(request, iov);
 	if (iovcnt < 0)
 		diag_raise();
 	return iovcnt;
 }
 
-/** @copydoc xrow_decode_request. */
-static inline struct request *
-xrow_decode_request_xc(struct xrow_header *row)
+/** @copydoc xrow_decode_call. */
+static inline void
+xrow_decode_call_xc(const struct xrow_header *row,
+		    struct call_request *request)
 {
-	struct request *ret = xrow_decode_request(row);
-	if (ret == NULL)
+	if (xrow_decode_call(row, request) != 0)
 		diag_raise();
-	return ret;
+}
+
+/** @copydoc xrow_decode_auth. */
+static inline void
+xrow_decode_auth_xc(const struct xrow_header *row,
+		    struct auth_request *request)
+{
+	if (xrow_decode_auth(row, request) != 0)
+		diag_raise();
 }
 
 /** @copydoc xrow_encode_auth. */
