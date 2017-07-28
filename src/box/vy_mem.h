@@ -62,9 +62,9 @@ struct tree_mem_key {
  */
 static int
 vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
-		const struct key_def *key_def)
+		const struct key_def *cmp_def)
 {
-	int res = vy_stmt_compare(a, b, key_def);
+	int res = vy_stmt_compare(a, b, cmp_def);
 	if (res)
 		return res;
 	int64_t a_lsn = vy_stmt_lsn(a), b_lsn = vy_stmt_lsn(b);
@@ -76,9 +76,9 @@ vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
  */
 static int
 vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
-		    const struct key_def *key_def)
+		    const struct key_def *cmp_def)
 {
-	int res = vy_stmt_compare(a, key->stmt, key_def);
+	int res = vy_stmt_compare(a, key->stmt, cmp_def);
 	if (res == 0) {
 		if (key->lsn == INT64_MAX - 1)
 			return 0;
@@ -93,8 +93,8 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 #define BPS_TREE_NAME vy_mem_tree
 #define BPS_TREE_BLOCK_SIZE 512
 #define BPS_TREE_EXTENT_SIZE VY_MEM_TREE_EXTENT_SIZE
-#define BPS_TREE_COMPARE(a, b, key_def) vy_mem_tree_cmp(a, b, key_def)
-#define BPS_TREE_COMPARE_KEY(a, b, key_def) vy_mem_tree_cmp_key(a, b, key_def)
+#define BPS_TREE_COMPARE(a, b, cmp_def) vy_mem_tree_cmp(a, b, cmp_def)
+#define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_mem_tree_cmp_key(a, b, cmp_def)
 #define bps_tree_elem_t const struct tuple *
 #define bps_tree_key_t struct tree_mem_key *
 #define bps_tree_arg_t const struct key_def *
@@ -139,8 +139,11 @@ struct vy_mem {
 	/** The min and max values of stmt->lsn in this tree. */
 	int64_t min_lsn;
 	int64_t max_lsn;
-	/* A key definition for this index. */
-	const struct key_def *key_def;
+	/**
+	 * Key definition for this index, extended with primary
+	 * key parts.
+	 */
+	const struct key_def *cmp_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 	/** Schema version at the time of creation. */
@@ -227,7 +230,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  */
 struct vy_mem *
 vy_mem_new(struct lsregion *allocator, int64_t generation,
-	   const struct key_def *key_def, struct tuple_format *format,
+	   const struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version);
 

@@ -262,6 +262,27 @@ s:drop()
 ---
 ...
 --
+-- Calling space.truncate concurrently.
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+c = fiber.channel(5)
+---
+...
+for i = 1, 5 do fiber.create(function() s:truncate() c:put(true) end) end
+---
+...
+for i = 1, 5 do c:get() end
+---
+...
+s:drop()
+---
+...
+--
 -- Check that space truncation is persistent.
 --
 -- The test checks the following cases:

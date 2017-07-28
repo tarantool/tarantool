@@ -343,9 +343,6 @@ struct fiber {
 	unsigned int stack_id;
 	/* A garbage-collected memory pool. */
 	struct region gc;
-#ifdef ENABLE_BACKTRACE
-	void *last_stack_frame;
-#endif
 	/**
 	 * The fiber which should be scheduled when
 	 * this fiber yields.

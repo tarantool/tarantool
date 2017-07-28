@@ -70,9 +70,9 @@ struct vy_cache_entry {
  */
 static inline int
 vy_cache_tree_cmp(struct vy_cache_entry *a,
-		  struct vy_cache_entry *b, struct key_def *key_def)
+		  struct vy_cache_entry *b, struct key_def *cmp_def)
 {
-	return vy_stmt_compare(a->stmt, b->stmt, key_def);
+	return vy_stmt_compare(a->stmt, b->stmt, cmp_def);
 }
 
 /**
@@ -80,9 +80,9 @@ vy_cache_tree_cmp(struct vy_cache_entry *a,
  */
 static inline int
 vy_cache_tree_key_cmp(struct vy_cache_entry *a,
-		      const struct tuple *b, struct key_def *key_def)
+		      const struct tuple *b, struct key_def *cmp_def)
 {
-	return vy_stmt_compare(a->stmt, b, key_def);
+	return vy_stmt_compare(a->stmt, b, cmp_def);
 }
 
 #define VY_CACHE_TREE_EXTENT_SIZE (16 * 1024)
@@ -90,8 +90,8 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a,
 #define BPS_TREE_NAME vy_cache_tree
 #define BPS_TREE_BLOCK_SIZE 512
 #define BPS_TREE_EXTENT_SIZE VY_CACHE_TREE_EXTENT_SIZE
-#define BPS_TREE_COMPARE(a, b, key_def) vy_cache_tree_cmp(a, b, key_def)
-#define BPS_TREE_COMPARE_KEY(a, b, key_def) vy_cache_tree_key_cmp(a, b, key_def)
+#define BPS_TREE_COMPARE(a, b, cmp_def) vy_cache_tree_cmp(a, b, cmp_def)
+#define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_cache_tree_key_cmp(a, b, cmp_def)
 #define bps_tree_elem_t struct vy_cache_entry *
 #define bps_tree_key_t const struct tuple *
 #define bps_tree_arg_t struct key_def *
@@ -146,8 +146,11 @@ vy_cache_env_destroy(struct vy_cache_env *e);
  * Tuple cache (of one particular index)
  */
 struct vy_cache {
-	/* Key definition for tuple comparison */
-	struct key_def *key_def;
+	/**
+	 * Key definition for tuple comparison, includes primary
+	 * key parts
+	 */
+	struct key_def *cmp_def;
 	/* Tree of cache entries */
 	struct vy_cache_tree cache_tree;
 	/* The vesrion of state of cache_tree. Increments on every change */
@@ -161,11 +164,11 @@ struct vy_cache {
 /**
  * Allocate and initialize tuple cache.
  * @param env - pointer to common cache environment.
- * @param key_def - key definition for tuple comparison.
+ * @param cmp_def - key definition for tuple comparison.
  */
 void
 vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
-		struct key_def *key_def);
+		struct key_def *cmp_def);
 
 /**
  * Destroy and deallocate tuple cache.

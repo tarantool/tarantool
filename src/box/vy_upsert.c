@@ -124,7 +124,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
-		const struct key_def *key_def, struct tuple_format *format,
+		const struct key_def *cmp_def, struct tuple_format *format,
 		struct tuple_format *upsert_format, bool suppress_error)
 {
 	/*
@@ -232,12 +232,12 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		return NULL;
 	vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(new_stmt));
 
-	check_key:
+check_key:
 	/*
 	 * Check that key hasn't been changed after applying operations.
 	 */
-	if (!key_update_can_be_skipped(key_def->column_mask, column_mask) &&
-	    vy_tuple_compare(old_stmt, result_stmt, key_def) != 0) {
+	if (!key_update_can_be_skipped(cmp_def->column_mask, column_mask) &&
+	    vy_tuple_compare(old_stmt, result_stmt, cmp_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and
 		 * @retval the old stmt.

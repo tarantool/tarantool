@@ -86,17 +86,6 @@ pthread_t main_thread_id;
 static size_t page_size;
 static int stack_direction;
 
-static void
-update_last_stack_frame(struct fiber *fiber)
-{
-#ifdef ENABLE_BACKTRACE
-	fiber->last_stack_frame = __builtin_frame_address(0);
-#else
-	(void)fiber;
-#endif /* ENABLE_BACKTRACE */
-
-}
-
 enum {
 	/* The minimum allowable fiber stack size in bytes */
 	FIBER_STACK_SIZE_MINIMAL = 16384,
@@ -188,8 +177,6 @@ fiber_call_impl(struct fiber *callee)
 	assert(caller != callee);
 
 	cord->fiber = callee;
-
-	update_last_stack_frame(caller);
 
 	callee->flags &= ~FIBER_IS_READY;
 	callee->csw++;
@@ -425,8 +412,6 @@ fiber_yield(void)
 	assert(callee->flags & FIBER_IS_READY || callee == &cord->sched);
 	assert(! (callee->flags & FIBER_IS_DEAD));
 	cord->fiber = callee;
-	update_last_stack_frame(caller);
-
 	callee->csw++;
 	callee->flags &= ~FIBER_IS_READY;
 	ASAN_START_SWITCH_FIBER(asan_state,

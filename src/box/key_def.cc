@@ -196,16 +196,25 @@ key_def_set_cmp(struct key_def *def)
 	tuple_extract_key_set(def);
 }
 
-box_key_def_t *
-box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
+struct key_def *
+key_def_new(uint32_t part_count)
 {
 	size_t sz = key_def_sizeof(part_count);
-	box_key_def_t *key_def = (box_key_def_t *)malloc(sz);
+	struct key_def *key_def = (struct key_def *) malloc(sz);
 	if (key_def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
 		return NULL;
 	}
 	key_def->part_count = part_count;
+	return key_def;
+}
+
+box_key_def_t *
+box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
+{
+	struct key_def *key_def = key_def_new(part_count);
+	if (key_def == NULL)
+		return key_def;
 
 	for (uint32_t item = 0; item < part_count; ++item)
 		key_def_set_part(key_def, item, fields[item],
@@ -256,17 +265,16 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts, uint32_t part_count)
+	      const struct index_opts *opts)
 {
 	assert(name_len <= BOX_NAME_MAX);
-	size_t sz = index_def_sizeof(part_count);
 	/*
 	 * Use calloc to zero all struct index_def attributes
 	 * the comparator pointers.
 	 */
-	struct index_def *def = (struct index_def *) calloc(1, sz);
+	struct index_def *def = (struct index_def *) calloc(1, sizeof(*def));
 	if (def == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
+		diag_set(OutOfMemory, sizeof(*def), "malloc", "struct index_def");
 		return NULL;
 	}
 	def->name = strndup(name, name_len);
@@ -284,7 +292,6 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
-	def->key_def.part_count = part_count;
 	return def;
 }
 
@@ -302,20 +309,25 @@ index_opts_dup(struct index_opts *dst, const struct index_opts *src)
 struct index_def *
 index_def_dup(const struct index_def *def)
 {
-	size_t sz = index_def_sizeof(def->key_def.part_count);
-	struct index_def *dup = (struct index_def *) malloc(sz);
+	struct index_def *dup = (struct index_def *) malloc(sizeof(*dup));
 	if (dup == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "struct index_def");
+		diag_set(OutOfMemory, sizeof(*dup), "malloc",
+			 "struct index_def");
 		return NULL;
 	}
-	memcpy(dup, def, sz);
+	*dup = *def;
 	dup->name = strdup(def->name);
-	if (dup->name == NULL) {
+	size_t sz = key_def_sizeof(def->key_def->part_count);
+	dup->key_def = (struct key_def *) malloc(sz);
+	if (dup->name == NULL || dup->key_def == NULL) {
+		free(dup->name);
+		free(dup->key_def);
 		free(dup);
 		diag_set(OutOfMemory, strlen(def->name) + 1, "malloc",
 			 "index_def name");
 		return NULL;
 	}
+	memcpy(dup->key_def, def->key_def, sz);
 	rlist_create(&dup->link);
 	index_opts_dup(&dup->opts, &def->opts);
 	return dup;
@@ -334,7 +346,7 @@ index_def_swap(struct index_def *def1, struct index_def *def2)
 	 * for indexes with identical key definitions.
 	 * @todo: remove key_def from index_def
 	 */
-	assert(def1->key_def.part_count == def2->key_def.part_count);
+	assert(def1->key_def->part_count == def2->key_def->part_count);
 }
 
 /** Free a key definition. */
@@ -343,6 +355,7 @@ index_def_delete(struct index_def *index_def)
 {
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
+	free(index_def->key_def);
 	free(index_def);
 }
 
@@ -353,10 +366,10 @@ index_def_change_requires_rebuild(struct index_def *old_index_def,
 	if (old_index_def->iid != new_index_def->iid ||
 	    old_index_def->type != new_index_def->type ||
 	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
-	    key_part_cmp(old_index_def->key_def.parts,
-			 old_index_def->key_def.part_count,
-			 new_index_def->key_def.parts,
-			 new_index_def->key_def.part_count) != 0) {
+	    key_part_cmp(old_index_def->key_def->parts,
+			 old_index_def->key_def->part_count,
+			 new_index_def->key_def->parts,
+			 new_index_def->key_def->part_count) != 0) {
 		return true;
 	}
 	if (old_index_def->type == RTREE) {
@@ -397,8 +410,8 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 	if (index_opts_cmp(&key1->opts, &key2->opts))
 		return index_opts_cmp(&key1->opts, &key2->opts);
 
-	return key_part_cmp(key1->key_def.parts, key1->key_def.part_count,
-			    key2->key_def.parts, key2->key_def.part_count);
+	return key_part_cmp(key1->key_def->parts, key1->key_def->part_count,
+			    key2->key_def->parts, key2->key_def->part_count);
 }
 
 void
@@ -416,22 +429,22 @@ index_def_check(struct index_def *index_def, const char *space_name)
 			  space_name,
 			  "primary key must be unique");
 	}
-	if (index_def->key_def.part_count == 0) {
+	if (index_def->key_def->part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  index_def->name,
 			  space_name,
 			  "part count must be positive");
 	}
-	if (index_def->key_def.part_count > BOX_INDEX_PART_MAX) {
+	if (index_def->key_def->part_count > BOX_INDEX_PART_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  index_def->name,
 			  space_name,
 			  "too many key parts");
 	}
-	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
-		assert(index_def->key_def.parts[i].type > FIELD_TYPE_ANY &&
-		       index_def->key_def.parts[i].type < field_type_MAX);
-		if (index_def->key_def.parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
+	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
+		assert(index_def->key_def->parts[i].type > FIELD_TYPE_ANY &&
+		       index_def->key_def->parts[i].type < field_type_MAX);
+		if (index_def->key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name,
@@ -442,8 +455,8 @@ index_def_check(struct index_def *index_def, const char *space_name)
 			 * Courtesy to a user who could have made
 			 * a typo.
 			 */
-			if (index_def->key_def.parts[i].fieldno ==
-			    index_def->key_def.parts[j].fieldno) {
+			if (index_def->key_def->parts[i].fieldno ==
+			    index_def->key_def->parts[j].fieldno) {
 				tnt_raise(ClientError, ER_MODIFY_INDEX,
 					  index_def->name,
 					  space_name,

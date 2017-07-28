@@ -49,7 +49,8 @@
 #include "port.h"
 #include "iobuf.h"
 #include "box.h"
-#include "tuple.h"
+#include "call.h"
+#include "tuple_convert.h"
 #include "session.h"
 #include "xrow.h"
 #include "schema.h" /* schema_version */
@@ -77,7 +78,11 @@ struct iproto_msg: public cmsg
 	struct xrow_header header;
 	union {
 		/* Box request, if this is a DML */
-		struct request request;
+		struct request dml_request;
+		/* Box request, if this is misc (call, eval). */
+		struct call_request call_request;
+		/* Authentication request. */
+		struct auth_request auth_request;
 		/* SQL request, if this is the EXECUTE request. */
 		struct sql_request sql_request;
 	};
@@ -623,37 +628,30 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	xrow_header_decode_xc(&msg->header, pos, reqend);
 	assert(*pos == reqend);
 	const char *body;
+	uint8_t type = msg->header.type;
 
-	switch (msg->header.type) {
+	/*
+	 * Parse request before putting it into the queue
+	 * to save tx some CPU. More complicated requests are
+	 * parsed in tx thread into request type-specific objects.
+	 */
+	switch (type) {
 	case IPROTO_SELECT:
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
+	case IPROTO_UPSERT:
+		xrow_decode_dml_xc(&msg->header, &msg->dml_request,
+				   dml_request_key_map(type));
+		assert(type < sizeof(dml_route)/sizeof(*dml_route));
+		cmsg_init(msg, dml_route[type]);
+		break;
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
-	case IPROTO_AUTH:
 	case IPROTO_EVAL:
-	case IPROTO_UPSERT:
-		request_create(&msg->request, msg->header.type);
-		msg->request.header = &msg->header;
-		/*
-		 * This is a common request which can be parsed with
-		 * request_decode(). Parse it before putting it into
-		 * the queue to save tx some CPU. More complicated
-		 * requests are parsed in tx thread into request type-
-		 * specific objects.
-		 */
-		if (msg->header.bodycnt == 0) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "missing request body");
-		}
-		body = (const char *) msg->header.body[0].iov_base;
-		request_decode_xc(&msg->request, body,
-				 msg->header.body[0].iov_len,
-				 request_key_map(msg->header.type));
-		assert(msg->header.type < sizeof(dml_route)/sizeof(*dml_route));
-		cmsg_init(msg, dml_route[msg->header.type]);
+		xrow_decode_call_xc(&msg->header, &msg->call_request);
+		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_PING:
 		cmsg_init(msg, misc_route);
@@ -673,11 +671,16 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 				      msg->header.sync);
 		cmsg_init(msg, sql_route);
 		break;
+	case IPROTO_AUTH:
+		xrow_decode_auth_xc(&msg->header, &msg->auth_request);
+		cmsg_init(msg, misc_route);
+		break;
 	default:
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) msg->header.type);
+			  (uint32_t) type);
 		break;
 	}
+	return;
 }
 
 /** Enqueue all requests which were read up. */
@@ -962,7 +965,7 @@ tx_process1(struct cmsg *m)
 
 	struct tuple *tuple;
 	struct obuf_svp svp;
-	if (box_process1(&msg->request, &tuple) ||
+	if (box_process1(&msg->dml_request, &tuple) ||
 	    iproto_prepare_select(out, &svp))
 		goto error;
 	if (tuple && tuple_to_obuf(tuple, out))
@@ -985,7 +988,7 @@ tx_process_select(struct cmsg *m)
 	struct obuf_svp svp;
 	struct port port;
 	int rc;
-	struct request *req = &msg->request;
+	struct request *req = &msg->dml_request;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
@@ -1031,16 +1034,13 @@ tx_process_misc(struct cmsg *m)
 		switch (msg->header.type) {
 		case IPROTO_CALL:
 		case IPROTO_CALL_16:
-			assert(msg->request.type == msg->header.type);
-			box_process_call(&msg->request, out);
+			box_process_call(&msg->call_request, out);
 			break;
 		case IPROTO_EVAL:
-			assert(msg->request.type == msg->header.type);
-			box_process_eval(&msg->request, out);
+			box_process_eval(&msg->call_request, out);
 			break;
 		case IPROTO_AUTH:
-			assert(msg->request.type == msg->header.type);
-			box_process_auth(&msg->request, out);
+			box_process_auth(&msg->auth_request, out);
 			break;
 		case IPROTO_PING:
 			iproto_reply_ok_xc(out, msg->header.sync,

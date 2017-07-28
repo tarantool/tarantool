@@ -316,7 +316,7 @@ typedef struct key_def box_key_def_t;
 
 /**
  * Create key definition with key fields with passed typed on passed positions.
- * May be used for tuple format creation and/or tuple comparation.
+ * May be used for tuple format creation and/or tuple comparison.
  *
  * \param fields array with key field identifiers
  * \param types array with key field types (see enum field_type)
@@ -344,12 +344,13 @@ struct index_def {
 	uint32_t iid;
 	/* Space id. */
 	uint32_t space_id;
+	/* Index key definition. */
+	struct key_def *key_def;
 	/** Index name. */
 	char *name;
 	/** Index type. */
 	enum index_type type;
 	struct index_opts opts;
-	struct key_def key_def;
 };
 
 struct index_def *
@@ -541,11 +542,11 @@ key_def_sizeof(uint32_t part_count)
 	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
 }
 
-static inline size_t
-index_def_sizeof(uint32_t part_count)
-{
-	return sizeof(struct index_def) + key_def_sizeof(part_count);
-}
+/**
+ * Allocate a new key_def with the given part count.
+ */
+struct key_def *
+key_def_new(uint32_t part_count);
 
 /**
  * Allocate a new key definition.
@@ -555,7 +556,7 @@ index_def_sizeof(uint32_t part_count)
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts, uint32_t part_count);
+	      const struct index_opts *opts);
 
 /**
  * Set a single key part in a key def.

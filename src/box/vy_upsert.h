@@ -56,7 +56,7 @@ struct tuple_format;
  *
  * @param new_stmt       An UPSERT statement.
  * @param old_stmt       An REPLACE/DELETE/UPSERT statement or NULL.
- * @param key_def        Key definition of an index.
+ * @param cmp_def        Key definition of an index, with primary parts.
  * @param format         Format for REPLACE/DELETE tuples.
  * @param upsert_format  Format for UPSERT tuples.
  * @param suppress_error True if ClientErrors must not be written to log.
@@ -66,7 +66,7 @@ struct tuple_format;
  */
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
-		const struct key_def *key_def, struct tuple_format *format,
+		const struct key_def *cmp_def, struct tuple_format *format,
 		struct tuple_format *upsert_format, bool suppress_error);
 
 #if defined(__cplusplus)

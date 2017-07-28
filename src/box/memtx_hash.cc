@@ -133,7 +133,7 @@ MemtxHash::MemtxHash(struct index_def *index_def_arg)
 	}
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
 			   memtx_index_extent_alloc, memtx_index_extent_free,
-			   NULL, &this->index_def->key_def);
+			   NULL, this->index_def->key_def);
 }
 
 MemtxHash::~MemtxHash()
@@ -176,11 +176,11 @@ MemtxHash::random(uint32_t rnd) const
 struct tuple *
 MemtxHash::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(index_def->opts.is_unique && part_count == index_def->key_def.part_count);
+	assert(index_def->opts.is_unique && part_count == index_def->key_def->part_count);
 	(void) part_count;
 
 	struct tuple *ret = NULL;
-	uint32_t h = key_hash(key, &index_def->key_def);
+	uint32_t h = key_hash(key, index_def->key_def);
 	uint32_t k = light_index_find_key(hash_table, h, key);
 	if (k != light_index_end)
 		ret = light_index_get(hash_table, k);
@@ -194,7 +194,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	uint32_t errcode;
 
 	if (new_tuple) {
-		uint32_t h = tuple_hash(new_tuple, &index_def->key_def);
+		uint32_t h = tuple_hash(new_tuple, index_def->key_def);
 		struct tuple *dup_tuple = NULL;
 		hash_t pos = light_index_replace(hash_table, h, new_tuple, &dup_tuple);
 		if (pos == light_index_end)
@@ -231,7 +231,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (old_tuple) {
-		uint32_t h = tuple_hash(old_tuple, &index_def->key_def);
+		uint32_t h = tuple_hash(old_tuple, index_def->key_def);
 		int res = light_index_delete_value(hash_table, h, old_tuple);
 		assert(res == 0); (void) res;
 	}
@@ -269,7 +269,7 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	case ITER_GT:
 		if (part_count != 0) {
 			light_index_iterator_key(it->hash_table, &it->iterator,
-					key_hash(key, &index_def->key_def), key);
+					key_hash(key, index_def->key_def), key);
 			it->base.next = hash_iterator_gt;
 		} else {
 			light_index_iterator_begin(it->hash_table, &it->iterator);
@@ -283,7 +283,7 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	case ITER_EQ:
 		assert(part_count > 0);
 		light_index_iterator_key(it->hash_table, &it->iterator,
-				key_hash(key, &index_def->key_def), key);
+				key_hash(key, index_def->key_def), key);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:

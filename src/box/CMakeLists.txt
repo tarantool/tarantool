@@ -31,18 +31,24 @@ add_library(xrow STATIC xrow.c iproto_constants.c)
 target_link_libraries(xrow server core small vclock misc box_error
                       scramble ${MSGPUCK_LIBRARIES})
 
-add_library(box STATIC
-    iproto.cc
-    error.cc
-    xrow_io.cc
-    xlog.cc
-    tuple_format.c
+add_library(tuple STATIC
     tuple.c
-    tuple_convert.c
+    tuple_format.c
     tuple_update.c
     tuple_compare.cc
     tuple_hash.cc
     key_def.cc
+)
+target_link_libraries(tuple box_error core ${MSGPUCK_LIBRARIES} misc)
+
+add_library(xlog STATIC xlog.cc)
+target_link_libraries(xlog core crc32 ${ZSTD_LIBRARIES})
+
+add_library(box STATIC
+    iproto.cc
+    error.cc
+    xrow_io.cc
+    tuple_convert.c
     index.cc
     iterator_type.c
     memtx_index.cc
@@ -77,7 +83,6 @@ add_library(box STATIC
     schema.cc
     session.cc
     port.c
-    request.c
     txn.cc
     box.cc
     gc.c
@@ -94,6 +99,7 @@ add_library(box STATIC
     wal.cc
     sql.c
     execute.c
+    call.cc
     ${lua_sources}
     lua/init.c
     lua/call.c
@@ -114,6 +120,6 @@ add_library(box STATIC
     lua/sql.c
     ${bin_sources})
 
-target_link_libraries(box box_error stat xrow vclock crc32 scramble sql
-                      ${ZSTD_LIBRARIES} ${common_libraries})
+target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 scramble
+                      sql ${common_libraries})
 add_dependencies(box build_bundled_libs)

@@ -297,7 +297,7 @@ vy_stmt_unref_if_possible(struct tuple *stmt)
  * Compare SELECT/DELETE statements using the key definition
  * @param a left operand (SELECT/DELETE)
  * @param b right operand (SELECT/DELETE)
- * @param key_def key definition
+ * @param cmp_def key definition, with primary parts
  *
  * @retval 0   if a == b
  * @retval > 0 if a > b
@@ -307,18 +307,18 @@ vy_stmt_unref_if_possible(struct tuple *stmt)
  */
 static inline int
 vy_key_compare(const struct tuple *a, const struct tuple *b,
-	       const struct key_def *key_def)
+	       const struct key_def *cmp_def)
 {
 	assert(vy_stmt_type(a) == IPROTO_SELECT);
 	assert(vy_stmt_type(b) == IPROTO_SELECT);
-	return key_compare(tuple_data(a), tuple_data(b), key_def);
+	return key_compare(tuple_data(a), tuple_data(b), cmp_def);
 }
 
 /**
  * Compare REPLACE/UPSERTS statements.
  * @param a left operand (REPLACE/UPSERT)
  * @param b right operand (REPLACE/UPSERT)
- * @param key_def key definition
+ * @param cmp_def key definition with primary parts
  *
  * @retval 0   if a == b
  * @retval > 0 if a > b
@@ -328,7 +328,7 @@ vy_key_compare(const struct tuple *a, const struct tuple *b,
  */
 static inline int
 vy_tuple_compare(const struct tuple *a, const struct tuple *b,
-		 const struct key_def *key_def)
+		 const struct key_def *cmp_def)
 {
 	assert(vy_stmt_type(a) == IPROTO_REPLACE ||
 	       vy_stmt_type(a) == IPROTO_UPSERT ||
@@ -336,7 +336,7 @@ vy_tuple_compare(const struct tuple *a, const struct tuple *b,
 	assert(vy_stmt_type(b) == IPROTO_REPLACE ||
 	       vy_stmt_type(b) == IPROTO_UPSERT ||
 	       vy_stmt_type(b) == IPROTO_DELETE);
-	return tuple_compare(a, b, key_def);
+	return tuple_compare(a, b, cmp_def);
 }
 
 /**
@@ -447,7 +447,8 @@ vy_key_dup(const char *key);
  * result: {nil, nil, a3, nil, a5}
  *
  * @param key     MessagePack array with key fields.
- * @param key_def Key definition of the result statement.
+ * @param cmp_def Key definition of the result statement (incudes
+ *                primary key parts).
  * @param format  Target tuple format.
  *
  * @retval not NULL Success.
@@ -455,7 +456,7 @@ vy_key_dup(const char *key);
  */
 struct tuple *
 vy_stmt_new_surrogate_delete_from_key(const char *key,
-				      const struct key_def *def,
+				      const struct key_def *cmp_def,
 				      struct tuple_format *format);
 
 /**
@@ -610,7 +611,7 @@ vy_stmt_encode_primary(const struct tuple *value,
  */
 int
 vy_stmt_encode_secondary(const struct tuple *value,
-			 const struct key_def *key_def,
+			 const struct key_def *cmp_def,
 			 struct xrow_header *xrow);
 
 /**

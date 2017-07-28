@@ -288,7 +288,7 @@ MemtxSpace::prepareDelete(struct txn_stmt *stmt, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(&pk->index_def->key_def, key, part_count) != 0)
+	if (primary_key_validate(pk->index_def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 }
@@ -301,7 +301,7 @@ MemtxSpace::prepareUpdate(struct txn_stmt *stmt, struct space *space,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(&pk->index_def->key_def, key, part_count) != 0)
+	if (primary_key_validate(pk->index_def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 
@@ -338,11 +338,11 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 	Index *index = index_find_unique(space, 0);
 
 	struct index_def *index_def = index->index_def;
-	uint32_t part_count = index->index_def->key_def.part_count;
+	uint32_t part_count = index->index_def->key_def->part_count;
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
-						&index_def->key_def, NULL);
+						index_def->key_def, NULL);
 	if (key == NULL)
 		diag_raise();
 	/* Cut array header */
@@ -403,10 +403,10 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		tuple_ref(stmt->new_tuple);
 
 		Index *pk = space->index[0];
-		if (!key_update_can_be_skipped(pk->index_def->key_def.column_mask,
+		if (!key_update_can_be_skipped(pk->index_def->key_def->column_mask,
 					       column_mask) &&
 		    tuple_compare(stmt->old_tuple, stmt->new_tuple,
-				  &pk->index_def->key_def) != 0) {
+				  pk->index_def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 				 pk->index_def->name, space_name(space));
@@ -524,7 +524,7 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 		/* TREE index has no limitations. */
 		break;
 	case RTREE:
-		if (index_def->key_def.part_count != 1) {
+		if (index_def->key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name(space),
@@ -536,7 +536,7 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 				  space_name(space),
 				  "RTREE index can not be unique");
 		}
-		if (index_def->key_def.parts[0].type != FIELD_TYPE_ARRAY) {
+		if (index_def->key_def->parts[0].type != FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name(space),
@@ -545,7 +545,7 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 		/* no furter checks of parts needed */
 		return;
 	case BITSET:
-		if (index_def->key_def.part_count != 1) {
+		if (index_def->key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name(space),
@@ -557,8 +557,8 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 				  space_name(space),
 				  "BITSET can not be unique");
 		}
-		if (index_def->key_def.parts[0].type != FIELD_TYPE_UNSIGNED &&
-		    index_def->key_def.parts[0].type != FIELD_TYPE_STRING) {
+		if (index_def->key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
+		    index_def->key_def->parts[0].type != FIELD_TYPE_STRING) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name(space),
@@ -574,8 +574,8 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 	}
 	/* Only HASH and TREE indexes checks parts there */
 	/* Just check that there are no ARRAY parts */
-	for (uint32_t i = 0; i < index_def->key_def.part_count; i++) {
-		if (index_def->key_def.parts[i].type == FIELD_TYPE_ARRAY) {
+	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
+		if (index_def->key_def->parts[i].type == FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name(space),

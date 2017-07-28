@@ -42,6 +42,11 @@
 #define TARANTOOL_LIBEXT "so"
 #endif
 
+/**
+ * Defined if cpuid() instruction is available.
+ */
+#cmakedefine HAVE_CPUID 1
+
 /*
  * Defined if gcov instrumentation should be enabled.
  */

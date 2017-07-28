@@ -77,6 +77,14 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
+
+	tuple_format_default_vtab = &memtx_tuple_format_vtab;
+	tuple_format_default = tuple_format_new(tuple_format_default_vtab,
+						NULL, 0, 0);
+	if (tuple_format_default == NULL)
+		diag_raise();
+	/* Make sure this one stays around. */
+	tuple_format_ref(tuple_format_default, 1);
 }
 
 void

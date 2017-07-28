@@ -256,18 +256,21 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
+	struct key_def *key_def;
 	struct index_def *index_def = index_def_new(BOX_SCHEMA_ID,
 						    0 /* index id */,
 						    "primary", /* name */
 						    strlen("primary"),
 						    TREE /* index type */,
-						    &index_opts_default,
-						    1); /* part count */
+						    &index_opts_default);
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard1 =
 		make_scoped_guard([=] { index_def_delete(index_def); });
-	struct key_def *key_def = &index_def->key_def;
+	key_def = index_def->key_def = key_def_new(1); /* part count */
+	if (index_def->key_def == NULL)
+		diag_raise();
+
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
 	(void) sc_space_new(BOX_SCHEMA_ID, "_schema", index_def,
@@ -285,7 +288,8 @@ schema_init()
 	/* _truncate - auxiliary space for triggering space truncation. */
 	index_def->space_id = BOX_TRUNCATE_ID;
 	(void) sc_space_new(BOX_TRUNCATE_ID, "_truncate", index_def,
-			    &on_replace_truncate, NULL);
+			    &on_replace_truncate,
+			    &on_stmt_begin_truncate);
 
 	/* _user - all existing users */
 	index_def->space_id = BOX_USER_ID;
@@ -315,28 +319,18 @@ schema_init()
 	index_def->space_id = BOX_TRIGGER_ID;
 	(void) sc_space_new(BOX_TRIGGER_ID, "_trigger", index_def, NULL, NULL);
 
-	index_def_delete(index_def);
-	index_def_guard1.is_active = false;
+	box_key_def_delete(index_def->key_def);
+	key_def = index_def->key_def = key_def_new(2); /* part count */
 
-	/* _index - definition of indexes in all spaces */
-	index_def = index_def_new(BOX_INDEX_ID,
-				  0 /* index id */,
-				  "primary",
-				  strlen("primary"),
-				  TREE /* index type */,
-				  &index_opts_default,
-				  2); /* part count */
-	if (index_def == NULL)
+	if (key_def == NULL)
 		diag_raise();
-	auto index_def_guard2 =
-		make_scoped_guard([=] { index_def_delete(index_def); });
-	key_def = &index_def->key_def;
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
+	index_def->space_id = BOX_INDEX_ID;
 	(void) sc_space_new(BOX_INDEX_ID, "_index", index_def,
 			    &alter_space_on_replace_index,
 			    &on_stmt_begin_index);

@@ -115,43 +115,40 @@ set (CMAKE_CXX_FLAGS_RELWITHDEBINFO
 
 unset(CC_DEBUG_OPT)
 
-option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in 'show
-fiber' administrative command. Only works on x86 architectures, if compiled
-with gcc. If GNU binutils and binutils-dev libraries are installed, backtrace
-is output with resolved function (symbol) names. Otherwise only frame
-addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
+check_include_file(libunwind.h HAVE_LIBUNWIND_H)
+find_library(UNWIND_LIBRARY PATH_SUFFIXES system NAMES unwind)
 
-set (HAVE_BFD False)
+set(ENABLE_BACKTRACE_DEFAULT OFF)
+if (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H)
+    set(ENABLE_BACKTRACE_DEFAULT ON)
+endif()
+
+option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in
+'fiber.info()' command." ${ENABLE_BACKTRACE_DEFAULT})
+
 if (ENABLE_BACKTRACE)
-    if (NOT ${CMAKE_COMPILER_IS_GNUCC})
-        # We only know this option to work with gcc
-        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system
-                is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler
-                is not GNU GCC (${CMAKE_C_COMPILER}).")
+    # unwind is required
+    if (NOT (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H))
+        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but unwind "
+                             "library is not found")
     endif()
-    # Use GNU bfd if present.
-    find_library(BFD_LIBRARY NAMES libbfd.a)
-    if(BFD_LIBRARY)
-        check_library_exists (${BFD_LIBRARY} bfd_init ""  HAVE_BFD_LIB)
-    endif()
-    find_library(IBERTY_LIBRARY NAMES libiberty.a)
-    if(IBERTY_LIBRARY)
-        check_library_exists (${IBERTY_LIBRARY} cplus_demangle ""  HAVE_IBERTY_LIB)
-    endif()
-    set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
-    check_include_file(bfd.h HAVE_BFD_H)
-    set(CMAKE_REQUIRED_DEFINITIONS)
-    find_package(ZLIB)
-    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB AND ZLIB_FOUND)
-        set (HAVE_BFD ON)
-        set (BFD_LIBRARIES ${BFD_LIBRARY} ${IBERTY_LIBRARY} ${ZLIB_LIBRARIES})
-        find_package_message(BFD_LIBRARIES "Found libbfd and dependencies"
-            ${BFD_LIBRARIES})
-        if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD OR
-            TARGET_OS_NETBSD)
-            set (BFD_LIBRARIES ${BFD_LIBRARIES} iconv)
+    if (TARGET_OS_DARWIN)
+        set (UNWIND_LIBRARIES ${UNWIND_LIBRARY})
+    else()
+        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR
+            CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+            find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
+                         NAMES "unwind-${CMAKE_SYSTEM_PROCESSOR}")
+        elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
+            find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
+                         NAMES "unwind-x86")
+        elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
+            find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
+                         NAMES "unwind-arm")
         endif()
+        set (UNWIND_LIBRARIES ${UNWIND_LIBRARY} ${UNWIND_PLATFORM_LIBRARY})
     endif()
+    find_package_message(UNWIND_LIBRARIES "Found unwind" "${UNWIND_LIBRARIES}")
 endif()
 
 #

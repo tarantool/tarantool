@@ -49,6 +49,7 @@ struct request;
 struct xrow_header;
 struct obuf;
 struct ev_io;
+struct auth_request;
 
 /*
  * Initialize box library
@@ -125,13 +126,7 @@ const char *box_status(void);
 } /* extern "C" */
 
 void
-box_process_auth(struct request *request, struct obuf *out);
-
-void
-box_process_call(struct request *request, struct obuf *out);
-
-void
-box_process_eval(struct request *request, struct obuf *out);
+box_process_auth(struct auth_request *request, struct obuf *out);
 
 void
 box_process_join(struct ev_io *io, struct xrow_header *header);
@@ -159,11 +154,6 @@ void box_update_vinyl_options(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-struct box_function_ctx {
-	struct request *request;
-	struct port *port;
-};
 
 typedef struct tuple box_tuple_t;
 

@@ -109,21 +109,21 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 			}
 		}
 	} else {
-		if (part_count > index_def->key_def.part_count) {
+		if (part_count > index_def->key_def->part_count) {
 			diag_set(ClientError, ER_KEY_PART_COUNT,
-				 index_def->key_def.part_count, part_count);
+				 index_def->key_def->part_count, part_count);
 			return -1;
 		}
 
 		/* Partial keys are allowed only for TREE index type. */
-		if (index_def->type != TREE && part_count < index_def->key_def.part_count) {
+		if (index_def->type != TREE && part_count < index_def->key_def->part_count) {
 			diag_set(ClientError, ER_PARTIAL_KEY,
 				 index_type_strs[index_def->type],
-				 index_def->key_def.part_count,
+				 index_def->key_def->part_count,
 				 part_count);
 			return -1;
 		}
-		if (key_validate_parts(&index_def->key_def, key,
+		if (key_validate_parts(index_def->key_def, key,
 				       part_count) != 0)
 			return -1;
 	}
@@ -150,7 +150,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 	try {
 		struct space *space = space_by_id(space_id);
 		Index *index = index_find_xc(space, index_id);
-		return tuple_extract_key(tuple, &index->index_def->key_def,
+		return tuple_extract_key(tuple, index->index_def->key_def,
 					 key_size);
 	} catch (ClientError *e) {
 		return NULL;
@@ -311,7 +311,7 @@ box_index_key_def(uint32_t space_id, uint32_t index_id)
 		struct space *space;
 		/* no tx management, len is approximate in vinyl anyway. */
 		Index *index = check_index(space_id, index_id, &space);
-		return &index->index_def->key_def;
+		return index->index_def->key_def;
 	} catch (Exception *) {
 		return NULL;
 	}
@@ -320,7 +320,7 @@ box_index_key_def(uint32_t space_id, uint32_t index_id)
 const box_key_def_t *
 box_iterator_key_def(box_iterator_t *iterator)
 {
-	return &iterator->index->index_def->key_def;
+	return iterator->index->index_def->key_def;
 }
 
 
@@ -377,7 +377,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		if (!index->index_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = mp_decode_array(&key);
-		if (primary_key_validate(&index->index_def->key_def, key,
+		if (primary_key_validate(index->index_def->key_def, key,
 					 part_count))
 			diag_raise();
 		/* Start transaction in the engine. */

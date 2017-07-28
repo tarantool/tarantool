@@ -135,11 +135,25 @@ add_executable(say.test say.c)
 target_link_libraries(say.test core unit)
 
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
-add_executable(vy_mem.test vy_mem.c vy_iterators_helper.c)
-target_link_libraries(vy_mem.test box unit)
+add_executable(vy_mem.test
+    vy_mem.c
+    vy_iterators_helper.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
+)
+target_link_libraries(vy_mem.test core tuple xrow unit)
 
-add_executable(column_mask.test column_mask.c)
-target_link_libraries(column_mask.test box unit)
+add_executable(column_mask.test
+    column_mask.c)
+target_link_libraries(column_mask.test tuple unit)
 
-add_executable(vy_write_iterator.test vy_write_iterator.c vy_iterators_helper.c)
-target_link_libraries(vy_write_iterator.test box unit)
+add_executable(vy_write_iterator.test
+    vy_write_iterator.c
+    vy_iterators_helper.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
+)
+target_link_libraries(vy_write_iterator.test core tuple xrow xlog unit)

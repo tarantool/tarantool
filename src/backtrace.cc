@@ -31,200 +31,18 @@
 #include "backtrace.h"
 #include "trivia/util.h"
 
-#include <cxxabi.h>
-#ifdef HAVE_BFD
-#include <bfd.h>
-#endif /* HAVE_BFD */
 #include <stdlib.h>
 #include <stdio.h>
+
+#include <cxxabi.h>
 
 #include "say.h"
 #include "fiber.h"
 
 #define CRLF "\n"
 
-#ifndef HAVE_LIBC_STACK_END
-void *__libc_stack_end;
-#endif
-
-#ifdef HAVE_BFD
-struct symbol {
-	void *addr;
-	const char *name;
-	void *end;
-};
-
-static struct symbol *symbols;
-static ssize_t symbol_count;
-
-int
-compare_symbol(const void *_a, const void *_b)
-{
-	const struct symbol *a = (const struct symbol *) _a;
-	const struct symbol *b = (const struct symbol *) _b;
-	if (a->addr > b->addr)
-		return 1;
-	if (a->addr == b->addr)
-		return 0;
-	return -1;
-}
-
-void
-symbols_load(const char *name)
-{
-	char *path = find_path(name);
-	long storage_needed;
-	asymbol **symbol_table = NULL;
-	long number_of_symbols;
-	bfd *h;
-	char **matching;
-	int j;
-
-	bfd_init();
-	h = bfd_openr(path, NULL);
-	if (h == NULL) {
-		say_syserror("bfd_open(%s) failed", path);
-		goto out;
-	}
-
-	if (bfd_check_format(h, bfd_archive)) {
-		say_warn("bfd_check_format() failed");
-		goto out;
-	}
-
-	if (!bfd_check_format_matches(h, bfd_object, &matching)) {
-		say_warn("bfd_check_format_matches() failed");
-		goto out;
-	}
-
-	storage_needed = bfd_get_symtab_upper_bound(h);
-
-	if (storage_needed <= 0) {
-		say_warn("storage_needed is out of bounds");
-		goto out;
-	}
-
-	symbol_table = (asymbol **) malloc(storage_needed);
-	if (symbol_table == NULL) {
-		say_warn("failed to allocate symbol table");
-		goto out;
-	}
-
-	number_of_symbols = bfd_canonicalize_symtab (h, symbol_table);
-	if (number_of_symbols < 0) {
-		say_warn("failed to canonicalize symbol table");
-		goto out;
-	}
-
-	for (int i = 0; i < number_of_symbols; i++) {
-		struct bfd_section *section;
-		unsigned long int vma, size;
-		section = bfd_get_section(symbol_table[i]);
-		vma = bfd_get_section_vma(h, section);
-		size = bfd_get_section_size(section);
-
-		/* On ELF (but not elsewhere) use BSF_FUNCTION flag.  */
-		bool is_func = (bfd_target_elf_flavour == h->xvec->flavour) ?
-			symbol_table[i]->flags & BSF_FUNCTION : 1;
-
-		if (is_func && vma + symbol_table[i]->value > 0 &&
-		    symbol_table[i]->value < size)
-			symbol_count++;
-	}
-
-	if (symbol_count == 0) {
-		say_warn("symbol count is 0");
-		goto out;
-	}
-
-	j = 0;
-	symbols = (struct symbol *) malloc(symbol_count * sizeof(struct symbol));
-	if (symbols == NULL)
-		goto out;
-
-	for (int i = 0; i < number_of_symbols; i++) {
-		struct bfd_section *section;
-		unsigned long int vma, size;
-		section = bfd_get_section(symbol_table[i]);
-		vma = bfd_get_section_vma(h, section);
-		size = bfd_get_section_size(section);
-
-		/* On ELF (but not elsewhere) use BSF_FUNCTION flag.  */
-		bool is_func = (bfd_target_elf_flavour == h->xvec->flavour) ?
-			symbol_table[i]->flags & BSF_FUNCTION : 1;
-
-		if (is_func && (vma + symbol_table[i]->value) > 0 &&
-		    symbol_table[i]->value < size)
-		{
-			int status;
-			symbols[j].name = abi::__cxa_demangle(symbol_table[i]->name, 0, 0, &status);
-			if (symbols[j].name == NULL)
-				symbols[j].name = strdup(symbol_table[i]->name);
-			symbols[j].addr = (void *)(uintptr_t)(vma + symbol_table[i]->value);
-			symbols[j].end = (void *)(uintptr_t)(vma + size);
-			j++;
-		}
-	}
-	bfd_close(h);
-
-	qsort(symbols, symbol_count, sizeof(struct symbol), compare_symbol);
-
-	for (int j = 0; j < symbol_count - 1; j++)
-		symbols[j].end = MIN((char *) symbols[j].end,
-				     (char *) symbols[j + 1].addr - 1);
-
-out:
-	if (symbol_count == 0)
-		say_warn("no symbols found in %s", path);
-
-	if (symbol_table)
-		free(symbol_table);
-}
-
-void symbols_free()
-{
-	for (struct symbol *s = symbols; s < symbols + symbol_count; s++)
-		free((void *) s->name);
-	free(symbols);
-}
-
-/**
- * Sic: this assumes stack direction is from lowest to
- * highest.
- */
-struct symbol *
-addr2symbol(void *addr)
-{
-	if (symbols == NULL)
-		return NULL;
-
-	struct symbol key;
-	key.addr = addr;
-	key.name = NULL;
-	key.end = NULL;
-	struct symbol *low = symbols;
-	struct symbol *high = symbols + symbol_count;
-
-	while (low + 1 < high) { /* there are at least two to choose from. */
-		struct symbol *middle = low + ((high - low) >> 1);
-
-		int diff = compare_symbol(&key, middle);
-		if (diff < 0) { /* key < middle. */
-			high = middle;
-		} else {/* key >= middle */
-			low = middle;
-			if (diff == 0)
-				break;
-		}
-	}
-	if (low->addr <= key.addr && low->end >= key.addr)
-		return low;
-	return NULL;
-}
-
-#endif /* HAVE_BFD */
 #ifdef ENABLE_BACKTRACE
-
+#include <libunwind.h>
 /*
  * We use a global static buffer because it is too late to do any
  * allocation when we are printing backtrace and fiber stack is
@@ -233,118 +51,287 @@ addr2symbol(void *addr)
 
 static char backtrace_buf[4096 * 4];
 
-/*
- * note, stack unwinding code assumes that binary is compiled with
- * frame pointers
- */
-
-struct frame {
-	struct frame *rbp;
-	void *ret;
-};
-
 char *
-backtrace(void *frame_, void *stack, size_t stack_size)
+backtrace(unw_context_t *unw_ctx)
 {
-	struct frame *frame = (struct frame *) frame_;
-	void *stack_top = (char *) stack + stack_size;
-	void *stack_bottom = stack;
-
+	int frame_no = 0;
+	unw_word_t sp, old_sp = 0, ip, offset;
+	unw_cursor_t unw_cur;
+	unw_init_local(&unw_cur, unw_ctx);
 	char *p = backtrace_buf;
 	char *end = p + sizeof(backtrace_buf) - 1;
-	int frameno = 0;
-	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
-		/**
-		 * The stack may be overwritten by the callback
-		 * in case of optimized builds.
-		 */
-		struct frame *prev_frame = frame->rbp;
-		p += snprintf(p, end - p, "#%-2d %p in ", frameno++, frame->ret);
-
+	int unw_status;
+	while ((unw_status = unw_step(&unw_cur)) > 0) {
+		char proc[200];
+		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
+		if (sp == old_sp) {
+			say_debug("unwinding error: previous frame "
+				  "identical to this frame (corrupt stack?)");
+			goto out;
+		}
+		old_sp = sp;
+		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
+		unw_get_proc_name(&unw_cur, proc, sizeof(proc), &offset);
+		p += snprintf(p, end - p, "#%-2d %p in ", frame_no, (void *)ip);
 		if (p >= end)
 			goto out;
-#ifdef HAVE_BFD
-		struct symbol *s = addr2symbol(frame->ret);
-		if (s != NULL) {
-			size_t offset = (const char *) frame->ret - (const char *) s->addr;
-			p += snprintf(p, end - p, "%s+%zu",
-				      s->name, offset);
-		} else
-#endif /* HAVE_BFD */
-		{
-			p += snprintf(p, end - p, "?");
-		}
+		p += snprintf(p, end - p, "%s+%lx", proc, (long)offset);
 		if (p >= end)
 			goto out;
 		p += snprintf(p, end - p, CRLF);
 		if (p >= end)
 			goto out;
-#ifdef HAVE_BFD
-		if (s != NULL && strcmp(s->name, "main") == 0)
-			break;
-
-#endif
-		frame = prev_frame;
+		++frame_no;
 	}
+#ifndef TARGET_OS_DARWIN
+	if (unw_status != 0)
+		say_debug("unwinding error: %s", unw_strerror(unw_status));
+#else
+	if (unw_status != 0)
+		say_debug("unwinding error: %i", unw_status);
+#endif
 out:
 	*p = '\0';
 	return backtrace_buf;
 }
 
-void
-backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
-                  void *cb_ctx)
+/*
+ * Libunwind unw_getcontext wrapper.
+ * unw_getcontext can be a macros on some platform and can not be called
+ * directly from asm code. Stack variable pass through the wrapper to
+ * preserve a old stack pointer during the wrapper call.
+ *
+ * @param unw_context unwind context to store execution state
+ * @param stack pointer to preserve.
+ * @retval preserved stack pointer.
+ */
+static void *
+unw_getcontext_f(unw_context_t *unw_context, void *stack)
 {
-	struct frame *frame = (struct frame *) frame_;
-	void *stack_top = (char *) stack + stack_size;
-	void *stack_bottom = stack;
-	int frameno = 0;
-	const char *sym = NULL;
-	size_t offset = 0;
-	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
-		/**
-		 * The stack may be overwritten by the callback
-		 * in case of optimized builds.
-		 */
-		struct frame *prev_frame = frame->rbp;
-#ifdef HAVE_BFD
-		struct symbol *s = addr2symbol(frame->ret);
-		if (s != NULL) {
-			sym = s->name;
-			offset = (const char *) frame->ret - (const char *) s->addr;
-			if (strcmp(s->name, "main") == 0) {
-				cb(frameno, frame->ret, sym, offset, cb_ctx);
-				break;
-			}
+	unw_getcontext(unw_context);
+	return stack;
+}
+
+/*
+ * Restore target coro context and call unw_getcontext over it.
+ * Work is done in four parts:
+ * 1. Save current fiber context to a stack and save a stack pointer
+ * 2. Restore target fiber context, stack pointer is not incremented because
+ *    all target stack context should be preserved across a call. No stack
+ *    changes are allowed until unwinding is done.
+ * 3. Setup new stack frame and call unw_getcontext wrapper. All callee-safe
+ *    registers are used by target fiber context, so old stack pointer is
+ *    passed as second arg to wrapper func.
+ * 4. Restore old stack pointer from wrapper return and restore old fiber
+ *    contex.
+ *
+ * @param @unw_context unwind context to store execution state.
+ * @param @coro_ctx fiber context to unwind.
+ */
+void
+coro_unwcontext(unw_context_t *unw_context, struct coro_context *coro_ctx)
+{
+#if __amd64
+__asm__(
+	/* Preserve current context */
+	"\tpushq %%rbp\n"
+	"\tpushq %%rbx\n"
+	"\tpushq %%r12\n"
+	"\tpushq %%r13\n"
+	"\tpushq %%r14\n"
+	"\tpushq %%r15\n"
+	/* Setup second arg as old sp */
+	"\tmovq %%rsp, %%rsi\n"
+	/* Restore target context, but not increment sp to preserve it */
+	"\tmovq 0(%1), %%rsp\n"
+	"\tmovq 0(%%rsp), %%r15\n"
+	"\tmovq 8(%%rsp), %%r14\n"
+	"\tmovq 16(%%rsp), %%r13\n"
+	"\tmovq 24(%%rsp), %%r12\n"
+	"\tmovq 32(%%rsp), %%rbx\n"
+	"\tmovq 40(%%rsp), %%rbp\n"
+	/* Set first arg and call */
+	"\tmovq %0, %%rdi\n"
+#ifdef TARGET_OS_DARWIN
+	"\tandq $0xfffffffffffffff0, %%rsp\n"
+#endif
+	"\tleaq %P2(%%rip), %%rax\n"
+	"\tcall *%%rax\n"
+	/* Restore old sp and context */
+	"\tmov %%rax, %%rsp\n"
+	"\tpopq %%r15\n"
+	"\tpopq %%r14\n"
+	"\tpopq %%r13\n"
+	"\tpopq %%r12\n"
+	"\tpopq %%rbx\n"
+	"\tpopq %%rbp\n"
+	:
+	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
+	: "rdi", "rsi"
+	);
+
+#elif __i386
+__asm__(
+	/* Save current context */
+	"\tpushl %%ebp\n"
+	"\tpushl %%ebx\n"
+	"\tpushl %%esi\n"
+	"\tpushl %%edi\n"
+	/* Setup second arg as old sp */
+	"\tmovl %%esp, %%ecx\n"
+	/* Restore target context ,but not increment sp to preserve it */
+	"\tmovl (%1), %%esp\n"
+	"\tmovl 0(%%esp), %%edi\n"
+	"\tmovl 4(%%esp), %%esi\n"
+	"\tmovl 8(%%esp), %%ebx\n"
+	"\tmovl 12(%%esp), %%ebp\n"
+	/* Setup first arg and call */
+	"\tpushl %%ecx\n"
+	"\tpushl %0\n"
+	"\tmovl %2, %%ecx\n"
+	"\tcall *%%ecx\n"
+	/* Restore old sp and context */
+	"\tmovl %%eax, %%esp\n"
+	"\tpopl %%edi\n"
+	"\tpopl %%esi\n"
+	"\tpopl %%ebx\n"
+	"\tpopl %%ebp\n"
+	:
+	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
+	: "ecx"
+	);
+
+#elif __ARM_ARCH==7
+__asm__(
+	/* Save current context */
+	".thumb\n"
+	"\tvpush {d8-d15}\n"
+	"\tpush {r4-r11,lr}\n"
+	/* Save sp */
+	"\tmov r1, sp\n"
+	/* Restore target context, but not increment sp to preserve it */
+	"\tldr sp, [%1]\n"
+	"\tldmia sp, {r4-r11,lr}\n"
+	"\tvldmia sp, {d8-d15}\n"
+	/* Setup first arg */
+	"\tmov r0, %0\n"
+	/* Setup stack frame */
+	"\tpush {r7, lr}\n"
+	"\tsub sp, #8\n"
+	"\tstr r0, [sp, #4]\n"
+	"\tstr r1, [sp, #0]\n"
+	"\tmov r7, sp\n"
+	"\tbl %2\n"
+	/* Old sp is returned via r0 */
+	"\tmov sp, r0\n"
+	"\tpop {r4-r11,lr}\n"
+	"\tvpop {d8-d15}\n"
+	:
+	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
+	: "lr", "r0", "r1", "ip"
+	);
+
+#elif __aarch64__
+__asm__(
+	/* Save current context */
+	"\tsub x1, sp, #8 * 20\n"
+	"\tstp x19, x20, [x1, #16 * 0]\n"
+	"\tstp x21, x22, [x1, #16 * 1]\n"
+	"\tstp x23, x24, [x1, #16 * 2]\n"
+	"\tstp x25, x26, [x1, #16 * 3]\n"
+	"\tstp x27, x28, [x1, #16 * 4]\n"
+	"\tstp x29, x30, [x1, #16 * 5]\n"
+	"\tstp d8,  d9,  [x1, #16 * 6]\n"
+	"\tstp d10, d11, [x1, #16 * 7]\n"
+	"\tstp d12, d13, [x1, #16 * 8]\n"
+	"\tstp d14, d15, [x1, #16 * 9]\n"
+	/* Restore target context */
+	"\tldr x2, [%1]\n"
+	"\tldp x19, x20, [x2, #16 * 0]\n"
+	"\tldp x21, x22, [x2, #16 * 1]\n"
+	"\tldp x23, x24, [x2, #16 * 2]\n"
+	"\tldp x25, x26, [x2, #16 * 3]\n"
+	"\tldp x27, x28, [x2, #16 * 4]\n"
+	"\tldp x29, x30, [x2, #16 * 5]\n"
+	"\tldp d8,  d9,  [x2, #16 * 6]\n"
+	"\tldp d10, d11, [x2, #16 * 7]\n"
+	"\tldp d12, d13, [x2, #16 * 8]\n"
+	"\tldp d14, d15, [x2, #16 * 9]\n"
+	"\tmov sp, x2\n"
+	/* Setup fisrst arg */
+	"\tmov x0, %0\n"
+	"\tbl %2\n"
+	/* Restore context (old sp in x0) */
+	"\tldp x19, x20, [x0, #16 * 0]\n"
+	"\tldp x21, x22, [x0, #16 * 1]\n"
+	"\tldp x23, x24, [x0, #16 * 2]\n"
+	"\tldp x25, x26, [x0, #16 * 3]\n"
+	"\tldp x27, x28, [x0, #16 * 4]\n"
+	"\tldp x29, x30, [x0, #16 * 5]\n"
+	"\tldp d8,  d9,  [x0, #16 * 6]\n"
+	"\tldp d10, d11, [x0, #16 * 7]\n"
+	"\tldp d12, d13, [x0, #16 * 8]\n"
+	"\tldp d14, d15, [x0, #16 * 9]\n"
+	"\tadd sp, x0, #8 * 20\n"
+	:
+	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
+	: /*"lr", "r0", "r1", "ip" */
+	 "x0", "x1", "x2", "x30"
+	);
+#endif
+}
+
+void
+backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
+{
+	unw_cursor_t unw_cur;
+	unw_context_t unw_ctx;
+	coro_unwcontext(&unw_ctx, coro_ctx);
+	unw_init_local(&unw_cur, &unw_ctx);
+	int frame_no = 0;
+	unw_word_t sp, old_sp = 0, ip, offset;
+	int unw_status, demangle_status;
+	char *demangle_buf = NULL;
+	size_t demangle_buf_len = 0;
+
+	while ((unw_status = unw_step(&unw_cur)) > 0) {
+		char proc[200];
+		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
+		if (sp == old_sp) {
+			say_debug("unwinding error: previous frame "
+				  "identical to this frame (corrupt stack?)");
+			goto out;
 		}
-#endif /* HAVE_BFD */
-		int rc = cb(frameno, frame->ret, sym, offset, cb_ctx);
-		if (rc != 0)
-			return;
-		frame = prev_frame;
-		sym = NULL;
-		offset = 0;
-		frameno++;
+		old_sp = sp;
+		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
+		unw_get_proc_name(&unw_cur, proc, sizeof(proc), &offset);
+
+		char *cxxname = abi::__cxa_demangle(proc, demangle_buf,
+						    &demangle_buf_len,
+						    &demangle_status);
+		if (cxxname != NULL)
+			demangle_buf = cxxname;
+		if (frame_no > 0 &&
+		    (cb(frame_no - 1, (void *)ip, cxxname != NULL ? cxxname : proc,
+			offset, cb_ctx) != 0))
+			goto out;
+		++frame_no;
 	}
+#ifndef TARGET_OS_DARWIN
+	if (unw_status != 0)
+		say_debug("unwinding error: %s", unw_strerror(unw_status));
+#else
+	if (unw_status != 0)
+		say_debug("unwinding error: %i", unw_status);
+#endif
+out:
+	free(demangle_buf);
 }
 
 void
 print_backtrace()
 {
-	void *frame = __builtin_frame_address(0);
-	void *stack_top;
-	size_t stack_size;
-
-	if (fiber() == NULL ||
-	    strcmp(fiber_name(fiber()), "sched") == 0) {
-		stack_top = frame; /* we don't know where the system stack top is */
-		stack_size = (const char *) __libc_stack_end - (const char *) frame;
-	} else {
-		stack_top = fiber()->stack;
-		stack_size = fiber()->stack_size;
-	}
-
-	fdprintf(STDERR_FILENO, "%s", backtrace(frame, stack_top, stack_size));
+	fdprintf(STDERR_FILENO, "%s", backtrace(NULL));
 }
 #endif /* ENABLE_BACKTRACE */
 

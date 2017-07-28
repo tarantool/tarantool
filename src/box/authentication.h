@@ -31,7 +31,9 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
 void
-authenticate(const char *user_name, uint32_t len,
-	     const char *tuple, const char *tuple_end);
+authenticate(const char *user_name, uint32_t len, const char *tuple);
+
 #endif /* INCLUDES_TARANTOOL_BOX_AUTHENTICATION_H */

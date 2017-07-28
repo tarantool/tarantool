@@ -38,7 +38,7 @@
 #include <trivia/util.h>
 
 int
-tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
+tuple_to_obuf(const struct tuple *tuple, struct obuf *buf)
 {
 	uint32_t bsize;
 	const char *data = tuple_data_range(tuple, &bsize);
@@ -47,17 +47,6 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 		return -1;
 	}
 	return 0;
-}
-
-ssize_t
-tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
-{
-	uint32_t bsize;
-	const char *data = tuple_data_range(tuple, &bsize);
-	if (likely(bsize <= size)) {
-		memcpy(buf, data, bsize);
-	}
-	return bsize;
 }
 
 int

@@ -231,11 +231,11 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * Create a new vinyl index object without opening it.
  * @param env             Vinyl environment.
  * @param space           Space the index is created for.
- * @param user_index_def  Index definition set by the user.
+ * @param index_def  Index definition set by the user.
  */
 struct vy_index *
 vy_new_index(struct vy_env *env, struct space *space,
-	     struct index_def *user_index_def);
+	     struct index_def *index_def);
 
 /**
  * Delete a vinyl index object.

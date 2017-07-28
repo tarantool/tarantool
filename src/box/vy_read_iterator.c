@@ -73,13 +73,13 @@ static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key,
-		       const struct key_def *key_def,
+		       const struct key_def *cmp_def,
 		       struct tuple_format *format,
 		       struct tuple_format *upsert_format,
 		       bool is_primary)
 {
 	assert(key != NULL);
-	itr->key_def = key_def;
+	itr->cmp_def = cmp_def;
 	itr->format = format;
 	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
@@ -102,11 +102,11 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr,
 	itr->skipped_start = 0;
 	itr->curr_stmt = NULL;
 	itr->is_one_value = iterator_type == ITER_EQ &&
-			    tuple_field_count(key) >= key_def->part_count;
+			    tuple_field_count(key) >= cmp_def->part_count;
 	itr->unique_optimization =
 		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
 		 iterator_type == ITER_LE) &&
-		tuple_field_count(key) >= key_def->part_count;
+		tuple_field_count(key) >= cmp_def->part_count;
 	itr->search_started = false;
 	itr->range_ended = false;
 }
@@ -264,7 +264,7 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 	itr->search_started = true;
 	if (vy_merge_iterator_check_version(itr))
 		return -2;
-	const struct key_def *def = itr->key_def;
+	const struct key_def *def = itr->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 	uint32_t prev_front_id = itr->front_id;
 	itr->front_id++;
@@ -416,7 +416,7 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
 	if (itr->curr_src == UINT32_MAX)
 		return 0;
 	assert(itr->curr_stmt != NULL);
-	const struct key_def *def = itr->key_def;
+	const struct key_def *def = itr->cmp_def;
 	struct vy_merge_src *src = &itr->src[itr->curr_src];
 	struct vy_stmt_iterator *sub_itr = &src->iterator;
 	int rc = sub_itr->iface->next_lsn(sub_itr, &src->stmt);
@@ -502,7 +502,7 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 			break;
 		struct tuple *applied;
 		assert(itr->is_primary);
-		applied = vy_apply_upsert(t, next, itr->key_def, itr->format,
+		applied = vy_apply_upsert(t, next, itr->cmp_def, itr->format,
 					  itr->upsert_format, suppress_error);
 		++*upserts_applied;
 		tuple_unref(t);
@@ -741,7 +741,7 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
 	const struct tuple *stmt = NULL;
 	if (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
 		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_stmt_compare(stmt, itr->key, mem->key_def) != 0)
+		if (vy_stmt_compare(stmt, itr->key, mem->cmp_def) != 0)
 			stmt = NULL;
 	}
 
@@ -769,7 +769,7 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
 		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
 		if (vy_stmt_lsn(stmt) >= vy_stmt_lsn(prev_stmt))
 			break;
-		if (vy_stmt_compare(stmt, itr->key, mem->key_def) != 0)
+		if (vy_stmt_compare(stmt, itr->key, mem->cmp_def) != 0)
 			break;
 	}
 	return 0;
@@ -818,8 +818,8 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	struct vy_run_iterator run_itr;
 	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator,
 			     itr->run_env, slice, ITER_EQ, itr->key,
-			     itr->p_read_view, index->key_def,
-			     index->user_key_def, format,
+			     itr->p_read_view, index->cmp_def,
+			     index->key_def, format,
 			     index->upsert_format, index->id == 0);
 	while (true) {
 		struct tuple *stmt;
@@ -922,7 +922,7 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 
 		struct tuple *stmt =
 			vy_apply_upsert(node->stmt, itr->curr_stmt,
-					itr->index->key_def,
+					itr->index->cmp_def,
 					itr->index->space_format,
 					itr->index->upsert_format, true);
 		itr->index->stat.upsert.applied++;
@@ -1107,8 +1107,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     &index->stat.disk.iterator,
 				     itr->run_env, slice,
 				     itr->iterator_type, itr->key,
-				     itr->read_view, index->key_def,
-				     index->user_key_def, format,
+				     itr->read_view, index->cmp_def,
+				     index->key_def, format,
 				     index->upsert_format, index->id == 0);
 	}
 }
@@ -1171,7 +1171,7 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 			       itr->iterator_type, itr->key);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
-			       itr->key, itr->index->key_def,
+			       itr->key, itr->index->cmp_def,
 			       itr->index->space_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
@@ -1194,7 +1194,7 @@ restart:
 	vy_merge_iterator_cleanup(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
-			       itr->key, itr->index->key_def,
+			       itr->key, itr->index->cmp_def,
 			       itr->index->space_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
@@ -1226,7 +1226,7 @@ retry:
 	 * go to the next.
 	 */
 	if (*ret != NULL && itr->curr_stmt != NULL &&
-	    vy_tuple_compare(itr->curr_stmt, *ret, itr->index->key_def) == 0)
+	    vy_tuple_compare(itr->curr_stmt, *ret, itr->index->cmp_def) == 0)
 		goto retry;
 	return rc;
 }
@@ -1249,7 +1249,7 @@ restart:
 	vy_merge_iterator_cleanup(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
-			       itr->key, index->key_def, index->space_format,
+			       itr->key, index->cmp_def, index->space_format,
 			       index->upsert_format, index->id == 0);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);
@@ -1265,12 +1265,12 @@ restart:
 		int dir = iterator_direction(itr->iterator_type);
 		if (dir >= 0 && itr->curr_range->end != NULL &&
 		    vy_tuple_compare_with_key(stmt, itr->curr_range->end,
-					      index->key_def) >= 0) {
+					      index->cmp_def) >= 0) {
 			goto restart;
 		}
 		if (dir < 0 && itr->curr_range->begin != NULL &&
 		    vy_tuple_compare_with_key(stmt, itr->curr_range->begin,
-					      index->key_def) < 0) {
+					      index->cmp_def) < 0) {
 			goto restart;
 		}
 	}
@@ -1295,10 +1295,10 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	if (itr->iterator_type == ITER_EQ) {
 		if (itr->index->opts.is_unique)
 			one_value = tuple_field_count(itr->key) >=
-				    itr->index->user_key_def->part_count;
+				    itr->index->key_def->part_count;
 		else
 			one_value = tuple_field_count(itr->key) >=
-				    itr->index->key_def->part_count;
+				    itr->index->cmp_def->part_count;
 	}
 	/* Run a special iterator for a special case */
 	if (one_value) {
@@ -1369,7 +1369,7 @@ restart:
 				struct tuple *applied;
 				assert(index->id == 0);
 				applied = vy_apply_upsert(t, NULL,
-							  index->key_def,
+							  index->cmp_def,
 							  mi->format,
 							  mi->upsert_format,
 							  true);
@@ -1406,11 +1406,11 @@ clear:
 			 * It is impossible to return fully equal
 			 * statements in sequence. At least they
 			 * must have different primary keys.
-			 * (index->key_def includes primary
+			 * (index->cmp_def includes primary
 			 * parts).
 			 */
 			assert(vy_tuple_compare(prev_key, itr->curr_stmt,
-						index->key_def) != 0);
+						index->cmp_def) != 0);
 		tuple_unref(prev_key);
 	}
 

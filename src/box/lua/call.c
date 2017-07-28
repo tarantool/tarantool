@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/call.h"
+#include "box/call.h"
 #include "box/error.h"
 #include "fiber.h"
 
@@ -244,7 +245,7 @@ luamp_encode_call(lua_State *L, struct luaL_serializer *cfg,
 }
 
 struct lua_function_ctx {
-	struct request *request;
+	struct call_request *request;
 	struct obuf *out;
 	struct obuf_svp svp;
 	/* true if `out' was changed and `svp' can be used for rollback  */
@@ -260,12 +261,12 @@ execute_lua_call(lua_State *L)
 {
 	struct lua_function_ctx *ctx = (struct lua_function_ctx *)
 		lua_topointer(L, 1);
-	struct request *request = ctx->request;
+	struct call_request *request = ctx->request;
 	struct obuf *out = ctx->out;
 	struct obuf_svp *svp = &ctx->svp;
 	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
-	const char *name = request->key;
+	const char *name = request->name;
 	uint32_t name_len = mp_decode_strl(&name);
 
 	int oc = 0; /* how many objects are on stack after box_lua_find */
@@ -273,7 +274,7 @@ execute_lua_call(lua_State *L)
 	oc = box_lua_find(L, name, name + name_len);
 
 	/* Push the rest of args (a tuple). */
-	const char *args = request->tuple;
+	const char *args = request->args;
 
 	uint32_t arg_count = mp_decode_array(&args);
 	luaL_checkstack(L, arg_count, "call: out of stack");
@@ -311,11 +312,11 @@ execute_lua_call(lua_State *L)
 		      luamp_error, L);
 
 	int count;
-	if (request->type == IPROTO_CALL_16) {
+	if (request->header->type == IPROTO_CALL_16) {
 		/* Tarantool < 1.7.1 compatibility */
 		count = luamp_encode_call(L, cfg, &stream);
 	} else {
-		assert(request->type == IPROTO_CALL);
+		assert(request->header->type == IPROTO_CALL);
 		count = lua_gettop(L);
 		for (int k = 1; k <= count; ++k) {
 			luamp_encode(L, cfg, &stream, k);
@@ -333,13 +334,13 @@ execute_lua_eval(lua_State *L)
 {
 	struct lua_function_ctx *ctx = (struct lua_function_ctx *)
 		lua_topointer(L, 1);
-	struct request *request = ctx->request;
+	struct call_request *request = ctx->request;
 	struct obuf *out = ctx->out;
 	struct obuf_svp *svp = &ctx->svp;
 	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
 	/* Compile expression */
-	const char *expr = request->key;
+	const char *expr = request->expr;
 	uint32_t expr_len = mp_decode_strl(&expr);
 	if (luaL_loadbuffer(L, expr, expr_len, "=eval")) {
 		diag_set(LuajitError, lua_tostring(L, -1));
@@ -347,7 +348,7 @@ execute_lua_eval(lua_State *L)
 	}
 
 	/* Unpack arguments */
-	const char *args = request->tuple;
+	const char *args = request->args;
 	uint32_t arg_count = mp_decode_array(&args);
 	luaL_checkstack(L, arg_count, "eval: out of stack");
 	for (uint32_t i = 0; i < arg_count; i++) {
@@ -376,7 +377,7 @@ execute_lua_eval(lua_State *L)
 }
 
 static inline int
-box_process_lua(struct request *request, struct obuf *out, lua_CFunction handler)
+box_process_lua(struct call_request *request, struct obuf *out, lua_CFunction handler)
 {
 	struct lua_function_ctx ctx = { request, out, {0, 0, 0}, false };
 
@@ -403,13 +404,13 @@ box_process_lua(struct request *request, struct obuf *out, lua_CFunction handler
 }
 
 int
-box_lua_call(struct request *request, struct obuf *out)
+box_lua_call(struct call_request *request, struct obuf *out)
 {
 	return box_process_lua(request, out, execute_lua_call);
 }
 
 int
-box_lua_eval(struct request *request, struct obuf *out)
+box_lua_eval(struct call_request *request, struct obuf *out)
 {
 	return box_process_lua(request, out, execute_lua_eval);
 }

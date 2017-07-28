@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_REQUEST_H_INCLUDED
-#define TARANTOOL_BOX_REQUEST_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_MOD_BOX_CALL_H
+#define INCLUDES_TARANTOOL_MOD_BOX_CALL_H
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,29 +30,20 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trivia/util.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+#include <stdint.h>
 
-struct request;
+struct obuf;
 
-/**
- * Convert one-based upsert/update operations to zero-based
- *
- * @param request a request to convert
- * @pre request->type == IPROTO_UPDATE || request->type == IPROTO_UPSERT
- * @pre request->index_base != 0
- * @pre request->ops are valid (see tuple_update_check_ops())
- * @post request->index_base = 0
- */
-int
-request_normalize_ops(struct request *request);
+struct box_function_ctx {
+	struct call_request *request;
+	struct port *port;
+};
 
-#if defined(__cplusplus)
-} /* extern "C" */
+void
+box_process_call(struct call_request *request, struct obuf *out);
 
-#endif /* defined(__cplusplus) */
+void
+box_process_eval(struct call_request *request, struct obuf *out);
 
-#endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_MOD_BOX_CALL_H */

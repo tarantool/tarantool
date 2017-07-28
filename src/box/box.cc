@@ -44,7 +44,6 @@
 #include "main.h"
 #include "tuple.h"
 #include "session.h"
-#include "func.h"
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
@@ -53,7 +52,6 @@
 #include "vinyl_engine.h"
 #include "space.h"
 #include "port.h"
-#include "request.h"
 #include "txn.h"
 #include "user.h"
 #include "cfg.h"
@@ -61,7 +59,6 @@
 #include "coio.h"
 #include "replication.h" /* replica */
 #include "title.h"
-#include "lua/call.h" /* box_lua_call */
 #include "xrow.h"
 #include "xrow_io.h"
 #include "xstream.h"
@@ -71,8 +68,12 @@
 #include "checkpoint.h"
 #include "sql.h"
 #include "systemd.h"
+#include "call.h"
 
 static char status[64] = "unknown";
+
+/** box.stat rmean */
+struct rmean *rmean_box;
 
 static void title(const char *new_status)
 {
@@ -158,7 +159,7 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	Index *primary = index_find_xc(space, 0);
 	uint32_t key_len;
 	char *key = tuple_extract_key(found_tuple,
-			&primary->index_def->key_def, &key_len);
+			primary->index_def->key_def, &key_len);
 	if (key == NULL)
 		diag_raise();
 	request->key = key;
@@ -313,7 +314,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
-	struct request *request = xrow_decode_request_xc(row);
+	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	process_rw(request, space, NULL);
 }
@@ -351,7 +352,7 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request = xrow_decode_request_xc(row);
+	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
@@ -636,7 +637,8 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	request = region_alloc_object(&fiber()->gc, struct request);
 	if (request == NULL)
 		return -1;
-	request_create(request, type);
+	memset(request, 0, sizeof(*request));
+	request->type = type;
 	request->space_id = space_id;
 	va_start(ap, format);
 	size_t buf_size = mp_vformat(NULL, 0, format, ap);
@@ -694,14 +696,11 @@ box_space_id_by_name(const char *name, uint32_t len)
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
 	uint32_t size = mp_sizeof_array(1) + mp_sizeof_str(len);
-	struct region *region = &fiber()->gc;
-	uint32_t used = region_used(region);
-	char *begin = (char *) region_alloc(region, size);
+	char *begin = (char *) region_alloc(&fiber()->gc, size);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "begin");
 		return BOX_ID_NIL;
 	}
-	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
 	char *end = mp_encode_array(begin, 1);
 	end = mp_encode_str(end, name, len);
 
@@ -723,14 +722,11 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 		return BOX_ID_NIL;
 	uint32_t size = mp_sizeof_array(2) + mp_sizeof_uint(space_id) +
 			mp_sizeof_str(len);
-	struct region *region = &fiber()->gc;
-	uint32_t used = region_used(region);
-	char *begin = (char *) region_alloc(region, size);
+	char *begin = (char *) region_alloc(&fiber()->gc, size);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "begin");
 		return BOX_ID_NIL;
 	}
-	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
 	char *end = mp_encode_array(begin, 2);
 	end = mp_encode_uint(end, space_id);
 	end = mp_encode_str(end, name, len);
@@ -791,7 +787,8 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	mp_tuple_assert(tuple, tuple_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_INSERT);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_INSERT;
 	request->space_id = space_id;
 	request->tuple = tuple;
 	request->tuple_end = tuple_end;
@@ -805,7 +802,8 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	mp_tuple_assert(tuple, tuple_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_REPLACE);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_REPLACE;
 	request->space_id = space_id;
 	request->tuple = tuple;
 	request->tuple_end = tuple_end;
@@ -819,7 +817,8 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_DELETE);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_DELETE;
 	request->space_id = space_id;
 	request->index_id = index_id;
 	request->key = key;
@@ -836,7 +835,8 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(ops, ops_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_UPDATE);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_UPDATE;
 	request->space_id = space_id;
 	request->index_id = index_id;
 	request->key = key;
@@ -857,7 +857,8 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 	mp_tuple_assert(tuple, tuple_end);
 	struct request *request;
 	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	request_create(request, IPROTO_UPSERT);
+	memset(request, 0, sizeof(*request));
+	request->type = IPROTO_UPSERT;
 	request->space_id = space_id;
 	request->index_id = index_id;
 	request->ops = ops;
@@ -949,189 +950,18 @@ box_on_join(const tt_uuid *instance_uuid)
 	box_register_replica(replica_id, instance_uuid);
 }
 
-static inline struct func *
-access_check_func(const char *name, uint32_t name_len)
-{
-	struct func *func = func_by_name(name, name_len);
-	struct credentials *credentials = current_user();
-	/*
-	 * If the user has universal access, don't bother with checks.
-	 * No special check for ADMIN user is necessary
-	 * since ADMIN has universal access.
-	 */
-	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL)
-		return func;
-	uint8_t access = PRIV_X & ~credentials->universal_access;
-	if (func == NULL || (func->def->uid != credentials->uid &&
-	     access & ~func->access[credentials->auth_token].effective)) {
-		/* Access violation, report error. */
-		struct user *user = user_find_xc(credentials->uid);
-		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->def->name,
-			  tt_cstr(name, name_len));
-	}
-
-	return func;
-}
-
-int
-func_call(struct func *func, struct request *request, struct obuf *out)
-{
-	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
-	if (func->func == NULL)
-		func_load(func);
-
-	/* Create a call context */
-	struct port port;
-	port_create(&port);
-	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
-	box_function_ctx_t ctx = { request, &port };
-
-	/* Clear all previous errors */
-	diag_clear(&fiber()->diag);
-	assert(!in_txn()); /* transaction is not started */
-	/* Call function from the shared library */
-	int rc = func->func(&ctx, request->tuple, request->tuple_end);
-	if (rc != 0) {
-		if (diag_last_error(&fiber()->diag) == NULL) {
-			/* Stored procedure forget to set diag  */
-			diag_set(ClientError, ER_PROC_C, "unknown error");
-		}
-		goto error;
-	}
-
-	/* Push results to obuf */
-	struct obuf_svp svp;
-	if (iproto_prepare_select(out, &svp) != 0)
-		goto error;
-
-	if (request->type == IPROTO_CALL_16) {
-		/* Tarantool < 1.7.1 compatibility */
-		if (port_dump(&port, out) != 0) {
-			obuf_rollback_to_svp(out, &svp);
-			goto error;
-		}
-		iproto_reply_select(out, &svp, request->header->sync,
-				    ::schema_version, port.size);
-	} else {
-		assert(request->type == IPROTO_CALL);
-		char *size_buf = (char *)
-			obuf_alloc(out, mp_sizeof_array(port.size));
-		if (size_buf == NULL)
-			goto error;
-		mp_encode_array(size_buf, port.size);
-		if (port_dump(&port, out) != 0) {
-			obuf_rollback_to_svp(out, &svp);
-			goto error;
-		}
-		iproto_reply_select(out, &svp, request->header->sync,
-				    ::schema_version, 1);
-	}
-
-	return 0;
-
-error:
-	txn_rollback();
-	return -1;
-}
-
 void
-box_process_call(struct request *request, struct obuf *out)
-{
-	rmean_collect(rmean_box, IPROTO_CALL, 1);
-	/**
-	 * Find the function definition and check access.
-	 */
-	const char *name = request->key;
-	uint32_t name_len = mp_decode_strl(&name);
-	struct func *func = access_check_func(name, name_len);
-	/*
-	 * Sic: func == NULL means that perhaps the user has a global
-	 * "EXECUTE" privilege, so no specific grant to a function.
-	 */
-
-	/**
-	 * Change the current user id if the function is
-	 * a set-definer-uid one. If the function is not
-	 * defined, it's obviously not a setuid one.
-	 */
-	struct credentials *orig_credentials = NULL;
-	if (func && func->def->setuid) {
-		orig_credentials = current_user();
-		/* Remember and change the current user id. */
-		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
-			/*
-			 * Fill the cache upon first access, since
-			 * when func is created, no user may
-			 * be around to fill it (recovery of
-			 * system spaces from a snapshot).
-			 */
-			struct user *owner = user_find_xc(func->def->uid);
-			credentials_init(&func->owner_credentials,
-					 owner->auth_token,
-					 owner->def->uid);
-		}
-		fiber_set_user(fiber(), &func->owner_credentials);
-	}
-
-	int rc;
-	if (func && func->def->language == FUNC_LANGUAGE_C) {
-		rc = func_call(func, request, out);
-	} else {
-		rc = box_lua_call(request, out);
-	}
-	/* Restore the original user */
-	if (orig_credentials)
-		fiber_set_user(fiber(), orig_credentials);
-
-	if (rc != 0) {
-		txn_rollback();
-		diag_raise();
-	}
-
-	if (in_txn()) {
-		/* The procedure forgot to call box.commit() */
-		say_warn("a transaction is active at return from '%.*s'",
-			name_len, name);
-		txn_rollback();
-	}
-}
-
-void
-box_process_eval(struct request *request, struct obuf *out)
-{
-	rmean_collect(rmean_box, IPROTO_EVAL, 1);
-	/* Check permissions */
-	access_check_universe(PRIV_X);
-	if (box_lua_eval(request, out) != 0) {
-		txn_rollback();
-		diag_raise();
-	}
-
-	if (in_txn()) {
-		/* The procedure forgot to call box.commit() */
-		const char *expr = request->key;
-		uint32_t expr_len = mp_decode_strl(&expr);
-		say_warn("a transaction is active at return from EVAL '%.*s'",
-			expr_len, expr);
-		txn_rollback();
-	}
-}
-
-void
-box_process_auth(struct request *request, struct obuf *out)
+box_process_auth(struct auth_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
-	assert(request->type == IPROTO_AUTH);
 
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	const char *user = request->key;
+	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
-	authenticate(user, len, request->tuple, request->tuple_end);
-	assert(request->header != NULL);
+	authenticate(user, len, request->scramble);
 	iproto_reply_ok_xc(out, request->header->sync, ::schema_version);
 }
 

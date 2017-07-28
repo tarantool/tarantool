@@ -1,7 +1,8 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H
+#ifndef TARANTOOL_BOX_TUPLE_CONVERT_H_INCLUDED
+#define TARANTOOL_BOX_TUPLE_CONVERT_H_INCLUDED
+
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -16,11 +17,11 @@
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
  * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
@@ -31,33 +32,29 @@
  * SUCH DAMAGE.
  */
 
-#include <stdint.h>
-#include "trivia/util.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct lua_State;
-
-void
-box_lua_call_init(struct lua_State *L);
-
-struct call_request;
 struct obuf;
+struct tuple;
+
+/* Store tuple in the output buffer in iproto format. */
+int
+tuple_to_obuf(const struct tuple *tuple, struct obuf *buf);
 
 /**
- * Invoke a Lua stored procedure from the binary protocol
- * (implementation of 'CALL' command code).
+ * Convert tuple to yaml string
+ *
+ * \param tuple tuple
+ * \retval NULL in case of error written in diag
+ * \retval pointer to string allocated on fiber()->gc region
  */
-int
-box_lua_call(struct call_request *request, struct obuf *out);
-
-int
-box_lua_eval(struct call_request *request, struct obuf *out);
+char *
+tuple_to_yaml(const struct tuple *tuple);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H */
+#endif /* TARANTOOL_BOX_TUPLE_CONVERT_H_INCLUDED */

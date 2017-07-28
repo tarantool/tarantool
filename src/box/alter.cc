@@ -389,19 +389,20 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
-	index_def = index_def_new(id, index_id, name, name_len, type, &opts,
-				  part_count);
+	index_def = index_def_new(id, index_id, name, name_len, type, &opts);
 	if (index_def == NULL)
 		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-
+	index_def->key_def = key_def_new(part_count);
+	if (index_def->key_def == NULL)
+		diag_raise();
 	if (is_166plus) {
 		/* 1.6.6+ */
-		if (key_def_decode_parts(&index_def->key_def, &parts) != 0)
+		if (key_def_decode_parts(index_def->key_def, &parts) != 0)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_165(&index_def->key_def, &parts) != 0)
+		if (key_def_decode_parts_165(index_def->key_def, &parts) != 0)
 			diag_raise();
 	}
 	index_def_check(index_def, space_name(old_space));
@@ -1167,7 +1168,7 @@ static void
 on_replace_dd_space(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_autocommit(txn, "Space _space");
+	txn_check_singlestatement(txn, "Space _space");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -1329,7 +1330,7 @@ static void
 on_replace_dd_index(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_autocommit(txn, "Space _index");
+	txn_check_singlestatement(txn, "Space _index");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -1497,7 +1498,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	txn_check_autocommit(txn, "Space _truncate");
+	txn_check_singlestatement(txn, "Space _truncate");
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	if (new_tuple == NULL) {
@@ -1764,7 +1765,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	txn_check_autocommit(txn, "Space _user");
+	txn_check_singlestatement(txn, "Space _user");
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -1896,7 +1897,7 @@ static void
 on_replace_dd_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_autocommit(txn, "Space _func");
+	txn_check_singlestatement(txn, "Space _func");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2100,7 +2101,7 @@ static void
 on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_autocommit(txn, "Space _priv");
+	txn_check_singlestatement(txn, "Space _priv");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2146,7 +2147,7 @@ static void
 on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_autocommit(txn, "Space _schema");
+	txn_check_singlestatement(txn, "Space _schema");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2225,7 +2226,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	txn_check_autocommit(txn, "Space _cluster");
+	txn_check_singlestatement(txn, "Space _cluster");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2334,6 +2335,10 @@ struct trigger on_stmt_begin_space = {
 };
 
 struct trigger on_stmt_begin_index = {
+	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
+};
+
+struct trigger on_stmt_begin_truncate = {
 	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
 };
 

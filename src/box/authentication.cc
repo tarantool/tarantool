@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "authentication.h"
 #include "user.h"
 #include "session.h"
 
@@ -35,7 +36,7 @@ static char zero_hash[SCRAMBLE_SIZE];
 
 void
 authenticate(const char *user_name, uint32_t len,
-	     const char *tuple, const char * /* tuple_end */)
+	     const char *tuple)
 {
 	struct user *user = user_find_by_name_xc(user_name, len);
 	struct session *session = current_session();

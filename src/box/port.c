@@ -30,6 +30,7 @@
  */
 #include "port.h"
 #include "tuple.h"
+#include "tuple_convert.h"
 #include <small/obuf.h>
 #include <small/slab_cache.h>
 #include <small/mempool.h>

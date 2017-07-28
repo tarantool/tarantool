@@ -654,3 +654,59 @@ _ = s:replace({1, string.rep('x', 35 * 1024 * 1024)})
 s:drop()
 ---
 ...
+-- https://github.com/tarantool/tarantool/issues/2614
+count = 10000
+---
+...
+s = box.schema.space.create("test", {engine='vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+cont = true
+---
+...
+finished = 0
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+_ = fiber.create(function()
+    while cont do
+        s:select(math.random(count), {iterator = box.index.LE, limit = 10})
+        fiber.sleep(0.01)
+    end
+    finished = finished + 1
+end);
+---
+...
+_ = fiber.create(function()
+    while cont do
+        box.snapshot()
+        fiber.sleep(0.01)
+    end
+    finished = finished + 1
+end);
+---
+...
+for i = 1, count do
+    s:replace{math.random(count)}
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+cont = false
+---
+...
+while finished ~= 2 do fiber.sleep(0.01) end
+---
+...
+s:drop()
+---
+...
