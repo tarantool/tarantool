@@ -431,16 +431,12 @@ test_iterator_restore_after_insertion()
 int
 main(int argc, char *argv[])
 {
-	memory_init();
-	fiber_init(fiber_c_invoke);
-	tuple_init();
+	vy_iterator_C_test_init(0);
 
 	test_basic();
 	test_iterator_initial_restore();
 	test_iterator_restore_after_insertion();
 
-	tuple_free();
-	fiber_free();
-	memory_free();
+	vy_iterator_C_test_finish();
 	return 0;
 }

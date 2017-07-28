@@ -405,14 +405,10 @@ test_basic(void)
 int
 main(int argc, char *argv[])
 {
-	memory_init();
-	fiber_init(fiber_c_invoke);
-	tuple_init();
+	vy_iterator_C_test_init(0);
 
 	test_basic();
 
-	tuple_free();
-	fiber_free();
-	memory_free();
+	vy_iterator_C_test_finish();
 	return 0;
 }

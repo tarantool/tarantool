@@ -587,11 +587,14 @@ vy_cache_iterator_start(struct vy_cache_iterator *itr, struct tuple **ret,
 	vy_cache_iterator_get(itr, ret);
 }
 
+/**
+ * Update the cache iterator version and its cache_tree_iterator
+ * to be valid and positioned on the same statement as before.
+ * @param itr Iterator to restore.
+ */
 static void
-vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr,
-			      bool *step_was_made)
+vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr)
 {
-	*step_was_made = false;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 
 	if (itr->version == itr->cache->version)
@@ -607,7 +610,6 @@ vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr,
 		vy_cache_tree_lower_bound(tree, itr->curr_stmt, &exact);
 	if (exact)
 		return;
-	*step_was_made = true;
 
 	tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
@@ -617,6 +619,7 @@ vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr,
 		return;
 	itr->curr_stmt = vy_cache_iterator_curr_stmt(itr);
 	tuple_ref(itr->curr_stmt);
+	return;
 }
 
 NODISCARD int
@@ -644,12 +647,12 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	int dir = iterator_direction(itr->iterator_type);
 	const struct tuple *key = itr->key;
+	bool is_version_changed = itr->version != itr->cache->version;
+	vy_cache_iterator_restore_pos(itr);
 
-	bool step_was_made;
-	vy_cache_iterator_restore_pos(itr, &step_was_made);
 	if (!itr->curr_stmt) /* End of search. */
 		return 0;
-	if (!step_was_made) {
+	if (! is_version_changed) {
 		struct vy_cache_entry **entry =
 			vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 
@@ -743,17 +746,16 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct key_def *def = itr->cache->cmp_def;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	int dir = iterator_direction(itr->iterator_type);
-	if (itr->curr_stmt != NULL) {
-		bool step_was_made;
-		vy_cache_iterator_restore_pos(itr, &step_was_made);
-	}
+	bool is_version_changed = itr->version != itr->cache->version;
+	if (itr->curr_stmt != NULL)
+		vy_cache_iterator_restore_pos(itr);
 
 	if (itr->search_started) {
 		if (itr->curr_stmt == NULL)
 			return 0;
 		int rc = 0;
 		struct vy_cache_tree_iterator pos = itr->curr_pos;
-		if (last_stmt == NULL && itr->curr_stmt != NULL) {
+		if (last_stmt == NULL) {
 			struct vy_cache_entry **entry =
 				vy_cache_tree_iterator_get_elem(tree, &pos);
 			assert(entry != NULL);
@@ -761,7 +763,8 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			vy_cache_iterator_get(itr, ret);
 			return 0;
 		}
-		if (itr->version == itr->cache->version) {
+		assert(itr->version == itr->cache->version);
+		if (! is_version_changed) {
 			vy_cache_iterator_get(itr, ret);
 			return 0;
 		}
@@ -777,7 +780,8 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			assert(*entry && (*entry)->stmt);
 			struct tuple *t = (*entry)->stmt;
 			int cmp = dir * vy_stmt_compare(t, last_stmt, def);
-			if (cmp < 0)
+			if (cmp < 0 || (cmp == 0 && vy_stmt_lsn(t) <=
+				        (**itr->read_view).vlsn))
 				break;
 			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
 				if (itr->curr_stmt != NULL)

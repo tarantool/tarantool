@@ -1,4 +1,30 @@
 #include "vy_iterators_helper.h"
+#include "memory.h"
+#include "fiber.h"
+
+struct tuple_format *vy_key_format = NULL;
+struct vy_cache_env cache_env;
+
+void
+vy_iterator_C_test_init(size_t cache_size)
+{
+	memory_init();
+	fiber_init(fiber_c_invoke);
+	tuple_init();
+	vy_cache_env_create(&cache_env, cord_slab_cache(), cache_size);
+	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, 0, 0);
+	tuple_format_ref(vy_key_format, 1);
+}
+
+void
+vy_iterator_C_test_finish()
+{
+	tuple_format_ref(vy_key_format, -1);
+	vy_cache_env_destroy(&cache_env);
+	tuple_free();
+	fiber_free();
+	memory_free();
+}
 
 struct tuple *
 vy_new_simple_stmt(struct tuple_format *format,
@@ -6,6 +32,8 @@ vy_new_simple_stmt(struct tuple_format *format,
 		   struct tuple_format *format_with_colmask,
 		   const struct vy_stmt_template *templ)
 {
+	if (templ == NULL)
+		return NULL;
 	/* Calculate binary size. */
 	int i = 0;
 	size_t size = 0;
@@ -71,6 +99,13 @@ vy_new_simple_stmt(struct tuple_format *format,
 		fail_if(ret == NULL);
 		goto end;
 	}
+	if (templ->type == IPROTO_SELECT) {
+		const char *key = buf;
+		uint part_count = mp_decode_array(&key);
+		ret = vy_stmt_new_select(vy_key_format, key, part_count);
+		fail_if(ret == NULL);
+		goto end;
+	}
 	fail_if(true);
 end:
 	free(buf);
@@ -83,14 +118,9 @@ end:
 const struct tuple *
 vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 {
-	struct tuple *stmt;
-	if (templ->type == IPROTO_UPSERT) {
-		stmt = vy_new_simple_stmt(mem->format, mem->upsert_format,
-					  mem->format_with_colmask, templ);
-	} else {
-		stmt = vy_new_simple_stmt(mem->format, mem->upsert_format,
-					  mem->format_with_colmask, templ);
-	}
+	struct tuple *stmt =
+		vy_new_simple_stmt(mem->format, mem->upsert_format,
+				   mem->format_with_colmask, templ);
 	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt, mem->allocator,
 							 mem->generation);
 	assert(region_stmt != NULL);
@@ -100,6 +130,43 @@ vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 	else
 		vy_mem_insert(mem, region_stmt);
 	return region_stmt;
+}
+
+void
+vy_cache_insert_templates_chain(struct vy_cache *cache,
+				struct tuple_format *format,
+				const struct vy_stmt_template *chain,
+				uint length,
+				const struct vy_stmt_template *key_templ,
+				enum iterator_type order)
+{
+	struct tuple *key =
+		vy_new_simple_stmt(format, NULL, NULL, key_templ);
+	struct tuple *prev_stmt = NULL;
+	struct tuple *stmt = NULL;
+
+	for (uint i = 0; i < length; ++i) {
+		stmt = vy_new_simple_stmt(format, NULL, NULL, &chain[i]);
+		vy_cache_add(cache, stmt, prev_stmt, key, order);
+		if (i != 0)
+			tuple_unref(prev_stmt);
+		prev_stmt = stmt;
+		stmt = NULL;
+	}
+	tuple_unref(key);
+	if (prev_stmt != NULL)
+		tuple_unref(prev_stmt);
+	if (stmt != NULL)
+		tuple_unref(stmt);
+}
+
+void
+vy_cache_on_write_template(struct vy_cache *cache, struct tuple_format *format,
+			   const struct vy_stmt_template *templ)
+{
+	struct tuple *written = vy_new_simple_stmt(format, NULL, NULL, templ);
+	vy_cache_on_write(cache, written, NULL);
+	tuple_unref(written);
 }
 
 void
