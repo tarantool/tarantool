@@ -627,7 +627,6 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 {
 	xrow_header_decode_xc(&msg->header, pos, reqend);
 	assert(*pos == reqend);
-	const char *body;
 	uint8_t type = msg->header.type;
 
 	/*
@@ -662,13 +661,8 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		*stop_input = true;
 		break;
 	case IPROTO_EXECUTE:
-		if (msg->header.bodycnt == 0)
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "missing request body");
-		body = (const char *) msg->header.body[0].iov_base;
-		sql_request_decode_xc(&msg->sql_request, body,
-				      msg->header.body[0].iov_len, &fiber()->gc,
-				      msg->header.sync);
+		xrow_decode_sql_xc(&msg->header, &msg->sql_request,
+				   &fiber()->gc);
 		cmsg_init(msg, sql_route);
 		break;
 	case IPROTO_AUTH:

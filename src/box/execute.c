@@ -242,20 +242,29 @@ sql_bind_list_decode(struct sql_request *request, const char *data,
 }
 
 int
-sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
-		   struct region *region, uint64_t sync)
+xrow_decode_sql(const struct xrow_header *row, struct sql_request *request,
+		struct region *region)
 {
-	const char *end = data + len;
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "missing request body");
+		return 1;
+	}
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	assert((end - data) > 0);
+
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
+
 	uint32_t map_size = mp_decode_map(&data);
 	request->sql_text = NULL;
 	request->bind = NULL;
 	request->bind_count = 0;
-	request->sync = sync;
+	request->sync = row->sync;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint8_t key = *data;
 		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT) {
@@ -537,6 +546,31 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 	return 0;
 }
 
+static inline int
+sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, int column_count,
+	    struct port *port, struct region *region)
+{
+	int rc;
+	if (column_count > 0) {
+		/* Either ROW or DONE or ERROR. */
+		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+			if (sql_row_to_port(stmt, column_count, region,
+					    port) != 0)
+				return -1;
+		}
+		assert(rc == SQLITE_DONE || rc != SQLITE_OK);
+	} else {
+		/* No rows. Either DONE or ERROR. */
+		rc = sqlite3_step(stmt);
+		assert(rc != SQLITE_ROW && rc != SQLITE_OK);
+	}
+	if (rc != SQLITE_DONE) {
+		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Execute the prepared statement and write to the @out obuf the
  * result. Result is either rows array in a case of not zero
@@ -554,30 +588,11 @@ static inline int
 sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 		       uint64_t sync, struct region *region)
 {
-	/*
-	 * Execute request.
-	 */
-	int rc;
 	struct port port;
 	port_create(&port);
 	int column_count = sqlite3_column_count(stmt);
-	if (column_count > 0) {
-		/* Either ROW or DONE or ERROR. */
-		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-			if (sql_row_to_port(stmt, column_count, region,
-					    &port) != 0)
-				goto err_execute;
-		}
-		assert(rc == SQLITE_DONE || rc != SQLITE_OK);
-	} else {
-		/* No rows. Either DONE or ERROR. */
-		rc = sqlite3_step(stmt);
-		assert(rc != SQLITE_ROW && rc != SQLITE_OK);
-	}
-	if (rc != SQLITE_DONE) {
-		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
+	if (sql_execute(db, stmt, column_count, &port, region) != 0)
 		goto err_execute;
-	}
 
 	/*
 	 * Encode response.
@@ -595,7 +610,6 @@ sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 			goto err_body;
 		if (port_dump(&port, out) != 0) {
 			/* Failed port dump destroyes the port. */
-			port_create(&port);
 			goto err_body;
 		}
 	} else {
@@ -614,7 +628,7 @@ sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 		buf = mp_encode_uint(buf, IPROTO_SQL_ROW_COUNT);
 		buf = mp_encode_uint(buf, changes);
 	}
-	/* Port already is destroyed during dump. */
+	port_destroy(&port);
 	iproto_reply_sql(out, &header_svp, sync, schema_version, keys);
 	return 0;
 

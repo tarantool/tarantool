@@ -41,6 +41,7 @@ extern "C" {
 struct obuf;
 struct region;
 struct sql_bind;
+struct xrow_header;
 
 /** EXECUTE request. */
 struct sql_request {
@@ -55,18 +56,16 @@ struct sql_request {
 
 /**
  * Parse the EXECUTE request.
+ * @param row Encoded data.
  * @param[out] request Request to decode to.
- * @param data EXECUTE body.
- * @param len Byte length of the @data.
  * @param region Allocator.
- * @param sync Request sync.
  *
  * @retval  0 Sucess.
  * @retval -1 Format or memory error.
  */
 int
-sql_request_decode(struct sql_request *request, const char *data, uint32_t len,
-		   struct region *region, uint64_t sync);
+xrow_decode_sql(const struct xrow_header *row, struct sql_request *request,
+		struct region *region);
 
 /**
  * Prepare and execute an SQL statement and encode the response in
@@ -114,10 +113,10 @@ sql_prepare_and_execute(const struct sql_request *request, struct obuf *out,
 
 /** @copydoc sql_request_decode. Throws on error. */
 static inline void
-sql_request_decode_xc(struct sql_request *request, const char *data,
-		      uint32_t len, struct region *region, uint64_t sync)
+xrow_decode_sql_xc(const struct xrow_header *row, struct sql_request *request,
+		   struct region *region)
 {
-	if (sql_request_decode(request, data, len, region, sync) != 0)
+	if (xrow_decode_sql(row, request, region) != 0)
 		diag_raise();
 }
 #endif
