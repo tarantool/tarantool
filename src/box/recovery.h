@@ -96,6 +96,6 @@ recovery_finalize(struct recovery *r, struct xstream *stream);
  */
 void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
-		       struct vclock *stop_vclock);
+		       struct vclock *stop_vclock, bool scan_dir);
 
 #endif /* TARANTOOL_RECOVERY_H_INCLUDED */

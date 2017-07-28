@@ -1299,12 +1299,27 @@ xlog_sync(struct xlog *l)
 	return 0;
 }
 
+static int
+xlog_write_eof(struct xlog *l)
+{
+	ERROR_INJECT(ERRINJ_WAL_WRITE_EOF, {
+		diag_set(ClientError, ER_INJECTION, "xlog write injection");
+		return -1;
+	});
+	if (fio_writen(l->fd, &eof_marker, sizeof(eof_marker)) < 0) {
+		diag_set(SystemError, "write() failed");
+		return -1;
+	}
+	return 0;
+}
+
 int
 xlog_close(struct xlog *l, bool reuse_fd)
 {
-	int rc = fio_writen(l->fd, &eof_marker, sizeof(log_magic_t));
+	int rc = xlog_write_eof(l);
 	if (rc < 0)
-		say_syserror("%s: failed to write EOF marker", l->filename);
+		say_error("%s: failed to write EOF marker: %s", l->filename,
+			  diag_last_error(diag_get())->errmsg);
 
 	/*
 	 * Sync the file before closing, since

@@ -173,7 +173,8 @@ relay_final_join_f(va_list ap)
 
 	/* Send all WALs until stop_vclock */
 	assert(relay->stream.write != NULL);
-	recover_remaining_wals(relay->r, &relay->stream, &relay->stop_vclock);
+	recover_remaining_wals(relay->r, &relay->stream,
+			       &relay->stop_vclock, true);
 	assert(vclock_compare(&relay->r->vclock, &relay->stop_vclock) == 0);
 	return 0;
 }
@@ -260,7 +261,7 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 }
 
 static void
-relay_process_wal_event(struct wal_watcher *watcher)
+relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 {
 	struct relay *relay = container_of(watcher, struct relay, wal_watcher);
 	if (relay->exiting) {
@@ -271,7 +272,8 @@ relay_process_wal_event(struct wal_watcher *watcher)
 		return;
 	}
 	try {
-		recover_remaining_wals(relay->r, &relay->stream, NULL);
+		recover_remaining_wals(relay->r, &relay->stream, NULL,
+				       (events & WAL_EVENT_ROTATE) != 0);
 	} catch (Exception *e) {
 		relay->failed = true;
 	}

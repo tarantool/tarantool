@@ -28,6 +28,8 @@ errinj.info()
     state: false
   ERRINJ_VY_INDEX_DUMP:
     state: -1
+  ERRINJ_WAL_WRITE_EOF:
+    state: false
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false
   ERRINJ_VY_RUN_DISCARD:

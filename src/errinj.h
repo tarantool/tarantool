@@ -77,6 +77,7 @@ struct errinj {
 	_(ERRINJ_WAL_WRITE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_WRITE_PARTIAL, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_WRITE_DISK, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_WAL_WRITE_EOF, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
