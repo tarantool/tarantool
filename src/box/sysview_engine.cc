@@ -110,7 +110,7 @@ SysviewSpace::buildSecondaryKey(struct space *, struct space *, Index *)
 {}
 
 SysviewEngine::SysviewEngine()
-	:Engine("sysview", &memtx_tuple_format_vtab)
+	:Engine("sysview", NULL)
 {
 }
 
