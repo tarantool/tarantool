@@ -134,7 +134,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 		uint32_t key_no = 0;
 		rlist_foreach_entry(index_def, key_list, link) {
 			keys[index_def == pk ? 0 : ++key_no] =
-				&index_def->key_def;
+				index_def->key_def;
 		}
 		/** Tuple format must be created before any other index. */
 		space->format = tuple_format_new(engine->format, keys,

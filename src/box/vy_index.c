@@ -124,7 +124,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
 	};
 
-	assert(index_def->key_def.part_count > 0);
+	assert(index_def->key_def->part_count > 0);
 	struct vy_index *pk = NULL;
 	if (index_def->iid > 0) {
 		pk = vy_index_find(space, 0);
@@ -146,7 +146,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		goto fail_tree;
 	}
 
-	struct key_def *key_def = key_def_dup(&index_def->key_def);
+	struct key_def *key_def = key_def_dup(index_def->key_def);
 	if (key_def == NULL)
 		goto fail_key_def;
 

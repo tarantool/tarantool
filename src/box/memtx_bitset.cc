@@ -303,7 +303,7 @@ MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 	if (new_tuple != NULL) {
 		const char *field;
-		field = tuple_field(new_tuple, index_def->key_def.parts[0].fieldno);
+		field = tuple_field(new_tuple, index_def->key_def->parts[0].fieldno);
 		uint32_t key_len;
 		const void *key = make_key(field, &key_len);
 #ifndef OLD_GOOD_BITSET

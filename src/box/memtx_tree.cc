@@ -48,7 +48,7 @@ struct key_data
 int
 memtx_tree_compare(const tuple *a, const tuple *b, struct index_def *index_def)
 {
-	int r = tuple_compare(a, b, &index_def->key_def);
+	int r = tuple_compare(a, b, index_def->key_def);
 	if (r == 0 && !index_def->opts.is_unique)
 		r = a < b ? -1 : a > b;
 	return r;
@@ -59,7 +59,7 @@ memtx_tree_compare_key(const tuple *a, const struct key_data *key_data,
 		       struct index_def *index_def)
 {
 	return tuple_compare_with_key(a, key_data->key,
-				      key_data->part_count, &index_def->key_def);
+				      key_data->part_count, index_def->key_def);
 }
 
 int
@@ -224,7 +224,7 @@ MemtxTree::random(uint32_t rnd) const
 struct tuple *
 MemtxTree::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(index_def->opts.is_unique && part_count == index_def->key_def.part_count);
+	assert(index_def->opts.is_unique && part_count == index_def->key_def->part_count);
 
 	struct key_data key_data;
 	key_data.key = key;

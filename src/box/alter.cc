@@ -372,19 +372,20 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
-	index_def = index_def_new(id, index_id, name, name_len, type, &opts,
-				  part_count);
+	index_def = index_def_new(id, index_id, name, name_len, type, &opts);
 	if (index_def == NULL)
 		diag_raise();
 	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-
+	index_def->key_def = key_def_new(part_count);
+	if (index_def->key_def == NULL)
+		diag_raise();
 	if (is_166plus) {
 		/* 1.6.6+ */
-		if (key_def_decode_parts(&index_def->key_def, &parts) != 0)
+		if (key_def_decode_parts(index_def->key_def, &parts) != 0)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_165(&index_def->key_def, &parts) != 0)
+		if (key_def_decode_parts_165(index_def->key_def, &parts) != 0)
 			diag_raise();
 	}
 	index_def_check(index_def, space_name(old_space));
