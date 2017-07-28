@@ -2,7 +2,7 @@ env = require('test_run')
 test_run = env.new()
 net_box = require('net.box')
 
-s = box.schema.space.create('test', { id = 0 })
+s = box.schema.space.create('test')
 _ = box.schema.space.create('test1', { id = 555 })
 box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
@@ -94,7 +94,7 @@ net_box = require('net.box')
 -- Prepare spaces
 box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
-s = box.schema.space.create('tweedledum', { id = 0 })
+s = box.schema.space.create('tweedledum')
 index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'string'} })
 index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'string'}})
 function compare(a,b) return a[1] < b[1] end
@@ -192,7 +192,7 @@ sorted(space.index.secondary:select('part1'))
 sorted(space.index.secondary:select('part1_a'))
 sorted(space.index.secondary:select('part_none'))
 
-sorted(box.space[0].index[1]:select({'part1', 'part2'}))
+sorted(s.index[1]:select({'part1', 'part2'}))
 
 sorted(space.index.secondary:select('part1'))
 sorted(space.index.secondary:select('part2'))
@@ -223,7 +223,7 @@ net_box = require('net.box')
 conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.tweedledum
 
-s = box.space[0]
+s = box.space.tweedledum
 
 -- Bug#929654 - secondary hash index is not built with build_indexes()
 sorted(space.index.secondary:select('hello'))

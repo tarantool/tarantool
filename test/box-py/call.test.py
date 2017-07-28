@@ -75,7 +75,7 @@ call("f3")
 call("f1", 'jason')
 call("f1", 'jason', 1, 'test', 2, 'stewart')
 
-admin("space = box.schema.space.create('tweedledum', { id = 0 })")
+admin("space = box.schema.space.create('tweedledum')")
 admin("index = space:create_index('primary', { type = 'hash' })")
 
 admin("function myreplace(...) return space:replace{...} end")

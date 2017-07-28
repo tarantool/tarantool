@@ -452,17 +452,26 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	def->name[name_len] = 0;
 	identifier_check(def->name);
 	def->id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
-	if (def->id > BOX_SPACE_MAX)
-		tnt_raise(ClientError, errcode, def->name,
+	if (def->id > BOX_SPACE_MAX) {
+		tnt_raise(ClientError, errcode,
+			  tt_cstr(def->name, BOX_INVALID_NAME_MAX),
 			  "space id is too big");
+	}
+	if (def->id == 0) {
+		tnt_raise(ClientError, errcode,
+			  tt_cstr(def->name, BOX_INVALID_NAME_MAX),
+			  "space id 0 is reserved");
+	}
 	def->uid = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_UID);
 	def->exact_field_count =
 		tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_FIELD_COUNT);
 	const char *engine_name =
 		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_ENGINE, &name_len);
-	if (name_len > ENGINE_NAME_MAX)
-		tnt_raise(ClientError, errcode, def->name,
+	if (name_len > ENGINE_NAME_MAX) {
+		tnt_raise(ClientError, errcode,
+			  tt_cstr(def->name, BOX_INVALID_NAME_MAX),
 			  "space engine name is too long");
+	}
 	memcpy(def->engine_name, engine_name, name_len);
 	def->engine_name[name_len] = 0;
 	identifier_check(def->engine_name);

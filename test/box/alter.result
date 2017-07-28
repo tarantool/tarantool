@@ -653,3 +653,10 @@ s.index.secondary:select{}
 s:drop()
 ---
 ...
+--
+-- Forbid explicit space id 0.
+--
+s = box.schema.create_space('test', { id = 0 })
+---
+- error: 'Failed to create space ''test'': space id 0 is reserved'
+...

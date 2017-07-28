@@ -247,3 +247,8 @@ s.index.pk
 s.index.secondary
 s.index.secondary:select{}
 s:drop()
+
+--
+-- Forbid explicit space id 0.
+--
+s = box.schema.create_space('test', { id = 0 })
