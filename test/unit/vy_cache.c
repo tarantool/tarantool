@@ -19,7 +19,7 @@ test_basic()
 		tuple_format_new(&vy_tuple_format_vtab, &key_def, 1, 0);
 	struct tuple *select_all =
 		vy_new_simple_stmt(format, NULL, NULL, &key_template);
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 
 	/*
 	 * Fill the cache with 3 chains.
@@ -119,7 +119,7 @@ test_basic()
 	itr.base.iface->close(&itr.base);
 
 	tuple_unref(select_all);
-	tuple_format_ref(format, -1);
+	tuple_format_unref(format);
 	vy_cache_destroy(&cache);
 	box_key_def_delete(key_def);
 	check_plan();

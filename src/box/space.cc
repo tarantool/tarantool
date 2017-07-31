@@ -124,7 +124,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 						 index_count, 0);
 		if (space->format == NULL)
 			diag_raise();
-		tuple_format_ref(space->format, 1);
+		tuple_format_ref(space->format);
 		space->format->exact_field_count = def->exact_field_count;
 	}
 	/* init space engine instance */
@@ -148,7 +148,7 @@ space_delete(struct space *space)
 			delete index;
 	}
 	if (space->format)
-		tuple_format_ref(space->format, -1);
+		tuple_format_unref(space->format);
 	if (space->handler)
 		delete space->handler;
 

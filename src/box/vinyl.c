@@ -2655,29 +2655,29 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 		vy_tuple_format_new_with_colmask(new_space->format);
 	if (format == NULL)
 		return -1;
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 
 	/* Update the upsert format. */
 	struct tuple_format *upsert_format =
 		vy_tuple_format_new_upsert(new_space->format);
 	if (upsert_format == NULL) {
-		tuple_format_ref(format, -1);
+		tuple_format_unref(format);
 		return -1;
 	}
-	tuple_format_ref(upsert_format, 1);
+	tuple_format_ref(upsert_format);
 
 	/* Set possibly changed opts. */
 	pk->opts = new_user_def->opts;
 
 	/* Set new formats. */
-	tuple_format_ref(pk->mem_format, -1);
-	tuple_format_ref(pk->upsert_format, -1);
-	tuple_format_ref(pk->mem_format_with_colmask, -1);
+	tuple_format_unref(pk->mem_format);
+	tuple_format_unref(pk->upsert_format);
+	tuple_format_unref(pk->mem_format_with_colmask);
 	pk->upsert_format = upsert_format;
 	pk->mem_format_with_colmask = format;
 	pk->mem_format = new_space->format;
 	pk->space_index_count = new_space->index_count;
-	tuple_format_ref(pk->mem_format, 1);
+	tuple_format_ref(pk->mem_format);
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
@@ -2686,13 +2686,13 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 		index->pk = pk;
 		new_user_def = space_index_def(new_space, i);
 		index->opts = new_user_def->opts;
-		tuple_format_ref(index->mem_format_with_colmask, -1);
-		tuple_format_ref(index->mem_format, -1);
+		tuple_format_unref(index->mem_format_with_colmask);
+		tuple_format_unref(index->mem_format);
 		index->mem_format_with_colmask =
 			pk->mem_format_with_colmask;
 		index->mem_format = pk->mem_format;
-		tuple_format_ref(index->mem_format_with_colmask, 1);
-		tuple_format_ref(index->mem_format, 1);
+		tuple_format_ref(index->mem_format_with_colmask);
+		tuple_format_ref(index->mem_format);
 		index->space_index_count = new_space->index_count;
 	}
 	return 0;
@@ -4232,18 +4232,18 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		if (ctx->key_def == NULL)
 			return -1;
 		if (ctx->format != NULL)
-			tuple_format_ref(ctx->format, -1);
+			tuple_format_unref(ctx->format);
 		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
 				(struct key_def **)&ctx->key_def, 1, 0);
 		if (ctx->format == NULL)
 			return -1;
-		tuple_format_ref(ctx->format, 1);
+		tuple_format_ref(ctx->format);
 		if (ctx->upsert_format != NULL)
-			tuple_format_ref(ctx->upsert_format, -1);
+			tuple_format_unref(ctx->upsert_format);
 		ctx->upsert_format = vy_tuple_format_new_upsert(ctx->format);
 		if (ctx->upsert_format == NULL)
 			return -1;
-		tuple_format_ref(ctx->upsert_format, 1);
+		tuple_format_ref(ctx->upsert_format);
 	}
 
 	/*
@@ -4359,9 +4359,9 @@ vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
 	if (ctx->key_def != NULL)
 		free(ctx->key_def);
 	if (ctx->format != NULL)
-		tuple_format_ref(ctx->format, -1);
+		tuple_format_unref(ctx->format);
 	if (ctx->upsert_format != NULL)
-		tuple_format_ref(ctx->upsert_format, -1);
+		tuple_format_unref(ctx->upsert_format);
 	struct vy_slice *slice, *tmp;
 	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
 		vy_slice_delete(slice);

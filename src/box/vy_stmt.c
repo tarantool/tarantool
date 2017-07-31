@@ -77,7 +77,7 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	 * counter.
 	 */
 	if (cord_is_main())
-		tuple_format_ref(format, -1);
+		tuple_format_unref(format);
 #ifndef NDEBUG
 	memset(tuple, '#', tuple_size(tuple)); /* fail early */
 #endif
@@ -109,7 +109,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 	tuple->refs = 1;
 	tuple->format_id = tuple_format_id(format);
 	if (cord_is_main())
-		tuple_format_ref(format, 1);
+		tuple_format_ref(format);
 	tuple->bsize = bsize;
 	tuple->data_offset = sizeof(struct vy_stmt) + meta_size;;
 	vy_stmt_set_lsn(tuple, 0);

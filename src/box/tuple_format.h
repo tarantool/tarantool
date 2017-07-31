@@ -167,16 +167,19 @@ void
 tuple_format_delete(struct tuple_format *format);
 
 static inline void
-tuple_format_ref(struct tuple_format *format, int count)
+tuple_format_ref(struct tuple_format *format)
 {
-	assert(format->refs + count >= 0);
-	assert((uint64_t)format->refs + count <= FORMAT_REF_MAX);
+	assert((uint64_t)format->refs + 1 <= FORMAT_REF_MAX);
+	format->refs++;
+}
 
-	format->refs += count;
-	if (format->refs == 0)
+static inline void
+tuple_format_unref(struct tuple_format *format)
+{
+	assert(format->refs >= 1);
+	if (--format->refs == 0)
 		tuple_format_delete(format);
-
-};
+}
 
 /**
  * Allocate, construct and register a new in-memory tuple format.

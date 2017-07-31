@@ -306,18 +306,18 @@ box_tuple_format_new(struct key_def **keys, uint16_t key_count)
 	box_tuple_format_t *format = tuple_format_new(tuple_format_default_vtab,
 						      keys, key_count, 0);
 	if (format != NULL)
-		tuple_format_ref(format, 1);
+		tuple_format_ref(format);
 	return format;
 }
 
 void
 box_tuple_format_ref(box_tuple_format_t *format)
 {
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 }
 
 void
 box_tuple_format_unref(box_tuple_format_t *format)
 {
-	tuple_format_ref(format, -1);
+	tuple_format_unref(format);
 }

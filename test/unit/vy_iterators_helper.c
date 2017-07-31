@@ -13,13 +13,13 @@ vy_iterator_C_test_init(size_t cache_size)
 	tuple_init();
 	vy_cache_env_create(&cache_env, cord_slab_cache(), cache_size);
 	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, 0, 0);
-	tuple_format_ref(vy_key_format, 1);
+	tuple_format_ref(vy_key_format);
 }
 
 void
 vy_iterator_C_test_finish()
 {
-	tuple_format_ref(vy_key_format, -1);
+	tuple_format_unref(vy_key_format);
 	vy_cache_env_destroy(&cache_env);
 	tuple_free();
 	fiber_free();

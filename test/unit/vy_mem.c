@@ -198,7 +198,7 @@ test_iterator_restore_after_insertion()
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
 						       &key_def, 1, 0);
 	assert(format != NULL);
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 
 	/* Create lsregion */
 	struct lsregion lsregion;
@@ -417,7 +417,7 @@ test_iterator_restore_after_insertion()
 	tuple_unref(restore_on_key);
 	tuple_unref(restore_on_key_reverse);
 
-	tuple_format_ref(format, -1);
+	tuple_format_unref(format);
 	lsregion_destroy(&lsregion);
 	box_key_def_delete(key_def);
 

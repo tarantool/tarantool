@@ -86,7 +86,7 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 	if (tuple_format_default == NULL)
 		diag_raise();
 	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_default, 1);
+	tuple_format_ref(tuple_format_default);
 }
 
 void
@@ -137,7 +137,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
 	tuple->bsize = tuple_len;
 	tuple->format_id = tuple_format_id(format);
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 	/*
 	 * Data offset is calculated from the begin of the struct
 	 * tuple base, not from memtx_tuple, because the struct
@@ -162,7 +162,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(tuple->refs == 0);
 	size_t total = sizeof(struct memtx_tuple) +
 		       tuple_format_meta_size(format) + tuple->bsize;
-	tuple_format_ref(format, -1);
+	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
 	if (!memtx_alloc.is_delayed_free_mode ||

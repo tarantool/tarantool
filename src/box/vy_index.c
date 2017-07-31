@@ -70,7 +70,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 					   NULL, 0, 0);
 	if (env->key_format == NULL)
 		return -1;
-	tuple_format_ref(env->key_format, 1);
+	tuple_format_ref(env->key_format);
 	env->path = path;
 	env->allocator = allocator;
 	env->p_generation = p_generation;
@@ -82,7 +82,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 void
 vy_index_env_destroy(struct vy_index_env *env)
 {
-	tuple_format_ref(env->key_format, -1);
+	tuple_format_unref(env->key_format);
 }
 
 const char *
@@ -135,25 +135,25 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 					      &cmp_def, 1, 0);
 	if (index->disk_format == NULL)
 		goto fail_format;
-	tuple_format_ref(index->disk_format, 1);
+	tuple_format_ref(index->disk_format);
 
 	if (index_def->iid == 0) {
 		index->upsert_format =
 			vy_tuple_format_new_upsert(format);
 		if (index->upsert_format == NULL)
 			goto fail_upsert_format;
-		tuple_format_ref(index->upsert_format, 1);
+		tuple_format_ref(index->upsert_format);
 
 		index->mem_format_with_colmask =
 			vy_tuple_format_new_with_colmask(format);
 		if (index->mem_format_with_colmask == NULL)
 			goto fail_mem_format_with_colmask;
-		tuple_format_ref(index->mem_format_with_colmask, 1);
+		tuple_format_ref(index->mem_format_with_colmask);
 	} else {
 		index->mem_format_with_colmask = pk->mem_format_with_colmask;
 		index->upsert_format = pk->upsert_format;
-		tuple_format_ref(index->mem_format_with_colmask, 1);
-		tuple_format_ref(index->upsert_format, 1);
+		tuple_format_ref(index->mem_format_with_colmask);
+		tuple_format_ref(index->upsert_format);
 	}
 
 	if (vy_index_stat_create(&index->stat) != 0)
@@ -183,7 +183,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	if (pk != NULL)
 		vy_index_ref(pk);
 	index->mem_format = format;
-	tuple_format_ref(index->mem_format, 1);
+	tuple_format_ref(index->mem_format);
 	index->space_index_count = index_count;
 	index->in_dump.pos = UINT32_MAX;
 	index->in_compact.pos = UINT32_MAX;
@@ -197,11 +197,11 @@ fail_mem:
 fail_run_hist:
 	vy_index_stat_destroy(&index->stat);
 fail_stat:
-	tuple_format_ref(index->mem_format_with_colmask, -1);
+	tuple_format_unref(index->mem_format_with_colmask);
 fail_mem_format_with_colmask:
-	tuple_format_ref(index->upsert_format, -1);
+	tuple_format_unref(index->upsert_format);
 fail_upsert_format:
-	tuple_format_ref(index->disk_format, -1);
+	tuple_format_unref(index->disk_format);
 fail_format:
 	free(cmp_def);
 fail_key_def:
@@ -243,16 +243,16 @@ vy_index_delete(struct vy_index *index)
 
 	vy_range_tree_iter(index->tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&index->range_heap);
-	tuple_format_ref(index->disk_format, -1);
-	tuple_format_ref(index->mem_format_with_colmask, -1);
-	tuple_format_ref(index->upsert_format, -1);
+	tuple_format_unref(index->disk_format);
+	tuple_format_unref(index->mem_format_with_colmask);
+	tuple_format_unref(index->upsert_format);
 	if (index->id > 0)
 		free(index->cmp_def);
 	free(index->key_def);
 	histogram_delete(index->run_hist);
 	vy_index_stat_destroy(&index->stat);
 	vy_cache_destroy(&index->cache);
-	tuple_format_ref(index->mem_format, -1);
+	tuple_format_unref(index->mem_format);
 	free(index->tree);
 	TRASH(index);
 	free(index);
