@@ -185,7 +185,8 @@ struct key_def *
 key_def_new(uint32_t part_count)
 {
 	size_t sz = key_def_sizeof(part_count);
-	struct key_def *key_def = (struct key_def *) malloc(sz);
+	/** Use calloc() to zero comparator function pointers. */
+	struct key_def *key_def = (struct key_def *) calloc(1, sz);
 	if (key_def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
 		return NULL;
@@ -250,13 +251,10 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts)
+	      const struct index_opts *opts, struct key_def *key_def)
 {
 	assert(name_len <= BOX_NAME_MAX);
-	/*
-	 * Use calloc to zero all struct index_def attributes
-	 * the comparator pointers.
-	 */
+	/* Use calloc to make index_def_delete() safe at all times. */
 	struct index_def *def = (struct index_def *) calloc(1, sizeof(*def));
 	if (def == NULL) {
 		diag_set(OutOfMemory, sizeof(*def), "malloc", "struct index_def");
@@ -264,13 +262,18 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	}
 	def->name = strndup(name, name_len);
 	if (def->name == NULL) {
-		free(def);
+		index_def_delete(def);
 		diag_set(OutOfMemory, name_len + 1, "malloc", "index_def name");
 		return NULL;
 	}
 	if (!identifier_is_valid(def->name)) {
 		diag_set(ClientError, ER_IDENTIFIER, def->name);
-		free(def);
+		index_def_delete(def);
+		return NULL;
+	}
+	def->key_def = key_def_dup(key_def);
+	if (def->key_def == NULL) {
+		index_def_delete(def);
 		return NULL;
 	}
 	def->type = type;

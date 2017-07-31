@@ -547,7 +547,7 @@ key_def_new(uint32_t part_count);
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts);
+	      const struct index_opts *opts, struct key_def *key_def);
 
 /**
  * Set a single key part in a key def.

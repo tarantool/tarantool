@@ -338,7 +338,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	bool is_166plus;
 	index_def_check_tuple(tuple, &is_166plus);
 
-	struct index_def *index_def;
 	struct index_opts opts;
 	uint32_t id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_SPACE_ID);
 	uint32_t index_id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_ID);
@@ -372,25 +371,28 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
-	index_def = index_def_new(id, index_id, name, name_len, type, &opts);
-	if (index_def == NULL)
+	struct key_def *key_def = key_def_new(part_count);
+	if (key_def == NULL)
 		diag_raise();
-	auto scoped_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-	index_def->key_def = key_def_new(part_count);
-	if (index_def->key_def == NULL)
-		diag_raise();
+	auto key_def_guard = make_scoped_guard([=] { box_key_def_delete(key_def); });
 	if (is_166plus) {
 		/* 1.6.6+ */
-		if (key_def_decode_parts(index_def->key_def, &parts) != 0)
+		if (key_def_decode_parts(key_def, &parts) != 0)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_165(index_def->key_def, &parts) != 0)
+		if (key_def_decode_parts_165(key_def, &parts) != 0)
 			diag_raise();
 	}
+	struct index_def *index_def =
+		index_def_new(id, index_id, name, name_len, type,
+			      &opts, key_def);
+	if (index_def == NULL)
+		diag_raise();
+	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	index_def_check(index_def, space_name(old_space));
 	old_space->handler->checkIndexDef(old_space, index_def);
-	scoped_guard.is_active = false;
+	index_def_guard.is_active = false;
 	return index_def;
 }
 

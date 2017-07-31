@@ -175,10 +175,21 @@ space_cache_replace(struct space *space)
 
 /** A wrapper around space_new() for data dictionary spaces. */
 struct space *
-sc_space_new(uint32_t id, const char *name, struct index_def *index_def,
+sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	     struct trigger *replace_trigger,
 	     struct trigger *stmt_begin_trigger)
 {
+	struct index_def *index_def = index_def_new(id, /* space id */
+						    0 /* index id */,
+						    "primary", /* name */
+						    strlen("primary"),
+						    TREE /* index type */,
+						    &index_opts_default,
+						    key_def);
+	if (index_def == NULL)
+		diag_raise();
+	auto index_def_guard =
+		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct space_def *def =
 		space_def_new(id, ADMIN, 0, name, strlen(name), "memtx",
 			      strlen("memtx"), &space_opts_default);
@@ -256,67 +267,49 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct key_def *key_def;
-	struct index_def *index_def = index_def_new(BOX_SCHEMA_ID,
-						    0 /* index id */,
-						    "primary", /* name */
-						    strlen("primary"),
-						    TREE /* index type */,
-						    &index_opts_default);
-	if (index_def == NULL)
+	struct key_def *key_def = key_def_new(1); /* part count */
+	if (key_def == NULL)
 		diag_raise();
-	auto index_def_guard1 =
-		make_scoped_guard([=] { index_def_delete(index_def); });
-	key_def = index_def->key_def = key_def_new(1); /* part count */
-	if (index_def->key_def == NULL)
-		diag_raise();
+	auto key_def_guard = make_scoped_guard([&] { box_key_def_delete(key_def); });
 
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING);
-	(void) sc_space_new(BOX_SCHEMA_ID, "_schema", index_def,
+	(void) sc_space_new(BOX_SCHEMA_ID, "_schema", key_def,
 			    &on_replace_schema, NULL);
 
 	/* _space - home for all spaces. */
-	index_def->space_id = BOX_SPACE_ID;
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
-
-	(void) sc_space_new(BOX_SPACE_ID, "_space", index_def,
+	(void) sc_space_new(BOX_SPACE_ID, "_space", key_def,
 			    &alter_space_on_replace_space,
 			    &on_stmt_begin_space);
 
 	/* _truncate - auxiliary space for triggering space truncation. */
-	index_def->space_id = BOX_TRUNCATE_ID;
-	(void) sc_space_new(BOX_TRUNCATE_ID, "_truncate", index_def,
+	(void) sc_space_new(BOX_TRUNCATE_ID, "_truncate", key_def,
 			    &on_replace_truncate,
 			    &on_stmt_begin_truncate);
 
 	/* _user - all existing users */
-	index_def->space_id = BOX_USER_ID;
-	(void) sc_space_new(BOX_USER_ID, "_user", index_def, &on_replace_user,
+	(void) sc_space_new(BOX_USER_ID, "_user", key_def, &on_replace_user,
 			    NULL);
 
 	/* _func - all executable objects on which one can have grants */
-	index_def->space_id = BOX_FUNC_ID;
-	(void) sc_space_new(BOX_FUNC_ID, "_func", index_def, &on_replace_func,
+	(void) sc_space_new(BOX_FUNC_ID, "_func", key_def, &on_replace_func,
 			    NULL);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
-	index_def->space_id = BOX_PRIV_ID;
-	(void) sc_space_new(BOX_PRIV_ID, "_priv", index_def, &on_replace_priv,
+	(void) sc_space_new(BOX_PRIV_ID, "_priv", key_def, &on_replace_priv,
 			    NULL);
 	/*
 	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
-	index_def->space_id = BOX_CLUSTER_ID;
-	(void) sc_space_new(BOX_CLUSTER_ID, "_cluster", index_def,
+	(void) sc_space_new(BOX_CLUSTER_ID, "_cluster", key_def,
 			    &on_replace_cluster, NULL);
-	box_key_def_delete(index_def->key_def);
-	key_def = index_def->key_def = key_def_new(2); /* part count */
-
+	free(key_def);
+	key_def = key_def_new(2); /* part count */
 	if (key_def == NULL)
 		diag_raise();
 	/* space no */
@@ -325,8 +318,7 @@ schema_init()
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
-	index_def->space_id = BOX_INDEX_ID;
-	(void) sc_space_new(BOX_INDEX_ID, "_index", index_def,
+	(void) sc_space_new(BOX_INDEX_ID, "_index", key_def,
 			    &alter_space_on_replace_index,
 			    &on_stmt_begin_index);
 }
