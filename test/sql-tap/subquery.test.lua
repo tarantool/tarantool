@@ -26,13 +26,13 @@ test:do_test(
     "subquery-1.1",
     function()
         test:execsql [[
-            BEGIN;
             CREATE TABLE t1(a PRIMARY KEY,b);
+            CREATE TABLE t2(x PRIMARY KEY,y);
+            BEGIN;
             INSERT INTO t1 VALUES(1,2);
             INSERT INTO t1 VALUES(3,4);
             INSERT INTO t1 VALUES(5,6);
             INSERT INTO t1 VALUES(7,8);
-            CREATE TABLE t2(x PRIMARY KEY,y);
             INSERT INTO t2 VALUES(1,1);
             INSERT INTO t2 VALUES(3,9);
             INSERT INTO t2 VALUES(5,25);

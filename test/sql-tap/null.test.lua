@@ -25,8 +25,8 @@ test:plan(37)
 test:do_execsql_test(
     "null-1.0",
     [[
-        begin;
         create table t1(a primary key,b,c);
+        begin;
         insert into t1 values(1,0,0);
         insert into t1 values(2,0,1);
         insert into t1 values(3,1,0);

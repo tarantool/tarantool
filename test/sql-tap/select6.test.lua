@@ -30,9 +30,9 @@ test:do_test(
         -- MUST_WORK_TEST
         -- CREATE TABLE t1(x, y);
         return test:execsql [[
-            BEGIN;
             DROP TABLE IF EXISTS t1;
             CREATE TABLE t1 (x int PRIMARY KEY, y int);
+            BEGIN;
             INSERT INTO t1 VALUES(1,1);
             INSERT INTO t1 VALUES(2,2);
             INSERT INTO t1 VALUES(3,2);
@@ -676,13 +676,13 @@ end
 test:do_execsql_test(
     "select6-8.1",
     [[
-        BEGIN;
         DROP TABLE IF EXISTS t3;
         CREATE TABLE t3 (p primary key, q);
-        INSERT INTO t3 VALUES(1,11);
-        INSERT INTO t3 VALUES(2,22);
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(q primary key, r);
+        BEGIN;
+        INSERT INTO t3 VALUES(1,11);
+        INSERT INTO t3 VALUES(2,22);
         INSERT INTO t4 VALUES(11,111);
         INSERT INTO t4 VALUES(22,222);
         COMMIT;

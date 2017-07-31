@@ -32,7 +32,8 @@ test:plan(2)
 test:do_execsql_test(
     "tkt1449-1.1",
     [[
-        BEGIN;
+        -- Tarantool: DDL is prohibited inside a transaction so far
+        -- BEGIN;
         CREATE TABLE ACLS(ISSUEID text(50) not null, OBJECTID text(50) not null, PARTICIPANTID text(50) not null, PERMISSIONBITS int not null, constraint PK_ACLS primary key (ISSUEID, OBJECTID, PARTICIPANTID));
         CREATE TABLE ACTIONITEMSTATUSES(CLASSID int null, SEQNO int not null, LASTMODONNODEID text(50) not null, PREVMODONNODEID text(50) null, ISSUEID text(50) not null, OBJECTID text(50) not null, REVISIONNUM int not null, CONTAINERID text(50) not null, AUTHORID text(50) not null, CREATIONDATE text(25) null, LASTMODIFIEDDATE text(25) null, UPDATENUMBER int null, PREVREVISIONNUM int null, LASTCMD int null, LASTCMDACLVERSION int null, USERDEFINEDFIELD text(300) null, LASTMODIFIEDBYID text(50) null, FRIENDLYNAME text(100) not null, REVISION int not null, SHORTNAME text(30) not null, LONGNAME text(200) not null, ATTACHMENTHANDLING int not null, RESULT int not null, NOTIFYCREATOR text(1) null, NOTIFYASSIGNEE text(1) null, NOTIFYFYI text(1) null, NOTIFYCLOSURETEAM text(1) null, NOTIFYCOORDINATORS text(1) null, COMMENTREQUIRED text(1) not null, constraint PK_ACTIONITEMSTATUSES primary key (ISSUEID, OBJECTID));
         CREATE TABLE ACTIONITEMTYPES(CLASSID int null, SEQNO int not null, LASTMODONNODEID text(50) not null, PREVMODONNODEID text(50) null, ISSUEID text(50) not null, OBJECTID text(50) not null, REVISIONNUM int not null, CONTAINERID text(50) not null, AUTHORID text(50) not null, CREATIONDATE text(25) null, LASTMODIFIEDDATE text(25) null, UPDATENUMBER int null, PREVREVISIONNUM int null, LASTCMD int null, LASTCMDACLVERSION int null, USERDEFINEDFIELD text(300) null, LASTMODIFIEDBYID text(50) null, REVISION int not null, LABEL text(200) not null, INSTRUCTIONS text not null, EMAILINSTRUCTIONS text null, ALLOWEDSTATUSES text not null, INITIALSTATUS text(100) not null, COMMENTREQUIRED text(1) not null, ATTACHMENTHANDLING int not null, constraint PK_ACTIONITEMTYPES primary key (ISSUEID, OBJECTID));
@@ -247,7 +248,7 @@ test:do_execsql_test(
         CREATE INDEX USERS_TQUNID on USERS (TQUNID);
         CREATE INDEX USERS_USERID_PARTITIONID on USERS (USERID, PARTITIONID);
         CREATE INDEX USERS_USERSID_USERID on USERS (USERSID, USERID);
-        COMMIT;
+        -- COMMIT;
     ]], {
         -- <tkt1449-1.1>
 

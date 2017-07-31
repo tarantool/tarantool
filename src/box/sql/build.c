@@ -4153,6 +4153,7 @@ void sqlite3BeginTransaction(Parse *pParse, int type){
       sqlite3VdbeUsesBtree(v, i);
     }
   }
+  sqlite3VdbeAddOp0(v, OP_TTransaction);
   sqlite3VdbeAddOp0(v, OP_AutoCommit);
 }
 

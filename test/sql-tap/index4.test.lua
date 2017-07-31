@@ -22,8 +22,8 @@ testprefix = "index4"
 test:do_execsql_test(
     1.1,
     [[
-        BEGIN;
           CREATE TABLE t1(x primary key);
+        BEGIN;
           INSERT INTO t1 VALUES(randomblob(102));
           INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     2
           INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     4
@@ -77,9 +77,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.6,
     [[
-        BEGIN;
           DROP TABLE t1;
           CREATE TABLE t1(x primary key);
+        BEGIN;
           INSERT INTO t1 VALUES('a');
           INSERT INTO t1 VALUES('b');
           INSERT INTO t1 VALUES('c');
@@ -140,8 +140,8 @@ end
 test:do_execsql_test(
     2.1,
     [[
-        BEGIN;
           CREATE TABLE t2(id primary key, x);
+        BEGIN;
           INSERT INTO t2 VALUES(1, 14);
           INSERT INTO t2 VALUES(2, 35);
           INSERT INTO t2 VALUES(3, 15);

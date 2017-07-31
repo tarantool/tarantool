@@ -42,10 +42,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.2,
     [[
-        BEGIN;
-          DROP TABLE pp;
-          DROP TABLE cc;
-        COMMIT;
+        DROP TABLE cc;
+        DROP TABLE pp;
     ]])
 
 test:do_execsql_test(
@@ -60,10 +58,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.4,
     [[
-        BEGIN;
-          DROP TABLE cc;
-          DROP TABLE pp;
-        COMMIT;
+        DROP TABLE cc;
+        DROP TABLE pp;
     ]])
 
 test:do_execsql_test(
@@ -80,10 +76,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.2,
     [[
-        BEGIN;
-          DROP TABLE pp;
-          DROP TABLE cc;
-        COMMIT;
+        DROP TABLE cc;
+        DROP TABLE pp;
     ]])
 
 test:do_execsql_test(
@@ -100,10 +94,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.4,
     [[
-        BEGIN;
-          DROP TABLE cc;
-          DROP TABLE pp;
-        COMMIT;
+        DROP TABLE cc;
+        DROP TABLE pp;
     ]])
 
 test:do_execsql_test(
@@ -125,11 +117,11 @@ test:do_execsql_test(
 test:do_catchsql_test(
     3.2,
     [[
-        BEGIN;
+        -- BEGIN;
           DELETE FROM pp2;
+        -- COMMIT;
           DROP TABLE pp1;
           DROP TABLE cc1;
-        COMMIT;
     ]], {
         -- <3.2>
         1, "FOREIGN KEY constraint failed"
@@ -140,7 +132,7 @@ test:do_catchsql_test(
     3.3,
     [[
         DROP TABLE cc2;
-        COMMIT;
+        -- COMMIT;
     ]], {
         -- <3.3>
         0

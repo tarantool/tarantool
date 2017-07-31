@@ -39,11 +39,11 @@ test:do_test(
             UPDATE t1 SET b=b||b;
             INSERT INTO t1 VALUES(2,'x');
             UPDATE t1 SET b=substr(b,1,500);
+            CREATE TABLE t2(x PRIMARY KEY,y);
             BEGIN;
         ]])
         test:catchsql("UPDATE t1 SET a=CASE a WHEN 2 THEN 1 ELSE a END, b='y';")
         return test:execsql([[
-            CREATE TABLE t2(x PRIMARY KEY,y);
             COMMIT;
             --PRAGMA integrity_check;
         ]])
@@ -491,10 +491,10 @@ if (0 > 0) then
     test:do_execsql_test(
         "misc3-7.1",
         [[
-            BEGIN;
             CREATE TABLE y1(a primary key);
             CREATE TABLE y2(b primary key);
             CREATE TABLE y3(c primary key);
+            BEGIN;
             CREATE TRIGGER r1 AFTER DELETE ON y1 FOR EACH ROW BEGIN
               INSERT INTO y3(c) SELECT b FROM y2 ORDER BY b LIMIT 1;
             END;

@@ -24,15 +24,15 @@ testprefix = "selectF"
 test:do_execsql_test(
     1,
     [[
-        BEGIN TRANSACTION;
         CREATE TABLE t1(a primary key, b, c);
-        INSERT INTO "t1" VALUES(1,'one','I');
         CREATE TABLE t2(d primary key, e, f);
+        BEGIN TRANSACTION;
+        INSERT INTO "t1" VALUES(1,'one','I');
         INSERT INTO "t2" VALUES(5,'ten','XX');
         INSERT INTO "t2" VALUES(6,NULL,NULL);
 
-        CREATE INDEX i1 ON t1(b, a);
         COMMIT;
+        CREATE INDEX i1 ON t1(b, a);
     ]])
 
 --explain_i {

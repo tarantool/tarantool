@@ -759,8 +759,8 @@ test:do_test(
     "select4-8.1",
     function()
         test:execsql [[
-            BEGIN;
             CREATE TABLE t3(a text primary key, b float, c text);
+            BEGIN;
             INSERT INTO t3 VALUES(1, 1.1, '1.1');
             INSERT INTO t3 VALUES(2, 1.10, '1.10');
             INSERT INTO t3 VALUES(3, 1.10, '1.1');

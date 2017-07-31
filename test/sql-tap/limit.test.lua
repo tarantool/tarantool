@@ -233,8 +233,8 @@ test:do_test(
     "limit-4.1",
     function()
         return test:execsql [[
-            BEGIN;
             CREATE TABLE t3(x primary KEY);
+            BEGIN;
             INSERT INTO t3 SELECT x FROM t1 ORDER BY x LIMIT 10 OFFSET 1;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
@@ -346,8 +346,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-6.1",
     [[
-        BEGIN;
         CREATE TABLE t6(a primary key);
+        BEGIN;
         INSERT INTO t6 VALUES(1);
         INSERT INTO t6 VALUES(2);
         INSERT INTO t6 SELECT a+2 FROM t6;

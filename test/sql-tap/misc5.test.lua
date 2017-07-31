@@ -71,9 +71,9 @@ end
 test:do_execsql_test(
     "misc5-2.1",
     [[
-        BEGIN;
         create table t2(x primary key);
         create table t2_temp(id primary key, x);
+        BEGIN;
         insert into t2_temp values(1, 1);
         insert into t2_temp select id+1,x*2 from t2_temp;
         insert into t2_temp select id+2,x*4 from t2_temp;
@@ -85,8 +85,8 @@ test:do_execsql_test(
         insert into t2_temp select id+128,x+1 from t2_temp;
         insert into t2_temp select id+256,-x from t2_temp;
         INSERT INTO t2 SELECT DISTINCT(x) FROM t2_temp;
-        DROP TABLE t2_temp;
         COMMIT;
+        DROP TABLE t2_temp;
         select count(*) from t2;
     ]], {
         -- <misc5-2.1>

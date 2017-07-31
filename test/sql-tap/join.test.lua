@@ -708,16 +708,16 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "join-5.1",
     [[
-        BEGIN;
         create table centros (id integer primary key, centro);
-        INSERT INTO centros VALUES(1,'xxx');
         create table usuarios (id integer primary key, nombre, apellidos,
         idcentro integer);
+        BEGIN;
+        INSERT INTO centros VALUES(1,'xxx');
         INSERT INTO usuarios VALUES(1,'a','aa',1);
         INSERT INTO usuarios VALUES(2,'b','bb',1);
         INSERT INTO usuarios VALUES(3,'c','cc',NULL);
-        create index idcentro on usuarios (idcentro);
         END;
+        create index idcentro on usuarios (idcentro);
         select usuarios.id, usuarios.nombre, centros.centro from
         usuarios left outer join centros on usuarios.idcentro = centros.id;
     ]], {
@@ -816,11 +816,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-9.1",
     [[
-        BEGIN;
         CREATE TABLE t12(a primary key,b);
+        CREATE TABLE t13(b primary key,c);
+        BEGIN;
         INSERT INTO t12 VALUES(1,11);
         INSERT INTO t12 VALUES(2,22);
-        CREATE TABLE t13(b primary key,c);
         INSERT INTO t13 VALUES(22,222);
         COMMIT;
     ]], {

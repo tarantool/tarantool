@@ -28,7 +28,6 @@ test:do_test(
     1.0,
     function()
         return test:execsql [[
-            BEGIN;
             CREATE TABLE album(
               aid INTEGER PRIMARY KEY,
               title TEXT UNIQUE NOT NULL
@@ -41,6 +40,7 @@ test:do_test(
               name TEXT,
               UNIQUE(aid, tn)
             );
+            BEGIN;
             INSERT INTO album VALUES(1, '1-one'), (2, '2-two'), (3, '3-three');
             INSERT INTO track VALUES
                 (1, 1, 1, 'one-a'),
@@ -414,7 +414,6 @@ test:do_test(
     3.0,
     function()
         return test:execsql [[
-            BEGIN;
             DROP TABLE album;
             DROP TABLE track;
             CREATE TABLE album(
@@ -428,6 +427,7 @@ test:do_test(
               name TEXT,
               UNIQUE(aid ASC, tn DESC)
             );
+            BEGIN;
             INSERT INTO album VALUES(1, '1-one'), (2, '2-two'), (3, '3-three');
             INSERT INTO track VALUES
                 (1, 1, 1, 'one-a'),

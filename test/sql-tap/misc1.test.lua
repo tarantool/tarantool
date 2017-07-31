@@ -176,8 +176,8 @@ test:do_test(
     "misc1-2.1",
     function()
         test:execsql([[
-            BEGIN TRANSACTION;
             CREATE TABLE agger(one text primary key, two text, three text, four text);
+            BEGIN TRANSACTION;
             INSERT INTO agger VALUES(1, 'one', 'hello', 'yes');
             INSERT INTO agger VALUES(2, 'two', 'howdy', 'no');
             INSERT INTO agger VALUES(3, 'thr', 'howareya', 'yes');
@@ -237,8 +237,8 @@ test:do_test(
 test:do_execsql_test(
     "misc1-4.1",
     [[
-        BEGIN;
         CREATE TABLE t2(a primary key);
+        BEGIN;
         INSERT INTO t2 VALUES('This is a long string to use up a lot of disk -');
         UPDATE t2 SET a=a||a||a||a;
         INSERT INTO t2 SELECT '1 - ' || a FROM t2;

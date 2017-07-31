@@ -26,18 +26,18 @@ test:do_test(
     "subquery2-1.1",
     function()
         test:execsql [[
-            BEGIN;
             CREATE TABLE t1(a PRIMARY KEY,b);
+            CREATE TABLE t2(c PRIMARY KEY,d);
+            CREATE TABLE t3(e PRIMARY KEY,f);
+            BEGIN;
             INSERT INTO t1 VALUES(1,2);
             INSERT INTO t1 VALUES(3,4);
             INSERT INTO t1 VALUES(5,6);
             INSERT INTO t1 VALUES(7,8);
-            CREATE TABLE t2(c PRIMARY KEY,d);
             INSERT INTO t2 VALUES(1,1);
             INSERT INTO t2 VALUES(3,9);
             INSERT INTO t2 VALUES(5,25);
             INSERT INTO t2 VALUES(7,49);
-            CREATE TABLE t3(e PRIMARY KEY,f);
             INSERT INTO t3 VALUES(1,1);
             INSERT INTO t3 VALUES(3,27);
             INSERT INTO t3 VALUES(5,125);

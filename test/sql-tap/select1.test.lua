@@ -1984,9 +1984,9 @@ test:do_test(
     "select1-13.1",
     function()
         test:execsql [[
-            BEGIN;
             drop table if exists abc;
             create TABLE abc(a, b, c, PRIMARY KEY(a, b));
+            BEGIN;
             INSERT INTO abc VALUES(1, 1, 1);
         ]]
         for i = 0,9,1 do

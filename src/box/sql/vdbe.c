@@ -2957,6 +2957,7 @@ case OP_AutoCommit: {
   if( desiredAutoCommit!=db->autoCommit ){
     if( iRollback ){
       assert( desiredAutoCommit==1 );
+      box_txn_rollback();
       sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
       db->autoCommit = 1;
     }else if( desiredAutoCommit && db->nVdbeWrite>0 ){

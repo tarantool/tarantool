@@ -441,9 +441,9 @@ if (0 > 0)
                 CREATE INDEX t ON t0(a);
                 PRAGMA writable_schema=ON;
                 UPDATE sqlite_master SET sql='CREATE TABLE a.b(a UNIQUE';
-                BEGIN;
-                CREATE TABLE t1(x);
-                ROLLBACK;
+                --BEGIN;
+                --CREATE TABLE t1(x);
+                --ROLLBACK;
                 DROP TABLE IF EXISTS t99;
             ]]
         end, {
@@ -1073,11 +1073,12 @@ end
 test:do_test(
     "table-15.1",
     function()
-        test:execsql "BEGIN"
+        --test:execsql "BEGIN"
         for i = 0, 2000-1, 1 do
             test:execsql("CREATE TABLE tbl"..i.." (a primary key, b, c)")
         end
-        return test:execsql "COMMIT"
+        --return test:execsql "COMMIT"
+        return
     end, {
         -- <table-15.1>
         
@@ -1087,11 +1088,12 @@ test:do_test(
 test:do_test(
     "table-15.2",
     function()
-        test:execsql "BEGIN"
+        -- test:execsql "BEGIN"
         for i = 0, 2000-1, 1 do
             test:execsql("DROP TABLE tbl"..i.."")
         end
-        return test:execsql "COMMIT"
+        -- return test:execsql "COMMIT"
+        return
     end, {
         -- <table-15.2>
         

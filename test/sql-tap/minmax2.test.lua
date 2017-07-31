@@ -27,8 +27,8 @@ test:do_execsql_test(
     "minmax2-1.0",
     [[
         PRAGMA legacy_file_format=0;
-        BEGIN;
         CREATE TABLE t1(id PRIMARY KEY, x, y);
+        BEGIN;
         INSERT INTO t1 VALUES(1, 1,1);
         INSERT INTO t1 VALUES(2, 2,2);
         INSERT INTO t1 VALUES(3, 3,2);

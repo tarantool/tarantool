@@ -38,8 +38,8 @@ test:do_test(
     "where2-1.0",
     function()
         test:execsql [[
-            BEGIN;
             CREATE TABLE t1(w int PRIMARY KEY, x int, y int, z int);
+            BEGIN;
         ]]
         for i=1,100 do
             w = i
@@ -49,9 +49,9 @@ test:do_test(
             test:execsql(string.format("INSERT INTO t1 VALUES(%s,%s,%s,%s)", w, x, y, z))
         end
         return test:execsql [[
+            COMMIT;
             CREATE INDEX i1xy ON t1(x,y);
             CREATE INDEX i1zyx ON t1(z,y,x);
-            COMMIT;
         ]]
     end, {
         -- <where2-1.0>
@@ -1244,8 +1244,8 @@ test:do_execsql_test(
         "where2-9.1",
         function()
             test:execsql [[
-                BEGIN;
                 CREATE TABLE t10(id int PRIMARY KEY,a,b,c);
+                BEGIN;
                 INSERT INTO t10 VALUES(1, 1,1,1);
                 INSERT INTO t10 VALUES(2, 1,2,2);
                 INSERT INTO t10 VALUES(3, 1,3,3);
@@ -1255,8 +1255,8 @@ test:do_execsql_test(
                 test:execsql(string.format("INSERT INTO t10 VALUES(%s,1,%s,%s)", i, i, i))
             end
             return test:execsql [[
-                CREATE INDEX i10 ON t10(a,b);
                 COMMIT;
+                CREATE INDEX i10 ON t10(a,b);
                 SELECT count(*) FROM t10;
             ]]
         end, {

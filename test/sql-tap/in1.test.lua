@@ -25,8 +25,8 @@ test:do_test(
     "in-1.0",
     function()
         test:execsql [[
-            BEGIN;
             CREATE TABLE t1(a PRIMARY KEY, b);
+            BEGIN;
         ]]
         -- for _ in X(0, "X!for", [=[["set i 1","$i<=10","incr i"]]=]) do
         local j = 1

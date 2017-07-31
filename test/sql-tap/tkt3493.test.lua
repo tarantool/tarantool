@@ -23,14 +23,14 @@ test:plan(26)
 test:do_execsql_test(
     "tkt3493-1.1",
     [[
-        BEGIN;
         CREATE TABLE A (id INTEGER PRIMARY KEY, val TEXT);
+        CREATE TABLE B (id INTEGER PRIMARY KEY, val TEXT);
+        CREATE TABLE A_B (B_id INTEGER NOT NULL PRIMARY KEY, A_id INTEGER);
+        BEGIN;
         INSERT INTO A VALUES(1,'123');
         INSERT INTO A VALUES(2,'456');
-        CREATE TABLE B (id INTEGER PRIMARY KEY, val TEXT);
         INSERT INTO B VALUES(1,1);
         INSERT INTO B VALUES(2,2);
-        CREATE TABLE A_B (B_id INTEGER NOT NULL PRIMARY KEY, A_id INTEGER);
         INSERT INTO A_B VALUES(1,1);
         INSERT INTO A_B VALUES(2,2);
         COMMIT;

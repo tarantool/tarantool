@@ -336,6 +336,25 @@ end
 --    return true
 --end
 
+function test.randstr(Length)
+    -- Length (number)
+    local Chars = {}
+    for Loop = 0, 255 do
+        Chars[Loop+1] = string.char(Loop)
+    end
+    local String = table.concat(Chars)
+    local Result = {}
+    local Lookup = Chars
+    local Range = #Lookup
+
+    for Loop = 1,Length do
+        Result[Loop] = Lookup[math.random(1, Range)]
+    end
+
+    return table.concat(Result)
+end
+
+
 setmetatable(_G, nil)
 os.execute("rm -f *.snap *.xlog*")
 

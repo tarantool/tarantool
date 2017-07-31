@@ -52,13 +52,16 @@ test:execsql "DROP TABLE t1;"
 test:do_test(
     "e_delete-1.0",
     function()
-        test:execsql("BEGIN;")
         local tables = {
             "t1", "t2", "t3", "t4", "t5", "t6"
         }
         for _, t in ipairs(tables) do
+            local sql = 'CREATE TABLE '..t..'(x PRIMARY KEY, y);'
+            test:execsql(sql)
+        end
+
+        for _, t in ipairs(tables) do
             local sql = [[
-                CREATE TABLE TABLE_NAME(x PRIMARY KEY, y);
                 INSERT INTO TABLE_NAME VALUES(1, 'one');
                 INSERT INTO TABLE_NAME VALUES(2, 'two');
                 INSERT INTO TABLE_NAME VALUES(3, 'three');
