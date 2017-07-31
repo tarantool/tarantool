@@ -49,11 +49,13 @@ struct tuple_format_vtab vy_tuple_format_vtab = {
 };
 
 void
-vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
-		   uint32_t tuple_max_size)
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t memory,
+		   uint32_t max_tuple_size)
 {
-	tuple_arena_create(&env->arena, &env->quota, arena_max_size,
-			   tuple_max_size, "vinyl");
+	/* Vinyl memory is limited by vy_quota. */
+	quota_init(&env->quota, QUOTA_MAX);
+	tuple_arena_create(&env->arena, &env->quota, memory,
+			   max_tuple_size, "vinyl");
 	lsregion_create(&env->allocator, &env->arena);
 }
 

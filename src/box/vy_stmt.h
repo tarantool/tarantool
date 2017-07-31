@@ -78,13 +78,12 @@ struct vy_stmt_env {
 /**
  * Initialize vinyl statement environment.
  * @param env[out] Vinyl statement environment.
- * @param arena_max_size Memory limit for vinyl statement arena.
- * @param tuple_max_size Memory limit for a single vinyl
- *        statement.
+ * @param memory The maximum number of in-memory bytes that vinyl uses.
+ * @param max_tuple_size Memory limit for a single vinyl statement.
  */
 void
-vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
-		   uint32_t tuple_max_size);
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t memory,
+		   uint32_t max_tuple_size);
 
 void
 vy_stmt_env_destroy(struct vy_stmt_env *env);

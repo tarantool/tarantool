@@ -72,6 +72,8 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 	/* Apply lowest allowed objsize bounds */
 	if (objsize_min < OBJSIZE_MIN)
 		objsize_min = OBJSIZE_MIN;
+	/** Preallocate entire quota. */
+	quota_init(&memtx_quota, tuple_arena_max_size);
 	tuple_arena_create(&memtx_arena, &memtx_quota, tuple_arena_max_size,
 			 objsize_max, "memtx");
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);

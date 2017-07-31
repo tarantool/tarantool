@@ -340,8 +340,6 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 	 * have accurate value of quota_used_ratio.
 	 */
 	size_t prealloc = small_align(arena_max_size, slab_size);
-	/** Preallocate entire quota. */
-	quota_init(quota, prealloc);
 
 	say_info("mapping %zu bytes for %s tuple arena...", prealloc,
 		 arena_name);

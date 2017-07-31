@@ -98,6 +98,8 @@ struct vy_conf {
 	uint64_t memory;
 	/** Max size of the tuple cache. */
 	uint64_t cache;
+	/** Max size of a tuple. */
+	uint32_t max_tuple_size;
 	/** Max time a transaction may wait for memory. */
 	double timeout;
 	/** Max number of threads used for reading. */
@@ -2018,6 +2020,7 @@ vy_conf_new()
 	}
 	conf->memory = cfg_geti64("vinyl_memory");
 	conf->cache = cfg_geti64("vinyl_cache");
+	conf->max_tuple_size = cfg_geti("vinyl_max_tuple_size");
 	conf->timeout = cfg_getd("vinyl_timeout");
 	conf->read_threads = cfg_geti("vinyl_read_threads");
 	conf->write_threads = cfg_geti("vinyl_write_threads");
@@ -3889,7 +3892,7 @@ vy_env_new(void)
 		goto error_squash_queue;
 
 	vy_stmt_env_create(&e->stmt_env, e->conf->memory,
-			   cfg_geti("vinyl_max_tuple_size"));
+			   e->conf->max_tuple_size);
 
 	if (vy_index_env_create(&e->index_env, e->conf->path,
 				&e->stmt_env.allocator,

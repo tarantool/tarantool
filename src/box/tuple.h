@@ -55,7 +55,7 @@ tuple_free(void);
 /**
  * Initialize tuples arena.
  * @param arena[out] Arena to initialize.
- * @param quota[out] Arena's quota.
+ * @param quota Arena's quota.
  * @param arena_max_size Maximal size of @arena.
  * @param tuple_max_size Maximal size of a tuple. This value is
  *        used to calculate such slab_size, in which any tuple can
