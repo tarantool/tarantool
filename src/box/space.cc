@@ -202,6 +202,14 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 				     link);
 }
 
+struct key_def *
+space_index_key_def(struct space *space, uint32_t id)
+{
+	if (id <= space->index_id_max && space->index_map[id])
+		return space->index_map[id]->index_def->key_def;
+	return NULL;
+}
+
 void
 space_swap_index(struct space *lhs, struct space *rhs,
 		 uint32_t lhs_id, uint32_t rhs_id)

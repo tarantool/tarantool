@@ -128,6 +128,13 @@ space_index(struct space *space, uint32_t id)
 }
 
 /**
+ * Return key_def of the index identified by id or NULL
+ * if there is no such index.
+ */
+struct key_def *
+space_index_key_def(struct space *space, uint32_t id);
+
+/**
  * Look up the index by id.
  */
 static inline struct Index *

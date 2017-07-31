@@ -341,6 +341,12 @@ struct index_def {
 	uint32_t space_id;
 	/* Index key definition. */
 	struct key_def *key_def;
+	/**
+	 * User-defined key definition, merged with the primary
+	 * key parts. Used by non-unique keys to uniquely identify
+	 * iterator position.
+	 */
+	struct key_def *cmp_def;
 	/** Index name. */
 	char *name;
 	/** Index type. */
@@ -540,14 +546,20 @@ struct key_def *
 key_def_new(uint32_t part_count);
 
 /**
- * Allocate a new key definition.
+ * Create a new index definition definition.
+ *
+ * @param key_def  key definition, must be fully built
+ * @param pk_def   primary key definition, pass non-NULL
+ *                 for secondary keys to construct
+ *                 index_def::cmp_def
  * @retval not NULL Success.
  * @retval NULL     Memory error.
  */
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts, struct key_def *key_def);
+	      const struct index_opts *opts,
+	      struct key_def *key_def, struct key_def *pk_def);
 
 /**
  * Set a single key part in a key def.

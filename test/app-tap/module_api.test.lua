@@ -33,7 +33,7 @@ local function test_pushcdata(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(22)
+    test:plan(21)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")

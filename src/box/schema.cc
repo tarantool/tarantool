@@ -185,7 +185,7 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 						    strlen("primary"),
 						    TREE /* index type */,
 						    &index_opts_default,
-						    key_def);
+						    key_def, NULL);
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard =

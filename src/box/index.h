@@ -88,21 +88,6 @@ typedef struct key_def box_key_def_t;
 /** \cond public */
 
 /**
- * Return a key definition for the index.
- *
- * Returned object is valid until the next yield.
- *
- * \param space_id space identifier
- * \param index_id index identifier
- * \retval key_def on success
- * \retval NULL on error
- * \sa box_tuple_compare()
- * \sa box_tuple_format_new()
- */
-const box_key_def_t *
-box_index_key_def(uint32_t space_id, uint32_t index_id);
-
-/**
  * Return the number of element in the index.
  *
  * \param space_id space identifier

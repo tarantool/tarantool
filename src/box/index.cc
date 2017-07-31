@@ -304,19 +304,6 @@ tuple_bless_null_xc(struct tuple *tuple)
 	return NULL;
 }
 
-const box_key_def_t *
-box_index_key_def(uint32_t space_id, uint32_t index_id)
-{
-	try {
-		struct space *space;
-		/* no tx management, len is approximate in vinyl anyway. */
-		Index *index = check_index(space_id, index_id, &space);
-		return index->index_def->key_def;
-	} catch (Exception *) {
-		return NULL;
-	}
-}
-
 ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)
 {

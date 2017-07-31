@@ -361,45 +361,6 @@ test_key_def_api(lua_State *L)
 }
 
 static int
-test_key_def_api2(lua_State *L)
-{
-	/* Get space_id and index_id by name */
-	static const char *SPACE_NAME = "test";
-	static const char *INDEX_NAME = "primary";
-	uint32_t space_id = box_space_id_by_name(SPACE_NAME,
-		strlen(SPACE_NAME));
-	uint32_t index_id = box_index_id_by_name(space_id, INDEX_NAME,
-		strlen(INDEX_NAME));
-	assert(space_id != BOX_ID_NIL && index_id != BOX_ID_NIL);
-
-	/* Insert couple tuples into space */
-	char buf[64], *buf_end;
-	box_tuple_t *tuples[2];
-	for (int i = 0; i < 2; i++) {
-		buf_end = buf;
-		buf_end = mp_encode_array(buf_end, 1);
-		buf_end = mp_encode_uint(buf_end, i);
-		MAYBE_UNUSED int rc;
-		rc = box_replace(space_id, buf, buf_end, &tuples[i]);
-		assert(rc == 0 && tuples[i] != NULL);
-		box_tuple_ref(tuples[i]);
-	}
-
-	/* Check box_index_key_def() and box_tuple_compare() */
-	const box_key_def_t *key_def = box_index_key_def(space_id, index_id);
-	bool cmp1 = box_tuple_compare(tuples[0], tuples[1], key_def) < 0;
-	bool cmp2 = box_tuple_compare(tuples[1], tuples[0], key_def) > 0;
-	bool cmp3 = box_tuple_compare(tuples[0], tuples[0], key_def) == 0;
-	lua_pushboolean(L, cmp1 && cmp2 && cmp3);
-
-	/* Unref tuples */
-	for (int i = 0; i < 2; i++)
-		box_tuple_unref(tuples[i]);
-
-	return 1;
-}
-
-static int
 check_error(lua_State *L)
 {
 	box_error_raise(ER_UNSUPPORTED, "test for luaT_error");
@@ -463,7 +424,6 @@ luaopen_module_api(lua_State *L)
 		{"test_clock", test_clock },
 		{"test_pushtuple", test_pushtuple},
 		{"test_key_def_api", test_key_def_api},
-		{"test_key_def_api2", test_key_def_api2},
 		{"check_error", check_error},
 		{"test_call", test_call},
 		{"test_cpcall", test_cpcall},

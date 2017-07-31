@@ -251,7 +251,8 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts, struct key_def *key_def)
+	      const struct index_opts *opts,
+	      struct key_def *key_def, struct key_def *pk_def)
 {
 	assert(name_len <= BOX_NAME_MAX);
 	/* Use calloc to make index_def_delete() safe at all times. */
@@ -272,7 +273,11 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		return NULL;
 	}
 	def->key_def = key_def_dup(key_def);
-	if (def->key_def == NULL) {
+	if (pk_def)
+		def->cmp_def = key_def_merge(key_def, pk_def);
+	else
+		def->cmp_def = key_def_dup(key_def);
+	if (def->key_def == NULL || def->cmp_def == NULL) {
 		index_def_delete(def);
 		return NULL;
 	}
@@ -294,17 +299,18 @@ index_def_dup(const struct index_def *def)
 	}
 	*dup = *def;
 	dup->name = strdup(def->name);
-	size_t sz = key_def_sizeof(def->key_def->part_count);
-	dup->key_def = (struct key_def *) malloc(sz);
-	if (dup->name == NULL || dup->key_def == NULL) {
-		free(dup->name);
-		free(dup->key_def);
+	if (dup->name == NULL) {
 		free(dup);
 		diag_set(OutOfMemory, strlen(def->name) + 1, "malloc",
 			 "index_def name");
 		return NULL;
 	}
-	memcpy(dup->key_def, def->key_def, sz);
+	dup->key_def = key_def_dup(def->key_def);
+	dup->cmp_def = key_def_dup(def->cmp_def);
+	if (dup->key_def == NULL || dup->cmp_def == NULL) {
+		index_def_delete(dup);
+		return NULL;
+	}
 	rlist_create(&dup->link);
 	return dup;
 }
@@ -331,6 +337,7 @@ index_def_delete(struct index_def *index_def)
 {
 	free(index_def->name);
 	free(index_def->key_def);
+	free(index_def->cmp_def);
 	free(index_def);
 }
 

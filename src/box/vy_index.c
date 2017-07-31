@@ -150,14 +150,10 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	if (key_def == NULL)
 		goto fail_key_def;
 
-	struct key_def *cmp_def = NULL;
-	if (index_def->iid == 0) {
-		cmp_def = key_def;
-	} else {
-		cmp_def = key_def_merge(key_def, pk->key_def);
-		if (cmp_def == NULL)
-			goto fail_cmp_def;
-	}
+	struct key_def *cmp_def = key_def_dup(index_def->cmp_def);
+	if (cmp_def == NULL)
+		goto fail_cmp_def;
+
 	index->cmp_def = cmp_def;
 	index->key_def = key_def;
 	index->surrogate_format = tuple_format_new(&vy_tuple_format_vtab,
@@ -233,8 +229,7 @@ fail_space_format_with_colmask:
 fail_upsert_format:
 	tuple_format_ref(index->surrogate_format, -1);
 fail_format:
-	if (index_def->iid > 0)
-		free(cmp_def);
+	free(cmp_def);
 fail_key_def:
 	free(key_def);
 fail_cmp_def:

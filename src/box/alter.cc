@@ -386,7 +386,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	}
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, type,
-			      &opts, key_def);
+			      &opts, key_def, space_index_key_def(old_space, 0));
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
