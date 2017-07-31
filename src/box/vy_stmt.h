@@ -621,7 +621,9 @@ vy_stmt_encode_secondary(const struct tuple *value,
  */
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format, bool is_primary);
+	       struct tuple_format *format,
+	       struct tuple_format *upsert_format,
+	       bool is_primary);
 
 /**
  * Format a key into string.
@@ -676,6 +678,22 @@ vy_tuple_format_new_with_colmask(struct tuple_format *space_format);
  */
 struct tuple_format *
 vy_tuple_format_new_upsert(struct tuple_format *space_format);
+
+
+/**
+ * Extract a key from a xrow-stored vy_stmt.
+ * @param xrow xrow with encoded vy_stmt
+ * @param key_def definition of a key to extract
+ *
+ * @retval not NULL Success.
+ * @retval     NULL Error.
+ */
+char *
+vy_stmt_extract_key(struct xrow_header *xrow,
+		    const struct key_def *key_def,
+		    struct tuple_format *space_format,
+		    struct tuple_format *upsert_format,
+		    bool is_primary);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -1402,15 +1402,6 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 }
 
 /**
- * Cursor parse position
- */
-static inline off_t
-xlog_cursor_pos(struct xlog_cursor *cursor)
-{
-	return cursor->read_offset - ibuf_used(&cursor->rbuf);
-}
-
-/**
  * Decompress zstd-compressed buf into cursor row block
  *
  * @retval -1 error, check diag
@@ -1623,6 +1614,7 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 		memcpy(dst, rpos, fixheader.len);
 		*data = (char *)rpos + fixheader.len;
 		assert(*data <= data_end);
+		tx_cursor->size = ibuf_used(&tx_cursor->rows);
 		return 0;
 	};
 
@@ -1645,6 +1637,7 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 
 	*data = rpos;
 	assert(*data <= data_end);
+	tx_cursor->size = ibuf_used(&tx_cursor->rows);
 	return 0;
 }
 
@@ -1893,6 +1886,32 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 error:
 	ibuf_destroy(&i->rbuf);
 	return -1;
+}
+
+int
+xlog_cursor_reset(struct xlog_cursor *cursor)
+{
+	cursor->rbuf.rpos = cursor->rbuf.buf;
+	if (ibuf_used(&cursor->rbuf) != (size_t)cursor->read_offset) {
+		cursor->rbuf.wpos = cursor->rbuf.buf;
+		cursor->read_offset = 0;
+	}
+	if (cursor->state == XLOG_CURSOR_TX)
+		xlog_tx_cursor_destroy(&cursor->tx_cursor);
+	if (xlog_cursor_ensure(cursor, XLOG_META_LEN_MAX) == -1)
+		return -1;
+	int rc;
+	rc = xlog_meta_parse(&cursor->meta,
+			     (const char **)&cursor->rbuf.rpos,
+			     (const char *)cursor->rbuf.wpos);
+	if (rc == -1)
+		return -1;
+	if (rc > 0) {
+		tnt_error(XlogError, "Unexpected end of file");
+		return -1;
+	}
+	cursor->state = XLOG_CURSOR_ACTIVE;
+	return 0;
 }
 
 void

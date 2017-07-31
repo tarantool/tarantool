@@ -540,7 +540,9 @@ vy_stmt_encode_secondary(const struct tuple *value,
 
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format, bool is_primary)
+	       struct tuple_format *format,
+	       struct tuple_format *upsert_format,
+	       bool is_primary)
 {
 	struct request request;
 	uint64_t key_map = dml_request_key_map(xrow->type);
@@ -571,7 +573,7 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	case IPROTO_UPSERT:
 		ops.iov_base = (char *)request.ops;
 		ops.iov_len = request.ops_end - request.ops;
-		stmt = vy_stmt_new_upsert(format, request.tuple,
+		stmt = vy_stmt_new_upsert(upsert_format, request.tuple,
 					  request.tuple_end, &ops, 1);
 		break;
 	default:
@@ -671,4 +673,21 @@ vy_tuple_format_new_upsert(struct tuple_format *space_format)
 	assert(format->extra_size == 0);
 	format->extra_size = sizeof(uint8_t);
 	return format;
+}
+
+char *
+vy_stmt_extract_key(struct xrow_header *xrow,
+		    const struct key_def *key_def,
+		    struct tuple_format *space_format,
+		    struct tuple_format *upsert_format,
+		    bool is_primary)
+{
+	struct tuple *tuple;
+	tuple = vy_stmt_decode(xrow, key_def, space_format, upsert_format,
+			       is_primary);
+	if (tuple == NULL)
+		return NULL;
+	char *key = tuple_extract_key(tuple, key_def, NULL);
+	tuple_unref(tuple);
+	return key;
 }

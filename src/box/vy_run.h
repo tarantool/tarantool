@@ -350,6 +350,25 @@ int
 vy_run_recover(struct vy_run *run, const char *dir,
 	       uint32_t space_id, uint32_t iid);
 
+/**
+ * Rebuild vy_run index
+ * @param run - run to laod
+ * @param dir - path to the vinyl directory
+ * @param space_id - space id
+ * @param iid - index id
+ * @param key_def index key definition
+ * @param bloom_fpr bloom filter param
+ * @return - 0 on sucess, -1 on fail
+ */
+int
+vy_run_rebuild_index(struct vy_run *run, const char *dir,
+		     uint32_t space_id, uint32_t iid,
+		     const struct key_def *key_def,
+		     const struct key_def *user_key_def,
+		     struct tuple_format *space_format,
+		     struct tuple_format *upsert_format,
+		     const struct index_opts *opts);
+
 enum vy_file_type {
 	VY_FILE_INDEX,
 	VY_FILE_RUN,

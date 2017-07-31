@@ -80,3 +80,44 @@ s3:drop()
 s4:drop()
 s5:drop()
 var:drop()
+
+
+test_run:cmd('create server force_recovery with script="vinyl/force_recovery.lua"')
+test_run:cmd('start server force_recovery')
+test_run:cmd('switch force_recovery')
+fio = require'fio'
+
+test = box.schema.space.create('test', {engine = 'vinyl'})
+_ = test:create_index('pk')
+for i = 0, 9999 do test:replace({i, i, string.rep('a', 512)}) end
+box.snapshot()
+for i = 10000, 11999 do test:delete({i - 10000}) end
+box.snapshot()
+for i = 12000, 13999 do test:upsert({i - 10000, i, string.rep('a', 128)}, {{'+', 2, 5}}) end
+box.snapshot()
+for _, f in pairs(fio.glob(box.cfg.vinyl_dir .. '/' .. test.id .. '/0/*.index')) do fio.unlink(f) end
+
+test2 = box.schema.space.create('test2', {engine = 'vinyl'})
+_ = test2:create_index('pk')
+_ = test2:create_index('sec', {parts = {4, 'unsigned', 2, 'string'}})
+test2:replace({1, 'a', 2, 3})
+test2:replace({2, 'd', 4, 1})
+test2:replace({3, 'c', 6, 7})
+test2:replace({4, 'b', 6, 3})
+box.snapshot()
+for _, f in pairs(fio.glob(box.cfg.vinyl_dir .. '/' .. test2.id .. '/0/*.index')) do fio.unlink(f) end
+for _, f in pairs(fio.glob(box.cfg.vinyl_dir .. '/' .. test2.id .. '/1/*.index')) do fio.unlink(f) end
+
+test_run = require('test_run').new()
+test_run:cmd('switch default')
+test_run:cmd('stop server force_recovery')
+test_run:cmd('start server force_recovery')
+test_run:cmd('switch force_recovery')
+sum = 0
+for k, v in pairs(box.space.test:select()) do sum = sum + v[2] end
+-- should be a sum(2005 .. 4004) + sum(4000 .. 9999) = 48006000
+sum
+box.space.test2:select()
+box.space.test2.index.sec:select()
+test_run:cmd('switch default')
+test_run:cmd('stop server force_recovery')
