@@ -46,6 +46,7 @@
 #include "trigger.h"
 #include "xrow_io.h"
 #include "error.h"
+#include "session.h"
 
 /* TODO: add configuration options */
 static const int RECONNECT_DELAY = 1;
@@ -393,6 +394,11 @@ static int
 applier_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
+	/*
+	 * Set correct session type for use in on_replace()
+	 * triggers.
+	 */
+	current_session()->type = SESSION_TYPE_APPLIER;
 
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {

@@ -48,6 +48,17 @@ session_free();
 
 enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 
+enum session_type {
+	SESSION_TYPE_BACKGROUND = 0,
+	SESSION_TYPE_BINARY,
+	SESSION_TYPE_CONSOLE,
+	SESSION_TYPE_REPL,
+	SESSION_TYPE_APPLIER,
+	session_type_MAX,
+};
+
+extern const char *session_type_strs[];
+
 /**
  * Abstraction of a single user session:
  * for now, only provides accounting of established
@@ -73,6 +84,7 @@ struct session {
 	 * the first yield.
 	 */
 	uint64_t sync;
+	enum session_type type;
 	/** Authentication salt. */
 	char salt[SESSION_SEED_SIZE];
 	/** Cached user id and global grants */
@@ -203,7 +215,7 @@ session_storage_cleanup(int sid);
  * trigger fails or runs out of resources.
  */
 struct session *
-session_create(int fd);
+session_create(int fd, enum session_type type);
 
 /**
  * Destroy a session.

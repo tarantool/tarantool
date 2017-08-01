@@ -432,7 +432,7 @@ public:
 };
 
 static int
-recovery_follow_f(va_list ap)
+hot_standby_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
 	struct xstream *stream = va_arg(ap, struct xstream *);
@@ -505,7 +505,7 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 * xlog.
 	 */
 	assert(r->watcher == NULL);
-	r->watcher = fiber_new_xc(name, recovery_follow_f);
+	r->watcher = fiber_new_xc(name, hot_standby_f);
 	fiber_set_joinable(r->watcher, true);
 	fiber_start(r->watcher, r, stream, wal_dir_rescan_delay);
 }

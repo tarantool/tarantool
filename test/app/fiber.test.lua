@@ -388,6 +388,15 @@ fiber.sleep(0.01)
 
 box.space.test2066:drop()
 
+--
+-- gh-2642 box.session.type()
+--
+session_type = ""
+function fn1() session_type = box.session.type() return end
+_ = fiber.create(fn1)
+session_type
+session_type = nil
+
 fiber = nil
 
 test_run:cmd("clear filter")

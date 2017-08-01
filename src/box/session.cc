@@ -36,6 +36,15 @@
 #include "random.h"
 #include "user.h"
 
+const char *session_type_strs[] = {
+	"background",
+	"binary",
+	"console",
+	"repl",
+	"applier",
+	"unknown",
+};
+
 static struct mh_i64ptr_t *session_registry;
 
 struct mempool session_pool;
@@ -70,7 +79,7 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 }
 
 struct session *
-session_create(int fd)
+session_create(int fd, enum session_type type)
 {
 	struct session *session =
 		(struct session *) mempool_alloc(&session_pool);
@@ -82,6 +91,7 @@ session_create(int fd)
 	session->id = sid_max();
 	session->fd =  fd;
 	session->sync = 0;
+	session->type = type;
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user->auth_token,
 			 guest_user->def->uid);
@@ -107,7 +117,7 @@ session_create_on_demand(int fd)
 	assert(fiber_get_session(fiber()) == NULL);
 
 	/* Create session on demand */
-	struct session *s = session_create(fd);
+	struct session *s = session_create(fd, SESSION_TYPE_BACKGROUND);
 	if (s == NULL)
 		return NULL;
 	s->fiber_on_stop = {

@@ -743,6 +743,19 @@ c:ping()
 c.space.test ~= nil
 
 c.space.test.connection == c
-
+box.schema.user.revoke('guest','read,write,execute','space', 'test')
 c:close()
+
+--
+-- gh-2642: box.session.type()
+--
+
+box.schema.user.grant('guest','read,write,execute','universe')
+c = net.connect(box.cfg.listen)
+c:call("box.session.type")
+
+-- cleanup
+c:close()
+box.schema.user.revoke('guest','read,write,execute','universe')
+
 space:drop()
