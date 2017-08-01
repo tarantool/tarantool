@@ -132,7 +132,6 @@ box_txn_begin
 box_txn_commit
 box_txn_rollback
 box_txn_alloc
-box_index_key_def
 box_key_def_new
 box_key_def_delete
 box_tuple_format_default
