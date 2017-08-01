@@ -119,7 +119,10 @@ static void
 cbus_endpoint_poison_f(struct cmsg *msg)
 {
 	struct cbus_endpoint *endpoint = ((struct cmsg_poison *)msg)->endpoint;
+	tt_pthread_mutex_lock(&cbus.mutex);
+	assert(endpoint->n_pipes > 0);
 	--endpoint->n_pipes;
+	tt_pthread_mutex_unlock(&cbus.mutex);
 	fiber_cond_signal(&endpoint->cond);
 	free(msg);
 }
