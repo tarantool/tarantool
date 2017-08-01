@@ -49,9 +49,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
-struct Index;
 struct lsregion;
-struct space;
 struct tuple;
 struct tuple_format;
 struct vy_index;
@@ -256,31 +254,11 @@ struct vy_index {
 const char *
 vy_index_name(struct vy_index *index);
 
-/**
- * Extract vy_index from a VinylIndex object.
- * Defined in vinyl_index.cc
- */
-struct vy_index *
-vy_index(struct Index *index);
-
-/**
- * Given a space and an index id, return vy_index.
- * If index not found, return NULL and set diag.
- */
-struct vy_index *
-vy_index_find(struct space *space, uint32_t id);
-
-/**
- * Wrapper around vy_index_find() which ensures that
- * the found index is unique.
- */
-struct vy_index *
-vy_index_find_unique(struct space *space, uint32_t id);
-
 /** Allocate a new index object. */
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct space *space, struct index_def *index_def);
+	     struct index_def *index_def, struct tuple_format *format,
+	     struct vy_index *pk, uint32_t index_count);
 
 /** Free an index object. */
 void

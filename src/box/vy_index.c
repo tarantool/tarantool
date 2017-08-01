@@ -49,7 +49,6 @@
 #include "key_def.h"
 #include "say.h"
 #include "schema.h"
-#include "space.h"
 #include "trivia/util.h"
 #include "tuple.h"
 #include "tuple_format.h"
@@ -96,40 +95,16 @@ vy_index_name(struct vy_index *index)
 }
 
 struct vy_index *
-vy_index_find(struct space *space, uint32_t iid)
-{
-	struct Index *index = index_find(space, iid);
-	if (index == NULL)
-		return NULL;
-	return vy_index(index);
-}
-
-struct vy_index *
-vy_index_find_unique(struct space *space, uint32_t index_id)
-{
-	struct vy_index *index = vy_index_find(space, index_id);
-	if (index != NULL && !index->opts.is_unique) {
-		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		return NULL;
-	}
-	return index;
-}
-
-struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct space *space, struct index_def *index_def)
+	     struct index_def *index_def, struct tuple_format *format,
+	     struct vy_index *pk, uint32_t index_count)
 {
-	assert(space != NULL);
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
 	};
 
 	assert(index_def->key_def->part_count > 0);
-	struct vy_index *pk = NULL;
-	if (index_def->iid > 0) {
-		pk = vy_index_find(space, 0);
-		assert(pk != NULL);
-	}
+	assert(index_def->iid == 0 || pk != NULL);
 
 	struct vy_index *index = calloc(1, sizeof(struct vy_index));
 	if (index == NULL) {
@@ -164,13 +139,13 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 
 	if (index_def->iid == 0) {
 		index->upsert_format =
-			vy_tuple_format_new_upsert(space->format);
+			vy_tuple_format_new_upsert(format);
 		if (index->upsert_format == NULL)
 			goto fail_upsert_format;
 		tuple_format_ref(index->upsert_format, 1);
 
 		index->space_format_with_colmask =
-			vy_tuple_format_new_with_colmask(space->format);
+			vy_tuple_format_new_with_colmask(format);
 		if (index->space_format_with_colmask == NULL)
 			goto fail_space_format_with_colmask;
 		tuple_format_ref(index->space_format_with_colmask, 1);
@@ -191,7 +166,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 
 	index->mem = vy_mem_new(index->env->allocator,
 				*index->env->p_generation,
-				cmp_def, space->format,
+				cmp_def, format,
 				index->space_format_with_colmask,
 				index->upsert_format, schema_version);
 	if (index->mem == NULL)
@@ -208,9 +183,9 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->pk = pk;
 	if (pk != NULL)
 		vy_index_ref(pk);
-	index->space_format = space->format;
+	index->space_format = format;
 	tuple_format_ref(index->space_format, 1);
-	index->space_index_count = space->index_count;
+	index->space_index_count = index_count;
 	index->in_dump.pos = UINT32_MAX;
 	index->in_compact.pos = UINT32_MAX;
 	index->space_id = index_def->space_id;

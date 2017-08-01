@@ -2250,12 +2250,52 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 
 /** }}} Introspection */
 
+/**
+ * Extract vy_index from a VinylIndex object.
+ * Defined in vinyl_index.cc
+ */
+struct vy_index *
+vy_index(struct Index *index);
+
+/**
+ * Given a space and an index id, return vy_index.
+ * If index not found, return NULL and set diag.
+ */
+static struct vy_index *
+vy_index_find(struct space *space, uint32_t iid)
+{
+	struct Index *index = index_find(space, iid);
+	if (index == NULL)
+		return NULL;
+	return vy_index(index);
+}
+
+/**
+ * Wrapper around vy_index_find() which ensures that
+ * the found index is unique.
+ */
+static  struct vy_index *
+vy_index_find_unique(struct space *space, uint32_t index_id)
+{
+	struct vy_index *index = vy_index_find(space, index_id);
+	if (index != NULL && !index->opts.is_unique) {
+		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		return NULL;
+	}
+	return index;
+}
+
 struct vy_index *
 vy_new_index(struct vy_env *env, struct space *space,
 	     struct index_def *index_def)
 {
+	struct vy_index *pk = NULL;
+	if (index_def->iid > 0) {
+		pk = vy_index_find(space, 0);
+		assert(pk != NULL);
+	}
 	return vy_index_new(&env->index_env, &env->cache_env,
-			    space, index_def);
+			    index_def, space->format, pk, space->index_count);
 }
 
 void
