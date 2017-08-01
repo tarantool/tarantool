@@ -43,7 +43,6 @@
 #include <small/rlist.h>
 
 #include "assoc.h"
-#include "cfg.h"
 #include "diag.h"
 #include "errcode.h"
 #include "histogram.h"
@@ -364,6 +363,10 @@ struct vy_index_recovery_cb_arg {
 	 * run each time a slice is created for it.
 	 */
 	struct mh_i64ptr_t *run_hash;
+	/**
+	 * True if force_recovery mode is enabled.
+	 */
+	bool force_recovery;
 };
 
 /** Index recovery callback, passed to vy_recovery_load_index(). */
@@ -374,6 +377,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_index *index = arg->index;
 	struct vy_range *range = arg->range;
 	struct mh_i64ptr_t *run_hash = arg->run_hash;
+	bool force_recovery = arg->force_recovery;
 	struct tuple_format *key_format = index->env->key_format;
 	struct tuple *begin = NULL, *end = NULL;
 	struct vy_run *run;
@@ -433,7 +437,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		run->dump_lsn = record->dump_lsn;
 		if (vy_run_recover(run, index->env->path,
 				   index->space_id, index->id) != 0 &&
-		    (cfg_geti("force_recovery") == false ||
+		     (!force_recovery ||
 		     vy_run_rebuild_index(run, index->env->path,
 					  index->space_id, index->id,
 					  index->cmp_def, index->key_def,
@@ -498,11 +502,16 @@ out:
 
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool snapshot_recovery)
+		 int64_t lsn, bool snapshot_recovery, bool force_recovery)
 {
 	assert(index->range_count == 0);
 
-	struct vy_index_recovery_cb_arg arg = { .index = index };
+	struct vy_index_recovery_cb_arg arg = {
+		.index = index,
+		.range = NULL,
+		.run_hash = NULL,
+		.force_recovery = force_recovery,
+	};
 	arg.run_hash = mh_i64ptr_new();
 	if (arg.run_hash == NULL) {
 		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");

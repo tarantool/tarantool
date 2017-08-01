@@ -356,7 +356,7 @@ vy_index_create(struct vy_index *index);
  */
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool snapshot_recovery);
+		 int64_t lsn, bool snapshot_recovery, bool force_recovery);
 
 /**
  * Return generation of in-memory data stored in an index

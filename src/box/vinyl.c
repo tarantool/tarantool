@@ -106,6 +106,8 @@ struct vy_conf {
 	int read_threads;
 	/** Max number of threads used for writing. */
 	int write_threads;
+	/** Force recovery of data files. */
+	bool force_recovery;
 };
 
 struct vy_env {
@@ -2024,6 +2026,7 @@ vy_conf_new()
 	conf->timeout = cfg_getd("vinyl_timeout");
 	conf->read_threads = cfg_geti("vinyl_read_threads");
 	conf->write_threads = cfg_geti("vinyl_write_threads");
+	conf->force_recovery = cfg_geti("force_recovery");
 
 	conf->path = strdup(cfg_gets("vinyl_dir"));
 	if (conf->path == NULL) {
@@ -2301,7 +2304,8 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 		 */
 		return vy_index_recover(index, env->recovery,
 				vclock_sum(env->recovery_vclock),
-				env->status == VINYL_INITIAL_RECOVERY_LOCAL);
+				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
+				env->conf->force_recovery);
 	default:
 		unreachable();
 		return -1;
