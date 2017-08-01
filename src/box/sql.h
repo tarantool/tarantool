@@ -59,4 +59,7 @@ sql_get();
 } /* extern "C" { */
 #endif
 
+struct info_handler;
+void
+sql_debug_info(struct info_handler *handler);
 #endif

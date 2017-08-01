@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(30)
+test:plan(36)
 
 --!./tcltestrunner.lua
 -- 2012 August 24
@@ -227,14 +227,22 @@ test:do_execsql_test(
 -- Similar to [do_execsql_test], except that two elements are appended
 -- to the result - the string "search" and the number of times test variable
 -- sqlite3_search_count is incremented by running the supplied SQL. e.g.
--- 
+--
 --   do_searchcount_test 1.0 { SELECT * FROM t1 } {x y search 2}
 --
--- Tarantool: search_count hook is not yet implemented. #2455
--- Comment routine and its callers so far
--- local function do_searchcount_test(tn, sql, res)
---     X(110, "X!cmd", [=[["uplevel",["\n    do_test ",["tn"]," {\n      set ::sqlite_search_count 0\n      concat [db eval {",["sql"],"}] search [set ::sqlite_search_count]\n    } [list ",["res"],"]\n  "]]]=])
--- end
+local function do_searchcount_test(tn, sql, res)
+    test:do_test(
+        tn,
+        function()
+            local sqlite_search_count = box.sql.debug().sqlite_search_count
+            local r = test:execsql(sql)
+            table.insert(r, "search")
+            table.insert(r, box.sql.debug().sqlite_search_count - sqlite_search_count)
+            return r
+        end,
+        res)
+end
+
 
 test:do_execsql_test(
     3.0,
@@ -253,32 +261,37 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES('b', 'two');
     ]])
 
--- Tarantool: #2455 begin
--- do_searchcount_test(3.1, [[
---   SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
--- ]], "1 one 2 two search 2")
--- do_searchcount_test(3.2, [[
---   SELECT a, c FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
--- ]], "1 i 2 ii search 4")
--- do_searchcount_test("3.4.1", [[
---   SELECT y FROM t4 WHERE x='a'
--- ]], "one search 1")
--- do_searchcount_test("3.4.2", [[
---   SELECT a, b FROM t3 WHERE 
---         (a=1 AND b=(SELECT y FROM t4 WHERE x='a')) 
---      OR (a=2 AND b='two')
--- ]], "1 one 2 two search 3")
--- do_searchcount_test("3.4.3", [[
---   SELECT a, b FROM t3 WHERE 
---         (a=2 AND b='two')
---      OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a')) 
--- ]], "2 two 1 one search 3")
--- do_searchcount_test("3.4.4", [[
---   SELECT a, b FROM t3 WHERE 
---         (a=2 AND b=(SELECT y FROM t4 WHERE x='b')) 
---      OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a')) 
--- ]], "2 two 1 one search 4")
--- Tarantool: #2455 end
+do_searchcount_test("3.1", [[
+  SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
+    ]],
+    {1, "one", 2, "two", "search", 2})
+do_searchcount_test("3.2", [[
+  SELECT a, c FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
+    ]],
+    {1, "i", 2, "ii", "search", 4})
+do_searchcount_test("3.4.1", [[
+  SELECT y FROM t4 WHERE x='a'
+    ]],
+    {"one", "search", 1})
+do_searchcount_test("3.4.2", [[
+  SELECT a, b FROM t3 WHERE
+        (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
+     OR (a=2 AND b='two')
+    ]],
+    {1, "one", 2, "two", "search", 3})
+do_searchcount_test("3.4.3", [[
+  SELECT a, b FROM t3 WHERE
+        (a=2 AND b='two')
+     OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
+    ]],
+    {2, "two", 1, "one", "search", 3})
+do_searchcount_test("3.4.4", [[
+  SELECT a, b FROM t3 WHERE
+        (a=2 AND b=(SELECT y FROM t4 WHERE x='b'))
+     OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
+    ]],
+    {2, "two", 1, "one", "search", 4})
+
 -- do_searchcount_test 3.5.1 {
 --   SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR rowid=4
 -- } {1 one 2 two search 3}
@@ -286,7 +299,7 @@ test:do_execsql_test(
 --   SELECT a, c FROM t3 WHERE (a=1 AND b='one') OR rowid=4
 -- } {1 i 2 ii search 3}
 -- Ticket [d02e1406a58ea02d] (2012-10-04)
--- LEFT JOIN with an OR in the ON clause causes segfault 
+-- LEFT JOIN with an OR in the ON clause causes segfault
 --
 test:do_test(
     4.1,

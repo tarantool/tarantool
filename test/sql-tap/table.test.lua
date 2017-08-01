@@ -945,7 +945,7 @@ test:do_execsql_test(
         -- </table-13.1>
     })
 
--- MUST_WORK_TEST debug var sqlite_current_time #2455
+-- MUST_WORK_TEST debug var sqlite_current_time #2646
 if (0 > 0) then
 -- ["unset","-nocomplain","date","time","seconds"]
 local data = {

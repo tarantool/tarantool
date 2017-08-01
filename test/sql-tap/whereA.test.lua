@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(12)
+test:plan(17)
 
 --!./tcltestrunner.lua
 -- 2009 February 23
@@ -207,77 +207,77 @@ test:do_test(
 
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
--- Tarantool: count hook is not yet supported. #2455
--- Comment routine and its callers so far
--- local function count(sql)
---     sqlite_sort_count = 0
---     return X(135, "X!cmd", [=[["concat",[["execsql",["sql"]]],["::sqlite_sort_count"]]]=])
--- end
+local function count(sql)
+    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
+    local r = test:execsql(sql)
+    table.insert(r, box.sql.debug().sqlite_sort_count - sqlite_sort_count)
+    return r
+end
 
--- test:do_test(
---     "whereA-4.2",
---     function()
---         -- Ticket #3904
---         test:execsql [[
---             CREATE INDEX t2x ON t2(x);
---         ]]
---         return count([[
---     SELECT x FROM t2;
---   ]])
---     end, {
---         -- <whereA-4.2>
---         2, 1, 0
---         -- </whereA-4.2>
---     })
+test:do_test(
+    "whereA-4.2",
+    function()
+        -- Ticket #3904
+        test:execsql([[
+            CREATE INDEX t2x ON t2(x);
+        ]])
+        return count([[
+    SELECT x FROM t2;
+  ]])
+    end, {
+    -- <whereA-4.2>
+    2, 1, 0
+    -- </whereA-4.2>
+})
 
--- test:do_test(
---     "whereA-4.3",
---     function()
---         return count([[
---     SELECT x FROM t2 ORDER BY x;
---   ]])
---     end, {
---         -- <whereA-4.3>
---         1, 2, 0
---         -- </whereA-4.3>
---     })
+test:do_test(
+    "whereA-4.3",
+    function()
+        return count([[
+    SELECT x FROM t2 ORDER BY x;
+  ]])
+    end, {
+    -- <whereA-4.3>
+    1, 2, 0
+    -- </whereA-4.3>
+})
 
--- test:do_test(
---     "whereA-4.4",
---     function()
---         return count([[
---     SELECT x FROM t2 ORDER BY x DESC;
---   ]])
---     end, {
---         -- <whereA-4.4>
---         2, 1, 0
---         -- </whereA-4.4>
---     })
+test:do_test(
+    "whereA-4.4",
+    function()
+        return count([[
+    SELECT x FROM t2 ORDER BY x DESC;
+  ]])
+    end, {
+    -- <whereA-4.4>
+    2, 1, 0
+    -- </whereA-4.4>
+})
 
--- test:do_test(
---     "whereA-4.5",
---     function()
---         test:execsql "DROP INDEX t2x;"
---         return count([[
---     SELECT x FROM t2 ORDER BY x;
---   ]])
---     end, {
---         -- <whereA-4.5>
---         1, 2, 1
---         -- </whereA-4.5>
---     })
+test:do_test(
+    "whereA-4.5",
+    function()
+        test:execsql("DROP INDEX t2x;")
+        return count([[
+    SELECT x FROM t2 ORDER BY x;
+  ]])
+    end, {
+    -- <whereA-4.5>
+    1, 2, 1
+    -- </whereA-4.5>
+})
 
--- test:do_test(
---     "whereA-4.6",
---     function()
---         return count([[
---     SELECT x FROM t2 ORDER BY x DESC;
---   ]])
---     end, {
---         -- <whereA-4.6>
---         2, 1, 1
---         -- </whereA-4.6>
---     })
+test:do_test(
+    "whereA-4.6",
+    function()
+        return count([[
+    SELECT x FROM t2 ORDER BY x DESC;
+  ]])
+    end, {
+    -- <whereA-4.6>
+    2, 1, 1
+    -- </whereA-4.6>
+})
 
 test:finish_test()
 

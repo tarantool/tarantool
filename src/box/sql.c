@@ -47,6 +47,7 @@
 #undef SWAP
 
 #include "index.h"
+#include "info.h"
 #include "schema.h"
 #include "box.h"
 #include "key_def.h"
@@ -1023,4 +1024,17 @@ int tarantoolSqlite3MakeIdxOpts(SqliteIndex *index, const char *zSql, void *buf)
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, zSql ? strlen(zSql) : 0);
 	return (int)(p - base);
+}
+
+void
+sql_debug_info(struct info_handler *h)
+{
+	extern int sqlite3_search_count;
+	extern int sqlite3_sort_count;
+	extern int sqlite3_found_count;
+	info_begin(h);
+	info_append_int(h, "sqlite_search_count", sqlite3_search_count);
+	info_append_int(h, "sqlite_sort_count", sqlite3_sort_count);
+	info_append_int(h, "sqlite_found_count", sqlite3_found_count);
+	info_end(h);
 }

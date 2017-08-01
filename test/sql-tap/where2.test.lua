@@ -62,8 +62,11 @@ test:do_test(
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
 local function count(sql)
-    sqlite_search_count = 0
-    return X(53, "X!cmd", [=[["concat",[["execsql",["sql"]]],["::sqlite_search_count"]]]=])
+    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
+    local r = test:execsql(sql)
+    print("lol "..(box.sql.debug().sqlite_sort_count - sqlite_sort_count))
+    table.insert(r, box.sql.debug().sqlite_sort_count - sqlite_sort_count)
+    return r
 end
 
 -- This procedure executes the SQL.  Then it checks to see if the OP_Sort
@@ -73,33 +76,14 @@ end
 -- This procedure is used to check to make sure sorting is or is not
 -- occurring as expected.
 --
--- Tarantool: no support yet. Issue submitted #2455
--- This is temporary hack
 local function cksort(sql)
-    local fh = fio.open("temp.tmp", {'O_WRONLY', 'O_CREAT', 'O_TRUNC'})
-    io.flush()
-    local old = ffi.C.dup(1)
-    ffi.C.dup2(fh['fh'], 1)
-    local data = test:execsql("PRAGMA vdbe_trace=true; "..sql.." ; PRAGMA vdbe_trace=false;")
-    ffi.C.dup2(old, 1)
-    ffi.C.close(old)
-    fh:close()
-
-    fh = io.open("temp.tmp", 'r');
-    local sort = 'nosort'
-    for line in fh:lines() do
-        -- print("**", line)
-        if string.find(line, 'Sort') ~= nil then
+    local sort = "nosort"
+    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
+    local data = test:execsql(sql)
+    if sqlite_sort_count < box.sql.debug().sqlite_sort_count then
             sort = 'sort'
-        end
     end
-
     table.insert(data, sort)
---     if db("status", "sort")
---  then
---         x = "sort"
---     end
---     table.insert(data,x) or data
     return data
 end
 
@@ -111,33 +95,15 @@ end
 -- This procedure executes the SQL.  Then it appends 
 -- the names of the table and index used
 --
--- Tarantool: no support yet for `sort` flag. Issue submitted #2455
--- This is temporary hack
 local function queryplan(sql)
-    -- sqlite_sort_count = 0
+    local sort = "nosort"
+    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
     local data = test:execsql(sql)
-
-    local fh = fio.open("temp.tmp", {'O_WRONLY', 'O_CREAT', 'O_TRUNC'})
-    io.flush()
-    local old = ffi.C.dup(1)
-    ffi.C.dup2(fh['fh'], 1)
-    ffi.C.close(fh['fh'])
-    local trace = test:execsql("PRAGMA vdbe_trace=true; "..sql.." ; PRAGMA vdbe_trace=false;")
-    ffi.C.dup2(old, 1)
-    ffi.C.close(old)
-    fh:close()
-
-    fh = io.open("temp.tmp", 'r');
-    local sort = 'nosort'
-    for line in fh:lines() do
-        -- print("**", line)
-        if string.find(line, 'Sort') ~= nil then
-            sort = 'sort'
-        end
+    if sqlite_sort_count < box.sql.debug().sqlite_sort_count then
+        sort = 'sort'
     end
-
     table.insert(data, sort)
-    eqp = test:execsql("EXPLAIN QUERY PLAN "..sql)
+    local eqp = test:execsql("EXPLAIN QUERY PLAN "..sql)
     for i,v in ipairs(eqp) do
         if i % 4 == 0 then
             local as, tab, idx = string.match(v, "TABLE (%w+ AS) (%w+) USING.*INDEX (%w+)")

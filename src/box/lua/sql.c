@@ -2,10 +2,9 @@
 #include "box/sql.h"
 
 #include "box/sql/sqlite3.h"
+#include "box/info.h"
 #include "lua/utils.h"
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
+#include "info.h"
 
 struct prep_stmt
 {
@@ -274,11 +273,21 @@ outofmem:
 	return luaL_error(L, "out of memory");
 }
 
+static int
+lua_sql_debug(struct lua_State *L)
+{
+	struct info_handler info;
+	luaT_info_handler_create(&info, L);
+	sql_debug_info(&info);
+	return 1;
+}
+
 void
 box_lua_sqlite_init(struct lua_State *L)
 {
 	static const struct luaL_Reg module_funcs [] = {
 		{"execute", lua_sql_execute},
+		{"debug", lua_sql_debug},
 		{NULL, NULL}
 	};
 

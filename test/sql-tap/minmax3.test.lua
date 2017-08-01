@@ -23,23 +23,23 @@ test:plan(28)
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
 
--- MUST_WORK_TEST uses sqlite_search_count #2455
-if 0 > 0 then
 local function count(sql)
-    sqlite_search_count = 0
-    return X(29, "X!cmd", [=[["concat",[["execsql",["sql"]]],["::sqlite_search_count"]]]=])
+    local sqlite_search_count = box.sql.debug().sqlite_search_count
+    local r = test:execsql(sql)
+    table.insert(r, box.sql.debug().sqlite_search_count - sqlite_search_count)
+    return r
 end
 
 -- This procedure sets the value of the file-format in file 'test.db'
 -- to $newval. Also, the schema cookie is incremented.
 --
-local function set_file_format(newval)
-    X(35, "X!cmd", [=[["hexio_write","test.db","44",[["hexio_render_int32",["newval"]]]]]=])
-    schemacookie = X(37, "X!cmd", [=[["hexio_get_int",[["hexio_read","test.db","40","4"]]]]=])
-    schemacookie = schemacookie + 1
-    X(38, "X!cmd", [=[["hexio_write","test.db","40",[["hexio_render_int32",["schemacookie"]]]]]=])
-    return ""
-end
+--local function set_file_format(newval)
+--    X(35, "X!cmd", [=[["hexio_write","test.db","44",[["hexio_render_int32",["newval"]]]]]=])
+--    schemacookie = X(37, "X!cmd", [=[["hexio_get_int",[["hexio_read","test.db","40","4"]]]]=])
+--    schemacookie = schemacookie + 1
+--    X(38, "X!cmd", [=[["hexio_write","test.db","40",[["hexio_render_int32",["schemacookie"]]]]]=])
+--    return ""
+--end
 
 
 test:do_test(
@@ -280,7 +280,6 @@ test:do_execsql_test(
 
         -- </minmax3-1.4.4>
     })
-end
 
 test:do_execsql_test(
     "minmax3-2.1",
