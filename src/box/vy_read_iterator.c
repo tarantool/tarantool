@@ -1392,6 +1392,31 @@ restart:
 	if (*result != NULL)
 		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
 
+#ifndef NDEBUG
+	/* Check constraints. */
+	int dir = iterator_direction(itr->iterator_type);
+	/*
+	 * Each result statement with iterator type GE/GT must
+	 * be >= iterator key. And with LT/LE must
+	 * be <= iterator_key. @sa gh-2614.
+	 */
+	if (itr->curr_stmt != NULL && tuple_field_count(itr->key) > 0) {
+		int cmp = dir * vy_stmt_compare(*result, itr->key,
+						itr->index->cmp_def);
+		assert(cmp >= 0);
+	}
+	/*
+	 * Ensure the read iterator does not return duplicates
+	 * and respects statements order (index->cmp_def includes
+	 * primary parts, so prev_key != itr->curr_stmt for any
+	 * index).
+	 */
+	if (prev_key != NULL && itr->curr_stmt != NULL) {
+		assert(dir * vy_tuple_compare(prev_key, itr->curr_stmt,
+					      index->cmp_def) < 0);
+	}
+#endif
+
 	/**
 	 * Add a statement to the cache
 	 */
@@ -1400,19 +1425,8 @@ restart:
 			     itr->key, itr->iterator_type);
 
 clear:
-	if (prev_key != NULL) {
-		if (itr->curr_stmt != NULL)
-			/*
-			 * It is impossible to return fully equal
-			 * statements in sequence. At least they
-			 * must have different primary keys.
-			 * (index->cmp_def includes primary
-			 * parts).
-			 */
-			assert(vy_tuple_compare(prev_key, itr->curr_stmt,
-						index->cmp_def) != 0);
+	if (prev_key != NULL)
 		tuple_unref(prev_key);
-	}
 
 	latency_collect(&index->stat.latency, ev_now(loop()) - start_time);
 	return rc;

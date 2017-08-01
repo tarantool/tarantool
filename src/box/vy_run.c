@@ -298,6 +298,7 @@ vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
 		itype = ITER_GE; /* One day it'll become obsolete */
 	assert(itype == ITER_GE || itype == ITER_GT ||
 	       itype == ITER_LE || itype == ITER_LT);
+	int dir = iterator_direction(itype);
 	*equal_key = false;
 
 	/**
@@ -340,14 +341,14 @@ vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
 	} while (range[1] - range[0] > 1);
 	if (range[0] < 0)
 		range[0] = run->info.page_count;
-	uint32_t page = range[iterator_direction(itype) > 0];
+	uint32_t page = range[dir > 0];
 
 	/**
 	 * Since page search uses only min_key of pages,
 	 *  for GE, GT and EQ the previous page can contain
 	 *  the point where iteration must be started.
 	 */
-	if (page > 0 && iterator_direction(itype) > 0)
+	if (page > 0 && dir > 0)
 		return page - 1;
 	return page;
 }
@@ -1124,8 +1125,10 @@ vy_run_iterator_search(struct vy_run_iterator *itr,
 	pos->page_no = vy_page_index_find_page(itr->slice->run, key,
 					       itr->cmp_def, iterator_type,
 					       equal_key);
-	if (pos->page_no == itr->slice->run->info.page_count)
+	if (pos->page_no == itr->slice->run->info.page_count) {
+		itr->search_ended = true;
 		return 0;
+	}
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
 	if (rc != 0)

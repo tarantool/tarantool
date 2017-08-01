@@ -1,7 +1,6 @@
 #include "trivia/util.h"
 #include "vy_iterators_helper.h"
 #include "unit.h"
-#include "vy_cache.h"
 
 const struct vy_stmt_template key_template = STMT_TEMPLATE(0, SELECT, vyend);
 
