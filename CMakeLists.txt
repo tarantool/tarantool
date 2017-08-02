@@ -290,6 +290,14 @@ find_package(Readline)
 # Patched.
 #
 set(ENABLE_BUNDLED_LUAJIT ON)
+set(LUAJIT_ENABLE_GC64_DEFAULT OFF)
+if (TARGET_OS_DARWIN)
+    # LuaJIT is unusable on OS X without enabled GC64
+    # See https://github.com/tarantool/tarantool/issues/2643
+    set(LUAJIT_ENABLE_GC64_DEFAULT ON)
+endif()
+option(LUAJIT_ENABLE_GC64 "Use 64-bit GC objects by default."
+       ${LUAJIT_ENABLE_GC64_DEFAULT})
 include(luajit)
 
 #

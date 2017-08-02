@@ -159,6 +159,15 @@ macro(luajit_build)
         set(luajit_cflags ${luajit_cflags} -Wno-implicit-fallthrough)
     endif()
 
+    if (LUAJIT_ENABLE_GC64)
+        add_definitions(-DLUAJIT_ENABLE_GC64=1)
+    elseif(TARGET_OS_DARWIN)
+        # Necessary to make LuaJIT work on Darwin, see
+        # http://luajit.org/install.html
+        set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}
+            "-pagezero_size 10000 -image_base 100000000")
+    endif()
+
     # We are consciously ommiting debug info in RelWithDebInfo mode
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_ccopt -O0)
