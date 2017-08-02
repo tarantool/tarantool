@@ -2690,7 +2690,7 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 		tuple_format_ref(index->space_format, -1);
 		index->space_format_with_colmask =
 			pk->space_format_with_colmask;
-		index->space_format = new_space->format;
+		index->space_format = pk->space_format;
 		tuple_format_ref(index->space_format_with_colmask, 1);
 		tuple_format_ref(index->space_format, 1);
 		index->space_index_count = new_space->index_count;
@@ -2939,7 +2939,7 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk->id == 0);
 	struct tuple *new_tuple =
-		vy_stmt_new_replace(space->format, request->tuple,
+		vy_stmt_new_replace(pk->space_format, request->tuple,
 				    request->tuple_end);
 	if (new_tuple == NULL)
 		return -1;
@@ -3001,7 +3001,7 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
 	assert(pk->id == 0);
-	new_stmt = vy_stmt_new_replace(space->format, request->tuple,
+	new_stmt = vy_stmt_new_replace(pk->space_format, request->tuple,
 				       request->tuple_end);
 	if (new_stmt == NULL)
 		return -1;
@@ -3022,7 +3022,7 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		goto error;
 
 	if (space->index_count > 1 && old_stmt != NULL) {
-		delete = vy_stmt_new_surrogate_delete(space->format, old_stmt);
+		delete = vy_stmt_new_surrogate_delete(pk->space_format, old_stmt);
 		if (delete == NULL)
 			goto error;
 	}
@@ -3191,7 +3191,7 @@ vy_delete_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
 	struct tuple *delete =
-		vy_stmt_new_surrogate_delete(space->format, tuple);
+		vy_stmt_new_surrogate_delete(pk->space_format, tuple);
 	if (delete == NULL)
 		return -1;
 	if (vy_tx_set(tx, pk, delete) != 0)
@@ -3255,7 +3255,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		struct tuple *delete =
 			vy_stmt_new_surrogate_delete_from_key(request->key,
 							      pk->key_def,
-							      space->format);
+							      pk->space_format);
 		if (delete == NULL)
 			return -1;
 		int rc = vy_tx_set(tx, pk, delete);
@@ -3359,14 +3359,14 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Check that the new tuple matches the space format and
 	 * the primary key was not modified.
 	 */
-	if (tuple_validate_raw(space->format, new_tuple))
+	if (tuple_validate_raw(pk->space_format, new_tuple))
 		return -1;
 
 	bool update_changes_all =
 		vy_update_changes_all_indexes(space, column_mask);
 	struct tuple_format *mask_format = pk->space_format_with_colmask;
 	if (space->index_count == 1 || update_changes_all) {
-		stmt->new_tuple = vy_stmt_new_replace(space->format, new_tuple,
+		stmt->new_tuple = vy_stmt_new_replace(pk->space_format, new_tuple,
 						      new_tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
@@ -3398,7 +3398,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			return -1;
 		vy_stmt_set_column_mask(delete, column_mask);
 	} else {
-		delete = vy_stmt_new_surrogate_delete(space->format,
+		delete = vy_stmt_new_surrogate_delete(pk->space_format,
 						      stmt->old_tuple);
 		if (delete == NULL)
 			return -1;
@@ -3577,7 +3577,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
-	if (tuple_validate_raw(space->format, tuple))
+	if (tuple_validate_raw(pk->space_format, tuple))
 		return -1;
 
 	if (space->index_count == 1 && rlist_empty(&space->on_replace))
@@ -3611,7 +3611,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 */
 	if (stmt->old_tuple == NULL) {
 		stmt->new_tuple =
-			vy_stmt_new_replace(space->format, tuple, tuple_end);
+			vy_stmt_new_replace(pk->space_format, tuple, tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		return vy_insert_first_upsert(env, tx, space, stmt->new_tuple);
@@ -3631,14 +3631,14 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Check that the new tuple matched the space
 	 * format and the primary key was not modified.
 	 */
-	if (tuple_validate_raw(space->format, new_tuple))
+	if (tuple_validate_raw(pk->space_format, new_tuple))
 		return -1;
 	new_tuple_end = new_tuple + new_size;
 	bool update_changes_all =
 		vy_update_changes_all_indexes(space, column_mask);
 	struct tuple_format *mask_format = pk->space_format_with_colmask;
 	if (space->index_count == 1 || update_changes_all) {
-		stmt->new_tuple = vy_stmt_new_replace(space->format, new_tuple,
+		stmt->new_tuple = vy_stmt_new_replace(pk->space_format, new_tuple,
 						      new_tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
@@ -3673,7 +3673,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			return -1;
 		vy_stmt_set_column_mask(delete, column_mask);
 	} else {
-		delete = vy_stmt_new_surrogate_delete(space->format,
+		delete = vy_stmt_new_surrogate_delete(pk->space_format,
 						      stmt->old_tuple);
 		if (delete == NULL)
 			return -1;
@@ -3722,7 +3722,7 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	assert(pk->id == 0);
 	/* First insert into the primary index. */
 	stmt->new_tuple =
-		vy_stmt_new_replace(space->format, request->tuple,
+		vy_stmt_new_replace(pk->space_format, request->tuple,
 				    request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
