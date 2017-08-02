@@ -889,7 +889,7 @@ void
 ModifyIndex::alter_def(struct alter_space *alter)
 {
 	rlist_del_entry(old_index_def, link);
-	rlist_add_entry(&alter->key_list, new_index_def, link);
+	index_def_list_add(&alter->key_list, new_index_def);
 }
 
 void
@@ -947,7 +947,7 @@ public:
 void
 CreateIndex::alter_def(struct alter_space *alter)
 {
-	rlist_add_tail_entry(&alter->key_list, new_index_def, link);
+	index_def_list_add(&alter->key_list, new_index_def);
 }
 
 /**
@@ -1020,7 +1020,7 @@ void
 RebuildIndex::alter_def(struct alter_space *alter)
 {
 	rlist_del_entry(old_index_def, link);
-	rlist_add_entry(&alter->key_list, new_index_def, link);
+	index_def_list_add(&alter->key_list, new_index_def);
 }
 
 void

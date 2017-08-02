@@ -365,6 +365,20 @@ void
 index_def_delete(struct index_def *def);
 
 /**
+ * Add an index definition to a list, preserving the
+ * first position of the primary key.
+ */
+static inline void
+index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
+{
+	/** Preserve the position of the primary key */
+	if (index_def->iid == 0)
+		rlist_add_entry(index_def_list, index_def, link);
+	else
+		rlist_add_tail_entry(index_def_list, index_def, link);
+}
+
+/**
  * True, if the index change by alter requires an index rebuild.
  *
  * Some changes, such as a new page size or bloom_fpr do not

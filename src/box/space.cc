@@ -84,17 +84,15 @@ space_new(struct space_def *def, struct rlist *key_list)
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
 	struct index_def *index_def;
-	struct index_def *pk = NULL;
+	struct index_def *pk = rlist_empty(key_list) ? NULL :
+		rlist_first_entry(key_list, struct index_def, link);
 	def = space_def_dup(def);
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
-		/* Find the primary key, we need to create it first. */
-		if (index_def->iid == 0)
-			pk = index_def;
 		index_id_max = MAX(index_id_max, index_def->iid);
 	}
 	/* A space with a secondary key without a primary is illegal. */
-	assert(index_count == 0 || pk != NULL);
+	assert(index_count == 0 || pk->iid == 0);
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
 	struct space *space = (struct space *) calloc(1, sz);
@@ -146,13 +144,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	}
 	/* init space engine instance */
 	space->handler = engine->createSpace();
-	/* Fill the space indexes. */
-	if (pk) {
-		space->index_map[0] = space->handler->createIndex(space, pk);
-	}
 	rlist_foreach_entry(index_def, key_list, link) {
-		if (index_def == pk)
-			continue;
 		space->index_map[index_def->iid] =
 			space->handler->createIndex(space, index_def);
 	}
@@ -197,6 +189,7 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 {
 	rlist_create(key_list);
 
+	/** Ensure the primary key is added first. */
 	for (unsigned j = 0; j < space->index_count; j++)
 		rlist_add_tail_entry(key_list, space->index[j]->index_def,
 				     link);
