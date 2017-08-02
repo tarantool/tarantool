@@ -167,8 +167,8 @@ macro(luajit_build)
         else ()
             set (luajit_ccdebug -g)
         endif ()
-        set (luajit_xcflags ${luajit_xcflags}
-            -DLUA_USE_APICHECK -DLUA_USE_ASSERT)
+        add_definitions(-DLUA_USE_APICHECK=1)
+        add_definitions(-DLUA_USE_ASSERT=1)
     else ()
         set (luajit_ccopt -O2)
         set (luajit_ccdbebug "")
@@ -198,15 +198,21 @@ macro(luajit_build)
         set (luajit_ccdebug ${luajit_ccdebug} -fprofile-arcs -ftest-coverage)
     endif()
     if (ENABLE_VALGRIND)
+        add_definitions(-DLUAJIT_USE_SYSMALLOC=1)
+        add_definitions(-DLUAJIT_USE_VALGRIND=1)
         set (luajit_xcflags ${luajit_xcflags}
-            -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC
             -I${PROJECT_SOURCE_DIR}/src/lib/small/third_party)
     endif()
     # AddressSanitizer - CFLAGS were set globaly
     if (ENABLE_ASAN)
-        set (luajit_xcflags ${luajit_xcflags} -DLUAJIT_USE_ASAN)
+        add_definitions(-DLUAJIT_USE_ASAN=1)
         set (luajit_ldflags ${luajit_ldflags} -fsanitize=address)
     endif()
+    # Add all COMPILE_DEFINITIONS to xcflags
+    get_property(defs DIRECTORY PROPERTY COMPILE_DEFINITIONS)
+    foreach(def ${defs})
+        set(luajit_xcflags ${luajit_xcflags} -D${def})
+    endforeach()
     set (luajit_buildoptions
         BUILDMODE=static
         HOST_CC="${luajit_hostcc}"
