@@ -367,6 +367,14 @@ index_def_delete(struct index_def *def);
 /**
  * Add an index definition to a list, preserving the
  * first position of the primary key.
+ *
+ * In non-unique indexes, secondary keys must contain key parts
+ * of the primary key. This is necessary to make ordered
+ * retrieval from a secondary key useful to SQL
+ * optimizer and make iterators over secondary keys stable
+ * in presence of concurrent updates.
+ * Thus we always create the primary key first, and put
+ * the primary key key_def first in the index_def list.
  */
 static inline void
 index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
