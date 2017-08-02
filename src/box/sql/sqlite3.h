@@ -161,33 +161,6 @@ SQLITE_API const char *sqlite3_sourceid(void);
 SQLITE_API int sqlite3_libversion_number(void);
 
 /*
-** CAPI3REF: Run-Time Library Compilation Options Diagnostics
-**
-** ^The sqlite3_compileoption_used() function returns 0 or 1 
-** indicating whether the specified option was defined at 
-** compile time.  ^The SQLITE_ prefix may be omitted from the 
-** option name passed to sqlite3_compileoption_used().  
-**
-** ^The sqlite3_compileoption_get() function allows iterating
-** over the list of options that were defined at compile time by
-** returning the N-th compile time option string.  ^If N is out of range,
-** sqlite3_compileoption_get() returns a NULL pointer.  ^The SQLITE_ 
-** prefix is omitted from any strings returned by 
-** sqlite3_compileoption_get().
-**
-** ^Support for the diagnostic functions sqlite3_compileoption_used()
-** and sqlite3_compileoption_get() may be omitted by specifying the 
-** [SQLITE_OMIT_COMPILEOPTION_DIAGS] option at compile time.
-**
-** See also: SQL functions [sqlite_compileoption_used()] and
-** [sqlite_compileoption_get()] and the [compile_options pragma].
-*/
-#ifndef SQLITE_OMIT_COMPILEOPTION_DIAGS
-SQLITE_API int sqlite3_compileoption_used(const char *zOptName);
-SQLITE_API const char *sqlite3_compileoption_get(int N);
-#endif
-
-/*
 ** CAPI3REF: Test To See If The Library Is Threadsafe
 **
 ** ^The sqlite3_threadsafe() function returns zero if and only if

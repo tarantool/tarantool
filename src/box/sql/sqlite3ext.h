@@ -426,8 +426,6 @@ typedef int (*sqlite3_loadext_entry)(
 #define sqlite3_backup_pagecount       sqlite3_api->backup_pagecount
 #define sqlite3_backup_remaining       sqlite3_api->backup_remaining
 #define sqlite3_backup_step            sqlite3_api->backup_step
-#define sqlite3_compileoption_get      sqlite3_api->compileoption_get
-#define sqlite3_compileoption_used     sqlite3_api->compileoption_used
 #define sqlite3_create_function_v2     sqlite3_api->create_function_v2
 #define sqlite3_db_config              sqlite3_api->db_config
 #define sqlite3_db_mutex               sqlite3_api->db_mutex

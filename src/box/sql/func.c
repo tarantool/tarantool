@@ -930,52 +930,6 @@ static void errlogFunc(
   sqlite3_log(sqlite3_value_int(argv[0]), "%s", sqlite3_value_text(argv[1]));
 }
 
-/*
-** Implementation of the sqlite_compileoption_used() function.
-** The result is an integer that identifies if the compiler option
-** was used to build SQLite.
-*/
-#ifndef SQLITE_OMIT_COMPILEOPTION_DIAGS
-static void compileoptionusedFunc(
-  sqlite3_context *context,
-  int argc,
-  sqlite3_value **argv
-){
-  const char *zOptName;
-  assert( argc==1 );
-  UNUSED_PARAMETER(argc);
-  /* IMP: R-39564-36305 The sqlite_compileoption_used() SQL
-  ** function is a wrapper around the sqlite3_compileoption_used() C/C++
-  ** function.
-  */
-  if( (zOptName = (const char*)sqlite3_value_text(argv[0]))!=0 ){
-    sqlite3_result_int(context, sqlite3_compileoption_used(zOptName));
-  }
-}
-#endif /* SQLITE_OMIT_COMPILEOPTION_DIAGS */
-
-/*
-** Implementation of the sqlite_compileoption_get() function. 
-** The result is a string that identifies the compiler options 
-** used to build SQLite.
-*/
-#ifndef SQLITE_OMIT_COMPILEOPTION_DIAGS
-static void compileoptiongetFunc(
-  sqlite3_context *context,
-  int argc,
-  sqlite3_value **argv
-){
-  int n;
-  assert( argc==1 );
-  UNUSED_PARAMETER(argc);
-  /* IMP: R-04922-24076 The sqlite_compileoption_get() SQL function
-  ** is a wrapper around the sqlite3_compileoption_get() C/C++ function.
-  */
-  n = sqlite3_value_int(argv[0]);
-  sqlite3_result_text(context, sqlite3_compileoption_get(n), -1, SQLITE_STATIC);
-}
-#endif /* SQLITE_OMIT_COMPILEOPTION_DIAGS */
-
 /* Array for converting from half-bytes (nybbles) into ASCII hex
 ** digits. */
 static const char hexdigits[] = {
@@ -1768,10 +1722,6 @@ void sqlite3RegisterBuiltinFunctions(void){
 #if SQLITE_USER_AUTHENTICATION
     FUNCTION(sqlite_crypt,       2, 0, 0, sqlite3CryptFunc ),
 #endif
-#ifndef SQLITE_OMIT_COMPILEOPTION_DIAGS
-    DFUNCTION(sqlite_compileoption_used,1, 0, 0, compileoptionusedFunc  ),
-    DFUNCTION(sqlite_compileoption_get, 1, 0, 0, compileoptiongetFunc  ),
-#endif /* SQLITE_OMIT_COMPILEOPTION_DIAGS */
     FUNCTION2(unlikely,          1, 0, 0, noopFunc,  SQLITE_FUNC_UNLIKELY),
     FUNCTION2(likelihood,        2, 0, 0, noopFunc,  SQLITE_FUNC_UNLIKELY),
     FUNCTION2(likely,            1, 0, 0, noopFunc,  SQLITE_FUNC_UNLIKELY),

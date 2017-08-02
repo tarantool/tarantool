@@ -1744,26 +1744,6 @@ void sqlite3Pragma(
   break;
 #endif /* SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS */
 
-#ifndef SQLITE_OMIT_COMPILEOPTION_DIAGS
-  /*
-  **   PRAGMA compile_options
-  **
-  ** Return the names of all compile-time options used in this build,
-  ** one option per row.
-  */
-  case PragTyp_COMPILE_OPTIONS: {
-    int i = 0;
-    const char *zOpt;
-    pParse->nMem = 1;
-    while( (zOpt = sqlite3_compileoption_get(i++))!=0 ){
-      sqlite3VdbeLoadString(v, 1, zOpt);
-      sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 1);
-    }
-    sqlite3VdbeReusable(v);
-  }
-  break;
-#endif /* SQLITE_OMIT_COMPILEOPTION_DIAGS */
-
 /* Tarantool: TODO: comment this so far, since native SQLite WAL was remoced.
    This might be used with native Tarantool's WAL.  */
 #if 0 

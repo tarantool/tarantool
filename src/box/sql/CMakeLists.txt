@@ -43,7 +43,6 @@ add_library(sql STATIC
     build.c
     callback.c
     complete.c
-    ctime.c
     date.c
     dbstat.c
     delete.c

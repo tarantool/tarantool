@@ -295,13 +295,8 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_backup_pagecount,
   sqlite3_backup_remaining,
   sqlite3_backup_step,
-#ifndef SQLITE_OMIT_COMPILEOPTION_DIAGS
-  sqlite3_compileoption_get,
-  sqlite3_compileoption_used,
-#else
   0,
   0,
-#endif
   sqlite3_create_function_v2,
   sqlite3_db_config,
   sqlite3_db_mutex,
