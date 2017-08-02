@@ -730,7 +730,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		(void) old_type;
 
 		applied = vy_apply_upsert(stmt, old->stmt, index->cmp_def,
-					  index->space_format,
+					  index->mem_format,
 					  index->upsert_format, true);
 		index->stat.upsert.applied++;
 		if (applied == NULL)

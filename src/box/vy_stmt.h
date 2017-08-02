@@ -659,25 +659,25 @@ vy_stmt_str(const struct tuple *stmt);
 /**
  * Create a tuple format with column mask of an update operation.
  * @sa vy_index.column_mask, vy_can_skip_update().
- * @param space_format A base tuple format.
+ * @param mem_format A base tuple format.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
 struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *space_format);
+vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
 
 /**
  * Create a tuple format for UPSERT tuples. UPSERTs has an additional
  * extra byte before an offsets table, that stores the count
  * of squashed upserts @sa vy_squash.
- * @param space_format A base tuple format.
+ * @param mem_format A base tuple format.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
 struct tuple_format *
-vy_tuple_format_new_upsert(struct tuple_format *space_format);
+vy_tuple_format_new_upsert(struct tuple_format *mem_format);
 
 
 /**
@@ -691,7 +691,7 @@ vy_tuple_format_new_upsert(struct tuple_format *space_format);
 char *
 vy_stmt_extract_key(struct xrow_header *xrow,
 		    const struct key_def *key_def,
-		    struct tuple_format *space_format,
+		    struct tuple_format *mem_format,
 		    struct tuple_format *upsert_format,
 		    bool is_primary);
 

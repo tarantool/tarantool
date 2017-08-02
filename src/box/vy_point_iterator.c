@@ -251,8 +251,7 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	 */
 	struct vy_index *index = itr->index;
 	struct tuple_format *format = (index->space_index_count == 1 ?
-				       index->space_format :
-				       index->surrogate_format);
+				       index->mem_format : index->disk_format);
 	struct vy_run_iterator run_itr;
 	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator,
 			     itr->run_env, slice, ITER_EQ, itr->key,
@@ -361,7 +360,7 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 		struct tuple *stmt =
 			vy_apply_upsert(node->stmt, itr->curr_stmt,
 					itr->index->cmp_def,
-					itr->index->space_format,
+					itr->index->mem_format,
 					itr->index->upsert_format, true);
 		itr->index->stat.upsert.applied++;
 		if (stmt == NULL)

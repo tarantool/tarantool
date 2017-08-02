@@ -365,7 +365,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     uint32_t space_id, uint32_t iid,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
-		     struct tuple_format *space_format,
+		     struct tuple_format *mem_format,
 		     struct tuple_format *upsert_format,
 		     const struct index_opts *opts);
 

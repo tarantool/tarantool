@@ -2559,7 +2559,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     uint32_t space_id, uint32_t iid,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
-		     struct tuple_format *space_format,
+		     struct tuple_format *mem_format,
 		     struct tuple_format *upsert_format,
 		     const struct index_opts *opts)
 {
@@ -2607,7 +2607,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 			}
 			++page_row_count;
 			key = vy_stmt_extract_key(&xrow, cmp_def,
-						  space_format, upsert_format,
+						  mem_format, upsert_format,
 						  iid == 0);
 			if (key == NULL)
 				goto close_err;
@@ -2657,7 +2657,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		if (xrow.type == VY_RUN_ROW_INDEX)
 			continue;
 
-		struct tuple *tuple = vy_stmt_decode(&xrow, cmp_def, space_format,
+		struct tuple *tuple = vy_stmt_decode(&xrow, cmp_def, mem_format,
 						     upsert_format, iid == 0);
 		if (tuple == NULL)
 			goto close_err;

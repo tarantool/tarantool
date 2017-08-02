@@ -615,7 +615,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	 * format in vy_mem.
 	 */
 	format = (index->space_index_count == 1 ?
-		  index->space_format : index->surrogate_format);
+		  index->mem_format : index->disk_format);
 	rlist_foreach_entry(slice, &itr->curr_range->slices, in_range) {
 		/*
 		 * vy_task_dump_complete() may yield after adding
@@ -701,7 +701,7 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
 			       itr->key, itr->index->cmp_def,
-			       itr->index->space_format,
+			       itr->index->mem_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
 
@@ -724,7 +724,7 @@ restart:
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
 			       itr->key, itr->index->cmp_def,
-			       itr->index->space_format,
+			       itr->index->mem_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
 	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
@@ -778,7 +778,7 @@ restart:
 	vy_merge_iterator_cleanup(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
-			       itr->key, index->cmp_def, index->space_format,
+			       itr->key, index->cmp_def, index->mem_format,
 			       index->upsert_format, index->id == 0);
 	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
 	vy_read_iterator_use_range(itr);

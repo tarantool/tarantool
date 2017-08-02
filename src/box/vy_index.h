@@ -145,15 +145,29 @@ struct vy_index {
 	struct key_def *cmp_def;
 	/** Key definition passed by the user. */
 	struct key_def *key_def;
-	/** Tuple format corresponding to key_def. */
-	struct tuple_format *surrogate_format;
+	/**
+	 * Tuple format for tuples of this index created when
+	 * reading pages from disk.
+	 * Is distinct from mem_format only for secondary keys,
+	 * whose tuples have MP_NIL in all "gap" positions between
+	 * positions of the secondary and primary key fields.
+	 * These gaps are necessary to make such tuples comparable
+	 * with tuples from vy_mem, while using the same cmp_def.
+	 * Since upserts are never present in secondary keys, is
+	 * used only for REPLACE and DELETE
+	 * tuples.
+	 */
+	struct tuple_format *disk_format;
 	/** Tuple format of the space this index belongs to. */
-	struct tuple_format *space_format;
+	struct tuple_format *mem_format;
 	/**
 	 * Format for tuples of type REPLACE or DELETE which
-	 * are a part of an UPDATE operation.
+	 * are a result of an UPDATE operation. Such tuples
+	 * contain a column mask which preserves the list
+	 * of actually changed columns. Used when creating
+	 * tuples for vy_mem, and used only by primary key.
 	 */
-	struct tuple_format *space_format_with_colmask;
+	struct tuple_format *mem_format_with_colmask;
 	/*
 	 * Format for UPSERT statements. Note, UPSERTs can only
 	 * appear in spaces with a single index.

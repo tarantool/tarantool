@@ -652,9 +652,9 @@ vy_stmt_str(const struct tuple *stmt)
 }
 
 struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *space_format)
+vy_tuple_format_new_with_colmask(struct tuple_format *mem_format)
 {
-	struct tuple_format *format = tuple_format_dup(space_format);
+	struct tuple_format *format = tuple_format_dup(mem_format);
 	if (format == NULL)
 		return NULL;
 	/* + size of column mask. */
@@ -664,9 +664,9 @@ vy_tuple_format_new_with_colmask(struct tuple_format *space_format)
 }
 
 struct tuple_format *
-vy_tuple_format_new_upsert(struct tuple_format *space_format)
+vy_tuple_format_new_upsert(struct tuple_format *mem_format)
 {
-	struct tuple_format *format = tuple_format_dup(space_format);
+	struct tuple_format *format = tuple_format_dup(mem_format);
 	if (format == NULL)
 		return NULL;
 	/* + size of n_upserts. */
@@ -678,12 +678,12 @@ vy_tuple_format_new_upsert(struct tuple_format *space_format)
 char *
 vy_stmt_extract_key(struct xrow_header *xrow,
 		    const struct key_def *key_def,
-		    struct tuple_format *space_format,
+		    struct tuple_format *mem_format,
 		    struct tuple_format *upsert_format,
 		    bool is_primary)
 {
 	struct tuple *tuple;
-	tuple = vy_stmt_decode(xrow, key_def, space_format, upsert_format,
+	tuple = vy_stmt_decode(xrow, key_def, mem_format, upsert_format,
 			       is_primary);
 	if (tuple == NULL)
 		return NULL;
