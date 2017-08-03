@@ -76,7 +76,8 @@ struct MemtxEngine: public Engine {
 		    uint32_t objsize_min, uint32_t objsize_max,
 		    float alloc_factor);
 	~MemtxEngine();
-	virtual Handler *createSpace() override;
+	virtual Handler *createSpace(struct rlist *key_list,
+				     uint32_t exact_field_count) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void rollbackStatement(struct txn *,
 				       struct txn_stmt *stmt) override;

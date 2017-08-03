@@ -107,10 +107,13 @@ VinylEngine::endRecovery()
 }
 
 Handler *
-VinylEngine::createSpace()
+VinylEngine::createSpace(struct rlist *key_list, uint32_t exact_field_count)
 {
+	(void) key_list;
+	(void) exact_field_count;
 	return new VinylSpace(this);
 }
+
 void
 VinylEngine::join(struct vclock *vclock, struct xstream *stream)
 {

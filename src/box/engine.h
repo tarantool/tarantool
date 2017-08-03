@@ -58,7 +58,8 @@ public:
 	/** Called once at startup. */
 	virtual void init();
 	/** Create a new engine instance for a space. */
-	virtual Handler *createSpace() = 0;
+	virtual Handler *createSpace(struct rlist *key_list,
+				     uint32_t exact_field_count) = 0;
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */

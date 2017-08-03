@@ -128,7 +128,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 		space->format->exact_field_count = def->exact_field_count;
 	}
 	/* init space engine instance */
-	space->handler = engine->createSpace();
+	space->handler = engine->createSpace(key_list, def->exact_field_count);
 	rlist_foreach_entry(index_def, key_list, link) {
 		space->index_map[index_def->iid] =
 			space->handler->createIndex(space, index_def);
