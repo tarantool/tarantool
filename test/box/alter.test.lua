@@ -252,3 +252,32 @@ s:drop()
 -- Forbid explicit space id 0.
 --
 s = box.schema.create_space('test', { id = 0 })
+
+
+--
+-- gh-2660 space:truncate() does not preserve table triggers
+--
+ts = box.schema.space.create('test')
+ti = ts:create_index('primary')
+
+ts:insert{1, 'b', 'c'}
+ts:insert{2, 'b', 'c'}
+
+o = nil
+n = nil
+function save_out(told, tnew) o = told n = tnew end
+
+_ = ts:on_replace(save_out)
+ts:replace{2, 'a', 'b', 'c'}
+o
+n
+
+ts:truncate()
+ts:replace{2, 'a', 'b'}
+o
+n
+ts:replace{3, 'a', 'b'}
+o
+n
+
+ts:drop()

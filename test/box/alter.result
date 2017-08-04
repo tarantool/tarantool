@@ -660,3 +660,74 @@ s = box.schema.create_space('test', { id = 0 })
 ---
 - error: 'Failed to create space ''test'': space id 0 is reserved'
 ...
+--
+-- gh-2660 space:truncate() does not preserve table triggers
+--
+ts = box.schema.space.create('test')
+---
+...
+ti = ts:create_index('primary')
+---
+...
+ts:insert{1, 'b', 'c'}
+---
+- [1, 'b', 'c']
+...
+ts:insert{2, 'b', 'c'}
+---
+- [2, 'b', 'c']
+...
+o = nil
+---
+...
+n = nil
+---
+...
+function save_out(told, tnew) o = told n = tnew end
+---
+...
+_ = ts:on_replace(save_out)
+---
+...
+ts:replace{2, 'a', 'b', 'c'}
+---
+- [2, 'a', 'b', 'c']
+...
+o
+---
+- [2, 'b', 'c']
+...
+n
+---
+- [2, 'a', 'b', 'c']
+...
+ts:truncate()
+---
+...
+ts:replace{2, 'a', 'b'}
+---
+- [2, 'a', 'b']
+...
+o
+---
+- null
+...
+n
+---
+- [2, 'a', 'b']
+...
+ts:replace{3, 'a', 'b'}
+---
+- [3, 'a', 'b']
+...
+o
+---
+- null
+...
+n
+---
+- [3, 'a', 'b']
+...
+ts:drop()
+---
+...
