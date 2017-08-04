@@ -1473,6 +1473,11 @@ truncate_space_rollback(struct trigger *trigger, void * /* event */)
 		(struct truncate_space *) trigger->data;
 	if (space_cache_replace(truncate->old_space) != truncate->new_space)
 		unreachable();
+
+	rlist_swap(&truncate->new_space->on_replace,
+		   &truncate->old_space->on_replace);
+	rlist_swap(&truncate->new_space->on_stmt_begin,
+		   &truncate->old_space->on_stmt_begin);
 	space_delete(truncate->new_space);
 }
 
@@ -1568,6 +1573,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	trigger_create(&truncate->on_rollback,
 		       truncate_space_rollback, truncate, NULL);
 	txn_on_rollback(txn, &truncate->on_rollback);
+
+	rlist_swap(&truncate->new_space->on_replace,
+		   &truncate->old_space->on_replace);
+	rlist_swap(&truncate->new_space->on_stmt_begin,
+		   &truncate->old_space->on_stmt_begin);
 }
 
 /* }}} */
