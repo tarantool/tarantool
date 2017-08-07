@@ -166,6 +166,31 @@ struct vy_mem *
 create_test_mem(struct lsregion *region, struct key_def *def);
 
 /**
+ * Create vy_cache, key_def and tuple_format, using a specified
+ * array of key fields.
+ * @param fields Array of key field numbers.
+ * @param types Array of key field types.
+ * @param key_cnt Length of @a fields and @a types.
+ * @param[out] cache Cache to create.
+ * @param[out] def Key def to create.
+ * @param[out] format Tuple format to create.
+ */
+void
+create_test_cache(uint32_t *fields, uint32_t *types,
+		  int key_cnt, struct vy_cache *cache, struct key_def **def,
+		  struct tuple_format **format);
+
+/**
+ * Destroy cache and its resources.
+ * @param vy_cache Cache to destroy.
+ * @param key_def Key def to delete.
+ * @param format Tuple format to unref.
+ */
+void
+destroy_test_cache(struct vy_cache *cache, struct key_def *def,
+		   struct tuple_format *format);
+
+/**
  * Check that the template specifies completely the same statement
  * as @stmt.
  *

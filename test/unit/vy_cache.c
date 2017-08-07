@@ -12,14 +12,12 @@ test_basic()
 	struct vy_cache cache;
 	uint32_t fields[] = { 0 };
 	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
-	struct key_def *key_def = box_key_def_new(fields, types, 1);
-	assert(key_def != NULL);
-	vy_cache_create(&cache, &cache_env, key_def);
-	struct tuple_format *format =
-		tuple_format_new(&vy_tuple_format_vtab, &key_def, 1, 0);
+	struct key_def *key_def;
+	struct tuple_format *format;
+	create_test_cache(fields, types, lengthof(fields), &cache, &key_def,
+			  &format);
 	struct tuple *select_all =
 		vy_new_simple_stmt(format, NULL, NULL, &key_template);
-	tuple_format_ref(format);
 
 	/*
 	 * Fill the cache with 3 chains.
@@ -35,7 +33,7 @@ test_basic()
 	vy_cache_insert_templates_chain(&cache, format, chain1,
 					lengthof(chain1), &key_template,
 					ITER_GE);
-	is(cache.cache_tree.size, 6, "cache filled with 6 statements");
+	is(cache.cache_tree.size, 6, "cache is filled with 6 statements");
 
 	const struct vy_stmt_template chain2[] = {
 		STMT_TEMPLATE(10, REPLACE, 1001),
@@ -48,7 +46,7 @@ test_basic()
 	vy_cache_insert_templates_chain(&cache, format, chain2,
 					lengthof(chain2), &key_template,
 					ITER_GE);
-	is(cache.cache_tree.size, 12, "cache filled with 12 statements");
+	is(cache.cache_tree.size, 12, "cache is filled with 12 statements");
 
 	const struct vy_stmt_template chain3[] = {
 		STMT_TEMPLATE(16, REPLACE, 1107),
@@ -61,7 +59,7 @@ test_basic()
 	vy_cache_insert_templates_chain(&cache, format, chain3,
 					lengthof(chain3), &key_template,
 					ITER_GE);
-	is(cache.cache_tree.size, 18, "cache filled with 18 statements");
+	is(cache.cache_tree.size, 18, "cache is filled with 18 statements");
 
 	/*
 	 * Try to restore opened and positioned iterator.
@@ -119,9 +117,67 @@ test_basic()
 	itr.base.iface->close(&itr.base);
 
 	tuple_unref(select_all);
-	tuple_format_unref(format);
-	vy_cache_destroy(&cache);
-	box_key_def_delete(key_def);
+	destroy_test_cache(&cache, key_def, format);
+	check_plan();
+	footer();
+}
+
+void
+test_gh2661_next_key()
+{
+	header();
+	plan(3);
+	struct vy_cache cache;
+	uint32_t fields[] = { 0, 1 };
+	uint32_t types[] = { FIELD_TYPE_UNSIGNED, FIELD_TYPE_UNSIGNED };
+	struct key_def *key_def;
+	struct tuple_format *format;
+	create_test_cache(fields, types, lengthof(fields), &cache, &key_def,
+			  &format);
+	struct tuple *select_all =
+		vy_new_simple_stmt(format, NULL, NULL, &key_template);
+	struct vy_cache_iterator itr;
+	struct vy_read_view rv;
+	rv.vlsn = INT64_MAX;
+	const struct vy_read_view *rv_p = &rv;
+	struct tuple *ret;
+	bool unused;
+
+	/*
+	 * Test case: insert a statement, position an iterator on
+	 * it. Then change the cache version and try to get the
+	 * next key. Before gh-2661 fix the cache iterator
+	 * returned the same tuple, as before version change.
+	 */
+	const struct vy_stmt_template chain1 =
+		STMT_TEMPLATE(1, REPLACE, 100, 1000);
+	vy_cache_insert_templates_chain(&cache, format, &chain1, 1,
+					&key_template, ITER_GE);
+	vy_cache_iterator_open(&itr, &cache, ITER_EQ, select_all, &rv_p);
+	/*
+	 * Call restore at first, because merge_iterator on start
+	 * calls restore for all iterators.
+	 */
+	ok(itr.base.iface->restore(&itr.base, NULL, &ret, &unused) >= 0,
+	   "restore");
+
+	/*
+	 * Change version by inserting a new statement
+	 * into the cache. Iterator's position is not changed.
+	 */
+	const struct vy_stmt_template chain2 =
+		STMT_TEMPLATE(1, REPLACE, 100, 2000);
+	vy_cache_insert_templates_chain(&cache, format, &chain2, 1,
+					&key_template, ITER_GE);
+	/* Must return the new statement. */
+	is(0, itr.base.iface->next_key(&itr.base, &ret, &unused),
+	   "next_key after version change");
+	ok(vy_stmt_are_same(ret, &chain2, format, NULL, NULL),
+	   "next_key after restore");
+
+	itr.base.iface->close(&itr.base);
+	tuple_unref(select_all);
+	destroy_test_cache(&cache, key_def, format);
 	check_plan();
 	footer();
 }
@@ -129,10 +185,11 @@ test_basic()
 int
 main()
 {
-	plan(1);
+	plan(2);
 	vy_iterator_C_test_init(4LLU * 1024LLU * 1024LLU * 1024LLU);
 
 	test_basic();
+	test_gh2661_next_key();
 
 	vy_iterator_C_test_finish();
 	return check_plan();

@@ -316,3 +316,19 @@ local_space:select{}
 box.commit()
 local_space:select{}
 local_space:drop()
+
+--
+-- gh-2661: vy_cache_next_key after version change returns the
+-- same statement as before.
+--
+
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+sk = s:create_index('sec', {parts = {2, 'string'}, unique = false})
+s:insert{1, 'key1'}
+sk:select('key1')
+s:insert{3, 'key2'}
+sk:select('key2')
+s:insert{5, 'key1'}
+sk:select('key1')
+s:drop()

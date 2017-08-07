@@ -647,40 +647,34 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	int dir = iterator_direction(itr->iterator_type);
 	const struct tuple *key = itr->key;
-	bool is_version_changed = itr->version != itr->cache->version;
 	vy_cache_iterator_restore_pos(itr);
 
 	if (!itr->curr_stmt) /* End of search. */
 		return 0;
-	if (! is_version_changed) {
-		struct vy_cache_entry **entry =
-			vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+	struct vy_cache_entry **entry =
+		vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
-		if (dir > 0)
-			vy_cache_tree_iterator_next(tree, &itr->curr_pos);
-		else
-			vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
-		if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos)) {
-			vy_cache_iterator_is_end_stop(itr, *entry, stop);
-			return 0;
-		}
-		itr->curr_stmt = vy_cache_iterator_curr_stmt(itr);
-		tuple_ref(itr->curr_stmt);
+	tuple_unref(itr->curr_stmt);
+	itr->curr_stmt = NULL;
+	if (dir > 0)
+		vy_cache_tree_iterator_next(tree, &itr->curr_pos);
+	else
+		vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
+	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos)) {
+		vy_cache_iterator_is_end_stop(itr, *entry, stop);
+		return 0;
 	}
+	itr->curr_stmt = vy_cache_iterator_curr_stmt(itr);
+	tuple_ref(itr->curr_stmt);
 
 	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt, itr->cache->cmp_def)) {
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
-		struct vy_cache_entry **entry =
-			vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 		vy_cache_iterator_is_end_stop(itr, *entry, stop);
 		return 0;
 	}
-	struct vy_cache_entry **entry =
-		vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+	entry = vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 	vy_cache_iterator_is_stop(itr, *entry, stop);
 
 	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
@@ -695,8 +689,7 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 			vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
 		if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
 			return 0;
-		entry = vy_cache_tree_iterator_get_elem(tree,
-							&itr->curr_pos);
+		entry = vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 		struct tuple *stmt = (*entry)->stmt;
 		if (itr->iterator_type == ITER_EQ &&
 		    vy_stmt_compare(key, stmt, itr->cache->cmp_def))

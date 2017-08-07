@@ -206,6 +206,27 @@ create_test_mem(struct lsregion *region, struct key_def *def)
 	return mem;
 }
 
+void
+create_test_cache(uint32_t *fields, uint32_t *types,
+		  int key_cnt, struct vy_cache *cache, struct key_def **def,
+		  struct tuple_format **format)
+{
+	*def = box_key_def_new(fields, types, key_cnt);
+	assert(*def != NULL);
+	vy_cache_create(cache, &cache_env, *def);
+	*format = tuple_format_new(&vy_tuple_format_vtab, def, 1, 0);
+	tuple_format_ref(*format);
+}
+
+void
+destroy_test_cache(struct vy_cache *cache, struct key_def *def,
+		   struct tuple_format *format)
+{
+	tuple_format_unref(format);
+	vy_cache_destroy(cache);
+	box_key_def_delete(def);
+}
+
 bool
 vy_stmt_are_same(const struct tuple *actual,
 		 const struct vy_stmt_template *expected,

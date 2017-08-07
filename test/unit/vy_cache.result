@@ -1,11 +1,18 @@
-1..1
+1..2
 	*** test_basic ***
     1..6
-    ok 1 - cache filled with 6 statements
-    ok 2 - cache filled with 12 statements
-    ok 3 - cache filled with 18 statements
+    ok 1 - cache is filled with 6 statements
+    ok 2 - cache is filled with 12 statements
+    ok 3 - cache is filled with 18 statements
     ok 4 - next_key * 4
     ok 5 - restore
     ok 6 - restore on position after last
 ok 1 - subtests
 	*** test_basic: done ***
+	*** test_gh2661_next_key ***
+    1..3
+    ok 1 - restore
+    ok 2 - next_key after version change
+    ok 3 - next_key after restore
+ok 2 - subtests
+	*** test_gh2661_next_key: done ***
