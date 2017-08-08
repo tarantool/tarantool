@@ -607,15 +607,12 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
 	struct vy_index *index = itr->index;
-	struct tuple_format *format;
 	struct vy_slice *slice;
 	/*
 	 * The format of the statement must be exactly the space
 	 * format with the same identifier to fully match the
 	 * format in vy_mem.
 	 */
-	format = (index->space_index_count == 1 ?
-		  index->mem_format : index->disk_format);
 	rlist_foreach_entry(slice, &itr->curr_range->slices, in_range) {
 		/*
 		 * vy_task_dump_complete() may yield after adding
@@ -637,7 +634,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     itr->run_env, slice,
 				     itr->iterator_type, itr->key,
 				     itr->read_view, index->cmp_def,
-				     index->key_def, format,
+				     index->key_def, index->disk_format,
 				     index->upsert_format, index->id == 0);
 	}
 }

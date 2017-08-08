@@ -184,7 +184,6 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		vy_index_ref(pk);
 	index->mem_format = format;
 	tuple_format_ref(index->mem_format);
-	index->space_index_count = index_count;
 	index->in_dump.pos = UINT32_MAX;
 	index->in_compact.pos = UINT32_MAX;
 	index->space_id = index_def->space_id;

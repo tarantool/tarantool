@@ -250,13 +250,11 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	 * format in vy_mem.
 	 */
 	struct vy_index *index = itr->index;
-	struct tuple_format *format = (index->space_index_count == 1 ?
-				       index->mem_format : index->disk_format);
 	struct vy_run_iterator run_itr;
 	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator,
 			     itr->run_env, slice, ITER_EQ, itr->key,
 			     itr->p_read_view, index->cmp_def,
-			     index->key_def, format,
+			     index->key_def, index->disk_format,
 			     index->upsert_format, index->id == 0);
 	while (true) {
 		struct tuple *stmt;

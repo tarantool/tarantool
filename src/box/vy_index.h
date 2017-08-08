@@ -173,8 +173,6 @@ struct vy_index {
 	 * appear in spaces with a single index.
 	 */
 	struct tuple_format *upsert_format;
-	/** Number of indexes in the space. */
-	uint32_t space_index_count;
 	/**
 	 * Primary index of the same space or NULL if this index
 	 * is primary. Referenced by each secondary index.

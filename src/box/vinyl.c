@@ -2676,7 +2676,6 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 	pk->upsert_format = upsert_format;
 	pk->mem_format_with_colmask = format;
 	pk->mem_format = new_space->format;
-	pk->space_index_count = new_space->index_count;
 	tuple_format_ref(pk->mem_format);
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
@@ -2693,7 +2692,6 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 		index->mem_format = pk->mem_format;
 		tuple_format_ref(index->mem_format_with_colmask);
 		tuple_format_ref(index->mem_format);
-		index->space_index_count = new_space->index_count;
 	}
 	return 0;
 }
@@ -4969,7 +4967,6 @@ vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
 {
 	struct tuple *vyresult = NULL;
 	struct vy_index *index = c->index;
-	assert(index->space_index_count > 0);
 	*result = NULL;
 
 	if (c->tx == NULL) {
