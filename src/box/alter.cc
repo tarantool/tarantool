@@ -744,7 +744,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
-	alter->old_space->handler->commitAlterSpace(alter->old_space,
+	alter->new_space->handler->commitAlterSpace(alter->old_space,
 						    alter->new_space);
 
 	struct space *old_space = space_cache_replace(alter->new_space);

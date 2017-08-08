@@ -270,7 +270,7 @@ vy_index_name(struct vy_index *index);
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk, uint32_t index_count);
+	     struct vy_index *pk);
 
 /** Free an index object. */
 void

@@ -2295,7 +2295,7 @@ vy_new_index(struct vy_env *env, struct space *space,
 		assert(pk != NULL);
 	}
 	return vy_index_new(&env->index_env, &env->cache_env,
-			    index_def, space->format, pk, space->index_count);
+			    index_def, space->format, pk);
 }
 
 void

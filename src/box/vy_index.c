@@ -97,7 +97,7 @@ vy_index_name(struct vy_index *index)
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk, uint32_t index_count)
+	     struct vy_index *pk)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
