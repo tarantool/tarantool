@@ -32,14 +32,17 @@
  */
 #include "index.h"
 
+struct vy_index;
+struct vy_env;
+
 /**
  * C++ wrapper for struct vy_index.
  */
 struct VinylIndex: public Index
 {
 public:
-	VinylIndex(struct vy_env *env, struct space *space,
-		   struct index_def *index_def);
+	VinylIndex(struct vy_env *env, struct index_def *index_def,
+		   struct tuple_format *format, struct vy_index *pk);
 	virtual ~VinylIndex() override;
 
 	/**

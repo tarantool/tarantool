@@ -39,6 +39,7 @@ struct VinylEngine: public Engine {
 	~VinylEngine();
 	virtual void init() override;
 	virtual Handler *createSpace(struct rlist *key_list,
+				     uint32_t index_count,
 				     uint32_t exact_field_count) override;
 	virtual void beginStatement(struct txn *txn) override;
 	virtual void begin(struct txn *txn) override;

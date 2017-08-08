@@ -80,9 +80,6 @@ struct space {
 	uint64_t truncate_count;
 	/** Enable/disable triggers. */
 	bool run_triggers;
-
-	/** Default tuple format used by this space */
-	struct tuple_format *format;
 	/**
 	 * Sparse array of indexes defined on the space, indexed
 	 * by id. Used to quickly find index by id (for SELECTs).

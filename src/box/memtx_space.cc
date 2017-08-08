@@ -237,10 +237,17 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 }
 
 
-MemtxSpace::MemtxSpace(Engine *e)
-	: Handler(e)
+MemtxSpace::MemtxSpace(Engine *e, struct tuple_format *format)
+	: Handler(e),
+	m_format(format)
 {
+	tuple_format_ref(m_format);
 	replace = memtx_replace_no_keys;
+}
+
+MemtxSpace::~MemtxSpace()
+{
+	tuple_format_unref(m_format);
 }
 
 static inline enum dup_replace_mode
@@ -260,7 +267,7 @@ MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 	struct txn *txn = txn_begin_stmt(space);
 	try {
 		struct txn_stmt *stmt = txn_current_stmt(txn);
-		prepareReplace(stmt, space, request);
+		prepareReplace(stmt, request);
 		this->replace(stmt, space, DUP_INSERT);
 		txn_commit_stmt(txn, request);
 	} catch (Exception *e) {
@@ -272,10 +279,9 @@ MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 }
 
 void
-MemtxSpace::prepareReplace(struct txn_stmt *stmt, struct space *space,
-			   struct request *request)
+MemtxSpace::prepareReplace(struct txn_stmt *stmt, struct request *request)
 {
-	stmt->new_tuple = memtx_tuple_new_xc(space->format, request->tuple,
+	stmt->new_tuple = memtx_tuple_new_xc(m_format, request->tuple,
 					     request->tuple_end);
 	tuple_ref(stmt->new_tuple);
 }
@@ -319,7 +325,7 @@ MemtxSpace::prepareUpdate(struct txn_stmt *stmt, struct space *space,
 	if (new_data == NULL)
 		diag_raise();
 
-	stmt->new_tuple = memtx_tuple_new_xc(space->format, new_data,
+	stmt->new_tuple = memtx_tuple_new_xc(m_format, new_data,
 					     new_data + new_size);
 	tuple_ref(stmt->new_tuple);
 }
@@ -332,7 +338,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 	 * Check all tuple fields: we should produce an error on
 	 * malformed tuple even if upsert turns into an update.
 	 */
-	if (tuple_validate_raw(space->format, request->tuple))
+	if (tuple_validate_raw(m_format, request->tuple))
 		diag_raise();
 
 	Index *index = index_find_unique(space, 0);
@@ -373,7 +379,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 				       request->index_base)) {
 			diag_raise();
 		}
-		stmt->new_tuple = memtx_tuple_new_xc(space->format,
+		stmt->new_tuple = memtx_tuple_new_xc(m_format,
 						     request->tuple,
 						     request->tuple_end);
 		tuple_ref(stmt->new_tuple);
@@ -398,7 +404,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		if (new_data == NULL)
 			diag_raise();
 
-		stmt->new_tuple = memtx_tuple_new_xc(space->format, new_data,
+		stmt->new_tuple = memtx_tuple_new_xc(m_format, new_data,
 						     new_data + new_size);
 		tuple_ref(stmt->new_tuple);
 
@@ -424,7 +430,7 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 {
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
-	prepareReplace(stmt, space, request);
+	prepareReplace(stmt, request);
 	this->replace(stmt, space, mode);
 	/** The new tuple is referenced by the primary key. */
 	return stmt->new_tuple;
@@ -688,13 +694,12 @@ MemtxSpace::buildSecondaryKey(struct space *old_space,
 	 */
 	/* Build the new index. */
 	struct tuple *tuple;
-	struct tuple_format *format = new_space->format;
 	while ((tuple = it->next(it))) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		if (tuple_validate(format, tuple))
+		if (tuple_validate(m_format, tuple))
 			diag_raise();
 		/*
 		 * @todo: better message if there is a duplicate.

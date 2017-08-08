@@ -227,6 +227,14 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * Index
  */
 
+struct Index;
+/**
+ * Extract vy_index from a VinylIndex object.
+ * Defined in vinyl_index.cc
+ */
+struct vy_index *
+vy_index(struct Index *index);
+
 /**
  * Create a new vinyl index object without opening it.
  * @param env             Vinyl environment.
@@ -234,8 +242,8 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * @param index_def  Index definition set by the user.
  */
 struct vy_index *
-vy_new_index(struct vy_env *env, struct space *space,
-	     struct index_def *index_def);
+vy_new_index(struct vy_env *env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk);
 
 /**
  * Delete a vinyl index object.
@@ -287,8 +295,8 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
  * @retval -1 Memory or new format register error.
  */
 int
-vy_commit_alter_space(struct vy_env *env, struct space *old_space,
-		      struct space *new_space);
+vy_commit_alter_space(struct vy_env *env, struct space *new_space,
+		      struct tuple_format *new_format);
 
 /**
  * Open a vinyl index.

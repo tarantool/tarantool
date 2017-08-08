@@ -32,7 +32,6 @@
 #include "sysview_index.h"
 #include "schema.h"
 #include "space.h"
-#include "tuple_format.h"
 
 struct SysviewSpace: public Handler {
 	SysviewSpace(Engine *e) : Handler(e) {}
@@ -110,14 +109,16 @@ SysviewSpace::buildSecondaryKey(struct space *, struct space *, Index *)
 {}
 
 SysviewEngine::SysviewEngine()
-	:Engine("sysview", NULL)
+	:Engine("sysview")
 {
 }
 
 Handler *SysviewEngine::createSpace(struct rlist *key_list,
+				    uint32_t index_count,
 				    uint32_t exact_field_count)
 {
 	(void) key_list;
+	(void) index_count;
 	(void) exact_field_count;
 	return new SysviewSpace(this);
 }

@@ -122,7 +122,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 			 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 			 uint32_t objsize_max, float alloc_factor)
-	:Engine("memtx", &memtx_tuple_format_vtab),
+	:Engine("memtx"),
 	m_state(MEMTX_INITIALIZED),
 	m_checkpoint(0),
 	m_snap_io_rate_limit(0),
@@ -278,11 +278,26 @@ MemtxEngine::endRecovery()
 }
 
 Handler *MemtxEngine::createSpace(struct rlist *key_list,
+				  uint32_t index_count,
 				  uint32_t exact_field_count)
 {
-	(void) key_list;
-	(void) exact_field_count;
-	return new MemtxSpace(this);
+	struct index_def *index_def;
+	uint32_t key_no = 0;
+	struct key_def **keys =
+		(struct key_def **)region_alloc_xc(&fiber()->gc,
+						   sizeof(*keys) * index_count);
+
+	rlist_foreach_entry(index_def, key_list, link)
+			keys[key_no++] = index_def->key_def;
+
+	struct tuple_format *format =
+		tuple_format_new(&memtx_tuple_format_vtab, keys, index_count, 0);
+	if (format == NULL)
+		diag_raise();
+	tuple_format_ref(format);
+	format->exact_field_count = exact_field_count;
+	auto format_guard = make_scoped_guard([=] { tuple_format_unref(format); });
+	return new MemtxSpace(this, format);
 }
 
 void

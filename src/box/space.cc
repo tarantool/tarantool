@@ -32,7 +32,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tuple.h"
-#include "tuple_format.h"
 #include "tuple_compare.h"
 #include "scoped_guard.h"
 #include "trigger.h"
@@ -110,25 +109,9 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
 	Engine *engine = engine_find(def->engine_name);
-	struct key_def **keys;
-	keys = (struct key_def **)region_alloc_xc(&fiber()->gc,
-						  sizeof(*keys) * index_count);
-	/* SysviewEngine doesn't need format */
-	if (engine->format != NULL) {
-		uint32_t key_no = 0;
-		rlist_foreach_entry(index_def, key_list, link)
-			keys[key_no++] = index_def->key_def;
-
-		/** Tuple format must be created before any other index. */
-		space->format = tuple_format_new(engine->format, keys,
-						 index_count, 0);
-		if (space->format == NULL)
-			diag_raise();
-		tuple_format_ref(space->format);
-		space->format->exact_field_count = def->exact_field_count;
-	}
 	/* init space engine instance */
-	space->handler = engine->createSpace(key_list, def->exact_field_count);
+	space->handler = engine->createSpace(key_list, index_count,
+					     def->exact_field_count);
 	rlist_foreach_entry(index_def, key_list, link) {
 		space->index_map[index_def->iid] =
 			space->handler->createIndex(space, index_def);
@@ -147,8 +130,6 @@ space_delete(struct space *space)
 		if (index)
 			delete index;
 	}
-	if (space->format)
-		tuple_format_unref(space->format);
 	if (space->handler)
 		delete space->handler;
 

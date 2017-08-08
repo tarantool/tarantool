@@ -2251,13 +2251,6 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 /** }}} Introspection */
 
 /**
- * Extract vy_index from a VinylIndex object.
- * Defined in vinyl_index.cc
- */
-struct vy_index *
-vy_index(struct Index *index);
-
-/**
  * Given a space and an index id, return vy_index.
  * If index not found, return NULL and set diag.
  */
@@ -2286,16 +2279,11 @@ vy_index_find_unique(struct space *space, uint32_t index_id)
 }
 
 struct vy_index *
-vy_new_index(struct vy_env *env, struct space *space,
-	     struct index_def *index_def)
+vy_new_index(struct vy_env *env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk)
 {
-	struct vy_index *pk = NULL;
-	if (index_def->iid > 0) {
-		pk = vy_index_find(space, 0);
-		assert(pk != NULL);
-	}
 	return vy_index_new(&env->index_env, &env->cache_env,
-			    index_def, space->format, pk);
+			    index_def, format, pk);
 }
 
 void
@@ -2640,26 +2628,25 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 }
 
 int
-vy_commit_alter_space(struct vy_env *env, struct space *old_space,
-		      struct space *new_space)
+vy_commit_alter_space(struct vy_env *env, struct space *new_space,
+		      struct tuple_format *new_format)
 {
 	(void) env;
-	(void) old_space;
 	struct vy_index *pk = vy_index(new_space->index[0]);
-	struct index_def *new_user_def = space_index_def(new_space, 0);
+	struct index_def *new_index_def = space_index_def(new_space, 0);
 
 	assert(pk->pk == NULL);
 
 	/* Update the format with column mask. */
 	struct tuple_format *format =
-		vy_tuple_format_new_with_colmask(new_space->format);
+		vy_tuple_format_new_with_colmask(new_format);
 	if (format == NULL)
 		return -1;
 	tuple_format_ref(format);
 
 	/* Update the upsert format. */
 	struct tuple_format *upsert_format =
-		vy_tuple_format_new_upsert(new_space->format);
+		vy_tuple_format_new_upsert(new_format);
 	if (upsert_format == NULL) {
 		tuple_format_unref(format);
 		return -1;
@@ -2667,7 +2654,7 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 	tuple_format_ref(upsert_format);
 
 	/* Set possibly changed opts. */
-	pk->opts = new_user_def->opts;
+	pk->opts = new_index_def->opts;
 
 	/* Set new formats. */
 	tuple_format_unref(pk->mem_format);
@@ -2675,7 +2662,7 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 	tuple_format_unref(pk->mem_format_with_colmask);
 	pk->upsert_format = upsert_format;
 	pk->mem_format_with_colmask = format;
-	pk->mem_format = new_space->format;
+	pk->mem_format = new_format;
 	tuple_format_ref(pk->mem_format);
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
@@ -2683,8 +2670,8 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
 		vy_index_unref(index->pk);
 		vy_index_ref(pk);
 		index->pk = pk;
-		new_user_def = space_index_def(new_space, i);
-		index->opts = new_user_def->opts;
+		new_index_def = space_index_def(new_space, i);
+		index->opts = new_index_def->opts;
 		tuple_format_unref(index->mem_format_with_colmask);
 		tuple_format_unref(index->mem_format);
 		index->mem_format_with_colmask =
@@ -2933,9 +2920,10 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	       struct request *request, struct txn_stmt *stmt)
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	assert(space->index_count == 1);
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk->id == 0);
+	if (tuple_validate_raw(pk->mem_format, request->tuple))
+		return -1;
 	struct tuple *new_tuple =
 		vy_stmt_new_replace(pk->mem_format, request->tuple,
 				    request->tuple_end);
@@ -2999,6 +2987,8 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
 	assert(pk->id == 0);
+	if (tuple_validate_raw(pk->mem_format, request->tuple))
+		return -1;
 	new_stmt = vy_stmt_new_replace(pk->mem_format, request->tuple,
 				       request->tuple_end);
 	if (new_stmt == NULL)
@@ -3718,6 +3708,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		/* The space hasn't the primary index. */
 		return -1;
 	assert(pk->id == 0);
+	if (tuple_validate_raw(pk->mem_format, request->tuple))
+		return -1;
 	/* First insert into the primary index. */
 	stmt->new_tuple =
 		vy_stmt_new_replace(pk->mem_format, request->tuple,
@@ -3742,9 +3734,6 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 {
 	if (vy_is_committed(env, space))
 		return 0;
-	/* Check the tuple fields. */
-	if (tuple_validate_raw(space->format, request->tuple))
-		return -1;
 	if (request->type == IPROTO_INSERT && env->status == VINYL_ONLINE)
 		return vy_insert(env, tx, stmt, space, request);
 

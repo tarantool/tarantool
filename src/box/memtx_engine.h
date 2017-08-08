@@ -77,6 +77,7 @@ struct MemtxEngine: public Engine {
 		    float alloc_factor);
 	~MemtxEngine();
 	virtual Handler *createSpace(struct rlist *key_list,
+				     uint32_t index_count,
 				     uint32_t exact_field_count) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void rollbackStatement(struct txn *,
