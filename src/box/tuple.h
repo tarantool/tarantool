@@ -357,6 +357,33 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 }
 
 /**
+ * Format a tuple into string.
+ * Example: [1, 2, "string"]
+ * @param buf buffer to format tuple to
+ * @param size buffer size. This function writes at most @a size bytes
+ * (including the terminating null byte ('\0')) to @a buffer
+ * @param tuple tuple to format
+ * @retval the number of characters printed, excluding the null byte used
+ * to end output to string. If the output was truncated due to this limit,
+ * then the return value is the number of characters (excluding the
+ * terminating null byte) which would have been written to the final string
+ * if enough space had been available.
+ * @see snprintf
+ * @see mp_snprint
+ */
+int
+tuple_snprint(char *buf, int size, const struct tuple *tuple);
+
+/**
+ * Format a tuple into string using a static buffer.
+ * Useful for debugger. Example: [1, 2, "string"]
+ * @param tuple to format
+ * @return formatted null-terminated string
+ */
+const char *
+tuple_str(const struct tuple *tuple);
+
+/**
  * Initialize key extraction functions in the key_def
  * @param key_def key definition
  */

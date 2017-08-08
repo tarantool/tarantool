@@ -494,3 +494,24 @@ box_tuple_next(box_tuple_iterator_t *it)
 {
 	return tuple_next(it);
 }
+
+int
+tuple_snprint(char *buf, int size, const struct tuple *tuple)
+{
+	int total = 0;
+	if (tuple == NULL) {
+		SNPRINT(total, snprintf, buf, size, "<NULL>");
+		return total;
+	}
+	SNPRINT(total, mp_snprint, buf, size, tuple_data(tuple));
+	return total;
+}
+
+const char *
+tuple_str(const struct tuple *tuple)
+{
+	char *buf = tt_static_buf();
+	if (tuple_snprint(buf, TT_STATIC_BUF_LEN, tuple) < 0)
+		return "<failed to format tuple>";
+	return buf;
+}
