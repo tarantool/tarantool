@@ -61,4 +61,12 @@ box.schema.func.drop("f15")
 box.schema.func.drop("f16")
 
 box.space.test:drop()
+
+-- Missing shared library
+name = 'unkownmod.unknownfunc'
+box.schema.func.create(name, {language = 'C'})
+box.schema.user.grant('guest', 'execute', 'function', name)
+c:call(name)
+box.schema.func.drop(name)
+
 c:close()

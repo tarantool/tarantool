@@ -190,6 +190,7 @@ struct errcode_record {
 	/*135 */_(ER_VY_QUOTA_TIMEOUT,		"Timed out waiting for Vinyl memory quota") \
 	/*136 */_(ER_PARTIAL_KEY,		"%s index  does not support selects via a partial key (expected %u parts, got %u). Please Consider changing index type to TREE.") \
 	/*137 */_(ER_TRUNCATE_SYSTEM_SPACE,	"Can't truncate a system space, space '%s'") \
+	/*138 */_(ER_LOAD_MODULE,		"Failed to dynamically load module '%.*s': %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

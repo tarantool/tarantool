@@ -345,6 +345,7 @@ t;
   - 'box.error.ILLEGAL_PARAMS : 1'
   - 'box.error.PARTIAL_KEY : 136'
   - 'box.error.INDEX_EXISTS : 85'
+  - 'box.error.LOAD_MODULE : 138'
   - 'box.error.FUNCTION_LANGUAGE : 100'
   - 'box.error.ROLE_GRANTED : 90'
   - 'box.error.CHECKPOINT_ROLLBACK : 134'

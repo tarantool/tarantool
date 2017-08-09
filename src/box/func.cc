@@ -68,6 +68,72 @@ func_split_name(const char *str, struct func_name *name)
 	}
 }
 
+/**
+ * Arguments for luaT_module_find used by lua_cpcall()
+ */
+struct module_find_ctx {
+	const char *package;
+	const char *package_end;
+	char *path;
+	size_t path_len;
+};
+
+/**
+ * A cpcall() helper for module_find()
+ */
+static int
+luaT_module_find(lua_State *L)
+{
+	struct module_find_ctx *ctx = (struct module_find_ctx *)
+		lua_topointer(L, 1);
+
+	/*
+	 * Call package.searchpath(name, package.cpath) and use
+	 * the path to the function in dlopen().
+	 */
+	lua_getglobal(L, "package");
+	lua_getfield(L, -1, "searchpath");
+
+	/* First argument of searchpath: name */
+	lua_pushlstring(L, ctx->package, ctx->package_end - ctx->package);
+	/* Fetch  cpath from 'package' as the second argument */
+	lua_getfield(L, -3, "cpath");
+
+	lua_call(L, 2, 1);
+	if (lua_isnil(L, -1))
+		return luaL_error(L, "module not found in package.cpath");
+
+	snprintf(ctx->path, ctx->path_len, "%s", lua_tostring(L, -1));
+	return 0;
+}
+
+/**
+ * Find path to module using Lua's package.cpath
+ * @param package package name
+ * @param package_end a pointer to the last byte in @a package + 1
+ * @param[out] path path to shared library
+ * @param path_len size of @a path buffer
+ * @retval 0 on success
+ * @retval -1 on error, diag is set
+ */
+static int
+module_find(const char *package, const char *package_end, char *path,
+	    size_t path_len)
+{
+	struct module_find_ctx ctx = { package, package_end, path, path_len };
+	lua_State *L = tarantool_L;
+	int top = lua_gettop(L);
+	if (luaT_cpcall(L, luaT_module_find, &ctx) != 0) {
+		int package_len = (int) (package_end - package);
+		diag_set(ClientError, ER_LOAD_MODULE, package_len, package,
+			 lua_tostring(L, -1));
+		lua_settop(L, top);
+		return -1;
+	}
+	assert(top == lua_gettop(L)); /* cpcall discard results */
+	return 0;
+}
+
 struct func *
 func_new(struct func_def *def)
 {
@@ -110,39 +176,18 @@ func_load(struct func *func)
 {
 	func_unload(func);
 
-	struct lua_State *L = tarantool_L;
-	int n = lua_gettop(L);
-
-	auto l_guard = make_scoped_guard([=]{
-		lua_settop(L, n);
-	});
-	/*
-	 * Call package.searchpath(name, package.cpath) and use
-	 * the path to the function in dlopen().
-	 */
-	lua_getglobal(L, "package");
-	lua_getfield(L, -1, "searchpath");
-
 	struct func_name name;
 	func_split_name(func->def->name, &name);
 
-	/* First argument of searchpath: name */
-	lua_pushlstring(L, name.package, name.package_end - name.package);
-	/* Fetch  cpath from 'package' as the second argument */
-	lua_getfield(L, -3, "cpath");
+	char path[PATH_MAX];
+	if (module_find(name.package, name.package_end, path, sizeof(path)))
+		diag_raise();
 
-	if (lua_pcall(L, 2, 1, 0)) {
-		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def->name,
-			  lua_tostring(L, -1));
-	}
-	if (lua_isnil(L, -1)) {
-		tnt_raise(ClientError, ER_LOAD_FUNCTION, func->def->name,
-			  "shared library not found in the search path");
-	}
-	func->dlhandle = dlopen(lua_tostring(L, -1), RTLD_NOW | RTLD_LOCAL);
+	func->dlhandle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
 	if (func->dlhandle == NULL) {
-		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def->name,
-			  dlerror());
+		int package_len = (int) (name.package_end - name.package_end);
+		tnt_raise(LoggedError, ER_LOAD_MODULE, package_len,
+			  name.package, dlerror());
 	}
 	func->func = (box_function_f) dlsym(func->dlhandle, name.sym);
 	if (func->func == NULL) {
