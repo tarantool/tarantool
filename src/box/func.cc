@@ -171,29 +171,50 @@ func_unload(struct func *func)
 	func->func = NULL;
 }
 
-void
+/**
+ * Resolve func->func (find the respective DLL and fetch the
+ * symbol from it).
+ */
+static int
 func_load(struct func *func)
 {
-	func_unload(func);
+	assert(func->func == NULL);
 
 	struct func_name name;
 	func_split_name(func->def->name, &name);
 
 	char path[PATH_MAX];
 	if (module_find(name.package, name.package_end, path, sizeof(path)))
-		diag_raise();
+		return -1;
 
 	func->dlhandle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
 	if (func->dlhandle == NULL) {
 		int package_len = (int) (name.package_end - name.package_end);
-		tnt_raise(LoggedError, ER_LOAD_MODULE, package_len,
+		diag_set(ClientError, ER_LOAD_MODULE, package_len,
 			  name.package, dlerror());
+		diag_log();
+		return -1;
 	}
 	func->func = (box_function_f) dlsym(func->dlhandle, name.sym);
 	if (func->func == NULL) {
-		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def->name,
+		diag_set(ClientError, ER_LOAD_FUNCTION, func->def->name,
 			  dlerror());
+		diag_log();
+		return -1;
 	}
+	return 0;
+}
+
+int
+func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
+	  const char *args_end)
+{
+	if (func->func == NULL) {
+		if (func_load(func) != 0)
+			return -1;
+	}
+
+	return func->func(ctx, args, args_end);
 }
 
 void

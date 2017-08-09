@@ -74,11 +74,11 @@ void
 func_delete(struct func *func);
 
 /**
- * Resolve func->func (find the respective DLL and fetch the
- * symbol from it).
+ * Call stored C function using @a args.
  */
-void
-func_load(struct func *func);
+int
+func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
+	  const char *args_end);
 
 #endif /* defined(__cplusplus) */
 
