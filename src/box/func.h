@@ -61,9 +61,6 @@ struct func {
 	struct access access[BOX_USER_MAX];
 };
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 struct func *
 func_new(struct func_def *def);
 
@@ -79,6 +76,9 @@ func_delete(struct func *func);
 int
 func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
 	  const char *args_end);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 #endif /* defined(__cplusplus) */
 

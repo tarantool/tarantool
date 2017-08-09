@@ -77,7 +77,7 @@ add_library(box STATIC
     vy_log.c
     vy_upsert.c
     space.cc
-    func.cc
+    func.c
     alter.cc
     schema.cc
     session.cc

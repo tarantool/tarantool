@@ -33,7 +33,6 @@
 #include <dlfcn.h>
 
 #include "lua/utils.h"
-#include "scoped_guard.h"
 
 /**
  * Parsed symbol and package names.
