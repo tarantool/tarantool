@@ -35,6 +35,39 @@
 #include "lua/utils.h"
 #include "scoped_guard.h"
 
+/**
+ * Parsed symbol and package names.
+ */
+struct func_name {
+	/** Null-terminated symbol name, e.g. "func" for "mod.submod.func" */
+	const char *sym;
+	/** Package name, e.g. "mod.submod" for "mod.submod.func" */
+	const char *package;
+	/** A pointer to the last character in ->package + 1 */
+	const char *package_end;
+};
+
+/***
+ * Split function name to symbol and package names.
+ * For example, str = foo.bar.baz => sym = baz, package = foo.bar
+ * @param str function name, e.g. "module.submodule.function".
+ * @param[out] name parsed symbol and package names.
+ */
+static void
+func_split_name(const char *str, struct func_name *name)
+{
+	name->package = str;
+	name->package_end = strrchr(str, '.');
+	if (name->package_end != NULL) {
+		/* module.submodule.function => module.submodule, function */
+		name->sym = name->package_end + 1; /* skip '.' */
+	} else {
+		/* package == function => function, function */
+		name->sym = name->package;
+		name->package_end = str + strlen(str);
+	}
+}
+
 struct func *
 func_new(struct func_def *def)
 {
@@ -90,24 +123,11 @@ func_load(struct func *func)
 	lua_getglobal(L, "package");
 	lua_getfield(L, -1, "searchpath");
 
-	/*
-	 * Extract package name from function name.
-	 * E.g. name = foo.bar.baz, function = baz, package = foo.bar
-	 */
-	const char *sym;
-	const char *package = func->def->name;
-	const char *package_end = strrchr(package, '.');
-	if (package_end != NULL) {
-		/* module.submodule.function => module.submodule, function */
-		sym = package_end + 1;
-	} else {
-		/* package == function => function, function */
-		sym = package;
-		package_end = package + strlen(package);
-	}
+	struct func_name name;
+	func_split_name(func->def->name, &name);
 
 	/* First argument of searchpath: name */
-	lua_pushlstring(L, package, package_end - package);
+	lua_pushlstring(L, name.package, name.package_end - name.package);
 	/* Fetch  cpath from 'package' as the second argument */
 	lua_getfield(L, -3, "cpath");
 
@@ -124,7 +144,7 @@ func_load(struct func *func)
 		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def->name,
 			  dlerror());
 	}
-	func->func = (box_function_f) dlsym(func->dlhandle, sym);
+	func->func = (box_function_f) dlsym(func->dlhandle, name.sym);
 	if (func->func == NULL) {
 		tnt_raise(LoggedError, ER_LOAD_FUNCTION, func->def->name,
 			  dlerror());
