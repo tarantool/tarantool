@@ -416,7 +416,7 @@ MemtxSpace::prepareUpsert(struct txn_stmt *stmt, struct space *space,
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 				 pk->index_def->name, space_name(space));
-			error_log(diag_last_error(diag_get()));
+			diag_log();
 			tuple_unref(stmt->new_tuple);
 			stmt->old_tuple = NULL;
 			stmt->new_tuple = NULL;

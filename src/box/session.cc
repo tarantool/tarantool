@@ -164,7 +164,7 @@ void
 session_run_on_disconnect_triggers(struct session *session)
 {
 	if (session_run_triggers(session, &session_on_disconnect) != 0)
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 	session_storage_cleanup(session->id);
 }
 

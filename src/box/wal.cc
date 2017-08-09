@@ -500,14 +500,14 @@ wal_opt_rotate(struct wal_writer *writer)
 	if (vclock == NULL) {
 		diag_set(OutOfMemory, sizeof(*vclock),
 			 "malloc", "struct vclock");
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 		return -1;
 	}
 	vclock_copy(vclock, &writer->vclock);
 
 	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
 			     &writer->vclock) != 0) {
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 		free(vclock);
 		return -1;
 	}

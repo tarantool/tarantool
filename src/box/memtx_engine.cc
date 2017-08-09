@@ -624,7 +624,7 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 	/* wait for memtx-part snapshot completion */
 	int result = cord_cojoin(&m_checkpoint->cord);
 	if (result != 0)
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 
 	m_checkpoint->waiting_for_snap_thread = false;
 	return result;
@@ -675,7 +675,7 @@ MemtxEngine::abortCheckpoint()
 	if (m_checkpoint->waiting_for_snap_thread) {
 		/* wait for memtx-part snapshot completion */
 		if (cord_cojoin(&m_checkpoint->cord) != 0)
-			error_log(diag_last_error(diag_get()));
+			diag_log();
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 

@@ -3639,7 +3639,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	}
 	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
 			    column_mask) != 0) {
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 		/*
 		 * Upsert is skipped, to match the semantics of
 		 * vy_index_upsert().
@@ -4838,7 +4838,7 @@ vy_squash_queue_f(va_list va)
 		struct vy_squash *squash;
 		squash = stailq_shift_entry(&sq->queue, struct vy_squash, next);
 		if (vy_squash_process(squash) != 0)
-			error_log(diag_last_error(diag_get()));
+			diag_log();
 		vy_squash_delete(&sq->pool, squash);
 	}
 	return 0;
@@ -4873,7 +4873,7 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt, void *arg)
 	fiber_cond_signal(&sq->cond);
 	return;
 fail:
-	error_log(diag_last_error(diag_get()));
+	diag_log();
 	diag_clear(diag_get());
 }
 

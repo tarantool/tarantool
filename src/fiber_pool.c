@@ -118,7 +118,7 @@ fiber_pool_cb(ev_loop *loop, struct ev_watcher *watcher, int events)
 		} else if (pool->size < pool->max_size) {
 			f = fiber_new(cord_name(cord()), fiber_pool_f);
 			if (f == NULL) {
-				error_log(diag_last_error(&fiber()->diag));
+				diag_log();
 				break;
 			}
 			fiber_start(f, pool);

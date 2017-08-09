@@ -124,7 +124,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		if (total > memtx_alloc.objsize_max) {
 			diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE,
 				 (unsigned) total);
-			error_log(diag_last_error(diag_get()));
+			diag_log();
 		} else {
 			diag_set(OutOfMemory, (unsigned) total,
 				 "slab allocator", "memtx_tuple");

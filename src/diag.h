@@ -244,6 +244,13 @@ diag_raise(void)
 	error_raise(e);
 }
 
+static inline void
+diag_log(void)
+{
+	struct error *e = diag_last_error(diag_get());
+	assert(e != NULL);
+	error_log(e);
+}
 
 #define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\

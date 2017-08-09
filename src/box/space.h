@@ -141,7 +141,7 @@ index_find(struct space *space, uint32_t index_id)
 	if (index == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_INDEX, index_id,
 			 space_name(space));
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 	}
 	return index;
 }
