@@ -52,7 +52,7 @@ vy_index(struct Index *index)
 
 struct vinyl_iterator {
 	struct iterator base;
-	const VinylIndex *index;
+	struct vy_env *env;
 	struct vy_cursor *cursor;
 };
 
@@ -157,7 +157,7 @@ static inline struct tuple *
 iterator_next(struct iterator *base_it)
 {
 	struct vinyl_iterator *it = (struct vinyl_iterator *) base_it;
-	struct vy_env *env = it->index->env;
+	struct vy_env *env = it->env;
 	struct tuple *tuple;
 
 	/* found */
@@ -187,7 +187,7 @@ vinyl_iterator_free(struct iterator *ptr)
 	assert(ptr->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
 	if (it->cursor) {
-		vy_cursor_delete(it->index->env, it->cursor);
+		vy_cursor_delete(it->env, it->cursor);
 		it->cursor = NULL;
 	}
 	free(ptr);
@@ -217,7 +217,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 	struct vy_tx *tx =
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
-	it->index = this;
+	it->env = this->env;
 	ptr->next = iterator_next;
 	if (type > ITER_GT || type < 0)
 		return Index::initIterator(ptr, type, key, part_count);
