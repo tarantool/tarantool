@@ -123,6 +123,7 @@ vy_point_iterator_scan_txw(struct vy_point_iterator *itr, struct rlist *history)
 	itr->index->stat.txw.iterator.lookup++;
 	struct txv *txv =
 		write_set_search_key(&tx->write_set, itr->index, itr->key);
+	assert(txv == NULL || txv->index == itr->index);
 	if (txv == NULL)
 		return 0;
 	vy_stmt_counter_acct_tuple(&itr->index->stat.txw.iterator.get,
@@ -229,7 +230,7 @@ vy_point_iterator_scan_mems(struct vy_point_iterator *itr,
 		if (rc != 0 || vy_point_iterator_history_is_terminal(history))
 			return rc;
 
-		rc = vy_point_iterator_scan_mem(itr, itr->index->mem, history);
+		rc = vy_point_iterator_scan_mem(itr, mem, history);
 	}
 	return 0;
 }
@@ -237,11 +238,18 @@ vy_point_iterator_scan_mems(struct vy_point_iterator *itr,
 /**
  * Scan one particular slice.
  * Add found statements to the history list up to terminal statement.
+ * Set *terminal_found to true if the terminal statement (DELETE or REPLACE)
+ * was found.
+ * @param itr - the iterator.
+ * @param slice - a slice to scan.
+ * @param history - history for adding statements.
+ * @param terminal_found - is set to true if terminal stmt was found.
+ * @return 0 on success, -1 otherwise.
  */
 static int
 vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
-			     struct vy_slice *slice,
-			     struct rlist *history)
+			     struct vy_slice *slice, struct rlist *history,
+			     bool *terminal_found)
 {
 	int rc = 0;
 	/*
@@ -274,8 +282,10 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 		node->stmt = stmt;
 		tuple_ref(stmt);
 		rlist_add_tail(history, &node->link);
-		if(vy_point_iterator_history_is_terminal(history))
+		if (vy_stmt_type(stmt) != IPROTO_UPSERT) {
+			*terminal_found = true;
 			break;
+		}
 	}
 	run_itr.base.iface->cleanup(&run_itr.base);
 	run_itr.base.iface->close(&run_itr.base);
@@ -311,10 +321,12 @@ vy_point_iterator_scan_slices(struct vy_point_iterator *itr,
 	}
 	assert(i == slice_count);
 	int rc = 0;
+	bool terminal_found = false;
 	for (i = 0; i < slice_count; i++) {
-		if (rc == 0 && !vy_point_iterator_history_is_terminal(history))
+		if (rc == 0 && !terminal_found)
 			rc = vy_point_iterator_scan_slice(itr, slices[i],
-							  history);
+							  history,
+							  &terminal_found);
 		vy_slice_unpin(slices[i]);
 	}
 	return rc;

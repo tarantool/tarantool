@@ -1015,3 +1015,49 @@ s:select()
 s:drop()
 ---
 ...
+-- Point select from secondary index during snapshot.
+-- Once upon time that leaded to crash.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+i1 = s:create_index('pk', {parts = {1, 'uint'}, bloom_fpr = 0.5})
+---
+...
+i2 = s:create_index('sk', {parts = {2, 'uint'}, bloom_fpr = 0.5})
+---
+...
+for i = 1,10 do s:replace{i, i, 0} end
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function worker()
+    for i = 11,100,2 do
+        s:upsert({i, i}, {{'=', 3, 1}})
+        i1:select{i}
+        s:upsert({i + 1 ,i + 1}, {{'=', 3, 1}})
+        i2:select{i + 1}
+    end
+end
+test_run:cmd("setopt delimiter ''");
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+---
+- ok
+...
+f = fiber.create(worker)
+---
+...
+while f:status() ~= 'dead' do box.snapshot() end
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false)
+---
+- ok
+...
+s:drop()
+---
+...

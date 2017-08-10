@@ -816,18 +816,10 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		*result = NULL;
 		return 0;
 	}
-#if 0
-	bool one_value = false;
-	if (itr->iterator_type == ITER_EQ) {
-		if (itr->index->opts.is_unique)
-			one_value = tuple_field_count(itr->key) >=
-				    itr->index->key_def->part_count;
-		else
-			one_value = tuple_field_count(itr->key) >=
-				    itr->index->cmp_def->part_count;
-	}
+
 	/* Run a special iterator for a special case */
-	if (one_value) {
+	if (itr->iterator_type == ITER_EQ &&
+	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
 		struct vy_point_iterator one;
 		vy_point_iterator_open(&one, itr->run_env, itr->index,
 				       itr->tx, itr->read_view, itr->key);
@@ -840,7 +832,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		itr->key = NULL;
 		return rc;
 	}
-#endif
 
 	*result = NULL;
 
