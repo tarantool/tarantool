@@ -339,6 +339,12 @@ struct index_def {
 	uint32_t iid;
 	/* Space id. */
 	uint32_t space_id;
+	/** Index name. */
+	char *name;
+	/** Index type. */
+	enum index_type type;
+	struct index_opts opts;
+
 	/* Index key definition. */
 	struct key_def *key_def;
 	/**
@@ -347,11 +353,6 @@ struct index_def {
 	 * iterator position.
 	 */
 	struct key_def *cmp_def;
-	/** Index name. */
-	char *name;
-	/** Index type. */
-	enum index_type type;
-	struct index_opts opts;
 };
 
 struct index_def *

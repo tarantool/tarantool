@@ -318,17 +318,17 @@ index_def_dup(const struct index_def *def)
 void
 index_def_swap(struct index_def *def1, struct index_def *def2)
 {
-	/* Swap const-size items. */
-	struct index_def tmp_def;
-	tmp_def = *def1;
-	*def1 = *def2;
-	*def2 = tmp_def;
 	/*
-	 * Do not swap key_defs: index_def_swap() is used only
-	 * for indexes with identical key definitions.
-	 * @todo: remove key_def from index_def
+	 * Swap const-size items and name. Keep the original key
+	 * definitions, they are used in the engines.
 	 */
-	assert(def1->key_def->part_count == def2->key_def->part_count);
+	struct index_def tmp_def = *def1;
+	memcpy(def1, def2, offsetof(struct index_def, key_def));
+	memcpy(def2, &tmp_def, offsetof(struct index_def, key_def));
+	/*
+	 * index_def_swap() is used only during alter to modify
+	 * index metadata.
+	 */
 }
 
 /** Free a key definition. */

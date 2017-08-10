@@ -933,9 +933,7 @@ ModifyIndex::rollback(struct alter_space *alter)
 	assert(old_index != NULL);
 	Index *new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	struct index_def *tmp = old_index->index_def;
-	old_index->index_def = new_index->index_def;
-	new_index->index_def = tmp;
+	index_def_swap(old_index->index_def, new_index->index_def);
 }
 
 ModifyIndex::~ModifyIndex()
