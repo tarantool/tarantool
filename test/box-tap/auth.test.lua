@@ -8,8 +8,8 @@ local urilib = require('uri')
 
 box.cfg {
     listen = os.getenv('LISTEN');
-    logger="tarantool.log";
-    slab_alloc_arena=0.1;
+    log="tarantool.log";
+    memtx_memory=100*1024*1024;
 }
 local uri = urilib.parse(box.cfg.listen)
 local HOST, PORT = uri.host or 'localhost', uri.service
@@ -130,5 +130,6 @@ space:drop()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('test', 'read,write,execute', 'universe')
 box.schema.user.drop('test', { if_exists = true})
+box.schema.user.drop("test2", { if_exists = true})
 
 os.exit(test:check() == true and 0 or -1)
