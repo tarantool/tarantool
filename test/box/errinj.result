@@ -12,35 +12,43 @@ index = space:create_index('primary', { type = 'hash' })
 ...
 errinj.info()
 ---
-- ERRINJ_VY_READ_PAGE:
-    state: false
-  ERRINJ_WAL_WRITE:
-    state: false
-  ERRINJ_BUILD_SECONDARY:
-    state: -1
-  ERRINJ_VY_READ_PAGE_TIMEOUT:
-    state: false
-  ERRINJ_XLOG_META:
+- ERRINJ_WAL_WRITE:
     state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false
-  ERRINJ_VYRUN_INDEX_GARBAGE:
-    state: false
-  ERRINJ_WAL_WRITE_DISK:
-    state: false
-  ERRINJ_XLOG_READ:
-    state: -1
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
-  ERRINJ_VY_RUN_WRITE:
-    state: false
+  ERRINJ_WAL_WRITE_PARTIAL:
+    state: -1
   ERRINJ_VY_GC:
     state: false
   ERRINJ_WAL_DELAY:
     state: false
-  ERRINJ_VY_INDEX_DUMP:
+  ERRINJ_XLOG_READ:
     state: -1
   ERRINJ_WAL_WRITE_EOF:
+    state: false
+  ERRINJ_VYRUN_INDEX_GARBAGE:
+    state: false
+  ERRINJ_VY_TASK_COMPLETE:
+    state: false
+  ERRINJ_PORT_DUMP:
+    state: false
+  ERRINJ_WAL_IO:
+    state: false
+  ERRINJ_TUPLE_ALLOC:
+    state: false
+  ERRINJ_VY_READ_PAGE:
+    state: false
+  ERRINJ_RELAY_REPORT_INTERVAL:
+    state: 0
+  ERRINJ_VY_READ_PAGE_TIMEOUT:
+    state: false
+  ERRINJ_XLOG_META:
+    state: false
+  ERRINJ_WAL_WRITE_DISK:
+    state: false
+  ERRINJ_VY_RUN_WRITE:
     state: false
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false
@@ -48,33 +56,27 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_PORT_DUMP:
-    state: false
-  ERRINJ_RELAY_REPORT_INTERVAL:
-    state: 0
-  ERRINJ_RELAY_TIMEOUT:
-    state: 0
-  ERRINJ_VY_LOG_FLUSH:
-    state: false
-  ERRINJ_VY_TASK_COMPLETE:
-    state: false
-  ERRINJ_VY_RUN_WRITE_TIMEOUT:
-    state: 0
-  ERRINJ_XLOG_GARBAGE:
-    state: false
-  ERRINJ_WAL_IO:
-    state: false
-  ERRINJ_VY_SQUASH_TIMEOUT:
-    state: 0
-  ERRINJ_TESTING:
-    state: false
-  ERRINJ_INDEX_ALLOC:
+  ERRINJ_VY_POINT_ITER_WAIT:
     state: false
   ERRINJ_TUPLE_FIELD:
     state: false
-  ERRINJ_TUPLE_ALLOC:
+  ERRINJ_INDEX_ALLOC:
     state: false
-  ERRINJ_WAL_WRITE_PARTIAL:
+  ERRINJ_XLOG_GARBAGE:
+    state: false
+  ERRINJ_VY_RUN_WRITE_TIMEOUT:
+    state: 0
+  ERRINJ_RELAY_TIMEOUT:
+    state: 0
+  ERRINJ_TESTING:
+    state: false
+  ERRINJ_VY_LOG_FLUSH:
+    state: false
+  ERRINJ_VY_SQUASH_TIMEOUT:
+    state: 0
+  ERRINJ_BUILD_SECONDARY:
+    state: -1
+  ERRINJ_VY_INDEX_DUMP:
     state: -1
 ...
 errinj.set("some-injection", true)

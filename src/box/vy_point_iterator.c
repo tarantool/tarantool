@@ -439,6 +439,13 @@ restart:
 	if (rc != 0)
 		goto done;
 
+	ERROR_INJECT(ERRINJ_VY_POINT_ITER_WAIT, {
+		while (mem_list_version == itr->index->mem_list_version)
+			fiber_sleep(0.01);
+		/* Turn of the injection to avoid infinite loop */
+		errinj(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL)->bparam = false;
+	});
+
 	if (mem_list_version != itr->index->mem_list_version) {
 		/*
 		 * Mem list was changed during yield. This could be rotation

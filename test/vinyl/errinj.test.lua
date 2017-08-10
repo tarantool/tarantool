@@ -401,21 +401,21 @@ for i = 1,10 do s:replace{i, i, 0} end
 
 test_run:cmd("setopt delimiter ';'")
 function worker()
-    for i = 11,100,2 do
+    for i = 11,20,2 do
         s:upsert({i, i}, {{'=', 3, 1}})
+        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
         i1:select{i}
         s:upsert({i + 1 ,i + 1}, {{'=', 3, 1}})
+        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
         i2:select{i + 1}
     end
 end
 test_run:cmd("setopt delimiter ''");
 
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
-
 f = fiber.create(worker)
 
-while f:status() ~= 'dead' do box.snapshot() end
+while f:status() ~= 'dead' do box.snapshot() fiber.sleep(0.01) end
 
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false)
+errinj.set("ERRINJ_VY_POINT_ITER_WAIT", false)
 
 s:drop()
