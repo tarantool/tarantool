@@ -4948,6 +4948,7 @@ vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 			      iterator_type, c->key,
 			      (const struct vy_read_view **)&tx->read_view);
 	c->iterator_type = iterator_type;
+	vy_index_ref(c->index);
 	return c;
 }
 
@@ -5014,6 +5015,7 @@ vy_cursor_delete(struct vy_env *env, struct vy_cursor *c)
 	}
 	if (c->key)
 		tuple_unref(c->key);
+	vy_index_unref(c->index);
 	rmean_collect(env->stat->rmean, VY_STAT_CURSOR, 1);
 	rmean_collect(env->stat->rmean, VY_STAT_CURSOR_OPS, c->n_reads);
 	TRASH(c);
