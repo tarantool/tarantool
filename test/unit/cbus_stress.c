@@ -19,7 +19,7 @@
 static const int thread_count = 32;
 
 /* Number of loop iterations performed by each test thread. */
-static const int loop_count = 1000;
+static const int loop_count = 300;
 
 /* Chance of connecting to a random neighbor in a loop iteration. */
 static const int connect_prob = 30;
