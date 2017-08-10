@@ -43,10 +43,10 @@
 #define vyend 99999999
 #define MAX_FIELDS_COUNT 100
 #define STMT_TEMPLATE(lsn, type, ...) \
-{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, false }
+{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, false, 0, 0 }
 
 #define STMT_TEMPLATE_OPTIMIZED(lsn, type, ...) \
-{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, true }
+{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, true, 0, 0 }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
 extern struct tuple_format *vy_key_format;
@@ -72,7 +72,7 @@ vy_iterator_C_test_finish();
 struct vy_stmt_template {
 	/** Array of statement fields, ended with 'vyend'. */
 	const int fields[MAX_FIELDS_COUNT];
-	/** Statement type: REPLACE/UPSERT/DELETE. */
+	/** Statement type: REPLACE/UPSERT/DELETE/UPSERT. */
 	enum iproto_type type;
 	/** Statement lsn. */
 	int64_t lsn;
@@ -81,6 +81,13 @@ struct vy_stmt_template {
 	 * to skip it in the write_iterator.
 	 */
 	bool optimize_update;
+	/*
+	 * In case of upsert it is possible to use only one 'add' operation.
+	 * This is the column number of the operation.
+	 */
+	uint32_t upsert_field;
+	/** And that is the value to add. */
+	int32_t upsert_value;
 };
 
 /**
