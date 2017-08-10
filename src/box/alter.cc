@@ -492,6 +492,7 @@ struct alter_space;
 
 class AlterSpaceOp {
 public:
+	AlterSpaceOp(struct alter_space *alter);
 	struct rlist link;
 	virtual void alter_def(struct alter_space * /* alter */) {}
 	virtual void alter(struct alter_space * /* alter */) {}
@@ -499,21 +500,14 @@ public:
 			    int64_t /* signature */) {}
 	virtual void rollback(struct alter_space * /* alter */) {}
 	virtual ~AlterSpaceOp() {}
-	template <typename T> static T *create();
-	static void destroy(AlterSpaceOp *op);
+
+	void *operator new(size_t size)
+	{
+		return region_aligned_calloc_xc(&fiber()->gc, size,
+						alignof(uint64_t));
+	}
+	void operator delete(void * /* ptr */) {}
 };
-
-template <typename T> T *
-AlterSpaceOp::create()
-{
-	return new (region_calloc_object_xc(&fiber()->gc, T)) T;
-}
-
-void
-AlterSpaceOp::destroy(AlterSpaceOp *op)
-{
-	op->~AlterSpaceOp();
-}
 
 /**
  * A trigger installed on transaction commit/rollback events of
@@ -562,7 +556,7 @@ alter_space_delete(struct alter_space *alter)
 	while (! rlist_empty(&alter->ops)) {
 		AlterSpaceOp *op = rlist_shift_entry(&alter->ops,
 						     AlterSpaceOp, link);
-		AlterSpaceOp::destroy(op);
+		delete op;
 	}
 	/* Delete the new space, if any. */
 	if (alter->new_space)
@@ -570,12 +564,10 @@ alter_space_delete(struct alter_space *alter)
 	space_def_delete(alter->space_def);
 }
 
-/** Add a single operation to the list of alter operations. */
-static void
-alter_space_add_op(struct alter_space *alter, AlterSpaceOp *op)
+AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
 {
 	/* Add to the tail: operations must be processed in order. */
-	rlist_add_tail_entry(&alter->ops, op, link);
+	rlist_add_tail_entry(&alter->ops, this, link);
 }
 
 /**
@@ -772,6 +764,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 class ModifySpace: public AlterSpaceOp
 {
 public:
+	ModifySpace(struct alter_space *alter, struct space_def *def_arg)
+		:AlterSpaceOp(alter), def(def_arg) {}
 	/* New space definition. */
 	struct space_def *def;
 	virtual void alter_def(struct alter_space *alter);
@@ -797,6 +791,8 @@ ModifySpace::~ModifySpace() {
 
 class DropIndex: public AlterSpaceOp {
 public:
+	DropIndex(struct alter_space *alter, struct index_def *def_arg)
+		:AlterSpaceOp(alter), old_index_def(def_arg) {}
 	/** A reference to Index key def of the dropped index. */
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
@@ -852,11 +848,14 @@ DropIndex::commit(struct alter_space *alter, int64_t /* signature */)
 class MoveIndex: public AlterSpaceOp
 {
 public:
+	MoveIndex(struct alter_space *alter, uint32_t iid_arg)
+		:AlterSpaceOp(alter), iid(iid_arg) {}
 	/** id of the index on the move. */
 	uint32_t iid;
 	virtual void alter(struct alter_space *alter);
 	virtual void rollback(struct alter_space *alter);
 };
+
 void
 MoveIndex::alter(struct alter_space *alter)
 {
@@ -876,6 +875,12 @@ MoveIndex::rollback(struct alter_space *alter)
 class ModifyIndex: public AlterSpaceOp
 {
 public:
+	ModifyIndex(struct alter_space *alter,
+		    struct index_def *new_index_def_arg,
+		    struct index_def *old_index_def_arg)
+		:AlterSpaceOp(alter),
+		new_index_def(new_index_def_arg),
+		old_index_def(old_index_def_arg) {}
 	struct index_def *new_index_def;
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
@@ -935,6 +940,7 @@ ModifyIndex::~ModifyIndex()
 /** CreateIndex - add a new index to the space. */
 class CreateIndex: public AlterSpaceOp {
 public:
+	CreateIndex(struct alter_space *alter) :AlterSpaceOp(alter) {}
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	virtual void alter_def(struct alter_space *alter);
@@ -1006,6 +1012,12 @@ CreateIndex::~CreateIndex()
  */
 class RebuildIndex: public AlterSpaceOp {
 public:
+	RebuildIndex(struct alter_space *alter,
+		     struct index_def *new_index_def_arg,
+		     struct index_def *old_index_def_arg)
+		:AlterSpaceOp(alter),
+		new_index_def(new_index_def_arg),
+		old_index_def(old_index_def_arg) {}
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	/** Old index index_def. */
@@ -1099,9 +1111,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		Index *index = space_index(old_space, index_id);
 		if (index == NULL)
 			continue;
-		MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
-		alter_space_add_op(alter, move_index);
-		move_index->iid = index->index_def->iid;
+		(void) new MoveIndex(alter, index->index_def->iid);
 	}
 }
 
@@ -1272,10 +1282,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct alter_space *alter = alter_space_new(old_space);
 		auto alter_guard =
 			make_scoped_guard([=] {alter_space_delete(alter);});
-		ModifySpace *modify =
-			AlterSpaceOp::create<ModifySpace>();
-		alter_space_add_op(alter, modify);
-		modify->def = def;
+		(void) new ModifySpace(alter, def);
 		def_guard.is_active = false;
 		/* Create MoveIndex ops for all space indexes. */
 		alter_space_move_indexes(alter, 0, old_space->index_id_max + 1);
@@ -1383,14 +1390,11 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	alter_space_move_indexes(alter, 0, iid);
 	/* Case 1: drop the index, if it is dropped. */
 	if (old_index != NULL && new_tuple == NULL) {
-		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
-		alter_space_add_op(alter, drop_index);
-		drop_index->old_index_def = old_index->index_def;
+		(void) new DropIndex(alter, old_index->index_def);
 	}
 	/* Case 2: create an index, if it is simply created. */
 	if (old_index == NULL && new_tuple != NULL) {
-		CreateIndex *create_index = AlterSpaceOp::create<CreateIndex>();
-		alter_space_add_op(alter, create_index);
+		CreateIndex *create_index = new CreateIndex(alter);
 		create_index->new_index_def =
 			index_def_new_from_tuple(new_tuple, old_space);
 	}
@@ -1402,27 +1406,21 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			make_scoped_guard([=] { index_def_delete(index_def); });
 		if (index_def_cmp(index_def, old_index->index_def) == 0) {
 			/* Index is not changed so just move it. */
-			MoveIndex *move_index = AlterSpaceOp::create<MoveIndex>();
-			alter_space_add_op(alter, move_index);
-			move_index->iid = old_index->index_def->iid;
+			(void) new MoveIndex(alter, old_index->index_def->iid);
 		}
 		else if (index_def_change_requires_rebuild(old_index->index_def, index_def)) {
 			/*
 			 * Operation demands an index rebuild.
 			 */
-			RebuildIndex *rebuild_index = AlterSpaceOp::create<RebuildIndex>();
-			alter_space_add_op(alter, rebuild_index);
-			rebuild_index->new_index_def = index_def;
-			rebuild_index->old_index_def = old_index->index_def;
+			(void) new RebuildIndex(alter, index_def,
+						old_index->index_def);
 			index_def_guard.is_active = false;
 		} else {
 			/*
 			 * Operation can be done without index rebuild.
 			 */
-			ModifyIndex *modify_index = AlterSpaceOp::create<ModifyIndex>();
-			alter_space_add_op(alter, modify_index);
-			modify_index->new_index_def = index_def;
-			modify_index->old_index_def = old_index->index_def;
+			(void) new ModifyIndex(alter, index_def,
+					       old_index->index_def);
 			index_def_guard.is_active = false;
 		}
 	}
