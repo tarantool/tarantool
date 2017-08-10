@@ -51,6 +51,7 @@ local default_cfg = {
     hot_standby         = false,
     checkpoint_interval = 3600,
     checkpoint_count    = 2,
+    worker_pool_threads = 4
 }
 
 -- types of available options
@@ -98,7 +99,8 @@ local template_cfg = {
     checkpoint_interval = 'number',
     checkpoint_count    = 'number',
     read_only           = 'boolean',
-    hot_standby         = 'boolean'
+    hot_standby         = 'boolean',
+    worker_pool_threads = 'number'
 }
 
 local function normalize_uri(port)
@@ -154,6 +156,7 @@ local dynamic_cfg = {
     vinyl_timeout           = private.cfg_set_vinyl_timeout,
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,
+    worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()

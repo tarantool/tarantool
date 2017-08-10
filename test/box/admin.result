@@ -26,6 +26,8 @@ cfg_filter(box.cfg)
     - 3600
   - - coredump
     - false
+  - - eio_parallel
+    - 4
   - - force_recovery
     - false
   - - hot_standby

@@ -86,6 +86,8 @@ cfg_filter(box.cfg)
     - 268435456
   - - wal_mode
     - write
+  - - worker_pool_threads
+    - 4
 ...
 -- must be read-only
 box.cfg()
@@ -165,6 +167,8 @@ cfg_filter(box.cfg)
     - 268435456
   - - wal_mode
     - write
+  - - worker_pool_threads
+    - 4
 ...
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}
