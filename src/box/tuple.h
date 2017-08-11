@@ -57,14 +57,11 @@ tuple_free(void);
  * @param arena[out] Arena to initialize.
  * @param quota Arena's quota.
  * @param arena_max_size Maximal size of @arena.
- * @param tuple_max_size Maximal size of a tuple. This value is
- *        used to calculate such slab_size, in which any tuple can
- *        fit.
  * @param arena_name Name of @arena for logs.
  */
 void
 tuple_arena_create(struct slab_arena *arena, struct quota *quota,
-		   uint64_t arena_max_size, uint32_t tuple_max_size,
+		   uint64_t arena_max_size, uint32_t slab_size,
 		   const char *arena_name);
 
 void

@@ -73,8 +73,7 @@ extern struct mempool memtx_index_extent_pool;
 struct MemtxEngine: public Engine {
 	MemtxEngine(const char *snap_dirname, bool force_recovery,
 		    uint64_t tuple_arena_max_size,
-		    uint32_t objsize_min, uint32_t objsize_max,
-		    float alloc_factor);
+		    uint32_t objsize_min, float alloc_factor);
 	~MemtxEngine();
 	virtual Handler *createSpace(struct rlist *key_list,
 				     uint32_t index_count,
@@ -103,6 +102,7 @@ struct MemtxEngine: public Engine {
 	{
 		m_snap_io_rate_limit = new_limit * 1024 * 1024;
 	}
+	void setMaxTupleSize(size_t max_size);
 	/**
 	 * Return LSN and vclock of the most recent snapshot
 	 * or -1 if there is no snapshot.

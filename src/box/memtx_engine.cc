@@ -121,15 +121,14 @@ memtx_build_secondary_keys(struct space *space, void *param)
 
 MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 			 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-			 uint32_t objsize_max, float alloc_factor)
+			 float alloc_factor)
 	:Engine("memtx"),
 	m_state(MEMTX_INITIALIZED),
 	m_checkpoint(0),
 	m_snap_io_rate_limit(0),
 	m_force_recovery(force_recovery)
 {
-	memtx_tuple_init(tuple_arena_max_size, objsize_min, objsize_max,
-			 alloc_factor);
+	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
 
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	m_snap_dir.force_recovery = force_recovery;
@@ -141,6 +140,12 @@ MemtxEngine::~MemtxEngine()
 	xdir_destroy(&m_snap_dir);
 
 	memtx_tuple_free();
+}
+
+void
+MemtxEngine::setMaxTupleSize(size_t max_size)
+{
+	memtx_max_tuple_size = max_size;
 }
 
 void

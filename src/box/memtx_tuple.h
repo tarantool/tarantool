@@ -44,7 +44,7 @@ extern "C" {
  */
 void
 memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 uint32_t objsize_max, float alloc_factor);
+		 float alloc_factor);
 
 /**
  * Cleanup memtx_tuple library
@@ -62,6 +62,9 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
  */
 void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+/** Maximal allowed tuple size (box.cfg.memtx_max_tuple_size) */
+extern size_t memtx_max_tuple_size;
 
 /** tuple format vtab for memtx engine. */
 extern struct tuple_format_vtab memtx_tuple_format_vtab;

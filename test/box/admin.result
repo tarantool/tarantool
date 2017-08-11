@@ -55,7 +55,7 @@ cfg_filter(box.cfg)
   - - rows_per_wal
     - 500000
   - - slab_alloc_factor
-    - 1.1
+    - 1.05
   - - too_long_threshold
     - 0.5
   - - vinyl_bloom_fpr

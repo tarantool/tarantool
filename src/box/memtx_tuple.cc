@@ -57,17 +57,19 @@ static struct slab_cache memtx_slab_cache;
 static struct quota memtx_quota;
 /** Memtx tuple allocator */
 struct small_alloc memtx_alloc; /* used box box.slab.info() */
-
+/* The maximal allowed tuple size, box.cfg.memtx_max_tuple_size */
+size_t memtx_max_tuple_size = 1 * 1024 * 1024; /* set dynamically */
 uint32_t snapshot_version;
 
 enum {
 	/** Lowest allowed slab_alloc_minimal */
 	OBJSIZE_MIN = 16,
+	SLAB_SIZE = 16 * 1024 * 1024,
 };
 
 void
 memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 uint32_t objsize_max, float alloc_factor)
+		 float alloc_factor)
 {
 	/* Apply lowest allowed objsize bounds */
 	if (objsize_min < OBJSIZE_MIN)
@@ -75,7 +77,7 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 	/** Preallocate entire quota. */
 	quota_init(&memtx_quota, tuple_arena_max_size);
 	tuple_arena_create(&memtx_arena, &memtx_quota, tuple_arena_max_size,
-			 objsize_max, "memtx");
+			   SLAB_SIZE, "memtx");
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
@@ -110,6 +112,13 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		     do { diag_set(OutOfMemory, (unsigned) total,
 				   "slab allocator", "memtx_tuple"); return NULL; }
 		     while(false); );
+	if (unlikely(total > memtx_max_tuple_size)) {
+		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE,
+			 (unsigned) total);
+		error_log(diag_last_error(diag_get()));
+		return NULL;
+	}
+
 	struct memtx_tuple *memtx_tuple =
 		(struct memtx_tuple *) smalloc(&memtx_alloc, total);
 	/**
@@ -121,14 +130,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * of disaster recovery.
 	 */
 	if (memtx_tuple == NULL) {
-		if (total > memtx_alloc.objsize_max) {
-			diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE,
-				 (unsigned) total);
-			diag_log();
-		} else {
-			diag_set(OutOfMemory, (unsigned) total,
+		diag_set(OutOfMemory, (unsigned) total,
 				 "slab allocator", "memtx_tuple");
-		}
 		return NULL;
 	}
 	struct tuple *tuple = &memtx_tuple->base;
@@ -165,7 +168,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
-	if (!memtx_alloc.is_delayed_free_mode ||
+	if (memtx_alloc.free_mode != SMALL_DELAYED_FREE ||
 	    memtx_tuple->version == snapshot_version)
 		smfree(&memtx_alloc, memtx_tuple, total);
 	else

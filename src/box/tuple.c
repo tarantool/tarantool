@@ -35,12 +35,6 @@
 #include "tt_uuid.h"
 #include "small/quota.h"
 
-enum {
-	/** Lowest allowed slab_alloc_maximal. */
-	TUPLE_MAX_SIZE_MIN = 16 * 1024,
-	SLAB_SIZE_MIN = 1024 * 1024,
-};
-
 static struct mempool tuple_iterator_pool;
 
 /**
@@ -324,17 +318,9 @@ tuple_init(void)
 
 void
 tuple_arena_create(struct slab_arena *arena, struct quota *quota,
-		   uint64_t arena_max_size, uint32_t tuple_max_size,
+		   uint64_t arena_max_size, uint32_t slab_size,
 		   const char *arena_name)
 {
-	if (tuple_max_size < TUPLE_MAX_SIZE_MIN)
-		tuple_max_size = TUPLE_MAX_SIZE_MIN;
-
-	/* Calculate slab size for tuple arena. */
-	size_t slab_size = small_round(tuple_max_size * 4);
-	if (slab_size < SLAB_SIZE_MIN)
-		slab_size = SLAB_SIZE_MIN;
-
 	/*
 	 * Ensure that quota is a multiple of slab_size, to
 	 * have accurate value of quota_used_ratio.
