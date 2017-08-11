@@ -257,6 +257,29 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it);
 
 /**
+ * Allocate and initialize a new tuple from a raw MsgPack Array data.
+ *
+ * \param format tuple format.
+ * Use box_tuple_format_default() to create space-independent tuple.
+ * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
+ * \param end the end of \a data
+ * \retval NULL on out of memory
+ * \retval tuple otherwise
+ * \pre data, end is valid MsgPack Array
+ * \sa \code box.tuple.new(data) \endcode
+ */
+box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+/**
  * Extract key from tuple according to key definition of given index.
  * Returned buffer is allocated on box_txn_alloc() with this key.
  * This function has O(n) complexity, where n is the number of key parts.
@@ -751,7 +774,6 @@ tuple_unref(struct tuple *tuple)
 }
 
 extern struct tuple *box_tuple_last;
-extern struct tuple_format *tuple_format_runtime;
 
 /**
  * Convert internal `struct tuple` to public `box_tuple_t`.

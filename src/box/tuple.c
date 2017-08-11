@@ -59,7 +59,7 @@ struct tuple *box_tuple_last;
  * A format for standalone tuples allocated on runtime arena.
  * \sa tuple_new().
  */
-struct tuple_format *tuple_format_runtime;
+static struct tuple_format *tuple_format_runtime;
 
 static void
 runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple);
@@ -579,6 +579,68 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it)
 {
 	return tuple_next(it);
+}
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr,
+		 const char *expr_end)
+{
+	struct tuple_format *format = tuple_format_runtime;
+
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(tuple, &bsize);
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	const char *new_data =
+		tuple_update_execute(region_aligned_alloc_cb, region, expr,
+				     expr_end, old_data, old_data + bsize,
+				     &new_size, 1, NULL);
+	if (new_data == NULL) {
+		region_truncate(region, used);
+		return NULL;
+	}
+
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
+	region_truncate(region, used);
+	if (ret != NULL)
+		return tuple_bless(ret);
+	return NULL;
+}
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
+		 const char *expr_end)
+{
+	struct tuple_format *format = tuple_format_runtime;
+
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(tuple, &bsize);
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	const char *new_data =
+		tuple_upsert_execute(region_aligned_alloc_cb, region, expr,
+				     expr_end, old_data, old_data + bsize,
+				     &new_size, 1, false, NULL);
+	if (new_data == NULL) {
+		region_truncate(region, used);
+		return NULL;
+	}
+
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
+	region_truncate(region, used);
+	if (ret != NULL)
+		return tuple_bless(ret);
+	return NULL;
+}
+
+box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
+{
+	struct tuple *ret = tuple_new(format, data, end);
+	if (ret == NULL)
+		return NULL;
+	/* Can't fail on zero refs. */
+	return tuple_bless(ret);
 }
 
 int
