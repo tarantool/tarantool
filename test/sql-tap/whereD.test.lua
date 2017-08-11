@@ -234,10 +234,10 @@ local function do_searchcount_test(tn, sql, res)
     test:do_test(
         tn,
         function()
-            local sqlite_search_count = box.sql.debug().sqlite_search_count
+            local sql_search_count = box.sql.debug().sql_search_count
             local r = test:execsql(sql)
             table.insert(r, "search")
-            table.insert(r, box.sql.debug().sqlite_search_count - sqlite_search_count)
+            table.insert(r, box.sql.debug().sql_search_count - sql_search_count)
             return r
         end,
         res)
@@ -264,7 +264,7 @@ test:do_execsql_test(
 do_searchcount_test("3.1", [[
   SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
     ]],
-    {1, "one", 2, "two", "search", 2})
+    {1, "one", 2, "two", "search", 4})
 do_searchcount_test("3.2", [[
   SELECT a, c FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
     ]],
@@ -278,19 +278,19 @@ do_searchcount_test("3.4.2", [[
         (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
      OR (a=2 AND b='two')
     ]],
-    {1, "one", 2, "two", "search", 3})
+    {1, "one", 2, "two", "search", 5})
 do_searchcount_test("3.4.3", [[
   SELECT a, b FROM t3 WHERE
         (a=2 AND b='two')
      OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
     ]],
-    {2, "two", 1, "one", "search", 3})
+    {2, "two", 1, "one", "search", 5})
 do_searchcount_test("3.4.4", [[
   SELECT a, b FROM t3 WHERE
         (a=2 AND b=(SELECT y FROM t4 WHERE x='b'))
      OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
     ]],
-    {2, "two", 1, "one", "search", 4})
+    {2, "two", 1, "one", "search", 6})
 
 -- do_searchcount_test 3.5.1 {
 --   SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR rowid=4

@@ -3089,7 +3089,7 @@ void sqlite3VdbeDelete(Vdbe *p){
 static int SQLITE_NOINLINE handleDeferredMoveto(VdbeCursor *p){
   int res, rc;
 #ifdef SQLITE_TEST
-  extern int sqlite3_search_count;
+  extern int sql_search_count;
 #endif
   assert( p->deferredMoveto );
   assert( p->isTable );
@@ -3098,7 +3098,7 @@ static int SQLITE_NOINLINE handleDeferredMoveto(VdbeCursor *p){
   if( rc ) return rc;
   if( res!=0 ) return SQLITE_CORRUPT_BKPT;
 #ifdef SQLITE_TEST
-  sqlite3_search_count++;
+  sql_search_count++;
 #endif
   p->deferredMoveto = 0;
   p->cacheStatus = CACHE_STALE;

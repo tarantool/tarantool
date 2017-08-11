@@ -1029,12 +1029,12 @@ int tarantoolSqlite3MakeIdxOpts(SqliteIndex *index, const char *zSql, void *buf)
 void
 sql_debug_info(struct info_handler *h)
 {
-	extern int sqlite3_search_count;
-	extern int sqlite3_sort_count;
-	extern int sqlite3_found_count;
+	extern int sql_search_count;
+	extern int sql_sort_count;
+	extern int sql_found_count;
 	info_begin(h);
-	info_append_int(h, "sqlite_search_count", sqlite3_search_count);
-	info_append_int(h, "sqlite_sort_count", sqlite3_sort_count);
-	info_append_int(h, "sqlite_found_count", sqlite3_found_count);
+	info_append_int(h, "sql_search_count", sql_search_count);
+	info_append_int(h, "sql_sort_count", sql_sort_count);
+	info_append_int(h, "sql_found_count", sql_found_count);
 	info_end(h);
 }

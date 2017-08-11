@@ -48,7 +48,7 @@
 ** help verify the correct operation of the library.
 */
 #ifdef SQLITE_TEST
-int sqlite3_search_count = 0;
+int sql_search_count = 0;
 #endif
 
 /*
@@ -71,7 +71,7 @@ int sqlite3_interrupt_count = 0;
 ** library.
 */
 #ifdef SQLITE_TEST
-int sqlite3_sort_count = 0;
+int sql_sort_count = 0;
 #endif
 
 /*
@@ -108,7 +108,7 @@ static void updateMaxBlobsize(Mem *p){
 ** library.
 */
 #ifdef SQLITE_TEST
-int sqlite3_found_count = 0;
+int sql_found_count = 0;
 #endif
 
 /*
@@ -3776,7 +3776,7 @@ case OP_SeekGT: {       /* jump, in3 */
   pC->deferredMoveto = 0;
   pC->cacheStatus = CACHE_STALE;
 #ifdef SQLITE_TEST
-  sqlite3_search_count++;
+  sql_search_count++;
 #endif
   if( oc>=OP_SeekGE ){  assert( oc==OP_SeekGE || oc==OP_SeekGT );
     if( res<0 || (res==0 && oc==OP_SeekGT) ){
@@ -3883,7 +3883,7 @@ case OP_Found: {        /* jump, in3 */
   UnpackedRecord r;
 
 #ifdef SQLITE_TEST
-  if( pOp->opcode!=OP_NoConflict ) sqlite3_found_count++;
+  if( pOp->opcode!=OP_NoConflict ) sql_found_count++;
 #endif
 
   assert( pOp->p1>=0 && pOp->p1<p->nCursor );
@@ -4738,8 +4738,8 @@ case OP_Last: {        /* jump */
 case OP_SorterSort:    /* jump */
 case OP_Sort: {        /* jump */
 #ifdef SQLITE_TEST
-  sqlite3_sort_count++;
-  sqlite3_search_count--;
+  sql_sort_count++;
+  sql_search_count--;
 #endif
   p->aCounter[SQLITE_STMTSTATUS_SORT]++;
   /* Fall through into OP_Rewind */
@@ -4904,7 +4904,7 @@ next_tail:
     pC->nullRow = 0;
     p->aCounter[pOp->p5]++;
 #ifdef SQLITE_TEST
-    sqlite3_search_count++;
+    sql_search_count++;
 #endif
     goto jump_to_p2_and_check_for_interrupt;
   }else{

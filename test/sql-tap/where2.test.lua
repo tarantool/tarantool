@@ -62,10 +62,10 @@ test:do_test(
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
 local function count(sql)
-    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
+    local sql_sort_count = box.sql.debug().sql_sort_count
     local r = test:execsql(sql)
-    print("lol "..(box.sql.debug().sqlite_sort_count - sqlite_sort_count))
-    table.insert(r, box.sql.debug().sqlite_sort_count - sqlite_sort_count)
+    print("lol "..(box.sql.debug().sql_sort_count - sql_sort_count))
+    table.insert(r, box.sql.debug().sql_sort_count - sql_sort_count)
     return r
 end
 
@@ -78,9 +78,9 @@ end
 --
 local function cksort(sql)
     local sort = "nosort"
-    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
+    local sql_sort_count = box.sql.debug().sql_sort_count
     local data = test:execsql(sql)
-    if sqlite_sort_count < box.sql.debug().sqlite_sort_count then
+    if sql_sort_count < box.sql.debug().sql_sort_count then
             sort = 'sort'
     end
     table.insert(data, sort)
@@ -97,9 +97,9 @@ end
 --
 local function queryplan(sql)
     local sort = "nosort"
-    local sqlite_sort_count = box.sql.debug().sqlite_sort_count
+    local sql_sort_count = box.sql.debug().sql_sort_count
     local data = test:execsql(sql)
-    if sqlite_sort_count < box.sql.debug().sqlite_sort_count then
+    if sql_sort_count < box.sql.debug().sql_sort_count then
         sort = 'sort'
     end
     table.insert(data, sort)
@@ -131,9 +131,9 @@ local function queryplan(sql)
 end
 
 -- local function queryplan(sql)
---     sqlite_sort_count = 0
+--     sql_sort_count = 0
 --     data = test:execsql(sql)
---     if sqlite_sort_count
+--     if sql_sort_count
 --     then
 --         x = "sort"
 --     end
@@ -990,7 +990,7 @@ test:do_test(
 --        AND y IN (SELECT y FROM tx WHERE rowid<0)
 --   }
 -- } {}
---set sqlite_where_trace 1
+--set sql_where_trace 1
 test:do_execsql_test(
     "where2-8.5",
     [[
