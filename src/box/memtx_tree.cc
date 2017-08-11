@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "memtx_tree.h"
-#include "tuple_compare.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */
 #include "errinj.h"
@@ -39,30 +38,10 @@
 
 /* {{{ Utilities. *************************************************/
 
-struct key_data
-{
-	const char *key;
-	uint32_t part_count;
-};
-
-int
-memtx_tree_compare(const tuple *a, const tuple *b, struct key_def *def)
-{
-	return tuple_compare(a, b, def);
-}
-
-int
-memtx_tree_compare_key(const tuple *a, const struct key_data *key_data,
-		       struct key_def *def)
-{
-	return tuple_compare_with_key(a, key_data->key,
-				      key_data->part_count, def);
-}
-
-int
+static int
 memtx_tree_qcompare(const void* a, const void *b, void *c)
 {
-	return memtx_tree_compare(*(struct tuple **)a,
+	return tuple_compare(*(struct tuple **)a,
 		*(struct tuple **)b, (struct key_def *)c);
 }
 
@@ -72,7 +51,7 @@ struct tree_iterator {
 	const struct memtx_tree *tree;
 	struct index_def *index_def;
 	struct memtx_tree_iterator tree_iterator;
-	struct key_data key_data;
+	struct memtx_tree_key_data key_data;
 };
 
 static void
@@ -230,7 +209,7 @@ MemtxTree::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(index_def->opts.is_unique && part_count == index_def->key_def->part_count);
 
-	struct key_data key_data;
+	struct memtx_tree_key_data key_data;
 	key_data.key = key;
 	key_data.part_count = part_count;
 	struct tuple **res = memtx_tree_find(&tree, &key_data);
