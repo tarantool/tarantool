@@ -2257,7 +2257,7 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		.filetype = XLOG_META_TYPE_RUN,
 		.instance_uuid = INSTANCE_UUID,
 	};
-	if (xlog_create(&data_xlog, path, &meta) < 0)
+	if (xlog_create(&data_xlog, path, 0, &meta) < 0)
 		goto err_free_bloom;
 
 	run->info.min_lsn = INT64_MAX;
@@ -2497,7 +2497,7 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 		.filetype = XLOG_META_TYPE_INDEX,
 		.instance_uuid = INSTANCE_UUID,
 	};
-	if (xlog_create(&index_xlog, path, &meta) < 0)
+	if (xlog_create(&index_xlog, path, 0, &meta) < 0)
 		return -1;
 
 	xlog_tx_begin(&index_xlog);

@@ -348,6 +348,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
  * Create new xlog writer based on fd.
  * @param fd            file descriptor
  * @param name          the assiciated name
+ * @param flags		flags to open the file or 0 for defaults
  * @param meta          xlog meta
  *
  * @retval 0 for success
@@ -355,7 +356,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
  */
 
 int
-xlog_create(struct xlog *xlog, const char *name,
+xlog_create(struct xlog *xlog, const char *name, int flags,
 	    const struct xlog_meta *meta);
 
 /**

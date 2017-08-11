@@ -725,7 +725,7 @@ xlog_destroy(struct xlog *xlog)
 }
 
 int
-xlog_create(struct xlog *xlog, const char *name,
+xlog_create(struct xlog *xlog, const char *name, int flags,
 	    const struct xlog_meta *meta)
 {
 	char meta_buf[XLOG_META_LEN_MAX];
@@ -747,6 +747,8 @@ xlog_create(struct xlog *xlog, const char *name,
 	xlog->is_inprogress = true;
 	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
 
+	if (flags == 0)
+		flags = O_RDWR | O_CREAT | O_EXCL;
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file.
 	 * If it exists, open will fail. Always open/create
@@ -757,7 +759,7 @@ xlog_create(struct xlog *xlog, const char *name,
 	 * may think that this is a corrupt file and stop
 	 * replication.
 	 */
-	xlog->fd = open(xlog->filename, O_RDWR | O_CREAT | O_EXCL, 0644);
+	xlog->fd = open(xlog->filename, flags, 0644);
 	if (xlog->fd < 0) {
 		say_syserror("open, [%s]", name);
 		diag_set(SystemError, "failed to create file '%s'", name);
@@ -900,7 +902,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	meta.instance_uuid = *dir->instance_uuid;
 	vclock_copy(&meta.vclock, vclock);
 
-	if (xlog_create(xlog, filename, &meta) != 0)
+	if (xlog_create(xlog, filename, dir->open_wflags, &meta) != 0)
 		return -1;
 
 	/* set sync interval from xdir settings */
