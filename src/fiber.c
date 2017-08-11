@@ -374,19 +374,12 @@ fiber_join(struct fiber *fiber)
 		fiber_yield();
 	}
 	assert(fiber_is_dead(fiber));
-	bool fiber_was_cancelled = fiber->flags & FIBER_IS_CANCELLED;
 	/* Move exception to the caller */
 	int ret = fiber->f_ret;
 	if (ret != 0) {
 		assert(!diag_is_empty(&fiber->diag));
 		diag_move(&fiber->diag, &fiber()->diag);
 	}
-	/** Don't bother with propagation of FiberIsCancelled */
-	if (fiber_was_cancelled) {
-		diag_clear(&fiber()->diag);
-		ret = 0;
-	}
-
 	/* The fiber is already dead. */
 	fiber_recycle(fiber);
 	return ret;

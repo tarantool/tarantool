@@ -220,7 +220,7 @@ test_fiber(lua_State *L)
 	fiber_cancel(fiber);
 	int ret = fiber_join(fiber);
 	box_error_t *err = box_error_last();
-	lua_pushboolean(L, (int)(ret == 0 || box_error_code(err) != 10));
+	lua_pushboolean(L, (int)(ret != 0 && box_error_code(err) == 10));
 	return 1;
 }
 
