@@ -38,6 +38,7 @@
 #include "txn.h"
 #include "vinyl.h"
 #include "tuple.h"
+#include "cfg.h"
 
 /**
  * Get (struct vy_index *) by (struct Index *).
@@ -73,7 +74,7 @@ VinylIndex::~VinylIndex()
 void
 VinylIndex::open()
 {
-	if (vy_index_open(env, db) != 0)
+	if (vy_index_open(env, db, cfg_geti("force_recovery")) != 0)
 		diag_raise();
 }
 

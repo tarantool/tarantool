@@ -61,7 +61,7 @@ struct VinylEngine: public Engine {
 	virtual int collectGarbage(int64_t lsn) override;
 	virtual int backup(struct vclock *vclock,
 			   engine_backup_cb cb, void *arg) override;
-	void updateOptions();
+	void setTimeout(double timeout);
 	virtual void checkSpaceDef(struct space_def *def) override;
 public:
 	struct vy_env *env;

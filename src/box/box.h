@@ -150,7 +150,7 @@ void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
 void box_set_checkpoint_count(void);
-void box_update_vinyl_options(void);
+void box_set_vinyl_timeout(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */

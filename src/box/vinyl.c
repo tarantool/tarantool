@@ -46,7 +46,6 @@
 #include <small/lsregion.h>
 #include <coio_file.h>
 
-#include "cfg.h"
 #include "coio_task.h"
 #include "cbus.h"
 #include "histogram.h"
@@ -88,33 +87,9 @@ enum vy_status {
 	VINYL_ONLINE,
 };
 
-/**
- * Global configuration of an entire vinyl instance (env object).
- */
-struct vy_conf {
-	/** Path to the data directory. */
-	char *path;
-	/** Max size of the memory level. */
-	uint64_t memory;
-	/** Max size of the tuple cache. */
-	uint64_t cache;
-	/** Max size of a tuple. */
-	uint32_t max_tuple_size;
-	/** Max time a transaction may wait for memory. */
-	double timeout;
-	/** Max number of threads used for reading. */
-	int read_threads;
-	/** Max number of threads used for writing. */
-	int write_threads;
-	/** Force recovery of data files. */
-	bool force_recovery;
-};
-
 struct vy_env {
 	/** Recovery status */
 	enum vy_status status;
-	/** Configuration */
-	struct vy_conf      *conf;
 	/** TX manager */
 	struct tx_manager   *xm;
 	/** Scheduler */
@@ -141,6 +116,17 @@ struct vy_env {
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
 	const struct vclock *recovery_vclock;
+	/** Path to the data directory. */
+	char *path;
+	/** Max size of the memory level. */
+	uint64_t memory;
+	/** Max size of the tuple cache. */
+	/** Max time a transaction may wait for memory. */
+	double timeout;
+	/** Max number of threads used for reading. */
+	int read_threads;
+	/** Max number of threads used for writing. */
+	int write_threads;
 };
 
 /** Mask passed to vy_gc(). */
@@ -1797,7 +1783,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 
 	/* Start worker threads */
 	scheduler->is_worker_pool_running = true;
-	scheduler->worker_pool_size = scheduler->env->conf->write_threads;
+	scheduler->worker_pool_size = scheduler->env->write_threads;
 	/* One thread is reserved for dumps, see vy_schedule(). */
 	assert(scheduler->worker_pool_size >= 2);
 	scheduler->workers_available = scheduler->worker_pool_size;
@@ -2009,60 +1995,6 @@ vy_end_checkpoint(struct vy_env *env)
 }
 
 /* Scheduler }}} */
-
-/* {{{ Configuration */
-
-static struct vy_conf *
-vy_conf_new()
-{
-	struct vy_conf *conf = calloc(1, sizeof(*conf));
-	if (conf == NULL) {
-		diag_set(OutOfMemory, sizeof(*conf), "conf", "struct");
-		return NULL;
-	}
-	conf->memory = cfg_geti64("vinyl_memory");
-	conf->cache = cfg_geti64("vinyl_cache");
-	conf->max_tuple_size = cfg_geti("vinyl_max_tuple_size");
-	conf->timeout = cfg_getd("vinyl_timeout");
-	conf->read_threads = cfg_geti("vinyl_read_threads");
-	conf->write_threads = cfg_geti("vinyl_write_threads");
-	conf->force_recovery = cfg_geti("force_recovery");
-
-	conf->path = strdup(cfg_gets("vinyl_dir"));
-	if (conf->path == NULL) {
-		diag_set(OutOfMemory, sizeof(*conf), "conf", "path");
-		goto error_1;
-	}
-	/* Ensure vinyl data directory exists. */
-	if (!path_exists(conf->path)) {
-		diag_set(ClientError, ER_CFG, "vinyl_dir",
-			 "directory does not exist");
-		goto error_2;
-	}
-	return conf;
-
-error_2:
-	free(conf->path);
-error_1:
-	free(conf);
-	return NULL;
-}
-
-static void vy_conf_delete(struct vy_conf *c)
-{
-	free(c->path);
-	free(c);
-}
-
-int
-vy_update_options(struct vy_env *env)
-{
-	struct vy_conf *conf = env->conf;
-	conf->timeout = cfg_getd("vinyl_timeout");
-	return 0;
-}
-
-/* Configuration }}} */
 
 /** {{{ Introspection */
 
@@ -2305,7 +2237,7 @@ vy_delete_index(struct vy_env *env, struct vy_index *index)
  * account.
  */
 int
-vy_index_open(struct vy_env *env, struct vy_index *index)
+vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 {
 	switch (env->status) {
 	case VINYL_ONLINE:
@@ -2333,7 +2265,7 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 		return vy_index_recover(index, env->recovery,
 				vclock_sum(env->recovery_vclock),
 				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
-				env->conf->force_recovery);
+				force_recovery);
 	default:
 		unreachable();
 		return -1;
@@ -3762,7 +3694,7 @@ vy_prepare(struct vy_env *env, struct vy_tx *tx)
 	 * it before checking for conflicts.
 	 */
 	if (vy_quota_use(&env->quota, tx->write_size,
-			 env->conf->timeout) != 0) {
+			 env->timeout) != 0) {
 		diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
 		return -1;
 	}
@@ -3897,7 +3829,8 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt,
 		   void /* struct vy_env */ *arg);
 
 struct vy_env *
-vy_env_new(void)
+vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
+	   int write_threads, double timeout, uint32_t max_tuple_size)
 {
 	struct vy_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL)) {
@@ -3906,9 +3839,22 @@ vy_env_new(void)
 	}
 	memset(e, 0, sizeof(*e));
 	e->status = VINYL_OFFLINE;
-	e->conf = vy_conf_new();
-	if (e->conf == NULL)
-		goto error_conf;
+	e->memory = memory;
+	e->timeout = timeout;
+	e->read_threads = read_threads;
+	e->write_threads = write_threads;
+	e->path = strdup(path);
+	if (e->path == NULL) {
+		diag_set(OutOfMemory, strlen(path),
+			 "malloc", "env->path");
+		goto error_path;
+	}
+	/* Ensure vinyl data directory exists. */
+	if (!path_exists(e->path)) {
+		diag_set(ClientError, ER_CFG, "vinyl_dir",
+			 "directory does not exist");
+		goto error_xm;
+	}
 	e->xm = tx_manager_new();
 	if (e->xm == NULL)
 		goto error_xm;
@@ -3922,10 +3868,9 @@ vy_env_new(void)
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
-	vy_stmt_env_create(&e->stmt_env, e->conf->memory,
-			   e->conf->max_tuple_size);
+	vy_stmt_env_create(&e->stmt_env, e->memory, max_tuple_size);
 
-	if (vy_index_env_create(&e->index_env, e->conf->path,
+	if (vy_index_env_create(&e->index_env, e->path,
 				&e->stmt_env.allocator,
 				&e->scheduler->generation, vy_squash_schedule,
 				e) != 0)
@@ -3940,9 +3885,9 @@ vy_env_new(void)
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
-	vy_cache_env_create(&e->cache_env, slab_cache, e->conf->cache);
+	vy_cache_env_create(&e->cache_env, slab_cache, cache);
 	vy_run_env_create(&e->run_env);
-	vy_log_init(e->conf->path);
+	vy_log_init(e->path);
 	return e;
 error_index_env:
 	vy_stmt_env_destroy(&e->stmt_env);
@@ -3954,8 +3899,8 @@ error_sched:
 error_stat:
 	tx_manager_delete(e->xm);
 error_xm:
-	vy_conf_delete(e->conf);
-error_conf:
+	free(e->path);
+error_path:
 	free(e);
 	return NULL;
 }
@@ -3967,7 +3912,7 @@ vy_env_delete(struct vy_env *e)
 	vy_squash_queue_delete(e->squash_queue);
 	vy_scheduler_delete(e->scheduler);
 	tx_manager_delete(e->xm);
-	vy_conf_delete(e->conf);
+	free(e->path);
 	vy_stat_delete(e->stat);
 	mempool_destroy(&e->cursor_pool);
 	vy_run_env_destroy(&e->run_env);
@@ -3981,6 +3926,13 @@ vy_env_delete(struct vy_env *e)
 	free(e);
 }
 
+int
+vy_set_timeout(struct vy_env *env, double timeout)
+{
+	env->timeout = timeout;
+	return 0;
+}
+
 /** }}} Environment */
 
 /** {{{ Recovery */
@@ -3991,8 +3943,8 @@ vy_bootstrap(struct vy_env *e)
 	assert(e->status == VINYL_OFFLINE);
 	if (vy_log_bootstrap() != 0)
 		return -1;
-	vy_quota_set_limit(&e->quota, e->conf->memory);
-	vy_run_env_enable_coio(&e->run_env, e->conf->read_threads);
+	vy_quota_set_limit(&e->quota, e->memory);
+	vy_run_env_enable_coio(&e->run_env, e->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -4012,7 +3964,7 @@ vy_begin_initial_recovery(struct vy_env *e,
 	} else {
 		if (vy_log_bootstrap() != 0)
 			return -1;
-		vy_quota_set_limit(&e->quota, e->conf->memory);
+		vy_quota_set_limit(&e->quota, e->memory);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
 	return 0;
@@ -4053,14 +4005,14 @@ vy_end_recovery(struct vy_env *e)
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
-		vy_quota_set_limit(&e->quota, e->conf->memory);
+		vy_quota_set_limit(&e->quota, e->memory);
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;
 	default:
 		unreachable();
 	}
-	vy_run_env_enable_coio(&e->run_env, e->conf->read_threads);
+	vy_run_env_enable_coio(&e->run_env, e->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -4248,7 +4200,7 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		struct vy_run *run = vy_run_new(record->run_id);
 		if (run == NULL)
 			goto done_slice;
-		if (vy_run_recover(run, ctx->env->conf->path,
+		if (vy_run_recover(run, ctx->env->path,
 				   ctx->space_id, ctx->index_id) != 0)
 			goto done_slice;
 
@@ -4427,7 +4379,7 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 	bool forget = true;
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
+		vy_run_snprint_path(path, sizeof(path), arg->env->path,
 				    arg->space_id, arg->index_id,
 				    record->run_id, type);
 		if (coio_unlink(path) < 0 && errno != ENOENT) {
@@ -4522,7 +4474,7 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_snprint_path(path, sizeof(path), arg->env->conf->path,
+		vy_run_snprint_path(path, sizeof(path), arg->env->path,
 				    arg->space_id, arg->index_id,
 				    record->run_id, type);
 		if (arg->cb(path, arg->cb_arg) != 0)

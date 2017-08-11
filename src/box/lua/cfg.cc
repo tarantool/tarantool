@@ -165,10 +165,10 @@ lbox_cfg_set_read_only(struct lua_State *L)
 }
 
 static int
-lbox_cfg_update_vinyl_options(struct lua_State *L)
+lbox_cfg_set_vinyl_timeout(struct lua_State *L)
 {
 	try {
-		box_update_vinyl_options();
+		box_set_vinyl_timeout();
 	} catch (Exception *) {
 		luaT_error(L);
 	}
@@ -183,8 +183,6 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_load", lbox_cfg_load},
 		{"cfg_set_listen", lbox_cfg_set_listen},
 		{"cfg_set_replication", lbox_cfg_set_replication},
-		/* Backward compatibility */
-		{"cfg_set_replication", lbox_cfg_set_replication},
 		{"cfg_set_log_level", lbox_cfg_set_log_level},
 		{"cfg_set_readahead", lbox_cfg_set_readahead},
 		{"cfg_set_io_collect_interval", lbox_cfg_set_io_collect_interval},
@@ -192,7 +190,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_snap_io_rate_limit", lbox_cfg_set_snap_io_rate_limit},
 		{"cfg_set_checkpoint_count", lbox_cfg_set_checkpoint_count},
 		{"cfg_set_read_only", lbox_cfg_set_read_only},
-		{"cfg_update_vinyl_options", lbox_cfg_update_vinyl_options},
+		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
 		{NULL, NULL}
 	};
 

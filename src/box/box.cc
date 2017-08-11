@@ -606,10 +606,10 @@ box_set_checkpoint_count(void)
 }
 
 void
-box_update_vinyl_options(void)
+box_set_vinyl_timeout(void)
 {
 	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
-	vinyl->updateOptions();
+	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
 }
 
 /* }}} configuration bindings */

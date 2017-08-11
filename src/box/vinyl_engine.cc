@@ -72,7 +72,13 @@ VinylEngine::~VinylEngine()
 void
 VinylEngine::init()
 {
-	env = vy_env_new();
+	env = vy_env_new(cfg_gets("vinyl_dir"),
+			 cfg_geti64("vinyl_memory"),
+			 cfg_geti64("vinyl_cache"),
+			 cfg_geti("vinyl_read_threads"),
+			 cfg_geti("vinyl_write_threads"),
+			 cfg_getd("vinyl_timeout"),
+			 cfg_geti("vinyl_max_tuple_size"));
 	if (env == NULL)
 		panic("failed to create vinyl environment");
 }
@@ -253,9 +259,9 @@ VinylEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
 }
 
 void
-VinylEngine::updateOptions()
+VinylEngine::setTimeout(double timeout)
 {
-	if (vy_update_options(env) != 0)
+	if (vy_set_timeout(env, timeout) != 0)
 		diag_raise();
 }
 

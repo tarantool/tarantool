@@ -151,7 +151,7 @@ local dynamic_cfg = {
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
-    vinyl_timeout           = private.cfg_update_vinyl_options,
+    vinyl_timeout           = private.cfg_set_vinyl_timeout,
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,
     -- do nothing, affects new replicas, which query this value on start
