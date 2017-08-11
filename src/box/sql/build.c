@@ -1264,7 +1264,7 @@ void sqlite3AddCollateType(Parse *pParse, Token *pToken){
   zColl = sqlite3NameFromToken(db, pToken);
   if( !zColl ) return;
 
-  if( sqlite3LocateCollSeq(pParse, zColl) ){
+  if( sqlite3LocateCollSeq(pParse, db, zColl) ){
     Index *pIdx;
     sqlite3DbFree(db, p->aCol[i].zColl);
     p->aCol[i].zColl = zColl;
@@ -1304,15 +1304,17 @@ void sqlite3AddCollateType(Parse *pParse, Token *pToken){
 **
 ** See also: sqlite3FindCollSeq(), sqlite3GetCollSeq()
 */
-CollSeq *sqlite3LocateCollSeq(Parse *pParse, const char *zName){
-  sqlite3 *db = pParse->db;
-  u8 enc = ENC(db);
-  u8 initbusy = db->init.busy;
+CollSeq *sqlite3LocateCollSeq(Parse *pParse, sqlite3 *db, const char *zName){
+  u8 enc;
+  u8 initbusy;
   CollSeq *pColl;
+
+  enc = ENC(db);
+  initbusy = db->init.busy;
 
   pColl = sqlite3FindCollSeq(db, enc, zName, initbusy);
   if( !initbusy && (!pColl || !pColl->xCmp) ){
-    pColl = sqlite3GetCollSeq(pParse, enc, pColl, zName);
+    pColl = sqlite3GetCollSeq(pParse, db, enc, pColl, zName);
   }
 
   return pColl;
@@ -1636,12 +1638,23 @@ static void createIndex(
 #endif
 
   if( pParse->pNewTable ){
+    int reg;
     /*
      * A new table is being created, hence iSpaceId is a register, but
      * iIndexId is literal.
      */
     sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol);
     sqlite3VdbeAddOp2(v, OP_Integer, iIndexId, iFirstCol+1);
+
+    /* Generate code to save new pageno into a register.
+     * This is runtime implementation of SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID:
+     *   pageno = (spaceid << 10) | indexid
+     */
+    pParse->regRoot = ++pParse->nMem;
+    reg = ++pParse->nMem;
+    sqlite3VdbeAddOp2(v, OP_Integer, 1 << 10, reg);
+    sqlite3VdbeAddOp3(v, OP_Multiply, reg, iSpaceId, pParse->regRoot);
+    sqlite3VdbeAddOp3(v, OP_AddImm, pParse->regRoot, iIndexId, pParse->regRoot);
   }else{
     /*
      * An existing table is being modified; iSpaceId is literal, but
@@ -2330,7 +2343,7 @@ static void sqlite3ClearStatTables(
   int i;
   for(i=1; i<=4; i++){
     char zTab[24];
-    sqlite3_snprintf(sizeof(zTab),zTab,"sqlite_stat%d",i);
+    sqlite3_snprintf(sizeof(zTab),zTab,"sql_stat%d",i);
     if( sqlite3FindTable(pParse->db, zTab) ){
       sqlite3NestedParse(pParse,
         "DELETE FROM %s WHERE %s=%Q",
@@ -2499,8 +2512,8 @@ void sqlite3DropTable(Parse *pParse, SrcList *pName, int isView, int noErr){
     }
   }
 #endif
-  if( sqlite3StrNICmp(pTab->zName, "sql_sequence", 12)==0
-    && sqlite3StrNICmp(pTab->zName, "sqlite_stat", 11)!=0 ){
+  if( sqlite3StrNICmp(pTab->zName, "sql_", 4)==0
+    && sqlite3StrNICmp(pTab->zName, "sql_stat", 8)!=0 ){
     sqlite3ErrorMsg(pParse, "table %s may not be dropped", pTab->zName);
     goto exit_drop_table;
   }
@@ -2722,7 +2735,7 @@ static void sqlite3RefillIndex(Parse *pParse, Index *pIndex, int memRootPage){
   }else{
     tnum = pIndex->tnum;
   }
-  pKey = sqlite3KeyInfoOfIndex(pParse, pIndex);
+  pKey = sqlite3KeyInfoOfIndex(pParse, db, pIndex);
   assert( pKey!=0 || db->mallocFailed || pParse->nErr );
 
   /* Open the sorter cursor if we are to use one. */
@@ -3197,7 +3210,7 @@ void sqlite3CreateIndex(
       zColl = pTab->aCol[j].zColl;
     }
     if( !zColl ) zColl = sqlite3StrBINARY;
-    if( !db->init.busy && !sqlite3LocateCollSeq(pParse, zColl) ){
+    if( !db->init.busy && !sqlite3LocateCollSeq(pParse, db, zColl) ){
       goto exit_create_index;
     }
     pIndex->azColl[i] = zColl;
@@ -3913,6 +3926,7 @@ void sqlite3BeginTransaction(Parse *pParse, int type){
   if( !v ) return;
   if( type!=TK_DEFERRED ){
     sqlite3VdbeAddOp2(v, OP_Transaction, 0, (type==TK_EXCLUSIVE)+1);
+    sqlite3VdbeAddOp0(v, OP_TTransaction);
     sqlite3VdbeUsesBtree(v);
   }
   sqlite3VdbeAddOp0(v, OP_TTransaction);
@@ -4270,13 +4284,15 @@ exit_reindex:
 ** The caller should invoke sqlite3KeyInfoUnref() on the returned object
 ** when it has finished using it.
 */
-KeyInfo *sqlite3KeyInfoOfIndex(Parse *pParse, Index *pIdx){
+KeyInfo *sqlite3KeyInfoOfIndex(Parse *pParse, sqlite3 *db, Index *pIdx){
   int i;
   int nCol = pIdx->nColumn;
   int nTableCol = pIdx->pTable->nCol;
   int nKey = pIdx->nKeyCol;
   KeyInfo *pKey;
-  if( pParse->nErr ) return 0;
+
+  if (pParse && pParse->nErr) return 0;
+
   /*
    * KeyInfo describes the index (i.e. the number of key columns,
    * comparator options, and the number of columns beyond the key).
@@ -4285,19 +4301,19 @@ KeyInfo *sqlite3KeyInfoOfIndex(Parse *pParse, Index *pIdx){
    * for row parser cache are allocated in VdbeCursor object.
    */
   if( pIdx->uniqNotNull ){
-    pKey = sqlite3KeyInfoAlloc(pParse->db, nKey, nTableCol-nKey);
+    pKey = sqlite3KeyInfoAlloc(db, nKey, nTableCol-nKey);
   }else{
-    pKey = sqlite3KeyInfoAlloc(pParse->db, nCol, nTableCol-nCol);
+    pKey = sqlite3KeyInfoAlloc(db, nCol, nTableCol-nCol);
   }
   if( pKey ){
     assert( sqlite3KeyInfoIsWriteable(pKey) );
     for(i=0; i<nCol; i++){
       const char *zColl = pIdx->azColl[i];
       pKey->aColl[i] = zColl==sqlite3StrBINARY ? 0 :
-                        sqlite3LocateCollSeq(pParse, zColl);
+        sqlite3LocateCollSeq(pParse, db, zColl);
       pKey->aSortOrder[i] = pIdx->aSortOrder[i];
     }
-    if( pParse->nErr ){
+    if( pParse && pParse->nErr ){
       sqlite3KeyInfoUnref(pKey);
       pKey = 0;
     }

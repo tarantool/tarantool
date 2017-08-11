@@ -1048,7 +1048,7 @@ void sqlite3VdbeSetP4KeyInfo(Parse *pParse, Index *pIdx){
   KeyInfo *pKeyInfo;
   assert( v!=0 );
   assert( pIdx!=0 );
-  pKeyInfo = sqlite3KeyInfoOfIndex(pParse, pIdx);
+  pKeyInfo = sqlite3KeyInfoOfIndex(pParse, pParse->db, pIdx);
   if( pKeyInfo ) sqlite3VdbeAppendP4(v, pKeyInfo, P4_KEYINFO);
 }
 
@@ -1311,16 +1311,22 @@ static char *displayP4(Op *pOp, char *zTemp, int nTemp){
   switch( pOp->p4type ){
     case P4_KEYINFO: {
       int j;
-      KeyInfo *pKeyInfo = pOp->p4.pKeyInfo;
-      assert( pKeyInfo->aSortOrder!=0 );
-      sqlite3XPrintf(&x, "k(%d", pKeyInfo->nField);
-      for(j=0; j<pKeyInfo->nField; j++){
-        CollSeq *pColl = pKeyInfo->aColl[j];
-        const char *zColl = pColl ? pColl->zName : "";
-        if( strcmp(zColl, "BINARY")==0 ) zColl = "B";
-        sqlite3XPrintf(&x, ",%s%s", pKeyInfo->aSortOrder[j] ? "-" : "", zColl);
+      KeyInfo *pKeyInfo;
+
+      if( pOp->p4.pKeyInfo == NULL ){
+        sqlite3XPrintf(&x, "k[NULL]");
+      } else {
+        pKeyInfo = pOp->p4.pKeyInfo;
+        assert( pKeyInfo->aSortOrder!=0 );
+        sqlite3XPrintf(&x, "k(%d", pKeyInfo->nField);
+        for(j=0; j<pKeyInfo->nField; j++){
+          CollSeq *pColl = pKeyInfo->aColl[j];
+          const char *zColl = pColl ? pColl->zName : "";
+          if( strcmp(zColl, "BINARY")==0 ) zColl = "B";
+          sqlite3XPrintf(&x, ",%s%s", pKeyInfo->aSortOrder[j] ? "-" : "", zColl);
+        }
+        sqlite3StrAccumAppend(&x, ")", 1);
       }
-      sqlite3StrAccumAppend(&x, ")", 1);
       break;
     }
 #ifdef SQLITE_ENABLE_CURSOR_HINTS

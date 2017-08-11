@@ -16,6 +16,7 @@ include_directories(${SRCDIR})
 add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
 add_definitions(-DTHREADSAFE=0)
 add_definitions(-DSQLITE_DEFAULT_FOREIGN_KEYS=1)
+add_definitions(-DSQLITE_ENABLE_STAT4=1)
 
 set(TEST_DEFINITIONS
     SQLITE_DEBUG=1

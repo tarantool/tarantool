@@ -1762,7 +1762,7 @@ struct Table {
   i16 iAutoIncPKey;    /* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
                           column number here, -1 otherwise Tarantool specifics */
   i16 nCol;            /* Number of columns in this table */
-  LogEst nRowLogEst;   /* Estimated rows in table - from sqlite_stat1 table */
+  LogEst nRowLogEst;   /* Estimated rows in table - from sql_stat1 table */
   LogEst szTabRow;     /* Estimated size of each table row in bytes */
 #ifdef SQLITE_ENABLE_COSTMULT
   LogEst costMult;     /* Cost multiplier for using this table */
@@ -2073,7 +2073,7 @@ struct Index {
 #define XN_EXPR      (-2)     /* Indexed column is an expression */
 
 /*
-** Each sample stored in the sqlite_stat3 table is represented in memory
+** Each sample stored in the sql_stat3 table is represented in memory
 ** using a structure of this type.  See documentation at the top of the
 ** analyze.c source file for additional information.
 */
@@ -3859,7 +3859,7 @@ const char *sqlite3ErrName(int);
 const char *sqlite3ErrStr(int);
 int sqlite3ReadSchema(Parse *pParse);
 CollSeq *sqlite3FindCollSeq(sqlite3*,u8 enc, const char*,int);
-CollSeq *sqlite3LocateCollSeq(Parse *pParse, const char*zName);
+CollSeq *sqlite3LocateCollSeq(Parse *pParse, sqlite3 *db, const char*zName);
 CollSeq *sqlite3ExprCollSeq(Parse *pParse, Expr *pExpr);
 Expr *sqlite3ExprAddCollateToken(Parse *pParse, Expr*, const Token*, int);
 Expr *sqlite3ExprAddCollateString(Parse*,Expr*,const char*);
@@ -3918,7 +3918,7 @@ int sqlite3ResolveOrderGroupBy(Parse*, Select*, ExprList*, const char*);
 void sqlite3ColumnDefault(Vdbe *, Table *, int, int);
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
-CollSeq *sqlite3GetCollSeq(Parse*, u8, CollSeq *, const char*);
+CollSeq *sqlite3GetCollSeq(Parse*, sqlite3*, u8, CollSeq *, const char*);
 char sqlite3AffinityType(const char*, u8*);
 void sqlite3Analyze(Parse*, Token*);
 int sqlite3InvokeBusyHandler(BusyHandler*);
@@ -3935,7 +3935,7 @@ int sqlite3SchemaToIndex(sqlite3 *db, Schema *);
 KeyInfo *sqlite3KeyInfoAlloc(sqlite3*,int,int);
 void sqlite3KeyInfoUnref(KeyInfo*);
 KeyInfo *sqlite3KeyInfoRef(KeyInfo*);
-KeyInfo *sqlite3KeyInfoOfIndex(Parse*, Index*);
+KeyInfo *sqlite3KeyInfoOfIndex(Parse*, sqlite3*, Index*);
 #ifdef SQLITE_DEBUG
 int sqlite3KeyInfoIsWriteable(KeyInfo*);
 #endif

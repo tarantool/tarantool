@@ -26,6 +26,9 @@
 
 #include "msgpuck/msgpuck.h"
 
+#include "box/schema.h"
+#include "box/space.h"
+
 /*
 ** Invoke this macro on memory cells just prior to changing the
 ** value of the cell.  This macro verifies that shallow copies are
@@ -3339,7 +3342,31 @@ case OP_OpenWrite:
     assert( p2>=2 );
   }
   if( pOp->p4type==P4_KEYINFO ){
-    pKeyInfo = pOp->p4.pKeyInfo;
+    if( pOp->p4.pKeyInfo ) {
+      pKeyInfo = pOp->p4.pKeyInfo;
+    } else {
+      unsigned spaceId;
+      struct space *space;
+      const char *zName;
+      Table *pTab;
+      Index *pIdx;
+      /* Try to extract KeyInfo from PK if it was not passed.  */
+      spaceId = SQLITE_PAGENO_TO_SPACEID(p2);
+      space = space_by_id(spaceId);
+      assert( space );
+
+      zName = space_name(space);
+      assert( zName );
+
+      pTab = sqlite3HashFind(&db->mdb.pSchema->tblHash, zName);
+      assert( pTab );
+
+      pIdx = sqlite3PrimaryKeyIndex(pTab);
+      assert( pIdx );
+
+      pKeyInfo = sqlite3KeyInfoOfIndex(0, db, pIdx);
+      assert( pKeyInfo );
+    }
     assert( pKeyInfo->enc==ENC(db) );
     assert( pKeyInfo->db==db );
     nField = pKeyInfo->nField+pKeyInfo->nXField;
@@ -5526,7 +5553,7 @@ case OP_ParseSchema3: {
 #if !defined(SQLITE_OMIT_ANALYZE)
 /* Opcode: LoadAnalysis P1 * * * *
 **
-** Read the sqlite_stat1 table for database P1 and load the content
+** Read the sql_stat1 table for database P1 and load the content
 ** of that table into the internal index hash table.  This will cause
 ** the analysis to be used when preparing all subsequent queries.
 */

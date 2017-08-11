@@ -407,18 +407,18 @@ test:do_catchsql_test(
 --   catchsql {DROP TABLE IF EXISTS sqlite_master}
 -- } {1 {table sqlite_master may not be dropped}}
 
--- Dropping sqlite_statN tables is OK.
+-- Dropping sql_statN tables is OK.
 --
 test:do_test(
     "table-5.2.1",
     function()
         return test:execsql [[
             ---ANALYZE;
-            DROP TABLE IF EXISTS sqlite_stat1;
-            DROP TABLE IF EXISTS sqlite_stat2;
-            DROP TABLE IF EXISTS sqlite_stat3;
-            DROP TABLE IF EXISTS sqlite_stat4;
-            SELECT name FROM sqlite_master WHERE name GLOB 'sqlite_stat*';
+            DROP TABLE IF EXISTS sql_stat1;
+            DROP TABLE IF EXISTS sql_stat2;
+            DROP TABLE IF EXISTS sql_stat3;
+            DROP TABLE IF EXISTS sql_stat4;
+            SELECT name FROM sqlite_master WHERE name GLOB 'sql_stat*';
         ]]
     end, {
         -- <table-5.2.1>

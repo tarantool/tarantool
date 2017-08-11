@@ -264,17 +264,6 @@ local function explain_no_trace(self, sql)
 end
 test.explain_no_trace = explain_no_trace
 
-test.do_eqp_test = function (self, label, sql, result)
-
-    test:do_test(
-        label,
-        function()
-            return box.sql.execute("EXPLAIN QUERY PLAN "..sql)
-        end,
-        result
-    )
-end
-
 function test.drop_all_tables(self)
     local tables = test:execsql("SELECT name FROM _space WHERE name NOT LIKE '\\_%' ESCAPE '\\';")
     for _, table in ipairs(tables) do
@@ -294,6 +283,22 @@ function test.do_select_tests(self, label, tests)
             end,
             result)
     end
+end
+
+function test.sf_execsql(self, sql)
+    local old = box.sql.debug().sql_search_count
+    local r = test:execsql(sql)
+    local new = box.sql.debug().sql_search_count - old
+
+    return {new, r}
+end
+
+function test.do_sf_execsql_test(self, label, sql, result)
+    return test:do_test(label,
+                        function()
+                            return test:sf_execsql(sql)
+                        end,
+                        result)
 end
 
 local function db(self, cmd, ...)
@@ -354,6 +359,14 @@ function test.randstr(Length)
     return table.concat(Result)
 end
 
+test.do_eqp_test = function (self, label, sql, result)
+    test:do_test(
+        label,
+        function()
+            return execsql_one_by_one("EXPLAIN QUERY PLAN "..sql)
+        end,
+        result)
+end
 
 setmetatable(_G, nil)
 os.execute("rm -f *.snap *.xlog*")

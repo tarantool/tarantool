@@ -95,5 +95,19 @@ for a, from in ipairs(froms) do
 
     end
 end
+
+test:do_test(
+    "tkt-fc7bd6358f.200",
+    function()
+        return test:execsql [[
+            DROP TABLE t;
+            DROP TABLE i;
+        ]]
+    end, {
+        -- <tkt-fc7bd6358f.100>
+        
+        -- </tkt-fc7bd6358f.100>
+    })
+
 test:finish_test()
 

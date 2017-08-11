@@ -1865,6 +1865,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 					for (i = 0; i < pPk->nKeyCol; i++) {
 						char *p4 = (char *)
 						    sqlite3LocateCollSeq(pParse,
+                                                                         db,
 									 pPk->azColl
 									 [i]);
 						x = pPk->aiColumn[i];

@@ -81,12 +81,12 @@ static int synthCollSeq(sqlite3 *db, CollSeq *pColl){
 */
 CollSeq *sqlite3GetCollSeq(
   Parse *pParse,        /* Parsing context */
+  sqlite3 *db,          /* if called during runtime - pointer to the DB */
   u8 enc,               /* The desired encoding for the collating sequence */
   CollSeq *pColl,       /* Collating sequence with native encoding, or NULL */
   const char *zName     /* Collating sequence name */
 ){
   CollSeq *p;
-  sqlite3 *db = pParse->db;
 
   p = pColl;
   if( !p ){
@@ -104,7 +104,10 @@ CollSeq *sqlite3GetCollSeq(
   }
   assert( !p || p->xCmp );
   if( p==0 ){
-    sqlite3ErrorMsg(pParse, "no such collation sequence: %s", zName);
+    if (pParse)
+      sqlite3ErrorMsg(pParse, "no such collation sequence: %s", zName);
+    else
+      {} /* Assert will be triggered.  */
   }
   return p;
 }
@@ -124,7 +127,7 @@ int sqlite3CheckCollSeq(Parse *pParse, CollSeq *pColl){
   if( pColl ){
     const char *zName = pColl->zName;
     sqlite3 *db = pParse->db;
-    CollSeq *p = sqlite3GetCollSeq(pParse, ENC(db), pColl, zName);
+    CollSeq *p = sqlite3GetCollSeq(pParse, pParse->db, ENC(db), pColl, zName);
     if( !p ){
       return SQLITE_ERROR;
     }

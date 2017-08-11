@@ -1107,9 +1107,8 @@ static sqlite3_value *valueNew(sqlite3 *db, struct ValueNewStat4Ctx *p){
       nByte = sizeof(Mem) * nCol + ROUND8(sizeof(UnpackedRecord));
       pRec = (UnpackedRecord*)sqlite3DbMallocZero(db, nByte);
       if( pRec ){
-        pRec->pKeyInfo = sqlite3KeyInfoOfIndex(p->pParse, pIdx);
+        pRec->pKeyInfo = sqlite3KeyInfoOfIndex(p->pParse, db, pIdx);
         if( pRec->pKeyInfo ){
-          assert( pRec->pKeyInfo->nField+pRec->pKeyInfo->nXField==nCol );
           assert( pRec->pKeyInfo->enc==ENC(db) );
           pRec->aMem = (Mem *)((u8*)pRec + ROUND8(sizeof(UnpackedRecord)));
           for(i=0; i<nCol; i++){
@@ -1399,7 +1398,7 @@ int sqlite3ValueFromExpr(
 ** record (a blob) containing the argument value.
 **
 ** This is used to convert the value stored in the 'sample' column of the
-** sqlite_stat3 table to the record format SQLite uses internally.
+** sql_stat3 table to the record format SQLite uses internally.
 */
 static void recordFunc(
   sqlite3_context *context,
@@ -1507,7 +1506,7 @@ static int stat4ValueFromExpr(
 /*
 ** This function is used to allocate and populate UnpackedRecord 
 ** structures intended to be compared against sample index keys stored 
-** in the sqlite_stat4 table.
+** in the sql_stat4 table.
 **
 ** A single call to this function populates zero or more fields of the
 ** record starting with field iVal (fields are numbered from left to
@@ -1648,7 +1647,7 @@ int sqlite3Stat4Column(
 void sqlite3Stat4ProbeFree(UnpackedRecord *pRec){
   if( pRec ){
     int i;
-    int nCol = pRec->pKeyInfo->nField+pRec->pKeyInfo->nXField;
+    int nCol = pRec->pKeyInfo->nField;
     Mem *aMem = pRec->aMem;
     sqlite3 *db = aMem[0].db;
     for(i=0; i<nCol; i++){

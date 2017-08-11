@@ -5587,7 +5587,7 @@ int sqlite3Select(
         }
         if( pBest ){
           iRoot = pBest->tnum;
-          pKeyInfo = sqlite3KeyInfoOfIndex(pParse, pBest);
+          pKeyInfo = sqlite3KeyInfoOfIndex(pParse, db, pBest);
         }
 
         /* Open a read-only cursor, execute the OP_Count, close the cursor. */

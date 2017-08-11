@@ -141,7 +141,7 @@ CollSeq *sqlite3ExprCollSeq(Parse *pParse, Expr *pExpr){
       continue;
     }
     if( op==TK_COLLATE || (op==TK_REGISTER && p->op2==TK_COLLATE) ){
-      pColl = sqlite3GetCollSeq(pParse, ENC(db), 0, p->u.zToken);
+      pColl = sqlite3GetCollSeq(pParse, db, ENC(db), 0, p->u.zToken);
       break;
     }
     if( (op==TK_AGG_COLUMN || op==TK_COLUMN

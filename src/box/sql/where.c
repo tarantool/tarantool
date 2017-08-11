@@ -17,6 +17,7 @@
 ** indices, you might also think of this module as the "query optimizer".
 */
 #include "sqliteInt.h"
+#include "vdbeInt.h"
 #include "whereInt.h"
 
 /* Forward declaration of methods */
@@ -1108,7 +1109,7 @@ static int whereKeyStats(
     }
 
     pRec->nField = n;
-    res = sqlite3VdbeRecordCompare(aSample[iSamp].n, aSample[iSamp].p, pRec);
+    res = sqlite3VdbeRecordCompareMsgpack(aSample[iSamp].n, aSample[iSamp].p, pRec);
     if( res<0 ){
       iLower = aSample[iSamp].anLt[n-1] + aSample[iSamp].anEq[n-1];
       iMin = iTest+1;
@@ -1133,9 +1134,9 @@ static int whereKeyStats(
       assert( i<pIdx->nSample );
       assert( iCol==nField-1 );
       pRec->nField = nField;
-      assert( 0==sqlite3VdbeRecordCompare(aSample[i].n, aSample[i].p, pRec) 
-           || pParse->db->mallocFailed 
-      );
+      assert( 0==sqlite3VdbeRecordCompareMsgpack(aSample[i].n, aSample[i].p, pRec)
+              || pParse->db->mallocFailed
+              );
     }else{
       /* Unless i==pIdx->nSample, indicating that pRec is larger than
       ** all samples in the aSample[] array, pRec must be smaller than the
@@ -1143,8 +1144,8 @@ static int whereKeyStats(
       assert( i<=pIdx->nSample && i>=0 );
       pRec->nField = iCol+1;
       assert( i==pIdx->nSample 
-           || sqlite3VdbeRecordCompare(aSample[i].n, aSample[i].p, pRec)>0
-           || pParse->db->mallocFailed );
+              || sqlite3VdbeRecordCompareMsgpack(aSample[i].n, aSample[i].p, pRec) > 0
+              || pParse->db->mallocFailed );
 
       /* if i==0 and iCol==0, then record pRec is smaller than all samples
       ** in the aSample[] array. Otherwise, if (iCol>0) then pRec must
@@ -1152,12 +1153,12 @@ static int whereKeyStats(
       ** If (i>0), then pRec must also be greater than sample (i-1).  */
       if( iCol>0 ){
         pRec->nField = iCol;
-        assert( sqlite3VdbeRecordCompare(aSample[i].n, aSample[i].p, pRec)<=0
+        assert( sqlite3VdbeRecordCompareMsgpack(aSample[i].n, aSample[i].p, pRec)<=0
              || pParse->db->mallocFailed );
       }
       if( i>0 ){
         pRec->nField = nField;
-        assert( sqlite3VdbeRecordCompare(aSample[i-1].n, aSample[i-1].p, pRec)<0
+        assert( sqlite3VdbeRecordCompareMsgpack(aSample[i-1].n, aSample[i-1].p, pRec)<0
              || pParse->db->mallocFailed );
       }
     }
@@ -1294,7 +1295,7 @@ static int whereRangeSkipScanEst(
   sqlite3_value *p2 = 0;          /* Value extracted from pUpper */
   sqlite3_value *pVal = 0;        /* Value extracted from record */
 
-  pColl = sqlite3LocateCollSeq(pParse, p->azColl[nEq]);
+  pColl = sqlite3LocateCollSeq(pParse, db, p->azColl[nEq]);
   if( pLower ){
     rc = sqlite3Stat4ValueFromExpr(pParse, pLower->pExpr->pRight, aff, &p1);
     nLower = 0;
@@ -1381,7 +1382,7 @@ static int whereRangeSkipScanEst(
 ** rows in the index. Assuming no error occurs, *pnOut is adjusted (reduced)
 ** to account for the range constraints pLower and pUpper.
 ** 
-** In the absence of sqlite_stat4 ANALYZE data, or if such data cannot be
+** In the absence of sql_stat4 ANALYZE data, or if such data cannot be
 ** used, a single range inequality reduces the search space by a factor of 4. 
 ** and a pair of constraints (x>? AND x<?) reduces the expected number of
 ** rows visited by a factor of 64.
@@ -1552,7 +1553,7 @@ static int whereRangeScanEst(
 ** Estimate the number of rows that will be returned based on
 ** an equality constraint x=VALUE and where that VALUE occurs in
 ** the histogram data.  This only works when x is the left-most
-** column of an index and sqlite_stat3 histogram data is available
+** column of an index and sql_stat3 histogram data is available
 ** for that index.  When pExpr==NULL that means the constraint is
 ** "x IS NULL" instead of "x=VALUE".
 **
@@ -1588,13 +1589,6 @@ static int whereEqualScanEst(
   ** of this one, no estimate can be made. Return SQLITE_NOTFOUND. */
   if( pBuilder->nRecValid<(nEq-1) ){
     return SQLITE_NOTFOUND;
-  }
-
-  /* This is an optimization only. The call to sqlite3Stat4ProbeSetValue()
-  ** below would return the same value.  */
-  if( nEq>=p->nColumn ){
-    *pnRow = 1;
-    return SQLITE_OK;
   }
 
   rc = sqlite3Stat4ProbeSetValue(pParse, p, &pRec, pExpr, 1, nEq-1, &bOk);
