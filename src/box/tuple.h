@@ -45,7 +45,7 @@ struct slab_arena;
 struct quota;
 
 /** Initialize tuple library */
-void
+int
 tuple_init(void);
 
 /** Cleanup tuple library */
@@ -451,6 +451,21 @@ tuple_extra(const struct tuple *tuple)
 }
 
 /**
+ * Instantiate a new engine-independent tuple from raw MsgPack Array data
+ * using runtime arena. Use this function to create a standalone tuple
+ * from Lua or C procedures.
+ *
+ * \param format tuple format.
+ * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
+ * \param end the end of \a data
+ * \retval tuple on success
+ * \retval NULL on out of memory
+ * \sa \code box.tuple.new(data) \endcode
+ */
+struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/**
  * Free the tuple of any engine.
  * @pre tuple->refs  == 0
  */
@@ -736,6 +751,7 @@ tuple_unref(struct tuple *tuple)
 }
 
 extern struct tuple *box_tuple_last;
+extern struct tuple_format *tuple_format_runtime;
 
 /**
  * Convert internal `struct tuple` to public `box_tuple_t`.

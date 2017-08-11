@@ -1386,6 +1386,9 @@ box_init(void)
 	 * as a default session user when running triggers.
 	 */
 	session_init();
+
+	if (tuple_init() != 0)
+		diag_raise();
 }
 
 bool
@@ -1397,8 +1400,6 @@ box_is_configured(void)
 static inline void
 box_cfg_xc(void)
 {
-	tuple_init();
-
 	/* Join the cord interconnect as "tx" endpoint. */
 	fiber_pool_create(&tx_fiber_pool, "tx", FIBER_POOL_SIZE,
 			  FIBER_POOL_IDLE_TIMEOUT);

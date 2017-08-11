@@ -53,6 +53,8 @@ status, result = pcall(function() return box.index.EQ end)
 test:ok(status and type(result) == 'number', "box.index without box.cfg")
 status, result = pcall(box.session.id)
 test:ok(status, "box.session without box.cfg")
+status, result = pcall(box.tuple.new, {1, 2, 3})
+test:ok(status and result[1] == 1, "box.tuple without box.cfg")
 
 os.execute("rm -rf vinyl")
 box.cfg{

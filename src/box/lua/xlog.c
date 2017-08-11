@@ -108,21 +108,15 @@ lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const c
 		lua_pushinteger(L, v); /* unknown key */
 	}
 
-	box_tuple_format_t *fmt = NULL;
 	if ((v == IPROTO_KEY || v == IPROTO_TUPLE) &&
-	    (mp_typeof(**beg) == MP_ARRAY) &&
-	    (fmt = box_tuple_format_default()) != NULL) {
+	    (mp_typeof(**beg) == MP_ARRAY)) {
 		/*
 		 * Push tuple if possible.
-		 *
-		 * Sic: box_tuple_format_default() != NULL is used to check
-		 * that box is initialized.
 		 */
 		const char *tuple_beg = *beg;
 		mp_next(beg);
-		struct tuple *tuple = NULL;
-		assert(fmt != NULL);
-		tuple = box_tuple_new(fmt, tuple_beg, *beg);
+		struct tuple_format *format = box_tuple_format_default();
+		struct tuple *tuple = box_tuple_new(format, tuple_beg, *beg);
 		if (tuple == NULL)
 			luaT_error(L);
 		luaT_pushtuple(L, tuple);

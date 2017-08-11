@@ -320,6 +320,7 @@ local box_cfg_guard_whitelist = {
     internal = true;
     index = true;
     session = true;
+    tuple = true;
     runtime = true;
 };
 

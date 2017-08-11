@@ -81,14 +81,6 @@ memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
-
-	tuple_format_default_vtab = &memtx_tuple_format_vtab;
-	tuple_format_default = tuple_format_new(tuple_format_default_vtab,
-						NULL, 0, 0);
-	if (tuple_format_default == NULL)
-		diag_raise();
-	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_default);
 }
 
 void
@@ -192,6 +184,8 @@ box_tuple_t *
 box_tuple_update(const box_tuple_t *tuple, const char *expr,
 		 const char *expr_end)
 {
+	struct tuple_format *format = tuple_format_runtime;
+
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
@@ -205,11 +199,10 @@ box_tuple_update(const box_tuple_t *tuple, const char *expr,
 		return NULL;
 	}
 
-	struct tuple *ret = memtx_tuple_new(tuple_format_default, new_data,
-					    new_data + new_size);
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
-		return tuple_bless_xc(ret);
+		return tuple_bless(ret);
 	return NULL;
 }
 
@@ -217,6 +210,8 @@ box_tuple_t *
 box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
 		 const char *expr_end)
 {
+	struct tuple_format *format = tuple_format_runtime;
+
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
@@ -230,20 +225,19 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
 		return NULL;
 	}
 
-	struct tuple *ret = memtx_tuple_new(tuple_format_default, new_data,
-					    new_data + new_size);
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
-		return tuple_bless_xc(ret);
+		return tuple_bless(ret);
 	return NULL;
 }
 
 box_tuple_t *
 box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 {
-	struct tuple *ret = memtx_tuple_new(format, data, end);
+	struct tuple *ret = tuple_new(format, data, end);
 	if (ret == NULL)
 		return NULL;
-	/* Can't throw on zero refs. */
-	return tuple_bless_xc(ret);
+	/* Can't fail on zero refs. */
+	return tuple_bless(ret);
 }

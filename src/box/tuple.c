@@ -31,17 +31,88 @@
 #include "tuple.h"
 
 #include "trivia/util.h"
+#include "memory.h"
 #include "fiber.h"
 #include "tt_uuid.h"
 #include "small/quota.h"
+#include "small/small.h"
+
+#include "tuple_update.h"
 
 static struct mempool tuple_iterator_pool;
+static struct small_alloc runtime_alloc;
+
+enum {
+	/** Lowest allowed slab_alloc_minimal */
+	OBJSIZE_MIN = 16,
+};
+
+static const double ALLOC_FACTOR = 1.05;
 
 /**
  * Last tuple returned by public C API
  * \sa tuple_bless()
  */
 struct tuple *box_tuple_last;
+
+/**
+ * A format for standalone tuples allocated on runtime arena.
+ * \sa tuple_new().
+ */
+struct tuple_format *tuple_format_runtime;
+
+static void
+runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+/** A virtual method table for tuple_format_runtime */
+static struct tuple_format_vtab tuple_format_runtime_vtab = {
+	runtime_tuple_delete,
+};
+
+struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	assert(format->vtab.destroy == tuple_format_runtime_vtab.destroy);
+
+	mp_tuple_assert(data, end);
+	size_t data_len = end - data;
+	size_t meta_size = tuple_format_meta_size(format);
+	size_t total = sizeof(struct tuple) + meta_size + data_len;
+
+	struct tuple *tuple = (struct tuple *) smalloc(&runtime_alloc, total);
+	if (tuple == NULL) {
+		diag_set(OutOfMemory, (unsigned) total,
+			 "malloc", "tuple");
+		return NULL;
+	}
+
+	tuple->refs = 0;
+	tuple->bsize = data_len;
+	tuple->format_id = tuple_format_id(format);
+	tuple_format_ref(format);
+	tuple->data_offset = sizeof(struct tuple) + meta_size;
+	char *raw = (char *) tuple + tuple->data_offset;
+	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw, data, data_len);
+	if (tuple_init_field_map(format, field_map, raw)) {
+		runtime_tuple_delete(format, tuple);
+		return NULL;
+	}
+	say_debug("%s(%zu) = %p", __func__, data_len, tuple);
+	return tuple;
+}
+
+static void
+runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
+{
+	assert(format->vtab.destroy == tuple_format_runtime_vtab.destroy);
+	say_debug("%s(%p)", __func__, tuple);
+	assert(tuple->refs == 0);
+	size_t total = sizeof(struct tuple) + tuple_format_meta_size(format) +
+		tuple->bsize;
+	tuple_format_unref(format);
+	smfree(&runtime_alloc, tuple, total);
+}
 
 int
 tuple_validate_raw(struct tuple_format *format, const char *tuple)
@@ -307,13 +378,30 @@ tuple_extract_key_set(struct key_def *key_def)
 	}
 }
 
-void
+int
 tuple_init(void)
 {
+	/*
+	 * Create a format for runtime tuples
+	 */
+	RLIST_HEAD(empty_list);
+	tuple_format_runtime = tuple_format_new(&tuple_format_runtime_vtab,
+						NULL, 0, 0);
+	if (tuple_format_runtime == NULL)
+		return -1;
+
+	/* Make sure this one stays around. */
+	tuple_format_ref(tuple_format_runtime);
+
+	small_alloc_create(&runtime_alloc, &cord()->slabc, OBJSIZE_MIN,
+			   ALLOC_FACTOR);
+
 	mempool_create(&tuple_iterator_pool, &cord()->slabc,
 		       sizeof(struct tuple_iterator));
 
 	box_tuple_last = NULL;
+
+	return 0;
 }
 
 void
@@ -359,6 +447,7 @@ tuple_free(void)
 	}
 
 	mempool_destroy(&tuple_iterator_pool);
+	small_alloc_destroy(&runtime_alloc);
 
 	tuple_format_free();
 }
@@ -366,7 +455,18 @@ tuple_free(void)
 box_tuple_format_t *
 box_tuple_format_default(void)
 {
-	return tuple_format_default;
+	return tuple_format_runtime;
+}
+
+box_tuple_format_t *
+box_tuple_format_new(struct key_def **keys, uint16_t key_count)
+{
+	box_tuple_format_t *format =
+		tuple_format_new(&tuple_format_runtime_vtab,
+				 keys, key_count, 0);
+	if (format != NULL)
+		tuple_format_ref(format);
+	return format;
 }
 
 int
