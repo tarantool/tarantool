@@ -763,7 +763,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 		return -1;
 	}
 	char *data = buf;
-	data = mp_encode_map(data, 3);
+	data = mp_encode_map(data, 4);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = xrow_encode_uuid(data, replicaset_uuid);
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
@@ -776,6 +776,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 		data = mp_encode_uint(data, replica.id);
 		data = mp_encode_uint(data, replica.lsn);
 	}
+	data = mp_encode_uint(data, IPROTO_VERSION);
+	data = mp_encode_uint(data, tarantool_version_id());
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
@@ -786,7 +788,8 @@ xrow_encode_subscribe(struct xrow_header *row,
 
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
-		      struct tt_uuid *instance_uuid, struct vclock *vclock)
+		      struct tt_uuid *instance_uuid, struct vclock *vclock,
+		      uint32_t *version_id)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -834,6 +837,16 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			}
 			lsnmap = d;
 			mp_next(&d);
+			break;
+		case IPROTO_VERSION:
+			if (version_id == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_UINT) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "invalid VERSION");
+				return -1;
+			}
+			*version_id = mp_decode_uint(&d);
 			break;
 		default: skip:
 			mp_next(&d); /* value */

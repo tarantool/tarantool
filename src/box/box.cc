@@ -1123,9 +1123,10 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 
 	struct tt_uuid replicaset_uuid = uuid_nil, replica_uuid = uuid_nil;
 	struct vclock replica_clock;
+	uint32_t replica_version_id;
 	vclock_create(&replica_clock);
 	xrow_decode_subscribe_xc(header, &replicaset_uuid, &replica_uuid,
-				 &replica_clock);
+				 &replica_clock, &replica_version_id);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
@@ -1192,7 +1193,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(io->fd, header->sync, replica, &replica_clock);
+	relay_subscribe(io->fd, header->sync, replica, &replica_clock,
+			replica_version_id);
 }
 
 /** Insert a new cluster into _schema */

@@ -35,6 +35,7 @@
 #include <sys/socket.h>
 #include <tarantool_ev.h>
 
+#include "fiber_cond.h"
 #include "fiber_channel.h"
 #include "trigger.h"
 #include "trivia/util.h"
@@ -70,6 +71,10 @@ extern const char *applier_state_strs[];
 struct applier {
 	/** Background fiber */
 	struct fiber *reader;
+	/** Background fiber to reply with vclock */
+	struct fiber *writer;
+	/** Writer cond. */
+	struct fiber_cond writer_cond;
 	/** Finite-state machine */
 	enum applier_state state;
 	/** Local time of this replica when the last row has been received */

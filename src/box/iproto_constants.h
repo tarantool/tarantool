@@ -78,6 +78,7 @@ enum iproto_key {
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
+	IPROTO_VERSION = 0x32,
 	IPROTO_KEY_MAX
 };
 

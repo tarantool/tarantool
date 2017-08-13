@@ -256,7 +256,8 @@ xrow_encode_subscribe(struct xrow_header *row,
  */
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
-		      struct tt_uuid *instance_uuid, struct vclock *vclock);
+		      struct tt_uuid *instance_uuid, struct vclock *vclock,
+		      uint32_t *version_id);
 
 /**
  * Encode JOIN command.
@@ -511,10 +512,11 @@ xrow_encode_subscribe_xc(struct xrow_header *row,
 static inline void
 xrow_decode_subscribe_xc(struct xrow_header *row,
 			 struct tt_uuid *replicaset_uuid,
-		         struct tt_uuid *instance_uuid, struct vclock *vclock)
+		         struct tt_uuid *instance_uuid, struct vclock *vclock,
+			 uint32_t *replica_version_id)
 {
 	if (xrow_decode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock) != 0)
+				  vclock, replica_version_id) != 0)
 		diag_raise();
 }
 
@@ -535,7 +537,7 @@ xrow_encode_join_xc(struct xrow_header *row,
 static inline void
 xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	xrow_decode_subscribe_xc(row, NULL, instance_uuid, NULL);
+	xrow_decode_subscribe_xc(row, NULL, instance_uuid, NULL, NULL);
 }
 
 /** @copydoc xrow_encode_vclock. */
@@ -554,7 +556,7 @@ xrow_encode_vclock_xc(struct xrow_header *row, const struct vclock *vclock)
 static inline int
 xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, NULL, NULL, vclock);
+	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL);
 }
 
 /**
@@ -565,7 +567,7 @@ xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 static inline void
 xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
 {
-	xrow_decode_subscribe_xc(row, NULL, NULL, vclock);
+	xrow_decode_subscribe_xc(row, NULL, NULL, vclock, NULL);
 }
 
 /** @copydoc iproto_reply_ok. */
