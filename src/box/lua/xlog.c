@@ -35,6 +35,7 @@
 #include <diag.h>
 #include <msgpuck/msgpuck.h>
 
+#include <box/error.h>
 #include <box/xlog.h>
 #include <box/xrow.h>
 #include <box/iproto_constants.h>

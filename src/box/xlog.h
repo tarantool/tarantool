@@ -49,8 +49,6 @@ struct xrow_header;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern const struct type_info type_XlogError;
-
 /* {{{ log dir */
 
 /**
@@ -706,30 +704,6 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 } /* extern C */
 
 #include "exception.h"
-
-/**
- * XlogError is raised when there is an error with contents
- * of the data directory or a log file. A special subclass
- * of exception is introduced to gracefully skip such errors
- * in force_recovery = true mode.
- */
-struct XlogError: public Exception
-{
-	XlogError(const char *file, unsigned line,
-		  const char *format, ...);
-	virtual void raise() { throw this; }
-protected:
-	XlogError(const struct type_info *type, const char *file,
-		  unsigned line, const char *format, ...);
-};
-
-struct XlogGapError: public XlogError
-{
-	XlogGapError(const char *file, unsigned line,
-		  const struct vclock *from,
-		  const struct vclock *to);
-	virtual void raise() { throw this; }
-};
 
 static inline void
 xdir_scan_xc(struct xdir *dir)

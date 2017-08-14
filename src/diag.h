@@ -231,6 +231,8 @@ struct error_factory {
 				     uint32_t errcode, ...);
 	struct error *(*SystemError)(const char *file, unsigned line,
 				     const char *format, ...);
+	struct error *(*XlogError)(const char *file, unsigned line,
+				   const char *format, ...);
 };
 
 struct diag *

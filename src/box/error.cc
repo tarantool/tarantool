@@ -157,9 +157,25 @@ ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 	/* nothing */
 }
 
+const struct type_info type_XlogError = make_type("XlogError", &type_Exception);
+
+static struct error *
+BuildXlogError(const char *file, unsigned line, const char *format, ...)
+{
+	try {
+		va_list ap;
+		va_start(ap, format);
+		XlogError *e = new XlogError(file, line, format, ap);
+		va_end(ap);
+		return e;
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}
+
 void
 box_error_init(void)
 {
 	error_factory->ClientError = BuildClientError;
+	error_factory->XlogError = BuildXlogError;
 }
-

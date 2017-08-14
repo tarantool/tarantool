@@ -38,7 +38,6 @@
 #include "fio.h"
 #include "third_party/tarantool_eio.h"
 #include <msgpuck.h>
-#include "scoped_guard.h"
 
 #include "coio_file.h"
 
@@ -78,45 +77,6 @@ enum {
 	 */
 	XLOG_TX_COMPRESS_THRESHOLD = 2 * 1024,
 };
-
-const struct type_info type_XlogError = make_type("XlogError", &type_Exception);
-XlogError::XlogError(const char *file, unsigned line,
-		     const char *format, ...)
-	:Exception(&type_XlogError, file, line)
-{
-	va_list ap;
-	va_start(ap, format);
-	error_vformat_msg(this, format, ap);
-	va_end(ap);
-}
-
-XlogError::XlogError(const struct type_info *type, const char *file,
-		     unsigned line, const char *format, ...)
-	:Exception(type, file, line)
-{
-	va_list ap;
-	va_start(ap, format);
-	error_vformat_msg(this, format, ap);
-	va_end(ap);
-}
-
-const struct type_info type_XlogGapError =
-	make_type("XlogGapError", &type_XlogError);
-
-XlogGapError::XlogGapError(const char *file, unsigned line,
-			   const struct vclock *from,
-			   const struct vclock *to)
-	:XlogError(&type_XlogGapError, file, line, "")
-{
-	char *s_from = vclock_to_string(from);
-	char *s_to = vclock_to_string(to);
-	snprintf(errmsg, sizeof(errmsg),
-		 "Missing .xlog file between LSN %lld %s and %lld %s",
-		 (long long) vclock_sum(from), s_from ? s_from : "",
-		 (long long) vclock_sum(to), s_to ? s_to : "");
-	free(s_from);
-	free(s_to);
-}
 
 /* {{{ struct xlog_meta */
 
@@ -193,7 +153,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 	 */
 	const char *eol = (const char *)memchr(pos, '\n', end - pos);
 	if (eol == end || (eol - pos) >= (ptrdiff_t) sizeof(meta->filetype)) {
-		tnt_error(XlogError, "failed to parse xlog type string");
+		diag_set(XlogError, "failed to parse xlog type string");
 		return -1;
 	}
 	memcpy(meta->filetype, pos, eol - pos);
@@ -207,7 +167,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 	char version[10];
 	eol = (const char *)memchr(pos, '\n', end - pos);
 	if (eol == end || (eol - pos) >= (ptrdiff_t) sizeof(version)) {
-		tnt_error(XlogError, "failed to parse xlog version string");
+		diag_set(XlogError, "failed to parse xlog version string");
 		return -1;
 	}
 	memcpy(version, pos, eol - pos);
@@ -216,7 +176,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 	assert(pos <= end);
 	if (strncmp(version, v12, sizeof(v12)) != 0 &&
 	    strncmp(version, v13, sizeof(v13)) != 0) {
-		tnt_error(XlogError,
+		diag_set(XlogError,
 			  "unsupported file format version %s",
 			  version);
 		return -1;
@@ -232,7 +192,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 		const char *key_end = (const char *)
 			memchr(key, ':', eol - key);
 		if (key_end == NULL) {
-			tnt_error(XlogError, "can't extract meta value");
+			diag_set(XlogError, "can't extract meta value");
 			return -1;
 		}
 		const char *val = key_end + 1;
@@ -249,14 +209,14 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			 * Instance: <uuid>
 			 */
 			if (val_end - val != UUID_STR_LEN) {
-				tnt_error(XlogError, "can't parse instance UUID");
+				diag_set(XlogError, "can't parse instance UUID");
 				return -1;
 			}
 			char uuid[UUID_STR_LEN + 1];
 			memcpy(uuid, val, UUID_STR_LEN);
 			uuid[UUID_STR_LEN] = '\0';
 			if (tt_uuid_from_string(uuid, &meta->instance_uuid) != 0) {
-				tnt_error(XlogError, "can't parse instance UUID");
+				diag_set(XlogError, "can't parse instance UUID");
 				return -1;
 			}
 		} else if (memcmp(key, VCLOCK_KEY, key_end - key) == 0){
@@ -264,7 +224,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			 * VClock: <vclock>
 			 */
 			if (val_end - val > VCLOCK_STR_LEN_MAX) {
-				tnt_error(XlogError, "can't parse vclock");
+				diag_set(XlogError, "can't parse vclock");
 				return -1;
 			}
 			char vclock[VCLOCK_STR_LEN_MAX + 1];
@@ -274,7 +234,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			ERROR_INJECT(ERRINJ_XLOG_META, {
 				off = 1;});
 			if (off != 0) {
-				tnt_error(XlogError, "invalid vclock at "
+				diag_set(XlogError, "invalid vclock at "
 					  "offset %zd", off);
 				return -1;
 			}
@@ -387,7 +347,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 */
 	struct vclock *dup = vclockset_search(&dir->index, &meta->vclock);
 	if (dup != NULL) {
-		tnt_error(XlogError, "%s: invalid xlog order", cursor.name);
+		diag_set(XlogError, "%s: invalid xlog order", cursor.name);
 		xlog_cursor_close(&cursor, false);
 		return -1;
 	}
@@ -398,7 +358,7 @@ xdir_index_file(struct xdir *dir, int64_t signature)
 	 */
 	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
 	if (vclock == NULL) {
-		tnt_error(OutOfMemory, sizeof(*vclock), "malloc", "vclock");
+		diag_set(OutOfMemory, sizeof(*vclock), "malloc", "vclock");
 		xlog_cursor_close(&cursor, false);
 		return -1;
 	}
@@ -433,7 +393,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	if (!tt_uuid_is_nil(dir->instance_uuid) &&
 	    !tt_uuid_is_equal(dir->instance_uuid, &meta->instance_uuid)) {
 		xlog_cursor_close(cursor, false);
-		tnt_error(XlogError, "%s: invalid instance UUID", filename);
+		diag_set(XlogError, "%s: invalid instance UUID", filename);
 		return -1;
 	}
 	/*
@@ -444,7 +404,7 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 	int64_t signature_check = vclock_sum(&meta->vclock);
 	if (signature_check != signature) {
 		xlog_cursor_close(cursor, false);
-		tnt_error(XlogError, "%s: signature check failed", filename);
+		diag_set(XlogError, "%s: signature check failed", filename);
 		return -1;
 	}
 	return 0;
@@ -501,16 +461,13 @@ xdir_scan(struct xdir *dir)
 	size_t s_count = 0, s_capacity = 0;
 
 	if (dh == NULL) {
-		tnt_error(SystemError, "error reading directory '%s'",
+		diag_set(SystemError, "error reading directory '%s'",
 			  dir->dirname);
 		return -1;
 	}
 
-	auto dir_guard = make_scoped_guard([&]{
-		closedir(dh);
-		free(signatures);
-	});
-
+	int rc = -1;
+	struct vclock *vclock;
 	struct dirent *dent;
 	/*
 	  A note regarding thread safety, readdir vs. readdir_r:
@@ -556,9 +513,9 @@ xdir_scan(struct xdir *dir)
 			size_t size = sizeof(*signatures) * s_capacity;
 			signatures = (int64_t *) realloc(signatures, size);
 			if (signatures == NULL) {
-				tnt_error(OutOfMemory,
+				diag_set(OutOfMemory,
 					  size, "realloc", "signatures array");
-				return -1;
+				goto exit;
 			}
 		}
 		signatures[s_count++] = signature;
@@ -570,9 +527,8 @@ xdir_scan(struct xdir *dir)
 	 * remove files which no longer exist, add files which
 	 * appeared since the last scan.
 	 */
-	struct vclock *vclock = vclockset_first(&dir->index);
-	unsigned i = 0;
-	while (i < s_count || vclock != NULL) {
+	vclock = vclockset_first(&dir->index);
+	for (unsigned i = 0; i < s_count || vclock != NULL;) {
 		int64_t s_old = vclock ? vclock_sum(vclock) : LLONG_MAX;
 		int64_t s_new = i < s_count ? signatures[i] : LLONG_MAX;
 		if (s_old < s_new) {
@@ -591,10 +547,11 @@ xdir_scan(struct xdir *dir)
 				struct error *e = diag_last_error(&fiber()->diag);
 				if (!dir->force_recovery ||
 				    type_cast(OutOfMemory, e))
-					return -1;
+					goto exit;
 				/** Skip a corrupted file */
 				error_log(e);
-				return 0;
+				rc = 0;
+				goto exit;
 			}
 			i++;
 		} else {
@@ -604,7 +561,12 @@ xdir_scan(struct xdir *dir)
 			i++;
 		}
 	}
-	return 0;
+	rc = 0;
+
+exit:
+	closedir(dh);
+	free(signatures);
+	return rc;
 }
 
 int
@@ -612,7 +574,7 @@ xdir_check(struct xdir *dir)
 {
 	DIR *dh = opendir(dir->dirname);        /* log dir */
 	if (dh == NULL) {
-		tnt_error(SystemError, "error reading directory '%s'",
+		diag_set(SystemError, "error reading directory '%s'",
 			  dir->dirname);
 		return -1;
 	}
@@ -821,7 +783,7 @@ xlog_open(struct xlog *xlog, const char *name)
 	if (rc < 0)
 		goto err_read;
 	if (rc > 0) {
-		tnt_error(XlogError, "Unexpected end of file");
+		diag_set(XlogError, "Unexpected end of file");
 		goto err_read;
 	}
 
@@ -1003,7 +965,7 @@ xlog_tx_write_zstd(struct xlog *log)
 		/* Allocate a destination buffer. */
 		void *zdst = obuf_reserve(&log->zbuf, zmax_size);
 		if (!zdst) {
-			tnt_error(OutOfMemory, zmax_size, "runtime arena",
+			diag_set(OutOfMemory, zmax_size, "runtime arena",
 				  "compression buffer");
 			goto error;
 		}
@@ -1173,7 +1135,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	 */
 	if (obuf_size(&log->obuf) == 0) {
 		if (!obuf_alloc(&log->obuf, XLOG_FIXHEADER_SIZE)) {
-			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,
+			diag_set(OutOfMemory, XLOG_FIXHEADER_SIZE,
 				  "runtime arena", "xlog tx output buffer");
 			return -1;
 		}
@@ -1201,7 +1163,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 		};
 		if (obuf_dup(&log->obuf, iov[i].iov_base, iov[i].iov_len) <
 		    iov[i].iov_len) {
-			tnt_error(OutOfMemory, XLOG_FIXHEADER_SIZE,
+			diag_set(OutOfMemory, XLOG_FIXHEADER_SIZE,
 				  "runtime arena", "xlog tx output buffer");
 			obuf_rollback_to_svp(&log->obuf, &svp);
 			return -1;
@@ -1482,7 +1444,7 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 	fixheader->magic = load_u32(pos);
 	if (fixheader->magic != row_marker &&
 	    fixheader->magic != zrow_marker) {
-		tnt_error(XlogError, "invalid magic: 0x%x", fixheader->magic);
+		diag_set(XlogError, "invalid magic: 0x%x", fixheader->magic);
 		return -1;
 	}
 	pos += sizeof(fixheader->magic);
@@ -1491,20 +1453,20 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 	const char *val = pos;
 	if (pos >= end || mp_check(&pos, end) != 0 ||
 	    mp_typeof(*val) != MP_UINT) {
-		tnt_error(XlogError, "broken fixheader length");
+		diag_set(XlogError, "broken fixheader length");
 		return -1;
 	}
 	fixheader->len = mp_decode_uint(&val);
 	assert(val == pos);
 	if (fixheader->len > IPROTO_BODY_LEN_MAX) {
-		tnt_error(XlogError, "too large fixheader length");
+		diag_set(XlogError, "too large fixheader length");
 		return -1;
 	}
 
 	/* Read previous crc32 */
 	if (pos >= end || mp_check(&pos, end) != 0 ||
 	    mp_typeof(*val) != MP_UINT) {
-		tnt_error(XlogError, "broken fixheader crc32p");
+		diag_set(XlogError, "broken fixheader crc32p");
 		return -1;
 	}
 	fixheader->crc32p = mp_decode_uint(&val);
@@ -1513,7 +1475,7 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 	/* Read current crc32 */
 	if (pos >= end || mp_check(&pos, end) != 0 ||
 	    mp_typeof(*val) != MP_UINT) {
-		tnt_error(XlogError, "broken fixheader crc32c");
+		diag_set(XlogError, "broken fixheader crc32c");
 		return -1;
 	}
 	fixheader->crc32c = mp_decode_uint(&val);
@@ -1521,7 +1483,7 @@ xlog_fixheader_decode(struct xlog_fixheader *fixheader,
 
 	/* Check and skip padding if any */
 	if (pos < end && (mp_check(&pos, end) != 0 || pos != end)) {
-		tnt_error(XlogError, "broken fixheader padding");
+		diag_set(XlogError, "broken fixheader padding");
 		return -1;
 	}
 
@@ -1541,7 +1503,7 @@ xlog_tx_decode(const char *data, const char *data_end,
 
 	/* Check that buffer has enough bytes */
 	if (data + fixheader.len != data_end) {
-		tnt_error(XlogError, "invalid compressed length: "
+		diag_set(XlogError, "invalid compressed length: "
 			  "expected %zd, got %u",
 			  data_end - data, fixheader.len);
 		return -1;
@@ -1553,14 +1515,14 @@ xlog_tx_decode(const char *data, const char *data_end,
 
 	/* Validate checksum */
 	if (crc32_calc(0, data, fixheader.len) != fixheader.crc32c) {
-		tnt_error(XlogError, "tx checksum mismatch");
+		diag_set(XlogError, "tx checksum mismatch");
 		return -1;
 	}
 
 	/* Copy uncompressed rows */
 	if (fixheader.magic == row_marker) {
 		if (rows_end - rows != (ptrdiff_t)fixheader.len) {
-			tnt_error(XlogError, "invalid unpacked length: "
+			diag_set(XlogError, "invalid unpacked length: "
 				  "expected %zd, got %u",
 				  rows_end - data, fixheader.len);
 			return -1;
@@ -1577,7 +1539,7 @@ xlog_tx_decode(const char *data, const char *data_end,
 	if (rc < 0) {
 		return -1;
 	} else if (rc > 0) {
-		tnt_error(XlogError, "invalid decompressed length: "
+		diag_set(XlogError, "invalid decompressed length: "
 			  "expected %zd, got %zd", rows_end - data,
 			   rows_end - data + XLOG_TX_AUTOCOMMIT_THRESHOLD);
 		return -1;
@@ -1614,7 +1576,7 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 
 	/* Validate checksum */
 	if (crc32_calc(0, rpos, fixheader.len) != fixheader.crc32c) {
-		tnt_error(XlogError, "tx checksum mismatch");
+		diag_set(XlogError, "tx checksum mismatch");
 		return -1;
 	}
 	data_end = rpos + fixheader.len;
@@ -1642,7 +1604,7 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 	do {
 		if (ibuf_reserve(&tx_cursor->rows,
 				 XLOG_TX_AUTOCOMMIT_THRESHOLD) == NULL) {
-			tnt_error(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
+			diag_set(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
 				  "runtime", "xlog output buffer");
 			ibuf_destroy(&tx_cursor->rows);
 			return -1;
@@ -1670,7 +1632,7 @@ xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor,
 				    (const char **)&tx_cursor->rows.rpos,
 				    (const char *)tx_cursor->rows.wpos);
 	if (rc != 0) {
-		tnt_error(XlogError, "can't parse row");
+		diag_set(XlogError, "can't parse row");
 		/* Discard remaining row data */
 		ibuf_reset(&tx_cursor->rows);
 		return -1;
@@ -1755,7 +1717,7 @@ eof_found:
 	if (rc < 0)
 		return -1;
 	if (rc == 0) {
-		tnt_error(XlogError, "%s: has some data after "
+		diag_set(XlogError, "%s: has some data after "
 			  "eof marker at %lld", i->name,
 			  xlog_cursor_pos(i));
 		return -1;
@@ -1832,7 +1794,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	if (rc == -1)
 		goto error;
 	if (rc > 0) {
-		tnt_error(XlogError, "Unexpected end of file");
+		diag_set(XlogError, "Unexpected end of file");
 		goto error;
 	}
 	snprintf(i->name, PATH_MAX, "%s", name);
@@ -1876,7 +1838,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 
 	void *dst = ibuf_alloc(&i->rbuf, size);
 	if (dst == NULL) {
-		tnt_error(OutOfMemory, size, "runtime",
+		diag_set(OutOfMemory, size, "runtime",
 			  "xlog cursor read buffer");
 		goto error;
 	}
@@ -1889,7 +1851,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	if (rc < 0)
 		goto error;
 	if (rc > 0) {
-		tnt_error(XlogError, "Unexpected end of file");
+		diag_set(XlogError, "Unexpected end of file");
 		goto error;
 	}
 	snprintf(i->name, PATH_MAX, "%s", name);
@@ -1925,7 +1887,7 @@ xlog_cursor_reset(struct xlog_cursor *cursor)
 	if (rc == -1)
 		return -1;
 	if (rc > 0) {
-		tnt_error(XlogError, "Unexpected end of file");
+		diag_set(XlogError, "Unexpected end of file");
 		return -1;
 	}
 	cursor->state = XLOG_CURSOR_ACTIVE;
