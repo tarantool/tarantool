@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "say.h"
+#include "fiber.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -41,8 +42,9 @@
 #include <sys/param.h>
 #endif
 #include <syslog.h>
-
-#include "fiber.h"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
 
 pid_t log_pid = 0;
 int log_level = S_INFO;
@@ -57,6 +59,8 @@ static int logger_nonblock;
 
 static int log_fd = STDERR_FILENO;
 static char *log_path; /* iff logger_type == SAY_LOGGER_FILE */
+/* Application identifier used to group syslog messages. */
+static char *syslog_ident = NULL;
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -255,6 +259,42 @@ say_file_init(const char *init_str)
 	logger_type = SAY_LOGGER_FILE;
 }
 
+/**
+ * Connect to syslogd using UNIX socket.
+ * @param path UNIX socket path.
+ * @retval not 0 Socket descriptor.
+ * @retval    -1 Socket error.
+ */
+static inline int
+syslog_connect_unix(const char *path)
+{
+	int fd = socket(PF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0)
+		return -1;
+	struct sockaddr_un un;
+	memset(&un, 0, sizeof(un));
+	snprintf(un.sun_path, sizeof(un.sun_path), "%s", path);
+	un.sun_family = AF_UNIX;
+	if (connect(fd, (struct sockaddr *) &un, sizeof(un)) != 0) {
+		close(fd);
+		return -1;
+	}
+	return fd;
+}
+
+static inline int
+say_syslog_connect()
+{
+	/*
+	 * Try two locations: '/dev/log' for Linux and
+	 * '/var/run/syslog' for Mac.
+	 */
+	log_fd = syslog_connect_unix("/dev/log");
+	if (log_fd < 0)
+		return syslog_connect_unix("/var/run/syslog");
+	return log_fd;
+}
+
 /** Initialize logging to syslog */
 static void
 say_syslog_init(const char *init_str)
@@ -263,18 +303,23 @@ say_syslog_init(const char *init_str)
 	struct say_syslog_opts opts;
 
 	if (say_parse_syslog_opts(init_str, &opts, &error)) {
-		say_error("syslog logger: %s", error ? error : "out of memory");
+		say_syserror("syslog logger: %s",
+			     error ? error : "out of memory");
 		free(error);
 		exit(EXIT_FAILURE);
 	}
 
 	if (opts.identity == NULL)
-		opts.identity = "tarantool";
-
-	/* TODO: ignoring init->facility, presumably no one needs it */
-	openlog(strdup(opts.identity), LOG_PID, LOG_USER);
+		syslog_ident = strdup("tarantool");
+	else
+		syslog_ident = strdup(opts.identity);
 	say_free_syslog_opts(&opts);
-
+	log_fd = say_syslog_connect();
+	if (log_fd < 0) {
+		/* syslog indent is freed in atexit(). */
+		say_syserror("syslog logger: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	say_info("started logging to syslog, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_SYSLOG;
 	return;
@@ -294,8 +339,8 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 	if (init_str != NULL) {
 		enum say_logger_type type;
 		if (say_parse_logger_type(&init_str, &type)) {
-			say_error("logger: bad initialization string: %s, %s",
-				  init_str, logger_syntax_reminder);
+			say_syserror("logger: bad initialization string: %s, %s",
+				     init_str, logger_syntax_reminder);
 			exit(EXIT_FAILURE);
 		}
 		switch (type) {
@@ -316,7 +361,7 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		 * non-blocking: this will garble interactive
 		 * console output.
 		 */
-		if (nonblock) {
+		if (logger_nonblock) {
 			int flags;
 			if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
 				fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
@@ -343,12 +388,84 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 }
 
 void
+say_logger_free()
+{
+	if (logger_type == SAY_LOGGER_SYSLOG && log_fd != -1)
+		close(log_fd);
+	free(syslog_ident);
+}
+
+/**
+ * Encode log message header, using syslog protocol. See RFC 5424
+ * and RFC 3164. The 3164 is compatible with 5424, so it is
+ * implemented.
+ * Protocol:
+ * <PRIORITY_VALUE>TIMESTAMP IDENTATION[PID]: MSG
+ * - Priority value is encoded as message subject * 8 and bitwise
+ *   OR with message level;
+ * - Timestamp must be encoded in the format: Mmm dd hh:mm:ss;
+ *   Mmm - moth abbreviation;
+ * - Identation is application name. By default it is "tarantool";
+ * - Pid - process identifier;
+ * - Msg - log message in any format. Encoded in vsay().
+ *
+ * @param level Tarantool log level.
+ * @param buf Buffer to encode to.
+ * @param len Length of @a buf.
+ * @param tm Timestamp.
+ * @param pid Process identifier.
+ *
+ * @retval Number of encoded bytes.
+ */
+static int
+say_encode_syslog_header(int level, char *buf, int len, struct tm *tm, int pid)
+{
+	int prio = level_to_syslog_priority(level);
+	int pos = 0;
+	pos += snprintf(buf + pos, len - pos, "<%d>", LOG_MAKEPRI(1, prio));
+	pos += strftime(buf + pos, len - pos, "%h %e %T ", tm);
+	pos += snprintf(buf + pos, len - pos, "%s[%d]:", syslog_ident, pid);
+	return pos;
+}
+
+/**
+ * Encode log message header using tarantool protocol:
+ * TIMESTAMP [PID]: MSG
+ * - Timestamp must be encoded in the format:
+ *   yyyy-mm-dd hh:mm:ss.ms;
+ * - Pid - process identifier;
+ * - Msg - log message in any format. Encoded in vsay().
+ *
+ * @param buf Buffer to encode to.
+ * @param len Length of @a buf.
+ * @param tm Timestamp.
+ * @param now Libev timestamp.
+ * @param now_seconds Seconds part of @a now.
+ * @param pid Process identifier.
+ *
+ * @retval Number of encoded bytes.
+ */
+static int
+say_encode_tarantool_header(char *buf, int len, struct tm *tm, ev_tstamp now,
+			    time_t now_seconds, int pid)
+{
+	int pos = 0;
+	/* Print time in format 2012-08-07 18:30:00.634 */
+	pos += strftime(buf + pos, len - pos, "%F %H:%M", tm);
+	pos += snprintf(buf + pos, len - pos, ":%06.3f",
+			now - now_seconds + tm->tm_sec);
+	pos += snprintf(buf + pos, len - pos, " [%i]", pid);
+	return pos;
+}
+
+void
 vsay(int level, const char *filename, int line, const char *error,
      const char *format, va_list ap)
 {
 	size_t p = 0, len = PIPE_BUF;
 	const char *f;
 	static __thread char buf[PIPE_BUF];
+	int pid = getpid();
 
 	if (booting) {
 		vfprintf(stderr, format, ap);
@@ -362,18 +479,17 @@ vsay(int level, const char *filename, int line, const char *error,
 		if (*f == '/' && *(f + 1) != '\0')
 			filename = f + 1;
 
+	/* Don't use ev_now() since it requires a working event loop. */
+	ev_tstamp now = ev_time();
+	time_t now_seconds = (time_t) now;
+	struct tm tm;
+	localtime_r(&now_seconds, &tm);
 	if (logger_type != SAY_LOGGER_SYSLOG) {
-		/* Don't use ev_now() since it requires a working event loop. */
-		ev_tstamp now = ev_time();
-		time_t now_seconds = (time_t) now;
-		struct tm tm;
-		localtime_r(&now_seconds, &tm);
-
-		/* Print time in format 2012-08-07 18:30:00.634 */
-		p += strftime(buf + p, len - p, "%F %H:%M", &tm);
-		p += snprintf(buf + p, len - p, ":%06.3f",
-				now - now_seconds + tm.tm_sec);
-		p += snprintf(buf + p, len - p, " [%i]", getpid());
+		p += say_encode_tarantool_header(buf + p, len - p, &tm, now,
+						 now_seconds, pid);
+	} else {
+		p += say_encode_syslog_header(level, buf + p, len - p, &tm,
+					      pid);
 	}
 
 	struct cord *cord = cord();
@@ -395,24 +511,34 @@ vsay(int level, const char *filename, int line, const char *error,
 	if (error && p < len - 1)
 		p += snprintf(buf + p, len - p, ": %s", error);
 
+	if (p >= len - 1)
+		p = len - 1;
+	*(buf + p) = '\n';
 	if (logger_type != SAY_LOGGER_SYSLOG) {
-		if (p >= len - 1)
-			p = len - 1;
-		*(buf + p) = '\n';
-		int r = write(log_fd, buf, p + 1);
-		(void)r;
-	} else {
+		(void) write(log_fd, buf, p + 1);
+	} else if (log_fd < 0 || write(log_fd, buf, p + 1) <= 0) {
 		/*
-		 * Due to omitted timestamp we have a leading
-		 * white space, hence buf + 1.
+		 * Try to reconnect, if write to syslog has
+		 * failed. Syslog write can fail, if, for example,
+		 * syslogd is restarted. In such a case write to
+		 * UNIX socket starts return -1 even for UDP.
 		 */
-		syslog(level_to_syslog_priority(level), "%s", buf + 1);
+		if (log_fd >= 0)
+			close(log_fd);
+		log_fd = say_syslog_connect();
+		if (log_fd >= 0) {
+			/*
+			 * In a case or error the log message is
+			 * lost. We can not wait for connection -
+			 * it would block thread. Try to reconnect
+			 * on next vsay().
+			 */
+			(void) write(log_fd, buf, p + 1);
+		}
 	}
 
-	if (level == S_FATAL && log_fd != STDERR_FILENO) {
-		int r = write(STDERR_FILENO, buf, p + 1);
-		(void)r;
-	}
+	if (level == S_FATAL && log_fd != STDERR_FILENO)
+		(void) write(STDERR_FILENO, buf, p + 1);
 }
 
 static void
