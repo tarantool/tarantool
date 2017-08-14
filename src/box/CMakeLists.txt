@@ -39,8 +39,8 @@ add_library(tuple STATIC
 )
 target_link_libraries(tuple box_error core ${MSGPUCK_LIBRARIES} misc)
 
-add_library(xlog STATIC xlog.cc)
-target_link_libraries(xlog core crc32 ${ZSTD_LIBRARIES})
+add_library(xlog STATIC xlog.c)
+target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
 
 add_library(box STATIC
     iproto.cc

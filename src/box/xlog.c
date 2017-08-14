@@ -34,6 +34,7 @@
 #include <ctype.h>
 
 #include "fiber.h"
+#include "exception.h"
 #include "crc32.h"
 #include "fio.h"
 #include "third_party/tarantool_eio.h"
@@ -261,7 +262,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 
 void
 xdir_create(struct xdir *dir, const char *dirname,
-	    enum xdir_type type, const tt_uuid *instance_uuid)
+	    enum xdir_type type, const struct tt_uuid *instance_uuid)
 {
 	memset(dir, 0, sizeof(*dir));
 	vclockset_new(&dir->index);
@@ -546,7 +547,7 @@ xdir_scan(struct xdir *dir)
 				 */
 				struct error *e = diag_last_error(&fiber()->diag);
 				if (!dir->force_recovery ||
-				    type_cast(OutOfMemory, e))
+				    type_assignable(&type_OutOfMemory, e->type))
 					goto exit;
 				/** Skip a corrupted file */
 				error_log(e);
