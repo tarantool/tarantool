@@ -26,8 +26,6 @@ cfg_filter(box.cfg)
     - 3600
   - - coredump
     - false
-  - - eio_parallel
-    - 4
   - - force_recovery
     - false
   - - hot_standby
@@ -92,6 +90,8 @@ cfg_filter(box.cfg)
     - 268435456
   - - wal_mode
     - write
+  - - worker_pool_threads
+    - 4
 ...
 space:insert{1, 'tuple'}
 ---
