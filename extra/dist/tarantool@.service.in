@@ -36,7 +36,7 @@ After=network.target
 Documentation=man:tarantool(1)
 
 # Instance file
-ConditionPathExists=@TARANTOOL_INSTANCEDIR@/%I.lua
+ConditionPathExists=@TARANTOOL_INSTANCEDIR@/%i.lua
 
 [Service]
 Type=notify
@@ -47,10 +47,10 @@ OOMScoreAdjust=-1000
 # Increase fd limit for Vinyl
 LimitNOFILE=65535
 
-ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl start %I
-ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %I
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl start %i
+ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %i
 ## NYI: https://github.com/tarantool/tarantool/issues/1229
-#ExecReload=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl reload %I
+#ExecReload=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl reload %i
 
 # Systemd waits until all xlogs are recovered
 TimeoutStartSec=86400s
