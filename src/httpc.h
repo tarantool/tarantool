@@ -223,6 +223,44 @@ void
 httpc_set_ca_file(struct httpc_request *req, const char *ca_file);
 
 /**
+ * Enables/disables verification of the certificate's name (CN) against host
+ * @param req request
+ * @param verify flag
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_SSL_VERIFYHOST.html
+ */
+void
+httpc_set_verify_host(struct httpc_request *req, long verify);
+
+/**
+ * Enables/disables verification of the peer's SSL certificate
+ * @param req request
+ * @param verify flag
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_SSL_VERIFYPEER.html
+ */
+void
+httpc_set_verify_peer(struct httpc_request *req, long verify);
+
+/**
+ * Specify path to private key for TLS ans SSL client certificate
+ * @param req request
+ * @param ssl_key - path to the private key. The application does not have to
+ * keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_SSLKEY.html
+ */
+void
+httpc_set_ssl_key(struct httpc_request *req, const char *ssl_key);
+
+/**
+ * Specify path to SSL client certificate
+ * @param req request
+ * @param ssl_cert - path to the client certificate. The application does not
+ * have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_SSLCERT.html
+ */
+void
+httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert);
+
+/**
  * This function does async HTTP request
  * @param request - reference to request object with filled fields
  * @param method - http method(case sensitive, e.g "GET")

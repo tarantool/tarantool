@@ -122,6 +122,26 @@ luaT_httpc_request(lua_State *L)
 		httpc_set_ca_file(req, lua_tostring(L, -1));
 	lua_pop(L, 1);
 
+	lua_getfield(L, 5, "verify_host");
+	if (!lua_isnil(L, -1))
+		httpc_set_verify_host(req, lua_toboolean(L, -1) == 1 ? 2 : 0);
+	lua_pop(L, 1);
+
+	lua_getfield(L, 5, "verify_peer");
+	if (!lua_isnil(L, -1))
+		httpc_set_verify_peer(req, lua_toboolean(L, -1));
+	lua_pop(L, 1);
+
+	lua_getfield(L, 5, "ssl_key");
+	if (!lua_isnil(L, -1))
+		httpc_set_ssl_key(req, lua_tostring(L, -1));
+	lua_pop(L, 1);
+
+	lua_getfield(L, 5, "ssl_cert");
+	if (!lua_isnil(L, -1))
+		httpc_set_ssl_cert(req, lua_tostring(L, -1));
+	lua_pop(L, 1);
+
 	long keepalive_idle = 0;
 	long keepalive_interval = 0;
 
