@@ -309,7 +309,7 @@ xdir_create(struct xdir *dir, const char *dirname,
 	dir->mode = 0660;
 	dir->instance_uuid = instance_uuid;
 	snprintf(dir->dirname, PATH_MAX, "%s", dirname);
-	dir->open_wflags = O_RDWR | O_CREAT | O_EXCL;
+	dir->open_wflags = 0;
 	switch (type) {
 	case SNAP:
 		dir->filetype = "SNAP";
@@ -747,8 +747,8 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 	xlog->is_inprogress = true;
 	snprintf(xlog->filename, PATH_MAX, "%s%s", name, inprogress_suffix);
 
-	if (flags == 0)
-		flags = O_RDWR | O_CREAT | O_EXCL;
+	flags |= O_RDWR | O_CREAT | O_EXCL;
+
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file.
 	 * If it exists, open will fail. Always open/create
