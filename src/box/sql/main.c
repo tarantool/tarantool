@@ -15,6 +15,7 @@
 ** accessed by users of the library.
 */
 #include "sqliteInt.h"
+#include "vdbeInt.h"
 
 #ifdef SQLITE_ENABLE_FTS3
 # include "fts3.h"
@@ -945,15 +946,15 @@ int sqlite3_total_changes(sqlite3 *db){
 ** database handle object, it does not close any savepoints that may be open
 ** at the b-tree/pager level.
 */
-void sqlite3CloseSavepoints(sqlite3 *db){
-  while( db->pSavepoint ){
-    Savepoint *pTmp = db->pSavepoint;
-    db->pSavepoint = pTmp->pNext;
-    sqlite3DbFree(db, pTmp);
+void sqlite3CloseSavepoints(Vdbe *pVdbe){
+  while( pVdbe->pSavepoint && pVdbe->pSavepoint->pNext ){
+    Savepoint *pTmp = pVdbe->pSavepoint;
+    pVdbe->pSavepoint = pTmp->pNext;
+    sqlite3DbFree(pVdbe->db, pTmp);
   }
-  db->nSavepoint = 0;
-  db->nStatement = 0;
-  db->isTransactionSavepoint = 0;
+  pVdbe->nSavepoint = 0;
+  pVdbe->nStatement = 0;
+  pVdbe->isTransactionSavepoint = 0;
 }
 
 /*
@@ -1085,7 +1086,8 @@ int sqlite3_close_v2(sqlite3 *db){ return sqlite3Close(db,1); }
 ** attempts to use that cursor.  Read cursors remain open and valid
 ** but are "saved" in case the table pages are moved around.
 */
-void sqlite3RollbackAll(sqlite3 *db, int tripCode){
+void sqlite3RollbackAll(Vdbe *pVdbe, int tripCode){
+  sqlite3 *db = pVdbe->db;
   int inTrans = 0;
   int schemaChange;
   assert( sqlite3_mutex_held(db->mutex) );
@@ -1118,12 +1120,12 @@ void sqlite3RollbackAll(sqlite3 *db, int tripCode){
   sqlite3BtreeLeaveAll(db);
 
   /* Any deferred constraint violations have now been resolved. */
-  db->nDeferredCons = 0;
-  db->nDeferredImmCons = 0;
+  pVdbe->nDeferredCons = 0;
+  pVdbe->nDeferredImmCons = 0;
   db->flags &= ~SQLITE_DeferFKs;
 
   /* If one has been configured, invoke the rollback-hook callback */
-  if( db->xRollbackCallback && (inTrans || !db->autoCommit) ){
+  if( db->xRollbackCallback && (inTrans || !pVdbe->autoCommit) ){
     db->xRollbackCallback(db->pRollbackArg);
   }
 }
@@ -2510,7 +2512,6 @@ static int openDatabase(
   assert( sizeof(db->aLimit)==sizeof(aHardLimit) );
   memcpy(db->aLimit, aHardLimit, sizeof(db->aLimit));
   db->aLimit[SQLITE_LIMIT_WORKER_THREADS] = SQLITE_DEFAULT_WORKER_THREADS;
-  db->autoCommit = 1;
   db->nextAutovac = -1;
   db->szMmap = sqlite3GlobalConfig.szMmap;
   db->nextPagesize = 0;
@@ -2873,22 +2874,6 @@ int sqlite3_global_recover(void){
   return SQLITE_OK;
 }
 #endif
-
-/*
-** Test to see whether or not the database connection is in autocommit
-** mode.  Return TRUE if it is and FALSE if not.  Autocommit mode is on
-** by default.  Autocommit is disabled by a BEGIN statement and reenabled
-** by the next COMMIT or ROLLBACK.
-*/
-int sqlite3_get_autocommit(sqlite3 *db){
-#ifdef SQLITE_ENABLE_API_ARMOR
-  if( !sqlite3SafetyCheckOk(db) ){
-    (void)SQLITE_MISUSE_BKPT;
-    return 0;
-  }
-#endif
-  return db->autoCommit;
-}
 
 /*
 ** The following routines are substitutes for constants SQLITE_CORRUPT,

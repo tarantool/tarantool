@@ -15,7 +15,6 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
-
 /*
 ** Variables in which to record status information.
 */
@@ -214,7 +213,7 @@ int sqlite3_db_status(
       break;
     }
 
-    /* 
+    /*
     ** Return an approximation for the amount of memory currently used
     ** by all pagers associated with the given database connection.  The
     ** highwater mark is meaningless and is returned as zero.
@@ -302,7 +301,7 @@ int sqlite3_db_status(
 
     /*
     ** Set *pCurrent to the total cache hits or misses encountered by all
-    ** pagers the database handle is connected to. *pHighwater is always set 
+    ** pagers the database handle is connected to. *pHighwater is always set
     ** to zero.
     */
     case SQLITE_DBSTATUS_CACHE_HIT:
@@ -329,7 +328,11 @@ int sqlite3_db_status(
     */
     case SQLITE_DBSTATUS_DEFERRED_FKS: {
       *pHighwater = 0;  /* IMP: R-11967-56545 */
-      *pCurrent = db->nDeferredImmCons>0 || db->nDeferredCons>0;
+      Vdbe * v = db->pVdbe;
+      while( v->pNext ) {
+        *pCurrent = v->nDeferredImmCons>0 || v->nDeferredCons>0;
+        v = v->pNext;
+      }
       break;
     }
 

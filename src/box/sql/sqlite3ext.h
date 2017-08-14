@@ -83,7 +83,6 @@ struct sqlite3_api_routines {
   int  (*finalize)(sqlite3_stmt*pStmt);
   void  (*free)(void*);
   void  (*free_table)(char**result);
-  int  (*get_autocommit)(sqlite3*);
   void * (*get_auxdata)(sqlite3_context*,int);
   int  (*get_table)(sqlite3*,const char*,char***,int*,int*,char**);
   int  (*global_recover)(void);
@@ -327,7 +326,6 @@ typedef int (*sqlite3_loadext_entry)(
 #define sqlite3_finalize               sqlite3_api->finalize
 #define sqlite3_free                   sqlite3_api->free
 #define sqlite3_free_table             sqlite3_api->free_table
-#define sqlite3_get_autocommit         sqlite3_api->get_autocommit
 #define sqlite3_get_auxdata            sqlite3_api->get_auxdata
 #define sqlite3_get_table              sqlite3_api->get_table
 #ifndef SQLITE_OMIT_DEPRECATED

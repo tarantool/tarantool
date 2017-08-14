@@ -157,7 +157,6 @@ static const sqlite3_api_routines sqlite3Apis = {
   sqlite3_finalize,
   sqlite3_free,
   sqlite3_free_table,
-  sqlite3_get_autocommit,
   sqlite3_get_auxdata,
   sqlite3_get_table,
   0,     /* Was sqlite3_global_recover(), but that function is deprecated */

@@ -507,8 +507,8 @@ static int sqlite3Step(Vdbe *p){
       db->u1.isInterrupted = 0;
     }
 
-    assert( db->nVdbeWrite>0 || db->autoCommit==0 
-        || (db->nDeferredCons==0 && db->nDeferredImmCons==0)
+    assert( db->nVdbeWrite>0 || p->autoCommit==0 
+        || (p->nDeferredCons==0 && p->nDeferredImmCons==0)
     );
 
 #ifndef SQLITE_OMIT_TRACE

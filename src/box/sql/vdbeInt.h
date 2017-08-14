@@ -341,69 +341,77 @@ struct ScanStatus {
 ** is really a pointer to an instance of this structure.
 */
 struct Vdbe {
-  sqlite3 *db;            /* The database connection that owns this statement */
-  Vdbe *pPrev,*pNext;     /* Linked list of VDBEs with the same Vdbe.db */
-  Parse *pParse;          /* Parsing context used to create this Vdbe */
-  ynVar nVar;             /* Number of entries in aVar[] */
-  u32 magic;              /* Magic number for sanity checking */
-  int nMem;               /* Number of memory locations currently allocated */
-  int nCursor;            /* Number of slots in apCsr[] */
-  u32 cacheCtr;           /* VdbeCursor row cache generation counter */
-  int pc;                 /* The program counter */
-  int rc;                 /* Value to return */
-  int nChange;            /* Number of db changes made since last reset */
-  int iStatement;         /* Statement number (or 0 if has not opened stmt) */
-  i64 iCurrentTime;       /* Value of julianday('now') for this statement */
-  i64 nFkConstraint;      /* Number of imm. FK constraints this VM */
-  i64 nStmtDefCons;       /* Number of def. constraints when stmt started */
-  i64 nStmtDefImmCons;    /* Number of def. imm constraints when stmt started */
+  sqlite3 *db;               /* The database connection that owns this statement */
+  Vdbe *pPrev,*pNext;        /* Linked list of VDBEs with the same Vdbe.db */
+  Parse *pParse;             /* Parsing context used to create this Vdbe */
+  ynVar nVar;                /* Number of entries in aVar[] */
+  u32 magic;                 /* Magic number for sanity checking */
+  int nMem;                  /* Number of memory locations currently allocated */
+  int nCursor;               /* Number of slots in apCsr[] */
+  u32 cacheCtr;              /* VdbeCursor row cache generation counter */
+  int pc;                    /* The program counter */
+  int rc;                    /* Value to return */
+  int nChange;               /* Number of db changes made since last reset */
+  int iStatement;            /* Statement number (or 0 if has not opened stmt) */
+  i64 iCurrentTime;          /* Value of julianday('now') for this statement */
+  i64 nFkConstraint;         /* Number of imm. FK constraints this VM */
+  i64 nStmtDefCons;          /* Number of def. constraints when stmt started */
+  i64 nStmtDefImmCons;       /* Number of def. imm constraints when stmt started */
+
+  u8 autoCommit;             /* The auto-commit flag. */
+  u8 isTransactionSavepoint; /* True if the outermost savepoint is a TS */
+  Savepoint *pSavepoint;     /* List of active savepoints */
+  int nSavepoint;            /* Number of non-transaction savepoints */
+  int nStatement;            /* Number of nested statement-transactions  */
+  i64 nDeferredCons;         /* Net deferred constraints this transaction. */
+  i64 nDeferredImmCons;      /* Net deferred immediate constraints */
 
   /* When allocating a new Vdbe object, all of the fields below should be
   ** initialized to zero or NULL */
 
-  Op *aOp;                /* Space to hold the virtual machine's program */
-  Mem *aMem;              /* The memory locations */
-  Mem **apArg;            /* Arguments to currently executing user function */
-  Mem *aColName;          /* Column names to return */
-  Mem *pResultSet;        /* Pointer to an array of results */
-  char *zErrMsg;          /* Error message written here */
-  VdbeCursor **apCsr;     /* One element of this array for each open cursor */
-  Mem *aVar;              /* Values for the OP_Variable opcode. */
-  VList *pVList;          /* Name of variables */
+  Op *aOp;                   /* Space to hold the virtual machine's program */
+  Mem *aMem;                 /* The memory locations */
+  Mem **apArg;               /* Arguments to currently executing user function */
+  Mem *aColName;             /* Column names to return */
+  Mem *pResultSet;           /* Pointer to an array of results */
+  char *zErrMsg;             /* Error message written here */
+  VdbeCursor **apCsr;        /* One element of this array for each open cursor */
+  Mem *aVar;                 /* Values for the OP_Variable opcode. */
+  VList *pVList;             /* Name of variables */
 #ifndef SQLITE_OMIT_TRACE
-  i64 startTime;          /* Time when query started - used for profiling */
+  i64 startTime;             /* Time when query started - used for profiling */
 #endif
-  int nOp;                /* Number of instructions in the program */
+  int nOp;                   /* Number of instructions in the program */
 #ifdef SQLITE_DEBUG
-  int rcApp;              /* errcode set by sqlite3_result_error_code() */
+  int rcApp;                 /* errcode set by sqlite3_result_error_code() */
 #endif
-  u16 nResColumn;         /* Number of columns in one row of the result set */
-  u8 errorAction;         /* Recovery action to do in case of an error */
-  u8 minWriteFileFormat;  /* Minimum file format for writable database files */
-  bft expired:1;          /* True if the VM needs to be recompiled */
-  bft doingRerun:1;       /* True if rerunning after an auto-reprepare */
-  bft explain:2;          /* True if EXPLAIN present on SQL command */
-  bft changeCntOn:1;      /* True to update the change-counter */
-  bft runOnlyOnce:1;      /* Automatically expire on reset */
-  bft usesStmtJournal:1;  /* True if uses a statement journal */
-  bft readOnly:1;         /* True for statements that do not write */
-  bft bIsReader:1;        /* True for statements that read */
-  bft isPrepareV2:1;      /* True if prepared with prepare_v2() */
-  yDbMask btreeMask;      /* Bitmask of db->aDb[] entries referenced */
-  yDbMask lockMask;       /* Subset of btreeMask that requires a lock */
-  u32 aCounter[5];        /* Counters used by sqlite3_stmt_status() */
-  char *zSql;             /* Text of the SQL statement that generated this */
-  void *pFree;            /* Free this when deleting the vdbe */
-  VdbeFrame *pFrame;      /* Parent frame */
-  VdbeFrame *pDelFrame;   /* List of frame objects to free on VM reset */
-  int nFrame;             /* Number of frames in pFrame list */
-  u32 expmask;            /* Binding to these vars invalidates VM */
-  SubProgram *pProgram;   /* Linked list of all sub-programs used by VM */
-  AuxData *pAuxData;      /* Linked list of auxdata allocations */
+  u16 nResColumn;            /* Number of columns in one row of the result set */
+  u8 errorAction;            /* Recovery action to do in case of an error */
+  u8 minWriteFileFormat;     /* Minimum file format for writable database files */
+  bft expired:1;             /* True if the VM needs to be recompiled */
+  bft doingRerun:1;          /* True if rerunning after an auto-reprepare */
+  bft explain:2;             /* True if EXPLAIN present on SQL command */
+  bft changeCntOn:1;         /* True to update the change-counter */
+  bft runOnlyOnce:1;         /* Automatically expire on reset */
+  bft usesStmtJournal:1;     /* True if uses a statement journal */
+  bft readOnly:1;            /* True for statements that do not write */
+  bft bIsReader:1;           /* True for statements that read */
+  bft isPrepareV2:1;         /* True if prepared with prepare_v2() */
+  yDbMask btreeMask;         /* Bitmask of db->aDb[] entries referenced */
+  yDbMask lockMask;          /* Subset of btreeMask that requires a lock */
+  u32 aCounter[5];           /* Counters used by sqlite3_stmt_status() */
+  char *zSql;                /* Text of the SQL statement that generated this */
+  void *pFree;               /* Free this when deleting the vdbe */
+  VdbeFrame *pFrame;         /* Parent frame */
+  VdbeFrame *pDelFrame;      /* List of frame objects to free on VM reset */
+  int nFrame;                /* Number of frames in pFrame list */
+  u32 expmask;               /* Binding to these vars invalidates VM */
+  SubProgram *pProgram;      /* Linked list of all sub-programs used by VM */
+  AuxData *pAuxData;         /* Linked list of auxdata allocations */
 #ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-  i64 *anExec;            /* Number of times each op has been executed */
-  int nScan;              /* Entries in aScan[] */
-  ScanStatus *aScan;      /* Scan definitions for sqlite3_stmt_scanstatus() */
+  i64 *anExec;               /* Number of times each op has been executed */
+  int nScan;                 /* Entries in aScan[] */
+  ScanStatus *aScan;         /* Scan definitions for sqlite3_stmt_scanstatus() */
 #endif
 };
 

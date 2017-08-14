@@ -187,7 +187,7 @@ extern int sqlite3InitDatabase(sqlite3 *db, char **pzErrMsg){
   ** will be closed before this function returns.  */
   sqlite3BtreeEnter(pDb->pBt);
   if( !sqlite3BtreeIsInReadTrans(pDb->pBt) ){
-    rc = sqlite3BtreeBeginTrans(pDb->pBt, 0);
+    rc = sqlite3BtreeBeginTrans(pDb->pBt, 0, 0);
     if( rc!=SQLITE_OK ){
       sqlite3SetString(pzErrMsg, db, sqlite3ErrStr(rc));
       goto initone_error_out;
@@ -397,7 +397,7 @@ static void schemaIsValid(Parse *pParse){
   ** on the b-tree database, open one now. If a transaction is opened, it
   ** will be closed immediately after reading the meta-value. */
   if( !sqlite3BtreeIsInReadTrans(pBt) ){
-    rc = sqlite3BtreeBeginTrans(pBt, 0);
+    rc = sqlite3BtreeBeginTrans(pBt, 0, 0);
     if( rc==SQLITE_NOMEM || rc==SQLITE_IOERR_NOMEM ){
       sqlite3OomFault(db);
     }

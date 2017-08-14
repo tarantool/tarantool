@@ -13,6 +13,7 @@
 */
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 #include "sqliteInt.h"
+#include "vdbeInt.h"
 
 /*
 ** Before a virtual table xCreate() or xConnect() method is invoked, the
@@ -929,7 +930,7 @@ int sqlite3VtabCommit(sqlite3 *db){
 ** If the xBegin call is successful, place the sqlite3_vtab pointer
 ** in the sqlite3.aVTrans array.
 */
-int sqlite3VtabBegin(sqlite3 *db, VTable *pVTab){
+int sqlite3VtabBegin(sqlite3 *db, Vdbe * pVdbe, VTable *pVTab){
   int rc = SQLITE_OK;
   const sqlite3_module *pModule;
 
@@ -962,7 +963,7 @@ int sqlite3VtabBegin(sqlite3 *db, VTable *pVTab){
     if( rc==SQLITE_OK ){
       rc = pModule->xBegin(pVTab->pVtab);
       if( rc==SQLITE_OK ){
-        int iSvpt = db->nStatement + db->nSavepoint;
+        int iSvpt = pVdbe->nStatement + pVdbe->nSavepoint;
         addToVTrans(db, pVTab);
         if( iSvpt && pModule->xSavepoint ){
           pVTab->iSavepoint = iSvpt;

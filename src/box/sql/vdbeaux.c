@@ -32,11 +32,20 @@ Vdbe *sqlite3VdbeCreate(Parse *pParse){
   if( db->pVdbe ){
     db->pVdbe->pPrev = p;
   }
+
   p->pNext = db->pVdbe;
   p->pPrev = 0;
   db->pVdbe = p;
   p->magic = VDBE_MAGIC_INIT;
   p->pParse = pParse;
+  p->autoCommit = (char)box_txn() == 0 ? 1 : 0;
+  p->isTransactionSavepoint = 0;
+  p->nStatement = 0;
+  p->nSavepoint = 0;
+  p->pSavepoint = 0;
+  p->nDeferredCons = 0;
+  p->nDeferredImmCons = 0;
+
   assert( pParse->aLabel==0 );
   assert( pParse->nLabel==0 );
   assert( pParse->nOpAlloc==0 );
@@ -2507,12 +2516,12 @@ int sqlite3VdbeCloseStatement(Vdbe *p, int eOp){
   ** is that an IO error may have occurred, causing an emergency rollback.
   ** In this case (db->nStatement==0), and there is nothing to do.
   */
-  if( db->nStatement && p->iStatement ){
+  if( p->nStatement && p->iStatement ){
     const int iSavepoint = p->iStatement-1;
 
     assert( eOp==SAVEPOINT_ROLLBACK || eOp==SAVEPOINT_RELEASE);
-    assert( db->nStatement>0 );
-    assert( p->iStatement==(db->nStatement+db->nSavepoint) );
+    assert( p->nStatement>0 );
+    assert( p->iStatement==(p->nStatement+p->nSavepoint) );
 
     int rc2 = SQLITE_OK;
     Btree *pBt = db->mdb.pBt;
@@ -2527,7 +2536,7 @@ int sqlite3VdbeCloseStatement(Vdbe *p, int eOp){
         rc = rc2;
       }
     }
-    db->nStatement--;
+    p->nStatement--;
     p->iStatement = 0;
 
     if( rc==SQLITE_OK ){
@@ -2543,8 +2552,8 @@ int sqlite3VdbeCloseStatement(Vdbe *p, int eOp){
     ** database handles deferred constraint counter to the value it had when 
     ** the statement transaction was opened.  */
     if( eOp==SAVEPOINT_ROLLBACK ){
-      db->nDeferredCons = p->nStmtDefCons;
-      db->nDeferredImmCons = p->nStmtDefImmCons;
+      p->nDeferredCons = p->nStmtDefCons;
+      p->nDeferredImmCons = p->nStmtDefImmCons;
     }
   }
   return rc;
@@ -2563,7 +2572,7 @@ int sqlite3VdbeCloseStatement(Vdbe *p, int eOp){
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 int sqlite3VdbeCheckFk(Vdbe *p, int deferred){
   sqlite3 *db = p->db;
-  if( (deferred && (db->nDeferredCons+db->nDeferredImmCons)>0) 
+  if( (deferred && (p->nDeferredCons+p->nDeferredImmCons)>0) 
    || (!deferred && p->nFkConstraint>0) 
   ){
     p->rc = SQLITE_CONSTRAINT_FOREIGNKEY;
@@ -2653,9 +2662,9 @@ int sqlite3VdbeHalt(Vdbe *p){
           */
           box_txn_rollback();
           closeCursorsAndFree(p);
-          sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
-          sqlite3CloseSavepoints(db);
-          db->autoCommit = 1;
+          sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
+          sqlite3CloseSavepoints(p);
+          p->autoCommit = 1;
           p->nChange = 0;
         }
       }
@@ -2673,8 +2682,8 @@ int sqlite3VdbeHalt(Vdbe *p){
     ** above has occurred. 
     */
     if( !sqlite3VtabInSync(db) 
-     && db->autoCommit 
-     && db->nVdbeWrite==(p->readOnly==0) 
+      && p->autoCommit 
+      && db->nVdbeWrite==(p->readOnly==0) 
     ){
       if( p->rc==SQLITE_OK || (p->errorAction==OE_Fail && !isSpecialError) ){
         rc = sqlite3VdbeCheckFk(p, 1);
@@ -2703,21 +2712,21 @@ int sqlite3VdbeHalt(Vdbe *p){
           p->rc = rc;
           box_txn_rollback();
           closeCursorsAndFree(p);
-          sqlite3RollbackAll(db, SQLITE_OK);
+          sqlite3RollbackAll(p, SQLITE_OK);
           p->nChange = 0;
         }else{
-          db->nDeferredCons = 0;
-          db->nDeferredImmCons = 0;
+          p->nDeferredCons = 0;
+          p->nDeferredImmCons = 0;
           db->flags &= ~SQLITE_DeferFKs;
           sqlite3CommitInternalChanges(db);
         }
       }else{
         box_txn_rollback();
         closeCursorsAndFree(p);
-        sqlite3RollbackAll(db, SQLITE_OK);
+        sqlite3RollbackAll(p, SQLITE_OK);
         p->nChange = 0;
       }
-      db->nStatement = 0;
+      p->nStatement = 0;
     }else if( eStatementOp==0 ){
       if( p->rc==SQLITE_OK || p->errorAction==OE_Fail ){
         eStatementOp = SAVEPOINT_RELEASE;
@@ -2726,9 +2735,9 @@ int sqlite3VdbeHalt(Vdbe *p){
       }else{
         box_txn_rollback();
         closeCursorsAndFree(p);
-        sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
-        sqlite3CloseSavepoints(db);
-        db->autoCommit = 1;
+        sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
+        sqlite3CloseSavepoints(p);
+        p->autoCommit = 1;
         p->nChange = 0;
       }
     }
@@ -2749,9 +2758,9 @@ int sqlite3VdbeHalt(Vdbe *p){
           p->zErrMsg = 0;
         }
         closeCursorsAndFree(p);
-        sqlite3RollbackAll(db, SQLITE_ABORT_ROLLBACK);
-        sqlite3CloseSavepoints(db);
-        db->autoCommit = 1;
+        sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
+        sqlite3CloseSavepoints(p);
+        p->autoCommit = 1;
         p->nChange = 0;
       }
     }
@@ -2793,11 +2802,11 @@ int sqlite3VdbeHalt(Vdbe *p){
   ** by connection db have now been released. Call sqlite3ConnectionUnlocked() 
   ** to invoke any required unlock-notify callbacks.
   */
-  if( db->autoCommit ){
+  if( p->autoCommit ){
     sqlite3ConnectionUnlocked(db);
   }
 
-  assert( db->nVdbeActive>0 || db->autoCommit==0 || db->nStatement==0 );
+  assert( db->nVdbeActive>0 || p->autoCommit==0 || p->nStatement==0 );
   return (p->rc==SQLITE_BUSY ? SQLITE_BUSY : SQLITE_OK);
 }
 

@@ -56,10 +56,6 @@ set pragma_def {
   ARG:  SQLITE_CkptFullFSync
   IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 
-  NAME: cache_spill
-  FLAG: Result0 SchemaReq NoColumns1
-  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-
   NAME: reverse_unordered_selects
   TYPE: FLAG
   ARG:  SQLITE_ReverseOrder
