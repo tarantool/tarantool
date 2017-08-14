@@ -49,8 +49,6 @@ enum {
 
 struct type_info;
 struct error;
-struct error_factory;
-extern struct error_factory *error_factory;
 
 typedef void (*error_f)(struct error *e);
 
@@ -214,27 +212,6 @@ diag_last_error(struct diag *diag)
 	return diag->last;
 }
 
-struct error_factory {
-	struct error *(*OutOfMemory)(const char *file,
-				     unsigned line, size_t amount,
-				     const char *allocator,
-				     const char *object);
-	struct error *(*FiberIsCancelled)(const char *file,
-					  unsigned line);
-	struct error *(*TimedOut)(const char *file,
-				  unsigned line);
-	struct error *(*ChannelIsClosed)(const char *file,
-					 unsigned line);
-	struct error *(*LuajitError)(const char *file,
-				     unsigned line, const char *msg);
-	struct error *(*ClientError)(const char *file, unsigned line,
-				     uint32_t errcode, ...);
-	struct error *(*SystemError)(const char *file, unsigned line,
-				     const char *format, ...);
-	struct error *(*XlogError)(const char *file, unsigned line,
-				   const char *format, ...);
-};
-
 struct diag *
 diag_get();
 
@@ -254,14 +231,28 @@ diag_log(void)
 	error_log(e);
 }
 
+struct error *
+BuildOutOfMemory(const char *file, unsigned line, size_t amount,
+		 const char *allocator,
+		 const char *object);
+struct error *
+BuildFiberIsCancelled(const char *file, unsigned line);
+struct error *
+BuildTimedOut(const char *file, unsigned line);
+struct error *
+BuildChannelIsClosed(const char *file, unsigned line);
+struct error *
+BuildLuajitError(const char *file, unsigned line, const char *msg);
+struct error *
+BuildSystemError(const char *file, unsigned line, const char *format, ...);
+struct error *
+BuildXlogError(const char *file, unsigned line, const char *format, ...);
+
 #define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	/* No op if exception subsystem is not initialized. */		\
-	if (error_factory) {						\
-		struct error *e;					\
-		e = error_factory->class(__FILE__, __LINE__, ##__VA_ARGS__);\
-		diag_add_error(diag_get(), e);				\
-	}								\
+	struct error *e;						\
+	e = Build##class(__FILE__, __LINE__, ##__VA_ARGS__);		\
+	diag_add_error(diag_get(), e);					\
 } while (0)
 
 #if defined(__cplusplus)

@@ -596,7 +596,6 @@ main(int argc, char **argv)
 	main_argv = argv;
 
 	exception_init();
-	box_error_init();
 
 	fiber_init(fiber_cxx_invoke);
 	/* Init iobuf library with default readahead */
