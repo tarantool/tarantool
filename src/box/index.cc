@@ -267,24 +267,13 @@ Index::initIterator(struct iterator *ptr, enum iterator_type type,
 }
 
 /**
- * Create a read view for iterator so further index modifications
- * will not affect the iterator iteration.
+ * Create an ALL iterator with personal read view so further
+ * index modifications will not affect the iteration results.
+ * Must be destroyed by iterator->free after usage.
  */
-void
-Index::createReadViewForIterator(struct iterator *iterator)
+struct iterator *
+Index::createSnapshotIterator()
 {
-	(void) iterator;
-	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
-}
-
-/**
- * Destroy a read view of an iterator. Must be called for iterators,
- * for which createReadViewForIterator was called.
- */
-void
-Index::destroyReadViewForIterator(struct iterator *iterator)
-{
-	(void) iterator;
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 

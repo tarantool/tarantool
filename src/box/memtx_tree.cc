@@ -209,24 +209,6 @@ tree_iterator_set_next_method(struct tree_iterator *it)
 	}
 }
 
-/**
- * Virtual method of an iterator that returns previously returned tuple
- * again and set the method to a proper function determined by iteration type.
- * @param iterator - iterator object.
- * @return - the same tuple as in the last return.
- */
-static struct tuple *
-tree_iterator_repeat(struct iterator *iterator)
-{
-	struct tree_iterator *it = tree_iterator(iterator);
-	if (it->current_tuple == NULL) {
-		iterator->next = tree_iterator_dummie;
-		return NULL;
-	}
-	tree_iterator_set_next_method(it);
-	return it->current_tuple;
-}
-
 static struct tuple *
 tree_iterator_start(struct iterator *iterator)
 {
@@ -489,37 +471,46 @@ MemtxTree::endBuild()
 	build_array_alloc_size = 0;
 }
 
-/**
- * Create a read view for iterator so further index modifications
- * will not affect the iterator iteration.
- */
-void
-MemtxTree::createReadViewForIterator(struct iterator *iterator)
+static void
+tree_snapshot_iterator_free(struct iterator *iterator)
 {
-	struct tree_iterator *it = tree_iterator(iterator);
-
-	/*
-	 * The read view of the tree is integrated the tree_iterator.
-	 * At the same time tree_iterator member can be recreated if the
-	 * tree was changed, and the read view will be lost.
-	 * To prevent it, for the last time call ->next method without
-	 * a read view and create the read view immediately.
-	 */
-	iterator->next(iterator);
-	iterator->next = tree_iterator_repeat;
-
+	assert(iterator->free == tree_snapshot_iterator_free);
+	struct tree_iterator *it = (struct tree_iterator *)iterator;
 	struct memtx_tree *tree = (struct memtx_tree *)it->tree;
-	memtx_tree_iterator_freeze(tree, &it->tree_iterator);
+	memtx_tree_iterator_destroy(tree, &it->tree_iterator);
+	free(iterator);
+}
+
+static struct tuple *
+tree_snapshot_iterator_next(struct iterator *iterator)
+{
+	assert(iterator->free == tree_snapshot_iterator_free);
+	struct tree_iterator *it = (struct tree_iterator *)iterator;
+	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
+	if (res == NULL)
+		return NULL;
+	memtx_tree_iterator_next(it->tree, &it->tree_iterator);
+	return *res;
 }
 
 /**
- * Destroy a read view of an iterator. Must be called for iterators,
- * for which createReadViewForIterator was called.
+ * Create an ALL iterator with personal read view so further
+ * index modifications will not affect the iteration results.
+ * Must be destroyed by iterator->free after usage.
  */
-void
-MemtxTree::destroyReadViewForIterator(struct iterator *iterator)
+struct iterator *
+MemtxTree::createSnapshotIterator()
 {
-	struct tree_iterator *it = tree_iterator(iterator);
-	struct memtx_tree *tree = (struct memtx_tree *)it->tree;
-	memtx_tree_iterator_destroy(tree, &it->tree_iterator);
+	struct tree_iterator *it = (struct tree_iterator *)
+		calloc(1, sizeof(*it));
+	if (it == NULL)
+		tnt_raise(OutOfMemory, sizeof(struct tree_iterator),
+			  "MemtxTree", "iterator");
+
+	it->base.free = tree_snapshot_iterator_free;
+	it->base.next = tree_snapshot_iterator_next;
+	it->tree = &tree;
+	it->tree_iterator = memtx_tree_iterator_first(&tree);
+	memtx_tree_iterator_freeze(&tree, &it->tree_iterator);
+	return (struct iterator *) it;
 }

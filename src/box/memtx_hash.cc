@@ -73,14 +73,14 @@ struct hash_iterator {
 	struct light_index_iterator iterator;
 };
 
-void
+static void
 hash_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->free == hash_iterator_free);
 	free(iterator);
 }
 
-struct tuple *
+static struct tuple *
 hash_iterator_ge(struct iterator *ptr)
 {
 	assert(ptr->free == hash_iterator_free);
@@ -90,7 +90,7 @@ hash_iterator_ge(struct iterator *ptr)
 	return res ? *res : 0;
 }
 
-struct tuple *
+static struct tuple *
 hash_iterator_gt(struct iterator *ptr)
 {
 	assert(ptr->free == hash_iterator_free);
@@ -292,25 +292,53 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 }
 
 /**
- * Create a read view for iterator so further index modifications
- * will not affect the iterator iteration.
+ * Destroy read view and free snapshot iterator.
+ * Virtual method of snapshot iterator @sa MemtxHash::createSnapshotIterator.
  */
-void
-MemtxHash::createReadViewForIterator(struct iterator *iterator)
+static void
+hash_snapshot_iterator_free(struct iterator *iterator)
 {
+	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) iterator;
-	light_index_iterator_freeze(it->hash_table, &it->iterator);
+	light_index_iterator_destroy(it->hash_table, &it->iterator);
+	free(iterator);
 }
 
 /**
- * Destroy a read view of an iterator. Must be called for iterators,
- * for which createReadViewForIterator was called.
+ * Get next tuple from snapshot iterator.
+ * Virtual method of snapshot iterator @sa MemtxHash::createSnapshotIterator.
  */
-void
-MemtxHash::destroyReadViewForIterator(struct iterator *iterator)
+static struct tuple *
+hash_snapshot_iterator_ge(struct iterator *ptr)
 {
-	struct hash_iterator *it = (struct hash_iterator *) iterator;
-	light_index_iterator_destroy(it->hash_table, &it->iterator);
+	assert(ptr->free == hash_snapshot_iterator_free);
+	struct hash_iterator *it = (struct hash_iterator *) ptr;
+	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
+							       &it->iterator);
+	return res ? *res : 0;
+}
+
+/**
+ * Create an ALL iterator with personal read view so further
+ * index modifications will not affect the iteration results.
+ * Must be destroyed by iterator->free after usage.
+ */
+struct iterator *
+MemtxHash::createSnapshotIterator()
+{
+	struct hash_iterator *it = (struct hash_iterator *)
+		calloc(1, sizeof(*it));
+	if (it == NULL) {
+		tnt_raise(OutOfMemory, sizeof(struct hash_iterator),
+			  "MemtxHash", "iterator");
+	}
+
+	it->base.next = hash_snapshot_iterator_ge;
+	it->base.free = hash_snapshot_iterator_free;
+	it->hash_table = hash_table;
+	light_index_iterator_begin(it->hash_table, &it->iterator);
+	light_index_iterator_freeze(it->hash_table, &it->iterator);
+	return (struct iterator *) it;
 }
 
 /* }}} */

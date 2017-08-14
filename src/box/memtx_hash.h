@@ -56,15 +56,11 @@ public:
 				  uint32_t part_count) const override;
 
 	/**
-	 * Create a read view for iterator so further index modifications
-	 * will not affect the iterator iteration.
+	 * Create an ALL iterator with personal read view so further
+	 * index modifications will not affect the iteration results.
+	 * Must be destroyed by iterator->free after usage.
 	 */
-	virtual void createReadViewForIterator(struct iterator *iterator) override;
-	/**
-	 * Destroy a read view of an iterator. Must be called for iterators,
-	 * for which createReadViewForIterator was called.
-	 */
-	virtual void destroyReadViewForIterator(struct iterator *iterator) override;
+	struct iterator *createSnapshotIterator() override;
 
 	virtual size_t bsize() const override;
 

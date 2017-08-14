@@ -519,8 +519,6 @@ checkpoint_destroy(struct checkpoint *ckpt)
 {
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
-		Index *pk = space_index(entry->space, 0);
-		pk->destroyReadViewForIterator(entry->iterator);
 		entry->iterator->free(entry->iterator);
 	}
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
@@ -545,10 +543,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
-	entry->iterator = pk->allocIterator();
-
-	pk->initIterator(entry->iterator, ITER_ALL, NULL, 0);
-	pk->createReadViewForIterator(entry->iterator);
+	entry->iterator = pk->createSnapshotIterator();
 };
 
 int
