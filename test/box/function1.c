@@ -143,3 +143,12 @@ errors(box_function_ctx_t *ctx, const char *args, const char *args_end)
 
 	return -1; /* raises "Unknown procedure error" */
 }
+
+int
+test_yield(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	say_info("-- yield -  called --");
+	fiber_sleep(0.001);
+	printf("ok - yield\n");
+	return 0;
+}

@@ -69,4 +69,13 @@ box.schema.user.grant('guest', 'execute', 'function', name)
 c:call(name)
 box.schema.func.drop(name)
 
+-- Drop function while executing gh-910
+box.schema.func.create('function1.test_yield', {language = "C"})
+box.schema.user.grant('guest', 'execute', 'function', 'function1.test_yield')
+fiber = require('fiber')
+ch = fiber.channel(1)
+_ = fiber.create(function() c:call('function1.test_yield') ch:put(true) end)
+box.schema.func.drop('function1.test_yield')
+ch:get()
+
 c:close()

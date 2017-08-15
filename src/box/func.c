@@ -32,6 +32,8 @@
 
 #include <dlfcn.h>
 
+#include "assoc.h"
+
 #include "lua/utils.h"
 
 /**
@@ -102,7 +104,14 @@ luaT_module_find(lua_State *L)
 	if (lua_isnil(L, -1))
 		return luaL_error(L, "module not found in package.cpath");
 
-	snprintf(ctx->path, ctx->path_len, "%s", lua_tostring(L, -1));
+	/* Convert path to absolute */
+	char resolved[PATH_MAX];
+	if (realpath(lua_tostring(L, -1), resolved) == NULL) {
+		diag_set(SystemError, "realpath");
+		return luaT_error(L);
+	}
+
+	snprintf(ctx->path, ctx->path_len, "%s", resolved);
 	return 0;
 }
 
@@ -133,6 +142,224 @@ module_find(const char *package, const char *package_end, char *path,
 	return 0;
 }
 
+static struct mh_strnptr_t *modules = NULL;
+
+static void
+module_gc(struct module *module);
+
+int
+module_init(void)
+{
+	modules = mh_strnptr_new();
+	if (modules == NULL) {
+		diag_set(OutOfMemory, sizeof(*modules), "malloc",
+			  "modules hash table");
+		return -1;
+	}
+	return 0;
+}
+
+void
+module_free(void)
+{
+	while (mh_size(modules) > 0) {
+		mh_int_t i = mh_first(modules);
+		struct module *module =
+			(struct module *) mh_strnptr_node(modules, i)->val;
+		/* Can't delete modules if they have active calls */
+		module_gc(module);
+	}
+	mh_strnptr_delete(modules);
+}
+
+/**
+ * Look up a module in the modules cache.
+ */
+static struct module *
+module_cache_find(const char *name, const char *name_end)
+{
+	mh_int_t i = mh_strnptr_find_inp(modules, name, name_end - name);
+	if (i == mh_end(modules))
+		return NULL;
+	return (struct module *)mh_strnptr_node(modules, i)->val;
+}
+
+/**
+ * Save module to the module cache.
+ */
+static inline int
+module_cache_put(const char *name, const char *name_end, struct module *module)
+{
+	size_t name_len = name_end - name;
+	uint32_t name_hash = mh_strn_hash(name, name_len);
+	const struct mh_strnptr_node_t strnode = {
+		name, name_len, name_hash, module};
+
+	if (mh_strnptr_put(modules, &strnode, NULL, NULL) == mh_end(modules)) {
+		diag_set(OutOfMemory, sizeof(strnode), "malloc", "modules");
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Delete a module from the module cache
+ */
+static void
+module_cache_del(const char *name, const char *name_end)
+{
+	mh_int_t i = mh_strnptr_find_inp(modules, name, name_end - name);
+	if (i == mh_end(modules))
+		return;
+	mh_strnptr_del(modules, i, NULL);
+}
+
+/*
+ * Load a dso.
+ * Create a new symlink based on temporary directory and try to
+ * load via this symink to load a dso twice for cases of a function
+ * reload.
+ */
+static struct module *
+module_load(const char *package, const char *package_end)
+{
+	char path[PATH_MAX];
+	if (module_find(package, package_end, path, sizeof(path)) != 0)
+		return NULL;
+
+	struct module *module = (struct module *) malloc(sizeof(*module));
+	if (module == NULL) {
+		diag_set(OutOfMemory, sizeof(struct module), "malloc",
+			 "struct module");
+		return NULL;
+	}
+	rlist_create(&module->funcs);
+	module->calls = 0;
+	module->is_unloading = false;
+	char dir_name[] = "/tmp/tntXXXXXX";
+	if (mkdtemp(dir_name) == NULL) {
+		diag_set(SystemError, "failed to create unique dir name");
+		goto error;
+	}
+	char load_name[PATH_MAX + 1];
+	snprintf(load_name, sizeof(load_name), "%s/%*s", dir_name,
+		 (int)(package_end - package), package);
+	if (symlink(path, load_name) < 0) {
+		diag_set(SystemError, "failed to create dso link");
+		goto error;
+	}
+	module->handle = dlopen(load_name, RTLD_NOW | RTLD_LOCAL);
+	if (unlink(load_name) != 0)
+		say_warn("failed to unlink dso link %s", load_name);
+	if (rmdir(dir_name) != 0)
+		say_warn("failed to delete temporary dir %s", dir_name);
+	if (module->handle == NULL) {
+		int package_len = (int) (package_end - package_end);
+		diag_set(ClientError, ER_LOAD_MODULE, package_len,
+			  package, dlerror());
+		goto error;
+	}
+
+	return module;
+error:
+	free(module);
+	return NULL;
+}
+
+static void
+module_delete(struct module *module)
+{
+	dlclose(module->handle);
+	TRASH(module);
+	free(module);
+}
+
+/*
+ * Check if a dso is unused and can be closed.
+ */
+static void
+module_gc(struct module *module)
+{
+	if (!module->is_unloading || !rlist_empty(&module->funcs) ||
+	     module->calls != 0)
+		return;
+	module_delete(module);
+}
+
+/*
+ * Import a function from the module.
+ */
+static box_function_f
+module_sym(struct module *module, const char *name)
+{
+	box_function_f f = (box_function_f)dlsym(module->handle, name);
+	if (f == NULL) {
+		diag_set(ClientError, ER_LOAD_FUNCTION, name, dlerror());
+		return NULL;
+	}
+	return f;
+}
+
+/*
+ * Reload a dso.
+ */
+int
+module_reload(const char *package, const char *package_end, struct module **module)
+{
+	struct module *old_module = module_cache_find(package, package_end);
+	if (old_module == NULL) {
+		/* Module wasn't loaded - do nothing. */
+		*module = NULL;
+		return 0;
+	}
+
+	struct module *new_module = module_load(package, package_end);
+	if (new_module == NULL)
+		return -1;
+
+	struct func *func, *tmp_func;
+	rlist_foreach_entry_safe(func, &old_module->funcs, item, tmp_func) {
+		struct func_name name;
+		func_split_name(func->def->name, &name);
+		func->func = module_sym(new_module, name.sym);
+		if (func->func == NULL)
+			goto restore;
+		func->module = new_module;
+		rlist_move(&new_module->funcs, &func->item);
+	}
+	module_cache_del(package, package_end);
+	if (module_cache_put(package, package_end, new_module) != 0)
+		goto restore;
+	old_module->is_unloading = true;
+	module_gc(old_module);
+	*module = new_module;
+	return 0;
+restore:
+	/*
+	 * Some old-dso func can't be load from new module, restore old
+	 * functions.
+	 */
+	do {
+		struct func_name name;
+		func_split_name(func->def->name, &name);
+		func->func = module_sym(old_module, name.sym);
+		if (func->func == NULL) {
+			/*
+			 * Something strange was happen, an early loaden
+			 * function was not found in an old dso.
+			 */
+			panic("Can't restore module function, "
+			      "server state is inconsistent");
+		}
+		func->module = old_module;
+		rlist_move(&old_module->funcs, &func->item);
+	} while (func != rlist_first_entry(&old_module->funcs,
+					   struct func, item));
+	assert(rlist_empty(&new_module->funcs));
+	module_delete(new_module);
+	return -1;
+}
+
 struct func *
 func_new(struct func_def *def)
 {
@@ -157,16 +384,23 @@ func_new(struct func_def *def)
 	 */
 	func->owner_credentials.auth_token = BOX_USER_MAX; /* invalid value */
 	func->func = NULL;
-	func->dlhandle = NULL;
+	func->module = NULL;
 	return func;
 }
 
 static void
 func_unload(struct func *func)
 {
-	if (func->dlhandle)
-		dlclose(func->dlhandle);
-	func->dlhandle = NULL;
+	if (func->module) {
+		rlist_del(&func->item);
+		if (rlist_empty(&func->module->funcs)) {
+			struct func_name name;
+			func_split_name(func->def->name, &name);
+			module_cache_del(name.package, name.package_end);
+		}
+		module_gc(func->module);
+	}
+	func->module = NULL;
 	func->func = NULL;
 }
 
@@ -182,22 +416,34 @@ func_load(struct func *func)
 	struct func_name name;
 	func_split_name(func->def->name, &name);
 
-	char path[PATH_MAX];
-	if (module_find(name.package, name.package_end, path, sizeof(path)))
-		return -1;
-
-	func->dlhandle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
-	if (func->dlhandle == NULL) {
-		int package_len = (int) (name.package_end - name.package_end);
-		diag_set(ClientError, ER_LOAD_MODULE, package_len,
-			  name.package, dlerror());
-		diag_log();
-		return -1;
+	struct module *module = module_cache_find(name.package,
+						  name.package_end);
+	if (module == NULL) {
+		/* Try to find loaded module in the cache */
+		module = module_load(name.package, name.package_end);
+		if (module == NULL)
+			diag_raise();
+		if (module_cache_put(name.package, name.package_end, module)) {
+			module_delete(module);
+			diag_raise();
+		}
 	}
-	func->func = (box_function_f) dlsym(func->dlhandle, name.sym);
-	if (func->func == NULL) {
-		diag_set(ClientError, ER_LOAD_FUNCTION, func->def->name,
-			  dlerror());
+
+	func->func = module_sym(module, name.sym);
+	if (func->func == NULL)
+		return -1;
+	func->module = module;
+	rlist_add(&module->funcs, &func->item);
+	return 0;
+}
+
+int
+func_reload(struct func *func)
+{
+	struct func_name name;
+	func_split_name(func->def->name, &name);
+	struct module *module = NULL;
+	if (module_reload(name.package, name.package_end, &module) != 0) {
 		diag_log();
 		return -1;
 	}
@@ -213,7 +459,15 @@ func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
 			return -1;
 	}
 
-	return func->func(ctx, args, args_end);
+	/* Module can be changed after function reload. */
+	struct module *module = func->module;
+	if (module != NULL)
+		++module->calls;
+	int rc = func->func(ctx, args, args_end);
+	if (module != NULL)
+		--module->calls;
+	module_gc(module);
+	return rc;
 }
 
 void

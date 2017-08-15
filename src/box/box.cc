@@ -68,6 +68,7 @@
 #include "checkpoint.h"
 #include "systemd.h"
 #include "call.h"
+#include "func.h"
 
 static char status[64] = "unknown";
 
@@ -1214,6 +1215,7 @@ box_free(void)
 		replication_free();
 		user_cache_free();
 		schema_free();
+		module_free();
 		tuple_free();
 		port_free();
 #endif
@@ -1403,6 +1405,8 @@ box_cfg_xc(void)
 
 	gc_init();
 	engine_init();
+	if (module_init() != 0)
+		diag_raise();
 	schema_init();
 	replication_init();
 	port_init();

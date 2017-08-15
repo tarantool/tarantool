@@ -414,8 +414,18 @@ box_lua_eval(struct call_request *request, struct obuf *out)
 	return box_process_lua(request, out, execute_lua_eval);
 }
 
+static int
+lbox_func_reload(lua_State *L)
+{
+	const char *name = luaL_optstring(L, 1, "function name");
+	if (box_func_reload(name) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
+	{"func_reload", lbox_func_reload},
 	{NULL, NULL}
 };
 

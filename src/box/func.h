@@ -30,6 +30,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#include <small/rlist.h>
+
 #include "key_def.h"
 
 #if defined(__cplusplus)
@@ -37,10 +44,28 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /**
+ * Dynamic shared module.
+ */
+struct module {
+	/** Module dlhandle. */
+	void *handle;
+	/** List of imported functions. */
+	struct rlist funcs;
+	/** Count of active calls. */
+	size_t calls;
+	/** True if module is being unloaded. */
+	bool is_unloading;
+};
+
+/**
  * Stored function.
  */
 struct func {
 	struct func_def *def;
+	/**
+	 * Anchor for module membership.
+	 */
+	struct rlist item;
 	/**
 	 * For C functions, the body of the function.
 	 */
@@ -49,7 +74,7 @@ struct func {
 	 * Each stored function keeps a handle to the
 	 * dynamic library for the C callback.
 	 */
-	void *dlhandle;
+	struct module *module;
 	/**
 	 * Authentication id of the owner of the function,
 	 * used for set-user-id functions.
@@ -60,6 +85,18 @@ struct func {
 	 */
 	struct access access[BOX_USER_MAX];
 };
+
+/**
+ * Initialize modules subsystem.
+ */
+int
+module_init(void);
+
+/**
+ * Cleanup modules subsystem.
+ */
+void
+module_free(void);
 
 struct func *
 func_new(struct func_def *def);
@@ -77,9 +114,11 @@ int
 func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
 	  const char *args_end);
 
+int
+func_reload(struct func *func);
+
 #if defined(__cplusplus)
 } /* extern "C" */
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_FUNC_H_INCLUDED */

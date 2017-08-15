@@ -33,6 +33,16 @@
 
 #include <stdint.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+int
+box_func_reload(const char *name);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
 struct obuf;
 
 struct box_function_ctx {
