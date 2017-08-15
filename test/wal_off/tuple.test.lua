@@ -16,14 +16,18 @@ function tuple_max()
     local n = 'a'
     while true do
         n = n..n
-        tester:insert{#n, n}
+        local status, reason = pcall(tester.insert, tester, {#n, n})
+        if not status then
+            return #n, reason
+        end
+        collectgarbage('collect')
     end
 end;
 test_run:cmd("setopt delimiter ''");
-tuple_max()
-tuple_max = string.rep('a', 1000000)
-#tuple_max
-t = tester:insert{#tuple_max, tuple_max}
+n, reason = tuple_max()
+n
+n + 32 >= box.cfg.memtx_max_tuple_size
+reason
 tester:drop()
 tuple_max = nil
 collectgarbage('collect')
