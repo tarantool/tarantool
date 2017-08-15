@@ -417,5 +417,27 @@ f = fiber.create(worker)
 while f:status() ~= 'dead' do box.snapshot() fiber.sleep(0.01) end
 
 errinj.set("ERRINJ_VY_POINT_ITER_WAIT", false)
+s:drop()
 
+-- vinyl: vy_cache_add: Assertion `0' failed
+-- https://github.com/tarantool/tarantool/issues/2685
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+s:replace{2, 0}
+box.snapshot()
+s:replace{1, 0}
+box.snapshot()
+s:replace{0, 0}
+s:select{0}
+
+errinj.set("ERRINJ_WAL_DELAY", true)
+wait_replace = true
+_ = fiber.create(function() s:replace{1, 1} wait_replace = false end)
+gen,param,state = s:pairs({1}, {iterator = 'GE'})
+state, value = gen(param, state)
+value
+errinj.set("ERRINJ_WAL_DELAY", false)
+while wait_replace do fiber.sleep(0.01) end
+state, value = gen(param, state)
+value
 s:drop()

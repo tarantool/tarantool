@@ -286,6 +286,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		vy_cache_entry_delete(cache->env, entry);
 		return;
 	}
+	assert(!vy_cache_tree_iterator_is_invalid(&inserted));
 	if (replaced != NULL) {
 		entry->flags = replaced->flags;
 		entry->left_boundary_level = replaced->left_boundary_level;
@@ -306,29 +307,59 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	/* The flag that must be set in the inserted chain entry */
 	uint32_t flag = direction > 0 ? VY_CACHE_LEFT_LINKED :
 			VY_CACHE_RIGHT_LINKED;
-	if (entry->flags & flag)
-		return;
 
 #ifndef NDEBUG
-	assert(!vy_cache_tree_iterator_is_invalid(&inserted));
-	if (direction > 0) {
+	/**
+	 * Usually prev_stmt is already in the cache but there are cases
+	 * when it's not (see below).
+	 * There must be no entries between (prev_stmt, stmt) interval in
+	 * any case. (1)
+	 * Farther, if the stmt entry is already linked (in certain direction),
+	 * it must be linked with prev_stmt (in that direction). (2)
+	 * Let't check (1) and (2) for debug reasons.
+	 *
+	 * There are two cases in which prev_stmt statement is absent
+	 * in the cache:
+	 * 1) The statement was in prepared state and then it was
+	 *  committed or rollbacked.
+	 * 2) The entry was popped out by vy_cache_gc.
+	 *
+	 * Note that case when the prev_stmt is owerwritten by other TX
+	 * is impossible because this TX would be sent to read view and
+	 * wouldn't be able to add anything to the cache.
+	 */
+	if (direction > 0)
 		vy_cache_tree_iterator_prev(&cache->cache_tree, &inserted);
-	} else {
+	else
 		vy_cache_tree_iterator_next(&cache->cache_tree, &inserted);
-	}
-	/* Check that there are no statements between prev_stmt and stmt */
+
 	if (!vy_cache_tree_iterator_is_invalid(&inserted)) {
 		struct vy_cache_entry **prev_check_entry =
 			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
 							&inserted);
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
-		if (vy_stmt_compare(prev_stmt, prev_check_stmt,
-		    cache->cmp_def) != 0)
-			/* Failed to build chain. */
-			unreachable();
+		int cmp = vy_stmt_compare(prev_stmt, prev_check_stmt,
+					  cache->cmp_def);
+
+		if (entry->flags & flag) {
+			/* The found entry must be exactly prev_stmt. (2) */
+			assert(cmp == 0);
+		} else {
+			/*
+			 * The found entry must be exactly prev_stmt or lay
+			 * farther than prev_stmt. (1)
+			 */
+			assert(cmp * direction >= 0);
+		}
+	} else {
+		/* Cannot be in chain (2) */
+		assert(!(entry->flags & flag));
 	}
 #endif
+
+	if (entry->flags & flag)
+		return;
 
 	/* Insert/replace entry with previous statement */
 	struct vy_cache_entry *prev_entry =
