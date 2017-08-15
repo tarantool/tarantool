@@ -30,6 +30,8 @@
  */
 #include "func.h"
 
+#include "trivia/config.h"
+
 #include <dlfcn.h>
 
 #include "assoc.h"
@@ -242,8 +244,8 @@ module_load(const char *package, const char *package_end)
 		goto error;
 	}
 	char load_name[PATH_MAX + 1];
-	snprintf(load_name, sizeof(load_name), "%s/%*s", dir_name,
-		 (int)(package_end - package), package);
+	snprintf(load_name, sizeof(load_name), "%s/%.*s." TARANTOOL_LIBEXT,
+		 dir_name, (int)(package_end - package), package);
 	if (symlink(path, load_name) < 0) {
 		diag_set(SystemError, "failed to create dso link");
 		goto error;

@@ -47,9 +47,35 @@ foo(box_function_ctx_t *ctx, const char *args, const char *args_end)
 int
 test_reload(box_function_ctx_t *ctx, const char *args, const char *args_end)
 {
-	fiber_sleep(0.001);
-	char tuple_buf[64];
+	static const char *SPACE_NAME = "test_reload";
+
+	uint32_t space_id = box_space_id_by_name(SPACE_NAME, strlen(SPACE_NAME));
+	if (space_id == BOX_ID_NIL) {
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C,
+			"Can't find space %s", SPACE_NAME);
+	}
+
+	assert(!box_txn());
+	box_txn_begin();
+	assert(box_txn());
+
+	/* Replace value */
+	char tuple_buf[16];
 	char *tuple_end = tuple_buf;
+	tuple_end = mp_encode_array(tuple_end, 2);
+	tuple_end = mp_encode_uint(tuple_end, 1);
+	tuple_end = mp_encode_uint(tuple_end, 2); /* counter */
+	assert(tuple_end <= tuple_buf + sizeof(tuple_buf));
+
+	if (box_replace(space_id, tuple_buf, tuple_end, NULL) != 0)
+		return -1;
+
+	box_txn_commit();
+	assert(!box_txn());
+
+	fiber_sleep(0.001);
+
+	tuple_end = tuple_buf;
 	tuple_end = mp_encode_array(tuple_end, 1);
 	tuple_end = mp_encode_uint(tuple_end, 1);
 	struct tuple *tuple = box_tuple_new(box_tuple_format_default(), tuple_buf, tuple_end);

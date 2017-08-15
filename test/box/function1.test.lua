@@ -72,10 +72,15 @@ box.schema.func.drop(name)
 -- Drop function while executing gh-910
 box.schema.func.create('function1.test_yield', {language = "C"})
 box.schema.user.grant('guest', 'execute', 'function', 'function1.test_yield')
+s = box.schema.space.create('test_yield')
+_ = s:create_index('pk')
+box.schema.user.grant('guest', 'read,write', 'space', 'test_yield')
 fiber = require('fiber')
 ch = fiber.channel(1)
 _ = fiber.create(function() c:call('function1.test_yield') ch:put(true) end)
+while s:get({1}) == nil do fiber.yield(0.0001) end
 box.schema.func.drop('function1.test_yield')
 ch:get()
+s:drop()
 
 c:close()
