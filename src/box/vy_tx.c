@@ -312,9 +312,11 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 	key.stmt = v->stmt;
 	key.tx = NULL;
 	/** Find the first value equal to or greater than key */
-	for (struct txv *abort = read_set_nsearch(tree, &key);
+	struct read_set_iterator it;
+	read_set_isearch_ge(tree, &key, &it);
+	for (struct txv *abort = read_set_inext(tree, &it);
 	     abort != NULL && abort->index == v->index;
-	     abort = read_set_next(tree, abort)) {
+	     abort = read_set_inext(tree, &it)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
 				    v->index->cmp_def) != 0)
@@ -353,9 +355,11 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 	key.stmt = v->stmt;
 	key.tx = NULL;
 	/** Find the first value equal to or greater than key. */
-	for (struct txv *abort = read_set_nsearch(tree, &key);
+	struct read_set_iterator it;
+	read_set_isearch_ge(tree, &key, &it);
+	for (struct txv *abort = read_set_inext(tree, &it);
 	     abort != NULL && abort->index == v->index;
-	     abort = read_set_next(tree, abort)) {
+	     abort = read_set_inext(tree, &it)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
 				    v->index->cmp_def) != 0)
@@ -496,8 +500,10 @@ vy_tx_prepare(struct vy_tx *tx)
 	tx->psn = ++xm->psn;
 
 	/** Send to read view read/write intersection. */
-	for (struct txv *v = write_set_first(&tx->write_set);
-	     v != NULL; v = write_set_next(&tx->write_set, v)) {
+	struct txv *v;
+	struct write_set_iterator it;
+	write_set_ifirst(&tx->write_set, &it);
+	while ((v = write_set_inext(&tx->write_set, &it)) != NULL) {
 		if (vy_tx_send_to_read_view(tx, v))
 			return -1;
 	}
@@ -509,7 +515,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	/* repsert - REPLACE/UPSERT */
 	const struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
-	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		/* Save only writes. */
 		if (v->is_read)
@@ -622,8 +627,9 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 	if (tx->read_view != &xm->global_read_view)
 		tx->read_view->is_aborted = true;
 
-	for (v = write_set_first(&tx->write_set); v != NULL;
-	     v = write_set_next(&tx->write_set, v)) {
+	struct write_set_iterator it;
+	write_set_ifirst(&tx->write_set, &it);
+	while ((v = write_set_inext(&tx->write_set, &it)) != NULL) {
 		vy_tx_abort_readers(tx, v);
 	}
 }

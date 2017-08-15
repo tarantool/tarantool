@@ -236,10 +236,10 @@ static void
 user_set_effective_access(struct user *user)
 {
 	struct credentials *cr = current_user();
+	struct privset_iterator it;
+	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
-	for (priv = privset_first(&user->privs);
-	     priv;
-	     priv = privset_next(&user->privs, priv)) {
+	while ((priv = privset_inext(&user->privs, &it)) != NULL) {
 		struct access *object = access_find(priv);
 		 /* Protect against a concurrent drop. */
 		if (object == NULL)
@@ -268,9 +268,9 @@ user_reload_privs(struct user *user)
 	 * corresponding objects to have
 	 * only the stuff that it's granted directly.
 	 */
-	for (priv = privset_first(&user->privs);
-	     priv;
-	     priv = privset_next(&user->privs, priv)) {
+	struct privset_iterator it;
+	privset_ifirst(&user->privs, &it);
+	while ((priv = privset_inext(&user->privs, &it)) != NULL) {
 		priv->access = 0;
 	}
 	user_set_effective_access(user);
@@ -305,10 +305,11 @@ user_reload_privs(struct user *user)
 		user_map_iterator_init(&it, &user->roles);
 		struct user *role;
 		while ((role = user_map_iterator_next(&it))) {
-			struct priv_def *def = privset_first(&role->privs);
-			while (def) {
+			struct privset_iterator it;
+			privset_ifirst(&role->privs, &it);
+			struct priv_def *def;
+			while ((def = privset_inext(&role->privs, &it))) {
 				user_grant_priv(user, def);
-				def = privset_next(&role->privs, def);
 			}
 		}
 	}
