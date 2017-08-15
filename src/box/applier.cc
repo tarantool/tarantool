@@ -121,22 +121,20 @@ applier_writer_f(va_list ap)
 			coio_write_xrow(&io, &xrow);
 		} catch (SocketError *e) {
 			/*
-			 * Do not exit, if there a network error then this
-			 * fiber will be woken next time after when a new
-			 * data recieved.
+			 * Do not exit, if there is a network error,
+			 * the reader fiber will reconnect for us
+			 * and signal our cond afterwards.
 			 */
 			e->log();
 		} catch (Exception *e) {
 			/*
-			 * Some unwanted exception (may be a memory
-			 * allocation trouble or something else), just
-			 * try to resend on next time.
+			 * Out of memory encoding the message, ignore
+			 * and try again after an interval.
 			 */
 			e->log();
 		}
 		fiber_gc();
 	}
-	coio_close(io.fd);
 	return 0;
 }
 

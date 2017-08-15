@@ -292,7 +292,7 @@ relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 
 /*
  * Relay reader fiber function.
- * Read xrow encloded vclocks from slave side.
+ * Read xrow encoded vclocks sent by the replica.
  */
 int
 relay_reader_f(va_list ap)
@@ -362,14 +362,13 @@ relay_subscribe_f(va_list ap)
 		if (inj != NULL && inj->dparam != 0)
 			timeout = inj->dparam;
 
+		fiber_cond_wait_timeout(&relay->reader_cond, timeout);
 		/*
-		 * The fiber can be woken by IO cancel, by the timeout of
+		 * The fiber can be woken by IO cancel, by a timeout of
 		 * status messaging or by an acknowledge to status message.
 		 * Handle cbus messages first.
 		 */
-		fiber_cond_wait_timeout(&relay->reader_cond, timeout);
 		cbus_process(&relay->endpoint);
-
 		/*
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
