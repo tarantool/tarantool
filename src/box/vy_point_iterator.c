@@ -343,8 +343,6 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 	if (rlist_empty(history))
 		return 0;
 
-	int64_t vlsn = (*itr->p_read_view)->vlsn;
-
 	struct vy_stmt_history_node *node =
 		rlist_last_entry(history, struct vy_stmt_history_node, link);
 	if (vy_point_iterator_history_is_terminal(history)) {
@@ -361,11 +359,9 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 	}
 	while (node != NULL) {
 		assert(vy_stmt_type(node->stmt) == IPROTO_UPSERT);
-		if (vy_stmt_lsn(node->stmt) > vlsn) {
-			/* We were sent to read view, skip the statement */
-			node = rlist_prev_entry_safe(node, history, link);
-			continue;
-		}
+		/* We could not read the data that is invisible now */
+		assert(node->src_type == ITER_SRC_TXW ||
+		       vy_stmt_lsn(node->stmt) <= (*itr->p_read_view)->vlsn);
 
 		struct tuple *stmt =
 			vy_apply_upsert(node->stmt, itr->curr_stmt,
