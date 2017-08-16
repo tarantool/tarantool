@@ -146,6 +146,7 @@ box.space._priv:select()
   - [1, 2, 'space', 297, 1]
   - [1, 2, 'space', 305, 1]
   - [1, 2, 'space', 313, 1]
+  - [1, 2, 'space', 330, 2]
   - [1, 3, 'space', 320, 2]
   - [1, 3, 'universe', 0, 1]
   - [1, 4, 'function', 3, 4]

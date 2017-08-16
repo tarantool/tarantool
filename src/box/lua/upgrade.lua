@@ -545,6 +545,9 @@ local function create_truncate_space()
 
     log.info("create index primary on _truncate")
     box.space._index:insert{_truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+
+    local _priv = box.space[box.schema.PRIV_ID]
+    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, 2}
 end
 
 local function upgrade_to_1_7_5()
