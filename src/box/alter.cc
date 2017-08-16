@@ -210,6 +210,33 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 	return 0;
 }
 
+static void
+opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
+	       uint32_t key_len, const char **data, uint32_t errcode,
+	       uint32_t field_no)
+{
+	char errmsg[DIAG_ERRMSG_MAX];
+	bool found = false;
+	for (const struct opt_def *def = reg; def->name != NULL; def++) {
+		if (key_len != strlen(def->name) ||
+		    memcmp(key, def->name, key_len) != 0)
+			continue;
+
+		if (opt_set(opts, def, data) != 0) {
+			snprintf(errmsg, sizeof(errmsg), "'%.*s' must be %s",
+				 key_len, key, opt_type_strs[def->type]);
+			tnt_raise(ClientError, errcode, field_no, errmsg);
+		}
+		found = true;
+		break;
+	}
+	if (!found) {
+		snprintf(errmsg, sizeof(errmsg), "unexpected option '%.*s'",
+			 key_len, key);
+		tnt_raise(ClientError, errcode, field_no, errmsg);
+	}
+}
+
 /**
  * Populate key options from their msgpack-encoded representation
  * (msgpack map)
@@ -220,8 +247,6 @@ static const char *
 opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		       uint32_t errcode, uint32_t field_no)
 {
-	char errmsg[DIAG_ERRMSG_MAX];
-
 	if (mp_typeof(*map) == MP_NIL)
 		return map;
 	if (mp_typeof(*map) != MP_MAP)
@@ -240,29 +265,8 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(&map, &key_len);
-		bool found = false;
-		for (const struct opt_def *def = reg; def->name != NULL; def++) {
-			if (key_len != strlen(def->name) ||
-			    memcmp(key, def->name, key_len) != 0)
-				continue;
-
-			if (opt_set(opts, def, &map) != 0) {
-				snprintf(errmsg, sizeof(errmsg),
-					"'%.*s' must be %s", key_len, key,
-					opt_type_strs[def->type]);
-				tnt_raise(ClientError, errcode, field_no,
-					  errmsg);
-			}
-
-			found = true;
-			break;
-		}
-		if (!found) {
-			snprintf(errmsg, sizeof(errmsg),
-				"unexpected option '%.*s'",
-				key_len, key);
-			tnt_raise(ClientError, errcode, field_no, errmsg);
-		}
+		opts_parse_key(opts, reg, key, key_len, &map, errcode,
+			       field_no);
 	}
 	return map;
 }
@@ -1711,11 +1715,11 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 			tnt_raise(ClientError, ER_CREATE_USER,
 				  user->name, "invalid user password");
 		}
-                if (user->uid == GUEST) {
-                    /** Guest user is permitted to have empty password */
-                    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
-                        tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
-                }
+		if (user->uid == GUEST) {
+		    /** Guest user is permitted to have empty password */
+		    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
+			tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
+		}
 
 		base64_decode(hash2_base64, len, user->hash2,
 			      sizeof(user->hash2));
