@@ -314,10 +314,16 @@ relay_reader_f(va_list ap)
 			fiber_cond_signal(&relay->reader_cond);
 		}
 	} catch (Exception *e) {
-		e->log();
-		if (!fiber_is_dead(relay_f)) {
+		if (diag_is_empty(&relay->diag)) {
+			/* Don't override existing error. */
 			diag_move(diag_get(), &relay->diag);
 			fiber_cancel(relay_f);
+		} else if (!fiber_is_cancelled()) {
+			/*
+			 * There is an relay error and this fiber
+			 * fiber has another, log it.
+			 */
+			e->log();
 		}
 	}
 	ibuf_destroy(&ibuf);
@@ -351,8 +357,9 @@ relay_subscribe_f(va_list ap)
 	relay_set_cord_name(relay->io.fd);
 
 	char name[FIBER_NAME_MAX];
-	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "monitor");
+	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
 	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
+	fiber_set_joinable(reader, true);
 	fiber_start(reader, relay, fiber());
 
 	while (!fiber_is_cancelled()) {
@@ -389,6 +396,9 @@ relay_subscribe_f(va_list ap)
 	}
 
 	say_crit("exiting the relay loop");
+	if (!fiber_is_dead(reader))
+		fiber_cancel(reader);
+	fiber_join(reader);
 	relay->exiting = true;
 	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
