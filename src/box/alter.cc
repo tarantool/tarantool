@@ -1556,6 +1556,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 			  space_name(old_space));
 
 	/*
+	 * Check if a write privilege was given, raise an error if not.
+	 */
+	access_check_space(old_space, PRIV_W);
+
+	/*
 	 * Truncate counter is updated - truncate the space.
 	 */
 	struct truncate_space *truncate =
