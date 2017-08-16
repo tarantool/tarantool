@@ -362,4 +362,6 @@ _ = s:replace({1, string.rep('x', 1 * 1024 * 1024 - 32)})
 box.cfg { memtx_max_tuple_size = memtx_max_tuple_size }
 
 s:drop();
+collectgarbage('collect') -- collect all large tuples
+box.snapshot() -- discard xlogs with large tuples
 test_run:cmd("clear filter")

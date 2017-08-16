@@ -1063,6 +1063,14 @@ box.cfg { memtx_max_tuple_size = memtx_max_tuple_size }
 s:drop();
 ---
 ...
+collectgarbage('collect') -- collect all large tuples
+---
+- 0
+...
+box.snapshot() -- discard xlogs with large tuples
+---
+- ok
+...
 test_run:cmd("clear filter")
 ---
 - true
