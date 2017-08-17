@@ -408,6 +408,7 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	itr = vy_cache_tree_lower_bound(&cache->cache_tree, stmt, &exact);
 	struct vy_cache_entry **entry =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &itr);
+	assert(!exact || entry != NULL);
 	/*
 	 * There are three cases possible
 	 * (1) there's a value in cache that is equal to stmt.
@@ -430,13 +431,13 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	struct vy_cache_entry **prev_entry =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &prev);
 
-	if (entry && ((*entry)->flags & VY_CACHE_LEFT_LINKED)) {
+	if (entry != NULL && ((*entry)->flags & VY_CACHE_LEFT_LINKED)) {
 		cache->version++;
 		(*entry)->flags &= ~VY_CACHE_LEFT_LINKED;
 		assert((*prev_entry)->flags & VY_CACHE_RIGHT_LINKED);
 		(*prev_entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
 	}
-	if (prev_entry) {
+	if (prev_entry != NULL) {
 		cache->version++;
 		(*prev_entry)->right_boundary_level = cache->cmp_def->part_count;
 	}
@@ -446,7 +447,7 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	struct vy_cache_entry **next_entry =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &next);
 
-	if (exact && entry && ((*entry)->flags & VY_CACHE_RIGHT_LINKED)) {
+	if (exact && ((*entry)->flags & VY_CACHE_RIGHT_LINKED)) {
 		cache->version++;
 		(*entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
 		assert((*next_entry)->flags & VY_CACHE_LEFT_LINKED);
@@ -458,6 +459,7 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	}
 
 	if (exact) {
+		assert(entry != NULL);
 		cache->version++;
 		struct vy_cache_entry *to_delete = *entry;
 		assert(vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);

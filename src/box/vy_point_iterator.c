@@ -431,6 +431,8 @@ restart:
 	if (itr->tx != NULL) {
 		rc = vy_tx_track(itr->tx, itr->index,
 				 (struct tuple *) itr->key, false);
+		if (rc != 0)
+			goto done;
 	}
 	/* Save version before yield */
 	uint32_t mem_list_version = itr->index->mem_list_version;

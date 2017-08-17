@@ -944,7 +944,10 @@ ModifyIndex::~ModifyIndex()
 /** CreateIndex - add a new index to the space. */
 class CreateIndex: public AlterSpaceOp {
 public:
-	CreateIndex(struct alter_space *alter) :AlterSpaceOp(alter) {}
+	CreateIndex(struct alter_space *alter)
+		:AlterSpaceOp(alter),
+		 new_index_def(NULL)
+	{}
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	virtual void alter_def(struct alter_space *alter);

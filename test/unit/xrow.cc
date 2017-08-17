@@ -50,11 +50,11 @@ test_iproto_constants()
 	 * [0, IPROTO_KEY_MAX).
 	 */
 	for (int i = 0; i < IPROTO_KEY_MAX; ++i)
-		iproto_key_name((enum iproto_key) i);
+		(void) iproto_key_name((enum iproto_key) i);
 
 	/* Same for iproto_type. */
 	for (uint32_t i = 0; i < IPROTO_TYPE_STAT_MAX; ++i)
-		iproto_type_name(i);
+		(void) iproto_type_name(i);
 	return 0;
 }
 
@@ -216,17 +216,17 @@ test_xrow_header_encode_decode()
 	header.tm = 123.456;
 	header.bodycnt = 0;
 	uint64_t sync = 100500;
-	struct iovec vec;
-	is(1, xrow_header_encode(&header, sync, &vec, 200), "encode");
+	struct iovec vec[1];
+	is(1, xrow_header_encode(&header, sync, vec, 200), "encode");
 	int fixheader_len = 200;
-	pos = (char *)vec.iov_base + fixheader_len;
+	pos = (char *)vec[0].iov_base + fixheader_len;
 	is(mp_decode_map((const char **)&pos), 5, "header map size");
 
 	struct xrow_header decoded_header;
-	const char *begin = (const char *)vec.iov_base;
+	const char *begin = (const char *)vec[0].iov_base;
 	begin += fixheader_len;
-	const char *end = (const char *)vec.iov_base;
-	end += vec.iov_len;
+	const char *end = (const char *)vec[0].iov_base;
+	end += vec[0].iov_len;
 	is(xrow_header_decode(&decoded_header, &begin, end), 0,
 	   "header decode");
 	is(header.type, decoded_header.type, "decoded type");

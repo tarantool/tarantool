@@ -203,9 +203,9 @@ fail_upsert_format:
 	tuple_format_unref(index->disk_format);
 fail_format:
 	free(cmp_def);
-fail_key_def:
-	free(key_def);
 fail_cmp_def:
+	free(key_def);
+fail_key_def:
 	free(index->tree);
 fail_tree:
 	free(index);
@@ -230,7 +230,7 @@ vy_index_delete(struct vy_index *index)
 {
 	assert(index->refs == 0);
 	assert(index->in_dump.pos == UINT32_MAX);
-	assert(index->in_compact.pos = UINT32_MAX);
+	assert(index->in_compact.pos == UINT32_MAX);
 
 	if (index->pk != NULL)
 		vy_index_unref(index->pk);

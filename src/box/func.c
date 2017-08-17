@@ -463,11 +463,10 @@ func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
 
 	/* Module can be changed after function reload. */
 	struct module *module = func->module;
-	if (module != NULL)
-		++module->calls;
+	assert(module != NULL);
+	++module->calls;
 	int rc = func->func(ctx, args, args_end);
-	if (module != NULL)
-		--module->calls;
+	--module->calls;
 	module_gc(module);
 	return rc;
 }

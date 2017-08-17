@@ -156,8 +156,6 @@ vy_cache_insert_templates_chain(struct vy_cache *cache,
 	tuple_unref(key);
 	if (prev_stmt != NULL)
 		tuple_unref(prev_stmt);
-	if (stmt != NULL)
-		tuple_unref(stmt);
 }
 
 void
@@ -184,8 +182,9 @@ struct vy_mem *
 create_test_mem(struct lsregion *region, struct key_def *def)
 {
 	/* Create format */
+	struct key_def *defs[] = { def };
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       &def, def->part_count,
+						       defs, def->part_count,
 						       0);
 	fail_if(format == NULL);
 
