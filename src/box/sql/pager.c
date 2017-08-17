@@ -660,7 +660,6 @@ struct Pager {
   sqlite3_file *sjfd;         /* File descriptor for sub-journal */
   i64 journalOff;             /* Current write offset in the journal file */
   i64 journalHdr;             /* Byte offset to previous journal header */
-  sqlite3_backup *pBackup;    /* Pointer to list of ongoing backup processes */
   PagerSavepoint *aSavepoint; /* Array of active savepoints */
   int nSavepoint;             /* Number of elements in aSavepoint[] */
   u32 iDataVersion;           /* Changes whenever database content changes */
@@ -5942,8 +5941,7 @@ int sqlite3PagerCommitPhaseOne(
   assert( isOpen(pPager->fd) || pPager->tempFile );
   if( 0==pagerFlushOnCommit(pPager, 1) ){
     /* If this is an in-memory db, or no pages have been written to, or this
-    ** function has already been called, it is mostly a no-op.  However, any
-    ** backup in progress needs to be restarted.  */
+    ** function has already been called, it is no-op. */
   }else{
     /* The following block updates the change-counter. Exactly how it
     ** does this depends on whether or not the atomic-update optimization
@@ -6712,16 +6710,6 @@ i64 sqlite3PagerJournalSizeLimit(Pager *pPager, i64 iLimit){
     pPager->journalSizeLimit = iLimit;
   }
   return pPager->journalSizeLimit;
-}
-
-/*
-** Return a pointer to the pPager->pBackup variable. The backup module
-** in backup.c maintains the content of this variable. This module
-** uses it opaquely as an argument to sqlite3BackupRestart() and
-** sqlite3BackupUpdate() only.
-*/
-sqlite3_backup **sqlite3PagerBackupPtr(Pager *pPager){
-  return &pPager->pBackup;
 }
 
 #ifdef SQLITE_ENABLE_ZIPVFS

@@ -2508,12 +2508,6 @@ int sqlite3BtreeGetPageSize(Btree *p){
 ** This function is similar to sqlite3BtreeGetReserve(), except that it
 ** may only be called if it is guaranteed that the b-tree mutex is already
 ** held.
-**
-** This is useful in one special case in the backup API code where it is
-** known that the shared b-tree mutex is held, but the mutex on the 
-** database handle that owns *p is not. In this case if sqlite3BtreeEnter()
-** were to be called, it might collide with some other operation on the
-** database handle that owns *p, causing undefined behavior.
 */
 int sqlite3BtreeGetReserveNoMutex(Btree *p){
   int n;
@@ -8197,12 +8191,6 @@ int sqlite3BtreeIsInReadTrans(Btree *p){
   assert( p );
   assert( sqlite3_mutex_held(p->db->mutex) );
   return p->inTrans!=TRANS_NONE;
-}
-
-int sqlite3BtreeIsInBackup(Btree *p){
-  assert( p );
-  assert( sqlite3_mutex_held(p->db->mutex) );
-  return p->nBackup!=0;
 }
 
 /*

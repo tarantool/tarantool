@@ -3625,10 +3625,7 @@ static int unixTruncate(sqlite3_file *id, i64 nByte){
     /* If we are doing a normal write to a database file (as opposed to
     ** doing a hot-journal rollback or a write to some file other than a
     ** normal database file) and we truncate the file to zero length,
-    ** that effectively updates the change counter.  This might happen
-    ** when restoring a database using the backup API from a zero-length
-    ** source.
-    */
+    ** that effectively updates the change counter.    */
     if( pFile->inNormalWrite && nByte==0 ){
       pFile->transCntrChng = 1;
     }

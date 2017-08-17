@@ -4886,9 +4886,7 @@ case OP_Rewind: {        /* jump */
 **
 ** Back up cursor P1 so that it points to the previous key/data pair in its
 ** table or index.  If there is no previous key/value pairs then fall through
-** to the following instruction.  But if the cursor backup was successful,
-** jump immediately to P2.
-**
+** to the following instruction.
 **
 ** The Prev opcode is only valid following an SeekLT, SeekLE, or
 ** OP_Last opcode used to position the cursor.  Prev is not allowed

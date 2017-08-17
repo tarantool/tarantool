@@ -3970,9 +3970,6 @@ void sqlite3StrAccumReset(StrAccum*);
 void sqlite3SelectDestInit(SelectDest*,int,int);
 Expr *sqlite3CreateColumnExpr(sqlite3 *, SrcList *, int, int);
 
-void sqlite3BackupRestart(sqlite3_backup *);
-void sqlite3BackupUpdate(sqlite3_backup *, Pgno, const u8 *);
-
 #ifndef SQLITE_OMIT_SUBQUERY
 int sqlite3ExprCheckIN(Parse*, Expr*);
 #else
