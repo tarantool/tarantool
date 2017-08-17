@@ -75,8 +75,9 @@ tarantool_lua_tostring(struct lua_State *L, int index);
  * @param argv argv command line arguments
  */
 void
-tarantool_lua_run_script(char *path, bool force_interactive, int argc,
-			 char **argv);
+tarantool_lua_run_script(char *path, bool force_interactive,
+			 int optc, char **optv,
+			 int argc, char **argv);
 
 extern char *history;
 

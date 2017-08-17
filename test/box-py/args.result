@@ -7,6 +7,8 @@ All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
   -h, --help			display this help and exit
   -V, --version			print program version and exit
+  -e EXPR			execute string 'EXPR'
+  -l NAME			require library 'NAME'
   -i				enter interactive mode after executing 'SCRIPT'
 
 Please visit project home page at http://tarantool.org
@@ -21,19 +23,21 @@ All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
   -h, --help			display this help and exit
   -V, --version			print program version and exit
+  -e EXPR			execute string 'EXPR'
+  -l NAME			require library 'NAME'
   -i				enter interactive mode after executing 'SCRIPT'
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
 tarantool -Z
-tarantool: invalid option -- 'Z'
+${SOURCEDIR}/src/tarantool: invalid option -- 'Z'
 
 tarantool --no-such-option
-tarantool: unrecognized option '--no-such-option'
+${SOURCEDIR}/src/tarantool: unrecognized option '--no-such-option'
 
 tarantool --no-such-option --version
-tarantool: unrecognized option '--no-such-option'
+${SOURCEDIR}/src/tarantool: unrecognized option '--no-such-option'
 
 tarantool --version
 Tarantool 1.minor.patch-<rev>-<commit>
@@ -50,4 +54,83 @@ Build options: flags
 Compiler: cc
 C_FLAGS: flags
 CXX_FLAGS: flags
+
+tarantool ${SOURCEDIR}/test/box-py/args.lua
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+
+tarantool ${SOURCEDIR}/test/box-py/args.lua 1 2 3
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => 1
+arg[2] => 2
+arg[3] => 3
+
+tarantool ${SOURCEDIR}/test/box-py/args.lua 1 2 3 -V
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => 1
+arg[2] => 2
+arg[3] => 3
+arg[4] => -V
+
+tarantool ${SOURCEDIR}/test/box-py/args.lua -V 1 2 3
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => -V
+arg[2] => 1
+arg[3] => 2
+arg[4] => 3
+
+tarantool ${SOURCEDIR}/test/box-py/args.lua 1 2 3 --help
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => 1
+arg[2] => 2
+arg[3] => 3
+arg[4] => --help
+
+tarantool ${SOURCEDIR}/test/box-py/args.lua --help 1 2 3
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => --help
+arg[2] => 1
+arg[3] => 2
+arg[4] => 3
+
+tarantool -V ${SOURCEDIR}/test/box-py/args.lua 1 2 3
+Tarantool 1.minor.patch-<rev>-<commit>
+Target: platform <build>
+Build options: flags
+Compiler: cc
+C_FLAGS: flags
+CXX_FLAGS: flags
+
+tarantool -e print('Hello') ${SOURCEDIR}/test/box-py/args.lua 1 2 3
+Hello
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => 1
+arg[2] => 2
+arg[3] => 3
+
+tarantool -e a = 10 -e print(a) ${SOURCEDIR}/test/box-py/args.lua 1 2 3 --help
+10
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => 1
+arg[2] => 2
+arg[3] => 3
+arg[4] => --help
+
+tarantool -e print(rawget(_G, 'log') == nil) -e io.flush() -l log -e print(log.info('Hello')) ${SOURCEDIR}/test/box-py/args.lua 1 2 3 --help
+true
+Hello
+
+arg[-1] => ${SOURCEDIR}/src/tarantool
+arg[0] => ${SOURCEDIR}/test/box-py/args.lua
+arg[1] => 1
+arg[2] => 2
+arg[3] => 3
+arg[4] => --help
 

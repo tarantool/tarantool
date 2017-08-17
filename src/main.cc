@@ -532,6 +532,8 @@ print_help(const char *program)
 	puts("When no script name is provided, the server responds to:");
 	puts("  -h, --help\t\t\tdisplay this help and exit");
 	puts("  -V, --version\t\t\tprint program version and exit");
+	puts("  -e EXPR\t\t\texecute string 'EXPR'");
+	puts("  -l NAME\t\t\trequire library 'NAME'");
 	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
 	puts("");
 	puts("Please visit project home page at http://tarantool.org");
@@ -551,13 +553,17 @@ main(int argc, char **argv)
 
 	/* Enter interactive mode after executing 'script' */
 	bool interactive = false;
+	/* Lua interpeter options, e.g. -e and -l */
+	int optc = 0;
+	char **optv = NULL;
+	auto guard = make_scoped_guard([=]{ if (optc) free(optv); });
 
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'V'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVi";
+	static const char *opts = "+hVie:l:";
 
 	int ch;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
@@ -571,6 +577,21 @@ main(int argc, char **argv)
 		case 'i':
 			/* Force interactive mode */
 			interactive = true;
+			break;
+		case 'l':
+		case 'e':
+			/* Save Lua interepter options to optv as is */
+			if (optc == 0) {
+				optv = (char **) calloc(argc, sizeof(char *));
+				if (optv == NULL)
+					panic_syserror("No enough memory for arguments");
+			}
+			/*
+			 * The variable optind is the index of the next
+			 * element to be processed in argv.
+			 */
+			optv[optc++] = argv[optind - 2];
+			optv[optc++] = argv[optind - 1];
 			break;
 		default:
 			/* "invalid option" is printed by getopt */
@@ -655,8 +676,8 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_run_script(script, interactive, main_argc,
-					 main_argv);
+		tarantool_lua_run_script(script, interactive, optc, optv,
+					 main_argc, main_argv);
 		/*
 		 * Start event loop after executing Lua script if signal_cb()
 		 * wasn't triggered and there is some new events. Initial value

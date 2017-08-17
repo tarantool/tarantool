@@ -492,8 +492,51 @@ run_script_f(va_list ap)
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
 	bool interactive = va_arg(ap, int);
+	int optc = va_arg(ap, int);
+	char **optv = va_arg(ap, char **);
 	int argc = va_arg(ap, int);
 	char **argv = va_arg(ap, char **);
+	struct diag *diag = &fiber()->diag;
+
+	/*
+	 * Load libraries and execute chunks passed by -l and -e
+	 * command line options
+	 */
+	for (int i = 0; i < optc; i += 2) {
+		assert(optv[i][0] == '-' && optv[i][2] == '\0');
+		switch (optv[i][1]) {
+		case 'l':
+			/*
+			 * Load library
+			 */
+			lua_getglobal(L, "require");
+			lua_pushstring(L, optv[i + 1]);
+			if (luaT_call(L, 1, 1) != 0) {
+				struct error *e = diag_last_error(diag);
+				panic("%s", e->errmsg);
+			}
+			/* Non-standard: set name = require('name') */
+			lua_setglobal(L, optv[i + 1]);
+			lua_settop(L, 0);
+			break;
+		case 'e':
+			/*
+			 * Execute chunk
+			 */
+			if (luaL_loadbuffer(L, optv[i + 1], strlen(optv[i + 1]),
+					    "=(command line)") != 0) {
+				panic("%s", lua_tostring(L, -1));
+			}
+			if (luaT_call(L, 0, 0) != 0) {
+				struct error *e = diag_last_error(diag);
+				panic("%s", e->errmsg);
+			}
+			lua_settop(L, 0);
+			break;
+		default:
+			unreachable(); /* checked by getopt() in main() */
+		}
+	}
 
 	/*
 	 * Return control to tarantool_lua_run_script.
@@ -542,7 +585,8 @@ run_script_f(va_list ap)
 }
 
 void
-tarantool_lua_run_script(char *path, bool interactive, int argc, char **argv)
+tarantool_lua_run_script(char *path, bool interactive,
+			 int optc, char **optv, int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
 	/*
@@ -555,7 +599,8 @@ tarantool_lua_run_script(char *path, bool interactive, int argc, char **argv)
 	script_fiber = fiber_new(title, run_script_f);
 	if (script_fiber == NULL)
 		panic("%s", diag_last_error(diag_get())->errmsg);
-	fiber_start(script_fiber, tarantool_L, path, interactive, argc, argv);
+	fiber_start(script_fiber, tarantool_L, path, interactive,
+		    optc, optv, argc, argv);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.
