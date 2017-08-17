@@ -526,12 +526,13 @@ print_help(const char *program)
 {
 	puts("Tarantool - a Lua application server");
 	puts("");
-	printf("Usage: %s script.lua [OPTIONS]\n", program);
+	printf("Usage: %s script.lua [OPTIONS] [SCRIPT [ARGS]]\n", program);
 	puts("");
 	puts("All command line options are passed to the interpreted script.");
 	puts("When no script name is provided, the server responds to:");
 	puts("  -h, --help\t\t\tdisplay this help and exit");
 	puts("  -V, --version\t\t\tprint program version and exit");
+	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
 	puts("");
 	puts("Please visit project home page at http://tarantool.org");
 	puts("to see online documentation, submit bugs or contribute a patch.");
@@ -548,12 +549,15 @@ main(int argc, char **argv)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
 	fpconv_check();
 
+	/* Enter interactive mode after executing 'script' */
+	bool interactive = false;
+
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'V'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hV";
+	static const char *opts = "+hVi";
 
 	int ch;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
@@ -564,6 +568,10 @@ main(int argc, char **argv)
 		case 'h':
 			print_help(basename(argv[0]));
 			return 0;
+		case 'i':
+			/* Force interactive mode */
+			interactive = true;
+			break;
 		default:
 			/* "invalid option" is printed by getopt */
 			return EX_USAGE;
@@ -647,7 +655,8 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_run_script(script, main_argc, main_argv);
+		tarantool_lua_run_script(script, interactive, main_argc,
+					 main_argv);
 		/*
 		 * Start event loop after executing Lua script if signal_cb()
 		 * wasn't triggered and there is some new events. Initial value

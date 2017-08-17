@@ -70,10 +70,13 @@ tarantool_lua_tostring(struct lua_State *L, int index);
 /**
  * Load and execute start-up file
  *
- * @param L is a Lua State.
+ * @param interactive force interactive mode
+ * @param argc argc the number of command line arguments
+ * @param argv argv command line arguments
  */
 void
-tarantool_lua_run_script(char *path, int argc, char **argv);
+tarantool_lua_run_script(char *path, bool force_interactive, int argc,
+			 char **argv);
 
 extern char *history;
 

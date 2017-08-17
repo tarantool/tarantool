@@ -466,6 +466,24 @@ tarantool_lua_slab_cache()
 }
 
 /**
+ * Push argument and call a function on the top of Lua stack
+ */
+static void
+lua_main(lua_State *L, int argc, char **argv)
+{
+	assert(lua_isfunction(L, -1));
+	lua_checkstack(L, argc - 1);
+	for (int i = 1; i < argc; i++)
+		lua_pushstring(L, argv[i]);
+	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0) {
+		struct error *e = diag_last_error(&fiber()->diag);
+		panic("%s", e->errmsg);
+	}
+	/* clear the stack from return values. */
+	lua_settop(L, 0);
+}
+
+/**
  * Execute start-up script.
  */
 static int
@@ -473,6 +491,7 @@ run_script_f(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
+	bool interactive = va_arg(ap, int);
 	int argc = va_arg(ap, int);
 	char **argv = va_arg(ap, char **);
 
@@ -487,11 +506,21 @@ run_script_f(va_list ap)
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
 			panic("%s", lua_tostring(L, -1));
+		lua_main(L, argc, argv);
 	} else if (!isatty(STDIN_FILENO)) {
 		/* Execute stdin */
 		if (luaL_loadfile(L, NULL) != 0)
 			panic("%s", lua_tostring(L, -1));
+		lua_main(L, argc, argv);
 	} else {
+		interactive = true;
+	}
+
+	/*
+	 * Start interactive mode when it was explicitly requested
+	 * by "-i" option or stdin is TTY or there are no script.
+	 */
+	if (interactive) {
 		say_crit("version %s\ntype 'help' for interactive help",
 			 tarantool_version());
 		/* get console.start from package.loaded */
@@ -501,17 +530,9 @@ run_script_f(va_list ap)
 		lua_remove(L, -2); /* remove package.loaded.console */
 		lua_remove(L, -2); /* remove package.loaded */
 		start_loop = false;
-	}
-	lua_checkstack(L, argc - 1);
-	for (int i = 1; i < argc; i++)
-		lua_pushstring(L, argv[i]);
-	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0) {
-		struct error *e = diag_last_error(&fiber()->diag);
-		panic("%s", e->errmsg);
+		lua_main(L, argc, argv);
 	}
 
-	/* clear the stack from return values. */
-	lua_settop(L, 0);
 	/*
 	 * Lua script finished. Stop the auxiliary event loop and
 	 * return control back to tarantool_lua_run_script.
@@ -521,7 +542,7 @@ run_script_f(va_list ap)
 }
 
 void
-tarantool_lua_run_script(char *path, int argc, char **argv)
+tarantool_lua_run_script(char *path, bool interactive, int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
 	/*
@@ -534,7 +555,7 @@ tarantool_lua_run_script(char *path, int argc, char **argv)
 	script_fiber = fiber_new(title, run_script_f);
 	if (script_fiber == NULL)
 		panic("%s", diag_last_error(diag_get())->errmsg);
-	fiber_start(script_fiber, tarantool_L, path, argc, argv);
+	fiber_start(script_fiber, tarantool_L, path, interactive, argc, argv);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.

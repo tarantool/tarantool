@@ -1,12 +1,13 @@
 tarantool --help
 Tarantool - a Lua application server
 
-Usage: tarantool script.lua [OPTIONS]
+Usage: tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
 
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
   -h, --help			display this help and exit
   -V, --version			print program version and exit
+  -i				enter interactive mode after executing 'SCRIPT'
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
@@ -14,12 +15,13 @@ to see online documentation, submit bugs or contribute a patch.
 tarantool -h
 Tarantool - a Lua application server
 
-Usage: tarantool script.lua [OPTIONS]
+Usage: tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
 
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
   -h, --help			display this help and exit
   -V, --version			print program version and exit
+  -i				enter interactive mode after executing 'SCRIPT'
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
