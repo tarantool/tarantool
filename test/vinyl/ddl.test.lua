@@ -218,3 +218,28 @@ state = nil
 itr = nil
 collectgarbage('collect')
 
+-- gh-2342 drop space if transaction is in progress
+ch = fiber.channel(1)
+s = box.schema.space.create('test', { engine = 'vinyl' })
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+sk = s:create_index('sec', { parts = { 2, 'uint' } })
+box.begin()
+s:replace({1, 2, 3})
+s:replace({4, 5, 6})
+s:replace({7, 8, 9})
+s:upsert({10, 11, 12}, {})
+_ = fiber.create(function () s:drop() ch:put(true) end)
+box.commit()
+ch:get()
+
+s = box.schema.space.create('test', { engine = 'vinyl' })
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+sk = s:create_index('sec', { parts = { 2, 'uint' } })
+box.begin()
+s:replace{1, 2, 3}
+s:replace{4, 5, 6}
+s:replace{7, 8, 9}
+_ = fiber.create(function () s:drop() ch:put(true) end)
+ch:get()
+box.commit()
+

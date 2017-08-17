@@ -231,6 +231,7 @@ txv_new(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		return NULL;
 	}
 	v->index = index;
+	vy_index_ref(v->index);
 	v->mem = NULL;
 	v->stmt = stmt;
 	tuple_ref(stmt);
@@ -245,6 +246,7 @@ static void
 txv_delete(struct txv *v)
 {
 	tuple_unref(v->stmt);
+	vy_index_unref(v->index);
 	mempool_free(&v->tx->xm->txv_mempool, v);
 }
 

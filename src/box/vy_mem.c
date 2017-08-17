@@ -143,9 +143,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
-	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
-	       stmt->format_id == tuple_format_id(mem->format) ||
-	       stmt->format_id == tuple_format_id(mem->upsert_format));
+	assert(stmt->format_id == tuple_format_id(mem->upsert_format));
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);
@@ -205,8 +203,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	assert(vy_stmt_type(stmt) != IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
 	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
-	       stmt->format_id == tuple_format_id(mem->format) ||
-	       stmt->format_id == tuple_format_id(mem->upsert_format));
+	       stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);

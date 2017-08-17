@@ -723,10 +723,23 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	/* We can't free region_stmt below, so let's add it to the stats */
 	index->stat.memory.count.bytes += tuple_size(stmt);
 
-	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
+	uint32_t format_id = stmt->format_id;
+	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT) {
+		/* Abort transaction if format was changed by DDL */
+		if (format_id != tuple_format_id(mem->format_with_colmask) &&
+		    format_id != tuple_format_id(mem->format)) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
 		return vy_mem_insert(mem, *region_stmt);
-	else
+	} else {
+		/* Abort transaction if format was changed by DDL */
+		if (format_id != tuple_format_id(mem->upsert_format)) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
 		return vy_mem_insert_upsert(mem, *region_stmt);
+	}
 }
 
 /**
