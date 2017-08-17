@@ -196,3 +196,25 @@ end ;
 test_run:cmd("setopt delimiter ''");
 
 s:drop()
+
+-- gh-2342 cursors after death of index
+create_iterator = require('utils').create_iterator
+s = box.schema.space.create('test', { engine = 'vinyl' })
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+sk = s:create_index('sec', { parts = { 2, 'uint' } })
+s:replace{1, 2, 3}
+s:replace{4, 5, 6}
+s:replace{7, 8, 9}
+itr = create_iterator(s, {})
+f, ctx, state = s.index.sec:pairs({5}, { iterator='LE' })
+itr.next()
+f(ctx, state)
+s:drop()
+itr.next()
+f(ctx, state)
+f = nil
+ctx = nil
+state = nil
+itr = nil
+collectgarbage('collect')
+
