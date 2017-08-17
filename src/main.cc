@@ -481,8 +481,6 @@ tarantool_free(void)
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
-	if (script)
-		free(script);
 	/* tarantool_lua_free() was formerly reponsible for terminal reset,
 	 * but it is no longer called
 	 */
@@ -535,6 +533,8 @@ print_help(const char *program)
 	puts("  -e EXPR\t\t\texecute string 'EXPR'");
 	puts("  -l NAME\t\t\trequire library 'NAME'");
 	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
+	puts("  --\t\t\t\tstop handling options");
+	puts("  -\t\t\t\texecute stdin and stop handling options");
 	puts("");
 	puts("Please visit project home page at http://tarantool.org");
 	puts("to see online documentation, submit bugs or contribute a patch.");
@@ -604,7 +604,7 @@ main(int argc, char **argv)
 	for (int i = 1; i < argc; i++)
 		argv[i] = argv[optind + i - 1];
 
-	if (argc > 1 && access(argv[1], R_OK) != 0) {
+	if (argc > 1 && strcmp(argv[1], "-") && access(argv[1], R_OK) != 0) {
 		/*
 		 * Somebody made a mistake in the file
 		 * name. Be nice: open the file to set
@@ -636,7 +636,7 @@ main(int argc, char **argv)
 	if (argc > 1) {
 		argv++;
 		argc--;
-		script = abspath(argv[0]);
+		script = argv[0];
 		title_set_script_name(argv[0]);
 	}
 

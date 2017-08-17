@@ -545,12 +545,12 @@ run_script_f(va_list ap)
 	 */
 	fiber_sleep(0.0);
 
-	if (path && access(path, F_OK) == 0) {
+	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
 			panic("%s", lua_tostring(L, -1));
 		lua_main(L, argc, argv);
-	} else if (!isatty(STDIN_FILENO)) {
+	} else if (!isatty(STDIN_FILENO) || (path && strcmp(path, "-") == 0)) {
 		/* Execute stdin */
 		if (luaL_loadfile(L, NULL) != 0)
 			panic("%s", lua_tostring(L, -1));

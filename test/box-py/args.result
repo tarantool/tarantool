@@ -10,6 +10,8 @@ When no script name is provided, the server responds to:
   -e EXPR			execute string 'EXPR'
   -l NAME			require library 'NAME'
   -i				enter interactive mode after executing 'SCRIPT'
+  --				stop handling options
+  -				execute stdin and stop handling options
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
@@ -26,6 +28,8 @@ When no script name is provided, the server responds to:
   -e EXPR			execute string 'EXPR'
   -l NAME			require library 'NAME'
   -i				enter interactive mode after executing 'SCRIPT'
+  --				stop handling options
+  -				execute stdin and stop handling options
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
