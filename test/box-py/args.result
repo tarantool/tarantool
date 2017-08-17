@@ -5,8 +5,8 @@ Usage: tarantool script.lua [OPTIONS]
 
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
-  -h, --help                       display this help and exit
-  -V, --version                    print program version and exit
+  -h, --help			display this help and exit
+  -V, --version			print program version and exit
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
@@ -18,20 +18,20 @@ Usage: tarantool script.lua [OPTIONS]
 
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
-  -h, --help                       display this help and exit
-  -V, --version                    print program version and exit
+  -h, --help			display this help and exit
+  -V, --version			print program version and exit
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
 tarantool -Z
-tarantool: -Z: unknown option
+tarantool: invalid option -- 'Z'
 
 tarantool --no-such-option
-tarantool: --no-such-option: unknown option
+tarantool: unrecognized option '--no-such-option'
 
-tarantool --version --no-such-option
-tarantool: --no-such-option: unknown option
+tarantool --no-such-option --version
+tarantool: unrecognized option '--no-such-option'
 
 tarantool --version
 Tarantool 1.minor.patch-<rev>-<commit>

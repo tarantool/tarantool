@@ -6,7 +6,6 @@ enable_tnt_compile_flags()
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
-include_directories(${LIBGOPT_INCLUDE_DIR})
 include_directories(${LUAJIT_INCLUDE_DIRS})
 include_directories(${READLINE_INCLUDE_DIRS})
 include_directories(${LIBYAML_INCLUDE_DIRS})
@@ -140,7 +139,6 @@ set (server_sources
      iobuf.cc
      httpc.c
      pickle.c
-     opts.c
      cfg.c
      cpu_feature.c
      title.c
@@ -214,7 +212,6 @@ set (reexport_libraries server core misc bitset csv
 
 set (common_libraries
     ${reexport_libraries}
-    ${LIBGOPT_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
     ${OPENSSL_LIBRARIES}

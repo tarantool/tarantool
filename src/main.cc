@@ -36,6 +36,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <grp.h>
+#include <getopt.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -67,7 +68,6 @@
 #include "random.h"
 #include "tt_uuid.h"
 #include "iobuf.h"
-#include <third_party/gopt/gopt.h>
 #include "cfg.h"
 #include "version.h"
 #include <readline/readline.h>
@@ -86,8 +86,6 @@ static int main_argc;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
-
-extern const void *opt_def;
 
 static double start_time;
 
@@ -512,6 +510,33 @@ tarantool_free(void)
 	say_logger_free();
 }
 
+static void
+print_version(void)
+{
+	printf("Tarantool %s\n", tarantool_version());
+	printf("Target: %s\n", BUILD_INFO);
+	printf("Build options: %s\n", BUILD_OPTIONS);
+	printf("Compiler: %s\n", COMPILER_INFO);
+	printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
+	printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
+}
+
+static void
+print_help(const char *program)
+{
+	puts("Tarantool - a Lua application server");
+	puts("");
+	printf("Usage: %s script.lua [OPTIONS]\n", program);
+	puts("");
+	puts("All command line options are passed to the interpreted script.");
+	puts("When no script name is provided, the server responds to:");
+	puts("  -h, --help\t\t\tdisplay this help and exit");
+	puts("  -V, --version\t\t\tprint program version and exit");
+	puts("");
+	puts("Please visit project home page at http://tarantool.org");
+	puts("to see online documentation, submit bugs or contribute a patch.");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -523,48 +548,47 @@ main(int argc, char **argv)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
 	fpconv_check();
 
-	if (argc > 1 && access(argv[1], R_OK) != 0) {
-		if (argc == 2 && argv[1][0] != '-') {
-			/*
-			 * Somebody made a mistake in the file
-			 * name. Be nice: open the file to set
-			 * errno.
-			 */
-			int fd = open(argv[1], O_RDONLY);
-			int save_errno = errno;
-			if (fd >= 0)
-				close(fd);
-			printf("Can't open script %s: %s\n", argv[1], strerror(save_errno));
-			return save_errno;
-		}
-		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
-		if (gopt(opt, 'V')) {
-			printf("Tarantool %s\n", tarantool_version());
-			printf("Target: %s\n", BUILD_INFO);
-			printf("Build options: %s\n", BUILD_OPTIONS);
-			printf("Compiler: %s\n", COMPILER_INFO);
-			printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
-			printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
-			return 0;
-		}
+	static struct option longopts[] = {
+		{"help", no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'V'},
+		{NULL, 0, 0, 0},
+	};
+	static const char *opts = "+hV";
 
-		if (gopt(opt, 'h') || argc == 1) {
-			puts("Tarantool - a Lua application server");
-			puts("");
-			printf("Usage: %s script.lua [OPTIONS]\n",
-			       basename(argv[0]));
-			puts("");
-			puts("All command line options are passed to the interpreted script.");
-			puts("When no script name is provided, the server responds to:");
-			gopt_help(opt_def);
-			puts("");
-			puts("Please visit project home page at http://tarantool.org");
-			puts("to see online documentation, submit bugs or contribute a patch.");
+	int ch;
+	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
+		switch (ch) {
+		case 'V':
+			print_version();
 			return 0;
+		case 'h':
+			print_help(basename(argv[0]));
+			return 0;
+		default:
+			/* "invalid option" is printed by getopt */
+			return EX_USAGE;
 		}
-		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
-		exit(EX_USAGE);
 	}
+
+	/* Shift arguments */
+	argc = 1 + (argc - optind);
+	for (int i = 1; i < argc; i++)
+		argv[i] = argv[optind + i - 1];
+
+	if (argc > 1 && access(argv[1], R_OK) != 0) {
+		/*
+		 * Somebody made a mistake in the file
+		 * name. Be nice: open the file to set
+		 * errno.
+		 */
+		int fd = open(argv[1], O_RDONLY);
+		int save_errno = errno;
+		if (fd >= 0)
+			close(fd);
+		printf("Can't open script %s: %s\n", argv[1], strerror(save_errno));
+		return save_errno;
+	}
+
 	argv = title_init(argc, argv);
 	/*
 	 * Support only #!/usr/bin/tarantol but not
