@@ -56,10 +56,10 @@ backtrace()
 {
 	int frame_no = 0;
 	unw_word_t sp = 0, old_sp = 0, ip, offset;
-	unw_context_t unw_ctx;
-	unw_getcontext(&unw_ctx);
+	unw_context_t unw_context;
+	unw_getcontext(&unw_context);
 	unw_cursor_t unw_cur;
-	unw_init_local(&unw_cur, &unw_ctx);
+	unw_init_local(&unw_cur, &unw_context);
 	char *p = backtrace_buf;
 	char *end = p + sizeof(backtrace_buf) - 1;
 	int unw_status;
@@ -206,7 +206,7 @@ __asm__(
 #elif __ARM_ARCH==7
 __asm__(
 	/* Save current context */
-	".thumb\n"
+	".syntax unified\n"
 	"\tvpush {d8-d15}\n"
 	"\tpush {r4-r11,lr}\n"
 	/* Save sp */
