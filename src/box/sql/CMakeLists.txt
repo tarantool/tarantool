@@ -35,7 +35,6 @@ add_library(sql STATIC
     analyze.c
     attach.c
     auth.c
-    backup.c
     bitvec.c
     btmutex.c
     btree.c

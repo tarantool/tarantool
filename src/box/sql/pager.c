@@ -1703,7 +1703,6 @@ static int writeMasterJournal(Pager *pPager, const char *zMaster){
 */
 static void pager_reset(Pager *pPager){
   pPager->iDataVersion++;
-  sqlite3BackupRestart(pPager->pBackup);
   sqlite3PcacheClear(pPager->pPCache);
 }
 
@@ -2349,11 +2348,6 @@ static int pager_playback_one_page(
     rc = sqlite3OsWrite(pPager->fd, (u8 *)aData, pPager->pageSize, ofst);
     if( pgno>pPager->dbFileSize ){
       pPager->dbFileSize = pgno;
-    }
-    if( pPager->pBackup ){
-      CODEC1(pPager, aData, pgno, 3, rc=SQLITE_NOMEM_BKPT);
-      sqlite3BackupUpdate(pPager->pBackup, pgno, (u8*)aData);
-      CODEC2(pPager, aData, pgno, 7, rc=SQLITE_NOMEM_BKPT, aData);
     }
   }else if( !isMainJrnl && pPg==0 ){
     /* If this is a rollback of a savepoint and data was not written to
@@ -4099,9 +4093,6 @@ static int pager_write_pagelist(Pager *pPager, PgHdr *pList){
         pPager->dbFileSize = pgno;
       }
       pPager->aStat[PAGER_STAT_WRITE]++;
-
-      /* Update any backup objects copying the contents of this pager. */
-      sqlite3BackupUpdate(pPager->pBackup, pgno, (u8*)pList->pData);
 
       PAGERTRACE(("STORE %d page %d hash(%08x)\n",
                    PAGERID(pPager), pgno, pager_pagehash(pList)));
@@ -5979,126 +5970,105 @@ int sqlite3PagerCommitPhaseOne(
     /* If this is an in-memory db, or no pages have been written to, or this
     ** function has already been called, it is mostly a no-op.  However, any
     ** backup in progress needs to be restarted.  */
-    sqlite3BackupRestart(pPager->pBackup);
   }else{
-    if( pagerUseWal(pPager) ){
-      PgHdr *pList = sqlite3PcacheDirtyList(pPager->pPCache);
-      PgHdr *pPageOne = 0;
-      if( pList==0 ){
-        /* Must have at least one page for the WAL commit flag.
-        ** Ticket [2d1a5c67dfc2363e44f29d9bbd57f] 2011-05-18 */
-        rc = sqlite3PagerGet(pPager, 1, &pPageOne, 0);
-        pList = pPageOne;
-        pList->pDirty = 0;
-      }
-      assert( rc==SQLITE_OK );
-      if( ALWAYS(pList) ){
-        rc = pagerWalFrames(pPager, pList, pPager->dbSize, 1);
-      }
-      sqlite3PagerUnref(pPageOne);
-      if( rc==SQLITE_OK ){
-        sqlite3PcacheCleanAll(pPager->pPCache);
-      }
-    }else{
-      /* The following block updates the change-counter. Exactly how it
-      ** does this depends on whether or not the atomic-update optimization
-      ** was enabled at compile time, and if this transaction meets the 
-      ** runtime criteria to use the operation: 
-      **
-      **    * The file-system supports the atomic-write property for
-      **      blocks of size page-size, and 
-      **    * This commit is not part of a multi-file transaction, and
-      **    * Exactly one page has been modified and store in the journal file.
-      **
-      ** If the optimization was not enabled at compile time, then the
-      ** pager_incr_changecounter() function is called to update the change
-      ** counter in 'indirect-mode'. If the optimization is compiled in but
-      ** is not applicable to this transaction, call sqlite3JournalCreate()
-      ** to make sure the journal file has actually been created, then call
-      ** pager_incr_changecounter() to update the change-counter in indirect
-      ** mode. 
-      **
-      ** Otherwise, if the optimization is both enabled and applicable,
-      ** then call pager_incr_changecounter() to update the change-counter
-      ** in 'direct' mode. In this case the journal file will never be
-      ** created for this transaction.
-      */
+    /* The following block updates the change-counter. Exactly how it
+    ** does this depends on whether or not the atomic-update optimization
+    ** was enabled at compile time, and if this transaction meets the 
+    ** runtime criteria to use the operation: 
+    **
+    **    * The file-system supports the atomic-write property for
+    **      blocks of size page-size, and 
+    **    * This commit is not part of a multi-file transaction, and
+    **    * Exactly one page has been modified and store in the journal file.
+    **
+    ** If the optimization was not enabled at compile time, then the
+    ** pager_incr_changecounter() function is called to update the change
+    ** counter in 'indirect-mode'. If the optimization is compiled in but
+    ** is not applicable to this transaction, call sqlite3JournalCreate()
+    ** to make sure the journal file has actually been created, then call
+    ** pager_incr_changecounter() to update the change-counter in indirect
+    ** mode. 
+    **
+    ** Otherwise, if the optimization is both enabled and applicable,
+    ** then call pager_incr_changecounter() to update the change-counter
+    ** in 'direct' mode. In this case the journal file will never be
+    ** created for this transaction.
+    */
   #ifdef SQLITE_ENABLE_ATOMIC_WRITE
-      PgHdr *pPg;
-      assert( isOpen(pPager->jfd) 
-           || pPager->journalMode==PAGER_JOURNALMODE_OFF 
-           || pPager->journalMode==PAGER_JOURNALMODE_WAL 
-      );
-      if( !zMaster && isOpen(pPager->jfd) 
-       && pPager->journalOff==jrnlBufferSize(pPager) 
-       && pPager->dbSize>=pPager->dbOrigSize
-       && (0==(pPg = sqlite3PcacheDirtyList(pPager->pPCache)) || 0==pPg->pDirty)
-      ){
-        /* Update the db file change counter via the direct-write method. The 
-        ** following call will modify the in-memory representation of page 1 
-        ** to include the updated change counter and then write page 1 
-        ** directly to the database file. Because of the atomic-write 
-        ** property of the host file-system, this is safe.
-        */
-        rc = pager_incr_changecounter(pPager, 1);
-      }else{
-        rc = sqlite3JournalCreate(pPager->jfd);
-        if( rc==SQLITE_OK ){
-          rc = pager_incr_changecounter(pPager, 0);
-        }
-      }
-  #else
-      rc = pager_incr_changecounter(pPager, 0);
-  #endif
-      if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
-  
-      /* Write the master journal name into the journal file. If a master 
-      ** journal file name has already been written to the journal file, 
-      ** or if zMaster is NULL (no master journal), then this call is a no-op.
+    PgHdr *pPg;
+    assert( isOpen(pPager->jfd) 
+         || pPager->journalMode==PAGER_JOURNALMODE_OFF 
+         || pPager->journalMode==PAGER_JOURNALMODE_WAL 
+    );
+    if( !zMaster && isOpen(pPager->jfd) 
+      && pPager->journalOff==jrnlBufferSize(pPager) 
+      && pPager->dbSize>=pPager->dbOrigSize
+      && (0==(pPg = sqlite3PcacheDirtyList(pPager->pPCache)) || 0==pPg->pDirty)
+    ){
+      /* Update the db file change counter via the direct-write method. The 
+      ** following call will modify the in-memory representation of page 1 
+      ** to include the updated change counter and then write page 1 
+      ** directly to the database file. Because of the atomic-write 
+      ** property of the host file-system, this is safe.
       */
-      rc = writeMasterJournal(pPager, zMaster);
-      if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
-  
-      /* Sync the journal file and write all dirty pages to the database.
-      ** If the atomic-update optimization is being used, this sync will not 
-      ** create the journal file or perform any real IO.
-      **
-      ** Because the change-counter page was just modified, unless the
-      ** atomic-update optimization is used it is almost certain that the
-      ** journal requires a sync here. However, in locking_mode=exclusive
-      ** on a system under memory pressure it is just possible that this is 
-      ** not the case. In this case it is likely enough that the redundant
-      ** xSync() call will be changed to a no-op by the OS anyhow. 
-      */
-      rc = syncJournal(pPager, 0);
-      if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
-  
-      rc = pager_write_pagelist(pPager,sqlite3PcacheDirtyList(pPager->pPCache));
-      if( rc!=SQLITE_OK ){
-        assert( rc!=SQLITE_IOERR_BLOCKED );
-        goto commit_phase_one_exit;
+      rc = pager_incr_changecounter(pPager, 1);
+    }else{
+      rc = sqlite3JournalCreate(pPager->jfd);
+      if( rc==SQLITE_OK ){
+        rc = pager_incr_changecounter(pPager, 0);
       }
-      sqlite3PcacheCleanAll(pPager->pPCache);
-
-      /* If the file on disk is smaller than the database image, use 
-      ** pager_truncate to grow the file here. This can happen if the database
-      ** image was extended as part of the current transaction and then the
-      ** last page in the db image moved to the free-list. In this case the
-      ** last page is never written out to disk, leaving the database file
-      ** undersized. Fix this now if it is the case.  */
-      if( pPager->dbSize>pPager->dbFileSize ){
-        Pgno nNew = pPager->dbSize - (pPager->dbSize==PAGER_MJ_PGNO(pPager));
-        assert( pPager->eState==PAGER_WRITER_DBMOD );
-        rc = pager_truncate(pPager, nNew);
-        if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
-      }
-  
-      /* Finally, sync the database file. */
-      if( !noSync ){
-        rc = sqlite3PagerSync(pPager, zMaster);
-      }
-      IOTRACE(("DBSYNC %p\n", pPager))
     }
+  #else
+    rc = pager_incr_changecounter(pPager, 0);
+  #endif
+    if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
+ 
+    /* Write the master journal name into the journal file. If a master 
+    ** journal file name has already been written to the journal file, 
+    ** or if zMaster is NULL (no master journal), then this call is a no-op.
+    */
+    rc = writeMasterJournal(pPager, zMaster);
+    if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
+
+    /* Sync the journal file and write all dirty pages to the database.
+    ** If the atomic-update optimization is being used, this sync will not 
+    ** create the journal file or perform any real IO.
+    **
+    ** Because the change-counter page was just modified, unless the
+    ** atomic-update optimization is used it is almost certain that the
+    ** journal requires a sync here. However, in locking_mode=exclusive
+    ** on a system under memory pressure it is just possible that this is 
+    ** not the case. In this case it is likely enough that the redundant
+    ** xSync() call will be changed to a no-op by the OS anyhow. 
+    */
+    rc = syncJournal(pPager, 0);
+    if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
+  
+    rc = pager_write_pagelist(pPager,sqlite3PcacheDirtyList(pPager->pPCache));
+    if( rc!=SQLITE_OK ){
+      assert( rc!=SQLITE_IOERR_BLOCKED );
+      goto commit_phase_one_exit;
+    }
+    sqlite3PcacheCleanAll(pPager->pPCache);
+
+    /* If the file on disk is smaller than the database image, use 
+    ** pager_truncate to grow the file here. This can happen if the database
+    ** image was extended as part of the current transaction and then the
+    ** last page in the db image moved to the free-list. In this case the
+    ** last page is never written out to disk, leaving the database file
+    ** undersized. Fix this now if it is the case.  */
+    if( pPager->dbSize>pPager->dbFileSize ){
+      Pgno nNew = pPager->dbSize - (pPager->dbSize==PAGER_MJ_PGNO(pPager));
+      assert( pPager->eState==PAGER_WRITER_DBMOD );
+      rc = pager_truncate(pPager, nNew);
+      if( rc!=SQLITE_OK ) goto commit_phase_one_exit;
+    }
+  
+    /* Finally, sync the database file. */
+    if( !noSync ){
+      rc = sqlite3PagerSync(pPager, zMaster);
+    }
+    IOTRACE(("DBSYNC %p\n", pPager))
   }
 
 commit_phase_one_exit:

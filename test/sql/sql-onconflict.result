@@ -21,8 +21,7 @@ box.sql.execute("INSERT INTO t values (1, 1), (2, 2), (3, 1)")
 ...
 box.sql.execute("SELECT * FROM t")
 ---
-- - [1, 1]
-  - [2, 2]
+- []
 ...
 box.sql.execute("INSERT INTO q values (1, 1), (2, 2), (3, 1)")
 ---

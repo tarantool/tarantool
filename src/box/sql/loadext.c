@@ -290,11 +290,6 @@ static const sqlite3_api_routines sqlite3Apis = {
   /*
   ** Added for 3.7.4
   */
-  sqlite3_backup_finish,
-  sqlite3_backup_init,
-  sqlite3_backup_pagecount,
-  sqlite3_backup_remaining,
-  sqlite3_backup_step,
   0,
   0,
   sqlite3_create_function_v2,
