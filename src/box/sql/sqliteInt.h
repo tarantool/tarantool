@@ -1785,6 +1785,8 @@ struct Table {
   int tnum;            /* Root BTree page for this table */
   u32 nTabRef;         /* Number of pointers to this Table */
   i16 iPKey;           /* If not negative, use aCol[iPKey] as the rowid */
+  i16 iAutoIncPKey;    /* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
+                          column number here, -1 otherwise Tarantool specifics */
   i16 nCol;            /* Number of columns in this table */
   LogEst nRowLogEst;   /* Estimated rows in table - from sqlite_stat1 table */
   LogEst szTabRow;     /* Estimated size of each table row in bytes */
@@ -3006,6 +3008,13 @@ struct AuthContext {
 #define OPFLAG_PERMUTE       0x01    /* OP_Compare: use the permutation */
 #define OPFLAG_SAVEPOSITION  0x02    /* OP_Delete: keep cursor position */
 #define OPFLAG_AUXDELETE     0x04    /* OP_Delete: index in a DELETE op */
+
+#define OPFLAG_SAME_FRAME    0x01    /* OP_FCopy: use same frame for source
+                                      * register
+                                      */
+#define OPFLAG_NOOP_IF_NULL  0x02    /* OP_FCopy: if source register is NULL
+                                      * then do nothing
+                                      */
 
 /*
  * Each trigger present in the database schema is stored as an instance of

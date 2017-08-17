@@ -1038,3 +1038,33 @@ sql_debug_info(struct info_handler *h)
 	info_append_int(h, "sql_found_count", sql_found_count);
 	info_end(h);
 }
+
+/**
+ * Extract maximum integer value from:
+ * @param index space_id
+ * @param index_id
+ * @param field number fieldno
+ * @param[out] fetched value in max_id
+ *
+ * @retval 0 on success, -1 otherwise.
+ *
+ * If index is empty - return 0 in max_id and success status
+ */
+int
+tarantoolSqlGetMaxId(uint32_t space_id, uint32_t index_id, uint32_t fieldno,
+		     uint64_t *max_id)
+{
+	char key[16];
+	struct tuple *tuple;
+	char *key_end = mp_encode_array(key, 0);
+	if (box_index_max(space_id, index_id, key, key_end, &tuple) != 0)
+		return -1;
+
+	/* Index is empty  */
+	if (tuple == NULL) {
+		*max_id = 0;
+		return 0;
+	}
+
+	return tuple_field_u64(tuple, fieldno, max_id);
+}

@@ -6,6 +6,8 @@
 ** that's why we are using a weird naming schema.
 */
 
+#include <stdint.h>
+
 /*
  * Tarantool system spaces.
  */
@@ -96,3 +98,9 @@ int tarantoolSqlite3MakeIdxParts(Index *index, void *buf);
  * If buf==NULL estimate result size.
  */
 int tarantoolSqlite3MakeIdxOpts(Index *index, const char *zSql, void *buf);
+
+/*
+ * Fetch maximum value from ineger column number `fieldno` of space_id/index_id
+ * Return 0 on success, -1 otherwise
+ */
+int tarantoolSqlGetMaxId(uint32_t space_id, uint32_t index_id, uint32_t fieldno, uint64_t *max_id);

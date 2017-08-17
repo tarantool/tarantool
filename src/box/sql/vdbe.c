@@ -4056,6 +4056,69 @@ case OP_Sequence: {           /* out2 */
   break;
 }
 
+/* Opcode: MaxId P1 P2 P3 * *
+** Synopsis: r[P3]=get_max(space_index[P1]{Column[P2]})
+**
+** Get next Id of the table. P1 is a table cursor, P2 is column
+** number. Return in P3 maximum id found in provided column.
+**
+** This opcode is Tarantool specific and will segfault in case
+** of SQLite cursor.
+*/
+case OP_MaxId: {     /* out3 */
+  VdbeCursor *pC;    /* The VDBE cursor */
+  int p2;            /* Column number, which stores the id */
+  int pgno;          /* Page number of the cursor */
+  pC = p->apCsr[pOp->p1];
+  p2 = pOp->p2;
+  pOut = &aMem[pOp->p3];
+
+  /* This opcode is Tarantool specific.  */
+  assert( pC->uc.pCursor->curFlags & BTCF_TaCursor );
+
+  pgno = pC->pgnoRoot;
+
+  tarantoolSqlGetMaxId(SQLITE_PAGENO_TO_SPACEID(pgno), SQLITE_PAGENO_TO_INDEXID(pgno), p2, &pOut->u.i);
+
+  pOut->flags = MEM_Int;
+  break;
+}
+
+/* Opcode: FCopy P1 P2 P3 * *
+** Synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)]
+**
+** Copy integer value of register P1 in root frame in to register P2 of current
+** frame. If current frame is topmost - copy within signle frame.
+** Source register must hold integer value.
+**
+** If P3's flag OPFLAG_SAME_FRAME is set, do shallow copy of register within
+** same frame, still making sure the value is integer.
+**
+** If P3's flag OPFLAG_NOOP_IF_NULL is set, then do nothing if reg[P1] is NULL
+*/
+case OP_FCopy: {     /* out2 */
+  VdbeFrame *pFrame;
+  Mem *pIn1, *pOut;
+  if( p->pFrame && ((pOp->p3 & OPFLAG_SAME_FRAME) == 0)) {
+    for(pFrame=p->pFrame; pFrame->pParent; pFrame=pFrame->pParent);
+    pIn1 = &pFrame->aMem[pOp->p1];
+  }else{
+    pIn1 = &aMem[pOp->p1];
+  }
+
+  if ((pOp->p3 & OPFLAG_NOOP_IF_NULL) && (pIn1->flags & MEM_Null)) {
+    /* Flag is set and register is NULL -> do nothing  */
+  } else {
+    assert( memIsValid(pIn1) );
+    assert( pIn1->flags &  MEM_Int);
+
+    pOut = &aMem[pOp->p2];
+    MemSetTypeFlag(pOut, MEM_Int);
+
+    pOut->u.i = pIn1->u.i;
+  }
+  break;
+}
 
 /* Opcode: NewRowid P1 P2 P3 * *
 ** Synopsis: r[P2]=rowid

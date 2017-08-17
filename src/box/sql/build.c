@@ -851,12 +851,12 @@ void sqlite3StartTable(
   assert( pParse->pNewTable==0 );
   pParse->pNewTable = pTable;
 
-  /* If this is the magic sqlite_sequence table used by autoincrement,
+  /* If this is the magic sql_sequence table used by autoincrement,
   ** then record a pointer to this table in the main database structure
   ** so that INSERT can find the table easily.
   */
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-  if( !pParse->nested && strcmp(zName, "sqlite_sequence")==0 ){
+  if( !pParse->nested && strcmp(zName, "sql_sequence")==0 ){
     assert( sqlite3SchemaMutexHeld(db, 0) );
     pTable->pSchema->pSeqTab = pTable;
   }
@@ -1191,12 +1191,14 @@ void sqlite3AddPrimaryKey(
       }
     }
   }
+  pTab->iAutoIncPKey = -1;
   if( nTerm==1
    && pCol
    && sqlite3StrICmp(sqlite3ColumnType(pCol,""), "INTEGER")==0
    && sortOrder!=SQLITE_SO_DESC
   ){
     pTab->iPKey = iCol;
+    pTab->iAutoIncPKey = iCol;
     pTab->keyConf = (u8)onError;
     assert( autoInc==0 || autoInc==1 );
     pTab->tabFlags |= autoInc*TF_Autoincrement;
@@ -1954,11 +1956,6 @@ void sqlite3EndTable(
 
   /* Special processing for WITHOUT ROWID Tables */
   if( tabOpts & TF_WithoutRowid ){
-    if( (p->tabFlags & TF_Autoincrement) ){
-      sqlite3ErrorMsg(pParse,
-          "AUTOINCREMENT not allowed on WITHOUT ROWID tables");
-      return;
-    }
     if( (p->tabFlags & TF_HasPrimaryKey)==0 ){
       sqlite3ErrorMsg(pParse, "PRIMARY KEY missing on table %s", p->zName);
     }else{
@@ -2110,7 +2107,7 @@ void sqlite3EndTable(
     sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-    /* Check to see if we need to create an sqlite_sequence table for
+    /* Check to see if we need to create an sql_sequence table for
     ** keeping track of autoincrement keys.
     */
     if( (p->tabFlags & TF_Autoincrement)!=0 ){
@@ -2118,7 +2115,7 @@ void sqlite3EndTable(
       assert( sqlite3SchemaMutexHeld(db, 0) );
       if( pDb->pSchema->pSeqTab==0 ){
         sqlite3NestedParse(pParse,
-          "CREATE TABLE sqlite_sequence(name,seq)"
+          "CREATE TABLE sql_sequence(name PRIMARY KEY,seq)"
         );
       }
     }
@@ -2466,14 +2463,14 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int isView){
   pParse->nested--;
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-  /* Remove any entries of the sqlite_sequence table associated with
+  /* Remove any entries of the sql_sequence table associated with
   ** the table being dropped. This is done before the table is dropped
-  ** at the btree level, in case the sqlite_sequence table needs to
+  ** at the btree level, in case the sql_sequence table needs to
   ** move as a result of the drop (can happen in auto-vacuum mode).
   */
   if( pTab->tabFlags & TF_Autoincrement ){
     sqlite3NestedParse(pParse,
-      "DELETE FROM sqlite_sequence WHERE name=%Q",
+      "DELETE FROM sql_sequence WHERE name=%Q",
       pTab->zName
     );
   }
@@ -2591,7 +2588,7 @@ void sqlite3DropTable(Parse *pParse, SrcList *pName, int isView, int noErr){
     }
   }
 #endif
-  if( sqlite3StrNICmp(pTab->zName, "sqlite_", 7)==0 
+  if( sqlite3StrNICmp(pTab->zName, "sql_sequence", 12)==0
     && sqlite3StrNICmp(pTab->zName, "sqlite_stat", 11)!=0 ){
     sqlite3ErrorMsg(pParse, "table %s may not be dropped", pTab->zName);
     goto exit_drop_table;
