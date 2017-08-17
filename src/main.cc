@@ -529,7 +529,7 @@ print_help(const char *program)
 	puts("All command line options are passed to the interpreted script.");
 	puts("When no script name is provided, the server responds to:");
 	puts("  -h, --help\t\t\tdisplay this help and exit");
-	puts("  -V, --version\t\t\tprint program version and exit");
+	puts("  -v, --version\t\t\tprint program version and exit");
 	puts("  -e EXPR\t\t\texecute string 'EXPR'");
 	puts("  -l NAME\t\t\trequire library 'NAME'");
 	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
@@ -560,15 +560,16 @@ main(int argc, char **argv)
 
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},
-		{"version", no_argument, 0, 'V'},
+		{"version", no_argument, 0, 'v'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVie:l:";
+	static const char *opts = "+hVvie:l:";
 
 	int ch;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'V':
+		case 'v':
 			print_version();
 			return 0;
 		case 'h':

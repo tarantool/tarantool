@@ -21,6 +21,7 @@ sys.stdout.push_filter("CXX_FLAGS:.*", "CXX_FLAGS: flags")
 sys.stdout.push_filter("Compiler: .*", "Compiler: cc")
 
 server.test_option("--version")
+server.test_option("-v")
 server.test_option("-V          ")
 
 script = os.getenv("SOURCEDIR") + "/test/box-py/args.lua"

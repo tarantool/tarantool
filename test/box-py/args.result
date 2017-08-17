@@ -6,7 +6,7 @@ Usage: tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
   -h, --help			display this help and exit
-  -V, --version			print program version and exit
+  -v, --version			print program version and exit
   -e EXPR			execute string 'EXPR'
   -l NAME			require library 'NAME'
   -i				enter interactive mode after executing 'SCRIPT'
@@ -24,7 +24,7 @@ Usage: tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
   -h, --help			display this help and exit
-  -V, --version			print program version and exit
+  -v, --version			print program version and exit
   -e EXPR			execute string 'EXPR'
   -l NAME			require library 'NAME'
   -i				enter interactive mode after executing 'SCRIPT'
@@ -44,6 +44,14 @@ tarantool --no-such-option --version
 ${SOURCEDIR}/src/tarantool: unrecognized option '--no-such-option'
 
 tarantool --version
+Tarantool 1.minor.patch-<rev>-<commit>
+Target: platform <build>
+Build options: flags
+Compiler: cc
+C_FLAGS: flags
+CXX_FLAGS: flags
+
+tarantool -v
 Tarantool 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags
