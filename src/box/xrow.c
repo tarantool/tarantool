@@ -776,7 +776,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 		data = mp_encode_uint(data, replica.id);
 		data = mp_encode_uint(data, replica.lsn);
 	}
-	data = mp_encode_uint(data, IPROTO_VERSION);
+	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
 	data = mp_encode_uint(data, tarantool_version_id());
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
@@ -838,7 +838,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			lsnmap = d;
 			mp_next(&d);
 			break;
-		case IPROTO_VERSION:
+		case IPROTO_SERVER_VERSION:
 			if (version_id == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_UINT) {

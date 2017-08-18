@@ -57,6 +57,7 @@ enum iproto_key {
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
 	IPROTO_SCHEMA_VERSION = 0x05,
+	IPROTO_SERVER_VERSION = 0x06,
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,
@@ -78,7 +79,6 @@ enum iproto_key {
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
-	IPROTO_VERSION = 0x32,
 	IPROTO_KEY_MAX
 };
 
