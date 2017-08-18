@@ -287,7 +287,8 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 }
 
 void
-iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
+		   uint64_t sync)
 {
 	uint32_t msg_len = strlen(e->errmsg);
 	uint32_t errcode = box_error_code(e);
@@ -295,7 +296,7 @@ iproto_write_error(int fd, const struct error *e, uint32_t schema_version)
 	char header[IPROTO_HEADER_LEN];
 	struct iproto_body_bin body = iproto_error_bin;
 
-	iproto_header_encode(header, iproto_encode_error(errcode), 0,
+	iproto_header_encode(header, iproto_encode_error(errcode), sync,
 			     schema_version, sizeof(body) + msg_len);
 
 	body.v_data_len = mp_bswap_u32(msg_len);

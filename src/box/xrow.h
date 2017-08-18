@@ -339,7 +339,8 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 
 /** Write error directly to a socket. */
 void
-iproto_write_error(int fd, const struct error *e, uint32_t schema_version);
+iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
+		   uint64_t sync);
 
 enum {
 	/* Maximal length of protocol name in handshake */

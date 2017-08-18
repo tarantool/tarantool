@@ -301,6 +301,16 @@ if resp['header'][IPROTO_SYNC] == 2334:
 else:
     print 'Bad first sync'
 
+#
+# Try incorrect JOIN. SYNC must be also returned.
+#
+body[IPROTO_SERVER_UUID] = 'unknown'
+resp = test_request(header, body)
+if resp['header'][IPROTO_SYNC] == 2334:
+    print('Sync on error is ok')
+else:
+    print('Sync on error is not ok')
+
 c.close()
 
 admin("space:drop()")
