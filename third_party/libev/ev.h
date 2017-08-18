@@ -606,6 +606,9 @@ ev_is_default_loop (void) EV_THROW
 
 #endif /* multiplicity */
 
+EV_API_DECL ev_tstamp ev_monotonic_time (void) EV_THROW;
+EV_API_DECL ev_tstamp ev_monotonic_now (EV_P) EV_THROW;
+
 /* destroy event loops, also works for the default loop */
 EV_API_DECL void ev_loop_destroy (EV_P);
 

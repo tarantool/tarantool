@@ -1902,6 +1902,18 @@ ev_now (EV_P) EV_THROW
 }
 #endif
 
+ev_tstamp
+ev_monotonic_now (EV_P) EV_THROW
+{
+  return mn_now;
+}
+
+ev_tstamp
+ev_monotonic_time (void) EV_THROW
+{
+  return get_clock();
+}
+
 void
 ev_sleep (ev_tstamp delay) EV_THROW
 {
