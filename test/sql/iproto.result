@@ -483,3 +483,8 @@ box.sql.execute('drop table test')
 space = nil
 ---
 ...
+-- Cleanup xlog
+box.snapshot()
+---
+- ok
+...

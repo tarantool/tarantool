@@ -183,3 +183,7 @@ cn:close()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.sql.execute('drop table test')
 space = nil
+
+-- Cleanup xlog
+box.snapshot()
+

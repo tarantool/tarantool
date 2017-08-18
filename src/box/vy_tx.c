@@ -687,20 +687,25 @@ int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct tuple *key, bool is_gap)
 {
+	struct txv *v;
+	uint32_t part_count = tuple_field_count(key);
+
+	/* We do not support tracking range requests. */
+	assert(part_count >= index->cmp_def->part_count);
+
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
 		return 0;
 	}
-	uint32_t part_count = tuple_field_count(key);
-	if (part_count >= index->cmp_def->part_count) {
-		struct txv *v = write_set_search_key(&tx->write_set, index, key);
-		if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
-				  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
-			/* Reading from own write set is serializable. */
-			return 0;
-		}
+
+	v = write_set_search_key(&tx->write_set, index, key);
+	if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
+			  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
+		/* Reading from own write set is serializable. */
+		return 0;
 	}
-	struct txv *v = read_set_search_key(&tx->xm->read_set, index, key, tx);
+
+	v = read_set_search_key(&tx->xm->read_set, index, key, tx);
 	if (v == NULL) {
 		v = txv_new(tx, index, key);
 		if (v == NULL)

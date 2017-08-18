@@ -376,6 +376,10 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	slice->end = end;
 	rlist_create(&slice->in_range);
 	fiber_cond_create(&slice->pin_cond);
+	if (run->info.page_count == 0) {
+		/* The run is empty hence the slice is empty too. */
+		return slice;
+	}
 	/** Lookup the first and the last pages spanned by the slice. */
 	bool unused;
 	if (slice->begin == NULL) {
@@ -384,18 +388,19 @@ vy_slice_new(int64_t id, struct vy_run *run,
 		slice->first_page_no =
 			vy_page_index_find_page(run, slice->begin, cmp_def,
 						ITER_GE, &unused);
-		assert(slice->last_page_no < run->info.page_count);
+		assert(slice->first_page_no < run->info.page_count);
 	}
 	if (slice->end == NULL) {
-		slice->last_page_no = run->info.page_count ?
-				      run->info.page_count - 1 : 0;
+		slice->last_page_no = run->info.page_count - 1;
 	} else {
 		slice->last_page_no =
 			vy_page_index_find_page(run, slice->end, cmp_def,
 						ITER_LT, &unused);
 		if (slice->last_page_no == run->info.page_count) {
 			/* It's an empty slice */
+			slice->first_page_no = 0;
 			slice->last_page_no = 0;
+			return slice;
 		}
 	}
 	assert(slice->last_page_no >= slice->first_page_no);

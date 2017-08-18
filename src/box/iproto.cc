@@ -1065,7 +1065,7 @@ static void
 tx_process_sql(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
-	struct obuf *out = &msg->iobuf->out;
+	struct obuf *out = msg->obuf;
 	uint64_t sync = msg->header.sync;
 
 	tx_fiber_init(msg->connection->session, sync);

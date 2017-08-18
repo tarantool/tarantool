@@ -512,6 +512,3 @@ box.schema.user.revoke('guest', 'read,write', 'space', 'access_truncate')
 s:drop()
 ---
 ...
-box.schema.user.revoke('guest', 'execute', 'universe')
----
-...

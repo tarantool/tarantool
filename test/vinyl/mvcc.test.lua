@@ -1502,19 +1502,10 @@ t:truncate()
 --
 -- Check that min/max/count transactions stay within a read view
 --
-c1:begin()
-c1("t.index.pk:max()")
-c2:begin()
-c2("t:replace{1}")
-c2:commit()
-c1("t.index.pk:max()") -- nothing
-c1("t.index.pk:min()") -- nothing
-c1("t.index.pk:count()") -- 0
-c1:commit()
---
 -- XXX bug: we read committed doata since there are no gap locks,
 -- and c1 is not turned into a read-only on conflict with c2.
 --
+t:replace{1}
 c1:begin()
 c1("t.index.pk:max()") -- {1}
 c1("t.index.pk:min()") -- {1}

@@ -841,6 +841,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	struct tuple *prev_key = itr->curr_stmt;
 	if (prev_key != NULL)
 		tuple_ref(prev_key);
+	bool skipped_txw_delete = false;
 
 	struct tuple *t = NULL;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
@@ -900,6 +901,10 @@ restart:
 			itr->curr_stmt = t;
 			break;
 		} else {
+			if (vy_stmt_lsn(t) == INT64_MAX) { /* t is from write set */
+				assert(vy_stmt_type(t) == IPROTO_DELETE);
+				skipped_txw_delete = true;
+			}
 			tuple_unref(t);
 		}
 	}
@@ -937,9 +942,23 @@ restart:
 	/**
 	 * Add a statement to the cache
 	 */
-	if ((**itr->read_view).vlsn == INT64_MAX) /* Do not store non-latest data */
-		vy_cache_add(&itr->index->cache, *result, prev_key,
+	if ((**itr->read_view).vlsn == INT64_MAX) { /* Do not store non-latest data */
+		struct tuple *cache_prev = prev_key;
+		if (skipped_txw_delete) {
+			/*
+			 * If we skipped DELETE that was read from TX write
+			 * set, there is a chance that the database actually
+			 * has the deleted key amd we must consider
+			 * previous+current tuple as an unbroken chain.
+			 */
+			cache_prev = NULL;
+		}
+		vy_cache_add(&itr->index->cache, *result, cache_prev,
 			     itr->key, itr->iterator_type);
+	}
+
+	if (itr->tx != NULL && *result != NULL)
+		rc = vy_tx_track(itr->tx, itr->index, *result, false);
 
 clear:
 	if (prev_key != NULL)

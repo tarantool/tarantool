@@ -358,6 +358,16 @@ box.cfg { memtx_max_tuple_size = 1 * 1024 * 1024 }
 _ = s:replace({1, string.rep('x', 2 * 1024 * 1024 )})
 _ = s:replace({1, string.rep('x', 1 * 1024 * 1024 - 32)})
 
+-- gh-2698 Tarantool crashed on 4M tuple
+max_item_size = 0
+test_run:cmd("setopt delimiter ';'")
+for _, v in pairs(box.slab.stats()) do
+    max_item_size = math.max(max_item_size, v.item_size)
+end;
+test_run:cmd("setopt delimiter ''");
+box.cfg { memtx_max_tuple_size = max_item_size + 32 }
+_ = box.space.test:replace{1, 1, string.rep('a', max_item_size)}
+
 -- reset to original value
 box.cfg { memtx_max_tuple_size = memtx_max_tuple_size }
 
