@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(6)
+test:plan(7)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script

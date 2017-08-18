@@ -49,7 +49,8 @@
 #include "session.h"
 
 /* TODO: add configuration options */
-static const int RECONNECT_DELAY = 1;
+static const double RECONNECT_DELAY = 1.0;
+static const double ACK_INTERVAL = 1.0;
 
 STRS(applier_state, applier_STATE);
 
@@ -93,8 +94,48 @@ applier_log_error(struct applier *applier, struct error *e)
 	}
 	error_log(e);
 	if (type_cast(SocketError, e))
-		say_info("will retry every %i second", RECONNECT_DELAY);
+		say_info("will retry every %.2lf second", RECONNECT_DELAY);
 	applier->last_logged_errcode = errcode;
+}
+
+/*
+ * Fiber function to write vclock to replication master.
+ */
+static int
+applier_writer_f(va_list ap)
+{
+	struct applier *applier = va_arg(ap, struct applier *);
+	struct ev_io io;
+	coio_create(&io, applier->io.fd);
+
+	/* Re-connect loop */
+	while (!fiber_is_cancelled()) {
+		fiber_cond_wait_timeout(&applier->writer_cond, ACK_INTERVAL);
+		/* Send ACKs only when in FINAL JOIN and FOLLOW modes */
+		if (applier->state != APPLIER_FOLLOW &&
+		    applier->state != APPLIER_FINAL_JOIN)
+			continue;
+		try {
+			struct xrow_header xrow;
+			xrow_encode_vclock(&xrow, &replicaset_vclock);
+			coio_write_xrow(&io, &xrow);
+		} catch (SocketError *e) {
+			/*
+			 * Do not exit, if there is a network error,
+			 * the reader fiber will reconnect for us
+			 * and signal our cond afterwards.
+			 */
+			e->log();
+		} catch (Exception *e) {
+			/*
+			 * Out of memory encoding the message, ignore
+			 * and try again after an interval.
+			 */
+			e->log();
+		}
+		fiber_gc();
+	}
+	return 0;
 }
 
 /**
@@ -188,6 +229,19 @@ done:
 	/* auth succeeded */
 	say_info("authenticated");
 	applier_set_state(applier, APPLIER_READY);
+
+	if (applier->version_id >= version_id(1, 7, 4)) {
+		/* Enable replication ACKs for newer servers */
+		assert(applier->writer == NULL);
+
+		char name[FIBER_NAME_MAX];
+		int pos = snprintf(name, sizeof(name), "applierw/");
+		uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
+
+		applier->writer = fiber_new_xc(name, applier_writer_f);
+		fiber_set_joinable(applier->writer, true);
+		fiber_start(applier->writer, applier);
+	}
 }
 
 /**
@@ -376,6 +430,7 @@ applier_subscribe(struct applier *applier)
 				      row.lsn);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		}
+		fiber_cond_signal(&applier->writer_cond);
 		iobuf_reset(iobuf);
 		fiber_gc();
 	}
@@ -384,6 +439,11 @@ applier_subscribe(struct applier *applier)
 static inline void
 applier_disconnect(struct applier *applier, enum applier_state state)
 {
+	if (applier->writer != NULL) {
+		fiber_cancel(applier->writer);
+		applier->writer = NULL;
+	}
+
 	coio_close(loop(), &applier->io);
 	iobuf_reset(applier->iobuf);
 	applier_set_state(applier, state);
@@ -523,6 +583,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 	applier->last_row_time = ev_now(loop());
 	rlist_create(&applier->on_state);
 	fiber_channel_create(&applier->pause, 0);
+	fiber_cond_create(&applier->writer_cond);
 
 	return applier;
 }
@@ -530,11 +591,12 @@ applier_new(const char *uri, struct xstream *join_stream,
 void
 applier_delete(struct applier *applier)
 {
-	assert(applier->reader == NULL);
+	assert(applier->reader == NULL && applier->writer == NULL);
 	iobuf_delete(applier->iobuf);
 	assert(applier->io.fd == -1);
 	fiber_channel_destroy(&applier->pause);
 	trigger_destroy(&applier->on_state);
+	fiber_cond_destroy(&applier->writer_cond);
 	free(applier);
 }
 

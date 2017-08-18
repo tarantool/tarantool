@@ -18,6 +18,8 @@ pad_size = 1000
 pad = string.rep('x', pad_size)
 for i = 1, 2 * box.cfg.vinyl_memory / pad_size do s:insert{i, pad} end
 -- Save the total number of committed and dumped statements.
+-- Make sure no task is completed after we saved stats.
+box.error.injection.set('ERRINJ_VY_TASK_COMPLETE', true)
 var = box.schema.space.create('var')
 _ = var:create_index('pk', {parts = {1, 'string'}})
 stat = box.space.test.index.pk:info()

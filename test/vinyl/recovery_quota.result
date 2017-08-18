@@ -38,6 +38,11 @@ for i = 1, 2 * box.cfg.vinyl_memory / pad_size do s:insert{i, pad} end
 ---
 ...
 -- Save the total number of committed and dumped statements.
+-- Make sure no task is completed after we saved stats.
+box.error.injection.set('ERRINJ_VY_TASK_COMPLETE', true)
+---
+- ok
+...
 var = box.schema.space.create('var')
 ---
 ...

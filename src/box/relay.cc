@@ -47,6 +47,7 @@
 #include "replication.h"
 #include "trigger.h"
 #include "vclock.h"
+#include "version.h"
 #include "xrow.h"
 #include "xrow_io.h"
 #include "xstream.h"
@@ -63,7 +64,7 @@ struct relay_status_msg {
 	struct cmsg msg;
 	/** Relay instance */
 	struct relay *relay;
-	/** New vclock */
+	/** Replica vclock. */
 	struct vclock vclock;
 };
 
@@ -99,8 +100,14 @@ struct relay {
 	struct wal_watcher wal_watcher;
 	/** Set before exiting the relay loop. */
 	bool exiting;
-	/** Set on relay error. */
-	bool failed;
+	/** Relay reader cond. */
+	struct fiber_cond reader_cond;
+	/** Relay diagnostics. */
+	struct diag diag;
+	/** Vclock recieved from replica. */
+	struct vclock recv_vclock;
+	/** Replicatoin slave version. */
+	uint32_t version_id;
 
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
@@ -114,7 +121,7 @@ struct relay {
 	struct {
 		/* Align to prevent false-sharing with tx thread */
 		alignas(CACHELINE_SIZE)
-		/** Current vclock sent by relay */
+		/** Known relay vclock. */
 		struct vclock vclock;
 	} tx;
 };
@@ -138,6 +145,8 @@ relay_init(struct relay *relay, int fd, uint64_t sync,
 	xstream_create(&relay->stream, stream_write);
 	coio_create(&relay->io, fd);
 	relay->sync = sync;
+	fiber_cond_create(&relay->reader_cond);
+	diag_create(&relay->diag);
 }
 
 static inline void
@@ -275,8 +284,50 @@ relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 		recover_remaining_wals(relay->r, &relay->stream, NULL,
 				       (events & WAL_EVENT_ROTATE) != 0);
 	} catch (Exception *e) {
-		relay->failed = true;
+		e->log();
+		diag_move(diag_get(), &relay->diag);
+		fiber_cancel(fiber());
 	}
+}
+
+/*
+ * Relay reader fiber function.
+ * Read xrow encoded vclocks sent by the replica.
+ */
+int
+relay_reader_f(va_list ap)
+{
+	struct relay *relay = va_arg(ap, struct relay *);
+	struct fiber *relay_f = va_arg(ap, struct fiber *);
+
+	struct ibuf ibuf;
+	struct ev_io io;
+	coio_create(&io, relay->io.fd);
+	ibuf_create(&ibuf, &cord()->slabc, 1024);
+	try {
+		while (!fiber_is_cancelled()) {
+			struct xrow_header xrow;
+			coio_read_xrow(&io, &ibuf, &xrow);
+			/* vclock is followed while decoding, zeroing it. */
+			vclock_create(&relay->recv_vclock);
+			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
+			fiber_cond_signal(&relay->reader_cond);
+		}
+	} catch (Exception *e) {
+		if (diag_is_empty(&relay->diag)) {
+			/* Don't override existing error. */
+			diag_move(diag_get(), &relay->diag);
+			fiber_cancel(relay_f);
+		} else if (!fiber_is_cancelled()) {
+			/*
+			 * There is an relay error and this fiber
+			 * fiber has another, log it.
+			 */
+			e->log();
+		}
+	}
+	ibuf_destroy(&ibuf);
+	return 0;
 }
 
 /**
@@ -305,79 +356,66 @@ relay_subscribe_f(va_list ap)
 
 	relay_set_cord_name(relay->io.fd);
 
-	/*
-	 * Init a read event: when replica closes its end
-	 * of the socket, we can read EOF and shutdown the
-	 * relay.
-	 */
-	struct ev_io read_ev;
-	read_ev.data = fiber();
-	ev_io_init(&read_ev, (ev_io_cb) fiber_schedule_cb,
-		   relay->io.fd, EV_READ);
+	char name[FIBER_NAME_MAX];
+	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
+	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
+	fiber_set_joinable(reader, true);
+	fiber_start(reader, relay, fiber());
 
-	while (true) {
+	while (!fiber_is_cancelled()) {
 		double timeout = RELAY_REPORT_INTERVAL;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam != 0)
 			timeout = inj->dparam;
 
-		ev_io_start(loop(), &read_ev);
-		fiber_yield_timeout(timeout);
-		ev_io_stop(loop(), &read_ev);
-
+		fiber_cond_wait_timeout(&relay->reader_cond, timeout);
 		/*
-		 * The fiber can be woken by IO read event, timeout,
-		 * or cbus message. Handle cbus messages first.
+		 * The fiber can be woken by IO cancel, by a timeout of
+		 * status messaging or by an acknowledge to status message.
+		 * Handle cbus messages first.
 		 */
 		cbus_process(&relay->endpoint);
-
-		if (relay->failed)
-			break;
-
-		uint8_t data;
-		int rc = recv(read_ev.fd, &data, sizeof(data), 0);
-
-		if (rc == 0 || (rc < 0 && errno == ECONNRESET)) {
-			say_info("the replica has closed its socket, exiting");
-			break;
-		}
-		if (rc < 0 && errno != EINTR && errno != EAGAIN &&
-		    errno != EWOULDBLOCK)
-			say_syserror("recv");
-
 		/*
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
 		 */
-		if (relay->status_msg.msg.route != NULL ||
-		    vclock_compare(&relay->status_msg.vclock,
-				   &r->vclock) == 0)
+		if (relay->status_msg.msg.route != NULL)
 			continue;
 		static const struct cmsg_hop route[] = {
 			{tx_status_update, NULL}
 		};
 		cmsg_init(&relay->status_msg.msg, route);
-		vclock_copy(&relay->status_msg.vclock, &r->vclock);
+		if (relay->version_id < version_id(1, 7, 4))
+			vclock_copy(&relay->status_msg.vclock, &r->vclock);
+		else
+			vclock_copy(&relay->status_msg.vclock,
+				    &relay->recv_vclock);
 		relay->status_msg.relay = relay;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 
 	say_crit("exiting the relay loop");
+	if (!fiber_is_dead(reader))
+		fiber_cancel(reader);
+	fiber_join(reader);
 	relay->exiting = true;
 	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
 	cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
 		    NULL, NULL, cbus_process);
 	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
-
-	return relay->failed ? -1 : 0;
+	if (!diag_is_empty(&relay->diag)) {
+		/* An error has occured while ACKs of xlog reading */
+		diag_move(&relay->diag, diag_get());
+	}
+	return diag_is_empty(diag_get()) ? 0: -1;
 }
 
 /** Replication acceptor fiber handler. */
 void
 relay_subscribe(int fd, uint64_t sync, struct replica *replica,
-		struct vclock *replica_clock)
+		struct vclock *replica_clock, uint32_t replica_version_id)
 {
 	assert(replica->id != REPLICA_ID_NIL);
 	/* Don't allow multiple relays for the same replica */
@@ -405,6 +443,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 			       cfg_geti("force_recovery"),
 			       replica_clock);
 	vclock_copy(&relay.tx.vclock, replica_clock);
+	relay.version_id = replica_version_id;
 	relay.replica = replica;
 	replica_set_relay(replica, &relay);
 
@@ -416,6 +455,8 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	replica_clear_relay(replica);
 	recovery_delete(relay.r);
 
+	fiber_cond_destroy(&relay.reader_cond);
+	diag_destroy(&relay.diag);
 	if (rc != 0)
 		diag_raise();
 }

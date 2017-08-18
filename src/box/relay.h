@@ -81,6 +81,6 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
  */
 void
 relay_subscribe(int fd, uint64_t sync, struct replica *replica,
-		struct vclock *replica_vclock);
+		struct vclock *replica_vclock, uint32_t replica_version_id);
 
 #endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */
