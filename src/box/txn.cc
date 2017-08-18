@@ -202,10 +202,10 @@ txn_write_to_wal(struct txn *txn)
 	}
 	assert(row == req->rows + req->n_rows);
 
-	ev_tstamp start = ev_now(loop()), stop;
+	ev_tstamp start = ev_monotonic_now(loop());
 	int64_t res = journal_write(req);
 
-	stop = ev_now(loop());
+	ev_tstamp stop = ev_monotonic_now(loop());
 	if (stop - start > too_long_threshold)
 		say_warn("too long WAL write: %.3f sec", stop - start);
 	if (res < 0) {

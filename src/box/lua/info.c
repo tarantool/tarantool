@@ -88,7 +88,8 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "idle");
-		lua_pushnumber(L, ev_now(loop()) - applier->last_row_time);
+		lua_pushnumber(L, ev_monotonic_now(loop()) -
+			       applier->last_row_time);
 		lua_settable(L, -3);
 
 		struct error *e = diag_last_error(&applier->reader->diag);

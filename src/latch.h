@@ -126,7 +126,7 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 			l->owner = fiber();
 			break;
 		}
-		timeout -= ev_now(loop()) - start;
+		timeout -= ev_monotonic_now(loop()) - start;
 		if (timeout <= 0) {
 			result = 1;
 			break;

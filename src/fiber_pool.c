@@ -42,7 +42,7 @@ fiber_pool_f(va_list ap)
 	struct ev_loop *loop = pool->consumer;
 	struct stailq *output = &pool->output;
 	struct cmsg *msg;
-	ev_tstamp last_active_at = ev_now(loop);
+	ev_tstamp last_active_at = ev_monotonic_now(loop);
 	pool->size++;
 restart:
 	msg = NULL;
@@ -64,9 +64,10 @@ restart:
 		cmsg_deliver(msg);
 	}
 	/** Put the current fiber into a fiber cache. */
-	if (msg != NULL || ev_now(loop) - last_active_at < pool->idle_timeout) {
+	if (msg != NULL ||
+	    ev_monotonic_now(loop) - last_active_at < pool->idle_timeout) {
 		if (msg != NULL)
-			last_active_at = ev_now(loop);
+			last_active_at = ev_monotonic_now(loop);
 		/*
 		 * Add the fiber to the front of the list, so that
 		 * it is most likely to get scheduled again.

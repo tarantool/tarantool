@@ -92,7 +92,7 @@ static double start_time;
 double
 tarantool_uptime(void)
 {
-	return ev_now(loop()) - start_time;
+	return ev_monotonic_now(loop()) - start_time;
 }
 
 /**
@@ -543,7 +543,6 @@ print_help(const char *program)
 int
 main(int argc, char **argv)
 {
-	start_time = ev_time();
 	/* set locale to make iswXXXX function work */
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL &&
 	    setlocale(LC_CTYPE, "en_US.UTF-8") == NULL &&
@@ -659,6 +658,8 @@ main(int argc, char **argv)
 	signal_init();
 	cbus_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
+
+	start_time = ev_monotonic_time();
 
 	try {
 		box_init();

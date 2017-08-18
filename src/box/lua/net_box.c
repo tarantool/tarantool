@@ -536,11 +536,11 @@ check_limit:
 				goto handle_error;
 		}
 
-		ev_tstamp deadline = fiber_time() + timeout;
+		ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
 		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
 				EV_WRITE : 0), timeout);
 		luaL_testcancel(L);
-		timeout = deadline - fiber_time();
+		timeout = deadline - ev_monotonic_now(loop());
 		timeout = MAX(0.0, timeout);
 		if (revents == 0 && timeout == 0.0) {
 			lua_pushinteger(L, ER_TIMEOUT);

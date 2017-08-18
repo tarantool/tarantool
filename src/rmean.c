@@ -90,7 +90,7 @@ rmean_age(ev_loop *loop,
 	struct rmean *rmean = (struct rmean *) timer->data;
 
 	double dt = rmean->prev_ts;
-	rmean->prev_ts = ev_now(loop);
+	rmean->prev_ts = ev_monotonic_now(loop);
 	dt = rmean->prev_ts - dt;
 	for (size_t i = 0; i < rmean->stats_n; i++) {
 		if (rmean->stats[i].name == NULL)
@@ -114,7 +114,7 @@ rmean_new(const char **name, size_t n)
 	for (size_t i = 0; i < n; i++, name++) {
 		rmean->stats[i].name = *name;
 	}
-	rmean->prev_ts = ev_now(loop());
+	rmean->prev_ts = ev_monotonic_now(loop());
 	ev_timer_init(&rmean->timer, rmean_age, 0, 1.);
 	ev_timer_again(loop(), &rmean->timer);
 	return rmean;
