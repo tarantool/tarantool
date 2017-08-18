@@ -2138,3 +2138,47 @@ box.commit()
 s:drop()
 ---
 ...
+s = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+i = s:create_index('primary', { parts = { 1, 'uint' } })
+---
+...
+s:replace{1} s:replace{2} s:replace{3}
+---
+...
+s:select{}
+---
+- - [1]
+  - [2]
+  - [3]
+...
+box.begin()
+---
+...
+gen,param,state = i:pairs({0}, {iterator = 'GE'})
+---
+...
+state, value = gen(param, state)
+---
+...
+value
+---
+- [1]
+...
+s:delete{2}
+---
+...
+state, value = gen(param, state)
+---
+...
+value
+---
+- [3]
+...
+box.commit()
+---
+...
+s:drop()
+---
+...
