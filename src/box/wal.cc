@@ -570,14 +570,14 @@ wal_assign_lsn(struct wal_writer *writer, struct xrow_header **row,
 	       struct xrow_header **end)
 {
 	/** Assign LSN to all local rows. */
-	if ((*row)->replica_id == 0) {
-		for ( ; row < end; row++) {
+	for ( ; row < end; row++) {
+		if ((*row)->replica_id == 0) {
 			(*row)->lsn = vclock_inc(&writer->vclock, instance_id);
 			(*row)->replica_id = instance_id;
+		} else {
+			vclock_follow(&writer->vclock, (*row)->replica_id,
+				      (*row)->lsn);
 		}
-	} else {
-		struct xrow_header *last = end[-1];
-		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
 	}
 }
 

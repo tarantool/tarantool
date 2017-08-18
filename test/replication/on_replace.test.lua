@@ -39,3 +39,37 @@ test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
+
+
+-- gh-2682 on_replace on slave server with data change
+
+SERVERS = { 'on_replace1', 'on_replace2' }
+test_run:create_cluster(SERVERS)
+test_run:wait_fullmesh(SERVERS)
+
+test_run:cmd('switch on_replace1')
+fiber = require'fiber'
+s1 = box.schema.space.create('s1')
+_ = s1:create_index('pk')
+s2 = box.schema.space.create('s2')
+_ = s2:create_index('pk')
+
+test_run:cmd('switch on_replace2')
+fiber = require'fiber'
+while box.space.s2 == nil do fiber.sleep(0.00001) end
+_ = box.space.s1:on_replace(function (old, new) box.space.s2:replace(new) end)
+
+test_run:cmd('switch on_replace1')
+box.space.s1:replace({1, 2, 3, 4})
+while #(box.space.s2:select()) == 0 do fiber.sleep(0.00001) end
+
+test_run:cmd('switch on_replace2')
+box.space.s1:select()
+box.space.s2:select()
+
+test_run:cmd('switch on_replace1')
+box.space.s1:select()
+box.space.s2:select()
+
+_ = test_run:cmd('switch default')
+test_run:drop_cluster(SERVERS)
