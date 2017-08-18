@@ -2707,21 +2707,15 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, &env->run_env, index, tx,
 			      ITER_EQ, vykey, p_read_view);
-	if (vy_read_iterator_next(&itr, result) != 0)
-		goto error;
-	if (tx != NULL && vy_tx_track(tx, index, vykey, *result == NULL) != 0) {
-		vy_read_iterator_close(&itr);
-		goto error;
-	}
+	int rc = vy_read_iterator_next(&itr, result);
 	tuple_unref(vykey);
 	if (*result != NULL)
 		tuple_ref(*result);
 	vy_read_iterator_close(&itr);
+	if (rc != 0)
+		return -1;
 	rmean_collect(env->stat->rmean, VY_STAT_GET, 1);
 	return 0;
-error:
-	tuple_unref(vykey);
-	return -1;
 }
 
 /**
@@ -4925,9 +4919,6 @@ vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
 	if (rc)
 		return -1;
 	c->n_reads++;
-	if (vy_tx_track(c->tx, index, vyresult ? vyresult : c->key,
-			vyresult == NULL))
-		return -1;
 	if (vyresult == NULL)
 		return 0;
 	if (c->need_check_eq &&

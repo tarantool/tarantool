@@ -457,8 +457,13 @@ restart:
 	}
 
 done:
-	if (rc == 0)
+	if (rc == 0) {
 		rc = vy_point_iterator_apply_history(itr, &history);
+		if (itr->tx != NULL)
+			rc = vy_tx_track(itr->tx, itr->index,
+					 (struct tuple *) itr->key,
+					 itr->curr_stmt == NULL);
+	}
 	*result = itr->curr_stmt;
 	vy_point_iterator_cleanup(&history, region_svp);
 	return rc;

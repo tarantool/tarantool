@@ -941,6 +941,9 @@ restart:
 		vy_cache_add(&itr->index->cache, *result, prev_key,
 			     itr->key, itr->iterator_type);
 
+	if (itr->tx != NULL && *result != NULL)
+		rc = vy_tx_track(itr->tx, itr->index, *result, false);
+
 clear:
 	if (prev_key != NULL)
 		tuple_unref(prev_key);
