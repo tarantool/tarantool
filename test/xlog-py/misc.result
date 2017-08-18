@@ -1,7 +1,7 @@
 
 # xlog file must exist after inserts.
 
-space = box.schema.space.create('tweedledum', { id = 0 })
+space = box.schema.space.create('tweedledum')
 ---
 ...
 .xlog exists
@@ -11,20 +11,18 @@ index = space:create_index('primary', { type = 'hash' })
 
 # a new xlog must be opened after regular termination.
 
-box.space[0]:insert{3, 'third tuple'}
+box.space.tweedledum:insert{3, 'third tuple'}
 ---
 - [3, 'third tuple']
 ...
-a new .xlog exists
-.xlog stays around after sutdown
 
 # An xlog file with one record during recovery.
 
-box.space[0]:insert{4, 'fourth tuple'}
+box.space.tweedledum:insert{4, 'fourth tuple'}
 ---
 - [4, 'fourth tuple']
 ...
-box.space[0]:insert{5, 'Unfinished record'}
+box.space.tweedledum:insert{5, 'Unfinished record'}
 ---
 - [5, 'Unfinished record']
 ...

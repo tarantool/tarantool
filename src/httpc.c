@@ -473,6 +473,30 @@ httpc_set_ca_file(struct httpc_request *req, const char *ca_file)
 	curl_easy_setopt(req->easy, CURLOPT_CAINFO, ca_file);
 }
 
+void
+httpc_set_verify_host(struct httpc_request *req, long verify)
+{
+	curl_easy_setopt(req->easy, CURLOPT_SSL_VERIFYHOST, verify);
+}
+
+void
+httpc_set_verify_peer(struct httpc_request *req, long verify)
+{
+	curl_easy_setopt(req->easy, CURLOPT_SSL_VERIFYPEER, verify);
+}
+
+void
+httpc_set_ssl_key(struct httpc_request *req, const char *ssl_key)
+{
+	curl_easy_setopt(req->easy, CURLOPT_SSLKEY, ssl_key);
+}
+
+void
+httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert)
+{
+	curl_easy_setopt(req->easy, CURLOPT_SSLCERT, ssl_cert);
+}
+
 static struct httpc_response *
 httpc_response_new(struct httpc_env *ctx)
 {

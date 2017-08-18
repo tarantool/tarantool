@@ -12,7 +12,7 @@ local default_cfg = {
     memtx_memory        = 256 * 1024 *1024,
     memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 1024 * 1024,
-    slab_alloc_factor   = 1.1,
+    slab_alloc_factor   = 1.05,
     work_dir            = nil,
     memtx_dir           = ".",
     wal_dir             = ".",
@@ -51,6 +51,7 @@ local default_cfg = {
     hot_standby         = false,
     checkpoint_interval = 3600,
     checkpoint_count    = 2,
+    worker_pool_threads = 4
 }
 
 -- types of available options
@@ -98,7 +99,8 @@ local template_cfg = {
     checkpoint_interval = 'number',
     checkpoint_count    = 'number',
     read_only           = 'boolean',
-    hot_standby         = 'boolean'
+    hot_standby         = 'boolean',
+    worker_pool_threads = 'number'
 }
 
 local function normalize_uri(port)
@@ -151,9 +153,11 @@ local dynamic_cfg = {
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
-    vinyl_timeout           = private.cfg_update_vinyl_options,
+    memtx_max_tuple_size    = private.cfg_set_memtx_max_tuple_size,
+    vinyl_timeout           = private.cfg_set_vinyl_timeout,
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,
+    worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()
@@ -316,6 +320,7 @@ local box_cfg_guard_whitelist = {
     internal = true;
     index = true;
     session = true;
+    tuple = true;
     runtime = true;
 };
 

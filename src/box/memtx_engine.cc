@@ -121,15 +121,14 @@ memtx_build_secondary_keys(struct space *space, void *param)
 
 MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 			 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-			 uint32_t objsize_max, float alloc_factor)
-	:Engine("memtx", &memtx_tuple_format_vtab),
+			 float alloc_factor)
+	:Engine("memtx"),
 	m_state(MEMTX_INITIALIZED),
 	m_checkpoint(0),
 	m_snap_io_rate_limit(0),
 	m_force_recovery(force_recovery)
 {
-	memtx_tuple_init(tuple_arena_max_size, objsize_min, objsize_max,
-			 alloc_factor);
+	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
 
 	xdir_create(&m_snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	m_snap_dir.force_recovery = force_recovery;
@@ -141,6 +140,12 @@ MemtxEngine::~MemtxEngine()
 	xdir_destroy(&m_snap_dir);
 
 	memtx_tuple_free();
+}
+
+void
+MemtxEngine::setMaxTupleSize(size_t max_size)
+{
+	memtx_max_tuple_size = max_size;
 }
 
 void
@@ -277,9 +282,27 @@ MemtxEngine::endRecovery()
 	}
 }
 
-Handler *MemtxEngine::createSpace()
+Handler *MemtxEngine::createSpace(struct rlist *key_list,
+				  uint32_t index_count,
+				  uint32_t exact_field_count)
 {
-	return new MemtxSpace(this);
+	struct index_def *index_def;
+	uint32_t key_no = 0;
+	struct key_def **keys =
+		(struct key_def **)region_alloc_xc(&fiber()->gc,
+						   sizeof(*keys) * index_count);
+
+	rlist_foreach_entry(index_def, key_list, link)
+			keys[key_no++] = index_def->key_def;
+
+	struct tuple_format *format =
+		tuple_format_new(&memtx_tuple_format_vtab, keys, index_count, 0);
+	if (format == NULL)
+		diag_raise();
+	tuple_format_ref(format);
+	format->exact_field_count = exact_field_count;
+	auto format_guard = make_scoped_guard([=] { tuple_format_unref(format); });
+	return new MemtxSpace(this, format);
 }
 
 void
@@ -501,8 +524,6 @@ checkpoint_destroy(struct checkpoint *ckpt)
 {
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
-		Index *pk = space_index(entry->space, 0);
-		pk->destroyReadViewForIterator(entry->iterator);
 		entry->iterator->free(entry->iterator);
 	}
 	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
@@ -527,10 +548,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
-	entry->iterator = pk->allocIterator();
-
-	pk->initIterator(entry->iterator, ITER_ALL, NULL, 0);
-	pk->createReadViewForIterator(entry->iterator);
+	entry->iterator = pk->createSnapshotIterator();
 };
 
 int
@@ -606,7 +624,7 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 	/* wait for memtx-part snapshot completion */
 	int result = cord_cojoin(&m_checkpoint->cord);
 	if (result != 0)
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 
 	m_checkpoint->waiting_for_snap_thread = false;
 	return result;
@@ -657,7 +675,7 @@ MemtxEngine::abortCheckpoint()
 	if (m_checkpoint->waiting_for_snap_thread) {
 		/* wait for memtx-part snapshot completion */
 		if (cord_cojoin(&m_checkpoint->cord) != 0)
-			error_log(diag_last_error(diag_get()));
+			diag_log();
 		m_checkpoint->waiting_for_snap_thread = false;
 	}
 

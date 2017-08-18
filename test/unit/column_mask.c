@@ -2,8 +2,8 @@
 #include "tuple_update.h"
 #include "unit.h"
 #include "msgpuck.h"
+#include "trivia/util.h"
 
-#define ARRAY_LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 #define MAX_OPS 20
 #define MAX_FIELDS 100
 #define LONG_TUPLE {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, \

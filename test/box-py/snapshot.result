@@ -1,4 +1,4 @@
-space = box.schema.space.create('tweedledum', { id = 0 })
+space = box.schema.space.create('tweedledum')
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })

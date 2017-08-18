@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
+#include <limits.h>
 
 #include "unit.h"
 
@@ -201,6 +202,57 @@ iterator_check()
 	for (long i = -1; i <= count1 + 1; i++) {
 		test_iterator begin = test_lower_bound(&tree, i, 0);
 		test_iterator end = test_upper_bound(&tree, i, 0);
+		long real_count = 0;
+		while (!test_iterator_are_equal(&tree, &begin, &end)) {
+			elem_t *elem = test_iterator_get_elem(&tree, &begin);
+			if (elem->first != i)
+				fail("range iterator failed (1)", "true");
+			if (elem->second != real_count)
+				fail("range iterator failed (2)", "true");
+			real_count++;
+			test_iterator_next(&tree, &begin);
+		}
+		long must_be_count = 0;
+		if (i >= 0 && i / 2 <= count1 - 1 && (i & 1) == 0)
+			must_be_count = count2;
+		if (real_count != must_be_count)
+			fail("range iterator failed (3)", "true");
+	}
+
+	/* Check iterating in range from lower bound to upper bound */
+	/* Several probes */
+	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+		const long key = keys[i];
+		struct elem_t lower_elem_key = {key, 0};
+		struct elem_t upper_elem_key = {key, LONG_MAX};
+		test_iterator begin = test_lower_bound_elem(&tree, lower_elem_key, NULL);
+		test_iterator end = test_upper_bound_elem(&tree, upper_elem_key, NULL);
+		printf("Key %ld, range [%s, %s): ", key,
+		       test_iterator_is_invalid(&begin) ? "eof" : "ptr",
+		       test_iterator_is_invalid(&end) ? "eof" : "ptr");
+		test_iterator runner = begin;
+		while (!test_iterator_are_equal(&tree, &runner, &end)) {
+			elem_t *elem = test_iterator_get_elem(&tree, &runner);
+			printf("(%ld,%ld) ", elem->first, elem->second);
+			test_iterator_next(&tree, &runner);
+		}
+		printf(" <-> ");
+		runner = end;
+		while (!test_iterator_are_equal(&tree, &runner, &begin)) {
+			test_iterator_prev(&tree, &runner);
+			elem_t *elem = test_iterator_get_elem(&tree, &runner);
+			printf("(%ld,%ld) ", elem->first, elem->second);
+		}
+		printf("\n");
+	}
+
+	/* Check iterating in range from lower bound to upper bound */
+	/* Automated */
+	for (long i = -1; i <= count1 + 1; i++) {
+		struct elem_t lower_elem_key = {i, 0};
+		struct elem_t upper_elem_key = {i, LONG_MAX};
+		test_iterator begin = test_lower_bound_elem(&tree, lower_elem_key, 0);
+		test_iterator end = test_upper_bound_elem(&tree, upper_elem_key, 0);
 		long real_count = 0;
 		while (!test_iterator_are_equal(&tree, &begin, &end)) {
 			elem_t *elem = test_iterator_get_elem(&tree, &begin);

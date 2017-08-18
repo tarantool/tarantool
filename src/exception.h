@@ -37,7 +37,26 @@
 #include "reflection.h"
 #include "diag.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 extern const struct type_info type_Exception;
+extern const struct type_info type_OutOfMemory;
+extern const struct type_info type_FiberIsCancelled;
+extern const struct type_info type_TimedOut;
+extern const struct type_info type_ChannelIsClosed;
+extern const struct type_info type_LuajitError;
+extern const struct type_info type_SystemError;
+
+const char *
+exception_get_string(struct error *e, const struct method_info *method);
+
+int
+exception_get_int(struct error *e, const struct method_info *method);
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 class Exception: public error {
 public:
@@ -59,7 +78,6 @@ protected:
 	Exception(const struct type_info *type, const char *file, unsigned line);
 };
 
-extern const struct type_info type_SystemError;
 class SystemError: public Exception {
 public:
 	virtual void raise() { throw this; }
@@ -77,7 +95,6 @@ protected:
 	int m_errno;
 };
 
-extern const struct type_info type_OutOfMemory;
 class OutOfMemory: public SystemError {
 public:
 	OutOfMemory(const char *file, unsigned line,
@@ -86,21 +103,18 @@ public:
 	virtual void raise() { throw this; }
 };
 
-extern const struct type_info type_TimedOut;
 class TimedOut: public SystemError {
 public:
 	TimedOut(const char *file, unsigned line);
 	virtual void raise() { throw this; }
 };
 
-extern const struct type_info type_ChannelIsClosed;
 class ChannelIsClosed: public Exception {
 public:
 	ChannelIsClosed(const char *file, unsigned line);
 	virtual void raise() { throw this; }
 };
 
-extern const struct type_info type_FiberIsCancelled;
 /**
  * This is thrown by fiber_* API calls when the fiber is
  * cancelled.
@@ -111,8 +125,6 @@ public:
 	virtual void log() const;
 	virtual void raise() { throw this; }
 };
-
-extern const struct type_info type_LuajitError;
 
 class LuajitError: public Exception {
 public:
@@ -138,9 +150,6 @@ exception_init();
 	throw tnt_error(__VA_ARGS__);					\
 } while (0)
 
-extern "C" const char *
-exception_get_string(struct error *e, const struct method_info *method);
-extern "C" int
-exception_get_int(struct error *e, const struct method_info *method);
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

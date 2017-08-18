@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(49)
+test:plan(50)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -226,6 +226,15 @@ client:close()
 while triggers_ran < 4 do fiber.yield() end
 test:is(triggers_ran, 4, "on_connect -> on_auth_error order")
 box.session.on_auth(nil, console_on_auth_error)
+
+--
+-- gh-2642 "box.session.type()"
+--
+client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+_ = client:read(128)
+client:write("box.session.type();\n")
+test:is(yaml.decode(client:read(EOL))[1], "console", "session type")
+client:close()
 
 server:close()
 

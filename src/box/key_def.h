@@ -344,13 +344,20 @@ struct index_def {
 	uint32_t iid;
 	/* Space id. */
 	uint32_t space_id;
-	/* Index key definition. */
-	struct key_def *key_def;
 	/** Index name. */
 	char *name;
 	/** Index type. */
 	enum index_type type;
 	struct index_opts opts;
+
+	/* Index key definition. */
+	struct key_def *key_def;
+	/**
+	 * User-defined key definition, merged with the primary
+	 * key parts. Used by non-unique keys to uniquely identify
+	 * iterator position.
+	 */
+	struct key_def *cmp_def;
 };
 
 struct index_def *
@@ -362,6 +369,28 @@ index_def_swap(struct index_def *def1, struct index_def *def2);
 /* Destroy and free an index_def. */
 void
 index_def_delete(struct index_def *def);
+
+/**
+ * Add an index definition to a list, preserving the
+ * first position of the primary key.
+ *
+ * In non-unique indexes, secondary keys must contain key parts
+ * of the primary key. This is necessary to make ordered
+ * retrieval from a secondary key useful to SQL
+ * optimizer and make iterators over secondary keys stable
+ * in presence of concurrent updates.
+ * Thus we always create the primary key first, and put
+ * the primary key key_def first in the index_def list.
+ */
+static inline void
+index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
+{
+	/** Preserve the position of the primary key */
+	if (index_def->iid == 0)
+		rlist_add_entry(index_def_list, index_def, link);
+	else
+		rlist_add_tail_entry(index_def_list, index_def, link);
+}
 
 /**
  * True, if the index change by alter requires an index rebuild.
@@ -549,14 +578,20 @@ struct key_def *
 key_def_new(uint32_t part_count);
 
 /**
- * Allocate a new key definition.
+ * Create a new index definition definition.
+ *
+ * @param key_def  key definition, must be fully built
+ * @param pk_def   primary key definition, pass non-NULL
+ *                 for secondary keys to construct
+ *                 index_def::cmp_def
  * @retval not NULL Success.
  * @retval NULL     Memory error.
  */
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts);
+	      const struct index_opts *opts,
+	      struct key_def *key_def, struct key_def *pk_def);
 
 /**
  * Set a single key part in a key def.

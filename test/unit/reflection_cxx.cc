@@ -51,7 +51,9 @@ struct Database: public Object {
 	}
 protected:
 	Database(const struct type_info *type)
-		: Object(type)
+		: Object(type),
+		  m_int(0),
+		  m_str{'\0'}
 	{}
 	int m_int;
 	char m_str[128];

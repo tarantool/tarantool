@@ -33,7 +33,8 @@
 #include "vinyl_engine.h"
 
 struct VinylSpace: public Handler {
-	VinylSpace(Engine*);
+	VinylSpace(Engine*, struct tuple_format *format);
+	~VinylSpace();
 	virtual void
 	applyInitialJoinRow(struct space *space,
 			    struct request *request) override;
@@ -69,6 +70,8 @@ struct VinylSpace: public Handler {
 	 */
 	virtual void commitAlterSpace(struct space *old_space,
 				      struct space *new_space) override;
+private:
+	struct tuple_format *m_format;
 };
 
 #endif /* TARANTOOL_BOX_VINYL_SPACE_H_INCLUDED */

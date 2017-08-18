@@ -10,7 +10,7 @@ _ = box.schema.space.create('test')
 _ = box.space.test:create_index('pk')
 test_run:cmd("setopt delimiter ';'")
 for i=1, 500 do
-    box.space.test:replace{1, string.rep('a', 10000)}
+    box.space.test:replace{1, string.rep('a', 50000)}
 -- or we run out of memory too soon
     collectgarbage('collect')
 end;

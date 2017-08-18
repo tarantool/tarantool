@@ -200,7 +200,8 @@ struct key_def *
 key_def_new(uint32_t part_count)
 {
 	size_t sz = key_def_sizeof(part_count);
-	struct key_def *key_def = (struct key_def *) malloc(sz);
+	/** Use calloc() to zero comparator function pointers. */
+	struct key_def *key_def = (struct key_def *) calloc(1, sz);
 	if (key_def == NULL) {
 		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
 		return NULL;
@@ -265,13 +266,11 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts)
+	      const struct index_opts *opts,
+	      struct key_def *key_def, struct key_def *pk_def)
 {
 	assert(name_len <= BOX_NAME_MAX);
-	/*
-	 * Use calloc to zero all struct index_def attributes
-	 * the comparator pointers.
-	 */
+	/* Use calloc to make index_def_delete() safe at all times. */
 	struct index_def *def = (struct index_def *) calloc(1, sizeof(*def));
 	if (def == NULL) {
 		diag_set(OutOfMemory, sizeof(*def), "malloc", "struct index_def");
@@ -279,13 +278,22 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	}
 	def->name = strndup(name, name_len);
 	if (def->name == NULL) {
-		free(def);
+		index_def_delete(def);
 		diag_set(OutOfMemory, name_len + 1, "malloc", "index_def name");
 		return NULL;
 	}
 	if (!identifier_is_valid(def->name)) {
 		diag_set(ClientError, ER_IDENTIFIER, def->name);
-		free(def);
+		index_def_delete(def);
+		return NULL;
+	}
+	def->key_def = key_def_dup(key_def);
+	if (pk_def)
+		def->cmp_def = key_def_merge(key_def, pk_def);
+	else
+		def->cmp_def = key_def_dup(key_def);
+	if (def->key_def == NULL || def->cmp_def == NULL) {
+		index_def_delete(def);
 		return NULL;
 	}
 	def->type = type;
@@ -327,7 +335,12 @@ index_def_dup(const struct index_def *def)
 			 "index_def name");
 		return NULL;
 	}
-	memcpy(dup->key_def, def->key_def, sz);
+	dup->key_def = key_def_dup(def->key_def);
+	dup->cmp_def = key_def_dup(def->cmp_def);
+	if (dup->key_def == NULL || dup->cmp_def == NULL) {
+		index_def_delete(dup);
+		return NULL;
+	}
 	rlist_create(&dup->link);
 	index_opts_dup(&dup->opts, &def->opts);
 	return dup;
@@ -336,17 +349,17 @@ index_def_dup(const struct index_def *def)
 void
 index_def_swap(struct index_def *def1, struct index_def *def2)
 {
-	/* Swap const-size items. */
-	struct index_def tmp_def;
-	tmp_def = *def1;
-	*def1 = *def2;
-	*def2 = tmp_def;
 	/*
-	 * Do not swap key_defs: index_def_swap() is used only
-	 * for indexes with identical key definitions.
-	 * @todo: remove key_def from index_def
+	 * Swap const-size items and name. Keep the original key
+	 * definitions, they are used in the engines.
 	 */
-	assert(def1->key_def->part_count == def2->key_def->part_count);
+	struct index_def tmp_def = *def1;
+	memcpy(def1, def2, offsetof(struct index_def, key_def));
+	memcpy(def2, &tmp_def, offsetof(struct index_def, key_def));
+	/*
+	 * index_def_swap() is used only during alter to modify
+	 * index metadata.
+	 */
 }
 
 /** Free a key definition. */
@@ -355,7 +368,18 @@ index_def_delete(struct index_def *index_def)
 {
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
-	free(index_def->key_def);
+
+	if (index_def->key_def) {
+		TRASH(index_def->key_def);
+		free(index_def->key_def);
+	}
+
+	if (index_def->cmp_def) {
+		TRASH(index_def->cmp_def);
+		free(index_def->cmp_def);
+	}
+
+	TRASH(index_def);
 	free(index_def);
 }
 

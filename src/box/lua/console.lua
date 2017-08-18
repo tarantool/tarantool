@@ -371,6 +371,7 @@ local function start()
         self.history_file = home_dir .. '/.tarantool_history'
         internal.load_history(self.history_file)
     end
+    session_internal.create(-1, "repl")
     repl(self)
     started = false
 end
@@ -436,7 +437,7 @@ local function connect(uri, opts)
 end
 
 local function client_handler(client, peer)
-    session_internal.create(client:fd())
+    session_internal.create(client:fd(), "console")
     session_internal.run_on_connect()
     session_internal.run_on_auth(box.session.user())
     local state = setmetatable({

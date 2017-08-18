@@ -69,6 +69,7 @@
 #include "sql.h"
 #include "systemd.h"
 #include "call.h"
+#include "func.h"
 
 static char status[64] = "unknown";
 
@@ -580,8 +581,14 @@ void
 box_set_snap_io_rate_limit(void)
 {
 	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
-	if (memtx)
-		memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
+	memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
+}
+
+void
+box_set_memtx_max_tuple_size(void)
+{
+	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+	memtx->setMaxTupleSize(cfg_geti("memtx_max_tuple_size"));
 }
 
 void
@@ -607,10 +614,10 @@ box_set_checkpoint_count(void)
 }
 
 void
-box_update_vinyl_options(void)
+box_set_vinyl_timeout(void)
 {
 	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
-	vinyl->updateOptions();
+	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
 }
 
 /* }}} configuration bindings */
@@ -1216,6 +1223,7 @@ box_free(void)
 		sql_free();
 		user_cache_free();
 		schema_free();
+		module_free();
 		tuple_free();
 		port_free();
 #endif
@@ -1238,7 +1246,6 @@ engine_init()
 					     cfg_geti("force_recovery"),
 					     cfg_getd("memtx_memory"),
 					     cfg_geti("memtx_min_tuple_size"),
-					     cfg_geti("memtx_max_tuple_size"),
 					     cfg_getd("slab_alloc_factor"));
 	engine_register(memtx);
 
@@ -1381,6 +1388,9 @@ box_init(void)
 	 * as a default session user when running triggers.
 	 */
 	session_init();
+
+	if (tuple_init() != 0)
+		diag_raise();
 }
 
 bool
@@ -1392,8 +1402,6 @@ box_is_configured(void)
 static inline void
 box_cfg_xc(void)
 {
-	tuple_init();
-
 	/* Join the cord interconnect as "tx" endpoint. */
 	fiber_pool_create(&tx_fiber_pool, "tx", FIBER_POOL_SIZE,
 			  FIBER_POOL_IDLE_TIMEOUT);
@@ -1405,6 +1413,8 @@ box_cfg_xc(void)
 
 	gc_init();
 	engine_init();
+	if (module_init() != 0)
+		diag_raise();
 	schema_init();
 	replication_init();
 	port_init();

@@ -49,12 +49,8 @@ memtx_replace_all_keys(struct txn_stmt *, struct space *space,
 		       enum dup_replace_mode /* mode */);
 
 struct MemtxSpace: public Handler {
-	MemtxSpace(Engine *e);
-	virtual ~MemtxSpace()
-	{
-		/* do nothing */
-		/* engine->close(this); */
-	}
+	MemtxSpace(Engine *e, struct tuple_format *m_format);
+	virtual ~MemtxSpace();
 	virtual void
 	applyInitialJoinRow(struct space *space,
 			    struct request *request) override;
@@ -101,8 +97,7 @@ public:
 	engine_replace_f replace;
 private:
 	void
-	prepareReplace(struct txn_stmt *stmt, struct space *space,
-		       struct request *request);
+	prepareReplace(struct txn_stmt *stmt, struct request *request);
 	void
 	prepareDelete(struct txn_stmt *stmt, struct space *space,
 		      struct request *request);
@@ -112,6 +107,8 @@ private:
 	void
 	prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		      struct request *request);
+private:
+	struct tuple_format *m_format;
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */

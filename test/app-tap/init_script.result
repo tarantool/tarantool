@@ -21,7 +21,7 @@ box.cfg
 16	read_only:false
 17	readahead:16320
 18	rows_per_wal:500000
-19	slab_alloc_factor:1.1
+19	slab_alloc_factor:1.05
 20	too_long_threshold:0.5
 21	vinyl_bloom_fpr:0.05
 22	vinyl_cache:134217728
@@ -39,6 +39,7 @@ box.cfg
 34	wal_dir_rescan_delay:2
 35	wal_max_size:268435456
 36	wal_mode:write
+37	worker_pool_threads:4
 --
 -- Test insert from detached fiber
 --

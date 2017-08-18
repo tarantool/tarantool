@@ -46,6 +46,7 @@
 #include "trigger.h"
 #include "xrow_io.h"
 #include "error.h"
+#include "session.h"
 
 /* TODO: add configuration options */
 static const int RECONNECT_DELAY = 1;
@@ -221,7 +222,7 @@ applier_join(struct applier *applier)
 		 * Used to initialize the replica's initial
 		 * vclock in bootstrap_from_master()
 		 */
-		xrow_decode_vclock(&row, &replicaset_vclock);
+		xrow_decode_vclock_xc(&row, &replicaset_vclock);
 	}
 
 	applier_set_state(applier, APPLIER_INITIAL_JOIN);
@@ -244,7 +245,7 @@ applier_join(struct applier *applier)
 				 * vclock yet, do it now. In 1.7+
 				 * this vlcock is not used.
 				 */
-				xrow_decode_vclock(&row, &replicaset_vclock);
+				xrow_decode_vclock_xc(&row, &replicaset_vclock);
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
@@ -329,7 +330,7 @@ applier_subscribe(struct applier *applier)
 		 */
 		struct vclock vclock;
 		vclock_create(&vclock);
-		xrow_decode_vclock(&row, &vclock);
+		xrow_decode_vclock_xc(&row, &vclock);
 	}
 	/**
 	 * Tarantool < 1.6.7:
@@ -393,6 +394,11 @@ static int
 applier_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
+	/*
+	 * Set correct session type for use in on_replace()
+	 * triggers.
+	 */
+	current_session()->type = SESSION_TYPE_APPLIER;
 
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {

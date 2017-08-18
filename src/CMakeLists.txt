@@ -183,7 +183,6 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/box/tuple.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple_format.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple_compare.h
-    ${CMAKE_SOURCE_DIR}/src/box/memtx_tuple.h
     ${CMAKE_SOURCE_DIR}/src/box/schema.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h
     ${CMAKE_SOURCE_DIR}/src/box/index.h
@@ -281,11 +280,8 @@ set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
 #
 if (TARGET_OS_DARWIN)
     target_link_libraries(tarantool box ${common_libraries})
-    # Necessary to make LuaJIT work on Darwin, see
-    # http://luajit.org/install.html
     set_target_properties(tarantool PROPERTIES
-        LINK_FLAGS "-pagezero_size 10000 -image_base 100000000 \
-        -Wl,-exported_symbols_list,${exports_file}")
+        LINK_FLAGS "-Wl,-exported_symbols_list,${exports_file}")
 else ()
     target_link_libraries(tarantool
                           -Wl,--whole-archive box ${reexport_libraries}

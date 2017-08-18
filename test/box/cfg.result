@@ -51,7 +51,7 @@ cfg_filter(box.cfg)
   - - rows_per_wal
     - 500000
   - - slab_alloc_factor
-    - 1.1
+    - 1.05
   - - too_long_threshold
     - 0.5
   - - vinyl_bloom_fpr
@@ -86,6 +86,8 @@ cfg_filter(box.cfg)
     - 268435456
   - - wal_mode
     - write
+  - - worker_pool_threads
+    - 4
 ...
 -- must be read-only
 box.cfg()
@@ -130,7 +132,7 @@ cfg_filter(box.cfg)
   - - rows_per_wal
     - 500000
   - - slab_alloc_factor
-    - 1.1
+    - 1.05
   - - too_long_threshold
     - 0.5
   - - vinyl_bloom_fpr
@@ -165,6 +167,8 @@ cfg_filter(box.cfg)
     - 268435456
   - - wal_mode
     - write
+  - - worker_pool_threads
+    - 4
 ...
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}
@@ -224,7 +228,7 @@ test_run:cmd('switch cfg_tester1')
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 ---
 - 268435456
-- 1.1
+- 1.05
 - 2
 ...
 test_run:cmd("switch default")
@@ -254,7 +258,7 @@ test_run:cmd('switch cfg_tester2')
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 ---
 - 214748364
-- 1.1
+- 1.05
 - 2
 ...
 test_run:cmd("switch default")
@@ -284,7 +288,7 @@ test_run:cmd('switch cfg_tester3')
 box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 ---
 - 214748364
-- 1.1
+- 1.05
 - 10
 ...
 test_run:cmd("switch default")

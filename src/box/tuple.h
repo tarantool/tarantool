@@ -45,7 +45,7 @@ struct slab_arena;
 struct quota;
 
 /** Initialize tuple library */
-void
+int
 tuple_init(void);
 
 /** Cleanup tuple library */
@@ -55,16 +55,13 @@ tuple_free(void);
 /**
  * Initialize tuples arena.
  * @param arena[out] Arena to initialize.
- * @param quota[out] Arena's quota.
+ * @param quota Arena's quota.
  * @param arena_max_size Maximal size of @arena.
- * @param tuple_max_size Maximal size of a tuple. This value is
- *        used to calculate such slab_size, in which any tuple can
- *        fit.
  * @param arena_name Name of @arena for logs.
  */
 void
 tuple_arena_create(struct slab_arena *arena, struct quota *quota,
-		   uint64_t arena_max_size, uint32_t tuple_max_size,
+		   uint64_t arena_max_size, uint32_t slab_size,
 		   const char *arena_name);
 
 void
@@ -260,6 +257,29 @@ const char *
 box_tuple_next(box_tuple_iterator_t *it);
 
 /**
+ * Allocate and initialize a new tuple from a raw MsgPack Array data.
+ *
+ * \param format tuple format.
+ * Use box_tuple_format_default() to create space-independent tuple.
+ * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
+ * \param end the end of \a data
+ * \retval NULL on out of memory
+ * \retval tuple otherwise
+ * \pre data, end is valid MsgPack Array
+ * \sa \code box.tuple.new(data) \endcode
+ */
+box_tuple_t *
+box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
+
+box_tuple_t *
+box_tuple_update(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+box_tuple_t *
+box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
+		 char *expr_end);
+
+/**
  * Extract key from tuple according to key definition of given index.
  * Returned buffer is allocated on box_txn_alloc() with this key.
  * This function has O(n) complexity, where n is the number of key parts.
@@ -357,6 +377,33 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
 }
 
 /**
+ * Format a tuple into string.
+ * Example: [1, 2, "string"]
+ * @param buf buffer to format tuple to
+ * @param size buffer size. This function writes at most @a size bytes
+ * (including the terminating null byte ('\0')) to @a buffer
+ * @param tuple tuple to format
+ * @retval the number of characters printed, excluding the null byte used
+ * to end output to string. If the output was truncated due to this limit,
+ * then the return value is the number of characters (excluding the
+ * terminating null byte) which would have been written to the final string
+ * if enough space had been available.
+ * @see snprintf
+ * @see mp_snprint
+ */
+int
+tuple_snprint(char *buf, int size, const struct tuple *tuple);
+
+/**
+ * Format a tuple into string using a static buffer.
+ * Useful for debugger. Example: [1, 2, "string"]
+ * @param tuple to format
+ * @return formatted null-terminated string
+ */
+const char *
+tuple_str(const struct tuple *tuple);
+
+/**
  * Initialize key extraction functions in the key_def
  * @param key_def key definition
  */
@@ -425,6 +472,21 @@ tuple_extra(const struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	return tuple_data(tuple) - tuple_format_meta_size(format);
 }
+
+/**
+ * Instantiate a new engine-independent tuple from raw MsgPack Array data
+ * using runtime arena. Use this function to create a standalone tuple
+ * from Lua or C procedures.
+ *
+ * \param format tuple format.
+ * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
+ * \param end the end of \a data
+ * \retval tuple on success
+ * \retval NULL on out of memory
+ * \sa \code box.tuple.new(data) \endcode
+ */
+struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end);
 
 /**
  * Free the tuple of any engine.

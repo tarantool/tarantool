@@ -433,8 +433,9 @@ error:
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
 		if (! iproto_dml_body_has_key(data, end)) {
-			mp_check(&data, end);
-			mp_check(&data, end);
+			if (mp_check(&data, end) != 0 ||
+			    mp_check(&data, end) != 0)
+				goto error;
 			continue;
 		}
 		uint64_t key = mp_decode_uint(&data);

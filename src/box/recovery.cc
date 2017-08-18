@@ -97,6 +97,27 @@
  * R -> M           # remote_stop()
  */
 
+const struct type_info type_XlogGapError =
+	make_type("XlogGapError", &type_XlogError);
+
+struct XlogGapError: public XlogError {
+	/** Used by BuildXlogGapError() */
+	XlogGapError(const char *file, unsigned line,
+		     const struct vclock *from, const struct vclock *to)
+		:XlogError(&type_XlogGapError, file, line)
+	{
+		char *s_from = vclock_to_string(from);
+		char *s_to = vclock_to_string(to);
+		snprintf(errmsg, sizeof(errmsg),
+			 "Missing .xlog file between LSN %lld %s and %lld %s",
+			 (long long) vclock_sum(from), s_from ? s_from : "",
+			 (long long) vclock_sum(to), s_to ? s_to : "");
+		free(s_from);
+		free(s_to);
+	}
+	virtual void raise() { throw this; }
+};
+
 /* {{{ Initial recovery */
 
 /**
@@ -249,30 +270,26 @@ recover_xlog(struct recovery *r, struct xstream *stream,
  */
 void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
-		       struct vclock *stop_vclock)
+		       struct vclock *stop_vclock, bool scan_dir)
 {
 	struct vclock *clock;
-	int64_t old_signature, new_signature;
+
+	if (scan_dir)
+		xdir_scan_xc(&r->wal_dir);
 
 	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
 		/* If there's a WAL open, recover from it first. */
 		assert(r->cursor.state != XLOG_CURSOR_EOF);
-		clock = vclockset_match(&r->wal_dir.index, &r->vclock);
-		goto recover_current_wal;
-	}
-
-	/*
-	 * There is no current WAL or we reached the end of one.
-	 * Look for new WALs.
-	 */
-	clock = vclockset_last(&r->wal_dir.index);
-	old_signature = clock != NULL ? vclock_sum(clock) : -1;
-	xdir_scan_xc(&r->wal_dir);
-	clock = vclockset_last(&r->wal_dir.index);
-	new_signature = clock != NULL ? vclock_sum(clock) : -1;
-	if (new_signature <= old_signature) {
-		/* No new WAL appeared, nothing to do. */
-		return;
+		clock = vclockset_search(&r->wal_dir.index,
+					 &r->cursor.meta.vclock);
+		if (clock != NULL)
+			goto recover_current_wal;
+		/*
+		 * The current WAL has disappeared under our feet -
+		 * assume anything can happen in production and go on.
+		 */
+		say_error("file `%s' was deleted under our feet",
+			  r->cursor.name);
 	}
 
 	for (clock = vclockset_match(&r->wal_dir.index, &r->vclock);
@@ -298,6 +315,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 			/* Ignore missing WALs */
 			say_warn("ignoring a gap in LSN");
 		}
+
 		recovery_close_log(r);
 
 		xdir_open_cursor_xc(&r->wal_dir, vclock_sum(clock), &r->cursor);
@@ -322,7 +340,7 @@ recovery_finalize(struct recovery *r, struct xstream *stream)
 {
 	recovery_stop_local(r);
 
-	recover_remaining_wals(r, stream, NULL);
+	recover_remaining_wals(r, stream, NULL, true);
 
 	recovery_close_log(r);
 
@@ -350,37 +368,34 @@ recovery_finalize(struct recovery *r, struct xstream *stream)
 
 /* {{{ Local recovery: support of hot standby and replication relay */
 
-/*
- * Implements a subscription to WAL updates.
- * Attempts to register a WAL watcher; if it fails, falls back to fs events.
- * In the latter mode either a change to the WAL dir itself or a change
- * in the XLOG file triggers a wakeup. The WAL dir path is set in
- * constructor. XLOG file path is set via .set_log_path().
+/**
+ * Implements a subscription to WAL updates via fs events.
+ * Any change to the WAL dir itself or a change in the XLOG
+ * file triggers a wakeup. The WAL dir path is set in the
+ * constructor. XLOG file path is set with set_log_path().
  */
 class WalSubscription {
 public:
 	struct fiber *f;
-	bool signaled;
+	unsigned events;
 	struct ev_stat dir_stat;
 	struct ev_stat file_stat;
-	struct ev_async async;
-	struct wal_watcher watcher;
 	char dir_path[PATH_MAX];
 	char file_path[PATH_MAX];
 
-	static void stat_cb(struct ev_loop *, struct ev_stat *stat, int)
+	static void dir_stat_cb(struct ev_loop *, struct ev_stat *stat, int)
 	{
-		((WalSubscription *)stat->data)->wakeup();
+		((WalSubscription *)stat->data)->wakeup(WAL_EVENT_ROTATE);
 	}
 
-	static void async_cb(struct ev_loop *, ev_async *async, int)
+	static void file_stat_cb(struct ev_loop *, struct ev_stat *stat, int)
 	{
-		((WalSubscription *)async->data)->wakeup();
+		((WalSubscription *)stat->data)->wakeup(WAL_EVENT_WRITE);
 	}
 
-	void wakeup()
+	void wakeup(unsigned events)
 	{
-		signaled = true;
+		this->events |= events;
 		if (f->flags & FIBER_IS_CANCELLABLE)
 			fiber_wakeup(f);
 	}
@@ -388,49 +403,30 @@ public:
 	WalSubscription(const char *wal_dir)
 	{
 		f = fiber();
-		signaled = false;
+		events = 0;
 		if ((size_t)snprintf(dir_path, sizeof(dir_path), "%s", wal_dir) >=
 				sizeof(dir_path)) {
 
 			panic("path too long: %s", wal_dir);
 		}
 
-		ev_stat_init(&dir_stat, stat_cb, "", 0.0);
-		ev_stat_init(&file_stat, stat_cb, "", 0.0);
-		ev_async_init(&async, async_cb);
+		ev_stat_init(&dir_stat, dir_stat_cb, "", 0.0);
+		ev_stat_init(&file_stat, file_stat_cb, "", 0.0);
 		dir_stat.data = this;
 		file_stat.data = this;
-		async.data = this;
 
-		ev_async_start(loop(), &async);
-		if (wal_set_watcher(&watcher, &async) == -1) {
-			/* Fallback to fs events. */
-			ev_async_stop(loop(), &async);
-			ev_stat_set(&dir_stat, dir_path, 0.0);
-			ev_stat_start(loop(), &dir_stat);
-			watcher.loop = NULL;
-			watcher.async = NULL;
-		}
+		ev_stat_set(&dir_stat, dir_path, 0.0);
+		ev_stat_start(loop(), &dir_stat);
 	}
 
 	~WalSubscription()
 	{
 		ev_stat_stop(loop(), &file_stat);
 		ev_stat_stop(loop(), &dir_stat);
-		wal_clear_watcher(&watcher);
-		ev_async_stop(loop(), &async);
 	}
 
 	void set_log_path(const char *path)
 	{
-		if (ev_is_active(&async)) {
-			/*
-			 * Notifications delivered via watcher, fs events
-			 * irrelevant.
-			 */
-			return;
-		}
-
 		/*
 		 * Avoid toggling ev_stat if the path didn't change.
 		 * Note: .file_path valid iff file_stat is active.
@@ -457,10 +453,12 @@ public:
 };
 
 static int
-recovery_follow_f(va_list ap)
+hot_standby_f(va_list ap)
 {
 	struct recovery *r = va_arg(ap, struct recovery *);
 	struct xstream *stream = va_arg(ap, struct xstream *);
+	bool scan_dir = true;
+
 	ev_tstamp wal_dir_rescan_delay = va_arg(ap, ev_tstamp);
 	fiber_set_user(fiber(), &admin_credentials);
 
@@ -480,7 +478,7 @@ recovery_follow_f(va_list ap)
 		do {
 			start = vclock_sum(&r->vclock);
 
-			recover_remaining_wals(r, stream, NULL);
+			recover_remaining_wals(r, stream, NULL, scan_dir);
 
 			end = vclock_sum(&r->vclock);
 			/*
@@ -494,17 +492,21 @@ recovery_follow_f(va_list ap)
 		subscription.set_log_path(r->cursor.state != XLOG_CURSOR_CLOSED ?
 					  r->cursor.name: NULL);
 
-		if (subscription.signaled == false) {
+		bool timed_out = false;
+		if (subscription.events == 0) {
 			/**
 			 * Allow an immediate wakeup/break loop
 			 * from recovery_stop_local().
 			 */
 			fiber_set_cancellable(true);
-			fiber_yield_timeout(wal_dir_rescan_delay);
+			timed_out = fiber_yield_timeout(wal_dir_rescan_delay);
 			fiber_set_cancellable(false);
 		}
 
-		subscription.signaled = false;
+		scan_dir = timed_out ||
+			(subscription.events & WAL_EVENT_ROTATE) != 0;
+
+		subscription.events = 0;
 	}
 	return 0;
 }
@@ -517,14 +519,14 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 * Scan wal_dir and recover all existing at the moment xlogs.
 	 * Blocks until finished.
 	 */
-	recover_remaining_wals(r, stream, NULL);
+	recover_remaining_wals(r, stream, NULL, true);
 	/*
 	 * Start 'hot_standby' background fiber to follow xlog changes.
 	 * It will pick up from the position of the currently open
 	 * xlog.
 	 */
 	assert(r->watcher == NULL);
-	r->watcher = fiber_new_xc(name, recovery_follow_f);
+	r->watcher = fiber_new_xc(name, hot_standby_f);
 	fiber_set_joinable(r->watcher, true);
 	fiber_start(r->watcher, r, stream, wal_dir_rescan_delay);
 }

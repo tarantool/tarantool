@@ -210,6 +210,8 @@ struct fio_batch *
 fio_batch_new(void)
 {
 	int max_iov = sysconf(_SC_IOV_MAX);
+	if (max_iov < 1)
+		max_iov = IOV_MAX;
 
 	struct fio_batch *batch = (struct fio_batch *)
 		malloc(sizeof(struct fio_batch) +

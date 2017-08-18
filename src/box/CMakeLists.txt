@@ -41,8 +41,8 @@ add_library(tuple STATIC
 )
 target_link_libraries(tuple box_error core ${MSGPUCK_LIBRARIES} misc)
 
-add_library(xlog STATIC xlog.cc)
-target_link_libraries(xlog core crc32 ${ZSTD_LIBRARIES})
+add_library(xlog STATIC xlog.c)
+target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
 
 add_library(box STATIC
     iproto.cc
@@ -73,12 +73,13 @@ add_library(box STATIC
     vy_index.c
     vy_tx.c
     vy_write_iterator.c
+    vy_point_iterator.c
     vy_read_iterator.c
     vy_cache.c
     vy_log.c
     vy_upsert.c
     space.cc
-    func.cc
+    func.c
     alter.cc
     schema.cc
     session.cc

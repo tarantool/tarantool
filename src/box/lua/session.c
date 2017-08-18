@@ -48,13 +48,14 @@ static int
 lbox_session_create(struct lua_State *L)
 {
 	struct session *session = fiber_get_session(fiber());
-	if (session != NULL)
-		return luaL_error(L, "session already exists");
-
-	int fd = luaL_optinteger(L, 1, -1);
-	session = session_create_on_demand(fd);
-	if (session == NULL)
-		return luaT_error(L);
+	if (session == NULL) {
+		int fd = luaL_optinteger(L, 1, -1);
+		session = session_create_on_demand(fd);
+		if (session == NULL)
+			return luaT_error(L);
+	}
+	/* If a session already exists, simply reset its type */
+	session->type = STR2ENUM(session_type, luaL_optstring(L, 2, "console"));
 
 	lua_pushnumber(L, session->id);
 	return 1;
@@ -72,6 +73,17 @@ static int
 lbox_session_id(struct lua_State *L)
 {
 	lua_pushnumber(L, current_session()->id);
+	return 1;
+}
+
+/**
+ * Return session type: one of "binary", "console",
+ * "replication", "background"
+ */
+static int
+lbox_session_type(struct lua_State *L)
+{
+	lua_pushstring(L, session_type_strs[current_session()->type]);
 	return 1;
 }
 
@@ -338,6 +350,7 @@ box_lua_session_init(struct lua_State *L)
 
 	static const struct luaL_Reg sessionlib[] = {
 		{"id", lbox_session_id},
+		{"type", lbox_session_type},
 		{"sync", lbox_session_sync},
 		{"uid", lbox_session_uid},
 		{"user", lbox_session_user},

@@ -12,7 +12,7 @@ site_config.LUAROCKS_ROCKS_SUBDIR=[[/share/tarantool/rocks]]
 site_config.LUAROCKS_ROCKS_SERVERS={
     [[http://rocks.tarantool.org/]]
 };
-site_config.LUAROCKS_HOMEDIR = require('fio').cwd()
+site_config.LUAROCKS_LOCALDIR = require('fio').cwd()
 site_config.LUAROCKS_HOME_TREE_SUBDIR=[[/.rocks]]
 site_config.LUA_DIR_SET=true
 site_config.LUAROCKS_UNAME_S=[[@CMAKE_SYSTEM_NAME@]]

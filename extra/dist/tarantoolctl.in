@@ -862,13 +862,14 @@ local function rocks()
     end
 
     -- Enable only useful commands
-    commands = {
+    local commands = {
        install = "luarocks.install",
        search = "luarocks.search",
        list = "luarocks.list",
        remove = "luarocks.remove",
        show = "luarocks.show",
     }
+    rawset(_G, 'commands', commands)
 
     -- Shift arguments in order to remove "rocks"
     local luarocks_arguments = {}

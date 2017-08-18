@@ -1164,7 +1164,7 @@ tx_process_connect(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = &msg->iobuf->out;
 	try {              /* connect. */
-		con->session = session_create(con->input.fd);
+		con->session = session_create(con->input.fd, SESSION_TYPE_BINARY);
 		if (con->session == NULL)
 			diag_raise();
 		tx_fiber_init(con->session, 0);

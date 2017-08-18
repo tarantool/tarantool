@@ -49,8 +49,6 @@ struct xrow_header;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern const struct type_info type_XlogError;
-
 /* {{{ log dir */
 
 /**
@@ -348,6 +346,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
  * Create new xlog writer based on fd.
  * @param fd            file descriptor
  * @param name          the assiciated name
+ * @param flags		flags to open the file or 0 for defaults
  * @param meta          xlog meta
  *
  * @retval 0 for success
@@ -355,7 +354,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
  */
 
 int
-xlog_create(struct xlog *xlog, const char *name,
+xlog_create(struct xlog *xlog, const char *name, int flags,
 	    const struct xlog_meta *meta);
 
 /**
@@ -470,6 +469,8 @@ struct xlog_tx_cursor
 {
 	/** rows buffer */
 	struct ibuf rows;
+	/** tx size */
+	size_t size;
 };
 
 /**
@@ -500,6 +501,18 @@ xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor);
  */
 int
 xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor, struct xrow_header *xrow);
+
+/**
+ * Return current tx cursor position
+ *
+ * @param tx_cursor tx_cursor
+ * @retval current tx cursor position
+ */
+static inline off_t
+xlog_tx_cursor_pos(struct xlog_tx_cursor *tx_cursor)
+{
+	return tx_cursor->size - ibuf_used(&tx_cursor->rows);
+}
 
 /**
  * A conventional helper to decode rows from the raw tx buffer.
@@ -589,6 +602,15 @@ xlog_cursor_openmem(struct xlog_cursor *cursor, const char *data, size_t size,
 		    const char *name);
 
 /**
+ * Reset cursor position
+ * @param cursor cursor
+ * @retval 0 succes
+ * @retval -1 error, check diag
+ */
+int
+xlog_cursor_reset(struct xlog_cursor *cursor);
+
+/**
  * Close cursor
  * @param cursor cursor
  */
@@ -637,6 +659,29 @@ xlog_cursor_next(struct xlog_cursor *cursor,
 int
 xlog_cursor_find_tx_magic(struct xlog_cursor *i);
 
+/**
+ * Cursor xlog position
+ *
+ * @param cursor xlog cursor
+ * @retval xlog current position
+ */
+static inline off_t
+xlog_cursor_pos(struct xlog_cursor *cursor)
+{
+	return cursor->read_offset - ibuf_used(&cursor->rbuf);
+}
+
+/**
+ * Return tx positon for xlog cursor
+ *
+ * @param cursor xlog_cursor
+ * @retval current tx postion
+ */
+static inline off_t
+xlog_cursor_tx_pos(struct xlog_cursor *cursor)
+{
+	return xlog_tx_cursor_pos(&cursor->tx_cursor);
+}
 /* }}} */
 
 /** {{{ miscellaneous log io functions. */
@@ -659,30 +704,6 @@ xdir_open_cursor(struct xdir *dir, int64_t signature,
 } /* extern C */
 
 #include "exception.h"
-
-/**
- * XlogError is raised when there is an error with contents
- * of the data directory or a log file. A special subclass
- * of exception is introduced to gracefully skip such errors
- * in force_recovery = true mode.
- */
-struct XlogError: public Exception
-{
-	XlogError(const char *file, unsigned line,
-		  const char *format, ...);
-	virtual void raise() { throw this; }
-protected:
-	XlogError(const struct type_info *type, const char *file,
-		  unsigned line, const char *format, ...);
-};
-
-struct XlogGapError: public XlogError
-{
-	XlogGapError(const char *file, unsigned line,
-		  const struct vclock *from,
-		  const struct vclock *to);
-	virtual void raise() { throw this; }
-};
 
 static inline void
 xdir_scan_xc(struct xdir *dir)

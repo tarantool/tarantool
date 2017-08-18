@@ -101,3 +101,39 @@ snap_lsn == run_lsn or {snap_lsn, run_lsn}
 s:drop()
 ---
 ...
+--
+-- gh-2614 about broken vy_run_iterator_start_from.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+p = s:create_index('pk')
+---
+...
+s:replace{100}
+---
+- [100]
+...
+s:replace{101}
+---
+- [101]
+...
+s:replace{102}
+---
+- [102]
+...
+s:replace{103}
+---
+- [103]
+...
+box.snapshot()
+---
+- ok
+...
+s:select({99}, {iterator = box.index.LE, limit = 10})
+---
+- []
+...
+s:drop()
+---
+...

@@ -49,9 +49,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
-struct Index;
 struct lsregion;
-struct space;
 struct tuple;
 struct tuple_format;
 struct vy_index;
@@ -147,22 +145,34 @@ struct vy_index {
 	struct key_def *cmp_def;
 	/** Key definition passed by the user. */
 	struct key_def *key_def;
-	/** Tuple format corresponding to key_def. */
-	struct tuple_format *surrogate_format;
+	/**
+	 * Tuple format for tuples of this index created when
+	 * reading pages from disk.
+	 * Is distinct from mem_format only for secondary keys,
+	 * whose tuples have MP_NIL in all "gap" positions between
+	 * positions of the secondary and primary key fields.
+	 * These gaps are necessary to make such tuples comparable
+	 * with tuples from vy_mem, while using the same cmp_def.
+	 * Since upserts are never present in secondary keys, is
+	 * used only for REPLACE and DELETE
+	 * tuples.
+	 */
+	struct tuple_format *disk_format;
 	/** Tuple format of the space this index belongs to. */
-	struct tuple_format *space_format;
+	struct tuple_format *mem_format;
 	/**
 	 * Format for tuples of type REPLACE or DELETE which
-	 * are a part of an UPDATE operation.
+	 * are a result of an UPDATE operation. Such tuples
+	 * contain a column mask which preserves the list
+	 * of actually changed columns. Used when creating
+	 * tuples for vy_mem, and used only by primary key.
 	 */
-	struct tuple_format *space_format_with_colmask;
+	struct tuple_format *mem_format_with_colmask;
 	/*
 	 * Format for UPSERT statements. Note, UPSERTs can only
 	 * appear in spaces with a single index.
 	 */
 	struct tuple_format *upsert_format;
-	/** Number of indexes in the space. */
-	uint32_t space_index_count;
 	/**
 	 * Primary index of the same space or NULL if this index
 	 * is primary. Referenced by each secondary index.
@@ -256,31 +266,11 @@ struct vy_index {
 const char *
 vy_index_name(struct vy_index *index);
 
-/**
- * Extract vy_index from a VinylIndex object.
- * Defined in vinyl_index.cc
- */
-struct vy_index *
-vy_index(struct Index *index);
-
-/**
- * Given a space and an index id, return vy_index.
- * If index not found, return NULL and set diag.
- */
-struct vy_index *
-vy_index_find(struct space *space, uint32_t id);
-
-/**
- * Wrapper around vy_index_find() which ensures that
- * the found index is unique.
- */
-struct vy_index *
-vy_index_find_unique(struct space *space, uint32_t id);
-
 /** Allocate a new index object. */
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct space *space, struct index_def *index_def);
+	     struct index_def *index_def, struct tuple_format *format,
+	     struct vy_index *pk);
 
 /** Free an index object. */
 void
@@ -356,7 +346,7 @@ vy_index_create(struct vy_index *index);
  */
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool snapshot_recovery);
+		 int64_t lsn, bool snapshot_recovery, bool force_recovery);
 
 /**
  * Return generation of in-memory data stored in an index

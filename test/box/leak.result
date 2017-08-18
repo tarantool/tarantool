@@ -31,7 +31,7 @@ test_run:cmd("setopt delimiter ';'")
 ...
 -- or we run out of memory too soon
 for i=1, 500 do
-    box.space.test:replace{1, string.rep('a', 10000)}
+    box.space.test:replace{1, string.rep('a', 50000)}
     collectgarbage('collect')
 end;
 ---

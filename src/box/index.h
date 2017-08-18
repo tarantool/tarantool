@@ -88,21 +88,6 @@ typedef struct key_def box_key_def_t;
 /** \cond public */
 
 /**
- * Return a key definition for the index.
- *
- * Returned object is valid until the next yield.
- *
- * \param space_id space identifier
- * \param index_id index identifier
- * \retval key_def on success
- * \retval NULL on error
- * \sa box_tuple_compare()
- * \sa box_tuple_format_new()
- */
-const box_key_def_t *
-box_index_key_def(uint32_t space_id, uint32_t index_id);
-
-/**
  * @todo: delete, a hack added by @mejedi for sql
  */
 const box_key_def_t *
@@ -354,15 +339,11 @@ public:
 				  const char *key, uint32_t part_count) const = 0;
 
 	/**
-	 * Create a read view for iterator so further index modifications
-	 * will not affect the iteration results.
+	 * Create an ALL iterator with personal read view so further
+	 * index modifications will not affect the iteration results.
+	 * Must be destroyed by iterator->free after usage.
 	 */
-	virtual void createReadViewForIterator(struct iterator *iterator);
-	/**
-	 * Destroy a read view of an iterator. Must be called for iterators,
-	 * for which createReadViewForIterator() was called.
-	 */
-	virtual void destroyReadViewForIterator(struct iterator *iterator);
+	virtual struct iterator *createSnapshotIterator();
 
 	/** Introspection (index:info()) */
 	virtual void info(struct info_handler *handler) const;

@@ -190,10 +190,11 @@ struct errcode_record {
 	/*135 */_(ER_VY_QUOTA_TIMEOUT,		"Timed out waiting for Vinyl memory quota") \
 	/*136 */_(ER_PARTIAL_KEY,		"%s index  does not support selects via a partial key (expected %u parts, got %u). Please Consider changing index type to TREE.") \
 	/*137 */_(ER_TRUNCATE_SYSTEM_SPACE,	"Can't truncate a system space, space '%s'") \
-	/*138 */_(ER_SQL_BIND_VALUE,		"Bind value for parameter %s is out of range for type %s") \
-	/*139 */_(ER_SQL_BIND_TYPE,		"Bind value type %s for parameter %s is not supported") \
-	/*140 */_(ER_SQL_BIND_PARAMETER_MAX,	"SQL bind parameter limit reached: %d") \
-	/*141 */_(ER_SQL_EXECUTE,		"Failed to execute SQL statement: %s") \
+	/*138 */_(ER_LOAD_MODULE,		"Failed to dynamically load module '%.*s': %s") \
+	/*139 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
+	/*140 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
+	/*141 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
+	/*142 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

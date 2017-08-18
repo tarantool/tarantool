@@ -35,7 +35,6 @@
 struct request;
 struct space;
 struct tuple;
-struct tuple_format_vtab;
 struct relay;
 
 extern struct rlist engines;
@@ -50,7 +49,7 @@ struct Handler;
 /** Engine instance */
 class Engine {
 public:
-	Engine(const char *engine_name, struct tuple_format_vtab *format);
+	Engine(const char *engine_name);
 
 	Engine(const Engine &) = delete;
 	Engine& operator=(const Engine&) = delete;
@@ -58,7 +57,9 @@ public:
 	/** Called once at startup. */
 	virtual void init();
 	/** Create a new engine instance for a space. */
-	virtual Handler *createSpace() = 0;
+	virtual Handler *createSpace(struct rlist *key_list,
+				     uint32_t index_count,
+				     uint32_t exact_field_count) = 0;
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
@@ -171,7 +172,6 @@ public:
 	uint32_t id;
 	/** Used for search for engine by name. */
 	struct rlist link;
-	struct tuple_format_vtab *format;
 };
 
 /** Engine handle - an operator of a space */

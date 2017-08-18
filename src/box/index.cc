@@ -267,24 +267,13 @@ Index::initIterator(struct iterator *ptr, enum iterator_type type,
 }
 
 /**
- * Create a read view for iterator so further index modifications
- * will not affect the iterator iteration.
+ * Create an ALL iterator with personal read view so further
+ * index modifications will not affect the iteration results.
+ * Must be destroyed by iterator->free after usage.
  */
-void
-Index::createReadViewForIterator(struct iterator *iterator)
+struct iterator *
+Index::createSnapshotIterator()
 {
-	(void) iterator;
-	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
-}
-
-/**
- * Destroy a read view of an iterator. Must be called for iterators,
- * for which createReadViewForIterator was called.
- */
-void
-Index::destroyReadViewForIterator(struct iterator *iterator)
-{
-	(void) iterator;
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 
@@ -305,24 +294,10 @@ tuple_bless_null_xc(struct tuple *tuple)
 }
 
 const box_key_def_t *
-box_index_key_def(uint32_t space_id, uint32_t index_id)
-{
-	try {
-		struct space *space;
-		/* no tx management, len is approximate in vinyl anyway. */
-		Index *index = check_index(space_id, index_id, &space);
-		return index->index_def->key_def;
-	} catch (Exception *) {
-		return NULL;
-	}
-}
-
-const box_key_def_t *
 box_iterator_key_def(box_iterator_t *iterator)
 {
-	return iterator->index->index_def->key_def;
+  return iterator->index->index_def->key_def;
 }
-
 
 ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)

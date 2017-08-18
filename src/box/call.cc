@@ -69,23 +69,23 @@ access_check_func(const char *name, uint32_t name_len)
 }
 
 static int
-func_call(struct func *func, struct call_request *request, struct obuf *out)
+box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 {
 	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
-	if (func->func == NULL)
-		func_load(func);
 
 	/* Create a call context */
 	struct port port;
 	port_create(&port);
 	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
-	box_function_ctx_t ctx = { request, &port };
+	box_function_ctx_t ctx = { &port };
 
 	/* Clear all previous errors */
 	diag_clear(&fiber()->diag);
 	assert(!in_txn()); /* transaction is not started */
+
 	/* Call function from the shared library */
-	int rc = func->func(&ctx, request->args, request->args_end);
+	int rc = func_call(func, &ctx, request->args, request->args_end);
+	func = NULL; /* May be deleted by DDL */
 	if (rc != 0) {
 		if (diag_last_error(&fiber()->diag) == NULL) {
 			/* Stored procedure forget to set diag  */
@@ -126,6 +126,18 @@ func_call(struct func *func, struct call_request *request, struct obuf *out)
 
 error:
 	txn_rollback();
+	return -1;
+}
+
+int
+box_func_reload(const char *name)
+{
+	size_t name_len = strlen(name);
+	struct func *func = access_check_func(name, name_len);
+	if (func->def->language != FUNC_LANGUAGE_C || func->func == NULL)
+		return 0; /* Nothing to do */
+	if (func_reload(func) == 0)
+		return 0;
 	return -1;
 }
 
@@ -171,7 +183,7 @@ box_process_call(struct call_request *request, struct obuf *out)
 
 	int rc;
 	if (func && func->def->language == FUNC_LANGUAGE_C) {
-		rc = func_call(func, request, out);
+		rc = box_c_call(func, request, out);
 	} else {
 		rc = box_lua_call(request, out);
 	}

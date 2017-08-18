@@ -77,11 +77,11 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 	index->schema_version = schema_version;
 	index->allocator = allocator;
 	index->format = format;
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 	index->format_with_colmask = format_with_colmask;
-	tuple_format_ref(format_with_colmask, 1);
+	tuple_format_ref(format_with_colmask);
 	index->upsert_format = upsert_format;
-	tuple_format_ref(upsert_format, 1);
+	tuple_format_ref(upsert_format);
 	vy_mem_tree_create(&index->tree, cmp_def,
 			   vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
@@ -96,23 +96,23 @@ vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
 		      struct tuple_format *new_upsert_format)
 {
 	assert(mem->count.rows == 0);
-	tuple_format_ref(mem->format, -1);
-	tuple_format_ref(mem->format_with_colmask, -1);
-	tuple_format_ref(mem->upsert_format, -1);
+	tuple_format_unref(mem->format);
+	tuple_format_unref(mem->format_with_colmask);
+	tuple_format_unref(mem->upsert_format);
 	mem->format = new_format;
 	mem->format_with_colmask = new_format_with_colmask;
 	mem->upsert_format = new_upsert_format;
-	tuple_format_ref(mem->format, 1);
-	tuple_format_ref(mem->format_with_colmask, 1);
-	tuple_format_ref(mem->upsert_format, 1);
+	tuple_format_ref(mem->format);
+	tuple_format_ref(mem->format_with_colmask);
+	tuple_format_ref(mem->upsert_format);
 }
 
 void
 vy_mem_delete(struct vy_mem *index)
 {
-	tuple_format_ref(index->format, -1);
-	tuple_format_ref(index->format_with_colmask, -1);
-	tuple_format_ref(index->upsert_format, -1);
+	tuple_format_unref(index->format);
+	tuple_format_unref(index->format_with_colmask);
+	tuple_format_unref(index->upsert_format);
 	fiber_cond_destroy(&index->pin_cond);
 	TRASH(index);
 	free(index);

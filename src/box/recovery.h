@@ -41,6 +41,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+extern const struct type_info type_XlogGapError;
+
 struct xrow_header;
 struct xstream;
 
@@ -50,9 +52,9 @@ struct recovery {
 	struct xlog_cursor cursor;
 	struct xdir wal_dir;
 	/**
-	 * This is used in local hot standby or replication
-	 * relay mode: look for changes in the wal_dir and apply them
-	 * locally or send to the replica.
+	 * This fiber is used in local hot standby mode.
+	 * It looks for changes in the wal_dir and applies
+	 * them locally.
 	 */
 	struct fiber *watcher;
 	/** List of triggers invoked when the current WAL is closed. */
@@ -96,6 +98,6 @@ recovery_finalize(struct recovery *r, struct xstream *stream);
  */
 void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
-		       struct vclock *stop_vclock);
+		       struct vclock *stop_vclock, bool scan_dir);
 
 #endif /* TARANTOOL_RECOVERY_H_INCLUDED */

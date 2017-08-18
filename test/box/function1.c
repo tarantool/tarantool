@@ -143,3 +143,37 @@ errors(box_function_ctx_t *ctx, const char *args, const char *args_end)
 
 	return -1; /* raises "Unknown procedure error" */
 }
+
+int
+test_yield(box_function_ctx_t *ctx, const char *args, const char *args_end)
+{
+	static const char *SPACE_NAME = "test_yield";
+
+	uint32_t space_id = box_space_id_by_name(SPACE_NAME, strlen(SPACE_NAME));
+	if (space_id == BOX_ID_NIL) {
+		return box_error_set(__FILE__, __LINE__, ER_PROC_C,
+			"Can't find space %s", SPACE_NAME);
+	}
+
+	assert(!box_txn());
+	box_txn_begin();
+	assert(box_txn());
+
+	/* Replace value */
+	char tuple_buf[16];
+	char *tuple_end = tuple_buf;
+	tuple_end = mp_encode_array(tuple_end, 2);
+	tuple_end = mp_encode_uint(tuple_end, 1);
+	tuple_end = mp_encode_uint(tuple_end, 2); /* counter */
+	assert(tuple_end <= tuple_buf + sizeof(tuple_buf));
+
+	if (box_replace(space_id, tuple_buf, tuple_end, NULL) != 0)
+		return -1;
+
+	box_txn_commit();
+	assert(!box_txn());
+	say_info("-- yield -  called --");
+	fiber_sleep(0.001);
+	printf("ok - yield\n");
+	return 0;
+}

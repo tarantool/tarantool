@@ -1,4 +1,4 @@
-add_compile_flags("C;CXX" "-Wno-unused")
+add_compile_flags("C;CXX" "-Wno-unused" "-Wno-unused-result")
 if(CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
     add_compile_flags("C;CXX" "-Wno-tautological-compare")
 endif()
@@ -7,6 +7,7 @@ set_source_files_compile_flags(${all_sources})
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/box)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
 add_library(unit STATIC unit.c)
@@ -92,6 +93,9 @@ target_link_libraries(fiber_channel.test core)
 add_executable(fiber_channel_stress.test fiber_channel_stress.cc)
 target_link_libraries(fiber_channel_stress.test core)
 
+add_executable(cbus_stress.test cbus_stress.c)
+target_link_libraries(cbus_stress.test core stat)
+
 add_executable(coio.test coio.cc ${CMAKE_SOURCE_DIR}/src/iobuf.cc)
 target_link_libraries(coio.test core eio bit uri unit)
 
@@ -134,14 +138,15 @@ target_link_libraries(histogram.test stat unit)
 add_executable(say.test say.c)
 target_link_libraries(say.test core unit)
 
-include_directories(${PROJECT_SOURCE_DIR}/src/box)
-add_executable(vy_mem.test
-    vy_mem.c
+set(ITERATOR_TEST_SOURCES
     vy_iterators_helper.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
-)
-target_link_libraries(vy_mem.test core tuple xrow unit)
+    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c)
+set(ITERATOR_TEST_LIBS core tuple xrow unit)
+
+add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES})
+target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS})
 
 add_executable(column_mask.test
     column_mask.c)
@@ -149,11 +154,12 @@ target_link_libraries(column_mask.test tuple unit)
 
 add_executable(vy_write_iterator.test
     vy_write_iterator.c
-    vy_iterators_helper.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
+    ${ITERATOR_TEST_SOURCES}
 )
-target_link_libraries(vy_write_iterator.test core tuple xrow xlog unit)
+target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS})
+
+add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES})
+target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS})

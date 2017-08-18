@@ -63,7 +63,7 @@ const char *cbus_stat_strings[CBUS_STAT_LAST] = {
  * @return endpoint or NULL if not found
  */
 static struct cbus_endpoint *
-cbus_find_endpoint(struct cbus *bus, const char *name)
+cbus_find_endpoint_locked(struct cbus *bus, const char *name)
 {
 	struct cbus_endpoint *endpoint;
 	rlist_foreach_entry(endpoint, &bus->endpoints, in_cbus) {
@@ -71,6 +71,15 @@ cbus_find_endpoint(struct cbus *bus, const char *name)
 			return endpoint;
 	}
 	return NULL;
+}
+
+static struct cbus_endpoint *
+cbus_find_endpoint(struct cbus *bus, const char *name)
+{
+	tt_pthread_mutex_lock(&bus->mutex);
+	struct cbus_endpoint *endpoint = cbus_find_endpoint_locked(bus, name);
+	tt_pthread_mutex_unlock(&bus->mutex);
+	return endpoint;
 }
 
 static void
@@ -90,10 +99,11 @@ cpipe_create(struct cpipe *pipe, const char *consumer)
 	pipe->flush_input.data = pipe;
 
 	tt_pthread_mutex_lock(&cbus.mutex);
-	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, consumer);
+	struct cbus_endpoint *endpoint =
+		cbus_find_endpoint_locked(&cbus, consumer);
 	while (endpoint == NULL) {
 		tt_pthread_cond_wait(&cbus.cond, &cbus.mutex);
-		endpoint = cbus_find_endpoint(&cbus, consumer);
+		endpoint = cbus_find_endpoint_locked(&cbus, consumer);
 	}
 	pipe->endpoint = endpoint;
 	++pipe->endpoint->n_pipes;
@@ -109,7 +119,10 @@ static void
 cbus_endpoint_poison_f(struct cmsg *msg)
 {
 	struct cbus_endpoint *endpoint = ((struct cmsg_poison *)msg)->endpoint;
+	tt_pthread_mutex_lock(&cbus.mutex);
+	assert(endpoint->n_pipes > 0);
 	--endpoint->n_pipes;
+	tt_pthread_mutex_unlock(&cbus.mutex);
 	fiber_cond_signal(&endpoint->cond);
 	free(msg);
 }
@@ -185,7 +198,7 @@ cbus_endpoint_create(struct cbus_endpoint *endpoint, const char *name,
 		     void *fetch_data)
 {
 	tt_pthread_mutex_lock(&cbus.mutex);
-	if (cbus_find_endpoint(&cbus, name) != NULL) {
+	if (cbus_find_endpoint_locked(&cbus, name) != NULL) {
 		tt_pthread_mutex_unlock(&cbus.mutex);
 		return 1;
 	}
@@ -445,6 +458,159 @@ cbus_flush(struct cpipe *callee, struct cpipe *caller,
 			break;
 		fiber_cond_wait(&msg.cond);
 	}
+}
+
+struct cbus_pair_msg {
+	struct cmsg cmsg;
+	void (*pair_cb)(void *);
+	void *pair_arg;
+	const char *src_name;
+	struct cpipe *src_pipe;
+	bool complete;
+	struct fiber_cond cond;
+};
+
+static void
+cbus_pair_complete(struct cmsg *cmsg);
+
+static void
+cbus_pair_perform(struct cmsg *cmsg)
+{
+	struct cbus_pair_msg *msg = container_of(cmsg,
+			struct cbus_pair_msg, cmsg);
+	static struct cmsg_hop route[] = {
+		{cbus_pair_complete, NULL},
+	};
+	cmsg_init(cmsg, route);
+	cpipe_create(msg->src_pipe, msg->src_name);
+	if (msg->pair_cb != NULL)
+		msg->pair_cb(msg->pair_arg);
+	cpipe_push(msg->src_pipe, cmsg);
+}
+
+static void
+cbus_pair_complete(struct cmsg *cmsg)
+{
+	struct cbus_pair_msg *msg = container_of(cmsg,
+			struct cbus_pair_msg, cmsg);
+	msg->complete = true;
+	fiber_cond_signal(&msg->cond);
+}
+
+void
+cbus_pair(const char *dest_name, const char *src_name,
+	  struct cpipe *dest_pipe, struct cpipe *src_pipe,
+	  void (*pair_cb)(void *), void *pair_arg,
+	  void (*process_cb)(struct cbus_endpoint *))
+{
+	static struct cmsg_hop route[] = {
+		{cbus_pair_perform, NULL},
+	};
+	struct cbus_pair_msg msg;
+
+	cmsg_init(&msg.cmsg, route);
+	msg.pair_cb = pair_cb;
+	msg.pair_arg = pair_arg;
+	msg.complete = false;
+	msg.src_name = src_name;
+	msg.src_pipe = src_pipe;
+	fiber_cond_create(&msg.cond);
+
+	struct cbus_endpoint *endpoint = cbus_find_endpoint(&cbus, src_name);
+	assert(endpoint != NULL);
+
+	cpipe_create(dest_pipe, dest_name);
+	cpipe_push(dest_pipe, &msg.cmsg);
+
+	while (true) {
+		if (process_cb != NULL)
+			process_cb(endpoint);
+		if (msg.complete)
+			break;
+		fiber_cond_wait(&msg.cond);
+	}
+}
+
+struct cbus_unpair_msg {
+	struct cmsg cmsg;
+	void (*unpair_cb)(void *);
+	void *unpair_arg;
+	struct cpipe *src_pipe;
+	bool complete;
+	struct fiber_cond cond;
+};
+
+static void
+cbus_unpair_prepare(struct cmsg *cmsg)
+{
+	struct cbus_unpair_msg *msg = container_of(cmsg,
+			struct cbus_unpair_msg, cmsg);
+	if (msg->unpair_cb != NULL)
+		msg->unpair_cb(msg->unpair_arg);
+}
+
+static void
+cbus_unpair_flush(struct cmsg *cmsg)
+{
+	(void)cmsg;
+}
+
+static void
+cbus_unpair_complete(struct cmsg *cmsg);
+
+static void
+cbus_unpair_perform(struct cmsg *cmsg)
+{
+	struct cbus_unpair_msg *msg = container_of(cmsg,
+			struct cbus_unpair_msg, cmsg);
+	static struct cmsg_hop route[] = {
+		{cbus_unpair_complete, NULL},
+	};
+	cmsg_init(cmsg, route);
+	cpipe_push(msg->src_pipe, cmsg);
+	cpipe_destroy(msg->src_pipe);
+}
+
+static void
+cbus_unpair_complete(struct cmsg *cmsg)
+{
+	struct cbus_unpair_msg *msg = container_of(cmsg,
+			struct cbus_unpair_msg, cmsg);
+	msg->complete = true;
+	fiber_cond_signal(&msg->cond);
+}
+
+void
+cbus_unpair(struct cpipe *dest_pipe, struct cpipe *src_pipe,
+	    void (*unpair_cb)(void *), void *unpair_arg,
+	    void (*process_cb)(struct cbus_endpoint *))
+{
+	struct cmsg_hop route[] = {
+		{cbus_unpair_prepare, src_pipe},
+		{cbus_unpair_flush, dest_pipe},
+		{cbus_unpair_perform, NULL},
+	};
+	struct cbus_unpair_msg msg;
+
+	cmsg_init(&msg.cmsg, route);
+	msg.unpair_cb = unpair_cb;
+	msg.unpair_arg = unpair_arg;
+	msg.src_pipe = src_pipe;
+	msg.complete = false;
+	fiber_cond_create(&msg.cond);
+
+	cpipe_push(dest_pipe, &msg.cmsg);
+
+	struct cbus_endpoint *endpoint = src_pipe->endpoint;
+	while (true) {
+		if (process_cb != NULL)
+			process_cb(endpoint);
+		if (msg.complete)
+			break;
+		fiber_cond_wait(&msg.cond);
+	}
+
+	cpipe_destroy(dest_pipe);
 }
 
 void

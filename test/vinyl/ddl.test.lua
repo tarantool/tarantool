@@ -1,4 +1,5 @@
 fiber = require('fiber')
+test_run = require('test_run').new()
 
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'vinyl' })
@@ -168,3 +169,30 @@ pk:alter({range_size = page_size * 2})
 while pk:info().range_count < 2 do space:replace{1, pad} box.snapshot() fiber.sleep(0.01) end
 
 space:drop()
+
+-- gh-2673 vinyl cursor uses already freed VinylIndex and vy_index
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i0 = s:create_index('i0', {parts = {1, 'string'}})
+i1 = s:create_index('i1', {unique = false, parts = {2, 'string', 3, 'string', 4, 'string'}})
+i2 = s:create_index('i2', {parts = {2, 'string', 4, 'string', 3, 'string', 1, 'string'}})
+i3 = s:create_index('i3', {parts = {2, 'string', 4, 'string', 6, 'unsigned', 1, 'string'}})
+
+test_run:cmd("setopt delimiter ';'")
+for j = 1, 60 do
+    s:truncate()
+    self = {}
+    self.end2018 = os.time{year=2018, month=12, day=31, hour=23, min=59, sec=59}
+    self.start2019 = os.time{year=2019, month=1, day=1, hour=0, min=0, sec=0}
+    self.week1end = os.time{year=2019, month=1, day=6, hour=23, min=59, sec=59}
+    self.week2start = os.time{year=2019, month=1, day=7, hour=0, min=0, sec=0}
+    local iface1 = s:insert{'id1', 'uid1', 'iid1', 'fid1', {1, 2, 3, 4}, self.end2018}
+    local iface2 = s:insert{'id2', 'uid1', 'iid1', 'fid1', {1, 2, 3, 4}, self.start2019}
+    local iface3 = s:insert{'id3', 'uid1', 'iid1', 'fid1', {1, 2, 3, 4}, self.week1end}
+    local iface4 = s:insert{'id4', 'uid1', 'iid1', 'fid1', {1, 2, 3, 4}, self.week2start}
+    local f, ctx, state = s.index.i3:pairs({'uid1', 'fid1', 0x7FFFFFFF}, { iterator='LE' })
+    state, tup = f(ctx, state)
+    state, tup = f(ctx, state)
+end ;
+test_run:cmd("setopt delimiter ''");
+
+s:drop()

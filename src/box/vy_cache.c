@@ -286,6 +286,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		vy_cache_entry_delete(cache->env, entry);
 		return;
 	}
+	assert(!vy_cache_tree_iterator_is_invalid(&inserted));
 	if (replaced != NULL) {
 		entry->flags = replaced->flags;
 		entry->left_boundary_level = replaced->left_boundary_level;
@@ -306,29 +307,59 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	/* The flag that must be set in the inserted chain entry */
 	uint32_t flag = direction > 0 ? VY_CACHE_LEFT_LINKED :
 			VY_CACHE_RIGHT_LINKED;
-	if (entry->flags & flag)
-		return;
 
 #ifndef NDEBUG
-	assert(!vy_cache_tree_iterator_is_invalid(&inserted));
-	if (direction > 0) {
+	/**
+	 * Usually prev_stmt is already in the cache but there are cases
+	 * when it's not (see below).
+	 * There must be no entries between (prev_stmt, stmt) interval in
+	 * any case. (1)
+	 * Farther, if the stmt entry is already linked (in certain direction),
+	 * it must be linked with prev_stmt (in that direction). (2)
+	 * Let't check (1) and (2) for debug reasons.
+	 *
+	 * There are two cases in which prev_stmt statement is absent
+	 * in the cache:
+	 * 1) The statement was in prepared state and then it was
+	 *  committed or rollbacked.
+	 * 2) The entry was popped out by vy_cache_gc.
+	 *
+	 * Note that case when the prev_stmt is owerwritten by other TX
+	 * is impossible because this TX would be sent to read view and
+	 * wouldn't be able to add anything to the cache.
+	 */
+	if (direction > 0)
 		vy_cache_tree_iterator_prev(&cache->cache_tree, &inserted);
-	} else {
+	else
 		vy_cache_tree_iterator_next(&cache->cache_tree, &inserted);
-	}
-	/* Check that there are no statements between prev_stmt and stmt */
+
 	if (!vy_cache_tree_iterator_is_invalid(&inserted)) {
 		struct vy_cache_entry **prev_check_entry =
 			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
 							&inserted);
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
-		if (vy_stmt_compare(prev_stmt, prev_check_stmt,
-		    cache->cmp_def) != 0)
-			/* Failed to build chain. */
-			unreachable();
+		int cmp = vy_stmt_compare(prev_stmt, prev_check_stmt,
+					  cache->cmp_def);
+
+		if (entry->flags & flag) {
+			/* The found entry must be exactly prev_stmt. (2) */
+			assert(cmp == 0);
+		} else {
+			/*
+			 * The found entry must be exactly prev_stmt or lay
+			 * farther than prev_stmt. (1)
+			 */
+			assert(cmp * direction >= 0);
+		}
+	} else {
+		/* Cannot be in chain (2) */
+		assert(!(entry->flags & flag));
 	}
 #endif
+
+	if (entry->flags & flag)
+		return;
 
 	/* Insert/replace entry with previous statement */
 	struct vy_cache_entry *prev_entry =
@@ -377,6 +408,7 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	itr = vy_cache_tree_lower_bound(&cache->cache_tree, stmt, &exact);
 	struct vy_cache_entry **entry =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &itr);
+	assert(!exact || entry != NULL);
 	/*
 	 * There are three cases possible
 	 * (1) there's a value in cache that is equal to stmt.
@@ -399,13 +431,13 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	struct vy_cache_entry **prev_entry =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &prev);
 
-	if (entry && ((*entry)->flags & VY_CACHE_LEFT_LINKED)) {
+	if (entry != NULL && ((*entry)->flags & VY_CACHE_LEFT_LINKED)) {
 		cache->version++;
 		(*entry)->flags &= ~VY_CACHE_LEFT_LINKED;
 		assert((*prev_entry)->flags & VY_CACHE_RIGHT_LINKED);
 		(*prev_entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
 	}
-	if (prev_entry) {
+	if (prev_entry != NULL) {
 		cache->version++;
 		(*prev_entry)->right_boundary_level = cache->cmp_def->part_count;
 	}
@@ -415,7 +447,7 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	struct vy_cache_entry **next_entry =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &next);
 
-	if (exact && entry && ((*entry)->flags & VY_CACHE_RIGHT_LINKED)) {
+	if (exact && ((*entry)->flags & VY_CACHE_RIGHT_LINKED)) {
 		cache->version++;
 		(*entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
 		assert((*next_entry)->flags & VY_CACHE_LEFT_LINKED);
@@ -427,6 +459,7 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 	}
 
 	if (exact) {
+		assert(entry != NULL);
 		cache->version++;
 		struct vy_cache_entry *to_delete = *entry;
 		assert(vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
@@ -459,27 +492,26 @@ vy_cache_iterator_curr_stmt(struct vy_cache_iterator *itr)
  *
  * @param itr - the iterator
  * @param entry - current record of the cache
- * @param stop - flag to set
  */
-static void
+static inline bool
 vy_cache_iterator_is_stop(struct vy_cache_iterator *itr,
-			  struct vy_cache_entry *entry, bool *stop)
+			  struct vy_cache_entry *entry)
 {
-	*stop = false;
 	uint8_t key_level = tuple_field_count(itr->key);
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
 		if (entry->flags & VY_CACHE_LEFT_LINKED)
-			*stop = true;
+			return true;
 		if (iter_is_eq && entry->left_boundary_level <= key_level)
-			*stop = true;
+			return true;
 	} else {
 		if (entry->flags & VY_CACHE_RIGHT_LINKED)
-			*stop = true;
+			return true;
 		if (iter_is_eq && entry->right_boundary_level <= key_level)
-			*stop = true;
+			return true;
 	}
+	return false;
 }
 
 /**
@@ -489,27 +521,26 @@ vy_cache_iterator_is_stop(struct vy_cache_iterator *itr,
  *
  * @param itr - the iterator
  * @param last_entry - the last record from previous step of the iterator
- * @param stop - flag to set
  */
-static void
+static inline bool
 vy_cache_iterator_is_end_stop(struct vy_cache_iterator *itr,
-			      struct vy_cache_entry *last_entry, bool *stop)
+			      struct vy_cache_entry *last_entry)
 {
-	struct vy_cache_entry *entry = last_entry;
 	uint8_t key_level = tuple_field_count(itr->key);
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
-		if (entry->flags & VY_CACHE_RIGHT_LINKED)
-			*stop = true;
-		if (iter_is_eq && entry->right_boundary_level <= key_level)
-			*stop = true;
+		if (last_entry->flags & VY_CACHE_RIGHT_LINKED)
+			return true;
+		if (iter_is_eq && last_entry->right_boundary_level <= key_level)
+			return true;
 	} else {
-		if (entry->flags & VY_CACHE_LEFT_LINKED)
-			*stop = true;
-		if (iter_is_eq && entry->left_boundary_level <= key_level)
-			*stop = true;
+		if (last_entry->flags & VY_CACHE_LEFT_LINKED)
+			return true;
+		if (iter_is_eq && last_entry->left_boundary_level <= key_level)
+			return true;
 	}
+	return false;
 }
 
 static void
@@ -519,6 +550,45 @@ vy_cache_iterator_get(struct vy_cache_iterator *itr, struct tuple **ret)
 	if (*ret != NULL)
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get, *ret);
 }
+
+/**
+ * Make one tree's iterator step from the current position.
+ * Direction of the step depends on the iterator type.
+ * @param itr Iterator to make step.
+ * @param[out] ret Result tuple.
+ *
+ * @retval Must a merge_iterator stop on @a ret?
+ * The function is implicitly used by merge_iterator_next_key and
+ * return value is used to determine if the merge_iterator can
+ * return @a ret to a read_iterator immediately, without lookups
+ * in mems and runs. It is possible, when @a ret is a part of
+ * continuous cached tuples chain. In such a case mems or runs can
+ * not contain more suitable tuples.
+ */
+static inline bool
+vy_cache_iterator_step(struct vy_cache_iterator *itr, struct tuple **ret)
+{
+	*ret = NULL;
+	struct vy_cache_tree *tree = &itr->cache->cache_tree;
+	struct vy_cache_entry *prev_entry =
+		*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+	if (iterator_direction(itr->iterator_type) > 0)
+		vy_cache_tree_iterator_next(tree, &itr->curr_pos);
+	else
+		vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
+	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
+		return vy_cache_iterator_is_end_stop(itr, prev_entry);
+	struct vy_cache_entry *entry =
+		*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+
+	if (itr->iterator_type == ITER_EQ &&
+	    vy_stmt_compare(itr->key, entry->stmt, itr->cache->cmp_def)) {
+		return vy_cache_iterator_is_end_stop(itr, prev_entry);
+	}
+	*ret = entry->stmt;
+	return vy_cache_iterator_is_stop(itr, entry);
+}
+
 
 /**
  * Find next (lower, older) record with the same key as current
@@ -560,38 +630,34 @@ vy_cache_iterator_start(struct vy_cache_iterator *itr, struct tuple **ret,
 	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
 		return;
 
-	struct vy_cache_entry **entry =
-		vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
-	vy_cache_iterator_is_stop(itr, *entry, stop);
-	struct tuple *candidate = (*entry)->stmt;
+	struct vy_cache_entry *entry =
+		*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+	*stop = vy_cache_iterator_is_stop(itr, entry);
+	struct tuple *candidate = entry->stmt;
 
 	while (vy_stmt_lsn(candidate) > (**itr->read_view).vlsn) {
-		/* The cache stores the latest tuple of the key,
-		 * but there could be earlier tuples in runs */
+		/*
+		 * The cache stores the latest tuple of the key,
+		 * but there could be earlier tuples in runs.
+		 */
 		*stop = false;
-		if (iterator_direction(itr->iterator_type) > 0)
-			vy_cache_tree_iterator_next(tree, &itr->curr_pos);
-		else
-			vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
-		if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
-			return;
-		entry = vy_cache_tree_iterator_get_elem(tree,
-							&itr->curr_pos);
-		candidate = (*entry)->stmt;
-		if (itr->iterator_type == ITER_EQ &&
-		    vy_stmt_compare(key, candidate, itr->cache->cmp_def))
+		vy_cache_iterator_step(itr, &candidate);
+		if (candidate == NULL)
 			return;
 	}
 	itr->curr_stmt = candidate;
-	tuple_ref(itr->curr_stmt);
+	tuple_ref(candidate);
 	vy_cache_iterator_get(itr, ret);
 }
 
+/**
+ * Update the cache iterator version and its cache_tree_iterator
+ * to be valid and positioned on the same statement as before.
+ * @param itr Iterator to restore.
+ */
 static void
-vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr,
-			      bool *step_was_made)
+vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr)
 {
-	*step_was_made = false;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 
 	if (itr->version == itr->cache->version)
@@ -607,7 +673,6 @@ vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr,
 		vy_cache_tree_lower_bound(tree, itr->curr_stmt, &exact);
 	if (exact)
 		return;
-	*step_was_made = true;
 
 	tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
@@ -617,6 +682,7 @@ vy_cache_iterator_restore_pos(struct vy_cache_iterator *itr,
 		return;
 	itr->curr_stmt = vy_cache_iterator_curr_stmt(itr);
 	tuple_ref(itr->curr_stmt);
+	return;
 }
 
 NODISCARD int
@@ -638,69 +704,27 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 		vy_cache_iterator_start(itr, ret, stop);
 		return 0;
 	}
-	if (!itr->curr_stmt) /* End of search. */
+	if (itr->curr_stmt == NULL) /* End of search. */
+		return 0;
+	vy_cache_iterator_restore_pos(itr);
+	if (itr->curr_stmt == NULL)
 		return 0;
 
-	struct vy_cache_tree *tree = &itr->cache->cache_tree;
-	int dir = iterator_direction(itr->iterator_type);
-	const struct tuple *key = itr->key;
-
-	bool step_was_made;
-	vy_cache_iterator_restore_pos(itr, &step_was_made);
-	if (!itr->curr_stmt) /* End of search. */
+	tuple_unref(itr->curr_stmt);
+	*stop = vy_cache_iterator_step(itr, &itr->curr_stmt);
+	if (itr->curr_stmt == NULL)
 		return 0;
-	if (!step_was_made) {
-		struct vy_cache_entry **entry =
-			vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
-
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
-		if (dir > 0)
-			vy_cache_tree_iterator_next(tree, &itr->curr_pos);
-		else
-			vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
-		if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos)) {
-			vy_cache_iterator_is_end_stop(itr, *entry, stop);
-			return 0;
-		}
-		itr->curr_stmt = vy_cache_iterator_curr_stmt(itr);
-		tuple_ref(itr->curr_stmt);
-	}
-
-	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, itr->curr_stmt, itr->cache->cmp_def)) {
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
-		struct vy_cache_entry **entry =
-			vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
-		vy_cache_iterator_is_end_stop(itr, *entry, stop);
-		return 0;
-	}
-	struct vy_cache_entry **entry =
-		vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
-	vy_cache_iterator_is_stop(itr, *entry, stop);
-
 	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
-		/* The cache stores the latest tuple of the key,
-		 * but there could be earlier tuples in runs */
+		/*
+		 * The cache stores the latest tuple of the key,
+		 * but there could be older tuples in runs.
+		 */
 		*stop = false;
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
-		if (dir > 0)
-			vy_cache_tree_iterator_next(tree, &itr->curr_pos);
-		else
-			vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
-		if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
+		vy_cache_iterator_step(itr, &itr->curr_stmt);
+		if (itr->curr_stmt == NULL)
 			return 0;
-		entry = vy_cache_tree_iterator_get_elem(tree,
-							&itr->curr_pos);
-		struct tuple *stmt = (*entry)->stmt;
-		if (itr->iterator_type == ITER_EQ &&
-		    vy_stmt_compare(key, stmt, itr->cache->cmp_def))
-			return 0;
-		itr->curr_stmt = stmt;
-		tuple_ref(itr->curr_stmt);
 	}
+	tuple_ref(itr->curr_stmt);
 	vy_cache_iterator_get(itr, ret);
 	return 0;
 }
@@ -743,25 +767,25 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	struct key_def *def = itr->cache->cmp_def;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	int dir = iterator_direction(itr->iterator_type);
-	if (itr->curr_stmt != NULL) {
-		bool step_was_made;
-		vy_cache_iterator_restore_pos(itr, &step_was_made);
-	}
+	bool is_version_changed = itr->version != itr->cache->version;
+	if (itr->curr_stmt != NULL)
+		vy_cache_iterator_restore_pos(itr);
 
 	if (itr->search_started) {
 		if (itr->curr_stmt == NULL)
 			return 0;
 		int rc = 0;
 		struct vy_cache_tree_iterator pos = itr->curr_pos;
-		if (last_stmt == NULL && itr->curr_stmt != NULL) {
+		if (last_stmt == NULL) {
 			struct vy_cache_entry **entry =
 				vy_cache_tree_iterator_get_elem(tree, &pos);
 			assert(entry != NULL);
-			vy_cache_iterator_is_stop(itr, *entry, stop);
+			*stop = vy_cache_iterator_is_stop(itr, *entry);
 			vy_cache_iterator_get(itr, ret);
 			return 0;
 		}
-		if (itr->version == itr->cache->version) {
+		assert(itr->version == itr->cache->version);
+		if (! is_version_changed) {
 			vy_cache_iterator_get(itr, ret);
 			return 0;
 		}
@@ -777,7 +801,8 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			assert(*entry && (*entry)->stmt);
 			struct tuple *t = (*entry)->stmt;
 			int cmp = dir * vy_stmt_compare(t, last_stmt, def);
-			if (cmp < 0)
+			if (cmp < 0 || (cmp == 0 && vy_stmt_lsn(t) <=
+				        (**itr->read_view).vlsn))
 				break;
 			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
 				if (itr->curr_stmt != NULL)
@@ -786,7 +811,7 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 				itr->curr_stmt = t;
 				tuple_ref(itr->curr_stmt);
 				rc = 1;
-				vy_cache_iterator_is_stop(itr, *entry, stop);
+				*stop = vy_cache_iterator_is_stop(itr, *entry);
 			}
 		}
 		vy_cache_iterator_get(itr, ret);

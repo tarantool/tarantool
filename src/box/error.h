@@ -121,6 +121,7 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 /** \endcond public */
 
 extern const struct type_info type_ClientError;
+extern const struct type_info type_XlogError;
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -180,6 +181,29 @@ public:
 class ErrorInjection: public LoggedError {
 public:
 	ErrorInjection(const char *file, unsigned line, const char *msg);
+};
+
+/**
+ * XlogError is raised when there is an error with contents
+ * of the data directory or a log file. A special subclass
+ * of exception is introduced to gracefully skip such errors
+ * in force_recovery = true mode.
+ */
+struct XlogError: public Exception
+{
+	XlogError(const char *file, unsigned line, const char *format,
+		  va_list ap)
+		:Exception(&type_XlogError, file, line)
+	{
+		error_vformat_msg(this, format, ap);
+	}
+	XlogError(const struct type_info *type, const char *file,
+		  unsigned line)
+		:Exception(type, file, line)
+	{
+	}
+
+	virtual void raise() { throw this; }
 };
 
 void

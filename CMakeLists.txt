@@ -57,10 +57,6 @@ check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 check_include_file(sys/time.h HAVE_SYS_TIME_H)
 check_include_file(cpuid.h HAVE_CPUID_H)
 check_include_file(sys/prctl.h HAVE_PRCTL_H)
-check_include_file(dlfcn.h HAVE_DLFCN_H)
-check_include_file(malloc.h MALLOC_H)
-check_include_file(memory.h MEMORY_H)
-check_include_file(strings.h STRINGS_H)
 
 check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
@@ -73,14 +69,6 @@ check_function_exists(sync_file_range HAVE_SYNC_FILE_RANGE)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 check_function_exists(sendfile HAVE_SENDFILE)
-check_function_exists(malloc_usable_size HAVE_MALLOC_USABLE_SIZE)
-check_function_exists(strchrnul HAVE_STRCHRNUL)
-check_function_exists(usleep HAVE_USLEEP)
-check_function_exists(utime HAVE_UTIME)
-check_function_exists(gmtime_r HAVE_GMTIME_R)
-check_function_exists(localtime_r HAVE_LOCALTIME_R)
-check_function_exists(localtime_s HAVE_LOCALTIME_S)
-
 if (HAVE_SENDFILE)
     if (TARGET_OS_LINUX)
         set(HAVE_SENDFILE_LINUX 1)
@@ -302,6 +290,14 @@ find_package(Readline)
 # Patched.
 #
 set(ENABLE_BUNDLED_LUAJIT ON)
+set(LUAJIT_ENABLE_GC64_DEFAULT OFF)
+if (TARGET_OS_DARWIN)
+    # LuaJIT is unusable on OS X without enabled GC64
+    # See https://github.com/tarantool/tarantool/issues/2643
+    set(LUAJIT_ENABLE_GC64_DEFAULT ON)
+endif()
+option(LUAJIT_ENABLE_GC64 "Use 64-bit GC objects by default."
+       ${LUAJIT_ENABLE_GC64_DEFAULT})
 include(luajit)
 
 #

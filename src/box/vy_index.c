@@ -49,7 +49,6 @@
 #include "key_def.h"
 #include "say.h"
 #include "schema.h"
-#include "space.h"
 #include "trivia/util.h"
 #include "tuple.h"
 #include "tuple_format.h"
@@ -71,7 +70,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 					   NULL, 0, 0);
 	if (env->key_format == NULL)
 		return -1;
-	tuple_format_ref(env->key_format, 1);
+	tuple_format_ref(env->key_format);
 	env->path = path;
 	env->allocator = allocator;
 	env->p_generation = p_generation;
@@ -83,7 +82,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 void
 vy_index_env_destroy(struct vy_index_env *env)
 {
-	tuple_format_ref(env->key_format, -1);
+	tuple_format_unref(env->key_format);
 }
 
 const char *
@@ -96,40 +95,16 @@ vy_index_name(struct vy_index *index)
 }
 
 struct vy_index *
-vy_index_find(struct space *space, uint32_t iid)
-{
-	struct Index *index = index_find(space, iid);
-	if (index == NULL)
-		return NULL;
-	return vy_index(index);
-}
-
-struct vy_index *
-vy_index_find_unique(struct space *space, uint32_t index_id)
-{
-	struct vy_index *index = vy_index_find(space, index_id);
-	if (index != NULL && !index->opts.is_unique) {
-		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		return NULL;
-	}
-	return index;
-}
-
-struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct space *space, struct index_def *index_def)
+	     struct index_def *index_def, struct tuple_format *format,
+	     struct vy_index *pk)
 {
-	assert(space != NULL);
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
 	};
 
 	assert(index_def->key_def->part_count > 0);
-	struct vy_index *pk = NULL;
-	if (index_def->iid > 0) {
-		pk = vy_index_find(space, 0);
-		assert(pk != NULL);
-	}
+	assert(index_def->iid == 0 || pk != NULL);
 
 	struct vy_index *index = calloc(1, sizeof(struct vy_index));
 	if (index == NULL) {
@@ -150,40 +125,35 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	if (key_def == NULL)
 		goto fail_key_def;
 
-	struct key_def *cmp_def = NULL;
-	if (index_def->iid == 0) {
-		cmp_def = key_def;
-	} else {
-		cmp_def = key_def_merge(key_def, pk->key_def);
-		if (cmp_def == NULL)
-			goto fail_cmp_def;
-	}
+	struct key_def *cmp_def = key_def_dup(index_def->cmp_def);
+	if (cmp_def == NULL)
+		goto fail_cmp_def;
+
 	index->cmp_def = cmp_def;
 	index->key_def = key_def;
-	index->surrogate_format = tuple_format_new(&vy_tuple_format_vtab,
-						   &cmp_def, 1, 0);
-	if (index->surrogate_format == NULL)
+	index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
+					      &cmp_def, 1, 0);
+	if (index->disk_format == NULL)
 		goto fail_format;
-	tuple_format_ref(index->surrogate_format, 1);
+	tuple_format_ref(index->disk_format);
 
 	if (index_def->iid == 0) {
 		index->upsert_format =
-			vy_tuple_format_new_upsert(space->format);
+			vy_tuple_format_new_upsert(format);
 		if (index->upsert_format == NULL)
 			goto fail_upsert_format;
-		tuple_format_ref(index->upsert_format, 1);
+		tuple_format_ref(index->upsert_format);
 
-		index->space_format_with_colmask =
-			vy_tuple_format_new_with_colmask(space->format);
-		if (index->space_format_with_colmask == NULL)
-			goto fail_space_format_with_colmask;
-		tuple_format_ref(index->space_format_with_colmask, 1);
+		index->mem_format_with_colmask =
+			vy_tuple_format_new_with_colmask(format);
+		if (index->mem_format_with_colmask == NULL)
+			goto fail_mem_format_with_colmask;
+		tuple_format_ref(index->mem_format_with_colmask);
 	} else {
-		index->space_format_with_colmask =
-			pk->space_format_with_colmask;
+		index->mem_format_with_colmask = pk->mem_format_with_colmask;
 		index->upsert_format = pk->upsert_format;
-		tuple_format_ref(index->space_format_with_colmask, 1);
-		tuple_format_ref(index->upsert_format, 1);
+		tuple_format_ref(index->mem_format_with_colmask);
+		tuple_format_ref(index->upsert_format);
 	}
 
 	if (vy_index_stat_create(&index->stat) != 0)
@@ -195,8 +165,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 
 	index->mem = vy_mem_new(index->env->allocator,
 				*index->env->p_generation,
-				cmp_def, space->format,
-				index->space_format_with_colmask,
+				cmp_def, format,
+				index->mem_format_with_colmask,
 				index->upsert_format, schema_version);
 	if (index->mem == NULL)
 		goto fail_mem;
@@ -212,9 +182,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->pk = pk;
 	if (pk != NULL)
 		vy_index_ref(pk);
-	index->space_format = space->format;
-	tuple_format_ref(index->space_format, 1);
-	index->space_index_count = space->index_count;
+	index->mem_format = format;
+	tuple_format_ref(index->mem_format);
 	index->in_dump.pos = UINT32_MAX;
 	index->in_compact.pos = UINT32_MAX;
 	index->space_id = index_def->space_id;
@@ -227,17 +196,16 @@ fail_mem:
 fail_run_hist:
 	vy_index_stat_destroy(&index->stat);
 fail_stat:
-	tuple_format_ref(index->space_format_with_colmask, -1);
-fail_space_format_with_colmask:
-	tuple_format_ref(index->upsert_format, -1);
+	tuple_format_unref(index->mem_format_with_colmask);
+fail_mem_format_with_colmask:
+	tuple_format_unref(index->upsert_format);
 fail_upsert_format:
-	tuple_format_ref(index->surrogate_format, -1);
+	tuple_format_unref(index->disk_format);
 fail_format:
-	if (index_def->iid > 0)
-		free(cmp_def);
-fail_key_def:
-	free(key_def);
+	free(cmp_def);
 fail_cmp_def:
+	free(key_def);
+fail_key_def:
 	free(index->tree);
 fail_tree:
 	free(index);
@@ -262,7 +230,7 @@ vy_index_delete(struct vy_index *index)
 {
 	assert(index->refs == 0);
 	assert(index->in_dump.pos == UINT32_MAX);
-	assert(index->in_compact.pos = UINT32_MAX);
+	assert(index->in_compact.pos == UINT32_MAX);
 
 	if (index->pk != NULL)
 		vy_index_unref(index->pk);
@@ -274,16 +242,16 @@ vy_index_delete(struct vy_index *index)
 
 	vy_range_tree_iter(index->tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&index->range_heap);
-	tuple_format_ref(index->surrogate_format, -1);
-	tuple_format_ref(index->space_format_with_colmask, -1);
-	tuple_format_ref(index->upsert_format, -1);
+	tuple_format_unref(index->disk_format);
+	tuple_format_unref(index->mem_format_with_colmask);
+	tuple_format_unref(index->upsert_format);
 	if (index->id > 0)
 		free(index->cmp_def);
 	free(index->key_def);
 	histogram_delete(index->run_hist);
 	vy_index_stat_destroy(&index->stat);
 	vy_cache_destroy(&index->cache);
-	tuple_format_ref(index->space_format, -1);
+	tuple_format_unref(index->mem_format);
 	free(index->tree);
 	TRASH(index);
 	free(index);
@@ -368,6 +336,10 @@ struct vy_index_recovery_cb_arg {
 	 * run each time a slice is created for it.
 	 */
 	struct mh_i64ptr_t *run_hash;
+	/**
+	 * True if force_recovery mode is enabled.
+	 */
+	bool force_recovery;
 };
 
 /** Index recovery callback, passed to vy_recovery_load_index(). */
@@ -378,6 +350,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_index *index = arg->index;
 	struct vy_range *range = arg->range;
 	struct mh_i64ptr_t *run_hash = arg->run_hash;
+	bool force_recovery = arg->force_recovery;
 	struct tuple_format *key_format = index->env->key_format;
 	struct tuple *begin = NULL, *end = NULL;
 	struct vy_run *run;
@@ -436,7 +409,14 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 			goto out;
 		run->dump_lsn = record->dump_lsn;
 		if (vy_run_recover(run, index->env->path,
-				   index->space_id, index->id) != 0) {
+				   index->space_id, index->id) != 0 &&
+		     (!force_recovery ||
+		     vy_run_rebuild_index(run, index->env->path,
+					  index->space_id, index->id,
+					  index->cmp_def, index->key_def,
+					  index->mem_format,
+					  index->upsert_format,
+					  &index->opts) != 0)) {
 			vy_run_unref(run);
 			goto out;
 		}
@@ -495,11 +475,16 @@ out:
 
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool snapshot_recovery)
+		 int64_t lsn, bool snapshot_recovery, bool force_recovery)
 {
 	assert(index->range_count == 0);
 
-	struct vy_index_recovery_cb_arg arg = { .index = index };
+	struct vy_index_recovery_cb_arg arg = {
+		.index = index,
+		.range = NULL,
+		.run_hash = NULL,
+		.force_recovery = force_recovery,
+	};
 	arg.run_hash = mh_i64ptr_new();
 	if (arg.run_hash == NULL) {
 		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
@@ -698,8 +683,8 @@ vy_index_rotate_mem(struct vy_index *index)
 
 	assert(index->mem != NULL);
 	mem = vy_mem_new(index->env->allocator, *index->env->p_generation,
-			 index->cmp_def, index->space_format,
-			 index->space_format_with_colmask,
+			 index->cmp_def, index->mem_format,
+			 index->mem_format_with_colmask,
 			 index->upsert_format, schema_version);
 	if (mem == NULL)
 		return -1;
@@ -826,7 +811,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, index->cmp_def,
-					index->space_format,
+					index->mem_format,
 					index->upsert_format, false);
 		index->stat.upsert.applied++;
 

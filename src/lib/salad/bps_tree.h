@@ -155,6 +155,8 @@
  * struct bps_tree_iterator bps_tree_iterator_last(tree);
  * struct bps_tree_iterator bps_tree_lower_bound(tree, key, exact);
  * struct bps_tree_iterator bps_tree_upper_bound(tree, key, exact);
+ * struct bps_tree_iterator bps_tree_lower_bound_elem(tree, elem, exact);
+ * struct bps_tree_iterator bps_tree_upper_bound_elem(tree, elem, exact);
  * size_t bps_tree_approxiamte_count(tree, key);
  * bps_tree_elem_t *bps_tree_iterator_get_elem(tree, itr);
  * bool bps_tree_iterator_next(tree, itr);
@@ -360,6 +362,8 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_iterator_last _api_name(iterator_last)
 #define bps_tree_lower_bound _api_name(lower_bound)
 #define bps_tree_upper_bound _api_name(upper_bound)
+#define bps_tree_lower_bound_elem _api_name(lower_bound_elem)
+#define bps_tree_upper_bound_elem _api_name(upper_bound_elem)
 #define bps_tree_approximate_count _api_name(approximate_count)
 #define bps_tree_iterator_get_elem _api_name(iterator_get_elem)
 #define bps_tree_iterator_next _api_name(iterator_next)
@@ -387,6 +391,7 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_find_ins_point_key _bps_tree(find_ins_point_key)
 #define bps_tree_find_ins_point_elem _bps_tree(find_ins_point_elem)
 #define bps_tree_find_after_ins_point_key _bps_tree(find_after_ins_point_key)
+#define bps_tree_find_after_ins_point_elem _bps_tree(find_after_ins_point_elem)
 #define bps_tree_get_leaf_safe _bps_tree(get_leaf_safe)
 #define bps_tree_garbage_push _bps_tree(garbage_push)
 #define bps_tree_garbage_pop _bps_tree(garbage_pop)
@@ -727,6 +732,35 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 static inline struct bps_tree_iterator
 bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact);
+
+/**
+ * @brief Get an iterator to the first element that is greater or
+ * equal than given element.
+ * @param tree - pointer to a tree
+ * @param key - the element that will be compared with tree elements
+ * @param exact - pointer to a bool value, that will be set to true if
+ *  and element pointed by the iterator is equal to the key, false otherwise
+ *  Pass NULL if you don't need that info.
+ * @return - Lower-bound iterator. Invalid if all elements are less than key.
+ */
+static inline struct bps_tree_iterator
+bps_tree_lower_bound_elem(const struct bps_tree *tree, bps_tree_elem_t key,
+			  bool *exact);
+
+/**
+ * @brief Get an iterator to the first element that is greater than given
+ * element.
+ * @param tree - pointer to a tree
+ * @param key - the element that will be compared with tree elements
+ * @param exact - pointer to a bool value, that will be set to true if
+ *  and element pointed by the (!)previous iterator is equal to the key,
+ *  false otherwise. Pass NULL if you don't need that info.
+ * @return - Upper-bound iterator. Invalid if all elements are less or equal
+ *  than the key.
+ */
+static inline struct bps_tree_iterator
+bps_tree_upper_bound_elem(const struct bps_tree *tree, bps_tree_elem_t key,
+			  bool *exact);
 
 /**
  * @brief Get approximate number of entries that are equal to given key.
@@ -1423,6 +1457,51 @@ bps_tree_find_after_ins_point_key(const struct bps_tree *tree,
 }
 
 /**
+ * @brief Find the lowest element in sorted array that is greater
+ * than the key.
+ * @param tree - pointer to a tree
+ * @param arr - array of elements
+ * @param size - size of the array
+ * @param elem - element to find
+ * @param exact - point to bool that receives true if equal
+ *                element is present
+ */
+static inline bps_tree_pos_t
+bps_tree_find_after_ins_point_elem(const struct bps_tree *tree,
+				   bps_tree_elem_t *arr, size_t size,
+				   bps_tree_elem_t elem, bool *exact)
+{
+	(void)tree;
+	bps_tree_elem_t *begin = arr;
+	bps_tree_elem_t *end = arr + size;
+	*exact = false;
+#ifdef BPS_BLOCK_LINEAR_SEARCH
+	while (begin != end) {
+		int res = BPS_TREE_COMPARE(*begin, elem, tree->arg);
+		if (res == 0)
+			*exact = true;
+		else if (res > 0)
+			return (bps_tree_pos_t)(begin - arr);
+		++begin;
+	}
+	return (bps_tree_pos_t)(begin - arr);
+#else
+	while (begin != end) {
+		bps_tree_elem_t *mid = begin + (end - begin) / 2;
+		int res = BPS_TREE_COMPARE(*mid, elem, tree->arg);
+		if (res > 0) {
+			end = mid;
+		} else if (res < 0) {
+			begin = mid + 1;
+		} else {
+			*exact = true;
+			begin = mid + 1;
+		}
+	}
+	return (bps_tree_pos_t)(end - arr);
+#endif
+}
+/**
  * @brief Get an invalid iterator. See iterator description.
  * @return - Invalid iterator
  */
@@ -1666,6 +1745,115 @@ bps_tree_upper_bound(const struct bps_tree *tree, bps_tree_key_t key,
 	pos = bps_tree_find_after_ins_point_key(tree, leaf->elems,
 						leaf->header.size,
 						key, &exact_test);
+	if (exact_test)
+		*exact = true;
+	if (pos >= leaf->header.size) {
+		res.block_id = leaf->next_id;
+		res.pos = 0;
+	} else {
+		res.block_id = block_id;
+		res.pos = pos;
+	}
+	return res;
+}
+
+/**
+ * @brief Get an iterator to the first element that is greater or
+ * equal than given element.
+ * @param tree - pointer to a tree
+ * @param key - the element that will be compared with tree elements
+ * @param exact - pointer to a bool value, that will be set to true if
+ *  and element pointed by the iterator is equal to the key, false otherwise
+ *  Pass NULL if you don't need that info.
+ * @return - Lower-bound iterator. Invalid if all elements are less than key.
+ */
+static inline struct bps_tree_iterator
+bps_tree_lower_bound_elem(const struct bps_tree *tree, bps_tree_elem_t key,
+			  bool *exact)
+{
+	struct bps_tree_iterator res;
+	matras_head_read_view(&res.view);
+	bool local_result;
+	if (!exact)
+		exact = &local_result;
+	*exact = false;
+	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
+		res.block_id = (bps_tree_block_id_t)(-1);
+		res.pos = 0;
+		return res;
+	}
+	struct bps_block *block = bps_tree_root(tree);
+	bps_tree_block_id_t block_id = tree->root_id;
+	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
+		struct bps_inner *inner = (struct bps_inner *)block;
+		bps_tree_pos_t pos;
+		pos = bps_tree_find_ins_point_elem(tree, inner->elems,
+						   inner->header.size - 1,
+						   key, exact);
+		block_id = inner->child_ids[pos];
+		block = bps_tree_restore_block(tree, block_id);
+	}
+
+	struct bps_leaf *leaf = (struct bps_leaf *)block;
+	bps_tree_pos_t pos;
+	pos = bps_tree_find_ins_point_elem(tree, leaf->elems, leaf->header.size,
+					   key, exact);
+	if (pos >= leaf->header.size) {
+		res.block_id = leaf->next_id;
+		res.pos = 0;
+	} else {
+		res.block_id = block_id;
+		res.pos = pos;
+	}
+	return res;
+}
+
+/**
+ * @brief Get an iterator to the first element that is greater than given
+ * element.
+ * @param tree - pointer to a tree
+ * @param key - the element that will be compared with tree elements
+ * @param exact - pointer to a bool value, that will be set to true if
+ *  and element pointed by the (!)previous iterator is equal to the key,
+ *  false otherwise. Pass NULL if you don't need that info.
+ * @return - Upper-bound iterator. Invalid if all elements are less or equal
+ *  than the key.
+ */
+static inline struct bps_tree_iterator
+bps_tree_upper_bound_elem(const struct bps_tree *tree, bps_tree_elem_t key,
+			  bool *exact)
+{
+	struct bps_tree_iterator res;
+	matras_head_read_view(&res.view);
+	bool local_result;
+	if (!exact)
+		exact = &local_result;
+	*exact = false;
+	bool exact_test;
+	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
+		res.block_id = (bps_tree_block_id_t)(-1);
+		res.pos = 0;
+		return res;
+	}
+	struct bps_block *block = bps_tree_root(tree);
+	bps_tree_block_id_t block_id = tree->root_id;
+	for (bps_tree_block_id_t i = 0; i < tree->depth - 1; i++) {
+		struct bps_inner *inner = (struct bps_inner *)block;
+		bps_tree_pos_t pos;
+		pos = bps_tree_find_after_ins_point_elem(tree, inner->elems,
+							 inner->header.size - 1,
+							 key, &exact_test);
+		if (exact_test)
+			*exact = true;
+		block_id = inner->child_ids[pos];
+		block = bps_tree_restore_block(tree, block_id);
+	}
+
+	struct bps_leaf *leaf = (struct bps_leaf *)block;
+	bps_tree_pos_t pos;
+	pos = bps_tree_find_after_ins_point_elem(tree, leaf->elems,
+						 leaf->header.size,
+						 key, &exact_test);
 	if (exact_test)
 		*exact = true;
 	if (pos >= leaf->header.size) {
@@ -5847,6 +6035,8 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_iterator_last
 #undef bps_tree_lower_bound
 #undef bps_tree_upper_bound
+#undef bps_tree_lower_bound_elem
+#undef bps_tree_upper_bound_elem
 #undef bps_tree_approximate_count
 #undef bps_tree_iterator_get_elem
 #undef bps_tree_iterator_next
@@ -5873,6 +6063,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_find_ins_point_key
 #undef bps_tree_find_ins_point_elem
 #undef bps_tree_find_after_ins_point_key
+#undef bps_tree_find_after_ins_point_elem
 #undef bps_tree_get_leaf_safe
 #undef bps_tree_garbage_push
 #undef bps_tree_garbage_pop

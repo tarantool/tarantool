@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(62)
+test:plan(63)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -53,9 +53,8 @@ status, result = pcall(function() return box.index.EQ end)
 test:ok(status and type(result) == 'number', "box.index without box.cfg")
 status, result = pcall(box.session.id)
 test:ok(status, "box.session without box.cfg")
-status, result = pcall(function() return box.sql end)
-test:ok(not status and result:match('Please call box.cfg{}'),
-	'exception on unconfigured box')
+status, result = pcall(box.tuple.new, {1, 2, 3})
+test:ok(status and result[1] == 1, "box.tuple without box.cfg")
 
 os.execute("rm -rf vinyl")
 box.cfg{
@@ -116,6 +115,10 @@ local status, reason = pcall(function()
     box.space._schema:insert({'read_only', 'test'})
 end)
 test:ok(status, "read_only = false")
+
+-- gh-2663: box.cfg() parameter to set the number of coio threads
+box.cfg({ worker_pool_threads = 1})
+test:is(box.cfg.worker_pool_threads, 1, 'worker_pool_threads')
 
 local tarantool_bin = arg[-1]
 local PANIC = 256

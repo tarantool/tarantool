@@ -6,7 +6,7 @@ from signal import SIGUSR1
 
 sys.stdout.push_filter(server.vardir, "<dir>")
 
-admin("space = box.schema.space.create('tweedledum', { id = 0 })")
+admin("space = box.schema.space.create('tweedledum')")
 admin("index = space:create_index('primary', { type = 'hash' })")
 
 print """#

@@ -19,7 +19,7 @@ wal = os.path.join(data_path, filename)
 
 server.start()
 
-server.admin("space = box.schema.space.create('tweedledum', { id = 0 })")
+server.admin("space = box.schema.space.create('tweedledum')")
 if os.access(wal, os.F_OK):
   print ".xlog exists"
 
@@ -36,7 +36,7 @@ server.start()
 
 wal = os.path.join(data_path, filename)
 
-server.admin("box.space[0]:insert{3, 'third tuple'}")
+server.admin("box.space.tweedledum:insert{3, 'third tuple'}")
 
 if os.access(wal, os.F_OK):
   print "a new .xlog exists"
@@ -54,8 +54,8 @@ print """
 server.start()
 filename = str(lsn).zfill(20) + ".xlog"
 wal = os.path.join(data_path, filename)
-server.admin("box.space[0]:insert{4, 'fourth tuple'}")
-server.admin("box.space[0]:insert{5, 'Unfinished record'}")
+server.admin("box.space.tweedledum:insert{4, 'fourth tuple'}")
+server.admin("box.space.tweedledum:insert{5, 'Unfinished record'}")
 pid = int(yaml.load(server.admin("require('tarantool').pid()", silent=True))[0])
 from signal import SIGKILL
 if pid > 0:

@@ -191,3 +191,43 @@ utils.sort(s0.index['i2']:select(0))
 s0:drop()
 s0 = nil
 
+-- Stable non-unique indexes
+-- https://github.com/tarantool/tarantool/issues/2476
+s = box.schema.space.create('test')
+i1 = s:create_index('i1', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
+i2 = s:create_index('i2', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+s:replace{5, 1, 1}
+s:replace{4, 1, 3}
+s:replace{6, 1, 2}
+s:replace{3, 1, 0}
+s:replace{7, 1, 100}
+s:replace{15, 2, 11}
+s:replace{14, 2, 41}
+s:replace{16, 2, 31}
+s:replace{13, 2, 13}
+s:replace{17, 2, 10}
+i2:select{1}
+i2:select{2}
+i2:select{1, 5}
+
+i1:alter{parts = {3, 'unsigned'}}
+i2:select{1}
+i2:select{2}
+i2:select{1, 1}
+
+s:truncate()
+i1:alter{parts = {1, 'str'}}
+s:replace{"5", 1}
+s:replace{"4", 1}
+s:replace{"6", 1}
+s:replace{"3", 1}
+s:replace{"7", 1}
+s:replace{"15", 2}
+s:replace{"14", 2}
+s:replace{"16", 2}
+s:replace{"13", 2}
+s:replace{"17", 2}
+i2:select{1}
+i2:select{2}
+
+s:drop()

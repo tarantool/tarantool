@@ -76,6 +76,15 @@ wait_repl(50)
 test_run:cmd("switch default")
 box.space.test.index[0]:count()
 
+-- Check that master doesn't stall on WALs without EOF (gh-2294).
+errinj.set("ERRINJ_WAL_WRITE_EOF", true)
+box.snapshot()
+test_f(51, true)
+test_run:cmd("switch replica")
+wait_repl(60)
+test_run:cmd("switch default")
+errinj.set("ERRINJ_WAL_WRITE_EOF", false)
+
 test_run:cmd("switch replica")
 test_run:cmd("stop server default")
 test_run:cmd("deploy server default")

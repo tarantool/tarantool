@@ -365,3 +365,79 @@ s:select{}
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 
 s:drop()
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+for i = 0, 9 do s:replace({i, i + 1}) end
+box.snapshot()
+errinj.set("ERRINJ_XLOG_GARBAGE", true)
+s:select()
+errinj.set("ERRINJ_XLOG_GARBAGE", false)
+errinj.set("ERRINJ_VYRUN_DATA_READ", true)
+s:select()
+errinj.set("ERRINJ_VYRUN_DATA_READ", false)
+s:select()
+s:drop()
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+for i = 0, 9 do s:replace({i, i + 1}) end
+errinj.set("ERRINJ_XLOG_GARBAGE", true)
+box.snapshot()
+for i = 10, 19 do s:replace({i, i + 1}) end
+errinj.set("ERRINJ_XLOG_GARBAGE", false)
+box.snapshot()
+s:select()
+
+s:drop()
+
+-- Point select from secondary index during snapshot.
+-- Once upon time that leaded to crash.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i1 = s:create_index('pk', {parts = {1, 'uint'}, bloom_fpr = 0.5})
+i2 = s:create_index('sk', {parts = {2, 'uint'}, bloom_fpr = 0.5})
+
+for i = 1,10 do s:replace{i, i, 0} end
+
+test_run:cmd("setopt delimiter ';'")
+function worker()
+    for i = 11,20,2 do
+        s:upsert({i, i}, {{'=', 3, 1}})
+        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
+        i1:select{i}
+        s:upsert({i + 1 ,i + 1}, {{'=', 3, 1}})
+        errinj.set("ERRINJ_VY_POINT_ITER_WAIT", true)
+        i2:select{i + 1}
+    end
+end
+test_run:cmd("setopt delimiter ''");
+
+f = fiber.create(worker)
+
+while f:status() ~= 'dead' do box.snapshot() fiber.sleep(0.01) end
+
+errinj.set("ERRINJ_VY_POINT_ITER_WAIT", false)
+s:drop()
+
+-- vinyl: vy_cache_add: Assertion `0' failed
+-- https://github.com/tarantool/tarantool/issues/2685
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+s:replace{2, 0}
+box.snapshot()
+s:replace{1, 0}
+box.snapshot()
+s:replace{0, 0}
+s:select{0}
+
+errinj.set("ERRINJ_WAL_DELAY", true)
+wait_replace = true
+_ = fiber.create(function() s:replace{1, 1} wait_replace = false end)
+gen,param,state = s:pairs({1}, {iterator = 'GE'})
+state, value = gen(param, state)
+value
+errinj.set("ERRINJ_WAL_DELAY", false)
+while wait_replace do fiber.sleep(0.01) end
+state, value = gen(param, state)
+value
+s:drop()

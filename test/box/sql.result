@@ -7,7 +7,7 @@ test_run = env.new()
 net_box = require('net.box')
 ---
 ...
-s = box.schema.space.create('test', { id = 0 })
+s = box.schema.space.create('test')
 ---
 ...
 _ = box.schema.space.create('test1', { id = 555 })
@@ -234,7 +234,7 @@ box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'execute,read,write', 'universe')
 ---
 ...
-s = box.schema.space.create('tweedledum', { id = 0 })
+s = box.schema.space.create('tweedledum')
 ---
 ...
 index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'string'} })
@@ -507,7 +507,7 @@ sorted(space.index.secondary:select('part_none'))
 ---
 - []
 ...
-sorted(box.space[0].index[1]:select({'part1', 'part2'}))
+sorted(s.index[1]:select({'part1', 'part2'}))
 ---
 - - [1234567, 'part1', 'part2']
   - [11234567, 'part1', 'part2']
@@ -589,7 +589,7 @@ conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.tweedledum
 ---
 ...
-s = box.space[0]
+s = box.space.tweedledum
 ---
 ...
 -- Bug#929654 - secondary hash index is not built with build_indexes()

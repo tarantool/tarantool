@@ -1280,6 +1280,8 @@ function box.schema.func.exists(name_or_id)
     return tuple ~= nil
 end
 
+box.schema.func.reload = internal.func_reload
+
 box.schema.user = {}
 
 box.schema.user.password = function(password)

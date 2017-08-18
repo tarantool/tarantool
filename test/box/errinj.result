@@ -12,55 +12,71 @@ index = space:create_index('primary', { type = 'hash' })
 ...
 errinj.info()
 ---
-- ERRINJ_VY_READ_PAGE:
+- ERRINJ_WAL_WRITE:
     state: false
-  ERRINJ_WAL_WRITE:
+  ERRINJ_VYRUN_DATA_READ:
     state: false
+  ERRINJ_VY_SCHED_TIMEOUT:
+    state: 0
+  ERRINJ_WAL_WRITE_PARTIAL:
+    state: -1
+  ERRINJ_VY_GC:
+    state: false
+  ERRINJ_WAL_DELAY:
+    state: false
+  ERRINJ_XLOG_READ:
+    state: -1
+  ERRINJ_WAL_WRITE_EOF:
+    state: false
+  ERRINJ_VYRUN_INDEX_GARBAGE:
+    state: false
+  ERRINJ_VY_TASK_COMPLETE:
+    state: false
+  ERRINJ_PORT_DUMP:
+    state: false
+  ERRINJ_WAL_IO:
+    state: false
+  ERRINJ_TUPLE_ALLOC:
+    state: false
+  ERRINJ_VY_READ_PAGE:
+    state: false
+  ERRINJ_RELAY_REPORT_INTERVAL:
+    state: 0
   ERRINJ_VY_READ_PAGE_TIMEOUT:
+    state: false
+  ERRINJ_XLOG_META:
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
   ERRINJ_VY_RUN_WRITE:
     state: false
-  ERRINJ_VY_GC:
-    state: false
-  ERRINJ_WAL_DELAY:
-    state: false
-  ERRINJ_VY_INDEX_DUMP:
-    state: -1
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false
   ERRINJ_VY_RUN_DISCARD:
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_PORT_DUMP:
-    state: false
-  ERRINJ_RELAY_REPORT_INTERVAL:
-    state: 0
-  ERRINJ_RELAY_TIMEOUT:
-    state: 0
-  ERRINJ_VY_LOG_FLUSH:
-    state: false
-  ERRINJ_VY_TASK_COMPLETE:
-    state: false
-  ERRINJ_VY_RUN_WRITE_TIMEOUT:
-    state: 0
-  ERRINJ_VY_SCHED_TIMEOUT:
-    state: 0
-  ERRINJ_WAL_IO:
-    state: false
-  ERRINJ_VY_SQUASH_TIMEOUT:
-    state: 0
-  ERRINJ_TESTING:
-    state: false
-  ERRINJ_INDEX_ALLOC:
+  ERRINJ_VY_POINT_ITER_WAIT:
     state: false
   ERRINJ_TUPLE_FIELD:
     state: false
-  ERRINJ_TUPLE_ALLOC:
+  ERRINJ_INDEX_ALLOC:
     state: false
-  ERRINJ_WAL_WRITE_PARTIAL:
+  ERRINJ_XLOG_GARBAGE:
+    state: false
+  ERRINJ_VY_RUN_WRITE_TIMEOUT:
+    state: 0
+  ERRINJ_RELAY_TIMEOUT:
+    state: 0
+  ERRINJ_TESTING:
+    state: false
+  ERRINJ_VY_LOG_FLUSH:
+    state: false
+  ERRINJ_VY_SQUASH_TIMEOUT:
+    state: 0
+  ERRINJ_BUILD_SECONDARY:
+    state: -1
+  ERRINJ_VY_INDEX_DUMP:
     state: -1
 ...
 errinj.set("some-injection", true)
@@ -844,6 +860,149 @@ _ = {fiber.create(test, {1, 2, 3}), fiber.create(test, {3, 4, 5})}
     - Failed to write to disk
 ...
 errinj.set("ERRINJ_WAL_WRITE", false)
+---
+- ok
+...
+s:drop()
+---
+...
+-- rebuild some secondary indexes if the primary was changed
+s = box.schema.space.create('test')
+---
+...
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
+---
+...
+--i2 = s:create_index('i2', {parts = {5, 'unsigned'}, unique = false})
+--i3 = s:create_index('i3', {parts = {6, 'unsigned'}, unique = false})
+i2 = i1 i3 = i1
+---
+...
+_ = s:insert{1, 4, 3, 4, 10, 10}
+---
+...
+_ = s:insert{2, 3, 1, 2, 10, 10}
+---
+...
+_ = s:insert{3, 2, 2, 1, 10, 10}
+---
+...
+_ = s:insert{4, 1, 4, 3, 10, 10}
+---
+...
+i1:select{}
+---
+- - [1, 4, 3, 4, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [4, 1, 4, 3, 10, 10]
+...
+i2:select{}
+---
+- - [1, 4, 3, 4, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [4, 1, 4, 3, 10, 10]
+...
+i3:select{}
+---
+- - [1, 4, 3, 4, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [4, 1, 4, 3, 10, 10]
+...
+i1:alter({parts={2, 'unsigned'}})
+---
+...
+_ = collectgarbage('collect')
+---
+...
+i1:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+i2:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+i3:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', i2.id)
+---
+- ok
+...
+i1:alter{parts = {3, "unsigned"}}
+---
+- error: Error injection 'buildSecondaryKey'
+...
+_ = collectgarbage('collect')
+---
+...
+i1:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+i2:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+i3:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', i3.id)
+---
+- ok
+...
+i1:alter{parts = {4, "unsigned"}}
+---
+- error: Error injection 'buildSecondaryKey'
+...
+_ = collectgarbage('collect')
+---
+...
+i1:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+i2:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+i3:select{}
+---
+- - [4, 1, 4, 3, 10, 10]
+  - [3, 2, 2, 1, 10, 10]
+  - [2, 3, 1, 2, 10, 10]
+  - [1, 4, 3, 4, 10, 10]
+...
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
 ---
 - ok
 ...

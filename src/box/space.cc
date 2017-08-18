@@ -32,7 +32,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tuple.h"
-#include "tuple_format.h"
 #include "tuple_compare.h"
 #include "scoped_guard.h"
 #include "trigger.h"
@@ -84,17 +83,15 @@ space_new(struct space_def *def, struct rlist *key_list)
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
 	struct index_def *index_def;
-	struct index_def *pk = NULL;
+	struct index_def *pk = rlist_empty(key_list) ? NULL :
+		rlist_first_entry(key_list, struct index_def, link);
 	def = space_def_dup(def);
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
-		/* Find the primary key, we need to create it first. */
-		if (index_def->iid == 0)
-			pk = index_def;
 		index_id_max = MAX(index_id_max, index_def->iid);
 	}
 	/* A space with a secondary key without a primary is illegal. */
-	assert(index_count == 0 || pk != NULL);
+	assert(index_count == 0 || pk->iid == 0);
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
 	struct space *space = (struct space *) calloc(1, sz);
@@ -112,47 +109,10 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
 	Engine *engine = engine_find(def->engine_name);
-	struct key_def **keys;
-	keys = (struct key_def **)region_alloc_xc(&fiber()->gc,
-						  sizeof(*keys) * index_count);
-	/* SysviewEngine doesn't need format */
-	if (engine->format != NULL) {
-		/**
-		 * In non-unique indexes, secondary keys must contain key parts
-		 * of the primary key. This is necessary to make ordered
-		 * retrieval from a secondary key useful to SQL
-		 * optimizer and make iterators over secondary keys stable
-		 * in presence of concurrent updates.
-		 * Since primary key fields may be used in a secondary key
-		 * too, we want add them to the field map in tuple_format_new().
-		 * Thus we always create the primary key first, and put
-		 * the primary key key_def first in the key_def array.
-		 * tuple_format_new() is a public API since 1.7.3 and
-		 * changing its signature by explicitly passing the
-		 * primary key key_def would unnecessarily break it.
-		 */
-		uint32_t key_no = 0;
-		rlist_foreach_entry(index_def, key_list, link) {
-			keys[index_def == pk ? 0 : ++key_no] =
-				index_def->key_def;
-		}
-		/** Tuple format must be created before any other index. */
-		space->format = tuple_format_new(engine->format, keys,
-						 index_count, 0);
-		if (space->format == NULL)
-			diag_raise();
-		tuple_format_ref(space->format, 1);
-		space->format->exact_field_count = def->exact_field_count;
-	}
 	/* init space engine instance */
-	space->handler = engine->createSpace();
-	/* Fill the space indexes. */
-	if (pk) {
-		space->index_map[0] = space->handler->createIndex(space, pk);
-	}
+	space->handler = engine->createSpace(key_list, index_count,
+					     def->exact_field_count);
 	rlist_foreach_entry(index_def, key_list, link) {
-		if (index_def == pk)
-			continue;
 		space->index_map[index_def->iid] =
 			space->handler->createIndex(space, index_def);
 	}
@@ -170,8 +130,6 @@ space_delete(struct space *space)
 		if (index)
 			delete index;
 	}
-	if (space->format)
-		tuple_format_ref(space->format, -1);
 	if (space->handler)
 		delete space->handler;
 
@@ -197,9 +155,18 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 {
 	rlist_create(key_list);
 
+	/** Ensure the primary key is added first. */
 	for (unsigned j = 0; j < space->index_count; j++)
 		rlist_add_tail_entry(key_list, space->index[j]->index_def,
 				     link);
+}
+
+struct key_def *
+space_index_key_def(struct space *space, uint32_t id)
+{
+	if (id <= space->index_id_max && space->index_map[id])
+		return space->index_map[id]->index_def->key_def;
+	return NULL;
 }
 
 void

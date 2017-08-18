@@ -41,9 +41,17 @@
 #include <stdio.h>
 #include <string.h>
 
-VinylSpace::VinylSpace(Engine *e)
-	:Handler(e)
-{}
+VinylSpace::VinylSpace(Engine *e, struct tuple_format *format)
+	:Handler(e),
+	m_format(format)
+{
+	tuple_format_ref(m_format);
+}
+
+VinylSpace::~VinylSpace()
+{
+	tuple_format_unref(m_format);
+}
 
 /* {{{ DML */
 
@@ -174,7 +182,12 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 		unreachable();
 		return NULL;
 	}
-	return new VinylIndex(engine->env, space, index_def);
+	struct vy_index *pk = NULL;
+	if (index_def->iid > 0) {
+		pk = vy_index(space_index(space, 0));
+		assert(pk != NULL);
+	}
+	return new VinylIndex(engine->env, index_def, m_format, pk);
 }
 
 void
@@ -243,12 +256,13 @@ VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 void
 VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 {
+	(void) old_space;
 	VinylEngine *engine = (VinylEngine *) this->engine;
 	if (new_space == NULL || new_space->index_count == 0) {
 		/* This is a drop space. */
 		return;
 	}
-	if (vy_commit_alter_space(engine->env, old_space, new_space) != 0)
+	if (vy_commit_alter_space(engine->env, new_space, m_format) != 0)
 		diag_raise();
 }
 

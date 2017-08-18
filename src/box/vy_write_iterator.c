@@ -364,9 +364,9 @@ vy_write_iterator_new(const struct key_def *cmp_def, struct tuple_format *format
 	rlist_create(&stream->src_list);
 	stream->cmp_def = cmp_def;
 	stream->format = format;
-	tuple_format_ref(stream->format, 1);
+	tuple_format_ref(stream->format);
 	stream->upsert_format = upsert_format;
-	tuple_format_ref(stream->upsert_format, 1);
+	tuple_format_ref(stream->upsert_format);
 	stream->is_primary = is_primary;
 	stream->is_last_level = is_last_level;
 	return &stream->base;
@@ -414,8 +414,8 @@ vy_write_iterator_close(struct vy_stmt_stream *vstream)
 	assert(vstream->iface->close == vy_write_iterator_close);
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	vy_write_iterator_stop(vstream);
-	tuple_format_ref(stream->format, -1);
-	tuple_format_ref(stream->upsert_format, -1);
+	tuple_format_unref(stream->format);
+	tuple_format_unref(stream->upsert_format);
 	free(stream);
 }
 

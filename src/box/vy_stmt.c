@@ -44,16 +44,28 @@
 #include "xrow.h"
 #include "fiber.h"
 
+enum {
+	/** Lowest allowed vinyl_max_tuple_size. */
+	TUPLE_MAX_SIZE_MIN = 16 * 1024,
+	SLAB_SIZE_MIN = 1024 * 1024
+};
+
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_delete,
 };
 
 void
-vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
-		   uint32_t tuple_max_size)
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t memory,
+		   uint32_t max_tuple_size)
 {
-	tuple_arena_create(&env->arena, &env->quota, arena_max_size,
-			   tuple_max_size, "vinyl");
+	if (max_tuple_size < TUPLE_MAX_SIZE_MIN)
+		max_tuple_size = TUPLE_MAX_SIZE_MIN;
+	uint32_t slab_size = small_round(max_tuple_size * 4);
+
+	/* Vinyl memory is limited by vy_quota. */
+	quota_init(&env->quota, QUOTA_MAX);
+	tuple_arena_create(&env->arena, &env->quota, memory,
+			   slab_size, "vinyl");
 	lsregion_create(&env->allocator, &env->arena);
 }
 
@@ -75,7 +87,7 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	 * counter.
 	 */
 	if (cord_is_main())
-		tuple_format_ref(format, -1);
+		tuple_format_unref(format);
 #ifndef NDEBUG
 	memset(tuple, '#', tuple_size(tuple)); /* fail early */
 #endif
@@ -107,7 +119,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 	tuple->refs = 1;
 	tuple->format_id = tuple_format_id(format);
 	if (cord_is_main())
-		tuple_format_ref(format, 1);
+		tuple_format_ref(format);
 	tuple->bsize = bsize;
 	tuple->data_offset = sizeof(struct vy_stmt) + meta_size;;
 	vy_stmt_set_lsn(tuple, 0);
@@ -538,7 +550,9 @@ vy_stmt_encode_secondary(const struct tuple *value,
 
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format, bool is_primary)
+	       struct tuple_format *format,
+	       struct tuple_format *upsert_format,
+	       bool is_primary)
 {
 	struct request request;
 	uint64_t key_map = dml_request_key_map(xrow->type);
@@ -569,7 +583,7 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	case IPROTO_UPSERT:
 		ops.iov_base = (char *)request.ops;
 		ops.iov_len = request.ops_end - request.ops;
-		stmt = vy_stmt_new_upsert(format, request.tuple,
+		stmt = vy_stmt_new_upsert(upsert_format, request.tuple,
 					  request.tuple_end, &ops, 1);
 		break;
 	default:
@@ -648,9 +662,9 @@ vy_stmt_str(const struct tuple *stmt)
 }
 
 struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *space_format)
+vy_tuple_format_new_with_colmask(struct tuple_format *mem_format)
 {
-	struct tuple_format *format = tuple_format_dup(space_format);
+	struct tuple_format *format = tuple_format_dup(mem_format);
 	if (format == NULL)
 		return NULL;
 	/* + size of column mask. */
@@ -660,13 +674,30 @@ vy_tuple_format_new_with_colmask(struct tuple_format *space_format)
 }
 
 struct tuple_format *
-vy_tuple_format_new_upsert(struct tuple_format *space_format)
+vy_tuple_format_new_upsert(struct tuple_format *mem_format)
 {
-	struct tuple_format *format = tuple_format_dup(space_format);
+	struct tuple_format *format = tuple_format_dup(mem_format);
 	if (format == NULL)
 		return NULL;
 	/* + size of n_upserts. */
 	assert(format->extra_size == 0);
 	format->extra_size = sizeof(uint8_t);
 	return format;
+}
+
+char *
+vy_stmt_extract_key(struct xrow_header *xrow,
+		    const struct key_def *key_def,
+		    struct tuple_format *mem_format,
+		    struct tuple_format *upsert_format,
+		    bool is_primary)
+{
+	struct tuple *tuple;
+	tuple = vy_stmt_decode(xrow, key_def, mem_format, upsert_format,
+			       is_primary);
+	if (tuple == NULL)
+		return NULL;
+	char *key = tuple_extract_key(tuple, key_def, NULL);
+	tuple_unref(tuple);
+	return key;
 }

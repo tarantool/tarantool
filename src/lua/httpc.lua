@@ -100,6 +100,16 @@ end
 --
 --      ca_file - a path to ssl certificate file;
 --
+--      verify_host - set on/off verification of the certificate's name (CN)
+--          against host;
+--
+--      verify_peer - set on/off verification of the peer's SSL certificate;
+--
+--      ssl_key - set path to the file with private key for TLS and SSL client
+--          certificate;
+--
+--      ssl_cert - set path to the file with SSL client certificate;
+--
 --      headers - a table of HTTP headers;
 --
 --      keepalive_idle & keepalive_interval -

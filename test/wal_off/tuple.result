@@ -26,7 +26,11 @@ function tuple_max()
     local n = 'a'
     while true do
         n = n..n
-        tester:insert{#n, n}
+        local status, reason = pcall(tester.insert, tester, {#n, n})
+        if not status then
+            return #n, reason
+        end
+        collectgarbage('collect')
     end
 end;
 ---
@@ -35,20 +39,21 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-tuple_max()
----
-- error: 'Failed to allocate 1048603 bytes for tuple in the slab allocator: tuple
-    is too large. Check ''memtx_max_tuple_size'' configuration option.'
-...
-tuple_max = string.rep('a', 1000000)
+n, reason = tuple_max()
 ---
 ...
-#tuple_max
+n
 ---
-- 1000000
+- 1048576
 ...
-t = tester:insert{#tuple_max, tuple_max}
+n + 32 >= box.cfg.memtx_max_tuple_size
 ---
+- true
+...
+reason
+---
+- 'Failed to allocate 1048603 bytes for tuple in the slab allocator: tuple is too
+  large. Check ''memtx_max_tuple_size'' configuration option.'
 ...
 tester:drop()
 ---

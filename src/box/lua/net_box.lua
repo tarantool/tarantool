@@ -739,7 +739,7 @@ function remote_methods:_request(method, opts, ...)
         elseif not err then
             setmetatable(res, sequence_mt)
             local postproc = method ~= 'eval' and method ~= 'call_17'
-            if postproc and rawget(box, 'tuple') then
+            if postproc then
                 local tnew = box.tuple.new
                 for i, v in pairs(res) do
                     res[i] = tnew(v)

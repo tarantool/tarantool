@@ -58,7 +58,7 @@ vinyl_engine_get_env()
 }
 
 VinylEngine::VinylEngine()
-	:Engine("vinyl", &vy_tuple_format_vtab)
+	:Engine("vinyl")
 {
 	env = NULL;
 }
@@ -72,7 +72,13 @@ VinylEngine::~VinylEngine()
 void
 VinylEngine::init()
 {
-	env = vy_env_new();
+	env = vy_env_new(cfg_gets("vinyl_dir"),
+			 cfg_geti64("vinyl_memory"),
+			 cfg_geti64("vinyl_cache"),
+			 cfg_geti("vinyl_read_threads"),
+			 cfg_geti("vinyl_write_threads"),
+			 cfg_getd("vinyl_timeout"),
+			 cfg_geti("vinyl_max_tuple_size"));
 	if (env == NULL)
 		panic("failed to create vinyl environment");
 }
@@ -107,10 +113,29 @@ VinylEngine::endRecovery()
 }
 
 Handler *
-VinylEngine::createSpace()
+VinylEngine::createSpace(struct rlist *key_list,
+			 uint32_t index_count,
+			 uint32_t exact_field_count)
 {
-	return new VinylSpace(this);
+	struct index_def *index_def;
+	uint32_t key_no = 0;
+	struct key_def **keys =
+		(struct key_def **)region_alloc_xc(&fiber()->gc,
+						   sizeof(*keys) * index_count);
+
+	rlist_foreach_entry(index_def, key_list, link)
+			keys[key_no++] = index_def->key_def;
+
+	struct tuple_format *format =
+		tuple_format_new(&vy_tuple_format_vtab, keys, index_count, 0);
+	if (format == NULL)
+		diag_raise();
+	tuple_format_ref(format);
+	format->exact_field_count = exact_field_count;
+	auto format_guard = make_scoped_guard([=] { tuple_format_unref(format); });
+	return new VinylSpace(this, format);
 }
+
 void
 VinylEngine::join(struct vclock *vclock, struct xstream *stream)
 {
@@ -234,9 +259,9 @@ VinylEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
 }
 
 void
-VinylEngine::updateOptions()
+VinylEngine::setTimeout(double timeout)
 {
-	if (vy_update_options(env) != 0)
+	if (vy_set_timeout(env, timeout) != 0)
 		diag_raise();
 }
 

@@ -461,6 +461,13 @@ tarantool_free(void)
 	if (getpid() != master_pid)
 		return;
 
+	/*
+	 * It's better to do nothing and keep xlogs opened when
+	 * we are called by exit() from a non-main thread.
+	 */
+	if (!cord_is_main())
+		return;
+
 	/* Shutdown worker pool. Waits until threads terminate. */
 	coio_shutdown();
 

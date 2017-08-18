@@ -408,7 +408,7 @@ sql_row_to_port(struct sqlite3_stmt *stmt, int column_count,
 		goto error;
 	}
 	struct tuple *tuple =
-		memtx_tuple_new(tuple_format_default, pos, pos + size);
+		memtx_tuple_new(box_tuple_format_default(), pos, pos + size);
 	if (tuple == NULL)
 		goto error;
 	region_truncate(region, svp);

@@ -38,6 +38,7 @@
 #include "small/lsregion.h"
 #include "vy_mem.h"
 #include "vy_stmt_iterator.h"
+#include "vy_cache.h"
 
 #define vyend 99999999
 #define MAX_FIELDS_COUNT 100
@@ -48,6 +49,24 @@
 { { __VA_ARGS__, vyend }, IPROTO_##type, lsn, true }
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
+extern struct tuple_format *vy_key_format;
+extern struct vy_cache_env cache_env;
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/**
+ * Initialize subsystems neccessary for correct vinyl iterators
+ * working.
+ * @param cache_size Vinyl cache quota limit.
+ */
+void
+vy_iterator_C_test_init(size_t cache_size);
+
+/** Close subsystems, opened in vy_iterator_C_test_init(). */
+void
+vy_iterator_C_test_finish();
 
 /** Template for creation a vinyl statement. */
 struct vy_stmt_template {
@@ -95,6 +114,33 @@ vy_mem_insert_template(struct vy_mem *mem,
 		       const struct vy_stmt_template *templ);
 
 /**
+ * Insert into the cache the statement template chain, got from
+ * the read iterator.
+ * @param cache Cache to insert into.
+ * @param format Statements format.
+ * @param chain Statement template array.
+ * @param length Length of @a chain.
+ * @param key_templ Key template.
+ * @param order Iteration order.
+ */
+void
+vy_cache_insert_templates_chain(struct vy_cache *cache,
+				struct tuple_format *format,
+				const struct vy_stmt_template *chain,
+				uint length,
+				const struct vy_stmt_template *key_templ,
+				enum iterator_type order);
+
+/**
+ * Vy_cache_on_write wrapper for statement templates.
+ * @param cache Cache to update to.
+ * @param templ Written statement template.
+ */
+void
+vy_cache_on_write_template(struct vy_cache *cache, struct tuple_format *format,
+			   const struct vy_stmt_template *templ);
+
+/**
  * Create a list of read views using the specified vlsns.
  *
  * @param rlist[out] Result list of read views.
@@ -120,6 +166,31 @@ struct vy_mem *
 create_test_mem(struct lsregion *region, struct key_def *def);
 
 /**
+ * Create vy_cache, key_def and tuple_format, using a specified
+ * array of key fields.
+ * @param fields Array of key field numbers.
+ * @param types Array of key field types.
+ * @param key_cnt Length of @a fields and @a types.
+ * @param[out] cache Cache to create.
+ * @param[out] def Key def to create.
+ * @param[out] format Tuple format to create.
+ */
+void
+create_test_cache(uint32_t *fields, uint32_t *types,
+		  int key_cnt, struct vy_cache *cache, struct key_def **def,
+		  struct tuple_format **format);
+
+/**
+ * Destroy cache and its resources.
+ * @param vy_cache Cache to destroy.
+ * @param key_def Key def to delete.
+ * @param format Tuple format to unref.
+ */
+void
+destroy_test_cache(struct vy_cache *cache, struct key_def *def,
+		   struct tuple_format *format);
+
+/**
  * Check that the template specifies completely the same statement
  * as @stmt.
  *
@@ -137,5 +208,9 @@ vy_stmt_are_same(const struct tuple *actual,
 		 struct tuple_format *format,
 		 struct tuple_format *upsert_format,
 		 struct tuple_format *format_with_colmask);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif

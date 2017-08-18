@@ -80,9 +80,6 @@ struct space {
 	uint64_t truncate_count;
 	/** Enable/disable triggers. */
 	bool run_triggers;
-
-	/** Default tuple format used by this space */
-	struct tuple_format *format;
 	/**
 	 * Sparse array of indexes defined on the space, indexed
 	 * by id. Used to quickly find index by id (for SELECTs).
@@ -128,6 +125,13 @@ space_index(struct space *space, uint32_t id)
 }
 
 /**
+ * Return key_def of the index identified by id or NULL
+ * if there is no such index.
+ */
+struct key_def *
+space_index_key_def(struct space *space, uint32_t id);
+
+/**
  * Look up the index by id.
  */
 static inline struct Index *
@@ -137,7 +141,7 @@ index_find(struct space *space, uint32_t index_id)
 	if (index == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_INDEX, index_id,
 			 space_name(space));
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 	}
 	return index;
 }

@@ -725,3 +725,21 @@ compare(im2:select{}, iv2:select{})
 
 sv:drop()
 sm:drop()
+
+s = box.schema.space.create('test', { engine = 'vinyl' })
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+
+s:replace{0, 0}
+s:replace{1, 10}
+
+box.begin()
+s:select{0 }
+txn_proxy = require('txn_proxy')
+c = txn_proxy.new()
+c("s:replace{0, 1}")
+s:upsert({1, 1}, {{'+', 2, 5}})
+s:select{0}
+s:select{1}
+box.commit()
+
+s:drop()

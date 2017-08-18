@@ -117,8 +117,6 @@ struct wal_writer
 	 * Used for replication relays.
 	 */
 	struct rlist watchers;
-	/** The lock protecting the watchers list. */
-	pthread_mutex_t watchers_mutex;
 };
 
 struct wal_msg: public cmsg {
@@ -285,7 +283,6 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	vclock_create(&writer->vclock);
 	vclock_copy(&writer->vclock, vclock);
 
-	tt_pthread_mutex_init(&writer->watchers_mutex, NULL);
 	rlist_create(&writer->watchers);
 }
 
@@ -294,7 +291,6 @@ static void
 wal_writer_destroy(struct wal_writer *writer)
 {
 	xdir_destroy(&writer->wal_dir);
-	tt_pthread_mutex_destroy(&writer->watchers_mutex);
 }
 
 /** WAL thread routine. */
@@ -462,6 +458,9 @@ wal_collect_garbage(int64_t lsn)
 	fiber_set_cancellable(cancellable);
 }
 
+static void
+wal_notify_watchers(struct wal_writer *writer, unsigned events);
+
 /**
  * If there is no current WAL, try to open it, and close the
  * previous WAL. We close the previous WAL only after opening
@@ -501,19 +500,20 @@ wal_opt_rotate(struct wal_writer *writer)
 	if (vclock == NULL) {
 		diag_set(OutOfMemory, sizeof(*vclock),
 			 "malloc", "struct vclock");
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 		return -1;
 	}
 	vclock_copy(vclock, &writer->vclock);
 
 	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
 			     &writer->vclock) != 0) {
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 		free(vclock);
 		return -1;
 	}
 	xdir_add_vclock(&writer->wal_dir, vclock);
 
+	wal_notify_watchers(writer, WAL_EVENT_ROTATE);
 	return 0;
 }
 
@@ -564,9 +564,6 @@ wal_writer_begin_rollback(struct wal_writer *writer)
 	cmsg_init(&writer->in_rollback, rollback_route);
 	cpipe_push(&wal_thread.tx_pipe, &writer->in_rollback);
 }
-
-static void
-wal_notify_watchers(struct wal_writer *writer);
 
 static void
 wal_assign_lsn(struct wal_writer *writer, struct xrow_header **row,
@@ -680,7 +677,7 @@ done:
 		wal_writer_begin_rollback(writer);
 	}
 	fiber_gc();
-	wal_notify_watchers(writer);
+	wal_notify_watchers(writer, WAL_EVENT_WRITE);
 }
 
 /** WAL thread main loop.  */
@@ -866,44 +863,122 @@ wal_rotate_vy_log()
 	fiber_set_cancellable(cancellable);
 }
 
-int
-wal_set_watcher(struct wal_watcher *watcher, struct ev_async *async)
+static void
+wal_watcher_notify(struct wal_watcher *watcher, unsigned events)
 {
-	struct wal_writer *writer = &wal_writer_singleton;
+	assert(!rlist_empty(&watcher->next));
 
-	if (journal_is_initialized(&wal_writer_singleton.base) == false)
-		return -1;
-
-	watcher->loop = loop();
-	watcher->async = async;
-	tt_pthread_mutex_lock(&writer->watchers_mutex);
-	rlist_add_tail_entry(&writer->watchers, watcher, next);
-	tt_pthread_mutex_unlock(&writer->watchers_mutex);
-	return 0;
-}
-
-void
-wal_clear_watcher(struct wal_watcher *watcher)
-{
-	struct wal_writer *writer = &wal_writer_singleton;
-	if (journal_is_initialized(&wal_writer_singleton.base) == false)
+	if (watcher->msg.cmsg.route != NULL) {
+		/*
+		 * If the notification message is still en route,
+		 * mark the watcher to resend it as soon as it
+		 * returns to WAL so as not to lose any events.
+		 */
+		watcher->events |= events;
 		return;
+	}
 
-	tt_pthread_mutex_lock(&writer->watchers_mutex);
-	rlist_del_entry(watcher, next);
-	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+	watcher->msg.events = events;
+	cmsg_init(&watcher->msg.cmsg, watcher->route);
+	cpipe_push(&watcher->watcher_pipe, &watcher->msg.cmsg);
 }
 
 static void
-wal_notify_watchers(struct wal_writer *writer)
+wal_watcher_notify_perform(struct cmsg *cmsg)
+{
+	struct wal_watcher_msg *msg = (struct wal_watcher_msg *) cmsg;
+	struct wal_watcher *watcher = msg->watcher;
+	unsigned events = msg->events;
+
+	watcher->cb(watcher, events);
+}
+
+static void
+wal_watcher_notify_complete(struct cmsg *cmsg)
+{
+	struct wal_watcher_msg *msg = (struct wal_watcher_msg *) cmsg;
+	struct wal_watcher *watcher = msg->watcher;
+
+	cmsg->route = NULL;
+
+	if (rlist_empty(&watcher->next)) {
+		/* The watcher is about to be destroyed. */
+		return;
+	}
+
+	if (watcher->events != 0) {
+		/*
+		 * Resend the message if we got notified while
+		 * it was en route, see wal_watcher_notify().
+		 */
+		wal_watcher_notify(watcher, watcher->events);
+		watcher->events = 0;
+	}
+}
+
+static void
+wal_watcher_attach(void *arg)
+{
+	struct wal_watcher *watcher = (struct wal_watcher *) arg;
+	struct wal_writer *writer = &wal_writer_singleton;
+
+	assert(rlist_empty(&watcher->next));
+	rlist_add_tail_entry(&writer->watchers, watcher, next);
+
+	/*
+	 * Notify the watcher right after registering it
+	 * so that it can process existing WALs.
+	 */
+	wal_watcher_notify(watcher, WAL_EVENT_ROTATE);
+}
+
+static void
+wal_watcher_detach(void *arg)
+{
+	struct wal_watcher *watcher = (struct wal_watcher *) arg;
+
+	assert(!rlist_empty(&watcher->next));
+	rlist_del_entry(watcher, next);
+}
+
+void
+wal_set_watcher(struct wal_watcher *watcher, const char *name,
+		void (*watcher_cb)(struct wal_watcher *, unsigned events),
+		void (*process_cb)(struct cbus_endpoint *))
+{
+	assert(journal_is_initialized(&wal_writer_singleton.base));
+
+	rlist_create(&watcher->next);
+	watcher->cb = watcher_cb;
+	watcher->msg.watcher = watcher;
+	watcher->msg.events = 0;
+	watcher->msg.cmsg.route = NULL;
+	watcher->events = 0;
+
+	assert(ARRAY_LENGTH(watcher->route) == 2);
+	watcher->route[0] = {wal_watcher_notify_perform, &watcher->wal_pipe};
+	watcher->route[1] = {wal_watcher_notify_complete, NULL};
+
+	cbus_pair("wal", name, &watcher->wal_pipe, &watcher->watcher_pipe,
+		  wal_watcher_attach, watcher, process_cb);
+}
+
+void
+wal_clear_watcher(struct wal_watcher *watcher,
+		  void (*process_cb)(struct cbus_endpoint *))
+{
+	assert(journal_is_initialized(&wal_writer_singleton.base));
+
+	cbus_unpair(&watcher->wal_pipe, &watcher->watcher_pipe,
+		    wal_watcher_detach, watcher, process_cb);
+}
+
+static void
+wal_notify_watchers(struct wal_writer *writer, unsigned events)
 {
 	struct wal_watcher *watcher;
-	/* notify watchers */
-	tt_pthread_mutex_lock(&writer->watchers_mutex);
-	rlist_foreach_entry(watcher, &writer->watchers, next) {
-		ev_async_send(watcher->loop, watcher->async);
-	}
-	tt_pthread_mutex_unlock(&writer->watchers_mutex);
+	rlist_foreach_entry(watcher, &writer->watchers, next)
+		wal_watcher_notify(watcher, events);
 }
 
 

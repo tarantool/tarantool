@@ -52,25 +52,27 @@
 static char backtrace_buf[4096 * 4];
 
 char *
-backtrace(unw_context_t *unw_ctx)
+backtrace()
 {
 	int frame_no = 0;
-	unw_word_t sp, old_sp = 0, ip, offset;
+	unw_word_t sp = 0, old_sp = 0, ip, offset;
+	unw_context_t unw_ctx;
+	unw_getcontext(&unw_ctx);
 	unw_cursor_t unw_cur;
-	unw_init_local(&unw_cur, unw_ctx);
+	unw_init_local(&unw_cur, &unw_ctx);
 	char *p = backtrace_buf;
 	char *end = p + sizeof(backtrace_buf) - 1;
 	int unw_status;
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
 		char proc[200];
+		old_sp = sp;
 		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
+		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
 		if (sp == old_sp) {
 			say_debug("unwinding error: previous frame "
 				  "identical to this frame (corrupt stack?)");
 			goto out;
 		}
-		old_sp = sp;
-		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
 		unw_get_proc_name(&unw_cur, proc, sizeof(proc), &offset);
 		p += snprintf(p, end - p, "#%-2d %p in ", frame_no, (void *)ip);
 		if (p >= end)
@@ -331,7 +333,7 @@ out:
 void
 print_backtrace()
 {
-	fdprintf(STDERR_FILENO, "%s", backtrace(NULL));
+	fdprintf(STDERR_FILENO, "%s", backtrace());
 }
 #endif /* ENABLE_BACKTRACE */
 

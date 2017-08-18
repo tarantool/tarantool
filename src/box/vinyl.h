@@ -59,7 +59,8 @@ enum iterator_type;
  */
 
 struct vy_env *
-vy_env_new(void);
+vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
+	   int write_threads, double timeout, uint32_t max_tuple_size);
 
 void
 vy_env_delete(struct vy_env *e);
@@ -227,6 +228,14 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * Index
  */
 
+struct Index;
+/**
+ * Extract vy_index from a VinylIndex object.
+ * Defined in vinyl_index.cc
+ */
+struct vy_index *
+vy_index(struct Index *index);
+
 /**
  * Create a new vinyl index object without opening it.
  * @param env             Vinyl environment.
@@ -234,8 +243,8 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * @param index_def  Index definition set by the user.
  */
 struct vy_index *
-vy_new_index(struct vy_env *env, struct space *space,
-	     struct index_def *index_def);
+vy_new_index(struct vy_env *env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk);
 
 /**
  * Delete a vinyl index object.
@@ -287,8 +296,8 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
  * @retval -1 Memory or new format register error.
  */
 int
-vy_commit_alter_space(struct vy_env *env, struct space *old_space,
-		      struct space *new_space);
+vy_commit_alter_space(struct vy_env *env, struct space *new_space,
+		      struct tuple_format *new_format);
 
 /**
  * Open a vinyl index.
@@ -298,7 +307,7 @@ vy_commit_alter_space(struct vy_env *env, struct space *old_space,
  * creates the index directory.
  */
 int
-vy_index_open(struct vy_env *env, struct vy_index *index);
+vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery);
 
 /**
  * Commit index creation in the metadata log.
@@ -361,8 +370,11 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
  * Configuration
  */
 
+/**
+ * Update query timeout.
+ */
 int
-vy_update_options(struct vy_env *env);
+vy_set_timeout(struct vy_env *env, double timeout);
 
 #ifdef __cplusplus
 }

@@ -608,8 +608,19 @@ xrow_encode_vclock_xc(struct xrow_header *row, const struct vclock *vclock)
  * \param row
  * \param[out] vclock
 */
-static inline void
+static inline int
 xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
+{
+	return xrow_decode_subscribe(row, NULL, NULL, vclock);
+}
+
+/**
+ * \brief Decode end of stream command (a response to JOIN command)
+ * \param row
+ * \param[out] vclock
+*/
+static inline void
+xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
 {
 	xrow_decode_subscribe_xc(row, NULL, NULL, vclock);
 }

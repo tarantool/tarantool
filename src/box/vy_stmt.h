@@ -78,13 +78,12 @@ struct vy_stmt_env {
 /**
  * Initialize vinyl statement environment.
  * @param env[out] Vinyl statement environment.
- * @param arena_max_size Memory limit for vinyl statement arena.
- * @param tuple_max_size Memory limit for a single vinyl
- *        statement.
+ * @param memory The maximum number of in-memory bytes that vinyl uses.
+ * @param max_tuple_size Memory limit for a single vinyl statement.
  */
 void
-vy_stmt_env_create(struct vy_stmt_env *env, uint64_t arena_max_size,
-		   uint32_t tuple_max_size);
+vy_stmt_env_create(struct vy_stmt_env *env, uint64_t memory,
+		   uint32_t max_tuple_size);
 
 void
 vy_stmt_env_destroy(struct vy_stmt_env *env);
@@ -622,7 +621,9 @@ vy_stmt_encode_secondary(const struct tuple *value,
  */
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format, bool is_primary);
+	       struct tuple_format *format,
+	       struct tuple_format *upsert_format,
+	       bool is_primary);
 
 /**
  * Format a key into string.
@@ -658,25 +659,41 @@ vy_stmt_str(const struct tuple *stmt);
 /**
  * Create a tuple format with column mask of an update operation.
  * @sa vy_index.column_mask, vy_can_skip_update().
- * @param space_format A base tuple format.
+ * @param mem_format A base tuple format.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
 struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *space_format);
+vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
 
 /**
  * Create a tuple format for UPSERT tuples. UPSERTs has an additional
  * extra byte before an offsets table, that stores the count
  * of squashed upserts @sa vy_squash.
- * @param space_format A base tuple format.
+ * @param mem_format A base tuple format.
  *
  * @retval not NULL Success.
  * @retval     NULL Memory or format register error.
  */
 struct tuple_format *
-vy_tuple_format_new_upsert(struct tuple_format *space_format);
+vy_tuple_format_new_upsert(struct tuple_format *mem_format);
+
+
+/**
+ * Extract a key from a xrow-stored vy_stmt.
+ * @param xrow xrow with encoded vy_stmt
+ * @param key_def definition of a key to extract
+ *
+ * @retval not NULL Success.
+ * @retval     NULL Error.
+ */
+char *
+vy_stmt_extract_key(struct xrow_header *xrow,
+		    const struct key_def *key_def,
+		    struct tuple_format *mem_format,
+		    struct tuple_format *upsert_format,
+		    bool is_primary);
 
 #if defined(__cplusplus)
 } /* extern "C" */

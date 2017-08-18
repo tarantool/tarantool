@@ -559,7 +559,7 @@ vy_log_record_decode(struct vy_log_record *record,
 
 	struct request req;
 	if (xrow_decode_dml(row, &req, 1ULL << IPROTO_TUPLE) != 0) {
-		error_log(diag_last_error(diag_get()));
+		diag_log();
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 "Bad record: failed to decode request");
 		return -1;
@@ -626,7 +626,7 @@ vy_log_record_decode(struct vy_log_record *record,
 			memset(key_def, 0, key_def_sizeof(part_count));
 			key_def->part_count = part_count;
 			if (key_def_decode_parts(key_def, &pos) != 0) {
-				error_log(diag_last_error(diag_get()));
+				diag_log();
 				diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 					 "Bad record: failed to decode "
 					 "index key definition");

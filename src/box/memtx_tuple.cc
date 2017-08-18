@@ -57,34 +57,30 @@ static struct slab_cache memtx_slab_cache;
 static struct quota memtx_quota;
 /** Memtx tuple allocator */
 struct small_alloc memtx_alloc; /* used box box.slab.info() */
-
+/* The maximal allowed tuple size, box.cfg.memtx_max_tuple_size */
+size_t memtx_max_tuple_size = 1 * 1024 * 1024; /* set dynamically */
 uint32_t snapshot_version;
 
 enum {
 	/** Lowest allowed slab_alloc_minimal */
 	OBJSIZE_MIN = 16,
+	SLAB_SIZE = 16 * 1024 * 1024,
 };
 
 void
 memtx_tuple_init(uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 uint32_t objsize_max, float alloc_factor)
+		 float alloc_factor)
 {
 	/* Apply lowest allowed objsize bounds */
 	if (objsize_min < OBJSIZE_MIN)
 		objsize_min = OBJSIZE_MIN;
+	/** Preallocate entire quota. */
+	quota_init(&memtx_quota, tuple_arena_max_size);
 	tuple_arena_create(&memtx_arena, &memtx_quota, tuple_arena_max_size,
-			 objsize_max, "memtx");
+			   SLAB_SIZE, "memtx");
 	slab_cache_create(&memtx_slab_cache, &memtx_arena);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
-
-	tuple_format_default_vtab = &memtx_tuple_format_vtab;
-	tuple_format_default = tuple_format_new(tuple_format_default_vtab,
-						NULL, 0, 0);
-	if (tuple_format_default == NULL)
-		diag_raise();
-	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_default, 1);
 }
 
 void
@@ -108,6 +104,13 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		     do { diag_set(OutOfMemory, (unsigned) total,
 				   "slab allocator", "memtx_tuple"); return NULL; }
 		     while(false); );
+	if (unlikely(total > memtx_max_tuple_size)) {
+		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE,
+			 (unsigned) total);
+		error_log(diag_last_error(diag_get()));
+		return NULL;
+	}
+
 	struct memtx_tuple *memtx_tuple =
 		(struct memtx_tuple *) smalloc(&memtx_alloc, total);
 	/**
@@ -119,14 +122,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * of disaster recovery.
 	 */
 	if (memtx_tuple == NULL) {
-		if (total > memtx_alloc.objsize_max) {
-			diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE,
-				 (unsigned) total);
-			error_log(diag_last_error(diag_get()));
-		} else {
-			diag_set(OutOfMemory, (unsigned) total,
+		diag_set(OutOfMemory, (unsigned) total,
 				 "slab allocator", "memtx_tuple");
-		}
 		return NULL;
 	}
 	struct tuple *tuple = &memtx_tuple->base;
@@ -135,7 +132,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
 	tuple->bsize = tuple_len;
 	tuple->format_id = tuple_format_id(format);
-	tuple_format_ref(format, 1);
+	tuple_format_ref(format);
 	/*
 	 * Data offset is calculated from the begin of the struct
 	 * tuple base, not from memtx_tuple, because the struct
@@ -160,10 +157,10 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(tuple->refs == 0);
 	size_t total = sizeof(struct memtx_tuple) +
 		       tuple_format_meta_size(format) + tuple->bsize;
-	tuple_format_ref(format, -1);
+	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
-	if (!memtx_alloc.is_delayed_free_mode ||
+	if (memtx_alloc.free_mode != SMALL_DELAYED_FREE ||
 	    memtx_tuple->version == snapshot_version)
 		smfree(&memtx_alloc, memtx_tuple, total);
 	else
@@ -181,64 +178,4 @@ void
 memtx_tuple_end_snapshot()
 {
 	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
-}
-
-box_tuple_t *
-box_tuple_update(const box_tuple_t *tuple, const char *expr,
-		 const char *expr_end)
-{
-	uint32_t new_size = 0, bsize;
-	const char *old_data = tuple_data_range(tuple, &bsize);
-	struct region *region = &fiber()->gc;
-	size_t used = region_used(region);
-	const char *new_data =
-		tuple_update_execute(region_aligned_alloc_cb, region, expr,
-				     expr_end, old_data, old_data + bsize,
-				     &new_size, 1, NULL);
-	if (new_data == NULL) {
-		region_truncate(region, used);
-		return NULL;
-	}
-
-	struct tuple *ret = memtx_tuple_new(tuple_format_default, new_data,
-					    new_data + new_size);
-	region_truncate(region, used);
-	if (ret != NULL)
-		return tuple_bless_xc(ret);
-	return NULL;
-}
-
-box_tuple_t *
-box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
-		 const char *expr_end)
-{
-	uint32_t new_size = 0, bsize;
-	const char *old_data = tuple_data_range(tuple, &bsize);
-	struct region *region = &fiber()->gc;
-	size_t used = region_used(region);
-	const char *new_data =
-		tuple_upsert_execute(region_aligned_alloc_cb, region, expr,
-				     expr_end, old_data, old_data + bsize,
-				     &new_size, 1, false, NULL);
-	if (new_data == NULL) {
-		region_truncate(region, used);
-		return NULL;
-	}
-
-	struct tuple *ret = memtx_tuple_new(tuple_format_default, new_data,
-					    new_data + new_size);
-	region_truncate(region, used);
-	if (ret != NULL)
-		return tuple_bless_xc(ret);
-	return NULL;
-}
-
-box_tuple_t *
-box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
-{
-	struct tuple *ret = memtx_tuple_new(format, data, end);
-	if (ret == NULL)
-		return NULL;
-	/* Can't throw on zero refs. */
-	return tuple_bless_xc(ret);
 }
