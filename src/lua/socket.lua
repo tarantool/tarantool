@@ -600,9 +600,8 @@ local function read(self, limit, timeout, check, ...)
         return data
     end
 
-    local started = fiber.time()
     while timeout > 0 do
-        local started = fiber.time()
+        local started = fiber.clock()
 
         assert(rbuf:size() < limit)
         local to_read = math.min(limit - rbuf:size(), buffer.READAHEAD)
@@ -635,7 +634,7 @@ local function read(self, limit, timeout, check, ...)
         if timeout <= 0 then
             break
         end
-        timeout = timeout - ( fiber.time() - started )
+        timeout = timeout - ( fiber.clock() - started )
     end
     self._errno = boxerrno.ETIMEDOUT
     return nil
@@ -675,7 +674,7 @@ socket_methods.write = function(self, octets, timeout)
         return 0
     end
 
-    local started = fiber.time()
+    local started = fiber.clock()
     while true do
         local written = syswrite(self, p, e - p)
         if written == 0 then
@@ -690,7 +689,7 @@ socket_methods.write = function(self, octets, timeout)
             return nil
         end
 
-        timeout = timeout - (fiber.time() - started)
+        timeout = timeout - (fiber.clock() - started)
         if timeout <= 0 or not self:writable(timeout) then
             break
         end
@@ -957,7 +956,7 @@ local function tcp_connect(host, port, timeout)
             family = 'PF_UNIX', type = 'SOCK_STREAM' }, timeout)
     end
     local timeout = timeout or TIMEOUT_INFINITY
-    local stop = fiber.time() + timeout
+    local stop = fiber.clock() + timeout
     local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
         protocol = 'tcp' })
     if dns == nil or #dns == 0 then
@@ -965,7 +964,7 @@ local function tcp_connect(host, port, timeout)
         return nil
     end
     for i, remote in pairs(dns) do
-        timeout = stop - fiber.time()
+        timeout = stop - fiber.clock()
         if timeout <= 0 then
             boxerrno(boxerrno.ETIMEDOUT)
             return nil

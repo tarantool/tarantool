@@ -13,6 +13,8 @@ guava
 random_bytes
 fiber_time
 fiber_time64
+fiber_clock
+fiber_clock64
 tarantool_lua_slab_cache
 ibuf_create
 ibuf_reinit

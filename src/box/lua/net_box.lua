@@ -12,7 +12,7 @@ local trigger  = require('internal.trigger')
 
 local band          = bit.band
 local max           = math.max
-local fiber_time    = fiber.time
+local fiber_clock   = fiber.clock
 local fiber_self    = fiber.self
 local ibuf_decode   = msgpack.ibuf_decode
 
@@ -177,10 +177,10 @@ local function create_transport(host, port, user, password, callback)
 
     -- FYI: [] on a string is valid
     local function wait_state(target_state, timeout)
-        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
         repeat until state == target_state or target_state[state] or
                      is_final_state[state] or
-                     not state_cond:wait(max(0, deadline - fiber_time()))
+                     not state_cond:wait(max(0, deadline - fiber_clock()))
         return state == target_state or target_state[state] or false
     end
 
@@ -223,7 +223,7 @@ local function create_transport(host, port, user, password, callback)
         if state ~= 'active' then
             return last_errno or E_NO_CONNECTION, last_error
         end
-        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
         -- alert worker to notify it of the queued outgoing data;
         -- if the buffer wasn't empty, assume the worker was already alerted
         if send_buf:size() == 0 then
@@ -239,7 +239,7 @@ local function create_transport(host, port, user, password, callback)
         request.buffer = buffer
         requests[id] = request
         repeat
-            local timeout = max(0, deadline - fiber_time())
+            local timeout = max(0, deadline - fiber_clock())
             if not state_cond:wait(timeout) then
                 requests[id] = nil
                 return E_TIMEOUT, 'Timeout exceeded'
@@ -321,12 +321,12 @@ local function create_transport(host, port, user, password, callback)
                 return nil, hdr, body_rpos, body_end
             end
         end
-        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
         local err, extra = send_and_recv(required, timeout)
         if err then
             return err, extra
         end
-        return send_and_recv_iproto(max(0, deadline - fiber_time()))
+        return send_and_recv_iproto(max(0, deadline - fiber_clock()))
     end
 
     local function send_and_recv_console(timeout)
@@ -350,13 +350,13 @@ local function create_transport(host, port, user, password, callback)
     local console_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm, error_sm
 
     protocol_sm = function ()
-        local tm_begin, tm = fiber.time(), callback('fetch_connect_timeout')
+        local tm_begin, tm = fiber.clock(), callback('fetch_connect_timeout')
         connection = socket.tcp_connect(host, port, tm)
         if connection == nil then
             return error_sm(E_NO_CONNECTION, errno.strerror(errno()))
         end
         local size = IPROTO_GREETING_SIZE
-        local err, msg = send_and_recv(size, tm - (fiber.time() - tm_begin))
+        local err, msg = send_and_recv(size, tm - (fiber.clock() - tm_begin))
         if err then
             return error_sm(err, msg)
         end
@@ -696,7 +696,7 @@ function remote_methods:_request(method, opts, ...)
     local deadline = nil
     if opts and opts.timeout then
         -- conn.space:request(, { timeout = timeout })
-        deadline = fiber_time() + opts.timeout
+        deadline = fiber_clock() + opts.timeout
     else
         -- conn:timeout(timeout).space:request()
         -- @deprecated since 1.7.4
@@ -705,10 +705,10 @@ function remote_methods:_request(method, opts, ...)
     local buffer = opts and opts.buffer
     local err, res
     repeat
-        local timeout = deadline and max(0, deadline - fiber_time())
+        local timeout = deadline and max(0, deadline - fiber_clock())
         if self.state ~= 'active' then
             wait_state('active', timeout)
-            timeout = deadline and max(0, deadline - fiber_time())
+            timeout = deadline and max(0, deadline - fiber_clock())
         end
         err, res = perform_request(timeout, buffer, method,
                                    self.schema_version, ...)
@@ -738,7 +738,7 @@ function remote_methods:ping(opts)
         -- conn:timeout(timeout):ping()
         -- @deprecated since 1.7.4
         local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline - fiber_time())
+        timeout = deadline and max(0, deadline - fiber_clock())
                             or (opts and opts.timeout)
     end
     local err = self._transport.perform_request(timeout, nil, 'ping',
@@ -790,7 +790,7 @@ function remote_methods:wait_state(state, timeout)
     check_remote_arg(self, 'wait_state')
     if timeout == nil then
         local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline-fiber_time())
+        timeout = deadline and max(0, deadline - fiber_clock())
     end
     return self._transport.wait_state(state, timeout)
 end
@@ -806,7 +806,7 @@ function remote_methods:timeout(timeout)
                  "please use space:<request>(..., {timeout = t}) instead.")
     end
     -- Sic: this is broken by design
-    self._deadlines[fiber_self()] = (timeout and fiber_time() + timeout)
+    self._deadlines[fiber_self()] = (timeout and fiber_clock() + timeout)
     return self
 end
 
@@ -909,9 +909,9 @@ function console_methods:eval(line, timeout)
     local transport = self._transport
     local pr = transport.perform_request
     if self.state ~= 'active' then
-        local deadline = fiber_time() + (timeout or TIMEOUT_INFINITY)
+        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
         transport.wait_state('active', timeout)
-        timeout = max(0, deadline - fiber_time())
+        timeout = max(0, deadline - fiber_clock())
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
