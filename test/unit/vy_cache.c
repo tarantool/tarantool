@@ -186,7 +186,7 @@ int
 main()
 {
 	plan(2);
-	vy_iterator_C_test_init(4LLU * 1024LLU * 1024LLU * 1024LLU);
+	vy_iterator_C_test_init(1LLU * 1024LLU * 1024LLU * 1024LLU);
 
 	test_basic();
 	test_gh2661_next_key();

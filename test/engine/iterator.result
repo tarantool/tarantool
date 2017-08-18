@@ -3740,7 +3740,7 @@ iterate('tweedledum', 'i3', 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
 -------------------------------------------------------------------------------
 -- Iterator: various
 -------------------------------------------------------------------------------
-space.index['primary']:pairs({}, {iterator = -666 })
+space.index['primary']:pairs({}, {iterator = 666 })
 ---
 - error: Index 'primary' (TREE) of space 'tweedledum' (engine) does not support requested
     iterator type
