@@ -948,7 +948,7 @@ restart:
 			/*
 			 * If we skipped DELETE that was read from TX write
 			 * set, there is a chance that the database actually
-			 * has the deleted key amd we must consider
+			 * has the deleted key and we must not consider
 			 * previous+current tuple as an unbroken chain.
 			 */
 			cache_prev = NULL;
