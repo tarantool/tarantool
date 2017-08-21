@@ -35,6 +35,8 @@
 #include "small/ibuf.h"
 #include "small/obuf.h"
 
+extern unsigned iobuf_readahead;
+
 struct iobuf
 {
 	/** Input buffer. */
@@ -42,6 +44,13 @@ struct iobuf
 	/** Output buffer. */
 	struct obuf out;
 };
+
+/**
+ * How big is a buffer which needs to be shrunk before it is put
+ * back into buffer cache.
+ */
+unsigned
+iobuf_max_size();
 
 /**
  * Create an instance of input/output buffer.
@@ -67,21 +76,12 @@ struct iobuf *
 iobuf_new_mt(struct slab_cache *slabc_out);
 
 /**
- * @pre 'out' must be freed if necessary by the consumer cord
- */
-void
-iobuf_delete_mt(struct iobuf *iobuf);
-
-/**
  * Must be called when we are done sending all output,
  * and there is likely no cached input.
  * Is automatically called by iobuf_flush().
  */
 void
 iobuf_reset(struct iobuf *iobuf);
-
-void
-iobuf_reset_mt(struct iobuf *iobuf);
 
 /** Return true if there is no input and no output and
  * no one has pinned the buffer - i.e. it's safe to
@@ -99,8 +99,5 @@ iobuf_is_idle(struct iobuf *iobuf)
  */
 void
 iobuf_init();
-
-void
-iobuf_set_readahead(int readahead);
 
 #endif /* TARANTOOL_IOBUF_H_INCLUDED */

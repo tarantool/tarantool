@@ -48,13 +48,14 @@ __thread struct mempool iobuf_pool;
  * sizes, so when we ask slab cache for 16320 bytes,
  * we get a slab of size 16384, not 32768.
  */
-static unsigned iobuf_readahead = 16320;
+unsigned iobuf_readahead = 16320;
 
 /**
  * How big is a buffer which needs to be shrunk before it is put
  * back into buffer cache.
  */
-static unsigned iobuf_max_size()
+unsigned
+iobuf_max_size()
 {
 	return 18 * iobuf_readahead;
 }
@@ -86,16 +87,6 @@ iobuf_delete(struct iobuf *iobuf)
 	mempool_free(&iobuf_pool, iobuf);
 }
 
-/** Second part of multi-threaded destroy. */
-void
-iobuf_delete_mt(struct iobuf *iobuf)
-{
-	ibuf_destroy(&iobuf->in);
-	/* Destroyed by the caller. */
-	assert(iobuf->out.pos == 0 && iobuf->out.iov[0].iov_base == NULL);
-	mempool_free(&iobuf_pool, iobuf);
-}
-
 void
 iobuf_reset(struct iobuf *iobuf)
 {
@@ -121,38 +112,7 @@ iobuf_reset(struct iobuf *iobuf)
 }
 
 void
-iobuf_reset_mt(struct iobuf *iobuf)
-{
-	/*
-	 * If we happen to have fully processed the input,
-	 * move the pos to the start of the input buffer.
-	 */
-	if (ibuf_used(&iobuf->in) == 0) {
-		if (ibuf_capacity(&iobuf->in) < iobuf_max_size()) {
-			ibuf_reset(&iobuf->in);
-		} else {
-			struct slab_cache *slabc = iobuf->in.slabc;
-			ibuf_destroy(&iobuf->in);
-			ibuf_create(&iobuf->in, slabc, iobuf_readahead);
-		}
-	}
-	/*
-	 * We can't re-create the output buffer in iproto thread,
-	 * since obuf->slabc is from tx thread.
-	 * FIXME: send a message to tx thread to garbage-collect
-	 * the buffer when it's too big.
-	 */
-	obuf_reset(&iobuf->out);
-}
-
-void
 iobuf_init()
 {
 	mempool_create(&iobuf_pool, &cord()->slabc, sizeof(struct iobuf));
-}
-
-void
-iobuf_set_readahead(int readahead)
-{
-	iobuf_readahead =  readahead;
 }
