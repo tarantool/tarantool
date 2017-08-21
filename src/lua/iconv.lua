@@ -43,7 +43,7 @@ local function iconv_convert(iconv, data)
         buf_left[0] = buf:unused()
         local res = ffi.C.iconv(iconv, data_ptr, data_left,
                                 buf_ptr, buf_left)
-        if res == -1 and errno() ~= E2BIG then
+        if res == ffi.cast('size_t', -1) and errno() ~= E2BIG then
             ffi.C.iconv(iconv, nil, nil, nil, nil)
             if errno() == EINVAL then
                 error('Invalid multibyte sequence')
