@@ -1762,7 +1762,18 @@ user_def_new_from_tuple(struct tuple *tuple)
 	if (tuple_field_count(tuple) > BOX_USER_FIELD_AUTH_MECH_LIST) {
 		const char *auth_data =
 			tuple_field(tuple, BOX_USER_FIELD_AUTH_MECH_LIST);
-		if (strlen(auth_data) != 0 && user->type == SC_ROLE)
+		const char *tmp = auth_data;
+		bool is_auth_empty;
+		if (mp_typeof(*auth_data) == MP_ARRAY &&
+		    mp_decode_array(&tmp) == 0) {
+			is_auth_empty = true;
+		} else if (mp_typeof(*auth_data) == MP_MAP &&
+			   mp_decode_map(&tmp) == 0) {
+			is_auth_empty = true;
+		} else {
+			is_auth_empty = false;
+		}
+		if (!is_auth_empty && user->type == SC_ROLE)
 			tnt_raise(ClientError, ER_CREATE_ROLE, user->name,
 				  "authentication data can not be set for a "\
 				  "role");
