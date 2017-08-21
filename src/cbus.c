@@ -148,6 +148,7 @@ cpipe_destroy(struct cpipe *pipe)
 	tt_pthread_mutex_lock(&endpoint->mutex);
 	/* Flush input */
 	stailq_concat(&endpoint->output, &pipe->input);
+	pipe->n_input = 0;
 	/* Add the pipe shutdown message as the last one. */
 	stailq_add_tail_entry(&endpoint->output, poison, msg.fifo);
 	/* Count statistics */
