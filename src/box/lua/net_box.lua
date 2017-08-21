@@ -680,7 +680,7 @@ end
 
 function remote_methods:is_connected()
     check_remote_arg(self, 'is_connected')
-    return self.state == 'active'
+    return self.state == 'active' or self.state == 'fetch_schema'
 end
 
 function remote_methods:wait_connected(timeout)
