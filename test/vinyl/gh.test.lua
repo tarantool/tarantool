@@ -268,10 +268,13 @@ s.index.i1:count() == s.index.i2:count()
 s:drop()
 
 -- https://github.com/tarantool/tarantool/issues/2588
+max_tuple_size = box.cfg.vinyl_max_tuple_size
+box.cfg { vinyl_max_tuple_size = 40 * 1024 * 1024 }
 s = box.schema.space.create('vinyl', { engine = 'vinyl' })
 i = box.space.vinyl:create_index('primary')
 _ = s:replace({1, string.rep('x', 35 * 1024 * 1024)})
 s:drop()
+box.cfg { vinyl_max_tuple_size = max_tuple_size }
 
 -- https://github.com/tarantool/tarantool/issues/2614
 

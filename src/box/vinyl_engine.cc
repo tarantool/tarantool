@@ -77,8 +77,7 @@ VinylEngine::init()
 			 cfg_geti64("vinyl_cache"),
 			 cfg_geti("vinyl_read_threads"),
 			 cfg_geti("vinyl_write_threads"),
-			 cfg_getd("vinyl_timeout"),
-			 cfg_geti("vinyl_max_tuple_size"));
+			 cfg_getd("vinyl_timeout"));
 	if (env == NULL)
 		panic("failed to create vinyl environment");
 }
@@ -256,6 +255,13 @@ int
 VinylEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
 {
 	return vy_backup(env, vclock, cb, arg);
+}
+
+void
+VinylEngine::setMaxTupleSize(size_t max_size)
+{
+	if (vy_set_max_tuple_size(env, max_size) != 0)
+		diag_raise();
 }
 
 void

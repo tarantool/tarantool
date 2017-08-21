@@ -328,6 +328,7 @@ t;
   - 'box.error.INVALID_INDEX_FILE : 131'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
   - 'box.error.CREATE_ROLE : 84'
+  - 'box.error.VINYL_MAX_TUPLE_SIZE : 139'
   - 'box.error.LOAD_FUNCTION : 99'
   - 'box.error.INVALID_XLOG : 74'
   - 'box.error.READ_VIEW_ABORTED : 130'

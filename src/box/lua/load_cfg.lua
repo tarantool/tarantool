@@ -154,6 +154,7 @@ local dynamic_cfg = {
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
     memtx_max_tuple_size    = private.cfg_set_memtx_max_tuple_size,
+    vinyl_max_tuple_size    = private.cfg_set_vinyl_max_tuple_size,
     vinyl_timeout           = private.cfg_set_vinyl_timeout,
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,

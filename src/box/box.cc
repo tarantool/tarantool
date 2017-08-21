@@ -613,6 +613,13 @@ box_set_checkpoint_count(void)
 }
 
 void
+box_set_vinyl_max_tuple_size(void)
+{
+	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
+	vinyl->setMaxTupleSize(cfg_geti("vinyl_max_tuple_size"));
+}
+
+void
 box_set_vinyl_timeout(void)
 {
 	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
