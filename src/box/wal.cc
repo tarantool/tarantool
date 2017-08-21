@@ -767,11 +767,21 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 	bool cancellable = fiber_set_cancellable(false);
 	fiber_yield(); /* Request was inserted. */
 	fiber_set_cancellable(cancellable);
-	/* All rows in request have the same replica id. */
-	struct xrow_header *last = entry->rows[entry->n_rows - 1];
-	/* Promote replica set vclock with local writes. */
-	if (entry->res > 0 && last->replica_id == instance_id)
-		vclock_follow(&replicaset_vclock, instance_id, last->lsn);
+	if (entry->res > 0) {
+		struct xrow_header **last = entry->rows + entry->n_rows - 1;
+		while (last >= entry->rows) {
+			/*
+			 * Find last row from local instance id
+			 * and promote vclock.
+			 */
+			if ((*last)->replica_id == instance_id) {
+				vclock_follow(&replicaset_vclock, instance_id,
+					      (*last)->lsn);
+				break;
+			}
+			--last;
+		}
+	}
 	return entry->res;
 }
 
@@ -780,22 +790,11 @@ wal_write_in_wal_mode_none(struct journal *journal,
 			   struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
-	/** All rows in a request have the same replica id. */
-	struct xrow_header *last = entry->rows[entry->n_rows - 1];
-	if (last->replica_id != 0) {
-		/*
-		 * All rows in a transaction have the same
-		 * replica_id
-		 */
-		vclock_follow(&writer->vclock, last->replica_id, last->lsn);
-	} else {
-		/*
-		 * Fake the local WAL by assigning an LSN to each
-		 * row.
-		 */
-		int64_t new_lsn = vclock_get(&writer->vclock, instance_id) +
-			entry->n_rows;
-		vclock_follow(&writer->vclock, instance_id, new_lsn);
+	wal_assign_lsn(writer, entry->rows, entry->rows + entry->n_rows);
+	int64_t old_lsn = vclock_get(&replicaset_vclock, instance_id);
+	int64_t new_lsn = vclock_get(&writer->vclock, instance_id);
+	if (new_lsn > old_lsn) {
+		/* There were local writes, promote vclock. */
 		vclock_follow(&replicaset_vclock, instance_id, new_lsn);
 	}
 	return vclock_sum(&writer->vclock);
