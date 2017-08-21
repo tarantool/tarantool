@@ -7,6 +7,9 @@ local fun = require('fun')
 local log = require('log')
 local session = box.session
 local internal = require('box.internal')
+local function setmap(table)
+    return setmetatable(table, { __serialize = 'map' })
+end
 
 local builtin = ffi.C
 
@@ -296,9 +299,9 @@ box.schema.space.create = function(name, options)
     end
     local format = options.format and options.format or {}
     -- filter out global parameters from the options array
-    local space_options = setmetatable({
+    local space_options = setmap({
         temporary = options.temporary and true or nil,
-    }, { __serialize = 'map' })
+    })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
     return box.space[id], "created"
@@ -1326,7 +1329,7 @@ box.schema.user.create = function(name, opts)
         end
         return
     end
-    local auth_mech_list = {}
+    local auth_mech_list = setmap({})
     if opts.password then
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
@@ -1533,7 +1536,7 @@ box.schema.role.create = function(name, opts)
         return
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.uid(), name, 'role'}
+    _user:auto_increment{session.uid(), name, 'role', setmap({})}
 end
 
 box.schema.role.drop = function(name, opts)

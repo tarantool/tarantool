@@ -103,6 +103,7 @@ enum field_type {
 	FIELD_TYPE_NUMBER,
 	FIELD_TYPE_INTEGER,
 	FIELD_TYPE_SCALAR,
+	FIELD_TYPE_MAP,
 	field_type_MAX
 };
 

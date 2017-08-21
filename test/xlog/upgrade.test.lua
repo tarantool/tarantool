@@ -33,7 +33,9 @@ box.space._vuser ~= nil
 box.space._vpriv ~= nil
 
 -- a test space
-box.space.distro:select{}
+r = box.space.distro:select()
+_ = table.sort(r, function(left, right) return tostring(left) < tostring(right) end)
+r
 
 test_run:cmd("clear filter")
 

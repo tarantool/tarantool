@@ -134,7 +134,7 @@ box.schema.user.revoke('rich', 'public')
 ...
 box.space['_user']:delete{uid}
 ---
-- [5, 1, 'rich', 'user', []]
+- [5, 1, 'rich', 'user', {}]
 ...
 box.schema.user.drop('test')
 ---
@@ -398,7 +398,7 @@ box.schema.user.create('user1')
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', []]
+- - [4, 1, 'user1', 'user', {}]
 ...
 session.su('user1')
 ---
