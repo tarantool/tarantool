@@ -244,7 +244,7 @@ int sqlite3VdbeLoadString(Vdbe *p, int iDest, const char *zStr){
 /*
 ** Generate code that initializes multiple registers to string or integer
 ** constants.  The registers begin with iDest and increase consecutively.
-** One register is initialized for each characgter in zTypes[].  For each
+** One register is initialized for each character in zTypes[].  For each
 ** "s" character in zTypes[], the register is a string if the argument is
 ** not NULL, or OP_Null if the value is a null pointer.  For each "i" character
 ** in zTypes[], the register is initialized to an integer.

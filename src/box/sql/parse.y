@@ -1322,7 +1322,9 @@ collate(C) ::= COLLATE ids.   {C = 1;}
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
-cmd ::= DROP INDEX ifexists(E) fullname(X).   {sqlite3DropIndex(pParse, X, E);}
+cmd ::= DROP INDEX ifexists(E) fullname(X) ON nm(Y).   {
+    sqlite3DropIndex(pParse, X, &Y, E);
+}
 
 ///////////////////////////// The VACUUM command /////////////////////////////
 //
@@ -1332,13 +1334,24 @@ cmd ::= DROP INDEX ifexists(E) fullname(X).   {sqlite3DropIndex(pParse, X, E);}
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //
 %ifndef SQLITE_OMIT_PRAGMA
-cmd ::= PRAGMA nm(X).                        {sqlite3Pragma(pParse,&X,0,0,0);}
-cmd ::= PRAGMA nm(X) EQ nmnum(Y).            {sqlite3Pragma(pParse,&X,0,&Y,0);}
-cmd ::= PRAGMA nm(X) LP nmnum(Y) RP.         {sqlite3Pragma(pParse,&X,0,&Y,0);}
-cmd ::= PRAGMA nm(X) EQ minus_num(Y). 
-                                             {sqlite3Pragma(pParse,&X,0,&Y,1);}
-cmd ::= PRAGMA nm(X) LP minus_num(Y) RP.
-                                             {sqlite3Pragma(pParse,&X,0,&Y,1);}
+cmd ::= PRAGMA nm(X).                        {
+    sqlite3Pragma(pParse,&X,0,0,0,0);
+}
+cmd ::= PRAGMA nm(X) EQ nmnum(Y).  {
+    sqlite3Pragma(pParse,&X,0,&Y,0,0);
+}
+cmd ::= PRAGMA nm(X) LP nmnum(Y) RP.         {
+    sqlite3Pragma(pParse,&X,0,&Y,0,0);
+}
+cmd ::= PRAGMA nm(X) EQ minus_num(Y).        {
+    sqlite3Pragma(pParse,&X,0,&Y,0,1);
+}
+cmd ::= PRAGMA nm(X) LP minus_num(Y) RP.     {
+    sqlite3Pragma(pParse,&X,0,&Y,0,1);
+}
+cmd ::= PRAGMA nm(X) EQ nm(Z) DOT nm(Y).    {
+    sqlite3Pragma(pParse,&X,0,&Y,&Z,0);
+}
 
 nmnum(A) ::= plus_num(A).
 nmnum(A) ::= nm(A).
@@ -1346,6 +1359,7 @@ nmnum(A) ::= ON(A).
 nmnum(A) ::= DELETE(A).
 nmnum(A) ::= DEFAULT(A).
 %endif SQLITE_OMIT_PRAGMA
+
 %token_class number INTEGER|FLOAT.
 plus_num(A) ::= PLUS number(X).       {A = X;}
 plus_num(A) ::= number(A).
@@ -1484,12 +1498,13 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
 %ifndef SQLITE_OMIT_REINDEX
 cmd ::= REINDEX.                {sqlite3Reindex(pParse, 0, 0);}
 cmd ::= REINDEX nm(X).          {sqlite3Reindex(pParse, &X, 0);}
+cmd ::= REINDEX nm(X) ON nm(Y). {sqlite3Reindex(pParse, &X, &Y);}
 %endif  SQLITE_OMIT_REINDEX
 
 /////////////////////////////////// ANALYZE ///////////////////////////////////
 %ifndef SQLITE_OMIT_ANALYZE
-cmd ::= ANALYZE.                {sqlite3Analyze(pParse, 0, 0);}
-cmd ::= ANALYZE nm(X).          {sqlite3Analyze(pParse, &X, 0);}
+cmd ::= ANALYZE.                {sqlite3Analyze(pParse, 0);}
+cmd ::= ANALYZE nm(X).          {sqlite3Analyze(pParse, &X);}
 %endif
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////

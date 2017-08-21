@@ -263,10 +263,10 @@ end
 test:do_execsql_test(
     "select9-2.0",
     [[
-        DROP INDEX i1;
-        DROP INDEX i2;
-        DROP INDEX i3;
-        DROP INDEX i4;
+        DROP INDEX i1 ON t1;
+        DROP INDEX i2 ON t1;
+        DROP INDEX i3 ON t2;
+        DROP INDEX i4 ON t2;
     ]], {
         -- <select9-2.0>
         
@@ -288,14 +288,14 @@ t2_space_id = test:execsql("SELECT * from _space where name='t2'")["id"]
 -- to them. Sometimes the WHERE clause may be satisfied using the same
 -- index used for ORDER BY, sometimes not.
 --
-local recreate_i1 = "DROP INDEX i1; CREATE INDEX i1 ON t1(b, a)"
+local recreate_i1 = "DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(b, a)"
 iOuterLoop = 1
 for _, indexes in ipairs({ [[
   /* Do not create any indexes. */
 ]], [[
   CREATE INDEX i1 ON t1(a)
 ]], [[
-  DROP INDEX 'i1';
+  DROP INDEX 'i1' ON t1;
   CREATE INDEX i1 ON t1(b,a);
 ]],
     -- TODO collation is not supported by now
@@ -344,9 +344,9 @@ end
 test:do_execsql_test(
     "select9-2.X",
     [[
-        DROP INDEX i1;
+        DROP INDEX i1 ON t1;
         /* TODO collation is not supported by nowDROP INDEX i2;*/
-        DROP INDEX i3;
+        DROP INDEX i3 ON t1;
     ]], {
         -- <select9-2.X>
         

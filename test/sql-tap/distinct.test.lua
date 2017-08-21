@@ -296,7 +296,7 @@ if (1 > 0) then
     test:do_execsql_test(
         5.4,
         [[
-            DROP INDEX t1x;
+            DROP INDEX t1x ON t1;
             CREATE INDEX t1x ON t1(x ASC);
             SELECT DISTINCT x FROM t1 ORDER BY x ASC;
         ]], {

@@ -7656,9 +7656,9 @@ test:do_test(
     "boundary2-3.1",
     function()
         return test:execsql([[
-            DROP INDEX t1i1;
-            DROP INDEX t1i2;
-            DROP INDEX t1i3;
+            DROP INDEX t1i1 ON t1;
+            DROP INDEX t1i2 ON t1;
+            DROP INDEX t1i3 ON t1;
         ]])
     end, {
         -- <boundary2-3.1>

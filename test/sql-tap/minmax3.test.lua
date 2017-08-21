@@ -46,7 +46,7 @@ test:do_test(
     "minmax3-1.0",
     function()
         test:execsql [[
-            CREATE TABLE t1(id primary key, x, y, z);
+            CREATE TABLE t1(id primary key, x, y, z)
         ]]
         -- db close
         -- set_file_format 4
@@ -60,7 +60,7 @@ test:do_test(
             INSERT INTO t1 VALUES(5, '2', 'V',   'five');
             INSERT INTO t1 VALUES(6, '3', 'VI',  'six');
             COMMIT;
-            PRAGMA automatic_index=OFF;
+--            PRAGMA automatic_index=OFF;
         ]]
     end, {
         -- <minmax3-1.0>
@@ -110,7 +110,7 @@ test:do_test(
     "minmax3-1.1.4",
     function()
         -- Index optimizes the WHERE x='2' constraint and the MAX(y).
-        test:execsql " DROP INDEX i2 ; CREATE INDEX i2 ON t1(x, y DESC) "
+        test:execsql " DROP INDEX i2 ON t1; CREATE INDEX i2 ON t1(x, y DESC) "
         return count(" SELECT max(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.1.4>
@@ -153,7 +153,7 @@ test:do_test(
     "minmax3-1.2.1",
     function()
         -- Linear scan of t1.
-        test:execsql " DROP INDEX i1 ; DROP INDEX i2 "
+        test:execsql " DROP INDEX i1 ON t1; DROP INDEX i2 ON t1;"
         return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.2.1>
@@ -190,7 +190,7 @@ test:do_test(
     "minmax3-1.2.4",
     function()
         -- Index optimizes the WHERE x='2' constraint and the MAX(y).
-        test:execsql " DROP INDEX i2 ; CREATE INDEX i2 ON t1(x, y DESC) "
+        test:execsql " DROP INDEX i2 ON t1; CREATE INDEX i2 ON t1(x, y DESC) "
         return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
     end, {
         -- <minmax3-1.2.4>
@@ -202,7 +202,7 @@ test:do_test(
     "minmax3-1.3.1",
     function()
         -- Linear scan
-        test:execsql " DROP INDEX i1 ; DROP INDEX i2 "
+        test:execsql " DROP INDEX i1 ON t1; DROP INDEX i2 ON t1;"
         return count(" SELECT min(y) FROM t1; ")
     end, {
         -- <minmax3-1.3.1>
@@ -226,7 +226,7 @@ test:do_test(
     "minmax3-1.3.3",
     function()
         -- Index i1 optimizes the min(y)
-        test:execsql " DROP INDEX i1 ; CREATE INDEX i1 ON t1(y DESC) "
+        test:execsql " DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(y DESC) "
         return count(" SELECT min(y) FROM t1; ")
     end, {
         -- <minmax3-1.3.3>
@@ -238,7 +238,7 @@ test:do_test(
     "minmax3-1.4.1",
     function()
         -- Linear scan
-        test:execsql " DROP INDEX i1 "
+        test:execsql " DROP INDEX i1 ON t1;"
         return count(" SELECT max(y) FROM t1; ")
     end, {
         -- <minmax3-1.4.1>
@@ -262,7 +262,7 @@ test:do_test(
     "minmax3-1.4.3",
     function()
         -- Index i1 optimizes the max(y)
-        test:execsql " DROP INDEX i1 ; CREATE INDEX i1 ON t1(y DESC) "
+        test:execsql " DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(y DESC) "
         test:execsql " SELECT y from t1"
         return count(" SELECT max(y) FROM t1; ")
     end, {
@@ -274,7 +274,7 @@ test:do_test(
 test:do_execsql_test(
     "minmax3-1.4.4",
     [[
-        DROP INDEX i1
+        DROP INDEX i1 ON t1;
     ]], {
         -- <minmax3-1.4.4>
 

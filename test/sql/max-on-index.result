@@ -46,7 +46,7 @@ box.sql.execute("SELECT MAX(f1) FROM test2")
 - - [1]
 ...
 -- Cleanup
-box.sql.execute("DROP INDEX test1_index")
+box.sql.execute("DROP INDEX test1_index ON test1")
 ---
 ...
 box.sql.execute("DROP TABLE test1")

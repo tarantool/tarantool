@@ -19,7 +19,7 @@ box.sql.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
 box.sql.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 
 -- Cleanup
-box.sql.execute("DROP INDEX zoobar2")
+box.sql.execute("DROP INDEX zoobar2 ON zoobar")
 box.sql.execute("DROP TABLE zoobar")
 
 -- Debug

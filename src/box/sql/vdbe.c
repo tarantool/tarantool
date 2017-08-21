@@ -1489,7 +1489,7 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 ** Synopsis: r[P3]=r[P2]%r[P1]
 **
 ** Compute the remainder after integer register P2 is divided by
-** register P1 and store the result in register P3. 
+** register P1 and store the result in register P3.
 ** If the value in register P1 is zero the result is NULL.
 ** If either operand is NULL, the result is NULL.
 */
@@ -1613,7 +1613,7 @@ case OP_CollSeq: {
 ** successors.  The result of the function is stored in register P3.
 ** Register P3 must not be one of the function inputs.
 **
-** P1 is a 32-bit bitmask indicating whether or not each argument to the 
+** P1 is a 32-bit bitmask indicating whether or not each argument to the
 ** function was determined to be constant at compile time. If the first
 ** argument was constant then bit 0 of P1 is set. This is used to determine
 ** whether meta data associated with a user function argument using the
@@ -1630,7 +1630,7 @@ case OP_CollSeq: {
 ** from register P2 and successors.  The result of the function is stored
 ** in register P3.  Register P3 must not be one of the function inputs.
 **
-** P1 is a 32-bit bitmask indicating whether or not each argument to the 
+** P1 is a 32-bit bitmask indicating whether or not each argument to the
 ** function was determined to be constant at compile time. If the first
 ** argument was constant then bit 0 of P1 is set. This is used to determine
 ** whether meta data associated with a user function argument using the
@@ -1805,7 +1805,7 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 
 /* Opcode: AddImm  P1 P2 * * *
 ** Synopsis: r[P1]=r[P1]+P2
-** 
+**
 ** Add the constant P2 to the value in register P1.
 ** The result is always an integer.
 **
@@ -1820,7 +1820,7 @@ case OP_AddImm: {            /* in1 */
 }
 
 /* Opcode: MustBeInt P1 P2 * * *
-** 
+**
 ** Force the value in register P1 to be an integer.  If the value
 ** in P1 is not an integer and cannot be converted into an integer
 ** without data loss, then jump immediately to P2, or if P2==0
@@ -1868,7 +1868,7 @@ case OP_RealAffinity: {                  /* in1 */
 ** Synopsis: affinity(r[P1])
 **
 ** Force the value in register P1 to be the type defined by P2.
-** 
+**
 ** <ul>
 ** <li value="97"> TEXT
 ** <li value="98"> BLOB
@@ -1904,14 +1904,14 @@ case OP_Cast: {                  /* in1 */
 ** store the result of comparison in register P2.
 **
 ** The SQLITE_AFF_MASK portion of P5 must be an affinity character -
-** SQLITE_AFF_TEXT, SQLITE_AFF_INTEGER, and so forth. An attempt is made 
+** SQLITE_AFF_TEXT, SQLITE_AFF_INTEGER, and so forth. An attempt is made
 ** to coerce both inputs according to this affinity before the
 ** comparison is made. If the SQLITE_AFF_MASK is 0x00, then numeric
 ** affinity is used. Note that the affinity conversions are stored
 ** back into the input registers P1 and P3.  So this opcode can cause
 ** persistent changes to registers P1 and P3.
 **
-** Once any conversions have taken place, and neither value is NULL, 
+** Once any conversions have taken place, and neither value is NULL,
 ** the values are compared. If both values are blobs then memcmp() is
 ** used to determine the results of the comparison.  If both values
 ** are text, then the appropriate collating function specified in
@@ -1950,18 +1950,18 @@ case OP_Cast: {                  /* in1 */
 ** the result of comparison (0 or 1 or NULL) into register P2.
 **
 ** If the SQLITE_JUMPIFNULL bit of P5 is set and either reg(P1) or
-** reg(P3) is NULL then the take the jump.  If the SQLITE_JUMPIFNULL 
+** reg(P3) is NULL then the take the jump.  If the SQLITE_JUMPIFNULL
 ** bit is clear then fall through if either operand is NULL.
 **
 ** The SQLITE_AFF_MASK portion of P5 must be an affinity character -
-** SQLITE_AFF_TEXT, SQLITE_AFF_INTEGER, and so forth. An attempt is made 
+** SQLITE_AFF_TEXT, SQLITE_AFF_INTEGER, and so forth. An attempt is made
 ** to coerce both inputs according to this affinity before the
 ** comparison is made. If the SQLITE_AFF_MASK is 0x00, then numeric
 ** affinity is used. Note that the affinity conversions are stored
 ** back into the input registers P1 and P3.  So this opcode can cause
 ** persistent changes to registers P1 and P3.
 **
-** Once any conversions have taken place, and neither value is NULL, 
+** Once any conversions have taken place, and neither value is NULL,
 ** the values are compared. If both values are blobs then memcmp() is
 ** used to determine the results of the comparison.  If both values
 ** are text, then the appropriate collating function specified in
@@ -2138,7 +2138,7 @@ compare_op:
 **
 ** This opcode must immediately follow an OP_Lt or OP_Gt comparison operator.
 ** If result of an OP_Eq comparison on the same two operands
-** would have be NULL or false (0), then then jump to P2. 
+** would have be NULL or false (0), then then jump to P2.
 ** If the result of an OP_Eq comparison on the two previous operands
 ** would have been true (1), then fall through.
 */
@@ -2158,7 +2158,7 @@ case OP_ElseNotEq: {       /* same as TK_ESCAPE, jump */
 ** of integers in P4.
 **
 ** The permutation is only valid until the next OP_Compare that has
-** the OPFLAG_PERMUTE bit set in P5. Typically the OP_Permutation should 
+** the OPFLAG_PERMUTE bit set in P5. Typically the OP_Permutation should
 ** occur immediately prior to the OP_Compare.
 **
 ** The first integer in the P4 integer array is the length of the array
@@ -2313,7 +2313,7 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 ** Synopsis: r[P2]= !r[P1]
 **
 ** Interpret the value in register P1 as a boolean value.  Store the
-** boolean complement in register P2.  If the value in register P1 is 
+** boolean complement in register P2.  If the value in register P1 is
 ** NULL, then a NULL is stored in P2.
 */
 case OP_Not: {                /* same as TK_NOT, in1, out2 */
@@ -2413,7 +2413,7 @@ case OP_IsNull: {            /* same as TK_ISNULL, jump, in1 */
 /* Opcode: NotNull P1 P2 * * *
 ** Synopsis: if r[P1]!=NULL goto P2
 **
-** Jump to P2 if the value in register P1 is not NULL.  
+** Jump to P2 if the value in register P1 is not NULL.
 */
 case OP_NotNull: {            /* same as TK_NOTNULL, jump, in1 */
   pIn1 = &aMem[pOp->p1];
@@ -2430,7 +2430,7 @@ case OP_NotNull: {            /* same as TK_NOTNULL, jump, in1 */
 ** Interpret the data that cursor P1 points to as a structure built using
 ** the MakeRecord instruction.  (See the MakeRecord opcode for additional
 ** information about the format of the data.)  Extract the P2-th column
-** from this record.  If there are less that (P2+1) 
+** from this record.  If there are less that (P2+1)
 ** values in the record, extract a NULL.
 **
 ** The value extracted is stored in register P3.
@@ -2685,13 +2685,13 @@ case OP_MakeRecord: {
   ** like this:
   **
   ** ------------------------------------------------------------------------
-  ** | hdr-size | type 0 | type 1 | ... | type N-1 | data0 | ... | data N-1 | 
+  ** | hdr-size | type 0 | type 1 | ... | type N-1 | data0 | ... | data N-1 |
   ** ------------------------------------------------------------------------
   **
   ** Data(0) is taken from register P1.  Data(1) comes from register P1+1
   ** and so forth.
   **
-  ** Each type field is a varint representing the serial type of the 
+  ** Each type field is a varint representing the serial type of the
   ** corresponding data element (see sqlite3VdbeSerialType()). The
   ** hdr-size field is also a varint which is the offset from the beginning
   ** of the record to data0.
@@ -2728,7 +2728,7 @@ case OP_MakeRecord: {
     goto too_big;
   }
 
-  /* Make sure the output register has a buffer large enough to store 
+  /* Make sure the output register has a buffer large enough to store
   ** the new record. The output register (pOp->p3) is not allowed to
   ** be one of the input registers (because the following call to
   ** sqlite3VdbeMemClearAndResize() could clobber the value before it is used).
@@ -2750,7 +2750,7 @@ case OP_MakeRecord: {
 /* Opcode: Count P1 P2 * * *
 ** Synopsis: r[P2]=count()
 **
-** Store the number of entries (an integer value) in the table or index 
+** Store the number of entries (an integer value) in the table or index
 ** opened by cursor P1 in register P2
 */
 #ifndef SQLITE_OMIT_BTREECOUNT
@@ -2789,7 +2789,7 @@ case OP_Savepoint: {
   zName = pOp->p4.z;
 
   /* Assert that the p1 parameter is valid. Also that if there is no open
-  ** transaction, then there cannot be any savepoints. 
+  ** transaction, then there cannot be any savepoints.
   */
   assert( p->pSavepoint==0 || p->autoCommit==0 );
   assert( p1==SAVEPOINT_BEGIN||p1==SAVEPOINT_RELEASE||p1==SAVEPOINT_ROLLBACK );
@@ -2799,7 +2799,7 @@ case OP_Savepoint: {
 
   if( p1==SAVEPOINT_BEGIN ){
     if( db->nVdbeWrite>0 ){
-      /* A new savepoint cannot be created if there are active write 
+      /* A new savepoint cannot be created if there are active write
       ** statements (i.e. open read/write incremental blob handles).
       */
       sqlite3VdbeError(p, "cannot open savepoint - SQL statements in progress");
@@ -5424,50 +5424,6 @@ case OP_CreateTable: {          /* out2 */
 ** then runs the new virtual machine.  It is thus a re-entrant opcode.
 */
 case OP_ParseSchema: {
-  int iDb;
-  const char *zMaster;
-  char *zSql;
-  InitData initData;
-
-  /* Any prepared statement that invokes this opcode will hold mutexes
-  ** on every btree.  This is a prerequisite for invoking
-  ** sqlite3InitCallback().
-  */
-#ifdef SQLITE_DEBUG
-  assert( sqlite3BtreeHoldsMutex(db->mdb.pBt) );
-#endif
-
-  iDb = pOp->p1;
-  assert( iDb==0 );
-  assert( DbHasProperty(db, DB_SchemaLoaded) );
-  /* Used to be a conditional */ {
-    zMaster = MASTER_NAME;
-    initData.db = db;
-    initData.iDb = pOp->p1;
-    initData.pzErrMsg = &p->zErrMsg;
-    zSql = sqlite3MPrintf(db,
-       "SELECT name, rootpage, sql FROM '%q'.%s WHERE %s ORDER BY rowid",
-       db->mdb.zDbSName, zMaster, pOp->p4.z);
-    if( zSql==0 ){
-      rc = SQLITE_NOMEM_BKPT;
-    }else{
-      assert( db->init.busy==0 );
-      db->init.busy = 1;
-      initData.rc = SQLITE_OK;
-      assert( !db->mallocFailed );
-      rc = sqlite3_exec(db, zSql, sqlite3InitCallback, &initData, 0);
-      if( rc==SQLITE_OK ) rc = initData.rc;
-      sqlite3DbFree(db, zSql);
-      db->init.busy = 0;
-    }
-  }
-  if( rc ){
-    sqlite3ResetAllSchemasOfConnection(db);
-    if( rc==SQLITE_NOMEM ){
-      goto no_mem;
-    }
-    goto abort_due_to_error;
-  }
   break;
 }
 
@@ -5481,8 +5437,7 @@ case OP_ParseSchema2: {
   int iDb;
   InitData initData;
   Mem *pRec, *pRecEnd;
-  char zPgnoBuf[16];
-  char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
+  char *argv[4] = {NULL, NULL, NULL, NULL};
 
   /* Any prepared statement that invokes this opcode will hold mutexes
   ** on every btree.  This is a prerequisite for invoking
@@ -5518,9 +5473,9 @@ case OP_ParseSchema2: {
    */
   for( ; pRecEnd-pRec>=4 && initData.rc==SQLITE_OK; pRec+=4 ){
     argv[0] = pRec[0].z;
-    /* argv[1] = */ snprintf(zPgnoBuf, sizeof(zPgnoBuf), "%d",
-      (int)SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(pRec[1].u.i, pRec[2].u.i)
-    );
+    int pageNo = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(pRec[1].u.i,
+                                                        pRec[2].u.i);
+    argv[1] = (char *)&pageNo;
     argv[2] = pRec[3].z;
     sqlite3InitCallback(&initData, 3, argv, NULL);
   }
@@ -5619,16 +5574,17 @@ case OP_DropTable: {
   break;
 }
 
-/* Opcode: DropIndex P1 * * P4 *
+/* Opcode: DropIndex * * *  P4
 **
 ** Remove the internal (in-memory) data structures that describe
-** the index named P4 in database P1.  This is called after an index
-** is dropped from disk (using the Destroy opcode)
-** in order to keep the internal representation of the
-** schema consistent with what is on disk.
+** the index named P4 for table.
+** This is called after an index is dropped from disk
+** (using the Destroy opcode) in order to keep
+** the internal representation of the schema consistent with what
+** is on disk.
 */
 case OP_DropIndex: {
-  sqlite3UnlinkAndDeleteIndex(db, pOp->p4.z);
+  sqlite3UnlinkAndDeleteIndex(db, pOp->p4.pIndex);
   break;
 }
 

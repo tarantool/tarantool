@@ -185,7 +185,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "unique-2.5",
     [[
-        DROP INDEX i2;
+        DROP INDEX i2 ON t2;
         SELECT a,b FROM t2 ORDER BY a;
     ]], {
         -- <unique-2.5>

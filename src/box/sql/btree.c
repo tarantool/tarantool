@@ -172,17 +172,20 @@ static int hasSharedCacheTableLock(
   ** written. For index b-trees, it is the root page of the associated
   ** table.  */
   if( isIndex ){
-    HashElem *p;
-    for(p=sqliteHashFirst(&pSchema->idxHash); p; p=sqliteHashNext(p)){
-      Index *pIdx = (Index *)sqliteHashData(p);
-      if( pIdx->tnum==(int)iRoot ){
-        if( iTab ){
-          /* Two or more indexes share the same root page.  There must
-          ** be imposter tables.  So just return true.  The assert is not
-          ** useful in that case. */
-          return 1;
+    HashElem *p, *j;
+    for(p=sqliteHashFirst(&pSchema->tblHash); p; p=sqliteHashNext(p)){
+      Table *pTab = (Table *)sqliteHashData(p);
+      for (j=sqliteHashFirst(&pTab->idxHash); j; j=sqliteHashNext(j)) {
+        Index *pIdx = (Index *)sqliteHashData(j);
+        if( pIdx->tnum==(int)iRoot ){
+          if( iTab ){
+            /* Two or more indexes share the same root page.  There must
+             ** be imposter tables.  So just return true.  The assert is not
+             ** useful in that case. */
+            return 1;
+          }
+          iTab = pIdx->pTable->tnum;
         }
-        iTab = pIdx->pTable->tnum;
       }
     }
   }else{

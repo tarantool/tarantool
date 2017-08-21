@@ -34,7 +34,7 @@ box.sql.execute("SELECT * FROM t3;");
 - - [6, 234, 567]
 ...
 -- Cleanup.
-box.sql.execute("DROP INDEX t3y");
+box.sql.execute("DROP INDEX t3y ON t3");
 ---
 ...
 box.sql.execute("DROP TABLE t3;");

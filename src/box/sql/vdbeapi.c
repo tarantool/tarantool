@@ -1087,9 +1087,7 @@ const char *sqlite3_column_origin_name(sqlite3_stmt *pStmt, int N){
   return columnName(
       pStmt, N, (const void*(*)(Mem*))sqlite3_value_text, COLNAME_COLUMN);
 }
-*/
 #endif /* SQLITE_ENABLE_COLUMN_METADATA */
-
 
 /******************************* sqlite3_bind_  ***************************
 ** 

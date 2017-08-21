@@ -22,7 +22,7 @@ box.sql.execute("DELETE FROM zoobar")
 box.sql.execute("SELECT * from zoobar")
 
 -- Cleanup
-box.sql.execute("DROP INDEX zoobar2")
+box.sql.execute("DROP INDEX zoobar2 ON zoobar")
 box.sql.execute("DROP TABLE zoobar")
 
 -- Debug

@@ -14,8 +14,8 @@ box.sql.execute("CREATE        INDEX zoobar3 ON zzoobar(c3)")
 -- Dummy entry
 box.sql.execute("INSERT INTO zzoobar VALUES (111, 222, 'c3', 444)")
 
-box.sql.execute("DROP INDEX zoobar2")
-box.sql.execute("DROP INDEX zoobar3")
+box.sql.execute("DROP INDEX zoobar2 ON zzoobar")
+box.sql.execute("DROP INDEX zoobar3 On zzoobar")
 
 -- zoobar2 is dropped - should be OK
 box.sql.execute("INSERT INTO zzoobar VALUES (111, 223, 'c3', 444)")
@@ -24,7 +24,7 @@ box.sql.execute("INSERT INTO zzoobar VALUES (111, 223, 'c3', 444)")
 box.sql.execute("CREATE INDEX zoobar2 ON zzoobar(c3)")
 
 -- Cleanup
-box.sql.execute("DROP INDEX zoobar2")
+box.sql.execute("DROP INDEX zoobar2 ON zzoobar")
 box.sql.execute("DROP TABLE zzoobar")
 
 -- Debug

@@ -262,7 +262,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "count-4.3",
     [[
-        DROP INDEX t4i1;
+        DROP INDEX t4i1 ON t4;
         CREATE INDEX t4i1 ON t4(b, a);
         SELECT count(*) FROM t4;
     ]], {

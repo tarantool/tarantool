@@ -61,6 +61,7 @@ struct VdbeOp {
     int *ai;               /* Used when p4type is P4_INTARRAY */
     SubProgram *pProgram;  /* Used when p4type is P4_SUBPROGRAM */
     Table *pTab;           /* Used when p4type is P4_TABLE */
+    Index *pIndex;         /* Used when p4type is P4_INDEX */
 #ifdef SQLITE_ENABLE_CURSOR_HINTS
     Expr *pExpr;           /* Used when p4type is P4_EXPR */
 #endif
@@ -124,7 +125,8 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_SUBPROGRAM  (-13) /* P4 is a pointer to a SubProgram structure */
 #define P4_ADVANCE  (-14) /* P4 is a pointer to BtreeNext() or BtreePrev() */
 #define P4_TABLE    (-15) /* P4 is a pointer to a Table structure */
-#define P4_FUNCCTX  (-16) /* P4 is a pointer to an sqlite3_context object */
+#define P4_INDEX    (-16) /* P4 is a pointer to a Index structure */
+#define P4_FUNCCTX  (-17) /* P4 is a pointer to an sqlite3_context object */
 
 /* Error message codes for OP_Halt */
 #define P5_ConstraintNotNull 1

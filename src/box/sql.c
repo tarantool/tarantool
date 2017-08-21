@@ -652,19 +652,16 @@ sql_schema_put(InitData *init,
 	       uint32_t spaceid, uint32_t indexid,
 	       const char *sql)
 {
-	char pageno[16];
+	int pageno = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(spaceid, indexid);
+
 	char *argv[] = {
 		(char *)name,
-		pageno,
+		(char *)&pageno,
 		(char *)sql,
 		NULL
 	};
 
 	if (init->rc != SQLITE_OK) return;
-
-	snprintf(pageno, sizeof(pageno), "%d",
-		 SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(
-			 spaceid, indexid));
 
 	sqlite3InitCallback(init, 3, argv, NULL);
 }

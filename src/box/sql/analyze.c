@@ -1329,19 +1329,15 @@ static void analyzeTable(Parse *pParse, Table *pTab, Index *pOnlyIdx){
 ** when it recognizes an ANALYZE command.
 **
 **        ANALYZE                            -- 1
-**        ANALYZE  <database>                -- 2
-**        ANALYZE  <tablename>               -- 3
+**        ANALYZE  <tablename>               -- 2
 **
-** Form 1 causes all indices in all attached databases to be analyzed.
-** Form 2 analyzes all indices the single database named.
-** Form 3 analyzes all indices associated with the named table.
+** Form 1 analyzes all indices the single database named.
+** Form 2 analyzes all indices associated with the named table.
 */
-void sqlite3Analyze(Parse *pParse, Token *pName1, Token *pName2){
+void sqlite3Analyze(Parse *pParse, Token *pName1){
   sqlite3 *db = pParse->db;
-  int iDb;
   char *z;
   Table *pTab;
-  Index *pIdx;
   Vdbe *v;
 
   /* Read the database schema. If an error occurs, leave an error message
@@ -1351,25 +1347,17 @@ void sqlite3Analyze(Parse *pParse, Token *pName1, Token *pName2){
     return;
   }
 
-  assert( pName2!=0 || pName1==0 );
   if( pName1==0 ){
     /* Form 1:  Analyze everything */
     analyzeDatabase(pParse);
-  }else if( pName2->n==0 ){
-    /* Form 2:  Analyze the database or table named */
-    iDb = sqlite3FindDb(db, pName1);
-    if( iDb==0 ){
-      analyzeDatabase(pParse);
-    }else{
-      z = sqlite3NameFromToken(db, pName1);
-      if( z ){
-        if( (pIdx = sqlite3FindIndex(db, z))!=0 ){
-          analyzeTable(pParse, pIdx->pTable, pIdx);
-        }else if( (pTab = sqlite3LocateTable(pParse, 0, z))!=0 ){
-          analyzeTable(pParse, pTab, 0);
-        }
-        sqlite3DbFree(db, z);
+  }else {
+    /* Form 2:  Analyze table named */
+    z = sqlite3NameFromToken(db, pName1);
+    if( z ){
+      if( (pTab = sqlite3LocateTable(pParse, 0, z))!=0 ){
+        analyzeTable(pParse, pTab, 0);
       }
+      sqlite3DbFree(db, z);
     }
   }
 
@@ -1484,7 +1472,7 @@ static int analysisLoader(void *pData, int argc, char **argv, char **NotUsed){
   }else if( sqlite3_stricmp(argv[0],argv[1])==0 ){
     pIndex = sqlite3PrimaryKeyIndex(pTable);
   }else{
-    pIndex = sqlite3FindIndex(pInfo->db, argv[1]);
+    pIndex = sqlite3FindIndex(pInfo->db, argv[1], pTable);
   }
   z = argv[2];
 
@@ -1803,7 +1791,7 @@ static int loadStat4(sqlite3 *db, const char *zDb){
 */
 int sqlite3AnalysisLoad(sqlite3 *db){
   analysisInfo sInfo;
-  HashElem *i;
+  HashElem *i, *j;
   char *zSql;
   int rc = SQLITE_OK;
 
@@ -1811,21 +1799,23 @@ int sqlite3AnalysisLoad(sqlite3 *db){
 
   /* Clear any prior statistics */
   assert( sqlite3SchemaMutexHeld(db, 0) );
-  for(i=sqliteHashFirst(&db->mdb.pSchema->idxHash);i;i=sqliteHashNext(i)){
-    Index *pIdx = sqliteHashData(i);
-    pIdx->aiRowLogEst[0] = 0;
+  for(j=sqliteHashFirst(&db->mdb.pSchema->tblHash);j;j=sqliteHashNext(j)){
+    Table *pTab = sqliteHashData(j);
+    for(i=sqliteHashFirst(&pTab->idxHash);i;i=sqliteHashNext(i)){
+      Index *pIdx = sqliteHashData(i);
+      pIdx->aiRowLogEst[0] = 0;
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
-    sqlite3DeleteIndexSamples(db, pIdx);
-    pIdx->aSample = 0;
+      sqlite3DeleteIndexSamples(db, pIdx);
+      pIdx->aSample = 0;
 #endif
+    }
   }
 
   /* Load new statistics out of the sqlite_stat1 table */
   sInfo.db = db;
   sInfo.zDatabase = db->mdb.zDbSName;
   if( sqlite3FindTable(db, "sqlite_stat1")!=0 ){
-    zSql = sqlite3MPrintf(db, 
-        "SELECT tbl,idx,stat FROM %Q.sqlite_stat1", sInfo.zDatabase);
+    zSql = sqlite3MPrintf(db, "SELECT tbl,idx,stat FROM sqlite_stat1");
     if( zSql==0 ){
       rc = SQLITE_NOMEM_BKPT;
     }else{
@@ -1836,11 +1826,13 @@ int sqlite3AnalysisLoad(sqlite3 *db){
 
   /* Set appropriate defaults on all indexes not in the sqlite_stat1 table */
   assert( sqlite3SchemaMutexHeld(db, 0) );
-  for(i=sqliteHashFirst(&db->mdb.pSchema->idxHash);i;i=sqliteHashNext(i)){
-    Index *pIdx = sqliteHashData(i);
-    if( pIdx->aiRowLogEst[0]==0 ) sqlite3DefaultRowEst(pIdx);
+  for(j=sqliteHashFirst(&db->mdb.pSchema->tblHash);j;j=sqliteHashNext(j)){
+    Table *pTab = sqliteHashData(j);
+    for(i=sqliteHashFirst(&pTab->idxHash);i;i=sqliteHashNext(i)){
+      Index *pIdx = sqliteHashData(i);
+      if( pIdx->aiRowLogEst[0]==0 ) sqlite3DefaultRowEst(pIdx);
+    }
   }
-
   /* Load the statistics from the sqlite_stat4 table. */
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
   if( rc==SQLITE_OK && OptimizationEnabled(db, SQLITE_Stat34) ){
@@ -1848,10 +1840,13 @@ int sqlite3AnalysisLoad(sqlite3 *db){
     rc = loadStat4(db, sInfo.zDatabase);
     db->lookaside.bDisable--;
   }
-  for(i=sqliteHashFirst(&db->mdb.pSchema->idxHash);i;i=sqliteHashNext(i)){
-    Index *pIdx = sqliteHashData(i);
-    sqlite3_free(pIdx->aiRowEst);
-    pIdx->aiRowEst = 0;
+
+  for(j=sqliteHashFirst(&db->mdb.pSchema->tblHash);j;j=sqliteHashNext(j)){
+    for(i=sqliteHashFirst(&j->idxHash);i;i=sqliteHashNext(i)){
+      Index *pIdx = sqliteHashData(i);
+      sqlite3_free(pIdx->aiRowEst);
+      pIdx->aiRowEst = 0;
+    }
   }
 #endif
 

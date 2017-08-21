@@ -430,7 +430,7 @@ test:do_test(
 test:do_execsql_test(
     "in3-4.6",
     [[
-        DROP INDEX t3_i2 
+        DROP INDEX t3_i2 ON t3
     ]], {
         -- <in3-4.6>
         

@@ -45,7 +45,7 @@ local idxs = {
 }
 
 for n, idx in ipairs(idxs) do
-    test:catchsql " DROP INDEX i1 "
+    test:catchsql " DROP INDEX i1 ON t1"
     test:execsql(idx)
     local queries = {
         {"GROUP BY x, y ORDER BY x, y", {1, 'a', 1, "b", 2, "a", 2, "b", 3, "a", 3, "b"}},

@@ -212,7 +212,7 @@ test:do_test(
 test:do_test(
     "table-2.2d",
     function()
-        test:execsql "DROP INDEX 'test3'"
+        test:execsql "DROP INDEX 'test3' ON test2"
         return test:catchsql "CREATE TABLE test3(two text primary key)"
     end, {
         -- <table-2.2d>

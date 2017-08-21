@@ -146,9 +146,9 @@ cn:execute('drop view if exists test3_view')
 cn:execute('create index test3_sec on test3(a, b)')
 cn:reload_schema()
 cn:execute('create index if not exists test3_sec on test3(a, b)')
-cn:execute('drop index test3_sec')
+cn:execute('drop index test3_sec on test3')
 cn:reload_schema()
-cn:execute('drop index if exists test3_sec')
+cn:execute('drop index if exists test3_sec on test3')
 
 -- Test CREATE TRIGGER [IF NOT EXISTS] and
 --      DROP   TRIGGER [IF EXISTS].

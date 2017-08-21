@@ -4,10 +4,10 @@
 #
 # To add new pragmas, first add the name and other relevant attributes
 # of the pragma to the "pragma_def" object below.  Then run this script
-# to generate the ../src/pragma.h header file that contains macros and
+# to generate the ../src/box/sql/pragma.h header file that contains macros and
 # the lookup table needed for pragma name lookup in the pragma.c module.
 # Then add the extra "case PragTyp_XXXXX:" and subsequent code for the
-# new pragma in ../src/pragma.c.
+# new pragma in ../src/box/sql/pragma.c.
 #
 
 # Flag meanings:
@@ -353,7 +353,7 @@ set pragma_def {
 
 # Open the output file
 #
-set destfile "[file dir [file dir [file normal $argv0]]]/src/pragma.h"
+set destfile "[file dir [file dir [file normal $argv0]]]/src/box/sql/pragma.h"
 puts "Overwriting $destfile with new pragma table..."
 set fd [open $destfile wb]
 puts $fd {/* DO NOT EDIT!
@@ -399,7 +399,7 @@ foreach line [split $pragma_def \n] {
   foreach {id val} [split $line :] break
   set val [string trim $val]
   if {$id=="NAME"} {
-    record_one    
+    record_one
     set name $val
     set type [string toupper $val]
   } elseif {$id=="TYPE"} {

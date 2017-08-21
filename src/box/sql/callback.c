@@ -442,7 +442,6 @@ void sqlite3SchemaClear(void *p){
   temp1 = pSchema->tblHash;
   temp2 = pSchema->trigHash;
   sqlite3HashInit(&pSchema->trigHash);
-  sqlite3HashClear(&pSchema->idxHash);
   for(pElem=sqliteHashFirst(&temp2); pElem; pElem=sqliteHashNext(pElem)){
     sqlite3DeleteTrigger(0, (Trigger*)sqliteHashData(pElem));
   }
@@ -476,7 +475,6 @@ Schema *sqlite3SchemaGet(sqlite3 *db, Btree *pBt){
     sqlite3OomFault(db);
   }else if ( 0==p->file_format ){
     sqlite3HashInit(&p->tblHash);
-    sqlite3HashInit(&p->idxHash);
     sqlite3HashInit(&p->trigHash);
     sqlite3HashInit(&p->fkeyHash);
     p->enc = SQLITE_UTF8;

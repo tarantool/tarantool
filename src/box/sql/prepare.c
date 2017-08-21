@@ -15,6 +15,7 @@
 */
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
+#include "box/space.h"
 
 /*
 ** Fill the InitData structure with an error message that indicates
@@ -37,6 +38,11 @@ static void corruptSchema(
   pData->rc = db->mallocFailed ? SQLITE_NOMEM_BKPT : SQLITE_CORRUPT_BKPT;
 }
 
+/* Necessary for appropriate value return in InitCallback.
+** Otherwise it will return uint32_t instead of 64 bit pointer.
+*/
+struct space *
+space_by_id(uint32_t id);
 /*
 ** This is the callback routine for the code that initializes the
 ** database.  See sqlite3Init() below for additional information.
@@ -45,7 +51,7 @@ static void corruptSchema(
 ** Each callback contains the following information:
 **
 **     argv[0] = name of thing being created
-**     argv[1] = root page number for table or index. 0 for trigger or view.
+**     argv[1] = root page number address.
 **     argv[2] = SQL text for the CREATE statement.
 **
 */
@@ -68,7 +74,7 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
   if( argv[1]==0 ){
     corruptSchema(pData, argv[0], 0);
   }else if( (strlen(argv[2])>7) &&
-	    sqlite3_strnicmp(argv[2],"create ",7)==0 ){
+	     sqlite3_strnicmp(argv[2],"create ",7)==0 ){
     /* Call the parser to process a CREATE TABLE, INDEX or VIEW.
     ** But because db->init.busy is set to 1, no VDBE code is generated
     ** or executed.  All the parser does is build the internal data
@@ -81,7 +87,7 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
 
     assert( db->init.busy );
     db->init.iDb = iDb;
-    db->init.newTnum = sqlite3Atoi(argv[1]);
+    db->init.newTnum = *((int *)argv[1]);
     db->init.orphanTrigger = 0;
     TESTONLY(rcp = ) sqlite3_prepare(db, argv[2], strlen(argv[2])+1, &pStmt, 0);
     rc = db->errCode;
@@ -89,15 +95,11 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
     db->init.iDb = saved_iDb;
     assert( saved_iDb==0 || (db->flags & SQLITE_Vacuum)!=0 );
     if( SQLITE_OK!=rc ){
-      if( db->init.orphanTrigger ){
-        assert( iDb==1 );
-      }else{
-        pData->rc = rc;
-        if( rc==SQLITE_NOMEM ){
-          sqlite3OomFault(db);
-        }else if( rc!=SQLITE_INTERRUPT && (rc&0xFF)!=SQLITE_LOCKED ){
-          corruptSchema(pData, argv[0], sqlite3_errmsg(db));
-        }
+      pData->rc = rc;
+      if( rc==SQLITE_NOMEM ){
+        sqlite3OomFault(db);
+      }else if( rc!=SQLITE_INTERRUPT && (rc&0xFF)!=SQLITE_LOCKED ){
+        corruptSchema(pData, argv[0], sqlite3_errmsg(db));
       }
     }
     sqlite3_finalize(pStmt);
@@ -112,7 +114,11 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
     ** to do here is record the root page number for that index.
     */
     Index *pIndex;
-    pIndex = sqlite3FindIndex(db, argv[0]);
+    long pageNo = *((long *)argv[1]);
+    int iSpace = (int)SQLITE_PAGENO_TO_SPACEID(pageNo);
+    struct space * pSpace = space_by_id(iSpace);
+    const char *zSpace = space_name(pSpace); 
+    pIndex = sqlite3LocateIndex(db, argv[0], zSpace);
     if( pIndex==0 ){
       /* This can occur if there exists an index on a TEMP table which
       ** has the same name as another index on a permanent index.  Since
@@ -120,9 +126,8 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
       ** safely ignore the index on the permanent table.
       */
       /* Do Nothing */;
-    }else if( sqlite3GetInt32(argv[1], &pIndex->tnum)==0 ){
-      corruptSchema(pData, argv[0], "invalid rootpage");
     }
+    pIndex->tnum = pageNo;
   }
   return 0;
 }
@@ -154,8 +159,9 @@ extern int sqlite3InitDatabase(sqlite3 *db, char **pzErrMsg){
   ** table name will be inserted automatically by the parser so we can just
   ** use the abbreviation "x" here.  The parser will also automatically tag
   ** the schema table as read-only. */
+  int rootPage = 1;
   azArg[0] = zMasterName = MASTER_NAME;
-  azArg[1] = "1";
+  azArg[1] = (char *)&rootPage;
   azArg[2] = "CREATE TABLE x(type text,name text,tbl_name text,"
                             "rootpage integer,sql text)";
   azArg[3] = 0;
@@ -279,12 +285,12 @@ extern int sqlite3InitDatabase(sqlite3 *db, char **pzErrMsg){
       xAuth = db->xAuth;
       db->xAuth = 0;
 #endif
-      rc = sqlite3_exec(db, zSql, sqlite3InitCallback, &initData, 0);
+      rc = SQLITE_OK;
 #ifndef SQLITE_OMIT_AUTHORIZATION
       db->xAuth = xAuth;
     }
 #endif
-    if( rc==SQLITE_OK ) rc = initData.rc;
+    rc = initData.rc;
     sqlite3DbFree(db, zSql);
 #ifndef SQLITE_OMIT_ANALYZE
     if( rc==SQLITE_OK ){

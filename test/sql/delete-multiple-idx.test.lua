@@ -23,7 +23,7 @@ box.sql.execute("DELETE FROM t3 WHERE y IS NULL;");
 box.sql.execute("SELECT * FROM t3;");
 
 -- Cleanup.
-box.sql.execute("DROP INDEX t3y");
+box.sql.execute("DROP INDEX t3y ON t3");
 box.sql.execute("DROP TABLE t3;");
 
 -- Debug.

@@ -231,7 +231,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.5",
     function()
-        test:execsql "DROP INDEX 'indext'"
+        test:execsql "DROP INDEX 'indext' ON test1"
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.5>
@@ -273,7 +273,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.9",
     function()
-        test:execsql "DROP INDEX 'index9'"
+        test:execsql "DROP INDEX 'index9' ON test1"
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.9>
@@ -294,7 +294,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.11",
     function()
-        test:execsql "DROP INDEX 'indext'"
+        test:execsql "DROP INDEX 'indext' ON test1"
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.11>
@@ -478,12 +478,15 @@ test:do_test(
 test:do_catchsql_test(
     "index-8.1",
     [[
-        DROP INDEX index1
+    	CREATE TABLE test1(a INT PRIMARY KEY);
+        DROP INDEX index1 ON test1
     ]], {
         -- <index-8.1>
-        1, "no such index: index1"
+        1, "no such index: test1.index1"
         -- </index-8.1>
     })
+
+test:execsql("DROP TABLE IF EXISTS test1")
 
 -- Make sure we don't actually create an index when the EXPLAIN keyword
 -- is used.
@@ -1041,7 +1044,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "index-17.4",
     [[
-        DROP INDEX IF EXISTS no_such_index;
+        DROP INDEX IF EXISTS no_such_index ON t7;
     ]], {
         -- <index-17.4>
         0
@@ -1203,7 +1206,7 @@ test:do_execsql_test(
     "index-20.1",
     [[
         CREATE INDEX "t6i2" ON t6(c);
-        DROP INDEX "t6i2";
+        DROP INDEX "t6i2" ON t6;
     ]], {
         -- <index-20.1>
         
@@ -1213,7 +1216,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index-20.2",
     [[
-        DROP INDEX "t6i1";
+        DROP INDEX "t6i1" ON t6;
     ]], {
         -- <index-20.2>
         

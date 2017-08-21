@@ -1123,7 +1123,6 @@ struct Schema {
   int schema_cookie;   /* Database schema version number for this file */
   int iGeneration;     /* Generation counter.  Incremented with each change */
   Hash tblHash;        /* All tables indexed by name */
-  Hash idxHash;        /* All (named) indices indexed by name */
   Hash trigHash;       /* All triggers indexed by name */
   Hash fkeyHash;       /* All foreign keys by referenced table name */
   Table *pSeqTab;      /* The sqlite_sequence table used by AUTOINCREMENT */
@@ -1783,6 +1782,7 @@ struct Table {
   char *zColAff;       /* String defining the affinity of each column */
   ExprList *pCheck;    /* All CHECK constraints */
                        /*   ... also used as column name list in a VIEW */
+  Hash idxHash;        /* All (named) indices indexed by name */
   int tnum;            /* Root BTree page for this table */
   u32 nTabRef;         /* Number of pointers to this Table */
   i16 iPKey;           /* If not negative, use aCol[iPKey] as the rowid */
@@ -3539,7 +3539,7 @@ void sqlite3ExprListDelete(sqlite3*, ExprList*);
 u32 sqlite3ExprListFlags(const ExprList*);
 int sqlite3Init(sqlite3*, char**);
 int sqlite3InitCallback(void*, int, char**, char**);
-void sqlite3Pragma(Parse*,Token*,Token*,Token*,int);
+void sqlite3Pragma(Parse*,Token*,Token*,Token*,Token*,int);
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 Module *sqlite3PragmaVtabRegister(sqlite3*,const char *zName);
 #endif
@@ -3632,7 +3632,7 @@ void sqlite3SrcListDelete(sqlite3*, SrcList*);
 Index *sqlite3AllocateIndexObject(sqlite3*,i16,int,char**);
 void sqlite3CreateIndex(Parse*,Token*,SrcList*,ExprList*,int,Token*,
                           Expr*, int, int, u8);
-void sqlite3DropIndex(Parse*, SrcList*, int);
+void sqlite3DropIndex(Parse*, SrcList*, Token*, int);
 int sqlite3Select(Parse*, Select*, SelectDest*);
 Select *sqlite3SelectNew(Parse*,ExprList*,SrcList*,Expr*,ExprList*,
                          Expr*,ExprList*,u32,Expr*,Expr*);
@@ -3690,9 +3690,10 @@ Table *sqlite3FindTable(sqlite3*,const char*);
 #define LOCATE_NOERR   0x02
 Table *sqlite3LocateTable(Parse*,u32 flags,const char*);
 Table *sqlite3LocateTableItem(Parse*,u32 flags,struct SrcList_item *);
-Index *sqlite3FindIndex(sqlite3*,const char*);
+Index *sqlite3FindIndex(sqlite3*,const char*,Table*);
+Index *sqlite3LocateIndex(sqlite3*,const char*,const char*);
 void sqlite3UnlinkAndDeleteTable(sqlite3*,const char*);
-void sqlite3UnlinkAndDeleteIndex(sqlite3*,const char*);
+void sqlite3UnlinkAndDeleteIndex(sqlite3*,Index*);
 void sqlite3Vacuum(Parse*,Token*);
 int sqlite3RunVacuum(char**, sqlite3*, int);
 char *sqlite3NameFromToken(sqlite3*, Token*);
@@ -3949,7 +3950,7 @@ void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
 CollSeq *sqlite3GetCollSeq(Parse*, u8, CollSeq *, const char*);
 char sqlite3AffinityType(const char*, u8*);
-void sqlite3Analyze(Parse*, Token*, Token*);
+void sqlite3Analyze(Parse*, Token*);
 int sqlite3InvokeBusyHandler(BusyHandler*);
 int sqlite3FindDb(sqlite3*, Token*);
 int sqlite3FindDbName(const char *);

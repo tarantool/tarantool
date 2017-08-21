@@ -381,14 +381,14 @@ cn:execute('create index if not exists test3_sec on test3(a, b)')
 ---
 - rowcount: 0
 ...
-cn:execute('drop index test3_sec')
+cn:execute('drop index test3_sec on test3')
 ---
 - rowcount: 1
 ...
 cn:reload_schema()
 ---
 ...
-cn:execute('drop index if exists test3_sec')
+cn:execute('drop index if exists test3_sec on test3')
 ---
 - rowcount: 0
 ...

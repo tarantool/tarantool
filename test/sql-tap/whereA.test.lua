@@ -257,7 +257,7 @@ test:do_test(
 test:do_test(
     "whereA-4.5",
     function()
-        test:execsql("DROP INDEX t2x;")
+        test:execsql("DROP INDEX t2x ON t2;")
         return count([[
     SELECT x FROM t2 ORDER BY x;
   ]])

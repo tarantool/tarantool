@@ -239,8 +239,7 @@ int sqlite3_db_status(
 
     /*
     ** *pCurrent gets an accurate estimate of the amount of memory used
-    ** to store the schema for all databases (main, temp, and any ATTACHed
-    ** databases.  *pHighwater is set to zero.
+    ** to store the schema for database. *pHighwater is set to zero.
     */
     case SQLITE_DBSTATUS_SCHEMA_USED: {
       int nByte = 0;              /* Used to accumulate return value */
@@ -254,12 +253,10 @@ int sqlite3_db_status(
         nByte += sqlite3GlobalConfig.m.xRoundup(sizeof(HashElem)) * (
             pSchema->tblHash.count
           + pSchema->trigHash.count
-          + pSchema->idxHash.count
           + pSchema->fkeyHash.count
         );
         nByte += sqlite3_msize(pSchema->tblHash.ht);
         nByte += sqlite3_msize(pSchema->trigHash.ht);
-        nByte += sqlite3_msize(pSchema->idxHash.ht);
         nByte += sqlite3_msize(pSchema->fkeyHash.ht);
 
         for(p=sqliteHashFirst(&pSchema->trigHash); p; p=sqliteHashNext(p)){

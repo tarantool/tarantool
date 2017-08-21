@@ -264,11 +264,13 @@ sqlite3Pragma(
 	      Token * pId1,	/* First part of [schema.]id field */
 	      Token * pId2,	/* Second part of [schema.]id field, or NULL */
 	      Token * pValue,	/* Token for <value>, or NULL */
+	      Token * pValue2,	/* Token for <value2>, or NULL */
 	      int minusFlag	/* True if a '-' sign preceded <value> */
 )
 {
 	char *zLeft = 0;	/* Nul-terminated UTF-8 string <id> */
 	char *zRight = 0;	/* Nul-terminated UTF-8 string <value>, or NULL */
+	char *zTable = 0;	/* Nul-terminated UTF-8 string <value2> or NULL */
 	const char *zDb = 0;	/* The database name */
 	Token *pId;		/* Pointer to <id> token */
 	char *aFcntl[4];	/* Argument to SQLITE_FCNTL_PRAGMA */
@@ -299,6 +301,7 @@ sqlite3Pragma(
 	} else {
 		zRight = sqlite3NameFromToken(db, pValue);
 	}
+	zTable = sqlite3NameFromToken(db, pValue2);
 
 	zDb = 0;
 	if (sqlite3AuthCheck(pParse, SQLITE_PRAGMA, zLeft, zRight, zDb)) {
@@ -307,9 +310,10 @@ sqlite3Pragma(
 	/* Send an SQLITE_FCNTL_PRAGMA file-control to the underlying VFS *
 	 * connection.  If it returns SQLITE_OK, then assume that the VFS *
 	 * handled the pragma and generate a no-op prepared statement. *
-	 *
-	 * IMPLEMENTATION-OF: R-12238-55120 Whenever a PRAGMA statement is parsed, *
-	 * an SQLITE_FCNTL_PRAGMA file control is sent to the open sqlite3_file *
+	 * 
+	 * IMPLEMENTATION-OF: R-12238-55120 Whenever a PRAGMA
+	 * statement is parsed, an SQLITE_FCNTL_PRAGMA file control
+	 * is sent to the open sqlite3_file
 	 * object corresponding to the database file to which the pragma *
 	 * statement refers. *
 	 *
@@ -323,10 +327,12 @@ sqlite3Pragma(
 	aFcntl[2] = zRight;
 	aFcntl[3] = 0;
 	db->busyHandler.nBusy = 0;
-	rc = sqlite3_file_control(db, zDb, SQLITE_FCNTL_PRAGMA, (void *)aFcntl);
+	rc = sqlite3_file_control(db, zDb,
+				  SQLITE_FCNTL_PRAGMA, (void *)aFcntl);
 	if (rc == SQLITE_OK) {
 		sqlite3VdbeSetNumCols(v, 1);
-		sqlite3VdbeSetColName(v, 0, COLNAME_NAME, aFcntl[0], SQLITE_TRANSIENT);
+		sqlite3VdbeSetColName(v, 0, COLNAME_NAME,
+				      aFcntl[0], SQLITE_TRANSIENT);
 		returnSingleText(v, aFcntl[0]);
 		sqlite3_free(aFcntl[0]);
 		goto pragma_out;
@@ -362,29 +368,33 @@ sqlite3Pragma(
 #if !defined(SQLITE_OMIT_PAGER_PRAGMAS) && !defined(SQLITE_OMIT_DEPRECATED)
 		/* * PRAGMA [schema.]default_cache_size *  PRAGMA *
 		 * [schema.]default_cache_size=N * *
-		 *
-		 * The first form reports the current persistent setting for the * *
-		 * page cache size.  The value returned is the maximum number *
-		 * of * pages in the page cache.  The second form sets both the *
-		 * current * page cache size value and the persistent page *
-		 * cache size value * stored in the database file. * *
-		 *
-		 * Older versions of SQLite would set the default cache size to *
-		 * a * negative number to indicate synchronous=OFF.  These *
+		 * 
+		 * The first form reports the current persistent
+		 * setting for the page cache size.
+		 * The value returned is the maximum number
+		 * of * pages in the page cache.  The second form sets
+		 * both the current page cache size value
+		 * and the persistent page cache size value stored in the
+		 * database file.
+		 * 
+		 * Older versions of SQLite would set the default
+		 * cache size to
+		 * a negative number to indicate synchronous=OFF.  These *
 		 * days, synchronous * is always on by default regardless of *
-		 * the sign of the default cache * size.  But continue to take *
-		 * the absolute value of the default cache * size of historical *
+		 * the sign of the default cache * size.  But continue to
+		 * take the absolute value of the default cache 
+		 * size of historical
 		 * compatibility. */
 	case PragTyp_DEFAULT_CACHE_SIZE:{
 		static const int iLn = VDBE_OFFSET_LINENO(2);
 		static const VdbeOpList getCacheSize[] = {
-			{OP_Transaction, 0, 0, 0},	/* 0 */
-			{OP_ReadCookie, 0, 1, BTREE_DEFAULT_CACHE_SIZE},	/* 1 */
+			{OP_Transaction, 0, 0, 0},			 /* 0 */
+			{OP_ReadCookie, 0, 1, BTREE_DEFAULT_CACHE_SIZE}, /* 1 */
 			{OP_IfPos, 1, 8, 0},
 			{OP_Integer, 0, 2, 0},
 			{OP_Subtract, 1, 2, 1},
 			{OP_IfPos, 1, 8, 0},
-			{OP_Integer, 0, 1, 0},	/* 6 */
+			{OP_Integer, 0, 1, 0},				 /* 6 */
 			{OP_Noop, 0, 0, 0},
 			{OP_ResultRow, 1, 1, 0},
 		};
@@ -405,7 +415,8 @@ sqlite3Pragma(
 			sqlite3VdbeAddOp3(v, OP_SetCookie, iDb, BTREE_DEFAULT_CACHE_SIZE, size);
 			assert(sqlite3SchemaMutexHeld(db, 0));
 			pDb->pSchema->cache_size = size;
-			sqlite3BtreeSetCacheSize(pDb->pBt, pDb->pSchema->cache_size);
+			sqlite3BtreeSetCacheSize(pDb->pBt,
+						 pDb->pSchema->cache_size);
 		}
 		break;
 	}
@@ -431,7 +442,8 @@ sqlite3Pragma(
 			 * pager module resizes using
 			 * sqlite3_realloc(). */
 			db->nextPagesize = sqlite3Atoi(zRight);
-			if (SQLITE_NOMEM == sqlite3BtreeSetPageSize(pBt, db->nextPagesize, -1, 0)) {
+			if (SQLITE_NOMEM == sqlite3BtreeSetPageSize(pBt,
+						  db->nextPagesize, -1, 0)) {
 				sqlite3OomFault(db);
 			}
 		}
@@ -940,11 +952,11 @@ sqlite3Pragma(
 		break;
 	}
 
+
 	case PragTyp_INDEX_INFO:{
-		if (zRight) {
+		if (zRight && zTable) {
 			Index *pIdx;
-			Table *pTab;
-			pIdx = sqlite3FindIndex(db, zRight);
+			pIdx = sqlite3LocateIndex(db, zRight, zTable);
 			if (pIdx) {
 				int i;
 				int mx;
@@ -960,13 +972,13 @@ sqlite3Pragma(
 					mx = pIdx->nKeyCol;
 					pParse->nMem = 3;
 				}
-				pTab = pIdx->pTable;
 				sqlite3CodeVerifySchema(pParse);
 				assert(pParse->nMem <= pPragma->nPragCName);
 				for (i = 0; i < mx; i++) {
 					i16 cnum = pIdx->aiColumn[i];
+					assert(pIdx->pTable);
 					sqlite3VdbeMultiLoad(v, 1, "iis", i, cnum,
-							     cnum < 0 ? 0 : pTab->aCol[cnum].zName);
+							     cnum < 0 ? 0 : pIdx->pTable->aCol[cnum].zName);
 					if (pPragma->iArg) {
 						sqlite3VdbeMultiLoad(v, 4, "isi",
 						  		    pIdx->aSortOrder[i],
@@ -979,7 +991,6 @@ sqlite3Pragma(
 		}
 		break;
 	}
-
 	case PragTyp_INDEX_LIST:{
 		if (zRight) {
 			Index *pIdx;
@@ -1810,6 +1821,7 @@ sqlite3Pragma(
 pragma_out:
 		sqlite3DbFree(db, zLeft);
 		sqlite3DbFree(db, zRight);
+		sqlite3DbFree(db, zTable);
 	}
 }
 #ifndef SQLITE_OMIT_VIRTUALTABLE
