@@ -261,14 +261,16 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES('b', 'two');
     ]])
 
+-- since extra columns deleted from pk (#2289), the searchcount decreased because
+-- query plan changed a lot
 do_searchcount_test("3.1", [[
   SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
     ]],
-    {1, "one", 2, "two", "search", 4})
+    {1, "one", 2, "two", "search", 2})
 do_searchcount_test("3.2", [[
   SELECT a, c FROM t3 WHERE (a=1 AND b='one') OR (a=2 AND b='two')
     ]],
-    {1, "i", 2, "ii", "search", 4})
+    {1, "i", 2, "ii", "search", 2})
 do_searchcount_test("3.4.1", [[
   SELECT y FROM t4 WHERE x='a'
     ]],
@@ -278,19 +280,19 @@ do_searchcount_test("3.4.2", [[
         (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
      OR (a=2 AND b='two')
     ]],
-    {1, "one", 2, "two", "search", 5})
+    {1, "one", 2, "two", "search", 3})
 do_searchcount_test("3.4.3", [[
   SELECT a, b FROM t3 WHERE
         (a=2 AND b='two')
      OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
     ]],
-    {2, "two", 1, "one", "search", 5})
+    {2, "two", 1, "one", "search", 3})
 do_searchcount_test("3.4.4", [[
   SELECT a, b FROM t3 WHERE
         (a=2 AND b=(SELECT y FROM t4 WHERE x='b'))
      OR (a=1 AND b=(SELECT y FROM t4 WHERE x='a'))
     ]],
-    {2, "two", 1, "one", "search", 6})
+    {2, "two", 1, "one", "search", 4})
 
 -- do_searchcount_test 3.5.1 {
 --   SELECT a, b FROM t3 WHERE (a=1 AND b='one') OR rowid=4

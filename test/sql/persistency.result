@@ -210,8 +210,7 @@ box.sql.execute("SELECT * FROM barfoo")
 ...
 box.sql.execute("SELECT * FROM foobar");
 ---
-- - [1, 'foo']
-  - [2, 'bar']
+- - [2, 'bar']
   - [1000, 'foobar']
   - ['foobar trigger test', 8888]
 ...

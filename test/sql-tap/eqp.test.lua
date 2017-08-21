@@ -209,12 +209,12 @@ test:do_eqp_test("2.2.4", "SELECT DISTINCT * FROM t1, t2", {
     -- actually it does not matter (in fact, it seems like pk should have been used in both cases)
     --{0, 1, 1, "SCAN TABLE t2 USING COVERING INDEX t2i1"},
     {0, 1, 1, "SCAN TABLE t2"},
-    {0, 0, 0, "USE TEMP B-TREE FOR DISTINCT"},
+    --{0, 0, 0, "USE TEMP B-TREE FOR DISTINCT"},
 })
 test:do_eqp_test("2.2.5", "SELECT DISTINCT * FROM t1, t2 ORDER BY t1.x", {
     {0, 0, 0, "SCAN TABLE t1"},
     {0, 1, 1, "SCAN TABLE t2"},
-    {0, 0, 0, "USE TEMP B-TREE FOR DISTINCT"},
+    --{0, 0, 0, "USE TEMP B-TREE FOR DISTINCT"},
     {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
 })
 test:do_eqp_test("2.2.6", "SELECT DISTINCT t2.x FROM t1, t2 ORDER BY t2.x", {
@@ -736,7 +736,7 @@ test:do_eqp_test(7.1, "SELECT count(*) FROM t1", {
     {0, 0, 0, "SCAN TABLE t1"},
 })
 test:do_eqp_test(7.2, "SELECT count(*) FROM t2", {
-    {0, 0, 0, "SCAN TABLE t2 USING COVERING INDEX i1"},
+    {0, 0, 0, "SCAN TABLE t2"},
 })
 -- MUST_WORK_TEST
 if (0 > 0)

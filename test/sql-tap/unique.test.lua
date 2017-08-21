@@ -213,7 +213,7 @@ test:do_catchsql_test(
         -- </unique-2.7>
     })
 
--- MUST_WORK_TEST i2 is checking not only "a" column #2289 #2495
+-- MUST_WORK_TEST i2 is checking not only "a" column #2495
 if 0 > 0 then
 test:do_catchsql_test(
     "unique-2.8",
@@ -392,7 +392,7 @@ test:do_catchsql_test(
         -- </unique-4.9>
     })
 
--- MUST_WORK_TEST i4c is checking not only "b" column #2289 #2495
+-- MUST_WORK_TEST i4c is checking not only "b" column #2495
 if 0 > 0 then
 test:do_catchsql_test(
     "unique-4.10",

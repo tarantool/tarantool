@@ -905,7 +905,9 @@ test:do_test(
             1, 2, 3, "nosort"
             -- </where2-7.2>
         })
-
+-- since extra columns deleted from pk (#2289), "order by" is optimized awy
+-- because 1 - we do not need to sorder by b (as t8 unique by a)
+-- 2 - t9 is already ordered by x
     test:do_test(
         "where2-7.3",
         function()
@@ -914,7 +916,8 @@ test:do_test(
   ]])
         end, {
             -- <where2-7.3>
-            1, 2, 3, 2, 3, "sort"
+            --1, 2, 3, 2, 3, "sort"
+            1, 2, 3, 2, 3, "nosort"
             -- </where2-7.3>
         })
 

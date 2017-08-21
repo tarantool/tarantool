@@ -116,26 +116,33 @@ test:do_execsql_test(
         -- </3.0>
     })
 
--- MUST_WORK_TEST wrong explain (possibly because of bug with indexes #2289)
-if 0>0 then
+-- Test plan changed because of changes in index representation
 for tn, sql in ipairs({[[SELECT t1.a, t1.b, t2.d, t2.e FROM t1, t2
                          WHERE t2.d=t1.b AND t1.a=(t2.d+1) AND t1.b = (t2.e+1)]],
 
                          [[SELECT t1.a, t1.b, t2.d, t2.e FROM t2, t1
-                           WHERE t2.d=t1.b AND t1.a=(t2.d+1) AND t1.b = (t2.e+1)]],
-
-                         [[SELECT t1.a, t1.b, t2.d, t2.e FROM t2 CROSS JOIN t1
-                           WHERE t2.d=t1.b AND t1.a=(t2.d+1) AND t1.b = (t2.e+1)]]}) do
+                           WHERE t2.d=t1.b AND t1.a=(t2.d+1) AND t1.b = (t2.e+1)]] }) do
     test:do_test(
         "3."..tn,
         function()
             return test:execsql("EXPLAIN QUERY PLAN "..sql)
         end, {
-            '/SCAN TABLE t2/',
-            '/SEARCH TABLE t1/'
+            '/SCAN TABLE t1/',
+            '/SEARCH TABLE t2/'
         })
 end
-end
+
+test:do_test(
+    "3.3",
+    function()
+        local sql = [[SELECT t1.a, t1.b, t2.d, t2.e FROM t2 CROSS JOIN t1
+                           WHERE t2.d=t1.b AND t1.a=(t2.d+1) AND t1.b = (t2.e+1)]]
+        return test:execsql("EXPLAIN QUERY PLAN "..sql)
+    end, {
+    '/SCAN TABLE t2/',
+    '/SEARCH TABLE t1/'
+})
+
 test:do_execsql_test(
     4.0,
     [[

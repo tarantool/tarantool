@@ -1187,5 +1187,30 @@ test:do_test(
 --   SELECT name FROM t19 ORDER BY name;
 -- } {{} savepoint t10 t11 t12 t13 t16 t2 t3 t3\"xyz t4\"abc t7 t8 t9 tablet8 test1 weird}
 
+test:do_test(
+    "table-20.1",
+    function()
+        local columns = {}
+        for i = 0, 1000-1, 1 do
+            table.insert(columns, "c"..i)
+        end
+        columns = table.concat(columns, ",")
+        test:execsql("CREATE TABLE t(c primary key, "..columns..")")
+        return
+    end, {
+    -- <table-15.1>
 
+    -- </table-15.1>
+})
+
+test:do_test(
+    "table-20.2",
+    function()
+        test:execsql("DROP TABLE t")
+        return
+    end, {
+    -- <table-15.1>
+
+    -- </table-15.1>
+})
 test:finish_test()

@@ -71,6 +71,9 @@ test:do_test(
         -- </1.2a>
     })
 
+-- since extra columns deleted from pk(#2289), "order by" is optimized awy
+-- as e is getting from ordered index by sequential scan by a single "d" value
+-- (howewer it was possible before because t1 was unique by a)
 test:do_test(
     "1.2b",
     function()
@@ -80,7 +83,8 @@ test:do_test(
         ]]
     end, {
         -- <1.2b>
-        "/ORDER BY/"
+        --"/ORDER BY/"
+        "~/ORDER BY/"
         -- </1.2b>
     })
 
