@@ -541,7 +541,7 @@ local function create_truncate_space()
 
     log.info("create space _truncate")
     box.space._space:insert{_truncate.id, ADMIN, '_truncate', 'memtx', 0, setmap({}),
-                            {{name = 'id', type = 'num'}, {name = 'count', type = 'num'}}}
+                            {{name = 'id', type = 'unsigned'}, {name = 'count', type = 'unsigned'}}}
 
     log.info("create index primary on _truncate")
     box.space._index:insert{_truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
@@ -550,15 +550,88 @@ local function create_truncate_space()
     _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, 2}
 end
 
+local function update_existing_users_to_1_7_5()
+    local def_ids_to_update = {}
+    for _, def in box.space._user:pairs() do
+        local new_def = def:totable()
+        if new_def[5] == nil then
+            table.insert(def_ids_to_update, new_def[1])
+        end
+    end
+    for _, id in ipairs(def_ids_to_update) do
+        box.space._user:update(id, {{'=', 5, setmap({})}})
+    end
+end
+
+local function update_space_formats_to_1_7_5()
+    local format = {}
+    format[1] = {type='string', name='key'}
+    box.space._schema:format(format)
+
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='engine', type='string'}
+    format[5] = {name='field_count', type='unsigned'}
+    format[6] = {name='flags', type='map'}
+    format[7] = {name='format', type='array'}
+    box.space._space:format(format)
+    box.space._vspace:format(format)
+
+    format = {}
+    format[1] = {name = 'id', type = 'unsigned'}
+    format[2] = {name = 'iid', type = 'unsigned'}
+    format[3] = {name = 'name', type = 'string'}
+    format[4] = {name = 'type', type = 'string'}
+    format[5] = {name = 'opts', type = 'map'}
+    format[6] = {name = 'parts', type = 'array'}
+    box.space._index:format(format)
+    box.space._vindex:format(format)
+
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='setuid', type='unsigned'}
+    box.space._func:format(format)
+    box.space._vfunc:format(format)
+
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='type', type='string'}
+    format[5] = {name='auth', type='map'}
+    box.space._user:format(format)
+    box.space._vuser:format(format)
+
+    format = {}
+    format[1] = {name='grantor', type='unsigned'}
+    format[2] = {name='grantee', type='unsigned'}
+    format[3] = {name='object_type', type='string'}
+    format[4] = {name='object_id', type='unsigned'}
+    format[5] = {name='privilege', type='unsigned'}
+    box.space._priv:format(format)
+    box.space._vpriv:format(format)
+
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='uuid', type='string'}
+    box.space._cluster:format(format)
+end
+
 local function upgrade_to_1_7_5()
     create_truncate_space()
+    update_space_formats_to_1_7_5()
+    update_existing_users_to_1_7_5()
 end
 
 local function upgrade_to_1_8_2()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _trigger = box.space[box.schema.TRIGGER_ID]
-    local format = {{name='name', type='str'},
+    local format = {{name='name', type='string'},
                     {name='opts', type='map'}}
 
     log.info("create space _trigger")

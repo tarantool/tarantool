@@ -138,6 +138,7 @@ space2 = box.schema.create_space('test2')
 Schema changed -> error: True
 Got another schema_id: True
 Sync ok
+Sync on error is ok
 space:drop()
 ---
 ...

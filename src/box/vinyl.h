@@ -60,7 +60,7 @@ enum iterator_type;
 
 struct vy_env *
 vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
-	   int write_threads, double timeout, uint32_t max_tuple_size);
+	   int write_threads, double timeout);
 
 void
 vy_env_delete(struct vy_env *e);
@@ -369,6 +369,12 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 /*
  * Configuration
  */
+
+/**
+ * Update max tuple size.
+ */
+int
+vy_set_max_tuple_size(struct vy_env *env, size_t max_size);
 
 /**
  * Update query timeout.

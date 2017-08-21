@@ -50,6 +50,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_NUMBER]   = */ "number",
 	/* [FIELD_TYPE_INTEGER]  = */ "integer",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
+	/* [FIELD_TYPE_MAP]      = */ "map",
 };
 
 enum field_type

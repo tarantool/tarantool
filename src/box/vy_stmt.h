@@ -68,6 +68,12 @@ static_assert(VY_UPSERT_INF == VY_UPSERT_THRESHOLD + 1,
 /** Vinyl statement vtable. */
 extern struct tuple_format_vtab vy_tuple_format_vtab;
 
+/**
+ * Max tuple size
+ * @see box.cfg.vinyl_max_tuple_size
+ */
+extern size_t vy_max_tuple_size;
+
 /** Vinyl statement environment. */
 struct vy_stmt_env {
 	struct lsregion allocator;
@@ -82,8 +88,7 @@ struct vy_stmt_env {
  * @param max_tuple_size Memory limit for a single vinyl statement.
  */
 void
-vy_stmt_env_create(struct vy_stmt_env *env, uint64_t memory,
-		   uint32_t max_tuple_size);
+vy_stmt_env_create(struct vy_stmt_env *env, size_t memory);
 
 void
 vy_stmt_env_destroy(struct vy_stmt_env *env);

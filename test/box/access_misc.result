@@ -249,14 +249,14 @@ box.space.admin_space:select()
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin', 'user']
+- - [1, 1, 'admin', 'user', {}]
 ...
 box.space._space:select(280)
 ---
-- - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
-      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
-        'name': 'format', 'type': '*'}]]
+- - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
+        'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
+        'type': 'map'}, {'name': 'format', 'type': 'array'}]]
 ...
 us = box.schema.space.create('uniuser_space')
 ---
@@ -355,7 +355,7 @@ session.su('admin')
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin', 'user']
+- - [1, 1, 'admin', 'user', {}]
 ...
 box.space._user:delete(testuser_uid)
 ---
@@ -379,7 +379,7 @@ box.space._user:delete(2)
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin', 'user']
+- - [1, 1, 'admin', 'user', {}]
 ...
 box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 ---
@@ -610,49 +610,51 @@ s:drop()
 box.space._user:select()
 ---
 - - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
-  - [1, 1, 'admin', 'user']
-  - [2, 1, 'public', 'role']
-  - [3, 1, 'replication', 'role']
+  - [1, 1, 'admin', 'user', {}]
+  - [2, 1, 'public', 'role', {}]
+  - [3, 1, 'replication', 'role', {}]
 ...
 box.space._space:select()
 ---
-- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'str', 'name': 'key'}]]
-  - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
-      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
-        'name': 'format', 'type': '*'}]]
-  - [281, 1, '_vspace', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'engine', 'type': 'str'},
-      {'name': 'field_count', 'type': 'num'}, {'name': 'flags', 'type': 'str'}, {
-        'name': 'format', 'type': '*'}]]
-  - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'iid',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
-      {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
-  - [289, 1, '_vindex', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'iid',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
-      {'name': 'opts', 'type': 'array'}, {'name': 'parts', 'type': 'array'}]]
-  - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
-  - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'setuid', 'type': 'num'}]]
-  - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
-      {'name': 'auth', 'type': '*'}]]
-  - [305, 1, '_vuser', 'sysview', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'owner',
-        'type': 'num'}, {'name': 'name', 'type': 'str'}, {'name': 'type', 'type': 'str'},
-      {'name': 'auth', 'type': '*'}]]
-  - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
-        'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
-        'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
-  - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'num'}, {'name': 'grantee',
-        'type': 'num'}, {'name': 'object_type', 'type': 'str'}, {'name': 'object_id',
-        'type': 'num'}, {'name': 'privilege', 'type': 'num'}]]
-  - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'uuid',
-        'type': 'str'}]]
-  - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'str'}, {'name': 'opts',
+- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}]]
+  - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
+        'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
+        'type': 'map'}, {'name': 'format', 'type': 'array'}]]
+  - [281, 1, '_vspace', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
+        'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
+        'type': 'map'}, {'name': 'format', 'type': 'array'}]]
+  - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
+        'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
+  - [289, 1, '_vindex', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
+        'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
+  - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
+        'type': 'unsigned'}]]
+  - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
+        'type': 'unsigned'}]]
+  - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
+        'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
+  - [305, 1, '_vuser', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
+        'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
+  - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {
+        'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
+      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+  - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'unsigned'},
+      {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
+      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+  - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
+        'type': 'string'}]]
+  - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'opts',
         'type': 'map'}]]
-  - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'num'}, {'name': 'count',
-        'type': 'num'}]]
+  - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count',
+        'type': 'unsigned'}]]
 ...
 box.space._func:select()
 ---

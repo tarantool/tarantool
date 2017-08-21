@@ -47,25 +47,23 @@
 enum {
 	/** Lowest allowed vinyl_max_tuple_size. */
 	TUPLE_MAX_SIZE_MIN = 16 * 1024,
-	SLAB_SIZE_MIN = 1024 * 1024
+	/** Slab size for tuple arena. */
+	SLAB_SIZE = 16 * 1024 * 1024
 };
 
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_delete,
 };
 
-void
-vy_stmt_env_create(struct vy_stmt_env *env, uint64_t memory,
-		   uint32_t max_tuple_size)
-{
-	if (max_tuple_size < TUPLE_MAX_SIZE_MIN)
-		max_tuple_size = TUPLE_MAX_SIZE_MIN;
-	uint32_t slab_size = small_round(max_tuple_size * 4);
+size_t vy_max_tuple_size = 1024 * 1024;
 
+void
+vy_stmt_env_create(struct vy_stmt_env *env, size_t memory)
+{
 	/* Vinyl memory is limited by vy_quota. */
 	quota_init(&env->quota, QUOTA_MAX);
 	tuple_arena_create(&env->arena, &env->quota, memory,
-			   slab_size, "vinyl");
+			   SLAB_SIZE, "vinyl");
 	lsregion_create(&env->allocator, &env->arena);
 }
 
@@ -104,11 +102,17 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
  * @retval not NULL Success.
  * @retval     NULL Memory error.
  */
-struct tuple *
+static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 {
 	uint32_t meta_size = tuple_format_meta_size(format);
 	uint32_t total_size = sizeof(struct vy_stmt) + meta_size + bsize;
+	if (unlikely(total_size > vy_max_tuple_size)) {
+		diag_set(ClientError, ER_VINYL_MAX_TUPLE_SIZE,
+			 (unsigned) total_size);
+		error_log(diag_last_error(diag_get()));
+		return NULL;
+	}
 	struct tuple *tuple = malloc(total_size);
 	if (unlikely(tuple == NULL)) {
 		diag_set(OutOfMemory, total_size, "malloc", "struct vy_stmt");

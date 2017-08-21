@@ -303,16 +303,17 @@ iproto_connection_stop(struct iproto_connection *con)
  * closing.
  * @param sock Socket to write to.
  * @param error Error to write.
+ * @param sync Request sync.
  */
 static inline void
-iproto_write_error_blocking(int sock, const struct error *e)
+iproto_write_error_blocking(int sock, const struct error *e, uint64_t sync)
 {
 	/* Set to blocking to write the error. */
 	int flags = fcntl(sock, F_GETFL, 0);
 	if (flags < 0)
 		return;
 	(void) fcntl(sock, F_SETFL, flags & (~O_NONBLOCK));
-	iproto_write_error(sock, e, ::schema_version);
+	iproto_write_error(sock, e, ::schema_version, sync);
 	(void) fcntl(sock, F_SETFL, flags);
 }
 
@@ -841,7 +842,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		iproto_enqueue_batch(con, in);
 	} catch (Exception *e) {
 		/* Best effort at sending the error message to the client. */
-		iproto_write_error_blocking(fd, e);
+		iproto_write_error_blocking(fd, e, 0);
 		e->log();
 		iproto_connection_close(con);
 	}
@@ -1117,7 +1118,7 @@ tx_process_join_subscribe(struct cmsg *m)
 	} catch (SocketError *e) {
 		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
-		iproto_write_error_blocking(con->input.fd, e);
+		iproto_write_error_blocking(con->input.fd, e, msg->header.sync);
 	}
 }
 

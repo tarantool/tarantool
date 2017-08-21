@@ -509,6 +509,7 @@ tarantool_free(void)
 	random_free();
 #endif
 	systemd_free();
+	say_logger_free();
 }
 
 int

@@ -119,7 +119,7 @@ struct vy_env {
 	/** Path to the data directory. */
 	char *path;
 	/** Max size of the memory level. */
-	uint64_t memory;
+	size_t memory;
 	/** Max size of the tuple cache. */
 	/** Max time a transaction may wait for memory. */
 	double timeout;
@@ -3824,7 +3824,7 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt,
 
 struct vy_env *
 vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
-	   int write_threads, double timeout, uint32_t max_tuple_size)
+	   int write_threads, double timeout)
 {
 	struct vy_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL)) {
@@ -3862,7 +3862,7 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
-	vy_stmt_env_create(&e->stmt_env, e->memory, max_tuple_size);
+	vy_stmt_env_create(&e->stmt_env, e->memory);
 
 	if (vy_index_env_create(&e->index_env, e->path,
 				&e->stmt_env.allocator,
@@ -3918,6 +3918,14 @@ vy_env_delete(struct vy_env *e)
 	vy_log_free();
 	TRASH(e);
 	free(e);
+}
+
+int
+vy_set_max_tuple_size(struct vy_env *env, size_t max_size)
+{
+	(void) env;
+	vy_max_tuple_size = max_size;
+	return 0;
 }
 
 int

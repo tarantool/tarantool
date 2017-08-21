@@ -19,7 +19,7 @@ s:drop()
 -- Check that space truncation works for spaces created via
 -- the internal API.
 --
-_ = box.space._space:insert{512, 1, 'test', engine, 0, {temporary = false}}
+_ = box.space._space:insert{512, 1, 'test', engine, 0, {temporary = false}, {}}
 _ = box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
 _ = box.space.test:insert{123}
 box.space.test:select()

@@ -77,6 +77,9 @@ say_logrotate(int /* signo */);
 void say_logger_init(const char *init_str,
                      int log_level, int nonblock, int background);
 
+void
+say_logger_free();
+
 CFORMAT(printf, 5, 0) void
 vsay(int level, const char *filename, int line, const char *error,
      const char *format, va_list ap);

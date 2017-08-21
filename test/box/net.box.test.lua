@@ -707,7 +707,7 @@ test_run:cmd("clear filter")
 -- gh-2402 net.box doesn't support space:format()
 --
 
-space = box.schema.space.create('test', {format={[1] = {"id", "number"}}})
+space = box.schema.space.create('test', {format={{name="id", type="number"}}})
 space ~= nil
 _ = box.space.test:create_index('primary')
 box.schema.user.grant('guest','read,write,execute','space', 'test')
@@ -720,8 +720,8 @@ c.space.test ~= nil
 format = c.space.test:format()
 
 format[1] ~= nil
-format[1][1] == "id"
-format[1][2] == "number"
+format[1].name == "id"
+format[1].type == "number"
 
 c.space.test:format({})
 
@@ -732,7 +732,7 @@ space:drop()
 -- Check that it's possible to get connection object form net.box space
 --
 
-space = box.schema.space.create('test', {format={[1] = {"id", "number"}}})
+space = box.schema.space.create('test', {format={{name="id", type="number"}}})
 space ~= nil
 _ = box.space.test:create_index('primary')
 box.schema.user.grant('guest','read,write,execute','space', 'test')

@@ -210,7 +210,7 @@ c:close()
 ...
 box.space._user:replace(u)
 ---
-- [1, 1, 'admin', 'user']
+- [1, 1, 'admin', 'user', {}]
 ...
 --
 -- Roles: test that universal access of an authenticated

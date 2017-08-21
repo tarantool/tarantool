@@ -226,6 +226,10 @@ function create_iterator(obj, key, opts)
     return res
 end
 
+function setmap(tab)
+    return setmetatable(tab, { __serialize = 'map' })
+end
+
 return {
     space_field_types = space_field_types;
     iterate = iterate;
@@ -237,4 +241,5 @@ return {
     check_space = check_space;
     space_bsize = space_bsize;
     create_iterator = create_iterator;
+    setmap = setmap;
 };
