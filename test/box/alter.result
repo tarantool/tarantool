@@ -148,32 +148,32 @@ space:replace{0}
 ---
 - error: Space '331' does not exist
 ...
-_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
+_index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 ---
 - error: Duplicate key exists in unique index 'primary' in space '_index'
 ...
-_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
+_index:replace{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 ---
-- [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
+- [280, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
 ...
-_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
+_index:insert{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 ---
 - error: Duplicate key exists in unique index 'primary' in space '_index'
 ...
-_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
+_index:replace{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 ---
-- [288, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned']
+- [288, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
 ...
 _index:select{}
 ---
 - - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
-  - [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
+  - [280, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
-  - [288, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned']
+  - [288, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [288, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
   - [289, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [289, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
@@ -211,9 +211,9 @@ _space:insert{1000, ADMIN, 'hello', 'memtx', 0}
 ---
 - [1000, 1, 'hello', 'memtx', 0]
 ...
-_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
+_index:insert{1000, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 ---
-- [1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
+- [1000, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
 ...
 box.space[1000]:insert{0, 'hello, world'}
 ---

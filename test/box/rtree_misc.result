@@ -547,29 +547,21 @@ f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'}
 s.index.s:drop()
 ---
 ...
--- support of 1.6.5 _index structure
-f(box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array'})
----
-- [0, 2, 's', 'rtree', 0, 1, 2, 'array']
-...
-s.index.s:drop()
----
-...
 -- with wrong args
 empty_map = setmetatable({}, {__serialize = 'map'})
 ---
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
 ---
-- error: 'Wrong record in _index space: got {number, number, string, string, unknown,
-    array}, expected {space id (number), index id (number), name (string), type (string),
-    options (map), parts (array)}'
+- error: 'Wrong record in _index space: got {unsigned, unsigned, string, string, nil,
+    array}, expected {space id (unsigned), index id (unsigned), name (string), type
+    (string), options (map), parts (array)}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
 ---
-- error: 'Wrong record in _index space: got {number, number, string, string, array,
-    array}, expected {space id (number), index id (number), name (string), type (string),
-    options (map), parts (array)}'
+- error: 'Wrong record in _index space: got {unsigned, unsigned, string, string, array,
+    array}, expected {space id (unsigned), index id (unsigned), name (string), type
+    (string), options (map), parts (array)}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
 ---
@@ -613,21 +605,20 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 - error: 'Wrong index parts: expected a non-empty array; expected field1 id (number),
     field1 type (string), ...'
 ...
-box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'thing'}}}
 ---
 - error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
     type (string), ...'
 ...
-box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'},{'wtf'}}}
 ---
-- error: 'Wrong record in _index space: got {number, number, string, string, number,
-    number, number, string, string}, expected {space id (number), index id (number),
-    name (string), type (string), is_unique (number), part count (number) part0 field
-    no (number), part0 field type (string), ...}'
+- error: 'Wrong index parts: a field type is missing; expected field1 id (number),
+    field1 type (string), ...'
 ...
-box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
+box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 ---
-- error: 'Can''t create or modify index ''s'' in space ''s'': part count must be positive'
+- error: 'Wrong index parts: expected a non-empty array; expected field1 id (number),
+    field1 type (string), ...'
 ...
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})

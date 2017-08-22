@@ -607,26 +607,6 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 	return 0;
 }
 
-int
-key_def_decode_parts_165(struct key_def *key_def, const char **data)
-{
-	char buf[FIELD_TYPE_NAME_MAX];
-	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		uint32_t field_no = (uint32_t) mp_decode_uint(data);
-		uint32_t len;
-		const char *str = mp_decode_str(data, &len);
-		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = field_type_by_name(buf);
-		if (field_type == field_type_MAX) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "unknown field type");
-			return -1;
-		}
-		key_def_set_part(key_def, i, field_no, field_type);
-	}
-	return 0;
-}
-
 const struct key_part *
 key_def_find(const struct key_def *key_def, uint32_t fieldno)
 {

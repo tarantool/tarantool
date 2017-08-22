@@ -623,7 +623,6 @@ char *
 key_def_encode_parts(char *data, const struct key_def *key_def);
 
 /**
- * 1.6.6+
  * Decode parts array from tuple field and write'em to index_def structure.
  * Throws a nice error about invalid types, but does not check ranges of
  *  resulting values field_no and field_type
@@ -632,17 +631,6 @@ key_def_encode_parts(char *data, const struct key_def *key_def);
  */
 int
 key_def_decode_parts(struct key_def *key_def, const char **data);
-
-/**
- * 1.6.5-
- * TODO: Remove it in newer version, find all 1.6.5-
- * Decode parts array from tuple fieldw and write'em to index_def structure.
- * Does not check anything since tuple must be validated before
- * Parts expected to be a sequence of <part_count> 2 * arrays values this:
- *  NUM, STR, NUM, STR, ..,
- */
-int
-key_def_decode_parts_165(struct key_def *key_def, const char **data);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.

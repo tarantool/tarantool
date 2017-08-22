@@ -59,15 +59,15 @@ t = _space:delete{space.id}
 space_deleted = box.space[t[1]]
 space_deleted
 space:replace{0}
-_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
-_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
-_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
-_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
+_index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
+_index:replace{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
+_index:insert{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
+_index:replace{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
 _space:insert{1000, ADMIN, 'hello', 'memtx', 0}
-_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
+_index:insert{1000, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 box.space[1000]:insert{0, 'hello, world'}
 box.space[1000]:drop()
 box.space[1000]

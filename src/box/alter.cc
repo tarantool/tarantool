@@ -81,52 +81,22 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
  * Support function for index_def_new_from_tuple(..)
  * Checks tuple (of _index space) and throws a nice error if it is invalid
  * Checks only types of fields and their count!
- * Additionally determines version of tuple structure
- * is_166plus is set as true if tuple structure is 1.6.6+
- * is_166plus is set as false if tuple structure is 1.6.5-
  */
 static void
-index_def_check_tuple(const struct tuple *tuple, bool *is_166plus)
+index_def_check_tuple(const struct tuple *tuple)
 {
-	*is_166plus = true;
-	const mp_type common_template[] = {MP_UINT, MP_UINT, MP_STR, MP_STR};
+	const mp_type common_template[] =
+		{MP_UINT, MP_UINT, MP_STR, MP_STR, MP_MAP, MP_ARRAY};
 	const char *data = tuple_data(tuple);
 	uint32_t field_count = mp_decode_array(&data);
 	const char *field_start = data;
-	if (field_count < 6)
+	if (field_count != 6)
 		goto err;
 	for (size_t i = 0; i < lengthof(common_template); i++) {
 		enum mp_type type = mp_typeof(*data);
 		if (type != common_template[i])
 			goto err;
 		mp_next(&data);
-	}
-	if (mp_typeof(*data) == MP_UINT) {
-		/* old 1.6.5- version */
-		/* TODO: removed it in newer versions, find all 1.6.5- */
-		*is_166plus = false;
-		mp_next(&data);
-		if (mp_typeof(*data) != MP_UINT)
-			goto err;
-		if (field_count % 2)
-			goto err;
-		mp_next(&data);
-		for (uint32_t i = 6; i < field_count; i += 2) {
-			if (mp_typeof(*data) != MP_UINT)
-				goto err;
-			mp_next(&data);
-			if (mp_typeof(*data) != MP_STR)
-				goto err;
-			mp_next(&data);
-		}
-	} else {
-		if (field_count != 6)
-			goto err;
-		if (mp_typeof(*data) != MP_MAP)
-			goto err;
-		mp_next(&data);
-		if (mp_typeof(*data) != MP_ARRAY)
-			goto err;
 	}
 	return;
 
@@ -137,39 +107,11 @@ err:
 	for (uint32_t i = 0; i < field_count && p < e; i++) {
 		enum mp_type type = mp_typeof(*data);
 		mp_next(&data);
-		const char *type_name;
-		switch (type) {
-		case MP_UINT:
-			type_name = "number";
-			break;
-		case MP_STR:
-			type_name = "string";
-			break;
-		case MP_ARRAY:
-			type_name = "array";
-			break;
-		case MP_MAP:
-			type_name = "map";
-			break;
-		default:
-			type_name = "unknown";
-			break;
-		}
-		p += snprintf(p, e - p, i ? ", %s" : "%s", type_name);
+		p += snprintf(p, e - p, i ? ", %s" : "%s", mp_type_strs[type]);
 	}
-	const char *expected;
-	if (*is_166plus) {
-		expected = "space id (number), index id (number), "
-			"name (string), type (string), "
-			"options (map), parts (array)";
-	} else {
-		expected = "space id (number), index id (number), "
-			"name (string), type (string), "
-			"is_unique (number), part count (number) "
-			"part0 field no (number), "
-			"part0 field type (string), ...";
-	}
-	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got, expected);
+	tnt_raise(ClientError, ER_WRONG_INDEX_RECORD, got,
+		  "space id (unsigned), index id (unsigned), name (string), "\
+		  "type (string), options (map), parts (array)");
 }
 
 static int
@@ -285,8 +227,6 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 }
 
 /**
- * Support function for index_def_new_from_tuple(..)
- * 1.6.6+
  * Decode distance type from message pached string to enum
  * Does not check message type, MP_STRING expected
  * Throws an error if the the value does not correspond to any enum value
@@ -311,8 +251,6 @@ index_opts_decode_distance(const char *str)
 }
 
 /**
- * Support function for index_def_new_from_tuple(..)
- * 1.6.6+
  * Fill index_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
  *
@@ -352,8 +290,7 @@ index_opts_create(struct index_opts *opts, const char *map)
 extern "C" struct index_def *
 index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 {
-	bool is_166plus;
-	index_def_check_tuple(tuple, &is_166plus);
+	index_def_check_tuple(tuple);
 
 	struct index_opts opts;
 	uint32_t id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_SPACE_ID);
@@ -364,43 +301,20 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	uint32_t name_len;
 	const char *name = tuple_field_str_xc(tuple, BOX_INDEX_FIELD_NAME,
 					      &name_len);
-	uint32_t part_count;
-	const char *parts;
-	if (is_166plus) {
-		/* 1.6.6+ _index space structure */
-		const char *opts_field =
-			tuple_field(tuple, BOX_INDEX_FIELD_OPTS);
-		index_opts_create(&opts, opts_field);
-		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
-		part_count = mp_decode_array(&parts);
-	} else {
-		/* 1.6.5- _index space structure */
-		/* TODO: remove it in newer versions, find all 1.6.5- */
-		opts = index_opts_default;
-		opts.is_unique =
-			tuple_field_u32_xc(tuple,
-					   BOX_INDEX_FIELD_IS_UNIQUE_165);
-		part_count = tuple_field_u32_xc(tuple,
-						BOX_INDEX_FIELD_PART_COUNT_165);
-		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS_165);
-	}
-	if (name_len > BOX_NAME_MAX)
+	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
+	}
+	index_opts_create(&opts, tuple_field(tuple, BOX_INDEX_FIELD_OPTS));
+	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
+	uint32_t part_count = mp_decode_array(&parts);
 	struct key_def *key_def = key_def_new(part_count);
 	if (key_def == NULL)
 		diag_raise();
 	auto key_def_guard = make_scoped_guard([=] { box_key_def_delete(key_def); });
-	if (is_166plus) {
-		/* 1.6.6+ */
-		if (key_def_decode_parts(key_def, &parts) != 0)
-			diag_raise();
-	} else {
-		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_165(key_def, &parts) != 0)
-			diag_raise();
-	}
+	if (key_def_decode_parts(key_def, &parts) != 0)
+		diag_raise();
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, type,
 			      &opts, key_def, space_index_key_def(old_space, 0));
@@ -428,25 +342,8 @@ space_opts_create(struct space_opts *opts, struct tuple *tuple)
 		return;
 
 	const char *data = tuple_field(tuple, BOX_SPACE_FIELD_OPTS);
-	bool is_170_plus = (mp_typeof(*data) == MP_MAP);
-	if (!is_170_plus) {
-		/* Tarantool < 1.7.0 compatibility */
-		const char *flags =
-			tuple_field_cstr_xc(tuple, BOX_SPACE_FIELD_OPTS);
-		while (flags && *flags) {
-			while (isspace(*flags)) /* skip space */
-				flags++;
-			if (strncmp(flags, "temporary", strlen("temporary")) == 0)
-				opts->temporary = true;
-			flags = strchr(flags, ',');
-			if (flags)
-				flags++;
-		}
-	} else {
-		opts_create_from_field(opts, space_opts_reg, data,
-				       ER_WRONG_SPACE_OPTIONS,
-				       BOX_SPACE_FIELD_OPTS);
-	}
+	opts_create_from_field(opts, space_opts_reg, data,
+			       ER_WRONG_SPACE_OPTIONS, BOX_SPACE_FIELD_OPTS);
 }
 
 /**
