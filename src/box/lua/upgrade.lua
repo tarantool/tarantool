@@ -627,6 +627,10 @@ local function upgrade_to_1_7_5()
     update_existing_users_to_1_7_5()
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 1.8.2
+--------------------------------------------------------------------------------
+
 local function upgrade_to_1_8_2()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
@@ -664,8 +668,8 @@ local function upgrade(options)
         {version = mkversion(1, 6, 8), func = upgrade_to_1_6_8, auto = false},
         {version = mkversion(1, 7, 1), func = upgrade_to_1_7_1, auto = false},
         {version = mkversion(1, 7, 2), func = upgrade_to_1_7_2, auto = false},
-        {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto = true},
-        {version = mkversion(1, 8, 2), func = upgrade_to_1_8_2, auto = false},
+        {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto = false},
+        {version = mkversion(1, 8, 2), func = upgrade_to_1_8_2, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

@@ -310,6 +310,7 @@ schema_init()
 			    &on_replace_cluster, NULL);
 
         /* _trigger - all existing SQL triggers */
+        key_def_set_part(key_def, 0, 0, FIELD_TYPE_STRING);
 	(void) sc_space_new(BOX_TRIGGER_ID, "_trigger", key_def, NULL, NULL);
 
 	free(key_def);
