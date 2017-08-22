@@ -690,7 +690,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct tuple *key, bool is_gap)
 {
 	struct txv *v;
-	uint32_t part_count = tuple_field_count(key);
+	MAYBE_UNUSED uint32_t part_count = tuple_field_count(key);
 
 	/* We do not support tracking range requests. */
 	assert(part_count >= index->cmp_def->part_count);

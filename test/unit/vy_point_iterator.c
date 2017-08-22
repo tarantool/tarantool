@@ -268,7 +268,7 @@ test_basic()
 					continue;
 				}
 			}
-			uint32_t got;
+			uint32_t got = 0;
 			tuple_field_u32(res, 1, &got);
 			if (got != expect && expect_lsn != vy_stmt_lsn(res))
 				results_ok = false;
