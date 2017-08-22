@@ -42,6 +42,11 @@
 
 #define LUA_WRONG_TYPE_MESG "Unsupported type passed to lua"
 
+struct lua_sql_func_info{
+	int func_ref;
+};
+
+
 /**
  * This function is callback which is called by sql engine.
  *
@@ -54,9 +59,9 @@ static void lua_sql_call(sqlite3_context *pCtx,
 						 sqlite3_value **apVal) {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	int func_ref = (int) (long long) sqlite3_user_data(pCtx);
+	struct lua_sql_func_info *func_info = sqlite3_user_data(pCtx);
 
-	lua_rawgeti(L, LUA_REGISTRYINDEX, func_ref);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, func_info->func_ref);
 	for (int i = 0; i < nVal; i++) {
 		sqlite3_value *param = apVal[i];
 		switch (sqlite3_value_type(param)) {
@@ -125,8 +130,9 @@ static void lua_sql_call(sqlite3_context *pCtx,
 
 static void lua_sql_destroy(void * p)
 {
-	int func_ref = (int)(long long)p;
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, func_ref);
+	struct lua_sql_func_info *func_info = p;
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, func_info->func_ref);
+	free(func_info);
 	return;
 }
 
@@ -139,11 +145,11 @@ static void lua_sql_destroy(void * p)
  */
 
 int lbox_sql_create_function(struct lua_State *L)
-{ 
+{
 	int argc = lua_gettop(L);
 	int func_arg_num = -1; // -1 is any arg num
 	const char *name;
-	int func_ref;
+	struct lua_sql_func_info *func_info;
 	sqlite3 *db = sql_get();
 	/**
 	 * Check args. Two types are possible:
@@ -156,7 +162,7 @@ int lbox_sql_create_function(struct lua_State *L)
 		luaL_error(L, "Invalid arguments");
 			return 0;
 	}
-	if (db == NULL){ 
+	if (db == NULL){
 		luaL_error(L, "Please call box.cfg{} first");
 		return 0;
 	}
@@ -166,9 +172,10 @@ int lbox_sql_create_function(struct lua_State *L)
 		lua_pop(L, 1);
 	}
 	name = lua_tostring(L, 1);
-	func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	sqlite3_create_function_v2(db, name, func_arg_num, 
-				   SQLITE_UTF8, (void*)(long long)func_ref,
+	func_info = (struct lua_sql_func_info*)malloc(sizeof(struct lua_sql_func_info));
+	func_info->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	sqlite3_create_function_v2(db, name, func_arg_num,
+				   SQLITE_UTF8, func_info,
 				   lua_sql_call, NULL, NULL, lua_sql_destroy);
 	return 0;
 }
