@@ -3054,6 +3054,7 @@ void sqlite3CreateIndex(
     if( iDb!=0 ) goto exit_create_index;
     assert( pName && pName->z );
 
+    sqlite3FixInit(&sFix, pParse, "index", pName);
     if( sqlite3FixSrcList(&sFix, pTblName) ){
       /* Because the parser constructs pTblName from a single identifier,
       ** sqlite3FixSrcList can never fail. */
