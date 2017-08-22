@@ -70,9 +70,16 @@ local function parse_list(list)
     for _,str in pairs(list) do
         if str ~= '' and not string.match(str, "HTTP/%d%.%d %d%d%d") then
             local h = str:split(': ')
-            local key = table.remove(h, 1)
+            local key = string.lower(table.remove(h, 1))
             local val = table.concat(h)
-            result[string.lower(key)] = val
+            local prev_val = result[key]
+            if prev_val == nil then
+                result[key] = val
+            elseif type(prev_val) == 'table' then
+                table.insert(prev_val, val)
+            else
+                result[key] = { prev_val, val }
+            end
         end
     end
     return result
