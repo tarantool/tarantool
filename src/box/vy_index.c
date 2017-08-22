@@ -30,28 +30,20 @@
  */
 #include "vy_index.h"
 
-#include <assert.h>
+#include "trivia/util.h"
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include <small/rlist.h>
 
 #include "assoc.h"
 #include "diag.h"
 #include "errcode.h"
 #include "histogram.h"
-#include "key_def.h"
+#include "index_def.h"
 #include "say.h"
 #include "schema.h"
-#include "trivia/util.h"
 #include "tuple.h"
-#include "tuple_format.h"
 #include "vy_log.h"
 #include "vy_mem.h"
 #include "vy_range.h"

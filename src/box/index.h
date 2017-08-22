@@ -212,7 +212,7 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 
 #if defined(__cplusplus)
 } /* extern "C" */
-#include "key_def.h"
+#include "index_def.h"
 
 struct iterator {
 	struct tuple *(*next)(struct iterator *);

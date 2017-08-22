@@ -31,126 +31,20 @@
  * SUCH DAMAGE.
  */
 
-/** \cond public */
-enum {
-	/** Start of the reserved range of system spaces. */
-	BOX_SYSTEM_ID_MIN = 256,
-	/** Space id of _schema. */
-	BOX_SCHEMA_ID = 272,
-	/** Space id of _space. */
-	BOX_SPACE_ID = 280,
-	/** Space id of _vspace view. */
-	BOX_VSPACE_ID = 281,
-	/** Space id of _index. */
-	BOX_INDEX_ID = 288,
-	/** Space id of _vindex view. */
-	BOX_VINDEX_ID = 289,
-	/** Space id of _func. */
-	BOX_FUNC_ID = 296,
-	/** Space id of _vfunc view. */
-	BOX_VFUNC_ID = 297,
-	/** Space id of _user. */
-	BOX_USER_ID = 304,
-	/** Space id of _vuser view. */
-	BOX_VUSER_ID = 305,
-	/** Space id of _priv. */
-	BOX_PRIV_ID = 312,
-	/** Space id of _vpriv view. */
-	BOX_VPRIV_ID = 313,
-	/** Space id of _cluster. */
-	BOX_CLUSTER_ID = 320,
-	/** Space id of _truncate. */
-	BOX_TRUNCATE_ID = 330,
-	/** End of the reserved range of system spaces. */
-	BOX_SYSTEM_ID_MAX = 511,
-	BOX_ID_NIL = 2147483647
-};
-/** \endcond public */
-
-/** _space fields. */
-enum {
-	BOX_SPACE_FIELD_ID = 0,
-	BOX_SPACE_FIELD_UID = 1,
-	BOX_SPACE_FIELD_NAME = 2,
-	BOX_SPACE_FIELD_ENGINE = 3,
-	BOX_SPACE_FIELD_FIELD_COUNT = 4,
-	BOX_SPACE_FIELD_OPTS = 5,
-};
-
-/** _index fields. */
-enum {
-	BOX_INDEX_FIELD_SPACE_ID = 0,
-	BOX_INDEX_FIELD_ID = 1,
-	BOX_INDEX_FIELD_NAME = 2,
-	BOX_INDEX_FIELD_TYPE = 3,
-	BOX_INDEX_FIELD_OPTS = 4,
-	BOX_INDEX_FIELD_IS_UNIQUE_165 = 4,
-	BOX_INDEX_FIELD_PARTS = 5,
-	BOX_INDEX_FIELD_PART_COUNT_165 = 5,
-	BOX_INDEX_FIELD_PARTS_165 = 6,
-};
-
-/** _user fields. */
-enum {
-	BOX_USER_FIELD_ID = 0,
-	BOX_USER_FIELD_UID = 1,
-	BOX_USER_FIELD_NAME = 2,
-	BOX_USER_FIELD_TYPE = 3,
-	BOX_USER_FIELD_AUTH_MECH_LIST = 4,
-};
-
-/** _priv fields. */
-enum {
-	BOX_PRIV_FIELD_ID = 0,
-	BOX_PRIV_FIELD_UID = 1,
-	BOX_PRIV_FIELD_OBJECT_TYPE = 2,
-	BOX_PRIV_FIELD_OBJECT_ID = 3,
-	BOX_PRIV_FIELD_ACCESS = 4,
-};
-
-/** _func fields. */
-enum {
-	BOX_FUNC_FIELD_ID = 0,
-	BOX_FUNC_FIELD_UID = 1,
-	BOX_FUNC_FIELD_NAME = 2,
-	BOX_FUNC_FIELD_SETUID = 3,
-	BOX_FUNC_FIELD_LANGUAGE = 4,
-};
-
-/** _schema fields. */
-enum {
-	BOX_SCHEMA_FIELD_KEY = 0,
-};
-
-/** _cluster fields. */
-enum {
-	BOX_CLUSTER_FIELD_ID = 0,
-	BOX_CLUSTER_FIELD_UUID = 1,
-};
-
-/** _truncate fields. */
-enum {
-	BOX_TRUNCATE_FIELD_SPACE_ID = 0,
-	BOX_TRUNCATE_FIELD_COUNT = 1,
-};
-
 #include <stdint.h>
-
-extern uint32_t schema_version;
-
-#if defined(__cplusplus)
-
-#include "error.h"
 #include <stdio.h> /* snprintf */
+#include "error.h"
 #include "space.h"
 #include "latch.h"
+
+extern uint32_t schema_version;
 
 /**
  * Lock of schema modification
  */
 extern struct latch schema_lock;
 
-struct space;
+#if defined(__cplusplus)
 
 /** Call a visitor function on every space in the space cache. */
 void
@@ -254,6 +148,7 @@ func_by_name(const char *name, uint32_t name_len);
  */
 bool
 schema_find_grants(const char *type, uint32_t id);
+
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

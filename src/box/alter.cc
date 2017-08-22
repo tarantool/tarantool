@@ -390,7 +390,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-	index_def_check(index_def, space_name(old_space));
+	index_def_check_xc(index_def, space_name(old_space));
 	old_space->handler->checkIndexDef(old_space, index_def);
 	index_def_guard.is_active = false;
 	return index_def;
@@ -452,7 +452,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = 0;
-	identifier_check(def->name);
+	identifier_check_xc(def->name);
 	def->id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
 	if (def->id > BOX_SPACE_MAX) {
 		tnt_raise(ClientError, errcode,
@@ -476,7 +476,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	}
 	memcpy(def->engine_name, engine_name, name_len);
 	def->engine_name[name_len] = 0;
-	identifier_check(def->engine_name);
+	identifier_check_xc(def->engine_name);
 	space_opts_create(&def->opts, tuple);
 	Engine *engine = engine_find(def->engine_name);
 	engine->checkSpaceDef(def);
@@ -550,7 +550,7 @@ alter_space_new(struct space *old_space)
 		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
-	alter->space_def = space_def_dup(alter->old_space->def);
+	alter->space_def = space_def_dup_xc(alter->old_space->def);
 	return alter;
 }
 
@@ -1751,7 +1751,7 @@ user_def_new_from_tuple(struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
 	}
-	identifier_check(user->name);
+	identifier_check_xc(user->name);
 	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain

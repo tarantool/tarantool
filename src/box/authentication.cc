@@ -31,6 +31,7 @@
 #include "authentication.h"
 #include "user.h"
 #include "session.h"
+#include "msgpuck.h"
 
 static char zero_hash[SCRAMBLE_SIZE];
 

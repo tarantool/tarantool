@@ -157,6 +157,8 @@ add_executable(vy_point_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_index.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c
+    ${PROJECT_SOURCE_DIR}/src/box/index_def.c
+    ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
 )
 target_link_libraries(vy_point_iterator.test core tuple xrow xlog unit)
 

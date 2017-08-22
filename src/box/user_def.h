@@ -30,12 +30,32 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "key_def.h" /* for SCHEMA_OBJECT_TYPE */
+#include "schema_def.h" /* for SCHEMA_OBJECT_TYPE */
 #include "scramble.h" /* for SCRAMBLE_SIZE */
+#define RB_COMPACT 1
+#include "small/rb.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/**
+ * Effective session user. A cache of user data
+ * and access stored in session and fiber local storage.
+ * Differs from the authenticated user when executing
+ * setuid functions.
+ */
+struct credentials {
+	/** A look up key to quickly find session user. */
+	uint8_t auth_token;
+	/**
+	 * Cached global grants, to avoid an extra look up
+	 * when checking global grants.
+	 */
+	uint8_t universal_access;
+	/** User id of the authenticated user. */
+	uint32_t uid;
+};
 
 enum {
 	/* SELECT */
@@ -48,9 +68,50 @@ enum {
 	PRIV_ALL = PRIV_R + PRIV_W + PRIV_X
 };
 
+/**
+ * Definition of a privilege
+ */
+struct priv_def {
+	/** Who grants the privilege. */
+	uint32_t grantor_id;
+	/** Whom the privilege is granted. */
+	uint32_t grantee_id;
+	/* Object id - is only defined for object type */
+	uint32_t object_id;
+	/* Object type - function, space, universe */
+	enum schema_object_type object_type;
+	/**
+	 * What is being granted, has been granted, or is being
+	 * revoked.
+	 */
+	uint8_t access;
+	/** To maintain a set of effective privileges. */
+	rb_node(struct priv_def) link;
+};
+
 /* Privilege name for error messages */
 const char *
 priv_name(uint8_t access);
+
+/**
+ * Encapsulates privileges of a user on an object.
+ * I.e. "space" object has an instance of this
+ * structure for each user.
+ */
+struct access {
+	/**
+	 * Granted access has been given to a user explicitly
+	 * via some form of a grant.
+	 */
+	uint8_t granted;
+	/**
+	 * Effective access is a sum of granted access and
+	 * all privileges inherited by a user on this object
+	 * via some role. Since roles may be granted to other
+	 * roles, this may include indirect grants.
+	 */
+	uint8_t effective;
+};
 
 /**
  * A cache entry for an existing user. Entries for all existing

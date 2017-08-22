@@ -30,8 +30,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "key_def.h"
+#include "user_def.h"
+#include "space_def.h"
 #include "small/rlist.h"
+#include "error.h"
 
 #if defined(__cplusplus)
 extern "C" {

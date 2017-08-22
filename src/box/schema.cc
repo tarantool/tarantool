@@ -37,7 +37,6 @@
 #include "assoc.h"
 #include "lua/utils.h"
 #include "lua/space.h"
-#include "key_def.h"
 #include "alter.h"
 #include "scoped_guard.h"
 #include <stdio.h>
@@ -191,8 +190,8 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	auto index_def_guard =
 		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct space_def *def =
-		space_def_new(id, ADMIN, 0, name, strlen(name), "memtx",
-			      strlen("memtx"), &space_opts_default);
+		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
+				 strlen("memtx"), &space_opts_default);
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct rlist key_list;
 	rlist_create(&key_list);
