@@ -626,6 +626,19 @@ box_set_vinyl_timeout(void)
 	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
 }
 
+double replication_timeout = 1;
+
+void
+box_set_replication_timeout(void)
+{
+	double timeout = cfg_getd("replication_timeout");
+	if (timeout <= 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_count",
+			  "the value must be greather than 0");
+	}
+	replication_timeout = timeout;
+}
+
 /* }}} configuration bindings */
 
 /**

@@ -52,7 +52,7 @@ local default_cfg = {
     checkpoint_interval = 3600,
     checkpoint_count    = 2,
     worker_pool_threads = 4,
-    replication_timeout = 10,
+    replication_timeout = 1,
 }
 
 -- types of available options
@@ -167,7 +167,7 @@ local dynamic_cfg = {
         require('title').update(box.cfg.custom_proc_title)
     end,
     force_recovery          = function() end,
-    replication_timeout     = function() end,
+    replication_timeout     = private.cfg_set_replication_timeout,
 }
 
 local dynamic_cfg_skip_at_load = {

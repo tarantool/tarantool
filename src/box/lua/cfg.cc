@@ -207,6 +207,17 @@ lbox_cfg_set_worker_pool_threads(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_cfg_set_replication_timeout(struct lua_State *L)
+{
+	try {
+		box_set_replication_timeout();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
 void
 box_lua_cfg_init(struct lua_State *L)
 {
@@ -226,6 +237,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_memtx_max_tuple_size", lbox_cfg_set_memtx_max_tuple_size},
 		{"cfg_set_vinyl_max_tuple_size", lbox_cfg_set_vinyl_max_tuple_size},
 		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
+		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
 		{NULL, NULL}
 	};
 

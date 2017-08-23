@@ -20,7 +20,7 @@ box.cfg
 15	pid_file:box.pid
 16	read_only:false
 17	readahead:16320
-18	replication_timeout:10
+18	replication_timeout:1
 19	rows_per_wal:500000
 20	slab_alloc_factor:1.05
 21	too_long_threshold:0.5
