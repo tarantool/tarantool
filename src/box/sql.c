@@ -73,9 +73,7 @@ sql_init()
 		/* XXX */
 	}
 
-	sqlite3_mutex_enter(db->mutex);
 	rc = sqlite3Init(db, &zErrMsg);
-	sqlite3_mutex_leave(db->mutex);
 	if (rc != SQLITE_OK) {
 		panic(zErrMsg);
 	} else {

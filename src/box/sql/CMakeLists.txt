@@ -14,6 +14,7 @@ include_directories(${SRCDIR})
 
 add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
 add_definitions(-DSQLITE_OMIT_VACUUM=1)
+add_definitions(-DTHREADSAFE=0)
 
 set(TEST_DEFINITIONS
     SQLITE_DEBUG=1

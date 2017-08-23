@@ -595,6 +595,8 @@ void
 sqlite3DeleteByKey(Parse *pParse, Token *pTab, const char **columns,
                    Expr **values, int nPairs)
 {
+  Expr *where = NULL;
+
   assert(nPairs > 0);
   if( pParse->nErr > 0 || pParse->db->mallocFailed )
     goto error;
@@ -605,7 +607,6 @@ sqlite3DeleteByKey(Parse *pParse, Token *pTab, const char **columns,
   Token t = { NULL, 0 };
   sqlite3SrcListIndexedBy(pParse, src, &t);
 
-  Expr *where = NULL;
   for (int i = 0; i < nPairs; ++i) {
     Expr *col_expr = sqlite3Expr(pParse->db, TK_ID, columns[i]);
     if (col_expr == NULL || values[i] == NULL)

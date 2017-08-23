@@ -357,7 +357,7 @@ void sqlite3BtreeCursorList(Btree*);
 
 # define sqlite3BtreeHoldsMutex(X) 1
 # define sqlite3BtreeHoldsAllMutexes(X) 1
-# define sqlite3SchemaMutexHeld(X,Y,Z) 1
+# define sqlite3SchemaMutexHeld(X,Y) 1
 #endif
 
 

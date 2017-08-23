@@ -2460,6 +2460,8 @@ case OP_Column: {
   pC = p->apCsr[pOp->p1];
   p2 = pOp->p2;
 
+  pCrsr = NULL;
+
   /* If the cursor cache is stale, bring it up-to-date */
   rc = sqlite3VdbeCursorMoveto(&pC, &p2);
   if( rc ) goto abort_due_to_error;
@@ -2540,7 +2542,7 @@ case OP_Column: {
     zEnd = zData + pC->payloadSize;
   }else{
     memset(&sMem, 0, sizeof(sMem));
-    rc = sqlite3VdbeMemFromBtree(pCrsr, 0, pC->payloadSize, &sMem);
+    rc = sqlite3VdbeMemFromBtree(pC->uc.pCursor, 0, pC->payloadSize, &sMem);
     if( rc!=SQLITE_OK ) goto abort_due_to_error;
     zData = (u8*)sMem.z;
     zEnd = zData + pC->payloadSize;
