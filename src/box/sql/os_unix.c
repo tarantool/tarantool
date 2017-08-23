@@ -1972,7 +1972,7 @@ static int closeUnixFile(sqlite3_file *id){
 ** Close a file.
 */
 static int unixClose(sqlite3_file *id){
-  int rc = SQLITE_OK;
+  int rc;
   unixFile *pFile = (unixFile *)id;
   verifyDbFile(pFile);
   unixUnlock(id, NO_LOCK);
@@ -2122,7 +2122,7 @@ static int dotlockCheckReservedLock(sqlite3_file *id, int *pResOut) {
 static int dotlockLock(sqlite3_file *id, int eFileLock) {
   unixFile *pFile = (unixFile*)id;
   char *zLockFile = (char *)pFile->lockingContext;
-  int rc = SQLITE_OK;
+  int rc;
 
 
   /* If we have any lock, then the lock file already exists.  All we have
@@ -3516,7 +3516,7 @@ static int full_fsync(int fd, int fullSync, int dataOnly){
 */
 static int openDirectory(const char *zFilename, int *pFd){
   int ii;
-  int fd = -1;
+  int fd;
   char zDirname[MAX_PATHNAME+1];
 
   sqlite3_snprintf(MAX_PATHNAME, zDirname, "%s", zFilename);
@@ -4975,7 +4975,7 @@ static int unixOpen(
   int openFlags = 0;             /* Flags to pass to open() */
   int eType = flags&0xFFFFFF00;  /* Type of file to open */
   int noLock;                    /* True to omit locking primitives */
-  int rc = SQLITE_OK;            /* Function Return Code */
+  int rc;                        /* Function Return Code */
   int ctrlFlags = 0;             /* UNIXFILE_* flags */
 
   int isExclusive  = (flags & SQLITE_OPEN_EXCLUSIVE);

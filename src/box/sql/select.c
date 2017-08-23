@@ -753,7 +753,7 @@ static void selectInnerLoop(
       for(i=pSort->nOBSat; i<pSort->pOrderBy->nExpr; i++){
         int j;
         if( (j = pSort->pOrderBy->a[i].u.x.iOrderByCol)>0 ){
-          pEList->a[j-1].u.x.iOrderByCol = i+1-pSort->nOBSat;
+          pEList->a[j-1].u.x.iOrderByCol = (u16) (i+1-pSort->nOBSat);
         }
       }
       regOrig = 0;
@@ -903,7 +903,7 @@ static void selectInnerLoop(
             pParse, pSort, p, regResult, regOrig, nResultCol, nPrefixReg);
       }else{
         int r1 = sqlite3GetTempReg(pParse);
-        assert( sqlite3Strlen30(pDest->zAffSdst)==nResultCol );
+        assert( sqlite3Strlen30(pDest->zAffSdst)==(unsigned int)nResultCol );
         sqlite3VdbeAddOp4(v, OP_MakeRecord, regResult, nResultCol, 
             r1, pDest->zAffSdst, nResultCol);
         sqlite3ExprCacheAffinityChange(pParse, regResult, nResultCol);
@@ -1293,7 +1293,7 @@ static void generateSortTail(
     }
 #ifndef SQLITE_OMIT_SUBQUERY
     case SRT_Set: {
-      assert( nColumn==sqlite3Strlen30(pDest->zAffSdst) );
+      assert( (unsigned int)nColumn==sqlite3Strlen30(pDest->zAffSdst) );
       sqlite3VdbeAddOp4(v, OP_MakeRecord, regRow, nColumn, regRowid,
                         pDest->zAffSdst, nColumn);
       sqlite3ExprCacheAffinityChange(pParse, regRow, nColumn);

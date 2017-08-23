@@ -435,16 +435,6 @@ void sqlite3_result_error_nomem(sqlite3_context *pCtx){
 }
 
 /*
-** This function is called after a transaction has been committed. It 
-** invokes callbacks registered with sqlite3_wal_hook() as required.
-*/
-static int doWalCallbacks(sqlite3 *db){
-  int rc = SQLITE_OK;
-  return rc;
-}
-
-
-/*
 ** Execute the statement pStmt, either until a row of data is ready, the
 ** statement is completely executed or an error occurs.
 **
@@ -544,14 +534,6 @@ static int sqlite3Step(Vdbe *p){
   if( rc!=SQLITE_ROW ) checkProfileCallback(db, p);
 #endif
 
-  if( rc==SQLITE_DONE ){
-    assert( p->rc==SQLITE_OK );
-    p->rc = doWalCallbacks(db);
-    if( p->rc!=SQLITE_OK ){
-      rc = SQLITE_ERROR;
-    }
-  }
-
   db->errCode = rc;
   if( SQLITE_NOMEM==sqlite3ApiExit(p->db, p->rc) ){
     p->rc = SQLITE_NOMEM_BKPT;
@@ -584,7 +566,7 @@ end_of_step:
 ** call sqlite3Reprepare() and try again.
 */
 int sqlite3_step(sqlite3_stmt *pStmt){
-  int rc = SQLITE_OK;      /* Result from sqlite3Step() */
+  int rc;                  /* Result from sqlite3Step() */
   int rc2 = SQLITE_OK;     /* Result from sqlite3Reprepare() */
   Vdbe *v = (Vdbe*)pStmt;  /* the prepared statement */
   int cnt = 0;             /* Counter to prevent infinite loop of reprepares */

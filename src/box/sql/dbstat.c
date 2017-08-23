@@ -147,7 +147,7 @@ static int statConnect(
   StatTable *pTab = 0;
   int rc = SQLITE_OK;
   int iDb;
-
+  (void) pAux; /* shut warnings */
   if( argc>=4 ){
     Token nm;
     sqlite3TokenInit(&nm, (char*)argv[3]);
@@ -193,7 +193,7 @@ static int statDisconnect(sqlite3_vtab *pVtab){
 */
 static int statBestIndex(sqlite3_vtab *tab, sqlite3_index_info *pIdxInfo){
   int i;
-
+  (void) tab; /* shut warning */
   pIdxInfo->estimatedCost = 1.0e6;  /* Initial cost estimate */
 
   /* Look for a valid schema=? constraint.  If found, change the idxNum to
@@ -582,10 +582,10 @@ static int statFilter(
   char *zSql;
   int rc = SQLITE_OK;
   char *zMaster;
-
+  (void)idxStr; (void) argc; /* shut warnings */
   if( idxNum==1 ){
     const char *zDbase = (const char*)sqlite3_value_text(argv[0]);
-    pCsr->iDb = sqlite3FindDbName(pTab->db, zDbase);
+    pCsr->iDb = sqlite3FindDbName(zDbase);
     if( pCsr->iDb<0 ){
       sqlite3_free(pCursor->pVtab->zErrMsg);
       pCursor->pVtab->zErrMsg = sqlite3_mprintf("no such schema: %s", zDbase);
@@ -696,6 +696,9 @@ int sqlite3DbstatRegister(sqlite3 *db){
     0,                            /* xRollback */
     0,                            /* xFindMethod */
     0,                            /* xRename */
+    0,                            /* xSavepoint */
+    0,                            /* xRelease */
+    0,                            /* xRollbackTo */
   };
   return sqlite3_create_module(db, "dbstat", &dbstat_module, 0);
 }

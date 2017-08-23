@@ -2909,7 +2909,7 @@ end_playback:
 ** If an IO error occurs, then the IO error is returned to the caller.
 ** Otherwise, SQLITE_OK is returned.
 */
-static int readDbPage(PgHdr *pPg, u32 iFrame){
+static int readDbPage(PgHdr *pPg) {
   Pager *pPager = pPg->pPager; /* Pager object associated with page pPg */
   Pgno pgno = pPg->pgno;       /* Page number to read */
   int rc = SQLITE_OK;          /* Return code */
@@ -5140,10 +5140,9 @@ static int getPageNormal(
       memset(pPg->pData, 0, pPager->pageSize);
       IOTRACE(("ZERO %p %d\n", pPager, pgno));
     }else{
-      u32 iFrame = 0;                 /* Frame to read from WAL file */
       assert( pPg->pPager==pPager );
       pPager->aStat[PAGER_STAT_MISS]++;
-      rc = readDbPage(pPg, iFrame);
+      rc = readDbPage(pPg);
       if( rc!=SQLITE_OK ){
         goto pager_acquire_err;
       }

@@ -861,7 +861,6 @@ void sqlite3FkCheck(
   sqlite3 *db = pParse->db;       /* Database handle */
   FKey *pFKey;                    /* Used to iterate through FKs */
   int iDb;                        /* Index of database containing pTab */
-  const char *zDb;                /* Name of database containing pTab */
   int isIgnoreErrors = pParse->disableTriggers;
 
   /* Exactly one of regOld and regNew should be non-zero. */
@@ -872,7 +871,6 @@ void sqlite3FkCheck(
 
   iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
   assert( iDb==0 );
-  zDb = db->mdb.zDbSName;
 
   /* Loop through all the foreign key constraints for which pTab is the
   ** child table (the table that the foreign key definition is part of).  */

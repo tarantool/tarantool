@@ -98,15 +98,15 @@ int sqlite3IsNaN(double x){
 
 /*
 ** Compute a string length that is limited to what can be stored in
-** lower 30 bits of a 32-bit signed integer.
+** lower 30 bits of a 32-bit unsigned integer.
 **
 ** The value returned will never be negative.  Nor will it ever be greater
 ** than the actual length of the string.  For very long strings (greater
 ** than 1GiB) the value returned might be less than the true string length.
 */
-int sqlite3Strlen30(const char *z){
+unsigned sqlite3Strlen30(const char *z){
   if( z==0 ) return 0;
-  return 0x3fffffff & (int)strlen(z);
+  return 0x3fffffff & (unsigned)strlen(z);
 }
 
 /*

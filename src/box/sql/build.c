@@ -24,6 +24,9 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#undef SWAP
+#undef likely
+#undef unlikely
 #include "tarantoolInt.h"
 #include "box/session.h"
 
@@ -299,7 +302,6 @@ int sqlite3UserAuthTable(const char *zTable){
 ** See also sqlite3LocateTable().
 */
 Table *sqlite3FindTable(sqlite3 *db, const char *zName){
-  Table *p = 0;
 
   /* All mutexes are required for schema access.  Make sure we hold them. */
   assert( sqlite3BtreeHoldsAllMutexes(db) );
@@ -375,14 +377,7 @@ Table *sqlite3LocateTableItem(
   u32 flags,
   struct SrcList_item *p
 ){
-  const char *zDb;
   assert( p->pSchema==0 || p->zDatabase==0 );
-  if( p->pSchema ){
-    int iDb = sqlite3SchemaToIndex(pParse->db, p->pSchema);
-    zDb = pParse->db->mdb.zDbSName;
-  }else{
-    zDb = p->zDatabase;
-  }
   return sqlite3LocateTable(pParse, flags, p->zName);
 }
 
@@ -393,7 +388,6 @@ Table *sqlite3LocateTableItem(
 ** Return NULL if not found.
 */
 Index *sqlite3FindIndex(sqlite3 *db, const char *zName){
-  Index *p = 0;
   /* All mutexes are required for schema access.  Make sure we hold them. */
   assert( sqlite3BtreeHoldsAllMutexes(db) );
   Schema *pSchema = db->mdb.pSchema;
@@ -632,11 +626,9 @@ void sqlite3OpenMasterTable(Parse *p){
 ** function returns the index of the named database in db->aDb[], or
 ** -1 if the named db cannot be found.
 */
-int sqlite3FindDbName(sqlite3 *db, const char *zName){
-  if( 0==sqlite3_stricmp("main", zName) ) {
-    return 0;
-  }
-  return -1;
+int sqlite3FindDbName(const char *zName) {
+  assert(0==sqlite3_stricmp("main", zName));
+  return 0;
 }
 
 /*
@@ -649,7 +641,7 @@ int sqlite3FindDb(sqlite3 *db, Token *pName){
   int i;                               /* Database number */
   char *zName;                         /* Name we are searching for */
   zName = sqlite3NameFromToken(db, pName);
-  i = sqlite3FindDbName(db, zName);
+  i = sqlite3FindDbName(zName);
   sqlite3DbFree(db, zName);
   return i;
 }
@@ -1463,31 +1455,6 @@ static char *createTableStmt(sqlite3 *db, Table *p){
 }
 
 /*
-** Resize an Index object to hold N columns total.  Return SQLITE_OK
-** on success and SQLITE_NOMEM on an OOM error.
-*/
-static int resizeIndexObject(sqlite3 *db, Index *pIdx, int N){
-  char *zExtra;
-  int nByte;
-  assert( pIdx->nColumn<N );
-  assert( pIdx->isResized==0 );
-  nByte = (sizeof(char*) + sizeof(i16) + 1)*N;
-  zExtra = sqlite3DbMallocZero(db, nByte);
-  if( zExtra==0 ) return SQLITE_NOMEM_BKPT;
-  memcpy(zExtra, pIdx->azColl, sizeof(char*)*pIdx->nColumn);
-  pIdx->azColl = (const char**)zExtra;
-  zExtra += sizeof(char*)*N;
-  memcpy(zExtra, pIdx->aiColumn, sizeof(i16)*pIdx->nColumn);
-  pIdx->aiColumn = (i16*)zExtra;
-  zExtra += sizeof(i16)*N;
-  memcpy(zExtra, pIdx->aSortOrder, pIdx->nColumn);
-  pIdx->aSortOrder = (u8*)zExtra;
-  pIdx->nColumn = N;
-  pIdx->isResized = 1;
-  return SQLITE_OK;
-}
-
-/*
 ** Estimate the total row width for a table.
 */
 static void estimateTableWidth(Table *pTab){
@@ -1543,9 +1510,7 @@ static int hasColumn(const i16 *aiCol, int nCol, int x){
 ** For virtual tables, only (1) is performed.
 */
 static void convertToWithoutRowidTable(Parse *pParse, Table *pTab){
-  Index *pIdx;
   Index *pPk;
-  int nPk;
   int i, j;
   sqlite3 *db = pParse->db;
 
@@ -2153,7 +2118,6 @@ void sqlite3CreateView(
   Token sEnd;
   DbFixer sFix;
   Token *pName = 0;
-  int iDb;
   sqlite3 *db = pParse->db;
 
   if( pParse->nVar>0 ){
@@ -2164,7 +2128,7 @@ void sqlite3CreateView(
   p = pParse->pNewTable;
   if( p==0 || pParse->nErr ) goto create_view_fail;
   sqlite3TwoPartName(pParse, pName1, &pName);
-  iDb = sqlite3SchemaToIndex(db, p->pSchema);
+  sqlite3SchemaToIndex(db, p->pSchema);
   sqlite3FixInit(&sFix, pParse, "view", pName);
   if( sqlite3FixSelect(&sFix, pSelect) ) goto create_view_fail;
 
@@ -2393,7 +2357,6 @@ static void sqlite3ClearStatTables(
   const char *zName      /* Name of index or table */
 ){
   int i;
-  const char *zDbName = pParse->db->mdb.zDbSName;
   for(i=1; i<=4; i++){
     char zTab[24];
     sqlite3_snprintf(sizeof(zTab),zTab,"sqlite_stat%d",i);
@@ -2413,7 +2376,6 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int isView){
   Vdbe *v;
   sqlite3 *db = pParse->db;
   Trigger *pTrigger;
-  Db *pDb = &db->mdb;
 
   v = sqlite3GetVdbe(pParse);
   assert( v!=0 );
@@ -2994,9 +2956,7 @@ void sqlite3CreateIndex(
   Token *pName = 0;    /* Unqualified name of the index to create */
   struct ExprList_item *pListItem; /* For looping over pList */
   int nExtra = 0;                  /* Space allocated for zExtra[] */
-  int nExtraCol;                   /* Number of extra columns needed */
   char *zExtra = 0;                /* Extra space after the Index object */
-  Index *pPk = 0;      /* PRIMARY KEY index for WITHOUT ROWID tables */
 
   if( db->mallocFailed || pParse->nErr>0 ){
     goto exit_create_index;
@@ -3043,7 +3003,7 @@ void sqlite3CreateIndex(
     pTab = sqlite3LocateTableItem(pParse, 0, &pTblName->a[0]);
     assert( db->mallocFailed==0 || pTab==0 );
     if( pTab==0 ) goto exit_create_index;
-    if( !HasRowid(pTab) ) pPk = sqlite3PrimaryKeyIndex(pTab);
+    if( !HasRowid(pTab) ) sqlite3PrimaryKeyIndex(pTab);
   }else{
     assert( pName==0 );
     assert( pStart==0 );
@@ -3964,7 +3924,6 @@ void sqlite3SrcListShiftJoinType(SrcList *p){
 void sqlite3BeginTransaction(Parse *pParse, int type){
   sqlite3 *db;
   Vdbe *v;
-  int i;
 
   assert( pParse!=0 );
   db = pParse->db;
@@ -4220,7 +4179,6 @@ static void reindexTable(Parse *pParse, Table *pTab, char const *zColl){
 
   for(pIndex=pTab->pIndex; pIndex; pIndex=pIndex->pNext){
     if( zColl==0 || collationMatch(zColl, pIndex) ){
-      int iDb = sqlite3SchemaToIndex(pParse->db, pTab->pSchema);
       sqlite3BeginWriteOperation(pParse, 0);
       sqlite3RefillIndex(pParse, pIndex, -1);
     }
@@ -4267,7 +4225,6 @@ static void reindexDatabases(Parse *pParse, char const *zColl){
 void sqlite3Reindex(Parse *pParse, Token *pName1, Token *pName2){
   CollSeq *pColl;             /* Collating sequence to be reindexed, or NULL */
   char *z;                    /* Name of a table or index */
-  const char *zDb;            /* Name of the database */
   Table *pTab;                /* A table in the database */
   Index *pIndex;              /* An index associated with pTab */
   int iDb;                    /* The database index number */
@@ -4300,7 +4257,6 @@ void sqlite3Reindex(Parse *pParse, Token *pName1, Token *pName2){
   if( iDb<0 ) return;
   z = sqlite3NameFromToken(db, pObjName);
   if( z==0 ) return;
-  zDb = db->mdb.zDbSName;
   pTab = sqlite3FindTable(db, z);
   if( pTab ){
     reindexTable(pParse, pTab, 0);

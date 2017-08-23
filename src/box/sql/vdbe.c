@@ -18,6 +18,7 @@
 ** in this file for details.  If in doubt, do not deviate from existing
 ** commenting and indentation practices when changing or adding code.
 */
+#include <box/txn.h>
 #include "sqliteInt.h"
 #include "btreeInt.h"
 #include "vdbeInt.h"
@@ -559,7 +560,7 @@ static Mem *out2Prerelease(Vdbe *p, VdbeOp *pOp){
 
 /*
 ** Execute as much of a VDBE program as we can.
-** This is the core of sqlite3_step(). 
+** This is the core of sqlite3_step().
 */
 int sqlite3VdbeExec(
   Vdbe *p                    /* The VDBE */
@@ -2510,7 +2511,7 @@ case OP_Column: {
      ** which happens when overflow pages come into play.
      */
     if ( avail==0 || mp_typeof(pC->aRow[0])!=MP_ARRAY ||
-         mp_check_array(pC->aRow, pC->aRow + avail)>0 ){
+         mp_check_array((char *)pC->aRow, (char *)(pC->aRow + avail))>0 ){
       rc = SQLITE_CORRUPT_BKPT;
       goto abort_due_to_error;
     }
@@ -2520,7 +2521,7 @@ case OP_Column: {
     pC->nHdrParsed = 0;
   }
 
-  if ( p2>=pC->nRowField ){
+  if ( (u32)p2>=pC->nRowField ){
     if( pOp->p4type==P4_MEM ){
       sqlite3VdbeMemShallowCopy(pDest, pOp->p4.pMem, MEM_Static);
     }else{
@@ -2557,7 +2558,7 @@ case OP_Column: {
 
     /* Fill in aOffset[i] values through the p2-th field. */
     do{
-      if( mp_check((const char **)&zParse, zEnd) != 0 ){
+      if( mp_check((const char **)&zParse, (char *)zEnd) != 0 ){
         rc = SQLITE_CORRUPT_BKPT;
         goto op_column_error;
       }
@@ -2565,7 +2566,7 @@ case OP_Column: {
     }while( i<=p2 );
 
     /* Excess data? */
-    if( p2==pC->nRowField && zParse!=zEnd) {
+    if( (unsigned)p2==pC->nRowField && zParse!=zEnd) {
       rc = SQLITE_CORRUPT_BKPT;
       goto op_column_error;
     }
@@ -2665,7 +2666,6 @@ case OP_Affinity: {
 ** If P4 is NULL then all index fields have the affinity BLOB.
 */
 case OP_MakeRecord: {
-  u8 *zNewRecord;        /* A buffer to hold the data for the new record */
   Mem *pRec;             /* The new record */
   i64 nByte;             /* Data space required for this record */
   Mem *pData0;           /* First field to be combined into the record */
@@ -2728,11 +2728,10 @@ case OP_MakeRecord: {
   if( sqlite3VdbeMemClearAndResize(pOut, (int)nByte) ){
     goto no_mem;
   }
-  zNewRecord = (u8 *)pOut->z;
 
   /* Write the record */
   assert( pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor) );
-  pOut->n = sqlite3VdbeMsgpackRecordPut(pOut->z, pData0, nField);
+  pOut->n = sqlite3VdbeMsgpackRecordPut((u8 *)pOut->z, pData0, nField);
   pOut->flags = MEM_Blob;
   pOut->enc = SQLITE_UTF8;  /* In case the blob is ever converted to text */
   REGISTER_TRACE(pOp->p3, pOut);
@@ -2992,7 +2991,7 @@ case OP_AutoCommit: {
         (!desiredAutoCommit)?"cannot start a transaction within a transaction":(
         (iRollback)?"cannot rollback - no transaction is active":
                    "cannot commit - no transaction is active"));
-      
+
     rc = SQLITE_ERROR;
     goto abort_due_to_error;
   }
@@ -3128,14 +3127,13 @@ case OP_Transaction: {
 ** Auto commit mode is disabled by OP_Transaction.
 */
 case OP_TTransaction:
-{
-  int rc;
-  if (p->autoCommit) {
-    rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
-  }
-  break;
-}
+	{
 
+		if (p->autoCommit){
+			rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;}
+		break;
+	}
+	
 /* Opcode: ReadCookie P1 P2 P3 * *
 **
 ** Read cookie number P3 from database P1 and write it into register P2.
@@ -3950,7 +3948,7 @@ case OP_Found: {        /* jump, in3 */
 **
 ** P1 is the index of a cursor open on an SQL table btree (with integer
 ** keys).  If register P3 does not contain an integer or if P1 does not
-** contain a record with rowid P3 then jump immediately to P2. 
+** contain a record with rowid P3 then jump immediately to P2.
 ** Or, if P2 is 0, raise an SQLITE_CORRUPT error. If P1 does contain
 ** a record with rowid P3 then
 ** leave the cursor pointing at that record and fall through to the next
@@ -4078,7 +4076,10 @@ case OP_MaxId: {     /* out3 */
 
   pgno = pC->pgnoRoot;
 
-  tarantoolSqlGetMaxId(SQLITE_PAGENO_TO_SPACEID(pgno), SQLITE_PAGENO_TO_INDEXID(pgno), p2, &pOut->u.i);
+  tarantoolSqlGetMaxId(SQLITE_PAGENO_TO_SPACEID(pgno),
+                       SQLITE_PAGENO_TO_INDEXID(pgno),
+                       p2,
+                       (uint64_t *) &pOut->u.i);
 
   pOut->flags = MEM_Int;
   break;
@@ -4587,7 +4588,7 @@ case OP_SorterData: {
 **
 ** Write into register P2 the complete row content for the row at
 ** which cursor P1 is currently pointing.
-** There is no interpretation of the data. 
+** There is no interpretation of the data.
 ** It is just copied onto the P2 register exactly as
 ** it is found in the database file.
 **
@@ -5535,7 +5536,7 @@ case OP_ParseSchema2: {
 case OP_ParseSchema3: {
   int iDb;
   InitData initData;
-  Mem *pRec, *pRecEnd;
+  Mem *pRec;
   char zPgnoBuf[16];
   char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
 
@@ -6086,7 +6087,7 @@ case OP_OffsetLimit: {    /* in1, out2, in3 */
 **
 ** Register P1 must contain an integer.  If the content of register P1 is
 ** initially greater than zero, then decrement the value in register P1.
-** If it is non-zero (negative or positive) and then also jump to P2. 
+** If it is non-zero (negative or positive) and then also jump to P2.
 ** If register P1 is initially zero, leave it unchanged and fall through.
 */
 case OP_IfNotZero: {        /* jump, in1 */
@@ -6307,9 +6308,6 @@ case OP_JournalMode: {    /* out2 */
   Pager *pPager;                  /* Pager associated with pBt */
   int eNew;                       /* New journal mode */
   int eOld;                       /* The old journal mode */
-#ifndef SQLITE_OMIT_WAL
-  const char *zFilename;          /* Name of database file for pPager */
-#endif
 
   pOut = out2Prerelease(p, pOp);
   eNew = pOp->p3;
@@ -6494,7 +6492,7 @@ case OP_VCreate: {
 */
 case OP_VDestroy: {
   db->nVDestroy++;
-  rc = sqlite3VtabCallDestroy(db, pOp->p1, pOp->p4.z);
+  rc = sqlite3VtabCallDestroy(db, pOp->p4.z);
   db->nVDestroy--;
   if( rc ) goto abort_due_to_error;
   break;

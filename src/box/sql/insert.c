@@ -1028,7 +1028,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		} else {
 			sqlite3VdbeAddOp3(v, OP_NewRowid, iDataCur, regRowid,
 					  regAutoinc);
-			appendFlag = 1;
 		}
 		autoIncStep(pParse, regAutoinc, regRowid);
 

@@ -204,7 +204,6 @@ void sqlite3BtreeLeaveAll(sqlite3 *db){
 ** This routine is used inside assert() statements only.
 */
 int sqlite3BtreeHoldsAllMutexes(sqlite3 *db){
-  int i;
   if( !sqlite3_mutex_held(db->mutex) ){
     return 0;
   }

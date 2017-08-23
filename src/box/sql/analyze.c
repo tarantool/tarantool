@@ -959,7 +959,7 @@ static void analyzeOneTable(
   int iTabCur;                 /* Table cursor */
   Vdbe *v;                     /* The virtual machine being built up */
   int i;                       /* Loop counter */
-  int jZeroRows = -1;          /* Jump from here if number of rows is zero */
+  int jZeroRows;               /* Jump from here if number of rows is zero */
   u8 needTableCnt = 1;         /* True to count the table */
   int regNewRowid = iMem++;    /* Rowid for the inserted record */
   int regStat4 = iMem++;       /* Register to hold Stat4Accum object */
@@ -1339,11 +1339,9 @@ static void analyzeTable(Parse *pParse, Table *pTab, Index *pOnlyIdx){
 void sqlite3Analyze(Parse *pParse, Token *pName1, Token *pName2){
   sqlite3 *db = pParse->db;
   int iDb;
-  int i;
   char *z;
   Table *pTab;
   Index *pIdx;
-  Token *pTableName;
   Vdbe *v;
 
   /* Read the database schema. If an error occurs, leave an error message

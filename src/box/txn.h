@@ -33,6 +33,7 @@
 
 #include <stdbool.h>
 #include "salad/stailq.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -6,9 +6,7 @@ option(SQL_MAINTAINER_MODE "Regenerate parser and opcodes for SQL compiler" OFF)
 # set(SQLITE_DEBUG 1)
 # endif()
 
-add_definitions(-Wno-pointer-sign -Wno-error)
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
+add_definitions(-Werror -Wall)
 
 set(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -52,7 +50,6 @@ add_library(sql STATIC
     hash.c
     insert.c
     legacy.c
-    loadext.c
     main.c
     malloc.c
     mem0.c

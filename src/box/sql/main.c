@@ -313,7 +313,6 @@ int sqlite3_shutdown(void){
     SQLITE_EXTRA_SHUTDOWN();
 #endif
     sqlite3_os_end();
-    sqlite3_reset_auto_extension();
     sqlite3GlobalConfig.isInit = 0;
   }
   if( sqlite3GlobalConfig.isPCacheInit ){
@@ -803,7 +802,6 @@ int sqlite3_db_config(sqlite3 *db, int op, ...){
         { SQLITE_DBCONFIG_ENABLE_FKEY,           SQLITE_ForeignKeys    },
         { SQLITE_DBCONFIG_ENABLE_TRIGGER,        SQLITE_EnableTrigger  },
         { SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER, SQLITE_Fts3Tokenizer  },
-        { SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, SQLITE_LoadExtension  },
         { SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,      SQLITE_NoCkptOnClose  },
       };
       unsigned int i;
@@ -1459,7 +1457,6 @@ int sqlite3CreateFunc(
   FuncDestructor *pDestructor
 ){
   FuncDef *p;
-  int nName;
   int extraFlags;
 
   assert( sqlite3_mutex_held(db->mutex) );
@@ -1468,7 +1465,7 @@ int sqlite3CreateFunc(
       (!xSFunc && (xFinal && !xStep)) ||
       (!xSFunc && (!xFinal && xStep)) ||
       (nArg<-1 || nArg>SQLITE_MAX_FUNCTION_ARG) ||
-      (255<(nName = sqlite3Strlen30( zFunctionName))) ){
+      (255<(sqlite3Strlen30(zFunctionName))) ){
     return SQLITE_MISUSE_BKPT;
   }
 
@@ -1834,42 +1831,6 @@ int sqlite3_wal_autocheckpoint(sqlite3 *db, int nFrame){
   return SQLITE_OK;
 }
 
-/*
-** Register a callback to be invoked each time a transaction is written
-** into the write-ahead-log by this database connection.
-*/
-void *sqlite3_wal_hook(
-  sqlite3 *db,                    /* Attach the hook to this db handle */
-  int(*xCallback)(void *, sqlite3*, const char*, int),
-  void *pArg                      /* First argument passed to xCallback() */
-){
-  return 0;
-}
-
-/*
-** Checkpoint database zDb.
-*/
-int sqlite3_wal_checkpoint_v2(
-  sqlite3 *db,                    /* Database handle */
-  const char *zDb,                /* Name of attached database (or NULL) */
-  int eMode,                      /* SQLITE_CHECKPOINT_* value */
-  int *pnLog,                     /* OUT: Size of WAL log in frames */
-  int *pnCkpt                     /* OUT: Total number of frames checkpointed */
-){
-  return SQLITE_OK;
-}
-
-
-/*
-** Checkpoint database zDb. If zDb is NULL, or if the buffer zDb points
-** to contains a zero-length string, all attached databases are 
-** checkpointed.
-*/
-int sqlite3_wal_checkpoint(sqlite3 *db, const char *zDb){
-  /* EVIDENCE-OF: R-41613-20553 The sqlite3_wal_checkpoint(D,X) is equivalent to
-  ** sqlite3_wal_checkpoint_v2(D,X,SQLITE_CHECKPOINT_PASSIVE,0,0). */
-  return sqlite3_wal_checkpoint_v2(db,zDb,SQLITE_CHECKPOINT_PASSIVE,0,0);
-}
 
 /*
 ** This function returns true if main-memory should be used instead of
@@ -2314,7 +2275,7 @@ int sqlite3ParseUri(
     while( zOpt[0] ){
       int nOpt = sqlite3Strlen30(zOpt);
       char *zVal = &zOpt[nOpt+1];
-      int nVal = sqlite3Strlen30(zVal);
+      unsigned int nVal = sqlite3Strlen30(zVal);
 
       if( nOpt==3 && memcmp("vfs", zOpt, 3)==0 ){
         zVfs = zVal;
@@ -2623,17 +2584,6 @@ static int openDatabase(
   }
 #endif
 
-  /* Load automatic extensions - extensions that have been registered
-  ** using the sqlite3_automatic_extension() API.
-  */
-  if( rc==SQLITE_OK ){
-    sqlite3AutoLoadExtensions(db);
-    rc = sqlite3_errcode(db);
-    if( rc!=SQLITE_OK ){
-      goto opendb_out;
-    }
-  }
-
 #ifdef SQLITE_ENABLE_FTS1
   if( !db->mallocFailed ){
     extern int sqlite3Fts1Init(sqlite3*);
@@ -2932,7 +2882,6 @@ void sqlite3_thread_cleanup(void){
 */
 int sqlite3_table_column_metadata(
   sqlite3 *db,                /* Connection handle */
-  const char *zDbName,        /* Database name or NULL */
   const char *zTableName,     /* Table name */
   const char *zColumnName,    /* Column name */
   char const **pzDataType,    /* OUTPUT: Declared data type */
@@ -3445,7 +3394,7 @@ int sqlite3_test_control(int op, ...){
     case SQLITE_TESTCTRL_IMPOSTER: {
       sqlite3 *db = va_arg(ap, sqlite3*);
       sqlite3_mutex_enter(db->mutex);
-      db->init.iDb = sqlite3FindDbName(db, va_arg(ap,const char*));
+      db->init.iDb = sqlite3FindDbName(va_arg(ap, const char*));
       db->init.busy = db->init.imposterTable = va_arg(ap,int);
       db->init.newTnum = va_arg(ap,int);
       if( db->init.busy==0 && db->init.newTnum>0 ){
@@ -3512,7 +3461,7 @@ sqlite3_int64 sqlite3_uri_int64(
 ** Return the Btree pointer identified by zDbName.  Return NULL if not found.
 */
 Btree *sqlite3DbNameToBtree(sqlite3 *db, const char *zDbName){
-  int iDb = zDbName ? sqlite3FindDbName(db, zDbName) : 0;
+  int iDb = zDbName ? sqlite3FindDbName(zDbName) : 0;
   return iDb<0 ? 0 : db->mdb.pBt;
 }
 

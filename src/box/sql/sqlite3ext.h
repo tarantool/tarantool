@@ -446,15 +446,11 @@ typedef int (*sqlite3_loadext_entry)(
 #define sqlite3_uri_vsnprintf          sqlite3_api->vsnprintf
 #define sqlite3_wal_checkpoint_v2      sqlite3_api->wal_checkpoint_v2
 /* Version 3.8.7 and later */
-#define sqlite3_auto_extension         sqlite3_api->auto_extension
 #define sqlite3_bind_blob64            sqlite3_api->bind_blob64
 #define sqlite3_bind_text64            sqlite3_api->bind_text64
-#define sqlite3_cancel_auto_extension  sqlite3_api->cancel_auto_extension
-#define sqlite3_load_extension         sqlite3_api->load_extension
 #define sqlite3_malloc64               sqlite3_api->malloc64
 #define sqlite3_msize                  sqlite3_api->msize
 #define sqlite3_realloc64              sqlite3_api->realloc64
-#define sqlite3_reset_auto_extension   sqlite3_api->reset_auto_extension
 #define sqlite3_result_blob64          sqlite3_api->result_blob64
 #define sqlite3_result_text64          sqlite3_api->result_text64
 #define sqlite3_strglob                sqlite3_api->strglob

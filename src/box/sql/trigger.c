@@ -209,8 +209,8 @@ void sqlite3FinishTrigger(
 ){
   Trigger *pTrig = pParse->pNewTrigger;   /* Trigger being finished */
   char *zName;                            /* Name of trigger */
-  char *zSql;                             /* SQL text */
-  char *zOpts;                            /* MsgPack containing SQL options */
+  char *zSql = 0;                         /* SQL text */
+  char *zOpts = 0;                        /* MsgPack containing SQL options */
   sqlite3 *db = pParse->db;               /* The database */
   DbFixer sFix;                           /* Fixer object */
   Token nameToken;                        /* Trigger name for error reporting */
@@ -237,8 +237,6 @@ void sqlite3FinishTrigger(
   */
   if( !db->init.busy ){
     Vdbe *v;
-    char *zSql;
-    int sql_len;
     int zOptsSz;
     Table *pSysTrigger;
     int iFirstCol;
@@ -481,7 +479,6 @@ void sqlite3DeleteTrigger(sqlite3 *db, Trigger *pTrigger){
 **/
 void sqlite3DropTrigger(Parse *pParse, SrcList *pName, int noErr){
   Trigger *pTrigger = 0;
-  int i;
   const char *zDb;
   const char *zName;
   sqlite3 *db = pParse->db;

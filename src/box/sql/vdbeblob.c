@@ -74,7 +74,9 @@ static int blobSeekToRow(Incrblob *p, sqlite3_int64 iRow, char **pzErr){
     sqlite3BtreeIncrblobCursor(p->pCsr);
 
     rc = sqlite3BtreePayload(pC->uc.pCursor,
-        p->iOffset, p->nByte>(u32)sizeof(buf) ? sizeof(buf) : p->nByte, buf);
+        (u32)p->iOffset,
+        (unsigned int)p->nByte>sizeof(buf) ? sizeof(buf) : (u32)p->nByte,
+        buf);
     if( rc==SQLITE_OK ) {
       /* Skip MsgPack header and reject certain types. */
       u8 *zParse = buf;

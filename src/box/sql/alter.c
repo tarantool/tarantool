@@ -676,7 +676,6 @@ void sqlite3AlterBeginAddColumn(Parse *pParse, SrcList *pSrc){
   Table *pNew;
   Table *pTab;
   Vdbe *v;
-  int iDb;
   int i;
   int nAlloc;
   sqlite3 *db = pParse->db;

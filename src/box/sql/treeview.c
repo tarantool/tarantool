@@ -33,7 +33,7 @@ static TreeView *sqlite3TreeViewPush(TreeView *p, u8 moreToFollow){
     p->iLevel++;
   }
   assert( moreToFollow==0 || moreToFollow==1 );
-  if( p->iLevel<sizeof(p->bLine) ) p->bLine[p->iLevel] = moreToFollow;
+  if( (unsigned int)p->iLevel<sizeof(p->bLine) ) p->bLine[p->iLevel] = moreToFollow;
   return p;
 }
 
@@ -57,7 +57,7 @@ static void sqlite3TreeViewLine(TreeView *p, const char *zFormat, ...){
   char zBuf[500];
   sqlite3StrAccumInit(&acc, 0, zBuf, sizeof(zBuf), 0);
   if( p ){
-    for(i=0; i<p->iLevel && i<sizeof(p->bLine)-1; i++){
+    for(i=0; i<p->iLevel && (unsigned int)i<sizeof(p->bLine)-1; i++){
       sqlite3StrAccumAppend(&acc, p->bLine[i] ? "|   " : "    ", 4);
     }
     sqlite3StrAccumAppend(&acc, p->bLine[i] ? "|-- " : "'-- ", 4);
@@ -83,7 +83,7 @@ static void sqlite3TreeViewItem(TreeView *p, const char *zLabel,u8 moreFollows){
 /*
 ** Generate a human-readable description of a WITH clause.
 */
-void sqlite3TreeViewWith(TreeView *pView, const With *pWith, u8 moreToFollow){
+void sqlite3TreeViewWith(TreeView *pView, const With *pWith) {
   int i;
   if( pWith==0 ) return;
   if( pWith->nCte==0 ) return;
@@ -128,7 +128,7 @@ void sqlite3TreeViewSelect(TreeView *pView, const Select *p, u8 moreToFollow){
   int cnt = 0;
   pView = sqlite3TreeViewPush(pView, moreToFollow);
   if( p->pWith ){
-    sqlite3TreeViewWith(pView, p->pWith, 1);
+    sqlite3TreeViewWith(pView, p->pWith);
     cnt = 1;
     sqlite3TreeViewPush(pView, 1);
   }

@@ -230,7 +230,7 @@ void sqlite3DeleteFrom(
   u8 *aToOpen = 0;       /* Open cursor iTabCur+j if aToOpen[j] is true */
   Index *pPk;            /* The PRIMARY KEY index on the table */
   int iPk = 0;           /* First of nPk registers holding PRIMARY KEY value */
-  i16 nPk = 1;           /* Number of columns in the PRIMARY KEY */
+  i16 nPk;               /* Number of columns in the PRIMARY KEY */
   int iKey;              /* Memory cell holding key of row to be deleted */
   i16 nKey;              /* Number of memory cells in the row key */
   int iEphCur = 0;       /* Ephemeral table holding all primary key values */
@@ -706,6 +706,7 @@ void sqlite3GenerateRowDelete(
 
   /* Vdbe is guaranteed to have been allocated by this stage. */
   assert( v );
+  (void) iIdxCur;
   VdbeModuleComment((v, "BEGIN: GenRowDel(%d,%d,%d,%d)",
                          iDataCur, iIdxCur, iPk, (int)nPk));
 

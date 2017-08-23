@@ -5571,7 +5571,6 @@ SQLITE_API SQLITE_DEPRECATED void sqlite3_soft_heap_limit(int N);
 */
 SQLITE_API int sqlite3_table_column_metadata(
   sqlite3 *db,                /* Connection handle */
-  const char *zDbName,        /* Database name or NULL */
   const char *zTableName,     /* Table name */
   const char *zColumnName,    /* Column name */
   char const **pzDataType,    /* OUTPUT: Declared data type */
@@ -5580,142 +5579,9 @@ SQLITE_API int sqlite3_table_column_metadata(
   int *pPrimaryKey,           /* OUTPUT: True if column part of PK */
   int *pAutoinc               /* OUTPUT: True if column is auto-increment */
 );
+SQLITE_API int sqlite3_table_column_metadata(sqlite3 *db, const char *zTableName, const char *zColumnName, char const **pzDataType,
+                                             char const **pzCollSeq, int *pNotNull, int *pPrimaryKey, int *pAutoinc);
 
-/*
-** CAPI3REF: Load An Extension
-** METHOD: sqlite3
-**
-** ^This interface loads an SQLite extension library from the named file.
-**
-** ^The sqlite3_load_extension() interface attempts to load an
-** [SQLite extension] library contained in the file zFile.  If
-** the file cannot be loaded directly, attempts are made to load
-** with various operating-system specific extensions added.
-** So for example, if "samplelib" cannot be loaded, then names like
-** "samplelib.so" or "samplelib.dylib" or "samplelib.dll" might
-** be tried also.
-**
-** ^The entry point is zProc.
-** ^(zProc may be 0, in which case SQLite will try to come up with an
-** entry point name on its own.  It first tries "sqlite3_extension_init".
-** If that does not work, it constructs a name "sqlite3_X_init" where the
-** X is consists of the lower-case equivalent of all ASCII alphabetic
-** characters in the filename from the last "/" to the first following
-** "." and omitting any initial "lib".)^
-** ^The sqlite3_load_extension() interface returns
-** [SQLITE_OK] on success and [SQLITE_ERROR] if something goes wrong.
-** ^If an error occurs and pzErrMsg is not 0, then the
-** [sqlite3_load_extension()] interface shall attempt to
-** fill *pzErrMsg with error message text stored in memory
-** obtained from [sqlite3_malloc()]. The calling function
-** should free this memory by calling [sqlite3_free()].
-**
-** ^Extension loading must be enabled using
-** [sqlite3_enable_load_extension()] or
-** [sqlite3_db_config](db,[SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION],1,NULL)
-** prior to calling this API,
-** otherwise an error will be returned.
-**
-** <b>Security warning:</b> It is recommended that the 
-** [SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION] method be used to enable only this
-** interface.  The use of the [sqlite3_enable_load_extension()] interface
-** should be avoided.  This will keep the SQL function [load_extension()]
-** disabled and prevent SQL injections from giving attackers
-** access to extension loading capabilities.
-**
-** See also the [load_extension() SQL function].
-*/
-SQLITE_API int sqlite3_load_extension(
-  sqlite3 *db,          /* Load the extension into this database connection */
-  const char *zFile,    /* Name of the shared library containing extension */
-  const char *zProc,    /* Entry point.  Derived from zFile if 0 */
-  char **pzErrMsg       /* Put error message here if not 0 */
-);
-
-/*
-** CAPI3REF: Enable Or Disable Extension Loading
-** METHOD: sqlite3
-**
-** ^So as not to open security holes in older applications that are
-** unprepared to deal with [extension loading], and as a means of disabling
-** [extension loading] while evaluating user-entered SQL, the following API
-** is provided to turn the [sqlite3_load_extension()] mechanism on and off.
-**
-** ^Extension loading is off by default.
-** ^Call the sqlite3_enable_load_extension() routine with onoff==1
-** to turn extension loading on and call it with onoff==0 to turn
-** it back off again.
-**
-** ^This interface enables or disables both the C-API
-** [sqlite3_load_extension()] and the SQL function [load_extension()].
-** ^(Use [sqlite3_db_config](db,[SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION],..)
-** to enable or disable only the C-API.)^
-**
-** <b>Security warning:</b> It is recommended that extension loading
-** be disabled using the [SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION] method
-** rather than this interface, so the [load_extension()] SQL function
-** remains disabled. This will prevent SQL injections from giving attackers
-** access to extension loading capabilities.
-*/
-SQLITE_API int sqlite3_enable_load_extension(sqlite3 *db, int onoff);
-
-/*
-** CAPI3REF: Automatically Load Statically Linked Extensions
-**
-** ^This interface causes the xEntryPoint() function to be invoked for
-** each new [database connection] that is created.  The idea here is that
-** xEntryPoint() is the entry point for a statically linked [SQLite extension]
-** that is to be automatically loaded into all new database connections.
-**
-** ^(Even though the function prototype shows that xEntryPoint() takes
-** no arguments and returns void, SQLite invokes xEntryPoint() with three
-** arguments and expects an integer result as if the signature of the
-** entry point where as follows:
-**
-** <blockquote><pre>
-** &nbsp;  int xEntryPoint(
-** &nbsp;    sqlite3 *db,
-** &nbsp;    const char **pzErrMsg,
-** &nbsp;    const struct sqlite3_api_routines *pThunk
-** &nbsp;  );
-** </pre></blockquote>)^
-**
-** If the xEntryPoint routine encounters an error, it should make *pzErrMsg
-** point to an appropriate error message (obtained from [sqlite3_mprintf()])
-** and return an appropriate [error code].  ^SQLite ensures that *pzErrMsg
-** is NULL before calling the xEntryPoint().  ^SQLite will invoke
-** [sqlite3_free()] on *pzErrMsg after xEntryPoint() returns.  ^If any
-** xEntryPoint() returns an error, the [sqlite3_open()], [sqlite3_open16()],
-** or [sqlite3_open_v2()] call that provoked the xEntryPoint() will fail.
-**
-** ^Calling sqlite3_auto_extension(X) with an entry point X that is already
-** on the list of automatic extensions is a harmless no-op. ^No entry point
-** will be called more than once for each database connection that is opened.
-**
-** See also: [sqlite3_reset_auto_extension()]
-** and [sqlite3_cancel_auto_extension()]
-*/
-SQLITE_API int sqlite3_auto_extension(void(*xEntryPoint)(void));
-
-/*
-** CAPI3REF: Cancel Automatic Extension Loading
-**
-** ^The [sqlite3_cancel_auto_extension(X)] interface unregisters the
-** initialization routine X that was registered using a prior call to
-** [sqlite3_auto_extension(X)].  ^The [sqlite3_cancel_auto_extension(X)]
-** routine returns 1 if initialization routine X was successfully 
-** unregistered and it returns 0 if X was not on the list of initialization
-** routines.
-*/
-SQLITE_API int sqlite3_cancel_auto_extension(void(*xEntryPoint)(void));
-
-/*
-** CAPI3REF: Reset Automatic Extension Loading
-**
-** ^This interface disables all automatic extensions previously
-** registered using [sqlite3_auto_extension()].
-*/
-SQLITE_API void sqlite3_reset_auto_extension(void);
 
 /*
 ** The interface to the virtual-table mechanism is currently considered
@@ -7453,9 +7319,7 @@ typedef struct sqlite3_backup sqlite3_backup;
 */
 SQLITE_API sqlite3_backup *sqlite3_backup_init(
   sqlite3 *pDest,                        /* Destination database handle */
-  const char *zDestName,                 /* Destination database name */
-  sqlite3 *pSource,                      /* Source database handle */
-  const char *zSourceName                /* Source database name */
+  sqlite3 *pSource                       /* Source database handle */
 );
 SQLITE_API int sqlite3_backup_step(sqlite3_backup *p, int nPage);
 SQLITE_API int sqlite3_backup_finish(sqlite3_backup *p);
@@ -7751,105 +7615,6 @@ SQLITE_API int sqlite3_wal_autocheckpoint(sqlite3 *db, int N);
 */
 SQLITE_API int sqlite3_wal_checkpoint(sqlite3 *db, const char *zDb);
 
-/*
-** CAPI3REF: Checkpoint a database
-** METHOD: sqlite3
-**
-** ^(The sqlite3_wal_checkpoint_v2(D,X,M,L,C) interface runs a checkpoint
-** operation on database X of [database connection] D in mode M.  Status
-** information is written back into integers pointed to by L and C.)^
-** ^(The M parameter must be a valid [checkpoint mode]:)^
-**
-** <dl>
-** <dt>SQLITE_CHECKPOINT_PASSIVE<dd>
-**   ^Checkpoint as many frames as possible without waiting for any database 
-**   readers or writers to finish, then sync the database file if all frames 
-**   in the log were checkpointed. ^The [busy-handler callback]
-**   is never invoked in the SQLITE_CHECKPOINT_PASSIVE mode.  
-**   ^On the other hand, passive mode might leave the checkpoint unfinished
-**   if there are concurrent readers or writers.
-**
-** <dt>SQLITE_CHECKPOINT_FULL<dd>
-**   ^This mode blocks (it invokes the
-**   [sqlite3_busy_handler|busy-handler callback]) until there is no
-**   database writer and all readers are reading from the most recent database
-**   snapshot. ^It then checkpoints all frames in the log file and syncs the
-**   database file. ^This mode blocks new database writers while it is pending,
-**   but new database readers are allowed to continue unimpeded.
-**
-** <dt>SQLITE_CHECKPOINT_RESTART<dd>
-**   ^This mode works the same way as SQLITE_CHECKPOINT_FULL with the addition
-**   that after checkpointing the log file it blocks (calls the 
-**   [busy-handler callback])
-**   until all readers are reading from the database file only. ^This ensures 
-**   that the next writer will restart the log file from the beginning.
-**   ^Like SQLITE_CHECKPOINT_FULL, this mode blocks new
-**   database writer attempts while it is pending, but does not impede readers.
-**
-** <dt>SQLITE_CHECKPOINT_TRUNCATE<dd>
-**   ^This mode works the same way as SQLITE_CHECKPOINT_RESTART with the
-**   addition that it also truncates the log file to zero bytes just prior
-**   to a successful return.
-** </dl>
-**
-** ^If pnLog is not NULL, then *pnLog is set to the total number of frames in
-** the log file or to -1 if the checkpoint could not run because
-** of an error or because the database is not in [WAL mode]. ^If pnCkpt is not
-** NULL,then *pnCkpt is set to the total number of checkpointed frames in the
-** log file (including any that were already checkpointed before the function
-** was called) or to -1 if the checkpoint could not run due to an error or
-** because the database is not in WAL mode. ^Note that upon successful
-** completion of an SQLITE_CHECKPOINT_TRUNCATE, the log file will have been
-** truncated to zero bytes and so both *pnLog and *pnCkpt will be set to zero.
-**
-** ^All calls obtain an exclusive "checkpoint" lock on the database file. ^If
-** any other process is running a checkpoint operation at the same time, the 
-** lock cannot be obtained and SQLITE_BUSY is returned. ^Even if there is a 
-** busy-handler configured, it will not be invoked in this case.
-**
-** ^The SQLITE_CHECKPOINT_FULL, RESTART and TRUNCATE modes also obtain the 
-** exclusive "writer" lock on the database file. ^If the writer lock cannot be
-** obtained immediately, and a busy-handler is configured, it is invoked and
-** the writer lock retried until either the busy-handler returns 0 or the lock
-** is successfully obtained. ^The busy-handler is also invoked while waiting for
-** database readers as described above. ^If the busy-handler returns 0 before
-** the writer lock is obtained or while waiting for database readers, the
-** checkpoint operation proceeds from that point in the same way as 
-** SQLITE_CHECKPOINT_PASSIVE - checkpointing as many frames as possible 
-** without blocking any further. ^SQLITE_BUSY is returned in this case.
-**
-** ^If parameter zDb is NULL or points to a zero length string, then the
-** specified operation is attempted on all WAL databases [attached] to 
-** [database connection] db.  In this case the
-** values written to output parameters *pnLog and *pnCkpt are undefined. ^If 
-** an SQLITE_BUSY error is encountered when processing one or more of the 
-** attached WAL databases, the operation is still attempted on any remaining 
-** attached databases and SQLITE_BUSY is returned at the end. ^If any other 
-** error occurs while processing an attached database, processing is abandoned 
-** and the error code is returned to the caller immediately. ^If no error 
-** (SQLITE_BUSY or otherwise) is encountered while processing the attached 
-** databases, SQLITE_OK is returned.
-**
-** ^If database zDb is the name of an attached database that is not in WAL
-** mode, SQLITE_OK is returned and both *pnLog and *pnCkpt set to -1. ^If
-** zDb is not NULL (or a zero length string) and is not the name of any
-** attached database, SQLITE_ERROR is returned to the caller.
-**
-** ^Unless it returns SQLITE_MISUSE,
-** the sqlite3_wal_checkpoint_v2() interface
-** sets the error information that is queried by
-** [sqlite3_errcode()] and [sqlite3_errmsg()].
-**
-** ^The [PRAGMA wal_checkpoint] command can be used to invoke this interface
-** from SQL.
-*/
-SQLITE_API int sqlite3_wal_checkpoint_v2(
-  sqlite3 *db,                    /* Database handle */
-  const char *zDb,                /* Name of attached database (or NULL) */
-  int eMode,                      /* SQLITE_CHECKPOINT_* value */
-  int *pnLog,                     /* OUT: Size of WAL log in frames */
-  int *pnCkpt                     /* OUT: Total number of frames checkpointed */
-);
 
 /*
 ** CAPI3REF: Checkpoint Mode Values

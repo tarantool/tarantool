@@ -124,27 +124,6 @@ getAutoVacuum(const char *z)
 }
 #endif				/* ifndef SQLITE_OMIT_AUTOVACUUM */
 
-#ifndef SQLITE_OMIT_PAGER_PRAGMAS
-/*
-** Interpret the given string as a temp db location. Return 1 for file
-** backed temporary databases, 2 for the Red-Black tree in memory database
-** and 0 to use the compile-time default.
-*/
-static int
-getTempStore(const char *z)
-{
-	if (z[0] >= '0' && z[0] <= '2') {
-		return z[0] - '0';
-	} else if (sqlite3StrICmp(z, "file") == 0) {
-		return 1;
-	} else if (sqlite3StrICmp(z, "memory") == 0) {
-		return 2;
-	} else {
-		return 0;
-	}
-}
-#endif				/* SQLITE_PAGER_PRAGMAS */
-
 /*
 ** Set result column names for a pragma.
 */
@@ -328,12 +307,12 @@ sqlite3Pragma(
 	/* Send an SQLITE_FCNTL_PRAGMA file-control to the underlying VFS *
 	 * connection.  If it returns SQLITE_OK, then assume that the VFS *
 	 * handled the pragma and generate a no-op prepared statement. *
-	 * 
+	 *
 	 * IMPLEMENTATION-OF: R-12238-55120 Whenever a PRAGMA statement is parsed, *
 	 * an SQLITE_FCNTL_PRAGMA file control is sent to the open sqlite3_file *
 	 * object corresponding to the database file to which the pragma *
 	 * statement refers. *
-	 * 
+	 *
 	 * IMPLEMENTATION-OF: R-29875-31678 The argument to the
 	 * SQLITE_FCNTL_PRAGMA * file control is an array of pointers to
 	 * strings (char**) in which the * second element of the array is the
@@ -383,13 +362,13 @@ sqlite3Pragma(
 #if !defined(SQLITE_OMIT_PAGER_PRAGMAS) && !defined(SQLITE_OMIT_DEPRECATED)
 		/* * PRAGMA [schema.]default_cache_size *  PRAGMA *
 		 * [schema.]default_cache_size=N * *
-		 * 
+		 *
 		 * The first form reports the current persistent setting for the * *
 		 * page cache size.  The value returned is the maximum number *
 		 * of * pages in the page cache.  The second form sets both the *
 		 * current * page cache size value and the persistent page *
 		 * cache size value * stored in the database file. * *
-		 * 
+		 *
 		 * Older versions of SQLite would set the default cache size to *
 		 * a * negative number to indicate synchronous=OFF.  These *
 		 * days, synchronous * is always on by default regardless of *
@@ -435,7 +414,7 @@ sqlite3Pragma(
 
 #if !defined(SQLITE_OMIT_PAGER_PRAGMAS)
 	/* *  PRAGMA [schema.]page_size *  PRAGMA [schema.]page_size=N *
-	 * 
+	 *
 	 * The first form reports the current setting for the * database
 	 * page size in bytes.  The second form sets the * database
 	 * page size value.  The value can only be set if * the
@@ -461,7 +440,7 @@ sqlite3Pragma(
 
 	/* *  PRAGMA [schema.]secure_delete *  PRAGMA
 	 * [schema.]secure_delete=ON/OFF *
-	 * 
+	 *
 	 * The first form reports the current setting for the *
 	 * secure_delete flag.  The second form changes the
 	 * secure_delete * flag setting and reports thenew value. */
@@ -482,18 +461,18 @@ sqlite3Pragma(
 
 	/* *  PRAGMA [schema.]max_page_count *  PRAGMA
 	 * [schema.]max_page_count=N *
-	 * 
+	 *
 	 * The first form reports the current setting for the * maximum
 	 * number of pages in the database file.  The * second form
 	 * attempts to change this setting.  Both * forms return the
 	 * current setting. *
-	 * 
+	 *
 	 * The absolute value of N is used.  This is undocumented and
 	 * might * change.  The only purpose is to provide an easy way
 	 * to test * the sqlite3AbsInt32() function. *
-	 * 
+	 *
 	 * PRAGMA [schema.]page_count *
-	 * 
+	 *
 	 * Return the number of pages in the specified database. */
 	case PragTyp_PAGE_COUNT:{
 		int iReg;
@@ -515,32 +494,29 @@ sqlite3Pragma(
 		const char *zRet = "normal";
 		int eMode = getLockingMode(zRight);
 
-		if (pId2->n == 0 && eMode == PAGER_LOCKINGMODE_QUERY) {
-			/* Simple "PRAGMA locking_mode;" statement.
-			 * This is a query for * the current default
-			 * locking mode (which may be different to *
-			 * the locking-mode of the main database). */
-			eMode = db->dfltLockMode;
-		} else {
-			Pager *pPager;
-			if (pId2->n == 0) {
-				/* This indicates that no database name
-				 * was specified as part * of the
-				 * PRAGMA command. In this case the
-				 * locking-mode must be * set on all
-				 * attached databases, as well as the
-				 * main db file. *
-				 * 
-				 * Also, the sqlite3.dfltLockMode variable
-				 * is set so that * any subsequently
-				 * attached databases also use the
-				 * specified * locking mode. */
-				assert(pDb == &db->mdb);
-				db->dfltLockMode = (u8) eMode;
-			}
-			pPager = sqlite3BtreePager(pDb->pBt);
-			eMode = sqlite3PagerLockingMode(pPager, eMode);
-		}
+          if (pId2->n == 0 && eMode == PAGER_LOCKINGMODE_QUERY) {
+              /* Simple "PRAGMA locking_mode;" statement.* This is a query for
+              * the current default* locking mode (which may be different to*
+              * the locking-mode of the main database).*/
+
+              eMode = db->dfltLockMode;
+          } else {
+            Pager *pPager;
+            if (pId2->n == 0) {
+              /* This indicates that no database name* was specified as part
+              * of the* PRAGMA command. In this case the* locking-mode must be
+              * set on all* attached databases, as well as the* main db file.*
+              *
+              * Also, the sqlite3.dfltLockMode variable* is set so that
+              * any subsequently* attached databases also use the
+              *specified* locking mode.
+              */
+              assert(pDb == &db->mdb);
+              db->dfltLockMode = (u8) eMode;
+            }
+              pPager = sqlite3BtreePager(pDb->pBt);
+              eMode = sqlite3PagerLockingMode(pPager, eMode);
+          }
 
 		assert(eMode == PAGER_LOCKINGMODE_NORMAL
 			       || eMode == PAGER_LOCKINGMODE_EXCLUSIVE);
@@ -591,7 +567,7 @@ sqlite3Pragma(
 
 	/* *  PRAGMA [schema.]journal_size_limit *  PRAGMA
 	 * [schema.]journal_size_limit=N *
-	 * 
+	 *
 	 * Get or set the size limit on rollback journal files. */
 	case PragTyp_JOURNAL_SIZE_LIMIT:{
 		Pager *pPager = sqlite3BtreePager(pDb->pBt);
@@ -610,7 +586,7 @@ sqlite3Pragma(
 
 	/* *  PRAGMA [schema.]auto_vacuum *  PRAGMA
 	 * [schema.]auto_vacuum=N *
-	 * 
+	 *
 	 * Get or set the value of the database 'auto-vacuum' parameter. *
 	 * The value is one of:  0 NONE 1 FULL 2 INCREMENTAL */
 #ifndef SQLITE_OMIT_AUTOVACUUM
@@ -665,7 +641,7 @@ sqlite3Pragma(
 #endif
 
 	/* *  PRAGMA [schema.]incremental_vacuum(N) *
-	 * 
+	 *
 	 * Do N steps of incremental vacuuming on a database. */
 #ifndef SQLITE_OMIT_AUTOVACUUM
 	case PragTyp_INCREMENTAL_VACUUM:{
@@ -689,7 +665,7 @@ sqlite3Pragma(
 #ifndef SQLITE_OMIT_PAGER_PRAGMAS
 	/* *  PRAGMA [schema.]cache_size *  PRAGMA
 	 * [schema.]cache_size=N *
-	 * 
+	 *
 	 * The first form reports the current local setting for the * page
 	 * cache size. The second form sets the local * page cache size
 	 * value.  If N is positive then that is the * number of pages
@@ -708,7 +684,7 @@ sqlite3Pragma(
 	}
 
 	/* *  PRAGMA [schema.]mmap_size(N) *
-	 * 
+	 *
 	 * Used to set mapping size limit. The mapping size limit is *
 	 * used to limit the aggregate size of all memory mapped
 	 * regions of the * database file. If this parameter is set to
@@ -716,7 +692,7 @@ sqlite3Pragma(
 	 * negative, then the default memory map * limit determined by
 	 * sqlite3_config(SQLITE_CONFIG_MMAP_SIZE) is set. * The
 	 * parameter N is measured in bytes. *
-	 * 
+	 *
 	 * This value is advisory.  The underlying VFS is free to memory
 	 * map * as little or as much as it wants.  Except, if N is set
 	 * to 0 then the * upper layers will never invoke the xFetch
@@ -724,19 +700,18 @@ sqlite3Pragma(
 	case PragTyp_MMAP_SIZE:{
 		sqlite3_int64 sz;
 #if SQLITE_MAX_MMAP_SIZE > 0
-		assert(sqlite3SchemaMutexHeld(db, 0));
-		if (zRight) {
-			sqlite3DecOrHexToI64(zRight, &sz);
-			if (sz < 0)
-				sz = sqlite3GlobalConfig.szMmap;
-			if (pId2->n == 0)
-				db->szMmap = sz;
-			if (db->mdb.pBt && pId2->n == 0) {
-				sqlite3BtreeSetMmapLimit(db->mdb.pBt, sz);
-			}
-		}
-		sz = -1;
-		rc = sqlite3_file_control(db, zDb, SQLITE_FCNTL_MMAP_SIZE, &sz);
+          assert(sqlite3SchemaMutexHeld(db, 0));
+          if (zRight) {
+
+            sqlite3DecOrHexToI64(zRight, &sz);
+            if (sz < 0) sz = sqlite3GlobalConfig.szMmap;
+            if (pId2->n == 0) db->szMmap = sz;
+            if (db->mdb.pBt && pId2->n == 0) {
+                sqlite3BtreeSetMmapLimit(db->mdb.pBt, sz);
+            }
+          }
+          sz = -1;
+          rc = sqlite3_file_control(db, zDb, SQLITE_FCNTL_MMAP_SIZE, &sz);
 #else
 		sz = 0;
 		rc = SQLITE_OK;
@@ -753,7 +728,7 @@ sqlite3Pragma(
 #if SQLITE_OS_WIN
 	/* *   PRAGMA data_store_directory *   PRAGMA
 	 * data_store_directory = ""|"directory_name" *
-	 * 
+	 *
 	 * Return or set the local value of the data_store_directory flag.
 	 * Changing * the value sets a specific directory to be used
 	 * for database files that * were specified with a relative
@@ -763,7 +738,7 @@ sqlite3Pragma(
 	 * directory for the * process.  Database file specified with
 	 * an absolute path are not impacted * by this setting,
 	 * regardless of its value. *
-	 * 
+	 *
 	 */
 	case PragTyp_DATA_STORE_DIRECTORY:{
 		if (!zRight) {
@@ -793,11 +768,11 @@ sqlite3Pragma(
 #if SQLITE_ENABLE_LOCKING_STYLE
 	/* *   PRAGMA [schema.]lock_proxy_file *   PRAGMA
 	 * [schema.]lock_proxy_file = ":auto:"|"lock_file_path" *
-	 * 
+	 *
 	 * Return or set the value of the lock_proxy_file flag. Changing *
 	 * the value sets a specific file to be used for database
 	 * access locks. *
-	 * 
+	 *
 	 */
 	case PragTyp_LOCK_PROXY_FILE:{
 		if (!zRight) {
@@ -829,7 +804,7 @@ sqlite3Pragma(
 
 	/* *   PRAGMA [schema.]synchronous *   PRAGMA
 	 * [schema.]synchronous=OFF|ON|NORMAL|FULL|EXTRA *
-	 * 
+	 *
 	 * Return or set the local value of the synchronous flag. Changing *
 	 * the local value does not make changes to the disk file and
 	 * the * default value will be restored the next time the
@@ -893,10 +868,10 @@ sqlite3Pragma(
 
 #ifndef SQLITE_OMIT_SCHEMA_PRAGMAS
 	/* *   PRAGMA table_info(<table>) *
-	 * 
+	 *
 	 * Return a single row for each column of the named table. The
 	 * columns of * the returned data set are: *
-	 * 
+	 *
 	 * cid:        Column id (numbered from left to right, starting at
 	 * 0) * name:       Column name * type:       Column
 	 * declaration type. * notnull:    True if 'NOT NULL' is part
@@ -1242,7 +1217,7 @@ sqlite3Pragma(
 		 * designed to detect most database corruption * without most
 		 * of the overhead of a full integrity-check. */
 	case PragTyp_INTEGRITY_CHECK:{
-		int i, j, addr, mxErr;
+		int j, addr, mxErr;
 
 		int isQuick = (sqlite3Tolower(zLeft[0]) == 'q');
 
@@ -1251,7 +1226,7 @@ sqlite3Pragma(
 		 * index of the database identified by <db>. * In this
 		 * case, the integrity of database iDb only is verified
 		 * by * the VDBE created below. *
-		 * 
+		 *
 		 * Otherwise, if the command was simply "PRAGMA
 		 * integrity_check" (or * "PRAGMA quick_check"), then
 		 * iDb is set to 0. In this case, set iDb * to -1 here,
@@ -1293,7 +1268,7 @@ sqlite3Pragma(
 		sqlite3VdbeJumpHere(v, addr);
 
 		/* Do an integrity check of the B-Tree *
-		 * 
+		 *
 		 * Begin by finding the root pages numbers * for all
 		 * tables and indices in the database. */
 		assert(sqlite3SchemaMutexHeld(db, 0));
@@ -1329,7 +1304,7 @@ sqlite3Pragma(
 
 			/* Do the b-tree integrity checks */
 			sqlite3VdbeAddOp4(v, OP_IntegrityCk, 2, cnt, 1, (char *)aRoot, P4_INTARRAY);
-			sqlite3VdbeChangeP5(v, (u8) i);
+			sqlite3VdbeChangeP5(v, 0);
 			addr = sqlite3VdbeAddOp1(v, OP_IsNull, 2);
 			VdbeCoverage(v);
 			sqlite3VdbeAddOp4(v, OP_String8, 0, 3, 0,
@@ -1495,11 +1470,11 @@ sqlite3Pragma(
 #endif				/* SQLITE_OMIT_INTEGRITY_CHECK */
 
 	/* *   PRAGMA encoding *   PRAGMA encoding = "utf-8" *
-	 * 
+	 *
 	 * In its first form, this pragma returns the encoding of
 	 * the main * database. If the database is not
 	 * initialized, it is initialized now. *
-	 * 
+	 *
 	 * The second form of this pragma is a no-op if the main
 	 * database file * has not already been initialized. In
 	 * this case it sets the default * encoding that will
@@ -1507,14 +1482,14 @@ sqlite3Pragma(
 	 * is created. If an existing main database file is
 	 * opened, then the * default text encoding for the
 	 * existing database is used. *
-	 * 
+	 *
 	 * In all cases new databases created using the ATTACH
 	 * command are * created to use the same default text
 	 * encoding as the main database. If * the main
 	 * database has not been initialized and/or created
 	 * when ATTACH * is executed, this is done before the
 	 * ATTACH operation. *
-	 * 
+	 *
 	 * In the second form this pragma sets the text encoding
 	 * to be used in * new database files created using
 	 * this database handle. It is only * useful if invoked
@@ -1571,23 +1546,23 @@ sqlite3Pragma(
 #ifndef SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS
 	/* *   PRAGMA [schema.]schema_version *   PRAGMA
 	 * [schema.]schema_version = <integer> *
-	 * 
+	 *
 	 * PRAGMA [schema.]user_version *   PRAGMA
 	 * [schema.]user_version = <integer> *
-	 * 
+	 *
 	 * PRAGMA [schema.]freelist_count *
-	 * 
+	 *
 	 * PRAGMA [schema.]data_version *
-	 * 
+	 *
 	 * PRAGMA [schema.]application_id *   PRAGMA
 	 * [schema.]application_id = <integer> *
-	 * 
+	 *
 	 * The pragma's schema_version and user_version are used
 	 * to set or get * the value of the schema-version and
 	 * user-version, respectively. Both * the
 	 * schema-version and the user-version are 32-bit
 	 * signed integers * stored in the database header. *
-	 * 
+	 *
 	 * The schema-cookie is usually only manipulated
 	 * internally by SQLite. It * is incremented by SQLite
 	 * whenever the database schema is modified (by *
@@ -1601,7 +1576,7 @@ sqlite3Pragma(
 	 * the schema-version is potentially dangerous and may
 	 * lead to program * crashes or database corruption.
 	 * Use with caution! *
-	 * 
+	 *
 	 * The user-version is not used internally by SQLite. It
 	 * may be used by * applications for any purpose. */
 	case PragTyp_HEADER_VALUE:{
@@ -1648,7 +1623,7 @@ sqlite3Pragma(
 #if 0
 			/* *   PRAGMA [schema.]wal_checkpoint =
 			 * passive|full|restart|truncate *
-			 * 
+			 *
 			 * Checkpoint the database. */
 	case PragTyp_WAL_CHECKPOINT:{
 				int iBt = (pId2->z ? iDb : SQLITE_MAX_ATTACHED);
@@ -1670,7 +1645,7 @@ sqlite3Pragma(
 
 			/* *   PRAGMA wal_autocheckpoint *   PRAGMA
 			 * wal_autocheckpoint = N *
-			 * 
+			 *
 			 * Configure a database connection to automatically
 			 * checkpoint a database * after accumulating N frames
 			 * in the log. Or query for the current value * of N. */
@@ -1686,7 +1661,7 @@ sqlite3Pragma(
 #endif
 
 			/* *  PRAGMA shrink_memory *
-			 * 
+			 *
 			 * IMPLEMENTATION-OF: R-23445-46109 This pragma causes the
 			 * database * connection on which it is invoked to free
 			 * up as much memory as it * can, by calling
@@ -1696,7 +1671,7 @@ sqlite3Pragma(
 		break;
 
 	/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
-	 * 
+	 *
 	 * Call sqlite3_busy_timeout(db, N).  Return the current
 	 * timeout value * if one is set.  If no busy handler
 	 * or a different busy handler is set * then 0 is
@@ -1714,7 +1689,7 @@ sqlite3Pragma(
 
 	/* *   PRAGMA soft_heap_limit *   PRAGMA
 	 * soft_heap_limit = N *
-	 * 
+	 *
 	 * IMPLEMENTATION-OF: R-26343-45930 This pragma invokes
 	 * the * sqlite3_soft_heap_limit64() interface with the
 	 * argument N, if N is * specified and is a
@@ -1733,7 +1708,7 @@ sqlite3Pragma(
 	}
 
 	/* *   PRAGMA threads *   PRAGMA threads = N *
-	 * 
+	 *
 	 * Configure the maximum number of worker threads. Return
 	 * the new * maximum, which might be less than
 	 * requested. */

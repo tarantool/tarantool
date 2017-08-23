@@ -401,7 +401,6 @@ void sqlite3VtabFinishParse(Parse *pParse, Token *pEnd){
   if( !db->init.busy ){
     char *zStmt;
     char *zWhere;
-    int iDb;
     int iReg;
     Vdbe *v;
 
@@ -436,11 +435,11 @@ void sqlite3VtabFinishParse(Parse *pParse, Token *pEnd){
 
     sqlite3VdbeAddOp0(v, OP_Expire);
     zWhere = sqlite3MPrintf(db, "name='%q' AND type='table'", pTab->zName);
-    sqlite3VdbeAddParseSchemaOp(v, iDb, zWhere);
+    sqlite3VdbeAddParseSchemaOp(v, 0, zWhere);
 
     iReg = ++pParse->nMem;
     sqlite3VdbeLoadString(v, iReg, pTab->zName);
-    sqlite3VdbeAddOp2(v, OP_VCreate, iDb, iReg);
+    sqlite3VdbeAddOp2(v, OP_VCreate, 0, iReg);
   }
 
   /* If we are rereading the sqlite_master table create the in-memory
@@ -507,7 +506,6 @@ static int vtabCallConstructor(
   int nArg = pTab->nModuleArg;
   char *zErr = 0;
   char *zModuleName;
-  int iDb;
   VtabCtx *pCtx;
 
   /* Check that the virtual-table is not already being initialized */
@@ -820,7 +818,7 @@ int sqlite3_declare_vtab(sqlite3 *db, const char *zCreateTable){
 **
 ** This call is a no-op if zTab is not a virtual table.
 */
-int sqlite3VtabCallDestroy(sqlite3 *db, int iDb, const char *zTab){
+int sqlite3VtabCallDestroy(sqlite3 *db, const char *zTab) {
   int rc = SQLITE_OK;
   Table *pTab;
 

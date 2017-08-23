@@ -116,7 +116,6 @@ void sqlite3Update(
   Expr *pRowidExpr = 0;  /* Expression defining the new record number */
   AuthContext sContext;  /* The authorization context */
   NameContext sNC;       /* The name-context to resolve expressions in */
-  int iDb;               /* Database containing the table being updated */
   int okOnePass;         /* True for one-pass algorithm without the FIFO */
   int hasFK;             /* True if foreign key processing is required */
   int labelBreak;        /* Jump here to break out of UPDATE loop */
