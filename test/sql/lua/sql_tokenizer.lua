@@ -3,11 +3,9 @@ local TK_TEMP = 2
 local TK_TRIGGER = 3
 local TK_CASE = 4
 local TK_END = 5
-local TK_QUOTE = 6
-local TK_DOUBLE_QUOTE = 7
-local TK_SEMI = 8
-local TK_EMPTY = 9
-local TK_TEXT = 10
+local TK_SEMI = 6
+local TK_EMPTY = 7
+local TK_TEXT = 8
 
 -- Read comment of the specified type and propagate the offset.
 -- @param context Map {sql: string, offset: number}.
@@ -48,7 +46,7 @@ local function read_spaces(context)
 end
 
 -- Read a text. It can be an identifier consisted of letters and
--- digits or another single symbol ('",.:;^&?! etc). Propagate the
+-- digits or another single symbol (,.:;^&?! etc). Propagate the
 -- offset.
 -- @param context Map {sql: string, offset: number}.
 --
@@ -62,14 +60,15 @@ local function read_text(context)
         local c = context.sql:sub(i, i)
         if not c:match('[%d%a_]') then
             if chars_read == 0 then
+                -- Read nontext symbol only if it is the first
+                -- symbol in the token. It is needed to avoid
+                -- mixing of SQL special words
+                -- (CREATE, TRIGGER, ...) with nontext symbols.
                 chars_read = 1
-                if c == "'" then
-                    tk_type = TK_QUOTE
-                elseif c == '"' then
-                    tk_type = TK_DOUBLE_QUOTE
-                elseif c == ';' then
+                if c == ';' then
                     tk_type = TK_SEMI
                 end
+                assert(c ~= '"' and c ~= "'")
             end
             goto finish
         end
@@ -96,6 +95,36 @@ local function read_text(context)
     return tk_type
 end
 
+-- Read a string in '' or "" quotes. Inside a string all special
+-- words and symbols lose their special meanings. Single quote '
+-- can be escaped using double-single quote: ''. For example:
+-- 'Example of the ''string'' with escape'. Double quote can not
+-- be escaped.
+-- @param context Map {sql: string, offset: number}.
+local function read_string(context)
+    local i = context.offset
+    local quote = context.sql:sub(i, i)
+    i = i + 1
+    while i <= context.sql:len() do
+        local c = context.sql:sub(i, i)
+        i = i + 1
+        if c == quote then
+            if quote == "'" then
+                local next_c = context.sql:sub(i, i)
+                if next_c ~= c then
+                    goto finish
+                else
+                    i = i + 1
+                end
+            else
+                goto finish
+            end
+        end
+    end
+::finish::
+    context.offset = i
+end
+
 -- Get next token from the SQL request at the specified offset.
 -- Context.offset is propagated on count of read characters.
 -- @param context Table with two keys: sql and offset. sql -
@@ -114,6 +143,8 @@ local function get_next_token(context)
             read_comment(context, next_c)
         elseif c == ' ' or c == '\n' or c == '\t' then
             read_spaces(context)
+        elseif c == "'" or c == '"' then
+            read_string(context, c)
         elseif c ~= '' then
             return read_text(context)
         end
@@ -127,11 +158,6 @@ local function split_sql(request)
     -- True, if the splitter reads the trigger body. In such a
     -- case the ';' can not be used as end of the statement.
     local in_trigger = false
-    -- True, if the splitter reads the string in the request.
-    -- Inside a string all chars lose their special meanings.
-    local in_quotes = false
-    -- Type of the quotes - either ' or ".
-    local quote_type = nil
     -- True, if the splitter reads the 'CASE WHEN ... END'
     -- statement. It is a special case, because 'END' is used
     -- to determine both end of 'CASE' and end of
@@ -147,14 +173,7 @@ local function split_sql(request)
     local is_not_empty = token ~= TK_EMPTY and token ~= TK_SEMI
     -- Read until multistatement request is finished.
     while token ~= TK_EMPTY do
-        if token == TK_QUOTE or token == TK_DOUBLE_QUOTE then
-            if in_quotes and token == quote_type then
-                in_quotes = false
-            elseif not in_quotes then
-                in_quotes = true
-                quote_type = token
-            end
-        elseif not in_quotes and not in_trigger and token == TK_SEMI then
+        if not in_trigger and token == TK_SEMI then
             if is_not_empty then
                 table.insert(res, request:sub(prev_sub_i, context.offset - 1))
             end
