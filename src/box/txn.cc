@@ -93,6 +93,7 @@ txn_stmt_new(struct txn *txn)
 struct txn *
 txn_begin(bool is_autocommit)
 {
+	static int64_t txn_id = 0;
 	assert(! in_txn());
 	struct txn *txn = region_alloc_object_xc(&fiber()->gc, struct txn);
 	/* Initialize members explicitly to save time on memset() */
@@ -101,6 +102,7 @@ txn_begin(bool is_autocommit)
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
 	txn->in_sub_stmt = 0;
+	txn->id = ++txn_id;
 	txn->signature = -1;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
@@ -308,6 +310,16 @@ txn_check_singlestatement(struct txn *txn, const char *where)
 
 extern "C" {
 
+int64_t
+box_txn_id(void)
+{
+	struct txn *txn = in_txn();
+	if (txn != NULL)
+		return txn->id;
+	else
+		return -1;
+}
+
 bool
 box_txn()
 {
@@ -374,6 +386,70 @@ box_txn_alloc(size_t size)
 	};
 	return region_aligned_alloc(&fiber()->gc, size,
 	                            alignof(union natural_align));
+}
+
+box_txn_savepoint_t *
+box_txn_savepoint()
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL) {
+		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		return NULL;
+	}
+	struct txn_savepoint *ret =
+		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
+							struct txn_savepoint);
+	if (ret == NULL) {
+		diag_set(OutOfMemory, sizeof(*ret) + alignof(*ret) - 1,
+			 "region_alloc_object", "ret");
+		return NULL;
+	}
+	if (stailq_empty(&txn->stmts)) {
+		ret->is_first = true;
+		return ret;
+	}
+	ret->is_first = false;
+	ret->saved_stmt = txn_last_stmt(txn);
+	ret->in_sub_stmt = txn->in_sub_stmt;
+	return ret;
+}
+
+int
+box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint)
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL) {
+		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		return -1;
+	}
+	struct txn_stmt *stmt = savepoint->saved_stmt;
+	if (!savepoint->is_first && (stmt == NULL || stmt->space == NULL ||
+	    savepoint->in_sub_stmt != txn->in_sub_stmt)) {
+		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
+		return -1;
+	}
+	struct stailq rollback_stmts;
+	if (savepoint->is_first) {
+		rollback_stmts = txn->stmts;
+		stailq_create(&txn->stmts);
+	} else {
+		stailq_create(&rollback_stmts);
+		stmt = stailq_next_entry(stmt, next);
+		stailq_splice(&txn->stmts, &stmt->next, &rollback_stmts);
+	}
+	stailq_reverse(&rollback_stmts);
+	stailq_foreach_entry(stmt, &rollback_stmts, next) {
+		txn->engine->rollbackStatement(txn, stmt);
+		if (stmt->row != NULL) {
+			stmt->row = NULL;
+			--txn->n_rows;
+			assert(txn->n_rows >= 0);
+		}
+		stmt->space = NULL;
+	}
+	savepoint->is_first = false;
+	savepoint->saved_stmt = NULL;
+	return 0;
 }
 
 } /* extern "C" */

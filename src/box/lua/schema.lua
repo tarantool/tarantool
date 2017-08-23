@@ -59,9 +59,18 @@ ffi.cdef[[
                     const char *key, const char *key_end);
     /** \endcond public */
     /** \cond public */
+    int64_t
+    box_txn_id();
     int
     box_txn_begin();
     /** \endcond public */
+    typedef struct txn_savepoint box_txn_savepoint_t;
+
+    box_txn_savepoint_t *
+    box_txn_savepoint();
+
+    int
+    box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
     struct port_entry {
         struct port_entry *next;
@@ -228,6 +237,37 @@ end
 
 box.begin = function()
     if builtin.box_txn_begin() == -1 then
+        box.error()
+    end
+end
+
+box.savepoint = function()
+    local csavepoint = builtin.box_txn_savepoint()
+    if csavepoint == nil then
+        box.error()
+    end
+    return { csavepoint=csavepoint, txn_id=builtin.box_txn_id() }
+end
+
+local savepoint_type = ffi.typeof('box_txn_savepoint_t')
+
+local function check_savepoint(savepoint)
+    if savepoint == nil or savepoint.txn_id == nil or
+       savepoint.csavepoint == nil or
+       type(tonumber(savepoint.txn_id)) ~= 'number' or
+       type(savepoint.csavepoint) ~= 'cdata' or
+       not ffi.istype(savepoint_type, savepoint.csavepoint) then
+        error("Usage: box.rollback_to_savepoint({csavepoint=cdata, "..
+              "txn_id=number})")
+    end
+end
+
+box.rollback_to_savepoint = function(savepoint)
+    check_savepoint(savepoint)
+    if savepoint.txn_id ~= builtin.box_txn_id() then
+        box.error(box.error.NO_SUCH_SAVEPOINT)
+    end
+    if builtin.box_txn_rollback_to_savepoint(savepoint.csavepoint) == -1 then
         box.error()
     end
 end

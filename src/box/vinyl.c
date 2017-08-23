@@ -4885,7 +4885,7 @@ vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
 	*result = NULL;
 
 	if (c->tx == NULL) {
-		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
 		return -1;
 	}
 	if (c->tx->state == VINYL_TX_ABORT || c->tx->read_view->is_aborted) {
