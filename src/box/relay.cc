@@ -108,6 +108,8 @@ struct relay {
 	struct vclock recv_vclock;
 	/** Replicatoin slave version. */
 	uint32_t version_id;
+	/** Timeout for clients ack. */
+	double timeout;
 
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
@@ -307,7 +309,8 @@ relay_reader_f(va_list ap)
 	try {
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
-			coio_read_xrow(&io, &ibuf, &xrow);
+			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
+						  relay->timeout);
 			/* vclock is followed while decoding, zeroing it. */
 			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
@@ -382,15 +385,19 @@ relay_subscribe_f(va_list ap)
 		 */
 		if (relay->status_msg.msg.route != NULL)
 			continue;
+		struct vclock *send_vclock;
+		if (relay->version_id < version_id(1, 7, 4))
+			send_vclock = &r->vclock;
+		else
+			send_vclock = &relay->recv_vclock;
+		if (vclock_sum(&relay->status_msg.vclock) ==
+		    vclock_sum(send_vclock))
+			continue;
 		static const struct cmsg_hop route[] = {
 			{tx_status_update, NULL}
 		};
 		cmsg_init(&relay->status_msg.msg, route);
-		if (relay->version_id < version_id(1, 7, 4))
-			vclock_copy(&relay->status_msg.vclock, &r->vclock);
-		else
-			vclock_copy(&relay->status_msg.vclock,
-				    &relay->recv_vclock);
+		vclock_copy(&relay->status_msg.vclock, send_vclock);
 		relay->status_msg.relay = relay;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
@@ -445,6 +452,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	vclock_copy(&relay.tx.vclock, replica_clock);
 	relay.version_id = replica_version_id;
 	relay.replica = replica;
+	relay.timeout = cfg_getd("replication_timeout");
 	replica_set_relay(replica, &relay);
 
 	int rc = cord_costart(&relay.cord, tt_sprintf("relay_%p", &relay),

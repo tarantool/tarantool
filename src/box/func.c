@@ -29,14 +29,12 @@
  * SUCH DAMAGE.
  */
 #include "func.h"
-
 #include "trivia/config.h"
-
-#include <dlfcn.h>
-
 #include "assoc.h"
-
 #include "lua/utils.h"
+#include "error.h"
+#include "diag.h"
+#include <dlfcn.h>
 
 /**
  * Parsed symbol and package names.

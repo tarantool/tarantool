@@ -31,225 +31,24 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "small/rlist.h"
 #include "error.h"
 #include "diag.h"
 #include <msgpuck.h>
-#define RB_COMPACT 1
-#include "small/rb.h"
 #include <limits.h>
-#include <wchar.h>
-#include <wctype.h>
+#include "field_def.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum {
-	BOX_ENGINE_MAX = 3, /* + 1 to the actual number of engines */
-	BOX_SPACE_MAX = INT32_MAX,
-	BOX_FUNCTION_MAX = 32000,
-	BOX_INDEX_MAX = 128,
-	BOX_NAME_MAX = 65000,
-	BOX_INVALID_NAME_MAX = 64,
-	ENGINE_NAME_MAX = 16,
-	FIELD_TYPE_NAME_MAX = 16,
-	GRANT_NAME_MAX = 16,
-	BOX_FIELD_MAX = INT32_MAX,
-	BOX_USER_MAX = 32,
-	/**
-	 * A fairly arbitrary limit which is still necessary
-	 * to keep tuple_format object small.
-	 */
-	BOX_INDEX_FIELD_MAX = INT16_MAX,
-	/** Yet another arbitrary limit which simply needs to
-	 * exist.
-	 */
-	BOX_INDEX_PART_MAX = UINT8_MAX
-};
-static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
-	      "invalid name max is less than name max");
-
-/*
- * Different objects which can be subject to access
- * control.
- *
- * Use 0 for unknown to use the same index consistently
- * even when there are more object types in the future.
- */
-enum schema_object_type {
-	SC_UNKNOWN = 0, SC_UNIVERSE = 1, SC_SPACE = 2, SC_FUNCTION = 3,
-	SC_USER = 4, SC_ROLE = 5
-};
-
-enum schema_object_type
-schema_object_type(const char *name);
-
-const char *
-schema_object_name(enum schema_object_type type);
-
-/** \cond public */
-
-/*
- * Possible field data types. Can't use STRS/ENUM macros for them,
- * since there is a mismatch between enum name (STRING) and type
- * name literal ("STR"). STR is already used as Objective C type.
- */
-enum field_type {
-	FIELD_TYPE_ANY = 0,
-	FIELD_TYPE_UNSIGNED,
-	FIELD_TYPE_STRING,
-	FIELD_TYPE_ARRAY,
-	FIELD_TYPE_NUMBER,
-	FIELD_TYPE_INTEGER,
-	FIELD_TYPE_SCALAR,
-	FIELD_TYPE_MAP,
-	field_type_MAX
-};
-
-/** \endcond public */
-
-extern const char *field_type_strs[];
-
 /* MsgPack type names */
 extern const char *mp_type_strs[];
-
-/**
- * The supported language of the stored function.
- */
-enum func_language {
-	FUNC_LANGUAGE_LUA,
-	FUNC_LANGUAGE_C,
-	func_language_MAX,
-};
-extern const char *func_language_strs[];
-
-static inline uint32_t
-field_type_maxlen(enum field_type type)
-{
-	static const uint32_t maxlen[] =
-		{ UINT32_MAX, 8, UINT32_MAX, UINT32_MAX, UINT32_MAX };
-	return maxlen[type];
-}
-
-enum field_type
-field_type_by_name(const char *name);
-
-enum index_type {
-	HASH = 0, /* HASH Index */
-	TREE,     /* TREE Index */
-	BITSET,   /* BITSET Index */
-	RTREE,    /* R-Tree Index */
-	index_type_MAX,
-};
-
-extern const char *index_type_strs[];
-
-enum opt_type {
-	OPT_BOOL,	/* bool */
-	OPT_INT,	/* int64_t */
-	OPT_FLOAT,	/* double */
-	OPT_STR,	/* char[] */
-	OPT_STRPTR,	/* char*, size_t */
-	opt_type_MAX,
-};
-
-extern const char *opt_type_strs[];
-
-struct opt_def {
-	const char *name;
-	enum opt_type type;
-	ptrdiff_t offset;
-	uint32_t len;
-};
-
-#define OPT_DEF(key, type, opts, field) \
-	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field) }
-
-enum rtree_index_distance_type {
-	 /* Euclid distance, sqrt(dx*dx + dy*dy) */
-	RTREE_INDEX_DISTANCE_TYPE_EUCLID,
-	/* Manhattan distance, fabs(dx) + fabs(dy) */
-	RTREE_INDEX_DISTANCE_TYPE_MANHATTAN,
-	rtree_index_distance_type_MAX
-};
-extern const char *rtree_index_distance_type_strs[];
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
 	uint32_t fieldno;
 	enum field_type type;
 };
-
-/** Index options */
-struct index_opts {
-	/**
-	 * Is this index unique or not - relevant to HASH/TREE
-	 * index
-	 */
-	bool is_unique;
-	/**
-	 * RTREE index dimension.
-	 */
-	int64_t dimension;
-	/**
-	 * RTREE distance type.
-	 */
-	char distancebuf[16];
-	enum rtree_index_distance_type distance;
-	/**
-	 * Vinyl index options.
-	 */
-	int64_t range_size;
-	int64_t page_size;
-	/**
-	 * Maximal number of runs that can be created in a level
-	 * of the LSM tree before triggering compaction.
-	 */
-	int64_t run_count_per_level;
-	/**
-	 * The LSM tree multiplier. Each subsequent level of
-	 * the LSM tree is run_size_ratio times larger than
-	 * previous one.
-	 */
-	double run_size_ratio;
-	/* Bloom filter false positive rate. */
-	double bloom_fpr;
-	/**
-	 * LSN from the time of index creation.
-	 */
-	int64_t lsn;
-	/**
-	 * SQL statement that produced this index.
-	 */
-	char *sql;
-};
-
-extern const struct index_opts index_opts_default;
-extern const struct opt_def index_opts_reg[];
-
-static inline int
-index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
-{
-	if (o1->is_unique != o2->is_unique)
-		return o1->is_unique < o2->is_unique ? -1 : 1;
-	if (o1->dimension != o2->dimension)
-		return o1->dimension < o2->dimension ? -1 : 1;
-	if (o1->distance != o2->distance)
-		return o1->distance < o2->distance ? -1 : 1;
-	if (o1->range_size != o2->range_size)
-		return o1->range_size < o2->range_size ? -1 : 1;
-	if (o1->page_size != o2->page_size)
-		return o1->page_size < o2->page_size ? -1 : 1;
-	if (o1->run_count_per_level != o2->run_count_per_level)
-		return o1->run_count_per_level < o2->run_count_per_level ?
-		       -1 : 1;
-	if (o1->run_size_ratio != o2->run_size_ratio)
-		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
-	if (o1->bloom_fpr != o2->bloom_fpr)
-		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
-	return 0;
-}
 
 struct key_def;
 struct tuple;
@@ -337,235 +136,6 @@ box_key_def_delete(box_key_def_t *key_def);
 
 /** \endcond public */
 
-/* Definition of an index. */
-struct index_def {
-	/* A link in key list. */
-	struct rlist link;
-	/** Ordinal index number in the index array. */
-	uint32_t iid;
-	/* Space id. */
-	uint32_t space_id;
-	/** Index name. */
-	char *name;
-	/** Index type. */
-	enum index_type type;
-	struct index_opts opts;
-
-	/* Index key definition. */
-	struct key_def *key_def;
-	/**
-	 * User-defined key definition, merged with the primary
-	 * key parts. Used by non-unique keys to uniquely identify
-	 * iterator position.
-	 */
-	struct key_def *cmp_def;
-};
-
-struct index_def *
-index_def_dup(const struct index_def *def);
-
-void
-index_def_swap(struct index_def *def1, struct index_def *def2);
-
-/* Destroy and free an index_def. */
-void
-index_def_delete(struct index_def *def);
-
-/**
- * Add an index definition to a list, preserving the
- * first position of the primary key.
- *
- * In non-unique indexes, secondary keys must contain key parts
- * of the primary key. This is necessary to make ordered
- * retrieval from a secondary key useful to SQL
- * optimizer and make iterators over secondary keys stable
- * in presence of concurrent updates.
- * Thus we always create the primary key first, and put
- * the primary key key_def first in the index_def list.
- */
-static inline void
-index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
-{
-	/** Preserve the position of the primary key */
-	if (index_def->iid == 0)
-		rlist_add_entry(index_def_list, index_def, link);
-	else
-		rlist_add_tail_entry(index_def_list, index_def, link);
-}
-
-/**
- * True, if the index change by alter requires an index rebuild.
- *
- * Some changes, such as a new page size or bloom_fpr do not
- * take effect immediately, so do not require a rebuild.
- *
- * Others, such as index name change, do not change the data, only
- * metadata, so do not require a rebuild either.
- *
- * Finally, changing index type or number of parts always requires
- * a rebuild.
- */
-bool
-index_def_change_requires_rebuild(struct index_def *old_index_def,
-				  struct index_def *new_index_def);
-
-/**
- * Encapsulates privileges of a user on an object.
- * I.e. "space" object has an instance of this
- * structure for each user.
- */
-struct access {
-	/**
-	 * Granted access has been given to a user explicitly
-	 * via some form of a grant.
-	 */
-	uint8_t granted;
-	/**
-	 * Effective access is a sum of granted access and
-	 * all privileges inherited by a user on this object
-	 * via some role. Since roles may be granted to other
-	 * roles, this may include indirect grants.
-	 */
-	uint8_t effective;
-};
-
-/**
- * Effective session user. A cache of user data
- * and access stored in session and fiber local storage.
- * Differs from the authenticated user when executing
- * setuid functions.
- */
-struct credentials {
-	/** A look up key to quickly find session user. */
-	uint8_t auth_token;
-	/**
-	 * Cached global grants, to avoid an extra look up
-	 * when checking global grants.
-	 */
-	uint8_t universal_access;
-	/** User id of the authenticated user. */
-	uint32_t uid;
-};
-
-/**
- * Definition of a function. Function body is not stored
- * or replicated (yet).
- */
-struct func_def {
-	/** Function id. */
-	uint32_t fid;
-	/** Owner of the function. */
-	uint32_t uid;
-	/**
-	 * True if the function requires change of user id before
-	 * invocation.
-	 */
-	bool setuid;
-	/**
-	 * The language of the stored function.
-	 */
-	enum func_language language;
-	/** Function name. */
-	char name[0];
-};
-
-/**
- * @param name_len length of func_def->name
- * @returns size in bytes needed to allocate for struct func_def
- * for a function of length @a a name_len.
- */
-static inline size_t
-func_def_sizeof(uint32_t name_len)
-{
-	/* +1 for '\0' name terminating. */
-	return sizeof(struct func_def) + name_len + 1;
-}
-
-/**
- * Definition of a privilege
- */
-struct priv_def {
-	/** Who grants the privilege. */
-	uint32_t grantor_id;
-	/** Whom the privilege is granted. */
-	uint32_t grantee_id;
-	/* Object id - is only defined for object type */
-	uint32_t object_id;
-	/* Object type - function, space, universe */
-	enum schema_object_type object_type;
-	/**
-	 * What is being granted, has been granted, or is being
-	 * revoked.
-	 */
-	uint8_t access;
-	/** To maintain a set of effective privileges. */
-	rb_node(struct priv_def) link;
-};
-
-/** Space options */
-struct space_opts {
-        /**
-	 * The space is a temporary:
-	 * - it is empty at server start
-	 * - changes are not written to WAL
-	 * - changes are not part of a snapshot
-	 */
-	bool temporary;
-	/**
-	 * SQL statement that produced this space.
-	 */
-	const char *sql;
-};
-
-extern const struct space_opts space_opts_default;
-extern const struct opt_def space_opts_reg[];
-
-/** Space metadata. */
-struct space_def {
-	/** Space id. */
-	uint32_t id;
-	/** User id of the creator of the space */
-	uint32_t uid;
-	/**
-	 * If not set (is 0), any tuple in the
-	 * space can have any number of fields.
-	 * If set, each tuple
-	 * must have exactly this many fields.
-	 */
-	uint32_t exact_field_count;
-	char engine_name[ENGINE_NAME_MAX + 1];
-	struct space_opts opts;
-	char name[0];
-};
-
-/**
- * Size of the space_def, calculated using its name.
- * @param name_len Length of the space name.
- * @retval Size in bytes.
- */
-static inline size_t
-space_def_sizeof(uint32_t name_len)
-{
-	return sizeof(struct space_def) + name_len + 1;
-}
-
-/**
- * Delete the space_def object.
- * @param def Def to delete.
- */
-static inline void
-space_def_delete(struct space_def *def)
-{
-	free(def);
-}
-
-/**
- * API of C stored function.
- */
-typedef struct box_function_ctx box_function_ctx_t;
-typedef int (*box_function_f)(box_function_ctx_t *ctx,
-	     const char *args, const char *args_end);
-
 static inline size_t
 key_def_sizeof(uint32_t part_count)
 {
@@ -577,22 +147,6 @@ key_def_sizeof(uint32_t part_count)
  */
 struct key_def *
 key_def_new(uint32_t part_count);
-
-/**
- * Create a new index definition definition.
- *
- * @param key_def  key definition, must be fully built
- * @param pk_def   primary key definition, pass non-NULL
- *                 for secondary keys to construct
- *                 index_def::cmp_def
- * @retval not NULL Success.
- * @retval NULL     Memory error.
- */
-struct index_def *
-index_def_new(uint32_t space_id, uint32_t iid, const char *name,
-	      uint32_t name_len, enum index_type type,
-	      const struct index_opts *opts,
-	      struct key_def *key_def, struct key_def *pk_def);
 
 /**
  * Set a single key part in a key def.
@@ -706,37 +260,6 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 	return 0;
 }
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-/**
- * Duplicate space_def object.
- * @param src Def to duplicate.
- * @retval Copy of the @src.
- */
-struct space_def *
-space_def_dup(const struct space_def *src); /* throws */
-
-/**
- * Create a new space definition.
- * @param id Space identifier.
- * @param uid Owner identifier.
- * @param exact_field_count Space tuples field count.
- *        0 for any count.
- * @param name Space name.
- * @param name_len Length of the @name.
- * @param engine_name Engine name.
- * @param engine_len Length of the @engine.
- * @param opts Space options.
- *
- * @retval Space definition.
- */
-struct space_def *
-space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
-	      const char *name, uint32_t name_len,
-	      const char *engine_name, uint32_t engine_len,
-	      const struct space_opts *opts); /* throws */
-
 /** Compare two key part arrays.
  *
  * This function is used to find out whether alteration
@@ -748,7 +271,6 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
  * One key part is considered to be greater than the other if:
  * - its fieldno is greater
  * - given the same fieldno, NUM < STRING
- *   (coarsely speaking, based on field_type_maxlen()).
  *
  * A key part array is considered greater than the other if all
  * its key parts are greater, or, all common key parts are equal
@@ -758,46 +280,8 @@ int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2);
 
-/**
- * One key definition is greater than the other if it's id is
- * greater, it's name is greater,  it's index type is greater
- * (HASH < TREE < BITSET) or its key part array is greater.
- */
-int
-index_def_cmp(const struct index_def *key1, const struct index_def *key2);
-
-/**
- * Check a key definition for violation of various limits.
- *
- * @param index_def   index definition
- * @param old_space   space definition
- */
-void
-index_def_check(struct index_def *index_def, const char *space_name);
-
-/**
- * Check object identifier for invalid symbols.
- * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
- * Result is locale-dependent.
- */
-bool
-identifier_is_valid(const char *str);
-
-/**
- * Throw an error if identifier is not valid.
- */
-void
-identifier_check(const char *str);
-
-static inline struct index_def *
-index_def_dup_xc(const struct index_def *def)
-{
-	struct index_def *ret = index_def_dup(def);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
-}
-
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

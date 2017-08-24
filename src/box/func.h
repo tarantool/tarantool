@@ -34,10 +34,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-
-#include <small/rlist.h>
-
-#include "key_def.h"
+#include "small/rlist.h"
+#include "func_def.h"
+#include "user_def.h"
 
 #if defined(__cplusplus)
 extern "C" {

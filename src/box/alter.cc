@@ -169,6 +169,33 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 	return 0;
 }
 
+static void
+opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
+	       uint32_t key_len, const char **data, uint32_t errcode,
+	       uint32_t field_no)
+{
+	char errmsg[DIAG_ERRMSG_MAX];
+	bool found = false;
+	for (const struct opt_def *def = reg; def->name != NULL; def++) {
+		if (key_len != strlen(def->name) ||
+		    memcmp(key, def->name, key_len) != 0)
+			continue;
+
+		if (opt_set(opts, def, data) != 0) {
+			snprintf(errmsg, sizeof(errmsg), "'%.*s' must be %s",
+				 key_len, key, opt_type_strs[def->type]);
+			tnt_raise(ClientError, errcode, field_no, errmsg);
+		}
+		found = true;
+		break;
+	}
+	if (!found) {
+		snprintf(errmsg, sizeof(errmsg), "unexpected option '%.*s'",
+			 key_len, key);
+		tnt_raise(ClientError, errcode, field_no, errmsg);
+	}
+}
+
 /**
  * Populate key options from their msgpack-encoded representation
  * (msgpack map)
@@ -179,8 +206,6 @@ static const char *
 opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		       uint32_t errcode, uint32_t field_no)
 {
-	char errmsg[DIAG_ERRMSG_MAX];
-
 	if (mp_typeof(*map) == MP_NIL)
 		return map;
 	if (mp_typeof(*map) != MP_MAP)
@@ -199,29 +224,8 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(&map, &key_len);
-		bool found = false;
-		for (const struct opt_def *def = reg; def->name != NULL; def++) {
-			if (key_len != strlen(def->name) ||
-			    memcmp(key, def->name, key_len) != 0)
-				continue;
-
-			if (opt_set(opts, def, &map) != 0) {
-				snprintf(errmsg, sizeof(errmsg),
-					"'%.*s' must be %s", key_len, key,
-					opt_type_strs[def->type]);
-				tnt_raise(ClientError, errcode, field_no,
-					  errmsg);
-			}
-
-			found = true;
-			break;
-		}
-		if (!found) {
-			snprintf(errmsg, sizeof(errmsg),
-				"unexpected option '%.*s'",
-				key_len, key);
-			tnt_raise(ClientError, errcode, field_no, errmsg);
-		}
+		opts_parse_key(opts, reg, key, key_len, &map, errcode,
+			       field_no);
 	}
 	return map;
 }
@@ -321,7 +325,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-	index_def_check(index_def, space_name(old_space));
+	index_def_check_xc(index_def, space_name(old_space));
 	old_space->handler->checkIndexDef(old_space, index_def);
 	index_def_guard.is_active = false;
 	return index_def;
@@ -366,7 +370,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = 0;
-	identifier_check(def->name);
+	identifier_check_xc(def->name);
 	def->id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
 	if (def->id > BOX_SPACE_MAX) {
 		tnt_raise(ClientError, errcode,
@@ -390,7 +394,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	}
 	memcpy(def->engine_name, engine_name, name_len);
 	def->engine_name[name_len] = 0;
-	identifier_check(def->engine_name);
+	identifier_check_xc(def->engine_name);
 	space_opts_create(&def->opts, tuple);
 	Engine *engine = engine_find(def->engine_name);
 	engine->checkSpaceDef(def);
@@ -464,7 +468,7 @@ alter_space_new(struct space *old_space)
 		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
-	alter->space_def = space_def_dup(alter->old_space->def);
+	alter->space_def = space_def_dup_xc(alter->old_space->def);
 	return alter;
 }
 
@@ -1625,11 +1629,11 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 			tnt_raise(ClientError, ER_CREATE_USER,
 				  user->name, "invalid user password");
 		}
-                if (user->uid == GUEST) {
-                    /** Guest user is permitted to have empty password */
-                    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
-                        tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
-                }
+		if (user->uid == GUEST) {
+		    /** Guest user is permitted to have empty password */
+		    if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len))
+			tnt_raise(ClientError, ER_GUEST_USER_PASSWORD);
+		}
 
 		base64_decode(hash2_base64, len, user->hash2,
 			      sizeof(user->hash2));
@@ -1665,7 +1669,7 @@ user_def_new_from_tuple(struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
 	}
-	identifier_check(user->name);
+	identifier_check_xc(user->name);
 	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain

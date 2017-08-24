@@ -148,6 +148,7 @@ cpipe_destroy(struct cpipe *pipe)
 	tt_pthread_mutex_lock(&endpoint->mutex);
 	/* Flush input */
 	stailq_concat(&endpoint->output, &pipe->input);
+	pipe->n_input = 0;
 	/* Add the pipe shutdown message as the last one. */
 	stailq_add_tail_entry(&endpoint->output, poison, msg.fifo);
 	/* Count statistics */
@@ -182,6 +183,12 @@ cbus_create(struct cbus *bus)
 static void
 cbus_destroy(struct cbus *bus)
 {
+	/*
+	 * Lock the mutex to ensure we do not destroy a mutex
+	 * while it is locked, happens in at_exit() handler.
+	 */
+	(void) tt_pthread_mutex_lock(&bus->mutex);
+	(void) tt_pthread_mutex_unlock(&bus->mutex);
 	(void) tt_pthread_mutex_destroy(&bus->mutex);
 	(void) tt_pthread_cond_destroy(&bus->cond);
 	rmean_delete(bus->stats);

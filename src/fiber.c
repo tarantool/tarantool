@@ -354,6 +354,18 @@ fiber_time64(void)
 	return (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 );
 }
 
+double
+fiber_clock(void)
+{
+	return ev_monotonic_now(loop());
+}
+
+uint64_t
+fiber_clock64(void)
+{
+	return (uint64_t) ( ev_monotonic_now(loop()) * 1000000 + 0.5 );
+}
+
 /**
  * Move current fiber to the end of ready fibers list and switch to next
  */

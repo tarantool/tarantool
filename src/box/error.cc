@@ -34,9 +34,6 @@
 #include <fiber.h>
 #include <rmean.h>
 
-static struct error *
-BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
-
 /* {{{ public API */
 
 const char *
@@ -115,7 +112,7 @@ ClientError::ClientError(const char *file, unsigned line,
 		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
 
-static struct error *
+struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 {
 	try {
@@ -159,7 +156,7 @@ ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 
 const struct type_info type_XlogError = make_type("XlogError", &type_Exception);
 
-static struct error *
+struct error *
 BuildXlogError(const char *file, unsigned line, const char *format, ...)
 {
 	try {
@@ -173,9 +170,3 @@ BuildXlogError(const char *file, unsigned line, const char *format, ...)
 	}
 }
 
-void
-box_error_init(void)
-{
-	error_factory->ClientError = BuildClientError;
-	error_factory->XlogError = BuildXlogError;
-}

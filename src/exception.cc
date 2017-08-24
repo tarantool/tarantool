@@ -227,7 +227,7 @@ LuajitError::LuajitError(const char *file, unsigned line,
 	if (p == NULL)					\
 		return &out_of_memory;
 
-static struct error *
+struct error *
 BuildOutOfMemory(const char *file, unsigned line,
 		 size_t amount, const char *allocator,
 		 const char *object)
@@ -237,35 +237,35 @@ BuildOutOfMemory(const char *file, unsigned line,
 				   object);
 }
 
-static struct error *
+struct error *
 BuildTimedOut(const char *file, unsigned line)
 {
 	BuildAlloc(TimedOut);
 	return new (p) TimedOut(file, line);
 }
 
-static struct error *
+struct error *
 BuildChannelIsClosed(const char *file, unsigned line)
 {
 	BuildAlloc(ChannelIsClosed);
 	return new (p) ChannelIsClosed(file, line);
 }
 
-static struct error *
+struct error *
 BuildFiberIsCancelled(const char *file, unsigned line)
 {
 	BuildAlloc(FiberIsCancelled);
 	return new (p) FiberIsCancelled(file, line);
 }
 
-static struct error *
+struct error *
 BuildLuajitError(const char *file, unsigned line, const char *msg)
 {
 	BuildAlloc(LuajitError);
 	return new (p) LuajitError(file, line, msg);
 }
 
-static struct error *
+struct error *
 BuildSystemError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(SystemError);
@@ -277,23 +277,11 @@ BuildSystemError(const char *file, unsigned line, const char *format, ...)
 	return e;
 }
 
-#undef BuildAlloc
-
 void
 exception_init()
 {
-	static struct error_factory exception_error_factory;
-
-	exception_error_factory.OutOfMemory = BuildOutOfMemory;
-	exception_error_factory.FiberIsCancelled = BuildFiberIsCancelled;
-	exception_error_factory.TimedOut = BuildTimedOut;
-	exception_error_factory.ChannelIsClosed = BuildChannelIsClosed;
-	exception_error_factory.LuajitError = BuildLuajitError;
-	exception_error_factory.SystemError = BuildSystemError;
-
-	error_factory = &exception_error_factory;
-
 	/* A special workaround for out_of_memory static init */
 	out_of_memory.refs = 1;
 }
 
+#undef BuildAlloc

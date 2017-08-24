@@ -88,9 +88,15 @@ vy_new_simple_stmt(struct tuple_format *format,
 		 * important.
 		 */
 		struct iovec operations[1];
-		char tmp[16];
+		char tmp[32];
 		char *ops = mp_encode_array(tmp, 1);
-		ops = mp_encode_array(ops, 0);
+		ops = mp_encode_array(ops, 3);
+		ops = mp_encode_str(ops, "+", 1);
+		ops = mp_encode_uint(ops, templ->upsert_field);
+		if (templ->upsert_value >= 0)
+			ops = mp_encode_uint(ops, templ->upsert_value);
+		else
+			ops = mp_encode_int(ops, templ->upsert_value);
 		operations[0].iov_base = tmp;
 		operations[0].iov_len = ops - tmp;
 		fail_if(templ->optimize_update);

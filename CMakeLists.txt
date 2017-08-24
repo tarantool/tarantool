@@ -343,14 +343,6 @@ libcoro_build()
 add_dependencies(build_bundled_libs coro)
 
 #
-# LibGOPT
-#
-
-include(BuildLibGOPT)
-libgopt_build()
-add_dependencies(build_bundled_libs gopt)
-
-#
 # MsgPuck
 #
 

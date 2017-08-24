@@ -39,6 +39,7 @@
 #include "vy_stmt.h" /* for comparators */
 #include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
 #include "vy_stat.h"
+#include "index_def.h"
 
 #include "small/mempool.h"
 #include "salad/bloom.h"

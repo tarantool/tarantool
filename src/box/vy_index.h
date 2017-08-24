@@ -37,7 +37,7 @@
 
 #include <small/rlist.h>
 
-#include "key_def.h"
+#include "index_def.h"
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 #include "vy_cache.h"

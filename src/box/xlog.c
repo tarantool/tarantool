@@ -658,7 +658,7 @@ xlog_init(struct xlog *xlog)
 {
 	memset(xlog, 0, sizeof(*xlog));
 	xlog->sync_interval = SNAP_SYNC_INTERVAL;
-	xlog->sync_time = ev_time();
+	xlog->sync_time = ev_monotonic_time();
 	xlog->is_autocommit = true;
 	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
@@ -1090,7 +1090,7 @@ xlog_tx_write(struct xlog *log)
 		if (log->rate_limit > 0) {
 			double throttle_time;
 			throttle_time = (double)sync_len / log->rate_limit -
-					(ev_time() - log->sync_time);
+					(ev_monotonic_time() - log->sync_time);
 			if (throttle_time > 0)
 				fiber_sleep(throttle_time);
 		}
@@ -1103,7 +1103,7 @@ xlog_tx_write(struct xlog *log)
 #else
 		fdatasync(log->fd);
 #endif /* HAVE_SYNC_FILE_RANGE */
-		log->sync_time = ev_time();
+		log->sync_time = ev_monotonic_time();
 		if (log->free_cache) {
 #ifdef HAVE_POSIX_FADVISE
 			/** free page cache */

@@ -30,28 +30,20 @@
  */
 #include "vy_index.h"
 
-#include <assert.h>
+#include "trivia/util.h"
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include <small/rlist.h>
 
 #include "assoc.h"
 #include "diag.h"
 #include "errcode.h"
 #include "histogram.h"
-#include "key_def.h"
+#include "index_def.h"
 #include "say.h"
 #include "schema.h"
-#include "trivia/util.h"
 #include "tuple.h"
-#include "tuple_format.h"
 #include "vy_log.h"
 #include "vy_mem.h"
 #include "vy_range.h"
@@ -723,10 +715,23 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 	/* We can't free region_stmt below, so let's add it to the stats */
 	index->stat.memory.count.bytes += tuple_size(stmt);
 
-	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
+	uint32_t format_id = stmt->format_id;
+	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT) {
+		/* Abort transaction if format was changed by DDL */
+		if (format_id != tuple_format_id(mem->format_with_colmask) &&
+		    format_id != tuple_format_id(mem->format)) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
 		return vy_mem_insert(mem, *region_stmt);
-	else
+	} else {
+		/* Abort transaction if format was changed by DDL */
+		if (format_id != tuple_format_id(mem->upsert_format)) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
 		return vy_mem_insert_upsert(mem, *region_stmt);
+	}
 }
 
 /**

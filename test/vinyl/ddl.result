@@ -469,3 +469,147 @@ test_run:cmd("setopt delimiter ''");
 s:drop()
 ---
 ...
+-- gh-2342 cursors after death of index
+create_iterator = require('utils').create_iterator
+---
+...
+s = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+---
+...
+sk = s:create_index('sec', { parts = { 2, 'uint' } })
+---
+...
+s:replace{1, 2, 3}
+---
+- [1, 2, 3]
+...
+s:replace{4, 5, 6}
+---
+- [4, 5, 6]
+...
+s:replace{7, 8, 9}
+---
+- [7, 8, 9]
+...
+itr = create_iterator(s, {})
+---
+...
+f, ctx, state = s.index.sec:pairs({5}, { iterator='LE' })
+---
+...
+itr.next()
+---
+- [1, 2, 3]
+...
+f(ctx, state)
+---
+- <iterator state>
+- [4, 5, 6]
+...
+s:drop()
+---
+...
+itr.next()
+---
+- null
+...
+f(ctx, state)
+---
+- null
+...
+f = nil
+---
+...
+ctx = nil
+---
+...
+state = nil
+---
+...
+itr = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+-- gh-2342 drop space if transaction is in progress
+ch = fiber.channel(1)
+---
+...
+s = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+---
+...
+sk = s:create_index('sec', { parts = { 2, 'uint' } })
+---
+...
+box.begin()
+---
+...
+s:replace({1, 2, 3})
+---
+- [1, 2, 3]
+...
+s:replace({4, 5, 6})
+---
+- [4, 5, 6]
+...
+s:replace({7, 8, 9})
+---
+- [7, 8, 9]
+...
+s:upsert({10, 11, 12}, {})
+---
+...
+_ = fiber.create(function () s:drop() ch:put(true) end)
+---
+...
+box.commit()
+---
+- error: Transaction has been aborted by conflict
+...
+ch:get()
+---
+- true
+...
+s = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+pk = s:create_index('primary', { parts = { 1, 'uint' } })
+---
+...
+sk = s:create_index('sec', { parts = { 2, 'uint' } })
+---
+...
+box.begin()
+---
+...
+s:replace{1, 2, 3}
+---
+- [1, 2, 3]
+...
+s:replace{4, 5, 6}
+---
+- [4, 5, 6]
+...
+s:replace{7, 8, 9}
+---
+- [7, 8, 9]
+...
+_ = fiber.create(function () s:drop() ch:put(true) end)
+---
+...
+ch:get()
+---
+- true
+...
+box.commit()
+---
+- error: Transaction has been aborted by conflict
+...

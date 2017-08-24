@@ -290,15 +290,31 @@ fiber_is_cancelled();
 
 /**
  * Report loop begin time as double (cheap).
+ * Uses real time clock.
  */
 API_EXPORT double
 fiber_time(void);
 
 /**
  * Report loop begin time as 64-bit int.
+ * Uses real time clock.
  */
 API_EXPORT uint64_t
 fiber_time64(void);
+
+/**
+ * Report loop begin time as double (cheap).
+ * Uses monotonic clock.
+ */
+API_EXPORT double
+fiber_clock(void);
+
+/**
+ * Report loop begin time as 64-bit int.
+ * Uses monotonic clock.
+ */
+API_EXPORT uint64_t
+fiber_clock64(void);
 
 /**
  * Reschedule fiber to end of event loop cycle.

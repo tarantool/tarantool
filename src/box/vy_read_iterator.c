@@ -808,7 +808,7 @@ restart:
 NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
-	ev_tstamp start_time = ev_now(loop());
+	ev_tstamp start_time = ev_monotonic_now(loop());
 
 	/* The key might be set to NULL during previous call, that means
 	 * that there's no more data */
@@ -964,7 +964,8 @@ clear:
 	if (prev_key != NULL)
 		tuple_unref(prev_key);
 
-	latency_collect(&index->stat.latency, ev_now(loop()) - start_time);
+	latency_collect(&index->stat.latency,
+			ev_monotonic_now(loop()) - start_time);
 	return rc;
 }
 

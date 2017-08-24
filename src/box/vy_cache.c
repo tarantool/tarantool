@@ -30,6 +30,7 @@
  */
 #include "vy_cache.h"
 #include "diag.h"
+#include "schema_def.h"
 
 #ifndef CT_ASSERT_G
 #define CT_ASSERT_G(e) typedef char CONCAT(__ct_assert_, __LINE__)[(e) ? 1 :-1]

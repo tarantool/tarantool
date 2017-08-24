@@ -35,9 +35,7 @@
 #include "port.h"
 #include "space.h"
 #include "exception.h"
-#include "schema.h"
 #include "small/rlist.h"
-#include "scoped_guard.h"
 #include "vclock.h"
 #include <stdlib.h>
 #include <string.h>

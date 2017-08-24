@@ -1277,10 +1277,10 @@ static ev_tstamp
 vy_scheduler_quota_throttled_cb(struct vy_quota *quota, ev_tstamp timeout)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	ev_tstamp wait_start = ev_now(loop());
+	ev_tstamp wait_start = ev_monotonic_now(loop());
 	if (fiber_cond_wait_timeout(&env->scheduler->quota_cond, timeout) != 0)
 		return 0; /* timed out */
-	ev_tstamp wait_end = ev_now(loop());
+	ev_tstamp wait_end = ev_monotonic_now(loop());
 	return timeout - (wait_end - wait_start);
 }
 
@@ -1845,7 +1845,7 @@ vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 		 * dump bandwidth when the dump round is complete
 		 * (see vy_scheduler_complete_dump()).
 		 */
-		scheduler->dump_start = ev_now(loop());
+		scheduler->dump_start = ev_monotonic_now(loop());
 	}
 	scheduler->generation++;
 }
@@ -1901,7 +1901,7 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 
 	/* Account dump bandwidth. */
 	struct vy_stat *stat = scheduler->env->stat;
-	ev_tstamp now = ev_now(loop());
+	ev_tstamp now = ev_monotonic_now(loop());
 	ev_tstamp dump_duration = now - scheduler->dump_start;
 	if (dump_duration > 0)
 		histogram_collect(stat->dump_bw, mem_dumped / dump_duration);

@@ -164,7 +164,7 @@ applier_connect(struct applier *applier)
 	coio_connect(coio, uri, &applier->addr, &applier->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greetingbuf, IPROTO_GREETING_SIZE);
-	applier->last_row_time = ev_now(loop());
+	applier->last_row_time = ev_monotonic_now(loop());
 
 	/* Decode instance version and name from greeting */
 	struct greeting greeting;
@@ -221,7 +221,7 @@ applier_connect(struct applier *applier)
 			    uri->login_len, uri->password, uri->password_len);
 	coio_write_xrow(coio, &row);
 	coio_read_xrow(coio, &iobuf->in, &row);
-	applier->last_row_time = ev_now(loop());
+	applier->last_row_time = ev_monotonic_now(loop());
 	if (row.type != IPROTO_OK)
 		xrow_decode_error_xc(&row); /* auth failed */
 
@@ -287,7 +287,7 @@ applier_join(struct applier *applier)
 	assert(applier->join_stream != NULL);
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
-		applier->last_row_time = ev_now(loop());
+		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write_xc(applier->join_stream, &row);
 		} else if (row.type == IPROTO_OK) {
@@ -324,7 +324,7 @@ applier_join(struct applier *applier)
 	 */
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
-		applier->last_row_time = ev_now(loop());
+		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			vclock_follow(&replicaset_vclock, row.replica_id,
 				      row.lsn);
@@ -403,7 +403,7 @@ applier_subscribe(struct applier *applier)
 	while (true) {
 		coio_read_xrow(coio, &iobuf->in, &row);
 		applier->lag = ev_now(loop()) - row.tm;
-		applier->last_row_time = ev_now(loop());
+		applier->last_row_time = ev_monotonic_now(loop());
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error_xc(&row);  /* error */
@@ -494,6 +494,10 @@ applier_f(va_list ap)
 				/* Invalid configuration */
 				applier_log_error(applier, e);
 				goto reconnect;
+			} else if (e->errcode() == ER_SYSTEM) {
+				/* System error from master instance. */
+				applier_log_error(applier, e);
+				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
 				applier_log_error(applier, e);
@@ -580,7 +584,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 
 	applier->join_stream = join_stream;
 	applier->subscribe_stream = subscribe_stream;
-	applier->last_row_time = ev_now(loop());
+	applier->last_row_time = ev_monotonic_now(loop());
 	rlist_create(&applier->on_state);
 	fiber_channel_create(&applier->pause, 0);
 	fiber_cond_create(&applier->writer_cond);
@@ -709,7 +713,7 @@ applier_connect_all(struct applier **appliers, int count,
 	/* Memory for on_state triggers registered in appliers */
 	struct applier_on_state triggers[VCLOCK_MAX];
 	/* Wait results until this time */
-	double deadline = fiber_time() + timeout;
+	double deadline = ev_monotonic_now(loop()) + timeout;
 
 	/* Add triggers and start simulations connection to remote peers */
 	for (int i = 0; i < count; i++) {
@@ -722,7 +726,7 @@ applier_connect_all(struct applier **appliers, int count,
 
 	/* Wait for all appliers */
 	for (int i = 0; i < count; i++) {
-		double wait = deadline - fiber_time();
+		double wait = deadline - ev_monotonic_now(loop());
 		if (wait < 0.0 ||
 		    applier_wait_for_state(&triggers[i], wait) != 0) {
 			goto error;

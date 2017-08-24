@@ -6,7 +6,6 @@ enable_tnt_compile_flags()
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
-include_directories(${LIBGOPT_INCLUDE_DIR})
 include_directories(${LUAJIT_INCLUDE_DIRS})
 include_directories(${READLINE_INCLUDE_DIRS})
 include_directories(${LIBYAML_INCLUDE_DIRS})
@@ -140,7 +139,6 @@ set (server_sources
      iobuf.cc
      httpc.c
      pickle.c
-     opts.c
      cfg.c
      cpu_feature.c
      title.c
@@ -180,10 +178,11 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/box/txn.h
     ${CMAKE_SOURCE_DIR}/src/box/key_def.h
+    ${CMAKE_SOURCE_DIR}/src/box/field_def.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple_format.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple_compare.h
-    ${CMAKE_SOURCE_DIR}/src/box/schema.h
+    ${CMAKE_SOURCE_DIR}/src/box/schema_def.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h
     ${CMAKE_SOURCE_DIR}/src/box/index.h
     ${CMAKE_SOURCE_DIR}/src/box/iterator_type.h
@@ -214,7 +213,6 @@ set (reexport_libraries server core misc bitset csv
 
 set (common_libraries
     ${reexport_libraries}
-    ${LIBGOPT_LIBRARIES}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
     ${OPENSSL_LIBRARIES}

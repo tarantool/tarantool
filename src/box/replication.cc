@@ -76,6 +76,7 @@ replication_init(void)
 {
 	mempool_create(&replica_pool, &cord()->slabc,
 		       sizeof(struct replica));
+	memset(&replicaset, 0, sizeof(replicaset));
 	replicaset_new(&replicaset);
 	vclock_create(&replicaset_vclock);
 }
@@ -183,6 +184,7 @@ void
 replicaset_update(struct applier **appliers, int count)
 {
 	replicaset_t uniq;
+	memset(&uniq, 0, sizeof(uniq));
 	replicaset_new(&uniq);
 	struct replica *replica, *next;
 

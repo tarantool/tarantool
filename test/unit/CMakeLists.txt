@@ -148,6 +148,25 @@ set(ITERATOR_TEST_LIBS core tuple xrow unit)
 add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES})
 target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS})
 
+add_executable(vy_point_iterator.test
+    vy_point_iterator.c
+    vy_iterators_helper.c
+    vy_log_stub.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_point_iterator.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_range.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_tx.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_index.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c
+    ${PROJECT_SOURCE_DIR}/src/box/index_def.c
+    ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
+)
+target_link_libraries(vy_point_iterator.test core tuple xrow xlog unit)
+
 add_executable(column_mask.test
     column_mask.c)
 target_link_libraries(column_mask.test tuple unit)

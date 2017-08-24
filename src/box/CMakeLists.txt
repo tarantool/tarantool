@@ -38,6 +38,8 @@ add_library(tuple STATIC
     tuple_compare.cc
     tuple_hash.cc
     key_def.cc
+    field_def.c
+    opt_def.c
 )
 target_link_libraries(tuple box_error core ${MSGPUCK_LIBRARIES} misc)
 
@@ -50,6 +52,7 @@ add_library(box STATIC
     xrow_io.cc
     tuple_convert.c
     index.cc
+    index_def.c
     iterator_type.c
     memtx_index.cc
     memtx_hash.cc
@@ -79,9 +82,12 @@ add_library(box STATIC
     vy_log.c
     vy_upsert.c
     space.cc
+    space_def.c
     func.c
+    func_def.c
     alter.cc
     schema.cc
+    schema_def.c
     session.cc
     port.c
     txn.cc

@@ -185,7 +185,7 @@ fiber_channel_check_wait(struct fiber_channel *ch, ev_tstamp start_time,
 		diag_set(FiberIsCancelled);
 		return -1;
 	}
-	if (timeout == 0 || ev_now(loop()) > start_time + timeout) {
+	if (timeout == 0 || ev_monotonic_now(loop()) > start_time + timeout) {
 		diag_set(TimedOut);
 		return -1;
 	}
@@ -291,7 +291,7 @@ fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 {
 	/** Ensure delivery fairness in case of prolonged wait. */
 	bool first_try = true;
-	ev_tstamp start_time = ev_now(loop());
+	ev_tstamp start_time = ev_monotonic_now(loop());
 
 	while (true) {
 		/*
@@ -383,7 +383,7 @@ fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 		}
 		if (pad.status == FIBER_CHANNEL_WAIT_DONE)
 			return 0;  /* OK, someone took the message. */
-		timeout -= ev_now(loop()) - start_time;
+		timeout -= ev_monotonic_now(loop()) - start_time;
 	}
 }
 
@@ -394,7 +394,7 @@ fiber_channel_get_msg_timeout(struct fiber_channel *ch,
 {
 	/** Ensure delivery fairness in case of prolonged wait. */
 	bool first_try = true;
-	ev_tstamp start_time = ev_now(loop());
+	ev_tstamp start_time = ev_monotonic_now(loop());
 
 	while (true) {
 		struct fiber *f;
@@ -484,6 +484,6 @@ fiber_channel_get_msg_timeout(struct fiber_channel *ch,
 			*msg = pad.msg;
 			return 0;
 		}
-		timeout -= ev_now(loop()) - start_time;
+		timeout -= ev_monotonic_now(loop()) - start_time;
 	}
 }

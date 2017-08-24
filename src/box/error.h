@@ -36,6 +36,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct error *
+BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
+
 /** \cond public */
 
 struct error;
@@ -205,9 +208,6 @@ struct XlogError: public Exception
 
 	virtual void raise() { throw this; }
 };
-
-void
-box_error_init(void);
 
 #endif /* defined(__cplusplus) */
 
