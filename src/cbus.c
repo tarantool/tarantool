@@ -32,6 +32,7 @@
 
 #include <limits.h>
 #include "fiber.h"
+#include "trigger.h"
 
 /**
  * Cord interconnect.
@@ -97,6 +98,7 @@ cpipe_create(struct cpipe *pipe, const char *consumer)
 
 	ev_async_init(&pipe->flush_input, cpipe_flush_cb);
 	pipe->flush_input.data = pipe;
+	rlist_create(&pipe->on_flush);
 
 	tt_pthread_mutex_lock(&cbus.mutex);
 	struct cbus_endpoint *endpoint =
@@ -135,6 +137,7 @@ cpipe_destroy(struct cpipe *pipe)
 	static const struct cmsg_hop route[1] = {
 		{cbus_endpoint_poison_f, NULL}
 	};
+	trigger_destroy(&pipe->on_flush);
 
 	struct cbus_endpoint *endpoint = pipe->endpoint;
 	struct cmsg_poison *poison = malloc(sizeof(struct cmsg_poison));
@@ -277,6 +280,7 @@ cpipe_flush_cb(ev_loop *loop, struct ev_async *watcher, int events)
 	if (pipe->n_input == 0)
 		return;
 
+	trigger_run(&pipe->on_flush, pipe);
 	/* Trigger task processing when the queue becomes non-empty. */
 	bool output_was_empty;
 

@@ -1,0 +1,24 @@
+	*** main ***
+1..6
+start main fiber
+start main loop
+start worker
+
+*** Test single message ***
+flush event, counter = 1
+ok 1 - 1 flush after test_single_msg
+
+*** Test several messages ***
+ok 2 - no flush during loop
+ok 3 - no flush during loop
+ok 4 - no flush during loop
+flush event, counter = 1
+ok 5 - 1 flush after test_several_messages
+
+*** Test forced flush ***
+flush event, counter = 1
+break main fiber and finish test
+ok 6 - flushed_cnt at the end of the test
+finish worker
+finish main loop
+	*** main: done ***
