@@ -18,3 +18,8 @@ box.sql.execute("SELECT * FROM p")
 
 box.sql.execute("INSERT INTO e values (1, 1), (2, 2), (3, 1)")
 box.sql.execute("SELECT * FROM e")
+
+box.sql.execute('DROP TABLE t')
+box.sql.execute('DROP TABLE q')
+box.sql.execute('DROP TABLE p')
+box.sql.execute('DROP TABLE e')
