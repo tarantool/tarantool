@@ -368,6 +368,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	if (def == NULL)
 		tnt_raise(OutOfMemory, size, "malloc", "def");
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
+	def->opts.sql = NULL;
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = 0;
 	identifier_check_xc(def->name);

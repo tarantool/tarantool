@@ -53,6 +53,15 @@ space_def_dup(const struct space_def *src)
 		return NULL;
 	}
 	memcpy(ret, src, size);
+	if (src->opts.sql != NULL) {
+		ret->opts.sql = strdup(src->opts.sql);
+		if (ret->opts.sql == NULL) {
+			diag_set(OutOfMemory, strlen(src->opts.sql) + 1,
+				 "strdup", "ret->opts.sql");
+			free(ret);
+			return NULL;
+		}
+	}
 	return ret;
 }
 
@@ -78,5 +87,14 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	memcpy(def->engine_name, engine_name, engine_len);
 	def->engine_name[engine_len] = 0;
 	def->opts = *opts;
+	if (opts->sql != NULL) {
+		def->opts.sql = strdup(opts->sql);
+		if (def->opts.sql == NULL) {
+			diag_set(OutOfMemory, strlen(opts->sql) + 1, "strdup",
+				 "def->opts.sql");
+			free(def);
+			return NULL;
+		}
+	}
 	return def;
 }

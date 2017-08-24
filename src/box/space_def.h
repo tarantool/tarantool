@@ -51,7 +51,7 @@ struct space_opts {
 	/**
 	 * SQL statement that produced this space.
 	 */
-	const char *sql;
+	char *sql;
 };
 
 extern const struct space_opts space_opts_default;
@@ -93,6 +93,7 @@ space_def_sizeof(uint32_t name_len)
 static inline void
 space_def_delete(struct space_def *def)
 {
+	free(def->opts.sql);
 	free(def);
 }
 
