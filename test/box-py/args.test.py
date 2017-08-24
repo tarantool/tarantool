@@ -9,6 +9,7 @@ server.test_option("-h")
 # Replace with the same value for case when builddir inside source dir
 sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")+'/src/tarantool'), "tarantool")
 sys.stdout.push_filter(re.escape(os.getenv("BUILDDIR")), "${SOURCEDIR}")
+sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")+'/src/tarantool'), "tarantool")
 sys.stdout.push_filter(re.escape(os.getenv("SOURCEDIR")), "${SOURCEDIR}")
 sys.stdout.push_filter("invalid option.*", "invalid option")
 sys.stdout.push_filter("unrecognized option.*", "unrecognized option")

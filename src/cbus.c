@@ -183,6 +183,12 @@ cbus_create(struct cbus *bus)
 static void
 cbus_destroy(struct cbus *bus)
 {
+	/*
+	 * Lock the mutex to ensure we do not destroy a mutex
+	 * while it is locked, happens in at_exit() handler.
+	 */
+	(void) tt_pthread_mutex_lock(&bus->mutex);
+	(void) tt_pthread_mutex_unlock(&bus->mutex);
 	(void) tt_pthread_mutex_destroy(&bus->mutex);
 	(void) tt_pthread_cond_destroy(&bus->cond);
 	rmean_delete(bus->stats);
