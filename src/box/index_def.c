@@ -63,30 +63,6 @@ const struct opt_def index_opts_reg[] = {
 	{ NULL, opt_type_MAX, 0, 0 },
 };
 
-/**
- * Destructor for struct index_opts.
- * The only relevant action so far is to free sql field if not-null.
- */
-static void
-index_opts_destroy(struct index_opts *opts)
-{
-	if (opts->sql) {
-		free(opts->sql);
-		opts->sql = 0;
-	}
-}
-
-static void
-index_opts_dup(struct index_opts *dst, const struct index_opts *src)
-{
-	*dst = *src;
-	if (src->sql) {
-		dst->sql = (char*)strdup(src->sql);
-		if (dst->sql == NULL)
-			diag_set(OutOfMemory, strlen(src->sql), "sql", "char *");
-	}
-}
-
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      uint32_t name_len, enum index_type type,
@@ -124,6 +100,15 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
+	if (opts->sql != NULL) {
+		def->opts.sql = strdup(opts->sql);
+		if (def->opts.sql == NULL) {
+			diag_set(OutOfMemory, strlen(opts->sql) + 1, "strdup",
+				 "def->opts.sql");
+			index_def_delete(def);
+			return NULL;
+		}
+	}
 	return def;
 }
 
@@ -151,7 +136,16 @@ index_def_dup(const struct index_def *def)
 		return NULL;
 	}
 	rlist_create(&dup->link);
-	index_opts_dup(&dup->opts, &def->opts);
+	dup->opts = def->opts;
+	if (def->opts.sql != NULL) {
+		dup->opts.sql = strdup(def->opts.sql);
+		if (dup->opts.sql == NULL) {
+			diag_set(OutOfMemory, strlen(def->opts.sql) + 1,
+				 "strdup", "dup->opts.sql");
+			index_def_delete(dup);
+			return NULL;
+		}
+	}
 	return dup;
 }
 

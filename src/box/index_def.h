@@ -102,6 +102,12 @@ struct index_opts {
 	char *sql;
 };
 
+static inline void
+index_opts_destroy(struct index_opts *opts)
+{
+	free(opts->sql);
+}
+
 extern const struct index_opts index_opts_default;
 extern const struct opt_def index_opts_reg[];
 

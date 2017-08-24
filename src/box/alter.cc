@@ -311,6 +311,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 			  space_name(old_space), "index name is too long");
 	}
 	index_opts_create(&opts, tuple_field(tuple, BOX_INDEX_FIELD_OPTS));
+	struct index_opts *opts_p = &opts;
+	auto opts_guard = make_scoped_guard([=] { index_opts_destroy(opts_p); });
 	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
 	uint32_t part_count = mp_decode_array(&parts);
 	struct key_def *key_def = key_def_new(part_count);
