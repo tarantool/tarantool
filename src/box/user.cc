@@ -239,7 +239,7 @@ user_set_effective_access(struct user *user)
 	struct privset_iterator it;
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
-	while ((priv = privset_inext(&user->privs, &it)) != NULL) {
+	while ((priv = privset_inext(&it)) != NULL) {
 		struct access *object = access_find(priv);
 		 /* Protect against a concurrent drop. */
 		if (object == NULL)
@@ -270,7 +270,7 @@ user_reload_privs(struct user *user)
 	 */
 	struct privset_iterator it;
 	privset_ifirst(&user->privs, &it);
-	while ((priv = privset_inext(&user->privs, &it)) != NULL) {
+	while ((priv = privset_inext(&it)) != NULL) {
 		priv->access = 0;
 	}
 	user_set_effective_access(user);
@@ -308,7 +308,7 @@ user_reload_privs(struct user *user)
 			struct privset_iterator it;
 			privset_ifirst(&role->privs, &it);
 			struct priv_def *def;
-			while ((def = privset_inext(&role->privs, &it))) {
+			while ((def = privset_inext(&it))) {
 				user_grant_priv(user, def);
 			}
 		}

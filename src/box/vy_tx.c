@@ -291,7 +291,7 @@ vy_tx_destroy(struct vy_tx *tx)
 static bool
 vy_tx_is_ro(struct vy_tx *tx)
 {
-	return tx->write_set.rbt_root == &tx->write_set.rbt_nil;
+	return write_set_empty(&tx->write_set);
 }
 
 /** Return true if the transaction is in read view. */
@@ -316,9 +316,9 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 	/** Find the first value equal to or greater than key */
 	struct read_set_iterator it;
 	read_set_isearch_ge(tree, &key, &it);
-	for (struct txv *abort = read_set_inext(tree, &it);
+	for (struct txv *abort = read_set_inext(&it);
 	     abort != NULL && abort->index == v->index;
-	     abort = read_set_inext(tree, &it)) {
+	     abort = read_set_inext(&it)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
 				    v->index->cmp_def) != 0)
@@ -359,9 +359,9 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 	/** Find the first value equal to or greater than key. */
 	struct read_set_iterator it;
 	read_set_isearch_ge(tree, &key, &it);
-	for (struct txv *abort = read_set_inext(tree, &it);
+	for (struct txv *abort = read_set_inext(&it);
 	     abort != NULL && abort->index == v->index;
-	     abort = read_set_inext(tree, &it)) {
+	     abort = read_set_inext(&it)) {
 		/* Check if we're still looking at the matching key. */
 		if (vy_stmt_compare(key.stmt, abort->stmt,
 				    v->index->cmp_def) != 0)
@@ -505,7 +505,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	struct txv *v;
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&tx->write_set, &it)) != NULL) {
+	while ((v = write_set_inext(&it)) != NULL) {
 		if (vy_tx_send_to_read_view(tx, v))
 			return -1;
 	}
@@ -631,7 +631,7 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&tx->write_set, &it)) != NULL) {
+	while ((v = write_set_inext(&it)) != NULL) {
 		vy_tx_abort_readers(tx, v);
 	}
 }
