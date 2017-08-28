@@ -651,7 +651,8 @@ tuple_field_with_type(const struct tuple *tuple, uint32_t fieldno,
 {
 	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_FIELD, fieldno);
+		diag_set(ClientError, ER_NO_SUCH_FIELD,
+			 fieldno + TUPLE_INDEX_BASE);
 		return NULL;
 	}
 	if (mp_typeof(*field) != type) {

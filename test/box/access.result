@@ -516,7 +516,7 @@ box.space._priv:select{id}
 -- -----------------------------------------------------------
 box.space._user:insert{10, 1, 'name'}
 ---
-- error: Field 3 was not found in the tuple
+- error: Field 4 was not found in the tuple
 ...
 box.space._user:insert{10, 1, 'name', 'strange-object-type'}
 ---
