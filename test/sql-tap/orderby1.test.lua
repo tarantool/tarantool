@@ -414,8 +414,8 @@ test:do_test(
     3.0,
     function()
         return test:execsql [[
-            DROP TABLE album;
             DROP TABLE track;
+            DROP TABLE album;
             CREATE TABLE album(
               aid INTEGER PRIMARY KEY,
               title TEXT UNIQUE NOT NULL

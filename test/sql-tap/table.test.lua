@@ -704,7 +704,9 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "table-10.1",
     [[
-        CREATE TABLE t6(a REFERENCES t4(a) NOT NULL primary key);
+        -- there is no t4 table
+        --CREATE TABLE t6(a REFERENCES t4(a) NOT NULL primary key);
+        CREATE TABLE t6(a REFERENCES t2(id) NOT NULL primary key);
         INSERT INTO t6 VALUES(NULL);
     ]], {
         -- <table-10.1>
