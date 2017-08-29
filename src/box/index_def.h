@@ -72,7 +72,6 @@ struct index_opts {
 	/**
 	 * RTREE distance type.
 	 */
-	char distancebuf[16];
 	enum rtree_index_distance_type distance;
 	/**
 	 * Vinyl index options.

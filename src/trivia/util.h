@@ -96,6 +96,9 @@ extern "C" {
 uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax);
 
+uint32_t
+strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax);
+
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
 #define field_sizeof(compound_type, field) sizeof(((compound_type *)NULL)->field)
 #ifndef lengthof

@@ -163,6 +163,28 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 		}
 		*(const char **)opt = ptr;
 		break;
+	case OPT_ENUM:
+		if (mp_typeof(**val) != MP_STR)
+			return -1;
+		str = mp_decode_str(val, &str_len);
+		ival = strnindex(def->enum_strs, str, str_len, def->enum_max);
+		switch(def->enum_size) {
+		case sizeof(uint8_t):
+			store_u8(opt, (uint8_t)ival);
+			break;
+		case sizeof(uint16_t):
+			store_u16(opt, (uint16_t)ival);
+			break;
+		case sizeof(uint32_t):
+			store_u32(opt, (uint32_t)ival);
+			break;
+		case sizeof(uint64_t):
+			store_u64(opt, (uint64_t)ival);
+			break;
+		default:
+			unreachable();
+		};
+		break;
 	default:
 		unreachable();
 	}
@@ -231,30 +253,6 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 }
 
 /**
- * Decode distance type from message pached string to enum
- * Does not check message type, MP_STRING expected
- * Throws an error if the the value does not correspond to any enum value
- */
-static enum rtree_index_distance_type
-index_opts_decode_distance(const char *str)
-{
-	uint32_t len = strlen(str);
-	if (len == strlen("euclid") &&
-	    strncasecmp(str, "euclid", len) == 0) {
-		return RTREE_INDEX_DISTANCE_TYPE_EUCLID;
-	} else if (len == strlen("manhattan") &&
-		   strncasecmp(str, "manhattan", len) == 0) {
-		return RTREE_INDEX_DISTANCE_TYPE_MANHATTAN;
-	} else {
-		tnt_raise(ClientError,
-			  ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS,
-			  "distance must be either 'euclid' or 'manhattan'");
-	}
-	return RTREE_INDEX_DISTANCE_TYPE_EUCLID; /* unreachabe */
-}
-
-/**
  * Fill index_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
  *
@@ -267,8 +265,11 @@ index_opts_create(struct index_opts *opts, const char *map)
 	map = opts_create_from_field(opts, index_opts_reg, map,
 				     ER_WRONG_INDEX_OPTIONS,
 				     BOX_INDEX_FIELD_OPTS);
-	if (opts->distancebuf[0] != '\0')
-		opts->distance = index_opts_decode_distance(opts->distancebuf);
+	if (opts->distance == rtree_index_distance_type_MAX) {
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
+			  "'euclid' or 'manhattan'");
+	}
 	if (opts->run_count_per_level <= 0)
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS,

@@ -40,6 +40,7 @@ enum opt_type {
 	OPT_FLOAT,	/* double */
 	OPT_STR,	/* char[] */
 	OPT_STRPTR,	/* char*, size_t */
+	OPT_ENUM,	/* enum */
 	opt_type_MAX,
 };
 
@@ -50,9 +51,21 @@ struct opt_def {
 	enum opt_type type;
 	ptrdiff_t offset;
 	uint32_t len;
+
+	const char *enum_name;
+	int enum_size;
+	const char **enum_strs;
+	uint32_t enum_max;
 };
 
 #define OPT_DEF(key, type, opts, field) \
-	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field) }
+	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field), \
+	  NULL, 0, NULL, 0 }
+
+#define OPT_DEF_ENUM(key, enum_name, opts, field) \
+	{ key, OPT_ENUM, offsetof(opts, field), sizeof(int), #enum_name, \
+	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX }
+
+#define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0}
 
 #endif /* TARANTOOL_BOX_OPT_DEF_H_INCLUDED */

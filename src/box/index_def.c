@@ -38,7 +38,6 @@ const char *rtree_index_distance_type_strs[] = { "EUCLID", "MANHATTAN" };
 const struct index_opts index_opts_default = {
 	/* .unique              = */ true,
 	/* .dimension           = */ 2,
-	/* .distancebuf         = */ { '\0' },
 	/* .distance            = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID,
 	/* .range_size          = */ 0,
 	/* .page_size           = */ 0,
@@ -52,7 +51,7 @@ const struct index_opts index_opts_default = {
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT, struct index_opts, dimension),
-	OPT_DEF("distance", OPT_STR, struct index_opts, distancebuf),
+	OPT_DEF_ENUM("distance", rtree_index_distance_type, struct index_opts, distance),
 	OPT_DEF("range_size", OPT_INT, struct index_opts, range_size),
 	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
 	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
@@ -60,7 +59,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
 	OPT_DEF("lsn", OPT_INT, struct index_opts, lsn),
 	OPT_DEF("sql", OPT_STRPTR, struct index_opts, sql),
-	{ NULL, opt_type_MAX, 0, 0 },
+	OPT_END,
 };
 
 struct index_def *
