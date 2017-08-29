@@ -338,6 +338,13 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 	assert(format->field_map_size == replace_format->field_map_size);
 	assert(format->field_count == replace_format->field_count);
 	for (uint32_t i = 0; i < format->field_count; ++i) {
+		if (format->fields[i].name != NULL) {
+			assert(replace_format->fields[i].name != NULL);
+			assert(strcmp(format->fields[i].name,
+				      replace_format->fields[i].name) == 0);
+		} else {
+			assert(replace_format->fields[i].name == NULL);
+		}
 		assert(format->fields[i].type ==
 		       replace_format->fields[i].type);
 		assert(format->fields[i].offset_slot ==

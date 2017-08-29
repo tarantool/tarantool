@@ -195,17 +195,21 @@ void space_noop(struct space *space);
 uint32_t
 space_size(struct space *space);
 
+struct field_def;
 /**
  * Allocate and initialize a space. The space
  * needs to be loaded before it can be used
  * (see space->handler->recover()).
  * @param space_def Space definition.
  * @param key_list List of index_defs.
+ * @param fields Array of fields specified in space format.
+ * @param field_count Length of @a fields.
  *
  * @retval Space object.
  */
 struct space *
-space_new(struct space_def *space_def, struct rlist *key_list);
+space_new(struct space_def *space_def, struct rlist *key_list,
+	  struct field_def *fields, uint32_t field_count);
 
 /** Destroy and free a space. */
 void

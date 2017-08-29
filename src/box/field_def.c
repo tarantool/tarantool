@@ -40,8 +40,20 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_NUMBER]   = */ "number",
 	/* [FIELD_TYPE_INTEGER]  = */ "integer",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
+	/* [FIELD_TYPE_MAP]      = */ "map",
 	/* [FIELD_TYPE_STR17]    = */ "str",
 	/* [FIELD_TYPE_NUM17]    = */ "num",
+};
+
+const struct opt_def field_def_reg[] = {
+	OPT_DEF_ENUM("type", field_type, struct field_def, type),
+	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
+	OPT_END,
+};
+
+const struct field_def field_def_default = {
+	.type = FIELD_TYPE_ANY,
+	.name = NULL,
 };
 
 enum field_type

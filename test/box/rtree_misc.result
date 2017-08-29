@@ -466,6 +466,9 @@ box.snapshot()
 - ok
 ...
 test_run:cmd("restart server default")
+utils = require('utils')
+---
+...
 s = box.space.spatial
 ---
 ...
@@ -548,22 +551,11 @@ s.index.s:drop()
 ---
 ...
 -- with wrong args
-empty_map = setmetatable({}, {__serialize = 'map'})
----
-...
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
 ---
-- error: 'Wrong record in _index space: got {unsigned, unsigned, string, string, nil,
-    array}, expected {space id (unsigned), index id (unsigned), name (string), type
-    (string), options (map), parts (array)}'
+- error: 'Tuple field 5 type does not match one required by operation: expected map'
 ...
-box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
----
-- error: 'Wrong record in _index space: got {unsigned, unsigned, string, string, array,
-    array}, expected {space id (unsigned), index id (unsigned), name (string), type
-    (string), options (map), parts (array)}'
-...
-box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', utils.setmap({}), {{2, 'array'}}}
 ---
 - error: 'Can''t create or modify index ''s'' in space ''s'': RTREE index can not
     be unique'

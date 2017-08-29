@@ -59,7 +59,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 		    void *upsert_thresh_arg)
 {
 	env->key_format = tuple_format_new(&vy_tuple_format_vtab,
-					   NULL, 0, 0);
+					   NULL, 0, 0, NULL, 0);
 	if (env->key_format == NULL)
 		return -1;
 	tuple_format_ref(env->key_format);
@@ -123,8 +123,19 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 
 	index->cmp_def = cmp_def;
 	index->key_def = key_def;
-	index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
-					      &cmp_def, 1, 0);
+	if (index_def->iid == 0) {
+		/*
+		 * Disk tuples can be returned to an user from a
+		 * primary key. And they must have field
+		 * definitions as well as space->format tuples.
+		 */
+		index->disk_format =
+			tuple_format_new(&vy_tuple_format_vtab, &cmp_def, 1, 0,
+					 format->fields, format->field_count);
+	} else {
+		index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
+						      &cmp_def, 1, 0, NULL, 0);
+	}
 	if (index->disk_format == NULL)
 		goto fail_format;
 	tuple_format_ref(index->disk_format);

@@ -164,6 +164,8 @@ box.snapshot()
 
 test_run:cmd("restart server default")
 
+utils = require('utils')
+
 s = box.space.spatial
 i = s.index.spatial
 s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
@@ -201,10 +203,8 @@ f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'}
 s.index.s:drop()
 
 -- with wrong args
-empty_map = setmetatable({}, {__serialize = 'map'})
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', utils.setmap({}), {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'}}}

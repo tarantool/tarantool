@@ -140,17 +140,20 @@ tuple_format_unref(struct tuple_format *format)
 
 /**
  * Allocate, construct and register a new in-memory tuple format.
- * @param vtab             Virtual function table for specific engines.
- * @param keys             Array of key_defs of a space.
- * @param key_count        The number of keys in @a keys array.
- * @param extra_size       Extra bytes to reserve in tuples metadata.
+ * @param vtab Virtual function table for specific engines.
+ * @param keys Array of key_defs of a space.
+ * @param key_count The number of keys in @a keys array.
+ * @param extra_size Extra bytes to reserve in tuples metadata.
+ * @param space_fields Array of fields, defined in a space format.
+ * @param space_field_count Length of @a space_fields.
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
  */
 struct tuple_format *
 tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
-		 uint16_t key_count, uint16_t extra_size);
+		 uint16_t key_count, uint16_t extra_size,
+		 struct field_def *space_fields, uint32_t space_field_count);
 
 /**
  * Register the duplicate of the specified format.

@@ -195,7 +195,8 @@ struct errcode_record {
 	/*140 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
 	/*141 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
 	/*142 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
-	/*143 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s")
+	/*143 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
+	/*144 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format (field %u): %s")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -671,7 +671,8 @@ sql_schema_put(InitData *init,
 
 /* TODO move to public header */
 struct space_def *
-space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode);
+space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
+			 struct field_def **fields, uint32_t *field_count);
 
 struct space;
 
@@ -732,11 +733,12 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		init->rc = SQLITE_TARANTOOL_ERROR;
 		return;
 	}
-
+	struct field_def *fields;
+	uint32_t field_count;
 	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
 		struct space_def *def;
 
-		def = space_def_new_from_tuple(tuple, 0);
+		def = space_def_new_from_tuple(tuple, 0, &fields, &field_count);
 		if (def->opts.sql != NULL) {
 			sql_schema_put(init, def->name, def->id, 0,
 				       def->opts.sql);
@@ -932,7 +934,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
-		t = aCol[i].affinity == SQLITE_AFF_BLOB ? "*" :
+		t = aCol[i].affinity == SQLITE_AFF_BLOB ? "scalar" :
 			convertSqliteAffinity(aCol[i].affinity, aCol[i].notNull == 0);
 		p = enc->encode_str(p, t, strlen(t));
 	}

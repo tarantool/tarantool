@@ -309,6 +309,7 @@ t;
   - 'box.error.CHECKPOINT_IN_PROGRESS : 120'
   - 'box.error.FIELD_TYPE : 23'
   - 'box.error.SQL_BIND_PARAMETER_MAX : 142'
+  - 'box.error.WRONG_SPACE_FORMAT : 144'
   - 'box.error.SQL_BIND_TYPE : 141'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
   - 'box.error.TUPLE_REF_OVERFLOW : 86'
