@@ -38,7 +38,7 @@ const struct space_opts space_opts_default = {
 
 const struct opt_def space_opts_reg[] = {
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, temporary),
-	{ NULL, opt_type_MAX, 0, 0 }
+	OPT_END,
 };
 
 struct space_def *

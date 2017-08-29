@@ -62,6 +62,23 @@ strindex(const char **haystack, const char *needle, uint32_t hmax)
 	return hmax;
 }
 
+/**
+ * Same as strindex(), but with a specified length of @a needle.
+ * Used, when @a needle is not 0 terminated.
+ */
+uint32_t
+strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax)
+{
+	if (len == 0)
+		return hmax;
+	for (unsigned index = 0; index != hmax && haystack[index]; index++) {
+		if (strncasecmp(haystack[index], needle, len) == 0 &&
+		    strlen(haystack[index]) == len)
+			return index;
+	}
+	return hmax;
+}
+
 void
 close_all_xcpt(int fdc, ...)
 {
