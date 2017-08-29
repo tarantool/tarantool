@@ -36,6 +36,6 @@ const char *opt_type_strs[] = {
 	/* [OPT_INT]	= */ "integer",
 	/* [OPT_FLOAT]	= */ "float",
 	/* [OPT_STR]	= */ "string",
-	/* [OPT_STRPTR] = */ "string*",
+	/* [OPT_STRPTR] = */ "string",
 	/* [OPT_ENUM]   = */ "enum",
 };
