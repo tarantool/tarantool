@@ -44,8 +44,8 @@ t:get{1} -- {1, 12}
 t:get{2} -- {2, 22}
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 --
 -- UPDATE
 --
@@ -65,8 +65,8 @@ t:get{1} -- {1, 11}
 t:get{2} -- {2, 21}
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- READ COMMITTED basic requirements: G1A
 -- ------------------------------------------------------------------------
@@ -83,8 +83,8 @@ c2("t:get{1}") -- {1, 10}
 c2:commit() -- true
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- READ COMMITTED basic requirements: G1B
 -- ------------------------------------------------------------------------
@@ -102,8 +102,8 @@ c2("t:get{1}") -- {1, 10}
 c2:commit() -- ok
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- Circular information flow: G1C
 -- ------------------------------------------------------------------------
@@ -121,8 +121,8 @@ c1:commit() -- ok
 c2:commit() -- rollback (@fixme: not necessary)
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- OTV: observable transaction vanishes
 -- ------------------------------------------------------------------------
@@ -146,8 +146,8 @@ c3("t:get{1}") -- {1, 11}
 c3:commit() -- read only transaction - OK to commit, stays with its read view
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 --  PMP: Predicate with many preceders
 -- ------------------------------------------------------------------------
@@ -166,8 +166,8 @@ c1("t:get{3}") -- nothing
 c1:commit() -- ok
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 --  PMP write: predicate many preceders for write predicates
 -- ------------------------------------------------------------------------
@@ -190,8 +190,8 @@ t:get{1} -- {1, 20}
 t:get{2} -- {2, 30}
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 --  P4: lost update: don't allow a subsequent commit to lose update
 -- ------------------------------------------------------------------------
@@ -209,8 +209,8 @@ c1:commit() -- ok
 c2:commit() -- rollback -- conflict
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 ------------------------------------------------------------------------
 -- G-single: read skew
 -- ------------------------------------------------------------------------
@@ -230,8 +230,8 @@ c1("t:get{2}") -- {2, 20}
 c1:commit() -- ok
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 ------------------------------------------------------------------------
 -- G-single: read skew, test with write predicate
 -- ------------------------------------------------------------------------
@@ -252,8 +252,8 @@ c1("t:get{2}") -- finds nothing
 c1:commit() -- rollback
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- G2-item: write skew
 -- ------------------------------------------------------------------------
@@ -273,8 +273,8 @@ c1:commit() -- ok
 c2:commit() -- rollback -- conflict
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- G2: anti-dependency cycles
 -- ------------------------------------------------------------------------
@@ -296,8 +296,8 @@ c1:commit() -- ok
 c2:commit() -- rollback
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 -- G2: anti-dependency cycles with two items
 -- ------------------------------------------------------------------------
@@ -319,8 +319,8 @@ c1("t:replace{1, 0}")
 c1:commit() -- rollback
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- ------------------------------------------------------------------------
 --  G2: anti-dependency cycles with two items (no replace)
 -- ------------------------------------------------------------------------
@@ -342,8 +342,8 @@ c3:commit() -- ok
 c1:commit() -- ok
 
 -- teardown
-t:delete{1}
-t:delete{2}
+t:truncate()
+
 -- *************************************************************************
 -- 1.7 cleanup marker: end of test cleanup
 -- *************************************************************************
