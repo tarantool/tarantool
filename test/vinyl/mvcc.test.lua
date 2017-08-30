@@ -1536,6 +1536,24 @@ c1("t.index.pk:count()") -- 2
 c1:commit()
 t:truncate()
 
+--
+-- Check that select() does not add the key following
+-- the last returned key to the conflict manager.
+--
+t:replace{1}
+t:replace{2}
+c1:begin()
+c1("t:select({}, {limit = 0})") -- none
+c2:begin()
+c2("t:replace{1, 'new'}")
+c2:commit()
+c1("t:select({}, {limit = 1})") -- {1, 'new'}
+c2:begin()
+c2("t:replace{2, 'new'}")
+c2:commit()
+c1("t:select()") -- {1, 'new'}, {2, 'new'}
+c1:commit()
+
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
 -- *************************************************************************
