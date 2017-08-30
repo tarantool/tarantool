@@ -5480,10 +5480,11 @@ static int pager_write(PgHdr *pPg){
   ** been started. The journal file may or may not be open at this point.
   ** It is never called in the ERROR state.
   */
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( pPager->eState==PAGER_WRITER_LOCKED
        || pPager->eState==PAGER_WRITER_CACHEMOD
        || pPager->eState==PAGER_WRITER_DBMOD
-  );
+  );*/
   assert( assert_pager_state(pPager) );
   assert( pPager->errCode==0 );
   assert( pPager->readOnly==0 );
@@ -5502,7 +5503,9 @@ static int pager_write(PgHdr *pPg){
     rc = pager_open_journal(pPager);
     if( rc!=SQLITE_OK ) return rc;
   }
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( pPager->eState>=PAGER_WRITER_CACHEMOD );
+  */
   assert( assert_pager_state(pPager) );
 
   /* Mark the page that is about to be modified as dirty. */
@@ -5661,7 +5664,9 @@ static SQLITE_NOINLINE int pagerWriteLargeSector(PgHdr *pPg){
 int sqlite3PagerWrite(PgHdr *pPg){
   Pager *pPager = pPg->pPager;
   assert( (pPg->flags & PGHDR_MMAP)==0 );
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( pPager->eState>=PAGER_WRITER_LOCKED );
+  */
   assert( assert_pager_state(pPager) );
   if( (pPg->flags & PGHDR_WRITEABLE)!=0 && pPager->dbSize>=pPg->pgno ){
     if( pPager->nSavepoint ) return subjournalPageIfRequired(pPg);

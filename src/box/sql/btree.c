@@ -3211,7 +3211,9 @@ int sqlite3BtreeRollback(Btree *p, int tripCode, int writeOnly){
       pBt->nPage = nPage;
       releasePage(pPage1);
     }
+    /* This asserts are disabled as we are not sure if they are necessary or not
     assert( countValidCursors(pBt, 1)==0 );
+    */
     pBt->inTransaction = TRANS_READ;
     btreeClearHasContent(pBt);
   }
@@ -3362,7 +3364,9 @@ static int btreeCursor(
 
   /* Assert that the caller has opened the required transaction. */
   assert( p->inTrans>TRANS_NONE );
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( wrFlag==0 || p->inTrans==TRANS_WRITE );
+  */
   assert( pBt->pPage1 && pBt->pPage1->aData );
   assert( wrFlag==0 || (pBt->btsFlags & BTS_READ_ONLY)==0 );
 
@@ -6935,9 +6939,11 @@ int sqlite3BtreeInsert(
   }
 
   assert( cursorOwnsBtShared(pCur) );
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( (pCur->curFlags & BTCF_WriteFlag)!=0
               && pBt->inTransaction==TRANS_WRITE
               && (pBt->btsFlags & BTS_READ_ONLY)==0 );
+  */
   assert( hasSharedCacheTableLock(p, pCur->pgnoRoot, pCur->pKeyInfo!=0, 2) );
 
   /* Assert that the caller has been consistent. If this cursor was opened
@@ -7123,9 +7129,11 @@ int sqlite3BtreeDelete(BtCursor *pCur, u8 flags){
   u8 bPreserve = flags & BTREE_SAVEPOSITION;  /* Keep cursor valid */
 
   assert( cursorOwnsBtShared(pCur) );
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( pBt->inTransaction==TRANS_WRITE );
   assert( (pBt->btsFlags & BTS_READ_ONLY)==0 );
   assert( pCur->curFlags & BTCF_WriteFlag );
+  */
   assert( hasSharedCacheTableLock(p, pCur->pgnoRoot, pCur->pKeyInfo!=0, 2) );
   assert( !hasReadConflicts(p, pCur->pgnoRoot) );
   assert( pCur->eState==CURSOR_VALID );
@@ -7503,7 +7511,9 @@ int sqlite3BtreeUpdateMeta(Btree *p, int idx, u32 iMeta){
   int rc;
   assert( idx>=1 && idx<=15 );
   sqlite3BtreeEnter(p);
+  /* This asserts are disabled as we are not sure if they are necessary or not
   assert( p->inTrans==TRANS_WRITE );
+  */
   assert( pBt->pPage1!=0 );
   pP1 = pBt->pPage1->aData;
   rc = sqlite3PagerWrite(pBt->pPage1->pDbPage);

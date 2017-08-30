@@ -2685,8 +2685,7 @@ int sqlite3VdbeHalt(Vdbe *p){
     ** above has occurred. 
     */
     if( !sqlite3VtabInSync(db) 
-      && p->autoCommit 
-      && db->nVdbeWrite==(p->readOnly==0) 
+      && p->autoCommit
     ){
       if( p->rc==SQLITE_OK || (p->errorAction==OE_Fail && !isSpecialError) ){
         rc = sqlite3VdbeCheckFk(p, 1);
