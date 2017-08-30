@@ -1,6 +1,12 @@
 session = box.session
 ---
 ...
+utils = require('utils')
+---
+...
+EMPTY_MAP = utils.setmap({})
+---
+...
 --
 -- Check a double create space
 --
@@ -343,12 +349,12 @@ box.space._user:select(1)
 ---
 - error: Read access is denied for user 'testuser' to space '_user'
 ...
-uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user'}[1]
+uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP}[1]
 ---
 ...
 box.space._user:delete(uid)
 ---
-- [5, 4, 'someone', 'user']
+- [5, 4, 'someone', 'user', {}]
 ...
 session.su('admin')
 ---
