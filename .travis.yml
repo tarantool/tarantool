@@ -108,6 +108,7 @@ matrix:
         compiler: gcc
 
 script:
+  - git tag -d 1.7.5
   - make -f .travis.mk ${TARGET}
 
 before_deploy:
