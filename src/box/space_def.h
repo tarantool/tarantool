@@ -33,6 +33,7 @@
 #include "trivia/util.h"
 #include "opt_def.h"
 #include "schema_def.h"
+#include <stdlib.h>
 #include <stdbool.h>
 
 #if defined(__cplusplus)
@@ -56,6 +57,26 @@ struct space_opts {
 
 extern const struct space_opts space_opts_default;
 extern const struct opt_def space_opts_reg[];
+
+/**
+ * Create space options using default values.
+ */
+static inline void
+space_opts_create(struct space_opts *opts)
+{
+	/* default values of opts */
+	*opts = space_opts_default;
+}
+
+/**
+ * Destroy space options
+ */
+static inline void
+space_opts_destroy(struct space_opts *opts)
+{
+	free(opts->sql);
+	TRASH(opts);
+}
 
 /** Space metadata. */
 struct space_def {
@@ -93,7 +114,8 @@ space_def_sizeof(uint32_t name_len)
 static inline void
 space_def_delete(struct space_def *def)
 {
-	free(def->opts.sql);
+	space_opts_destroy(&def->opts);
+	TRASH(def);
 	free(def);
 }
 

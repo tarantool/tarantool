@@ -101,14 +101,27 @@ struct index_opts {
 	char *sql;
 };
 
+extern const struct index_opts index_opts_default;
+extern const struct opt_def index_opts_reg[];
+
+/**
+ * Create index options using default values
+ */
+static inline void
+index_opts_create(struct index_opts *opts)
+{
+	*opts = index_opts_default;
+}
+
+/**
+ * Destroy index options
+ */
 static inline void
 index_opts_destroy(struct index_opts *opts)
 {
 	free(opts->sql);
+	TRASH(opts);
 }
-
-extern const struct index_opts index_opts_default;
-extern const struct opt_def index_opts_reg[];
 
 static inline int
 index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)

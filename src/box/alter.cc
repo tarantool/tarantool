@@ -225,14 +225,10 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
  * @return   the end of the msgpack map in the stream
  */
 static const char *
-opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
-		       uint32_t errcode, uint32_t field_no)
+opts_decode(void *opts, const struct opt_def *reg, const char *map,
+	    uint32_t errcode, uint32_t field_no)
 {
-	if (mp_typeof(*map) == MP_NIL)
-		return map;
-	if (mp_typeof(*map) != MP_MAP)
-		tnt_raise(ClientError, errcode, field_no,
-			  "expected a map with options");
+	assert(mp_typeof(*map) == MP_MAP);
 
 	/*
 	 * The implementation below has O(map_size * reg_size) complexity.
@@ -259,12 +255,11 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
  * @return  the end of the map in the msgpack stream
  */
 static const char *
-index_opts_create(struct index_opts *opts, const char *map)
+index_opts_decode(struct index_opts *opts, const char *map)
 {
-	*opts = index_opts_default;
-	map = opts_create_from_field(opts, index_opts_reg, map,
-				     ER_WRONG_INDEX_OPTIONS,
-				     BOX_INDEX_FIELD_OPTS);
+	index_opts_create(opts);
+	map = opts_decode(opts, index_opts_reg, map,
+			  ER_WRONG_INDEX_OPTIONS, BOX_INDEX_FIELD_OPTS);
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
@@ -311,10 +306,14 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
 	}
-	index_opts_create(&opts, tuple_field(tuple, BOX_INDEX_FIELD_OPTS));
+	index_opts_decode(&opts, tuple_field_with_type_xc(tuple,
+							  BOX_INDEX_FIELD_OPTS,
+							  MP_MAP));
 	struct index_opts *opts_p = &opts;
 	auto opts_guard = make_scoped_guard([=] { index_opts_destroy(opts_p); });
-	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
+	const char *parts =
+		tuple_field_with_type_xc(tuple, BOX_INDEX_FIELD_PARTS,
+					 MP_ARRAY);
 	uint32_t part_count = mp_decode_array(&parts);
 	struct key_def *key_def = key_def_new(part_count);
 	if (key_def == NULL)
@@ -339,18 +338,11 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
  * tuple).
  */
 static void
-space_opts_create(struct space_opts *opts, struct tuple *tuple)
+space_opts_decode(struct space_opts *opts, const char *map)
 {
-	/* default values of opts */
-	*opts = space_opts_default;
-
-	/* there is no property in the space */
-	if (tuple_field_count(tuple) <= BOX_SPACE_FIELD_OPTS)
-		return;
-
-	const char *data = tuple_field(tuple, BOX_SPACE_FIELD_OPTS);
-	opts_create_from_field(opts, space_opts_reg, data,
-			       ER_WRONG_SPACE_OPTIONS, BOX_SPACE_FIELD_OPTS);
+	space_opts_create(opts);
+	opts_decode(opts, space_opts_reg, map, ER_WRONG_SPACE_OPTIONS,
+		    BOX_SPACE_FIELD_OPTS);
 }
 
 /**
@@ -399,7 +391,11 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	memcpy(def->engine_name, engine_name, name_len);
 	def->engine_name[name_len] = 0;
 	identifier_check_xc(def->engine_name);
-	space_opts_create(&def->opts, tuple);
+	space_opts_decode(&def->opts,
+			tuple_field_with_type_xc(tuple, BOX_SPACE_FIELD_OPTS,
+						 MP_MAP));
+	/* Check that format is defined */
+	tuple_field_with_type_xc(tuple, BOX_SPACE_FIELD_FORMAT, MP_ARRAY);
 	Engine *engine = engine_find(def->engine_name);
 	engine->checkSpaceDef(def);
 	access_check_ddl(def->uid, SC_SPACE);

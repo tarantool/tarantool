@@ -30,7 +30,7 @@ _space:replace{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't change properties of a space
 --
-_space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
+_space:replace{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't drop a system space
 --
@@ -44,7 +44,7 @@ _space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
+t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 -- Check that a space exists
 space = box.space[t[1]]
 space.id
@@ -69,7 +69,7 @@ _index:replace{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'},
 _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
-_space:insert{1000, ADMIN, 'hello', 'memtx', 0}
+_space:insert{1000, ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 _index:insert{1000, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}}
 box.space[1000]:insert{0, 'hello, world'}
 box.space[1000]:drop()
@@ -286,6 +286,13 @@ o
 n
 
 ts:drop()
+
+--
+-- Test missing fields
+--
+box.space._space:auto_increment{1, 'test', 'memtx'}
+box.space._space:auto_increment{1, 'test', 'memtx', 0}
+box.space._space:auto_increment{1, 'test', 'memtx', 0, EMPTY_MAP}
 
 --
 -- Try insert incorrect sql in index and space opts.

@@ -849,6 +849,17 @@ struct TupleRefNil {
 	void operator=(const TupleRefNil&) = delete;
 };
 
+/* @copydoc tuple_field_with_type() */
+static inline const char *
+tuple_field_with_type_xc(const struct tuple *tuple, uint32_t fieldno,
+		         enum mp_type type)
+{
+	const char *out = tuple_field_with_type(tuple, fieldno, type);
+	if (out == NULL)
+		diag_raise();
+	return out;
+}
+
 /* @copydoc tuple_field_u64() */
 static inline uint64_t
 tuple_field_u64_xc(const struct tuple *tuple, uint32_t fieldno)
