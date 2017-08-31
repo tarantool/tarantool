@@ -178,6 +178,11 @@ struct vy_read_iterator {
 	struct tuple *curr_stmt;
 	/* is lazy search started */
 	bool search_started;
+	/**
+	 * Set if the resulting statement needs to be
+	 * checked to match the search key.
+	 */
+	bool need_check_eq;
 };
 
 /**

@@ -678,8 +678,23 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 	itr->key = key;
 	itr->read_view = rv;
 	itr->search_started = false;
+	itr->need_check_eq = false;
 	itr->curr_stmt = NULL;
 	itr->curr_range = NULL;
+
+	if (iterator_type == ITER_ALL)
+		itr->iterator_type = ITER_GE;
+
+	if (iterator_type == ITER_REQ) {
+		if (index->opts.is_unique &&
+		    tuple_field_count(key) == index->cmp_def->part_count) {
+			/* Use point-lookup iterator (optimization). */
+			itr->iterator_type = ITER_EQ;
+		} else {
+			itr->need_check_eq = true;
+			itr->iterator_type = ITER_LE;
+		}
+	}
 }
 
 /**
@@ -955,6 +970,12 @@ restart:
 		}
 		vy_cache_add(&itr->index->cache, *result, cache_prev,
 			     itr->key, itr->iterator_type);
+	}
+
+	if (itr->need_check_eq && *result != NULL &&
+	    vy_tuple_compare_with_key(*result, itr->key,
+				      index->cmp_def) != 0) {
+		*result = NULL;
 	}
 
 	if (itr->tx != NULL && *result != NULL)
