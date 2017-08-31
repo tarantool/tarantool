@@ -725,21 +725,42 @@ MemtxSpace::prepareTruncateSpace(struct space *old_space,
 	replace = handler->replace;
 }
 
+static void
+memtx_prune_space(struct space *space)
+{
+	MemtxIndex *index = (MemtxIndex *) space_index(space, 0);
+	if (index == NULL)
+		return;
+
+	struct iterator *it = index->position();
+	index->initIterator(it, ITER_ALL, NULL, 0);
+	struct tuple *tuple;
+	while ((tuple = it->next(it)) != NULL)
+		tuple_unref(tuple);
+}
+
 void
 MemtxSpace::commitTruncateSpace(struct space *old_space,
 				struct space *new_space)
 {
 	(void)new_space;
-	MemtxIndex *index = (MemtxIndex *) space_index(old_space, 0);
-	if (index != NULL)
-		index->truncate();
+	memtx_prune_space(old_space);
 }
+
 void
 MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
 	(void)new_space;
 	MemtxSpace *handler = (MemtxSpace *) old_space->handler;
 	replace = handler->replace;
+}
+
+void
+MemtxSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
+{
+	/* Delete all tuples when the last index is dropped. */
+	if (new_space->index_count == 0)
+		memtx_prune_space(old_space);
 }
 
 /* }}} DDL */

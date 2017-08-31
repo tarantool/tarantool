@@ -88,6 +88,8 @@ struct MemtxSpace: public Handler {
 					 struct space *new_space) override;
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;
+	virtual void commitAlterSpace(struct space *old_space,
+				      struct space *new_space) override;
 	virtual void initSystemSpace(struct space *space) override;
 public:
 	/**
