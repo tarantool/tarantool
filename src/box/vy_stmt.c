@@ -325,7 +325,7 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 
 	/* Copy statement data excluding UPSERT operations */
 	struct tuple_format *format = tuple_format_by_id(upsert->format_id);
-	(void)format;
+#ifndef NDEBUG
 	/*
 	 * UPSERT must have the n_upserts field in the extra
 	 * memory.
@@ -337,8 +337,13 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 	 */
 	assert(format->field_map_size == replace_format->field_map_size);
 	assert(format->field_count == replace_format->field_count);
-	assert(! memcmp(format->fields, replace_format->fields,
-			sizeof(struct tuple_field_format) * format->field_count));
+	for (uint32_t i = 0; i < format->field_count; ++i) {
+		assert(format->fields[i].type ==
+		       replace_format->fields[i].type);
+		assert(format->fields[i].offset_slot ==
+		       replace_format->fields[i].offset_slot);
+	}
+#endif
 	struct tuple *replace = vy_stmt_alloc(replace_format, bsize);
 	if (replace == NULL)
 		return NULL;
@@ -397,7 +402,7 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 	char *raw = (char *) tuple_data(stmt);
 	char *wpos = mp_encode_array(raw, field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
-		struct tuple_field_format *field = &format->fields[i];
+		struct field_def *field = &format->fields[i];
 		if (field->type == FIELD_TYPE_ANY) {
 			wpos = mp_encode_nil(wpos);
 			continue;
@@ -450,7 +455,7 @@ vy_stmt_new_surrogate(struct tuple_format *format, const struct tuple *src,
 	(void) src_count;
 	char *pos = mp_encode_array(data, format->field_count);
 	for (uint32_t i = 0; i < format->field_count; ++i) {
-		struct tuple_field_format *field = &format->fields[i];
+		struct field_def *field = &format->fields[i];
 		if (field->type == FIELD_TYPE_ANY) {
 			/* Unindexed field - write NIL */
 			pos = mp_encode_nil(pos);

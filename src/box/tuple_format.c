@@ -63,7 +63,7 @@ tuple_format_create(struct tuple_format *format, struct key_def **keys,
 
 		for (; part < parts_end; part++) {
 			assert(part->fieldno < format->field_count);
-			struct tuple_field_format *field =
+			struct field_def *field =
 				&format->fields[part->fieldno];
 
 			if (field->type == FIELD_TYPE_ANY) {
@@ -168,7 +168,7 @@ tuple_format_alloc(struct key_def **keys, uint16_t key_count)
 	uint32_t field_count = key_count > 0 ? max_fieldno + 1 : 0;
 
 	uint32_t total = sizeof(struct tuple_format) +
-			 field_count * sizeof(struct tuple_field_format);
+			 field_count * sizeof(struct field_def);
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 	if (format == NULL) {
@@ -215,7 +215,7 @@ struct tuple_format *
 tuple_format_dup(const struct tuple_format *src)
 {
 	uint32_t total = sizeof(struct tuple_format) +
-			 src->field_count * sizeof(struct tuple_field_format);
+			 src->field_count * sizeof(struct field_def);
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 	if (format == NULL) {
