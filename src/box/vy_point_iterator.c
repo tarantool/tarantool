@@ -404,6 +404,19 @@ vy_point_iterator_get(struct vy_point_iterator *itr, struct tuple **result)
 	itr->index->stat.lookup++;
 	/* History list */
 	struct rlist history;
+	/*
+	 * Notify the TX manager that we are about to read the key
+	 * so that if a new statement with the same key arrives
+	 * while we are reading a run file, we will be sent to a
+	 * read view and hence will not try to add a stale value
+	 * to the cache.
+	 */
+	if (itr->tx != NULL) {
+		rc = vy_tx_track_point(itr->tx, itr->index,
+				       (struct tuple *) itr->key);
+		if (rc != 0)
+			goto done;
+	}
 restart:
 	rlist_create(&history);
 
@@ -419,17 +432,6 @@ restart:
 	if (rc != 0 || vy_point_iterator_history_is_terminal(&history))
 		goto done;
 
-	/*
-	 * From this moment we have to notify TX manager that we
-	 * are about to read the key and if a new statement with the same
-	 * key arrives we will be sent to read view.
-	 */
-	if (itr->tx != NULL) {
-		rc = vy_tx_track(itr->tx, itr->index,
-				 (struct tuple *) itr->key, false);
-		if (rc != 0)
-			goto done;
-	}
 	/* Save version before yield */
 	uint32_t mem_list_version = itr->index->mem_list_version;
 
@@ -457,13 +459,8 @@ restart:
 	}
 
 done:
-	if (rc == 0) {
+	if (rc == 0)
 		rc = vy_point_iterator_apply_history(itr, &history);
-		if (itr->tx != NULL)
-			rc = vy_tx_track(itr->tx, itr->index,
-					 (struct tuple *) itr->key,
-					 itr->curr_stmt == NULL);
-	}
 	*result = itr->curr_stmt;
 	vy_point_iterator_cleanup(&history, region_svp);
 	return rc;

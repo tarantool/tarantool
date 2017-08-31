@@ -43,6 +43,7 @@
 #include "vy_cache.h"
 #include "vy_range.h"
 #include "vy_stat.h"
+#include "vy_read_set.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -70,6 +71,8 @@ struct vy_index_env {
 	int64_t *p_generation;
 	/** Tuple format for keys (SELECT). */
 	struct tuple_format *key_format;
+	/** Key (SELECT) with no parts. */
+	struct tuple *empty_key;
 	/**
 	 * Callback invoked when the number of upserts for
 	 * the same key exceeds VY_UPSERT_THRESHOLD.
@@ -260,6 +263,13 @@ struct vy_index {
 	struct heap_node in_dump;
 	/** Link in vy_scheduler->compact_heap. */
 	struct heap_node in_compact;
+	/**
+	 * Interval tree containing reads from this index done by all
+	 * active transactions. Linked by vy_tx_interval->in_index.
+	 * Used to abort transactions that conflict with a write to
+	 * the index.
+	 */
+	vy_index_read_set_t read_set;
 };
 
 /** Return index name. Used for logging. */

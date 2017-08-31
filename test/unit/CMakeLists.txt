@@ -157,6 +157,7 @@ add_executable(vy_point_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_range.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_tx.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_read_set.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_index.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c

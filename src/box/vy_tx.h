@@ -42,8 +42,10 @@
 #include "iterator_type.h"
 #include "salad/stailq.h"
 #include "trivia/util.h"
+#include "vy_index.h"
 #include "vy_stat.h"
 #include "vy_stmt_iterator.h"
+#include "vy_read_set.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -51,7 +53,6 @@ extern "C" {
 
 struct tuple;
 struct tx_manager;
-struct vy_index;
 struct vy_mem;
 struct vy_tx;
 
@@ -70,8 +71,7 @@ enum tx_state {
 };
 
 /**
- * A single operation made by a transaction:
- * a single read or write in a vy_index.
+ * A single write operation performed by a transaction.
  */
 struct txv {
 	/** Transaction. */
@@ -86,15 +86,8 @@ struct txv {
 	const struct tuple *region_stmt;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
-	/** Member of either read or write set. */
+	/** Member the transaction write set. */
 	rb_node(struct txv) in_set;
-	/** True for read tx, false for write tx. */
-	bool is_read;
-	/**
-	 * True if this is a read statement and there was no
-	 * value found for the same key.
-	 */
-	bool is_gap;
 	/**
 	 * True if the txv was overwritten by another txv of
 	 * the same transaction.
@@ -103,33 +96,6 @@ struct txv {
 	/** txv that was overwritten by the current txv. */
 	struct txv *overwritten;
 };
-
-/**
- * Conflict manager index.
- * Ordered by index, then by key, and finally by tx.
- */
-struct read_set_key {
-	struct vy_index *index;
-	const struct tuple *stmt;
-	struct vy_tx *tx;
-};
-
-int
-read_set_cmp(struct txv *a, struct txv *b);
-int
-read_set_key_cmp(struct read_set_key *a, struct txv *b);
-
-typedef rb_tree(struct txv) read_set_t;
-rb_gen_ext_key(MAYBE_UNUSED static inline, read_set_, read_set_t, struct txv,
-	       in_set, read_set_cmp, struct read_set_key *, read_set_key_cmp);
-
-static inline struct txv *
-read_set_search_key(read_set_t *rbtree, struct vy_index *index,
-		    const struct tuple *stmt, struct vy_tx *tx)
-{
-	struct read_set_key key = { .index = index, .stmt = stmt, .tx = tx };
-	return read_set_search(rbtree, &key);
-}
 
 /**
  * Index of all modifications made by a transaction.
@@ -197,6 +163,12 @@ struct vy_tx {
 	 */
 	struct vy_read_view *read_view;
 	/**
+	 * Tree of all intervals read by this transaction. Linked
+	 * by vy_tx_interval->in_tx. Used to merge intersecting
+	 * intervals.
+	 */
+	vy_tx_read_set_t read_set;
+	/**
 	 * Prepare sequence number or -1 if the transaction
 	 * is not prepared.
 	 */
@@ -224,14 +196,6 @@ struct tx_manager {
 	 * or NULL if there are no prepared transactions.
 	 */
 	struct vy_tx *last_prepared_tx;
-	/**
-	 * Conflict manager index. Contains all changes
-	 * made by transaction before they commit. Is used
-	 * to implement read committed isolation level, i.e.
-	 * the changes made by a transaction are only present
-	 * in this tree, and thus not seen by other transactions.
-	 */
-	read_set_t read_set;
 	/**
 	 * The list of TXs with a read view in order of vlsn.
 	 */
@@ -268,6 +232,8 @@ struct tx_manager {
 	struct mempool tx_mempool;
 	/** Memory pool for struct txv allocations. */
 	struct mempool txv_mempool;
+	/** Memory pool for struct vy_read_interval allocations. */
+	struct mempool read_interval_mempool;
 	/** Memory pool for struct vy_read_view allocations. */
 	struct mempool read_view_mempool;
 };
@@ -340,7 +306,12 @@ vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp);
 /** Remember a read in the conflict manager index. */
 int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
-	    struct tuple *key, bool is_gap);
+	    struct tuple *left, bool left_belongs,
+	    struct tuple *right, bool right_belongs);
+
+int
+vy_tx_track_point(struct vy_tx *tx, struct vy_index *index,
+		  struct tuple *stmt);
 
 /** Add a statement to a transaction. */
 int

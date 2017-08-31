@@ -2034,6 +2034,8 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "tx_allocated", mstats.objcount);
 	mempool_stats(&env->xm->txv_mempool, &mstats);
 	info_append_int(h, "txv_allocated", mstats.objcount);
+	mempool_stats(&env->xm->read_interval_mempool, &mstats);
+	info_append_int(h, "read_interval", mstats.objcount);
 	mempool_stats(&env->xm->read_view_mempool, &mstats);
 	info_append_int(h, "read_view", mstats.objcount);
 

@@ -165,7 +165,7 @@ struct vy_read_iterator {
 
 	/* search options */
 	enum iterator_type iterator_type;
-	const struct tuple *key;
+	struct tuple *key;
 	const struct vy_read_view **read_view;
 
 	/* iterator over ranges */
@@ -199,7 +199,7 @@ struct vy_read_iterator {
 void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type, const struct tuple *key,
+		      enum iterator_type iterator_type, struct tuple *key,
 		      const struct vy_read_view **rv);
 
 /**
