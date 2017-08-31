@@ -397,7 +397,7 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 	char *raw = (char *) tuple_data(stmt);
 	char *wpos = mp_encode_array(raw, field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
-		struct tuple_field_format *field = &format->fields[i];
+		struct field_def *field = &format->fields[i];
 		if (field->type == FIELD_TYPE_ANY) {
 			wpos = mp_encode_nil(wpos);
 			continue;
@@ -450,7 +450,7 @@ vy_stmt_new_surrogate(struct tuple_format *format, const struct tuple *src,
 	(void) src_count;
 	char *pos = mp_encode_array(data, format->field_count);
 	for (uint32_t i = 0; i < format->field_count; ++i) {
-		struct tuple_field_format *field = &format->fields[i];
+		struct field_def *field = &format->fields[i];
 		if (field->type == FIELD_TYPE_ANY) {
 			/* Unindexed field - write NIL */
 			pos = mp_encode_nil(pos);

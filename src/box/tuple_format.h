@@ -31,7 +31,8 @@
  * SUCH DAMAGE.
  */
 
-#include "key_def.h" /* for enum field_type */
+#include "key_def.h"
+#include "field_def.h"
 #include "errinj.h"
 
 #if defined(__cplusplus)
@@ -59,38 +60,6 @@ enum { TUPLE_INDEX_BASE = 1 };
  * an offset for a field_id.
  */
 enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
-
-/**
- * @brief Tuple field format
- * Support structure for struct tuple_format.
- * Contains information of one field.
- */
-struct tuple_field_format {
-	/**
-	 * Field type of an indexed field.
-	 * If a field participates in at least one of space indexes
-	 * then its type is stored in this member.
-	 * If a field does not participate in an index
-	 * then UNKNOWN is stored for it.
-	 */
-	enum field_type type;
-	/**
-	 * Offset slot in field map in tuple.
-	 * Normally tuple stores field map - offsets of all fields
-	 * participating in indexes. This allows quick access to most
-	 * used fields without parsing entire mspack.
-	 * This member stores position in the field map of tuple
-	 * for current field.
-	 * If the field does not participate in indexes then it has
-	 * no offset in field map and INT_MAX is stored in this member.
-	 * Due to specific field map in tuple (it is stored before tuple),
-	 * the positions in field map is negative.
-	 * Thus if this member is negative, smth like
-	 * tuple->data[((uint32_t *)tuple)[format->offset_slot[fieldno]]]
-	 * gives the start of the field
-	 */
-	int32_t offset_slot;
-};
 
 struct tuple;
 struct tuple_format;
@@ -132,7 +101,7 @@ struct tuple_format {
 	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/* Formats of the fields */
-	struct tuple_field_format fields[];
+	struct field_def fields[0];
 };
 
 extern struct tuple_format **tuple_formats;

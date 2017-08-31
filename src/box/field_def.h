@@ -31,6 +31,8 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -60,6 +62,34 @@ extern const char *field_type_strs[];
 
 enum field_type
 field_type_by_name(const char *name);
+
+/**
+ * @brief Field definition
+ * Contains information about of one tuple field.
+ */
+struct field_def {
+	/**
+	 * Field type of an indexed field.
+	 * If a field participates in at least one of space indexes
+	 * then its type is stored in this member.
+	 * If a field does not participate in an index
+	 * then UNKNOWN is stored for it.
+	 */
+	enum field_type type;
+	/**
+	 * Offset slot in field map in tuple. Normally tuple
+	 * stores field map - offsets of all fields participating
+	 * in indexes. This allows quick access to most used
+	 * fields without parsing entire mspack. This member
+	 * stores position in the field map of tuple for current
+	 * field. If the field does not participate in indexes
+	 * then it has no offset in field map and INT_MAX is
+	 * stored in this member. Due to specific field map in
+	 * tuple (it is stored before tuple), the positions in
+	 * field map is negative.
+	 */
+	int32_t offset_slot;
+};
 
 #if defined(__cplusplus)
 } /* extern "C" */
