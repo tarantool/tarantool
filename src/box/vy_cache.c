@@ -886,12 +886,6 @@ vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	if (tuple_field_count(key) == 0) {
-		/* NULL key. change itr->iterator_type for simplification */
-		itr->iterator_type = iterator_type == ITER_LT ||
-				     iterator_type == ITER_LE ?
-				     ITER_LE : ITER_GE;
-	}
 
 	itr->curr_stmt = NULL;
 	itr->curr_pos = vy_cache_tree_invalid_iterator();

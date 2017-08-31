@@ -682,6 +682,19 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 	itr->curr_stmt = NULL;
 	itr->curr_range = NULL;
 
+	if (tuple_field_count(key) == 0) {
+		/*
+		 * Strictly speaking, a GT/LT iterator should return
+		 * nothing if the key is empty, because every key is
+		 * equal to the empty key, but historically we return
+		 * all keys instead. So use GE/LE instead of GT/LT
+		 * in this case.
+		 */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
+	}
+
 	if (iterator_type == ITER_ALL)
 		itr->iterator_type = ITER_GE;
 

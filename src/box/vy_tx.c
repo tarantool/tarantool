@@ -790,13 +790,6 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key)
 {
-	if (tuple_field_count(key) == 0) {
-		/* Change iterator_type for simplicity. */
-		iterator_type = (iterator_type == ITER_LT ||
-				 iterator_type == ITER_LE ?
-				 ITER_LE : ITER_GE);
-	}
-
 	itr->base.iface = &vy_txw_iterator_iface;
 	itr->stat = stat;
 	itr->tx = tx;

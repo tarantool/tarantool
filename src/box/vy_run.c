@@ -1526,12 +1526,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	if (tuple_field_count(key) == 0) {
-		/* NULL key. change itr->iterator_type for simplification */
-		itr->iterator_type = iterator_type == ITER_LT ||
-				     iterator_type == ITER_LE ?
-				     ITER_LE : ITER_GE;
-	}
 
 	itr->curr_stmt = NULL;
 	itr->curr_pos.page_no = slice->run->info.page_count;
