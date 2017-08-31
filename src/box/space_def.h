@@ -53,6 +53,16 @@ struct space_opts {
 extern const struct space_opts space_opts_default;
 extern const struct opt_def space_opts_reg[];
 
+/**
+ * Create space options using default values.
+ */
+static inline void
+space_opts_create(struct space_opts *opts)
+{
+	/* default values of opts */
+	*opts = space_opts_default;
+}
+
 /** Space metadata. */
 struct space_def {
 	/** Space id. */
@@ -89,6 +99,7 @@ space_def_sizeof(uint32_t name_len)
 static inline void
 space_def_delete(struct space_def *def)
 {
+	TRASH(def);
 	free(def);
 }
 

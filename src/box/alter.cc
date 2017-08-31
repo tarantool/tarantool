@@ -261,19 +261,13 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 
 /**
  * Populate key options from their msgpack-encoded representation
- * (msgpack map)
- *
- * @return   the end of the msgpack map in the stream
+ * (msgpack map).
  */
-static const char *
-opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
-		       uint32_t errcode, uint32_t field_no)
+static void
+opts_decode(void *opts, const struct opt_def *reg, const char *map,
+	    uint32_t errcode, uint32_t field_no)
 {
-	if (mp_typeof(*map) == MP_NIL)
-		return map;
-	if (mp_typeof(*map) != MP_MAP)
-		tnt_raise(ClientError, errcode, field_no,
-			  "expected a map with options");
+	assert(mp_typeof(*map) == MP_MAP);
 
 	/*
 	 * The implementation below has O(map_size * reg_size) complexity.
@@ -290,22 +284,18 @@ opts_create_from_field(void *opts, const struct opt_def *reg, const char *map,
 		opts_parse_key(opts, reg, key, key_len, &map, errcode,
 			       field_no);
 	}
-	return map;
 }
 
 /**
  * Fill index_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
- *
- * @return  the end of the map in the msgpack stream
  */
-static const char *
-index_opts_create(struct index_opts *opts, const char *map)
+static void
+index_opts_decode(struct index_opts *opts, const char *map)
 {
-	*opts = index_opts_default;
-	map = opts_create_from_field(opts, index_opts_reg, map,
-				     ER_WRONG_INDEX_OPTIONS,
-				     BOX_INDEX_FIELD_OPTS);
+	index_opts_create(opts);
+	opts_decode(opts, index_opts_reg, map, ER_WRONG_INDEX_OPTIONS,
+		    BOX_INDEX_FIELD_OPTS);
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
@@ -318,7 +308,6 @@ index_opts_create(struct index_opts *opts, const char *map)
 	if (opts->run_size_ratio <= 1)
 		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "run_size_ratio must be > 1");
-	return map;
 }
 
 /**
@@ -340,6 +329,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	index_def_check_tuple(tuple, &is_166plus);
 
 	struct index_opts opts;
+	index_opts_create(&opts);
 	uint32_t id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_SPACE_ID);
 	uint32_t index_id = tuple_field_u32_xc(tuple, BOX_INDEX_FIELD_ID);
 	enum index_type type =
@@ -353,14 +343,14 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	if (is_166plus) {
 		/* 1.6.6+ _index space structure */
 		const char *opts_field =
-			tuple_field(tuple, BOX_INDEX_FIELD_OPTS);
-		index_opts_create(&opts, opts_field);
+			tuple_field_with_type_xc(tuple, BOX_INDEX_FIELD_OPTS,
+						 MP_MAP);
+		index_opts_decode(&opts, opts_field);
 		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
 		part_count = mp_decode_array(&parts);
 	} else {
 		/* 1.6.5- _index space structure */
 		/* TODO: remove it in newer versions, find all 1.6.5- */
-		opts = index_opts_default;
 		opts.is_unique =
 			tuple_field_u32_xc(tuple,
 					   BOX_INDEX_FIELD_IS_UNIQUE_165);
@@ -368,10 +358,11 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 						BOX_INDEX_FIELD_PART_COUNT_165);
 		parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS_165);
 	}
-	if (name_len > BOX_NAME_MAX)
+	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(old_space), "index name is too long");
+	}
 	struct key_def *key_def = key_def_new(part_count);
 	if (key_def == NULL)
 		diag_raise();
@@ -402,21 +393,23 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
  * tuple).
  */
 static void
-space_opts_create(struct space_opts *opts, struct tuple *tuple)
+space_opts_decode(struct space_opts *opts, const char *data)
 {
-	/* default values of opts */
-	*opts = space_opts_default;
-
-	/* there is no property in the space */
-	if (tuple_field_count(tuple) <= BOX_SPACE_FIELD_OPTS)
+	space_opts_create(opts);
+	if (data == NULL)
 		return;
 
-	const char *data = tuple_field(tuple, BOX_SPACE_FIELD_OPTS);
 	bool is_170_plus = (mp_typeof(*data) == MP_MAP);
 	if (!is_170_plus) {
 		/* Tarantool < 1.7.0 compatibility */
-		const char *flags =
-			tuple_field_cstr_xc(tuple, BOX_SPACE_FIELD_OPTS);
+		if (mp_typeof(*data) != MP_STR) {
+			tnt_raise(ClientError, ER_FIELD_TYPE,
+				  BOX_SPACE_FIELD_OPTS + TUPLE_INDEX_BASE,
+				  mp_type_strs[MP_STR]);
+		}
+		uint32_t len;
+		const char *flags = mp_decode_str(&data, &len);
+		flags = tt_cstr(flags, len);
 		while (flags && *flags) {
 			while (isspace(*flags)) /* skip space */
 				flags++;
@@ -427,9 +420,8 @@ space_opts_create(struct space_opts *opts, struct tuple *tuple)
 				flags++;
 		}
 	} else {
-		opts_create_from_field(opts, space_opts_reg, data,
-				       ER_WRONG_SPACE_OPTIONS,
-				       BOX_SPACE_FIELD_OPTS);
+		opts_decode(opts, space_opts_reg, data, ER_WRONG_SPACE_OPTIONS,
+			    BOX_SPACE_FIELD_OPTS);
 	}
 }
 
@@ -478,7 +470,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	memcpy(def->engine_name, engine_name, name_len);
 	def->engine_name[name_len] = 0;
 	identifier_check_xc(def->engine_name);
-	space_opts_create(&def->opts, tuple);
+	space_opts_decode(&def->opts, tuple_field(tuple, BOX_SPACE_FIELD_OPTS));
 	Engine *engine = engine_find(def->engine_name);
 	engine->checkSpaceDef(def);
 	access_check_ddl(def->uid, SC_SPACE);

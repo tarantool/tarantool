@@ -100,6 +100,15 @@ struct index_opts {
 extern const struct index_opts index_opts_default;
 extern const struct opt_def index_opts_reg[];
 
+/**
+ * Create index options using default values
+ */
+static inline void
+index_opts_create(struct index_opts *opts)
+{
+	*opts = index_opts_default;
+}
+
 static inline int
 index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 {
