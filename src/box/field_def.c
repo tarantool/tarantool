@@ -40,12 +40,19 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_NUMBER]   = */ "number",
 	/* [FIELD_TYPE_INTEGER]  = */ "integer",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
+	/* [FIELD_TYPE_STR17]    = */ "str",
+	/* [FIELD_TYPE_NUM17]    = */ "num",
 };
 
 enum field_type
 field_type_by_name(const char *name)
 {
 	enum field_type field_type = STR2ENUM(field_type, name);
+	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
+	if (field_type == FIELD_TYPE_STR17)
+		return FIELD_TYPE_STRING;
+	if (field_type == FIELD_TYPE_NUM17)
+		return FIELD_TYPE_UNSIGNED;
 	/*
 	 * FIELD_TYPE_ANY can't be used as type of indexed field,
 	 * because it is internal type used only for filling
@@ -53,10 +60,5 @@ field_type_by_name(const char *name)
 	 */
 	if (field_type != field_type_MAX && field_type != FIELD_TYPE_ANY)
 		return field_type;
-	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
-	if (strcasecmp(name, "num") == 0)
-		return FIELD_TYPE_UNSIGNED;
-	else if (strcasecmp(name, "str") == 0)
-		return FIELD_TYPE_STRING;
 	return field_type_MAX;
 }

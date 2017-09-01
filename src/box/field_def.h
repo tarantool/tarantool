@@ -52,6 +52,9 @@ enum field_type {
 	FIELD_TYPE_NUMBER,
 	FIELD_TYPE_INTEGER,
 	FIELD_TYPE_SCALAR,
+	/** For compatibility with 1.7 */
+	FIELD_TYPE_STR17,
+	FIELD_TYPE_NUM17,
 	field_type_MAX
 };
 
