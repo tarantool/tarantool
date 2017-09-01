@@ -296,7 +296,7 @@ index_opts_decode(struct index_opts *opts, const char *map,
  * - types of parts in the parts array are known to the system
  * - fieldno of each part in the parts array is within limits
  */
-extern "C" struct index_def *
+struct index_def *
 index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 {
 	index_def_check_tuple(tuple);
@@ -504,7 +504,7 @@ space_format_decode(const char *data, uint32_t *out_count,
 /**
  * Fill space_def structure from struct tuple.
  */
-extern "C" struct space_def *
+struct space_def *
 space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 			 struct field_def **fields, uint32_t *field_count)
 {

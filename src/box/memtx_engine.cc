@@ -244,7 +244,7 @@ MemtxEngine::beginFinalRecovery()
 
 	assert(m_state == MEMTX_INITIAL_RECOVERY);
 	/* End of the fast path: loaded the primary key. */
-	space_foreach(memtx_end_build_primary_key, this);
+	space_foreach_xc(memtx_end_build_primary_key, this);
 
 	if (!m_force_recovery) {
 		/*
@@ -262,7 +262,7 @@ MemtxEngine::beginFinalRecovery()
 		 * unique keys.
 		 */
 		m_state = MEMTX_OK;
-		space_foreach(memtx_build_secondary_keys, this);
+		space_foreach_xc(memtx_build_secondary_keys, this);
 	}
 }
 
@@ -278,7 +278,7 @@ MemtxEngine::endRecovery()
 	if (m_state != MEMTX_OK) {
 		assert(m_state == MEMTX_FINAL_RECOVERY);
 		m_state = MEMTX_OK;
-		space_foreach(memtx_build_secondary_keys, this);
+		space_foreach_xc(memtx_build_secondary_keys, this);
 	}
 }
 
@@ -598,7 +598,7 @@ MemtxEngine::beginCheckpoint()
 	m_checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
 
 	checkpoint_init(m_checkpoint, m_snap_dir.dirname, m_snap_io_rate_limit);
-	space_foreach(checkpoint_add_space, m_checkpoint);
+	space_foreach_xc(checkpoint_add_space, m_checkpoint);
 
 	/* increment snapshot version; set tuple deletion to delayed mode */
 	memtx_tuple_begin_snapshot();

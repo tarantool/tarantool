@@ -45,10 +45,16 @@ extern uint32_t schema_version;
 extern struct latch schema_lock;
 
 #if defined(__cplusplus)
+extern "C"
+#endif /* __cplusplus */
+int
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
+
+#if defined(__cplusplus)
 
 /** Call a visitor function on every space in the space cache. */
 void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
+space_foreach_xc(void (*func)(struct space *sp, void *udata), void *udata);
 
 /**
  * Try to look up a space by space number in the space cache.

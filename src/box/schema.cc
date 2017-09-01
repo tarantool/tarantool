@@ -93,7 +93,7 @@ box_schema_version()
  * Visit all spaces and apply 'func'.
  */
 void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
+space_foreach_xc(void (*func)(struct space *sp, void *udata), void *udata)
 {
 	mh_int_t i;
 	struct space *space;
@@ -132,6 +132,18 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 			continue;
 		func(space, udata);
 	}
+}
+
+int
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
+{
+	try {
+		space_foreach_xc(func, udata);
+	}
+	catch(Exception *) {
+		return -1;
+	}
+	return 0;
 }
 
 /** Delete a space from the space cache and Lua. */

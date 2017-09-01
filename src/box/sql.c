@@ -669,18 +669,26 @@ sql_schema_put(InitData *init,
 	sqlite3InitCallback(init, 3, argv, NULL);
 }
 
-/* TODO move to public header */
-struct space_def *
-space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
-			 struct field_def **fields, uint32_t *field_count);
-
 struct space;
 
 struct space *
 space_by_id(uint32_t id);
 
-struct index_def *
-index_def_new_from_tuple(struct tuple *tuple, struct space *old_space);
+static void
+space_foreach_put_cb(struct space *space, void *udata)
+{
+	if (space->def->opts.sql == NULL)
+		return; /* Not SQL space. */
+	sql_schema_put((InitData *) udata, space->def->name, space->def->id, 0,
+		       space->def->opts.sql);
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		struct index_def *def = space_index_def(space, i);
+		if (def->opts.sql != NULL) {
+			sql_schema_put((InitData *) udata, def->name,
+				       def->space_id, def->iid, def->opts.sql);
+		}
+	}
+}
 
 /* Load database schema from Tarantool. */
 void tarantoolSqlite3LoadSchema(InitData *init)
@@ -726,55 +734,10 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 	);
 
 	/* Read _space */
-	it = box_index_iterator(BOX_SPACE_ID, 0, ITER_GE,
-				nil_key, nil_key + sizeof(nil_key));
-
-	if (it == NULL) {
+	if (space_foreach(space_foreach_put_cb, init) != 0) {
 		init->rc = SQLITE_TARANTOOL_ERROR;
 		return;
 	}
-	struct field_def *fields;
-	uint32_t field_count;
-	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
-		struct space_def *def;
-
-		def = space_def_new_from_tuple(tuple, 0, &fields, &field_count);
-		if (def->opts.sql != NULL) {
-			sql_schema_put(init, def->name, def->id, 0,
-				       def->opts.sql);
-		}
-		space_def_delete(def);
-	}
-
-	box_iterator_free(it);
-
-	/* Read _index */
-	it = box_index_iterator(BOX_INDEX_ID, 0, ITER_GE,
-				nil_key, nil_key + sizeof(nil_key));
-
-	if (it == NULL) {
-		init->rc = SQLITE_TARANTOOL_ERROR;
-		return;
-	}
-
-	while (box_iterator_next(it, &tuple) == 0 && tuple != NULL) {
-		struct index_def *def;
-		uint32_t id = 0;
-		(void) tuple_field_u32(tuple, 0, &id);
-		struct space *space = space_by_id(id);
-		def = index_def_new_from_tuple(tuple, space);
-		if (def->opts.sql != NULL) {
-			sql_schema_put(
-				init, def->name,
-				def->space_id, def->iid,
-				def->opts.sql
-			);
-		}
-		index_def_delete(def);
-	}
-
-
-	box_iterator_free(it);
 
 	/* Read _trigger */
 	it = box_index_iterator(BOX_TRIGGER_ID, 0, ITER_GE,
