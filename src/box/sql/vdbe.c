@@ -920,6 +920,9 @@ case OP_HaltIfNull: {      /* in3 */
   pIn3 = &aMem[pOp->p3];
   if( (pIn3->flags & MEM_Null)==0 ) break;
   /* Fall through into OP_Halt */
+#if __GNUC__ >= 7
+  __attribute__ ((fallthrough));
+#endif
 }
 
 /* Opcode:  Halt P1 P2 * P4 P5
@@ -1663,6 +1666,9 @@ case OP_Function0: {
   pOp->p4.pCtx = pCtx;
   pOp->opcode = OP_Function;
   /* Fall through into OP_Function */
+#if __GNUC__ >= 7
+  __attribute__ ((fallthrough));
+#endif
 }
 case OP_Function: {
   int i;
@@ -4803,6 +4809,9 @@ case OP_Sort: {        /* jump */
 #endif
   p->aCounter[SQLITE_STMTSTATUS_SORT]++;
   /* Fall through into OP_Rewind */
+#if __GNUC__ >= 7
+  __attribute__ ((fallthrough));
+#endif
 }
 /* Opcode: Rewind P1 P2 * * *
 **
@@ -6167,6 +6176,9 @@ case OP_AggStep0: {
   pOp->p4.pCtx = pCtx;
   pOp->opcode = OP_AggStep;
   /* Fall through into OP_AggStep */
+#if __GNUC__ >= 7
+  __attribute__ ((fallthrough));
+#endif
 }
 case OP_AggStep: {
   int i;

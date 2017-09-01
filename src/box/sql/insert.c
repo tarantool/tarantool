@@ -1607,6 +1607,9 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 		default:{
 				onError = OE_Abort;
 				/* Fall thru into the next case */
+#if __GNUC__ >= 7
+                                __attribute__ ((fallthrough));
+#endif
 			}
 		case OE_Rollback:
 		case OE_Abort:

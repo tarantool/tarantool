@@ -3437,6 +3437,9 @@ int sqlite3ExprCodeTarget(Parse *pParse, Expr *pExpr, int target){
         return target;
       }
       /* Otherwise, fall thru into the TK_COLUMN case */
+#if __GNUC__ >= 7
+      __attribute__ ((fallthrough));
+#endif
     }
     case TK_COLUMN: {
       int iTab = pExpr->iTable;
