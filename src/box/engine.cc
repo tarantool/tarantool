@@ -270,6 +270,12 @@ Handler::bsize() const
 	return 0;
 }
 
+struct tuple_format *
+Handler::format()
+{
+	return NULL;
+}
+
 /* }}} DDL */
 
 /* {{{ Engine API */

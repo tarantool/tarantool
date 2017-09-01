@@ -274,6 +274,14 @@ public:
 	/** Binary size of a space. */
 	virtual size_t
 	bsize() const;
+	/**
+	 * Get format of a space.
+	 * @retval not NULL Space format.
+	 * @retval     NULL Space has no format (Sysview engine,
+	 *         for example).
+	 */
+	virtual struct tuple_format *
+	format();
 
 	Engine *engine;
 };

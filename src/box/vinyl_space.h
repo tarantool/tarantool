@@ -70,6 +70,8 @@ struct VinylSpace: public Handler {
 	 */
 	virtual void commitAlterSpace(struct space *old_space,
 				      struct space *new_space) override;
+	virtual struct tuple_format *
+	format() override;
 private:
 	struct tuple_format *m_format;
 };

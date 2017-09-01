@@ -786,4 +786,10 @@ MemtxSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 			((MemtxSpace *)old_space->handler)->m_bsize;
 }
 
+struct tuple_format *
+MemtxSpace::format()
+{
+	return m_format;
+}
+
 /* }}} DDL */
