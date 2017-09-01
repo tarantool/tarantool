@@ -1550,6 +1550,21 @@ c2("t:replace{2, 'new'}")
 c2:commit()
 c1("t:select()") -- {1, 'new'}, {2, 'new'}
 c1:commit()
+t:truncate()
+
+--
+-- gh-2716 uniqueness check for secondary indexes
+--
+_ = t:create_index('sk', {parts = {2, 'unsigned'}, unique = true})
+c1:begin()
+c2:begin()
+c1("t:insert{1, 2}")
+c2("t:insert{2, 2}")
+c1:commit()
+c2:commit() -- rollback
+t:select() -- {1, 2}
+t:truncate()
+t.index.sk:drop()
 
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup
