@@ -265,6 +265,12 @@ Handler::commitAlterSpace(struct space *, struct space *)
 {
 }
 
+struct tuple_format *
+Handler::format()
+{
+	return NULL;
+}
+
 /* }}} DDL */
 
 /* {{{ Engine API */

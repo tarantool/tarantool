@@ -266,4 +266,10 @@ VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 		diag_raise();
 }
 
+struct tuple_format *
+VinylSpace::format()
+{
+	return m_format;
+}
+
 /* }}} DDL */

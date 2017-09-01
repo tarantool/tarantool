@@ -742,4 +742,10 @@ MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 	replace = handler->replace;
 }
 
+struct tuple_format *
+MemtxSpace::format()
+{
+	return m_format;
+}
+
 /* }}} DDL */

@@ -89,6 +89,8 @@ struct MemtxSpace: public Handler {
 	virtual void prepareAlterSpace(struct space *old_space,
 				       struct space *new_space) override;
 	virtual void initSystemSpace(struct space *space) override;
+	virtual struct tuple_format *
+	format() override;
 public:
 	/**
 	 * A pointer to replace function, set to different values
