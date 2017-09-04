@@ -15,6 +15,7 @@
 */
 #include "btreeInt.h"
 #include "tarantoolInt.h"
+#include "box/session.h"
 
 /*
 ** The header string that appears at the beginning of every
@@ -135,13 +136,15 @@ static int hasSharedCacheTableLock(
   Schema *pSchema = (Schema *)pBtree->pBt->pSchema;
   Pgno iTab = 0;
   BtLock *pLock;
+  struct session *user_session = current_session();
 
   /* If this database is not shareable, or if the client is reading
   ** and has the read-uncommitted flag set, then no lock is required. 
   ** Return true immediately.
   */
   if( (pBtree->sharable==0)
-   || (eLockType==READ_LOCK && (pBtree->db->flags & SQLITE_ReadUncommitted))
+      || (eLockType==READ_LOCK &&
+      (user_session->sql_flags & SQLITE_ReadUncommitted))
   ){
     return 1;
   }
@@ -218,10 +221,11 @@ static int hasSharedCacheTableLock(
 */
 static int hasReadConflicts(Btree *pBtree, Pgno iRoot){
   BtCursor *p;
+  struct session *user_session = current_session();
   for(p=pBtree->pBt->pCursor; p; p=p->pNext){
     if( p->pgnoRoot==iRoot 
      && p->pBtree!=pBtree
-     && 0==(p->pBtree->db->flags & SQLITE_ReadUncommitted)
+     && 0==(user_session->sql_flags & SQLITE_ReadUncommitted)
     ){
       return 1;
     }
@@ -239,19 +243,21 @@ static int hasReadConflicts(Btree *pBtree, Pgno iRoot){
 static int querySharedCacheTableLock(Btree *p, Pgno iTab, u8 eLock){
   BtShared *pBt = p->pBt;
   BtLock *pIter;
+  struct session *user_session = current_session();
 
   assert( sqlite3BtreeHoldsMutex(p) );
   assert( eLock==READ_LOCK || eLock==WRITE_LOCK );
   assert( p->db!=0 );
-  assert( !(p->db->flags&SQLITE_ReadUncommitted)||eLock==WRITE_LOCK||iTab==1 );
-  
+  assert( !(user_session->sql_flags &
+          SQLITE_ReadUncommitted)||eLock==WRITE_LOCK||iTab==1 );
+
   /* If requesting a write-lock, then the Btree must have an open write
-  ** transaction on this file. And, obviously, for this to be so there 
+  ** transaction on this file. And, obviously, for this to be so there
   ** must be an open write transaction on the file itself.
   */
   assert( eLock==READ_LOCK || (p==pBt->pWriter && p->inTrans==TRANS_WRITE) );
   assert( eLock==READ_LOCK || pBt->inTransaction==TRANS_WRITE );
-  
+
   /* This routine is a no-op if the shared-cache is not enabled */
   if( !p->sharable ){
     return SQLITE_OK;
@@ -266,7 +272,7 @@ static int querySharedCacheTableLock(Btree *p, Pgno iTab, u8 eLock){
   }
 
   for(pIter=pBt->pLock; pIter; pIter=pIter->pNext){
-    /* The condition (pIter->eLock!=eLock) in the following if(...) 
+    /* The condition (pIter->eLock!=eLock) in the following if(...)
     ** statement is a simplification of:
     **
     **   (eLock==WRITE_LOCK || pIter->eLock==WRITE_LOCK)
@@ -312,6 +318,7 @@ static int setSharedCacheTableLock(Btree *p, Pgno iTable, u8 eLock){
   BtShared *pBt = p->pBt;
   BtLock *pLock = 0;
   BtLock *pIter;
+  struct session *user_session = current_session();
 
   assert( sqlite3BtreeHoldsMutex(p) );
   assert( eLock==READ_LOCK || eLock==WRITE_LOCK );
@@ -321,7 +328,7 @@ static int setSharedCacheTableLock(Btree *p, Pgno iTable, u8 eLock){
   ** obtain a read-lock using this function. The only read-lock obtained
   ** by a connection in read-uncommitted mode is on the sqlite_master 
   ** table, and that lock is obtained in BtreeBeginTrans().  */
-  assert( 0==(p->db->flags&SQLITE_ReadUncommitted) || eLock==WRITE_LOCK );
+  assert( 0==(user_session->sql_flags & SQLITE_ReadUncommitted) || eLock==WRITE_LOCK );
 
   /* This function should only be called on a sharable b-tree after it 
   ** has been determined that no other b-tree holds a conflicting lock.  */
@@ -1992,7 +1999,7 @@ int sqlite3BtreeOpen(
   assert( (flags & BTREE_UNORDERED)==0 || (flags & BTREE_SINGLE)!=0 );
 
   /* A BTREE_SINGLE database is always a temporary and/or ephemeral */
-  assert( (flags & BTREE_SINGLE)==0 || isTempDb );
+  assert( (flags & BTREE_SINGLE)==0 || isTempDb);
 
   if( isMemdb ){
     flags |= BTREE_MEMORY;

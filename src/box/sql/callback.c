@@ -15,6 +15,7 @@
 */
 
 #include "sqliteInt.h"
+#include "box/session.h"
 
 /*
 ** Invoke the 'collation needed' callback to request a collation sequence
@@ -358,6 +359,7 @@ FuncDef *sqlite3FindFunction(
   int bestScore = 0;  /* Score of best match */
   int h;              /* Hash value */
   int nName;          /* Length of the name */
+  struct session *user_session = current_session();
 
   assert( nArg>=(-2) );
   assert( nArg>=(-1) || createFlag==0 );
@@ -387,7 +389,8 @@ FuncDef *sqlite3FindFunction(
   ** new function.  But the FuncDefs for built-in functions are read-only.
   ** So we must not search for built-ins when creating a new function.
   */ 
-  if( !createFlag && (pBest==0 || (db->flags & SQLITE_PreferBuiltin)!=0) ){
+  if( !createFlag &&
+      (pBest==0 || (user_session->sql_flags & SQLITE_PreferBuiltin)!=0) ){
     bestScore = 0;
     h = (sqlite3UpperToLower[(u8)zName[0]] + nName) % SQLITE_FUNC_HASH_SZ;
     p = functionSearch(h, zName);

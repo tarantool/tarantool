@@ -53,10 +53,17 @@
 #include "tuple.h"
 #include "fiber.h"
 #include "small/region.h"
+#include "session.h"
 
 static sqlite3 *db;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
+
+static const uint32_t default_sql_flags = SQLITE_ShortColNames
+					  | SQLITE_EnableTrigger
+					  | SQLITE_AutoIndex
+					  | SQLITE_RecTriggers
+					  | SQLITE_ForeignKeys;
 
 void
 sql_init()
@@ -64,12 +71,16 @@ sql_init()
 	int rc;
 	char *zErrMsg = 0;
 
+	default_flags |= default_sql_flags;
+
 	rc = sqlite3_open("", &db);
 	if (rc != SQLITE_OK) {
 		panic("failed to initialize SQL subsystem");
 	} else {
 		/* XXX */
 	}
+
+	current_session()->sql_flags |= default_sql_flags;
 
 	rc = sqlite3Init(db, &zErrMsg);
 	if (rc != SQLITE_OK) {

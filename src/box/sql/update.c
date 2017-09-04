@@ -13,6 +13,7 @@
 ** to handle UPDATE statements.
 */
 #include "sqliteInt.h"
+#include "box/session.h"
 
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 /* Forward declaration */
@@ -120,6 +121,7 @@ void sqlite3Update(
   int hasFK;             /* True if foreign key processing is required */
   int labelBreak;        /* Jump here to break out of UPDATE loop */
   int labelContinue;     /* Jump here to continue next step of UPDATE loop */
+  struct session *user_session = current_session();
 
 #ifndef SQLITE_OMIT_TRIGGER
   int isView;            /* True when updating a view (INSTEAD OF trigger) */
@@ -156,7 +158,7 @@ void sqlite3Update(
   ** updated is a view.
   */
 #ifndef SQLITE_OMIT_TRIGGER
-  pTrigger = sqlite3TriggersExist(pParse, pTab, TK_UPDATE, pChanges, &tmask);
+  pTrigger = sqlite3TriggersExist(pTab, TK_UPDATE, pChanges, &tmask);
   isView = pTab->pSelect!=0;
   assert( pTrigger || tmask==0 );
 #else
@@ -268,7 +270,7 @@ void sqlite3Update(
   */
   pTabList->a[0].colUsed = IsVirtual(pTab) ? ALLBITS : 0;
 
-  hasFK = sqlite3FkRequired(pParse, pTab, aXRef, chngKey);
+  hasFK = sqlite3FkRequired(pTab, aXRef, chngKey);
 
   /* There is one entry in the aRegIdx[] array for each index on the table
   ** being updated.  Fill in aRegIdx[] with a register number that will hold
@@ -405,7 +407,7 @@ void sqlite3Update(
 
   /* Initialize the count of updated rows
   */
-  if( (db->flags & SQLITE_CountRows) && !pParse->pTriggerTab ){
+  if( (user_session->sql_flags & SQLITE_CountRows) && !pParse->pTriggerTab ){
     regRowCount = ++pParse->nMem;
     sqlite3VdbeAddOp2(v, OP_Integer, 0, regRowCount);
   }
@@ -636,7 +638,7 @@ void sqlite3Update(
 
   /* Increment the row counter 
   */
-  if( (db->flags & SQLITE_CountRows) && !pParse->pTriggerTab){
+  if( (user_session->sql_flags & SQLITE_CountRows) && !pParse->pTriggerTab){
     sqlite3VdbeAddOp2(v, OP_AddImm, regRowCount, 1);
   }
 
@@ -669,7 +671,8 @@ void sqlite3Update(
   ** generating code because of a call to sqlite3NestedParse(), do not
   ** invoke the callback function.
   */
-  if( (db->flags&SQLITE_CountRows) && !pParse->pTriggerTab && !pParse->nested ){
+  if( (user_session->sql_flags & SQLITE_CountRows) &&
+       !pParse->pTriggerTab && !pParse->nested ){
     sqlite3VdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
     sqlite3VdbeSetNumCols(v, 1);
     sqlite3VdbeSetColName(v, 0, COLNAME_NAME, "rows updated", SQLITE_STATIC);

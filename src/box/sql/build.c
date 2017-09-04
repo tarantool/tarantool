@@ -435,11 +435,12 @@ static void freeIndex(sqlite3 *db, Index *p){
 ** the index hash table and free all memory structures associated
 ** with the index.
 */
-void sqlite3UnlinkAndDeleteIndex(sqlite3 *db, Index *pIndex)
-{
+void sqlite3UnlinkAndDeleteIndex(sqlite3 *db, Index *pIndex){
   assert( sqlite3SchemaMutexHeld(db, 0) );
   assert( pIndex!=0 );
   assert( &pIndex->pTable->idxHash );
+
+  struct session *user_session = current_session();
 
   pIndex = sqlite3HashInsert(&pIndex->pTable->idxHash, pIndex->zName, 0);
   if( ALWAYS(pIndex) ){
@@ -458,7 +459,7 @@ void sqlite3UnlinkAndDeleteIndex(sqlite3 *db, Index *pIndex)
     freeIndex(db, pIndex);
   }
 
-  db->flags |= SQLITE_InternChanges;
+  user_session->sql_flags |= SQLITE_InternChanges;
 }
 
 /*
@@ -481,11 +482,12 @@ void sqlite3ResetOneSchema(sqlite3 *db){
 */
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *db){
   sqlite3BtreeEnterAll(db);
+  struct session *user_session = current_session();
   Db *pDb = &db->mdb;
   if( pDb->pSchema ){
     sqlite3SchemaClear(pDb->pSchema);
   }
-  db->flags &= ~SQLITE_InternChanges;
+  user_session->sql_flags &= ~SQLITE_InternChanges;
   sqlite3VtabUnlockList(db);
   sqlite3BtreeLeaveAll(db);
 }
@@ -493,8 +495,8 @@ void sqlite3ResetAllSchemasOfConnection(sqlite3 *db){
 /*
 ** This routine is called when a commit occurs.
 */
-void sqlite3CommitInternalChanges(sqlite3 *db){
-  db->flags &= ~SQLITE_InternChanges;
+void sqlite3CommitInternalChanges(){
+  current_session()->sql_flags &= ~SQLITE_InternChanges;
 }
 
 /*
@@ -2109,7 +2111,7 @@ void sqlite3EndTable(
       return;
     }
     pParse->pNewTable = 0;
-    db->flags |= SQLITE_InternChanges;
+    current_session()->sql_flags |= SQLITE_InternChanges;
 
 #ifndef SQLITE_OMIT_ALTERTABLE
     if( !p->pSelect ){
@@ -2939,6 +2941,7 @@ void sqlite3CreateIndex(
   struct ExprList_item *pListItem; /* For looping over pList */
   int nExtra = 0;                  /* Space allocated for zExtra[] */
   char *zExtra = 0;                /* Extra space after the Index object */
+  struct session *user_session = current_session();
 
   if( db->mallocFailed || pParse->nErr>0 ){
     goto exit_create_index;
@@ -3301,7 +3304,7 @@ void sqlite3CreateIndex(
       sqlite3OomFault(db);
       goto exit_create_index;
     }
-    db->flags |= SQLITE_InternChanges;
+    user_session->sql_flags |= SQLITE_InternChanges;
     if( pTblName!=0 ){
       pIndex->tnum = db->init.newTnum;
     }

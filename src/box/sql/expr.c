@@ -13,6 +13,7 @@
 ** for generating VDBE code that evaluates expressions in SQLite.
 */
 #include "sqliteInt.h"
+#include "box/session.h"
 
 /* Forward declarations */
 static void exprCodeBetween(Parse*,Expr*,int,void(*)(Parse*,Expr*,int,int),int);
@@ -3143,9 +3144,10 @@ void sqlite3ExprCacheRemove(Parse *pParse, int iReg, int nReg){
 ** corresponding pop occurs.
 */
 void sqlite3ExprCachePush(Parse *pParse){
+  struct session *user_session = current_session();
   pParse->iCacheLevel++;
 #ifdef SQLITE_DEBUG
-  if( pParse->db->flags & SQLITE_VdbeAddopTrace ){
+  if( user_session->sql_flags & SQLITE_VdbeAddopTrace ){
     printf("PUSH to %d\n", pParse->iCacheLevel);
   }
 #endif
@@ -3158,10 +3160,11 @@ void sqlite3ExprCachePush(Parse *pParse){
 */
 void sqlite3ExprCachePop(Parse *pParse){
   int i = 0;
+  struct session *user_session = current_session();
   assert( pParse->iCacheLevel>=1 );
   pParse->iCacheLevel--;
 #ifdef SQLITE_DEBUG
-  if( pParse->db->flags & SQLITE_VdbeAddopTrace ){
+  if( user_session->sql_flags & SQLITE_VdbeAddopTrace ){
     printf("POP  to %d\n", pParse->iCacheLevel);
   }
 #endif
@@ -3294,9 +3297,10 @@ void sqlite3ExprCodeGetColumnToReg(
 */
 void sqlite3ExprCacheClear(Parse *pParse){
   int i;
+  struct session *user_session = current_session();
 
 #if SQLITE_DEBUG
-  if( pParse->db->flags & SQLITE_VdbeAddopTrace ){
+  if( user_session->sql_flags & SQLITE_VdbeAddopTrace ){
     printf("CLEAR\n");
   }
 #endif

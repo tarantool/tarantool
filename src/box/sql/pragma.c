@@ -13,6 +13,7 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "box/session.h"
 
 #if !defined(SQLITE_ENABLE_LOCKING_STYLE)
 #if defined(__APPLE__)
@@ -243,6 +244,7 @@ sqlite3Pragma(
 	Db *pDb;		/* The specific database being pragmaed */
 	Vdbe *v = sqlite3GetVdbe(pParse);	/* Prepared statement */
 	const PragmaName *pPragma;	/* The pragma */
+	struct session *user_session = current_session();
 
 	if (v == 0)
 		return;
@@ -380,15 +382,15 @@ sqlite3Pragma(
 	case PragTyp_FLAG:{
 		if (zRight == 0) {
 			setPragmaResultColumnNames(v, pPragma);
-			returnSingleInt(v, (db->flags & pPragma->iArg) != 0);
+			returnSingleInt(v, (user_session->sql_flags & pPragma->iArg) != 0);
 		} else {
 			int mask = pPragma->iArg;	/* Mask of bits to set
 							 * or clear. */
 
 			if (sqlite3GetBoolean(zRight, 0)) {
-				db->flags |= mask;
+				user_session->sql_flags |= mask;
 			} else {
-				db->flags &= ~mask;
+				user_session->sql_flags &= ~mask;
 				if (mask == SQLITE_DeferFKs) {
 					Vdbe *v = db->pVdbe;
 					while (v->pNext) {

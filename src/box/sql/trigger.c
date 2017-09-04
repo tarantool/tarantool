@@ -14,6 +14,7 @@
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
+#include "box/session.h"
 
 /* See comment in sqliteInt.h */
 int sqlSubProgramsRemaining;
@@ -576,6 +577,7 @@ void sqlite3DropTriggerPtr(Parse *pParse, Trigger *pTrigger){
 void sqlite3UnlinkAndDeleteTrigger(sqlite3 *db, const char *zName){
   Trigger *pTrigger;
   Hash *pHash;
+  struct session *user_session = current_session();
 
   assert( sqlite3SchemaMutexHeld(db, 0) );
   pHash = &(db->mdb.pSchema->trigHash);
@@ -588,7 +590,7 @@ void sqlite3UnlinkAndDeleteTrigger(sqlite3 *db, const char *zName){
       *pp = (*pp)->pNext;
     }
     sqlite3DeleteTrigger(db, pTrigger);
-    db->flags |= SQLITE_InternChanges;
+    user_session->sql_flags |= SQLITE_InternChanges;
   }
 }
 
@@ -617,7 +619,6 @@ static int checkColumnOverlap(IdList *pIdList, ExprList *pEList){
 ** least one of the columns in pChanges is being modified.
 */
 Trigger *sqlite3TriggersExist(
-  Parse *pParse,          /* Parse context */
   Table *pTab,            /* The table the contains the triggers */
   int op,                 /* one of TK_DELETE, TK_INSERT, TK_UPDATE */
   ExprList *pChanges,     /* Columns that change in an UPDATE statement */
@@ -626,8 +627,9 @@ Trigger *sqlite3TriggersExist(
   int mask = 0;
   Trigger *pList = 0;
   Trigger *p;
+  struct session *user_session = current_session();
 
-  if( (pParse->db->flags & SQLITE_EnableTrigger)!=0 ){
+  if( (user_session->sql_flags & SQLITE_EnableTrigger)!=0 ){
     pList = pTab->pTrigger;
   }
   assert( pList==0 || IsVirtual(pTab)==0 );
@@ -953,13 +955,16 @@ void sqlite3CodeRowTriggerDirect(
 ){
   Vdbe *v = sqlite3GetVdbe(pParse); /* Main VM */
   TriggerPrg *pPrg;
+  struct session *user_session = current_session();
+
   pPrg = getRowTrigger(pParse, p, pTab, orconf);
   assert( pPrg || pParse->nErr || pParse->db->mallocFailed );
 
   /* Code the OP_Program opcode in the parent VDBE. P4 of the OP_Program 
   ** is a pointer to the sub-vdbe containing the trigger program.  */
   if( pPrg ){
-    int bRecursive = (p->zName && 0==(pParse->db->flags&SQLITE_RecTriggers));
+    int bRecursive = (p->zName &&
+		      0==(user_session->sql_flags&SQLITE_RecTriggers));
 
     sqlite3VdbeAddOp4(v, OP_Program, reg, ignoreJump, ++pParse->nMem,
                       (const char *)pPrg->pProgram, P4_SUBPROGRAM);

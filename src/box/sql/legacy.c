@@ -16,6 +16,7 @@
 */
 
 #include "sqliteInt.h"
+#include "box/session.h"
 
 /*
 ** Execute SQL code.  Return one of the SQLITE_ success/failure
@@ -39,6 +40,7 @@ int sqlite3_exec(
   sqlite3_stmt *pStmt = 0;    /* The current SQL statement */
   char **azCols = 0;          /* Names of result columns */
   int callbackIsInit;         /* True if callback data is initialized */
+  struct session *user_session = current_session();
 
   if( !sqlite3SafetyCheckOk(db) ) return SQLITE_MISUSE_BKPT;
   if( zSql==0 ) zSql = "";
@@ -67,11 +69,10 @@ int sqlite3_exec(
     while( 1 ){
       int i;
       rc = sqlite3_step(pStmt);
-
       /* Invoke the callback function if required */
       if( xCallback && (SQLITE_ROW==rc || 
-          (SQLITE_DONE==rc && !callbackIsInit
-                           && db->flags&SQLITE_NullCallback)) ){
+          (SQLITE_DONE==rc && !callbackIsInit &&
+          user_session->sql_flags&SQLITE_NullCallback)) ){
         if( !callbackIsInit ){
           azCols = sqlite3DbMallocZero(db, 2*nCol*sizeof(const char*) + 1);
           if( azCols==0 ){

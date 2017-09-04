@@ -13,6 +13,7 @@
 ** to handle SELECT statements in SQLite.
 */
 #include "sqliteInt.h"
+#include "box/session.h"
 
 /*
 ** Trace output macros
@@ -1567,6 +1568,7 @@ static void generateColumnNames(
   int i, j;
   sqlite3 *db = pParse->db;
   int fullNames, shortNames;
+  struct session *user_session = current_session();
 
 #ifndef SQLITE_OMIT_EXPLAIN
   /* If this is an EXPLAIN, skip this step */
@@ -1579,8 +1581,8 @@ static void generateColumnNames(
   assert( v!=0 );
   assert( pTabList!=0 );
   pParse->colNamesSet = 1;
-  fullNames = (db->flags & SQLITE_FullColNames)!=0;
-  shortNames = (db->flags & SQLITE_ShortColNames)!=0;
+  fullNames = (user_session->sql_flags & SQLITE_FullColNames)!=0;
+  shortNames = (user_session->sql_flags & SQLITE_ShortColNames)!=0;
   sqlite3VdbeSetNumCols(v, pEList->nExpr);
   for(i=0; i<pEList->nExpr; i++){
     Expr *p;
@@ -1790,15 +1792,16 @@ void sqlite3SelectAddColumnTypeAndCollation(
 Table *sqlite3ResultSetOfSelect(Parse *pParse, Select *pSelect){
   Table *pTab;
   sqlite3 *db = pParse->db;
-  int savedFlags;
+  uint32_t savedFlags;
+  struct session *user_session = current_session();
 
-  savedFlags = db->flags;
-  db->flags &= ~SQLITE_FullColNames;
-  db->flags |= SQLITE_ShortColNames;
+  savedFlags = user_session->sql_flags;
+  user_session->sql_flags |= ~SQLITE_FullColNames;
+  user_session->sql_flags &= SQLITE_ShortColNames;
   sqlite3SelectPrep(pParse, pSelect, 0);
   if( pParse->nErr ) return 0;
   while( pSelect->pPrior ) pSelect = pSelect->pPrior;
-  db->flags = savedFlags;
+  user_session->sql_flags = savedFlags;
   pTab = sqlite3DbMallocZero(db, sizeof(Table) );
   if( pTab==0 ){
     return 0;
@@ -1833,6 +1836,7 @@ static SQLITE_NOINLINE Vdbe *allocVdbe(Parse *pParse){
   }
   return v;
 }
+
 Vdbe *sqlite3GetVdbe(Parse *pParse){
   Vdbe *v = pParse->pVdbe;
   return v ? v : allocVdbe(pParse);
@@ -4272,6 +4276,7 @@ static int selectExpander(Walker *pWalker, Select *p){
   sqlite3 *db = pParse->db;
   Expr *pE, *pRight, *pExpr;
   u16 selFlags = p->selFlags;
+  struct session *user_session = current_session();
 
   p->selFlags |= SF_Expanded;
   if( db->mallocFailed  ){
@@ -4389,7 +4394,7 @@ static int selectExpander(Walker *pWalker, Select *p){
     */
     struct ExprList_item *a = pEList->a;
     ExprList *pNew = 0;
-    int flags = pParse->db->flags;
+    uint32_t flags = user_session->sql_flags;
     int longNames = (flags & SQLITE_FullColNames)!=0
                       && (flags & SQLITE_ShortColNames)==0;
 

@@ -16,6 +16,7 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "box/session.h"
 
 #ifdef SQLITE_ENABLE_FTS3
 # include "fts3.h"
@@ -35,19 +36,19 @@ int sqlite3Fts5Init(sqlite3*);
 
 #ifndef SQLITE_AMALGAMATION
 /* IMPLEMENTATION-OF: R-46656-45156 The sqlite3_version[] string constant
-** contains the text of SQLITE_VERSION macro. 
+** contains the text of SQLITE_VERSION macro.
 */
 const char sqlite3_version[] = SQLITE_VERSION;
 #endif
 
 /* IMPLEMENTATION-OF: R-53536-42575 The sqlite3_libversion() function returns
-** a pointer to the to the sqlite3_version[] string constant. 
+** a pointer to the to the sqlite3_version[] string constant.
 */
 const char *sqlite3_libversion(void){ return sqlite3_version; }
 
 /* IMPLEMENTATION-OF: R-63124-39300 The sqlite3_sourceid() function returns a
 ** pointer to a string constant whose value is the same as the
-** SQLITE_SOURCE_ID C preprocessor macro. 
+** SQLITE_SOURCE_ID C preprocessor macro.
 */
 const char *sqlite3_sourceid(void){ return SQLITE_SOURCE_ID; }
 
@@ -770,6 +771,8 @@ int sqlite3_db_cacheflush(sqlite3 *db){
 int sqlite3_db_config(sqlite3 *db, int op, ...){
   va_list ap;
   int rc;
+  struct session *user_session = current_session();
+
   va_start(ap, op);
   switch( op ){
     case SQLITE_DBCONFIG_MAINDBNAME: {
@@ -799,17 +802,17 @@ int sqlite3_db_config(sqlite3 *db, int op, ...){
         if( aFlagOp[i].op==op ){
           int onoff = va_arg(ap, int);
           int *pRes = va_arg(ap, int*);
-          int oldFlags = db->flags;
+          uint32_t oldFlags = user_session->sql_flags;
           if( onoff>0 ){
-            db->flags |= aFlagOp[i].mask;
+            user_session->sql_flags |= aFlagOp[i].mask;
           }else if( onoff==0 ){
-            db->flags &= ~aFlagOp[i].mask;
+            user_session->sql_flags &= ~aFlagOp[i].mask;
           }
-          if( oldFlags!=db->flags ){
+          if( oldFlags!=user_session->sql_flags ){
             sqlite3ExpirePreparedStatements(db);
           }
           if( pRes ){
-            *pRes = (db->flags & aFlagOp[i].mask)!=0;
+            *pRes = (user_session->sql_flags & aFlagOp[i].mask)!=0;
           }
           rc = SQLITE_OK;
           break;
@@ -1074,6 +1077,7 @@ void sqlite3RollbackAll(Vdbe *pVdbe, int tripCode){
   sqlite3 *db = pVdbe->db;
   int inTrans = 0;
   int schemaChange;
+  struct session *user_session = current_session();
   assert( sqlite3_mutex_held(db->mutex) );
   sqlite3BeginBenignMalloc();
 
@@ -1084,7 +1088,8 @@ void sqlite3RollbackAll(Vdbe *pVdbe, int tripCode){
   ** the database rollback and schema reset, which can cause false
   ** corruption reports in some cases.  */
   sqlite3BtreeEnterAll(db);
-  schemaChange = (db->flags & SQLITE_InternChanges)!=0 && db->init.busy==0;
+  schemaChange = (user_session->sql_flags & SQLITE_InternChanges)!=0 &&
+                  db->init.busy==0;
 
   Btree *p = db->mdb.pBt;
   assert( p );
@@ -1097,7 +1102,7 @@ void sqlite3RollbackAll(Vdbe *pVdbe, int tripCode){
   sqlite3VtabRollback(db);
   sqlite3EndBenignMalloc();
 
-  if( (db->flags&SQLITE_InternChanges)!=0 && db->init.busy==0 ){
+  if( (user_session->sql_flags&SQLITE_InternChanges)!=0 && db->init.busy==0 ){
     sqlite3ExpirePreparedStatements(db);
     sqlite3ResetAllSchemasOfConnection(db);
   }
@@ -1106,7 +1111,7 @@ void sqlite3RollbackAll(Vdbe *pVdbe, int tripCode){
   /* Any deferred constraint violations have now been resolved. */
   pVdbe->nDeferredCons = 0;
   pVdbe->nDeferredImmCons = 0;
-  db->flags &= ~SQLITE_DeferFKs;
+  user_session->sql_flags &= ~SQLITE_DeferFKs;
 
   /* If one has been configured, invoke the rollback-hook callback */
   if( db->xRollbackCallback && (inTrans || !pVdbe->autoCommit) ){
@@ -2373,6 +2378,7 @@ static int openDatabase(
   int isThreadsafe;               /* True for threadsafe connections */
   char *zOpen = 0;                /* Filename argument to pass to BtreeOpen() */
   char *zErrMsg = 0;              /* Error message from sqlite3ParseUri() */
+  struct session *user_session = current_session();
 
 #ifdef SQLITE_ENABLE_API_ARMOR
   if( ppDb==0 ) return SQLITE_MISUSE_BKPT;
@@ -2383,7 +2389,7 @@ static int openDatabase(
   if( rc ) return rc;
 #endif
 
-  /* Only allow sensible combinations of bits in the flags argument.  
+  /* Only allow sensible combinations of bits in the flags argument.
   ** Throw an error if any non-sense combination is used.  If we
   ** do not block illegal combinations here, it could trigger
   ** assert() statements in deeper layers.  Sensible combinations
@@ -2417,14 +2423,13 @@ static int openDatabase(
   }else if( sqlite3GlobalConfig.sharedCacheEnabled ){
     flags |= SQLITE_OPEN_SHAREDCACHE;
   }
-
   /* Remove harmful bits from the flags parameter
   **
   ** The SQLITE_OPEN_NOMUTEX and SQLITE_OPEN_FULLMUTEX flags were
-  ** dealt with in the previous code block.  Besides these, the only
+  ** dealt with in the previous code block. Besides these, the only
   ** valid input flags for sqlite3_open_v2() are SQLITE_OPEN_READONLY,
   ** SQLITE_OPEN_READWRITE, SQLITE_OPEN_CREATE, SQLITE_OPEN_SHAREDCACHE,
-  ** SQLITE_OPEN_PRIVATECACHE, and some reserved bits.  Silently mask
+  ** SQLITE_OPEN_PRIVATECACHE, and some reserved bits. Silently mask
   ** off all other flags.
   */
   flags &=  ~( SQLITE_OPEN_DELETEONCLOSE |
@@ -2461,18 +2466,6 @@ static int openDatabase(
   db->aLimit[SQLITE_LIMIT_WORKER_THREADS] = SQLITE_DEFAULT_WORKER_THREADS;
   db->szMmap = sqlite3GlobalConfig.szMmap;
   db->nMaxSorterMmap = 0x7FFFFFFF;
-  db->flags |= SQLITE_ShortColNames | SQLITE_EnableTrigger
-                 | SQLITE_AutoIndex
-#if SQLITE_DEFAULT_RECURSIVE_TRIGGERS
-                 | SQLITE_RecTriggers
-#endif
-#if defined(SQLITE_DEFAULT_FOREIGN_KEYS) && SQLITE_DEFAULT_FOREIGN_KEYS
-                 | SQLITE_ForeignKeys
-#endif
-#if defined(SQLITE_REVERSE_UNORDERED_SELECTS)
-                 | SQLITE_ReverseOrder
-#endif
-      ;
   sqlite3HashInit(&db->aCollSeq);
 #ifndef SQLITE_OMIT_VIRTUALTABLE
   sqlite3HashInit(&db->aModule);
@@ -2492,14 +2485,16 @@ static int openDatabase(
     goto opendb_out;
   }
   /* EVIDENCE-OF: R-08308-17224 The default collating function for all
-  ** strings is BINARY. 
+  ** strings is BINARY.
   */
   db->pDfltColl = sqlite3FindCollSeq(db, SQLITE_UTF8, sqlite3StrBINARY, 0);
   assert( db->pDfltColl!=0 );
 
-  /* Parse the filename/URI argument. */
   db->openFlags = flags;
-  rc = sqlite3ParseUri(zVfs, zFilename, &flags, &db->pVfs, &zOpen, &zErrMsg);
+  /* Parse the filename/URI argument. */
+  rc = sqlite3ParseUri(zVfs, zFilename,
+                       &flags,
+                       &db->pVfs, &zOpen, &zErrMsg);
   if( rc!=SQLITE_OK ){
     if( rc==SQLITE_NOMEM ) sqlite3OomFault(db);
     sqlite3ErrorWithMsg(db, rc, zErrMsg ? "%s" : 0, zErrMsg);
@@ -2509,7 +2504,7 @@ static int openDatabase(
 
   /* Open the backend database driver */
   rc = sqlite3BtreeOpen(db->pVfs, zOpen, db, &db->mdb.pBt, 0,
-                        flags | SQLITE_OPEN_MAIN_DB);
+                        user_session->sql_flags | SQLITE_OPEN_MAIN_DB);
   if( rc!=SQLITE_OK ){
     if( rc==SQLITE_IOERR_NOMEM ){
       rc = SQLITE_NOMEM_BKPT;
@@ -2524,7 +2519,7 @@ static int openDatabase(
   db->mdb.pSchema = sqlite3SchemaGet(db, 0);
 
   /* The default safety_level for the main database is FULL; for the temp
-  ** database it is OFF. This matches the pager layer defaults.  
+  ** database it is OFF. This matches the pager layer defaults.
   */
   db->mdb.zDbSName = "main";
   db->mdb.safety_level = SQLITE_DEFAULT_SYNCHRONOUS+1;
@@ -2544,7 +2539,7 @@ static int openDatabase(
 
 #ifdef SQLITE_ENABLE_FTS5
   /* Register any built-in FTS5 module before loading the automatic
-  ** extensions. This allows automatic extensions to register FTS5 
+  ** extensions. This allows automatic extensions to register FTS5
   ** tokenizers and auxiliary functions.  */
   if( !db->mallocFailed && rc==SQLITE_OK ){
     rc = sqlite3Fts5Init(db);
@@ -2658,8 +2653,8 @@ opendb_out:
 ** Open a new database handle.
 */
 int sqlite3_open(
-  const char *zFilename, 
-  sqlite3 **ppDb 
+  const char *zFilename,
+  sqlite3 **ppDb
 ){
   return openDatabase(zFilename, ppDb,
                       SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0);
@@ -2677,9 +2672,9 @@ int sqlite3_open_v2(
 ** Register a new collation sequence with the database handle db.
 */
 int sqlite3_create_collation(
-  sqlite3* db, 
-  const char *zName, 
-  int enc, 
+  sqlite3* db,
+  const char *zName,
+  int enc,
   void* pCtx,
   int(*xCompare)(void*,int,const void*,int,const void*)
 ){
@@ -2690,9 +2685,9 @@ int sqlite3_create_collation(
 ** Register a new collation sequence with the database handle db.
 */
 int sqlite3_create_collation_v2(
-  sqlite3* db, 
-  const char *zName, 
-  int enc, 
+  sqlite3* db,
+  const char *zName,
+  int enc,
   void* pCtx,
   int(*xCompare)(void*,int,const void*,int,const void*),
   void(*xDel)(void*)
@@ -2715,9 +2710,9 @@ int sqlite3_create_collation_v2(
 ** Register a new collation sequence with the database handle db.
 */
 int sqlite3_create_collation16(
-  sqlite3* db, 
+  sqlite3* db,
   const void *zName,
-  int enc, 
+  int enc,
   void* pCtx,
   int(*xCompare)(void*,int,const void*,int,const void*)
 ){
@@ -2745,8 +2740,8 @@ int sqlite3_create_collation16(
 ** db. Replace any previously installed collation sequence factory.
 */
 int sqlite3_collation_needed(
-  sqlite3 *db, 
-  void *pCollNeededArg, 
+  sqlite3 *db,
+  void *pCollNeededArg,
   void(*xCollNeeded)(void*,sqlite3*,int eTextRep,const char*)
 ){
 #ifdef SQLITE_ENABLE_API_ARMOR
@@ -2766,8 +2761,8 @@ int sqlite3_collation_needed(
 ** db. Replace any previously installed collation sequence factory.
 */
 int sqlite3_collation_needed16(
-  sqlite3 *db, 
-  void *pCollNeededArg, 
+  sqlite3 *db,
+  void *pCollNeededArg,
   void(*xCollNeeded16)(void*,sqlite3*,int eTextRep,const void*)
 ){
 #ifdef SQLITE_ENABLE_API_ARMOR
@@ -2914,9 +2909,9 @@ int sqlite3_table_column_metadata(
   /* The following block stores the meta information that will be returned
   ** to the caller in local variables zDataType, zCollSeq, notnull, primarykey
   ** and autoinc. At this point there are two possibilities:
-  ** 
-  **     1. The specified column name was rowid", "oid" or "_rowid_" 
-  **        and there is no explicitly declared IPK column. 
+  **
+  **     1. The specified column name was rowid", "oid" or "_rowid_"
+  **        and there is no explicitly declared IPK column.
   **
   **     2. The table is not a view and the column name identified an 
   **        explicitly declared column. Copy meta information from *pCol.
@@ -3256,11 +3251,11 @@ int sqlite3_test_control(int op, ...){
       rc = (sqlite3KeywordCode((u8*)zWord, n)!=TK_ID) ? SQLITE_N_KEYWORD : 0;
       break;
     }
-#endif 
+#endif
 
     /* sqlite3_test_control(SQLITE_TESTCTRL_SCRATCHMALLOC, sz, &pNew, pFree);
     **
-    ** Pass pFree into sqlite3ScratchFree(). 
+    ** Pass pFree into sqlite3ScratchFree().
     ** If sz>0 then allocate a scratch buffer into pNew.  
     */
     case SQLITE_TESTCTRL_SCRATCHMALLOC: {
@@ -3467,7 +3462,7 @@ int sqlite3_db_readonly(sqlite3 *db, const char *zDbName){
 ** being read by handle db.
 */
 int sqlite3_snapshot_get(
-  sqlite3 *db, 
+  sqlite3 *db,
   const char *zDb,
   sqlite3_snapshot **ppSnapshot
 ){
@@ -3479,8 +3474,8 @@ int sqlite3_snapshot_get(
 ** Open a read-transaction on the snapshot idendified by pSnapshot.
 */
 int sqlite3_snapshot_open(
-  sqlite3 *db, 
-  const char *zDb, 
+  sqlite3 *db,
+  const char *zDb,
   sqlite3_snapshot *pSnapshot
 ){
   int rc = SQLITE_ERROR;

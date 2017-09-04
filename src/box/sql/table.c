@@ -157,7 +157,8 @@ int sqlite3_get_table(
       }
       sqlite3_free(res.zErrMsg);
     }
-    db->errCode = res.rc;  /* Assume 32-bit assignment is atomic */
+    /* Assume 32-bit assignment is atomic */
+    db->errCode = res.rc;
     return res.rc;
   }
   sqlite3_free(res.zErrMsg);

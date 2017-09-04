@@ -13,6 +13,7 @@
 ** in order to generate code for DELETE FROM statements.
 */
 #include "sqliteInt.h"
+#include "box/session.h"
 
 /*
 ** While a SrcList can in general represent multiple tables and subqueries
@@ -237,6 +238,7 @@ void sqlite3DeleteFrom(
   int addrEphOpen = 0;   /* Instruction to open the Ephemeral table */
   int bComplex;          /* True if there are triggers or FKs or
                          ** subqueries in the WHERE clause */
+  struct session *user_session = current_session();
 
 #ifndef SQLITE_OMIT_TRIGGER
   int isView;                  /* True if attempting to delete from a view */
@@ -262,9 +264,9 @@ void sqlite3DeleteFrom(
   ** deleted from is a view
   */
 #ifndef SQLITE_OMIT_TRIGGER
-  pTrigger = sqlite3TriggersExist(pParse, pTab, TK_DELETE, 0, 0);
+  pTrigger = sqlite3TriggersExist(pTab, TK_DELETE, 0, 0);
   isView = pTab->pSelect!=0;
-  bComplex = pTrigger || sqlite3FkRequired(pParse, pTab, 0, 0);
+  bComplex = pTrigger || sqlite3FkRequired(pTab, 0, 0);
 #else
 # define pTrigger 0
 # define isView 0
@@ -338,7 +340,7 @@ void sqlite3DeleteFrom(
   /* Initialize the counter of the number of rows deleted, if
   ** we are counting rows.
   */
-  if( db->flags & SQLITE_CountRows ){
+  if( user_session->sql_flags & SQLITE_CountRows ){
     memCnt = ++pParse->nMem;
     sqlite3VdbeAddOp2(v, OP_Integer, 0, memCnt);
   }
@@ -412,7 +414,7 @@ void sqlite3DeleteFrom(
     /* assert( IsVirtual(pTab) || bComplex || eOnePass!=ONEPASS_OFF ); */
 
     /* Keep track of the number of rows to be deleted */
-    if( db->flags & SQLITE_CountRows ){
+    if( user_session->sql_flags & SQLITE_CountRows ){
       sqlite3VdbeAddOp2(v, OP_AddImm, memCnt, 1);
     }
 
@@ -558,7 +560,8 @@ void sqlite3DeleteFrom(
   ** generating code because of a call to sqlite3NestedParse(), do not
   ** invoke the callback function.
   */
-  if( (db->flags&SQLITE_CountRows) && !pParse->nested && !pParse->pTriggerTab ){
+  if( (user_session->sql_flags & SQLITE_CountRows) &&
+       !pParse->nested && !pParse->pTriggerTab ){
     sqlite3VdbeAddOp2(v, OP_ResultRow, memCnt, 1);
     sqlite3VdbeSetNumCols(v, 1);
     sqlite3VdbeSetColName(v, 0, COLNAME_NAME, "rows deleted", SQLITE_STATIC);
@@ -721,7 +724,7 @@ void sqlite3GenerateRowDelete(
 
   /* If there are any triggers to fire, allocate a range of registers to
   ** use for the old.* references in the triggers.  */
-  if( sqlite3FkRequired(pParse, pTab, 0, 0) || pTrigger ){
+  if( sqlite3FkRequired(pTab, 0, 0) || pTrigger ){
     u32 mask;                     /* Mask of OLD.* columns in use */
     int iCol;                     /* Iterator used while populating OLD.* */
     int addrStart;                /* Start of BEFORE trigger programs */

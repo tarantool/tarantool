@@ -12,6 +12,7 @@
 ** support to compiled SQL statements.
 */
 #include "sqliteInt.h"
+#include "box/session.h"
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 #ifndef SQLITE_OMIT_TRIGGER
@@ -330,6 +331,7 @@ static void fkLookupParent(
   Vdbe *v = sqlite3GetVdbe(pParse);         /* Vdbe to add code to */
   int iCur = pParse->nTab - 1;              /* Cursor number to use */
   int iOk = sqlite3VdbeMakeLabel(v);        /* jump here if parent key found */
+  struct session *user_session = current_session();
 
   /* If nIncr is less than zero, then check at runtime if there are any
   ** outstanding constraints to resolve. If there are not, there is no need
@@ -425,7 +427,7 @@ static void fkLookupParent(
     }
   }
 
-  if( !pFKey->isDeferred && !(pParse->db->flags & SQLITE_DeferFKs)
+  if( !pFKey->isDeferred && !(user_session->sql_flags & SQLITE_DeferFKs)
    && !pParse->pToplevel 
    && !pParse->isMultiWrite 
   ){
@@ -702,7 +704,10 @@ static void fkTriggerDelete(sqlite3 *dbMem, Trigger *p){
 */
 void sqlite3FkDropTable(Parse *pParse, SrcList *pName, Table *pTab){
   sqlite3 *db = pParse->db;
-  if( (db->flags&SQLITE_ForeignKeys) && !IsVirtual(pTab) && !pTab->pSelect ){
+  struct session *user_session = current_session();
+
+  if( (user_session->sql_flags & SQLITE_ForeignKeys) &&
+      !IsVirtual(pTab) && !pTab->pSelect ){
     int iSkip = 0;
     Vdbe *v = sqlite3GetVdbe(pParse);
 
@@ -715,7 +720,7 @@ void sqlite3FkDropTable(Parse *pParse, SrcList *pName, Table *pTab){
       ** when this statement is run.  */
       FKey *p;
       for(p=pTab->pFKey; p; p=p->pNextFrom){
-        if( p->isDeferred || (db->flags & SQLITE_DeferFKs) ) break;
+        if( p->isDeferred || (user_session->sql_flags & SQLITE_DeferFKs) ) break;
       }
       if( !p ) return;
       iSkip = sqlite3VdbeMakeLabel(v);
@@ -735,7 +740,7 @@ void sqlite3FkDropTable(Parse *pParse, SrcList *pName, Table *pTab){
     ** the statement transaction will not be rolled back even if FK
     ** constraints are violated.
     */
-    if( (db->flags & SQLITE_DeferFKs)==0 ){
+    if( (user_session->sql_flags & SQLITE_DeferFKs)==0 ){
       sqlite3VdbeAddOp2(v, OP_FkIfZero, 0, sqlite3VdbeCurrentAddr(v)+2);
       VdbeCoverage(v);
       sqlite3HaltConstraint(pParse, SQLITE_CONSTRAINT_FOREIGNKEY,
@@ -862,12 +867,13 @@ void sqlite3FkCheck(
   FKey *pFKey;                    /* Used to iterate through FKs */
   int iDb;                        /* Index of database containing pTab */
   int isIgnoreErrors = pParse->disableTriggers;
+  struct session *user_session = current_session();
 
   /* Exactly one of regOld and regNew should be non-zero. */
   assert( (regOld==0)!=(regNew==0) );
 
   /* If foreign-keys are disabled, this function is a no-op. */
-  if( (db->flags&SQLITE_ForeignKeys)==0 ) return;
+  if( (user_session->sql_flags & SQLITE_ForeignKeys)==0 ) return;
 
   iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
   assert( iDb==0 );
@@ -984,7 +990,7 @@ void sqlite3FkCheck(
       continue;
     }
 
-    if( !pFKey->isDeferred && !(db->flags & SQLITE_DeferFKs) 
+    if( !pFKey->isDeferred && !(user_session->sql_flags & SQLITE_DeferFKs)
      && !pParse->pToplevel && !pParse->isMultiWrite 
     ){
       assert( regOld==0 && regNew!=0 );
@@ -1054,7 +1060,9 @@ u32 sqlite3FkOldmask(
   Table *pTab                     /* Table being modified */
 ){
   u32 mask = 0;
-  if( pParse->db->flags&SQLITE_ForeignKeys ){
+  struct session *user_session = current_session();
+
+  if( user_session->sql_flags&SQLITE_ForeignKeys ){
     FKey *p;
     int i;
     for(p=pTab->pFKey; p; p=p->pNextFrom){
@@ -1090,12 +1098,12 @@ u32 sqlite3FkOldmask(
 ** returns false.
 */
 int sqlite3FkRequired(
-  Parse *pParse,                  /* Parse context */
   Table *pTab,                    /* Table being modified */
   int *aChange,                   /* Non-NULL for UPDATE operations */
   int chngRowid                   /* True for UPDATE that affects rowid */
 ){
-  if( pParse->db->flags&SQLITE_ForeignKeys ){
+  struct session *user_session = current_session();
+  if( user_session->sql_flags & SQLITE_ForeignKeys ){
     if( !aChange ){
       /* A DELETE operation. Foreign key processing is required if the 
       ** table in question is either the child or parent table for any 
@@ -1159,9 +1167,10 @@ static Trigger *fkActionTrigger(
   int action;                     /* One of OE_None, OE_Cascade etc. */
   Trigger *pTrigger;              /* Trigger definition to return */
   int iAction = (pChanges!=0);    /* 1 for UPDATE, 0 for DELETE */
+  struct session *user_session = current_session();
 
   action = pFKey->aAction[iAction];
-  if( action==OE_Restrict && (db->flags & SQLITE_DeferFKs) ){
+  if( action==OE_Restrict && (user_session->sql_flags & SQLITE_DeferFKs) ){
     return 0;
   }
   pTrigger = pFKey->apTrigger[iAction];
@@ -1340,11 +1349,12 @@ void sqlite3FkActions(
   int *aChange,                   /* Array indicating UPDATEd columns (or 0) */
   int bChngRowid                  /* True if rowid is UPDATEd */
 ){
+  struct session *user_session = current_session();
   /* If foreign-key support is enabled, iterate through all FKs that 
   ** refer to table pTab. If there is an action associated with the FK 
   ** for this operation (either update or delete), invoke the associated 
   ** trigger sub-program.  */
-  if( pParse->db->flags&SQLITE_ForeignKeys ){
+  if( user_session->sql_flags & SQLITE_ForeignKeys ){
     FKey *pFKey;                  /* Iterator variable */
     for(pFKey = sqlite3FkReferences(pTab); pFKey; pFKey=pFKey->pNextTo){
       if( aChange==0 || fkParentIsModified(pTab, pFKey, aChange, bChngRowid) ){

@@ -16,6 +16,7 @@
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
 #include "box/space.h"
+#include "box/session.h"
 
 /*
 ** Fill the InitData structure with an error message that indicates
@@ -117,7 +118,7 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
     long pageNo = *((long *)argv[1]);
     int iSpace = (int)SQLITE_PAGENO_TO_SPACEID(pageNo);
     struct space * pSpace = space_by_id(iSpace);
-    const char *zSpace = space_name(pSpace); 
+    const char *zSpace = space_name(pSpace);
     pIndex = sqlite3LocateIndex(db, argv[0], zSpace);
     if( pIndex==0 ){
       /* This can occur if there exists an index on a TEMP table which
@@ -319,7 +320,8 @@ error_out:
 */
 int sqlite3Init(sqlite3 *db, char **pzErrMsg){
   int rc;
-  int commit_internal = !(db->flags&SQLITE_InternChanges);
+  struct session *user_session = current_session();
+  int commit_internal = !(user_session->sql_flags&SQLITE_InternChanges);
   
   assert( sqlite3_mutex_held(db->mutex) );
   assert( sqlite3BtreeHoldsMutex(db->mdb.pBt) );
@@ -504,7 +506,7 @@ static int sqlite3Prepare(
   if( rc ){
     const char *zDb = db->mdb.zDbSName;
     sqlite3ErrorWithMsg(db, rc, "database schema is locked: %s", zDb);
-    testcase( db->flags & SQLITE_ReadUncommitted );
+    testcase( user_session->sql_flags & SQLITE_ReadUncommitted );
     goto end_prepare;
   }
 
@@ -598,7 +600,7 @@ end_prepare:
 
   sqlite3ParserReset(&sParse);
   rc = sqlite3ApiExit(db, rc);
-  assert( (rc&db->errMask)==rc );
+  assert( (rc & db->errMask)==rc );
   return rc;
 }
 static int sqlite3LockAndPrepare(

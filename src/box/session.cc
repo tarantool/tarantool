@@ -47,6 +47,8 @@ const char *session_type_strs[] = {
 
 static struct mh_i64ptr_t *session_registry;
 
+uint32_t default_flags = 0;
+
 struct mempool session_pool;
 
 RLIST_HEAD(session_on_connect);
@@ -88,10 +90,13 @@ session_create(int fd, enum session_type type)
 			 "new slab");
 		return NULL;
 	}
+
 	session->id = sid_max();
 	session->fd =  fd;
 	session->sync = 0;
 	session->type = type;
+	session->sql_flags = default_flags;
+
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user->auth_token,
 			 guest_user->def->uid);

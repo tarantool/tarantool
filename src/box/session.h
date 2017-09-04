@@ -60,6 +60,13 @@ enum session_type {
 extern const char *session_type_strs[];
 
 /**
+ * default_flags accumulates flags value from SQL submodules.
+ * It is assigned during sql_init(). Lately it is used in each session
+ * initialization.
+ */
+extern uint32_t default_flags;
+
+/**
  * Abstraction of a single user session:
  * for now, only provides accounting of established
  * sessions and on-connect/on-disconnect event
@@ -75,6 +82,9 @@ struct session {
 	 * Only if the session has a peer.
 	 */
 	int fd;
+
+	/** SQL Connection flag for current user session */
+	uint32_t sql_flags;
 	/**
 	 * For iproto requests, we set this field
 	 * to the value of packet sync. Since the

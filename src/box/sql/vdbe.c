@@ -18,7 +18,8 @@
 ** in this file for details.  If in doubt, do not deviate from existing
 ** commenting and indentation practices when changing or adding code.
 */
-#include <box/txn.h>
+#include "box/txn.h"
+#include "box/session.h"
 #include "sqliteInt.h"
 #include "btreeInt.h"
 #include "vdbeInt.h"
@@ -501,7 +502,8 @@ static void registerTrace(int iReg, Mem *p){
 #endif
 
 #ifdef SQLITE_DEBUG
-#  define REGISTER_TRACE(R,M) if(db->flags&SQLITE_VdbeTrace)registerTrace(R,M)
+#  define REGISTER_TRACE(R,M) \
+  if(user_session->sql_flags&SQLITE_VdbeTrace) registerTrace(R,M);
 #else
 #  define REGISTER_TRACE(R,M)
 #endif
@@ -595,6 +597,7 @@ int sqlite3VdbeExec(
 #ifdef VDBE_PROFILE
   u64 start;                 /* CPU clock count at start of opcode */
 #endif
+  struct session *user_session = current_session();
   /*** INSERT STACK UNION HERE ***/
 
   assert( p->magic==VDBE_MAGIC_RUN );  /* sqlite3_step() verifies this */
@@ -623,18 +626,19 @@ int sqlite3VdbeExec(
 #ifdef SQLITE_DEBUG
   sqlite3BeginBenignMalloc();
   if( p->pc==0
-   && (p->db->flags & (SQLITE_VdbeListing|SQLITE_VdbeEQP|SQLITE_VdbeTrace))!=0
+   && (user_session->sql_flags&
+       (SQLITE_VdbeListing|SQLITE_VdbeEQP|SQLITE_VdbeTrace))!=0
   ){
     int i;
     int once = 1;
     sqlite3VdbePrintSql(p);
-    if( p->db->flags & SQLITE_VdbeListing ){
+    if( user_session->sql_flags & SQLITE_VdbeListing ){
       printf("VDBE Program Listing:\n");
       for(i=0; i<p->nOp; i++){
         sqlite3VdbePrintOp(stdout, i, &aOp[i]);
       }
     }
-    if( p->db->flags & SQLITE_VdbeEQP ){
+    if( user_session->sql_flags & SQLITE_VdbeEQP ){
       for(i=0; i<p->nOp; i++){
         if( aOp[i].opcode==OP_Explain ){
           if( once ) printf("VDBE Query Plan:\n");
@@ -643,7 +647,7 @@ int sqlite3VdbeExec(
         }
       }
     }
-    if( p->db->flags & SQLITE_VdbeTrace )  printf("VDBE Trace:\n");
+    if( user_session->sql_flags & SQLITE_VdbeTrace )  printf("VDBE Trace:\n");
   }
   sqlite3EndBenignMalloc();
 #endif
@@ -664,7 +668,7 @@ int sqlite3VdbeExec(
     /* Only allow tracing if SQLITE_DEBUG is defined.
     */
 #ifdef SQLITE_DEBUG
-    if( db->flags & SQLITE_VdbeTrace ){
+    if( user_session->sql_flags & SQLITE_VdbeTrace ){
       sqlite3VdbePrintOp(stdout, (int)(pOp - aOp), pOp);
     }
 #endif
@@ -1335,6 +1339,7 @@ case OP_IntCopy: {            /* out2 */
 case OP_ResultRow: {
   Mem *pMem;
   int i;
+
   assert( p->nResColumn==pOp->p2 );
   assert( pOp->p1>0 );
   assert( pOp->p1+pOp->p2<=(p->nMem+1 - p->nCursor)+1 );
@@ -1355,7 +1360,7 @@ case OP_ResultRow: {
   ** not return the number of rows modified. And do not RELEASE the statement
   ** transaction. It needs to be rolled back.  */
   if( SQLITE_OK!=(rc = sqlite3VdbeCheckFk(p, 0)) ){
-    assert( db->flags&SQLITE_CountRows );
+    assert( user_session->sql_flags&SQLITE_CountRows );
     assert( p->usesStmtJournal );
     goto abort_due_to_error;
   }
@@ -1375,7 +1380,7 @@ case OP_ResultRow: {
   ** The statement transaction is never a top-level transaction.  Hence
   ** the RELEASE call below can never fail.
   */
-  assert( p->iStatement==0 || db->flags&SQLITE_CountRows );
+  assert( p->iStatement==0 || user_session->sql_flags&SQLITE_CountRows );
   rc = sqlite3VdbeCloseStatement(p, SAVEPOINT_RELEASE);
   assert( rc==SQLITE_OK );
 
@@ -2885,7 +2890,7 @@ case OP_Savepoint: {
         int isSchemaChange;
         iSavepoint = p->nSavepoint - iSavepoint - 1;
         if( p1==SAVEPOINT_ROLLBACK ){
-          isSchemaChange = (db->flags & SQLITE_InternChanges)!=0;
+          isSchemaChange = (user_session->sql_flags & SQLITE_InternChanges)!=0;
           rc = sqlite3BtreeTripAllCursors(db->mdb.pBt,
                                      SQLITE_ABORT_ROLLBACK,
                                      isSchemaChange==0);
@@ -2900,7 +2905,7 @@ case OP_Savepoint: {
         if( isSchemaChange ){
           sqlite3ExpirePreparedStatements(db);
           sqlite3ResetAllSchemasOfConnection(db);
-          db->flags = (db->flags | SQLITE_InternChanges);
+          user_session->sql_flags |= SQLITE_InternChanges;
         }
       }
 
@@ -3048,7 +3053,7 @@ case OP_Transaction: {
   assert( p->readOnly==0 || pOp->p2==0 );
   assert( pOp->p1==0 );
   assert( DbMaskTest(p->btreeMask, pOp->p1) );
-  if( pOp->p2 && (db->flags & SQLITE_QueryOnly)!=0 ){
+  if( pOp->p2 && (user_session->sql_flags & SQLITE_QueryOnly)!=0 ){
     rc = SQLITE_READONLY;
     goto abort_due_to_error;
   }
@@ -3195,7 +3200,7 @@ case OP_SetCookie: {
   if( pOp->p2==BTREE_SCHEMA_VERSION ){
     /* When the schema cookie changes, record the new cookie internally */
     pDb->pSchema->schema_cookie = pOp->p3;
-    db->flags |= SQLITE_InternChanges;
+    user_session->sql_flags |= SQLITE_InternChanges;
   }else if( pOp->p2==BTREE_FILE_FORMAT ){
     /* Record changes in the file format */
     pDb->pSchema->file_format = pOp->p3;
@@ -5923,7 +5928,7 @@ case OP_Param: {           /* out2 */
 ** statement counter is incremented (immediate foreign key constraints).
 */
 case OP_FkCounter: {
-  if( db->flags & SQLITE_DeferFKs ){
+  if( user_session->sql_flags & SQLITE_DeferFKs ){
     p->nDeferredImmCons += pOp->p2;
   }else if( pOp->p1 ){
     p->nDeferredCons += pOp->p2;
@@ -6348,7 +6353,7 @@ case OP_Expire: {
 */
 case OP_TableLock: {
   u8 isWriteLock = (u8)pOp->p3;
-  if( isWriteLock || 0==(db->flags&SQLITE_ReadUncommitted) ){
+  if( isWriteLock || 0==(user_session->sql_flags&SQLITE_ReadUncommitted) ){
     int p1 = pOp->p1;
     assert( p1==0 );
     assert( DbMaskTest(p->btreeMask, p1) );
@@ -6836,7 +6841,7 @@ case OP_Init: {          /* jump */
   }
 #endif /* SQLITE_USE_FCNTL_TRACE */
 #ifdef SQLITE_DEBUG
-  if( (db->flags & SQLITE_SqlTrace)!=0
+  if( (user_session->sql_flags & SQLITE_SqlTrace)!=0
    && (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql))!=0
   ){
     sqlite3DebugPrintf("SQL-trace: %s\n", zTrace);
@@ -6939,7 +6944,7 @@ default: {          /* This is really OP_Noop and OP_Explain */
     assert( pOp>=&aOp[-1] && pOp<&aOp[p->nOp-1] );
 
 #ifdef SQLITE_DEBUG
-    if( db->flags & SQLITE_VdbeTrace ){
+    if( user_session->sql_flags & SQLITE_VdbeTrace ){
       u8 opProperty = sqlite3OpcodeProperty[pOrigOp->opcode];
       if( rc!=0 ) printf("rc=%d\n",rc);
       if( opProperty & (OPFLG_OUT2) ){

@@ -16,6 +16,7 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "msgpuck/msgpuck.h"
+#include "box/session.h"
 
 #ifndef SQLITE_OMIT_INCRBLOB
 
@@ -134,6 +135,7 @@ int sqlite3_blob_open(
   Table *pTab;
   Parse *pParse = 0;
   Incrblob *pBlob = 0;
+  struct session *user_session = current_session();
 
 #ifdef SQLITE_ENABLE_API_ARMOR
   if( ppBlob==0 ){
@@ -212,7 +214,7 @@ int sqlite3_blob_open(
       const char *zFault = 0;
       Index *pIdx;
 #ifndef SQLITE_OMIT_FOREIGN_KEY
-      if( db->flags&SQLITE_ForeignKeys ){
+      if( user_session->sql_flags&SQLITE_ForeignKeys ){
         /* Check that the column is not part of an FK child key definition. It
         ** is not necessary to check if it is part of a parent key, as parent
         ** key columns must be indexed. The check below will pick up this 

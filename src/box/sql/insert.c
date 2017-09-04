@@ -13,6 +13,7 @@
 ** to handle INSERT statements in SQLite.
 */
 #include "sqliteInt.h"
+#include "box/session.h"
 
 /*
 ** Generate code that will
@@ -534,6 +535,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	u8 withoutRowid;	/* 0 for normal table.  1 for WITHOUT ROWID table */
 	u8 bIdListInOrder;	/* True if IDLIST is in table order */
 	ExprList *pList = 0;	/* List of VALUES() to be inserted  */
+	struct session *user_session = current_session();
 
 	/* Register allocations */
 	int regFromSelect = 0;	/* Base register for data coming from SELECT */
@@ -590,7 +592,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 ** inserted into is a view
 	 */
 #ifndef SQLITE_OMIT_TRIGGER
-	pTrigger = sqlite3TriggersExist(pParse, pTab, TK_INSERT, 0, &tmask);
+	pTrigger = sqlite3TriggersExist(pTab, TK_INSERT, 0, &tmask);
 	isView = pTab->pSelect != 0;
 #else
 #define pTrigger 0
@@ -825,7 +827,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 
 	/* Initialize the count of rows to be inserted
 	 */
-	if (db->flags & SQLITE_CountRows) {
+	if (user_session->sql_flags & SQLITE_CountRows) {
 		regRowCount = ++pParse->nMem;
 		sqlite3VdbeAddOp2(v, OP_Integer, 0, regRowCount);
 	}
@@ -1179,7 +1181,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			 ** VdbeCursor.seekResult variable, disabling the OPFLAG_USESEEKRESULT
 			 ** functionality.  */
 			bUseSeek = (isReplace == 0 || (pTrigger == 0 &&
-						       ((db->flags &
+						       ((user_session->sql_flags &
 							 SQLITE_ForeignKeys) ==
 							0
 							||
@@ -1193,7 +1195,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 
 	/* Update the count of rows that are inserted
 	 */
-	if ((db->flags & SQLITE_CountRows) != 0) {
+	if ((user_session->sql_flags & SQLITE_CountRows) != 0) {
 		sqlite3VdbeAddOp2(v, OP_AddImm, regRowCount, 1);
 	}
 
@@ -1233,7 +1235,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 ** generating code because of a call to sqlite3NestedParse(), do not
 	 ** invoke the callback function.
 	 */
-	if ((db->flags & SQLITE_CountRows) && !pParse->nested
+	if ((user_session->sql_flags & SQLITE_CountRows) && !pParse->nested
 	    && !pParse->pTriggerTab) {
 		sqlite3VdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlite3VdbeSetNumCols(v, 1);
@@ -1432,6 +1434,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 	int ipkBottom = 0;	/* Bottom of the rowid change constraint check */
 	u8 isUpdate;		/* True if this is an UPDATE operation */
 	u8 bAffinityDone = 0;	/* True if the OP_Affinity operation has been run */
+	struct session *user_session = current_session();
 
 	isUpdate = regOldData != 0;
 	db = pParse->db;
@@ -1521,7 +1524,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 	/* Test all CHECK constraints
 	 */
 #ifndef SQLITE_OMIT_CHECK
-	if (pTab->pCheck && (db->flags & SQLITE_IgnoreChecks) == 0) {
+	if (pTab->pCheck && (user_session->sql_flags &
+	    SQLITE_IgnoreChecks) == 0) {
 		ExprList *pCheck = pTab->pCheck;
 		pParse->ckBase = regNewData + 1;
 		onError =
@@ -1636,14 +1640,14 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 				 ** table.
 				 */
 				Trigger *pTrigger = 0;
-				if (db->flags & SQLITE_RecTriggers) {
+				if (user_session->sql_flags & SQLITE_RecTriggers) {
 					pTrigger =
-					    sqlite3TriggersExist(pParse, pTab,
+					    sqlite3TriggersExist(pTab,
 								 TK_DELETE, 0,
 								 0);
 				}
 				if (pTrigger
-				    || sqlite3FkRequired(pParse, pTab, 0, 0)) {
+				    || sqlite3FkRequired(pTab, 0, 0)) {
 					sqlite3MultiWrite(pParse);
 					sqlite3GenerateRowDelete(pParse, pTab,
 								 pTrigger,
@@ -1794,10 +1798,9 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 		if ((ix == 0 && pIdx->pNext == 0)	/* Condition 3 */
 		    &&pPk == pIdx	/* Condition 2 */
 		    && onError == OE_Replace	/* Condition 1 */
-		    && (0 == (db->flags & SQLITE_RecTriggers) ||	/* Condition 4 */
-			0 == sqlite3TriggersExist(pParse, pTab, TK_DELETE, 0,
-						  0))
-		    && (0 == (db->flags & SQLITE_ForeignKeys) ||	/* Condition 5 */
+		    && (0 == (user_session->sql_flags & SQLITE_RecTriggers) /* Condition 4 */
+			  || 0 == sqlite3TriggersExist(pTab, TK_DELETE, 0, 0))
+		    && (0 == (user_session->sql_flags & SQLITE_ForeignKeys) ||	/* Condition 5 */
 			(0 == pTab->pFKey && 0 == sqlite3FkReferences(pTab)))
 		    ) {
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
@@ -1909,11 +1912,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,	/* The parser context */
 				Trigger *pTrigger = 0;
 				assert(onError == OE_Replace);
 				sqlite3MultiWrite(pParse);
-				if (db->flags & SQLITE_RecTriggers) {
-					pTrigger =
-					    sqlite3TriggersExist(pParse, pTab,
-								 TK_DELETE, 0,
-								 0);
+				if (user_session->sql_flags & SQLITE_RecTriggers) {
+					pTrigger = sqlite3TriggersExist(pTab, TK_DELETE, 0, 0);
 				}
 				sqlite3GenerateRowDelete(pParse, pTab, pTrigger,
 							 iDataCur, iIdxCur,
@@ -2179,6 +2179,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	int regAutoinc;		        /* Memory register used by AUTOINC */
 	int destHasUniqueIdx = 0;	/* True if pDest has a UNIQUE index */
 	int regData, regRowid;	        /* Registers holding data and rowid */
+	struct session *user_session = current_session();
 
 	if (pSelect == 0) {
 		return 0;	/* Must be of the form  INSERT INTO ... SELECT ... */
@@ -2327,11 +2328,11 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 ** So the extra complication to make this rule less restrictive is probably
 	 ** not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
 	 */
-	if ((db->flags & SQLITE_ForeignKeys) != 0 && pDest->pFKey != 0) {
+	if ((user_session->sql_flags & SQLITE_ForeignKeys) != 0 && pDest->pFKey != 0) {
 		return 0;
 	}
 #endif
-	if ((db->flags & SQLITE_CountRows) != 0) {
+	if ((user_session->sql_flags & SQLITE_CountRows) != 0) {
 		return 0;	/* xfer opt does not play well with PRAGMA count_changes */
 	}
 

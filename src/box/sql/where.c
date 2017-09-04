@@ -19,6 +19,7 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "whereInt.h"
+#include "box/session.h"
 
 /* Forward declaration of methods */
 static int whereLoopResize(sqlite3*, WhereLoop*, int);
@@ -2745,6 +2746,7 @@ static int whereLoopAddBtree(
   LogEst rLogSize;            /* Logarithm of the number of rows in the table */
   WhereClause *pWC;           /* The parsed WHERE clause */
   Table *pTab;                /* Table being queried */
+  struct session *user_session = current_session();
   
   pNew = pBuilder->pNew;
   pWInfo = pBuilder->pWInfo;
@@ -2790,7 +2792,7 @@ static int whereLoopAddBtree(
   /* Automatic indexes */
   if( !pBuilder->pOrSet      /* Not part of an OR optimization */
    && (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE)==0
-   && (pWInfo->pParse->db->flags & SQLITE_AutoIndex)!=0
+   && (user_session->sql_flags & SQLITE_AutoIndex)!=0
    && pSrc->pIBIndex==0      /* Has no INDEXED BY clause */
    && !pSrc->fg.notIndexed   /* Has no NOT INDEXED clause */
    && HasRowid(pTab)         /* Not WITHOUT ROWID table. (FIXME: Why not?) */
@@ -4352,6 +4354,7 @@ WhereInfo *sqlite3WhereBegin(
   sqlite3 *db;               /* Database connection */
   int rc;                    /* Return code */
   u8 bFordelete = 0;         /* OPFLAG_FORDELETE or zero, as appropriate */
+  struct session *user_session = current_session();
 
   assert( (wctrlFlags & WHERE_ONEPASS_MULTIROW)==0 || (
         (wctrlFlags & WHERE_ONEPASS_DESIRED)!=0 
@@ -4536,7 +4539,8 @@ WhereInfo *sqlite3WhereBegin(
        if( db->mallocFailed ) goto whereBeginError;
     }
   }
-  if( pWInfo->pOrderBy==0 && (db->flags & SQLITE_ReverseOrder)!=0 ){
+  if( pWInfo->pOrderBy==0 &&
+      (user_session->sql_flags & SQLITE_ReverseOrder)!=0 ){
      pWInfo->revMask = ALLBITS;
   }
   if( pParse->nErr || NEVER(db->mallocFailed) ){

@@ -12,8 +12,9 @@
 ** This file contains code used for creating, destroying, and populating
 ** a VDBE (or an "sqlite3_stmt" as it is known to the outside world.) 
 */
-#include <box/txn.h>
-#include <fiber.h>
+#include "box/txn.h"
+#include "fiber.h"
+#include "box/session.h"
 #include "sqliteInt.h"
 #include "btreeInt.h"
 #include "vdbeInt.h"
@@ -174,9 +175,11 @@ static SQLITE_NOINLINE int growOp3(Vdbe *p, int op, int p1, int p2, int p3){
   assert( p->pParse->nOpAlloc>p->nOp );
   return sqlite3VdbeAddOp3(p, op, p1, p2, p3);
 }
+
 int sqlite3VdbeAddOp3(Vdbe *p, int op, int p1, int p2, int p3){
   int i;
   VdbeOp *pOp;
+  struct session *user_session = current_session();
 
   i = p->nOp;
   assert( p->magic==VDBE_MAGIC_INIT );
@@ -197,7 +200,7 @@ int sqlite3VdbeAddOp3(Vdbe *p, int op, int p1, int p2, int p3){
   pOp->zComment = 0;
 #endif
 #ifdef SQLITE_DEBUG
-  if( p->db->flags & SQLITE_VdbeAddopTrace ){
+  if( user_session->sql_flags & SQLITE_VdbeAddopTrace ){
     int jj, kk;
     Parse *pParse = p->pParse;
     for(jj=kk=0; jj<pParse->nColCache; jj++){
@@ -729,6 +732,7 @@ VdbeOp *sqlite3VdbeAddOpList(
   int iLineno                  /* Source-file line number of first opcode */
 ){
   int i;
+  struct session *user_session = current_session();
   VdbeOp *pOut, *pFirst;
   assert( nOp>0 );
   assert( p->magic==VDBE_MAGIC_INIT );
@@ -757,7 +761,7 @@ VdbeOp *sqlite3VdbeAddOpList(
     (void)iLineno;
 #endif
 #ifdef SQLITE_DEBUG
-    if( p->db->flags & SQLITE_VdbeAddopTrace ){
+    if( user_session->sql_flags & SQLITE_VdbeAddopTrace ){
       sqlite3VdbePrintOp(0, i+p->nOp, &p->aOp[i+p->nOp]);
     }
 #endif
@@ -2465,6 +2469,7 @@ int sqlite3VdbeCheckFk(Vdbe *p, int deferred){
 int sqlite3VdbeHalt(Vdbe *p){
   int rc;                         /* Used to store transient return codes */
   sqlite3 *db = p->db;
+  struct session *user_session = current_session();
 
   /* This function contains the logic that determines if a statement or
   ** transaction will be committed or rolled back as a result of the
@@ -2581,8 +2586,8 @@ int sqlite3VdbeHalt(Vdbe *p){
         }else{
           p->nDeferredCons = 0;
           p->nDeferredImmCons = 0;
-          db->flags &= ~SQLITE_DeferFKs;
-          sqlite3CommitInternalChanges(db);
+          user_session->sql_flags &= ~SQLITE_DeferFKs;
+          sqlite3CommitInternalChanges(p->db);
         }
       }else{
         box_txn_rollback();
