@@ -91,7 +91,7 @@ memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
 	}
 	((MemtxIndex *) space->index[0])->buildNext(stmt->new_tuple);
 	stmt->engine_savepoint = stmt;
-	stmt->bsize_change = space_bsize_update(space, NULL, stmt->new_tuple);
+	((MemtxSpace *) space->handler)->bsize_update(NULL, stmt->new_tuple);
 }
 
 /**
@@ -105,7 +105,8 @@ memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
 	stmt->old_tuple = space->index[0]->replace(stmt->old_tuple,
 						   stmt->new_tuple, mode);
 	stmt->engine_savepoint = stmt;
-	stmt->bsize_change = space_bsize_update(space, stmt->old_tuple, stmt->new_tuple);
+	((MemtxSpace *) space->handler)->bsize_update(stmt->old_tuple,
+						      stmt->new_tuple);
 }
 
 /**
@@ -233,13 +234,13 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 	}
 	stmt->old_tuple = old_tuple;
 	stmt->engine_savepoint = stmt;
-	stmt->bsize_change = space_bsize_update(space, old_tuple, new_tuple);
+	((MemtxSpace *) space->handler)->bsize_update(old_tuple, new_tuple);
 }
 
 
 MemtxSpace::MemtxSpace(Engine *e, struct tuple_format *format)
 	: Handler(e),
-	m_format(format)
+	m_format(format), m_bsize(0)
 {
 	tuple_format_ref(m_format);
 	replace = memtx_replace_no_keys;
@@ -663,6 +664,12 @@ MemtxSpace::initSystemSpace(struct space *space)
 	memtx_add_primary_key(space, MEMTX_OK);
 }
 
+size_t
+MemtxSpace::bsize() const
+{
+	return m_bsize;
+}
+
 void
 MemtxSpace::buildSecondaryKey(struct space *old_space,
 			      struct space *new_space, Index *new_index)
@@ -725,6 +732,16 @@ MemtxSpace::prepareTruncateSpace(struct space *old_space,
 	replace = handler->replace;
 }
 
+void
+MemtxSpace::bsize_update(const struct tuple *old_tuple,
+			 const struct tuple *new_tuple)
+{
+	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;
+	ssize_t new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
+	assert((ssize_t)m_bsize + new_bsize - old_bsize >= 0);
+	m_bsize += new_bsize - old_bsize;
+}
+
 static void
 memtx_prune_space(struct space *space)
 {
@@ -761,6 +778,9 @@ MemtxSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 	/* Delete all tuples when the last index is dropped. */
 	if (new_space->index_count == 0)
 		memtx_prune_space(old_space);
+	else
+		((MemtxSpace *)new_space->handler)->m_bsize =
+			((MemtxSpace *)old_space->handler)->m_bsize;
 }
 
 /* }}} DDL */

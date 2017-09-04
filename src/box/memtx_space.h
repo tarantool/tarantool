@@ -91,6 +91,21 @@ struct MemtxSpace: public Handler {
 	virtual void commitAlterSpace(struct space *old_space,
 				      struct space *new_space) override;
 	virtual void initSystemSpace(struct space *space) override;
+
+	virtual size_t
+	bsize() const override;
+
+	/**
+	 * Change binary size of a space subtracting old tuple's
+	 * size and adding new tuple's size. Used also for
+	 * rollback by swaping old and new tuple.
+	 * @param old_tuple Old tuple (replaced or deleted).
+	 * @param new_tuple New tuple (inserted).
+	 */
+	void
+	bsize_update(const struct tuple *old_tuple,
+		     const struct tuple *new_tuple);
+
 public:
 	/**
 	 * A pointer to replace function, set to different values
@@ -109,8 +124,11 @@ private:
 	void
 	prepareUpsert(struct txn_stmt *stmt, struct space *space,
 		      struct request *request);
+
 private:
 	struct tuple_format *m_format;
+	/* Number of bytes used in memory by tuples in the space. */
+	size_t m_bsize;
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */

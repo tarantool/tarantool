@@ -264,6 +264,12 @@ Handler::commitAlterSpace(struct space *, struct space *)
 {
 }
 
+size_t
+Handler::bsize() const
+{
+	return 0;
+}
+
 /* }}} DDL */
 
 /* {{{ Engine API */

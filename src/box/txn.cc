@@ -82,7 +82,6 @@ txn_stmt_new(struct txn *txn)
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
-	stmt->bsize_change = 0;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 

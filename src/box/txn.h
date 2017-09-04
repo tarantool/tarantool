@@ -58,7 +58,6 @@ struct txn_stmt {
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
-	ptrdiff_t bsize_change; /* saved result of space_bsize_update(..) call */
 	/** Engine savepoint for the start of this statement. */
 	void *engine_savepoint;
 	/** Redo info: the binary log row */

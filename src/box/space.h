@@ -56,8 +56,6 @@ struct space {
 	struct rlist on_replace;
 	/** Triggers fired before space statement */
 	struct rlist on_stmt_begin;
-	/* Number of bytes used in memory by tuples in the space. */
-	size_t bsize;
 	/**
 	 * The number of *enabled* indexes in the space.
 	 *
@@ -152,7 +150,7 @@ index_find(struct space *space, uint32_t index_id)
  * Returns number of bytes used in memory by tuples in the space.
  */
 size_t
-space_bsize(struct space *space);
+space_bsize(const struct space *space);
 
 /** Get definition of the n-th index of the space. */
 struct index_def *
@@ -267,22 +265,6 @@ index_find_system(struct space *space, uint32_t index_id)
 	}
 	return (MemtxIndex *) index_find_xc(space, index_id);
 }
-
-/**
- * Updates space bsize field: decrease it by old tuple's bsize and
- * increase it by new one's.
- * Return an increment in space.bsize
- */
-ptrdiff_t
-space_bsize_update(struct space *space,
-		   const struct tuple *old_tuple,
-		   const struct tuple *new_tuple);
-
-/**
- * Revert previous change in space_bsize
- */
-void
-space_bsize_rollback(struct space *space, ptrdiff_t bsize_change);
 
 #endif /* defined(__cplusplus) */
 

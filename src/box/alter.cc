@@ -738,11 +738,6 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	rlist_swap(&alter->new_space->on_stmt_begin,
 		   &alter->old_space->on_stmt_begin);
 	/*
-	 * Init space bsize.
-	 */
-	if (alter->new_space->index_count != 0)
-		alter->new_space->bsize = alter->old_space->bsize;
-	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */

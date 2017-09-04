@@ -270,6 +270,11 @@ public:
 	 */
 	virtual void commitAlterSpace(struct space *old_space,
 				      struct space *new_space);
+
+	/** Binary size of a space. */
+	virtual size_t
+	bsize() const;
+
 	Engine *engine;
 };
 
