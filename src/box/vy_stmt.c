@@ -325,7 +325,6 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 
 	/* Copy statement data excluding UPSERT operations */
 	struct tuple_format *format = tuple_format_by_id(upsert->format_id);
-#ifndef NDEBUG
 	/*
 	 * UPSERT must have the n_upserts field in the extra
 	 * memory.
@@ -335,22 +334,7 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 	 * In other fields the REPLACE tuple format must equal to
 	 * the UPSERT tuple format.
 	 */
-	assert(format->field_map_size == replace_format->field_map_size);
-	assert(format->field_count == replace_format->field_count);
-	for (uint32_t i = 0; i < format->field_count; ++i) {
-		if (format->fields[i].name != NULL) {
-			assert(replace_format->fields[i].name != NULL);
-			assert(strcmp(format->fields[i].name,
-				      replace_format->fields[i].name) == 0);
-		} else {
-			assert(replace_format->fields[i].name == NULL);
-		}
-		assert(format->fields[i].type ==
-		       replace_format->fields[i].type);
-		assert(format->fields[i].offset_slot ==
-		       replace_format->fields[i].offset_slot);
-	}
-#endif
+	assert(tuple_format_eq(format, replace_format));
 	struct tuple *replace = vy_stmt_alloc(replace_format, bsize);
 	if (replace == NULL)
 		return NULL;

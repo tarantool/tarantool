@@ -156,6 +156,14 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
 		 struct field_def *space_fields, uint32_t space_field_count);
 
 /**
+ * Check that two tuple formats are identical.
+ * @param a format a
+ * @param b format b
+ */
+bool
+tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b);
+
+/**
  * Register the duplicate of the specified format.
  * @param src Original format.
  *
