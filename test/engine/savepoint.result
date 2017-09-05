@@ -10,12 +10,11 @@ s1 = nil
 ...
 s1 = box.savepoint()
 ---
-- error: Can not use savepoints - no active transaction
+- error: Can not set a savepoint in absence of active transaction
 ...
 box.rollback_to_savepoint(s1)
 ---
-- error: 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint({csavepoint=cdata,
-    txn_id=number})'
+- error: 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 box.begin() s1 = box.savepoint()
 ---
@@ -25,7 +24,7 @@ box.rollback()
 ...
 box.begin() box.rollback_to_savepoint(s1)
 ---
-- error: 'Can not rollback to savepoint: no such savepoint'
+- error: 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 box.rollback()
 ---
@@ -53,7 +52,7 @@ ok2
 ...
 errmsg2
 ---
-- 'Can not rollback to savepoint: no such savepoint'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 engine = test_run:get_cfg('engine')
 ---
@@ -316,7 +315,7 @@ ok1
 ...
 errmsg1
 ---
-- 'Can not rollback to savepoint: no such savepoint'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 s:drop()
 ---
@@ -349,32 +348,27 @@ test_run:cmd("setopt delimiter ''");
 ok1, errmsg1
 ---
 - false
-- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint({csavepoint=cdata,
-  txn_id=number})'
+- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok2, errmsg2
 ---
 - false
-- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint({csavepoint=cdata,
-  txn_id=number})'
+- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok3, errmsg3
 ---
 - false
-- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint({csavepoint=cdata,
-  txn_id=number})'
+- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok4, errmsg4
 ---
 - false
-- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint({csavepoint=cdata,
-  txn_id=number})'
+- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok5, errmsg5
 ---
 - false
-- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint({csavepoint=cdata,
-  txn_id=number})'
+- 'builtin/box/schema.lua:260: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 s:select{}
 ---
@@ -387,7 +381,7 @@ box.begin() ok1, errmsg1 = pcall(box.rollback_to_savepoint, s1) box.commit()
 ok1, errmsg1
 ---
 - false
-- 'Can not rollback to savepoint: no such savepoint'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 s:select{}
 ---
@@ -486,12 +480,12 @@ select7
 ok1, errmsg1
 ---
 - false
-- 'Can not rollback to savepoint: no such savepoint'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 ok2, errmsg2
 ---
 - false
-- 'Can not rollback to savepoint: no such savepoint'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 s:truncate()
 ---
@@ -556,7 +550,7 @@ s:select{}
 ok1, errmsg1
 ---
 - false
-- 'Can not rollback to savepoint: no such savepoint'
+- 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 s:truncate()
 ---

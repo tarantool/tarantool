@@ -91,7 +91,7 @@ memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
 	}
 	((MemtxIndex *) space->index[0])->buildNext(stmt->new_tuple);
 	stmt->engine_savepoint = stmt;
-	((MemtxSpace *) space->handler)->bsize_update(NULL, stmt->new_tuple);
+	((MemtxSpace *) space->handler)->updateBsize(NULL, stmt->new_tuple);
 }
 
 /**
@@ -105,8 +105,8 @@ memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
 	stmt->old_tuple = space->index[0]->replace(stmt->old_tuple,
 						   stmt->new_tuple, mode);
 	stmt->engine_savepoint = stmt;
-	((MemtxSpace *) space->handler)->bsize_update(stmt->old_tuple,
-						      stmt->new_tuple);
+	((MemtxSpace *) space->handler)->updateBsize(stmt->old_tuple,
+						     stmt->new_tuple);
 }
 
 /**
@@ -234,7 +234,7 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 	}
 	stmt->old_tuple = old_tuple;
 	stmt->engine_savepoint = stmt;
-	((MemtxSpace *) space->handler)->bsize_update(old_tuple, new_tuple);
+	((MemtxSpace *) space->handler)->updateBsize(old_tuple, new_tuple);
 }
 
 
@@ -733,7 +733,7 @@ MemtxSpace::prepareTruncateSpace(struct space *old_space,
 }
 
 void
-MemtxSpace::bsize_update(const struct tuple *old_tuple,
+MemtxSpace::updateBsize(const struct tuple *old_tuple,
 			 const struct tuple *new_tuple)
 {
 	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;

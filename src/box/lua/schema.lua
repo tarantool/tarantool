@@ -257,8 +257,7 @@ local function check_savepoint(savepoint)
        type(tonumber(savepoint.txn_id)) ~= 'number' or
        type(savepoint.csavepoint) ~= 'cdata' or
        not ffi.istype(savepoint_type, savepoint.csavepoint) then
-        error("Usage: box.rollback_to_savepoint({csavepoint=cdata, "..
-              "txn_id=number})")
+        error("Usage: box.rollback_to_savepoint(savepoint)")
     end
 end
 

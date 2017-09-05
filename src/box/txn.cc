@@ -396,40 +396,40 @@ box_txn_savepoint()
 		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
 		return NULL;
 	}
-	struct txn_savepoint *ret =
+	struct txn_savepoint *svp =
 		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
 							struct txn_savepoint);
-	if (ret == NULL) {
-		diag_set(OutOfMemory, sizeof(*ret) + alignof(*ret) - 1,
-			 "region_alloc_object", "ret");
+	if (svp == NULL) {
+		diag_set(OutOfMemory, sizeof(*svp) + alignof(*svp) - 1,
+			 "region_alloc_object", "svp");
 		return NULL;
 	}
 	if (stailq_empty(&txn->stmts)) {
-		ret->is_first = true;
-		return ret;
+		svp->is_first = true;
+		return svp;
 	}
-	ret->is_first = false;
-	ret->saved_stmt = txn_last_stmt(txn);
-	ret->in_sub_stmt = txn->in_sub_stmt;
-	return ret;
+	svp->is_first = false;
+	svp->stmt = txn_last_stmt(txn);
+	svp->in_sub_stmt = txn->in_sub_stmt;
+	return svp;
 }
 
 int
-box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint)
+box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL) {
 		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
 		return -1;
 	}
-	struct txn_stmt *stmt = savepoint->saved_stmt;
-	if (!savepoint->is_first && (stmt == NULL || stmt->space == NULL ||
-	    savepoint->in_sub_stmt != txn->in_sub_stmt)) {
+	struct txn_stmt *stmt = svp->stmt;
+	if (!svp->is_first && (stmt == NULL || stmt->space == NULL ||
+			       svp->in_sub_stmt != txn->in_sub_stmt)) {
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
 	struct stailq rollback_stmts;
-	if (savepoint->is_first) {
+	if (svp->is_first) {
 		rollback_stmts = txn->stmts;
 		stailq_create(&txn->stmts);
 	} else {
@@ -447,8 +447,9 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint)
 		}
 		stmt->space = NULL;
 	}
-	savepoint->is_first = false;
-	savepoint->saved_stmt = NULL;
+	/* Destroy the savepoint to provide error on double rollback */
+	svp->is_first = false;
+	svp->stmt = NULL;
 	return 0;
 }
 

@@ -79,10 +79,10 @@ struct txn_savepoint {
 	 * Statement, on which a savepoint is created. On rollback
 	 * to this savepoint all newer statements are rolled back.
 	 */
-	struct txn_stmt *saved_stmt;
+	struct txn_stmt *stmt;
 	/**
 	 * True, if a savepoint is created when a transaction is
-	 * empty. In such a case saved_stmt can not be used.
+	 * empty. In such a case stmt can not be used.
 	 */
 	bool is_first;
 };
@@ -271,6 +271,11 @@ txn_last_stmt(struct txn *txn)
 
 /** \cond public */
 
+/**
+ * Transaction id - a non-persistent unique identifier
+ * of the current transaction. -1 if there is no current
+ * transaction.
+ */
 API_EXPORT int64_t
 box_txn_id(void);
 

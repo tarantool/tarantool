@@ -369,7 +369,7 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 	}
 	/** Reset to old bsize, if it was changed. */
 	if (stmt->engine_savepoint != NULL)
-		handler->bsize_update(stmt->new_tuple, stmt->old_tuple);
+		handler->updateBsize(stmt->new_tuple, stmt->old_tuple);
 
 	if (stmt->new_tuple)
 		tuple_unref(stmt->new_tuple);

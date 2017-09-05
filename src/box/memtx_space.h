@@ -103,8 +103,8 @@ struct MemtxSpace: public Handler {
 	 * @param new_tuple New tuple (inserted).
 	 */
 	void
-	bsize_update(const struct tuple *old_tuple,
-		     const struct tuple *new_tuple);
+	updateBsize(const struct tuple *old_tuple,
+		    const struct tuple *new_tuple);
 
 public:
 	/**
