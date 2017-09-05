@@ -106,6 +106,50 @@ local function socket_close(socket)
     return true
 end
 
+local soname_mt = {
+    __tostring = function(si)
+        if si.host == nil and si.port == nil then
+            return ''
+        end
+        if si.host == nil then
+            return format('%s:%s', '0', tostring(si.port))
+        end
+
+        if si.port == nil then
+            return format('%s:%', tostring(si.host), 0)
+        end
+        return format('%s:%s', tostring(si.host), tostring(si.port))
+    end
+}
+
+local function socket_name(self)
+    local fd = check_socket(self)
+    local aka = internal.name(fd)
+    if aka == nil then
+        self._errno = boxerrno()
+        return nil
+    end
+    self._errno = nil
+    setmetatable(aka, soname_mt)
+    return aka
+end
+
+local function socket_peer(self)
+    local fd = check_socket(self)
+    local peer = internal.peer(fd)
+    if peer == nil then
+        self._errno = boxerrno()
+        return nil
+    end
+    self._errno = nil
+    setmetatable(peer, soname_mt)
+    return peer
+end
+
+local function socket_fd(self)
+    return check_socket(self)
+end
+
 local function get_ivalue(table, key)
     if type(key) == 'number' then
         return key
@@ -861,50 +905,6 @@ local function getaddrinfo(host, port, timeout, opts)
 
     end
     return internal.getaddrinfo(host, port, timeout, ga_opts)
-end
-
-local soname_mt = {
-    __tostring = function(si)
-        if si.host == nil and si.port == nil then
-            return ''
-        end
-        if si.host == nil then
-            return format('%s:%s', '0', tostring(si.port))
-        end
-
-        if si.port == nil then
-            return format('%s:%', tostring(si.host), 0)
-        end
-        return format('%s:%s', tostring(si.host), tostring(si.port))
-    end
-}
-
-local function socket_name(self)
-    local fd = check_socket(self)
-    local aka = internal.name(fd)
-    if aka == nil then
-        self._errno = boxerrno()
-        return nil
-    end
-    self._errno = nil
-    setmetatable(aka, soname_mt)
-    return aka
-end
-
-local function socket_peer(self)
-    local fd = check_socket(self)
-    local peer = internal.peer(fd)
-    if peer == nil then
-        self._errno = boxerrno()
-        return nil
-    end
-    self._errno = nil
-    setmetatable(peer, soname_mt)
-    return peer
-end
-
-local function socket_fd(self)
-    return check_socket(self)
 end
 
 -- tcp connector
