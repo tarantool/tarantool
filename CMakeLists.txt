@@ -37,6 +37,23 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
+#
+# Check submodules
+#
+function(update_submodules)
+    message(STATUS "Updating submodules")
+    execute_process(COMMAND ${GIT} submodule update --init --recursive
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endfunction()
+
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
+    if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
+        update_submodules()
+    else()
+        message(FATAL_ERROR "Failed to find submodules")
+    endif()
+endif()
+
 # Define GNU standard installation directories
 include(GNUInstallDirs)
 
@@ -149,9 +166,7 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
         message(STATUS "Generating VERSION file")
         file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
 
-        message(STATUS "Updating submodules")
-        execute_process(COMMAND ${GIT} submodule update --init --recursive
-                        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        update_submodules()
     endif()
 endif()
 
