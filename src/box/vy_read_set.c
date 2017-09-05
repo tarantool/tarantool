@@ -35,6 +35,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "trivia/util.h"
 #include "tuple.h"
 #include "vy_index.h"
 #include "vy_stmt.h"
@@ -44,7 +45,8 @@ vy_read_interval_cmpl(const struct vy_read_interval *a,
 		      const struct vy_read_interval *b)
 {
 	assert(a->index == b->index);
-	int cmp = vy_stmt_compare(a->left, b->left, a->index->cmp_def);
+	struct key_def *cmp_def = a->index->cmp_def;
+	int cmp = vy_stmt_compare(a->left, b->left, cmp_def);
 	if (cmp != 0)
 		return cmp;
 	if (a->left_belongs && !b->left_belongs)
@@ -53,7 +55,9 @@ vy_read_interval_cmpl(const struct vy_read_interval *a,
 		return 1;
 	uint32_t a_parts = tuple_field_count(a->left);
 	uint32_t b_parts = tuple_field_count(b->left);
-	if (a->left_belongs && b->left_belongs)
+	a_parts = MIN(a_parts, cmp_def->part_count);
+	b_parts = MIN(b_parts, cmp_def->part_count);
+	if (a->left_belongs)
 		return a_parts < b_parts ? -1 : a_parts > b_parts;
 	else
 		return a_parts > b_parts ? -1 : a_parts < b_parts;
@@ -64,7 +68,8 @@ vy_read_interval_cmpr(const struct vy_read_interval *a,
 		      const struct vy_read_interval *b)
 {
 	assert(a->index == b->index);
-	int cmp = vy_stmt_compare(a->right, b->right, a->index->cmp_def);
+	struct key_def *cmp_def = a->index->cmp_def;
+	int cmp = vy_stmt_compare(a->right, b->right, cmp_def);
 	if (cmp != 0)
 		return cmp;
 	if (a->right_belongs && !b->right_belongs)
@@ -73,7 +78,9 @@ vy_read_interval_cmpr(const struct vy_read_interval *a,
 		return -1;
 	uint32_t a_parts = tuple_field_count(a->right);
 	uint32_t b_parts = tuple_field_count(b->right);
-	if (a->right_belongs && b->right_belongs)
+	a_parts = MIN(a_parts, cmp_def->part_count);
+	b_parts = MIN(b_parts, cmp_def->part_count);
+	if (a->right_belongs)
 		return a_parts > b_parts ? -1 : a_parts < b_parts;
 	else
 		return a_parts < b_parts ? -1 : a_parts > b_parts;
@@ -85,7 +92,8 @@ vy_read_interval_should_merge(const struct vy_read_interval *l,
 {
 	assert(l->index == r->index);
 	assert(vy_read_interval_cmpl(l, r) <= 0);
-	int cmp = vy_stmt_compare(l->right, r->left, l->index->cmp_def);
+	struct key_def *cmp_def = l->index->cmp_def;
+	int cmp = vy_stmt_compare(l->right, r->left, cmp_def);
 	if (cmp > 0)
 		return true;
 	if (cmp < 0)
@@ -96,6 +104,8 @@ vy_read_interval_should_merge(const struct vy_read_interval *l,
 		return false;
 	uint32_t l_parts = tuple_field_count(l->right);
 	uint32_t r_parts = tuple_field_count(r->left);
+	l_parts = MIN(l_parts, cmp_def->part_count);
+	r_parts = MIN(r_parts, cmp_def->part_count);
 	if (l->right_belongs)
 		return l_parts <= r_parts;
 	else

@@ -290,6 +290,21 @@ _ = s:insert{1000} -- send c to read view
 c("s:get(1000)") -- none
 c:commit()
 
+s:truncate()
+----------------------------------------------------------------
+_ = s:insert{1, 0}
+_ = s:insert{2, 0}
+_ = s:insert{3, 0}
+_ = s:insert{4, 0}
+
+gap_lock_count() -- 0
+
+c:begin()
+c("s:select({1}, {iterator = 'GE', limit = 2})") -- locks [1, 2]
+c("s:select({2}, {iterator = 'GT', limit = 2})") -- locks (2, 4]
+gap_lock_count() -- 1
+c:commit()
+
 s:drop()
 ----------------------------------------------------------------
 s = box.schema.space.create('test', {engine = 'vinyl'})

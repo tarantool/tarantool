@@ -303,12 +303,46 @@ vy_tx_savepoint(struct vy_tx *tx)
 void
 vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp);
 
-/** Remember a read in the conflict manager index. */
+/**
+ * Remember a read interval in the conflict manager index.
+ * On success, this function guarantees that if another
+ * transaction successfully commits a statement within a
+ * tracked interval, the transaction the interval belongs
+ * to will be aborted.
+ *
+ * @param tx            Transaction that invoked the read.
+ * @param index         Index that was read from.
+ * @param left          Left boundary of the read interval.
+ * @param left_belongs  Set if the left boundary belongs to
+ *                      the interval.
+ * @param right         Right boundary of the read interval.
+ * @param right_belongs Set if the right boundary belongs to
+ *                      the interval.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
 int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
 	    struct tuple *left, bool left_belongs,
 	    struct tuple *right, bool right_belongs);
 
+/**
+ * Remember a point read in the conflict manager index.
+ *
+ * @param tx    Transaction that invoked the read.
+ * @param index Index that was read from.
+ * @param stmt  Key that was read.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ *
+ * Note, this function isn't just a shortcut to vy_tx_track().
+ * Before adding the key to the conflict manager index, it checks
+ * if the key was overwritten by the transaction itself. If this
+ * is the case, there is no point in tracking the key, because the
+ * transaction read it from its own write set.
+ */
 int
 vy_tx_track_point(struct vy_tx *tx, struct vy_index *index,
 		  struct tuple *stmt);
