@@ -93,7 +93,7 @@ end
 
 local gc_socket_sentinel = ffi.new(gc_socket_t, { fd = -1 })
 
-local function close_socket(socket)
+local function socket_close(socket)
     local fd = check_socket(socket)
     socket._errno = nil
     local r = ffi.C.coio_close(fd)
@@ -130,8 +130,7 @@ local function get_iflags(table, flags)
     return res
 end
 
-local socket_methods  = {}
-socket_methods.errno = function(self)
+local function socket_errno(self)
     check_socket(self)
     if self['_errno'] == nil then
         return 0
@@ -140,7 +139,7 @@ socket_methods.errno = function(self)
     end
 end
 
-socket_methods.error = function(self)
+local function socket_error(self)
     check_socket(self)
     if self['_errno'] == nil then
         return nil
@@ -153,7 +152,7 @@ end
 local addrbuf = ffi.new('char[128]') -- enough to fit any address
 local addr = ffi.cast('struct sockaddr *', addrbuf)
 local addr_len = ffi.new('socklen_t[1]')
-socket_methods.sysconnect = function(self, host, port)
+local function socket_sysconnect(self, host, port)
     local fd = check_socket(self)
     self._errno = nil
 
@@ -184,7 +183,7 @@ local function syswrite(self, charptr, size)
     return tonumber(done)
 end
 
-socket_methods.syswrite = function(self, arg1, arg2)
+local function socket_syswrite(self, arg1, arg2)
     -- TODO: ffi.istype('char *', arg1) doesn't work for ffi.new('char[256]')
     if type(arg1) == 'cdata' and arg2 ~= nil then
         return syswrite(self, arg1, arg2)
@@ -208,7 +207,7 @@ local function sysread(self, charptr, size)
     return tonumber(res)
 end
 
-socket_methods.sysread = function(self, arg1, arg2)
+local function socket_sysread(self, arg1, arg2)
     -- TODO: ffi.istype('char *', arg1) doesn't work for ffi.new('char[256]')
     if type(arg1) == 'cdata' and arg2 ~= nil then
         return sysread(self, arg1, arg2)
@@ -231,7 +230,7 @@ socket_methods.sysread = function(self, arg1, arg2)
     end
 end
 
-socket_methods.nonblock = function(self, nb)
+local function socket_nonblock(self, nb)
     local fd = check_socket(self)
     self._errno = nil
 
@@ -271,19 +270,19 @@ local function do_wait(self, what, timeout)
     return res
 end
 
-socket_methods.readable = function(self, timeout)
+local function socket_readable(self, timeout)
     return do_wait(self, 1, timeout) ~= 0
 end
 
-socket_methods.writable = function(self, timeout)
+local function socket_writable(self, timeout)
     return do_wait(self, 2, timeout) ~= 0
 end
 
-socket_methods.wait = function(self, timeout)
+local function socket_wait(self, timeout)
     return do_wait(self, 'RW', timeout)
 end
 
-socket_methods.listen = function(self, backlog)
+local function socket_listen(self, backlog)
     local fd = check_socket(self)
     self._errno = nil
     if backlog == nil then
@@ -297,7 +296,7 @@ socket_methods.listen = function(self, backlog)
     return true
 end
 
-socket_methods.bind = function(self, host, port)
+local function socket_bind(self, host, port)
     local fd = check_socket(self)
     self._errno = nil
 
@@ -317,9 +316,7 @@ socket_methods.bind = function(self, host, port)
     return false
 end
 
-socket_methods.close = close_socket
-
-socket_methods.shutdown = function(self, how)
+local function socket_shutdown(self, how)
     local fd = check_socket(self)
     local hvariants = {
         ['R']           = 0,
@@ -346,7 +343,7 @@ socket_methods.shutdown = function(self, how)
     return true
 end
 
-socket_methods.setsockopt = function(self, level, name, value)
+local function socket_setsockopt(self, level, name, value)
     local fd = check_socket(self)
 
     local info = get_ivalue(internal.SO_OPT, name)
@@ -412,7 +409,7 @@ socket_methods.setsockopt = function(self, level, name, value)
     error(format("Unsupported socket option: %s", name))
 end
 
-socket_methods.getsockopt = function(self, level, name)
+local function socket_getsockopt(self, level, name)
     local fd = check_socket(self)
 
     local info = get_ivalue(internal.SO_OPT, name)
@@ -473,7 +470,7 @@ socket_methods.getsockopt = function(self, level, name)
     error(format("Unsupported socket option: %s", name))
 end
 
-socket_methods.linger = function(self, active, timeout)
+local function socket_linger(self, active, timeout)
     local fd = check_socket(self)
 
     local info = internal.SO_OPT.SO_LINGER
@@ -519,7 +516,7 @@ socket_methods.linger = function(self, active, timeout)
     return active, timeout
 end
 
-socket_methods.accept = function(self)
+local function socket_accept(self)
     local server_fd = check_socket(self)
     self._errno = nil
 
@@ -623,12 +620,11 @@ local function read(self, limit, timeout, check, ...)
                 rbuf.rpos = rbuf.rpos + len
                 return data
             end
-        elseif not errno_is_transient[self:errno()] then
-            self._errno = boxerrno()
+        elseif not errno_is_transient[self._errno] then
             return nil
         end
 
-        if not self:readable(timeout) then
+        if not socket_readable(self, timeout) then
             return nil
         end
         if timeout <= 0 then
@@ -640,7 +636,7 @@ local function read(self, limit, timeout, check, ...)
     return nil
 end
 
-socket_methods.read = function(self, opts, timeout)
+local function socket_read(self, opts, timeout)
     check_socket(self)
     timeout = timeout or TIMEOUT_INFINITY
     if type(opts) == 'number' then
@@ -661,7 +657,7 @@ socket_methods.read = function(self, opts, timeout)
     error('Usage: s:read(delimiter|chunk|{delimiter = x, chunk = x}, timeout)')
 end
 
-socket_methods.write = function(self, octets, timeout)
+local function socket_write(self, octets, timeout)
     check_socket(self)
     if timeout == nil then
         timeout = TIMEOUT_INFINITY
@@ -685,18 +681,18 @@ socket_methods.write = function(self, octets, timeout)
             if p == e then
                 return e - s
             end
-        elseif not errno_is_transient[self:errno()] then
+        elseif not errno_is_transient[self._errno] then
             return nil
         end
 
         timeout = timeout - (fiber.clock() - started)
-        if timeout <= 0 or not self:writable(timeout) then
+        if timeout <= 0 or not socket_writable(self, timeout) then
             break
         end
     end
 end
 
-socket_methods.send = function(self, octets, flags)
+local function socket_send(self, octets, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
 
@@ -709,7 +705,7 @@ socket_methods.send = function(self, octets, flags)
     return tonumber(res)
 end
 
-socket_methods.recv = function(self, size, flags)
+local function socket_recv(self, size, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
     if iflags == nil then
@@ -730,7 +726,7 @@ socket_methods.recv = function(self, size, flags)
     return ffi.string(buf, res)
 end
 
-socket_methods.recvfrom = function(self, size, flags)
+local function socket_recvfrom(self, size, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
     if iflags == nil then
@@ -748,7 +744,7 @@ socket_methods.recvfrom = function(self, size, flags)
     return res, from
 end
 
-socket_methods.sendto = function(self, host, port, octets, flags)
+local function socket_sendto(self, host, port, octets, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
 
@@ -779,7 +775,7 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     return tonumber(res)
 end
 
-local function create_socket(domain, stype, proto)
+local function socket_new(domain, stype, proto)
     local idomain = get_ivalue(internal.DOMAIN, domain)
     if idomain == nil then
         boxerrno(boxerrno.EINVAL)
@@ -883,7 +879,7 @@ local soname_mt = {
     end
 }
 
-socket_methods.name = function(self)
+local function socket_name(self)
     local fd = check_socket(self)
     local aka = internal.name(fd)
     if aka == nil then
@@ -895,7 +891,7 @@ socket_methods.name = function(self)
     return aka
 end
 
-socket_methods.peer = function(self)
+local function socket_peer(self)
     local fd = check_socket(self)
     local peer = internal.peer(fd)
     if peer == nil then
@@ -907,18 +903,18 @@ socket_methods.peer = function(self)
     return peer
 end
 
-socket_methods.fd = function(self)
+local function socket_fd(self)
     return check_socket(self)
 end
 
 -- tcp connector
 local function tcp_connect_remote(remote, timeout)
-    local s = create_socket(remote.family, remote.type, remote.protocol)
+    local s = socket_new(remote.family, remote.type, remote.protocol)
     if not s then
         -- Address family is not supported by the host
         return nil
     end
-    local res = s:sysconnect(remote.host, remote.port)
+    local res = socket_sysconnect(s, remote.host, remote.port)
     if res then
         -- Even through the socket is nonblocking, if the server to which we
         -- are connecting is on the same host, the connect is normally
@@ -926,22 +922,22 @@ local function tcp_connect_remote(remote, timeout)
         boxerrno(0)
         return s
     end
-    local save_errno = s:errno()
+    local save_errno = s._errno
     if save_errno ~= boxerrno.EINPROGRESS then
-        s:close()
+        socket_close(s)
         boxerrno(save_errno)
         return nil
     end
     -- Wait until the connection is established or ultimately fails.
     -- In either condition the socket becomes writable. To tell these
     -- conditions appart SO_ERROR must be consulted (man connect).
-    if s:writable(timeout) then
-        save_errno = s:getsockopt('SOL_SOCKET', 'SO_ERROR')
+    if socket_writable(s, timeout) then
+        save_errno = socket_getsockopt(s, 'SOL_SOCKET', 'SO_ERROR')
     else
         save_errno = boxerrno.ETIMEDOUT
     end
     if save_errno ~= 0 then
-        s:close()
+        socket_close(s)
         boxerrno(save_errno)
         return nil
     end
@@ -991,12 +987,13 @@ end
 local function tcp_server_loop(server, s, addr)
     fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port))
     log.info("started")
-    while s:readable() do
-        local sc, from = s:accept()
+    while socket_readable(s) do
+        local sc, from = socket_accept(s)
         if sc == nil then
-            local errno = s:errno()
+            local errno = s._errno
             if not errno_is_transient[errno] then
-                log.error('accept(%s) failed: %s', tostring(s), s:error())
+                log.error('accept(%s) failed: %s', tostring(s),
+                          socket_error(s))
             end
             if  errno_is_fatal[errno] then
                 break
@@ -1017,7 +1014,7 @@ local function tcp_server_usage()
 end
 
 local function tcp_server_bind(s, addr)
-    if s:bind(addr.host, addr.port) then
+    if socket_bind(s, addr.host, addr.port) then
         return true
     end
 
@@ -1049,7 +1046,7 @@ local function tcp_server_bind(s, addr)
         boxerrno(save_errno)
         return false
     end
-    return s:bind(addr.host, addr.port)
+    return socket_bind(s, addr.host, addr.port)
 end
 
 
@@ -1083,17 +1080,17 @@ local function tcp_server(host, port, opts, timeout)
     end
 
     for _, addr in ipairs(dns) do
-        local s = create_socket(addr.family, addr.type, addr.protocol)
+        local s = socket_new(addr.family, addr.type, addr.protocol)
         if s ~= nil then
             local backlog
             if server.prepare then
                 backlog = server.prepare(s)
             else
-                s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
+                socket_setsockopt(s, 'SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
             end
             if not tcp_server_bind(s, addr) or not s:listen(backlog) then
                 local save_errno = boxerrno()
-                s:close()
+                socket_close(s)
                 boxerrno(save_errno)
                 return nil
             end
@@ -1107,17 +1104,44 @@ local function tcp_server(host, port, opts, timeout)
 end
 
 socket_mt   = {
-    __index     = socket_methods,
+    __index = {
+        close = socket_close;
+        errno = socket_errno;
+        error = socket_error;
+        sysconnect = socket_sysconnect;
+        syswrite = socket_syswrite;
+        sysread = socket_sysread;
+        nonblock = socket_nonblock;
+        readable = socket_readable;
+        writable = socket_writable;
+        wait = socket_wait;
+        listen = socket_listen;
+        bind = socket_bind;
+        shutdown = socket_shutdown;
+        setsockopt = socket_setsockopt;
+        getsockopt = socket_getsockopt;
+        linger = socket_linger;
+        accept = socket_accept;
+        read = socket_read;
+        write = socket_write;
+        send = socket_send;
+        recv = socket_recv;
+        recvfrom = socket_recvfrom;
+        sendto = socket_sendto;
+        name = socket_name;
+        peer = socket_peer;
+        fd = socket_fd;
+    };
     __tostring  = function(self)
         local fd = check_socket(self)
 
         local save_errno = self._errno
         local name = format("fd %d", fd)
-        local aka = self:name()
+        local aka = socket_name(self)
         if aka ~= nil then
             name = format("%s, aka %s:%s", name, aka.host, aka.port)
         end
-        local peer = self:peer(self)
+        local peer = socket_peer(self)
         if peer ~= nil then
             name = format("%s, peer %s:%s", name, peer.host, peer.port)
         end
@@ -1127,7 +1151,7 @@ socket_mt   = {
     __serialize = function(self)
         -- Allow YAML, MsgPack and JSON to dump objects with sockets
         local fd = check_socket(self)
-        return { fd = fd, peer = self:peer(), name = self:name() }
+        return { fd = fd, peer = socket_peer(self), name = socket_name(self) }
     end
 }
 
@@ -1137,5 +1161,5 @@ return setmetatable({
     tcp_server = tcp_server,
     iowait = internal.iowait
 }, {
-    __call = function(self, ...) return create_socket(...) end;
+    __call = function(self, ...) return socket_new(...) end;
 })
