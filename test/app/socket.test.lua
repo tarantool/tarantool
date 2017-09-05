@@ -564,3 +564,153 @@ f = fiber.create(function()
 end);
 test_run:cmd("setopt delimiter ''");
 f:cancel()
+
+--------------------------------------------------------------------------------
+-- Lua Socket Emulation
+--------------------------------------------------------------------------------
+
+test_run:cmd("push filter 'fd=([0-9]+)' to 'fd=<FD>'")
+
+s = socket.tcp()
+s
+s:close()
+-- Sic: incompatible with Lua Socket
+s:close()
+
+s = socket.tcp()
+host, port, family = s:getsockname()
+host == '0.0.0.0', port == '0', family == 'inet'
+status, reason = s:getpeername()
+status == nil, type(reason) == 'string'
+s:settimeout(100500)
+s:setoption('keepalive', true)
+s:setoption('linger', { on = true })
+s:setoption('linger', true)
+s:setoption('reuseaddr', true)
+s:setoption('tcp-nodelay', true)
+s:setoption('unknown', true)
+s:bind('127.0.0.1', 0)
+s:bind('127.0.0.1', 0) -- error handling
+s:listen(10)
+s -- transformed to tcp{server} socket
+host, port, family = s:getsockname()
+host == '127.0.0.1', type(port) == 'string', family == 'inet'
+status, reason = s:getpeername()
+status == nil, type(reason) == 'string'
+s:settimeout(0)
+status, reason = s:accept()
+status == nil, type(reason) == 'string'
+s:settimeout(0.001)
+status, reason = s:accept()
+status == nil, type(reason) == 'string'
+s:settimeout(100500)
+
+rch, wch = fiber.channel(1), fiber.channel(1)
+sc = socket.connect(host, port)
+test_run:cmd("setopt delimiter ';'")
+cfiber = fiber.create(function(sc, rch, wch)
+    while sc:send(wch:get()) and rch:put(sc:receive("*l")) do end
+end, sc, rch, wch);
+test_run:cmd("setopt delimiter ''");
+
+c = s:accept()
+c
+chost, cport, cfamily = c:getsockname()
+chost == '127.0.0.1', type(cport) == 'string', cfamily == 'inet'
+chost, cport, cfamily = c:getpeername()
+chost == '127.0.0.1', type(cport) == 'string', cfamily == 'inet'
+
+wch:put("Ping\n")
+c:receive("*l")
+c:send("Pong\n")
+rch:get()
+wch:put("HELO lua\nMAIL FROM: <roman@tarantool.org>\n")
+c:receive("*l")
+c:receive("*l")
+c:send("250 Welcome to Lua Universe\n")
+c:send("$$$250 OK\n$$$", 4, 11)
+rch:get()
+wch:put("RCPT TO: <team@lua.org>\n")
+c:receive()
+c:send("250")
+c:send(" ")
+c:send("OK")
+c:send("\n")
+rch:get()
+wch:put("DATA\n")
+c:receive(4)
+c:receive("*l")
+wch:put("Fu")
+c:send("354 Please type your message\n")
+sc:close()
+c:receive("*l", "Line: ")
+c:receive()
+c:receive(10)
+c:receive("*a")
+c:close()
+
+-- eof with bytes
+sc = socket.connect(host, port)
+sc
+c = s:accept()
+c
+_ = fiber.create(function() sc:send("Po") end)
+sc:close()
+c:receive(100500, "Message:")
+c:close()
+
+-- eof with '*l'
+sc = socket.connect(host, port)
+sc
+c = s:accept()
+c
+_ = fiber.create(function() sc:send("Pong\nPo") end)
+sc:close()
+c:receive("*l", "Message:")
+c:receive("*l", "Message: ")
+c:receive("*l", "Message: ")
+c:close()
+
+-- eof with '*a'
+sc = socket.connect(host, port)
+sc
+c = s:accept()
+c
+_ = fiber.create(function() sc:send("Pong\n") end)
+sc:close()
+c:receive("*a", "Message: ")
+c:receive("*a", "Message: ")
+c:close()
+
+-- shutdown
+sc = socket.connect(host, port)
+sc
+c = s:accept()
+c
+_ = fiber.create(function() sc:send("Pong\n") end)
+sc:shutdown("send")
+c:receive()
+c:shutdown("send")
+status, reason = c:shutdown("recv")
+status == nil, type(reason) == 'string'
+status, reason = c:shutdown("recv")
+status == nil, type(reason) == 'string'
+status, reason = c:shutdown("both")
+status == nil, type(reason) == 'string'
+c:close()
+sc:close()
+s:close()
+
+-- socket.bind / socket.connect
+s = socket.bind('0.0.0.0', 0)
+s
+host, port, family = s:getsockname()
+sc = socket.connect(host, port)
+sc
+sc:close()
+sc = socket.tcp()
+sc:connect(host, port)
+sc:close()
+s:close()
+
+test_run:cmd("clear filter")

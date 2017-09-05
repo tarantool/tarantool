@@ -387,10 +387,13 @@ local function socket_shutdown(self, how)
     local hvariants = {
         ['R']           = 0,
         ['READ']        = 0,
+        ['receive']     = 0,
         ['W']           = 1,
         ['WRITE']       = 1,
+        ['send']        = 1,
         ['RW']          = 2,
         ['READ_WRITE']  = 2,
+        ["both"]        = 2,
 
         [0]             = 0,
         [1]             = 1,
@@ -918,48 +921,47 @@ local function getaddrinfo(host, port, timeout, opts)
 end
 
 -- tcp connector
-local function tcp_connect_remote(remote, timeout)
-    local s = socket_new(remote.family, remote.type, remote.protocol)
-    if not s then
-        -- Address family is not supported by the host
-        return nil
-    end
-    local res = socket_sysconnect(s, remote.host, remote.port)
+local function socket_tcp_connect(s, address, port, timeout)
+    local res = socket_sysconnect(s, address, port)
     if res then
         -- Even through the socket is nonblocking, if the server to which we
         -- are connecting is on the same host, the connect is normally
         -- established immediately when we call connect (Stevens UNP).
-        boxerrno(0)
-        return s
+        return true
     end
-    local save_errno = s._errno
-    if save_errno ~= boxerrno.EINPROGRESS then
-        socket_close(s)
-        boxerrno(save_errno)
+    if s._errno ~= boxerrno.EINPROGRESS then
         return nil
     end
     -- Wait until the connection is established or ultimately fails.
     -- In either condition the socket becomes writable. To tell these
     -- conditions appart SO_ERROR must be consulted (man connect).
     if socket_writable(s, timeout) then
-        save_errno = socket_getsockopt(s, 'SOL_SOCKET', 'SO_ERROR')
+        s._errno = socket_getsockopt(s, 'SOL_SOCKET', 'SO_ERROR')
     else
-        save_errno = boxerrno.ETIMEDOUT
+        s._errno = boxerrno.ETIMEDOUT
     end
-    if save_errno ~= 0 then
-        socket_close(s)
-        boxerrno(save_errno)
+    if s._errno ~= 0 then
         return nil
     end
     -- Connected
-    boxerrno(0)
-    return s
+    return true
 end
 
 local function tcp_connect(host, port, timeout)
     if host == 'unix/' then
-        return tcp_connect_remote({ host = host, port = port, protocol = 0,
-            family = 'PF_UNIX', type = 'SOCK_STREAM' }, timeout)
+        local s = socket_new('AF_UNIX', 'SOCK_STREAM', 0)
+        if not s then
+            -- Address family is not supported by the host
+            return nil
+        end
+        if not socket_tcp_connect(s, host, port, timeout) then
+            local save_errno = s._errno
+            s:close()
+            boxerrno(save_errno)
+            return nil
+        end
+        boxerrno(0)
+        return s
     end
     local timeout = timeout or TIMEOUT_INFINITY
     local stop = fiber.clock() + timeout
@@ -975,12 +977,18 @@ local function tcp_connect(host, port, timeout)
             boxerrno(boxerrno.ETIMEDOUT)
             return nil
         end
-        local s = tcp_connect_remote(remote, timeout)
+        local s = socket_new(remote.family, remote.type, remote.protocol)
         if s then
-            return s
+            if socket_tcp_connect(s, remote.host, remote.port, timeout) then
+                boxerrno(0)
+                return s
+            end
+            local save_errno = s:errno()
+            s:close()
+            boxerrno(save_errno)
         end
     end
-    -- errno is set by tcp_connect_remote()
+    -- errno is set by socket_tcp_connect()
     return nil
 end
 
@@ -1023,7 +1031,7 @@ local function tcp_server_usage()
     error('Usage: socket.tcp_server(host, port, handler | opts)')
 end
 
-local function tcp_server_bind(s, addr)
+local function tcp_server_bind_addr(s, addr)
     if socket_bind(s, addr.host, addr.port) then
         return true
     end
@@ -1060,22 +1068,7 @@ local function tcp_server_bind(s, addr)
 end
 
 
-local function tcp_server(host, port, opts, timeout)
-    local server = {}
-    if type(opts) == 'function' then
-        server.handler = opts
-    elseif type(opts) == 'table' then
-        if type(opts.handler) ~='function' or (opts.prepare ~= nil and
-            type(opts.prepare) ~= 'function') then
-            tcp_server_usage()
-        end
-        for k, v in pairs(opts) do
-            server[k] = v
-        end
-    else
-        tcp_server_usage()
-    end
-    server.name = server.name or 'server'
+local function tcp_server_bind(host, port, prepare, timeout)
     timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
     local dns
     if host == 'unix/' then
@@ -1093,24 +1086,47 @@ local function tcp_server(host, port, opts, timeout)
         local s = socket_new(addr.family, addr.type, addr.protocol)
         if s ~= nil then
             local backlog
-            if server.prepare then
-                backlog = server.prepare(s)
+            if prepare then
+                backlog = prepare(s)
             else
                 socket_setsockopt(s, 'SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
             end
-            if not tcp_server_bind(s, addr) or not s:listen(backlog) then
+            if not tcp_server_bind_addr(s, addr) or not s:listen(backlog) then
                 local save_errno = boxerrno()
                 socket_close(s)
                 boxerrno(save_errno)
                 return nil
             end
-            fiber.create(tcp_server_loop, server, s, addr)
             return s, addr
        end
     end
     -- DNS resolved successfully, but addresss family is not supported
     boxerrno(boxerrno.EAFNOSUPPORT)
     return nil
+end
+
+local function tcp_server(host, port, opts, timeout)
+    local server = {}
+    if type(opts) == 'function' then
+        server.handler = opts
+    elseif type(opts) == 'table' then
+        if type(opts.handler) ~='function' or (opts.prepare ~= nil and
+            type(opts.prepare) ~= 'function') then
+            tcp_server_usage()
+        end
+        for k, v in pairs(opts) do
+            server[k] = v
+        end
+    else
+        tcp_server_usage()
+    end
+    server.name = server.name or 'server'
+    local s, addr = tcp_server_bind(host, port, server.prepare, timeout)
+    if not s then
+        return nil
+    end
+    fiber.create(tcp_server_loop, server, s, addr)
+    return s, addr
 end
 
 socket_mt   = {
@@ -1165,6 +1181,306 @@ socket_mt   = {
     end
 }
 
+--------------------------------------------------------------------------------
+-- Lua Socket Emulation
+--------------------------------------------------------------------------------
+
+local lsocket_tcp_mt
+local lsocket_tcp_server_mt
+local lsocket_tcp_client_mt
+
+--
+-- TCP Master Socket
+--
+
+local function lsocket_tcp_tostring(self)
+    local fd = check_socket(self)
+    return string.format("tcp{master}: fd=%d", fd)
+end
+
+local function lsocket_tcp_close(self)
+    if not socket_close(self) then
+        return nil, socket_error(self)
+    end
+    return 1
+end
+
+local function lsocket_tcp_getsockname(self)
+    local aka = socket_name(self)
+    if aka == nil then
+        return nil, socket_error(self)
+    end
+    return aka.host, tostring(aka.port), aka.family:match("AF_(.*)"):lower()
+end
+
+local function lsocket_tcp_getpeername(self)
+    local peer = socket_peer(self)
+    if peer == nil then
+        return nil, socket_error(self)
+    end
+    return peer.host, tostring(peer.port), peer.family:match("AF_(.*)"):lower()
+end
+
+local function lsocket_tcp_settimeout(self, value, mode)
+    check_socket(self)
+    self.timeout = value
+    -- mode is effectively ignored
+    return 1
+end
+
+local function lsocket_tcp_setoption(self, option, value)
+    local r
+    if option == 'reuseaddr' then
+        r = socket_setsockopt(self, 'socket', 'SO_REUSEADDR', value)
+    elseif option == 'keepalive' then
+        r = socket_setsockopt(self, 'socket', 'SO_KEEPALIVE', value)
+    elseif option == 'linger' then
+        value = type(value) == 'table' and value.on or value
+        -- Sic: value.timeout is ignored
+        r = socket_linger(self, value)
+    elseif option == 'tcp-nodelay' then
+        r = socket_setsockopt(self, 'tcp', 'TCP_NODELAY', value)
+    else
+        error(format("Unknown socket option name: %s", tostring(option)))
+    end
+    if not r then
+        return nil, socket_error(self)
+    end
+    return 1
+end
+
+local function lsocket_tcp_bind(self, address, port)
+    if not socket_bind(self, address, port) then
+        return nil, socket_error(self)
+    end
+    return 1
+end
+
+local function lsocket_tcp_listen(self, backlog)
+    if not socket_listen(self, backlog) then
+        return nil, socket_error(self)
+    end
+    setmetatable(self, lsocket_tcp_server_mt)
+    return 1
+end
+
+local function lsocket_tcp_connect(self, host, port)
+    check_socket(self)
+    local deadline = fiber.clock() + (self.timeout or TIMEOUT_INFINITY)
+    -- This function is broken by design
+    local ga_opts = { family = 'AF_INET', type = 'SOCK_STREAM' }
+    local timeout = deadline - fiber.clock()
+    local dns = getaddrinfo(host, port, timeout, ga_opts)
+    if dns == nil or #dns == 0 then
+        self._errno = boxerrno.EINVAL
+        return nil, socket_error(self)
+    end
+    for _, remote in ipairs(dns) do
+        timeout = deadline - fiber.clock()
+        if socket_tcp_connect(self, remote.host, remote.port, timeout) then
+            return 1
+        end
+    end
+    return nil, socket_error(self)
+end
+
+lsocket_tcp_mt = {
+    __index = {
+        close = lsocket_tcp_close;
+        getsockname = lsocket_tcp_getsockname;
+        getpeername = lsocket_tcp_getpeername;
+        settimeout = lsocket_tcp_settimeout;
+        setoption = lsocket_tcp_setoption;
+        bind = lsocket_tcp_bind;
+        listen = lsocket_tcp_listen;
+        connect = lsocket_tcp_connect;
+    };
+    __tostring = lsocket_tcp_tostring;
+    __serialize = lsocket_tcp_tostring;
+};
+
+--
+-- TCP Server Socket
+--
+
+local function lsocket_tcp_server_tostring(self)
+    local fd = check_socket(self)
+    return string.format("tcp{server}: fd=%d", fd)
+end
+
+local function lsocket_tcp_accept(self)
+    check_socket(self)
+    local deadline = fiber.clock() + (self.timeout or TIMEOUT_INFINITY)
+    repeat
+        local client = socket_accept(self)
+        if client then
+            setmetatable(client, lsocket_tcp_client_mt)
+            return client
+        end
+        local errno = socket_errno(self)
+        if not errno_is_transient[errno] then
+            break
+        end
+    until not socket_readable(self, deadline - fiber.clock())
+    return nil, socket_error(self)
+end
+
+lsocket_tcp_server_mt = {
+    __index = {
+        close = lsocket_tcp_close;
+        getsockname = lsocket_tcp_getsockname;
+        getpeername = lsocket_tcp_getpeername;
+        settimeout = lsocket_tcp_settimeout;
+        setoption = lsocket_tcp_setoption;
+        accept = lsocket_tcp_accept;
+    };
+    __tostring = lsocket_tcp_server_tostring;
+    __serialize = lsocket_tcp_server_tostring;
+};
+
+--
+-- TCP Client Socket
+--
+
+local function lsocket_tcp_client_tostring(self)
+    local fd = check_socket(self)
+    return string.format("tcp{client}: fd=%d", fd)
+end
+
+local function lsocket_tcp_receive(self, pattern, prefix)
+    check_socket(self)
+    prefix = prefix or ''
+    local timeout = self.timeout or TIMEOUT_INFINITY
+    local data
+    if type(pattern) == 'number' then
+        data = read(self, pattern, timeout, check_limit)
+        if data == nil then
+            return nil, socket_error(self)
+        elseif #data < pattern then
+            -- eof
+            return nil, 'closed', prefix..data
+        else
+            return prefix..data
+        end
+    elseif pattern == "*l" or pattern == nil then
+        data = read(self, LIMIT_INFINITY, timeout, check_delimiter, {"\n"})
+        if data == nil then
+            return nil, socket_error(self)
+        elseif #data > 0 and data:byte(#data) == 10 then
+            -- remove '\n'
+            return prefix..data:sub(1, #data - 1)
+        else
+            -- eof
+            return nil, 'closed', prefix..data
+        end
+    elseif pattern == "*a" then
+        local result = { prefix }
+        local deadline = fiber.clock() + (self.timeout or TIMEOUT_INFINITY)
+        repeat
+            local data = socket_sysread(self)
+            if data == nil then
+                if not errno_is_transient[self._errno] then
+                    return nil, socket_error(self)
+                end
+            elseif data == '' then
+                break
+            else
+                table.insert(result, data)
+            end
+        until not socket_readable(self, deadline - fiber.clock())
+        if #result == 1 then
+            return nil, 'closed', table.concat(result)
+        end
+        return table.concat(result)
+    else
+        error("Usage: socket:receive(pattern, [, prefix])")
+    end
+end
+
+local function lsocket_tcp_send(self, data, i, j)
+    if i ~= nil then
+        data = string.sub(data, i, j)
+    end
+    local sent = socket_write(self, data, self.timeout)
+    if not sent then
+        return nil, socket_error(self)
+    end
+    return (i or 1) + sent - 1
+end
+
+local function lsocket_tcp_shutdown(self, how)
+    if not socket_shutdown(self, how) then
+        return nil, socket_error(self)
+    end
+    return 1
+end
+
+lsocket_tcp_client_mt = {
+    __index = {
+        close = lsocket_tcp_close;
+        getsockname = lsocket_tcp_getsockname;
+        getpeername = lsocket_tcp_getpeername;
+        settimeout = lsocket_tcp_settimeout;
+        setoption = lsocket_tcp_setoption;
+        receive = lsocket_tcp_receive;
+        send = lsocket_tcp_send;
+        shutdown = lsocket_tcp_shutdown;
+    };
+    __tostring = lsocket_tcp_client_tostring;
+    __serialize = lsocket_tcp_client_tostring;
+};
+
+--
+-- Unconnected tcp socket (tcp{master}) should not have receive() and
+-- send methods according to LuaSocket documentation[1]. Unfortunally,
+-- original implementation is buggy and doesn't match the documentation.
+-- Some modules (e.g. MobDebug) rely on this bug and attempt to invoke
+-- receive()/send() on unconnected sockets.
+-- [1]: http://w3.impa.br/~diego/software/luasocket/tcp.html
+--
+lsocket_tcp_mt.__index.receive = lsocket_tcp_receive;
+lsocket_tcp_mt.__index.send = lsocket_tcp_send;
+
+--
+-- TCP Constructor and Shortcuts
+--
+
+local function lsocket_tcp()
+    local s = socket_new('AF_INET', 'SOCK_STREAM', 'tcp')
+    if not s then
+        return nil, socket_error(self)
+    end
+    return setmetatable(s, lsocket_tcp_mt)
+end
+
+local function lsocket_connect(host, port)
+    if host == nil or port == nil then
+        error("Usage: luasocket.connect(host, port)")
+    end
+    local s = tcp_connect(host, port)
+    if not s then
+        return nil, boxerrno.strerror()
+    end
+    setmetatable(s, lsocket_tcp_client_mt)
+    return s
+end
+
+local function lsocket_bind(host, port, backlog)
+    if host == nil or port == nil then
+        error("Usage: luasocket.bind(host, port [, backlog])")
+    end
+    local function prepare(s) return backlog end
+    local s = tcp_server_bind(host, port, prepare)
+    if not s then
+        return nil, boxerrno.strerror()
+    end
+    return setmetatable(s, lsocket_tcp_server_mt)
+end
+
+--------------------------------------------------------------------------------
+-- Module Definition
+--------------------------------------------------------------------------------
+
 return setmetatable({
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
@@ -1173,4 +1489,9 @@ return setmetatable({
     internal = internal,
 }, {
     __call = function(self, ...) return socket_new(...) end;
+    __index = {
+        tcp = lsocket_tcp;
+        connect = lsocket_connect;
+        bind = lsocket_bind;
+    }
 })
