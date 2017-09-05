@@ -113,45 +113,16 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr,
 }
 
 /**
- * Free all resources allocated in a worker thread.
- */
-static void
-vy_merge_iterator_cleanup(struct vy_merge_iterator *itr)
-{
-	if (itr->curr_stmt != NULL) {
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
-	}
-	for (size_t i = 0; i < itr->src_count; i++) {
-		vy_iterator_close_f cb =
-			itr->src[i].iterator.iface->cleanup;
-		if (cb != NULL)
-			cb(&itr->src[i].iterator);
-	}
-	itr->src_capacity = 0;
-	itr->range_version = 0;
-	itr->range_tree_version = 0;
-	itr->mem_list_version = 0;
-	itr->p_range_version = NULL;
-	itr->p_range_tree_version = NULL;
-	itr->p_mem_list_version = NULL;
-}
-
-/**
  * Close the iterator and free resources.
- * Can be called only after cleanup().
  */
 static void
 vy_merge_iterator_close(struct vy_merge_iterator *itr)
 {
-	assert(cord_is_main());
-
-	assert(itr->curr_stmt == NULL);
+	if (itr->curr_stmt != NULL)
+		tuple_unref(itr->curr_stmt);
 	for (size_t i = 0; i < itr->src_count; i++)
 		itr->src[i].iterator.iface->close(&itr->src[i].iterator);
 	free(itr->src);
-	itr->src_count = 0;
-	itr->src = NULL;
 }
 
 /**
@@ -745,7 +716,6 @@ restart:
 	vy_range_iterator_restore(&itr->range_iterator, itr->curr_stmt,
 				  &itr->curr_range);
 	/* Re-create merge iterator */
-	vy_merge_iterator_cleanup(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
 			       itr->key, itr->index->cmp_def,
@@ -800,7 +770,6 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr, struct tuple **ret)
 	int rc = 0;
 	struct vy_index *index = itr->index;
 restart:
-	vy_merge_iterator_cleanup(&itr->merge_iterator);
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
 			       itr->key, index->cmp_def, index->mem_format,
@@ -1025,13 +994,9 @@ clear:
 void
 vy_read_iterator_close(struct vy_read_iterator *itr)
 {
-	assert(cord_is_main());
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
-	if (itr->search_started)
-		vy_merge_iterator_cleanup(&itr->merge_iterator);
-
 	if (itr->search_started)
 		vy_merge_iterator_close(&itr->merge_iterator);
 }

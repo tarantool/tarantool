@@ -871,7 +871,6 @@ static struct vy_stmt_iterator_iface vy_cache_iterator_iface = {
 	.next_key = vy_cache_iterator_next_key,
 	.next_lsn = vy_cache_iterator_next_lsn,
 	.restore = vy_cache_iterator_restore,
-	.cleanup = NULL,
 	.close = vy_cache_iterator_close,
 };
 

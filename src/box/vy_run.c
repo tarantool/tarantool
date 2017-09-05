@@ -1816,35 +1816,21 @@ vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
 }
 
 /**
- * Free all allocated resources in a worker thread.
- */
-static void
-vy_run_iterator_cleanup(struct vy_stmt_iterator *vitr)
-{
-	assert(vitr->iface->cleanup == vy_run_iterator_cleanup);
-	vy_run_iterator_cache_clean((struct vy_run_iterator *) vitr);
-}
-
-/**
  * Close the iterator and free resources.
- * Can be called only after cleanup().
  */
 static void
 vy_run_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_run_iterator_close);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
-	/* cleanup() must be called before */
-	assert(itr->curr_stmt == NULL && itr->curr_page == NULL);
+	vy_run_iterator_cache_clean(itr);
 	TRASH(itr);
-	(void) itr;
 }
 
 static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 	.next_key = vy_run_iterator_next_key,
 	.next_lsn = vy_run_iterator_next_lsn,
 	.restore = vy_run_iterator_restore,
-	.cleanup = vy_run_iterator_cleanup,
 	.close = vy_run_iterator_close,
 };
 

@@ -129,7 +129,6 @@ test_iterator_initial_restore()
 		if (rc != 0) {
 			wrong_rc = true;
 			i_fail = i;
-			itr.base.iface->cleanup(&itr.base);
 			itr.base.iface->close(&itr.base);
 			continue;
 		}
@@ -138,7 +137,6 @@ test_iterator_initial_restore()
 			if (t == NULL) {
 				wrong_value = true;
 				i_fail = i;
-				itr.base.iface->cleanup(&itr.base);
 				itr.base.iface->close(&itr.base);
 				continue;
 			}
@@ -159,7 +157,6 @@ test_iterator_initial_restore()
 			}
 		}
 
-		itr.base.iface->cleanup(&itr.base);
 		itr.base.iface->close(&itr.base);
 
 		tuple_unref(stmt);

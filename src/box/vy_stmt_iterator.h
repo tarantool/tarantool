@@ -103,7 +103,6 @@ struct vy_stmt_iterator_iface {
 	vy_iterator_next_key_f next_key;
 	vy_iterator_next_lsn_f next_lsn;
 	vy_iterator_restore_f restore;
-	vy_iterator_close_f cleanup;
 	vy_iterator_close_f close;
 };
 

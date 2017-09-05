@@ -872,39 +872,24 @@ done:
 }
 
 /**
- * Free all resources allocated in a worker thread.
- */
-static void
-vy_mem_iterator_cleanup(struct vy_stmt_iterator *vitr)
-{
-	assert(vitr->iface->cleanup == vy_mem_iterator_cleanup);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
-	if (itr->last_stmt != NULL)
-		tuple_unref(itr->last_stmt);
-	itr->last_stmt = NULL;
-}
-
-/**
  * Close the iterator and free resources.
- * Can be called only after cleanup().
  */
 static void
 vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_mem_iterator_close);
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
-	assert(itr->last_stmt == NULL);
+	if (itr->last_stmt != NULL)
+		tuple_unref(itr->last_stmt);
 	if (itr->before_first != NULL)
 		tuple_unref(itr->before_first);
 	TRASH(itr);
-	(void) itr;
 }
 
 static const struct vy_stmt_iterator_iface vy_mem_iterator_iface = {
 	.next_key = vy_mem_iterator_next_key,
 	.next_lsn = vy_mem_iterator_next_lsn,
 	.restore = vy_mem_iterator_restore,
-	.cleanup = vy_mem_iterator_cleanup,
 	.close = vy_mem_iterator_close
 };
 

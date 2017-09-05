@@ -1049,6 +1049,5 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface = {
 	.next_key = vy_txw_iterator_next_key,
 	.next_lsn = vy_txw_iterator_next_lsn,
 	.restore = vy_txw_iterator_restore,
-	.cleanup = NULL,
 	.close = vy_txw_iterator_close
 };
