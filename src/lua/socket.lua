@@ -174,6 +174,28 @@ local function get_iflags(table, flags)
     return res
 end
 
+local function getprotobyname(name)
+    if type(name) == 'number' then
+        return name
+    elseif type(name) ~= 'string' then
+        boxerrno(boxerrno.EINVAL)
+        return nil
+    end
+    local num = internal.protocols[name]
+    if num ~= nil then
+        return num
+    end
+    local p = ffi.C.getprotobyname(name)
+    if p == nil then
+        boxerrno(boxerrno.EPROTOTYPE)
+        return nil
+    end
+    num = p.p_proto
+    -- update cache
+    internal.protocols[name] = num
+    return num
+end
+
 local function socket_errno(self)
     check_socket(self)
     if self['_errno'] == nil then
@@ -387,11 +409,35 @@ local function socket_shutdown(self, how)
     return true
 end
 
+local function getsol(level)
+    if type(level) == 'number' then
+        return level
+    elseif type(level) ~= 'string' then
+        boxerrno(boxerrno.EINVAL)
+        return nil
+    elseif level == 'SOL_SOCKET' or level == 'socket' then
+        return internal.SOL_SOCKET
+    end
+    level = (level:match('IPPROTO_([A-Z]*)') or
+             level:match('SOL_([A-Z]*)') or
+             level):lower()
+    level = getprotobyname(level)
+    if level == nil then
+        return nil
+    end
+    return level
+end
+
 local function socket_setsockopt(self, level, name, value)
     local fd = check_socket(self)
 
-    local info = get_ivalue(internal.SO_OPT, name)
+    level = getsol(level)
+    if level == nil then
+        self._errno = boxerrno()
+        return false
+    end
 
+    local info = get_ivalue(internal.SO_OPT[level] or {}, name)
     if info == nil then
         error(format("Unknown socket option name: %s", tostring(name)))
     end
@@ -401,21 +447,6 @@ local function socket_setsockopt(self, level, name, value)
     end
 
     self._errno = nil
-
-    if type(level) == 'string' then
-        if level == 'SOL_SOCKET' then
-            level = internal.SOL_SOCKET
-        else
-            local p = ffi.C.getprotobyname(level)
-            if p == nil then
-                self._errno = boxerrno()
-                return false
-            end
-            level = p.p_proto
-        end
-    else
-        level = tonumber(level)
-    end
 
     if type(value) == 'boolean' then
         if value then
@@ -456,30 +487,18 @@ end
 local function socket_getsockopt(self, level, name)
     local fd = check_socket(self)
 
-    local info = get_ivalue(internal.SO_OPT, name)
+    level = getsol(level)
+    if level == nil then
+        self._errno = boxerrno()
+        return false
+    end
 
+    local info = get_ivalue(internal.SO_OPT[level] or {}, name)
     if info == nil then
         error(format("Unknown socket option name: %s", tostring(name)))
     end
 
     self._errno = nil
-
-    if type(level) == 'string' then
-        if level == 'SOL_SOCKET' then
-            level = internal.SOL_SOCKET
-        else
-            local p = ffi.C.getprotobyname(level)
-            if p == nil then
-                boxerrno(boxerrno.EINVAL)
-                self._errno = boxerrno.EINVAL
-                return nil
-            end
-            level = p.p_proto
-        end
-    else
-        level = tonumber(level)
-    end
-
 
     if info.type == 1 then
         local value = ffi.new("int[1]", 0)
@@ -517,13 +536,13 @@ end
 local function socket_linger(self, active, timeout)
     local fd = check_socket(self)
 
-    local info = internal.SO_OPT.SO_LINGER
+    local level = internal.SOL_SOCKET
+    local info = internal.SO_OPT[level].SO_LINGER
     self._errno = nil
     if active == nil then
         local value = ffi.new("linger_t[1]")
         local len = ffi.new("size_t[1]", 2 * ffi.sizeof('int'))
-        local res = ffi.C.getsockopt(fd,
-            internal.SOL_SOCKET, info.iname, value, len)
+        local res = ffi.C.getsockopt(fd, level, info.iname, value, len)
         if res < 0 then
             self._errno = boxerrno()
             return nil
@@ -550,8 +569,7 @@ local function socket_linger(self, active, timeout)
     local value = ffi.new("linger_t[1]",
         { { active = iactive, timeout = timeout } })
     local len = 2 * ffi.sizeof('int')
-    local res = ffi.C.setsockopt(fd,
-        internal.SOL_SOCKET, info.iname, value, len)
+    local res = ffi.C.setsockopt(fd, level, info.iname, value, len)
     if res < 0 then
         self._errno = boxerrno()
         return nil
@@ -832,16 +850,9 @@ local function socket_new(domain, stype, proto)
         return nil
     end
 
-    local iproto
-    if type(proto) == 'string' then
-        local p = ffi.C.getprotobyname(proto)
-        if p == nil then
-            boxerrno(boxerrno.EINVAL)
-            return nil
-        end
-        iproto = p.p_proto
-    else
-        iproto = tonumber(proto)
+    local iproto = getprotobyname(proto)
+    if iproto == nil then
+        return nil
     end
 
     local fd = ffi.C.socket(idomain, itype, iproto)
@@ -886,12 +897,11 @@ local function getaddrinfo(host, port, timeout, opts)
         end
 
         if opts.protocol ~= nil then
-            local p = ffi.C.getprotobyname(opts.protocol)
+            local p = getprotobyname(opts.protocol)
             if p == nil then
-                boxerrno(boxerrno.EINVAL)
                 return nil
             end
-            ga_opts.protocol = p.p_proto
+            ga_opts.protocol = p
         end
 
         if opts.flags ~= nil then
@@ -1159,7 +1169,8 @@ return setmetatable({
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
     tcp_server = tcp_server,
-    iowait = internal.iowait
+    iowait = internal.iowait,
+    internal = internal,
 }, {
     __call = function(self, ...) return socket_new(...) end;
 })

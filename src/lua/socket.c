@@ -41,6 +41,8 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <unistd.h>
 
 #include <lua.h>
@@ -177,7 +179,20 @@ static const struct { char name[32]; int value; } send_flags[] = {
 	{ "",			0		}
 };
 
-static const struct { char name[32]; int value, type, rw; } so_opts[] = {
+/** SOL_SOCKET/IPPROTO_IP/IPPROTO_TCP/IPPROTO_UDP options */
+struct lbox_sockopt_reg {
+	/** Option name */
+	const char *name;
+	/** Option key */
+	int value;
+	/** 0 - unknown, 1 - int option, 2 - size_t option */
+	int type;
+	/** true if option is writable */
+	bool rw;
+};
+
+/** SOL_SOCKET options */
+static const struct lbox_sockopt_reg so_opts[] = {
 #ifdef SO_ACCEPTCONN
 	{"SO_ACCEPTCONN",	SO_ACCEPTCONN,		1,	0, },
 #endif
@@ -256,6 +271,95 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 
 	{"SO_TYPE",		SO_TYPE,		1,	0, },
 
+	{"",			0,			0,	0, }
+};
+
+/** IPPROTO_TCP options */
+static const struct lbox_sockopt_reg so_tcp_opts[] = {
+#ifdef TCP_NODELAY
+	{"TCP_NODELAY",		TCP_NODELAY,		1,	1, },
+#endif
+#ifdef TCP_MAXSEG
+	{"TCP_MAXSEG",		TCP_MAXSEG,		1,	1, },
+#endif
+#ifdef TCP_CORK
+	{"TCP_CORK",		TCP_CORK,		1,	1, },
+#endif
+#ifdef TCP_KEEPIDLE
+	{"TCP_KEEPIDLE",	TCP_KEEPIDLE,		1,	1, },
+#endif
+#ifdef TCP_KEEPINTVL
+	{"TCP_KEEPINTVL",	TCP_KEEPINTVL,		1,	1, },
+#endif
+#ifdef TCP_KEEPCNT
+	{"TCP_KEEPCNT",		TCP_KEEPCNT,		1,	1, },
+#endif
+#ifdef TCP_SYNCNT
+	{"TCP_SYNCNT",		TCP_SYNCNT,		1,	1, },
+#endif
+#ifdef TCP_LINGER2
+	{"TCP_LINGER2",		TCP_LINGER2,		1,	1, },
+#endif
+#ifdef TCP_DEFER_ACCEPT
+	{"TCP_DEFER_ACCEPT",	TCP_DEFER_ACCEPT,	1,	1, },
+#endif
+#ifdef TCP_WINDOW_CLAMP
+	{"TCP_WINDOW_CLAMP",	TCP_WINDOW_CLAMP,	1,	1, },
+#endif
+#ifdef TCP_INFO
+	{"TCP_INFO",		TCP_INFO,		0,	0, },
+#endif
+#ifdef TCP_QUICKACK
+	{"TCP_QUICKACK",	TCP_QUICKACK,		1,	1, },
+#endif
+#ifdef TCP_CONGESTION
+	{"TCP_CONGESTION",	TCP_CONGESTION,		1,	1, },
+#endif
+#ifdef TCP_MD5SIG
+	{"TCP_MD5SIG",		TCP_MD5SIG,		1,	1, },
+#endif
+#ifdef TCP_COOKIE_TRANSACTIONS
+	{"TCP_COOKIE_TRANSACTIONS", TCP_COOKIE_TRANSACTIONS, 1, 1, },
+#endif
+#ifdef TCP_THIN_LINEAR_TIMEOUTS
+	{"TCP_THIN_LINEAR_TIMEOUTS", TCP_THIN_LINEAR_TIMEOUTS, 1, 1, },
+#endif
+#ifdef TCP_THIN_DUPACK
+	{"TCP_THIN_DUPACK",	TCP_THIN_DUPACK,	1,	1, },
+#endif
+#ifdef TCP_USER_TIMEOUT
+	{"TCP_USER_TIMEOUT",	TCP_USER_TIMEOUT,	1,	1, },
+#endif
+#ifdef TCP_REPAIR
+	{"TCP_REPAIR",		TCP_REPAIR,		1,	1, },
+#endif
+#ifdef TCP_REPAIR_QUEUE
+	{"TCP_REPAIR_QUEUE",	TCP_REPAIR_QUEUE,	1,	1, },
+#endif
+#ifdef TCP_QUEUE_SEQ
+	{"TCP_QUEUE_SEQ",	TCP_QUEUE_SEQ,		1,	1, },
+#endif
+#ifdef TCP_REPAIR_OPTIONS
+	{"TCP_REPAIR_OPTIONS",	TCP_REPAIR_OPTIONS,	1,	1, },
+#endif
+#ifdef TCP_FASTOPEN
+	{"TCP_FASTOPEN",	TCP_FASTOPEN,		1,	1, },
+#endif
+#ifdef TCP_TIMESTAMP
+	{"TCP_TIMESTAMP",	TCP_TIMESTAMP,		1,	1, },
+#endif
+#ifdef TCP_NOTSENT_LOWAT
+	{"TCP_NOTSENT_LOWAT",	TCP_NOTSENT_LOWAT,	1,	1, },
+#endif
+#ifdef TCP_CC_INFO
+	{"TCP_CC_INFO",		TCP_CC_INFO,		1,	1, },
+#endif
+#ifdef TCP_SAVE_SYN
+	{"TCP_SAVE_SYN",	TCP_SAVE_SYN,		1,	1, },
+#endif
+#ifdef TCP_SAVED_SYN
+	{"TCP_SAVED_SYN",	TCP_SAVED_SYN,		1,	1, },
+#endif
 	{"",			0,			0,	0, }
 };
 
@@ -877,6 +981,30 @@ lbox_socket_recvfrom(struct lua_State *L)
 	return 2;
 }
 
+static void
+lbox_socket_pushsockopt(lua_State *L, const struct lbox_sockopt_reg *reg)
+{
+	lua_newtable(L);
+	for (int i = 0; reg[i].name[0]; i++) {
+		lua_pushstring(L, reg[i].name);
+		lua_newtable(L);
+
+		lua_pushliteral(L, "iname");
+		lua_pushinteger(L, reg[i].value);
+		lua_rawset(L, -3);
+
+		lua_pushliteral(L, "type");
+		lua_pushinteger(L, reg[i].type);
+		lua_rawset(L, -3);
+
+		lua_pushliteral(L, "rw");
+		lua_pushboolean(L, reg[i].rw);
+		lua_rawset(L, -3);
+
+		lua_rawset(L, -3);
+	}
+}
+
 void
 tarantool_lua_socket_init(struct lua_State *L)
 {
@@ -937,32 +1065,39 @@ tarantool_lua_socket_init(struct lua_State *L)
 	}
 	lua_rawset(L, -3);
 
-	/* SO_OPT */
-	lua_pushliteral(L, "SO_OPT");
+	/* basic protocols */
+	lua_pushliteral(L, "protocols");
 	lua_newtable(L);
-	for (int i = 0; so_opts[i].name[0]; i++) {
-		lua_pushstring(L, so_opts[i].name);
-		lua_newtable(L);
-
-		lua_pushliteral(L, "iname");
-		lua_pushinteger(L, so_opts[i].value);
-		lua_rawset(L, -3);
-
-		lua_pushliteral(L, "type");
-		lua_pushinteger(L, so_opts[i].type);
-		lua_rawset(L, -3);
-
-		lua_pushliteral(L, "rw");
-		lua_pushboolean(L, so_opts[i].rw);
-		lua_rawset(L, -3);
-
-		lua_rawset(L, -3);
-	}
+	lua_pushliteral(L, "ip");
+	lua_pushinteger(L, IPPROTO_IP);
+	lua_rawset(L, -3);
+	lua_pushliteral(L, "tcp");
+	lua_pushinteger(L, IPPROTO_TCP);
+	lua_rawset(L, -3);
+	lua_pushliteral(L, "udp");
+	lua_pushinteger(L, IPPROTO_UDP);
+	lua_rawset(L, -3);
 	lua_rawset(L, -3);
 
-	/* constants */
+	/* setsockopt() SOL_SOCKET level */
 	lua_pushliteral(L, "SOL_SOCKET");
 	lua_pushinteger(L, SOL_SOCKET);
+	lua_rawset(L, -3);
+
+	/* setsockopt() options */
+	lua_pushliteral(L, "SO_OPT");
+	lua_newtable(L);
+
+	/* setsockopt(SOL_SOCKET) options */
+	lua_pushinteger(L, SOL_SOCKET);
+	lbox_socket_pushsockopt(L, so_opts);
+	lua_rawset(L, -3);
+
+	/* setsockopt(IPPROTO_TCP) options */
+	lua_pushinteger(L, IPPROTO_TCP);
+	lbox_socket_pushsockopt(L, so_tcp_opts);
+	lua_rawset(L, -3);
+
 	lua_rawset(L, -3);
 
 	lua_pop(L, 1); /* socket.internal */

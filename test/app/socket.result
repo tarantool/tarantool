@@ -329,7 +329,7 @@ s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
 ---
 - true
 ...
-s:getsockopt('SOL_SOCKET', 'SO_TYPE')
+s:getsockopt('socket', 'SO_TYPE')
 ---
 - 1
 ...
@@ -341,7 +341,7 @@ s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
 ---
 - true
 ...
-s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
+s:getsockopt('socket', 'SO_DEBUG')
 ---
 - 0
 ...
@@ -356,6 +356,46 @@ s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 s:error()
 ---
 - null
+...
+s:setsockopt('IPPROTO_TCP', 'TCP_NODELAY', true)
+---
+- true
+...
+s:getsockopt('IPPROTO_TCP', 'TCP_NODELAY') > 0
+---
+- true
+...
+s:setsockopt('SOL_TCP', 'TCP_NODELAY', false)
+---
+- true
+...
+s:getsockopt('SOL_TCP', 'TCP_NODELAY') == 0
+---
+- true
+...
+s:setsockopt('tcp', 'TCP_NODELAY', true)
+---
+- true
+...
+s:getsockopt('tcp', 'TCP_NODELAY') > 0
+---
+- true
+...
+s:setsockopt(6, 'TCP_NODELAY', false)
+---
+- true
+...
+s:getsockopt(6, 'TCP_NODELAY') == 0
+---
+- true
+...
+not s:setsockopt(nil, 'TCP_NODELAY', true) and errno() == errno.EINVAL
+---
+- true
+...
+not s:getsockopt(nil, 'TCP_NODELAY') and errno() == errno.EINVAL
+---
+- true
 ...
 s:linger()
 ---
@@ -1614,7 +1654,7 @@ socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == e
 ---
 - true
 ...
-socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
+socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EPROTOTYPE
 ---
 - true
 ...

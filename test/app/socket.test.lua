@@ -105,13 +105,23 @@ string.match(tostring(sc), ', peer') ~= nil
 sevres[1].host
 
 s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
-s:getsockopt('SOL_SOCKET', 'SO_TYPE')
+s:getsockopt('socket', 'SO_TYPE')
 s:error()
 s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
-s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
+s:getsockopt('socket', 'SO_DEBUG')
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 s:error()
+s:setsockopt('IPPROTO_TCP', 'TCP_NODELAY', true)
+s:getsockopt('IPPROTO_TCP', 'TCP_NODELAY') > 0
+s:setsockopt('SOL_TCP', 'TCP_NODELAY', false)
+s:getsockopt('SOL_TCP', 'TCP_NODELAY') == 0
+s:setsockopt('tcp', 'TCP_NODELAY', true)
+s:getsockopt('tcp', 'TCP_NODELAY') > 0
+s:setsockopt(6, 'TCP_NODELAY', false)
+s:getsockopt(6, 'TCP_NODELAY') == 0
+not s:setsockopt(nil, 'TCP_NODELAY', true) and errno() == errno.EINVAL
+not s:getsockopt(nil, 'TCP_NODELAY') and errno() == errno.EINVAL
 
 s:linger()
 s:linger(true, 1)
@@ -541,7 +551,7 @@ fio.stat(path) == nil
 -- wrong options for getaddrinfo
 socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == errno.EINVAL
 socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
-socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
+socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EPROTOTYPE
 socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL
 
 -- gh-574: check that fiber with getaddrinfo can be safely cancelled
