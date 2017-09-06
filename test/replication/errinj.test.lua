@@ -92,3 +92,37 @@ test_run:cmd("start server default")
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
+
+box.cfg{replication_timeout = 0.01}
+box.schema.user.grant("guest", "replication")
+
+test_run:cmd("start server replica")
+test_run:cmd("switch replica")
+fiber = require'fiber'
+while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+
+test_run:cmd("switch default")
+box.cfg{replication_timeout = 0.05}
+test_run:cmd("switch replica")
+-- wait for reconnect
+while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
+box.info.replication[1].upstream.status
+-- wait for ack timeout
+while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
+
+test_run:cmd("switch default")
+box.cfg{replication_timeout = 5}
+
+test_run:cmd("switch replica")
+-- wait for reconnect
+while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
+-- wait for ack timeout again, should be ok
+fiber.sleep(0.01)
+{box.info.replication[1].upstream.status, box.info.replication[1].upstream.message}
+
+test_run:cmd("stop server default")
+test_run:cmd("deploy server default")
+test_run:cmd("start server default")
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
