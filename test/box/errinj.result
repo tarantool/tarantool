@@ -56,6 +56,8 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
+  ERRINJ_RELAY_EXIT_DELAY:
+    state: 0
   ERRINJ_VY_POINT_ITER_WAIT:
     state: false
   ERRINJ_TUPLE_FIELD:

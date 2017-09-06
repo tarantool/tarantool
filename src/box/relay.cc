@@ -418,6 +418,10 @@ relay_subscribe_f(va_list ap)
 		/* An error has occured while ACKs of xlog reading */
 		diag_move(&relay->diag, diag_get());
 	}
+	struct errinj *inj = errinj(ERRINJ_RELAY_EXIT_DELAY, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
+
 	return diag_is_empty(diag_get()) ? 0: -1;
 }
 

@@ -497,6 +497,10 @@ applier_f(va_list ap)
 				/* System error from master instance. */
 				applier_log_error(applier, e);
 				goto reconnect;
+			} else if (e->errcode() == ER_CFG) {
+				/* Invalid configuration */
+				applier_log_error(applier, e);
+				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
 				applier_log_error(applier, e);
