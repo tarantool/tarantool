@@ -1366,18 +1366,10 @@ struct sqlite3 {
 
 /*
 ** Possible values for the sqlite3.flags.
-**
-** Value constraints (enforced via assert()):
-**      SQLITE_FullFSync     == PAGER_FULLFSYNC
-**      SQLITE_CkptFullFSync == PAGER_CKPT_FULLFSYNC
-**      SQLITE_CacheSpill    == PAGER_CACHE_SPILL
 */
 #define SQLITE_VdbeTrace      0x00000001  /* True to trace VDBE execution */
 #define SQLITE_InternChanges  0x00000002  /* Uncommitted Hash table changes */
 #define SQLITE_FullColNames   0x00000004  /* Show full column names on SELECT */
-#define SQLITE_FullFSync      0x00000008  /* Use full fsync on the backend */
-#define SQLITE_CkptFullFSync  0x00000010  /* Use full fsync for checkpoint */
-#define SQLITE_CacheSpill     0x00000020  /* OK to spill pager cache */
 #define SQLITE_ShortColNames  0x00000040  /* Show short columns names */
 #define SQLITE_CountRows      0x00000080  /* Count rows changed by INSERT, */
                                           /*   DELETE, or UPDATE and return */
@@ -1386,12 +1378,9 @@ struct sqlite3 {
                                           /*   result set is empty */
 #define SQLITE_SqlTrace       0x00000200  /* Debug print SQL as it executes */
 #define SQLITE_VdbeListing    0x00000400  /* Debug listings of VDBE programs */
-#define SQLITE_WriteSchema    0x00000800  /* OK to update SQLITE_MASTER */
 #define SQLITE_VdbeAddopTrace 0x00001000  /* Trace sqlite3VdbeAddOp() calls */
 #define SQLITE_IgnoreChecks   0x00002000  /* Do not enforce check constraints */
 #define SQLITE_ReadUncommitted 0x0004000  /* For shared-cache mode */
-#define SQLITE_LegacyFileFmt  0x00008000  /* Create new databases in format 1 */
-#define SQLITE_RecoveryMode   0x00010000  /* Ignore schema errors */
 #define SQLITE_ReverseOrder   0x00020000  /* Reverse unordered SELECTs */
 #define SQLITE_RecTriggers    0x00040000  /* Enable recursive triggers */
 #define SQLITE_ForeignKeys    0x00080000  /* Enforce foreign key constraints  */
@@ -1401,8 +1390,6 @@ struct sqlite3 {
 #define SQLITE_DeferFKs       0x02000000  /* Defer all FK constraints */
 #define SQLITE_QueryOnly      0x04000000  /* Disable database changes */
 #define SQLITE_VdbeEQP        0x08000000  /* Debug EXPLAIN QUERY PLAN */
-#define SQLITE_CellSizeCk     0x20000000  /* Check btree cell sizes on load */
-#define SQLITE_Fts3Tokenizer  0x40000000  /* Enable fts3_tokenizer(2) */
 #define SQLITE_NoCkptOnClose  0x80000000  /* No checkpoint on close()/DETACH */
 
 

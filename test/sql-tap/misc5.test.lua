@@ -307,13 +307,12 @@ test:do_test(
     })
 
 -- # Parser stack overflow is silently ignored when it occurs while parsing the
--- # schema and PRAGMA writable_schema is turned on.
+-- # schema.
 -- #
 -- do_test misc5-7.2 {
 --   sqlite3 db2 :memory:
 --   catchsql {
 --     CREATE TABLE t1(x UNIQUE);
---     PRAGMA writable_schema=ON;
 --     UPDATE sqlite_master SET sql='CREATE table t(o CHECK(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((;VALUES(o)';
 --     BEGIN;
 --     CREATE TABLE t2(y);

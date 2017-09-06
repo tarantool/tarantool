@@ -41,21 +41,6 @@ set pragma_def {
   ARG:  SQLITE_NullCallback
   IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 
-  NAME: legacy_file_format
-  TYPE: FLAG
-  ARG:  SQLITE_LegacyFileFmt
-  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-
-  NAME: fullfsync
-  TYPE: FLAG
-  ARG:  SQLITE_FullFSync
-  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-
-  NAME: checkpoint_fullfsync
-  TYPE: FLAG
-  ARG:  SQLITE_CkptFullFSync
-  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-
   NAME: reverse_unordered_selects
   TYPE: FLAG
   ARG:  SQLITE_ReverseOrder
@@ -65,12 +50,6 @@ set pragma_def {
   TYPE: FLAG
   ARG:  SQLITE_QueryOnly
   IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-
-  NAME: automatic_index
-  TYPE: FLAG
-  ARG:  SQLITE_AutoIndex
-  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-  IF:   !defined(SQLITE_OMIT_AUTOMATIC_INDEX)
 
   NAME: sql_trace
   TYPE: FLAG
@@ -114,11 +93,6 @@ set pragma_def {
   IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
   IF:   !defined(SQLITE_OMIT_CHECK)
 
-  NAME: writable_schema
-  TYPE: FLAG
-  ARG:  SQLITE_WriteSchema|SQLITE_RecoveryMode
-  IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-
   NAME: read_uncommitted
   TYPE: FLAG
   ARG:  SQLITE_ReadUncommitted
@@ -141,54 +115,9 @@ set pragma_def {
   IF:   !defined(SQLITE_OMIT_FLAG_PRAGMAS)
   IF:   !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
 
-  NAME: cell_size_check
-  TYPE: FLAG
-  ARG:  SQLITE_CellSizeCk
-
-  NAME: default_cache_size
-  FLAG: NeedSchema Result0 SchemaReq NoColumns1
-  COLS: cache_size
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS) && !defined(SQLITE_OMIT_DEPRECATED)
-
   NAME: secure_delete
   FLAG: Result0
   IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: page_count
-  FLAG: NeedSchema Result0 SchemaReq
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: max_page_count
-  TYPE: PAGE_COUNT
-  FLAG: NeedSchema Result0 SchemaReq
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: locking_mode
-  FLAG: Result0 SchemaReq
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: journal_mode
-  FLAG: NeedSchema Result0 SchemaReq
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: journal_size_limit
-  FLAG: Result0 SchemaReq
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: cache_size
-  FLAG: NeedSchema Result0 SchemaReq NoColumns1
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: mmap_size
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: data_store_directory
-  FLAG: NoColumns1
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS) && SQLITE_OS_WIN
-
-  NAME: lock_proxy_file
-  FLAG: NoColumns1
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS) && SQLITE_ENABLE_LOCKING_STYLE
 
   NAME: synchronous
   FLAG: NeedSchema Result0 SchemaReq NoColumns1
@@ -249,15 +178,6 @@ set pragma_def {
   NAME: case_sensitive_like
   FLAG: NoColumns
 
-  NAME: integrity_check
-  FLAG: NeedSchema
-  IF:   !defined(SQLITE_OMIT_INTEGRITY_CHECK)
-
-  NAME: quick_check
-  TYPE: INTEGRITY_CHECK
-  FLAG: NeedSchema
-  IF:   !defined(SQLITE_OMIT_INTEGRITY_CHECK)
-
   NAME: encoding
   FLAG: Result0 NoColumns1
   IF:   !defined(SQLITE_OMIT_UTF16)
@@ -311,11 +231,6 @@ set pragma_def {
   FLAG: Result0
   COLS: timeout
 
-  NAME: lock_status
-  FLAG: Result0
-  COLS: database status
-  IF:   defined(SQLITE_DEBUG) || defined(SQLITE_TEST)
-
   NAME: key
   IF:   defined(SQLITE_HAS_CODEC)
 
@@ -328,9 +243,6 @@ set pragma_def {
   NAME: hexrekey
   TYPE: HEXKEY
   IF:   defined(SQLITE_HAS_CODEC)
-
-  NAME: activate_extensions
-  IF:   defined(SQLITE_HAS_CODEC) || defined(SQLITE_ENABLE_CEROD)
 
   NAME: soft_heap_limit
   FLAG: Result0

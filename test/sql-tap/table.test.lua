@@ -439,7 +439,6 @@ if (0 > 0)
             return test:execsql [[
                 CREATE TABLE t0(a,b);
                 CREATE INDEX t ON t0(a);
-                PRAGMA writable_schema=ON;
                 UPDATE sqlite_master SET sql='CREATE TABLE a.b(a UNIQUE';
                 --BEGIN;
                 --CREATE TABLE t1(x);

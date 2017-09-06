@@ -1064,7 +1064,6 @@ test:do_execsql_test(
 -- sqlite3 db :memory:
 -- do_execsql_test misc1-23.1 {
 --   CREATE TABLE t1(x);
---   PRAGMA writable_schema=ON;
 --   UPDATE sqlite_master SET sql='CREATE table t(d CHECK(T(#0)';
 --   BEGIN;
 --   CREATE TABLE t2(y);
@@ -1078,7 +1077,6 @@ test:do_execsql_test(
 -- sqlite3 db :memory:
 -- do_catchsql_test misc1-23.2 {
 --   CREATE TABLE t1(x UNIQUE);
---   PRAGMA writable_schema=ON;
 --   UPDATE sqlite_master SET sql='CREATE TABLE IF not EXISTS t(c)';
 --   BEGIN;
 --   CREATE TABLE t2(x);
@@ -1089,7 +1087,6 @@ test:do_execsql_test(
 -- sqlite3 db :memory:
 -- do_catchsql_test misc1-23.3 {
 --   CREATE TABLE t1(x UNIQUE);
---   PRAGMA writable_schema=ON;
 --   UPDATE sqlite_master SET sql='CREATE table y(a TEXT, a TEXT)';
 --   BEGIN;
 --   CREATE TABLE t2(y);

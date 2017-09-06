@@ -96,7 +96,6 @@ test:do_execsql_test(
 -- #
 -- do_test index3-99.1 {
 --   execsql {
---     PRAGMA writable_schema=on;
 --     UPDATE sqlite_master SET sql='nonsense' WHERE name='t1d'
 --   }
 --   db close

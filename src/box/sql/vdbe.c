@@ -3137,7 +3137,7 @@ case OP_TTransaction:
 			rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;}
 		break;
 	}
-	
+
 /* Opcode: ReadCookie P1 P2 P3 * *
 **
 ** Read cookie number P3 from database P1 and write it into register P2.
@@ -5600,25 +5600,22 @@ case OP_DropTrigger: {
 ** This opcode is used to implement the integrity_check pragma.
 */
 case OP_IntegrityCk: {
-  int nRoot;      /* Number of tables to check.  (Number of root pages.) */
-  int *aRoot;     /* Array of rootpage numbers for tables to be checked */
+  /* Number of tables to check.  (Number of root pages.) */
+  int nRoot;
   int nErr;       /* Number of errors reported */
   char *z;        /* Text of the error report */
   Mem *pnErr;     /* Register keeping track of errors remaining */
 
   assert( p->bIsReader );
   nRoot = pOp->p2;
-  aRoot = pOp->p4.ai;
   assert( nRoot>0 );
-  assert( aRoot[nRoot]==0 );
   assert( pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor) );
   pnErr = &aMem[pOp->p3];
   assert( (pnErr->flags & MEM_Int)!=0 );
   assert( (pnErr->flags & (MEM_Str|MEM_Blob))==0 );
   pIn1 = &aMem[pOp->p1];
   assert( DbMaskTest(p->btreeMask, pOp->p5) );
-  z = sqlite3BtreeIntegrityCheck(db->mdb.pBt, aRoot, nRoot,
-                                 (int)pnErr->u.i, &nErr);
+  z = sqlite3BtreeIntegrityCheck(db->mdb.pBt, (int)pnErr->u.i, &nErr);
   pnErr->u.i -= nErr;
   sqlite3VdbeMemSetNull(pIn1);
   if( nErr==0 ){

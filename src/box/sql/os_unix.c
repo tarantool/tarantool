@@ -3382,16 +3382,6 @@ int sqlite3_fullsync_count = 0;
 # define fdatasync fsync
 #endif
 
-/*
-** Define HAVE_FULLFSYNC to 0 or 1 depending on whether or not
-** the F_FULLFSYNC macro is defined.  F_FULLFSYNC is currently
-** only available on Mac OS X.  But that could change.
-*/
-#ifdef F_FULLFSYNC
-# define HAVE_FULLFSYNC 1
-#else
-# define HAVE_FULLFSYNC 0
-#endif
 
 
 /*
@@ -3429,8 +3419,6 @@ static int full_fsync(int fd, int fullSync, int dataOnly){
   UNUSED_PARAMETER(fd);
   UNUSED_PARAMETER(fullSync);
   UNUSED_PARAMETER(dataOnly);
-#elif HAVE_FULLFSYNC
-  UNUSED_PARAMETER(dataOnly);
 #else
   UNUSED_PARAMETER(fullSync);
   UNUSED_PARAMETER(dataOnly);
@@ -3455,22 +3443,6 @@ static int full_fsync(int fd, int fullSync, int dataOnly){
     struct stat buf;
     rc = osFstat(fd, &buf);
   }
-#elif HAVE_FULLFSYNC
-  if( fullSync ){
-    rc = osFcntl(fd, F_FULLFSYNC, 0);
-  }else{
-    rc = 1;
-  }
-  /* If the FULLFSYNC failed, fall back to attempting an fsync().
-  ** It shouldn't be possible for fullfsync to fail on the local 
-  ** file system (on OSX), so failure indicates that FULLFSYNC
-  ** isn't supported for this file system. So, attempt an fsync 
-  ** and (for now) ignore the overhead of a superfluous fcntl call.  
-  ** It'd be better to detect fullfsync support once and avoid 
-  ** the fcntl call every time sync is called.
-  */
-  if( rc ) rc = fsync(fd);
-
 #elif defined(__APPLE__)
   /* fdatasync() on HFS+ doesn't yet flush the file size if it changed correctly
   ** so currently we default to the macro that redefines fdatasync to fsync
@@ -3483,7 +3455,7 @@ static int full_fsync(int fd, int fullSync, int dataOnly){
     rc = fsync(fd);
   }
 #endif /* OS_VXWORKS */
-#endif /* ifdef SQLITE_NO_SYNC elif HAVE_FULLFSYNC */
+#endif /* ifdef SQLITE_NO_SYNC */
 
   if( OS_VXWORKS && rc!= -1 ){
     rc = 0;
@@ -3577,24 +3549,6 @@ static int unixSync(sqlite3_file *id, int flags){
     return unixLogError(SQLITE_IOERR_FSYNC, "full_fsync", pFile->zPath);
   }
 
-  /* Also fsync the directory containing the file if the DIRSYNC flag
-  ** is set.  This is a one-time occurrence.  Many systems (examples: AIX)
-  ** are unable to fsync a directory, so ignore errors on the fsync.
-  */
-  if( pFile->ctrlFlags & UNIXFILE_DIRSYNC ){
-    int dirfd;
-    OSTRACE(("DIRSYNC %s (have_fullfsync=%d fullsync=%d)\n", pFile->zPath,
-            HAVE_FULLFSYNC, isFullsync));
-    rc = osOpenDirectory(pFile->zPath, &dirfd);
-    if( rc==SQLITE_OK ){
-      full_fsync(dirfd, 0, 0);
-      robust_close(pFile, dirfd, __LINE__);
-    }else{
-      assert( rc==SQLITE_CANTOPEN );
-      rc = SQLITE_OK;
-    }
-    pFile->ctrlFlags &= ~UNIXFILE_DIRSYNC;
-  }
   return rc;
 }
 

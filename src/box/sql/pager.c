@@ -3232,9 +3232,7 @@ void sqlite3PagerShrink(Pager *pPager){
 ** syncs associated with NORMAL.  There is no difference between FULL
 ** and EXTRA for WAL mode.
 **
-** Do not confuse synchronous=FULL with SQLITE_SYNC_FULL.  The
-** SQLITE_SYNC_FULL macro means to use the MacOSX-style full-fsync
-** using fcntl(F_FULLFSYNC).  SQLITE_SYNC_NORMAL means to do an
+** SQLITE_SYNC_NORMAL means to do an
 ** ordinary fsync() call.  There is no difference between SQLITE_SYNC_FULL
 ** and SQLITE_SYNC_NORMAL on platforms other than MacOSX.  But the
 ** synchronous=FULL versus synchronous=NORMAL setting determines when
@@ -3261,22 +3259,12 @@ void sqlite3PagerSetFlags(
   if( pPager->noSync ){
     pPager->syncFlags = 0;
     pPager->ckptSyncFlags = 0;
-  }else if( pgFlags & PAGER_FULLFSYNC ){
-    pPager->syncFlags = SQLITE_SYNC_FULL;
-    pPager->ckptSyncFlags = SQLITE_SYNC_FULL;
-  }else if( pgFlags & PAGER_CKPT_FULLFSYNC ){
-    pPager->syncFlags = SQLITE_SYNC_NORMAL;
-    pPager->ckptSyncFlags = SQLITE_SYNC_FULL;
   }else{
     pPager->syncFlags = SQLITE_SYNC_NORMAL;
     pPager->ckptSyncFlags = SQLITE_SYNC_NORMAL;
   }
   pPager->walSyncFlags = pPager->syncFlags;
-  if( pgFlags & PAGER_CACHESPILL ){
-    pPager->doNotSpill &= ~SPILLFLAG_OFF;
-  }else{
-    pPager->doNotSpill |= SPILLFLAG_OFF;
-  }
+  pPager->doNotSpill |= SPILLFLAG_OFF;
 }
 #endif
 

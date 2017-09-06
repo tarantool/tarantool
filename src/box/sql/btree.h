@@ -270,7 +270,7 @@ int sqlite3BtreePayload(BtCursor*, u32 offset, u32 amt, void*);
 const void *sqlite3BtreePayloadFetch(BtCursor*, u32 *pAmt);
 u32 sqlite3BtreePayloadSize(BtCursor*);
 
-char *sqlite3BtreeIntegrityCheck(Btree*, int *aRoot, int nRoot, int, int*);
+char *sqlite3BtreeIntegrityCheck(Btree*, int, int*);
 struct Pager *sqlite3BtreePager(Btree*);
 
 #ifndef SQLITE_OMIT_INCRBLOB

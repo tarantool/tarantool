@@ -801,7 +801,6 @@ int sqlite3_db_config(sqlite3 *db, int op, ...){
       } aFlagOp[] = {
         { SQLITE_DBCONFIG_ENABLE_FKEY,           SQLITE_ForeignKeys    },
         { SQLITE_DBCONFIG_ENABLE_TRIGGER,        SQLITE_EnableTrigger  },
-        { SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER, SQLITE_Fts3Tokenizer  },
         { SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,      SQLITE_NoCkptOnClose  },
       };
       unsigned int i;
@@ -2472,19 +2471,8 @@ static int openDatabase(
   db->aLimit[SQLITE_LIMIT_WORKER_THREADS] = SQLITE_DEFAULT_WORKER_THREADS;
   db->szMmap = sqlite3GlobalConfig.szMmap;
   db->nMaxSorterMmap = 0x7FFFFFFF;
-  db->flags |= SQLITE_ShortColNames | SQLITE_EnableTrigger | SQLITE_CacheSpill
-#if !defined(SQLITE_DEFAULT_AUTOMATIC_INDEX) || SQLITE_DEFAULT_AUTOMATIC_INDEX
+  db->flags |= SQLITE_ShortColNames | SQLITE_EnableTrigger
                  | SQLITE_AutoIndex
-#endif
-#if SQLITE_DEFAULT_CKPTFULLFSYNC
-                 | SQLITE_CkptFullFSync
-#endif
-#if SQLITE_DEFAULT_FILE_FORMAT<4
-                 | SQLITE_LegacyFileFmt
-#endif
-#ifdef SQLITE_ENABLE_LOAD_EXTENSION
-                 | SQLITE_LoadExtension
-#endif
 #if SQLITE_DEFAULT_RECURSIVE_TRIGGERS
                  | SQLITE_RecTriggers
 #endif
@@ -2493,12 +2481,6 @@ static int openDatabase(
 #endif
 #if defined(SQLITE_REVERSE_UNORDERED_SELECTS)
                  | SQLITE_ReverseOrder
-#endif
-#if defined(SQLITE_ENABLE_OVERSIZE_CELL_CHECK)
-                 | SQLITE_CellSizeCk
-#endif
-#if defined(SQLITE_ENABLE_FTS3_TOKENIZER)
-                 | SQLITE_Fts3Tokenizer
 #endif
       ;
   sqlite3HashInit(&db->aCollSeq);

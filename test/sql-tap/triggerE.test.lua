@@ -79,7 +79,6 @@ end
 -- the sqlite_master table are automatically converted to NULL.
 --
 -- do_execsql_test 2.1 {
---   PRAGMA writable_schema = 1;
 --   INSERT INTO sqlite_master VALUES('trigger', 'tr1', 't1', 0,
 --     'CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN
 --         INSERT INTO t2 VALUES(?1, ?2);
