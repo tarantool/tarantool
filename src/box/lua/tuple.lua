@@ -292,8 +292,14 @@ local methods = {
     ["update"]      = tuple_update;
     ["upsert"]      = tuple_upsert;
     ["bsize"]       = tuple_bsize;
-    ["__serialize"] = tuple_totable; -- encode hook for msgpack/yaml/json
 }
+
+-- Aliases for tuple:methods().
+for k, v in pairs(methods) do
+    box.tuple[k] = v
+end
+
+methods["__serialize"] = tuple_totable -- encode hook for msgpack/yaml/json
 
 local tuple_field = function(tuple, field_n)
     local field = builtin.box_tuple_field(tuple, field_n - 1)

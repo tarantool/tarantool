@@ -332,4 +332,21 @@ tostring(t);
 t;
 test_run:cmd("setopt delimiter ''");
 
+--
+-- gh-1014: tuple field names and tuple methods aliases.
+--
+t = box.tuple.new({1, 2, 3})
+box.tuple.next == t.next
+box.tuple.ipairs == t.ipairs
+box.tuple.pairs == t.pairs
+box.tuple.slice == t.slice
+box.tuple.transform == t.transform
+box.tuple.find == t.find
+box.tuple.findall == t.findall
+box.tuple.unpack == t.unpack
+box.tuple.totable == t.totable
+box.tuple.update == t.update
+box.tuple.upsert == t.upsert
+box.tuple.bsize == t.bsize
+
 test_run:cmd("clear filter")
