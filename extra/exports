@@ -78,7 +78,6 @@ tnt_EVP_MD_CTX_new
 tnt_EVP_MD_CTX_free
 tnt_HMAC_CTX_new
 tnt_HMAC_CTX_free
-sqlite3BitvecBuiltinTest
 
 # Module API
 
