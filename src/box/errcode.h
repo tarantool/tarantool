@@ -112,8 +112,8 @@ struct errcode_record {
 	/* 57 */_(ER_NO_SUCH_ENGINE,		"Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		"Can't set option '%s' dynamically") \
 	/* 59 */_(ER_CFG,			"Incorrect value for option '%s': %s") \
-	/* 60 */_(ER_SQL,			"SQL error: %s") \
-	/* 61 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
+	/* 60 */_(ER_SAVEPOINT_EMPTY_TX,	"Can not set a savepoint in an empty transaction") \
+	/* 61 */_(ER_NO_SUCH_SAVEPOINT,		"Can not rollback to savepoint: the savepoint does not exist") \
 	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %s") \
 	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
@@ -132,7 +132,7 @@ struct errcode_record {
 	/* 77 */_(ER_NO_CONNECTION,		"Connection is not established") \
 	/* 78 */_(ER_TIMEOUT,			"Timeout exceeded") \
 	/* 79 */_(ER_ACTIVE_TRANSACTION,	"Operation is not permitted when there is an active transaction ") \
-	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	"The transaction the cursor belongs to has ended") \
+	/* 80 */_(ER_CURSOR_NO_TRANSACTION,	"The transaction the cursor belongs to has ended") \
 	/* 81 */_(ER_CROSS_ENGINE_TRANSACTION,	"A multi-statement transaction can not use multiple storage engines") \
 	/* 82 */_(ER_NO_SUCH_ROLE,		"Role '%s' is not found") \
 	/* 83 */_(ER_ROLE_EXISTS,		"Role '%s' already exists") \
@@ -166,7 +166,7 @@ struct errcode_record {
 	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options (field %u): %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		"View '%s' is read-only") \
-	/*114 */_(ER_UNUSED114,			"") \
+	/*114 */_(ER_SAVEPOINT_NO_TRANSACTION,	"Can not set a savepoint in absence of active transaction") \
 	/*115 */_(ER_SYSTEM,			"%s") \
 	/*116 */_(ER_LOADING,			"Instance bootstrap hasn't finished yet") \
 	/*117 */_(ER_CONNECTION_TO_SELF,	"Connection to self") \
@@ -196,7 +196,9 @@ struct errcode_record {
 	/*141 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
 	/*142 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
 	/*143 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
-	/*144 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format (field %u): %s")
+	/*144 */_(ER_SQL,			"SQL error: %s") \
+	/*145 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
+	/*146 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format (field %u): %s")
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

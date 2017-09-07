@@ -828,11 +828,6 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	rlist_swap(&alter->new_space->on_stmt_begin,
 		   &alter->old_space->on_stmt_begin);
 	/*
-	 * Init space bsize.
-	 */
-	if (alter->new_space->index_count != 0)
-		alter->new_space->bsize = alter->old_space->bsize;
-	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
@@ -1130,6 +1125,7 @@ public:
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t signature);
 	virtual ~RebuildIndex();
 };
 
@@ -1152,6 +1148,15 @@ RebuildIndex::alter(struct alter_space *alter)
 	handler->buildSecondaryKey(new_index_def->iid != 0 ?
 				   alter->new_space : alter->old_space,
 				   alter->new_space, new_index);
+}
+
+void
+RebuildIndex::commit(struct alter_space *alter, int64_t signature)
+{
+	Index *old_index = space_index(alter->old_space, old_index_def->iid);
+	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	old_index->commitDrop();
+	new_index->commitCreate(signature);
 }
 
 RebuildIndex::~RebuildIndex()

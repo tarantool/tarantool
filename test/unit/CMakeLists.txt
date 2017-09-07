@@ -98,6 +98,9 @@ target_link_libraries(fiber_channel_stress.test core)
 add_executable(cbus_stress.test cbus_stress.c)
 target_link_libraries(cbus_stress.test core stat)
 
+add_executable(cbus.test cbus.c)
+target_link_libraries(cbus.test core unit stat)
+
 add_executable(coio.test coio.cc ${CMAKE_SOURCE_DIR}/src/iobuf.cc)
 target_link_libraries(coio.test core eio bit uri unit)
 
@@ -161,6 +164,7 @@ add_executable(vy_point_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_range.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_tx.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_read_set.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_index.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c

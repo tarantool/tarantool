@@ -369,8 +369,8 @@ s3:truncate()
 _ = s3:insert{789, 987}
 ---
 ...
--- Check that index drop or create after space truncate
--- does not break recovery (gh-2615)
+-- Check that index drop, create, and alter called after space
+-- truncate do not break recovery (gh-2615)
 s4 = box.schema.create_space('test4', {engine = engine})
 ---
 ...
@@ -390,6 +390,9 @@ s4.index.i3:drop()
 ---
 ...
 _ = s4:create_index('i2', {parts = {2, 'string'}})
+---
+...
+s4.index.i1:alter({parts = {1, 'string', 2, 'string'}})
 ---
 ...
 _ = s4:insert{'abc', 'cba'}

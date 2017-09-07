@@ -190,6 +190,10 @@ index3:select{}
 -- dump.
 space:replace{10, 100, 1000, 10000, 100000, 1000000}
 index:update({100}, {{'=', 6, 1}})
+box.begin()
+space:replace{20, 200, 2000, 20000, 200000, 2000000}
+index:update({200}, {{'=', 6, 2}})
+box.commit()
 box.snapshot()
 index_run_count = wait_for_dump(index, index_run_count)
 old_stmt_count = dumped_stmt_count()

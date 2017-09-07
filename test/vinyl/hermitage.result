@@ -90,10 +90,7 @@ t:get{2} -- {2, 22}
 - [2, 22]
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 --
@@ -149,10 +146,7 @@ t:get{2} -- {2, 21}
 - [2, 21]
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -196,10 +190,7 @@ c2:commit() -- true
 - 
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -247,10 +238,7 @@ c2:commit() -- ok
 - 
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -298,10 +286,7 @@ c2:commit() -- rollback (@fixme: not necessary)
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -373,10 +358,7 @@ c3:commit() -- read only transaction - OK to commit, stays with its read view
 - 
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -399,9 +381,9 @@ c2:begin()
 ---
 - 
 ...
-c1("t:get{3}")
+c1("t:select()") -- {1, 10}, {2, 20}
 ---
-- 
+- - [[1, 10], [2, 20]]
 ...
 c2("t:replace{3, 30}")
 ---
@@ -411,27 +393,16 @@ c2:commit() -- ok
 ---
 - 
 ...
-c1("t:get{1}") -- {1, 10}
+c1("t:select()") -- still {1, 10}, {2, 20}
 ---
-- - [1, 10]
-...
-c1("t:get{2}") -- {2, 20}
----
-- - [2, 20]
-...
-c1("t:get{3}") -- nothing
----
-- 
+- - [[1, 10], [2, 20]]
 ...
 c1:commit() -- ok
 ---
 - 
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -495,10 +466,7 @@ t:get{2} -- {2, 30}
 - [2, 30]
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -546,10 +514,7 @@ c2:commit() -- rollback -- conflict
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 ------------------------------------------------------------------------
@@ -605,10 +570,7 @@ c1:commit() -- ok
 - 
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 ------------------------------------------------------------------------
@@ -668,10 +630,7 @@ c1:commit() -- rollback
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -727,10 +686,7 @@ c2:commit() -- rollback -- conflict
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -754,25 +710,13 @@ c2:begin()
 - 
 ...
 -- select * from test where value % 3 = 0
-c1("t:get{1}") -- {1, 10}
+c1("t:select()") -- {1, 10}, {2, 20}
 ---
-- - [1, 10]
+- - [[1, 10], [2, 20]]
 ...
-c1("t:get{2}") -- {2, 20}
+c2("t:select()") -- {1, 10}, {2, 20}
 ---
-- - [2, 20]
-...
-c2("t:get{1}") -- {1, 10}
----
-- - [1, 10]
-...
-c2("t:get{2}") -- {2, 20}
----
-- - [2, 20]
-...
-c2("t:get{3}") -- {3, 30} to be inserted
----
-- - [3, 30]
+- - [[1, 10], [2, 20]]
 ...
 c1("t:replace{3, 30}")
 ---
@@ -791,10 +735,7 @@ c2:commit() -- rollback
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -858,10 +799,7 @@ c1:commit() -- rollback
 - - {'error': 'Transaction has been aborted by conflict'}
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- ------------------------------------------------------------------------
@@ -922,10 +860,7 @@ c1:commit() -- ok
 - 
 ...
 -- teardown
-t:delete{1}
----
-...
-t:delete{2}
+t:truncate()
 ---
 ...
 -- *************************************************************************

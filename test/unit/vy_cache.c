@@ -153,7 +153,7 @@ test_gh2661_next_key()
 		STMT_TEMPLATE(1, REPLACE, 100, 1000);
 	vy_cache_insert_templates_chain(&cache, format, &chain1, 1,
 					&key_template, ITER_GE);
-	vy_cache_iterator_open(&itr, &cache, ITER_EQ, select_all, &rv_p);
+	vy_cache_iterator_open(&itr, &cache, ITER_GE, select_all, &rv_p);
 	/*
 	 * Call restore at first, because merge_iterator on start
 	 * calls restore for all iterators.

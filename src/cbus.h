@@ -135,6 +135,11 @@ struct cpipe {
 	 * flushed messages.
 	 */
 	struct cbus_endpoint *endpoint;
+	/**
+	 * Triggers to call on flush event, if the input queue
+	 * is not empty.
+	 */
+	struct rlist on_flush;
 };
 
 /**

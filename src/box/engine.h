@@ -280,6 +280,9 @@ public:
 	 */
 	virtual struct tuple_format *
 	format();
+	/** Binary size of a space. */
+	virtual size_t
+	bsize() const;
 
 	Engine *engine;
 };

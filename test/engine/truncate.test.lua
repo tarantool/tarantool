@@ -163,8 +163,8 @@ _ = s3:insert{200, 200}
 _ = s3:insert{300, 100}
 s3:truncate()
 _ = s3:insert{789, 987}
--- Check that index drop or create after space truncate
--- does not break recovery (gh-2615)
+-- Check that index drop, create, and alter called after space
+-- truncate do not break recovery (gh-2615)
 s4 = box.schema.create_space('test4', {engine = engine})
 _ = s4:create_index('i1', {parts = {1, 'string'}})
 _ = s4:create_index('i3', {parts = {3, 'string'}})
@@ -172,6 +172,7 @@ _ = s4:insert{'zzz', 111, 'yyy'}
 s4:truncate()
 s4.index.i3:drop()
 _ = s4:create_index('i2', {parts = {2, 'string'}})
+s4.index.i1:alter({parts = {1, 'string', 2, 'string'}})
 _ = s4:insert{'abc', 'cba'}
 test_run:cmd('restart server default')
 s1 = box.space.test1

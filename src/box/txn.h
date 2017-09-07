@@ -59,13 +59,34 @@ struct txn_stmt {
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
-	ptrdiff_t bsize_change; /* saved result of space_bsize_update(..) call */
 	/** Engine savepoint for the start of this statement. */
 	void *engine_savepoint;
 	/** Redo info: the binary log row */
 	struct xrow_header *row;
 };
 
+/**
+ * Transaction savepoint object. Allocated on a transaction
+ * region and becames invalid after the transaction's end.
+ * Allows to rollback a transaction partially.
+ */
+struct txn_savepoint {
+	/**
+	 * Saved substatement level at the time of a savepoint
+	 * creation.
+	 */
+	int in_sub_stmt;
+	/**
+	 * Statement, on which a savepoint is created. On rollback
+	 * to this savepoint all newer statements are rolled back.
+	 */
+	struct txn_stmt *stmt;
+	/**
+	 * True, if a savepoint is created when a transaction is
+	 * empty. In such a case stmt can not be used.
+	 */
+	bool is_first;
+};
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -75,9 +96,14 @@ struct txn_stmt {
 #include "fiber.h"
 
 extern double too_long_threshold;
-struct tuple;
 
 struct txn {
+	/**
+	 * A sequentially growing transaction id, assigned when
+	 * a transaction is initiated. Used to identify
+	 * a transaction after it has possibly been destroyed.
+	 */
+	int64_t id;
 	/** List of statements in a transaction. */
 	struct stailq stmts;
 	/** Total number of WAL rows in this txn. */
@@ -247,6 +273,14 @@ txn_last_stmt(struct txn *txn)
 /** \cond public */
 
 /**
+ * Transaction id - a non-persistent unique identifier
+ * of the current transaction. -1 if there is no current
+ * transaction.
+ */
+API_EXPORT int64_t
+box_txn_id(void);
+
+/**
  * Return true if there is an active transaction.
  */
 API_EXPORT bool
@@ -293,5 +327,31 @@ API_EXPORT void *
 box_txn_alloc(size_t size);
 
 /** \endcond public */
+
+typedef struct txn_savepoint box_txn_savepoint_t;
+
+/**
+ * Create a new savepoint.
+ * @retval not NULL Savepoint object.
+ * @retval     NULL Client or memory error.
+ */
+API_EXPORT box_txn_savepoint_t *
+box_txn_savepoint(void);
+
+/**
+ * Rollback to @a savepoint. Rollback all statements newer than a
+ * saved statement and delete @a savepoint. Savepoint can not be
+ * rolled back twice.
+ * All existing savepoints, newer than @a savepoint, also are
+ * deleted and can not be used.
+ * @A savepoint must be from a current transaction, else the
+ * rollback crashes.
+ * To validate savepoints store transaction id together with a
+ * savepoint.
+ * @retval  0 Success.
+ * @retval -1 Client error.
+ */
+API_EXPORT int
+box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

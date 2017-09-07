@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+case "$1" in
+    configure)
+        update-alternatives \
+            --install /usr/bin/lua lua-interpreter /usr/bin/tarantool 50 \
+            --slave /usr/share/man/man1/lua.1.gz lua-manual \
+                /usr/share/man/man1/tarantool.1.gz
+esac
+
+#DEBHELPER#

@@ -51,6 +51,7 @@
 #include "vy_stat.h"
 #include "vy_stmt.h"
 #include "vy_upsert.h"
+#include "vy_read_set.h"
 
 int
 vy_index_env_create(struct vy_index_env *env, const char *path,
@@ -63,6 +64,11 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 	if (env->key_format == NULL)
 		return -1;
 	tuple_format_ref(env->key_format);
+	env->empty_key = vy_stmt_new_select(env->key_format, NULL, 0);
+	if (env->empty_key == NULL) {
+		tuple_format_unref(env->key_format);
+		return -1;
+	}
 	env->path = path;
 	env->allocator = allocator;
 	env->p_generation = p_generation;
@@ -74,6 +80,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 void
 vy_index_env_destroy(struct vy_index_env *env)
 {
+	tuple_unref(env->empty_key);
 	tuple_format_unref(env->key_format);
 }
 
@@ -192,6 +199,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->space_id = index_def->space_id;
 	index->id = index_def->iid;
 	index->opts = index_def->opts;
+	vy_index_read_set_new(&index->read_set);
 	return index;
 
 fail_mem:
@@ -234,6 +242,7 @@ vy_index_delete(struct vy_index *index)
 	assert(index->refs == 0);
 	assert(index->in_dump.pos == UINT32_MAX);
 	assert(index->in_compact.pos == UINT32_MAX);
+	assert(vy_index_read_set_empty(&index->read_set));
 
 	if (index->pk != NULL)
 		vy_index_unref(index->pk);

@@ -197,14 +197,13 @@ Handler::executeSelect(struct txn *, struct space *space,
 	index->initIterator(it, type, key, part_count);
 
 	struct tuple *tuple;
-	while ((tuple = it->next(it)) != NULL) {
+	while (found < limit && (tuple = it->next(it)) != NULL) {
 		if (offset > 0) {
 			offset--;
 			continue;
 		}
-		if (limit == found++)
-			break;
 		port_add_tuple_xc(port, tuple);
+		found++;
 	}
 }
 
@@ -269,6 +268,12 @@ struct tuple_format *
 Handler::format()
 {
 	return NULL;
+}
+
+size_t
+Handler::bsize() const
+{
+	return 0;
 }
 
 /* }}} DDL */

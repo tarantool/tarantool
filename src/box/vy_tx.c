@@ -56,28 +56,7 @@
 #include "vy_stmt.h"
 #include "vy_stmt_iterator.h"
 #include "vy_upsert.h"
-
-int
-read_set_cmp(struct txv *a, struct txv *b)
-{
-	int rc = a->index < b->index ? -1 : a->index > b->index;
-	if (rc == 0)
-		rc = vy_stmt_compare(a->stmt, b->stmt, a->index->cmp_def);
-	if (rc == 0)
-		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
-	return rc;
-}
-
-int
-read_set_key_cmp(struct read_set_key *a, struct txv *b)
-{
-	int rc = a->index < b->index ? -1 : a->index > b->index;
-	if (rc == 0)
-		rc = vy_stmt_compare(a->stmt, b->stmt, b->index->cmp_def);
-	if (rc == 0)
-		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
-	return rc;
-}
+#include "vy_read_set.h"
 
 int
 write_set_cmp(struct txv *a, struct txv *b)
@@ -126,7 +105,6 @@ tx_manager_new(void)
 		return NULL;
 	}
 
-	read_set_new(&xm->read_set);
 	rlist_create(&xm->read_views);
 	vy_global_read_view_create((struct vy_read_view *)&xm->global_read_view,
 				   INT64_MAX);
@@ -138,6 +116,8 @@ tx_manager_new(void)
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&xm->tx_mempool, slab_cache, sizeof(struct vy_tx));
 	mempool_create(&xm->txv_mempool, slab_cache, sizeof(struct txv));
+	mempool_create(&xm->read_interval_mempool, slab_cache,
+		       sizeof(struct vy_read_interval));
 	mempool_create(&xm->read_view_mempool, slab_cache,
 		       sizeof(struct vy_read_view));
 	return xm;
@@ -147,6 +127,7 @@ void
 tx_manager_delete(struct tx_manager *xm)
 {
 	mempool_destroy(&xm->read_view_mempool);
+	mempool_destroy(&xm->read_interval_mempool);
 	mempool_destroy(&xm->txv_mempool);
 	mempool_destroy(&xm->tx_mempool);
 	free(xm);
@@ -250,6 +231,51 @@ txv_delete(struct txv *v)
 	mempool_free(&v->tx->xm->txv_mempool, v);
 }
 
+static struct vy_read_interval *
+vy_read_interval_new(struct vy_tx *tx, struct vy_index *index,
+		     struct tuple *left, bool left_belongs,
+		     struct tuple *right, bool right_belongs)
+{
+	struct vy_read_interval *interval;
+	interval = mempool_alloc(&tx->xm->read_interval_mempool);
+	if (interval == NULL) {
+		diag_set(OutOfMemory, sizeof(*interval),
+			 "mempool", "struct vy_read_interval");
+		return NULL;
+	}
+	interval->tx = tx;
+	vy_index_ref(index);
+	interval->index = index;
+	tuple_ref(left);
+	interval->left = left;
+	interval->left_belongs = left_belongs;
+	tuple_ref(right);
+	interval->right = right;
+	interval->right_belongs = right_belongs;
+	interval->subtree_last = NULL;
+	return interval;
+}
+
+static void
+vy_read_interval_delete(struct vy_read_interval *interval)
+{
+	vy_index_unref(interval->index);
+	tuple_unref(interval->left);
+	tuple_unref(interval->right);
+	mempool_free(&interval->tx->xm->read_interval_mempool, interval);
+}
+
+static struct vy_read_interval *
+vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
+		       struct vy_read_interval *interval, void *arg)
+{
+	(void)arg;
+	(void)read_set;
+	vy_index_read_set_remove(&interval->index->read_set, interval);
+	vy_read_interval_delete(interval);
+	return NULL;
+}
+
 void
 vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 {
@@ -260,6 +286,7 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
 	tx->read_view = (struct vy_read_view *)xm->p_global_read_view;
+	vy_tx_read_set_new(&tx->read_set);
 	tx->psn = 0;
 	rlist_create(&tx->on_destroy);
 	xm->stat.active++;
@@ -273,16 +300,14 @@ vy_tx_destroy(struct vy_tx *tx)
 
 	tx_manager_destroy_read_view(tx->xm, tx->read_view);
 
-	/* Remove from the conflict manager index */
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
-		if (v->is_read)
-			read_set_remove(&tx->xm->read_set, v);
-		else
-			vy_stmt_counter_unacct_tuple(&v->index->stat.txw.count,
-						     v->stmt);
+		vy_stmt_counter_unacct_tuple(&v->index->stat.txw.count,
+					     v->stmt);
 		txv_delete(v);
 	}
+
+	vy_tx_read_set_iter(&tx->read_set, NULL, vy_tx_read_set_free_cb, NULL);
 
 	tx->xm->stat.active--;
 }
@@ -291,7 +316,7 @@ vy_tx_destroy(struct vy_tx *tx)
 static bool
 vy_tx_is_ro(struct vy_tx *tx)
 {
-	return tx->write_set.rbt_root == &tx->write_set.rbt_nil;
+	return write_set_empty(&tx->write_set);
 }
 
 /** Return true if the transaction is in read view. */
@@ -308,38 +333,23 @@ vy_tx_is_in_read_view(struct vy_tx *tx)
 static int
 vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 {
-	read_set_t *tree = &tx->xm->read_set;
-	struct read_set_key key;
-	key.index = v->index;
-	key.stmt = v->stmt;
-	key.tx = NULL;
-	/** Find the first value equal to or greater than key */
-	struct read_set_iterator it;
-	read_set_isearch_ge(tree, &key, &it);
-	for (struct txv *abort = read_set_inext(tree, &it);
-	     abort != NULL && abort->index == v->index;
-	     abort = read_set_inext(tree, &it)) {
-		/* Check if we're still looking at the matching key. */
-		if (vy_stmt_compare(key.stmt, abort->stmt,
-				    v->index->cmp_def) != 0)
-			break;
+	struct vy_tx_conflict_iterator it;
+	vy_tx_conflict_iterator_init(&it, &v->index->read_set, v->stmt);
+	struct vy_tx *abort;
+	while ((abort = vy_tx_conflict_iterator_next(&it)) != NULL) {
 		/* Don't abort self. */
-		if (abort->tx == tx)
+		if (abort == tx)
 			continue;
 		/* Abort only active TXs */
-		if (abort->tx->state != VINYL_TX_READY)
-			continue;
-		/* Delete of nothing does not cause a conflict */
-		if (abort->is_gap && vy_stmt_type(v->stmt) == IPROTO_DELETE)
+		if (abort->state != VINYL_TX_READY)
 			continue;
 		/* already in (earlier) read view */
-		if (vy_tx_is_in_read_view(abort->tx))
+		if (vy_tx_is_in_read_view(abort))
 			continue;
-
 		struct vy_read_view *rv = tx_manager_read_view(tx->xm);
 		if (rv == NULL)
 			return -1;
-		abort->tx->read_view = rv;
+		abort->read_view = rv;
 	}
 	return 0;
 }
@@ -351,31 +361,17 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 static void
 vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 {
-	read_set_t *tree = &tx->xm->read_set;
-	struct read_set_key key;
-	key.index = v->index;
-	key.stmt = v->stmt;
-	key.tx = NULL;
-	/** Find the first value equal to or greater than key. */
-	struct read_set_iterator it;
-	read_set_isearch_ge(tree, &key, &it);
-	for (struct txv *abort = read_set_inext(tree, &it);
-	     abort != NULL && abort->index == v->index;
-	     abort = read_set_inext(tree, &it)) {
-		/* Check if we're still looking at the matching key. */
-		if (vy_stmt_compare(key.stmt, abort->stmt,
-				    v->index->cmp_def) != 0)
-			break;
+	struct vy_tx_conflict_iterator it;
+	vy_tx_conflict_iterator_init(&it, &v->index->read_set, v->stmt);
+	struct vy_tx *abort;
+	while ((abort = vy_tx_conflict_iterator_next(&it)) != NULL) {
 		/* Don't abort self. */
-		if (abort->tx == tx)
+		if (abort == tx)
 			continue;
 		/* Abort only active TXs */
-		if (abort->tx->state != VINYL_TX_READY)
+		if (abort->state != VINYL_TX_READY)
 			continue;
-		/* Delete of nothing does not cause a conflict. */
-		if (abort->is_gap && vy_stmt_type(v->stmt) == IPROTO_DELETE)
-			continue;
-		abort->tx->state = VINYL_TX_ABORT;
+		abort->state = VINYL_TX_ABORT;
 	}
 }
 
@@ -505,7 +501,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	struct txv *v;
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&tx->write_set, &it)) != NULL) {
+	while ((v = write_set_inext(&it)) != NULL) {
 		if (vy_tx_send_to_read_view(tx, v))
 			return -1;
 	}
@@ -518,10 +514,6 @@ vy_tx_prepare(struct vy_tx *tx)
 	const struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
-		/* Save only writes. */
-		if (v->is_read)
-			continue;
-
 		struct vy_index *index = v->index;
 		if (index->id == 0) {
 			/* The beginning of the new txn_stmt is met. */
@@ -631,7 +623,7 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&tx->write_set, &it)) != NULL) {
+	while ((v = write_set_inext(&it)) != NULL) {
 		vy_tx_abort_readers(tx, v);
 	}
 }
@@ -668,56 +660,119 @@ vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 	stailq_reverse(&tail);
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tail, next_in_log) {
-		/* Remove from the conflict manager index */
-		if (v->is_read)
-			read_set_remove(&tx->xm->read_set, v);
-		/* Remove from the transaction write log. */
-		if (!v->is_read) {
-			write_set_remove(&tx->write_set, v);
-			if (v->overwritten != NULL) {
-				/* Restore overwritten statement. */
-				write_set_insert(&tx->write_set, v->overwritten);
-				v->overwritten->is_overwritten = false;
-			}
-			tx->write_set_version++;
+		write_set_remove(&tx->write_set, v);
+		if (v->overwritten != NULL) {
+			/* Restore overwritten statement. */
+			write_set_insert(&tx->write_set, v->overwritten);
+			v->overwritten->is_overwritten = false;
 		}
+		tx->write_set_version++;
 		txv_delete(v);
 	}
 }
 
 int
 vy_tx_track(struct vy_tx *tx, struct vy_index *index,
-	    struct tuple *key, bool is_gap)
+	    struct tuple *left, bool left_belongs,
+	    struct tuple *right, bool right_belongs)
 {
-	struct txv *v;
-	MAYBE_UNUSED uint32_t part_count = tuple_field_count(key);
+	if (vy_tx_is_in_read_view(tx)) {
+		/* No point in tracking reads. */
+		return 0;
+	}
 
-	/* We do not support tracking range requests. */
-	assert(part_count >= index->cmp_def->part_count);
+	struct vy_read_interval *new_interval;
+	new_interval = vy_read_interval_new(tx, index, left, left_belongs,
+					    right, right_belongs);
+	if (new_interval == NULL)
+		return -1;
+
+	/*
+	 * Search for intersections in the transaction read set.
+	 */
+	struct stailq merge;
+	stailq_create(&merge);
+
+	struct vy_tx_read_set_iterator it;
+	vy_tx_read_set_isearch_le(&tx->read_set, new_interval, &it);
+
+	struct vy_read_interval *interval;
+	interval = vy_tx_read_set_inext(&it);
+	if (interval != NULL && interval->index == index) {
+		if (vy_read_interval_cmpr(interval, new_interval) >= 0) {
+			/*
+			 * There is an interval in the tree spanning
+			 * the new interval. Nothing to do.
+			 */
+			vy_read_interval_delete(new_interval);
+			return 0;
+		}
+		if (vy_read_interval_should_merge(interval, new_interval))
+			stailq_add_tail_entry(&merge, interval, in_merge);
+	}
+
+	if (interval == NULL)
+		vy_tx_read_set_isearch_gt(&tx->read_set, new_interval, &it);
+
+	while ((interval = vy_tx_read_set_inext(&it)) != NULL &&
+	       interval->index == index &&
+	       vy_read_interval_should_merge(new_interval, interval))
+		stailq_add_tail_entry(&merge, interval, in_merge);
+
+	/*
+	 * Merge intersecting intervals with the new interval and
+	 * remove them from the transaction and index read sets.
+	 */
+	if (!stailq_empty(&merge)) {
+		interval = stailq_first_entry(&merge, struct vy_read_interval,
+					      in_merge);
+		if (vy_read_interval_cmpl(new_interval, interval) > 0) {
+			tuple_ref(interval->left);
+			tuple_unref(new_interval->left);
+			new_interval->left = interval->left;
+			new_interval->left_belongs = interval->left_belongs;
+		}
+		interval = stailq_last_entry(&merge, struct vy_read_interval,
+					     in_merge);
+		if (vy_read_interval_cmpr(new_interval, interval) < 0) {
+			tuple_ref(interval->right);
+			tuple_unref(new_interval->right);
+			new_interval->right = interval->right;
+			new_interval->right_belongs = interval->right_belongs;
+		}
+		struct vy_read_interval *next_interval;
+		stailq_foreach_entry_safe(interval, next_interval, &merge,
+					  in_merge) {
+			vy_tx_read_set_remove(&tx->read_set, interval);
+			vy_index_read_set_remove(&index->read_set, interval);
+			vy_read_interval_delete(interval);
+		}
+	}
+
+	vy_tx_read_set_insert(&tx->read_set, new_interval);
+	vy_index_read_set_insert(&index->read_set, new_interval);
+	return 0;
+}
+
+int
+vy_tx_track_point(struct vy_tx *tx, struct vy_index *index,
+		  struct tuple *stmt)
+{
+	assert(tuple_field_count(stmt) >= index->cmp_def->part_count);
 
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
 		return 0;
 	}
 
-	v = write_set_search_key(&tx->write_set, index, key);
+	struct txv *v = write_set_search_key(&tx->write_set, index, stmt);
 	if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
 			  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
 		/* Reading from own write set is serializable. */
 		return 0;
 	}
 
-	v = read_set_search_key(&tx->xm->read_set, index, key, tx);
-	if (v == NULL) {
-		v = txv_new(tx, index, key);
-		if (v == NULL)
-			return -1;
-		v->is_read = true;
-		v->is_gap = is_gap;
-		stailq_add_tail_entry(&tx->log, v, next_in_log);
-		read_set_insert(&tx->xm->read_set, v);
-	}
-	return 0;
+	return vy_tx_track(tx, index, stmt, true, stmt, true);
 }
 
 int
@@ -769,8 +824,17 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		old->is_overwritten = true;
 	}
 
-	v->is_read = false;
-	v->is_gap = false;
+	if (old != NULL && vy_stmt_type(stmt) != IPROTO_UPSERT) {
+		/*
+		 * Inherit the column mask of the overwritten statement
+		 * so as not to skip both statements on dump.
+		 */
+		uint64_t column_mask = vy_stmt_column_mask(stmt);
+		if (column_mask != UINT64_MAX)
+			vy_stmt_set_column_mask(stmt, column_mask |
+						vy_stmt_column_mask(old->stmt));
+	}
+
 	v->overwritten = old;
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
@@ -790,13 +854,6 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key)
 {
-	if (tuple_field_count(key) == 0) {
-		/* Change iterator_type for simplicity. */
-		iterator_type = (iterator_type == ITER_LT ||
-				 iterator_type == ITER_LE ?
-				 ITER_LE : ITER_GE);
-	}
-
 	itr->base.iface = &vy_txw_iterator_iface;
 	itr->stat = stat;
 	itr->tx = tx;

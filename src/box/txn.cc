@@ -82,7 +82,6 @@ txn_stmt_new(struct txn *txn)
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
-	stmt->bsize_change = 0;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 
@@ -94,6 +93,7 @@ txn_stmt_new(struct txn *txn)
 struct txn *
 txn_begin(bool is_autocommit)
 {
+	static int64_t txn_id = 0;
 	assert(! in_txn());
 	struct txn *txn = region_alloc_object_xc(&fiber()->gc, struct txn);
 	/* Initialize members explicitly to save time on memset() */
@@ -102,6 +102,7 @@ txn_begin(bool is_autocommit)
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
 	txn->in_sub_stmt = 0;
+	txn->id = ++txn_id;
 	txn->signature = -1;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
@@ -309,6 +310,16 @@ txn_check_singlestatement(struct txn *txn, const char *where)
 
 extern "C" {
 
+int64_t
+box_txn_id(void)
+{
+	struct txn *txn = in_txn();
+	if (txn != NULL)
+		return txn->id;
+	else
+		return -1;
+}
+
 bool
 box_txn()
 {
@@ -375,6 +386,71 @@ box_txn_alloc(size_t size)
 	};
 	return region_aligned_alloc(&fiber()->gc, size,
 	                            alignof(union natural_align));
+}
+
+box_txn_savepoint_t *
+box_txn_savepoint()
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL) {
+		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		return NULL;
+	}
+	struct txn_savepoint *svp =
+		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
+							struct txn_savepoint);
+	if (svp == NULL) {
+		diag_set(OutOfMemory, sizeof(*svp) + alignof(*svp) - 1,
+			 "region_alloc_object", "svp");
+		return NULL;
+	}
+	if (stailq_empty(&txn->stmts)) {
+		svp->is_first = true;
+		return svp;
+	}
+	svp->is_first = false;
+	svp->stmt = txn_last_stmt(txn);
+	svp->in_sub_stmt = txn->in_sub_stmt;
+	return svp;
+}
+
+int
+box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL) {
+		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		return -1;
+	}
+	struct txn_stmt *stmt = svp->stmt;
+	if (!svp->is_first && (stmt == NULL || stmt->space == NULL ||
+			       svp->in_sub_stmt != txn->in_sub_stmt)) {
+		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
+		return -1;
+	}
+	struct stailq rollback_stmts;
+	if (svp->is_first) {
+		rollback_stmts = txn->stmts;
+		stailq_create(&txn->stmts);
+	} else {
+		stailq_create(&rollback_stmts);
+		stmt = stailq_next_entry(stmt, next);
+		stailq_splice(&txn->stmts, &stmt->next, &rollback_stmts);
+	}
+	stailq_reverse(&rollback_stmts);
+	stailq_foreach_entry(stmt, &rollback_stmts, next) {
+		txn->engine->rollbackStatement(txn, stmt);
+		if (stmt->row != NULL) {
+			stmt->row = NULL;
+			--txn->n_rows;
+			assert(txn->n_rows >= 0);
+		}
+		stmt->space = NULL;
+	}
+	/* Destroy the savepoint to provide error on double rollback */
+	svp->is_first = false;
+	svp->stmt = NULL;
+	return 0;
 }
 
 } /* extern "C" */

@@ -1502,20 +1502,17 @@ t:truncate()
 --
 -- Check that min/max/count transactions stay within a read view
 --
--- XXX bug: we read committed doata since there are no gap locks,
--- and c1 is not turned into a read-only on conflict with c2.
---
 t:replace{1}
 c1:begin()
 c1("t.index.pk:max()") -- {1}
 c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 1
 c2:begin()
-c2("t:replace{2}")
+c2("t:replace{2}") -- conflicts with c1 so c1 starts using a read view
 c2:commit()
-c1("t.index.pk:max()") -- {2}
+c1("t.index.pk:max()") -- {1}
 c1("t.index.pk:min()") -- {1}
-c1("t.index.pk:count()") -- 2
+c1("t.index.pk:count()") -- 1
 c1:commit()
 --
 -- Convert the reader to a read view: in this test we have
@@ -1535,6 +1532,39 @@ c1("t.index.pk:min()") -- {1}
 c1("t.index.pk:count()") -- 2
 c1:commit()
 t:truncate()
+
+--
+-- Check that select() does not add the key following
+-- the last returned key to the conflict manager.
+--
+t:replace{1}
+t:replace{2}
+c1:begin()
+c1("t:select({}, {limit = 0})") -- none
+c2:begin()
+c2("t:replace{1, 'new'}")
+c2:commit()
+c1("t:select({}, {limit = 1})") -- {1, 'new'}
+c2:begin()
+c2("t:replace{2, 'new'}")
+c2:commit()
+c1("t:select()") -- {1, 'new'}, {2, 'new'}
+c1:commit()
+t:truncate()
+
+--
+-- gh-2716 uniqueness check for secondary indexes
+--
+_ = t:create_index('sk', {parts = {2, 'unsigned'}, unique = true})
+c1:begin()
+c2:begin()
+c1("t:insert{1, 2}")
+c2("t:insert{2, 2}")
+c1:commit()
+c2:commit() -- rollback
+t:select() -- {1, 2}
+t:truncate()
+t.index.sk:drop()
 
 -- *************************************************************************
 -- 1.7 cleanup marker: end of tests cleanup

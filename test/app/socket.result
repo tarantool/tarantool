@@ -329,7 +329,7 @@ s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
 ---
 - true
 ...
-s:getsockopt('SOL_SOCKET', 'SO_TYPE')
+s:getsockopt('socket', 'SO_TYPE')
 ---
 - 1
 ...
@@ -341,7 +341,7 @@ s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
 ---
 - true
 ...
-s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
+s:getsockopt('socket', 'SO_DEBUG')
 ---
 - 0
 ...
@@ -356,6 +356,46 @@ s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 s:error()
 ---
 - null
+...
+s:setsockopt('IPPROTO_TCP', 'TCP_NODELAY', true)
+---
+- true
+...
+s:getsockopt('IPPROTO_TCP', 'TCP_NODELAY') > 0
+---
+- true
+...
+s:setsockopt('SOL_TCP', 'TCP_NODELAY', false)
+---
+- true
+...
+s:getsockopt('SOL_TCP', 'TCP_NODELAY') == 0
+---
+- true
+...
+s:setsockopt('tcp', 'TCP_NODELAY', true)
+---
+- true
+...
+s:getsockopt('tcp', 'TCP_NODELAY') > 0
+---
+- true
+...
+s:setsockopt(6, 'TCP_NODELAY', false)
+---
+- true
+...
+s:getsockopt(6, 'TCP_NODELAY') == 0
+---
+- true
+...
+not s:setsockopt(nil, 'TCP_NODELAY', true) and errno() == errno.EINVAL
+---
+- true
+...
+not s:getsockopt(nil, 'TCP_NODELAY') and errno() == errno.EINVAL
+---
+- true
 ...
 s:linger()
 ---
@@ -1614,7 +1654,7 @@ socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == e
 ---
 - true
 ...
-socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
+socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EPROTOTYPE
 ---
 - true
 ...
@@ -1641,4 +1681,520 @@ test_run:cmd("setopt delimiter ''");
 ...
 f:cancel()
 ---
+...
+--------------------------------------------------------------------------------
+-- Lua Socket Emulation
+--------------------------------------------------------------------------------
+test_run:cmd("push filter 'fd=([0-9]+)' to 'fd=<FD>'")
+---
+- true
+...
+s = socket.tcp()
+---
+...
+s
+---
+- 'tcp{master}: fd=<FD>'
+...
+s:close()
+---
+- 1
+...
+-- Sic: incompatible with Lua Socket
+s:close()
+---
+- error: 'builtin/socket.lua: attempt to use closed socket'
+...
+s = socket.tcp()
+---
+...
+host, port, family = s:getsockname()
+---
+...
+host == '0.0.0.0', port == '0', family == 'inet'
+---
+- true
+- true
+- true
+...
+status, reason = s:getpeername()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(100500)
+---
+- 1
+...
+s:setoption('keepalive', true)
+---
+- 1
+...
+s:setoption('linger', { on = true })
+---
+- 1
+...
+s:setoption('linger', true)
+---
+- 1
+...
+s:setoption('reuseaddr', true)
+---
+- 1
+...
+s:setoption('tcp-nodelay', true)
+---
+- 1
+...
+s:setoption('unknown', true)
+---
+- error: 'builtin/socket.lua: Unknown socket option name: unknown'
+...
+s:bind('127.0.0.1', 0)
+---
+- 1
+...
+s:bind('127.0.0.1', 0) -- error handling
+---
+- null
+- Invalid argument
+...
+s:listen(10)
+---
+- 1
+...
+s -- transformed to tcp{server} socket
+---
+- 'tcp{server}: fd=<FD>'
+...
+host, port, family = s:getsockname()
+---
+...
+host == '127.0.0.1', type(port) == 'string', family == 'inet'
+---
+- true
+- true
+- true
+...
+status, reason = s:getpeername()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(0)
+---
+- 1
+...
+status, reason = s:accept()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(0.001)
+---
+- 1
+...
+status, reason = s:accept()
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+s:settimeout(100500)
+---
+- 1
+...
+rch, wch = fiber.channel(1), fiber.channel(1)
+---
+...
+sc = socket.connect(host, port)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+cfiber = fiber.create(function(sc, rch, wch)
+    while sc:send(wch:get()) and rch:put(sc:receive("*l")) do end
+end, sc, rch, wch);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+chost, cport, cfamily = c:getsockname()
+---
+...
+chost == '127.0.0.1', type(cport) == 'string', cfamily == 'inet'
+---
+- true
+- true
+- true
+...
+chost, cport, cfamily = c:getpeername()
+---
+...
+chost == '127.0.0.1', type(cport) == 'string', cfamily == 'inet'
+---
+- true
+- true
+- true
+...
+wch:put("Ping\n")
+---
+- true
+...
+c:receive("*l")
+---
+- Ping
+...
+c:send("Pong\n")
+---
+- 5
+...
+rch:get()
+---
+- Pong
+...
+wch:put("HELO lua\nMAIL FROM: <roman@tarantool.org>\n")
+---
+- true
+...
+c:receive("*l")
+---
+- HELO lua
+...
+c:receive("*l")
+---
+- 'MAIL FROM: <roman@tarantool.org>'
+...
+c:send("250 Welcome to Lua Universe\n")
+---
+- 28
+...
+c:send("$$$250 OK\n$$$", 4, 11)
+---
+- 11
+...
+rch:get()
+---
+- 250 Welcome to Lua Universe
+...
+wch:put("RCPT TO: <team@lua.org>\n")
+---
+- true
+...
+c:receive()
+---
+- 'RCPT TO: <team@lua.org>'
+...
+c:send("250")
+---
+- 3
+...
+c:send(" ")
+---
+- 1
+...
+c:send("OK")
+---
+- 2
+...
+c:send("\n")
+---
+- 1
+...
+rch:get()
+---
+- 250 OK
+...
+wch:put("DATA\n")
+---
+- true
+...
+c:receive(4)
+---
+- DATA
+...
+c:receive("*l")
+---
+- 
+...
+wch:put("Fu")
+---
+- true
+...
+c:send("354 Please type your message\n")
+---
+- 29
+...
+sc:close()
+---
+- 1
+...
+c:receive("*l", "Line: ")
+---
+- null
+- closed
+- 'Line: Fu'
+...
+c:receive()
+---
+- null
+- closed
+- 
+...
+c:receive(10)
+---
+- null
+- closed
+- 
+...
+c:receive("*a")
+---
+- null
+- closed
+- 
+...
+c:close()
+---
+- 1
+...
+-- eof with bytes
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Po") end)
+---
+...
+sc:close()
+---
+- 1
+...
+c:receive(100500, "Message:")
+---
+- null
+- closed
+- Message:Po
+...
+c:close()
+---
+- 1
+...
+-- eof with '*l'
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Pong\nPo") end)
+---
+...
+sc:close()
+---
+- 1
+...
+c:receive("*l", "Message:")
+---
+- Message:Pong
+...
+c:receive("*l", "Message: ")
+---
+- null
+- closed
+- 'Message: Po'
+...
+c:receive("*l", "Message: ")
+---
+- null
+- closed
+- 'Message: '
+...
+c:close()
+---
+- 1
+...
+-- eof with '*a'
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Pong\n") end)
+---
+...
+sc:close()
+---
+- 1
+...
+c:receive("*a", "Message: ")
+---
+- 'Message: Pong
+
+'
+...
+c:receive("*a", "Message: ")
+---
+- null
+- closed
+- 'Message: '
+...
+c:close()
+---
+- 1
+...
+-- shutdown
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+c = s:accept()
+---
+...
+c
+---
+- 'tcp{client}: fd=<FD>'
+...
+_ = fiber.create(function() sc:send("Pong\n") end)
+---
+...
+sc:shutdown("send")
+---
+- 1
+...
+c:receive()
+---
+- Pong
+...
+c:shutdown("send")
+---
+- 1
+...
+status, reason = c:shutdown("recv")
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+status, reason = c:shutdown("recv")
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+status, reason = c:shutdown("both")
+---
+...
+status == nil, type(reason) == 'string'
+---
+- true
+- true
+...
+c:close()
+---
+- 1
+...
+sc:close()
+---
+- 1
+...
+s:close()
+---
+- 1
+...
+-- socket.bind / socket.connect
+s = socket.bind('0.0.0.0', 0)
+---
+...
+s
+---
+- 'tcp{server}: fd=<FD>'
+...
+host, port, family = s:getsockname()
+---
+...
+sc = socket.connect(host, port)
+---
+...
+sc
+---
+- 'tcp{client}: fd=<FD>'
+...
+sc:close()
+---
+- 1
+...
+sc = socket.tcp()
+---
+...
+sc:connect(host, port)
+---
+- 1
+...
+sc:close()
+---
+- 1
+...
+s:close()
+---
+- 1
+...
+test_run:cmd("clear filter")
+---
+- true
 ...

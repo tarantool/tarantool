@@ -186,29 +186,10 @@ space_run_triggers(struct space *space, bool yesno)
 	space->run_triggers = yesno;
 }
 
-ptrdiff_t
-space_bsize_update(struct space *space,
-		   const struct tuple *old_tuple,
-		   const struct tuple *new_tuple)
-{
-	ptrdiff_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0,
-	          new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
-	assert((ptrdiff_t)space->bsize >= old_bsize);
-	space->bsize += new_bsize - old_bsize;
-	return new_bsize - old_bsize;
-}
-
-void
-space_bsize_rollback(struct space *space, ptrdiff_t bsize_change)
-{
-	assert(bsize_change < 0 || (ptrdiff_t)space->bsize >= bsize_change);
-	space->bsize -= bsize_change;
-}
-
 size_t
-space_bsize(struct space *space)
+space_bsize(const struct space *space)
 {
-	return space->bsize;
+	return space->handler->bsize();
 }
 
 struct index_def *

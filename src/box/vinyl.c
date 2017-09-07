@@ -264,7 +264,6 @@ struct vy_cursor {
 	 * was created.
 	 */
 	struct vy_tx *tx;
-	enum iterator_type iterator_type;
 	/** The number of vy_cursor_next() invocations. */
 	int n_reads;
 	/** Cursor creation time, used for statistics. */
@@ -273,8 +272,6 @@ struct vy_cursor {
 	struct trigger on_tx_destroy;
 	/** Iterator over index */
 	struct vy_read_iterator iterator;
-	/** Set to true, if need to check statements to match the cursor key. */
-	bool need_check_eq;
 };
 
 /**
@@ -2037,6 +2034,8 @@ vy_info_append_performance(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "tx_allocated", mstats.objcount);
 	mempool_stats(&env->xm->txv_mempool, &mstats);
 	info_append_int(h, "txv_allocated", mstats.objcount);
+	mempool_stats(&env->xm->read_interval_mempool, &mstats);
+	info_append_int(h, "read_interval", mstats.objcount);
 	mempool_stats(&env->xm->read_view_mempool, &mstats);
 	info_append_int(h, "read_view", mstats.objcount);
 
@@ -4872,37 +4871,9 @@ vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 		trigger_add(&tx->on_destroy, &c->on_tx_destroy);
 	}
 	c->tx = tx;
-	c->need_check_eq = false;
-	enum iterator_type iterator_type;
-	switch (type) {
-	case ITER_ALL:
-		iterator_type = ITER_GE;
-		break;
-	case ITER_GE:
-	case ITER_GT:
-	case ITER_LE:
-	case ITER_LT:
-	case ITER_EQ:
-		iterator_type = type;
-		break;
-	case ITER_REQ: {
-		/* point-lookup iterator (optimization) */
-		if (index->opts.is_unique &&
-		    part_count == index->cmp_def->part_count) {
-			iterator_type = ITER_EQ;
-		} else {
-			c->need_check_eq = true;
-			iterator_type = ITER_LE;
-		}
-		break;
-	}
-	default:
-		unreachable();
-	}
 	vy_read_iterator_open(&c->iterator, &env->run_env, index, tx,
-			      iterator_type, c->key,
+			      type, c->key,
 			      (const struct vy_read_view **)&tx->read_view);
-	c->iterator_type = iterator_type;
 	vy_index_ref(c->index);
 	return c;
 }
@@ -4915,7 +4886,7 @@ vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
 	*result = NULL;
 
 	if (c->tx == NULL) {
-		diag_set(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
 		return -1;
 	}
 	if (c->tx->state == VINYL_TX_ABORT || c->tx->read_view->is_aborted) {
@@ -4929,9 +4900,6 @@ vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
 		return -1;
 	c->n_reads++;
 	if (vyresult == NULL)
-		return 0;
-	if (c->need_check_eq &&
-	    vy_tuple_compare_with_key(vyresult, c->key, index->cmp_def) != 0)
 		return 0;
 	if (index->id > 0 && vy_index_full_by_stmt(env, c->tx, index, vyresult,
 						   &vyresult))

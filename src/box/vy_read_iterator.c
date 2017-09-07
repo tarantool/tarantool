@@ -73,7 +73,7 @@ struct vy_merge_src {
 static void
 vy_merge_iterator_open(struct vy_merge_iterator *itr,
 		       enum iterator_type iterator_type,
-		       const struct tuple *key,
+		       struct tuple *key,
 		       const struct key_def *cmp_def,
 		       struct tuple_format *format,
 		       struct tuple_format *upsert_format,
@@ -668,7 +668,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type, const struct tuple *key,
+		      enum iterator_type iterator_type, struct tuple *key,
 		      const struct vy_read_view **rv)
 {
 	itr->run_env = run_env;
@@ -678,8 +678,36 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 	itr->key = key;
 	itr->read_view = rv;
 	itr->search_started = false;
+	itr->need_check_eq = false;
 	itr->curr_stmt = NULL;
 	itr->curr_range = NULL;
+
+	if (tuple_field_count(key) == 0) {
+		/*
+		 * Strictly speaking, a GT/LT iterator should return
+		 * nothing if the key is empty, because every key is
+		 * equal to the empty key, but historically we return
+		 * all keys instead. So use GE/LE instead of GT/LT
+		 * in this case.
+		 */
+		itr->iterator_type = iterator_type == ITER_LT ||
+				     iterator_type == ITER_LE ?
+				     ITER_LE : ITER_GE;
+	}
+
+	if (iterator_type == ITER_ALL)
+		itr->iterator_type = ITER_GE;
+
+	if (iterator_type == ITER_REQ) {
+		if (index->opts.is_unique &&
+		    tuple_field_count(key) == index->cmp_def->part_count) {
+			/* Use point-lookup iterator (optimization). */
+			itr->iterator_type = ITER_EQ;
+		} else {
+			itr->need_check_eq = true;
+			itr->iterator_type = ITER_LE;
+		}
+	}
 }
 
 /**
@@ -957,9 +985,31 @@ restart:
 			     itr->key, itr->iterator_type);
 	}
 
-	if (itr->tx != NULL && *result != NULL)
-		rc = vy_tx_track(itr->tx, itr->index, *result, false);
+	if (itr->need_check_eq && *result != NULL &&
+	    vy_tuple_compare_with_key(*result, itr->key,
+				      index->cmp_def) != 0) {
+		*result = NULL;
+	}
 
+	if (itr->tx != NULL) {
+		struct tuple *last = *result;
+		if (last == NULL) {
+			last = (itr->need_check_eq ||
+				itr->iterator_type == ITER_EQ ?
+				itr->key :
+				index->env->empty_key);
+		}
+		if (iterator_direction(itr->iterator_type) >= 0) {
+			rc = vy_tx_track(itr->tx, index,
+					 itr->key,
+					 itr->iterator_type != ITER_GT,
+					 last, true);
+		} else {
+			rc = vy_tx_track(itr->tx, index, last, true,
+					 itr->key,
+					 itr->iterator_type != ITER_LT);
+		}
+	}
 clear:
 	if (prev_key != NULL)
 		tuple_unref(prev_key);

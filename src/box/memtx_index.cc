@@ -37,19 +37,6 @@
 #include "space.h"
 
 void
-MemtxIndex::truncate()
-{
-	if (index_def->iid != 0)
-		return; /* nothing to do for secondary keys */
-
-	struct iterator *it = position();
-	initIterator(it, ITER_ALL, NULL, 0);
-	struct tuple *tuple;
-	while ((tuple = it->next(it)) != NULL)
-		tuple_unref(tuple);
-}
-
-void
 MemtxIndex::beginBuild()
 {}
 

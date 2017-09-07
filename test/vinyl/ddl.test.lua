@@ -12,38 +12,48 @@ space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', {type = 'hash'})
 space:drop()
 
--- new indexes on not empty space are unsupported
+-- creation of a new index and altering the definition of an existing
+-- index are unsupported for non-empty spaces
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')
 space:insert({1})
 -- fail because of wrong tuple format {1}, but need {1, ...}
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 #box.space._index:select({space.id})
+box.space._index:get{space.id, 0}[6]
 space:drop()
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')
 space:insert({1, 2})
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 #box.space._index:select({space.id})
+box.space._index:get{space.id, 0}[6]
 space:drop()
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')
 space:insert({1, 2})
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 #box.space._index:select({space.id})
+box.space._index:get{space.id, 0}[6]
 space:delete({1})
 
 -- must fail because vy_mems have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 box.snapshot()
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
 -- can be altered.
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 #box.space._index:select({space.id})
+box.space._index:get{space.id, 0}[6]
 space:insert({1, 2})
 index:select{}
 index2:select{}
@@ -58,6 +68,7 @@ box.snapshot()
 while space.index.primary:info().run_count ~= 2 do fiber.sleep(0.01) end
 -- must fail because vy_runs have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 
 -- After compaction the REPLACE + DELETE + DELETE = nothing, so
 -- the space is now empty and can be altered.
@@ -69,6 +80,7 @@ box.snapshot()
 -- Wait until the dump is finished.
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 
 space:drop()
 
