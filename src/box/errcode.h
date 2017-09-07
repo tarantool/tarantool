@@ -194,6 +194,13 @@ struct errcode_record {
 	/*139 */_(ER_VINYL_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple: tuple is too large. Check 'vinyl_max_tuple_size' configuration option.") \
 	/*140 */_(ER_WRONG_DD_VERSION,		"Wrong _schema version: expected 'major.minor[.patch]'") \
 	/*141 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format (field %u): %s") \
+	/*142 */_(ER_CREATE_SEQUENCE,		"Failed to create sequence '%s': %s") \
+	/*143 */_(ER_ALTER_SEQUENCE,		"Can't modify sequence '%s': %s") \
+	/*144 */_(ER_DROP_SEQUENCE,		"Can't drop sequence '%s': %s") \
+	/*145 */_(ER_NO_SUCH_SEQUENCE,		"Sequence '%s' does not exist") \
+	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
+	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
+	/*148 */_(ER_SEQUENCE_NOT_STARTED,	"Sequence '%s' is not started") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

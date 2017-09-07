@@ -22,6 +22,13 @@ box.space._space:select{}
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
         'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
         'type': 'map'}, {'name': 'format', 'type': 'array'}]]
+  - [284, 1, '_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
+        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'step',
+        'type': 'integer'}, {'name': 'min', 'type': 'integer'}, {'name': 'max', 'type': 'integer'},
+      {'name': 'start', 'type': 'integer'}, {'name': 'cache', 'type': 'integer'},
+      {'name': 'cycle', 'type': 'boolean'}]]
+  - [285, 1, '_sequence_data', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
+      {'name': 'value', 'type': 'integer'}]]
   - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
         'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
@@ -60,6 +67,10 @@ box.space._index:select{}
   - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [284, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [284, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [284, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
+  - [285, 0, 'primary', 'hash', {'unique': true}, [[0, 'unsigned']]]
   - [288, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [288, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
   - [289, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]

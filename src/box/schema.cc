@@ -33,6 +33,7 @@
 #include "engine.h"
 #include "memtx_index.h"
 #include "func.h"
+#include "sequence.h"
 #include "tuple.h"
 #include "assoc.h"
 #include "alter.h"
@@ -58,10 +59,12 @@
 static struct mh_i32ptr_t *spaces;
 static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
+static struct mh_i32ptr_t *sequences;
 uint32_t schema_version = 0;
 uint32_t dd_version_id = version_id(1, 6, 4);
 
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
+struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
 
 /**
  * Lock of scheme modification
@@ -251,6 +254,7 @@ schema_init()
 	spaces = mh_i32ptr_new();
 	funcs = mh_i32ptr_new();
 	funcs_by_name = mh_strnptr_new();
+	sequences = mh_i32ptr_new();
 	/*
 	 * Create surrogate space objects for the mandatory system
 	 * spaces (the primal eggs from which we get all the
@@ -281,6 +285,14 @@ schema_init()
 	/* _truncate - auxiliary space for triggering space truncation. */
 	sc_space_new(BOX_TRUNCATE_ID, "_truncate", key_def,
 		     &on_replace_truncate, &on_stmt_begin_truncate);
+
+	/* _sequence - definition of all sequence objects. */
+	sc_space_new(BOX_SEQUENCE_ID, "_sequence", key_def,
+		     &on_replace_sequence, NULL);
+
+	/* _sequence_data - current sequence value. */
+	sc_space_new(BOX_SEQUENCE_DATA_ID, "_sequence_data", key_def,
+		     &on_replace_sequence_data, NULL);
 
 	/* _user - all existing users */
 	sc_space_new(BOX_USER_ID, "_user", key_def, &on_replace_user, NULL);
@@ -335,6 +347,14 @@ schema_free(void)
 		func_cache_delete(func->def->fid);
 	}
 	mh_i32ptr_delete(funcs);
+	while (mh_size(sequences) > 0) {
+		mh_int_t i = mh_first(sequences);
+
+		struct sequence *seq = ((struct sequence *)
+					mh_i32ptr_node(sequences, i)->val);
+		sequence_cache_delete(seq->def->id);
+	}
+	mh_i32ptr_delete(sequences);
 }
 
 void
@@ -424,4 +444,58 @@ schema_find_grants(const char *type, uint32_t id)
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
 	index->initIterator(it, ITER_EQ, key, 2);
 	return it->next(it);
+}
+
+struct sequence *
+sequence_by_id(uint32_t id)
+{
+	mh_int_t k = mh_i32ptr_find(sequences, id, NULL);
+	if (k == mh_end(sequences))
+		return NULL;
+	return (struct sequence *) mh_i32ptr_node(sequences, k)->val;
+}
+
+struct sequence *
+sequence_cache_find(uint32_t id)
+{
+	struct sequence *seq = sequence_by_id(id);
+	if (seq == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_SEQUENCE, int2str(id));
+	return seq;
+}
+
+void
+sequence_cache_replace(struct sequence_def *def)
+{
+	struct sequence *seq = sequence_by_id(def->id);
+	if (seq == NULL) {
+		/* Create a new sequence. */
+		seq = (struct sequence *) calloc(1, sizeof(*seq));
+		if (seq == NULL)
+			goto error;
+		struct mh_i32ptr_node_t node = { def->id, seq };
+		if (mh_i32ptr_put(sequences, &node, NULL, NULL) ==
+		    mh_end(sequences))
+			goto error;
+	} else {
+		/* Update an existing sequence. */
+		free(seq->def);
+	}
+	seq->def = def;
+	return;
+error:
+	panic_syserror("Out of memory for the data "
+		       "dictionary cache (sequence).");
+}
+
+void
+sequence_cache_delete(uint32_t id)
+{
+	struct sequence *seq = sequence_by_id(id);
+	if (seq != NULL) {
+		mh_i32ptr_del(sequences, seq->def->id, NULL);
+		free(seq->def);
+		TRASH(seq);
+		free(seq);
+	}
 }

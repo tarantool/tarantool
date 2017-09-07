@@ -69,6 +69,7 @@
 #include "systemd.h"
 #include "call.h"
 #include "func.h"
+#include "sequence.h"
 
 static char status[64] = "unknown";
 
@@ -939,6 +940,89 @@ box_truncate(uint32_t space_id)
 	} catch (Exception *exc) {
 		return -1;
 	}
+}
+
+/** Update a record in _sequence_data space. */
+static int
+sequence_data_update(uint32_t seq_id, int64_t value)
+{
+	size_t tuple_buf_size = (mp_sizeof_array(2) +
+				 2 * mp_sizeof_uint(UINT64_MAX));
+	char *tuple_buf = (char *) region_alloc(&fiber()->gc, tuple_buf_size);
+	if (tuple_buf == NULL) {
+		diag_set(OutOfMemory, tuple_buf_size, "region", "tuple");
+		return -1;
+	}
+	char *tuple_buf_end = tuple_buf;
+	tuple_buf_end = mp_encode_array(tuple_buf_end, 2);
+	tuple_buf_end = mp_encode_uint(tuple_buf_end, seq_id);
+	tuple_buf_end = (value < 0 ?
+			 mp_encode_int(tuple_buf_end, value) :
+			 mp_encode_uint(tuple_buf_end, value));
+	assert(tuple_buf_end < tuple_buf + tuple_buf_size);
+	return box_replace(BOX_SEQUENCE_DATA_ID,
+			   tuple_buf, tuple_buf_end, NULL);
+}
+
+/** Delete a record from _sequence_data space. */
+static int
+sequence_data_delete(uint32_t seq_id)
+{
+	size_t key_buf_size = mp_sizeof_array(1) + mp_sizeof_uint(UINT64_MAX);
+	char *key_buf = (char *) region_alloc(&fiber()->gc, key_buf_size);
+	if (key_buf == NULL) {
+		diag_set(OutOfMemory, key_buf_size, "region", "key");
+		return -1;
+	}
+	char *key_buf_end = key_buf;
+	key_buf_end = mp_encode_array(key_buf_end, 1);
+	key_buf_end = mp_encode_uint(key_buf_end, seq_id);
+	assert(key_buf_end < key_buf + key_buf_size);
+	return box_delete(BOX_SEQUENCE_DATA_ID, 0,
+			  key_buf, key_buf_end, NULL);
+}
+
+int
+box_sequence_next(uint32_t seq_id, int64_t *result)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	int64_t value;
+	if (sequence_next(seq, &value) != 0)
+		return -1;
+	if (sequence_data_update(seq_id, value) != 0)
+		return -1;
+	*result = value;
+	return 0;
+}
+int
+box_sequence_get(uint32_t seq_id, int64_t *result)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	return sequence_get(seq, result);
+}
+
+int
+box_sequence_set(uint32_t seq_id, int64_t value)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	sequence_set(seq, value);
+	return sequence_data_update(seq_id, value);
+}
+
+int
+box_sequence_reset(uint32_t seq_id)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	sequence_reset(seq);
+	return sequence_data_delete(seq_id);
 }
 
 static inline void

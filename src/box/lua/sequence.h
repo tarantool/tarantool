@@ -1,7 +1,7 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
+#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_SEQUENCE_H
+#define INCLUDES_TARANTOOL_MOD_BOX_LUA_SEQUENCE_H
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,20 +30,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_truncate;
-extern struct trigger on_replace_schema;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_priv;
-extern struct trigger on_replace_cluster;
-extern struct trigger on_replace_sequence;
-extern struct trigger on_replace_sequence_data;
-extern struct trigger on_stmt_begin_space;
-extern struct trigger on_stmt_begin_index;
-extern struct trigger on_stmt_begin_truncate;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+struct lua_State;
+
+void
+box_lua_sequence_init(struct lua_State *L);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_SEQUENCE_H */

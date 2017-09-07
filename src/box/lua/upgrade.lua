@@ -86,6 +86,8 @@ local function erase()
     truncate(box.space._user)
     truncate(box.space._func)
     truncate(box.space._priv)
+    truncate(box.space._sequence_data)
+    truncate(box.space._sequence)
     truncate(box.space._truncate)
     --truncate(box.space._schema)
     box.space._schema:delete('version')
@@ -837,8 +839,41 @@ end
 -- Tarantool 1.7.6
 --------------------------------------------------------------------------------
 
+local function create_sequence_space()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _sequence = box.space[box.schema.SEQUENCE_ID]
+    local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
+    local MAP = setmap({})
+
+    log.info("create space _sequence")
+    _space:insert{_sequence.id, ADMIN, '_sequence', 'memtx', 0, MAP,
+                  {{name = 'id', type = 'unsigned'},
+                   {name = 'owner', type = 'unsigned'},
+                   {name = 'name', type = 'string'},
+                   {name = 'step', type = 'integer'},
+                   {name = 'min', type = 'integer'},
+                   {name = 'max', type = 'integer'},
+                   {name = 'start', type = 'integer'},
+                   {name = 'cache', type = 'integer'},
+                   {name = 'cycle', type = 'boolean'}}}
+    log.info("create index _sequence:primary")
+    _index:insert{_sequence.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+    log.info("create index _sequence:owner")
+    _index:insert{_sequence.id, 1, 'owner', 'tree', {unique = false}, {{1, 'unsigned'}}}
+    log.info("create index _sequence:name")
+    _index:insert{_sequence.id, 2, 'name', 'tree', {unique = true}, {{2, 'string'}}}
+
+    log.info("create space _sequence_data")
+    _space:insert{_sequence_data.id, ADMIN, '_sequence_data', 'memtx', 0, MAP,
+                  {{name = 'id', type = 'unsigned'}, {name = 'value', type = 'integer'}}}
+    log.info("create index primary on _sequence_data")
+    _index:insert{_sequence_data.id, 0, 'primary', 'hash', {unique = true}, {{0, 'unsigned'}}}
+end
+
 local function upgrade_to_1_7_6()
--- Trigger space format checking by updating version in _schema.
+    create_sequence_space()
+    -- Trigger space format checking by updating version in _schema.
 end
 
 --------------------------------------------------------------------------------

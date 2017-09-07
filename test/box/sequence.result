@@ -1,0 +1,625 @@
+test_run = require('test_run').new()
+---
+...
+-- Options check on create.
+box.schema.sequence.create('test', {abc = 'abc'})
+---
+- error: Illegal parameters, unexpected option 'abc'
+...
+box.schema.sequence.create('test', {step = 'a'})
+---
+- error: Illegal parameters, options parameter 'step' should be of type number
+...
+box.schema.sequence.create('test', {min = 'b'})
+---
+- error: Illegal parameters, options parameter 'min' should be of type number
+...
+box.schema.sequence.create('test', {max = 'c'})
+---
+- error: Illegal parameters, options parameter 'max' should be of type number
+...
+box.schema.sequence.create('test', {start = true})
+---
+- error: Illegal parameters, options parameter 'start' should be of type number
+...
+box.schema.sequence.create('test', {cycle = 123})
+---
+- error: Illegal parameters, options parameter 'cycle' should be of type boolean
+...
+box.schema.sequence.create('test', {name = 'test'})
+---
+- error: Illegal parameters, unexpected option 'name'
+...
+box.schema.sequence.create('test', {step = 0})
+---
+- error: 'Failed to create sequence ''test'': step option must be non-zero'
+...
+box.schema.sequence.create('test', {min = 10, max = 1})
+---
+- error: 'Failed to create sequence ''test'': max must be greater than or equal to
+    min'
+...
+box.schema.sequence.create('test', {min = 10, max = 20, start = 1})
+---
+- error: 'Failed to create sequence ''test'': start must be between min and max'
+...
+-- Options check on alter.
+_ = box.schema.sequence.create('test')
+---
+...
+box.schema.sequence.alter('test', {abc = 'abc'})
+---
+- error: Illegal parameters, unexpected option 'abc'
+...
+box.schema.sequence.alter('test', {step = 'a'})
+---
+- error: Illegal parameters, options parameter 'step' should be of type number
+...
+box.schema.sequence.alter('test', {min = 'b'})
+---
+- error: Illegal parameters, options parameter 'min' should be of type number
+...
+box.schema.sequence.alter('test', {max = 'c'})
+---
+- error: Illegal parameters, options parameter 'max' should be of type number
+...
+box.schema.sequence.alter('test', {start = true})
+---
+- error: Illegal parameters, options parameter 'start' should be of type number
+...
+box.schema.sequence.alter('test', {cycle = 123})
+---
+- error: Illegal parameters, options parameter 'cycle' should be of type boolean
+...
+box.schema.sequence.alter('test', {name = 'test'})
+---
+...
+box.schema.sequence.alter('test', {if_not_exists = false})
+---
+- error: Illegal parameters, unexpected option 'if_not_exists'
+...
+box.schema.sequence.alter('test', {step = 0})
+---
+- error: 'Can''t modify sequence ''test'': step option must be non-zero'
+...
+box.schema.sequence.alter('test', {min = 10, max = 1})
+---
+- error: 'Can''t modify sequence ''test'': max must be greater than or equal to min'
+...
+box.schema.sequence.alter('test', {min = 10, max = 20, start = 1})
+---
+- error: 'Can''t modify sequence ''test'': start must be between min and max'
+...
+box.schema.sequence.drop('test')
+---
+...
+-- Duplicate name.
+sq1 = box.schema.sequence.create('test')
+---
+...
+box.schema.sequence.create('test')
+---
+- error: Sequence 'test' already exists
+...
+sq2, msg = box.schema.sequence.create('test', {if_not_exists = true})
+---
+...
+sq1 == sq2, msg
+---
+- true
+- not created
+...
+_ = box.schema.sequence.create('test2')
+---
+...
+box.schema.sequence.alter('test2', {name = 'test'})
+---
+- error: Duplicate key exists in unique index 'name' in space '_sequence'
+...
+box.schema.sequence.drop('test2')
+---
+...
+box.schema.sequence.drop('test')
+---
+...
+-- Check that box.sequence gets updated.
+sq = box.schema.sequence.create('test')
+---
+...
+box.sequence.test == sq
+---
+- true
+...
+sq.step
+---
+- 1
+...
+sq:alter{step = 2}
+---
+...
+box.sequence.test == sq
+---
+- true
+...
+sq.step
+---
+- 2
+...
+sq:drop()
+---
+...
+box.sequence.test == nil
+---
+- true
+...
+-- Attempt to delete a sequence that has a record in _sequence_data.
+sq = box.schema.sequence.create('test')
+---
+...
+sq:next()
+---
+- 1
+...
+box.space._sequence:delete(sq.id)
+---
+- error: 'Can''t drop sequence ''test'': the sequence has data'
+...
+box.space._sequence_data:delete(sq.id)
+---
+- [1, 1]
+...
+box.space._sequence:delete(sq.id)
+---
+- [1, 1, 'test', 1, 1, 9223372036854775807, 1, 0, false]
+...
+box.sequence.test == nil
+---
+- true
+...
+-- Default ascending sequence.
+sq = box.schema.sequence.create('test')
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1
+- false
+...
+sq:get()  -- error
+---
+- error: Sequence 'test' is not started
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:get()  -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:set(100)
+---
+...
+sq:get()  -- 100
+---
+- 100
+...
+sq:next() -- 101
+---
+- 101
+...
+sq:next() -- 102
+---
+- 102
+...
+sq:reset()
+---
+...
+sq:get()  -- error
+---
+- error: Sequence 'test' is not started
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:drop()
+---
+...
+-- Default descending sequence.
+sq = box.schema.sequence.create('test', {step = -1})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- -1
+- -9223372036854775808
+- -1
+- -1
+- false
+...
+sq:get()  -- error
+---
+- error: Sequence 'test' is not started
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:get()  -- -1
+---
+- -1
+...
+sq:next() -- -2
+---
+- -2
+...
+sq:set(-100)
+---
+...
+sq:get()  -- -100
+---
+- -100
+...
+sq:next() -- -101
+---
+- -101
+...
+sq:next() -- -102
+---
+- -102
+...
+sq:reset()
+---
+...
+sq:get()  -- error
+---
+- error: Sequence 'test' is not started
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- -2
+---
+- -2
+...
+sq:drop()
+---
+...
+-- Custom min/max.
+sq = box.schema.sequence.create('test', {min = 10})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 10
+- 9223372036854775807
+- 10
+- false
+...
+sq:next() -- 10
+---
+- 10
+...
+sq:next() -- 11
+---
+- 11
+...
+sq:drop()
+---
+...
+sq = box.schema.sequence.create('test', {step = -1, max = 20})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- -1
+- -9223372036854775808
+- 20
+- 20
+- false
+...
+sq:next() -- 20
+---
+- 20
+...
+sq:next() -- 19
+---
+- 19
+...
+sq:drop()
+---
+...
+-- Custom start value.
+sq = box.schema.sequence.create('test', {start = 1000})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1000
+- false
+...
+sq:next() -- 1000
+---
+- 1000
+...
+sq:next() -- 1001
+---
+- 1001
+...
+sq:reset()
+---
+...
+sq:next() -- 1000
+---
+- 1000
+...
+sq:next() -- 1001
+---
+- 1001
+...
+sq:drop()
+---
+...
+-- Overflow and cycle.
+sq = box.schema.sequence.create('test', {max = 2})
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:alter{cycle = true}
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:alter{step = 2}
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:alter{cycle = false}
+---
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:drop()
+---
+...
+-- Setting sequence value outside boundaries.
+sq = box.schema.sequence.create('test')
+---
+...
+sq:alter{step = 1, min = 1, max = 10}
+---
+...
+sq:set(-100)
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:set(100)
+---
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:reset()
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:alter{min = 5, start = 5}
+---
+...
+sq:next() -- 5
+---
+- 5
+...
+sq:reset()
+---
+...
+sq:alter{step = -1, min = 1, max = 10, start = 10}
+---
+...
+sq:set(100)
+---
+...
+sq:next() -- 10
+---
+- 10
+...
+sq:set(-100)
+---
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:reset()
+---
+...
+sq:next() -- 10
+---
+- 10
+...
+sq:alter{max = 5, start = 5}
+---
+...
+sq:next() -- 5
+---
+- 5
+...
+sq:drop()
+---
+...
+-- number64 arguments.
+INT64_MIN = tonumber64('-9223372036854775808')
+---
+...
+INT64_MAX = tonumber64('9223372036854775807')
+---
+...
+sq = box.schema.sequence.create('test', {step = INT64_MAX, min = INT64_MIN, max = INT64_MAX, start = INT64_MIN})
+---
+...
+sq:next() -- -9223372036854775808
+---
+- -9223372036854775808
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- 9223372036854775806
+---
+- 9223372036854775806
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:alter{step = INT64_MIN, start = INT64_MAX}
+---
+...
+sq:reset()
+---
+...
+sq:next() -- 9223372036854775807
+---
+- 9223372036854775807
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:drop()
+---
+...
+-- Using in a transaction.
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+sq1 = box.schema.sequence.create('sq1', {step = 1})
+---
+...
+sq2 = box.schema.sequence.create('sq2', {step = -1})
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+box.begin()
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+box.rollback();
+---
+...
+box.begin()
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+box.commit();
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s:select() -- [4, -4], [5, -5], [6, -6]
+---
+- - [4, -4]
+  - [5, -5]
+  - [6, -6]
+...
+sq1:drop()
+---
+...
+sq2:drop()
+---
+...
+s:drop()
+---
+...
+--
+-- Check that sequences are persistent.
+--
+sq = box.schema.sequence.create('test', {step = 2, min = 10, max = 20, start = 15, cycle = true})
+---
+...
+sq:next()
+---
+- 15
+...
+test_run:cmd('restart server default')
+sq = box.sequence.test
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 2
+- 10
+- 20
+- 15
+- true
+...
+sq:next()
+---
+- 17
+...
+sq:drop()
+---
+...
