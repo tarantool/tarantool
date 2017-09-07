@@ -72,12 +72,6 @@ test:do_test(
 --     SELECT * FROM t1 ORDER BY rowid;
 --   }
 -- } {1 2 3 2 hello world 3 4.53 {}}
--- do_test whereA-1.5 {
---   db eval {
---     VACUUM;
---     SELECT * FROM t1 ORDER BY rowid;
---   }
--- } {1 2 3 2 hello world 3 4.53 {}}
 test:do_test(
     "whereA-1.6",
     function()
@@ -90,15 +84,6 @@ test:do_test(
         -- </whereA-1.6>
     })
 
--- do_test whereA-1.7 {
---   db close
---   sqlite3 db test.db
---   db eval {
---     PRAGMA reverse_unordered_selects=1;
---     VACUUM;
---     SELECT * FROM t1;
---   }
--- } {3 4.53 {} 2 hello world 1 2 3}
 test:do_execsql_test(
     "whereA-1.8",
     [[

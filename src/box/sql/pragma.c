@@ -102,28 +102,6 @@ getLockingMode(const char *z)
 	}
 	return PAGER_LOCKINGMODE_QUERY;
 }
-#ifndef SQLITE_OMIT_AUTOVACUUM
-/*
-** Interpret the given string as an auto-vacuum mode value.
-**
-** The following strings, "none", "full" and "incremental" are
-** acceptable, as are their numeric equivalents: 0, 1 and 2 respectively.
-*/
-static int
-getAutoVacuum(const char *z)
-{
-	int i;
-	if (0 == sqlite3StrICmp(z, "none"))
-		return BTREE_AUTOVACUUM_NONE;
-	if (0 == sqlite3StrICmp(z, "full"))
-		return BTREE_AUTOVACUUM_FULL;
-	if (0 == sqlite3StrICmp(z, "incremental"))
-		return BTREE_AUTOVACUUM_INCR;
-	i = sqlite3Atoi(z);
-	return (u8) ((i >= 0 && i <= 2) ? i : 0);
-}
-#endif				/* ifndef SQLITE_OMIT_AUTOVACUUM */
-
 /*
 ** Set result column names for a pragma.
 */
@@ -424,32 +402,6 @@ sqlite3Pragma(
 	 * !SQLITE_OMIT_DEPRECATED */
 
 #if !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-	/* *  PRAGMA [schema.]page_size *  PRAGMA [schema.]page_size=N *
-	 *
-	 * The first form reports the current setting for the * database
-	 * page size in bytes.  The second form sets the * database
-	 * page size value.  The value can only be set if * the
-	 * database has not yet been created. */
-	case PragTyp_PAGE_SIZE:{
-		Btree *pBt = pDb->pBt;
-		assert(pBt != 0);
-		if (!zRight) {
-			int size = ALWAYS(pBt) ? sqlite3BtreeGetPageSize(pBt) : 0;
-			returnSingleInt(v, size);
-		} else {
-			/* Malloc may fail when setting the page-size,
-			 * as there is an internal * buffer that the
-			 * pager module resizes using
-			 * sqlite3_realloc(). */
-			db->nextPagesize = sqlite3Atoi(zRight);
-			if (SQLITE_NOMEM == sqlite3BtreeSetPageSize(pBt,
-						  db->nextPagesize, -1, 0)) {
-				sqlite3OomFault(db);
-			}
-		}
-		break;
-	}
-
 	/* *  PRAGMA [schema.]secure_delete *  PRAGMA
 	 * [schema.]secure_delete=ON/OFF *
 	 *
@@ -595,84 +547,6 @@ sqlite3Pragma(
 	}
 
 #endif		/* SQLITE_OMIT_PAGER_PRAGMAS */
-
-	/* *  PRAGMA [schema.]auto_vacuum *  PRAGMA
-	 * [schema.]auto_vacuum=N *
-	 *
-	 * Get or set the value of the database 'auto-vacuum' parameter. *
-	 * The value is one of:  0 NONE 1 FULL 2 INCREMENTAL */
-#ifndef SQLITE_OMIT_AUTOVACUUM
-	case PragTyp_AUTO_VACUUM:{
-		Btree *pBt = pDb->pBt;
-		assert(pBt != 0);
-		if (!zRight) {
-			returnSingleInt(v, sqlite3BtreeGetAutoVacuum(pBt));
-		} else {
-			int eAuto = getAutoVacuum(zRight);
-			assert(eAuto >= 0 && eAuto <= 2);
-			db->nextAutovac = (u8) eAuto;
-			/* Call SetAutoVacuum() to set initialize the
-			 * internal auto and * incr-vacuum flags. This
-			 * is required in case this connection *
-			 * creates the database file. It is important
-			 * that it is created * as an auto-vacuum
-			 * capable db. */
-			rc = sqlite3BtreeSetAutoVacuum(pBt, eAuto);
-			if (rc == SQLITE_OK && (eAuto == 1 || eAuto == 2)) {
-				/* When setting the auto_vacuum mode to
-				 * either "full" or * "incremental",
-				 * write the value of meta[6] in the
-				 * database * file. Before writing to
-				 * meta[6], check that meta[3]
-				 * indicates * that this really is an
-				 * auto-vacuum capable database. */
-				static const int iLn = VDBE_OFFSET_LINENO(2);
-				static const VdbeOpList setMeta6[] = {
-					{OP_Transaction, 0, 1, 0},	/* 0 */
-					{OP_ReadCookie, 0, 1, BTREE_LARGEST_ROOT_PAGE},
-					{OP_If, 1, 0, 0},	/* 2 */
-					{OP_Halt, SQLITE_OK, OE_Abort, 0},	/* 3 */
-					{OP_SetCookie, 0, BTREE_INCR_VACUUM, 0},	/* 4 */
-				};
-				VdbeOp *aOp;
-				int iAddr = sqlite3VdbeCurrentAddr(v);
-				sqlite3VdbeVerifyNoMallocRequired(v, ArraySize(setMeta6));
-				aOp = sqlite3VdbeAddOpList(v, ArraySize(setMeta6), setMeta6, iLn);
-				if (ONLY_IF_REALLOC_STRESS(aOp == 0))
-					break;
-				aOp[0].p1 = iDb;
-				aOp[1].p1 = iDb;
-				aOp[2].p2 = iAddr + 4;
-				aOp[4].p1 = iDb;
-				aOp[4].p3 = eAuto - 1;
-				sqlite3VdbeUsesBtree(v);
-			}
-		}
-		break;
-	}
-#endif
-
-	/* *  PRAGMA [schema.]incremental_vacuum(N) *
-	 *
-	 * Do N steps of incremental vacuuming on a database. */
-#ifndef SQLITE_OMIT_AUTOVACUUM
-	case PragTyp_INCREMENTAL_VACUUM:{
-		int iLimit, addr;
-		if (zRight == 0 || !sqlite3GetInt32(zRight, &iLimit) || iLimit <= 0) {
-			iLimit = 0x7fffffff;
-		}
-		sqlite3BeginWriteOperation(pParse, 0);
-		sqlite3VdbeAddOp2(v, OP_Integer, iLimit, 1);
-		addr = sqlite3VdbeAddOp1(v, OP_IncrVacuum, iDb);
-		VdbeCoverage(v);
-		sqlite3VdbeAddOp1(v, OP_ResultRow, 1);
-		sqlite3VdbeAddOp2(v, OP_AddImm, 1, -1);
-		sqlite3VdbeAddOp2(v, OP_IfPos, 1, addr);
-		VdbeCoverage(v);
-		sqlite3VdbeJumpHere(v, addr);
-		break;
-	}
-#endif
 
 #ifndef SQLITE_OMIT_PAGER_PRAGMAS
 	/* *  PRAGMA [schema.]cache_size *  PRAGMA

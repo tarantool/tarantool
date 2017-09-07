@@ -150,10 +150,6 @@ set pragma_def {
   COLS: cache_size
   IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS) && !defined(SQLITE_OMIT_DEPRECATED)
 
-  NAME: page_size
-  FLAG: Result0 SchemaReq NoColumns1
-  IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
   NAME: secure_delete
   FLAG: Result0
   IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
@@ -185,14 +181,6 @@ set pragma_def {
 
   NAME: mmap_size
   IF:   !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-
-  NAME: auto_vacuum
-  FLAG: NeedSchema Result0 SchemaReq NoColumns1
-  IF:   !defined(SQLITE_OMIT_AUTOVACUUM)
-
-  NAME: incremental_vacuum
-  FLAG: NeedSchema NoColumns
-  IF:   !defined(SQLITE_OMIT_AUTOVACUUM)
 
   NAME: data_store_directory
   FLAG: NoColumns1

@@ -93,7 +93,7 @@ int sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed){
     rc = db->errCode;
     assert( (rc&0xFF)==(rcp&0xFF) );
     db->init.iDb = saved_iDb;
-    assert( saved_iDb==0 || (db->flags & SQLITE_Vacuum)!=0 );
+    assert( saved_iDb==0 );
     if( SQLITE_OK!=rc ){
       pData->rc = rc;
       if( rc==SQLITE_NOMEM ){
@@ -207,13 +207,8 @@ extern int sqlite3InitDatabase(sqlite3 *db, char **pzErrMsg){
   **    meta[0]   Schema cookie.  Changes with each schema change.
   **    meta[1]   File format of schema layer.
   **    meta[2]   Size of the page cache.
-  **    meta[3]   Largest rootpage (auto/incr_vacuum mode)
-  **    meta[4]   Db text encoding. 1:UTF-8 2:UTF-16LE 3:UTF-16BE
-  **    meta[5]   User version
-  **    meta[6]   Incremental vacuum mode
-  **    meta[7]   unused
-  **    meta[8]   unused
-  **    meta[9]   unused
+  **    meta[3]   Db text encoding. 1:UTF-8 2:UTF-16LE 3:UTF-16BE
+  **    meta[4]   User version
   **
   ** Note: The #defined SQLITE_UTF* symbols in sqliteInt.h correspond to
   ** the possible values of meta[4].
@@ -260,15 +255,6 @@ extern int sqlite3InitDatabase(sqlite3 *db, char **pzErrMsg){
     sqlite3SetString(pzErrMsg, db, "unsupported file format");
     rc = SQLITE_ERROR;
     goto initone_error_out;
-  }
-
-  /* Ticket #2804:  When we open a database in the newer file format,
-  ** clear the legacy_file_format pragma flag so that a VACUUM will
-  ** not downgrade the database and thus invalidate any descending
-  ** indices that the user might have created.
-  */
-  if( meta[BTREE_FILE_FORMAT-1]>=4 ){
-    db->flags &= ~SQLITE_LegacyFileFmt;
   }
 
   /* Read the schema information out of the schema tables

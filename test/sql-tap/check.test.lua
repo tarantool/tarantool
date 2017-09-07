@@ -547,19 +547,6 @@ test:do_catchsql_test(
         -- </check-4.9>
     })
 
--- not related to tarantool
---    test:do_catchsql_test(
---        "check_4.10",
---        [[
---            VACUUM
---        ]], {
---            -- <check_4.10>
---            0, {}
---            -- </check_4.10>
---        })
-
-
-
 test:do_catchsql_test(
     "check-5.1",
     [[

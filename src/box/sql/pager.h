@@ -128,9 +128,6 @@ int sqlite3PagerReadFileheader(Pager*, int, unsigned char*);
 /* Functions used to configure a Pager object. */
 void sqlite3PagerSetBusyhandler(Pager*, int(*)(void *), void *);
 int sqlite3PagerSetPagesize(Pager*, u32*, int);
-#ifdef SQLITE_HAS_CODEC
-void sqlite3PagerAlignReserve(Pager*,Pager*);
-#endif
 int sqlite3PagerMaxPageCount(Pager*, int);
 void sqlite3PagerSetCachesize(Pager*, int);
 int sqlite3PagerSetSpillsize(Pager*, int);
@@ -155,7 +152,6 @@ void sqlite3PagerUnrefNotNull(DbPage*);
 /* Operations on page references. */
 int sqlite3PagerWrite(DbPage*);
 void sqlite3PagerDontWrite(DbPage*);
-int sqlite3PagerMovepage(Pager*,DbPage*,Pgno,int);
 int sqlite3PagerPageRefcount(DbPage*);
 void *sqlite3PagerGetData(DbPage *); 
 void *sqlite3PagerGetExtra(DbPage *); 
@@ -193,7 +189,6 @@ const char *sqlite3PagerJournalname(Pager*);
 void *sqlite3PagerTempSpace(Pager*);
 int sqlite3PagerIsMemdb(Pager*);
 void sqlite3PagerCacheStat(Pager *, int, int, int *);
-void sqlite3PagerClearCache(Pager*);
 int sqlite3SectorSize(sqlite3_file *);
 
 /* Functions used to truncate the database file. */

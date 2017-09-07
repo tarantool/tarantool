@@ -132,7 +132,6 @@ set rp2v_ops {
   OP_AutoCommit
   OP_Savepoint
   OP_Checkpoint
-  OP_Vacuum
   OP_JournalMode
   OP_VUpdate
   OP_VFilter

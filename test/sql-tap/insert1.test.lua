@@ -324,15 +324,6 @@ test:do_execsql_test("insert-4.7", [[
 
   -- end
 
-  -- do_test insert-5.4 {
-  --   # Verify that table "test1" begins on page 3.  This should be the same
-  --   # page number used by "t4" above.
-  --   #
-  --   # Update for v3 - the first table now begins on page 2 of each file, not 3.
-  --   execsql {
-  --     SELECT rootpage FROM sqlite_master WHERE name='test1';
-  --   }
-  -- } [expr $AUTOVACUUM?3:2]
   -- do_test insert-5.5 {
   --   # Verify that "t4" begins on page 3.
   --   #

@@ -22,18 +22,6 @@
 #define SQLITE_N_BTREE_META 16
 
 /*
-** If defined as non-zero, auto-vacuum is enabled by default. Otherwise
-** it must be turned on for each database using "PRAGMA auto_vacuum = 1".
-*/
-#ifndef SQLITE_DEFAULT_AUTOVACUUM
-  #define SQLITE_DEFAULT_AUTOVACUUM 0
-#endif
-
-#define BTREE_AUTOVACUUM_NONE 0        /* Do not do auto-vacuum */
-#define BTREE_AUTOVACUUM_FULL 1        /* Do full auto-vacuum */
-#define BTREE_AUTOVACUUM_INCR 2        /* Incremental vacuum */
-
-/*
 ** Forward declarations of structure
 */
 typedef struct Btree Btree;
@@ -69,15 +57,13 @@ int sqlite3BtreeSetSpillSize(Btree*,int);
   int sqlite3BtreeSetMmapLimit(Btree*,sqlite3_int64);
 #endif
 int sqlite3BtreeSetPagerFlags(Btree*,unsigned);
-int sqlite3BtreeSetPageSize(Btree *p, int nPagesize, int nReserve, int eFix);
+int sqlite3BtreeSetPageSize(Btree *p, int nPagesize, int nReserve);
 int sqlite3BtreeGetPageSize(Btree*);
 int sqlite3BtreeMaxPageCount(Btree*,int);
 u32 sqlite3BtreeLastPage(Btree*);
 int sqlite3BtreeSecureDelete(Btree*,int);
 int sqlite3BtreeGetOptimalReserve(Btree*);
 int sqlite3BtreeGetReserveNoMutex(Btree *p);
-int sqlite3BtreeSetAutoVacuum(Btree *, int);
-int sqlite3BtreeGetAutoVacuum(Btree *);
 int sqlite3BtreeBeginTrans(Btree*,int,int);
 int sqlite3BtreeCommitPhaseOne(Btree*, const char *zMaster);
 int sqlite3BtreeCommitPhaseTwo(Btree*, int);
@@ -97,8 +83,6 @@ int sqlite3BtreeSavepoint(Btree *, int, int);
 
 const char *sqlite3BtreeGetFilename(Btree *);
 const char *sqlite3BtreeGetJournalname(Btree *);
-
-int sqlite3BtreeIncrVacuum(Btree *);
 
 /* The flags parameter to sqlite3BtreeCreateTable can be the bitwise OR
 ** of the flags shown below.
@@ -131,10 +115,6 @@ int sqlite3BtreeNewDb(Btree *p);
 **
 **   offset = 36 + (idx * 4)
 **
-** For example, the free-page-count field is located at byte offset 36 of
-** the database file header. The incr-vacuum-flag field is located at
-** byte offset 64 (== 36+4*7).
-**
 ** The BTREE_DATA_VERSION value is not really a value stored in the header.
 ** It is a read-only number computed by the pager.  But we merge it with
 ** the header value access routines since its access pattern is the same.
@@ -147,7 +127,6 @@ int sqlite3BtreeNewDb(Btree *p);
 #define BTREE_LARGEST_ROOT_PAGE   4
 #define BTREE_TEXT_ENCODING       5
 #define BTREE_USER_VERSION        6
-#define BTREE_INCR_VACUUM         7
 #define BTREE_APPLICATION_ID      8
 #define BTREE_DATA_VERSION        15  /* A virtual meta-value */
 

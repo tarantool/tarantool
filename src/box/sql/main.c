@@ -2473,9 +2473,7 @@ static int openDatabase(
   assert( sizeof(db->aLimit)==sizeof(aHardLimit) );
   memcpy(db->aLimit, aHardLimit, sizeof(db->aLimit));
   db->aLimit[SQLITE_LIMIT_WORKER_THREADS] = SQLITE_DEFAULT_WORKER_THREADS;
-  db->nextAutovac = -1;
   db->szMmap = sqlite3GlobalConfig.szMmap;
-  db->nextPagesize = 0;
   db->nMaxSorterMmap = 0x7FFFFFFF;
   db->flags |= SQLITE_ShortColNames | SQLITE_EnableTrigger | SQLITE_CacheSpill
 #if !defined(SQLITE_DEFAULT_AUTOMATIC_INDEX) || SQLITE_DEFAULT_AUTOMATIC_INDEX
@@ -3256,7 +3254,7 @@ int sqlite3_test_control(int op, ...){
       sqlite3 *db = va_arg(ap, sqlite3*);
       int x = va_arg(ap,int);
       sqlite3_mutex_enter(db->mutex);
-      sqlite3BtreeSetPageSize(db->mdb.pBt, 0, x, 0);
+      sqlite3BtreeSetPageSize(db->mdb.pBt, 0, x);
       sqlite3_mutex_leave(db->mutex);
       break;
     }

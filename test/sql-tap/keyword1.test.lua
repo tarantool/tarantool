@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(116)
+test:plan(114)
 
 --!./tcltestrunner.lua
 -- 2009 January 29
@@ -79,7 +79,6 @@ local kwlist = {
     "temp",
     "temporary",
     "trigger",
-    "vacuum",
     "view",
     "virtual",
     "with",

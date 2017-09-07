@@ -100,7 +100,7 @@ void sqlite3PcacheMakeClean(PgHdr*);    /* Mark a single page as clean */
 void sqlite3PcacheCleanAll(PCache*);    /* Mark all dirty list pages as clean */
 void sqlite3PcacheClearWritable(PCache*);
 
-/* Change a page number.  Used by incr-vacuum. */
+/* Change a page number. */
 void sqlite3PcacheMove(PgHdr*, Pgno);
 
 /* Remove all pages with pgno>x.  Reset the cache if x==0 */

@@ -687,7 +687,7 @@ int sqlite3TwoPartName(
   int iDb;                    /* Database holding the object */
   sqlite3 *db = pParse->db;
 
-  assert( db->init.iDb==0 || db->init.busy || (db->flags & SQLITE_Vacuum)!=0);
+  assert( db->init.iDb==0 || db->init.busy );
   iDb = db->init.iDb;
   *pUnqual = pName1;
   assert( iDb==0 );
@@ -2320,48 +2320,6 @@ static void sqliteViewResetAll(sqlite3 *db){
 #endif /* SQLITE_OMIT_VIEW */
 
 /*
-** This function is called by the VDBE to adjust the internal schema
-** used by SQLite when the btree layer moves a table root page. The
-** root-page of a table or index in database iDb has changed from iFrom
-** to iTo.
-**
-** Ticket #1728:  The symbol table might still contain information
-** on tables and/or indices that are the process of being deleted.
-** If you are unlucky, one of those deleted indices or tables might
-** have the same rootpage number as the real table or index that is
-** being moved.  So we cannot stop searching after the first match 
-** because the first match might be for one of the deleted indices
-** or tables and not the table/index that is actually being moved.
-** We must continue looping until all tables and indices with
-** rootpage==iFrom have been converted to have a rootpage of iTo
-** in order to be certain that we got the right one.
-*/
-#ifndef SQLITE_OMIT_AUTOVACUUM
-void sqlite3RootPageMoved(sqlite3 *db, int iFrom, int iTo){
-  HashElem *pElem, *pItem;
-  Hash *pHash;
-  Db *pDb;
-
-  assert( sqlite3SchemaMutexHeld(db, 0) );
-  pDb = &db->mdb;
-  pHash = &pDb->pSchema->tblHash;
-  for(pElem=sqliteHashFirst(pHash); pElem; pElem=sqliteHashNext(pElem)){
-    Table *pTab = sqliteHashData(pElem);
-    Hash *IdxHash = &pTab->idxHash;
-    if( pTab->tnum==iFrom ){
-      pTab->tnum = iTo;
-    }
-    for(pItem=sqliteHashFirst(IdxHash); pItem; pItem=sqliteHashNext(pItem)){
-      Index *pIdx = sqliteHashData(pItem);
-      if( pIdx->tnum==iFrom ){
-        pIdx->tnum = iTo;
-      }
-    }
-  }
-}
-#endif
-
-/*
 ** Remove entries from the sqlite_statN tables (for N in (1,2,3))
 ** after a DROP INDEX or DROP TABLE command.
 */
@@ -2418,11 +2376,10 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int isView){
   }
   pParse->nested--;
 
-#ifndef SQLITE_OMIT_AUTOINCREMENT
   /* Remove any entries of the sql_sequence table associated with
   ** the table being dropped. This is done before the table is dropped
   ** at the btree level, in case the sql_sequence table needs to
-  ** move as a result of the drop (can happen in auto-vacuum mode).
+  ** move as a result of the drop.
   */
   if( pTab->tabFlags & TF_Autoincrement ){
     sqlite3NestedParse(pParse,
@@ -2430,7 +2387,6 @@ void sqlite3CodeDropTable(Parse *pParse, Table *pTab, int isView){
       pTab->zName
     );
   }
-#endif
 
   /* Drop all _space and _index entries that refer to the
   ** table. The program loops through the _index & _space tables and deletes

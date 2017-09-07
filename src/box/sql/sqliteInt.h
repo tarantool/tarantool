@@ -1267,11 +1267,9 @@ struct sqlite3 {
   u8 mallocFailed;              /* True if we have seen a malloc failure */
   u8 bBenignMalloc;             /* Do not require OOMs if true */
   u8 dfltLockMode;              /* Default locking-mode for attached dbs */
-  signed char nextAutovac;      /* Autovac setting after VACUUM if >=0 */
   u8 suppressErr;               /* Do not issue error messages if true */
   u8 vtabOnConflict;            /* Value to return for s3_vtab_on_conflict() */
   u8 mTrace;                    /* zero or more SQLITE_TRACE flags */
-  int nextPagesize;             /* Pagesize after VACUUM if >0 */
   u32 magic;                    /* Magic number for detect library misuse */
   int nChange;                  /* Value returned by sqlite3_changes() */
   int nTotalChange;             /* Value returned by sqlite3_total_changes() */
@@ -1403,7 +1401,6 @@ struct sqlite3 {
 #define SQLITE_DeferFKs       0x02000000  /* Defer all FK constraints */
 #define SQLITE_QueryOnly      0x04000000  /* Disable database changes */
 #define SQLITE_VdbeEQP        0x08000000  /* Debug EXPLAIN QUERY PLAN */
-#define SQLITE_Vacuum         0x10000000  /* Currently in a VACUUM */
 #define SQLITE_CellSizeCk     0x20000000  /* Check btree cell sizes on load */
 #define SQLITE_Fts3Tokenizer  0x40000000  /* Enable fts3_tokenizer(2) */
 #define SQLITE_NoCkptOnClose  0x80000000  /* No checkpoint on close()/DETACH */
@@ -3683,8 +3680,6 @@ Index *sqlite3FindIndex(sqlite3*,const char*,Table*);
 Index *sqlite3LocateIndex(sqlite3*,const char*,const char*);
 void sqlite3UnlinkAndDeleteTable(sqlite3*,const char*);
 void sqlite3UnlinkAndDeleteIndex(sqlite3*,Index*);
-void sqlite3Vacuum(Parse*,Token*);
-int sqlite3RunVacuum(char**, sqlite3*, int);
 char *sqlite3NameFromToken(sqlite3*, Token*);
 int sqlite3ExprCompare(Expr*, Expr*, int);
 int sqlite3ExprListCompare(ExprList*, ExprList*, int);
@@ -3918,7 +3913,6 @@ extern FuncDefHash sqlite3BuiltinFunctions;
 extern int sqlite3PendingByte;
 #endif
 #endif
-void sqlite3RootPageMoved(sqlite3*, int, int);
 void sqlite3Reindex(Parse*, Token*, Token*);
 void sqlite3AlterFunctions(void);
 void sqlite3AlterRenameTable(Parse*, SrcList*, Token*);

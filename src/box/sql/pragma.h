@@ -6,45 +6,42 @@
 
 /* The various pragma types */
 #define PragTyp_HEADER_VALUE                   0
-#define PragTyp_AUTO_VACUUM                    1
-#define PragTyp_FLAG                           2
-#define PragTyp_BUSY_TIMEOUT                   3
-#define PragTyp_CACHE_SIZE                     4
-#define PragTyp_CASE_SENSITIVE_LIKE            5
-#define PragTyp_COLLATION_LIST                 6
-#define PragTyp_COMPILE_OPTIONS                7
-#define PragTyp_DATA_STORE_DIRECTORY           8
-#define PragTyp_DATABASE_LIST                  9
-#define PragTyp_DEFAULT_CACHE_SIZE            10
-#define PragTyp_ENCODING                      11
-#define PragTyp_FOREIGN_KEY_CHECK             12
-#define PragTyp_FOREIGN_KEY_LIST              13
-#define PragTyp_INCREMENTAL_VACUUM            14
-#define PragTyp_INDEX_INFO                    15
-#define PragTyp_INDEX_LIST                    16
-#define PragTyp_INTEGRITY_CHECK               17
-#define PragTyp_JOURNAL_MODE                  18
-#define PragTyp_JOURNAL_SIZE_LIMIT            19
-#define PragTyp_LOCK_PROXY_FILE               20
-#define PragTyp_LOCKING_MODE                  21
-#define PragTyp_PAGE_COUNT                    22
-#define PragTyp_MMAP_SIZE                     23
-#define PragTyp_PAGE_SIZE                     24
-#define PragTyp_SECURE_DELETE                 25
-#define PragTyp_SHRINK_MEMORY                 26
-#define PragTyp_SOFT_HEAP_LIMIT               27
-#define PragTyp_STATS                         28
-#define PragTyp_SYNCHRONOUS                   29
-#define PragTyp_TABLE_INFO                    30
-#define PragTyp_THREADS                       31
-#define PragTyp_WAL_AUTOCHECKPOINT            32
-#define PragTyp_WAL_CHECKPOINT                33
-#define PragTyp_ACTIVATE_EXTENSIONS           34
-#define PragTyp_HEXKEY                        35
-#define PragTyp_KEY                           36
-#define PragTyp_REKEY                         37
-#define PragTyp_LOCK_STATUS                   38
-#define PragTyp_PARSER_TRACE                  39
+#define PragTyp_FLAG                           1
+#define PragTyp_BUSY_TIMEOUT                   2
+#define PragTyp_CACHE_SIZE                     3
+#define PragTyp_CASE_SENSITIVE_LIKE            4
+#define PragTyp_COLLATION_LIST                 5
+#define PragTyp_COMPILE_OPTIONS                6
+#define PragTyp_DATA_STORE_DIRECTORY           7
+#define PragTyp_DATABASE_LIST                  8
+#define PragTyp_DEFAULT_CACHE_SIZE             9
+#define PragTyp_ENCODING                      10
+#define PragTyp_FOREIGN_KEY_CHECK             11
+#define PragTyp_FOREIGN_KEY_LIST              12
+#define PragTyp_INDEX_INFO                    13
+#define PragTyp_INDEX_LIST                    14
+#define PragTyp_INTEGRITY_CHECK               15
+#define PragTyp_JOURNAL_MODE                  16
+#define PragTyp_JOURNAL_SIZE_LIMIT            17
+#define PragTyp_LOCK_PROXY_FILE               18
+#define PragTyp_LOCKING_MODE                  19
+#define PragTyp_PAGE_COUNT                    20
+#define PragTyp_MMAP_SIZE                     21
+#define PragTyp_SECURE_DELETE                 22
+#define PragTyp_SHRINK_MEMORY                 23
+#define PragTyp_SOFT_HEAP_LIMIT               24
+#define PragTyp_STATS                         25
+#define PragTyp_SYNCHRONOUS                   26
+#define PragTyp_TABLE_INFO                    27
+#define PragTyp_THREADS                       28
+#define PragTyp_WAL_AUTOCHECKPOINT            29
+#define PragTyp_WAL_CHECKPOINT                30
+#define PragTyp_ACTIVATE_EXTENSIONS           31
+#define PragTyp_HEXKEY                        32
+#define PragTyp_KEY                           33
+#define PragTyp_REKEY                         34
+#define PragTyp_LOCK_STATUS                   35
+#define PragTyp_PARSER_TRACE                  36
 
 /* Property flags associated with various pragma. */
 #define PragFlg_NeedSchema 0x01 /* Force schema load before running */
@@ -134,13 +131,6 @@ static const PragmaName aPragmaName[] = {
   /* ePragFlg:  */ PragFlg_NoColumns1|PragFlg_Result0,
   /* ColNames:  */ 0, 0,
   /* iArg:      */ BTREE_APPLICATION_ID },
-#endif
-#if !defined(SQLITE_OMIT_AUTOVACUUM)
- {/* zName:     */ "auto_vacuum",
-  /* ePragTyp:  */ PragTyp_AUTO_VACUUM,
-  /* ePragFlg:  */ PragFlg_NeedSchema|PragFlg_Result0|PragFlg_SchemaReq|PragFlg_NoColumns1,
-  /* ColNames:  */ 0, 0,
-  /* iArg:      */ 0 },
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 #if !defined(SQLITE_OMIT_AUTOMATIC_INDEX)
@@ -315,13 +305,6 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ SQLITE_IgnoreChecks },
 #endif
 #endif
-#if !defined(SQLITE_OMIT_AUTOVACUUM)
- {/* zName:     */ "incremental_vacuum",
-  /* ePragTyp:  */ PragTyp_INCREMENTAL_VACUUM,
-  /* ePragFlg:  */ PragFlg_NeedSchema|PragFlg_NoColumns,
-  /* ColNames:  */ 0, 0,
-  /* iArg:      */ 0 },
-#endif
 #if !defined(SQLITE_OMIT_SCHEMA_PRAGMAS)
  {/* zName:     */ "index_info",
   /* ePragTyp:  */ PragTyp_INDEX_INFO,
@@ -405,11 +388,6 @@ static const PragmaName aPragmaName[] = {
  {/* zName:     */ "page_count",
   /* ePragTyp:  */ PragTyp_PAGE_COUNT,
   /* ePragFlg:  */ PragFlg_NeedSchema|PragFlg_Result0|PragFlg_SchemaReq,
-  /* ColNames:  */ 0, 0,
-  /* iArg:      */ 0 },
- {/* zName:     */ "page_size",
-  /* ePragTyp:  */ PragTyp_PAGE_SIZE,
-  /* ePragFlg:  */ PragFlg_Result0|PragFlg_SchemaReq|PragFlg_NoColumns1,
   /* ColNames:  */ 0, 0,
   /* iArg:      */ 0 },
 #endif
@@ -582,4 +560,4 @@ static const PragmaName aPragmaName[] = {
   /* iArg:      */ SQLITE_WriteSchema|SQLITE_RecoveryMode },
 #endif
 };
-/* Number of pragmas: 57 on by default, 70 total. */
+/* Number of pragmas: 54 on by default, 67 total. */

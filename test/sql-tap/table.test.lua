@@ -975,10 +975,7 @@ end
 -- Test cases table-14.*
 --
 -- Test that a table cannot be created or dropped while other virtual
--- machines are active. This is required because otherwise when in 
--- auto-vacuum mode the btree-layer may need to move the root-pages of 
--- a table for which there is an open cursor.
---
+-- machines are active.
 -- 2007-05-02:  A open btree cursor no longer blocks CREATE TABLE.
 -- But DROP TABLE is still prohibited because we do not want to
 -- delete a table out from under a running query.

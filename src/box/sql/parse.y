@@ -215,7 +215,7 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
   CONFLICT DATABASE DEFERRED DESC DETACH EACH END EXCLUSIVE EXPLAIN FAIL FOR
   IGNORE IMMEDIATE INITIALLY INSTEAD LIKE_KW MATCH NO PLAN
   QUERY KEY OF OFFSET PRAGMA RAISE RECURSIVE RELEASE REPLACE RESTRICT ROW
-  ROLLBACK SAVEPOINT TRIGGER VACUUM VIEW VIRTUAL WITH WITHOUT
+  ROLLBACK SAVEPOINT TRIGGER VIEW VIRTUAL WITH WITHOUT
 %ifdef SQLITE_OMIT_COMPOUND_SELECT
   EXCEPT INTERSECT UNION
 %endif SQLITE_OMIT_COMPOUND_SELECT
@@ -1325,11 +1325,6 @@ collate(C) ::= COLLATE ids.   {C = 1;}
 cmd ::= DROP INDEX ifexists(E) fullname(X) ON nm(Y).   {
     sqlite3DropIndex(pParse, X, &Y, E);
 }
-
-///////////////////////////// The VACUUM command /////////////////////////////
-//
-%ifndef SQLITE_OMIT_VACUUM
-%endif  SQLITE_OMIT_VACUUM
 
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //

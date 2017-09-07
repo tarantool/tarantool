@@ -5266,14 +5266,7 @@ case OP_IdxGE:  {       /* jump */
 ** P3==1 then the table to be clear is in the auxiliary database file
 ** that is used to store tables create using CREATE TEMPORARY TABLE.
 **
-** If AUTOVACUUM is enabled then it is possible that another root page
-** might be moved into the newly deleted root page in order to keep all
-** root pages contiguous at the beginning of the database.  The former
-** value of the root page that moved - its value before the move occurred -
-** is stored in register P2.  If no page
-** movement was required (because the table being dropped was already
-** the last one in the database) then a zero is stored in register P2.
-** If AUTOVACUUM is disabled then a zero is stored in register P2.
+** Zero is stored in register P2.
 **
 ** See also: Clear
 */
@@ -5297,14 +5290,6 @@ case OP_Destroy: {     /* out2 */
     pOut->flags = MEM_Int;
     pOut->u.i = iMoved;
     if( rc ) goto abort_due_to_error;
-#ifndef SQLITE_OMIT_AUTOVACUUM
-    if( iMoved!=0 ){
-      sqlite3RootPageMoved(db, iMoved, pOp->p1);
-      /* All OP_Destroy operations occur on the same btree */
-      assert( resetSchemaOnFault==0 || resetSchemaOnFault==iDb+1 );
-      resetSchemaOnFault = iDb+1;
-    }
-#endif
   }
   break;
 }
@@ -6305,44 +6290,6 @@ case OP_JournalMode: {    /* out2 */
 };
 #endif /* SQLITE_OMIT_PRAGMA */
 
-#if !defined(SQLITE_OMIT_VACUUM) && !defined(SQLITE_OMIT_ATTACH)
-/* Opcode: Vacuum P1 * * * *
-**
-** Vacuum the entire database P1.  P1 is 0 for "main", and 2 or more
-** for an attached database.  The "temp" database may not be vacuumed.
-*/
-case OP_Vacuum: {
-  assert( p->readOnly==0 );
-  rc = sqlite3RunVacuum(&p->zErrMsg, db, pOp->p1);
-  if( rc ) goto abort_due_to_error;
-  break;
-}
-#endif
-
-#if !defined(SQLITE_OMIT_AUTOVACUUM)
-/* Opcode: IncrVacuum P1 P2 * * *
-**
-** Perform a single step of the incremental vacuum procedure on
-** the P1 database. If the vacuum has finished, jump to instruction
-** P2. Otherwise, fall through to the next instruction.
-*/
-case OP_IncrVacuum: {        /* jump */
-  Btree *pBt;
-
-  assert( pOp->p1==0 );
-  assert( DbMaskTest(p->btreeMask, pOp->p1) );
-  assert( p->readOnly==0 );
-  pBt = db->mdb.pBt;
-  rc = sqlite3BtreeIncrVacuum(pBt);
-  VdbeBranchTaken(rc==SQLITE_DONE,2);
-  if( rc ){
-    if( rc!=SQLITE_DONE ) goto abort_due_to_error;
-    rc = SQLITE_OK;
-    goto jump_to_p2;
-  }
-  break;
-}
-#endif
 
 /* Opcode: Expire P1 * * * *
 **

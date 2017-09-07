@@ -62,7 +62,6 @@ test:do_test(
             DROP TABLE t1;
             DROP TABLE t2;
         ]])
-        --ifcapable {vacuum} {execsql VACUUM}
         test:execsql([[
             CREATE TABLE t1(a PRIMARY KEY,b);
             INSERT INTO t1

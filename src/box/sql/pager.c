@@ -2157,20 +2157,6 @@ static void pagerReportSize(Pager *pPager){
 # define pagerReportSize(X)     /* No-op if we do not support a codec */
 #endif
 
-#ifdef SQLITE_HAS_CODEC
-/*
-** Make sure the number of reserved bits is the same in the destination
-** pager as it is in the source.  This comes up when a VACUUM changes the
-** number of reserved bits to the "optimal" amount.
-*/
-void sqlite3PagerAlignReserve(Pager *pDest, Pager *pSrc){
-  if( pDest->nReserve!=pSrc->nReserve ){
-    pDest->nReserve = pSrc->nReserve;
-    pagerReportSize(pDest);
-  }
-}
-#endif
-
 /*
 ** Read a single page from either the journal file (if isMainJrnl==1) or
 ** from the sub-journal (if isMainJrnl==0) and playback that page.
@@ -2291,13 +2277,6 @@ static int pager_playback_one_page(
   ** page in the pager cache. In this case just update the pager cache,
   ** not the database file. The page is left marked dirty in this case.
   **
-  ** An exception to the above rule: If the database is in no-sync mode
-  ** and a page is moved during an incremental vacuum then the page may
-  ** not be in the pager cache. Later: if a malloc() or IO error occurs
-  ** during a Movepage() call, then the page may not be in the cache
-  ** either. So the condition described in the above paragraph is not
-  ** assert()able.
-  **
   ** If in WRITER_DBMOD, WRITER_FINISHED or OPEN state, then we update the
   ** pager cache if it exists and the main file. The page is then marked 
   ** not dirty. Since this code is only executed in PAGER_OPEN state for
@@ -2317,10 +2296,6 @@ static int pager_playback_one_page(
   ** locked.  (2) we know that the original page content is fully synced
   ** in the main journal either because the page is not in cache or else
   ** the page is marked as needSync==0.
-  **
-  ** 2008-04-14:  When attempting to vacuum a corrupt database file, it
-  ** is possible to fail a statement on a database that does not yet exist.
-  ** Do not attempt to write if database file has never been opened.
   */
   if( pagerUseWal(pPager) ){
     pPg = 0;
@@ -4063,7 +4038,7 @@ static int pager_write_pagelist(Pager *pPager, PgHdr *pList){
 
     /* If there are dirty pages in the page cache with page numbers greater
     ** than Pager.dbSize, this means sqlite3PagerTruncateImage() was called to
-    ** make the file smaller (presumably by auto-vacuum code). Do not write
+    ** make the file smaller. Do not write
     ** any such pages to the file.
     **
     ** Also, do not write out any page that has the PGHDR_DONT_WRITE flag
@@ -6542,160 +6517,6 @@ int sqlite3PagerState(Pager *pPager){
 }
 #endif /* SQLITE_HAS_CODEC */
 
-#ifndef SQLITE_OMIT_AUTOVACUUM
-/*
-** Move the page pPg to location pgno in the file.
-**
-** There must be no references to the page previously located at
-** pgno (which we call pPgOld) though that page is allowed to be
-** in cache.  If the page previously located at pgno is not already
-** in the rollback journal, it is not put there by by this routine.
-**
-** References to the page pPg remain valid. Updating any
-** meta-data associated with pPg (i.e. data stored in the nExtra bytes
-** allocated along with the page) is the responsibility of the caller.
-**
-** A transaction must be active when this routine is called. It used to be
-** required that a statement transaction was not active, but this restriction
-** has been removed (CREATE INDEX needs to move a page when a statement
-** transaction is active).
-**
-** If the fourth argument, isCommit, is non-zero, then this page is being
-** moved as part of a database reorganization just before the transaction 
-** is being committed. In this case, it is guaranteed that the database page 
-** pPg refers to will not be written to again within this transaction.
-**
-** This function may return SQLITE_NOMEM or an IO error code if an error
-** occurs. Otherwise, it returns SQLITE_OK.
-*/
-int sqlite3PagerMovepage(Pager *pPager, DbPage *pPg, Pgno pgno, int isCommit){
-  PgHdr *pPgOld;               /* The page being overwritten. */
-  Pgno needSyncPgno = 0;       /* Old value of pPg->pgno, if sync is required */
-  int rc;                      /* Return code */
-  Pgno origPgno;               /* The original page number */
-
-  assert( pPg->nRef>0 );
-  assert( pPager->eState==PAGER_WRITER_CACHEMOD
-       || pPager->eState==PAGER_WRITER_DBMOD
-  );
-  assert( assert_pager_state(pPager) );
-
-  /* In order to be able to rollback, an in-memory database must journal
-  ** the page we are moving from.
-  */
-  assert( pPager->tempFile || !MEMDB );
-  if( pPager->tempFile ){
-    rc = sqlite3PagerWrite(pPg);
-    if( rc ) return rc;
-  }
-
-  /* If the page being moved is dirty and has not been saved by the latest
-  ** savepoint, then save the current contents of the page into the 
-  ** sub-journal now. This is required to handle the following scenario:
-  **
-  **   BEGIN;
-  **     <journal page X, then modify it in memory>
-  **     SAVEPOINT one;
-  **       <Move page X to location Y>
-  **     ROLLBACK TO one;
-  **
-  ** If page X were not written to the sub-journal here, it would not
-  ** be possible to restore its contents when the "ROLLBACK TO one"
-  ** statement were is processed.
-  **
-  ** subjournalPage() may need to allocate space to store pPg->pgno into
-  ** one or more savepoint bitvecs. This is the reason this function
-  ** may return SQLITE_NOMEM.
-  */
-  if( (pPg->flags & PGHDR_DIRTY)!=0
-   && SQLITE_OK!=(rc = subjournalPageIfRequired(pPg))
-  ){
-    return rc;
-  }
-
-  PAGERTRACE(("MOVE %d page %d (needSync=%d) moves to %d\n", 
-      PAGERID(pPager), pPg->pgno, (pPg->flags&PGHDR_NEED_SYNC)?1:0, pgno));
-  IOTRACE(("MOVE %p %d %d\n", pPager, pPg->pgno, pgno))
-
-  /* If the journal needs to be sync()ed before page pPg->pgno can
-  ** be written to, store pPg->pgno in local variable needSyncPgno.
-  **
-  ** If the isCommit flag is set, there is no need to remember that
-  ** the journal needs to be sync()ed before database page pPg->pgno 
-  ** can be written to. The caller has already promised not to write to it.
-  */
-  if( (pPg->flags&PGHDR_NEED_SYNC) && !isCommit ){
-    needSyncPgno = pPg->pgno;
-    assert( pPager->journalMode==PAGER_JOURNALMODE_OFF ||
-            pageInJournal(pPager, pPg) || pPg->pgno>pPager->dbOrigSize );
-    assert( pPg->flags&PGHDR_DIRTY );
-  }
-
-  /* If the cache contains a page with page-number pgno, remove it
-  ** from its hash chain. Also, if the PGHDR_NEED_SYNC flag was set for 
-  ** page pgno before the 'move' operation, it needs to be retained 
-  ** for the page moved there.
-  */
-  pPg->flags &= ~PGHDR_NEED_SYNC;
-  pPgOld = sqlite3PagerLookup(pPager, pgno);
-  assert( !pPgOld || pPgOld->nRef==1 );
-  if( pPgOld ){
-    pPg->flags |= (pPgOld->flags&PGHDR_NEED_SYNC);
-    if( pPager->tempFile ){
-      /* Do not discard pages from an in-memory database since we might
-      ** need to rollback later.  Just move the page out of the way. */
-      sqlite3PcacheMove(pPgOld, pPager->dbSize+1);
-    }else{
-      sqlite3PcacheDrop(pPgOld);
-    }
-  }
-
-  origPgno = pPg->pgno;
-  sqlite3PcacheMove(pPg, pgno);
-  sqlite3PcacheMakeDirty(pPg);
-
-  /* For an in-memory database, make sure the original page continues
-  ** to exist, in case the transaction needs to roll back.  Use pPgOld
-  ** as the original page since it has already been allocated.
-  */
-  if( pPager->tempFile && pPgOld ){
-    sqlite3PcacheMove(pPgOld, origPgno);
-    sqlite3PagerUnrefNotNull(pPgOld);
-  }
-
-  if( needSyncPgno ){
-    /* If needSyncPgno is non-zero, then the journal file needs to be 
-    ** sync()ed before any data is written to database file page needSyncPgno.
-    ** Currently, no such page exists in the page-cache and the 
-    ** "is journaled" bitvec flag has been set. This needs to be remedied by
-    ** loading the page into the pager-cache and setting the PGHDR_NEED_SYNC
-    ** flag.
-    **
-    ** If the attempt to load the page into the page-cache fails, (due
-    ** to a malloc() or IO failure), clear the bit in the pInJournal[]
-    ** array. Otherwise, if the page is loaded and written again in
-    ** this transaction, it may be written to the database file before
-    ** it is synced into the journal file. This way, it may end up in
-    ** the journal file twice, but that is not a problem.
-    */
-    PgHdr *pPgHdr;
-    rc = sqlite3PagerGet(pPager, needSyncPgno, &pPgHdr, 0);
-    if( rc!=SQLITE_OK ){
-      if( needSyncPgno<=pPager->dbOrigSize ){
-        assert( pPager->pTmpSpace!=0 );
-        sqlite3BitvecClear(pPager->pInJournal, needSyncPgno, pPager->pTmpSpace);
-      }
-      return rc;
-    }
-    pPgHdr->flags |= PGHDR_NEED_SYNC;
-    sqlite3PcacheMakeDirty(pPgHdr);
-    sqlite3PagerUnrefNotNull(pPgHdr);
-  }
-
-  return SQLITE_OK;
-}
-#endif
-
 /*
 ** The page handle passed as the first argument refers to a dirty page 
 ** with a page number other than iNew. This function changes the page's 
@@ -6902,16 +6723,6 @@ i64 sqlite3PagerJournalSizeLimit(Pager *pPager, i64 iLimit){
 sqlite3_backup **sqlite3PagerBackupPtr(Pager *pPager){
   return &pPager->pBackup;
 }
-
-#ifndef SQLITE_OMIT_VACUUM
-/*
-** Unless this is an in-memory or temporary database, clear the pager cache.
-*/
-void sqlite3PagerClearCache(Pager *pPager){
-  assert( MEMDB==0 || pPager->tempFile );
-  if( pPager->tempFile==0 ) pager_reset(pPager);
-}
-#endif
 
 #ifdef SQLITE_ENABLE_ZIPVFS
 /*

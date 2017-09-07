@@ -451,8 +451,6 @@ datetest(13.34, "date('2001-01-01','-1.5 years')", "1999-07-02")
 -- if {0==[sqlite3 -has-codec]} {
 --   do_test date-14.1 {
 --     execsql {
---       PRAGMA auto_vacuum=OFF;
---       PRAGMA page_size = 1024;
 --       CREATE TABLE t1(x);
 --       INSERT INTO t1 VALUES(1.1);
 --     }

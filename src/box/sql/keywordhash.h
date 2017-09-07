@@ -11,9 +11,9 @@
 ** is substantially reduced.  This is important for embedded applications
 ** on platforms with limited memory.
 */
-/* Hash score: 179 */
+/* Hash score: 177 */
 static int keywordCode(const char *z, int n, int *pType){
-  /* zText[] encodes 819 bytes of keywords in 546 bytes */
+  /* zText[] encodes 812 bytes of keywords in 540 bytes */
   /*   REINDEXEDESCAPEACHECKEYBEFOREIGNOREGEXPLAINSTEADDATABASELECT       */
   /*   ABLEFTHENDEFERRABLELSEXCEPTRANSACTIONATURALTERAISEXCLUSIVE         */
   /*   XISTSAVEPOINTERSECTRIGGEREFERENCESCONSTRAINTOFFSETUNIQUERY         */
@@ -23,8 +23,8 @@ static int keywordCode(const char *z, int n, int *pType){
   /*   COLLATECOLUMNCOMMITCONFLICTCREATECROSSCURRENT_DATE                 */
   /*   CURRENT_TIMESTAMPRIMARYDEFERREDELETEDISTINCTDROPFAILFROMFULL       */
   /*   GLOBYIFIMMEDIATEISNULLORDERESTRICTRIGHTROLLBACKROWUNIONUSING       */
-  /*   VACUUMVIEWINITIALLY                                                */
-  static const char zText[545] = {
+  /*   VIEWINITIALLY                                                      */
+  static const char zText[539] = {
     'R','E','I','N','D','E','X','E','D','E','S','C','A','P','E','A','C','H',
     'E','C','K','E','Y','B','E','F','O','R','E','I','G','N','O','R','E','G',
     'E','X','P','L','A','I','N','S','T','E','A','D','D','A','T','A','B','A',
@@ -54,22 +54,21 @@ static int keywordCode(const char *z, int n, int *pType){
     'O','B','Y','I','F','I','M','M','E','D','I','A','T','E','I','S','N','U',
     'L','L','O','R','D','E','R','E','S','T','R','I','C','T','R','I','G','H',
     'T','R','O','L','L','B','A','C','K','R','O','W','U','N','I','O','N','U',
-    'S','I','N','G','V','A','C','U','U','M','V','I','E','W','I','N','I','T',
-    'I','A','L','L','Y',
+    'S','I','N','G','V','I','E','W','I','N','I','T','I','A','L','L','Y',
   };
   static const unsigned char aHash[127] = {
       69, 102, 115, 110,   0,   0,   0,   0,  75,   0,  70,   0,   0,
       43,  13,  71,  16,   0, 114,  78,  52, 109,   0,  20,   0,   0,
-     119,   0, 117, 113,   0,  23,  86,   0,   9,   0,   0,  89,  93,
+      36,   0, 117, 113,   0,  23,  86,   0,   9,   0,   0,  89,  93,
        0,  67,   6,   0,  46,  83,  98,   0, 116,  97,   0,   0,  34,
-       0,  99,  25,   0,  18,   0, 120,  51,  24,   0,   5, 107,  26,
-      90,   0,   0, 122, 103,  58, 121,  55,  29,  53,   0,  84,   0,
+       0,  99,  25,   0,  18,   0, 119,  51,  24,   0,   5, 107,  26,
+      90,   0,   0, 121, 103,  58, 120,  55,  29,  53,   0,  84,   0,
       96,  27,   0,  94,   0,   0,   0,  88,  85,  91,  81, 106,  15,
       40, 105,   0,  74,   0,  19,  82, 108,  33,   0, 118,  73, 111,
       60,  22,  77,   0,   0,  87,  41,  57, 112,   0,  37,   0,   0,
       30,   0,  79,  61,  62,   0,  21,  59,   0,  54,
   };
-  static const unsigned char aNext[122] = {
+  static const unsigned char aNext[121] = {
        0,   0,   0,   0,   4,   0,   0,   0,   0,   0,   0,   0,   0,
        0,   0,   2,   0,   0,   0,   0,   0,  12,  14,   0,   0,   0,
        0,   0,   7,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -79,9 +78,9 @@ static int keywordCode(const char *z, int n, int *pType){
        0,   0,  32,  50,  17,  35,  10,   0,   0,   0,  64,   0,   0,
        0,   0,   0,   0,  11,  95,  72,   0,   0,   8,   0, 101,  92,
        0, 104,   0,  80,   0,   0,  68,  49,   0,  28,  38,  66,  76,
-       0,  36, 100,   0,   0,
+       0, 100,   0,   0,
   };
-  static const unsigned char aLen[122] = {
+  static const unsigned char aLen[121] = {
        7,   7,   5,   4,   6,   4,   5,   3,   6,   7,   3,   2,   6,
        6,   7,   7,   3,   8,   2,   6,   5,   4,   4,   3,  10,   4,
        6,  11,   6,   2,   7,   5,   5,   9,   6,   9,   9,   7,  10,
@@ -91,9 +90,9 @@ static int keywordCode(const char *z, int n, int *pType){
        5,   6,   5,   7,   3,   7,  13,   2,   2,   4,   7,   6,   6,
        8,   6,   5,  12,  17,  12,   7,   8,   6,   8,   2,   4,   4,
        4,   4,   4,   2,   2,   9,   6,   5,   8,   5,   8,   3,   5,
-       5,   6,   4,   9,   3,
+       5,   4,   9,   3,
   };
-  static const unsigned short int aOffset[122] = {
+  static const unsigned short int aOffset[121] = {
        0,   2,   2,   8,   9,  14,  16,  20,  23,  25,  25,  26,  29,
       33,  36,  41,  46,  48,  53,  54,  59,  62,  65,  67,  69,  78,
       81,  86,  91,  95,  96, 101, 105, 109, 117, 122, 128, 136, 142,
@@ -103,9 +102,9 @@ static int keywordCode(const char *z, int n, int *pType){
      310, 313, 319, 323, 330, 332, 339, 341, 343, 352, 356, 363, 369,
      375, 383, 389, 394, 406, 406, 422, 429, 436, 442, 443, 450, 454,
      458, 462, 466, 469, 471, 473, 482, 488, 492, 500, 505, 513, 516,
-     521, 526, 532, 536, 541,
+     521, 526, 530, 535,
   };
-  static const unsigned char aCode[122] = {
+  static const unsigned char aCode[121] = {
     TK_REINDEX,    TK_INDEXED,    TK_INDEX,      TK_DESC,       TK_ESCAPE,     
     TK_EACH,       TK_CHECK,      TK_KEY,        TK_BEFORE,     TK_FOREIGN,    
     TK_FOR,        TK_OR,         TK_IGNORE,     TK_LIKE_KW,    TK_EXPLAIN,    
@@ -129,8 +128,8 @@ static int keywordCode(const char *z, int n, int *pType){
     TK_DISTINCT,   TK_IS,         TK_DROP,       TK_FAIL,       TK_FROM,       
     TK_JOIN_KW,    TK_LIKE_KW,    TK_BY,         TK_IF,         TK_IMMEDIATE,  
     TK_ISNULL,     TK_ORDER,      TK_RESTRICT,   TK_JOIN_KW,    TK_ROLLBACK,   
-    TK_ROW,        TK_UNION,      TK_USING,      TK_VACUUM,     TK_VIEW,       
-    TK_INITIALLY,  TK_ALL,        
+    TK_ROW,        TK_UNION,      TK_USING,      TK_VIEW,       TK_INITIALLY,  
+    TK_ALL,        
   };
   int i, j;
   const char *zKW;
@@ -265,10 +264,9 @@ static int keywordCode(const char *z, int n, int *pType){
       testcase( i==115 ); /* ROW */
       testcase( i==116 ); /* UNION */
       testcase( i==117 ); /* USING */
-      testcase( i==118 ); /* VACUUM */
-      testcase( i==119 ); /* VIEW */
-      testcase( i==120 ); /* INITIALLY */
-      testcase( i==121 ); /* ALL */
+      testcase( i==118 ); /* VIEW */
+      testcase( i==119 ); /* INITIALLY */
+      testcase( i==120 ); /* ALL */
       *pType = aCode[i];
       break;
     }
@@ -280,4 +278,4 @@ int sqlite3KeywordCode(const unsigned char *z, int n){
   keywordCode((char*)z, n, &id);
   return id;
 }
-#define SQLITE_N_KEYWORD 122
+#define SQLITE_N_KEYWORD 121

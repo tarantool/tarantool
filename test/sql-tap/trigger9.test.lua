@@ -52,7 +52,6 @@ box.internal.sql_create_function('randstr', test.randstr, 1)
 test:do_execsql_test(
     "trigger9-1.1",
     [[
-        PRAGMA page_size = 1024;
         CREATE TABLE t1(x PRIMARY KEY, y, z);
         INSERT INTO t1 VALUES('1', randstr(10000), '2');
         INSERT INTO t1 VALUES('2', randstr(10000), '4');

@@ -215,9 +215,7 @@ readsTable(Parse * p, Table * pTab)
 ** Locate or create an AutoincInfo structure associated with table pTab
 ** which is in database.  Return the register number for the register
 ** that holds the maximum rowid.  Return zero if pTab is not an AUTOINCREMENT
-** table.  (Also return zero when doing a VACUUM since we do not want to
-** update the AUTOINCREMENT counters during a VACUUM.)
-**
+** table.
 ** There is at most one AutoincInfo structure per table even if the
 ** same table is autoincremented multiple times due to inserts within
 ** triggers.  A new AutoincInfo structure is created if this is the
@@ -239,8 +237,7 @@ autoIncBegin(Parse * pParse,	/* Parsing context */
     )
 {
 	int memId = 0;		/* Register holding maximum rowid */
-	if ((pTab->tabFlags & TF_Autoincrement) != 0
-	    && (pParse->db->flags & SQLITE_Vacuum) == 0) {
+	if ((pTab->tabFlags & TF_Autoincrement) != 0) {
 		Parse *pToplevel = sqlite3ParseToplevel(pParse);
 		AutoincInfo *pInfo;
 
@@ -2158,8 +2155,6 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 ** returns FALSE so that the caller will know to go ahead and generate
 ** an unoptimized transfer.  This routine also returns FALSE if there
 ** is no chance that the xfer optimization can be applied.
-**
-** This optimization is particularly useful at making VACUUM run faster.
 */
 static int
 xferOptimization(Parse * pParse,	/* Parser context */
@@ -2278,9 +2273,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		Column *pDestCol = &pDest->aCol[i];
 		Column *pSrcCol = &pSrc->aCol[i];
 #ifdef SQLITE_ENABLE_HIDDEN_COLUMNS
-		if ((db->flags & SQLITE_Vacuum) == 0
-		    && (pDestCol->
-			colFlags | pSrcCol->colFlags) & COLFLAG_HIDDEN) {
+		if ( (pDestCol-> colFlags | pSrcCol->colFlags) &
+			COLFLAG_HIDDEN) {
 			return 0;	/* Neither table may have __hidden__ columns */
 		}
 #endif
@@ -2329,9 +2323,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 	/* Disallow the transfer optimization if the destination table constains
 	 ** any foreign key constraints.  This is more restrictive than necessary.
-	 ** But the main beneficiary of the transfer optimization is the VACUUM
-	 ** command, and the VACUUM command disables foreign key constraints.  So
-	 ** the extra complication to make this rule less restrictive is probably
+	 ** So the extra complication to make this rule less restrictive is probably
 	 ** not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
 	 */
 	if ((db->flags & SQLITE_ForeignKeys) != 0 && pDest->pFKey != 0) {
@@ -2359,15 +2351,14 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	regRowid = sqlite3GetTempReg(pParse);
 	sqlite3OpenTable(pParse, iDest, pDest, OP_OpenWrite);
 	assert(HasRowid(pDest) || destHasUniqueIdx);
-	if ((db->flags & SQLITE_Vacuum) == 0 && ((pDest->iPKey < 0 && pDest->pIndex != 0)	/* (1) */
-						 ||destHasUniqueIdx	/* (2) */
-						 || (onError != OE_Abort && onError != OE_Rollback)	/* (3) */
-	    )) {
+	if ((pDest->iPKey < 0 && pDest->pIndex != 0)		/* (1) */
+	    ||destHasUniqueIdx					/* (2) */
+	    || (onError != OE_Abort && onError != OE_Rollback)	/* (3) */
+	    ) {
 		/* In some circumstances, we are able to run the xfer optimization
-		 ** only if the destination table is initially empty. Unless the
-		 ** SQLITE_Vacuum flag is set, this block generates code to make
-		 ** that determination. If SQLITE_Vacuum is set, then the destination
-		 ** table is always empty.
+		 ** only if the destination table is initially empty.
+		 ** This block generates code to make
+		 ** that determination.
 		 **
 		 ** Conditions under which the destination must be empty:
 		 **
@@ -2407,14 +2398,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			assert((pDest->tabFlags & TF_Autoincrement) == 0);
 		}
 		sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);
-		if (db->flags & SQLITE_Vacuum) {
-			sqlite3VdbeAddOp3(v, OP_Last, iDest, 0, -1);
-			insFlags = OPFLAG_NCHANGE | OPFLAG_LASTROWID |
-			    OPFLAG_APPEND | OPFLAG_USESEEKRESULT;
-		} else {
-			insFlags =
-			    OPFLAG_NCHANGE | OPFLAG_LASTROWID | OPFLAG_APPEND;
-		}
+		insFlags = OPFLAG_NCHANGE | OPFLAG_LASTROWID | OPFLAG_APPEND;
 		sqlite3VdbeAddOp4(v, OP_Insert, iDest, regData, regRowid,
 				  (char *)pDest, P4_TABLE);
 		sqlite3VdbeChangeP5(v, insFlags);
@@ -2445,33 +2429,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);
 		sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);
-		if (db->flags & SQLITE_Vacuum) {
-			/* This INSERT command is part of a VACUUM operation, which guarantees
-			 ** that the destination table is empty. If all indexed columns use
-			 ** collation sequence BINARY, then it can also be assumed that the
-			 ** index will be populated by inserting keys in strictly sorted
-			 ** order. In this case, instead of seeking within the b-tree as part
-			 ** of every OP_IdxInsert opcode, an OP_Last is added before the
-			 ** OP_IdxInsert to seek to the point within the b-tree where each key
-			 ** should be inserted. This is faster.
-			 **
-			 ** If any of the indexed columns use a collation sequence other than
-			 ** BINARY, this optimization is disabled. This is because the user
-			 ** might change the definition of a collation sequence and then run
-			 ** a VACUUM command. In that case keys may not be written in strictly
-			 ** sorted order.  */
-			for (i = 0; i < pSrcIdx->nColumn; i++) {
-				const char *zColl = pSrcIdx->azColl[i];
-				assert(sqlite3_stricmp(sqlite3StrBINARY, zColl)
-				       != 0 || sqlite3StrBINARY == zColl);
-				if (sqlite3_stricmp(sqlite3StrBINARY, zColl))
-					break;
-			}
-			if (i == pSrcIdx->nColumn) {
-				idxInsFlags = OPFLAG_USESEEKRESULT;
-				sqlite3VdbeAddOp3(v, OP_Last, iDest, 0, -1);
-			}
-		}
 		if (!HasRowid(pSrc) && pDestIdx->idxType == 2) {
 			idxInsFlags |= OPFLAG_NCHANGE;
 		}

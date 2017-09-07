@@ -72,10 +72,8 @@
 **     40       4     Schema cookie
 **     44       4     File format of schema layer
 **     48       4     Size of page cache
-**     52       4     Largest root-page (auto/incr_vacuum)
 **     56       4     1=UTF-8 2=UTF16le 3=UTF16be
 **     60       4     User version
-**     64       4     Incremental vacuum mode
 **     68       4     Application-ID
 **     72      20     unused
 **     92       4     The version-valid-for number
@@ -410,11 +408,6 @@ struct BtShared {
   BtCursor *pCursor;    /* A list of all open cursors */
   MemPage *pPage1;      /* First page of the database */
   u8 openFlags;         /* Flags to sqlite3BtreeOpen() */
-#ifndef SQLITE_OMIT_AUTOVACUUM
-  u8 autoVacuum;        /* True if auto-vacuum is enabled */
-  u8 incrVacuum;        /* True if incr-vacuum is enabled */
-  u8 bDoTruncate;       /* True to truncate db on commit */
-#endif
   u8 inTransaction;     /* Transaction state */
   u8 max1bytePayload;   /* Maximum first byte of cell for a 1-byte payload */
 #ifdef SQLITE_HAS_CODEC
@@ -590,46 +583,7 @@ struct BtCursor {
 ** used to test if pgno is a pointer-map page. PTRMAP_ISPAGE implements
 ** this test.
 */
-#define PTRMAP_PAGENO(pBt, pgno) ptrmapPageno(pBt, pgno)
 #define PTRMAP_PTROFFSET(pgptrmap, pgno) (5*(pgno-pgptrmap-1))
-#define PTRMAP_ISPAGE(pBt, pgno) (PTRMAP_PAGENO((pBt),(pgno))==(pgno))
-
-/*
-** The pointer map is a lookup table that identifies the parent page for
-** each child page in the database file.  The parent page is the page that
-** contains a pointer to the child.  Every page in the database contains
-** 0 or 1 parent pages.  (In this context 'database page' refers
-** to any page that is not part of the pointer map itself.)  Each pointer map
-** entry consists of a single byte 'type' and a 4 byte parent page number.
-** The PTRMAP_XXX identifiers below are the valid types.
-**
-** The purpose of the pointer map is to facility moving pages from one
-** position in the file to another as part of autovacuum.  When a page
-** is moved, the pointer in its parent must be updated to point to the
-** new location.  The pointer map is used to locate the parent page quickly.
-**
-** PTRMAP_ROOTPAGE: The database page is a root-page. The page-number is not
-**                  used in this case.
-**
-** PTRMAP_FREEPAGE: The database page is an unused (free) page. The page-number 
-**                  is not used in this case.
-**
-** PTRMAP_OVERFLOW1: The database page is the first page in a list of 
-**                   overflow pages. The page number identifies the page that
-**                   contains the cell with a pointer to this overflow page.
-**
-** PTRMAP_OVERFLOW2: The database page is the second or later page in a list of
-**                   overflow pages. The page-number identifies the previous
-**                   page in the overflow page list.
-**
-** PTRMAP_BTREE: The database page is a non-root btree page. The page number
-**               identifies the parent page in the btree.
-*/
-#define PTRMAP_ROOTPAGE 1
-#define PTRMAP_FREEPAGE 2
-#define PTRMAP_OVERFLOW1 3
-#define PTRMAP_OVERFLOW2 4
-#define PTRMAP_BTREE 5
 
 /* A bunch of assert() statements to check the transaction state variables
 ** of handle p (type Btree*) are internally consistent.
@@ -637,20 +591,6 @@ struct BtCursor {
 #define btreeIntegrity(p) \
   assert( p->pBt->inTransaction!=TRANS_NONE || p->pBt->nTransaction==0 ); \
   assert( p->pBt->inTransaction>=p->inTrans ); 
-
-
-/*
-** The ISAUTOVACUUM macro is used within balance_nonroot() to determine
-** if the database supports auto-vacuum or not. Because it is used
-** within an expression that is an argument to another macro 
-** (sqliteMallocRaw), it is not possible to use conditional compilation.
-** So, this macro is defined instead.
-*/
-#ifndef SQLITE_OMIT_AUTOVACUUM
-#define ISAUTOVACUUM (pBt->autoVacuum)
-#else
-#define ISAUTOVACUUM 0
-#endif
 
 
 /*

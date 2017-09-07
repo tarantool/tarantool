@@ -295,8 +295,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t4(
           abort primary key, asc, begin, cluster, conflict, copy, delimiters, desc, end,
-          explain, fail, ignore, key, offset, pragma, replace, temp,
-          vacuum, view
+          explain, fail, ignore, key, offset, pragma, replace, temp, view
         );
     ]], {
         -- <misc1-6.1>
@@ -308,7 +307,7 @@ test:do_catchsql_test(
     "misc1-6.2",
     [[
         INSERT INTO t4
-           VALUES(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19);
+           VALUES(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18);
     ]], {
         -- <misc1-6.2>
         0
@@ -321,7 +320,7 @@ test:do_execsql_test(
         SELECT * FROM t4
     ]], {
         -- <misc1-6.3>
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18
         -- </misc1-6.3>
     })
 

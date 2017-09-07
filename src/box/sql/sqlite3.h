@@ -859,7 +859,7 @@ struct sqlite3_io_methods {
 ** ^The [SQLITE_FCNTL_OVERWRITE] opcode is invoked by SQLite after opening
 ** a write transaction to indicate that, unless it is rolled back for some
 ** reason, the entire database file will be overwritten by the current 
-** transaction. This is used by VACUUM operations.
+** transaction.
 **
 ** <li>[[SQLITE_FCNTL_VFSNAME]]
 ** ^The [SQLITE_FCNTL_VFSNAME] opcode can be used to obtain the names of
