@@ -824,6 +824,17 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		old->is_overwritten = true;
 	}
 
+	if (old != NULL && vy_stmt_type(stmt) != IPROTO_UPSERT) {
+		/*
+		 * Inherit the column mask of the overwritten statement
+		 * so as not to skip both statements on dump.
+		 */
+		uint64_t column_mask = vy_stmt_column_mask(stmt);
+		if (column_mask != UINT64_MAX)
+			vy_stmt_set_column_mask(stmt, column_mask |
+						vy_stmt_column_mask(old->stmt));
+	}
+
 	v->overwritten = old;
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
