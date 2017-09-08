@@ -13,18 +13,6 @@ box.rollback()
 box.begin() box.rollback_to_savepoint(s1)
 box.rollback()
 
--- Test multiple rollback of a same savepoint.
-test_run:cmd("setopt delimiter ';'")
-box.begin()
-s1 = box.savepoint()
-ok1 = pcall(box.rollback_to_savepoint, s1)
-ok2, errmsg2 = pcall(box.rollback_to_savepoint, s1)
-box.commit()
-test_run:cmd("setopt delimiter ''");
-ok1
-ok2
-errmsg2
-
 engine = test_run:get_cfg('engine')
 
 -- Test many savepoints on each statement.
@@ -286,6 +274,20 @@ s:replace{2}
 box.rollback_to_savepoint(s3)
 box.rollback_to_savepoint(s2)
 box.rollback_to_savepoint(s1)
+box.commit()
+test_run:cmd("setopt delimiter ''");
+s:select{}
+s:truncate()
+
+-- Test multiple rollback of a same savepoint.
+test_run:cmd("setopt delimiter ';'")
+box.begin()
+s1 = box.savepoint()
+s:replace{1}
+box.rollback_to_savepoint(s1)
+s:replace{2}
+box.rollback_to_savepoint(s1)
+s:replace{3}
 box.commit()
 test_run:cmd("setopt delimiter ''");
 s:select{}

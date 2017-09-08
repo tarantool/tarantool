@@ -339,14 +339,12 @@ box_txn_savepoint(void);
 
 /**
  * Rollback to @a savepoint. Rollback all statements newer than a
- * saved statement and delete @a savepoint. Savepoint can not be
- * rolled back twice.
- * All existing savepoints, newer than @a savepoint, also are
+ * saved statement. @A savepoint can be rolled back multiple
+ * times. All existing savepoints, newer than @a savepoint, are
  * deleted and can not be used.
  * @A savepoint must be from a current transaction, else the
- * rollback crashes.
- * To validate savepoints store transaction id together with a
- * savepoint.
+ * rollback crashes. To validate savepoints store transaction id
+ * together with @a savepoint.
  * @retval  0 Success.
  * @retval -1 Client error.
  */

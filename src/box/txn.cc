@@ -447,9 +447,6 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		}
 		stmt->space = NULL;
 	}
-	/* Destroy the savepoint to provide error on double rollback */
-	svp->is_first = false;
-	svp->stmt = NULL;
 	return 0;
 }
 
