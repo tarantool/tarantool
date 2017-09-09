@@ -401,7 +401,7 @@ vy_mem_iterator_start_from(struct vy_mem_iterator *itr,
 }
 
 /**
- * Start iteration from the key following @before_first.
+ * Start iteration.
  *
  * @retval 0 Found
  * @retval 1 Not found
@@ -410,25 +410,7 @@ static int
 vy_mem_iterator_start(struct vy_mem_iterator *itr)
 {
 	assert(!itr->search_started);
-
-	if (itr->before_first == NULL)
-		return vy_mem_iterator_start_from(itr, itr->iterator_type,
-						  itr->key);
-
-	enum iterator_type iterator_type = itr->iterator_type;
-	if (iterator_type == ITER_GE || iterator_type == ITER_EQ)
-		iterator_type = ITER_GT;
-	else if (iterator_type == ITER_LE)
-		iterator_type = ITER_LT;
-	int rc = vy_mem_iterator_start_from(itr, iterator_type,
-					    itr->before_first);
-	if (rc == 0 && itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, itr->curr_stmt,
-			    itr->mem->cmp_def) != 0) {
-		itr->curr_stmt = NULL;
-		rc = 1;
-	}
-	return rc;
+	return vy_mem_iterator_start_from(itr, itr->iterator_type, itr->key);
 }
 
 /**
@@ -464,8 +446,7 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv,
-		     struct tuple *before_first)
+		     const struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
@@ -476,9 +457,6 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *s
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	itr->before_first = before_first;
-	if (before_first != NULL)
-		tuple_ref(before_first);
 
 	itr->curr_pos = vy_mem_tree_invalid_iterator();
 	itr->curr_stmt = NULL;
@@ -881,8 +859,6 @@ vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
-	if (itr->before_first != NULL)
-		tuple_unref(itr->before_first);
 	TRASH(itr);
 }
 

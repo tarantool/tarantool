@@ -121,7 +121,7 @@ test_iterator_initial_restore()
 		rv.vlsn = lsn;
 		const struct vy_read_view *prv = &rv;
 		vy_mem_iterator_open(&itr, &stats, mem, ITER_EQ, stmt,
-				     &prv, NULL);
+				     &prv);
 		struct tuple *t;
 		bool stop = false;
 		int rc = itr.base.iface->restore(&itr.base, NULL, &t, &stop);
@@ -300,7 +300,7 @@ test_iterator_restore_after_insertion()
 		const struct vy_read_view *prv = &rv;
 		vy_mem_iterator_open(&itr, &stats, mem,
 				     direct ? ITER_GE : ITER_LE, select_key,
-				     &prv, NULL);
+				     &prv);
 		struct tuple *t;
 		bool stop = false;
 		int rc = itr.base.iface->next_key(&itr.base, &t, &stop);

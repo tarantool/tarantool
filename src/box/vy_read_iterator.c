@@ -486,70 +486,34 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 	return 0;
 }
 
-/**
- * Restore the position of merge iterator after the given key
- * and according to the initial retrieval order.
- */
-static NODISCARD int
-vy_merge_iterator_restore(struct vy_merge_iterator *itr,
-			  const struct tuple *last_stmt)
-{
-	itr->unique_optimization = false;
-	int result = 0;
-	for (uint32_t i = 0; i < itr->src_count; i++) {
-		struct vy_stmt_iterator *sub_itr = &itr->src[i].iterator;
-		bool stop;
-		int rc = sub_itr->iface->restore(sub_itr, last_stmt,
-						 &itr->src[i].stmt, &stop);
-		if (rc < 0)
-			return rc;
-		if (vy_merge_iterator_check_version(itr) != 0)
-			return -2;
-		result = result || rc;
-	}
-	itr->skipped_start = itr->src_count;
-	return result;
-}
-
 /* }}} Merge iterator */
 
 static void
-vy_read_iterator_add_tx(struct vy_read_iterator *itr)
+vy_read_iterator_add_tx(struct vy_read_iterator *itr,
+			enum iterator_type iterator_type, struct tuple *key)
 {
 	assert(itr->tx != NULL);
 	struct vy_txw_iterator_stat *stat = &itr->index->stat.txw.iterator;
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_txw_iterator_open(&sub_src->txw_iterator, stat, itr->tx, itr->index,
-			     itr->iterator_type, itr->key);
-	int rc = sub_src->iterator.iface->restore(&sub_src->iterator,
-						  itr->curr_stmt, &sub_src->stmt, NULL);
-	(void)rc;
+			     iterator_type, key);
 }
 
 static void
-vy_read_iterator_add_cache(struct vy_read_iterator *itr)
+vy_read_iterator_add_cache(struct vy_read_iterator *itr,
+			   enum iterator_type iterator_type, struct tuple *key)
 {
 	struct vy_merge_src *sub_src =
 		vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_cache_iterator_open(&sub_src->cache_iterator,
-			       &itr->index->cache, itr->iterator_type,
-			       itr->key, itr->read_view);
-	if (itr->curr_stmt != NULL) {
-		/*
-		 * In order not to loose stop flag, do not restore cache
-		 * iterator in general case (itr->curr_stmt)
-		 */
-		bool stop = false;
-		int rc = sub_src->iterator.iface->restore(&sub_src->iterator,
-							  itr->curr_stmt,
-							  &sub_src->stmt, &stop);
-		(void)rc;
-	}
+			       &itr->index->cache, iterator_type,
+			       key, itr->read_view);
 }
 
 static void
-vy_read_iterator_add_mem(struct vy_read_iterator *itr)
+vy_read_iterator_add_mem(struct vy_read_iterator *itr,
+			 enum iterator_type iterator_type, struct tuple *key)
 {
 	struct vy_index *index = itr->index;
 	struct vy_merge_src *sub_src;
@@ -559,8 +523,8 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 	sub_src = vy_merge_iterator_add(&itr->merge_iterator, true, false);
 	vy_mem_iterator_open(&sub_src->mem_iterator,
 			     &index->stat.memory.iterator,
-			     index->mem, itr->iterator_type, itr->key,
-			     itr->read_view, itr->curr_stmt);
+			     index->mem, iterator_type, key,
+			     itr->read_view);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
@@ -568,13 +532,14 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 						false, false);
 		vy_mem_iterator_open(&sub_src->mem_iterator,
 				     &index->stat.memory.iterator,
-				     mem, itr->iterator_type, itr->key,
-				     itr->read_view, itr->curr_stmt);
+				     mem, iterator_type, key,
+				     itr->read_view);
 	}
 }
 
 static void
-vy_read_iterator_add_disk(struct vy_read_iterator *itr)
+vy_read_iterator_add_disk(struct vy_read_iterator *itr,
+			  enum iterator_type iterator_type, struct tuple *key)
 {
 	assert(itr->curr_range != NULL);
 	struct vy_index *index = itr->index;
@@ -603,7 +568,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		vy_run_iterator_open(&sub_src->run_iterator,
 				     &index->stat.disk.iterator,
 				     itr->run_env, slice,
-				     itr->iterator_type, itr->key,
+				     iterator_type, key,
 				     itr->read_view, index->cmp_def,
 				     index->key_def, index->disk_format,
 				     index->upsert_format, index->id == 0);
@@ -616,14 +581,25 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_use_range(struct vy_read_iterator *itr)
 {
-	if (itr->tx != NULL)
-		vy_read_iterator_add_tx(itr);
+	struct tuple *key = itr->key;
+	enum iterator_type iterator_type = itr->iterator_type;
 
-	vy_read_iterator_add_cache(itr);
-	vy_read_iterator_add_mem(itr);
+	if (itr->curr_stmt != NULL) {
+		if (iterator_type == ITER_EQ)
+			itr->need_check_eq = true;
+		iterator_type = iterator_direction(iterator_type) >= 0 ?
+				ITER_GT : ITER_LT;
+		key = itr->curr_stmt;
+	}
+
+	if (itr->tx != NULL)
+		vy_read_iterator_add_tx(itr, iterator_type, key);
+
+	vy_read_iterator_add_cache(itr, iterator_type, key);
+	vy_read_iterator_add_mem(itr, iterator_type, key);
 
 	if (itr->curr_range != NULL)
-		vy_read_iterator_add_disk(itr);
+		vy_read_iterator_add_disk(itr, iterator_type, key);
 
 	/* Enable range and range index version checks */
 	vy_merge_iterator_set_version(&itr->merge_iterator,
@@ -705,14 +681,13 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 }
 
 /**
- * Check versions of index and current range and restores position if
- * something was changed
+ * Restart the read iterator from the position following
+ * the last statement returned to the user. Called when
+ * the current range or the whole range tree is changed.
  */
-static NODISCARD int
+static void
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
-	int rc;
-restart:
 	vy_range_iterator_restore(&itr->range_iterator, itr->curr_stmt,
 				  &itr->curr_range);
 	/* Re-create merge iterator */
@@ -722,12 +697,6 @@ restart:
 			       itr->index->mem_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
-	rc = vy_merge_iterator_restore(&itr->merge_iterator, itr->curr_stmt);
-	if (rc == -1)
-		return -1;
-	if (rc == -2)
-		goto restart;
-	return rc;
 }
 
 /**
@@ -743,8 +712,7 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 retry:
 	*ret = NULL;
 	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2)
-		if (vy_read_iterator_restore(itr) < 0)
-			return -1;
+		vy_read_iterator_restore(itr);
 	/*
 	 * If the iterator after next_key is on the same key then
 	 * go to the next.
@@ -868,10 +836,7 @@ restart:
 			if (rc == -1)
 				goto clear;
 			do {
-				if (vy_read_iterator_restore(itr) < 0) {
-					rc = -1;
-					goto clear;
-				}
+				vy_read_iterator_restore(itr);
 				rc = vy_merge_iterator_next_lsn(mi, &t);
 			} while (rc == -2);
 			if (rc != 0)
