@@ -58,6 +58,8 @@ struct vy_merge_src {
 	bool is_mutable;
 	/** Source belongs to a range (@sa vy_merge_iterator comments). */
 	bool belong_range;
+	/** Set if the iterator was started. */
+	bool is_started;
 	/**
 	 * All sources with the same front_id as in struct
 	 * vy_merge_iterator are on the same key of current output
@@ -252,16 +254,31 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 
 		struct vy_merge_src *src = &itr->src[i];
 		bool stop = false;
+
 		if (src->front_id == prev_front_id) {
+			/*
+			 * The source was used on the previous iteration.
+			 * Advance it to the next key.
+			 */
+			assert(src->is_started);
 			assert(itr->curr_stmt != NULL);
 			assert(i < itr->skipped_start);
 			rc = src->iterator.iface->next_key(&src->iterator,
 							   &src->stmt, &stop);
-		} else if (i < itr->skipped_start || src->stmt == NULL) {
+		} else if (!src->is_started) {
 			/*
-			 * Do not restore skipped unless it's the first round.
-			 * Generally skipped srcs are handled below, but some
-			 * iterators need to be restored before next_key call.
+			 * This is the first time the source is used.
+			 * Start the iterator.
+			 */
+			src->is_started = true;
+			rc = src->iterator.iface->next_key(&src->iterator,
+							   &src->stmt, &stop);
+		} else if (i < itr->skipped_start) {
+			/*
+			 * The source was updated, but was not used, so it
+			 * does not need to be advanced. However, it might
+			 * have changed since the last iteration, so the
+			 * iterator needs to be restored.
 			 */
 			rc = src->iterator.iface->restore(&src->iterator,
 							  itr->curr_stmt,
@@ -273,6 +290,11 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 		if (rc != 0)
 			return rc;
 		if (i >= itr->skipped_start && itr->curr_stmt != NULL) {
+			/*
+			 * If the source was not used on the last iteration,
+			 * it might have lagged behind the current merge key.
+			 * Advance it until it is up-to-date.
+			 */
 			while (src->stmt != NULL &&
 			       dir * vy_tuple_compare(src->stmt, itr->curr_stmt,
 						      def) <= 0) {
