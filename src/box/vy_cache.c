@@ -759,11 +759,11 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	*ret = NULL;
 	struct vy_cache_iterator *itr = (struct vy_cache_iterator *) vitr;
 
+	assert(itr->search_started);
+
 	/* disable cache for errinj test - let it try to read from disk */
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
-		     { itr->search_started = true; return 0; });
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
-		     { itr->search_started = true; return 0; });
+	ERROR_INJECT(ERRINJ_VY_READ_PAGE, return 0);
+	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT, return 0);
 
 	struct key_def *def = itr->cache->cmp_def;
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
@@ -772,84 +772,50 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	if (itr->curr_stmt != NULL)
 		vy_cache_iterator_restore_pos(itr);
 
-	if (itr->search_started) {
-		if (itr->curr_stmt == NULL)
-			return 0;
-		int rc = 0;
-		struct vy_cache_tree_iterator pos = itr->curr_pos;
-		if (last_stmt == NULL) {
-			struct vy_cache_entry **entry =
-				vy_cache_tree_iterator_get_elem(tree, &pos);
-			assert(entry != NULL);
-			*stop = vy_cache_iterator_is_stop(itr, *entry);
-			vy_cache_iterator_get(itr, ret);
-			return 0;
-		}
-		assert(itr->version == itr->cache->version);
-		if (! is_version_changed) {
-			vy_cache_iterator_get(itr, ret);
-			return 0;
-		}
-		while (true) {
-			if (dir > 0)
-				vy_cache_tree_iterator_prev(tree, &pos);
-			else
-				vy_cache_tree_iterator_next(tree, &pos);
-			if (vy_cache_tree_iterator_is_invalid(&pos))
-				break;
-			struct vy_cache_entry **entry =
-				vy_cache_tree_iterator_get_elem(tree, &pos);
-			assert(*entry && (*entry)->stmt);
-			struct tuple *t = (*entry)->stmt;
-			int cmp = dir * vy_stmt_compare(t, last_stmt, def);
-			if (cmp < 0 || (cmp == 0 && vy_stmt_lsn(t) <=
-				        (**itr->read_view).vlsn))
-				break;
-			if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
-				if (itr->curr_stmt != NULL)
-					tuple_unref(itr->curr_stmt);
-				itr->curr_pos = pos;
-				itr->curr_stmt = t;
-				tuple_ref(itr->curr_stmt);
-				rc = 1;
-				*stop = vy_cache_iterator_is_stop(itr, *entry);
-			}
-		}
-		vy_cache_iterator_get(itr, ret);
-		return rc;
-	}
-
-	assert(itr->curr_stmt == NULL);
-
-	if (last_stmt == NULL) {
-		vy_cache_iterator_start(itr, ret, stop);
-		return *ret != NULL;
-	}
-
-	/*
-	 * Restoration is very similar to first search so we'll use
-	 * that.
-	 */
-	enum iterator_type save_type = itr->iterator_type;
-	const struct tuple *save_key = itr->key;
-	itr->iterator_type = dir > 0 ? ITER_GE : ITER_LE;
-	itr->key = last_stmt;
-	vy_cache_iterator_start(itr, ret, stop);
-	itr->iterator_type = save_type;
-	itr->key = save_key;
-	if (*ret == NULL) /* Search ended. */
+	if (itr->curr_stmt == NULL)
 		return 0;
-	if (vy_stmt_compare(itr->curr_stmt, last_stmt, def) == 0) {
-		int rc = vy_cache_iterator_next_key(vitr, ret, stop);
-		assert(rc == 0);
-		(void)rc;
-	} else if (itr->iterator_type == ITER_EQ &&
-		   vy_stmt_compare(itr->key, itr->curr_stmt, def) != 0) {
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
+	int rc = 0;
+	struct vy_cache_tree_iterator pos = itr->curr_pos;
+	if (last_stmt == NULL) {
+		struct vy_cache_entry **entry =
+			vy_cache_tree_iterator_get_elem(tree, &pos);
+		assert(entry != NULL);
+		*stop = vy_cache_iterator_is_stop(itr, *entry);
+		vy_cache_iterator_get(itr, ret);
+		return 0;
 	}
-	*ret = itr->curr_stmt;
-	return itr->curr_stmt != NULL;
+	assert(itr->version == itr->cache->version);
+	if (!is_version_changed) {
+		vy_cache_iterator_get(itr, ret);
+		return 0;
+	}
+	while (true) {
+		if (dir > 0)
+			vy_cache_tree_iterator_prev(tree, &pos);
+		else
+			vy_cache_tree_iterator_next(tree, &pos);
+		if (vy_cache_tree_iterator_is_invalid(&pos))
+			break;
+		struct vy_cache_entry **entry =
+			vy_cache_tree_iterator_get_elem(tree, &pos);
+		assert(*entry && (*entry)->stmt);
+		struct tuple *t = (*entry)->stmt;
+		int cmp = dir * vy_stmt_compare(t, last_stmt, def);
+		if (cmp < 0 || (cmp == 0 && vy_stmt_lsn(t) <=
+				(**itr->read_view).vlsn))
+			break;
+		if (vy_stmt_lsn(t) <= (**itr->read_view).vlsn) {
+			if (itr->curr_stmt != NULL)
+				tuple_unref(itr->curr_stmt);
+			itr->curr_pos = pos;
+			itr->curr_stmt = t;
+			tuple_ref(itr->curr_stmt);
+			rc = 1;
+			*stop = vy_cache_iterator_is_stop(itr, *entry);
+		}
+	}
+	vy_cache_iterator_get(itr, ret);
+	return rc;
 }
 
 /**
