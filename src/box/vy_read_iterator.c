@@ -366,7 +366,10 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 
 		int cmp = min_stmt == NULL ? -1 :
 			  dir * vy_tuple_compare(src->stmt, min_stmt, def);
-		if (cmp < 0) {
+		if (cmp > 0)
+			continue;
+
+		if (cmp < 0 || vy_stmt_lsn(src->stmt) > vy_stmt_lsn(min_stmt)) {
 			itr->front_id++;
 			if (min_stmt)
 				tuple_unref(min_stmt);
@@ -374,7 +377,7 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			tuple_ref(min_stmt);
 			itr->curr_src = i;
 			src->front_id = itr->front_id;
-		} else if (cmp == 0) {
+		} else {
 			itr->curr_src = MIN(itr->curr_src, (uint32_t)i);
 			src->front_id = itr->front_id;
 		}
