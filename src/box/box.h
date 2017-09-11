@@ -158,8 +158,6 @@ void box_set_replication_timeout(void);
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern double replication_timeout;
-
 typedef struct tuple box_tuple_t;
 
 /* box_select is private and used only by FFI */

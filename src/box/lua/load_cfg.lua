@@ -174,6 +174,7 @@ local dynamic_cfg_skip_at_load = {
     wal_mode                = true,
     listen                  = true,
     replication             = true,
+    replication_timeout     = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,

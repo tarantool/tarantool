@@ -34,7 +34,6 @@
 #include "trivia/util.h"
 #include "cbus.h"
 #include "cfg.h"
-#include "box.h"
 #include "errinj.h"
 #include "fiber.h"
 #include "say.h"
@@ -54,8 +53,8 @@
 #include "xstream.h"
 #include "wal.h"
 
-/** Report relay status to tx thread at least once per this interval */
-static const int RELAY_REPORT_INTERVAL = 1;
+/** Network timeout */
+double relay_timeout;
 
 /**
  * Cbus message to send status updates from relay to tx thread.
@@ -312,7 +311,7 @@ relay_reader_f(va_list ap)
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
-						  TIMEOUT_PERIODS * replication_timeout);
+						  TIMEOUT_PERIODS * relay_timeout);
 			/* vclock is followed while decoding, zeroing it. */
 			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
@@ -368,7 +367,7 @@ relay_subscribe_f(va_list ap)
 	fiber_start(reader, relay, fiber());
 
 	while (!fiber_is_cancelled()) {
-		double timeout = replication_timeout;
+		double timeout = relay_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam != 0)

@@ -32,7 +32,6 @@
 
 #include <msgpuck.h>
 
-#include "box.h"
 #include "xlog.h"
 #include "fiber.h"
 #include "scoped_guard.h"
@@ -48,6 +47,8 @@
 #include "xrow_io.h"
 #include "error.h"
 #include "session.h"
+
+double applier_timeout = 1;
 
 STRS(applier_state, applier_STATE);
 
@@ -92,7 +93,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	error_log(e);
 	if (type_cast(SocketError, e))
 		say_info("will retry every %.2lf second",
-			 replication_timeout);
+			 applier_timeout);
 	applier->last_logged_errcode = errcode;
 }
 
@@ -109,7 +110,7 @@ applier_writer_f(va_list ap)
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
 		fiber_cond_wait_timeout(&applier->writer_cond,
-					replication_timeout);
+					applier_timeout);
 		/* Send ACKs only when in FINAL JOIN and FOLLOW modes */
 		if (applier->state != APPLIER_FOLLOW &&
 		    applier->state != APPLIER_FINAL_JOIN)
@@ -528,7 +529,7 @@ applier_f(va_list ap)
 		*/
 reconnect:
 		applier_disconnect(applier, APPLIER_DISCONNECTED);
-		fiber_sleep(replication_timeout);
+		fiber_sleep(applier_timeout);
 	}
 	return 0;
 }
