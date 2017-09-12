@@ -5,7 +5,7 @@ SystemError Failed to allocate 42 bytes in allocator for exception: Cannot alloc
 
 # set new fiber name: Horace.
 
-# fiber name is truncated: aaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
+# fiber name is truncated: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.
 
 	*** fiber_name_test: done ***
 	*** fiber_join_test ***

@@ -151,9 +151,11 @@ fiber_name_test()
 
 	note("set new fiber name: %s.\n", fiber_name(fiber()));
 
-	fiber_set_name(fiber(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+	const char *long_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+	fiber_set_name(fiber(), long_name);
 
 	note("fiber name is truncated: %s.\n", fiber_name(fiber()));
 	footer();

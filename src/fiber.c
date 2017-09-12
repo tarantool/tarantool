@@ -672,12 +672,6 @@ fiber_loop(MAYBE_UNUSED void *data)
 	}
 }
 
-/** Set fiber name.
- *
- * @param[in] name the new name of the fiber. Truncated to
- * FIBER_NAME_MAXLEN.
-*/
-
 void
 fiber_set_name(struct fiber *fiber, const char *name)
 {

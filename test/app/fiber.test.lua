@@ -399,4 +399,23 @@ session_type = nil
 
 fiber = nil
 
+--
+-- gh-2622 fiber.name() truncates new name
+--
+fiber = require('fiber')
+long_name = string.rep('a', 300)
+fiber.name()
+fiber.name('new_name')
+fiber.name(long_name)
+fiber.name()
+fiber.name(long_name, {truncate = true})
+fiber.name()
+f = fiber.self()
+fiber.name(f)
+fiber.name(f, 'new_name')
+fiber.name(f, long_name)
+fiber.name(f)
+fiber.name(f, long_name, {truncate = true})
+fiber.name(f)
+
 test_run:cmd("clear filter")

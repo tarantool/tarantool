@@ -62,7 +62,7 @@ local function process(self)
 end
 
 local function daemon_fiber(self)
-    fiber.name(PREFIX)
+    fiber.name(PREFIX, {truncate = true})
     log.info("started")
 
     --

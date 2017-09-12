@@ -964,6 +964,62 @@ session_type = nil
 fiber = nil
 ---
 ...
+--
+-- gh-2622 fiber.name() truncates new name
+--
+fiber = require('fiber')
+---
+...
+long_name = string.rep('a', 300)
+---
+...
+fiber.name()
+---
+- 'console/unix/:'
+...
+fiber.name('new_name')
+---
+...
+fiber.name(long_name)
+---
+- error: Fiber name is too long
+...
+fiber.name()
+---
+- new_name
+...
+fiber.name(long_name, {truncate = true})
+---
+...
+fiber.name()
+---
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+...
+f = fiber.self()
+---
+...
+fiber.name(f)
+---
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+...
+fiber.name(f, 'new_name')
+---
+...
+fiber.name(f, long_name)
+---
+- error: Fiber name is too long
+...
+fiber.name(f)
+---
+- new_name
+...
+fiber.name(f, long_name, {truncate = true})
+---
+...
+fiber.name(f)
+---
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+...
 test_run:cmd("clear filter")
 ---
 - true
