@@ -52,13 +52,14 @@ const uint32_t key_mp_type[] = {
 	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
 	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
 	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
-	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_NUMBER]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
 	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
 	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
 		(1U << MP_BIN) | (1U << MP_BOOL),
+	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
+	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
 
 struct key_def *
