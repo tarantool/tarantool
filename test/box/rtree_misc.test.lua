@@ -217,9 +217,8 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
 
--- unknown args ignored
-f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array', {part = 'opts'}}}})
-s.index.s:drop()
+-- unknown part args are no more ignored (#2649)
+f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{field=2, type='array', part = 'opts'}}})
 
 -- alter
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})

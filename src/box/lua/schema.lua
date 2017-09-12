@@ -483,6 +483,13 @@ local function update_index_parts(parts)
                 part.field = v;
             elseif k == 2 then
                 part.type = v;
+            elseif k == 'collation' then
+                local coll = box.space._collation.index.name:get{v}
+                if not coll then
+                    box.error(box.error.ILLEGAL_PARAMS,
+                    "options.parts[" .. i .. "]: collation was not found by name " .. v)
+                end
+                part[k] = coll[1]
             else
                 part[k] = v
             end

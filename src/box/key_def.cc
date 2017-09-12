@@ -33,6 +33,7 @@
 #include "tuple_hash.h"
 #include "column_mask.h"
 #include "schema_def.h"
+#include "coll_cache.h"
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
@@ -46,6 +47,19 @@ const char *mp_type_strs[] = {
 	/* .MP_FLOAT  = */ "float",
 	/* .MP_DOUBLE = */ "double",
 	/* .MP_EXT    = */ "extension",
+};
+
+enum part_option {
+	PART_OPTION_FIELD = 0,
+	PART_OPTION_TYPE = 1,
+	PART_OPTION_COLLATION = 2,
+	field_type_option_MAX
+};
+
+const char *field_type_option_strs[] = {
+	"field",
+	"type",
+	"collation",
 };
 
 const uint32_t key_mp_type[] = {
@@ -108,7 +122,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 
 	for (uint32_t item = 0; item < part_count; ++item)
 		key_def_set_part(key_def, item, fields[item],
-				 (enum field_type)types[item]);
+				 (enum field_type)types[item], NULL);
 	return key_def;
 }
 
@@ -131,18 +145,23 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 			return part1->fieldno < part2->fieldno ? -1 : 1;
 		if ((int) part1->type != (int) part2->type)
 			return (int) part1->type < (int) part2->type ? -1 : 1;
+		if (part1->coll != part2->coll)
+			return (uintptr_t) part1->coll <
+			       (uintptr_t) part2->coll ? -1 : 1;
 	}
 	return part_count1 < part_count2 ? -1 : part_count1 > part_count2;
 }
 
 void
 key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type)
+		 uint32_t fieldno, enum field_type type,
+		 struct coll *coll)
 {
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
+	def->parts[part_no].coll = coll;
 	column_mask_set_fieldno(&def->column_mask, fieldno);
 	/**
 	 * When all parts are set, initialize the tuple
@@ -183,12 +202,19 @@ key_def_sizeof_parts(const struct key_def *key_def)
 	size_t size = 0;
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		const struct key_part *part = &key_def->parts[i];
-		size += mp_sizeof_map(2);
-		size += mp_sizeof_str(strlen("field"));
+		size += mp_sizeof_map(part->coll == NULL ? 2 : 3);
+		const char *opt = field_type_option_strs[PART_OPTION_FIELD];
+		size += mp_sizeof_str(strlen(opt));
 		size += mp_sizeof_uint(part->fieldno);
 		assert(part->type < field_type_MAX);
-		size += mp_sizeof_str(strlen("type"));
+		opt = field_type_option_strs[PART_OPTION_TYPE];
+		size += mp_sizeof_str(strlen(opt));
 		size += mp_sizeof_str(strlen(field_type_strs[part->type]));
+		if (part->coll != NULL) {
+			opt = field_type_option_strs[PART_OPTION_COLLATION];
+			size += mp_sizeof_str(strlen(opt));
+			size += mp_sizeof_uint(part->coll->id);
+		}
 	}
 	return size;
 }
@@ -198,13 +224,20 @@ key_def_encode_parts(char *data, const struct key_def *key_def)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		const struct key_part *part = &key_def->parts[i];
-		data = mp_encode_map(data, 2);
-		data = mp_encode_str(data, "field", strlen("field"));
+		data = mp_encode_map(data, part->coll == NULL ? 2 : 3);
+		const char *opt = field_type_option_strs[PART_OPTION_FIELD];
+		data = mp_encode_str(data, opt, strlen(opt));
 		data = mp_encode_uint(data, part->fieldno);
-		data = mp_encode_str(data, "type", strlen("type"));
+		opt = field_type_option_strs[PART_OPTION_TYPE];
+		data = mp_encode_str(data, opt, strlen(opt));
 		assert(part->type < field_type_MAX);
 		const char *type_str = field_type_strs[part->type];
 		data = mp_encode_str(data, type_str, strlen(type_str));
+		if (part->coll != NULL) {
+			opt = field_type_option_strs[PART_OPTION_COLLATION];
+			data = mp_encode_str(data, opt, strlen(opt));
+			data = mp_encode_uint(data, part->coll->id);
+		}
 	}
 	return data;
 }
@@ -258,7 +291,7 @@ key_def_decode_parts_166(struct key_def *key_def, const char **data)
 				 "unknown field type");
 			return -1;
 		}
-		key_def_set_part(key_def, i, field_no, field_type);
+		key_def_set_part(key_def, i, field_no, field_type, NULL);
 	}
 	return 0;
 }
@@ -269,10 +302,20 @@ part_type_by_name_wrapper(const char *str, uint32_t len)
 	return field_type_by_name(str, len);
 }
 
+struct key_part_def {
+	/** Tuple field index for this part */
+	uint32_t fieldno;
+	/** Type of the tuple field */
+	enum field_type type;
+	/** Collation ID for string comparison */
+	uint32_t coll_id;
+};
+
 const struct opt_def part_def_reg[] = {
-	OPT_DEF_ENUM("type", field_type, struct key_part, type,
+	OPT_DEF_ENUM("type", field_type, struct key_part_def, type,
 		     part_type_by_name_wrapper),
-	OPT_DEF("field", OPT_UINT32, struct key_part, fieldno),
+	OPT_DEF("field", OPT_UINT32, struct key_part_def, fieldno),
+	OPT_DEF("collation", OPT_UINT32, struct key_part_def, coll_id),
 	OPT_END,
 };
 
@@ -287,7 +330,7 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 				 "index part is expected to be a map");
 			return -1;
 		}
-		struct key_part part = {0, field_type_MAX};
+		struct key_part_def part = {0, field_type_MAX, UINT32_MAX};
 		if (opts_decode(&part, part_def_reg, data,
 				ER_WRONG_INDEX_OPTIONS, i + 1, NULL) != 0)
 			return -1;
@@ -296,7 +339,17 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 				 "index part: unknown field type");
 			return -1;
 		}
-		key_def_set_part(key_def, i, part.fieldno, part.type);
+		struct coll *coll = NULL;
+		if (part.coll_id != UINT32_MAX) {
+			coll = coll_cache_find(part.coll_id);
+			if (coll == NULL) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 i + 1,
+					 "collation was not found by ID");
+				return -1;
+			}
+		}
+		key_def_set_part(key_def, i, part.fieldno, part.type, coll);
 	}
 	return 0;
 }
@@ -314,7 +367,7 @@ key_def_decode_parts_160(struct key_def *key_def, const char **data)
 				 "unknown field type");
 			return -1;
 		}
-		key_def_set_part(key_def, i, field_no, field_type);
+		key_def_set_part(key_def, i, field_no, field_type, NULL);
 	}
 	return 0;
 }
@@ -360,7 +413,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	part = first->parts;
 	end = part + first->part_count;
 	for (; part != end; part++)
-	     key_def_set_part(new_def, pos++, part->fieldno, part->type);
+		key_def_set_part(new_def, pos++, part->fieldno, part->type,
+				 part->coll);
 
 	/* Set-append second key def's part to the new key def. */
 	part = second->parts;
@@ -368,7 +422,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	for (; part != end; part++) {
 		if (key_def_find(first, part->fieldno))
 			continue;
-		key_def_set_part(new_def, pos++, part->fieldno, part->type);
+		key_def_set_part(new_def, pos++, part->fieldno, part->type,
+				 part->coll);
 	}
 	return new_def;
 }

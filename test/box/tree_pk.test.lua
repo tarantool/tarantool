@@ -231,3 +231,69 @@ i2:select{1}
 i2:select{2}
 
 s:drop()
+
+--https://github.com/tarantool/tarantool/issues/2649
+-- create standart index and alter it to collation index
+box.internal.collation.create('test', 'ICU', 'ru-RU')
+box.internal.collation.create('test-ci', 'ICU', 'ru-RU', {strength = 'secondary'})
+s = box.schema.space.create('test')
+i1 = s:create_index('i1', { type = 'tree', parts = {{1, 'str'}}, unique = true })
+
+_ = s:replace{"ааа"}
+_ = s:replace{"еее"}
+_ = s:replace{"ёёё"}
+_ = s:replace{"жжж"}
+_ = s:replace{"яяя"}
+_ = s:replace{"ААА"}
+_ = s:replace{"ЯЯЯ"}
+
+-- bad output
+s:select{}
+
+i1:alter({parts = {{1, 'str', collation='test'}}})
+
+-- good output
+s:select{}
+
+i1:alter({parts = {{1, 'str', collation='test-ci'}}})
+
+_ = s:delete{"ААА"}
+_ = s:delete{"ЯЯЯ"}
+
+i1:alter({parts = {{1, 'str', collation='test-ci'}}})
+
+-- good output
+s:select{}
+
+s:insert{"ААА"}
+s:replace{"ЯЯЯ"}
+
+-- good output
+s:select{}
+
+s:drop()
+
+-- create collation index and alter it to standart index
+s = box.schema.space.create('test')
+i1 = s:create_index('i1', { type = 'tree', parts = {{1, 'str', collation='test'}}, unique = true })
+
+_ = s:replace{"ааа"}
+_ = s:replace{"еее"}
+_ = s:replace{"ёёё"}
+_ = s:replace{"жжж"}
+_ = s:replace{"яяя"}
+_ = s:replace{"ААА"}
+_ = s:replace{"ЯЯЯ"}
+
+-- good output
+s:select{}
+
+i1:alter({parts = {{1, 'str'}}})
+
+-- bad output
+s:select{}
+
+s:drop()
+
+box.internal.collation.drop('test')
+box.internal.collation.drop('test-ci')
