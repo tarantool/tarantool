@@ -303,3 +303,17 @@ c:_request("select", nil, 1, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
 c:_request("select", nil, 65537, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
 c:_request("select", nil, 4294967295, box.index.EQ, 0, 0, 0xFFFFFFFF, {})
 c:close()
+
+session = box.session
+box.schema.user.create('test')
+box.schema.user.grant('test', 'read,write', 'universe')
+session.su('test')
+box.internal.collation.create('test', 'ICU', 'ru_RU')
+session.su('admin')
+box.internal.collation.drop('test') -- success
+box.internal.collation.create('test', 'ICU', 'ru_RU')
+session.su('test')
+box.internal.collation.drop('test') -- fail
+session.su('admin')
+box.internal.collation.drop('test') -- success
+box.schema.user.drop('test')

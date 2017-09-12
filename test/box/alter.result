@@ -182,6 +182,8 @@ box.space._vspace.index.owner:alter{parts = {2, 'unsigned'}}
 _index:select{}
 ---
 - - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [276, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [276, 1, 'name', 'tree', {'unique': true}, [[1, 'string']]]
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
   - [280, 1, 'owner', 'tree', {'unique': false}, [{'field': 1, 'type': 'unsigned'}]]
   - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]

@@ -138,11 +138,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 6
+- 7
 ...
 #box.space._vindex:select{}
 ---
-- 15
+- 17
 ...
 box.session.su('admin')
 ---
@@ -230,11 +230,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 17
+- 18
 ...
 #box.space._vindex:select{}
 ---
-- 39
+- 41
 ...
 #box.space._vuser:select{}
 ---
@@ -242,7 +242,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 12
+- 13
 ...
 #box.space._vfunc:select{}
 ---
@@ -262,7 +262,7 @@ box.session.su('guest')
 ...
 #box.space._vindex:select{}
 ---
-- 39
+- 41
 ...
 #box.space._vuser:select{}
 ---

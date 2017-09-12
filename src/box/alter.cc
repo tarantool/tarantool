@@ -34,6 +34,7 @@
 #include "space.h"
 #include "memtx_index.h"
 #include "func.h"
+#include "coll_cache.h"
 #include "txn.h"
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
@@ -2043,6 +2044,183 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	}
 }
 
+/** Create a collation definition from tuple. */
+void
+coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
+{
+	memset(def, 0, sizeof(*def));
+	uint32_t name_len, locale_len, type_len;
+	def->id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_ID);
+	def->name = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_NAME, &name_len);
+	def->name_len = name_len;
+	uint32_t owner_id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_UID);
+	const char *type = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_TYPE,
+					      &type_len);
+	def->type = STRN2ENUM(coll_type, type, type_len);
+	if (def->type == coll_type_MAX)
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "unknown collation type");
+	def->locale = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_LOCALE,
+					 &locale_len);
+	def->locale_len = locale_len;
+	const char *options =
+		tuple_field_with_type_xc(tuple, BOX_COLLATION_FIELD_OPTIONS,
+					 MP_MAP);
+
+	if (name_len > BOX_NAME_MAX)
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "collation name is too long");
+	if (locale_len > BOX_NAME_MAX)
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "collation locale is too long");
+
+	assert(def->type == COLL_TYPE_ICU); /* no more defined now */
+	if (opts_decode(&def->icu, coll_icu_opts_reg, &options,
+			ER_WRONG_COLLATION_OPTIONS,
+			BOX_COLLATION_FIELD_OPTIONS, NULL) != 0)
+		diag_raise();
+
+	if (def->icu.french_collation == coll_icu_on_off_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong french_collation option setting, "
+				  "expected ON | OFF");
+	}
+
+	if (def->icu.alternate_handling == coll_icu_alternate_handling_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong alternate_handling option setting, "
+				  "expected NON_IGNORABLE | SHIFTED");
+	}
+
+	if (def->icu.case_first == coll_icu_case_first_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong case_first option setting, "
+				  "expected OFF | UPPER_FIRST | LOWER_FIRST");
+	}
+
+	if (def->icu.case_level == coll_icu_on_off_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong case_level option setting, "
+				  "expected ON | OFF");
+	}
+
+	if (def->icu.normalization_mode == coll_icu_on_off_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong normalization_mode option setting, "
+				  "expected ON | OFF");
+	}
+
+	if (def->icu.strength == coll_icu_strength_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong strength option setting, "
+				  "expected PRIMARY | SECONDARY | "
+				  "TERTIARY | QUATERNARY | IDENTICAL");
+	}
+
+	if (def->icu.numeric_collation == coll_icu_on_off_MAX) {
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "ICU wrong numeric_collation option setting, "
+				  "expected ON | OFF");
+	}
+
+	access_check_ddl(owner_id, SC_COLLATION);
+
+}
+
+/** Rollback change in collation space. */
+static void
+coll_cache_rollback(struct trigger *trigger, void *event)
+{
+	struct coll *old_coll = (struct coll *)trigger->data;
+	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	if (new_tuple != NULL) {
+		uint32_t new_id = tuple_field_u32_xc(new_tuple,
+						     BOX_COLLATION_FIELD_ID);
+		struct coll *new_coll = coll_cache_find(new_id);
+		coll_cache_delete(new_coll);
+		coll_delete(new_coll);
+	}
+
+	if (old_coll != NULL) {
+		struct coll *replaced;
+		int rc = coll_cache_replace(old_coll, &replaced);
+		assert(rc == 0 && replaced == NULL);
+		(void)rc;
+	}
+}
+
+/** Delete a collation. */
+static void
+coll_cache_delete_coll(struct trigger *trigger, void */* event */)
+{
+	struct coll *old_coll = (struct coll *)trigger->data;
+	coll_delete(old_coll);
+}
+
+/**
+ * A trigger invoked on replace in a space containing
+ * collations that a user defined.
+ */
+static void
+on_replace_dd_collation(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	struct coll *old_coll = NULL;
+	if (old_tuple != NULL) {
+		/* TODO: Check that no index uses the collation */
+		uint32_t old_id = tuple_field_u32_xc(old_tuple,
+						     BOX_COLLATION_FIELD_ID);
+		old_coll = coll_cache_find(old_id);
+		assert(old_coll != NULL);
+		access_check_ddl(old_coll->owner_id, SC_COLLATION);
+
+		struct trigger *on_commit =
+			txn_alter_trigger_new(coll_cache_delete_coll, old_coll);
+		txn_on_commit(txn, on_commit);
+	}
+
+	if (new_tuple == NULL) {
+		/* Simple DELETE */
+		assert(old_tuple != NULL);
+		coll_cache_delete(old_coll);
+
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(coll_cache_rollback, old_coll);
+		txn_on_rollback(txn, on_rollback);
+		return;
+	}
+
+	struct coll_def new_def;
+	coll_def_new_from_tuple(new_tuple, &new_def);
+	struct coll *new_coll = coll_new(&new_def);
+	if (new_coll == NULL)
+		diag_raise();
+	auto def_guard = make_scoped_guard([=] { coll_delete(new_coll); });
+
+	struct coll *replaced;
+	if (coll_cache_replace(new_coll, &replaced) != 0)
+		diag_raise();
+	if (replaced == NULL && old_coll != NULL) {
+		/*
+		 * ID of a collation was changed.
+		 * Remove collation by old ID.
+		 */
+		coll_cache_delete(old_coll);
+	}
+
+	struct trigger *on_rollback =
+		txn_alter_trigger_new(coll_cache_rollback, old_coll);
+	txn_on_rollback(txn, on_rollback);
+
+	def_guard.is_active = false;
+}
+
 /**
  * Create a privilege definition from tuple.
  */
@@ -2685,6 +2863,10 @@ struct trigger on_replace_user = {
 
 struct trigger on_replace_func = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_func, NULL, NULL
+};
+
+struct trigger on_replace_collation = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_collation, NULL, NULL
 };
 
 struct trigger on_replace_priv = {

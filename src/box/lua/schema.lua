@@ -1611,6 +1611,66 @@ end
 
 box.schema.func.reload = internal.func_reload
 
+box.internal.collation = {}
+box.internal.collation.create = function(name, coll_type, locale, opts)
+    opts = opts or setmap{}
+    if type(name) ~= 'string' then
+        box.error(box.error.ILLEGAL_PARAMS,
+        "name (first arg) must be a string")
+    end
+    if type(coll_type) ~= 'string' then
+        box.error(box.error.ILLEGAL_PARAMS,
+        "type (second arg) must be a string")
+    end
+    if type(locale) ~= 'string' then
+        box.error(box.error.ILLEGAL_PARAMS,
+        "locale (third arg) must be a string")
+    end
+    if type(opts) ~= 'table' then
+        box.error(box.error.ILLEGAL_PARAMS,
+        "options (fourth arg) must be a table or nil")
+    end
+    local lua_opts = {if_not_exists = opts.if_not_exists }
+    check_param_table(lua_opts, {if_not_exists = 'boolean'})
+    opts.if_not_exists = nil
+    opts = setmap(opts)
+
+    local _coll = box.space[box.schema.COLLATION_ID]
+    if lua_opts.if_not_exists then
+        local coll = _coll.index.name:get{name}
+        if coll then
+            return
+        end
+    end
+    _coll:auto_increment{name, session.uid(), coll_type, locale, opts}
+end
+
+box.internal.collation.drop = function(name, opts)
+    opts = opts or {}
+    check_param_table(opts, { if_exists = 'boolean' })
+
+    local _coll = box.space[box.schema.COLLATION_ID]
+    if opts.if_exists then
+        local coll = _coll.index.name:get{name}
+        if not coll then
+            return
+        end
+    end
+    _coll.index.name:delete{name}
+end
+
+box.internal.collation.exists = function(name)
+    local _coll = box.space[box.schema.COLLATION_ID]
+    local coll = _coll.index.name:get{name}
+    return not not coll
+end
+
+box.internal.collation.id_by_name = function(name)
+    local _coll = box.space[box.schema.COLLATION_ID]
+    local coll = _coll.index.name:get{name}
+    return coll[1]
+end
+
 box.schema.user = {}
 
 box.schema.user.password = function(password)

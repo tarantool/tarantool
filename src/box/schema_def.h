@@ -68,6 +68,8 @@ enum {
 	BOX_SYSTEM_ID_MIN = 256,
 	/** Space id of _schema. */
 	BOX_SCHEMA_ID = 272,
+	/** Space id of _collation. */
+	BOX_COLLATION_ID = 276,
 	/** Space id of _space. */
 	BOX_SPACE_ID = 280,
 	/** Space id of _vspace view. */
@@ -155,6 +157,16 @@ enum {
 	BOX_FUNC_FIELD_LANGUAGE = 4,
 };
 
+/** _collation fields. */
+enum {
+	BOX_COLLATION_FIELD_ID = 0,
+	BOX_COLLATION_FIELD_NAME = 1,
+	BOX_COLLATION_FIELD_UID = 2,
+	BOX_COLLATION_FIELD_TYPE = 3,
+	BOX_COLLATION_FIELD_LOCALE = 4,
+	BOX_COLLATION_FIELD_OPTIONS = 5,
+};
+
 /** _schema fields. */
 enum {
 	BOX_SCHEMA_FIELD_KEY = 0,
@@ -213,6 +225,8 @@ enum schema_object_type {
 	SC_USER = 4,
 	SC_ROLE = 5,
 	SC_SEQUENCE = 6,
+	SC_COLLATION = 7,
+	schema_object_type_MAX = 8
 };
 
 enum schema_object_type

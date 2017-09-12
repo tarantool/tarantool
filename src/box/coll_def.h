@@ -33,6 +33,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "opt_def.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -127,6 +128,8 @@ struct coll_def {
 	/** Type specific options. */
 	struct coll_icu_def icu;
 };
+
+extern const struct opt_def coll_icu_opts_reg[];
 
 #if defined(__cplusplus)
 } /* extern "C" */

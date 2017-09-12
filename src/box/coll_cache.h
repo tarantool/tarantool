@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
+#ifndef TARANTOOL_BOX_COLL_CACHE_H_INCLUDED
+#define TARANTOOL_BOX_COLL_CACHE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,22 +30,48 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_truncate;
-extern struct trigger on_replace_schema;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_collation;
-extern struct trigger on_replace_priv;
-extern struct trigger on_replace_cluster;
-extern struct trigger on_replace_sequence;
-extern struct trigger on_replace_sequence_data;
-extern struct trigger on_replace_space_sequence;
-extern struct trigger on_stmt_begin_space;
-extern struct trigger on_stmt_begin_index;
-extern struct trigger on_stmt_begin_truncate;
+#include "coll.h"
 
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+/**
+ * Create global hash tables.
+ * @return - 0 on success, -1 on memory error.
+ */
+int
+coll_cache_init();
+
+/** Delete global hash tables. */
+void
+coll_cache_destroy();
+
+/**
+ * Insert or replace a collation into collation cache.
+ * @param coll - collation to insert/replace.
+ * @param replaced - collation that was replaced.
+ * @return - 0 on success, -1 on memory error.
+ */
+int
+coll_cache_replace(struct coll *coll, struct coll **replaced);
+
+/**
+ * Delete a collation from collation cache.
+ * @param coll - collation to delete.
+ */
+void
+coll_cache_delete(const struct coll *coll);
+
+/**
+ * Find a collation object by its id.
+ */
+struct coll *
+coll_cache_find(uint32_t id);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* TARANTOOL_BOX_COLL_CACHE_H_INCLUDED */

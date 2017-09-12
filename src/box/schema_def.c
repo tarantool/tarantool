@@ -40,6 +40,7 @@ static const char *object_type_strs[] = {
 	/* [SC_USER]            = */ "user",
 	/* [SC_ROLE]            = */ "role",
 	/* [SC_SEQUENCE]        = */ "sequence",
+	/* [SC_COLLATION]       = */ "collation",
 };
 
 enum schema_object_type

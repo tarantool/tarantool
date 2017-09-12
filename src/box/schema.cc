@@ -279,6 +279,11 @@ schema_init()
 	/* _space - home for all spaces. */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_UNSIGNED);
+
+	/* _collation - collation description. */
+	sc_space_new(BOX_COLLATION_ID, "_collation", key_def,
+		     &on_replace_collation, NULL);
+
 	sc_space_new(BOX_SPACE_ID, "_space", key_def,
 		     &alter_space_on_replace_space, &on_stmt_begin_space);
 

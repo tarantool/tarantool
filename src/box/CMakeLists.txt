@@ -37,10 +37,13 @@ add_library(tuple STATIC
     tuple_compare.cc
     tuple_hash.cc
     key_def.cc
+    coll_def.c
+    coll.c
+    coll_cache.c
     field_def.c
     opt_def.c
 )
-target_link_libraries(tuple box_error core ${MSGPUCK_LIBRARIES} misc bit)
+target_link_libraries(tuple box_error core ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES} misc bit)
 
 add_library(xlog STATIC xlog.c)
 target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
@@ -86,8 +89,6 @@ add_library(box STATIC
     sequence.c
     func.c
     func_def.c
-    coll_def.c
-    coll.c
     alter.cc
     schema.cc
     schema_def.c
