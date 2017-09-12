@@ -39,6 +39,7 @@
 #include "lua/space.h"
 #include "alter.h"
 #include "scoped_guard.h"
+#include "version.h"
 #include <stdio.h>
 /**
  * @module Data Dictionary
@@ -60,6 +61,8 @@ static struct mh_i32ptr_t *spaces;
 static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
 uint32_t schema_version = 0;
+uint32_t dd_version_id = version_id(1, 6, 4);
+
 /**
  * Lock of scheme modification
  */

@@ -331,6 +331,7 @@ t;
   - 'box.error.GRANT : 88'
   - 'box.error.INVALID_INDEX_FILE : 131'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
+  - 'box.error.WRONG_DD_VERSION : 140'
   - 'box.error.CREATE_ROLE : 84'
   - 'box.error.VINYL_MAX_TUPLE_SIZE : 139'
   - 'box.error.LOAD_FUNCTION : 99'

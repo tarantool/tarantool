@@ -40,6 +40,11 @@
 extern uint32_t schema_version;
 
 /**
+ * Persistent version of the schema, stored in _schema["version"].
+ */
+extern uint32_t dd_version_id;
+
+/**
  * Lock of schema modification
  */
 extern struct latch schema_lock;
