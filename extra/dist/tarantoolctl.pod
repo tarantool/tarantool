@@ -183,7 +183,7 @@ On success, C<0> is returned, a non-zero failure code otherwise.
 
 =head1 SEE ALSO
 
-Tarantool manual at http://tarantool.org/doc/
+tarantool(1), Tarantool manual at http://tarantool.org/doc/
 
 =head1 COPYRIGHT
 
