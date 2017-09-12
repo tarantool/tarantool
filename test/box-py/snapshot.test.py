@@ -27,13 +27,16 @@ admin("box.snapshot()")
 admin("space:insert{2, 'second tuple'}")
 #
 # Check for other errors, e.g. "Permission denied".
-print "# Make 'var' directory read-only."
-data_dir = os.path.join(server.vardir, server.name)
-os.chmod(data_dir, 0555)
-admin("box.snapshot()")
-
-# cleanup
-os.chmod(data_dir, 0755)
+lsn = int(yaml.load(admin("box.info.server.lsn", silent=True))[0])
+snapshot = str(lsn).zfill(20) + ".snap"
+snapshot = os.path.join(os.path.join(server.vardir, server.name), snapshot)
+# Make snapshot path unwritable
+snapshot
+os.mkdir(snapshot)
+admin("_, e = pcall(box.snapshot)")
+admin("e:match('exists') ~= nil")
+# Cleanup
+os.rmdir(snapshot)
 
 admin("space:delete{1}")
 admin("space:delete{2}")

@@ -27,10 +27,12 @@ space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']
 ...
-# Make 'var' directory read-only.
-box.snapshot()
+_, e = pcall(box.snapshot)
 ---
-- error: can't save snapshot, errno 13 (Permission denied)
+...
+e:match('exists') ~= nil
+---
+- true
 ...
 space:delete{1}
 ---
