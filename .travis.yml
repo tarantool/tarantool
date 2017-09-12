@@ -8,6 +8,8 @@ os:
   - linux
   - osx
 
+osx_image: xcode9
+
 cache:
     directories:
       - $HOME/.cache
