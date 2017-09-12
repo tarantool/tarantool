@@ -227,6 +227,25 @@ fi
 %{_includedir}/tarantool/module.h
 
 %changelog
+* Tue Sep 12 2017 Roman Tsisyk <roman@tarantool.org> 1.7.5.46-1
+- Stabilization of Vinyl storage engine.
+- Improved MemTX TREE iterators.
+- Better replication monitoring.
+- WAL tracking for remote replicas on master.
+- Automatic snapshots every hour.
+- Lua API to create consistent backups.
+- Hot code reload for stored C procedures.
+- New built-in rocks: 'http.client', 'iconv' and 'pwd'.
+- Lua 5.1 command line options.
+- LuaRocks-based package manager.
+- Stack traces support in fiber.info().
+- New names for box.cfg() options.
+- Hot standy mode is now off by default.
+- Support for UNIX pipes in tarantoolctl.
+- Non-blocking syslog logger.
+- Improved systemd integration.
+- Hundrends of bugs fixed, see GitHub release notes for details:
+  https://github.com/tarantool/tarantool/releases/tag/1.7.5
 
 * Fri Dec 16 2016 Roman Tsisyk <roman@tarantool.org> 1.7.2.385-1
 - Add `tarantoolctl cat/play` commands and `xlog` Lua module.
