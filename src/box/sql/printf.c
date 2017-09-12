@@ -363,9 +363,7 @@ void sqlite3VXPrintf(
         flag_longlong = sizeof(char*)==sizeof(i64);
         flag_long = sizeof(char*)==sizeof(long int);
         /* Fall through into the next case */
-#if __GNUC__ >= 7
-        __attribute__ ((fallthrough));
-#endif
+        FALLTHROUGH;
       case etORDINAL:
       case etRADIX:
         if( infop->flags & FLAG_SIGNED ){

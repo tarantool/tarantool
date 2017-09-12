@@ -594,9 +594,7 @@ static void resolveP2Values(Vdbe *p, int *pMaxFuncArgs){
         case OP_Transaction: {
           if( pOp->p2!=0 ) p->readOnly = 0;
           /* fall thru */
-#if __GNUC__ >= 7
-          __attribute__ ((fallthrough));
-#endif
+          FALLTHROUGH;
         }
         case OP_AutoCommit:
         case OP_Savepoint: {

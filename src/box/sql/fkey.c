@@ -1314,9 +1314,7 @@ static Trigger *fkActionTrigger(
           pStep->op = TK_DELETE; 
           break; 
         }
-#if __GNUC__ >= 7
-      __attribute__ ((fallthrough));
-#endif
+        FALLTHROUGH;
       default:
         pStep->op = TK_UPDATE;
     }

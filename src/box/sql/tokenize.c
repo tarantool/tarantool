@@ -330,9 +330,7 @@ int sqlite3GetToken(const unsigned char *z, int *tokenType){
         *tokenType = TK_ILLEGAL;
         return i;
       }
-#if __GNUC__ >= 7
-      __attribute__ ((fallthrough));
-#endif
+      FALLTHROUGH;
     }
     case CC_DOT: {
 #ifndef SQLITE_OMIT_FLOATING_POINT
@@ -344,9 +342,7 @@ int sqlite3GetToken(const unsigned char *z, int *tokenType){
       }
       /* If the next character is a digit, this is a floating point
       ** number that begins with ".".  Fall thru into the next case */
-#if __GNUC__ >= 7
-      __attribute__ ((fallthrough));
-#endif
+      FALLTHROUGH;
     }
     case CC_DIGIT: {
       testcase( z[0]=='0' );  testcase( z[0]=='1' );  testcase( z[0]=='2' );
@@ -451,9 +447,7 @@ int sqlite3GetToken(const unsigned char *z, int *tokenType){
 #endif
       /* If it is not a BLOB literal, then it must be an ID, since no
       ** SQL keywords start with the letter 'x'.  Fall through */
-#if __GNUC__ >= 7
-      __attribute__ ((fallthrough));
-#endif
+      FALLTHROUGH;
     }
     case CC_ID: {
       i = 1;

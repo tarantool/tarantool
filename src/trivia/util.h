@@ -142,14 +142,6 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
  * prediction information.
  */
 
-#ifdef likely
-#  undef likely
-#endif
-
-#ifdef unlikely
-#  undef unlikely
-#endif
-
 #if __has_builtin(__builtin_expect) || defined(__GNUC__)
 #  define likely(x)    __builtin_expect(!! (x),1)
 #  define unlikely(x)  __builtin_expect(!! (x),0)
