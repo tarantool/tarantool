@@ -4167,6 +4167,24 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			return -1;
 		REPLICASET_UUID = uu;
 		say_info("cluster uuid %s", tt_uuid_str(&uu));
+	} else if (strcmp(key, "version") == 0) {
+		if (new_tuple != NULL) {
+			uint32_t major, minor, patch;
+			if (tuple_field_u32(new_tuple, 1, &major) != 0 ||
+			    tuple_field_u32(new_tuple, 2, &minor) != 0)
+				tnt_raise(ClientError, ER_WRONG_DD_VERSION);
+			/* Version can be major.minor with no patch. */
+			if (tuple_field_u32(new_tuple, 3, &patch) != 0)
+				patch = 0;
+			dd_version_id = version_id(major, minor, patch);
+		} else {
+			assert(old_tuple != NULL);
+			/*
+			 * _schema:delete({'version'}) for
+			 * example, for box.internal.bootstrap().
+			 */
+			dd_version_id = tarantool_version_id();
+		}
 	}
 	return 0;
 }

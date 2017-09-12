@@ -70,6 +70,9 @@ uint32_t schema_version = 0;
  */
 uint32_t space_cache_version = 0;
 
+/** Persistent version of the schema, stored in _schema["version"]. */
+uint32_t dd_version_id = 0;
+
 struct rlist on_schema_init = RLIST_HEAD_INITIALIZER(on_schema_init);
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);

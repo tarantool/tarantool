@@ -44,6 +44,7 @@ struct func;
 
 extern uint32_t schema_version;
 extern uint32_t space_cache_version;
+extern uint32_t dd_version_id;
 
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
