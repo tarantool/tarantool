@@ -71,117 +71,6 @@ test_basic(void)
 }
 
 static void
-test_iterator_initial_restore()
-{
-	header();
-
-	plan(3);
-
-	/* Create key_def */
-	uint32_t fields[] = { 0 };
-	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
-	struct key_def *key_def = box_key_def_new(fields, types, 1);
-	assert(key_def != NULL);
-
-	/* Create lsregion */
-	struct lsregion lsregion;
-	struct slab_cache *slab_cache = cord_slab_cache();
-	lsregion_create(&lsregion, slab_cache->arena);
-
-	struct vy_mem *mem = create_test_mem(&lsregion, key_def);
-
-	const uint64_t count = 100;
-	for (uint64_t i = 0; i < count; i++) {
-		const struct vy_stmt_template stmts[2] = {
-			STMT_TEMPLATE(200, REPLACE, i * 2 + 1),
-			STMT_TEMPLATE(300, REPLACE, i * 2 + 1)
-		};
-		vy_mem_insert_template(mem, &stmts[0]);
-		vy_mem_insert_template(mem, &stmts[1]);
-	}
-
-	/* initial restore */
-	bool wrong_rc = false;
-	bool wrong_lsn = false;
-	bool wrong_value = false;
-	int i_fail = 0;
-	for (uint64_t i = 0; i < (count * 2 + 1) * 3; i++) {
-		uint64_t key = i % (count * 2 + 1);
-		int64_t lsn = (i / (count * 2 + 1)) * 100 + 100;
-		bool value_is_expected = lsn != 100 && (key % 2 == 1);
-		char data[16];
-		char *end = data;
-		end = mp_encode_uint(end, key);
-		assert(end <= data + sizeof(data));
-		struct tuple *stmt = vy_stmt_new_select(mem->format, data, 1);
-
-		struct vy_mem_iterator itr;
-		struct vy_mem_iterator_stat stats = {0, {0, 0}};
-		struct vy_read_view rv;
-		rv.vlsn = lsn;
-		const struct vy_read_view *prv = &rv;
-		vy_mem_iterator_open(&itr, &stats, mem, ITER_EQ, stmt,
-				     &prv, NULL);
-		struct tuple *t;
-		bool stop = false;
-		int rc = itr.base.iface->restore(&itr.base, NULL, &t, &stop);
-
-		if (rc != 0) {
-			wrong_rc = true;
-			i_fail = i;
-			itr.base.iface->cleanup(&itr.base);
-			itr.base.iface->close(&itr.base);
-			continue;
-		}
-
-		if (value_is_expected) {
-			if (t == NULL) {
-				wrong_value = true;
-				i_fail = i;
-				itr.base.iface->cleanup(&itr.base);
-				itr.base.iface->close(&itr.base);
-				continue;
-			}
-			if (vy_stmt_lsn(t) != lsn) {
-				wrong_lsn = true;
-				i_fail = i;
-			}
-			uint32_t got_val;
-			if (tuple_field_u32(t, 0, &got_val) ||
-			    got_val != key) {
-				wrong_value = true;
-				i_fail = i;
-			}
-		} else {
-			if (t != NULL) {
-				wrong_value = true;
-				i_fail = i;
-			}
-		}
-
-		itr.base.iface->cleanup(&itr.base);
-		itr.base.iface->close(&itr.base);
-
-		tuple_unref(stmt);
-	}
-
-	ok(!wrong_rc, "check rc %d", i_fail);
-	ok(!wrong_lsn, "check lsn %d", i_fail);
-	ok(!wrong_value, "check value %d", i_fail);
-
-	/* Clean up */
-	vy_mem_delete(mem);
-	lsregion_destroy(&lsregion);
-	box_key_def_delete(key_def);
-
-	fiber_gc();
-
-	check_plan();
-
-	footer();
-}
-
-static void
 test_iterator_restore_after_insertion()
 {
 	header();
@@ -303,7 +192,7 @@ test_iterator_restore_after_insertion()
 		const struct vy_read_view *prv = &rv;
 		vy_mem_iterator_open(&itr, &stats, mem,
 				     direct ? ITER_GE : ITER_LE, select_key,
-				     &prv, NULL);
+				     &prv);
 		struct tuple *t;
 		bool stop = false;
 		int rc = itr.base.iface->next_key(&itr.base, &t, &stop);
@@ -434,7 +323,6 @@ main(int argc, char *argv[])
 	vy_iterator_C_test_init(0);
 
 	test_basic();
-	test_iterator_initial_restore();
 	test_iterator_restore_after_insertion();
 
 	vy_iterator_C_test_finish();

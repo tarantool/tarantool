@@ -53,8 +53,8 @@
 #include "xstream.h"
 #include "wal.h"
 
-/** Report relay status to tx thread at least once per this interval */
-static const int RELAY_REPORT_INTERVAL = 1;
+/** Network timeout */
+double relay_timeout;
 
 /**
  * Cbus message to send status updates from relay to tx thread.
@@ -108,8 +108,6 @@ struct relay {
 	struct vclock recv_vclock;
 	/** Replicatoin slave version. */
 	uint32_t version_id;
-	/** Timeout for clients ack. */
-	double timeout;
 
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
@@ -292,6 +290,9 @@ relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 	}
 }
 
+/* Count of replication_timeout periods to disconnect the client. */
+#define TIMEOUT_PERIODS 4
+
 /*
  * Relay reader fiber function.
  * Read xrow encoded vclocks sent by the replica.
@@ -310,7 +311,7 @@ relay_reader_f(va_list ap)
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
-						  relay->timeout);
+						  TIMEOUT_PERIODS * relay_timeout);
 			/* vclock is followed while decoding, zeroing it. */
 			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
@@ -366,7 +367,7 @@ relay_subscribe_f(va_list ap)
 	fiber_start(reader, relay, fiber());
 
 	while (!fiber_is_cancelled()) {
-		double timeout = RELAY_REPORT_INTERVAL;
+		double timeout = relay_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam != 0)
@@ -416,6 +417,10 @@ relay_subscribe_f(va_list ap)
 		/* An error has occured while ACKs of xlog reading */
 		diag_move(&relay->diag, diag_get());
 	}
+	struct errinj *inj = errinj(ERRINJ_RELAY_EXIT_DELAY, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
+
 	return diag_is_empty(diag_get()) ? 0: -1;
 }
 
@@ -452,7 +457,6 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	vclock_copy(&relay.tx.vclock, replica_clock);
 	relay.version_id = replica_version_id;
 	relay.replica = replica;
-	relay.timeout = cfg_getd("replication_timeout");
 	replica_set_relay(replica, &relay);
 
 	int rc = cord_costart(&relay.cord, tt_sprintf("relay_%p", &relay),

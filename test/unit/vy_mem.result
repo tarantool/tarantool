@@ -13,12 +13,6 @@ ok 10 - vy_mem_rollback 2
 ok 11 - vy_mem->version
 ok 12 - vy_mem->version
 	*** test_basic: done ***
-	*** test_iterator_initial_restore ***
-1..3
-ok 1 - check rc 0
-ok 2 - check lsn 0
-ok 3 - check value 0
-	*** test_iterator_initial_restore: done ***
 	*** test_iterator_restore_after_insertion ***
 1..1
 ok 1 - check wrong_output 0

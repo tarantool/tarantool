@@ -872,58 +872,60 @@ vy_txw_iterator_get(struct vy_txw_iterator *itr, struct tuple **ret)
 	vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
 }
 
-/** Start iteration over the transaction write set. */
+/**
+ * Position the iterator to the first entry in the transaction
+ * write set satisfying the search criteria for a given key and
+ * direction.
+ */
 static void
-vy_txw_iterator_start(struct vy_txw_iterator *itr, struct tuple **ret)
+vy_txw_iterator_seek(struct vy_txw_iterator *itr,
+		     enum iterator_type iterator_type,
+		     const struct tuple *key)
 {
 	itr->stat->lookup++;
-	*ret = NULL;
-	itr->search_started = true;
 	itr->version = itr->tx->write_set_version;
 	itr->curr_txv = NULL;
 	struct vy_index *index = itr->index;
-	struct write_set_key key = { index, itr->key };
+	struct write_set_key k = { index, key };
 	struct txv *txv;
-	if (tuple_field_count(itr->key) > 0) {
-		if (itr->iterator_type == ITER_EQ)
-			txv = write_set_search(&itr->tx->write_set, &key);
-		else if (itr->iterator_type == ITER_GE ||
-			 itr->iterator_type == ITER_GT)
-			txv = write_set_nsearch(&itr->tx->write_set, &key);
+	if (tuple_field_count(key) > 0) {
+		if (iterator_type == ITER_EQ)
+			txv = write_set_search(&itr->tx->write_set, &k);
+		else if (iterator_type == ITER_GE || iterator_type == ITER_GT)
+			txv = write_set_nsearch(&itr->tx->write_set, &k);
 		else
-			txv = write_set_psearch(&itr->tx->write_set, &key);
+			txv = write_set_psearch(&itr->tx->write_set, &k);
 		if (txv == NULL || txv->index != index)
 			return;
-		if (vy_stmt_compare(itr->key, txv->stmt, index->cmp_def) == 0) {
+		if (vy_stmt_compare(key, txv->stmt, index->cmp_def) == 0) {
 			while (true) {
 				struct txv *next;
-				if (itr->iterator_type == ITER_LE ||
-				    itr->iterator_type == ITER_GT)
+				if (iterator_type == ITER_LE ||
+				    iterator_type == ITER_GT)
 					next = write_set_next(&itr->tx->write_set, txv);
 				else
 					next = write_set_prev(&itr->tx->write_set, txv);
 				if (next == NULL || next->index != index)
 					break;
-				if (vy_stmt_compare(itr->key, next->stmt,
+				if (vy_stmt_compare(key, next->stmt,
 						    index->cmp_def) != 0)
 					break;
 				txv = next;
 			}
-			if (itr->iterator_type == ITER_GT)
+			if (iterator_type == ITER_GT)
 				txv = write_set_next(&itr->tx->write_set, txv);
-			else if (itr->iterator_type == ITER_LT)
+			else if (iterator_type == ITER_LT)
 				txv = write_set_prev(&itr->tx->write_set, txv);
 		}
-	} else if (itr->iterator_type == ITER_LE) {
-		txv = write_set_nsearch(&itr->tx->write_set, &key);
+	} else if (iterator_type == ITER_LE) {
+		txv = write_set_nsearch(&itr->tx->write_set, &k);
 	} else {
-		assert(itr->iterator_type == ITER_GE);
-		txv = write_set_psearch(&itr->tx->write_set, &key);
+		assert(iterator_type == ITER_GE);
+		txv = write_set_psearch(&itr->tx->write_set, &k);
 	}
 	if (txv == NULL || txv->index != index)
 		return;
 	itr->curr_txv = txv;
-	vy_txw_iterator_get(itr, ret);
 }
 
 /**
@@ -940,8 +942,9 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 	*ret = NULL;
 
 	if (!itr->search_started) {
-		vy_txw_iterator_start(itr, ret);
-		return 0;
+		itr->search_started = true;
+		vy_txw_iterator_seek(itr, itr->iterator_type, itr->key);
+		goto out;
 	}
 	itr->version = itr->tx->write_set_version;
 	if (itr->curr_txv == NULL)
@@ -956,6 +959,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 	    vy_stmt_compare(itr->key, itr->curr_txv->stmt,
 			    itr->index->cmp_def) != 0)
 		itr->curr_txv = NULL;
+out:
 	if (itr->curr_txv != NULL)
 		vy_txw_iterator_get(itr, ret);
 	return 0;
@@ -977,60 +981,45 @@ vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 /**
  * Restore the iterator position after a change in the write set.
  * Iterator is positioned to the statement following @last_stmt.
- * Can restore an iterator that was out of data previously.
  * Returns 1 if the iterator position changed, 0 otherwise.
-  */
+ */
 static NODISCARD int
 vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct tuple *last_stmt, struct tuple **ret,
-			bool *stop)
+			const struct tuple *last_stmt,
+			struct tuple **ret, bool *stop)
 {
 	(void)stop;
+
 	assert(vitr->iface->restore == vy_txw_iterator_restore);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
+
+	assert(itr->search_started);
+	if (itr->version == itr->tx->write_set_version)
+		return 0;
+
+	const struct tuple *key = itr->key;
+	enum iterator_type iterator_type = itr->iterator_type;
+	if (last_stmt != NULL) {
+		key = last_stmt;
+		iterator_type = iterator_direction(iterator_type) > 0 ?
+				ITER_GT : ITER_LT;
+	}
+
+	struct txv *prev_txv = itr->curr_txv;
+	vy_txw_iterator_seek(itr, iterator_type, key);
+
+	if (itr->iterator_type == ITER_EQ && itr->curr_txv != NULL &&
+	    vy_stmt_compare(itr->key, itr->curr_txv->stmt,
+			    itr->index->cmp_def) != 0)
+		itr->curr_txv = NULL;
+
+	if (prev_txv == itr->curr_txv)
+		return 0;
+
 	*ret = NULL;
-
-	if (!itr->search_started && last_stmt == NULL) {
-		vy_txw_iterator_start(itr, ret);
-		return 0;
-	}
-	if (last_stmt == NULL || itr->version == itr->tx->write_set_version) {
-		if (itr->curr_txv)
-			vy_txw_iterator_get(itr, ret);
-		return 0;
-	}
-
-	itr->search_started = true;
-	itr->version = itr->tx->write_set_version;
-	struct write_set_key key = { itr->index, last_stmt };
-	struct tuple *was_stmt = itr->curr_txv != NULL ?
-				 itr->curr_txv->stmt : NULL;
-	itr->curr_txv = NULL;
-	struct txv *txv;
-	struct key_def *def = itr->index->cmp_def;
-	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
-		txv = write_set_psearch(&itr->tx->write_set, &key);
-	else
-		txv = write_set_nsearch(&itr->tx->write_set, &key);
-	if (txv != NULL && txv->index == itr->index &&
-	    vy_tuple_compare(txv->stmt, last_stmt, def) == 0) {
-		if (itr->iterator_type == ITER_LE ||
-		    itr->iterator_type == ITER_LT)
-			txv = write_set_prev(&itr->tx->write_set, txv);
-		else
-			txv = write_set_next(&itr->tx->write_set, txv);
-	}
-	if (txv != NULL && txv->index == itr->index &&
-	    itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, txv->stmt, def) != 0)
-		txv = NULL;
-	if (txv == NULL || txv->index != itr->index) {
-		assert(was_stmt == NULL);
-		return 0;
-	}
-	itr->curr_txv = txv;
-	vy_txw_iterator_get(itr, ret);
-	return txv->stmt != was_stmt;
+	if (itr->curr_txv != NULL)
+		vy_txw_iterator_get(itr, ret);
+	return 1;
 }
 
 /**
@@ -1049,6 +1038,5 @@ static struct vy_stmt_iterator_iface vy_txw_iterator_iface = {
 	.next_key = vy_txw_iterator_next_key,
 	.next_lsn = vy_txw_iterator_next_lsn,
 	.restore = vy_txw_iterator_restore,
-	.cleanup = NULL,
 	.close = vy_txw_iterator_close
 };

@@ -153,6 +153,7 @@ void box_set_checkpoint_count(void);
 void box_set_memtx_max_tuple_size(void);
 void box_set_vinyl_max_tuple_size(void);
 void box_set_vinyl_timeout(void);
+void box_set_replication_timeout(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */

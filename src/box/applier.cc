@@ -48,9 +48,7 @@
 #include "error.h"
 #include "session.h"
 
-/* TODO: add configuration options */
-static const double RECONNECT_DELAY = 1.0;
-static const double ACK_INTERVAL = 1.0;
+double applier_timeout = 1;
 
 STRS(applier_state, applier_STATE);
 
@@ -94,7 +92,8 @@ applier_log_error(struct applier *applier, struct error *e)
 	}
 	error_log(e);
 	if (type_cast(SocketError, e))
-		say_info("will retry every %.2lf second", RECONNECT_DELAY);
+		say_info("will retry every %.2lf second",
+			 applier_timeout);
 	applier->last_logged_errcode = errcode;
 }
 
@@ -110,7 +109,8 @@ applier_writer_f(va_list ap)
 
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
-		fiber_cond_wait_timeout(&applier->writer_cond, ACK_INTERVAL);
+		fiber_cond_wait_timeout(&applier->writer_cond,
+					applier_timeout);
 		/* Send ACKs only when in FINAL JOIN and FOLLOW modes */
 		if (applier->state != APPLIER_FOLLOW &&
 		    applier->state != APPLIER_FINAL_JOIN)
@@ -498,6 +498,10 @@ applier_f(va_list ap)
 				/* System error from master instance. */
 				applier_log_error(applier, e);
 				goto reconnect;
+			} else if (e->errcode() == ER_CFG) {
+				/* Invalid configuration */
+				applier_log_error(applier, e);
+				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
 				applier_log_error(applier, e);
@@ -525,7 +529,7 @@ applier_f(va_list ap)
 		*/
 reconnect:
 		applier_disconnect(applier, APPLIER_DISCONNECTED);
-		fiber_sleep(RECONNECT_DELAY);
+		fiber_sleep(applier_timeout);
 	}
 	return 0;
 }

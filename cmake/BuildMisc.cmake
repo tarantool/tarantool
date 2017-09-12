@@ -8,12 +8,6 @@ macro(libmisc_build)
         ${PROJECT_SOURCE_DIR}/third_party/qsort_arg.c
     )
 
-    if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
-        # Disable false-positive warnings in switch() {} block
-        set_source_files_properties(${PROJECT_SOURCE_DIR}/third_party/base64.c
-            PROPERTIES COMPILE_FLAGS -Wno-implicit-fallthrough)
-    endif()
-
     if (NOT HAVE_MEMMEM)
         list(APPEND misc_src
             ${PROJECT_SOURCE_DIR}/third_party/memmem.c

@@ -106,7 +106,7 @@ static bool is_ro = true;
  * box.cfg{} will fail if one or more replicas can't be reached
  * within the given period.
  */
-static const int REPLICATION_CFG_TIMEOUT = 10; /* seconds */
+static double replication_cfg_timeout = 1.0; /* seconds */
 
 /* Use the shared instance of xstream for all appliers */
 static struct xstream join_stream;
@@ -397,6 +397,17 @@ box_check_replication(void)
 	}
 }
 
+static double
+box_check_replication_timeout(void)
+{
+	double timeout = cfg_getd("replication_timeout");
+	if (timeout <= 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_timeout",
+			  "the value must be greather than 0");
+	}
+	return timeout;
+}
+
 static enum wal_mode
 box_check_wal_mode(const char *mode_name)
 {
@@ -455,6 +466,7 @@ box_check_config()
 	box_check_log(cfg_gets("log"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication();
+	box_check_replication_timeout();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
@@ -544,11 +556,18 @@ box_set_replication(void)
 
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(REPLICATION_CFG_TIMEOUT);
+	box_sync_replication(replication_cfg_timeout);
 	replicaset_foreach(replica) {
 		if (replica->applier != NULL)
 			applier_resume(replica->applier);
 	}
+}
+
+void
+box_set_replication_timeout(void)
+{
+	double timeout = box_check_replication_timeout();
+	replication_cfg_timeout = relay_timeout = applier_timeout = timeout;
 }
 
 void
@@ -1434,6 +1453,7 @@ box_cfg_xc(void)
 
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
+	box_set_replication_timeout();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 

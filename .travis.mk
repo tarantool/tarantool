@@ -2,6 +2,8 @@
 # Travis CI rules
 #
 
+DOCKER_IMAGE:=packpack/packpack:ubuntu-zesty
+
 all: package
 
 source:
@@ -14,14 +16,33 @@ package:
 
 test: test_$(TRAVIS_OS_NAME)
 
-deps_linux:
-	sudo apt-get update > /dev/null
-	sudo apt-get -q -y install binutils-dev python-daemon python-yaml \
-		libcurl4-gnutls-dev tcl
-	sudo pip install six==1.9.0
-	sudo pip install gevent==1.1.2
+# Redirect some targets via docker
+test_linux: docker_test_ubuntu
+coverage: docker_coverage_ubuntu
 
-test_linux: deps_linux
+docker_%:
+	mkdir -p ~/.cache/ccache
+	docker run \
+		--rm=true --tty=true \
+		--volume "${PWD}:/tarantool" \
+		--volume "${HOME}/.cache:/cache" \
+		--workdir /tarantool \
+		-e XDG_CACHE_HOME=/cache \
+		-e CCACHE_DIR=/cache/ccache \
+		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
+		${DOCKER_IMAGE} \
+		make -f .travis.mk $(subst docker_,,$@)
+
+deps_ubuntu:
+	sudo apt-get update && apt-get install -y -f \
+		build-essential cmake coreutils sed \
+		libreadline-dev libncurses5-dev libyaml-dev libssl-dev \
+		libcurl4-openssl-dev libunwind-dev \
+		python python-pip python-setuptools python-dev \
+		python-msgpack python-yaml python-argparse python-six python-gevent \
+		lcov ruby tcl
+
+test_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
 	make -j8
 	cd test && /usr/bin/python test-run.py -j -1
@@ -43,8 +64,7 @@ test_osx: deps_osx
 	make -j8
 	cd test && python test-run.py -j -1 unit/ app/ app-tap/ box/ box-tap/
 
-coverage: deps_linux
-	sudo apt-get -q -y install lcov
+coverage_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
 	make -j8
 	# Enable --long tests for coverage

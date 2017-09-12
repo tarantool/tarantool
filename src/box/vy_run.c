@@ -1734,117 +1734,40 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 	return vy_run_iterator_get(itr, ret);
 }
 
-/**
- * Restore the current position (if necessary) after a change in the set of
- * runs or ranges and check if the position was changed.
- * @sa struct vy_stmt_iterator comments.
- *
- * @pre the iterator is not started
- *
- * @param last_stmt the last key on which the iterator was
- *		      positioned
- *
- * @retval 0	if position did not change (iterator started)
- * @retval 1	if position changed
- * @retval -1	a read or memory error
- */
+/** Disk runs are immutable so the ->restore() callback is a no-op. */
 static NODISCARD int
 vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct tuple *last_stmt, struct tuple **ret,
-
-			bool *stop)
+			const struct tuple *last_stmt,
+			struct tuple **ret, bool *stop)
 {
+	(void)ret;
 	(void)stop;
+	(void)last_stmt;
+
 	assert(vitr->iface->restore == vy_run_iterator_restore);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
-	*ret = NULL;
-	int rc;
 
-	if (itr->search_started || last_stmt == NULL) {
-		if (!itr->search_started) {
-			rc = vy_run_iterator_start(itr, ret);
-		} else {
-			rc = vy_run_iterator_get(itr, ret);
-		}
-		if (rc < 0)
-			return rc;
-		return 0;
-	}
-	/* Restoration is very similar to first search so we'll use that */
-	enum iterator_type iterator_type = itr->iterator_type;
-	if (iterator_type == ITER_GT || iterator_type == ITER_EQ)
-		iterator_type = ITER_GE;
-	else if (iterator_type == ITER_LT)
-		iterator_type = ITER_LE;
-	struct tuple *next;
-	rc = vy_run_iterator_start_from(itr, iterator_type, last_stmt, &next);
-	if (rc != 0)
-		return rc;
-	else if (next == NULL)
-		return 0;
-	const struct key_def *def = itr->cmp_def;
-	bool position_changed = true;
-	if (vy_stmt_compare(next, last_stmt, def) == 0) {
-		position_changed = false;
-		if (vy_stmt_lsn(next) >= vy_stmt_lsn(last_stmt)) {
-			/* skip the same stmt to next stmt or older version */
-			do {
-				rc = vy_run_iterator_next_lsn(vitr, &next);
-				if (rc != 0)
-					return rc;
-				if (next == NULL) {
-					rc = vy_run_iterator_next_key(vitr,
-								      &next,
-								      NULL);
-					if (rc != 0)
-						return rc;
-					break;
-				}
-			} while (vy_stmt_lsn(next) >= vy_stmt_lsn(last_stmt));
-			if (next != NULL)
-				position_changed = true;
-		}
-	} else if (itr->iterator_type == ITER_EQ &&
-		   vy_stmt_compare(itr->key, next, def) != 0) {
-
-		itr->search_ended = true;
-		vy_run_iterator_cache_clean(itr);
-		return position_changed;
-	}
-	*ret = next;
-	return position_changed;
-}
-
-/**
- * Free all allocated resources in a worker thread.
- */
-static void
-vy_run_iterator_cleanup(struct vy_stmt_iterator *vitr)
-{
-	assert(vitr->iface->cleanup == vy_run_iterator_cleanup);
-	vy_run_iterator_cache_clean((struct vy_run_iterator *) vitr);
+	assert(itr->search_started);
+	(void)itr;
+	return 0;
 }
 
 /**
  * Close the iterator and free resources.
- * Can be called only after cleanup().
  */
 static void
 vy_run_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_run_iterator_close);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
-	/* cleanup() must be called before */
-	assert(itr->curr_stmt == NULL && itr->curr_page == NULL);
+	vy_run_iterator_cache_clean(itr);
 	TRASH(itr);
-	(void) itr;
 }
 
 static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
 	.next_key = vy_run_iterator_next_key,
 	.next_lsn = vy_run_iterator_next_lsn,
 	.restore = vy_run_iterator_restore,
-	.cleanup = vy_run_iterator_cleanup,
 	.close = vy_run_iterator_close,
 };
 

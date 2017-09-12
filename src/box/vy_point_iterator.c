@@ -287,7 +287,6 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 			break;
 		}
 	}
-	run_itr.base.iface->cleanup(&run_itr.base);
 	run_itr.base.iface->close(&run_itr.base);
 	return rc;
 }

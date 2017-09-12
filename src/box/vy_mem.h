@@ -319,11 +319,6 @@ struct vy_mem_iterator {
 	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	const struct vy_read_view **read_view;
-	/**
-	 * If not NULL, start iteration from the key following
-	 * @before_first.
-	 */
-	struct tuple *before_first;
 
 	/* State of iterator */
 	/* Current position in tree */
@@ -354,8 +349,7 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv,
-		     struct tuple *before_first);
+		     const struct tuple *key, const struct vy_read_view **rv);
 
 /**
  * Simple stream over a mem. @see vy_stmt_stream.

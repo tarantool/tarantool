@@ -155,11 +155,10 @@ test_gh2661_next_key()
 					&key_template, ITER_GE);
 	vy_cache_iterator_open(&itr, &cache, ITER_GE, select_all, &rv_p);
 	/*
-	 * Call restore at first, because merge_iterator on start
-	 * calls restore for all iterators.
+	 * Call next_key first to start iteration.
 	 */
-	ok(itr.base.iface->restore(&itr.base, NULL, &ret, &unused) >= 0,
-	   "restore");
+	ok(itr.base.iface->next_key(&itr.base, &ret, &unused) >= 0,
+	   "start");
 
 	/*
 	 * Change version by inserting a new statement

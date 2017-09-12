@@ -44,6 +44,9 @@
 
 #include "vclock.h"
 
+/** Network timeout */
+extern double applier_timeout;
+
 struct xstream;
 
 enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
