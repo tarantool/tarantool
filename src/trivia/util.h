@@ -364,6 +364,29 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 
 /** Function Attributes }}} */
 
+/** {{{ Statement Attributes */
+
+/**
+ * The fallthrough attribute with a null statement serves as a fallthrough
+ * statement. It hints to the compiler that a statement that falls through
+ * to another case label, or user-defined label in a switch statement is
+ * intentional and thus the -Wimplicit-fallthrough warning must not trigger.
+ * The fallthrough attribute may appear at most once in each attribute list,
+ * and may not be mixed with other attributes. It can only be used in a switch
+ * statement (the compiler will issue an error otherwise), after a preceding
+ * statement and before a logically succeeding case label, or user-defined
+ * label.
+ */
+#if defined(__cplusplus) && __has_cpp_attribute(fallthrough)
+#  define FALLTHROUGH [[fallthrough]]
+#elif __has_attribute(fallthrough) || (defined(__GNUC__) && __GNUC__ >= 7)
+#  define FALLTHROUGH __attribute__((fallthrough))
+#else
+#  define FALLTHROUGH
+#endif
+
+/** Statement Attributes }}} */
+
 /** \endcond public */
 
 void close_all_xcpt(int fdc, ...);
