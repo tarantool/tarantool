@@ -23,7 +23,6 @@ space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']
 ...
-# Make 'var' directory read-only.
 _, e = pcall(box.snapshot)
 ---
 ...
@@ -33,7 +32,7 @@ e.type
 ...
 e.errno
 ---
-- 13
+- 17
 ...
 space:delete{1}
 ---
