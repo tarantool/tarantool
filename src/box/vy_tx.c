@@ -946,7 +946,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 		vy_txw_iterator_seek(itr, itr->iterator_type, itr->key);
 		goto out;
 	}
-	itr->version = itr->tx->write_set_version;
+	assert(itr->version == itr->tx->write_set_version);
 	if (itr->curr_txv == NULL)
 		return 0;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
@@ -976,6 +976,7 @@ vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
 
 	assert(itr->search_started);
+	assert(itr->version == itr->tx->write_set_version);
 	(void)itr;
 
 	*ret = NULL;

@@ -705,12 +705,9 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 		vy_cache_iterator_start(itr, ret, stop);
 		return 0;
 	}
+	assert(itr->version == itr->cache->version);
 	if (itr->curr_stmt == NULL) /* End of search. */
 		return 0;
-	vy_cache_iterator_restore_pos(itr);
-	if (itr->curr_stmt == NULL)
-		return 0;
-
 	tuple_unref(itr->curr_stmt);
 	*stop = vy_cache_iterator_step(itr, &itr->curr_stmt);
 	if (itr->curr_stmt == NULL)

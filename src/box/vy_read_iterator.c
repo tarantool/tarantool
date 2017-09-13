@@ -255,17 +255,7 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 		struct vy_merge_src *src = &itr->src[i];
 		bool stop = false;
 
-		if (src->front_id == prev_front_id) {
-			/*
-			 * The source was used on the previous iteration.
-			 * Advance it to the next key.
-			 */
-			assert(src->is_started);
-			assert(itr->curr_stmt != NULL);
-			assert(i < itr->skipped_start);
-			rc = src->iterator.iface->next_key(&src->iterator,
-							   &src->stmt, &stop);
-		} else if (!src->is_started) {
+		if (!src->is_started) {
 			/*
 			 * This is the first time the source is used.
 			 * Start the iterator.
@@ -273,22 +263,30 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			src->is_started = true;
 			rc = src->iterator.iface->next_key(&src->iterator,
 							   &src->stmt, &stop);
-		} else if (i < itr->skipped_start) {
+		} else {
 			/*
-			 * The source was updated, but was not used, so it
-			 * does not need to be advanced. However, it might
-			 * have changed since the last iteration, so the
-			 * iterator needs to be restored.
+			 * The source might have changed since the last time
+			 * it was used, so the iterator needs to be restored.
 			 */
 			rc = src->iterator.iface->restore(&src->iterator,
 							  itr->curr_stmt,
 							  &src->stmt, &stop);
-			rc = rc > 0 ? 0 : rc;
+			if (rc == 0 && src->front_id == prev_front_id) {
+				/*
+				 * The source was used on the previous iteration.
+				 * Advance the iterator to the next key unless it
+				 * was restored.
+				 */
+				assert(itr->curr_stmt != NULL);
+				assert(i < itr->skipped_start);
+				rc = src->iterator.iface->next_key(&src->iterator,
+								   &src->stmt, &stop);
+			}
 		}
+		if (rc < 0)
+			return -1;
 		if (vy_merge_iterator_check_version(itr))
 			return -2;
-		if (rc != 0)
-			return rc;
 		if (i >= itr->skipped_start && itr->curr_stmt != NULL) {
 			/*
 			 * If the source was not used on the last iteration,
@@ -400,6 +398,12 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 
 /**
  * Iterate to the next (elder) version of the same key
+ *
+ * Note, we don't need to restore individual sources in this
+ * function, because sources that may yield (i.e. runs) are
+ * immutable and iterated last (after txw, cache, and mems)
+ * as they contain the oldest data.
+ *
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read error
  * @retval -2 iterator is not valid anymore
