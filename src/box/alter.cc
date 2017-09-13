@@ -174,12 +174,14 @@ err:
 }
 
 static int
-opt_set(void *opts, const struct opt_def *def, const char **val)
+opt_set(void *opts, const struct opt_def *def, const char **val,
+	struct region *region)
 {
 	int64_t ival;
 	double dval;
 	uint32_t str_len;
 	const char *str;
+	char *ptr;
 	char *opt = ((char *) opts) + def->offset;
 	switch (def->type) {
 	case OPT_BOOL:
@@ -204,6 +206,20 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 		str_len = MIN(str_len, def->len - 1);
 		memcpy(opt, str, str_len);
 		opt[str_len] = '\0';
+		break;
+	case OPT_STRPTR:
+		if (mp_typeof(**val) != MP_STR)
+			return -1;
+		str = mp_decode_str(val, &str_len);
+		if (str_len > 0) {
+			ptr = (char *) region_alloc_xc(region, str_len + 1);
+			memcpy(ptr, str, str_len);
+			ptr[str_len] = '\0';
+			assert (strlen(ptr) == str_len);
+		} else {
+			ptr = NULL;
+		}
+		*(const char **)opt = ptr;
 		break;
 	case OPT_ENUM:
 		if (mp_typeof(**val) != MP_STR)
@@ -236,7 +252,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val)
 static void
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t key_len, const char **data, uint32_t errcode,
-	       uint32_t field_no)
+	       uint32_t field_no, struct region *region)
 {
 	char errmsg[DIAG_ERRMSG_MAX];
 	bool found = false;
@@ -245,7 +261,7 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 		    memcmp(key, def->name, key_len) != 0)
 			continue;
 
-		if (opt_set(opts, def, data) != 0) {
+		if (opt_set(opts, def, data, region) != 0) {
 			snprintf(errmsg, sizeof(errmsg), "'%.*s' must be %s",
 				 key_len, key, opt_type_strs[def->type]);
 			tnt_raise(ClientError, errcode, field_no, errmsg);
@@ -266,7 +282,7 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
  */
 static void
 opts_decode(void *opts, const struct opt_def *reg, const char *map,
-	    uint32_t errcode, uint32_t field_no)
+	    uint32_t errcode, uint32_t field_no, struct region *region)
 {
 	assert(mp_typeof(*map) == MP_MAP);
 
@@ -283,7 +299,7 @@ opts_decode(void *opts, const struct opt_def *reg, const char *map,
 		uint32_t key_len;
 		const char *key = mp_decode_str(&map, &key_len);
 		opts_parse_key(opts, reg, key, key_len, &map, errcode,
-			       field_no);
+			       field_no, region);
 	}
 }
 
@@ -296,7 +312,7 @@ index_opts_decode(struct index_opts *opts, const char *map)
 {
 	index_opts_create(opts);
 	opts_decode(opts, index_opts_reg, map, ER_WRONG_INDEX_OPTIONS,
-		    BOX_INDEX_FIELD_OPTS);
+		    BOX_INDEX_FIELD_OPTS, NULL);
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
@@ -422,7 +438,7 @@ space_opts_decode(struct space_opts *opts, const char *data)
 		}
 	} else {
 		opts_decode(opts, space_opts_reg, data, ER_WRONG_SPACE_OPTIONS,
-			    BOX_SPACE_FIELD_OPTS);
+			    BOX_SPACE_FIELD_OPTS, NULL);
 	}
 }
 
