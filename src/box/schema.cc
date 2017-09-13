@@ -73,7 +73,7 @@ space_is_system(struct space *space)
 }
 
 /** Return space by its number */
-extern "C" struct space *
+struct space *
 space_by_id(uint32_t id)
 {
 	mh_int_t space = mh_i32ptr_find(spaces, id, NULL);
