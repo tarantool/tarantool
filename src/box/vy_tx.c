@@ -973,7 +973,11 @@ static NODISCARD int
 vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
 	assert(vitr->iface->next_lsn == vy_txw_iterator_next_lsn);
-	(void)vitr;
+	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
+
+	assert(itr->search_started);
+	(void)itr;
+
 	*ret = NULL;
 	return 0;
 }

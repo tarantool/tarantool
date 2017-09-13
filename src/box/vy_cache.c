@@ -730,14 +730,17 @@ vy_cache_iterator_next_key(struct vy_stmt_iterator *vitr,
 	return 0;
 }
 
+/**
+ * This should never be called, because ->next_key() may only
+ * return REPLACE statements.
+ */
 NODISCARD int
 vy_cache_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 {
-	(void)vitr;
 	assert(vitr->iface->next_lsn == vy_cache_iterator_next_lsn);
-	/* next_key must return REPLACE, so there's no need of next_lsn */
-	assert(!((struct vy_cache_iterator *) vitr)->search_started);
-	*ret = NULL;
+	(void)vitr;
+	(void)ret;
+	unreachable();
 	return 0;
 }
 

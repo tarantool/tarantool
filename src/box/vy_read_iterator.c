@@ -407,11 +407,10 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 static NODISCARD int
 vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
 {
-	if (!itr->search_started)
-		return vy_merge_iterator_next_key(itr, ret);
 	*ret = NULL;
 	if (itr->curr_src == UINT32_MAX)
 		return 0;
+	assert(itr->search_started);
 	assert(itr->curr_stmt != NULL);
 	const struct key_def *def = itr->cmp_def;
 	struct vy_merge_src *src = &itr->src[itr->curr_src];
@@ -833,7 +832,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			rc = -1;
 			goto clear;
 		}
-restart:
 		if (mi->range_ended && itr->curr_range != NULL &&
 		    vy_read_iterator_next_range(itr, &t)) {
 			rc = -1;
@@ -848,16 +846,11 @@ restart:
 		}
 		rc = vy_merge_iterator_squash_upsert(mi, &t, true,
 						     &index->stat.upsert.applied);
-		if (rc != 0) {
-			if (rc == -1)
-				goto clear;
-			do {
-				vy_read_iterator_restore(itr);
-				rc = vy_merge_iterator_next_lsn(mi, &t);
-			} while (rc == -2);
-			if (rc != 0)
-				goto clear;
-			goto restart;
+		if (rc == -1)
+			goto clear;
+		if (rc == -2) {
+			vy_read_iterator_restore(itr);
+			continue;
 		}
 		assert(t != NULL);
 		if (vy_stmt_type(t) != IPROTO_DELETE) {

@@ -524,8 +524,7 @@ vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 static NODISCARD int
 vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 {
-	if (!itr->search_started)
-		return vy_mem_iterator_start(itr);
+	assert(itr->search_started);
 	if (!itr->curr_stmt) /* End of search. */
 		return 1;
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
