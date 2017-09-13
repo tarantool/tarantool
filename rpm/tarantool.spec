@@ -232,7 +232,7 @@ fi
 - Improved MemTX TREE iterators.
 - Better replication monitoring.
 - WAL tracking for remote replicas on master.
-- Automatic snapshots every hour.
+- Automatic checkpoints every hour.
 - Lua API to create consistent backups.
 - Hot code reload for stored C procedures.
 - New built-in rocks: 'http.client', 'iconv' and 'pwd'.

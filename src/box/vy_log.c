@@ -1957,7 +1957,7 @@ static ssize_t
 vy_recovery_new_f(va_list ap)
 {
 	int64_t signature = va_arg(ap, int64_t);
-	bool only_snapshot = va_arg(ap, int);
+	bool only_checkpoint = va_arg(ap, int);
 	struct vy_recovery **p_recovery = va_arg(ap, struct vy_recovery **);
 
 	struct vy_recovery *recovery = malloc(sizeof(*recovery));
@@ -2010,7 +2010,7 @@ vy_recovery_new_f(va_list ap)
 		if (rc < 0)
 			break;
 		if (record.type == VY_LOG_SNAPSHOT) {
-			if (only_snapshot)
+			if (only_checkpoint)
 				break;
 			continue;
 		}
@@ -2037,7 +2037,7 @@ fail:
 }
 
 struct vy_recovery *
-vy_recovery_new(int64_t signature, bool only_snapshot)
+vy_recovery_new(int64_t signature, bool only_checkpoint)
 {
 	int rc;
 	struct vy_recovery *recovery;
@@ -2054,7 +2054,7 @@ vy_recovery_new(int64_t signature, bool only_snapshot)
 
 	/* Load the log from coio so as not to stall tx thread. */
 	rc = coio_call(vy_recovery_new_f, signature,
-		       (int)only_snapshot, &recovery);
+		       (int)only_checkpoint, &recovery);
 out:
 	latch_unlock(&vy_log.latch);
 	return rc == 0 ? recovery : NULL;
@@ -2228,7 +2228,7 @@ vy_recovery_iterate(struct vy_recovery *recovery,
 int
 vy_recovery_load_index(struct vy_recovery *recovery,
 		       uint32_t space_id, uint32_t index_id,
-		       int64_t index_lsn, bool snapshot_recovery,
+		       int64_t index_lsn, bool is_checkpoint_recovery,
 		       vy_recovery_cb cb, void *cb_arg)
 {
 	struct vy_index_recovery_info *index;
@@ -2257,7 +2257,7 @@ vy_recovery_load_index(struct vy_recovery *recovery,
 		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 			return -1;
 		return 0;
-	} else if (snapshot_recovery || index_lsn == index->index_lsn) {
+	} else if (is_checkpoint_recovery || index_lsn == index->index_lsn) {
 		/*
 		 * Loading the last incarnation of the index.
 		 * Replay all records we have recovered from
@@ -2270,7 +2270,7 @@ vy_recovery_load_index(struct vy_recovery *recovery,
 		 * context, because we failed to log it before restart.
 		 * Do nothing and let the caller retry logging.
 		 */
-		assert(!snapshot_recovery);
+		assert(!is_checkpoint_recovery);
 		assert(index_lsn > index->index_lsn);
 		return 0;
 	}

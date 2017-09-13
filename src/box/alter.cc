@@ -1224,8 +1224,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 *   when index look up is not possible
 	 * - _space, _index and other metaspaces initially don't
 	 *   have a tuple which represents it, this tuple is only
-	 *   created during recovery from
-	 *   a snapshot.
+	 *   created during recovery from a snapshot.
 	 *
 	 * Let's establish whether an old space exists. Use
 	 * old_tuple ID field, if old_tuple is set, since UPDATE

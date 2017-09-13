@@ -121,8 +121,8 @@ struct replica {
 
 enum {
 	/**
-	 * Reserved id used for local requests, snapshot rows and in cases
-	 * where id is unknown.
+	 * Reserved id used for local requests, checkpoint rows
+	 * and in cases where id is unknown.
 	 */
 	REPLICA_ID_NIL = 0,
 };

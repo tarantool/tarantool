@@ -146,7 +146,7 @@ enum vy_log_record_type {
 	 * corresponding to the snapshot. The following record
 	 * represents the marker.
 	 *
-	 * See also: @only_snapshot argument of vy_recovery_new().
+	 * See also: @only_checkpoint argument of vy_recovery_new().
 	 */
 	VY_LOG_SNAPSHOT			= 11,
 	/**
@@ -341,14 +341,14 @@ vy_log_end_recovery(void);
  * Create a recovery context from the metadata log created
  * by checkpoint with the given signature.
  *
- * If @only_snapshot is set, do not load records appended to
+ * If @only_checkpoint is set, do not load records appended to
  * the log after checkpoint (i.e. get a consistent view of
  * Vinyl at the time of the checkpoint).
  *
  * Returns NULL on failure.
  */
 struct vy_recovery *
-vy_recovery_new(int64_t signature, bool only_snapshot);
+vy_recovery_new(int64_t signature, bool only_checkpoint);
 
 /**
  * Free a recovery context created by vy_recovery_new().
@@ -387,7 +387,7 @@ vy_recovery_iterate(struct vy_recovery *recovery,
  * Note, this function returns 0 if there's no index with the requested
  * id in the recovery context. In this case, @cb isn't called at all.
  *
- * The @snapshot_recovery flag indicates that the row that created
+ * The @is_checkpoint_recovery flag indicates that the row that created
  * the index was loaded from a snapshot, in which case @index_lsn is
  * the snapshot signature. Otherwise @index_lsn is the LSN of the WAL
  * row that created the index.
@@ -397,28 +397,28 @@ vy_recovery_iterate(struct vy_recovery *recovery,
  * follows. Let @record denote the vylog record corresponding to the
  * last incarnation of the index. Then
  *
- * - If @snapshot_recovery is set and @index_lsn >= @record->index_lsn,
+ * - If @is_checkpoint_recovery is set and @index_lsn >= @record->index_lsn,
  *   the last index incarnation was created before the snapshot and we
  *   need to load it right now.
  *
- * - If @snapshot_recovery is set and @index_lsn < @record->index_lsn,
+ * - If @is_checkpoint_recovery is set and @index_lsn < @record->index_lsn,
  *   the last index incarnation was created after the snapshot, i.e.
  *   the index loaded now is going to be dropped so load a dummy.
  *
- * - If @snapshot_recovery is unset and @index_lsn < @record->index_lsn,
+ * - If @is_checkpoint_recovery is unset and @index_lsn < @record->index_lsn,
  *   the last index incarnation is created further in WAL, load a dummy.
  *
- * - If @snapshot_recovery is unset and @index_lsn == @record->index_lsn,
+ * - If @is_checkpoint_recovery is unset and @index_lsn == @record->index_lsn,
  *   load the last index incarnation.
  *
- * - If @snapshot_recovery is unset and @index_lsn > @record->index_lsn,
+ * - If @is_checkpoint_recovery is unset and @index_lsn > @record->index_lsn,
  *   it seems we failed to log index creation before restart. In this
  *   case don't do anything. The caller is supposed to retry logging.
  */
 int
 vy_recovery_load_index(struct vy_recovery *recovery,
 		       uint32_t space_id, uint32_t index_id,
-		       int64_t index_lsn, bool snapshot_recovery,
+		       int64_t index_lsn, bool is_checkpoint_recovery,
 		       vy_recovery_cb cb, void *cb_arg);
 
 /**

@@ -53,8 +53,8 @@ extern "C" {
 
 /**
  * Type of log directory. A single filesystem directory can be
- * used for logs and snapshots, but an xlog object sees only
- * those files which match its type.
+ * used for write ahead logs, memtx snapshots or vinyl run files,
+ * but an xlog object sees only those files which match its type.
  */
 enum xdir_type {
 	SNAP,		/* memtx snapshot */
@@ -70,7 +70,8 @@ enum xdir_type {
 enum log_suffix { NONE, INPROGRESS };
 
 /**
- * A handle for a data directory with write ahead logs or snapshots.
+ * A handle for a data directory with write ahead logs, snapshots,
+ * vylogs.
  * Can be used to find the last log in the directory, scan
  * through all logs, create a new log.
  */
@@ -107,8 +108,8 @@ struct xdir {
 	const struct tt_uuid *instance_uuid;
 	/**
 	 * Text of a marker written to the text file header:
-	 * XLOG (meaning it's a write ahead log) or SNAP (a
-	 * snapshot).
+	 * XLOG (meaning it's a write ahead log) SNAP (a
+	 * snapshot) or VYLOG.
 	 */
 	const char *filetype;
 	/**
@@ -224,7 +225,7 @@ struct xlog_meta {
 	 * Text file header: vector clock taken at the time
 	 * this file was created. For WALs, this is vector
 	 * clock *at start of WAL*, for snapshots, this
-	 * is vector clock *at the time the snapshot is taken.
+	 * is vector clock *at the time the snapshot is taken*.
 	 */
 	struct vclock vclock;
 };
@@ -232,7 +233,7 @@ struct xlog_meta {
 /* }}} */
 
 /**
- * A single log file - a snapshot or a write ahead log.
+ * A single log file - a snapshot, a vylog or a write ahead log.
  */
 struct xlog {
 	/** xlog meta header */

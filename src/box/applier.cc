@@ -259,7 +259,7 @@ applier_join(struct applier *applier)
 
 	/**
 	 * Tarantool < 1.7.0: if JOIN is successful, there is no "OK"
-	 * response, but a stream of rows from snapshot.
+	 * response, but a stream of rows from checkpoint.
 	 */
 	if (applier->version_id >= version_id(1, 7, 0)) {
 		/* Decode JOIN response */
@@ -466,9 +466,8 @@ applier_f(va_list ap)
 			applier_connect(applier);
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				/*
-				 * Execute JOIN if this is a bootstrap,
-				 * and there is no snapshot. The
-				 * join will pause the applier
+				 * Execute JOIN if this is a bootstrap.
+				 * The join will pause the applier
 				 * until WAL is created.
 				 */
 				applier_join(applier);

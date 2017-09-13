@@ -90,7 +90,7 @@ bool
 box_is_ro(void);
 
 /** True if snapshot is in progress. */
-extern bool box_snapshot_is_in_progress;
+extern bool box_checkpoint_is_in_progress;
 /** Incremented with each next snapshot. */
 extern uint32_t snapshot_version;
 
@@ -98,7 +98,7 @@ extern uint32_t snapshot_version;
  * Iterate over all spaces and save them to the
  * snapshot file.
  */
-int box_snapshot(void);
+int box_checkpoint(void);
 
 typedef int (*box_backup_cb)(const char *path, void *arg);
 

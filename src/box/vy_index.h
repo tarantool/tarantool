@@ -341,7 +341,7 @@ vy_index_create(struct vy_index *index);
  * metadata log, rebuilds the range tree, and opens run
  * files.
  *
- * If @snapshot_recovery is set, the index is recovered from
+ * If @is_checkpoint_recovery is set, the index is recovered from
  * the last snapshot. In particular, this means that the index
  * must have been logged in the metadata log and so if the
  * function does not find it in the recovery context, it will
@@ -356,7 +356,7 @@ vy_index_create(struct vy_index *index);
  */
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool snapshot_recovery, bool force_recovery);
+		 int64_t lsn, bool is_checkpoint_recovery, bool force_recovery);
 
 /**
  * Return generation of in-memory data stored in an index
