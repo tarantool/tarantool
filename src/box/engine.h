@@ -45,6 +45,7 @@ engine_backup_cb(const char *path, void *arg);
 #if defined(__cplusplus)
 
 struct Handler;
+struct field_def;
 
 /** Engine instance */
 class Engine {
@@ -58,7 +59,8 @@ public:
 	virtual void init();
 	/** Create a new engine instance for a space. */
 	virtual Handler *createSpace(struct rlist *key_list,
-				     uint32_t index_count,
+				     struct field_def *fields,
+				     uint32_t field_count, uint32_t index_count,
 				     uint32_t exact_field_count) = 0;
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.

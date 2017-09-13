@@ -36,20 +36,40 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
 
-/** Extract all available type info from keys. */
+/**
+ * Extract all available type info from keys and field
+ * definitions.
+ */
 static int
 tuple_format_create(struct tuple_format *format, struct key_def **keys,
-		    uint16_t key_count)
+		    uint16_t key_count, struct field_def *fields,
+		    uint32_t field_count)
 {
 	if (format->field_count == 0) {
 		format->field_map_size = 0;
 		return 0;
 	}
-
-	/* There may be fields between indexed fields (gaps). */
-	for (uint32_t i = 0; i < format->field_count; i++) {
+	/* Initialize defined fields */
+	char *name_pos = (char *)format + sizeof(struct tuple_format) +
+			 format->field_count * sizeof(struct field_def);
+	for (uint32_t i = 0; i < field_count; ++i) {
+		format->fields[i].type = fields[i].type;
+		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
+		if (fields[i].name != NULL) {
+			format->fields[i].name = name_pos;
+			size_t len = strlen(fields[i].name);
+			memcpy(name_pos, fields[i].name, len);
+			name_pos[len] = 0;
+			name_pos += len + 1;
+		} else {
+			format->fields[i].name = NULL;
+		}
+	}
+	/* Initialize remaining fields */
+	for (uint32_t i = field_count; i < format->field_count; i++) {
 		format->fields[i].type = FIELD_TYPE_ANY;
 		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
+		format->fields[i].name = NULL;
 	}
 
 	int current_slot = 0;
@@ -70,9 +90,9 @@ tuple_format_create(struct tuple_format *format, struct key_def **keys,
 				field->type = part->type;
 			} else if (field->type != part->type) {
 				/**
-				 * Check that two different indexes do not
-				 * put contradicting constraints on
-				 * indexed field type.
+				 * Check that there are no
+				 * conflicts between index part
+				 * types and space fields.
 				 */
 				diag_set(ClientError, ER_FIELD_TYPE_MISMATCH,
 					 part->fieldno + TUPLE_INDEX_BASE,
@@ -153,22 +173,25 @@ tuple_format_deregister(struct tuple_format *format)
 }
 
 static struct tuple_format *
-tuple_format_alloc(struct key_def **keys, uint16_t key_count)
+tuple_format_alloc(struct key_def **keys, uint16_t key_count,
+		   struct field_def *space_fields, uint32_t space_field_count)
 {
-	uint32_t max_fieldno = 0;
-
+	uint32_t field_count = space_field_count;
 	/* find max max field no */
 	for (uint16_t key_no = 0; key_no < key_count; ++key_no) {
 		struct key_def *key_def = keys[key_no];
 		struct key_part *part = key_def->parts;
 		struct key_part *pend = part + key_def->part_count;
 		for (; part < pend; part++)
-			max_fieldno = MAX(max_fieldno, part->fieldno);
+			field_count = MAX(field_count, part->fieldno + 1);
 	}
-	uint32_t field_count = key_count > 0 ? max_fieldno + 1 : 0;
 
 	uint32_t total = sizeof(struct tuple_format) +
 			 field_count * sizeof(struct field_def);
+	for (uint32_t i = 0; i < space_field_count; ++i) {
+		if (space_fields[i].name != NULL)
+			total += strlen(space_fields[i].name) + 1;
+	}
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 	if (format == NULL) {
@@ -193,9 +216,12 @@ tuple_format_delete(struct tuple_format *format)
 
 struct tuple_format *
 tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
-		 uint16_t key_count, uint16_t extra_size)
+		 uint16_t key_count, uint16_t extra_size,
+		 struct field_def *space_fields, uint32_t space_field_count)
 {
-	struct tuple_format *format = tuple_format_alloc(keys, key_count);
+	struct tuple_format *format =
+		tuple_format_alloc(keys, key_count, space_fields,
+				   space_field_count);
 	if (format == NULL)
 		return NULL;
 	format->vtab = *vtab;
@@ -204,7 +230,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
 		tuple_format_delete(format);
 		return NULL;
 	}
-	if (tuple_format_create(format, keys, key_count) < 0) {
+	if (tuple_format_create(format, keys, key_count, space_fields,
+				space_field_count) < 0) {
 		tuple_format_delete(format);
 		return NULL;
 	}
@@ -221,6 +248,13 @@ tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b)
 		if (a->fields[i].type != b->fields[i].type ||
 		    a->fields[i].offset_slot != b->fields[i].offset_slot)
 			return false;
+		if (a->fields[i].name != NULL) {
+			assert(b->fields[i].name != NULL);
+			assert(strcmp(a->fields[i].name,
+				      b->fields[i].name) == 0);
+		} else {
+			assert(b->fields[i].name == NULL);
+		}
 	}
 	return true;
 }
@@ -230,14 +264,28 @@ tuple_format_dup(const struct tuple_format *src)
 {
 	uint32_t total = sizeof(struct tuple_format) +
 			 src->field_count * sizeof(struct field_def);
+	uint32_t name_offset = total;
+	for (uint32_t i = 0; i < src->field_count; ++i) {
+		if (src->fields[i].name != NULL)
+			total += strlen(src->fields[i].name) + 1;
+	}
 
 	struct tuple_format *format = (struct tuple_format *) malloc(total);
 	if (format == NULL) {
-		diag_set(OutOfMemory, sizeof(struct tuple_format), "malloc",
-			 "tuple format");
+		diag_set(OutOfMemory, total, "malloc", "tuple format");
 		return NULL;
 	}
 	memcpy(format, src, total);
+	char *name_pos = (char *)format + name_offset;
+	for (uint32_t i = 0; i < src->field_count; ++i) {
+		if (src->fields[i].name != NULL) {
+			int len = strlen(src->fields[i].name);
+			format->fields[i].name = name_pos;
+			memcpy(name_pos, src->fields[i].name, len);
+			name_pos[len] = 0;
+			name_pos += len + 1;
+		}
+	}
 	format->id = FORMAT_ID_NIL;
 	format->refs = 0;
 	if (tuple_format_register(format) != 0) {

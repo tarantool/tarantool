@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include "opt_def.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -60,8 +61,14 @@ enum field_type {
 
 extern const char *field_type_strs[];
 
+/**
+ * Get field type by name
+ */
 enum field_type
-field_type_by_name(const char *name);
+field_type_by_name(const char *name, size_t len);
+
+extern const struct opt_def field_def_reg[];
+extern const struct field_def field_def_default;
 
 /**
  * @brief Field definition
@@ -76,6 +83,8 @@ struct field_def {
 	 * then UNKNOWN is stored for it.
 	 */
 	enum field_type type;
+	/** 0-terminated field name. */
+	char *name;
 	/**
 	 * Offset slot in field map in tuple. Normally tuple
 	 * stores field map - offsets of all fields participating

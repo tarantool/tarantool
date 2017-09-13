@@ -164,6 +164,8 @@ box.snapshot()
 
 test_run:cmd("restart server default")
 
+utils = require('utils')
+
 s = box.space.spatial
 i = s.index.spatial
 s.index.spatial:select({{0, 0}}, {iterator = 'neighbor'})
@@ -199,15 +201,10 @@ function f(t) local r = {} for i, v in ipairs(t) do r[i] = v end r[1] = 0 return
 -- new index through inserting to _index space
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'}}})
 s.index.s:drop()
--- support of 1.6.5 _index structure
-f(box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array'})
-s.index.s:drop()
 
 -- with wrong args
-empty_map = setmetatable({}, {__serialize = 'map'})
 box.space._index:insert{s.id, 2, 's', 'rtree', nil, {{2, 'array'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', {}, {{2, 'array'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', empty_map, {{2, 'array'}}}
+box.space._index:insert{s.id, 2, 's', 'rtree', utils.setmap({}), {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'}}}
@@ -216,9 +213,6 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
-box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
-box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
 
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})

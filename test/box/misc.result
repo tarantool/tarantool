@@ -308,6 +308,7 @@ t;
   - 'box.error.NO_SUCH_TRIGGER : 34'
   - 'box.error.CHECKPOINT_IN_PROGRESS : 120'
   - 'box.error.FIELD_TYPE : 23'
+  - 'box.error.WRONG_SPACE_FORMAT : 141'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
   - 'box.error.CURSOR_NO_TRANSACTION : 80'
   - 'box.error.TUPLE_REF_OVERFLOW : 86'

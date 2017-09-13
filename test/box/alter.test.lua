@@ -30,7 +30,7 @@ _space:replace{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't change properties of a space
 --
-_space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
+_space:replace{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't drop a system space
 --
@@ -44,7 +44,7 @@ _space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
+t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 -- Check that a space exists
 space = box.space[t[1]]
 space.id
@@ -69,7 +69,7 @@ _index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigne
 _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
-_space:insert{1000, ADMIN, 'hello', 'memtx', 0}
+_space:insert{1000, ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 _index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 box.space[1000]:insert{0, 'hello, world'}
 box.space[1000]:drop()
@@ -286,3 +286,86 @@ o
 n
 
 ts:drop()
+
+--
+-- gh-2652: validate space format.
+--
+s = box.schema.space.create('test', { format = "format" })
+s = box.schema.space.create('test', { format = { "not_map" } })
+format = { utils.setmap({'unsigned'}) }
+s = box.schema.space.create('test', { format = format })
+format = { { name = 100 } }
+s = box.schema.space.create('test', { format = format })
+long = string.rep('a', box.schema.NAME_MAX + 1)
+format = { { name = long } }
+s = box.schema.space.create('test', { format = format })
+format = { { name = 'id', type = '100' } }
+s = box.schema.space.create('test', { format = format })
+format = { utils.setmap({}) }
+s = box.schema.space.create('test', { format = format })
+
+-- Ensure the format is updated after index drop.
+format = { { name = 'id', type = 'unsigned' } }
+s = box.schema.space.create('test', { format = format })
+pk = s:create_index('pk')
+sk = s:create_index('sk', { parts = { 2, 'string' } })
+s:replace{1, 1}
+sk:drop()
+s:replace{1, 1}
+s:drop()
+
+-- Check index parts conflicting with space format.
+format = { { name='field1', type='unsigned' }, { name='field2', type='string' }, { name='field3', type='scalar' } }
+s = box.schema.space.create('test', { format = format })
+pk = s:create_index('pk')
+sk1 = s:create_index('sk1', { parts = { 2, 'unsigned' } })
+sk2 = s:create_index('sk2', { parts = { 3, 'number' } })
+
+-- Check space format conflicting with index parts.
+sk3 = s:create_index('sk3', { parts = { 2, 'string' } })
+format[2].type = 'unsigned'
+s:format(format)
+s:format()
+s.index.sk3.parts
+
+-- Space format can be updated, if conflicted index is deleted.
+sk3:drop()
+s:format(format)
+s:format()
+
+-- Check deprecated field types.
+format[2].type = 'num'
+format[3].type = 'str'
+format[4] = { name = 'field4', type = '*' }
+format
+s:format(format)
+s:format()
+s:replace{1, 2, '3', {4, 4, 4}}
+
+-- Check not indexed fields checking.
+s:truncate()
+format[2] = {name='field2', type='string'}
+format[3] = {name='field3', type='array'}
+format[4] = {name='field4', type='number'}
+format[5] = {name='field5', type='integer'}
+format[6] = {name='field6', type='scalar'}
+format[7] = {name='field7', type='map'}
+format[8] = {name='field8', type='any'}
+format[9] = {name='field9'}
+s:format(format)
+
+-- Check incorrect field types.
+format[9] = {name='err', type='any'}
+s:format(format)
+
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8, 9}
+s:replace{1, 2, {3, 3}, 4.4, -5, true, {value=7}, 8, 9}
+s:replace{1, '2', 3, 4.4, -5, true, {value=7}, 8, 9}
+s:replace{1, '2', {3, 3}, '4', -5, true, {value=7}, 8, 9}
+s:replace{1, '2', {3, 3}, 4.4, -5.5, true, {value=7}, 8, 9}
+s:replace{1, '2', {3, 3}, 4.4, -5, {6, 6}, {value=7}, 8, 9}
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
+
+s:drop()

@@ -193,6 +193,7 @@ struct errcode_record {
 	/*138 */_(ER_LOAD_MODULE,		"Failed to dynamically load module '%.*s': %s") \
 	/*139 */_(ER_VINYL_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple: tuple is too large. Check 'vinyl_max_tuple_size' configuration option.") \
 	/*140 */_(ER_WRONG_DD_VERSION,		"Wrong _schema version: expected 'major.minor[.patch]'") \
+	/*141 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format (field %u): %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

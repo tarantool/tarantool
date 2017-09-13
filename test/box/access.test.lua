@@ -211,10 +211,9 @@ box.space._priv:select{id}
 -- -----------------------------------------------------------
 -- Be a bit more rigorous in what is accepted in space _user
 -- -----------------------------------------------------------
-box.space._user:insert{10, 1, 'name'}
-box.space._user:insert{10, 1, 'name', 'strange-object-type'}
-box.space._user:insert{10, 1, 'name', 'user', 'password'}
-box.space._user:insert{10, 1, 'name', 'role', 'password'}
+utils = require('utils')
+box.space._user:insert{10, 1, 'name', 'strange-object-type', utils.setmap({})}
+box.space._user:insert{10, 1, 'name', 'role', utils.setmap{'password'}}
 session = nil
 -- -----------------------------------------------------------
 -- admin can't manage grants on not owned objects

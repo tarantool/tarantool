@@ -4174,7 +4174,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		if (ctx->format != NULL)
 			tuple_format_unref(ctx->format);
 		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
-				(struct key_def **)&ctx->key_def, 1, 0);
+				(struct key_def **)&ctx->key_def, 1, 0,
+				NULL, 0);
 		if (ctx->format == NULL)
 			return -1;
 		tuple_format_ref(ctx->format);

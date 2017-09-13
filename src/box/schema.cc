@@ -199,7 +199,7 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
-	struct space *space = space_new(def, &key_list);
+	struct space *space = space_new(def, &key_list, NULL, 0);
 	(void) space_cache_replace(space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);

@@ -636,10 +636,7 @@ end
 
 --------------------------------------------------------------------------------
 
-local function upgrade(options)
-    options = options or {}
-    setmetatable(options, {__index = {auto = false}})
-
+local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
         error('Missing "version" in box.space._schema')
@@ -648,7 +645,14 @@ local function upgrade(options)
     local minor = version[3]
     local patch = version[4] or 0
 
-    version = mkversion(major, minor, patch)
+    return mkversion(major, minor, patch)
+end
+
+local function upgrade(options)
+    options = options or {}
+    setmetatable(options, {__index = {auto = false}})
+
+    local version = get_version()
 
     local handlers = {
         {version = mkversion(1, 6, 8), func = upgrade_to_1_6_8, auto = false},
@@ -680,11 +684,23 @@ end
 
 local function bootstrap()
     set_system_triggers(false)
+    local version = get_version()
 
-    -- erase current schema
-    erase()
-    -- insert initial schema
-    initial()
+    -- Initial() creates a spaces with 1.6.0 format, but 1.7.6
+    -- checks space formats, that fails initial(). It is because
+    -- bootstrap() is called after box.cfg{}. If box.cfg{} is run
+    -- on 1.7.6, then spaces in the cache contains new 1.7.6
+    -- formats (gh-2754). Spaces in the cache are not updated on
+    -- erase(), because system triggers are turned off.
+    if version ~= mkversion(1, 7, 6) then
+        -- erase current schema
+        erase()
+        -- insert initial schema
+        initial()
+    else
+        log.info('version is 1.7.6, do not reset schema to initial')
+    end
+
     -- upgrade schema to the latest version
     upgrade()
 

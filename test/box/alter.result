@@ -67,9 +67,9 @@ _space:replace{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 --
 -- Can't change properties of a space
 --
-_space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
+_space:replace{_space.id, ADMIN, '_space', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- [280, 1, '_space', 'memtx', 0]
+- [280, 1, '_space', 'memtx', 0, {}, []]
 ...
 --
 -- Can't drop a system space
@@ -98,7 +98,7 @@ _space:update({_space.id}, {{'-', 1, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
+t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 ---
 ...
 -- Check that a space exists
@@ -212,9 +212,9 @@ _index:delete{_index.id, 0}
 ---
 - error: Can't drop the primary key in a system space, space '_index'
 ...
-_space:insert{1000, ADMIN, 'hello', 'memtx', 0}
+_space:insert{1000, ADMIN, 'hello', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- [1000, 1, 'hello', 'memtx', 0]
+- [1000, 1, 'hello', 'memtx', 0, {}, []]
 ...
 _index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 ---
@@ -741,5 +741,245 @@ n
 - [3, 'a', 'b']
 ...
 ts:drop()
+---
+...
+--
+-- gh-2652: validate space format.
+--
+s = box.schema.space.create('test', { format = "format" })
+---
+- error: Illegal parameters, options parameter 'format' should be of type table
+...
+s = box.schema.space.create('test', { format = { "not_map" } })
+---
+- error: 'Failed to create space ''test'': field 1 is not map'
+...
+format = { utils.setmap({'unsigned'}) }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+- error: 'Failed to create space ''test'': field 1 format is not map with string keys'
+...
+format = { { name = 100 } }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+- error: 'Wrong space format (field 1): ''name'' must be string'
+...
+long = string.rep('a', box.schema.NAME_MAX + 1)
+---
+...
+format = { { name = long } }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+- error: 'Failed to create space ''test'': field 1 name is too long'
+...
+format = { { name = 'id', type = '100' } }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+- error: 'Failed to create space ''test'': field 1 has unknown field type'
+...
+format = { utils.setmap({}) }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+- error: 'Failed to create space ''test'': field 1 name is not specified'
+...
+-- Ensure the format is updated after index drop.
+format = { { name = 'id', type = 'unsigned' } }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk = s:create_index('sk', { parts = { 2, 'string' } })
+---
+...
+s:replace{1, 1}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+sk:drop()
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+s:drop()
+---
+...
+-- Check index parts conflicting with space format.
+format = { { name='field1', type='unsigned' }, { name='field2', type='string' }, { name='field3', type='scalar' } }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk1 = s:create_index('sk1', { parts = { 2, 'unsigned' } })
+---
+- error: Ambiguous field type, field 2. Requested type is unsigned but the field has
+    previously been defined as string
+...
+sk2 = s:create_index('sk2', { parts = { 3, 'number' } })
+---
+- error: Ambiguous field type, field 3. Requested type is number but the field has
+    previously been defined as scalar
+...
+-- Check space format conflicting with index parts.
+sk3 = s:create_index('sk3', { parts = { 2, 'string' } })
+---
+...
+format[2].type = 'unsigned'
+---
+...
+s:format(format)
+---
+- error: Ambiguous field type, field 2. Requested type is string but the field has
+    previously been defined as unsigned
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'string'}, {
+    'name': 'field3', 'type': 'scalar'}]
+...
+s.index.sk3.parts
+---
+- - type: string
+    fieldno: 2
+...
+-- Space format can be updated, if conflicted index is deleted.
+sk3:drop()
+---
+...
+s:format(format)
+---
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'unsigned'},
+  {'name': 'field3', 'type': 'scalar'}]
+...
+-- Check deprecated field types.
+format[2].type = 'num'
+---
+...
+format[3].type = 'str'
+---
+...
+format[4] = { name = 'field4', type = '*' }
+---
+...
+format
+---
+- - name: field1
+    type: unsigned
+  - name: field2
+    type: num
+  - name: field3
+    type: str
+  - name: field4
+    type: '*'
+...
+s:format(format)
+---
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'num'}, {'name': 'field3',
+    'type': 'str'}, {'name': 'field4', 'type': '*'}]
+...
+s:replace{1, 2, '3', {4, 4, 4}}
+---
+- [1, 2, '3', [4, 4, 4]]
+...
+-- Check not indexed fields checking.
+s:truncate()
+---
+...
+format[2] = {name='field2', type='string'}
+---
+...
+format[3] = {name='field3', type='array'}
+---
+...
+format[4] = {name='field4', type='number'}
+---
+...
+format[5] = {name='field5', type='integer'}
+---
+...
+format[6] = {name='field6', type='scalar'}
+---
+...
+format[7] = {name='field7', type='map'}
+---
+...
+format[8] = {name='field8', type='any'}
+---
+...
+format[9] = {name='field9'}
+---
+...
+s:format(format)
+---
+...
+-- Check incorrect field types.
+format[9] = {name='err', type='any'}
+---
+...
+s:format(format)
+---
+...
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8, 9}
+---
+- [1, '2', [3, 3], 4.4, -5, true, {'value': 7}, 8, 9]
+...
+s:replace{1, 2, {3, 3}, 4.4, -5, true, {value=7}, 8, 9}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+s:replace{1, '2', 3, 4.4, -5, true, {value=7}, 8, 9}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected array'
+...
+s:replace{1, '2', {3, 3}, '4', -5, true, {value=7}, 8, 9}
+---
+- error: 'Tuple field 4 type does not match one required by operation: expected number'
+...
+s:replace{1, '2', {3, 3}, 4.4, -5.5, true, {value=7}, 8, 9}
+---
+- error: 'Tuple field 5 type does not match one required by operation: expected integer'
+...
+s:replace{1, '2', {3, 3}, 4.4, -5, {6, 6}, {value=7}, 8, 9}
+---
+- error: 'Tuple field 6 type does not match one required by operation: expected scalar'
+...
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
+---
+- error: 'Tuple field 7 type does not match one required by operation: expected map'
+...
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
+---
+- error: Tuple field count 7 is less than required by a defined index (expected 9)
+...
+s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
+---
+- error: Tuple field count 8 is less than required by a defined index (expected 9)
+...
+s:drop()
 ---
 ...

@@ -78,7 +78,8 @@ space_fill_index_map(struct space *space)
 }
 
 struct space *
-space_new(struct space_def *def, struct rlist *key_list)
+space_new(struct space_def *def, struct rlist *key_list,
+	  struct field_def *fields, uint32_t field_count)
 {
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
@@ -110,7 +111,8 @@ space_new(struct space_def *def, struct rlist *key_list)
 				      index_count * sizeof(Index *));
 	Engine *engine = engine_find(def->engine_name);
 	/* init space engine instance */
-	space->handler = engine->createSpace(key_list, index_count,
+	space->handler = engine->createSpace(key_list, fields, field_count,
+					     index_count,
 					     def->exact_field_count);
 	rlist_foreach_entry(index_def, key_list, link) {
 		space->index_map[index_def->iid] =

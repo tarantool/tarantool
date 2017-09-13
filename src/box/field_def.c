@@ -43,18 +43,37 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_MAP]      = */ "map",
 };
 
-enum field_type
-field_type_by_name(const char *name)
+static int64_t
+field_type_by_name_wrapper(const char *str, uint32_t len)
 {
-	enum field_type field_type = STR2ENUM(field_type, name);
+	return field_type_by_name(str, len);
+}
+
+const struct opt_def field_def_reg[] = {
+	OPT_DEF_ENUM("type", field_type, struct field_def, type,
+		     field_type_by_name_wrapper),
+	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
+	OPT_END,
+};
+
+const struct field_def field_def_default = {
+	.type = FIELD_TYPE_ANY,
+	.name = NULL,
+};
+
+enum field_type
+field_type_by_name(const char *name, size_t len)
+{
+	enum field_type field_type = strnindex(field_type_strs, name, len,
+					       field_type_MAX);
 	if (field_type != field_type_MAX)
 		return field_type;
 	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
-	if (strcasecmp(name, "num") == 0)
+	if (strncasecmp(name, "num", len) == 0)
 		return FIELD_TYPE_UNSIGNED;
-	else if (strcasecmp(name, "str") == 0)
+	else if (strncasecmp(name, "str", len) == 0)
 		return FIELD_TYPE_STRING;
-	else if (strcmp(name, "*") == 0)
+	else if (len == 1 && name[0] == '*')
 		return FIELD_TYPE_ANY;
 	return field_type_MAX;
 }

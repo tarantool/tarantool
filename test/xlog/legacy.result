@@ -1,0 +1,177 @@
+test_run = require('test_run').new()
+---
+...
+version = test_run:get_cfg('version')
+---
+...
+-- Use 1.7.5 snapshot to check that space formats are not checked.
+-- It allows to use >= 1.6.5 format versions.
+test_run:cmd('create server legacy with script="xlog/upgrade.lua", workdir="xlog/upgrade/1.7.5"')
+---
+- true
+...
+test_run:cmd("start server legacy")
+---
+- true
+...
+test_run:switch('legacy')
+---
+- true
+...
+box.space._schema:get({'version'})
+---
+- ['version', 1, 7, 5]
+...
+_space = box.space._space
+---
+...
+--
+-- Check _space 1.7.5 format.
+--
+_space:replace{600, 1, 'test', 'memtx', 0}
+---
+- [600, 1, 'test', 'memtx', 0]
+...
+box.space.test:drop()
+---
+...
+--
+-- Check _index 1.6.5 format.
+--
+s = box.schema.space.create('s')
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk = box.space._index:insert{s.id, 2, 'sk', 'rtree', 0, 1, 2, 'array'}
+---
+...
+s.index.sk.parts
+---
+- - type: array
+    fieldno: 3
+...
+s.index.sk:drop()
+---
+...
+box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
+---
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
+...
+box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
+---
+- error: 'Wrong record in _index space: got {number, number, string, string, number,
+    number, number, string, string}, expected {space id (number), index id (number),
+    name (string), type (string), is_unique (number), part count (number) part0 field
+    no (number), part0 field type (string), ...}'
+...
+box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
+---
+- error: 'Can''t create or modify index ''s'' in space ''s'': part count must be positive'
+...
+s:drop()
+---
+...
+--
+-- Check 1.6.5 space flags.
+--
+s = box.schema.space.create('t', { temporary = true })
+---
+...
+index = s:create_index('primary', { type = 'hash' })
+---
+...
+s:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+_ = _space:update(s.id, {{'=', 6, 'temporary'}})
+---
+...
+s.temporary
+---
+- true
+...
+_ = _space:update(s.id, {{'=', 6, ''}})
+---
+- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
+    space'
+...
+s.temporary
+---
+- true
+...
+s:truncate()
+---
+...
+_ = _space:update(s.id, {{'=', 6, 'no-temporary'}})
+---
+...
+s.temporary
+---
+- false
+...
+_ = _space:update(s.id, {{'=', 6, ',:asfda:temporary'}})
+---
+...
+s.temporary
+---
+- false
+...
+_ = _space:update(s.id, {{'=', 6, 'a,b,c,d,e'}})
+---
+...
+s.temporary
+---
+- false
+...
+_ = _space:update(s.id, {{'=', 6, 'temporary'}})
+---
+...
+s.temporary
+---
+- true
+...
+s:get{1}
+---
+...
+s:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+_ = _space:update(s.id, {{'=', 6, 'temporary'}})
+---
+...
+s.temporary
+---
+- true
+...
+_ = _space:update(s.id, {{'=', 6, 'no-temporary'}})
+---
+- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
+    space'
+...
+s.temporary
+---
+- true
+...
+s:delete{1}
+---
+- [1, 2, 3]
+...
+_ = _space:update(s.id, {{'=', 6, 'no-temporary'}})
+---
+...
+s:drop()
+---
+...
+test_run:switch('default')
+---
+- true
+...
+test_run:cmd('stop server legacy')
+---
+- true
+...
