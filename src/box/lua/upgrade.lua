@@ -626,6 +626,13 @@ local function upgrade_to_1_7_5()
     update_space_formats_to_1_7_5()
     update_existing_users_to_1_7_5()
 end
+--------------------------------------------------------------------------------
+-- Tarantool 1.7.6
+--------------------------------------------------------------------------------
+
+local function upgrade_to_1_7_6()
+-- Trigger space format checking by updating version in _schema.
+end
 
 --------------------------------------------------------------------------------
 
@@ -648,6 +655,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 1), func = upgrade_to_1_7_1, auto = false},
         {version = mkversion(1, 7, 2), func = upgrade_to_1_7_2, auto = false},
         {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto = true},
+        {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = false}
     }
 
     for _, handler in ipairs(handlers) do

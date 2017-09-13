@@ -36,7 +36,7 @@ box.space._schema:select()
 ---
 - - ['cluster', '<server_uuid>']
   - ['max_id', 513]
-  - ['version', 1, 7, 5]
+  - ['version', 1, 7, 6]
 ...
 box.space._space:select()
 ---
