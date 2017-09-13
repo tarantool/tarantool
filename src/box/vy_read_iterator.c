@@ -480,14 +480,11 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
  */
 static NODISCARD int
 vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
-				struct tuple **ret, bool suppress_error,
-				int64_t *upserts_applied)
+				struct tuple **ret, int64_t *upserts_applied)
 {
 	*ret = NULL;
 	struct tuple *t = itr->curr_stmt;
 
-	if (t == NULL)
-		return 0;
 	/* Upserts enabled only in the primary index. */
 	assert(vy_stmt_type(t) != IPROTO_UPSERT || itr->is_primary);
 	tuple_ref(t);
@@ -498,17 +495,17 @@ vy_merge_iterator_squash_upsert(struct vy_merge_iterator *itr,
 			tuple_unref(t);
 			return rc;
 		}
-		if (next == NULL)
-			break;
 		struct tuple *applied;
 		assert(itr->is_primary);
 		applied = vy_apply_upsert(t, next, itr->cmp_def, itr->format,
-					  itr->upsert_format, suppress_error);
+					  itr->upsert_format, true);
 		++*upserts_applied;
 		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
 		t = applied;
+		if (next == NULL)
+			break;
 	}
 	*ret = t;
 	return 0;
@@ -848,38 +845,23 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			rc = 0; /* No more data. */
 			break;
 		}
-		rc = vy_merge_iterator_squash_upsert(mi, &t, true,
-						     &index->stat.upsert.applied);
+		rc = vy_merge_iterator_squash_upsert(mi, &t,
+				&index->stat.upsert.applied);
 		if (rc == -1)
 			goto clear;
 		if (rc == -2) {
 			vy_read_iterator_restore(itr);
 			continue;
 		}
-		assert(t != NULL);
-		if (vy_stmt_type(t) != IPROTO_DELETE) {
-			if (vy_stmt_type(t) == IPROTO_UPSERT) {
-				struct tuple *applied;
-				assert(index->id == 0);
-				applied = vy_apply_upsert(t, NULL,
-							  index->cmp_def,
-							  mi->format,
-							  mi->upsert_format,
-							  true);
-				index->stat.upsert.applied++;
-				tuple_unref(t);
-				t = applied;
-				assert(vy_stmt_type(t) == IPROTO_REPLACE);
-			}
+		if (vy_stmt_type(t) == IPROTO_REPLACE) {
 			if (itr->curr_stmt != NULL)
 				tuple_unref(itr->curr_stmt);
 			itr->curr_stmt = t;
 			break;
 		} else {
-			if (vy_stmt_lsn(t) == INT64_MAX) { /* t is from write set */
-				assert(vy_stmt_type(t) == IPROTO_DELETE);
+			assert(vy_stmt_type(t) == IPROTO_DELETE);
+			if (vy_stmt_lsn(t) == INT64_MAX) /* t is from write set */
 				skipped_txw_delete = true;
-			}
 			tuple_unref(t);
 		}
 	}
