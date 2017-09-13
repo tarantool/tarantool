@@ -3557,14 +3557,8 @@ SQLITE_API char *sqlite3_expanded_sql(sqlite3_stmt *pStmt);
 ** [SAVEPOINT], and [RELEASE] cause sqlite3_stmt_readonly() to return true,
 ** since the statements themselves do not actually modify the database but
 ** rather they control the timing of when other statements modify the 
-** database.  ^The [ATTACH] and [DETACH] statements also cause
-** sqlite3_stmt_readonly() to return true since, while those statements
-** change the configuration of a database connection, they do not make 
-** changes to the content of the database files on disk.
 ** ^The sqlite3_stmt_readonly() interface returns true for [BEGIN] since
-** [BEGIN] merely sets internal flags, but the [BEGIN|BEGIN IMMEDIATE] and
-** [BEGIN|BEGIN EXCLUSIVE] commands do touch the database and so
-** sqlite3_stmt_readonly() returns false for those commands.
+** [BEGIN] merely sets internal flags.
 */
 SQLITE_API int sqlite3_stmt_readonly(sqlite3_stmt *pStmt);
 

@@ -94,8 +94,8 @@
 #define OP_Cast           91 /* synopsis: affinity(r[P1])                  */
 #define OP_Permutation    92
 #define OP_Compare        93 /* synopsis: r[P1@P3] <-> r[P2@P3]            */
-#define OP_Column         94 /* synopsis: r[P3]=PX                         */
-#define OP_String8        95 /* same as TK_STRING, synopsis: r[P2]='P4'    */
+#define OP_String8        94 /* same as TK_STRING, synopsis: r[P2]='P4'    */
+#define OP_Column         95 /* synopsis: r[P3]=PX                         */
 #define OP_Affinity       96 /* synopsis: affinity(r[P1@P2])               */
 #define OP_MakeRecord     97 /* synopsis: r[P3]=mkrec(r[P1@P2])            */
 #define OP_Count          98 /* synopsis: r[P2]=count()                    */
@@ -129,8 +129,8 @@
 #define OP_IdxInsert     126 /* synopsis: key=r[P2]                        */
 #define OP_IdxDelete     127 /* synopsis: key=r[P2@P3]                     */
 #define OP_Seek          128 /* synopsis: Move P3 to P1.rowid              */
-#define OP_IdxRowid      129 /* synopsis: r[P2]=rowid                      */
-#define OP_Real          130 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_Real          129 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_IdxRowid      130 /* synopsis: r[P2]=rowid                      */
 #define OP_Destroy       131
 #define OP_Clear         132
 #define OP_ResetSorter   133
@@ -189,7 +189,7 @@
 /*  64 */ 0x01, 0x03, 0x03, 0x03, 0x01, 0x01, 0x02, 0x02,\
 /*  72 */ 0x08, 0x00, 0x10, 0x10, 0x10, 0x10, 0x00, 0x10,\
 /*  80 */ 0x10, 0x00, 0x00, 0x10, 0x10, 0x00, 0x00, 0x00,\
-/*  88 */ 0x00, 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x10,\
+/*  88 */ 0x00, 0x02, 0x02, 0x02, 0x00, 0x00, 0x10, 0x00,\
 /*  96 */ 0x00, 0x00, 0x10, 0x00, 0x10, 0x00, 0x00, 0x00,\
 /* 104 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
 /* 112 */ 0x10, 0x20, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00,\

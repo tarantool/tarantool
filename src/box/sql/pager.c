@@ -209,13 +209,6 @@ int sqlite3PagerTrace=1;  /* True to enable tracing */
 **    required to start a write-transaction are held, but no actual 
 **    modifications to the cache or database have taken place.
 **
-**    In rollback mode, a RESERVED or (if the transaction was opened with 
-**    BEGIN EXCLUSIVE) EXCLUSIVE lock is obtained on the database file when
-**    moving to this state, but the journal file is not written to or opened 
-**    to in this state. If the transaction is committed or rolled back while 
-**    in WRITER_LOCKED state, all that is required is to unlock the database 
-**    file.
-**
 **    IN WAL mode, WalBeginWriteTransaction() is called to lock the log file.
 **    If the connection is running with locking_mode=exclusive, an attempt
 **    is made to obtain an EXCLUSIVE lock on the database file.

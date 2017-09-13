@@ -3135,7 +3135,6 @@ case OP_Transaction: {
 */
 case OP_TTransaction:
 	{
-
 		if (p->autoCommit){
 			rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;}
 		break;

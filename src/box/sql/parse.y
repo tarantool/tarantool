@@ -150,8 +150,6 @@ trans_opt ::= TRANSACTION nm.
 %type transtype {int}
 transtype(A) ::= .             {A = TK_DEFERRED;}
 transtype(A) ::= DEFERRED(X).  {A = @X; /*A-overwrites-X*/}
-transtype(A) ::= IMMEDIATE(X). {A = @X; /*A-overwrites-X*/}
-transtype(A) ::= EXCLUSIVE(X). {A = @X; /*A-overwrites-X*/}
 cmd ::= COMMIT trans_opt.      {sqlite3CommitTransaction(pParse);}
 cmd ::= END trans_opt.         {sqlite3CommitTransaction(pParse);}
 cmd ::= ROLLBACK trans_opt.    {sqlite3RollbackTransaction(pParse);}
@@ -212,7 +210,7 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 //
 %fallback ID
   ABORT ACTION AFTER ANALYZE ASC ATTACH BEFORE BEGIN BY CASCADE CAST COLUMNKW
-  CONFLICT DATABASE DEFERRED DESC DETACH EACH END EXCLUSIVE EXPLAIN FAIL FOR
+  CONFLICT DATABASE DEFERRED DESC DETACH EACH END EXPLAIN FAIL FOR
   IGNORE IMMEDIATE INITIALLY INSTEAD LIKE_KW MATCH NO PLAN
   QUERY KEY OF OFFSET PRAGMA RAISE RECURSIVE RELEASE REPLACE RESTRICT ROW
   ROLLBACK SAVEPOINT TRIGGER VIEW VIRTUAL WITH WITHOUT

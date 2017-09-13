@@ -3912,7 +3912,7 @@ void sqlite3SrcListShiftJoinType(SrcList *p){
 /*
 ** Generate VDBE code for a BEGIN statement.
 */
-void sqlite3BeginTransaction(Parse *pParse, int type){
+void sqlite3BeginTransaction(Parse *pParse, MAYBE_UNUSED int type){
   sqlite3 *db;
   Vdbe *v;
 
@@ -3924,11 +3924,6 @@ void sqlite3BeginTransaction(Parse *pParse, int type){
   }
   v = sqlite3GetVdbe(pParse);
   if( !v ) return;
-  if( type!=TK_DEFERRED ){
-    sqlite3VdbeAddOp2(v, OP_Transaction, 0, (type==TK_EXCLUSIVE)+1);
-    sqlite3VdbeAddOp0(v, OP_TTransaction);
-    sqlite3VdbeUsesBtree(v);
-  }
   sqlite3VdbeAddOp0(v, OP_TTransaction);
   sqlite3VdbeAddOp0(v, OP_AutoCommit);
 }
