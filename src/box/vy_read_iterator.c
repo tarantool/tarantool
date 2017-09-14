@@ -678,9 +678,8 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 	assert(itr->curr_range == NULL);
 	itr->search_started = true;
 
-	vy_range_iterator_open(&itr->range_iterator, itr->index->tree,
-			       itr->iterator_type, itr->key);
-	vy_range_iterator_next(&itr->range_iterator, &itr->curr_range);
+	itr->curr_range = vy_range_tree_find_by_key(itr->index->tree,
+					itr->iterator_type, itr->key);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
 			       itr->key, itr->index->cmp_def,
 			       itr->index->mem_format,
@@ -698,8 +697,8 @@ vy_read_iterator_start(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
-	vy_range_iterator_restore(&itr->range_iterator, itr->curr_stmt,
-				  &itr->curr_range);
+	itr->curr_range = vy_range_tree_find_by_key(itr->index->tree,
+			itr->iterator_type, itr->curr_stmt ?: itr->key);
 	/* Re-create merge iterator */
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
@@ -707,6 +706,49 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 			       itr->index->mem_format,
 			       itr->index->upsert_format, itr->index->id == 0);
 	vy_read_iterator_use_range(itr);
+}
+
+static bool
+vy_read_iterator_next_range(struct vy_read_iterator *itr)
+{
+	struct vy_index *index = itr->index;
+	struct vy_range *range = itr->curr_range;
+
+	assert(range != NULL);
+
+	switch (itr->iterator_type) {
+	case ITER_LT:
+	case ITER_LE:
+		range = vy_range_tree_prev(index->tree, range);
+		break;
+	case ITER_GT:
+	case ITER_GE:
+		range = vy_range_tree_next(index->tree, range);
+		break;
+	case ITER_EQ:
+		/* A partial key can be found in more than one range. */
+		if (range->end != NULL &&
+		    vy_stmt_compare_with_key(itr->key, range->end,
+					     range->cmp_def) >= 0) {
+			range = vy_range_tree_next(index->tree, range);
+		} else {
+			range = NULL;
+		}
+		break;
+	default:
+		unreachable();
+	}
+
+	itr->curr_range = range;
+	if (range == NULL)
+		return false;
+
+	vy_merge_iterator_close(&itr->merge_iterator);
+	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
+			       itr->key, index->cmp_def, index->mem_format,
+			       index->upsert_format, index->id == 0);
+	vy_read_iterator_use_range(itr);
+	return true;
 }
 
 /**
@@ -717,14 +759,12 @@ static NODISCARD int
 vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 				struct tuple **ret)
 {
-	struct vy_merge_iterator *mi = &itr->merge_iterator;
-	struct vy_index *index = itr->index;
-	struct key_def *cmp_def = index->cmp_def;
+	struct key_def *cmp_def = itr->index->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 	struct tuple *stmt;
 
 	while (true) {
-		int rc = vy_merge_iterator_next_key(mi, &stmt);
+		int rc = vy_merge_iterator_next_key(&itr->merge_iterator, &stmt);
 		if (rc == -1)
 			return -1;
 		if (rc == -2) {
@@ -754,18 +794,10 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 				break;
 		}
 
-		/* Iterate to the next range. */
-		vy_range_iterator_next(&itr->range_iterator,
-				       &itr->curr_range);
-		if (itr->curr_range == NULL) {
+		if (!vy_read_iterator_next_range(itr)) {
 			/* No more ranges to merge. */
 			break;
 		}
-		vy_merge_iterator_close(mi);
-		vy_merge_iterator_open(mi, itr->iterator_type, itr->key,
-				       cmp_def, index->mem_format,
-				       index->upsert_format, index->id == 0);
-		vy_read_iterator_use_range(itr);
 	}
 	*ret = stmt;
 	return 0;

@@ -155,8 +155,6 @@ struct vy_read_iterator {
 	struct tuple *key;
 	const struct vy_read_view **read_view;
 
-	/* iterator over ranges */
-	struct vy_range_iterator range_iterator;
 	/* current range */
 	struct vy_range *curr_range;
 	/* merge iterator over current range */
