@@ -111,27 +111,6 @@ struct vy_merge_iterator {
 	 * current iteration (optimization)
 	 */
 	uint32_t front_id;
-	/**
-	 * For some optimization the flag is set for unique
-	 * index and full key and EQ order - that means that only
-	 * one value is to be emitted by the iterator.
-	 */
-	bool is_one_value;
-	/**
-	 * If index is unique and full key is given we can
-	 * optimize first search in order to avoid unnecessary
-	 * reading from disk.  That flag is set to true during
-	 * initialization if index is unique and  full key is
-	 * given. After first _get or _next_key call is set to
-	 * false
-	 */
-	bool unique_optimization;
-	/**
-	 * This flag is set to false during initialization and
-	 * means that we must do lazy search for first _get or
-	 * _next call. After that is set to false
-	 */
-	bool search_started;
 };
 
 /**

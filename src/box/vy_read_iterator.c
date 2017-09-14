@@ -102,13 +102,6 @@ vy_merge_iterator_open(struct vy_merge_iterator *itr,
 	itr->mutable_end = 0;
 	itr->skipped_start = 0;
 	itr->curr_stmt = NULL;
-	itr->is_one_value = iterator_type == ITER_EQ &&
-			    tuple_field_count(key) >= cmp_def->part_count;
-	itr->unique_optimization =
-		(iterator_type == ITER_EQ || iterator_type == ITER_GE ||
-		 iterator_type == ITER_LE) &&
-		tuple_field_count(key) >= cmp_def->part_count;
-	itr->search_started = false;
 }
 
 /**
@@ -161,7 +154,6 @@ vy_merge_iterator_reserve(struct vy_merge_iterator *itr, uint32_t capacity)
 static struct vy_merge_src *
 vy_merge_iterator_add(struct vy_merge_iterator *itr, bool is_mutable)
 {
-	assert(!itr->search_started);
 	if (itr->src_count == itr->src_capacity) {
 		if (vy_merge_iterator_reserve(itr, itr->src_count + 1) != 0)
 			return NULL;
@@ -227,12 +219,17 @@ static NODISCARD int
 vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
-	if (itr->search_started && itr->is_one_value)
+	const struct key_def *def = itr->cmp_def;
+	if (itr->curr_stmt != NULL && itr->iterator_type == ITER_EQ &&
+	    tuple_field_count(itr->key) >= def->part_count) {
+		/*
+		 * There may be one statement at max satisfying
+		 * EQ with a full key.
+		 */
 		return 0;
-	itr->search_started = true;
+	}
 	if (vy_merge_iterator_check_version(itr))
 		return -2;
-	const struct key_def *def = itr->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 	uint32_t prev_front_id = itr->front_id;
 	itr->front_id++;
@@ -311,9 +308,19 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 		if (src->stmt == NULL)
 			continue;
 
-		if (itr->unique_optimization &&
-		    vy_stmt_compare(src->stmt, itr->key, def) == 0)
+		if (itr->curr_stmt == NULL && (itr->iterator_type == ITER_EQ ||
+					       itr->iterator_type == ITER_GE ||
+					       itr->iterator_type == ITER_LE) &&
+		    tuple_field_count(itr->key) >= def->part_count &&
+		    vy_stmt_compare(src->stmt, itr->key, def) == 0) {
+			/**
+			 * If the index is unique and the search key
+			 * is full, we can avoid disk accesses on the
+			 * first iteration in case the key is found
+			 * in memory.
+			 */
 			stop = true;
+		}
 
 		int cmp = min_stmt == NULL ? -1 :
 			  dir * vy_tuple_compare(src->stmt, min_stmt, def);
@@ -369,8 +376,6 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 		src->front_id = itr->front_id;
 	}
 
-	itr->unique_optimization = false;
-
 	if (itr->curr_stmt != NULL && min_stmt != NULL)
 		assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) > 0);
 
@@ -400,7 +405,6 @@ vy_merge_iterator_next_lsn(struct vy_merge_iterator *itr, struct tuple **ret)
 	*ret = NULL;
 	if (itr->curr_src == UINT32_MAX)
 		return 0;
-	assert(itr->search_started);
 	assert(itr->curr_stmt != NULL);
 	const struct key_def *def = itr->cmp_def;
 	struct vy_merge_src *src = &itr->src[itr->curr_src];
