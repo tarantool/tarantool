@@ -721,6 +721,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
+	struct obuf *p_obuf = iproto_connection_output_by_input(con, con->p_ibuf);
 	int n_requests = 0;
 	bool stop_input = false;
 	while (con->parse_size && stop_input == false) {
@@ -739,8 +740,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			break;
 		struct iproto_msg *msg = iproto_msg_new(con);
 		msg->p_ibuf = con->p_ibuf;
-		msg->p_obuf =
-			iproto_connection_output_by_input(con, con->p_ibuf);
+		msg->p_obuf = p_obuf;
 		auto guard = make_scoped_guard([=] { iproto_msg_delete(msg); });
 
 		msg->len = reqend - reqstart; /* total request length */
