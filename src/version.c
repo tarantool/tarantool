@@ -32,6 +32,12 @@
 #include "trivia/config.h"
 
 const char *
+tarantool_package(void)
+{
+	return PACKAGE;
+}
+
+const char *
 tarantool_version(void)
 {
 	return PACKAGE_VERSION;

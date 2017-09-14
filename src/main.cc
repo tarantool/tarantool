@@ -434,7 +434,7 @@ load_cfg()
 	 * after (optional) daemonising to avoid confusing messages with
 	 * different pids
 	 */
-	say_crit("version %s", tarantool_version());
+	say_crit("%s %s", tarantool_package(), tarantool_version());
 	say_crit("log level %i", cfg_geti("log_level"));
 
 	if (pid_file_handle != NULL) {
@@ -511,7 +511,7 @@ tarantool_free(void)
 static void
 print_version(void)
 {
-	printf("Tarantool %s\n", tarantool_version());
+	printf("%s %s\n", tarantool_package(), tarantool_version());
 	printf("Target: %s\n", BUILD_INFO);
 	printf("Build options: %s\n", BUILD_OPTIONS);
 	printf("Compiler: %s\n", COMPILER_INFO);

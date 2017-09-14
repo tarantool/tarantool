@@ -25,7 +25,7 @@ find_program(LD ld)
 find_program(CTAGS ctags)
 
 # Define PACKAGE macro in tarantool/config.h
-set (PACKAGE "Tarantool")
+set(PACKAGE "Tarantool" CACHE STRING "Package name.")
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -471,7 +471,8 @@ configure_file(
 message (STATUS "")
 
 set(PREFIX ${CMAKE_INSTALL_PREFIX})
-set(options VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS PREFIX
+set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
+    PREFIX
     ENABLE_SSE2 ENABLE_AVX
     ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN
     ENABLE_BACKTRACE

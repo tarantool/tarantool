@@ -67,6 +67,12 @@ version_id_patch(uint32_t version_id)
 }
 
 /**
+ * Return Tarantool package name as string
+ */
+const char *
+tarantool_package(void);
+
+/**
  * Return Tarantool version as string
  */
 const char *
