@@ -58,12 +58,6 @@ extern "C" {
  * 1) All sources are sorted by age, i.e. the most fresh
  * sources are added first.
  * 2) Mutable sources are added before read-blocking sources.
- *
- * The iterator can merge the write set of the current
- * transaction, that does not belong to any range but to entire
- * index, and mems and runs of some range. For this purpose the
- * iterator has a special flag (range_ended) that signals to the
- * read iterator that it must switch to the next range.
  */
 struct vy_merge_iterator {
 	/** Array of sources */
@@ -138,13 +132,6 @@ struct vy_merge_iterator {
 	 * _next call. After that is set to false
 	 */
 	bool search_started;
-	/**
-	 * If all sources marked with belong_range = true comes to
-	 * the end of data this flag is automatically set to true;
-	 * is false otherwise.  For read iterator range_ended = true
-	 * means that it must switch to next range
-	 */
-	bool range_ended;
 };
 
 /**
