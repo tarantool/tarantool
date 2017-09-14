@@ -13,6 +13,7 @@
 ** a VDBE (or an "sqlite3_stmt" as it is known to the outside world.) 
 */
 #include <box/txn.h>
+#include <fiber.h>
 #include "sqliteInt.h"
 #include "btreeInt.h"
 #include "vdbeInt.h"
@@ -1503,7 +1504,7 @@ void sqlite3VdbePrintOp(FILE *pOut, int pc, Op *pOp){
   char *zP4;
   char zPtr[50];
   char zCom[100];
-  static const char *zFormat1 = "%4d %-13s %4d %4d %4d %-13s %.2X %s\n";
+  static const char *zFormat1 = "%4d> %4d %-13s %4d %4d %4d %-13s %.2X %s\n";
   if( pOut==0 ) pOut = stdout;
   zP4 = displayP4(pOp, zPtr, sizeof(zPtr));
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
@@ -1514,7 +1515,7 @@ void sqlite3VdbePrintOp(FILE *pOut, int pc, Op *pOp){
   /* NB:  The sqlite3OpcodeName() function is implemented by code created
   ** by the mkopcodeh.awk and mkopcodec.awk scripts which extract the
   ** information from the vdbe.c source text */
-  fprintf(pOut, zFormat1, pc, 
+  fprintf(pOut, zFormat1, fiber_self()->fid, pc,
       sqlite3OpcodeName(pOp->opcode), pOp->p1, pOp->p2, pOp->p3, zP4, pOp->p5,
       zCom
   );
