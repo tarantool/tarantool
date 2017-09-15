@@ -1,23 +1,21 @@
 =head1 NAME
 
-tarantool- a Lua application server and a database management system
+tarantool - a Lua application server and a database management system
 
 =head1 SYNOPSIS
 
-    tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
+    tarantool [OPTIONS] [SCRIPT [ARGS]]
 
 =head1 DESCRIPTION
 
-Tarantool is a Lua application server fully compatible with Lua
-5.1.
+Tarantool is a Lua application server fully compatible with Lua 5.1.
 
 It includes a mature database to persist, replicate and recover application
 state and a curated set of Lua modules for networking, I/O, messaging, data
 formats and more.
 
-It is designed to let developers quickly create efficient,
-reliable and powerful micro-services and backend applications
-for Internet.
+It is designed to let developers quickly create efficient, reliable and
+powerful micro-services and backend applications for the Internet.
 
 Key features:
 
@@ -29,53 +27,53 @@ Fully compatible with Lua 5.1.
 
 =item *
 
-Coroutines and asynchronous I/O to implement high-performance
-lock-free access to data
+Coroutines and asynchronous I/O to implement high-performance lock-free
+access to data.
 
 =item *
 
-ACID transactions
+ACID transactions.
 
 =item *
 
-ANSI SQL, Lua stored procedures and triggers
+ANSI SQL, Lua stored procedures and triggers.
 
 =item *
 
-Authentication and access control
+Authentication and access control.
 
 =item *
 
-Master-master replication and automatic sharding
+Master-master replication and automatic sharding.
 
 =back
 
 =head1 OPTIONS
 
-All command line options are passed to the interpreted script.
-When no script name is provided, the server responds to:
+You can use these options before (or instead of) the interpreted 'SCRIPT'
+name:
 
 =over
 
 =item -h, --help
 
-Display helpscreen and exit.
+Display the help screen and exit.
 
-=item -V, --version
+=item -V, -v, --version
 
-Print program version and exit.
+Print the program version and exit.
 
 =item -e EXRP
 
-Execute string 'EXPR'.
+Execute the string 'EXPR'.
 
 =item -l NAME
 
-Require library 'NAME'.
+Require the library 'NAME'.
 
 =item -i
 
-Enter interactive mode after executing 'SCRIPT'.
+Enter the interactive mode after executing 'SCRIPT'.
 
 =item --
 
