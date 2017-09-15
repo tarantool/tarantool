@@ -38,7 +38,7 @@ deps_ubuntu:
 		libcurl4-openssl-dev binutils-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
-		lcov ruby awscli
+		lcov ruby
 
 test_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -62,11 +62,12 @@ test_osx: deps_osx
 	make -j8
 	cd test && python test-run.py unit/ app/ app-tap/ box/ box-tap/
 
-source_ubuntu:
+source_ubuntu: deps_ubuntu
 	git clone https://github.com/packpack/packpack.git packpack
 	make -f ./packpack/pack/Makefile TARBALL_COMPRESSOR=gz tarball
 
 source_deploy_ubuntu:
+	sudo apt-get update && apt-get install -y awscli
 	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 \
 		cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" \
 		--acl public-read
