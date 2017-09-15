@@ -83,7 +83,6 @@ script:
 
 before_deploy:
   - ls -l build/
-  - pip install awscli --user
 
 deploy:
   # Deploy packages to PackageCloud
@@ -99,7 +98,7 @@ deploy:
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
   # Deploy sources to S3
   - provider: script
-    script: aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" --acl public-read
+    script: make -f .travis.mk source_deploy
     skip_cleanup: true
     on:
       branch: "1.7"
