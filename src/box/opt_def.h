@@ -46,6 +46,8 @@ enum opt_type {
 
 extern const char *opt_type_strs[];
 
+typedef int64_t (*opt_def_to_enum_cb)(const char *str, uint32_t len);
+
 struct opt_def {
 	const char *name;
 	enum opt_type type;
@@ -56,16 +58,18 @@ struct opt_def {
 	int enum_size;
 	const char **enum_strs;
 	uint32_t enum_max;
+	/** If not NULL, used to get a enum value by a string. */
+	opt_def_to_enum_cb to_enum;
 };
 
 #define OPT_DEF(key, type, opts, field) \
 	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field), \
-	  NULL, 0, NULL, 0 }
+	  NULL, 0, NULL, 0, NULL }
 
-#define OPT_DEF_ENUM(key, enum_name, opts, field) \
+#define OPT_DEF_ENUM(key, enum_name, opts, field, to_enum) \
 	{ key, OPT_ENUM, offsetof(opts, field), sizeof(int), #enum_name, \
-	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX }
+	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX, to_enum }
 
-#define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0}
+#define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0, NULL}
 
 #endif /* TARANTOOL_BOX_OPT_DEF_H_INCLUDED */

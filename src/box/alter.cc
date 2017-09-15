@@ -225,7 +225,12 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 		if (mp_typeof(**val) != MP_STR)
 			return -1;
 		str = mp_decode_str(val, &str_len);
-		ival = strnindex(def->enum_strs, str, str_len, def->enum_max);
+		if (def->to_enum == NULL) {
+			ival = strnindex(def->enum_strs, str, str_len,
+					 def->enum_max);
+		} else {
+			ival = def->to_enum(str, str_len);
+		}
 		switch(def->enum_size) {
 		case sizeof(uint8_t):
 			store_u8(opt, (uint8_t)ival);
