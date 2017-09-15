@@ -255,3 +255,11 @@ _ = fiber.create(function () s:drop() ch:put(true) end)
 ch:get()
 box.commit()
 
+-- check invalid field types
+space = box.schema.space.create('test', { engine = 'vinyl' })
+pk = space:create_index('primary')
+index = space:create_index('test', { type = 'tree', parts = { 2, 'nosuchtype' }})
+index = space:create_index('test', { type = 'tree', parts = { 2, 'any' }})
+index = space:create_index('test', { type = 'tree', parts = { 2, 'array' }})
+index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
+space:drop()

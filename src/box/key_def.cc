@@ -139,7 +139,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		 uint32_t fieldno, enum field_type type)
 {
 	assert(part_no < def->part_count);
-	assert(type > FIELD_TYPE_ANY && type < field_type_MAX);
+	assert(type < field_type_MAX);
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	column_mask_set_fieldno(&def->column_mask, fieldno);

@@ -32,13 +32,13 @@ i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'arr
 -- tree and hash indexes over array field is not possible
 i = s:create_index('primary', { type = 'tree', parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''spatial'': ARRAY field
-    type is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''spatial'': field type
+    ''array'' is not supported'
 ...
 i = s:create_index('primary', { type = 'hash', parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''spatial'': ARRAY field
-    type is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''spatial'': field type
+    ''array'' is not supported'
 ...
 -- normal indexes
 i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
@@ -145,8 +145,8 @@ s.index.spatial:alter({unique = true})
 ...
 s.index.spatial:alter({type = 'tree'})
 ---
-- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': ARRAY field
-    type is not supported'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': field type
+    ''array'' is not supported'
 ...
 box.space[box.schema.SPACE_ID]:update({s.id}, {{"=", 4, 'vinyl'}})
 ---
@@ -648,8 +648,8 @@ i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})
 ...
 i:alter{type = 'tree' }
 ---
-- error: 'Can''t create or modify index ''s'' in space ''s'': ARRAY field type is
-    not supported'
+- error: 'Can''t create or modify index ''s'' in space ''s'': field type ''array''
+    is not supported'
 ...
 i:alter{dimension = 3 }
 ---

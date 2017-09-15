@@ -226,8 +226,7 @@ index_def_is_valid(struct index_def *index_def, const char *space_name)
 		return false;
 	}
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
-		assert(index_def->key_def->parts[i].type > FIELD_TYPE_ANY &&
-		       index_def->key_def->parts[i].type < field_type_MAX);
+		assert(index_def->key_def->parts[i].type < field_type_MAX);
 		if (index_def->key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 				 space_name, "field no is too big");

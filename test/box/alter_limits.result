@@ -432,10 +432,40 @@ index = s:create_index('test', { type = 'hash', parts = { 1 }})
     pairs'
 ...
 -- unknown field type
-index = s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
+index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
 ---
 - error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
     type (string), ...'
+...
+index = s:create_index('test', { type = 'hash', parts = { 2, 'any' }})
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': field type ''any''
+    is not supported'
+...
+index = s:create_index('test', { type = 'hash', parts = { 2, 'array' }})
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': field type ''array''
+    is not supported'
+...
+index = s:create_index('test', { type = 'hash', parts = { 2, 'map' }})
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': field type ''map''
+    is not supported'
+...
+index = s:create_index('test', { type = 'rtree', parts = { 2, 'nosuchtype' }})
+---
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
+...
+index = s:create_index('test', { type = 'rtree', parts = { 2, 'any' }})
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': RTREE index field
+    type must be ARRAY'
+...
+index = s:create_index('test', { type = 'rtree', parts = { 2, 'map' }})
+---
+- error: 'Can''t create or modify index ''test'' in space ''test'': RTREE index field
+    type must be ARRAY'
 ...
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})

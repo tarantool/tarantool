@@ -155,7 +155,13 @@ index = s:create_index('test', { type = 'hash', parts = {}})
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = { 1 }})
 -- unknown field type
-index = s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
+index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
+index = s:create_index('test', { type = 'hash', parts = { 2, 'any' }})
+index = s:create_index('test', { type = 'hash', parts = { 2, 'array' }})
+index = s:create_index('test', { type = 'hash', parts = { 2, 'map' }})
+index = s:create_index('test', { type = 'rtree', parts = { 2, 'nosuchtype' }})
+index = s:create_index('test', { type = 'rtree', parts = { 2, 'any' }})
+index = s:create_index('test', { type = 'rtree', parts = { 2, 'map' }})
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 -- big field no

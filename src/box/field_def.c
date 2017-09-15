@@ -47,12 +47,7 @@ enum field_type
 field_type_by_name(const char *name)
 {
 	enum field_type field_type = STR2ENUM(field_type, name);
-	/*
-	 * FIELD_TYPE_ANY can't be used as type of indexed field,
-	 * because it is internal type used only for filling
-	 * struct tuple_format.fields array.
-	 */
-	if (field_type != field_type_MAX && field_type != FIELD_TYPE_ANY)
+	if (field_type != field_type_MAX)
 		return field_type;
 	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
 	if (strcasecmp(name, "num") == 0)
