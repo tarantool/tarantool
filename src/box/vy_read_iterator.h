@@ -35,119 +35,82 @@
 #include <stdbool.h>
 
 #include "iterator_type.h"
-#include "vy_range.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-
 /**
- * Merge iterator takes several iterators as sources and sorts
- * output from them by the given order and LSN DESC. It has no filter,
- * it just sorts output from its sources.
+ * Vinyl read iterator.
  *
- * All statements from all sources can be traversed via
- * next_key()/next_lsn() like in a simple iterator (run, mem etc).
- * next_key() switches to the youngest statement of
- * the next key (according to the order), and next_lsn()
- * switches to an older statement of the same key.
- *
- * There are several merge optimizations, which expect that:
- *
- * 1) All sources are sorted by age, i.e. the most fresh
- * sources are added first.
- * 2) Mutable sources are added before read-blocking sources.
- */
-struct vy_merge_iterator {
-	/** Array of sources */
-	struct vy_merge_src *src;
-	/** Number of elements in the src array */
-	uint32_t src_count;
-	/** Number of elements allocated in the src array */
-	uint32_t src_capacity;
-	/** Current source offset that merge iterator is positioned on */
-	uint32_t curr_src;
-	/** Offset of the first source with is_mutable == true */
-	uint32_t mutable_start;
-	/** Next offset after the last source with is_mutable == true */
-	uint32_t mutable_end;
-	/** The offset starting with which the sources were skipped */
-	uint32_t skipped_start;
-	/**
-	 * Index key definition for compare (extended with
-	 * primary key parts.
-	 */
-	const struct key_def *cmp_def;
-	/** Format to allocate REPLACE and DELETE tuples. */
-	struct tuple_format *format;
-	/** Format to allocate UPSERT tuples. */
-	struct tuple_format *upsert_format;
-	/** Set if this iterator is for a primary index. */
-	bool is_primary;
-
-	/* {{{ Range version checking */
-	/* pointer to index->range_tree_version */
-	const uint32_t *p_range_tree_version;
-	/* pointer to index->mem_list_version */
-	const uint32_t *p_mem_list_version;
-	/* copy of index->range_tree_version to track range tree changes */
-	uint32_t range_tree_version;
-	/* copy of index->mem_list_version to track range tree changes */
-	uint32_t mem_list_version;
-	/* pointer to range->version */
-	const uint32_t *p_range_version;
-	/* copy of curr_range->version to track mem/run lists changes */
-	uint32_t range_version;
-	/* Range version checking }}} */
-
-	const struct tuple *key;
-	/** Iteration type. */
-	enum iterator_type iterator_type;
-	/** Current stmt that merge iterator is positioned on */
-	struct tuple *curr_stmt;
-	/**
-	 * All sources with this front_id are on the same key of
-	 * current iteration (optimization)
-	 */
-	uint32_t front_id;
-};
-
-/**
- * Complex read iterator over vinyl index and write_set of current tx
- * Iterates over ranges, creates merge iterator for every range and outputs
- * the result.
- * Can also wor without transaction, just set tx = NULL in _open
- * Applyes upserts and skips deletes, so only one replace stmt for every key
- * is output
+ * Used for executing a SELECT request over a Vinyl index.
  */
 struct vy_read_iterator {
 	/** Vinyl run environment. */
 	struct vy_run_env *run_env;
-	/* index to iterate over */
+	/** Index to iterate over. */
 	struct vy_index *index;
-	/* transaction to iterate over */
+	/** Active transaction or NULL. */
 	struct vy_tx *tx;
-
-	/* search options */
+	/** Iterator type. */
 	enum iterator_type iterator_type;
+	/** Search key. */
 	struct tuple *key;
+	/** Read view the iterator lives in. */
 	const struct vy_read_view **read_view;
-
-	/* current range */
-	struct vy_range *curr_range;
-	/* merge iterator over current range */
-	struct vy_merge_iterator merge_iterator;
-
-	/** Last statement returned by vy_read_iterator_next(). */
-	struct tuple *last_stmt;
-	/* is lazy search started */
-	bool search_started;
 	/**
 	 * Set if the resulting statement needs to be
 	 * checked to match the search key.
 	 */
 	bool need_check_eq;
+	/** Set on the first call to vy_read_iterator_next(). */
+	bool search_started;
+	/** Last statement returned by vy_read_iterator_next(). */
+	struct tuple *last_stmt;
+	/**
+	 * Copy of index->range_tree_version.
+	 * Used for detecting range tree changes.
+	 */
+	uint32_t range_tree_version;
+	/**
+	 * Copy of index->mem_list_version.
+	 * Used for detecting memory level changes.
+	 */
+	uint32_t mem_list_version;
+	/**
+	 * Copy of curr_range->version.
+	 * Used for detecting changes in the current range.
+	 */
+	uint32_t range_version;
+	/** Range the iterator is currently positioned at. */
+	struct vy_range *curr_range;
+	/**
+	 * Array of merge sources. Sources are sorted by age.
+	 * In particular, this means that all mutable sources
+	 * come first while all sources that may yield (runs)
+	 * go last.
+	 */
+	struct vy_read_src *src;
+	/** Number of elements in the src array. */
+	uint32_t src_count;
+	/** Maximal capacity of the src array. */
+	uint32_t src_capacity;
+	/** Index of the current merge source. */
+	uint32_t curr_src;
+	/** Statement returned by the current merge source. */
+	struct tuple *curr_stmt;
+	/** Offset of the first mutable source. */
+	uint32_t mutable_start;
+	/** Offset of the source following the last mutable source. */
+	uint32_t mutable_end;
+	/** Offset of the first skipped source. */
+	uint32_t skipped_start;
+	/**
+	 * front_id of the current source and all sources
+	 * that are on the same key.
+	 */
+	uint32_t front_id;
 };
 
 /**
@@ -159,7 +122,7 @@ struct vy_read_iterator {
  * @param iterator_type Type of the iterator that determines order
  *                      of the iteration.
  * @param key           Key for the iteration.
- * @param vlsn          Maximal visible LSN of transactions.
+ * @param rv            Read view.
  */
 void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
