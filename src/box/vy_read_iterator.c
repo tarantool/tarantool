@@ -598,12 +598,12 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 
-	if (itr->curr_stmt != NULL) {
+	if (itr->last_stmt != NULL) {
 		if (iterator_type == ITER_EQ)
 			itr->need_check_eq = true;
 		iterator_type = iterator_direction(iterator_type) >= 0 ?
 				ITER_GT : ITER_LT;
-		key = itr->curr_stmt;
+		key = itr->last_stmt;
 	}
 
 	if (itr->tx != NULL)
@@ -640,7 +640,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 	itr->read_view = rv;
 	itr->search_started = false;
 	itr->need_check_eq = false;
-	itr->curr_stmt = NULL;
+	itr->last_stmt = NULL;
 	itr->curr_range = NULL;
 
 	if (tuple_field_count(key) == 0) {
@@ -678,7 +678,7 @@ static void
 vy_read_iterator_start(struct vy_read_iterator *itr)
 {
 	assert(!itr->search_started);
-	assert(itr->curr_stmt == NULL);
+	assert(itr->last_stmt == NULL);
 	assert(itr->curr_range == NULL);
 	itr->search_started = true;
 
@@ -702,7 +702,7 @@ static void
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
 	itr->curr_range = vy_range_tree_find_by_key(itr->index->tree,
-			itr->iterator_type, itr->curr_stmt ?: itr->key);
+			itr->iterator_type, itr->last_stmt ?: itr->key);
 	/* Re-create merge iterator */
 	vy_merge_iterator_close(&itr->merge_iterator);
 	vy_merge_iterator_open(&itr->merge_iterator, itr->iterator_type,
@@ -828,7 +828,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		int rc = vy_point_iterator_get(&one, result);
 		if (*result) {
 			tuple_ref(*result);
-			itr->curr_stmt = *result;
+			itr->last_stmt = *result;
 		}
 		vy_point_iterator_close(&one);
 		itr->key = NULL;
@@ -840,7 +840,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	if (!itr->search_started)
 		vy_read_iterator_start(itr);
 
-	struct tuple *prev_key = itr->curr_stmt;
+	struct tuple *prev_key = itr->last_stmt;
 	if (prev_key != NULL)
 		tuple_ref(prev_key);
 	bool skipped_txw_delete = false;
@@ -855,9 +855,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			goto clear;
 		}
 		if (t == NULL) {
-			if (itr->curr_stmt != NULL)
-				tuple_unref(itr->curr_stmt);
-			itr->curr_stmt = NULL;
+			if (itr->last_stmt != NULL)
+				tuple_unref(itr->last_stmt);
+			itr->last_stmt = NULL;
 			rc = 0; /* No more data. */
 			break;
 		}
@@ -870,9 +870,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			continue;
 		}
 		if (vy_stmt_type(t) == IPROTO_REPLACE) {
-			if (itr->curr_stmt != NULL)
-				tuple_unref(itr->curr_stmt);
-			itr->curr_stmt = t;
+			if (itr->last_stmt != NULL)
+				tuple_unref(itr->last_stmt);
+			itr->last_stmt = t;
 			break;
 		} else {
 			assert(vy_stmt_type(t) == IPROTO_DELETE);
@@ -882,7 +882,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		}
 	}
 
-	*result = itr->curr_stmt;
+	*result = itr->last_stmt;
 	assert(*result == NULL || vy_stmt_type(*result) == IPROTO_REPLACE);
 	if (*result != NULL)
 		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
@@ -895,7 +895,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	 * be >= iterator key. And with LT/LE must
 	 * be <= iterator_key. @sa gh-2614.
 	 */
-	if (itr->curr_stmt != NULL && tuple_field_count(itr->key) > 0) {
+	if (itr->last_stmt != NULL && tuple_field_count(itr->key) > 0) {
 		int cmp = dir * vy_stmt_compare(*result, itr->key,
 						itr->index->cmp_def);
 		assert(cmp >= 0);
@@ -903,11 +903,11 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	/*
 	 * Ensure the read iterator does not return duplicates
 	 * and respects statements order (index->cmp_def includes
-	 * primary parts, so prev_key != itr->curr_stmt for any
+	 * primary parts, so prev_key != itr->last_stmt for any
 	 * index).
 	 */
-	if (prev_key != NULL && itr->curr_stmt != NULL) {
-		assert(dir * vy_tuple_compare(prev_key, itr->curr_stmt,
+	if (prev_key != NULL && itr->last_stmt != NULL) {
+		assert(dir * vy_tuple_compare(prev_key, itr->last_stmt,
 					      index->cmp_def) < 0);
 	}
 #endif
@@ -970,9 +970,9 @@ clear:
 void
 vy_read_iterator_close(struct vy_read_iterator *itr)
 {
-	if (itr->curr_stmt != NULL)
-		tuple_unref(itr->curr_stmt);
-	itr->curr_stmt = NULL;
+	if (itr->last_stmt != NULL)
+		tuple_unref(itr->last_stmt);
+	itr->last_stmt = NULL;
 	if (itr->search_started)
 		vy_merge_iterator_close(&itr->merge_iterator);
 }

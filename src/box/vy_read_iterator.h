@@ -139,7 +139,8 @@ struct vy_read_iterator {
 	/* merge iterator over current range */
 	struct vy_merge_iterator merge_iterator;
 
-	struct tuple *curr_stmt;
+	/** Last statement returned by vy_read_iterator_next(). */
+	struct tuple *last_stmt;
 	/* is lazy search started */
 	bool search_started;
 	/**
