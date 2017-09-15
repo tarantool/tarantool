@@ -59,5 +59,7 @@ field_type_by_name(const char *name)
 		return FIELD_TYPE_UNSIGNED;
 	else if (strcasecmp(name, "str") == 0)
 		return FIELD_TYPE_STRING;
+	else if (strcmp(name, "*") == 0)
+		return FIELD_TYPE_ANY;
 	return field_type_MAX;
 }
