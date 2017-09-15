@@ -83,6 +83,7 @@ script:
 
 before_deploy:
   - ls -l build/
+  - pip install awscli --user
 
 deploy:
   # Deploy packages to PackageCloud
@@ -96,9 +97,9 @@ deploy:
     on:
       branch: "1.7"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy sources to SFTP
+  # Deploy sources to S3
   - provider: script
-    script: ./packpack/tools/sftp ${TRAVIS_BRANCH}/src build/*.tar.gz
+    script: aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" --acl public-read
     skip_cleanup: true
     on:
       branch: "1.7"
