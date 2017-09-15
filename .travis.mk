@@ -6,10 +6,6 @@ DOCKER_IMAGE:=packpack/packpack:ubuntu-zesty
 
 all: package
 
-source:
-	git clone https://github.com/packpack/packpack.git packpack
-	TARBALL_COMPRESSOR=gz packpack/packpack tarball
-
 package:
 	git clone https://github.com/packpack/packpack.git packpack
 	./packpack/packpack
@@ -19,6 +15,8 @@ test: test_$(TRAVIS_OS_NAME)
 # Redirect some targets via docker
 test_linux: docker_test_ubuntu
 coverage: docker_coverage_ubuntu
+source: docker_source_ubuntu
+source_deploy: docker_source_deploy_ubuntu
 
 docker_%:
 	mkdir -p ~/.cache/ccache
@@ -40,7 +38,7 @@ deps_ubuntu:
 		libcurl4-openssl-dev binutils-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
-		lcov ruby
+		lcov ruby awscli
 
 test_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -63,3 +61,12 @@ test_osx: deps_osx
 	ulimit -n
 	make -j8
 	cd test && python test-run.py unit/ app/ app-tap/ box/ box-tap/
+
+source_ubuntu:
+	git clone https://github.com/packpack/packpack.git packpack
+	make -f ./packpack/pack/Makefile TARBALL_COMPRESSOR=gz tarball
+
+source_deploy_ubuntu:
+	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 \
+		cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" \
+		--acl public-read
