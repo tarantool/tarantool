@@ -183,8 +183,7 @@ luaT_httpc_request(lua_State *L)
 		httpc_set_verbose(req, true);
 	lua_pop(L, 1);
 
-	struct httpc_response *resp = httpc_execute(req, timeout);
-	if (resp == NULL) {
+	if (httpc_execute(req, timeout) != 0) {
 		httpc_request_delete(req);
 		return luaT_error(L);
 	}
@@ -192,20 +191,19 @@ luaT_httpc_request(lua_State *L)
 	lua_newtable(L);
 
 	lua_pushstring(L, "status");
-	lua_pushinteger(L, resp->status);
+	lua_pushinteger(L, req->status);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "reason");
-	lua_pushstring(L, resp->reason);
+	lua_pushstring(L, req->reason);
 	lua_settable(L, -3);
 
-	size_t headers_len = region_used(&resp->headers);
+	size_t headers_len = region_used(&req->resp_headers);
 	if (headers_len > 0) {
-		char *headers = region_join(&resp->headers, headers_len);
+		char *headers = region_join(&req->resp_headers, headers_len);
 		if (headers == NULL) {
 			diag_set(OutOfMemory, headers_len, "region", "headers");
 			httpc_request_delete(req);
-			httpc_response_delete(resp);
 			return luaT_error(L);
 		}
 		lua_pushstring(L, "headers");
@@ -213,13 +211,12 @@ luaT_httpc_request(lua_State *L)
 		lua_settable(L, -3);
 	}
 
-	size_t body_len = region_used(&resp->body);
+	size_t body_len = region_used(&req->resp_body);
 	if (body_len > 0) {
-		char *body = region_join(&resp->body, body_len);
+		char *body = region_join(&req->resp_body, body_len);
 		if (body == NULL) {
 			diag_set(OutOfMemory, body_len, "region", "body");
 			httpc_request_delete(req);
-			httpc_response_delete(resp);
 			return luaT_error(L);
 		}
 		lua_pushstring(L, "body");
@@ -229,7 +226,6 @@ luaT_httpc_request(lua_State *L)
 
 	/* clean up */
 	httpc_request_delete(req);
-	httpc_response_delete(resp);
 	return 1;
 }
 
@@ -242,11 +238,11 @@ luaT_httpc_stat(lua_State *L)
 
 	lua_newtable(L);
 	lua_add_key_u64(L, "active_requests",
-			(uint64_t) ctx->stat.active_requests);
+			(uint64_t) ctx->curl_env.stat.active_requests);
 	lua_add_key_u64(L, "sockets_added",
-			(uint64_t) ctx->stat.sockets_added);
+			(uint64_t) ctx->curl_env.stat.sockets_added);
 	lua_add_key_u64(L, "sockets_deleted",
-			(uint64_t) ctx->stat.sockets_deleted);
+			(uint64_t) ctx->curl_env.stat.sockets_deleted);
 	lua_add_key_u64(L, "total_requests",
 			ctx->stat.total_requests);
 	lua_add_key_u64(L, "http_200_responses",
