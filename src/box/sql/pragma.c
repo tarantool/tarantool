@@ -342,8 +342,10 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 	}
 	/* Locate the pragma in the lookup table */
 	pPragma = pragmaLocate(zLeft);
-	if (pPragma == 0)
+	if (pPragma == 0) {
+		sqlite3ErrorMsg(pParse, "no such pragma: %s", zLeft);
 		goto pragma_out;
+	}
 
 	/* Make sure the database schema is loaded if the pragma requires that */
 	if ((pPragma->mPragFlg & PragFlg_NeedSchema) != 0) {

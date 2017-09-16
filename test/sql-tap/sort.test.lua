@@ -851,7 +851,6 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-13.3",
     [[
-        PRAGMA cache_size = 5;
         SELECT a, b FROM t10 ORDER BY a;
     ]], test:execsql "SELECT a, b FROM t10 ORDER BY a, b")
 
@@ -875,7 +874,6 @@ box.internal.sql_create_function("cksum", cksum)
     test:do_execsql_test(
         "sort-14.0",
         [[
-            PRAGMA cache_size = 5;
             CREATE TABLE t11(a, b);
             INSERT INTO t11 VALUES(randomblob(5000), NULL);
             INSERT INTO t11 SELECT randomblob(5000), NULL FROM t11; --2

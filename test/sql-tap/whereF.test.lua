@@ -52,7 +52,6 @@ testprefix = "whereF"
 test:do_execsql_test(
     1.0,
     [[
-        PRAGMA automatic_index = 0;
         CREATE TABLE t1(a PRIMARY KEY, b, c);
         CREATE TABLE t2(d PRIMARY KEY, e, f);
     ]], {

@@ -78,7 +78,6 @@ for a, from in ipairs(froms) do
         test:do_test(
             string.format("tkt-fc7bd6358f.110.%s.%s.1", a, b),
             function()
-                test:execsql "PRAGMA automatic_index=ON"
                 return test:execsql(string.format("SELECT t1.textid, i.intid, t2.textid %s %s", from, where))
             end, {
                 "12", 12, "12", "34", 34, "34"
@@ -87,7 +86,6 @@ for a, from in ipairs(froms) do
         test:do_test(
             string.format("tkt-fc7bd6358f.110.%s.%s.2", a, b),
             function()
-                test:execsql("PRAGMA automatic_index=OFF")
                 return test:execsql(string.format("SELECT t1.textid, i.intid, t2.textid %s %s", from, where))
             end, {
                 "12", 12, "12", "34", 34, "34"

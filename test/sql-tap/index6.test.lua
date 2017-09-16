@@ -32,7 +32,6 @@ test:plan(14)
 --        SELECT CASE WHEN value%3!=0 THEN value END, value, value
 --          FROM nums WHERE value<=20;
 --     SELECT count(a), count(b) FROM t1;
---     PRAGMA integrity_check;
 --   }
 -- } {14 20 ok}
 -- # Make sure the count(*) optimization works correctly with
@@ -72,7 +71,6 @@ test:plan(14)
 --   execsql {
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {{} 20 t1a {14 1} t1b {10 1} ok}
 -- # STAT1 shows the partial indices have a reduced number of
@@ -83,7 +81,6 @@ test:plan(14)
 --     UPDATE t1 SET a=b;
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {{} 20 t1a {20 1} t1b {10 1} ok}
 -- do_test index6-1.11 {
@@ -92,7 +89,6 @@ test:plan(14)
 --     UPDATE t1 SET b=b+100;
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {{} 20 t1a {6 1} t1b {20 1} ok}
 -- do_test index6-1.12 {
@@ -101,7 +97,6 @@ test:plan(14)
 --     UPDATE t1 SET b=b-100;
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {{} 20 t1a {13 1} t1b {10 1} ok}
 -- do_test index6-1.13 {
@@ -109,7 +104,6 @@ test:plan(14)
 --     DELETE FROM t1 WHERE b BETWEEN 8 AND 12;
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {{} 15 t1a {10 1} t1b {8 1} ok}
 -- do_test index6-1.14 {
@@ -117,7 +111,6 @@ test:plan(14)
 --     REINDEX;
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {{} 15 t1a {10 1} t1b {8 1} ok}
 -- do_test index6-1.15 {
@@ -125,7 +118,6 @@ test:plan(14)
 --     CREATE INDEX t1c ON t1(c);
 --     ANALYZE;
 --     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
---     PRAGMA integrity_check;
 --   }
 -- } {t1a {10 1} t1b {8 1} t1c {15 1} ok}
 -- # Queries use partial indices as appropriate times.
@@ -175,7 +167,6 @@ test:plan(14)
 -- do_execsql_test index6-2.102 {
 --   CREATE INDEX t2a2 ON t2(a) WHERE a<100 OR a>200;
 --   SELECT b FROM t2 WHERE a=15;
---   PRAGMA integrity_check;
 -- } {10015 ok}
 -- do_execsql_test index6-2.102eqp {
 --   EXPLAIN QUERY PLAN
@@ -259,7 +250,6 @@ test:do_execsql_test(
     })
 
 -- do_execsql_test index6-6.2 {
---   PRAGMA integrity_check;
 -- } {ok}
 -- Test case for ticket [2326c258d02ead33d69faa63de8f4686b9b1b9d9] on
 -- 2015-02-24.  Any use of a partial index qualifying constraint inside
@@ -273,7 +263,6 @@ test:do_execsql_test(
         CREATE TABLE t7b(id primary key, y);
         INSERT INTO t7a VALUES(1, 1);
         CREATE INDEX t7ax ON t7a(x) WHERE x=99;
-        PRAGMA automatic_index=OFF;
         SELECT x,y FROM t7a LEFT JOIN t7b ON (x=99) ORDER BY x;
     ]], {
         -- <index6-7.0>
