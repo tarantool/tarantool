@@ -15,8 +15,6 @@ test: test_$(TRAVIS_OS_NAME)
 # Redirect some targets via docker
 test_linux: docker_test_ubuntu
 coverage: docker_coverage_ubuntu
-source: docker_source_ubuntu
-source_deploy: docker_source_deploy_ubuntu
 
 docker_%:
 	mkdir -p ~/.cache/ccache
@@ -38,7 +36,7 @@ deps_ubuntu:
 		libcurl4-openssl-dev libunwind-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
-		lcov ruby awscli
+		lcov ruby
 
 test_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -78,11 +76,12 @@ coverage_ubuntu: deps_ubuntu
 		coveralls-lcov --repo-token $(COVERALLS_TOKEN) coverage.info; \
 	fi;
 
-source_ubuntu:
+source:
 	git clone https://github.com/packpack/packpack.git packpack
-	make -f ./packpack/pack/Makefile TARBALL_COMPRESSOR=gz tarball
+	TARBALL_COMPRESSOR=gz packpack/packpack tarball
 
-source_deploy_ubuntu:
+source_deploy:
+	pip install awscli --user
 	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 \
 		cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" \
 		--acl public-read
