@@ -8,6 +8,8 @@ local GUEST = 0
 local ADMIN = 1
 -- role 'PUBLIC' is special, it's automatically granted to every user
 local PUBLIC = 2
+-- role 'REPLICATION'
+local REPLICATION = 3
 
 
 --------------------------------------------------------------------------------
@@ -626,6 +628,211 @@ local function upgrade_to_1_7_5()
     update_space_formats_to_1_7_5()
     update_existing_users_to_1_7_5()
 end
+
+local function initial_1_7_5()
+    -- stick to the following convention:
+    -- prefer user id (owner id) in field #1
+    -- prefer object name in field #2
+    -- index on owner id is index #1
+    -- index on object name is index #2
+    --
+
+    local _schema = box.space[box.schema.SCHEMA_ID]
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _func = box.space[box.schema.FUNC_ID]
+    local _user = box.space[box.schema.USER_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local _cluster = box.space[box.schema.CLUSTER_ID]
+    local _truncate = box.space[box.schema.TRUNCATE_ID]
+    local MAP = setmap({})
+
+    --
+    -- _schema
+    --
+    log.info("create space _schema")
+    local format = {}
+    format[1] = {type='string', name='key'}
+    _space:insert{_schema.id, ADMIN, '_schema', 'memtx', 0, MAP, format}
+    log.info("create index primary on _schema")
+    _index:insert{_schema.id, 0, 'primary', 'tree', { unique = true }, {{0, 'string'}}}
+
+    --
+    -- _space
+    --
+    log.info("create space _space")
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='engine', type='string'}
+    format[5] = {name='field_count', type='unsigned'}
+    format[6] = {name='flags', type='map'}
+    format[7] = {name='format', type='array'}
+    _space:insert{_space.id, ADMIN, '_space', 'memtx', 0, MAP, format}
+    -- space name is unique
+    log.info("create index primary on _space")
+    _index:insert{_space.id, 0, 'primary', 'tree', { unique = true }, {{0, 'unsigned'}}}
+    log.info("create index owner on _space")
+    _index:insert{_space.id, 1, 'owner', 'tree', {unique = false }, {{1, 'unsigned'}}}
+    log.info("create index index name on _space")
+    _index:insert{_space.id, 2, 'name', 'tree', { unique = true }, {{2, 'string'}}}
+    create_sysview(box.schema.SPACE_ID, box.schema.VSPACE_ID)
+
+    --
+    -- _index
+    --
+    log.info("create space _index")
+    format = {}
+    format[1] = {name = 'id', type = 'unsigned'}
+    format[2] = {name = 'iid', type = 'unsigned'}
+    format[3] = {name = 'name', type = 'string'}
+    format[4] = {name = 'type', type = 'string'}
+    format[5] = {name = 'opts', type = 'map'}
+    format[6] = {name = 'parts', type = 'array'}
+    _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, MAP, format}
+    -- index name is unique within a space
+    log.info("create index primary on _index")
+    _index:insert{_index.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
+    log.info("create index name on _index")
+    _index:insert{_index.id, 2, 'name', 'tree', {unique = true}, {{0, 'unsigned'}, {2, 'string'}}}
+    create_sysview(box.schema.INDEX_ID, box.schema.VINDEX_ID)
+
+    --
+    -- _func
+    --
+    log.info("create space _func")
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='setuid', type='unsigned'}
+    _space:insert{_func.id, ADMIN, '_func', 'memtx', 0, MAP, format}
+    -- function name and id are unique
+    log.info("create index _func:primary")
+    _index:insert{_func.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+    log.info("create index _func:owner")
+    _index:insert{_func.id, 1, 'owner', 'tree', {unique = false}, {{1, 'unsigned'}}}
+    log.info("create index _func:name")
+    _index:insert{_func.id, 2, 'name', 'tree', {unique = true}, {{2, 'string'}}}
+    create_sysview(box.schema.FUNC_ID, box.schema.VFUNC_ID)
+
+    --
+    -- _user
+    --
+    log.info("create space _user")
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='owner', type='unsigned'}
+    format[3] = {name='name', type='string'}
+    format[4] = {name='type', type='string'}
+    format[5] = {name='auth', type='map'}
+    _space:insert{_user.id, ADMIN, '_user', 'memtx', 0, MAP, format}
+    -- user name and id are unique
+    log.info("create index _func:primary")
+    _index:insert{_user.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+    log.info("create index _func:owner")
+    _index:insert{_user.id, 1, 'owner', 'tree', {unique = false}, {{1, 'unsigned'}}}
+    log.info("create index _func:name")
+    _index:insert{_user.id, 2, 'name', 'tree', {unique = true}, {{2, 'string'}}}
+    create_sysview(box.schema.USER_ID, box.schema.VUSER_ID)
+
+    --
+    -- _priv
+    --
+    log.info("create space _priv")
+    format = {}
+    format[1] = {name='grantor', type='unsigned'}
+    format[2] = {name='grantee', type='unsigned'}
+    format[3] = {name='object_type', type='string'}
+    format[4] = {name='object_id', type='unsigned'}
+    format[5] = {name='privilege', type='unsigned'}
+    _space:insert{_priv.id, ADMIN, '_priv', 'memtx', 0, MAP, format}
+    -- user id, object type and object id are unique
+    log.info("create index primary on _priv")
+    _index:insert{_priv.id, 0, 'primary', 'tree', {unique = true}, {{1, 'unsigned'}, {2, 'string'}, {3, 'unsigned'}}}
+    -- owner index  - to quickly find all privileges granted by a user
+    log.info("create index owner on _priv")
+    _index:insert{_priv.id, 1, 'owner', 'tree', {unique = false}, {{0, 'unsigned'}}}
+    -- object index - to quickly find all grants on a given object
+    log.info("create index object on _priv")
+    _index:insert{_priv.id, 2, 'object', 'tree', {unique = false}, {{2, 'string'}, {3, 'unsigned'}}}
+    create_sysview(box.schema.PRIV_ID, box.schema.VPRIV_ID)
+
+    --
+    -- _cluster
+    --
+    log.info("create space _cluster")
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='uuid', type='string'}
+    _space:insert{_cluster.id, ADMIN, '_cluster', 'memtx', 0, MAP, format}
+    -- primary key: node id
+    log.info("create index primary on _cluster")
+    _index:insert{_cluster.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+    -- node uuid key: node uuid
+    log.info("create index uuid on _cluster")
+    _index:insert{_cluster.id, 1, 'uuid', 'tree', {unique = true}, {{1, 'string'}}}
+
+    --
+    -- _truncate
+    --
+    log.info("create space _truncate")
+    format = {}
+    format[1] = {name='id', type='unsigned'}
+    format[2] = {name='count', type='unsigned'}
+    _space:insert{_truncate.id, ADMIN, '_truncate', 'memtx', 0, MAP, format}
+    -- primary key: space id
+    log.info("create index primary on _truncate")
+    _index:insert{_truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+
+    --
+    -- Create users
+    --
+    log.info("create user guest")
+    _user:insert{GUEST, ADMIN, 'guest', 'user', MAP}
+    box.schema.user.passwd('guest', '')
+    log.info("create user admin")
+    _user:insert{ADMIN, ADMIN, 'admin', 'user', MAP}
+    log.info("create role public")
+    _user:insert{PUBLIC, ADMIN, 'public', 'role', MAP}
+    log.info("create role replication")
+    _user:insert{REPLICATION, ADMIN, 'replication', 'role', MAP}
+
+    --
+    -- Create grants
+    --
+    log.info("grant read,write,execute on universe to admin")
+    _priv:insert{ADMIN, ADMIN, 'universe', 0, 7}
+
+    -- grant role 'public' to 'guest'
+    log.info("grant role public to guest")
+    _priv:insert{ADMIN, GUEST, 'role', PUBLIC, 4}
+
+    -- replication can read the entire universe
+    log.info("grant read on universe to replication")
+    _priv:replace{ADMIN, REPLICATION, 'universe', 0, 1}
+    -- replication can append to '_cluster' system space
+    log.info("grant write on space _cluster to replication")
+    _priv:replace{ADMIN, REPLICATION, 'space', _cluster.id, 2}
+
+    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, 2}
+
+    -- create "box.schema.user.info" function
+    log.info('create function "box.schema.user.info" with setuid')
+    _func:replace{1, ADMIN, 'box.schema.user.info', 1, 'LUA'}
+
+    -- grant 'public' role access to 'box.schema.user.info' function
+    log.info('grant execute on function "box.schema.user.info" to public')
+    _priv:replace{ADMIN, PUBLIC, 'function', 1, 4}
+
+    log.info("set max_id to box.schema.SYSTEM_ID_MAX")
+    _schema:insert{'max_id', box.schema.SYSTEM_ID_MAX}
+
+    log.info("set schema version to 1.7.5")
+    _schema:insert({'version', 1, 7, 5})
+end
+
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
 --------------------------------------------------------------------------------
@@ -692,13 +899,14 @@ local function bootstrap()
     -- on 1.7.6, then spaces in the cache contains new 1.7.6
     -- formats (gh-2754). Spaces in the cache are not updated on
     -- erase(), because system triggers are turned off.
-    if version ~= mkversion(1, 7, 6) then
-        -- erase current schema
-        erase()
-        -- insert initial schema
+
+    -- erase current schema
+    erase()
+    -- insert initial schema
+    if version < mkversion(1, 7, 6) then
         initial()
     else
-        log.info('version is 1.7.6, do not reset schema to initial')
+        initial_1_7_5()
     end
 
     -- upgrade schema to the latest version
