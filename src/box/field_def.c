@@ -38,6 +38,7 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_STRING]   = */ "string",
 	/* [FIELD_TYPE_NUMBER]   = */ "number",
 	/* [FIELD_TYPE_INTEGER]  = */ "integer",
+	/* [FIELD_TYPE_BOOLEAN]  = */ "boolean",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
 	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_MAP]      = */ "map",

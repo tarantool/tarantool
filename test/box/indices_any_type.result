@@ -8,23 +8,26 @@ i3_1 = s3:create_index('my_space4_idx1', {type='HASH', parts={1, 'scalar', 2, 'i
 i3_2 = s3:create_index('my_space4_idx2', {type='HASH', parts={4, 'string', 5, 'scalar'}, unique=true})
 ---
 ...
-s3:insert({100.5, 30, 95, "str1", 5})
+i3_3 = s3:create_index('my_space4_idx3', {type='TREE', parts={6, 'boolean'}, unique=false})
 ---
-- [100.5, 30, 95, 'str1', 5]
 ...
-s3:insert({"abc#$23", 1000, -21.542, "namesurname", 99})
+s3:insert({100.5, 30, 95, "str1", 5, true})
 ---
-- ['abc#$23', 1000, -21.542, 'namesurname', 99]
+- [100.5, 30, 95, 'str1', 5, true]
 ...
-s3:insert({true, -459, 4000, "foobar", "36.6"})
+s3:insert({"abc#$23", 1000, -21.542, "namesurname", 99, false})
 ---
-- [true, -459, 4000, 'foobar', '36.6']
+- ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
+...
+s3:insert({true, -459, 4000, "foobar", "36.6", true})
+---
+- [true, -459, 4000, 'foobar', '36.6', true]
 ...
 s3:select{}
 ---
-- - [true, -459, 4000, 'foobar', '36.6']
-  - ['abc#$23', 1000, -21.542, 'namesurname', 99]
-  - [100.5, 30, 95, 'str1', 5]
+- - [true, -459, 4000, 'foobar', '36.6', true]
+  - ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
+  - [100.5, 30, 95, 'str1', 5, true]
 ...
 i3_1:select({100.5})
 ---
@@ -38,11 +41,11 @@ i3_1:select({true, -459})
 ...
 i3_1:select({"abc#$23", 1000, -21.542})
 ---
-- - ['abc#$23', 1000, -21.542, 'namesurname', 99]
+- - ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
 ...
 i3_2:select({"str1", 5})
 ---
-- - [100.5, 30, 95, 'str1', 5]
+- - [100.5, 30, 95, 'str1', 5, true]
 ...
 i3_2:select({"str"})
 ---
@@ -55,7 +58,22 @@ i3_2:select({"str", 5})
 ...
 i3_2:select({"foobar", "36.6"})
 ---
-- - [true, -459, 4000, 'foobar', '36.6']
+- - [true, -459, 4000, 'foobar', '36.6', true]
+...
+i3_3:select{true}
+---
+- - [true, -459, 4000, 'foobar', '36.6', true]
+  - [100.5, 30, 95, 'str1', 5, true]
+...
+i3_3:select{false}
+---
+- - ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
+...
+i3_3:select{}
+---
+- - ['abc#$23', 1000, -21.542, 'namesurname', 99, false]
+  - [true, -459, 4000, 'foobar', '36.6', true]
+  - [100.5, 30, 95, 'str1', 5, true]
 ...
 s3:drop()
 ---
