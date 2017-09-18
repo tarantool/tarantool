@@ -580,13 +580,16 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 		break;
 	}
 	/* Only HASH and TREE indexes checks parts there */
-	/* Just check that there are no ARRAY parts */
+	/* Check that there are no ANY, ARRAY, MAP parts */
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
-		if (index_def->key_def->parts[i].type == FIELD_TYPE_ARRAY) {
+		struct key_part *part = &index_def->key_def->parts[i];
+		if (part->type <= FIELD_TYPE_ANY ||
+		    part->type >= FIELD_TYPE_ARRAY) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  index_def->name,
 				  space_name(space),
-				  "ARRAY field type is not supported");
+				  tt_sprintf("field type '%s' is not supported",
+					     field_type_strs[part->type]));
 		}
 	}
 }

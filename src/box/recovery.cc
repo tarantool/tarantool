@@ -48,28 +48,13 @@
  *
  * A facade of the recovery subsystem is struct recovery.
  *
- * Depending on the configuration, start-up parameters, the
- * actual task being performed, the recovery can be
- * in a different state.
- *
- * The main factors influencing recovery state are:
- * - temporal: whether or not the instance is just booting
- *   from a snapshot, is in 'local hot standby mode', or
- *   is already accepting requests
- * - task based: whether it's a master process,
- *   snapshot saving process or a replication relay.
- *
- * Depending on the above factors, recovery can be in two main
- * operation modes: "read mode", recovering in-memory state
- * from existing data, and "write mode", i.e. recording on
- * disk changes of the in-memory state.
+ * Depending on the actual task being performed the recovery
+ * can be in a different state.
  *
  * Let's enumerate all possible distinct states of recovery:
  *
- * Read mode
- * ---------
  * IR - initial recovery, initiated right after server start:
- * reading data from the snapshot and existing WALs
+ * reading data from a checkpoint and existing WALs
  * and restoring the in-memory state
  * IRR - initial replication relay mode, reading data from
  * existing WALs (xlogs) and sending it to the client.
@@ -81,20 +66,11 @@
  * changes done by the master and sending them to the
  * replica
  *
- * Write mode
- * ----------
- * M - master mode, recording in-memory state changes in the WAL
- * R - replica mode, receiving changes from the master and
- * recording them in the WAL
- *
  * The following state transitions are possible/supported:
  *
  * recovery_init() -> IR | IRR # recover()
  * IR -> HS         # recovery_follow_local()
  * IRR -> RR        # recovery_follow_local()
- * HS -> M          # recovery_finalize()
- * M -> R           # remote_start()
- * R -> M           # remote_stop()
  */
 
 const struct type_info type_XlogGapError =

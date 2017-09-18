@@ -6,10 +6,6 @@ DOCKER_IMAGE:=packpack/packpack:ubuntu-zesty
 
 all: package
 
-source:
-	git clone https://github.com/packpack/packpack.git packpack
-	TARBALL_COMPRESSOR=gz packpack/packpack tarball
-
 package:
 	git clone https://github.com/packpack/packpack.git packpack
 	./packpack/packpack
@@ -79,3 +75,13 @@ coverage_ubuntu: deps_ubuntu
 		echo coveralls-lcov --repo-token [FILTERED] coverage.info; \
 		coveralls-lcov --repo-token $(COVERALLS_TOKEN) coverage.info; \
 	fi;
+
+source:
+	git clone https://github.com/packpack/packpack.git packpack
+	TARBALL_COMPRESSOR=gz packpack/packpack tarball
+
+source_deploy:
+	pip install awscli --user
+	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 \
+		cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" \
+		--acl public-read

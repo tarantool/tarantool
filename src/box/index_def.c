@@ -51,7 +51,8 @@ const struct index_opts index_opts_default = {
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT, struct index_opts, dimension),
-	OPT_DEF_ENUM("distance", rtree_index_distance_type, struct index_opts, distance),
+	OPT_DEF_ENUM("distance", rtree_index_distance_type, struct index_opts,
+		     distance, NULL),
 	OPT_DEF("range_size", OPT_INT, struct index_opts, range_size),
 	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
 	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
@@ -248,8 +249,7 @@ index_def_is_valid(struct index_def *index_def, const char *space_name)
 		return false;
 	}
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
-		assert(index_def->key_def->parts[i].type > FIELD_TYPE_ANY &&
-		       index_def->key_def->parts[i].type < field_type_MAX);
+		assert(index_def->key_def->parts[i].type < field_type_MAX);
 		if (index_def->key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 				 space_name, "field no is too big");

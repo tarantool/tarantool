@@ -224,6 +224,28 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 			}
 			break;
 		case CSV_IN_QUOTES:
+			/*
+			 * Bufp can became NULL in two cases:
+			 * CSV_NEWFIELD and CSV_OUT_OF_QUOTES.
+			 *
+			 * In a case of 'newfield' the csv after
+			 * nullifying bufp and returning to the
+			 * iteration starts from
+			 * CSV_LEADING_SPACES. Here bufp is set
+			 * to not NULL (see 'leading_spaces').
+			 *
+			 * In a case of 'out_of_quotes' it can be
+			 * set to NULL only if
+			 * is_line_end == true. So at the
+			 * beginning of 'out_of_quotes'
+			 * is_line_end was true also
+			 * (see "if (is_line_end || ..." above).
+			 * In this 'if' the state of the csv is
+			 * set to CSV_LEADING_SPACES, so on a
+			 * next iteration the bufp are set to not
+			 * NULL.
+			 */
+			assert(csv->bufp != NULL);
 			if (*p == csv->quote_char) {
 				csv->state = CSV_QUOTE_CLOSING;
 			} else {

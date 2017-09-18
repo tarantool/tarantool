@@ -49,14 +49,11 @@ enum field_type {
 	FIELD_TYPE_ANY = 0,
 	FIELD_TYPE_UNSIGNED,
 	FIELD_TYPE_STRING,
-	FIELD_TYPE_ARRAY,
 	FIELD_TYPE_NUMBER,
 	FIELD_TYPE_INTEGER,
 	FIELD_TYPE_SCALAR,
+	FIELD_TYPE_ARRAY,
 	FIELD_TYPE_MAP,
-	/** For compatibility with 1.7 */
-	FIELD_TYPE_STR17,
-	FIELD_TYPE_NUM17,
 	field_type_MAX
 };
 
@@ -64,8 +61,11 @@ enum field_type {
 
 extern const char *field_type_strs[];
 
+/**
+ * Get field type by name
+ */
 enum field_type
-field_type_by_name(const char *name);
+field_type_by_name(const char *name, size_t len);
 
 extern const struct opt_def field_def_reg[];
 extern const struct field_def field_def_default;

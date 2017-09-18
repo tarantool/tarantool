@@ -346,10 +346,7 @@ end
 
 --------------------------------------------------------------------------------
 
-local function upgrade(options)
-    options = options or {}
-    setmetatable(options, {__index = {auto = false}})
-
+local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
         error('Missing "version" in box.space._schema')
@@ -358,7 +355,14 @@ local function upgrade(options)
     local minor = version[3]
     local patch = version[4] or 0
 
-    version = mkversion(major, minor, patch)
+    return mkversion(major, minor, patch)
+end
+
+local function upgrade(options)
+    options = options or {}
+    setmetatable(options, {__index = {auto = false}})
+
+    local version = get_version()
     if version < mkversion(1, 7, 5) then
         log.warn('can upgrade from 1.7.5 only')
         return

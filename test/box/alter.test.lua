@@ -341,9 +341,11 @@ s:format()
 -- Check deprecated field types.
 format[2].type = 'num'
 format[3].type = 'str'
+format[4] = { name = 'field4', type = '*' }
+format
 s:format(format)
 s:format()
-s:replace{1, 2, '3'}
+s:replace{1, 2, '3', {4, 4, 4}}
 
 -- Check not indexed fields checking.
 s:truncate()

@@ -1,70 +1,98 @@
 =head1 NAME
 
-tarantool- a Lua application server and a NoSQL database
+tarantool- a Lua application server and a database management system
 
 =head1 SYNOPSIS
 
-    tarantool [OPTIONS]
+    tarantool script.lua [OPTIONS] [SCRIPT [ARGS]]
 
 =head1 DESCRIPTION
 
-Tarantool is a Lua application server and a NoSQL database.
+Tarantool is a Lua application server fully compatible with Lua
+5.1.
 
-Its key properties include:
+It includes a mature database to persist, replicate and recover application
+state and a curated set of Lua modules for networking, I/O, messaging, data
+formats and more.
+
+It is designed to let developers quickly create efficient,
+reliable and powerful micro-services and backend applications
+for Internet.
+
+Key features:
 
 =over
 
 =item *
-    
-Licence: simplified BSD
+
+Fully compatible with Lua 5.1.
 
 =item *
-    
-All data is maintained in RAM
+
+Coroutines and asynchronous I/O to implement high-performance
+lock-free access to data
 
 =item *
-    
-Data persistence is implemented using Write Ahead Log and snapshotting
+
+ACID transactions
 
 =item *
-    
-Supports asynchronous replication and hot standby
+
+ANSI SQL, Lua stored procedures and triggers
 
 =item *
-    
-Uses coroutines and asynchronous I/O to implement
-high-performance lock-free access to data
+
+Authentication and access control
 
 =item *
-    
-Available on Linux, FreeBSD, Mac OS X
 
-=item *
-    
-Stored procedures in Lua are supported.
+Master-master replication and automatic sharding
 
 =back
 
-=head2 Data model
+=head1 OPTIONS
 
-The basic atom of storage in Tarantool is called tuple. A tuple
-can have arbitrary number of fields. The first field or fields 
-in the tuple
-are always the identifying unique key. Tuples form spaces. It is
-possible to search tuples in spaces using the primary or secondary
-keys. It is possible to change, as well as add or remove fields.
-
-=head1 Command-line options
+All command line options are passed to the interpreted script.
+When no script name is provided, the server responds to:
 
 =over
 
 =item -h, --help
 
-Displays helpscreen and exits.
+Display helpscreen and exit.
 
 =item -V, --version
 
-Prints program version and exits.
+Print program version and exit.
+
+=item -e EXRP
+
+Execute string 'EXPR'.
+
+=item -l NAME
+
+Require library 'NAME'.
+
+=item -i
+
+Enter interactive mode after executing 'SCRIPT'.
+
+=item --
+
+Stop handling options.
+
+=item -
+
+Execute stdin and stop handling options.
 
 =back
 
+=head1 SEE ALSO
+
+tarantoolctl(1), Tarantool documentation at http://tarantool.org
+
+=head1 COPYRIGHT
+
+Copyright (C) 2010-2017 Tarantool AUTHORS: please see AUTHORS file.
+
+=cut

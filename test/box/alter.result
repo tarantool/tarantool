@@ -760,15 +760,14 @@ s = box.schema.space.create('test', { format = "format" })
 ...
 s = box.schema.space.create('test', { format = { "not_map" } })
 ---
-- error: 'Failed to create space ''test'': 1-th field is not map'
+- error: 'Failed to create space ''test'': field 1 is not map'
 ...
 format = { utils.setmap({'unsigned'}) }
 ---
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Failed to create space ''test'': 1-th field format is not map with string
-    keys'
+- error: 'Failed to create space ''test'': field 1 format is not map with string keys'
 ...
 format = { { name = 100 } }
 ---
@@ -785,21 +784,21 @@ format = { { name = long } }
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Failed to create space ''test'': 1-th field name is too long'
+- error: 'Failed to create space ''test'': field 1 name is too long'
 ...
 format = { { name = 'id', type = '100' } }
 ---
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Failed to create space ''test'': 1-th field has unknown field type'
+- error: 'Failed to create space ''test'': field 1 has unknown field type'
 ...
 format = { utils.setmap({}) }
 ---
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Failed to create space ''test'': 1-th field name is not specified'
+- error: 'Failed to create space ''test'': field 1 name is not specified'
 ...
 -- Ensure the format is updated after index drop.
 format = { { name = 'id', type = 'unsigned' } }
@@ -889,17 +888,31 @@ format[2].type = 'num'
 format[3].type = 'str'
 ---
 ...
+format[4] = { name = 'field4', type = '*' }
+---
+...
+format
+---
+- - name: field1
+    type: unsigned
+  - name: field2
+    type: num
+  - name: field3
+    type: str
+  - name: field4
+    type: '*'
+...
 s:format(format)
 ---
 ...
 s:format()
 ---
 - [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'num'}, {'name': 'field3',
-    'type': 'str'}]
+    'type': 'str'}, {'name': 'field4', 'type': '*'}]
 ...
-s:replace{1, 2, '3'}
+s:replace{1, 2, '3', {4, 4, 4}}
 ---
-- [1, 2, '3']
+- [1, 2, '3', [4, 4, 4]]
 ...
 -- Check not indexed fields checking.
 s:truncate()

@@ -36,17 +36,22 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",
 	/* [FIELD_TYPE_UNSIGNED] = */ "unsigned",
 	/* [FIELD_TYPE_STRING]   = */ "string",
-	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_NUMBER]   = */ "number",
 	/* [FIELD_TYPE_INTEGER]  = */ "integer",
 	/* [FIELD_TYPE_SCALAR]   = */ "scalar",
+	/* [FIELD_TYPE_ARRAY]    = */ "array",
 	/* [FIELD_TYPE_MAP]      = */ "map",
-	/* [FIELD_TYPE_STR17]    = */ "str",
-	/* [FIELD_TYPE_NUM17]    = */ "num",
 };
 
+static int64_t
+field_type_by_name_wrapper(const char *str, uint32_t len)
+{
+	return field_type_by_name(str, len);
+}
+
 const struct opt_def field_def_reg[] = {
-	OPT_DEF_ENUM("type", field_type, struct field_def, type),
+	OPT_DEF_ENUM("type", field_type, struct field_def, type,
+		     field_type_by_name_wrapper),
 	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
 	OPT_END,
 };
@@ -57,20 +62,18 @@ const struct field_def field_def_default = {
 };
 
 enum field_type
-field_type_by_name(const char *name)
+field_type_by_name(const char *name, size_t len)
 {
-	enum field_type field_type = STR2ENUM(field_type, name);
-	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
-	if (field_type == FIELD_TYPE_STR17)
-		return FIELD_TYPE_STRING;
-	if (field_type == FIELD_TYPE_NUM17)
-		return FIELD_TYPE_UNSIGNED;
-	/*
-	 * FIELD_TYPE_ANY can't be used as type of indexed field,
-	 * because it is internal type used only for filling
-	 * struct tuple_format.fields array.
-	 */
-	if (field_type != field_type_MAX && field_type != FIELD_TYPE_ANY)
+	enum field_type field_type = strnindex(field_type_strs, name, len,
+					       field_type_MAX);
+	if (field_type != field_type_MAX)
 		return field_type;
+	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
+	if (strncasecmp(name, "num", len) == 0)
+		return FIELD_TYPE_UNSIGNED;
+	else if (strncasecmp(name, "str", len) == 0)
+		return FIELD_TYPE_STRING;
+	else if (len == 1 && name[0] == '*')
+		return FIELD_TYPE_ANY;
 	return field_type_MAX;
 }

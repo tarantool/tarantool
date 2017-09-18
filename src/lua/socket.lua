@@ -993,7 +993,7 @@ local function tcp_connect(host, port, timeout)
 end
 
 local function tcp_server_handler(server, sc, from)
-    fiber.name(format("%s/%s:%s", server.name, from.host, from.port))
+    fiber.name(format("%s/%s:%s", server.name, from.host, from.port), {truncate = true})
     local status, message = pcall(server.handler, sc, from)
     sc:shutdown()
     sc:close()
@@ -1003,7 +1003,7 @@ local function tcp_server_handler(server, sc, from)
 end
 
 local function tcp_server_loop(server, s, addr)
-    fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port))
+    fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port), {truncate = true})
     log.info("started")
     while socket_readable(s) do
         local sc, from = socket_accept(s)

@@ -99,7 +99,7 @@ lbox_rollback(lua_State *L)
 static int
 lbox_snapshot(struct lua_State *L)
 {
-	int ret = box_snapshot();
+	int ret = box_checkpoint();
 	if (ret == 0) {
 		lua_pushstring(L, "ok");
 		return 1;

@@ -62,6 +62,23 @@
 /* The number of iproto messages in flight */
 enum { IPROTO_MSG_MAX = 768 };
 
+void
+iproto_reset_input(struct ibuf *ibuf)
+{
+	/*
+	 * If we happen to have fully processed the input,
+	 * move the pos to the start of the input buffer.
+	 */
+	assert(ibuf_used(ibuf) == 0);
+	if (ibuf_capacity(ibuf) < iobuf_max_size()) {
+		ibuf_reset(ibuf);
+	} else {
+		struct slab_cache *slabc = ibuf->slabc;
+		ibuf_destroy(ibuf);
+		ibuf_create(ibuf, slabc, iobuf_readahead);
+	}
+}
+
 /* {{{ iproto_msg - declaration */
 
 /**
@@ -87,9 +104,9 @@ struct iproto_msg: public cmsg
 		struct sql_request sql_request;
 	};
 	/** Output buffer to write response and flush. */
-	struct obuf *obuf;
+	struct obuf *p_obuf;
 	/** Input buffer to store and discard request data. */
-	struct ibuf *ibuf;
+	struct ibuf *p_ibuf;
 	/**
 	 * How much space the request takes in the
 	 * input buffer (len, header and body - all of it)
@@ -170,19 +187,19 @@ const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
  * +---|---------------------+   +------------+
  * |   |      IPROTO thread  |   | TX thread  |
  * |   v                     |   |            |
- * |iobuf[0].ibuf - - - - - -|- -|- - >+      |
+ * | ibuf[0]- - - - - - - - -|- -|- - >+      |
  * |                         |   |     |      |
- * |          iobuf[1].ibuf  |   |     |      |
+ * |           ibuf[1]       |   |     |      |
  * |                         |   |     |      |
- * |iobuf[0].out <- - - - - -|- -|- - -+      |
+ * | obuf[0] <- - - - - - - -|- -|- - -+      |
  * |    |                    |   |     |      |
- * |    |     iobuf[1].out <-|- -|- - -+      |
+ * |    |      obuf[1] <- - -|- -|- - -+      |
  * +----|-----------|--------+   +------------+
  *      |           v
  *      |        Send to
  *      |        network.
  *      v
- * Send to network after iobuf[1], i.e. older responses are sent first.
+ * Send to network after obuf[1], i.e. older responses are sent first.
  *
  * ibuf structure:
  *                   rpos             wpos           end
@@ -197,23 +214,31 @@ const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
 struct iproto_connection
 {
 	/**
-	 * Two rotating buffers for I/O. Input is always read into
-	 * iobuf[0]. As soon as iobuf[0] input buffer becomes full,
-	 * iobuf[0] is moved to iobuf[1], for flushing. As soon as
-	 * all output in iobuf[1].out is sent to the client, iobuf[1]
-	 * and iobuf[0] are moved around again.
+	 * Two rotating buffers for input. Input is first read into
+	 * ibuf[0]. As soon as it buffer becomes full, the buffers are
+	 * rotated. When all input buffers are used up, the input
+	 * is suspended. The buffer becomes available for use
+	 * again when all output from the curresponding obuf[]
+	 * buffer is flushed.
 	 */
-	struct iobuf *iobuf[2];
+	struct ibuf ibuf[2];
+	/** Pointer to the current buffer. */
+	struct ibuf *p_ibuf;
+	/**
+	 * Two rotating buffers for output. obuf[0] corresponds
+	 * to requests from ibuf[0], and obuf[1] from ibuf[1].
+	 */
+	struct obuf obuf[2];
 	/*
-	 * Size of readahead which is not parsed yet, i.e.
-	 * size of a piece of request which is not fully read.
-	 * Is always relative to iobuf[0]->in.wpos. In other words,
-	 * iobuf[0]->in.wpos - parse_size gives the start of the
-	 * unparsed request. A size rather than a pointer is used
-	 * to be safe in case in->buf is reallocated. Being
-	 * relative to in->wpos, rather than to in->rpos is helpful to
-	 * make sure ibuf_reserve() or iobuf rotation don't make
-	 * the value meaningless.
+	 * Size of readahead which is not parsed yet, i.e. size of
+	 * a piece of request which is not fully read. Is always
+	 * relative to ibuf.wpos. In other words, ibuf.wpos -
+	 * parse_size gives the start of the unparsed request.
+	 * A size rather than a pointer is used to be safe in case
+	 * ibuf.buf is reallocated. Being relative to ibuf.wpos,
+	 * rather than to ibuf.rpos is helpful to make sure
+	 * ibuf_reserve() or buffers rotation don't make the value
+	 * meaningless.
 	 */
 	size_t parse_size;
 	struct ev_io input;
@@ -284,8 +309,8 @@ iproto_resume()
 static inline bool
 iproto_connection_is_idle(struct iproto_connection *con)
 {
-	return ibuf_used(&con->iobuf[0]->in) == 0 &&
-		ibuf_used(&con->iobuf[1]->in) == 0;
+	return ibuf_used(&con->ibuf[0]) == 0 &&
+	       ibuf_used(&con->ibuf[1]) == 0;
 }
 
 static inline void
@@ -336,8 +361,12 @@ iproto_connection_delete(struct iproto_connection *con)
 	 * The output buffers must have been deleted
 	 * in tx thread.
 	 */
-	iobuf_delete_mt(con->iobuf[0]);
-	iobuf_delete_mt(con->iobuf[1]);
+	ibuf_destroy(&con->ibuf[0]);
+	ibuf_destroy(&con->ibuf[1]);
+	assert(con->obuf[0].pos == 0 &&
+	       con->obuf[0].iov[0].iov_base == NULL);
+	assert(con->obuf[1].pos == 0 &&
+	       con->obuf[1].iov[0].iov_base == NULL);
 	if (con->disconnect)
 		iproto_msg_delete(con->disconnect);
 	mempool_free(&iproto_connection_pool, con);
@@ -398,8 +427,8 @@ tx_process_disconnect(struct cmsg *m)
 	 * Got to be done in iproto thread since
 	 * that's where the memory is allocated.
 	 */
-	obuf_destroy(&con->iobuf[0]->out);
-	obuf_destroy(&con->iobuf[1]->out);
+	obuf_destroy(&con->obuf[0]);
+	obuf_destroy(&con->obuf[1]);
 }
 
 /**
@@ -470,8 +499,11 @@ iproto_connection_new(const char *name, int fd)
 	con->loop = loop();
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
-	con->iobuf[0] = iobuf_new_mt(&tx_cord->slabc);
-	con->iobuf[1] = iobuf_new_mt(&tx_cord->slabc);
+	ibuf_create(&con->ibuf[0], cord_slab_cache(), iobuf_readahead);
+	ibuf_create(&con->ibuf[1], cord_slab_cache(), iobuf_readahead);
+	obuf_create(&con->obuf[0], &tx_cord->slabc, iobuf_readahead);
+	obuf_create(&con->obuf[1], &tx_cord->slabc, iobuf_readahead);
+	con->p_ibuf = &con->ibuf[0];
 	con->parse_size = 0;
 	con->session = NULL;
 	rlist_create(&con->in_stop_list);
@@ -504,7 +536,7 @@ iproto_connection_close(struct iproto_connection *con)
 		 * parsed data is processed.  It's important this
 		 * is done only once.
 		 */
-		con->iobuf[0]->in.wpos -= con->parse_size;
+		con->p_ibuf->wpos -= con->parse_size;
 	}
 	/*
 	 * If the connection has no outstanding requests in the
@@ -527,53 +559,66 @@ iproto_connection_close(struct iproto_connection *con)
 	rlist_del(&con->in_stop_list);
 }
 
-static inline void
-iproto_connection_rotate_input(struct iproto_connection *con)
+static inline struct ibuf *
+iproto_connection_next_input(struct iproto_connection *con)
 {
-	struct iobuf *tmp = con->iobuf[1];
-	con->iobuf[1] = con->iobuf[0];
-	con->iobuf[0] = tmp;
+	return &con->ibuf[con->p_ibuf == &con->ibuf[0]];
+}
+
+static inline struct ibuf *
+iproto_connection_prev_input(struct iproto_connection *con)
+{
+	/* Because only 2 buffers. */
+	return iproto_connection_next_input(con);
+}
+
+static inline struct obuf *
+iproto_connection_output_by_input(struct iproto_connection *con,
+				  struct ibuf *ibuf)
+{
+	return &con->obuf[ibuf != &con->ibuf[0]];
 }
 
 /**
  * If there is no space for reading input, we can do one of the
  * following:
- * - try to get a new iobuf, so that it can fit the request.
+ * - try to get a new ibuf, so that it can fit the request.
  *   Always getting a new input buffer when there is no space
  *   makes the instance susceptible to input-flood attacks.
- *   Therefore, at most 2 iobufs are used in a single connection,
- *   one is "open", receiving input, and the  other is closed,
- *   flushing output.
+ *   Therefore, at most 2 ibufs are used in a single connection,
+ *   one is "open", receiving input, and the other is closed,
+ *   waiting for flushing output from a corresponding obuf.
  * - stop input and wait until the client reads piled up output,
  *   so the input buffer can be reused. This complements
  *   the previous strategy. It is only safe to stop input if it
  *   is known that there is output. In this case input event
  *   flow will be resumed when all replies to previous requests
- *   are sent, in iproto_connection_gc_iobuf(). Since there are two
- *   buffers, the input is only stopped when both of them
- *   are fully used up.
+ *   are sent. Since there are two buffers, the input is only
+ *   stopped when both of them are fully used up.
  *
- * To make this strategy work, each iobuf in use must fit at
- * least one request. Otherwise, iobuf[1] may end
- * up having no data to flush, while iobuf[0] is too small to
- * fit a big incoming request.
+ * To make this strategy work, each ibuf in use must fit at least
+ * one request. Otherwise, both obufs may end up having no data to
+ * flush, while current ibuf is too small to fit a big incoming
+ * request.
  */
 static struct ibuf *
 iproto_connection_input_buffer(struct iproto_connection *con)
 {
-	struct ibuf *oldbuf = &con->iobuf[0]->in;
+	struct ibuf *old_ibuf = con->p_ibuf;
+	struct obuf *old_obuf =
+		iproto_connection_output_by_input(con, old_ibuf);
 
 	size_t to_read = 3; /* Smallest possible valid request. */
 
 	/* The type code is checked in iproto_enqueue_batch() */
 	if (con->parse_size) {
-		const char *pos = oldbuf->wpos - con->parse_size;
-		if (mp_check_uint(pos, oldbuf->wpos) <= 0)
+		const char *pos = old_ibuf->wpos - con->parse_size;
+		if (mp_check_uint(pos, old_ibuf->wpos) <= 0)
 			to_read = mp_decode_uint(&pos);
 	}
 
-	if (ibuf_unused(oldbuf) >= to_read)
-		return oldbuf;
+	if (ibuf_unused(old_ibuf) >= to_read)
+		return old_ibuf;
 
 	/**
 	 * Reuse the buffer if:
@@ -586,45 +631,49 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 	 *   buffer, simply falling through to the subsequent
 	 *   branches will not make the buffer larger.
 	 */
-	if (ibuf_used(oldbuf) == con->parse_size &&
-	    (ibuf_pos(oldbuf) == con->parse_size ||
-	     obuf_size(&con->iobuf[0]->out) == 0)) {
-		ibuf_reserve_xc(oldbuf, to_read);
-		return oldbuf;
+	if (ibuf_used(old_ibuf) == con->parse_size &&
+	    (ibuf_pos(old_ibuf) == con->parse_size ||
+	     obuf_size(old_obuf) == 0)) {
+		ibuf_reserve_xc(old_ibuf, to_read);
+		return old_ibuf;
 	}
 
-	if (! iobuf_is_idle(con->iobuf[1])) {
+	struct ibuf *new_ibuf = iproto_connection_next_input(con);
+	struct obuf *new_obuf = iproto_connection_output_by_input(con, new_ibuf);
+	if (ibuf_used(new_ibuf) != 0 || obuf_used(new_obuf) != 0) {
 		/*
 		 * Wait until the second buffer is flushed
 		 * and becomes available for reuse.
 		 */
 		return NULL;
 	}
-	struct ibuf *newbuf = &con->iobuf[1]->in;
 
-	ibuf_reserve_xc(newbuf, to_read + con->parse_size);
+	ibuf_reserve_xc(new_ibuf, to_read + con->parse_size);
 	/*
 	 * Discard unparsed data in the old buffer, otherwise it
 	 * won't be recycled when all parsed requests are processed.
 	 */
-	oldbuf->wpos -= con->parse_size;
+	old_ibuf->wpos -= con->parse_size;
 	if (con->parse_size != 0) {
 		/* Move the cached request prefix to the new buffer. */
-		memcpy(newbuf->rpos, oldbuf->wpos, con->parse_size);
-		newbuf->wpos += con->parse_size;
+		memcpy(new_ibuf->rpos, old_ibuf->wpos, con->parse_size);
+		new_ibuf->wpos += con->parse_size;
 		/*
-		 * We made ibuf idle. If obuf was already idle it makes the whole
-		 * iobuf idle, time to trim buffers.
+		 * We made ibuf idle. If obuf was already idle it
+		 * makes the both ibuf and obuf idle, time to trim
+		 * them.
 		 */
-		if (iobuf_is_idle(con->iobuf[0]))
-			iobuf_reset_mt(con->iobuf[0]);
+		if (ibuf_used(old_ibuf) == 0 && obuf_used(old_obuf) == 0) {
+			obuf_reset(old_obuf);
+			iproto_reset_input(old_ibuf);
+		}
 	}
 	/*
 	 * Rotate buffers. Not strictly necessary, but
 	 * helps preserve response order.
 	 */
-	iproto_connection_rotate_input(con);
-	return newbuf;
+	con->p_ibuf = new_ibuf;
+	return new_ibuf;
 }
 
 static void
@@ -687,6 +736,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
+	struct obuf *p_obuf = iproto_connection_output_by_input(con, con->p_ibuf);
 	int n_requests = 0;
 	bool stop_input = false;
 	while (con->parse_size && stop_input == false) {
@@ -704,8 +754,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		if (reqend > in->wpos)
 			break;
 		struct iproto_msg *msg = iproto_msg_new(con);
-		msg->obuf = &con->iobuf[0]->out;
-		msg->ibuf = &con->iobuf[0]->in;
+		msg->p_ibuf = con->p_ibuf;
+		msg->p_obuf = p_obuf;
 		auto guard = make_scoped_guard([=] { iproto_msg_delete(msg); });
 
 		msg->len = reqend - reqstart; /* total request length */
@@ -725,7 +775,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			 * decode a request, as we have enough info
 			 * to proceed to the next one.
 			 */
-			struct obuf *out = msg->obuf;
+			struct obuf *out = msg->p_obuf;
 			/*
 			 * Advance read position right away: the
 			 * message is so no need to hold the input
@@ -848,29 +898,27 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	}
 }
 
-/** Get the obuf which is currently being flushed. */
-static inline struct obuf *
-iproto_connection_output_buffer(struct iproto_connection *con)
-{
-	if (obuf_used(&con->iobuf[1]->out) > 0)
-		return &con->iobuf[1]->out;
-	/*
-	 * Don't try to write from a newer buffer if an older one
-	 * exists: in case of a partial write of a newer buffer,
-	 * the client may end up getting a salad of different
-	 * pieces of replies from both buffers.
-	 */
-	if (ibuf_used(&con->iobuf[1]->in) == 0 &&
-	    obuf_used(&con->iobuf[0]->out) > 0)
-		return &con->iobuf[0]->out;
-	return NULL;
-}
-
 /** writev() to the socket and handle the result. */
 
 static int
-iproto_flush(struct obuf *obuf, struct iproto_connection *con)
+iproto_flush(struct iproto_connection *con)
 {
+	struct ibuf *ibuf = iproto_connection_prev_input(con);
+	struct obuf *obuf = iproto_connection_output_by_input(con, ibuf);
+	if (obuf_used(obuf) == 0) {
+		obuf = iproto_connection_output_by_input(con, con->p_ibuf);
+		/*
+		 * Don't try to write from a newer buffer if an
+		 * older one exists: in case of a partial write of
+		 * a newer buffer, the client may end up getting a
+		 * salad of different pieces of replies from both
+		 * buffers.
+		 */
+		if (ibuf_used(ibuf) > 0 || obuf_used(obuf) == 0)
+			return 1;
+		ibuf = con->p_ibuf;
+	}
+
 	int fd = con->output.fd;
 	struct obuf_svp *begin = &obuf->wpos;
 	struct obuf_svp *end = &obuf->wend;
@@ -893,13 +941,12 @@ iproto_flush(struct obuf *obuf, struct iproto_connection *con)
 	rmean_collect(rmean_net, IPROTO_SENT, nwr);
 	if (nwr > 0) {
 		if (begin->used + nwr == end->used) {
-			struct iobuf *iobuf =
-				container_of(obuf, struct iobuf, out);
-			if (ibuf_used(&iobuf->in) == 0) {
+			if (ibuf_used(ibuf) == 0) {
 				/* Quickly recycle the buffer if it's idle. */
 				assert(end->used == obuf_size(obuf));
 				/* resets wpos and wpend to zero pos */
-				iobuf_reset_mt(iobuf);
+				obuf_reset(obuf);
+				iproto_reset_input(ibuf);
 			} else { /* Avoid assignment reordering. */
 				/* Advance write position. */
 				*begin = *end;
@@ -924,9 +971,9 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
 
 	try {
-		struct obuf *obuf;
-		while ((obuf = iproto_connection_output_buffer(con))) {
-			if (iproto_flush(obuf, con) < 0) {
+		int rc;
+		while ((rc = iproto_flush(con)) <= 0) {
+			if (rc != 0) {
 				ev_io_start(loop, &con->output);
 				return;
 			}
@@ -958,7 +1005,7 @@ static void
 tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
-	struct obuf *out = msg->obuf;
+	struct obuf *out = msg->p_obuf;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 	if (tx_check_schema(msg->header.schema_version))
@@ -985,7 +1032,7 @@ static void
 tx_process_select(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
-	struct obuf *out = msg->obuf;
+	struct obuf *out = msg->p_obuf;
 	struct obuf_svp svp;
 	struct port port;
 	int rc;
@@ -1024,7 +1071,7 @@ static void
 tx_process_misc(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
-	struct obuf *out = msg->obuf;
+	struct obuf *out = msg->p_obuf;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
@@ -1066,7 +1113,7 @@ static void
 tx_process_sql(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
-	struct obuf *out = msg->obuf;
+	struct obuf *out = msg->p_obuf;
 	uint64_t sync = msg->header.sync;
 
 	tx_fiber_init(msg->connection->session, sync);
@@ -1128,8 +1175,8 @@ net_send_msg(struct cmsg *m)
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
 	/* Discard request (see iproto_enqueue_batch()) */
-	msg->ibuf->rpos += msg->len;
-	msg->obuf->wend = msg->write_end;
+	msg->p_ibuf->rpos += msg->len;
+	msg->p_obuf->wend = msg->write_end;
 
 	if (evio_has_fd(&con->output)) {
 		if (! ev_is_active(&con->output))
@@ -1146,7 +1193,7 @@ net_end_join_subscribe(struct cmsg *m)
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
 
-	msg->ibuf->rpos += msg->len;
+	msg->p_ibuf->rpos += msg->len;
 	iproto_msg_delete(msg);
 
 	assert(! ev_is_active(&con->input));
@@ -1154,7 +1201,7 @@ net_end_join_subscribe(struct cmsg *m)
 	 * Enqueue any messages if they are in the readahead
 	 * queue. Will simply start input otherwise.
 	 */
-	iproto_enqueue_batch(con, msg->ibuf);
+	iproto_enqueue_batch(con, msg->p_ibuf);
 }
 
 /**
@@ -1167,7 +1214,7 @@ tx_process_connect(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
-	struct obuf *out = msg->obuf;
+	struct obuf *out = msg->p_obuf;
 	try {              /* connect. */
 		con->session = session_create(con->input.fd, SESSION_TYPE_BINARY);
 		if (con->session == NULL)
@@ -1200,7 +1247,7 @@ net_send_greeting(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
-	struct obuf *out = msg->obuf;
+	struct obuf *out = msg->p_obuf;
 	if (msg->close_connection) {
 		try {
 			int64_t nwr = sio_writev(con->output.fd, out->iov,
@@ -1256,8 +1303,8 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	 */
 	struct iproto_msg *msg = iproto_msg_new(con);
 	cmsg_init(msg, connect_route);
-	msg->obuf = &con->iobuf[0]->out;
-	msg->ibuf = &con->iobuf[0]->in;
+	msg->p_ibuf = con->p_ibuf;
+	msg->p_obuf = iproto_connection_output_by_input(con, con->p_ibuf);
 	msg->close_connection = false;
 	cpipe_push(&tx_pipe, msg);
 }

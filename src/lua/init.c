@@ -564,8 +564,8 @@ run_script_f(va_list ap)
 	 * by "-i" option or stdin is TTY or there are no script.
 	 */
 	if (interactive) {
-		say_crit("version %s\ntype 'help' for interactive help",
-			 tarantool_version());
+		say_crit("%s %s\ntype 'help' for interactive help",
+			 tarantool_package(), tarantool_version());
 		/* get console.start from package.loaded */
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 		lua_getfield(L, -1, "console");

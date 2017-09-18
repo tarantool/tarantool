@@ -415,7 +415,7 @@ local cat_formats = setmetatable({
 local orig_cfg = box.cfg
 
 local function wrapper_cfg(cfg)
-    fiber.name(instance_name)
+    fiber.name(instance_name, {truncate=true})
     log.info('Run console at %s', console_sock)
     console.listen(console_sock)
 

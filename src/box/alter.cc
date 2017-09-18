@@ -166,7 +166,12 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 		if (mp_typeof(**val) != MP_STR)
 			return -1;
 		str = mp_decode_str(val, &str_len);
-		ival = strnindex(def->enum_strs, str, str_len, def->enum_max);
+		if (def->to_enum == NULL) {
+			ival = strnindex(def->enum_strs, str, str_len,
+					 def->enum_max);
+		} else {
+			ival = def->to_enum(str, str_len);
+		}
 		switch(def->enum_size) {
 		case sizeof(uint8_t):
 			store_u8(opt, (uint8_t)ival);
@@ -219,11 +224,9 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 
 /**
  * Populate key options from their msgpack-encoded representation
- * (msgpack map)
- *
- * @return   the end of the msgpack map in the stream
+ * (msgpack map).
  */
-static const char *
+static void
 opts_decode(void *opts, const struct opt_def *reg, const char *map,
 	    uint32_t errcode, uint32_t field_no, struct region *region)
 {
@@ -244,22 +247,19 @@ opts_decode(void *opts, const struct opt_def *reg, const char *map,
 		opts_parse_key(opts, reg, key, key_len, &map, errcode,
 			       field_no, region);
 	}
-	return map;
 }
 
 /**
  * Fill index_opts structure from opts field in tuple of space _index
  * Throw an error is unrecognized option.
- *
- * @return  the end of the map in the msgpack stream
  */
-static const char *
+static void
 index_opts_decode(struct index_opts *opts, const char *map,
 		  struct region *region)
 {
 	index_opts_create(opts);
-	map = opts_decode(opts, index_opts_reg, map,
-			  ER_WRONG_INDEX_OPTIONS, BOX_INDEX_FIELD_OPTS, region);
+	opts_decode(opts, index_opts_reg, map, ER_WRONG_INDEX_OPTIONS,
+		    BOX_INDEX_FIELD_OPTS, region);
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
@@ -281,7 +281,6 @@ index_opts_decode(struct index_opts *opts, const char *map,
 	if (opts->run_size_ratio <= 1)
 		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "run_size_ratio must be > 1");
-	return map;
 }
 
 /**
@@ -425,7 +424,7 @@ field_def_decode(struct field_def *field, const char **data,
 {
 	if (mp_typeof(**data) != MP_MAP) {
 		tnt_raise(ClientError, errcode, space_name,
-			  tt_sprintf("%d-th field is not map",
+			  tt_sprintf("field %d is not map",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
 	int count = mp_decode_map(data);
@@ -433,7 +432,7 @@ field_def_decode(struct field_def *field, const char **data,
 	for (int i = 0; i < count; ++i) {
 		if (mp_typeof(**data) != MP_STR) {
 			tnt_raise(ClientError, errcode, space_name,
-				  tt_sprintf("%d-th field format is not map"\
+				  tt_sprintf("field %d format is not map"\
 					     " with string keys",
 					     fieldno + TUPLE_INDEX_BASE));
 		}
@@ -445,28 +444,18 @@ field_def_decode(struct field_def *field, const char **data,
 	}
 	if (field->name == NULL) {
 		tnt_raise(ClientError, errcode, space_name,
-			  tt_sprintf("%d-th field name is not specified",
+			  tt_sprintf("field %d name is not specified",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
 	if (strlen(field->name) > BOX_NAME_MAX) {
 		tnt_raise(ClientError, errcode, space_name,
-			  tt_sprintf("%d-th field name is too long",
+			  tt_sprintf("field %d name is too long",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
-	switch(field->type) {
-	case field_type_MAX:
+	if (field->type == field_type_MAX) {
 		tnt_raise(ClientError, errcode, space_name,
-			  tt_sprintf("%d-th field has unknown field type",
+			  tt_sprintf("field %d has unknown field type",
 				     fieldno + TUPLE_INDEX_BASE));
-		break;
-	case FIELD_TYPE_STR17:
-		field->type = FIELD_TYPE_STRING;
-		break;
-	case FIELD_TYPE_NUM17:
-		field->type = FIELD_TYPE_UNSIGNED;
-		break;
-	default:
-		break;
 	}
 }
 
@@ -504,12 +493,12 @@ space_format_decode(const char *data, uint32_t *out_count,
 /**
  * Fill space_def structure from struct tuple.
  */
-struct space_def *
+static struct space_def *
 space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
-			 struct field_def **fields, uint32_t *field_count)
+			 struct field_def **fields, uint32_t *field_count,
+			 struct region *region)
 {
 	uint32_t name_len;
-	struct region *region = &fiber()->gc;
 	const char *name =
 		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_NAME, &name_len);
 	if (name_len > BOX_NAME_MAX)
@@ -1306,6 +1295,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
+	struct region *region = &fiber()->gc;
 	/*
 	 * Things to keep in mind:
 	 * - old_tuple is set only in case of UPDATE.  For INSERT
@@ -1314,8 +1304,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 *   when index look up is not possible
 	 * - _space, _index and other metaspaces initially don't
 	 *   have a tuple which represents it, this tuple is only
-	 *   created during recovery from
-	 *   a snapshot.
+	 *   created during recovery from a snapshot.
 	 *
 	 * Let's establish whether an old space exists. Use
 	 * old_tuple ID field, if old_tuple is set, since UPDATE
@@ -1329,7 +1318,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		uint32_t field_count;
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_CREATE_SPACE,
-						 &fields, &field_count);
+						 &fields, &field_count, region);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		RLIST_HEAD(empty_list);
@@ -1383,7 +1372,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		uint32_t field_count;
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE,
-						 &fields, &field_count);
+						 &fields, &field_count, region);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		if (def->id != space_id(old_space))

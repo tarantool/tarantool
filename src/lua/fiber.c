@@ -337,23 +337,46 @@ lbox_fiber_status(struct lua_State *L)
 	return 1;
 }
 
-/** Get or set fiber name.
+/**
+ * Get or set fiber name.
  * With no arguments, gets or sets the current fiber
  * name. It's also possible to get/set the name of
  * another fiber.
+ * Last argument can be a map with a single key:
+ * {truncate = boolean}. If truncate is true, then a new fiber
+ * name is truncated to a max possible fiber name length.
+ * If truncate is false (or was not specified), then too long
+ * new name raise error.
  */
 static int
 lbox_fiber_name(struct lua_State *L)
 {
 	struct fiber *f = fiber();
-	int name_index = 1;
+	int name_index;
+	int opts_index;
+	int top = lua_gettop(L);
 	if (lua_type(L, 1) == LUA_TUSERDATA) {
 		f = lbox_checkfiber(L, 1);
 		name_index = 2;
+		opts_index = 3;
+	} else {
+		name_index = 1;
+		opts_index = 2;
 	}
-	if (lua_gettop(L) == name_index) {
+	if (top == name_index || top == opts_index) {
 		/* Set name. */
 		const char *name = luaL_checkstring(L, name_index);
+		int name_len = strlen(name);
+		if (top == opts_index && lua_istable(L, opts_index)) {
+			lua_getfield(L, opts_index, "truncate");
+			/* Truncate the name if needed. */
+			if (lua_isboolean(L, -1) && lua_toboolean(L, -1) &&
+			    name_len > FIBER_NAME_MAX)
+				name_len = FIBER_NAME_MAX;
+			lua_pop(L, 1);
+		}
+		if (name_len > FIBER_NAME_MAX)
+			luaL_error(L, "Fiber name is too long");
 		fiber_set_name(f, name);
 		return 0;
 	} else {

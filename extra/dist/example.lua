@@ -8,7 +8,7 @@
 -- To connect to the instance, use "sudo tarantoolctl enter example"
 -- Features:
 -- 1. Database configuration
--- 2. Binary logging and snapshots
+-- 2. Binary logging and automatic checkpoints
 -- 3. Replication
 -- 4. Automatinc sharding
 -- 5. Message queue
@@ -61,7 +61,12 @@ box.cfg {
 
     -- Size of the largest allocation unit, in bytes.
     -- It can be tuned up if it is necessary to store large tuples
-    memtx_max_tuple_size = 1 * 1024 * 1024; -- 1Mb
+    memtx_max_tuple_size = 128 * 1024 * 1024; -- 128Mb
+
+    -- Reduce the throttling effect of box.snapshot() on
+    -- INSERT/UPDATE/DELETE performance by setting a limit
+    -- on how many megabytes per second it can write to disk
+    -- memtx_snap_io_rate_limit = nil;
 
     ----------------------
     -- Vinyl configuration
@@ -76,6 +81,10 @@ box.cfg {
 
     -- How much memory Vinyl engine can use for caches, in bytes.
     vinyl_cache = 128 * 1024 * 1024; -- 128Mb
+
+    -- Size of the largest allocation unit, in bytes.
+    -- It can be tuned up if it is necessary to store large tuples
+    vinyl_max_tuple_size = 128 * 1024 * 1024; -- 128Mb
 
     -- The maximum number of background workers for compaction.
     vinyl_write_threads = 2;
@@ -97,16 +106,11 @@ box.cfg {
     -- The maximal size of a single write-ahead log file
     wal_max_size = 256 * 1024 * 1024;
 
-    -- The interval between actions by the snapshot daemon, in seconds
+    -- The interval between actions by the checkpoint daemon, in seconds
     checkpoint_interval = 60 * 60; -- one hour
 
-    -- The maximum number of snapshots that the snapshot daemon maintans
+    -- The maximum number of checkpoints that the daemon maintans
     checkpoint_count = 6;
-
-    -- Reduce the throttling effect of box.snapshot() on
-    -- INSERT/UPDATE/DELETE performance by setting a limit
-    -- on how many megabytes per second it can write to disk
-    snap_io_rate_limit = nil;
 
     -- Don't abort recovery if there is an error while reading
     -- files from the disk at server start.
@@ -122,7 +126,8 @@ box.cfg {
     -- 3 – CRITICAL
     -- 4 – WARNING
     -- 5 – INFO
-    -- 6 – DEBUG
+    -- 6 – VERBOSE
+    -- 7 – DEBUG
     log_level = 5;
 
     -- By default, the log is sent to /var/log/tarantool/INSTANCE.log

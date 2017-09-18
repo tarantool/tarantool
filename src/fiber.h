@@ -50,7 +50,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { FIBER_NAME_MAX = 30 };
+enum { FIBER_NAME_MAX = 32 };
 
 enum {
 	/**
@@ -536,6 +536,11 @@ fiber_init(int (*fiber_invoke)(fiber_func f, va_list ap));
 void
 fiber_free(void);
 
+/**
+ * Set fiber name.
+ * @param fiber Fiber to set name for.
+ * @param name A new name of @a fiber.
+ */
 void
 fiber_set_name(struct fiber *fiber, const char *name);
 

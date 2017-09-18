@@ -487,7 +487,7 @@ out:
 
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool snapshot_recovery, bool force_recovery)
+		 int64_t lsn, bool is_checkpoint_recovery, bool force_recovery)
 {
 	assert(index->range_count == 0);
 
@@ -514,7 +514,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		lsn = index->opts.lsn;
 
 	int rc = vy_recovery_load_index(recovery, index->space_id, index->id,
-					lsn, snapshot_recovery,
+					lsn, is_checkpoint_recovery,
 					vy_index_recovery_cb, &arg);
 
 	mh_int_t k;
@@ -545,7 +545,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 
 	if (index->commit_lsn < 0) {
 		/* Index was not found in the metadata log. */
-		if (snapshot_recovery) {
+		if (is_checkpoint_recovery) {
 			/*
 			 * All indexes created from snapshot rows must
 			 * be present in vylog, because snapshot can

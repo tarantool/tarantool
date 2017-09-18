@@ -32,13 +32,13 @@ i = s:create_index('spatial', { type = 'rtree', unique = false, parts = {1, 'arr
 -- tree and hash indexes over array field is not possible
 i = s:create_index('primary', { type = 'tree', parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''spatial'': ARRAY field
-    type is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''spatial'': field type
+    ''array'' is not supported'
 ...
 i = s:create_index('primary', { type = 'hash', parts = {1, 'array'}})
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''spatial'': ARRAY field
-    type is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''spatial'': field type
+    ''array'' is not supported'
 ...
 -- normal indexes
 i = s:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}})
@@ -145,8 +145,8 @@ s.index.spatial:alter({unique = true})
 ...
 s.index.spatial:alter({type = 'tree'})
 ---
-- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': ARRAY field
-    type is not supported'
+- error: 'Can''t create or modify index ''spatial'' in space ''spatial'': field type
+    ''array'' is not supported'
 ...
 box.space[box.schema.SPACE_ID]:update({s.id}, {{"=", 4, 'vinyl'}})
 ---
@@ -597,21 +597,6 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 - error: 'Wrong index parts: expected a non-empty array; expected field1 id (number),
     field1 type (string), ...'
 ...
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'thing'}}}
----
-- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
-    type (string), ...'
-...
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'},{'wtf'}}}
----
-- error: 'Wrong index parts: a field type is missing; expected field1 id (number),
-    field1 type (string), ...'
-...
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
----
-- error: 'Wrong index parts: expected a non-empty array; expected field1 id (number),
-    field1 type (string), ...'
-...
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
 ---
@@ -631,8 +616,8 @@ i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})
 ...
 i:alter{type = 'tree' }
 ---
-- error: 'Can''t create or modify index ''s'' in space ''s'': ARRAY field type is
-    not supported'
+- error: 'Can''t create or modify index ''s'' in space ''s'': field type ''array''
+    is not supported'
 ...
 i:alter{dimension = 3 }
 ---

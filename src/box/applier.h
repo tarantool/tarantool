@@ -121,9 +121,10 @@ struct applier {
  * If recovery is finalized (i.e. r->writer != NULL) then the client
  * connect to a master and follow remote updates using SUBSCRIBE command.
  *
- * If recovery is not finalized (i.e. r->writer == NULL) then the client
- * connect to a master, download and process snapshot using JOIN command
- * and then switch to follow mode.
+ * If recovery is not finalized (i.e. r->writer == NULL) then the
+ * client connects to a master, downloads and processes
+ * a checkpoint using JOIN command and then switches to 'follow'
+ * mode.
  *
  * \sa fiber_start()
  */

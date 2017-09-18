@@ -96,18 +96,18 @@ tarantool_uptime(void)
 }
 
 /**
-* Create snapshot from signal handler (SIGUSR1)
+* Create a checkpoint from signal handler (SIGUSR1)
 */
 static void
-sig_snapshot(ev_loop * /* loop */, struct ev_signal * /* w */,
+sig_checkpoint(ev_loop * /* loop */, struct ev_signal * /* w */,
 	     int /* revents */)
 {
-	if (box_snapshot_is_in_progress) {
-		say_warn("Snapshot process is already running,"
+	if (box_checkpoint_is_in_progress) {
+		say_warn("Checkpoint is already in progress,"
 			" the signal is ignored");
 		return;
 	}
-	fiber_start(fiber_new_xc("snapshot", (fiber_func)box_snapshot));
+	fiber_start(fiber_new_xc("checkpoint", (fiber_func)box_checkpoint));
 }
 
 static void
@@ -256,7 +256,7 @@ signal_init(void)
 		panic_syserror("sigaction");
 	}
 
-	ev_signal_init(&ev_sigs[0], sig_snapshot, SIGUSR1);
+	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
 	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
 	ev_signal_init(&ev_sigs[3], signal_cb, SIGHUP);
@@ -434,7 +434,7 @@ load_cfg()
 	 * after (optional) daemonising to avoid confusing messages with
 	 * different pids
 	 */
-	say_crit("version %s", tarantool_version());
+	say_crit("%s %s", tarantool_package(), tarantool_version());
 	say_crit("log level %i", cfg_geti("log_level"));
 
 	if (pid_file_handle != NULL) {
@@ -511,7 +511,7 @@ tarantool_free(void)
 static void
 print_version(void)
 {
-	printf("Tarantool %s\n", tarantool_version());
+	printf("%s %s\n", tarantool_package(), tarantool_version());
 	printf("Target: %s\n", BUILD_INFO);
 	printf("Build options: %s\n", BUILD_OPTIONS);
 	printf("Compiler: %s\n", COMPILER_INFO);

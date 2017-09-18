@@ -197,7 +197,7 @@ local function create_transport(host, port, user, password, callback)
         set_state('connecting')
         fiber.create(function()
             worker_fiber = fiber_self()
-            fiber.name(string.format('%s:%s (net.box)', host, port))
+            fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
             local ok, err = pcall(protocol_sm)
             if not (ok or is_final_state[state]) then
                 set_state('error', E_UNKNOWN, err)

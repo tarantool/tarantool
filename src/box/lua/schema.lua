@@ -553,6 +553,7 @@ box.schema.index.create = function(space_id, name, options)
         uint = 'unsigned';
         str = 'string';
         int = 'integer';
+        ['*'] = 'any';
     };
     for _, part in pairs(parts) do
         local field_type = part[2]:lower()

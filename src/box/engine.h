@@ -104,7 +104,7 @@ public:
 	 */
 	virtual void bootstrap();
 	/**
-	 * Begin initial recovery from snapshot or dirty disk data.
+	 * Begin initial recovery from checkpoint or dirty disk data.
 	 * On local recovery @recovery_vclock points to the vclock
 	 * used for assigning LSNs to statements replayed from WAL.
 	 * On remote recovery, it is set to NULL.
@@ -122,7 +122,7 @@ public:
 	 */
 	virtual void endRecovery();
 	/**
-	 * Begin a two-phase snapshot creation in this
+	 * Begin a two-phase checkpoint creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 * Must not yield.
 	 */
@@ -142,15 +142,15 @@ public:
 	virtual void abortCheckpoint();
 	/**
 	 * Remove files that are not needed to recover
-	 * from snapshot with @lsn or newer.
+	 * from checkpoint with @lsn or newer.
 	 *
 	 * If this function returns a non-zero value, garbage
 	 * collection is aborted, i.e. this method isn't called
 	 * for other engines and xlog files aren't deleted.
 	 *
 	 * Used to abort garbage collection in case MemtxEngine
-	 * failes to delete a snapshot file, because we recover
-	 * checkpoint list by scanning snapshot directory.
+	 * fails to delete a snapshot file, because we recover
+	 * checkpoint list by scanning the snapshot directory.
 	 */
 	virtual int collectGarbage(int64_t lsn);
 	/**
@@ -332,7 +332,7 @@ void
 engine_end_recovery();
 
 /**
- * Feed snapshot data as join events to the replicas.
+ * Feed checkpoint data as join events to the replicas.
  * (called on the master).
  */
 void
@@ -345,7 +345,7 @@ int
 engine_begin_checkpoint();
 
 /**
- * Save a snapshot.
+ * Create a checkpoint.
  */
 int
 engine_commit_checkpoint(struct vclock *vclock);

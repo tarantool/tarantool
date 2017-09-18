@@ -107,7 +107,6 @@ struct MemtxSpace: public Handler {
 	void
 	updateBsize(const struct tuple *old_tuple,
 		    const struct tuple *new_tuple);
-
 public:
 	/**
 	 * A pointer to replace function, set to different values

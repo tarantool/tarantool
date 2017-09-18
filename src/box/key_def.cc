@@ -52,14 +52,14 @@ const uint32_t key_mp_type[] = {
 	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
 	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
 	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
-	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_NUMBER]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
 	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
 	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
 		(1U << MP_BIN) | (1U << MP_BOOL) | (1U << MP_NIL),
-	/* [FIELD_TYPE_MAP]      =  */ 1U << MP_MAP,
+	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
+	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
 
 struct key_def *
@@ -139,7 +139,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 		 uint32_t fieldno, enum field_type type)
 {
 	assert(part_no < def->part_count);
-	assert(type > FIELD_TYPE_ANY && type < field_type_MAX);
+	assert(type < field_type_MAX);
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	column_mask_set_fieldno(&def->column_mask, fieldno);
@@ -205,7 +205,6 @@ key_def_encode_parts(char *data, const struct key_def *key_def)
 int
 key_def_decode_parts(struct key_def *key_def, const char **data)
 {
-	char buf[FIELD_TYPE_NAME_MAX];
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (mp_typeof(**data) != MP_ARRAY) {
 			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
@@ -238,8 +237,7 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 		const char *str = mp_decode_str(data, &len);
 		for (uint32_t j = 2; j < item_count; j++)
 			mp_next(data);
-		snprintf(buf, sizeof(buf), "%.*s", len, str);
-		enum field_type field_type = field_type_by_name(buf);
+		enum field_type field_type = field_type_by_name(str, len);
 		if (field_type == field_type_MAX) {
 			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
 				 "unknown field type");

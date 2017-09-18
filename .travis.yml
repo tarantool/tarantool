@@ -97,9 +97,9 @@ deploy:
     on:
       branch: "1.8"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy sources to SFTP
+  # Deploy sources to S3
   - provider: script
-    script: ./packpack/tools/sftp ${TRAVIS_BRANCH}/src build/*.tar.gz
+    script: make -f .travis.mk source_deploy
     skip_cleanup: true
     on:
       branch: "1.8"

@@ -213,10 +213,6 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'thing'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array'},{'wtf'}}}
-box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
-
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
 

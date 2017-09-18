@@ -169,7 +169,7 @@ __asm__(
 	"\tpopq %%rbp\n"
 	:
 	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "rdi", "rsi"
+	: "rdi", "rsi", "rax"
 	);
 
 #elif __i386
@@ -200,7 +200,7 @@ __asm__(
 	"\tpopl %%ebp\n"
 	:
 	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "ecx"
+	: "ecx", "eax"
 	);
 
 #elif __ARM_ARCH==7

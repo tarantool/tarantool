@@ -84,12 +84,12 @@ static void title(const char *new_status)
 	systemd_snotify("STATUS=%s", status);
 }
 
-bool box_snapshot_is_in_progress = false;
+bool box_checkpoint_is_in_progress = false;
 
 /**
  * If backup is in progress, this points to the gc consumer
  * object that prevents the garbage collector from deleting
- * the snapshot that is currently being backed up.
+ * the checkpoint files that are currently being backed up.
  */
 static struct gc_consumer *backup_gc;
 
@@ -621,7 +621,7 @@ box_set_readahead(void)
 {
 	int readahead = cfg_geti("readahead");
 	box_check_readahead(readahead);
-	iobuf_set_readahead(readahead);
+	iobuf_readahead = readahead;
 }
 
 void
@@ -1267,7 +1267,7 @@ engine_init()
 	/*
 	 * Sic: order is important here, since
 	 * memtx must be the first to participate
-	 * in snapshotting (in enigne_foreach order),
+	 * in checkpoints (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
 	MemtxEngine *memtx = new MemtxEngine(cfg_gets("memtx_dir"),
@@ -1394,7 +1394,7 @@ bootstrap()
 	}
 	if (engine_begin_checkpoint() ||
 	    engine_commit_checkpoint(&replicaset_vclock))
-		panic("failed to save a snapshot");
+		panic("failed to create a checkpoint");
 }
 
 static void
@@ -1629,18 +1629,18 @@ box_atfork()
 }
 
 int
-box_snapshot()
+box_checkpoint()
 {
 	/* Signal arrived before box.cfg{} */
 	if (! is_box_configured)
 		return 0;
 	int rc = 0;
-	if (box_snapshot_is_in_progress) {
+	if (box_checkpoint_is_in_progress) {
 		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
 		return -1;
 	}
-	box_snapshot_is_in_progress = true;
-	/* create snapshot file */
+	box_checkpoint_is_in_progress = true;
+	/* create checkpoint files */
 	latch_lock(&schema_lock);
 	if ((rc = engine_begin_checkpoint()))
 		goto end;
@@ -1657,7 +1657,7 @@ end:
 	else
 		gc_run();
 	latch_unlock(&schema_lock);
-	box_snapshot_is_in_progress = false;
+	box_checkpoint_is_in_progress = false;
 	return rc;
 }
 

@@ -347,9 +347,6 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 	if (itr->skipped_start < itr->src_count)
 		itr->range_ended = false;
 
-	if (itr->curr_stmt != NULL && min_stmt != NULL)
-		assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) >= 0);
-
 	for (int i = MIN(itr->skipped_start, itr->mutable_end) - 1;
 	     was_yield_possible && i >= (int) itr->mutable_start; i--) {
 		struct vy_merge_src *src = &itr->src[i];
@@ -370,25 +367,28 @@ vy_merge_iterator_next_key(struct vy_merge_iterator *itr, struct tuple **ret)
 			continue;
 
 		if (cmp < 0 || vy_stmt_lsn(src->stmt) > vy_stmt_lsn(min_stmt)) {
-			itr->front_id++;
 			if (min_stmt)
 				tuple_unref(min_stmt);
 			min_stmt = src->stmt;
 			tuple_ref(min_stmt);
-			itr->curr_src = i;
-			src->front_id = itr->front_id;
-		} else {
-			itr->curr_src = MIN(itr->curr_src, (uint32_t)i);
-			src->front_id = itr->front_id;
 		}
-		if (itr->curr_stmt != NULL && min_stmt != NULL)
-			assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) >= 0);
+
+		if (cmp < 0) {
+			itr->front_id++;
+			itr->curr_src = i;
+		} else
+			itr->curr_src = MIN(itr->curr_src, (uint32_t)i);
+
+		src->front_id = itr->front_id;
 	}
 
 	if (itr->skipped_start < itr->src_count)
 		itr->range_ended = false;
 
 	itr->unique_optimization = false;
+
+	if (itr->curr_stmt != NULL && min_stmt != NULL)
+		assert(dir * vy_tuple_compare(min_stmt, itr->curr_stmt, def) > 0);
 
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
@@ -734,17 +734,8 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 {
 	int rc;
 	struct vy_merge_iterator *mi = &itr->merge_iterator;
-retry:
-	*ret = NULL;
 	while ((rc = vy_merge_iterator_next_key(mi, ret)) == -2)
 		vy_read_iterator_restore(itr);
-	/*
-	 * If the iterator after next_key is on the same key then
-	 * go to the next.
-	 */
-	if (*ret != NULL && itr->curr_stmt != NULL &&
-	    vy_tuple_compare(itr->curr_stmt, *ret, itr->index->cmp_def) == 0)
-		goto retry;
 	return rc;
 }
 
