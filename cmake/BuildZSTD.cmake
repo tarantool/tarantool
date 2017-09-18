@@ -18,6 +18,8 @@ macro(zstd_build)
         set_source_files_properties(${zstd_src}
             PROPERTIES COMPILE_FLAGS -Wno-implicit-fallthrough)
     endif()
+    set_source_files_properties(${zstd_src}
+        PROPERTIES COMPILE_FLAGS -Ofast)
 
     add_library(zstd STATIC ${zstd_src})
     set(ZSTD_LIBRARIES zstd)
