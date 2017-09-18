@@ -65,7 +65,7 @@ int sqlite3BtreeSecureDelete(Btree*,int);
 int sqlite3BtreeGetOptimalReserve(Btree*);
 int sqlite3BtreeGetReserveNoMutex(Btree *p);
 int sqlite3BtreeBeginTrans(Btree*,int,int);
-int sqlite3BtreeCommitPhaseOne(Btree*, const char *zMaster);
+int sqlite3BtreeCommitPhaseOne(Btree *);
 int sqlite3BtreeCommitPhaseTwo(Btree*, int);
 int sqlite3BtreeCommit(Btree*);
 int sqlite3BtreeRollback(Btree*,int,int);

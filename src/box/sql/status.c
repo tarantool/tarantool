@@ -221,17 +221,6 @@ int sqlite3_db_status(
     case SQLITE_DBSTATUS_CACHE_USED_SHARED:
     case SQLITE_DBSTATUS_CACHE_USED: {
       int totalUsed = 0;
-      sqlite3BtreeEnterAll(db);
-      Btree *pBt = db->mdb.pBt;
-      if( pBt ){
-        Pager *pPager = sqlite3BtreePager(pBt);
-        int nByte = sqlite3PagerMemUsed(pPager);
-        if( op==SQLITE_DBSTATUS_CACHE_USED_SHARED ){
-          nByte = nByte / sqlite3BtreeConnectionCount(pBt);
-        }
-        totalUsed += nByte;
-      }
-      sqlite3BtreeLeaveAll(db);
       *pCurrent = totalUsed;
       *pHighwater = 0;
       break;
@@ -308,10 +297,6 @@ int sqlite3_db_status(
       assert( SQLITE_DBSTATUS_CACHE_MISS==SQLITE_DBSTATUS_CACHE_HIT+1 );
       assert( SQLITE_DBSTATUS_CACHE_WRITE==SQLITE_DBSTATUS_CACHE_HIT+2 );
 
-      if( db->mdb.pBt ){
-        Pager *pPager = sqlite3BtreePager(db->mdb.pBt);
-        sqlite3PagerCacheStat(pPager, op, resetFlag, &nRet);
-      }
       *pHighwater = 0; /* IMP: R-42420-56072 */
                        /* IMP: R-54100-20147 */
                        /* IMP: R-29431-39229 */

@@ -739,8 +739,6 @@ int sqlite3_db_release_memory(sqlite3 *db){
   sqlite3BtreeEnterAll(db);
   Btree *pBt = db->mdb.pBt;
   assert( pBt );
-  Pager *pPager = sqlite3BtreePager(pBt);
-  sqlite3PagerShrink(pPager);
   sqlite3BtreeLeaveAll(db);
   sqlite3_mutex_leave(db->mutex);
   return SQLITE_OK;
@@ -761,14 +759,6 @@ int sqlite3_db_cacheflush(sqlite3 *db){
   sqlite3BtreeEnterAll(db);
   Btree *pBt = db->mdb.pBt;
   assert( pBt );
-  if( sqlite3BtreeIsInTrans(pBt) ){
-    Pager *pPager = sqlite3BtreePager(pBt);
-    rc = sqlite3PagerFlush(pPager);
-    if( rc==SQLITE_BUSY ){
-      bSeenBusy = 1;
-      rc = SQLITE_OK;
-    }
-  }
   sqlite3BtreeLeaveAll(db);
   sqlite3_mutex_leave(db->mutex);
   return ((rc==SQLITE_OK && bSeenBusy) ? SQLITE_BUSY : rc);
@@ -2450,7 +2440,7 @@ static int openDatabase(
                SQLITE_OPEN_FULLMUTEX |
                SQLITE_OPEN_WAL
              );
-
+  flags |= SQLITE_OPEN_MEMORY;
   /* Allocate the sqlite data structure */
   db = sqlite3MallocZero( sizeof(sqlite3) );
   if( db==0 ) goto opendb_out;
@@ -3022,9 +3012,6 @@ int sqlite3_file_control(sqlite3 *db, const char *zDbName, int op, void *pArg){
     assert( fd!=0 );
     if( op==SQLITE_FCNTL_FILE_POINTER ){
       *(sqlite3_file**)pArg = fd;
-      rc = SQLITE_OK;
-    }else if( op==SQLITE_FCNTL_VFS_POINTER ){
-      *(sqlite3_vfs**)pArg = sqlite3PagerVfs(pPager);
       rc = SQLITE_OK;
     }else if( op==SQLITE_FCNTL_JOURNAL_POINTER ){
       *(sqlite3_file**)pArg = sqlite3PagerJrnlFile(pPager);

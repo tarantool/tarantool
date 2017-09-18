@@ -3440,7 +3440,8 @@ case OP_OpenEphemeral: {
       SQLITE_OPEN_CREATE |
       SQLITE_OPEN_EXCLUSIVE |
       SQLITE_OPEN_DELETEONCLOSE |
-      SQLITE_OPEN_TRANSIENT_DB;
+      SQLITE_OPEN_TRANSIENT_DB |
+      SQLITE_OPEN_MEMORY;
   assert( pOp->p1>=0 );
   assert( pOp->p2>=0 );
   pCx = allocateCursor(p, pOp->p1, pOp->p2, -1, CURTYPE_BTREE);
@@ -6296,10 +6297,8 @@ case OP_JournalMode: {    /* out2 */
   pPager = sqlite3BtreePager(pBt);
   eOld = sqlite3PagerGetJournalMode(pPager);
   if( eNew==PAGER_JOURNALMODE_QUERY ) eNew = eOld;
-  if( !sqlite3PagerOkToChangeJournalMode(pPager) ) eNew = eOld;
 
   if( rc ) eNew = eOld;
-  eNew = sqlite3PagerSetJournalMode(pPager, eNew);
 
   pOut->flags = MEM_Str|MEM_Static|MEM_Term;
   pOut->z = (char *)sqlite3JournalModename(eNew);
@@ -6773,7 +6772,6 @@ case OP_MaxPgcnt: {            /* out2 */
     newMax = sqlite3BtreeLastPage(pBt);
     if( newMax < (unsigned)pOp->p3 ) newMax = (unsigned)pOp->p3;
   }
-  pOut->u.i = sqlite3BtreeMaxPageCount(pBt, newMax);
   break;
 }
 #endif

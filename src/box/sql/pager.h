@@ -119,20 +119,10 @@ int sqlite3PagerClose(Pager *pPager, sqlite3*);
 int sqlite3PagerReadFileheader(Pager*, int, unsigned char*);
 
 /* Functions used to configure a Pager object. */
-void sqlite3PagerSetBusyhandler(Pager*, int(*)(void *), void *);
 int sqlite3PagerSetPagesize(Pager*, u32*, int);
-int sqlite3PagerMaxPageCount(Pager*, int);
 void sqlite3PagerSetCachesize(Pager*, int);
-int sqlite3PagerSetSpillsize(Pager*, int);
-void sqlite3PagerSetMmapLimit(Pager *, sqlite3_int64);
-void sqlite3PagerShrink(Pager*);
-void sqlite3PagerSetFlags(Pager*,unsigned);
 int sqlite3PagerLockingMode(Pager *, int);
-int sqlite3PagerSetJournalMode(Pager *, int);
 int sqlite3PagerGetJournalMode(Pager*);
-int sqlite3PagerOkToChangeJournalMode(Pager*);
-i64 sqlite3PagerJournalSizeLimit(Pager *, i64);
-int sqlite3PagerFlush(Pager*);
 
 /* Functions used to obtain and release page references. */ 
 int sqlite3PagerGet(Pager *pPager, Pgno pgno, DbPage **ppPage, int clrFlag);
@@ -150,13 +140,8 @@ void *sqlite3PagerGetExtra(DbPage *);
 
 /* Functions used to manage pager transactions and savepoints. */
 void sqlite3PagerPagecount(Pager*, int*);
-int sqlite3PagerBegin(Pager*, int exFlag, int);
-int sqlite3PagerCommitPhaseOne(Pager*,const char *zMaster, int);
+int sqlite3PagerCommitPhaseOne(Pager*);
 int sqlite3PagerExclusiveLock(Pager*);
-int sqlite3PagerSync(Pager *pPager, const char *zMaster);
-int sqlite3PagerCommitPhaseTwo(Pager*);
-int sqlite3PagerRollback(Pager*);
-int sqlite3PagerOpenSavepoint(Pager *pPager, int n);
 int sqlite3PagerSavepoint(Pager *pPager, int op, int iSavepoint);
 int sqlite3PagerSharedLock(Pager *pPager);
 
@@ -172,19 +157,10 @@ u32 sqlite3PagerDataVersion(Pager*);
 #ifdef SQLITE_DEBUG
   int sqlite3PagerRefcount(Pager*);
 #endif
-int sqlite3PagerMemUsed(Pager*);
 const char *sqlite3PagerFilename(Pager*, int);
-sqlite3_vfs *sqlite3PagerVfs(Pager*);
 sqlite3_file *sqlite3PagerFile(Pager*);
 sqlite3_file *sqlite3PagerJrnlFile(Pager*);
-const char *sqlite3PagerJournalname(Pager*);
 void *sqlite3PagerTempSpace(Pager*);
-int sqlite3PagerIsMemdb(Pager*);
-void sqlite3PagerCacheStat(Pager *, int, int, int *);
-int sqlite3SectorSize(sqlite3_file *);
-
-/* Functions used to truncate the database file. */
-void sqlite3PagerTruncateImage(Pager*,Pgno);
 
 void sqlite3PagerRekey(DbPage*, Pgno, u16);
 
@@ -194,8 +170,6 @@ void sqlite3PagerRekey(DbPage*, Pgno, u16);
   int sqlite3PagerIswriteable(DbPage*);
 #endif
 #ifdef SQLITE_TEST
-  int *sqlite3PagerStats(Pager*);
-  void sqlite3PagerRefdump(Pager*);
   void disable_simulated_io_errors(void);
   void enable_simulated_io_errors(void);
 #else

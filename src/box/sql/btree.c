@@ -2016,66 +2016,6 @@ int sqlite3BtreeOpen(
   ** If this Btree is a candidate for shared cache, try to find an
   ** existing BtShared object that we can share with
   */
-  if( isTempDb==0 && (isMemdb==0 || (vfsFlags&SQLITE_OPEN_URI)!=0) ){
-    if( vfsFlags & SQLITE_OPEN_SHAREDCACHE ){
-      int nFilename = sqlite3Strlen30(zFilename)+1;
-      int nFullPathname = pVfs->mxPathname+1;
-      char *zFullPathname = sqlite3Malloc(MAX(nFullPathname,nFilename));
-      MUTEX_LOGIC( sqlite3_mutex *mutexShared; )
-
-      p->sharable = 1;
-      if( !zFullPathname ){
-        sqlite3_free(p);
-        return SQLITE_NOMEM_BKPT;
-      }
-      if( isMemdb ){
-        memcpy(zFullPathname, zFilename, nFilename);
-      }else{
-        rc = sqlite3OsFullPathname(pVfs, zFilename,
-                                   nFullPathname, zFullPathname);
-        if( rc ){
-          sqlite3_free(zFullPathname);
-          sqlite3_free(p);
-          return rc;
-        }
-      }
-#if SQLITE_THREADSAFE
-      mutexOpen = sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_OPEN);
-      sqlite3_mutex_enter(mutexOpen);
-      mutexShared = sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_MASTER);
-      sqlite3_mutex_enter(mutexShared);
-#endif
-      for(pBt=GLOBAL(BtShared*,sqlite3SharedCacheList); pBt; pBt=pBt->pNext){
-        assert( pBt->nRef>0 );
-        if( 0==strcmp(zFullPathname, sqlite3PagerFilename(pBt->pPager, 0))
-                 && sqlite3PagerVfs(pBt->pPager)==pVfs ){
-          Btree *pExisting = db->mdb.pBt;
-          if( pExisting && pExisting->pBt==pBt ){
-            sqlite3_mutex_leave(mutexShared);
-            sqlite3_mutex_leave(mutexOpen);
-            sqlite3_free(zFullPathname);
-            sqlite3_free(p);
-            return SQLITE_CONSTRAINT;
-          }
-          p->pBt = pBt;
-          pBt->nRef++;
-          break;
-        }
-      }
-      sqlite3_mutex_leave(mutexShared);
-      sqlite3_free(zFullPathname);
-    }
-#ifdef SQLITE_DEBUG
-    else{
-      /* In debug mode, we mark all persistent databases as sharable
-      ** even when they are not.  This exercises the locking code and
-      ** gives more opportunity for asserts(sqlite3_mutex_held())
-      ** statements to find locking problems.
-      */
-      p->sharable = 1;
-    }
-#endif
-  }
 #endif
   if( pBt==0 ){
     /*
@@ -2097,7 +2037,6 @@ int sqlite3BtreeOpen(
     rc = sqlite3PagerOpen(pVfs, &pBt->pPager, zFilename,
                           sizeof(MemPage), flags, vfsFlags, pageReinit);
     if( rc==SQLITE_OK ){
-      sqlite3PagerSetMmapLimit(pBt->pPager, db->szMmap);
       rc = sqlite3PagerReadFileheader(pBt->pPager,sizeof(zDbHeader),zDbHeader);
     }
     if( rc!=SQLITE_OK ){
@@ -2105,7 +2044,6 @@ int sqlite3BtreeOpen(
     }
     pBt->openFlags = (u8)flags;
     pBt->db = db;
-    sqlite3PagerSetBusyhandler(pBt->pPager, btreeInvokeBusyHandler, pBt);
     p->pBt = pBt;
   
     pBt->pCursor = 0;
@@ -2373,62 +2311,6 @@ int sqlite3BtreeSetCacheSize(Btree *p, int mxPage){
   return SQLITE_OK;
 }
 
-/*
-** Change the "spill" limit on the number of pages in the cache.
-** If the number of pages exceeds this limit during a write transaction,
-** the pager might attempt to "spill" pages to the journal early in
-** order to free up memory.
-**
-** The value returned is the current spill size.  If zero is passed
-** as an argument, no changes are made to the spill size setting, so
-** using mxPage of 0 is a way to query the current spill size.
-*/
-int sqlite3BtreeSetSpillSize(Btree *p, int mxPage){
-  BtShared *pBt = p->pBt;
-  int res;
-  assert( sqlite3_mutex_held(p->db->mutex) );
-  sqlite3BtreeEnter(p);
-  res = sqlite3PagerSetSpillsize(pBt->pPager, mxPage);
-  sqlite3BtreeLeave(p);
-  return res;
-}
-
-#if SQLITE_MAX_MMAP_SIZE>0
-/*
-** Change the limit on the amount of the database file that may be
-** memory mapped.
-*/
-int sqlite3BtreeSetMmapLimit(Btree *p, sqlite3_int64 szMmap){
-  BtShared *pBt = p->pBt;
-  assert( sqlite3_mutex_held(p->db->mutex) );
-  sqlite3BtreeEnter(p);
-  sqlite3PagerSetMmapLimit(pBt->pPager, szMmap);
-  sqlite3BtreeLeave(p);
-  return SQLITE_OK;
-}
-#endif /* SQLITE_MAX_MMAP_SIZE>0 */
-
-/*
-** Change the way data is synced to disk in order to increase or decrease
-** how well the database resists damage due to OS crashes and power
-** failures.  Level 1 is the same as asynchronous (no syncs() occur and
-** there is a high probability of damage)  Level 2 is the default.  There
-** is a very low but non-zero probability of damage.  Level 3 reduces the
-** probability of damage to near zero but with a write performance reduction.
-*/
-#ifndef SQLITE_OMIT_PAGER_PRAGMAS
-int sqlite3BtreeSetPagerFlags(
-  Btree *p,              /* The btree to set the safety level on */
-  unsigned pgFlags       /* Various PAGER_* flags */
-){
-  BtShared *pBt = p->pBt;
-  assert( sqlite3_mutex_held(p->db->mutex) );
-  sqlite3BtreeEnter(p);
-  sqlite3PagerSetFlags(pBt->pPager, pgFlags);
-  sqlite3BtreeLeave(p);
-  return SQLITE_OK;
-}
-#endif
 
 /*
 ** Change the default pages size and the number of reserved bytes per page.
@@ -2515,19 +2397,6 @@ int sqlite3BtreeGetOptimalReserve(Btree *p){
   return n;
 }
 
-
-/*
-** Set the maximum page count for a database if mxPage is positive.
-** No changes are made if mxPage is 0 or negative.
-** Regardless of the value of mxPage, return the maximum page count.
-*/
-int sqlite3BtreeMaxPageCount(Btree *p, int mxPage){
-  int n;
-  sqlite3BtreeEnter(p);
-  n = sqlite3PagerMaxPageCount(p->pBt->pPager, mxPage);
-  sqlite3BtreeLeave(p);
-  return n;
-}
 
 /*
 ** Set the BTS_SECURE_DELETE flag if newFlag is 0 or 1.  If newFlag is -1,
@@ -2822,7 +2691,7 @@ int sqlite3BtreeNewDb(Btree *p){
 int sqlite3BtreeBeginTrans(Btree *p, int nSavepoint, int wrflag){
   BtShared *pBt = p->pBt;
   int rc = SQLITE_OK;
-
+  (void) nSavepoint;
   sqlite3BtreeEnter(p);
   btreeIntegrity(p);
 
@@ -2889,11 +2758,12 @@ int sqlite3BtreeBeginTrans(Btree *p, int nSavepoint, int wrflag){
     if( rc==SQLITE_OK && wrflag ){
       if( (pBt->btsFlags & BTS_READ_ONLY)!=0 ){
         rc = SQLITE_READONLY;
-      }else{
-        rc = sqlite3PagerBegin(pBt->pPager,wrflag>1,sqlite3TempInMemory(p->db));
-        if( rc==SQLITE_OK ){
-          rc = newDatabase(pBt);
-        }
+      }else {
+        // we have no transactions on ephem tables (other tables work over Tarantool)
+        //rc = sqlite3PagerBegin(pBt->pPager,wrflag>1,sqlite3TempInMemory(p->db));
+        //if( rc==SQLITE_OK ){
+        rc = newDatabase(pBt);
+        //}
       }
     }
   
@@ -2950,7 +2820,9 @@ trans_begun:
     ** open savepoints. If the second parameter is greater than 0 and
     ** the sub-journal is not already open, then it will be opened here.
     */
+    /* disabled as btree used only for ephemeral tables
     rc = sqlite3PagerOpenSavepoint(pBt->pPager, nSavepoint);
+     */
   }
 
   btreeIntegrity(p);
@@ -2984,12 +2856,12 @@ trans_begun:
 ** Once this is routine has returned, the only thing required to commit
 ** the write-transaction for this database file is to delete the journal.
 */
-int sqlite3BtreeCommitPhaseOne(Btree *p, const char *zMaster){
+int sqlite3BtreeCommitPhaseOne(Btree *p) {
   int rc = SQLITE_OK;
   if( p->inTrans==TRANS_WRITE ){
     BtShared *pBt = p->pBt;
     sqlite3BtreeEnter(p);
-    rc = sqlite3PagerCommitPhaseOne(pBt->pPager, zMaster, 0);
+    rc = sqlite3PagerCommitPhaseOne(pBt->pPager);
     sqlite3BtreeLeave(p);
   }
   return rc;
@@ -3072,7 +2944,10 @@ int sqlite3BtreeCommitPhaseTwo(Btree *p, int bCleanup){
     BtShared *pBt = p->pBt;
     assert( pBt->inTransaction==TRANS_WRITE );
     assert( pBt->nTransaction>0 );
+    /* disabled as pager used only by ephemeral tables
     rc = sqlite3PagerCommitPhaseTwo(pBt->pPager);
+     */
+    rc = SQLITE_OK;
     if( rc!=SQLITE_OK && bCleanup==0 ){
       sqlite3BtreeLeave(p);
       return rc;
@@ -3093,7 +2968,7 @@ int sqlite3BtreeCommitPhaseTwo(Btree *p, int bCleanup){
 int sqlite3BtreeCommit(Btree *p){
   int rc;
   sqlite3BtreeEnter(p);
-  rc = sqlite3BtreeCommitPhaseOne(p, 0);
+  rc = sqlite3BtreeCommitPhaseOne(p);
   if( rc==SQLITE_OK ){
     rc = sqlite3BtreeCommitPhaseTwo(p, 0);
   }
@@ -3192,13 +3067,8 @@ int sqlite3BtreeRollback(Btree *p, int tripCode, int writeOnly){
   btreeIntegrity(p);
 
   if( p->inTrans==TRANS_WRITE ){
-    int rc2;
 
     assert( TRANS_WRITE==pBt->inTransaction );
-    rc2 = sqlite3PagerRollback(pBt->pPager);
-    if( rc2!=SQLITE_OK ){
-      rc = rc2;
-    }
 
     /* The rollback may have destroyed the pPage1->aData value.  So
     ** call btreeGetPage() on page 1 again to make
@@ -3242,7 +3112,7 @@ int sqlite3BtreeRollback(Btree *p, int tripCode, int writeOnly){
 ** using the sqlite3BtreeSavepoint() function.
 */
 int sqlite3BtreeBeginStmt(Btree *p, int iStatement, int nSavepoint){
-  int rc;
+  int rc = SQLITE_OK;
   BtShared *pBt = p->pBt;
   sqlite3BtreeEnter(p);
   assert( p->inTrans==TRANS_WRITE );
@@ -3255,7 +3125,9 @@ int sqlite3BtreeBeginStmt(Btree *p, int iStatement, int nSavepoint){
   ** SQL statements. It is illegal to open, release or rollback any
   ** such savepoints while the statement transaction savepoint is active.
   */
-  rc = sqlite3PagerOpenSavepoint(pBt->pPager, iStatement);
+  /* disabled as pager used only by epemeral tables
+   * rc = sqlite3PagerOpenSavepoint(pBt->pPager, iStatement);
+   */
   sqlite3BtreeLeave(p);
   return rc;
 }
@@ -7833,19 +7705,6 @@ integrity_ck_cleanup:
 const char *sqlite3BtreeGetFilename(Btree *p){
   assert( p->pBt->pPager!=0 );
   return sqlite3PagerFilename(p->pBt->pPager, 1);
-}
-
-/*
-** Return the pathname of the journal file for this database. The return
-** value of this routine is the same regardless of whether the journal file
-** has been created or not.
-**
-** The pager journal filename is invariant as long as the pager is
-** open so it is safe to access without the BtShared mutex.
-*/
-const char *sqlite3BtreeGetJournalname(Btree *p){
-  assert( p->pBt->pPager!=0 );
-  return sqlite3PagerJournalname(p->pBt->pPager);
 }
 
 /*
