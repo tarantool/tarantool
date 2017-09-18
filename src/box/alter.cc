@@ -652,6 +652,18 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	return def;
 }
 
+/**
+ * Space old and new space triggers (move the original triggers
+ * to the new space, or vice versa, restore the original triggers
+ * in the old space).
+ */
+static void
+space_swap_triggers(struct space *new_space, struct space *old_space)
+{
+	rlist_swap(&new_space->on_replace, &old_space->on_replace);
+	rlist_swap(&new_space->on_stmt_begin, &old_space->on_stmt_begin);
+}
+
 /* }}} */
 
 /* {{{ struct alter_space - the body of a full blown alter */
@@ -804,10 +816,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	/*
 	 * Don't forget about space triggers.
 	 */
-	rlist_swap(&alter->new_space->on_replace,
-		   &alter->old_space->on_replace);
-	rlist_swap(&alter->new_space->on_stmt_begin,
-		   &alter->old_space->on_stmt_begin);
+	space_swap_triggers(alter->new_space, alter->old_space);
 	struct space *new_space = space_cache_replace(alter->old_space);
 	assert(new_space == alter->new_space);
 	(void) new_space;
@@ -904,10 +913,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	/*
 	 * Don't forget about space triggers.
 	 */
-	rlist_swap(&alter->new_space->on_replace,
-		   &alter->old_space->on_replace);
-	rlist_swap(&alter->new_space->on_stmt_begin,
-		   &alter->old_space->on_stmt_begin);
+	space_swap_triggers(alter->new_space, alter->old_space);
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
@@ -1700,10 +1706,7 @@ truncate_space_rollback(struct trigger *trigger, void * /* event */)
 	if (space_cache_replace(truncate->old_space) != truncate->new_space)
 		unreachable();
 
-	rlist_swap(&truncate->new_space->on_replace,
-		   &truncate->old_space->on_replace);
-	rlist_swap(&truncate->new_space->on_stmt_begin,
-		   &truncate->old_space->on_stmt_begin);
+	space_swap_triggers(truncate->new_space, truncate->old_space);
 	space_delete(truncate->new_space);
 }
 
@@ -1812,10 +1815,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		       truncate_space_rollback, truncate, NULL);
 	txn_on_rollback(txn, &truncate->on_rollback);
 
-	rlist_swap(&truncate->new_space->on_replace,
-		   &truncate->old_space->on_replace);
-	rlist_swap(&truncate->new_space->on_stmt_begin,
-		   &truncate->old_space->on_stmt_begin);
+	space_swap_triggers(truncate->new_space, truncate->old_space);
 }
 
 /* }}} */
