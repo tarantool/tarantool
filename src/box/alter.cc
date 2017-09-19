@@ -361,7 +361,7 @@ index_opts_decode(struct index_opts *opts, const char *map)
  * - fieldno of each part in the parts array is within limits
  */
 static struct index_def *
-index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
+index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 {
 	bool is_166plus;
 	index_def_check_tuple(tuple, &is_166plus);
@@ -399,7 +399,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
-			  space_name(old_space), "index name is too long");
+			  space_name(space), "index name is too long");
 	}
 	struct key_def *key_def = key_def_new(part_count);
 	if (key_def == NULL)
@@ -416,14 +416,14 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	}
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, type,
-			      &opts, key_def, space_index_key_def(old_space, 0));
+			      &opts, key_def, space_index_key_def(space, 0));
 	if (index_def == NULL)
 		diag_raise();
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-	index_def_check_xc(index_def, space_name(old_space));
-	old_space->handler->checkIndexDef(old_space, index_def);
-	if (old_space->sequence != NULL)
-		index_def_check_sequence(index_def, space_name(old_space));
+	index_def_check_xc(index_def, space_name(space));
+	space->handler->checkIndexDef(space, index_def);
+	if (space->sequence != NULL)
+		index_def_check_sequence(index_def, space_name(space));
 	index_def_guard.is_active = false;
 	return index_def;
 }
