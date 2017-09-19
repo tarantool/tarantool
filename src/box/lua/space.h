@@ -45,12 +45,4 @@ box_lua_space_init(struct lua_State *L);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-struct space;
-
-void
-box_lua_space_new(struct lua_State *L, struct space *space);
-
-void
-box_lua_space_delete(struct lua_State *L, uint32_t id);
-
 #endif /* INCLUDES_TARANTOOL_LUA_SPACE_H */

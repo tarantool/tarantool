@@ -154,6 +154,14 @@ func_by_name(const char *name, uint32_t name_len);
 bool
 schema_find_grants(const char *type, uint32_t id);
 
+/**
+ * Triggers fired after committing a change in space definition.
+ * The space is passed to the trigger callback in the event
+ * argument. It is the new space in case of create/update or
+ * the old space in case of drop.
+ */
+extern struct rlist on_alter_space;
+
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

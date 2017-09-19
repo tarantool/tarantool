@@ -783,12 +783,14 @@ alter_space_commit(struct trigger *trigger, void *event)
 	rlist_foreach_entry(op, &alter->ops, link) {
 		op->commit(alter, txn->signature);
 	}
-	/*
-	 * The new space is ready. Time to update the space
-	 * cache with it.
-	 */
+
+	trigger_run(&on_alter_space, alter->new_space);
 
 	alter->new_space = NULL; /* for alter_space_delete(). */
+	/*
+	 * Delete the old version of the space, we are not
+	 * going to use it.
+	 */
 	space_delete(alter->old_space);
 	alter_space_delete(alter);
 }
@@ -1262,6 +1264,7 @@ on_drop_space_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
+	trigger_run(&on_alter_space, space);
 	space_delete(space);
 }
 
@@ -1276,6 +1279,17 @@ on_drop_space_rollback(struct trigger *trigger, void *event)
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
 	space_cache_replace(space);
+}
+
+/**
+ * Run the triggers registered on commit of a change in _space.
+ */
+static void
+on_create_space_commit(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct space *space = (struct space *)trigger->data;
+	trigger_run(&on_alter_space, space);
 }
 
 /**
@@ -1436,6 +1450,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * so it's safe to simply drop the space on
 		 * rollback.
 		 */
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_create_space_commit, space);
+		txn_on_commit(txn, on_commit);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(on_create_space_rollback, space);
 		txn_on_rollback(txn, on_rollback);

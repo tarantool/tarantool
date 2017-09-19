@@ -35,8 +35,6 @@
 #include "func.h"
 #include "tuple.h"
 #include "assoc.h"
-#include "lua/utils.h"
-#include "lua/space.h"
 #include "alter.h"
 #include "scoped_guard.h"
 #include "version.h"
@@ -62,6 +60,8 @@ static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
 uint32_t schema_version = 0;
 uint32_t dd_version_id = version_id(1, 6, 4);
+
+struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 
 /**
  * Lock of scheme modification
@@ -141,8 +141,6 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 struct space *
 space_cache_delete(uint32_t id)
 {
-	if (tarantool_L)
-		box_lua_space_delete(tarantool_L, id);
 	mh_int_t k = mh_i32ptr_find(spaces, id, NULL);
 	assert(k != mh_end(spaces));
 	struct space *space = (struct space *)mh_i32ptr_node(spaces, k)->val;
@@ -166,12 +164,6 @@ space_cache_replace(struct space *space)
 			       "dictionary cache.");
 	}
 	schema_version++;
-	/*
-	 * Must be after the space is put into the hash, since
-	 * box.schema.space.bless() uses hash look up to find the
-	 * space and create userdata objects for space objects.
-	 */
-	box_lua_space_new(tarantool_L, space);
 	return p_old ? (struct space *) p_old->val : NULL;
 }
 
@@ -216,6 +208,8 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	 *   a snapshot of older version.
 	 */
 	space->handler->initSystemSpace(space);
+
+	trigger_run(&on_alter_space, space);
 }
 
 uint32_t
