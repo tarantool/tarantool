@@ -99,6 +99,14 @@ struct key_def {
 	tuple_hash_t tuple_hash;
 	/** @see key_hash() */
 	key_hash_t key_hash;
+	/**
+	 * Minimal part count which always is unique. For example,
+	 * if a secondary index is unique, then
+	 * unique_part_count == secondary index part count. But if
+	 * a secondary index is not unique, then
+	 * unique_part_count == part count of a merged key_def.
+	 */
+	uint32_t unique_part_count;
 	/** True, if at least one part can store NULL. */
 	bool is_nullable;
 	/** Key fields mask. @sa column_mask.h for details. */

@@ -143,6 +143,7 @@ key_def_new(uint32_t part_count)
 		return NULL;
 	}
 	key_def->part_count = part_count;
+	key_def->unique_part_count = part_count;
 	return key_def;
 }
 
@@ -462,6 +463,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		return NULL;
 	}
 	new_def->part_count = new_part_count;
+	new_def->unique_part_count = new_part_count;
 	new_def->is_nullable = first->is_nullable || second->is_nullable;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
