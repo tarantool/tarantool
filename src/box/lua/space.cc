@@ -193,13 +193,17 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		for (uint32_t j = 0; j < index_def->key_def->part_count; j++) {
 			lua_pushnumber(L, j + 1);
 			lua_newtable(L);
+			const struct key_part *part =
+				&index_def->key_def->parts[j];
 
-			lua_pushstring(L,
-			       field_type_strs[index_def->key_def->parts[j].type]);
+			lua_pushstring(L, field_type_strs[part->type]);
 			lua_setfield(L, -2, "type");
 
-			lua_pushnumber(L, index_def->key_def->parts[j].fieldno + 1);
+			lua_pushnumber(L, part->fieldno + TUPLE_INDEX_BASE);
 			lua_setfield(L, -2, "fieldno");
+
+			lua_pushboolean(L, part->is_nullable);
+			lua_setfield(L, -2, "is_nullable");
 
 			lua_settable(L, -3); /* index[k].parts[j] */
 		}

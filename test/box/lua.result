@@ -713,8 +713,10 @@ tmp = space:create_index('primary', { type = 'tree', parts = {3, 'unsigned', 2, 
 space.index['primary'].parts
 ---
 - - type: unsigned
+    is_nullable: false
     fieldno: 3
   - type: unsigned
+    is_nullable: false
     fieldno: 2
 ...
 space:insert{1, 2, 3, 4}

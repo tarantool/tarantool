@@ -97,6 +97,8 @@ struct tuple_field {
 	bool is_key_part;
 	/** Tuple field name, specified by a user. Can be NULL. */
 	char *name;
+	/** True, if a field can store NULL. */
+	bool is_nullable;
 };
 
 struct mh_strnu32_t;

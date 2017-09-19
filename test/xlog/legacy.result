@@ -50,6 +50,7 @@ sk = box.space._index:insert{s.id, 2, 'sk', 'rtree', 0, 1, 2, 'array'}
 s.index.sk.parts
 ---
 - - type: array
+    is_nullable: false
     fieldno: 3
 ...
 s.index.sk:drop()

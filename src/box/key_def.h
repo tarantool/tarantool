@@ -53,6 +53,8 @@ struct key_part {
 	enum field_type type;
 	/** Collation definition for string comparison */
 	struct coll *coll;
+	/** True if a part can store NULLs. */
+	bool is_nullable;
 };
 
 struct key_def;
@@ -97,6 +99,8 @@ struct key_def {
 	tuple_hash_t tuple_hash;
 	/** @see key_hash() */
 	key_hash_t key_hash;
+	/** True, if at least one part can store NULL. */
+	bool is_nullable;
 	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
 	/** The size of the 'parts' array. */
@@ -158,9 +162,8 @@ key_def_new(uint32_t part_count);
  * @pre part_no < part_count
  */
 void
-key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type,
-		 struct coll *coll);
+key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
+		 enum field_type type, bool is_nullable, struct coll *coll);
 
 /**
  * An snprint-style function to print a key definition.
@@ -193,7 +196,8 @@ key_def_encode_parts(char *data, const struct key_def *key_def);
  *  {field=NUM, type=STR, ..}{field=NUM, type=STR, ..}..,
  */
 int
-key_def_decode_parts(struct key_def *key_def, const char **data);
+key_def_decode_parts(struct key_def *key_def, const char **data,
+		     const struct field_def *fields, uint32_t field_count);
 
 /**
  * 1.6.0-1.6.5
@@ -204,7 +208,8 @@ key_def_decode_parts(struct key_def *key_def, const char **data);
  *  NUM, STR, NUM, STR, ..,
  */
 int
-key_def_decode_parts_160(struct key_def *key_def, const char **data);
+key_def_decode_parts_160(struct key_def *key_def, const char **data,
+			 const struct field_def *fields, uint32_t field_count);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.

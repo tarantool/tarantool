@@ -79,12 +79,14 @@ const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("type", field_type, struct field_def, type,
 		     field_type_by_name_wrapper),
 	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
+	OPT_DEF("is_nullable", OPT_BOOL, struct field_def, is_nullable),
 	OPT_END,
 };
 
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
 	.name = NULL,
+	.is_nullable = false,
 };
 
 enum field_type

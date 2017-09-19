@@ -274,11 +274,14 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	auto key_def_guard = make_scoped_guard([=] { box_key_def_delete(key_def); });
 	if (is_166plus) {
 		/* 1.6.6+ */
-		if (key_def_decode_parts(key_def, &parts) != 0)
+		if (key_def_decode_parts(key_def, &parts, space->def->fields,
+					 space->def->field_count) != 0)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_160(key_def, &parts) != 0)
+		if (key_def_decode_parts_160(key_def, &parts,
+					     space->def->fields,
+					     space->def->field_count) != 0)
 			diag_raise();
 	}
 	struct index_def *index_def =

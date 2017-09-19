@@ -237,6 +237,7 @@ end;
 t;
 ---
 - - 'type : unsigned'
+  - 'is_nullable : false'
   - 'fieldno : 1'
 ...
 ----------------
@@ -382,9 +383,11 @@ t;
   - 'box.error.UPDATE_ARG_TYPE : 26'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.IDENTIFIER : 70'
+  - 'box.error.injection : table: <address>
+  - 'box.error.NULLABLE_MISMATCH : 153'
   - 'box.error.NO_SUCH_ENGINE : 57'
   - 'box.error.COMMIT_IN_SUB_STMT : 122'
-  - 'box.error.injection : table: <address>
+  - 'box.error.TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.SPACE_FIELD_IS_DUPLICATE : 149'
   - 'box.error.LAST_DROP : 15'
   - 'box.error.SEQUENCE_OVERFLOW : 147'
@@ -433,7 +436,7 @@ t;
   - 'box.error.UNKNOWN : 0'
   - 'box.error.NO_CONNECTION : 77'
   - 'box.error.DROP_PRIMARY_KEY : 17'
-  - 'box.error.TUPLE_FORMAT_LIMIT : 16'
+  - 'box.error.NULLABLE_PRIMARY : 152'
   - 'box.error.NO_SUCH_SEQUENCE : 145'
   - 'box.error.PROC_RET : 21'
   - 'box.error.INVALID_UUID : 64'

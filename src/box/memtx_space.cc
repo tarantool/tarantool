@@ -507,6 +507,17 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 static void
 memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
+	if (index_def->key_def->is_nullable) {
+		if (index_def->iid == 0) {
+			tnt_raise(ClientError, ER_NULLABLE_PRIMARY,
+				  space_name(space));
+		}
+		if (index_def->type != TREE) {
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+				  index_type_strs[index_def->type],
+				  "nullable parts");
+		}
+	}
 	switch (index_def->type) {
 	case HASH:
 		if (! index_def->opts.is_unique) {

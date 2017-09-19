@@ -91,6 +91,8 @@ struct field_def {
 	enum field_type type;
 	/** 0-terminated field name. */
 	char *name;
+	/** True, if a field can store NULL. */
+	bool is_nullable;
 };
 
 #if defined(__cplusplus)

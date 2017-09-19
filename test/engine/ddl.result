@@ -311,6 +311,7 @@ pk = space:create_index('pk', {parts={{field = 1, type = 'unsigned'}}})
 pk.parts
 ---
 - - type: unsigned
+    is_nullable: false
     fieldno: 1
 ...
 pk:drop()
@@ -322,6 +323,7 @@ pk = space:create_index('pk', {parts={{1, 'unsigned'}}})
 pk.parts
 ---
 - - type: unsigned
+    is_nullable: false
     fieldno: 1
 ...
 pk:drop()
@@ -333,6 +335,7 @@ pk = space:create_index('pk', {parts={{1, type='unsigned'}}})
 pk.parts
 ---
 - - type: unsigned
+    is_nullable: false
     fieldno: 1
 ...
 space:insert{1, 2, 3}

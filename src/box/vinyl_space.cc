@@ -187,6 +187,8 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 		          index_def->name,
 			  space_name(space));
 	}
+	if (index_def->key_def->is_nullable && index_def->iid == 0)
+		tnt_raise(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
 	/* Check that there are no ANY, ARRAY, MAP parts */
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
 		struct key_part *part = &index_def->key_def->parts[i];

@@ -35,6 +35,39 @@
 #include "schema_def.h"
 #include "coll_cache.h"
 
+struct key_part_def {
+	/** Tuple field index for this part. */
+	uint32_t fieldno;
+	/** Type of the tuple field. */
+	enum field_type type;
+	/** Collation ID for string comparison. */
+	uint32_t coll_id;
+	/** True if a key part can store NULLs. */
+	bool is_nullable;
+};
+
+static const struct key_part_def key_part_def_default = {
+	0,
+	field_type_MAX,
+	UINT32_MAX,
+	false,
+};
+
+static int64_t
+part_type_by_name_wrapper(const char *str, uint32_t len)
+{
+	return field_type_by_name(str, len);
+}
+
+const struct opt_def part_def_reg[] = {
+	OPT_DEF_ENUM("type", field_type, struct key_part_def, type,
+		     part_type_by_name_wrapper),
+	OPT_DEF("field", OPT_UINT32, struct key_part_def, fieldno),
+	OPT_DEF("collation", OPT_UINT32, struct key_part_def, coll_id),
+	OPT_DEF("is_nullable", OPT_BOOL, struct key_part_def, is_nullable),
+	OPT_END,
+};
+
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
 	/* .MP_UINT   = */ "unsigned",
@@ -120,9 +153,11 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 	if (key_def == NULL)
 		return key_def;
 
-	for (uint32_t item = 0; item < part_count; ++item)
+	for (uint32_t item = 0; item < part_count; ++item) {
 		key_def_set_part(key_def, item, fields[item],
-				 (enum field_type)types[item], NULL);
+				 (enum field_type)types[item],
+				 key_part_def_default.is_nullable, NULL);
+	}
 	return key_def;
 }
 
@@ -174,12 +209,13 @@ key_part_check_compatibility(const struct key_part *old_parts,
 }
 
 void
-key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type,
-		 struct coll *coll)
+key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
+		 enum field_type type, bool is_nullable, struct coll *coll)
 {
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
+	def->is_nullable |= is_nullable;
+	def->parts[part_no].is_nullable = is_nullable;
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	def->parts[part_no].coll = coll;
@@ -272,7 +308,8 @@ key_def_encode_parts(char *data, const struct key_def *key_def)
  *  [NUM, STR, ..][NUM, STR, ..]..,
  */
 static int
-key_def_decode_parts_166(struct key_def *key_def, const char **data)
+key_def_decode_parts_166(struct key_def *key_def, const char **data,
+			 const struct field_def *fields, uint32_t field_count)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (mp_typeof(**data) != MP_ARRAY) {
@@ -312,51 +349,40 @@ key_def_decode_parts_166(struct key_def *key_def, const char **data)
 				 "unknown field type");
 			return -1;
 		}
-		key_def_set_part(key_def, i, field_no, field_type, NULL);
+		bool is_nullable;
+		if (field_no < field_count)
+			is_nullable = fields[field_no].is_nullable;
+		else
+			is_nullable = key_part_def_default.is_nullable;
+		key_def_set_part(key_def, i, field_no, field_type, is_nullable,
+				 NULL);
 	}
 	return 0;
 }
 
-static int64_t
-part_type_by_name_wrapper(const char *str, uint32_t len)
-{
-	return field_type_by_name(str, len);
-}
-
-struct key_part_def {
-	/** Tuple field index for this part */
-	uint32_t fieldno;
-	/** Type of the tuple field */
-	enum field_type type;
-	/** Collation ID for string comparison */
-	uint32_t coll_id;
-};
-
-const struct opt_def part_def_reg[] = {
-	OPT_DEF_ENUM("type", field_type, struct key_part_def, type,
-		     part_type_by_name_wrapper),
-	OPT_DEF("field", OPT_UINT32, struct key_part_def, fieldno),
-	OPT_DEF("collation", OPT_UINT32, struct key_part_def, coll_id),
-	OPT_END,
-};
-
 int
-key_def_decode_parts(struct key_def *key_def, const char **data)
+key_def_decode_parts(struct key_def *key_def, const char **data,
+		     const struct field_def *fields, uint32_t field_count)
 {
-	if (mp_typeof(**data) == MP_ARRAY)
-		return key_def_decode_parts_166(key_def, data);
+	if (mp_typeof(**data) == MP_ARRAY) {
+		return key_def_decode_parts_166(key_def, data, fields,
+						field_count);
+	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (mp_typeof(**data) != MP_MAP) {
-			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, i + 1,
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+				 i + TUPLE_INDEX_BASE,
 				 "index part is expected to be a map");
 			return -1;
 		}
-		struct key_part_def part = {0, field_type_MAX, UINT32_MAX};
+		struct key_part_def part = key_part_def_default;
 		if (opts_decode(&part, part_def_reg, data,
-				ER_WRONG_INDEX_OPTIONS, i + 1, NULL) != 0)
+				ER_WRONG_INDEX_OPTIONS, i + TUPLE_INDEX_BASE,
+				NULL) != 0)
 			return -1;
 		if (part.type == field_type_MAX) {
-			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, i + 1,
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+				 i + TUPLE_INDEX_BASE,
 				 "index part: unknown field type");
 			return -1;
 		}
@@ -370,13 +396,15 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 				return -1;
 			}
 		}
-		key_def_set_part(key_def, i, part.fieldno, part.type, coll);
+		key_def_set_part(key_def, i, part.fieldno, part.type,
+				 part.is_nullable, coll);
 	}
 	return 0;
 }
 
 int
-key_def_decode_parts_160(struct key_def *key_def, const char **data)
+key_def_decode_parts_160(struct key_def *key_def, const char **data,
+			 const struct field_def *fields, uint32_t field_count)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		uint32_t field_no = (uint32_t) mp_decode_uint(data);
@@ -388,7 +416,13 @@ key_def_decode_parts_160(struct key_def *key_def, const char **data)
 				 "unknown field type");
 			return -1;
 		}
-		key_def_set_part(key_def, i, field_no, field_type, NULL);
+		bool is_nullable;
+		if (field_no < field_count)
+			is_nullable = fields[field_no].is_nullable;
+		else
+			is_nullable = key_part_def_default.is_nullable;
+		key_def_set_part(key_def, i, field_no, field_type, is_nullable,
+				 NULL);
 	}
 	return 0;
 }
@@ -428,14 +462,16 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		return NULL;
 	}
 	new_def->part_count = new_part_count;
+	new_def->is_nullable = first->is_nullable || second->is_nullable;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
 	/* Append first key def's parts to the new index_def. */
 	part = first->parts;
 	end = part + first->part_count;
-	for (; part != end; part++)
+	for (; part != end; part++) {
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->coll);
+				 part->is_nullable, part->coll);
+	}
 
 	/* Set-append second key def's part to the new key def. */
 	part = second->parts;
@@ -444,7 +480,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		if (key_def_find(first, part->fieldno))
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->coll);
+				 part->is_nullable, part->coll);
 	}
 	return new_def;
 }
