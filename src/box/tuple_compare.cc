@@ -86,10 +86,9 @@ mp_compare_bool(const char *field_a, const char *field_b)
 }
 
 static int
-mp_compare_integer(const char *field_a, const char *field_b)
+mp_compare_integer_with_hint(const char *field_a, enum mp_type a_type,
+			     const char *field_b, enum mp_type b_type)
 {
-	enum mp_type a_type = mp_typeof(*field_a);
-	enum mp_type b_type = mp_typeof(*field_b);
 	assert(mp_classof(a_type) == MP_CLASS_NUMBER);
 	assert(mp_classof(b_type) == MP_CLASS_NUMBER);
 	if (a_type == MP_UINT) {
@@ -245,10 +244,9 @@ mp_compare_double_any_number(double lhs, const char *rhs,
 }
 
 static int
-mp_compare_number(const char *lhs, const char *rhs)
+mp_compare_number_with_hint(const char *lhs, enum mp_type lhs_type,
+			    const char *rhs, enum mp_type rhs_type)
 {
-	enum mp_type lhs_type = mp_typeof(*lhs);
-	enum mp_type rhs_type = mp_typeof(*rhs);
 	assert(mp_classof(lhs_type) == MP_CLASS_NUMBER);
 	assert(mp_classof(rhs_type) == MP_CLASS_NUMBER);
 
@@ -274,7 +272,14 @@ mp_compare_number(const char *lhs, const char *rhs)
 		);
 	}
 	assert(lhs_type == MP_INT || lhs_type == MP_UINT);
-	return mp_compare_integer(lhs, rhs);
+	return mp_compare_integer_with_hint(lhs, lhs_type, rhs, rhs_type);
+}
+
+static inline int
+mp_compare_number(const char *lhs, const char *rhs)
+{
+	return mp_compare_number_with_hint(lhs, mp_typeof(*lhs),
+					   rhs, mp_typeof(*rhs));
 }
 
 static inline int
@@ -311,10 +316,9 @@ static mp_compare_f mp_class_comparators[] = {
 };
 
 static int
-mp_compare_scalar(const char *field_a, const char *field_b)
+mp_compare_scalar_with_hint(const char *field_a, enum mp_type a_type,
+			    const char *field_b, enum mp_type b_type)
 {
-	enum mp_type a_type = mp_typeof(*field_a);
-	enum mp_type b_type = mp_typeof(*field_b);
 	enum mp_class a_class = mp_classof(a_type);
 	enum mp_class b_class = mp_classof(b_type);
 	if (a_class != b_class)
@@ -322,6 +326,13 @@ mp_compare_scalar(const char *field_a, const char *field_b)
 	mp_compare_f cmp = mp_class_comparators[a_class];
 	assert(cmp != NULL);
 	return cmp(field_a, field_b);
+}
+
+static inline int
+mp_compare_scalar(const char *field_a, const char *field_b)
+{
+	return mp_compare_scalar_with_hint(field_a, mp_typeof(*field_a),
+					   field_b, mp_typeof(*field_b));
 }
 
 /**
@@ -343,7 +354,10 @@ tuple_compare_field(const char *field_a, const char *field_b,
 	case FIELD_TYPE_STRING:
 		return mp_compare_str(field_a, field_b);
 	case FIELD_TYPE_INTEGER:
-		return mp_compare_integer(field_a, field_b);
+		return mp_compare_integer_with_hint(field_a,
+						    mp_typeof(*field_a),
+						    field_b,
+						    mp_typeof(*field_b));
 	case FIELD_TYPE_NUMBER:
 		return mp_compare_number(field_a, field_b);
 	case FIELD_TYPE_BOOLEAN:
