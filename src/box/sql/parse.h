@@ -160,8 +160,8 @@
 #define TK_ILLEGAL                        160
 
 /* The token codes above must all fit in 8 bits */
-#define TKFLG_MASK           0xff  
+#define TKFLG_MASK           0xff
 
 /* Flags that can be added to a token code when it is not
-** being stored in a u8: */
-#define TKFLG_DONTFOLD       0x100  /* Omit constant folding optimizations */
+ * being stored in a u8: */
+#define TKFLG_DONTFOLD       0x100	/* Omit constant folding optimizations */

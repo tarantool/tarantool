@@ -108,7 +108,7 @@
 #define OP_OpenAutoindex 105 /* synopsis: nColumn=P2                       */
 #define OP_OpenEphemeral 106 /* synopsis: nColumn=P2                       */
 #define OP_SorterOpen    107
-#define OP_SequenceTest  108 /* synopsis: if( cursor[P1].ctr++ ) pc = P2   */
+#define OP_SequenceTest  108 /* synopsis: if (cursor[P1].ctr++) pc = P2    */
 #define OP_OpenPseudo    109 /* synopsis: P3 columns in r[P2]              */
 #define OP_Close         110
 #define OP_ColumnsUsed   111

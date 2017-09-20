@@ -119,7 +119,7 @@ const char *sqlite3OpcodeName(int i){
     /* 105 */ "OpenAutoindex"    OpHelp("nColumn=P2"),
     /* 106 */ "OpenEphemeral"    OpHelp("nColumn=P2"),
     /* 107 */ "SorterOpen"       OpHelp(""),
-    /* 108 */ "SequenceTest"     OpHelp("if( cursor[P1].ctr++ ) pc = P2"),
+    /* 108 */ "SequenceTest"     OpHelp("if (cursor[P1].ctr++) pc = P2"),
     /* 109 */ "OpenPseudo"       OpHelp("P3 columns in r[P2]"),
     /* 110 */ "Close"            OpHelp(""),
     /* 111 */ "ColumnsUsed"      OpHelp(""),
