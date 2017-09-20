@@ -220,6 +220,8 @@ key_hash_slowpath(const char *key, const struct key_def *key_def);
 
 void
 tuple_hash_func_set(struct key_def *key_def) {
+	if (key_def->is_nullable)
+		goto slowpath;
 	/*
 	 * Check that key_def defines sequential a key without holes
 	 * starting from **arbitrary** field.

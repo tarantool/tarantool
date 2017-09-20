@@ -139,9 +139,10 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 
 	/* Check field types */
 	for (uint32_t i = 0; i < format->field_count; i++) {
-		if (key_mp_type_validate(format->fields[i].type,
-					 mp_typeof(*tuple), ER_FIELD_TYPE,
-					 i + TUPLE_INDEX_BASE))
+		struct tuple_field *field = &format->fields[i];
+		if (key_mp_type_validate(field->type, mp_typeof(*tuple),
+					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE,
+					 field->is_nullable))
 			return -1;
 		mp_next(&tuple);
 	}

@@ -274,9 +274,18 @@ MemtxTree::MemtxTree(struct index_def *index_def_arg)
 	build_array_alloc_size(0)
 {
 	memtx_index_arena_init();
-	/** Use extended key def only for non-unique indexes. */
-	struct key_def *cmp_def = index_def->opts.is_unique ?
-		index_def->key_def : index_def->cmp_def;
+	/**
+	 * Use extended key def for non-unique and nullable
+	 * indexes. Unique, but nullable, index can store
+	 * multiple NULLs. To correctly compare these NULLs
+	 * extended key def must be used. For details @sa
+	 * tuple_compare.cc.
+	 */
+	struct key_def *cmp_def;
+	if (index_def->opts.is_unique && !index_def->key_def->is_nullable)
+		cmp_def = index_def->key_def;
+	else
+		cmp_def = index_def->cmp_def;
 	memtx_tree_create(&tree, cmp_def,
 			  memtx_index_extent_alloc,
 			  memtx_index_extent_free, NULL);

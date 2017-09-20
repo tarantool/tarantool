@@ -100,6 +100,336 @@ format[2].is_nullable = true
 s:format(format) -- Ok.
 ---
 ...
+-- Test insert.
+s:insert{1, 1}
+---
+- [1, 1]
+...
+s:insert{2, NULL}
+---
+- [2, null]
+...
+s:insert{3, NULL}
+---
+- [3, null]
+...
+s:insert{4, 1} -- Fail.
+---
+- error: Duplicate key exists in unique index 'sk' in space 'test'
+...
+s:insert{5, NULL}
+---
+- [5, null]
+...
+pk:select{}
+---
+- - [1, 1]
+  - [2, null]
+  - [3, null]
+  - [5, null]
+...
+sk:select{}
+---
+- - [2, null]
+  - [3, null]
+  - [5, null]
+  - [1, 1]
+...
+-- Test iterators.
+sk:get{NULL}
+---
+- [2, null]
+...
+sk:select{NULL}
+---
+- - [2, null]
+  - [3, null]
+  - [5, null]
+...
+sk:select({NULL}, {iterator = 'LE'})
+---
+- - [5, null]
+  - [3, null]
+  - [2, null]
+...
+sk:select({NULL}, {iterator = 'LT'})
+---
+- []
+...
+sk:select({NULL}, {iterator = 'GE'})
+---
+- - [2, null]
+  - [3, null]
+  - [5, null]
+  - [1, 1]
+...
+sk:select({NULL}, {iterator = 'GT'})
+---
+- - [1, 1]
+...
+_ = sk:delete{NULL}
+---
+...
+sk:select{}
+---
+- - [3, null]
+  - [5, null]
+  - [1, 1]
+...
+pk:select{}
+---
+- - [1, 1]
+  - [3, null]
+  - [5, null]
+...
+-- Test snapshot during iterator (Vinyl restore).
+create_iterator = require('utils').create_iterator
+---
+...
+iter = create_iterator(sk, {NULL})
+---
+...
+iter.next()
+---
+- [3, null]
+...
+box.snapshot()
+---
+- ok
+...
+iter.iterate_over()
+---
+- 0: [5, null]
+...
+sk:select{}
+---
+- - [3, null]
+  - [5, null]
+  - [1, 1]
+...
+pk:select{}
+---
+- - [1, 1]
+  - [3, null]
+  - [5, null]
+...
+-- Test replace.
+s:replace{2, 2}
+---
+- [2, 2]
+...
+s:replace{3, NULL} -- no changes.
+---
+- [3, null]
+...
+s:replace{6, NULL}
+---
+- [6, null]
+...
+pk:select{}
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, null]
+  - [5, null]
+  - [6, null]
+...
+sk:select{}
+---
+- - [3, null]
+  - [5, null]
+  - [6, null]
+  - [1, 1]
+  - [2, 2]
+...
+-- Test not unique indexes.
+s:truncate()
+---
+...
+sk:drop()
+---
+...
+sk = s:create_index('sk', { parts = parts, unique = false })
+---
+...
+s:insert{1, 1}
+---
+- [1, 1]
+...
+s:insert{2, NULL}
+---
+- [2, null]
+...
+s:insert{3, NULL}
+---
+- [3, null]
+...
+s:insert{4, 1}
+---
+- [4, 1]
+...
+s:insert{5, NULL}
+---
+- [5, null]
+...
+pk:select{}
+---
+- - [1, 1]
+  - [2, null]
+  - [3, null]
+  - [4, 1]
+  - [5, null]
+...
+sk:select{}
+---
+- - [2, null]
+  - [3, null]
+  - [5, null]
+  - [1, 1]
+  - [4, 1]
+...
+-- Test several secondary indexes.
+s:truncate()
+---
+...
+format[2].is_nullable = true
+---
+...
+format[3] = { name = 'field3', type = 'unsigned', is_nullable = true }
+---
+...
+s:format(format)
+---
+...
+parts[1].field = 3
+---
+...
+sk2 = s:create_index('sk2', { parts = parts })
+---
+...
+s:replace{4, 3, 4}
+---
+- [4, 3, 4]
+...
+s:replace{3, 3, 3}
+---
+- [3, 3, 3]
+...
+s:replace{2, NULL, NULL}
+---
+- [2, null, null]
+...
+s:replace{1, NULL, 1}
+---
+- [1, null, 1]
+...
+s:replace{0, 0, NULL}
+---
+- [0, 0, null]
+...
+pk:select{}
+---
+- - [0, 0, null]
+  - [1, null, 1]
+  - [2, null, null]
+  - [3, 3, 3]
+  - [4, 3, 4]
+...
+sk:select{}
+---
+- - [1, null, 1]
+  - [2, null, null]
+  - [0, 0, null]
+  - [3, 3, 3]
+  - [4, 3, 4]
+...
+sk2:select{}
+---
+- - [0, 0, null]
+  - [2, null, null]
+  - [1, null, 1]
+  - [3, 3, 3]
+  - [4, 3, 4]
+...
+-- Check duplicate conflict on replace.
+s:replace{4, 4, 3} -- fail
+---
+- error: Duplicate key exists in unique index 'sk2' in space 'test'
+...
+s:replace{4, 4, NULL} -- ok
+---
+- [4, 4, null]
+...
+pk:select{}
+---
+- - [0, 0, null]
+  - [1, null, 1]
+  - [2, null, null]
+  - [3, 3, 3]
+  - [4, 4, null]
+...
+sk:select{}
+---
+- - [1, null, 1]
+  - [2, null, null]
+  - [0, 0, null]
+  - [3, 3, 3]
+  - [4, 4, null]
+...
+sk2:select{}
+---
+- - [0, 0, null]
+  - [2, null, null]
+  - [4, 4, null]
+  - [1, null, 1]
+  - [3, 3, 3]
+...
+-- Check delete works correctrly with multiple secondary indexes.
+_ = sk2:delete{NULL}
+---
+...
+pk:select{}
+---
+- - [1, null, 1]
+  - [2, null, null]
+  - [3, 3, 3]
+  - [4, 4, null]
+...
+sk:select{}
+---
+- - [1, null, 1]
+  - [2, null, null]
+  - [3, 3, 3]
+  - [4, 4, null]
+...
+sk2:select{}
+---
+- - [2, null, null]
+  - [4, 4, null]
+  - [1, null, 1]
+  - [3, 3, 3]
+...
+_ = pk:delete{2}
+---
+...
+pk:select{}
+---
+- - [1, null, 1]
+  - [3, 3, 3]
+  - [4, 4, null]
+...
+sk:select{}
+---
+- - [1, null, 1]
+  - [3, 3, 3]
+  - [4, 4, null]
+...
+sk2:select{}
+---
+- - [4, 4, null]
+  - [1, null, 1]
+  - [3, 3, 3]
+...
 s:drop()
 ---
 ...

@@ -254,8 +254,8 @@ struct snapshot_iterator {
  * @retval -1 The key is invalid.
  */
 int
-key_validate(struct index_def *index_def, enum iterator_type type, const char *key,
-	     uint32_t part_count);
+key_validate(const struct index_def *index_def, enum iterator_type type,
+	     const char *key, uint32_t part_count);
 
 /**
  * Check that the supplied key is valid for a search in a unique

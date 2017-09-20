@@ -2861,7 +2861,9 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * conflict with existing tuples. If the index is not
 	 * unique a conflict is impossible.
 	 */
-	if (index->opts.is_unique) {
+	if (index->opts.is_unique &&
+	    (!index->key_def->is_nullable ||
+	     !vy_tuple_key_contains_null(stmt, index->key_def))) {
 		uint32_t key_len;
 		const char *key = tuple_extract_key(stmt, index->cmp_def,
 						    &key_len);

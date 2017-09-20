@@ -54,8 +54,8 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 }
 
 int
-key_validate(struct index_def *index_def, enum iterator_type type, const char *key,
-	     uint32_t part_count)
+key_validate(const struct index_def *index_def, enum iterator_type type,
+	     const char *key, uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
 	if (part_count == 0) {
@@ -81,7 +81,7 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 		if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
 			if (key_mp_type_validate(FIELD_TYPE_ARRAY, mp_type,
-						 ER_KEY_PART_TYPE, 0))
+						 ER_KEY_PART_TYPE, 0, false))
 				return -1;
 			uint32_t array_size = mp_decode_array(&key);
 			if (array_size != d && array_size != d * 2) {
@@ -94,7 +94,8 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 				mp_next(&key);
 				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
 							 mp_type,
-							 ER_KEY_PART_TYPE, 0))
+							 ER_KEY_PART_TYPE, 0,
+							 false))
 					return -1;
 			}
 		} else {
@@ -104,7 +105,7 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
 							 mp_type,
 							 ER_KEY_PART_TYPE,
-							 part))
+							 part, false))
 					return -1;
 			}
 		}

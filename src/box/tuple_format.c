@@ -456,19 +456,23 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 
 	/* first field is simply accessible, so we do not store offset to it */
 	enum mp_type mp_type = mp_typeof(*pos);
-	if (key_mp_type_validate(format->fields[0].type, mp_type, ER_FIELD_TYPE,
-				 TUPLE_INDEX_BASE))
+	const struct tuple_field *field = &format->fields[0];
+	if (key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
+				 TUPLE_INDEX_BASE, field->is_nullable))
 		return -1;
 	mp_next(&pos);
 	/* other fields...*/
-	for (uint32_t i = 1; i < format->field_count; i++) {
+	++field;
+	for (uint32_t i = 1; i < format->field_count; i++, ++field) {
 		mp_type = mp_typeof(*pos);
-		if (key_mp_type_validate(format->fields[i].type, mp_type,
-					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE))
+		if (key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
+					 i + TUPLE_INDEX_BASE,
+					 field->is_nullable))
 			return -1;
-		if (format->fields[i].offset_slot != TUPLE_OFFSET_SLOT_NIL)
-			field_map[format->fields[i].offset_slot] =
+		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL) {
+			field_map[field->offset_slot] =
 				(uint32_t) (pos - tuple);
+		}
 		mp_next(&pos);
 	}
 	return 0;

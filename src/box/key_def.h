@@ -247,7 +247,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second);
  * @retval -1 The key is invalid.
  */
 int
-key_validate_parts(struct key_def *key_def, const char *key,
+key_validate_parts(const struct key_def *key_def, const char *key,
 		   uint32_t part_count);
 
 /**
@@ -299,11 +299,12 @@ extern const uint32_t key_mp_type[];
  */
 static inline int
 key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
-	       int err, uint32_t field_no)
+		     int err, uint32_t field_no, bool is_nullable)
 {
 	assert(key_type < field_type_MAX);
 	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
-	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0)) {
+	uint32_t mask = key_mp_type[key_type] | (is_nullable * (1U << MP_NIL));
+	if (unlikely((mask & (1U << mp_type)) == 0)) {
 		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
 		return -1;
 	}
