@@ -93,7 +93,7 @@ struct vy_point_iterator {
 	struct vy_index *index;
 	struct vy_tx *tx;
 	const struct vy_read_view **p_read_view;
-	const struct tuple *key;
+	struct tuple *key;
 
 	/**
 	 *  For compatibility reasons, the iterator references the
@@ -109,7 +109,7 @@ void
 vy_point_iterator_open(struct vy_point_iterator *itr,
 		       struct vy_run_env *run_env, struct vy_index *index,
 		       struct vy_tx *tx, const struct vy_read_view **rv,
-		       const struct tuple *key);
+		       struct tuple *key);
 
 
 /**

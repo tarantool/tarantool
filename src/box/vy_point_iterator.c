@@ -43,7 +43,7 @@
 void
 vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_run_env *run_env,
 		       struct vy_index *index, struct vy_tx *tx,
-		       const struct vy_read_view **rv, const struct tuple *key)
+		       const struct vy_read_view **rv, struct tuple *key)
 {
 	itr->run_env = run_env;
 	vy_index_ref(index);
@@ -51,6 +51,7 @@ vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_run_env *run_env
 	itr->tx = tx;
 	itr->p_read_view = rv;
 	itr->key = key;
+	tuple_ref(key);
 
 	itr->curr_stmt = NULL;
 }
@@ -90,6 +91,7 @@ vy_point_iterator_close(struct vy_point_iterator *itr)
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
 	vy_index_unref(itr->index);
+	tuple_unref(itr->key);
 	TRASH(itr);
 }
 
@@ -407,8 +409,7 @@ vy_point_iterator_get(struct vy_point_iterator *itr, struct tuple **result)
 	 * to the cache.
 	 */
 	if (itr->tx != NULL) {
-		rc = vy_tx_track_point(itr->tx, itr->index,
-				       (struct tuple *) itr->key);
+		rc = vy_tx_track_point(itr->tx, itr->index, itr->key);
 		if (rc != 0)
 			goto done;
 	}
