@@ -406,6 +406,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     for k, tuple in pairs(privs) do
         box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
+    _truncate:delete{space_id}
     if _space:delete{space_id} == nil then
         if space_name == nil then
             space_name = '#'..tostring(space_id)
@@ -414,7 +415,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
             box.error(box.error.NO_SUCH_SPACE, space_name)
         end
     end
-    _truncate:delete{space_id}
 end
 
 box.schema.space.rename = function(space_id, space_name)

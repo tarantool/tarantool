@@ -665,6 +665,32 @@ space_swap_triggers(struct space *new_space, struct space *old_space)
 	rlist_swap(&new_space->on_stmt_begin, &old_space->on_stmt_begin);
 }
 
+/**
+ * True if the space has records identified by key 'uid'.
+ * Uses 'iid' index.
+ */
+bool
+space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
+{
+	struct space *space = space_by_id(id);
+	if (space == NULL)
+		return false;
+
+	if (space_index(space, iid) == NULL)
+		return false;
+
+	MemtxIndex *index = index_find_system(space, iid);
+	char key[6];
+	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
+	mp_encode_uint(key, uid);
+	struct iterator *it = index->position();
+
+	index->initIterator(it, ITER_EQ, key, 1);
+	if (it->next(it))
+		return true;
+	return false;
+}
+
 /* }}} */
 
 /* {{{ struct alter_space - the body of a full blown alter */
@@ -1470,6 +1496,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "the space has grants");
 		}
+		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id))
+			tnt_raise(ClientError, ER_DROP_SPACE,
+				  space_name(old_space),
+				  "the space has truncate record");
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable
@@ -1839,31 +1869,6 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 /* }}} */
 
 /* {{{ access control */
-
-/** True if the space has records identified by key 'uid'
- * Uses 'owner' index.
- */
-bool
-space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
-{
-	struct space *space = space_by_id(id);
-	if (space == NULL)
-		return false;
-
-	if (space_index(space, iid) == NULL)
-		return false;
-
-	MemtxIndex *index = index_find_system(space, iid);
-	char key[6];
-	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
-	mp_encode_uint(key, uid);
-	struct iterator *it = index->position();
-
-	index->initIterator(it, ITER_EQ, key, 1);
-	if (it->next(it))
-		return true;
-	return false;
-}
 
 bool
 user_has_data(struct user *user)
