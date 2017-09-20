@@ -111,16 +111,6 @@ sequence_set(struct sequence *seq, int64_t value)
 int
 sequence_next(struct sequence *seq, int64_t *result);
 
-/**
- * Get the last value returned by a sequence.
- *
- * Return 0 and assign the last sequence value to @result
- * if the sequence was started. If it was not, return -1
- * and raise ER_SEQUENCE_NOT_STARTED error.
- */
-int
-sequence_get(struct sequence *seq, int64_t *result);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

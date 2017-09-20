@@ -82,14 +82,3 @@ overflow:
 	value = def->step > 0 ? def->min : def->max;
 	goto done;
 }
-
-int
-sequence_get(struct sequence *seq, int64_t *result)
-{
-	if (!seq->is_started) {
-		diag_set(ClientError, ER_SEQUENCE_NOT_STARTED, seq->def->name);
-		return -1;
-	}
-	*result = seq->value;
-	return 0;
-}

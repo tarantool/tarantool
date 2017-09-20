@@ -200,7 +200,6 @@ struct errcode_record {
 	/*145 */_(ER_NO_SUCH_SEQUENCE,		"Sequence '%s' does not exist") \
 	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
 	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
-	/*148 */_(ER_SEQUENCE_NOT_STARTED,	"Sequence '%s' is not started") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

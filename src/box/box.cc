@@ -997,15 +997,6 @@ box_sequence_next(uint32_t seq_id, int64_t *result)
 	return 0;
 }
 int
-box_sequence_get(uint32_t seq_id, int64_t *result)
-{
-	struct sequence *seq = sequence_cache_find(seq_id);
-	if (seq == NULL)
-		return -1;
-	return sequence_get(seq, result);
-}
-
-int
 box_sequence_set(uint32_t seq_id, int64_t value)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);

@@ -188,15 +188,7 @@ sq.step, sq.min, sq.max, sq.start, sq.cycle
 - 1
 - false
 ...
-sq:get()  -- error
----
-- error: Sequence 'test' is not started
-...
 sq:next() -- 1
----
-- 1
-...
-sq:get()  -- 1
 ---
 - 1
 ...
@@ -206,10 +198,6 @@ sq:next() -- 2
 ...
 sq:set(100)
 ---
-...
-sq:get()  -- 100
----
-- 100
 ...
 sq:next() -- 101
 ---
@@ -221,10 +209,6 @@ sq:next() -- 102
 ...
 sq:reset()
 ---
-...
-sq:get()  -- error
----
-- error: Sequence 'test' is not started
 ...
 sq:next() -- 1
 ---
@@ -249,15 +233,7 @@ sq.step, sq.min, sq.max, sq.start, sq.cycle
 - -1
 - false
 ...
-sq:get()  -- error
----
-- error: Sequence 'test' is not started
-...
 sq:next() -- -1
----
-- -1
-...
-sq:get()  -- -1
 ---
 - -1
 ...
@@ -267,10 +243,6 @@ sq:next() -- -2
 ...
 sq:set(-100)
 ---
-...
-sq:get()  -- -100
----
-- -100
 ...
 sq:next() -- -101
 ---
@@ -282,10 +254,6 @@ sq:next() -- -102
 ...
 sq:reset()
 ---
-...
-sq:get()  -- error
----
-- error: Sequence 'test' is not started
 ...
 sq:next() -- -1
 ---

@@ -58,16 +58,12 @@ box.sequence.test == nil
 -- Default ascending sequence.
 sq = box.schema.sequence.create('test')
 sq.step, sq.min, sq.max, sq.start, sq.cycle
-sq:get()  -- error
 sq:next() -- 1
-sq:get()  -- 1
 sq:next() -- 2
 sq:set(100)
-sq:get()  -- 100
 sq:next() -- 101
 sq:next() -- 102
 sq:reset()
-sq:get()  -- error
 sq:next() -- 1
 sq:next() -- 2
 sq:drop()
@@ -75,16 +71,12 @@ sq:drop()
 -- Default descending sequence.
 sq = box.schema.sequence.create('test', {step = -1})
 sq.step, sq.min, sq.max, sq.start, sq.cycle
-sq:get()  -- error
 sq:next() -- -1
-sq:get()  -- -1
 sq:next() -- -2
 sq:set(-100)
-sq:get()  -- -100
 sq:next() -- -101
 sq:next() -- -102
 sq:reset()
-sq:get()  -- error
 sq:next() -- -1
 sq:next() -- -2
 sq:drop()

@@ -1198,10 +1198,6 @@ sequence_mt.next = function(self)
     return internal.sequence.next(self.id)
 end
 
-sequence_mt.get = function(self)
-    return internal.sequence.get(self.id)
-end
-
 sequence_mt.set = function(self, value)
     return internal.sequence.set(self.id, value)
 end
