@@ -332,7 +332,7 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		int tree_res =
 		memtx_tree_insert(&tree, new_tuple, &dup_tuple);
 		if (tree_res) {
-			tnt_raise(OutOfMemory, BPS_TREE_EXTENT_SIZE,
+			tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 				  "MemtxTree", "replace");
 		}
 
@@ -430,13 +430,13 @@ void
 MemtxTree::buildNext(struct tuple *tuple)
 {
 	if (build_array == NULL) {
-		build_array = (struct tuple**) malloc(BPS_TREE_EXTENT_SIZE);
+		build_array = (struct tuple**) malloc(MEMTX_EXTENT_SIZE);
 		if (build_array == NULL) {
-			tnt_raise(OutOfMemory, BPS_TREE_EXTENT_SIZE,
+			tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
 				"MemtxTree", "buildNext");
 		}
 		build_array_alloc_size =
-			BPS_TREE_EXTENT_SIZE / sizeof(struct tuple*);
+			MEMTX_EXTENT_SIZE / sizeof(struct tuple*);
 	}
 	assert(build_array_size <= build_array_alloc_size);
 	if (build_array_size == build_array_alloc_size) {

@@ -76,6 +76,15 @@ memtx_tree_compare_key(const tuple *tuple,
 
 #include "salad/bps_tree.h"
 
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+
 class MemtxTree: public MemtxIndex {
 public:
 	MemtxTree(struct index_def *index_def);
