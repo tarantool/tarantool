@@ -2730,7 +2730,8 @@ on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 	if (new_tuple != NULL) {			/* INSERT, UPDATE */
 		int64_t value = tuple_field_i64_xc(new_tuple,
 				BOX_SEQUENCE_DATA_FIELD_VALUE);
-		sequence_set(seq, value);
+		if (sequence_set(seq, value) != 0)
+			diag_raise();
 	} else {					/* DELETE */
 		sequence_reset(seq);
 	}

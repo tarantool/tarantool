@@ -1002,7 +1002,8 @@ box_sequence_set(uint32_t seq_id, int64_t value)
 	struct sequence *seq = sequence_cache_find(seq_id);
 	if (seq == NULL)
 		return -1;
-	sequence_set(seq, value);
+	if (sequence_set(seq, value) != 0)
+		return -1;
 	return sequence_data_update(seq_id, value);
 }
 
@@ -1328,6 +1329,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		sequence_free();
 		gc_free();
 		engine_shutdown();
 		wal_thread_stop();
@@ -1492,6 +1494,8 @@ box_init(void)
 
 	if (tuple_init() != 0)
 		diag_raise();
+
+	sequence_init();
 }
 
 bool

@@ -83,6 +83,7 @@ add_library(box STATIC
     space.cc
     space_def.c
     sequence.c
+    sequence_iterator.cc
     func.c
     func_def.c
     alter.cc

@@ -493,6 +493,8 @@ sequence_cache_delete(uint32_t id)
 {
 	struct sequence *seq = sequence_by_id(id);
 	if (seq != NULL) {
+		/* Delete sequence data. */
+		sequence_reset(seq);
 		mh_i32ptr_del(sequences, seq->def->id, NULL);
 		free(seq->def);
 		TRASH(seq);

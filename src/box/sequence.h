@@ -40,6 +40,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct iterator;
+
 /** Sequence metadata. */
 struct sequence_def {
 	/** Sequence id. */
@@ -74,10 +76,6 @@ struct sequence_def {
 struct sequence {
 	/** Sequence definition. */
 	struct sequence_def *def;
-	/** Last value returned by the sequence. */
-	int64_t value;
-	/** True if the sequence was started. */
-	bool is_started;
 };
 
 static inline size_t
@@ -86,27 +84,72 @@ sequence_def_sizeof(uint32_t name_len)
 	return sizeof(struct sequence_def) + name_len + 1;
 }
 
-/** Reset a sequence. */
-static inline void
-sequence_reset(struct sequence *seq)
+/** Sequence state. */
+struct sequence_data {
+	/** Sequence id. */
+	uint32_t id;
+	/** Sequence value. */
+	int64_t value;
+};
+
+static inline bool
+sequence_data_equal(struct sequence_data data1, struct sequence_data data2)
 {
-	seq->is_started = false;
+	return data1.id == data2.id;
 }
 
-/** Set a sequence value. */
-static inline void
-sequence_set(struct sequence *seq, int64_t value)
+static inline bool
+sequence_data_equal_key(struct sequence_data data, uint32_t id)
 {
-	seq->value = value;
-	seq->is_started = true;
+	return data.id == id;
 }
+
+#define LIGHT_NAME _sequence
+#define LIGHT_DATA_TYPE struct sequence_data
+#define LIGHT_KEY_TYPE uint32_t
+#define LIGHT_CMP_ARG_TYPE int
+#define LIGHT_EQUAL(a, b, c) sequence_data_equal(a, b)
+#define LIGHT_EQUAL_KEY(a, b, c) sequence_data_equal_key(a, b)
+#include "salad/light.h"
+
+extern struct light_sequence_core sequence_data_index;
+
+#undef LIGHT_NAME
+#undef LIGHT_DATA_TYPE
+#undef LIGHT_KEY_TYPE
+#undef LIGHT_CMP_ARG_TYPE
+#undef LIGHT_EQUAL
+#undef LIGHT_EQUAL_KEY
+
+/** Init sequence subsystem. */
+void
+sequence_init(void);
+
+/** Destroy sequence subsystem. */
+void
+sequence_free(void);
+
+/** Reset a sequence. */
+void
+sequence_reset(struct sequence *seq);
+
+/**
+ * Set a sequence value.
+ *
+ * Return 0 on success, -1 on memory allocation failure.
+ */
+int
+sequence_set(struct sequence *seq, int64_t value);
 
 /**
  * Advance a sequence.
  *
  * On success, return 0 and assign the next sequence to
- * @result. If the sequence isn't cyclic and has reached
- * its limit, return -1 and set diag.
+ * @result, otherwise return -1 and set diag.
+ *
+ * The function may fail for two reasons:
+ * - sequence isn't cyclic and has reached its limit
+ * - memory allocation failure
  */
 int
 sequence_next(struct sequence *seq, int64_t *result);
@@ -114,5 +157,15 @@ sequence_next(struct sequence *seq, int64_t *result);
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
+
+/**
+ * Create an iterator over sequence data.
+ *
+ * The iterator creates a snapshot of sequence data and walks
+ * over it, i.e. updates done after the iterator was open are
+ * invisible. Used to make a snapshot of _sequence_data space.
+ */
+struct snapshot_iterator *
+sequence_data_iterator_create(void);
 
 #endif /* INCLUDES_TARANTOOL_BOX_SEQUENCE_H */
