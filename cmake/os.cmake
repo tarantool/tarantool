@@ -93,6 +93,21 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
             message(WARNING "Homebrew's OpenSSL isn't installed. Work isn't "
                             "guarenteed if built with system OpenSSL")
         endif()
+
+        # Detecting CURL
+        execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix curl
+            OUTPUT_VARIABLE HOMEBREW_CURL
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if (DEFINED HOMEBREW_CURL)
+            if (NOT DEFINED CURL_ROOT_DIR)
+                message(STATUS "Setting CURL root to ${HOMEBREW_CURL}")
+                set(CURL_ROOT ${HOMEBREW_CURL})
+            endif()
+        elseif(NOT DEFINED CURL_ROOT_DIR)
+            message(WARNING "Homebrew's CURL isn't installed. Work isn't "
+                "guarenteed if built with system CURL")
+        endif()
+
     endif()
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
