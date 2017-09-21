@@ -44,7 +44,7 @@ test_ubuntu: deps_ubuntu
 	cd test && /usr/bin/python test-run.py -j -1
 
 deps_osx:
-	brew install openssl readline curl --force
+	brew install openssl readline curl icu4c --force
 	pip install -r test-run/requirements.txt --user
 
 test_osx: deps_osx
