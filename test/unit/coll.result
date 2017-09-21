@@ -1,0 +1,100 @@
+	*** manual_test ***
+ -- default ru_RU -- 
+123
+45 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё GREATER 
+ЕЕЕЕ GREATER 
+и GREATER 
+И GREATER 
+S GREATER 
+z GREATER 
+Z GREATER 
+ -- --||-- + upper first -- 
+123
+45 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+Ё GREATER 
+ё GREATER 
+ЕЕЕЕ GREATER 
+И GREATER 
+и GREATER 
+S GREATER 
+Z GREATER 
+z GREATER 
+ -- --||-- + lower first -- 
+123
+45 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё GREATER 
+ЕЕЕЕ GREATER 
+и GREATER 
+И GREATER 
+S GREATER 
+z GREATER 
+Z GREATER 
+ -- --||-- + secondary strength + numeric -- 
+45
+123 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё EQUAL
+ЕЕЕЕ GREATER 
+и GREATER 
+И EQUAL
+S GREATER 
+z GREATER 
+Z EQUAL
+ -- --||-- + case level -- 
+45
+123 GREATER 
+Б GREATER 
+бб GREATER 
+е GREATER 
+ё GREATER 
+Ё GREATER 
+ЕЕЕЕ GREATER 
+и GREATER 
+И GREATER 
+S GREATER 
+z GREATER 
+Z GREATER 
+ -- en_EN -- 
+aa
+bb GREATER 
+cc GREATER 
+ch GREATER 
+dd GREATER 
+gg GREATER 
+hh GREATER 
+ii GREATER 
+ -- cs_CZ -- 
+aa
+bb GREATER 
+cc GREATER 
+dd GREATER 
+gg GREATER 
+hh GREATER 
+ch GREATER 
+ii GREATER 
+	*** manual_test: done ***
+	*** hash_test ***
+Case sensitive
+OK
+OK
+OK
+Case insensitive
+OK
+OK
+OK
+	*** hash_test: done ***

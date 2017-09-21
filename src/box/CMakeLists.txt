@@ -86,6 +86,8 @@ add_library(box STATIC
     sequence.c
     func.c
     func_def.c
+    coll_def.c
+    coll.c
     alter.cc
     schema.cc
     schema_def.c

@@ -327,6 +327,7 @@ t;
   - 'box.error.PASSWORD_MISMATCH : 47'
   - 'box.error.UNSUPPORTED_ROLE_PRIV : 98'
   - 'box.error.ACCESS_DENIED : 42'
+  - 'box.error.CANT_CREATE_COLLATION : 150'
   - 'box.error.USER_EXISTS : 46'
   - 'box.error.WAL_IO : 40'
   - 'box.error.RTREE_RECT : 101'
