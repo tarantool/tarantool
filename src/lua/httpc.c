@@ -314,6 +314,6 @@ LUA_API int
 luaopen_http_client_driver(lua_State *L)
 {
 	luaL_register_type(L, DRIVER_LUA_UDATA_NAME, Client);
-	luaL_register(L, "http.client.driver", Module);
+	luaL_register_module(L, "http.client", Module);
 	return 1;
 }
