@@ -844,6 +844,7 @@ local function create_sequence_space()
     local _index = box.space[box.schema.INDEX_ID]
     local _sequence = box.space[box.schema.SEQUENCE_ID]
     local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local MAP = setmap({})
 
     log.info("create space _sequence")
@@ -869,6 +870,16 @@ local function create_sequence_space()
                   {{name = 'id', type = 'unsigned'}, {name = 'value', type = 'integer'}}}
     log.info("create index primary on _sequence_data")
     _index:insert{_sequence_data.id, 0, 'primary', 'hash', {unique = true}, {{0, 'unsigned'}}}
+
+    log.info("create space _space_sequence")
+    _space:insert{_space_sequence.id, ADMIN, '_space_sequence', 'memtx', 0, MAP,
+                  {{name = 'id', type = 'unsigned'},
+                   {name = 'sequence_id', type = 'unsigned'},
+                   {name = 'is_generated', type = 'boolean'}}}
+    log.info("create index _space_sequence:primary")
+    _index:insert{_space_sequence.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+    log.info("create index _space_sequence:sequence")
+    _index:insert{_space_sequence.id, 1, 'sequence', 'tree', {unique = false}, {{1, 'unsigned'}}}
 end
 
 local function upgrade_to_1_7_6()

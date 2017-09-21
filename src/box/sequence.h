@@ -142,6 +142,15 @@ int
 sequence_set(struct sequence *seq, int64_t value);
 
 /**
+ * Update the sequence if the given value is newer than
+ * the last generated value.
+ *
+ * Return 0 on success, -1 on memory allocation failure.
+ */
+int
+sequence_update(struct sequence *seq, int64_t value);
+
+/**
  * Advance a sequence.
  *
  * On success, return 0 and assign the next sequence to

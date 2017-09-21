@@ -41,6 +41,7 @@ extern "C" {
 
 struct Index;
 struct Handler;
+struct sequence;
 
 struct space {
 	struct access access[BOX_USER_MAX];
@@ -72,6 +73,8 @@ struct space {
 	uint32_t index_id_max;
 	/** Space meta. */
 	struct space_def *def;
+	/** Sequence attached to this space or NULL. */
+	struct sequence *sequence;
 	/**
 	 * Number of times the space has been truncated.
 	 * Updating this counter via _truncate space triggers

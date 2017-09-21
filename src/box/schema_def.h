@@ -96,6 +96,8 @@ enum {
 	BOX_CLUSTER_ID = 320,
 	/** Space id of _truncate. */
 	BOX_TRUNCATE_ID = 330,
+	/** Space id of _space_sequence. */
+	BOX_SPACE_SEQUENCE_ID = 340,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
@@ -187,6 +189,13 @@ enum {
 enum {
 	BOX_SEQUENCE_DATA_FIELD_ID = 0,
 	BOX_SEQUENCE_DATA_FIELD_VALUE = 1,
+};
+
+/** _space_seq fields. */
+enum {
+	BOX_SPACE_SEQUENCE_FIELD_ID = 0,
+	BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID = 1,
+	BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED = 2,
 };
 
 /*

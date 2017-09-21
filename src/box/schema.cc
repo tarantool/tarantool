@@ -294,6 +294,10 @@ schema_init()
 	sc_space_new(BOX_SEQUENCE_DATA_ID, "_sequence_data", key_def,
 		     &on_replace_sequence_data, NULL);
 
+	/* _space_seq - association space <-> sequence. */
+	sc_space_new(BOX_SPACE_SEQUENCE_ID, "_space_sequence", key_def,
+		     &on_replace_space_sequence, NULL);
+
 	/* _user - all existing users */
 	sc_space_new(BOX_USER_ID, "_user", key_def, &on_replace_user, NULL);
 

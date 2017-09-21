@@ -563,8 +563,562 @@ s:drop()
 ---
 ...
 --
+-- Attaching a sequence to a space.
+--
+-- Index create/modify checks.
+s = box.schema.space.create('test')
+---
+...
+sq = box.schema.sequence.create('test')
+---
+...
+sq:set(123)
+---
+...
+s:create_index('pk', {parts = {1, 'string'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+s:create_index('pk', {parts = {1, 'scalar'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+s:create_index('pk', {parts = {1, 'number'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+pk = s:create_index('pk', {parts = {1, 'integer'}, sequence = 'test'}) -- ok
+---
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
+---
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk') -- ok
+---
+...
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
+---
+...
+pk:alter{parts = {1, 'string'}} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+box.space._index:update({s.id, pk.id}, {{'=', 6, {{0, 'string'}}}}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+box.space._index:delete{s.id, pk.id} -- error
+---
+- error: 'Can''t modify space ''test'': can not drop primary key while space sequence
+    exists'
+...
+pk:alter{parts = {1, 'string'}, sequence = false} -- ok
+---
+...
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+sk:alter{sequence = 'test'} -- error
+---
+- error: 'Can''t create or modify index ''sk'' in space ''test'': sequence cannot
+    be used with a secondary key'
+...
+box.space._space_sequence:insert{s.id, sq.id, false} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+sk:drop()
+---
+...
+pk:drop()
+---
+...
+s:create_index('pk', {sequence = {}}) -- error
+---
+- error: 'Illegal parameters, options parameter ''sequence'' should be one of types:
+    boolean, number, string'
+...
+s:create_index('pk', {sequence = 'abc'}) -- error
+---
+- error: Sequence 'abc' does not exist
+...
+s:create_index('pk', {sequence = 12345}) -- error
+---
+- error: Sequence '12345' does not exist
+...
+pk = s:create_index('pk', {sequence = 'test'}) -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {sequence = sq.id}) -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {sequence = false}) -- ok
+---
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+pk:alter{sequence = {}} -- error
+---
+- error: 'Illegal parameters, options parameter ''sequence'' should be one of types:
+    boolean, number, string'
+...
+pk:alter{sequence = 'abc'} -- error
+---
+- error: Sequence 'abc' does not exist
+...
+pk:alter{sequence = 12345} -- error
+---
+- error: Sequence '12345' does not exist
+...
+pk:alter{sequence = 'test'} -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:alter{sequence = sq.id} -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:alter{sequence = false} -- ok
+---
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+pk:drop()
+---
+...
+sq:next() -- 124
+---
+- 124
+...
+sq:drop()
+---
+...
+s:drop()
+---
+...
+-- Using a sequence for auto increment.
+sq = box.schema.sequence.create('test')
+---
+...
+s1 = box.schema.space.create('test1')
+---
+...
+_ = s1:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'})
+---
+...
+s2 = box.schema.space.create('test2')
+---
+...
+_ = s2:create_index('pk', {parts = {2, 'integer'}, sequence = 'test'})
+---
+...
+s3 = box.schema.space.create('test3')
+---
+...
+_ = s3:create_index('pk', {parts = {2, 'unsigned', 1, 'string'}, sequence = 'test'})
+---
+...
+s1:insert(box.tuple.new(nil)) -- 1
+---
+- [1]
+...
+s2:insert(box.tuple.new('a', nil)) -- 2
+---
+- ['a', 2]
+...
+s3:insert(box.tuple.new('b', nil)) -- 3
+---
+- ['b', 3]
+...
+s1:truncate()
+---
+...
+s2:truncate()
+---
+...
+s3:truncate()
+---
+...
+s1:insert{nil, 123, 456} -- 4
+---
+- [4, 123, 456]
+...
+s2:insert{'c', nil, 123} -- 5
+---
+- ['c', 5, 123]
+...
+s3:insert{'d', nil, 456} -- 6
+---
+- ['d', 6, 456]
+...
+sq:next() -- 7
+---
+- 7
+...
+sq:reset()
+---
+...
+s1:insert{nil, nil, 'aa'} -- 1
+---
+- [1, null, 'aa']
+...
+s2:insert{'bb', nil, nil, 'cc'} -- 2
+---
+- ['bb', 2, null, 'cc']
+...
+s3:insert{'dd', nil, nil, 'ee'} -- 3
+---
+- ['dd', 3, null, 'ee']
+...
+sq:next() -- 4
+---
+- 4
+...
+sq:set(100)
+---
+...
+s1:insert{nil, 'aaa', 1} -- 101
+---
+- [101, 'aaa', 1]
+...
+s2:insert{'bbb', nil, 2} -- 102
+---
+- ['bbb', 102, 2]
+...
+s3:insert{'ccc', nil, 3} -- 103
+---
+- ['ccc', 103, 3]
+...
+sq:next() -- 104
+---
+- 104
+...
+s1:insert{1000, 'xxx'}
+---
+- [1000, 'xxx']
+...
+sq:next() -- 1001
+---
+- 1001
+...
+s2:insert{'yyy', 2000}
+---
+- ['yyy', 2000]
+...
+sq:next() -- 2001
+---
+- 2001
+...
+s3:insert{'zzz', 3000}
+---
+- ['zzz', 3000]
+...
+sq:next() -- 3001
+---
+- 3001
+...
+s1:insert{500, 'xxx'}
+---
+- [500, 'xxx']
+...
+s3:insert{'zzz', 2500}
+---
+- ['zzz', 2500]
+...
+s2:insert{'yyy', 1500}
+---
+- ['yyy', 1500]
+...
+sq:next() -- 3002
+---
+- 3002
+...
+sq:drop() -- error
+---
+- error: 'Can''t drop sequence ''test'': the sequence is in use'
+...
+s1:drop()
+---
+...
+sq:drop() -- error
+---
+- error: 'Can''t drop sequence ''test'': the sequence is in use'
+...
+s2:drop()
+---
+...
+sq:drop() -- error
+---
+- error: 'Can''t drop sequence ''test'': the sequence is in use'
+...
+s3:drop()
+---
+...
+sq:drop() -- ok
+---
+...
+-- Automatically generated sequences.
+s = box.schema.space.create('test')
+---
+...
+sq = box.schema.sequence.create('test')
+---
+...
+sq:set(123)
+---
+...
+pk = s:create_index('pk', {sequence = true})
+---
+...
+sq = box.sequence.test_seq
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1
+- false
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+s:insert{nil, 'a'} -- 1
+---
+- [1, 'a']
+...
+s:insert{nil, 'b'} -- 2
+---
+- [2, 'b']
+...
+s:insert{nil, 'c'} -- 3
+---
+- [3, 'c']
+...
+sq:next() -- 4
+---
+- 4
+...
+pk:alter{sequence = false}
+---
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+s:insert{nil, 'x'} -- error
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+pk:alter{sequence = true}
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1
+- false
+...
+sq = box.sequence.test_seq
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+s:insert{100, 'abc'}
+---
+- [100, 'abc']
+...
+s:insert{nil, 'cda'} -- 101
+---
+- [101, 'cda']
+...
+sq:next() -- 102
+---
+- 102
+...
+pk:alter{sequence = 'test'}
+---
+...
+s.index.pk.sequence_id == box.sequence.test.id
+---
+- true
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+pk:alter{sequence = true}
+---
+...
+s.index.pk.sequence_id == box.sequence.test_seq.id
+---
+- true
+...
+pk:drop()
+---
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+pk = s:create_index('pk', {sequence = true})
+---
+...
+s.index.pk.sequence_id == box.sequence.test_seq.id
+---
+- true
+...
+s:drop()
+---
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+sq = box.sequence.test
+---
+...
+sq:next() -- 124
+---
+- 124
+...
+sq:drop()
+---
+...
+-- Sequences are compatible with Vinyl spaces.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk', {sequence = true})
+---
+...
+s:insert{nil, 'a'} -- 1
+---
+- [1, 'a']
+...
+s:insert{100, 'b'} -- 100
+---
+- [100, 'b']
+...
+box.begin()
+---
+...
+s:insert{nil, 'c'} -- 101
+---
+- [101, 'c']
+...
+s:insert{nil, 'd'} -- 102
+---
+- [102, 'd']
+...
+box.rollback()
+---
+...
+box.begin()
+---
+...
+s:insert{nil, 'e'} -- 103
+---
+- [103, 'e']
+...
+s:insert{nil, 'f'} -- 104
+---
+- [104, 'f']
+...
+box.commit()
+---
+...
+s:select() -- {1, 'a'}, {100, 'b'}, {103, 'e'}, {104, 'f'}
+---
+- - [1, 'a']
+  - [100, 'b']
+  - [103, 'e']
+  - [104, 'f']
+...
+s:drop()
+---
+...
+--
 -- Check that sequences are persistent.
 --
+s1 = box.schema.space.create('test1')
+---
+...
+_ = s1:create_index('pk', {sequence = true})
+---
+...
+s1:insert{nil, 'a'} -- 1
+---
+- [1, 'a']
+...
+box.snapshot()
+---
+- ok
+...
+s2 = box.schema.space.create('test2')
+---
+...
+_ = s2:create_index('pk', {sequence = true})
+---
+...
+s2:insert{101, 'aaa'}
+---
+- [101, 'aaa']
+...
 sq = box.schema.sequence.create('test', {step = 2, min = 10, max = 20, start = 15, cycle = true})
 ---
 ...
@@ -589,5 +1143,33 @@ sq:next()
 - 17
 ...
 sq:drop()
+---
+...
+s1 = box.space.test1
+---
+...
+s1.index.pk.sequence_id == box.sequence.test1_seq.id
+---
+- true
+...
+s1:insert{nil, 'b'} -- 2
+---
+- [2, 'b']
+...
+s1:drop()
+---
+...
+s2 = box.space.test2
+---
+...
+s2.index.pk.sequence_id == box.sequence.test2_seq.id
+---
+- true
+...
+s2:insert{nil, 'bbb'} -- 102
+---
+- [102, 'bbb']
+...
+s2:drop()
 ---
 ...

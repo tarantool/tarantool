@@ -397,6 +397,12 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _index = box.space[box.schema.INDEX_ID]
     local _priv = box.space[box.schema.PRIV_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    local sequence_tuple = _space_sequence:delete{space_id}
+    if sequence_tuple ~= nil and sequence_tuple[3] == true then
+        -- Delete automatically generated sequence.
+        box.schema.sequence.drop(sequence_tuple[2])
+    end
     local keys = _index:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
@@ -491,6 +497,7 @@ local alter_index_template = {
     name = 'string',
     type = 'string',
     parts = 'table',
+    sequence = 'boolean, number, string',
 }
 for k, v in pairs(index_options) do
     alter_index_template[k] = v
@@ -591,14 +598,49 @@ box.schema.index.create = function(space_id, name, options)
                      "please use '%s' instead", field_type, part[2])
         end
     end
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    local sequence_is_generated = false
+    local sequence = options.sequence or nil -- ignore sequence = false
+    if sequence ~= nil then
+        if iid ~= 0 then
+            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+                      "sequence cannot be used with a secondary key")
+        end
+        if #parts >= 1 and parts[1][2] ~= 'integer' and
+                           parts[1][2] ~= 'unsigned' then
+            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+                      "sequence cannot be used with a non-integer key")
+        end
+        if sequence == true then
+            sequence = box.schema.sequence.create(
+                box.space[space_id].name .. '_seq')
+            sequence = sequence.id
+            sequence_is_generated = true
+        else
+            sequence = sequence_resolve(sequence)
+            if sequence == nil then
+                box.error(box.error.NO_SUCH_SEQUENCE, options.sequence)
+            end
+        end
+    end
     _index:insert{space_id, iid, name, options.type, index_opts, parts}
+    if sequence ~= nil then
+        _space_sequence:insert{space_id, sequence, sequence_is_generated}
+    end
     return box.space[space_id].index[name]
 end
 
 box.schema.index.drop = function(space_id, index_id)
     check_param(space_id, 'space_id', 'number')
     check_param(index_id, 'index_id', 'number')
-
+    if index_id == 0 then
+        local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+        local sequence_tuple = _space_sequence:delete{space_id}
+        if sequence_tuple ~= nil and sequence_tuple[3] == true then
+            -- Delete automatically generated sequence.
+            box.schema.sequence.drop(sequence_tuple[2])
+        end
+    end
     local _index = box.space[box.schema.INDEX_ID]
     _index:delete{space_id, index_id}
 end
@@ -695,8 +737,52 @@ box.schema.index.alter = function(space_id, index_id, options)
             table.insert(parts, {options.parts[i], options.parts[i + 1]})
         end
     end
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    local sequence_is_generated = false
+    local sequence = options.sequence
+    local sequence_tuple = _space_sequence:get(space_id)
+    if sequence or (sequence ~= false and sequence_tuple ~= nil) then
+        if index_id ~= 0 then
+            box.error(box.error.MODIFY_INDEX,
+                      options.name, box.space[space_id].name,
+                      "sequence cannot be used with a secondary key")
+        end
+        if #parts >= 1 and parts[1][2] ~= 'integer' and
+                           parts[1][2] ~= 'unsigned' then
+            box.error(box.error.MODIFY_INDEX,
+                      options.name, box.space[space_id].name,
+                      "sequence cannot be used with a non-integer key")
+        end
+    end
+    if sequence == true then
+        if sequence_tuple == nil or sequence_tuple[3] == false then
+            sequence = box.schema.sequence.create(
+                box.space[space_id].name .. '_seq')
+            sequence = sequence.id
+            sequence_is_generated = true
+        else
+            -- Space already has an automatically generated sequence.
+            sequence = nil
+        end
+    elseif sequence then
+        sequence = sequence_resolve(sequence)
+        if sequence == nil then
+            box.error(box.error.NO_SUCH_SEQUENCE, options.sequence)
+        end
+    end
+    if sequence == false then
+        _space_sequence:delete(space_id)
+    end
     _index:replace{space_id, index_id, options.name, options.type,
                    index_opts, parts}
+    if sequence then
+        _space_sequence:replace{space_id, sequence, sequence_is_generated}
+    end
+    if sequence_tuple ~= nil and sequence_tuple[3] == true and
+       sequence_tuple[2] ~= sequence then
+        -- Delete automatically generated sequence.
+        box.schema.sequence.drop(sequence_tuple[2])
+    end
 end
 
 -- a static box_tuple_t ** instance for calling box_index_* API

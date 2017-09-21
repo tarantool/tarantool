@@ -170,6 +170,91 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	request->header = NULL;
 }
 
+/**
+ * Handle INSERT/REPLACE in a space with a sequence attached.
+ */
+static void
+request_handle_sequence(struct request *request, struct space *space)
+{
+	struct sequence *seq = space->sequence;
+
+	assert(seq != NULL);
+	assert(request->type == IPROTO_INSERT ||
+	       request->type == IPROTO_REPLACE);
+
+	struct Index *pk = space_index(space, 0);
+	if (unlikely(pk == NULL))
+		return;
+
+	/*
+	 * Look up the first field of the primary key.
+	 */
+	const char *data = request->tuple;
+	const char *data_end = request->tuple_end;
+	int len = mp_decode_array(&data);
+	int fieldno = pk->index_def->key_def->parts[0].fieldno;
+	if (unlikely(len < fieldno + 1))
+		return;
+
+	const char *key = data;
+	if (unlikely(fieldno > 0)) {
+		do {
+			mp_next(&key);
+		} while (--fieldno > 0);
+	}
+
+	int64_t value;
+	if (mp_typeof(*key) == MP_NIL) {
+		/*
+		 * If the first field of the primary key is nil,
+		 * this is an auto increment request and we need
+		 * to replace the nil with the next value generated
+		 * by the space sequence.
+		 */
+		if (unlikely(sequence_next(seq, &value) != 0))
+			diag_raise();
+
+		const char *key_end = key;
+		mp_decode_nil(&key_end);
+
+		size_t buf_size = (request->tuple_end - request->tuple) +
+						mp_sizeof_uint(UINT64_MAX);
+		char *tuple = (char *) region_alloc_xc(&fiber()->gc, buf_size);
+		char *tuple_end = mp_encode_array(tuple, len);
+
+		if (unlikely(key != data)) {
+			memcpy(tuple_end, data, key - data);
+			tuple_end += key - data;
+		}
+
+		if (value >= 0)
+			tuple_end = mp_encode_uint(tuple_end, value);
+		else
+			tuple_end = mp_encode_int(tuple_end, value);
+
+		memcpy(tuple_end, key_end, data_end - key_end);
+		tuple_end += data_end - key_end;
+
+		assert(tuple_end <= tuple + buf_size);
+
+		request->tuple = tuple;
+		request->tuple_end = tuple_end;
+	} else {
+		/*
+		 * If the first field is not nil, update the space
+		 * sequence with its value, to make sure that an
+		 * auto increment request never tries to insert a
+		 * value that is already in the space. Note, this
+		 * code is also invoked on final recovery to restore
+		 * the sequence value from WAL.
+		 */
+		if (likely(mp_read_int64(&key, &value) == 0)) {
+			if (sequence_update(seq, value) != 0)
+				diag_raise();
+		}
+	}
+}
+
 static void
 process_rw(struct request *request, struct space *space, struct tuple **result)
 {
@@ -182,6 +267,8 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 		switch (request->type) {
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
+			if (space->sequence != NULL)
+				request_handle_sequence(request, space);
 			tuple = space->handler->executeReplace(txn, space,
 							       request);
 

@@ -122,6 +122,31 @@ sequence_set(struct sequence *seq, int64_t value)
 }
 
 int
+sequence_update(struct sequence *seq, int64_t value)
+{
+	uint32_t key = seq->def->id;
+	uint32_t hash = sequence_hash(key);
+	uint32_t pos = light_sequence_find_key(&sequence_data_index, hash, key);
+	struct sequence_data new_data, data;
+	new_data.id = key;
+	new_data.value = value;
+	if (pos != light_sequence_end) {
+		data = light_sequence_get(&sequence_data_index, pos);
+		if ((seq->def->step > 0 && value > data.value) ||
+		    (seq->def->step < 0 && value < data.value)) {
+			if (light_sequence_replace(&sequence_data_index, hash,
+					new_data, &data) == light_sequence_end)
+				unreachable();
+		}
+	} else {
+		if (light_sequence_insert(&sequence_data_index, hash,
+					  new_data) == light_sequence_end)
+			return -1;
+	}
+	return 0;
+}
+
+int
 sequence_next(struct sequence *seq, int64_t *result)
 {
 	int64_t value;

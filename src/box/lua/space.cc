@@ -45,6 +45,7 @@ extern "C" {
 #include "box/tuple.h"
 #include "box/txn.h"
 #include "box/vclock.h" /* VCLOCK_MAX */
+#include "box/sequence.h"
 
 /**
  * Trigger function for all spaces
@@ -205,6 +206,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 		lua_settable(L, -3); /* space.index[k].parts */
 
+		if (k == 0 && space->sequence != NULL) {
+			lua_pushnumber(L, space->sequence->def->id);
+			lua_setfield(L, -2, "sequence_id");
+		}
+
 		if (space_is_vinyl(space)) {
 			lua_pushstring(L, "options");
 			lua_newtable(L);
@@ -359,6 +365,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "SEQUENCE_ID");
 	lua_pushnumber(L, BOX_SEQUENCE_DATA_ID);
 	lua_setfield(L, -2, "SEQUENCE_DATA_ID");
+	lua_pushnumber(L, BOX_SPACE_SEQUENCE_ID);
+	lua_setfield(L, -2, "SPACE_SEQUENCE_ID");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);
