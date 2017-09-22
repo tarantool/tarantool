@@ -1921,6 +1921,14 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 	assert(!scheduler->checkpoint_in_progress);
 
 	/*
+	 * The scheduler starts worker threads upon the first wakeup.
+	 * To avoid starting the threads for nothing, do not wake it
+	 * up if Vinyl is not used.
+	 */
+	if (lsregion_used(&scheduler->env->stmt_env.allocator) == 0)
+		return 0;
+
+	/*
 	 * If the scheduler is throttled due to errors, do not wait
 	 * until it wakes up as it may take quite a while. Instead
 	 * fail checkpoint immediately with the last error seen by
@@ -1947,7 +1955,8 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 static int
 vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 {
-	assert(scheduler->checkpoint_in_progress);
+	if (!scheduler->checkpoint_in_progress)
+		return 0;
 
 	/*
 	 * Wait until all in-memory trees created before
@@ -1975,6 +1984,9 @@ vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 static void
 vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
 {
+	if (!scheduler->checkpoint_in_progress)
+		return;
+
 	/*
 	 * Checkpoint blocks dumping of in-memory trees created after
 	 * checkpoint started, so wake up the scheduler after we are
