@@ -792,11 +792,8 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 			if (cmp < 0 || (cmp == 0 && !key_belongs))
 				break;
 			if (vy_stmt_lsn(entry->stmt) <= (**itr->read_view).vlsn) {
-				if (itr->curr_stmt != NULL)
-					tuple_unref(itr->curr_stmt);
 				itr->curr_pos = pos;
 				itr->curr_stmt = entry->stmt;
-				tuple_ref(itr->curr_stmt);
 				*stop = vy_cache_iterator_is_stop(itr, entry);
 			}
 			if (cmp == 0)
