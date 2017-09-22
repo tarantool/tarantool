@@ -291,19 +291,14 @@ vy_run_env_destroy(struct vy_run_env *env);
 /**
  * Enable coio reads for a vinyl run environment.
  *
- * This functions starts @threads reader threads and makes
+ * This function starts @threads reader threads and makes
  * the run iterator hand disk reads over to them rather than
  * read run files directly blocking the current fiber.
+ *
+ * Subsequent calls to this function will silently return.
  */
 void
 vy_run_env_enable_coio(struct vy_run_env *env, int threads);
-
-/**
- * Disable coio reads for a vinyl run environment.
- * This function joins reader threads.
- */
-void
-vy_run_env_disable_coio(struct vy_run_env *env);
 
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)

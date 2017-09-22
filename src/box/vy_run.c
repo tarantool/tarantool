@@ -191,6 +191,8 @@ vy_run_env_destroy(struct vy_run_env *env)
 void
 vy_run_env_enable_coio(struct vy_run_env *env, int threads)
 {
+	if (env->reader_pool != NULL)
+		return; /* already enabled */
 	vy_run_env_start_readers(env, threads);
 }
 

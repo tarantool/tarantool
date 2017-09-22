@@ -200,6 +200,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->id = index_def->iid;
 	index->opts = index_def->opts;
 	vy_index_read_set_new(&index->read_set);
+
+	index_env->index_count++;
 	return index;
 
 fail_mem:
@@ -243,6 +245,9 @@ vy_index_delete(struct vy_index *index)
 	assert(index->in_dump.pos == UINT32_MAX);
 	assert(index->in_compact.pos == UINT32_MAX);
 	assert(vy_index_read_set_empty(&index->read_set));
+	assert(index->env->index_count > 0);
+
+	index->env->index_count--;
 
 	if (index->pk != NULL)
 		vy_index_unref(index->pk);

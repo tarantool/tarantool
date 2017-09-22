@@ -2248,13 +2248,20 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		diag_set(SystemError, "can not access vinyl data directory");
 		return -1;
 	}
+	int rc;
 	switch (env->status) {
 	case VINYL_ONLINE:
 		/*
 		 * The recovery is complete, simply
 		 * create a new index.
 		 */
-		return vy_index_create(index);
+		rc = vy_index_create(index);
+		if (rc == 0) {
+			/* Make sure reader threads are up and running. */
+			vy_run_env_enable_coio(&env->run_env,
+					       env->read_threads);
+		}
+		break;
 	case VINYL_INITIAL_RECOVERY_REMOTE:
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		/*
@@ -2262,7 +2269,8 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		 * exist locally, and we should create the
 		 * index directory from scratch.
 		 */
-		return vy_index_create(index);
+		rc = vy_index_create(index);
+		break;
 	case VINYL_INITIAL_RECOVERY_LOCAL:
 	case VINYL_FINAL_RECOVERY_LOCAL:
 		/*
@@ -2271,14 +2279,15 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		 * have already been created, so try to load
 		 * the index files from it.
 		 */
-		return vy_index_recover(index, env->recovery,
+		rc = vy_index_recover(index, env->recovery,
 				vclock_sum(env->recovery_vclock),
 				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
 				force_recovery);
+		break;
 	default:
 		unreachable();
-		return -1;
 	}
+	return rc;
 }
 
 void
@@ -3988,7 +3997,6 @@ vy_bootstrap(struct vy_env *e)
 	if (vy_log_bootstrap() != 0)
 		return -1;
 	vy_quota_set_limit(&e->quota, e->memory);
-	vy_run_env_enable_coio(&e->run_env, e->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -4056,7 +4064,13 @@ vy_end_recovery(struct vy_env *e)
 	default:
 		unreachable();
 	}
-	vy_run_env_enable_coio(&e->run_env, e->read_threads);
+	/*
+	 * Do not start reader threads if no Vinyl index was
+	 * recovered. The threads will be started lazily upon
+	 * the first index creation, see vy_index_open().
+	 */
+	if (e->index_env.index_count > 0)
+		vy_run_env_enable_coio(&e->run_env, e->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
