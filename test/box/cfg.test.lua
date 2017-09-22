@@ -63,4 +63,22 @@ test_run:cmd("switch default")
 test_run:cmd("stop server cfg_tester4")
 test_run:cmd("cleanup server cfg_tester4")
 
+--------------------------------------------------------------------------------
+-- Check that 'vinyl_dir' cfg option is not checked as long as
+-- there is no vinyl indexes (issue #2664)
+--------------------------------------------------------------------------------
+
+test_run:cmd('create server cfg_tester with script = "box/lua/cfg_bad_vinyl_dir.lua"')
+test_run:cmd("start server cfg_tester")
+test_run:cmd('switch cfg_tester')
+_ = box.schema.space.create('test_memtx', {engine = 'memtx'})
+_ = box.space.test_memtx:create_index('pk') -- ok
+_ = box.schema.space.create('test_vinyl', {engine = 'vinyl'})
+_ = box.space.test_vinyl:create_index('pk') -- error
+box.snapshot()
+test_run:cmd("restart server cfg_tester")
+test_run:cmd("switch default")
+test_run:cmd("stop server cfg_tester")
+test_run:cmd("cleanup server cfg_tester")
+
 test_run:cmd("clear filter")

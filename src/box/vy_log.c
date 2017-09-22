@@ -863,7 +863,12 @@ vy_log_begin_recovery(const struct vclock *vclock)
 {
 	assert(vy_log.recovery == NULL);
 
-	if (xdir_scan(&vy_log.dir) < 0)
+	/*
+	 * Do not fail recovery if vinyl directory does not exist,
+	 * because vinyl might not be even in use. Complain only
+	 * on an attempt to write a vylog.
+	 */
+	if (xdir_scan(&vy_log.dir) < 0 && errno != ENOENT)
 		return NULL;
 
 	struct vclock vy_log_vclock;

@@ -141,14 +141,6 @@ static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
 
-static int
-path_exists(const char *path)
-{
-	struct stat st;
-	int rc = lstat(path, &st);
-	return rc == 0;
-}
-
 enum vy_stat_name {
 	VY_STAT_GET,
 	VY_STAT_TX,
@@ -2254,6 +2246,11 @@ vy_delete_index(struct vy_env *env, struct vy_index *index)
 int
 vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 {
+	/* Ensure vinyl data directory exists. */
+	if (access(env->path, F_OK) != 0) {
+		diag_set(SystemError, "can not access vinyl data directory");
+		return -1;
+	}
 	switch (env->status) {
 	case VINYL_ONLINE:
 		/*
@@ -3857,12 +3854,6 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 		diag_set(OutOfMemory, strlen(path),
 			 "malloc", "env->path");
 		goto error_path;
-	}
-	/* Ensure vinyl data directory exists. */
-	if (!path_exists(e->path)) {
-		diag_set(ClientError, ER_CFG, "vinyl_dir",
-			 "directory does not exist");
-		goto error_xm;
 	}
 	e->xm = tx_manager_new();
 	if (e->xm == NULL)
