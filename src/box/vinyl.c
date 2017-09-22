@@ -59,6 +59,7 @@
 #include "info.h"
 #include "column_mask.h"
 #include "trigger.h"
+#include "checkpoint.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -439,8 +440,6 @@ struct vy_scheduler {
 	bool is_throttled;
 	/** Set if checkpoint is in progress. */
 	bool checkpoint_in_progress;
-	/** Last checkpoint vclock. */
-	struct vclock last_checkpoint;
 	/**
 	 * Current generation of in-memory data.
 	 *
@@ -1047,7 +1046,7 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
-	int64_t gc_lsn = vclock_sum(&scheduler->last_checkpoint);
+	int64_t gc_lsn = checkpoint_last(NULL);
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
@@ -1318,7 +1317,6 @@ vy_scheduler_new(struct vy_env *env)
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
 	diag_create(&scheduler->diag);
 	fiber_cond_create(&scheduler->dump_cond);
-	vclock_create(&scheduler->last_checkpoint);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
 	vy_dump_heap_create(&scheduler->dump_heap);
@@ -1972,8 +1970,6 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	if (vy_log_rotate(vclock) != 0)
 		goto error;
 
-	vclock_copy(&scheduler->last_checkpoint, vclock);
-
 	say_info("vinyl checkpoint done");
 	return 0;
 error:
@@ -2384,7 +2380,7 @@ vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
 	index->is_dropped = true;
 
 	vy_log_tx_begin();
-	vy_log_index_prune(index, vclock_sum(&env->scheduler->last_checkpoint));
+	vy_log_index_prune(index, checkpoint_last(NULL));
 	vy_log_drop_index(index->commit_lsn);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
@@ -2490,7 +2486,7 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 	 * don't, we will replay them during WAL recovery.
 	 */
 	vy_log_tx_begin();
-	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
+	int64_t gc_lsn = checkpoint_last(NULL);
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct vy_index *old_index = vy_index(old_space->index[i]);
 		struct vy_index *new_index = vy_index(new_space->index[i]);
@@ -4434,7 +4430,7 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 	vy_log_collect_garbage(lsn);
 
 	/* Cleanup run files. */
-	int64_t signature = vclock_sum(&env->scheduler->last_checkpoint);
+	int64_t signature = checkpoint_last(NULL);
 	struct vy_recovery *recovery = vy_recovery_new(signature, false);
 	if (recovery == NULL) {
 		say_warn("vinyl garbage collection failed: %s",

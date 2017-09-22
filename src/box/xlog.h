@@ -181,8 +181,8 @@ int
 xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio);
 
 /**
- * Return LSN of the newest file in a directory
- * or -1 if the directory is empty.
+ * Return LSN and vclock (unless @vclock is NULL) of the newest
+ * file in a directory or -1 if the directory is empty.
  */
 static inline int64_t
 xdir_last_vclock(struct xdir *xdir, struct vclock *vclock)
@@ -190,8 +190,9 @@ xdir_last_vclock(struct xdir *xdir, struct vclock *vclock)
 	struct vclock *last = vclockset_last(&xdir->index);
 	if (last == NULL)
 		return -1;
-	vclock_copy(vclock, last);
-	return vclock_sum(vclock);
+	if (vclock != NULL)
+		vclock_copy(vclock, last);
+	return vclock_sum(last);
 }
 
 /**
