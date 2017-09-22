@@ -708,8 +708,10 @@ vy_cache_iterator_restore(struct vy_stmt_iterator *vitr,
 	assert(itr->search_started);
 
 	/* disable cache for errinj test - let it try to read from disk */
-	if (errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL)->bparam ||
-	    errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL)->bparam) {
+	if ((errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL) != NULL &&
+	     errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL)->bparam) ||
+	    (errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL) != NULL &&
+	     errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL)->bparam)) {
 		*ret = NULL;
 		*stop = false;
 		return 0;
