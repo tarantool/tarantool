@@ -419,6 +419,7 @@ local function wrapper_cfg(cfg)
     log.info('Run console at %s', console_sock)
     console.listen(console_sock)
 
+    cfg = cfg or {}
     for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
             cfg[i] = v
