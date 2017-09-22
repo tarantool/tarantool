@@ -1911,15 +1911,13 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	scheduler->dump_start = now;
 }
 
-/*
- * Schedule checkpoint. Please call vy_wait_checkpoint() after that.
+/**
+ * Schedule checkpoint. Please call vy_scheduler_wait_checkpoint()
+ * after that.
  */
-int
-vy_begin_checkpoint(struct vy_env *env)
+static int
+vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 {
-	struct vy_scheduler *scheduler = env->scheduler;
-
-	assert(env->status == VINYL_ONLINE);
 	assert(!scheduler->checkpoint_in_progress);
 
 	/*
@@ -1942,14 +1940,13 @@ vy_begin_checkpoint(struct vy_env *env)
 	return 0;
 }
 
-/*
- * Wait for checkpoint. Please call vy_end_checkpoint() after that.
+/**
+ * Wait for checkpoint. Please call vy_scheduler_end_checkpoint()
+ * after that.
  */
-int
-vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
+static int
+vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 {
-	struct vy_scheduler *scheduler = env->scheduler;
-
 	assert(scheduler->checkpoint_in_progress);
 
 	/*
@@ -1962,30 +1959,22 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 			assert(!diag_is_empty(&scheduler->diag));
 			diag_add_error(diag_get(),
 				       diag_last_error(&scheduler->diag));
-			goto error;
+			say_error("vinyl checkpoint error: %s",
+				  diag_last_error(diag_get())->errmsg);
+			return -1;
 		}
 		fiber_cond_wait(&scheduler->dump_cond);
 	}
-
-	if (vy_log_rotate(vclock) != 0)
-		goto error;
-
 	say_info("vinyl checkpoint done");
 	return 0;
-error:
-	say_error("vinyl checkpoint error: %s",
-		  diag_last_error(diag_get())->errmsg);
-	return -1;
 }
 
-/*
+/**
  * End checkpoint. Called on both checkpoint commit and abort.
  */
-void
-vy_end_checkpoint(struct vy_env *env)
+static void
+vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
 {
-	struct vy_scheduler *scheduler = env->scheduler;
-
 	/*
 	 * Checkpoint blocks dumping of in-memory trees created after
 	 * checkpoint started, so wake up the scheduler after we are
@@ -3938,6 +3927,45 @@ vy_set_timeout(struct vy_env *env, double timeout)
 }
 
 /** }}} Environment */
+
+/* {{{ Checkpoint */
+
+int
+vy_begin_checkpoint(struct vy_env *env)
+{
+	assert(env->status == VINYL_ONLINE);
+	if (vy_scheduler_begin_checkpoint(env->scheduler) != 0)
+		return -1;
+	return 0;
+}
+
+int
+vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
+{
+	assert(env->status == VINYL_ONLINE);
+	if (vy_scheduler_wait_checkpoint(env->scheduler) != 0)
+		return -1;
+	if (vy_log_rotate(vclock) != 0)
+		return -1;
+	return 0;
+}
+
+void
+vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
+{
+	(void)vclock;
+	assert(env->status == VINYL_ONLINE);
+	vy_scheduler_end_checkpoint(env->scheduler);
+}
+
+void
+vy_abort_checkpoint(struct vy_env *env)
+{
+	assert(env->status == VINYL_ONLINE);
+	vy_scheduler_end_checkpoint(env->scheduler);
+}
+
+/* }}} Checkpoint */
 
 /** {{{ Recovery */
 

@@ -235,14 +235,13 @@ VinylEngine::waitCheckpoint(struct vclock *vclock)
 void
 VinylEngine::commitCheckpoint(struct vclock *vclock)
 {
-	(void)vclock;
-	vy_end_checkpoint(env);
+	vy_commit_checkpoint(env, vclock);
 }
 
 void
 VinylEngine::abortCheckpoint()
 {
-	vy_end_checkpoint(env);
+	vy_abort_checkpoint(env);
 }
 
 int
