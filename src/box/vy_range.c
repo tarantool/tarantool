@@ -87,6 +87,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		switch (iterator_type) {
 		case ITER_LT:
 		case ITER_LE:
+		case ITER_REQ:
 			return vy_range_tree_last(tree);
 		case ITER_GT:
 		case ITER_GE:
@@ -133,7 +134,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		if (range == NULL)
 			range = vy_range_tree_first(tree);
 	} else {
-		assert(iterator_type == ITER_LT || iterator_type == ITER_LE);
+		assert(iterator_type == ITER_LT || iterator_type == ITER_LE ||
+		       iterator_type == ITER_REQ);
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}

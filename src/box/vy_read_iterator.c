@@ -143,7 +143,8 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
 	const struct key_def *def = itr->index->cmp_def;
-	if (itr->curr_stmt != NULL && itr->iterator_type == ITER_EQ &&
+	if (itr->curr_stmt != NULL && (itr->iterator_type == ITER_EQ ||
+				       itr->iterator_type == ITER_REQ) &&
 	    tuple_field_count(itr->key) >= def->part_count) {
 		/*
 		 * There may be one statement at max satisfying
@@ -232,6 +233,7 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 			continue;
 
 		if (itr->curr_stmt == NULL && (itr->iterator_type == ITER_EQ ||
+					       itr->iterator_type == ITER_REQ ||
 					       itr->iterator_type == ITER_GE ||
 					       itr->iterator_type == ITER_LE) &&
 		    tuple_field_count(itr->key) >= def->part_count &&
@@ -543,11 +545,18 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	 * first.
 	 */
 	if (itr->last_stmt != NULL) {
-		if (iterator_type == ITER_EQ)
+		if (iterator_type == ITER_EQ || iterator_type == ITER_REQ)
 			itr->need_check_eq = true;
 		iterator_type = iterator_direction(iterator_type) >= 0 ?
 				ITER_GT : ITER_LT;
 		key = itr->last_stmt;
+	} else if (iterator_type == ITER_REQ) {
+		/*
+		 * Source iterators can't handle ITER_REQ.
+		 * Use ITER_LE instead and enable EQ check.
+		 */
+		iterator_type = ITER_LE;
+		itr->need_check_eq = true;
 	}
 
 	if (itr->tx != NULL)
@@ -585,24 +594,12 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 		 * all keys instead. So use GE/LE instead of GT/LT
 		 * in this case.
 		 */
-		itr->iterator_type = iterator_type == ITER_LT ||
-				     iterator_type == ITER_LE ?
-				     ITER_LE : ITER_GE;
+		itr->iterator_type = iterator_direction(iterator_type) > 0 ?
+				     ITER_GE : ITER_LE;
 	}
 
 	if (iterator_type == ITER_ALL)
 		itr->iterator_type = ITER_GE;
-
-	if (iterator_type == ITER_REQ) {
-		if (index->opts.is_unique &&
-		    tuple_field_count(key) == index->cmp_def->part_count) {
-			/* Use point-lookup iterator (optimization). */
-			itr->iterator_type = ITER_EQ;
-		} else {
-			itr->need_check_eq = true;
-			itr->iterator_type = ITER_LE;
-		}
-	}
 }
 
 /**
@@ -651,6 +648,7 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 	switch (itr->iterator_type) {
 	case ITER_LT:
 	case ITER_LE:
+	case ITER_REQ:
 		range = vy_range_tree_prev(index->tree, range);
 		break;
 	case ITER_GT:
@@ -677,6 +675,33 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 
 	vy_read_iterator_use_range(itr);
 	return true;
+}
+
+/**
+ * Track a read in the conflict manager.
+ */
+static int
+vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt)
+{
+	if (itr->tx == NULL)
+		return 0;
+
+	if (stmt == NULL) {
+		stmt = (itr->iterator_type == ITER_EQ ||
+			itr->iterator_type == ITER_REQ ?
+			itr->key : itr->index->env->empty_key);
+	}
+
+	int rc;
+	if (iterator_direction(itr->iterator_type) >= 0) {
+		rc = vy_tx_track(itr->tx, itr->index, itr->key,
+				 itr->iterator_type != ITER_GT,
+				 stmt, true);
+	} else {
+		rc = vy_tx_track(itr->tx, itr->index, stmt, true,
+				 itr->key, itr->iterator_type != ITER_LT);
+	}
+	return rc;
 }
 
 /**
@@ -727,6 +752,14 @@ vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
 			break;
 		}
 	}
+
+	if (itr->need_check_eq && stmt != NULL &&
+	    vy_tuple_compare_with_key(stmt, itr->key, cmp_def) != 0)
+		stmt = NULL;
+
+	if (vy_read_iterator_track_read(itr, stmt) != 0)
+		return -1;
+
 	*ret = stmt;
 	return 0;
 }
@@ -744,7 +777,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	}
 
 	/* Run a special iterator for a special case */
-	if (itr->iterator_type == ITER_EQ &&
+	if ((itr->iterator_type == ITER_EQ || itr->iterator_type == ITER_REQ) &&
 	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
 		struct vy_point_iterator one;
 		vy_point_iterator_open(&one, itr->run_env, itr->index,
@@ -850,32 +883,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		}
 		vy_cache_add(&itr->index->cache, *result, cache_prev,
 			     itr->key, itr->iterator_type);
-	}
-
-	if (itr->need_check_eq && *result != NULL &&
-	    vy_tuple_compare_with_key(*result, itr->key,
-				      index->cmp_def) != 0) {
-		*result = NULL;
-	}
-
-	if (itr->tx != NULL) {
-		struct tuple *last = *result;
-		if (last == NULL) {
-			last = (itr->need_check_eq ||
-				itr->iterator_type == ITER_EQ ?
-				itr->key :
-				index->env->empty_key);
-		}
-		if (iterator_direction(itr->iterator_type) >= 0) {
-			rc = vy_tx_track(itr->tx, index,
-					 itr->key,
-					 itr->iterator_type != ITER_GT,
-					 last, true);
-		} else {
-			rc = vy_tx_track(itr->tx, index, last, true,
-					 itr->key,
-					 itr->iterator_type != ITER_LT);
-		}
 	}
 clear:
 	if (prev_key != NULL)

@@ -249,7 +249,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		}
 	} else {
 		assert(prev_stmt != NULL);
-		if (order == ITER_EQ) {
+		if (order == ITER_EQ || order == ITER_REQ) {
 			/* that is the last statement that is equal to key */
 			boundary_level = tuple_field_count(key);
 		} else {
