@@ -835,11 +835,19 @@ vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
 
+	/*
+	 * It's no use alerting the user if the server is
+	 * shutting down or the index was dropped.
+	 */
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: dump failed: %s", vy_index_name(index),
 			  diag_last_error(&task->diag)->errmsg);
+	}
+
+	/* The metadata log is unavailable on shutdown. */
+	if (!in_shutdown)
 		vy_run_discard(task->new_run);
-	} else
+	else
 		vy_run_unref(task->new_run);
 
 	index->is_dumping = false;
@@ -1136,12 +1144,20 @@ vy_task_compact_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	/* The iterator has been cleaned up in worker. */
 	task->wi->iface->close(task->wi);
 
+	/*
+	 * It's no use alerting the user if the server is
+	 * shutting down or the index was dropped.
+	 */
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
 			  vy_index_name(index), vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
+	}
+
+	/* The metadata log is unavailable on shutdown. */
+	if (!in_shutdown)
 		vy_run_discard(task->new_run);
-	} else
+	else
 		vy_run_unref(task->new_run);
 
 	assert(range->heap_node.pos == UINT32_MAX);
