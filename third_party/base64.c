@@ -38,9 +38,14 @@
 /* {{{ encode */
 
 extern inline int
-base64_bufsize(int binsize);
+base64_bufsize(int binsize, int options);
 
 enum base64_encodestep { step_A, step_B, step_C };
+
+static const char default_encoding[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char urlsafe_encoding[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 struct base64_encodestate {
 	enum base64_encodestep step;
@@ -57,11 +62,10 @@ base64_encodestate_init(struct base64_encodestate *state)
 }
 
 static inline char
-base64_encode_value(char value)
+base64_encode_value(char value, const char *encoding)
 {
-	static const char encoding[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	unsigned codepos = (unsigned) value;
-	if (codepos > sizeof(encoding) - 1)
+	if (codepos > 64)
 		return '=';
 	return encoding[codepos];
 }
@@ -69,7 +73,8 @@ base64_encode_value(char value)
 static int
 base64_encode_block(const char *in_bin, int in_len,
 		    char *out_base64, int out_len,
-		    struct base64_encodestate *state)
+		    struct base64_encodestate *state, const char *encoding,
+		    int options)
 {
 	const char *const in_end = in_bin + in_len;
 	const char *in_pos = in_bin;
@@ -86,43 +91,43 @@ base64_encode_block(const char *in_bin, int in_len,
 		{
 	case step_A:
 			if (in_pos == in_end || out_pos >= out_end) {
-				state->result = result;
 				state->step = step_A;
-				return out_pos - out_base64;
+				goto out;
 			}
 			fragment = *in_pos++;
 			result = (fragment & 0x0fc) >> 2;
-			*out_pos++ = base64_encode_value(result);
+			*out_pos++ = base64_encode_value(result, encoding);
 			result = (fragment & 0x003) << 4;
 			FALLTHROUGH;
 	case step_B:
 			if (in_pos == in_end || out_pos >= out_end) {
-				state->result = result;
 				state->step = step_B;
-				return out_pos - out_base64;
+				goto out;
 			}
 			fragment = *in_pos++;
 			result |= (fragment & 0x0f0) >> 4;
-			*out_pos++ = base64_encode_value(result);
+			*out_pos++ = base64_encode_value(result, encoding);
 			result = (fragment & 0x00f) << 2;
 			FALLTHROUGH;
 	case step_C:
-			if (in_pos == in_end || out_pos + 2 >= out_end) {
-				state->result = result;
+			if (in_pos == in_end || out_pos >= out_end) {
 				state->step = step_C;
-				return out_pos - out_base64;
+				goto out;
 			}
 			fragment = *in_pos++;
 			result |= (fragment & 0x0c0) >> 6;
-			*out_pos++ = base64_encode_value(result);
+			*out_pos++ = base64_encode_value(result, encoding);
+			if (out_pos >= out_end)
+				goto out;
 			result  = (fragment & 0x03f) >> 0;
-			*out_pos++ = base64_encode_value(result);
+			*out_pos++ = base64_encode_value(result, encoding);
 
 			/*
 			 * Each full step (A->B->C) yields
 			 * 4 characters.
 			 */
-			if (++state->stepcount * 4 == BASE64_CHARS_PER_LINE) {
+			if ((options & BASE64_NOWRAP) == 0 &&
+			    ++state->stepcount * 4 == BASE64_CHARS_PER_LINE) {
 				if (out_pos >= out_end)
 					return out_pos - out_base64;
 				*out_pos++ = '\n';
@@ -130,29 +135,35 @@ base64_encode_block(const char *in_bin, int in_len,
 			}
 		}
 	}
-	/* control should not reach here */
+out:
+	state->result = result;
 	return out_pos - out_base64;
 }
 
 static int
 base64_encode_blockend(char *out_base64, int out_len,
-		       struct base64_encodestate *state)
+		       struct base64_encodestate *state, const char *encoding,
+		       int options)
 {
 	char *out_pos = out_base64;
 	char *out_end = out_base64 + out_len;
 
 	switch (state->step) {
 	case step_B:
-		if (out_pos + 2 >= out_end)
+		if (out_pos >= out_end)
 			return out_pos - out_base64;
-		*out_pos++ = base64_encode_value(state->result);
+		*out_pos++ = base64_encode_value(state->result, encoding);
+		if (out_pos + 1 >= out_end || (options & BASE64_NOPAD) != 0)
+			return out_pos - out_base64;
 		*out_pos++ = '=';
 		*out_pos++ = '=';
 		break;
 	case step_C:
-		if (out_pos + 1 >= out_end)
+		if (out_pos >= out_end)
 			return out_pos - out_base64;
-		*out_pos++ = base64_encode_value(state->result);
+		*out_pos++ = base64_encode_value(state->result, encoding);
+		if (out_pos >= out_end || (options & BASE64_NOPAD) != 0)
+			return out_pos - out_base64;
 		*out_pos++ = '=';
 		break;
 	case step_A:
@@ -172,14 +183,19 @@ base64_encode_blockend(char *out_base64, int out_len,
 
 int
 base64_encode(const char *in_bin, int in_len,
-	      char *out_base64, int out_len)
+	      char *out_base64, int out_len, int options)
 {
+	const char *encoding;
+	if ((options & BASE64_URLSAFE) != 0)
+		encoding = urlsafe_encoding;
+	else
+		encoding = default_encoding;
 	struct base64_encodestate state;
 	base64_encodestate_init(&state);
 	int res = base64_encode_block(in_bin, in_len, out_base64,
-				      out_len, &state);
+				      out_len, &state, encoding, options);
 	return res + base64_encode_blockend(out_base64 + res, out_len - res,
-					    &state);
+					    &state, encoding, options);
 }
 
 /* }}} */
@@ -198,11 +214,11 @@ static int
 base64_decode_value(int value)
 {
 	static const int decoding[] = {
-		62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58,
+		62, -1, 62, -1, 63, 52, 53, 54, 55, 56, 57, 58,
 		59, 60, 61, -1, -1, -1, -2, -1, -1, -1,  0,  1,
 		2,   3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13,
 		14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-		-1, -1, -1, -1, -1, -1, 26, 27, 28, 29, 30, 31,
+		-1, -1, -1, -1, 63, -1, 26, 27, 28, 29, 30, 31,
 		32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
 		44, 45, 46, 47, 48, 49, 50, 51
 	};

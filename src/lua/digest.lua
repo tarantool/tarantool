@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 local crypto = require('crypto')
+local bit = require('bit')
 
 ffi.cdef[[
     /* internal implementation */
@@ -16,9 +17,9 @@ ffi.cdef[[
     extern crc32_func crc32_calc;
 
     /* base64 */
-    int base64_bufsize(int binsize);
+    int base64_bufsize(int binsize, int options);
     int base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
-    int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len);
+    int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len, int options);
 
     /* random */
     void random_bytes(char *, size_t);
@@ -28,6 +29,11 @@ ffi.cdef[[
     uint32_t PMurHash32_Result(uint32_t h1, uint32_t carry, uint32_t total_length);
     uint32_t PMurHash32(uint32_t seed, const void *key, int len);
 ]]
+
+-- @sa base64.h
+local BASE64_NOPAD = 1
+local BASE64_NOWRAP = 2
+local BASE64_URLSAFE = 7
 
 local digest_shortcuts = {
     sha     = 'SHA',
@@ -136,14 +142,27 @@ setmetatable(CRC32, {
 })
 
 local m = {
-    base64_encode = function(bin)
-        if type(bin) ~= 'string' then
-            error('Usage: digest.base64_encode(string)')
+    base64_encode = function(bin, options)
+        if type(bin) ~= 'string' or
+           options ~= nil and type(options) ~= 'table' then
+            error('Usage: digest.base64_encode(string[, table])')
+        end
+        local mask = 0
+        if options ~= nil then
+            if options.urlsafe then
+                mask = bit.bor(mask, BASE64_URLSAFE)
+            end
+            if options.nopad then
+                mask = bit.bor(mask, BASE64_NOPAD)
+            end
+            if options.nowrap then
+                mask = bit.bor(mask, BASE64_NOWRAP)
+            end
         end
         local blen = #bin
-        local slen = ffi.C.base64_bufsize(blen)
+        local slen = ffi.C.base64_bufsize(blen, mask)
         local str  = ffi.new('char[?]', slen)
-        local len = ffi.C.base64_encode(bin, blen, str, slen)
+        local len = ffi.C.base64_encode(bin, blen, str, slen, mask)
         return ffi.string(str, len)
     end,
 

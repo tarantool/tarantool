@@ -43,7 +43,7 @@ target_link_libraries(bitset_iterator.test bitset)
 add_executable(bitset_index.test bitset_index.c)
 target_link_libraries(bitset_index.test bitset)
 add_executable(base64.test base64.c)
-target_link_libraries(base64.test misc)
+target_link_libraries(base64.test misc unit)
 add_executable(uuid.test uuid.c)
 target_link_libraries(uuid.test uuid unit)
 

@@ -104,5 +104,5 @@ password_prepare(const char *password, int len, char *out, int out_len)
 	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
 	SHA1Final(hash2, &ctx);
 
-	base64_encode((char *) hash2, SCRAMBLE_SIZE, out, out_len);
+	base64_encode((char *) hash2, SCRAMBLE_SIZE, out, out_len, 0);
 }

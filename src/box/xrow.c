@@ -948,8 +948,8 @@ greeting_encode(char *greetingbuf, uint32_t version_id,
 	memset(greetingbuf + r, ' ', h - r - 1);
 	greetingbuf[h - 1] = '\n';
 
-	assert(base64_bufsize(salt_len) + 1 < h);
-	r = base64_encode(salt, salt_len, greetingbuf + h, h - 1);
+	assert(base64_bufsize(salt_len, 0) + 1 < h);
+	r = base64_encode(salt, salt_len, greetingbuf + h, h - 1, 0);
 	assert(r < h);
 	memset(greetingbuf + h + r, ' ', h - r - 1);
 	greetingbuf[IPROTO_GREETING_SIZE - 1] = '\n';

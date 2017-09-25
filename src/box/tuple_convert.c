@@ -176,14 +176,14 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 		}
 		style = YAML_ANY_SCALAR_STYLE;
 		/* Binary or not UTF8 */
-		binlen = base64_bufsize(len);
+		binlen = base64_bufsize(len, 0);
 		bin = (char *) malloc(binlen);
 		if (bin == NULL) {
 			diag_set(OutOfMemory, binlen, "malloc",
 				 "tuple_to_yaml");
 			return 0;
 		}
-		binlen = base64_encode(str, len, bin, binlen);
+		binlen = base64_encode(str, len, bin, binlen, 0);
 		str = bin;
 		len = binlen;
 		tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";

@@ -53,7 +53,7 @@
 
 /**
  * chap-sha1 of empty string, i.e.
- * base64_encode(sha1(sha1(""))
+ * base64_encode(sha1(sha1(""), 0)
  */
 #define CHAP_SHA1_EMPTY_PASSWORD "vhvewKp0tNyweZQ+cFKAlsyphfg="
 
@@ -1983,7 +1983,7 @@ user_def_new_from_tuple(struct tuple *tuple)
 	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain
-	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
+	 * chap-sha1 -> base64_encode(sha1(sha1(password), 0).
 	 * Check for trivial errors when a plain text
 	 * password is saved in this field instead.
 	 */

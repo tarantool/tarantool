@@ -1,8 +1,178 @@
-	*** base64_test ***
-	*** base64_test: done ***
-	*** base64_test ***
-	*** base64_test: done ***
-	*** base64_test ***
-	*** base64_test: done ***
-	*** base64_test ***
-	*** base64_test: done ***
+1..28
+	*** main ***
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 1 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 2 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 3 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 4 - subtests
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 5 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 6 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 7 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 8 - subtests
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 9 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 10 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 11 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 12 - subtests
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 13 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 14 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 15 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 16 - subtests
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 17 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 18 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 19 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 20 - subtests
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 21 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 22 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 23 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 24 - subtests
+    1..3
+    ok 1 - length
+    ok 2 - decode length ok
+    ok 3 - encode/decode
+ok 25 - subtests
+    1..6
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - no + symbols
+    ok 4 - no = symbols
+    ok 5 - decode length ok
+    ok 6 - encode/decode
+ok 26 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no = symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 27 - subtests
+    1..4
+    ok 1 - length
+    ok 2 - no \n symbols
+    ok 3 - decode length ok
+    ok 4 - encode/decode
+ok 28 - subtests
+	*** main: done ***
