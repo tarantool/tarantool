@@ -106,6 +106,12 @@
 #define LIGHT(name) CONCAT4(light, LIGHT_NAME, _, name)
 
 /**
+ * Overhead per value stored in a hash table.
+ * Must be adjusted if struct LIGHT(record) is modified.
+ */
+enum { LIGHT_RECORD_OVERHEAD = 8 };
+
+/**
  * Struct for one record of the hash table
  */
 struct LIGHT(record) {
@@ -116,7 +122,11 @@ struct LIGHT(record) {
 	/* the value */
 	union {
 		LIGHT_DATA_TYPE value;
-		uint64_t uint64_padding;
+		uint32_t empty_next;
+		/* Round record size up to nearest power of two. */
+		uint8_t padding[(1 << (32 - __builtin_clz(sizeof(LIGHT_DATA_TYPE) +
+							LIGHT_RECORD_OVERHEAD - 1))) -
+				LIGHT_RECORD_OVERHEAD];
 	};
 };
 
@@ -508,7 +518,7 @@ LIGHT(set_empty_prev)(struct LIGHT(record) *record, uint32_t pos)
 static inline uint32_t
 LIGHT(get_empty_next)(struct LIGHT(record) *record)
 {
-	return (uint32_t)(uint64_t)record->value;
+	return record->empty_next;
 }
 
 /*
@@ -518,7 +528,7 @@ LIGHT(get_empty_next)(struct LIGHT(record) *record)
 static inline void
 LIGHT(set_empty_next)(struct LIGHT(record) *record, uint32_t pos)
 {
-	record->value = (LIGHT_DATA_TYPE)(int64_t)pos;
+	record->empty_next = pos;
 }
 
 /*
