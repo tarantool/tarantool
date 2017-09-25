@@ -120,12 +120,13 @@ struct LIGHT(record) {
 	};
 };
 
+/* Number of records added while grow iteration */
+enum { LIGHT_GROW_INCREMENT = 8 };
+
 /**
  * Main struct for holding hash table
  */
 struct LIGHT(core) {
-	/* Number of records added while grow iteration */
-	enum { GROW_INCREMENT = 8 };
 	/* count of values in hash table */
 	uint32_t count;
 	/* size of hash table ( equal to mtable.size ) */
@@ -183,17 +184,17 @@ static const uint32_t LIGHT(end) = 0xFFFFFFFF;
  * @param alloc_ctx - argument passed to memory block allocator
  * @param arg - optional parameter to save for comparing function
  */
-void
+static inline void
 LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
 	      LIGHT(extent_alloc_t) extent_alloc_func,
 	      LIGHT(extent_free_t) extent_free_func,
-	      LIGHT_CMP_ARG_TYPE arg);
+	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg);
 
 /**
  * @brief Hash table destruction. Frees all allocated memory
  * @param ht - pointer to a hash table struct
  */
-void
+static inline void
 LIGHT(destroy)(struct LIGHT(core) *ht);
 
 /**
@@ -203,7 +204,7 @@ LIGHT(destroy)(struct LIGHT(core) *ht);
  * @param data - value to find
  * @return integer ID of found record or light_end if nothing found
  */
-uint32_t
+static inline uint32_t
 LIGHT(find)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
 
 /**
@@ -213,7 +214,7 @@ LIGHT(find)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
  * @param data - key to find
  * @return integer ID of found record or light_end if nothing found
  */
-uint32_t
+static inline uint32_t
 LIGHT(find_key)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_KEY_TYPE data);
 
 /**
@@ -223,7 +224,7 @@ LIGHT(find_key)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_KEY_TYPE data
  * @param data - value to insert
  * @return integer ID of inserted record or light_end if failed
  */
-uint32_t
+static inline uint32_t
 LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
 
 /**
@@ -234,7 +235,7 @@ LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE data);
  * @param replaced - pointer to a value that was stored in table before replace
  * @return integer ID of found record or light_end if nothing found
  */
-uint32_t
+static inline uint32_t
 LIGHT(replace)(struct LIGHT(core) *ht, uint32_t hash,
 	       LIGHT_DATA_TYPE data, LIGHT_DATA_TYPE *replaced);
 
@@ -244,7 +245,7 @@ LIGHT(replace)(struct LIGHT(core) *ht, uint32_t hash,
  * @param slotpos - ID of an record. See LIGHT(find) for details.
  * @return 0 if ok, -1 on memory error (only with freezed iterators)
  */
-int
+static inline int
 LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slotpos);
 
 /**
@@ -254,7 +255,7 @@ LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slotpos);
  * @return 0 if ok, 1 if not found or -1 on memory error
  * (only with freezed iterators)
  */
-int
+static inline int
 LIGHT(delete_value)(struct LIGHT(core) *ht,
 		    uint32_t hash, LIGHT_DATA_TYPE value);
 
@@ -264,7 +265,7 @@ LIGHT(delete_value)(struct LIGHT(core) *ht,
  * @param slotpos - ID of an record
  *  ID must be vaild, check it by light_pos_valid (asserted).
  */
-LIGHT_DATA_TYPE
+static inline LIGHT_DATA_TYPE
 LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos);
 
 /**
@@ -273,7 +274,7 @@ LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos);
  * @param slotpos - ID of an record
  *  ID must be in valid range [0, ht->table_size) (asserted).
  */
-bool
+static inline bool
 LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos);
 
 /**
@@ -281,7 +282,7 @@ LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos);
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to set
  */
-void
+static inline void
 LIGHT(iterator_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /**
@@ -291,7 +292,7 @@ LIGHT(iterator_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
  * @param hash - hash to find
  * @param data - key to find
  */
-void
+static inline void
 LIGHT(iterator_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
 	            uint32_t hash, LIGHT_KEY_TYPE data);
 
@@ -301,7 +302,7 @@ LIGHT(iterator_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
  * @param itr - iterator to set
  * @return poiner to the value or NULL if iteration is complete
  */
-LIGHT_DATA_TYPE *
+static inline LIGHT_DATA_TYPE *
 LIGHT(iterator_get_and_next)(const struct LIGHT(core) *ht,
 			     struct LIGHT(iterator) *itr);
 
@@ -312,7 +313,7 @@ LIGHT(iterator_get_and_next)(const struct LIGHT(core) *ht,
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to freeze
  */
-void
+static inline void
 LIGHT(iterator_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /**
@@ -321,7 +322,7 @@ LIGHT(iterator_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to destroy
  */
-void
+static inline void
 LIGHT(iterator_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
 
 /* Functions definition */
@@ -335,13 +336,13 @@ LIGHT(iterator_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr);
  * @param alloc_ctx - argument passed to memory block allocator
  * @param arg - optional parameter to save for comparing function
  */
-inline void
+static inline void
 LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
 	      LIGHT(extent_alloc_t) extent_alloc_func,
 	      LIGHT(extent_free_t) extent_free_func,
 	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg)
 {
-	assert((ht->GROW_INCREMENT & (ht->GROW_INCREMENT - 1)) == 0);
+	assert((LIGHT_GROW_INCREMENT & (LIGHT_GROW_INCREMENT - 1)) == 0);
 	assert(sizeof(LIGHT_DATA_TYPE) >= sizeof(uint32_t));
 	ht->count = 0;
 	ht->table_size = 0;
@@ -356,7 +357,7 @@ LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
  * @brief Hash table destruction. Frees all allocated memory
  * @param ht - pointer to a hash table struct
  */
-inline void
+static inline void
 LIGHT(destroy)(struct LIGHT(core) *ht)
 {
 	matras_destroy(&ht->mtable);
@@ -366,7 +367,7 @@ LIGHT(destroy)(struct LIGHT(core) *ht)
  * Find a slot (index in the hash table), where an item with
  * given hash should be placed.
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(slot)(const struct LIGHT(core) *ht, uint32_t hash)
 {
 	uint32_t cover_mask = ht->cover_mask;
@@ -385,7 +386,7 @@ LIGHT(slot)(const struct LIGHT(core) *ht, uint32_t hash)
  * @param data - value to find
  * @return integer ID of found record or light_end if nothing found
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(find)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 {
 	if (ht->count == 0)
@@ -416,7 +417,7 @@ LIGHT(find)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
  * @param data - key to find
  * @return integer ID of found record or light_end if nothing found
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(find_key)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_KEY_TYPE key)
 {
 	if (ht->count == 0)
@@ -448,7 +449,7 @@ LIGHT(find_key)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_KEY_TYPE key)
  * @param replaced - pointer to a value that was stored in table before replace
  * @return integer ID of found record or light_end if nothing found
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(replace)(struct LIGHT(core) *ht, uint32_t hash,
 	       LIGHT_DATA_TYPE value, LIGHT_DATA_TYPE *replaced)
 {
@@ -484,7 +485,7 @@ LIGHT(replace)(struct LIGHT(core) *ht, uint32_t hash,
  * Empty records (that do not store value) are linked into doubly linked list.
  * Get an slot of the previous record in that list.
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(get_empty_prev)(struct LIGHT(record) *record)
 {
 	return record->hash;
@@ -494,7 +495,7 @@ LIGHT(get_empty_prev)(struct LIGHT(record) *record)
  * Empty records (that do not store value) are linked into doubly linked list.
  * Set an slot of the previous record in that list.
  */
-inline void
+static inline void
 LIGHT(set_empty_prev)(struct LIGHT(record) *record, uint32_t pos)
 {
 	record->hash = pos;
@@ -504,7 +505,7 @@ LIGHT(set_empty_prev)(struct LIGHT(record) *record, uint32_t pos)
  * Empty records (that do not store value) are linked into doubly linked list.
  * Get an slot of the next record in that list.
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(get_empty_next)(struct LIGHT(record) *record)
 {
 	return (uint32_t)(uint64_t)record->value;
@@ -514,7 +515,7 @@ LIGHT(get_empty_next)(struct LIGHT(record) *record)
  * Empty records (that do not store value) are linked into doubly linked list.
  * Get an slot of the next record in that list.
  */
-inline void
+static inline void
 LIGHT(set_empty_next)(struct LIGHT(record) *record, uint32_t pos)
 {
 	record->value = (LIGHT_DATA_TYPE)(int64_t)pos;
@@ -525,7 +526,7 @@ LIGHT(set_empty_next)(struct LIGHT(record) *record, uint32_t pos)
  * Add given record with given slot to that list.
  * Touches matras of the record
  */
-inline int
+static inline int
 LIGHT(enqueue_empty)(struct LIGHT(core) *ht, uint32_t slot,
 		     struct LIGHT(record) *record)
 {
@@ -548,7 +549,7 @@ LIGHT(enqueue_empty)(struct LIGHT(core) *ht, uint32_t slot,
  * Remove from list first record of that list and return that record
  * Touches matras of result and all changing records
  */
-inline struct LIGHT(record) *
+static inline struct LIGHT(record) *
 LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
 {
 	assert(ht->empty_slot != LIGHT(end));
@@ -576,7 +577,7 @@ LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
  * Remove from list the record by given slot and return that record
  * Touches matras of result and all changing records
  */
-inline struct LIGHT(record) *
+static inline struct LIGHT(record) *
 LIGHT(detach_empty)(struct LIGHT(core) *ht, uint32_t slot)
 {
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
@@ -613,7 +614,7 @@ LIGHT(detach_empty)(struct LIGHT(core) *ht, uint32_t slot)
 /*
  * Allocate memory and initialize empty list to get ready for first insertion
  */
-inline int
+static inline int
 LIGHT(prepare_first_insert)(struct LIGHT(core) *ht)
 {
 	assert(ht->count == 0);
@@ -622,43 +623,43 @@ LIGHT(prepare_first_insert)(struct LIGHT(core) *ht)
 
 	uint32_t slot;
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_alloc_range(&ht->mtable, &slot, ht->GROW_INCREMENT);
+		matras_alloc_range(&ht->mtable, &slot, LIGHT_GROW_INCREMENT);
 	if (!record)
 		return -1;
 	assert(slot == 0);
-	ht->table_size = ht->GROW_INCREMENT;
-	ht->cover_mask = ht->GROW_INCREMENT - 1;
+	ht->table_size = LIGHT_GROW_INCREMENT;
+	ht->cover_mask = LIGHT_GROW_INCREMENT - 1;
 	ht->empty_slot = 0;
-	for (int i = 0; i < ht->GROW_INCREMENT; i++) {
+	for (int i = 0; i < LIGHT_GROW_INCREMENT; i++) {
 		record[i].next = i;
 		LIGHT(set_empty_prev)(record + i, i - 1);
 		LIGHT(set_empty_next)(record + i, i + 1);
 	}
 	LIGHT(set_empty_prev)(record, LIGHT(end));
-	LIGHT(set_empty_next)(record + ht->GROW_INCREMENT - 1, LIGHT(end));
+	LIGHT(set_empty_next)(record + LIGHT_GROW_INCREMENT - 1, LIGHT(end));
 	return 0;
 }
 
 /*
  * Enlarge hash table to store more values
  */
-inline int
+static inline int
 LIGHT(grow)(struct LIGHT(core) *ht)
 {
 	assert(ht->empty_slot == LIGHT(end));
 	uint32_t new_slot;
 	struct LIGHT(record) *new_record = (struct LIGHT(record) *)
-		matras_alloc_range(&ht->mtable, &new_slot, ht->GROW_INCREMENT);
+		matras_alloc_range(&ht->mtable, &new_slot, LIGHT_GROW_INCREMENT);
 	if (!new_record) /* memory failure */
 		return -1;
 	new_record = (struct LIGHT(record) *)
 		matras_touch(&ht->mtable, new_slot);
 	if (!new_record) { /* memory failure */
-		matras_dealloc_range(&ht->mtable, ht->GROW_INCREMENT);
+		matras_dealloc_range(&ht->mtable, LIGHT_GROW_INCREMENT);
 		return -1;
 	}
 	uint32_t save_cover_mask = ht->cover_mask;
-	ht->table_size += ht->GROW_INCREMENT;
+	ht->table_size += LIGHT_GROW_INCREMENT;
 	if (ht->cover_mask < ht->table_size - 1)
 		ht->cover_mask = (ht->cover_mask << 1) | (uint32_t)1;
 
@@ -670,13 +671,13 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 		matras_touch(&ht->mtable, susp_slot);
 
 	if (!susp_record) {
-		matras_dealloc_range(&ht->mtable, ht->GROW_INCREMENT);
+		matras_dealloc_range(&ht->mtable, LIGHT_GROW_INCREMENT);
 		ht->cover_mask = save_cover_mask;
-		ht->table_size -= ht->GROW_INCREMENT;
+		ht->table_size -= LIGHT_GROW_INCREMENT;
 		return -1;
 	}
 
-	for (int i = 0; i < ht->GROW_INCREMENT;
+	for (int i = 0; i < LIGHT_GROW_INCREMENT;
 	     i++, susp_slot++, susp_record++, new_slot++, new_record++) {
 		if (susp_record->next == susp_slot) {
 			/* Suspicious slot is empty, nothing to split */
@@ -746,7 +747,7 @@ LIGHT(grow)(struct LIGHT(core) *ht)
  * @param data - value to insert
  * @return integer ID of inserted record or light_end if failed
  */
-inline uint32_t
+static inline uint32_t
 LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 {
 	if (ht->table_size == 0)
@@ -820,7 +821,7 @@ LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
  * @param slotpos - ID of an record. See LIGHT(find) for details.
  * @return 0 if ok, -1 on memory error (only with freezed iterators)
  */
-inline int
+static inline int
 LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slot)
 {
 	assert(slot < ht->table_size);
@@ -878,7 +879,7 @@ LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slot)
  * @return 0 if ok, 1 if not found or -1 on memory error
  * (only with freezed iterators)
  */
-inline int
+static inline int
 LIGHT(delete_value)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 {
 	if (ht->count == 0)
@@ -943,7 +944,7 @@ LIGHT(delete_value)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value
  * @param slotpos - ID of an record
  *  ID must be vaild, check it by light_pos_valid (asserted).
  */
-inline LIGHT_DATA_TYPE
+static inline LIGHT_DATA_TYPE
 LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos)
 {
 	assert(slotpos < ht->table_size);
@@ -959,8 +960,8 @@ LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos)
  * @param slotpos - ID of an record
  *  ID must be in valid range [0, ht->table_size) (asserted).
  */
-inline bool
-LIGHT(pos_valid)(LIGHT(core) *ht, uint32_t slotpos)
+static inline bool
+LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos)
 {
 	assert(slotpos < ht->table_size);
 	struct LIGHT(record) *record = (struct LIGHT(record) *)
@@ -973,7 +974,7 @@ LIGHT(pos_valid)(LIGHT(core) *ht, uint32_t slotpos)
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to set
  */
-inline void
+static inline void
 LIGHT(iterator_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	(void)ht;
@@ -988,7 +989,7 @@ LIGHT(iterator_begin)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
  * @param hash - hash to find
  * @param data - key to find
  */
-inline void
+static inline void
 LIGHT(iterator_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
 	       uint32_t hash, LIGHT_KEY_TYPE data)
 {
@@ -1002,7 +1003,7 @@ LIGHT(iterator_key)(const struct LIGHT(core) *ht, struct LIGHT(iterator) *itr,
  * @param itr - iterator to set
  * @return poiner to the value or NULL if iteration is complete
  */
-inline LIGHT_DATA_TYPE *
+static inline LIGHT_DATA_TYPE *
 LIGHT(iterator_get_and_next)(const struct LIGHT(core) *ht,
 			     struct LIGHT(iterator) *itr)
 {
@@ -1027,7 +1028,7 @@ LIGHT(iterator_get_and_next)(const struct LIGHT(core) *ht,
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to freeze
  */
-inline void
+static inline void
 LIGHT(iterator_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	assert(!matras_is_read_view_created(&itr->view));
@@ -1040,7 +1041,7 @@ LIGHT(iterator_freeze)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
  * @param ht - pointer to a hash table struct
  * @param itr - iterator to destroy
  */
-inline void
+static inline void
 LIGHT(iterator_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
 {
 	matras_destroy_read_view(&ht->mtable, &itr->view);
@@ -1051,7 +1052,7 @@ LIGHT(iterator_destroy)(struct LIGHT(core) *ht, struct LIGHT(iterator) *itr)
  * That means that you should not use this function.
  * If return not zero, something went terribly wrong.
  */
-inline int
+static inline int
 LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 {
 	int res = 0;
