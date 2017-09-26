@@ -1,0 +1,8 @@
+import os
+
+source_dir = os.environ["SOURCEDIR"]
+
+module_api_path = os.path.join(source_dir, "test", "app-tap", "module_api.so")
+
+if not os.path.exists(module_api_path):
+    self.skip = 1

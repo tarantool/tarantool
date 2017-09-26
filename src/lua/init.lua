@@ -66,6 +66,8 @@ typedef int32_t pid_t;
 pid_t getpid(void);
 ]]
 
+local fio = require("fio")
+
 local REFLECTION_CACHE = {}
 
 local function reflection_enumerate(err)
@@ -207,6 +209,72 @@ end
 local function pid()
     return tonumber(ffi.C.getpid())
 end
+
+local function mksymname(name)
+    local mark = string.find(name, "-")
+    if mark then name = string.sub(name, mark + 1) end
+    return "luaopen_" .. string.gsub(name, "%.", "_")
+end
+
+local function try_load(path, name)
+    local file, err = package.searchpath(name, path)
+    if file == nil then
+        return nil, err
+    end
+    local loaded, err = loadfile(file)
+    if loaded == nil then
+        name = mksymname(name)
+        loaded, err = package.loadlib(file, name)
+        if err ~= nil then
+            return nil, err
+        end
+    end
+    return loaded
+end
+
+local function cwd_loader(name)
+    if not name then
+        return "empty name of module"
+    end
+    local path = "./?.lua;./?/init.lua;./?.so"
+
+    local loaded, err = try_load(path, name)
+    if err == nil then
+        return loaded
+    else
+        return err
+    end
+end
+
+local function rocks_loader(name)
+    if not name then
+        return "empty name of module"
+    end
+    local pathes_search = {
+        "/.rocks/share/tarantool/?.lua;",
+        "/.rocks/share/tarantool/?/init.lua;",
+        "/.rocks/lib/tarantool/?.so"
+    }
+
+    local cwd = fio.cwd()
+    local index = string.len(cwd) + 1
+    local strerr = ""
+    while index ~= nil do
+        cwd = string.sub(cwd, 1, index - 1)
+        for i, path in ipairs(pathes_search) do
+            local loaded, err = try_load(cwd .. path, name)
+            if err == nil then
+                return loaded
+            end
+            strerr = strerr .. err
+        end
+        index = string.find(cwd, "/[^/]*$")
+    end
+    return strerr
+end
+
+table.insert(package.loaders, 2, cwd_loader)
+table.insert(package.loaders, 3, rocks_loader)
 
 return {
     uptime = uptime;

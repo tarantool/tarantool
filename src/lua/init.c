@@ -280,12 +280,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	getcwd(cwd, sizeof(cwd));
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
-	lua_pushliteral(L, "./?.lua;");
-	lua_pushliteral(L, "./?/init.lua;");
-	lua_pushstring(L, cwd);
-	lua_pushliteral(L, "/.rocks/share/tarantool/?.lua;");
-	lua_pushstring(L, cwd);
-	lua_pushliteral(L, "/.rocks/share/tarantool/?/init.lua;");
+
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
@@ -302,9 +297,6 @@ tarantool_lua_setpaths(struct lua_State *L)
 	tarantool_lua_pushpath_env(L, "LUA_PATH");
 	lua_setfield(L, top, "path");
 
-	lua_pushliteral(L, "./?" MODULE_LIBSUFFIX ";");
-	lua_pushstring(L, cwd);
-	lua_pushliteral(L, "/.rocks/lib/tarantool/?" MODULE_LIBSUFFIX ";");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?" MODULE_LIBSUFFIX ";");
