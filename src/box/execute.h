@@ -38,6 +38,14 @@
 extern "C" {
 #endif
 
+/** Keys of IPROTO_SQL_INFO map. */
+enum sql_info_key {
+	SQL_INFO_ROW_COUNT = 0,
+	sql_info_key_MAX,
+};
+
+extern const char *sql_info_key_strs[];
+
 struct obuf;
 struct region;
 struct sql_bind;
@@ -90,7 +98,7 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request,
  * +-------------------- OR ----------------------+
  * | IPROTO_BODY: {                               |
  * |     IPROTO_SQL_INFO: {                       |
- * |         IPROTO_SQL_ROW_COUNT: number         |
+ * |         SQL_INFO_ROW_COUNT: number           |
  * |     }                                        |
  * | }                                            |
  * +----------------------------------------------+

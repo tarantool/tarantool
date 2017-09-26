@@ -193,7 +193,6 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"SQL bind",         /* 0x41 */
 	"SQL options",      /* 0x42 */
 	"SQL info",         /* 0x43 */
-	"SQL row count",    /* 0x44 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {

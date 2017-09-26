@@ -106,11 +106,10 @@ enum iproto_key {
 	IPROTO_SQL_OPTIONS = 0x42,
 	/**
 	 * IPROTO_SQL_INFO: {
-	 *     IPROTO_SQL_ROW_COUNT: number
+	 *     SQL_INFO_ROW_COUNT: number
 	 * }
 	 */
 	IPROTO_SQL_INFO = 0x43,
-	IPROTO_SQL_ROW_COUNT = 0x44,
 	IPROTO_KEY_MAX
 };
 

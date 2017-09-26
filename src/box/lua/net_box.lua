@@ -39,7 +39,7 @@ local IPROTO_SYNC_KEY      = 0x01
 local IPROTO_SCHEMA_VERSION_KEY = 0x05
 local IPROTO_METADATA_KEY = 0x32
 local IPROTO_SQL_INFO_KEY = 0x43
-local IPROTO_SQL_ROW_COUNT_KEY = 0x44
+local SQL_INFO_ROW_COUNT_KEY = 0
 local IPROTO_FIELD_NAME_KEY = 0
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
@@ -957,8 +957,8 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     assert((info == nil and metadata ~= nil and res ~= nil) or
            (info ~= nil and metadata == nil and res == nil))
     if info ~= nil then
-        assert(info[IPROTO_SQL_ROW_COUNT_KEY] ~= nil)
-        return {rowcount = info[IPROTO_SQL_ROW_COUNT_KEY]}
+        assert(info[SQL_INFO_ROW_COUNT_KEY] ~= nil)
+        return {rowcount = info[SQL_INFO_ROW_COUNT_KEY]}
     end
     -- Set readable names for the metadata fields.
     for i, field_meta in pairs(metadata) do
