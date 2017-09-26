@@ -291,15 +291,22 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 	}
 }
 
+struct hash_snapshot_iterator {
+	struct snapshot_iterator base;
+	struct light_index_core *hash_table;
+	struct light_index_iterator iterator;
+};
+
 /**
  * Destroy read view and free snapshot iterator.
  * Virtual method of snapshot iterator @sa MemtxHash::createSnapshotIterator.
  */
 static void
-hash_snapshot_iterator_free(struct iterator *iterator)
+hash_snapshot_iterator_free(struct snapshot_iterator *iterator)
 {
 	assert(iterator->free == hash_snapshot_iterator_free);
-	struct hash_iterator *it = (struct hash_iterator *) iterator;
+	struct hash_snapshot_iterator *it =
+		(struct hash_snapshot_iterator *) iterator;
 	light_index_iterator_destroy(it->hash_table, &it->iterator);
 	free(iterator);
 }
@@ -308,14 +315,17 @@ hash_snapshot_iterator_free(struct iterator *iterator)
  * Get next tuple from snapshot iterator.
  * Virtual method of snapshot iterator @sa MemtxHash::createSnapshotIterator.
  */
-static struct tuple *
-hash_snapshot_iterator_ge(struct iterator *ptr)
+static const char *
+hash_snapshot_iterator_next(struct snapshot_iterator *iterator, uint32_t *size)
 {
-	assert(ptr->free == hash_snapshot_iterator_free);
-	struct hash_iterator *it = (struct hash_iterator *) ptr;
+	assert(iterator->free == hash_snapshot_iterator_free);
+	struct hash_snapshot_iterator *it =
+		(struct hash_snapshot_iterator *) iterator;
 	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
 							       &it->iterator);
-	return res ? *res : 0;
+	if (res == NULL)
+		return NULL;
+	return tuple_data_range(*res, size);
 }
 
 /**
@@ -323,22 +333,22 @@ hash_snapshot_iterator_ge(struct iterator *ptr)
  * index modifications will not affect the iteration results.
  * Must be destroyed by iterator->free after usage.
  */
-struct iterator *
+struct snapshot_iterator *
 MemtxHash::createSnapshotIterator()
 {
-	struct hash_iterator *it = (struct hash_iterator *)
+	struct hash_snapshot_iterator *it = (struct hash_snapshot_iterator *)
 		calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(OutOfMemory, sizeof(struct hash_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct hash_snapshot_iterator),
 			  "MemtxHash", "iterator");
 	}
 
-	it->base.next = hash_snapshot_iterator_ge;
+	it->base.next = hash_snapshot_iterator_next;
 	it->base.free = hash_snapshot_iterator_free;
 	it->hash_table = hash_table;
 	light_index_iterator_begin(it->hash_table, &it->iterator);
 	light_index_iterator_freeze(it->hash_table, &it->iterator);
-	return (struct iterator *) it;
+	return (struct snapshot_iterator *) it;
 }
 
 /* }}} */

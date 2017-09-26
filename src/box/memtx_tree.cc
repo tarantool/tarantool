@@ -471,26 +471,34 @@ MemtxTree::endBuild()
 	build_array_alloc_size = 0;
 }
 
+struct tree_snapshot_iterator {
+	struct snapshot_iterator base;
+	struct memtx_tree *tree;
+	struct memtx_tree_iterator tree_iterator;
+};
+
 static void
-tree_snapshot_iterator_free(struct iterator *iterator)
+tree_snapshot_iterator_free(struct snapshot_iterator *iterator)
 {
 	assert(iterator->free == tree_snapshot_iterator_free);
-	struct tree_iterator *it = (struct tree_iterator *)iterator;
+	struct tree_snapshot_iterator *it =
+		(struct tree_snapshot_iterator *)iterator;
 	struct memtx_tree *tree = (struct memtx_tree *)it->tree;
 	memtx_tree_iterator_destroy(tree, &it->tree_iterator);
 	free(iterator);
 }
 
-static struct tuple *
-tree_snapshot_iterator_next(struct iterator *iterator)
+static const char *
+tree_snapshot_iterator_next(struct snapshot_iterator *iterator, uint32_t *size)
 {
 	assert(iterator->free == tree_snapshot_iterator_free);
-	struct tree_iterator *it = (struct tree_iterator *)iterator;
+	struct tree_snapshot_iterator *it =
+		(struct tree_snapshot_iterator *)iterator;
 	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (res == NULL)
 		return NULL;
 	memtx_tree_iterator_next(it->tree, &it->tree_iterator);
-	return *res;
+	return tuple_data_range(*res, size);
 }
 
 /**
@@ -498,13 +506,13 @@ tree_snapshot_iterator_next(struct iterator *iterator)
  * index modifications will not affect the iteration results.
  * Must be destroyed by iterator->free after usage.
  */
-struct iterator *
+struct snapshot_iterator *
 MemtxTree::createSnapshotIterator()
 {
-	struct tree_iterator *it = (struct tree_iterator *)
+	struct tree_snapshot_iterator *it = (struct tree_snapshot_iterator *)
 		calloc(1, sizeof(*it));
 	if (it == NULL)
-		tnt_raise(OutOfMemory, sizeof(struct tree_iterator),
+		tnt_raise(OutOfMemory, sizeof(struct tree_snapshot_iterator),
 			  "MemtxTree", "iterator");
 
 	it->base.free = tree_snapshot_iterator_free;
@@ -512,5 +520,5 @@ MemtxTree::createSnapshotIterator()
 	it->tree = &tree;
 	it->tree_iterator = memtx_tree_iterator_first(&tree);
 	memtx_tree_iterator_freeze(&tree, &it->tree_iterator);
-	return (struct iterator *) it;
+	return (struct snapshot_iterator *) it;
 }

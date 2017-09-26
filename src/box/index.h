@@ -225,6 +225,23 @@ struct iterator {
 };
 
 /**
+ * Snapshot iterator.
+ * \sa Index::createSnapshotIterator().
+ */
+struct snapshot_iterator {
+	/**
+	 * Iterate to the next tuple in the snapshot.
+	 * Returns a pointer to the tuple data and its
+	 * size or NULL if EOF.
+	 */
+	const char *(*next)(struct snapshot_iterator *, uint32_t *size);
+	/**
+	 * Destroy the iterator.
+	 */
+	void (*free)(struct snapshot_iterator *);
+};
+
+/**
  * Check that the key has correct part count and correct part size
  * for use in an index iterator.
  *
@@ -337,7 +354,7 @@ public:
 	 * index modifications will not affect the iteration results.
 	 * Must be destroyed by iterator->free after usage.
 	 */
-	virtual struct iterator *createSnapshotIterator();
+	virtual struct snapshot_iterator *createSnapshotIterator();
 
 	/** Introspection (index:info()) */
 	virtual void info(struct info_handler *handler) const;

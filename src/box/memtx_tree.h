@@ -114,7 +114,7 @@ public:
 	 * index modifications will not affect the iteration results.
 	 * Must be destroyed by iterator->free after usage.
 	 */
-	struct iterator *createSnapshotIterator() override;
+	struct snapshot_iterator *createSnapshotIterator() override;
 
 private:
 	struct memtx_tree tree;
