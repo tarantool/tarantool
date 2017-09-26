@@ -45,10 +45,12 @@
 struct sequence_data_iterator {
 	struct snapshot_iterator base;
 	/** Last tuple returned by the iterator. */
-	char *tuple;
 	/** Iterator over the data index. */
 	struct light_sequence_iterator iter;
+	char tuple[0];
 };
+
+static const int BUF_SIZE = mp_sizeof_array(2) + 2 * mp_sizeof_uint(UINT64_MAX);
 
 static const char *
 sequence_data_iterator_next(struct snapshot_iterator *base, uint32_t *size)
@@ -56,31 +58,21 @@ sequence_data_iterator_next(struct snapshot_iterator *base, uint32_t *size)
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
 
-	if (iter->tuple != NULL) {
-		free(iter->tuple);
-		iter->tuple = NULL;
-	}
-
 	struct sequence_data *data =
 		light_sequence_iterator_get_and_next(&sequence_data_index,
 						     &iter->iter);
 	if (data == NULL)
 		return NULL;
 
-	size_t buf_size = mp_sizeof_array(2) + 2 * mp_sizeof_uint(UINT64_MAX);
-	char *buf = (char *)malloc(buf_size);
-	if (buf == NULL)
-		tnt_raise(OutOfMemory, buf_size, "malloc", "tuple");
-	char *buf_end = buf;
+	char *buf_end = iter->tuple;
 	buf_end = mp_encode_array(buf_end, 2);
 	buf_end = mp_encode_uint(buf_end, data->id);
 	buf_end = (data->value >= 0 ?
 		   mp_encode_uint(buf_end, data->value) :
 		   mp_encode_int(buf_end, data->value));
-	assert(buf_end <= buf + buf_size);
-	*size = buf_end - buf;
-	iter->tuple = buf;
-	return buf;
+	assert(buf_end <= iter->tuple + BUF_SIZE);
+	*size = buf_end - iter->tuple;
+	return iter->tuple;
 }
 
 static void
@@ -88,8 +80,6 @@ sequence_data_iterator_free(struct snapshot_iterator *base)
 {
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
-	if (iter->tuple != NULL)
-		free(iter->tuple);
 	light_sequence_iterator_destroy(&sequence_data_index, &iter->iter);
 	TRASH(iter);
 	free(iter);
@@ -99,9 +89,9 @@ struct snapshot_iterator *
 sequence_data_iterator_create(void)
 {
 	struct sequence_data_iterator *iter =
-		(struct sequence_data_iterator *)calloc(1, sizeof(*iter));
+		(struct sequence_data_iterator *)calloc(1, sizeof(*iter) + BUF_SIZE);
 	if (iter == NULL)
-		tnt_raise(OutOfMemory, sizeof(*iter),
+		tnt_raise(OutOfMemory, sizeof(*iter) + BUF_SIZE,
 			  "malloc", "sequence_data_iterator");
 
 	iter->base.free = sequence_data_iterator_free;
