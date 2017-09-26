@@ -574,7 +574,7 @@ netbox_encode_execute(lua_State *L)
 	luamp_encode_uint(cfg, &stream, IPROTO_SQL_BIND);
 	luamp_encode_tuple(L, cfg, &stream, 5);
 
-	luamp_encode_uint(cfg, &stream, IPROTO_SQL_OPTIONS);
+	luamp_encode_uint(cfg, &stream, IPROTO_OPTIONS);
 	luamp_encode_tuple(L, cfg, &stream, 6);
 
 	netbox_encode_request(&stream, svp);

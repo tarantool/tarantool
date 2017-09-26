@@ -87,6 +87,7 @@ enum iproto_key {
 	/* Also request keys. See the comment above. */
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
+	IPROTO_OPTIONS = 0x29,
 
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
@@ -103,13 +104,12 @@ enum iproto_key {
 	/* Leave a gap between response keys and SQL keys. */
 	IPROTO_SQL_TEXT = 0x40,
 	IPROTO_SQL_BIND = 0x41,
-	IPROTO_SQL_OPTIONS = 0x42,
 	/**
 	 * IPROTO_SQL_INFO: {
 	 *     SQL_INFO_ROW_COUNT: number
 	 * }
 	 */
-	IPROTO_SQL_INFO = 0x43,
+	IPROTO_SQL_INFO = 0x42,
 	IPROTO_KEY_MAX
 };
 
