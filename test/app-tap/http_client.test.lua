@@ -11,7 +11,7 @@ local yaml = require('yaml')
 
 local TARANTOOL_SRC_DIR = os.getenv("TARANTOOL_SRC_DIR") or "../.."
 
-test:plan(8)
+test:plan(9)
 
 local function start_server()
     local s = socketlib('AF_INET', 'SOCK_STREAM', 0)
@@ -186,6 +186,16 @@ test:test("errors", function(test)
     test:is(r.status, 595, "GET: response on bad url")
 end)
 
+test:test("headers", function(test)
+    test:plan(4)
+    local http = client:new()
+    local r = http:get(URL .. 'headers')
+    test:is(type(r.headers["set-cookie"]), 'string', "set-cookie check")
+    test:is(r.headers["set-cookie"], "likes=cheese,age=17", "set-cookie check")
+    test:is(r.headers["content-type"], "application/json", "content-type check")
+    test:is(r.headers["my_header"], "value1,value2", "other header check")
+end)
+
 test:test("special methods", function(test)
     test:plan(14)
     local http = client.new()
@@ -259,7 +269,7 @@ test:test("concurrent", function(test)
     local curls   = { }
     local headers = { }
 
-    -- Init [[ 
+    -- Init [[
     for i = 1, num_test do
         headers["My-header" .. i] = "my-value"
     end
@@ -286,8 +296,8 @@ test:test("concurrent", function(test)
             fiber.create(function()
                 local r = obj.http:post(obj.url, obj.body, {
                     headers = obj.headers,
-                    keepalive_idle = 30, 
-                    keepalive_interval = 60, 
+                    keepalive_idle = 30,
+                    keepalive_interval = 60,
                     connect_timeout = obj.connect_timeout,
                     timeout = obj.timeout,
                 })
@@ -296,15 +306,15 @@ test:test("concurrent", function(test)
             fiber.create(function()
                 local r = obj.http:get(obj.url, {
                     headers = obj.headers,
-                    keepalive_idle = 30, 
-                    keepalive_interval = 60, 
+                    keepalive_idle = 30,
+                    keepalive_interval = 60,
                     connect_timeout = obj.connect_timeout,
                     timeout = obj.timeout,
                 })
                 ch:put(r.status)
             end)
         end
-    end 
+    end
     local ok_sockets_added = true
     local ok_active = true
     local ok_timeout = true

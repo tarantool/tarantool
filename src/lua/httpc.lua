@@ -65,21 +65,70 @@ local function check_args(self, method)
     end
 end
 
+--
+-- RFC2616: http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2
+--
+-- Multiple message-header fields with the same field-name MAY be present
+-- in a message if and only if the entire field-value for that header field
+-- is defined as a comma-separated list [i.e., #(values)]. It MUST be possible
+-- to combine the multiple header fields into one "field-name: field-value"
+-- pair, without changing the semantics of the message, by appending each
+-- subsequent field-value to the first, each separated by a comma. The order
+-- in which header fields with the same field-name are received is therefore
+-- significant to the interpretation of the combined field value, and thus
+-- a proxy MUST NOT change the order of these field values when a message
+-- is forwarded.
+--
+-- Tarantool implementation concatenates all headers by default except
+-- the blacklist below.
+--
+
+local special_headers = {
+    ["age"] = true,
+    ["authorization"] = true,
+    ["content-length"] = true,
+    ["content-type"] = true,
+    ["etag"] = true,
+    ["expires"] = true,
+    ["from"] = true,
+    ["host"] = true,
+    ["if-modified-since"] = true,
+    ["if-unmodified-since"] = true,
+    ["last-modified"] = true,
+    ["location"] = true,
+    ["max-forwards"] = true,
+    ["proxy-authorization"] = true,
+    ["referer"] = true,
+    ["retry-after"] = true,
+    ["user-agent"] = true,
+}
+
 local function parse_list(list)
     local result = {}
     for _,str in pairs(list) do
-        if str ~= '' and not string.match(str, "HTTP/%d%.%d %d%d%d") then
-            local h = str:split(': ')
-            local key = string.lower(table.remove(h, 1))
-            local val = table.concat(h)
+        if str ~= '' then
+            local h = str:split(':', 1)
+            local key = h[1]:lower()
+            local val = string.gsub(h[2], "^%s*(.-)%s*$", "%1")
             local prev_val = result[key]
-            if prev_val == nil then
-                result[key] = val
-            elseif type(prev_val) == 'table' then
-                table.insert(prev_val, val)
-            else
-                result[key] = { prev_val, val }
-            end
+            -- pack headers
+            if not special_headers[key] then
+                    if prev_val == nil then
+                        result[key] = {}
+                        table.insert(result[key], val)
+                    else
+                        table.insert(prev_val, val)
+                    end
+                else if not prev_val then
+                        result[key] = val
+                    end
+                end
+        end
+    end
+
+    for key, value in pairs(result) do
+        if not special_headers[key] then
+            result[key] = table.concat(result[key], ",")
         end
     end
     return result
