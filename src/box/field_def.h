@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "opt_def.h"
 
 #if defined(__cplusplus)
@@ -71,6 +72,12 @@ field_type_by_name(const char *name, size_t len);
 extern const struct opt_def field_def_reg[];
 extern const struct field_def field_def_default;
 
+/*
+ * A special value to indicate that tuple format doesn't store
+ * an offset for a field_id.
+ */
+enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
+
 /**
  * @brief Field definition
  * Contains information about of one tuple field.
@@ -99,6 +106,8 @@ struct field_def {
 	 * field map is negative.
 	 */
 	int32_t offset_slot;
+	/** True if this field is used by an index. */
+	bool is_key_part;
 };
 
 #if defined(__cplusplus)

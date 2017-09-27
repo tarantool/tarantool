@@ -53,6 +53,7 @@ tuple_format_create(struct tuple_format *format, struct key_def **keys,
 	char *name_pos = (char *)format + sizeof(struct tuple_format) +
 			 format->field_count * sizeof(struct field_def);
 	for (uint32_t i = 0; i < field_count; ++i) {
+		format->fields[i].is_key_part = false;
 		format->fields[i].type = fields[i].type;
 		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
 		if (fields[i].name != NULL) {
@@ -66,11 +67,8 @@ tuple_format_create(struct tuple_format *format, struct key_def **keys,
 		}
 	}
 	/* Initialize remaining fields */
-	for (uint32_t i = field_count; i < format->field_count; i++) {
-		format->fields[i].type = FIELD_TYPE_ANY;
-		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
-		format->fields[i].name = NULL;
-	}
+	for (uint32_t i = field_count; i < format->field_count; i++)
+		format->fields[i] = field_def_default;
 
 	int current_slot = 0;
 
@@ -86,6 +84,7 @@ tuple_format_create(struct tuple_format *format, struct key_def **keys,
 			struct field_def *field =
 				&format->fields[part->fieldno];
 
+			field->is_key_part = true;
 			if (field->type == FIELD_TYPE_ANY) {
 				field->type = part->type;
 			} else if (field->type != part->type) {
@@ -176,15 +175,18 @@ static struct tuple_format *
 tuple_format_alloc(struct key_def **keys, uint16_t key_count,
 		   struct field_def *space_fields, uint32_t space_field_count)
 {
-	uint32_t field_count = space_field_count;
+	uint32_t index_field_count = 0;
 	/* find max max field no */
 	for (uint16_t key_no = 0; key_no < key_count; ++key_no) {
 		struct key_def *key_def = keys[key_no];
 		struct key_part *part = key_def->parts;
 		struct key_part *pend = part + key_def->part_count;
-		for (; part < pend; part++)
-			field_count = MAX(field_count, part->fieldno + 1);
+		for (; part < pend; part++) {
+			index_field_count = MAX(index_field_count,
+						part->fieldno + 1);
+		}
 	}
+	uint32_t field_count = MAX(space_field_count, index_field_count);
 
 	uint32_t total = sizeof(struct tuple_format) +
 			 field_count * sizeof(struct field_def);
@@ -203,6 +205,7 @@ tuple_format_alloc(struct key_def **keys, uint16_t key_count,
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
 	format->field_count = field_count;
+	format->index_field_count = index_field_count;
 	format->exact_field_count = 0;
 	return format;
 }
@@ -248,13 +251,13 @@ tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b)
 		if (a->fields[i].type != b->fields[i].type ||
 		    a->fields[i].offset_slot != b->fields[i].offset_slot)
 			return false;
-		if (a->fields[i].name != NULL) {
-			assert(b->fields[i].name != NULL);
-			assert(strcmp(a->fields[i].name,
-				      b->fields[i].name) == 0);
-		} else {
-			assert(b->fields[i].name == NULL);
-		}
+		if ((a->fields[i].name != NULL) != (b->fields[i].name != NULL))
+			return false;
+		if (a->fields[i].name != NULL &&
+		    strcmp(a->fields[i].name, b->fields[i].name) != 0)
+				return false;
+		if (a->fields[i].is_key_part != b->fields[i].is_key_part)
+			return false;
 	}
 	return true;
 }

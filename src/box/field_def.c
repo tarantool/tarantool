@@ -60,6 +60,8 @@ const struct opt_def field_def_reg[] = {
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
 	.name = NULL,
+	.offset_slot = TUPLE_OFFSET_SLOT_NIL,
+	.is_key_part = false,
 };
 
 enum field_type
