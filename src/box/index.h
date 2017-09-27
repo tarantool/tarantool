@@ -210,10 +210,6 @@ int
 box_index_info(uint32_t space_id, uint32_t index_id,
 	       struct info_handler *info);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#include "index_def.h"
-
 struct iterator {
 	struct tuple *(*next)(struct iterator *);
 	void (*free)(struct iterator *);
@@ -240,6 +236,10 @@ struct snapshot_iterator {
 	 */
 	void (*free)(struct snapshot_iterator *);
 };
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#include "index_def.h"
 
 /**
  * Check that the key has correct part count and correct part size
