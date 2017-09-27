@@ -343,6 +343,7 @@ t;
   - 'box.error.PRIV_NOT_GRANTED : 91'
   - 'box.error.TRANSACTION_CONFLICT : 97'
   - 'box.error.GUEST_USER_PASSWORD : 96'
+  - 'box.error.SEQUENCE_ACCESS_DENIED : 148'
   - 'box.error.PROC_C : 102'
   - 'box.error.INVALID_RUN_FILE : 132'
   - 'box.error.NONMASTER : 6'

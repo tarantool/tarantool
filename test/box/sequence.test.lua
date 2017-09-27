@@ -389,3 +389,162 @@ s2 = box.space.test2
 s2.index.pk.sequence_id == box.sequence.test2_seq.id
 s2:insert{nil, 'bbb'} -- 102
 s2:drop()
+
+--
+-- Test permission checks.
+--
+
+-- Sanity checks.
+box.schema.user.create('user')
+sq = box.schema.sequence.create('seq')
+box.schema.user.grant('user', 'write', 'sequence', 'test') -- error: no such sequence
+box.schema.user.grant('user', 'write', 'sequence', 'seq') -- ok
+box.space._priv.index.object:select{'sequence'}
+box.space._sequence:delete(sq.id) -- error: sequence has grants
+sq:drop() -- ok
+box.space._priv.index.object:select{'sequence'}
+
+-- Access to a standalone sequence is denied unless
+-- the user has the corresponding privileges.
+sq = box.schema.sequence.create('seq')
+box.session.su('user')
+sq:set(100) -- error
+sq:next() -- error
+sq:reset() -- error
+box.session.su('admin')
+box.schema.user.grant('user', 'write', 'sequence', 'seq')
+box.session.su('user')
+sq:set(100) -- ok
+sq:next() -- ok
+sq:reset() -- ok
+box.session.su('admin')
+box.schema.user.revoke('user', 'write', 'sequence', 'seq')
+
+-- Check that access via role works.
+box.schema.role.create('seq_role')
+box.schema.role.grant('seq_role', 'write', 'sequence', 'seq')
+box.schema.user.grant('user', 'execute', 'role', 'seq_role')
+box.session.su('user')
+sq:set(100) -- ok
+sq:next() -- ok
+sq:reset() -- ok
+box.session.su('admin')
+box.schema.role.drop('seq_role')
+
+-- Universe access grants access to any sequence.
+box.schema.user.grant('user', 'write', 'universe')
+box.session.su('user')
+sq:set(100) -- ok
+sq:next() -- ok
+sq:reset() -- ok
+box.session.su('admin')
+
+-- A sequence is inaccessible after privileges have been revoked.
+box.schema.user.revoke('user', 'write', 'universe')
+box.session.su('user')
+sq:set(100) -- error
+sq:next() -- error
+sq:reset() -- error
+box.session.su('admin')
+
+-- A user cannot alter sequences created by other users.
+box.schema.user.grant('user', 'read,write', 'universe')
+box.session.su('user')
+sq:alter{step = 2} -- error
+sq:drop() -- error
+box.session.su('admin')
+sq:drop()
+
+-- A user can alter/use sequences that he owns.
+box.session.su('user')
+sq = box.schema.sequence.create('seq')
+sq:alter{step = 2} -- ok
+sq:drop() -- ok
+sq = box.schema.sequence.create('seq')
+box.session.su('admin')
+box.schema.user.revoke('user', 'read,write', 'universe')
+box.session.su('user')
+sq:set(100) -- ok
+sq:next() -- ok
+sq:reset() -- ok
+box.session.su('admin')
+sq:drop()
+
+-- A sequence can be attached to a space only if the user owns both.
+sq1 = box.schema.sequence.create('seq1')
+s1 = box.schema.space.create('space1')
+_ = s1:create_index('pk')
+box.schema.user.grant('user', 'read,write', 'universe')
+box.session.su('user')
+sq2 = box.schema.sequence.create('seq2')
+s2 = box.schema.space.create('space2')
+_ = s2:create_index('pk', {sequence = 'seq1'}) -- error
+s1.index.pk:alter({sequence = 'seq1'}) -- error
+box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
+box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
+box.space._space_sequence:replace{s2.id, sq1.id, false} -- error
+s2.index.pk:alter({sequence = 'seq2'}) -- ok
+box.session.su('admin')
+
+-- If the user owns a sequence attached to a space,
+-- it can use it for auto increment, otherwise it
+-- needs privileges.
+box.schema.user.revoke('user', 'read,write', 'universe')
+box.session.su('user')
+s2:insert{nil, 1} -- ok: {1, 1}
+box.session.su('admin')
+s2.index.pk:alter{sequence = 'seq1'}
+box.session.su('user')
+s2:insert{2, 2} -- error
+s2:insert{nil, 2} -- error
+s2:update(1, {{'+', 2, 1}}) -- ok
+s2:delete(1) -- ok
+box.session.su('admin')
+box.schema.user.grant('user', 'write', 'sequence', 'seq1')
+box.session.su('user')
+s2:insert{2, 2} -- ok
+s2:insert{nil, 3} -- ok: {3, 3}
+box.session.su('admin')
+s1:drop()
+s2:drop()
+sq1:drop()
+sq2:drop()
+
+-- If the user has access to a space, it also has access to
+-- an automatically generated sequence attached to it.
+s = box.schema.space.create('test')
+_ = s:create_index('pk', {sequence = true})
+box.schema.user.grant('user', 'read,write', 'space', 'test')
+box.session.su('user')
+s:insert{10, 10} -- ok
+s:insert{nil, 11} -- ok: {11, 11}
+box.sequence.test_seq:set(100) -- error
+box.sequence.test_seq:next() -- error
+box.sequence.test_seq:reset() -- error
+box.session.su('admin')
+s:drop()
+
+-- When a user is dropped, all his sequences are dropped as well.
+box.schema.user.grant('user', 'read,write', 'universe')
+box.session.su('user')
+_ = box.schema.sequence.create('test1')
+_ = box.schema.sequence.create('test2')
+box.session.su('admin')
+box.schema.user.drop('user')
+box.sequence
+
+-- Apart from the admin, only the owner can grant permissions
+-- to a sequence.
+box.schema.user.create('user1')
+box.schema.user.create('user2')
+box.schema.user.grant('user1', 'read,write', 'universe')
+box.schema.user.grant('user2', 'read,write', 'universe')
+box.session.su('user1')
+sq = box.schema.sequence.create('test')
+box.session.su('user2')
+box.schema.user.grant('user2', 'write', 'sequence', 'test') -- error
+box.session.su('user1')
+box.schema.user.grant('user2', 'write', 'sequence', 'test') -- ok
+box.session.su('admin')
+box.schema.user.drop('user1')
+box.schema.user.drop('user2')

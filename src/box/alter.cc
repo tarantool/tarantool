@@ -2245,6 +2245,17 @@ priv_def_check(struct priv_def *priv)
 		}
 		break;
 	}
+	case SC_SEQUENCE:
+	{
+		struct sequence *seq = sequence_cache_find(priv->object_id);
+		if (seq->def->uid != grantor->def->uid &&
+		    grantor->def->uid != ADMIN) {
+			tnt_raise(ClientError, ER_ACCESS_DENIED,
+				  "Grant", schema_object_name(priv->object_type),
+				  grantor->def->name);
+		}
+		break;
+	}
 	case SC_ROLE:
 	{
 		struct user *role = user_by_id(priv->object_id);
@@ -2645,18 +2656,23 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 						 BOX_SEQUENCE_DATA_FIELD_ID);
 		struct sequence *seq = sequence_by_id(id);
 		assert(seq != NULL);
+		access_check_ddl(seq->def->uid, SC_SEQUENCE);
 		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id))
 			tnt_raise(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence has data");
 		if (space_has_data(BOX_SPACE_SEQUENCE_ID, 1, id))
 			tnt_raise(ClientError, ER_DROP_SEQUENCE,
 				  seq->def->name, "the sequence is in use");
+		if (schema_find_grants("sequence", seq->def->id))
+			tnt_raise(ClientError, ER_DROP_SEQUENCE,
+				  seq->def->name, "the sequence has grants");
 		alter->old_def = seq->def;
 	} else {						/* UPDATE */
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_ALTER_SEQUENCE);
 		struct sequence *seq = sequence_by_id(new_def->id);
 		assert(seq != NULL);
+		access_check_ddl(seq->def->uid, SC_SEQUENCE);
 		alter->old_def = seq->def;
 		alter->new_def = new_def;
 	}
@@ -2724,9 +2740,14 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 				BOX_SPACE_SEQUENCE_FIELD_ID);
 	uint32_t sequence_id = tuple_field_u32_xc(tuple,
 				BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID);
+	bool is_generated = tuple_field_bool_xc(tuple,
+				BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED);
 
 	struct space *space = space_cache_find(space_id);
 	struct sequence *seq = sequence_cache_find(sequence_id);
+
+	access_check_ddl(space->def->uid, SC_SPACE);
+	access_check_ddl(seq->def->uid, SC_SEQUENCE);
 
 	struct trigger *on_commit =
 		txn_alter_trigger_new(on_commit_dd_space_sequence, space);
@@ -2735,6 +2756,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
 		struct Index *pk = index_find(space, 0);
 		index_def_check_sequence(pk->index_def, space_name(space));
+		seq->is_generated = is_generated;
 		space->sequence = seq;
 	} else {					/* DELETE */
 		assert(space->sequence == seq);

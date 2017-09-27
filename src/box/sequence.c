@@ -41,6 +41,7 @@
 #include "error.h"
 #include "errcode.h"
 #include "fiber.h"
+#include "session.h"
 
 #include "third_party/PMurHash.h"
 
@@ -204,4 +205,27 @@ overflow:
 	}
 	value = def->step > 0 ? def->min : def->max;
 	goto done;
+}
+
+int
+access_check_sequence(struct sequence *seq)
+{
+	struct credentials *cr = current_user();
+	/*
+	 * If the user has universal access, don't bother with checks.
+	 * No special check for ADMIN user is necessary since ADMIN has
+	 * universal access.
+	 */
+	uint8_t access = PRIV_W & ~cr->universal_access;
+	if (seq->def->uid != cr->uid &&
+	     access & ~seq->access[cr->auth_token].effective) {
+		/* Access violation, report error. */
+		struct user *user = user_find(cr->uid);
+		if (user != NULL)
+			diag_set(ClientError, ER_SEQUENCE_ACCESS_DENIED,
+				 priv_name(access), user->def->name,
+				 seq->def->name);
+		return -1;
+	}
+	return 0;
 }

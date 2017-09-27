@@ -33,7 +33,14 @@
 #include <wctype.h>
 
 static const char *object_type_strs[] = {
-	"unknown", "universe", "space", "function", "user", "role" };
+	/* [SC_UKNNOWN]         = */ "unknown",
+	/* [SC_UNIVERSE]        = */ "universe",
+	/* [SC_SPACE]           = */ "space",
+	/* [SC_FUNCTION]        = */ "function",
+	/* [SC_USER]            = */ "user",
+	/* [SC_ROLE]            = */ "role",
+	/* [SC_SEQUENCE]        = */ "sequence",
+};
 
 enum schema_object_type
 schema_object_type(const char *name)

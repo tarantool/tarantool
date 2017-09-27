@@ -36,6 +36,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "user_def.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -76,6 +78,10 @@ struct sequence_def {
 struct sequence {
 	/** Sequence definition. */
 	struct sequence_def *def;
+	/** Set if the sequence is automatically generated. */
+	bool is_generated;
+	/** Cached runtime access information. */
+	struct access access[BOX_USER_MAX];
 };
 
 static inline size_t
@@ -162,6 +168,13 @@ sequence_update(struct sequence *seq, int64_t value);
  */
 int
 sequence_next(struct sequence *seq, int64_t *result);
+
+/**
+ * Check whether or not the current user can be granted
+ * access to the sequence.
+ */
+int
+access_check_sequence(struct sequence *seq);
 
 #if defined(__cplusplus)
 } /* extern "C" */

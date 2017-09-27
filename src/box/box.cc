@@ -182,6 +182,14 @@ request_handle_sequence(struct request *request, struct space *space)
 	assert(request->type == IPROTO_INSERT ||
 	       request->type == IPROTO_REPLACE);
 
+	/*
+	 * An automatically generated sequence inherits
+	 * privileges of the space it is used with.
+	 */
+	if (!seq->is_generated &&
+	    access_check_sequence(seq) != 0)
+		diag_raise();
+
 	struct Index *pk = space_index(space, 0);
 	if (unlikely(pk == NULL))
 		return;
@@ -1047,8 +1055,15 @@ sequence_data_update(uint32_t seq_id, int64_t value)
 			 mp_encode_int(tuple_buf_end, value) :
 			 mp_encode_uint(tuple_buf_end, value));
 	assert(tuple_buf_end < tuple_buf + tuple_buf_size);
-	return box_replace(BOX_SEQUENCE_DATA_ID,
-			   tuple_buf, tuple_buf_end, NULL);
+
+	struct credentials *orig_credentials = current_user();
+	fiber_set_user(fiber(), &admin_credentials);
+
+	int rc = box_replace(BOX_SEQUENCE_DATA_ID,
+			     tuple_buf, tuple_buf_end, NULL);
+
+	fiber_set_user(fiber(), orig_credentials);
+	return rc;
 }
 
 /** Delete a record from _sequence_data space. */
@@ -1065,8 +1080,15 @@ sequence_data_delete(uint32_t seq_id)
 	key_buf_end = mp_encode_array(key_buf_end, 1);
 	key_buf_end = mp_encode_uint(key_buf_end, seq_id);
 	assert(key_buf_end < key_buf + key_buf_size);
-	return box_delete(BOX_SEQUENCE_DATA_ID, 0,
-			  key_buf, key_buf_end, NULL);
+
+	struct credentials *orig_credentials = current_user();
+	fiber_set_user(fiber(), &admin_credentials);
+
+	int rc = box_delete(BOX_SEQUENCE_DATA_ID, 0,
+			    key_buf, key_buf_end, NULL);
+
+	fiber_set_user(fiber(), orig_credentials);
+	return rc;
 }
 
 int
@@ -1074,6 +1096,8 @@ box_sequence_next(uint32_t seq_id, int64_t *result)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);
 	if (seq == NULL)
+		return -1;
+	if (access_check_sequence(seq) != 0)
 		return -1;
 	int64_t value;
 	if (sequence_next(seq, &value) != 0)
@@ -1089,6 +1113,8 @@ box_sequence_set(uint32_t seq_id, int64_t value)
 	struct sequence *seq = sequence_cache_find(seq_id);
 	if (seq == NULL)
 		return -1;
+	if (access_check_sequence(seq) != 0)
+		return -1;
 	if (sequence_set(seq, value) != 0)
 		return -1;
 	return sequence_data_update(seq_id, value);
@@ -1099,6 +1125,8 @@ box_sequence_reset(uint32_t seq_id)
 {
 	struct sequence *seq = sequence_cache_find(seq_id);
 	if (seq == NULL)
+		return -1;
+	if (access_check_sequence(seq) != 0)
 		return -1;
 	sequence_reset(seq);
 	return sequence_data_delete(seq_id);
