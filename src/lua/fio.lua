@@ -262,4 +262,136 @@ fio.chdir = function(path)
     return ffi.C.chdir(path) == 0
 end
 
+fio.listdir = function(path)
+    if path == nil or type(path) ~= 'string' then
+        return nil
+    end
+    local str = internal.listdir(path)
+    if str == nil then
+        return nil
+    end
+    local t = {}
+    if str == "" then
+        return t
+    end
+    local names = string.split(str, "\n")
+    for i, name in ipairs(names) do
+        table.insert(t, name)
+    end
+    return t
+end
+
+fio.mktree = function(path, mode)
+    path = fio.abspath(path)
+    if path == nil then
+        return false
+    end
+    local path = string.gsub(path, '^/', '')
+    local dirs = string.split(path, "/")
+
+    if #dirs == 1 then
+        if mode then
+            return fio.mkdir(path, mode)
+        else
+            return fio.mkdir(path)
+        end
+    end
+
+    local current_dir = "/"
+    for i, dir in ipairs(dirs) do
+        current_dir = fio.pathjoin(current_dir, dir)
+        if not fio.stat(current_dir) then
+            local res
+            if mode then
+                if not fio.mkdir(current_dir, mode) then
+                    res = false
+                end
+            else
+                if not fio.mkdir(current_dir) then
+                    res = false
+                end
+            end
+        end
+    end
+    return true
+end
+
+fio.rmtree = function(path)
+    if path == nil then
+        return false
+    end
+    local path = tostring(path)
+    path = fio.abspath(path)
+    local ls = fio.listdir(path)
+
+    for i, f in ipairs(ls) do
+        local tmppath = fio.pathjoin(path, f)
+        if fio.stat(tmppath):is_dir() then
+            if not fio.rmtree(tmppath) then
+                return false
+            end
+        end
+    end
+    return fio.rmdir(path)
+end
+
+fio.copyfile = function(from, to)
+    if type(from) ~= 'string' or type(to) ~= 'string' then
+        error('Usage: fio.copyfile(from, to)')
+    end
+    local st = fio.stat(to)
+    if st and st:is_dir() then
+        to = fio.pathjoin(to, fio.basename(from))
+    end
+    return internal.copyfile(from, to)
+end
+
+fio.copytree = function(from, to)
+    if type(from) ~= 'string' or type(to) ~= 'string' then
+        error('Usage: fio.copytree(from, to)')
+    end
+    local status, reason
+    from = fio.abspath(from)
+    local st = fio.stat(from)
+    if st == nil or not st:is_dir() then
+        return false, errno.strerror(errno.ENOTDIR)
+    end
+    local ls = fio.listdir(from)
+    to = fio.abspath(to)
+
+    -- create tree of destination
+    local status, reason = fio.mktree(to)
+    if not status then
+        return status, reason
+    end
+    for i, f in ipairs(ls) do
+        local ffrom = fio.pathjoin(from, f)
+        local fto = fio.pathjoin(to, f)
+        local st = fio.lstat(ffrom)
+        if st:is_dir() then
+            status, reason = fio.copytree(ffrom, fto)
+            if not status then
+                return status, reason
+            end
+        end
+        if st:is_reg() then
+            status, reason = fio.copyfile(ffrom, fto)
+            if not status then
+                return status, reason
+            end
+        end
+        if st:is_link() then
+            local link_to, reason = fio.readlink(ffrom)
+            if not link_to then
+                return status, reason
+            end
+            status, reason = fio.symlink(link_to, fto)
+            if not status then
+                return nil, "can't create symlink in place of existing file "..fto
+            end
+        end
+    end
+    return true
+end
+
 return fio
