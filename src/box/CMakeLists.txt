@@ -84,6 +84,8 @@ add_library(box STATIC
     vy_read_set.c
     space.cc
     space_def.c
+    sequence.c
+    sequence_iterator.cc
     func.c
     func_def.c
     alter.cc
@@ -118,6 +120,7 @@ add_library(box STATIC
     lua/slab.c
     lua/index.c
     lua/space.cc
+    lua/sequence.c
     lua/misc.cc
     lua/info.c
     lua/stat.c

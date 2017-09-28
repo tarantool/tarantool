@@ -72,6 +72,10 @@ enum {
 	BOX_SPACE_ID = 280,
 	/** Space id of _vspace view. */
 	BOX_VSPACE_ID = 281,
+	/** Space id of _sequence. */
+	BOX_SEQUENCE_ID = 284,
+	/** Space id of _sequence_data. */
+	BOX_SEQUENCE_DATA_ID = 285,
 	/** Space id of _index. */
 	BOX_INDEX_ID = 288,
 	/** Space id of _vindex view. */
@@ -94,6 +98,8 @@ enum {
 	BOX_TRIGGER_ID = 328,
 	/** Space id of _truncate. */
 	BOX_TRUNCATE_ID = 330,
+	/** Space id of _space_sequence. */
+	BOX_SPACE_SEQUENCE_ID = 340,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
@@ -166,6 +172,32 @@ enum {
 enum {
 	BOX_TRUNCATE_FIELD_SPACE_ID = 0,
 	BOX_TRUNCATE_FIELD_COUNT = 1,
+};
+
+/** _sequence fields. */
+enum {
+	BOX_SEQUENCE_FIELD_ID = 0,
+	BOX_SEQUENCE_FIELD_UID = 1,
+	BOX_SEQUENCE_FIELD_NAME = 2,
+	BOX_SEQUENCE_FIELD_STEP = 3,
+	BOX_SEQUENCE_FIELD_MIN = 4,
+	BOX_SEQUENCE_FIELD_MAX = 5,
+	BOX_SEQUENCE_FIELD_START = 6,
+	BOX_SEQUENCE_FIELD_CACHE = 7,
+	BOX_SEQUENCE_FIELD_CYCLE = 8,
+};
+
+/** _sequence_data fields. */
+enum {
+	BOX_SEQUENCE_DATA_FIELD_ID = 0,
+	BOX_SEQUENCE_DATA_FIELD_VALUE = 1,
+};
+
+/** _space_seq fields. */
+enum {
+	BOX_SPACE_SEQUENCE_FIELD_ID = 0,
+	BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID = 1,
+	BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED = 2,
 };
 
 /*

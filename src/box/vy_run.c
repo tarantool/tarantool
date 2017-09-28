@@ -191,6 +191,8 @@ vy_run_env_destroy(struct vy_run_env *env)
 void
 vy_run_env_enable_coio(struct vy_run_env *env, int threads)
 {
+	if (env->reader_pool != NULL)
+		return; /* already enabled */
 	vy_run_env_start_readers(env, threads);
 }
 
@@ -1688,10 +1690,9 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 	*ret = NULL;
 	int rc;
 
+	assert(itr->search_started);
 	if (itr->search_ended)
 		return 0;
-	if (!itr->search_started)
-		return vy_run_iterator_start(itr, ret);
 	assert(itr->curr_pos.page_no < itr->slice->run->info.page_count);
 
 	struct vy_run_iterator_pos next_pos;

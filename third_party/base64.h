@@ -39,13 +39,33 @@ extern "C" {
 
 #define BASE64_CHARS_PER_LINE 72
 
+/** Options for base64 encoder. */
+enum base64_options {
+	/** Do not write padding symbols '='. */
+	BASE64_NOPAD = 1,   /* 0 0 1 */
+	/** Do not write '\n' every 72 symbols. */
+	BASE64_NOWRAP = 2,  /* 0 1 0 */
+	/**
+	 * No-pad + no-wrap.
+	 * Replace '+' -> '-' and '/' -> '_'.
+	 */
+	BASE64_URLSAFE = 7, /* 1 1 1 */
+};
+
 inline int
-base64_bufsize(int binsize)
+base64_bufsize(int binsize, int options)
 {
-	int datasize = binsize * 4/3 + 4;
-	int newlines = ((datasize + BASE64_CHARS_PER_LINE - 1)/
-			BASE64_CHARS_PER_LINE);
-	return datasize + newlines;
+	int datasize = binsize * 4/3;
+	if ((options & BASE64_NOWRAP) == 0) {
+		/* Account '\n' symbols. */
+		datasize += ((datasize + BASE64_CHARS_PER_LINE - 1)/
+			     BASE64_CHARS_PER_LINE);
+	} else if (binsize % 3 != 0) {
+		datasize++;
+	}
+	if ((options & BASE64_NOPAD) == 0)
+		datasize += 4;
+	return datasize;
 }
 
 /**
@@ -62,10 +82,9 @@ base64_bufsize(int binsize)
  *
  * @return the size of encoded output
  */
-
 int
 base64_encode(const char *in_bin, int in_len,
-	      char *out_base64, int out_len);
+	      char *out_base64, int out_len, int options);
 
 /**
  * Decode a BASE64 text into a binary
@@ -80,9 +99,8 @@ base64_encode(const char *in_bin, int in_len,
  *
  * @return the size of decoded output
  */
-
-int base64_decode(const char *in_base64, int in_len,
-		  char *out_bin, int out_len);
+int
+base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
 
 #ifdef __cplusplus
 } /* extern "C" */

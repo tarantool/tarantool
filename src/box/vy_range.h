@@ -262,62 +262,6 @@ vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
 			const struct index_opts *opts,
 			struct vy_range **p_first, struct vy_range **p_last);
 
-/**
- * Iterator over ranges in a tree.
- */
-struct vy_range_iterator {
-	/** Range tree to iterate. */
-	vy_range_tree_t *tree;
-	/** Iterator type. */
-	enum iterator_type iterator_type;
-	/** Search key. */
-	const struct tuple *key;
-	/**
-	 * Current range or NULL if the iteration
-	 * has stopped or has not been started.
-	 */
-	struct vy_range *curr_range;
-};
-
-/**
- * Initialize a range iterator.
- *
- * @param itr           The iterator.
- * @param tree          Range tree to iterate.
- * @param iterator_type Iterator type.
- * @param key           Search key.
- */
-void
-vy_range_iterator_open(struct vy_range_iterator *itr, vy_range_tree_t *tree,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key);
-
-/**
- * Iterate to the next range.
- *
- * @param itr           The iterator.
- * @param[out] result   Next range.
- */
-void
-vy_range_iterator_next(struct vy_range_iterator *itr,
-		       struct vy_range **result);
-
-/**
- * Restore an iterator after a tree modification.
- *
- * @param itr           The iterator.
- * @param last_stmt     The last iterated statement.
- * @param[out] result   Next range.
- *
- * This function positions the iterator to the range that
- * contains @last_stmt. If @last_stmt is NULL, it restarts
- * the iterator.
- */
-void
-vy_range_iterator_restore(struct vy_range_iterator *itr,
-			  const struct tuple *last_stmt,
-			  struct vy_range **result);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

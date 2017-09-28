@@ -156,8 +156,9 @@ local code;
 code = [[ box.cfg{ work_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'work_dir is invalid')
 
+-- gh-2664: vinyl_dir is checked on the first use
 code = [[ box.cfg{ vinyl_dir='invalid' } ]]
-test:is(run_script(code), PANIC, 'vinyl_dir is invalid')
+test:is(run_script(code), 0, 'vinyl_dir is invalid')
 
 code = [[ box.cfg{ memtx_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'snap_dir is invalid')

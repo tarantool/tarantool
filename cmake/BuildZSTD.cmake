@@ -2,11 +2,14 @@ macro(zstd_build)
     set(zstd_src
         third_party/zstd/lib/common/zstd_common.c
         third_party/zstd/lib/common/entropy_common.c
+        third_party/zstd/lib/common/error_private.c
+        third_party/zstd/lib/common/pool.c
         third_party/zstd/lib/common/xxhash.c
         third_party/zstd/lib/common/fse_decompress.c
         third_party/zstd/lib/decompress/zstd_decompress.c
         third_party/zstd/lib/decompress/huf_decompress.c
         third_party/zstd/lib/compress/zstd_compress.c
+        third_party/zstd/lib/compress/zstdmt_compress.c
         third_party/zstd/lib/compress/huf_compress.c
         third_party/zstd/lib/compress/fse_compress.c
     )
@@ -15,6 +18,8 @@ macro(zstd_build)
         set_source_files_properties(${zstd_src}
             PROPERTIES COMPILE_FLAGS -Wno-implicit-fallthrough)
     endif()
+    set_source_files_properties(${zstd_src}
+        PROPERTIES COMPILE_FLAGS -Ofast)
 
     add_library(zstd STATIC ${zstd_src})
     set(ZSTD_LIBRARIES zstd)

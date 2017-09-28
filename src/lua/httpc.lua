@@ -30,7 +30,9 @@
 --
 
 local fiber = require('fiber')
-local driver = require('http.client.driver')
+
+local driver = package.loaded.http.client
+package.loaded.http = nil
 
 local curl_mt
 
@@ -282,4 +284,4 @@ for _, name in ipairs({ 'get', 'delete', 'trace', 'options', 'head',
     this_module[name] = http_default_wrap(name)
 end
 
-package.loaded['http.client'] = this_module
+return this_module

@@ -50,8 +50,10 @@ end
 local server, URL = start_server()
 
 test:test("http.client", function(test)
-    test:plan(7)
+    test:plan(9)
 
+    test:isnil(rawget(_G, 'http'), "global namespace is not polluted");
+    test:isnil(rawget(_G, 'http.client'), "global namespace is not polluted");
     local r = client.get(URL)
     test:is(r.status, 200, 'simple 200')
     test:is(r.proto[1], 1, 'proto major http 1.1')

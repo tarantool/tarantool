@@ -142,5 +142,25 @@ digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tra
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 
+--
+-- Test base64 options. (gh-2479, gh-2478, gh-2777).
+--
+b = digest.base64_encode('123', { urlsafe = true })
+b
+digest.base64_decode(b)
+b = digest.base64_encode('1234567', { urlsafe = true })
+b
+digest.base64_decode(b)
+b = digest.base64_encode('12345678', { urlsafe = true })
+b
+digest.base64_decode(b)
+b = digest.base64_encode('1234567', { nopad = true })
+b
+digest.base64_decode(b)
+b = digest.base64_encode(string.rep('a', 100), { nowrap = true })
+b
+digest.base64_decode(b)
+
+
 digest = nil
 test_run:cmd("clear filter")

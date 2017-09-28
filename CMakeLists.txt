@@ -393,9 +393,17 @@ endif()
 
 # Debian: missing zstd_static.h in libzstd-dev
 # Fedora: not found
-# => always use bundled version
-include(BuildZSTD)
-zstd_build()
+# => use bundled version by default
+
+option(ENABLE_BUNDLED_ZSTD "Enable building of the bundled zstd" ON)
+if (ENABLE_BUNDLED_ZSTD)
+    include(BuildZSTD)
+    zstd_build()
+    add_dependencies(build_bundled_libs zstd)
+else()
+    set(ZSTD_FIND_REQUIRED ON)
+    find_package(ZSTD)
+endif()
 
 #
 # OpenSSL

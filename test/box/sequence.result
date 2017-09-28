@@ -1,0 +1,1175 @@
+test_run = require('test_run').new()
+---
+...
+-- Options check on create.
+box.schema.sequence.create('test', {abc = 'abc'})
+---
+- error: Illegal parameters, unexpected option 'abc'
+...
+box.schema.sequence.create('test', {step = 'a'})
+---
+- error: Illegal parameters, options parameter 'step' should be of type number
+...
+box.schema.sequence.create('test', {min = 'b'})
+---
+- error: Illegal parameters, options parameter 'min' should be of type number
+...
+box.schema.sequence.create('test', {max = 'c'})
+---
+- error: Illegal parameters, options parameter 'max' should be of type number
+...
+box.schema.sequence.create('test', {start = true})
+---
+- error: Illegal parameters, options parameter 'start' should be of type number
+...
+box.schema.sequence.create('test', {cycle = 123})
+---
+- error: Illegal parameters, options parameter 'cycle' should be of type boolean
+...
+box.schema.sequence.create('test', {name = 'test'})
+---
+- error: Illegal parameters, unexpected option 'name'
+...
+box.schema.sequence.create('test', {step = 0})
+---
+- error: 'Failed to create sequence ''test'': step option must be non-zero'
+...
+box.schema.sequence.create('test', {min = 10, max = 1})
+---
+- error: 'Failed to create sequence ''test'': max must be greater than or equal to
+    min'
+...
+box.schema.sequence.create('test', {min = 10, max = 20, start = 1})
+---
+- error: 'Failed to create sequence ''test'': start must be between min and max'
+...
+-- Options check on alter.
+_ = box.schema.sequence.create('test')
+---
+...
+box.schema.sequence.alter('test', {abc = 'abc'})
+---
+- error: Illegal parameters, unexpected option 'abc'
+...
+box.schema.sequence.alter('test', {step = 'a'})
+---
+- error: Illegal parameters, options parameter 'step' should be of type number
+...
+box.schema.sequence.alter('test', {min = 'b'})
+---
+- error: Illegal parameters, options parameter 'min' should be of type number
+...
+box.schema.sequence.alter('test', {max = 'c'})
+---
+- error: Illegal parameters, options parameter 'max' should be of type number
+...
+box.schema.sequence.alter('test', {start = true})
+---
+- error: Illegal parameters, options parameter 'start' should be of type number
+...
+box.schema.sequence.alter('test', {cycle = 123})
+---
+- error: Illegal parameters, options parameter 'cycle' should be of type boolean
+...
+box.schema.sequence.alter('test', {name = 'test'})
+---
+...
+box.schema.sequence.alter('test', {if_not_exists = false})
+---
+- error: Illegal parameters, unexpected option 'if_not_exists'
+...
+box.schema.sequence.alter('test', {step = 0})
+---
+- error: 'Can''t modify sequence ''test'': step option must be non-zero'
+...
+box.schema.sequence.alter('test', {min = 10, max = 1})
+---
+- error: 'Can''t modify sequence ''test'': max must be greater than or equal to min'
+...
+box.schema.sequence.alter('test', {min = 10, max = 20, start = 1})
+---
+- error: 'Can''t modify sequence ''test'': start must be between min and max'
+...
+box.schema.sequence.drop('test')
+---
+...
+-- Duplicate name.
+sq1 = box.schema.sequence.create('test')
+---
+...
+box.schema.sequence.create('test')
+---
+- error: Sequence 'test' already exists
+...
+sq2, msg = box.schema.sequence.create('test', {if_not_exists = true})
+---
+...
+sq1 == sq2, msg
+---
+- true
+- not created
+...
+_ = box.schema.sequence.create('test2')
+---
+...
+box.schema.sequence.alter('test2', {name = 'test'})
+---
+- error: Duplicate key exists in unique index 'name' in space '_sequence'
+...
+box.schema.sequence.drop('test2')
+---
+...
+box.schema.sequence.drop('test')
+---
+...
+-- Check that box.sequence gets updated.
+sq = box.schema.sequence.create('test')
+---
+...
+box.sequence.test == sq
+---
+- true
+...
+sq.step
+---
+- 1
+...
+sq:alter{step = 2}
+---
+...
+box.sequence.test == sq
+---
+- true
+...
+sq.step
+---
+- 2
+...
+sq:drop()
+---
+...
+box.sequence.test == nil
+---
+- true
+...
+-- Attempt to delete a sequence that has a record in _sequence_data.
+sq = box.schema.sequence.create('test')
+---
+...
+sq:next()
+---
+- 1
+...
+box.space._sequence:delete(sq.id)
+---
+- error: 'Can''t drop sequence ''test'': the sequence has data'
+...
+box.space._sequence_data:delete(sq.id)
+---
+- [1, 1]
+...
+box.space._sequence:delete(sq.id)
+---
+- [1, 1, 'test', 1, 1, 9223372036854775807, 1, 0, false]
+...
+box.sequence.test == nil
+---
+- true
+...
+-- Default ascending sequence.
+sq = box.schema.sequence.create('test')
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1
+- false
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:set(100)
+---
+...
+sq:next() -- 101
+---
+- 101
+...
+sq:next() -- 102
+---
+- 102
+...
+sq:reset()
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:drop()
+---
+...
+-- Default descending sequence.
+sq = box.schema.sequence.create('test', {step = -1})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- -1
+- -9223372036854775808
+- -1
+- -1
+- false
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- -2
+---
+- -2
+...
+sq:set(-100)
+---
+...
+sq:next() -- -101
+---
+- -101
+...
+sq:next() -- -102
+---
+- -102
+...
+sq:reset()
+---
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- -2
+---
+- -2
+...
+sq:drop()
+---
+...
+-- Custom min/max.
+sq = box.schema.sequence.create('test', {min = 10})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 10
+- 9223372036854775807
+- 10
+- false
+...
+sq:next() -- 10
+---
+- 10
+...
+sq:next() -- 11
+---
+- 11
+...
+sq:drop()
+---
+...
+sq = box.schema.sequence.create('test', {step = -1, max = 20})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- -1
+- -9223372036854775808
+- 20
+- 20
+- false
+...
+sq:next() -- 20
+---
+- 20
+...
+sq:next() -- 19
+---
+- 19
+...
+sq:drop()
+---
+...
+-- Custom start value.
+sq = box.schema.sequence.create('test', {start = 1000})
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1000
+- false
+...
+sq:next() -- 1000
+---
+- 1000
+...
+sq:next() -- 1001
+---
+- 1001
+...
+sq:reset()
+---
+...
+sq:next() -- 1000
+---
+- 1000
+...
+sq:next() -- 1001
+---
+- 1001
+...
+sq:drop()
+---
+...
+-- Overflow and cycle.
+sq = box.schema.sequence.create('test', {max = 2})
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:alter{cycle = true}
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:next() -- 2
+---
+- 2
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:alter{step = 2}
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:alter{cycle = false}
+---
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:drop()
+---
+...
+-- Setting sequence value outside boundaries.
+sq = box.schema.sequence.create('test')
+---
+...
+sq:alter{step = 1, min = 1, max = 10}
+---
+...
+sq:set(-100)
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:set(100)
+---
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:reset()
+---
+...
+sq:next() -- 1
+---
+- 1
+...
+sq:alter{min = 5, start = 5}
+---
+...
+sq:next() -- 5
+---
+- 5
+...
+sq:reset()
+---
+...
+sq:alter{step = -1, min = 1, max = 10, start = 10}
+---
+...
+sq:set(100)
+---
+...
+sq:next() -- 10
+---
+- 10
+...
+sq:set(-100)
+---
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:reset()
+---
+...
+sq:next() -- 10
+---
+- 10
+...
+sq:alter{max = 5, start = 5}
+---
+...
+sq:next() -- 5
+---
+- 5
+...
+sq:drop()
+---
+...
+-- number64 arguments.
+INT64_MIN = tonumber64('-9223372036854775808')
+---
+...
+INT64_MAX = tonumber64('9223372036854775807')
+---
+...
+sq = box.schema.sequence.create('test', {step = INT64_MAX, min = INT64_MIN, max = INT64_MAX, start = INT64_MIN})
+---
+...
+sq:next() -- -9223372036854775808
+---
+- -9223372036854775808
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- 9223372036854775806
+---
+- 9223372036854775806
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:alter{step = INT64_MIN, start = INT64_MAX}
+---
+...
+sq:reset()
+---
+...
+sq:next() -- 9223372036854775807
+---
+- 9223372036854775807
+...
+sq:next() -- -1
+---
+- -1
+...
+sq:next() -- error
+---
+- error: Sequence 'test' has overflowed
+...
+sq:drop()
+---
+...
+-- Using in a transaction.
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+sq1 = box.schema.sequence.create('sq1', {step = 1})
+---
+...
+sq2 = box.schema.sequence.create('sq2', {step = -1})
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+box.begin()
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+box.rollback();
+---
+...
+box.begin()
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+s:insert{sq1:next(), sq2:next()}
+box.commit();
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s:select() -- [4, -4], [5, -5], [6, -6]
+---
+- - [4, -4]
+  - [5, -5]
+  - [6, -6]
+...
+sq1:drop()
+---
+...
+sq2:drop()
+---
+...
+s:drop()
+---
+...
+--
+-- Attaching a sequence to a space.
+--
+-- Index create/modify checks.
+s = box.schema.space.create('test')
+---
+...
+sq = box.schema.sequence.create('test')
+---
+...
+sq:set(123)
+---
+...
+s:create_index('pk', {parts = {1, 'string'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+s:create_index('pk', {parts = {1, 'scalar'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+s:create_index('pk', {parts = {1, 'number'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+pk = s:create_index('pk', {parts = {1, 'integer'}, sequence = 'test'}) -- ok
+---
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
+---
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk') -- ok
+---
+...
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
+---
+...
+pk:alter{parts = {1, 'string'}} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+box.space._index:update({s.id, pk.id}, {{'=', 6, {{0, 'string'}}}}) -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+box.space._index:delete{s.id, pk.id} -- error
+---
+- error: 'Can''t modify space ''test'': can not drop primary key while space sequence
+    exists'
+...
+pk:alter{parts = {1, 'string'}, sequence = false} -- ok
+---
+...
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+sk:alter{sequence = 'test'} -- error
+---
+- error: 'Can''t create or modify index ''sk'' in space ''test'': sequence cannot
+    be used with a secondary key'
+...
+box.space._space_sequence:insert{s.id, sq.id, false} -- error
+---
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
+    be used with a non-integer key'
+...
+sk:drop()
+---
+...
+pk:drop()
+---
+...
+s:create_index('pk', {sequence = {}}) -- error
+---
+- error: 'Illegal parameters, options parameter ''sequence'' should be one of types:
+    boolean, number, string'
+...
+s:create_index('pk', {sequence = 'abc'}) -- error
+---
+- error: Sequence 'abc' does not exist
+...
+s:create_index('pk', {sequence = 12345}) -- error
+---
+- error: Sequence '12345' does not exist
+...
+pk = s:create_index('pk', {sequence = 'test'}) -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {sequence = sq.id}) -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:drop()
+---
+...
+pk = s:create_index('pk', {sequence = false}) -- ok
+---
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+pk:alter{sequence = {}} -- error
+---
+- error: 'Illegal parameters, options parameter ''sequence'' should be one of types:
+    boolean, number, string'
+...
+pk:alter{sequence = 'abc'} -- error
+---
+- error: Sequence 'abc' does not exist
+...
+pk:alter{sequence = 12345} -- error
+---
+- error: Sequence '12345' does not exist
+...
+pk:alter{sequence = 'test'} -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:alter{sequence = sq.id} -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+pk:alter{sequence = false} -- ok
+---
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+pk:drop()
+---
+...
+sq:next() -- 124
+---
+- 124
+...
+sq:drop()
+---
+...
+s:drop()
+---
+...
+-- Using a sequence for auto increment.
+sq = box.schema.sequence.create('test')
+---
+...
+s1 = box.schema.space.create('test1')
+---
+...
+_ = s1:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'})
+---
+...
+s2 = box.schema.space.create('test2')
+---
+...
+_ = s2:create_index('pk', {parts = {2, 'integer'}, sequence = 'test'})
+---
+...
+s3 = box.schema.space.create('test3')
+---
+...
+_ = s3:create_index('pk', {parts = {2, 'unsigned', 1, 'string'}, sequence = 'test'})
+---
+...
+s1:insert(box.tuple.new(nil)) -- 1
+---
+- [1]
+...
+s2:insert(box.tuple.new('a', nil)) -- 2
+---
+- ['a', 2]
+...
+s3:insert(box.tuple.new('b', nil)) -- 3
+---
+- ['b', 3]
+...
+s1:truncate()
+---
+...
+s2:truncate()
+---
+...
+s3:truncate()
+---
+...
+s1:insert{nil, 123, 456} -- 4
+---
+- [4, 123, 456]
+...
+s2:insert{'c', nil, 123} -- 5
+---
+- ['c', 5, 123]
+...
+s3:insert{'d', nil, 456} -- 6
+---
+- ['d', 6, 456]
+...
+sq:next() -- 7
+---
+- 7
+...
+sq:reset()
+---
+...
+s1:insert{nil, nil, 'aa'} -- 1
+---
+- [1, null, 'aa']
+...
+s2:insert{'bb', nil, nil, 'cc'} -- 2
+---
+- ['bb', 2, null, 'cc']
+...
+s3:insert{'dd', nil, nil, 'ee'} -- 3
+---
+- ['dd', 3, null, 'ee']
+...
+sq:next() -- 4
+---
+- 4
+...
+sq:set(100)
+---
+...
+s1:insert{nil, 'aaa', 1} -- 101
+---
+- [101, 'aaa', 1]
+...
+s2:insert{'bbb', nil, 2} -- 102
+---
+- ['bbb', 102, 2]
+...
+s3:insert{'ccc', nil, 3} -- 103
+---
+- ['ccc', 103, 3]
+...
+sq:next() -- 104
+---
+- 104
+...
+s1:insert{1000, 'xxx'}
+---
+- [1000, 'xxx']
+...
+sq:next() -- 1001
+---
+- 1001
+...
+s2:insert{'yyy', 2000}
+---
+- ['yyy', 2000]
+...
+sq:next() -- 2001
+---
+- 2001
+...
+s3:insert{'zzz', 3000}
+---
+- ['zzz', 3000]
+...
+sq:next() -- 3001
+---
+- 3001
+...
+s1:insert{500, 'xxx'}
+---
+- [500, 'xxx']
+...
+s3:insert{'zzz', 2500}
+---
+- ['zzz', 2500]
+...
+s2:insert{'yyy', 1500}
+---
+- ['yyy', 1500]
+...
+sq:next() -- 3002
+---
+- 3002
+...
+sq:drop() -- error
+---
+- error: 'Can''t drop sequence ''test'': the sequence is in use'
+...
+s1:drop()
+---
+...
+sq:drop() -- error
+---
+- error: 'Can''t drop sequence ''test'': the sequence is in use'
+...
+s2:drop()
+---
+...
+sq:drop() -- error
+---
+- error: 'Can''t drop sequence ''test'': the sequence is in use'
+...
+s3:drop()
+---
+...
+sq:drop() -- ok
+---
+...
+-- Automatically generated sequences.
+s = box.schema.space.create('test')
+---
+...
+sq = box.schema.sequence.create('test')
+---
+...
+sq:set(123)
+---
+...
+pk = s:create_index('pk', {sequence = true})
+---
+...
+sq = box.sequence.test_seq
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1
+- false
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+s:insert{nil, 'a'} -- 1
+---
+- [1, 'a']
+...
+s:insert{nil, 'b'} -- 2
+---
+- [2, 'b']
+...
+s:insert{nil, 'c'} -- 3
+---
+- [3, 'c']
+...
+sq:next() -- 4
+---
+- 4
+...
+pk:alter{sequence = false}
+---
+...
+s.index.pk.sequence_id == nil
+---
+- true
+...
+s:insert{nil, 'x'} -- error
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+pk:alter{sequence = true}
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 1
+- 1
+- 9223372036854775807
+- 1
+- false
+...
+sq = box.sequence.test_seq
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+s:insert{100, 'abc'}
+---
+- [100, 'abc']
+...
+s:insert{nil, 'cda'} -- 101
+---
+- [101, 'cda']
+...
+sq:next() -- 102
+---
+- 102
+...
+pk:alter{sequence = 'test'}
+---
+...
+s.index.pk.sequence_id == box.sequence.test.id
+---
+- true
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+pk:alter{sequence = true}
+---
+...
+s.index.pk.sequence_id == box.sequence.test_seq.id
+---
+- true
+...
+pk:drop()
+---
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+pk = s:create_index('pk', {sequence = true})
+---
+...
+s.index.pk.sequence_id == box.sequence.test_seq.id
+---
+- true
+...
+s:drop()
+---
+...
+box.sequence.test_seq == nil
+---
+- true
+...
+sq = box.sequence.test
+---
+...
+sq:next() -- 124
+---
+- 124
+...
+sq:drop()
+---
+...
+-- Sequences are compatible with Vinyl spaces.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk', {sequence = true})
+---
+...
+s:insert{nil, 'a'} -- 1
+---
+- [1, 'a']
+...
+s:insert{100, 'b'} -- 100
+---
+- [100, 'b']
+...
+box.begin()
+---
+...
+s:insert{nil, 'c'} -- 101
+---
+- [101, 'c']
+...
+s:insert{nil, 'd'} -- 102
+---
+- [102, 'd']
+...
+box.rollback()
+---
+...
+box.begin()
+---
+...
+s:insert{nil, 'e'} -- 103
+---
+- [103, 'e']
+...
+s:insert{nil, 'f'} -- 104
+---
+- [104, 'f']
+...
+box.commit()
+---
+...
+s:select() -- {1, 'a'}, {100, 'b'}, {103, 'e'}, {104, 'f'}
+---
+- - [1, 'a']
+  - [100, 'b']
+  - [103, 'e']
+  - [104, 'f']
+...
+s:drop()
+---
+...
+--
+-- Check that sequences are persistent.
+--
+s1 = box.schema.space.create('test1')
+---
+...
+_ = s1:create_index('pk', {sequence = true})
+---
+...
+s1:insert{nil, 'a'} -- 1
+---
+- [1, 'a']
+...
+box.snapshot()
+---
+- ok
+...
+s2 = box.schema.space.create('test2')
+---
+...
+_ = s2:create_index('pk', {sequence = true})
+---
+...
+s2:insert{101, 'aaa'}
+---
+- [101, 'aaa']
+...
+sq = box.schema.sequence.create('test', {step = 2, min = 10, max = 20, start = 15, cycle = true})
+---
+...
+sq:next()
+---
+- 15
+...
+test_run:cmd('restart server default')
+sq = box.sequence.test
+---
+...
+sq.step, sq.min, sq.max, sq.start, sq.cycle
+---
+- 2
+- 10
+- 20
+- 15
+- true
+...
+sq:next()
+---
+- 17
+...
+sq:drop()
+---
+...
+s1 = box.space.test1
+---
+...
+s1.index.pk.sequence_id == box.sequence.test1_seq.id
+---
+- true
+...
+s1:insert{nil, 'b'} -- 2
+---
+- [2, 'b']
+...
+s1:drop()
+---
+...
+s2 = box.space.test2
+---
+...
+s2.index.pk.sequence_id == box.sequence.test2_seq.id
+---
+- true
+...
+s2:insert{nil, 'bbb'} -- 102
+---
+- [102, 'bbb']
+...
+s2:drop()
+---
+...

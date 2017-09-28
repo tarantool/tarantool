@@ -82,6 +82,10 @@ vy_begin_final_recovery(struct vy_env *e);
 int
 vy_end_recovery(struct vy_env *e);
 
+/*
+ * Checkpoint
+ */
+
 int
 vy_begin_checkpoint(struct vy_env *env);
 
@@ -89,7 +93,10 @@ int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock);
 
 void
-vy_end_checkpoint(struct vy_env *env);
+vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock);
+
+void
+vy_abort_checkpoint(struct vy_env *env);
 
 /*
  * Introspection

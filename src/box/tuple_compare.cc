@@ -354,6 +354,8 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		return mp_compare_integer(field_a, field_b);
 	case FIELD_TYPE_NUMBER:
 		return mp_compare_number(field_a, field_b);
+	case FIELD_TYPE_BOOLEAN:
+		return mp_compare_bool(field_a, field_b);
 	case FIELD_TYPE_SCALAR:
 		return mp_compare_scalar(field_a, field_b);
 	default:

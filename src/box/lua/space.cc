@@ -46,6 +46,7 @@ extern "C" {
 #include "box/tuple.h"
 #include "box/txn.h"
 #include "box/vclock.h" /* VCLOCK_MAX */
+#include "box/sequence.h"
 
 /**
  * Trigger function for all spaces
@@ -206,6 +207,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 		lua_settable(L, -3); /* space.index[k].parts */
 
+		if (k == 0 && space->sequence != NULL) {
+			lua_pushnumber(L, space->sequence->def->id);
+			lua_setfield(L, -2, "sequence_id");
+		}
+
 		if (space_is_vinyl(space)) {
 			lua_pushstring(L, "options");
 			lua_newtable(L);
@@ -249,7 +255,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 }
 
 /** Export a space to Lua */
-void
+static void
 box_lua_space_new(struct lua_State *L, struct space *space)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
@@ -286,7 +292,7 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 }
 
 /** Delete a given space in Lua */
-void
+static void
 box_lua_space_delete(struct lua_State *L, uint32_t id)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
@@ -302,10 +308,30 @@ box_lua_space_delete(struct lua_State *L, uint32_t id)
 	lua_pop(L, 2); /* box, space */
 }
 
+static void
+box_lua_space_new_or_delete(struct trigger *trigger, void *event)
+{
+	struct lua_State *L = (struct lua_State *) trigger->data;
+	struct space *space = (struct space *) event;
+
+	if (space_by_id(space->def->id) != NULL) {
+		box_lua_space_new(L, space);
+	} else {
+		box_lua_space_delete(L, space->def->id);
+	}
+}
+
+static struct trigger on_alter_space_in_lua = {
+	RLIST_LINK_INITIALIZER, box_lua_space_new_or_delete, NULL, NULL
+};
 
 void
 box_lua_space_init(struct lua_State *L)
 {
+	/* Register the trigger that will push space data to Lua. */
+	on_alter_space_in_lua.data = L;
+	trigger_add(&on_alter_space, &on_alter_space_in_lua);
+
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_newtable(L);
 	lua_setfield(L, -2, "schema");
@@ -338,6 +364,12 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "TRIGGER_ID");
 	lua_pushnumber(L, BOX_TRUNCATE_ID);
 	lua_setfield(L, -2, "TRUNCATE_ID");
+	lua_pushnumber(L, BOX_SEQUENCE_ID);
+	lua_setfield(L, -2, "SEQUENCE_ID");
+	lua_pushnumber(L, BOX_SEQUENCE_DATA_ID);
+	lua_setfield(L, -2, "SEQUENCE_DATA_ID");
+	lua_pushnumber(L, BOX_SPACE_SEQUENCE_ID);
+	lua_setfield(L, -2, "SPACE_SEQUENCE_ID");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MAX);

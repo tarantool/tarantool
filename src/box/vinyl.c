@@ -59,6 +59,7 @@
 #include "info.h"
 #include "column_mask.h"
 #include "trigger.h"
+#include "checkpoint.h"
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
@@ -140,14 +141,6 @@ enum {
 static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
-
-static int
-path_exists(const char *path)
-{
-	struct stat st;
-	int rc = lstat(path, &st);
-	return rc == 0;
-}
 
 enum vy_stat_name {
 	VY_STAT_GET,
@@ -447,8 +440,6 @@ struct vy_scheduler {
 	bool is_throttled;
 	/** Set if checkpoint is in progress. */
 	bool checkpoint_in_progress;
-	/** Last checkpoint vclock. */
-	struct vclock last_checkpoint;
 	/**
 	 * Current generation of in-memory data.
 	 *
@@ -835,11 +826,19 @@ vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
 
+	/*
+	 * It's no use alerting the user if the server is
+	 * shutting down or the index was dropped.
+	 */
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: dump failed: %s", vy_index_name(index),
 			  diag_last_error(&task->diag)->errmsg);
+	}
+
+	/* The metadata log is unavailable on shutdown. */
+	if (!in_shutdown)
 		vy_run_discard(task->new_run);
-	} else
+	else
 		vy_run_unref(task->new_run);
 
 	index->is_dumping = false;
@@ -1047,7 +1046,7 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
-	int64_t gc_lsn = vclock_sum(&scheduler->last_checkpoint);
+	int64_t gc_lsn = checkpoint_last(NULL);
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
@@ -1136,12 +1135,20 @@ vy_task_compact_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	/* The iterator has been cleaned up in worker. */
 	task->wi->iface->close(task->wi);
 
+	/*
+	 * It's no use alerting the user if the server is
+	 * shutting down or the index was dropped.
+	 */
 	if (!in_shutdown && !index->is_dropped) {
 		say_error("%s: failed to compact range %s: %s",
 			  vy_index_name(index), vy_range_str(range),
 			  diag_last_error(&task->diag)->errmsg);
+	}
+
+	/* The metadata log is unavailable on shutdown. */
+	if (!in_shutdown)
 		vy_run_discard(task->new_run);
-	} else
+	else
 		vy_run_unref(task->new_run);
 
 	assert(range->heap_node.pos == UINT32_MAX);
@@ -1310,7 +1317,6 @@ vy_scheduler_new(struct vy_env *env)
 	tt_pthread_mutex_init(&scheduler->mutex, NULL);
 	diag_create(&scheduler->diag);
 	fiber_cond_create(&scheduler->dump_cond);
-	vclock_create(&scheduler->last_checkpoint);
 	scheduler->env = env;
 	vy_compact_heap_create(&scheduler->compact_heap);
 	vy_dump_heap_create(&scheduler->dump_heap);
@@ -1905,16 +1911,22 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	scheduler->dump_start = now;
 }
 
-/*
- * Schedule checkpoint. Please call vy_wait_checkpoint() after that.
+/**
+ * Schedule checkpoint. Please call vy_scheduler_wait_checkpoint()
+ * after that.
  */
-int
-vy_begin_checkpoint(struct vy_env *env)
+static int
+vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 {
-	struct vy_scheduler *scheduler = env->scheduler;
-
-	assert(env->status == VINYL_ONLINE);
 	assert(!scheduler->checkpoint_in_progress);
+
+	/*
+	 * The scheduler starts worker threads upon the first wakeup.
+	 * To avoid starting the threads for nothing, do not wake it
+	 * up if Vinyl is not used.
+	 */
+	if (lsregion_used(&scheduler->env->stmt_env.allocator) == 0)
+		return 0;
 
 	/*
 	 * If the scheduler is throttled due to errors, do not wait
@@ -1936,15 +1948,15 @@ vy_begin_checkpoint(struct vy_env *env)
 	return 0;
 }
 
-/*
- * Wait for checkpoint. Please call vy_end_checkpoint() after that.
+/**
+ * Wait for checkpoint. Please call vy_scheduler_end_checkpoint()
+ * after that.
  */
-int
-vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
+static int
+vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 {
-	struct vy_scheduler *scheduler = env->scheduler;
-
-	assert(scheduler->checkpoint_in_progress);
+	if (!scheduler->checkpoint_in_progress)
+		return 0;
 
 	/*
 	 * Wait until all in-memory trees created before
@@ -1956,31 +1968,24 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 			assert(!diag_is_empty(&scheduler->diag));
 			diag_add_error(diag_get(),
 				       diag_last_error(&scheduler->diag));
-			goto error;
+			say_error("vinyl checkpoint error: %s",
+				  diag_last_error(diag_get())->errmsg);
+			return -1;
 		}
 		fiber_cond_wait(&scheduler->dump_cond);
 	}
-
-	if (vy_log_rotate(vclock) != 0)
-		goto error;
-
-	vclock_copy(&scheduler->last_checkpoint, vclock);
-
 	say_info("vinyl checkpoint done");
 	return 0;
-error:
-	say_error("vinyl checkpoint error: %s",
-		  diag_last_error(diag_get())->errmsg);
-	return -1;
 }
 
-/*
+/**
  * End checkpoint. Called on both checkpoint commit and abort.
  */
-void
-vy_end_checkpoint(struct vy_env *env)
+static void
+vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
 {
-	struct vy_scheduler *scheduler = env->scheduler;
+	if (!scheduler->checkpoint_in_progress)
+		return;
 
 	/*
 	 * Checkpoint blocks dumping of in-memory trees created after
@@ -2238,13 +2243,25 @@ vy_delete_index(struct vy_env *env, struct vy_index *index)
 int
 vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 {
+	/* Ensure vinyl data directory exists. */
+	if (access(env->path, F_OK) != 0) {
+		diag_set(SystemError, "can not access vinyl data directory");
+		return -1;
+	}
+	int rc;
 	switch (env->status) {
 	case VINYL_ONLINE:
 		/*
 		 * The recovery is complete, simply
 		 * create a new index.
 		 */
-		return vy_index_create(index);
+		rc = vy_index_create(index);
+		if (rc == 0) {
+			/* Make sure reader threads are up and running. */
+			vy_run_env_enable_coio(&env->run_env,
+					       env->read_threads);
+		}
+		break;
 	case VINYL_INITIAL_RECOVERY_REMOTE:
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		/*
@@ -2252,7 +2269,8 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		 * exist locally, and we should create the
 		 * index directory from scratch.
 		 */
-		return vy_index_create(index);
+		rc = vy_index_create(index);
+		break;
 	case VINYL_INITIAL_RECOVERY_LOCAL:
 	case VINYL_FINAL_RECOVERY_LOCAL:
 		/*
@@ -2261,14 +2279,15 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		 * have already been created, so try to load
 		 * the index files from it.
 		 */
-		return vy_index_recover(index, env->recovery,
+		rc = vy_index_recover(index, env->recovery,
 				vclock_sum(env->recovery_vclock),
 				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
 				force_recovery);
+		break;
 	default:
 		unreachable();
-		return -1;
 	}
+	return rc;
 }
 
 void
@@ -2371,7 +2390,7 @@ vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
 	index->is_dropped = true;
 
 	vy_log_tx_begin();
-	vy_log_index_prune(index, vclock_sum(&env->scheduler->last_checkpoint));
+	vy_log_index_prune(index, checkpoint_last(NULL));
 	vy_log_drop_index(index->commit_lsn);
 	if (vy_log_tx_try_commit() < 0)
 		say_warn("failed to log drop index: %s",
@@ -2477,7 +2496,7 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 	 * don't, we will replay them during WAL recovery.
 	 */
 	vy_log_tx_begin();
-	int64_t gc_lsn = vclock_sum(&env->scheduler->last_checkpoint);
+	int64_t gc_lsn = checkpoint_last(NULL);
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct vy_index *old_index = vy_index(old_space->index[i]);
 		struct vy_index *new_index = vy_index(new_space->index[i]);
@@ -3842,12 +3861,6 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 			 "malloc", "env->path");
 		goto error_path;
 	}
-	/* Ensure vinyl data directory exists. */
-	if (!path_exists(e->path)) {
-		diag_set(ClientError, ER_CFG, "vinyl_dir",
-			 "directory does not exist");
-		goto error_xm;
-	}
 	e->xm = tx_manager_new();
 	if (e->xm == NULL)
 		goto error_xm;
@@ -3936,6 +3949,45 @@ vy_set_timeout(struct vy_env *env, double timeout)
 
 /** }}} Environment */
 
+/* {{{ Checkpoint */
+
+int
+vy_begin_checkpoint(struct vy_env *env)
+{
+	assert(env->status == VINYL_ONLINE);
+	if (vy_scheduler_begin_checkpoint(env->scheduler) != 0)
+		return -1;
+	return 0;
+}
+
+int
+vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
+{
+	assert(env->status == VINYL_ONLINE);
+	if (vy_scheduler_wait_checkpoint(env->scheduler) != 0)
+		return -1;
+	if (vy_log_rotate(vclock) != 0)
+		return -1;
+	return 0;
+}
+
+void
+vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
+{
+	(void)vclock;
+	assert(env->status == VINYL_ONLINE);
+	vy_scheduler_end_checkpoint(env->scheduler);
+}
+
+void
+vy_abort_checkpoint(struct vy_env *env)
+{
+	assert(env->status == VINYL_ONLINE);
+	vy_scheduler_end_checkpoint(env->scheduler);
+}
+
+/* }}} Checkpoint */
+
 /** {{{ Recovery */
 
 int
@@ -3945,7 +3997,6 @@ vy_bootstrap(struct vy_env *e)
 	if (vy_log_bootstrap() != 0)
 		return -1;
 	vy_quota_set_limit(&e->quota, e->memory);
-	vy_run_env_enable_coio(&e->run_env, e->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -4013,7 +4064,13 @@ vy_end_recovery(struct vy_env *e)
 	default:
 		unreachable();
 	}
-	vy_run_env_enable_coio(&e->run_env, e->read_threads);
+	/*
+	 * Do not start reader threads if no Vinyl index was
+	 * recovered. The threads will be started lazily upon
+	 * the first index creation, see vy_index_open().
+	 */
+	if (e->index_env.index_count > 0)
+		vy_run_env_enable_coio(&e->run_env, e->read_threads);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -4427,7 +4484,7 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 	vy_log_collect_garbage(lsn);
 
 	/* Cleanup run files. */
-	int64_t signature = vclock_sum(&env->scheduler->last_checkpoint);
+	int64_t signature = checkpoint_last(NULL);
 	struct vy_recovery *recovery = vy_recovery_new(signature, false);
 	if (recovery == NULL) {
 		say_warn("vinyl garbage collection failed: %s",

@@ -122,74 +122,13 @@ test_basic()
 	footer();
 }
 
-void
-test_gh2661_next_key()
-{
-	header();
-	plan(3);
-	struct vy_cache cache;
-	uint32_t fields[] = { 0, 1 };
-	uint32_t types[] = { FIELD_TYPE_UNSIGNED, FIELD_TYPE_UNSIGNED };
-	struct key_def *key_def;
-	struct tuple_format *format;
-	create_test_cache(fields, types, lengthof(fields), &cache, &key_def,
-			  &format);
-	struct tuple *select_all =
-		vy_new_simple_stmt(format, NULL, NULL, &key_template);
-	struct vy_cache_iterator itr;
-	struct vy_read_view rv;
-	rv.vlsn = INT64_MAX;
-	const struct vy_read_view *rv_p = &rv;
-	struct tuple *ret;
-	bool unused;
-
-	/*
-	 * Test case: insert a statement, position an iterator on
-	 * it. Then change the cache version and try to get the
-	 * next key. Before gh-2661 fix the cache iterator
-	 * returned the same tuple, as before version change.
-	 */
-	const struct vy_stmt_template chain1 =
-		STMT_TEMPLATE(1, REPLACE, 100, 1000);
-	vy_cache_insert_templates_chain(&cache, format, &chain1, 1,
-					&key_template, ITER_GE);
-	vy_cache_iterator_open(&itr, &cache, ITER_GE, select_all, &rv_p);
-	/*
-	 * Call next_key first to start iteration.
-	 */
-	ok(itr.base.iface->next_key(&itr.base, &ret, &unused) >= 0,
-	   "start");
-
-	/*
-	 * Change version by inserting a new statement
-	 * into the cache. Iterator's position is not changed.
-	 */
-	const struct vy_stmt_template chain2 =
-		STMT_TEMPLATE(1, REPLACE, 100, 2000);
-	vy_cache_insert_templates_chain(&cache, format, &chain2, 1,
-					&key_template, ITER_GE);
-	/* Must return the new statement. */
-	is(0, itr.base.iface->next_key(&itr.base, &ret, &unused),
-	   "next_key after version change");
-	ok(vy_stmt_are_same(ret, &chain2, format, NULL, NULL),
-	   "next_key after restore");
-
-	itr.base.iface->close(&itr.base);
-	tuple_unref(select_all);
-	destroy_test_cache(&cache, key_def, format);
-	check_plan();
-	footer();
-}
-
 int
 main()
 {
-	plan(2);
 	vy_iterator_C_test_init(1LLU * 1024LLU * 1024LLU * 1024LLU);
 
 	test_basic();
-	test_gh2661_next_key();
 
 	vy_iterator_C_test_finish();
-	return check_plan();
+	return 0;
 }

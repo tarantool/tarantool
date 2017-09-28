@@ -458,13 +458,14 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 }
 
 static void
-checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple)
+checkpoint_write_tuple(struct xlog *l, uint32_t space_id,
+		       const char *data, uint32_t size)
 {
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;
 	body.m_space_id = 0xce; /* uint32 */
-	body.v_space_id = mp_bswap_u32(n);
+	body.v_space_id = mp_bswap_u32(space_id);
 	body.k_tuple = IPROTO_TUPLE;
 
 	struct xrow_header row;
@@ -474,15 +475,14 @@ checkpoint_write_tuple(struct xlog *l, uint32_t n, struct tuple *tuple)
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);
-	uint32_t bsize;
-	row.body[1].iov_base = (char *) tuple_data_range(tuple, &bsize);
-	row.body[1].iov_len = bsize;
+	row.body[1].iov_base = (char *)data;
+	row.body[1].iov_len = size;
 	checkpoint_write_row(l, &row);
 }
 
 struct checkpoint_entry {
 	struct space *space;
-	struct iterator *iterator;
+	struct snapshot_iterator *iterator;
 	struct rlist link;
 };
 
@@ -579,11 +579,13 @@ checkpoint_f(va_list ap)
 	say_info("saving snapshot `%s'", snap.filename);
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
-		struct tuple *tuple;
-		struct iterator *it = entry->iterator;
-		for (tuple = it->next(it); tuple; tuple = it->next(it)) {
+		uint32_t size;
+		const char *data;
+		struct snapshot_iterator *it = entry->iterator;
+		for (data = it->next(it, &size); data != NULL;
+		     data = it->next(it, &size)) {
 			checkpoint_write_tuple(&snap, space_id(entry->space),
-					       tuple);
+					       data, size);
 		}
 	}
 	xlog_flush(&snap);

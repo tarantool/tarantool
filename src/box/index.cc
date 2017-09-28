@@ -271,7 +271,7 @@ Index::initIterator(struct iterator *ptr, enum iterator_type type,
  * index modifications will not affect the iteration results.
  * Must be destroyed by iterator->free after usage.
  */
-struct iterator *
+struct snapshot_iterator *
 Index::createSnapshotIterator()
 {
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");

@@ -342,11 +342,11 @@ digest.base64_decode(nil)
 ...
 digest.base64_encode(nil)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_encode(string[, table])'
 ...
 digest.base64_encode(123)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_encode(string)'
+- error: 'builtin/digest.lua:<line>"]: Usage: digest.base64_encode(string[, table])'
 ...
 digest.base64_decode(123)
 ---
@@ -447,6 +447,64 @@ digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspa
 ---
 - error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope
     routines:EVP_DecryptFinal_ex:bad decrypt'
+...
+--
+-- Test base64 options. (gh-2479, gh-2478, gh-2777).
+--
+b = digest.base64_encode('123', { urlsafe = true })
+---
+...
+b
+---
+- MTIz
+...
+digest.base64_decode(b)
+---
+- '123'
+...
+b = digest.base64_encode('1234567', { urlsafe = true })
+---
+...
+b
+---
+- MTIzNDU2Nw
+...
+digest.base64_decode(b)
+---
+- '1234567'
+...
+b = digest.base64_encode('12345678', { urlsafe = true })
+---
+...
+b
+---
+- MTIzNDU2Nzg
+...
+digest.base64_decode(b)
+---
+- '12345678'
+...
+b = digest.base64_encode('1234567', { nopad = true })
+---
+...
+b
+---
+- MTIzNDU2Nw
+...
+digest.base64_decode(b)
+---
+- '1234567'
+...
+b = digest.base64_encode(string.rep('a', 100), { nowrap = true })
+---
+...
+b
+---
+- YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==
+...
+digest.base64_decode(b)
+---
+- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ...
 digest = nil
 ---

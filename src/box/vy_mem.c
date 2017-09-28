@@ -413,29 +413,6 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 	return vy_mem_iterator_seek(itr, itr->iterator_type, itr->key);
 }
 
-/**
- * Restores iterator if the mem have been changed
- */
-static void
-vy_mem_iterator_check_version(struct vy_mem_iterator *itr)
-{
-	assert(itr->curr_stmt != NULL);
-	if (itr->version == itr->mem->version)
-		return;
-	itr->version = itr->mem->version;
-	const struct tuple * const *record;
-	record = vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
-	if (record != NULL && *record == itr->curr_stmt)
-		return;
-	struct tree_mem_key tree_key;
-	tree_key.stmt = itr->curr_stmt;
-	tree_key.lsn = vy_stmt_lsn(itr->curr_stmt);
-	bool exact;
-	itr->curr_pos = vy_mem_tree_lower_bound(&itr->mem->tree,
-						&tree_key, &exact);
-	assert(exact);
-}
-
 /* }}} vy_mem_iterator support functions */
 
 /* {{{ vy_mem_iterator API implementation */
@@ -477,8 +454,8 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 		return vy_mem_iterator_start(itr);
 	if (!itr->curr_stmt) /* End of search. */
 		return 1;
+	assert(itr->mem->version == itr->version);
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
-	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	const struct key_def *cmp_def = itr->mem->cmp_def;
 
@@ -524,12 +501,11 @@ vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 static NODISCARD int
 vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 {
-	if (!itr->search_started)
-		return vy_mem_iterator_start(itr);
+	assert(itr->search_started);
 	if (!itr->curr_stmt) /* End of search. */
 		return 1;
+	assert(itr->mem->version == itr->version);
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
-	vy_mem_iterator_check_version(itr);
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	const struct key_def *cmp_def = itr->mem->cmp_def;
 

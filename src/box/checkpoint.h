@@ -49,8 +49,8 @@ extern "C" {
 struct vclock;
 
 /**
- * Return LSN and vclock of the most recent checkpoint
- * or -1 if there is no checkpoint.
+ * Return LSN and vclock (unless @vclock is NULL) of the most
+ * recent checkpoint or -1 if there is no checkpoint.
  */
 int64_t
 checkpoint_last(struct vclock *vclock);

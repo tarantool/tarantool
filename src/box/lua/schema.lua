@@ -19,6 +19,9 @@ local tuple_bless = box.tuple.bless
 local is_tuple = box.tuple.is
 assert(tuple_encode ~= nil and tuple_bless ~= nil and is_tuple ~= nil)
 
+local INT64_MIN = tonumber64('-9223372036854775808')
+local INT64_MAX = tonumber64('9223372036854775807')
+
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     extern uint32_t box_schema_version();
@@ -142,6 +145,31 @@ local function user_resolve(name_or_id)
     end
 end
 
+local function sequence_resolve(name_or_id)
+    local _sequence = box.space[box.schema.SEQUENCE_ID]
+    local tuple
+    if type(name_or_id) == 'string' then
+        tuple = _sequence.index.name:get{name_or_id}
+    elseif type(name_or_id) ~= 'nil' then
+        tuple = _sequence:get{name_or_id}
+    end
+    if tuple ~= nil then
+        return tuple[1], tuple
+    else
+        return nil
+    end
+end
+
+-- Same as type(), but returns 'number' if 'param' is
+-- of type 'cdata' and represents a 64-bit integer.
+local function param_type(param)
+    local t = type(param)
+    if t == 'cdata' and tonumber64(param) ~= nil then
+        t = 'number'
+    end
+    return t
+end
+
 --[[
  @brief Common function to check table with parameters (like options)
  @param table - table with parameters
@@ -180,7 +208,7 @@ local function check_param_table(table, template)
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
             -- one type
-            if type(v) ~= template[k] then
+            if param_type(v) ~= template[k] then
                 box.error(box.error.ILLEGAL_PARAMS,
                           "options parameter '" .. k ..
                           "' should be of type " .. template[k])
@@ -188,7 +216,7 @@ local function check_param_table(table, template)
         else
             local good_types = string.gsub(template[k], ' ', '')
             local haystack = ',' .. good_types .. ','
-            local needle = ',' .. type(v) .. ','
+            local needle = ',' .. param_type(v) .. ','
             if (string.find(haystack, needle) == nil) then
                 good_types = string.gsub(good_types, ',', ', ')
                 box.error(box.error.ILLEGAL_PARAMS,
@@ -205,7 +233,7 @@ end
  @example: check_param(user, 'user', 'string')
 --]]
 local function check_param(param, name, should_be_type)
-    if type(param) ~= should_be_type then
+    if param_type(param) ~= should_be_type then
         box.error(box.error.ILLEGAL_PARAMS,
                   name .. " should be a " .. should_be_type)
     end
@@ -369,6 +397,12 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _index = box.space[box.schema.INDEX_ID]
     local _priv = box.space[box.schema.PRIV_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    local sequence_tuple = _space_sequence:delete{space_id}
+    if sequence_tuple ~= nil and sequence_tuple[3] == true then
+        -- Delete automatically generated sequence.
+        box.schema.sequence.drop(sequence_tuple[2])
+    end
     local keys = _index:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
@@ -378,6 +412,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     for k, tuple in pairs(privs) do
         box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
+    _truncate:delete{space_id}
     if _space:delete{space_id} == nil then
         if space_name == nil then
             space_name = '#'..tostring(space_id)
@@ -386,7 +421,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
             box.error(box.error.NO_SUCH_SPACE, space_name)
         end
     end
-    _truncate:delete{space_id}
 end
 
 box.schema.space.rename = function(space_id, space_name)
@@ -463,6 +497,7 @@ local alter_index_template = {
     name = 'string',
     type = 'string',
     parts = 'table',
+    sequence = 'boolean, number, string',
 }
 for k, v in pairs(index_options) do
     alter_index_template[k] = v
@@ -563,14 +598,49 @@ box.schema.index.create = function(space_id, name, options)
                      "please use '%s' instead", field_type, part[2])
         end
     end
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    local sequence_is_generated = false
+    local sequence = options.sequence or nil -- ignore sequence = false
+    if sequence ~= nil then
+        if iid ~= 0 then
+            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+                      "sequence cannot be used with a secondary key")
+        end
+        if #parts >= 1 and parts[1][2] ~= 'integer' and
+                           parts[1][2] ~= 'unsigned' then
+            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+                      "sequence cannot be used with a non-integer key")
+        end
+        if sequence == true then
+            sequence = box.schema.sequence.create(
+                box.space[space_id].name .. '_seq')
+            sequence = sequence.id
+            sequence_is_generated = true
+        else
+            sequence = sequence_resolve(sequence)
+            if sequence == nil then
+                box.error(box.error.NO_SUCH_SEQUENCE, options.sequence)
+            end
+        end
+    end
     _index:insert{space_id, iid, name, options.type, index_opts, parts}
+    if sequence ~= nil then
+        _space_sequence:insert{space_id, sequence, sequence_is_generated}
+    end
     return box.space[space_id].index[name]
 end
 
 box.schema.index.drop = function(space_id, index_id)
     check_param(space_id, 'space_id', 'number')
     check_param(index_id, 'index_id', 'number')
-
+    if index_id == 0 then
+        local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+        local sequence_tuple = _space_sequence:delete{space_id}
+        if sequence_tuple ~= nil and sequence_tuple[3] == true then
+            -- Delete automatically generated sequence.
+            box.schema.sequence.drop(sequence_tuple[2])
+        end
+    end
     local _index = box.space[box.schema.INDEX_ID]
     _index:delete{space_id, index_id}
 end
@@ -667,8 +737,52 @@ box.schema.index.alter = function(space_id, index_id, options)
             table.insert(parts, {options.parts[i], options.parts[i + 1]})
         end
     end
+    local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
+    local sequence_is_generated = false
+    local sequence = options.sequence
+    local sequence_tuple = _space_sequence:get(space_id)
+    if sequence or (sequence ~= false and sequence_tuple ~= nil) then
+        if index_id ~= 0 then
+            box.error(box.error.MODIFY_INDEX,
+                      options.name, box.space[space_id].name,
+                      "sequence cannot be used with a secondary key")
+        end
+        if #parts >= 1 and parts[1][2] ~= 'integer' and
+                           parts[1][2] ~= 'unsigned' then
+            box.error(box.error.MODIFY_INDEX,
+                      options.name, box.space[space_id].name,
+                      "sequence cannot be used with a non-integer key")
+        end
+    end
+    if sequence == true then
+        if sequence_tuple == nil or sequence_tuple[3] == false then
+            sequence = box.schema.sequence.create(
+                box.space[space_id].name .. '_seq')
+            sequence = sequence.id
+            sequence_is_generated = true
+        else
+            -- Space already has an automatically generated sequence.
+            sequence = nil
+        end
+    elseif sequence then
+        sequence = sequence_resolve(sequence)
+        if sequence == nil then
+            box.error(box.error.NO_SUCH_SEQUENCE, options.sequence)
+        end
+    end
+    if sequence == false then
+        _space_sequence:delete(space_id)
+    end
     _index:replace{space_id, index_id, options.name, options.type,
                    index_opts, parts}
+    if sequence then
+        _space_sequence:replace{space_id, sequence, sequence_is_generated}
+    end
+    if sequence_tuple ~= nil and sequence_tuple[3] == true and
+       sequence_tuple[2] ~= sequence then
+        -- Delete automatically generated sequence.
+        box.schema.sequence.drop(sequence_tuple[2])
+    end
 end
 
 -- a static box_tuple_t ** instance for calling box_index_* API
@@ -1163,6 +1277,143 @@ function box.schema.space.bless(space)
     end
 end
 
+local sequence_mt = {}
+sequence_mt.__index = sequence_mt
+
+sequence_mt.next = function(self)
+    return internal.sequence.next(self.id)
+end
+
+sequence_mt.set = function(self, value)
+    return internal.sequence.set(self.id, value)
+end
+
+sequence_mt.reset = function(self)
+    return internal.sequence.reset(self.id)
+end
+
+sequence_mt.alter = function(self, opts)
+    box.schema.sequence.alter(self.id, opts)
+end
+
+sequence_mt.drop = function(self)
+    box.schema.sequence.drop(self.id)
+end
+
+local function sequence_tuple_decode(seq, tuple)
+    seq.id, seq.uid, seq.name, seq.step, seq.min, seq.max,
+        seq.start, seq.cache, seq.cycle = tuple:unpack()
+end
+
+local function sequence_new(tuple)
+    local seq = setmetatable({}, sequence_mt)
+    sequence_tuple_decode(seq, tuple)
+    return seq
+end
+
+local function sequence_on_alter(old_tuple, new_tuple)
+    if old_tuple and not new_tuple then
+        local old_name = old_tuple[3]
+        box.sequence[old_name] = nil
+    elseif not old_tuple and new_tuple then
+        local seq = sequence_new(new_tuple)
+        box.sequence[seq.name] = seq
+    else
+        local old_name = old_tuple[3]
+        local seq = box.sequence[old_name]
+        if not seq then
+            seq = sequence_new(seq, new_tuple)
+        else
+            sequence_tuple_decode(seq, new_tuple)
+        end
+        box.sequence[old_name] = nil
+        box.sequence[seq.name] = seq
+    end
+end
+
+box.sequence = {}
+local function box_sequence_init()
+    -- Install a trigger that will update Lua objects on
+    -- _sequence space modifications.
+    internal.sequence.on_alter(sequence_on_alter)
+end
+
+local sequence_options = {
+    step = 'number',
+    min = 'number',
+    max = 'number',
+    start = 'number',
+    cache = 'number',
+    cycle = 'boolean',
+}
+
+local create_sequence_options = table.deepcopy(sequence_options)
+create_sequence_options.if_not_exists = 'boolean'
+
+local alter_sequence_options = table.deepcopy(sequence_options)
+alter_sequence_options.name = 'string'
+
+box.schema.sequence = {}
+box.schema.sequence.create = function(name, opts)
+    opts = opts or {}
+    check_param(name, 'name', 'string')
+    check_param_table(opts, create_sequence_options)
+    local ascending = not opts.step or opts.step > 0
+    local options_defaults = {
+        step = 1,
+        min = ascending and 1 or INT64_MIN,
+        max = ascending and INT64_MAX or -1,
+        start = ascending and (opts.min or 1) or (opts.max or -1),
+        cache = 0,
+        cycle = false,
+    }
+    opts = update_param_table(opts, options_defaults)
+    local id = sequence_resolve(name)
+    if id ~= nil then
+        if not opts.if_not_exists then
+            box.error(box.error.SEQUENCE_EXISTS, name)
+        end
+        return box.sequence[name], 'not created'
+    end
+    local _sequence = box.space[box.schema.SEQUENCE_ID]
+    _sequence:auto_increment{session.uid(), name, opts.step, opts.min,
+                             opts.max, opts.start, opts.cache, opts.cycle}
+    return box.sequence[name]
+end
+
+box.schema.sequence.alter = function(name, opts)
+    check_param_table(opts, alter_sequence_options)
+    local id, tuple = sequence_resolve(name)
+    if id == nil then
+        box.error(box.error.NO_SUCH_SEQUENCE, name)
+    end
+    if opts == nil then
+        return
+    end
+    local seq = {}
+    sequence_tuple_decode(seq, tuple)
+    opts = update_param_table(opts, seq)
+    local _sequence = box.space[box.schema.SEQUENCE_ID]
+    _sequence:replace{seq.id, seq.uid, opts.name, opts.step, opts.min,
+                      opts.max, opts.start, opts.cache, opts.cycle}
+end
+
+box.schema.sequence.drop = function(name, opts)
+    opts = opts or {}
+    check_param_table(opts, {if_exists = 'boolean'})
+    local id = sequence_resolve(name)
+    if id == nil then
+        if not opts.if_exists then
+            box.error(box.error.NO_SUCH_SEQUENCE, name)
+        end
+        return
+    end
+    local _sequence = box.space[box.schema.SEQUENCE_ID]
+    local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
+    _sequence_data:delete{id}
+    _sequence:delete{id}
+end
+
 local function privilege_resolve(privilege)
     local numeric = 0
     if type(privilege) == 'string' then
@@ -1491,6 +1742,10 @@ local function drop(uid, opts)
     for k, tuple in pairs(grants) do
         revoke(tuple[2], tuple[2], uid)
     end
+    local sequences = box.space[box.schema.SEQUENCE_ID].index.owner:select{uid}
+    for k, tuple in pairs(sequences) do
+        box.schema.sequence.drop(tuple[1])
+    end
     box.space[box.schema.USER_ID]:delete{uid}
 end
 
@@ -1651,3 +1906,8 @@ local function box_space_mt(tab)
 end
 
 setmetatable(box.space, { __serialize = box_space_mt })
+
+box.internal.schema = {}
+box.internal.schema.init = function()
+    box_sequence_init()
+end

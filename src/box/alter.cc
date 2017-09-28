@@ -48,10 +48,12 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "memtx_tuple.h"
+#include "version.h"
+#include "sequence.h"
 
 /**
  * chap-sha1 of empty string, i.e.
- * base64_encode(sha1(sha1(""))
+ * base64_encode(sha1(sha1(""), 0)
  */
 #define CHAP_SHA1_EMPTY_PASSWORD "vhvewKp0tNyweZQ+cFKAlsyphfg="
 
@@ -74,6 +76,21 @@ access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
 			  "Create, drop or alter", schema_object_name(type),
 			  user->def->name);
+	}
+}
+
+/**
+ * Throw an exception if the given index definition
+ * is incompatible with a sequence.
+ */
+static void
+index_def_check_sequence(struct index_def *index_def, const char *space_name)
+{
+	enum field_type type = index_def->key_def->parts[0].type;
+	if (type != FIELD_TYPE_UNSIGNED && type != FIELD_TYPE_INTEGER) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
+			  space_name, "sequence cannot be used with "
+			  "a non-integer key");
 	}
 }
 
@@ -337,6 +354,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *old_space)
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	index_def_check_xc(index_def, space_name(old_space));
 	old_space->handler->checkIndexDef(old_space, index_def);
+	if (old_space->sequence != NULL)
+		index_def_check_sequence(index_def, space_name(old_space));
 	index_def_guard.is_active = false;
 	return index_def;
 }
@@ -560,6 +579,44 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	return def;
 }
 
+/**
+ * Space old and new space triggers (move the original triggers
+ * to the new space, or vice versa, restore the original triggers
+ * in the old space).
+ */
+static void
+space_swap_triggers(struct space *new_space, struct space *old_space)
+{
+	rlist_swap(&new_space->on_replace, &old_space->on_replace);
+	rlist_swap(&new_space->on_stmt_begin, &old_space->on_stmt_begin);
+}
+
+/**
+ * True if the space has records identified by key 'uid'.
+ * Uses 'iid' index.
+ */
+bool
+space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
+{
+	struct space *space = space_by_id(id);
+	if (space == NULL)
+		return false;
+
+	if (space_index(space, iid) == NULL)
+		return false;
+
+	MemtxIndex *index = index_find_system(space, iid);
+	char key[6];
+	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
+	mp_encode_uint(key, uid);
+	struct iterator *it = index->position();
+
+	index->initIterator(it, ITER_EQ, key, 1);
+	if (it->next(it))
+		return true;
+	return false;
+}
+
 /* }}} */
 
 /* {{{ struct alter_space - the body of a full blown alter */
@@ -679,12 +736,14 @@ alter_space_commit(struct trigger *trigger, void *event)
 	rlist_foreach_entry(op, &alter->ops, link) {
 		op->commit(alter, txn->signature);
 	}
-	/*
-	 * The new space is ready. Time to update the space
-	 * cache with it.
-	 */
+
+	trigger_run(&on_alter_space, alter->new_space);
 
 	alter->new_space = NULL; /* for alter_space_delete(). */
+	/*
+	 * Delete the old version of the space, we are not
+	 * going to use it.
+	 */
 	space_delete(alter->old_space);
 	alter_space_delete(alter);
 }
@@ -712,10 +771,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	/*
 	 * Don't forget about space triggers.
 	 */
-	rlist_swap(&alter->new_space->on_replace,
-		   &alter->old_space->on_replace);
-	rlist_swap(&alter->new_space->on_stmt_begin,
-		   &alter->old_space->on_stmt_begin);
+	space_swap_triggers(alter->new_space, alter->old_space);
 	struct space *new_space = space_cache_replace(alter->old_space);
 	assert(new_space == alter->new_space);
 	(void) new_space;
@@ -780,9 +836,11 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	alter->new_space->handler->prepareAlterSpace(alter->old_space,
 						     alter->new_space);
 
+	alter->new_space->sequence = alter->old_space->sequence;
 	alter->new_space->truncate_count = alter->old_space->truncate_count;
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
+
 	/*
 	 * Change the new space: build the new index, rename,
 	 * change the fixed field count.
@@ -812,10 +870,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	/*
 	 * Don't forget about space triggers.
 	 */
-	rlist_swap(&alter->new_space->on_replace,
-		   &alter->old_space->on_replace);
-	rlist_swap(&alter->new_space->on_stmt_begin,
-		   &alter->old_space->on_stmt_begin);
+	space_swap_triggers(alter->new_space, alter->old_space);
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
@@ -1164,6 +1219,7 @@ on_drop_space_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
+	trigger_run(&on_alter_space, space);
 	space_delete(space);
 }
 
@@ -1178,6 +1234,17 @@ on_drop_space_rollback(struct trigger *trigger, void *event)
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
 	space_cache_replace(space);
+}
+
+/**
+ * Run the triggers registered on commit of a change in _space.
+ */
+static void
+on_create_space_commit(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct space *space = (struct space *)trigger->data;
+	trigger_run(&on_alter_space, space);
 }
 
 /**
@@ -1338,6 +1405,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * so it's safe to simply drop the space on
 		 * rollback.
 		 */
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_create_space_commit, space);
+		txn_on_commit(txn, on_commit);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(on_create_space_rollback, space);
 		txn_on_rollback(txn, on_rollback);
@@ -1354,6 +1424,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "the space has grants");
 		}
+		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id))
+			tnt_raise(ClientError, ER_DROP_SPACE,
+				  space_name(old_space),
+				  "the space has truncate record");
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable
@@ -1487,6 +1561,15 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_DROP_PRIMARY_KEY,
 				  space_name(old_space));
 		}
+		/*
+		 * Can't drop primary key before space sequence.
+		 */
+		if (old_space->sequence != NULL) {
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not drop primary key while "
+				  "space sequence exists");
+		}
 	}
 
 	if (iid != 0 && space_index(old_space, 0) == NULL) {
@@ -1608,10 +1691,7 @@ truncate_space_rollback(struct trigger *trigger, void * /* event */)
 	if (space_cache_replace(truncate->old_space) != truncate->new_space)
 		unreachable();
 
-	rlist_swap(&truncate->new_space->on_replace,
-		   &truncate->old_space->on_replace);
-	rlist_swap(&truncate->new_space->on_stmt_begin,
-		   &truncate->old_space->on_stmt_begin);
+	space_swap_triggers(truncate->new_space, truncate->old_space);
 	space_delete(truncate->new_space);
 }
 
@@ -1696,6 +1776,9 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/* Preserve the access control lists during truncate. */
 	memcpy(new_space->access, old_space->access, sizeof(old_space->access));
 
+	/* Truncate does not affect space sequence. */
+	new_space->sequence = old_space->sequence;
+
 	/*
 	 * Replace the old space with the new one in the space
 	 * cache. Requests processed after this point will see
@@ -1720,51 +1803,24 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		       truncate_space_rollback, truncate, NULL);
 	txn_on_rollback(txn, &truncate->on_rollback);
 
-	rlist_swap(&truncate->new_space->on_replace,
-		   &truncate->old_space->on_replace);
-	rlist_swap(&truncate->new_space->on_stmt_begin,
-		   &truncate->old_space->on_stmt_begin);
+	space_swap_triggers(truncate->new_space, truncate->old_space);
 }
 
 /* }}} */
 
 /* {{{ access control */
 
-/** True if the space has records identified by key 'uid'
- * Uses 'owner' index.
- */
-bool
-space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
-{
-	struct space *space = space_by_id(id);
-	if (space == NULL)
-		return false;
-
-	if (space_index(space, iid) == NULL)
-		return false;
-
-	MemtxIndex *index = index_find_system(space, iid);
-	char key[6];
-	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
-	mp_encode_uint(key, uid);
-	struct iterator *it = index->position();
-
-	index->initIterator(it, ITER_EQ, key, 1);
-	if (it->next(it))
-		return true;
-	return false;
-}
-
 bool
 user_has_data(struct user *user)
 {
 	uint32_t uid = user->def->uid;
-	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_PRIV_ID, BOX_PRIV_ID };
+	uint32_t spaces[] = { BOX_SPACE_ID, BOX_FUNC_ID, BOX_SEQUENCE_ID,
+			      BOX_PRIV_ID, BOX_PRIV_ID };
 	/*
 	 * owner index id #1 for _space and _func and _priv.
 	 * For _priv also check that the user has no grants.
 	 */
-	uint32_t indexes[] = { 1, 1, 1, 0 };
+	uint32_t indexes[] = { 1, 1, 1, 1, 0 };
 	uint32_t count = sizeof(spaces)/sizeof(*spaces);
 	for (uint32_t i = 0; i < count; i++) {
 		if (space_has_data(spaces[i], indexes[i], uid))
@@ -1867,7 +1923,7 @@ user_def_new_from_tuple(struct tuple *tuple)
 	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain
-	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
+	 * chap-sha1 -> base64_encode(sha1(sha1(password), 0).
 	 * Check for trivial errors when a plain text
 	 * password is saved in this field instead.
 	 */
@@ -2435,6 +2491,223 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 
 /* }}} cluster configuration */
 
+/* {{{ sequence */
+
+/** Create a sequence definition from a tuple. */
+static struct sequence_def *
+sequence_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
+{
+	uint32_t name_len;
+	const char *name = tuple_field_str_xc(tuple, BOX_USER_FIELD_NAME,
+					      &name_len);
+	if (name_len > BOX_NAME_MAX) {
+		tnt_raise(ClientError, errcode,
+			  tt_cstr(name, BOX_INVALID_NAME_MAX),
+			  "sequence name is too long");
+	}
+	size_t sz = sequence_def_sizeof(name_len);
+	struct sequence_def *def = (struct sequence_def *) malloc(sz);
+	if (def == NULL)
+		tnt_raise(OutOfMemory, sz, "malloc", "sequence");
+	auto def_guard = make_scoped_guard([=] { free(def); });
+	memcpy(def->name, name, name_len);
+	def->name[name_len] = '\0';
+	def->id = tuple_field_u32_xc(tuple, BOX_SEQUENCE_FIELD_ID);
+	def->uid = tuple_field_u32_xc(tuple, BOX_SEQUENCE_FIELD_UID);
+	def->step = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_STEP);
+	def->min = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_MIN);
+	def->max = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_MAX);
+	def->start = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_START);
+	def->cache = tuple_field_i64_xc(tuple, BOX_SEQUENCE_FIELD_CACHE);
+	def->cycle = tuple_field_bool_xc(tuple, BOX_SEQUENCE_FIELD_CYCLE);
+	if (def->step == 0)
+		tnt_raise(ClientError, errcode, def->name,
+			  "step option must be non-zero");
+	if (def->min > def->max)
+		tnt_raise(ClientError, errcode, def->name,
+			  "max must be greater than or equal to min");
+	if (def->start < def->min || def->start > def->max)
+		tnt_raise(ClientError, errcode, def->name,
+			  "start must be between min and max");
+	def_guard.is_active = false;
+	return def;
+}
+
+/** Argument passed to on_commit_dd_sequence() trigger. */
+struct alter_sequence {
+	/** Trigger invoked on commit in the _sequence space. */
+	struct trigger on_commit;
+	/** Trigger invoked on rollback in the _sequence space. */
+	struct trigger on_rollback;
+	/** Old sequence definition or NULL if create. */
+	struct sequence_def *old_def;
+	/** New sequence defitition or NULL if drop. */
+	struct sequence_def *new_def;
+};
+
+/**
+ * Trigger invoked on commit in the _sequence space.
+ */
+static void
+on_commit_dd_sequence(struct trigger *trigger, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct alter_sequence *alter = (struct alter_sequence *) trigger->data;
+
+	if (alter->new_def != NULL && alter->old_def != NULL) {
+		/* Alter a sequence. */
+		sequence_cache_replace(alter->new_def);
+	} else if (alter->new_def == NULL) {
+		/* Drop a sequence. */
+		sequence_cache_delete(alter->old_def->id);
+	}
+
+	trigger_run(&on_alter_sequence, txn_last_stmt(txn));
+}
+
+/**
+ * Trigger invoked on rollback in the _sequence space.
+ */
+static void
+on_rollback_dd_sequence(struct trigger *trigger, void * /* event */)
+{
+	struct alter_sequence *alter = (struct alter_sequence *) trigger->data;
+
+	if (alter->new_def != NULL && alter->old_def == NULL) {
+		/* Rollback creation of a sequence. */
+		sequence_cache_delete(alter->new_def->id);
+	}
+}
+
+/**
+ * A trigger invoked on replace in space _sequence.
+ * Used to alter a sequence definition.
+ */
+static void
+on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	txn_check_singlestatement(txn, "Space _sequence");
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	struct alter_sequence *alter =
+		region_calloc_object_xc(&fiber()->gc, struct alter_sequence);
+
+	struct sequence_def *new_def = NULL;
+	auto def_guard = make_scoped_guard([=] { free(new_def); });
+
+	if (old_tuple == NULL && new_tuple != NULL) {		/* INSERT */
+		new_def = sequence_def_new_from_tuple(new_tuple,
+						      ER_CREATE_SEQUENCE);
+		assert(sequence_by_id(new_def->id) == NULL);
+		sequence_cache_replace(new_def);
+		alter->new_def = new_def;
+	} else if (old_tuple != NULL && new_tuple == NULL) {	/* DELETE */
+		uint32_t id = tuple_field_u32_xc(old_tuple,
+						 BOX_SEQUENCE_DATA_FIELD_ID);
+		struct sequence *seq = sequence_by_id(id);
+		assert(seq != NULL);
+		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id))
+			tnt_raise(ClientError, ER_DROP_SEQUENCE,
+				  seq->def->name, "the sequence has data");
+		if (space_has_data(BOX_SPACE_SEQUENCE_ID, 1, id))
+			tnt_raise(ClientError, ER_DROP_SEQUENCE,
+				  seq->def->name, "the sequence is in use");
+		alter->old_def = seq->def;
+	} else {						/* UPDATE */
+		new_def = sequence_def_new_from_tuple(new_tuple,
+						      ER_ALTER_SEQUENCE);
+		struct sequence *seq = sequence_by_id(new_def->id);
+		assert(seq != NULL);
+		alter->old_def = seq->def;
+		alter->new_def = new_def;
+	}
+
+	def_guard.is_active = false;
+
+	trigger_create(&alter->on_commit,
+		       on_commit_dd_sequence, alter, NULL);
+	txn_on_commit(txn, &alter->on_commit);
+	trigger_create(&alter->on_rollback,
+		       on_rollback_dd_sequence, alter, NULL);
+	txn_on_rollback(txn, &alter->on_rollback);
+}
+
+/**
+ * A trigger invoked on replace in space _sequence_data.
+ * Used to update a sequence value.
+ */
+static void
+on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	uint32_t id = tuple_field_u32_xc(old_tuple ?: new_tuple,
+					 BOX_SEQUENCE_DATA_FIELD_ID);
+	struct sequence *seq = sequence_cache_find(id);
+	if (seq == NULL)
+		diag_raise();
+	if (new_tuple != NULL) {			/* INSERT, UPDATE */
+		int64_t value = tuple_field_i64_xc(new_tuple,
+				BOX_SEQUENCE_DATA_FIELD_VALUE);
+		if (sequence_set(seq, value) != 0)
+			diag_raise();
+	} else {					/* DELETE */
+		sequence_reset(seq);
+	}
+}
+
+/**
+ * Run the triggers registered on commit of a change in _space.
+ */
+static void
+on_commit_dd_space_sequence(struct trigger *trigger, void * /* event */)
+{
+	struct space *space = (struct space *) trigger->data;
+	trigger_run(&on_alter_space, space);
+}
+
+/**
+ * A trigger invoked on replace in space _space_sequence.
+ * Used to update space <-> sequence mapping.
+ */
+static void
+on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	txn_check_singlestatement(txn, "Space _space_sequence");
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *tuple = stmt->new_tuple ?: stmt->old_tuple;
+
+	uint32_t space_id = tuple_field_u32_xc(tuple,
+				BOX_SPACE_SEQUENCE_FIELD_ID);
+	uint32_t sequence_id = tuple_field_u32_xc(tuple,
+				BOX_SPACE_SEQUENCE_FIELD_SEQUENCE_ID);
+
+	struct space *space = space_cache_find(space_id);
+	struct sequence *seq = sequence_cache_find(sequence_id);
+
+	struct trigger *on_commit =
+		txn_alter_trigger_new(on_commit_dd_space_sequence, space);
+	txn_on_commit(txn, on_commit);
+
+	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
+		struct Index *pk = index_find(space, 0);
+		index_def_check_sequence(pk->index_def, space_name(space));
+		space->sequence = seq;
+	} else {					/* DELETE */
+		assert(space->sequence == seq);
+		space->sequence = NULL;
+	}
+}
+
+/* }}} sequence */
+
 static void
 unlock_after_dd(struct trigger *trigger, void *event)
 {
@@ -2489,6 +2762,18 @@ struct trigger on_replace_priv = {
 
 struct trigger on_replace_cluster = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_cluster, NULL, NULL
+};
+
+struct trigger on_replace_sequence = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_sequence, NULL, NULL
+};
+
+struct trigger on_replace_sequence_data = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_sequence_data, NULL, NULL
+};
+
+struct trigger on_replace_space_sequence = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_space_sequence, NULL, NULL
 };
 
 struct trigger on_stmt_begin_space = {

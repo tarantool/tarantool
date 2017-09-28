@@ -314,6 +314,40 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 API_EXPORT int
 box_truncate(uint32_t space_id);
 
+/**
+ * Advance a sequence.
+ *
+ * \param seq_id sequence identifier
+ * \param[out] result pointer to a variable where the next sequence
+ * value will be stored on success
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_sequence_next(uint32_t seq_id, int64_t *result);
+
+/**
+ * Set a sequence value.
+ *
+ * \param seq_id sequence identifier
+ * \param value new sequence value; on success the next call to
+ * box_sequence_next() will return the value following \a value
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_sequence_set(uint32_t seq_id, int64_t value);
+
+/**
+ * Reset a sequence.
+ *
+ * \param seq_id sequence identifier
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_sequence_reset(uint32_t seq_id);
+
 /** \endcond public */
 
 /**

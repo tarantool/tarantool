@@ -155,6 +155,46 @@ func_by_name(const char *name, uint32_t name_len);
 bool
 schema_find_grants(const char *type, uint32_t id);
 
+/**
+ * Find a sequence by id. Return NULL if the sequence was
+ * not found.
+ */
+struct sequence *
+sequence_by_id(uint32_t id);
+
+/**
+ * A wrapper around sequence_by_id() that raises an exception
+ * if the sequence was not found in the cache.
+ */
+struct sequence *
+sequence_cache_find(uint32_t id);
+
+/**
+ * Insert a new sequence object into the cache or update
+ * an existing one if there's already a sequence with
+ * the given id in the cache.
+ */
+void
+sequence_cache_replace(struct sequence_def *def);
+
+/** Delete a sequence from the sequence cache. */
+void
+sequence_cache_delete(uint32_t id);
+
 #endif /* defined(__cplusplus) */
+
+/**
+ * Triggers fired after committing a change in space definition.
+ * The space is passed to the trigger callback in the event
+ * argument. It is the new space in case of create/update or
+ * the old space in case of drop.
+ */
+extern struct rlist on_alter_space;
+
+/**
+ * Triggers fired after committing a change in sequence definition.
+ * It is passed the txn statement that altered the sequence.
+ */
+extern struct rlist on_alter_sequence;
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

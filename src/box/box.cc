@@ -70,6 +70,7 @@
 #include "systemd.h"
 #include "call.h"
 #include "func.h"
+#include "sequence.h"
 
 static char status[64] = "unknown";
 
@@ -170,6 +171,91 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	request->header = NULL;
 }
 
+/**
+ * Handle INSERT/REPLACE in a space with a sequence attached.
+ */
+static void
+request_handle_sequence(struct request *request, struct space *space)
+{
+	struct sequence *seq = space->sequence;
+
+	assert(seq != NULL);
+	assert(request->type == IPROTO_INSERT ||
+	       request->type == IPROTO_REPLACE);
+
+	struct Index *pk = space_index(space, 0);
+	if (unlikely(pk == NULL))
+		return;
+
+	/*
+	 * Look up the first field of the primary key.
+	 */
+	const char *data = request->tuple;
+	const char *data_end = request->tuple_end;
+	int len = mp_decode_array(&data);
+	int fieldno = pk->index_def->key_def->parts[0].fieldno;
+	if (unlikely(len < fieldno + 1))
+		return;
+
+	const char *key = data;
+	if (unlikely(fieldno > 0)) {
+		do {
+			mp_next(&key);
+		} while (--fieldno > 0);
+	}
+
+	int64_t value;
+	if (mp_typeof(*key) == MP_NIL) {
+		/*
+		 * If the first field of the primary key is nil,
+		 * this is an auto increment request and we need
+		 * to replace the nil with the next value generated
+		 * by the space sequence.
+		 */
+		if (unlikely(sequence_next(seq, &value) != 0))
+			diag_raise();
+
+		const char *key_end = key;
+		mp_decode_nil(&key_end);
+
+		size_t buf_size = (request->tuple_end - request->tuple) +
+						mp_sizeof_uint(UINT64_MAX);
+		char *tuple = (char *) region_alloc_xc(&fiber()->gc, buf_size);
+		char *tuple_end = mp_encode_array(tuple, len);
+
+		if (unlikely(key != data)) {
+			memcpy(tuple_end, data, key - data);
+			tuple_end += key - data;
+		}
+
+		if (value >= 0)
+			tuple_end = mp_encode_uint(tuple_end, value);
+		else
+			tuple_end = mp_encode_int(tuple_end, value);
+
+		memcpy(tuple_end, key_end, data_end - key_end);
+		tuple_end += data_end - key_end;
+
+		assert(tuple_end <= tuple + buf_size);
+
+		request->tuple = tuple;
+		request->tuple_end = tuple_end;
+	} else {
+		/*
+		 * If the first field is not nil, update the space
+		 * sequence with its value, to make sure that an
+		 * auto increment request never tries to insert a
+		 * value that is already in the space. Note, this
+		 * code is also invoked on final recovery to restore
+		 * the sequence value from WAL.
+		 */
+		if (likely(mp_read_int64(&key, &value) == 0)) {
+			if (sequence_update(seq, value) != 0)
+				diag_raise();
+		}
+	}
+}
+
 static void
 process_rw(struct request *request, struct space *space, struct tuple **result)
 {
@@ -182,6 +268,8 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 		switch (request->type) {
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
+			if (space->sequence != NULL)
+				request_handle_sequence(request, space);
 			tuple = space->handler->executeReplace(txn, space,
 							       request);
 
@@ -942,6 +1030,81 @@ box_truncate(uint32_t space_id)
 	}
 }
 
+/** Update a record in _sequence_data space. */
+static int
+sequence_data_update(uint32_t seq_id, int64_t value)
+{
+	size_t tuple_buf_size = (mp_sizeof_array(2) +
+				 2 * mp_sizeof_uint(UINT64_MAX));
+	char *tuple_buf = (char *) region_alloc(&fiber()->gc, tuple_buf_size);
+	if (tuple_buf == NULL) {
+		diag_set(OutOfMemory, tuple_buf_size, "region", "tuple");
+		return -1;
+	}
+	char *tuple_buf_end = tuple_buf;
+	tuple_buf_end = mp_encode_array(tuple_buf_end, 2);
+	tuple_buf_end = mp_encode_uint(tuple_buf_end, seq_id);
+	tuple_buf_end = (value < 0 ?
+			 mp_encode_int(tuple_buf_end, value) :
+			 mp_encode_uint(tuple_buf_end, value));
+	assert(tuple_buf_end < tuple_buf + tuple_buf_size);
+	return box_replace(BOX_SEQUENCE_DATA_ID,
+			   tuple_buf, tuple_buf_end, NULL);
+}
+
+/** Delete a record from _sequence_data space. */
+static int
+sequence_data_delete(uint32_t seq_id)
+{
+	size_t key_buf_size = mp_sizeof_array(1) + mp_sizeof_uint(UINT64_MAX);
+	char *key_buf = (char *) region_alloc(&fiber()->gc, key_buf_size);
+	if (key_buf == NULL) {
+		diag_set(OutOfMemory, key_buf_size, "region", "key");
+		return -1;
+	}
+	char *key_buf_end = key_buf;
+	key_buf_end = mp_encode_array(key_buf_end, 1);
+	key_buf_end = mp_encode_uint(key_buf_end, seq_id);
+	assert(key_buf_end < key_buf + key_buf_size);
+	return box_delete(BOX_SEQUENCE_DATA_ID, 0,
+			  key_buf, key_buf_end, NULL);
+}
+
+int
+box_sequence_next(uint32_t seq_id, int64_t *result)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	int64_t value;
+	if (sequence_next(seq, &value) != 0)
+		return -1;
+	if (sequence_data_update(seq_id, value) != 0)
+		return -1;
+	*result = value;
+	return 0;
+}
+int
+box_sequence_set(uint32_t seq_id, int64_t value)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	if (sequence_set(seq, value) != 0)
+		return -1;
+	return sequence_data_update(seq_id, value);
+}
+
+int
+box_sequence_reset(uint32_t seq_id)
+{
+	struct sequence *seq = sequence_cache_find(seq_id);
+	if (seq == NULL)
+		return -1;
+	sequence_reset(seq);
+	return sequence_data_delete(seq_id);
+}
+
 static inline void
 box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {
@@ -1255,6 +1418,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		sequence_free();
 		gc_free();
 		engine_shutdown();
 		wal_thread_stop();
@@ -1419,6 +1583,8 @@ box_init(void)
 
 	if (tuple_init() != 0)
 		diag_raise();
+
+	sequence_init();
 }
 
 bool

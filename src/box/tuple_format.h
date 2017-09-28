@@ -55,12 +55,6 @@ enum { FORMAT_REF_MAX = INT32_MAX};
  */
 enum { TUPLE_INDEX_BASE = 1 };
 
-/*
- * A special value to indicate that tuple format doesn't store
- * an offset for a field_id.
- */
-enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
-
 struct tuple;
 struct tuple_format;
 
@@ -98,6 +92,11 @@ struct tuple_format {
 	 * fields. If set, each tuple must have exactly this number of fields.
 	 */
 	uint32_t exact_field_count;
+	/**
+	 * The longest field array prefix in which the last
+	 * element is used by an index.
+	 */
+	uint32_t index_field_count;
 	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/* Formats of the fields */

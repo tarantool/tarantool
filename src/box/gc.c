@@ -201,7 +201,6 @@ void
 gc_set_checkpoint_count(int checkpoint_count)
 {
 	gc.checkpoint_count = checkpoint_count;
-	gc_run();
 }
 
 struct gc_consumer *

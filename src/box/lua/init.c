@@ -48,6 +48,7 @@
 #include "box/lua/slab.h"
 #include "box/lua/index.h"
 #include "box/lua/space.h"
+#include "box/lua/sequence.h"
 #include "box/lua/misc.h"
 #include "box/lua/stat.h"
 #include "box/lua/info.h"
@@ -237,6 +238,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_slab_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);
+	box_lua_sequence_init(L);
 	box_lua_misc_init(L);
 	box_lua_info_init(L);
 	box_lua_stat_init(L);

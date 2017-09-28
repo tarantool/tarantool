@@ -28,6 +28,16 @@ box.space.test:select()
 box.space.test:drop()
 
 --
+-- Check that a space cannot be dropped if it has a record
+-- in _truncate space.
+--
+s = box.schema.create_space('test', {engine = engine})
+s:truncate()
+_ = box.space._space:delete{s.id} -- error
+_ = box.space._truncate:delete{s.id}
+_ = box.space._space:delete{s.id} -- ok
+
+--
 -- Check that truncation of system spaces is not permitted.
 --
 box.space._space:truncate()

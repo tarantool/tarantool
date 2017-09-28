@@ -360,16 +360,14 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 	assert(type != IPROTO_UPSERT && format->extra_size != sizeof(uint8_t));
 	struct region *region = &fiber()->gc;
 
-	uint32_t field_count = format->field_count;
+	uint32_t field_count = format->index_field_count;
 	struct iovec *iov = region_alloc(region, sizeof(*iov) * field_count);
 	if (iov == NULL) {
 		diag_set(OutOfMemory, sizeof(*iov) * field_count,
 			 "region", "iov for surrogate key");
 		return NULL;
 	}
-#ifndef NDEBUG
-	memset(iov, '#', sizeof(*iov) * field_count);
-#endif
+	memset(iov, 0, sizeof(*iov) * field_count);
 	uint32_t part_count = mp_decode_array(&key);
 	assert(part_count == cmp_def->part_count);
 	assert(part_count <= field_count);
@@ -391,25 +389,21 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 		return NULL;
 
 	char *raw = (char *) tuple_data(stmt);
+	uint32_t *field_map = (uint32_t *) raw;
 	char *wpos = mp_encode_array(raw, field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
-		struct field_def *field = &format->fields[i];
-		if (field->type == FIELD_TYPE_ANY) {
+		if (iov[i].iov_base == NULL) {
 			wpos = mp_encode_nil(wpos);
 			continue;
 		}
-		assert(iov[i].iov_base != NULL);
+		struct field_def *field = &format->fields[i];
 		memcpy(wpos, iov[i].iov_base, iov[i].iov_len);
+		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL)
+			field_map[field->offset_slot] = wpos - raw;
 		wpos += iov[i].iov_len;
 	}
 	assert(wpos == raw + bsize);
 	vy_stmt_set_type(stmt, type);
-
-	/* Calculate offsets for key parts */
-	if (tuple_init_field_map(format, (uint32_t *) raw, raw)) {
-		tuple_unref(stmt);
-		return NULL;
-	}
 	return stmt;
 }
 
@@ -422,32 +416,31 @@ vy_stmt_new_surrogate_delete_from_key(const char *key,
 					      cmp_def, format);
 }
 
-static struct tuple *
-vy_stmt_new_surrogate(struct tuple_format *format, const struct tuple *src,
-		      enum iproto_type type)
+struct tuple *
+vy_stmt_new_surrogate_delete(struct tuple_format *format,
+			     const struct tuple *src)
 {
-	/**
-	 * UPSERT can't be surrogate. Also any not UPSERT tuple
-	 * mustn't have the n_upserts field.
-	 */
-	assert(type != IPROTO_UPSERT && format->extra_size != sizeof(uint8_t));
 	uint32_t src_size;
 	const char *src_data = tuple_data_range(src, &src_size);
+	uint32_t total_size = src_size + format->field_map_size;
 	/* Surrogate tuple uses less memory than the original tuple */
-	char *data = region_alloc(&fiber()->gc, src_size);
+	char *data = region_alloc(&fiber()->gc, total_size);
 	if (data == NULL) {
 		diag_set(OutOfMemory, src_size, "region", "tuple");
 		return NULL;
 	}
+	char *field_map_begin = data + src_size;
+	uint32_t *field_map = (uint32_t *) (data + total_size);
 
 	const char *src_pos = src_data;
 	uint32_t src_count = mp_decode_array(&src_pos);
-	assert(src_count >= format->field_count);
+	uint32_t field_count = format->index_field_count;
+	assert(src_count >= field_count);
 	(void) src_count;
-	char *pos = mp_encode_array(data, format->field_count);
-	for (uint32_t i = 0; i < format->field_count; ++i) {
+	char *pos = mp_encode_array(data, field_count);
+	for (uint32_t i = 0; i < field_count; ++i) {
 		struct field_def *field = &format->fields[i];
-		if (field->type == FIELD_TYPE_ANY) {
+		if (! field->is_key_part) {
 			/* Unindexed field - write NIL */
 			pos = mp_encode_nil(pos);
 			mp_next(&src_pos);
@@ -457,18 +450,22 @@ vy_stmt_new_surrogate(struct tuple_format *format, const struct tuple *src,
 		const char *src_field = src_pos;
 		mp_next(&src_pos);
 		memcpy(pos, src_field, src_pos - src_field);
+		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL)
+			field_map[field->offset_slot] = pos - data;
 		pos += src_pos - src_field;
 	}
 	assert(pos <= data + src_size);
+	uint32_t bsize = pos - data;
+	struct tuple *stmt = vy_stmt_alloc(format, bsize);
+	if (stmt == NULL)
+		return NULL;
+	char *stmt_data = (char *) tuple_data(stmt);
+	char *stmt_field_map_begin = stmt_data - format->field_map_size;
+	memcpy(stmt_data, data, bsize);
+	memcpy(stmt_field_map_begin, field_map_begin, format->field_map_size);
+	vy_stmt_set_type(stmt, IPROTO_DELETE);
 
-	return vy_stmt_new_with_ops(format, data, pos, NULL, 0, type);
-}
-
-struct tuple *
-vy_stmt_new_surrogate_delete(struct tuple_format *format,
-			     const struct tuple *src)
-{
-	return vy_stmt_new_surrogate(format, src, IPROTO_DELETE);
+	return stmt;
 }
 
 int

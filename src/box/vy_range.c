@@ -87,6 +87,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		switch (iterator_type) {
 		case ITER_LT:
 		case ITER_LE:
+		case ITER_REQ:
 			return vy_range_tree_last(tree);
 		case ITER_GT:
 		case ITER_GE:
@@ -133,7 +134,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		if (range == NULL)
 			range = vy_range_tree_first(tree);
 	} else {
-		assert(iterator_type == ITER_LT || iterator_type == ITER_LE);
+		assert(iterator_type == ITER_LT || iterator_type == ITER_LE ||
+		       iterator_type == ITER_REQ);
 		/**
 		 * Case 1. part_count == 1, looking for [10]. ranges:
 		 * {1, 3, 5} {7, 8, 9} {10, 15 20} {22, 32, 42}
@@ -486,64 +488,4 @@ vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
 		*p_first = it;
 	}
 	return *p_first != *p_last;
-}
-
-void
-vy_range_iterator_open(struct vy_range_iterator *itr, vy_range_tree_t *tree,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key)
-{
-	itr->tree = tree;
-	itr->iterator_type = iterator_type;
-	itr->key = key;
-	itr->curr_range = NULL;
-}
-
-void
-vy_range_iterator_next(struct vy_range_iterator *itr, struct vy_range **result)
-{
-	struct vy_range *curr = itr->curr_range;
-	struct vy_range *next;
-
-	if (curr == NULL) {
-		/* First iteration */
-		next = vy_range_tree_find_by_key(itr->tree, itr->iterator_type,
-						 itr->key);
-		goto out;
-	}
-	switch (itr->iterator_type) {
-	case ITER_LT:
-	case ITER_LE:
-		next = vy_range_tree_prev(itr->tree, curr);
-		break;
-	case ITER_GT:
-	case ITER_GE:
-		next = vy_range_tree_next(itr->tree, curr);
-		break;
-	case ITER_EQ:
-		if (curr->end != NULL &&
-		    vy_stmt_compare_with_key(itr->key, curr->end,
-					     curr->cmp_def) >= 0) {
-			/* A partial key can be found in more than one range. */
-			next = vy_range_tree_next(itr->tree, curr);
-		} else {
-			next = NULL;
-		}
-		break;
-	default:
-		unreachable();
-	}
-out:
-	*result = itr->curr_range = next;
-}
-
-void
-vy_range_iterator_restore(struct vy_range_iterator *itr,
-			  const struct tuple *last_stmt,
-			  struct vy_range **result)
-{
-	struct vy_range *curr = vy_range_tree_find_by_key(itr->tree,
-				itr->iterator_type,
-				last_stmt != NULL ? last_stmt : itr->key);
-	*result = itr->curr_range = curr;
 }

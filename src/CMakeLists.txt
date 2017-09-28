@@ -137,6 +137,7 @@ add_library(crc32 STATIC
 set (server_sources
      find_path.c
      iobuf.cc
+     curl.c
      httpc.c
      pickle.c
      cfg.c

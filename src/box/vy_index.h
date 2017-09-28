@@ -80,6 +80,8 @@ struct vy_index_env {
 	vy_upsert_thresh_cb upsert_thresh_cb;
 	/** Argument passed to upsert_thresh_cb. */
 	void *upsert_thresh_arg;
+	/** Number of indexes in this environment. */
+	int index_count;
 };
 
 /** Create a common index environment. */

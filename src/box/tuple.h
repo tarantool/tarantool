@@ -665,6 +665,52 @@ tuple_field_with_type(const struct tuple *tuple, uint32_t fieldno,
 
 /**
  * A convenience shortcut for data dictionary - get a tuple field
+ * as bool.
+ */
+static inline int
+tuple_field_bool(const struct tuple *tuple, uint32_t fieldno, bool *out)
+{
+	const char *field = tuple_field_with_type(tuple, fieldno, MP_BOOL);
+	if (field == NULL)
+		return -1;
+	*out = mp_decode_bool(&field);
+	return 0;
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as int64_t.
+ */
+static inline int
+tuple_field_i64(const struct tuple *tuple, uint32_t fieldno, int64_t *out)
+{
+	const char *field = tuple_field(tuple, fieldno);
+	if (field == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FIELD, fieldno);
+		return -1;
+	}
+	uint64_t val;
+	switch (mp_typeof(*field)) {
+	case MP_INT:
+		*out = mp_decode_int(&field);
+		break;
+	case MP_UINT:
+		val = mp_decode_uint(&field);
+		if (val <= INT64_MAX) {
+			*out = val;
+			break;
+		}
+		FALLTHROUGH;
+	default:
+		diag_set(ClientError, ER_FIELD_TYPE, fieldno + TUPLE_INDEX_BASE,
+			 field_type_strs[FIELD_TYPE_INTEGER]);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
  * as uint64_t.
  */
 static inline int
@@ -856,6 +902,26 @@ tuple_field_with_type_xc(const struct tuple *tuple, uint32_t fieldno,
 {
 	const char *out = tuple_field_with_type(tuple, fieldno, type);
 	if (out == NULL)
+		diag_raise();
+	return out;
+}
+
+/* @copydoc tuple_field_bool() */
+static inline bool
+tuple_field_bool_xc(const struct tuple *tuple, uint32_t fieldno)
+{
+	bool out;
+	if (tuple_field_bool(tuple, fieldno, &out) != 0)
+		diag_raise();
+	return out;
+}
+
+/* @copydoc tuple_field_i64() */
+static inline int64_t
+tuple_field_i64_xc(const struct tuple *tuple, uint32_t fieldno)
+{
+	int64_t out;
+	if (tuple_field_i64(tuple, fieldno, &out) != 0)
 		diag_raise();
 	return out;
 }

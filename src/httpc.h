@@ -36,7 +36,8 @@
 #include <tarantool_ev.h>
 
 #include "diag.h"
-#include "fiber_cond.h"
+
+#include "curl.h"
 
 /** {{{ Environment */
 
@@ -53,27 +54,16 @@ struct httpc_stat {
 	uint64_t http_other_responses;
 	uint64_t failed_requests;
 	uint64_t active_requests;
-	uint64_t sockets_added;
-	uint64_t sockets_deleted;
 };
 
 /**
  * HTTP Client Environment
  */
 struct httpc_env {
-	/** libcurl multi handler*/
-	CURLM *multi;
-
-	/** libev timer watcher */
-	struct ev_timer timer_event;
-
+	/** Curl enviroment. */
+	struct curl_env curl_env;
 	/** Memory pool for requests */
 	struct mempool req_pool;
-	/** Memory pool for responses */
-	struct mempool resp_pool;
-	/** Memory pool for sockets */
-	struct mempool sock_pool;
-
 	/** Statistics */
 	struct httpc_stat stat;
 };
@@ -86,7 +76,7 @@ struct httpc_env {
  * @retval -1 on error, check diag
  */
 int
-httpc_env_create(struct httpc_env *ctx, long max_conns);
+httpc_env_create(struct httpc_env *ctx, int max_conns);
 
 /**
  * Destroy HTTP client environment
@@ -105,12 +95,20 @@ httpc_env_destroy(struct httpc_env *env);
 struct httpc_request {
 	/** Environment */
 	struct httpc_env *env;
-	/** Information associated with a specific easy handle */
-	CURL *easy;
 	/** HTTP headers */
 	struct curl_slist *headers;
 	/** Buffer for the request body */
 	struct ibuf body;
+	/** curl resuest. */
+	struct curl_request curl_request;
+	/** HTTP status code */
+	int status;
+	/** Error message */
+	const char *reason;
+	/** buffer of headers */
+	struct region resp_headers;
+	/** buffer of body */
+	struct region resp_body;
 };
 
 /**
@@ -263,53 +261,12 @@ httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert);
 /**
  * This function does async HTTP request
  * @param request - reference to request object with filled fields
- * @param method - http method(case sensitive, e.g "GET")
- * @param url
  * @param timeout - timeout of waiting for libcurl api
- * \return pointer structure httpc_response or NULL
- * \details User recieves the reference to object response,
- * which should be destroyed with httpc_response_delete() at the end
- * Don't delete the request object before handling response!
- * That will destroy some fields in response object.
+ * @return 0 for success or NULL
  */
-struct httpc_response *
+int
 httpc_execute(struct httpc_request *req, double timeout);
 
 /** Request }}} */
-
-/** {{{ Response */
-
-/**
- * HTTP Response
- */
-struct httpc_response {
-	/** Environment */
-	struct httpc_env *ctx;
-	/** HTTP status code */
-	int status;
-	/** Error message */
-	const char *reason;
-	/** Internal libcurl status code */
-	int curl_code;
-	/** buffer of headers */
-	struct region headers;
-	/** buffer of body */
-	struct region body;
-	/**
-	 * Internal condition variable
-	 * When request is given to curl-driver, client waits on this variable
-	 * until the handler (callback function) gives a signal within variable
-	 * */
-	struct fiber_cond cond;
-};
-
-/**
- * Destroy response object
- * @param resp response object
- */
-void
-httpc_response_delete(struct httpc_response *resp);
-
-/** Response }}} */
 
 #endif /* TARANTOOL_HTTPC_H_INCLUDED */

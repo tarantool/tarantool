@@ -189,7 +189,6 @@ box.once('example-1.0', bootstrap)
 -- Docs: https://github.com/tarantool/queue/blob/master/README.md
 -- Example:
 --  local queue = require('queue')
---  queue.start()
 --  queue.create_tube(tube_name, 'fifottl')
 
 -------------------

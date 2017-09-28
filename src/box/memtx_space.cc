@@ -41,6 +41,7 @@
 #include "port.h"
 #include "memtx_tuple.h"
 #include "column_mask.h"
+#include "sequence.h"
 
 /* {{{ DML */
 
@@ -594,10 +595,30 @@ MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 	}
 }
 
+class SequenceDataIndex: public MemtxHash {
+public:
+	SequenceDataIndex(struct index_def *index_def)
+		: MemtxHash(index_def) {}
+	struct snapshot_iterator *createSnapshotIterator() override
+	{
+		return sequence_data_iterator_create();
+	}
+};
+
 Index *
 MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
 {
-	(void) space;
+	if (space->def->id == BOX_SEQUENCE_DATA_ID) {
+		/*
+		 * The content of _sequence_data is not updated
+		 * when a sequence is used for auto increment in
+		 * a space. To make sure all sequence values are
+		 * written to snapshot, use a special snapshot
+		 * iterator that walks over the sequence cache.
+		 */
+		return new SequenceDataIndex(index_def_arg);
+	}
+
 	switch (index_def_arg->type) {
 	case HASH:
 		return new MemtxHash(index_def_arg);

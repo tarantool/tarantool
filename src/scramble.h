@@ -84,7 +84,7 @@ scramble_check(const void *scramble, const void *salt, const void *hash2);
 /**
  * Prepare a password hash as is stored in the _user space.
  * @pre out must be at least SCRAMBLE_BASE64_SIZE
- * @post out contains base64_encode(sha1(sha1(password)))
+ * @post out contains base64_encode(sha1(sha1(password)), 0)
  */
 void
 password_prepare(const char *password, int len, char *out, int out_len);
