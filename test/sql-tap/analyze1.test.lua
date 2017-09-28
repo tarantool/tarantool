@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(35)
+test:plan(34)
 
 --!./tcltestrunner.lua
 -- 2005 July 22
@@ -54,16 +54,6 @@ test:do_execsql_test(
 --         1, "unknown database no_such_db"
 --         -- </analyze-1.3>
 --     })
-
-test:do_execsql_test(
-    "analyze-1.4",
-    [[
-        SELECT count(*) FROM sqlite_master WHERE name='sql_stat1'
-    ]], {
-        -- <analyze-1.4>
-        0
-        -- </analyze-1.4>
-    })
 
 -- MUST_WORK_TEST
 test:do_catchsql_test(

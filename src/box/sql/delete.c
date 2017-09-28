@@ -78,7 +78,7 @@ sqlite3IsReadOnly(Parse * pParse, Table * pTab, int viewOk)
 {
 	/*
 	 * A table is not writable if it is a system table
-	 * (i.e. sqlite_master), this call is not part of a
+	 * (i.e. _sql_stat1), this call is not part of a
 	 * nested parse. In either case leave an error message in
 	 * pParse and return non-zero.
 	 */

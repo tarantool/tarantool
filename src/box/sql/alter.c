@@ -271,41 +271,12 @@ sqlite3AlterFunctions(void)
 				  ArraySize(aAlterTableFuncs));
 }
 
-/*
- * This function is used to create the text of expressions of the form:
- *
- *   name=<constant1> OR name=<constant2> OR ...
- *
- * If argument zWhere is NULL, then a pointer string containing the text
- * "name=<constant>" is returned, where <constant> is the quoted version
- * of the string passed as argument zConstant. The returned buffer is
- * allocated using sqlite3DbMalloc(). It is the responsibility of the
- * caller to ensure that it is eventually freed.
- *
- * If argument zWhere is not NULL, then the string returned is
- * "<where> OR name=<constant>", where <where> is the contents of zWhere.
- * In this case zWhere is passed to sqlite3DbFree() before returning.
- *
- */
-static char *
-whereOrName(sqlite3 * db, char *zWhere, char *zConstant)
-{
-	char *zNew;
-	if (!zWhere) {
-		zNew = sqlite3MPrintf(db, "name=%Q", zConstant);
-	} else {
-		zNew = sqlite3MPrintf(db, "%s OR name=%Q", zWhere, zConstant);
-		sqlite3DbFree(db, zWhere);
-	}
-	return zNew;
-}
-
-#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
+/* Block this routine until Tarantool support alter. */
+#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER) && 0
 /*
  * Generate the text of a WHERE expression which can be used to select all
  * tables that have foreign key constraints that refer to table pTab (i.e.
- * constraints for which pTab is the parent table) from the sqlite_master
- * table.
+ * constraints for which pTab is the parent table).
  */
 static char *
 whereForeignKeys(Parse * pParse, Table * pTab)
@@ -399,13 +370,7 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	Table *pTab;		/* Table being renamed */
 	char *zName = 0;	/* NULL-terminated version of pName */
 	sqlite3 *db = pParse->db;	/* Database connection */
-	int nTabName;		/* Number of UTF-8 characters in zTabName */
-	const char *zTabName;	/* Original name of the table */
-	const char *zDb = db->mdb.zDbSName;
 	Vdbe *v;
-#ifndef SQLITE_OMIT_TRIGGER
-	char *zWhere = 0;	/* Where clause to locate temp triggers */
-#endif
 	uint32_t savedDbFlags;	/* Saved value of db->flags */
 	struct session *user_session = current_session();
 
@@ -473,49 +438,18 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	sqlite3BeginWriteOperation(pParse, false);
 	sqlite3ChangeCookie(pParse);
 
-	/* figure out how many UTF-8 characters are in zName */
-	zTabName = pTab->zName;
-	nTabName = sqlite3Utf8CharLen(zTabName, -1);
-
 #if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
 	if (user_session->sql_flags & SQLITE_ForeignKeys) {
 		/* If foreign-key support is enabled, rewrite the CREATE TABLE
 		 * statements corresponding to all child tables of foreign key constraints
 		 * for which the renamed table is the parent table.
 		 */
-		if ((zWhere = whereForeignKeys(pParse, pTab)) != 0) {
-			sqlite3NestedParse(pParse,
-					   "UPDATE %s SET "
-					   "sql = sqlite_rename_parent(sql, %Q, %Q) "
-					   "WHERE %s;", MASTER_NAME, zTabName,
-					   zName, zWhere);
-			sqlite3DbFree(db, zWhere);
-		}
+		/* TODO: Adopt the code for Tarantool */
+		;
 	}
 #endif
 
-	/* Modify the sqlite_master table to use the new table name. */
-	sqlite3NestedParse(pParse, "UPDATE %s SET "
-#ifdef SQLITE_OMIT_TRIGGER
-			   "sql = sqlite_rename_table(sql, %Q), "
-#else
-			   "sql = CASE "
-			   "WHEN type = 'trigger' THEN sqlite_rename_trigger(sql, %Q)"
-			   "ELSE sqlite_rename_table(sql, %Q) END, "
-#endif
-			   "tbl_name = %Q, "
-			   "name = CASE "
-			   "WHEN type='table' THEN %Q "
-			   "WHEN name LIKE 'sqlite_autoindex%%' AND type='index' THEN "
-			   "'sqlite_autoindex_' || %Q || substr(name,%d+18) "
-			   "ELSE name END "
-			   "WHERE tbl_name=%Q COLLATE nocase AND "
-			   "(type='table' OR type='index' OR type='trigger');",
-			   MASTER_NAME, zName, zName, zName,
-#ifndef SQLITE_OMIT_TRIGGER
-			   zName,
-#endif
-			   zName, nTabName, zTabName);
+	/* TODO: Adopt for Tarantool. */
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
 	/* If the sqlite_sequence table exists in this database, then update
@@ -563,9 +497,7 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 {
 	Table *pNew;		/* Copy of pParse->pNewTable */
 	Table *pTab;		/* Table being altered */
-	const char *zDb;	/* Database name */
 	const char *zTab;	/* Table name */
-	char *zCol;		/* Null-terminated column definition */
 	Column *pCol;		/* The new column */
 	Expr *pDflt;		/* Default value for the new column */
 	sqlite3 *db;		/* The database connection; */
@@ -581,7 +513,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	assert(pNew);
 
 	assert(sqlite3BtreeHoldsAllMutexes(db));
-	zDb = db->mdb.zDbSName;
 	zTab = &pNew->zName[16];	/* Skip the "sqlite_altertab_" prefix on the name */
 	pCol = &pNew->aCol[pNew->nCol - 1];
 	pDflt = pCol->pDflt;
@@ -650,23 +581,8 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	}
 
 	/* Modify the CREATE TABLE statement. */
-	zCol = sqlite3DbStrNDup(db, (char *)pColDef->z, pColDef->n);
-	if (zCol) {
-		char *zEnd = &zCol[pColDef->n - 1];
-		int savedDbFlags = user_session->sql_flags;
-		while (zEnd > zCol && (*zEnd == ';' || sqlite3Isspace(*zEnd))) {
-			*zEnd-- = '\0';
-		}
-		user_session->sql_flags |= SQLITE_PreferBuiltin;
-		sqlite3NestedParse(pParse,
-				   "UPDATE %s SET "
-				   "sql = substr(sql,1,%d) || ', ' || %Q || substr(sql,%d) "
-				   "WHERE type = 'table' AND name = %Q",
-				   MASTER_NAME, pNew->addColOffset, zCol,
-				   pNew->addColOffset + 1, zTab);
-		sqlite3DbFree(db, zCol);
-		user_session->sql_flags = savedDbFlags;
-	}
+	/* TODO: Adopt for Tarantool. */
+	(void)pColDef;
 
 	/* Make sure the schema version is at least 3.  But do not upgrade
 	 * from less than 3 to 4, as that will corrupt any preexisting DESC

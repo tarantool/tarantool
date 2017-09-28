@@ -3714,8 +3714,6 @@ sqlite3_test_control(int op, ...)
 	case SQLITE_TESTCTRL_IMPOSTER:{
 			sqlite3 *db = va_arg(ap, sqlite3 *);
 			sqlite3_mutex_enter(db->mutex);
-			db->init.iDb =
-			    sqlite3FindDbName(va_arg(ap, const char *));
 			db->init.busy = db->init.imposterTable =
 			    va_arg(ap, int);
 			db->init.newTnum = va_arg(ap, int);

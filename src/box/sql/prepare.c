@@ -84,8 +84,6 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 {
 	InitData *pData = (InitData *) pInit;
 	sqlite3 *db = pData->db;
-	int iDb = pData->iDb;
-
 	assert(argc == 3);
 	UNUSED_PARAMETER2(NotUsed, argc);
 	assert(sqlite3_mutex_held(db->mutex));
@@ -95,7 +93,6 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 		return 1;
 	}
 
-	assert(iDb == 0);
 	if (argv == 0)
 		return 0;	/* Might happen if EMPTY_RESULT_CALLBACKS are on */
 	if (argv[1] == 0) {
@@ -108,20 +105,16 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 		 * structures that describe the table, index, or view.
 		 */
 		int rc;
-		u8 saved_iDb = db->init.iDb;
 		sqlite3_stmt *pStmt;
 		TESTONLY(int rcp);	/* Return code from sqlite3_prepare() */
 
 		assert(db->init.busy);
-		db->init.iDb = iDb;
 		db->init.newTnum = *((int *)argv[1]);
 		db->init.orphanTrigger = 0;
 		TESTONLY(rcp =) sqlite3_prepare(db, argv[2],
 						strlen(argv[2]) + 1, &pStmt, 0);
 		rc = db->errCode;
 		assert((rc & 0xFF) == (rcp & 0xFF));
-		db->init.iDb = saved_iDb;
-		assert(saved_iDb == 0);
 		if (SQLITE_OK != rc) {
 			pData->rc = rc;
 			if (rc == SQLITE_NOMEM) {
@@ -175,38 +168,19 @@ sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg)
 	int size;
 #endif
 	Db *pDb;
-	char const *azArg[4];
 	int meta[5];
 	InitData initData;
-	const char *zMasterName;
 	int openedTransaction = 0;
 
 	assert(db->mdb.pSchema);
 	assert(sqlite3_mutex_held(db->mutex));
 	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
 
-	/* Construct the in-memory representation schema tables (sqlite_master or
-	 * sqlite_temp_master) by invoking the parser directly.  The appropriate
-	 * table name will be inserted automatically by the parser so we can just
-	 * use the abbreviation "x" here.  The parser will also automatically tag
-	 * the schema table as read-only.
-	 */
-	int rootPage = 1;
-	azArg[0] = zMasterName = MASTER_NAME;
-	azArg[1] = (char *)&rootPage;
-	azArg[2] = "CREATE TABLE x(type text,name text,tbl_name text,"
-	    "rootpage integer,sql text)";
-	azArg[3] = 0;
+	memset(&initData, 0, sizeof(InitData));
 	initData.db = db;
-	initData.iDb = 0;
-	initData.rc = SQLITE_OK;
-	initData.pzErrMsg = pzErrMsg;
-	sqlite3InitCallback(&initData, 3, (char **)azArg, 0);
 
 	/* Load schema from Tarantool - into the primary db only. */
-	if (initData.rc == SQLITE_OK) {
-		tarantoolSqlite3LoadSchema(&initData);
-	}
+	tarantoolSqlite3LoadSchema(&initData);
 
 	if (initData.rc) {
 		rc = initData.rc;
@@ -296,10 +270,6 @@ sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg)
 	 */
 	assert(db->init.busy);
 	{
-		char *zSql;
-		zSql = sqlite3MPrintf(db,
-				      "SELECT name, rootpage, sql FROM %s ORDER BY rowid",
-				      zMasterName);
 #ifndef SQLITE_OMIT_AUTHORIZATION
 		{
 			sqlite3_xauth xAuth;
@@ -312,7 +282,6 @@ sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg)
 		}
 #endif
 		rc = initData.rc;
-		sqlite3DbFree(db, zSql);
 #ifndef SQLITE_OMIT_ANALYZE
 		if (rc == SQLITE_OK) {
 			sqlite3AnalysisLoad(db);
@@ -550,15 +519,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	Btree *pBt = db->mdb.pBt;
 	assert(pBt);
 	assert(sqlite3BtreeHoldsMutex(pBt));
-	rc = sqlite3BtreeSchemaLocked(pBt);
-	if (rc) {
-		const char *zDb = db->mdb.zDbSName;
-		sqlite3ErrorWithMsg(db, rc, "database schema is locked: %s",
-				    zDb);
-		testcase(user_session->sql_flags & SQLITE_ReadUncommitted);
-		goto end_prepare;
-	}
-
 	sParse.db = db;
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
 		char *zSqlCopy;

@@ -71,7 +71,7 @@ sqlite3DeleteTriggerStep(sqlite3 * db, TriggerStep * pTriggerStep)
  */
 void
 sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER statement */
-		    Token * pName1,	/* The name of the trigger */
+		    Token * pName,	/* The name of the trigger */
 		    int tr_tm,	/* One of TK_BEFORE, TK_AFTER, TK_INSTEAD */
 		    int op,	/* One of TK_INSERT, TK_UPDATE, TK_DELETE */
 		    IdList * pColumns,	/* column list if this is an UPDATE OF trigger */
@@ -84,7 +84,6 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	Table *pTab;		/* Table that the trigger fires off of */
 	char *zName = 0;	/* Name of the trigger */
 	sqlite3 *db = pParse->db;	/* The database connection */
-	Token *pName;		/* The unqualified db name */
 	DbFixer sFix;		/* State vector for the DB fixer */
 
 	/* Do not account nested operations: the count of such
@@ -96,28 +95,12 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 		if (v != NULL)
 			sqlite3VdbeCountChanges(v);
 	}
-	assert(pName1 != 0);	/* pName1->z might be NULL, but not pName1 itself */
+	assert(pName != 0);	/* pName->z might be NULL, but not pName itself */
 	assert(op == TK_INSERT || op == TK_UPDATE || op == TK_DELETE);
 	assert(op > 0 && op < 0xff);
 
-	if (sqlite3TwoPartName(pParse, pName1, &pName) != 0) {
-		goto trigger_cleanup;
-	}
 	if (!pTableName || db->mallocFailed) {
 		goto trigger_cleanup;
-	}
-
-	/* A long-standing parser bug is that this syntax was allowed:
-	 *
-	 *    CREATE TRIGGER attached.demo AFTER INSERT ON attached.tab ....
-	 *                                                 ^^^^^^^^
-	 *
-	 * To maintain backwards compatibility, ignore the database
-	 * name on pTableName if we are reparsing out of SQLITE_MASTER.
-	 */
-	if (db->init.busy) {
-		sqlite3DbFree(db, pTableName->a[0].zDatabase);
-		pTableName->a[0].zDatabase = 0;
 	}
 
 	/* Ensure the table name matches database name and that the table exists */
@@ -263,7 +246,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 	}
 
 	/* if we are not initializing,
-	 * build the sqlite_master entry
+	 * generate byte code to insert a new trigger into Tarantool.
 	 */
 	if (!db->init.busy) {
 		Vdbe *v;
@@ -273,7 +256,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 		int iCursor = pParse->nTab++;
 		int iRecord;
 
-		/* Make an entry in the sqlite_master table */
+		/* Make an entry in the _trigger space.  */
 		v = sqlite3GetVdbe(pParse);
 		if (v == 0)
 			goto triggerfinish_cleanup;

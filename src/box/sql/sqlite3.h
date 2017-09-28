@@ -5616,7 +5616,7 @@ sqlite3_rollback_hook(sqlite3 *, void (*)(void *),
  * ^In the case of an update, this is the [rowid] after the update takes place.
  *
  * ^(The update hook is not invoked when internal system tables are
- * modified (i.e. sqlite_master and sqlite_sequence).)^
+ * modified (i.e. _sql_stat1).)^
  * ^The update hook is not invoked when [WITHOUT ROWID] tables are modified.
  *
  * ^In the current implementation, the update hook

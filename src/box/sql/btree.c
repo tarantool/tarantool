@@ -216,8 +216,7 @@ hasSharedCacheTableLock(Btree * pBtree,	/* Handle that must hold lock */
 	 */
 	for (pLock = pBtree->pBt->pLock; pLock; pLock = pLock->pNext) {
 		if (pLock->pBtree == pBtree
-		    && (pLock->iTable == iTab
-			|| (pLock->eLock == WRITE_LOCK && pLock->iTable == 1))
+		    && pLock->iTable == iTab
 		    && pLock->eLock >= eLockType) {
 			return 1;
 		}
@@ -281,7 +280,7 @@ querySharedCacheTableLock(Btree * p, Pgno iTab, u8 eLock)
 	assert(eLock == READ_LOCK || eLock == WRITE_LOCK);
 	assert(p->db != 0);
 	assert(!(user_session->sql_flags &
-		 SQLITE_ReadUncommitted) || eLock == WRITE_LOCK || iTab == 1);
+		 SQLITE_ReadUncommitted) || eLock == WRITE_LOCK);
 
 	/* If requesting a write-lock, then the Btree must have an open write
 	 * transaction on this file. And, obviously, for this to be so there
@@ -355,19 +354,10 @@ setSharedCacheTableLock(Btree * p, Pgno iTable, u8 eLock)
 	BtShared *pBt = p->pBt;
 	BtLock *pLock = 0;
 	BtLock *pIter;
-	struct session *user_session = current_session();
 
 	assert(sqlite3BtreeHoldsMutex(p));
 	assert(eLock == READ_LOCK || eLock == WRITE_LOCK);
 	assert(p->db != 0);
-
-	/* A connection with the read-uncommitted flag set will never try to
-	 * obtain a read-lock using this function. The only read-lock obtained
-	 * by a connection in read-uncommitted mode is on the sqlite_master
-	 * table, and that lock is obtained in BtreeBeginTrans().
-	 */
-	assert(0 == (user_session->sql_flags & SQLITE_ReadUncommitted)
-	       || eLock == WRITE_LOCK);
 
 	/* This function should only be called on a sharable b-tree after it
 	 * has been determined that no other b-tree holds a conflicting lock.
@@ -2995,14 +2985,6 @@ sqlite3BtreeBeginTrans(Btree * p, int nSavepoint, int wrflag)
 	}
 #endif
 
-	/* Any read-only or read-write transaction implies a read-lock on
-	 * page 1. So if some other shared-cache client already has a write-lock
-	 * on page 1, the transaction cannot be opened.
-	 */
-	rc = querySharedCacheTableLock(p, MASTER_ROOT, READ_LOCK);
-	if (SQLITE_OK != rc)
-		goto trans_begun;
-
 	pBt->btsFlags &= ~BTS_INITIALLY_EMPTY;
 	if (pBt->nPage == 0)
 		pBt->btsFlags |= BTS_INITIALLY_EMPTY;
@@ -3587,10 +3569,9 @@ sqlite3BtreeCursor(Btree * p,	/* The btree */
 	} else {
 		sqlite3BtreeEnter(p);
 		rc = btreeCursor(p, iTable, wrFlag, pKeyInfo, pCur);
-		if (iTable != 1 && (p->db->mdb.pBt == p)) {
-			/* Main database and temporary database "files" are backed by
-			 * Tarantool, except for the sqlite_master table(s)
-			 * (assuming it fits in 1 page).
+		if (p->db->mdb.pBt == p) {
+			/* Main database backed by Tarantool.
+			 * Ephemeral tables are not, in which case if-stmt is false
 			 */
 			pCur->curFlags |= BTCF_TaCursor;
 			pCur->pTaCursor = 0;	/* sqlite3BtreeCursorZero didn't touch it */
@@ -8027,8 +8008,6 @@ sqlite3BtreeGetMeta(Btree * p, int idx, u32 * pMeta)
 
 	sqlite3BtreeEnter(p);
 	assert(p->inTrans > TRANS_NONE);
-	assert(SQLITE_OK ==
-	       querySharedCacheTableLock(p, MASTER_ROOT, READ_LOCK));
 	assert(pBt->pPage1);
 	assert(idx >= 0 && idx <= 15);
 
@@ -8455,23 +8434,6 @@ sqlite3BtreeSchema(Btree * p, int nBytes, void (*xFree) (void *))
 	}
 	sqlite3BtreeLeave(p);
 	return pBt->pSchema;
-}
-
-/*
- * Return SQLITE_LOCKED_SHAREDCACHE if another user of the same shared
- * btree as the argument handle holds an exclusive lock on the
- * sqlite_master table. Otherwise SQLITE_OK.
- */
-int
-sqlite3BtreeSchemaLocked(Btree * p)
-{
-	int rc;
-	assert(sqlite3_mutex_held(p->db->mutex));
-	sqlite3BtreeEnter(p);
-	rc = querySharedCacheTableLock(p, MASTER_ROOT, READ_LOCK);
-	assert(rc == SQLITE_OK || rc == SQLITE_LOCKED_SHAREDCACHE);
-	sqlite3BtreeLeave(p);
-	return rc;
 }
 
 #ifndef SQLITE_OMIT_SHARED_CACHE

@@ -918,17 +918,6 @@ struct BusyHandler {
 };
 
 /*
- * Name of the master database table.  The master database table
- * is a special table that holds the names and attributes of all
- * user tables and indices.
- */
-#define MASTER_NAME       "sqlite_master"
-/*
- * The root-page of the master database table.
- */
-#define MASTER_ROOT       1
-
-/*
  * A convenience macro that returns the number of elements in
  * an array.
  */
@@ -1291,7 +1280,6 @@ struct sqlite3 {
 	int nMaxSorterMmap;	/* Maximum size of regions mapped by sorter */
 	struct sqlite3InitInfo {	/* Information used during initialization */
 		int newTnum;	/* Rootpage of table being initialized */
-		u8 iDb;		/* Which db file is being initialized */
 		u8 busy;	/* TRUE if currently initializing */
 		u8 orphanTrigger;	/* Last statement is orphaned TEMP trigger */
 		u8 imposterTable;	/* Building an imposter table */
@@ -1702,7 +1690,7 @@ struct Table {
 	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
 				   column number here, -1 otherwise Tarantool specifics */
 	i16 nCol;		/* Number of columns in this table */
-	LogEst nRowLogEst;	/* Estimated rows in table - from sql_stat1 table */
+	LogEst nRowLogEst;	/* Estimated rows in table - from _sql_stat1 table */
 	LogEst szTabRow;	/* Estimated size of each table row in bytes */
 #ifdef SQLITE_ENABLE_COSTMULT
 	LogEst costMult;	/* Cost multiplier for using this table */
@@ -1929,8 +1917,8 @@ struct UnpackedRecord {
  * element.
  *
  * While parsing a CREATE TABLE or CREATE INDEX statement in order to
- * generate VDBE code (as opposed to parsing one read from an sqlite_master
- * table as part of parsing an existing database schema), transient instances
+ * generate VDBE code (as opposed to reading from Tarantool's _space
+ * space as part of parsing an existing database schema), transient instances
  * of this structure may be created. In this case the Index.tnum variable is
  * used to store the address of a VDBE instruction, not a database page
  * number (it cannot - the database page is not allocated until the VDBE
@@ -3414,10 +3402,9 @@ void sqlite3DeleteColumnNames(sqlite3 *, Table *);
 int sqlite3ColumnsFromExprList(Parse *, ExprList *, i16 *, Column **);
 void sqlite3SelectAddColumnTypeAndCollation(Parse *, Table *, Select *);
 Table *sqlite3ResultSetOfSelect(Parse *, Select *);
-void sqlite3OpenMasterTable(Parse *);
 Index *sqlite3PrimaryKeyIndex(Table *);
 i16 sqlite3ColumnOfIndex(Index *, i16);
-void sqlite3StartTable(Parse *, Token *, int, int, int);
+void sqlite3StartTable(Parse *, Token *, int);
 #if SQLITE_ENABLE_HIDDEN_COLUMNS
 void sqlite3ColumnPropertiesFromName(Table *, Column *);
 #else
@@ -3743,7 +3730,6 @@ void sqlite3Error(sqlite3 *, int);
 void sqlite3SystemError(sqlite3 *, int);
 void *sqlite3HexToBlob(sqlite3 *, const char *z, int n);
 u8 sqlite3HexToInt(int h);
-int sqlite3TwoPartName(Parse *, Token *, Token **);
 
 #if defined(SQLITE_NEED_ERR_NAME)
 const char *sqlite3ErrName(int);

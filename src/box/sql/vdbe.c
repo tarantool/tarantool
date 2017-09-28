@@ -3503,7 +3503,7 @@ case OP_OpenEphemeral: {
 			assert(pOp->p4type==P4_KEYINFO);
 			rc = sqlite3BtreeCreateTable(pCx->pBtx, &pgno, BTREE_BLOBKEY | pOp->p5);
 			if (rc==SQLITE_OK) {
-				assert(pgno==MASTER_ROOT+1);
+				assert(pgno==2);
 				assert(pKeyInfo->db==db);
 				assert(pKeyInfo->enc==ENC(db));
 				rc = sqlite3BtreeCursor(pCx->pBtx, pgno, BTREE_WRCSR,
@@ -3511,7 +3511,7 @@ case OP_OpenEphemeral: {
 			}
 			pCx->isTable = 0;
 		} else {
-			rc = sqlite3BtreeCursor(pCx->pBtx, MASTER_ROOT, BTREE_WRCSR,
+			rc = sqlite3BtreeCursor(pCx->pBtx, 1, BTREE_WRCSR,
 						0, pCx->uc.pCursor);
 			pCx->isTable = 1;
 		}
@@ -5460,6 +5460,9 @@ case OP_CreateTable: {          /* out2 */
  *
  * This opcode invokes the parser to create a new virtual machine,
  * then runs the new virtual machine.  It is thus a re-entrant opcode.
+ *
+ * Tarantool: this opcode is deprecated and superceeded by OP_ParseSchema2
+ * which is in charge for updated Tarantool's schema
  */
 case OP_ParseSchema: {
 			break;
@@ -5468,8 +5471,9 @@ case OP_ParseSchema: {
 /* Opcode: ParseSchema2 P1 P2 P3 * *
  * Synopsis: rows=r[P1@P2] iDb=P3
  *
- * For each 4-tuple from r[P1@P2] range convert to SQLITE_MASTER row
- * format and update the schema with the resulting entry.
+ * For each 4-tuple from r[P1@P2] range convert to following
+ * format and update the schema with the resulting entry:
+ *  <name, pageno (which is hash(spaceId, indexId)), sql>
  */
 case OP_ParseSchema2: {
 	int iDb;
@@ -5507,7 +5511,7 @@ case OP_ParseSchema2: {
 	 *   ...
 	 *   nameN, spaceIdN, indexIdN, sqlN.
 	 *
-	 * Convert to SQLite master format and update schema.
+	 * Uppdate the schema.
 	 */
 	for( ; pRecEnd-pRec>=4 && initData.rc==SQLITE_OK; pRec+=4) {
 		argv[0] = pRec[0].z;

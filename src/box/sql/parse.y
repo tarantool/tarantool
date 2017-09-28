@@ -170,7 +170,7 @@ cmd ::= ROLLBACK trans_opt TO savepoint_opt nm(X). {
 //
 cmd ::= create_table create_table_args.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
-   sqlite3StartTable(pParse,&Y,0,0,E);
+   sqlite3StartTable(pParse,&Y,E);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
@@ -1266,13 +1266,6 @@ uniqueflag(A) ::= .        {A = OE_None;}
 //
 // eidlist is grouped with CREATE INDEX because it used to be the non-terminal
 // used for the arguments to an index.  That is just an historical accident.
-//
-// IMPORTANT COMPATIBILITY NOTE:  Some prior versions of SQLite accepted
-// COLLATE clauses and ASC or DESC keywords on ID lists in inappropriate
-// places - places that might have been stored in the sqlite_master schema.
-// Those extra features were ignored.  But because they might be in some
-// (busted) old databases, we need to continue parsing them when loading
-// historical schemas.
 //
 %type eidlist {ExprList*}
 %destructor eidlist {sqlite3ExprListDelete(pParse->db, $$);}

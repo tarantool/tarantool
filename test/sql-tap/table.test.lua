@@ -418,7 +418,6 @@ test:do_test(
             DROP TABLE IF EXISTS sql_stat2;
             DROP TABLE IF EXISTS sql_stat3;
             DROP TABLE IF EXISTS sql_stat4;
-            SELECT name FROM sqlite_master WHERE name GLOB 'sql_stat*';
         ]]
     end, {
         -- <table-5.2.1>

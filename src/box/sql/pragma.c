@@ -253,7 +253,7 @@ pragmaLocate(const char *zName)
  * id and pId2 is any empty string.
  */
 void
-sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field */
+sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	      Token * pId2,	/* Second part of [schema.]id field, or NULL */
 	      Token * pValue,	/* Token for <value>, or NULL */
 	      Token * pValue2,	/* Token for <value2>, or NULL */
@@ -264,9 +264,7 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 	char *zRight = 0;	/* Nul-terminated UTF-8 string <value>, or NULL */
 	char *zTable = 0;	/* Nul-terminated UTF-8 string <value2> or NULL */
 	const char *zDb = 0;	/* The database name */
-	Token *pId;		/* Pointer to <id> token */
 	char *aFcntl[4];	/* Argument to SQLITE_FCNTL_PRAGMA */
-	int iDb;		/* Database index for <database> */
 	int rc;			/* return value form SQLITE_FCNTL_PRAGMA */
 	sqlite3 *db = pParse->db;	/* The database connection */
 	Db *pDb;		/* The specific database being pragmaed */
@@ -278,13 +276,6 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 		return;
 	sqlite3VdbeRunOnlyOnce(v);
 	pParse->nMem = 2;
-
-	/* Interpret the [schema.] part of the pragma statement. iDb is the *
-	 * index of the database this pragma is being applied to in db.aDb[].
-	 */
-	iDb = sqlite3TwoPartName(pParse, pId1, &pId);
-	if (iDb < 0)
-		return;
 	pDb = &db->mdb;
 
 	zLeft = sqlite3NameFromToken(db, pId);
@@ -724,7 +715,6 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 			pParse->nMem += 4;
 			regKey = ++pParse->nMem;
 			regRow = ++pParse->nMem;
-			assert(iDb == 0);
 			sqlite3CodeVerifySchema(pParse);
 			k = sqliteHashFirst(&db->mdb.pSchema->tblHash);
 			while (k) {
@@ -770,7 +760,7 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 									  i,
 									  pIdx->
 									  tnum,
-									  iDb);
+									  0);
 							sqlite3VdbeSetP4KeyInfo
 							    (pParse, pIdx);
 						}
@@ -1057,8 +1047,8 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 							 setCookie, 0);
 				if (ONLY_IF_REALLOC_STRESS(aOp == 0))
 					break;
-				aOp[0].p1 = iDb;
-				aOp[1].p1 = iDb;
+				aOp[0].p1 = 0;
+				aOp[1].p1 = 0;
 				aOp[1].p2 = iCookie;
 				aOp[1].p3 = sqlite3Atoi(zRight);
 			} else {
@@ -1078,8 +1068,8 @@ sqlite3Pragma(Parse * pParse, Token * pId1,	/* First part of [schema.]id field *
 							 readCookie, 0);
 				if (ONLY_IF_REALLOC_STRESS(aOp == 0))
 					break;
-				aOp[0].p1 = iDb;
-				aOp[1].p1 = iDb;
+				aOp[0].p1 = 0;
+				aOp[1].p1 = 0;
 				aOp[1].p3 = iCookie;
 				sqlite3VdbeReusable(v);
 			}

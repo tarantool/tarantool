@@ -93,7 +93,6 @@ int sqlite3BtreeCreateTable(Btree *, int *, int flags);
 int sqlite3BtreeIsInTrans(Btree *);
 int sqlite3BtreeIsInReadTrans(Btree *);
 void *sqlite3BtreeSchema(Btree *, int, void (*)(void *));
-int sqlite3BtreeSchemaLocked(Btree * pBtree);
 #ifndef SQLITE_OMIT_SHARED_CACHE
 int sqlite3BtreeLockTable(Btree * pBtree, int iTab, u8 isWriteLock);
 #endif

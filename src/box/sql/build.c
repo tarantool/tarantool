@@ -282,9 +282,9 @@ sqlite3FinishCoding(Parse * pParse)
  * and finalization steps are omitted because those are handling by the
  * outermost parser.
  *
- * Not everything is nestable.  This facility is designed to permit
- * INSERT, UPDATE, and DELETE operations against SQLITE_MASTER.  Use
- * care if you decide to try to use this routine for some other purposes.
+ * Not everything is nestable.  This facility is designed to perform
+ * basic DDL operations.  Use care if you decide to try to use this routine
+ * for some other purposes.
  */
 void
 sqlite3NestedParse(Parse * pParse, const char *zFormat, ...)
@@ -688,21 +688,6 @@ sqlite3NameFromToken(sqlite3 * db, Token * pName)
 }
 
 /*
- * Open the sqlite_master table stored in database
- * writing. The table is opened using cursor 0.
- */
-void
-sqlite3OpenMasterTable(Parse * p)
-{
-	Vdbe *v = sqlite3GetVdbe(p);
-	sqlite3TableLock(p, MASTER_ROOT, 1, MASTER_NAME);
-	sqlite3VdbeAddOp4Int(v, OP_OpenWrite, 0, MASTER_ROOT, 0, 5);
-	if (p->nTab == 0) {
-		p->nTab = 1;
-	}
-}
-
-/*
  * Parameter zName points to a nul-terminated buffer containing the name
  * of a database ("main", "temp" or the name of an attached db). This
  * function returns the index of the named database in db->aDb[], or
@@ -730,39 +715,6 @@ sqlite3FindDb(sqlite3 * db, Token * pName)
 	i = sqlite3FindDbName(zName);
 	sqlite3DbFree(db, zName);
 	return i;
-}
-
-/* The table or view or trigger name is passed to this routine via tokens
- * pName1 and pName2. If the table name was fully qualified, for example:
- *
- * CREATE TABLE xxx.yyy (...);
- *
- * Then pName1 is set to "xxx" and pName2 "yyy". On the other hand if
- * the table name is not fully qualified, i.e.:
- *
- * CREATE TABLE yyy(...);
- *
- * Then pName1 is set to "yyy" and pName2 is "".
- *
- * This routine sets the *ppUnqual pointer to point at the token (pName1 or
- * pName2) that stores the unqualified table name.  The index of the
- * database "xxx" is returned.
- */
-int
-sqlite3TwoPartName(Parse * pParse,	/* Parsing and code generating context */
-		   Token * pName1,	/* The "xxx" in the name "xxx.yyy" or "xxx" */
-		   Token ** pUnqual	/* Write the unqualified object name here */
-    )
-{
-	int iDb;		/* Database holding the object */
-	sqlite3 *db = pParse->db;
-
-	assert(db->init.iDb == 0 || db->init.busy);
-	iDb = db->init.iDb;
-	*pUnqual = pName1;
-	assert(iDb == 0);
-
-	return iDb;
 }
 
 /*
@@ -835,21 +787,18 @@ sqlite3ColumnOfIndex(Index * pIdx, i16 iCol)
  * routines will be called to add more information to this record.
  * At the end of the CREATE TABLE statement, the sqlite3EndTable() routine
  * is called to complete the construction of the new table record.
+ *
+ * @param pParse Parser context.
+ * @param pName1 First part of the name of the table or view.
+ * @param noErr Do nothing if table already exists.
  */
 void
-sqlite3StartTable(Parse * pParse,	/* Parser context */
-		  Token * pName1,	/* First part of the name of the table or view */
-		  int isTemp,	/* True if this is a TEMP table */
-		  int isView,	/* True if this is a VIEW */
-		  int noErr	/* Do nothing if table already exists */
-    )
+sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 {
 	Table *pTable;
 	char *zName = 0;	/* The name of the new table */
 	sqlite3 *db = pParse->db;
 	Vdbe *v;
-	int iDb;		/* Database number to create the table in */
-	Token *pName;		/* Unqualified name of the table to create */
 
 	/* Do not account nested operations: the count of such
 	 * operations depends on Tarantool data dictionary internals,
@@ -861,18 +810,8 @@ sqlite3StartTable(Parse * pParse,	/* Parser context */
 		sqlite3VdbeCountChanges(v);
 	}
 
-	if (db->init.busy && db->init.newTnum == 1) {
-		/* Special case:  Parsing the sqlite_master or sqlite_temp_master schema */
-		iDb = db->init.iDb;
-		zName = sqlite3DbStrDup(db, MASTER_NAME);
-		pName = pName1;
-	} else {
-		/* The common case */
-		iDb = sqlite3TwoPartName(pParse, pName1, &pName);
-		if (iDb < 0)
-			return;
-		zName = sqlite3NameFromToken(db, pName);
-	}
+	zName = sqlite3NameFromToken(db, pName);
+
 	pParse->sNameToken = *pName;
 	if (zName == 0)
 		return;
@@ -948,9 +887,9 @@ sqlite3StartTable(Parse * pParse,	/* Parser context */
 	}
 #endif
 
-	/* Begin generating the code that will insert the table record into
-	 * the SQLITE_MASTER table.  Note in particular that we must go ahead
-	 * and allocate the record number for the table entry now.  Before any
+	/* Begin generating the code that will create a new table.
+	 * Note in particular that we must go ahead and allocate the
+	 * record number for the table entry now.  Before any
 	 * PRIMARY KEY or UNIQUE keywords are parsed.  Those keywords will cause
 	 * indices to be created and the table record must come before the
 	 * indices.  Hence, the record number for the table must be allocated
@@ -2004,12 +1943,12 @@ parseTableSchemaRecord(Parse * pParse, int iSpaceId, char *zStmt)
  * is added to the internal hash tables, assuming no errors have
  * occurred.
  *
- * An entry for the table is made in the master table on disk, unless
- * this is a temporary table or db->init.busy==1.  When db->init.busy==1
- * it means we are reading the sqlite_master table because we just
- * connected to the database or because the sqlite_master table has
- * recently changed, so the entry for this table already exists in
- * the sqlite_master table.  We do not want to create it again.
+ * Insert is performed in two passes:
+ *  1. When db->init.busy == 0. Byte code for creation of new Tarantool
+ *     space and all necessary Tarantool indexes is emitted
+ *  2. When db->init.busy == 1. This means that byte code for creation
+ *     of new table is executing right now, and it's time to add new entry
+ *     for the table into SQL memory represenation
  *
  * If the pSelect argument is not NULL, it means that this routine
  * was called to create a table generated from a
@@ -2039,28 +1978,16 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 
 	assert(!db->init.busy || !pSelect);
 
-	/* If the db->init.busy is 1 it means we are reading the SQL off the
-	 * "sqlite_master" or "sqlite_temp_master" table on the disk.
-	 * So do not write to the disk again.  Extract the root page number
-	 * for the table from the db->init.newTnum field.  (The page number
-	 * should have been put there by the sqliteOpenCb routine.)
-	 *
-	 * If the root page number is 1, that means this is the sqlite_master
-	 * table itself.  So mark it read-only.
+	/* If db->init.busy == 1, then we're called from
+	 * OP_ParseSchema2 and is about to update in-memory
+	 * schema.
 	 */
-	if (db->init.busy) {
+	if (db->init.busy)
 		p->tnum = db->init.newTnum;
-		if (p->tnum == 1)
-			p->tabFlags |= TF_Readonly;
-	}
 
-	/*
-	 * Enforce WITHOUT ROWID, but not for sqlite_master.
-	 * Skip VIEWs.
-	 */
-	if (!p->pSelect && (!db->init.busy || p->tnum != 1)) {
+	/* Enforce WITHOUT ROWID, skip VIEWs. */
+	if (!p->pSelect)
 		tabOpts |= TF_WithoutRowid;
-	}
 
 	/* Special processing for WITHOUT ROWID Tables */
 	if (tabOpts & TF_WithoutRowid) {
@@ -2091,8 +2018,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		estimateIndexWidth(pIdx);
 	}
 
-	/* If not initializing, then create a record for the new table
-	 * in the SQLITE_MASTER table of the database.
+	/* If not initializing, then create new Tarantool space.
 	 *
 	 * If this is a TEMPORARY table, write the entry into the auxiliary
 	 * file instead of into the main database file.
@@ -2277,7 +2203,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 void
 sqlite3CreateView(Parse * pParse,	/* The parsing context */
 		  Token * pBegin,	/* The CREATE token that begins the statement */
-		  Token * pName1,	/* The token that holds the name of the view */
+		  Token * pName,	/* The token that holds the name of the view */
 		  ExprList * pCNames,	/* Optional list of view column names */
 		  Select * pSelect,	/* A SELECT statement that will become the new view */
 		  int noErr	/* Suppress error messages if VIEW already exists */
@@ -2288,18 +2214,16 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 	const char *z;
 	Token sEnd;
 	DbFixer sFix;
-	Token *pName = 0;
 	sqlite3 *db = pParse->db;
 
 	if (pParse->nVar > 0) {
 		sqlite3ErrorMsg(pParse, "parameters are not allowed in views");
 		goto create_view_fail;
 	}
-	sqlite3StartTable(pParse, pName1, 0, 1, noErr);
+	sqlite3StartTable(pParse, pName, noErr);
 	p = pParse->pNewTable;
 	if (p == 0 || pParse->nErr)
 		goto create_view_fail;
-	sqlite3TwoPartName(pParse, pName1, &pName);
 	sqlite3SchemaToIndex(db, p->pSchema);
 	sqlite3FixInit(&sFix, pParse, "view", pName);
 	if (sqlite3FixSelect(&sFix, pSelect))
@@ -2333,7 +2257,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 	sEnd.z = &z[n - 1];
 	sEnd.n = 1;
 
-	/* Use sqlite3EndTable() to add the view to the SQLITE_MASTER table */
+	/* Use sqlite3EndTable() to add the view to the Tarantool.  */
 	sqlite3EndTable(pParse, 0, &sEnd, 0, 0);
 
  create_view_fail:
@@ -2520,8 +2444,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	sqlite3BeginWriteOperation(pParse, 1);
 
 	/* Drop all triggers associated with the table being dropped. Code
-	 * is generated to remove entries from sqlite_master and/or
-	 * sqlite_temp_master if required.
+	 * is generated to remove entries from _trigger space.
 	 */
 	pTrigger = pTab->pTrigger;
 	/* Do not account triggers deletion - they will be accounted
@@ -3083,7 +3006,7 @@ addIndexToTable(Index * pIndex, Table * pTab)
  */
 void
 sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
-		   Token * pName1,	/* First part of index name. May be NULL */
+		   Token * pName,	/* Index name. May be NULL */
 		   SrcList * pTblName,	/* Table to index. Use pParse->pNewTable if 0 */
 		   ExprList * pList,	/* A list of columns to be indexed */
 		   int onError,	/* OE_Abort, OE_Ignore, OE_Replace, or OE_None */
@@ -3104,7 +3027,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	sqlite3 *db = pParse->db;
 	Db *pDb;		/* The specific table containing the indexed database */
 	int iDb;		/* Index of the database that is being written */
-	Token *pName = 0;	/* Unqualified name of the index to create */
 	struct ExprList_item *pListItem;	/* For looping over pList */
 	int nExtra = 0;		/* Space allocated for zExtra[] */
 	char *zExtra = 0;	/* Extra space after the Index object */
@@ -3138,10 +3060,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		 * to search for the table. 'Fix' the table name to this db
 		 * before looking up the table.
 		 */
-		assert(pName1);
-		iDb = sqlite3TwoPartName(pParse, pName1, &pName);
-		if (iDb != 0)
-			goto exit_create_index;
 		assert(pName && pName->z);
 
 		sqlite3FixInit(&sFix, pParse, "index", pName);
@@ -3157,6 +3075,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		if (!HasRowid(pTab))
 			sqlite3PrimaryKeyIndex(pTab);
+		iDb = 0;
 	} else {
 		assert(pName == 0);
 		assert(pStart == 0);
@@ -3190,7 +3109,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * index or table with the same name.
 	 *
 	 * Exception:  If we are reading the names of permanent indices from the
-	 * sqlite_master table (because some other process changed the schema) and
+	 * Tarantool schema (because some other process changed the schema) and
 	 * one of the index names collides with the name of a temporary table or
 	 * index, then we will continue to process this index.
 	 *
@@ -3493,11 +3412,9 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 
 	/* If this is the initial CREATE INDEX statement (or CREATE TABLE if the
 	 * index is an implied index for a UNIQUE or PRIMARY KEY constraint) then
-	 * emit code to allocate the index rootpage on disk and make an entry for
-	 * the index in the sqlite_master table and populate the index with
-	 * content.  But, do not do this if we are simply reading the sqlite_master
-	 * table to parse the schema, or if this index is the PRIMARY KEY index
-	 * of a WITHOUT ROWID table.
+	 * emit code to to insert new index into Tarantool.
+	 * But, do not do this if we are simply parsing the schema, or if this
+	 * index is the PRIMARY KEY index of a WITHOUT ROWID table.
 	 *
 	 * If pTblName==0 it means this index is generated as an implied PRIMARY KEY
 	 * or UNIQUE index in a CREATE TABLE statement.  Since the table
