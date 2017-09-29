@@ -98,11 +98,8 @@ struct sqlite3_api_routines {
 				void (*xStep) (sqlite3_context *, int,
 					       sqlite3_value **),
 				void (*xFinal) (sqlite3_context *));
-	int (*create_module) (sqlite3 *, const char *, const sqlite3_module *,
-			      void *);
 	int (*data_count) (sqlite3_stmt * pStmt);
 	sqlite3 *(*db_handle) (sqlite3_stmt *);
-	int (*declare_vtab) (sqlite3 *, const char *);
 	int (*enable_shared_cache) (int);
 	int (*errcode) (sqlite3 * db);
 	const char *(*errmsg) (sqlite3 *);
@@ -176,10 +173,6 @@ struct sqlite3_api_routines {
 	int (*prepare_v2) (sqlite3 *, const char *, int, sqlite3_stmt **,
 			   const char **);
 	int (*clear_bindings) (sqlite3_stmt *);
-	/* Added by 3.4.1 */
-	int (*create_module_v2) (sqlite3 *, const char *,
-				 const sqlite3_module *, void *,
-				 void (*xDestroy) (void *));
 	/* Added by 3.5.0 */
 	int (*bind_zeroblob) (sqlite3_stmt *, int, int);
 	int (*blob_bytes) (sqlite3_blob *);
@@ -244,8 +237,6 @@ struct sqlite3_api_routines {
 			   int (*)(void *, sqlite3 *, const char *, int),
 			   void *);
 	int (*blob_reopen) (sqlite3_blob *, sqlite3_int64);
-	int (*vtab_config) (sqlite3 *, int op, ...);
-	int (*vtab_on_conflict) (sqlite3 *);
 	/* Version 3.7.16 and later */
 	int (*close_v2) (sqlite3 *);
 	const char *(*db_filename) (sqlite3 *, const char *);
@@ -356,11 +347,8 @@ typedef int (*sqlite3_loadext_entry) (sqlite3 * db,	/* Handle to the database. *
 #define sqlite3_complete               sqlite3_api->complete
 #define sqlite3_create_collation       sqlite3_api->create_collation
 #define sqlite3_create_function        sqlite3_api->create_function
-#define sqlite3_create_module          sqlite3_api->create_module
-#define sqlite3_create_module_v2       sqlite3_api->create_module_v2
 #define sqlite3_data_count             sqlite3_api->data_count
 #define sqlite3_db_handle              sqlite3_api->db_handle
-#define sqlite3_declare_vtab           sqlite3_api->declare_vtab
 #define sqlite3_enable_shared_cache    sqlite3_api->enable_shared_cache
 #define sqlite3_errcode                sqlite3_api->errcode
 #define sqlite3_errmsg                 sqlite3_api->errmsg
@@ -421,7 +409,6 @@ typedef int (*sqlite3_loadext_entry) (sqlite3 * db,	/* Handle to the database. *
 #define sqlite3_value_type             sqlite3_api->value_type
 #define sqlite3_vmprintf               sqlite3_api->vmprintf
 #define sqlite3_vsnprintf              sqlite3_api->vsnprintf
-#define sqlite3_overload_function      sqlite3_api->overload_function
 #define sqlite3_prepare_v2             sqlite3_api->prepare_v2
 #define sqlite3_clear_bindings         sqlite3_api->clear_bindings
 #define sqlite3_bind_zeroblob          sqlite3_api->bind_zeroblob
@@ -474,8 +461,6 @@ typedef int (*sqlite3_loadext_entry) (sqlite3 * db,	/* Handle to the database. *
 #define sqlite3_wal_checkpoint         sqlite3_api->wal_checkpoint
 #define sqlite3_wal_hook               sqlite3_api->wal_hook
 #define sqlite3_blob_reopen            sqlite3_api->blob_reopen
-#define sqlite3_vtab_config            sqlite3_api->vtab_config
-#define sqlite3_vtab_on_conflict       sqlite3_api->vtab_on_conflict
 /* Version 3.7.16 and later */
 #define sqlite3_close_v2               sqlite3_api->close_v2
 #define sqlite3_db_filename            sqlite3_api->db_filename

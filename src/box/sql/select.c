@@ -4343,9 +4343,6 @@ isSimpleCount(Select * p, AggInfo * pAggInfo)
 	pTab = p->pSrc->a[0].pTab;
 	pExpr = p->pEList->a[0].pExpr;
 	assert(pTab && !pTab->pSelect && pExpr);
-
-	if (IsVirtual(pTab))
-		return 0;
 	if (pExpr->op != TK_AGG_FUNCTION)
 		return 0;
 	if (NEVER(pAggInfo->nFunc == 0))
@@ -4807,11 +4804,11 @@ selectExpander(Walker * pWalker, Select * p)
 				return WRC_Abort;
 			}
 			pTab->nTabRef++;
-			if (!IsVirtual(pTab) && cannotBeFunction(pParse, pFrom)) {
+			if (cannotBeFunction(pParse, pFrom)) {
 				return WRC_Abort;
 			}
-#if !defined(SQLITE_OMIT_VIEW) || !defined (SQLITE_OMIT_VIRTUALTABLE)
-			if (IsVirtual(pTab) || pTab->pSelect) {
+#if !defined(SQLITE_OMIT_VIEW)
+			if (pTab->pSelect) {
 				i16 nCol;
 				if (sqlite3ViewGetColumnNames(pParse, pTab))
 					return WRC_Abort;

@@ -830,7 +830,7 @@ case OP_Goto: {             /* jump */
 	pOp = &aOp[pOp->p2 - 1];
 
 	/* Opcodes that are used as the bottom of a loop (OP_Next, OP_Prev,
-	 * OP_VNext, OP_RowSetNext, or OP_SorterNext) all jump here upon
+	 * OP_RowSetNext, or OP_SorterNext) all jump here upon
 	 * completion.  Check to see if sqlite3_interrupt() has been called
 	 * or if the progress callback needs to be invoked.
 	 *
@@ -2539,7 +2539,6 @@ case OP_Column: {
 	assert(pC!=0);
 	assert(p2<pC->nField);
 	aOffset = pC->aOffset;
-	assert(pC->eCurType!=CURTYPE_VTAB);
 	assert(pC->eCurType!=CURTYPE_PSEUDO || pC->nullRow);
 	assert(pC->eCurType!=CURTYPE_SORTER);
 
@@ -2867,18 +2866,6 @@ case OP_Savepoint: {
 		} else {
 			nName = sqlite3Strlen30(zName);
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-			/* This call is Ok even if this savepoint is actually a transaction
-			 * savepoint (and therefore should not prompt xSavepoint()) callbacks.
-			 * If this is a transaction savepoint being opened, it is guaranteed
-			 * that the db->aVTrans[] array is empty.
-			 */
-			assert(p->autoCommit==0 || db->nVTrans==0);
-			rc = sqlite3VtabSavepoint(db, SAVEPOINT_BEGIN,
-						  p->nStatement+p->nSavepoint);
-			if (rc!=SQLITE_OK) goto abort_due_to_error;
-#endif
-
 			/* Create a new savepoint structure. */
 			pNew = sqlite3DbMallocRawNN(db, sizeof(Savepoint)+nName+1);
 			if (pNew) {
@@ -2993,11 +2980,6 @@ case OP_Savepoint: {
 			} else {
 				p->nDeferredCons = pSavepoint->nDeferredCons;
 				p->nDeferredImmCons = pSavepoint->nDeferredImmCons;
-			}
-
-			if (!isTransaction || p1==SAVEPOINT_ROLLBACK) {
-				rc = sqlite3VtabSavepoint(db, p1, iSavepoint);
-				if (rc!=SQLITE_OK) goto abort_due_to_error;
 			}
 		}
 	}
@@ -3142,11 +3124,7 @@ case OP_Transaction: {
 				p->nStatement++;
 				p->iStatement = p->nSavepoint + p->nStatement;
 			}
-
-			rc = sqlite3VtabSavepoint(db, SAVEPOINT_BEGIN, p->iStatement-1);
-			if (rc==SQLITE_OK) {
-				rc = sqlite3BtreeBeginStmt(pBt, p->iStatement, p->nSavepoint);
-			}
+			rc = sqlite3BtreeBeginStmt(pBt, p->iStatement, p->nSavepoint);
 
 			/* Store the current value of the database handles deferred constraint
 			 * counter. If the statement transaction needs to be rolled back,
@@ -3173,15 +3151,6 @@ case OP_Transaction: {
 		/* If the schema-cookie from the database file matches the cookie
 		 * stored with the in-memory representation of the schema, do
 		 * not reload the schema from the database file.
-		 *
-		 * If virtual-tables are in use, this is not just an optimization.
-		 * Often, v-tables store their data in other SQLite tables, which
-		 * are queried from within xNext() and other v-table methods using
-		 * prepared queries. If such a query is out-of-date, we do not want to
-		 * discard the database schema, as the user code implementing the
-		 * v-table would have to be ready for the sqlite3_vtab structure itself
-		 * to be invalidated whenever sqlite3_step() is called from within
-		 * a v-table method.
 		 */
 		if (db->mdb.pSchema->schema_cookie!=iMeta) {
 			sqlite3ResetOneSchema(db);
@@ -4154,7 +4123,6 @@ case OP_NotExists:          /* jump, in3 */
 case OP_Sequence: {           /* out2 */
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(p->apCsr[pOp->p1]!=0);
-	assert(p->apCsr[pOp->p1]->eCurType!=CURTYPE_VTAB);
 	pOut = out2Prerelease(p, pOp);
 	pOut->u.i = p->apCsr[pOp->p1]->seqCount++;
 	break;
@@ -4763,16 +4731,10 @@ case OP_RowData: {
  *
  * Store in register P2 an integer which is the key of the table entry that
  * P1 is currently point to.
- *
- * P1 can be either an ordinary table or a virtual table.  There used to
- * be a separate OP_VRowid opcode for use with virtual tables, but this
- * one opcode now works for both table types.
  */
 case OP_Rowid: {                 /* out2 */
 	VdbeCursor *pC;
 	i64 v;
-	sqlite3_vtab *pVtab;
-	const sqlite3_module *pModule;
 
 	pOut = out2Prerelease(p, pOp);
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
@@ -4784,16 +4746,6 @@ case OP_Rowid: {                 /* out2 */
 		break;
 	} else if (pC->deferredMoveto) {
 		v = pC->movetoTarget;
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	} else if (pC->eCurType==CURTYPE_VTAB) {
-		assert(pC->uc.pVCur!=0);
-		pVtab = pC->uc.pVCur->pVtab;
-		pModule = pVtab->pModule;
-		assert(pModule->xRowid);
-		rc = pModule->xRowid(pC->uc.pVCur, &v);
-		sqlite3VtabImportErrmsg(p, pVtab);
-		if (rc) goto abort_due_to_error;
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
 	} else {
 		assert(pC->eCurType==CURTYPE_BTREE);
 		assert(pC->uc.pCursor!=0);
@@ -5385,7 +5337,7 @@ case OP_Destroy: {     /* out2 */
 	assert(pOp->p1>1);
 	pOut = out2Prerelease(p, pOp);
 	pOut->flags = MEM_Null;
-	if (db->nVdbeRead > db->nVDestroy+1) {
+	if (db->nVdbeRead > 1) {
 		rc = SQLITE_LOCKED;
 		p->errorAction = OE_Abort;
 		goto abort_due_to_error;
@@ -6450,380 +6402,6 @@ case OP_TableLock: {
 	break;
 }
 #endif /* SQLITE_OMIT_SHARED_CACHE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VBegin * * * P4 *
- *
- * P4 may be a pointer to an sqlite3_vtab structure. If so, call the
- * xBegin method for that table.
- *
- * Also, whether or not P4 is set, check that this is not being called from
- * within a callback to a virtual table xSync() method. If it is, the error
- * code will be set to SQLITE_LOCKED.
- */
-case OP_VBegin: {
-	VTable *pVTab;
-	pVTab = pOp->p4.pVtab;
-	rc = sqlite3VtabBegin(db, p, pVTab);
-	if (pVTab) sqlite3VtabImportErrmsg(p, pVTab->pVtab);
-	if (rc) goto abort_due_to_error;
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VCreate P1 P2 * * *
- *
- * P2 is a register that holds the name of a virtual table in database
- * P1. Call the xCreate method for that table.
- */
-case OP_VCreate: {
-	Mem sMem;          /* For storing the record being decoded */
-	const char *zTab;  /* Name of the virtual table */
-
-	memset(&sMem, 0, sizeof(sMem));
-	sMem.db = db;
-	/* Because P2 is always a static string, it is impossible for the
-	 * sqlite3VdbeMemCopy() to fail
-	 */
-	assert((aMem[pOp->p2].flags & MEM_Str)!=0);
-	assert((aMem[pOp->p2].flags & MEM_Static)!=0);
-	rc = sqlite3VdbeMemCopy(&sMem, &aMem[pOp->p2]);
-	assert(rc==SQLITE_OK);
-	zTab = (const char*)sqlite3_value_text(&sMem);
-	assert(zTab || db->mallocFailed);
-	if (zTab) {
-		rc = sqlite3VtabCallCreate(db, pOp->p1, zTab, &p->zErrMsg);
-	}
-	sqlite3VdbeMemRelease(&sMem);
-	if (rc) goto abort_due_to_error;
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VDestroy P1 * * P4 *
- *
- * P4 is the name of a virtual table in database P1.  Call the xDestroy method
- * of that table.
- */
-case OP_VDestroy: {
-	db->nVDestroy++;
-	rc = sqlite3VtabCallDestroy(db, pOp->p4.z);
-	db->nVDestroy--;
-	if (rc) goto abort_due_to_error;
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VOpen P1 * * P4 *
- *
- * P4 is a pointer to a virtual table object, an sqlite3_vtab structure.
- * P1 is a cursor number.  This opcode opens a cursor to the virtual
- * table and stores that cursor in P1.
- */
-case OP_VOpen: {
-	VdbeCursor *pCur;
-	sqlite3_vtab_cursor *pVCur;
-	sqlite3_vtab *pVtab;
-	const sqlite3_module *pModule;
-
-	assert(p->bIsReader);
-	pCur = 0;
-	pVCur = 0;
-	pVtab = pOp->p4.pVtab->pVtab;
-	if (pVtab==0 || NEVER(pVtab->pModule==0)) {
-		rc = SQLITE_LOCKED;
-		goto abort_due_to_error;
-	}
-	pModule = pVtab->pModule;
-	rc = pModule->xOpen(pVtab, &pVCur);
-	sqlite3VtabImportErrmsg(p, pVtab);
-	if (rc) goto abort_due_to_error;
-
-	/* Initialize sqlite3_vtab_cursor base class */
-	pVCur->pVtab = pVtab;
-
-	/* Initialize vdbe cursor object */
-	pCur = allocateCursor(p, pOp->p1, 0, -1, CURTYPE_VTAB);
-	if (pCur) {
-		pCur->uc.pVCur = pVCur;
-		pVtab->nRef++;
-	} else {
-		assert(db->mallocFailed);
-		pModule->xClose(pVCur);
-		goto no_mem;
-	}
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VFilter P1 P2 P3 P4 *
- * Synopsis: iplan=r[P3] zplan='P4'
- *
- * P1 is a cursor opened using VOpen.  P2 is an address to jump to if
- * the filtered result set is empty.
- *
- * P4 is either NULL or a string that was generated by the xBestIndex
- * method of the module.  The interpretation of the P4 string is left
- * to the module implementation.
- *
- * This opcode invokes the xFilter method on the virtual table specified
- * by P1.  The integer query plan parameter to xFilter is stored in register
- * P3. Register P3+1 stores the argc parameter to be passed to the
- * xFilter method. Registers P3+2..P3+1+argc are the argc
- * additional parameters which are passed to
- * xFilter as argv. Register P3+2 becomes argv[0] when passed to xFilter.
- *
- * A jump is made to P2 if the result set after filtering would be empty.
- */
-case OP_VFilter: {   /* jump */
-	int nArg;
-	int iQuery;
-	const sqlite3_module *pModule;
-	Mem *pQuery;
-	Mem *pArgc;
-	sqlite3_vtab_cursor *pVCur;
-	sqlite3_vtab *pVtab;
-	VdbeCursor *pCur;
-	int res;
-	int i;
-	Mem **apArg;
-
-	pQuery = &aMem[pOp->p3];
-	pArgc = &pQuery[1];
-	pCur = p->apCsr[pOp->p1];
-	assert(memIsValid(pQuery));
-	REGISTER_TRACE(pOp->p3, pQuery);
-	assert(pCur->eCurType==CURTYPE_VTAB);
-	pVCur = pCur->uc.pVCur;
-	pVtab = pVCur->pVtab;
-	pModule = pVtab->pModule;
-
-	/* Grab the index number and argc parameters */
-	assert((pQuery->flags&MEM_Int)!=0 && pArgc->flags==MEM_Int);
-	nArg = (int)pArgc->u.i;
-	iQuery = (int)pQuery->u.i;
-
-	/* Invoke the xFilter method */
-	res = 0;
-	apArg = p->apArg;
-	for(i = 0; i<nArg; i++) {
-		apArg[i] = &pArgc[i+1];
-	}
-	rc = pModule->xFilter(pVCur, iQuery, pOp->p4.z, nArg, apArg);
-	sqlite3VtabImportErrmsg(p, pVtab);
-	if (rc) goto abort_due_to_error;
-	res = pModule->xEof(pVCur);
-	pCur->nullRow = 0;
-	VdbeBranchTaken(res!=0,2);
-	if (res) goto jump_to_p2;
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VColumn P1 P2 P3 * *
- * Synopsis: r[P3]=vcolumn(P2)
- *
- * Store the value of the P2-th column of
- * the row of the virtual-table that the
- * P1 cursor is pointing to into register P3.
- */
-case OP_VColumn: {
-	sqlite3_vtab *pVtab;
-	const sqlite3_module *pModule;
-	Mem *pDest;
-	sqlite3_context sContext;
-
-	VdbeCursor *pCur = p->apCsr[pOp->p1];
-	assert(pCur->eCurType==CURTYPE_VTAB);
-	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
-	pDest = &aMem[pOp->p3];
-	memAboutToChange(p, pDest);
-	if (pCur->nullRow) {
-		sqlite3VdbeMemSetNull(pDest);
-		break;
-	}
-	pVtab = pCur->uc.pVCur->pVtab;
-	pModule = pVtab->pModule;
-	assert(pModule->xColumn);
-	memset(&sContext, 0, sizeof(sContext));
-	sContext.pOut = pDest;
-	MemSetTypeFlag(pDest, MEM_Null);
-	rc = pModule->xColumn(pCur->uc.pVCur, &sContext, pOp->p2);
-	sqlite3VtabImportErrmsg(p, pVtab);
-	if (sContext.isError) {
-		rc = sContext.isError;
-	}
-	sqlite3VdbeChangeEncoding(pDest, encoding);
-	REGISTER_TRACE(pOp->p3, pDest);
-	UPDATE_MAX_BLOBSIZE(pDest);
-
-	if (sqlite3VdbeMemTooBig(pDest)) {
-		goto too_big;
-	}
-	if (rc) goto abort_due_to_error;
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VNext P1 P2 * * *
- *
- * Advance virtual table P1 to the next row in its result set and
- * jump to instruction P2.  Or, if the virtual table has reached
- * the end of its result set, then fall through to the next instruction.
- */
-case OP_VNext: {   /* jump */
-	sqlite3_vtab *pVtab;
-	const sqlite3_module *pModule;
-	int res;
-	VdbeCursor *pCur;
-
-	res = 0;
-	pCur = p->apCsr[pOp->p1];
-	assert(pCur->eCurType==CURTYPE_VTAB);
-	if (pCur->nullRow) {
-		break;
-	}
-	pVtab = pCur->uc.pVCur->pVtab;
-	pModule = pVtab->pModule;
-	assert(pModule->xNext);
-
-	/* Invoke the xNext() method of the module. There is no way for the
-	 * underlying implementation to return an error if one occurs during
-	 * xNext(). Instead, if an error occurs, true is returned (indicating that
-	 * data is available) and the error code returned when xColumn or
-	 * some other method is next invoked on the save virtual table cursor.
-	 */
-	rc = pModule->xNext(pCur->uc.pVCur);
-	sqlite3VtabImportErrmsg(p, pVtab);
-	if (rc) goto abort_due_to_error;
-	res = pModule->xEof(pCur->uc.pVCur);
-	VdbeBranchTaken(!res,2);
-	if (!res) {
-		/* If there is data, jump to P2 */
-		goto jump_to_p2_and_check_for_interrupt;
-	}
-	goto check_for_interrupt;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VRename P1 * * P4 *
- *
- * P4 is a pointer to a virtual table object, an sqlite3_vtab structure.
- * This opcode invokes the corresponding xRename method. The value
- * in register P1 is passed as the zName argument to the xRename method.
- */
-case OP_VRename: {
-	sqlite3_vtab *pVtab;
-	Mem *pName;
-
-	pVtab = pOp->p4.pVtab->pVtab;
-	pName = &aMem[pOp->p1];
-	assert(pVtab->pModule->xRename);
-	assert(memIsValid(pName));
-	assert(p->readOnly==0);
-	REGISTER_TRACE(pOp->p1, pName);
-	assert(pName->flags & MEM_Str);
-	testcase( pName->enc==SQLITE_UTF8);
-	testcase( pName->enc==SQLITE_UTF16BE);
-	testcase( pName->enc==SQLITE_UTF16LE);
-	rc = sqlite3VdbeChangeEncoding(pName, SQLITE_UTF8);
-	if (rc) goto abort_due_to_error;
-	rc = pVtab->pModule->xRename(pVtab, pName->z);
-	sqlite3VtabImportErrmsg(p, pVtab);
-	p->expired = 0;
-	if (rc) goto abort_due_to_error;
-	break;
-}
-#endif
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/* Opcode: VUpdate P1 P2 P3 P4 P5
- * Synopsis: data=r[P3@P2]
- *
- * P4 is a pointer to a virtual table object, an sqlite3_vtab structure.
- * This opcode invokes the corresponding xUpdate method. P2 values
- * are contiguous memory cells starting at P3 to pass to the xUpdate
- * invocation. The value in register (P3+P2-1) corresponds to the
- * p2th element of the argv array passed to xUpdate.
- *
- * The xUpdate method will do a DELETE or an INSERT or both.
- * The argv[0] element (which corresponds to memory cell P3)
- * is the rowid of a row to delete.  If argv[0] is NULL then no
- * deletion occurs.  The argv[1] element is the rowid of the new
- * row.  This can be NULL to have the virtual table select the new
- * rowid for itself.  The subsequent elements in the array are
- * the values of columns in the new row.
- *
- * If P2==1 then no insert is performed.  argv[0] is the rowid of
- * a row to delete.
- *
- * P1 is a boolean flag. If it is set to true and the xUpdate call
- * is successful, then the value returned by sqlite3_last_insert_rowid()
- * is set to the value of the rowid for the row just inserted.
- *
- * P5 is the error actions (OE_Replace, OE_Fail, OE_Ignore, etc) to
- * apply in the case of a constraint failure on an insert or update.
- */
-case OP_VUpdate: {
-	sqlite3_vtab *pVtab;
-	const sqlite3_module *pModule;
-	int nArg;
-	int i;
-	sqlite_int64 rowid;
-	Mem **apArg;
-	Mem *pX;
-
-	assert(pOp->p2==1        || pOp->p5==OE_Fail   || pOp->p5==OE_Rollback
-	       || pOp->p5==OE_Abort || pOp->p5==OE_Ignore || pOp->p5==OE_Replace
-		);
-	assert(p->readOnly==0);
-	pVtab = pOp->p4.pVtab->pVtab;
-	if (pVtab==0 || NEVER(pVtab->pModule==0)) {
-		rc = SQLITE_LOCKED;
-		goto abort_due_to_error;
-	}
-	pModule = pVtab->pModule;
-	nArg = pOp->p2;
-	assert(pOp->p4type==P4_VTAB);
-	if (ALWAYS(pModule->xUpdate)) {
-		u8 vtabOnConflict = db->vtabOnConflict;
-		apArg = p->apArg;
-		pX = &aMem[pOp->p3];
-		for(i=0; i<nArg; i++) {
-			assert(memIsValid(pX));
-			memAboutToChange(p, pX);
-			apArg[i] = pX;
-			pX++;
-		}
-		db->vtabOnConflict = pOp->p5;
-		rc = pModule->xUpdate(pVtab, nArg, apArg, &rowid);
-		db->vtabOnConflict = vtabOnConflict;
-		sqlite3VtabImportErrmsg(p, pVtab);
-		if (rc==SQLITE_OK && pOp->p1) {
-			assert(nArg>1 && apArg[0] && (apArg[0]->flags&MEM_Null));
-			db->lastRowid = lastRowid = rowid;
-		}
-		if ((rc&0xff)==SQLITE_CONSTRAINT && pOp->p4.pVtab->bConstraint) {
-			if (pOp->p5==OE_Ignore) {
-				rc = SQLITE_OK;
-			} else {
-				p->errorAction = ((pOp->p5==OE_Replace) ? OE_Abort : pOp->p5);
-			}
-		} else {
-			p->nChange++;
-		}
-		if (rc) goto abort_due_to_error;
-	}
-	break;
-}
-#endif /* SQLITE_OMIT_VIRTUALTABLE */
 
 #ifndef  SQLITE_OMIT_PAGER_PRAGMAS
 /* Opcode: Pagecount P1 P2 * * *

@@ -76,19 +76,13 @@ sqlite3SrcListLookup(Parse * pParse, SrcList * pSrc)
 int
 sqlite3IsReadOnly(Parse * pParse, Table * pTab, int viewOk)
 {
-	/* A table is not writable under the following circumstances:
-	 *
-	 *   1) It is a virtual table and no implementation of the xUpdate method
-	 *      has been provided, or
-	 *   2) It is a system table (i.e. sqlite_master), this call is not
-	 *      part of a nested parse.
-	 * In either case leave an error message in pParse and return non-zero.
+	/*
+	 * A table is not writable if it is a system table
+	 * (i.e. sqlite_master), this call is not part of a
+	 * nested parse. In either case leave an error message in
+	 * pParse and return non-zero.
 	 */
-	if (((IsVirtual(pTab)
-	      && sqlite3GetVTable(pParse->db,
-				  pTab)->pMod->pModule->xUpdate == 0))
-	    || ((pTab->tabFlags & TF_Readonly) != 0 && pParse->nested == 0)
-	    ) {
+	if ((pTab->tabFlags & TF_Readonly) != 0 && pParse->nested == 0) {
 		sqlite3ErrorMsg(pParse, "table %s may not be modified",
 				pTab->zName);
 		return 1;
@@ -386,7 +380,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	 * this optimization caused the row change count (the value returned by
 	 * API function sqlite3_count_changes) to be set incorrectly.
 	 */
-	if (rcauth == SQLITE_OK && pWhere == 0 && !bComplex && !IsVirtual(pTab)
+	if (rcauth == SQLITE_OK && pWhere == 0 && !bComplex
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
 	    && db->xPreUpdateCallback == 0
 #endif
@@ -451,9 +445,9 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		if (pWInfo == 0)
 			goto delete_from_cleanup;
 		eOnePass = sqlite3WhereOkOnePass(pWInfo, aiCurOnePass);
-		assert(IsVirtual(pTab) == 0 || eOnePass != ONEPASS_MULTI);
+		assert(eOnePass != ONEPASS_MULTI);
 		/* Tarantool workaround: see comment in sqlite3WhereBegin.  */
-		/* assert( IsVirtual(pTab) || bComplex || eOnePass!=ONEPASS_OFF ); */
+		/* assert( bComplex || eOnePass!=ONEPASS_OFF ); */
 
 		/* Keep track of the number of rows to be deleted */
 		if (user_session->sql_flags & SQLITE_CountRows) {
@@ -538,14 +532,12 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 				iAddrOnce = sqlite3VdbeAddOp0(v, OP_Once);
 				VdbeCoverage(v);
 			}
-			testcase(IsVirtual(pTab));
 			sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite,
 						   OPFLAG_FORDELETE, iTabCur,
 						   aToOpen, &iDataCur,
 						   &iIdxCur);
-			assert(pPk || IsVirtual(pTab) || iDataCur == iTabCur);
-			assert(pPk || IsVirtual(pTab)
-			       || iIdxCur == iDataCur + 1);
+			assert(pPk || iDataCur == iTabCur);
+			assert(pPk || iIdxCur == iDataCur + 1);
 			if (eOnePass == ONEPASS_MULTI)
 				sqlite3VdbeJumpHere(v, iAddrOnce);
 		}
@@ -555,7 +547,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		 */
 		if (eOnePass != ONEPASS_OFF) {
 			assert(nKey == nPk);	/* OP_Found will use an unpacked key */
-			if (!IsVirtual(pTab) && aToOpen[iDataCur - iTabCur]) {
+			if (aToOpen[iDataCur - iTabCur]) {
 				assert(pPk != 0 || pTab->pSelect != 0);
 				sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur,
 						     addrBypass, iKey, nKey);
@@ -575,23 +567,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		}
 
 		/* Delete the row */
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-		if (IsVirtual(pTab)) {
-			const char *pVTab =
-			    (const char *)sqlite3GetVTable(db, pTab);
-			sqlite3VtabMakeWritable(pParse, pTab);
-			sqlite3VdbeAddOp4(v, OP_VUpdate, 0, 1, iKey, pVTab,
-					  P4_VTAB);
-			sqlite3VdbeChangeP5(v, OE_Abort);
-			assert(eOnePass == ONEPASS_OFF
-			       || eOnePass == ONEPASS_SINGLE);
-			sqlite3MayAbort(pParse);
-			if (eOnePass == ONEPASS_SINGLE
-			    && sqlite3IsToplevel(pParse)) {
-				pParse->isMultiWrite = 0;
-			}
-		} else
-#endif
 		{
 			int count = (pParse->nested == 0);	/* True to count changes */
 			int iIdxNoSeek = -1;

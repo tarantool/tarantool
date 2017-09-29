@@ -1585,27 +1585,6 @@ sqlite3LogEst(u64 x)
 	return a[x & 7] + y - 10;
 }
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/*
- * Convert a double into a LogEst
- * In other words, compute an approximation for 10*log2(x).
- */
-LogEst
-sqlite3LogEstFromDouble(double x)
-{
-	u64 a;
-	LogEst e;
-	assert(sizeof(x) == 8 && sizeof(a) == 8);
-	if (x <= 1)
-		return 0;
-	if (x <= 2000000000)
-		return sqlite3LogEst((u64) x);
-	memcpy(&a, &x, 8);
-	e = (a >> 52) - 1022;
-	return e * 10;
-}
-#endif				/* SQLITE_OMIT_VIRTUALTABLE */
-
 #if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || \
     defined(SQLITE_ENABLE_STAT3_OR_STAT4) || \
     defined(SQLITE_EXPLAIN_ESTIMATED_ROWS)

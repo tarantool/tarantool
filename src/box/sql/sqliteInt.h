@@ -1019,7 +1019,6 @@ typedef struct KeyClass KeyClass;
 typedef struct KeyInfo KeyInfo;
 typedef struct Lookaside Lookaside;
 typedef struct LookasideSlot LookasideSlot;
-typedef struct Module Module;
 typedef struct NameContext NameContext;
 typedef struct Parse Parse;
 typedef struct PreUpdate PreUpdate;
@@ -1039,8 +1038,6 @@ typedef struct Trigger Trigger;
 typedef struct TriggerPrg TriggerPrg;
 typedef struct TriggerStep TriggerStep;
 typedef struct UnpackedRecord UnpackedRecord;
-typedef struct VTable VTable;
-typedef struct VtabCtx VtabCtx;
 typedef struct Walker Walker;
 typedef struct WhereInfo WhereInfo;
 typedef struct With With;
@@ -1286,7 +1283,6 @@ struct sqlite3 {
 	u8 bBenignMalloc;	/* Do not require OOMs if true */
 	u8 dfltLockMode;	/* Default locking-mode for attached dbs */
 	u8 suppressErr;		/* Do not issue error messages if true */
-	u8 vtabOnConflict;	/* Value to return for s3_vtab_on_conflict() */
 	u8 mTrace;		/* zero or more SQLITE_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
 	int nChange;		/* Value returned by sqlite3_changes() */
@@ -1304,9 +1300,6 @@ struct sqlite3 {
 	int nVdbeRead;		/* Number of active VDBEs that read or write */
 	int nVdbeWrite;		/* Number of active VDBEs that read and write */
 	int nVdbeExec;		/* Number of nested calls to VdbeExec() */
-	int nVDestroy;		/* Number of active OP_VDestroy operations */
-	int nExtension;		/* Number of loaded extensions */
-	void **aExtension;	/* Array of shared library handles */
 	int (*xTrace) (u32, void *, void *, void *);	/* Trace function */
 	void *pTraceArg;	/* Argument to the trace function */
 	void (*xProfile) (void *, const char *, u64);	/* Profiling function */
@@ -1343,13 +1336,6 @@ struct sqlite3 {
 	int (*xProgress) (void *);	/* The progress callback */
 	void *pProgressArg;	/* Argument to the progress callback */
 	unsigned nProgressOps;	/* Number of opcodes for progress callback */
-#endif
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	int nVTrans;		/* Allocated size of aVTrans */
-	Hash aModule;		/* populated by sqlite3_create_module() */
-	VtabCtx *pVtabCtx;	/* Context for active vtab connect/create */
-	VTable **aVTrans;	/* Virtual tables with open transactions */
-	VTable *pDisconnect;	/* Disconnect these in next sqlite3_prepare() */
 #endif
 	Hash aFunc;		/* Hash table of connection functions */
 	Hash aCollSeq;		/* All collating sequences */
@@ -1610,19 +1596,6 @@ struct Savepoint {
 #define SAVEPOINT_ROLLBACK   2
 
 /*
- * Each SQLite module (virtual table definition) is defined by an
- * instance of the following structure, stored in the sqlite3.aModule
- * hash table.
- */
-struct Module {
-	const sqlite3_module *pModule;	/* Callback pointers */
-	const char *zName;	/* Name passed to create_module() */
-	void *pAux;		/* pAux passed to create_module() */
-	void (*xDestroy) (void *);	/* Module destructor function */
-	Table *pEpoTab;		/* Eponymous table for this module */
-};
-
-/*
  * information about each column of an SQL table is held in an instance
  * of this structure.
  */
@@ -1639,7 +1612,7 @@ struct Column {
 /* Allowed values for Column.colFlags:
  */
 #define COLFLAG_PRIMKEY  0x0001	/* Column is part of the primary key */
-#define COLFLAG_HIDDEN   0x0002	/* A hidden column in a virtual table */
+#define COLFLAG_HIDDEN   0x0002	/* A hidden column. */
 #define COLFLAG_HASTYPE  0x0004	/* Type name follows column name */
 
 /*
@@ -1710,58 +1683,6 @@ struct CollSeq {
 #define SQLITE_NOTNULL      0x90	/* Assert that operands are never NULL */
 
 /*
- * An object of this type is created for each virtual table present in
- * the database schema.
- *
- * If the database schema is shared, then there is one instance of this
- * structure for each database connection (sqlite3*) that uses the shared
- * schema. This is because each database connection requires its own unique
- * instance of the sqlite3_vtab* handle used to access the virtual table
- * implementation. sqlite3_vtab* handles can not be shared between
- * database connections, even when the rest of the in-memory database
- * schema is shared, as the implementation often stores the database
- * connection handle passed to it via the xConnect() or xCreate() method
- * during initialization internally. This database connection handle may
- * then be used by the virtual table implementation to access real tables
- * within the database. So that they appear as part of the callers
- * transaction, these accesses need to be made via the same database
- * connection as that used to execute SQL operations on the virtual table.
- *
- * All VTable objects that correspond to a single table in a shared
- * database schema are initially stored in a linked-list pointed to by
- * the Table.pVTable member variable of the corresponding Table object.
- * When an sqlite3_prepare() operation is required to access the virtual
- * table, it searches the list for the VTable that corresponds to the
- * database connection doing the preparing so as to use the correct
- * sqlite3_vtab* handle in the compiled query.
- *
- * When an in-memory Table object is deleted (for example when the
- * schema is being reloaded for some reason), the VTable objects are not
- * deleted and the sqlite3_vtab* handles are not xDisconnect()ed
- * immediately. Instead, they are moved from the Table.pVTable list to
- * another linked list headed by the sqlite3.pDisconnect member of the
- * corresponding sqlite3 structure. They are then deleted/xDisconnected
- * next time a statement is prepared using said sqlite3*. This is done
- * to avoid deadlock issues involving multiple sqlite3.mutex mutexes.
- * Refer to comments above function sqlite3VtabUnlockList() for an
- * explanation as to why it is safe to add an entry to an sqlite3.pDisconnect
- * list without holding the corresponding sqlite3.mutex mutex.
- *
- * The memory for objects of this type is always allocated by
- * sqlite3DbMalloc(), using the connection handle stored in VTable.db as
- * the first argument.
- */
-struct VTable {
-	sqlite3 *db;		/* Database connection associated with this table */
-	Module *pMod;		/* Pointer to module implementation */
-	sqlite3_vtab *pVtab;	/* Pointer to vtab instance */
-	int nRef;		/* Number of pointers to this structure */
-	u8 bConstraint;		/* True if constraints are supported */
-	int iSavepoint;		/* Depth of the SAVEPOINT stack */
-	VTable *pNext;		/* Next in linked list (see above) */
-};
-
-/*
  * The schema for each SQL table and view is represented in memory
  * by an instance of the following structure.
  */
@@ -1791,11 +1712,6 @@ struct Table {
 #ifndef SQLITE_OMIT_ALTERTABLE
 	int addColOffset;	/* Offset in CREATE TABLE stmt to add a new column */
 #endif
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	int nModuleArg;		/* Number of arguments to the module */
-	char **azModuleArg;	/* 0: module 1: schema 2: vtab name 3...: args */
-	VTable *pVTable;	/* List of VTable objects. */
-#endif
 	Trigger *pTrigger;	/* List of triggers stored in pSchema */
 	Schema *pSchema;	/* Schema that contains this table */
 	Table *pNextZombie;	/* Next on the Parse.pZombieTab list */
@@ -1805,43 +1721,26 @@ struct Table {
  * Allowed values for Table.tabFlags.
  *
  * TF_OOOHidden applies to tables or view that have hidden columns that are
- * followed by non-hidden columns.  Example:  "CREATE VIRTUAL TABLE x USING
- * vtab1(a HIDDEN, b);".  Since "b" is a non-hidden column but "a" is hidden,
- * the TF_OOOHidden attribute would apply in this case.  Such tables require
- * special handling during INSERT processing.
+ * followed by non-hidden columns.Such tables require special
+ * handling during INSERT processing.
  */
 #define TF_Readonly        0x01	/* Read-only system table */
 #define TF_Ephemeral       0x02	/* An ephemeral table */
 #define TF_HasPrimaryKey   0x04	/* Table has a primary key */
 #define TF_Autoincrement   0x08	/* Integer primary key is autoincrement */
-#define TF_Virtual         0x10	/* Is a virtual table */
 #define TF_WithoutRowid    0x20	/* No rowid.  PRIMARY KEY is the key */
 #define TF_NoVisibleRowid  0x40	/* No user-visible "rowid" column */
 #define TF_OOOHidden       0x80	/* Out-of-Order hidden columns */
 
 /*
- * Test to see whether or not a table is a virtual table.  This is
- * done as a macro so that it will be optimized out when virtual
- * table support is omitted from the build.
- */
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-#define IsVirtual(X)      (((X)->tabFlags & TF_Virtual)!=0)
-#else
-#define IsVirtual(X)      0
-#endif
-
-/*
- * Macros to determine if a column is hidden.  IsOrdinaryHiddenColumn()
- * only works for non-virtual tables (ordinary tables and views) and is
- * always false unless SQLITE_ENABLE_HIDDEN_COLUMNS is defined.  The
- * IsHiddenColumn() macro is general purpose.
+ * Macros to determine if a column is hidden.
+ * IsOrdinaryHiddenColumn() is always false unless
+ * SQLITE_ENABLE_HIDDEN_COLUMNS is defined. The IsHiddenColumn()
+ * macro is general purpose.
  */
 #if defined(SQLITE_ENABLE_HIDDEN_COLUMNS)
 #define IsHiddenColumn(X)         (((X)->colFlags & COLFLAG_HIDDEN)!=0)
 #define IsOrdinaryHiddenColumn(X) (((X)->colFlags & COLFLAG_HIDDEN)!=0)
-#elif !defined(SQLITE_OMIT_VIRTUALTABLE)
-#define IsHiddenColumn(X)         (((X)->colFlags & COLFLAG_HIDDEN)!=0)
-#define IsOrdinaryHiddenColumn(X) 0
 #else
 #define IsHiddenColumn(X)         0
 #define IsOrdinaryHiddenColumn(X) 0
@@ -2920,10 +2819,6 @@ struct Parse {
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
 	u8 iPkSortOrder;	/* ASC or DESC for INTEGER PRIMARY KEY */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	u8 declareVtab;		/* True if inside sqlite3_declare_vtab() */
-	int nVtabLock;		/* Number of virtual tables to lock */
-#endif
 	int nHeight;		/* Expression tree height of current sub-select */
 #ifndef SQLITE_OMIT_EXPLAIN
 	int iSelectId;		/* ID of current select for EXPLAIN output */
@@ -2935,10 +2830,6 @@ struct Parse {
 	Table *pNewTable;	/* A table being constructed by CREATE TABLE */
 	Trigger *pNewTrigger;	/* Trigger under construct by a CREATE TRIGGER */
 	const char *zAuthContext;	/* The 6th parameter to db->xAuth callbacks */
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	Token sArg;		/* Complete text of a module argument */
-	Table **apVtabLock;	/* Pointer to virtual tables needing locking */
-#endif
 	Table *pZombieTab;	/* List of Table objects to delete after code gen */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
@@ -2954,15 +2845,6 @@ struct Parse {
 #define PARSE_RECURSE_SZ offsetof(Parse,sLastToken)	/* Recursive part */
 #define PARSE_TAIL_SZ (sizeof(Parse)-PARSE_RECURSE_SZ)	/* Non-recursive part */
 #define PARSE_TAIL(X) (((char*)(X))+PARSE_RECURSE_SZ)	/* Pointer to tail */
-
-/*
- * Return true if currently inside an sqlite3_declare_vtab() call.
- */
-#ifdef SQLITE_OMIT_VIRTUALTABLE
-#define IN_DECLARE_VTAB 0
-#else
-#define IN_DECLARE_VTAB (pParse->declareVtab)
-#endif
 
 /*
  * An instance of the following structure can be declared on a stack and used
@@ -3329,14 +3211,6 @@ int sqlite3IoerrnomemError(int);
 #endif
 
 /*
- * FTS3 and FTS4 both require virtual table support
- */
-#if defined(SQLITE_OMIT_VIRTUALTABLE)
-#undef SQLITE_ENABLE_FTS3
-#undef SQLITE_ENABLE_FTS4
-#endif
-
-/*
  * FTS4 is really an extension for FTS3.  It is enabled using the
  * SQLITE_ENABLE_FTS3 macro.  But to avoid confusion we also call
  * the SQLITE_ENABLE_FTS4 macro to serve as an alias for SQLITE_ENABLE_FTS3.
@@ -3533,9 +3407,6 @@ u32 sqlite3ExprListFlags(const ExprList *);
 int sqlite3Init(sqlite3 *, char **);
 int sqlite3InitCallback(void *, int, char **, char **);
 void sqlite3Pragma(Parse *, Token *, Token *, Token *, Token *, int);
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-Module *sqlite3PragmaVtabRegister(sqlite3 *, const char *zName);
-#endif
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
 void sqlite3ResetOneSchema(sqlite3 *);
 void sqlite3CommitInternalChanges();
@@ -3546,7 +3417,7 @@ Table *sqlite3ResultSetOfSelect(Parse *, Select *);
 void sqlite3OpenMasterTable(Parse *);
 Index *sqlite3PrimaryKeyIndex(Table *);
 i16 sqlite3ColumnOfIndex(Index *, i16);
-void sqlite3StartTable(Parse *, Token *, int, int, int, int);
+void sqlite3StartTable(Parse *, Token *, int, int, int);
 #if SQLITE_ENABLE_HIDDEN_COLUMNS
 void sqlite3ColumnPropertiesFromName(Table *, Column *);
 #else
@@ -3588,7 +3459,7 @@ int sqlite3RowSetNext(RowSet *, i64 *);
 
 void sqlite3CreateView(Parse *, Token *, Token *, ExprList *, Select *, int);
 
-#if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_VIRTUALTABLE)
+#if !defined(SQLITE_OMIT_VIEW)
 int sqlite3ViewGetColumnNames(Parse *, Table *);
 #else
 #define sqlite3ViewGetColumnNames(A,B) 0
@@ -3827,9 +3698,6 @@ int sqlite3Utf8CharLen(const char *pData, int nByte);
 u32 sqlite3Utf8Read(const u8 **);
 LogEst sqlite3LogEst(u64);
 LogEst sqlite3LogEstAdd(LogEst, LogEst);
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-LogEst sqlite3LogEstFromDouble(double);
-#endif
 #if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || \
     defined(SQLITE_ENABLE_STAT3_OR_STAT4) || \
     defined(SQLITE_EXPLAIN_ESTIMATED_ROWS)
@@ -4019,47 +3887,6 @@ void sqlite3TableLock(Parse *, int, u8, const char *);
 int sqlite3Utf8To8(unsigned char *);
 #endif
 
-#ifdef SQLITE_OMIT_VIRTUALTABLE
-#define sqlite3VtabClear(Y)
-#define sqlite3VtabSync(X,Y) SQLITE_OK
-#define sqlite3VtabRollback(X)
-#define sqlite3VtabCommit(X)
-#define sqlite3VtabInSync(db) 0
-#define sqlite3VtabLock(X)
-#define sqlite3VtabUnlock(X)
-#define sqlite3VtabUnlockList(X)
-#define sqlite3VtabSavepoint(X, Y, Z) SQLITE_OK
-#define sqlite3GetVTable(X,Y)  ((VTable*)0)
-#else
-void sqlite3VtabClear(sqlite3 * db, Table *);
-void sqlite3VtabDisconnect(sqlite3 * db, Table * p);
-int sqlite3VtabSync(sqlite3 * db, Vdbe *);
-int sqlite3VtabRollback(sqlite3 * db);
-int sqlite3VtabCommit(sqlite3 * db);
-void sqlite3VtabLock(VTable *);
-void sqlite3VtabUnlock(VTable *);
-void sqlite3VtabUnlockList(sqlite3 *);
-int sqlite3VtabSavepoint(sqlite3 *, int, int);
-void sqlite3VtabImportErrmsg(Vdbe *, sqlite3_vtab *);
-VTable *sqlite3GetVTable(sqlite3 *, Table *);
-Module *sqlite3VtabCreateModule(sqlite3 *,
-				const char *,
-				const sqlite3_module *, void *, void (*)(void *)
-    );
-#define sqlite3VtabInSync(db) ((db)->nVTrans>0 && (db)->aVTrans==0)
-#endif
-int sqlite3VtabEponymousTableInit(Parse *, Module *);
-void sqlite3VtabEponymousTableClear(sqlite3 *, Module *);
-void sqlite3VtabMakeWritable(Parse *, Table *);
-void sqlite3VtabBeginParse(Parse *, Token *, Token *, Token *, int);
-void sqlite3VtabFinishParse(Parse *, Token *);
-void sqlite3VtabArgInit(Parse *);
-void sqlite3VtabArgExtend(Parse *, Token *);
-int sqlite3VtabCallCreate(sqlite3 *, int, const char *, char **);
-int sqlite3VtabCallConnect(Parse *, Table *);
-int sqlite3VtabCallDestroy(sqlite3 *, const char *);
-int sqlite3VtabBegin(sqlite3 *, Vdbe *, VTable *);
-FuncDef *sqlite3VtabOverloadFunction(sqlite3 *, FuncDef *, int nArg, Expr *);
 void sqlite3InvalidFunction(sqlite3_context *, int, sqlite3_value **);
 sqlite3_int64 sqlite3StmtCurrentTime(sqlite3_context *);
 int sqlite3VdbeParameterIndex(Vdbe *, const char *, int);
@@ -4241,10 +4068,6 @@ int sqlite3MemdebugNoType(void *, u8);
 #if SQLITE_MAX_WORKER_THREADS>0
 int sqlite3ThreadCreate(SQLiteThread **, void *(*)(void *), void *);
 int sqlite3ThreadJoin(SQLiteThread *, void **);
-#endif
-
-#if defined(SQLITE_ENABLE_DBSTAT_VTAB) || defined(SQLITE_TEST)
-int sqlite3DbstatRegister(sqlite3 *);
 #endif
 
 int sqlite3ExprVectorSize(Expr * pExpr);

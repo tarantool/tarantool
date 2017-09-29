@@ -231,17 +231,6 @@ sqlite3FinishCoding(Parse * pParse)
 					     pParse->mayAbort
 					     && pParse->isMultiWrite));
 			}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-			for (i = 0; i < pParse->nVtabLock; i++) {
-				char *vtab =
-				    (char *)sqlite3GetVTable(db,
-							     pParse->
-							     apVtabLock[i]);
-				sqlite3VdbeAddOp4(v, OP_VBegin, 0, 0, 0, vtab,
-						  P4_VTAB);
-			}
-			pParse->nVtabLock = 0;
-#endif
 
 			/* Once all the cookies have been verified and transactions opened,
 			 * obtain the required table-locks. This is a no-op unless the
@@ -397,20 +386,6 @@ sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
 	if (p == 0) {
 		const char *zMsg =
 		    flags & LOCATE_VIEW ? "no such view" : "no such table";
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-		/* If zName is the not the name of a table in the schema created using
-		 * CREATE, then check to see if it is the name of an virtual table that
-		 * can be an eponymous virtual table.
-		 */
-		Module *pMod =
-		    (Module *) sqlite3HashFind(&pParse->db->aModule, zName);
-		if (pMod == 0 && sqlite3_strnicmp(zName, "pragma_", 7) == 0) {
-			pMod = sqlite3PragmaVtabRegister(pParse->db, zName);
-		}
-		if (pMod && sqlite3VtabEponymousTableInit(pParse, pMod)) {
-			return pMod->pEpoTab;
-		}
-#endif
 		if ((flags & LOCATE_NOERR) == 0) {
 			sqlite3ErrorMsg(pParse, "%s: %s", zMsg, zName);
 			pParse->checkSchema = 1;
@@ -559,7 +534,6 @@ sqlite3ResetAllSchemasOfConnection(sqlite3 * db)
 		sqlite3SchemaClear(pDb->pSchema);
 	}
 	user_session->sql_flags &= ~SQLITE_InternChanges;
-	sqlite3VtabUnlockList(db);
 	sqlite3BtreeLeaveAll(db);
 }
 
@@ -627,10 +601,8 @@ deleteTable(sqlite3 * db, Table * pTable)
 	/* Delete all indices associated with this table. */
 	for (pIndex = pTable->pIndex; pIndex; pIndex = pNext) {
 		pNext = pIndex->pNext;
-		assert(pIndex->pSchema == pTable->pSchema
-		       || (IsVirtual(pTable)
-			   && pIndex->idxType != SQLITE_IDXTYPE_APPDEF));
-		if ((db == 0 || db->pnBytesFreed == 0) && !IsVirtual(pTable)) {
+		assert(pIndex->pSchema == pTable->pSchema);
+		if ((db == 0 || db->pnBytesFreed == 0)) {
 			char *zName = pIndex->zName;
 			TESTONLY(Index *
 				 pOld =) sqlite3HashInsert(&pTable->idxHash,
@@ -653,9 +625,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 	sqlite3DbFree(db, pTable->zColAff);
 	sqlite3SelectDelete(db, pTable->pSelect);
 	sqlite3ExprListDelete(db, pTable->pCheck);
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	sqlite3VtabClear(db, pTable);
-#endif
 	sqlite3DbFree(db, pTable);
 
 	/* Verify that no lookaside memory was used by schema tables */
@@ -872,7 +841,6 @@ sqlite3StartTable(Parse * pParse,	/* Parser context */
 		  Token * pName1,	/* First part of the name of the table or view */
 		  int isTemp,	/* True if this is a TEMP table */
 		  int isView,	/* True if this is a VIEW */
-		  int isVirtual,	/* True if this is a VIRTUAL table */
 		  int noErr	/* Do nothing if table already exists */
     )
 {
@@ -925,37 +893,31 @@ sqlite3StartTable(Parse * pParse,	/* Parser context */
 		    (pParse, SQLITE_INSERT, MASTER_NAME, 0, zDb)) {
 			goto begin_table_error;
 		}
-		if (!isVirtual
-		    && sqlite3AuthCheck(pParse, (int)aCode[isTemp + 2 * isView],
-					zName, 0, zDb)) {
+		if (sqlite3AuthCheck(pParse, (int)aCode[isTemp + 2 * isView],
+				     zName, 0, zDb)) {
 			goto begin_table_error;
 		}
 	}
 #endif
 
-	/* Make sure the new table name does not collide with an existing
-	 * index or table name in the same database.  Issue an error message if
-	 * it does. The exception is if the statement being parsed was passed
-	 * to an sqlite3_declare_vtab() call. In that case only the column names
-	 * and types will be used, so there is no need to test for namespace
-	 * collisions.
+	/*
+	 * Make sure the new table name does not collide with an
+	 * existing index or table name in the same database.
+	 * Issue an error message if it does.
 	 */
-	if (!IN_DECLARE_VTAB) {
-		if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-			goto begin_table_error;
+	if (SQLITE_OK != sqlite3ReadSchema(pParse))
+		goto begin_table_error;
+	pTable = sqlite3FindTable(db, zName);
+	if (pTable) {
+		if (!noErr) {
+			sqlite3ErrorMsg(pParse,
+					"table %T already exists",
+					pName);
+		} else {
+			assert(!db->init.busy || CORRUPT_DB);
+			sqlite3CodeVerifySchema(pParse);
 		}
-		pTable = sqlite3FindTable(db, zName);
-		if (pTable) {
-			if (!noErr) {
-				sqlite3ErrorMsg(pParse,
-						"table %T already exists",
-						pName);
-			} else {
-				assert(!db->init.busy || CORRUPT_DB);
-				sqlite3CodeVerifySchema(pParse);
-			}
-			goto begin_table_error;
-		}
+		goto begin_table_error;
 	}
 
 	pTable = sqlite3DbMallocZero(db, sizeof(Table));
@@ -994,15 +956,8 @@ sqlite3StartTable(Parse * pParse,	/* Parser context */
 	 * indices.  Hence, the record number for the table must be allocated
 	 * now.
 	 */
-	if (!db->init.busy && (v = sqlite3GetVdbe(pParse)) != 0) {
+	if (!db->init.busy && (v = sqlite3GetVdbe(pParse)) != 0)
 		sqlite3BeginWriteOperation(pParse, 1);
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-		if (isVirtual) {
-			sqlite3VdbeAddOp0(v, OP_VBegin);
-		}
-#endif
-	}
 
 	/* Normal (non-error) return. */
 	return;
@@ -1389,7 +1344,7 @@ sqlite3AddCheckConstraint(Parse * pParse,	/* Parsing context */
 #ifndef SQLITE_OMIT_CHECK
 	Table *pTab = pParse->pNewTable;
 	sqlite3 *db = pParse->db;
-	if (pTab && !IN_DECLARE_VTAB && !sqlite3BtreeIsReadonly(db->mdb.pBt)
+	if (pTab && !sqlite3BtreeIsReadonly(db->mdb.pBt)
 	    ) {
 		pTab->pCheck =
 		    sqlite3ExprListAppend(pParse, pTab->pCheck, pCheckExpr);
@@ -1704,8 +1659,6 @@ hasColumn(const i16 * aiCol, int nCol, int x)
  *          sorting or lookup or uniqueness checks.
  *     (6)  Replace the rowid tail on all automatically generated UNIQUE
  *          indices with the PRIMARY KEY columns.
- *
- * For virtual tables, only (1) is performed.
  */
 static void
 convertToWithoutRowidTable(Parse * pParse, Table * pTab)
@@ -1723,12 +1676,6 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 			}
 		}
 	}
-
-	/* The remaining transformations only apply to b-tree tables, not to
-	 * virtual tables
-	 */
-	if (IN_DECLARE_VTAB)
-		return;
 
 	/* Locate the PRIMARY KEY index.  Or, if this table was originally
 	 * an INTEGER PRIMARY KEY table, create a new PRIMARY KEY index.
@@ -2348,7 +2295,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 		sqlite3ErrorMsg(pParse, "parameters are not allowed in views");
 		goto create_view_fail;
 	}
-	sqlite3StartTable(pParse, pName1, 0, 1, 0, noErr);
+	sqlite3StartTable(pParse, pName1, 0, 1, noErr);
 	p = pParse->pNewTable;
 	if (p == 0 || pParse->nErr)
 		goto create_view_fail;
@@ -2396,7 +2343,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 }
 #endif				/* SQLITE_OMIT_VIEW */
 
-#if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_VIRTUALTABLE)
+#if !defined(SQLITE_OMIT_VIEW)
 /*
  * The Table structure pTable is really a VIEW.  Fill in the names of
  * the columns of the view in the pTable structure.  Return the number
@@ -2415,14 +2362,6 @@ sqlite3ViewGetColumnNames(Parse * pParse, Table * pTable)
 #endif
 
 	assert(pTable);
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (sqlite3VtabCallConnect(pParse, pTable)) {
-		return SQLITE_ERROR;
-	}
-	if (IsVirtual(pTable))
-		return 0;
-#endif
 
 #ifndef SQLITE_OMIT_VIEW
 	/* A positive nCol means the columns names for this view are
@@ -2516,7 +2455,7 @@ sqlite3ViewGetColumnNames(Parse * pParse, Table * pTable)
 #endif				/* SQLITE_OMIT_VIEW */
 	return nErr;
 }
-#endif				/* !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_VIRTUALTABLE) */
+#endif				/* !defined(SQLITE_OMIT_VIEW) */
 
 #ifndef SQLITE_OMIT_VIEW
 /*
@@ -2580,12 +2519,6 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	assert(v != 0);
 	sqlite3BeginWriteOperation(pParse, 1);
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (IsVirtual(pTab)) {
-		sqlite3VdbeAddOp0(v, OP_VBegin);
-	}
-#endif
-
 	/* Drop all triggers associated with the table being dropped. Code
 	 * is generated to remove entries from sqlite_master and/or
 	 * sqlite_temp_master if required.
@@ -2622,7 +2555,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	 * database.
 	 */
 	int space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
-	if (!isView && !IsVirtual(pTab)) {
+	if (!isView) {
 		if (pTab->pIndex && pTab->pIndex->pNext) {
 			/*  Remove all indexes, except for primary.
 			   Tarantool won't allow remove primary when secondary exist. */
@@ -2654,9 +2587,6 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	 * the schema cookie.
 	 */
 
-	if (IsVirtual(pTab)) {
-		sqlite3VdbeAddOp4(v, OP_VDestroy, 0, 0, 0, pTab->zName, 0);
-	}
 	sqlite3VdbeAddOp4(v, OP_DropTable, 0, 0, 0, pTab->zName, 0);
 	sqlite3ChangeCookie(pParse);
 	sqliteViewResetAll(db);
@@ -2702,33 +2632,19 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	}
 	iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
 	assert(iDb == 0);
-
-	/* If pTab is a virtual table, call ViewGetColumnNames() to ensure
-	 * it is initialized.
-	 */
-	if (IsVirtual(pTab) && sqlite3ViewGetColumnNames(pParse, pTab)) {
-		goto exit_drop_table;
-	}
 #ifndef SQLITE_OMIT_AUTHORIZATION
 	{
 		int code;
 		const char *zTab = MASTER_NAME;
 		char *zDb = db->mdb.zDbSName;
-		const char *zArg2 = 0;
 		if (sqlite3AuthCheck(pParse, SQLITE_DELETE, zTab, 0, zDb)) {
 			goto exit_drop_table;
 		}
-		if (isView) {
+		if (isView)
 			code = SQLITE_DROP_VIEW;
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-		} else if (IsVirtual(pTab)) {
-			code = SQLITE_DROP_VTABLE;
-			zArg2 = sqlite3GetVTable(db, pTab)->pMod->zName;
-#endif
-		} else {
+		else
 			code = SQLITE_DROP_TABLE;
-		}
-		if (sqlite3AuthCheck(pParse, code, pTab->zName, zArg2, zDb)) {
+		if (sqlite3AuthCheck(pParse, code, pTab->zName, NULL, zDb)) {
 			goto exit_drop_table;
 		}
 		if (sqlite3AuthCheck
@@ -2807,7 +2723,7 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 	char *z;
 
 	assert(pTo != 0);
-	if (p == 0 || IN_DECLARE_VTAB)
+	if (p == 0)
 		goto fk_end;
 	if (pFromCol == 0) {
 		int iCol = p->nCol - 1;
@@ -3209,9 +3125,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		sqlite3VdbeCountChanges(v);
 	}
-	if (IN_DECLARE_VTAB && idxType != SQLITE_IDXTYPE_PRIMARYKEY) {
-		goto exit_create_index;
-	}
 	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
 		goto exit_create_index;
 	}
@@ -3272,13 +3185,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		goto exit_create_index;
 	}
 #endif
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (IsVirtual(pTab)) {
-		sqlite3ErrorMsg(pParse, "virtual tables may not be indexed");
-		goto exit_create_index;
-	}
-#endif
-
 	/*
 	 * Find the name of the index.  Make sure there is not already another
 	 * index or table with the same name.
@@ -3331,15 +3237,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		if (zName == 0) {
 			goto exit_create_index;
 		}
-
-		/* Automatic index names generated from within sqlite3_declare_vtab()
-		 * must have names that are distinct from normal automatic index names.
-		 * The following statement converts "sqlite3_autoindex..." into
-		 * "sqlite3_butoindex..." in order to make the names distinct.
-		 * The "vtab_err.test" test demonstrates the need of this statement.
-		 */
-		if (IN_DECLARE_VTAB)
-			zName[7]++;
 	}
 
 	/* Check for authorization to create an index.
@@ -3581,7 +3478,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	assert(pParse->nErr == 0);
 	if (db->init.busy) {
 		Index *p;
-		assert(!IN_DECLARE_VTAB);
 		assert(sqlite3SchemaMutexHeld(db, pIndex->pSchema));
 		p = sqlite3HashInsert(&pTab->idxHash, pIndex->zName, pIndex);
 		if (p) {

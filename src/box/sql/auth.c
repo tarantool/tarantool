@@ -231,12 +231,12 @@ sqlite3AuthCheck(Parse * pParse,
 	sqlite3 *db = pParse->db;
 	int rc;
 
-	/* Don't do any authorization checks if the database is initialising
-	 * or if the parser is being invoked from within sqlite3_declare_vtab.
+	/*
+	 * Don't do any authorization checks if the database is
+	 * initialising.
 	 */
-	if (db->init.busy || IN_DECLARE_VTAB) {
+	if (db->init.busy)
 		return SQLITE_OK;
-	}
 
 	if (db->xAuth == 0) {
 		return SQLITE_OK;

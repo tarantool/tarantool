@@ -220,8 +220,7 @@ operatorMask(int op)
  *
  * In order for the operator to be optimizible, the RHS must be a string
  * literal that does not begin with a wildcard.  The LHS must be a column
- * that may only be NULL, a string, or a BLOB, never a number. (This means
- * that virtual tables cannot participate in the LIKE optimization.)  The
+ * that may only be NULL, a string, or a BLOB, never a number. The
  * collating sequence for the column on the LHS must be appropriate for
  * the operator.
  */
@@ -253,7 +252,7 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 #endif
 	pList = pExpr->x.pList;
 	pLeft = pList->a[1].pExpr;
-	if (pLeft->op != TK_COLUMN || sqlite3ExprAffinity(pLeft) != SQLITE_AFF_TEXT || IsVirtual(pLeft->pTab)	/* Value might be numeric */
+	if (pLeft->op != TK_COLUMN || sqlite3ExprAffinity(pLeft) != SQLITE_AFF_TEXT	/* Value might be numeric */
 	    ) {
 		/* IMP: R-02065-49465 The left-hand side of the LIKE or GLOB operator must
 		 * be the name of an indexed column with TEXT affinity.
@@ -319,57 +318,6 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 	return rc;
 }
 #endif				/* SQLITE_OMIT_LIKE_OPTIMIZATION */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/*
- * Check to see if the given expression is of the form
- *
- *         column OP expr
- *
- * where OP is one of MATCH, GLOB, LIKE or REGEXP and "column" is a
- * column of a virtual table.
- *
- * If it is then return TRUE.  If not, return FALSE.
- */
-static int
-isMatchOfColumn(Expr * pExpr,	/* Test this expression */
-		unsigned char *peOp2	/* OUT: 0 for MATCH, or else an op2 value */
-    )
-{
-	static const struct Op2 {
-		const char *zOp;
-		unsigned char eOp2;
-	} aOp[] = {
-		{
-		"match", SQLITE_INDEX_CONSTRAINT_MATCH}, {
-		"glob", SQLITE_INDEX_CONSTRAINT_GLOB}, {
-		"like", SQLITE_INDEX_CONSTRAINT_LIKE}, {
-		"regexp", SQLITE_INDEX_CONSTRAINT_REGEXP}
-	};
-	ExprList *pList;
-	Expr *pCol;		/* Column reference */
-	int i;
-
-	if (pExpr->op != TK_FUNCTION) {
-		return 0;
-	}
-	pList = pExpr->x.pList;
-	if (pList == 0 || pList->nExpr != 2) {
-		return 0;
-	}
-	pCol = pList->a[1].pExpr;
-	if (pCol->op != TK_COLUMN || !IsVirtual(pCol->pTab)) {
-		return 0;
-	}
-	for (i = 0; i < ArraySize(aOp); i++) {
-		if (sqlite3StrICmp(pExpr->u.zToken, aOp[i].zOp) == 0) {
-			*peOp2 = aOp[i].eOp2;
-			return 1;
-		}
-	}
-	return 0;
-}
-#endif				/* SQLITE_OMIT_VIRTUALTABLE */
 
 /*
  * If the pBase expression originated in the ON or USING clause of
@@ -1040,7 +988,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	int op;			/* Top-level operator.  pExpr->op */
 	Parse *pParse = pWInfo->pParse;	/* Parsing context */
 	sqlite3 *db = pParse->db;	/* Database connection */
-	unsigned char eOp2;	/* op2 value for LIKE/REGEXP/GLOB */
 
 	if (db->mallocFailed) {
 		return;
@@ -1291,46 +1238,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		}
 	}
 #endif				/* SQLITE_OMIT_LIKE_OPTIMIZATION */
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	/* Add a WO_MATCH auxiliary term to the constraint set if the
-	 * current expression is of the form:  column MATCH expr.
-	 * This information is used by the xBestIndex methods of
-	 * virtual tables.  The native query optimizer does not attempt
-	 * to do anything with MATCH functions.
-	 */
-	if (pWC->op == TK_AND && isMatchOfColumn(pExpr, &eOp2)) {
-		int idxNew;
-		Expr *pRight, *pLeft;
-		WhereTerm *pNewTerm;
-		Bitmask prereqColumn, prereqExpr;
-
-		pRight = pExpr->x.pList->a[0].pExpr;
-		pLeft = pExpr->x.pList->a[1].pExpr;
-		prereqExpr = sqlite3WhereExprUsage(pMaskSet, pRight);
-		prereqColumn = sqlite3WhereExprUsage(pMaskSet, pLeft);
-		if ((prereqExpr & prereqColumn) == 0) {
-			Expr *pNewExpr;
-			pNewExpr = sqlite3PExpr(pParse, TK_MATCH,
-						0, sqlite3ExprDup(db, pRight,
-								  0));
-			idxNew =
-			    whereClauseInsert(pWC, pNewExpr,
-					      TERM_VIRTUAL | TERM_DYNAMIC);
-			testcase(idxNew == 0);
-			pNewTerm = &pWC->a[idxNew];
-			pNewTerm->prereqRight = prereqExpr;
-			pNewTerm->leftCursor = pLeft->iTable;
-			pNewTerm->u.leftColumn = pLeft->iColumn;
-			pNewTerm->eOperator = WO_MATCH;
-			pNewTerm->eMatchOp = eOp2;
-			markTermAsChild(pWC, idxNew, idxTerm);
-			pTerm = &pWC->a[idxTerm];
-			pTerm->wtFlags |= TERM_COPIED;
-			pNewTerm->prereqAll = pTerm->prereqAll;
-		}
-	}
-#endif				/* SQLITE_OMIT_VIRTUALTABLE */
 
 	/* If there is a vector == or IS term - e.g. "(a, b) == (?, ?)" - create
 	 * new terms for each component comparison - "a = ?" and "b = ?".  The

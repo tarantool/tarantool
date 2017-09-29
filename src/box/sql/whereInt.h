@@ -140,21 +140,11 @@ struct WhereLoop {
 	LogEst rSetup;		/* One-time setup cost (ex: create transient index) */
 	LogEst rRun;		/* Cost of running each loop */
 	LogEst nOut;		/* Estimated number of output rows */
-	union {
-		struct {	/* Information for internal btree tables */
-			u16 nEq;	/* Number of equality constraints */
-			u16 nBtm;	/* Size of BTM vector */
-			u16 nTop;	/* Size of TOP vector */
-			Index *pIndex;	/* Index used, or NULL */
-		} btree;
-		struct {	/* Information for virtual tables */
-			int idxNum;	/* Index number */
-			u8 needFree;	/* True if sqlite3_free(idxStr) is needed */
-			i8 isOrdered;	/* True if satisfies ORDER BY */
-			u16 omitMask;	/* Terms that may be omitted */
-			char *idxStr;	/* Index identifier string */
-		} vtab;
-	} u;
+	/* Information for internal btree tables */
+	u16 nEq;	/* Number of equality constraints */
+	u16 nBtm;	/* Size of BTM vector */
+	u16 nTop;	/* Size of TOP vector */
+	Index *pIndex;	/* Index used, or NULL */
 	u32 wsFlags;		/* WHERE_* flags describing the plan */
 	u16 nLTerm;		/* Number of entries in aLTerm[] */
 	u16 nSkip;		/* Number of NULL aLTerm[] entries */
@@ -272,7 +262,6 @@ struct WhereTerm {
 	u16 wtFlags;		/* TERM_xxx bit flags.  See below */
 	u16 eOperator;		/* A WO_xx value describing <op> */
 	u8 nChild;		/* Number of children that must disable us */
-	u8 eMatchOp;		/* Op for vtab MATCH/LIKE/GLOB/REGEXP terms */
 	int iParent;		/* Disable pWC->a[iParent] when this term disabled */
 	int leftCursor;		/* Cursor number of X in "X <op> <expr>" */
 	int iField;		/* Field in (?,?,?) IN (SELECT...) vector */
@@ -554,7 +543,6 @@ void sqlite3WhereTabFuncArgs(Parse *, struct SrcList_item *, WhereClause *);
 #define WHERE_IDX_ONLY     0x00000040	/* Use index only - omit table */
 #define WHERE_IPK          0x00000100	/* x is the INTEGER PRIMARY KEY */
 #define WHERE_INDEXED      0x00000200	/* WhereLoop.u.btree.pIndex is valid */
-#define WHERE_VIRTUALTABLE 0x00000400	/* WhereLoop.u.vtab is valid */
 #define WHERE_IN_ABLE      0x00000800	/* Able to support an IN operator */
 #define WHERE_ONEROW       0x00001000	/* Selects no more than one row */
 #define WHERE_MULTI_OR     0x00002000	/* OR using multiple indices */

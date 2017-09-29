@@ -645,17 +645,7 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		pParse->nTableLock = 0;
 	}
 #endif
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	sqlite3_free(pParse->apVtabLock);
-#endif
-
-	if (!IN_DECLARE_VTAB) {
-		/* If the pParse->declareVtab flag is set, do not delete any table
-		 * structure built up in pParse->pNewTable. The calling code (see vtab.c)
-		 * will take responsibility for freeing the Table structure.
-		 */
-		sqlite3DeleteTable(db, pParse->pNewTable);
-	}
+	sqlite3DeleteTable(db, pParse->pNewTable);
 
 	if (pParse->pWithToFree)
 		sqlite3WithDelete(db, pParse->pWithToFree);

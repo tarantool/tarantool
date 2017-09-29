@@ -77,7 +77,6 @@ struct VdbeOp {
 		sqlite3_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
 		CollSeq *pColl;	/* Used when p4type is P4_COLLSEQ */
 		Mem *pMem;	/* Used when p4type is P4_MEM */
-		VTable *pVtab;	/* Used when p4type is P4_VTAB */
 		KeyInfo *pKeyInfo;	/* Used when p4type is P4_KEYINFO */
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
@@ -137,7 +136,6 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_EXPR     (-6)	/* P4 is a pointer to an Expr tree */
 #define P4_MEM      (-7)	/* P4 is a pointer to a Mem*    structure */
 #define P4_TRANSIENT  0		/* P4 is a pointer to a transient string */
-#define P4_VTAB     (-8)	/* P4 is a pointer to an sqlite3_vtab structure */
 #define P4_REAL     (-9)	/* P4 is a 64-bit floating point value */
 #define P4_INT64    (-10)	/* P4 is a 64-bit signed integer */
 #define P4_INT32    (-11)	/* P4 is a 32-bit signed integer */

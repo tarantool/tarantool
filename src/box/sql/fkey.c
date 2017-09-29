@@ -793,8 +793,7 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
 	sqlite3 *db = pParse->db;
 	struct session *user_session = current_session();
 
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) &&
-	    !IsVirtual(pTab) && !pTab->pSelect) {
+	if ((user_session->sql_flags & SQLITE_ForeignKeys) && !pTab->pSelect) {
 		int iSkip = 0;
 		Vdbe *v = sqlite3GetVdbe(pParse);
 
@@ -1582,8 +1581,7 @@ sqlite3FkDelete(sqlite3 * db, Table * pTab)
 	FKey *pFKey;		/* Iterator variable */
 	FKey *pNext;		/* Copy of pFKey->pNextFrom */
 
-	assert(db == 0 || IsVirtual(pTab)
-	       || sqlite3SchemaMutexHeld(db, pTab->pSchema));
+	assert(db == 0 || sqlite3SchemaMutexHeld(db, pTab->pSchema));
 	for (pFKey = pTab->pFKey; pFKey; pFKey = pNext) {
 
 		/* Remove the FK from the fkeyHash hash table. */

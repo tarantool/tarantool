@@ -2306,8 +2306,6 @@ isCandidateForInOpt(Expr * pX)
 	pTab = pSrc->a[0].pTab;
 	assert(pTab != 0);
 	assert(pTab->pSelect == 0);	/* FROM clause is not a view */
-	if (IsVirtual(pTab))
-		return 0;	/* FROM clause not a virtual table */
 	pEList = p->pEList;
 	assert(pEList != 0);
 	/* All SELECT results must be columns. */
@@ -3726,13 +3724,12 @@ sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
 	if (iCol < 0 || iCol == pTab->iPKey) {
 		sqlite3VdbeAddOp2(v, OP_Rowid, iTabCur, regOut);
 	} else {
-		int op = IsVirtual(pTab) ? OP_VColumn : OP_Column;
 		int x = iCol;
-		if (!HasRowid(pTab) && !IsVirtual(pTab)) {
+		if (!HasRowid(pTab)) {
 			x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab),
 						 iCol);
 		}
-		sqlite3VdbeAddOp3(v, op, iTabCur, x, regOut);
+		sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
 	}
 	if (iCol >= 0) {
 		sqlite3ColumnDefault(v, pTab, iCol, regOut);
@@ -4340,31 +4337,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			} else {
 				r1 = 0;
 			}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-			/* Possibly overload the function if the first argument is
-			 * a virtual table column.
-			 *
-			 * For infix functions (LIKE, GLOB, REGEXP, and MATCH) use the
-			 * second argument, not the first, as the argument to test to
-			 * see if it is a column in a virtual table.  This is done because
-			 * the left operand of infix functions (the operand we want to
-			 * control overloading) ends up as the second argument to the
-			 * function.  The expression "A glob B" is equivalent to
-			 * "glob(B,A).  We want to use the A in "A glob B" to test
-			 * for function overloading.  But we use the B term in "glob(B,A)".
-			 */
-			if (nFarg >= 2 && (pExpr->flags & EP_InfixFunc)) {
-				pDef =
-				    sqlite3VtabOverloadFunction(db, pDef, nFarg,
-								pFarg->a[1].
-								pExpr);
-			} else if (nFarg > 0) {
-				pDef =
-				    sqlite3VtabOverloadFunction(db, pDef, nFarg,
-								pFarg->a[0].
-								pExpr);
-			}
-#endif
 			if (pDef->funcFlags & SQLITE_FUNC_NEEDCOLL) {
 				if (!pColl)
 					pColl = db->pDfltColl;

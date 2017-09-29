@@ -1059,10 +1059,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	if (v == 0 || NEVER(pTab == 0)) {
 		return;
 	}
-	if (pTab->tnum == 0) {
-		/* Do not gather statistics on views or virtual tables */
-		return;
-	}
+	assert(pTab->tnum != 0);
 	if (sqlite3_strlike("sql_%", pTab->zName, 0) == 0 ||
 	    strncmp("_space", pTab->zName, 6) == 0 ||
 	    strncmp("_index", pTab->zName, 6) == 0 ||

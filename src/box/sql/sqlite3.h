@@ -501,7 +501,6 @@ sqlite3_exec(sqlite3 *,	/* An open database */
 #define SQLITE_CANTOPEN_ISDIR          (SQLITE_CANTOPEN | (2<<8))
 #define SQLITE_CANTOPEN_FULLPATH       (SQLITE_CANTOPEN | (3<<8))
 #define SQLITE_CANTOPEN_CONVPATH       (SQLITE_CANTOPEN | (4<<8))
-#define SQLITE_CORRUPT_VTAB            (SQLITE_CORRUPT | (1<<8))
 #define SQLITE_READONLY_RECOVERY       (SQLITE_READONLY | (1<<8))
 #define SQLITE_READONLY_CANTLOCK       (SQLITE_READONLY | (2<<8))
 #define SQLITE_READONLY_ROLLBACK       (SQLITE_READONLY | (3<<8))
@@ -515,7 +514,6 @@ sqlite3_exec(sqlite3 *,	/* An open database */
 #define SQLITE_CONSTRAINT_PRIMARYKEY   (SQLITE_CONSTRAINT | (6<<8))
 #define SQLITE_CONSTRAINT_TRIGGER      (SQLITE_CONSTRAINT | (7<<8))
 #define SQLITE_CONSTRAINT_UNIQUE       (SQLITE_CONSTRAINT | (8<<8))
-#define SQLITE_CONSTRAINT_VTAB         (SQLITE_CONSTRAINT | (9<<8))
 #define SQLITE_CONSTRAINT_ROWID        (SQLITE_CONSTRAINT |(10<<8))
 #define SQLITE_NOTICE_RECOVER_WAL      (SQLITE_NOTICE | (1<<8))
 #define SQLITE_NOTICE_RECOVER_ROLLBACK (SQLITE_NOTICE | (2<<8))
@@ -2055,19 +2053,18 @@ sqlite3_extended_result_codes(sqlite3 *, int onoff);
  * is another alias for the rowid.
  *
  * ^The sqlite3_last_insert_rowid(D) interface returns the [rowid] of the
- * most recent successful [INSERT] into a rowid table or [virtual table]
- * on database connection D.
+ * most recent successful [INSERT] into a rowid table.
  * ^Inserts into [WITHOUT ROWID] tables are not recorded.
  * ^If no successful [INSERT]s into rowid tables
  * have ever occurred on the database connection D,
  * then sqlite3_last_insert_rowid(D) returns zero.
  *
- * ^(If an [INSERT] occurs within a trigger or within a [virtual table]
- * method, then this routine will return the [rowid] of the inserted
- * row as long as the trigger or virtual table method is running.
- * But once the trigger or virtual table method ends, the value returned
- * by this routine reverts to what it was before the trigger or virtual
- * table method began.)^
+ * ^(If an [INSERT] occurs within a trigger method, then this
+ * routine will return the [rowid] of the inserted row as long as
+ * the trigger or virtual table method is running. But once the
+ * trigger or virtual table method ends, the value returned by
+ * this routine reverts to what it was before the trigger or
+ * virtual table method began.)^
  *
  * ^An [INSERT] that fails due to a constraint violation is not a
  * successful [INSERT] and does not change the value returned by this
@@ -2794,9 +2791,6 @@ sqlite3_set_authorizer(sqlite3 *,
  * to signal SQLite whether or not the action is permitted.  See the
  * [sqlite3_set_authorizer | authorizer documentation] for additional
  * information.
- *
- * Note that SQLITE_IGNORE is also used as a [conflict resolution mode]
- * returned from the [sqlite3_vtab_on_conflict()] interface.
 */
 #define SQLITE_DENY   1		/* Abort the SQL statement with an error */
 #define SQLITE_IGNORE 2		/* Don't allow access, but don't generate an error */
@@ -2849,8 +2843,6 @@ sqlite3_set_authorizer(sqlite3 *,
 #define SQLITE_ALTER_TABLE          26	/* Database Name   Table Name      */
 #define SQLITE_REINDEX              27	/* Index Name      NULL            */
 #define SQLITE_ANALYZE              28	/* Table Name      NULL            */
-#define SQLITE_CREATE_VTABLE        29	/* Table Name      Module Name     */
-#define SQLITE_DROP_VTABLE          30	/* Table Name      Module Name     */
 #define SQLITE_FUNCTION             31	/* NULL            Function Name   */
 #define SQLITE_SAVEPOINT            32	/* Operation       Savepoint Name  */
 #define SQLITE_COPY                  0	/* No longer used */
@@ -3651,8 +3643,8 @@ sqlite3_expanded_sql(sqlite3_stmt * pStmt);
  * and only if the [prepared statement] X makes no direct changes to
  * the content of the database file.
  *
- * Note that [application-defined SQL functions] or
- * [virtual tables] might change the database indirectly as a side effect.
+ * Note that [application-defined SQL functions] might change the
+ * database indirectly as a side effect.
  * ^(For example, if an application defines a function "eval()" that
  * calls [sqlite3_exec()], then the following SQL statement would
  * change the database file through side-effects:
@@ -5880,362 +5872,6 @@ sqlite3_table_column_metadata(sqlite3 * db,
 			      int *pAutoinc);
 
 /*
- * The interface to the virtual-table mechanism is currently considered
- * to be experimental.  The interface might change in incompatible ways.
- * If this is a problem for you, do not use the interface at this time.
- *
- * When the virtual-table mechanism stabilizes, we will declare the
- * interface fixed, support it indefinitely, and remove this comment.
-*/
-
-/*
- * Structures used by the virtual table interface
-*/
-typedef struct sqlite3_vtab sqlite3_vtab;
-typedef struct sqlite3_index_info sqlite3_index_info;
-typedef struct sqlite3_vtab_cursor sqlite3_vtab_cursor;
-typedef struct sqlite3_module sqlite3_module;
-
-/*
- * CAPI3REF: Virtual Table Object
- * KEYWORDS: sqlite3_module {virtual table module}
- *
- * This structure, sometimes called a "virtual table module",
- * defines the implementation of a [virtual tables].
- * This structure consists mostly of methods for the module.
- *
- * ^A virtual table module is created by filling in a persistent
- * instance of this structure and passing a pointer to that instance
- * to [sqlite3_create_module()] or [sqlite3_create_module_v2()].
- * ^The registration remains valid until it is replaced by a different
- * module or until the [database connection] closes.  The content
- * of this structure must not change while it is registered with
- * any database connection.
-*/
-struct sqlite3_module {
-	int iVersion;
-	int (*xCreate) (sqlite3 *, void *pAux,
-			int argc, const char *const *argv,
-			sqlite3_vtab ** ppVTab, char **);
-	int (*xConnect) (sqlite3 *, void *pAux,
-			 int argc, const char *const *argv,
-			 sqlite3_vtab ** ppVTab, char **);
-	int (*xBestIndex) (sqlite3_vtab * pVTab, sqlite3_index_info *);
-	int (*xDisconnect) (sqlite3_vtab * pVTab);
-	int (*xDestroy) (sqlite3_vtab * pVTab);
-	int (*xOpen) (sqlite3_vtab * pVTab,
-		      sqlite3_vtab_cursor ** ppCursor);
-	int (*xClose) (sqlite3_vtab_cursor *);
-	int (*xFilter) (sqlite3_vtab_cursor *, int idxNum,
-			const char *idxStr, int argc,
-			sqlite3_value ** argv);
-	int (*xNext) (sqlite3_vtab_cursor *);
-	int (*xEof) (sqlite3_vtab_cursor *);
-	int (*xColumn) (sqlite3_vtab_cursor *, sqlite3_context *, int);
-	int (*xRowid) (sqlite3_vtab_cursor *, sqlite3_int64 * pRowid);
-	int (*xUpdate) (sqlite3_vtab *, int, sqlite3_value **,
-			sqlite3_int64 *);
-	int (*xBegin) (sqlite3_vtab * pVTab);
-	int (*xSync) (sqlite3_vtab * pVTab);
-	int (*xCommit) (sqlite3_vtab * pVTab);
-	int (*xRollback) (sqlite3_vtab * pVTab);
-	int (*xFindFunction) (sqlite3_vtab * pVtab, int nArg,
-			      const char *zName,
-			      void (**pxFunc) (sqlite3_context *, int,
-					       sqlite3_value **),
-			      void **ppArg);
-	int (*xRename) (sqlite3_vtab * pVtab, const char *zNew);
-	/* The methods above are in version 1 of the sqlite_module object. Those
-	** below are for version 2 and greater.
-	*/
-	int (*xSavepoint) (sqlite3_vtab * pVTab, int);
-	int (*xRelease) (sqlite3_vtab * pVTab, int);
-	int (*xRollbackTo) (sqlite3_vtab * pVTab, int);
-};
-
-/*
- * CAPI3REF: Virtual Table Indexing Information
- * KEYWORDS: sqlite3_index_info
- *
- * The sqlite3_index_info structure and its substructures is used as part
- * of the [virtual table] interface to
- * pass information into and receive the reply from the [xBestIndex]
- * method of a [virtual table module].  The fields under **Inputs** are the
- * inputs to xBestIndex and are read-only.  xBestIndex inserts its
- * results into the **Outputs** fields.
- *
- * ^(The aConstraint[] array records WHERE clause constraints of the form:
- *
- * <blockquote>column OP expr</blockquote>
- *
- * where OP is =, &lt;, &lt;=, &gt;, or &gt;=.)^  ^(The particular operator is
- * stored in aConstraint[].op using one of the
- * [SQLITE_INDEX_CONSTRAINT_EQ | SQLITE_INDEX_CONSTRAINT_ values].)^
- * ^(The index of the column is stored in
- * aConstraint[].iColumn.)^  ^(aConstraint[].usable is TRUE if the
- * expr on the right-hand side can be evaluated (and thus the constraint
- * is usable) and false if it cannot.)^
- *
- * ^The optimizer automatically inverts terms of the form "expr OP column"
- * and makes other simplifications to the WHERE clause in an attempt to
- * get as many WHERE clause terms into the form shown above as possible.
- * ^The aConstraint[] array only reports WHERE clause terms that are
- * relevant to the particular virtual table being queried.
- *
- * ^Information about the ORDER BY clause is stored in aOrderBy[].
- * ^Each term of aOrderBy records a column of the ORDER BY clause.
- *
- * The colUsed field indicates which columns of the virtual table may be
- * required by the current scan. Virtual table columns are numbered from
- * zero in the order in which they appear within the CREATE TABLE statement
- * passed to sqlite3_declare_vtab(). For the first 63 columns (columns 0-62),
- * the corresponding bit is set within the colUsed mask if the column may be
- * required by SQLite. If the table has at least 64 columns and any column
- * to the right of the first 63 is required, then bit 63 of colUsed is also
- * set. In other words, column iCol may be required if the expression
- * (colUsed & ((sqlite3_uint64)1 << (iCol>=63 ? 63 : iCol))) evaluates to
- * non-zero.
- *
- * The [xBestIndex] method must fill aConstraintUsage[] with information
- * about what parameters to pass to xFilter.  ^If argvIndex>0 then
- * the right-hand side of the corresponding aConstraint[] is evaluated
- * and becomes the argvIndex-th entry in argv.  ^(If aConstraintUsage[].omit
- * is true, then the constraint is assumed to be fully handled by the
- * virtual table and is not checked again by SQLite.)^
- *
- * ^The idxNum and idxPtr values are recorded and passed into the
- * [xFilter] method.
- * ^[sqlite3_free()] is used to free idxPtr if and only if
- * needToFreeIdxPtr is true.
- *
- * ^The orderByConsumed means that output from [xFilter]/[xNext] will occur in
- * the correct order to satisfy the ORDER BY clause so that no separate
- * sorting step is required.
- *
- * ^The estimatedCost value is an estimate of the cost of a particular
- * strategy. A cost of N indicates that the cost of the strategy is similar
- * to a linear scan of an SQLite table with N rows. A cost of log(N)
- * indicates that the expense of the operation is similar to that of a
- * binary search on a unique indexed field of an SQLite table with N rows.
- *
- * ^The estimatedRows value is an estimate of the number of rows that
- * will be returned by the strategy.
- *
- * The xBestIndex method may optionally populate the idxFlags field with a
- * mask of SQLITE_INDEX_SCAN_* flags. Currently there is only one such flag -
- * SQLITE_INDEX_SCAN_UNIQUE. If the xBestIndex method sets this flag, SQLite
- * assumes that the strategy may visit at most one row.
- *
- * Additionally, if xBestIndex sets the SQLITE_INDEX_SCAN_UNIQUE flag, then
- * SQLite also assumes that if a call to the xUpdate() method is made as
- * part of the same statement to delete or update a virtual table row and the
- * implementation returns SQLITE_CONSTRAINT, then there is no need to rollback
- * any database changes. In other words, if the xUpdate() returns
- * SQLITE_CONSTRAINT, the database contents must be exactly as they were
- * before xUpdate was called. By contrast, if SQLITE_INDEX_SCAN_UNIQUE is not
- * set and xUpdate returns SQLITE_CONSTRAINT, any database changes made by
- * the xUpdate method are automatically rolled back by SQLite.
- *
- * IMPORTANT: The estimatedRows field was added to the sqlite3_index_info
- * structure for SQLite [version 3.8.2] ([dateof:3.8.2]).
- * If a virtual table extension is
- * used with an SQLite version earlier than 3.8.2, the results of attempting
- * to read or write the estimatedRows field are undefined (but are likely
- * to included crashing the application). The estimatedRows field should
- * therefore only be used if [sqlite3_libversion_number()] returns a
- * value greater than or equal to 3008002. Similarly, the idxFlags field
- * was added for [version 3.9.0] ([dateof:3.9.0]).
- * It may therefore only be used if
- * sqlite3_libversion_number() returns a value greater than or equal to
- * 3009000.
-*/
-struct sqlite3_index_info {
-	/* Inputs */
-	int nConstraint;	/* Number of entries in aConstraint */
-	struct sqlite3_index_constraint {
-		int iColumn;	/* Column constrained.  -1 for ROWID */
-		unsigned char op;	/* Constraint operator */
-		unsigned char usable;	/* True if this constraint is usable */
-		int iTermOffset;	/* Used internally - xBestIndex should ignore */
-	} *aConstraint;	/* Table of WHERE clause constraints */
-	int nOrderBy;	/* Number of terms in the ORDER BY clause */
-	struct sqlite3_index_orderby {
-		int iColumn;	/* Column number */
-		unsigned char desc;	/* True for DESC.  False for ASC. */
-	} *aOrderBy;	/* The ORDER BY clause */
-	/* Outputs */
-	struct sqlite3_index_constraint_usage {
-		int argvIndex;	/* if >0, constraint is part of argv to xFilter */
-		unsigned char omit;	/* Do not code a test for this constraint */
-	} *aConstraintUsage;
-	int idxNum;	/* Number used to identify the index */
-	char *idxStr;	/* String, possibly obtained from sqlite3_malloc */
-	int needToFreeIdxStr;	/* Free idxStr using sqlite3_free() if true */
-	int orderByConsumed;	/* True if output is already ordered */
-	double estimatedCost;	/* Estimated cost of using this index */
-	/* Fields below are only available in SQLite 3.8.2 and later */
-	sqlite3_int64 estimatedRows;	/* Estimated number of rows returned */
-	/* Fields below are only available in SQLite 3.9.0 and later */
-	int idxFlags;	/* Mask of SQLITE_INDEX_SCAN_* flags */
-	/* Fields below are only available in SQLite 3.10.0 and later */
-	sqlite3_uint64 colUsed;	/* Input: Mask of columns used by statement */
-};
-
-/*
- * CAPI3REF: Virtual Table Scan Flags
-*/
-#define SQLITE_INDEX_SCAN_UNIQUE      1	/* Scan visits at most 1 row */
-
-/*
- * CAPI3REF: Virtual Table Constraint Operator Codes
- *
- * These macros defined the allowed values for the
- * [sqlite3_index_info].aConstraint[].op field.  Each value represents
- * an operator that is part of a constraint term in the wHERE clause of
- * a query that uses a [virtual table].
-*/
-#define SQLITE_INDEX_CONSTRAINT_EQ      2
-#define SQLITE_INDEX_CONSTRAINT_GT      4
-#define SQLITE_INDEX_CONSTRAINT_LE      8
-#define SQLITE_INDEX_CONSTRAINT_LT     16
-#define SQLITE_INDEX_CONSTRAINT_GE     32
-#define SQLITE_INDEX_CONSTRAINT_MATCH  64
-#define SQLITE_INDEX_CONSTRAINT_LIKE   65
-#define SQLITE_INDEX_CONSTRAINT_GLOB   66
-#define SQLITE_INDEX_CONSTRAINT_REGEXP 67
-
-/*
- * CAPI3REF: Register A Virtual Table Implementation
- * METHOD: sqlite3
- *
- * ^These routines are used to register a new [virtual table module] name.
- * ^Module names must be registered before
- * creating a new [virtual table] using the module and before using a
- * preexisting [virtual table] for the module.
- *
- * ^The module name is registered on the [database connection] specified
- * by the first parameter.  ^The name of the module is given by the
- * second parameter.  ^The third parameter is a pointer to
- * the implementation of the [virtual table module].   ^The fourth
- * parameter is an arbitrary client data pointer that is passed through
- * into the [xCreate] and [xConnect] methods of the virtual table module
- * when a new virtual table is be being created or reinitialized.
- *
- * ^The sqlite3_create_module_v2() interface has a fifth parameter which
- * is a pointer to a destructor for the pClientData.  ^SQLite will
- * invoke the destructor function (if it is not NULL) when SQLite
- * no longer needs the pClientData pointer.  ^The destructor will also
- * be invoked if the call to sqlite3_create_module_v2() fails.
- * ^The sqlite3_create_module()
- * interface is equivalent to sqlite3_create_module_v2() with a NULL
- * destructor.
-*/
-SQLITE_API int
-sqlite3_create_module(sqlite3 * db,	/* SQLite connection to register module with */
-		      const char *zName,	/* Name of the module */
-		      const sqlite3_module * p,	/* Methods for the module */
-		      void *pClientData	/* Client data for xCreate/xConnect */
-	);
-
-SQLITE_API int
-sqlite3_create_module_v2(sqlite3 * db,	/* SQLite connection to register module with */
-			 const char *zName,	/* Name of the module */
-			 const sqlite3_module * p,	/* Methods for the module */
-			 void *pClientData,	/* Client data for xCreate/xConnect */
-			 void (*xDestroy) (void *)	/* Module destructor function */
-	);
-
-/*
- * CAPI3REF: Virtual Table Instance Object
- * KEYWORDS: sqlite3_vtab
- *
- * Every [virtual table module] implementation uses a subclass
- * of this object to describe a particular instance
- * of the [virtual table].  Each subclass will
- * be tailored to the specific needs of the module implementation.
- * The purpose of this superclass is to define certain fields that are
- * common to all module implementations.
- *
- * ^Virtual tables methods can set an error message by assigning a
- * string obtained from [sqlite3_mprintf()] to zErrMsg.  The method should
- * take care that any prior string is freed by a call to [sqlite3_free()]
- * prior to assigning a new string to zErrMsg.  ^After the error message
- * is delivered up to the client application, the string will be automatically
- * freed by sqlite3_free() and the zErrMsg field will be zeroed.
-*/
-struct sqlite3_vtab {
-	const sqlite3_module *pModule;	/* The module for this virtual table */
-	int nRef;	/* Number of open cursors */
-	char *zErrMsg;	/* Error message from sqlite3_mprintf() */
-	/* Virtual table implementations will typically add additional fields */
-};
-
-/*
- * CAPI3REF: Virtual Table Cursor Object
- * KEYWORDS: sqlite3_vtab_cursor {virtual table cursor}
- *
- * Every [virtual table module] implementation uses a subclass of the
- * following structure to describe cursors that point into the
- * [virtual table] and are used
- * to loop through the virtual table.  Cursors are created using the
- * [sqlite3_module.xOpen | xOpen] method of the module and are destroyed
- * by the [sqlite3_module.xClose | xClose] method.  Cursors are used
- * by the [xFilter], [xNext], [xEof], [xColumn], and [xRowid] methods
- * of the module.  Each module implementation will define
- * the content of a cursor structure to suit its own needs.
- *
- * This superclass exists in order to define fields of the cursor that
- * are common to all implementations.
-*/
-struct sqlite3_vtab_cursor {
-	sqlite3_vtab *pVtab;	/* Virtual table of this cursor */
-	/* Virtual table implementations will typically add additional fields */
-};
-
-/*
- * CAPI3REF: Declare The Schema Of A Virtual Table
- *
- * ^The [xCreate] and [xConnect] methods of a
- * [virtual table module] call this interface
- * to declare the format (the names and datatypes of the columns) of
- * the virtual tables they implement.
-*/
-SQLITE_API int
-sqlite3_declare_vtab(sqlite3 *, const char *zSQL);
-
-/*
- * CAPI3REF: Overload A Function For A Virtual Table
- * METHOD: sqlite3
- *
- * ^(Virtual tables can provide alternative implementations of functions
- * using the [xFindFunction] method of the [virtual table module].
- * But global versions of those functions
- * must exist in order to be overloaded.)^
- *
- * ^(This API makes sure a global version of a function with a particular
- * name and number of parameters exists.  If no such function exists
- * before this API is called, a new function is created.)^  ^The implementation
- * of the new function always causes an exception to be thrown.  So
- * the new function is not good for anything by itself.  Its only
- * purpose is to be a placeholder function that can be overloaded
- * by a [virtual table].
-*/
-SQLITE_API int
-sqlite3_overload_function(sqlite3 *,
-			  const char *zFuncName,
-			  int nArg);
-
-/*
- * The interface to the virtual-table mechanism defined above (back up
- * to a comment remarkably similar to this one) is currently considered
- * to be experimental.  The interface might change in incompatible ways.
- * If this is a problem for you, do not use the interface at this time.
- *
- * When the virtual-table mechanism stabilizes, we will declare the
- * interface fixed, support it indefinitely, and remove this comment.
-*/
-
-/*
  * CAPI3REF: A Handle To An Open BLOB
  * KEYWORDS: {BLOB handle} {BLOB handles}
  *
@@ -7645,9 +7281,9 @@ sqlite3_strlike(const char *zGlob, const char *zStr,
  * ^If logging is enabled, the zFormat string and subsequent arguments are
  * used with [sqlite3_snprintf()] to generate the final output string.
  *
- * The sqlite3_log() interface is intended for use by extensions such as
- * virtual tables, collating functions, and SQL functions.  While there is
- * nothing to prevent an application from calling sqlite3_log(), doing so
+ * The sqlite3_log() interface is intended for use by extensions,
+ * collating functions, and SQL functions.  While there is nothing
+ * to prevent an application from calling sqlite3_log(), doing so
  * is considered bad form.
  *
  * The zFormat string must not be NULL.
@@ -7768,95 +7404,6 @@ sqlite3_wal_checkpoint(sqlite3 * db, const char *zDb);
 #define SQLITE_CHECKPOINT_FULL     1	/* Wait for writers, then checkpoint */
 #define SQLITE_CHECKPOINT_RESTART  2	/* Like FULL but wait for for readers */
 #define SQLITE_CHECKPOINT_TRUNCATE 3	/* Like RESTART but also truncate WAL */
-
-/*
- * CAPI3REF: Virtual Table Interface Configuration
- *
- * This function may be called by either the [xConnect] or [xCreate] method
- * of a [virtual table] implementation to configure
- * various facets of the virtual table interface.
- *
- * If this interface is invoked outside the context of an xConnect or
- * xCreate virtual table method then the behavior is undefined.
- *
- * At present, there is only one option that may be configured using
- * this function. (See [SQLITE_VTAB_CONSTRAINT_SUPPORT].)  Further options
- * may be added in the future.
-*/
-SQLITE_API int
-sqlite3_vtab_config(sqlite3 *, int op, ...);
-
-/*
- * CAPI3REF: Virtual Table Configuration Options
- *
- * These macros define the various options to the
- * [sqlite3_vtab_config()] interface that [virtual table] implementations
- * can use to customize and optimize their behavior.
- *
- * <dl>
- * <dt>SQLITE_VTAB_CONSTRAINT_SUPPORT
- * <dd>Calls of the form
- * [sqlite3_vtab_config](db,SQLITE_VTAB_CONSTRAINT_SUPPORT,X) are supported,
- * where X is an integer.  If X is zero, then the [virtual table] whose
- * [xCreate] or [xConnect] method invoked [sqlite3_vtab_config()] does not
- * support constraints.  In this configuration (which is the default) if
- * a call to the [xUpdate] method returns [SQLITE_CONSTRAINT], then the entire
- * statement is rolled back as if [ON CONFLICT | OR ABORT] had been
- * specified as part of the users SQL statement, regardless of the actual
- * ON CONFLICT mode specified.
- *
- * If X is non-zero, then the virtual table implementation guarantees
- * that if [xUpdate] returns [SQLITE_CONSTRAINT], it will do so before
- * any modifications to internal or persistent data structures have been made.
- * If the [ON CONFLICT] mode is ABORT, FAIL, IGNORE or ROLLBACK, SQLite
- * is able to roll back a statement or database transaction, and abandon
- * or continue processing the current SQL statement as appropriate.
- * If the ON CONFLICT mode is REPLACE and the [xUpdate] method returns
- * [SQLITE_CONSTRAINT], SQLite handles this as if the ON CONFLICT mode
- * had been ABORT.
- *
- * Virtual table implementations that are required to handle OR REPLACE
- * must do so within the [xUpdate] method. If a call to the
- * [sqlite3_vtab_on_conflict()] function indicates that the current ON
- * CONFLICT policy is REPLACE, the virtual table implementation should
- * silently replace the appropriate rows within the xUpdate callback and
- * return SQLITE_OK. Or, if this is not possible, it may return
- * SQLITE_CONSTRAINT, in which case SQLite falls back to OR ABORT
- * constraint handling.
- * </dl>
-*/
-#define SQLITE_VTAB_CONSTRAINT_SUPPORT 1
-
-/*
- * CAPI3REF: Determine The Virtual Table Conflict Policy
- *
- * This function may only be called from within a call to the [xUpdate] method
- * of a [virtual table] implementation for an INSERT or UPDATE operation. ^The
- * value returned is one of [SQLITE_ROLLBACK], [SQLITE_IGNORE], [SQLITE_FAIL],
- * [SQLITE_ABORT], or [SQLITE_REPLACE], according to the [ON CONFLICT] mode
- * of the SQL statement that triggered the call to the [xUpdate] method of the
- * [virtual table].
-*/
-SQLITE_API int
-sqlite3_vtab_on_conflict(sqlite3 *);
-
-/*
- * CAPI3REF: Conflict resolution modes
- * KEYWORDS: {conflict resolution mode}
- *
- * These constants are returned by [sqlite3_vtab_on_conflict()] to
- * inform a [virtual table] implementation what the [ON CONFLICT] mode
- * is for the SQL statement being evaluated.
- *
- * Note that the [SQLITE_IGNORE] constant is also used as a potential
- * return value from the [sqlite3_set_authorizer()] callback and that
- * [SQLITE_ABORT] is also a [result code].
-*/
-#define SQLITE_ROLLBACK 1
-/* #define SQLITE_IGNORE 2 // Also used by sqlite3_authorizer() callback */
-#define SQLITE_FAIL     3
-/* #define SQLITE_ABORT 4  // Also an error code */
-#define SQLITE_REPLACE  5
 
 /*
  * CAPI3REF: Prepared Statement Scan Status Opcodes
@@ -8013,8 +7560,7 @@ sqlite3_db_cacheflush(sqlite3 *);
  * the first parameter to callbacks.
  *
  * ^The preupdate hook only fires for changes to [rowid tables]; the preupdate
- * hook is not invoked for changes to [virtual tables] or [WITHOUT ROWID]
- * tables.
+ * hook is not invoked for changes to [WITHOUT ROWID] tables.
  *
  * ^The second parameter to the preupdate callback is a pointer to
  * the [database connection] that registered the preupdate hook.

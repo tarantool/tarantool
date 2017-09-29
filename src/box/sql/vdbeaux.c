@@ -590,8 +590,6 @@ opIterNext(VdbeOpIter * p)
  *   *  OP_Halt with P1=SQLITE_CONSTRAINT and P2=OE_Abort.
  *   *  OP_HaltIfNull with P1=SQLITE_CONSTRAINT and P2=OE_Abort.
  *   *  OP_Destroy
- *   *  OP_VUpdate
- *   *  OP_VRename
  *   *  OP_FkCounter with P2==0 (immediate foreign key constraint)
  *   *  OP_CreateTable and OP_InitCoroutine (for CREATE TABLE AS SELECT ...)
  *
@@ -616,9 +614,8 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
 
 	while ((pOp = opIterNext(&sIter)) != 0) {
 		int opcode = pOp->opcode;
-		if (opcode == OP_Destroy || opcode == OP_VUpdate
-		    || opcode == OP_VRename
-		    || ((opcode == OP_Halt || opcode == OP_HaltIfNull)
+		if (opcode == OP_Destroy ||
+		    ((opcode == OP_Halt || opcode == OP_HaltIfNull)
 			&& ((pOp->p1 & 0xff) == SQLITE_CONSTRAINT
 			    && pOp->p2 == OE_Abort))
 		    ) {
@@ -711,22 +708,6 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 					p->bIsReader = 1;
 					break;
 				}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-			case OP_VUpdate:{
-					if (pOp->p2 > nMaxArgs)
-						nMaxArgs = pOp->p2;
-					break;
-				}
-			case OP_VFilter:{
-					int n;
-					assert((pOp - p->aOp) >= 3);
-					assert(pOp[-1].opcode == OP_Integer);
-					n = pOp[-1].p1;
-					if (n > nMaxArgs)
-						nMaxArgs = n;
-					break;
-				}
-#endif
 			case OP_Next:
 			case OP_NextIfOpen:
 			case OP_SorterNext:{
@@ -1025,11 +1006,6 @@ freeP4(sqlite3 * db, int p4type, void *p4)
 			}
 			break;
 		}
-	case P4_VTAB:{
-			if (db->pnBytesFreed == 0)
-				sqlite3VtabUnlock((VTable *) p4);
-			break;
-		}
 	}
 }
 
@@ -1143,8 +1119,7 @@ sqlite3VdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 	assert(p->magic == VDBE_MAGIC_INIT);
 	assert(p->aOp != 0 || db->mallocFailed);
 	if (db->mallocFailed) {
-		if (n != P4_VTAB)
-			freeP4(db, n, (void *)*(char **)&zP4);
+		freeP4(db, n, (void *)*(char **)&zP4);
 		return;
 	}
 	assert(p->nOp > 0);
@@ -1167,8 +1142,6 @@ sqlite3VdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 		assert(n < 0);
 		pOp->p4.p = (void *)zP4;
 		pOp->p4type = (signed char)n;
-		if (n == P4_VTAB)
-			sqlite3VtabLock((VTable *) zP4);
 	}
 }
 
@@ -1185,7 +1158,7 @@ void
 sqlite3VdbeAppendP4(Vdbe * p, void *pP4, int n)
 {
 	VdbeOp *pOp;
-	assert(n != P4_INT32 && n != P4_VTAB);
+	assert(n != P4_INT32);
 	assert(n <= 0);
 	if (p->db->mallocFailed) {
 		freeP4(p->db, n, pP4);
@@ -1648,13 +1621,6 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			}
 			break;
 		}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	case P4_VTAB:{
-			sqlite3_vtab *pVtab = pOp->p4.pVtab->pVtab;
-			sqlite3XPrintf(&x, "vtab:%p", pVtab);
-			break;
-		}
-#endif
 	case P4_INTARRAY:{
 			int i;
 			int *ai = pOp->p4.ai;
@@ -2382,16 +2348,6 @@ sqlite3VdbeFreeCursor(Vdbe * p, VdbeCursor * pCx)
 			}
 			break;
 		}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	case CURTYPE_VTAB:{
-			sqlite3_vtab_cursor *pVCur = pCx->uc.pVCur;
-			const sqlite3_module *pModule = pVCur->pVtab->pModule;
-			assert(pVCur->pVtab->nRef > 0);
-			pVCur->pVtab->nRef--;
-			pModule->xClose(pVCur);
-			break;
-		}
-#endif
 	}
 }
 
@@ -2576,7 +2532,7 @@ sqlite3VdbeSetColName(Vdbe * p,			/* Vdbe being configured */
  * takes care of the master journal trickery.
  */
 static int
-vdbeCommit(sqlite3 * db, Vdbe * p)
+vdbeCommit(sqlite3 * db)
 {
 	int nTrans = 0;		/* Number of databases with an active write-transaction
 				 * that are candidates for a two-phase commit using a
@@ -2584,21 +2540,6 @@ vdbeCommit(sqlite3 * db, Vdbe * p)
 				 */
 	int rc = SQLITE_OK;
 	int needXcommit = 0;
-
-#ifdef SQLITE_OMIT_VIRTUALTABLE
-	/* With this option, sqlite3VtabSync() is defined to be simply
-	 * SQLITE_OK so p is not used.
-	 */
-	UNUSED_PARAMETER(p);
-#endif
-
-	/* Before doing anything else, call the xSync() callback for any
-	 * virtual module tables written in this transaction. This has to
-	 * be done before determining whether a master journal file is
-	 * required, as an xSync() callback may add an attached database
-	 * to the transaction.
-	 */
-	rc = sqlite3VtabSync(db, p);
 
 	/* This loop determines (a) if the commit hook should be invoked and
 	 * (b) how many database files have open write transactions, not
@@ -2667,9 +2608,6 @@ vdbeCommit(sqlite3 * db, Vdbe * p)
 		 */
 		if (pBt) {
 			rc = sqlite3BtreeCommitPhaseTwo(pBt, 0);
-		}
-		if (rc == SQLITE_OK) {
-			sqlite3VtabCommit(db);
 		}
 	}
 	return rc;
@@ -2760,18 +2698,6 @@ sqlite3VdbeCloseStatement(Vdbe * p, int eOp)
 		}
 		p->nStatement--;
 		p->iStatement = 0;
-
-		if (rc == SQLITE_OK) {
-			if (eOp == SAVEPOINT_ROLLBACK) {
-				rc = sqlite3VtabSavepoint(db,
-							  SAVEPOINT_ROLLBACK,
-							  iSavepoint);
-			}
-			if (rc == SQLITE_OK) {
-				rc = sqlite3VtabSavepoint(db, SAVEPOINT_RELEASE,
-							  iSavepoint);
-			}
-		}
 
 		/* If the statement transaction is being rolled back, also restore the
 		 * database handles deferred constraint counter to the value it had when
@@ -2914,8 +2840,7 @@ sqlite3VdbeHalt(Vdbe * p)
 		 * Note: This block also runs if one of the special errors handled
 		 * above has occurred.
 		 */
-		if (!sqlite3VtabInSync(db)
-		    && p->autoCommit) {
+		if (p->autoCommit) {
 			if (p->rc == SQLITE_OK
 			    || (p->errorAction == OE_Fail && !isSpecialError)) {
 				rc = sqlite3VdbeCheckFk(p, 1);
@@ -2932,7 +2857,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					 * key constraints to hold up the transaction. This means a commit
 					 * is required.
 					 */
-					rc = vdbeCommit(db, p);
+					rc = vdbeCommit(db);
 					if (rc == SQLITE_OK)
 						rc = box_txn_commit() ==
 						    0 ? SQLITE_OK :
@@ -4723,25 +4648,6 @@ sqlite3VdbeSetVarmask(Vdbe * v, int iVar)
 		v->expmask |= ((u32) 1 << (iVar - 1));
 	}
 }
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-/*
- * Transfer error message text from an sqlite3_vtab.zErrMsg (text stored
- * in memory obtained from sqlite3_malloc) into a Vdbe.zErrMsg (text stored
- * in memory obtained from sqlite3DbMalloc).
- */
-void
-sqlite3VtabImportErrmsg(Vdbe * p, sqlite3_vtab * pVtab)
-{
-	if (pVtab->zErrMsg) {
-		sqlite3 *db = p->db;
-		sqlite3DbFree(db, p->zErrMsg);
-		p->zErrMsg = sqlite3DbStrDup(db, pVtab->zErrMsg);
-		sqlite3_free(pVtab->zErrMsg);
-		pVtab->zErrMsg = 0;
-	}
-}
-#endif				/* SQLITE_OMIT_VIRTUALTABLE */
 
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
 

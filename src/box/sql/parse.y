@@ -170,7 +170,7 @@ cmd ::= ROLLBACK trans_opt TO savepoint_opt nm(X). {
 //
 cmd ::= create_table create_table_args.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
-   sqlite3StartTable(pParse,&Y,0,0,0,E);
+   sqlite3StartTable(pParse,&Y,0,0,E);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
@@ -213,7 +213,7 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
   CONFLICT DATABASE DEFERRED DESC DETACH EACH END EXPLAIN FAIL FOR
   IGNORE IMMEDIATE INITIALLY INSTEAD LIKE_KW MATCH NO PLAN
   QUERY KEY OF OFFSET PRAGMA RAISE RECURSIVE RELEASE REPLACE RESTRICT ROW
-  ROLLBACK SAVEPOINT TRIGGER VIEW VIRTUAL WITH WITHOUT
+  ROLLBACK SAVEPOINT TRIGGER VIEW WITH WITHOUT
 %ifdef SQLITE_OMIT_COMPOUND_SELECT
   EXCEPT INTERSECT UNION
 %endif SQLITE_OMIT_COMPOUND_SELECT
@@ -1517,27 +1517,6 @@ add_column_fullname ::= fullname(X). {
 kwcolumn_opt ::= .
 kwcolumn_opt ::= COLUMNKW.
 %endif  SQLITE_OMIT_ALTERTABLE
-
-//////////////////////// CREATE VIRTUAL TABLE ... /////////////////////////////
-%ifndef SQLITE_OMIT_VIRTUALTABLE
-cmd ::= create_vtab.                       {sqlite3VtabFinishParse(pParse,0);}
-cmd ::= create_vtab LP vtabarglist RP(X).  {sqlite3VtabFinishParse(pParse,&X);}
-create_vtab ::= createkw VIRTUAL TABLE ifnotexists(E)
-                nm(X) USING nm(Z). {
-    sqlite3VtabBeginParse(pParse, &X, 0, &Z, E);
-}
-vtabarglist ::= vtabarg.
-vtabarglist ::= vtabarglist COMMA vtabarg.
-vtabarg ::= .                       {sqlite3VtabArgInit(pParse);}
-vtabarg ::= vtabarg vtabargtoken.
-vtabargtoken ::= ANY(X).            {sqlite3VtabArgExtend(pParse,&X);}
-vtabargtoken ::= lp anylist RP(X).  {sqlite3VtabArgExtend(pParse,&X);}
-lp ::= LP(X).                       {sqlite3VtabArgExtend(pParse,&X);}
-anylist ::= .
-anylist ::= anylist LP anylist RP.
-anylist ::= anylist ANY.
-%endif  SQLITE_OMIT_VIRTUALTABLE
-
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////
 %type with {With*}

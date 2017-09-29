@@ -406,7 +406,6 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 #ifndef SQLITE_OMIT_TRIGGER
 	char *zWhere = 0;	/* Where clause to locate temp triggers */
 #endif
-	VTable *pVTab = 0;	/* Non-zero if this is a v-tab with an xRename() */
 	uint32_t savedDbFlags;	/* Saved value of db->flags */
 	struct session *user_session = current_session();
 
@@ -463,44 +462,16 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	}
 #endif
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (sqlite3ViewGetColumnNames(pParse, pTab)) {
-		goto exit_rename_table;
-	}
-	if (IsVirtual(pTab)) {
-		pVTab = sqlite3GetVTable(db, pTab);
-		if (pVTab->pVtab->pModule->xRename == 0) {
-			pVTab = 0;
-		}
-	}
-#endif
-
 	/* Begin a transaction for database.
 	 * Then modify the schema cookie (since the ALTER TABLE modifies the
-	 * schema). Open a statement transaction if the table is a virtual
-	 * table.
+	 * schema).
 	 */
 	v = sqlite3GetVdbe(pParse);
 	if (v == 0) {
 		goto exit_rename_table;
 	}
-	sqlite3BeginWriteOperation(pParse, pVTab != 0);
+	sqlite3BeginWriteOperation(pParse, false);
 	sqlite3ChangeCookie(pParse);
-
-	/* If this is a virtual table, invoke the xRename() function if
-	 * one is defined. The xRename() callback will modify the names
-	 * of any resources used by the v-table implementation (including other
-	 * SQLite tables) that are identified by the name of the virtual table.
-	 */
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (pVTab) {
-		int i = ++pParse->nMem;
-		sqlite3VdbeLoadString(v, i, zName);
-		sqlite3VdbeAddOp4(v, OP_VRename, i, 0, 0, (const char *)pVTab,
-				  P4_VTAB);
-		sqlite3MayAbort(pParse);
-	}
-#endif
 
 	/* figure out how many UTF-8 characters are in zName */
 	zTabName = pTab->zName;
@@ -747,13 +718,6 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	pTab = sqlite3LocateTableItem(pParse, 0, &pSrc->a[0]);
 	if (!pTab)
 		goto exit_begin_add_column;
-
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (IsVirtual(pTab)) {
-		sqlite3ErrorMsg(pParse, "virtual tables may not be altered");
-		goto exit_begin_add_column;
-	}
-#endif
 
 	/* Make sure this is not an attempt to ALTER a view. */
 	if (pTab->pSelect) {

@@ -133,8 +133,6 @@ set rp2v_ops {
   OP_Savepoint
   OP_Checkpoint
   OP_JournalMode
-  OP_VUpdate
-  OP_VFilter
   OP_Next
   OP_NextIfOpen
   OP_SorterNext

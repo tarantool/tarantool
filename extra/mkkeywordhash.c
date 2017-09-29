@@ -122,11 +122,6 @@ struct Keyword {
 #else
 #  define VIEW       0x00008000
 #endif
-#ifdef SQLITE_OMIT_VIRTUALTABLE
-#  define VTAB       0
-#else
-#  define VTAB       0x00010000
-#endif
 #ifdef SQLITE_OMIT_CTE
 #  define CTE        0
 #else
@@ -252,7 +247,6 @@ static Keyword aKeywordTable[] = {
   { "USING",            "TK_USING",        ALWAYS                 },
   { "VALUES",           "TK_VALUES",       ALWAYS                 },
   { "VIEW",             "TK_VIEW",         VIEW                   },
-  { "VIRTUAL",          "TK_VIRTUAL",      VTAB                   },
   { "WITH",             "TK_WITH",         CTE                    },
   { "WITHOUT",          "TK_WITHOUT",      ALWAYS                 },
   { "WHEN",             "TK_WHEN",         ALWAYS                 },

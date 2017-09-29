@@ -52,7 +52,6 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 		 int opcode)	/* OP_OpenRead or OP_OpenWrite */
 {
 	Vdbe *v;
-	assert(!IsVirtual(pTab));
 	v = sqlite3GetVdbe(pParse);
 	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
 	sqlite3TableLock(pParse, pTab->tnum,
@@ -200,10 +199,6 @@ readsTable(Parse * p, Table * pTab)
 	int i;
 	int iEnd = sqlite3VdbeCurrentAddr(v);
 
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	VTable *pVTab = IsVirtual(pTab) ? sqlite3GetVTable(p->db, pTab) : 0;
-#endif
-
 	for (i = 1; i < iEnd; i++) {
 		VdbeOp *pOp = sqlite3VdbeGetOp(v, i);
 		assert(pOp != 0);
@@ -220,13 +215,6 @@ readsTable(Parse * p, Table * pTab)
 				}
 			}
 		}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-		if (pOp->opcode == OP_VOpen && pOp->p4.pVtab == pVTab) {
-			assert(pOp->p4.pVtab != 0);
-			assert(pOp->p4type == P4_VTAB);
-			return 1;
-		}
-#endif
 	}
 	return 0;
 }
@@ -539,7 +527,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	Vdbe *v;		/* Generate code into this virtual machine */
 	Index *pIdx;		/* For looping over indices of the table */
 	int nColumn;		/* Number of columns in the data */
-	int nHidden = 0;	/* Number of hidden columns if TABLE is virtual */
+	int nHidden = 0;	/* Number of hidden columns. */
 	int iDataCur = 0;	/* VDBE cursor that is the main data repository */
 	int iIdxCur = 0;	/* First index cursor */
 	int ipkColumn = -1;	/* Column that is the INTEGER PRIMARY KEY */
@@ -672,10 +660,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 */
 	regRowid = regIns = pParse->nMem + 1;
 	pParse->nMem += pTab->nCol + 1;
-	if (IsVirtual(pTab)) {
-		regRowid++;
-		pParse->nMem++;
-	}
 	regData = regRowid + 1;
 
 	/* If the INSERT statement included an IDLIST term, then make sure
@@ -930,11 +914,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			VdbeCoverage(v);
 		}
 
-		/* Cannot have triggers on a virtual table. If it were possible,
-		 * this block would have to account for hidden column.
-		 */
-		assert(!IsVirtual(pTab));
-
 		/* Create the new column data
 		 */
 		for (i = j = 0; i < pTab->nCol; i++) {
@@ -986,10 +965,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 * registers beginning at regIns.
 	 */
 	if (!isView) {
-		if (IsVirtual(pTab)) {
-			/* The row that the VUpdate opcode will delete: none */
-			sqlite3VdbeAddOp2(v, OP_Null, 0, regIns);
-		}
 		if (ipkColumn >= 0) {
 			if (useTempTable) {
 				sqlite3VdbeAddOp3(v, OP_Column, srcTab,
@@ -1004,8 +979,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						pList->a[ipkColumn].pExpr,
 						regRowid);
 				pOp = sqlite3VdbeGetOp(v, -1);
-				if (ALWAYS(pOp) && pOp->opcode == OP_Null
-				    && !IsVirtual(pTab)) {
+				if (ALWAYS(pOp) && pOp->opcode == OP_Null) {
 					appendFlag = 1;
 					pOp->opcode = OP_NewRowid;
 					pOp->p1 = iDataCur;
@@ -1017,26 +991,18 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			 * to generate a unique primary key value.
 			 */
 			if (!appendFlag) {
-				int addr1;
-				if (!IsVirtual(pTab)) {
-					addr1 =
-					    sqlite3VdbeAddOp1(v, OP_NotNull,
-							      regRowid);
-					VdbeCoverage(v);
-					sqlite3VdbeAddOp3(v, OP_NewRowid,
-							  iDataCur, regRowid,
-							  regAutoinc);
-					sqlite3VdbeJumpHere(v, addr1);
-				} else {
-					addr1 = sqlite3VdbeCurrentAddr(v);
-					sqlite3VdbeAddOp2(v, OP_IsNull,
-							  regRowid, addr1 + 2);
-					VdbeCoverage(v);
-				}
+				int addr1 =
+				    sqlite3VdbeAddOp1(v, OP_NotNull,
+						      regRowid);
+				VdbeCoverage(v);
+				sqlite3VdbeAddOp3(v, OP_NewRowid,
+						  iDataCur, regRowid,
+						  regAutoinc);
+				sqlite3VdbeJumpHere(v, addr1);
 				sqlite3VdbeAddOp1(v, OP_MustBeInt, regRowid);
 				VdbeCoverage(v);
 			}
-		} else if (IsVirtual(pTab) || withoutRowid) {
+		} else if (withoutRowid) {
 			if (pTab->iAutoIncPKey >= 0)
 				sqlite3VdbeAddOp3(v, OP_MaxId, iDataCur,
 						  pTab->iAutoIncPKey, regRowid);
@@ -1175,51 +1141,29 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		/* Generate code to check constraints and generate index keys
 		   and do the insertion.
 		 */
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-		if (IsVirtual(pTab)) {
-			const char *pVTab =
-			    (const char *)sqlite3GetVTable(db, pTab);
-			sqlite3VtabMakeWritable(pParse, pTab);
-			sqlite3VdbeAddOp4(v, OP_VUpdate, 1, pTab->nCol + 2,
-					  regIns, pVTab, P4_VTAB);
-			sqlite3VdbeChangeP5(v,
-					    onError ==
-					    OE_Default ? OE_Abort : onError);
-			sqlite3MayAbort(pParse);
-		} else
-#endif
-		{
-			int isReplace;	/* Set to true if constraints may cause a replace */
-			int bUseSeek;	/* True to use OPFLAG_SEEKRESULT */
-			sqlite3GenerateConstraintChecks(pParse, pTab, aRegIdx,
-							iDataCur, iIdxCur,
-							regIns, 0,
-							ipkColumn >= 0, onError,
-							endOfLoop, &isReplace,
-							0);
-			sqlite3FkCheck(pParse, pTab, 0, regIns, 0, 0);
+		int isReplace;	/* Set to true if constraints may cause a replace */
+		int bUseSeek;	/* True to use OPFLAG_SEEKRESULT */
+		sqlite3GenerateConstraintChecks(pParse, pTab, aRegIdx, iDataCur,
+						iIdxCur, regIns, 0,
+						ipkColumn >= 0, onError,
+						endOfLoop, &isReplace, 0);
+		sqlite3FkCheck(pParse, pTab, 0, regIns, 0, 0);
 
-			/* Set the OPFLAG_USESEEKRESULT flag if either (a) there are no REPLACE
-			 * constraints or (b) there are no triggers and this table is not a
-			 * parent table in a foreign key constraint. It is safe to set the
-			 * flag in the second case as if any REPLACE constraint is hit, an
-			 * OP_Delete or OP_IdxDelete instruction will be executed on each
-			 * cursor that is disturbed. And these instructions both clear the
-			 * VdbeCursor.seekResult variable, disabling the OPFLAG_USESEEKRESULT
-			 * functionality.
-			 */
-			bUseSeek = (isReplace == 0 || (pTrigger == 0 &&
-						       ((user_session->
-							 sql_flags &
-							 SQLITE_ForeignKeys) ==
-							0
-							||
-							sqlite3FkReferences
-							(pTab) == 0)
-				    ));
-			sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx,
-						 bUseSeek);
-		}
+		/* Set the OPFLAG_USESEEKRESULT flag if either (a) there are no REPLACE
+		 * constraints or (b) there are no triggers and this table is not a
+		 * parent table in a foreign key constraint. It is safe to set the
+		 * flag in the second case as if any REPLACE constraint is hit, an
+		 * OP_Delete or OP_IdxDelete instruction will be executed on each
+		 * cursor that is disturbed. And these instructions both clear the
+		 * VdbeCursor.seekResult variable, disabling the OPFLAG_USESEEKRESULT
+		 * functionality.
+		 */
+		bUseSeek = isReplace == 0 || (pTrigger == 0 &&
+					      ((user_session->sql_flags &
+						SQLITE_ForeignKeys) == 0 ||
+					       sqlite3FkReferences(pTab) == 0));
+		sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx,
+					 bUseSeek);
 	}
 
 	/* Update the count of rows that are inserted
@@ -2052,9 +1996,6 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
  * For a WITHOUT ROWID table, *piDataCur will be somewhere in the range
  * of *piIdxCurs, depending on where the PRIMARY KEY index appears on the
  * pTab->pIndex list.
- *
- * If pTab is a virtual table, then this routine is a no-op and the
- * *piDataCur and *piIdxCur values are left uninitialized.
  */
 int
 sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
@@ -2074,13 +2015,6 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 
 	assert(op == OP_OpenRead || op == OP_OpenWrite);
 	assert(op == OP_OpenWrite || p5 == 0);
-	if (IsVirtual(pTab)) {
-		/* This routine is a no-op for virtual tables. Leave the output
-		 * variables *piDataCur and *piIdxCur uninitialized so that valgrind
-		 * can detect if they are used by mistake in the caller.
-		 */
-		return 0;
-	}
 	iDb = sqlite3SchemaToIndex(pParse->db, pTab->pSchema);
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
@@ -2237,11 +2171,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (pDest->pTrigger) {
 		return 0;	/* tab1 must not have triggers */
 	}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (pDest->tabFlags & TF_Virtual) {
-		return 0;	/* tab1 must not be a virtual table */
-	}
-#endif
 	if (onError == OE_Default) {
 		if (pDest->iPKey >= 0)
 			onError = pDest->keyConf;
@@ -2302,11 +2231,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (HasRowid(pDest) != HasRowid(pSrc)) {
 		return 0;	/* source and destination must both be WITHOUT ROWID or not */
 	}
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	if (pSrc->tabFlags & TF_Virtual) {
-		return 0;	/* tab2 must not be a virtual table */
-	}
-#endif
 	if (pSrc->pSelect) {
 		return 0;	/* tab2 may not be a view */
 	}

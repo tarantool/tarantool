@@ -43,7 +43,6 @@ add_library(sql STATIC
     callback.c
     complete.c
     date.c
-    dbstat.c
     delete.c
     expr.c
     fault.c
@@ -94,7 +93,6 @@ add_library(sql STATIC
     vdbemem.c
     vdbesort.c
     vdbetrace.c
-    vtab.c
     walker.c
     where.c
     wherecode.c

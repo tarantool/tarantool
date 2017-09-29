@@ -792,8 +792,7 @@ sqlite3StmtCurrentTime(sqlite3_context * p)
  * fails with an error message stating that the function is used in the
  * wrong context.  The sqlite3_overload_function() API might construct
  * SQL function that use this routine so that the functions will exist
- * for name resolution but are actually overloaded by the xFindFunction
- * method of virtual tables.
+ * for name resolution.
  */
 void
 sqlite3InvalidFunction(sqlite3_context * context,	/* The function calling context */

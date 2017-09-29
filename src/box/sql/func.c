@@ -1710,6 +1710,31 @@ groupConcatFinalize(sqlite3_context * context)
 }
 
 /*
+ * If the function already exists as a regular global function, then
+ * this routine is a no-op.  If the function does not exist, then create
+ * a new one that always throws a run-time error.
+ */
+static inline int
+sqlite3_overload_function(sqlite3 * db, const char *zName, int nArg)
+{
+	int rc = SQLITE_OK;
+
+#ifdef SQLITE_ENABLE_API_ARMOR
+	if (!sqlite3SafetyCheckOk(db) || zName == 0 || nArg < -2) {
+		return SQLITE_MISUSE_BKPT;
+	}
+#endif
+	sqlite3_mutex_enter(db->mutex);
+	if (sqlite3FindFunction(db, zName, nArg, SQLITE_UTF8, 0) == 0) {
+		rc = sqlite3CreateFunc(db, zName, nArg, SQLITE_UTF8,
+				       0, sqlite3InvalidFunction, 0, 0, 0);
+	}
+	rc = sqlite3ApiExit(db, rc);
+	sqlite3_mutex_leave(db->mutex);
+	return rc;
+}
+
+/*
  * This routine does per-connection function registration.  Most
  * of the built-in functions above are part of the global function set.
  * This routine only deals with those that are not global.

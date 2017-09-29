@@ -1084,36 +1084,6 @@ functionDestroy(sqlite3 * db, FuncDef * p)
 }
 
 /*
- * Disconnect all sqlite3_vtab objects that belong to database connection
- * db. This is called when db is being closed.
- */
-static void
-disconnectAllVtab(sqlite3 * db)
-{
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	HashElem *p;
-	sqlite3BtreeEnterAll(db);
-	Schema *pSchema = db->mdb.pSchema;
-	assert(pSchema);
-	for (p = sqliteHashFirst(&pSchema->tblHash); p; p = sqliteHashNext(p)) {
-		Table *pTab = (Table *) sqliteHashData(p);
-		if (IsVirtual(pTab))
-			sqlite3VtabDisconnect(db, pTab);
-	}
-	for (p = sqliteHashFirst(&db->aModule); p; p = sqliteHashNext(p)) {
-		Module *pMod = (Module *) sqliteHashData(p);
-		if (pMod->pEpoTab) {
-			sqlite3VtabDisconnect(db, pMod->pEpoTab);
-		}
-	}
-	sqlite3VtabUnlockList(db);
-	sqlite3BtreeLeaveAll(db);
-#else
-	UNUSED_PARAMETER(db);
-#endif
-}
-
-/*
  * Return TRUE if database connection db has unfinalized prepared
  * statement.
  */
@@ -1145,18 +1115,6 @@ sqlite3Close(sqlite3 * db, int forceZombie)
 	if (db->mTrace & SQLITE_TRACE_CLOSE) {
 		db->xTrace(SQLITE_TRACE_CLOSE, db->pTraceArg, db, 0);
 	}
-
-	/* Force xDisconnect calls on all virtual tables */
-	disconnectAllVtab(db);
-
-	/* If a transaction is open, the disconnectAllVtab() call above
-	 * will not have called the xDisconnect() method on any virtual
-	 * tables in the db->aVTrans[] array. The following sqlite3VtabRollback()
-	 * call will do so. We need to do this before the check for active
-	 * SQL statements below, as the v-table implementation may be storing
-	 * some prepared statements internally.
-	 */
-	sqlite3VtabRollback(db);
 
 	/* Legacy behavior (sqlite3_close() behavior) is to return
 	 * SQLITE_BUSY if the connection can not be closed immediately.
@@ -1240,7 +1198,6 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 		}
 		sqlite3BtreeRollback(p, tripCode, !schemaChange);
 	}
-	sqlite3VtabRollback(db);
 	sqlite3EndBenignMalloc();
 
 	if ((user_session->sql_flags & SQLITE_InternChanges) != 0
@@ -1408,9 +1365,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_CORRUPT:
 			zName = "SQLITE_CORRUPT";
 			break;
-		case SQLITE_CORRUPT_VTAB:
-			zName = "SQLITE_CORRUPT_VTAB";
-			break;
 		case SQLITE_NOTFOUND:
 			zName = "SQLITE_NOTFOUND";
 			break;
@@ -1467,9 +1421,6 @@ sqlite3ErrName(int rc)
 			break;
 		case SQLITE_CONSTRAINT_COMMITHOOK:
 			zName = "SQLITE_CONSTRAINT_COMMITHOOK";
-			break;
-		case SQLITE_CONSTRAINT_VTAB:
-			zName = "SQLITE_CONSTRAINT_VTAB";
 			break;
 		case SQLITE_CONSTRAINT_FUNCTION:
 			zName = "SQLITE_CONSTRAINT_FUNCTION";
@@ -1912,38 +1863,6 @@ sqlite3_create_function_v2(sqlite3 * db,
 	}
 
  out:
-	rc = sqlite3ApiExit(db, rc);
-	sqlite3_mutex_leave(db->mutex);
-	return rc;
-}
-
-/*
- * Declare that a function has been overloaded by a virtual table.
- *
- * If the function already exists as a regular global function, then
- * this routine is a no-op.  If the function does not exist, then create
- * a new one that always throws a run-time error.
- *
- * When virtual tables intend to provide an overloaded function, they
- * should call this routine to make sure the global function exists.
- * A global function must exist in order for name resolution to work
- * properly.
- */
-int
-sqlite3_overload_function(sqlite3 * db, const char *zName, int nArg)
-{
-	int rc = SQLITE_OK;
-
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db) || zName == 0 || nArg < -2) {
-		return SQLITE_MISUSE_BKPT;
-	}
-#endif
-	sqlite3_mutex_enter(db->mutex);
-	if (sqlite3FindFunction(db, zName, nArg, SQLITE_UTF8, 0) == 0) {
-		rc = sqlite3CreateFunc(db, zName, nArg, SQLITE_UTF8,
-				       0, sqlite3InvalidFunction, 0, 0, 0);
-	}
 	rc = sqlite3ApiExit(db, rc);
 	sqlite3_mutex_leave(db->mutex);
 	return rc;
@@ -2854,9 +2773,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	db->szMmap = sqlite3GlobalConfig.szMmap;
 	db->nMaxSorterMmap = 0x7FFFFFFF;
 	sqlite3HashInit(&db->aCollSeq);
-#ifndef SQLITE_OMIT_VIRTUALTABLE
-	sqlite3HashInit(&db->aModule);
-#endif
 
 	/* Add the default collation sequence BINARY. BINARY works for both UTF-8
 	 * and UTF-16, so add a version for each to avoid any unnecessary
@@ -2965,12 +2881,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 #ifdef SQLITE_ENABLE_RTREE
 	if (!db->mallocFailed && rc == SQLITE_OK) {
 		rc = sqlite3RtreeInit(db);
-	}
-#endif
-
-#ifdef SQLITE_ENABLE_DBSTAT_VTAB
-	if (!db->mallocFailed && rc == SQLITE_OK) {
-		rc = sqlite3DbstatRegister(db);
 	}
 #endif
 

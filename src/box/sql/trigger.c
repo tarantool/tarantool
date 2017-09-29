@@ -132,11 +132,6 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	if (!pTab) {
 		goto trigger_cleanup;
 	}
-	if (IsVirtual(pTab)) {
-		sqlite3ErrorMsg(pParse,
-				"cannot create triggers on virtual tables");
-		goto trigger_cleanup;
-	}
 
 	/* Check that the trigger name is not reserved and that no trigger of the
 	 * specified name exists
@@ -703,7 +698,6 @@ sqlite3TriggersExist(Table * pTab,	/* The table the contains the triggers */
 	if ((user_session->sql_flags & SQLITE_EnableTrigger) != 0) {
 		pList = pTab->pTrigger;
 	}
-	assert(pList == 0 || IsVirtual(pTab) == 0);
 	for (p = pList; p; p = p->pNext) {
 		if (p->op == op && checkColumnOverlap(p->pColumns, pChanges)) {
 			mask |= p->tr_tm;

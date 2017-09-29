@@ -79,7 +79,6 @@ typedef struct AuxData AuxData;
 /* Types of VDBE cursors */
 #define CURTYPE_BTREE       0
 #define CURTYPE_SORTER      1
-#define CURTYPE_VTAB        2
 #define CURTYPE_PSEUDO      3
 
 /*
@@ -89,7 +88,6 @@ typedef struct AuxData AuxData;
  *          -  In the main database or in an ephemeral database
  *          -  On either an index or a table
  *      * A sorter
- *      * A virtual table
  *      * A one-row "pseudotable" stored in a single register
  */
 typedef struct VdbeCursor VdbeCursor;
@@ -130,7 +128,6 @@ struct VdbeCursor {
 	VdbeCursor *pAltCursor;	/* Associated index cursor from which to read */
 	union {
 		BtCursor *pCursor;	/* CURTYPE_BTREE.  Btree cursor */
-		sqlite3_vtab_cursor *pVCur;	/* CURTYPE_VTAB.   Vtab cursor */
 		int pseudoTableReg;	/* CURTYPE_PSEUDO. Reg holding content. */
 		VdbeSorter *pSorter;	/* CURTYPE_SORTER. Sorter object */
 	} uc;

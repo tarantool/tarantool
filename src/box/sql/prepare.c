@@ -559,8 +559,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 		goto end_prepare;
 	}
 
-	sqlite3VtabUnlockList(db);
-
 	sParse.db = db;
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
 		char *zSqlCopy;
