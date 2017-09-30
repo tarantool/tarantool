@@ -105,17 +105,25 @@ struct vy_read_iterator {
 	uint32_t curr_src;
 	/** Statement returned by the current merge source. */
 	struct tuple *curr_stmt;
-	/** Offset of the first mutable source. */
-	uint32_t mutable_start;
-	/** Offset of the source following the last mutable source. */
-	uint32_t mutable_end;
+	/** Offset of the transaction write set source. */
+	uint32_t txw_src;
+	/** Offset of the cache source. */
+	uint32_t cache_src;
+	/** Offset of the first memory source. */
+	uint32_t mem_src;
+	/** Offset of the first disk source. */
+	uint32_t disk_src;
 	/** Offset of the first skipped source. */
-	uint32_t skipped_start;
+	uint32_t skipped_src;
 	/**
 	 * front_id of the current source and all sources
 	 * that are on the same key.
 	 */
 	uint32_t front_id;
+	/**
+	 * front_id from the previous iteration.
+	 */
+	uint32_t prev_front_id;
 };
 
 /**
