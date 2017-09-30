@@ -39,10 +39,10 @@ scalable Web architecture: queue servers, caches,
 stateful Web applications.
 
 To download and install Tarantool as a binary package for your OS, please visit
-https://tarantool.org/download.html.
+https://tarantool.org/en/download.html.
 
 To build Tarantool from source, see detailed instructions in the Tarantool
-documentation at https://tarantool.org/doc/dev_guide/building_from_source.html.
+documentation at https://tarantool.org/en/doc/dev_guide/building_from_source.html.
 
 Please report bugs at http://github.com/tarantool/tarantool/issues
 We also warmly welcome your feedback in the discussion mailing
