@@ -250,13 +250,10 @@ struct field_def;
  * @param index_def Index definition.
  * @param format Space format.
  * @param pk Primary index.
- * @param space_fields Space field definitions.
- * @param field_count Length of @a space_fields.
  */
 struct vy_index *
 vy_new_index(struct vy_env *env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_index *pk,
-	     const struct field_def *space_fields, uint32_t field_count);
+	     struct tuple_format *format, struct vy_index *pk);
 
 /**
  * Delete a vinyl index object.

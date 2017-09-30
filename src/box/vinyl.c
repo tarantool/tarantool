@@ -2216,11 +2216,10 @@ vy_index_find_unique(struct space *space, uint32_t index_id)
 
 struct vy_index *
 vy_new_index(struct vy_env *env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_index *pk,
-	     const struct field_def *space_fields, uint32_t field_count)
+	     struct tuple_format *format, struct vy_index *pk)
 {
 	return vy_index_new(&env->index_env, &env->cache_env,
-			    index_def, format, pk, space_fields, field_count);
+			    index_def, format, pk);
 }
 
 void
@@ -2593,28 +2592,32 @@ vy_commit_alter_space(struct vy_env *env, struct space *new_space,
 		vy_tuple_format_new_with_colmask(new_format);
 	if (format == NULL)
 		return -1;
-	tuple_format_ref(format);
 
 	/* Update the upsert format. */
 	struct tuple_format *upsert_format =
 		vy_tuple_format_new_upsert(new_format);
 	if (upsert_format == NULL) {
-		tuple_format_unref(format);
+		tuple_format_delete(format);
 		return -1;
 	}
-	tuple_format_ref(upsert_format);
 
 	/* Set possibly changed opts. */
 	pk->opts = new_index_def->opts;
 
 	/* Set new formats. */
+	tuple_format_unref(pk->disk_format);
 	tuple_format_unref(pk->mem_format);
 	tuple_format_unref(pk->upsert_format);
 	tuple_format_unref(pk->mem_format_with_colmask);
+	pk->disk_format = new_format;
+	tuple_format_ref(new_format);
 	pk->upsert_format = upsert_format;
+	tuple_format_ref(upsert_format);
 	pk->mem_format_with_colmask = format;
+	tuple_format_ref(format);
 	pk->mem_format = new_format;
-	tuple_format_ref(pk->mem_format);
+	tuple_format_ref(new_format);
+	vy_index_validate_formats(pk);
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
@@ -2625,11 +2628,15 @@ vy_commit_alter_space(struct vy_env *env, struct space *new_space,
 		index->opts = new_index_def->opts;
 		tuple_format_unref(index->mem_format_with_colmask);
 		tuple_format_unref(index->mem_format);
+		tuple_format_unref(index->upsert_format);
 		index->mem_format_with_colmask =
 			pk->mem_format_with_colmask;
 		index->mem_format = pk->mem_format;
+		index->upsert_format = pk->upsert_format;
 		tuple_format_ref(index->mem_format_with_colmask);
 		tuple_format_ref(index->mem_format);
+		tuple_format_ref(index->upsert_format);
+		vy_index_validate_formats(index);
 	}
 	return 0;
 }

@@ -58,13 +58,10 @@ struct vinyl_iterator {
 };
 
 VinylIndex::VinylIndex(struct vy_env *env, struct index_def *index_def,
-		       struct tuple_format *format, struct vy_index *pk,
-		       const struct field_def *space_fields,
-		       uint32_t field_count)
+		       struct tuple_format *format, struct vy_index *pk)
 	: Index(index_def), env(env)
 {
-	db = vy_new_index(env, index_def, format, pk, space_fields,
-			  field_count);
+	db = vy_new_index(env, index_def, format, pk);
 	if (db == NULL)
 		diag_raise();
 }

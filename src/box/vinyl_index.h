@@ -43,8 +43,7 @@ struct VinylIndex: public Index
 {
 public:
 	VinylIndex(struct vy_env *env, struct index_def *index_def,
-		   struct tuple_format *format, struct vy_index *pk,
-		   const struct field_def *space_fields, uint32_t field_count);
+		   struct tuple_format *format, struct vy_index *pk);
 	virtual ~VinylIndex() override;
 
 	/**

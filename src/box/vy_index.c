@@ -53,6 +53,32 @@
 #include "vy_upsert.h"
 #include "vy_read_set.h"
 
+void
+vy_index_validate_formats(const struct vy_index *index)
+{
+	(void) index;
+	assert(index->disk_format != NULL);
+	assert(index->mem_format != NULL);
+	assert(index->mem_format_with_colmask != NULL);
+	assert(index->upsert_format != NULL);
+	uint32_t index_field_count = index->mem_format->index_field_count;
+	(void) index_field_count;
+	if (index->id == 0) {
+		assert(index->disk_format == index->mem_format);
+		assert(index->disk_format->index_field_count ==
+		       index_field_count);
+		assert(index->mem_format_with_colmask->index_field_count ==
+		       index_field_count);
+	} else {
+		assert(index->disk_format != index->mem_format);
+		assert(index->disk_format->index_field_count <=
+		       index_field_count);
+	}
+	assert(index->upsert_format->index_field_count == index_field_count);
+	assert(index->mem_format_with_colmask->index_field_count ==
+	       index_field_count);
+}
+
 int
 vy_index_env_create(struct vy_index_env *env, const char *path,
 		    struct lsregion *allocator, int64_t *p_generation,
@@ -96,8 +122,7 @@ vy_index_name(struct vy_index *index)
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk, const struct field_def *space_fields,
-	     uint32_t field_count)
+	     struct vy_index *pk)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -137,15 +162,14 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		 * primary key. And they must have field
 		 * definitions as well as space->format tuples.
 		 */
-		index->disk_format =
-			tuple_format_new(&vy_tuple_format_vtab, &cmp_def, 1,
-					 0, space_fields, field_count);
+		index->disk_format = format;
+		tuple_format_ref(format);
 	} else {
 		index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
 						      &cmp_def, 1, 0, NULL, 0);
+		if (index->disk_format == NULL)
+			goto fail_format;
 	}
-	if (index->disk_format == NULL)
-		goto fail_format;
 	tuple_format_ref(index->disk_format);
 
 	if (index_def->iid == 0) {
@@ -203,6 +227,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	vy_index_read_set_new(&index->read_set);
 
 	index_env->index_count++;
+	vy_index_validate_formats(index);
 	return index;
 
 fail_mem:
