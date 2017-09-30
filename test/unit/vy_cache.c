@@ -86,7 +86,7 @@ test_basic()
 	struct tuple *ret;
 	bool unused;
 	for (int i = 0; i < 4; ++i)
-		itr.base.iface->next_key(&itr.base, &ret, &unused);
+		vy_cache_iterator_next(&itr, &ret, &unused);
 	ok(vy_stmt_are_same(ret, &chain1[3], format, NULL, NULL),
 	   "next_key * 4");
 
@@ -108,13 +108,13 @@ test_basic()
 	 */
 	struct tuple *last_stmt =
 		vy_new_simple_stmt(format, NULL, NULL, &chain1[0]);
-	ok(itr.base.iface->restore(&itr.base, last_stmt, &ret, &unused) >= 0,
+	ok(vy_cache_iterator_restore(&itr, last_stmt, &ret, &unused) >= 0,
 	   "restore");
 	ok(vy_stmt_are_same(ret, &chain1[1], format, NULL, NULL),
 	   "restore on position after last");
 	tuple_unref(last_stmt);
 
-	itr.base.iface->close(&itr.base);
+	vy_cache_iterator_close(&itr);
 
 	tuple_unref(select_all);
 	destroy_test_cache(&cache, key_def, format);

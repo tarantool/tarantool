@@ -264,9 +264,8 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 			     itr->p_read_view, index->cmp_def,
 			     index->key_def, index->disk_format,
 			     index->upsert_format, index->id == 0);
-	bool unused;
 	struct tuple *stmt;
-	rc = run_itr.base.iface->next_key(&run_itr.base, &stmt, &unused);
+	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {
 		struct vy_stmt_history_node *node = vy_point_iterator_new_node();
 		if (node == NULL) {
@@ -281,9 +280,9 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 			*terminal_found = true;
 			break;
 		}
-		rc = run_itr.base.iface->next_lsn(&run_itr.base, &stmt);
+		rc = vy_run_iterator_next_lsn(&run_itr, &stmt);
 	}
-	run_itr.base.iface->close(&run_itr.base);
+	vy_run_iterator_close(&run_itr);
 	return rc;
 }
 

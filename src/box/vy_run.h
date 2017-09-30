@@ -204,8 +204,6 @@ struct vy_run_iterator_pos {
  * key.
  */
 struct vy_run_iterator {
-	/** Parent class, must be the first member */
-	struct vy_stmt_iterator base;
 	/** Usage statistics */
 	struct vy_run_iterator_stat *stat;
 	/** Vinyl run environment. */
@@ -464,6 +462,9 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 	     const struct key_def *cmp_def,
 	     struct vy_slice **result);
 
+/**
+ * Open an iterator over on-disk run.
+ */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
@@ -474,6 +475,28 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct tuple_format *format,
 		     struct tuple_format *upsert_format,
 		     bool is_primary);
+
+/**
+ * Advance a run iterator to the newest statement for the next key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+NODISCARD int
+vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret);
+
+/**
+ * Advance a run iterator to the older statement for the same key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+NODISCARD int
+vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret);
+
+/**
+ * Close a run iterator.
+ */
+void
+vy_run_iterator_close(struct vy_run_iterator *itr);
 
 /**
  * Simple stream over a slice. @see vy_stmt_stream.

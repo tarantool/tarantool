@@ -1313,13 +1313,6 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	return 0;
 }
 
-/*
- * FIXME: vy_run_iterator_next_key() calls vy_run_iterator_start() which
- * recursivly calls vy_run_iterator_next_key().
- */
-static NODISCARD int
-vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
-			 bool *stop);
 /**
  * Start iteration for a given key and direction.
  * Note, this function doesn't check slice boundaries.
@@ -1413,7 +1406,7 @@ vy_run_iterator_start_from(struct vy_run_iterator *itr,
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need to make a step on previous key
 		 */
-		return vy_run_iterator_next_key(&itr->base, ret, NULL);
+		return vy_run_iterator_next_key(itr, ret);
 	} else {
 		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
 		       iterator_type == ITER_EQ);
@@ -1498,12 +1491,6 @@ vy_run_iterator_start(struct vy_run_iterator *itr, struct tuple **ret)
 
 /* {{{ vy_run_iterator API implementation */
 
-/** Vtable for vy_stmt_iterator - declared below */
-static struct vy_stmt_iterator_iface vy_run_iterator_iface;
-
-/**
- * Open the iterator.
- */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
@@ -1515,7 +1502,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct tuple_format *upsert_format,
 		     bool is_primary)
 {
-	itr->base.iface = &vy_run_iterator_iface;
 	itr->stat = stat;
 	itr->cmp_def = cmp_def;
 	itr->key_def = key_def;
@@ -1572,21 +1558,9 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
 	return rc;
 }
 
-/**
- * Find the next stmt in a page, i.e. a stmt with a different key
- * and fresh enough LSN (i.e. skipping the keys
- * too old for the current transaction).
- *
- * @retval 0 success or EOF (*ret == NULL)
- * @retval -1 memory or read error
- */
-static NODISCARD int
-vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
-			 bool *stop)
+NODISCARD int
+vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 {
-	(void)stop;
-	assert(vitr->iface->next_key == vy_run_iterator_next_key);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	*ret = NULL;
 	int rc;
 
@@ -1677,16 +1651,9 @@ vy_run_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 	return vy_run_iterator_find_lsn(itr, itr->iterator_type, itr->key, ret);
 }
 
-/**
- * Find next (lower, older) record with the same key as current
- * @retval 0 success or EOF (*ret == NULL)
- * @retval -1 memory or read error
- */
-static NODISCARD int
-vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
+NODISCARD int
+vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 {
-	assert(vitr->iface->next_lsn == vy_run_iterator_next_lsn);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	*ret = NULL;
 	int rc;
 
@@ -1735,42 +1702,12 @@ vy_run_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
 	return vy_run_iterator_get(itr, ret);
 }
 
-/** Disk runs are immutable so the ->restore() callback is a no-op. */
-static NODISCARD int
-vy_run_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct tuple *last_stmt,
-			struct tuple **ret, bool *stop)
+void
+vy_run_iterator_close(struct vy_run_iterator *itr)
 {
-	(void)ret;
-	(void)stop;
-	(void)last_stmt;
-
-	assert(vitr->iface->restore == vy_run_iterator_restore);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
-
-	assert(itr->search_started);
-	(void)itr;
-	return 0;
-}
-
-/**
- * Close the iterator and free resources.
- */
-static void
-vy_run_iterator_close(struct vy_stmt_iterator *vitr)
-{
-	assert(vitr->iface->close == vy_run_iterator_close);
-	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	vy_run_iterator_cache_clean(itr);
 	TRASH(itr);
 }
-
-static struct vy_stmt_iterator_iface vy_run_iterator_iface = {
-	.next_key = vy_run_iterator_next_key,
-	.next_lsn = vy_run_iterator_next_lsn,
-	.restore = vy_run_iterator_restore,
-	.close = vy_run_iterator_close,
-};
 
 /* }}} vy_run_iterator API implementation */
 

@@ -50,7 +50,6 @@ struct vy_read_src {
 		struct vy_mem_iterator mem_iterator;
 		struct vy_txw_iterator txw_iterator;
 		struct vy_cache_iterator cache_iterator;
-		struct vy_stmt_iterator iterator;
 	};
 	/** Set if the iterator was started. */
 	bool is_started;
@@ -88,8 +87,6 @@ vy_read_iterator_reserve(struct vy_read_iterator *itr, uint32_t capacity)
 /**
  * Add another source to read iterator. Must be called before actual
  * iteration start and must not be called after.
- * The resulting vy_stmt_iterator must be properly initialized before merge
- * iteration start.
  */
 static struct vy_read_src *
 vy_read_iterator_add_src(struct vy_read_iterator *itr)
@@ -243,9 +240,8 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 static void
 vy_read_iterator_scan_txw(struct vy_read_iterator *itr, bool *stop)
 {
-	int rc;
-	bool unused;
 	struct vy_read_src *src = &itr->src[itr->txw_src];
+	struct vy_txw_iterator *src_itr = &src->txw_iterator;
 
 	if (itr->tx == NULL)
 		return;
@@ -254,48 +250,38 @@ vy_read_iterator_scan_txw(struct vy_read_iterator *itr, bool *stop)
 
 	if (!src->is_started) {
 		src->is_started = true;
-		rc = src->iterator.iface->next_key(&src->iterator,
-						   &src->stmt, &unused);
+		vy_txw_iterator_next(src_itr, &src->stmt);
 	} else {
-		rc = src->iterator.iface->restore(&src->iterator,
-				itr->last_stmt, &src->stmt, &unused);
+		int rc = vy_txw_iterator_restore(src_itr, itr->last_stmt,
+						 &src->stmt);
 		if (rc == 0 && src->front_id == itr->prev_front_id)
-			rc = src->iterator.iface->next_key(&src->iterator,
-							   &src->stmt, &unused);
+			vy_txw_iterator_next(src_itr, &src->stmt);
+		assert(rc >= 0);
 	}
-	assert(rc >= 0);
-	(void)rc;
-
 	vy_read_iterator_evaluate_src(itr, src, stop);
 }
 
 static void
 vy_read_iterator_scan_cache(struct vy_read_iterator *itr, bool *stop)
 {
-	int rc;
 	bool is_interval = false;
 	struct vy_read_src *src = &itr->src[itr->cache_src];
+	struct vy_cache_iterator *src_itr = &src->cache_iterator;
 
 	if (!src->is_started) {
 		src->is_started = true;
-		rc = src->iterator.iface->next_key(&src->iterator,
-					&src->stmt, &is_interval);
+		vy_cache_iterator_next(src_itr, &src->stmt, &is_interval);
 	} else {
-		rc = src->iterator.iface->restore(&src->iterator,
-				itr->last_stmt, &src->stmt, &is_interval);
+		int rc = vy_cache_iterator_restore(src_itr, itr->last_stmt,
+						   &src->stmt, &is_interval);
 		if (rc == 0 && src->front_id == itr->prev_front_id)
-			rc = src->iterator.iface->next_key(&src->iterator,
-						&src->stmt, &is_interval);
+			vy_cache_iterator_next(src_itr, &src->stmt, &is_interval);
+		assert(rc >= 0);
 	}
-	assert(rc >= 0);
-	(void)rc;
 
 	while (itr->cache_src >= itr->skipped_src && src->stmt != NULL &&
 	       vy_read_iterator_cmp_stmt(itr, src->stmt, itr->last_stmt) <= 0) {
-		rc = src->iterator.iface->next_key(&src->iterator,
-					&src->stmt, &is_interval);
-		assert(rc == 0);
-		(void)rc;
+		vy_cache_iterator_next(src_itr, &src->stmt, &is_interval);
 	}
 
 	vy_read_iterator_evaluate_src(itr, src, stop);
@@ -311,29 +297,26 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr,
 			  uint32_t mem_src, bool *stop)
 {
 	int rc;
-	bool unused;
 	struct vy_read_src *src = &itr->src[mem_src];
+	struct vy_mem_iterator *src_itr = &src->mem_iterator;
 
 	assert(mem_src >= itr->mem_src && mem_src < itr->disk_src);
 
 	if (!src->is_started) {
 		src->is_started = true;
-		rc = src->iterator.iface->next_key(&src->iterator,
-						   &src->stmt, &unused);
+		rc = vy_mem_iterator_next_key(src_itr, &src->stmt);
 	} else {
-		rc = src->iterator.iface->restore(&src->iterator,
-				itr->last_stmt, &src->stmt, &unused);
+		rc = vy_mem_iterator_restore(src_itr, itr->last_stmt,
+					     &src->stmt);
 		if (rc == 0 && src->front_id == itr->prev_front_id)
-			rc = src->iterator.iface->next_key(&src->iterator,
-							   &src->stmt, &unused);
+			rc = vy_mem_iterator_next_key(src_itr, &src->stmt);
 	}
 	if (rc < 0)
 		return -1;
 
 	while (mem_src >= itr->skipped_src && src->stmt != NULL &&
 	       vy_read_iterator_cmp_stmt(itr, src->stmt, itr->last_stmt) <= 0) {
-		rc = src->iterator.iface->next_key(&src->iterator,
-						   &src->stmt, &unused);
+		rc = vy_mem_iterator_next_key(src_itr, &src->stmt);
 		if (rc < 0)
 			return -1;
 	}
@@ -347,15 +330,14 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr,
 			   uint32_t disk_src, bool *stop)
 {
 	int rc = 0;
-	bool unused;
 	struct vy_read_src *src = &itr->src[disk_src];
+	struct vy_run_iterator *src_itr = &src->run_iterator;
 
 	assert(disk_src >= itr->disk_src && disk_src < itr->src_count);
 
 	if (!src->is_started || src->front_id == itr->prev_front_id) {
 		src->is_started = true;
-		rc = src->iterator.iface->next_key(&src->iterator,
-						   &src->stmt, &unused);
+		rc = vy_run_iterator_next_key(src_itr, &src->stmt);
 	}
 	if (rc < 0)
 		return -1;
@@ -364,8 +346,7 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr,
 
 	while (disk_src >= itr->skipped_src && src->stmt != NULL &&
 	       vy_read_iterator_cmp_stmt(itr, src->stmt, itr->last_stmt) <= 0) {
-		rc = src->iterator.iface->next_key(&src->iterator,
-						   &src->stmt, &unused);
+		rc = vy_run_iterator_next_key(src_itr, &src->stmt);
 		if (rc < 0)
 			return -1;
 		if (vy_read_iterator_check_version(itr))
@@ -386,11 +367,10 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr)
 {
 	int rc;
 	int cmp;
-	bool unused;
 	struct vy_read_src *src = &itr->src[itr->mem_src];
 
-	rc = src->iterator.iface->restore(&src->iterator, itr->last_stmt,
-					  &src->stmt, &unused);
+	rc = vy_mem_iterator_restore(&src->mem_iterator,
+				     itr->last_stmt, &src->stmt);
 	if (rc < 0)
 		return -1; /* memory allocation error */
 	if (rc == 0)
@@ -546,8 +526,8 @@ vy_read_iterator_next_lsn(struct vy_read_iterator *itr, struct tuple **ret)
 		if (src->front_id != itr->front_id)
 			continue;
 		if (i == itr->curr_src &&
-		    src->iterator.iface->next_lsn(&src->iterator,
-						  &src->stmt) != 0)
+		    vy_mem_iterator_next_lsn(&src->mem_iterator,
+					     &src->stmt) != 0)
 			return -1;
 		if (src->stmt != NULL)
 			goto found;
@@ -564,8 +544,8 @@ vy_read_iterator_next_lsn(struct vy_read_iterator *itr, struct tuple **ret)
 		if (src->front_id != itr->front_id)
 			continue;
 		if (i == itr->curr_src &&
-		    src->iterator.iface->next_lsn(&src->iterator,
-						  &src->stmt) != 0)
+		    vy_run_iterator_next_lsn(&src->run_iterator,
+					     &src->stmt) != 0)
 			return -1;
 		if (vy_read_iterator_check_version(itr))
 			return -2;
@@ -710,6 +690,33 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr,
 }
 
 /**
+ * Close all open sources.
+ */
+static void
+vy_read_iterator_close_src(struct vy_read_iterator *itr)
+{
+	uint32_t i;
+	struct vy_read_src *src;
+
+	if (itr->txw_src < itr->src_count) {
+		src = &itr->src[itr->txw_src];
+		vy_txw_iterator_close(&src->txw_iterator);
+	}
+	if (itr->cache_src < itr->src_count) {
+		src = &itr->src[itr->cache_src];
+		vy_cache_iterator_close(&src->cache_iterator);
+	}
+	for (i = itr->mem_src; i < itr->disk_src; i++) {
+		src = &itr->src[i];
+		vy_mem_iterator_close(&src->mem_iterator);
+	}
+	for (i = itr->disk_src; i < itr->src_count; i++) {
+		src = &itr->src[i];
+		vy_run_iterator_close(&src->run_iterator);
+	}
+}
+
+/**
  * Set up the read iterator for the current range.
  */
 static void
@@ -721,8 +728,7 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	/* Close all open sources and reset merge state. */
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
-	for (uint32_t i = 0; i < itr->src_count; i++)
-		itr->src[i].iterator.iface->close(&itr->src[i].iterator);
+	vy_read_iterator_close_src(itr);
 	itr->src_count = 0;
 	itr->cache_src = UINT32_MAX;
 	itr->txw_src = UINT32_MAX;
@@ -1108,8 +1114,7 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 		tuple_unref(itr->last_stmt);
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
-	for (uint32_t i = 0; i < itr->src_count; i++)
-		itr->src[i].iterator.iface->close(&itr->src[i].iterator);
+	vy_read_iterator_close_src(itr);
 	free(itr->src);
 	TRASH(itr);
 }

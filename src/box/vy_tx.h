@@ -353,8 +353,6 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt);
  * Iterator over the write set of a transaction.
  */
 struct vy_txw_iterator {
-	/** Parent class, must be the first member. */
-	struct vy_stmt_iterator base;
 	/** Iterator statistics. */
 	struct vy_txw_iterator_stat *stat;
 	/** Transaction whose write set is iterated. */
@@ -387,6 +385,28 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_tx *tx, struct vy_index *index,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key);
+
+/**
+ * Advance a txw iterator to the next statement.
+ * The next statement is returned in @ret (NULL if EOF).
+ */
+void
+vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret);
+
+/**
+ * Check if a txw iterator was invalidated and needs to be restored.
+ * If it does, set the iterator position to the statement following
+ * @last_stmt and return 1, otherwise return 0.
+ */
+int
+vy_txw_iterator_restore(struct vy_txw_iterator *itr,
+			const struct tuple *last_stmt, struct tuple **ret);
+
+/**
+ * Close a txw iterator.
+ */
+void
+vy_txw_iterator_close(struct vy_txw_iterator *itr);
 
 #if defined(__cplusplus)
 } /* extern "C" */

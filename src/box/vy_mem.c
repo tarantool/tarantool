@@ -417,15 +417,11 @@ vy_mem_iterator_start(struct vy_mem_iterator *itr)
 
 /* {{{ vy_mem_iterator API implementation */
 
-/* Declared below */
-static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
-
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv)
 {
-	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
 
 	assert(key != NULL);
@@ -475,19 +471,10 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 	return vy_mem_iterator_find_lsn(itr, itr->iterator_type, itr->key);
 }
 
-/**
- * Find the next record with different key as current and visible lsn.
- * @retval 0 success or EOF (*ret == NULL)
- */
-static NODISCARD int
-vy_mem_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
-			 bool *stop)
+NODISCARD int
+vy_mem_iterator_next_key(struct vy_mem_iterator *itr, struct tuple **ret)
 {
-	(void)stop;
-	assert(vitr->iface->next_key == vy_mem_iterator_next_key);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	*ret = NULL;
-
 	if (vy_mem_iterator_next_key_impl(itr) == 0)
 		return vy_mem_iterator_copy_to(itr, ret);
 	return 0;
@@ -524,40 +511,19 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 	return 1;
 }
 
-/**
- * Find next (lower, older) record with the same key as current
- * @retval 0 success or EOF (*ret == NULL)
- */
-static NODISCARD int
-vy_mem_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
+NODISCARD int
+vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr, struct tuple **ret)
 {
-	assert(vitr->iface->next_lsn == vy_mem_iterator_next_lsn);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	*ret = NULL;
 	if (vy_mem_iterator_next_lsn_impl(itr) == 0)
 		return vy_mem_iterator_copy_to(itr, ret);
 	return 0;
 }
 
-/**
- * Restore the current position (if necessary).
- * @sa struct vy_stmt_iterator comments.
- *
- * @param last_stmt the key the the read iterator was positioned on.
- *
- * @retval 0 nothing changed
- * @retval 1 iterator position was changed
- */
-static NODISCARD int
-vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct tuple *last_stmt,
-			struct tuple **ret, bool *stop)
+NODISCARD int
+vy_mem_iterator_restore(struct vy_mem_iterator *itr,
+			const struct tuple *last_stmt, struct tuple **ret)
 {
-	(void)stop;
-
-	assert(vitr->iface->restore == vy_mem_iterator_restore);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
-
 	assert(itr->search_started);
 	if (itr->version == itr->mem->version)
 		return 0;
@@ -587,25 +553,13 @@ vy_mem_iterator_restore(struct vy_stmt_iterator *vitr,
 	return 1;
 }
 
-/**
- * Close the iterator and free resources.
- */
-static void
-vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
+void
+vy_mem_iterator_close(struct vy_mem_iterator *itr)
 {
-	assert(vitr->iface->close == vy_mem_iterator_close);
-	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
 	TRASH(itr);
 }
-
-static const struct vy_stmt_iterator_iface vy_mem_iterator_iface = {
-	.next_key = vy_mem_iterator_next_key,
-	.next_lsn = vy_mem_iterator_next_lsn,
-	.restore = vy_mem_iterator_restore,
-	.close = vy_mem_iterator_close
-};
 
 static NODISCARD int
 vy_mem_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)

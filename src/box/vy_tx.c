@@ -840,8 +840,6 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	return 0;
 }
 
-static struct vy_stmt_iterator_iface vy_txw_iterator_iface;
-
 void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
@@ -849,7 +847,6 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key)
 {
-	itr->base.iface = &vy_txw_iterator_iface;
 	itr->stat = stat;
 	itr->tx = tx;
 	itr->index = index;
@@ -923,19 +920,10 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr,
 	itr->curr_txv = txv;
 }
 
-/**
- * Advance an iterator to the next statement.
- * Always returns 0. On EOF, *ret is set to NULL.
- */
-static NODISCARD int
-vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
-			 bool *stop)
+void
+vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret)
 {
-	(void)stop;
-	assert(vitr->iface->next_key == vy_txw_iterator_next_key);
-	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
 	*ret = NULL;
-
 	if (!itr->search_started) {
 		itr->search_started = true;
 		vy_txw_iterator_seek(itr, itr->iterator_type, itr->key);
@@ -943,7 +931,7 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 	}
 	assert(itr->version == itr->tx->write_set_version);
 	if (itr->curr_txv == NULL)
-		return 0;
+		return;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		itr->curr_txv = write_set_prev(&itr->tx->write_set, itr->curr_txv);
 	else
@@ -957,42 +945,12 @@ vy_txw_iterator_next_key(struct vy_stmt_iterator *vitr, struct tuple **ret,
 out:
 	if (itr->curr_txv != NULL)
 		vy_txw_iterator_get(itr, ret);
-	return 0;
 }
 
-/**
- * This function does nothing. It is only needed to conform
- * to the common iterator interface.
- */
-static NODISCARD int
-vy_txw_iterator_next_lsn(struct vy_stmt_iterator *vitr, struct tuple **ret)
+int
+vy_txw_iterator_restore(struct vy_txw_iterator *itr,
+			const struct tuple *last_stmt, struct tuple **ret)
 {
-	assert(vitr->iface->next_lsn == vy_txw_iterator_next_lsn);
-	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
-
-	assert(itr->search_started);
-	assert(itr->version == itr->tx->write_set_version);
-	(void)itr;
-
-	*ret = NULL;
-	return 0;
-}
-
-/**
- * Restore the iterator position after a change in the write set.
- * Iterator is positioned to the statement following @last_stmt.
- * Returns 1 if the iterator position changed, 0 otherwise.
- */
-static NODISCARD int
-vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
-			const struct tuple *last_stmt,
-			struct tuple **ret, bool *stop)
-{
-	(void)stop;
-
-	assert(vitr->iface->restore == vy_txw_iterator_restore);
-	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
-
 	assert(itr->search_started);
 	if (itr->version == itr->tx->write_set_version)
 		return 0;
@@ -1025,18 +983,9 @@ vy_txw_iterator_restore(struct vy_stmt_iterator *vitr,
 /**
  * Close a txw iterator.
  */
-static void
-vy_txw_iterator_close(struct vy_stmt_iterator *vitr)
+void
+vy_txw_iterator_close(struct vy_txw_iterator *itr)
 {
-	assert(vitr->iface->close == vy_txw_iterator_close);
-	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
 	(void)itr; /* suppress warn if NDEBUG */
 	TRASH(itr);
 }
-
-static struct vy_stmt_iterator_iface vy_txw_iterator_iface = {
-	.next_key = vy_txw_iterator_next_key,
-	.next_lsn = vy_txw_iterator_next_lsn,
-	.restore = vy_txw_iterator_restore,
-	.close = vy_txw_iterator_close
-};

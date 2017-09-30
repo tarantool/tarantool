@@ -214,8 +214,6 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
  * Cache iterator
  */
 struct vy_cache_iterator {
-	/** Parent class, must be the first member */
-	struct vy_stmt_iterator base;
 	/* The cache */
 	struct vy_cache *cache;
 
@@ -254,6 +252,33 @@ void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
 		       const struct tuple *key, const struct vy_read_view **rv);
+
+/**
+ * Advance a cache iterator to the next statement.
+ * The next statement is returned in @ret (NULL if EOF).
+ * @stop flag is set if a chain was found in the cache
+ * and so there shouldn't be statements preceding the
+ * returned statement in memory or on disk.
+ */
+void
+vy_cache_iterator_next(struct vy_cache_iterator *itr,
+		       struct tuple **ret, bool *stop);
+
+/**
+ * Check if a cache iterator was invalidated and needs to be restored.
+ * If it does, set the iterator position to the statement following
+ * @last_stmt and return 1, otherwise return 0.
+ */
+int
+vy_cache_iterator_restore(struct vy_cache_iterator *itr,
+			  const struct tuple *last_stmt,
+			  struct tuple **ret, bool *stop);
+
+/**
+ * Close a cache iterator.
+ */
+void
+vy_cache_iterator_close(struct vy_cache_iterator *itr);
 
 #if defined(__cplusplus)
 } /* extern "C" { */
