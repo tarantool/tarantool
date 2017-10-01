@@ -37,7 +37,8 @@
 #include "fiber_cond.h"
 #include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
-#include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_stmt_stream.h"
+#include "vy_read_view.h"
 #include "vy_stat.h"
 #include "index_def.h"
 

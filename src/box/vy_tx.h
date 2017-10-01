@@ -44,8 +44,8 @@
 #include "trivia/util.h"
 #include "vy_index.h"
 #include "vy_stat.h"
-#include "vy_stmt_iterator.h"
 #include "vy_read_set.h"
+#include "vy_read_view.h"
 
 #if defined(__cplusplus)
 extern "C" {

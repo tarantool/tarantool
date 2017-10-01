@@ -54,9 +54,9 @@
 #include "vy_mem.h"
 #include "vy_stat.h"
 #include "vy_stmt.h"
-#include "vy_stmt_iterator.h"
 #include "vy_upsert.h"
 #include "vy_read_set.h"
+#include "vy_read_view.h"
 
 int
 write_set_cmp(struct txv *a, struct txv *b)

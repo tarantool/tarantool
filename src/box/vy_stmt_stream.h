@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_VY_STMT_ITERATOR_H
-#define INCLUDES_TARANTOOL_BOX_VY_STMT_ITERATOR_H
+#ifndef INCLUDES_TARANTOOL_BOX_VY_STMT_STREAM_H
+#define INCLUDES_TARANTOOL_BOX_VY_STMT_STREAM_H
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -32,8 +32,6 @@
  */
 
 #include <trivia/util.h>
-#include <stdbool.h>
-#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -82,41 +80,8 @@ struct vy_stmt_stream {
 	const struct vy_stmt_stream_iface *iface;
 };
 
-
-/** The state of the database the cursor should be looking at. */
-struct vy_read_view {
-	/**
-	 * Consistent read view LSN. Originally read-only transactions
-	 * receive a read view lsn upon creation and do not see further
-	 * changes.
-	 * Other transactions are expected to be read-write and
-	 * have vlsn == INT64_MAX to read newest data. Once a value read
-	 * by such a transaction (T) is overwritten by another
-	 * commiting transaction, T permanently goes to read view that does
-	 * not see this change.
-	 * If T does not have any write statements by the commit time it will
-	 * be committed successfully, or aborted as conflicted otherwise.
-	 */
-	int64_t vlsn;
-	/** The link in read_views of the TX manager */
-	struct rlist in_read_views;
-	/**
-	 * The number of references to this read view. The global
-	 * read view has zero refs, we don't do reference
-	 * count it as it is missing from read_views list.
-	 */
-	int refs;
-	/**
-	 * Is set to true when the read view which includes
-	 * a prepared but not committed transaction, is
-	 * compromised by a cascading rollback.
-	 */
-	bool is_aborted;
-};
-
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_BOX_VY_STMT_ITERATOR_H */
+#endif /* INCLUDES_TARANTOOL_BOX_VY_STMT_STREAM_H */

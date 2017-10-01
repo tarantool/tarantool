@@ -31,7 +31,8 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "vy_stmt_iterator.h"
+#include "vy_stmt_stream.h"
+#include "vy_read_view.h"
 #include <stdbool.h>
 #include <pthread.h>
 
