@@ -265,6 +265,15 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
 		       struct tuple **ret, bool *stop);
 
 /**
+ * Advance a cache iterator to the statement following @last_stmt.
+ * The statement is returned in @ret (NULL if EOF).
+ */
+void
+vy_cache_iterator_skip(struct vy_cache_iterator *itr,
+		       const struct tuple *last_stmt,
+		       struct tuple **ret, bool *stop);
+
+/**
  * Check if a cache iterator was invalidated and needs to be restored.
  * If it does, set the iterator position to the statement following
  * @last_stmt and return 1, otherwise return 0.

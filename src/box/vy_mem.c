@@ -521,11 +521,52 @@ vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr, struct tuple **ret)
 }
 
 NODISCARD int
+vy_mem_iterator_skip(struct vy_mem_iterator *itr,
+		     const struct tuple *last_stmt, struct tuple **ret)
+{
+	*ret = NULL;
+	assert(!itr->search_started || itr->version == itr->mem->version);
+
+	/*
+	 * Check if the iterator is already positioned
+	 * at the statement following last_stmt.
+	 */
+	if (itr->search_started &&
+	    (itr->curr_stmt == NULL || last_stmt == NULL ||
+	     iterator_direction(itr->iterator_type) *
+	     vy_stmt_compare(itr->curr_stmt, last_stmt,
+			     itr->mem->cmp_def) > 0)) {
+		if (itr->curr_stmt != NULL)
+			*ret = itr->last_stmt;
+		return 0;
+	}
+
+	const struct tuple *key = itr->key;
+	enum iterator_type iterator_type = itr->iterator_type;
+	if (last_stmt != NULL) {
+		key = last_stmt;
+		iterator_type = iterator_direction(iterator_type) > 0 ?
+				ITER_GT : ITER_LT;
+	}
+
+	itr->search_started = true;
+	vy_mem_iterator_seek(itr, iterator_type, key);
+
+	if (itr->iterator_type == ITER_EQ && last_stmt != NULL &&
+	    itr->curr_stmt != NULL && vy_stmt_compare(itr->key,
+			itr->curr_stmt, itr->mem->cmp_def) != 0)
+		itr->curr_stmt = NULL;
+
+	if (itr->curr_stmt != NULL)
+		return vy_mem_iterator_copy_to(itr, ret);
+	return 0;
+}
+
+NODISCARD int
 vy_mem_iterator_restore(struct vy_mem_iterator *itr,
 			const struct tuple *last_stmt, struct tuple **ret)
 {
-	assert(itr->search_started);
-	if (itr->version == itr->mem->version)
+	if (!itr->search_started || itr->version == itr->mem->version)
 		return 0;
 
 	const struct tuple *key = itr->key;

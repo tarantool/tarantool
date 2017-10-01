@@ -394,6 +394,14 @@ void
 vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret);
 
 /**
+ * Advance a txw iterator to the statement following @last_stmt.
+ * The statement is returned in @ret (NULL if EOF).
+ */
+void
+vy_txw_iterator_skip(struct vy_txw_iterator *itr,
+		     const struct tuple *last_stmt, struct tuple **ret);
+
+/**
  * Check if a txw iterator was invalidated and needs to be restored.
  * If it does, set the iterator position to the statement following
  * @last_stmt and return 1, otherwise return 0.

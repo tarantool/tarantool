@@ -494,6 +494,15 @@ NODISCARD int
 vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret);
 
 /**
+ * Advance a run iterator to the newest statement for the first key
+ * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+NODISCARD int
+vy_run_iterator_skip(struct vy_run_iterator *itr,
+		     const struct tuple *last_stmt, struct tuple **ret);
+
+/**
  * Close a run iterator.
  */
 void

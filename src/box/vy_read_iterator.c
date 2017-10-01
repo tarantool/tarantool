@@ -248,15 +248,15 @@ vy_read_iterator_scan_txw(struct vy_read_iterator *itr, bool *stop)
 
 	assert(itr->txw_src < itr->skipped_src);
 
-	if (!src->is_started) {
-		src->is_started = true;
-		vy_txw_iterator_next(src_itr, &src->stmt);
-	} else {
-		int rc = vy_txw_iterator_restore(src_itr, itr->last_stmt,
-						 &src->stmt);
-		if (rc == 0 && src->front_id == itr->prev_front_id)
+	int rc = vy_txw_iterator_restore(src_itr, itr->last_stmt, &src->stmt);
+	if (rc == 0) {
+		if (!src->is_started) {
+			vy_txw_iterator_skip(src_itr, itr->last_stmt,
+					     &src->stmt);
+		} else if (src->front_id == itr->prev_front_id) {
 			vy_txw_iterator_next(src_itr, &src->stmt);
-		assert(rc >= 0);
+		}
+		src->is_started = true;
 	}
 	vy_read_iterator_evaluate_src(itr, src, stop);
 }
@@ -268,22 +268,18 @@ vy_read_iterator_scan_cache(struct vy_read_iterator *itr, bool *stop)
 	struct vy_read_src *src = &itr->src[itr->cache_src];
 	struct vy_cache_iterator *src_itr = &src->cache_iterator;
 
-	if (!src->is_started) {
+	int rc = vy_cache_iterator_restore(src_itr, itr->last_stmt,
+					   &src->stmt, &is_interval);
+	if (rc == 0) {
+		if (!src->is_started || itr->cache_src >= itr->skipped_src) {
+			vy_cache_iterator_skip(src_itr, itr->last_stmt,
+					       &src->stmt, &is_interval);
+		} else if (src->front_id == itr->prev_front_id) {
+			vy_cache_iterator_next(src_itr, &src->stmt,
+					       &is_interval);
+		}
 		src->is_started = true;
-		vy_cache_iterator_next(src_itr, &src->stmt, &is_interval);
-	} else {
-		int rc = vy_cache_iterator_restore(src_itr, itr->last_stmt,
-						   &src->stmt, &is_interval);
-		if (rc == 0 && src->front_id == itr->prev_front_id)
-			vy_cache_iterator_next(src_itr, &src->stmt, &is_interval);
-		assert(rc >= 0);
 	}
-
-	while (itr->cache_src >= itr->skipped_src && src->stmt != NULL &&
-	       vy_read_iterator_cmp_stmt(itr, src->stmt, itr->last_stmt) <= 0) {
-		vy_cache_iterator_next(src_itr, &src->stmt, &is_interval);
-	}
-
 	vy_read_iterator_evaluate_src(itr, src, stop);
 
 	if (is_interval) {
@@ -302,24 +298,18 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr,
 
 	assert(mem_src >= itr->mem_src && mem_src < itr->disk_src);
 
-	if (!src->is_started) {
-		src->is_started = true;
-		rc = vy_mem_iterator_next_key(src_itr, &src->stmt);
-	} else {
-		rc = vy_mem_iterator_restore(src_itr, itr->last_stmt,
-					     &src->stmt);
-		if (rc == 0 && src->front_id == itr->prev_front_id)
+	rc = vy_mem_iterator_restore(src_itr, itr->last_stmt, &src->stmt);
+	if (rc == 0) {
+		if (!src->is_started || mem_src >= itr->skipped_src) {
+			rc = vy_mem_iterator_skip(src_itr, itr->last_stmt,
+						  &src->stmt);
+		} else if (src->front_id == itr->prev_front_id) {
 			rc = vy_mem_iterator_next_key(src_itr, &src->stmt);
+		}
+		src->is_started = true;
 	}
 	if (rc < 0)
 		return -1;
-
-	while (mem_src >= itr->skipped_src && src->stmt != NULL &&
-	       vy_read_iterator_cmp_stmt(itr, src->stmt, itr->last_stmt) <= 0) {
-		rc = vy_mem_iterator_next_key(src_itr, &src->stmt);
-		if (rc < 0)
-			return -1;
-	}
 
 	vy_read_iterator_evaluate_src(itr, src, stop);
 	return 0;
@@ -335,23 +325,16 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr,
 
 	assert(disk_src >= itr->disk_src && disk_src < itr->src_count);
 
-	if (!src->is_started || src->front_id == itr->prev_front_id) {
-		src->is_started = true;
+	if (!src->is_started || disk_src >= itr->skipped_src)
+		rc = vy_run_iterator_skip(src_itr, itr->last_stmt, &src->stmt);
+	else if (src->front_id == itr->prev_front_id)
 		rc = vy_run_iterator_next_key(src_itr, &src->stmt);
-	}
+	src->is_started = true;
+
 	if (rc < 0)
 		return -1;
 	if (vy_read_iterator_check_version(itr))
 		return -2;
-
-	while (disk_src >= itr->skipped_src && src->stmt != NULL &&
-	       vy_read_iterator_cmp_stmt(itr, src->stmt, itr->last_stmt) <= 0) {
-		rc = vy_run_iterator_next_key(src_itr, &src->stmt);
-		if (rc < 0)
-			return -1;
-		if (vy_read_iterator_check_version(itr))
-			return -2;
-	}
 
 	vy_read_iterator_evaluate_src(itr, src, stop);
 	return 0;
@@ -607,30 +590,33 @@ vy_read_iterator_squash_upsert(struct vy_read_iterator *itr,
 }
 
 static void
-vy_read_iterator_add_tx(struct vy_read_iterator *itr,
-			enum iterator_type iterator_type, struct tuple *key)
+vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 {
 	assert(itr->tx != NULL);
+	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
+					    itr->iterator_type : ITER_LE);
 	struct vy_txw_iterator_stat *stat = &itr->index->stat.txw.iterator;
 	struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 	vy_txw_iterator_open(&sub_src->txw_iterator, stat, itr->tx, itr->index,
-			     iterator_type, key);
+			     iterator_type, itr->key);
 }
 
 static void
-vy_read_iterator_add_cache(struct vy_read_iterator *itr,
-			   enum iterator_type iterator_type, struct tuple *key)
+vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 {
+	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
+					    itr->iterator_type : ITER_LE);
 	struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 	vy_cache_iterator_open(&sub_src->cache_iterator,
 			       &itr->index->cache, iterator_type,
-			       key, itr->read_view);
+			       itr->key, itr->read_view);
 }
 
 static void
-vy_read_iterator_add_mem(struct vy_read_iterator *itr,
-			 enum iterator_type iterator_type, struct tuple *key)
+vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 {
+	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
+					    itr->iterator_type : ITER_LE);
 	struct vy_index *index = itr->index;
 	struct vy_read_src *sub_src;
 
@@ -639,7 +625,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr,
 	sub_src = vy_read_iterator_add_src(itr);
 	vy_mem_iterator_open(&sub_src->mem_iterator,
 			     &index->stat.memory.iterator,
-			     index->mem, iterator_type, key,
+			     index->mem, iterator_type, itr->key,
 			     itr->read_view);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
@@ -647,16 +633,17 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr,
 		sub_src = vy_read_iterator_add_src(itr);
 		vy_mem_iterator_open(&sub_src->mem_iterator,
 				     &index->stat.memory.iterator,
-				     mem, iterator_type, key,
+				     mem, iterator_type, itr->key,
 				     itr->read_view);
 	}
 }
 
 static void
-vy_read_iterator_add_disk(struct vy_read_iterator *itr,
-			  enum iterator_type iterator_type, struct tuple *key)
+vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
 	assert(itr->curr_range != NULL);
+	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
+					    itr->iterator_type : ITER_LE);
 	struct vy_index *index = itr->index;
 	struct vy_slice *slice;
 	/*
@@ -682,7 +669,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr,
 		vy_run_iterator_open(&sub_src->run_iterator,
 				     &index->stat.disk.iterator,
 				     itr->run_env, slice,
-				     iterator_type, key,
+				     iterator_type, itr->key,
 				     itr->read_view, index->cmp_def,
 				     index->key_def, index->disk_format,
 				     index->upsert_format, index->id == 0);
@@ -722,9 +709,6 @@ vy_read_iterator_close_src(struct vy_read_iterator *itr)
 static void
 vy_read_iterator_use_range(struct vy_read_iterator *itr)
 {
-	struct tuple *key = itr->key;
-	enum iterator_type iterator_type = itr->iterator_type;
-
 	/* Close all open sources and reset merge state. */
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
@@ -739,41 +723,21 @@ vy_read_iterator_use_range(struct vy_read_iterator *itr)
 	itr->curr_src = UINT32_MAX;
 	itr->front_id = 1;
 
-	/*
-	 * Open all sources starting from the last statement
-	 * returned to the user. Newer sources must be added
-	 * first.
-	 */
-	if (itr->last_stmt != NULL) {
-		if (iterator_type == ITER_EQ || iterator_type == ITER_REQ)
-			itr->need_check_eq = true;
-		iterator_type = iterator_direction(iterator_type) >= 0 ?
-				ITER_GT : ITER_LT;
-		key = itr->last_stmt;
-	} else if (iterator_type == ITER_REQ) {
-		/*
-		 * Source iterators can't handle ITER_REQ.
-		 * Use ITER_LE instead and enable EQ check.
-		 */
-		iterator_type = ITER_LE;
-		itr->need_check_eq = true;
-	}
-
 	if (itr->tx != NULL) {
 		itr->txw_src = itr->src_count;
-		vy_read_iterator_add_tx(itr, iterator_type, key);
+		vy_read_iterator_add_tx(itr);
 	}
 
 	itr->cache_src = itr->src_count;
-	vy_read_iterator_add_cache(itr, iterator_type, key);
+	vy_read_iterator_add_cache(itr);
 
 	itr->mem_src = itr->src_count;
-	vy_read_iterator_add_mem(itr, iterator_type, key);
+	vy_read_iterator_add_mem(itr);
 
 	itr->disk_src = itr->src_count;
 	if (itr->curr_range != NULL) {
 		itr->range_version = itr->curr_range->version;
-		vy_read_iterator_add_disk(itr, iterator_type, key);
+		vy_read_iterator_add_disk(itr);
 	}
 }
 
@@ -807,6 +771,18 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 
 	if (iterator_type == ITER_ALL)
 		itr->iterator_type = ITER_GE;
+
+	if (iterator_type == ITER_REQ) {
+		/*
+		 * Source iterators cannot handle ITER_REQ and
+		 * use ITER_LE instead, so we need to enable EQ
+		 * check in this case.
+		 *
+		 * See vy_read_iterator_add_{tx,cache,mem,run}.
+		 */
+		itr->need_check_eq = true;
+	}
+
 }
 
 /**

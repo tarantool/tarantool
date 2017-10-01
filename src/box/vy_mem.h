@@ -366,6 +366,15 @@ NODISCARD int
 vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr, struct tuple **ret);
 
 /**
+ * Advance a mem iterator to the newest statement for the first key
+ * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+NODISCARD int
+vy_mem_iterator_skip(struct vy_mem_iterator *itr,
+		     const struct tuple *last_stmt, struct tuple **ret);
+
+/**
  * Check if a mem iterator was invalidated and needs to be restored.
  * If it does, set the iterator position to the newest statement for
  * the key following @last_stmt and return 1, otherwise return 0.
