@@ -66,6 +66,7 @@ renameTableFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 	unsigned char const *zCsr = zSql;
 	int len = 0;
 	char *zRet;
+	bool unused;
 
 	sqlite3 *db = sqlite3_context_db_handle(context);
 
@@ -91,7 +92,7 @@ renameTableFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 			 */
 			do {
 				zCsr += len;
-				len = sqlite3GetToken(zCsr, &token);
+				len = sqlite3GetToken(zCsr, &token, &unused);
 			} while (token == TK_SPACE);
 			assert(len > 0);
 		} while (token != TK_LP && token != TK_USING);
@@ -133,17 +134,18 @@ renameParentFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 	unsigned const char *z;	/* Pointer to token */
 	int n;			/* Length of token z */
 	int token;		/* Type of token */
+	bool unused;
 
 	UNUSED_PARAMETER(NotUsed);
 	if (zInput == 0 || zOld == 0)
 		return;
 	for (z = zInput; *z; z = z + n) {
-		n = sqlite3GetToken(z, &token);
+		n = sqlite3GetToken(z, &token, &unused);
 		if (token == TK_REFERENCES) {
 			char *zParent;
 			do {
 				z += n;
-				n = sqlite3GetToken(z, &token);
+				n = sqlite3GetToken(z, &token, &unused);
 			} while (token == TK_SPACE);
 
 			if (token == TK_ILLEGAL)
@@ -194,6 +196,7 @@ renameTriggerFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 	int len = 0;
 	char *zRet;
 	sqlite3 *db = sqlite3_context_db_handle(context);
+	bool unused;
 
 	UNUSED_PARAMETER(NotUsed);
 
@@ -219,7 +222,7 @@ renameTriggerFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 			 */
 			do {
 				zCsr += len;
-				len = sqlite3GetToken(zCsr, &token);
+				len = sqlite3GetToken(zCsr, &token, &unused);
 			} while (token == TK_SPACE);
 			assert(len > 0);
 

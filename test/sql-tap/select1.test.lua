@@ -1416,7 +1416,7 @@ test:do_catchsql_test(
             SELECT f1 FROM test1 UNION SELECT WHERE;
         ]], {
             -- <select1-7.2>
-            1, [[near "WHERE": syntax error]]
+            1, [[keyword "WHERE" is reserved]]
             -- </select1-7.2>
         })
 
@@ -1428,7 +1428,7 @@ test:do_catchsql_test(
     [[
         SELECT f1 FROM test1 as "hi", test2 as]], {
         -- <select1-7.3>
-        1, [[near "as": syntax error]]
+        1, [[keyword "as" is reserved]]
         -- </select1-7.3>
     })
 
@@ -1448,7 +1448,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 ORDER BY f1 desc, f2 where;
     ]], {
         -- <select1-7.5>
-        1, [[near "where": syntax error]]
+        1, [[keyword "where" is reserved]]
         -- </select1-7.5>
     })
 
@@ -1458,7 +1458,7 @@ test:do_catchsql_test(
         SELECT count(f1,f2 FROM test1;
     ]], {
         -- <select1-7.6>
-        1, [[near "FROM": syntax error]]
+        1, [[keyword "FROM" is reserved]]
         -- </select1-7.6>
     })
 
@@ -1488,7 +1488,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 LIMIT 5+3 OFFSET 11 ORDER BY f2;
     ]], {
         -- <select1-7.9>
-        1, [[near "ORDER": syntax error]]
+        1, [[keyword "ORDER" is reserved]]
         -- </select1-7.9>
     })
 

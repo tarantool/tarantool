@@ -37,12 +37,12 @@ test:do_execsql_test(
 
         CREATE TABLE source_packages
                     (name TEXT NOT NULL,
-                    release TEXT NOT NULL,
+                    release_t TEXT NOT NULL,
                     subrelease TEXT NOT NULL,
                     archive TEXT NOT NULL,
                     version TEXT NOT NULL,
                     version_id INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (name, release, subrelease, archive));
+                    PRIMARY KEY (name, release_t, subrelease, archive));
 
         CREATE TABLE bugs
                 (name TEXT NOT NULL PRIMARY KEY,
@@ -62,14 +62,14 @@ test:do_execsql_test(
                  fixed_version TEXT
                      CHECK (fixed_version IS NULL OR fixed_version <> ''),
                  fixed_version_id INTEGER NOT NULL DEFAULT 0,
-                 release TEXT NOT NULL,
+                 release_t TEXT NOT NULL,
                  package_kind TEXT NOT NULL DEFAULT 'unknown',
                  urgency TEXT NOT NULL,
                  bug_origin TEXT NOT NULL DEFAULT '');
         CREATE INDEX package_notes_package
                     ON package_notes(package);
         CREATE UNIQUE INDEX package_notes_bug
-                    ON package_notes(bug_name, package, release);
+                    ON package_notes(bug_name, package, release_t);
 
         CREATE TABLE debian_bugs
                 (bug INTEGER NOT NULL,

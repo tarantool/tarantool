@@ -84,7 +84,7 @@ test:do_test(
 
             CREATE TABLE Users (
                 userId INTEGER PRIMARY KEY,
-                user STRING UNIQUE,
+                "user" STRING UNIQUE,
                 salt BINARY,
                 password STRING
             );
@@ -139,7 +139,7 @@ test:do_execsql_test(
                left outer join Items as PerItems
                      on Permissions.itemId = PerItems.itemId
              where
-                   Users.user = 'limited'
+                   Users."user" = 'limited'
                and Users.userId = UserGroupMembers.userId
                and UserGroupMembers.userGroupId = Permissions.userGroupId
            ) as UP join LabelMap on ( UP.labelId = 0 or
@@ -175,7 +175,7 @@ test:do_execsql_test(
                left outer join Items as PerItems
                      on Permissions.itemId = PerItems.itemId
              where
-                   Users.user = 'limited'
+                   Users."user" = 'limited'
                and Users.userId = UserGroupMembers.userId
                and UserGroupMembers.userGroupId = Permissions.userGroupId
            ) as UP join LabelMap on ( UP.labelId = 0 or

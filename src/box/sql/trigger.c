@@ -601,7 +601,8 @@ sqlite3DropTriggerPtr(Parse * pParse, Trigger * pTrigger)
 	assert(pTable != 0);
 	if ((v = sqlite3GetVdbe(pParse)) != 0) {
 		Token _trigger = { TARANTOOL_SYS_TRIGGER_NAME,
-			strlen(TARANTOOL_SYS_TRIGGER_NAME)
+			strlen(TARANTOOL_SYS_TRIGGER_NAME),
+			false
 		};
 		const char *column = "name";
 		Expr *value = sqlite3Expr(db, TK_STRING, pTrigger->zName);

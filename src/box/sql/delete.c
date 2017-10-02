@@ -645,7 +645,7 @@ sqlite3DeleteByKey(Parse * pParse, Token * pTab, const char **columns,
 	if (src == NULL)
 		goto error;
 	/* Dummy init of INDEXED BY clause. */
-	Token t = { NULL, 0 };
+	Token t = { NULL, 0, false };
 	sqlite3SrcListIndexedBy(pParse, src, &t);
 
 	for (int i = 0; i < nPairs; ++i) {

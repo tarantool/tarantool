@@ -21,6 +21,7 @@
 #define ISUPPER(X) isupper((unsigned char)(X))
 #define ISLOWER(X) islower((unsigned char)(X))
 
+#define FUTURE_TOKEN "STANDARD"
 
 #ifndef __WIN32__
 #   if defined(_WIN32) || defined(WIN32)
@@ -4061,6 +4062,7 @@ void ReportTable(
       fprintf(out,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
       lineno++;
     }
+    fprintf(out, "#define %s%-s30s %2d\n",prefix,"STANDARD", i);
     fprintf(out,"#endif\n"); lineno++;
   }
   tplt_xfer(lemp->name,in,out,&lineno);
@@ -4544,6 +4546,7 @@ void ReportHeader(struct lemon *lemp)
     for(i=1; i<lemp->nterminal; i++){
       fprintf(out,"#define %s%-30s %3d\n",prefix,lemp->symbols[i]->name,i);
     }
+    fprintf(out,"#define %s%-30s %3d\n",prefix,FUTURE_TOKEN,i);
     fclose(out);  
   }
   return;

@@ -53,10 +53,11 @@ findNextHostParameter(const char *zSql, int *pnToken)
 	int tokenType;
 	int nTotal = 0;
 	int n;
+	bool unused;
 
 	*pnToken = 0;
 	while (zSql[0]) {
-		n = sqlite3GetToken((u8 *) zSql, &tokenType);
+		n = sqlite3GetToken((u8 *) zSql, &tokenType, &unused);
 		assert(n > 0 && tokenType != TK_ILLEGAL);
 		if (tokenType == TK_VARIABLE) {
 			*pnToken = n;

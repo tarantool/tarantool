@@ -106,7 +106,7 @@ test:do_catchsql_test(
         SELECT count(*) FROM t1, t2 USING (a) ON (t1.a=t2.a)
     ]], {
         -- <e_select-0.1.5>
-        1, [[near "ON": syntax error]]
+        1, [[keyword "ON" is reserved]]
         -- </e_select-0.1.5>
     })
 

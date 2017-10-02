@@ -446,7 +446,7 @@ test:do_catchsql_test(6.3, [[
     INSERT INTO t2 SELECT a, b, FROM t1;
 ]], {
     -- <6.3>
-    1, [[near "FROM": syntax error]]
+    1, [[keyword "FROM" is reserved]]
     -- </6.3>
 })
 
@@ -464,7 +464,7 @@ test:do_catchsql_test(6.4, [[
     INSERT INTO t2 SELECT a, b, FROM t1 a a a;
 ]], {
     -- <6.4>
-    1, [[near "FROM": syntax error]]
+    1, [[keyword "FROM" is reserved]]
     -- </6.4>
 })
 

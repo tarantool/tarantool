@@ -68,9 +68,9 @@ test:do_execsql_test(
         INSERT INTO t4 VALUES(4, 'b', 2, 'four');
         SELECT ( 
           SELECT c FROM (
-            SELECT a,b,c FROM t4 WHERE a=out.a ORDER BY b LIMIT 10 OFFSET 1
-          ) WHERE b=out.b
-        ) FROM t4 AS out;
+            SELECT a,b,c FROM t4 WHERE a=output.a ORDER BY b LIMIT 10 OFFSET 1
+          ) WHERE b=output.b
+        ) FROM t4 AS output;
     ]], {
         -- <1.2>
         "", "two", "", "four"

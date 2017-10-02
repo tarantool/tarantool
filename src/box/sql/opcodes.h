@@ -76,24 +76,24 @@
 #define OP_Int64          73 /* synopsis: r[P2]=P4                         */
 #define OP_String         74 /* synopsis: r[P2]='P4' (len=P1)              */
 #define OP_Null           75 /* synopsis: r[P2..P3]=NULL                   */
-#define OP_SoftNull       76 /* synopsis: r[P1]=NULL                       */
-#define OP_Blob           77 /* synopsis: r[P2]=P4 (len=P1, subtype=P3)    */
-#define OP_Variable       78 /* synopsis: r[P2]=parameter(P1,P4)           */
-#define OP_Move           79 /* synopsis: r[P2@P3]=r[P1@P3]                */
-#define OP_Copy           80 /* synopsis: r[P2@P3+1]=r[P1@P3+1]            */
-#define OP_SCopy          81 /* synopsis: r[P2]=r[P1]                      */
-#define OP_IntCopy        82 /* synopsis: r[P2]=r[P1]                      */
-#define OP_ResultRow      83 /* synopsis: output=r[P1@P2]                  */
-#define OP_CollSeq        84
-#define OP_Function0      85 /* synopsis: r[P3]=func(r[P2@P5])             */
-#define OP_Function       86 /* synopsis: r[P3]=func(r[P2@P5])             */
-#define OP_AddImm         87 /* synopsis: r[P1]=r[P1]+P2                   */
-#define OP_RealAffinity   88
-#define OP_Cast           89 /* synopsis: affinity(r[P1])                  */
-#define OP_Permutation    90
-#define OP_Compare        91 /* synopsis: r[P1@P3] <-> r[P2@P3]            */
-#define OP_Column         92 /* synopsis: r[P3]=PX                         */
-#define OP_String8        93 /* same as TK_STRING, synopsis: r[P2]='P4'    */
+#define OP_String8        76 /* same as TK_STRING, synopsis: r[P2]='P4'    */
+#define OP_SoftNull       77 /* synopsis: r[P1]=NULL                       */
+#define OP_Blob           78 /* synopsis: r[P2]=P4 (len=P1, subtype=P3)    */
+#define OP_Variable       79 /* synopsis: r[P2]=parameter(P1,P4)           */
+#define OP_Move           80 /* synopsis: r[P2@P3]=r[P1@P3]                */
+#define OP_Copy           81 /* synopsis: r[P2@P3+1]=r[P1@P3+1]            */
+#define OP_SCopy          82 /* synopsis: r[P2]=r[P1]                      */
+#define OP_IntCopy        83 /* synopsis: r[P2]=r[P1]                      */
+#define OP_ResultRow      84 /* synopsis: output=r[P1@P2]                  */
+#define OP_CollSeq        85
+#define OP_Function0      86 /* synopsis: r[P3]=func(r[P2@P5])             */
+#define OP_Function       87 /* synopsis: r[P3]=func(r[P2@P5])             */
+#define OP_AddImm         88 /* synopsis: r[P1]=r[P1]+P2                   */
+#define OP_RealAffinity   89
+#define OP_Cast           90 /* synopsis: affinity(r[P1])                  */
+#define OP_Permutation    91
+#define OP_Compare        92 /* synopsis: r[P1@P3] <-> r[P2@P3]            */
+#define OP_Column         93 /* synopsis: r[P3]=PX                         */
 #define OP_Affinity       94 /* synopsis: affinity(r[P1@P2])               */
 #define OP_MakeRecord     95 /* synopsis: r[P3]=mkrec(r[P1@P2])            */
 #define OP_Count          96 /* synopsis: r[P2]=count()                    */
@@ -116,19 +116,19 @@
 #define OP_NewRowid      113 /* synopsis: r[P2]=rowid                      */
 #define OP_Insert        114 /* synopsis: intkey=r[P3] data=r[P2]          */
 #define OP_InsertInt     115 /* synopsis: intkey=P3 data=r[P2]             */
-#define OP_Delete        116
-#define OP_ResetCount    117
-#define OP_SorterCompare 118 /* synopsis: if key(P1)!=trim(r[P3],P4) goto P2 */
-#define OP_SorterData    119 /* synopsis: r[P2]=data                       */
-#define OP_RowData       120 /* synopsis: r[P2]=data                       */
-#define OP_Rowid         121 /* synopsis: r[P2]=rowid                      */
-#define OP_NullRow       122
-#define OP_SorterInsert  123 /* synopsis: key=r[P2]                        */
-#define OP_IdxInsert     124 /* synopsis: key=r[P2]                        */
-#define OP_IdxDelete     125 /* synopsis: key=r[P2@P3]                     */
-#define OP_Seek          126 /* synopsis: Move P3 to P1.rowid              */
-#define OP_IdxRowid      127 /* synopsis: r[P2]=rowid                      */
-#define OP_Real          128 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_Real          116 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_Delete        117
+#define OP_ResetCount    118
+#define OP_SorterCompare 119 /* synopsis: if key(P1)!=trim(r[P3],P4) goto P2 */
+#define OP_SorterData    120 /* synopsis: r[P2]=data                       */
+#define OP_RowData       121 /* synopsis: r[P2]=data                       */
+#define OP_Rowid         122 /* synopsis: r[P2]=rowid                      */
+#define OP_NullRow       123
+#define OP_SorterInsert  124 /* synopsis: key=r[P2]                        */
+#define OP_IdxInsert     125 /* synopsis: key=r[P2]                        */
+#define OP_IdxDelete     126 /* synopsis: key=r[P2@P3]                     */
+#define OP_Seek          127 /* synopsis: Move P3 to P1.rowid              */
+#define OP_IdxRowid      128 /* synopsis: r[P2]=rowid                      */
 #define OP_Destroy       129
 #define OP_Clear         130
 #define OP_ResetSorter   131
@@ -179,13 +179,13 @@
 /*  48 */ 0x09, 0x09, 0x09, 0x01, 0x01, 0x01, 0x01, 0x01,\
 /*  56 */ 0x01, 0x01, 0x01, 0x23, 0x0b, 0x01, 0x01, 0x03,\
 /*  64 */ 0x03, 0x03, 0x01, 0x02, 0x02, 0x08, 0x00, 0x10,\
-/*  72 */ 0x10, 0x10, 0x10, 0x10, 0x00, 0x10, 0x10, 0x00,\
-/*  80 */ 0x00, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00, 0x02,\
-/*  88 */ 0x02, 0x02, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00,\
+/*  72 */ 0x10, 0x10, 0x10, 0x10, 0x10, 0x00, 0x10, 0x10,\
+/*  80 */ 0x00, 0x00, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00,\
+/*  88 */ 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,\
 /*  96 */ 0x10, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00,\
 /* 104 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x20,\
-/* 112 */ 0x10, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
-/* 120 */ 0x00, 0x10, 0x00, 0x04, 0x04, 0x00, 0x00, 0x10,\
+/* 112 */ 0x10, 0x10, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,\
+/* 120 */ 0x00, 0x00, 0x10, 0x00, 0x04, 0x04, 0x00, 0x00,\
 /* 128 */ 0x10, 0x10, 0x00, 0x00, 0x10, 0x10, 0x00, 0x00,\
 /* 136 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x10,\
 /* 144 */ 0x00, 0x04, 0x1a, 0x00, 0x00, 0x00, 0x00, 0x00,\

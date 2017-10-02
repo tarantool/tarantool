@@ -2000,6 +2000,7 @@ struct IndexSample {
 struct Token {
 	const char *z;		/* Text of the token.  Not NULL-terminated! */
 	unsigned int n;		/* Number of characters in this token */
+	bool isReserved;         /* If reserved keyword or not */
 };
 
 /*
@@ -3778,7 +3779,7 @@ extern int sqlite3PendingByte;
 void sqlite3Reindex(Parse *, Token *, Token *);
 void sqlite3AlterFunctions(void);
 void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
-int sqlite3GetToken(const unsigned char *, int *);
+int sqlite3GetToken(const unsigned char *, int *, bool *);
 void sqlite3NestedParse(Parse *, const char *, ...);
 void sqlite3ExpirePreparedStatements(sqlite3 *);
 int sqlite3CodeSubselect(Parse *, Expr *, int, int);

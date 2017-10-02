@@ -716,7 +716,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT replace(1)
     ]], {
         -- <limit-12.1>
-        1, "wrong number of arguments to function replace()"
+        1, 'wrong number of arguments to function replace()'
         -- </limit-12.1>
     })
 
@@ -726,7 +726,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT 5 OFFSET replace(1)
     ]], {
         -- <limit-12.2>
-        1, "wrong number of arguments to function replace()"
+        1, 'wrong number of arguments to function replace()'
         -- </limit-12.2>
     })
 

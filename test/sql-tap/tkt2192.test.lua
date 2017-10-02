@@ -30,7 +30,7 @@ test:do_execsql_test(
         -- Raw data (RBS) --------
 
         create table records (
-          date          real primary key,
+          date_t        real primary key,
           type          text,
           description   text,
           value         integer,
@@ -43,29 +43,29 @@ test:do_execsql_test(
           select * from records where type = 'D/D';
 
         create view monthly_direct_debits as
-          select strftime('%Y-%m', date) as date, (-1 * sum(value)) as value
+          select strftime('%Y-%m', date_t) as "date", (-1 * sum(value)) as value
             from direct_debits
-           group by strftime('%Y-%m', date);
+           group by strftime('%Y-%m', date_t);
 
         -- Expense Categories ---------------
         create view energy as
-          select strftime('%Y-%m', date) as date, (-1 * sum(value)) as value
+          select strftime('%Y-%m', date_t) as "date", (-1 * sum(value)) as value
             from direct_debits
            where description like '%NPOWER%'
-           group by strftime('%Y-%m', date);
+           group by strftime('%Y-%m', date_t);
 
         create view phone_internet as
-          select strftime('%Y-%m', date) as date, (-1 * sum(value)) as value
+          select strftime('%Y-%m', date_t) as "date", (-1 * sum(value)) as value
             from direct_debits
            where description like '%BT DIRECT%'
               or description like '%SUPANET%'
               or description like '%ORANGE%'
-           group by strftime('%Y-%m', date);
+           group by strftime('%Y-%m', date_t);
 
         create view credit_cards as
-          select strftime('%Y-%m', date) as date, (-1 * sum(value)) as value
+          select strftime('%Y-%m', date_t) as "date", (-1 * sum(value)) as value
             from direct_debits where description like '%VISA%'
-           group by strftime('%Y-%m', date);
+           group by strftime('%Y-%m', date_t);
 
         -- Overview ---------------------
 
@@ -78,11 +78,11 @@ test:do_execsql_test(
 
         create view jan as
           select 'jan', expense, value from expense_overview
-           where date like '%-01';
+           where "date" like '%-01';
 
         create view nov as
           select 'nov', expense, value from expense_overview
-           where date like '%-11';
+           where "date" like '%-11';
 
         create view summary as
           select * from jan join nov on (jan.expense = nov.expense);

@@ -107,7 +107,7 @@ test:do_test(
             INSERT INTO "object_changes" VALUES(2048,1,114608,'exported_pools',2,2319);
             CREATE TABLE timeline (
                                 rowid        integer primary key,
-                                timestamp    text,
+                                timestamp_t    text,
                                 system_id    int,
                                 entry_type   int,
                                 entry_id     int

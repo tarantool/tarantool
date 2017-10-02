@@ -269,8 +269,8 @@ FuncDefHash sqlite3BuiltinFunctions;
  * Constant tokens for values 0 and 1.
  */
 const Token sqlite3IntTokens[] = {
-	{"0", 1},
-	{"1", 1}
+	{"0", 1, false},
+	{"1", 1, false}
 };
 
 /*

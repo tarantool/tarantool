@@ -23,6 +23,7 @@
 ** input grammar file:
 */
 #include <stdio.h>
+#include <stdbool.h>
 /************ Begin %include sections from the grammar ************************/
 %%
 /**************** End of %include directives **********************************/
@@ -214,6 +215,7 @@ struct yyParser {
 #ifndef YYNOERRORRECOVERY
   int yyerrcnt;                 /* Shifts left before out of the error */
 #endif
+  bool is_fallback_failed;      /* Shows if fallback failed or not */
   ParseARG_SDECL                /* A place to hold %extra_argument */
 #if YYSTACKDEPTH<=0
   int yystksz;                  /* Current side of the stack */
@@ -334,6 +336,7 @@ void *ParseAlloc(void *(*mallocProc)(YYMALLOCARGTYPE)){
   if( pParser ){
 #ifdef YYTRACKMAXSTACKDEPTH
     pParser->yyhwm = 0;
+    pParser->is_fallback_failed = false;
 #endif
 #if YYSTACKDEPTH<=0
     pParser->yytos = NULL;
@@ -458,7 +461,7 @@ static unsigned int yy_find_shift_action(
     i += iLookAhead;
     if( i<0 || i>=YY_ACTTAB_COUNT || yy_lookahead[i]!=iLookAhead ){
 #ifdef YYFALLBACK
-      YYCODETYPE iFallback;            /* Fallback token */
+      YYCODETYPE iFallback = -1;            /* Fallback token */
       if( iLookAhead<sizeof(yyFallback)/sizeof(yyFallback[0])
              && (iFallback = yyFallback[iLookAhead])!=0 ){
 #ifndef NDEBUG
@@ -470,6 +473,8 @@ static unsigned int yy_find_shift_action(
         assert( yyFallback[iFallback]==0 ); /* Fallback loop must terminate */
         iLookAhead = iFallback;
         continue;
+      } else if ( iFallback==0 ) {
+        pParser->is_fallback_failed = true;
       }
 #endif
 #ifdef YYWILDCARD

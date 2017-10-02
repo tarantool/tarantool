@@ -38,6 +38,7 @@
  */
 #include "sqliteInt.h"
 #include <stdlib.h>
+#include "say.h"
 
 /* Character classes for tokenizing
  *
@@ -210,8 +211,9 @@ const char sqlite3IsEbcdicIdChar[] = {
  * Store the token type in *tokenType before returning.
  */
 int
-sqlite3GetToken(const unsigned char *z, int *tokenType)
+sqlite3GetToken(const unsigned char *z, int *tokenType, bool *is_reserved)
 {
+	*is_reserved = false;
 	int i, c;
 	switch (aiClass[*z]) {	/* Switch on the character-class of the first byte
 				 * of the token. See the comment on the CC_ defines
@@ -480,7 +482,7 @@ sqlite3GetToken(const unsigned char *z, int *tokenType)
 				break;
 			}
 			*tokenType = TK_ID;
-			return keywordCode((char *)z, i, tokenType);
+			return keywordCode((char *)z, i, tokenType, is_reserved);
 		}
 	case CC_X:{
 #ifndef SQLITE_OMIT_BLOB_LITERAL
@@ -564,7 +566,8 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		if (zSql[i] != 0) {
 			pParse->sLastToken.z = &zSql[i];
 			pParse->sLastToken.n =
-			    sqlite3GetToken((u8 *) & zSql[i], &tokenType);
+			    sqlite3GetToken((u8 *) & zSql[i], &tokenType,
+					    &pParse->sLastToken.isReserved);
 			i += pParse->sLastToken.n;
 			if (i > mxSqlLen) {
 				pParse->rc = SQLITE_TOOBIG;

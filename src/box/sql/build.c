@@ -2588,7 +2588,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 			   space_id);
 
 	Token _space =
-	    { TARANTOOL_SYS_SPACE_NAME, strlen(TARANTOOL_SYS_SPACE_NAME) };
+	    { TARANTOOL_SYS_SPACE_NAME, strlen(TARANTOOL_SYS_SPACE_NAME), false };
 	Expr *id_value = sqlite3ExprInteger(db, space_id);
 	const char *column = "id";
 	/* Execute not nested DELETE of a space to account DROP TABLE
@@ -3698,7 +3698,7 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 	sqlite3BeginWriteOperation(pParse, 1);
 
 	Token _index =
-	    { TARANTOOL_SYS_INDEX_NAME, strlen(TARANTOOL_SYS_INDEX_NAME) };
+	    { TARANTOOL_SYS_INDEX_NAME, strlen(TARANTOOL_SYS_INDEX_NAME), false };
 	const char *columns[2] = { "id", "iid" };
 	Expr *values[2];
 	values[0] =

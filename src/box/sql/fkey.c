@@ -1336,8 +1336,8 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 		assert(aiCol || pFKey->nCol == 1);
 
 		for (i = 0; i < pFKey->nCol; i++) {
-			Token tOld = { "old", 3 };	/* Literal "old" token */
-			Token tNew = { "new", 3 };	/* Literal "new" token */
+			Token tOld = { "old", 3, false };	/* Literal "old" token */
+			Token tNew = { "new", 3, false };	/* Literal "new" token */
 			Token tFromCol;	/* Name of column in child table */
 			Token tToCol;	/* Name of column in parent table */
 			int iFromCol;	/* Idx of column in child table */

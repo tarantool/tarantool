@@ -500,13 +500,13 @@ test:do_catchsql_test(
     [=[
         CREATE TABLE weird(
           id primary key,
-          desc text,
-          asc text,
+          "desc" text,
+          "asc" text,
           key int,
           "14_vac" boolean,
           fuzzy_dog_12 varchar(10),
-          begin blob,
-          end clob
+          beginn blob,
+          endd clob
         )
     ]=], {
         -- <table-7.1>
@@ -531,17 +531,17 @@ test:do_execsql2_test(
         SELECT * FROM weird;
     ]], {
         -- <table-7.3>
-        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "begin", "hi", "end", "y'all"
+        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "beginn", "hi", "endd", "y'all"
         -- </table-7.3>
     })
 
 test:do_execsql_test(
     "table-7.3",
     [[
-        CREATE TABLE savepoint(release primary key);
-        INSERT INTO savepoint(release) VALUES(10);
-        UPDATE savepoint SET release = 5;
-        SELECT release FROM savepoint;
+        CREATE TABLE savepoint_t(release_t primary key);
+        INSERT INTO savepoint_t(release_t) VALUES(10);
+        UPDATE savepoint_t SET release_t = 5;
+        SELECT release_t FROM savepoint_t;
     ]], {
         -- <table-7.3>
         5
@@ -556,19 +556,19 @@ test:do_execsql2_test(
         --CREATE TABLE t2 AS SELECT * FROM weird;
         CREATE TABLE t2(
           id primary key,
-          desc text,
-          asc text,
+          "desc" text,
+          "asc" text,
           key int,
           "14_vac" boolean,
           fuzzy_dog_12 varchar(10),
-          begin blob,
-          end clob
+          beginn blob,
+          endd clob
         );
         INSERT INTO t2 SELECT * from weird;
         SELECT * FROM t2;
     ]=], {
         -- <table-8.1>
-        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "begin", "hi", "end", "y'all"
+        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "beginn", "hi", "endd", "y'all"
         -- </table-8.1>
     })
 
@@ -627,7 +627,7 @@ test:do_execsql2_test(
         SELECT * FROM t2;
     ]], {
         -- <table-8.6>
-        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "begin", "hi", "end", "y'all"
+        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "beginn", "hi", "endd", "y'all"
         -- </table-8.6>
     })
 

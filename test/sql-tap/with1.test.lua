@@ -178,7 +178,7 @@ test:do_catchsql_test(3.6, [[
   SELECT * FROM tmp;
 ]], {
   -- <3.6>
-  1, [[near "SELECT": syntax error]]
+  1, [[keyword "SELECT" is reserved]]
   -- </3.6>
 })
 
