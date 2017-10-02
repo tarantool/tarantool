@@ -121,6 +121,31 @@ vy_read_iterator_check_version(struct vy_read_iterator *itr)
 }
 
 /**
+ * Return true if the current statement is outside the current
+ * range and hence we should move to the next range.
+ */
+static bool
+vy_read_iterator_range_is_done(struct vy_read_iterator *itr)
+{
+	struct tuple *stmt = itr->curr_stmt;
+	struct vy_range *range = itr->curr_range;
+	struct key_def *cmp_def = itr->index->cmp_def;
+	int dir = iterator_direction(itr->iterator_type);
+
+	if (dir > 0 && range->end != NULL &&
+	    (stmt == NULL || vy_tuple_compare_with_key(stmt,
+				range->end, cmp_def) >= 0))
+		return true;
+
+	if (dir < 0 && range->begin != NULL &&
+	    (stmt == NULL || vy_tuple_compare_with_key(stmt,
+				range->begin, cmp_def) < 0))
+		return true;
+
+	return false;
+}
+
+/**
  * Compare two tuples from the read iterator perspective.
  *
  * Returns:
@@ -396,6 +421,12 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr)
 	return 0;
 }
 
+static void
+vy_read_iterator_next_range(struct vy_read_iterator *itr);
+
+static int
+vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt);
+
 /**
  * Iterate to the next key
  * @retval 0 success or EOF (*ret == NULL)
@@ -445,6 +476,7 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 		if (stop)
 			goto done;
 	}
+rescan_disk:
 	/* The following code may yield as it needs to access disk. */
 	for (i = itr->disk_src; i < itr->src_count; i++) {
 		int rc = vy_read_iterator_scan_disk(itr, i, &stop);
@@ -460,10 +492,27 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 	 */
 	if (vy_read_iterator_restore_mem(itr) != 0)
 		return -1;
+	/*
+	 * Scan the next range in case we transgressed the current
+	 * range's boundaries.
+	 */
+	if (vy_read_iterator_range_is_done(itr)) {
+		vy_read_iterator_next_range(itr);
+		goto rescan_disk;
+	}
 done:
 	if (itr->last_stmt != NULL && itr->curr_stmt != NULL)
 	       assert(vy_read_iterator_cmp_stmt(itr, itr->curr_stmt,
 						itr->last_stmt) > 0);
+
+	if (itr->need_check_eq && itr->curr_stmt != NULL &&
+	    vy_tuple_compare_with_key(itr->curr_stmt, itr->key,
+				      itr->index->cmp_def) != 0)
+		itr->curr_stmt = NULL;
+
+	if (vy_read_iterator_track_read(itr, itr->curr_stmt) != 0)
+		return -1;
+
 	*ret = itr->curr_stmt;
 	return 0;
 }
@@ -677,10 +726,10 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 }
 
 /**
- * Close all open sources.
+ * Close all open sources and reset the merge state.
  */
 static void
-vy_read_iterator_close_src(struct vy_read_iterator *itr)
+vy_read_iterator_cleanup(struct vy_read_iterator *itr)
 {
 	uint32_t i;
 	struct vy_read_src *src;
@@ -701,44 +750,17 @@ vy_read_iterator_close_src(struct vy_read_iterator *itr)
 		src = &itr->src[i];
 		vy_run_iterator_close(&src->run_iterator);
 	}
-}
 
-/**
- * Set up the read iterator for the current range.
- */
-static void
-vy_read_iterator_use_range(struct vy_read_iterator *itr)
-{
-	/* Close all open sources and reset merge state. */
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
-	vy_read_iterator_close_src(itr);
-	itr->src_count = 0;
-	itr->cache_src = UINT32_MAX;
+	itr->curr_stmt = NULL;
+	itr->curr_src = UINT32_MAX;
 	itr->txw_src = UINT32_MAX;
+	itr->cache_src = UINT32_MAX;
 	itr->mem_src = UINT32_MAX;
 	itr->disk_src = UINT32_MAX;
 	itr->skipped_src = UINT32_MAX;
-	itr->curr_stmt = NULL;
-	itr->curr_src = UINT32_MAX;
-	itr->front_id = 1;
-
-	if (itr->tx != NULL) {
-		itr->txw_src = itr->src_count;
-		vy_read_iterator_add_tx(itr);
-	}
-
-	itr->cache_src = itr->src_count;
-	vy_read_iterator_add_cache(itr);
-
-	itr->mem_src = itr->src_count;
-	vy_read_iterator_add_mem(itr);
-
-	itr->disk_src = itr->src_count;
-	if (itr->curr_range != NULL) {
-		itr->range_version = itr->curr_range->version;
-		vy_read_iterator_add_disk(itr);
-	}
+	itr->src_count = 0;
 }
 
 void
@@ -786,78 +808,78 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 }
 
 /**
- * Prepare the read iterator for the first iteration.
- */
-static void
-vy_read_iterator_start(struct vy_read_iterator *itr)
-{
-	assert(!itr->search_started);
-	assert(itr->last_stmt == NULL);
-	assert(itr->curr_range == NULL);
-	itr->search_started = true;
-
-	itr->mem_list_version = itr->index->mem_list_version;
-	itr->range_tree_version = itr->index->range_tree_version;
-	itr->curr_range = vy_range_tree_find_by_key(itr->index->tree,
-					itr->iterator_type, itr->key);
-	vy_read_iterator_use_range(itr);
-
-	itr->index->stat.lookup++;
-}
-
-/**
  * Restart the read iterator from the position following
  * the last statement returned to the user. Called when
  * the current range or the whole range tree is changed.
+ * Also used for preparing the iterator for the first
+ * iteration.
  */
 static void
 vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
+	vy_read_iterator_cleanup(itr);
+
 	itr->mem_list_version = itr->index->mem_list_version;
 	itr->range_tree_version = itr->index->range_tree_version;
 	itr->curr_range = vy_range_tree_find_by_key(itr->index->tree,
 			itr->iterator_type, itr->last_stmt ?: itr->key);
-	vy_read_iterator_use_range(itr);
-}
+	itr->range_version = itr->curr_range->version;
 
-static bool
-vy_read_iterator_next_range(struct vy_read_iterator *itr)
-{
-	struct vy_index *index = itr->index;
-	struct vy_range *range = itr->curr_range;
-
-	assert(range != NULL);
-
-	switch (itr->iterator_type) {
-	case ITER_LT:
-	case ITER_LE:
-	case ITER_REQ:
-		range = vy_range_tree_prev(index->tree, range);
-		break;
-	case ITER_GT:
-	case ITER_GE:
-		range = vy_range_tree_next(index->tree, range);
-		break;
-	case ITER_EQ:
-		/* A partial key can be found in more than one range. */
-		if (range->end != NULL &&
-		    vy_stmt_compare_with_key(itr->key, range->end,
-					     range->cmp_def) >= 0) {
-			range = vy_range_tree_next(index->tree, range);
-		} else {
-			range = NULL;
-		}
-		break;
-	default:
-		unreachable();
+	if (itr->tx != NULL) {
+		itr->txw_src = itr->src_count;
+		vy_read_iterator_add_tx(itr);
 	}
 
-	itr->curr_range = range;
-	if (range == NULL)
-		return false;
+	itr->cache_src = itr->src_count;
+	vy_read_iterator_add_cache(itr);
 
-	vy_read_iterator_use_range(itr);
-	return true;
+	itr->mem_src = itr->src_count;
+	vy_read_iterator_add_mem(itr);
+
+	itr->disk_src = itr->src_count;
+	vy_read_iterator_add_disk(itr);
+}
+
+/**
+ * Iterate to the next range.
+ */
+static void
+vy_read_iterator_next_range(struct vy_read_iterator *itr)
+{
+	struct vy_range *range = itr->curr_range;
+	struct key_def *cmp_def = itr->index->cmp_def;
+	int dir = iterator_direction(itr->iterator_type);
+
+	assert(range != NULL);
+	while (true) {
+		range = dir > 0 ? vy_range_tree_next(itr->index->tree, range) :
+				  vy_range_tree_prev(itr->index->tree, range);
+		assert(range != NULL);
+
+		if (itr->last_stmt == NULL)
+			break;
+		/*
+		 * We could skip an entire range due to the cache.
+		 * Make sure the next statement falls in the range.
+		 */
+		if (dir > 0 && (range->end == NULL ||
+				vy_tuple_compare_with_key(itr->last_stmt,
+						range->end, cmp_def) < 0))
+			break;
+		if (dir < 0 && vy_tuple_compare_with_key(itr->last_stmt,
+						range->begin, cmp_def) > 0)
+			break;
+	}
+	itr->curr_range = range;
+	itr->range_version = range->version;
+
+	for (uint32_t i = itr->disk_src; i < itr->src_count; i++) {
+		struct vy_read_src *src = &itr->src[i];
+		vy_run_iterator_close(&src->run_iterator);
+	}
+	itr->src_count = itr->disk_src;
+
+	vy_read_iterator_add_disk(itr);
 }
 
 /**
@@ -885,66 +907,6 @@ vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt)
 				 itr->key, itr->iterator_type != ITER_LT);
 	}
 	return rc;
-}
-
-/**
- * Conventional wrapper around vy_read_iterator_next_key() to automatically
- * re-create the merge iterator on vy_index/vy_range/vy_run changes.
- */
-static NODISCARD int
-vy_read_iterator_merge_next_key(struct vy_read_iterator *itr,
-				struct tuple **ret)
-{
-	struct key_def *cmp_def = itr->index->cmp_def;
-	int dir = iterator_direction(itr->iterator_type);
-	struct tuple *stmt;
-
-	while (true) {
-		int rc = vy_read_iterator_next_key(itr, &stmt);
-		if (rc == -1)
-			return -1;
-		if (rc == -2) {
-			vy_read_iterator_restore(itr);
-			continue;
-		}
-
-		/*
-		 * Check if the statement is within the current range.
-		 * If it is, return it right away, otherwise move to
-		 * the next range and restart merge.
-		 */
-		struct vy_range *range = itr->curr_range;
-		if (range == NULL) {
-			/* All ranges have been merged. */
-			break;
-		}
-
-		if (stmt != NULL) {
-			if (dir > 0 && (range->end == NULL ||
-					vy_tuple_compare_with_key(stmt,
-						range->end, cmp_def) < 0))
-				break;
-			if (dir < 0 && (range->begin == NULL ||
-					vy_tuple_compare_with_key(stmt,
-						range->begin, cmp_def) >= 0))
-				break;
-		}
-
-		if (!vy_read_iterator_next_range(itr)) {
-			/* No more ranges to merge. */
-			break;
-		}
-	}
-
-	if (itr->need_check_eq && stmt != NULL &&
-	    vy_tuple_compare_with_key(stmt, itr->key, cmp_def) != 0)
-		stmt = NULL;
-
-	if (vy_read_iterator_track_read(itr, stmt) != 0)
-		return -1;
-
-	*ret = stmt;
-	return 0;
 }
 
 NODISCARD int
@@ -977,8 +939,11 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 
 	*result = NULL;
 
-	if (!itr->search_started)
-		vy_read_iterator_start(itr);
+	if (!itr->search_started) {
+		itr->search_started = true;
+		itr->index->stat.lookup++;
+		vy_read_iterator_restore(itr);
+	}
 
 	struct tuple *prev_key = itr->last_stmt;
 	if (prev_key != NULL)
@@ -989,9 +954,12 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	struct vy_index *index = itr->index;
 	int rc = 0;
 	while (true) {
-		if (vy_read_iterator_merge_next_key(itr, &t)) {
-			rc = -1;
+		rc = vy_read_iterator_next_key(itr, &t);
+		if (rc == -1)
 			goto clear;
+		if (rc == -2) {
+			vy_read_iterator_restore(itr);
+			continue;
 		}
 		if (t == NULL) {
 			if (itr->last_stmt != NULL)
@@ -1088,9 +1056,7 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 {
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
-	if (itr->curr_stmt != NULL)
-		tuple_unref(itr->curr_stmt);
-	vy_read_iterator_close_src(itr);
+	vy_read_iterator_cleanup(itr);
 	free(itr->src);
 	TRASH(itr);
 }
