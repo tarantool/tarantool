@@ -72,12 +72,6 @@ field_type_by_name(const char *name, size_t len);
 extern const struct opt_def field_def_reg[];
 extern const struct field_def field_def_default;
 
-/*
- * A special value to indicate that tuple format doesn't store
- * an offset for a field_id.
- */
-enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
-
 /**
  * @brief Field definition
  * Contains information about of one tuple field.
@@ -93,21 +87,6 @@ struct field_def {
 	enum field_type type;
 	/** 0-terminated field name. */
 	char *name;
-	/**
-	 * Offset slot in field map in tuple. Normally tuple
-	 * stores field map - offsets of all fields participating
-	 * in indexes. This allows quick access to most used
-	 * fields without parsing entire mspack. This member
-	 * stores position in the field map of tuple for current
-	 * field. If the field does not participate in indexes
-	 * then it has no offset in field map and INT_MAX is
-	 * stored in this member. Due to specific field map in
-	 * tuple (it is stored before tuple), the positions in
-	 * field map is negative.
-	 */
-	int32_t offset_slot;
-	/** True if this field is used by an index. */
-	bool is_key_part;
 };
 
 #if defined(__cplusplus)

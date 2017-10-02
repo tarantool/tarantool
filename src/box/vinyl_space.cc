@@ -199,7 +199,8 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 		pk = vy_index(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	return new VinylIndex(engine->env, index_def, m_format, pk);
+	return new VinylIndex(engine->env, index_def, m_format, pk,
+			      space->def->fields, space->def->field_count);
 }
 
 void

@@ -466,54 +466,13 @@ space_opts_decode(struct space_opts *opts, const char *data)
 }
 
 /**
- * Get an array of named fields of @a format. Necessary to create
- * a new fields array after drop of an index. In such a case some
- * fields from the space format could be deleted together with
- * a deleted index, and the fields array must be rebuilt from
- * the named and indexed fields.
- * @param format Format to get named fields.
- * @param[out] out_count Count of named fields.
- * @param region Region to allocate a result array.
- *
- * @retval Array of named fields.
- */
-static struct field_def *
-tuple_format_named_fields(const struct tuple_format *format,
-			  uint32_t *out_count, struct region *region)
-{
-	assert(format != NULL);
-	uint32_t count = 0;
-	for (uint32_t i = 0; i < format->field_count; ++i) {
-		if (format->fields[i].name != NULL)
-			++count;
-	}
-	*out_count = count;
-	if (count == 0)
-		return NULL;
-	size_t size = sizeof(struct field_def) * count;
-	struct field_def *ret =
-		(struct field_def *) region_alloc_xc(region, size);
-	for (uint32_t i = 0; i < format->field_count; ++i) {
-		if (format->fields[i].name != NULL) {
-			/*
-			 * No need to copy names on a region,
-			 * because format->fields names remains
-			 * valid until ret is already copied into
-			 * a new tuple_format.
-			 */
-			memcpy(&ret[i], &format->fields[i], sizeof(ret[i]));
-		}
-	}
-	return ret;
-}
-
-/**
  * Decode field definition from MessagePack map. Format:
  * {name: <string>, type: <string>}. Type is optional.
  * @param[out] field Field to decode to.
  * @param data MessagePack map to decode.
  * @param space_name Name of a space, from which the field is got.
  *        Used in error messages.
+ * @param name_len Length of @a space_name.
  * @param errcode Error code to use for client errors. Either
  *        create or modify space errors.
  * @param fieldno Field number to decode. Used in error messages.
@@ -521,11 +480,11 @@ tuple_format_named_fields(const struct tuple_format *format,
  */
 static void
 field_def_decode(struct field_def *field, const char **data,
-		 const char *space_name, uint32_t errcode, uint32_t fieldno,
-		 struct region *region)
+		 const char *space_name, uint32_t name_len,
+		 uint32_t errcode, uint32_t fieldno, struct region *region)
 {
 	if (mp_typeof(**data) != MP_MAP) {
-		tnt_raise(ClientError, errcode, space_name,
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d is not map",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
@@ -533,7 +492,8 @@ field_def_decode(struct field_def *field, const char **data,
 	*field = field_def_default;
 	for (int i = 0; i < count; ++i) {
 		if (mp_typeof(**data) != MP_STR) {
-			tnt_raise(ClientError, errcode, space_name,
+			tnt_raise(ClientError, errcode,
+				  tt_cstr(space_name, name_len),
 				  tt_sprintf("field %d format is not map"\
 					     " with string keys",
 					     fieldno + TUPLE_INDEX_BASE));
@@ -545,17 +505,17 @@ field_def_decode(struct field_def *field, const char **data,
 			       fieldno + TUPLE_INDEX_BASE, region);
 	}
 	if (field->name == NULL) {
-		tnt_raise(ClientError, errcode, space_name,
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d name is not specified",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
 	if (strlen(field->name) > BOX_NAME_MAX) {
-		tnt_raise(ClientError, errcode, space_name,
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d name is too long",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
 	if (field->type == field_type_MAX) {
-		tnt_raise(ClientError, errcode, space_name,
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d has unknown field type",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
@@ -573,8 +533,8 @@ field_def_decode(struct field_def *field, const char **data,
  */
 static struct field_def *
 space_format_decode(const char *data, uint32_t *out_count,
-		    const char *space_name, uint32_t errcode,
-		    struct region *region)
+		    const char *space_name, uint32_t name_len,
+		    uint32_t errcode, struct region *region)
 {
 	/* Type is checked by _space format. */
 	assert(mp_typeof(*data) == MP_ARRAY);
@@ -586,8 +546,8 @@ space_format_decode(const char *data, uint32_t *out_count,
 	struct field_def *region_defs =
 		(struct field_def *) region_alloc_xc(region, size);
 	for (uint32_t i = 0; i < count; ++i) {
-		field_def_decode(&region_defs[i], &data, space_name, errcode,
-				 i, region);
+		field_def_decode(&region_defs[i], &data, space_name, name_len,
+				 errcode, i, region);
 	}
 	return region_defs;
 }
@@ -597,7 +557,6 @@ space_format_decode(const char *data, uint32_t *out_count,
  */
 static struct space_def *
 space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
-			 struct field_def **fields, uint32_t *field_count,
 			 struct region *region)
 {
 	uint32_t name_len;
@@ -607,39 +566,32 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		tnt_raise(ClientError, errcode,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "space name is too long");
-	size_t size = space_def_sizeof(name_len);
-	struct space_def *def = (struct space_def *) malloc(size);
-	if (def == NULL)
-		tnt_raise(OutOfMemory, size, "malloc", "def");
-	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
-	memcpy(def->name, name, name_len);
-	def->name[name_len] = 0;
-	identifier_check_xc(def->name);
-	def->id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
-	if (def->id > BOX_SPACE_MAX) {
-		tnt_raise(ClientError, errcode,
-			  tt_cstr(def->name, BOX_INVALID_NAME_MAX),
+	identifier_check_xc(name, name_len);
+	uint32_t id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
+	if (id > BOX_SPACE_MAX) {
+		tnt_raise(ClientError, errcode, tt_cstr(name, name_len),
 			  "space id is too big");
 	}
-	if (def->id == 0) {
-		tnt_raise(ClientError, errcode,
-			  tt_cstr(def->name, BOX_INVALID_NAME_MAX),
+	if (id == 0) {
+		tnt_raise(ClientError, errcode, tt_cstr(name, name_len),
 			  "space id 0 is reserved");
 	}
-	def->uid = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_UID);
-	def->exact_field_count =
+	uint32_t uid = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_UID);
+	access_check_ddl(uid, SC_SPACE);
+	uint32_t exact_field_count =
 		tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_FIELD_COUNT);
+	uint32_t engine_name_len;
 	const char *engine_name =
-		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_ENGINE, &name_len);
-	if (name_len > ENGINE_NAME_MAX) {
-		tnt_raise(ClientError, errcode,
-			  tt_cstr(def->name, BOX_INVALID_NAME_MAX),
+		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_ENGINE,
+				   &engine_name_len);
+	if (engine_name_len > ENGINE_NAME_MAX) {
+		tnt_raise(ClientError, errcode, tt_cstr(name, name_len),
 			  "space engine name is too long");
 	}
-	memcpy(def->engine_name, engine_name, name_len);
-	def->engine_name[name_len] = 0;
-	identifier_check_xc(def->engine_name);
+	identifier_check_xc(engine_name, engine_name_len);
 	const char *space_opts;
+	struct field_def *fields;
+	uint32_t field_count;
 	if (dd_version_id >= version_id(1, 7, 6)) {
 		/* Check space opts. */
 		space_opts =
@@ -649,23 +601,28 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		const char *format =
 			tuple_field_with_type_xc(tuple, BOX_SPACE_FIELD_FORMAT,
 						 MP_ARRAY);
-		*fields = space_format_decode(format, field_count, def->name,
-					      errcode, region);
-		if (def->exact_field_count != 0 &&
-		    def->exact_field_count < *field_count) {
-			tnt_raise(ClientError, errcode, def->name,
+		fields = space_format_decode(format, &field_count, name,
+					     name_len, errcode, region);
+		if (exact_field_count != 0 &&
+		    exact_field_count < field_count) {
+			tnt_raise(ClientError, errcode, tt_cstr(name, name_len),
 				  "exact_field_count must be either 0 or >= "\
 				  "formatted field count");
 		}
 	} else {
-		*fields = NULL;
-		*field_count = 0;
+		fields = NULL;
+		field_count = 0;
 		space_opts = tuple_field(tuple, BOX_SPACE_FIELD_OPTS);
 	}
-	space_opts_decode(&def->opts, space_opts);
+	struct space_opts opts;
+	space_opts_decode(&opts, space_opts);
+	struct space_def *def =
+		space_def_new_xc(id, uid, exact_field_count, name, name_len,
+				 engine_name, engine_name_len, &opts, fields,
+				 field_count);
+	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	Engine *engine = engine_find(def->engine_name);
 	engine->checkSpaceDef(def);
-	access_check_ddl(def->uid, SC_SPACE);
 	def_guard.is_active = false;
 	return def;
 }
@@ -764,23 +721,16 @@ struct alter_space {
 	 * substantially.
 	 */
 	struct key_def *pk_def;
-	/** New space format. */
-	struct field_def *new_fields;
-	/** Length of @a new_fields. */
-	uint32_t field_count;
 };
 
 static struct alter_space *
-alter_space_new(struct space *old_space, struct field_def *fields,
-		uint32_t field_count)
+alter_space_new(struct space *old_space)
 {
 	struct alter_space *alter =
 		region_calloc_object_xc(&fiber()->gc, struct alter_space);
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup_xc(alter->old_space->def);
-	alter->new_fields = fields;
-	alter->field_count = field_count;
 	return alter;
 }
 
@@ -915,8 +865,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * Create a new (empty) space for the new definition.
 	 * Sic: the triggers are not moved over yet.
 	 */
-	alter->new_space = space_new(alter->space_def, &alter->key_list,
-				     alter->new_fields, alter->field_count);
+	alter->new_space = space_new(alter->space_def, &alter->key_list);
 	/*
 	 * Copy the replace function, the new space is at the same recovery
 	 * phase as the old one. This hack is especially necessary for
@@ -1472,16 +1421,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 					     BOX_SPACE_FIELD_ID);
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
-		struct field_def *fields;
-		uint32_t field_count;
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_CREATE_SPACE,
-						 &fields, &field_count, region);
+						 region);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		RLIST_HEAD(empty_list);
-		struct space *space = space_new(def, &empty_list, fields,
-						field_count);
+		struct space *space = space_new(def, &empty_list);
 		/**
 		 * The new space must be inserted in the space
 		 * cache right away to achieve linearisable
@@ -1533,11 +1479,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
-		struct field_def *fields;
-		uint32_t field_count;
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE,
-						 &fields, &field_count, region);
+						 region);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		if (def->id != space_id(old_space))
@@ -1570,8 +1514,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
 		 */
-		struct alter_space *alter = alter_space_new(old_space, fields,
-							    field_count);
+		struct alter_space *alter = alter_space_new(old_space);
 		auto alter_guard =
 			make_scoped_guard([=] {alter_space_delete(alter);});
 		(void) new ModifySpace(alter, def);
@@ -1673,16 +1616,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			  "can not add a secondary key before primary");
 	}
 
-	struct alter_space *alter;
-	struct tuple_format *format = old_space->handler->format();
-	if (format != NULL) {
-		uint32_t count;
-		struct field_def *fields =
-			tuple_format_named_fields(format, &count, &fiber()->gc);
-		alter = alter_space_new(old_space, fields, count);
-	} else {
-		alter = alter_space_new(old_space, NULL, 0);
-	}
+	struct alter_space *alter = alter_space_new(old_space);
 	auto scoped_guard =
 		make_scoped_guard([=] { alter_space_delete(alter); });
 
@@ -1848,14 +1782,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/* Create an empty copy of the old space. */
 	struct rlist key_list;
 	space_dump_def(old_space, &key_list);
-	struct space *new_space;
-	struct tuple_format *format = old_space->handler->format();
-	if (format != NULL) {
-		new_space = space_new(old_space->def, &key_list,
-				      format->fields, format->field_count);
-	} else {
-		new_space = space_new(old_space->def, &key_list, NULL, 0);
-	}
+	struct space *new_space = space_new(old_space->def, &key_list);
 	new_space->truncate_count = truncate_count;
 	auto space_guard = make_scoped_guard([=] { space_delete(new_space); });
 
@@ -2010,7 +1937,7 @@ user_def_new_from_tuple(struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  user->name, "unknown user type");
 	}
-	identifier_check_xc(user->name);
+	identifier_check_xc(user->name, name_len);
 	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain

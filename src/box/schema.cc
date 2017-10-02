@@ -189,12 +189,12 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 		make_scoped_guard([=] { index_def_delete(index_def); });
 	struct space_def *def =
 		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
-				 strlen("memtx"), &space_opts_default);
+				 strlen("memtx"), &space_opts_default, NULL, 0);
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
-	struct space *space = space_new(def, &key_list, NULL, 0);
+	struct space *space = space_new(def, &key_list);
 	(void) space_cache_replace(space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);

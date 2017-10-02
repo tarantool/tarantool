@@ -2216,10 +2216,11 @@ vy_index_find_unique(struct space *space, uint32_t index_id)
 
 struct vy_index *
 vy_new_index(struct vy_env *env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_index *pk)
+	     struct tuple_format *format, struct vy_index *pk,
+	     const struct field_def *space_fields, uint32_t field_count)
 {
 	return vy_index_new(&env->index_env, &env->cache_env,
-			    index_def, format, pk);
+			    index_def, format, pk, space_fields, field_count);
 }
 
 void
@@ -4231,8 +4232,7 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		if (ctx->format != NULL)
 			tuple_format_unref(ctx->format);
 		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
-				(struct key_def **)&ctx->key_def, 1, 0,
-				NULL, 0);
+					       &ctx->key_def, 1, 0, NULL, 0);
 		if (ctx->format == NULL)
 			return -1;
 		tuple_format_ref(ctx->format);

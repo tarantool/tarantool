@@ -57,7 +57,7 @@ test_basic()
 			      &index_opts, key_def, NULL);
 
 	struct vy_index *pk = vy_index_new(&index_env, &cache_env, index_def,
-					   format, NULL);
+					   format, NULL, NULL, 0);
 	isnt(pk, NULL, "index is not NULL")
 
 	struct vy_range *range = vy_range_new(1, NULL, NULL, pk->cmp_def);

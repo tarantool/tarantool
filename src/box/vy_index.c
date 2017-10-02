@@ -96,7 +96,8 @@ vy_index_name(struct vy_index *index)
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk)
+	     struct vy_index *pk, const struct field_def *space_fields,
+	     uint32_t field_count)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -137,8 +138,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		 * definitions as well as space->format tuples.
 		 */
 		index->disk_format =
-			tuple_format_new(&vy_tuple_format_vtab, &cmp_def, 1, 0,
-					 format->fields, format->field_count);
+			tuple_format_new(&vy_tuple_format_vtab, &cmp_def, 1,
+					 0, space_fields, field_count);
 	} else {
 		index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
 						      &cmp_def, 1, 0, NULL, 0);

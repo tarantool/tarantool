@@ -222,7 +222,7 @@ schema_object_name(enum schema_object_type type);
  * Result is locale-dependent.
  */
 bool
-identifier_is_valid(const char *str);
+identifier_is_valid(const char *str, uint32_t len);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -233,10 +233,10 @@ identifier_is_valid(const char *str);
  * Throw an error if identifier is not valid.
  */
 static inline void
-identifier_check_xc(const char *str)
+identifier_check_xc(const char *str, uint32_t len)
 {
-	if (! identifier_is_valid(str))
-		tnt_raise(ClientError, ER_IDENTIFIER, str);
+	if (! identifier_is_valid(str, len))
+		tnt_raise(ClientError, ER_IDENTIFIER, tt_cstr(str, len));
 }
 
 #endif /* defined(__cplusplus) */

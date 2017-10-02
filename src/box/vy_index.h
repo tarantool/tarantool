@@ -282,7 +282,8 @@ vy_index_name(struct vy_index *index);
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk);
+	     struct vy_index *pk, const struct field_def *space_fields,
+	     uint32_t field_count);
 
 /** Free an index object. */
 void
