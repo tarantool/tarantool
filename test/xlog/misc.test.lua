@@ -20,6 +20,7 @@ box.snapshot()
 xlog_path = fio.pathjoin(box.cfg.wal_dir, string.format("%020d.xlog", 0))
 result = {}
 fun, param, state = xlog.pairs(xlog_path)
+type(fun.totable)
 -- skip grants until our insert into _schema
 repeat state, row = fun(param, state) until row.BODY.space_id == box.space._schema.id
 row.HEADER.type
