@@ -207,6 +207,24 @@ const void *tarantoolSqlite3PayloadFetch(BtCursor *pCur, u32 *pAmt)
 	return tuple_data(c->tuple_last);
 }
 
+const void *
+tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
+{
+	assert((pCur->curFlags & BTCF_TaCursor) != 0);
+	struct ta_cursor *c = pCur->pTaCursor;
+	assert(c != NULL);
+	assert(c->tuple_last != NULL);
+	struct tuple_format *format = tuple_format(c->tuple_last);
+	assert(fieldno < format->field_count);
+	if (format->fields[fieldno].offset_slot == TUPLE_OFFSET_SLOT_NIL)
+		return NULL;
+	const char *field = tuple_field(c->tuple_last, fieldno);
+	const char *end = field;
+	mp_next(&end);
+	*field_size = end - field;
+	return field;
+}
+
 int tarantoolSqlite3First(BtCursor *pCur, int *pRes)
 {
 	return cursor_seek(pCur, pRes, ITER_GE,

@@ -46,6 +46,19 @@ const char *tarantoolErrorMessage();
 /* Storage interface. */
 int tarantoolSqlite3CloseCursor(BtCursor * pCur);
 const void *tarantoolSqlite3PayloadFetch(BtCursor * pCur, u32 * pAmt);
+
+/**
+ * Try to get a current tuple field using its field map.
+ * @param pCur Btree cursor holding a tuple.
+ * @param fieldno Number of a field to get.
+ * @param[out] field_size Result field size.
+ * @retval not NULL MessagePack field.
+ * @retval     NULL Can not use field_map - it does not contain
+ *         offset to @a fieldno.
+ */
+const void *
+tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size);
+
 int tarantoolSqlite3First(BtCursor * pCur, int *pRes);
 int tarantoolSqlite3Last(BtCursor * pCur, int *pRes);
 int tarantoolSqlite3Next(BtCursor * pCur, int *pRes);
