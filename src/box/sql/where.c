@@ -1293,7 +1293,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
  * rows in the index. Assuming no error occurs, *pnOut is adjusted (reduced)
  * to account for the range constraints pLower and pUpper.
  *
- * In the absence of sql_stat4 ANALYZE data, or if such data cannot be
+ * In the absence of _sql_stat4 ANALYZE data, or if such data cannot be
  * used, a single range inequality reduces the search space by a factor of 4.
  * and a pair of constraints (x>? AND x<?) reduces the expected number of
  * rows visited by a factor of 64.

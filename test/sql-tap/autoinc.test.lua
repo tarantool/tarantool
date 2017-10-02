@@ -42,7 +42,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-1.3",
     [[
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-1.3>
 
@@ -57,7 +57,7 @@ test:do_execsql_test(
 --         db("close")
 --         sqlite3("db", "test.db")
 --         return test:execsql([[
---             SELECT * FROM sql_sequence;
+--             SELECT * FROM _sql_sequence;
 --         ]])
 --     end, {
 --         -- <autoinc-1.4>
@@ -70,10 +70,10 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "autoinc-1.5",
     [[
-        DROP TABLE sql_sequence
+        DROP TABLE _sql_sequence
     ]], {
         -- <autoinc-1.5>
-        1, "table sql_sequence may not be dropped"
+        1, "table _sql_sequence may not be dropped"
         -- </autoinc-1.5>
     })
 
@@ -83,7 +83,7 @@ test:do_execsql_test(
         SELECT name FROM _space WHERE name NOT IN (SELECT name FROM _space WHERE name LIKE '\_%' ESCAPE '\')
     ]], {
         -- <autoinc-1.6>
-        "t1", "sql_sequence"
+        "t1"
         -- </autoinc-1.6>
     })
 
@@ -93,7 +93,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.1",
     [[
-        --SELECT * FROM sql_sequence
+        --SELECT * FROM _sql_sequence
     ]], {
         -- <autoinc-2.1>
 
@@ -104,7 +104,7 @@ test:do_execsql_test(
     "autoinc-2.2",
     [[
         INSERT INTO t1 VALUES(12,34);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.2>
         "t1", 12
@@ -115,7 +115,7 @@ test:do_execsql_test(
     "autoinc-2.3",
     [[
         INSERT INTO t1 VALUES(1,23);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.3>
         "t1", 12
@@ -126,7 +126,7 @@ test:do_execsql_test(
     "autoinc-2.4",
     [[
         INSERT INTO t1 VALUES(123,456);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.4>
         "t1", 123
@@ -137,7 +137,7 @@ test:do_execsql_test(
     "autoinc-2.5",
     [[
         INSERT INTO t1 VALUES(NULL,567);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.5>
         "t1", 124
@@ -148,7 +148,7 @@ test:do_execsql_test(
     "autoinc-2.6",
     [[
         DELETE FROM t1 WHERE y=567;
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.6>
         "t1", 124
@@ -159,7 +159,7 @@ test:do_execsql_test(
     "autoinc-2.7",
     [[
         INSERT INTO t1 VALUES(NULL,567);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.7>
         "t1", 125
@@ -170,7 +170,7 @@ test:do_execsql_test(
     "autoinc-2.8",
     [[
         DELETE FROM t1;
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.8>
         "t1", 125
@@ -181,7 +181,7 @@ test:do_execsql_test(
     "autoinc-2.9",
     [[
         INSERT INTO t1 VALUES(12,34);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.9>
         "t1", 125
@@ -192,7 +192,7 @@ test:do_execsql_test(
     "autoinc-2.10",
     [[
         INSERT INTO t1 VALUES(125,456);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.10>
         "t1", 125
@@ -203,7 +203,7 @@ test:do_execsql_test(
     "autoinc-2.11",
     [[
         INSERT INTO t1 VALUES(-1234567,-1);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.11>
         "t1", 125
@@ -214,7 +214,7 @@ test:do_execsql_test(
     "autoinc-2.12",
     [[
         INSERT INTO t1 VALUES(234,5678);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.12>
         "t1", 234
@@ -226,7 +226,7 @@ test:do_execsql_test(
     [[
         DELETE FROM t1;
         INSERT INTO t1 VALUES(NULL,1);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.13>
         "t1", 235
@@ -248,7 +248,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.20",
     [[
-        UPDATE sql_sequence SET seq=1234 WHERE name='t1';
+        UPDATE _sql_sequence SET seq=1234 WHERE name='t1';
         INSERT INTO t1 VALUES(NULL,2);
         SELECT * FROM t1;
     ]], {
@@ -260,7 +260,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.21",
     [[
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.21>
         "t1", 1235
@@ -270,7 +270,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.22",
     [[
-        UPDATE sql_sequence SET seq=NULL WHERE name='t1';
+        UPDATE _sql_sequence SET seq=NULL WHERE name='t1';
         INSERT INTO t1 VALUES(NULL,3);
         SELECT * FROM t1;
     ]], {
@@ -282,7 +282,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.23",
     [[
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.23>
         "t1", 1236
@@ -292,7 +292,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.24",
     [[
-        UPDATE sql_sequence SET seq='a-string' WHERE name='t1';
+        UPDATE _sql_sequence SET seq='a-string' WHERE name='t1';
         INSERT INTO t1 VALUES(NULL,4);
         SELECT * FROM t1;
     ]], {
@@ -304,7 +304,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.25",
     [[
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.25>
         "t1", 1237
@@ -314,7 +314,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.26",
     [[
-        DELETE FROM sql_sequence WHERE name='t1';
+        DELETE FROM _sql_sequence WHERE name='t1';
         INSERT INTO t1 VALUES(NULL,5);
         SELECT * FROM t1;
     ]], {
@@ -326,7 +326,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.27",
     [[
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.27>
         "t1", 1238
@@ -336,7 +336,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.28",
     [[
-        UPDATE sql_sequence SET seq='-12345678901234567890'
+        UPDATE _sql_sequence SET seq='-12345678901234567890'
           WHERE name='t1';
         INSERT INTO t1 VALUES(NULL,6);
         SELECT * FROM t1;
@@ -349,7 +349,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.29",
     [[
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.29>
         "t1", 1239
@@ -373,7 +373,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.51",
     [[
-        SELECT * FROM sql_sequence
+        SELECT * FROM _sql_sequence
     ]], {
         -- <autoinc-2.51>
         "t1", 1241
@@ -420,7 +420,7 @@ test:do_test(
         return test:execsql([[
             CREATE TABLE t2(d, e INTEGER PRIMARY KEY AUTOINCREMENT, f);
             INSERT INTO t2(d) VALUES(1);
-            SELECT * FROM sql_sequence;
+            SELECT * FROM _sql_sequence;
         ]])
     end, {
         -- <autoinc-2.70>
@@ -432,7 +432,7 @@ test:do_execsql_test(
     "autoinc-2.71",
     [[
         INSERT INTO t2(d) VALUES(2);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.71>
         "t1", 1241, "t2", 2
@@ -443,7 +443,7 @@ test:do_execsql_test(
     "autoinc-2.72",
     [[
         INSERT INTO t1(x) VALUES(10000);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.72>
         "t1", 10000, "t2", 2
@@ -455,7 +455,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t3(g INTEGER PRIMARY KEY AUTOINCREMENT, h);
         INSERT INTO t3(h) VALUES(1);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.73>
         "t1", 10000, "t2", 2, "t3", 1
@@ -466,7 +466,7 @@ test:do_execsql_test(
     "autoinc-2.74",
     [[
         INSERT INTO t2(d,e) VALUES(3,100);
-        SELECT * FROM sql_sequence;
+        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.74>
         "t1", 10000, "t2", 100, "t3", 1
@@ -480,7 +480,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-3.1",
     [[
-        SELECT name FROM sql_sequence
+        SELECT name FROM _sql_sequence
     ]], {
         -- <autoinc-3.1>
         "t1", "t2", "t3"
@@ -491,7 +491,7 @@ test:do_execsql_test(
     "autoinc-3.2",
     [[
         DROP TABLE t1;
-        SELECT name FROM sql_sequence;
+        SELECT name FROM _sql_sequence;
     ]], {
         -- <autoinc-3.2>
         "t2", "t3"
@@ -502,7 +502,7 @@ test:do_execsql_test(
     "autoinc-3.3",
     [[
         DROP TABLE t3;
-        SELECT name FROM sql_sequence;
+        SELECT name FROM _sql_sequence;
     ]], {
         -- <autoinc-3.3>
         "t2"
@@ -513,7 +513,7 @@ test:do_execsql_test(
     "autoinc-3.4",
     [[
         DROP TABLE t2;
-        SELECT name FROM sql_sequence;
+        SELECT name FROM _sql_sequence;
     ]], {
         -- <autoinc-3.4>
 
@@ -668,7 +668,7 @@ test:do_execsql_test(
         CREATE TABLE t6(v INTEGER PRIMARY KEY AUTOINCREMENT, w);
         INSERT INTO t6 VALUES(9223372036854775808,1);
         INSERT INTO t6 VALUES(NULL,1);
-        -- SELECT seq FROM sql_sequence WHERE name='t6';
+        -- SELECT seq FROM _sql_sequence WHERE name='t6';
     ]], {
         -- <autoinc-6.1>
         -- 9223372036854775807
@@ -729,7 +729,7 @@ test:do_test(
             CREATE TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b);
             INSERT INTO t3 SELECT * FROM t2 WHERE y>1;
 
-            SELECT * FROM sql_sequence WHERE name='t3';
+            SELECT * FROM _sql_sequence WHERE name='t3';
         ]])
     end, {
         -- <autoinc-9.1>
@@ -767,7 +767,7 @@ test:do_test(
     "autoinc-3928.2",
     function()
         return test:execsql([[
-            SELECT * FROM sql_sequence WHERE name='t3928'
+            SELECT * FROM _sql_sequence WHERE name='t3928'
         ]])
     end, {
         -- <autoinc-3928.2>
@@ -803,7 +803,7 @@ test:do_test(
     "autoinc-3928.4",
     function()
         return test:execsql([[
-            SELECT * FROM sql_sequence WHERE name='t3928'
+            SELECT * FROM _sql_sequence WHERE name='t3928'
         ]])
     end, {
         -- <autoinc-3928.4>
@@ -854,7 +854,7 @@ test:do_test(
     "autoinc-3928.7",
     function()
         return test:execsql([[
-            SELECT * FROM sql_sequence WHERE name LIKE 't3928%' ORDER BY name;
+            SELECT * FROM _sql_sequence WHERE name LIKE 't3928%' ORDER BY name;
         ]])
     end, {
         -- <autoinc-3928.7>

@@ -54,7 +54,7 @@ test:do_test(
 --
 test:do_execsql_test(
     "analyze4-1.1",
-    [[ SELECT idx, stat FROM sql_stat1 WHERE tbl='t1' ORDER BY idx; ]],
+    [[ SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx; ]],
     {
         -- <analyze4-1.1>
         "t1","128 1", "t1a", "128 1", "t1b", "128 128"
@@ -71,7 +71,7 @@ test:do_test(
         return test:execsql([[
             UPDATE t1 SET b='x' WHERE a%2;
             ANALYZE;
-            SELECT idx, stat FROM sql_stat1 WHERE tbl='t1' ORDER BY idx;
+            SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx;
         ]])
     end, {
         -- <analyze4-1.2>
@@ -109,7 +109,7 @@ test:do_execsql_test(
             CREATE INDEX t1cdb ON t1(c,d,b);
             CREATE INDEX t1cbd ON t1(c,b,d);
             ANALYZE;
-            SELECT idx, stat FROM sql_stat1 WHERE tbl='t1' ORDER BY idx;
+            SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx;
     ]]
     , {
         -- <analyze4-1.3>
@@ -145,7 +145,7 @@ test:do_execsql_test(
 --             INSERT INTO t2 VALUES(7, 'aBc ', 'aBc ', 'aBc ');
 --             INSERT INTO t2 VALUES(8, 'aBC ', 'aBC ', 'aBC ');
 --             ANALYZE;
---             SELECT idx, stat FROM sql_stat1 WHERE tbl='t2' ORDER BY idx;
+--             SELECT idx, stat FROM _sql_stat1 WHERE tbl='t2' ORDER BY idx;
 --         ]])
 --     end, {
 --         -- <analyze4-2.0>

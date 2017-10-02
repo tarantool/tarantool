@@ -876,12 +876,12 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	assert(pParse->pNewTable == 0);
 	pParse->pNewTable = pTable;
 
-	/* If this is the magic sql_sequence table used by autoincrement,
+	/* If this is the magic _sql_sequence table used by autoincrement,
 	 * then record a pointer to this table in the main database structure
 	 * so that INSERT can find the table easily.
 	 */
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-	if (!pParse->nested && strcmp(zName, "sql_sequence") == 0) {
+	if (!pParse->nested && strcmp(zName, "_sql_sequence") == 0) {
 		assert(sqlite3SchemaMutexHeld(db, 0));
 		pTable->pSchema->pSeqTab = pTable;
 	}
@@ -2149,7 +2149,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-		/* Check to see if we need to create an sql_sequence table for
+		/* Check to see if we need to create an _sql_sequence table for
 		 * keeping track of autoincrement keys.
 		 */
 		if ((p->tabFlags & TF_Autoincrement) != 0) {
@@ -2157,7 +2157,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			assert(sqlite3SchemaMutexHeld(db, 0));
 			if (pDb->pSchema->pSeqTab == 0) {
 				sqlite3NestedParse(pParse,
-						   "CREATE TABLE sql_sequence(name PRIMARY KEY,seq)");
+						   "CREATE TABLE _sql_sequence(name PRIMARY KEY,seq)");
 			}
 		}
 #endif
@@ -2420,7 +2420,7 @@ sqlite3ClearStatTables(Parse * pParse,	/* The parsing context */
 	int i;
 	for (i = 1; i <= 4; i++) {
 		char zTab[24];
-		sqlite3_snprintf(sizeof(zTab), zTab, "sql_stat%d", i);
+		sqlite3_snprintf(sizeof(zTab), zTab, "_sql_stat%d", i);
 		if (sqlite3FindTable(pParse->db, zTab)) {
 			sqlite3NestedParse(pParse,
 					   "DELETE FROM %s WHERE %s=%Q",
@@ -2459,14 +2459,14 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	}
 	pParse->nested--;
 
-	/* Remove any entries of the sql_sequence table associated with
+	/* Remove any entries of the _sql_sequence table associated with
 	 * the table being dropped. This is done before the table is dropped
-	 * at the btree level, in case the sql_sequence table needs to
+	 * at the btree level, in case the _sql_sequence table needs to
 	 * move as a result of the drop.
 	 */
 	if (pTab->tabFlags & TF_Autoincrement) {
 		sqlite3NestedParse(pParse,
-				   "DELETE FROM sql_sequence WHERE name=%Q",
+				   "DELETE FROM _sql_sequence WHERE name=%Q",
 				   pTab->zName);
 	}
 
@@ -2576,8 +2576,7 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 		}
 	}
 #endif
-	if (sqlite3StrNICmp(pTab->zName, "sql_", 4) == 0
-	    && sqlite3StrNICmp(pTab->zName, "sql_stat", 8) != 0) {
+	if (sqlite3StrNICmp(pTab->zName, "_", 1) == 0) {
 		sqlite3ErrorMsg(pParse, "table %s may not be dropped",
 				pTab->zName);
 		goto exit_drop_table;

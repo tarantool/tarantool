@@ -38,10 +38,10 @@
  *
  * The following system tables are or have been supported:
  *
- *    CREATE TABLE sql_stat1(tbl, idx, stat);
+ *    CREATE TABLE _sql_stat1(tbl, idx, stat);
  *    CREATE TABLE sql_stat2(tbl, idx, sampleno, sample);
  *    CREATE TABLE sql_stat3(tbl, idx, nEq, nLt, nDLt, sample);
- *    CREATE TABLE sql_stat4(tbl, idx, nEq, nLt, nDLt, sample);
+ *    CREATE TABLE _sql_stat4(tbl, idx, nEq, nLt, nDLt, sample);
  *
  * Additional tables might be added in future releases of SQLite.
  * The sql_stat2 table is not created or used unless the SQLite version
@@ -50,16 +50,16 @@
  * The sql_stat2 table is superseded by sql_stat3, which is only
  * created and used by SQLite versions 3.7.9 and later and with
  * SQLITE_ENABLE_STAT3 defined.  The functionality of sql_stat3
- * is a superset of sql_stat2.  The sql_stat4 is an enhanced
+ * is a superset of sql_stat2.  The _sql_stat4 is an enhanced
  * version of sql_stat3 and is only available when compiled with
  * SQLITE_ENABLE_STAT4 and in SQLite versions 3.8.1 and later.  It is
  * not possible to enable both STAT3 and STAT4 at the same time.  If they
  * are both enabled, then STAT4 takes precedence.
  *
- * For most applications, sql_stat1 provides all the statistics required
+ * For most applications, _sql_stat1 provides all the statistics required
  * for the query planner to make good choices.
  *
- * Format of sql_stat1:
+ * Format of _sql_stat1:
  *
  * There is normally one row per index, with the index identified by the
  * name in the idx column.  The tbl column is the name of the table to
@@ -81,9 +81,9 @@
  * "unordered" keyword is present, then the query planner assumes that
  * the index is unordered and will not use the index for a range query.
  *
- * If the sql_stat1.idx column is NULL, then the sql_stat1.stat
+ * If the _sql_stat1.idx column is NULL, then the _sql_stat1.stat
  * column contains a single integer which is the (estimated) number of
- * rows in the table identified by sql_stat1.tbl.
+ * rows in the table identified by _sql_stat1.tbl.
  *
  * Format of sql_stat2:
  *
@@ -113,18 +113,18 @@
  *
  * Format for sql_stat3:
  *
- * The sql_stat3 format is a subset of sql_stat4.  Hence, the
- * sql_stat4 format will be described first.  Further information
- * about sql_stat3 follows the sql_stat4 description.
+ * The sql_stat3 format is a subset of _sql_stat4.  Hence, the
+ * _sql_stat4 format will be described first.  Further information
+ * about sql_stat3 follows the _sql_stat4 description.
  *
- * Format for sql_stat4:
+ * Format for _sql_stat4:
  *
- * As with sql_stat2, the sql_stat4 table contains histogram data
+ * As with sql_stat2, the _sql_stat4 table contains histogram data
  * to aid the query planner in choosing good indices based on the values
  * that indexed columns are compared against in the WHERE clauses of
  * queries.
  *
- * The sql_stat4 table contains multiple entries for each index.
+ * The _sql_stat4 table contains multiple entries for each index.
  * The idx column names the index and the tbl column is the table of the
  * index.  If the idx and tbl columns are the same, then the sample is
  * of the INTEGER PRIMARY KEY.  The sample column is a blob which is the
@@ -144,21 +144,21 @@
  * number of distinct entries in the index that are less than the
  * sample.
  *
- * There can be an arbitrary number of sql_stat4 entries per index.
- * The ANALYZE command will typically generate sql_stat4 tables
+ * There can be an arbitrary number of _sql_stat4 entries per index.
+ * The ANALYZE command will typically generate _sql_stat4 tables
  * that contain between 10 and 40 samples which are distributed across
  * the key space, though not uniformly, and which include samples with
  * large nEq values.
  *
  * Format for sql_stat3 redux:
  *
- * The sql_stat3 table is like sql_stat4 except that it only
+ * The sql_stat3 table is like _sql_stat4 except that it only
  * looks at the left-most column of the index.  The sql_stat3.sample
  * column contains the actual value of the left-most column instead
  * of a blob encoding of the complete index key as is found in
- * sql_stat4.sample.  The nEq, nLt, and nDLt entries of sql_stat3
+ * _sql_stat4.sample.  The nEq, nLt, and nDLt entries of sql_stat3
  * all contain just a single integer which is the same as the first
- * integer in the equivalent columns in sql_stat4.
+ * integer in the equivalent columns in _sql_stat4.
  */
 #ifndef SQLITE_OMIT_ANALYZE
 
@@ -188,8 +188,8 @@
 
 /*
  * This routine generates code that opens the sql_statN tables.
- * The sql_stat1 table is always relevant.  sql_stat2 is now
- * obsolete.  sql_stat3 and sql_stat4 are only opened when
+ * The _sql_stat1 table is always relevant.  sql_stat2 is now
+ * obsolete.  sql_stat3 and _sql_stat4 are only opened when
  * appropriate compile-time options are provided.
  *
  * If the sql_statN tables do not previously exist, it is created.
@@ -201,7 +201,7 @@
  */
 static void
 openStatTable(Parse * pParse,	/* Parsing context */
-	      int iStatCur,	/* Open the sql_stat1 table on this cursor */
+	      int iStatCur,	/* Open the _sql_stat1 table on this cursor */
 	      const char *zWhere,	/* Delete entries for this table or index */
 	      const char *zWhereType	/* Either "tbl" or "idx" */
     )
@@ -211,10 +211,10 @@ openStatTable(Parse * pParse,	/* Parsing context */
 		const char *zCols;
 	} aTable[] = {
 		{
-		"sql_stat1", "tbl,idx,stat, PRIMARY KEY(tbl, idx)"},
+		"_sql_stat1", "tbl,idx,stat, PRIMARY KEY(tbl, idx)"},
 #if defined(SQLITE_ENABLE_STAT4)
 		{
-		"sql_stat4",
+		"_sql_stat4",
 			    "tbl,idx,neq,nlt,ndlt,sample, PRIMARY KEY(tbl, idx, sample)"},
 		{
 		"sql_stat3", 0},
@@ -223,11 +223,11 @@ openStatTable(Parse * pParse,	/* Parsing context */
 		"sql_stat3",
 			    "tbl,idx,neq,nlt,ndlt,sample, PRIMARY KEY (tbl, idx)"},
 		{
-		"sql_stat4", 0},
+		"_sql_stat4", 0},
 #else
 		{
 		"sql_stat3", 0}, {
-		"sql_stat4", 0},
+		"_sql_stat4", 0},
 #endif
 	};
 	int i;
@@ -294,7 +294,7 @@ openStatTable(Parse * pParse,	/* Parsing context */
 }
 
 /*
- * Recommended number of samples for sql_stat4
+ * Recommended number of samples for _sql_stat4
  */
 #ifndef SQL_STAT4_SAMPLES
 #define SQL_STAT4_SAMPLES 24
@@ -308,10 +308,10 @@ openStatTable(Parse * pParse,	/* Parsing context */
 typedef struct Stat4Accum Stat4Accum;
 typedef struct Stat4Sample Stat4Sample;
 struct Stat4Sample {
-	tRowcnt *anEq;		/* sql_stat4.nEq */
-	tRowcnt *anDLt;		/* sql_stat4.nDLt */
+	tRowcnt *anEq;		/* _sql_stat4.nEq */
+	tRowcnt *anDLt;		/* _sql_stat4.nDLt */
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
-	tRowcnt *anLt;		/* sql_stat4.nLt */
+	tRowcnt *anLt;		/* _sql_stat4.nLt */
 	union {
 		i64 iRowid;	/* Rowid in main table of the key */
 		u8 *aRowid;	/* Key for WITHOUT ROWID tables */
@@ -892,7 +892,7 @@ statGet(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	assert(argc == 1);
 #endif
 	{
-		/* Return the value to store in the "stat" column of the sql_stat1
+		/* Return the value to store in the "stat" column of the _sql_stat1
 		 * table for this index.
 		 *
 		 * The value is a string composed of a list of integers describing
@@ -901,7 +901,7 @@ statGet(sqlite3_context * context, int argc, sqlite3_value ** argv)
 		 * for each indexed column. This additional integer is an estimate of
 		 * the number of rows matched by a stabbing query on the index using
 		 * a key with the corresponding number of fields. In other words,
-		 * if the index is on columns (a,b) and the sql_stat1 value is
+		 * if the index is on columns (a,b) and the _sql_stat1 value is
 		 * "100 10 2", then SQLite estimates that:
 		 *
 		 *   * the index contains 100 rows,
@@ -1029,7 +1029,7 @@ static void
 analyzeOneTable(Parse * pParse,	/* Parser context */
 		Table * pTab,	/* Table whose indices are to be analyzed */
 		Index * pOnlyIdx,	/* If not NULL, only analyze this one index */
-		int iStatCur,	/* Index of VdbeCursor that writes the sql_stat1 table */
+		int iStatCur,	/* Index of VdbeCursor that writes the _sql_stat1 table */
 		int iMem,	/* Available memory locations begin here */
 		int iTab	/* Next available cursor */
     )
@@ -1051,7 +1051,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	int regTemp = iMem++;	/* Temporary use register */
 	int regTabname = iMem++;	/* Register containing table name */
 	int regIdxname = iMem++;	/* Register containing index name */
-	int regStat1 = iMem++;	/* Value for the stat column of sql_stat1 */
+	int regStat1 = iMem++;	/* Value for the stat column of _sql_stat1 */
 	int regPrev = iMem;	/* MUST BE LAST (see below) */
 
 	pParse->nMem = MAX(pParse->nMem, iMem);
@@ -1060,12 +1060,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		return;
 	}
 	assert(pTab->tnum != 0);
-	if (sqlite3_strlike("sql_%", pTab->zName, 0) == 0 ||
-	    strncmp("_space", pTab->zName, 6) == 0 ||
-	    strncmp("_index", pTab->zName, 6) == 0 ||
-	    strncmp("_schema", pTab->zName, 7) == 0 ||
-	    strncmp("_trigger", pTab->zName, 8) == 0 ||
-	    strncmp("_truncate", pTab->zName, 9) == 0) {
+	if (sqlite3_strlike("\\_%", pTab->zName, '\\') == 0) {
 		/* Do not gather statistics on system tables */
 		return;
 	}
@@ -1151,7 +1146,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		/* Make sure there are enough memory cells allocated to accommodate
 		 * the regPrev array and a trailing rowid (the rowid slot is required
 		 * when building a record to insert into the sample column of
-		 * the sql_stat4 table.
+		 * the _sql_stat4 table.
 		 */
 		pParse->nMem = MAX(pParse->nMem, regPrev + nColTest);
 
@@ -1361,7 +1356,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		sqlite3VdbeJumpHere(v, addrRewind);
 	}
 
-	/* Create a single sql_stat1 entry containing NULL as the index
+	/* Create a single _sql_stat1 entry containing NULL as the index
 	 * name and the row count as the content.
 	 */
 	if (pOnlyIdx == 0 && needTableCnt) {
@@ -1577,7 +1572,7 @@ decodeIntArray(char *zIntArray,	/* String containing int array to decode */
 
 /*
  * This callback is invoked once for each index when reading the
- * sql_stat1 table.
+ * _sql_stat1 table.
  *
  *     argv[0] = name of the table
  *     argv[1] = name of the index (might be NULL)
@@ -1618,7 +1613,7 @@ analysisLoader(void *pData, int argc, char **argv, char **NotUsed)
 		int nCol = pIndex->nKeyCol + 1;
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 		/* Index.aiRowEst may already be set here if there are duplicate
-		 * sql_stat1 entries for this index. In that case just clobber
+		 * _sql_stat1 entries for this index. In that case just clobber
 		 * the old data with the new instead of allocating a new array.
 		 */
 		if (pIndex->aiRowEst == 0) {
@@ -1772,15 +1767,15 @@ sampleCompareMsgPack(const void *a, const void *b, void *arg)
 }
 
 /*
- * Load the content from either the sql_stat4 or sql_stat3 table
+ * Load the content from either the _sql_stat4 or sql_stat3 table
  * into the relevant Index.aSample[] arrays.
  *
  * Arguments zSql1 and zSql2 must point to SQL statements that return
  * data equivalent to the following (statements are different for stat3,
  * see the caller of this function for details):
  *
- *    zSql1: SELECT tbl,idx,count(*) FROM sql_stat4 GROUP BY tbl,idx
- *    zSql2: SELECT tbl,idx,neq,nlt,ndlt,sample FROM sql_stat4
+ *    zSql1: SELECT tbl,idx,count(*) FROM _sql_stat4 GROUP BY tbl,idx
+ *    zSql2: SELECT tbl,idx,neq,nlt,ndlt,sample FROM _sql_stat4
  *
  */
 static int
@@ -1902,7 +1897,7 @@ loadStatTbl(sqlite3 * db,	/* Database handle */
 			continue;
 
 		/* This next condition is true if data has already been loaded from
-		 * the sql_stat4 table. In this case ignore stat3 data.
+		 * the _sql_stat4 table. In this case ignore stat3 data.
 		 */
 		nCol = pIdx->nSampleCol;
 		if (bStat3 && nCol > 1)
@@ -1968,7 +1963,7 @@ loadStatTbl(sqlite3 * db,	/* Database handle */
 }
 
 /*
- * Load content from the sql_stat4 and sql_stat3 tables into
+ * Load content from the _sql_stat4 and sql_stat3 tables into
  * the Index.aSample[] arrays of all indices.
  */
 static int
@@ -1978,11 +1973,11 @@ loadStat4(sqlite3 * db)
 	Table *pTab = 0;	/* Pointer to stat table */
 
 	assert(db->lookaside.bDisable);
-	if ((pTab = sqlite3FindTable(db, "sql_stat4"))) {
+	if ((pTab = sqlite3FindTable(db, "_sql_stat4"))) {
 		rc = loadStatTbl(db, 0,
 				 pTab,
-				 "SELECT tbl,idx,count(*) FROM sql_stat4 GROUP BY tbl,idx",
-				 "SELECT tbl,idx,neq,nlt,ndlt,sample FROM sql_stat4");
+				 "SELECT tbl,idx,count(*) FROM _sql_stat4 GROUP BY tbl,idx",
+				 "SELECT tbl,idx,neq,nlt,ndlt,sample FROM _sql_stat4");
 	}
 
 	if (rc == SQLITE_OK && (pTab = sqlite3FindTable(db, "sql_stat3"))) {
@@ -1997,19 +1992,19 @@ loadStat4(sqlite3 * db)
 #endif				/* SQLITE_ENABLE_STAT3_OR_STAT4 */
 
 /*
- * Load the content of the sql_stat1 and sql_stat3/4 tables. The
- * contents of sql_stat1 are used to populate the Index.aiRowEst[]
+ * Load the content of the _sql_stat1 and sql_stat3/4 tables. The
+ * contents of _sql_stat1 are used to populate the Index.aiRowEst[]
 *\* arrays. The contents of sql_stat3/4 are used to populate the
  * Index.aSample[] arrays.
  *
- * If the sql_stat1 table is not present in the database, SQLITE_ERROR
+ * If the _sql_stat1 table is not present in the database, SQLITE_ERROR
  * is returned. In this case, even if SQLITE_ENABLE_STAT3/4 was defined
  * during compilation and the sql_stat3/4 table is present, no data is
  * read from it.
  *
  * If SQLITE_ENABLE_STAT3/4 was defined during compilation and the
- * sql_stat4 table is not present in the database, SQLITE_ERROR is
- * returned. However, in this case, data is read from the sql_stat1
+ * _sql_stat4 table is not present in the database, SQLITE_ERROR is
+ * returned. However, in this case, data is read from the _sql_stat1
  * table (if it is present) before returning.
  *
  * If an OOM error occurs, this function always sets db->mallocFailed.
@@ -2042,14 +2037,14 @@ sqlite3AnalysisLoad(sqlite3 * db)
 		}
 	}
 
-	/* Load new statistics out of the sql_stat1 table */
+	/* Load new statistics out of the _sql_stat1 table */
 	sInfo.db = db;
-	if (sqlite3FindTable(db, "sql_stat1") != 0) {
-		zSql = "SELECT tbl,idx,stat FROM sql_stat1";
+	if (sqlite3FindTable(db, "_sql_stat1") != 0) {
+		zSql = "SELECT tbl,idx,stat FROM _sql_stat1";
 		rc = sqlite3_exec(db, zSql, analysisLoader, &sInfo, 0);
 	}
 
-	/* Set appropriate defaults on all indexes not in the sql_stat1 table */
+	/* Set appropriate defaults on all indexes not in the _sql_stat1 table */
 	assert(sqlite3SchemaMutexHeld(db, 0));
 	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {
@@ -2062,7 +2057,7 @@ sqlite3AnalysisLoad(sqlite3 * db)
 		}
 	}
 
-	/* Load the statistics from the sql_stat4 table. */
+	/* Load the statistics from the _sql_stat4 table. */
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	if (rc == SQLITE_OK && OptimizationEnabled(db, SQLITE_Stat34)) {
 		db->lookaside.bDisable++;

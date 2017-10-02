@@ -235,7 +235,7 @@ readsTable(Parse * p, Table * pTab)
  *
  *   (1)  Register to hold the name of the pTab table.
  *   (2)  Register to hold the maximum ROWID of pTab.
- *   (3)  Register to hold the rowid in sql_sequence of pTab
+ *   (3)  Register to hold the rowid in _sql_sequence of pTab
  *
  * The 2nd register is the one that is returned.  That is all the
  * insert routine needs to know about.
@@ -263,7 +263,7 @@ autoIncBegin(Parse * pParse,	/* Parsing context */
 			pInfo->pTab = pTab;
 			pToplevel->nMem++;	/* Register to hold name of table */
 			pInfo->regCtr = ++pToplevel->nMem;	/* Max rowid register */
-			pToplevel->nMem++;	/* Rowid in sql_sequence */
+			pToplevel->nMem++;	/* Rowid in _sql_sequence */
 		}
 		memId = pInfo->regCtr;
 	}
@@ -341,7 +341,7 @@ autoIncStep(Parse * pParse, int memId, int regRowid)
 
 /*
  * This routine generates the code needed to write autoincrement
- * maximum rowid values back into the sql_sequence register.
+ * maximum rowid values back into the _sql_sequence register.
  * Every statement that might do an INSERT into an autoincrement
  * table (either directly or through triggers) needs to call this
  * routine just before the "exit" code.
@@ -651,7 +651,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 #endif				/* SQLITE_OMIT_XFER_OPT */
 
 	/* If this is an AUTOINCREMENT table, look up the sequence number in the
-	 * sql_sequence table and store it in memory cell regAutoinc.
+	 * _sql_sequence table and store it in memory cell regAutoinc.
 	 */
 	regAutoinc = autoIncBegin(pParse, pTab);
 
@@ -1026,7 +1026,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				 * autoincrementation. Extract max ID from the
 				 * index and increment it. This'll be compared
 				 * w/ corresponding value extracted from
-				 * sql_sequence for given index later.
+				 * _sql_sequence for given index later.
 				 */
 				if ((pTab->tabFlags & TF_Autoincrement)
 				    && (ipkColumn == -1)) {
@@ -1195,7 +1195,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	}
 
  insert_end:
-	/* Update the sql_sequence table by storing the content of the
+	/* Update the _sql_sequence table by storing the content of the
 	 * maximum rowid counter values recorded while inserting into
 	 * autoincrement tables.
 	 */

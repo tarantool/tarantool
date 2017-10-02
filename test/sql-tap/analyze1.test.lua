@@ -38,7 +38,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "analyze-1.2",
     [[
-        SELECT count(*) FROM _space WHERE name='sql_stat1'
+        SELECT count(*) FROM _space WHERE name='_sql_stat1'
     ]], {
         -- <analyze-1.2>
         0
@@ -69,7 +69,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "analyze-1.6",
     [[
-        SELECT count(*) FROM _space WHERE name='sql_stat1'
+        SELECT count(*) FROM _space WHERE name='_sql_stat1'
     ]], {
         -- <analyze-1.6>
         1
@@ -81,7 +81,7 @@ test:do_execsql_test(
 -- test:do_catchsql_test(
 --     "analyze-1.6.2",
 --     [[
---         CREATE INDEX stat1idx ON sql_stat1(idx);
+--         CREATE INDEX stat1idx ON _sql_stat1(idx);
 --     ]], {
 --         -- <analyze-1.6.2>
 --         1, "table sqlite_stat1 may not be indexed"
@@ -101,7 +101,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "analyze-1.7",
     [[
-        SELECT * FROM sql_stat1 WHERE idx NOT NULL
+        SELECT * FROM _sql_stat1 WHERE idx NOT NULL
     ]], {
         -- <analyze-1.7>
         -- </analyze-1.7>
@@ -120,7 +120,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "analyze-1.9",
     [[
-        SELECT * FROM sql_stat1 WHERE idx NOT NULL
+        SELECT * FROM _sql_stat1 WHERE idx NOT NULL
     ]], {
         -- <analyze-1.9>
         -- </analyze-1.9>
@@ -141,7 +141,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "analyze-1.11",
     [[
-        SELECT * FROM sql_stat1
+        SELECT * FROM _sql_stat1
     ]], {
         -- <analyze-1.11>
         -- </analyze-1.11>
@@ -165,7 +165,7 @@ test:do_execsql_test(
     [[
         CREATE INDEX t1i1 ON t1(a);
         ANALYZE t1;
-        SELECT * FROM sql_stat1 ORDER BY idx;
+        SELECT * FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-2.1>
         -- </analyze-2.1>
@@ -176,7 +176,7 @@ test:do_execsql_test(
     [[
         CREATE INDEX t1i2 ON t1(b);
         ANALYZE t1;
-        SELECT * FROM sql_stat1 ORDER BY idx;
+        SELECT * FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-2.2>
         -- </analyze-2.2>
@@ -187,7 +187,7 @@ test:do_execsql_test(
     [[
         CREATE INDEX t1i3 ON t1(a,b);
         ANALYZE;
-        SELECT * FROM sql_stat1 ORDER BY idx;
+        SELECT * FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-2.3>
         -- </analyze-2.3>
@@ -203,7 +203,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(1, 1,2);
         INSERT INTO t1 VALUES(2, 1,3);
         ANALYZE t1;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.1>
         "t1", "2 1", "t1i1", "2 2", "t1i2", "2 1", "t1i3", "2 2 1"
@@ -216,7 +216,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(3, 1,4);
         INSERT INTO t1 VALUES(4, 1,5);
         ANALYZE t1;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.2>
         "t1", "4 1", "t1i1", "4 4", "t1i2", "4 1", "t1i3", "4 4 1"
@@ -228,7 +228,7 @@ test:do_execsql_test(
     [[
         INSERT INTO t1 (a,b) VALUES(2,5);
         ANALYZE;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.3>
         "t1","5 1", "t1i1", "5 3", "t1i2", "5 2", "t1i3", "5 3 1"
@@ -244,7 +244,7 @@ test:do_execsql_test(
         CREATE INDEX t2i2 ON t2(b);
         CREATE INDEX t2i3 ON t2(a,b);
         ANALYZE;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.4>
         "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3","t2i2","5 2","t2i3","5 3 1"
@@ -256,7 +256,7 @@ test:do_execsql_test(
     [[
         DROP INDEX t2i3 ON t2;;
         ANALYZE t1;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.5>
         "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3","t2i2","5 2"
@@ -267,7 +267,7 @@ test:do_execsql_test(
     "analyze-3.6",
     [[
         ANALYZE t2;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.6>
         "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3","t2i2","5 2"
@@ -279,7 +279,7 @@ test:do_execsql_test(
     [[
         DROP INDEX t2i2 ON t2;
         ANALYZE t2;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.7>
         "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3"
@@ -296,7 +296,7 @@ test:do_execsql_test(
         CREATE INDEX t3i3 ON t3(d,b,c,a);
         DROP TABLE t1;
         DROP TABLE t2;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.8>
         
@@ -307,7 +307,7 @@ test:do_execsql_test(
     "analyze-3.9",
     [[
         ANALYZE;
-        SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.9>
         "t3","5 1","t3i1","5 3","t3i2","5 3 1 1 1","t3i3","5 5 2 1 1"
@@ -324,7 +324,7 @@ test:do_execsql_test(
 --         INSERT INTO [silly " name] (a,b,c) VALUES(1, 2, 3);
 --         INSERT INTO [silly " name] (a,b,c) VALUES(4, 5, 6);
 --         ANALYZE;
---         SELECT idx, stat FROM sql_stat1 ORDER BY idx;
+--         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
 --     ]], {
 --         -- <analyze-3.10>
 --         "another foolish ' name", "2 1", "foolish ' name", "2 1 1", "t3i1", "5 3", "t3i2", "5 3 1 1 1", "t3i3", "5 5 2 1 1"
@@ -371,7 +371,7 @@ test:do_execsql_test(
         INSERT INTO t3 (a,b,c,d) SELECT a+64, b+64, c+64, d+64 FROM t3;
         INSERT INTO t4 (x,y,z) SELECT a, b, c FROM t3;
         ANALYZE;
-        SELECT DISTINCT tbl FROM sql_stat1 ORDER BY 1;
+        SELECT DISTINCT tbl FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.0>
         "t3", "t4"
@@ -381,14 +381,14 @@ test:do_execsql_test(
 test:do_execsql_test(
     "analyze-5.0.1",
     [[
-        SELECT DISTINCT idx FROM sql_stat1 ORDER BY 1;
+        SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.0>
         "t3", "t3i1", "t3i2", "t3i3", "t4", "t4i1", "t4i2"
         -- </analyze-5.0>
     })
 
-stat = "sql_stat4"
+stat = "_sql_stat4"
 
 test:do_execsql_test(
     "analyze-5.1",
@@ -415,7 +415,7 @@ test:do_execsql_test(
     [[
         DROP INDEX t3i2 ON t3;
         ANALYZE;
-        SELECT DISTINCT idx FROM sql_stat1 ORDER BY 1;
+        SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.2>
         "t3", "t3i1", "t3i3", "t4", "t4i1", "t4i2"
@@ -425,7 +425,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "analyze-5.2.1",
     [[
-        SELECT DISTINCT tbl FROM sql_stat1 ORDER BY 1;
+        SELECT DISTINCT tbl FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.2>
         "t3", "t4"
@@ -457,7 +457,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t3;
         ANALYZE;
-        SELECT DISTINCT idx FROM sql_stat1 ORDER BY 1;
+        SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.4>
         "t4", "t4i1", "t4i2"
@@ -467,7 +467,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "analyze-5.4.1",
     [[
-        SELECT DISTINCT tbl FROM sql_stat1 ORDER BY 1;
+        SELECT DISTINCT tbl FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.4>
         "t4"
