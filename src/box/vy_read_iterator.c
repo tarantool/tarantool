@@ -102,22 +102,30 @@ vy_read_iterator_add_src(struct vy_read_iterator *itr)
 }
 
 /**
- * Check if the read iterator needs to be restored.
- *
- * @retval 0	if position did not change (iterator started)
- * @retval -2	iterator is no more valid
+ * Pin all slices open by the read iterator.
+ * Used to make sure no run slice is invalidated by
+ * compaction while we are fetching data from disk.
  */
-static NODISCARD int
-vy_read_iterator_check_version(struct vy_read_iterator *itr)
+static void
+vy_read_iterator_pin_slices(struct vy_read_iterator *itr)
 {
-	if (itr->index->mem_list_version != itr->mem_list_version)
-		return -2;
-	if (itr->index->range_tree_version != itr->range_tree_version)
-		return -2;
-	if (itr->curr_range != NULL &&
-	    itr->curr_range->version != itr->range_version)
-		return -2;
-	return 0;
+	for (uint32_t i = itr->disk_src; i < itr->src_count; i++) {
+		struct vy_read_src *src = &itr->src[i];
+		vy_slice_pin(src->run_iterator.slice);
+	}
+}
+
+/**
+ * Unpin all slices open by the read iterator.
+ * See also: vy_read_iterator_pin_slices().
+ */
+static void
+vy_read_iterator_unpin_slices(struct vy_read_iterator *itr)
+{
+	for (uint32_t i = itr->disk_src; i < itr->src_count; i++) {
+		struct vy_read_src *src = &itr->src[i];
+		vy_slice_unpin(src->run_iterator.slice);
+	}
 }
 
 /**
@@ -358,8 +366,6 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr,
 
 	if (rc < 0)
 		return -1;
-	if (vy_read_iterator_check_version(itr))
-		return -2;
 
 	vy_read_iterator_evaluate_src(itr, src, stop);
 	return 0;
@@ -422,6 +428,9 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr)
 }
 
 static void
+vy_read_iterator_restore(struct vy_read_iterator *itr);
+
+static void
 vy_read_iterator_next_range(struct vy_read_iterator *itr);
 
 static int
@@ -431,7 +440,6 @@ vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt);
  * Iterate to the next key
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read error
- * @retval -2 iterator is not valid anymore
  */
 static NODISCARD int
 vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
@@ -449,10 +457,16 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 		*ret = NULL;
 		return 0;
 	}
-
-	if (vy_read_iterator_check_version(itr))
-		return -2;
-
+	/*
+	 * Restore the iterator position if the index has changed
+	 * since the last iteration.
+	 */
+	if (itr->mem_list_version != itr->index->mem_list_version ||
+	    itr->range_tree_version != itr->index->range_tree_version ||
+	    itr->range_version != itr->curr_range->version) {
+		vy_read_iterator_restore(itr);
+	}
+restart:
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
@@ -478,12 +492,26 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 	}
 rescan_disk:
 	/* The following code may yield as it needs to access disk. */
+	vy_read_iterator_pin_slices(itr);
 	for (i = itr->disk_src; i < itr->src_count; i++) {
-		int rc = vy_read_iterator_scan_disk(itr, i, &stop);
-		if (rc != 0)
-			return rc;
+		if (vy_read_iterator_scan_disk(itr, i, &stop) != 0)
+			goto err_disk;
 		if (stop)
 			break;
+	}
+	vy_read_iterator_unpin_slices(itr);
+	/*
+	 * The list of in-memory indexes and/or the range tree could
+	 * have been modified by dump/compaction while we were fetching
+	 * data from disk. Restart the iterator if this is the case.
+	 * Note, we don't need to check the current range's version,
+	 * because all slices were pinned and hence could not be
+	 * removed.
+	 */
+	if (itr->mem_list_version != itr->index->mem_list_version ||
+	    itr->range_tree_version != itr->index->range_tree_version) {
+		vy_read_iterator_restore(itr);
+		goto restart;
 	}
 	/*
 	 * The transaction write set couldn't change during the yield
@@ -515,13 +543,16 @@ done:
 
 	*ret = itr->curr_stmt;
 	return 0;
+
+err_disk:
+	vy_read_iterator_unpin_slices(itr);
+	return -1;
 }
 
 /**
  * Iterate to the next (elder) version of the same key
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read error
- * @retval -2 iterator is not valid anymore
  */
 static NODISCARD int
 vy_read_iterator_next_lsn(struct vy_read_iterator *itr, struct tuple **ret)
@@ -565,25 +596,33 @@ vy_read_iterator_next_lsn(struct vy_read_iterator *itr, struct tuple **ret)
 			goto found;
 	}
 
-	/* Look up the older statement in on-disk runs. */
+	/*
+	 * Look up the older statement in on-disk runs.
+	 *
+	 * Note, we don't need to check the index version after the yield
+	 * caused by the disk read, because once we've come to this point,
+	 * we won't read any source except run slices, which are pinned
+	 * and hence cannot be removed during the yield.
+	 */
+	vy_read_iterator_pin_slices(itr);
 	for (i = MAX(itr->curr_src, itr->disk_src); i < itr->src_count; i++) {
 		src = &itr->src[i];
-		if (i >= itr->skipped_src) {
-			int rc = vy_read_iterator_scan_disk(itr, i, &unused);
-			if (rc != 0)
-				return rc;
-		}
+		if (i >= itr->skipped_src &&
+		    vy_read_iterator_scan_disk(itr, i, &unused) != 0)
+			goto err_disk;
 		if (src->front_id != itr->front_id)
 			continue;
 		if (i == itr->curr_src &&
 		    vy_run_iterator_next_lsn(&src->run_iterator,
 					     &src->stmt) != 0)
-			return -1;
-		if (vy_read_iterator_check_version(itr))
-			return -2;
+			goto err_disk;
 		if (src->stmt != NULL)
-			goto found;
+			break;
 	}
+	vy_read_iterator_unpin_slices(itr);
+
+	if (i < itr->src_count)
+		goto found;
 
 	/* Searched everywhere, found nothing. */
 	*ret = NULL;
@@ -596,6 +635,10 @@ found:
 	itr->curr_src = src - itr->src;
 	*ret = itr->curr_stmt;
 	return 0;
+
+err_disk:
+	vy_read_iterator_unpin_slices(itr);
+	return -1;
 }
 
 /**
@@ -603,7 +646,6 @@ found:
  *
  * @retval 0 success
  * @retval -1 error
- * @retval -2 invalid iterator
  */
 static NODISCARD int
 vy_read_iterator_squash_upsert(struct vy_read_iterator *itr,
@@ -955,12 +997,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	int rc = 0;
 	while (true) {
 		rc = vy_read_iterator_next_key(itr, &t);
-		if (rc == -1)
+		if (rc != 0)
 			goto clear;
-		if (rc == -2) {
-			vy_read_iterator_restore(itr);
-			continue;
-		}
 		if (t == NULL) {
 			if (itr->last_stmt != NULL)
 				tuple_unref(itr->last_stmt);
@@ -969,12 +1007,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			break;
 		}
 		rc = vy_read_iterator_squash_upsert(itr, &t);
-		if (rc == -1)
+		if (rc != 0)
 			goto clear;
-		if (rc == -2) {
-			vy_read_iterator_restore(itr);
-			continue;
-		}
 		if (itr->last_stmt != NULL)
 			tuple_unref(itr->last_stmt);
 		itr->last_stmt = t;
