@@ -369,7 +369,7 @@ struct vy_txw_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Search key. */
-	struct tuple *key;
+	const struct tuple *key;
 	/* Last seen value of the write set version. */
 	uint32_t version;
 	/* Current position in the write set. */
@@ -385,7 +385,8 @@ void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_index *index,
-		     enum iterator_type iterator_type, struct tuple *key);
+		     enum iterator_type iterator_type,
+		     const struct tuple *key);
 
 #if defined(__cplusplus)
 } /* extern "C" */

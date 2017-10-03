@@ -846,7 +846,8 @@ void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_index *index,
-		     enum iterator_type iterator_type, struct tuple *key)
+		     enum iterator_type iterator_type,
+		     const struct tuple *key)
 {
 	itr->base.iface = &vy_txw_iterator_iface;
 	itr->stat = stat;
@@ -854,7 +855,6 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 	itr->index = index;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
-	tuple_ref(key);
 	itr->version = UINT32_MAX;
 	itr->curr_txv = NULL;
 	itr->search_started = false;
@@ -1030,7 +1030,7 @@ vy_txw_iterator_close(struct vy_stmt_iterator *vitr)
 {
 	assert(vitr->iface->close == vy_txw_iterator_close);
 	struct vy_txw_iterator *itr = (struct vy_txw_iterator *) vitr;
-	tuple_unref(itr->key);
+	(void)itr; /* suppress warn if NDEBUG */
 	TRASH(itr);
 }
 

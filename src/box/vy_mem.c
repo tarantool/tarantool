@@ -423,7 +423,7 @@ static const struct vy_stmt_iterator_iface vy_mem_iterator_iface;
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     struct tuple *key, const struct vy_read_view **rv)
+		     const struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->base.iface = &vy_mem_iterator_iface;
 	itr->stat = stat;
@@ -433,7 +433,6 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *s
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;
-	tuple_ref(key);
 	itr->read_view = rv;
 
 	itr->curr_pos = vy_mem_tree_invalid_iterator();
@@ -598,7 +597,6 @@ vy_mem_iterator_close(struct vy_stmt_iterator *vitr)
 	struct vy_mem_iterator *itr = (struct vy_mem_iterator *) vitr;
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
-	tuple_unref(itr->key);
 	TRASH(itr);
 }
 

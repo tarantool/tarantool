@@ -51,7 +51,6 @@ vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_run_env *run_env
 	itr->tx = tx;
 	itr->p_read_view = rv;
 	itr->key = key;
-	tuple_ref(key);
 
 	itr->curr_stmt = NULL;
 }
@@ -91,7 +90,6 @@ vy_point_iterator_close(struct vy_point_iterator *itr)
 	if (itr->curr_stmt != NULL)
 		tuple_unref(itr->curr_stmt);
 	vy_index_unref(itr->index);
-	tuple_unref(itr->key);
 	TRASH(itr);
 }
 
