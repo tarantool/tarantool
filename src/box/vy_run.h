@@ -465,6 +465,9 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 
 /**
  * Open an iterator over on-disk run.
+ *
+ * Note, it is the caller's responsibility to make sure the slice
+ * is not compacted while the iterator is reading it.
  */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,

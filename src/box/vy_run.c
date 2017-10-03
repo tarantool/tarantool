@@ -949,7 +949,6 @@ vy_page_read_cb_free(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	vy_page_delete(task->page);
-	vy_slice_unpin(task->slice);
 	mempool_free(&task->run_env->read_task_pool, task);
 	return 0;
 }
@@ -996,13 +995,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		reader = &env->reader_pool[env->next_reader++];
 		env->next_reader %= env->reader_pool_size;
 
-		/*
-		 * Make sure the run file descriptor won't be closed
-		 * (even worse, reopened) while a reader thread is
-		 * reading it.
-		 */
-		vy_slice_pin(slice);
-
 		task->slice = slice;
 		task->page_info = *page_info;
 		task->run_env = env;
@@ -1016,7 +1008,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			return -1; /* timed out or cancelled */
 
 		mempool_free(&env->read_task_pool, task);
-		vy_slice_unpin(slice);
 
 		if (rc != 0) {
 			/* posted, but failed */
