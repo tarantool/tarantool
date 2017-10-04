@@ -31,6 +31,8 @@
 #include "box/box.h"
 
 #include "trivia/config.h"
+
+#include "lua/utils.h" /* lua_hash() */
 #include "fiber_pool.h"
 #include <say.h>
 #include <scoped_guard.h>
@@ -1607,7 +1609,7 @@ box_init(void)
 	 */
 	session_init();
 
-	if (tuple_init() != 0)
+	if (tuple_init(lua_hash) != 0)
 		diag_raise();
 
 	sequence_init();

@@ -986,6 +986,28 @@ s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
 ---
 - error: Tuple field count 8 is less than required by a defined index (expected 9)
 ...
+s:truncate()
+---
+...
+--
+-- gh-1014: field names.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2'}
+---
+...
+format[3] = {name = 'field1'}
+---
+...
+s:format(format)
+---
+- error: Space field 'field1' is duplicate
+...
 s:drop()
 ---
 ...

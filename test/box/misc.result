@@ -383,6 +383,7 @@ t;
   - 'box.error.NO_SUCH_ENGINE : 57'
   - 'box.error.COMMIT_IN_SUB_STMT : 122'
   - 'box.error.injection : table: <address>
+  - 'box.error.SPACE_FIELD_IS_DUPLICATE : 149'
   - 'box.error.LAST_DROP : 15'
   - 'box.error.SEQUENCE_OVERFLOW : 147'
   - 'box.error.DECOMPRESSION : 124'

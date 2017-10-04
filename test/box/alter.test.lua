@@ -367,5 +367,15 @@ s:replace{1, '2', {3, 3}, 4.4, -5, {6, 6}, {value=7}, 8, 9}
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
+s:truncate()
+
+--
+-- gh-1014: field names.
+--
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2'}
+format[3] = {name = 'field1'}
+s:format(format)
 
 s:drop()

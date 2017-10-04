@@ -361,6 +361,38 @@ lbox_tuple_transform(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Find a tuple field using its name.
+ * @param L Lua state.
+ * @param tuple 1-th argument on lua stack, tuple to get field
+ *        from.
+ * @param field_name 2-th argument on lua stack, field name to
+ *        get.
+ *
+ * @retval If a field was not found, return -1 and nil to lua else
+ *         return 0 and decoded field.
+ */
+static int
+lbox_tuple_field_by_name(struct lua_State *L)
+{
+	struct tuple *tuple = luaT_istuple(L, 1);
+	/* Is checked in Lua wrapper. */
+	assert(tuple != NULL);
+	assert(lua_isstring(L, 2));
+	size_t name_len;
+	const char *name = lua_tolstring(L, 2, &name_len);
+	uint32_t name_hash = lua_hashstring(L, 2);
+	const char *field =
+		tuple_field_by_name(tuple, name, name_len, name_hash);
+	if (field == NULL) {
+		lua_pushinteger(L, -1);
+		lua_pushnil(L);
+		return 2;
+	}
+	lua_pushinteger(L, 0);
+	luamp_decode(L, luaL_msgpack_default, &field);
+	return 2;
+}
 
 static int
 lbox_tuple_to_string(struct lua_State *L)
@@ -398,6 +430,7 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"tostring", lbox_tuple_to_string},
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
+	{"tuple_field_by_name", lbox_tuple_field_by_name},
 	{NULL, NULL}
 };
 

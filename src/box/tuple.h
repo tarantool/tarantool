@@ -46,7 +46,7 @@ struct quota;
 
 /** Initialize tuple library */
 int
-tuple_init(void);
+tuple_init(field_name_hash_f hash);
 
 /** Cleanup tuple library */
 void
@@ -564,6 +564,25 @@ tuple_field(const struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
 			       tuple_field_map(tuple), fieldno);
+}
+
+/**
+ * Get tuple field by its name.
+ * @param tuple Tuple to get field from.
+ * @param name Field name.
+ * @param name_len Length of @a name.
+ * @param name_hash Hash of @a name.
+ *
+ * @retval not NULL MessagePack field.
+ * @retval     NULL No field with @a name.
+ */
+static inline const char *
+tuple_field_by_name(const struct tuple *tuple, const char *name,
+		    uint32_t name_len, uint32_t name_hash)
+{
+	return tuple_field_raw_by_name(tuple_format(tuple), tuple_data(tuple),
+				       tuple_field_map(tuple), name, name_len,
+				       name_hash);
 }
 
 /**

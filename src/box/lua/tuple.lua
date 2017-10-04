@@ -278,6 +278,10 @@ end
 
 msgpackffi.on_encode(const_tuple_ref_t, tuple_to_msgpack)
 
+local function tuple_field_by_name(tuple, name)
+    tuple_check(tuple, "tuple['field_name']");
+    return internal.tuple.tuple_field_by_name(tuple, name)
+end
 
 local methods = {
     ["next"]        = tuple_next;
@@ -319,6 +323,18 @@ ffi.metatype(tuple_t, {
     __index = function(tuple, key)
         if type(key) == "number" then
             return tuple_field(tuple, key)
+        elseif type(key) == "string" then
+            -- Try to get a field with a name = key. If it was not
+            -- found (rc ~= 0) then return a method from the
+            -- vtable. If a collision occurred, then fields have
+            -- higher priority. For example, if a tuple T has a
+            -- field with name 'bsize', then T.bsize returns field
+            -- value, not tuple_bsize function. To access hidden
+            -- methods use 'box.tuple.<method_name>(T, [args...])'.
+            local rc, field = tuple_field_by_name(tuple, key)
+            if rc == 0 then
+                return field
+            end
         end
         return methods[key]
     end;

@@ -110,6 +110,313 @@ test_run:cmd("clear filter")
 ---
 - true
 ...
+--
+-- gh-1014: tuple field names.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'string'}
+---
+...
+format[3] = {name = 'field3', type = 'array'}
+---
+...
+format[4] = {name = 'field4', type = 'number'}
+---
+...
+format[5] = {name = 'field5', type = 'integer'}
+---
+...
+format[6] = {name = 'field6', type = 'scalar'}
+---
+...
+format[7] = {name = 'field7', type = 'map'}
+---
+...
+format[8] = {name = 'field8', type = 'any'}
+---
+...
+format[9] = {name = 'field9'}
+---
+...
+format[10] = {name = 'bsize'}
+---
+...
+format[11] = {name = 'totable'}
+---
+...
+format[12] = {name = 'longlonglonglonglonglongname'}
+---
+...
+s = box.schema.space.create('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = {1, '2', {3, 3}, 4.4, -5, true, {key = 7}, 8, 9, 10, 11, 12}
+---
+...
+t = s:replace(t)
+---
+...
+t
+---
+- [1, '2', [3, 3], 4.4, -5, true, {'key': 7}, 8, 9, 10, 11, 12]
+...
+t.field1, t.field2, t.field3, t.field4, t.field5, t.field6, t.field7, t.field8, t.field9, t.bsize, t.totable
+---
+- 1
+- '2'
+- [3, 3]
+- 4.4
+- -5
+- true
+- {'key': 7}
+- 8
+- 9
+- 10
+- 11
+...
+t.longlonglonglonglonglongname
+---
+- 12
+...
+box.tuple.bsize(t)
+---
+- 29
+...
+box.tuple.totable(t)
+---
+- [1, '2', [3, 3], 4.4, -5, true, {'key': 7}, 8, 9, 10, 11, 12]
+...
+s:drop()
+---
+...
+--
+-- Increase collisions number and make juajit use second hash
+-- function.
+--
+format = {}
+---
+...
+for i = 1, 100 do format[i] = {name = "skwjhfjwhfwfhwkhfwkjh"..i.."avjnbknwkvbwekjf"} end
+---
+...
+s = box.schema.space.create('test', { engine = engine, format = format })
+---
+...
+p = s:create_index('pk')
+---
+...
+to_insert = {}
+---
+...
+for i = 1, 100 do to_insert[i] = i end
+---
+...
+t = s:replace(to_insert)
+---
+...
+format = nil
+---
+...
+name = nil
+---
+...
+s = nil
+---
+...
+p = nil
+---
+...
+to_insert = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+-- Print many many strings (> 40 to reach max_collisions limit in luajit).
+t.skwjhfjwhfwfhwkhfwkjh01avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh02avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh03avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh04avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh05avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh06avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh07avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh08avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh09avjnbknwkvbwekjf
+---
+- null
+...
+t.skwjhfjwhfwfhwkhfwkjh10avjnbknwkvbwekjf
+---
+- 10
+...
+t.skwjhfjwhfwfhwkhfwkjh11avjnbknwkvbwekjf
+---
+- 11
+...
+t.skwjhfjwhfwfhwkhfwkjh12avjnbknwkvbwekjf
+---
+- 12
+...
+t.skwjhfjwhfwfhwkhfwkjh13avjnbknwkvbwekjf
+---
+- 13
+...
+t.skwjhfjwhfwfhwkhfwkjh14avjnbknwkvbwekjf
+---
+- 14
+...
+t.skwjhfjwhfwfhwkhfwkjh15avjnbknwkvbwekjf
+---
+- 15
+...
+t.skwjhfjwhfwfhwkhfwkjh16avjnbknwkvbwekjf
+---
+- 16
+...
+t.skwjhfjwhfwfhwkhfwkjh17avjnbknwkvbwekjf
+---
+- 17
+...
+t.skwjhfjwhfwfhwkhfwkjh18avjnbknwkvbwekjf
+---
+- 18
+...
+t.skwjhfjwhfwfhwkhfwkjh19avjnbknwkvbwekjf
+---
+- 19
+...
+t.skwjhfjwhfwfhwkhfwkjh20avjnbknwkvbwekjf
+---
+- 20
+...
+t.skwjhfjwhfwfhwkhfwkjh21avjnbknwkvbwekjf
+---
+- 21
+...
+t.skwjhfjwhfwfhwkhfwkjh22avjnbknwkvbwekjf
+---
+- 22
+...
+t.skwjhfjwhfwfhwkhfwkjh23avjnbknwkvbwekjf
+---
+- 23
+...
+t.skwjhfjwhfwfhwkhfwkjh24avjnbknwkvbwekjf
+---
+- 24
+...
+t.skwjhfjwhfwfhwkhfwkjh25avjnbknwkvbwekjf
+---
+- 25
+...
+t.skwjhfjwhfwfhwkhfwkjh26avjnbknwkvbwekjf
+---
+- 26
+...
+t.skwjhfjwhfwfhwkhfwkjh27avjnbknwkvbwekjf
+---
+- 27
+...
+t.skwjhfjwhfwfhwkhfwkjh28avjnbknwkvbwekjf
+---
+- 28
+...
+t.skwjhfjwhfwfhwkhfwkjh29avjnbknwkvbwekjf
+---
+- 29
+...
+t.skwjhfjwhfwfhwkhfwkjh30avjnbknwkvbwekjf
+---
+- 30
+...
+t.skwjhfjwhfwfhwkhfwkjh31avjnbknwkvbwekjf
+---
+- 31
+...
+t.skwjhfjwhfwfhwkhfwkjh32avjnbknwkvbwekjf
+---
+- 32
+...
+t.skwjhfjwhfwfhwkhfwkjh33avjnbknwkvbwekjf
+---
+- 33
+...
+t.skwjhfjwhfwfhwkhfwkjh34avjnbknwkvbwekjf
+---
+- 34
+...
+t.skwjhfjwhfwfhwkhfwkjh35avjnbknwkvbwekjf
+---
+- 35
+...
+t.skwjhfjwhfwfhwkhfwkjh36avjnbknwkvbwekjf
+---
+- 36
+...
+t.skwjhfjwhfwfhwkhfwkjh37avjnbknwkvbwekjf
+---
+- 37
+...
+t.skwjhfjwhfwfhwkhfwkjh38avjnbknwkvbwekjf
+---
+- 38
+...
+t.skwjhfjwhfwfhwkhfwkjh39avjnbknwkvbwekjf
+---
+- 39
+...
+t.skwjhfjwhfwfhwkhfwkjh40avjnbknwkvbwekjf
+---
+- 40
+...
+t.skwjhfjwhfwfhwkhfwkjh41avjnbknwkvbwekjf
+---
+- 41
+...
+t.skwjhfjwhfwfhwkhfwkjh42avjnbknwkvbwekjf
+---
+- 42
+...
+t.skwjhfjwhfwfhwkhfwkjh43avjnbknwkvbwekjf
+---
+- 43
+...
+box.space.test:drop()
+---
+...
 engine = nil
 ---
 ...

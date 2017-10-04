@@ -379,8 +379,9 @@ tuple_extract_key_set(struct key_def *key_def)
 }
 
 int
-tuple_init(void)
+tuple_init(field_name_hash_f hash)
 {
+	field_name_hash = hash;
 	/*
 	 * Create a format for runtime tuples
 	 */
