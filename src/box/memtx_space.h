@@ -115,19 +115,6 @@ public:
 	 */
 	engine_replace_f replace;
 private:
-	void
-	prepareReplace(struct txn_stmt *stmt, struct request *request);
-	void
-	prepareDelete(struct txn_stmt *stmt, struct space *space,
-		      struct request *request);
-	void
-	prepareUpdate(struct txn_stmt *stmt, struct space *space,
-		      struct request *request);
-	void
-	prepareUpsert(struct txn_stmt *stmt, struct space *space,
-		      struct request *request);
-
-private:
 	struct tuple_format *m_format;
 	/* Number of bytes used in memory by tuples in the space. */
 	size_t m_bsize;
