@@ -49,15 +49,15 @@ const struct index_opts index_opts_default = {
 
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
-	OPT_DEF("dimension", OPT_INT, struct index_opts, dimension),
+	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
 	OPT_DEF_ENUM("distance", rtree_index_distance_type, struct index_opts,
 		     distance, NULL),
-	OPT_DEF("range_size", OPT_INT, struct index_opts, range_size),
-	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
-	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
+	OPT_DEF("range_size", OPT_INT64, struct index_opts, range_size),
+	OPT_DEF("page_size", OPT_INT64, struct index_opts, page_size),
+	OPT_DEF("run_count_per_level", OPT_INT64, struct index_opts, run_count_per_level),
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
 	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
-	OPT_DEF("lsn", OPT_INT, struct index_opts, lsn),
+	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
 	OPT_END,
 };
 

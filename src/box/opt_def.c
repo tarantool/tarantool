@@ -38,7 +38,8 @@
 
 const char *opt_type_strs[] = {
 	/* [OPT_BOOL]	= */ "boolean",
-	/* [OPT_INT]	= */ "integer",
+	/* [OPT_UINT32]	= */ "unsigned",
+	/* [OPT_INT64]	= */ "integer",
 	/* [OPT_FLOAT]	= */ "float",
 	/* [OPT_STR]	= */ "string",
 	/* [OPT_STRPTR] = */ "string",
@@ -50,6 +51,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 	struct region *region)
 {
 	int64_t ival;
+	uint64_t uval;
 	double dval;
 	uint32_t str_len;
 	const char *str;
@@ -61,7 +63,15 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 			return -1;
 		store_bool(opt, mp_decode_bool(val));
 		break;
-	case OPT_INT:
+	case OPT_UINT32:
+		if (mp_typeof(**val) != MP_UINT)
+			return -1;
+		uval = mp_decode_uint(val);
+		if (uval > UINT32_MAX)
+			return -1;
+		store_u32(opt, uval);
+		break;
+	case OPT_INT64:
 		if (mp_read_int64(val, &ival) != 0)
 			return -1;
 		store_u64(opt, ival);

@@ -40,7 +40,8 @@ extern "C" {
 
 enum opt_type {
 	OPT_BOOL,	/* bool */
-	OPT_INT,	/* int64_t */
+	OPT_UINT32,	/* uint32_t */
+	OPT_INT64,	/* int64_t */
 	OPT_FLOAT,	/* double */
 	OPT_STR,	/* char[] */
 	OPT_STRPTR,	/* char*  */
