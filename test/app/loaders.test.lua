@@ -1,14 +1,33 @@
 fio = require('fio')
 env = require('test_run')
 test_run = env.new()
-path_app = os.getenv("SOURCEDIR") .. "/test/app/"
-fio.chdir(path_app)
-f = package.loaders[2]("lua.fiber")
-type(f)
+source_dir = os.getenv("SOURCEDIR") .. "/test/app/"
+build_dir = os.getenv("BUILDDIR") .. "/test/app/"
 
-tmp_name = fio.tempdir()
-dir_name = tmp_name .. "/pr"
-rocks_dir = "/.rocks/share/tarantool";
+--
+-- Check . loader
+--
+orig_cwd = fio.cwd()
+fio.chdir(source_dir)
+cwd_loader = package.loaders[2]
+f = cwd_loader("loaders")
+type(f)
+f()
+fio.chdir(orig_cwd)
+
+--
+-- Check .rocks loader
+--
+tmp_dir = fio.tempdir()
+work_dir = fio.pathjoin(tmp_dir, "pr")
+fio.mkdir(work_dir)
+pr1_dir = fio.pathjoin(work_dir, "pr1")
+fio.mkdir(pr1_dir)
+pr2_dir = fio.pathjoin(pr1_dir, "pr2")
+fio.mkdir(pr2_dir)
+
+lua_dir = ".rocks/share/tarantool"
+lib_dir = ".rocks/lib/tarantool"
 
 test_run:cmd("setopt delimiter ';'");
 function create_dirs(name)
@@ -21,24 +40,40 @@ function create_dirs(name)
 end;
 test_run:cmd("setopt delimiter ''");
 
-create_dirs(dir_name)
-create_dirs(dir_name .. "/pr1/")
-create_dirs(dir_name .. "/pr1/pr2/")
+create_dirs(work_dir)
+create_dirs(pr1_dir)
+create_dirs(pr2_dir)
 
-os.execute("cp lua/fiber.lua " .. dir_name .. rocks_dir)
-os.execute("cp lua/fiber.lua " .. dir_name .. "/pr1/pr2/" .. rocks_dir)
-os.execute("cp " .. path_app .. "../app-tap/module_api.so " .. dir_name .. "/pr1/pr2/.rocks/lib/tarantool")
-fio.chdir(dir_name .. "/pr1/pr2/")
-fio.rename(dir_name .. "/pr1/pr2/" .. rocks_dir .. "/fiber.lua", dir_name .. "/pr1/pr2/".. rocks_dir .."/fiber1.lua")
+soext = (jit.os == "OSX" and "dylib" or "so")
+loaders_path = fio.pathjoin(source_dir, "loaders.lua")
+loaderslib_path = fio.pathjoin(build_dir, "loaderslib."..soext)
 
-f = package.loaders[3]("fiber")
-type(f)
-f = package.loaders[3]("fiber1")
-type(f)
-f = package.loaders[3]("module_api")
-type(f)
+fio.symlink(loaders_path, fio.pathjoin(work_dir, lua_dir, "loaders.lua"))
+fio.symlink(loaderslib_path, fio.pathjoin(pr1_dir, lib_dir, "loaderslib."..soext))
 
-fio.chdir(dir_name .. "/pr1/")
--- error as it lies in child dir
-f = package.loaders[3]("fiber")
+orig_cwd = fio.cwd()
+
+fio.chdir(pr2_dir)
+rocks_loader = package.loaders[3]
+f = rocks_loader("loaders")
 type(f)
+f()
+f = rocks_loader("loaderslib")
+type(f)
+f()
+f = rocks_loader("loaders1")
+type(f) -- error
+package.loaded.loaders = nil
+package.loaded.loaders1 = nil
+package.loaded.loaderslib = nil
+
+fio.chdir(work_dir)
+f = rocks_loader("loaders")
+type(f)
+f()
+f = rocks_loader("loaders1")
+type(f) -- error
+f = rocks_loader("loaderslib")
+type(f) -- error
+
+fio.chdir(orig_cwd)

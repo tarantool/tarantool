@@ -42,6 +42,7 @@ add_custom_target(test-force
         --vardir=${PROJECT_BINARY_DIR}/test/var
         --force)
 
+add_subdirectory(app)
 add_subdirectory(app-tap)
 add_subdirectory(box)
 add_subdirectory(unit)

@@ -236,7 +236,11 @@ local function cwd_loader(name)
     if not name then
         return "empty name of module"
     end
-    local path = "./?.lua;./?/init.lua;./?.so"
+    local path = "./?.lua;./?/init.lua"
+    if jit.os == "OSX" then
+        path = path .. ";./?.dylib"
+    end
+    path = path .. ";./?.so"
 
     local loaded, err = try_load(path, name)
     if err == nil then
@@ -253,8 +257,11 @@ local function rocks_loader(name)
     local pathes_search = {
         "/.rocks/share/tarantool/?.lua;",
         "/.rocks/share/tarantool/?/init.lua;",
-        "/.rocks/lib/tarantool/?.so"
     }
+    if jit.os == "OSX" then
+        table.insert(pathes_search, "/.rocks/lib/tarantool/?.dylib")
+    end
+    table.insert(pathes_search, "/.rocks/lib/tarantool/?.so")
 
     local cwd = fio.cwd()
     local index = string.len(cwd) + 1
