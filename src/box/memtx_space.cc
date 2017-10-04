@@ -239,9 +239,8 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 }
 
 
-MemtxSpace::MemtxSpace(Engine *e, struct tuple_format *format)
-	: Handler(e),
-	m_format(format), m_bsize(0)
+MemtxSpace::MemtxSpace(struct tuple_format *format)
+	: m_format(format), m_bsize(0)
 {
 	tuple_format_ref(m_format);
 	replace = memtx_replace_no_keys;
@@ -674,7 +673,7 @@ memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 void
 MemtxSpace::addPrimaryKey(struct space *space)
 {
-	memtx_add_primary_key(space, ((MemtxEngine *) engine)->m_state);
+	memtx_add_primary_key(space, ((MemtxEngine *) space->engine)->m_state);
 }
 
 void

@@ -49,7 +49,7 @@ memtx_replace_all_keys(struct txn_stmt *, struct space *space,
 		       enum dup_replace_mode /* mode */);
 
 struct MemtxSpace: public Handler {
-	MemtxSpace(Engine *e, struct tuple_format *m_format);
+	MemtxSpace(struct tuple_format *m_format);
 	virtual ~MemtxSpace();
 	virtual void
 	applyInitialJoinRow(struct space *space,

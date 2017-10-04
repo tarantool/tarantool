@@ -41,10 +41,13 @@ extern "C" {
 
 struct Index;
 struct Handler;
+struct Engine;
 struct sequence;
 
 struct space {
 	struct access access[BOX_USER_MAX];
+	/** Engine used by this space. */
+	struct Engine *engine;
 	/**
 	 * Reflects the current space state and is also a vtab
 	 * with methods. Unlike a C++ vtab, changes during space
@@ -184,11 +187,11 @@ void
 access_check_space(struct space *space, uint8_t access);
 
 static inline bool
-space_is_memtx(struct space *space) { return space->handler->engine->id == 0; }
+space_is_memtx(struct space *space) { return space->engine->id == 0; }
 
 /** Return true if space is run under vinyl engine. */
 static inline bool
-space_is_vinyl(struct space *space) { return strcmp(space->handler->engine->name, "vinyl") == 0; }
+space_is_vinyl(struct space *space) { return strcmp(space->engine->name, "vinyl") == 0; }
 
 void space_noop(struct space *space);
 
@@ -265,7 +268,7 @@ index_find_system(struct space *space, uint32_t index_id)
 {
 	if (! space_is_memtx(space)) {
 		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  space->handler->engine->name, "system data");
+			  space->engine->name, "system data");
 	}
 	return (MemtxIndex *) index_find_xc(space, index_id);
 }

@@ -109,6 +109,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
 	Engine *engine = engine_find(def->engine_name);
+	space->engine = engine;
 	/* init space engine instance */
 	space->handler = engine->createSpace(key_list, def->fields,
 					     def->field_count, index_count,

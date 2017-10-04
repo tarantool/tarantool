@@ -33,7 +33,7 @@
 #include "vinyl_engine.h"
 
 struct VinylSpace: public Handler {
-	VinylSpace(Engine*, struct tuple_format *format);
+	VinylSpace(struct tuple_format *format);
 	~VinylSpace();
 	virtual void
 	applyInitialJoinRow(struct space *space,

@@ -133,7 +133,7 @@ VinylEngine::createSpace(struct rlist *key_list, struct field_def *fields,
 	tuple_format_ref(format);
 	format->exact_field_count = exact_field_count;
 	auto format_guard = make_scoped_guard([=] { tuple_format_unref(format); });
-	return new VinylSpace(this, format);
+	return new VinylSpace(format);
 }
 
 void

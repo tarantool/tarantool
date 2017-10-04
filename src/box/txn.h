@@ -206,7 +206,7 @@ txn_begin_ro_stmt(struct space *space)
 {
 	struct txn *txn = in_txn();
 	if (txn) {
-		Engine *engine = space->handler->engine;
+		Engine *engine = space->engine;
 		txn_begin_in_engine(engine, txn);
 	}
 	return txn;

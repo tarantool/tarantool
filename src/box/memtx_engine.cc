@@ -78,7 +78,7 @@ static void
 memtx_end_build_primary_key(struct space *space, void *param)
 {
 	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
-	if (handler->engine != param || space_index(space, 0) == NULL ||
+	if (space->engine != param || space_index(space, 0) == NULL ||
 	    handler->replace == memtx_replace_all_keys)
 		return;
 
@@ -96,7 +96,7 @@ void
 memtx_build_secondary_keys(struct space *space, void *param)
 {
 	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
-	if (handler->engine != param || space_index(space, 0) == NULL ||
+	if (space->engine != param || space_index(space, 0) == NULL ||
 	    handler->replace == memtx_replace_all_keys)
 		return;
 
@@ -207,7 +207,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find(request->space_id);
 	/* memtx snapshot must contain only memtx spaces */
-	if (space->handler->engine != this)
+	if (space->engine != this)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	/* no access checks here - applier always works with admin privs */
 	space->handler->applyInitialJoinRow(space, request);
@@ -304,7 +304,7 @@ Handler *MemtxEngine::createSpace(struct rlist *key_list,
 	tuple_format_ref(format);
 	format->exact_field_count = exact_field_count;
 	auto format_guard = make_scoped_guard([=] { tuple_format_unref(format); });
-	return new MemtxSpace(this, format);
+	return new MemtxSpace(format);
 }
 
 void

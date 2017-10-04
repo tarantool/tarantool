@@ -180,7 +180,7 @@ public:
 
 struct Handler {
 public:
-	Handler(Engine *f);
+	Handler() = default;
 	virtual ~Handler() {}
 	Handler(const Handler &) = delete;
 	Handler& operator=(const Handler&) = delete;
@@ -284,8 +284,6 @@ public:
 	 */
 	virtual struct tuple_format *
 	format();
-
-	Engine *engine;
 };
 
 /** Register engine engine instance. */
@@ -299,12 +297,6 @@ Engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
-
-static inline uint32_t
-engine_id(Handler *space)
-{
-	return space->engine->id;
-}
 
 /**
  * Initialize an empty data directory

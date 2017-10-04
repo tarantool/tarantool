@@ -137,41 +137,36 @@ Engine::checkSpaceDef(struct space_def * /* def */)
 
 /** {{{ DML */
 
-Handler::Handler(Engine *f)
-	:engine(f)
-{
-}
-
 void
-Handler::applyInitialJoinRow(struct space *, struct request *)
+Handler::applyInitialJoinRow(struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name,
+	tnt_raise(ClientError, ER_UNSUPPORTED, space->engine->name,
 		  "applySnapshotRow");
 }
 
 struct tuple *
-Handler::executeReplace(struct txn *, struct space *,
+Handler::executeReplace(struct txn *, struct space *space,
                         struct request *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "replace");
+	tnt_raise(ClientError, ER_UNSUPPORTED, space->engine->name, "replace");
 }
 
 struct tuple *
-Handler::executeDelete(struct txn*, struct space *, struct request *)
+Handler::executeDelete(struct txn*, struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "delete");
+	tnt_raise(ClientError, ER_UNSUPPORTED, space->engine->name, "delete");
 }
 
 struct tuple *
-Handler::executeUpdate(struct txn*, struct space *, struct request *)
+Handler::executeUpdate(struct txn*, struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "update");
+	tnt_raise(ClientError, ER_UNSUPPORTED, space->engine->name, "update");
 }
 
 void
-Handler::executeUpsert(struct txn *, struct space *, struct request *)
+Handler::executeUpsert(struct txn *, struct space *space, struct request *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "upsert");
+	tnt_raise(ClientError, ER_UNSUPPORTED, space->engine->name, "upsert");
 }
 
 void
@@ -239,9 +234,9 @@ Handler::dropPrimaryKey(struct space * /* space */)
 }
 
 void
-Handler::buildSecondaryKey(struct space *, struct space *, Index *)
+Handler::buildSecondaryKey(struct space *space, struct space *, Index *)
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED, engine->name, "buildSecondaryKey");
+	tnt_raise(ClientError, ER_UNSUPPORTED, space->engine->name, "buildSecondaryKey");
 }
 
 void

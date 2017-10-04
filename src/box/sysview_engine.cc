@@ -34,10 +34,6 @@
 #include "space.h"
 
 struct SysviewSpace: public Handler {
-	SysviewSpace(Engine *e) : Handler(e) {}
-
-	virtual ~SysviewSpace() {}
-
 	virtual struct tuple *
 	executeReplace(struct txn *, struct space *, struct request *) override;
 	virtual struct tuple *
@@ -123,6 +119,6 @@ Handler *SysviewEngine::createSpace(struct rlist *key_list,
 	(void) field_count;
 	(void) index_count;
 	(void) exact_field_count;
-	return new SysviewSpace(this);
+	return new SysviewSpace();
 }
 
