@@ -171,6 +171,14 @@ vinyl_init_system_space(struct space *)
 	unreachable();
 }
 
+void
+vinyl_space_check_format(struct space *new_space, struct space *old_space)
+{
+	VinylEngine *engine = (VinylEngine *) new_space->engine;
+	if (vy_check_format(engine->env, old_space) != 0)
+		diag_raise();
+}
+
 static void
 vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 {
@@ -310,6 +318,7 @@ const struct space_vtab vinyl_space_vtab = {
 	/* .create_index = */ vinyl_space_create_index,
 	/* .add_primary_key = */ vinyl_space_add_primary_key,
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
+	/* .check_format = */ vinyl_space_check_format,
 	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
 	/* .prepare_truncate = */ vinyl_space_prepare_truncate,
 	/* .commit_truncate = */ vinyl_space_commit_truncate,

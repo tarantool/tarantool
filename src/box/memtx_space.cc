@@ -668,6 +668,27 @@ memtx_space_add_primary_key(struct space *space)
 }
 
 static void
+memtx_space_check_format(struct space *new_space, struct space *old_space)
+{
+	if (old_space->index_count == 0 || space_size(old_space) == 0)
+		return;
+	Index *pk = index_find_xc(old_space, 0);
+	struct iterator *it = pk->allocIterator();
+	IteratorGuard guard(it);
+	pk->initIterator(it, ITER_ALL, NULL, 0);
+
+	struct tuple *tuple;
+	while ((tuple = it->next(it))) {
+		/*
+		 * Check that the tuple is OK according to the
+		 * new format.
+		 */
+		if (tuple_validate(new_space->format, tuple))
+			diag_raise();
+	}
+}
+
+static void
 memtx_space_drop_primary_key(struct space *space)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
@@ -771,6 +792,10 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	new_memtx_space->replace = old_memtx_space->replace;
+	bool is_empty = space_index(old_space, 0) == NULL ||
+			space_size(old_space) == 0;
+	space_def_check_compatibility_xc(old_space->def, new_space->def,
+					 is_empty);
 }
 
 static void
@@ -802,6 +827,7 @@ const struct space_vtab memtx_space_vtab = {
 	/* .create_index = */ memtx_space_create_index,
 	/* .add_primary_key = */ memtx_space_add_primary_key,
 	/* .drop_primary_key = */ memtx_space_drop_primary_key,
+	/* .check_format  = */ memtx_space_check_format,
 	/* .build_secondary_key = */ memtx_space_build_secondary_key,
 	/* .prepare_truncate = */ memtx_space_prepare_truncate,
 	/* .commit_truncate = */ memtx_space_commit_truncate,

@@ -44,7 +44,6 @@ engine_backup_cb(const char *path, void *arg);
 
 #if defined(__cplusplus)
 
-struct Handler;
 struct field_def;
 struct tuple_format;
 

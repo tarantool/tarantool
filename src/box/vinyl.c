@@ -2548,6 +2548,9 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 	if (pk->stat.disk.count.rows == 0 &&
 	    pk->stat.memory.count.rows == 0)
 		return 0;
+	if (space_def_check_compatibility(old_space->def, new_space->def,
+					  false) != 0)
+		return -1;
 	if (old_space->index_count < new_space->index_count) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "adding an index to a non-empty space");
@@ -2575,6 +2578,22 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 	}
 	/* Drop index or a change in index options. */
 	return 0;
+}
+
+int
+vy_check_format(struct vy_env *env, struct space *old_space)
+{
+	/* @sa vy_prepare_alter_space for checks below. */
+	if (old_space->index_count == 0)
+		return 0;
+	struct vy_index *pk = vy_index(old_space->index[0]);
+	if (env->status != VINYL_ONLINE)
+		return 0;
+	if (pk->stat.disk.count.rows == 0 && pk->stat.memory.count.rows == 0)
+		return 0;
+	diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+		 "adding new fields to a non-empty space");
+	return -1;
 }
 
 int

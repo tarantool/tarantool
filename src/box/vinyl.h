@@ -294,6 +294,18 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 		       struct space *new_space);
 
 /**
+ * Check that new fields of a space format are
+ * compatible with existing tuples.
+ * @param env Vinyl environment.
+ * @param old_space Old space.
+ *
+ * @retval  0 Success.
+ * @retval -1 Client error.
+ */
+int
+vy_check_format(struct vy_env *env, struct space *old_space);
+
+/**
  * Hook on an alter space commit event. It is called on each
  * create_index(), drop_index() and is used for update
  * vy_index.space attribute.

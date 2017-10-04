@@ -817,6 +817,7 @@ public:
 	/* New space definition. */
 	struct space_def *def;
 	virtual void alter_def(struct alter_space *alter);
+	virtual void alter(struct alter_space *alter);
 	virtual ~ModifySpace();
 };
 
@@ -828,6 +829,51 @@ ModifySpace::alter_def(struct alter_space *alter)
 	alter->space_def = def;
 	/* Now alter owns the def. */
 	def = NULL;
+}
+
+void
+ModifySpace::alter(struct alter_space *alter)
+{
+	struct space *new_space = alter->new_space;
+	struct space *old_space = alter->old_space;
+	uint32_t old_field_count = old_space->def->field_count;
+	uint32_t new_field_count = new_space->def->field_count;
+	if (old_field_count >= new_field_count) {
+		/* Is checked by space_def_check_compatibility. */
+		return;
+	}
+	struct tuple_format *new_format = new_space->format;
+	struct tuple_format *old_format = old_space->format;
+	/*
+	 * A tuples validation can be skipped if fields between
+	 * old_space->def->field_count and
+	 * new_space->def->field_count are indexed or have type
+	 * ANY. If they are indexed, then their type is already
+	 * checked. Type ANY can store any values.
+	 * Optimization is inapplicable if
+	 * new_def->def->field_count > old_format->field_count.
+	 */
+	if (old_format != NULL && new_field_count <= old_format->field_count) {
+		assert(new_field_count <= new_format->field_count);
+		struct tuple_field *fields = new_format->fields;
+		bool are_new_fields_checked = true;
+		for (uint32_t i = old_field_count; i < new_field_count; ++i) {
+			if (!fields[i].is_key_part &&
+			    fields[i].type != FIELD_TYPE_ANY) {
+				are_new_fields_checked = false;
+				break;
+			}
+		}
+		if (are_new_fields_checked) {
+			/*
+			 * If the new space fields are already
+			 * used by existing indexes, then tuples
+			 * already are validated by them.
+			 */
+			return;
+		}
+	}
+	new_space->vtab->check_format(new_space, old_space);
 }
 
 ModifySpace::~ModifySpace() {
@@ -1350,32 +1396,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 						 region);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
-		if (def->id != space_id(old_space))
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(old_space), "space id is immutable");
-
-		if (strcmp(def->engine_name, old_space->def->engine_name) != 0)
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(old_space),
-				  "can not change space engine");
-
-		if (def->exact_field_count != 0 &&
-		    def->exact_field_count != old_space->def->exact_field_count &&
-		    space_index(old_space, 0) != NULL &&
-		    space_size(old_space) > 0) {
-
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(old_space),
-				  "can not change field count on a non-empty space");
-		}
-
-		if (def->opts.temporary != old_space->def->opts.temporary &&
-		    space_index(old_space, 0) != NULL &&
-		    space_size(old_space) > 0) {
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(old_space),
-				  "can not switch temporary flag on a non-empty space");
-		}
+		/*
+		 * Check basic options. Assume the space to be
+		 * empty, because we can not calculate here
+		 * a size of a vinyl space.
+		 */
+		space_def_check_compatibility_xc(old_space->def, def, true);
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.

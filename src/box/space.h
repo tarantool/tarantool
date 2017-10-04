@@ -94,6 +94,12 @@ struct space_vtab {
 	 */
 	void (*drop_primary_key)(struct space *);
 	/**
+	 * Check that new fields of a space format are
+	 * compatible with existing tuples.
+	 */
+	void (*check_format)(struct space *new_space,
+			     struct space *old_space);
+	/**
 	 * Called with the new empty secondary index.
 	 * Fill the new index with data from the primary
 	 * key of the space.
@@ -262,11 +268,36 @@ space_index_def(struct space *space, int n);
 const char *
 index_name_by_id(struct space *space, uint32_t id);
 
+/**
+ * Check that a space with @an old_def can be altered to have
+ * @a new_def.
+ * @param old_def Old space definition.
+ * @param new_def New space definition.
+ * @param is_space_empty True, if a space is empty.
+ *
+ * @retval  0 Space definition can be altered to @a new_def.
+ * @retval -1 Client error.
+ */
+int
+space_def_check_compatibility(const struct space_def *old_def,
+			      const struct space_def *new_def,
+			      bool is_space_empty);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 #include "index.h"
 #include "engine.h"
+
+static inline void
+space_def_check_compatibility_xc(const struct space_def *old_def,
+				 const struct space_def *new_def,
+				 bool is_space_empty)
+{
+	if (space_def_check_compatibility(old_def, new_def,
+					  is_space_empty) != 0)
+		diag_raise();
+}
 
 /** Check whether or not the current user can be granted
  * the requested access to the space.

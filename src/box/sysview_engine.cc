@@ -147,6 +147,12 @@ sysview_space_commit_alter(struct space *, struct space *)
 {
 }
 
+static void
+sysview_space_check_format(struct space *, struct space *)
+{
+	unreachable();
+}
+
 static const struct space_vtab sysview_space_vtab = {
 	/* .destroy = */ sysview_space_destroy,
 	/* .bsize = */ sysview_space_bsize,
@@ -161,6 +167,7 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .create_index = */ sysview_space_create_index,
 	/* .add_primary_key = */ sysview_space_add_primary_key,
 	/* .drop_primary_key = */ sysview_space_drop_primary_key,
+	/* .check_format = */ sysview_space_check_format,
 	/* .build_secondary_key = */ sysview_space_build_secondary_key,
 	/* .prepare_truncate = */ sysview_space_prepare_truncate,
 	/* .commit_truncate = */ sysview_space_commit_truncate,
