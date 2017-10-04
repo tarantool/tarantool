@@ -34,6 +34,10 @@
 #include "trivia/util.h"
 #include <stddef.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum opt_type {
 	OPT_BOOL,	/* bool */
 	OPT_INT,	/* int64_t */
@@ -71,5 +75,27 @@ struct opt_def {
 	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX, to_enum }
 
 #define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0, NULL}
+
+struct region;
+
+/**
+ * Populate key options from their msgpack-encoded representation
+ * (msgpack map).
+ */
+int
+opts_decode(void *opts, const struct opt_def *reg, const char *map,
+	    uint32_t errcode, uint32_t field_no, struct region *region);
+
+/**
+ * Populate one options from msgpack-encoded representation
+ */
+int
+opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
+	       uint32_t key_len, const char **data, uint32_t errcode,
+	       uint32_t field_no, struct region *region);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_OPT_DEF_H_INCLUDED */
