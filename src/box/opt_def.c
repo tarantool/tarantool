@@ -166,25 +166,25 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
  * (msgpack map).
  */
 int
-opts_decode(void *opts, const struct opt_def *reg, const char *map,
+opts_decode(void *opts, const struct opt_def *reg, const char **map,
 	    uint32_t errcode, uint32_t field_no, struct region *region)
 {
-	assert(mp_typeof(*map) == MP_MAP);
+	assert(mp_typeof(**map) == MP_MAP);
 
 	/*
 	 * The implementation below has O(map_size * reg_size) complexity.
 	 * DDL is not performance-critical, so this is not a problem.
 	 */
-	uint32_t map_size = mp_decode_map(&map);
+	uint32_t map_size = mp_decode_map(map);
 	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*map) != MP_STR) {
+		if (mp_typeof(**map) != MP_STR) {
 			diag_set(ClientError, errcode, field_no,
 				 "key must be a string");
 			return -1;
 		}
 		uint32_t key_len;
-		const char *key = mp_decode_str(&map, &key_len);
-		if (opts_parse_key(opts, reg, key, key_len, &map, errcode,
+		const char *key = mp_decode_str(map, &key_len);
+		if (opts_parse_key(opts, reg, key, key_len, map, errcode,
 				   field_no, region) != 0)
 			return -1;
 	}

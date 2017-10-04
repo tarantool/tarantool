@@ -83,7 +83,7 @@ struct region;
  * (msgpack map).
  */
 int
-opts_decode(void *opts, const struct opt_def *reg, const char *map,
+opts_decode(void *opts, const struct opt_def *reg, const char **map,
 	    uint32_t errcode, uint32_t field_no, struct region *region);
 
 /**

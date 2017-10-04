@@ -197,7 +197,7 @@ static void
 index_opts_decode(struct index_opts *opts, const char *map)
 {
 	index_opts_create(opts);
-	if (opts_decode(opts, index_opts_reg, map, ER_WRONG_INDEX_OPTIONS,
+	if (opts_decode(opts, index_opts_reg, &map, ER_WRONG_INDEX_OPTIONS,
 			BOX_INDEX_FIELD_OPTS, NULL) != 0)
 		diag_raise();
 	if (opts->distance == rtree_index_distance_type_MAX) {
@@ -325,7 +325,7 @@ space_opts_decode(struct space_opts *opts, const char *data)
 			if (flags)
 				flags++;
 		}
-	} else if (opts_decode(opts, space_opts_reg, data,
+	} else if (opts_decode(opts, space_opts_reg, &data,
 			       ER_WRONG_SPACE_OPTIONS,
 			       BOX_SPACE_FIELD_OPTS, NULL) != 0) {
 		diag_raise();
