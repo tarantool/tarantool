@@ -419,6 +419,20 @@ local function wrapper_cfg(cfg)
     log.info('Run console at %s', console_sock)
     console.listen(console_sock)
 
+    -- gh-2782: socket can be owned by root
+    local console_sock = uri.parse(console_sock).service
+    if not fio.chown(console_sock, default_cfg.username, group_name) then
+        log.error("Can't chown(%s, %s, %s) [%d]: %s", console_sock,
+            default_cfg.username, group_name, errno(), errno.strerror())
+    end
+
+    -- gh-1293: members of `tarantool` group should be able to do `enter`
+    local mode = '0664'
+    if not fio.chmod(console_sock, tonumber(mode, 8)) then
+        log.error("Can't chmod(%s, %s) [%d]: %s", console_sock, mode, errno(),
+                  errno.strerror())
+    end
+
     cfg = cfg or {}
     for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
@@ -449,14 +463,6 @@ local function wrapper_cfg(cfg)
             end
         end
         os.exit(1)
-    end
-
-    -- gh-1293: members of `tarantool` group should be able to do `enter`
-    local console_sock = uri.parse(console_sock).service
-    local mode = '0664'
-    if not fio.chmod(console_sock, tonumber(mode, 8)) then
-        log.error("Can't chmod(%s, %s) [%d]: %s", console_sock, mode, errno(),
-                  errno.strerror())
     end
 
     return data
