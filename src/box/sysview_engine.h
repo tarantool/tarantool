@@ -35,10 +35,7 @@
 struct SysviewEngine: public Engine {
 public:
 	SysviewEngine();
-	virtual Handler *createSpace(struct rlist *key_list,
-				     struct field_def *fields,
-				     uint32_t field_count, uint32_t index_count,
-				     uint32_t exact_field_count) override;
+	virtual Handler *createSpace() override;
 };
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

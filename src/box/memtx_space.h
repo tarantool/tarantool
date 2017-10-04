@@ -49,8 +49,7 @@ memtx_replace_all_keys(struct txn_stmt *, struct space *space,
 		       enum dup_replace_mode /* mode */);
 
 struct MemtxSpace: public Handler {
-	MemtxSpace(struct tuple_format *m_format);
-	virtual ~MemtxSpace();
+	MemtxSpace();
 	virtual void
 	applyInitialJoinRow(struct space *space,
 			    struct request *request) override;
@@ -105,9 +104,6 @@ struct MemtxSpace: public Handler {
 	void
 	updateBsize(const struct tuple *old_tuple,
 		    const struct tuple *new_tuple);
-
-	virtual struct tuple_format *
-	format() override;
 public:
 	/**
 	 * A pointer to replace function, set to different values
@@ -115,7 +111,6 @@ public:
 	 */
 	engine_replace_f replace;
 private:
-	struct tuple_format *m_format;
 	/* Number of bytes used in memory by tuples in the space. */
 	size_t m_bsize;
 };

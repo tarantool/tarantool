@@ -46,6 +46,7 @@ engine_backup_cb(const char *path, void *arg);
 
 struct Handler;
 struct field_def;
+struct tuple_format;
 
 /** Engine instance */
 class Engine {
@@ -57,11 +58,17 @@ public:
 	virtual ~Engine() {}
 	/** Called once at startup. */
 	virtual void init();
+	/**
+	 * Construct a tuple format for a new space.
+	 * Returns NULL if the engine does not support format
+	 * (sysview, for example).
+	 */
+	virtual struct tuple_format *
+	createFormat(struct key_def **keys, uint32_t key_count,
+		     struct field_def *fields, uint32_t field_count,
+		     uint32_t exact_field_count);
 	/** Create a new engine instance for a space. */
-	virtual Handler *createSpace(struct rlist *key_list,
-				     struct field_def *fields,
-				     uint32_t field_count, uint32_t index_count,
-				     uint32_t exact_field_count) = 0;
+	virtual Handler *createSpace() = 0;
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
@@ -276,14 +283,6 @@ public:
 	/** Binary size of a space. */
 	virtual size_t
 	bsize() const;
-	/**
-	 * Get format of a space.
-	 * @retval not NULL Space format.
-	 * @retval     NULL Space has no format (Sysview engine,
-	 *         for example).
-	 */
-	virtual struct tuple_format *
-	format();
 };
 
 /** Register engine engine instance. */

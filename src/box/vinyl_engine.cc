@@ -111,29 +111,24 @@ VinylEngine::endRecovery()
 		diag_raise();
 }
 
-Handler *
-VinylEngine::createSpace(struct rlist *key_list, struct field_def *fields,
-			 uint32_t field_count, uint32_t index_count,
-			 uint32_t exact_field_count)
+struct tuple_format *
+VinylEngine::createFormat(struct key_def **keys, uint32_t key_count,
+			  struct field_def *fields, uint32_t field_count,
+			  uint32_t exact_field_count)
 {
-	struct index_def *index_def;
-	uint32_t key_no = 0;
-	struct key_def **keys =
-		(struct key_def **)region_alloc_xc(&fiber()->gc,
-						   sizeof(*keys) * index_count);
-
-	rlist_foreach_entry(index_def, key_list, link)
-			keys[key_no++] = index_def->key_def;
-
-	struct tuple_format *format =
-		tuple_format_new(&vy_tuple_format_vtab, keys, index_count, 0,
-				 fields, field_count);
+	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
+						       keys, key_count, 0,
+						       fields, field_count);
 	if (format == NULL)
 		diag_raise();
-	tuple_format_ref(format);
 	format->exact_field_count = exact_field_count;
-	auto format_guard = make_scoped_guard([=] { tuple_format_unref(format); });
-	return new VinylSpace(format);
+	return format;
+}
+
+Handler *
+VinylEngine::createSpace()
+{
+	return new VinylSpace();
 }
 
 void

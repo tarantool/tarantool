@@ -41,17 +41,6 @@
 #include <stdio.h>
 #include <string.h>
 
-VinylSpace::VinylSpace(struct tuple_format *format)
-	: m_format(format)
-{
-	tuple_format_ref(m_format);
-}
-
-VinylSpace::~VinylSpace()
-{
-	tuple_format_unref(m_format);
-}
-
 /* {{{ DML */
 
 void
@@ -198,7 +187,7 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 		pk = vy_index(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	return new VinylIndex(engine->env, index_def, m_format, pk);
+	return new VinylIndex(engine->env, index_def, space->format, pk);
 }
 
 void
@@ -273,14 +262,9 @@ VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 		/* This is a drop space. */
 		return;
 	}
-	if (vy_commit_alter_space(engine->env, new_space, m_format) != 0)
+	if (vy_commit_alter_space(engine->env, new_space,
+				  new_space->format) != 0)
 		diag_raise();
-}
-
-struct tuple_format *
-VinylSpace::format()
-{
-	return m_format;
 }
 
 /* }}} DDL */

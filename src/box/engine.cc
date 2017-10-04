@@ -52,6 +52,13 @@ Engine::Engine(const char *engine_name)
 void Engine::init()
 {}
 
+struct tuple_format *
+Engine::createFormat(struct key_def **, uint32_t,
+		     struct field_def *, uint32_t, uint32_t)
+{
+	return NULL;
+}
+
 void Engine::begin(struct txn *)
 {}
 
@@ -263,12 +270,6 @@ size_t
 Handler::bsize() const
 {
 	return 0;
-}
-
-struct tuple_format *
-Handler::format()
-{
-	return NULL;
 }
 
 /* }}} DDL */
