@@ -296,6 +296,7 @@ sq = box.schema.sequence.create('test')
 sq:set(123)
 
 pk = s:create_index('pk', {sequence = true})
+sk = s:create_index('sk', {parts = {2, 'string'}})
 sq = box.sequence.test_seq
 sq.step, sq.min, sq.max, sq.start, sq.cycle
 s.index.pk.sequence_id == sq.id
@@ -323,6 +324,7 @@ box.sequence.test_seq == nil
 
 pk:alter{sequence = true}
 s.index.pk.sequence_id == box.sequence.test_seq.id
+sk:drop()
 pk:drop()
 box.sequence.test_seq == nil
 

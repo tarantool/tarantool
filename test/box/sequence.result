@@ -914,6 +914,9 @@ sq:set(123)
 pk = s:create_index('pk', {sequence = true})
 ---
 ...
+sk = s:create_index('sk', {parts = {2, 'string'}})
+---
+...
 sq = box.sequence.test_seq
 ---
 ...
@@ -1007,6 +1010,9 @@ pk:alter{sequence = true}
 s.index.pk.sequence_id == box.sequence.test_seq.id
 ---
 - true
+...
+sk:drop()
+---
 ...
 pk:drop()
 ---

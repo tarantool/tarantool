@@ -422,7 +422,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	index_def_check_xc(index_def, space_name(space));
 	space->handler->checkIndexDef(space, index_def);
-	if (space->sequence != NULL)
+	if (index_def->iid == 0 && space->sequence != NULL)
 		index_def_check_sequence(index_def, space_name(space));
 	index_def_guard.is_active = false;
 	return index_def;
