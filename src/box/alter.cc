@@ -2756,6 +2756,11 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
 		struct Index *pk = index_find(space, 0);
 		index_def_check_sequence(pk->index_def, space_name(space));
+		if (seq->is_generated) {
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(space),
+				  "can not attach generated sequence");
+		}
 		seq->is_generated = is_generated;
 		space->sequence = seq;
 	} else {					/* DELETE */

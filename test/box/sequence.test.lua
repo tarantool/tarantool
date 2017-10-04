@@ -337,6 +337,16 @@ sq = box.sequence.test
 sq:next() -- 124
 sq:drop()
 
+-- Check that generated sequence cannot be attached to another space.
+s1 = box.schema.space.create('test1')
+_ = s1:create_index('pk', {sequence = true})
+s2 = box.schema.space.create('test2')
+_ = s2:create_index('pk', {sequence = 'test1_seq'}) -- error
+box.space._space_sequence:insert{s2.id, box.sequence.test1_seq.id, false} -- error
+
+s1:drop()
+s2:drop()
+
 -- Sequences are compatible with Vinyl spaces.
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {sequence = true})
