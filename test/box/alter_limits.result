@@ -422,8 +422,7 @@ index = s:create_index('test', { type = 'bitset', parts = {1, 'unsigned', 2, 'un
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = {}})
 ---
-- error: 'Can''t create or modify index ''test'' in space ''test'': part count must
-    be positive'
+- error: Illegal parameters, options.parts must have at least one part
 ...
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = { 1 }})
@@ -434,8 +433,7 @@ index = s:create_index('test', { type = 'hash', parts = { 1 }})
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
 ---
-- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
-    type (string), ...'
+- error: 'Wrong index options (field 1): index part: unknown field type'
 ...
 index = s:create_index('test', { type = 'hash', parts = { 2, 'any' }})
 ---
@@ -454,8 +452,7 @@ index = s:create_index('test', { type = 'hash', parts = { 2, 'map' }})
 ...
 index = s:create_index('test', { type = 'rtree', parts = { 2, 'nosuchtype' }})
 ---
-- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
-    type (string), ...'
+- error: 'Wrong index options (field 1): index part: unknown field type'
 ...
 index = s:create_index('test', { type = 'rtree', parts = { 2, 'any' }})
 ---

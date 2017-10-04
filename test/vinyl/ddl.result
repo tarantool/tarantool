@@ -55,7 +55,7 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ...
 box.space._index:get{space.id, 0}[6]
 ---
-- [[0, 'unsigned']]
+- [{'field': 0, 'type': 'unsigned'}]
 ...
 space:drop()
 ---
@@ -84,7 +84,7 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ...
 box.space._index:get{space.id, 0}[6]
 ---
-- [[0, 'unsigned']]
+- [{'field': 0, 'type': 'unsigned'}]
 ...
 space:drop()
 ---
@@ -113,7 +113,7 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ...
 box.space._index:get{space.id, 0}[6]
 ---
-- [[0, 'unsigned']]
+- [{'field': 0, 'type': 'unsigned'}]
 ...
 space:delete({1})
 ---
@@ -148,7 +148,7 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ...
 box.space._index:get{space.id, 0}[6]
 ---
-- [[0, 'unsigned'], [1, 'unsigned']]
+- [{'field': 0, 'type': 'unsigned'}, {'field': 1, 'type': 'unsigned'}]
 ...
 space:insert({1, 2})
 ---
@@ -665,8 +665,7 @@ pk = space:create_index('primary')
 ...
 index = space:create_index('test', { type = 'tree', parts = { 2, 'nosuchtype' }})
 ---
-- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
-    type (string), ...'
+- error: 'Wrong index options (field 1): index part: unknown field type'
 ...
 index = space:create_index('test', { type = 'tree', parts = { 2, 'any' }})
 ---

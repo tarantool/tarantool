@@ -433,11 +433,8 @@ end
 
 box.schema.index = {}
 
-local function check_index_parts(parts)
-    if type(parts) ~= "table" then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  "options.parts parameter should be a table")
-    end
+local function update_index_parts_1_6_0(parts)
+    local result = {}
     if #parts % 2 ~= 0 then
         box.error(box.error.ILLEGAL_PARAMS,
                   "options.parts: expected field_no (number), type (string) pairs")
@@ -451,26 +448,61 @@ local function check_index_parts(parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "invalid index parts: field_no must be one-based")
         end
-    end
-    for i=2,#parts,2 do
-        if type(parts[i]) ~= "string" then
+        if type(parts[i + 1]) ~= "string" then
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts: expected field_no (number), type (string) pairs")
         end
+        table.insert(result, {field = parts[i] - 1, type = parts[i + 1]})
     end
+    return result
 end
 
 local function update_index_parts(parts)
-    local new_parts = {}
-    for i=1,#parts do
-        -- Lua uses one-based field numbers but _space is zero-based
-        if i % 2 == 1 then
-            new_parts[i] = parts[i] - 1
-        else
-            new_parts[i] = parts[i]
-        end
+    if type(parts) ~= "table" then
+        box.error(box.error.ILLEGAL_PARAMS,
+        "options.parts parameter should be a table")
     end
-    return new_parts
+    if #parts == 0 then
+        box.error(box.error.ILLEGAL_PARAMS,
+        "options.parts must have at least one part")
+    end
+    if (type(parts[1]) ~= "table") then
+        return update_index_parts_1_6_0(parts)
+    end
+
+    local result = {}
+    for i=1,#parts do
+        if type(parts[i]) ~= "table" then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts[" .. i .. "]: each part expected to be a map")
+        end
+        local part = {}
+        -- Support {1, 'unsigned', collation='xx'} shortcut
+        for k, v in pairs(parts[i]) do
+            if k == 1 then
+                part.field = v;
+            elseif k == 2 then
+                part.type = v;
+            else
+                part[k] = v
+            end
+        end
+        if type(part.field) ~= 'number' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts[" .. i .. "]: field (number) is expected")
+        elseif part.field == 0 then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts[" .. i .. "]: field (number) must be one-based")
+        else
+            part.field = part.field - 1
+        end
+        if type(part.type) ~= 'string' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts[" .. i .. "]: type (string) is expected")
+        end
+        table.insert(result, part)
+    end
+    return result
 end
 
 -- Historically, some properties of an index
@@ -541,9 +573,6 @@ box.schema.index.create = function(space_id, name, options)
     end
     options = update_param_table(options, options_defaults)
 
-    check_index_parts(options.parts)
-    options.parts = update_index_parts(options.parts)
-
     local _index = box.space[box.schema.INDEX_ID]
     if _index.index.name:get{space_id, name} then
         if options.if_not_exists then
@@ -567,10 +596,7 @@ box.schema.index.create = function(space_id, name, options)
             end
         end
     end
-    local parts = {}
-    for i = 1, #options.parts, 2 do
-        table.insert(parts, {options.parts[i], options.parts[i + 1]})
-    end
+    local parts = update_index_parts(options.parts)
     -- create_index() options contains type, parts, etc,
     -- stored separately. Remove these members from index_opts
     local index_opts = {
@@ -591,8 +617,8 @@ box.schema.index.create = function(space_id, name, options)
         ['*'] = 'any';
     };
     for _, part in pairs(parts) do
-        local field_type = part[2]:lower()
-        part[2] = field_type_aliases[field_type] or field_type
+        local field_type = part.type:lower()
+        part.type = field_type_aliases[field_type] or field_type
         if field_type == 'num' then
             log.warn("field type '%s' is deprecated since Tarantool 1.7, "..
                      "please use '%s' instead", field_type, part[2])
@@ -606,8 +632,8 @@ box.schema.index.create = function(space_id, name, options)
             box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
                       "sequence cannot be used with a secondary key")
         end
-        if #parts >= 1 and parts[1][2] ~= 'integer' and
-                           parts[1][2] ~= 'unsigned' then
+        if #parts >= 1 and parts[1].type ~= 'integer' and
+                           parts[1].type ~= 'unsigned' then
             box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
                       "sequence cannot be used with a non-integer key")
         end
@@ -730,12 +756,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         end
     end
     if options.parts ~= nil then
-        check_index_parts(options.parts)
-        options.parts = update_index_parts(options.parts)
-        parts = {}
-        for i = 1, #options.parts, 2 do
-            table.insert(parts, {options.parts[i], options.parts[i + 1]})
-        end
+        parts = update_index_parts(options.parts)
     end
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_is_generated = false
@@ -747,8 +768,8 @@ box.schema.index.alter = function(space_id, index_id, options)
                       options.name, box.space[space_id].name,
                       "sequence cannot be used with a secondary key")
         end
-        if #parts >= 1 and parts[1][2] ~= 'integer' and
-                           parts[1][2] ~= 'unsigned' then
+        if #parts >= 1 and parts[1].type ~= 'integer' and
+                           parts[1].type  ~= 'unsigned' then
             box.error(box.error.MODIFY_INDEX,
                       options.name, box.space[space_id].name,
                       "sequence cannot be used with a non-integer key")

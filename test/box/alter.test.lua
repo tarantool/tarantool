@@ -66,6 +66,11 @@ _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 _index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'unsigned'}
 _index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
 _index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned'}
+-- access_sysview.test changes output of _index:select{}.
+-- let's change _index space in such a way that it will be
+-- uniformn weather access_sysview.test is completed of not.
+box.space._space.index.owner:alter{parts = {2, 'unsigned'}}
+box.space._vspace.index.owner:alter{parts = {2, 'unsigned'}}
 _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.id, 0}

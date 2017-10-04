@@ -183,6 +183,8 @@ key_def_encode_parts(char *data, const struct key_def *key_def);
  *  resulting values field_no and field_type
  * Parts expected to be a sequence of <part_count> arrays like this:
  *  [NUM, STR, ..][NUM, STR, ..]..,
+ *  OR
+ *  {field=NUM, type=STR, ..}{field=NUM, type=STR, ..}..,
  */
 int
 key_def_decode_parts(struct key_def *key_def, const char **data);

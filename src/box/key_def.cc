@@ -183,9 +183,11 @@ key_def_sizeof_parts(const struct key_def *key_def)
 	size_t size = 0;
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		const struct key_part *part = &key_def->parts[i];
-		size += mp_sizeof_array(2);
+		size += mp_sizeof_map(2);
+		size += mp_sizeof_str(strlen("field"));
 		size += mp_sizeof_uint(part->fieldno);
 		assert(part->type < field_type_MAX);
+		size += mp_sizeof_str(strlen("type"));
 		size += mp_sizeof_str(strlen(field_type_strs[part->type]));
 	}
 	return size;
@@ -196,8 +198,10 @@ key_def_encode_parts(char *data, const struct key_def *key_def)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		const struct key_part *part = &key_def->parts[i];
-		data = mp_encode_array(data, 2);
+		data = mp_encode_map(data, 2);
+		data = mp_encode_str(data, "field", strlen("field"));
 		data = mp_encode_uint(data, part->fieldno);
+		data = mp_encode_str(data, "type", strlen("type"));
 		assert(part->type < field_type_MAX);
 		const char *type_str = field_type_strs[part->type];
 		data = mp_encode_str(data, type_str, strlen(type_str));
@@ -205,8 +209,16 @@ key_def_encode_parts(char *data, const struct key_def *key_def)
 	return data;
 }
 
-int
-key_def_decode_parts(struct key_def *key_def, const char **data)
+/**
+ * 1.6.6-1.7.5
+ * Decode parts array from tuple field and write'em to index_def structure.
+ * Throws a nice error about invalid types, but does not check ranges of
+ *  resulting values field_no and field_type
+ * Parts expected to be a sequence of <part_count> arrays like this:
+ *  [NUM, STR, ..][NUM, STR, ..]..,
+ */
+static int
+key_def_decode_parts_166(struct key_def *key_def, const char **data)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (mp_typeof(**data) != MP_ARRAY) {
@@ -247,6 +259,44 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 			return -1;
 		}
 		key_def_set_part(key_def, i, field_no, field_type);
+	}
+	return 0;
+}
+
+static int64_t
+part_type_by_name_wrapper(const char *str, uint32_t len)
+{
+	return field_type_by_name(str, len);
+}
+
+const struct opt_def part_def_reg[] = {
+	OPT_DEF_ENUM("type", field_type, struct key_part, type,
+		     part_type_by_name_wrapper),
+	OPT_DEF("field", OPT_UINT32, struct key_part, fieldno),
+	OPT_END,
+};
+
+int
+key_def_decode_parts(struct key_def *key_def, const char **data)
+{
+	if (mp_typeof(**data) == MP_ARRAY)
+		return key_def_decode_parts_166(key_def, data);
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		if (mp_typeof(**data) != MP_MAP) {
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, i + 1,
+				 "index part is expected to be a map");
+			return -1;
+		}
+		struct key_part part = {0, field_type_MAX};
+		if (opts_decode(&part, part_def_reg, data,
+				ER_WRONG_INDEX_OPTIONS, i + 1, NULL) != 0)
+			return -1;
+		if (part.type == field_type_MAX) {
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, i + 1,
+				 "index part: unknown field type");
+			return -1;
+		}
+		key_def_set_part(key_def, i, part.fieldno, part.type);
 	}
 	return 0;
 }

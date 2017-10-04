@@ -102,3 +102,20 @@ box.space._index:select{space.id}[1][3]
 pk:alter({name = 'altered_pk'})
 box.space._index:select{space.id}[1][3]
 space:drop()
+
+--new index format
+space = box.schema.space.create('test', {engine = engine})
+pk = space:create_index('pk', {parts={{field1 = 1, type = 'unsigned'}}})
+pk = space:create_index('pk', {parts={{field = 0, type = 'unsigned'}}})
+pk = space:create_index('pk', {parts={{field = 1, type = 'const char *'}}})
+pk = space:create_index('pk', {parts={{field = 1, type = 'unsigned'}}})
+pk.parts
+pk:drop()
+pk = space:create_index('pk', {parts={{1, 'unsigned'}}})
+pk.parts
+pk:drop()
+pk = space:create_index('pk', {parts={{1, type='unsigned'}}})
+pk.parts
+space:insert{1, 2, 3}
+pk:drop()
+space:drop()

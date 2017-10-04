@@ -170,14 +170,23 @@ _index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigne
 ---
 - [288, 0, 'primary', 'tree', 1, 2, 0, 'unsigned', 1, 'unsigned']
 ...
+-- access_sysview.test changes output of _index:select{}.
+-- let's change _index space in such a way that it will be
+-- uniformn weather access_sysview.test is completed of not.
+box.space._space.index.owner:alter{parts = {2, 'unsigned'}}
+---
+...
+box.space._vspace.index.owner:alter{parts = {2, 'unsigned'}}
+---
+...
 _index:select{}
 ---
 - - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
-  - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [280, 1, 'owner', 'tree', {'unique': false}, [{'field': 1, 'type': 'unsigned'}]]
   - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
-  - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [281, 1, 'owner', 'tree', {'unique': false}, [{'field': 1, 'type': 'unsigned'}]]
   - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [284, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [284, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
@@ -505,7 +514,7 @@ space.index.primary.parts[2].type == 'string'
 ...
 box.space._index:get({space.id, 0})[6]
 ---
-- [[0, 'number'], [1, 'string']]
+- [{'field': 0, 'type': 'number'}, {'field': 1, 'type': 'string'}]
 ...
 space:drop()
 ---
@@ -533,7 +542,8 @@ space.index.primary.parts[3].type == 'string'
 ...
 box.space._index:get({space.id, 0})[6]
 ---
-- [[0, 'unsigned'], [1, 'integer'], [2, 'string']]
+- [{'field': 0, 'type': 'unsigned'}, {'field': 1, 'type': 'integer'}, {'field': 2,
+    'type': 'string'}]
 ...
 space:drop()
 ---
@@ -554,7 +564,7 @@ space.index.primary.parts[1].type == 'unsigned'
 ...
 box.space._index:get({space.id, 0})[6]
 ---
-- [[0, 'unsigned']]
+- [{'field': 0, 'type': 'unsigned'}]
 ...
 space:drop()
 ---
