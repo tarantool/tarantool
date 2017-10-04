@@ -93,17 +93,15 @@ luaT_module_find(lua_State *L)
 	 * the path to the function in dlopen().
 	 */
 	lua_getglobal(L, "package");
-	lua_getfield(L, -1, "searchpath");
 
-	/* First argument of searchpath: name */
+	lua_getfield(L, -1, "search");
+
+	/* Argument of search: name */
 	lua_pushlstring(L, ctx->package, ctx->package_end - ctx->package);
-	/* Fetch  cpath from 'package' as the second argument */
-	lua_getfield(L, -3, "cpath");
 
-	lua_call(L, 2, 1);
+	lua_call(L, 1, 1);
 	if (lua_isnil(L, -1))
-		return luaL_error(L, "module not found in package.cpath");
-
+		return luaL_error(L, "module not found");
 	/* Convert path to absolute */
 	char resolved[PATH_MAX];
 	if (realpath(lua_tostring(L, -1), resolved) == NULL) {

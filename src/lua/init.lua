@@ -216,11 +216,7 @@ local function mksymname(name)
     return "luaopen_" .. string.gsub(name, "%.", "_")
 end
 
-local function try_load(path, name)
-    local file, err = package.searchpath(name, path)
-    if file == nil then
-        return nil, err
-    end
+local function try_load(file, name)
     local loaded, err = loadfile(file)
     if loaded == nil then
         name = mksymname(name)
@@ -236,13 +232,11 @@ local function cwd_loader(name)
     if not name then
         return "empty name of module"
     end
-    local path = "./?.lua;./?/init.lua"
-    if jit.os == "OSX" then
-        path = path .. ";./?.dylib"
+    local file, err = search_cwd(name)
+    if not file then
+        return err
     end
-    path = path .. ";./?.so"
-
-    local loaded, err = try_load(path, name)
+    local loaded, err = try_load(file, name)
     if err == nil then
         return loaded
     else
@@ -254,6 +248,32 @@ local function rocks_loader(name)
     if not name then
         return "empty name of module"
     end
+    local file, err = search_rocks(name)
+    if not file then
+        return err
+    end
+    local loaded, err = try_load(file, name)
+    if err == nil then
+        return loaded
+    else
+        return err
+    end
+end
+
+function search_cwd(name)
+    local path = "./?.lua;./?/init.lua"
+    if jit.os == "OSX" then
+        path = path .. ";./?.dylib"
+    end
+    path = path .. ";./?.so"
+    local file, err = package.searchpath(name, path)
+    if file == nil then
+        return nil, err
+    end
+    return file
+end
+
+function search_rocks(name)
     local pathes_search = {
         "/.rocks/share/tarantool/?.lua;",
         "/.rocks/share/tarantool/?/init.lua;",
@@ -269,20 +289,43 @@ local function rocks_loader(name)
     while index ~= nil do
         cwd = string.sub(cwd, 1, index - 1)
         for i, path in ipairs(pathes_search) do
-            local loaded, err = try_load(cwd .. path, name)
+            local file, err = package.searchpath(name, cwd .. path)
             if err == nil then
-                return loaded
+                return file
             end
             strerr = strerr .. err
         end
         index = string.find(cwd, "/[^/]*$")
     end
-    return strerr
+    return nil, strerr
+end
+
+local function search(name)
+    if not name then
+        return "empty name of module"
+    end
+    local file = search_cwd(name)
+    if file ~= nil then
+        return file
+    end
+    file = search_rocks(name)
+    if file ~= nil then
+        return file
+    end
+    file = package.searchpath(name, package.path)
+    if file ~= nil then
+        return file
+    end
+    file = package.searchpath(name, package.cpath)
+    if file ~= nil then
+        return file
+    end
+    return nil
 end
 
 table.insert(package.loaders, 2, cwd_loader)
 table.insert(package.loaders, 3, rocks_loader)
-
+package.search = search
 return {
     uptime = uptime;
     pid = pid;
