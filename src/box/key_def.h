@@ -188,7 +188,7 @@ int
 key_def_decode_parts(struct key_def *key_def, const char **data);
 
 /**
- * 1.6.5-
+ * 1.6.0-1.6.5
  * TODO: Remove it in newer version, find all 1.6.5-
  * Decode parts array from tuple fieldw and write'em to index_def structure.
  * Does not check anything since tuple must be validated before
@@ -196,7 +196,7 @@ key_def_decode_parts(struct key_def *key_def, const char **data);
  *  NUM, STR, NUM, STR, ..,
  */
 int
-key_def_decode_parts_165(struct key_def *key_def, const char **data);
+key_def_decode_parts_160(struct key_def *key_def, const char **data);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.

@@ -252,7 +252,7 @@ key_def_decode_parts(struct key_def *key_def, const char **data)
 }
 
 int
-key_def_decode_parts_165(struct key_def *key_def, const char **data)
+key_def_decode_parts_160(struct key_def *key_def, const char **data)
 {
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		uint32_t field_no = (uint32_t) mp_decode_uint(data);

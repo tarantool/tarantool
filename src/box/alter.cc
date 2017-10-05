@@ -277,7 +277,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_165(key_def, &parts) != 0)
+		if (key_def_decode_parts_160(key_def, &parts) != 0)
 			diag_raise();
 	}
 	struct index_def *index_def =
