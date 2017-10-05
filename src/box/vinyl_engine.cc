@@ -125,10 +125,17 @@ VinylEngine::createFormat(struct key_def **keys, uint32_t key_count,
 	return format;
 }
 
-Handler *
+struct space *
 VinylEngine::createSpace()
 {
-	return new VinylSpace();
+	struct space *space = (struct space *)calloc(1, sizeof(*space));
+	if (space == NULL)
+		tnt_raise(OutOfMemory, sizeof(*space),
+			  "malloc", "struct space");
+	auto space_guard = make_scoped_guard([=] { free(space); });
+	space->handler = new VinylSpace();
+	space_guard.is_active = false;
+	return space;
 }
 
 void

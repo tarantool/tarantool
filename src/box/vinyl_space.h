@@ -33,6 +33,7 @@
 #include "vinyl_engine.h"
 
 struct VinylSpace: public Handler {
+	virtual void destroy(struct space *space) override;
 	virtual void
 	applyInitialJoinRow(struct space *space,
 			    struct request *request) override;

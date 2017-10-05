@@ -67,8 +67,8 @@ public:
 	createFormat(struct key_def **keys, uint32_t key_count,
 		     struct field_def *fields, uint32_t field_count,
 		     uint32_t exact_field_count);
-	/** Create a new engine instance for a space. */
-	virtual Handler *createSpace() = 0;
+	/** Allocate a new space instance. */
+	virtual struct space *createSpace() = 0;
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
@@ -192,6 +192,9 @@ public:
 	Handler(const Handler &) = delete;
 	Handler& operator=(const Handler&) = delete;
 
+	/** Free a space instance. */
+	virtual void destroy(struct space *space) = 0;
+
 	virtual void
 	applyInitialJoinRow(struct space *space, struct request *);
 
@@ -282,7 +285,7 @@ public:
 
 	/** Binary size of a space. */
 	virtual size_t
-	bsize() const;
+	bsize(struct space *);
 };
 
 /** Register engine engine instance. */

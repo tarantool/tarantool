@@ -31,25 +31,49 @@
  * SUCH DAMAGE.
  */
 #include "engine.h"
+#include "space.h"
 
-typedef void
-(*engine_replace_f)(struct txn_stmt *, struct space *, enum dup_replace_mode);
+struct memtx_space {
+	struct space base;
+	/* Number of bytes used in memory by tuples in the space. */
+	size_t bsize;
+	/**
+	 * A pointer to replace function, set to different values
+	 * at different stages of recovery.
+	 */
+	void (*replace)(struct space *, struct txn_stmt *,
+			enum dup_replace_mode);
+};
+
+/**
+ * Change binary size of a space subtracting old tuple's size and
+ * adding new tuple's size. Used also for rollback by swaping old
+ * and new tuple.
+ *
+ * @param space Instance of memtx space.
+ * @param old_tuple Old tuple (replaced or deleted).
+ * @param new_tuple New tuple (inserted).
+ */
+void
+memtx_space_update_bsize(struct space *space,
+			 const struct tuple *old_tuple,
+			 const struct tuple *new_tuple);
 
 void
-memtx_replace_no_keys(struct txn_stmt *, struct space *space,
-		      enum dup_replace_mode /* mode */);
+memtx_space_replace_no_keys(struct space *, struct txn_stmt *,
+			    enum dup_replace_mode);
 void
-memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
-			 enum dup_replace_mode mode);
+memtx_space_replace_build_next(struct space *, struct txn_stmt *,
+			       enum dup_replace_mode);
 void
-memtx_replace_primary_key(struct txn_stmt *, struct space *space,
-			  enum dup_replace_mode /* mode */);
+memtx_space_replace_primary_key(struct space *, struct txn_stmt *,
+				enum dup_replace_mode);
 void
-memtx_replace_all_keys(struct txn_stmt *, struct space *space,
-		       enum dup_replace_mode /* mode */);
+memtx_space_replace_all_keys(struct space *, struct txn_stmt *,
+			     enum dup_replace_mode);
 
 struct MemtxSpace: public Handler {
-	MemtxSpace();
+	virtual void destroy(struct space *space) override;
 	virtual void
 	applyInitialJoinRow(struct space *space,
 			    struct request *request) override;
@@ -92,27 +116,7 @@ struct MemtxSpace: public Handler {
 	virtual void initSystemSpace(struct space *space) override;
 
 	virtual size_t
-	bsize() const override;
-
-	/**
-	 * Change binary size of a space subtracting old tuple's
-	 * size and adding new tuple's size. Used also for
-	 * rollback by swaping old and new tuple.
-	 * @param old_tuple Old tuple (replaced or deleted).
-	 * @param new_tuple New tuple (inserted).
-	 */
-	void
-	updateBsize(const struct tuple *old_tuple,
-		    const struct tuple *new_tuple);
-public:
-	/**
-	 * A pointer to replace function, set to different values
-	 * at different stages of recovery.
-	 */
-	engine_replace_f replace;
-private:
-	/* Number of bytes used in memory by tuples in the space. */
-	size_t m_bsize;
+	bsize(struct space *space) override;
 };
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */

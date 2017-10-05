@@ -77,13 +77,13 @@ txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
 static void
 memtx_end_build_primary_key(struct space *space, void *param)
 {
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	if (space->engine != param || space_index(space, 0) == NULL ||
-	    handler->replace == memtx_replace_all_keys)
+	    memtx_space->replace == memtx_space_replace_all_keys)
 		return;
 
 	((MemtxIndex *) space->index[0])->endBuild();
-	handler->replace = memtx_replace_primary_key;
+	memtx_space->replace = memtx_space_replace_primary_key;
 }
 
 /**
@@ -95,9 +95,9 @@ memtx_end_build_primary_key(struct space *space, void *param)
 void
 memtx_build_secondary_keys(struct space *space, void *param)
 {
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	if (space->engine != param || space_index(space, 0) == NULL ||
-	    handler->replace == memtx_replace_all_keys)
+	    memtx_space->replace == memtx_space_replace_all_keys)
 		return;
 
 	if (space->index_id_max > 0) {
@@ -116,7 +116,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 			say_info("Space '%s': done", space_name(space));
 		}
 	}
-	handler->replace = memtx_replace_all_keys;
+	memtx_space->replace = memtx_space_replace_all_keys;
 }
 
 MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
@@ -296,9 +296,18 @@ MemtxEngine::createFormat(struct key_def **keys, uint32_t key_count,
 	return format;
 }
 
-Handler *MemtxEngine::createSpace()
+struct space *MemtxEngine::createSpace()
 {
-	return new MemtxSpace();
+	struct memtx_space *memtx_space = (struct memtx_space *)
+		calloc(1, sizeof(*memtx_space));
+	if (memtx_space == NULL)
+		tnt_raise(OutOfMemory, sizeof(*memtx_space),
+			  "malloc", "struct memtx_space");
+	auto space_guard = make_scoped_guard([=] { free(memtx_space); });
+	memtx_space->base.handler = new MemtxSpace();
+	memtx_space->replace = memtx_space_replace_no_keys;
+	space_guard.is_active = false;
+	return &memtx_space->base;
 }
 
 void
@@ -346,15 +355,15 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
 		return;
 	struct space *space = stmt->space;
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	int index_count;
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
 
 	/* Only roll back the changes if they were made. */
 	if (stmt->engine_savepoint == NULL)
 		index_count = 0;
-	else if (handler->replace == memtx_replace_all_keys)
+	else if (memtx_space->replace == memtx_space_replace_all_keys)
 		index_count = space->index_count;
-	else if (handler->replace == memtx_replace_primary_key)
+	else if (memtx_space->replace == memtx_space_replace_primary_key)
 		index_count = 1;
 	else
 		panic("transaction rolled back during snapshot recovery");
@@ -365,7 +374,8 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 	}
 	/** Reset to old bsize, if it was changed. */
 	if (stmt->engine_savepoint != NULL)
-		handler->updateBsize(stmt->new_tuple, stmt->old_tuple);
+		memtx_space_update_bsize(space, stmt->new_tuple,
+					 stmt->old_tuple);
 
 	if (stmt->new_tuple)
 		tuple_unref(stmt->new_tuple);

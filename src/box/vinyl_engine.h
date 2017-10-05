@@ -42,7 +42,7 @@ struct VinylEngine: public Engine {
 	createFormat(struct key_def **keys, uint32_t key_count,
 		     struct field_def *fields, uint32_t field_count,
 		     uint32_t exact_field_count) override;
-	virtual Handler *createSpace() override;
+	virtual struct space *createSpace() override;
 	virtual void beginStatement(struct txn *txn) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;

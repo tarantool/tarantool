@@ -98,11 +98,9 @@ struct space {
 	struct Index **index_map;
 	/**
 	 * Dense array of indexes defined on the space, in order
-	 * of index id. Initially stores only the primary key at
-	 * position 0, and is fully built by
-	 * space_build_secondary_keys().
+	 * of index id.
 	 */
-	struct Index *index[];
+	struct Index **index;
 };
 
 /** Get space ordinal number. */
@@ -161,7 +159,7 @@ index_find(struct space *space, uint32_t index_id)
  * Returns number of bytes used in memory by tuples in the space.
  */
 size_t
-space_bsize(const struct space *space);
+space_bsize(struct space *space);
 
 /** Get definition of the n-th index of the space. */
 struct index_def *

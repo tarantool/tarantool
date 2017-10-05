@@ -32,8 +32,10 @@
 #include "sysview_index.h"
 #include "schema.h"
 #include "space.h"
+#include "scoped_guard.h"
 
 struct SysviewSpace: public Handler {
+	virtual void destroy(struct space *space) override;
 	virtual struct tuple *
 	executeReplace(struct txn *, struct space *, struct request *) override;
 	virtual struct tuple *
@@ -49,6 +51,12 @@ struct SysviewSpace: public Handler {
 				       struct space *new_space,
 				       Index *new_index) override;
 };
+
+void SysviewSpace::destroy(struct space *space)
+{
+	delete space->handler;
+	free(space);
+}
 
 struct tuple *
 SysviewSpace::executeReplace(struct txn *, struct space *space,
@@ -109,8 +117,14 @@ SysviewEngine::SysviewEngine()
 {
 }
 
-Handler *SysviewEngine::createSpace()
+struct space *SysviewEngine::createSpace()
 {
-	return new SysviewSpace();
+	struct space *space = (struct space *)calloc(1, sizeof(*space));
+	if (space == NULL)
+		tnt_raise(OutOfMemory, sizeof(*space),
+			  "malloc", "struct space");
+	auto space_guard = make_scoped_guard([=] { free(space); });
+	space->handler = new SysviewSpace();
+	space_guard.is_active = false;
+	return space;
 }
-

@@ -267,7 +267,7 @@ Handler::commitAlterSpace(struct space *, struct space *)
 }
 
 size_t
-Handler::bsize() const
+Handler::bsize(struct space *)
 {
 	return 0;
 }

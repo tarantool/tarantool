@@ -43,6 +43,12 @@
 #include "column_mask.h"
 #include "sequence.h"
 
+void MemtxSpace::destroy(struct space *space)
+{
+	delete space->handler;
+	free(space);
+}
+
 /* {{{ DML */
 
 /**
@@ -50,8 +56,8 @@
  * no indexes (is not yet fully built).
  */
 void
-memtx_replace_no_keys(struct txn_stmt * /* stmt */, struct space *space,
-		      enum dup_replace_mode /* mode */)
+memtx_space_replace_no_keys(struct space *space, struct txn_stmt *,
+			    enum dup_replace_mode)
 {
 	Index *index = index_find_xc(space, 0);
 	assert(index == NULL); /* not reached. */
@@ -75,8 +81,8 @@ enum {
  * from snapshot.
  */
 void
-memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
-			 enum dup_replace_mode mode)
+memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
+			       enum dup_replace_mode mode)
 {
 	assert(stmt->old_tuple == NULL && mode == DUP_INSERT);
 	(void) mode;
@@ -90,9 +96,9 @@ memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	((MemtxIndex *) space->index[0])->buildNext(stmt->new_tuple);
+	((MemtxIndex *)space->index[0])->buildNext(stmt->new_tuple);
 	stmt->engine_savepoint = stmt;
-	((MemtxSpace *) space->handler)->updateBsize(NULL, stmt->new_tuple);
+	memtx_space_update_bsize(space, NULL, stmt->new_tuple);
 }
 
 /**
@@ -100,20 +106,19 @@ memtx_replace_build_next(struct txn_stmt *stmt, struct space *space,
  * data from XLOG files.
  */
 void
-memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
-			  enum dup_replace_mode mode)
+memtx_space_replace_primary_key(struct space *space, struct txn_stmt *stmt,
+				enum dup_replace_mode mode)
 {
 	stmt->old_tuple = space->index[0]->replace(stmt->old_tuple,
 						   stmt->new_tuple, mode);
 	stmt->engine_savepoint = stmt;
-	((MemtxSpace *) space->handler)->updateBsize(stmt->old_tuple,
-						     stmt->new_tuple);
+	memtx_space_update_bsize(space, stmt->old_tuple, stmt->new_tuple);
 }
 
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *
- * @param sp space
+ * @param space space
  * @param old_tuple the tuple that should be removed (can be NULL)
  * @param new_tuple the tuple that should be inserted (can be NULL)
  * @param mode      dup_replace_mode, used only if new_tuple is not
@@ -195,8 +200,8 @@ memtx_replace_primary_key(struct txn_stmt *stmt, struct space *space,
  * primary key.
  */
 void
-memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
-		       enum dup_replace_mode mode)
+memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
+			     enum dup_replace_mode mode)
 {
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -235,13 +240,7 @@ memtx_replace_all_keys(struct txn_stmt *stmt, struct space *space,
 	}
 	stmt->old_tuple = old_tuple;
 	stmt->engine_savepoint = stmt;
-	((MemtxSpace *) space->handler)->updateBsize(old_tuple, new_tuple);
-}
-
-MemtxSpace::MemtxSpace()
-	: m_bsize(0)
-{
-	replace = memtx_replace_no_keys;
+	memtx_space_update_bsize(space, old_tuple, new_tuple);
 }
 
 static inline enum dup_replace_mode
@@ -274,12 +273,13 @@ struct tuple *
 MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 			   struct request *request)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
 	stmt->new_tuple = memtx_tuple_new_xc(space->format, request->tuple,
 					     request->tuple_end);
 	tuple_ref(stmt->new_tuple);
-	this->replace(stmt, space, mode);
+	memtx_space->replace(space, stmt, mode);
 	/** The new tuple is referenced by the primary key. */
 	return stmt->new_tuple;
 }
@@ -288,6 +288,7 @@ struct tuple *
 MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 			  struct request *request)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
@@ -297,7 +298,7 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 	if (stmt->old_tuple)
-		this->replace(stmt, space, DUP_REPLACE_OR_INSERT);
+		memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT);
 	return stmt->old_tuple;
 }
 
@@ -305,6 +306,7 @@ struct tuple *
 MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 			  struct request *request)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
 	Index *pk = index_find_unique(space, request->index_id);
@@ -332,7 +334,7 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 					     new_data + new_size);
 	tuple_ref(stmt->new_tuple);
 	if (stmt->old_tuple)
-		this->replace(stmt, space, DUP_REPLACE);
+		memtx_space->replace(space, stmt, DUP_REPLACE);
 	return stmt->new_tuple;
 }
 
@@ -340,6 +342,7 @@ void
 MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 			  struct request *request)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/*
 	 * Check all tuple fields: we should produce an error on
@@ -436,7 +439,7 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	 * above.
 	 */
 	if (stmt->new_tuple)
-		this->replace(stmt, space, DUP_REPLACE_OR_INSERT);
+		memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT);
 	/* Return nothing: UPSERT does not return data. */
 }
 
@@ -612,24 +615,24 @@ MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
 static void
 memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 {
-	struct MemtxSpace *handler = (struct MemtxSpace *) space->handler;
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	switch (state) {
 	case MEMTX_INITIALIZED:
 		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_INITIAL_RECOVERY:
 		((MemtxIndex *) space->index[0])->beginBuild();
-		handler->replace = memtx_replace_build_next;
+		memtx_space->replace = memtx_space_replace_build_next;
 		break;
 	case MEMTX_FINAL_RECOVERY:
 		((MemtxIndex *) space->index[0])->beginBuild();
 		((MemtxIndex *) space->index[0])->endBuild();
-		handler->replace = memtx_replace_primary_key;
+		memtx_space->replace = memtx_space_replace_primary_key;
 		break;
 	case MEMTX_OK:
 		((MemtxIndex *) space->index[0])->beginBuild();
 		((MemtxIndex *) space->index[0])->endBuild();
-		handler->replace = memtx_replace_all_keys;
+		memtx_space->replace = memtx_space_replace_all_keys;
 		break;
 	}
 }
@@ -643,9 +646,9 @@ MemtxSpace::addPrimaryKey(struct space *space)
 void
 MemtxSpace::dropPrimaryKey(struct space *space)
 {
-	(void )space;
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	assert(this == space->handler);
-	replace = memtx_replace_no_keys;
+	memtx_space->replace = memtx_space_replace_no_keys;
 }
 
 void
@@ -655,9 +658,10 @@ MemtxSpace::initSystemSpace(struct space *space)
 }
 
 size_t
-MemtxSpace::bsize() const
+MemtxSpace::bsize(struct space *space)
 {
-	return m_bsize;
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	return memtx_space->bsize;
 }
 
 void
@@ -670,9 +674,9 @@ MemtxSpace::buildSecondaryKey(struct space *old_space,
 	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
 	 */
 	if (new_index_def->iid != 0) {
-		struct MemtxSpace *handler;
-		handler = (struct MemtxSpace *) new_space->handler;
-		if (!(handler->replace == memtx_replace_all_keys))
+		struct memtx_space *memtx_space;
+		memtx_space = (struct memtx_space *)new_space;
+		if (!(memtx_space->replace == memtx_space_replace_all_keys))
 			return;
 	}
 	Index *pk = index_find_xc(old_space, 0);
@@ -717,19 +721,21 @@ void
 MemtxSpace::prepareTruncateSpace(struct space *old_space,
 				 struct space *new_space)
 {
-	(void)new_space;
-	MemtxSpace *handler = (MemtxSpace *) old_space->handler;
-	replace = handler->replace;
+	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
+	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+	new_memtx_space->replace = old_memtx_space->replace;
 }
 
 void
-MemtxSpace::updateBsize(const struct tuple *old_tuple,
+memtx_space_update_bsize(struct space *space,
+			 const struct tuple *old_tuple,
 			 const struct tuple *new_tuple)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;
 	ssize_t new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
-	assert((ssize_t)m_bsize + new_bsize - old_bsize >= 0);
-	m_bsize += new_bsize - old_bsize;
+	assert((ssize_t)memtx_space->bsize + new_bsize - old_bsize >= 0);
+	memtx_space->bsize += new_bsize - old_bsize;
 }
 
 static void
@@ -757,20 +763,22 @@ MemtxSpace::commitTruncateSpace(struct space *old_space,
 void
 MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
 {
-	(void)new_space;
-	MemtxSpace *handler = (MemtxSpace *) old_space->handler;
-	replace = handler->replace;
+	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
+	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+	new_memtx_space->replace = old_memtx_space->replace;
 }
 
 void
 MemtxSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 {
+	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
+	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+
 	/* Delete all tuples when the last index is dropped. */
 	if (new_space->index_count == 0)
 		memtx_prune_space(old_space);
 	else
-		((MemtxSpace *)new_space->handler)->m_bsize =
-			((MemtxSpace *)old_space->handler)->m_bsize;
+		new_memtx_space->bsize = old_memtx_space->bsize;
 }
 
 /* }}} DDL */

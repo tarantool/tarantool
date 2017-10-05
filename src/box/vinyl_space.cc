@@ -41,6 +41,13 @@
 #include <stdio.h>
 #include <string.h>
 
+void
+VinylSpace::destroy(struct space *space)
+{
+	delete space->handler;
+	free(space);
+}
+
 /* {{{ DML */
 
 void
