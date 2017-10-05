@@ -201,8 +201,8 @@ index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
  * a rebuild.
  */
 bool
-index_def_change_requires_rebuild(struct index_def *old_index_def,
-				  struct index_def *new_index_def);
+index_def_change_requires_rebuild(const struct index_def *old_index_def,
+				  const struct index_def *new_index_def);
 
 /**
  * Create a new index definition definition.

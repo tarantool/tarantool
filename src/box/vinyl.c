@@ -2568,7 +2568,11 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 			 * vinyl yet.
 			 */
 			if (index_def_change_requires_rebuild(old_def,
-							      new_def)) {
+							      new_def) ||
+			    key_part_cmp(old_def->key_def->parts,
+					 old_def->key_def->part_count,
+					 new_def->key_def->parts,
+					 new_def->key_def->part_count) != 0) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 					 "changing the definition of a non-empty "\
 					 "index");

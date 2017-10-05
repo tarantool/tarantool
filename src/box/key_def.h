@@ -297,13 +297,8 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 	return 0;
 }
 
-/** Compare two key part arrays.
- *
- * This function is used to find out whether alteration
- * of an index has changed it substantially enough to warrant
- * a rebuild or not. For example, change of index id is
- * not a substantial change, whereas change of index type
- * or key parts requires a rebuild.
+/**
+ * Compare two key part arrays.
  *
  * One key part is considered to be greater than the other if:
  * - its fieldno is greater
@@ -316,6 +311,19 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2);
+
+/**
+ * Find out whether alteration of an index has changed it
+ * substantially enough to warrant a rebuild or not. For example,
+ * change of index id is not a substantial change, whereas change
+ * of index type or incompatible change of key parts requires
+ * a rebuild.
+ */
+bool
+key_part_check_compatibility(const struct key_part *old_parts,
+			     uint32_t old_part_count,
+			     const struct key_part *new_parts,
+			     uint32_t new_part_count);
 
 #if defined(__cplusplus)
 } /* extern "C" */
