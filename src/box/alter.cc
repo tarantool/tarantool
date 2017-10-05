@@ -228,7 +228,12 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 			return -1;
 		str = mp_decode_str(val, &str_len);
 		if (str_len > 0) {
-			ptr = (char *) region_alloc_xc(region, str_len + 1);
+			ptr = (char *) region_alloc(region, str_len + 1);
+			if (ptr == NULL) {
+				diag_set(OutOfMemory, str_len + 1, "region",
+					 "opt string");
+				return -1;
+			}
 			memcpy(ptr, str, str_len);
 			ptr[str_len] = '\0';
 			assert (strlen(ptr) == str_len);
@@ -270,7 +275,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 	return 0;
 }
 
-static void
+static int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t key_len, const char **data, uint32_t errcode,
 	       uint32_t field_no, struct region *region)
@@ -285,7 +290,8 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 		if (opt_set(opts, def, data, region) != 0) {
 			snprintf(errmsg, sizeof(errmsg), "'%.*s' must be %s",
 				 key_len, key, opt_type_strs[def->type]);
-			tnt_raise(ClientError, errcode, field_no, errmsg);
+			diag_set(ClientError, errcode, field_no, errmsg);
+			return -1;
 		}
 		found = true;
 		break;
@@ -293,15 +299,17 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	if (!found) {
 		snprintf(errmsg, sizeof(errmsg), "unexpected option '%.*s'",
 			 key_len, key);
-		tnt_raise(ClientError, errcode, field_no, errmsg);
+		diag_set(ClientError, errcode, field_no, errmsg);
+		return -1;
 	}
+	return 0;
 }
 
 /**
  * Populate key options from their msgpack-encoded representation
  * (msgpack map).
  */
-static void
+static int
 opts_decode(void *opts, const struct opt_def *reg, const char *map,
 	    uint32_t errcode, uint32_t field_no, struct region *region)
 {
@@ -314,14 +322,17 @@ opts_decode(void *opts, const struct opt_def *reg, const char *map,
 	uint32_t map_size = mp_decode_map(&map);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*map) != MP_STR) {
-			tnt_raise(ClientError, errcode, field_no,
-				  "key must be a string");
+			diag_set(ClientError, errcode, field_no,
+				 "key must be a string");
+			return -1;
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(&map, &key_len);
-		opts_parse_key(opts, reg, key, key_len, &map, errcode,
-			       field_no, region);
+		if (opts_parse_key(opts, reg, key, key_len, &map, errcode,
+				   field_no, region) != 0)
+			return -1;
 	}
+	return 0;
 }
 
 /**
@@ -332,8 +343,9 @@ static void
 index_opts_decode(struct index_opts *opts, const char *map)
 {
 	index_opts_create(opts);
-	opts_decode(opts, index_opts_reg, map, ER_WRONG_INDEX_OPTIONS,
-		    BOX_INDEX_FIELD_OPTS, NULL);
+	if (opts_decode(opts, index_opts_reg, map, ER_WRONG_INDEX_OPTIONS,
+			BOX_INDEX_FIELD_OPTS, NULL) != 0)
+		diag_raise();
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
@@ -459,9 +471,10 @@ space_opts_decode(struct space_opts *opts, const char *data)
 			if (flags)
 				flags++;
 		}
-	} else {
-		opts_decode(opts, space_opts_reg, data, ER_WRONG_SPACE_OPTIONS,
-			    BOX_SPACE_FIELD_OPTS, NULL);
+	} else if (opts_decode(opts, space_opts_reg, data,
+			       ER_WRONG_SPACE_OPTIONS,
+			       BOX_SPACE_FIELD_OPTS, NULL) != 0) {
+		diag_raise();
 	}
 }
 
@@ -500,9 +513,10 @@ field_def_decode(struct field_def *field, const char **data,
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(data, &key_len);
-		opts_parse_key(field, field_def_reg, key, key_len, data,
+		if (opts_parse_key(field, field_def_reg, key, key_len, data,
 			       ER_WRONG_SPACE_FORMAT,
-			       fieldno + TUPLE_INDEX_BASE, region);
+			       fieldno + TUPLE_INDEX_BASE, region) != 0)
+			diag_raise();
 	}
 	if (field->name == NULL) {
 		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
