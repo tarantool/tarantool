@@ -10,6 +10,8 @@ parse_logger_type(const char *input)
 
 	if (rc == 0)
 		switch (type) {
+		case SAY_LOGGER_BOOT:
+			note("type: boot"); break;
 		case SAY_LOGGER_STDERR:
 			note("type: stderr"); break;
 		case SAY_LOGGER_FILE:

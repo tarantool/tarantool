@@ -148,6 +148,7 @@ say_check_init_str(const char *str, char **error);
 /* internals, for unit testing */
 
 enum say_logger_type {
+	SAY_LOGGER_BOOT,
 	SAY_LOGGER_STDERR,
 	SAY_LOGGER_FILE,
 	SAY_LOGGER_PIPE,

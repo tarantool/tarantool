@@ -52,8 +52,7 @@ int log_level = S_INFO;
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
 
-static bool booting = true;
-static enum say_logger_type logger_type = SAY_LOGGER_STDERR;
+static enum say_logger_type logger_type = SAY_LOGGER_BOOT;
 static bool logger_background = true;
 static int logger_nonblock;
 
@@ -367,6 +366,8 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 				fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
 				say_syserror("fcntl, fd=%i", log_fd);
 		}
+	} else {
+		logger_type = SAY_LOGGER_STDERR;
 	}
 
 	if (background) {
@@ -384,7 +385,6 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 			dup2(log_fd, STDOUT_FILENO);
 		}
 	}
-	booting = false;
 }
 
 void
@@ -529,7 +529,7 @@ vsay(int level, const char *filename, int line, const char *error,
 			filename = f + 1;
 
 	int total;
-	if (booting) {
+	if (logger_type == SAY_LOGGER_BOOT) {
 		total = say_format_boot(buf, sizeof(buf), error, format, ap);
 		assert(total >= 0);
 		(void) write(STDERR_FILENO, buf, total);
