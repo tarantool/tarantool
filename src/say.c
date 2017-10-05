@@ -52,7 +52,6 @@ int log_level = S_INFO;
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
 
-static enum say_logger_type logger_type = SAY_LOGGER_BOOT;
 static bool logger_background = true;
 static int logger_nonblock;
 
@@ -62,10 +61,17 @@ static char *log_path; /* iff logger_type == SAY_LOGGER_FILE */
 static char *syslog_ident = NULL;
 
 static void
-sayf(int level, const char *filename, int line, const char *error,
-     const char *format, ...);
+say_logger_boot(int level, const char *filename, int line, const char *error,
+		const char *format, ...);
+static void
+say_logger_file(int level, const char *filename, int line, const char *error,
+		const char *format, ...);
+static void
+say_logger_syslog(int level, const char *filename, int line, const char *error,
+		  const char *format, ...);
 
-sayfunc_t _say = sayf;
+static enum say_logger_type logger_type = SAY_LOGGER_BOOT;
+sayfunc_t _say = say_logger_boot;
 
 static char
 level_to_char(int level)
@@ -193,6 +199,7 @@ say_pipe_init(const char *init_str)
 	log_fd = pipefd[1];
 	say_info("started logging into a pipe, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_PIPE;
+	_say = say_logger_file;
 	return;
 error:
 	say_syserror("can't start logger: %s", init_str);
@@ -256,6 +263,7 @@ say_file_init(const char *init_str)
 	log_fd = fd;
 	signal(SIGHUP, say_logrotate); /* will access log_fd */
 	logger_type = SAY_LOGGER_FILE;
+	_say = say_logger_file;
 }
 
 /**
@@ -321,6 +329,7 @@ say_syslog_init(const char *init_str)
 	}
 	say_info("started logging to syslog, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_SYSLOG;
+	_say = say_logger_syslog;
 	return;
 }
 
@@ -368,6 +377,7 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 		}
 	} else {
 		logger_type = SAY_LOGGER_STDERR;
+		_say = say_logger_file;
 	}
 
 	if (background) {
@@ -434,8 +444,13 @@ say_format_plain_tail(char *buf, int len, int level, const char *filename,
 		}
 	}
 
-	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR)
+	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR) {
+		/* Primitive basename(filename) */
+		for (const char *f = filename; *f; f++)
+			if (*f == '/' && *(f + 1) != '\0')
+				filename = f + 1;
 		SNPRINT(total, snprintf, buf, len, " %s:%i", filename, line);
+	}
 
 	SNPRINT(total, snprintf, buf, len, " %c> ", level_to_char(level));
 
@@ -517,37 +532,82 @@ say_format_syslog(char *buf, int len, int level, const char *filename,
 
 /** Formatters }}} */
 
-void
-vsay(int level, const char *filename, int line, const char *error,
-     const char *format, va_list ap)
+/** {{{ Loggers */
+
+static __thread char buf[PIPE_BUF];
+
+/**
+ * Boot-time logger.
+ *
+ * Used without box.cfg()
+ */
+static void
+say_logger_boot(int level, const char *filename, int line, const char *error,
+		const char *format, ...)
 {
-	static __thread char buf[PIPE_BUF];
+	assert(logger_type == SAY_LOGGER_BOOT);
+	(void) filename;
+	(void) line;
+	if (!say_log_level_is_enabled(level))
+		return;
 
-	/* Primitive basename(filename) */
-	for (const char *f = filename; *f; f++)
-		if (*f == '/' && *(f + 1) != '\0')
-			filename = f + 1;
+	int errsv = errno; /* Preserve the errno. */
+	va_list ap;
+	va_start(ap, format);
+	int total = say_format_boot(buf, sizeof(buf), error, format, ap);
+	assert(total >= 0);
+	(void) write(STDERR_FILENO, buf, total);
+	va_end(ap);
+	errno = errsv; /* Preserve the errno. */
+}
 
-	int total;
-	if (logger_type == SAY_LOGGER_BOOT) {
-		total = say_format_boot(buf, sizeof(buf), error, format, ap);
-		assert(total >= 0);
+/**
+ * File and pipe logger
+ */
+static void
+say_logger_file(int level, const char *filename, int line, const char *error,
+		const char *format, ...)
+{
+	assert(logger_type == SAY_LOGGER_FILE ||
+	       logger_type == SAY_LOGGER_PIPE ||
+	       logger_type == SAY_LOGGER_STDERR);
+	if (!say_log_level_is_enabled(level))
+		return;
+
+	int errsv = errno; /* Preserve the errno. */
+	va_list ap;
+	va_start(ap, format);
+
+	int total = say_format_plain(buf, sizeof(buf), level, filename,
+				     line, error, format, ap);
+	assert(total >= 0);
+	(void) write(log_fd, buf, total);
+	/* Log fatal errors to STDERR */
+	if (level == S_FATAL && log_fd != STDERR_FILENO)
 		(void) write(STDERR_FILENO, buf, total);
-		return;
-	} else if (logger_type != SAY_LOGGER_SYSLOG) {
-		total = say_format_plain(buf, sizeof(buf), level, filename,
-					 line, error, format, ap);
-		assert(total >= 0);
-		(void) write(log_fd, buf, total);
-		/* Log fatal errors to STDERR */
-		if (level == S_FATAL && log_fd != STDERR_FILENO)
-			(void) write(STDERR_FILENO, buf, total);
-		return;
-	}
 
+	va_end(ap);
+	errno = errsv; /* Preserve the errno. */
+}
+
+/**
+ * Syslog logger
+ */
+static void
+say_logger_syslog(int level, const char *filename, int line, const char *error,
+		  const char *format, ...)
+{
 	assert(logger_type == SAY_LOGGER_SYSLOG);
-	total = say_format_syslog(buf, sizeof(buf), level, filename, line,
-				  error, format, ap);
+
+	if (!say_log_level_is_enabled(level))
+		return;
+
+	int errsv = errno; /* Preserve the errno. */
+	va_list ap;
+	va_start(ap, format);
+
+	int total = say_format_syslog(buf, sizeof(buf), level, filename, line,
+				       error, format, ap);
 	assert(total >= 0);
 
 	if (level == S_FATAL && log_fd != STDERR_FILENO)
@@ -573,21 +633,12 @@ vsay(int level, const char *filename, int line, const char *error,
 			(void) write(log_fd, buf, total);
 		}
 	}
-}
 
-static void
-sayf(int level, const char *filename, int line, const char *error,
-     const char *format, ...)
-{
-	int errsv = errno; /* Preserve the errno. */
-	if (!say_log_level_is_enabled(level))
-		return;
-	va_list ap;
-	va_start(ap, format);
-	vsay(level, filename, line, error, format, ap);
 	va_end(ap);
 	errno = errsv; /* Preserve the errno. */
 }
+
+/** Loggers }}} */
 
 /*
  * Init string parser(s)
