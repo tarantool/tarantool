@@ -129,6 +129,11 @@ struct request {
 };
 
 /**
+ * Create a JSON-like string representation of a request. */
+const char *
+request_str(const struct request *request);
+
+/**
  * Decode DML request from a given MessagePack map.
  * @param row request header.
  * @param[out] request DML request to decode to.

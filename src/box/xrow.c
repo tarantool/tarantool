@@ -429,6 +429,23 @@ error:
 	return 0;
 }
 
+const char *
+request_str(const struct request *request)
+{
+	char *buf = tt_static_buf();
+	char *end = buf + TT_STATIC_BUF_LEN;
+	char *pos = buf;
+	pos += snprintf(pos, end - pos, "{type: '%s', lsn: %lld, "\
+			"space_id: %u, index_id: %u, tuple: ",
+			iproto_type_name(request->type),
+			(long long) request->header->lsn,
+			(unsigned) request->space_id,
+			(unsigned) request->index_id);
+	pos += mp_snprint(pos, end - pos, request->tuple);
+	pos += snprintf(pos, end - pos, "}");
+	return buf;
+}
+
 int
 xrow_encode_dml(const struct request *request, struct iovec *iov)
 {
