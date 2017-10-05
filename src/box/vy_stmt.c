@@ -392,15 +392,15 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 	uint32_t *field_map = (uint32_t *) raw;
 	char *wpos = mp_encode_array(raw, field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
-		if (iov[i].iov_base == NULL) {
-			wpos = mp_encode_nil(wpos);
-			continue;
-		}
-		struct field_def *field = &format->fields[i];
-		memcpy(wpos, iov[i].iov_base, iov[i].iov_len);
+		const struct tuple_field *field = &format->fields[i];
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL)
 			field_map[field->offset_slot] = wpos - raw;
-		wpos += iov[i].iov_len;
+		if (iov[i].iov_base == NULL) {
+			wpos = mp_encode_nil(wpos);
+		} else {
+			memcpy(wpos, iov[i].iov_base, iov[i].iov_len);
+			wpos += iov[i].iov_len;
+		}
 	}
 	assert(wpos == raw + bsize);
 	vy_stmt_set_type(stmt, type);
@@ -439,7 +439,7 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 	(void) src_count;
 	char *pos = mp_encode_array(data, field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
-		struct field_def *field = &format->fields[i];
+		const struct tuple_field *field = &format->fields[i];
 		if (! field->is_key_part) {
 			/* Unindexed field - write NIL */
 			pos = mp_encode_nil(pos);

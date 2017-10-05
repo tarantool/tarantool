@@ -203,14 +203,11 @@ struct field_def;
  * (see space->handler->recover()).
  * @param space_def Space definition.
  * @param key_list List of index_defs.
- * @param fields Array of fields specified in space format.
- * @param field_count Length of @a fields.
  *
  * @retval Space object.
  */
 struct space *
-space_new(struct space_def *space_def, struct rlist *key_list,
-	  struct field_def *fields, uint32_t field_count);
+space_new(struct space_def *space_def, struct rlist *key_list);
 
 /** Destroy and free a space. */
 void

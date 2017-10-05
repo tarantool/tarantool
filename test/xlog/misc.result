@@ -40,6 +40,10 @@ result = {}
 fun, param, state = xlog.pairs(xlog_path)
 ---
 ...
+type(fun.totable)
+---
+- function
+...
 -- skip grants until our insert into _schema
 repeat state, row = fun(param, state) until row.BODY.space_id == box.space._schema.id
 ---

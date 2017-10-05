@@ -34,6 +34,7 @@
 
 struct vy_index;
 struct vy_env;
+struct field_def;
 
 /**
  * C++ wrapper for struct vy_index.

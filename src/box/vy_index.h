@@ -274,6 +274,13 @@ struct vy_index {
 	vy_index_read_set_t read_set;
 };
 
+/**
+ * Assert if an index formats are inconsistent.
+ * @param index Index to validate.
+ */
+void
+vy_index_validate_formats(const struct vy_index *index);
+
 /** Return index name. Used for logging. */
 const char *
 vy_index_name(struct vy_index *index);

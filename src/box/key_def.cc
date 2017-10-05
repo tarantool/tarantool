@@ -151,8 +151,10 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	/* Last part is set, initialize the comparators. */
 	bool all_parts_set = true;
 	for (uint32_t i = 0; i < def->part_count; i++) {
-		if (def->parts[i].type == FIELD_TYPE_ANY)
+		if (def->parts[i].type == FIELD_TYPE_ANY) {
 			all_parts_set = false;
+			break;
+		}
 	}
 	if (all_parts_set)
 		key_def_set_cmp(def);

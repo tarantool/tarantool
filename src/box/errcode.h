@@ -200,12 +200,13 @@ struct errcode_record {
 	/*145 */_(ER_NO_SUCH_SEQUENCE,		"Sequence '%s' does not exist") \
 	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
 	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
-	/*148 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
-	/*149 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
-	/*150 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
-	/*151 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
-	/*152 */_(ER_SQL,			"SQL error: %s") \
-	/*153 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
+	/*148 */_(ER_SEQUENCE_ACCESS_DENIED,	"%s access is denied for user '%s' to sequence '%s'") \
+	/*149 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
+	/*150 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
+	/*151 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
+	/*152 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
+	/*153 */_(ER_SQL,			"SQL error: %s") \
+	/*154 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -189,7 +189,7 @@ struct vy_mem *
 create_test_mem(struct lsregion *region, struct key_def *def)
 {
 	/* Create format */
-	struct key_def *defs[] = { def };
+	struct key_def * const defs[] = { def };
 	struct tuple_format *format =
 		tuple_format_new(&vy_tuple_format_vtab, defs, def->part_count,
 				 0, NULL, 0);
@@ -214,8 +214,8 @@ create_test_mem(struct lsregion *region, struct key_def *def)
 
 void
 create_test_cache(uint32_t *fields, uint32_t *types,
-		  int key_cnt, struct vy_cache *cache, struct key_def **def,
-		  struct tuple_format **format)
+		  int key_cnt, struct vy_cache *cache,
+		  struct key_def **def, struct tuple_format **format)
 {
 	*def = box_key_def_new(fields, types, key_cnt);
 	assert(*def != NULL);

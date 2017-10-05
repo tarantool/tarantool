@@ -2592,28 +2592,32 @@ vy_commit_alter_space(struct vy_env *env, struct space *new_space,
 		vy_tuple_format_new_with_colmask(new_format);
 	if (format == NULL)
 		return -1;
-	tuple_format_ref(format);
 
 	/* Update the upsert format. */
 	struct tuple_format *upsert_format =
 		vy_tuple_format_new_upsert(new_format);
 	if (upsert_format == NULL) {
-		tuple_format_unref(format);
+		tuple_format_delete(format);
 		return -1;
 	}
-	tuple_format_ref(upsert_format);
 
 	/* Set possibly changed opts. */
 	pk->opts = new_index_def->opts;
 
 	/* Set new formats. */
+	tuple_format_unref(pk->disk_format);
 	tuple_format_unref(pk->mem_format);
 	tuple_format_unref(pk->upsert_format);
 	tuple_format_unref(pk->mem_format_with_colmask);
+	pk->disk_format = new_format;
+	tuple_format_ref(new_format);
 	pk->upsert_format = upsert_format;
+	tuple_format_ref(upsert_format);
 	pk->mem_format_with_colmask = format;
+	tuple_format_ref(format);
 	pk->mem_format = new_format;
-	tuple_format_ref(pk->mem_format);
+	tuple_format_ref(new_format);
+	vy_index_validate_formats(pk);
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
@@ -2624,11 +2628,15 @@ vy_commit_alter_space(struct vy_env *env, struct space *new_space,
 		index->opts = new_index_def->opts;
 		tuple_format_unref(index->mem_format_with_colmask);
 		tuple_format_unref(index->mem_format);
+		tuple_format_unref(index->upsert_format);
 		index->mem_format_with_colmask =
 			pk->mem_format_with_colmask;
 		index->mem_format = pk->mem_format;
+		index->upsert_format = pk->upsert_format;
 		tuple_format_ref(index->mem_format_with_colmask);
 		tuple_format_ref(index->mem_format);
+		tuple_format_ref(index->upsert_format);
+		vy_index_validate_formats(index);
 	}
 	return 0;
 }
@@ -4231,8 +4239,7 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		if (ctx->format != NULL)
 			tuple_format_unref(ctx->format);
 		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
-				(struct key_def **)&ctx->key_def, 1, 0,
-				NULL, 0);
+					       &ctx->key_def, 1, 0, NULL, 0);
 		if (ctx->format == NULL)
 			return -1;
 		tuple_format_ref(ctx->format);

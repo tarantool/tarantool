@@ -1408,6 +1408,11 @@ box.schema.sequence.drop = function(name, opts)
         end
         return
     end
+    local _priv = box.space[box.schema.PRIV_ID]
+    local privs = _priv.index.object:select{'sequence', id}
+    for k, tuple in pairs(privs) do
+        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
+    end
     local _sequence = box.space[box.schema.SEQUENCE_ID]
     local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
     _sequence_data:delete{id}
@@ -1480,6 +1485,13 @@ local function object_resolve(object_type, object_name)
             box.error(box.error.NO_SUCH_FUNCTION, object_name)
         end
     end
+    if object_type == 'sequence' then
+        local seq = sequence_resolve(object_name)
+        if seq == nil then
+            box.error(box.error.NO_SUCH_SEQUENCE, object_name)
+        end
+        return seq
+    end
     if object_type == 'role' then
         local _user = box.space[box.schema.USER_ID]
         local role
@@ -1505,6 +1517,8 @@ local function object_name(object_type, object_id)
     local space
     if object_type == 'space' then
         space = box.space._space
+    elseif object_type == 'sequence' then
+        seq = box.space._sequence
     elseif object_type == 'function' then
         space = box.space._func
     elseif object_type == 'role' or object_type == 'user' then

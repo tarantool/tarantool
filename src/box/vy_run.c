@@ -1508,7 +1508,7 @@ void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv,
+		     struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
 		     struct tuple_format *format,
@@ -1527,6 +1527,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 
 	itr->iterator_type = iterator_type;
 	itr->key = key;
+	tuple_ref(key);
 	itr->read_view = rv;
 
 	itr->curr_stmt = NULL;
@@ -1762,6 +1763,7 @@ vy_run_iterator_close(struct vy_stmt_iterator *vitr)
 	assert(vitr->iface->close == vy_run_iterator_close);
 	struct vy_run_iterator *itr = (struct vy_run_iterator *) vitr;
 	vy_run_iterator_cache_clean(itr);
+	tuple_unref(itr->key);
 	TRASH(itr);
 }
 

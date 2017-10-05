@@ -36,6 +36,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "user_def.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -76,6 +78,10 @@ struct sequence_def {
 struct sequence {
 	/** Sequence definition. */
 	struct sequence_def *def;
+	/** Set if the sequence is automatically generated. */
+	bool is_generated;
+	/** Cached runtime access information. */
+	struct access access[BOX_USER_MAX];
 };
 
 static inline size_t
@@ -83,43 +89,6 @@ sequence_def_sizeof(uint32_t name_len)
 {
 	return sizeof(struct sequence_def) + name_len + 1;
 }
-
-/** Sequence state. */
-struct sequence_data {
-	/** Sequence id. */
-	uint32_t id;
-	/** Sequence value. */
-	int64_t value;
-};
-
-static inline bool
-sequence_data_equal(struct sequence_data data1, struct sequence_data data2)
-{
-	return data1.id == data2.id;
-}
-
-static inline bool
-sequence_data_equal_key(struct sequence_data data, uint32_t id)
-{
-	return data.id == id;
-}
-
-#define LIGHT_NAME _sequence
-#define LIGHT_DATA_TYPE struct sequence_data
-#define LIGHT_KEY_TYPE uint32_t
-#define LIGHT_CMP_ARG_TYPE int
-#define LIGHT_EQUAL(a, b, c) sequence_data_equal(a, b)
-#define LIGHT_EQUAL_KEY(a, b, c) sequence_data_equal_key(a, b)
-#include "salad/light.h"
-
-extern struct light_sequence_core sequence_data_index;
-
-#undef LIGHT_NAME
-#undef LIGHT_DATA_TYPE
-#undef LIGHT_KEY_TYPE
-#undef LIGHT_CMP_ARG_TYPE
-#undef LIGHT_EQUAL
-#undef LIGHT_EQUAL_KEY
 
 /** Init sequence subsystem. */
 void
@@ -163,9 +132,12 @@ sequence_update(struct sequence *seq, int64_t value);
 int
 sequence_next(struct sequence *seq, int64_t *result);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
+/**
+ * Check whether or not the current user can be granted
+ * access to the sequence.
+ */
+int
+access_check_sequence(struct sequence *seq);
 
 /**
  * Create an iterator over sequence data.
@@ -176,5 +148,9 @@ sequence_next(struct sequence *seq, int64_t *result);
  */
 struct snapshot_iterator *
 sequence_data_iterator_create(void);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_SEQUENCE_H */

@@ -601,7 +601,10 @@ public:
 		: MemtxHash(index_def) {}
 	struct snapshot_iterator *createSnapshotIterator() override
 	{
-		return sequence_data_iterator_create();
+		struct snapshot_iterator *ret = sequence_data_iterator_create();
+		if (ret == NULL)
+			diag_raise();
+		return ret;
 	}
 };
 

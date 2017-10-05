@@ -822,6 +822,7 @@ vy_cache_iterator_close(struct vy_stmt_iterator *vitr)
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
 	}
+	tuple_unref(itr->key);
 	TRASH(itr);
 }
 
@@ -834,14 +835,15 @@ static struct vy_stmt_iterator_iface vy_cache_iterator_iface = {
 
 void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key, const struct vy_read_view **rv)
+		       enum iterator_type iterator_type, struct tuple *key,
+		       const struct vy_read_view **rv)
 {
 	itr->base.iface = &vy_cache_iterator_iface;
 
 	itr->cache = cache;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
+	tuple_ref(key);
 	itr->read_view = rv;
 
 	itr->curr_stmt = NULL;

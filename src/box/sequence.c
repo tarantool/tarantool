@@ -36,11 +36,16 @@
 #include <stdlib.h>
 
 #include <small/mempool.h>
+#include <msgpuck/msgpuck.h>
 
 #include "diag.h"
 #include "error.h"
 #include "errcode.h"
 #include "fiber.h"
+#include "index.h"
+#include "schema.h"
+#include "session.h"
+#include "trivia/util.h"
 
 #include "third_party/PMurHash.h"
 
@@ -49,8 +54,35 @@ enum {
 	SEQUENCE_DATA_EXTENT_SIZE = 512,
 };
 
-struct light_sequence_core sequence_data_index;
+/** Sequence state. */
+struct sequence_data {
+	/** Sequence id. */
+	uint32_t id;
+	/** Sequence value. */
+	int64_t value;
+};
 
+static inline bool
+sequence_data_equal(struct sequence_data data1, struct sequence_data data2)
+{
+	return data1.id == data2.id;
+}
+
+static inline bool
+sequence_data_equal_key(struct sequence_data data, uint32_t id)
+{
+	return data.id == id;
+}
+
+#define LIGHT_NAME _sequence
+#define LIGHT_DATA_TYPE struct sequence_data
+#define LIGHT_KEY_TYPE uint32_t
+#define LIGHT_CMP_ARG_TYPE int
+#define LIGHT_EQUAL(a, b, c) sequence_data_equal(a, b)
+#define LIGHT_EQUAL_KEY(a, b, c) sequence_data_equal_key(a, b)
+#include "salad/light.h"
+
+static struct light_sequence_core sequence_data_index;
 static struct mempool sequence_data_extent_pool;
 
 static void *
@@ -204,4 +236,90 @@ overflow:
 	}
 	value = def->step > 0 ? def->min : def->max;
 	goto done;
+}
+
+int
+access_check_sequence(struct sequence *seq)
+{
+	struct credentials *cr = current_user();
+	/*
+	 * If the user has universal access, don't bother with checks.
+	 * No special check for ADMIN user is necessary since ADMIN has
+	 * universal access.
+	 */
+	uint8_t access = PRIV_W & ~cr->universal_access;
+	if (seq->def->uid != cr->uid &&
+	     access & ~seq->access[cr->auth_token].effective) {
+		/* Access violation, report error. */
+		struct user *user = user_find(cr->uid);
+		if (user != NULL)
+			diag_set(ClientError, ER_SEQUENCE_ACCESS_DENIED,
+				 priv_name(access), user->def->name,
+				 seq->def->name);
+		return -1;
+	}
+	return 0;
+}
+
+struct sequence_data_iterator {
+	struct snapshot_iterator base;
+	/** Iterator over the data index. */
+	struct light_sequence_iterator iter;
+	/** Last tuple returned by the iterator. */
+	char tuple[0];
+};
+
+#define SEQUENCE_TUPLE_BUF_SIZE		(mp_sizeof_array(2) + \
+					 2 * mp_sizeof_uint(UINT64_MAX))
+
+static const char *
+sequence_data_iterator_next(struct snapshot_iterator *base, uint32_t *size)
+{
+	struct sequence_data_iterator *iter =
+		(struct sequence_data_iterator *)base;
+
+	struct sequence_data *data =
+		light_sequence_iterator_get_and_next(&sequence_data_index,
+						     &iter->iter);
+	if (data == NULL)
+		return NULL;
+
+	char *buf_end = iter->tuple;
+	buf_end = mp_encode_array(buf_end, 2);
+	buf_end = mp_encode_uint(buf_end, data->id);
+	buf_end = (data->value >= 0 ?
+		   mp_encode_uint(buf_end, data->value) :
+		   mp_encode_int(buf_end, data->value));
+	assert(buf_end <= iter->tuple + SEQUENCE_TUPLE_BUF_SIZE);
+	*size = buf_end - iter->tuple;
+	return iter->tuple;
+}
+
+static void
+sequence_data_iterator_free(struct snapshot_iterator *base)
+{
+	struct sequence_data_iterator *iter =
+		(struct sequence_data_iterator *)base;
+	light_sequence_iterator_destroy(&sequence_data_index, &iter->iter);
+	TRASH(iter);
+	free(iter);
+}
+
+struct snapshot_iterator *
+sequence_data_iterator_create(void)
+{
+	struct sequence_data_iterator *iter = calloc(1, sizeof(*iter) +
+						     SEQUENCE_TUPLE_BUF_SIZE);
+	if (iter == NULL) {
+		diag_set(OutOfMemory, sizeof(*iter) + SEQUENCE_TUPLE_BUF_SIZE,
+			 "malloc", "sequence_data_iterator");
+		return NULL;
+	}
+
+	iter->base.free = sequence_data_iterator_free;
+	iter->base.next = sequence_data_iterator_next;
+
+	light_sequence_iterator_begin(&sequence_data_index, &iter->iter);
+	light_sequence_iterator_freeze(&sequence_data_index, &iter->iter);
+	return &iter->base;
 }

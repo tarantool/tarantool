@@ -54,6 +54,11 @@ enum { FORMAT_REF_MAX = INT32_MAX};
  * message
  */
 enum { TUPLE_INDEX_BASE = 1 };
+/*
+ * A special value to indicate that tuple format doesn't store
+ * an offset for a field_id.
+ */
+enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
 
 struct tuple;
 struct tuple_format;
@@ -63,6 +68,33 @@ struct tuple_format_vtab {
 	/** Free allocated tuple using engine-specific memory allocator. */
 	void
 	(*destroy)(struct tuple_format *format, struct tuple *tuple);
+};
+
+/** Tuple field meta information for tuple_format. */
+struct tuple_field {
+	/**
+	 * Field type of an indexed field.
+	 * If a field participates in at least one of space indexes
+	 * then its type is stored in this member.
+	 * If a field does not participate in an index
+	 * then UNKNOWN is stored for it.
+	 */
+	enum field_type type;
+	/**
+	 * Offset slot in field map in tuple. Normally tuple
+	 * stores field map - offsets of all fields participating
+	 * in indexes. This allows quick access to most used
+	 * fields without parsing entire mspack. This member
+	 * stores position in the field map of tuple for current
+	 * field. If the field does not participate in indexes
+	 * then it has no offset in field map and INT_MAX is
+	 * stored in this member. Due to specific field map in
+	 * tuple (it is stored before tuple), the positions in
+	 * field map is negative.
+	 */
+	int32_t offset_slot;
+	/** True if this field is used by an index. */
+	bool is_key_part;
 };
 
 /**
@@ -100,7 +132,7 @@ struct tuple_format {
 	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/* Formats of the fields */
-	struct field_def fields[0];
+	struct tuple_field fields[0];
 };
 
 extern struct tuple_format **tuple_formats;
@@ -150,9 +182,10 @@ tuple_format_unref(struct tuple_format *format)
  * @retval     NULL Memory error.
  */
 struct tuple_format *
-tuple_format_new(struct tuple_format_vtab *vtab, struct key_def **keys,
+tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		 uint16_t key_count, uint16_t extra_size,
-		 struct field_def *space_fields, uint32_t space_field_count);
+		 const struct field_def *space_fields,
+		 uint32_t space_field_count);
 
 /**
  * Check that two tuple formats are identical.

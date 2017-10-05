@@ -38,6 +38,7 @@
 #include "bit/bit.h"
 #include "session.h"
 #include "scoped_guard.h"
+#include "sequence.h"
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];
@@ -219,6 +220,13 @@ access_find(struct priv_def *priv)
 		struct func *func = func_by_id(priv->object_id);
 		if (func)
 			access = func->access;
+		break;
+	}
+	case SC_SEQUENCE:
+	{
+		struct sequence *seq = sequence_by_id(priv->object_id);
+		if (seq)
+			access = seq->access;
 		break;
 	}
 	default:

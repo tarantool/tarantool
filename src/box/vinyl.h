@@ -243,11 +243,13 @@ struct Index;
 struct vy_index *
 vy_index(struct Index *index);
 
+struct field_def;
 /**
  * Create a new vinyl index object without opening it.
- * @param env             Vinyl environment.
- * @param space           Space the index is created for.
- * @param index_def  Index definition set by the user.
+ * @param env Vinyl environment.
+ * @param index_def Index definition.
+ * @param format Space format.
+ * @param pk Primary index.
  */
 struct vy_index *
 vy_new_index(struct vy_env *env, struct index_def *index_def,

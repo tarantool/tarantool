@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "opt_def.h"
+#include "field_def.h"
 #include "schema_def.h"
 #include <stdlib.h>
 #include <stdbool.h>
@@ -92,20 +92,13 @@ struct space_def {
 	 */
 	uint32_t exact_field_count;
 	char engine_name[ENGINE_NAME_MAX + 1];
+	/** Space fields, specified by a user. */
+	struct field_def *fields;
+	/** Length of @a fields. */
+	uint32_t field_count;
 	struct space_opts opts;
 	char name[0];
 };
-
-/**
- * Size of the space_def, calculated using its name.
- * @param name_len Length of the space name.
- * @retval Size in bytes.
- */
-static inline size_t
-space_def_sizeof(uint32_t name_len)
-{
-	return sizeof(struct space_def) + name_len + 1;
-}
 
 /**
  * Delete the space_def object.
@@ -138,6 +131,8 @@ space_def_dup(const struct space_def *src);
  * @param engine_name Engine name.
  * @param engine_len Length of the @engine.
  * @param opts Space options.
+ * @param fields Field definitions.
+ * @param field_count Length of @a fields.
  *
  * @retval Space definition.
  */
@@ -145,7 +140,8 @@ struct space_def *
 space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      const char *name, uint32_t name_len,
 	      const char *engine_name, uint32_t engine_len,
-	      const struct space_opts *opts);
+	      const struct space_opts *opts, const struct field_def *fields,
+	      uint32_t field_count);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -165,11 +161,12 @@ static inline struct space_def *
 space_def_new_xc(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 		 const char *name, uint32_t name_len,
 		 const char *engine_name, uint32_t engine_len,
-		 const struct space_opts *opts)
+		 const struct space_opts *opts, const struct field_def *fields,
+		 uint32_t field_count)
 {
 	struct space_def *ret = space_def_new(id, uid, exact_field_count, name,
 					      name_len, engine_name, engine_len,
-					      opts);
+					      opts, fields, field_count);
 	if (ret == NULL)
 		diag_raise();
 	return ret;

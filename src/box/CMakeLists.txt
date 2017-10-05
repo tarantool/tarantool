@@ -11,6 +11,7 @@ lua_source(lua_sources lua/checkpoint_daemon.lua)
 lua_source(lua_sources lua/net_box.lua)
 lua_source(lua_sources lua/upgrade.lua)
 lua_source(lua_sources lua/console.lua)
+lua_source(lua_sources lua/xlog.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
@@ -85,7 +86,6 @@ add_library(box STATIC
     space.cc
     space_def.c
     sequence.c
-    sequence_iterator.cc
     func.c
     func_def.c
     alter.cc

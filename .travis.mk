@@ -44,10 +44,8 @@ test_ubuntu: deps_ubuntu
 	cd test && /usr/bin/python test-run.py -j -1
 
 deps_osx:
-	brew install openssl readline --force
-	sudo pip install python-daemon PyYAML
-	sudo pip install six==1.9.0
-	sudo pip install gevent==1.1.2
+	brew install openssl readline curl --force
+	pip install -r test-run/requirements.txt --user
 
 test_osx: deps_osx
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
