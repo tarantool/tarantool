@@ -36,7 +36,6 @@
 
 #include "trivia/util.h"
 #include "cfg.h"
-#include "scoped_guard.h"
 
 #include "vinyl_index.h"
 #include "vinyl_space.h"
@@ -132,9 +131,7 @@ VinylEngine::createSpace()
 	if (space == NULL)
 		tnt_raise(OutOfMemory, sizeof(*space),
 			  "malloc", "struct space");
-	auto space_guard = make_scoped_guard([=] { free(space); });
-	space->handler = new VinylSpace();
-	space_guard.is_active = false;
+	space->vtab = &vinyl_space_vtab;
 	return space;
 }
 

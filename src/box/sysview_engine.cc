@@ -32,62 +32,66 @@
 #include "sysview_index.h"
 #include "schema.h"
 #include "space.h"
-#include "scoped_guard.h"
 
-struct SysviewSpace: public Handler {
-	virtual void destroy(struct space *space) override;
-	virtual struct tuple *
-	executeReplace(struct txn *, struct space *, struct request *) override;
-	virtual struct tuple *
-	executeDelete(struct txn *, struct space *, struct request *) override;
-	virtual struct tuple *
-	executeUpdate(struct txn *, struct space *, struct request *) override;
-	virtual void
-	executeUpsert(struct txn *, struct space *, struct request *) override;
-
-	virtual Index *createIndex(struct space *space,
-				   struct index_def *index_def) override;
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index) override;
-};
-
-void SysviewSpace::destroy(struct space *space)
+static void
+sysview_space_destroy(struct space *space)
 {
-	delete space->handler;
 	free(space);
 }
 
-struct tuple *
-SysviewSpace::executeReplace(struct txn *, struct space *space,
+static size_t
+sysview_space_bsize(struct space *)
+{
+	return 0;
+}
+
+static void
+sysview_space_apply_initial_join_row(struct space *, struct request *)
+{
+	unreachable();
+}
+
+static struct tuple *
+sysview_space_execute_replace(struct space *space, struct txn *,
 			      struct request *)
 {
 	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
-	return NULL;
 }
 
-struct tuple *
-SysviewSpace::executeDelete(struct txn*, struct space *space, struct request *)
-{
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
-	return NULL;
-}
-
-struct tuple *
-SysviewSpace::executeUpdate(struct txn*, struct space *space, struct request *)
-{
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
-	return NULL;
-}
-
-void
-SysviewSpace::executeUpsert(struct txn *, struct space *space, struct request *)
+static struct tuple *
+sysview_space_execute_delete(struct space *space, struct txn *,
+			     struct request *)
 {
 	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
 }
 
-Index *
-SysviewSpace::createIndex(struct space *space, struct index_def *index_def)
+static struct tuple *
+sysview_space_execute_update(struct space *space, struct txn *,
+			     struct request *)
+{
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
+}
+
+static void
+sysview_space_execute_upsert(struct space *space, struct txn *,
+			     struct request *)
+{
+	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
+}
+
+static void
+sysview_init_system_space(struct space *)
+{
+	unreachable();
+}
+
+static void
+sysview_space_check_index_def(struct space *, struct index_def *)
+{
+}
+
+static struct Index *
+sysview_space_create_index(struct space *space, struct index_def *index_def)
 {
 	assert(index_def->type == TREE);
 	switch (index_def->space_id) {
@@ -104,13 +108,65 @@ SysviewSpace::createIndex(struct space *space, struct index_def *index_def)
 	default:
 		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
 			  space_name(space), "unknown space for system view");
-		return NULL;
 	}
 }
 
-void
-SysviewSpace::buildSecondaryKey(struct space *, struct space *, Index *)
-{}
+static void
+sysview_space_add_primary_key(struct space *)
+{
+}
+
+static void
+sysview_space_drop_primary_key(struct space *)
+{
+}
+
+static void
+sysview_space_build_secondary_key(struct space *, struct space *,
+				  struct Index *)
+{
+}
+
+static void
+sysview_space_prepare_truncate(struct space *, struct space *)
+{
+}
+
+static void
+sysview_space_commit_truncate(struct space *, struct space *)
+{
+}
+
+static void
+sysview_space_prepare_alter(struct space *, struct space *)
+{
+}
+
+static void
+sysview_space_commit_alter(struct space *, struct space *)
+{
+}
+
+static const struct space_vtab sysview_space_vtab = {
+	.destroy = sysview_space_destroy,
+	.bsize = sysview_space_bsize,
+	.apply_initial_join_row = sysview_space_apply_initial_join_row,
+	.execute_replace = sysview_space_execute_replace,
+	.execute_delete = sysview_space_execute_delete,
+	.execute_update = sysview_space_execute_update,
+	.execute_upsert = sysview_space_execute_upsert,
+	.execute_select = generic_space_execute_select,
+	.init_system_space = sysview_init_system_space,
+	.check_index_def = sysview_space_check_index_def,
+	.create_index = sysview_space_create_index,
+	.add_primary_key = sysview_space_add_primary_key,
+	.drop_primary_key = sysview_space_drop_primary_key,
+	.build_secondary_key = sysview_space_build_secondary_key,
+	.prepare_truncate = sysview_space_prepare_truncate,
+	.commit_truncate = sysview_space_commit_truncate,
+	.prepare_alter = sysview_space_prepare_alter,
+	.commit_alter = sysview_space_commit_alter,
+};
 
 SysviewEngine::SysviewEngine()
 	:Engine("sysview")
@@ -123,8 +179,6 @@ struct space *SysviewEngine::createSpace()
 	if (space == NULL)
 		tnt_raise(OutOfMemory, sizeof(*space),
 			  "malloc", "struct space");
-	auto space_guard = make_scoped_guard([=] { free(space); });
-	space->handler = new SysviewSpace();
-	space_guard.is_active = false;
+	space->vtab = &sysview_space_vtab;
 	return space;
 }

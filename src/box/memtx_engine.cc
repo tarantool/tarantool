@@ -210,7 +210,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 	if (space->engine != this)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	/* no access checks here - applier always works with admin privs */
-	space->handler->applyInitialJoinRow(space, request);
+	space->vtab->apply_initial_join_row(space, request);
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
@@ -303,10 +303,8 @@ struct space *MemtxEngine::createSpace()
 	if (memtx_space == NULL)
 		tnt_raise(OutOfMemory, sizeof(*memtx_space),
 			  "malloc", "struct memtx_space");
-	auto space_guard = make_scoped_guard([=] { free(memtx_space); });
-	memtx_space->base.handler = new MemtxSpace();
+	memtx_space->base.vtab = &memtx_space_vtab;
 	memtx_space->replace = memtx_space_replace_no_keys;
-	space_guard.is_active = false;
 	return &memtx_space->base;
 }
 

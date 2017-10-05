@@ -30,6 +30,7 @@
  */
 #include "vinyl_space.h"
 #include "vinyl_index.h"
+#include "vinyl_engine.h"
 #include "xrow.h"
 #include "txn.h"
 #include "vinyl.h"
@@ -41,17 +42,22 @@
 #include <stdio.h>
 #include <string.h>
 
-void
-VinylSpace::destroy(struct space *space)
+static void
+vinyl_space_destroy(struct space *space)
 {
-	delete space->handler;
 	free(space);
+}
+
+static size_t
+vinyl_space_bsize(struct space *)
+{
+	return 0;
 }
 
 /* {{{ DML */
 
-void
-VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
+static void
+vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 {
 	assert(request->header != NULL);
 	struct vy_env *env = ((VinylEngine *)space->engine)->env;
@@ -102,9 +108,9 @@ VinylSpace::applyInitialJoinRow(struct space *space, struct request *request)
  *  - replace in one index
  *  - replace in multiple indexes.
  */
-struct tuple *
-VinylSpace::executeReplace(struct txn *txn, struct space *space,
-			   struct request *request)
+static struct tuple *
+vinyl_space_execute_replace(struct space *space, struct txn *txn,
+			    struct request *request)
 {
 	assert(request->index_id == 0);
 	VinylEngine *engine = (VinylEngine *) space->engine;
@@ -116,9 +122,9 @@ VinylSpace::executeReplace(struct txn *txn, struct space *space,
 	return stmt->new_tuple;
 }
 
-struct tuple *
-VinylSpace::executeDelete(struct txn *txn, struct space *space,
-                          struct request *request)
+static struct tuple *
+vinyl_space_execute_delete(struct space *space, struct txn *txn,
+			   struct request *request)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -132,9 +138,9 @@ VinylSpace::executeDelete(struct txn *txn, struct space *space,
 	return NULL;
 }
 
-struct tuple *
-VinylSpace::executeUpdate(struct txn *txn, struct space *space,
-                          struct request *request)
+static struct tuple *
+vinyl_space_execute_update(struct space *space, struct txn *txn,
+			   struct request *request)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
@@ -144,8 +150,8 @@ VinylSpace::executeUpdate(struct txn *txn, struct space *space,
 	return stmt->new_tuple;
 }
 
-void
-VinylSpace::executeUpsert(struct txn *txn, struct space *space,
+static void
+vinyl_space_execute_upsert(struct space *space, struct txn *txn,
                            struct request *request)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
@@ -159,8 +165,14 @@ VinylSpace::executeUpsert(struct txn *txn, struct space *space,
 
 /* {{{ DDL */
 
-void
-VinylSpace::checkIndexDef(struct space *space, struct index_def *index_def)
+static void
+vinyl_init_system_space(struct space *)
+{
+	unreachable();
+}
+
+static void
+vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	if (index_def->type != TREE) {
 		tnt_raise(ClientError, ER_INDEX_TYPE,
@@ -181,8 +193,8 @@ VinylSpace::checkIndexDef(struct space *space, struct index_def *index_def)
 	}
 }
 
-Index *
-VinylSpace::createIndex(struct space *space, struct index_def *index_def)
+static struct Index *
+vinyl_space_create_index(struct space *space, struct index_def *index_def)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
 	if (index_def->type != TREE) {
@@ -197,22 +209,26 @@ VinylSpace::createIndex(struct space *space, struct index_def *index_def)
 	return new VinylIndex(engine->env, index_def, space->format, pk);
 }
 
-void
-VinylSpace::addPrimaryKey(struct space *space)
+static void
+vinyl_space_add_primary_key(struct space *space)
 {
 	VinylIndex *pk = (VinylIndex *) index_find_xc(space, 0);
 	pk->open();
 }
 
-void
-VinylSpace::buildSecondaryKey(struct space *old_space,
-			      struct space *new_space,
-			      Index *new_index_arg)
+static void
+vinyl_space_drop_primary_key(struct space *)
+{
+}
+
+static void
+vinyl_space_build_secondary_key(struct space *old_space,
+				struct space *new_space,
+				struct Index *new_index)
 {
 	(void)old_space;
 	(void)new_space;
-	VinylIndex *new_index = (VinylIndex *) new_index_arg;
-	new_index->open();
+	((VinylIndex *)new_index)->open();
 	/*
 	 * Unlike Memtx, Vinyl does not need building of a secondary index.
 	 * This is true because of two things:
@@ -235,33 +251,33 @@ VinylSpace::buildSecondaryKey(struct space *old_space,
 	 */
 }
 
-void
-VinylSpace::prepareTruncateSpace(struct space *old_space,
-				 struct space *new_space)
+static void
+vinyl_space_prepare_truncate(struct space *old_space,
+			     struct space *new_space)
 {
 	VinylEngine *engine = (VinylEngine *) old_space->engine;
 	if (vy_prepare_truncate_space(engine->env, old_space, new_space) != 0)
 		diag_raise();
 }
 
-void
-VinylSpace::commitTruncateSpace(struct space *old_space,
-				struct space *new_space)
+static void
+vinyl_space_commit_truncate(struct space *old_space,
+			    struct space *new_space)
 {
 	VinylEngine *engine = (VinylEngine *) old_space->engine;
 	vy_commit_truncate_space(engine->env, old_space, new_space);
 }
 
-void
-VinylSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
+static void
+vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	VinylEngine *engine = (VinylEngine *) old_space->engine;
 	if (vy_prepare_alter_space(engine->env, old_space, new_space) != 0)
 		diag_raise();
 }
 
-void
-VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
+static void
+vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 {
 	(void) old_space;
 	VinylEngine *engine = (VinylEngine *) old_space->engine;
@@ -275,3 +291,24 @@ VinylSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
 }
 
 /* }}} DDL */
+
+const struct space_vtab vinyl_space_vtab = {
+	.destroy = vinyl_space_destroy,
+	.bsize = vinyl_space_bsize,
+	.apply_initial_join_row = vinyl_space_apply_initial_join_row,
+	.execute_replace = vinyl_space_execute_replace,
+	.execute_delete = vinyl_space_execute_delete,
+	.execute_update = vinyl_space_execute_update,
+	.execute_upsert = vinyl_space_execute_upsert,
+	.execute_select = generic_space_execute_select,
+	.init_system_space = vinyl_init_system_space,
+	.check_index_def = vinyl_space_check_index_def,
+	.create_index = vinyl_space_create_index,
+	.add_primary_key = vinyl_space_add_primary_key,
+	.drop_primary_key = vinyl_space_drop_primary_key,
+	.build_secondary_key = vinyl_space_build_secondary_key,
+	.prepare_truncate = vinyl_space_prepare_truncate,
+	.commit_truncate = vinyl_space_commit_truncate,
+	.prepare_alter = vinyl_space_prepare_alter,
+	.commit_alter = vinyl_space_commit_alter,
+};

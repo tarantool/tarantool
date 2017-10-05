@@ -37,6 +37,7 @@
 #include "trigger.h"
 #include "user.h"
 #include "session.h"
+#include "port.h"
 
 void
 access_check_space(struct space *space, uint8_t access)
@@ -121,7 +122,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index = space->index_map + index_id_max + 1;
 	rlist_foreach_entry(index_def, key_list, link) {
 		space->index_map[index_def->iid] =
-			space->handler->createIndex(space, index_def);
+			space->vtab->create_index(space, index_def);
 	}
 	space_fill_index_map(space);
 	space->run_triggers = true;
@@ -144,7 +145,7 @@ space_delete(struct space *space)
 	trigger_destroy(&space->on_replace);
 	trigger_destroy(&space->on_stmt_begin);
 	space_def_delete(space->def);
-	space->handler->destroy(space);
+	space->vtab->destroy(space);
 }
 
 /** Do nothing if the space is already recovered. */
@@ -195,7 +196,7 @@ space_run_triggers(struct space *space, bool yesno)
 size_t
 space_bsize(struct space *space)
 {
-	return space->handler->bsize(space);
+	return space->vtab->bsize(space);
 }
 
 struct index_def *
@@ -213,4 +214,38 @@ index_name_by_id(struct space *space, uint32_t id)
 	return NULL;
 }
 
-/* vim: set fm=marker */
+void
+generic_space_execute_select(struct space *space, struct txn *txn,
+			     uint32_t index_id, uint32_t iterator,
+			     uint32_t offset, uint32_t limit,
+			     const char *key, const char *key_end,
+			     struct port *port)
+{
+	(void)txn;
+	(void)key_end;
+
+	Index *index = index_find_xc(space, index_id);
+
+	uint32_t found = 0;
+	if (iterator >= iterator_type_MAX)
+		tnt_raise(IllegalParams, "Invalid iterator type");
+	enum iterator_type type = (enum iterator_type) iterator;
+
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	if (key_validate(index->index_def, type, key, part_count))
+		diag_raise();
+
+	struct iterator *it = index->allocIterator();
+	IteratorGuard guard(it);
+	index->initIterator(it, type, key, part_count);
+
+	struct tuple *tuple;
+	while (found < limit && (tuple = it->next(it)) != NULL) {
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		port_add_tuple_xc(port, tuple);
+		found++;
+	}
+}

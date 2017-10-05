@@ -30,45 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "vinyl_engine.h"
+#include "space.h"
 
-struct VinylSpace: public Handler {
-	virtual void destroy(struct space *space) override;
-	virtual void
-	applyInitialJoinRow(struct space *space,
-			    struct request *request) override;
-	virtual struct tuple *
-	executeReplace(struct txn*, struct space *space,
-	               struct request *request) override;
-	virtual struct tuple *
-	executeDelete(struct txn*, struct space *space,
-	              struct request *request) override;
-	virtual struct tuple *
-	executeUpdate(struct txn*, struct space *space,
-	              struct request *request) override;
-	virtual void
-	executeUpsert(struct txn*, struct space *space,
-	              struct request *request) override;
-
-	virtual void checkIndexDef(struct space *new_space,
-				   struct index_def *def) override;
-	virtual Index *createIndex(struct space *, struct index_def *) override;
-	virtual void addPrimaryKey(struct space *space) override;
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index) override;
-	virtual void prepareTruncateSpace(struct space *old_space,
-					  struct space *new_space) override;
-	virtual void commitTruncateSpace(struct space *old_space,
-					 struct space *new_space) override;
-	virtual void prepareAlterSpace(struct space *old_space,
-				       struct space *new_space) override;
-	/**
-	 * If space was altered then this method updates
-	 * pointers to the primary index in all secondary ones.
-	 */
-	virtual void commitAlterSpace(struct space *old_space,
-				      struct space *new_space) override;
-};
+extern const struct space_vtab vinyl_space_vtab;
 
 #endif /* TARANTOOL_BOX_VINYL_SPACE_H_INCLUDED */

@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "engine.h"
 #include "space.h"
 
 struct memtx_space {
@@ -72,51 +71,6 @@ void
 memtx_space_replace_all_keys(struct space *, struct txn_stmt *,
 			     enum dup_replace_mode);
 
-struct MemtxSpace: public Handler {
-	virtual void destroy(struct space *space) override;
-	virtual void
-	applyInitialJoinRow(struct space *space,
-			    struct request *request) override;
-	virtual struct tuple *
-	executeReplace(struct txn *txn, struct space *space,
-		       struct request *request) override;
-	virtual struct tuple *
-	executeDelete(struct txn *txn, struct space *space,
-		      struct request *request) override;
-	virtual struct tuple *
-	executeUpdate(struct txn *txn, struct space *space,
-		      struct request *request) override;
-	virtual void
-	executeUpsert(struct txn *txn, struct space *space,
-		      struct request *request) override;
-	virtual void
-	executeSelect(struct txn *, struct space *space,
-		      uint32_t index_id, uint32_t iterator,
-		      uint32_t offset, uint32_t limit,
-		      const char *key, const char * /* key_end */,
-		      struct port *port) override;
-
-	virtual void checkIndexDef(struct space *new_space,
-				   struct index_def *index_def) override;
-	virtual Index *createIndex(struct space *space,
-				   struct index_def *index_def) override;
-	virtual void addPrimaryKey(struct space *space) override;
-	virtual void dropPrimaryKey(struct space *space) override;
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index) override;
-	virtual void prepareTruncateSpace(struct space *old_space,
-					  struct space *new_space) override;
-	virtual void commitTruncateSpace(struct space *old_space,
-					 struct space *new_space) override;
-	virtual void prepareAlterSpace(struct space *old_space,
-				       struct space *new_space) override;
-	virtual void commitAlterSpace(struct space *old_space,
-				      struct space *new_space) override;
-	virtual void initSystemSpace(struct space *space) override;
-
-	virtual size_t
-	bsize(struct space *space) override;
-};
+extern const struct space_vtab memtx_space_vtab;
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */

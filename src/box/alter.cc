@@ -288,7 +288,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		diag_raise();
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	index_def_check_xc(index_def, space_name(space));
-	space->handler->checkIndexDef(space, index_def);
+	space->vtab->check_index_def(space, index_def);
 	if (index_def->iid == 0 && space->sequence != NULL)
 		index_def_check_sequence(index_def, space_name(space));
 	index_def_guard.is_active = false;
@@ -742,8 +742,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * snapshot/xlog, but needs to continue staying "fully
 	 * built".
 	 */
-	alter->new_space->handler->prepareAlterSpace(alter->old_space,
-						     alter->new_space);
+	alter->new_space->vtab->prepare_alter(alter->old_space,
+					      alter->new_space);
 
 	alter->new_space->sequence = alter->old_space->sequence;
 	alter->new_space->truncate_count = alter->old_space->truncate_count;
@@ -784,8 +784,8 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
-	alter->new_space->handler->commitAlterSpace(alter->old_space,
-						    alter->new_space);
+	alter->new_space->vtab->commit_alter(alter->old_space,
+					     alter->new_space);
 
 	struct space *old_space = space_cache_replace(alter->new_space);
 	(void) old_space;
@@ -878,7 +878,7 @@ DropIndex::alter(struct alter_space *alter)
 	 * - when a new primary key is finally added, the space
 	 *   can be put back online properly.
 	 */
-	alter->new_space->handler->dropPrimaryKey(alter->new_space);
+	alter->new_space->vtab->drop_primary_key(alter->new_space);
 }
 
 void
@@ -1018,8 +1018,6 @@ CreateIndex::alter_def(struct alter_space *alter)
 void
 CreateIndex::alter(struct alter_space *alter)
 {
-	Handler *handler = alter->new_space->handler;
-
 	if (new_index_def->iid == 0) {
 		/*
 		 * Adding a primary key: bring the space
@@ -1031,14 +1029,15 @@ CreateIndex::alter(struct alter_space *alter)
 		 * key. After recovery, it means building
 		 * all keys.
 		 */
-		handler->addPrimaryKey(alter->new_space);
+		alter->new_space->vtab->add_primary_key(alter->new_space);
 		return;
 	}
 	/**
 	 * Get the new index and build it.
 	 */
 	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
-	handler->buildSecondaryKey(alter->new_space, alter->new_space, new_index);
+	alter->new_space->vtab->build_secondary_key(alter->new_space,
+					alter->new_space, new_index);
 }
 
 void
@@ -1093,14 +1092,12 @@ RebuildIndex::alter_def(struct alter_space *alter)
 void
 RebuildIndex::alter(struct alter_space *alter)
 {
-	Handler *handler = alter->new_space->handler;
-
 	/* Get the new index and build it.  */
 	Index *new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	handler->buildSecondaryKey(new_index_def->iid != 0 ?
-				   alter->new_space : alter->old_space,
-				   alter->new_space, new_index);
+	alter->new_space->vtab->build_secondary_key(new_index_def->iid != 0 ?
+					alter->new_space : alter->old_space,
+					alter->new_space, new_index);
 }
 
 void
@@ -1568,8 +1565,8 @@ truncate_space_commit(struct trigger *trigger, void * /* event */)
 {
 	struct truncate_space *truncate =
 		(struct truncate_space *) trigger->data;
-	truncate->new_space->handler->commitTruncateSpace(truncate->old_space,
-							  truncate->new_space);
+	truncate->new_space->vtab->commit_truncate(truncate->old_space,
+						   truncate->new_space);
 	space_delete(truncate->old_space);
 }
 
@@ -1656,7 +1653,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	auto space_guard = make_scoped_guard([=] { space_delete(new_space); });
 
 	/* Notify the engine about upcoming space truncation. */
-	new_space->handler->prepareTruncateSpace(old_space, new_space);
+	new_space->vtab->prepare_truncate(old_space, new_space);
 
 	space_guard.is_active = false;
 

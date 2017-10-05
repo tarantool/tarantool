@@ -39,23 +39,108 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct space;
 struct Index;
-struct Handler;
+struct index_def;
 struct Engine;
 struct sequence;
+struct txn;
+struct request;
+struct port;
+
+struct space_vtab {
+	/** Free a space instance. */
+	void (*destroy)(struct space *);
+	/** Return binary size of a space. */
+	size_t (*bsize)(struct space *);
+
+	void (*apply_initial_join_row)(struct space *, struct request *);
+
+	struct tuple *(*execute_replace)(struct space *, struct txn *,
+					 struct request *);
+	struct tuple *(*execute_delete)(struct space *, struct txn *,
+					struct request *);
+	struct tuple *(*execute_update)(struct space *, struct txn *,
+					struct request *);
+	void (*execute_upsert)(struct space *, struct txn *, struct request *);
+	void (*execute_select)(struct space *space, struct txn *txn,
+			       uint32_t index_id, uint32_t iterator,
+			       uint32_t offset, uint32_t limit,
+			       const char *key, const char *key_end,
+			       struct port *port);
+
+	void (*init_system_space)(struct space *);
+	/**
+	 * Check an index definition for violation of
+	 * various limits.
+	 */
+	void (*check_index_def)(struct space *, struct index_def *);
+	/**
+	 * Create an instance of space index. Used in alter
+	 * space before commit to WAL. The created index is
+	 * deleted with delete operator.
+	 */
+	struct Index *(*create_index)(struct space *, struct index_def *);
+	/**
+	 * Called by alter when a primary key is added,
+	 * after create_index is invoked for the new
+	 * key and before the write to WAL.
+	 */
+	void (*add_primary_key)(struct space *);
+	/**
+	 * Called by alter when the primary key is dropped.
+	 * Do whatever is necessary with the space object,
+	 * to not crash in DML.
+	 */
+	void (*drop_primary_key)(struct space *);
+	/**
+	 * Called with the new empty secondary index.
+	 * Fill the new index with data from the primary
+	 * key of the space.
+	 */
+	void (*build_secondary_key)(struct space *old_space,
+				    struct space *new_space,
+				    struct Index *new_index);
+	/**
+	 * Notify the enigne about upcoming space truncation
+	 * so that it can prepare new_space object.
+	 */
+	void (*prepare_truncate)(struct space *old_space,
+				 struct space *new_space);
+	/**
+	 * Commit space truncation. Called after space truncate
+	 * record was written to WAL hence must not fail.
+	 *
+	 * The old_space is the space that was replaced with the
+	 * new_space as a result of truncation. The callback is
+	 * supposed to release resources associated with the
+	 * old_space and commit the new_space.
+	 */
+	void (*commit_truncate)(struct space *old_space,
+				struct space *new_space);
+	/**
+	 * Notify the engine about the changed space,
+	 * before it's done, to prepare 'new_space' object.
+	 */
+	void (*prepare_alter)(struct space *old_space,
+			      struct space *new_space);
+	/**
+	 * Notify the engine engine after altering a space and
+	 * replacing old_space with new_space in the space cache,
+	 * to, e.g., update all references to struct space
+	 * and replace old_space with new_space.
+	 */
+	void (*commit_alter)(struct space *old_space,
+			     struct space *new_space);
+};
 
 struct space {
+	/** Virtual function table. */
+	const struct space_vtab *vtab;
+	/** Cached runtime access information. */
 	struct access access[BOX_USER_MAX];
 	/** Engine used by this space. */
 	struct Engine *engine;
-	/**
-	 * Reflects the current space state and is also a vtab
-	 * with methods. Unlike a C++ vtab, changes during space
-	 * life cycle, throughout phases of recovery or with
-	 * deletion and addition of indexes.
-	 */
-	struct Handler *handler;
-
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
 	/** Triggers fired before space statement */
@@ -203,12 +288,9 @@ space_size(struct space *space);
 
 struct field_def;
 /**
- * Allocate and initialize a space. The space
- * needs to be loaded before it can be used
- * (see space->handler->recover()).
+ * Allocate and initialize a space.
  * @param space_def Space definition.
  * @param key_list List of index_defs.
- *
  * @retval Space object.
  */
 struct space *
@@ -275,6 +357,14 @@ index_find_system(struct space *space, uint32_t index_id)
 	}
 	return (MemtxIndex *) index_find_xc(space, index_id);
 }
+
+/** Generic implementation of space_vtab::execute_select method. */
+void
+generic_space_execute_select(struct space *space, struct txn *txn,
+			     uint32_t index_id, uint32_t iterator,
+			     uint32_t offset, uint32_t limit,
+			     const char *key, const char *key_end,
+			     struct port *port);
 
 #endif /* defined(__cplusplus) */
 

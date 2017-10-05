@@ -43,13 +43,32 @@
 #include "column_mask.h"
 #include "sequence.h"
 
-void MemtxSpace::destroy(struct space *space)
+static void
+memtx_space_destroy(struct space *space)
 {
-	delete space->handler;
 	free(space);
 }
 
+static size_t
+memtx_space_bsize(struct space *space)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	return memtx_space->bsize;
+}
+
 /* {{{ DML */
+
+void
+memtx_space_update_bsize(struct space *space,
+			 const struct tuple *old_tuple,
+			 const struct tuple *new_tuple)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;
+	ssize_t new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
+	assert((ssize_t)memtx_space->bsize + new_bsize - old_bsize >= 0);
+	memtx_space->bsize += new_bsize - old_bsize;
+}
 
 /**
  * A version of space_replace for a space which has
@@ -249,8 +268,8 @@ dup_replace_mode(uint32_t op)
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
-void
-MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
+static void
+memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 {
 	if (request->type != IPROTO_INSERT) {
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
@@ -259,7 +278,7 @@ MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 	request->header->replica_id = 0;
 	struct txn *txn = txn_begin_stmt(space);
 	try {
-		this->executeReplace(txn, space, request);
+		space->vtab->execute_replace(space, txn, request);
 		txn_commit_stmt(txn, request);
 	} catch (Exception *e) {
 		say_error("rollback: %s", e->errmsg);
@@ -269,9 +288,9 @@ MemtxSpace::applyInitialJoinRow(struct space *space, struct request *request)
 	/** The new tuple is referenced by the primary key. */
 }
 
-struct tuple *
-MemtxSpace::executeReplace(struct txn *txn, struct space *space,
-			   struct request *request)
+static struct tuple *
+memtx_space_execute_replace(struct space *space, struct txn *txn,
+			    struct request *request)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -284,9 +303,9 @@ MemtxSpace::executeReplace(struct txn *txn, struct space *space,
 	return stmt->new_tuple;
 }
 
-struct tuple *
-MemtxSpace::executeDelete(struct txn *txn, struct space *space,
-			  struct request *request)
+static struct tuple *
+memtx_space_execute_delete(struct space *space, struct txn *txn,
+			   struct request *request)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -302,9 +321,9 @@ MemtxSpace::executeDelete(struct txn *txn, struct space *space,
 	return stmt->old_tuple;
 }
 
-struct tuple *
-MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
-			  struct request *request)
+static struct tuple *
+memtx_space_execute_update(struct space *space, struct txn *txn,
+			   struct request *request)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -338,9 +357,9 @@ MemtxSpace::executeUpdate(struct txn *txn, struct space *space,
 	return stmt->new_tuple;
 }
 
-void
-MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
-			  struct request *request)
+static void
+memtx_space_execute_upsert(struct space *space, struct txn *txn,
+			   struct request *request)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -443,13 +462,16 @@ MemtxSpace::executeUpsert(struct txn *txn, struct space *space,
 	/* Return nothing: UPSERT does not return data. */
 }
 
-void
-MemtxSpace::executeSelect(struct txn *, struct space *space,
-			  uint32_t index_id, uint32_t iterator,
-			  uint32_t offset, uint32_t limit,
-			  const char *key, const char * /* key_end */,
-			  struct port *port)
+static void
+memtx_space_execute_select(struct space *space, struct txn *txn,
+			   uint32_t index_id, uint32_t iterator,
+			   uint32_t offset, uint32_t limit,
+			   const char *key, const char *key_end,
+			   struct port *port)
 {
+	(void)txn;
+	(void)key_end;
+
 	MemtxIndex *index = (MemtxIndex *) index_find_xc(space, index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
@@ -482,8 +504,8 @@ MemtxSpace::executeSelect(struct txn *, struct space *space,
 
 /* {{{ DDL */
 
-void
-MemtxSpace::checkIndexDef(struct space *space, struct index_def *index_def)
+static void
+memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	switch (index_def->type) {
 	case HASH:
@@ -574,8 +596,8 @@ public:
 	}
 };
 
-Index *
-MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
+static struct Index *
+memtx_space_create_index(struct space *space, struct index_def *index_def)
 {
 	if (space->def->id == BOX_SEQUENCE_DATA_ID) {
 		/*
@@ -585,18 +607,18 @@ MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
 		 * written to snapshot, use a special snapshot
 		 * iterator that walks over the sequence cache.
 		 */
-		return new SequenceDataIndex(index_def_arg);
+		return new SequenceDataIndex(index_def);
 	}
 
-	switch (index_def_arg->type) {
+	switch (index_def->type) {
 	case HASH:
-		return new MemtxHash(index_def_arg);
+		return new MemtxHash(index_def);
 	case TREE:
-		return new MemtxTree(index_def_arg);
+		return new MemtxTree(index_def);
 	case RTREE:
-		return new MemtxRTree(index_def_arg);
+		return new MemtxRTree(index_def);
 	case BITSET:
-		return new MemtxBitset(index_def_arg);
+		return new MemtxBitset(index_def);
 	default:
 		unreachable();
 		return NULL;
@@ -613,7 +635,8 @@ MemtxSpace::createIndex(struct space *space, struct index_def *index_def_arg)
  * right away.
  */
 static void
-memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
+memtx_space_do_add_primary_key(struct space *space,
+			       enum memtx_recovery_state state)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	switch (state) {
@@ -637,36 +660,30 @@ memtx_add_primary_key(struct space *space, enum memtx_recovery_state state)
 	}
 }
 
-void
-MemtxSpace::addPrimaryKey(struct space *space)
+static void
+memtx_space_add_primary_key(struct space *space)
 {
-	memtx_add_primary_key(space, ((MemtxEngine *) space->engine)->m_state);
+	memtx_space_do_add_primary_key(space,
+		((MemtxEngine *)space->engine)->m_state);
 }
 
-void
-MemtxSpace::dropPrimaryKey(struct space *space)
+static void
+memtx_space_drop_primary_key(struct space *space)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	assert(this == space->handler);
 	memtx_space->replace = memtx_space_replace_no_keys;
 }
 
-void
-MemtxSpace::initSystemSpace(struct space *space)
+static void
+memtx_init_system_space(struct space *space)
 {
-	memtx_add_primary_key(space, MEMTX_OK);
+	memtx_space_do_add_primary_key(space, MEMTX_OK);
 }
 
-size_t
-MemtxSpace::bsize(struct space *space)
-{
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	return memtx_space->bsize;
-}
-
-void
-MemtxSpace::buildSecondaryKey(struct space *old_space,
-			      struct space *new_space, Index *new_index)
+static void
+memtx_space_build_secondary_key(struct space *old_space,
+				struct space *new_space,
+				struct Index *new_index)
 {
 	struct index_def *new_index_def = new_index->index_def;
 	/**
@@ -717,29 +734,17 @@ MemtxSpace::buildSecondaryKey(struct space *old_space,
 	}
 }
 
-void
-MemtxSpace::prepareTruncateSpace(struct space *old_space,
-				 struct space *new_space)
+static void
+memtx_space_prepare_truncate(struct space *old_space,
+			     struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	new_memtx_space->replace = old_memtx_space->replace;
 }
 
-void
-memtx_space_update_bsize(struct space *space,
-			 const struct tuple *old_tuple,
-			 const struct tuple *new_tuple)
-{
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;
-	ssize_t new_bsize = new_tuple ? box_tuple_bsize(new_tuple) : 0;
-	assert((ssize_t)memtx_space->bsize + new_bsize - old_bsize >= 0);
-	memtx_space->bsize += new_bsize - old_bsize;
-}
-
 static void
-memtx_prune_space(struct space *space)
+memtx_space_prune(struct space *space)
 {
 	MemtxIndex *index = (MemtxIndex *) space_index(space, 0);
 	if (index == NULL)
@@ -752,33 +757,54 @@ memtx_prune_space(struct space *space)
 		tuple_unref(tuple);
 }
 
-void
-MemtxSpace::commitTruncateSpace(struct space *old_space,
-				struct space *new_space)
+static void
+memtx_space_commit_truncate(struct space *old_space,
+			    struct space *new_space)
 {
 	(void)new_space;
-	memtx_prune_space(old_space);
+	memtx_space_prune(old_space);
 }
 
-void
-MemtxSpace::prepareAlterSpace(struct space *old_space, struct space *new_space)
+static void
+memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	new_memtx_space->replace = old_memtx_space->replace;
 }
 
-void
-MemtxSpace::commitAlterSpace(struct space *old_space, struct space *new_space)
+static void
+memtx_space_commit_alter(struct space *old_space, struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 
 	/* Delete all tuples when the last index is dropped. */
 	if (new_space->index_count == 0)
-		memtx_prune_space(old_space);
+		memtx_space_prune(old_space);
 	else
 		new_memtx_space->bsize = old_memtx_space->bsize;
 }
 
 /* }}} DDL */
+
+const struct space_vtab memtx_space_vtab = {
+	.destroy = memtx_space_destroy,
+	.bsize = memtx_space_bsize,
+	.apply_initial_join_row = memtx_space_apply_initial_join_row,
+	.execute_replace = memtx_space_execute_replace,
+	.execute_delete = memtx_space_execute_delete,
+	.execute_update = memtx_space_execute_update,
+	.execute_upsert = memtx_space_execute_upsert,
+	.execute_select = memtx_space_execute_select,
+	.init_system_space = memtx_init_system_space,
+	.check_index_def = memtx_space_check_index_def,
+	.create_index = memtx_space_create_index,
+	.add_primary_key = memtx_space_add_primary_key,
+	.drop_primary_key = memtx_space_drop_primary_key,
+	.build_secondary_key = memtx_space_build_secondary_key,
+	.prepare_truncate = memtx_space_prepare_truncate,
+	.commit_truncate = memtx_space_commit_truncate,
+	.prepare_alter = memtx_space_prepare_alter,
+	.commit_alter = memtx_space_commit_alter,
+};
