@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(50)
+test:plan(61)
 
 --!./tcltestrunner.lua
 -- 2008 July 15
@@ -39,7 +39,6 @@ test:plan(50)
 --
 -- Verify the default settings for short_column_name and full_column_name
 --
-
 local function lreplace(arr, pos, len, val)
     for i = pos + 1, pos + len + 1, 1 do
         arr[i] = val
@@ -178,8 +177,8 @@ test:do_test(
     "colname-3.1",
     function()
         test:execsql [[
-            PRAGMA short_column_names=OFF;
-            PRAGMA full_column_names=OFF;
+            PRAGMA short_column_names='OFF';
+            PRAGMA full_column_names='OFF';
             CREATE VIEW v3 AS SELECT tabC.a, txyZ.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
             CREATE VIEW v4 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, * 
@@ -299,8 +298,8 @@ test:do_test(
     "colname-4.1",
     function()
         test:execsql [[
-            PRAGMA short_column_names=OFF;
-            PRAGMA full_column_names=ON;
+            PRAGMA short_column_names='OFF';
+            PRAGMA full_column_names='ON';
             CREATE VIEW v5 AS SELECT tabC.a, txyZ.x, *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
             CREATE VIEW v6 AS SELECT tabC.a, txyZ.x, tboTh.a, tbotH.x, * 
@@ -457,11 +456,11 @@ test:do_test(
         -- instead of reconnect to database
         -- we are just turning settings to default state
         test:execsql([[
-            PRAGMA short_column_names=ON;
-            PRAGMA full_column_names=OFF;
+            PRAGMA short_column_names='ON';
+            PRAGMA full_column_names='OFF';
             ]])
         test:execsql [=[
-            CREATE TABLE t6(a primary key, ['a'], ["a"], "[a]", [`a`]);
+            CREATE TABLE t6(a primary key, "'a'", """a""", "[a]", "`a`");
             INSERT INTO t6 VALUES(1,2,3,4,5);
         ]=]
         return test:execsql2 "SELECT * FROM t6"
@@ -469,16 +468,6 @@ test:do_test(
         -- <colname-6.1>
         "a", 1, "'a'", 2, [["a"]], 3, "[a]", 4, "`a`", 5
         -- </colname-6.1>
-    })
-
-test:do_execsql2_test(
-    "colname-6.2",
-    [=[
-        SELECT ['a'], [`a`], "[a]", [a], ["a"] FROM t6
-    ]=], {
-        -- <colname-6.2>
-        "'a'", 2, "`a`", 5, "[a]", 4, "a", 1, [["a"]], 3
-        -- </colname-6.2>
     })
 
 test:do_execsql2_test(
@@ -492,16 +481,6 @@ test:do_execsql2_test(
     })
 
 test:do_execsql2_test(
-    "colname-6.4",
-    [=[
-        SELECT `'a'`, ```a```, `[a]`, `a`, `"a"` FROM t6
-    ]=], {
-        -- <colname-6.4>
-        "'a'", 2, "`a`", 5, "[a]", 4, "a", 1, [["a"]], 3
-        -- </colname-6.4>
-    })
-
-test:do_execsql2_test(
     "colname-6.11",
     [[
         SELECT a, max(a) AS m FROM t6
@@ -509,16 +488,6 @@ test:do_execsql2_test(
         -- <colname-6.11>
         "a", 1, "m", 1
         -- </colname-6.11>
-    })
-
-test:do_execsql2_test(
-    "colname-6.12",
-    [[
-        SELECT `a`, max(a) AS m FROM t6
-    ]], {
-        -- <colname-6.12>
-        "a", 1, "m", 1
-        -- </colname-6.12>
     })
 
 test:do_execsql2_test(
@@ -532,16 +501,6 @@ test:do_execsql2_test(
     })
 
 test:do_execsql2_test(
-    "colname-6.14",
-    [=[
-        SELECT [a], max(a) AS m FROM t6
-    ]=], {
-        -- <colname-6.14>
-        "a", 1, "m", 1
-        -- </colname-6.14>
-    })
-
-test:do_execsql2_test(
     "colname-6.15",
     [[
         SELECT t6.a, max(a) AS m FROM t6
@@ -549,26 +508,6 @@ test:do_execsql2_test(
         -- <colname-6.15>
         "a", 1, "m", 1
         -- </colname-6.15>
-    })
-
-test:do_execsql2_test(
-    "colname-6.16",
-    [=[
-        SELECT ['a'], max(['a']) AS m FROM t6
-    ]=], {
-        -- <colname-6.16>
-        "'a'", 2, "m", 2
-        -- </colname-6.16>
-    })
-
-test:do_execsql2_test(
-    "colname-6.17",
-    [=[
-        SELECT ["a"], max(["a"]) AS m FROM t6
-    ]=], {
-        -- <colname-6.17>
-        [["a"]], 3, "m", 3
-        -- </colname-6.17>
     })
 
 test:do_execsql2_test(
@@ -584,7 +523,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-6.19",
     [=[
-        SELECT "`a`", max([`a`]) AS m FROM t6
+        SELECT "`a`", max("`a`") AS m FROM t6
     ]=], {
         -- <colname-6.19>
         "`a`", 5, "m", 5
@@ -624,6 +563,93 @@ test:do_test(
         -- </colname-8.1>
     })
 
+local data = {
+    [[`a`]],
+    "[a]",
+}
+for i, val in ipairs(data) do
+    test:do_catchsql_test(
+        "colname-9.1."..i,
+        string.format("SELECT %s FROM t6", val),
+        {1, "/unrecognized token/"}
+    )
+end
 
+local data2 = {
+    {[['a']],{1, "/syntax error/"}}, -- because ' is delimiter for strings
+    {[[`a`]],{1, "/unrecognized token/"}}, -- because ` is undefined symbol
+    {"[a]",{1, "/unrecognized token/"}} -- because [ is undefined symbol
+}
+for i, val in ipairs(data2) do
+    test:do_catchsql_test(
+        "colname-9.2"..i,
+        string.format("create table %s(a primary key)", val[1]),
+        val[2]
+    )
+end
+
+
+for i, val in ipairs(data2) do
+    test:do_catchsql_test(
+        "colname-9.3."..i,
+        string.format("create table a(%s primary key)", val[1]),
+        val[2]
+    )
+end
+
+test:execsql("create table table1(a primary key, b)")
+test:execsql("insert into table1 values('a1', 'a1')")
+
+-- " is used for identifiers
+-- ' is used for strings
+
+local data3 = {
+    --{1, [["a1" = "b1"]], {0, {}}}, -- should be error: column does not exist?
+    {2, [["a" = 'a1']], {0, {"a1", "a1"}}},
+    {3, [['a' = 'a1']], {0, {}}},
+    {4, [["a" = "b"]], {0, {"a1", "a1"}}},
+    {5, [['a1' = "a"]], {0, {"a1", "a1"}}},
+    {6, [['a' = "a"]], {0, {}}},
+    {7, [[ "a" = "a"]], {0, {"a1", "a1"}}},
+}
+
+for _, val in ipairs(data3) do
+    test:do_catchsql_test(
+        "colname-10.1."..val[1],
+        string.format([[select * from table1 where %s]], val[2]),
+        val[3])
+end
+
+test:do_test(
+    "colname-11.0.1",
+    function ()
+        test:drop_all_tables()
+    end,
+    nil)
+
+test:do_test(
+    "colname-11.0.2",
+    function ()
+        test:drop_all_views()
+    end,
+    nil)
+
+test:do_catchsql_test(
+    "colname-11.1",
+    [[ create table t1(a, b, c, primary key('A'))]],
+    {1, "expressions prohibited in PRIMARY KEY"})
+
+test:do_catchsql_test(
+    "colname-11.2",
+    [[CREATE TABLE t1(a, b, c, d, e, 
+      PRIMARY KEY(a), UNIQUE('b' COLLATE nocase DESC));]],
+    {1, "/expressions prohibited in PRIMARY KEY/"})
+
+test:execsql("create table table1(a primary key, b, c)")
+
+test:do_catchsql_test(
+    "colname-11.3",
+    [[ CREATE INDEX t1c ON table1('c'); ]],
+    {1, "/expressions prohibited in PRIMARY KEY/"})
 
 test:finish_test()

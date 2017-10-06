@@ -277,7 +277,7 @@ test:do_execsql_test(
     "minmax2-4.1",
     [[
         SELECT coalesce(min(x+0),-1), coalesce(max(x+0),-1) FROM
-          (SELECT x, y FROM t1 UNION SELECT NULL as 'x', NULL as 'y')
+          (SELECT x, y FROM t1 UNION SELECT NULL as "x", NULL as "y")
     ]], {
         -- <minmax2-4.1>
         1, 20

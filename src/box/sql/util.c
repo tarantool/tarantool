@@ -299,8 +299,6 @@ sqlite3Dequote(char *z)
 	quote = z[0];
 	if (!sqlite3Isquote(quote))
 		return;
-	if (quote == '[')
-		quote = ']';
 	for (i = 1, j = 0;; i++) {
 		assert(z[i]);
 		if (z[i] == quote) {

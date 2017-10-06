@@ -492,22 +492,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 	}
 
 	/*
-	 * If X and Y are NULL (in other words if only the column name Z is
-	 * supplied) and the value of Z is enclosed in double-quotes, then
-	 * Z is a string literal if it doesn't match any column names.  In that
-	 * case, we need to return right away and not make any changes to
-	 * pExpr.
-	 *
-	 * Because no reference was made to outer contexts, the pNC->nRef
-	 * fields are not changed in any context.
-	 */
-	if (cnt == 0 && zTab == 0 && ExprHasProperty(pExpr, EP_DblQuoted)) {
-		pExpr->op = TK_STRING;
-		pExpr->pTab = 0;
-		return WRC_Prune;
-	}
-
-	/*
 	 * cnt==0 means there was not match.  cnt>1 means there were two or
 	 * more matches.  Either way, we have an error.
 	 */

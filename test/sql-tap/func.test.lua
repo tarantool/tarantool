@@ -1832,7 +1832,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-21.3",
     [[
-        SELECT typeof(replace("This is the main test string", NULL, "ALT"));
+        SELECT typeof(replace('This is the main test string', NULL, 'ALT'));
     ]], {
         -- <func-21.3>
         "null"
@@ -1842,7 +1842,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.4",
     [[
-        SELECT typeof(replace(NULL, "main", "ALT"));
+        SELECT typeof(replace(NULL, 'main', 'ALT'));
     ]], {
         -- <func-21.4>
         "null"
@@ -1852,7 +1852,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.5",
     [[
-        SELECT typeof(replace("This is the main test string", "main", NULL));
+        SELECT typeof(replace('This is the main test string', 'main', NULL));
     ]], {
         -- <func-21.5>
         "null"
@@ -1862,7 +1862,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.6",
     [[
-        SELECT replace("This is the main test string", "main", "ALT");
+        SELECT replace('This is the main test string', 'main', 'ALT');
     ]], {
         -- <func-21.6>
         "This is the ALT test string"
@@ -1872,7 +1872,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.7",
     [[
-        SELECT replace("This is the main test string", "main", "larger-main");
+        SELECT replace('This is the main test string', 'main', 'larger-main');
     ]], {
         -- <func-21.7>
         "This is the larger-main test string"
@@ -1882,7 +1882,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-21.8",
     [[
-        SELECT replace("aaaaaaa", "a", "0123456789");
+        SELECT replace('aaaaaaa', 'a', '0123456789');
     ]], {
         -- <func-21.8>
         "0123456789012345678901234567890123456789012345678901234567890123456789"
@@ -2445,7 +2445,7 @@ test:do_test(
             CREATE TABLE t29(id INTEGER PRIMARY KEY, x, y);
             INSERT INTO t29 VALUES(1, 2, 3), (2, NULL, 4), (3, 4.5, 5);
             INSERT INTO t29 VALUES(4, randomblob(1000000), 6);
-            INSERT INTO t29 VALUES(5, "hello", 7);
+            INSERT INTO t29 VALUES(5, 'hello', 7);
         ]])
         db("close")
         sqlite3("db", "test.db")

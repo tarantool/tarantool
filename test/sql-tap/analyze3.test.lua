@@ -179,7 +179,7 @@ test:do_sf_execsql_test(
 test:do_test(
     "analyze3-1.1.5",
     function()
-        return test:sf_execsql([[ SELECT sum(y) FROM t1 WHERE x>"200" AND x<"300" ]])
+        return test:sf_execsql([[ SELECT sum(y) FROM t1 WHERE x>'200' AND x<'300' ]])
     end, {
         -- <analyze3-1.1.5>
         100, {14850}
@@ -211,7 +211,7 @@ test:do_test(
     function()
         -- l = X(150, "X!cmd", [=[["string","range","0","0","end"]]=])
         -- u = X(151, "X!cmd", [=[["string","range","1100","0","end"]]=])
-        return test:sf_execsql([[ SELECT sum(y) FROM t1 WHERE x>"0" AND x<"1100" ]])
+        return test:sf_execsql([[ SELECT sum(y) FROM t1 WHERE x>'0' AND x<'1100' ]])
     end, {
         -- <analyze3-1.1.8>
         1000, {499500}
@@ -306,7 +306,7 @@ test:do_test(
     function()
         -- l = X(192, "X!cmd", [=[["string","range","12","0","end"]]=])
         -- u = X(193, "X!cmd", [=[["string","range","20","0","end"]]=])
-        return test:sf_execsql([[SELECT typeof("12"), typeof("20"), sum(y) FROM t2 WHERE x>"12" AND x<"20"]])
+        return test:sf_execsql([[SELECT typeof('12'), typeof('20'), sum(y) FROM t2 WHERE x>'12' AND x<'20']])
     end, {
         -- <analyze3-1.2.5>
         81, {"text", "text", 4760}
@@ -340,7 +340,7 @@ test:do_test(
     function()
         -- l = X(205, "X!cmd", [=[["string","range","0","0","end"]]=])
         -- u = X(206, "X!cmd", [=[["string","range","99","0","end"]]=])
-        return test:sf_execsql([[SELECT typeof("0"), typeof("99"), sum(y) FROM t2 WHERE x>"0" AND x<"99"]])
+        return test:sf_execsql([[SELECT typeof('0'), typeof('99'), sum(y) FROM t2 WHERE x>'0' AND x<'99']])
     end, {
         -- <analyze3-1.2.8>
         991, {"text", "text", 490555}
@@ -434,7 +434,7 @@ test:do_test(
     function()
         -- l = X(244, "X!cmd", [=[["string","range","200","0","end"]]=])
         -- u = X(245, "X!cmd", [=[["string","range","300","0","end"]]=])
-        return test:sf_execsql([[ SELECT sum(y) FROM t3 WHERE x>"200" AND x<"300" ]])
+        return test:sf_execsql([[ SELECT sum(y) FROM t3 WHERE x>'200' AND x<'300' ]])
     end, {
         -- <analyze3-1.3.5>
         100, {14850}
@@ -468,7 +468,7 @@ test:do_test(
     function()
         -- l = X(257, "X!cmd", [=[["string","range","0","0","end"]]=])
         -- u = X(258, "X!cmd", [=[["string","range","1100","0","end"]]=])
-        return test:sf_execsql([[ SELECT sum(y) FROM t3 WHERE x>"0" AND x<"1100" ]])
+        return test:sf_execsql([[ SELECT sum(y) FROM t3 WHERE x>'0' AND x<'1100' ]])
     end, {
         -- <analyze3-1.3.8>
         1000, {499500}

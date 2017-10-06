@@ -2186,7 +2186,7 @@ test:do_select_tests(
 --
 for _, val in ipairs({{1, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a+1", "1st"},
     {2, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a, a+1", "2nd"},
-    {3, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY 'hello'", "1st"},
+    {3, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY \"hello\"", "1st"},
     {4, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY blah", "1st"},
     {5, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY c,d,c+d", "3rd"},
     {6, "SELECT * FROM d5 EXCEPT SELECT * FROM d7 ORDER BY 1,2,b,a/b", "4th"}}) do

@@ -212,7 +212,7 @@ test:do_test(
 test:do_test(
     "table-2.2d",
     function()
-        test:execsql "DROP INDEX 'test3' ON test2"
+        test:execsql [[DROP INDEX "test3" ON test2]]
         return test:catchsql "CREATE TABLE test3(two text primary key)"
     end, {
         -- <table-2.2d>
@@ -354,7 +354,7 @@ test:do_test(
     function()
         for i = 2, 100, 2 do
             -- if {$i==38} {execsql {pragma vdbe_trace=on}}
-            sql = "DROP TABLE "..string.format("TEST%03d", i)..""
+            local sql = "DROP TABLE "..string.format("TEST%03d", i)..""
             test:execsql(sql)
         end
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
@@ -503,7 +503,7 @@ test:do_catchsql_test(
           desc text,
           asc text,
           key int,
-          [14_vac] boolean,
+          "14_vac" boolean,
           fuzzy_dog_12 varchar(10),
           begin blob,
           end clob
@@ -559,7 +559,7 @@ test:do_execsql2_test(
           desc text,
           asc text,
           key int,
-          [14_vac] boolean,
+          "14_vac" boolean,
           fuzzy_dog_12 varchar(10),
           begin blob,
           end clob

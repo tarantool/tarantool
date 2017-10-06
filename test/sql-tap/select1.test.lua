@@ -927,7 +927,7 @@ test:do_test(
 test:do_catchsql2_test(
     "select1-6.1.2",
     [[
-        SELECT f1 as 'f1' FROM test1 ORDER BY f2
+        SELECT f1 as "f1" FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.1.2>
         0, {"f1", 11, "f1", 33}
@@ -1003,7 +1003,7 @@ test:do_catchsql2_test(
 test:do_catchsql2_test(
     "select1-6.3.1",
     [[
-        SELECT f1 as 'xyzzy ' FROM test1 ORDER BY f2
+        SELECT f1 as "xyzzy " FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.3.1>
         0, {"xyzzy ", 11, "xyzzy ", 33}
@@ -1124,8 +1124,8 @@ test:do_test(
     "select1-6.9.3",
     function()
         test:execsql [[
-            PRAGMA short_column_names=OFF;
-            PRAGMA full_column_names=OFF;
+            PRAGMA short_column_names='OFF';
+            PRAGMA full_column_names='OFF';
         ]]
         return test:execsql2 [[
             SELECT test1 . f1, test1 . f2 FROM test1 LIMIT 1
@@ -1140,8 +1140,8 @@ test:do_test(
     "select1-6.9.4",
     function()
         test:execsql [[
-            PRAGMA short_column_names=OFF;
-            PRAGMA full_column_names=ON;
+            PRAGMA short_column_names='OFF';
+            PRAGMA full_column_names='ON';
         ]]
         return test:execsql2 [[
             SELECT test1 . f1, test1 . f2 FROM test1 LIMIT 1
@@ -1156,8 +1156,8 @@ test:do_test(
     "select1-6.9.5",
     function()
         test:execsql [[
-            PRAGMA short_column_names=OFF;
-            PRAGMA full_column_names=ON;
+            PRAGMA short_column_names='OFF';
+            PRAGMA full_column_names='ON';
         ]]
         return test:execsql2 [[
             SELECT 123.45;
@@ -1238,8 +1238,8 @@ test:do_test(
     "select1-6.9.11",
     function()
         test:execsql [[
-            PRAGMA short_column_names=ON;
-            PRAGMA full_column_names=ON;
+            PRAGMA short_column_names='ON';
+            PRAGMA full_column_names='ON';
         ]]
         return test:execsql2 [[
             SELECT a.f1, b.f2 FROM test1 a, test1 b LIMIT 1
@@ -1264,8 +1264,8 @@ test:do_test(
     "select1-6.9.13",
     function()
         test:execsql [[
-            PRAGMA short_column_names=ON;
-            PRAGMA full_column_names=OFF;
+            PRAGMA short_column_names='ON';
+            PRAGMA full_column_names='OFF';
         ]]
         return test:execsql2 [[
             SELECT a.f1, b.f1 FROM test1 a, test1 b LIMIT 1
@@ -1290,8 +1290,8 @@ test:do_test(
     "select1-6.9.15",
     function()
         test:execsql [[
-            PRAGMA short_column_names=OFF;
-            PRAGMA full_column_names=ON;
+            PRAGMA short_column_names='OFF';
+            PRAGMA full_column_names='ON';
         ]]
         return test:execsql2 [[
             SELECT a.f1, b.f1 FROM test1 a, test1 b LIMIT 1
@@ -1313,8 +1313,8 @@ test:do_execsql2_test(
     })
 
 test:execsql [[
-    PRAGMA short_column_names=ON;
-    PRAGMA full_column_names=OFF;
+    PRAGMA short_column_names='ON';
+    PRAGMA full_column_names='OFF';
 ]]
 test:do_catchsql2_test(
         "select1-6.10",
@@ -1426,7 +1426,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "select1-7.3",
     [[
-        SELECT f1 FROM test1 as 'hi', test2 as]], {
+        SELECT f1 FROM test1 as "hi", test2 as]], {
         -- <select1-7.3>
         1, [[near "as": syntax error]]
         -- </select1-7.3>
@@ -1833,7 +1833,7 @@ test:do_execsql2_test(
     test:do_execsql2_test(
         "select1-11.14",
         [[
-            SELECT * FROM t3, (SELECT max(a), max(b) FROM t4) AS 'tx'
+            SELECT * FROM t3, (SELECT max(a), max(b) FROM t4) as "tx"
         ]], {
             -- <select1-11.14>
             "id", 0, "a", 1, "b", 2, "max(a)", 3, "max(b)", 4
@@ -1887,7 +1887,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "select1-12.3",
     [[
-        SELECT 1 AS 'a','hello' AS 'b',2 AS 'c'
+        SELECT 1 as "a",'hello' as "b",2 as "c"
     ]], {
         -- <select1-12.3>
         "a", 1, "b", "hello", "c", 2
@@ -1908,7 +1908,7 @@ test:do_execsql_test(
 test:do_execsql_test(
         "select1-12.5",
         [[
-            SELECT a,b FROM t3 UNION SELECT 3 AS 'a', 4 ORDER BY a;
+            SELECT a,b FROM t3 UNION SELECT 3 as "a", 4 ORDER BY a;
         ]], {
             -- <select1-12.5>
             1, 2, 3, 4
@@ -1968,7 +1968,7 @@ test:do_execsql2_test(
     [[
         SELECT z.x FROM (
           SELECT a AS x,b AS y FROM t3 UNION SELECT a, b FROM t4 ORDER BY a,b
-        ) AS 'z' ORDER BY x;
+        ) as "z" ORDER BY x;
     ]], {
         -- <select1-12.10>
         "x", 1, "x", 3

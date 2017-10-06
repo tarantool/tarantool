@@ -60,7 +60,7 @@ test:do_test(
             INSERT INTO t1 VALUES(5, '2', 'V',   'five');
             INSERT INTO t1 VALUES(6, '3', 'VI',  'six');
             COMMIT;
---            PRAGMA automatic_index=OFF;
+--            PRAGMA automatic_index='OFF';
         ]]
     end, {
         -- <minmax3-1.0>

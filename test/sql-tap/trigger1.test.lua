@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(34)
+test:plan(31)
 
 --!./tcltestrunner.lua
 -- The author disclaims copyright to this source code.  In place of
@@ -115,18 +115,6 @@ test:do_catchsql_test(
         -- <trigger1-1.2.2>
         1, [[trigger "tr1" already exists]]
         -- </trigger1-1.2.2>
-    })
-
-test:do_catchsql_test(
-    "trigger1-1.2.3",
-    [=[
-        CREATE TRIGGER [tr1] DELETE ON t1 BEGIN
-            SELECT * FROM sqlite_master;
-         END
-    ]=], {
-        -- <trigger1-1.2.3>
-        1, "trigger [tr1] already exists"
-        -- </trigger1-1.2.3>
     })
 
 -- do_test trigger1-1.3 {
@@ -548,7 +536,7 @@ test:execsql "DROP TRIGGER IF EXISTS t2"
 test:do_execsql_test(
     "trigger1-8.1",
     [[
-        CREATE TRIGGER 'trigger' AFTER INSERT ON t2 BEGIN SELECT 1; END;
+        CREATE TRIGGER "trigger" AFTER INSERT ON t2 BEGIN SELECT 1; END;
         SELECT name FROM _trigger WHERE name='trigger';
     ]], {
         -- <trigger1-8.1>
@@ -559,7 +547,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger1-8.2",
     [[
-        DROP TRIGGER 'trigger';
+        DROP TRIGGER "trigger";
         SELECT name FROM _trigger WHERE name='trigger';
     ]], {
         -- <trigger1-8.2>
@@ -587,28 +575,6 @@ test:do_execsql_test(
         -- <trigger1-8.4>
         
         -- </trigger1-8.4>
-    })
-
-test:do_execsql_test(
-    "trigger1-8.5",
-    [=[
-        CREATE TRIGGER [trigger] AFTER INSERT ON t2 BEGIN SELECT 1; END;
-        SELECT name FROM _trigger WHERE name='trigger';
-    ]=], {
-        -- <trigger1-8.5>
-        "trigger"
-        -- </trigger1-8.5>
-    })
-
-test:do_execsql_test(
-    "trigger1-8.6",
-    [=[
-        DROP TRIGGER [trigger];
-        SELECT name FROM _trigger;
-    ]=], {
-        -- <trigger1-8.6>
-        
-        -- </trigger1-8.6>
     })
 
 -- ifcapable conflict {

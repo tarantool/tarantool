@@ -295,7 +295,7 @@ for _, indexes in ipairs({ [[
 ]], [[
   CREATE INDEX i1 ON t1(a)
 ]], [[
-  DROP INDEX 'i1' ON t1;
+  DROP INDEX "i1" ON t1;
   CREATE INDEX i1 ON t1(b,a);
 ]],
     -- TODO collation is not supported by now

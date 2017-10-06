@@ -1096,7 +1096,7 @@ test:execsql(
 test:do_execsql_test(
     "triggerC-13.1",
     [[
-        PRAGMA recursive_triggers = ON;
+        PRAGMA recursive_triggers = 'ON';
         CREATE TABLE t12(id INTEGER PRIMARY KEY, a, b);
         INSERT INTO t12 VALUES(1, 1, 2);
         CREATE TRIGGER tr12 AFTER UPDATE ON t12 BEGIN
@@ -1180,7 +1180,7 @@ test:do_execsql_test(
     "triggerC-15.1.1",
     [[
         -- test is not respects fk
-        PRAGMA foreign_keys=false;
+        PRAGMA foreign_keys='false';
         PRAGMA recursive_triggers = 1;
         CREATE TABLE node(
             id int not null primary key,
@@ -1203,7 +1203,7 @@ test:do_execsql_test(
         INSERT INTO node(id, pid, key) VALUES(900, 90, 'test2');
         DELETE FROM node WHERE id=9;
         SELECT * FROM node;
-        PRAGMA foreign_keys=true;
+        PRAGMA foreign_keys='true';
     ]])
 
 -- Tarantool: such indentifiers are not working

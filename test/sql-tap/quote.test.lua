@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(13)
+test:plan(9)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -27,7 +27,7 @@ test:do_catchsql_test(
     "quote-1.0",
     [[
         --- CREATE TABLE '@abc' ( '#xyz' int PRIMARY KEY, '!pqr' text );
-        CREATE TABLE 't_5abc' ( '#xyz' int PRIMARY KEY, '!pqr' text );
+        CREATE TABLE "abc5_" ( "#xyz" int PRIMARY KEY, "!pqr" text );
     ]], {
         -- <quote-1.0>
         0
@@ -39,7 +39,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.1",
     [[
-        INSERT INTO 't_5abc' VALUES(5,'hello')
+        INSERT INTO "abc5_" VALUES(5,'hello')
     ]], {
         -- <quote-1.1>
         0
@@ -49,39 +49,17 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.2.1",
     [[
-        SELECT * FROM 't_5abc'
+        SELECT * FROM "abc5_"
     ]], {
         -- <quote-1.2.1>
         0, {5, "hello"}
         -- </quote-1.2.1>
     })
 
-test:do_test(
-    "quote-1.2.2",
-    function()
-        return test:catchsql "SELECT * FROM [t_5abc]"
-        -- SqlServer compatibility
-    end, {
-        -- <quote-1.2.2>
-        0, {5, "hello"}
-        -- </quote-1.2.2>
-    })
-
-test:do_test(
-    "quote-1.2.3",
-    function()
-        return test:catchsql "SELECT * FROM `t_5abc`"
-        -- MySQL compatibility
-    end, {
-        -- <quote-1.2.3>
-        0, {5, "hello"}
-        -- </quote-1.2.3>
-    })
-
 test:do_catchsql_test(
     "quote-1.3",
     [[
-        SELECT 't_5abc'.'!pqr', 't_5abc'.'#xyz'+5 FROM 't_5abc'
+        SELECT "abc5_"."!pqr", "abc5_"."#xyz"+5 FROM "abc5_"
     ]], {
         -- <quote-1.3>
         0, {"hello", 10}
@@ -91,7 +69,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.3.1",
     [[
-        SELECT '!pqr', '#xyz'+5 FROM 't_5abc'
+        SELECT '!pqr', '#xyz'+5 FROM "abc5_"
     ]], {
         -- <quote-1.3.1>
         0, {"!pqr", 5}
@@ -101,7 +79,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.3.2",
     [[
-        SELECT "!pqr", "#xyz"+5 FROM 't_5abc'
+        SELECT "!pqr", "#xyz"+5 FROM "abc5_"
     ]], {
         -- <quote-1.3.2>
         0, {"hello", 10}
@@ -109,29 +87,9 @@ test:do_catchsql_test(
     })
 
 test:do_catchsql_test(
-    "quote-1.3.3",
-    [=[
-        SELECT [!pqr], `#xyz`+5 FROM 't_5abc'
-    ]=], {
-        -- <quote-1.3.3>
-        0, {"hello", 10}
-        -- </quote-1.3.3>
-    })
-
-test:do_catchsql_test(
-    "quote-1.3.4",
-    [[
-        SELECT 't_5abc'.'!pqr', 't_5abc'.'#xyz'+5 FROM 't_5abc'
-    ]], {
-        -- <quote-1.3.4>
-        0, {"hello", 10}
-        -- </quote-1.3.4>
-    })
-
-test:do_catchsql_test(
     "quote-1.4",
     [[
-        UPDATE 't_5abc' SET '#xyz'=11
+        UPDATE "abc5_" SET "#xyz"=11
     ]], {
         -- <quote-1.4>
         0
@@ -141,7 +99,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.5",
     [[
-        SELECT 't_5abc'.'!pqr', 't_5abc'.'#xyz'+5 FROM 't_5abc'
+        SELECT "abc5_"."!pqr", "abc5_"."#xyz"+5 FROM "abc5_"
     ]], {
         -- <quote-1.5>
         0, {"hello", 16}
@@ -153,7 +111,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.6",
     [[
-        DROP TABLE 't_5abc'
+        DROP TABLE "abc5_"
     ]], {
         -- <quote-1.6>
         0

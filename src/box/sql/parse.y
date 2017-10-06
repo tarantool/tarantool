@@ -230,7 +230,6 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 //
 %type nm {Token}
 nm(A) ::= id(A).
-nm(A) ::= STRING(A).
 nm(A) ::= JOIN_KW(A).
 
 // A typetoken is really zero or more tokens that form a type name such
@@ -1340,6 +1339,7 @@ cmd ::= PRAGMA nm(X) EQ nm(Z) DOT nm(Y).    {
 }
 
 nmnum(A) ::= plus_num(A).
+nmnum(A) ::= STRING(A).
 nmnum(A) ::= nm(A).
 nmnum(A) ::= ON(A).
 nmnum(A) ::= DELETE(A).
@@ -1458,7 +1458,7 @@ expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
     A.pExpr->affinity = OE_Ignore;
   }
 }
-expr(A) ::= RAISE(X) LP raisetype(T) COMMA nm(Z) RP(Y).  {
+expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
   A.pExpr = sqlite3ExprAlloc(pParse->db, TK_RAISE, &Z, 1); 
   if( A.pExpr ) {

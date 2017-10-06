@@ -231,7 +231,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.5",
     function()
-        test:execsql "DROP INDEX 'indext' ON test1"
+        test:execsql [[DROP INDEX "indext" ON test1]]
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.5>
@@ -273,7 +273,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.9",
     function()
-        test:execsql "DROP INDEX 'index9' ON test1"
+        test:execsql [[DROP INDEX "index9" ON test1]]
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.9>
@@ -294,7 +294,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.11",
     function()
-        test:execsql "DROP INDEX 'indext' ON test1"
+        test:execsql [[DROP INDEX "indext" ON test1]]
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.11>

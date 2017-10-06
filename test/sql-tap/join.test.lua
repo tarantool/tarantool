@@ -325,7 +325,7 @@ test:do_execsql2_test(
     "join-1.13",
     [[
         SELECT * FROM t1 NATURAL JOIN 
-          (SELECT b as 'c', c as 'd', d as 'e' FROM t2) as t3
+          (SELECT b as "c", c as "d", d as "e" FROM t2) as t3
     ]], {
         -- <join-1.13>
         "a", 1, "b", 2, "c", 3, "d", 4, "e", 5
@@ -335,7 +335,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "join-1.14",
     [[
-        SELECT * FROM (SELECT b as 'c', c as 'd', d as 'e' FROM t2) as 'tx'
+        SELECT * FROM (SELECT b as "c", c as "d", d as "e" FROM t2) as "tx"
             NATURAL JOIN t1
     ]], {
         -- <join-1.14>
@@ -734,21 +734,21 @@ test:do_execsql_test(
     "join-7.1",
     [[
         CREATE TABLE t7 (id primary key, x, y);
-        INSERT INTO t7 VALUES (1, "pa1", 1);
-        INSERT INTO t7 VALUES (2, "pa2", NULL);
-        INSERT INTO t7 VALUES (3, "pa3", NULL);
-        INSERT INTO t7 VALUES (4, "pa4", 2);
-        INSERT INTO t7 VALUES (5, "pa30", 131);
-        INSERT INTO t7 VALUES (6, "pa31", 130);
-        INSERT INTO t7 VALUES (7, "pa28", NULL);
+        INSERT INTO t7 VALUES (1, 'pa1', 1);
+        INSERT INTO t7 VALUES (2, 'pa2', NULL);
+        INSERT INTO t7 VALUES (3, 'pa3', NULL);
+        INSERT INTO t7 VALUES (4, 'pa4', 2);
+        INSERT INTO t7 VALUES (5, 'pa30', 131);
+        INSERT INTO t7 VALUES (6, 'pa31', 130);
+        INSERT INTO t7 VALUES (7, 'pa28', NULL);
 
         CREATE TABLE t8 (a integer primary key, b);
-        INSERT INTO t8 VALUES (1, "pa1");
-        INSERT INTO t8 VALUES (2, "pa4");
+        INSERT INTO t8 VALUES (1, 'pa1');
+        INSERT INTO t8 VALUES (2, 'pa4');
         INSERT INTO t8 VALUES (3, NULL);
         INSERT INTO t8 VALUES (4, NULL);
-        INSERT INTO t8 VALUES (130, "pa31");
-        INSERT INTO t8 VALUES (131, "pa30");
+        INSERT INTO t8 VALUES (130, 'pa31');
+        INSERT INTO t8 VALUES (131, 'pa30');
 
         SELECT coalesce(t8.a,999) from t7 LEFT JOIN t8 on y=a;
     ]], {

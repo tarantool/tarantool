@@ -1051,7 +1051,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "misc1-22.1",
     [[
-        SELECT ""+3 FROM (SELECT ""+5);
+        SELECT ''+3 FROM (SELECT ''+5);
     ]], {
         -- <misc1-22.1>
         3

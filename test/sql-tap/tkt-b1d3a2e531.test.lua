@@ -27,7 +27,7 @@ testprefix = "tkt-b1d3a2e531"
 test:do_execsql_test(
     1.0,
     [[
-        PRAGMA foreign_keys = ON
+        PRAGMA foreign_keys = 'ON'
     ]])
 
 test:do_execsql_test(

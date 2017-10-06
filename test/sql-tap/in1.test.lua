@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(84)
+test:plan(83)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -555,16 +555,6 @@ test:do_execsql_test(
         -- <in-8.1>
         "world"
         -- </in-8.1>
-    })
-
-test:do_execsql_test(
-    "in-8.2",
-    [[
-        SELECT b FROM t1 WHERE a IN ("hello",'there')
-    ]], {
-        -- <in-8.2>
-        "world"
-        -- </in-8.2>
     })
 
 -- Test constructs of the form:  expr IN tablename

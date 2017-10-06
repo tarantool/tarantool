@@ -226,7 +226,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES(3);
 
         -- Allow the 'x' syntax for backwards compatibility
-        CREATE TABLE t4(x,y,z,PRIMARY KEY('x' ASC, "y" ASC));
+        CREATE TABLE t4(x,y,z,PRIMARY KEY(x ASC, y ASC));
 
         SELECT *
           FROM t2 LEFT JOIN t4 b1

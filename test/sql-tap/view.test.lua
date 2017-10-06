@@ -268,7 +268,7 @@ test:do_execsql2_test(
     "view-3.3.1",
     [[
         DROP VIEW v1;
-        CREATE VIEW v1 AS SELECT a AS 'xyz', b+c AS 'pqr', c-b FROM t1;
+        CREATE VIEW v1 AS SELECT a AS "xyz", b+c AS "pqr", c-b FROM t1;
         SELECT * FROM v1 LIMIT 1
     ]], {
         -- <view-3.3.1>
@@ -339,7 +339,7 @@ test:do_execsql2_test(
         CREATE VIEW v4 AS
           SELECT a, b FROM t1
           UNION
-          SELECT b AS 'x', a AS 'y' FROM t1
+          SELECT b AS "x", a AS "y" FROM t1
           ORDER BY x, y;
         SELECT b FROM v4 ORDER BY b LIMIT 4;
     ]], {
@@ -779,9 +779,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-10.1",
     [=[
-        CREATE TABLE t3("9" integer primary key, [4] text);
+        CREATE TABLE t3("9" integer primary key, "4" text);
         INSERT INTO t3 VALUES(1,2);
-        CREATE VIEW v_t3_a AS SELECT a.[9] FROM t3 AS a;
+        CREATE VIEW v_t3_a AS SELECT a."9" FROM t3 AS a;
         CREATE VIEW v_t3_b AS SELECT "4" FROM t3;
         SELECT * FROM v_t3_a;
     ]=], {
@@ -1149,7 +1149,7 @@ if (0 > 0)
     test:do_execsql_test(
         "view-22.1",
         [[
-            CREATE VIEW x1 AS SELECT 123 AS '', 234 AS '', 345 AS '';
+            CREATE VIEW x1 AS SELECT 123 AS "", 234 AS "", 345 AS "";
             SELECT * FROM x1;
         ]], {
             -- <view-22.1>

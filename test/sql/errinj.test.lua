@@ -13,7 +13,7 @@ fiber = require('fiber')
 errinj.set("ERRINJ_WAL_DELAY", true)
 insert_res = nil
 select_res = nil
-function execute_yield() insert_res = cn:execute('insert into test values (100, 1, "1")') end
+function execute_yield() insert_res = cn:execute("insert into test values (100, 1, '1')") end
 function execute_notyield() select_res = cn:execute('select 1') end
 f1 = fiber.create(execute_yield)
 while f1:status() ~= 'suspended' do fiber.sleep(0) end

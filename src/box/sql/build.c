@@ -1152,31 +1152,6 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 	sqlite3ExprDelete(db, pSpan->pExpr);
 }
 
-/*
- * Backwards Compatibility Hack:
- *
- * Historical versions of SQLite accepted strings as column names in
- * indexes and PRIMARY KEY constraints and in UNIQUE constraints.  Example:
- *
- *     CREATE TABLE xyz(a,b,c,d,e,PRIMARY KEY('a'),UNIQUE('b','c' COLLATE trim)
- *     CREATE INDEX abc ON xyz('c','d' DESC,'e' COLLATE nocase DESC);
- *
- * This is goofy.  But to preserve backwards compatibility we continue to
- * accept it.  This routine does the necessary conversion.  It converts
- * the expression given in its argument from a TK_STRING into a TK_ID
- * if the expression is just a TK_STRING with an optional COLLATE clause.
- * If the epxression is anything other than TK_STRING, the expression is
- * unchanged.
- */
-static void
-sqlite3StringToId(Expr * p)
-{
-	if (p->op == TK_STRING) {
-		p->op = TK_ID;
-	} else if (p->op == TK_COLLATE && p->pLeft->op == TK_STRING) {
-		p->pLeft->op = TK_ID;
-	}
-}
 
 /*
  * Designate the PRIMARY KEY for the table.  pList is a list of names
@@ -1228,18 +1203,19 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 			Expr *pCExpr =
 			    sqlite3ExprSkipCollate(pList->a[i].pExpr);
 			assert(pCExpr != 0);
-			sqlite3StringToId(pCExpr);
-			if (pCExpr->op == TK_ID) {
-				const char *zCName = pCExpr->u.zToken;
-				for (iCol = 0; iCol < pTab->nCol; iCol++) {
-					if (sqlite3StrICmp
-					    (zCName,
-					     pTab->aCol[iCol].zName) == 0) {
-						pCol = &pTab->aCol[iCol];
-						pCol->colFlags |=
-						    COLFLAG_PRIMKEY;
-						break;
-					}
+			if (pCExpr->op != TK_ID) {
+				sqlite3ErrorMsg(pParse, "expressions prohibited in PRIMARY KEY");
+				goto primary_key_exit;
+			}
+			const char *zCName = pCExpr->u.zToken;
+			for (iCol = 0; iCol < pTab->nCol; iCol++) {
+				if (sqlite3StrICmp
+				    (zCName,
+				     pTab->aCol[iCol].zName) == 0) {
+					pCol = &pTab->aCol[iCol];
+					pCol->colFlags |=
+					    COLFLAG_PRIMKEY;
+					break;
 				}
 			}
 		}
@@ -3253,32 +3229,16 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		Expr *pCExpr;	/* The i-th index expression */
 		int requestedSortOrder;	/* ASC or DESC on the i-th expression */
 		const char *zColl;	/* Collation sequence name */
-
-		sqlite3StringToId(pListItem->pExpr);
 		sqlite3ResolveSelfReference(pParse, pTab, NC_IdxExpr,
 					    pListItem->pExpr, 0);
 		if (pParse->nErr)
 			goto exit_create_index;
 		pCExpr = sqlite3ExprSkipCollate(pListItem->pExpr);
 		if (pCExpr->op != TK_COLUMN) {
-			if (pTab == pParse->pNewTable) {
-				sqlite3ErrorMsg(pParse,
-						"expressions prohibited in PRIMARY KEY and "
-						"UNIQUE constraints");
-				goto exit_create_index;
-			}
-			if (pIndex->aColExpr == 0) {
-				ExprList *pCopy =
-				    sqlite3ExprListDup(db, pList, 0);
-				pIndex->aColExpr = pCopy;
-				if (!db->mallocFailed) {
-					assert(pCopy != 0);
-					pListItem = &pCopy->a[i];
-				}
-			}
-			j = XN_EXPR;
-			pIndex->aiColumn[i] = XN_EXPR;
-			pIndex->uniqNotNull = 0;
+			sqlite3ErrorMsg(pParse,
+					"expressions prohibited in PRIMARY KEY and "
+					"UNIQUE constraints");
+			goto exit_create_index;
 		} else {
 			j = pCExpr->iColumn;
 			assert(j <= 0x7fff);

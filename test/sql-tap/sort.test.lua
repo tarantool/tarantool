@@ -915,7 +915,7 @@ box.internal.sql_create_function("cksum", cksum)
         sqlite3_soft_heap_limit(softheaplimit)
         reset_db()
         sqlite3_test_control("SQLITE_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
-        test:execsql(string.format("PRAGMA temp_store = %s; PRAGMA threads = %s", tmpstore, nWorker))
+        test:execsql(string.format("PRAGMA temp_store = %s; PRAGMA threads = '%s'", tmpstore, nWorker))
         ten = string.rep("X", 10300)
         one = string.rep("y", 200)
         if softheaplimit then

@@ -55,8 +55,8 @@
 #define CC_VARALPHA   5		/* '@', '#', ':'.  Alphabetic SQL variables */
 #define CC_VARNUM     6		/* '?'.  Numeric SQL variables */
 #define CC_SPACE      7		/* Space characters */
-#define CC_QUOTE      8		/* '"', '\'', or '`'.  String literals, quoted ids */
-#define CC_QUOTE2     9		/* '['.   [...] style quoted ids */
+#define CC_QUOTE      8		/* '\''. String literals */
+#define CC_DQUOTE     9		/* '"'. Identifiers*/
 #define CC_PIPE      10		/* '|'.   Bitwise OR or concatenate */
 #define CC_MINUS     11		/* '-'.  Minus or SQL-style comment */
 #define CC_LT        12		/* '<'.  Part of < or <= or <> */
@@ -78,14 +78,14 @@
 
 static const unsigned char aiClass[] = {
 #ifdef SQLITE_ASCII
-/*         x0  x1  x2  x3  x4  x5  x6  x7  x8  x9  xa  xb  xc  xd  xe  xf */
-/* 0x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 7, 7, 27, 7, 7, 27, 27,
+/*       x0  x1  x2  x3  x4  x5  x6  x7  x8 x9  xa xb  xc xd xe  xf */
+/* 0x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 7,  7, 27, 7, 7, 27, 27,
 /* 1x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
-/* 2x */ 7, 15, 8, 5, 4, 22, 24, 8, 17, 18, 21, 20, 23, 11, 26, 16,
+/* 2x */ 7, 15, 9, 5, 4, 22, 24, 8, 17, 18, 21, 20, 23, 11, 26, 16,
 /* 3x */ 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 19, 12, 14, 13, 6,
 /* 4x */ 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-/* 5x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 9, 27, 27, 27, 1,
-/* 6x */ 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+/* 5x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 27, 27, 27, 27, 1,
+/* 6x */ 27, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 /* 7x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 27, 10, 27, 25, 27,
 /* 8x */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 /* 9x */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
@@ -339,9 +339,9 @@ sqlite3GetToken(const unsigned char *z, int *tokenType)
 			*tokenType = TK_BITNOT;
 			return 1;
 		}
-	case CC_QUOTE:{
+	case CC_QUOTE:
+	case CC_DQUOTE:{
 			int delim = z[0];
-			testcase(delim == '`');
 			testcase(delim == '\'');
 			testcase(delim == '"');
 			for (i = 1; (c = z[i]) != 0; i++) {
@@ -425,12 +425,6 @@ sqlite3GetToken(const unsigned char *z, int *tokenType)
 				*tokenType = TK_ILLEGAL;
 				i++;
 			}
-			return i;
-		}
-	case CC_QUOTE2:{
-			for (i = 1, c = z[0]; c != ']' && (c = z[i]) != 0; i++) {
-			}
-			*tokenType = c == ']' ? TK_ID : TK_ILLEGAL;
 			return i;
 		}
 	case CC_VARNUM:{

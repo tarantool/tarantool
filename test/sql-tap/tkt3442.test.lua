@@ -62,7 +62,7 @@ test:do_test(
 test:do_test(
     "tkt3442-1.3",
     function()
-        return EQP([[ SELECT node FROM listhash WHERE id="5000" LIMIT 1; ]])
+        return EQP([[ SELECT node FROM listhash WHERE id='5000' LIMIT 1; ]])
     end, {
         -- <tkt3442-1.3>
         0, 0, 0, "SEARCH TABLE listhash USING COVERING INDEX ididx (id=?)"
@@ -88,7 +88,7 @@ test:do_test(
 test:do_catchsql_test(
     "tkt3442-1.5",
     [=[
-        SELECT node FROM listhash WHERE id=[5000] LIMIT 1;
+        SELECT node FROM listhash WHERE id="5000" LIMIT 1;
     ]=], {
         -- <tkt3442-1.5>
         1, "no such column: 5000"

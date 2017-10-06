@@ -684,7 +684,7 @@ test:do_test(
 test:do_test(
     "limit-10.5",
     function()
-        local limit = '"hello world"'
+        local limit = "'hello world'"
         return {pcall(function()
             return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
         end)}

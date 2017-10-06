@@ -24,7 +24,7 @@ test:plan(25)
 test:do_test(
     "badutf-1.1",
     function()
-        test:execsql "PRAGMA encoding=UTF8"
+        test:execsql "PRAGMA encoding='UTF8'"
         return test:execsql2("SELECT hex('\x80') AS x")
     end, {
         -- <badutf-1.1>
@@ -98,7 +98,7 @@ sqlite3("db2", "")
 test:do_test(
     "badutf-1.10",
     function()
-        test:execsql "PRAGMA encoding=UTF16be"
+        test:execsql "PRAGMA encoding='UTF16be'"
         return sqlite3_exec("db2", "SELECT hex('%80') AS x")
     end, {
         -- <badutf-1.10>

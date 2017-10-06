@@ -734,7 +734,7 @@ test:do_execsql_test(
         INSERT INTO abc VALUES(7, 8, 9);
         SELECT (
           SELECT 'hardware' FROM ( 
-            SELECT 'software' ORDER BY 'firmware' ASC, 'sportswear' DESC 
+            SELECT 'software' ORDER BY 'firmware' ASC, 'sportswear' DESC
           ) GROUP BY 1 HAVING length(b)
         )
         FROM abc;

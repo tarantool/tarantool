@@ -206,7 +206,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t2(
           id primary key,
-          x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=="integer"),
+          x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
           y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='real' ),
           z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='text' )
         );
@@ -527,7 +527,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "check-4.8",
     [[
-        PRAGMA ignore_check_constraints=ON;
+        PRAGMA ignore_check_constraints='ON';
         UPDATE t4 SET x=0, y=1;
         SELECT * FROM t4;
     ]], {
@@ -539,7 +539,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "check-4.9",
     [[
-        PRAGMA ignore_check_constraints=OFF;
+        PRAGMA ignore_check_constraints='OFF';
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>

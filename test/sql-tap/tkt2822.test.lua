@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(38)
+test:plan(37)
 
 --!./tcltestrunner.lua
 -- 2007 Dec 4
@@ -267,7 +267,7 @@ test:do_test(
     function()
         -- Quoting should not matter
         return test:execsql [[
-            SELECT a AS 'b' FROM t3 ORDER BY "B";
+            SELECT a as "b" FROM t3 ORDER BY "B";
         ]]
     end, {
         -- <tkt2822-5.3>
@@ -275,18 +275,6 @@ test:do_test(
         -- </tkt2822-5.3>
     })
 
-test:do_test(
-    "tkt2822-5.4",
-    function()
-        -- Quoting should not matter
-        return test:execsql [=[
-            SELECT a AS "b" FROM t3 ORDER BY [B];
-        ]=]
-    end, {
-        -- <tkt2822-5.4>
-        1, 9
-        -- </tkt2822-5.4>
-    })
 
 -- In "ORDER BY +b" the term is now an expression rather than
 -- a label.  It therefore matches by rule (3) instead of rule (2).

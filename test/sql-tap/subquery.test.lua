@@ -733,7 +733,7 @@ test:do_test(
             INSERT INTO t5 VALUES(3,33);
             INSERT INTO t5 VALUES(4,44);
             SELECT b FROM t5 WHERE a IN
-               (SELECT callcnt(y)+0 FROM t4 WHERE x="two")
+               (SELECT callcnt(y)+0 FROM t4 WHERE x='two')
         ]]
     end, {
         -- <subquery-5.1>
