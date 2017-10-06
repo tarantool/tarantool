@@ -1546,7 +1546,7 @@ local function object_name(object_type, object_id)
     if object_type == 'space' then
         space = box.space._space
     elseif object_type == 'sequence' then
-        seq = box.space._sequence
+        space = box.space._sequence
     elseif object_type == 'function' then
         space = box.space._func
     elseif object_type == 'role' or object_type == 'user' then

@@ -408,6 +408,11 @@ s2:drop()
 
 -- Sanity checks.
 box.schema.user.create('user')
+-- Setup read permissions for box.schema.user.info() to work.
+box.schema.user.grant('user', 'read', 'space', '_priv')
+box.schema.user.grant('user', 'read', 'space', '_user')
+box.schema.user.grant('user', 'read', 'space', '_space')
+box.schema.user.grant('user', 'read', 'space', '_sequence')
 sq = box.schema.sequence.create('seq')
 box.schema.user.grant('user', 'write', 'sequence', 'test') -- error: no such sequence
 box.schema.user.grant('user', 'write', 'sequence', 'seq') -- ok
@@ -426,6 +431,7 @@ sq:reset() -- error
 box.session.su('admin')
 box.schema.user.grant('user', 'write', 'sequence', 'seq')
 box.session.su('user')
+box.schema.user.info()
 sq:set(100) -- ok
 sq:next() -- ok
 sq:reset() -- ok
