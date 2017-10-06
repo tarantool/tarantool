@@ -33,7 +33,7 @@ deps_ubuntu:
 	sudo apt-get update && apt-get install -y -f \
 		build-essential cmake coreutils sed \
 		libreadline-dev libncurses5-dev libyaml-dev libssl-dev \
-		libcurl4-openssl-dev libunwind-dev \
+		libcurl4-openssl-dev libunwind-dev libicu-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
 		lcov ruby
