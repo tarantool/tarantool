@@ -31,7 +31,8 @@ env:
       - OS=ubuntu DIST=precise
       - OS=ubuntu DIST=trusty
       - OS=ubuntu DIST=xenial
-      - OS=ubuntu DIST=yakkety
+      - OS=ubuntu DIST=zesty
+      - OS=ubuntu DIST=artful
       - OS=debian DIST=wheezy
       - OS=debian DIST=jessie
       - OS=debian DIST=stretch
