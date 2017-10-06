@@ -570,6 +570,25 @@ struct xlog_cursor
 };
 
 /**
+ * Return true if the cursor was opened and has not
+ * been closed yet.
+ */
+static inline bool
+xlog_cursor_is_open(const struct xlog_cursor *cursor)
+{
+	return cursor->state != XLOG_CURSOR_CLOSED;
+}
+
+/**
+ * Return true if the cursor has reached EOF.
+ */
+static inline bool
+xlog_cursor_is_eof(const struct xlog_cursor *cursor)
+{
+	return cursor->state == XLOG_CURSOR_EOF;
+}
+
+/**
  * Open cursor from file descriptor
  * @param cursor cursor
  * @param fd file descriptor

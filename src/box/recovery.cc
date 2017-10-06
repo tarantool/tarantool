@@ -139,9 +139,9 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 static inline void
 recovery_close_log(struct recovery *r)
 {
-	if (r->cursor.state == XLOG_CURSOR_CLOSED)
+	if (!xlog_cursor_is_open(&r->cursor))
 		return;
-	if (r->cursor.state == XLOG_CURSOR_EOF) {
+	if (xlog_cursor_is_eof(&r->cursor)) {
 		say_info("done `%s'", r->cursor.name);
 	} else {
 		say_warn("file `%s` wasn't correctly closed",
@@ -158,7 +158,7 @@ recovery_delete(struct recovery *r)
 
 	trigger_destroy(&r->on_close_log);
 	xdir_destroy(&r->wal_dir);
-	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
+	if (xlog_cursor_is_open(&r->cursor)) {
 		/*
 		 * Possible if shutting down a replication
 		 * relay or if error during startup.
@@ -253,9 +253,9 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 	if (scan_dir)
 		xdir_scan_xc(&r->wal_dir);
 
-	if (r->cursor.state != XLOG_CURSOR_CLOSED) {
+	if (xlog_cursor_is_open(&r->cursor)) {
 		/* If there's a WAL open, recover from it first. */
-		assert(r->cursor.state != XLOG_CURSOR_EOF);
+		assert(!xlog_cursor_is_eof(&r->cursor));
 		clock = vclockset_search(&r->wal_dir.index,
 					 &r->cursor.meta.vclock);
 		if (clock != NULL)
@@ -302,7 +302,7 @@ recover_current_wal:
 		recover_xlog(r, stream, stop_vclock);
 	}
 
-	if (r->cursor.state == XLOG_CURSOR_EOF)
+	if (xlog_cursor_is_eof(&r->cursor))
 		recovery_close_log(r);
 
 	if (stop_vclock != NULL && vclock_compare(&r->vclock, stop_vclock) != 0)
@@ -463,10 +463,10 @@ hot_standby_f(va_list ap)
 			 * Sic: end * is < start (is 0) if someone deleted all logs
 			 * on the filesystem.
 			 */
-		} while (end > start && r->cursor.state == XLOG_CURSOR_CLOSED);
+		} while (end > start && !xlog_cursor_is_open(&r->cursor));
 
-		subscription.set_log_path(r->cursor.state != XLOG_CURSOR_CLOSED ?
-					  r->cursor.name: NULL);
+		subscription.set_log_path(xlog_cursor_is_open(&r->cursor) ?
+					  r->cursor.name : NULL);
 
 		bool timed_out = false;
 		if (subscription.events == 0) {
