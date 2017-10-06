@@ -276,6 +276,16 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 			break;
 		}
 
+		if (xlog_cursor_is_eof(&r->cursor) &&
+		    vclock_sum(clock) < vclock_sum(&r->vclock)) {
+			/*
+			 * If we reached EOF while reading last xlog,
+			 * the next xlog to scan must have signature
+			 * equal to the current recovery position.
+			 */
+			continue;
+		}
+
 		if (vclock_compare(clock, &r->vclock) > 0) {
 			/**
 			 * The best clock we could find is
