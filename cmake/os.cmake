@@ -108,6 +108,19 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
                 "guarenteed if built with system CURL")
         endif()
 
+        # Detecting ICU4C
+        execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix icu4c
+            OUTPUT_VARIABLE HOMEBREW_ICU4C
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if (DEFINED HOMEBREW_ICU4C AND EXISTS "${HOMEBREW_ICU4C}")
+            set(ICU_INCLUDE_DIR "${HOMEBREW_ICU4C}/include")
+            set(ICU_LIBRARY_I18N "${HOMEBREW_ICU4C}/lib/libicui18n.dylib")
+            set(ICU_LIBRARY_UC "${HOMEBREW_ICU4C}/lib/libicuuc.dylib")
+            include_directories("${ICU_INCLUDE_DIR}")
+        else()
+            message (FATAL_ERROR "Homebrew's icu4c isn't installed.")
+        endif()
+
     endif()
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
