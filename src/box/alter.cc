@@ -650,7 +650,7 @@ alter_space_commit(struct trigger *trigger, void *event)
 		op->commit(alter, txn->signature);
 	}
 
-	trigger_run(&on_alter_space, alter->new_space);
+	trigger_run_xc(&on_alter_space, alter->new_space);
 
 	alter->new_space = NULL; /* for alter_space_delete(). */
 	/*
@@ -1182,7 +1182,7 @@ on_drop_space_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
-	trigger_run(&on_alter_space, space);
+	trigger_run_xc(&on_alter_space, space);
 	space_delete(space);
 }
 
@@ -1207,7 +1207,7 @@ on_create_space_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
-	trigger_run(&on_alter_space, space);
+	trigger_run_xc(&on_alter_space, space);
 }
 
 /**
@@ -2688,7 +2688,7 @@ on_commit_dd_sequence(struct trigger *trigger, void *event)
 		sequence_cache_delete(alter->old_def->id);
 	}
 
-	trigger_run(&on_alter_sequence, txn_last_stmt(txn));
+	trigger_run_xc(&on_alter_sequence, txn_last_stmt(txn));
 }
 
 /**
@@ -2800,7 +2800,7 @@ static void
 on_commit_dd_space_sequence(struct trigger *trigger, void * /* event */)
 {
 	struct space *space = (struct space *) trigger->data;
-	trigger_run(&on_alter_space, space);
+	trigger_run_xc(&on_alter_space, space);
 }
 
 /**

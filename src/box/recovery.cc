@@ -148,7 +148,7 @@ recovery_close_log(struct recovery *r)
 			 r->cursor.name);
 	}
 	xlog_cursor_close(&r->cursor, false);
-	trigger_run(&r->on_close_log, NULL);
+	trigger_run_xc(&r->on_close_log, NULL);
 }
 
 void

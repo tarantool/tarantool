@@ -92,6 +92,7 @@ set (core_sources
      assoc.c
      util.c
      random.c
+     trigger.cc
  )
 
 if (TARGET_OS_NETBSD)

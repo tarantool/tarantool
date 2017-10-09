@@ -70,14 +70,6 @@ trigger_create(struct trigger *trigger, trigger_f run, void *data,
 }
 
 static inline void
-trigger_run(struct rlist *list, void *event)
-{
-	struct trigger *trigger, *tmp;
-	rlist_foreach_entry_safe(trigger, list, link, tmp)
-		trigger->run(trigger, event);
-}
-
-static inline void
 trigger_add(struct rlist *list, struct trigger *trigger)
 {
 	/*
@@ -120,8 +112,22 @@ trigger_destroy(struct rlist *list)
 			trigger->destroy(trigger);
 	}
 }
+
+int
+trigger_run(struct rlist *list, void *event);
+
 #if defined(__cplusplus)
 } /* extern "C" */
+
+#include "diag.h"
+
+static inline void
+trigger_run_xc(struct rlist *list, void *event)
+{
+	if (trigger_run(list, event) != 0)
+		diag_raise();
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_TRIGGER_H */

@@ -136,7 +136,7 @@ txn_begin_stmt(struct space *space)
 	else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
 		tnt_raise(ClientError, ER_SUB_STMT_MAX);
 
-	trigger_run(&space->on_stmt_begin, txn);
+	trigger_run_xc(&space->on_stmt_begin, txn);
 	struct engine *engine = space->engine;
 	txn_begin_in_engine(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
@@ -177,7 +177,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-		trigger_run(&stmt->space->on_replace, txn);
+		trigger_run_xc(&stmt->space->on_replace, txn);
 	}
 	--txn->in_sub_stmt;
 	if (txn->is_autocommit && txn->in_sub_stmt == 0)
@@ -244,8 +244,12 @@ txn_commit(struct txn *txn)
 		 * may throw. In case an error has happened, there is
 		 * no other option but terminate.
 		 */
-		if (txn->has_triggers)
-			trigger_run(&txn->on_commit, txn);
+		if (txn->has_triggers &&
+		    trigger_run(&txn->on_commit, txn) != 0) {
+			diag_log();
+			unreachable();
+			panic("commit trigger failed");
+		}
 
 		engine_commit(txn->engine, txn);
 	}
@@ -288,8 +292,13 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	if (txn->has_triggers)
-		trigger_run(&txn->on_rollback, txn); /* must not throw. */
+	/* Rollback triggers must not throw. */
+	if (txn->has_triggers &&
+	    trigger_run(&txn->on_rollback, txn) != 0) {
+		diag_log();
+		unreachable();
+		panic("rollback trigger failed");
+	}
 	if (txn->engine)
 		engine_rollback(txn->engine, txn);
 	TRASH(txn);

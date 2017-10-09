@@ -227,7 +227,7 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	 */
 	init_system_space(space);
 
-	trigger_run(&on_alter_space, space);
+	trigger_run_xc(&on_alter_space, space);
 }
 
 uint32_t
