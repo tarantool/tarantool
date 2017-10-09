@@ -30,6 +30,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #if defined(__cplusplus)
 
 #include "engine.h"
@@ -72,84 +76,18 @@ enum memtx_recovery_state {
 /** Memtx extents pool, available to statistics. */
 extern struct mempool memtx_index_extent_pool;
 
-struct memtx_engine: public engine {
-	memtx_engine(const char *snap_dirname, bool force_recovery,
-		     uint64_t tuple_arena_max_size,
-		     uint32_t objsize_min, float alloc_factor);
-	~memtx_engine();
-	virtual struct space *createSpace(struct space_def *def,
-					  struct rlist *key_list) override;
-	virtual void begin(struct txn *txn) override;
-	virtual void rollbackStatement(struct txn *,
-				       struct txn_stmt *stmt) override;
-	virtual void rollback(struct txn *txn) override;
-	virtual void prepare(struct txn *txn) override;
-	virtual void commit(struct txn *txn) override;
-	virtual void bootstrap() override;
-	virtual void beginInitialRecovery(const struct vclock *) override;
-	virtual void beginFinalRecovery() override;
-	virtual void endRecovery() override;
-	virtual void join(struct vclock *vclock,
-			  struct xstream *stream) override;
-	virtual int beginCheckpoint() override;
-	virtual int waitCheckpoint(struct vclock *vclock) override;
-	virtual void commitCheckpoint(struct vclock *vclock) override;
-	virtual void abortCheckpoint() override;
-	virtual int collectGarbage(int64_t lsn) override;
-	virtual int backup(struct vclock *vclock,
-			   engine_backup_cb cb, void *arg) override;
-	/* Update snap_io_rate_limit. */
-	void setSnapIoRateLimit(double new_limit)
-	{
-		m_snap_io_rate_limit = new_limit * 1024 * 1024;
-	}
-	void setMaxTupleSize(size_t max_size);
-	/**
-	 * Return LSN and vclock of the most recent snapshot
-	 * or -1 if there is no snapshot.
-	 */
-	int64_t lastSnapshot(struct vclock *vclock)
-	{
-		return xdir_last_vclock(&m_snap_dir, vclock);
-	}
-	/**
-	 * Return the vclock of the snapshot following the
-	 * given one or NULL if the given snapshot is last.
-	 * Pass NULL to get the oldest snapshot.
-	 */
-	const struct vclock *nextSnapshot(const struct vclock *vclock)
-	{
-		if (vclock == NULL)
-			return vclockset_first(&m_snap_dir.index);
-		return vclockset_next(&m_snap_dir.index,
-				      (struct vclock *)vclock);
-	}
-	/**
-	 * Return the vclock of the snapshot preceding the
-	 * given one or NULL if the given snapshot is oldest.
-	 * Pass NULL to get the newest snapshot.
-	 */
-	const struct vclock *prevSnapshot(const struct vclock *vclock)
-	{
-		if (vclock == NULL)
-			return vclockset_last(&m_snap_dir.index);
-		return vclockset_prev(&m_snap_dir.index,
-				      (struct vclock *)vclock);
-	}
-	void recoverSnapshot(const struct vclock *vclock);
-public:
-	/** Engine recovery state */
-	enum memtx_recovery_state m_state;
-private:
-	void
-	recoverSnapshotRow(struct xrow_header *row);
+struct memtx_engine {
+	struct engine base;
+	/** Engine recovery state. */
+	enum memtx_recovery_state state;
 	/** Non-zero if there is a checkpoint (snapshot) in progress. */
-	struct checkpoint *m_checkpoint;
+	struct checkpoint *checkpoint;
 	/** The directory where to store snapshots. */
-	struct xdir m_snap_dir;
+	struct xdir snap_dir;
 	/** Limit disk usage of checkpointing (bytes per second). */
-	uint64_t m_snap_io_rate_limit;
-	bool m_force_recovery;
+	uint64_t snap_io_rate_limit;
+	/** Skip invalid snapshot records if this flag is set. */
+	bool force_recovery;
 };
 
 struct memtx_engine *

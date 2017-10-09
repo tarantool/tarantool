@@ -171,28 +171,159 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .commit_alter = */ sysview_space_commit_alter,
 };
 
-sysview_engine::sysview_engine()
-	: engine("sysview")
+static void
+sysview_engine_shutdown(struct engine *engine)
 {
+	free(engine);
 }
 
-struct space *
-sysview_engine::createSpace(struct space_def *def, struct rlist *key_list)
+static struct space *
+sysview_engine_create_space(struct engine *engine, struct space_def *def,
+			    struct rlist *key_list)
 {
 	struct space *space = (struct space *)calloc(1, sizeof(*space));
 	if (space == NULL)
 		tnt_raise(OutOfMemory, sizeof(*space),
 			  "malloc", "struct space");
-	if (space_create(space, (struct engine *)this,
-			 &sysview_space_vtab, def, key_list, NULL) != 0) {
+	if (space_create(space, engine, &sysview_space_vtab,
+			 def, key_list, NULL) != 0) {
 		free(space);
 		diag_raise();
 	}
 	return space;
 }
 
+static void
+sysview_engine_begin(struct engine *, struct txn *)
+{
+}
+
+static void
+sysview_engine_begin_statement(struct engine *, struct txn *)
+{
+}
+
+static void
+sysview_engine_prepare(struct engine *, struct txn *)
+{
+}
+
+static void
+sysview_engine_commit(struct engine *, struct txn *)
+{
+}
+
+static void
+sysview_engine_rollback(struct engine *, struct txn *)
+{
+}
+
+static void
+sysview_engine_rollback_statement(struct engine *, struct txn *,
+				  struct txn_stmt *)
+{
+}
+
+static void
+sysview_engine_bootstrap(struct engine *)
+{
+}
+
+static void
+sysview_engine_begin_initial_recovery(struct engine *, const struct vclock *)
+{
+}
+
+static void
+sysview_engine_begin_final_recovery(struct engine *)
+{
+}
+
+static void
+sysview_engine_end_recovery(struct engine *)
+{
+}
+
+static void
+sysview_engine_join(struct engine *, struct vclock *,
+		    struct xstream *)
+{
+}
+
+static int
+sysview_engine_begin_checkpoint(struct engine *)
+{
+	return 0;
+}
+
+static int
+sysview_engine_wait_checkpoint(struct engine *, struct vclock *)
+{
+	return 0;
+}
+
+static void
+sysview_engine_commit_checkpoint(struct engine *, struct vclock *)
+{
+}
+
+static void
+sysview_engine_abort_checkpoint(struct engine *)
+{
+}
+
+static int
+sysview_engine_collect_garbage(struct engine *, int64_t)
+{
+	return 0;
+}
+
+static int
+sysview_engine_backup(struct engine *, struct vclock *,
+		      engine_backup_cb, void *)
+{
+	return 0;
+}
+
+static void
+sysview_engine_check_space_def(struct space_def *)
+{
+}
+
+static const struct engine_vtab sysview_engine_vtab = {
+	/* .shutdown = */ sysview_engine_shutdown,
+	/* .create_space = */ sysview_engine_create_space,
+	/* .join = */ sysview_engine_join,
+	/* .begin = */ sysview_engine_begin,
+	/* .begin_statement = */ sysview_engine_begin_statement,
+	/* .prepare = */ sysview_engine_prepare,
+	/* .commit = */ sysview_engine_commit,
+	/* .rollback_statement = */ sysview_engine_rollback_statement,
+	/* .rollback = */ sysview_engine_rollback,
+	/* .bootstrap = */ sysview_engine_bootstrap,
+	/* .begin_initial_recovery = */ sysview_engine_begin_initial_recovery,
+	/* .begin_final_recovery = */ sysview_engine_begin_final_recovery,
+	/* .end_recovery = */ sysview_engine_end_recovery,
+	/* .begin_checkpoint = */ sysview_engine_begin_checkpoint,
+	/* .wait_checkpoint = */ sysview_engine_wait_checkpoint,
+	/* .commit_checkpoint = */ sysview_engine_commit_checkpoint,
+	/* .abort_checkpoint = */ sysview_engine_abort_checkpoint,
+	/* .collect_garbage = */ sysview_engine_collect_garbage,
+	/* .backup = */ sysview_engine_backup,
+	/* .check_space_def = */ sysview_engine_check_space_def,
+};
+
 struct sysview_engine *
 sysview_engine_new(void)
 {
-	return new sysview_engine();
+	struct sysview_engine *sysview =
+		(struct sysview_engine *)calloc(1, sizeof(*sysview));
+	if (sysview == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*sysview),
+			  "malloc", "struct sysview_engine");
+	}
+
+	sysview->base.vtab = &sysview_engine_vtab;
+	sysview->base.name = "sysview";
+	return sysview;
 }

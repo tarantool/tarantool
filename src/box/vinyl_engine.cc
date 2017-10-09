@@ -56,92 +56,93 @@ vinyl_engine_get_env()
 	return vinyl->env;
 }
 
-vinyl_engine::vinyl_engine(const char *dir, size_t memory, size_t cache,
-			   int read_threads, int write_threads, double timeout)
-	: engine("vinyl")
+static void
+vinyl_engine_shutdown(struct engine *engine)
 {
-	env = vy_env_new(dir, memory, cache, read_threads,
-			 write_threads, timeout);
-	if (env == NULL)
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	vy_env_delete(vinyl->env);
+	free(vinyl);
+}
+
+static void
+vinyl_engine_bootstrap(struct engine *engine)
+{
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	if (vy_bootstrap(vinyl->env) != 0)
 		diag_raise();
 }
 
-vinyl_engine::~vinyl_engine()
+static void
+vinyl_engine_begin_initial_recovery(struct engine *engine,
+				    const struct vclock *recovery_vclock)
 {
-	if (env)
-		vy_env_delete(env);
-}
-
-void
-vinyl_engine::bootstrap()
-{
-	if (vy_bootstrap(env) != 0)
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	if (vy_begin_initial_recovery(vinyl->env, recovery_vclock) != 0)
 		diag_raise();
 }
 
-void
-vinyl_engine::beginInitialRecovery(const struct vclock *recovery_vclock)
+static void
+vinyl_engine_begin_final_recovery(struct engine *engine)
 {
-	if (vy_begin_initial_recovery(env, recovery_vclock) != 0)
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	if (vy_begin_final_recovery(vinyl->env) != 0)
 		diag_raise();
 }
 
-void
-vinyl_engine::beginFinalRecovery()
+static void
+vinyl_engine_end_recovery(struct engine *engine)
 {
-	if (vy_begin_final_recovery(env) != 0)
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	if (vy_end_recovery(vinyl->env) != 0)
 		diag_raise();
 }
 
-void
-vinyl_engine::endRecovery()
+static struct space *
+vinyl_engine_create_space(struct engine *engine, struct space_def *def,
+			  struct rlist *key_list)
 {
-	/* complete two-phase recovery */
-	if (vy_end_recovery(env) != 0)
-		diag_raise();
-}
-
-struct space *
-vinyl_engine::createSpace(struct space_def *def, struct rlist *key_list)
-{
-	struct space *space = vinyl_space_new(this, def, key_list);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	struct space *space = vinyl_space_new(vinyl, def, key_list);
 	if (space == NULL)
 		diag_raise();
 	return space;
 }
 
-void
-vinyl_engine::join(struct vclock *vclock, struct xstream *stream)
+static void
+vinyl_engine_join(struct engine *engine, struct vclock *vclock,
+		  struct xstream *stream)
 {
-	if (vy_join(env, vclock, stream) != 0)
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	if (vy_join(vinyl->env, vclock, stream) != 0)
 		diag_raise();
 }
 
-
-void
-vinyl_engine::begin(struct txn *txn)
+static void
+vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	assert(txn->engine_tx == NULL);
-	txn->engine_tx = vy_begin(env);
+	txn->engine_tx = vy_begin(vinyl->env);
 	if (txn->engine_tx == NULL)
 		diag_raise();
 }
 
-void
-vinyl_engine::beginStatement(struct txn *txn)
+static void
+vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
-	assert(txn != NULL);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	struct vy_tx *tx = (struct vy_tx *)(txn->engine_tx);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	stmt->engine_savepoint = vy_savepoint(env, tx);
+	stmt->engine_savepoint = vy_savepoint(vinyl->env, tx);
 }
 
-void
-vinyl_engine::prepare(struct txn *txn)
+static void
+vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 {
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 
-	if (vy_prepare(env, tx))
+	if (vy_prepare(vinyl->env, tx))
 		diag_raise();
 }
 
@@ -156,28 +157,30 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 	stmt->new_tuple = NULL;
 }
 
-void
-vinyl_engine::commit(struct txn *txn)
+static void
+vinyl_engine_commit(struct engine *engine, struct txn *txn)
 {
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		txn_stmt_unref_tuples(stmt);
 	}
 	if (tx) {
-		vy_commit(env, tx, txn->signature);
+		vy_commit(vinyl->env, tx, txn->signature);
 		txn->engine_tx = NULL;
 	}
 }
 
-void
-vinyl_engine::rollback(struct txn *txn)
+static void
+vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 {
 	if (txn->engine_tx == NULL)
 		return;
 
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
-	vy_rollback(env, tx);
+	vy_rollback(vinyl->env, tx);
 	txn->engine_tx = NULL;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
@@ -185,68 +188,62 @@ vinyl_engine::rollback(struct txn *txn)
 	}
 }
 
-void
-vinyl_engine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
+static void
+vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
+				struct txn_stmt *stmt)
 {
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	txn_stmt_unref_tuples(stmt);
-	vy_rollback_to_savepoint(env, (struct vy_tx *)txn->engine_tx,
+	vy_rollback_to_savepoint(vinyl->env, (struct vy_tx *)txn->engine_tx,
 				 stmt->engine_savepoint);
 }
 
-
-int
-vinyl_engine::beginCheckpoint()
+static int
+vinyl_engine_begin_checkpoint(struct engine *engine)
 {
-	return vy_begin_checkpoint(env);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	return vy_begin_checkpoint(vinyl->env);
 }
 
-int
-vinyl_engine::waitCheckpoint(struct vclock *vclock)
+static int
+vinyl_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
 {
-	return vy_wait_checkpoint(env, vclock);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	return vy_wait_checkpoint(vinyl->env, vclock);
 }
 
-void
-vinyl_engine::commitCheckpoint(struct vclock *vclock)
+static void
+vinyl_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
 {
-	vy_commit_checkpoint(env, vclock);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	vy_commit_checkpoint(vinyl->env, vclock);
 }
 
-void
-vinyl_engine::abortCheckpoint()
+static void
+vinyl_engine_abort_checkpoint(struct engine *engine)
 {
-	vy_abort_checkpoint(env);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	vy_abort_checkpoint(vinyl->env);
 }
 
-int
-vinyl_engine::collectGarbage(int64_t lsn)
+static int
+vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 {
-	vy_collect_garbage(env, lsn);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	vy_collect_garbage(vinyl->env, lsn);
 	return 0;
 }
 
-int
-vinyl_engine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
+static int
+vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
+		    engine_backup_cb cb, void *arg)
 {
-	return vy_backup(env, vclock, cb, arg);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	return vy_backup(vinyl->env, vclock, cb, arg);
 }
 
-void
-vinyl_engine::setMaxTupleSize(size_t max_size)
-{
-	if (vy_set_max_tuple_size(env, max_size) != 0)
-		diag_raise();
-}
-
-void
-vinyl_engine::setTimeout(double timeout)
-{
-	if (vy_set_timeout(env, timeout) != 0)
-		diag_raise();
-}
-
-void
-vinyl_engine::checkSpaceDef(struct space_def *def)
+static void
+vinyl_engine_check_space_def(struct space_def *def)
 {
 	if (def->opts.temporary) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
@@ -254,22 +251,62 @@ vinyl_engine::checkSpaceDef(struct space_def *def)
 	}
 }
 
+static const struct engine_vtab vinyl_engine_vtab = {
+	/* .shutdown = */ vinyl_engine_shutdown,
+	/* .create_space = */ vinyl_engine_create_space,
+	/* .join = */ vinyl_engine_join,
+	/* .begin = */ vinyl_engine_begin,
+	/* .begin_statement = */ vinyl_engine_begin_statement,
+	/* .prepare = */ vinyl_engine_prepare,
+	/* .commit = */ vinyl_engine_commit,
+	/* .rollback_statement = */ vinyl_engine_rollback_statement,
+	/* .rollback = */ vinyl_engine_rollback,
+	/* .bootstrap = */ vinyl_engine_bootstrap,
+	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
+	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
+	/* .end_recovery = */ vinyl_engine_end_recovery,
+	/* .begin_checkpoint = */ vinyl_engine_begin_checkpoint,
+	/* .wait_checkpoint = */ vinyl_engine_wait_checkpoint,
+	/* .commit_checkpoint = */ vinyl_engine_commit_checkpoint,
+	/* .abort_checkpoint = */ vinyl_engine_abort_checkpoint,
+	/* .collect_garbage = */ vinyl_engine_collect_garbage,
+	/* .backup = */ vinyl_engine_backup,
+	/* .check_space_def = */ vinyl_engine_check_space_def,
+};
+
 struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory, size_t cache,
 		 int read_threads, int write_threads, double timeout)
 {
-	return new vinyl_engine(dir, memory, cache, read_threads,
+	struct vinyl_engine *vinyl =
+		(struct vinyl_engine *)calloc(1, sizeof(*vinyl));
+	if (vinyl == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*vinyl),
+			  "malloc", "struct vinyl_engine");
+	}
+
+	vinyl->env = vy_env_new(dir, memory, cache, read_threads,
 				write_threads, timeout);
+	if (vinyl->env == NULL) {
+		free(vinyl);
+		diag_raise();
+	}
+
+	vinyl->base.vtab = &vinyl_engine_vtab;
+	vinyl->base.name = "vinyl";
+	return vinyl;
 }
 
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
 {
-	vinyl->setMaxTupleSize(max_size);
+	if (vy_set_max_tuple_size(vinyl->env, max_size) != 0)
+		diag_raise();
 }
 
 void
 vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout)
 {
-	vinyl->setTimeout(timeout);
+	if (vy_set_timeout(vinyl->env, timeout) != 0)
+		diag_raise();
 }

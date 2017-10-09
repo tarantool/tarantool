@@ -30,40 +30,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stddef.h>
+
 #include "engine.h"
 
 struct vy_env;
 
-struct vinyl_engine: public engine {
-	vinyl_engine(const char *dir, size_t memory, size_t cache,
-		     int read_threads, int write_threads, double timeout);
-	~vinyl_engine();
-	virtual struct space *createSpace(struct space_def *def,
-					  struct rlist *key_list) override;
-	virtual void beginStatement(struct txn *txn) override;
-	virtual void begin(struct txn *txn) override;
-	virtual void prepare(struct txn *txn) override;
-	virtual void commit(struct txn *txn) override;
-	virtual void rollback(struct txn *txn) override;
-	virtual void rollbackStatement(struct txn *txn,
-				       struct txn_stmt *stmt) override;
-	virtual void bootstrap() override;
-	virtual void beginInitialRecovery(const struct vclock *) override;
-	virtual void beginFinalRecovery() override;
-	virtual void endRecovery() override;
-	virtual void join(struct vclock *vclock,
-			  struct xstream *stream) override;
-	virtual int beginCheckpoint() override;
-	virtual int waitCheckpoint(struct vclock *vclock) override;
-	virtual void commitCheckpoint(struct vclock *vclock) override;
-	virtual void abortCheckpoint() override;
-	virtual int collectGarbage(int64_t lsn) override;
-	virtual int backup(struct vclock *vclock,
-			   engine_backup_cb cb, void *arg) override;
-	void setMaxTupleSize(size_t max_size);
-	void setTimeout(double timeout);
-	virtual void checkSpaceDef(struct space_def *def) override;
-public:
+struct vinyl_engine {
+	struct engine base;
 	struct vy_env *env;
 };
 

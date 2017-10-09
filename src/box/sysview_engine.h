@@ -32,11 +32,8 @@
  */
 #include "engine.h"
 
-struct sysview_engine: public engine {
-public:
-	sysview_engine();
-	virtual struct space *createSpace(struct space_def *def,
-					  struct rlist *key_list) override;
+struct sysview_engine {
+	struct engine base;
 };
 
 struct sysview_engine *

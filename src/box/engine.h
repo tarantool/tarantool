@@ -30,13 +30,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
+#include <stdint.h>
+#include <small/rlist.h>
 
-struct request;
+#include "error.h"
+
+struct engine;
+struct txn;
+struct txn_stmt;
 struct space;
-struct tuple;
-struct relay;
+struct space_def;
 struct vclock;
+struct xstream;
 
 extern struct rlist engines;
 
@@ -45,21 +50,17 @@ engine_backup_cb(const char *path, void *arg);
 
 #if defined(__cplusplus)
 
-/** Engine instance */
-struct engine {
-public:
-	engine(const char *engine_name);
-
-	engine(const engine &) = delete;
-	engine& operator=(const engine&) = delete;
-	virtual ~engine() {}
+struct engine_vtab {
+	/** Destroy an engine instance. */
+	void (*shutdown)(struct engine *);
 	/** Allocate a new space instance. */
-	virtual struct space *createSpace(struct space_def *def,
-					  struct rlist *key_list) = 0;
+	struct space *(*create_space)(struct engine *engine,
+			struct space_def *def, struct rlist *key_list);
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
-	virtual void join(struct vclock *vclock, struct xstream *stream);
+	void (*join)(struct engine *engine, struct vclock *vclock,
+		     struct xstream *stream);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -67,73 +68,75 @@ public:
 	 * transaction in the engine begins with the first
 	 * statement.
 	 */
-	virtual void begin(struct txn *);
+	void (*begin)(struct engine *, struct txn *);
 	/**
 	 * Begine one statement in existing transaction.
 	 */
-	virtual void beginStatement(struct txn *);
+	void (*begin_statement)(struct engine *, struct txn *);
 	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
 	 */
-	virtual void prepare(struct txn *);
+	void (*prepare)(struct engine *, struct txn *);
 	/**
 	 * End the transaction in the engine, the transaction
 	 * has been successfully written to the WAL.
 	 * This method can't throw: if any error happens here,
 	 * there is no better option than panic.
 	 */
-	virtual void commit(struct txn *);
+	void (*commit)(struct engine *, struct txn *);
 	/*
 	 * Called to roll back effects of a statement if an
 	 * error happens, e.g., in a trigger.
 	 */
-	virtual void rollbackStatement(struct txn *, struct txn_stmt *);
+	void (*rollback_statement)(struct engine *, struct txn *,
+				   struct txn_stmt *);
 	/*
 	 * Roll back and end the transaction in the engine.
 	 */
-	virtual void rollback(struct txn *);
+	void (*rollback)(struct engine *, struct txn *);
 	/**
 	 * Bootstrap an empty data directory
 	 */
-	virtual void bootstrap();
+	void (*bootstrap)(struct engine *);
 	/**
 	 * Begin initial recovery from checkpoint or dirty disk data.
 	 * On local recovery @recovery_vclock points to the vclock
 	 * used for assigning LSNs to statements replayed from WAL.
 	 * On remote recovery, it is set to NULL.
 	 */
-	virtual void beginInitialRecovery(const struct vclock *recovery_vclock);
+	void (*begin_initial_recovery)(struct engine *engine,
+			const struct vclock *recovery_vclock);
 	/**
 	 * Notify engine about a start of recovering from WALs
 	 * that could be local WALs during local recovery
 	 * of WAL catch up durin join on slave side
 	 */
-	virtual void beginFinalRecovery();
+	void (*begin_final_recovery)(struct engine *);
 	/**
 	 * Inform the engine about the end of recovery from the
 	 * binary log.
 	 */
-	virtual void endRecovery();
+	void (*end_recovery)(struct engine *);
 	/**
 	 * Begin a two-phase checkpoint creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 * Must not yield.
 	 */
-	virtual int beginCheckpoint();
+	int (*begin_checkpoint)(struct engine *);
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
-	virtual int waitCheckpoint(struct vclock *vclock);
+	int (*wait_checkpoint)(struct engine *, struct vclock *);
 	/**
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
 	 */
-	virtual void commitCheckpoint(struct vclock *vclock);
+	void (*commit_checkpoint)(struct engine *, struct vclock *);
 	/**
 	 * An error in one of the engines, abort checkpoint.
 	 */
-	virtual void abortCheckpoint();
+	void (*abort_checkpoint)(struct engine *);
 	/**
 	 * Remove files that are not needed to recover
 	 * from checkpoint with @lsn or newer.
@@ -146,23 +149,26 @@ public:
 	 * fails to delete a snapshot file, because we recover
 	 * checkpoint list by scanning the snapshot directory.
 	 */
-	virtual int collectGarbage(int64_t lsn);
+	int (*collect_garbage)(struct engine *engine, int64_t lsn);
 	/**
 	 * Backup callback. It is supposed to call @cb for each file
 	 * that needs to be backed up in order to restore from the
 	 * checkpoint @vclock.
 	 */
-	virtual int backup(struct vclock *vclock,
-			   engine_backup_cb cb, void *cb_arg);
-
+	int (*backup)(struct engine *engine, struct vclock *vclock,
+		      engine_backup_cb cb, void *cb_arg);
 	/**
 	 * Check definition of a new space for engine-specific
 	 * limitations. E.g. not all engines support temporary
 	 * tables.
 	 */
-	virtual void checkSpaceDef(struct space_def *def);
-public:
-	/** Name of the engine. */
+	void (*check_space_def)(struct space_def *);
+};
+
+struct engine {
+	/** Virtual function table. */
+	const struct engine_vtab *vtab;
+	/** Engine name. */
 	const char *name;
 	/** Engine id. */
 	uint32_t id;
@@ -194,50 +200,50 @@ static inline struct space *
 engine_create_space(struct engine *engine, struct space_def *def,
 		    struct rlist *key_list)
 {
-	return engine->createSpace(def, key_list);
+	return engine->vtab->create_space(engine, def, key_list);
 }
 
 static inline void
 engine_begin(struct engine *engine, struct txn *txn)
 {
-	engine->begin(txn);
+	engine->vtab->begin(engine, txn);
 }
 
 static inline void
 engine_begin_statement(struct engine *engine, struct txn *txn)
 {
-	engine->beginStatement(txn);
+	engine->vtab->begin_statement(engine, txn);
 }
 
 static inline void
 engine_prepare(struct engine *engine, struct txn *txn)
 {
-	engine->prepare(txn);
+	engine->vtab->prepare(engine, txn);
 }
 
 static inline void
 engine_commit(struct engine *engine, struct txn *txn)
 {
-	engine->commit(txn);
+	engine->vtab->commit(engine, txn);
 }
 
 static inline void
 engine_rollback_statement(struct engine *engine, struct txn *txn,
 			  struct txn_stmt *stmt)
 {
-	engine->rollbackStatement(txn, stmt);
+	engine->vtab->rollback_statement(engine, txn, stmt);
 }
 
 static inline void
 engine_rollback(struct engine *engine, struct txn *txn)
 {
-	engine->rollback(txn);
+	engine->vtab->rollback(engine, txn);
 }
 
 static inline void
 engine_check_space_def(struct engine *engine, struct space_def *def)
 {
-	engine->checkSpaceDef(def);
+	engine->vtab->check_space_def(def);
 }
 
 /** Shutdown all engine factories. */

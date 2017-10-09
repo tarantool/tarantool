@@ -42,7 +42,7 @@ checkpoint_last(struct vclock *vclock)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	return memtx->lastSnapshot(vclock);
+	return xdir_last_vclock(&memtx->snap_dir, vclock);
 }
 
 const struct vclock *
@@ -51,7 +51,10 @@ checkpoint_iterator_next(struct checkpoint_iterator *it)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	it->curr = memtx->nextSnapshot(it->curr);
+	it->curr = it->curr == NULL ?
+		vclockset_first(&memtx->snap_dir.index) :
+		vclockset_next(&memtx->snap_dir.index,
+			       (struct vclock *)it->curr);
 	return it->curr;
 }
 
@@ -61,6 +64,9 @@ checkpoint_iterator_prev(struct checkpoint_iterator *it)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	it->curr = memtx->prevSnapshot(it->curr);
+	it->curr = it->curr == NULL ?
+		vclockset_last(&memtx->snap_dir.index) :
+		vclockset_prev(&memtx->snap_dir.index,
+			       (struct vclock *)it->curr);
 	return it->curr;
 }
