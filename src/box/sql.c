@@ -893,10 +893,21 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 {
 	struct Column *aCol = pTable->aCol;
 	const struct Enc *enc = get_enc(buf);
+	struct SqliteIndex *pk_idx = sqlite3PrimaryKeyIndex(pTable);
+	int pk_forced_int = -1;
 	char *base = buf, *p;
 	int i, n = pTable->nCol;
 
 	p = enc->encode_array(base, n);
+
+	/* If table's PK is single column which is INTEGER, then
+	 * treat it as strict type, not affinity.  */
+	if (pk_idx && pk_idx->nKeyCol == 1) {
+		int pk = pk_idx->aiColumn[0];
+		if (pTable->aCol[pk].affinity == 'D')
+			pk_forced_int = pk;
+	}
+
 	for (i = 0; i < n; i++) {
 		const char *t;
 
@@ -904,8 +915,12 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
-		t = aCol[i].affinity == SQLITE_AFF_BLOB ? "scalar" :
-			convertSqliteAffinity(aCol[i].affinity, aCol[i].notNull == 0);
+		if (i == pk_forced_int) {
+			t = "integer";
+		} else {
+			t = aCol[i].affinity == SQLITE_AFF_BLOB ? "scalar" :
+				convertSqliteAffinity(aCol[i].affinity, aCol[i].notNull == 0);
+		}
 		p = enc->encode_str(p, t, strlen(t));
 	}
 	return (int)(p - base);
@@ -941,7 +956,20 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 {
 	struct Column *aCol = pIndex->pTable->aCol;
 	const struct Enc *enc = get_enc(buf);
+	struct SqliteIndex *primary_index;
 	char *base = buf, *p;
+	int pk_forced_int = -1;
+
+	primary_index = sqlite3PrimaryKeyIndex(pIndex->pTable);
+
+	/* If table's PK is single column which is INTEGER, then
+	 * treat it as strict type, not affinity.  */
+	if (primary_index->nKeyCol == 1) {
+		int pk = primary_index->aiColumn[0];
+		if (aCol[pk].affinity == 'D')
+			pk_forced_int = pk;
+	}
+
 	/* gh-2187
 	 *
 	 * Include all index columns, i.e. "key" columns followed by the
@@ -953,7 +981,11 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	p = enc->encode_array(base, n);
 	for (i = 0; i < n; i++) {
 		int col = pIndex->aiColumn[i];
-		const char *t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
+		const char *t;
+		if (pk_forced_int == col)
+			t = "integer";
+		else
+			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
 
 		p = enc->encode_array(p, 2),
 		p = enc->encode_uint(p, col);

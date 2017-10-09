@@ -47,7 +47,7 @@ static int whereLoopResize(sqlite3 *, WhereLoop *, int);
 
 /* Test variable that can be set to enable WHERE tracing */
 #if defined(SQLITE_TEST) || defined(SQLITE_DEBUG)
-/***/ int sqlite3WhereTrace = 0;
+/***/ int sqlite3WhereTrace = 0; /* -1; */
 #endif
 
 /*

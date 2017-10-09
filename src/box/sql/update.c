@@ -460,15 +460,15 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	/* Top of the update loop */
 	if (okOnePass) {
+		labelContinue = labelBreak;
+		sqlite3VdbeAddOp2(v, OP_IsNull, pPk ? regKey : regOldRowid,
+				  labelBreak);
 		if (aToOpen[iDataCur - iBaseCur] && !isView) {
 			assert(pPk);
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur,
 					     labelBreak, regKey, nKey);
 			VdbeCoverageNeverTaken(v);
 		}
-		labelContinue = labelBreak;
-		sqlite3VdbeAddOp2(v, OP_IsNull, pPk ? regKey : regOldRowid,
-				  labelBreak);
 		VdbeCoverageIf(v, pPk == 0);
 		VdbeCoverageIf(v, pPk != 0);
 	} else if (pPk) {

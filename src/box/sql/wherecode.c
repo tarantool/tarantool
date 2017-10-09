@@ -1438,6 +1438,10 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		char *zEndAff = 0;	/* Affinity for end of range constraint */
 		u8 bSeekPastNull = 0;	/* True to seek past initial nulls */
 		u8 bStopAtNull = 0;	/* Add condition to terminate at NULLs */
+		int force_integer_reg = -1;  /* If non-negative: number of
+					      * column which must be converted
+					      * to integer type, used for IPK.
+					      */
 
 		pIdx = pLoop->pIndex;
 		iIdxCur = pLevel->iIdxCur;
@@ -1563,6 +1567,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		if (pRangeStart) {
 			Expr *pRight = pRangeStart->pExpr->pRight;
 			codeExprOrVector(pParse, pRight, regBase + nEq, nBtm);
+
 			whereLikeOptimizationStringFixup(v, pLevel,
 							 pRangeStart);
 			if ((pRangeStart->wtFlags & TERM_VNULL) == 0
@@ -1571,6 +1576,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						  addrNxt);
 				VdbeCoverage(v);
 			}
+
 			if (zStartAff) {
 				updateRangeAffinityStr(pRight, nBtm,
 						       &zStartAff[nEq]);
@@ -1589,6 +1595,31 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			startEq = 0;
 			start_constraints = 1;
 		}
+		if (!HasRowid(pIdx->pTable)) {
+			struct Index *pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
+			assert(pk);
+			if (pk->nKeyCol == 1
+			    && pIdx->pTable->aCol[pk->aiColumn[0]].affinity == 'D') {
+				/* Right now INTEGER PRIMARY KEY is the only option to
+				 * get Tarantool's INTEGER column type. Need special handling
+				 * here: try to loosely convert FLOAT to INT. If RHS type
+				 * is not INT or FLOAT - skip this ites, i.e. goto addrNxt.
+				 */
+				int limit = pRangeStart == NULL ? nEq : nEq + 1;
+				for (int i = 0; i < limit; i++) {
+					if (pIdx->aiColumn[i] == pk->aiColumn[0]) {
+						/* Here: we know for sure that table has INTEGER
+						   PRIMARY KEY, single column, and Index we're
+						   trying to use for scan contains this column. */
+						if (i < nEq)
+							sqlite3VdbeAddOp2(v, OP_MustBeInt, regBase + i, addrNxt);
+						else
+							force_integer_reg = regBase + i;
+						break;
+					}
+				}
+			}
+		}
 		codeApplyAffinity(pParse, regBase, nConstraint - bSeekPastNull,
 				  zStartAff);
 		if (pLoop->nSkip > 0 && nConstraint == pLoop->nSkip) {
@@ -1602,6 +1633,14 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			assert(op != 0);
 			sqlite3VdbeAddOp4Int(v, op, iIdxCur, addrNxt, regBase,
 					     nConstraint);
+			/* If this is Seek* opcode, and IPK is detected in the
+			 * constraints vector: force it to be integer.
+			 */
+			if ((op == OP_SeekGE || op == OP_SeekGT
+			    || op == OP_SeekLE || op == OP_SeekLT)
+			    && force_integer_reg > 0) {
+				sqlite3VdbeChangeP5(v, force_integer_reg);
+			}
 			VdbeCoverage(v);
 			VdbeCoverageIf(v, op == OP_Rewind);
 			testcase(op == OP_Rewind);

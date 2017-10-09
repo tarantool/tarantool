@@ -1734,6 +1734,16 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		}
 
 		if (!HasRowid(pTab) && IsPrimaryKeyIndex(pIdx)) {
+			/* If PK is marked as INTEGER, use it as strict type,
+			 * not as affinity. Emit code for type checking */
+			if (pIdx->nKeyCol == 1) {
+				int pk = pIdx->aiColumn[0];
+				if (pTab->zColAff[pk] == 'D') {
+					sqlite3VdbeAddOp2(v, OP_MustBeInt,
+							  regNewData + 1 + pk,
+							  0);
+				}
+			}
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
 					  pTab->nCol, aRegIdx[ix]);
 		} else {

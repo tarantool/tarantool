@@ -3626,7 +3626,7 @@ case OP_ColumnsUsed: {
 }
 #endif
 
-/* Opcode: SeekGE P1 P2 P3 P4 *
+/* Opcode: SeekGE P1 P2 P3 P4 P5
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -3649,9 +3649,12 @@ case OP_ColumnsUsed: {
  * from the beginning toward the end.  In other words, the cursor is
  * configured to use Next, not Prev.
  *
+ * If P5 is not zero, than it is offset of IPK in input vector. Force
+ * corresponding value to be INTEGER.
+ *
  * See also: Found, NotFound, SeekLt, SeekGt, SeekLe
  */
-/* Opcode: SeekGT P1 P2 P3 P4 *
+/* Opcode: SeekGT P1 P2 P3 P4 P5
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -3667,9 +3670,12 @@ case OP_ColumnsUsed: {
  * from the beginning toward the end.  In other words, the cursor is
  * configured to use Next, not Prev.
  *
+ * If P5 is not zero, than it is offset of IPK in input vector. Force
+ * corresponding value to be INTEGER.
+ *
  * See also: Found, NotFound, SeekLt, SeekGe, SeekLe
  */
-/* Opcode: SeekLT P1 P2 P3 P4 *
+/* Opcode: SeekLT P1 P2 P3 P4 P5
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -3685,9 +3691,12 @@ case OP_ColumnsUsed: {
  * from the end toward the beginning.  In other words, the cursor is
  * configured to use Prev, not Next.
  *
+ * If P5 is not zero, than it is offset of IPK in input vector. Force
+ * corresponding value to be INTEGER.
+ *
  * See also: Found, NotFound, SeekGt, SeekGe, SeekLe
  */
-/* Opcode: SeekLE P1 P2 P3 P4 *
+/* Opcode: SeekLE P1 P2 P3 P4 P5
  * Synopsis: key=r[P3@P4]
  *
  * If cursor P1 refers to an SQL table (B-Tree that uses integer keys),
@@ -3721,8 +3730,9 @@ case OP_SeekGT: {       /* jump, in3 */
 	VdbeCursor *pC;    /* The cursor to seek */
 	UnpackedRecord r;  /* The key to seek for */
 	int nField;        /* Number of columns or fields in the key */
-	i64 iKey;          /* The rowid we are to seek to */
+	i64 iKey;          /* The id we are to seek to */
 	int eqOnly;        /* Only interested in == results */
+	int reg_ipk=0;     /* Register number which holds IPK. */
 
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	assert(pOp->p2!=0);
@@ -3740,17 +3750,17 @@ case OP_SeekGT: {       /* jump, in3 */
 #ifdef SQLITE_DEBUG
 	pC->seekOp = pOp->opcode;
 #endif
+	reg_ipk = pOp->p5;
+	if (pC->isTable)
+		reg_ipk = pOp->p3;
 
-	if (pC->isTable) {
-		/* The BTREE_SEEK_EQ flag is only set on index cursors */
-		assert(sqlite3BtreeCursorHasHint(pC->uc.pCursor, BTREE_SEEK_EQ)==0
-		       || CORRUPT_DB);
+	if (reg_ipk > 0) {
 
 		/* The input value in P3 might be of any type: integer, real, string,
 		 * blob, or NULL.  But it needs to be an integer before we can do
 		 * the seek, so convert it.
 		 */
-		pIn3 = &aMem[pOp->p3];
+		pIn3 = &aMem[reg_ipk];
 		if ((pIn3->flags & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
 			applyNumericAffinity(pIn3, 0);
 		}
@@ -3792,6 +3802,12 @@ case OP_SeekGT: {       /* jump, in3 */
 				if ((oc & 0x0001)==(OP_SeekLT & 0x0001)) oc++;
 			}
 		}
+	}
+	if (pC->isTable) {
+		/* The BTREE_SEEK_EQ flag is only set on index cursors */
+		assert(sqlite3BtreeCursorHasHint(pC->uc.pCursor, BTREE_SEEK_EQ)==0
+		       || CORRUPT_DB);
+		assert(reg_ipk);
 		rc = sqlite3BtreeMovetoUnpacked(pC->uc.pCursor, 0, (u64)iKey, 0, &res);
 		pC->movetoTarget = iKey;  /* Used by OP_Delete */
 		if (rc!=SQLITE_OK) {
@@ -3817,6 +3833,11 @@ case OP_SeekGT: {       /* jump, in3 */
 		assert(nField>0);
 		r.pKeyInfo = pC->pKeyInfo;
 		r.nField = (u16)nField;
+
+		if (reg_ipk > 0) {
+			aMem[reg_ipk].u.i = iKey;
+			aMem[reg_ipk].flags = MEM_Int;
+		}
 
 		r.default_rc = ((1 & (oc - OP_SeekLT)) ? -1 : +1);
 		assert(oc!=OP_SeekGT || r.default_rc==-1);

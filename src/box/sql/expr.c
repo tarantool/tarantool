@@ -2899,6 +2899,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			 * is used.
 			 */
 			pExpr->iTable = pParse->nTab++;
+			pExpr->is_ephemeral = 1;
 			addr = sqlite3VdbeAddOp2(v, OP_OpenEphemeral,
 						 pExpr->iTable,
 						 (isRowid ? 0 : nVal));
@@ -3359,6 +3360,25 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	} else {
 		sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff,
 				  nVector);
+		if ((pExpr->flags & EP_xIsSelect)
+		    && !pExpr->is_ephemeral) {
+			struct SrcList *src_list = pExpr->x.pSelect->pSrc;
+			assert(src_list->nSrc == 1);
+
+			struct Table *tab = src_list->a[0].pTab;
+			assert(tab != NULL);
+
+			struct Index *pk = sqlite3PrimaryKeyIndex(tab);
+			assert(pk);
+
+			if (pk->nKeyCol == 1
+			    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
+			    && pk->aiColumn[0] < nVector) {
+				int reg_pk = rLhs + pk->aiColumn[0];
+				sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
+			}
+
+		}
 		if (destIfFalse == destIfNull) {
 			/* Combine Step 3 and Step 5 into a single opcode */
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
