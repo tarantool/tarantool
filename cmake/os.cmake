@@ -108,6 +108,16 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
                 "guarenteed if built with system CURL")
         endif()
 
+        # Detecting ICU4C
+        if (NOT DEFINED ICU_ROOT)
+            execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix icu4c
+                OUTPUT_VARIABLE HOMEBREW_ICU4C
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (HOMEBREW_ICU4C)
+                message(STATUS "Setting ICU root to ${HOMEBREW_ICU4C}")
+                set(ICU_ROOT ${HOMEBREW_ICU4C})
+            endif()
+        endif()
     endif()
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")

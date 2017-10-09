@@ -11,6 +11,7 @@ include_directories(${READLINE_INCLUDE_DIRS})
 include_directories(${LIBYAML_INCLUDE_DIRS})
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
+include_directories(${ICU_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})

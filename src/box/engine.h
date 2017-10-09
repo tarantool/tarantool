@@ -49,7 +49,7 @@ struct field_def;
 struct tuple_format;
 
 /** Engine instance */
-class Engine {
+struct Engine {
 public:
 	Engine(const char *engine_name);
 
