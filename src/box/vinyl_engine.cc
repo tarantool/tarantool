@@ -64,37 +64,33 @@ vinyl_engine_shutdown(struct engine *engine)
 	free(vinyl);
 }
 
-static void
+static int
 vinyl_engine_bootstrap(struct engine *engine)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	if (vy_bootstrap(vinyl->env) != 0)
-		diag_raise();
+	return vy_bootstrap(vinyl->env);
 }
 
-static void
+static int
 vinyl_engine_begin_initial_recovery(struct engine *engine,
 				    const struct vclock *recovery_vclock)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	if (vy_begin_initial_recovery(vinyl->env, recovery_vclock) != 0)
-		diag_raise();
+	return vy_begin_initial_recovery(vinyl->env, recovery_vclock);
 }
 
-static void
+static int
 vinyl_engine_begin_final_recovery(struct engine *engine)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	if (vy_begin_final_recovery(vinyl->env) != 0)
-		diag_raise();
+	return vy_begin_final_recovery(vinyl->env);
 }
 
-static void
+static int
 vinyl_engine_end_recovery(struct engine *engine)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	if (vy_end_recovery(vinyl->env) != 0)
-		diag_raise();
+	return vy_end_recovery(vinyl->env);
 }
 
 static struct space *
@@ -102,48 +98,44 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 			  struct rlist *key_list)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	struct space *space = vinyl_space_new(vinyl, def, key_list);
-	if (space == NULL)
-		diag_raise();
-	return space;
+	return vinyl_space_new(vinyl, def, key_list);
 }
 
-static void
+static int
 vinyl_engine_join(struct engine *engine, struct vclock *vclock,
 		  struct xstream *stream)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	if (vy_join(vinyl->env, vclock, stream) != 0)
-		diag_raise();
+	return vy_join(vinyl->env, vclock, stream);
 }
 
-static void
+static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	assert(txn->engine_tx == NULL);
 	txn->engine_tx = vy_begin(vinyl->env);
 	if (txn->engine_tx == NULL)
-		diag_raise();
+		return -1;
+	return 0;
 }
 
-static void
+static int
 vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	struct vy_tx *tx = (struct vy_tx *)(txn->engine_tx);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	stmt->engine_savepoint = vy_savepoint(vinyl->env, tx);
+	return 0;
 }
 
-static void
+static int
 vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
-
-	if (vy_prepare(vinyl->env, tx))
-		diag_raise();
+	return vy_prepare(vinyl->env, tx);
 }
 
 static inline void
@@ -242,13 +234,15 @@ vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
 	return vy_backup(vinyl->env, vclock, cb, arg);
 }
 
-static void
+static int
 vinyl_engine_check_space_def(struct space_def *def)
 {
 	if (def->opts.temporary) {
-		tnt_raise(ClientError, ER_ALTER_SPACE,
-			  def->name, "engine does not support temporary flag");
+		diag_set(ClientError, ER_ALTER_SPACE,
+			 def->name, "engine does not support temporary flag");
+		return -1;
 	}
+	return 0;
 }
 
 static const struct engine_vtab vinyl_engine_vtab = {
@@ -275,21 +269,22 @@ static const struct engine_vtab vinyl_engine_vtab = {
 };
 
 struct vinyl_engine *
-vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
-		    int read_threads, int write_threads, double timeout)
+vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+		 int read_threads, int write_threads, double timeout)
 {
 	struct vinyl_engine *vinyl =
 		(struct vinyl_engine *)calloc(1, sizeof(*vinyl));
 	if (vinyl == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*vinyl),
-			  "malloc", "struct vinyl_engine");
+		diag_set(OutOfMemory, sizeof(*vinyl),
+			 "malloc", "struct vinyl_engine");
+		return NULL;
 	}
 
 	vinyl->env = vy_env_new(dir, memory, cache, read_threads,
 				write_threads, timeout);
 	if (vinyl->env == NULL) {
 		free(vinyl);
-		diag_raise();
+		return NULL;
 	}
 
 	vinyl->base.vtab = &vinyl_engine_vtab;

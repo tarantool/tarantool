@@ -65,42 +65,53 @@ engine_shutdown()
 	}
 }
 
-void
-engine_bootstrap_xc()
+int
+engine_bootstrap()
 {
 	struct engine *engine;
 	engine_foreach(engine) {
-		engine->vtab->bootstrap(engine);
+		if (engine->vtab->bootstrap(engine) != 0)
+			return -1;
 	}
+	return 0;
 }
 
-void
-engine_begin_initial_recovery_xc(const struct vclock *recovery_vclock)
+int
+engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
-		engine->vtab->begin_initial_recovery(engine, recovery_vclock);
+		if (engine->vtab->begin_initial_recovery(engine,
+					recovery_vclock) != 0)
+			return -1;
 	}
+	return 0;
 }
 
-void
-engine_begin_final_recovery_xc()
+int
+engine_begin_final_recovery()
 {
 	struct engine *engine;
-	engine_foreach(engine)
-		engine->vtab->begin_final_recovery(engine);
+	engine_foreach(engine) {
+		if (engine->vtab->begin_final_recovery(engine) != 0)
+			return -1;
+	}
+	return 0;
 }
 
-void
-engine_end_recovery_xc()
+int
+engine_end_recovery()
 {
 	/*
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.
 	 */
 	struct engine *engine;
-	engine_foreach(engine)
-		engine->vtab->end_recovery(engine);
+	engine_foreach(engine) {
+		if (engine->vtab->end_recovery(engine) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 int
@@ -158,11 +169,13 @@ engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 	return 0;
 }
 
-void
-engine_join_xc(struct vclock *vclock, struct xstream *stream)
+int
+engine_join(struct vclock *vclock, struct xstream *stream)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
-		engine->vtab->join(engine, vclock, stream);
+		if (engine->vtab->join(engine, vclock, stream) != 0)
+			return -1;
 	}
+	return 0;
 }

@@ -32,11 +32,31 @@
  */
 #include "engine.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct sysview_engine {
 	struct engine base;
 };
 
 struct sysview_engine *
-sysview_engine_new_xc(void);
+sysview_engine_new(void);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+static inline struct sysview_engine *
+sysview_engine_new_xc(void)
+{
+	struct sysview_engine *sysview = sysview_engine_new();
+	if (sysview == NULL)
+		diag_raise();
+	return sysview;
+}
+
+#endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

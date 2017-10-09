@@ -33,8 +33,6 @@
 #include "memtx_tuple.h"
 
 #include "coio_file.h"
-#include "scoped_guard.h"
-
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tree.h"
@@ -44,7 +42,6 @@
 #include "bootstrap.h"
 #include "replication.h"
 #include "schema.h"
-
 #include "gc.h"
 
 /** For all memory used by all indexes.
@@ -133,13 +130,13 @@ memtx_engine_shutdown(struct engine *engine)
 	memtx_tuple_free();
 }
 
-static void
+static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 				  struct xrow_header *row);
 
-void
-memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
-				 const struct vclock *vclock)
+int
+memtx_engine_recover_snapshot(struct memtx_engine *memtx,
+			      const struct vclock *vclock)
 {
 	/* Process existing snapshot */
 	say_info("recovery start");
@@ -149,23 +146,22 @@ memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
 
 	say_info("recovering from `%s'", filename);
 	struct xlog_cursor cursor;
-	xlog_cursor_open_xc(&cursor, filename);
+	if (xlog_cursor_open(&cursor, filename) < 0)
+		return -1;
 	INSTANCE_UUID = cursor.meta.instance_uuid;
-	auto reader_guard = make_scoped_guard([&]{
-		xlog_cursor_close(&cursor, false);
-	});
 
+	int rc;
 	struct xrow_header row;
 	uint64_t row_count = 0;
-	while (xlog_cursor_next_xc(&cursor, &row, memtx->force_recovery) == 0) {
+	while ((rc = xlog_cursor_next(&cursor, &row,
+				      memtx->force_recovery)) == 0) {
 		row.lsn = signature;
-		try {
-			memtx_engine_recover_snapshot_row(memtx, &row);
-		} catch (ClientError *e) {
+		rc = memtx_engine_recover_snapshot_row(memtx, &row);
+		if (rc < 0) {
 			if (!memtx->force_recovery)
-				throw;
+				break;
 			say_error("can't apply row: ");
-			e->log();
+			diag_log();
 		}
 		++row_count;
 		if (row_count % 100000 == 0) {
@@ -174,6 +170,9 @@ memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
 			fiber_yield_timeout(0);
 		}
 	}
+	xlog_cursor_close(&cursor, false);
+	if (rc < 0)
+		return -1;
 
 	/**
 	 * We should never try to read snapshots with no EOF
@@ -183,35 +182,45 @@ memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
 	if (!xlog_cursor_is_eof(&cursor))
 		panic("snapshot `%s' has no EOF marker", filename);
 
+	return 0;
 }
 
-static void
+static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 				  struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) row->type);
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			 (uint32_t) row->type);
+		return -1;
 	}
 
-	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find_xc(request->space_id);
+	struct request *request = xrow_decode_dml_gc(row);
+	if (request == NULL)
+		return -1;
+	struct space *space = space_cache_find(request->space_id);
+	if (space == NULL)
+		return -1;
 	/* memtx snapshot must contain only memtx spaces */
-	if (space->engine != (struct engine *)memtx)
-		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+	if (space->engine != (struct engine *)memtx) {
+		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+		return -1;
+	}
 	/* no access checks here - applier always works with admin privs */
-	space_apply_initial_join_row_xc(space, request);
+	if (space_apply_initial_join_row(space, request) != 0)
+		return -1;
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
 	fiber_gc();
+	return 0;
 }
 
 /** Called at start to tell memtx to recover to a given LSN. */
-static void
+static int
 memtx_engine_begin_initial_recovery(struct engine *engine,
 				    const struct vclock *)
 {
@@ -228,14 +237,15 @@ memtx_engine_begin_initial_recovery(struct engine *engine,
 	 */
 	memtx->state = (memtx->force_recovery ?
 			MEMTX_OK : MEMTX_INITIAL_RECOVERY);
+	return 0;
 }
 
-static void
+static int
 memtx_engine_begin_final_recovery(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	if (memtx->state == MEMTX_OK)
-		return;
+		return 0;
 
 	assert(memtx->state == MEMTX_INITIAL_RECOVERY);
 	/* End of the fast path: loaded the primary key. */
@@ -258,11 +268,12 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		 */
 		memtx->state = MEMTX_OK;
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
-			diag_raise();
+			return -1;
 	}
+	return 0;
 }
 
-static void
+static int
 memtx_engine_end_recovery(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -276,8 +287,9 @@ memtx_engine_end_recovery(struct engine *engine)
 		assert(memtx->state == MEMTX_FINAL_RECOVERY);
 		memtx->state = MEMTX_OK;
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
-			diag_raise();
+			return -1;
 	}
+	return 0;
 }
 
 static struct space *
@@ -285,18 +297,15 @@ memtx_engine_create_space(struct engine *engine, struct space_def *def,
 			  struct rlist *key_list)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	struct space *space = memtx_space_new(memtx, def, key_list);
-	if (space == NULL)
-		diag_raise();
-	return space;
+	return memtx_space_new(memtx, def, key_list);
 }
 
-static void
+static int
 memtx_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	if (txn->is_autocommit)
-		return;
+		return 0;
 	/*
 	 * These triggers are only used for memtx and only
 	 * when autocommit == false, so we are saving
@@ -304,9 +313,10 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 	 */
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
+	return 0;
 }
 
-static void
+static int
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
@@ -330,11 +340,13 @@ memtx_engine_begin(struct engine *engine, struct txn *txn)
 		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
 	}
+	return 0;
 }
 
-static void
+static int
 memtx_engine_begin_statement(struct engine *, struct txn *)
 {
+	return 0;
 }
 
 static void
@@ -360,9 +372,15 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		panic("transaction rolled back during snapshot recovery");
 
 	for (int i = 0; i < index_count; i++) {
+		struct tuple *unused;
 		struct index *index = space->index[i];
-		index_replace_xc(index, stmt->new_tuple,
-				 stmt->old_tuple, DUP_INSERT);
+		/* Rollback must not fail. */
+		if (index_replace(index, stmt->new_tuple, stmt->old_tuple,
+				  DUP_INSERT, &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
 	}
 	/** Reset to old bsize, if it was changed. */
 	if (stmt->engine_savepoint != NULL)
@@ -397,7 +415,7 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 	}
 }
 
-static void
+static int
 memtx_engine_bootstrap(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -407,24 +425,23 @@ memtx_engine_bootstrap(struct engine *engine)
 
 	/* Recover from bootstrap.snap */
 	say_info("initializing an empty data directory");
-	struct xdir dir;
-	xdir_create(&dir, "", SNAP, &uuid_nil);
 	struct xlog_cursor cursor;
 	if (xlog_cursor_openmem(&cursor, (const char *)bootstrap_bin,
-				sizeof(bootstrap_bin), "bootstrap") < 0) {
-		diag_raise();
-	};
-	auto guard = make_scoped_guard([&]{
-		xlog_cursor_close(&cursor, false);
-		xdir_destroy(&dir);
-	});
+				sizeof(bootstrap_bin), "bootstrap") < 0)
+		return -1;
 
+	int rc;
 	struct xrow_header row;
-	while (xlog_cursor_next_xc(&cursor, &row, true) == 0)
-		memtx_engine_recover_snapshot_row(memtx, &row);
+	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
+		rc = memtx_engine_recover_snapshot_row(memtx, &row);
+		if (rc < 0)
+			break;
+	}
+	xlog_cursor_close(&cursor, false);
+	return rc < 0 ? -1 : 0;
 }
 
-static void
+static int
 checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 {
 	static ev_tstamp last = 0;
@@ -447,16 +464,16 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 
 	ssize_t written = xlog_write_row(l, row);
 	fiber_gc();
-	if (written < 0) {
-		diag_raise();
-	}
+	if (written < 0)
+		return -1;
 
 	if ((l->rows + l->tx_rows) % 100000 == 0)
 		say_crit("%.1fM rows written", (l->rows + l->tx_rows) / 1000000.0);
+	return 0;
 
 }
 
-static void
+static int
 checkpoint_write_tuple(struct xlog *l, uint32_t space_id,
 		       const char *data, uint32_t size)
 {
@@ -476,7 +493,7 @@ checkpoint_write_tuple(struct xlog *l, uint32_t space_id,
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = (char *)data;
 	row.body[1].iov_len = size;
-	checkpoint_write_row(l, &row);
+	return checkpoint_write_row(l, &row);
 }
 
 struct checkpoint_entry {
@@ -582,9 +599,8 @@ checkpoint_f(va_list ap)
 
 	struct xlog snap;
 	if (xdir_create_xlog(&ckpt->dir, &snap, ckpt->vclock) != 0)
-		diag_raise();
+		return -1;
 
-	auto guard = make_scoped_guard([&]{ xlog_close(&snap, false); });
 	snap.rate_limit = ckpt->snap_io_rate_limit;
 
 	say_info("saving snapshot `%s'", snap.filename);
@@ -595,11 +611,16 @@ checkpoint_f(va_list ap)
 		struct snapshot_iterator *it = entry->iterator;
 		for (data = it->next(it, &size); data != NULL;
 		     data = it->next(it, &size)) {
-			checkpoint_write_tuple(&snap, space_id(entry->space),
-					       data, size);
+			if (checkpoint_write_tuple(&snap,
+					space_id(entry->space),
+					data, size) != 0) {
+				xlog_close(&snap, false);
+				return -1;
+			}
 		}
 	}
 	xlog_flush(&snap);
+	xlog_close(&snap, false);
 	say_info("done");
 	return 0;
 }
@@ -782,32 +803,34 @@ memtx_initial_join_f(va_list ap)
 	 * safe to use in another thread.
 	 */
 	xdir_create(&dir, snap_dirname, SNAP, &INSTANCE_UUID);
-	auto guard = make_scoped_guard([&]{
-		xdir_destroy(&dir);
-	});
 	struct xlog_cursor cursor;
-	xdir_open_cursor_xc(&dir, checkpoint_lsn, &cursor);
-	auto reader_guard = make_scoped_guard([&]{
-		xlog_cursor_close(&cursor, false);
-	});
+	int rc = xdir_open_cursor(&dir, checkpoint_lsn, &cursor);
+	xdir_destroy(&dir);
+	if (rc < 0)
+		return -1;
 
 	struct xrow_header row;
-	while (xlog_cursor_next_xc(&cursor, &row, true) == 0) {
-		xstream_write_xc(stream, &row);
+	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
+		rc = xstream_write(stream, &row);
+		if (rc < 0)
+			break;
 	}
+	xlog_cursor_close(&cursor, false);
+	if (rc < 0)
+		return -1;
 
 	/**
 	 * We should never try to read snapshots with no EOF
 	 * marker - such snapshots are very likely corrupted and
 	 * should not be trusted.
 	 */
-	/* TODO: replace panic with tnt_raise() */
+	/* TODO: replace panic with diag_set() */
 	if (!xlog_cursor_is_eof(&cursor))
 		panic("snapshot `%s' has no EOF marker", cursor.name);
 	return 0;
 }
 
-static void
+static int
 memtx_engine_join(struct engine *engine, struct vclock *vclock,
 		  struct xstream *stream)
 {
@@ -825,13 +848,13 @@ memtx_engine_join(struct engine *engine, struct vclock *vclock,
 	/* Send snapshot using a thread */
 	struct cord cord;
 	cord_costart(&cord, "initial_join", memtx_initial_join_f, &arg);
-	if (cord_cojoin(&cord) != 0)
-		diag_raise();
+	return cord_cojoin(&cord);
 }
 
-static void
+static int
 memtx_engine_check_space_def(struct space_def *)
 {
+	return 0;
 }
 
 static const struct engine_vtab memtx_engine_vtab = {
@@ -858,17 +881,18 @@ static const struct engine_vtab memtx_engine_vtab = {
 };
 
 struct memtx_engine *
-memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
-		    uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		    float alloc_factor)
+memtx_engine_new(const char *snap_dirname, bool force_recovery,
+		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
+		 float alloc_factor)
 {
 	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
 
 	struct memtx_engine *memtx =
 		(struct memtx_engine *)calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*memtx),
-			  "malloc", "struct memtx_engine");
+		diag_set(OutOfMemory, sizeof(*memtx),
+			 "malloc", "struct memtx_engine");
+		return NULL;
 	}
 
 	xdir_create(&memtx->snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
@@ -877,7 +901,7 @@ memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 	if (xdir_scan(&memtx->snap_dir) != 0) {
 		xdir_destroy(&memtx->snap_dir);
 		free(memtx);
-		diag_raise();
+		return NULL;
 	}
 
 	memtx->state = MEMTX_INITIALIZED;

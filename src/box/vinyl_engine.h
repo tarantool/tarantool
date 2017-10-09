@@ -34,6 +34,10 @@
 
 #include "engine.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct vy_env;
 
 struct vinyl_engine {
@@ -42,13 +46,32 @@ struct vinyl_engine {
 };
 
 struct vinyl_engine *
-vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
-		    int read_threads, int write_threads, double timeout);
+vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+		 int read_threads, int write_threads, double timeout);
 
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
 
 void
 vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+static inline struct vinyl_engine *
+vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
+		    int read_threads, int write_threads, double timeout)
+{
+	struct vinyl_engine *vinyl;
+	vinyl = vinyl_engine_new(dir, memory, cache, read_threads,
+				 write_threads, timeout);
+	if (vinyl == NULL)
+		diag_raise();
+	return vinyl;
+}
+
+#endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */

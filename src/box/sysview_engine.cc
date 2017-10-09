@@ -182,30 +182,35 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 			    struct rlist *key_list)
 {
 	struct space *space = (struct space *)calloc(1, sizeof(*space));
-	if (space == NULL)
-		tnt_raise(OutOfMemory, sizeof(*space),
-			  "malloc", "struct space");
+	if (space == NULL) {
+		diag_set(OutOfMemory, sizeof(*space),
+			 "malloc", "struct space");
+		return NULL;
+	}
 	if (space_create(space, engine, &sysview_space_vtab,
 			 def, key_list, NULL) != 0) {
 		free(space);
-		diag_raise();
+		return NULL;
 	}
 	return space;
 }
 
-static void
+static int
 sysview_engine_begin(struct engine *, struct txn *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_engine_begin_statement(struct engine *, struct txn *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_engine_prepare(struct engine *, struct txn *)
 {
+	return 0;
 }
 
 static void
@@ -224,30 +229,35 @@ sysview_engine_rollback_statement(struct engine *, struct txn *,
 {
 }
 
-static void
+static int
 sysview_engine_bootstrap(struct engine *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_engine_begin_initial_recovery(struct engine *, const struct vclock *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_engine_begin_final_recovery(struct engine *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_engine_end_recovery(struct engine *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_engine_join(struct engine *, struct vclock *,
 		    struct xstream *)
 {
+	return 0;
 }
 
 static int
@@ -285,9 +295,10 @@ sysview_engine_backup(struct engine *, struct vclock *,
 	return 0;
 }
 
-static void
+static int
 sysview_engine_check_space_def(struct space_def *)
 {
+	return 0;
 }
 
 static const struct engine_vtab sysview_engine_vtab = {
@@ -314,13 +325,14 @@ static const struct engine_vtab sysview_engine_vtab = {
 };
 
 struct sysview_engine *
-sysview_engine_new_xc(void)
+sysview_engine_new(void)
 {
 	struct sysview_engine *sysview =
 		(struct sysview_engine *)calloc(1, sizeof(*sysview));
 	if (sysview == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*sysview),
-			  "malloc", "struct sysview_engine");
+		diag_set(OutOfMemory, sizeof(*sysview),
+			 "malloc", "struct sysview_engine");
+		return NULL;
 	}
 
 	sysview->base.vtab = &sysview_engine_vtab;

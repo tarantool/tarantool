@@ -34,10 +34,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if defined(__cplusplus)
-
 #include "engine.h"
 #include "xlog.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 /**
  * The state of memtx recovery process.
@@ -91,22 +93,19 @@ struct memtx_engine {
 };
 
 struct memtx_engine *
-memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
-		    uint64_t tuple_arena_max_size,
-		    uint32_t objsize_min, float alloc_factor);
+memtx_engine_new(const char *snap_dirname, bool force_recovery,
+		 uint64_t tuple_arena_max_size,
+		 uint32_t objsize_min, float alloc_factor);
 
-void
-memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
-				 const struct vclock *vclock);
+int
+memtx_engine_recover_snapshot(struct memtx_engine *memtx,
+			      const struct vclock *vclock);
 
 void
 memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
-
-extern "C" {
-#endif /* defined(__cplusplus) */
 
 enum {
 	MEMTX_EXTENT_SIZE = 16 * 1024,
@@ -143,6 +142,31 @@ memtx_index_extent_reserve(int num);
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+#include "diag.h"
+
+static inline struct memtx_engine *
+memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
+		    uint64_t tuple_arena_max_size,
+		    uint32_t objsize_min, float alloc_factor)
+{
+	struct memtx_engine *memtx;
+	memtx = memtx_engine_new(snap_dirname, force_recovery,
+				 tuple_arena_max_size,
+				 objsize_min, alloc_factor);
+	if (memtx == NULL)
+		diag_raise();
+	return memtx;
+}
+
+static inline void
+memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
+				 const struct vclock *vclock)
+{
+	if (memtx_engine_recover_snapshot(memtx, vclock) != 0)
+		diag_raise();
+}
+
 #endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */
