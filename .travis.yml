@@ -32,7 +32,6 @@ env:
       - OS=ubuntu DIST=trusty
       - OS=ubuntu DIST=xenial
       - OS=ubuntu DIST=zesty
-      - OS=ubuntu DIST=artful
       - OS=debian DIST=wheezy
       - OS=debian DIST=jessie
       - OS=debian DIST=stretch
@@ -47,7 +46,7 @@ matrix:
 #      - env: OS=ubuntu DIST=precise
 #      - env: OS=ubuntu DIST=trusty
 #      - env: OS=ubuntu DIST=xenial
-#      - env: OS=ubuntu DIST=yakkety
+#      - env: OS=ubuntu DIST=zesty
 #      - env: OS=debian DIST=wheezy
 #      - env: OS=debian DIST=jessie
 #      - env: OS=debian DIST=stretch
@@ -66,7 +65,7 @@ matrix:
         os: osx
       - env: OS=ubuntu DIST=xenial
         os: osx
-      - env: OS=ubuntu DIST=yakkety
+      - env: OS=ubuntu DIST=zesty
         os: osx
       - env: OS=debian DIST=wheezy
         os: osx
