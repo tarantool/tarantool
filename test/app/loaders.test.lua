@@ -55,10 +55,11 @@ orig_cwd = fio.cwd()
 
 fio.chdir(pr2_dir)
 rocks_loader = package.loaders[3]
+rocks_loader_dyn = package.loaders[6]
 f = rocks_loader("loaders")
 type(f)
 f()
-f = rocks_loader("loaderslib")
+f = rocks_loader_dyn("loaderslib")
 type(f)
 f()
 f = rocks_loader("loaders1")
@@ -73,7 +74,7 @@ type(f)
 f()
 f = rocks_loader("loaders1")
 type(f) -- error
-f = rocks_loader("loaderslib")
+f = rocks_loader_dyn("loaderslib")
 type(f) -- error
 
 fio.chdir(orig_cwd)
