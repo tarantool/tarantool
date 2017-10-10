@@ -558,23 +558,6 @@ index4 = space:create_index('fourth', { parts = {2, 'str', 3, 'str'} })
 #box.space._index:select{space.id}
 space:drop()
 
---Collation
-s = box.schema.space.create('test')
-i1 = s:create_index('i1', { type = 'tree', parts = {{1, 'str', collation='unicode'}}, unique = true })
-
-_ = s:replace{"ааа"}
-_ = s:replace{"еее"}
-_ = s:replace{"ёёё"}
-_ = s:replace{"жжж"}
-_ = s:replace{"яяя"}
-_ = s:replace{"ААА"}
-_ = s:replace{"ЯЯЯ"}
-
--- good output
-s:select{}
-
-s:drop()
-
 -------------------------------------------------------------------------------
 -- Cleanup
 -------------------------------------------------------------------------------

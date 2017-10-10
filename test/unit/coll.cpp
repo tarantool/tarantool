@@ -58,7 +58,7 @@ manual_test()
 	cout << " -- default ru_RU -- " << endl;
 	coll = coll_new(&def);
 	assert(coll != NULL);
-	strings = {"S", "z", "Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45", "Z" };
+	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
 	coll_delete(coll);
 
@@ -66,7 +66,7 @@ manual_test()
 	def.icu.case_first = COLL_ICU_CF_UPPER_FIRST;
 	coll = coll_new(&def);
 	assert(coll != NULL);
-	strings = {"S", "z", "Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45", "Z" };
+	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
 	coll_delete(coll);
 
@@ -74,7 +74,7 @@ manual_test()
 	def.icu.case_first = COLL_ICU_CF_LOWER_FIRST;
 	coll = coll_new(&def);
 	assert(coll != NULL);
-	strings = {"S", "z", "Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45", "Z" };
+	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
 	coll_delete(coll);
 
@@ -83,7 +83,7 @@ manual_test()
 	def.icu.numeric_collation = COLL_ICU_ON;
 	coll = coll_new(&def);
 	assert(coll != NULL);
-	strings = {"S", "z", "Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45", "Z" };
+	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
 	coll_delete(coll);
 
@@ -91,7 +91,7 @@ manual_test()
 	def.icu.case_level = COLL_ICU_ON;
 	coll = coll_new(&def);
 	assert(coll != NULL);
-	strings = {"S", "z", "Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45", "Z" };
+	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
 	coll_delete(coll);
 

@@ -10,9 +10,6 @@
 ЕЕЕЕ GREATER 
 и GREATER 
 И GREATER 
-S GREATER 
-z GREATER 
-Z GREATER 
  -- --||-- + upper first -- 
 123
 45 GREATER 
@@ -24,9 +21,6 @@ Z GREATER
 ЕЕЕЕ GREATER 
 И GREATER 
 и GREATER 
-S GREATER 
-Z GREATER 
-z GREATER 
  -- --||-- + lower first -- 
 123
 45 GREATER 
@@ -38,9 +32,6 @@ z GREATER
 ЕЕЕЕ GREATER 
 и GREATER 
 И GREATER 
-S GREATER 
-z GREATER 
-Z GREATER 
  -- --||-- + secondary strength + numeric -- 
 45
 123 GREATER 
@@ -52,9 +43,6 @@ Z GREATER
 ЕЕЕЕ GREATER 
 и GREATER 
 И EQUAL
-S GREATER 
-z GREATER 
-Z EQUAL
  -- --||-- + case level -- 
 45
 123 GREATER 
@@ -66,9 +54,6 @@ Z EQUAL
 ЕЕЕЕ GREATER 
 и GREATER 
 И GREATER 
-S GREATER 
-z GREATER 
-Z GREATER 
  -- en_EN -- 
 aa
 bb GREATER 

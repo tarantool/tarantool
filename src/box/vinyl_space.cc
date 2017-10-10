@@ -191,6 +191,10 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 					     field_type_strs[part->type]));
 		}
 	}
+	if (key_def_has_collation(index_def->key_def)) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
+			  space_name(space), "vinyl does not support collation");
+	}
 }
 
 static struct Index *
