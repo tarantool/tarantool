@@ -507,7 +507,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 		return 0; /* invalidate iterator */
 	}
 	try {
-		struct tuple *tuple = itr->next(itr);
+		struct tuple *tuple = iterator_next_xc(itr);
 		*result = tuple_bless_null_xc(tuple);
 		return 0;
 	} catch (Exception *) {

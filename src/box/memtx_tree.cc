@@ -75,15 +75,16 @@ tree_iterator_free(struct iterator *iterator)
 	free(iterator);
 }
 
-static struct tuple *
-tree_iterator_dummie(struct iterator *iterator)
+static int
+tree_iterator_dummie(struct iterator *iterator, struct tuple **ret)
 {
 	(void)iterator;
+	*ret = NULL;
 	return 0;
 }
 
-static struct tuple *
-tree_iterator_next(struct iterator *iterator)
+static int
+tree_iterator_next(struct iterator *iterator, struct tuple **ret)
 {
 	tuple **res;
 	struct tree_iterator *it = tree_iterator(iterator);
@@ -100,15 +101,16 @@ tree_iterator_next(struct iterator *iterator)
 	res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (res == NULL) {
 		iterator->next = tree_iterator_dummie;
-		return NULL;
+		*ret = NULL;
+	} else {
+		*ret = it->current_tuple = *res;
+		tuple_ref(it->current_tuple);
 	}
-	it->current_tuple = *res;
-	tuple_ref(it->current_tuple);
-	return *res;
+	return 0;
 }
 
-static struct tuple *
-tree_iterator_prev(struct iterator *iterator)
+static int
+tree_iterator_prev(struct iterator *iterator, struct tuple **ret)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	assert(it->current_tuple != NULL);
@@ -123,15 +125,16 @@ tree_iterator_prev(struct iterator *iterator)
 	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res) {
 		iterator->next = tree_iterator_dummie;
-		return NULL;
+		*ret = NULL;
+	} else {
+		*ret = it->current_tuple = *res;
+		tuple_ref(it->current_tuple);
 	}
-	it->current_tuple = *res;
-	tuple_ref(it->current_tuple);
-	return *res;
+	return 0;
 }
 
-static struct tuple *
-tree_iterator_next_equal(struct iterator *iterator)
+static int
+tree_iterator_next_equal(struct iterator *iterator, struct tuple **ret)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	assert(it->current_tuple != NULL);
@@ -149,15 +152,16 @@ tree_iterator_next_equal(struct iterator *iterator)
 	if (!res || memtx_tree_compare_key(*res, &it->key_data,
 					   it->index_def->key_def) != 0) {
 		iterator->next = tree_iterator_dummie;
-		return NULL;
+		*ret = NULL;
+	} else {
+		*ret = it->current_tuple = *res;
+		tuple_ref(it->current_tuple);
 	}
-	it->current_tuple = *res;
-	tuple_ref(it->current_tuple);
-	return *res;
+	return 0;
 }
 
-static struct tuple *
-tree_iterator_prev_equal(struct iterator *iterator)
+static int
+tree_iterator_prev_equal(struct iterator *iterator, struct tuple **ret)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	assert(it->current_tuple != NULL);
@@ -174,11 +178,12 @@ tree_iterator_prev_equal(struct iterator *iterator)
 	if (!res || memtx_tree_compare_key(*res, &it->key_data,
 					   it->index_def->key_def) != 0) {
 		iterator->next = tree_iterator_dummie;
-		return NULL;
+		*ret = NULL;
+	} else {
+		*ret = it->current_tuple = *res;
+		tuple_ref(it->current_tuple);
 	}
-	it->current_tuple = *res;
-	tuple_ref(it->current_tuple);
-	return *res;
+	return 0;
 }
 
 static void
@@ -209,9 +214,10 @@ tree_iterator_set_next_method(struct tree_iterator *it)
 	}
 }
 
-static struct tuple *
-tree_iterator_start(struct iterator *iterator)
+static int
+tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 {
+	*ret = NULL;
 	struct tree_iterator *it = tree_iterator(iterator);
 	it->base.next = tree_iterator_dummie;
 	const memtx_tree *tree = it->tree;
@@ -230,13 +236,13 @@ tree_iterator_start(struct iterator *iterator)
 				memtx_tree_lower_bound(tree, &it->key_data,
 						       &exact);
 			if (type == ITER_EQ && !exact)
-				return NULL;
+				return 0;
 		} else { // ITER_GT, ITER_REQ, ITER_LE
 			it->tree_iterator =
 				memtx_tree_upper_bound(tree, &it->key_data,
 						       &exact);
 			if (type == ITER_REQ && !exact)
-				return NULL;
+				return 0;
 		}
 		if (iterator_type_is_reverse(type)) {
 			/*
@@ -256,11 +262,11 @@ tree_iterator_start(struct iterator *iterator)
 
 	tuple **res = memtx_tree_iterator_get_elem(it->tree, &it->tree_iterator);
 	if (!res)
-		return NULL;
-	it->current_tuple = *res;
+		return 0;
+	*ret = it->current_tuple = *res;
 	tuple_ref(it->current_tuple);
 	tree_iterator_set_next_method(it);
-	return *res;
+	return 0;
 }
 
 /* }}} */

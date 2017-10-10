@@ -1184,7 +1184,7 @@ box_on_join(const tt_uuid *instance_uuid)
 	struct tuple *tuple;
 	/** Assign a new replica id. */
 	uint32_t replica_id = 1;
-	while ((tuple = it->next(it))) {
+	while ((tuple = iterator_next_xc(it)) != NULL) {
 		if (tuple_field_u32_xc(tuple,
 				       BOX_CLUSTER_FIELD_ID) != replica_id)
 			break;

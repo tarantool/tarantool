@@ -532,7 +532,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	struct iterator *it = index->position();
 
 	index->initIterator(it, ITER_EQ, key, 1);
-	if (it->next(it))
+	if (iterator_next_xc(it) != NULL)
 		return true;
 	return false;
 }

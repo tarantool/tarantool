@@ -489,7 +489,7 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 	index->initIterator(it, type, key, part_count);
 
 	struct tuple *tuple;
-	while ((tuple = it->next(it)) != NULL) {
+	while ((tuple = iterator_next_xc(it)) != NULL) {
 		if (offset > 0) {
 			offset--;
 			continue;
@@ -689,7 +689,7 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	struct tuple *tuple;
-	while ((tuple = it->next(it))) {
+	while ((tuple = iterator_next_xc(it)) != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
@@ -749,7 +749,7 @@ memtx_space_build_secondary_key(struct space *old_space,
 	 */
 	/* Build the new index. */
 	struct tuple *tuple;
-	while ((tuple = it->next(it))) {
+	while ((tuple = iterator_next_xc(it)) != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
@@ -785,7 +785,7 @@ memtx_space_prune(struct space *space)
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
-	while ((tuple = it->next(it)) != NULL)
+	while ((tuple = iterator_next_xc(it)) != NULL)
 		tuple_unref(tuple);
 }
 

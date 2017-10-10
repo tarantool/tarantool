@@ -158,7 +158,7 @@ bitset_index_iterator(struct iterator *it)
 	return (struct bitset_index_iterator *) it;
 }
 
-void
+static void
 bitset_index_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->free == bitset_index_iterator_free);
@@ -168,21 +168,24 @@ bitset_index_iterator_free(struct iterator *iterator)
 	free(it);
 }
 
-struct tuple *
-bitset_index_iterator_next(struct iterator *iterator)
+static int
+bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	size_t value = bitset_iterator_next(&it->bitset_it);
-	if (value == SIZE_MAX)
-		return NULL;
+	if (value == SIZE_MAX) {
+		*ret = NULL;
+		return 0;
+	}
 
 #ifndef OLD_GOOD_BITSET
-	return it->bitset_index->valueToTuple((uint32_t)value);
+	*ret = it->bitset_index->valueToTuple((uint32_t)value);
 #else /* #ifndef OLD_GOOD_BITSET */
-	return value_to_tuple(value);
+	*ret = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
+	return 0;
 }
 
 MemtxBitset::MemtxBitset(struct index_def *index_def_arg)

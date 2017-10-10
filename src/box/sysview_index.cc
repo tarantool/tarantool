@@ -57,20 +57,21 @@ sysview_iterator_free(struct iterator *ptr)
 	free(it);
 }
 
-static struct tuple *
-sysview_iterator_next(struct iterator *iterator)
+static int
+sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 {
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_iterator *it = sysview_iterator(iterator);
+	*ret = NULL;
 	if (it->source->schema_version != schema_version)
-		return NULL; /* invalidate iterator */
+		return 0; /* invalidate iterator */
 	class SysviewIndex *index = (class SysviewIndex *) iterator->index;
-	struct tuple *tuple;
-	while ((tuple = it->source->next(it->source)) != NULL) {
-		if (index->filter(it->space, tuple))
-			return tuple;
+	int rc;
+	while ((rc = it->source->next(it->source, ret)) == 0 && *ret != NULL) {
+		if (index->filter(it->space, *ret))
+			break;
 	}
-	return NULL;
+	return rc;
 }
 
 SysviewIndex::SysviewIndex(struct index_def *index_def, uint32_t source_space_id,

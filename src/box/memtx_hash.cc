@@ -80,42 +80,44 @@ hash_iterator_free(struct iterator *iterator)
 	free(iterator);
 }
 
-static struct tuple *
-hash_iterator_ge(struct iterator *ptr)
+static int
+hash_iterator_ge(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
 							       &it->iterator);
-	return res ? *res : 0;
+	*ret = res != NULL ? *res : NULL;
+	return 0;
 }
 
-static struct tuple *
-hash_iterator_gt(struct iterator *ptr)
+static int
+hash_iterator_gt(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	ptr->next = hash_iterator_ge;
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 	struct tuple **res = light_index_iterator_get_and_next(it->hash_table,
 							       &it->iterator);
-	if (!res)
-		return 0;
-	res = light_index_iterator_get_and_next(it->hash_table,
-						&it->iterator);
-	return res ? *res : 0;
+	if (res != NULL)
+		res = light_index_iterator_get_and_next(it->hash_table,
+							&it->iterator);
+	*ret = res != NULL ? *res : NULL;
+	return 0;
 }
 
-static struct tuple *
-hash_iterator_eq_next(MAYBE_UNUSED struct iterator *it)
+static int
+hash_iterator_eq_next(MAYBE_UNUSED struct iterator *it, struct tuple **ret)
 {
-	return NULL;
+	*ret = NULL;
+	return 0;
 }
 
-static struct tuple *
-hash_iterator_eq(struct iterator *it)
+static int
+hash_iterator_eq(struct iterator *it, struct tuple **ret)
 {
 	it->next = hash_iterator_eq_next;
-	return hash_iterator_ge(it);
+	return hash_iterator_ge(it, ret);
 }
 
 /* }}} */

@@ -121,7 +121,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 		pk->initIterator(it, ITER_GE, key, 1);
 
 		struct tuple *tuple;
-		while ((tuple = it->next(it))) {
+		while ((tuple = iterator_next_xc(it)) != NULL) {
 			/* Get space id, primary key, field 0. */
 			uint32_t id =
 				tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
@@ -233,7 +233,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, key, 1);
 
-	struct tuple *tuple = it->next(it);
+	struct tuple *tuple = iterator_next_xc(it);
 	if (tuple) {
 		/* id is always field #1 */
 		return tuple_field_u32_xc(tuple, 0);
@@ -452,7 +452,7 @@ schema_find_grants(const char *type, uint32_t id)
 	assert(strlen(type) <= GRANT_NAME_MAX);
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
 	index->initIterator(it, ITER_EQ, key, 2);
-	return it->next(it);
+	return iterator_next_xc(it);
 }
 
 struct sequence *

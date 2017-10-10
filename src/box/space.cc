@@ -240,7 +240,7 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 	index->initIterator(it, type, key, part_count);
 
 	struct tuple *tuple;
-	while (found < limit && (tuple = it->next(it)) != NULL) {
+	while (found < limit && (tuple = iterator_next_xc(it)) != NULL) {
 		if (offset > 0) {
 			offset--;
 			continue;

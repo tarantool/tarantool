@@ -211,7 +211,13 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 	       struct info_handler *info);
 
 struct iterator {
-	struct tuple *(*next)(struct iterator *);
+	/**
+	 * Iterate to the next tuple.
+	 * The tuple is returned in @ret (NULL if EOF).
+	 * Returns 0 on success, -1 on error.
+	 */
+	int (*next)(struct iterator *it, struct tuple **ret);
+	/** Destroy the iterator. */
 	void (*free)(struct iterator *);
 	/* optional parameters used in lua */
 	uint32_t schema_version;
@@ -239,6 +245,8 @@ struct snapshot_iterator {
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+#include "diag.h"
 #include "index_def.h"
 
 /**
@@ -427,6 +435,19 @@ static inline bool
 index_is_primary(const Index *index)
 {
 	return index_id(index) == 0;
+}
+
+/**
+ * Wrapper around iterator::next() that throws
+ * an exception in case of error.
+ */
+static inline struct tuple *
+iterator_next_xc(struct iterator *it)
+{
+	struct tuple *tuple;
+	if (it->next(it, &tuple) != 0)
+		diag_raise();
+	return tuple;
 }
 
 #endif /* defined(__plusplus) */

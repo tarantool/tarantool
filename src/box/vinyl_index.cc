@@ -122,7 +122,7 @@ VinylIndex::min(const char *key, uint32_t part_count) const
 	struct iterator *it = allocIterator();
 	auto guard = make_scoped_guard([=]{it->free(it);});
 	initIterator(it, ITER_GE, key, part_count);
-	return it->next(it);
+	return iterator_next_xc(it);
 }
 
 struct tuple *
@@ -131,7 +131,7 @@ VinylIndex::max(const char *key, uint32_t part_count) const
 	struct iterator *it = allocIterator();
 	auto guard = make_scoped_guard([=]{it->free(it);});
 	initIterator(it, ITER_LE, key, part_count);
-	return it->next(it);
+	return iterator_next_xc(it);
 }
 
 size_t
@@ -143,19 +143,20 @@ VinylIndex::count(enum iterator_type type, const char *key,
 	initIterator(it, type, key, part_count);
 	size_t count = 0;
 	struct tuple *tuple = NULL;
-	while ((tuple = it->next(it)) != NULL)
+	while ((tuple = iterator_next_xc(it)) != NULL)
 		++count;
 	return count;
 }
 
-static struct tuple *
-vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr)
+static int
+vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr, struct tuple **ret)
 {
-	return NULL;
+	*ret = NULL;
+	return 0;
 }
 
-static inline struct tuple *
-iterator_next(struct iterator *base_it)
+static int
+vinyl_iterator_next(struct iterator *base_it, struct tuple **ret)
 {
 	struct vinyl_iterator *it = (struct vinyl_iterator *) base_it;
 	struct vy_env *env = it->env;
@@ -167,19 +168,23 @@ iterator_next(struct iterator *base_it)
 		vy_cursor_delete(env, it->cursor);
 		it->cursor = NULL;
 		it->base.next = vinyl_iterator_last;
-		diag_raise();
+		return -1;
 	}
 	if (tuple != NULL) {
-		tuple = tuple_bless_xc(tuple);
+		tuple = tuple_bless(tuple);
+		if (tuple == NULL)
+			return -1;
 		tuple_unref(tuple);
-		return tuple;
+		*ret = tuple;
+		return 0;
 	}
 
 	/* immediately close the cursor */
 	vy_cursor_delete(env, it->cursor);
 	it->cursor = NULL;
 	it->base.next = vinyl_iterator_last;
-	return NULL;
+	*ret = NULL;
+	return 0;
 }
 
 static void
@@ -219,7 +224,7 @@ VinylIndex::initIterator(struct iterator *ptr,
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
 	it->env = this->env;
-	ptr->next = iterator_next;
+	ptr->next = vinyl_iterator_next;
 	if (type > ITER_GT || type < 0)
 		return Index::initIterator(ptr, type, key, part_count);
 

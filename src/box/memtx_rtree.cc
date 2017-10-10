@@ -142,11 +142,12 @@ index_rtree_iterator_free(struct iterator *i)
 	free(itr);
 }
 
-static struct tuple *
-index_rtree_iterator_next(struct iterator *i)
+static int
+index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
-	return (struct tuple *)rtree_iterator_next(&itr->impl);
+	*ret = (struct tuple *)rtree_iterator_next(&itr->impl);
+	return 0;
 }
 
 /* }}} */
