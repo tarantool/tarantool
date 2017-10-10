@@ -31,7 +31,7 @@ test:do_catchsql_test(
         INSERT INTO x VALUES('assert');
     ]], {
         -- <1.1>
-        1, "no such column: abc.a"
+        1, "no such column: ABC.A"
         -- </1.1>
     })
 

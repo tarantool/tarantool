@@ -54,10 +54,10 @@ test:do_execsql_test(
     -- primary key autoincrement was removed from id
     -- because it does not related to the ticket
     [=[
-        CREATE TABLE "Beginnings" (
-          "Id" INTEGER PRIMARY KEY,"Title" TEXT, "EndingId" INTEGER
+        CREATE TABLE Beginnings (
+          Id INTEGER PRIMARY KEY,Title TEXT, EndingId INTEGER
         );
-        CREATE TABLE "Endings" (Id INT PRIMARY KEY,Title TEXT,EndingId INT);
+        CREATE TABLE Endings (Id INT PRIMARY KEY,Title TEXT,EndingId INT);
         INSERT INTO Beginnings (Id, Title, EndingId) VALUES (1, 'FACTOR', 18);
         INSERT INTO Beginnings (Id, Title, EndingId) VALUES (2, 'SWIMM', 18);
         INSERT INTO Endings (Id, Title, EndingId) VALUES (1, 'ING', 18);

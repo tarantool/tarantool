@@ -240,7 +240,7 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 		if (pParent->iPKey >= 0) {
 			if (!zKey)
 				return 0;
-			if (!sqlite3StrICmp
+			if (!strcmp
 			    (pParent->aCol[pParent->iPKey].zName, zKey))
 				return 0;
 		}
@@ -298,13 +298,13 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 					zDfltColl = pParent->aCol[iCol].zColl;
 					if (!zDfltColl)
 						zDfltColl = sqlite3StrBINARY;
-					if (sqlite3StrICmp
+					if (strcmp
 					    (pIdx->azColl[i], zDfltColl))
 						break;
 
 					zIdxCol = pParent->aCol[iCol].zName;
 					for (j = 0; j < nCol; j++) {
-						if (sqlite3StrICmp
+						if (strcmp
 						    (pFKey->aCol[j].zCol,
 						     zIdxCol) == 0) {
 							if (aiCol)
@@ -903,7 +903,7 @@ fkParentIsModified(Table * pTab, FKey * p, int *aChange, int bChngRowid)
 				Column *pCol = &pTab->aCol[iKey];
 				if (zKey) {
 					if (0 ==
-					    sqlite3StrICmp(pCol->zName, zKey))
+					    strcmp(pCol->zName, zKey))
 						return 1;
 				} else if (pCol->colFlags & COLFLAG_PRIMKEY) {
 					return 1;

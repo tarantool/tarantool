@@ -309,7 +309,7 @@ test:do_execsql_test(
         SELECT x,y FROM t7a JOIN t7b ON (x=99) ORDER BY x;
     ]], {
         -- <index6-7.4>
-        "/USING COVERING INDEX t7ax/"
+        "/USING COVERING INDEX T7AX/"
         -- </index6-7.4>
     })
 
@@ -340,8 +340,8 @@ test:do_eqp_test(
         SELECT * FROM t8a LEFT JOIN t8b ON (x = 'value' AND y = a)
     ]], {
         -- <index6-8.1>
-    {0, 0, 0, "SCAN TABLE t8a"},
-    {0, 1, 1, "SEARCH TABLE t8b USING COVERING INDEX i8c (y=?)"}
+    {0, 0, 0, "SCAN TABLE T8A"},
+    {0, 1, 1, "SEARCH TABLE T8B USING COVERING INDEX I8C (Y=?)"}
         -- </index6-8.1>
     })
 
@@ -415,7 +415,7 @@ test:do_execsql_test(
         SELECT e FROM t10 WHERE a=1 AND b=2 AND c=3 ORDER BY d;
     ]], {
         -- <index6-10.1eqp>
-        "/USING COVERING INDEX t10x/"
+        "/USING COVERING INDEX T10X/"
         -- </index6-10.1eqp>
     })
 
@@ -436,7 +436,7 @@ test:do_execsql_test(
         SELECT e FROM t10 WHERE c=3 AND 2=b AND a=1 ORDER BY d DESC;
     ]], {
         -- <index6-10.2eqp>
-        "/USING COVERING INDEX t10x/"
+        "/USING COVERING INDEX T10X/"
         -- </index6-10.2eqp>
     })
 

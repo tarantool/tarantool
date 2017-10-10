@@ -126,8 +126,8 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	assert(sqlite3SchemaMutexHeld(db, 0));
 	if (sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName)) {
 		if (!noErr) {
-			sqlite3ErrorMsg(pParse, "trigger %T already exists",
-					pName);
+			sqlite3ErrorMsg(pParse, "trigger %s already exists",
+					zName);
 		} else {
 			assert(!db->init.busy);
 			sqlite3CodeVerifySchema(pParse);
@@ -394,7 +394,7 @@ triggerStepAllocate(sqlite3 * db,	/* Database connection */
 	if (pTriggerStep) {
 		char *z = (char *)&pTriggerStep[1];
 		memcpy(z, pName->z, pName->n);
-		sqlite3Dequote(z);
+		sqlite3NormalizeName(z);
 		pTriggerStep->zTarget = z;
 		pTriggerStep->op = op;
 	}
@@ -604,7 +604,7 @@ sqlite3DropTriggerPtr(Parse * pParse, Trigger * pTrigger)
 			strlen(TARANTOOL_SYS_TRIGGER_NAME),
 			false
 		};
-		const char *column = "name";
+		const char *column = "NAME";
 		Expr *value = sqlite3Expr(db, TK_STRING, pTrigger->zName);
 		sqlite3DeleteByKey(pParse, &_trigger, &column, &value, 1);
 		sqlite3ChangeCookie(pParse);

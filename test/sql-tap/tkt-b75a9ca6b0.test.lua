@@ -28,7 +28,7 @@ test:do_execsql_test(
     1,
     [[
         CREATE TABLE t1 (id primary key, x, y);
-        INSERT INTO t1 VALUES (1, 1, 3); 
+        INSERT INTO t1 VALUES (1, 1, 3);
         INSERT INTO t1 VALUES (2, 2, 2);
         INSERT INTO t1 VALUES (3, 3, 1);
     ]])
@@ -39,8 +39,8 @@ test:do_execsql_test(
         CREATE INDEX i1 ON t1(x, y);
     ]])
 
-local idxscan = {0, 0, 0, "SCAN TABLE t1 USING COVERING INDEX i1"}
-local tblscan = {0, 0, 0, "SCAN TABLE t1"}
+local idxscan = {0, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I1"}
+local tblscan = {0, 0, 0, "SCAN TABLE T1"}
 local grpsort = {0, 0, 0, "USE TEMP B-TREE FOR GROUP BY"}
 local sort = {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"}
 local eqps = {

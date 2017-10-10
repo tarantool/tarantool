@@ -345,7 +345,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <misc1-7.1>
-        1, [[table "error1" has more than one primary key]]
+        1, [[table "ERROR1" has more than one primary key]]
         -- </misc1-7.1>
     })
 
@@ -358,7 +358,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <misc1-7.2>
-        1, [[table "error1" has more than one primary key]]
+        1, [[table "ERROR1" has more than one primary key]]
         -- </misc1-7.2>
     })
 
@@ -380,7 +380,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(1,2,4);
     ]], {
         -- <misc1-7.4>
-        1, "UNIQUE constraint failed: t5.a, t5.b"
+        1, "UNIQUE constraint failed: T5.A, T5.B"
         -- </misc1-7.4>
     })
 
@@ -420,7 +420,7 @@ test:do_catchsql_test(
         SELECT t1.*;
     ]], {
         -- <misc1-8.2>
-        1, "no such table: t1"
+        1, "no such table: T1"
         -- </misc1-8.2>
     })
 
@@ -883,7 +883,7 @@ test:do_catchsql_test(
         CREATE TABLE test(a integer, primary key(a));
     ]], {
         -- <misc1-16.2>
-        1, "table test already exists"
+        1, "table TEST already exists"
         -- </misc1-16.2>
     })
 
@@ -893,7 +893,7 @@ test:do_catchsql_test(
         CREATE TABLE test2(a text primary key, b text, primary key(a,b));
     ]], {
         -- <misc1-16.3>
-        1, [[table "test2" has more than one primary key]]
+        1, [[table "TEST2" has more than one primary key]]
         -- </misc1-16.3>
     })
 

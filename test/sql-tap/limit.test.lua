@@ -726,7 +726,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT 5 OFFSET replace(1)
     ]], {
         -- <limit-12.2>
-        1, 'wrong number of arguments to function replace()'
+        1, 'wrong number of arguments to function REPLACE()'
         -- </limit-12.2>
     })
 
@@ -736,7 +736,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT x
     ]], {
         -- <limit-12.3>
-        1, "no such column: x"
+        1, "no such column: X"
         -- </limit-12.3>
     })
 
@@ -746,7 +746,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT 1 OFFSET x
     ]], {
         -- <limit-12.4>
-        1, "no such column: x"
+        1, "no such column: X"
         -- </limit-12.4>
     })
 

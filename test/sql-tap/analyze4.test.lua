@@ -45,7 +45,7 @@ test:do_test(
         return test:execsql("EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=5 AND b IS NULL")
     end, {
         -- <analyze4-1.0>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
         -- </analyze4-1.0>
     })
 
@@ -54,10 +54,10 @@ test:do_test(
 --
 test:do_execsql_test(
     "analyze4-1.1",
-    [[ SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx; ]],
+    [[ SELECT idx, stat FROM _sql_stat1 WHERE tbl='T1' ORDER BY idx; ]],
     {
         -- <analyze4-1.1>
-        "t1","128 1", "t1a", "128 1", "t1b", "128 128"
+        "T1","128 1", "T1A", "128 1", "T1B", "128 128"
         -- </analyze4-1.1>
     })
 
@@ -73,11 +73,11 @@ test:do_test(
 -- pragma vdbe_debug=1;
             ANALYZE;
 -- pragma vdbe_debug=0;
-            SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx;
+            SELECT idx, stat FROM _sql_stat1 WHERE tbl='T1' ORDER BY idx;
         ]])
     end, {
         -- <analyze4-1.2>
-        "t1", "128 1", "t1a", "128 1", "t1b", "128 64"
+        "T1", "128 1", "T1A", "128 1", "T1B", "128 64"
         -- </analyze4-1.2>
     })
 
@@ -111,11 +111,11 @@ test:do_execsql_test(
             CREATE INDEX t1cdb ON t1(c,d,b);
             CREATE INDEX t1cbd ON t1(c,b,d);
             ANALYZE;
-            SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx;
+            SELECT idx, stat FROM _sql_stat1 WHERE tbl='T1' ORDER BY idx;
     ]]
     , {
         -- <analyze4-1.3>
-        "t1","128 1", "t1a", "128 1", "t1b", "128 128", "t1bcd", "128 128 4 2", "t1cbd", "128 4 4 2", "t1cdb", "128 4 2 1"
+        "T1","128 1", "T1A", "128 1", "T1B", "128 128", "T1BCD", "128 128 4 2", "T1CBD", "128 4 4 2", "T1CDB", "128 4 2 1"
         -- </analyze4-1.3>
     })
 

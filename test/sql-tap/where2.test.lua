@@ -162,7 +162,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-1.1>
-        85, 6, 7396, 7402, "nosort", "t1", "*"
+        85, 6, 7396, 7402, "nosort", "T1", "*"
         -- </where2-1.1>
     })
 
@@ -183,7 +183,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-2.1>
-        85, 6, 7396, 7402, "nosort", "t1", "*"
+        85, 6, 7396, 7402, "nosort", "T1", "*"
         -- </where2-2.1>
     })
 
@@ -195,7 +195,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-2.2>
-        85, 6, 7396, 7402, "sort", "t1", "i1xy"
+        85, 6, 7396, 7402, "sort", "T1", "I1XY"
         -- </where2-2.2>
     })
 
@@ -293,7 +293,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.1>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
         -- </where2-4.1>
     })
 
@@ -307,7 +307,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.2>
-        99, 6, 10000, 10006, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, "sort", "T1", "I1ZYX"
         -- </where2-4.2>
     })
 
@@ -321,7 +321,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.3>
-        99, 6, 10000, 10006, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, "sort", "T1", "I1ZYX"
         -- </where2-4.3>
     })
 
@@ -336,7 +336,7 @@ test:do_test(
       ]])
     end, {
         -- <where2-4.4>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
         -- </where2-4.4>
     })
 
@@ -351,7 +351,7 @@ test:do_test(
       ]])
     end, {
         -- <where2-4.5>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
         -- </where2-4.5>
     })
 
@@ -368,7 +368,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6a>
-        99, 6, 10000, 10006, "nosort", "t1", "i1xy"
+        99, 6, 10000, 10006, "nosort", "T1", "I1XY"
         -- </where2-4.6a>
     })
 
@@ -383,7 +383,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6b>
-        99, 6, 10000, 10006, "nosort", "t1", "i1xy"
+        99, 6, 10000, 10006, "nosort", "T1", "I1XY"
         -- </where2-4.6b>
     })
 
@@ -398,7 +398,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6c>
-        99, 6, 10000, 10006, "nosort", "t1", "i1xy"
+        99, 6, 10000, 10006, "nosort", "T1", "I1XY"
         -- </where2-4.6c>
     })
 
@@ -413,7 +413,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6d>
-        99, 6, 10000, 10006, "sort", "t1", "i1xy"
+        99, 6, 10000, 10006, "sort", "T1", "I1XY"
         -- </where2-4.6d>
     })
 
@@ -429,7 +429,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6x>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
         -- </where2-4.6x>
     })
 
@@ -442,7 +442,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-4.6y>
-        100, 6, 10201, 10207, 99, 6, 10000, 10006, "sort", "t1", "i1zyx"
+        100, 6, 10201, 10207, 99, 6, 10000, 10006, "sort", "T1", "I1ZYX"
         -- </where2-4.6y>
     })
 
@@ -457,7 +457,7 @@ test:do_test(
       ]])
     end, {
         -- <where2-4.7>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", "i1zyx"
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", "I1ZYX"
         -- </where2-4.7>
     })
 
@@ -476,7 +476,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-5.1>
-        99, 6, 10000, 10006, "nosort", "t1", "*"
+        99, 6, 10000, 10006, "nosort", "T1", "*"
         -- </where2-5.1>
     })
 
@@ -488,7 +488,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-5.2a>
-        99, 6, 10000, 10006, "nosort", "t1", "*"
+        99, 6, 10000, 10006, "nosort", "T1", "*"
         -- </where2-5.2a>
     })
 
@@ -500,7 +500,7 @@ test:do_test(
     ]])
     end, {
         -- <where2-5.2b>
-        99, 6, 10000, 10006, "nosort", "t1", "*"
+        99, 6, 10000, 10006, "nosort", "T1", "*"
         -- </where2-5.2b>
     })
 
@@ -520,7 +520,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.1.1>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
         -- </where2-6.1.1>
     })
 
@@ -532,7 +532,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.1.2>
-        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
+        99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
         -- </where2-6.1.2>
     })
 
@@ -544,14 +544,14 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.2>
-        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
+        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
         -- </where2-6.2>
     })
 
 -- tarantool
 -- changed to * after reordering indexes
 -- actually it does not matter (because it uses full scan)
---idx = "i1zyx"
+--idx = "I1ZYX"
 idx = "*"
 
 test:do_test(
@@ -562,7 +562,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.3>
-        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "t1", idx
+        6, 2, 49, 51, 99, 6, 10000, 10006, 100, 6, 10201, 10207, "sort", "T1", idx
         -- </where2-6.3>
     })
 
@@ -574,7 +574,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.4>
-        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "t1", idx
+        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "T1", idx
         -- </where2-6.4>
     })
 
@@ -586,16 +586,16 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.5>
-        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "t1", idx
+        6, 2, 49, 51, "|", 99, 6, 10000, 10006, "|", 100, 6, 10201, 10207, "|", "sort", "T1", idx
         -- </where2-6.5>
     })
 
 idx = ""
-idx = "i1zyx"
+idx = "I1ZYX"
 
 
 test:do_test(
-    "where2-6.5",
+    "where2-6.6.1",
     function()
         return queryplan([[
     SELECT b.w,b.x,b.y,b.z FROM t1 a, t1 b
@@ -604,12 +604,12 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.5>
-        1, 0, 4, 4, 2, 1, 9, 10, "sort", "a", "*", "b", idx
+        1, 0, 4, 4, 2, 1, 9, 10, "sort", "A", "*", "B", idx
         -- </where2-6.5>
     })
 
 test:do_test(
-    "where2-6.6",
+    "where2-6.6.2",
     function()
         return queryplan([[
     SELECT b.w,b.x,b.y,b.z FROM t1 a, t1 b
@@ -618,7 +618,7 @@ test:do_test(
   ]])
     end, {
         -- <where2-6.6>
-        1, 0, 4, 4, 2, 1, 9, 10, "sort", "a", "*", "b", idx
+        1, 0, 4, 4, 2, 1, 9, 10, "sort", "A", "*", "B", idx
         -- </where2-6.6>
     })
 
@@ -645,7 +645,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.7>
-            123, '0123', "nosort", "t2249b", "*", "t2249a", "*"
+            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.7>
         })
 
@@ -660,7 +660,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.9>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.9>
         })
 
@@ -673,7 +673,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.9.2>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.9.2>
         })
 
@@ -688,7 +688,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.10>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.10>
         })
 
@@ -702,7 +702,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.11>
-            123, '0123', "nosort", "t2249b", "*", "t2249a", "*"
+            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.11>
         })
 
@@ -715,7 +715,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.11.2>
-            123, '0123', "nosort", "t2249b", "*", "t2249a", "*"
+            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.11.2>
         })
 
@@ -728,7 +728,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.11.3>
-            123, '0123', "nosort", "t2249b", "*", "t2249a", "*"
+            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.11.3>
         })
 
@@ -741,7 +741,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.11.4>
-            123, '0123', "nosort", "t2249b", "*", "t2249a", "*"
+            123, '0123', "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.11.4>
         })
 
@@ -761,7 +761,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.12>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.12>
         })
 
@@ -776,7 +776,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.12.2>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.12.2>
         })
 
@@ -791,7 +791,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.12.3>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.12.3>
         })
 
@@ -805,7 +805,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.13>
-            "nosort", "t2249b", "*", "t2249a", "*"
+            "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.13>
         })
 
@@ -821,7 +821,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.20>
-            '0123', '0123', "nosort", "x", "*", "y", "*"
+            '0123', '0123', "nosort", "X", "*", "Y", "*"
             -- </where2-6.20>
         })
 
@@ -839,7 +839,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.21>
-            '0123', '0123', "nosort", "x", "*", "y", "*"
+            '0123', '0123', "nosort", "X", "*", "Y", "*"
             -- </where2-6.21>
         })
 
@@ -852,7 +852,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.22>
-            '0123', '0123', "nosort", "x", "*", "y", "*"
+            '0123', '0123', "nosort", "X", "*", "Y", "*"
             -- </where2-6.22>
         })
 
@@ -865,7 +865,7 @@ test:do_test(
     ]])
         end, {
             -- <where2-6.23>
-            '0123', '0123', "nosort", "x", "*", "y", "*"
+            '0123', '0123', "nosort", "X", "*", "Y", "*"
             -- </where2-6.23>
         })
 
@@ -1291,13 +1291,13 @@ test:do_execsql_test(
                 EXPLAIN QUERY PLAN
                   SELECT a.x, b.x
                     FROM t12 AS a JOIN t12 AS b ON a.y=b.x
-                    WHERE (b.x=$abc OR b.y=$abc);
+                    WHERE (b.x=1 OR b.y=1);
                 ]])
             -- Tarantool: model this unsupported match
             -- "/.*SEARCH TABLE t12 AS b .*SEARCH TABLE t12 AS b .*/"
             local cnt = 0
             for _, v in ipairs(data) do
-                if type(v) == 'string' and string.find(v, 'SEARCH TABLE t12 AS b ') then
+                if type(v) == 'string' and string.find(v, 'SEARCH TABLE T12 AS B ') then
                     cnt = cnt + 1
                 end
             end

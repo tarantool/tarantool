@@ -43,7 +43,7 @@ test:do_execsql_test(
         SELECT * FROM _sequence;
     ]], {
         -- <autoinc-1.3>
-        1,1,"t1",1,0,9223372036854775807LL,1,0,4294967041
+        1,1,"T1",1,0,9223372036854775807LL,1,0,4294967041
         -- </autoinc-1.3>
     })
 
@@ -71,7 +71,7 @@ test:do_catchsql_test(
         DROP TABLE _sequence
     ]], {
         -- <autoinc-1.5>
-        1, "table _sequence may not be dropped"
+        1, "table _SEQUENCE may not be dropped"
         -- </autoinc-1.5>
     })
 
@@ -81,7 +81,7 @@ test:do_execsql_test(
         SELECT name FROM _space WHERE name NOT IN (SELECT name FROM _space WHERE name LIKE '\_%' ESCAPE '\')
     ]], {
         -- <autoinc-1.6>
-        "t1"
+        "T1"
         -- </autoinc-1.6>
     })
 
@@ -334,7 +334,7 @@ test:do_execsql_test(
         SELECT name FROM _sequence
     ]], {
         -- <autoinc-3.1>
-        "t1", "t2", "t3"
+        "T1", "T2", "T3"
         -- </autoinc-3.1>
     })
 
@@ -345,7 +345,7 @@ test:do_execsql_test(
         SELECT name FROM _sequence;
     ]], {
         -- <autoinc-3.2>
-        "t2", "t3"
+       "T2", "T3"
         -- </autoinc-3.2>
     })
 
@@ -356,7 +356,7 @@ test:do_execsql_test(
         SELECT name FROM _sequence;
     ]], {
         -- <autoinc-3.3>
-        "t2"
+        "T2"
         -- </autoinc-3.3>
     })
 
@@ -531,7 +531,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL,1);
     ]], {
         -- <autoinc-6.2>
-        1, "Sequence 't6' has overflowed"
+        1, "Sequence 'T6' has overflowed"
         -- </autoinc-6.2>
     })
 

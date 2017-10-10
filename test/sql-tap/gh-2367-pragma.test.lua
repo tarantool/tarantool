@@ -24,7 +24,7 @@ test:do_catchsql_test(
 	[[
 		PRAGMA kek = 'ON';
 	]], {
-		1, "no such pragma: kek"
+		1, "no such pragma: KEK"
 	})
 
 test:finish_test()

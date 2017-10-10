@@ -66,7 +66,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-1.3>
-	1, "default value of column [y] is not constant"
+	1, "default value of column [Y] is not constant"
 	-- </default-1.3>
 })
 
@@ -80,7 +80,7 @@ test:do_execsql_test(
 	PRAGMA table_info(t4);
 	]], {
 	-- <default-2.1>
-	0,"rowid","INTEGER",1,"",1,1,"c","",0,"'abc'",0
+	0,"ROWID","INTEGER",1,"",1,1,"C","",0,"'abc'",0
 	-- </default-2.1>
 })
 
@@ -91,7 +91,7 @@ test:do_execsql_test(
 	PRAGMA table_info(t4);
 	]], {
 	-- <default-2.2>
-	0,"rowid","INTEGER",1,"",1,1,"c","",0,"'abc'",0
+	0,"ROWID","INTEGER",1,"",1,1,"C","",0,"'abc'",0
 	-- </default-2.2>
 })
 
@@ -174,7 +174,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.2>
-	1, "default value of column [b] is not constant"
+	1, "default value of column [B] is not constant"
 	-- </default-4.2>
 })
 
@@ -188,7 +188,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.3>
-	1, "default value of column [b] is not constant"
+	1, "default value of column [B] is not constant"
 	-- </default-4.3>
 })
 
@@ -202,7 +202,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.4>
-	1, "default value of column [b] is not constant"
+	1, "default value of column [B] is not constant"
 	-- </default-4.4>
 })
 

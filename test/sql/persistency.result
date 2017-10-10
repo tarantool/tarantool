@@ -20,7 +20,7 @@ box.sql.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ...
 box.sql.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
-- error: 'UNIQUE constraint failed: foobar.foo'
+- error: 'UNIQUE constraint failed: FOOBAR.FOO'
 ...
 -- simple select
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -141,7 +141,7 @@ box.sql.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO
 ...
 box.sql.execute("SELECT * FROM _trigger");
 ---
-- - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
+- - ['TFOOBAR', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
 ...
 -- Many entries
 box.sql.execute("CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));")
@@ -167,7 +167,7 @@ test_run:cmd('restart server default');
 -- prove that trigger survived
 box.sql.execute("SELECT * FROM _trigger");
 ---
-- - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
+- - ['TFOOBAR', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
 ...
 -- ... functional
 box.sql.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
@@ -180,7 +180,7 @@ box.sql.execute("SELECT * FROM barfoo WHERE foo = 9999");
 -- and still persistent
 box.sql.execute("SELECT * FROM _trigger")
 ---
-- - ['tfoobar', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
+- - ['TFOOBAR', !!binary gaNzcWzZaUNSRUFURSBUUklHR0VSIHRmb29iYXIgQUZURVIgSU5TRVJUIE9OIGZvb2JhciBCRUdJTiBJTlNFUlQgSU5UTyBiYXJmb28gVkFMVUVTICgndHJpZ2dlciB0ZXN0JywgOTk5OSk7IEVORA==]
 ...
 -- and can be dropped just once
 box.sql.execute("DROP TRIGGER tfoobar")
@@ -189,7 +189,7 @@ box.sql.execute("DROP TRIGGER tfoobar")
 -- Should error
 box.sql.execute("DROP TRIGGER tfoobar")
 ---
-- error: 'no such trigger: tfoobar'
+- error: 'no such trigger: TFOOBAR'
 ...
 -- Should be empty
 box.sql.execute("SELECT * FROM _trigger")
@@ -199,7 +199,7 @@ box.sql.execute("SELECT * FROM _trigger")
 -- prove barfoo2 still exists
 box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
-- error: 'UNIQUE constraint failed: barfoo.foo'
+- error: 'UNIQUE constraint failed: BARFOO.FOO'
 ...
 box.sql.execute("SELECT * FROM barfoo")
 ---

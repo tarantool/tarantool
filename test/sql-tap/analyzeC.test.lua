@@ -55,7 +55,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT b, c, d, '#' FROM t1 WHERE b BETWEEN 3 AND 8 ORDER BY d;
     ]], {
         -- <1.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)",
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B>? AND B<?)",
         0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"
         -- </1.1>
     })
@@ -76,7 +76,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT d FROM t1 ORDER BY b;
     ]], {
         -- <1.3>
-        0, 0, 0, "SCAN TABLE t1 USING COVERING INDEX t1b"
+        0, 0, 0, "SCAN TABLE T1 USING COVERING INDEX T1B"
         -- </1.3>
     })
 
@@ -101,7 +101,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT b, c, d, '#' FROM t1 WHERE b BETWEEN 3 AND 8 ORDER BY d;
     ]], {
         -- <2.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)",
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B>? AND B<?)",
         0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"
         -- </2.1>
     })
@@ -122,7 +122,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT d FROM t1 ORDER BY b;
     ]], {
         -- <2.3>
-        0, 0, 0, "SCAN TABLE t1 USING COVERING INDEX t1b"
+        0, 0, 0, "SCAN TABLE T1 USING COVERING INDEX T1B"
         -- </2.3>
     })
 
@@ -146,7 +146,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT b, c, d, '#' FROM t1 WHERE b BETWEEN 3 AND 8 ORDER BY d;
     ]], {
         -- <3.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)",
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B>? AND B<?)",
         0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"
         -- </3.1>
     })
@@ -167,7 +167,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT d FROM t1 ORDER BY b;
     ]], {
         -- <3.3>
-        0, 0, 0, "SCAN TABLE t1 USING COVERING INDEX t1b"
+        0, 0, 0, "SCAN TABLE T1 USING COVERING INDEX T1B"
         -- </3.3>
     })
 
@@ -195,7 +195,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT count(b) FROM t1;
     ]], {
         -- <4.1>
-        0, 0, 0, "SCAN TABLE t1"
+        0, 0, 0, "SCAN TABLE T1"
         -- </4.1>
     })
 
@@ -218,7 +218,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT count(b) FROM t1;
     ]], {
         -- <4.3>
-        0, 0, 0, "SCAN TABLE t1"
+        0, 0, 0, "SCAN TABLE T1"
         -- </4.3>
     })
 
@@ -247,7 +247,7 @@ test:do_execsql_test(
         SELECT count(b) FROM t1;
     ]], {
         -- <5.1>
-        0, 0, 0, "SCAN TABLE t1"
+        0, 0, 0, "SCAN TABLE T1"
         -- </5.1>
     })
 
@@ -270,7 +270,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT count(b) FROM t1;
     ]], {
         -- <5.3>
-        0, 0, 0, "SCAN TABLE t1"
+        0, 0, 0, "SCAN TABLE T1"
         -- </5.3>
     })
 

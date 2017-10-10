@@ -1206,8 +1206,8 @@ test:do_test(
              consoleHost text,
              consolePort text
             );
-            INSERT INTO "host" VALUES('aald04','aalp03','4');
-            INSERT INTO "host" VALUES('aald17','aalp01','1');
+            INSERT INTO host VALUES('aald04','aalp03','4');
+            INSERT INTO host VALUES('aald17','aalp01','1');
             CREATE VIEW consolemap1a as
               select hostname, consolehost, '/dev/cuaD0.' || (consoleport-1) consoleport
                 from host where consolehost='aalp01';

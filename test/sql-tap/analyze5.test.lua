@@ -115,8 +115,8 @@ test:do_test(
         -- DISTINCT idx, sample -- lindex(test_decode(sample),0)
         -- WHERE idx='t1u' ORDER BY nlt;
         return test:execsql([[ SELECT DISTINCT msgpack_decode(sample)
-                                 FROM _sql_stat4
-                                 WHERE idx='t1u'
+                                 FROM _SQL_STAT4
+                                 WHERE idx='T1U'
                                  ORDER BY nlt]])
     end, {
         -- <analyze5-1.0>
@@ -146,7 +146,7 @@ test:do_test(
         return test:execsql("SELECT idx, count(*) FROM _sql_stat4 GROUP BY 1 ORDER BY 1")
     end, {
         -- <analyze5-1.2>
-        "t1",24,"t1t",4,"t1u",4,"t1v",1,"t1w",4,"t1x",4,"t1y",2,"t1z",4
+        "T1",24,"T1T",4,"T1U",4,"T1V",1,"T1W",4,"T1X",4,"T1Y",2,"T1Z",4
         -- </analyze5-1.2>
     })
 

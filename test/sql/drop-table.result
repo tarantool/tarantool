@@ -21,7 +21,7 @@ box.sql.execute("DROP TABLE zzzoobar")
 -- Table does not exist anymore. Should error here.
 box.sql.execute("INSERT INTO zzzoobar VALUES (111, 222, 'c3', 444)")
 ---
-- error: 'no such table: zzzoobar'
+- error: 'no such table: ZZZOOBAR'
 ...
 -- Cleanup
 -- DROP TABLE should do the job

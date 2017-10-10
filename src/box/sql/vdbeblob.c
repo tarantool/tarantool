@@ -223,7 +223,7 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 
 		/* Now search pTab for the exact column. */
 		for (iCol = 0; iCol < pTab->nCol; iCol++) {
-			if (sqlite3StrICmp(pTab->aCol[iCol].zName, zColumn) ==
+			if (strcmp(pTab->aCol[iCol].zName, zColumn) ==
 			    0) {
 				break;
 			}

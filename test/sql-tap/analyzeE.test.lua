@@ -43,7 +43,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 500 AND 2500;
    ]], {
        -- <analyzeE-1.1>
-       0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+       0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
        -- </analyzeE-1.1>
    })
 
@@ -53,7 +53,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE b BETWEEN 2900 AND 3000;
     ]], {
         -- <analyzeE-1.2>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1B (B>? AND B<?)'
         -- </analyzeE-1.2>
     })
 
@@ -63,7 +63,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1700 AND 1750;
     ]], {
         -- <analyzeE-1.3>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-1.3>
     })
 
@@ -73,7 +73,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1 AND 500;
     ]], {
         -- <analyzeE-1.4>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-1.4>
     })
 
@@ -83,7 +83,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 3000 AND 3000000;
     ]], {
         -- <analyzeE-1.5>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-1.5>
     })
 
@@ -93,7 +93,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<500;
     ]], {
         -- <analyzeE-1.6>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A<?)'
         -- </analyzeE-1.6>
     })
 
@@ -103,7 +103,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>2500;
     ]], {
         -- <analyzeE-1.7>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>?)'
         -- </analyzeE-1.7>
     })
 
@@ -113,7 +113,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1900;
     ]], {
         -- <analyzeE-1.8>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>?)'
         -- </analyzeE-1.8>
     })
 
@@ -123,7 +123,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1100;
    ]], {
        -- <analyzeE-1.9>
-       0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>?)'
+       0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>?)'
        -- </analyzeE-1.9>
    })
 
@@ -133,7 +133,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1100;
     ]], {
         -- <analyzeE-1.10>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A<?)'
         -- </analyzeE-1.10>
     })
 
@@ -143,7 +143,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1900;
    ]], {
         -- <analyzeE-1.11>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A<?)'
         -- </analyzeE-1.11>
    })
 
@@ -166,7 +166,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 500 AND 2500;
     ]], {
         -- <analyzeE-2.1>
-        0,0,0,"SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)"
+        0,0,0,"SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)"
         -- </analyzeE-2.1>
     })
 
@@ -176,7 +176,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 2900 AND 3000;
     ]], {
         -- <analyzeE-2.2>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-2.2>
     })
 
@@ -186,7 +186,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1700 AND 1750;
     ]], {
         -- <analyzeE-2.3>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-2.3>
     })
 
@@ -196,7 +196,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1 AND 500;
     ]], {
         -- <analyzeE-2.4>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-2.4>
     })
 
@@ -206,7 +206,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 3000 AND 3000000;
     ]], {
         -- <analyzeE-2.5>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>? AND A<?)'
         -- </analyzeE-2.5>
     })
 
@@ -216,7 +216,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<500;
     ]], {
         -- <analyzeE-2.6>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A<?)'
         -- </analyzeE-2.6>
     })
 
@@ -226,7 +226,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>2500;
     ]], {
         -- <analyzeE-2.7>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>?)'
         -- </analyzeE-2.7>
     })
 
@@ -236,7 +236,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1900;
     ]], {
         -- <analyzeE-2.8>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A>?)'
         -- </analyzeE-2.8>
     })
 
@@ -246,7 +246,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1100;
     ]], {
         -- <analyzeE-2.9>
-        0,0,0,"SEARCH TABLE t1 USING COVERING INDEX t1a (a>?)"
+        0,0,0,"SEARCH TABLE T1 USING COVERING INDEX T1A (A>?)"
         -- </analyzeE-2.9>
     })
 
@@ -256,7 +256,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1100;
     ]], {
         -- <analyzeE-2.10>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1a (a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1A (A<?)'
         -- </analyzeE-2.10>
     })
 
@@ -266,7 +266,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1900;
     ]], {
         -- <analyzeE-2.11>
-        0,0,0,"SEARCH TABLE t1 USING COVERING INDEX t1a (a<?)"
+        0,0,0,"SEARCH TABLE T1 USING COVERING INDEX T1A (A<?)"
         -- </analyzeE-2.11>
     })
 
@@ -293,7 +293,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 500 AND 2500 AND c=123;
     ]], {
         -- <analyzeE-3.1>
-        0,0,0,"SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)"
+        0,0,0,"SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)"
         -- </analyzeE-3.1>
     })
 
@@ -303,7 +303,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 2900 AND 3000 AND c=123;
     ]], {
         -- <analyzeE-3.2>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-3.2>
     })
 
@@ -313,7 +313,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1700 AND 1750 AND c=123;
     ]], {
         -- <analyzeE-3.3>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-3.3>
     })
 
@@ -323,7 +323,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1 AND 500 AND c=123;
     ]], {
         -- <analyzeE-3.4>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-3.4>
     })
 
@@ -333,7 +333,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 3000 AND 3000000 AND c=123;
     ]], {
         -- <analyzeE-3.5>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-3.5>
     })
 
@@ -343,7 +343,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<500 AND c=123;
     ]], {
         -- <analyzeE-3.6>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A<?)'
         -- </analyzeE-3.6>
     })
 
@@ -353,7 +353,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>2500 AND c=123;
     ]], {
         -- <analyzeE-3.7>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>?)'
         -- </analyzeE-3.7>
     })
 
@@ -363,7 +363,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1900 AND c=123;
     ]], {
         -- <analyzeE-3.8>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>?)'
         -- </analyzeE-3.8>
     })
 
@@ -373,7 +373,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1100 AND c=123;
     ]], {
         -- <analyzeE-3.9>
-        0, 0, 0,"SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>?)"
+        0, 0, 0,"SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>?)"
         -- </analyzeE-3.9>
     })
 
@@ -383,7 +383,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1100 AND c=123;
     ]], {
         -- <analyzeE-3.10>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A<?)'
         -- </analyzeE-3.10>
     })
 
@@ -393,7 +393,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1900 AND c=123;
     ]], {
         -- <analyzeE-3.11>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a<?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A<?)"
         -- </analyzeE-3.11>
     })
 
@@ -417,7 +417,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 500 AND 2500 AND c=123;
     ]], {
         -- <analyzeE-4.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)"
         -- </analyzeE-4.1>
     })
 
@@ -427,7 +427,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 2900 AND 3000 AND c=123;
     ]], {
         -- <analyzeE-4.2>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-4.2>
     })
 
@@ -437,7 +437,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1700 AND 1750 AND c=123;
     ]], {
         -- <analyzeE-4.3>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-4.3>
     })
 
@@ -447,7 +447,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 1 AND 500 AND c=123;
     ]], {
         -- <analyzeE-4.4>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-4.4>
     })
 
@@ -457,7 +457,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a BETWEEN 3000 AND 3000000 AND c=123;
     ]], {
         -- <analyzeE-4.5>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>? AND A<?)'
         -- </analyzeE-4.5>
     })
 
@@ -467,7 +467,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<500 AND c=123;
     ]], {
         -- <analyzeE-4.6>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A<?)'
         -- </analyzeE-4.6>
     })
 
@@ -477,7 +477,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>2500 AND c=123;
     ]], {
         -- <analyzeE-4.7>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>?)'
         -- </analyzeE-4.7>
     })
 
@@ -487,7 +487,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1900 AND c=123;
     ]], {
         -- <analyzeE-4.8>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>?)'
         -- </analyzeE-4.8>
     })
 
@@ -497,7 +497,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a>1100 AND c=123;
     ]], {
         -- <analyzeE-4.9>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a>?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A>?)"
         -- </analyzeE-4.9>
     })
 
@@ -507,7 +507,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1100 AND c=123;
     ]], {
         -- <analyzeE-4.10>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a<?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A<?)'
         -- </analyzeE-4.10>
     })
 
@@ -517,7 +517,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a<1900 AND c=123;
     ]], {
         -- <analyzeE-4.11>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1ca (c=? AND a<?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CA (C=? AND A<?)"
         -- </analyzeE-4.11>
     })
 

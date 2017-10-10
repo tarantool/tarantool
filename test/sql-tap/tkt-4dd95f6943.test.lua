@@ -34,7 +34,7 @@ for tn1, idx in ipairs(idxs) do
     test:do_execsql_test(
         "1."..tn1..".1",
         [[
-            DROP INDEX IF EXISTS "i1" ON t1;
+            DROP INDEX IF EXISTS i1 ON t1;
         ]])
 
     test:do_execsql_test(
@@ -91,7 +91,7 @@ for tn1, idx in ipairs(indexes) do
     test:do_execsql_test(
         "2."..tn1..".1",
         [[
-            DROP INDEX IF EXISTS "i1" ON t2;
+            DROP INDEX IF EXISTS i1 ON t2;
         ]])
 
     test:do_execsql_test(
@@ -236,7 +236,7 @@ for tn, val in ipairs(data) do
     test:do_execsql_test(
         "3."..tn,
         string.format([[
-            DROP INDEX IF EXISTS "i8" ON t8;
+            DROP INDEX IF EXISTS i8 ON t8;
             CREATE UNIQUE INDEX i8 ON t8(y %s);
             SELECT x FROM t7 WHERE x IN (SELECT y FROM t8) ORDER BY x %s;
         ]], idxdir, sortdir),

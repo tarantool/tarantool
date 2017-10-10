@@ -36,7 +36,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <unique-1.1>
-        1, [[table "t1" has more than one primary key]]
+        1, [[table "T1" has more than one primary key]]
         -- </unique-1.1>
     })
 
@@ -70,7 +70,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(1,3,4)
     ]], {
         -- <unique-1.3>
-        1, "UNIQUE constraint failed: t1.a"
+        1, "UNIQUE constraint failed: T1.A"
         -- </unique-1.3>
     })
 
@@ -91,7 +91,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(3,2,4)
     ]], {
         -- <unique-1.5>
-        1, "UNIQUE constraint failed: t1.b"
+        1, "UNIQUE constraint failed: T1.B"
         -- </unique-1.5>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1,5);
     ]], {
         -- <unique-2.3>
-        1, "UNIQUE constraint failed: t2.a"
+        1, "UNIQUE constraint failed: T2.A"
         -- </unique-2.3>
     })
 
@@ -287,7 +287,7 @@ test:do_catchsql_test(
         SELECT a,b,c,d FROM t3 ORDER BY a,b,c,d;
     ]], {
         -- <unique-3.4>
-        1, "UNIQUE constraint failed: t3.a, t3.c, t3.d"
+        1, "UNIQUE constraint failed: T3.A, T3.C, T3.D"
         -- </unique-3.4>
     })
 
@@ -444,7 +444,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(2, 1,2,3,4,5,6);
     ]], {
         -- <unique-5.2>
-        1, "UNIQUE constraint failed: t5.first_column_with_long_name, t5.second_column_with_long_name, t5.third_column_with_long_name, t5.fourth_column_with_long_name, t5.fifth_column_with_long_name, t5.sixth_column_with_long_name"
+        1, "UNIQUE constraint failed: T5.FIRST_COLUMN_WITH_LONG_NAME, T5.SECOND_COLUMN_WITH_LONG_NAME, T5.THIRD_COLUMN_WITH_LONG_NAME, T5.FOURTH_COLUMN_WITH_LONG_NAME, T5.FIFTH_COLUMN_WITH_LONG_NAME, T5.SIXTH_COLUMN_WITH_LONG_NAME"
         -- </unique-5.2>
     })
 

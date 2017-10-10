@@ -201,7 +201,7 @@ for _, kw in ipairs(kwlist) do
         "keyword1-"..kw..".1",
         function()
             if (kw == "if") then
-                test:execsql( string.format([[CREATE TABLE "%s"(%s %s PRIMARY KEY)]], kw, kw, kw))
+                test:execsql( string.format([[CREATE TABLE "%s"(%s %s PRIMARY KEY)]], kw:upper(), kw, kw))
             else
                 test:execsql(string.format("CREATE TABLE %s(%s %s PRIMARY KEY)", kw, kw, kw))
             end
@@ -210,7 +210,7 @@ for _, kw in ipairs(kwlist) do
             if test:lsearch(exprkw, kw) <0 then
                 return test:execsql(string.format("SELECT * FROM %s ORDER BY %s ASC", kw, kw))
             else
-                return test:execsql(string.format([[SELECT * FROM %s ORDER BY "%s" ASC]], kw, kw))
+                return test:execsql(string.format([[SELECT * FROM %s ORDER BY "%s" ASC]], kw, kw:upper()))
             end
         end, {
             1, 2, 3, 99
@@ -220,7 +220,7 @@ for _, kw in ipairs(kwlist) do
         "keyword1-"..kw..".2",
         function()
             if (kw == "if") then
-                test:execsql(string.format([[DROP TABLE "%s"]], kw))
+                test:execsql(string.format([[DROP TABLE "%s"]], kw:upper()))
                 test:execsql(string.format([[CREATE INDEX "%s" ON t1(a)]], kw))
             else
                 test:execsql("DROP TABLE "..kw.."")

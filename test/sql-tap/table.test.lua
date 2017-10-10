@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(55)
+test:plan(54)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -131,18 +131,8 @@ test:do_test(
         return test:catchsql "CREATE TABLE test2(id primary key, two text default 'hi')"
     end, {
         -- <table-2.1>
-        1, "table test2 already exists"
+        1, "table TEST2 already exists"
         -- </table-2.1>
-    })
-
-test:do_catchsql_test(
-    "table-2.1.1",
-    [[
-        CREATE TABLE "test2" (two primary key)
-    ]], {
-        -- <table-2.1.1>
-        1, [[table "test2" already exists]]
-        -- </table-2.1.1>
     })
 
 -- do_test table-2.1b {
@@ -212,7 +202,7 @@ test:do_test(
 test:do_test(
     "table-2.2d",
     function()
-        test:execsql [[DROP INDEX "test3" ON test2]]
+        test:execsql [[DROP INDEX test3 ON test2]]
         return test:catchsql "CREATE TABLE test3(two text primary key)"
     end, {
         -- <table-2.2d>
@@ -286,7 +276,7 @@ test:do_catchsql_test(
         CREATE TABLE biG(xyz foo primary key)
     ]], {
         -- <table-3.3>
-        1, "table biG already exists"
+        1, "table BIG already exists"
         -- </table-3.3>
     })
 
@@ -296,7 +286,7 @@ test:do_catchsql_test(
         CREATE TABLE bIg(xyz foo primary key)
     ]], {
         -- <table-3.4>
-        1, "table bIg already exists"
+        1, "table BIG already exists"
         -- </table-3.4>
     })
 
@@ -321,7 +311,7 @@ test:do_test(
 --
 local r = {}
 for i = 1, 100, 1 do
-    table.insert(r, string.format("test%03d", i))
+    table.insert(r, string.format("TEST%03d", i))
 end
 test:do_test(
     "table-4.1",
@@ -347,7 +337,7 @@ test:do_test(
 --
 r = {}
 for i = 1, 100, 2 do
-    table.insert(r,string.format("test%03d", i))
+    table.insert(r,string.format("TEST%03d", i))
 end
 test:do_test(
     "table-4.2",
@@ -387,14 +377,14 @@ test:do_catchsql_test(
         DROP TABLE test009
     ]], {
         -- <table-5.1.1>
-        1, "no such table: test009"
+        1, "no such table: TEST009"
         -- </table-5.1.1>
     })
 
 test:do_catchsql_test(
     "table-5.1.2",
     [[
-        DROP TABLE IF EXISTS test009
+        DROP TABLE IF EXISTS TEST009
     ]], {
         -- <table-5.1.2>
         0
@@ -482,7 +472,7 @@ test:do_test(
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
     end, {
         -- <table-5.4>
-        "test1"
+        "TEST1"
         -- </table-5.4>
     })
 
@@ -531,7 +521,7 @@ test:do_execsql2_test(
         SELECT * FROM weird;
     ]], {
         -- <table-7.3>
-        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "beginn", "hi", "endd", "y'all"
+        "ID",1,"desc","a","asc","b","KEY",9,"14_vac",0,"FUZZY_DOG_12","xyz","BEGINN","hi","ENDD","y'all"
         -- </table-7.3>
     })
 
@@ -568,7 +558,7 @@ test:do_execsql2_test(
         SELECT * FROM t2;
     ]=], {
         -- <table-8.1>
-        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "beginn", "hi", "endd", "y'all"
+        "ID",1,"desc","a","asc","b","KEY",9,"14_vac",0,"FUZZY_DOG_12","xyz","BEGINN","hi","ENDD","y'all"
         -- </table-8.1>
     })
 
@@ -627,7 +617,7 @@ test:do_execsql2_test(
         SELECT * FROM t2;
     ]], {
         -- <table-8.6>
-        "id", 1, "desc", "a", "asc", "b", "key", 9, "14_vac", 0, "fuzzy_dog_12", "xyz", "beginn", "hi", "endd", "y'all"
+        "ID",1,"desc","a","asc","b","KEY",9,"14_vac",0,"FUZZY_DOG_12","xyz","BEGINN","hi","ENDD","y'all"
         -- </table-8.6>
     })
 
@@ -637,7 +627,7 @@ test:do_catchsql_test(
         SELECT * FROM t5;
     ]], {
         -- <table-8.7>
-        1, "no such table: t5"
+        1, "no such table: T5"
         -- </table-8.7>
     })
 
@@ -684,7 +674,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(a primary key,b,a);
     ]], {
         -- <table-9.1>
-        1, "duplicate column name: a"
+        1, "duplicate column name: A"
         -- </table-9.1>
     })
 
@@ -694,7 +684,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(a varchar(100) primary key, b blob, a integer);
     ]], {
         -- <table-9.2>
-        1, "duplicate column name: a"
+        1, "duplicate column name: A"
         -- </table-9.2>
     })
 
@@ -709,7 +699,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL);
     ]], {
         -- <table-10.1>
-        1, "NOT NULL constraint failed: t6.a"
+        1, "NOT NULL constraint failed: T6.A"
         -- </table-10.1>
     })
 
@@ -832,7 +822,7 @@ test:do_test(
         ]]
     end, {
         -- <table-10.11>
-        1, "foreign key on c should reference only one column of table t4"
+        1, "foreign key on C should reference only one column of table t4"
         -- </table-10.11>
     })
 
@@ -847,7 +837,7 @@ test:do_test(
         ]]
     end, {
         -- <table-10.12>
-        1, [[unknown column "x" in foreign key definition]]
+        1, [[unknown column "X" in foreign key definition]]
         -- </table-10.12>
     })
 
@@ -862,7 +852,7 @@ test:do_test(
         ]]
     end, {
         -- <table-10.13>
-        1, [[unknown column "x" in foreign key definition]]
+        1, [[unknown column "X" in foreign key definition]]
         -- </table-10.13>
     })
 

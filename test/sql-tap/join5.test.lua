@@ -91,12 +91,12 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE ab(a primary key,b);
-            INSERT INTO "ab" VALUES(1,2);
-            INSERT INTO "ab" VALUES(3,NULL);
+            INSERT INTO ab VALUES(1,2);
+            INSERT INTO ab VALUES(3,NULL);
 
             CREATE TABLE xy(x,y primary key);
-            INSERT INTO "xy" VALUES(2,3);
-            INSERT INTO "xy" VALUES(NULL,1);
+            INSERT INTO xy VALUES(2,3);
+            INSERT INTO xy VALUES(NULL,1);
         ]]
         return test:execsql "SELECT * FROM xy LEFT JOIN ab ON 0"
     end, {

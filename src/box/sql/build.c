@@ -676,7 +676,7 @@ sqlite3NameFromToken(sqlite3 * db, Token * pName)
 	char *zName;
 	if (pName) {
 		zName = sqlite3DbStrNDup(db, (char *)pName->z, pName->n);
-		sqlite3Dequote(zName);
+		sqlite3NormalizeName(zName);
 	} else {
 		zName = 0;
 	}
@@ -846,8 +846,8 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	if (pTable) {
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse,
-					"table %T already exists",
-					pName);
+					"table %s already exists",
+					zName);
 		} else {
 			assert(!db->init.busy || CORRUPT_DB);
 			sqlite3CodeVerifySchema(pParse);
@@ -878,7 +878,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	 * so that INSERT can find the table easily.
 	 */
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-	if (!pParse->nested && strcmp(zName, "_sequence") == 0) {
+	if (!pParse->nested && strcmp(zName, "_SEQUENCE") == 0) {
 		assert(sqlite3SchemaMutexHeld(db, 0));
 		pTable->pSchema->pSeqTab = pTable;
 	}
@@ -950,9 +950,9 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		return;
 	memcpy(z, pName->z, pName->n);
 	z[pName->n] = 0;
-	sqlite3Dequote(z);
+	sqlite3NormalizeName(z);
 	for (i = 0; i < p->nCol; i++) {
-		if (sqlite3_stricmp(z, p->aCol[i].zName) == 0) {
+		if (strcmp(z, p->aCol[i].zName) == 0) {
 			sqlite3ErrorMsg(pParse, "duplicate column name: %s", z);
 			sqlite3DbFree(db, z);
 			return;
@@ -1206,7 +1206,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 			}
 			const char *zCName = pCExpr->u.zToken;
 			for (iCol = 0; iCol < pTab->nCol; iCol++) {
-				if (sqlite3StrICmp
+				if (strcmp
 				    (zCName,
 				     pTab->aCol[iCol].zName) == 0) {
 					pCol = &pTab->aCol[iCol];
@@ -2505,10 +2505,10 @@ sqlite3ClearStatTables(Parse * pParse,	/* The parsing context */
 	int i;
 	for (i = 1; i <= 4; i++) {
 		char zTab[24];
-		sqlite3_snprintf(sizeof(zTab), zTab, "_sql_stat%d", i);
+		sqlite3_snprintf(sizeof(zTab), zTab, "_SQL_STAT%d", i);
 		if (sqlite3FindTable(pParse->db, zTab)) {
 			sqlite3NestedParse(pParse,
-					   "DELETE FROM %s WHERE %s=%Q",
+					   "DELETE FROM \"%s\" WHERE %s=%Q",
 					   zTab, zType, zName);
 		}
 	}
@@ -2590,7 +2590,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	Token _space =
 	    { TARANTOOL_SYS_SPACE_NAME, strlen(TARANTOOL_SYS_SPACE_NAME), false };
 	Expr *id_value = sqlite3ExprInteger(db, space_id);
-	const char *column = "id";
+	const char *column = "ID";
 	/* Execute not nested DELETE of a space to account DROP TABLE
 	 * changes.
 	 */
@@ -2692,7 +2692,7 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	 */
 
 	sqlite3BeginWriteOperation(pParse, 1);
-	sqlite3ClearStatTables(pParse, "tbl", pTab->zName);
+	sqlite3ClearStatTables(pParse, "TBL", pTab->zName);
 	sqlite3FkDropTable(pParse, pName, pTab);
 	sqlite3CodeDropTable(pParse, pTab, isView);
 
@@ -2773,7 +2773,7 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 	pFKey->zTo = z;
 	memcpy(z, pTo->z, pTo->n);
 	z[pTo->n] = 0;
-	sqlite3Dequote(z);
+	sqlite3NormalizeName(z);
 	z += pTo->n + 1;
 	pFKey->nCol = nCol;
 	if (pFromCol == 0) {
@@ -2782,7 +2782,7 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 		for (i = 0; i < nCol; i++) {
 			int j;
 			for (j = 0; j < p->nCol; j++) {
-				if (sqlite3StrICmp
+				if (strcmp
 				    (p->aCol[j].zName,
 				     pFromCol->a[i].zName) == 0) {
 					pFKey->aCol[i].iFrom = j;
@@ -3433,7 +3433,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 					break;
 				z1 = pIdx->azColl[k];
 				z2 = pIndex->azColl[k];
-				if (sqlite3StrICmp(z1, z2))
+				if (strcmp(z1, z2))
 					break;
 			}
 			if (k == pIdx->nKeyCol) {
@@ -3509,7 +3509,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 
 		pSysIndex =
 		    sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
-				    TARANTOOL_SYS_INDEX_NAME);
+				    "_INDEX");
 		if (NEVER(!pSysIndex))
 			return;
 
@@ -3699,7 +3699,7 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 
 	Token _index =
 	    { TARANTOOL_SYS_INDEX_NAME, strlen(TARANTOOL_SYS_INDEX_NAME), false };
-	const char *columns[2] = { "id", "iid" };
+	const char *columns[2] = { "ID", "IID" };
 	Expr *values[2];
 	values[0] =
 	    sqlite3ExprInteger(db, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum));
@@ -3707,7 +3707,7 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 	    sqlite3ExprInteger(db, SQLITE_PAGENO_TO_INDEXID(pIndex->tnum));
 	sqlite3DeleteByKey(pParse, &_index, columns, values, 2);
 
-	sqlite3ClearStatTables(pParse, "idx", pIndex->zName);
+	sqlite3ClearStatTables(pParse, "IDX", pIndex->zName);
 	sqlite3ChangeCookie(pParse);
 
 	sqlite3VdbeAddOp3(v, OP_DropIndex, 0, 0, 0);
@@ -3814,7 +3814,7 @@ sqlite3IdListIndex(IdList * pList, const char *zName)
 	if (pList == 0)
 		return -1;
 	for (i = 0; i < pList->nId; i++) {
-		if (sqlite3StrICmp(pList->a[i].zName, zName) == 0)
+		if (strcmp(pList->a[i].zName, zName) == 0)
 			return i;
 	}
 	return -1;
@@ -4617,7 +4617,7 @@ sqlite3WithAdd(Parse * pParse,	/* Parsing context */
 	if (zName && pWith) {
 		int i;
 		for (i = 0; i < pWith->nCte; i++) {
-			if (sqlite3StrICmp(zName, pWith->a[i].zName) == 0) {
+			if (strcmp(zName, pWith->a[i].zName) == 0) {
 				sqlite3ErrorMsg(pParse,
 						"duplicate WITH table name: %s",
 						zName);

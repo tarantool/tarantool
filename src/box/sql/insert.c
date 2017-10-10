@@ -483,7 +483,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		}
 		for (i = 0; i < pColumn->nId; i++) {
 			for (j = 0; j < pTab->nCol; j++) {
-				if (sqlite3StrICmp
+				if (strcmp
 				    (pColumn->a[i].zName,
 				     pTab->aCol[j].zName) == 0) {
 					pColumn->a[i].idx = j;

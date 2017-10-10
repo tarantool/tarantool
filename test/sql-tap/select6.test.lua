@@ -68,7 +68,7 @@ test:do_execsql2_test(
         SELECT * FROM (SELECT x, y FROM t1 WHERE x<2)
     ]], {
         -- <select6-1.1>
-        "x", 1, "y", 1
+        "X", 1, "Y", 1
         -- </select6-1.1>
     })
 
@@ -187,7 +187,7 @@ test:do_execsql2_test(
         SELECT * FROM (SELECT a, b FROM t2 WHERE a<2)
     ]], {
         -- <select6-2.1>
-        "a", 1, "b", 1
+        "A", 1, "B", 1
         -- </select6-2.1>
     })
 
@@ -289,7 +289,7 @@ test:do_execsql2_test(
         SELECT * FROM (SELECT * FROM (SELECT * FROM t1 WHERE x=3));
     ]], {
         -- <select6-3.1>
-        "x", 3, "y", 2
+        "X", 3, "Y", 2
         -- </select6-3.1>
     })
 
@@ -301,7 +301,7 @@ test:do_execsql_test(
            FROM (SELECT count(*) as p , b as q FROM t2 GROUP BY q) AS a,
                 (SELECT max(a) as r, b as s FROM t2 GROUP BY s) as b
            WHERE a.q=b.s ORDER BY a.q)
-        ORDER BY "q" -- there is no "a.q" in this context any more
+        ORDER BY "Q" -- there is no "a.q" in this context any more
     ]], {
         -- <select6-3.2>
         1, 1, 1, 2, 2, 3, 3, 4, 7, 4, 8, 15, 5, 5, 20
@@ -311,7 +311,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.3",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", avg(y) as "b" FROM t1)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1)
     ]], {
         -- <select6-3.3>
         10.5, 3.7, 14.2
@@ -321,7 +321,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.4",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", avg(y) as "b" FROM t1 WHERE y=4)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1 WHERE y=4)
     ]], {
         -- <select6-3.4>
         11.5, 4.0, 15.5
@@ -331,7 +331,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.5",
     [[
-        SELECT x,y,x+y FROM (SELECT avg(a) as "x", avg(b) as "y" FROM t2 WHERE a=4)
+        SELECT x,y,x+y FROM (SELECT avg(a) as x, avg(b) as y FROM t2 WHERE a=4)
     ]], {
         -- <select6-3.5>
         4.0, 3.0, 7.0
@@ -341,7 +341,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.6",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", avg(y) as "b" FROM t1)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1)
         WHERE a>10
     ]], {
         -- <select6-3.6>
@@ -352,7 +352,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.7",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", avg(y) as "b" FROM t1)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1)
         WHERE a<10
     ]], {
         -- <select6-3.7>
@@ -363,7 +363,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.8",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", avg(y) as "b" FROM t1 WHERE y=4)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1 WHERE y=4)
         WHERE a>10
     ]], {
         -- <select6-3.8>
@@ -374,7 +374,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.9",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", avg(y) as "b" FROM t1 WHERE y=4)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, avg(y) as b FROM t1 WHERE y=4)
         WHERE a<10
     ]], {
         -- <select6-3.9>
@@ -385,7 +385,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-3.10",
     [[
-        SELECT a,b,a+b FROM (SELECT avg(x) as "a", y as "b" FROM t1 GROUP BY b)
+        SELECT a,b,a+b FROM (SELECT avg(x) as a, y as b FROM t1 GROUP BY b)
         ORDER BY a
     ]], {
         -- <select6-3.10>
@@ -397,7 +397,7 @@ test:do_execsql_test(
     "select6-3.11",
     [[
         SELECT a,b,a+b FROM 
-           (SELECT avg(x) as "a", y as "b" FROM t1 GROUP BY b)
+           (SELECT avg(x) as a, y as b FROM t1 GROUP BY b)
         WHERE b<4 ORDER BY a
     ]], {
         -- <select6-3.11>
@@ -409,7 +409,7 @@ test:do_execsql_test(
     "select6-3.12",
     [[
         SELECT a,b,a+b FROM 
-           (SELECT avg(x) as "a", y as "b" FROM t1 GROUP BY b HAVING a>1)
+           (SELECT avg(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
         WHERE b<4 ORDER BY a
     ]], {
         -- <select6-3.12>
@@ -421,7 +421,7 @@ test:do_execsql_test(
     "select6-3.13",
     [[
         SELECT a,b,a+b FROM 
-           (SELECT avg(x) as "a", y as "b" FROM t1 GROUP BY b HAVING a>1)
+           (SELECT avg(x) as a, y as b FROM t1 GROUP BY b HAVING a>1)
         ORDER BY a
     ]], {
         -- <select6-3.13>
@@ -455,7 +455,7 @@ test:do_execsql_test(
     "select6-4.1",
     [[
         SELECT a,b,c FROM 
-          (SELECT x AS "a", y AS "b", x+y AS "c" FROM t1 WHERE y=4)
+          (SELECT x AS a, y AS b, x+y AS c FROM t1 WHERE y=4)
         WHERE a<10 ORDER BY a;
     ]], {
         -- <select6-4.1>
@@ -507,8 +507,8 @@ test:do_execsql_test(
     "select6-5.1",
     [[
         SELECT a,x,b FROM
-          (SELECT x+3 AS "a", x FROM t1 WHERE y=3) AS "p",
-          (SELECT x AS "b" FROM t1 WHERE y=4) AS "q"
+          (SELECT x+3 AS a, x FROM t1 WHERE y=3) AS p,
+          (SELECT x AS b FROM t1 WHERE y=4) AS q
         WHERE a=b
         ORDER BY a
     ]], {
@@ -521,8 +521,8 @@ test:do_execsql_test(
     "select6-5.2",
     [[
         SELECT a,x,b FROM
-          (SELECT x+3 AS "a", x FROM t1 WHERE y=3),
-          (SELECT x AS "b" FROM t1 WHERE y=4)
+          (SELECT x+3 AS a, x FROM t1 WHERE y=3),
+          (SELECT x AS b FROM t1 WHERE y=4)
         WHERE a=b
         ORDER BY a
     ]], {
@@ -548,7 +548,7 @@ test:do_execsql_test(
     "select6-6.2",
     [[
         SELECT * FROM (
-          SELECT x AS "a" FROM t1 UNION ALL SELECT x+10 AS "a" FROM t1
+          SELECT x AS a FROM t1 UNION ALL SELECT x+10 AS a FROM t1
         ) ORDER BY a;
     ]], {
         -- <select6-6.2>
@@ -560,7 +560,7 @@ test:do_execsql_test(
     "select6-6.3",
     [[
         SELECT * FROM (
-          SELECT x AS "a" FROM t1 UNION ALL SELECT x+1 AS "a" FROM t1
+          SELECT x AS a FROM t1 UNION ALL SELECT x+1 AS a FROM t1
         ) ORDER BY a;
     ]], {
         -- <select6-6.3>
@@ -572,7 +572,7 @@ test:do_execsql_test(
     "select6-6.4",
     [[
         SELECT * FROM (
-          SELECT x AS "a" FROM t1 UNION SELECT x+1 AS "a" FROM t1
+          SELECT x AS a FROM t1 UNION SELECT x+1 AS a FROM t1
         ) ORDER BY a;
     ]], {
         -- <select6-6.4>
@@ -584,7 +584,7 @@ test:do_execsql_test(
     "select6-6.5",
     [[
         SELECT * FROM (
-          SELECT x AS "a" FROM t1 INTERSECT SELECT x+1 AS "a" FROM t1
+          SELECT x AS a FROM t1 INTERSECT SELECT x+1 AS a FROM t1
         ) ORDER BY a;
     ]], {
         -- <select6-6.5>
@@ -596,7 +596,7 @@ test:do_execsql_test(
     "select6-6.6",
     [[
         SELECT * FROM (
-          SELECT x AS "a" FROM t1 EXCEPT SELECT x*2 AS "a" FROM t1
+          SELECT x AS a FROM t1 EXCEPT SELECT x*2 AS a FROM t1
         ) ORDER BY a;
     ]], {
         -- <select6-6.6>
@@ -622,7 +622,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-7.2",
     [[
-        SELECT c,b,a,* FROM (SELECT 1 AS "a", 2 AS "b", 'abc' AS "c")
+        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c)
     ]], {
         -- <select6-7.2>
         "abc", 2, 1, 1, 2, "abc"
@@ -632,7 +632,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-7.3",
     [[
-        SELECT c,b,a,* FROM (SELECT 1 AS "a", 2 AS "b", 'abc' AS "c" WHERE 0)
+        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE 0)
     ]], {
         -- <select6-7.3>
         
@@ -642,10 +642,10 @@ test:do_execsql_test(
 test:do_execsql2_test(
     "select6-7.4",
     [[
-        SELECT c,b,a,* FROM (SELECT 1 AS "a", 2 AS "b", 'abc' AS "c" WHERE 1)
+        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE 1)
     ]], {
         -- <select6-7.4>
-        "c", "abc", "b", 2, "a", 1, "a", 1, "b", 2, "c", "abc"
+        "C", "abc", "B", 2, "A", 1, "A", 1, "B", 2, "C", "abc"
         -- </select6-7.4>
     })
 

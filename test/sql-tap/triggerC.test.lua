@@ -1189,9 +1189,9 @@ test:do_execsql_test(
             path varchar default '',
             unique(pid, key)
             );
-        CREATE TRIGGER node_delete_referencing AFTER DELETE ON "node"
+        CREATE TRIGGER node_delete_referencing AFTER DELETE ON node
           BEGIN
-          DELETE FROM "node" WHERE pid = old."id";
+          DELETE FROM node WHERE pid = old.id;
         END;
     ]])
 

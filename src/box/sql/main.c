@@ -3226,7 +3226,7 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 	} else {
 		for (iCol = 0; iCol < pTab->nCol; iCol++) {
 			pCol = &pTab->aCol[iCol];
-			if (0 == sqlite3StrICmp(pCol->zName, zColumnName)) {
+			if (0 == strcmp(pCol->zName, zColumnName)) {
 				break;
 			}
 		}

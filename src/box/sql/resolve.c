@@ -145,7 +145,7 @@ nameInUsingClause(IdList * pUsing, const char *zCol)
 	if (pUsing) {
 		int k;
 		for (k = 0; k < pUsing->nId; k++) {
-			if (sqlite3StrICmp(pUsing->a[k].zName, zCol) == 0)
+			if (strcmp(pUsing->a[k].zName, zCol) == 0)
 				return 1;
 		}
 	}
@@ -176,7 +176,7 @@ sqlite3MatchSpanName(const char *zSpan,
 		return 0;
 	}
 	zSpan += n + 1;
-	if (zCol && sqlite3StrICmp(zSpan, zCol) != 0) {
+	if (zCol && strcmp(zSpan, zCol) != 0) {
 		return 0;
 	}
 	return 1;
@@ -257,7 +257,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 		} else {
 			assert(db->mdb.zDbSName);
 			/* TODO: forbit names like db_name.column_names */
-			if (sqlite3StrICmp(db->mdb.zDbSName, zDb) != 0) {
+			if (strcmp(db->mdb.zDbSName, zDb) != 0) {
 				cnt = 0;
 				cntTab = 0;
 				goto lookup_error;
@@ -304,7 +304,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 					    pItem->zAlias ? pItem->
 					    zAlias : pTab->zName;
 					assert(zTabName != 0);
-					if (sqlite3StrICmp(zTabName, zTab) != 0) {
+					if (strcmp(zTabName, zTab) != 0) {
 						continue;
 					}
 				}
@@ -313,7 +313,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 				}
 				for (j = 0, pCol = pTab->aCol; j < pTab->nCol;
 				     j++, pCol++) {
-					if (sqlite3StrICmp(pCol->zName, zCol) ==
+					if (strcmp(pCol->zName, zCol) ==
 					    0) {
 						/* If there has been exactly one prior match and this match
 						 * is for the right-hand table of a NATURAL JOIN or is in a
@@ -377,7 +377,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 				cntTab++;
 				for (iCol = 0, pCol = pTab->aCol;
 				     iCol < pTab->nCol; iCol++, pCol++) {
-					if (sqlite3StrICmp(pCol->zName, zCol) ==
+					if (strcmp(pCol->zName, zCol) ==
 					    0) {
 						if (iCol == pTab->iPKey) {
 							iCol = -1;
@@ -453,7 +453,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 		if ((pEList = pNC->pEList) != 0 && zTab == 0 && cnt == 0) {
 			for (j = 0; j < pEList->nExpr; j++) {
 				char *zAs = pEList->a[j].zName;
-				if (zAs != 0 && sqlite3StrICmp(zAs, zCol) == 0) {
+				if (zAs != 0 && strcmp(zAs, zCol) == 0) {
 					Expr *pOrig;
 					assert(pExpr->pLeft == 0
 					       && pExpr->pRight == 0);
@@ -964,7 +964,7 @@ resolveAsName(Parse * pParse,	/* Parsing context for error messages */
 		char *zCol = pE->u.zToken;
 		for (i = 0; i < pEList->nExpr; i++) {
 			char *zAs = pEList->a[i].zName;
-			if (zAs != 0 && sqlite3StrICmp(zAs, zCol) == 0) {
+			if (zAs != 0 && strcmp(zAs, zCol) == 0) {
 				return i + 1;
 			}
 		}

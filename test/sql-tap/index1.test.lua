@@ -26,20 +26,20 @@ test:do_test(
     function()
         test:execsql "CREATE TABLE test1(id primary key, f1 int, f2 int, f3 int)"
         test:execsql "CREATE INDEX index1 ON test1(f1)"
-        return test:execsql "SELECT name FROM _space WHERE name='test1'"
+        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
     end, {
         -- <index-1.1>
-        "test1"
+        "TEST1"
         -- </index-1.1>
     })
 
 test:do_execsql_test(
     "index-1.1.1",
     [[
-        SELECT name FROM _index WHERE name='index1'
+        SELECT name FROM _index WHERE name='INDEX1'
     ]], {
         -- <index-1.1.1>
-        "index1"
+        "INDEX1"
         -- </index-1.1.1>
     })
 
@@ -67,7 +67,7 @@ test:do_test(
     "index-1.2",
     function()
         test:execsql "DROP TABLE test1"
-        return test:execsql "SELECT name FROM _space WHERE name='test1'"
+        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-1.2>
@@ -83,7 +83,7 @@ test:do_catchsql_test(
         CREATE INDEX index1 ON test1(f1)
     ]], {
         -- <index-2.1>
-        1, "no such table: test1"
+        1, "no such table: TEST1"
         -- </index-2.1>
     })
 
@@ -97,7 +97,7 @@ test:do_test(
         return test:catchsql "CREATE INDEX index1 ON test1(f4)"
     end, {
         -- <index-2.1b>
-        1, "no such column: f4"
+        1, "no such column: F4"
         -- </index-2.1b>
     })
 
@@ -115,7 +115,7 @@ test:do_test(
         return table.insert(v,msg) or v
     end, {
         -- <index-2.2>
-        1, "no such column: f4"
+        1, "no such column: F4"
         -- </index-2.2>
     })
 
@@ -191,10 +191,10 @@ test:do_test(
         end
         test:execsql "CREATE INDEX index9 ON test1(cnt)"
         test:execsql "CREATE INDEX indext ON test1(power)"
-        return test:execsql "SELECT name FROM _index WHERE name='index9' OR name='indext' union SELECT name FROM _space WHERE name='test1';"
+        return test:execsql "SELECT name FROM _index WHERE name='INDEX9' OR name='INDEXT' union SELECT name FROM _space WHERE name='TEST1';"
     end, {
         -- <index-4.1>
-        "index9", "indext", "test1"
+        "INDEX9", "INDEXT", "TEST1"
         -- </index-4.1>
     })
 
@@ -231,7 +231,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.5",
     function()
-        test:execsql [[DROP INDEX "indext" ON test1]]
+        test:execsql [[DROP INDEX indext ON test1]]
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.5>
@@ -273,7 +273,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.9",
     function()
-        test:execsql [[DROP INDEX "index9" ON test1]]
+        test:execsql [[DROP INDEX index9 ON test1]]
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.9>
@@ -294,7 +294,7 @@ test:do_execsql_test(
 test:do_test(
     "index-4.11",
     function()
-        test:execsql [[DROP INDEX "indext" ON test1]]
+        test:execsql [[DROP INDEX indext ON test1]]
         return test:execsql "SELECT power FROM test1 WHERE cnt=6"
     end, {
         -- <index-4.11>
@@ -316,7 +316,7 @@ test:do_test(
     "index-4.13",
     function()
         test:execsql "DROP TABLE test1"
-        return test:execsql "SELECT name FROM _space WHERE name='test1'"
+        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-4.13>
@@ -357,10 +357,10 @@ test:do_test(
 test:do_execsql_test(
     "index-6.1b",
     [[
-        SELECT name FROM _index WHERE name='index1' union SELECT name FROM _space WHERE name='test1' OR name='test2'
+        SELECT name FROM _index WHERE name='INDEX1' union SELECT name FROM _space WHERE name='TEST1' OR name='TEST2'
     ]], {
         -- <index-6.1b>
-        "index1", "test1", "test2"
+        "INDEX1", "TEST1", "TEST2"
         -- </index-6.1b>
     })
 
@@ -380,17 +380,17 @@ test:do_catchsql_test(
         CREATE INDEX test1 ON test2(g1)
     ]], {
         -- <index-6.2>
-        1, "there is already a table named test1"
+        1, "there is already a table named TEST1"
         -- </index-6.2>
     })
 
 test:do_execsql_test(
     "index-6.2b",
     [[
-        SELECT name FROM _index WHERE name='index1' union SELECT name FROM _space WHERE name='test1' OR name='test2'
+        SELECT name FROM _index WHERE name='INDEX1' union SELECT name FROM _space WHERE name='TEST1' OR name='TEST2'
     ]], {
         -- <index-6.2b>
-        "index1", "test1", "test2"
+        "INDEX1", "TEST1", "TEST2"
         -- </index-6.2b>
     })
 
@@ -399,7 +399,7 @@ test:do_test(
     function()
         test:execsql "DROP TABLE test1"
         test:execsql "DROP TABLE test2"
-        return test:execsql "SELECT name FROM _space WHERE name='test1' OR name='test2'"
+        return test:execsql "SELECT name FROM _space WHERE name='TEST1' OR name='TEST2'"
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-6.3>
@@ -415,7 +415,7 @@ test:do_execsql_test(
         CREATE INDEX index2 ON test1(b);
         CREATE INDEX index3 ON test1(a,b);
         DROP TABLE test1;
-        SELECT name FROM _space WHERE name='test1';
+        SELECT name FROM _space WHERE name='TEST1';
     ]], {
         -- <index-6.4>
         
@@ -454,10 +454,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index-7.3",
     [[
-        SELECT name FROM _index WHERE name='sqlite_autoindex_test1_1'
+        SELECT name FROM _index WHERE name='sqlite_autoindex_TEST1_1'
     ]], {
         -- <index-7.3>
-        "sqlite_autoindex_test1_1"
+        "sqlite_autoindex_TEST1_1"
         -- </index-7.3>
     })
 
@@ -465,7 +465,7 @@ test:do_test(
     "index-7.4",
     function()
         test:execsql "DROP table test1"
-        return test:execsql "SELECT name FROM _space WHERE name='test1'"
+        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
     end, {
         -- <index-7.4>
         
@@ -482,7 +482,7 @@ test:do_catchsql_test(
         DROP INDEX index1 ON test1
     ]], {
         -- <index-8.1>
-        1, "no such index: test1.index1"
+        1, "no such index: TEST1.INDEX1"
         -- </index-8.1>
     })
 
@@ -498,10 +498,10 @@ test:do_test(
         test:execsql "EXPLAIN CREATE INDEX idx1 ON tab1(a)"
 
 
-        return test:execsql "SELECT name FROM _space WHERE name='tab1'"
+        return test:execsql "SELECT name FROM _space WHERE name='TAB1'"
     end, {
         -- <index-9.1>
-        "tab1"
+        "TAB1"
         -- </index-9.1>
     })
 
@@ -509,10 +509,10 @@ test:do_test(
     "index-9.2",
     function()
         test:execsql "CREATE INDEX idx1 ON tab1(a)"
-        return test:execsql "SELECT name FROM _index WHERE name='idx1' union SELECT name FROM _space WHERE name='tab1'"
+        return test:execsql "SELECT name FROM _index WHERE name='IDX1' union SELECT name FROM _space WHERE name='TAB1'"
     end, {
         -- <index-9.2>
-        "idx1", "tab1"
+        "IDX1", "TAB1"
         -- </index-9.2>
     })
 
@@ -959,7 +959,7 @@ test:do_execsql_test(
     "index-16.1",
     [[
         CREATE TABLE t7(c UNIQUE PRIMARY KEY);
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='t7';
+        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
     ]], {
         -- <index-16.1>
         1
@@ -971,7 +971,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c UNIQUE PRIMARY KEY);
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='t7';
+        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
     ]], {
         -- <index-16.2>
         1
@@ -983,7 +983,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c PRIMARY KEY, UNIQUE(c) );
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='t7';
+        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
     ]], {
         -- <index-16.3>
         1
@@ -995,7 +995,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c, d , UNIQUE(c, d), PRIMARY KEY(c, d) );
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='t7';
+        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
     ]], {
         -- <index-16.4>
         1
@@ -1007,7 +1007,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c, d , UNIQUE(c), PRIMARY KEY(c, d) );
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='t7';
+        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
     ]], {
         -- <index-16.5>
         2
@@ -1024,10 +1024,10 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c, d UNIQUE, UNIQUE(c), PRIMARY KEY(c, d) );
-        SELECT _index.name FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='t7';
+        SELECT _index.name FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
     ]], {
         -- <index-17.1>
-        "sqlite_autoindex_t7_3", "sqlite_autoindex_t7_2", "sqlite_autoindex_t7_1"
+        "sqlite_autoindex_T7_3", "sqlite_autoindex_T7_2", "sqlite_autoindex_T7_1"
         -- </index-17.1>
     })
 
@@ -1061,7 +1061,7 @@ test:do_catchsql_test(
         CREATE TABLE sqlite_t1(a, b, c);
     ]], {
         -- <index-18.1>
-        1, "object name reserved for internal use: sqlite_t1"
+        1, "object name reserved for internal use: SQLITE_T1"
         -- </index-18.1>
     })
 
@@ -1071,7 +1071,7 @@ test:do_catchsql_test(
         CREATE INDEX sqlite_i1 ON t7(c);
     ]], {
         -- <index-18.2>
-        1, "object name reserved for internal use: sqlite_i1"
+        1, "object name reserved for internal use: SQLITE_I1"
         -- </index-18.2>
     })
 
@@ -1081,7 +1081,7 @@ test:do_catchsql_test(
         CREATE VIEW sqlite_v1 AS SELECT * FROM t7;
     ]], {
         -- <index-18.3>
-        1, "object name reserved for internal use: sqlite_v1"
+        1, "object name reserved for internal use: SQLITE_V1"
         -- </index-18.3>
     })
 
@@ -1097,7 +1097,7 @@ if (1 > 0)
             CREATE TRIGGER sqlite_tr1 BEFORE INSERT ON t7 BEGIN SELECT 1; END;
         ]], {
             -- <index-18.4>
-            1, "object name reserved for internal use: sqlite_tr1"
+            1, "object name reserved for internal use: SQLITE_TR1"
             -- </index-18.4>
         })
 
@@ -1137,7 +1137,7 @@ test:do_execsql_test(
             INSERT INTO t7 VALUES(1);
         ]], {
             -- <index-19.2>
-            1, "UNIQUE constraint failed: t7.a"
+            1, "UNIQUE constraint failed: T7.A"
             -- </index-19.2>
         })
 
@@ -1157,7 +1157,7 @@ test:do_execsql_test(
             INSERT INTO t8 VALUES(1);
         ]], {
             -- <index-19.4>
-            1, "UNIQUE constraint failed: t8.a"
+            1, "UNIQUE constraint failed: T8.A"
             -- </index-19.4>
         })
 
@@ -1216,7 +1216,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index-20.2",
     [[
-        DROP INDEX "t6i1" ON t6;
+        DROP INDEX t6i1 ON t6;
     ]], {
         -- <index-20.2>
         

@@ -18,12 +18,12 @@ box.sql.execute("INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 -- PK must be unique
 box.sql.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
 ---
-- error: 'UNIQUE constraint failed: zoobar.c2'
+- error: 'UNIQUE constraint failed: ZOOBAR.C2'
 ...
 -- Unique index must be respected
 box.sql.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 ---
-- error: 'UNIQUE constraint failed: zoobar.c1, zoobar.c4'
+- error: 'UNIQUE constraint failed: ZOOBAR.C1, ZOOBAR.C4'
 ...
 -- Cleanup
 box.sql.execute("DROP INDEX zoobar2 ON zoobar")

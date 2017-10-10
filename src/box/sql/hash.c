@@ -87,7 +87,7 @@ strHash(const char *z)
 		 * 0x9e3779b1 is 2654435761 which is the closest prime number to
 		 * (2**32)*golden_ratio, where golden_ratio = (sqrt(5) - 1)/2.
 		 */
-		h += sqlite3UpperToLower[c];
+		h += c;
 		h *= 0x9e3779b1;
 	}
 	return h;
@@ -203,7 +203,7 @@ findElementWithHash(const Hash * pH,	/* The pH to be searched */
 	*pHash = h;
 	while (count--) {
 		assert(elem != 0);
-		if (sqlite3StrICmp(elem->pKey, pKey) == 0) {
+		if (strcmp(elem->pKey, pKey) == 0) {
 			return elem;
 		}
 		elem = elem->next;

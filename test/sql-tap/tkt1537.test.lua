@@ -128,9 +128,9 @@ test:do_execsql_test(
 
 
 test:execsql [[
-    DROP INDEX "t1a1" ON t1;
-    DROP INDEX "t1a2" ON t1;
-    DROP INDEX "t2b" ON t2;
+    DROP INDEX t1a1 ON t1;
+    DROP INDEX t1a2 ON t1;
+    DROP INDEX t2b ON t2;
 ]]
 test:do_execsql_test(
     "tkt1537-2.1",

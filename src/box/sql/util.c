@@ -315,6 +315,25 @@ sqlite3Dequote(char *z)
 	z[j] = 0;
 }
 
+
+void
+sqlite3NormalizeName(char *z)
+{
+	char quote;
+	int i=0;
+	if (z == 0)
+		return;
+	quote = z[0];
+	if (sqlite3Isquote(quote)){
+		sqlite3Dequote(z);
+		return;
+	}
+	while(z[i]!=0){
+		z[i] = (char)sqlite3Toupper(z[i]);
+		i++;
+	}
+}
+
 /*
  * Generate a Token object from a string
  */

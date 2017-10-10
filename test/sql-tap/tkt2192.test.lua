@@ -70,11 +70,11 @@ test:do_execsql_test(
         -- Overview ---------------------
 
         create view expense_overview as
-          select 'Energy' as expense, date, value from energy
+          select 'Energy' as expense, "date", value from energy
           union
-          select 'Phone/Internet' as expense, date, value from phone_internet
+          select 'Phone/Internet' as expense, "date", value from phone_internet
           union
-          select 'Credit Card' as expense, date, value from credit_cards;
+          select 'Credit Card' as expense, "date", value from credit_cards;
 
         create view jan as
           select 'jan', expense, value from expense_overview

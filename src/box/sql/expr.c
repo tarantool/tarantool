@@ -133,7 +133,7 @@ sqlite3ExprAddCollateString(Parse * pParse, Expr * pExpr, const char *zC)
 	Token s;
 	assert(zC != 0);
 	sqlite3TokenInit(&s, (char *)zC);
-	return sqlite3ExprAddCollateToken(pParse, pExpr, &s, 0);
+	return sqlite3ExprAddCollateToken(pParse, pExpr, &s, 1);
 }
 
 /*
@@ -870,11 +870,14 @@ sqlite3ExprAlloc(sqlite3 * db,	/* Handle for sqlite3DbMallocRawNN() */
 					memcpy(pNew->u.zToken, pToken->z,
 					       pToken->n);
 				pNew->u.zToken[pToken->n] = 0;
-				if (dequote
-				    && sqlite3Isquote(pNew->u.zToken[0])) {
+				if (dequote){
 					if (pNew->u.zToken[0] == '"')
 						pNew->flags |= EP_DblQuoted;
-					sqlite3Dequote(pNew->u.zToken);
+					if (pNew->op == TK_ID || pNew->op == TK_COLLATE){
+						sqlite3NormalizeName(pNew->u.zToken);
+					}else{
+						sqlite3Dequote(pNew->u.zToken);
+					}
 				}
 			}
 		}
@@ -1847,7 +1850,7 @@ sqlite3ExprListSetName(Parse * pParse,	/* Parsing context */
 		assert(pItem->zName == 0);
 		pItem->zName = sqlite3DbStrNDup(pParse->db, pName->z, pName->n);
 		if (dequote)
-			sqlite3Dequote(pItem->zName);
+			sqlite3NormalizeName(pItem->zName);
 	}
 }
 
@@ -2588,7 +2591,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							assert(pIdx->azColl[j]);
 							if (pReq != 0
 							    &&
-							    sqlite3StrICmp
+							    strcmp
 							    (pReq->zName,
 							     pIdx->azColl[j]) !=
 							    0) {

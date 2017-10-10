@@ -13,7 +13,7 @@ test:do_catchsql_test(
         SELECT * FROM test1
     ]], {
         -- <select1-1.1>
-        1, "no such table: test1"
+        1, "no such table: TEST1"
         -- </select1-1.1>
     })
 
@@ -25,7 +25,7 @@ test:do_catchsql_test(
         SELECT * FROM test1, test2
     ]], {
         -- <select1-1.2>
-        1, "no such table: test2"
+        1, "no such table: TEST2"
         -- </select1-1.2>
     })
 
@@ -35,7 +35,7 @@ test:do_catchsql_test(
         SELECT * FROM test2, test1
     ]], {
         -- <select1-1.3>
-        1, "no such table: test2"
+        1, "no such table: TEST2"
         -- </select1-1.3>
     })
 
@@ -539,7 +539,7 @@ test:do_catchsql_test(
         SELECT SUM(min(f1)) FROM test1
     ]], {
         -- <select1-2.20>
-        1, "misuse of aggregate function min()"
+        1, "misuse of aggregate function MIN()"
         -- </select1-2.20>
     })
 
@@ -551,7 +551,7 @@ test:do_catchsql_test(
         SELECT min(f1) AS m FROM test1 GROUP BY f1 HAVING max(m+5)<10
     ]], {
         -- <select1-2.21>
-        1, "misuse of aliased aggregate m"
+        1, "misuse of aliased aggregate M"
         -- </select1-2.21>
     })
 
@@ -563,7 +563,7 @@ test:do_catchsql_test(
         HAVING max(m+5)<10
     ]], {
         -- <select1-2.22>
-        1, "misuse of aliased aggregate m"
+        1, "misuse of aliased aggregate M"
         -- </select1-2.22>
     })
 
@@ -733,7 +733,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 ORDER BY min(f1)
     ]], {
         -- <select1-4.4>
-        1, "misuse of aggregate: min()"
+        1, "misuse of aggregate: MIN()"
         -- </select1-4.4>
     })
 
@@ -743,7 +743,7 @@ test:do_catchsql_test(
         INSERT INTO test1(f1) SELECT f1 FROM test1 ORDER BY min(f1);
     ]], {
         -- <select1-4.5>
-        1, "misuse of aggregate: min()"
+        1, "misuse of aggregate: MIN()"
         -- </select1-4.5>
     })
 
@@ -909,7 +909,7 @@ test:do_catchsql2_test(
         SELECT f1 FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.1>
-        0, {"f1", 11, "f1", 33}
+        0, {"F1", 11, "F1", 33}
         -- </select1-6.1>
     })
 
@@ -920,7 +920,7 @@ test:do_test(
         return test:catchsql2 "SELECT f1 FROM test1 ORDER BY f2"
     end, {
         -- <select1-6.1.1>
-        0, {"test1.f1", 11, "test1.f1", 33}
+        0, {"TEST1.F1", 11, "TEST1.F1", 33}
         -- </select1-6.1.1>
     })
 
@@ -940,7 +940,7 @@ test:do_catchsql2_test(
         SELECT * FROM test1 WHERE f1==11
     ]], {
         -- <select1-6.1.3>
-        0, {"f1", 11, "f2", 22}
+        0, {"F1", 11, "F2", 22}
         -- </select1-6.1.3>
     })
 
@@ -956,7 +956,7 @@ test:do_test(
         return table.insert(v,msg) or v
     end, {
         -- <select1-6.1.4>
-        0, {"f1", 11, "f2", 22}
+        0, {"F1", 11, "F2", 22}
         -- </select1-6.1.4>
     })
 
@@ -966,7 +966,7 @@ test:do_catchsql2_test(
         SELECT * FROM test1 WHERE f1==11
     ]], {
         -- <select1-6.1.5>
-        0, {"f1", 11, "f2", 22}
+        0, {"F1", 11, "F2", 22}
         -- </select1-6.1.5>
     })
 
@@ -976,7 +976,7 @@ test:do_catchsql2_test(
         SELECT DISTINCT * FROM test1 WHERE f1==11
     ]], {
         -- <select1-6.1.6>
-        0, {"f1", 11, "f2", 22}
+        0, {"F1", 11, "F2", 22}
         -- </select1-6.1.6>
     })
 
@@ -986,7 +986,7 @@ test:do_catchsql2_test(
         SELECT f1 as xyzzy FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.2>
-        0, {"xyzzy", 11, "xyzzy", 33}
+        0, {"XYZZY", 11, "XYZZY", 33}
         -- </select1-6.2>
     })
 
@@ -1016,7 +1016,7 @@ test:do_catchsql2_test(
         SELECT f1+F2 as xyzzy FROM test1 ORDER BY f2
     ]], {
         -- <select1-6.4>
-        0, {"xyzzy", 33, "xyzzy", 77}
+        0, {"XYZZY", 33, "XYZZY", 77}
         -- </select1-6.4>
     })
 
@@ -1062,7 +1062,7 @@ test:do_catchsql2_test(
     [[SELECT test1.f1+F2, t1 FROM test1, test2 
          ORDER BY f2]], {
         -- <select1-6.6>
-        0, {"test1.f1+F2", 33, "t1", "abc", "test1.f1+F2", 77, "t1", "abc"}
+        0, {"test1.f1+F2", 33, "T1", "abc", "test1.f1+F2", 77, "T1", "abc"}
         -- </select1-6.6>
     })
 
@@ -1071,7 +1071,7 @@ test:do_catchsql2_test(
     [[SELECT A.f1, t1 FROM test1 as A, test2 
          ORDER BY f2]], {
         -- <select1-6.7>
-        0, {"f1", 11, "t1", "abc", "f1", 33, "t1", "abc"}
+        0, {"F1", 11, "T1", "abc", "F1", 33, "T1", "abc"}
         -- </select1-6.7>
     })
 
@@ -1080,7 +1080,7 @@ test:do_catchsql2_test(
     [[SELECT A.f1, f1 FROM test1 as A, test1 as B 
          ORDER BY f2]], {
         -- <select1-6.8>
-        1, "ambiguous column name: f1"
+        1, "ambiguous column name: F1"
         -- </select1-6.8>
     })
 
@@ -1089,7 +1089,7 @@ test:do_catchsql2_test(
     [[SELECT A.f1, B.f1 FROM test1 as A, test1 as B 
          ORDER BY f2]], {
         -- <select1-6.8b>
-        1, "ambiguous column name: f2"
+        1, "ambiguous column name: F2"
         -- </select1-6.8b>
     })
 
@@ -1098,7 +1098,7 @@ test:do_catchsql2_test(
     [[SELECT A.f1, f1 FROM test1 as A, test1 as A 
          ORDER BY f2]], {
         -- <select1-6.8c>
-        1, "ambiguous column name: A.f1"
+        1, "ambiguous column name: A.F1"
         -- </select1-6.8c>
     })
 
@@ -1116,7 +1116,7 @@ test:do_catchsql2_test(
     [[SELECT A.f1, B.f1 FROM test1 as A, test1 as B
          ORDER BY A.f1, B.f1]], {
     -- <select1-6.9.2>
-    0, {"f1", 11, "f1", 11, "f1", 11, "f1", 33, "f1", 33, "f1", 11, "f1", 33, "f1", 33}
+    0, {"F1", 11, "F1", 11, "F1", 11, "F1", 33, "F1", 33, "F1", 11, "F1", 33, "F1", 33}
     -- </select1-6.9.2>
 })
 
@@ -1148,7 +1148,7 @@ test:do_test(
         ]]
     end, {
         -- <select1-6.9.4>
-        "test1.f1", 11, "test1.f2", 22
+        "TEST1.F1", 11, "TEST1.F2", 22
         -- </select1-6.9.4>
     })
 
@@ -1174,7 +1174,7 @@ test:do_execsql2_test(
         SELECT * FROM test1 a, test1 b LIMIT 1
     ]], {
         -- <select1-6.9.6>
-        "a.f1", 11, "a.f2", 22, "b.f1", 11, "b.f2", 22
+        "A.F1", 11, "A.F2", 22, "B.F1", 11, "B.F2", 22
         -- </select1-6.9.6>
     })
 
@@ -1192,7 +1192,7 @@ test:do_test(
         return x
     end, {
         -- <select1-6.9.7>
-        "a.f1", 11, "a.f2", 22, "sqlite_subquery.5", 5, "sqlite_subquery.6", 6
+        "A.F1", 11, "A.F2", 22, "sqlite_subquery.5", 5, "sqlite_subquery.6", 6
         -- </select1-6.9.7>
     })
 
@@ -1210,7 +1210,7 @@ test:do_test(
         return x
     end, {
         -- <select1-6.9.8>
-        "a.f1", 11, "a.f2", 22, "b.x", 5, "b.y", 6
+        "A.F1", 11, "A.F2", 22, "B.X", 5, "B.Y", 6
         -- </select1-6.9.8>
     })
 
@@ -1220,7 +1220,7 @@ test:do_execsql2_test(
         SELECT a.f1, b.f2 FROM test1 a, test1 b LIMIT 1
     ]], {
         -- <select1-6.9.9>
-        "test1.f1", 11, "test1.f2", 22
+        "TEST1.F1", 11, "TEST1.F2", 22
         -- </select1-6.9.9>
     })
 
@@ -1230,7 +1230,7 @@ test:do_execsql2_test(
         SELECT f1, t1 FROM test1, test2 LIMIT 1
     ]], {
         -- <select1-6.9.10>
-        "test1.f1", 11, "test2.t1", "abc"
+        "TEST1.F1", 11, "TEST2.T1", "abc"
         -- </select1-6.9.10>
     })
 
@@ -1246,7 +1246,7 @@ test:do_test(
         ]]
     end, {
         -- <select1-6.9.11>
-        "test1.f1", 11, "test1.f2", 22
+        "TEST1.F1", 11, "TEST1.F2", 22
         -- </select1-6.9.11>
     })
 
@@ -1256,7 +1256,7 @@ test:do_execsql2_test(
         SELECT f1, t1 FROM test1, test2 LIMIT 1
     ]], {
         -- <select1-6.9.12>
-        "test1.f1", 11, "test2.t1", "abc"
+        "TEST1.F1", 11, "TEST2.T1", "abc"
         -- </select1-6.9.12>
     })
 
@@ -1272,7 +1272,7 @@ test:do_test(
         ]]
     end, {
         -- <select1-6.9.13>
-        "f1", 11, "f1", 11
+        "F1", 11, "F1", 11
         -- </select1-6.9.13>
     })
 
@@ -1282,7 +1282,7 @@ test:do_execsql2_test(
         SELECT f1, t1 FROM test1, test2 LIMIT 1
     ]], {
         -- <select1-6.9.14>
-        "f1", 11, "t1", "abc"
+        "F1", 11, "T1", "abc"
         -- </select1-6.9.14>
     })
 
@@ -1298,7 +1298,7 @@ test:do_test(
         ]]
     end, {
         -- <select1-6.9.15>
-        "test1.f1", 11, "test1.f1", 11
+        "TEST1.F1", 11, "TEST1.F1", 11
         -- </select1-6.9.15>
     })
 
@@ -1308,7 +1308,7 @@ test:do_execsql2_test(
         SELECT f1, t1 FROM test1, test2 LIMIT 1
     ]], {
         -- <select1-6.9.16>
-        "test1.f1", 11, "test2.t1", "abc"
+        "TEST1.F1", 11, "TEST2.T1", "abc"
         -- </select1-6.9.16>
     })
 
@@ -1323,7 +1323,7 @@ test:do_catchsql2_test(
             ORDER BY f2;
         ]], {
             -- <select1-6.10>
-            0, {"f1", 11, "f1", 22, "f1", 33, "f1", 44}
+            0, {"F1", 11, "F1", 22, "F1", 33, "F1", 44}
             -- </select1-6.10>
         })
 
@@ -1572,7 +1572,7 @@ test:do_test(
         return r[0]
     end, {
         -- <select1-9.2>
-        "f1", "f2"
+        "F1", "F2"
         -- </select1-9.2>
     })
 
@@ -1583,7 +1583,7 @@ test:do_test(
             return r[0]
         end, {
             -- <select1-9.3>
-            "f1", "f2"
+            "F1", "F2"
             -- </select1-9.3>
         })
 
@@ -1596,7 +1596,7 @@ test:do_test(
         return r[0]
     end, {
         -- <select1-9.4>
-        "f1", "f2"
+        "F1", "F2"
         -- </select1-9.4>
     })
 
@@ -1607,7 +1607,7 @@ test:do_test(
         return r[0]
     end, {
         -- <select1-9.5>
-        "f1", "f2"
+        "F1", "F2"
         -- </select1-9.5>
     })
 
@@ -1716,7 +1716,7 @@ test:do_execsql2_test(
         SELECT * FROM t3, t4;
     ]], {
         -- <select1-11.2.2>
-        "id",0,"a",1,"b",2,"id",0,"a",3,"b",4
+        "ID",0,"A",1,"B",2,"ID",0,"A",3,"B",4
         -- </select1-11.2.2>
     })
 
@@ -1733,7 +1733,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select1-11.4.2",
     [[
-        SELECT "t3".*, t4.b FROM t3, t4;
+        SELECT "T3".*, t4.b FROM t3, t4;
     ]], {
         -- <select1-11.4.2>
         0, 1, 2, 4
@@ -1746,7 +1746,7 @@ test:do_execsql2_test(
         SELECT t3.*, t4.b FROM t3, t4;
     ]], {
         -- <select1-11.5.1>
-        "id", 0, "a", 1, "b", 2, "b", 4
+        "ID", 0, "A", 1, "B", 2, "B", 4
         -- </select1-11.5.1>
     })
 
@@ -1756,7 +1756,7 @@ test:do_execsql2_test(
         SELECT x.*, y.b FROM t3 AS x, t4 AS y;
     ]], {
         -- <select1-11.6>
-        "id", 0, "a", 1, "b", 2, "b", 4
+        "ID", 0, "A", 1, "B", 2, "B", 4
         -- </select1-11.6>
     })
 
@@ -1776,7 +1776,7 @@ test:do_execsql2_test(
         SELECT t3.b, t4.* FROM t3, t4;
     ]], {
         -- <select1-11.8>
-        "b", 2, "id", 0, "a", 3, "b", 4
+        "B", 2, "ID", 0, "A", 3, "B", 4
         -- </select1-11.8>
     })
 
@@ -1786,7 +1786,7 @@ test:do_execsql2_test(
         SELECT x.b, y.* FROM t3 AS x, t4 AS y;
     ]], {
         -- <select1-11.9>
-        "b", 2, "id", 0, "a", 3, "b", 4
+        "B", 2, "ID", 0, "A", 3, "B", 4
         -- </select1-11.9>
     })
 
@@ -1796,7 +1796,7 @@ test:do_catchsql_test(
         SELECT t5.* FROM t3, t4;
     ]], {
         -- <select1-11.10>
-        1, "no such table: t5"
+        1, "no such table: T5"
         -- </select1-11.10>
     })
 
@@ -1806,7 +1806,7 @@ test:do_catchsql_test(
         SELECT t3.* FROM t3 AS x, t4;
     ]], {
         -- <select1-11.11>
-        1, "no such table: t3"
+        1, "no such table: T3"
         -- </select1-11.11>
     })
 
@@ -1816,7 +1816,7 @@ test:do_execsql2_test(
             SELECT t3.* FROM t3, (SELECT max(a), max(b) FROM t4)
         ]], {
             -- <select1-11.12>
-            "id", 0, "a", 1, "b", 2
+            "ID", 0, "A", 1, "B", 2
             -- </select1-11.12>
         })
 
@@ -1826,7 +1826,7 @@ test:do_execsql2_test(
             SELECT t3.* FROM (SELECT max(a), max(b) FROM t4), t3
         ]], {
             -- <select1-11.13>
-            "id", 0, "a", 1, "b", 2
+            "ID", 0, "A", 1, "B", 2
             -- </select1-11.13>
         })
 
@@ -1836,7 +1836,7 @@ test:do_execsql2_test(
             SELECT * FROM t3, (SELECT max(a), max(b) FROM t4) as "tx"
         ]], {
             -- <select1-11.14>
-            "id", 0, "a", 1, "b", 2, "max(a)", 3, "max(b)", 4
+            "ID", 0, "A", 1, "B", 2, "max(a)", 3, "max(b)", 4
             -- </select1-11.14>
         })
 
@@ -1846,7 +1846,7 @@ test:do_execsql2_test(
             SELECT y.*, t3.* FROM t3, (SELECT max(a), max(b) FROM t4) AS y
         ]], {
             -- <select1-11.15>
-            "max(a)", 3, "max(b)", 4, "id", 0, "a", 1, "b", 2
+            "max(a)", 3, "max(b)", 4, "ID", 0, "A", 1, "B", 2
             -- </select1-11.15>
         })
 
@@ -1858,7 +1858,7 @@ test:do_execsql2_test(
         SELECT y.* FROM t3 as y, t4 as z
     ]], {
         -- <select1-11.16>
-        "id", 0, "a", 1, "b", 2
+        "ID", 0, "A", 1, "B", 2
         -- </select1-11.16>
     })
 
@@ -1959,7 +1959,7 @@ test:do_execsql2_test(
         ) ORDER BY x;
     ]], {
         -- <select1-12.9>
-        "x", 1, "x", 3
+        "X", 1, "X", 3
         -- </select1-12.9>
     })
 
@@ -1968,10 +1968,10 @@ test:do_execsql2_test(
     [[
         SELECT z.x FROM (
           SELECT a AS x,b AS y FROM t3 UNION SELECT a, b FROM t4 ORDER BY a,b
-        ) as "z" ORDER BY x;
+        ) as z ORDER BY x;
     ]], {
         -- <select1-12.10>
-        "x", 1, "x", 3
+        "X", 1, "X", 3
         -- </select1-12.10>
     })
 

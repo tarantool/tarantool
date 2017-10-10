@@ -41,7 +41,7 @@ test:do_catchsql_test(
 	]],
 	{
 	-- <index-1.3>
-	1, "index t1.same_index_name already exists"
+	1, "index T1.SAME_INDEX_NAME already exists"
 	-- <index-1.3>
 	})
 
@@ -52,7 +52,7 @@ test:do_catchsql_test(
 	]],
 	{
 	-- <index-1.4>
-	1, "index t2.same_index_name already exists"
+	1, "index T2.SAME_INDEX_NAME already exists"
 	-- <index-1.4>
 	})
 

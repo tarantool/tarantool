@@ -526,15 +526,15 @@ end
 test:do_catchsql_test(
     "e_select-1.4.1",
     "SELECT * FROM t1, t3 USING (b)",
-    {1, "/cannot join using column b -- column not present in both tables/"})
+    {1, "/cannot join using column B -- column not present in both tables/"})
 test:do_catchsql_test(
     "e_select-1.4.2",
     "SELECT * FROM t3, t1 USING (c)",
-    {1, "/cannot join using column c -- column not present in both tables/"})
+    {1, "/cannot join using column C -- column not present in both tables/"})
 test:do_catchsql_test(
     "e_select-1.4.3",
     "SELECT * FROM t3, (SELECT a AS b, b AS c FROM t1) USING (a)",
-    {1, "/cannot join using column a -- column not present in both tables/"})
+    {1, "/cannot join using column A -- column not present in both tables/"})
 -- EVIDENCE-OF: R-22776-52830 For each pair of named columns, the
 -- expression "lhs.X = rhs.X" is evaluated for each row of the cartesian
 -- product as a boolean expression. Only rows for which all such

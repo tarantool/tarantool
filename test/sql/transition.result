@@ -14,7 +14,7 @@ box.sql.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ...
 box.sql.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
-- error: 'UNIQUE constraint failed: foobar.foo'
+- error: 'UNIQUE constraint failed: FOOBAR.FOO'
 ...
 -- simple select
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -112,7 +112,7 @@ box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 - - [0]
 ...
 -- cleanup
-box.space.foobar:drop()
+box.space.FOOBAR:drop()
 ---
 ...
 -- multi-index
@@ -136,7 +136,7 @@ box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 -- prove barfoo2 was created
 box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
-- error: 'UNIQUE constraint failed: barfoo.foo'
+- error: 'UNIQUE constraint failed: BARFOO.FOO'
 ...
 box.sql.execute("SELECT foo, bar FROM barfoo")
 ---
@@ -175,18 +175,18 @@ box.sql.execute("DROP TABLE barfoo")
 -- attempt to create a WITHOUT ROWID table lacking PRIMARY KEY
 box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x) WITHOUT ROWID")
 ---
-- error: PRIMARY KEY missing on table without_rowid_lacking_primary_key
+- error: PRIMARY KEY missing on table WITHOUT_ROWID_LACKING_PRIMARY_KEY
 ...
 -- attempt to create a table lacking WITHOUT ROWID clause
 box.sql.execute("CREATE TABLE rowid(x)")
 ---
-- error: PRIMARY KEY missing on table rowid
+- error: PRIMARY KEY missing on table ROWID
 ...
 -- create a table with implicit indices (used to SEGFAULT)
 box.sql.execute("CREATE TABLE implicit_indices(a PRIMARY KEY,b,c,d UNIQUE) WITHOUT ROWID")
 ---
 ...
-box.space.implicit_indices:drop()
+box.space.IMPLICIT_INDICES:drop()
 ---
 ...
 box.sql.execute("DROP TABLE implicit_indices")

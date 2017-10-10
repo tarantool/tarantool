@@ -56,31 +56,31 @@ test:do_test(
                 itemId integer primary key,
                  item str unique
             );
-            INSERT INTO "Items" VALUES(0, 'ALL');
-            INSERT INTO "Items" VALUES(1, 'double:source');
-            INSERT INTO "Items" VALUES(2, 'double');
-            INSERT INTO "Items" VALUES(3, 'double:runtime');
-            INSERT INTO "Items" VALUES(4, '.*:runtime');
+            INSERT INTO Items VALUES(0, 'ALL');
+            INSERT INTO Items VALUES(1, 'double:source');
+            INSERT INTO Items VALUES(2, 'double');
+            INSERT INTO Items VALUES(3, 'double:runtime');
+            INSERT INTO Items VALUES(4, '.*:runtime');
 
             CREATE TABLE Labels(
                 labelId INTEGER PRIMARY KEY,
                 label STR UNIQUE
             );
-            INSERT INTO "Labels" VALUES(0, 'ALL');
-            INSERT INTO "Labels" VALUES(1, 'localhost@rpl:linux');
-            INSERT INTO "Labels" VALUES(2, 'localhost@rpl:branch');
+            INSERT INTO Labels VALUES(0, 'ALL');
+            INSERT INTO Labels VALUES(1, 'localhost@rpl:linux');
+            INSERT INTO Labels VALUES(2, 'localhost@rpl:branch');
 
             CREATE TABLE LabelMap(id primary key,
                 itemId INTEGER,
                 labelId INTEGER,
                 branchId integer
             );
-            INSERT INTO "LabelMap" VALUES(1, 1, 1, 1);
-            INSERT INTO "LabelMap" VALUES(2, 2, 1, 1);
-            INSERT INTO "LabelMap" VALUES(3, 3, 1, 1);
-            INSERT INTO "LabelMap" VALUES(4, 1, 2, 2);
-            INSERT INTO "LabelMap" VALUES(5, 2, 2, 3);
-            INSERT INTO "LabelMap" VALUES(6, 3, 2, 3);
+            INSERT INTO LabelMap VALUES(1, 1, 1, 1);
+            INSERT INTO LabelMap VALUES(2, 2, 1, 1);
+            INSERT INTO LabelMap VALUES(3, 3, 1, 1);
+            INSERT INTO LabelMap VALUES(4, 1, 2, 2);
+            INSERT INTO LabelMap VALUES(5, 2, 2, 3);
+            INSERT INTO LabelMap VALUES(6, 3, 2, 3);
 
             CREATE TABLE Users (
                 userId INTEGER PRIMARY KEY,
@@ -88,23 +88,23 @@ test:do_test(
                 salt BINARY,
                 password STRING
             );
-            INSERT INTO "Users" VALUES(1, 'test', 'æ%s',
+            INSERT INTO Users VALUES(1, 'test', 'æ%s',
                        '43ba0f45014306bd6df529551ffdb3df');
-            INSERT INTO "Users" VALUES(2, 'limited', 'ª>S',
+            INSERT INTO Users VALUES(2, 'limited', 'ª>S',
                        'cf07c8348fdf675cc1f7696b7d45191b');
             CREATE TABLE UserGroups (
                 userGroupId INTEGER PRIMARY KEY,
                 userGroup STRING UNIQUE
             );
-            INSERT INTO "UserGroups" VALUES(1, 'test');
-            INSERT INTO "UserGroups" VALUES(2, 'limited');
+            INSERT INTO UserGroups VALUES(1, 'test');
+            INSERT INTO UserGroups VALUES(2, 'limited');
 
             CREATE TABLE UserGroupMembers (
                 userGroupId INTEGER primary key,
                 userId INTEGER
             );
-            INSERT INTO "UserGroupMembers" VALUES(1, 1);
-            INSERT INTO "UserGroupMembers" VALUES(2, 2);
+            INSERT INTO UserGroupMembers VALUES(1, 1);
+            INSERT INTO UserGroupMembers VALUES(2, 2);
 
             CREATE TABLE Permissions (
                 userGroupId INTEGER primary key,
@@ -114,8 +114,8 @@ test:do_test(
                 capped INTEGER,
                 admin INTEGER
             );
-            INSERT INTO "Permissions" VALUES(1, 0, 0, 1, 0, 1);
-            INSERT INTO "Permissions" VALUES(2, 2, 4, 0, 0, 0);
+            INSERT INTO Permissions VALUES(1, 0, 0, 1, 0, 1);
+            INSERT INTO Permissions VALUES(2, 2, 4, 0, 0, 0);
         ]], d))
     end, {
         -- <tkt1443-1.0>

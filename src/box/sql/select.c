@@ -312,7 +312,7 @@ columnIndex(Table * pTab, const char *zCol)
 {
 	int i;
 	for (i = 0; i < pTab->nCol; i++) {
-		if (sqlite3StrICmp(pTab->aCol[i].zName, zCol) == 0)
+		if (strcmp(pTab->aCol[i].zName, zCol) == 0)
 			return i;
 	}
 	return -1;
@@ -4118,7 +4118,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 			if (pList->a[i].zName == 0) {
 				char *zName =
 				    sqlite3DbStrDup(db, pList->a[i].zSpan);
-				sqlite3Dequote(zName);
+				sqlite3NormalizeName(zName);
 				pList->a[i].zName = zName;
 			}
 		}
@@ -4370,7 +4370,7 @@ sqlite3IndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 		char *zIndexedBy = pFrom->u1.zIndexedBy;
 		Index *pIdx;
 		for (pIdx = pTab->pIndex;
-		     pIdx && sqlite3StrICmp(pIdx->zName, zIndexedBy);
+		     pIdx && strcmp(pIdx->zName, zIndexedBy);
 		     pIdx = pIdx->pNext) ;
 		if (!pIdx) {
 			sqlite3ErrorMsg(pParse, "no such index: %s", zIndexedBy,
@@ -4504,7 +4504,7 @@ searchWith(With * pWith,		/* Current innermost WITH clause */
 		for (p = pWith; p; p = p->pOuter) {
 			int i;
 			for (i = 0; i < p->nCte; i++) {
-				if (sqlite3StrICmp(zName, p->a[i].zName) == 0) {
+				if (strcmp(zName, p->a[i].zName) == 0) {
 					*ppContext = p;
 					return &p->a[i];
 				}
@@ -4608,7 +4608,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 				struct SrcList_item *pItem = &pSrc->a[i];
 				if (pItem->zDatabase == 0
 				    && pItem->zName != 0
-				    && 0 == sqlite3StrICmp(pItem->zName,
+				    && 0 == strcmp(pItem->zName,
 							   pCte->zName)
 				    ) {
 					pItem->pTab = pTab;
@@ -4921,7 +4921,7 @@ selectExpander(Walker * pWalker, Select * p)
 					    0) {
 						pSub = 0;
 						if (zTName
-						    && sqlite3StrICmp(zTName,
+						    && strcmp(zTName,
 								      zTabName)
 						    != 0) {
 							continue;

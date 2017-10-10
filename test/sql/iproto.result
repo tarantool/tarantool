@@ -4,7 +4,7 @@ remote = require('net.box')
 box.sql.execute('create table test (id primary key, a float, b text)')
 ---
 ...
-space = box.space.test
+space = box.space.TEST
 ---
 ...
 space:replace{1, 2, '3'}
@@ -41,7 +41,7 @@ cn:ping()
 -- Simple select.
 cn:execute('select * from test')
 ---
-- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
   rows:
   - [1, 2, '3']
   - [4, 5, '6']
@@ -67,7 +67,7 @@ cn:execute('delete from test where a = 12')
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
 ---
-- error: 'Failed to execute SQL statement: no such table: not_existing_table'
+- error: 'Failed to execute SQL statement: no such table: NOT_EXISTING_TABLE'
 ...
 cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 ---
@@ -76,7 +76,7 @@ cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 -- Empty result.
 cn:execute('select id as identifier from test where a = 5;')
 ---
-- metadata: [{'name': identifier}]
+- metadata: [{'name': IDENTIFIER}]
   rows: []
 ...
 -- netbox API errors.
@@ -102,7 +102,7 @@ cn:execute('   ;')
 --
 cn:execute('select * from test where id = ?', {1})
 ---
-- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
   rows:
   - [1, 2, '3']
 ...
@@ -117,7 +117,7 @@ parameters[1][':value'] = 1
 ...
 cn:execute('select * from test where id = :value', parameters)
 ---
-- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
   rows:
   - [1, 2, '3']
 ...
@@ -201,7 +201,7 @@ cn:execute('select ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
 -- Try to replace '?' in meta with something meaningful.
 cn:execute('select ? as kek, ? as kek2', {1, 2})
 ---
-- metadata: [{'name': kek}, {'name': 'kek2'}]
+- metadata: [{'name': KEK}, {'name': 'KEK2'}]
   rows:
   - [1, 2]
 ...
@@ -289,9 +289,9 @@ cn:execute('create table test2(id primary key, a, b, c)')
 cn:reload_schema()
 ---
 ...
-box.space.test2.name
+box.space.TEST2.name
 ---
-- test2
+- TEST2
 ...
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 ---
@@ -299,7 +299,7 @@ cn:execute('insert into test2 values (1, 1, 1, 1)')
 ...
 cn:execute('select * from test2')
 ---
-- metadata: [{'name': id}, {'name': 'a'}, {'name': 'b'}, {'name': 'c'}]
+- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}, {'name': 'C'}]
   rows:
   - [1, 1, 1, 1]
 ...
@@ -310,7 +310,7 @@ cn:execute('create index test2_a_b_index on test2(a, b)')
 cn:reload_schema()
 ---
 ...
-#box.space.test2.index
+#box.space.TEST2.index
 ---
 - 1
 ...
@@ -321,7 +321,7 @@ cn:execute('drop table test2')
 cn:reload_schema()
 ---
 ...
-box.space.test2
+box.space.TEST2
 ---
 - null
 ...
@@ -432,7 +432,7 @@ cn:execute('create index idx2 on test3(b)')
 cn:reload_schema()
 ---
 ...
-box.space.test3:truncate()
+box.space.TEST3:truncate()
 ---
 ...
 cn:reload_schema()
@@ -469,7 +469,7 @@ res = cn:execute('select * from test')
 ...
 res.metadata
 ---
-- [{'name': id}, {'name': 'a'}, {'name': 'b'}]
+- [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
 ...
 cn:close()
 ---

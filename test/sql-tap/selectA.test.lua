@@ -1191,10 +1191,10 @@ test:do_execsql_test(
         CREATE UNIQUE INDEX t2x ON t2(x);
         CREATE UNIQUE INDEX t2y ON t2(y);
         CREATE UNIQUE INDEX t2z ON t2(z);
-        SELECT name FROM _index WHERE name LIKE 't%';
+        SELECT name FROM _index WHERE name LIKE 'T%';
     ]], {
         -- <selectA-3.0>
-        "t1a", "t1b", "t1c", "t2x", "t2y", "t2z"
+        "T1A", "T1B", "T1C", "T2X", "T2Y", "T2Z"
         -- </selectA-3.0>
     })
 

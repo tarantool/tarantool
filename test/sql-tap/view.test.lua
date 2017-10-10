@@ -106,7 +106,7 @@ test:do_catchsql_test(
         SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.4>
-        1, "no such table: v1"
+        1, "no such table: V1"
         -- </view-1.4>
     })
 
@@ -128,7 +128,7 @@ test:do_catchsql_test(
         SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.6>
-        1, "no such table: t1"
+        1, "no such table: T1"
         -- </view-1.6>
     })
 
@@ -186,7 +186,7 @@ test:do_test(
         ]]
     end, {
         -- <view-2.1>
-        "x", 7, "a", 8, "b", 9, "c", 10
+        "X", 7, "A", 8, "B", 9, "C", 10
         -- </view-2.1>
     })
 
@@ -196,7 +196,7 @@ test:do_catchsql_test(
         INSERT INTO v2 VALUES(1,2,3,4);
     ]], {
         -- <view-2.2>
-        1, "cannot modify v2 because it is a view"
+        1, "cannot modify V2 because it is a view"
         -- </view-2.2>
     })
 
@@ -206,7 +206,7 @@ test:do_catchsql_test(
         UPDATE v2 SET a=10 WHERE a=5;
     ]], {
         -- <view-2.3>
-        1, "cannot modify v2 because it is a view"
+        1, "cannot modify V2 because it is a view"
         -- </view-2.3>
     })
 
@@ -216,7 +216,7 @@ test:do_catchsql_test(
         DELETE FROM v2;
     ]], {
         -- <view-2.4>
-        1, "cannot modify v2 because it is a view"
+        1, "cannot modify V2 because it is a view"
         -- </view-2.4>
     })
 
@@ -250,7 +250,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 LIMIT 1
     ]], {
         -- <view-3.1>
-        "a", 2, "b", 3
+        "A", 2, "B", 3
         -- </view-3.1>
     })
 
@@ -260,7 +260,7 @@ test:do_execsql2_test(
         SELECT * FROM v2 LIMIT 1
     ]], {
         -- <view-3.2>
-        "x", 7, "a", 8, "b", 9, "c", 10
+        "X", 7, "A", 8, "B", 9, "C", 10
         -- </view-3.2>
     })
 
@@ -268,11 +268,11 @@ test:do_execsql2_test(
     "view-3.3.1",
     [[
         DROP VIEW v1;
-        CREATE VIEW v1 AS SELECT a AS "xyz", b+c AS "pqr", c-b FROM t1;
+        CREATE VIEW v1 AS SELECT a AS xyz, b+c AS pqr, c-b FROM t1;
         SELECT * FROM v1 LIMIT 1
     ]], {
         -- <view-3.3.1>
-        "xyz", 2, "pqr", 7, "c-b", 1
+        "XYZ", 2, "PQR", 7, "c-b", 1
         -- </view-3.3.1>
     })
 
@@ -283,7 +283,7 @@ test:do_execsql2_test(
         SELECT * FROM v1b LIMIT 1
     ]], {
         -- <view-3.3.2>
-        "a", 2, "b+c", 7, "c", 4
+        "A", 2, "b+c", 7, "C", 4
         -- </view-3.3.2>
     })
 
@@ -292,7 +292,7 @@ test:do_execsql2_test(
     [[
         CREATE VIEW v1c(x,y,z) AS SELECT a, b+c, c-b FROM t1;
         SELECT * FROM v1c LIMIT 1;
-    ]],{"x", 2, "y", 7, "z", 1})
+    ]],{"X", 2, "Y", 7, "Z", 1})
 
 test:do_catchsql_test(
     "view-3.3.4",
@@ -309,7 +309,7 @@ test:do_catchsql_test(
     [[
         CREATE VIEW v1err(x,y) AS SELECT a, b+c, c-b FROM t1;
         SELECT * FROM v1err;
-    ]], {1, "expected 2 columns for 'v1err' but got 3"})
+    ]], {1, "expected 2 columns for 'V1ERR' but got 3"})
 
 test:do_catchsql_test(
     "view-3.3.5.2",
@@ -317,7 +317,7 @@ test:do_catchsql_test(
         DROP VIEW IF EXISTS v1err;
         CREATE VIEW v1err(w,x,y,z) AS SELECT a, b+c, c-b FROM t1;
         SELECT * FROM v1err;
-    ]], {1, "expected 4 columns for 'v1err' but got 3"})
+    ]], {1, "expected 4 columns for 'V1ERR' but got 3"})
 
 -- #MUST_WORK_TEST no query solution
 -- # ifcapable compound {
@@ -328,7 +328,7 @@ test:do_execsql2_test(
         SELECT * FROM v3 LIMIT 4;
     ]], {
         -- <view-3.4>
-        "a", 2, "a", 3, "a", 5, "a", 6
+        "A", 2, "A", 3, "A", 5, "A", 6
         -- </view-3.4>
     })
 
@@ -339,12 +339,12 @@ test:do_execsql2_test(
         CREATE VIEW v4 AS
           SELECT a, b FROM t1
           UNION
-          SELECT b AS "x", a AS "y" FROM t1
+          SELECT b AS x, a AS y FROM t1
           ORDER BY x, y;
         SELECT b FROM v4 ORDER BY b LIMIT 4;
     ]], {
         -- <view-3.5>
-        "b", 2, "b", 3, "b", 5, "b", 6
+        "B", 2, "B", 3, "B", 5, "B", 6
         -- </view-3.5>
     })
 
@@ -355,7 +355,7 @@ test:do_catchsql_test(
         DROP VIEW t1;
     ]], {
         -- <view-4.1>
-        1, "use DROP TABLE to delete table t1"
+        1, "use DROP TABLE to delete table T1"
         -- </view-4.1>
     })
 
@@ -375,7 +375,7 @@ test:do_catchsql_test(
         DROP TABLE v1;
     ]], {
         -- <view-4.3>
-        1, "use DROP VIEW to delete view v1"
+        1, "use DROP VIEW to delete view V1"
         -- </view-4.3>
     })
 
@@ -925,7 +925,7 @@ test:do_execsql2_test(
         SELECT * FROM v15 LIMIT 1;
     ]], {
         -- <view-15.1>
-        "x", 2, "y", 3
+        "X", 2, "Y", 3
         -- </view-15.1>
     })
 
@@ -935,7 +935,7 @@ test:do_execsql2_test(
         SELECT x, y FROM v15 LIMIT 1
     ]], {
         -- <view-15.2>
-        "x", 2, "y", 3
+        "X", 2, "Y", 3
         -- </view-15.2>
     })
 
@@ -974,7 +974,7 @@ test:do_catchsql_test(
         DROP VIEW nosuchview
     ]], {
         -- <view-17.1>
-        1, "no such view: nosuchview"
+        1, "no such view: NOSUCHVIEW"
         -- </view-17.1>
     })
 

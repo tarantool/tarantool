@@ -16,7 +16,7 @@ test:do_execsql_test(
 	"PRAGMA index_info = t1.t1ix1;",
 	{
 	-- <index-info-1.1>
-	0, 0, 'a'
+	0, 0, 'A'
 	-- <index-info-1.1>
 	})
 
@@ -25,7 +25,7 @@ test:do_execsql_test(
 	"PRAGMA index_info = t1.t1ix2;",
 	{
 	-- <index-info-1.1>
-	0, 0, 'a', 1, 1, 'b',
+	0, 0, 'A', 1, 1, 'B',
 	-- <index-info-1.1>
 	})
 
@@ -34,7 +34,7 @@ test:do_execsql_test(
 	"PRAGMA index_info = t1.t1ix3;",
 	{
 	-- <index-info-1.1>
-	0, 0, 'a', 1, 1, 'b', 2, 2, 'c'
+	0, 0, 'A', 1, 1, 'B', 2, 2, 'C'
 	-- <index-info-1.1>
 	})
 
@@ -43,7 +43,7 @@ test:do_execsql_test(
 	"PRAGMA index_xinfo = t1.t1ix1;",
 	{
 	-- <index-info-1.1>
-	0, 0, 'a', 0, 'BINARY', 1,
+	0, 0, 'A', 0, 'BINARY', 1,
 	-- <index-info-1.1>
 	})
 

@@ -202,8 +202,8 @@ end
 test:do_execsql_test(
     "selectB-3.0",
     [[
-        DROP INDEX "i1" ON t1;
-        DROP INDEX "i2" ON t2;
+        DROP INDEX i1 ON t1;
+        DROP INDEX i2 ON t2;
     ]], {
         -- <selectB-3.0>
         

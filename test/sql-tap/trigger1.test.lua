@@ -43,7 +43,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.1>
-        1, "no such table: no_such_table"
+        1, "no such table: NO_SUCH_TABLE"
         -- </trigger1-1.1.1>
     })
 
@@ -55,7 +55,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.2>
-        1, "no such table: no_such_table"
+        1, "no such table: NO_SUCH_TABLE"
         -- </trigger1-1.1.2>
     })
 
@@ -101,19 +101,19 @@ test:do_catchsql_test(
          END
     ]], {
         -- <trigger1-1.2.1>
-        1, "trigger tr1 already exists"
+        1, "trigger TR1 already exists"
         -- </trigger1-1.2.1>
     })
 
 test:do_catchsql_test(
     "trigger1-1.2.2",
     [[
-        CREATE TRIGGER "tr1" DELETE ON t1 BEGIN
+        CREATE TRIGGER tr1 DELETE ON t1 BEGIN
             SELECT * FROM sqlite_master;
          END
     ]], {
         -- <trigger1-1.2.2>
-        1, [[trigger "tr1" already exists]]
+        1, [[trigger TR1 already exists]]
         -- </trigger1-1.2.2>
     })
 
@@ -159,7 +159,7 @@ test:do_catchsql_test(
         DROP TRIGGER biggles;
     ]], {
         -- <trigger1-1.6.2>
-        1, "no such trigger: biggles"
+        1, "no such trigger: BIGGLES"
         -- </trigger1-1.6.2>
     })
 
@@ -170,7 +170,7 @@ test:do_catchsql_test(
         DROP TRIGGER tr1;
     ]], {
         -- <trigger1-1.7>
-        1, "no such trigger: tr1"
+        1, "no such trigger: TR1"
         -- </trigger1-1.7>
     })
 
@@ -251,7 +251,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.12>
-        1, "cannot create INSTEAD OF trigger on table: t1"
+        1, "cannot create INSTEAD OF trigger on table: T1"
         -- </trigger1-1.12>
     })
 
@@ -265,7 +265,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.13>
-        1, "cannot create BEFORE trigger on view: v1"
+        1, "cannot create BEFORE trigger on view: V1"
         -- </trigger1-1.13>
     })
 
@@ -280,7 +280,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.14>
-        1, "cannot create AFTER trigger on view: v1"
+        1, "cannot create AFTER trigger on view: V1"
         -- </trigger1-1.14>
     })
 

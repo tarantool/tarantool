@@ -69,8 +69,8 @@ for tn, sql in ipairs({"SELECT * FROM t1,           t2 WHERE t1.a=t2.e AND t2.d<
         function()
             return test:execsql("EXPLAIN QUERY PLAN "..sql)
         end, {
-            '/SCAN TABLE t2/',
-            '/SEARCH TABLE t1/'
+            '/SCAN TABLE T2/',
+            '/SEARCH TABLE T1/'
         })
 end
 test:do_execsql_test(
@@ -97,8 +97,8 @@ for tn, sql in ipairs({"SELECT * FROM t1,           t2 WHERE t1.a>? AND t2.d>t1.
         function()
             return test:execsql("EXPLAIN QUERY PLAN "..sql)
         end, {
-            '/SCAN TABLE t2/',
-            '/SEARCH TABLE t1/'
+            '/SCAN TABLE T2/',
+            '/SEARCH TABLE T1/'
         })
 end
 
@@ -126,8 +126,8 @@ for tn, sql in ipairs({[[SELECT t1.a, t1.b, t2.d, t2.e FROM t1, t2
         function()
             return test:execsql("EXPLAIN QUERY PLAN "..sql)
         end, {
-            '/SCAN TABLE t1/',
-            '/SEARCH TABLE t2/'
+            '/SCAN TABLE T1/',
+            '/SEARCH TABLE T2/'
         })
 end
 
@@ -138,8 +138,8 @@ test:do_test(
                            WHERE t2.d=t1.b AND t1.a=(t2.d+1) AND t1.b = (t2.e+1)]]
         return test:execsql("EXPLAIN QUERY PLAN "..sql)
     end, {
-    '/SCAN TABLE t2/',
-    '/SEARCH TABLE t1/'
+    '/SCAN TABLE T2/',
+    '/SEARCH TABLE T1/'
 })
 
 test:do_execsql_test(
@@ -151,7 +151,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT a FROM t4 WHERE a=? AND b=?;
     ]], {
         -- <4.0>
-        "/a=. AND b=./"
+        "/A=. AND B=./"
         -- </4.0>
     })
 

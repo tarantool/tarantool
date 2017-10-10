@@ -273,12 +273,12 @@ test:do_execsql_test(
     [[
         CREATE TABLE bookmark ( idBookmark integer primary key, idFile integer, timeInSeconds double, totalTimeInSeconds double, thumbNailImage text, player text, playerState text, type integer);
         CREATE TABLE path ( idPath integer primary key, strPath text, strContent text, strScraper text, strHash text, scanRecursive integer, useFolderNames bool, strSettings text, noUpdate bool, exclude bool, dateAdded text);
-        INSERT INTO "path" VALUES(1,'/tmp/tvshows/','tvshows','metadata.tvdb.com','989B1CE5680A14F5F86123F751169B49',0,0,'<settings><setting id="absolutenumber" value="false" /><setting id="dvdorder" value="false" /><setting id="fanart" value="true" /><setting id="language" value="en" /></settings>',0,0,NULL);
-        INSERT INTO "path" VALUES(2,'/tmp/tvshows/The.Big.Bang.Theory/','','','85E1DAAB2F5FF6EAE8AEDF1B5C882D1E',NULL,NULL,NULL,NULL,NULL,'2013-10-23 18:58:43');
+        INSERT INTO path VALUES(1,'/tmp/tvshows/','tvshows','metadata.tvdb.com','989B1CE5680A14F5F86123F751169B49',0,0,'<settings><setting id="absolutenumber" value="false" /><setting id="dvdorder" value="false" /><setting id="fanart" value="true" /><setting id="language" value="en" /></settings>',0,0,NULL);
+        INSERT INTO path VALUES(2,'/tmp/tvshows/The.Big.Bang.Theory/','','','85E1DAAB2F5FF6EAE8AEDF1B5C882D1E',NULL,NULL,NULL,NULL,NULL,'2013-10-23 18:58:43');
         CREATE TABLE files ( idFile integer primary key, idPath integer, strFilename text, playCount integer, lastPlayed text, dateAdded text);
-        INSERT INTO "files" VALUES(1,2,'The.Big.Bang.Theory.S01E01.WEB-DL.AAC2.0.H264.mkv',NULL,NULL,'2013-10-23 18:57:36');
+        INSERT INTO files VALUES(1,2,'The.Big.Bang.Theory.S01E01.WEB-DL.AAC2.0.H264.mkv',NULL,NULL,'2013-10-23 18:57:36');
         CREATE TABLE tvshow ( idShow integer primary key,c00 text,c01 text,c02 text,c03 text,c04 text,c05 text,c06 text,c07 text,c08 text,c09 text,c10 text,c11 text,c12 text,c13 text,c14 text,c15 text,c16 text,c17 text,c18 text,c19 text,c20 text,c21 text,c22 text,c23 text);
-        INSERT INTO "tvshow" VALUES(1,'The Big Bang Theory','Leonard Hofstadter and Sheldon Cooper are brilliant physicists, the kind of "beautiful minds" that understand how the universe works. But none of that genius helps them interact with people, especially women. All this begins to change when a free-spirited beauty named Penny moves in next door. Sheldon, Leonard''s roommate, is quite content spending his nights playing Klingon Boggle with their socially dysfunctional friends, fellow CalTech scientists Howard Wolowitz and Raj Koothrappali. However, Leonard sees in Penny a whole new universe of possibilities... including love.','','','9.200000','2007-09-24','<thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g13.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g23.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g18.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g17.jpg</thumb><thumb aspect="banner">http://
+        INSERT INTO tvshow VALUES(1,'The Big Bang Theory','Leonard Hofstadter and Sheldon Cooper are brilliant physicists, the kind of "beautiful minds" that understand how the universe works. But none of that genius helps them interact with people, especially women. All this begins to change when a free-spirited beauty named Penny moves in next door. Sheldon, Leonard''s roommate, is quite content spending his nights playing Klingon Boggle with their socially dysfunctional friends, fellow CalTech scientists Howard Wolowitz and Raj Koothrappali. However, Leonard sees in Penny a whole new universe of possibilities... including love.','','','9.200000','2007-09-24','<thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g13.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g23.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g18.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g17.jpg</thumb><thumb aspect="banner">http://
         thetvdb.com/banners/graphical/80379-g6.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g5.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g2.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g11.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g12.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g19.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g3.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g4.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g15.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g22.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g7.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g10.jpg</thumb><thumb
         aspect="banner">http://thetvdb.com/banners/graphical/80379-g24.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g8.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g9.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g14.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g16.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/graphical/80379-g21.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/text/80379-4.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/text/80379-2.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/text/80379-3.jpg</thumb><thumb aspect="banner">http://thetvdb.com/banners/text/80379-5.jpg</thumb><thumb aspect="poster" type="season" season="6">http://thetvdb.com/banners/seasons/80379-6-8.jpg</thumb><thumb aspect="poster" type="season" season="0">http://thetvdb.com/banners/seasons/80379-0-4.jpg</thumb><thumb aspect="poster" type="season"
         season="1">http://thetvdb.com/banners/seasons/80379-1-12.jpg</thumb><thumb aspect="poster" type="season" season="3">http://thetvdb.com/banners/seasons/80379-3-9.jpg</thumb><thumb aspect="poster" type="season" season="2">http://thetvdb.com/banners/seasons/80379-2-11.jpg</thumb><thumb aspect="poster" type="season" season="5">http://thetvdb.com/banners/seasons/80379-5-9.jpg</thumb><thumb aspect="poster" type="season" season="4">http://thetvdb.com/banners/seasons/80379-4-8.jpg</thumb><thumb aspect="poster" type="season" season="7">http://thetvdb.com/banners/seasons/80379-7-3.jpg</thumb><thumb aspect="poster" type="season" season="3">http://thetvdb.com/banners/seasons/80379-3-4.jpg</thumb><thumb aspect="poster" type="season" season="4">http://thetvdb.com/banners/seasons/80379-4-5.jpg</thumb><thumb aspect="poster" type="season" season="2">http://thetvdb.com/banners/seasons/80379-2-9.jpg</thumb><thumb aspect="poster" type="season" season="0">http://thetvdb.com/banners/seasons/80379-0-2.jpg</thumb><thumb aspect="
@@ -300,49 +300,49 @@ test:do_execsql_test(
         dim="1920x1080" colors="|253,237,186|33,25,22|245,144,38|" preview="_cache/fanart/original/80379-38.jpg">fanart/original/80379-38.jpg</thumb><thumb dim="1920x1080" colors="|174,111,68|243,115,50|252,226,45|" preview="_cache/fanart/original/80379-20.jpg">fanart/original/80379-20.jpg</thumb><thumb dim="1920x1080" colors="|63,56,123|87,59,47|63,56,123|" preview="_cache/fanart/original/80379-17.jpg">fanart/original/80379-17.jpg</thumb><thumb dim="1920x1080" colors="" preview="_cache/fanart/original/80379-43.jpg">fanart/original/80379-43.jpg</thumb><thumb dim="1280x720" colors="|69,68,161|142,118,142|222,191,137|" preview="_cache/fanart/original/80379-22.jpg">fanart/original/80379-22.jpg</thumb><thumb dim="1280x720" colors="|1,108,206|242,209,192|250,197,163|" preview="_cache/fanart/original/80379-15.jpg">fanart/original/80379-15.jpg</thumb><thumb dim="1280x720" colors="|239,229,237|0,0,0|167,136,115|" preview="_cache/fanart/original/80379-18.jpg">fanart/original/80379-18.jpg</thumb><thumb dim="1280x720" colors=""
         preview="_cache/fanart/original/80379-6.jpg">fanart/original/80379-6.jpg</thumb><thumb dim="1280x720" colors="" preview="_cache/fanart/original/80379-8.jpg">fanart/original/80379-8.jpg</thumb><thumb dim="1280x720" colors="" preview="_cache/fanart/original/80379-41.jpg">fanart/original/80379-41.jpg</thumb><thumb dim="1920x1080" colors="" preview="_cache/fanart/original/80379-44.jpg">fanart/original/80379-44.jpg</thumb><thumb dim="1280x720" colors="" preview="_cache/fanart/original/80379-39.jpg">fanart/original/80379-39.jpg</thumb></fanart>','80379','TV-PG','CBS','','/tmp/tvshows/The.Big.Bang.Theory/','1',NULL,NULL,NULL,NULL,NULL,NULL);
         CREATE TABLE episode ( idEpisode integer primary key, idFile integer,c00 text,c01 text,c02 text,c03 text,c04 text,c05 text,c06 text,c07 text,c08 text,c09 text,c10 text,c11 text,c12 varchar(24),c13 varchar(24),c14 text,c15 text,c16 text,c17 varchar(24),c18 text,c19 text,c20 text,c21 text,c22 text,c23 text, idShow integer);
-        INSERT INTO "episode" VALUES(1,1,'Pilot','Brilliant physicist roommates Leonard and Sheldon meet their new neighbor Penny, who begins showing them that as much as they know about science, they know little about actual living.','','7.700000','Chuck Lorre / Bill Prady','2007-09-24','<thumb>http://thetvdb.com/banners/episodes/80379/332484.jpg</thumb>','',NULL,'1800','James Burrows','','1','1','','-1','-1','-1','/tmp/tvshows/The.Big.Bang.Theory/The.Big.Bang.Theory.S01E01.WEB-DL.AAC2.0.H264.mkv','2','332484',NULL,NULL,NULL,1);
+        INSERT INTO episode VALUES(1,1,'Pilot','Brilliant physicist roommates Leonard and Sheldon meet their new neighbor Penny, who begins showing them that as much as they know about science, they know little about actual living.','','7.700000','Chuck Lorre / Bill Prady','2007-09-24','<thumb>http://thetvdb.com/banners/episodes/80379/332484.jpg</thumb>','',NULL,'1800','James Burrows','','1','1','','-1','-1','-1','/tmp/tvshows/The.Big.Bang.Theory/The.Big.Bang.Theory.S01E01.WEB-DL.AAC2.0.H264.mkv','2','332484',NULL,NULL,NULL,1);
         CREATE TABLE tvshowlinkpath (idShow integer, idPath integer, PRIMARY KEY(idShow, idPath));
-        INSERT INTO "tvshowlinkpath" VALUES(1,2);
+        INSERT INTO tvshowlinkpath VALUES(1,2);
         CREATE TABLE seasons ( idSeason integer primary key, idShow integer, season integer);
-        INSERT INTO "seasons" VALUES(1,1,-1);
-        INSERT INTO "seasons" VALUES(2,1,0);
-        INSERT INTO "seasons" VALUES(3,1,1);
-        INSERT INTO "seasons" VALUES(4,1,2);
-        INSERT INTO "seasons" VALUES(5,1,3);
-        INSERT INTO "seasons" VALUES(6,1,4);
-        INSERT INTO "seasons" VALUES(7,1,5);
-        INSERT INTO "seasons" VALUES(8,1,6);
-        INSERT INTO "seasons" VALUES(9,1,7);
+        INSERT INTO seasons VALUES(1,1,-1);
+        INSERT INTO seasons VALUES(2,1,0);
+        INSERT INTO seasons VALUES(3,1,1);
+        INSERT INTO seasons VALUES(4,1,2);
+        INSERT INTO seasons VALUES(5,1,3);
+        INSERT INTO seasons VALUES(6,1,4);
+        INSERT INTO seasons VALUES(7,1,5);
+        INSERT INTO seasons VALUES(8,1,6);
+        INSERT INTO seasons VALUES(9,1,7);
         CREATE TABLE art(art_id INTEGER PRIMARY KEY, media_id INTEGER, media_type TEXT, type TEXT, url TEXT);
-        INSERT INTO "art" VALUES(1,1,'actor','thumb','http://thetvdb.com/banners/actors/73597.jpg');
-        INSERT INTO "art" VALUES(2,2,'actor','thumb','http://thetvdb.com/banners/actors/73596.jpg');
-        INSERT INTO "art" VALUES(3,3,'actor','thumb','http://thetvdb.com/banners/actors/73595.jpg');
-        INSERT INTO "art" VALUES(4,4,'actor','thumb','http://thetvdb.com/banners/actors/73599.jpg');
-        INSERT INTO "art" VALUES(5,5,'actor','thumb','http://thetvdb.com/banners/actors/73598.jpg');
-        INSERT INTO "art" VALUES(6,6,'actor','thumb','http://thetvdb.com/banners/actors/283158.jpg');
-        INSERT INTO "art" VALUES(7,7,'actor','thumb','http://thetvdb.com/banners/actors/283157.jpg');
-        INSERT INTO "art" VALUES(8,8,'actor','thumb','http://thetvdb.com/banners/actors/91271.jpg');
-        INSERT INTO "art" VALUES(9,9,'actor','thumb','http://thetvdb.com/banners/actors/294178.jpg');
-        INSERT INTO "art" VALUES(10,10,'actor','thumb','http://thetvdb.com/banners/actors/283159.jpg');
-        INSERT INTO "art" VALUES(11,1,'tvshow','banner','http://thetvdb.com/banners/graphical/80379-g13.jpg');
-        INSERT INTO "art" VALUES(12,1,'tvshow','fanart','http://thetvdb.com/banners/fanart/original/80379-2.jpg');
-        INSERT INTO "art" VALUES(13,1,'tvshow','poster','http://thetvdb.com/banners/posters/80379-22.jpg');
-        INSERT INTO "art" VALUES(14,1,'season','poster','http://thetvdb.com/banners/posters/80379-22.jpg');
-        INSERT INTO "art" VALUES(15,2,'season','banner','http://thetvdb.com/banners/seasonswide/80379-0.jpg');
-        INSERT INTO "art" VALUES(16,2,'season','poster','http://thetvdb.com/banners/seasons/80379-0-4.jpg');
-        INSERT INTO "art" VALUES(17,3,'season','banner','http://thetvdb.com/banners/seasonswide/80379-1-2.jpg');
-        INSERT INTO "art" VALUES(18,3,'season','poster','http://thetvdb.com/banners/seasons/80379-1-12.jpg');
-        INSERT INTO "art" VALUES(19,4,'season','banner','http://thetvdb.com/banners/seasonswide/80379-2-2.jpg');
-        INSERT INTO "art" VALUES(20,4,'season','poster','http://thetvdb.com/banners/seasons/80379-2-11.jpg');
-        INSERT INTO "art" VALUES(21,5,'season','banner','http://thetvdb.com/banners/seasonswide/80379-3-2.jpg');
-        INSERT INTO "art" VALUES(22,5,'season','poster','http://thetvdb.com/banners/seasons/80379-3-9.jpg');
-        INSERT INTO "art" VALUES(23,6,'season','banner','http://thetvdb.com/banners/seasonswide/80379-4-2.jpg');
-        INSERT INTO "art" VALUES(24,6,'season','poster','http://thetvdb.com/banners/seasons/80379-4-8.jpg');
-        INSERT INTO "art" VALUES(25,7,'season','banner','http://thetvdb.com/banners/seasonswide/80379-5.jpg');
-        INSERT INTO "art" VALUES(26,7,'season','poster','http://thetvdb.com/banners/seasons/80379-5-9.jpg');
-        INSERT INTO "art" VALUES(27,8,'season','poster','http://thetvdb.com/banners/seasons/80379-6-8.jpg');
-        INSERT INTO "art" VALUES(28,9,'season','poster','http://thetvdb.com/banners/seasons/80379-7-3.jpg');
-        INSERT INTO "art" VALUES(29,1,'episode','thumb','http://thetvdb.com/banners/episodes/80379/332484.jpg');
+        INSERT INTO art VALUES(1,1,'actor','thumb','http://thetvdb.com/banners/actors/73597.jpg');
+        INSERT INTO art VALUES(2,2,'actor','thumb','http://thetvdb.com/banners/actors/73596.jpg');
+        INSERT INTO art VALUES(3,3,'actor','thumb','http://thetvdb.com/banners/actors/73595.jpg');
+        INSERT INTO art VALUES(4,4,'actor','thumb','http://thetvdb.com/banners/actors/73599.jpg');
+        INSERT INTO art VALUES(5,5,'actor','thumb','http://thetvdb.com/banners/actors/73598.jpg');
+        INSERT INTO art VALUES(6,6,'actor','thumb','http://thetvdb.com/banners/actors/283158.jpg');
+        INSERT INTO art VALUES(7,7,'actor','thumb','http://thetvdb.com/banners/actors/283157.jpg');
+        INSERT INTO art VALUES(8,8,'actor','thumb','http://thetvdb.com/banners/actors/91271.jpg');
+        INSERT INTO art VALUES(9,9,'actor','thumb','http://thetvdb.com/banners/actors/294178.jpg');
+        INSERT INTO art VALUES(10,10,'actor','thumb','http://thetvdb.com/banners/actors/283159.jpg');
+        INSERT INTO art VALUES(11,1,'tvshow','banner','http://thetvdb.com/banners/graphical/80379-g13.jpg');
+        INSERT INTO art VALUES(12,1,'tvshow','fanart','http://thetvdb.com/banners/fanart/original/80379-2.jpg');
+        INSERT INTO art VALUES(13,1,'tvshow','poster','http://thetvdb.com/banners/posters/80379-22.jpg');
+        INSERT INTO art VALUES(14,1,'season','poster','http://thetvdb.com/banners/posters/80379-22.jpg');
+        INSERT INTO art VALUES(15,2,'season','banner','http://thetvdb.com/banners/seasonswide/80379-0.jpg');
+        INSERT INTO art VALUES(16,2,'season','poster','http://thetvdb.com/banners/seasons/80379-0-4.jpg');
+        INSERT INTO art VALUES(17,3,'season','banner','http://thetvdb.com/banners/seasonswide/80379-1-2.jpg');
+        INSERT INTO art VALUES(18,3,'season','poster','http://thetvdb.com/banners/seasons/80379-1-12.jpg');
+        INSERT INTO art VALUES(19,4,'season','banner','http://thetvdb.com/banners/seasonswide/80379-2-2.jpg');
+        INSERT INTO art VALUES(20,4,'season','poster','http://thetvdb.com/banners/seasons/80379-2-11.jpg');
+        INSERT INTO art VALUES(21,5,'season','banner','http://thetvdb.com/banners/seasonswide/80379-3-2.jpg');
+        INSERT INTO art VALUES(22,5,'season','poster','http://thetvdb.com/banners/seasons/80379-3-9.jpg');
+        INSERT INTO art VALUES(23,6,'season','banner','http://thetvdb.com/banners/seasonswide/80379-4-2.jpg');
+        INSERT INTO art VALUES(24,6,'season','poster','http://thetvdb.com/banners/seasons/80379-4-8.jpg');
+        INSERT INTO art VALUES(25,7,'season','banner','http://thetvdb.com/banners/seasonswide/80379-5.jpg');
+        INSERT INTO art VALUES(26,7,'season','poster','http://thetvdb.com/banners/seasons/80379-5-9.jpg');
+        INSERT INTO art VALUES(27,8,'season','poster','http://thetvdb.com/banners/seasons/80379-6-8.jpg');
+        INSERT INTO art VALUES(28,9,'season','poster','http://thetvdb.com/banners/seasons/80379-7-3.jpg');
+        INSERT INTO art VALUES(29,1,'episode','thumb','http://thetvdb.com/banners/episodes/80379/332484.jpg');
         CREATE INDEX ix_bookmark ON bookmark (idFile, type);
         CREATE INDEX ix_path ON path ( strPath );
         CREATE INDEX ix_files ON files ( idPath, strFilename );
@@ -536,7 +536,7 @@ test:do_execsql_test(
         SELECT x, y, z FROM c1 WHERE x=y AND y=z AND z='abc';
     ]], {
         -- <transitive1-560eqp>
-        "/SCAN TABLE c1/"
+        "/SCAN TABLE C1/"
         -- </transitive1-560eqp>
     })
 
@@ -559,7 +559,7 @@ test:do_execsql_test(
         SELECT * FROM c1 WHERE x=y AND z=y AND z='abc';
     ]], {
         -- <transitive1-570eqp>
-        "/SEARCH TABLE c1 USING COVERING INDEX c1x/"
+        "/SEARCH TABLE C1 USING COVERING INDEX C1X/"
         -- </transitive1-570eqp>
     })
 

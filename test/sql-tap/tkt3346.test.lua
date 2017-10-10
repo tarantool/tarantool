@@ -94,7 +94,7 @@ test:do_catchsql_test(
         SELECT * FROM (SELECT a,b FROM t1 WHERE 1=x.a) AS x;
     ]], {
         -- <tkt3346-2.1>
-        1, "no such column: x.a"
+        1, "no such column: X.A"
         -- </tkt3346-2.1>
     })
 

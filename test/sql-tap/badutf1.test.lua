@@ -28,7 +28,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\x80') AS x")
     end, {
         -- <badutf-1.1>
-        "x", "80"
+        "X", "80"
         -- </badutf-1.1>
     })
 
@@ -38,7 +38,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\x81') AS x")
     end, {
         -- <badutf-1.2>
-        "x", "81"
+        "X", "81"
         -- </badutf-1.2>
     })
 
@@ -48,7 +48,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\xbf') AS x")
     end, {
         -- <badutf-1.3>
-        "x", "BF"
+        "X", "BF"
         -- </badutf-1.3>
     })
 
@@ -58,7 +58,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\xc0') AS x")
     end, {
         -- <badutf-1.4>
-        "x", "C0"
+        "X", "C0"
         -- </badutf-1.4>
     })
 
@@ -68,7 +68,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\xe0') AS x")
     end, {
         -- <badutf-1.5>
-        "x", "E0"
+        "X", "E0"
         -- </badutf-1.5>
     })
 
@@ -78,7 +78,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\xf0') AS x")
     end, {
         -- <badutf-1.6>
-        "x", "F0"
+        "X", "F0"
         -- </badutf-1.6>
     })
 
@@ -88,7 +88,7 @@ test:do_test(
         return test:execsql2("SELECT hex('\xff') AS x")
     end, {
         -- <badutf-1.7>
-        "x", "FF"
+        "X", "FF"
         -- </badutf-1.7>
     })
 
@@ -214,7 +214,7 @@ test:do_test(
         return test:execsql2("SELECT '\x80'=CAST(x'80' AS text) AS x")
     end, {
         -- <badutf-2.1>
-        "x", 1
+        "X", 1
         -- </badutf-2.1>
     })
 
@@ -224,7 +224,7 @@ test:do_test(
         return test:execsql2("SELECT CAST('\x80' AS blob)=x'80' AS x")
     end, {
         -- <badutf-2.2>
-        "x", 1
+        "X", 1
         -- </badutf-2.2>
     })
 
@@ -236,7 +236,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x80') AS x")
     end, {
         -- <badutf-3.1>
-        "x", 1
+        "X", 1
         -- </badutf-3.1>
     })
 
@@ -246,7 +246,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x61\x62\x63') AS x")
     end, {
         -- <badutf-3.2>
-        "x", 3
+        "X", 3
         -- </badutf-3.2>
     })
 
@@ -256,7 +256,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x7f\x80\x81') AS x")
     end, {
         -- <badutf-3.3>
-        "x", 3
+        "X", 3
         -- </badutf-3.3>
     })
 
@@ -266,7 +266,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x61\xc0') AS x")
     end, {
         -- <badutf-3.4>
-        "x", 2
+        "X", 2
         -- </badutf-3.4>
     })
 
@@ -276,7 +276,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x61\xc0\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80') AS x")
     end, {
         -- <badutf-3.5>
-        "x", 2
+        "X", 2
         -- </badutf-3.5>
     })
 
@@ -286,7 +286,7 @@ test:do_test(
         return test:execsql2("SELECT length('\xc0\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80') AS x")
     end, {
         -- <badutf-3.6>
-        "x", 1
+        "X", 1
         -- </badutf-3.6>
     })
 
@@ -296,7 +296,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80') AS x")
     end, {
         -- <badutf-3.7>
-        "x", 10
+        "X", 10
         -- </badutf-3.7>
     })
 
@@ -306,7 +306,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x80\x80\x80\x80\x80\xf0\x80\x80\x80\x80') AS x")
     end, {
         -- <badutf-3.8>
-        "x", 6
+        "X", 6
         -- </badutf-3.8>
     })
 
@@ -316,7 +316,7 @@ test:do_test(
         return test:execsql2("SELECT length('\x80\x80\x80\x80\x80\xf0\x80\x80\x80\xff') AS x")
     end, {
         -- <badutf-3.9>
-        "x", 7
+        "X", 7
         -- </badutf-3.9>
     })
 
@@ -326,7 +326,7 @@ test:do_test(
         return test:execsql2("SELECT hex(trim('\x80\x80\x80\xf0\x80\x80\x80\xff','\x80\xff')) AS x")
     end, {
         -- <badutf-4.1>
-        "x", "F0"
+        "X", "F0"
         -- </badutf-4.1>
     })
 
@@ -336,7 +336,7 @@ test:do_test(
         return test:execsql2("SELECT hex(ltrim('\x80\x80\x80\xf0\x80\x80\x80\xff','\x80\xff')) AS x")
     end, {
         -- <badutf-4.2>
-        "x", "F0808080FF"
+        "X", "F0808080FF"
         -- </badutf-4.2>
     })
 
@@ -346,7 +346,7 @@ test:do_test(
         return test:execsql2("SELECT hex(rtrim('\x80\x80\x80\xf0\x80\x80\x80\xff','\x80\xff')) AS x")
     end, {
         -- <badutf-4.3>
-        "x", "808080F0"
+        "X", "808080F0"
         -- </badutf-4.3>
     })
 
@@ -356,7 +356,7 @@ test:do_test(
         return test:execsql2("SELECT hex(trim('\x80\x80\x80\xf0\x80\x80\x80\xff','\xff\x80')) AS x")
     end, {
         -- <badutf-4.4>
-        "x", "808080F0808080FF"
+        "X", "808080F0808080FF"
         -- </badutf-4.4>
     })
 
@@ -366,7 +366,7 @@ test:do_test(
         return test:execsql2("SELECT hex(trim('\xff\x80\x80\xf0\x80\x80\x80\xff','\xff\x80')) AS x")
     end, {
         -- <badutf-4.5>
-        "x", "80F0808080FF"
+        "X", "80F0808080FF"
         -- </badutf-4.5>
     })
 
@@ -376,7 +376,7 @@ test:do_test(
         return test:execsql2("SELECT hex(trim('\xff\x80\xf0\x80\x80\x80\xff','\xff\x80')) AS x")
     end, {
         -- <badutf-4.6>
-        "x", "F0808080FF"
+        "X", "F0808080FF"
         -- </badutf-4.6>
     })
 
@@ -386,7 +386,7 @@ test:do_test(
         return test:execsql2("SELECT hex(trim('\xff\x80\xf0\x80\x80\x80\xff','\xff\x80\x80')) AS x")
     end, {
         -- <badutf-4.7>
-        "x", "FF80F0808080FF"
+        "X", "FF80F0808080FF"
         -- </badutf-4.7>
     })
 

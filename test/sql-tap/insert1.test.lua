@@ -26,7 +26,7 @@ test:do_catchsql_test("insert-1.1", [[
   INSERT INTO test1 VALUES(1,2,3)
 ]], {
   -- <insert-1.1>
-  1, "no such table: test1"
+  1, "no such table: TEST1"
   -- </insert-1.1>
 })
 
@@ -43,7 +43,7 @@ test:do_test("insert-1.3", function()
   return test:catchsql "INSERT INTO test1 VALUES(1,2)"
 end, {
   -- <insert-1.3>
-  1, "table test1 has 3 columns but 2 values were supplied"
+  1, "table TEST1 has 3 columns but 2 values were supplied"
   -- </insert-1.3>
 })
 
@@ -51,7 +51,7 @@ test:do_catchsql_test("insert-1.3b", [[
   INSERT INTO test1 VALUES(1,2,3,4)
 ]], {
   -- <insert-1.3b>
-  1, "table test1 has 3 columns but 4 values were supplied"
+  1, "table TEST1 has 3 columns but 4 values were supplied"
   -- </insert-1.3b>
 })
 
@@ -77,7 +77,7 @@ test:do_catchsql_test("insert-1.4", [[
   INSERT INTO test1(one,four) VALUES(1,2)
 ]], {
   -- <insert-1.4>
-  1, "table test1 has no column named four"
+  1, "table TEST1 has no column named FOUR"
   -- </insert-1.4>
 })
 
@@ -245,7 +245,7 @@ end, {
     SELECT * FROM t3 ORDER BY a;
   ]], {
     -- <insert-4.3>
-    1, "no such column: t3.a"
+    1, "no such column: T3.A"
     -- </insert-4.3>
   })
 

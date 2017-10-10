@@ -25,7 +25,7 @@ test:do_catchsql_test("update-1.1", [[
   UPDATE test1 SET f2=5 WHERE f1<1
 ]], {
   -- <update-1.1>
-  1, "no such table: test1"
+  1, "no such table: TEST1"
   -- </update-1.1>
 })
 
@@ -58,7 +58,7 @@ test:do_catchsql_test("update-3.2", [[
   UPDATE test1 SET f1=f3*2 WHERE f2==32
 ]], {
   -- <update-3.2>
-  1, "no such column: f3"
+  1, "no such column: F3"
   -- </update-3.2>
 })
 
@@ -66,7 +66,7 @@ test:do_catchsql_test("update-3.3", [[
   UPDATE test1 SET f1=test2.f1*2 WHERE f2==32
 ]], {
   -- <update-3.3>
-  1, "no such column: test2.f1"
+  1, "no such column: TEST2.F1"
   -- </update-3.3>
 })
 
@@ -74,7 +74,7 @@ test:do_catchsql_test("update-3.4", [[
   UPDATE test1 SET f3=f1*2 WHERE f2==32
 ]], {
   -- <update-3.4>
-  1, "no such column: f3"
+  1, "no such column: F3"
   -- </update-3.4>
 })
 
@@ -445,7 +445,7 @@ test:do_execsql_test("update-5.6.5", [[
 --
 test:execsql "PRAGMA synchronous='FULL'"
 test:do_test("update-6.0", function()
-  test:execsql "DROP INDEX \"idx1\" ON test1"
+  test:execsql "DROP INDEX idx1 ON test1"
   test:execsql "CREATE INDEX idx1 ON test1(f2)"
   return test:execsql "SELECT f1,f2 FROM test1 ORDER BY f1,f2"
 end, {
@@ -854,7 +854,7 @@ test:do_catchsql_test("update-9.1", [[
   UPDATE test1 SET x=11 WHERE f1=1025
 ]], {
   -- <update-9.1>
-  1, "no such column: x"
+  1, "no such column: X"
   -- </update-9.1>
 })
 
@@ -870,7 +870,7 @@ test:do_catchsql_test("update-9.3", [[
   UPDATE test1 SET f1=11 WHERE x=1025
 ]], {
   -- <update-9.3>
-  1, "no such column: x"
+  1, "no such column: X"
   -- </update-9.3>
 })
 
@@ -917,7 +917,7 @@ test:do_catchsql_test("update-10.3", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.3>
-  1, "UNIQUE constraint failed: t1.a"
+  1, "UNIQUE constraint failed: T1.A"
   -- </update-10.3>
 })
 
@@ -943,7 +943,7 @@ test:do_catchsql_test("update-10.6", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.6>
-  1, "UNIQUE constraint failed: t1.b"
+  1, "UNIQUE constraint failed: T1.B"
   -- </update-10.6>
 })
 
@@ -969,7 +969,7 @@ test:do_catchsql_test("update-10.9", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.9>
-  1, "UNIQUE constraint failed: t1.c, t1.d"
+  1, "UNIQUE constraint failed: T1.C, T1.D"
   -- </update-10.9>
 })
 

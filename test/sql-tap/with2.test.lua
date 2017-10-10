@@ -215,7 +215,7 @@ test:do_catchsql_test(1.16, [[
     SELECT * FROM t4;
 ]], {
     -- <1.16>
-    1, "multiple references to recursive table: t4"
+    1, "multiple references to recursive table: T4"
     -- </1.16>
 })
 
@@ -258,7 +258,7 @@ test:do_catchsql_test(3.1, [[
     SELECT * FROM i;
 ]], {
     -- <3.1>
-    1, "circular reference: i"
+    1, "circular reference: I"
     -- </3.1>
 })
 
@@ -270,7 +270,7 @@ test:do_catchsql_test(3.2, [[
     SELECT * FROM i;
 ]], {
     -- <3.2>
-    1, "circular reference: i"
+    1, "circular reference: I"
     -- </3.2>
 })
 
@@ -281,7 +281,7 @@ test:do_catchsql_test(3.3, [[
     SELECT * FROM i;
 ]], {
     -- <3.3>
-    1, "circular reference: i"
+    1, "circular reference: I"
     -- </3.3>
 })
 
@@ -292,7 +292,7 @@ test:do_catchsql_test(3.4, [[
     SELECT * FROM j;
 ]], {
     -- <3.4>
-    1, "circular reference: j"
+    1, "circular reference: J"
     -- </3.4>
 })
 
@@ -305,7 +305,7 @@ test:do_catchsql_test(3.5, [[
     SELECT * FROM i;
 ]], {
     -- <3.5>
-    1, "circular reference: i"
+    1, "circular reference: I"
     -- </3.5>
 })
 
@@ -441,7 +441,7 @@ test:do_catchsql_test(6.2, [[
     -- </6.2>
 })
 
-test:do_catchsql_test(6.3, [[
+test:do_catchsql_test("6.3.1", [[
     WITH x AS (SELECT * FROM t1)
     INSERT INTO t2 SELECT a, b, FROM t1;
 ]], {
@@ -450,12 +450,12 @@ test:do_catchsql_test(6.3, [[
     -- </6.3>
 })
 
-test:do_catchsql_test(6.3, [[
+test:do_catchsql_test("6.3.2", [[
     WITH x AS (SELECT * FROM t1)
     INSERT INTO t2 SELECT a, b FROM abc;
 ]], {
     -- <6.3>
-    1, "no such table: abc"
+    1, "no such table: ABC"
     -- </6.3>
 })
 
@@ -509,7 +509,7 @@ test:do_catchsql_test(6.9, [[
     -- </6.9>
 })
 
-test:do_catchsql_test(6.10, [[
+test:do_catchsql_test("6.10", [[
     WITH x(a,b) AS (
       SELECT 1, 1
       UNION ALL
@@ -518,7 +518,7 @@ test:do_catchsql_test(6.10, [[
     SELECT * FROM x
 ]], {
     -- <6.10>
-    1, "no such column: c"
+    1, "no such column: C"
     -- </6.10>
 })
 

@@ -67,7 +67,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=100 AND b=55]],
     {
         -- <1.1>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"}
         -- </1.1>
     })
 
@@ -76,7 +76,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=99 AND b=55]],
     {
         -- <1.2>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"}
         -- </1.2>
     })
 
@@ -85,7 +85,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=101 AND b=55]],
     {
         -- <1.3>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"}
         -- </1.3>
     })
 
@@ -94,7 +94,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=100 AND b=56]],
     {
         -- <1.4>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"}
         -- </1.4>
     })
 
@@ -103,7 +103,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=99 AND b=56]],
     {
         -- <1.5>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"}
         -- </1.5>
     })
 
@@ -112,7 +112,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=101 AND b=56]],
     {
         -- <1.6>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"}
         -- </1.6>
     })
 
@@ -121,7 +121,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=100 AND b BETWEEN 50 AND 54]],
     {
         -- <2.1>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B>? AND B<?)"}
         -- </2.1>
     })
 
@@ -171,7 +171,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE b BETWEEN 30 AND 34 AND c BETWEEN 0 AND 100000]],
     {
         -- <3.1>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B>? AND B<?)"}
         -- </3.1>
     })
 
@@ -181,9 +181,8 @@ test:do_eqp_test(
        WHERE b BETWEEN 30 AND 34 AND c BETWEEN 800000 AND 900000]],
     {
         -- <3.2>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1c (c>? AND c<?)"}
-        -- {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)"}        
-        -- </3.2>
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1C (C>? AND C<?)"}
+        -- {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)"}
     })
 
 test:do_eqp_test(
@@ -191,7 +190,7 @@ test:do_eqp_test(
     [[SELECT * FROM t1 WHERE a=100 AND c BETWEEN 0 AND 100000]],
     {
         -- <3.3>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"}
         -- </3.3>
     })
 
@@ -201,7 +200,7 @@ test:do_eqp_test(
        WHERE a=100 AND c BETWEEN 800000 AND 900000]],
     {
         -- <3.4>
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1c (c>? AND c<?)"}
+        {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1C (C>? AND C<?)"}
         -- </3.4>
     })
 

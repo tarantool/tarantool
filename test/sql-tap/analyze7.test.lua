@@ -34,7 +34,7 @@ test:do_test(
 		]])
 		end, {
         	-- <analyze7-1.0>
-            0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
+            0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
             -- </analyze7-1.0>
         })
 
@@ -44,7 +44,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE b=123;
 	]], {
     	-- <analyze7-1.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-1.1>
     })
 
@@ -54,7 +54,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=2;
 	]], {
         -- <analyze7-1.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1cd (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=?)"
         -- </analyze7-1.2>
     })
 
@@ -69,7 +69,7 @@ test:do_test(
 		return test:execsql("EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123;")
 	end, {
        	-- <analyze7-2.0>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
         -- </analyze7-2.0>
     })
 
@@ -79,7 +79,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE b=123;
 	]], {
         -- <analyze7-2.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-2.1>
     })
 
@@ -89,7 +89,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=2;
 	]], {
         -- <analyze7-2.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1cd (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=?)"
         -- </analyze7-2.2>
     })
 
@@ -104,7 +104,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123 AND b=123;
 	]], {
         -- <analyze7-2.3>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
         -- </analyze7-2.3>
     })
 
@@ -118,7 +118,7 @@ test:do_test(
 		return test:execsql("EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123;")
 	end, {
         -- <analyze7-3.0>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
         -- </analyze7-3.0>
     })
 
@@ -128,17 +128,17 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE b=123;
 	]], {
         -- <analyze7-3.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-3.1>
     })
 
 test:do_execsql_test(
 	"analyze7-3.2.1",
 	[[
-		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=?;
+		EXPLAIN QUERY PLAN SELECT * FROM T1 WHERE C=?;
 	]], {
         -- <analyze7-3.2.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1cd (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=?)"
         -- </analyze7-3.2.1>
     })
 
@@ -150,20 +150,20 @@ test:do_execsql_test(
     	EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=2;
     ]], {
     	-- <analyze7-3.2.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1cd (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=?)"
         -- </analyze7-3.2.2>
     })
 
 test:do_execsql_test(
 	"analyze7-3.3",
 	[[
-		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123 AND b=123;
+		EXPLAIN QUERY PLAN SELECT * FROM T1 WHERE A=123 AND B=123;
 	]], {
 		-- After running second ANALYZE query, there are equal statistics for
 		-- indexes t1a and t1b, so it doesn't really matter which index planner uses.
         -- <analyze7-3.3>
         -- 0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-3.3>
     })
 
@@ -173,7 +173,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=123 AND b=123;
 	]], {
         -- <analyze7-3.4>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-3.4>
     })
 
@@ -183,7 +183,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=123 AND d=123 AND b=123;
 	]], {
        -- <analyze7-3.6>
-       0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b=?)"
+       0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
        -- </analyze7-3.6>
     })
 

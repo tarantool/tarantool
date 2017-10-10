@@ -48,7 +48,7 @@ test:do_catchsql_test(
         SELECT 1 AS yy FROM t1, t2 ORDER BY y;
     ]], {
         -- <resolver01-1.2>
-        1, "ambiguous column name: y"
+        1, "ambiguous column name: Y"
         -- </resolver01-1.2>
     })
 
@@ -119,7 +119,7 @@ test:do_catchsql_test(
         SELECT 2 AS yy FROM t1, t2 ORDER BY y COLLATE nocase;
     ]], {
         -- <resolver01-2.2>
-        1, "ambiguous column name: y"
+        1, "ambiguous column name: Y"
         -- </resolver01-2.2>
     })
 
@@ -176,7 +176,7 @@ test:do_catchsql_test(
         SELECT 3 AS y FROM t1, t2 ORDER BY +y;
     ]], {
         -- <resolver01-3.1>
-        1, "ambiguous column name: y"
+        1, "ambiguous column name: Y"
         -- </resolver01-3.1>
     })
 
@@ -186,7 +186,7 @@ test:do_catchsql_test(
         SELECT 2 AS yy FROM t1, t2 ORDER BY +y;
     ]], {
         -- <resolver01-3.2>
-        1, "ambiguous column name: y"
+        1, "ambiguous column name: Y"
         -- </resolver01-3.2>
     })
 

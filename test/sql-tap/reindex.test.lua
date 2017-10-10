@@ -16,7 +16,7 @@ test:do_execsql_test(
 	})
 
 test:do_catchsql_test(
-	"reindex-1.1",
+	"reindex-1.2",
 	"REINDEX t1ix2 ON t1",
 	{
 		-- <reindex-1.1>
@@ -25,11 +25,11 @@ test:do_catchsql_test(
 	})
 
 test:do_catchsql_test(
-	"reindex-1.1",
+	"reindex-1.3",
 	"REINDEX t1ix1 ON t3",
 	{
 		-- <reindex-1.1>
-		1, "no such table: t3"
+		1, "no such table: T3"
 		-- <reindex-1.1>
 	})
 

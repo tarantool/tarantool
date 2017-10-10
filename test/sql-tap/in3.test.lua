@@ -461,7 +461,7 @@ test:do_catchsql_test(
         (SELECT folderid FROM Folder WHERE path LIKE 'C:\MP3\Albums\' || '%');
     ]], {
         -- <in3-5.2>
-        1, "no such table: Folder"
+        1, "no such table: FOLDER"
         -- </in3-5.2>
     })
 

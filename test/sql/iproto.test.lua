@@ -1,7 +1,7 @@
 remote = require('net.box')
 
 box.sql.execute('create table test (id primary key, a float, b text)')
-space = box.space.test
+space = box.space.TEST
 space:replace{1, 2, '3'}
 space:replace{4, 5, '6'}
 space:replace{7, 8.5, '9'}
@@ -112,15 +112,15 @@ cn:execute('select :value', parameters)
 -- gh-2608 SQL iproto DDL
 cn:execute('create table test2(id primary key, a, b, c)')
 cn:reload_schema()
-box.space.test2.name
+box.space.TEST2.name
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 cn:execute('select * from test2')
 cn:execute('create index test2_a_b_index on test2(a, b)')
 cn:reload_schema()
-#box.space.test2.index
+#box.space.TEST2.index
 cn:execute('drop table test2')
 cn:reload_schema()
-box.space.test2
+box.space.TEST2
 
 -- gh-2617 DDL row_count either 0 or 1.
 
@@ -165,7 +165,7 @@ cn:execute('create index idx1 on test3(a)')
 cn:reload_schema()
 cn:execute('create index idx2 on test3(b)')
 cn:reload_schema()
-box.space.test3:truncate()
+box.space.TEST3:truncate()
 cn:reload_schema()
 cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
 cn:reload_schema()

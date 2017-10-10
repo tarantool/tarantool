@@ -237,7 +237,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			goto update_cleanup;
 		}
 		for (j = 0; j < pTab->nCol; j++) {
-			if (sqlite3StrICmp
+			if (strcmp
 			    (pTab->aCol[j].zName, pChanges->a[i].zName) == 0) {
 				if (j == pTab->iPKey) {
 					chngRowid = 1;

@@ -192,7 +192,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1>
-        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
+        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
         -- </where3-2.1>
     })
 
@@ -205,7 +205,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.1>
-        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
+        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
         -- </where3-2.1.1>
     })
 
@@ -218,7 +218,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.2>
-        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
+        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
         -- </where3-2.1.2>
     })
 
@@ -231,7 +231,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.3>
-        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
+        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
         -- </where3-2.1.3>
     })
 
@@ -244,7 +244,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.4>
-        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
+        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
         -- </where3-2.1.4>
     })
 
@@ -257,7 +257,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.1.5>
-        "tA", "*", "tB", "*", "tC", "*", "tD", "*"
+        "TA", "*", "TB", "*", "TC", "*", "TD", "*"
         -- </where3-2.1.5>
     })
 
@@ -270,7 +270,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.2>
-        "tB", "*", "tA", "*", "tC", "*", "tD", "*"
+        "TB", "*", "TA", "*", "TC", "*", "TD", "*"
         -- </where3-2.2>
     })
 
@@ -283,7 +283,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.3>
-        "tB", "*", "tA", "*", "tC", "*", "tD", "*"
+        "TB", "*", "TA", "*", "TC", "*", "TD", "*"
         -- </where3-2.3>
     })
 
@@ -296,7 +296,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.4>
-        "tC", "*", "tA", "*", "tB", "*", "tD", "*"
+        "TC", "*", "TA", "*", "TB", "*", "TD", "*"
         -- </where3-2.4>
     })
 
@@ -309,7 +309,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.5>
-        "tA", "*", "tC", "*", "tB", "*", "tD", "*"
+        "TA", "*", "TC", "*", "TB", "*", "TD", "*"
         -- </where3-2.5>
     })
 
@@ -322,7 +322,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.6>
-        "tC", "*", "tB", "*", "tA", "*", "tD", "*"
+        "TC", "*", "TB", "*", "TA", "*", "TD", "*"
         -- </where3-2.6>
     })
 
@@ -335,7 +335,7 @@ test:do_test(
   ]])
     end, {
         -- <where3-2.7>
-        "tB", "*", "tC", "*", "tA", "*", "tD", "*"
+        "TB", "*", "TC", "*", "TA", "*", "TD", "*"
         -- </where3-2.7>
     })
 
@@ -407,7 +407,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t402.z GLOB 'abc*';
         ]], {
             -- <where3-4.0>
-            0, 0, 2, "SCAN TABLE t402", 0, 1, 0, "SCAN TABLE t400", 0, 2, 1, "SCAN TABLE t401"
+            0, 0, 2, "SCAN TABLE T402", 0, 1, 0, "SCAN TABLE T400", 0, 2, 1, "SCAN TABLE T401"
             -- </where3-4.0>
         })
 
@@ -418,7 +418,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t401.r GLOB 'abc*';
         ]], {
             -- <where3-4.1>
-            0, 0, 1, "SCAN TABLE t401", 0, 1, 0, "SCAN TABLE t400", 0, 2, 2, "SCAN TABLE t402"
+            0, 0, 1, "SCAN TABLE T401", 0, 1, 0, "SCAN TABLE T400", 0, 2, 2, "SCAN TABLE T402"
             -- </where3-4.1>
         })
 
@@ -429,7 +429,7 @@ if 0
             SELECT * FROM t400, t401, t402 WHERE t400.c GLOB 'abc*';
         ]], {
             -- <where3-4.2>
-            0, 0, 0, "SCAN TABLE t400", 0, 1, 1, "SCAN TABLE t401", 0, 2, 2, "SCAN TABLE t402"
+            0, 0, 0, "SCAN TABLE T400", 0, 1, 1, "SCAN TABLE T401", 0, 2, 2, "SCAN TABLE T402"
             -- </where3-4.2>
         })
 

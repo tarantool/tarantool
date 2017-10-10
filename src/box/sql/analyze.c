@@ -211,10 +211,10 @@ openStatTable(Parse * pParse,	/* Parsing context */
 		const char *zCols;
 	} aTable[] = {
 		{
-		"_sql_stat1", "tbl,idx,stat, PRIMARY KEY(tbl, idx)"},
+		"_SQL_STAT1", "tbl,idx,stat, PRIMARY KEY(tbl, idx)"},
 #if defined(SQLITE_ENABLE_STAT4)
 		{
-		"_sql_stat4",
+		"_SQL_STAT4",
 			    "tbl,idx,neq,nlt,ndlt,sample, PRIMARY KEY(tbl, idx, sample)"},
 		{
 		"sql_stat3", 0},
@@ -1978,14 +1978,14 @@ loadStat4(sqlite3 * db)
 	Table *pTab = 0;	/* Pointer to stat table */
 
 	assert(db->lookaside.bDisable);
-	if ((pTab = sqlite3FindTable(db, "_sql_stat4"))) {
+	if ((pTab = sqlite3FindTable(db, "_SQL_STAT4"))) {
 		rc = loadStatTbl(db, 0,
 				 pTab,
 				 "SELECT tbl,idx,count(*) FROM _sql_stat4 GROUP BY tbl,idx",
 				 "SELECT tbl,idx,neq,nlt,ndlt,sample FROM _sql_stat4");
 	}
 
-	if (rc == SQLITE_OK && (pTab = sqlite3FindTable(db, "sql_stat3"))) {
+	if (rc == SQLITE_OK && (pTab = sqlite3FindTable(db, "SQL_STAT3"))) {
 		rc = loadStatTbl(db, 1,
 				 pTab,
 				 "SELECT tbl,idx,count(*) FROM sql_stat3 GROUP BY tbl,idx",
@@ -2044,7 +2044,7 @@ sqlite3AnalysisLoad(sqlite3 * db)
 
 	/* Load new statistics out of the _sql_stat1 table */
 	sInfo.db = db;
-	if (sqlite3FindTable(db, "_sql_stat1") != 0) {
+	if (sqlite3FindTable(db, "_SQL_STAT1") != 0) {
 		zSql = "SELECT tbl,idx,stat FROM _sql_stat1";
 		rc = sqlite3_exec(db, zSql, analysisLoader, &sInfo, 0);
 	}

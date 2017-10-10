@@ -81,7 +81,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-1.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -177,7 +177,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-2.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -273,7 +273,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-3.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -371,7 +371,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-4.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -471,7 +471,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-5.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -571,7 +571,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-6.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -671,7 +671,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-7.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -771,7 +771,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-8.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {
@@ -871,7 +871,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereB-9.100",
     [[
-        DROP INDEX "t2b" ON t2;
+        DROP INDEX t2b ON t2;
         SELECT x, a, y=b FROM t1, t2 WHERE y=b;
     ]],
     {

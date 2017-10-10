@@ -138,7 +138,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in5-3.1",
     [[
-        DROP INDEX "t2abc" ON t2;
+        DROP INDEX t2abc ON t2;
         CREATE INDEX t2ab ON t2(a,b);
         SELECT d FROM t2 WHERE a IN t1x AND b IN t1y AND c IN t1z ORDER BY d;
     ]], {
@@ -178,7 +178,7 @@ test:do_test(
 test:do_execsql_test(
     "in5-4.1",
     [[
-        DROP INDEX "t2ab" ON t2;
+        DROP INDEX t2ab ON t2;
         CREATE INDEX t2abcd ON t2(a,b,c,d);
         SELECT d FROM t2 WHERE a IN t1x AND b IN t1y AND c IN t1z ORDER BY d;
     ]], {
@@ -218,7 +218,7 @@ test:do_test(
 test:do_execsql_test(
     "in5-5.1",
     [[
-        DROP INDEX "t2abcd" ON t2;
+        DROP INDEX t2abcd ON t2;
         CREATE INDEX t2cbad ON t2(c,b,a,d);
         SELECT d FROM t2 WHERE a IN t1x AND b IN t1y AND c IN t1z ORDER BY d;
     ]], {

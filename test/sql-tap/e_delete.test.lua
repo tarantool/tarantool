@@ -38,10 +38,10 @@ test:do_execsql_test(
 --
 test:do_delete_tests("e_delete-0.1", {
     {1, "DELETE FROM t1", {}},
-    {2, "DELETE FROM t1 INDEXED BY \"i1\"", {}},
+    {2, "DELETE FROM t1 INDEXED BY i1", {}},
     {3, "DELETE FROM t1 NOT INDEXED", {}},
     {7, "DELETE FROM t1 WHERE a>2", {}},
-    {8, "DELETE FROM t1 INDEXED BY \"i1\" WHERE a>2", {}},
+    {8, "DELETE FROM t1 INDEXED BY i1 WHERE a>2", {}},
     {9, "DELETE FROM t1 NOT INDEXED WHERE a>2", {}},
 })
 -- EVIDENCE-OF: R-20205-17349 If the WHERE clause is not present, all

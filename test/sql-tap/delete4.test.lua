@@ -155,7 +155,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(col0 PRIMARY KEY, col1);
-        INSERT INTO "t4" VALUES(14, 'abcde');
+        INSERT INTO t4 VALUES(14, 'abcde');
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);
         DELETE FROM t4 WHERE col0=69 OR col0>7;
     ]], {
@@ -169,7 +169,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(col0 PRIMARY KEY, col1);
-        INSERT INTO "t4" VALUES(14, 'abcde');
+        INSERT INTO t4 VALUES(14, 'abcde');
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);
         DELETE FROM t4 WHERE col0=69 OR col0>7;
     ]], {

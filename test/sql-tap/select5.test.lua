@@ -88,7 +88,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY z ORDER BY y
     ]], {
         -- <select5-2.1.1>
-        1, "no such column: z"
+        1, "no such column: Z"
         -- </select5-2.1.1>
     })
 
@@ -98,7 +98,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY temp.t1.y ORDER BY y
     ]], {
         -- <select5-2.1.2>
-        1, "no such column: temp.t1.y"
+        1, "no such column: TEMP.T1.Y"
         -- </select5-2.1.2>
     })
 
@@ -108,7 +108,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY z(y) ORDER BY y
     ]], {
         -- <select5-2.2>
-        1, "no such function: z"
+        1, "no such function: Z"
         -- </select5-2.2>
     })
 
@@ -128,7 +128,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY y HAVING z(y)<3 ORDER BY y
     ]], {
         -- <select5-2.4>
-        1, "no such function: z"
+        1, "no such function: Z"
         -- </select5-2.4>
     })
 
@@ -138,7 +138,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<z ORDER BY y
     ]], {
         -- <select5-2.5>
-        1, "no such column: z"
+        1, "no such column: Z"
         -- </select5-2.5>
     })
 

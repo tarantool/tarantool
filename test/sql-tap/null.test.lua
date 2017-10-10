@@ -282,7 +282,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-6.4",
     [[
-        select b from t1 union select c from t1 order by main.t1.b;
+        select b from t1 union select c from t1 order by "main".t1.b;
     ]], {
         -- <null-6.4>
         "", 0, 1
@@ -302,7 +302,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "null-6.6",
     [[
-        select b from t1 union select c from t1 order by main.t1.a;
+        select b from t1 union select c from t1 order by "main".t1.a;
     ]], {
         -- <null-6.6>
         1, "1st ORDER BY term does not match any column in the result set"

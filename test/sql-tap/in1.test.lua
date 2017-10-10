@@ -221,7 +221,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 WHERE c IN (10,20)
     ]], {
         -- <in-2.11>
-        1, "no such column: c"
+        1, "no such column: C"
         -- </in-2.11>
     })
 

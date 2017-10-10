@@ -35,7 +35,7 @@ test:do_catchsql_test(
 	"columns-1.2",
 	fail_statement, {
 		-- <columns-1.2>
-		1, "too many columns on t2"
+		1, "too many columns on T2"
 		-- <columns-1.2>
 	})
 

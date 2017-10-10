@@ -123,7 +123,7 @@ test:do_catchsql_test(3.1, [[
   SELECT * FROM tmp1;
 ]], {
   -- <3.1>
-  1, "circular reference: tmp1"
+  1, "circular reference: TMP1"
   -- </3.1>
 })
 
@@ -134,7 +134,7 @@ test:do_catchsql_test(3.2, [[
   SELECT * FROM tmp;
 ]], {
   -- <3.2>
-  1, "duplicate WITH table name: tmp"
+  1, "duplicate WITH table name: TMP"
   -- </3.2>
 })
 
@@ -334,7 +334,7 @@ test:do_catchsql_test("5.6.1", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.1>
-  1, "table i has 1 values for 2 columns"
+  1, "table I has 1 values for 2 columns"
   -- </5.6.1>
 })
 
@@ -343,7 +343,7 @@ test:do_catchsql_test("5.6.2", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.2>
-  1, "table i has 2 values for 1 columns"
+  1, "table I has 2 values for 1 columns"
   -- </5.6.2>
 })
 
@@ -353,7 +353,7 @@ test:do_catchsql_test("5.6.3", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.3>
-  1, "table i has 2 values for 1 columns"
+  1, "table I has 2 values for 1 columns"
   -- </5.6.3>
 })
 
@@ -362,7 +362,7 @@ test:do_catchsql_test("5.6.4", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.4>
-  1, "table i has 2 values for 1 columns"
+  1, "table I has 2 values for 1 columns"
   -- </5.6.4>
 })
 
@@ -389,7 +389,7 @@ test:do_catchsql_test("5.6.7", [[
   SELECT * FROM i;
 ]], {
   -- <5.6.7>
-  1, "table i has 2 values for 1 columns"
+  1, "table I has 2 values for 1 columns"
   -- </5.6.7>
 })
 
@@ -501,7 +501,7 @@ test:do_catchsql_test(7.4, [[
   SELECT id FROM t;
 ]], {
   -- <7.4>
-  1, "recursive reference in a subquery: t"
+  1, "recursive reference in a subquery: T"
   -- </7.4>
 })
 
@@ -514,7 +514,7 @@ test:do_catchsql_test(7.5, [[
   SELECT id FROM t;
 ]], {
   -- <7.5>
-  1, "multiple recursive references: t"
+  1, "multiple recursive references: T"
   -- </7.5>
 })
 
@@ -527,7 +527,7 @@ test:do_catchsql_test(7.6, [[
   SELECT id FROM t;
 ]], {
   -- <7.6>
-  1, "circular reference: t"
+  1, "circular reference: T"
   -- </7.6>
 })
 
@@ -1049,7 +1049,7 @@ test:do_catchsql_test(13.3, [[
   SELECT i FROM c;
 ]], {
   -- <13.3>
-  1, "table c has 1 values for 2 columns"
+  1, "table C has 1 values for 2 columns"
   -- </13.3>
 })
 

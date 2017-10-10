@@ -65,7 +65,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 NATURAL JOIN t2;
     ]], {
         -- <join-1.3>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5
         -- </join-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_execsql2_test(
         SELECT * FROM t2 NATURAL JOIN t1;
     ]], {
         -- <join-1.3.1>
-        "b", 2, "c", 3, "d", 4, "a", 1, "b", 3, "c", 4, "d", 5, "a", 2
+        "B", 2, "C", 3, "D", 4, "A", 1, "B", 3, "C", 4, "D", 5, "A", 2
         -- </join-1.3.1>
     })
 
@@ -85,7 +85,7 @@ test:do_execsql2_test(
         SELECT * FROM t2 AS x NATURAL JOIN t1;
     ]], {
         -- <join-1.3.2>
-        "b", 2, "c", 3, "d", 4, "a", 1, "b", 3, "c", 4, "d", 5, "a", 2
+        "B", 2, "C", 3, "D", 4, "A", 1, "B", 3, "C", 4, "D", 5, "A", 2
         -- </join-1.3.2>
     })
 
@@ -95,7 +95,7 @@ test:do_execsql2_test(
         SELECT * FROM t2 NATURAL JOIN t1 AS y;
     ]], {
         -- <join-1.3.3>
-        "b", 2, "c", 3, "d", 4, "a", 1, "b", 3, "c", 4, "d", 5, "a", 2
+        "B", 2, "C", 3, "D", 4, "A", 1, "B", 3, "C", 4, "D", 5, "A", 2
         -- </join-1.3.3>
     })
 
@@ -116,7 +116,7 @@ test:do_execsql2_test(
         SELECT t2.* FROM t2 NATURAL JOIN t1
     ]], {
         -- <join-1.3.5>
-        "b", 2, "c", 3, "d", 4, "b", 3, "c", 4, "d", 5
+        "B", 2, "C", 3, "D", 4, "B", 3, "C", 4, "D", 5
         -- </join-1.3.5>
     })
 
@@ -126,7 +126,7 @@ test:do_execsql2_test(
         SELECT xyzzy.* FROM t2 AS xyzzy NATURAL JOIN t1
     ]], {
         -- <join-1.3.6>
-        "b", 2, "c", 3, "d", 4, "b", 3, "c", 4, "d", 5
+        "B", 2, "C", 3, "D", 4, "B", 3, "C", 4, "D", 5
         -- </join-1.3.6>
     })
 
@@ -136,7 +136,7 @@ test:do_execsql2_test(
         SELECT t1.* FROM t2 NATURAL JOIN t1
     ]], {
         -- <join-1.3.7>
-        "a", 1, "b", 2, "c", 3, "a", 2, "b", 3, "c", 4
+        "A", 1, "B", 2, "C", 3, "A", 2, "B", 3, "C", 4
         -- </join-1.3.7>
     })
 
@@ -146,7 +146,7 @@ test:do_execsql2_test(
         SELECT xyzzy.* FROM t2 NATURAL JOIN t1 AS xyzzy
     ]], {
         -- <join-1.3.8>
-        "a", 1, "b", 2, "c", 3, "a", 2, "b", 3, "c", 4
+        "A", 1, "B", 2, "C", 3, "A", 2, "B", 3, "C", 4
         -- </join-1.3.8>
     })
 
@@ -156,7 +156,7 @@ test:do_execsql2_test(
         SELECT aaa.*, bbb.* FROM t2 AS aaa NATURAL JOIN t1 AS bbb
     ]], {
         -- <join-1.3.9>
-        "b", 2, "c", 3, "d", 4, "a", 1, "b", 2, "c", 3, "b", 3, "c", 4, "d", 5, "a", 2, "b", 3, "c", 4
+        "B", 2, "C", 3, "D", 4, "A", 1, "B", 2, "C", 3, "B", 3, "C", 4, "D", 5, "A", 2, "B", 3, "C", 4
         -- </join-1.3.9>
     })
 
@@ -166,7 +166,7 @@ test:do_execsql2_test(
         SELECT t1.*, t2.* FROM t2 NATURAL JOIN t1
     ]], {
         -- <join-1.3.10>
-        "a", 1, "b", 2, "c", 3, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "B", 3, "C", 4, "D", 5
         -- </join-1.3.10>
     })
 
@@ -176,7 +176,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 INNER JOIN t2 USING(b,c);
     ]], {
         -- <join-1.4.1>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5
         -- </join-1.4.1>
     })
 
@@ -186,7 +186,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 AS x INNER JOIN t2 USING(b,c);
     ]], {
         -- <join-1.4.2>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5
         -- </join-1.4.2>
     })
 
@@ -196,7 +196,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 INNER JOIN t2 AS y USING(b,c);
     ]], {
         -- <join-1.4.3>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5
         -- </join-1.4.3>
     })
 
@@ -206,7 +206,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 AS x INNER JOIN t2 AS y USING(b,c);
     ]], {
         -- <join-1.4.4>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5
         -- </join-1.4.4>
     })
 
@@ -227,7 +227,7 @@ test:do_execsql2_test(
         SELECT t1.* FROM t1 JOIN t2 USING(b);
     ]], {
         -- <join-1.4.6>
-        "a", 1, "b", 2, "c", 3, "a", 2, "b", 3, "c", 4
+        "A", 1, "B", 2, "C", 3, "A", 2, "B", 3, "C", 4
         -- </join-1.4.6>
     })
 
@@ -237,7 +237,7 @@ test:do_execsql2_test(
         SELECT t2.* FROM t1 JOIN t2 USING(b);
     ]], {
         -- <join-1.4.7>
-        "b", 2, "c", 3, "d", 4, "b", 3, "c", 4, "d", 5
+        "B", 2, "C", 3, "D", 4, "B", 3, "C", 4, "D", 5
         -- </join-1.4.7>
     })
 
@@ -247,7 +247,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 INNER JOIN t2 USING(b);
     ]], {
         -- <join-1.5>
-        "a", 1, "b", 2, "c", 3, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "C", 4, "D", 5
         -- </join-1.5>
     })
 
@@ -257,7 +257,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 INNER JOIN t2 USING(c);
     ]], {
         -- <join-1.6>
-        "a", 1, "b", 2, "c", 3, "b", 2, "d", 4, "a", 2, "b", 3, "c", 4, "b", 3, "d", 5
+        "A", 1, "B", 2, "C", 3, "B", 2, "D", 4, "A", 2, "B", 3, "C", 4, "B", 3, "D", 5
         -- </join-1.6>
     })
 
@@ -267,7 +267,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 INNER JOIN t2 USING(c,b);
     ]], {
         -- <join-1.7>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5
         -- </join-1.7>
     })
 
@@ -325,21 +325,21 @@ test:do_execsql2_test(
     "join-1.13",
     [[
         SELECT * FROM t1 NATURAL JOIN 
-          (SELECT b as "c", c as "d", d as "e" FROM t2) as t3
+          (SELECT b as c, c as d, d as e FROM t2) as t3
     ]], {
         -- <join-1.13>
-        "a", 1, "b", 2, "c", 3, "d", 4, "e", 5
+        "A", 1, "B", 2, "C", 3, "D", 4, "E", 5
         -- </join-1.13>
     })
 
 test:do_execsql2_test(
     "join-1.14",
     [[
-        SELECT * FROM (SELECT b as "c", c as "d", d as "e" FROM t2) as "tx"
+        SELECT * FROM (SELECT b as c, c as d, d as e FROM t2) as "tx"
             NATURAL JOIN t1
     ]], {
         -- <join-1.14>
-        "c", 3, "d", 4, "e", 5, "a", 1, "b", 2
+        "C", 3, "D", 4, "E", 5, "A", 1, "B", 2
         -- </join-1.14>
     })
 
@@ -375,7 +375,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 natural join t2 natural join t3;
     ]], {
         -- <join-1.17>
-        "a", 1, "b", 2, "c", 3, "d", 4, "e", 5, "a", 2, "b", 3, "c", 4, "d", 5, "e", 6
+        "A", 1, "B", 2, "C", 3, "D", 4, "E", 5, "A", 2, "B", 3, "C", 4, "D", 5, "E", 6
         -- </join-1.17>
     })
 
@@ -409,7 +409,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 natural join t2 natural join t4;
     ]], {
         -- <join-1.19.2>
-        "a", 1, "b", 2, "c", 3, "d", 4, "e", 5, "f", 6
+        "A", 1, "B", 2, "C", 3, "D", 4, "E", 5, "F", 6
         -- </join-1.19.2>
     })
 
@@ -440,7 +440,7 @@ test:do_execsql2_test(
         SELECT * FROM t1 NATURAL LEFT JOIN t2;
     ]], {
         -- <join-2.1.1>
-        "a", 1, "b", 2, "c", 3, "d", 4, "a", 2, "b", 3, "c", 4, "d", 5, "a", 3, "b", 4, "c", 5, "d", NULL,
+        "A", 1, "B", 2, "C", 3, "D", 4, "A", 2, "B", 3, "C", 4, "D", 5, "A", 3, "B", 4, "C", 5, "D", NULL,
         -- </join-2.1.1>
     })
 
@@ -450,7 +450,7 @@ test:do_execsql2_test(
         SELECT t1.* FROM t1 NATURAL LEFT JOIN t2;
     ]], {
         -- <join-2.1.2>
-        "a", 1, "b", 2, "c", 3, "a", 2, "b", 3, "c", 4, "a", 3, "b", 4, "c", 5
+        "A", 1, "B", 2, "C", 3, "A", 2, "B", 3, "C", 4, "A", 3, "B", 4, "C", 5
         -- </join-2.1.2>
     })
 
@@ -460,7 +460,7 @@ test:do_execsql2_test(
         SELECT t2.* FROM t1 NATURAL LEFT JOIN t2;
     ]], {
         -- <join-2.1.3>
-        "b", 2, "c", 3, "d", 4, "b", 3, "c", 4, "d", 5, "b", NULL, "c", NULL, "d", NULL,
+        "B", 2, "C", 3, "D", 4, "B", 3, "C", 4, "D", 5, "B", NULL, "C", NULL, "D", NULL,
         -- </join-2.1.3>
     })
 
@@ -550,7 +550,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 JOIN t2 USING(a);
     ]], {
         -- <join-3.4.1>
-        1, "cannot join using column a - column not present in both tables"
+        1, "cannot join using column A - column not present in both tables"
         -- </join-3.4.1>
     })
 
@@ -560,7 +560,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 JOIN t2 USING(d);
     ]], {
         -- <join-3.4.2>
-        1, "cannot join using column d - column not present in both tables"
+        1, "cannot join using column D - column not present in both tables"
         -- </join-3.4.2>
     })
 
@@ -580,7 +580,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 JOIN t2 ON t3.a=t2.b;
     ]], {
         -- <join-3.6>
-        1, "no such column: t3.a"
+        1, "no such column: T3.A"
         -- </join-3.6>
     })
 
@@ -1080,9 +1080,9 @@ jointest("join-12.9", 1000, {1, 'at most 64 tables in a join'})
 --    if X(703, "X!cmd", [=[["expr","[lsearch [db eval {PRAGMA compile_options}] MEMDEBUG]<0"]]=])
 -- then
 jointest("join-12.10", 65534, {1, 'at most 64 tables in a join'})
-jointest("join-12.11", 65535, {1, 'too many references to "t14": max 65535'})
-jointest("join-12.12", 65536, {1, 'too many references to "t14": max 65535'})
-jointest("join-12.13", 65537, {1, 'too many references to "t14": max 65535'})
+jointest("join-12.11", 65535, {1, 'too many references to "T14": max 65535'})
+jointest("join-12.12", 65536, {1, 'too many references to "T14": max 65535'})
+jointest("join-12.13", 65537, {1, 'too many references to "T14": max 65535'})
 --    end
 --end
 

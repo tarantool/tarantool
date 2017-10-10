@@ -267,7 +267,7 @@ test:do_test(
     function()
         -- Quoting should not matter
         return test:execsql [[
-            SELECT a as "b" FROM t3 ORDER BY "B";
+            SELECT a as b FROM t3 ORDER BY "B";
         ]]
     end, {
         -- <tkt2822-5.3>

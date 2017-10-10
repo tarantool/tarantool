@@ -292,7 +292,7 @@ ccons ::= CHECK LP expr(X) RP.   {sqlite3AddCheckConstraint(pParse,X.pExpr);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
                                  {sqlite3CreateForeignKey(pParse,0,&T,TA,R);}
 ccons ::= defer_subclause(D).    {sqlite3DeferForeignKey(pParse,D);}
-ccons ::= COLLATE ids(C).        {sqlite3AddCollateType(pParse, &C);}
+ccons ::= COLLATE id(C).        {sqlite3AddCollateType(pParse, &C);}
 
 // The optional AUTOINCREMENT keyword
 %type autoinc {int}
@@ -863,9 +863,8 @@ idlist(A) ::= nm(Y).
       p->u.zToken = (char*)&p[1];
       memcpy(p->u.zToken, t.z, t.n);
       p->u.zToken[t.n] = 0;
-      if( sqlite3Isquote(p->u.zToken[0]) ){
-        if( p->u.zToken[0]=='"' ) p->flags |= EP_DblQuoted;
-        sqlite3Dequote(p->u.zToken);
+      if (op != TK_VARIABLE){
+        sqlite3NormalizeName(p->u.zToken);
       }
 #if SQLITE_MAX_EXPR_DEPTH>0
       p->nHeight = 1;
@@ -926,7 +925,7 @@ expr(A) ::= VARIABLE(X).     {
     }
   }
 }
-expr(A) ::= expr(A) COLLATE ids(C). {
+expr(A) ::= expr(A) COLLATE id(C). {
   A.pExpr = sqlite3ExprAddCollateToken(pParse, A.pExpr, &C, 1);
   A.zEnd = &C.z[C.n];
 }
@@ -1316,7 +1315,7 @@ eidlist(A) ::= nm(Y) collate(C) sortorder(Z). {
 
 %type collate {int}
 collate(C) ::= .              {C = 0;}
-collate(C) ::= COLLATE ids.   {C = 1;}
+collate(C) ::= COLLATE id.   {C = 1;}
 
 
 ///////////////////////////// The DROP INDEX command /////////////////////////

@@ -34,7 +34,7 @@ box.sql.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
 box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 
 -- cleanup
-box.space.foobar:drop()
+box.space.FOOBAR:drop()
 
 -- multi-index
 
@@ -69,5 +69,5 @@ box.sql.execute("CREATE TABLE rowid(x)")
 
 -- create a table with implicit indices (used to SEGFAULT)
 box.sql.execute("CREATE TABLE implicit_indices(a PRIMARY KEY,b,c,d UNIQUE) WITHOUT ROWID")
-box.space.implicit_indices:drop()
+box.space.IMPLICIT_INDICES:drop()
 box.sql.execute("DROP TABLE implicit_indices")

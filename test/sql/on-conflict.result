@@ -17,7 +17,7 @@ box.sql.execute("CREATE TABLE e (id INTEGER PRIMARY KEY, v INTEGER NOT NULL ON C
 -- Insert values and select them
 box.sql.execute("INSERT INTO t values (1, 1), (2, 2), (3, 1)")
 ---
-- error: 'UNIQUE constraint failed: t.v'
+- error: 'UNIQUE constraint failed: T.V'
 ...
 box.sql.execute("SELECT * FROM t")
 ---
@@ -25,7 +25,7 @@ box.sql.execute("SELECT * FROM t")
 ...
 box.sql.execute("INSERT INTO q values (1, 1), (2, 2), (3, 1)")
 ---
-- error: 'UNIQUE constraint failed: q.v'
+- error: 'UNIQUE constraint failed: Q.V'
 ...
 box.sql.execute("SELECT * FROM q")
 ---

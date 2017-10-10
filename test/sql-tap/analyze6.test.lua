@@ -76,7 +76,7 @@ test:do_eqp_test(
     [[SELECT count(*) FROM ev, cat WHERE x=y;]],
     {
         -- <analyze6-1.1>
-        {0, 0, 1, "SCAN TABLE cat"}, {0, 1, 0, "SEARCH TABLE ev USING COVERING INDEX evy (y=?)"}
+        {0, 0, 1, "SCAN TABLE CAT"}, {0, 1, 0, "SEARCH TABLE EV USING COVERING INDEX EVY (Y=?)"}
         -- </analyze6-1.1>
 })
 
@@ -88,7 +88,7 @@ test:do_eqp_test(
     [[SELECT count(*) FROM cat, ev WHERE x=y]],
     {
         -- <analyze6-1.2>
-        {0, 0, 0, "SCAN TABLE cat"}, {0, 1, 1, "SEARCH TABLE ev USING COVERING INDEX evy (y=?)"}
+        {0, 0, 0, "SCAN TABLE CAT"}, {0, 1, 1, "SEARCH TABLE EV USING COVERING INDEX EVY (Y=?)"}
         -- </analyze6-1.2>
 })
 
@@ -107,7 +107,7 @@ test:do_test(
         return test:execsql("EXPLAIN QUERY PLAN ".."SELECT * FROM t201 WHERE z=5")
     end, {
         -- <analyze6-2.1>
-        0, 0, 0, "SEARCH TABLE t201 USING COVERING INDEX t201z (z=?)"
+        0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX T201Z (Z=?)"
         -- </analyze6-2.1>
 })
 
@@ -116,7 +116,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE y=5]],
     {
         -- <analyze6-2.2>
-        {0, 0, 0, "SEARCH TABLE t201 USING COVERING INDEX sqlite_autoindex_t201_1 (y=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX sqlite_autoindex_T201_1 (Y=?)"}
         -- </analyze6-2.2>
 })
 
@@ -125,7 +125,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE x=5]],
     {
         -- <analyze6-2.3>
-        {0, 0, 0, "SEARCH TABLE t201 USING PRIMARY KEY (x=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING PRIMARY KEY (X=?)"}
         -- </analyze6-2.3>
 })
 
@@ -139,7 +139,7 @@ test:do_test(
         return test:execsql("EXPLAIN QUERY PLAN ".."SELECT * FROM t201 WHERE z=5")
     end, {
         -- <analyze6-2.4>
-        0, 0, 0, "SEARCH TABLE t201 USING COVERING INDEX t201z (z=?)"
+        0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX T201Z (Z=?)"
         -- </analyze6-2.4>
 })
 
@@ -148,7 +148,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE y=5]],
     {
         -- <analyze6-2.5>
-        {0, 0, 0, "SEARCH TABLE t201 USING COVERING INDEX sqlite_autoindex_t201_1 (y=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX sqlite_autoindex_T201_1 (Y=?)"}
         -- </analyze6-2.5>
 })
 
@@ -157,7 +157,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE x=5]],
     {
         -- <analyze6-2.6>
-        {0, 0, 0, "SEARCH TABLE t201 USING PRIMARY KEY (x=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING PRIMARY KEY (X=?)"}
         -- </analyze6-2.6>
 })
 
@@ -174,7 +174,7 @@ test:do_test(
         return test:execsql("EXPLAIN QUERY PLAN ".."SELECT * FROM t201 WHERE z=5")
     end, {
         -- <analyze6-2.7>
-        0, 0, 0, "SEARCH TABLE t201 USING COVERING INDEX t201z (z=?)"
+        0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX T201Z (Z=?)"
         -- </analyze6-2.7>
 })
 
@@ -183,7 +183,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE y=5]],
     {
         -- <analyze6-2.8>
-        {0, 0, 0, "SEARCH TABLE t201 USING COVERING INDEX sqlite_autoindex_t201_1 (y=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX sqlite_autoindex_T201_1 (Y=?)"}
         -- </analyze6-2.8>
 })
 
@@ -192,7 +192,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE x=5]],
     {
         -- <analyze6-2.9>
-        {0, 0, 0, "SEARCH TABLE t201 USING PRIMARY KEY (x=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING PRIMARY KEY (X=?)"}
         -- </analyze6-2.9>
 })
 

@@ -38,7 +38,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-4a03ed-1.1>
-        1, "UNIQUE constraint failed: t1.b"
+        1, "UNIQUE constraint failed: T1.B"
         -- </tkt-4a03ed-1.1>
     })
 

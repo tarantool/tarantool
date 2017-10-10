@@ -153,8 +153,8 @@ renameParentFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 			zParent = sqlite3DbStrNDup(db, (const char *)z, n);
 			if (zParent == 0)
 				break;
-			sqlite3Dequote(zParent);
-			if (0 == sqlite3StrICmp((const char *)zOld, zParent)) {
+			sqlite3NormalizeName(zParent);
+			if (0 == strcmp((const char *)zOld, zParent)) {
 				char *zOut = sqlite3MPrintf(db, "%s%.*s\"%w\"",
 							    (zOutput ? zOutput :
 							     ""),

@@ -26,7 +26,7 @@ test:do_catchsql_test(
         ANALYZE no_such_table
     ]], {
         -- <analyze-1.1>
-        1, "no such table: no_such_table"
+        1, "no such table: NO_SUCH_TABLE"
         -- </analyze-1.1>
     })
 
@@ -53,7 +53,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "analyze-1.6",
     [[
-        SELECT count(*) FROM _space WHERE name='_sql_stat1'
+        SELECT count(*) FROM _space WHERE name='_SQL_STAT1'
     ]], {
         -- <analyze-1.6>
         1
@@ -180,7 +180,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.1>
-        "t1", "2 1", "t1i1", "2 2", "t1i2", "2 1", "t1i3", "2 2 1"
+        "T1", "2 1", "T1I1", "2 2", "T1I2", "2 1", "T1I3", "2 2 1"
         -- </analyze-3.1>
     })
 
@@ -193,7 +193,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.2>
-        "t1", "4 1", "t1i1", "4 4", "t1i2", "4 1", "t1i3", "4 4 1"
+        "T1", "4 1", "T1I1", "4 4", "T1I2", "4 1", "T1I3", "4 4 1"
         -- </analyze-3.2>
     })
 
@@ -205,7 +205,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.3>
-        "t1","5 1", "t1i1", "5 3", "t1i2", "5 2", "t1i3", "5 3 1"
+        "T1","5 1", "T1I1", "5 3", "T1I2", "5 2", "T1I3", "5 3 1"
         -- </analyze-3.3>
     })
 
@@ -221,7 +221,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.4>
-        "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3","t2i2","5 2","t2i3","5 3 1"
+        "T1","5 1","T1I1","5 3","T1I2","5 2","T1I3","5 3 1","T2","5 1","T2I1","5 3","T2I2","5 2","T2I3","5 3 1"
         -- </analyze-3.4>
     })
 
@@ -233,7 +233,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.5>
-        "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3","t2i2","5 2"
+        "T1","5 1","T1I1","5 3","T1I2","5 2","T1I3","5 3 1","T2","5 1","T2I1","5 3","T2I2","5 2"
         -- </analyze-3.5>
     })
 
@@ -244,7 +244,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.6>
-        "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3","t2i2","5 2"
+        "T1","5 1","T1I1","5 3","T1I2","5 2","T1I3","5 3 1","T2","5 1","T2I1","5 3","T2I2","5 2"
         -- </analyze-3.6>
     })
 
@@ -256,7 +256,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.7>
-        "t1","5 1","t1i1","5 3","t1i2","5 2","t1i3","5 3 1","t2","5 1","t2i1","5 3"
+        "T1","5 1","T1I1","5 3","T1I2","5 2","T1I3","5 3 1","T2","5 1","T2I1","5 3"
         -- </analyze-3.7>
     })
 
@@ -283,7 +283,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-3.9>
-        "t3","5 1","t3i1","5 3","t3i2","5 3 1 1 1","t3i3","5 5 2 1 1"
+        "T3","5 1","T3I1","5 3","T3I2","5 3 1 1 1","T3I3","5 5 2 1 1"
         -- </analyze-3.9>
     })
 
@@ -340,7 +340,7 @@ test:do_execsql_test(
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
         -- <analyze-4.0>
-        "t3", "5 1", "t3i1", "5 3", "t3i2", "5 3 1 1 1", "t3i3", "5 5 2 1 1", "t4", "5 1", "t4i1", "5 3", "t4i2", "5 2"
+        "T3", "5 1", "T3I1", "5 3", "T3I2", "5 3 1 1 1", "T3I3", "5 5 2 1 1", "T4", "5 1", "T4I1", "5 3", "T4I2", "5 2"
         -- </analyze-4.0>
     })
 
@@ -390,7 +390,7 @@ test:do_execsql_test(
         SELECT DISTINCT tbl FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.0>
-        "t3", "t4"
+        "T3", "T4"
         -- </analyze-5.0>
     })
 
@@ -400,7 +400,7 @@ test:do_execsql_test(
         SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.0>
-        "t3", "t3i1", "t3i2", "t3i3", "t4", "t4i1", "t4i2"
+        "T3", "T3I1", "T3I2", "T3I3", "T4", "T4I1", "T4I2"
         -- </analyze-5.0>
     })
 
@@ -412,7 +412,7 @@ test:do_execsql_test(
             SELECT DISTINCT idx FROM %s ORDER BY 1;
         ]], stat, stat), {
         -- <analyze-5.1>
-        "t3", "t3i1", "t3i2", "t3i3", "t4", "t4i1", "t4i2"
+        "T3", "T3I1", "T3I2", "T3I3", "T4", "T4I1", "T4I2"
         -- </analyze-5.1>
     })
 
@@ -422,7 +422,7 @@ test:do_execsql_test(
             SELECT DISTINCT tbl FROM %s ORDER BY 1;
         ]], stat, stat), {
         -- <analyze-5.1>
-        "t3", "t4"
+        "T3", "T4"
         -- </analyze-5.1>
     })
 
@@ -434,7 +434,7 @@ test:do_execsql_test(
         SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.2>
-        "t3", "t3i1", "t3i3", "t4", "t4i1", "t4i2"
+        "T3", "T3I1", "T3I3", "T4", "T4I1", "T4I2"
         -- </analyze-5.2>
     })
 
@@ -444,7 +444,7 @@ test:do_execsql_test(
         SELECT DISTINCT tbl FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.2>
-        "t3", "t4"
+        "T3", "T4"
         -- </analyze-5.2>
     })
 
@@ -454,7 +454,7 @@ test:do_execsql_test(
             SELECT DISTINCT idx FROM %s ORDER BY 1;
         ]], stat, stat), {
         -- <analyze-5.3>
-        "t3", "t3i1", "t3i3", "t4", "t4i1", "t4i2"
+        "T3", "T3I1", "T3I3", "T4", "T4I1", "T4I2"
         -- </analyze-5.3>
     })
 
@@ -464,7 +464,7 @@ test:do_execsql_test(
             SELECT DISTINCT tbl FROM %s ORDER BY 1;
         ]], stat, stat), {
         -- <analyze-5.3>
-        "t3", "t4"
+        "T3", "T4"
         -- </analyze-5.3>
     })
 
@@ -476,7 +476,7 @@ test:do_execsql_test(
         SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.4>
-        "t4", "t4i1", "t4i2"
+        "T4", "T4I1", "T4I2"
         -- </analyze-5.4>
     })
 
@@ -486,7 +486,7 @@ test:do_execsql_test(
         SELECT DISTINCT tbl FROM _sql_stat1 ORDER BY 1;
     ]], {
         -- <analyze-5.4>
-        "t4"
+        "T4"
         -- </analyze-5.4>
     })
 
@@ -496,7 +496,7 @@ test:do_execsql_test(
             SELECT DISTINCT idx FROM %s ORDER BY 1;
         ]], stat), {
         -- <analyze-5.5>
-        "t4", "t4i1", "t4i2"
+        "T4", "T4I1", "T4I2"
         -- </analyze-5.5>
     })
 
@@ -506,7 +506,7 @@ test:do_execsql_test(
             SELECT DISTINCT tbl FROM %s ORDER BY 1;
         ]], stat), {
         -- <analyze-5.5>
-        "t4"
+        "T4"
         -- </analyze-5.5>
     })
 -- # This test corrupts the database file so it must be the last test

@@ -1,0 +1,201 @@
+#!/usr/bin/env tarantool
+test = require("sqltester")
+test:plan(51)
+
+local test_prefix = "identifier_case-"
+
+local data = {
+    { 1,  [[ table1 ]], {0} },
+    { 2,  [[ Table1 ]], {"/already exists/"} },
+    { 3,  [[ TABLE1 ]], {"/already exists/"} },
+    { 4,  [[ "TABLE1" ]], {"/already exists/"} },
+    { 5,  [[ "table1" ]], {0} },
+    { 6,  [[ "Table1" ]], {0} },
+    -- non ASCII characters case is not supported
+    { 7,  [[ русский ]], {0} },
+    { 8,  [[ Русский ]], {0} },
+    { 9,  [[ "русский" ]], {"/already exists/"} },
+}
+
+for _, row in ipairs(data) do
+    test:do_catchsql_test(
+        test_prefix.."1.1."..row[1],
+        string.format( [[
+                CREATE TABLE %s (a int PRIMARY KEY);
+                INSERT INTO %s values (%s);
+                ]], row[2], row[2], row[1]),
+        row[3])
+end
+
+data = {
+    { 1, [[ table1 ]], {1}},
+    { 2, [[ Table1 ]], {1}},
+    { 3, [[ TABLE1 ]], {1}},
+    { 4, [[ "TABLE1" ]], {1}},
+    { 5, [[ "table1" ]], {5}},
+    { 6, [[ "Table1" ]], {6}},
+    { 7, [[ русский ]], {7}},
+    { 8, [[ Русский ]], {8}},
+}
+
+for _, row in ipairs(data) do
+    test:do_execsql_test(
+        test_prefix.."1.2."..row[1],
+        string.format([[
+            SELECT * FROM %s;
+            ]], row[2]),
+        row[3])
+end
+
+test:do_test(
+    test_prefix.."1.3.1",
+    function ()
+        test:execsql([[ DROP TABLE table1; ]])
+    end,
+    nil)
+
+test:do_test(
+    test_prefix.."1.3.2",
+    function ()
+        test:execsql([[ DROP TABLE "table1"; ]])
+    end,
+    nil)
+
+test:do_test(
+    test_prefix.."1.3.3",
+    function ()
+        return #test:drop_all_tables()
+    end,
+    3)
+
+data = {
+    { 1,  [[ columnn ]], {0} },
+    { 2,  [[ Columnn ]], {0} },
+    { 3,  [[ COLUMNN ]], {0} },
+    { 4,  [[ "COLUMNN" ]], {0} },
+    { 5,  [[ "columnn" ]], {0} },
+    { 6,  [[ "Columnn" ]], {0} },
+    { 7,  [[ "columNN" ]], {1, "/duplicate column name/"} }
+}
+
+for _, row in ipairs(data) do
+    test:do_catchsql_test(
+        test_prefix.."2.1."..row[1],
+        string.format( [[
+                CREATE TABLE table%s ("columNN", %s, primary key("columNN", %s));
+                INSERT INTO table%s(%s, "columNN") values (%s, %s);
+                ]],
+                row[1], row[2], row[2],
+                row[1], row[2], row[1], row[1]+1),
+        row[3])
+end
+
+
+data = {
+    { 1,  [[ columnn ]], },
+    { 2,  [[ Columnn ]], },
+    { 3,  [[ COLUMNN ]], },
+    { 4,  [[ "COLUMNN" ]], },
+    { 5,  [[ "columnn" ]], },
+    { 6,  [[ "Columnn" ]], }
+}
+
+for _, row in ipairs(data) do
+    test:do_execsql_test(
+        test_prefix.."2.2."..row[1],
+        string.format([[
+            SELECT %s FROM table%s;
+            ]], row[2], row[1]),
+        {row[1]})
+end
+
+test:do_test(
+    test_prefix.."2.3.1",
+    function ()
+        return #test:drop_all_tables()
+    end,
+    6)
+
+test:execsql([[create table table1(columnn, "columnn" primary key)]])
+test:execsql([[insert into table1("columnn", "COLUMNN") values(2,1)]])
+
+
+data = {
+    --tn  lookup_cln    lookup_val  set_cln       set_val result
+    { 1,  [[ columnn ]], 1,          [[ columnn ]], 3 ,     {3,2} },
+    { 2,  [[ Columnn ]], 3,          [[ columnn ]], 4 ,     {4,2} },
+    { 3,  [[ columnn ]], 4,          [[ Columnn ]], 5 ,     {5,2} },
+    { 4,  [["COLUMNN"]], 5,          [[ columnn ]], 6 ,     {6,2} },
+    { 5,  [[ columnn ]], 6,          [["COLUMNN"]], 7 ,     {7,2} },
+    { 6,  [["columnn"]], 2,          [["columnn"]], 3 ,     {7,3} },
+    { 7,  [["columnn"]], 3,          [[ columnn ]], 8 ,     {8,3} },
+    { 8,  [["columnn"]], 8,          [[ columnn ]], 1000 ,  {8,3} },
+}
+
+for _, row in ipairs(data) do
+    local tn = row[1]
+    local lookup_cln = row[2]
+    local lookup_val = row[3]
+    local set_cln = row[4]
+    local set_val = row[5]
+    local result = row[6]
+    test:do_execsql_test(
+        test_prefix.."3.1."..tn,
+        string.format( [[
+                UPDATE table1 set %s = %s where %s = %s;
+                SELECT table1.columnn, "TABLE1"."columnn" FROM table1;
+                ]],
+            set_cln, set_val, lookup_cln, lookup_val),
+        result)
+end
+
+test:do_test(
+    test_prefix.."3.2.1",
+    function ()
+        return #test:drop_all_tables()
+    end,
+    1)
+
+test:do_execsql_test(
+    test_prefix.."4.0",
+    string.format([[create table table1(a, b primary key)]]),
+    nil
+)
+
+test:do_execsql_test(
+    test_prefix.."4.1",
+    string.format([[select * from table1 order by a collate NOCASE]]),
+    {}
+)
+
+data = {
+    { 1,  [[ trigger1 ]], {0}},
+    { 2,  [[ Trigger1 ]], {1, "trigger TRIGGER1 already exists"}},
+    { 3,  [["TRIGGER1"]], {1, "trigger TRIGGER1 already exists"}},
+    { 4,  [["trigger1" ]], {0}}
+}
+
+for _, row in ipairs(data) do
+    test:do_catchsql_test(
+        test_prefix.."5.1."..row[1],
+        string.format( [[
+                CREATE TRIGGER %s DELETE ON table1 BEGIN SELECT 1; END
+                ]], row[2]),
+        row[3])
+end
+
+data = {
+    { 1,  [[ trigger1 ]], {0}},
+    { 2,  [["trigger1" ]], {0}}
+}
+
+for _, row in ipairs(data) do
+    test:do_catchsql_test(
+        test_prefix.."5.2."..row[1],
+        string.format( [[
+                DROP TRIGGER %s
+                ]], row[2]),
+        row[3])
+end
+
+test:finish_test()

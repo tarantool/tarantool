@@ -69,7 +69,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=3001 AND c=150;
 	]], {
         -- <1.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1_c (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1_C (C=?)"
         -- </1.2>
     })
 
@@ -93,7 +93,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=3001 AND c=150;
 	]], {
         -- <1.4>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1_c (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1_C (C=?)"
         -- </1.4>
     })
 
@@ -113,7 +113,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=13 AND c=150;
 	]], {
         -- <1.6>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1_c (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1_C (C=?)"
         -- </1.6>
     })
 
@@ -135,7 +135,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=13 AND c=150;
 	]], {
         -- <1.8>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1_c (c=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1_C (C=?)"
         -- </1.8>
    	})
 

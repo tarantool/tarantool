@@ -275,8 +275,8 @@ test:do_execsql_test(
 
 local t1_space_id = ""
 local t2_space_id = ""
-t1_space_id = test:execsql("SELECT * from _space where name='t1'")["id"]
-t2_space_id = test:execsql("SELECT * from _space where name='t2'")["id"]
+t1_space_id = test:execsql("SELECT * from _space where name='T1'")["ID"]
+t2_space_id = test:execsql("SELECT * from _space where name='T2'")["ID"]
 --X(276, "X!cmd", [=[["db","eval","SELECT * from _space where name='t2'","data","\n  set t2_space_id $data(id)\n"]]=])
 --local function reverse(lhs, rhs)
 --    return X(283, "X!cmd", [=[["string","compare",["rhs"],["lhs"]]]=])
@@ -295,7 +295,7 @@ for _, indexes in ipairs({ [[
 ]], [[
   CREATE INDEX i1 ON t1(a)
 ]], [[
-  DROP INDEX "i1" ON t1;
+  DROP INDEX i1 ON t1;
   CREATE INDEX i1 ON t1(b,a);
 ]],
     -- TODO collation is not supported by now

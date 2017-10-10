@@ -65,25 +65,25 @@ box.internal.sql_create_function("msgpack_decode_sample", msgpack_decode_sample)
 test:do_execsql_test(
     1.2,
     [[
-        SELECT tbl,idx,nEq,nLt,nDLt,msgpack_decode_sample(sample) FROM _sql_stat4 where idx = 'i1';
+        SELECT tbl,idx,nEq,nLt,nDLt,msgpack_decode_sample(sample) FROM _sql_stat4 where idx = 'I1';
     ]], {
         -- <1.2>
-        "t1", "i1", "1 1", "0 0", "0 0", "(0) (0)", "t1", "i1", "1 1", "1 1", "1 1", "(1) (1)", 
-        "t1", "i1", "1 1", "2 2", "2 2", "(2) (2)", "t1", "i1", "1 1", "3 3", "3 3", "(3) (3)", 
-        "t1", "i1", "1 1", "4 4", "4 4", "(4) (4)"
+        "T1", "I1", "1 1", "0 0", "0 0", "(0) (0)", "T1", "I1", "1 1", "1 1", "1 1", "(1) (1)", 
+        "T1", "I1", "1 1", "2 2", "2 2", "(2) (2)", "T1", "I1", "1 1", "3 3", "3 3", "(3) (3)", 
+        "T1", "I1", "1 1", "4 4", "4 4", "(4) (4)"
         -- </1.2>
     })
 
 test:do_execsql_test(
     1.3,
     [[
-        SELECT tbl,idx,nEq,nLt,nDLt,msgpack_decode_sample(sample) FROM _sql_stat4 where idx = 't1';
+        SELECT tbl,idx,nEq,nLt,nDLt,msgpack_decode_sample(sample) FROM _sql_stat4 where idx = 'T1';
 
     ]], {
         -- <1.3>
-        't1', 't1', '1', '0', '0', '(0)', 't1', 't1', '1', '1', '1', '(1)', 
-        't1', 't1', '1', '2', '2', '(2)', 't1', 't1', '1', '3', '3', '(3)', 
-        't1', 't1', '1', '4', '4', '(4)'
+        'T1', 'T1', '1', '0', '0', '(0)', 'T1', 'T1', '1', '1', '1', '(1)', 
+        'T1', 'T1', '1', '2', '2', '(2)', 'T1', 'T1', '1', '3', '3', '(3)', 
+        'T1', 'T1', '1', '4', '4', '(4)'
         -- </1.3>
     })
 
@@ -185,7 +185,7 @@ test:do_execsql_test(
     "3.3.2",
     [[
         ANALYZE;
-        SELECT lrange(nEq, 1, 1) FROM _sql_stat4 WHERE idx = 'i2';
+        SELECT lrange(nEq, 1, 1) FROM _sql_stat4 WHERE idx = 'I2';
     ]], generate_tens_str(24))
 
 ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ test:do_execsql_test(
     4.3,
     [[
         SELECT neq, lrange(nlt, 1, 3), lrange(ndlt, 1, 3), lrange(msgpack_decode_sample(sample), 1, 3) 
-            FROM _sql_stat4 WHERE idx = 'i1' ORDER BY sample LIMIT 16;
+            FROM _sql_stat4 WHERE idx = 'I1' ORDER BY sample LIMIT 16;
     ]], {
         -- <4.3>
         "10 10 1","0 0 8","0 0 8","0 0 0","10 10 1","10 10 10","1 1 10","1 1 1","10 10 1","20 20 28",
@@ -300,7 +300,7 @@ test:do_execsql_test(
     4.4,
     [[
         SELECT neq, lrange(nlt, 1, 3), lrange(ndlt, 1, 3), lrange(msgpack_decode_sample(sample), 1, 3) 
-        FROM _sql_stat4 WHERE idx = 'i1' ORDER BY sample DESC LIMIT 2;
+        FROM _sql_stat4 WHERE idx = 'I1' ORDER BY sample DESC LIMIT 2;
     ]], {
         -- <4.4>
         "2 1 1","295 296 296","120 122 296","201 4 h","5 3 1","290 290 291","119 119 291","200 1 b"
@@ -618,7 +618,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t3 WHERE a IS NULL AND b = 2;
     ]], {
         -- <10.1.3>
-        0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX t3b (b=?)"
+        0, 0, 0, "SEARCH TABLE T3 USING COVERING INDEX T3B (B=?)"
         -- </10.1.3>
     })
 
@@ -628,7 +628,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t3 WHERE a IS NOT NULL AND b = 2;
     ]], {
         -- <10.1.4>
-        0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX t3a (a>?)"
+        0, 0, 0, "SEARCH TABLE T3 USING COVERING INDEX T3A (A>?)"
         -- </10.1.4>
     })
 
@@ -666,7 +666,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t3 WHERE x = 'xyz' AND a IS NULL AND b = 2;
     ]], {
         -- <10.2.3>
-        0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX t3b (x=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T3 USING COVERING INDEX T3B (X=? AND B=?)"
         -- </10.2.3>
     })
 
@@ -676,7 +676,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t3 WHERE x = 'xyz' AND a IS NOT NULL AND b = 2;
     ]], {
         -- <10.2.4>
-        0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX t3a (x=? AND a>?)"
+        0, 0, 0, "SEARCH TABLE T3 USING COVERING INDEX T3A (X=? AND A>?)"
         -- </10.2.4>
     })
 
@@ -720,7 +720,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'def' AND b = 3;
     ]], {
         -- <11.2>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
         -- </11.2>
     })
 
@@ -730,7 +730,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' AND b = 3;
     ]], {
         -- <11.3>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
         -- </11.3>
     })
 
@@ -771,7 +771,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'def' AND b = 3;
     ]], {
         -- <11.6>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
         -- </11.6>
     })
 
@@ -781,7 +781,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' COLLATE nocase AND b = 3;
     ]], {
         -- <11.7>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
         -- </11.7>
     })
 
@@ -791,7 +791,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a COLLATE nocase = 'abc' AND b = 3;
     ]], {
         -- <11.8>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
         -- </11.8>
     })
 
@@ -832,7 +832,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
     ]], {
         -- <12.2>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
         -- </12.2>
     })
 
@@ -842,7 +842,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'abc' AND b = 3;
     ]], {
         -- <12.3>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
         -- </12.3>
     })
 
@@ -883,7 +883,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
     ]], {
         -- <12.6>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
         -- </12.6>
     })
 
@@ -893,7 +893,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x= 'abcdef' AND a = 'abc' COLLATE nocase AND b = 3;
     ]], {
         -- <12.7>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
         -- </12.7>
     })
 
@@ -903,7 +903,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a COLLATE nocase = 'abc' AND b = 3;
     ]], {
         -- <12.8>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
         -- </12.8>
     })
 
@@ -939,7 +939,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<15 AND b<12;
     ]], {
         -- <13.2.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"
         -- </13.2.1>
     })
 
@@ -949,7 +949,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<'15' AND b<12;
     ]], {
         -- <13.2.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"
         -- </13.2.2>
     })
 
@@ -959,7 +959,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<100 AND b<12;
     ]], {
         -- <13.3.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"
         -- </13.3.1>
     })
 
@@ -969,7 +969,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<'100' AND b<12;
     ]], {
         -- <13.3.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"
         -- </13.3.2>
     })
 
@@ -1003,7 +1003,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='ott' AND b<10 AND c=1;
     ]], {
         -- <13.2.1>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=? AND b<?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=? AND B<?)"
         -- </13.2.1>
     })
 
@@ -1013,7 +1013,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='ott' AND b<'10' AND c=1;
     ]], {
         -- <13.2.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=? AND b<?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=? AND B<?)"
         -- </13.2.2>
     })
 
@@ -1166,7 +1166,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE d IS NOT NULL AND a=0 AND b=10 AND c=10;
     ]], {
         -- <17.2>
-        0, 0, 0, 'SEARCH TABLE t1 USING COVERING INDEX i1 (a=? AND b=?)'
+        0, 0, 0, 'SEARCH TABLE T1 USING COVERING INDEX I1 (A=? AND B=?)'
         -- </17.2>
     })
 
@@ -1176,7 +1176,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE d IS NOT NULL AND a=0 AND b=0 AND c=10;
     ]], {
         -- <17.3>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=? AND b=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=? AND B=?)"
         -- </17.3>
     })
 
@@ -1193,7 +1193,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE d IS NOT NULL AND a=0 AND b=10 AND c=10;
     ]], {
         -- <17.5>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (c=? AND d>?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (C=? AND D>?)"
         -- </17.5>
     })
 
@@ -1203,7 +1203,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE d IS NOT NULL AND a=0 AND b=0 AND c=10;
     ]], {
         -- <17.6>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (c=? AND d>?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (C=? AND D>?)"
         -- </17.6>
     })
 
@@ -1221,7 +1221,7 @@ test:do_test(
             test:execsql(string.format("INSERT INTO t1 VALUES(%s, 0);", i))
         end
         test:execsql("ANALYZE")
-        return test:execsql(" SELECT count(*) FROM _sql_stat4 WHERE idx = 'i1'; ")
+        return test:execsql(" SELECT count(*) FROM _sql_stat4 WHERE idx = 'I1'; ")
     end, {
         -- <18.1>
         9
@@ -1268,7 +1268,7 @@ for i = 0, 15 do
         "20.3."..i,
         function()
             return test:execsql(string.format(
-                "SELECT count(*) FROM _sql_stat4 WHERE idx = 'i1' AND lrange(msgpack_decode_sample(sample), 1, 1) = '%s'", i))
+                "SELECT count(*) FROM _sql_stat4 WHERE idx = 'I1' AND lrange(msgpack_decode_sample(sample), 1, 1) = '%s'", i))
         end, {
             1
         })
@@ -1304,7 +1304,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t2 WHERE a='one' AND id < 10;
     ]], {
         -- <21.2>
-        0, 0, 0, "SEARCH TABLE t2 USING PRIMARY KEY (id<?)"
+        0, 0, 0, "SEARCH TABLE T2 USING PRIMARY KEY (ID<?)"
         -- </21.2>
     })
 
@@ -1314,7 +1314,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t2 WHERE a='one' AND id < 50
     ]], {
         -- <21.3>
-        0, 0, 0, "SEARCH TABLE t2 USING PRIMARY KEY (id<?)"
+        0, 0, 0, "SEARCH TABLE T2 USING PRIMARY KEY (ID<?)"
         -- </21.3>
     })
 
@@ -1345,7 +1345,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t3 WHERE c = 'one' AND a = 'B' AND d < 20;
     ]], {
         -- <22.2>
-        0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX i4 (d<?)"
+        0, 0, 0, "SEARCH TABLE T3 USING COVERING INDEX I4 (D<?)"
         -- </22.2>
     })
 
@@ -1355,7 +1355,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t3 WHERE c = 'one' AND a = 'A' AND d < 20;
     ]], {
         -- <22.2>
-        0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX i4 (d<?)"
+        0, 0, 0, "SEARCH TABLE T3 USING COVERING INDEX I4 (D<?)"
         -- </22.2>
     })
 
@@ -1395,7 +1395,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE (e=1 AND b='xyz' AND c='zyx' AND a<'AEA') AND f<300;
     ]], {
         -- <23.1>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX i42 (f<?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX I42 (F<?)"
         -- </23.1>
     })
 
@@ -1405,7 +1405,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE (e=1 AND b='xyz' AND c='zyx' AND a<'JJJ') AND f<300;
     ]], {
         -- <23.2>
-        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX i42 (f<?)"
+        0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX I42 (F<?)"
         -- </23.2>
     })
 
@@ -1427,7 +1427,7 @@ test:do_execsql_test(
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t5 WHERE d=0 AND a='z' AND b='n' AND e<200;
     ]], {
-        0, 0, 0, "SEARCH TABLE t5 USING COVERING INDEX t5e (e<?)"
+        0, 0, 0, "SEARCH TABLE T5 USING COVERING INDEX T5E (E<?)"
     })
 
 test:do_execsql_test(
@@ -1435,7 +1435,7 @@ test:do_execsql_test(
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t5 WHERE d=0 AND a='z' AND b='n' AND e<100;
     ]], {
-        0, 0, 0, "SEARCH TABLE t5 USING COVERING INDEX t5e (e<?)"
+        0, 0, 0, "SEARCH TABLE T5 USING COVERING INDEX T5E (E<?)"
     })
 
 test:do_execsql_test(
@@ -1443,7 +1443,7 @@ test:do_execsql_test(
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t5 WHERE d=0 AND e<300;
     ]], {
-        0, 0, 0, "SEARCH TABLE t5 USING COVERING INDEX t5d (d=?)"
+        0, 0, 0, "SEARCH TABLE T5 USING COVERING INDEX T5D (D=?)"
     })
 
 test:do_execsql_test(
@@ -1451,7 +1451,7 @@ test:do_execsql_test(
     [[
         EXPLAIN QUERY PLAN SELECT * FROM t5 WHERE d=0 AND e<200;
     ]], {
-        0, 0, 0, "SEARCH TABLE t5 USING COVERING INDEX t5e (e<?)"
+        0, 0, 0, "SEARCH TABLE T5 USING COVERING INDEX T5E (E<?)"
     })
 
 
@@ -1479,7 +1479,7 @@ test:do_execsql_test(
     "25.2.1",
     "EXPLAIN QUERY PLAN SELECT * FROM t6 WHERE a<30 AND b<?;", {
         -- <25.2.1>
-        0, 0, 0, "SEARCH TABLE t6 USING COVERING INDEX bb (b<?)"
+        0, 0, 0, "SEARCH TABLE T6 USING COVERING INDEX BB (B<?)"
         -- </25.2.1>
     })
 
@@ -1487,7 +1487,7 @@ test:do_execsql_test(
     "25.2.2",
     "EXPLAIN QUERY PLAN SELECT * FROM t6 WHERE a<20 AND b<?;", {
         -- <25.2.2>
-        0, 0, 0, "SEARCH TABLE t6 USING COVERING INDEX aa (a<?)"
+        0, 0, 0, "SEARCH TABLE T6 USING COVERING INDEX AA (A<?)"
         -- </25.2.2>
     })
 
@@ -1498,7 +1498,7 @@ test:do_execsql_test(
        EXPLAIN QUERY PLAN SELECT * FROM t6 WHERE a BETWEEN 5 AND 10 AND b BETWEEN ? AND ?;
     ]], {
         -- <25.3.1>
-        0, 0, 0, "SEARCH TABLE t6 USING COVERING INDEX bb (b>? AND b<?)"
+        0, 0, 0, "SEARCH TABLE T6 USING COVERING INDEX BB (B>? AND B<?)"
         -- </25.3.1>
     })
 
@@ -1511,7 +1511,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t6 WHERE a < 10 AND (b BETWEEN ? AND 60);
     ]], {
         -- <25.4.1>
-        0, 0, 0, "SEARCH TABLE t6 USING COVERING INDEX aa (a<?)"
+        0, 0, 0, "SEARCH TABLE T6 USING COVERING INDEX AA (A<?)"
         -- </25.4.1>
     })
 
@@ -1521,7 +1521,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t6 WHERE a < 20 AND (b BETWEEN ? AND 60);
     ]], {
         -- <25.4.2>
-        0, 0, 0, "SEARCH TABLE t6 USING COVERING INDEX bb (b>? AND b<?)"
+        0, 0, 0, "SEARCH TABLE T6 USING COVERING INDEX BB (B>? AND B<?)"
         -- </25.4.2>
     })
 
@@ -1598,7 +1598,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE x = 10000 AND y < 50 AND z = 444;
     ]], {
         -- <26.1.4>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1z (z=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1Z (Z=?)"
         -- </26.1.4>
     })
 
@@ -1648,7 +1648,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE x='B' AND y>25 AND z=?;
     ]], {
         -- <26.2.2>
-        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i2 (z=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (Z=?)"
         -- </26.2.2>
     })
 

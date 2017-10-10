@@ -314,7 +314,7 @@ whereScanNext(WhereScan * pScan)
 							if (pColl == 0)
 								pColl =
 								    pParse->db->pDfltColl;
-							if (sqlite3StrICmp(pColl->zName,
+							if (strcmp(pColl->zName,
 									   pScan->zCollName)) {
 								continue;
 							}
@@ -475,7 +475,7 @@ findIndexCol(Parse * pParse,	/* Parse context */
 		    && p->iTable == iBase) {
 			CollSeq *pColl =
 			    sqlite3ExprCollSeq(pParse, pList->a[i].pExpr);
-			if (pColl && 0 == sqlite3StrICmp(pColl->zName, zColl)) {
+			if (pColl && 0 == strcmp(pColl->zName, zColl)) {
 				return i;
 			}
 		}
@@ -2279,7 +2279,7 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		pColl = sqlite3BinaryCompareCollSeq(pParse, pLhs, pRhs);
 		if (pColl == 0)
 			break;
-		if (sqlite3StrICmp(pColl->zName, pIdx->azColl[i + nEq]))
+		if (strcmp(pColl->zName, pIdx->azColl[i + nEq]))
 			break;
 	}
 	return i;
@@ -3338,7 +3338,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				if (!pColl)
 					pColl = db->pDfltColl;
 				z2 = pColl->zName;
-				if (sqlite3StrICmp(z1, z2) != 0)
+				if (strcmp(z1, z2) != 0)
 					continue;
 				testcase(pTerm->pExpr->op == TK_IS);
 			}
@@ -3472,7 +3472,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 								       pOrderBy->a[i].pExpr);
 						if (!pColl)
 							pColl = db->pDfltColl;
-						if (sqlite3StrICmp(pColl->zName,
+						if (strcmp(pColl->zName,
 								   pIndex->azColl[j]) != 0)
 							continue;
 					}
