@@ -373,7 +373,7 @@ load_cfg()
 
 	int background = cfg_geti("background");
 	const char *log = cfg_gets("log");
-
+	const char *log_format = cfg_gets("log_format");
 	pid_file = (char *)cfg_gets("pid_file");
 	if (pid_file != NULL) {
 		pid_file = abspath(pid_file);
@@ -424,6 +424,7 @@ load_cfg()
 	say_logger_init(log,
 			cfg_geti("log_level"),
 			cfg_geti("log_nonblock"),
+			log_format,
 			background);
 	systemd_init();
 

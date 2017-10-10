@@ -107,6 +107,7 @@ target_link_libraries(core
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
+    ${MSGPUCK_LIBRARIES}
 )
 
 add_library(stat STATIC rmean.c latency.c histogram.c)

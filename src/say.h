@@ -57,7 +57,14 @@ enum say_level {
 	S_DEBUG
 };
 
+/** Log formats */
+enum say_format {
+	SF_PLAIN,
+	SF_JSON
+};
+
 extern int log_level;
+extern int log_format;
 
 static inline bool
 say_log_level_is_enabled(int level)
@@ -71,11 +78,19 @@ void
 say_set_log_level(int new_level);
 
 void
+say_set_log_format(int new_format);
+
+int
+say_convert_log_format(const char *format_name);
+
+void
 say_logrotate(int /* signo */);
 
 /* Init logger. */
 void say_logger_init(const char *init_str,
-                     int log_level, int nonblock, int background);
+                     int log_level, int nonblock,
+					 const char *log_format,
+					 int background);
 
 void
 say_logger_free();

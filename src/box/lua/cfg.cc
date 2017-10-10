@@ -100,6 +100,17 @@ lbox_cfg_set_log_level(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_log_format(struct lua_State *L)
+{
+	try {
+		box_set_log_format();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
+static int
 lbox_cfg_set_readahead(struct lua_State *L)
 {
 	try {
@@ -228,6 +239,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication", lbox_cfg_set_replication},
 		{"cfg_set_worker_pool_threads", lbox_cfg_set_worker_pool_threads},
 		{"cfg_set_log_level", lbox_cfg_set_log_level},
+		{"cfg_set_log_format", lbox_cfg_set_log_format},
 		{"cfg_set_readahead", lbox_cfg_set_readahead},
 		{"cfg_set_io_collect_interval", lbox_cfg_set_io_collect_interval},
 		{"cfg_set_too_long_threshold", lbox_cfg_set_too_long_threshold},

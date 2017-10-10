@@ -46,7 +46,7 @@ parse_syslog_opts(const char *input)
 
 int main()
 {
-	say_logger_init("/dev/null", S_INFO, 0, 0);
+	say_logger_init("/dev/null", S_INFO, 0, "plain", 0);
 
 	plan(20);
 

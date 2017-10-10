@@ -688,6 +688,12 @@ box_set_log_level(void)
 }
 
 void
+box_set_log_format(void)
+{
+	say_set_log_format(say_convert_log_format(cfg_gets("log_format")));
+}
+
+void
 box_set_io_collect_interval(void)
 {
 	ev_set_io_collect_interval(loop(), cfg_getd("io_collect_interval"));
