@@ -206,29 +206,28 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		if (row.lsn <= current_lsn)
 			continue; /* already applied, skip */
 
-		try {
-			/*
-			 * All rows in xlog files have an assigned
-			 * replica id.
-			 */
-			assert(row.replica_id != 0);
-			/*
-			 * We can promote the vclock either before
-			 * or after xstream_write(): it only makes
-			 * any impact in case of forced recovery,
-			 * when we skip the failed row anyway.
-			 */
-			vclock_follow(&r->vclock,  row.replica_id, row.lsn);
-			xstream_write_xc(stream, &row);
+		/*
+		 * All rows in xlog files have an assigned
+		 * replica id.
+		 */
+		assert(row.replica_id != 0);
+		/*
+		 * We can promote the vclock either before or
+		 * after xstream_write(): it only makes any impact
+		 * in case of forced recovery, when we skip the
+		 * failed row anyway.
+		 */
+		vclock_follow(&r->vclock,  row.replica_id, row.lsn);
+		if (xstream_write(stream, &row) == 0) {
 			++row_count;
 			if (row_count % 100000 == 0)
 				say_info("%.1fM rows processed",
 					 row_count / 1000000.);
-		} catch (ClientError *e) {
+		} else {
 			say_error("can't apply row: ");
-			e->log();
+			diag_log();
 			if (!r->wal_dir.force_recovery)
-				throw;
+				diag_raise();
 		}
 	}
 }
