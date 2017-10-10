@@ -768,23 +768,12 @@ s = box.schema.space.create('test', { format = "format" })
 ---
 - error: Illegal parameters, options parameter 'format' should be of type table
 ...
-s = box.schema.space.create('test', { format = { "not_map" } })
----
-- error: 'Failed to create space ''test'': field 1 is not map'
-...
-format = { utils.setmap({'unsigned'}) }
----
-...
-s = box.schema.space.create('test', { format = format })
----
-- error: 'Failed to create space ''test'': field 1 format is not map with string keys'
-...
 format = { { name = 100 } }
 ---
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Wrong space format (field 1): ''name'' must be string'
+- error: 'Illegal parameters, format[1]: name (string) is expected'
 ...
 long = string.rep('a', box.schema.NAME_MAX + 1)
 ---
@@ -808,7 +797,7 @@ format = { utils.setmap({}) }
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Failed to create space ''test'': field 1 name is not specified'
+- error: 'Illegal parameters, format[1]: name (string) is expected'
 ...
 -- Ensure the format is updated after index drop.
 format = { { name = 'id', type = 'unsigned' } }
@@ -1019,6 +1008,62 @@ format[3] = {name = 'field1'}
 s:format(format)
 ---
 - error: Space field 'field1' is duplicate
+...
+s:drop()
+---
+...
+-- https://github.com/tarantool/tarantool/issues/2815
+-- Extend space format definition syntax
+format = {{name='key',type='unsigned'}, {name='value',type='string'}}
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+s:format()
+---
+- [{'name': 'key', 'type': 'unsigned'}, {'name': 'value', 'type': 'string'}]
+...
+s:format({'id', 'name'})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name', 'type': 'any'}]
+...
+s:format({'id', {'name1'}})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name1', 'type': 'any'}]
+...
+s:format({'id', {'name2', 'string'}})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name2', 'type': 'string'}]
+...
+s:format({'id', {'name', type = 'string'}})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name', 'type': 'string'}]
+...
+s:drop()
+---
+...
+format = {'key', {'value',type='string'}}
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+s:format()
+---
+- [{'name': 'key', 'type': 'any'}, {'name': 'value', 'type': 'string'}]
 ...
 s:drop()
 ---

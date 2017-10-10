@@ -296,9 +296,6 @@ ts:drop()
 -- gh-2652: validate space format.
 --
 s = box.schema.space.create('test', { format = "format" })
-s = box.schema.space.create('test', { format = { "not_map" } })
-format = { utils.setmap({'unsigned'}) }
-s = box.schema.space.create('test', { format = format })
 format = { { name = 100 } }
 s = box.schema.space.create('test', { format = format })
 long = string.rep('a', box.schema.NAME_MAX + 1)
@@ -383,4 +380,24 @@ format[2] = {name = 'field2'}
 format[3] = {name = 'field1'}
 s:format(format)
 
+s:drop()
+
+-- https://github.com/tarantool/tarantool/issues/2815
+-- Extend space format definition syntax
+format = {{name='key',type='unsigned'}, {name='value',type='string'}}
+s = box.schema.space.create('test', { format = format })
+s:format()
+s:format({'id', 'name'})
+s:format()
+s:format({'id', {'name1'}})
+s:format()
+s:format({'id', {'name2', 'string'}})
+s:format()
+s:format({'id', {'name', type = 'string'}})
+s:format()
+s:drop()
+
+format = {'key', {'value',type='string'}}
+s = box.schema.space.create('test', { format = format })
+s:format()
 s:drop()

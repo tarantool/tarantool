@@ -316,6 +316,38 @@ end
 -- box.commit yields, so it's defined as Lua/C binding
 -- box.rollback yields as well
 
+function update_format(format)
+    local result = {}
+    for i,given in pairs(format) do
+        local field = {}
+        if type(given) ~= "table" then
+            field.name = given
+        else
+            for k, v in pairs(given) do
+                if k == 1 then
+                    field.name = v;
+                elseif k == 2 then
+                    field.type = v;
+                else
+                    field[k] = v
+                end
+            end
+        end
+        if type(field.name) ~= 'string' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                "format[" .. i .. "]: name (string) is expected")
+        end
+        if field.type == nil then
+            field.type = 'any'
+        elseif type(field.type) ~= 'string' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                "format[" .. i .. "]: type must be a string")
+        end
+        table.insert(result, field)
+    end
+    return result
+end
+
 box.schema.space = {}
 box.schema.space.create = function(name, options)
     check_param(name, 'name', 'string')
@@ -365,6 +397,8 @@ box.schema.space.create = function(name, options)
         uid = session.uid()
     end
     local format = options.format and options.format or {}
+    check_param(format, 'format', 'table')
+    format = update_format(format)
     -- filter out global parameters from the options array
     local space_options = setmap({
         temporary = options.temporary and true or nil,
@@ -383,6 +417,7 @@ function box.schema.space.format(id, format)
         return _space:get(id)[7]
     else
         check_param(format, 'format', 'table')
+        format = update_format(format)
         _space:update(id, {{'=', 7, format}})
     end
 end
