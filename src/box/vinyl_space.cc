@@ -56,7 +56,7 @@ vinyl_space_bsize(struct space *)
 
 /* {{{ DML */
 
-static void
+static int
 vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 {
 	assert(request->header != NULL);
@@ -64,7 +64,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 	struct vy_tx *tx = vy_begin(env);
 	if (tx == NULL)
-		diag_raise();
+		return -1;
 
 	int64_t signature = request->header->lsn;
 
@@ -83,11 +83,11 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 		rc = vy_delete(env, tx, &stmt, space, request);
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) request->type);
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, request->type);
+		return -1;
 	}
 	if (rc != 0)
-		diag_raise();
+		return -1;
 
 	if (stmt.old_tuple)
 		tuple_unref(stmt.old_tuple);
@@ -96,9 +96,10 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 	if (vy_prepare(env, tx)) {
 		vy_rollback(env, tx);
-		diag_raise();
+		return -1;
 	}
 	vy_commit(env, tx, signature);
+	return 0;
 }
 
 /*
@@ -108,9 +109,9 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
  *  - replace in one index
  *  - replace in multiple indexes.
  */
-static struct tuple *
+static int
 vinyl_space_execute_replace(struct space *space, struct txn *txn,
-			    struct request *request)
+			    struct request *request, struct tuple **result)
 {
 	assert(request->index_id == 0);
 	VinylEngine *engine = (VinylEngine *) space->engine;
@@ -118,47 +119,49 @@ vinyl_space_execute_replace(struct space *space, struct txn *txn,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	if (vy_replace(engine->env, tx, stmt, space, request))
-		diag_raise();
-	return stmt->new_tuple;
+		return -1;
+	*result = stmt->new_tuple;
+	return 0;
 }
 
-static struct tuple *
+static int
 vinyl_space_execute_delete(struct space *space, struct txn *txn,
-			   struct request *request)
+			   struct request *request, struct tuple **result)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 	if (vy_delete(engine->env, tx, stmt, space, request))
-		diag_raise();
+		return -1;
 	/*
 	 * Delete may or may not set stmt->old_tuple, but we
 	 * always return NULL.
 	 */
-	return NULL;
+	*result = NULL;
+	return 0;
 }
 
-static struct tuple *
+static int
 vinyl_space_execute_update(struct space *space, struct txn *txn,
-			   struct request *request)
+			   struct request *request, struct tuple **result)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_update(engine->env, tx, stmt, space, request) != 0)
-		diag_raise();
-	return stmt->new_tuple;
+		return -1;
+	*result = stmt->new_tuple;
+	return 0;
 }
 
-static void
+static int
 vinyl_space_execute_upsert(struct space *space, struct txn *txn,
                            struct request *request)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (vy_upsert(engine->env, tx, stmt, space, request) != 0)
-		diag_raise();
+	return vy_upsert(engine->env, tx, stmt, space, request);
 }
 
 /* }}} DML */
@@ -171,40 +174,43 @@ vinyl_init_system_space(struct space *)
 	unreachable();
 }
 
-void
+static int
 vinyl_space_check_format(struct space *new_space, struct space *old_space)
 {
 	VinylEngine *engine = (VinylEngine *) new_space->engine;
-	if (vy_check_format(engine->env, old_space) != 0)
-		diag_raise();
+	return vy_check_format(engine->env, old_space);
 }
 
-static void
+static int
 vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	if (index_def->type != TREE) {
-		tnt_raise(ClientError, ER_INDEX_TYPE,
-		          index_def->name,
-			  space_name(space));
+		diag_set(ClientError, ER_INDEX_TYPE,
+			 index_def->name, space_name(space));
+		return -1;
 	}
-	if (index_def->key_def->is_nullable && index_def->iid == 0)
-		tnt_raise(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
+	if (index_def->key_def->is_nullable && index_def->iid == 0) {
+		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
+		return -1;
+	}
 	/* Check that there are no ANY, ARRAY, MAP parts */
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
 		struct key_part *part = &index_def->key_def->parts[i];
 		if (part->type <= FIELD_TYPE_ANY ||
 		    part->type >= FIELD_TYPE_ARRAY) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  tt_sprintf("field type '%s' is not supported",
-					     field_type_strs[part->type]));
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 tt_sprintf("field type '%s' is not supported",
+					    field_type_strs[part->type]));
+			return -1;
 		}
 	}
 	if (key_def_has_collation(index_def->key_def)) {
-		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
-			  space_name(space), "vinyl does not support collation");
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name(space), "vinyl does not support collation");
+		return -1;
 	}
+	return 0;
 }
 
 static struct index *
@@ -220,19 +226,17 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		pk = vy_index(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	struct index *index = (struct index *)vinyl_index_new(engine->env,
-					index_def, space->format, pk);
-	if (index == NULL)
-		diag_raise();
-	return index;
+	return (struct index *)vinyl_index_new(engine->env,
+				index_def, space->format, pk);
 }
 
-static void
+static int
 vinyl_space_add_primary_key(struct space *space)
 {
-	struct index *pk = index_find_xc(space, 0);
-	if (vinyl_index_open((struct vinyl_index *)pk) != 0)
-		diag_raise();
+	struct index *pk = index_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	return vinyl_index_open((struct vinyl_index *)pk);
 }
 
 static void
@@ -240,7 +244,7 @@ vinyl_space_drop_primary_key(struct space *)
 {
 }
 
-static void
+static int
 vinyl_space_build_secondary_key(struct space *old_space,
 				struct space *new_space,
 				struct index *new_index)
@@ -267,17 +271,15 @@ vinyl_space_build_secondary_key(struct space *old_space,
 	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
 	 *  but aware of three cases mentioned above.
 	 */
-	if (vinyl_index_open((struct vinyl_index *)new_index) != 0)
-		diag_raise();
+	return vinyl_index_open((struct vinyl_index *)new_index);
 }
 
-static void
+static int
 vinyl_space_prepare_truncate(struct space *old_space,
 			     struct space *new_space)
 {
 	VinylEngine *engine = (VinylEngine *) old_space->engine;
-	if (vy_prepare_truncate_space(engine->env, old_space, new_space) != 0)
-		diag_raise();
+	return vy_prepare_truncate_space(engine->env, old_space, new_space);
 }
 
 static void
@@ -288,12 +290,11 @@ vinyl_space_commit_truncate(struct space *old_space,
 	vy_commit_truncate_space(engine->env, old_space, new_space);
 }
 
-static void
+static int
 vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	VinylEngine *engine = (VinylEngine *) old_space->engine;
-	if (vy_prepare_alter_space(engine->env, old_space, new_space) != 0)
-		diag_raise();
+	return vy_prepare_alter_space(engine->env, old_space, new_space);
 }
 
 static void
@@ -306,8 +307,12 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		return;
 	}
 	if (vy_commit_alter_space(engine->env, new_space,
-				  new_space->format) != 0)
-		diag_raise();
+				  new_space->format) != 0) {
+		/* FIXME: space_vtab::commit_alter() must not fail. */
+		diag_log();
+		unreachable();
+		panic("failed to alter space");
+	}
 }
 
 /* }}} DDL */

@@ -74,13 +74,14 @@ memtx_space_update_bsize(struct space *space,
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
  */
-void
+int
 memtx_space_replace_no_keys(struct space *space, struct txn_stmt *,
 			    enum dup_replace_mode)
 {
-	struct index *index = index_find_xc(space, 0);
+	struct index *index = index_find(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
+	return -1;
 }
 
 enum {
@@ -99,7 +100,7 @@ enum {
  * A short-cut version of replace() used during bulk load
  * from snapshot.
  */
-void
+int
 memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
 			       enum dup_replace_mode mode)
 {
@@ -115,23 +116,27 @@ memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	index_build_next_xc(space->index[0], stmt->new_tuple);
+	if (index_build_next(space->index[0], stmt->new_tuple) != 0)
+		return -1;
 	stmt->engine_savepoint = stmt;
 	memtx_space_update_bsize(space, NULL, stmt->new_tuple);
+	return 0;
 }
 
 /**
  * A short-cut version of replace() used when loading
  * data from XLOG files.
  */
-void
+int
 memtx_space_replace_primary_key(struct space *space, struct txn_stmt *stmt,
 				enum dup_replace_mode mode)
 {
-	stmt->old_tuple = index_replace_xc(space->index[0], stmt->old_tuple,
-					   stmt->new_tuple, mode);
+	if (index_replace(space->index[0], stmt->old_tuple,
+			  stmt->new_tuple, mode, &stmt->old_tuple) != 0)
+		return -1;
 	stmt->engine_savepoint = stmt;
 	memtx_space_update_bsize(space, stmt->old_tuple, stmt->new_tuple);
+	return 0;
 }
 
 /**
@@ -218,7 +223,7 @@ memtx_space_replace_primary_key(struct space *space, struct txn_stmt *stmt,
  * Otherwise, it's taken into account only for the
  * primary key.
  */
-void
+int
 memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 			     enum dup_replace_mode mode)
 {
@@ -228,38 +233,53 @@ memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 	 * Ensure we have enough slack memory to guarantee
 	 * successful statement-level rollback.
 	 */
-	memtx_index_extent_reserve(new_tuple ?
-				   RESERVE_EXTENTS_BEFORE_REPLACE :
-				   RESERVE_EXTENTS_BEFORE_DELETE);
-	uint32_t i = 0;
-	try {
-		/* Update the primary key */
-		struct index *pk = index_find_xc(space, 0);
-		assert(pk->def->opts.is_unique);
-		/*
-		 * If old_tuple is not NULL, the index
-		 * has to find and delete it, or raise an
-		 * error.
-		 */
-		old_tuple = index_replace_xc(pk, old_tuple, new_tuple, mode);
+	if (memtx_index_extent_reserve(new_tuple ?
+				       RESERVE_EXTENTS_BEFORE_REPLACE :
+				       RESERVE_EXTENTS_BEFORE_DELETE) != 0)
+		return -1;
 
-		assert(old_tuple || new_tuple);
-		/* Update secondary keys. */
-		for (i++; i < space->index_count; i++) {
-			struct index *index = space->index[i];
-			index_replace_xc(index, old_tuple, new_tuple, DUP_INSERT);
-		}
-	} catch (Exception *e) {
-		/* Rollback all changes */
-		for (; i > 0; i--) {
-			struct index *index = space->index[i-1];
-			index_replace_xc(index, new_tuple, old_tuple, DUP_INSERT);
-		}
-		throw;
+	uint32_t i = 0;
+
+	/* Update the primary key */
+	struct index *pk = index_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	assert(pk->def->opts.is_unique);
+	/*
+	 * If old_tuple is not NULL, the index has to
+	 * find and delete it, or return an error.
+	 */
+	if (index_replace(pk, old_tuple, new_tuple, mode, &old_tuple) != 0)
+		return -1;
+	assert(old_tuple || new_tuple);
+
+	/* Update secondary keys. */
+	for (i++; i < space->index_count; i++) {
+		struct tuple *unused;
+		struct index *index = space->index[i];
+		if (index_replace(index, old_tuple, new_tuple,
+				  DUP_INSERT, &unused) != 0)
+			goto rollback;
 	}
+
 	stmt->old_tuple = old_tuple;
 	stmt->engine_savepoint = stmt;
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
+	return 0;
+
+rollback:
+	for (; i > 0; i--) {
+		struct tuple *unused;
+		struct index *index = space->index[i - 1];
+		/* Rollback must not fail. */
+		if (index_replace(index, new_tuple, old_tuple,
+				  DUP_INSERT, &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+	}
+	return -1;
 }
 
 static inline enum dup_replace_mode
@@ -268,75 +288,90 @@ dup_replace_mode(uint32_t op)
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
-static void
+static int
 memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 {
 	if (request->type != IPROTO_INSERT) {
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				(uint32_t) request->type);
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, request->type);
+		return -1;
 	}
 	request->header->replica_id = 0;
-	struct txn *txn = txn_begin_stmt(space);
 	try {
+		struct txn *txn = txn_begin_stmt(space);
 		space_execute_replace_xc(space, txn, request);
 		txn_commit_stmt(txn, request);
 	} catch (Exception *e) {
 		say_error("rollback: %s", e->errmsg);
 		txn_rollback_stmt();
-		throw;
+		return -1;
 	}
 	/** The new tuple is referenced by the primary key. */
+	return 0;
 }
 
-static struct tuple *
+static int
 memtx_space_execute_replace(struct space *space, struct txn *txn,
-			    struct request *request)
+			    struct request *request, struct tuple **result)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
-	stmt->new_tuple = memtx_tuple_new_xc(space->format, request->tuple,
-					     request->tuple_end);
+	stmt->new_tuple = memtx_tuple_new(space->format, request->tuple,
+					  request->tuple_end);
+	if (stmt->new_tuple == NULL)
+		return -1;
 	tuple_ref(stmt->new_tuple);
-	memtx_space->replace(space, stmt, mode);
+	if (memtx_space->replace(space, stmt, mode) != 0)
+		return -1;
 	/** The new tuple is referenced by the primary key. */
-	return stmt->new_tuple;
+	*result = stmt->new_tuple;
+	return 0;
 }
 
-static struct tuple *
+static int
 memtx_space_execute_delete(struct space *space, struct txn *txn,
-			   struct request *request)
+			   struct request *request, struct tuple **result)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	struct index *pk = index_find_unique_xc(space, request->index_id);
+	struct index *pk = index_find_unique(space, request->index_id);
+	if (pk == NULL)
+		return -1;
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
-		diag_raise();
-	stmt->old_tuple = index_get_xc(pk, key, part_count);
-	if (stmt->old_tuple)
-		memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT);
-	return stmt->old_tuple;
+		return -1;
+	if (index_get(pk, key, part_count, &stmt->old_tuple) != 0)
+		return -1;
+	if (stmt->old_tuple != NULL &&
+	    memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT) != 0)
+		return -1;
+	*result = stmt->old_tuple;
+	return 0;
 }
 
-static struct tuple *
+static int
 memtx_space_execute_update(struct space *space, struct txn *txn,
-			   struct request *request)
+			   struct request *request, struct tuple **result)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	struct index *pk = index_find_unique_xc(space, request->index_id);
+	struct index *pk = index_find_unique(space, request->index_id);
+	if (pk == NULL)
+		return -1;
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
-		diag_raise();
-	stmt->old_tuple = index_get_xc(pk, key, part_count);
+		return -1;
+	if (index_get(pk, key, part_count, &stmt->old_tuple) != 0)
+		return -1;
 
-	if (stmt->old_tuple == NULL)
-		return NULL;
+	if (stmt->old_tuple == NULL) {
+		*result = NULL;
+		return 0;
+	}
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	uint32_t new_size = 0, bsize;
@@ -347,17 +382,21 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 				     old_data, old_data + bsize,
 				     &new_size, request->index_base, NULL);
 	if (new_data == NULL)
-		diag_raise();
+		return -1;
 
-	stmt->new_tuple = memtx_tuple_new_xc(space->format, new_data,
-					     new_data + new_size);
+	stmt->new_tuple = memtx_tuple_new(space->format, new_data,
+					  new_data + new_size);
+	if (stmt->new_tuple == NULL)
+		return -1;
 	tuple_ref(stmt->new_tuple);
-	if (stmt->old_tuple)
-		memtx_space->replace(space, stmt, DUP_REPLACE);
-	return stmt->new_tuple;
+	if (stmt->old_tuple != NULL &&
+	    memtx_space->replace(space, stmt, DUP_REPLACE) != 0)
+		return -1;
+	*result = stmt->new_tuple;
+	return 0;
 }
 
-static void
+static int
 memtx_space_execute_upsert(struct space *space, struct txn *txn,
 			   struct request *request)
 {
@@ -368,9 +407,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	 * malformed tuple even if upsert turns into an update.
 	 */
 	if (tuple_validate_raw(space->format, request->tuple))
-		diag_raise();
+		return -1;
 
-	struct index *index = index_find_unique_xc(space, 0);
+	struct index *index = index_find_unique(space, 0);
+	if (index == NULL)
+		return -1;
 
 	uint32_t part_count = index->def->key_def->part_count;
 	/* Extract the primary key from tuple. */
@@ -378,12 +419,13 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 						request->tuple_end,
 						index->def->key_def, NULL);
 	if (key == NULL)
-		diag_raise();
+		return -1;
 	/* Cut array header */
 	mp_decode_array(&key);
 
 	/* Try to find the tuple by primary key. */
-	stmt->old_tuple = index_get_xc(index, key, part_count);
+	if (index_get(index, key, part_count, &stmt->old_tuple) != 0)
+		return -1;
 
 	if (stmt->old_tuple == NULL) {
 		/**
@@ -402,14 +444,16 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 *   we get it here, it's also OK to throw it
 		 * @sa https://github.com/tarantool/tarantool/issues/1156
 		 */
-		if (tuple_update_check_ops(region_aligned_alloc_xc_cb, &fiber()->gc,
+		if (tuple_update_check_ops(region_aligned_alloc_cb, &fiber()->gc,
 				       request->ops, request->ops_end,
 				       request->index_base)) {
-			diag_raise();
+			return -1;
 		}
-		stmt->new_tuple = memtx_tuple_new_xc(space->format,
-						     request->tuple,
-						     request->tuple_end);
+		stmt->new_tuple = memtx_tuple_new(space->format,
+						  request->tuple,
+						  request->tuple_end);
+		if (stmt->new_tuple == NULL)
+			return -1;
 		tuple_ref(stmt->new_tuple);
 	} else {
 		uint32_t new_size = 0, bsize;
@@ -430,10 +474,12 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 					     request->index_base, false,
 					     &column_mask);
 		if (new_data == NULL)
-			diag_raise();
+			return -1;
 
-		stmt->new_tuple = memtx_tuple_new_xc(space->format, new_data,
-						     new_data + new_size);
+		stmt->new_tuple = memtx_tuple_new(space->format, new_data,
+						  new_data + new_size);
+		if (stmt->new_tuple == NULL)
+			return -1;
 		tuple_ref(stmt->new_tuple);
 
 		struct index *pk = space->index[0];
@@ -456,12 +502,14 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	 * we checked this case explicitly and skipped the upsert
 	 * above.
 	 */
-	if (stmt->new_tuple)
-		memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT);
+	if (stmt->new_tuple != NULL &&
+	    memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT) != 0)
+		return -1;
 	/* Return nothing: UPSERT does not return data. */
+	return 0;
 }
 
-static void
+static int
 memtx_space_execute_select(struct space *space, struct txn *txn,
 			   uint32_t index_id, uint32_t iterator,
 			   uint32_t offset, uint32_t limit,
@@ -471,59 +519,79 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)key_end;
 
-	struct index *index = index_find_xc(space, index_id);
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
 
-	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
+	ERROR_INJECT(ERRINJ_TESTING, {
+		diag_set(ClientError, ER_INJECTION, "ERRINJ_TESTING");
+		return -1;
+	});
 
 	uint32_t found = 0;
-	if (iterator >= iterator_type_MAX)
-		tnt_raise(IllegalParams, "Invalid iterator type");
+	if (iterator >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
+		diag_log();
+		return -1;
+	}
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	if (key_validate(index->def, type, key, part_count))
-		diag_raise();
+		return -1;
 
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, type, key, part_count);
+	struct iterator *it = index_position(index);
+	if (it == NULL)
+		return -1;
+	if (index_init_iterator(index, it, type, key, part_count) != 0)
+		return -1;
 
+	int rc = 0;
 	struct tuple *tuple;
-	while ((tuple = iterator_next_xc(it)) != NULL) {
+	while (found < limit) {
+		rc = it->next(it, &tuple);
+		if (rc != 0 || tuple == NULL)
+			break;
 		if (offset > 0) {
 			offset--;
 			continue;
 		}
-		if (limit == found++)
+		rc = port_add_tuple(port, tuple);
+		if (rc != 0)
 			break;
-		port_add_tuple_xc(port, tuple);
+		found++;
 	}
+	return rc;
 }
 
 /* }}} DML */
 
 /* {{{ DDL */
 
-static void
+static int
 memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 {
 	if (index_def->key_def->is_nullable) {
 		if (index_def->iid == 0) {
-			tnt_raise(ClientError, ER_NULLABLE_PRIMARY,
-				  space_name(space));
+			diag_set(ClientError, ER_NULLABLE_PRIMARY,
+				 space_name(space));
+			return -1;
 		}
 		if (index_def->type != TREE) {
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  index_type_strs[index_def->type],
-				  "nullable parts");
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 index_type_strs[index_def->type],
+				 "nullable parts");
+			return -1;
 		}
 	}
 	switch (index_def->type) {
 	case HASH:
 		if (! index_def->opts.is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "HASH index must be unique");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "HASH index must be unique");
+			return -1;
 		}
 		break;
 	case TREE:
@@ -531,52 +599,51 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 		break;
 	case RTREE:
 		if (index_def->key_def->part_count != 1) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "RTREE index key can not be multipart");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "RTREE index key can not be multipart");
+			return -1;
 		}
 		if (index_def->opts.is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "RTREE index can not be unique");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "RTREE index can not be unique");
+			return -1;
 		}
 		if (index_def->key_def->parts[0].type != FIELD_TYPE_ARRAY) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "RTREE index field type must be ARRAY");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "RTREE index field type must be ARRAY");
+			return -1;
 		}
 		/* no furter checks of parts needed */
-		return;
+		return 0;
 	case BITSET:
 		if (index_def->key_def->part_count != 1) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "BITSET index key can not be multipart");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "BITSET index key can not be multipart");
+			return -1;
 		}
 		if (index_def->opts.is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "BITSET can not be unique");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "BITSET can not be unique");
+			return -1;
 		}
 		if (index_def->key_def->parts[0].type != FIELD_TYPE_UNSIGNED &&
 		    index_def->key_def->parts[0].type != FIELD_TYPE_STRING) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  "BITSET index field type must be NUM or STR");
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 "BITSET index field type must be NUM or STR");
+			return -1;
 		}
 		/* no furter checks of parts needed */
-		return;
+		return 0;
 	default:
-		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  index_def->name,
-			  space_name(space));
-		break;
+		diag_set(ClientError, ER_INDEX_TYPE,
+			 index_def->name, space_name(space));
+		return -1;
 	}
 	/* Only HASH and TREE indexes checks parts there */
 	/* Check that there are no ANY, ARRAY, MAP parts */
@@ -584,13 +651,14 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 		struct key_part *part = &index_def->key_def->parts[i];
 		if (part->type <= FIELD_TYPE_ANY ||
 		    part->type >= FIELD_TYPE_ARRAY) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  index_def->name,
-				  space_name(space),
-				  tt_sprintf("field type '%s' is not supported",
-					     field_type_strs[part->type]));
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 tt_sprintf("field type '%s' is not supported",
+					    field_type_strs[part->type]));
+			return -1;
 		}
 	}
+	return 0;
 }
 
 static struct snapshot_iterator *
@@ -615,8 +683,6 @@ sequence_data_index_new(struct index_def *def)
 static struct index *
 memtx_space_create_index(struct space *space, struct index_def *index_def)
 {
-	struct index *index;
-
 	if (space->def->id == BOX_SEQUENCE_DATA_ID) {
 		/*
 		 * The content of _sequence_data is not updated
@@ -625,32 +691,22 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		 * written to snapshot, use a special snapshot
 		 * iterator that walks over the sequence cache.
 		 */
-		index = sequence_data_index_new(index_def);
-		if (index == NULL)
-			diag_raise();
-		return index;
+		return sequence_data_index_new(index_def);
 	}
 
 	switch (index_def->type) {
 	case HASH:
-		index = (struct index *)memtx_hash_index_new(index_def);
-		break;
+		return (struct index *)memtx_hash_index_new(index_def);
 	case TREE:
-		index = (struct index *)memtx_tree_index_new(index_def);
-		break;
+		return (struct index *)memtx_tree_index_new(index_def);
 	case RTREE:
-		index = (struct index *)memtx_rtree_index_new(index_def);
-		break;
+		return (struct index *)memtx_rtree_index_new(index_def);
 	case BITSET:
-		index = (struct index *)memtx_bitset_index_new(index_def);
-		break;
+		return (struct index *)memtx_bitset_index_new(index_def);
 	default:
 		unreachable();
 		return NULL;
 	}
-	if (index == NULL)
-		diag_raise();
-	return index;
 }
 
 /**
@@ -688,33 +744,44 @@ memtx_space_do_add_primary_key(struct space *space,
 	}
 }
 
-static void
+static int
 memtx_space_add_primary_key(struct space *space)
 {
 	memtx_space_do_add_primary_key(space,
 		((MemtxEngine *)space->engine)->m_state);
+	return 0;
 }
 
-static void
+static int
 memtx_space_check_format(struct space *new_space, struct space *old_space)
 {
-	if (old_space->index_count == 0 ||
-	    index_size(old_space->index[0]) == 0)
-		return;
-	struct index *pk = index_find_xc(old_space, 0);
-	struct iterator *it = index_alloc_iterator_xc(pk);
-	IteratorGuard guard(it);
-	index_init_iterator_xc(pk, it, ITER_ALL, NULL, 0);
+	if (old_space->index_count == 0)
+		return 0;
+	struct index *pk = old_space->index[0];
+	if (index_size(pk) == 0)
+		return 0;
 
+	struct iterator *it = index_alloc_iterator(pk);
+	if (it == NULL)
+		return -1;
+	if (index_init_iterator(pk, it, ITER_ALL, NULL, 0) != 0) {
+		it->free(it);
+		return -1;
+	}
+
+	int rc;
 	struct tuple *tuple;
-	while ((tuple = iterator_next_xc(it)) != NULL) {
+	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		if (tuple_validate(new_space->format, tuple))
-			diag_raise();
+		rc = tuple_validate(new_space->format, tuple);
+		if (rc != 0)
+			break;
 	}
+	it->free(it);
+	return rc;
 }
 
 static void
@@ -730,7 +797,7 @@ memtx_init_system_space(struct space *space)
 	memtx_space_do_add_primary_key(space, MEMTX_OK);
 }
 
-static void
+static int
 memtx_space_build_secondary_key(struct space *old_space,
 				struct space *new_space,
 				struct index *new_index)
@@ -743,19 +810,27 @@ memtx_space_build_secondary_key(struct space *old_space,
 		struct memtx_space *memtx_space;
 		memtx_space = (struct memtx_space *)new_space;
 		if (!(memtx_space->replace == memtx_space_replace_all_keys))
-			return;
+			return 0;
 	}
-	struct index *pk = index_find_xc(old_space, 0);
+	struct index *pk = index_find(old_space, 0);
+	if (pk == NULL)
+		return -1;
 
 	struct errinj *inj = errinj(ERRINJ_BUILD_SECONDARY, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
-		tnt_raise(ClientError, ER_INJECTION, "buildSecondaryKey");
+		diag_set(ClientError, ER_INJECTION, "buildSecondaryKey");
+		return -1;
 	}
 
 	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = index_alloc_iterator_xc(pk);
-	IteratorGuard guard(it);
-	index_init_iterator_xc(pk, it, ITER_ALL, NULL, 0);
+	struct iterator *it = index_alloc_iterator(pk);
+	if (it == NULL)
+		return -1;
+
+	if (index_init_iterator(pk, it, ITER_ALL, NULL, 0) != 0) {
+		it->free(it);
+		return -1;
+	}
 
 	/*
 	 * The index has to be built tuple by tuple, since
@@ -765,31 +840,39 @@ memtx_space_build_secondary_key(struct space *old_space,
 	 * etc., the build is aborted.
 	 */
 	/* Build the new index. */
+	int rc;
 	struct tuple *tuple;
-	while ((tuple = iterator_next_xc(it)) != NULL) {
+	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		if (tuple_validate(new_space->format, tuple))
-			diag_raise();
+		rc = tuple_validate(new_space->format, tuple);
+		if (rc != 0)
+			break;
 		/*
 		 * @todo: better message if there is a duplicate.
 		 */
-		struct tuple *old_tuple = index_replace_xc(new_index, NULL,
-							   tuple, DUP_INSERT);
+		struct tuple *old_tuple;
+		rc = index_replace(new_index, NULL, tuple,
+				   DUP_INSERT, &old_tuple);
+		if (rc != 0)
+			break;
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
 		(void) old_tuple;
 	}
+	it->free(it);
+	return rc;
 }
 
-static void
+static int
 memtx_space_prepare_truncate(struct space *old_space,
 			     struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	new_memtx_space->replace = old_memtx_space->replace;
+	return 0;
 }
 
 static void
@@ -799,11 +882,28 @@ memtx_space_prune(struct space *space)
 	if (index == NULL)
 		return;
 
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, ITER_ALL, NULL, 0);
+	struct iterator *it = index_position(index);
+	if (it == NULL)
+		goto fail;
+	if (index_init_iterator(index, it, ITER_ALL, NULL, 0) != 0)
+		goto fail;
+	int rc;
 	struct tuple *tuple;
-	while ((tuple = iterator_next_xc(it)) != NULL)
+	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
 		tuple_unref(tuple);
+	if (rc == 0)
+		return;
+fail:
+	/*
+	 * This function is called from space_vtab::commit_alter()
+	 * or commit_truncate(), which do not tolerate failures,
+	 * so we have no other choice but panic here. Good news is
+	 * memtx iterators do not fail so we should not normally
+	 * get here.
+	 */
+	diag_log();
+	unreachable();
+	panic("failed to prune space");
 }
 
 static void
@@ -814,7 +914,7 @@ memtx_space_commit_truncate(struct space *old_space,
 	memtx_space_prune(old_space);
 }
 
-static void
+static int
 memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
@@ -822,8 +922,8 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	new_memtx_space->replace = old_memtx_space->replace;
 	bool is_empty = old_space->index_count == 0 ||
 			index_size(old_space->index[0]) == 0;
-	space_def_check_compatibility_xc(old_space->def, new_space->def,
-					 is_empty);
+	return space_def_check_compatibility(old_space->def,
+					     new_space->def, is_empty);
 }
 
 static void

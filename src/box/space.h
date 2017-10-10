@@ -46,6 +46,7 @@ struct sequence;
 struct txn;
 struct request;
 struct port;
+struct tuple;
 
 struct space_vtab {
 	/** Free a space instance. */
@@ -53,27 +54,27 @@ struct space_vtab {
 	/** Return binary size of a space. */
 	size_t (*bsize)(struct space *);
 
-	void (*apply_initial_join_row)(struct space *, struct request *);
+	int (*apply_initial_join_row)(struct space *, struct request *);
 
-	struct tuple *(*execute_replace)(struct space *, struct txn *,
-					 struct request *);
-	struct tuple *(*execute_delete)(struct space *, struct txn *,
-					struct request *);
-	struct tuple *(*execute_update)(struct space *, struct txn *,
-					struct request *);
-	void (*execute_upsert)(struct space *, struct txn *, struct request *);
-	void (*execute_select)(struct space *space, struct txn *txn,
-			       uint32_t index_id, uint32_t iterator,
-			       uint32_t offset, uint32_t limit,
-			       const char *key, const char *key_end,
-			       struct port *port);
+	int (*execute_replace)(struct space *, struct txn *,
+			       struct request *, struct tuple **result);
+	int (*execute_delete)(struct space *, struct txn *,
+			      struct request *, struct tuple **result);
+	int (*execute_update)(struct space *, struct txn *,
+			      struct request *, struct tuple **result);
+	int (*execute_upsert)(struct space *, struct txn *, struct request *);
+	int (*execute_select)(struct space *space, struct txn *txn,
+			      uint32_t index_id, uint32_t iterator,
+			      uint32_t offset, uint32_t limit,
+			      const char *key, const char *key_end,
+			      struct port *port);
 
 	void (*init_system_space)(struct space *);
 	/**
 	 * Check an index definition for violation of
 	 * various limits.
 	 */
-	void (*check_index_def)(struct space *, struct index_def *);
+	int (*check_index_def)(struct space *, struct index_def *);
 	/**
 	 * Create an instance of space index. Used in alter
 	 * space before commit to WAL. The created index is
@@ -85,7 +86,7 @@ struct space_vtab {
 	 * after create_index is invoked for the new
 	 * key and before the write to WAL.
 	 */
-	void (*add_primary_key)(struct space *);
+	int (*add_primary_key)(struct space *);
 	/**
 	 * Called by alter when the primary key is dropped.
 	 * Do whatever is necessary with the space object,
@@ -96,22 +97,22 @@ struct space_vtab {
 	 * Check that new fields of a space format are
 	 * compatible with existing tuples.
 	 */
-	void (*check_format)(struct space *new_space,
-			     struct space *old_space);
+	int (*check_format)(struct space *new_space,
+			    struct space *old_space);
 	/**
 	 * Called with the new empty secondary index.
 	 * Fill the new index with data from the primary
 	 * key of the space.
 	 */
-	void (*build_secondary_key)(struct space *old_space,
-				    struct space *new_space,
-				    struct index *new_index);
+	int (*build_secondary_key)(struct space *old_space,
+				   struct space *new_space,
+				   struct index *new_index);
 	/**
 	 * Notify the enigne about upcoming space truncation
 	 * so that it can prepare new_space object.
 	 */
-	void (*prepare_truncate)(struct space *old_space,
-				 struct space *new_space);
+	int (*prepare_truncate)(struct space *old_space,
+				struct space *new_space);
 	/**
 	 * Commit space truncation. Called after space truncate
 	 * record was written to WAL hence must not fail.
@@ -127,8 +128,8 @@ struct space_vtab {
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space' object.
 	 */
-	void (*prepare_alter)(struct space *old_space,
-			      struct space *new_space);
+	int (*prepare_alter)(struct space *old_space,
+			     struct space *new_space);
 	/**
 	 * Notify the engine engine after altering a space and
 	 * replacing old_space with new_space in the space cache,
@@ -304,16 +305,102 @@ space_def_check_compatibility(const struct space_def *old_def,
 int
 access_check_space(struct space *space, uint8_t access);
 
+static inline int
+space_apply_initial_join_row(struct space *space, struct request *request)
+{
+	return space->vtab->apply_initial_join_row(space, request);
+}
+
+static inline int
+space_execute_replace(struct space *space, struct txn *txn,
+		      struct request *request, struct tuple **result)
+{
+	return space->vtab->execute_replace(space, txn, request, result);
+}
+
+static inline int
+space_execute_delete(struct space *space, struct txn *txn,
+		     struct request *request, struct tuple **result)
+{
+	return space->vtab->execute_delete(space, txn, request, result);
+}
+
+static inline int
+space_execute_update(struct space *space, struct txn *txn,
+		     struct request *request, struct tuple **result)
+{
+	return space->vtab->execute_update(space, txn, request, result);
+}
+
+static inline int
+space_execute_upsert(struct space *space, struct txn *txn,
+		     struct request *request)
+{
+	return space->vtab->execute_upsert(space, txn, request);
+}
+
+static inline int
+space_execute_select(struct space *space, struct txn *txn,
+		     uint32_t index_id, uint32_t iterator,
+		     uint32_t offset, uint32_t limit,
+		     const char *key, const char *key_end,
+		     struct port *port)
+{
+	return space->vtab->execute_select(space, txn, index_id, iterator,
+					   offset, limit, key, key_end, port);
+}
+
 static inline void
 init_system_space(struct space *space)
 {
 	space->vtab->init_system_space(space);
 }
 
+static inline int
+space_check_index_def(struct space *space, struct index_def *index_def)
+{
+	return space->vtab->check_index_def(space, index_def);
+}
+
+static inline struct index *
+space_create_index(struct space *space, struct index_def *index_def)
+{
+	return space->vtab->create_index(space, index_def);
+}
+
+static inline int
+space_add_primary_key(struct space *space)
+{
+	return space->vtab->add_primary_key(space);
+}
+
+static inline int
+space_check_format(struct space *new_space, struct space *old_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	return new_space->vtab->check_format(new_space, old_space);
+}
+
 static inline void
 space_drop_primary_key(struct space *space)
 {
 	space->vtab->drop_primary_key(space);
+}
+
+static inline int
+space_build_secondary_key(struct space *old_space,
+			  struct space *new_space, struct index *new_index)
+{
+	assert(old_space->vtab == new_space->vtab);
+	return new_space->vtab->build_secondary_key(old_space,
+						    new_space, new_index);
+}
+
+static inline int
+space_prepare_truncate(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	return new_space->vtab->prepare_truncate(old_space, new_space);
 }
 
 static inline void
@@ -323,12 +410,27 @@ space_commit_truncate(struct space *old_space, struct space *new_space)
 	new_space->vtab->commit_truncate(old_space, new_space);
 }
 
+static inline int
+space_prepare_alter(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	return new_space->vtab->prepare_alter(old_space, new_space);
+}
+
 static inline void
 space_commit_alter(struct space *old_space, struct space *new_space)
 {
 	assert(old_space->vtab == new_space->vtab);
 	new_space->vtab->commit_alter(old_space, new_space);
 }
+
+/** Generic implementation of space_vtab::execute_select method. */
+int
+generic_space_execute_select(struct space *space, struct txn *txn,
+			     uint32_t index_id, uint32_t iterator,
+			     uint32_t offset, uint32_t limit,
+			     const char *key, const char *key_end,
+			     struct port *port);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -431,46 +533,49 @@ index_find_system_xc(struct space *space, uint32_t index_id)
 	return index_find_xc(space, index_id);
 }
 
-/** Generic implementation of space_vtab::execute_select method. */
-void
-generic_space_execute_select(struct space *space, struct txn *txn,
-			     uint32_t index_id, uint32_t iterator,
-			     uint32_t offset, uint32_t limit,
-			     const char *key, const char *key_end,
-			     struct port *port);
-
 static inline void
 space_apply_initial_join_row_xc(struct space *space, struct request *request)
 {
-	space->vtab->apply_initial_join_row(space, request);
+	if (space_apply_initial_join_row(space, request) != 0)
+		diag_raise();
 }
 
 static inline struct tuple *
 space_execute_replace_xc(struct space *space, struct txn *txn,
 			 struct request *request)
 {
-	return space->vtab->execute_replace(space, txn, request);
+	struct tuple *result;
+	if (space_execute_replace(space, txn, request, &result) != 0)
+		diag_raise();
+	return result;
 }
 
 static inline struct tuple *
 space_execute_delete_xc(struct space *space, struct txn *txn,
 			struct request *request)
 {
-	return space->vtab->execute_delete(space, txn, request);
+	struct tuple *result;
+	if (space_execute_delete(space, txn, request, &result) != 0)
+		diag_raise();
+	return result;
 }
 
 static inline struct tuple *
 space_execute_update_xc(struct space *space, struct txn *txn,
 			struct request *request)
 {
-	return space->vtab->execute_update(space, txn, request);
+	struct tuple *result;
+	if (space_execute_update(space, txn, request, &result) != 0)
+		diag_raise();
+	return result;
 }
 
 static inline void
 space_execute_upsert_xc(struct space *space, struct txn *txn,
 			struct request *request)
 {
-	space->vtab->execute_upsert(space, txn, request);
+	if (space_execute_upsert(space, txn, request) != 0)
+		diag_raise();
 }
 
 static inline void
@@ -480,55 +585,61 @@ space_execute_select_xc(struct space *space, struct txn *txn,
 			const char *key, const char *key_end,
 			struct port *port)
 {
-	space->vtab->execute_select(space, txn, index_id, iterator,
-				    offset, limit, key, key_end, port);
+	if (space_execute_select(space, txn, index_id, iterator,
+				 offset, limit, key, key_end, port) != 0)
+		diag_raise();
 }
 
 static inline void
 space_check_index_def_xc(struct space *space, struct index_def *index_def)
 {
-	space->vtab->check_index_def(space, index_def);
+	if (space_check_index_def(space, index_def) != 0)
+		diag_raise();
 }
 
 static inline struct index *
 space_create_index_xc(struct space *space, struct index_def *index_def)
 {
-	return space->vtab->create_index(space, index_def);
+	struct index *index = space_create_index(space, index_def);
+	if (index == NULL)
+		diag_raise();
+	return index;
 }
 
 static inline void
 space_add_primary_key_xc(struct space *space)
 {
-	space->vtab->add_primary_key(space);
+	if (space_add_primary_key(space) != 0)
+		diag_raise();
 }
 
 static inline void
 space_check_format_xc(struct space *new_space, struct space *old_space)
 {
-	assert(old_space->vtab == new_space->vtab);
-	new_space->vtab->check_format(new_space, old_space);
+	if (space_check_format(new_space, old_space) != 0)
+		diag_raise();
 }
 
 static inline void
 space_build_secondary_key_xc(struct space *old_space,
 			     struct space *new_space, struct index *new_index)
 {
-	assert(old_space->vtab == new_space->vtab);
-	new_space->vtab->build_secondary_key(old_space, new_space, new_index);
+	if (space_build_secondary_key(old_space, new_space, new_index) != 0)
+		diag_raise();
 }
 
 static inline void
 space_prepare_truncate_xc(struct space *old_space, struct space *new_space)
 {
-	assert(old_space->vtab == new_space->vtab);
-	new_space->vtab->prepare_truncate(old_space, new_space);
+	if (space_prepare_truncate(old_space, new_space) != 0)
+		diag_raise();
 }
 
 static inline void
 space_prepare_alter_xc(struct space *old_space, struct space *new_space)
 {
-	assert(old_space->vtab == new_space->vtab);
-	new_space->vtab->prepare_alter(old_space, new_space);
+	if (space_prepare_alter(old_space, new_space) != 0)
+		diag_raise();
 }
 
 #endif /* defined(__cplusplus) */

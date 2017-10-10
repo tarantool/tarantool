@@ -45,38 +45,43 @@ sysview_space_bsize(struct space *)
 	return 0;
 }
 
-static void
+static int
 sysview_space_apply_initial_join_row(struct space *, struct request *)
 {
 	unreachable();
+	return 0;
 }
 
-static struct tuple *
+static int
 sysview_space_execute_replace(struct space *space, struct txn *,
-			      struct request *)
+			      struct request *, struct tuple **)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
 }
 
-static struct tuple *
+static int
 sysview_space_execute_delete(struct space *space, struct txn *,
-			     struct request *)
+			     struct request *, struct tuple **)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
 }
 
-static struct tuple *
+static int
 sysview_space_execute_update(struct space *space, struct txn *,
-			     struct request *)
+			     struct request *, struct tuple **)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
 }
 
-static void
+static int
 sysview_space_execute_upsert(struct space *space, struct txn *,
 			     struct request *)
 {
-	tnt_raise(ClientError, ER_VIEW_IS_RO, space->def->name);
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
 }
 
 static void
@@ -85,24 +90,22 @@ sysview_init_system_space(struct space *)
 	unreachable();
 }
 
-static void
+static int
 sysview_space_check_index_def(struct space *, struct index_def *)
 {
+	return 0;
 }
 
 static struct index *
 sysview_space_create_index(struct space *space, struct index_def *index_def)
 {
-	struct index *index = (struct index *)
-		sysview_index_new(index_def, space_name(space));
-	if (index == NULL)
-		diag_raise();
-	return index;
+	return (struct index *)sysview_index_new(index_def, space_name(space));
 }
 
-static void
+static int
 sysview_space_add_primary_key(struct space *)
 {
+	return 0;
 }
 
 static void
@@ -110,15 +113,17 @@ sysview_space_drop_primary_key(struct space *)
 {
 }
 
-static void
+static int
 sysview_space_build_secondary_key(struct space *, struct space *,
 				  struct index *)
 {
+	return 0;
 }
 
-static void
+static int
 sysview_space_prepare_truncate(struct space *, struct space *)
 {
+	return 0;
 }
 
 static void
@@ -126,9 +131,10 @@ sysview_space_commit_truncate(struct space *, struct space *)
 {
 }
 
-static void
+static int
 sysview_space_prepare_alter(struct space *, struct space *)
 {
+	return 0;
 }
 
 static void
@@ -136,10 +142,11 @@ sysview_space_commit_alter(struct space *, struct space *)
 {
 }
 
-static void
+static int
 sysview_space_check_format(struct space *, struct space *)
 {
 	unreachable();
+	return 0;
 }
 
 static const struct space_vtab sysview_space_vtab = {

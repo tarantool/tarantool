@@ -861,18 +861,25 @@ memtx_index_extent_free(void *ctx, void *extent)
  * Reserve num extents in pool.
  * Ensure that next num extent_alloc will succeed w/o an error
  */
-void
+int
 memtx_index_extent_reserve(int num)
 {
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
-		     /* same error as in mempool_alloc */
-		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
-			       "mempool", "new slab")
-		    );
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
+		/* same error as in mempool_alloc */
+		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+			 "mempool", "new slab");
+		return -1;
+	});
 	while (memtx_index_num_reserved_extents < num) {
-		void *ext = mempool_alloc_xc(&memtx_index_extent_pool);
+		void *ext = mempool_alloc(&memtx_index_extent_pool);
+		if (ext == NULL) {
+			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+				 "mempool", "new slab");
+			return -1;
+		}
 		*(void **)ext = memtx_index_reserved_extents;
 		memtx_index_reserved_extents = ext;
 		memtx_index_num_reserved_extents++;
 	}
+	return 0;
 }

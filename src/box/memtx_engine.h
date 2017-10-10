@@ -184,16 +184,15 @@ memtx_index_extent_alloc(void *ctx);
 void
 memtx_index_extent_free(void *ctx, void *extent);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 /**
  * Reserve num extents in pool.
  * Ensure that next num extent_alloc will succeed w/o an error
  */
-void
+int
 memtx_index_extent_reserve(int num);
 
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */

@@ -211,7 +211,7 @@ index_name_by_id(struct space *space, uint32_t id)
 	return NULL;
 }
 
-void
+int
 generic_space_execute_select(struct space *space, struct txn *txn,
 			     uint32_t index_id, uint32_t iterator,
 			     uint32_t offset, uint32_t limit,
@@ -221,30 +221,48 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)key_end;
 
-	struct index *index = index_find_xc(space, index_id);
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
 
 	uint32_t found = 0;
-	if (iterator >= iterator_type_MAX)
-		tnt_raise(IllegalParams, "Invalid iterator type");
+	if (iterator >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
+		diag_log();
+		return -1;
+	}
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	if (key_validate(index->def, type, key, part_count))
-		diag_raise();
+		return -1;
 
-	struct iterator *it = index_alloc_iterator_xc(index);
-	IteratorGuard guard(it);
-	index_init_iterator_xc(index, it, type, key, part_count);
+	struct iterator *it = index_alloc_iterator(index);
+	if (it == NULL)
+		return -1;
+	if (index_init_iterator(index, it, type, key, part_count) != 0) {
+		it->free(it);
+		return -1;
+	}
 
+	int rc = 0;
 	struct tuple *tuple;
-	while (found < limit && (tuple = iterator_next_xc(it)) != NULL) {
+	while (found < limit) {
+		rc = it->next(it, &tuple);
+		if (rc != 0 || tuple == NULL)
+			break;
 		if (offset > 0) {
 			offset--;
 			continue;
 		}
-		port_add_tuple_xc(port, tuple);
+		rc = port_add_tuple(port, tuple);
+		if (rc != 0)
+			break;
 		found++;
 	}
+	it->free(it);
+	return rc;
 }
 
 int
