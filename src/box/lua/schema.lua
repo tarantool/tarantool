@@ -492,7 +492,7 @@ local function update_index_parts_1_6_0(parts)
     return result
 end
 
-local function update_index_parts(parts)
+local function update_index_parts(space_id, parts)
     if type(parts) ~= "table" then
         box.error(box.error.ILLEGAL_PARAMS,
         "options.parts parameter should be a table")
@@ -501,47 +501,65 @@ local function update_index_parts(parts)
         box.error(box.error.ILLEGAL_PARAMS,
         "options.parts must have at least one part")
     end
-    if (type(parts[1]) ~= "table") then
+    if type(parts[1]) == 'number' and type(parts[2]) == 'string' then
         return update_index_parts_1_6_0(parts)
     end
 
     local result = {}
     for i=1,#parts do
-        if type(parts[i]) ~= "table" then
-            box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts[" .. i .. "]: each part expected to be a map")
-        end
         local part = {}
-        -- Support {1, 'unsigned', collation='xx'} shortcut
-        for k, v in pairs(parts[i]) do
-            if k == 1 then
-                part.field = v;
-            elseif k == 2 then
-                part.type = v;
-            elseif k == 'collation' then
-                local coll = box.space._collation.index.name:get{v}
-                if not coll then
-                    box.error(box.error.ILLEGAL_PARAMS,
-                    "options.parts[" .. i .. "]: collation was not found by name " .. v)
+        if type(parts[i]) ~= "table" then
+            part.field = parts[i]
+        else
+            for k, v in pairs(parts[i]) do
+                -- Support {1, 'unsigned', collation='xx'} shortcut
+                if k == 1 then
+                    part.field = v;
+                elseif k == 2 then
+                    part.type = v;
+                elseif k == 'collation' then
+                    -- find ID by name
+                    local coll = box.space._collation.index.name:get{v}
+                    if not coll then
+                        box.error(box.error.ILLEGAL_PARAMS,
+                            "options.parts[" .. i .. "]: collation was not found by name '" .. v .. "'")
+                    end
+                    part[k] = coll[1]
+                else
+                    part[k] = v
                 end
-                part[k] = coll[1]
-            else
-                part[k] = v
             end
         end
-        if type(part.field) ~= 'number' then
+        if type(part.field) ~= 'number' and type(part.field) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts[" .. i .. "]: field (number) is expected")
+                      "options.parts[" .. i .. "]: field (name or number) is expected")
+        elseif type(part.field) == 'string' then
+            for k,v in pairs(box.space[space_id]:format()) do
+                if v.name == part.field then
+                    part.field = k
+                    break
+                end
+            end
+            if type(part.field) == 'string' then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "options.parts[" .. i .. "]: field was not found by name '" .. part.field .. "'")
+            end
         elseif part.field == 0 then
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: field (number) must be one-based")
-        else
-            part.field = part.field - 1
         end
-        if type(part.type) ~= 'string' then
+        if part.type == nil then
+            local fmt = box.space[space_id]:format()[part.field]
+            if fmt and fmt.type then
+                part.type = fmt.type
+            else
+                part.type = 'scalar'
+            end
+        elseif type(part.type) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: type (string) is expected")
         end
+        part.field = part.field - 1
         table.insert(result, part)
     end
     return result
@@ -638,7 +656,7 @@ box.schema.index.create = function(space_id, name, options)
             end
         end
     end
-    local parts = update_index_parts(options.parts)
+    local parts = update_index_parts(space_id, options.parts)
     -- create_index() options contains type, parts, etc,
     -- stored separately. Remove these members from index_opts
     local index_opts = {
@@ -798,7 +816,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         end
     end
     if options.parts ~= nil then
-        parts = update_index_parts(options.parts)
+        parts = update_index_parts(space_id, options.parts)
     end
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_is_generated = false

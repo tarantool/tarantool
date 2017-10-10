@@ -455,8 +455,7 @@ index = s:create_index('primary', {unique = true, parts = {0, 'unsigned', 1, 'st
 ...
 index = s:create_index('primary', {unique = true, parts = {'unsigned', 1, 'string', 2}})
 ---
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''unsigned'''
 ...
 index = s:create_index('primary', {unique = true, parts = 'bug'})
 ---
@@ -1064,6 +1063,96 @@ s = box.schema.space.create('test', { format = format })
 s:format()
 ---
 - [{'name': 'key', 'type': 'any'}, {'name': 'value', 'type': 'string'}]
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test')
+---
+...
+s:create_index('test', {parts = {'test'}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{field = 'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {1}}).parts
+---
+- - type: scalar
+    fieldno: 1
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test')
+---
+...
+s:format{{'test1', 'integer'}, 'test2', {'test3', 'integer'}, {'test4','scalar'}}
+---
+...
+s:create_index('test', {parts = {'test'}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{field = 'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test1', {parts = {'test1'}}).parts
+---
+- - type: integer
+    fieldno: 1
+...
+s:create_index('test2', {parts = {'test2'}}).parts
+---
+- error: 'Can''t create or modify index ''test2'' in space ''test'': field type ''any''
+    is not supported'
+...
+s:create_index('test3', {parts = {{'test1', 'integer'}}}).parts
+---
+- - type: integer
+    fieldno: 1
+...
+s:create_index('test4', {parts = {{'test2', 'integer'}}}).parts
+---
+- - type: integer
+    fieldno: 2
+...
+s:create_index('test5', {parts = {{'test2', 'integer'}}}).parts
+---
+- - type: integer
+    fieldno: 2
+...
+s:create_index('test6', {parts = {1, 3}}).parts
+---
+- - type: integer
+    fieldno: 1
+  - type: integer
+    fieldno: 3
+...
+s:create_index('test7', {parts = {'test1', 4}}).parts
+---
+- - type: integer
+    fieldno: 1
+  - type: scalar
+    fieldno: 4
+...
+s:create_index('test8', {parts = {{1, 'integer'}, {'test4', 'scalar'}}}).parts
+---
+- - type: integer
+    fieldno: 1
+  - type: scalar
+    fieldno: 4
 ...
 s:drop()
 ---

@@ -401,3 +401,25 @@ format = {'key', {'value',type='string'}}
 s = box.schema.space.create('test', { format = format })
 s:format()
 s:drop()
+
+s = box.schema.space.create('test')
+s:create_index('test', {parts = {'test'}})
+s:create_index('test', {parts = {{'test'}}})
+s:create_index('test', {parts = {{field = 'test'}}})
+s:create_index('test', {parts = {1}}).parts
+s:drop()
+
+s = box.schema.space.create('test')
+s:format{{'test1', 'integer'}, 'test2', {'test3', 'integer'}, {'test4','scalar'}}
+s:create_index('test', {parts = {'test'}})
+s:create_index('test', {parts = {{'test'}}})
+s:create_index('test', {parts = {{field = 'test'}}})
+s:create_index('test1', {parts = {'test1'}}).parts
+s:create_index('test2', {parts = {'test2'}}).parts
+s:create_index('test3', {parts = {{'test1', 'integer'}}}).parts
+s:create_index('test4', {parts = {{'test2', 'integer'}}}).parts
+s:create_index('test5', {parts = {{'test2', 'integer'}}}).parts
+s:create_index('test6', {parts = {1, 3}}).parts
+s:create_index('test7', {parts = {'test1', 4}}).parts
+s:create_index('test8', {parts = {{1, 'integer'}, {'test4', 'scalar'}}}).parts
+s:drop()

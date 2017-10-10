@@ -295,7 +295,7 @@ space = box.schema.space.create('test', {engine = engine})
 ...
 pk = space:create_index('pk', {parts={{field1 = 1, type = 'unsigned'}}})
 ---
-- error: 'Illegal parameters, options.parts[1]: field (number) is expected'
+- error: 'Illegal parameters, options.parts[1]: field (name or number) is expected'
 ...
 pk = space:create_index('pk', {parts={{field = 0, type = 'unsigned'}}})
 ---
