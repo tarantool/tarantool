@@ -289,6 +289,10 @@ box.internal.collation.create('test', 'ICU', 'ru_RU', {strength='primary'}) --ok
 box.internal.collation.drop('test') --ok
 ---
 ...
+box.begin() box.internal.collation.create('test2', 'ICU', 'ru_RU') box.commit()
+---
+- error: Space _collation does not support multi-statement transactions
+...
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 ---
 ...

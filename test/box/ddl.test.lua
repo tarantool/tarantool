@@ -128,6 +128,8 @@ box.internal.collation.drop('test') --ok
 box.internal.collation.create('test', 'ICU', 'ru_RU', {strength='primary'}) --ok
 box.internal.collation.drop('test') --ok
 
+box.begin() box.internal.collation.create('test2', 'ICU', 'ru_RU') box.commit()
+
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 box.internal.collation.exists('test')
 

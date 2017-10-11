@@ -2167,7 +2167,7 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-
+	txn_check_singlestatement(txn, "Space _collation");
 	struct coll *old_coll = NULL;
 	if (old_tuple != NULL) {
 		/* TODO: Check that no index uses the collation */
