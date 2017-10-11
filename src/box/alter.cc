@@ -32,7 +32,7 @@
 #include "schema.h"
 #include "user.h"
 #include "space.h"
-#include "memtx_index.h"
+#include "index.h"
 #include "func.h"
 #include "coll_cache.h"
 #include "txn.h"
@@ -525,7 +525,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	if (space_index(space, iid) == NULL)
 		return false;
 
-	MemtxIndex *index = index_find_system(space, iid);
+	struct Index *index = index_find_system(space, iid);
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);

@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "memtx_tree.h"
+#include "memtx_index.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */
 #include "errinj.h"
@@ -274,7 +275,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 /* {{{ MemtxTree  **********************************************************/
 
 MemtxTree::MemtxTree(struct index_def *index_def_arg)
-	: MemtxIndex(index_def_arg),
+	: Index(index_def_arg),
 	build_array(0),
 	build_array_size(0),
 	build_array_alloc_size(0)
@@ -313,6 +314,25 @@ size_t
 MemtxTree::bsize() const
 {
 	return memtx_tree_mem_used(&tree);
+}
+
+struct tuple *
+MemtxTree::min(const char *key, uint32_t part_count) const
+{
+	return memtx_index_min(this, key, part_count);
+}
+
+struct tuple *
+MemtxTree::max(const char *key, uint32_t part_count) const
+{
+	return memtx_index_max(this, key, part_count);
+}
+
+size_t
+MemtxTree::count(enum iterator_type type, const char *key,
+		 uint32_t part_count) const
+{
+	return memtx_index_count(this, type, key, part_count);
 }
 
 struct tuple *

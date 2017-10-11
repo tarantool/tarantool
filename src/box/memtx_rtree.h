@@ -30,11 +30,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "memtx_index.h"
+#include "index.h"
 
 #include <salad/rtree.h>
 
-class MemtxRTree: public MemtxIndex
+class MemtxRTree: public Index
 {
 public:
 	MemtxRTree(struct index_def *index_def);
@@ -42,6 +42,12 @@ public:
 
 	virtual void beginBuild() override;
 	virtual size_t size() const override;
+	virtual struct tuple *min(const char *key,
+				  uint32_t part_count) const override;
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const override;
 	virtual struct tuple *findByKey(const char *key,
 					uint32_t part_count) const override;
 	virtual struct tuple *replace(struct tuple *old_tuple,

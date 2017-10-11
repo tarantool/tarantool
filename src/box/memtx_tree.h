@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 
-#include "memtx_index.h"
+#include "index.h"
 #include "memtx_engine.h"
 #include "tuple_compare.h"
 
@@ -85,7 +85,7 @@ memtx_tree_compare_key(const tuple *tuple,
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
 
-class MemtxTree: public MemtxIndex {
+class MemtxTree: public Index {
 public:
 	MemtxTree(struct index_def *index_def);
 	virtual ~MemtxTree() override;
@@ -95,6 +95,12 @@ public:
 	virtual void buildNext(struct tuple *tuple) override;
 	virtual void endBuild() override;
 	virtual size_t size() const override;
+	virtual struct tuple *min(const char *key,
+				  uint32_t part_count) const override;
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const override;
 	virtual struct tuple *random(uint32_t rnd) const override;
 	virtual struct tuple *findByKey(const char *key,
 					uint32_t part_count) const override;

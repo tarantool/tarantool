@@ -163,7 +163,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /* {{{ Index -- base class for all indexes. ********************/
 
 Index::Index(struct index_def *index_def_arg)
-	:index_def(NULL), schema_version(::schema_version)
+	:index_def(NULL), schema_version(::schema_version), m_position(NULL)
 {
 	index_def = index_def_dup(index_def_arg);
 	if (index_def == NULL)
@@ -172,6 +172,8 @@ Index::Index(struct index_def *index_def_arg)
 
 Index::~Index()
 {
+	if (m_position != NULL)
+		m_position->free(m_position);
 	index_def_delete(index_def);
 }
 
@@ -276,6 +278,27 @@ struct snapshot_iterator *
 Index::createSnapshotIterator()
 {
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
+}
+
+void
+Index::beginBuild()
+{
+}
+
+void
+Index::reserve(uint32_t /* size_hint */)
+{
+}
+
+void
+Index::buildNext(struct tuple *tuple)
+{
+	replace(NULL, tuple, DUP_INSERT);
+}
+
+void
+Index::endBuild()
+{
 }
 
 static inline Index *
@@ -548,3 +571,27 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 }
 
 /* }}} */
+
+void
+index_build(struct Index *index, struct Index *pk)
+{
+	uint32_t n_tuples = pk->size();
+	uint32_t estimated_tuples = n_tuples * 1.2;
+
+	index->beginBuild();
+	index->reserve(estimated_tuples);
+
+	if (n_tuples > 0) {
+		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
+			 n_tuples, index_type_strs[index->index_def->type],
+			 index_name(index));
+	}
+
+	struct iterator *it = pk->position();
+	pk->initIterator(it, ITER_ALL, NULL, 0);
+	struct tuple *tuple;
+	while ((tuple = iterator_next_xc(it)) != NULL)
+		index->buildNext(tuple);
+
+	index->endBuild();
+}

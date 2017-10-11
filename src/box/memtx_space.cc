@@ -115,7 +115,7 @@ memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	((MemtxIndex *)space->index[0])->buildNext(stmt->new_tuple);
+	space->index[0]->buildNext(stmt->new_tuple);
 	stmt->engine_savepoint = stmt;
 	memtx_space_update_bsize(space, NULL, stmt->new_tuple);
 }
@@ -472,7 +472,7 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)key_end;
 
-	MemtxIndex *index = (MemtxIndex *) index_find_xc(space, index_id);
+	struct Index *index = index_find_xc(space, index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
@@ -655,17 +655,17 @@ memtx_space_do_add_primary_key(struct space *space,
 		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_INITIAL_RECOVERY:
-		((MemtxIndex *) space->index[0])->beginBuild();
+		space->index[0]->beginBuild();
 		memtx_space->replace = memtx_space_replace_build_next;
 		break;
 	case MEMTX_FINAL_RECOVERY:
-		((MemtxIndex *) space->index[0])->beginBuild();
-		((MemtxIndex *) space->index[0])->endBuild();
+		space->index[0]->beginBuild();
+		space->index[0]->endBuild();
 		memtx_space->replace = memtx_space_replace_primary_key;
 		break;
 	case MEMTX_OK:
-		((MemtxIndex *) space->index[0])->beginBuild();
-		((MemtxIndex *) space->index[0])->endBuild();
+		space->index[0]->beginBuild();
+		space->index[0]->endBuild();
 		memtx_space->replace = memtx_space_replace_all_keys;
 		break;
 	}
@@ -778,7 +778,7 @@ memtx_space_prepare_truncate(struct space *old_space,
 static void
 memtx_space_prune(struct space *space)
 {
-	MemtxIndex *index = (MemtxIndex *) space_index(space, 0);
+	struct Index *index = space_index(space, 0);
 	if (index == NULL)
 		return;
 

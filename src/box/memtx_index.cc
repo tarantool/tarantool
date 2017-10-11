@@ -29,82 +29,41 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdint.h>
+#include <stddef.h>
+
 #include "index.h"
 #include "memtx_index.h"
-#include "tuple.h"
-#include "say.h"
-#include "schema.h"
-#include "space.h"
-
-void
-MemtxIndex::beginBuild()
-{}
-
-void
-MemtxIndex::reserve(uint32_t /* size_hint */)
-{}
-
-void
-MemtxIndex::buildNext(struct tuple *tuple)
-{
-	replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-MemtxIndex::endBuild()
-{}
 
 struct tuple *
-MemtxIndex::min(const char *key, uint32_t part_count) const
+memtx_index_min(const struct Index *index,
+		const char *key, uint32_t part_count)
 {
-	struct iterator *it = position();
-	initIterator(it, ITER_GE, key, part_count);
+	struct iterator *it = index->position();
+	index->initIterator(it, ITER_GE, key, part_count);
 	return iterator_next_xc(it);
 }
 
 struct tuple *
-MemtxIndex::max(const char *key, uint32_t part_count) const
+memtx_index_max(const struct Index *index,
+		const char *key, uint32_t part_count)
 {
-	struct iterator *it = position();
-	initIterator(it, ITER_LE, key, part_count);
+	struct iterator *it = index->position();
+	index->initIterator(it, ITER_LE, key, part_count);
 	return iterator_next_xc(it);
 }
 
 size_t
-MemtxIndex::count(enum iterator_type type, const char *key,
-		  uint32_t part_count) const
+memtx_index_count(const struct Index *index, enum iterator_type type,
+		  const char *key, uint32_t part_count)
 {
 	if (type == ITER_ALL)
-		return size(); /* optimization */
-	struct iterator *it = position();
-	initIterator(it, type, key, part_count);
+		return index->size(); /* optimization */
+	struct iterator *it = index->position();
+	index->initIterator(it, type, key, part_count);
 	size_t count = 0;
 	struct tuple *tuple = NULL;
 	while ((tuple = iterator_next_xc(it)) != NULL)
 		++count;
 	return count;
-}
-
-void
-index_build(MemtxIndex *index, MemtxIndex *pk)
-{
-	uint32_t n_tuples = pk->size();
-	uint32_t estimated_tuples = n_tuples * 1.2;
-
-	index->beginBuild();
-	index->reserve(estimated_tuples);
-
-	if (n_tuples > 0) {
-		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
-			 n_tuples, index_type_strs[index->index_def->type],
-			 index_name(index));
-	}
-
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-	struct tuple *tuple;
-	while ((tuple = iterator_next_xc(it)) != NULL)
-		index->buildNext(tuple);
-
-	index->endBuild();
 }

@@ -30,54 +30,28 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
+#include <stdint.h>
+#include <stddef.h>
 
-class MemtxIndex: public Index {
-public:
-	MemtxIndex(struct index_def *index_def_arg)
-		:Index(index_def_arg), m_position(NULL)
-	{}
-	virtual ~MemtxIndex() override {
-		if (m_position != NULL)
-			m_position->free(m_position);
-	}
+#include "iterator_type.h"
 
-	virtual struct tuple *min(const char *key,
-				  uint32_t part_count) const override;
-	virtual struct tuple *max(const char *key,
-				  uint32_t part_count) const override;
-	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const override;
+struct Index;
+struct tuple;
 
-	inline struct iterator *position() const
-	{
-		if (m_position == NULL)
-			m_position = allocIterator();
-		return m_position;
-	}
+/*
+ * Index methods common to all memtx indexes.
+ */
 
-	/**
-	 * Two-phase index creation: begin building, add tuples, finish.
-	 */
-	virtual void beginBuild();
-	/**
-	 * Optional hint, given to the index, about
-	 * the total size of the index. If given,
-	 * is given after beginBuild().
-	 */
-	virtual void reserve(uint32_t /* size_hint */);
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
-protected:
-	/*
-	 * Pre-allocated iterator to speed up the main case of
-	 * box_process(). Should not be used elsewhere.
-	 */
-	mutable struct iterator *m_position;
-};
+struct tuple *
+memtx_index_min(const struct Index *index,
+		const char *key, uint32_t part_count);
 
-/** Build this index based on the contents of another index. */
-void
-index_build(MemtxIndex *index, MemtxIndex *pk);
+struct tuple *
+memtx_index_max(const struct Index *index,
+		const char *key, uint32_t part_count);
+
+size_t
+memtx_index_count(const struct Index *index, enum iterator_type type,
+		  const char *key, uint32_t part_count);
 
 #endif /* TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED */

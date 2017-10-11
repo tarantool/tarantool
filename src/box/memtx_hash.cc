@@ -34,6 +34,7 @@
 #include "tuple_compare.h"
 #include "tuple_hash.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */
 #include "errinj.h"
@@ -125,7 +126,7 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
 MemtxHash::MemtxHash(struct index_def *index_def_arg)
-	: MemtxIndex(index_def_arg)
+	: Index(index_def_arg)
 {
 	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
@@ -160,6 +161,25 @@ size_t
 MemtxHash::bsize() const
 {
         return matras_extent_count(&hash_table->mtable) * HASH_INDEX_EXTENT_SIZE;
+}
+
+struct tuple *
+MemtxHash::min(const char *key, uint32_t part_count) const
+{
+	return memtx_index_min(this, key, part_count);
+}
+
+struct tuple *
+MemtxHash::max(const char *key, uint32_t part_count) const
+{
+	return memtx_index_max(this, key, part_count);
+}
+
+size_t
+MemtxHash::count(enum iterator_type type, const char *key,
+		 uint32_t part_count) const
+{
+	return memtx_index_count(this, type, key, part_count);
 }
 
 struct tuple *

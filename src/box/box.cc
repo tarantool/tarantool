@@ -49,10 +49,10 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
-#include "memtx_index.h"
 #include "sysview_engine.h"
 #include "vinyl_engine.h"
 #include "space.h"
+#include "index.h"
 #include "port.h"
 #include "txn.h"
 #include "user.h"
@@ -1178,7 +1178,7 @@ box_on_join(const tt_uuid *instance_uuid)
 
 	/** Find the largest existing replica id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
-	class MemtxIndex *index = index_find_system(space, 0);
+	struct Index *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;

@@ -31,17 +31,23 @@
  * SUCH DAMAGE.
  */
 
-#include "memtx_index.h"
+#include "index.h"
 
 struct light_index_core;
 
-class MemtxHash: public MemtxIndex {
+class MemtxHash: public Index {
 public:
 	MemtxHash(struct index_def *index_def);
 	virtual ~MemtxHash() override;
 
 	virtual void reserve(uint32_t size_hint) override;
 	virtual size_t size() const override;
+	virtual struct tuple *min(const char *key,
+				  uint32_t part_count) const override;
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
+	virtual size_t count(enum iterator_type type, const char *key,
+			     uint32_t part_count) const override;
 	virtual struct tuple *random(uint32_t rnd) const override;
 	virtual struct tuple *findByKey(const char *key,
 					uint32_t part_count) const override;

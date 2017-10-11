@@ -36,6 +36,7 @@
 #include "trivia/util.h"
 
 #include "tuple.h"
+#include "memtx_index.h"
 
 #ifndef OLD_GOOD_BITSET
 #include "memtx_engine.h"
@@ -189,7 +190,7 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 }
 
 MemtxBitset::MemtxBitset(struct index_def *index_def_arg)
-	: MemtxIndex(index_def_arg)
+	: Index(index_def_arg)
 {
 	assert(!this->index_def->opts.is_unique);
 
@@ -395,6 +396,18 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 	}
 }
 
+struct tuple *
+MemtxBitset::min(const char *key, uint32_t part_count) const
+{
+	return memtx_index_min(this, key, part_count);
+}
+
+struct tuple *
+MemtxBitset::max(const char *key, uint32_t part_count) const
+{
+	return memtx_index_max(this, key, part_count);
+}
+
 size_t
 MemtxBitset::count(enum iterator_type type, const char *key,
 		   uint32_t part_count) const
@@ -453,5 +466,5 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 	}
 
 	/* Call generic method */
-	return MemtxIndex::count(type, key, part_count);
+	return memtx_index_count(this, type, key, part_count);
 }

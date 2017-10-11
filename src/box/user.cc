@@ -32,7 +32,6 @@
 #include "assoc.h"
 #include "schema.h"
 #include "space.h"
-#include "memtx_index.h"
 #include "func.h"
 #include "index.h"
 #include "bit/bit.h"
@@ -289,7 +288,7 @@ user_reload_privs(struct user *user)
 		struct space *space = space_cache_find(BOX_PRIV_ID);
 		char key[6];
 		/** Primary key - by user id */
-		MemtxIndex *index = index_find_system(space, 0);
+		struct Index *index = index_find_system(space, 0);
 		mp_encode_uint(key, user->def->uid);
 
 		struct iterator *it = index->position();

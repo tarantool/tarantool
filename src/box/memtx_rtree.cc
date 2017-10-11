@@ -39,6 +39,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 
 /* {{{ Utilities. *************************************************/
 
@@ -165,7 +166,7 @@ MemtxRTree::~MemtxRTree()
 }
 
 MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
-	: MemtxIndex(index_def_arg)
+	: Index(index_def_arg)
 {
 	assert(index_def->key_def->part_count == 1);
 	assert(index_def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
@@ -199,6 +200,25 @@ size_t
 MemtxRTree::bsize() const
 {
 	return rtree_used_size(&m_tree);
+}
+
+struct tuple *
+MemtxRTree::min(const char *key, uint32_t part_count) const
+{
+	return memtx_index_min(this, key, part_count);
+}
+
+struct tuple *
+MemtxRTree::max(const char *key, uint32_t part_count) const
+{
+	return memtx_index_max(this, key, part_count);
+}
+
+size_t
+MemtxRTree::count(enum iterator_type type, const char *key,
+		  uint32_t part_count) const
+{
+	return memtx_index_count(this, type, key, part_count);
 }
 
 struct tuple *

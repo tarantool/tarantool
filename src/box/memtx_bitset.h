@@ -35,7 +35,7 @@
  * @brief Index API wrapper for bitset_index
  * @see bitset/index.h
  */
-#include "memtx_index.h"
+#include "index.h"
 #include "bitset/index.h"
 
 #ifndef OLD_GOOD_BITSET
@@ -43,11 +43,15 @@ struct matras;
 struct mh_bitset_index_t;
 #endif /*#ifndef OLD_GOOD_BITSET*/
 
-class MemtxBitset: public MemtxIndex {
+class MemtxBitset: public Index {
 public:
 	MemtxBitset(struct index_def *index_def);
 	virtual ~MemtxBitset() override;
 	virtual size_t size() const override;
+	virtual struct tuple *min(const char *key,
+				  uint32_t part_count) const override;
+	virtual struct tuple *max(const char *key,
+				  uint32_t part_count) const override;
 	virtual size_t count(enum iterator_type type, const char *key,
 			     uint32_t part_count) const override;
 	virtual struct tuple *replace(struct tuple *old_tuple,

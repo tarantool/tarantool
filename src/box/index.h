@@ -306,6 +306,13 @@ public:
 	uint32_t schema_version;
 
 protected:
+	/*
+	 * Pre-allocated iterator to speed up the main case of
+	 * box_process(). Should not be used elsewhere.
+	 * Safe to use only if the index iterator does not yield.
+	 */
+	mutable struct iterator *m_position;
+
 	/**
 	 * Initialize index instance. The created
 	 * object makes a copy of the index definition.
@@ -366,6 +373,26 @@ public:
 
 	/** Introspection (index:info()) */
 	virtual void info(struct info_handler *handler) const;
+
+	inline struct iterator *position() const
+	{
+		if (m_position == NULL)
+			m_position = allocIterator();
+		return m_position;
+	}
+
+	/**
+	 * Two-phase index creation: begin building, add tuples, finish.
+	 */
+	virtual void beginBuild();
+	/**
+	 * Optional hint, given to the index, about
+	 * the total size of the index. If given,
+	 * is given after beginBuild().
+	 */
+	virtual void reserve(uint32_t /* size_hint */);
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
 };
 
 /*
@@ -436,6 +463,10 @@ index_is_primary(const Index *index)
 {
 	return index_id(index) == 0;
 }
+
+/** Build this index based on the contents of another index. */
+void
+index_build(struct Index *index, struct Index *pk);
 
 /**
  * Wrapper around iterator::next() that throws

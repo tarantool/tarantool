@@ -82,7 +82,7 @@ memtx_end_build_primary_key(struct space *space, void *param)
 	    memtx_space->replace == memtx_space_replace_all_keys)
 		return;
 
-	((MemtxIndex *) space->index[0])->endBuild();
+	space->index[0]->endBuild();
 	memtx_space->replace = memtx_space_replace_primary_key;
 }
 
@@ -101,7 +101,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		return;
 
 	if (space->index_id_max > 0) {
-		MemtxIndex *pk = (MemtxIndex *) space->index[0];
+		struct Index *pk = space->index[0];
 		uint32_t n_tuples = pk->size();
 
 		if (n_tuples > 0) {
@@ -110,7 +110,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++)
-			index_build((MemtxIndex *) space->index[j], pk);
+			index_build(space->index[j], pk);
 
 		if (n_tuples > 0) {
 			say_info("Space '%s': done", space_name(space));
