@@ -102,6 +102,7 @@ coll_icu_init_cmp(struct coll *coll, const struct coll_def *def)
 	}
 	char locale[MAX_LOCALE];
 	memcpy(locale, def->locale, def->locale_len);
+	locale[def->locale_len] = '\0';
 	UErrorCode status = U_ZERO_ERROR;
 	struct UCollator *collator = ucol_open(locale, &status);
 	if (U_FAILURE(status)) {
