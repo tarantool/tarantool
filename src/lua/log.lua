@@ -66,7 +66,7 @@ local function say(level, fmt, ...)
         if not stat then
             error(fmt, 3)
         end
-    elseif ffi.C.log_format == ffi.C.SF_JSON and type_fmt == 'table' then
+    elseif type_fmt == 'table' then
         -- ignore internal keys
         for _, field in ipairs(special_fields) do
             fmt[field] = nil

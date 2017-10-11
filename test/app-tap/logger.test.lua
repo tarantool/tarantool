@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(18)
+test:plan(19)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
@@ -32,12 +32,14 @@ test:is(file:read():match('I>%s+(.*)'), "gh-700: %%s %%f %%d", "formatting")
 log.info("gh-2340: %s %D")
 test:is(file:read():match('I>%s+(.*)'), "gh-2340: %s %D", "formatting without arguments")
 
+log.info({key="value"})
+test:is(file:read():match('I>%s+(.*)'), '{"key":"value"}', "table is handled as json")
 
 function help() log.info("gh-2340: %s %s", 'help') end
 
 xpcall(help, function(err)
     test:ok(err:match("bad argument #3"), "found error string")
-    test:ok(err:match("logger.test.lua:36:"), "found error place")
+    test:ok(err:match("logger.test.lua:38:"), "found error place")
 end)
 
 file:close()
