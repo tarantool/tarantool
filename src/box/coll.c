@@ -34,6 +34,7 @@
 #include "error.h"
 #include "diag.h"
 #include <unicode/ucol.h>
+#include <trivia/config.h>
 
 enum {
 	MAX_HASH_BUFFER = 1024,
@@ -50,8 +51,17 @@ coll_icu_cmp(const char *s, size_t slen, const char *t, size_t tlen,
 	assert(coll->icu.collator != NULL);
 
 	UErrorCode status = U_ZERO_ERROR;
+
+#ifdef HAVE_ICU_STRCOLLUTF8
 	UCollationResult result = ucol_strcollUTF8(coll->icu.collator,
 						   s, slen, t, tlen, &status);
+#else
+	UCharIterator s_iter, t_iter;
+	uiter_setUTF8(&s_iter, s, slen);
+	uiter_setUTF8(&t_iter, t, tlen);
+	UCollationResult result = ucol_strcollIter(coll->icu.collator,
+						   &s_iter, &t_iter, &status);
+#endif
 	assert(!U_FAILURE(status));
 	return (int)result;
 }

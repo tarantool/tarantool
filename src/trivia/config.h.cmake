@@ -194,6 +194,11 @@
 #cmakedefine HAVE_GETPROGNAME 1
 
 /*
+ * Defined if ICU library has ucol_strcollUTF8 method.
+ */
+#cmakedefine HAVE_ICU_STRCOLLUTF8 1
+
+/*
 * Defined if systemd is enabled
  */
 #cmakedefine WITH_SYSTEMD 1

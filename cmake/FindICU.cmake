@@ -37,3 +37,18 @@ set(ICU_INCLUDE_DIRS ${ICU_INCLUDE_DIR})
 set(ICU_LIBRARIES ${ICU_LIBRARY_I18N} ${ICU_LIBRARY_UC})
 mark_as_advanced(ICU_INCLUDE_DIR ICU_INCLUDE_DIRS
         ICU_LIBRARY_I18N ICU_LIBRARY_UC ICU_LIBRARIES)
+
+#
+# Check presence of ucol_strcollUTF8 function from ICU
+#
+set(CMAKE_REQUIRED_LIBRARIES ${ICU_LIBRARIES})
+set(CMAKE_REQUIRED_INCLUDES ${ICU_INCLUDE_DIRS})
+set(CMAKE_REQUIRED_FLAGS "-std=c++11")
+set(CMAKE_REQUIRED_DEFINITIONS "")
+check_cxx_source_compiles("#include <unicode/ucol.h>
+int main(void) {
+    return (int)ucol_strcollUTF8(0, 0, 0, 0, 0, 0);
+}" HAVE_ICU_STRCOLLUTF8)
+set(CMAKE_REQUIRED_LIBRARIES "")
+set(CMAKE_REQUIRED_INCLUDES "")
+set(CMAKE_REQUIRED_FLAGS "")
