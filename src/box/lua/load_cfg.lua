@@ -342,13 +342,6 @@ for k, v in pairs(box) do
     end
 end
 
-setmetatable(box, {
-    __index = function(table, index)
-        error(debug.traceback("Please call box.cfg{} first"))
-        error("Please call box.cfg{} first")
-     end
-})
-
 local function load_cfg(cfg)
     box.internal.schema.init()
     cfg = upgrade_cfg(cfg, translate_cfg)
@@ -388,6 +381,13 @@ local function load_cfg(cfg)
     end
 end
 box.cfg = load_cfg
+
+setmetatable(box, {
+    __index = function(table, index)
+        load_cfg()
+        return rawget(table, index)
+     end
+})
 
 -- gh-810:
 -- hack luajit default cpath
