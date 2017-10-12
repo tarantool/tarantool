@@ -300,7 +300,7 @@ local function rocks_loader_func(lib)
         if not file then
             return err
         end
-        local loaded, err = load_func(name, file)
+        local loaded, err = load_func(file, name)
         if err == nil then
             return loaded
         else

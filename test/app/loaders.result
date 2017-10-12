@@ -125,10 +125,10 @@ fio.chdir(pr2_dir)
 ---
 - true
 ...
-rocks_loader = package.loaders[3]
+rocks_loader = package.loaders[4]
 ---
 ...
-rocks_loader_dyn = package.loaders[6]
+rocks_loader_dyn = package.loaders[5]
 ---
 ...
 f = rocks_loader("loaders")
