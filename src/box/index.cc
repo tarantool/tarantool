@@ -42,10 +42,9 @@
 /* {{{ Utilities. **********************************************/
 
 UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
-	unsigned line, struct index *index, const char *what)
+	unsigned line, struct index_def *index_def, const char *what)
 	: ClientError(file, line, ER_UNKNOWN)
 {
-	struct index_def *index_def = index->def;
 	struct space *space = space_cache_find(index_def->space_id);
 	m_errcode = ER_UNSUPPORTED_INDEX_FEATURE;
 	error_format_msg(this, tnt_errcode_desc(m_errcode), index_def->name,
@@ -157,130 +156,6 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 	}
 }
 
-/* }}} */
-
-/* {{{ Index -- base class for all indexes. ********************/
-
-index::index(struct index_def *index_def_arg)
-	:def(NULL), schema_version(::schema_version), m_position(NULL)
-{
-	def = index_def_dup(index_def_arg);
-	if (def == NULL)
-		diag_raise();
-}
-
-index::~index()
-{
-	if (m_position != NULL)
-		m_position->free(m_position);
-	index_def_delete(def);
-}
-
-void
-index::commitCreate(int64_t /* signature */)
-{
-}
-
-void
-index::commitDrop()
-{
-}
-
-size_t
-index::size()
-{
-	tnt_raise(UnsupportedIndexFeature, this, "size()");
-	return 0;
-}
-
-struct tuple *
-index::min(const char* /* key */, uint32_t /* part_count */)
-{
-	tnt_raise(UnsupportedIndexFeature, this, "min()");
-	return NULL;
-}
-
-struct tuple *
-index::max(const char* /* key */, uint32_t /* part_count */)
-{
-	tnt_raise(UnsupportedIndexFeature, this, "max()");
-	return NULL;
-}
-
-struct tuple *
-index::random(uint32_t rnd)
-{
-	(void) rnd;
-	tnt_raise(UnsupportedIndexFeature, this, "random()");
-	return NULL;
-}
-
-size_t
-index::count(enum iterator_type /* type */, const char* /* key */,
-             uint32_t /* part_count */)
-{
-	tnt_raise(UnsupportedIndexFeature, this, "count()");
-	return 0;
-}
-
-struct tuple *
-index::findByKey(const char *key, uint32_t part_count)
-{
-	(void) key;
-	(void) part_count;
-	tnt_raise(UnsupportedIndexFeature, this, "findByKey()");
-	return NULL;
-}
-
-struct tuple *
-index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-		     enum dup_replace_mode mode)
-{
-	(void) old_tuple;
-	(void) new_tuple;
-	(void) mode;
-	tnt_raise(UnsupportedIndexFeature, this, "replace()");
-	return NULL;
-}
-
-size_t
-index::bsize()
-{
-	return 0;
-}
-
-/**
- * Create an ALL iterator with personal read view so further
- * index modifications will not affect the iteration results.
- * Must be destroyed by iterator->free after usage.
- */
-struct snapshot_iterator *
-index::createSnapshotIterator()
-{
-	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
-}
-
-void
-index::beginBuild()
-{
-}
-
-void
-index::reserve(uint32_t /* size_hint */)
-{
-}
-
-void
-index::buildNext(struct tuple *tuple)
-{
-	replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-index::endBuild()
-{
-}
-
 static inline struct index *
 check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 {
@@ -296,6 +171,10 @@ tuple_bless_null_xc(struct tuple *tuple)
 		return tuple_bless_xc(tuple);
 	return NULL;
 }
+
+/* }}} */
+
+/* {{{ Public API */
 
 ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)
@@ -380,7 +259,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		struct index *index = check_index(space_id, index_id, &space);
 		if (index->def->type != TREE) {
 			/* Show nice error messages in Lua */
-			tnt_raise(UnsupportedIndexFeature, index, "min()");
+			tnt_raise(UnsupportedIndexFeature, index->def, "min()");
 		}
 		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->def, ITER_GE, key, part_count))
@@ -408,7 +287,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		struct index *index = check_index(space_id, index_id, &space);
 		if (index->def->type != TREE) {
 			/* Show nice error messages in Lua */
-			tnt_raise(UnsupportedIndexFeature, index, "max()");
+			tnt_raise(UnsupportedIndexFeature, index->def, "max()");
 		}
 		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->def, ITER_LE, key, part_count))
@@ -530,13 +409,6 @@ box_iterator_free(box_iterator_t *it)
 
 /* {{{ Introspection */
 
-void
-index::info(struct info_handler *info)
-{
-	info_begin(info);
-	info_end(info);
-}
-
 int
 box_index_info(uint32_t space_id, uint32_t index_id,
 	       struct info_handler *info)
@@ -552,6 +424,32 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 }
 
 /* }}} */
+
+/* {{{ Internal API */
+
+int
+index_create(struct index *index, const struct index_vtab *vtab,
+	     struct index_def *def)
+{
+	def = index_def_dup(def);
+	if (def == NULL)
+		return -1;
+
+	index->vtab = vtab;
+	index->def = def;
+	index->schema_version = schema_version;
+	index->position = NULL;
+	return 0;
+}
+
+void
+index_delete(struct index *index)
+{
+	if (index->position != NULL)
+		index->position->free(index->position);
+	index_def_delete(index->def);
+	index->vtab->destroy(index);
+}
 
 void
 index_build(struct index *index, struct index *pk)
@@ -576,3 +474,115 @@ index_build(struct index *index, struct index *pk)
 
 	index_end_build(index);
 }
+
+/* }}} */
+
+/* {{{ Virtual method stubs */
+
+void
+generic_index_commit_create(struct index *, int64_t)
+{
+}
+
+void
+generic_index_commit_drop(struct index *)
+{
+}
+
+size_t
+generic_index_size(struct index *index)
+{
+	tnt_raise(UnsupportedIndexFeature, index->def, "size()");
+	return 0;
+}
+
+struct tuple *
+generic_index_min(struct index *index, const char *key, uint32_t part_count)
+{
+	(void)key;
+	(void)part_count;
+	tnt_raise(UnsupportedIndexFeature, index->def, "min()");
+}
+
+struct tuple *
+generic_index_max(struct index *index, const char *key, uint32_t part_count)
+{
+	(void)key;
+	(void)part_count;
+	tnt_raise(UnsupportedIndexFeature, index->def, "max()");
+}
+
+struct tuple *
+generic_index_random(struct index *index, uint32_t rnd)
+{
+	(void)rnd;
+	tnt_raise(UnsupportedIndexFeature, index->def, "random()");
+}
+
+size_t
+generic_index_count(struct index *index, enum iterator_type type,
+		    const char *key, uint32_t part_count)
+{
+	(void)type;
+	(void)key;
+	(void)part_count;
+	tnt_raise(UnsupportedIndexFeature, index->def, "count()");
+}
+
+struct tuple *
+generic_index_get(struct index *index,
+		   const char *key, uint32_t part_count)
+{
+	(void)key;
+	(void)part_count;
+	tnt_raise(UnsupportedIndexFeature, index->def, "get()");
+}
+
+struct tuple *
+generic_index_replace(struct index *index,
+		      struct tuple *old_tuple,
+		      struct tuple *new_tuple,
+		      enum dup_replace_mode mode)
+{
+	(void)old_tuple;
+	(void)new_tuple;
+	(void)mode;
+	tnt_raise(UnsupportedIndexFeature, index->def, "replace()");
+}
+
+struct snapshot_iterator *
+generic_index_create_snapshot_iterator(struct index *index)
+{
+	tnt_raise(UnsupportedIndexFeature, index->def, "consistent read view");
+}
+
+void
+generic_index_info(struct index *index, struct info_handler *handler)
+{
+	(void)index;
+	info_begin(handler);
+	info_end(handler);
+}
+
+void
+generic_index_begin_build(struct index *)
+{
+}
+
+void
+generic_index_reserve(struct index *, uint32_t)
+{
+}
+
+void
+generic_index_build_next(struct index *index, struct tuple *tuple)
+{
+	index_replace_xc(index, NULL, tuple, DUP_INSERT);
+}
+
+void
+generic_index_end_build(struct index *)
+{
+}
+
+/* }}} */

@@ -43,40 +43,17 @@ struct matras;
 struct mh_bitset_index_t;
 #endif /*#ifndef OLD_GOOD_BITSET*/
 
-class MemtxBitset: public index {
-public:
-	MemtxBitset(struct index_def *index_def);
-	virtual ~MemtxBitset() override;
-	virtual size_t size() override;
-	virtual struct tuple *min(const char *key,
-				  uint32_t part_count) override;
-	virtual struct tuple *max(const char *key,
-				  uint32_t part_count) override;
-	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) override;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode) override;
-
-	virtual size_t bsize() override;
-	virtual struct iterator *allocIterator() override;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key,
-				  uint32_t part_count) override;
+struct memtx_bitset_index {
+	struct index base;
+	struct bitset_index index;
 #ifndef OLD_GOOD_BITSET
-	void registerTuple(struct tuple *tuple);
-	void unregisterTuple(struct tuple *tuple);
-	uint32_t tupleToValue(struct tuple *tuple);
-	struct tuple *valueToTuple(uint32_t value);
-#endif /*#ifndef OLD_GOOD_BITSET*/
-private:
-	struct bitset_index m_index;
-#ifndef OLD_GOOD_BITSET
-	struct matras *m_id_to_tuple;
-	struct mh_bitset_index_t *m_tuple_to_id;
-	uint32_t m_spare_id;
+	struct matras *id_to_tuple;
+	struct mh_bitset_index_t *tuple_to_id;
+	uint32_t spare_id;
 #endif /*#ifndef OLD_GOOD_BITSET*/
 };
+
+struct memtx_bitset_index *
+memtx_bitset_index_new(struct index_def *);
 
 #endif /* TARANTOOL_BOX_MEMTX_BITSET_H_INCLUDED */

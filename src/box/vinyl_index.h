@@ -34,56 +34,18 @@
 
 struct vy_index;
 struct vy_env;
-struct field_def;
 
-/**
- * C++ wrapper for struct vy_index.
- */
-struct VinylIndex: public index
-{
-public:
-	VinylIndex(struct vy_env *env, struct index_def *index_def,
-		   struct tuple_format *format, struct vy_index *pk);
-	virtual ~VinylIndex() override;
-
-	/**
-	 * Open this vinyl index. Called on index creation
-	 * before WAL write. May throw an exception.
-	 */
-	void open();
-
-	virtual void commitCreate(int64_t signature) override;
-	virtual void commitDrop() override;
-
-	virtual struct tuple*
-	findByKey(const char *key, uint32_t) override;
-
-	virtual struct iterator*
-	allocIterator() override;
-
-	virtual void
-	initIterator(struct iterator *iterator,
-		     enum iterator_type type,
-		     const char *key, uint32_t part_count) override;
-
-	virtual size_t
-	bsize() override;
-
-	virtual struct tuple *
-	min(const char *key, uint32_t part_count) override;
-
-	virtual struct tuple *
-	max(const char *key, uint32_t part_count) override;
-
-	virtual size_t
-	count(enum iterator_type type, const char *key, uint32_t part_count)
-		override;
-
-	virtual void
-	info(struct info_handler *handler) override;
-
+struct vinyl_index {
+	struct index base;
 	struct vy_env *env;
 	struct vy_index *db;
 };
+
+struct vinyl_index *
+vinyl_index_new(struct vy_env *env, struct index_def *def,
+		struct tuple_format *format, struct vy_index *pk);
+
+void
+vinyl_index_open(struct vinyl_index *index);
 
 #endif /* TARANTOOL_BOX_VINYL_INDEX_H_INCLUDED */

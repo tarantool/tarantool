@@ -65,7 +65,7 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 	*ret = NULL;
 	if (it->source->schema_version != schema_version)
 		return 0; /* invalidate iterator */
-	class SysviewIndex *index = (class SysviewIndex *) iterator->index;
+	struct sysview_index *index = (struct sysview_index *)iterator->index;
 	int rc;
 	while ((rc = it->source->next(it->source, ret)) == 0 && *ret != NULL) {
 		if (index->filter(it->space, *ret))
@@ -74,39 +74,41 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 	return rc;
 }
 
-SysviewIndex::SysviewIndex(struct index_def *index_def, uint32_t source_space_id,
-		     uint32_t source_index_id, sysview_filter_f filter)
-	: index(index_def), source_space_id(source_space_id),
-	  source_index_id(source_index_id), filter(filter)
+static void
+sysview_index_destroy(struct index *index)
 {
+	free(index);
 }
 
-SysviewIndex::~SysviewIndex()
+static size_t
+sysview_index_bsize(struct index *)
 {
+	return 0;
 }
 
-struct iterator *
-SysviewIndex::allocIterator()
+static struct iterator *
+sysview_index_alloc_iterator(void)
 {
 	struct sysview_iterator *it = (struct sysview_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(OutOfMemory, sizeof(struct sysview_iterator),
-			  "SysviewIndex", "iterator");
+			  "malloc", "struct sysview_iterator");
 	}
 	it->base.free = sysview_iterator_free;
 	return (struct iterator *) it;
 }
 
-void
-SysviewIndex::initIterator(struct iterator *iterator,
-			   enum iterator_type type,
-			   const char *key, uint32_t part_count)
+static void
+sysview_index_init_iterator(struct index *base, struct iterator *iterator,
+			    enum iterator_type type,
+			    const char *key, uint32_t part_count)
 {
 	assert(iterator->free == sysview_iterator_free);
+	struct sysview_index *index = (struct sysview_index *)base;
 	struct sysview_iterator *it = sysview_iterator(iterator);
-	struct space *source = space_cache_find(source_space_id);
-	struct index *pk = index_find_xc(source, source_index_id);
+	struct space *source = space_cache_find(index->source_space_id);
+	struct index *pk = index_find_xc(source, index->source_index_id);
 	/*
 	 * Explicitly validate that key matches source's index_def.
 	 * It is possible to change a source space without changing
@@ -115,34 +117,59 @@ SysviewIndex::initIterator(struct iterator *iterator,
 	if (key_validate(pk->def, type, key, part_count))
 		diag_raise();
 	/* Re-allocate iterator if schema was changed */
-	if (it->source != NULL && it->source->schema_version != ::schema_version) {
+	if (it->source != NULL &&
+	    it->source->schema_version != schema_version) {
 		it->source->free(it->source);
 		it->source = NULL;
 	}
 	if (it->source == NULL) {
 		it->source = index_alloc_iterator_xc(pk);
-		it->source->schema_version = ::schema_version;
+		it->source->schema_version = schema_version;
 	}
 	index_init_iterator_xc(pk, it->source, type, key, part_count);
-	iterator->index = (struct index *) this;
+	iterator->index = (struct index *) index;
 	iterator->next = sysview_iterator_next;
 	it->space = source;
 }
 
-struct tuple *
-SysviewIndex::findByKey(const char *key, uint32_t part_count)
+static struct tuple *
+sysview_index_get(struct index *base, const char *key, uint32_t part_count)
 {
-	struct space *source = space_cache_find(source_space_id);
-	struct index *pk = index_find_xc(source, source_index_id);
+	struct sysview_index *index = (struct sysview_index *)base;
+	struct space *source = space_cache_find(index->source_space_id);
+	struct index *pk = index_find_xc(source, index->source_index_id);
 	if (!pk->def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		diag_raise();
 	struct tuple *tuple = index_get_xc(pk, key, part_count);
-	if (tuple == NULL || !filter(source, tuple))
+	if (tuple == NULL || !index->filter(source, tuple))
 		return NULL;
 	return tuple;
 }
+
+static const struct index_vtab sysview_index_vtab = {
+	/* .destroy = */ sysview_index_destroy,
+	/* .commit_create = */ generic_index_commit_create,
+	/* .commit_drop = */ generic_index_commit_drop,
+	/* .size = */ generic_index_size,
+	/* .bsize = */ sysview_index_bsize,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ generic_index_count,
+	/* .get = */ sysview_index_get,
+	/* .replace = */ generic_index_replace,
+	/* .alloc_iterator = */ sysview_index_alloc_iterator,
+	/* .init_iterator = */ sysview_index_init_iterator,
+	/* .create_snapshot_iterator = */
+		generic_index_create_snapshot_iterator,
+	/* .info = */ generic_index_info,
+	/* .begin_build = */ generic_index_begin_build,
+	/* .reserve = */ generic_index_reserve,
+	/* .build_next = */ generic_index_build_next,
+	/* .end_build = */ generic_index_end_build,
+};
 
 static bool
 vspace_filter(struct space *source, struct tuple *tuple)
@@ -160,16 +187,6 @@ vspace_filter(struct space *source, struct tuple *tuple)
 		space->def->uid == cr->uid);
 }
 
-SysviewVspaceIndex::SysviewVspaceIndex(struct index_def *index_def)
-	: SysviewIndex(index_def, BOX_SPACE_ID, index_def->iid, vspace_filter)
-{
-}
-
-SysviewVindexIndex::SysviewVindexIndex(struct index_def *index_def)
-	: SysviewIndex(index_def, BOX_INDEX_ID, index_def->iid, vspace_filter)
-{
-}
-
 static bool
 vuser_filter(struct space *source, struct tuple *tuple)
 {
@@ -184,11 +201,6 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	return uid == cr->uid || owner_id == cr->uid;
 }
 
-SysviewVuserIndex::SysviewVuserIndex(struct index_def *index_def)
-	: SysviewIndex(index_def, BOX_USER_ID, index_def->iid, vuser_filter)
-{
-}
-
 static bool
 vpriv_filter(struct space *source, struct tuple *tuple)
 {
@@ -201,11 +213,6 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 	uint32_t grantor_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_ID);
 	uint32_t grantee_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_UID);
 	return grantor_id == cr->uid || grantee_id == cr->uid;
-}
-
-SysviewVprivIndex::SysviewVprivIndex(struct index_def *index_def)
-	: SysviewIndex(index_def, BOX_PRIV_ID, index_def->iid, vpriv_filter)
-{
 }
 
 static bool
@@ -227,7 +234,60 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	return false;
 }
 
-SysviewVfuncIndex::SysviewVfuncIndex(struct index_def *index_def)
-	: SysviewIndex(index_def, BOX_FUNC_ID, index_def->iid, vfunc_filter)
+struct sysview_index *
+sysview_index_new(struct index_def *def, const char *space_name)
 {
+	assert(def->type == TREE);
+
+	uint32_t source_space_id;
+	uint32_t source_index_id;
+	sysview_filter_f filter;
+
+	switch (def->space_id) {
+	case BOX_VSPACE_ID:
+		source_space_id = BOX_SPACE_ID;
+		source_index_id = def->iid;
+		filter = vspace_filter;
+		break;
+	case BOX_VINDEX_ID:
+		source_space_id = BOX_INDEX_ID;
+		source_index_id = def->iid;
+		filter = vspace_filter;
+		break;
+	case BOX_VUSER_ID:
+		source_space_id = BOX_USER_ID;
+		source_index_id = def->iid;
+		filter = vuser_filter;
+		break;
+	case BOX_VFUNC_ID:
+		source_space_id = BOX_FUNC_ID;
+		source_index_id = def->iid;
+		filter = vfunc_filter;
+		break;
+	case BOX_VPRIV_ID:
+		source_space_id = BOX_PRIV_ID;
+		source_index_id = def->iid;
+		filter = vpriv_filter;
+		break;
+	default:
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  def->name, space_name,
+			  "unknown space for system view");
+	}
+
+	struct sysview_index *index =
+		(struct sysview_index *)calloc(1, sizeof(*index));
+	if (index == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*index),
+			  "malloc", "struct sysview_index");
+	}
+	if (index_create(&index->base, &sysview_index_vtab, def) != 0) {
+		free(index);
+		diag_raise();
+	}
+
+	index->source_space_id = source_space_id;
+	index->source_index_id = source_index_id;
+	index->filter = filter;
+	return index;
 }

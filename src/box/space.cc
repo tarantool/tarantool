@@ -137,7 +137,7 @@ space_delete(struct space *space)
 			     j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
 		if (index)
-			delete index;
+			index_delete(index);
 	}
 	free(space->index_map);
 	if (space->format != NULL)

@@ -68,56 +68,60 @@ enum {
 	SPARE_ID_END = 0xFFFFFFFF
 };
 
-void
-MemtxBitset::registerTuple(struct tuple *tuple)
+static void
+memtx_bitset_index_register_tuple(struct memtx_bitset_index *index,
+				  struct tuple *tuple)
 {
 	uint32_t id;
 	struct tuple **place;
-	if (m_spare_id != SPARE_ID_END) {
-		id = m_spare_id;
-		void *mem = matras_get(m_id_to_tuple, id);
-		m_spare_id = *(uint32_t *)mem;
+	if (index->spare_id != SPARE_ID_END) {
+		id = index->spare_id;
+		void *mem = matras_get(index->id_to_tuple, id);
+		index->spare_id = *(uint32_t *)mem;
 		place = (struct tuple **)mem;
 	} else {
-		place = (struct tuple **)matras_alloc(m_id_to_tuple, &id);
+		place = (struct tuple **)matras_alloc(index->id_to_tuple, &id);
 	}
 	*place = tuple;
 
 	struct bitset_hash_entry entry;
 	entry.id = id;
 	entry.tuple = tuple;
-	uint32_t pos = mh_bitset_index_put(m_tuple_to_id, &entry, 0, 0);
-	if (pos == mh_end(m_tuple_to_id)) {
-		*(uint32_t *)tuple = m_spare_id;
-		m_spare_id = id;
+	uint32_t pos = mh_bitset_index_put(index->tuple_to_id, &entry, 0, 0);
+	if (pos == mh_end(index->tuple_to_id)) {
+		*(uint32_t *)tuple = index->spare_id;
+		index->spare_id = id;
 		tnt_raise(OutOfMemory, (ssize_t) pos, "hash", "key");
 	}
 }
 
-void
-MemtxBitset::unregisterTuple(struct tuple *tuple)
+static void
+memtx_bitset_index_unregister_tuple(struct memtx_bitset_index *index,
+				    struct tuple *tuple)
 {
 
-	uint32_t k = mh_bitset_index_find(m_tuple_to_id, tuple, 0);
-	struct bitset_hash_entry *e = mh_bitset_index_node(m_tuple_to_id, k);
-	void *mem = matras_get(m_id_to_tuple, e->id);
-	*(uint32_t *)mem = m_spare_id;
-	m_spare_id = e->id;
-	mh_bitset_index_del(m_tuple_to_id, k, 0);
+	uint32_t k = mh_bitset_index_find(index->tuple_to_id, tuple, 0);
+	struct bitset_hash_entry *e = mh_bitset_index_node(index->tuple_to_id, k);
+	void *mem = matras_get(index->id_to_tuple, e->id);
+	*(uint32_t *)mem = index->spare_id;
+	index->spare_id = e->id;
+	mh_bitset_index_del(index->tuple_to_id, k, 0);
 }
 
-uint32_t
-MemtxBitset::tupleToValue(struct tuple *tuple)
+static uint32_t
+memtx_bitset_index_tuple_to_value(struct memtx_bitset_index *index,
+				  struct tuple *tuple)
 {
-	uint32_t k = mh_bitset_index_find(m_tuple_to_id, tuple, 0);
-	struct bitset_hash_entry *e = mh_bitset_index_node(m_tuple_to_id, k);
+	uint32_t k = mh_bitset_index_find(index->tuple_to_id, tuple, 0);
+	struct bitset_hash_entry *e = mh_bitset_index_node(index->tuple_to_id, k);
 	return e->id;
 }
 
-struct tuple *
-MemtxBitset::valueToTuple(uint32_t value)
+static struct tuple *
+memtx_bitset_index_value_to_tuple(struct memtx_bitset_index *index,
+				  uint32_t value)
 {
-	void *mem = matras_get(m_id_to_tuple, value);
+	void *mem = matras_get(index->id_to_tuple, value);
 	return *(struct tuple **)mem;
 }
 #else /* #ifndef OLD_GOOD_BITSET */
@@ -149,7 +153,7 @@ struct bitset_index_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct bitset_iterator bitset_it;
 #ifndef OLD_GOOD_BITSET
-	class MemtxBitset *bitset_index;
+	struct memtx_bitset_index *bitset_index;
 #endif /* #ifndef OLD_GOOD_BITSET */
 };
 
@@ -182,64 +186,48 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 	}
 
 #ifndef OLD_GOOD_BITSET
-	*ret = it->bitset_index->valueToTuple((uint32_t)value);
+	*ret = memtx_bitset_index_value_to_tuple(it->bitset_index, value);
 #else /* #ifndef OLD_GOOD_BITSET */
 	*ret = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
 	return 0;
 }
 
-MemtxBitset::MemtxBitset(struct index_def *index_def_arg)
-	: index(index_def_arg)
+static void
+memtx_bitset_index_destroy(struct index *base)
 {
-	assert(!this->def->opts.is_unique);
-
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	bitset_index_destroy(&index->index);
 #ifndef OLD_GOOD_BITSET
-	m_spare_id = SPARE_ID_END;
-	m_id_to_tuple = (struct matras *)malloc(sizeof(*m_id_to_tuple));
-	if (!m_id_to_tuple)
-		panic("failed to allocate memtx bitset index");
-	matras_create(m_id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
-		      memtx_index_extent_alloc, memtx_index_extent_free, NULL);
-
-	m_tuple_to_id = mh_bitset_index_new();
-	if (!m_tuple_to_id)
-		panic("failed to allocate memtx bitset index");
+	mh_bitset_index_delete(index->tuple_to_id);
+	matras_destroy(index->id_to_tuple);
+	free(index->id_to_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-	bitset_index_create(&m_index, realloc);
-
+	free(index);
 }
 
-MemtxBitset::~MemtxBitset()
+static size_t
+memtx_bitset_index_size(struct index *base)
 {
-	bitset_index_destroy(&m_index);
-#ifndef OLD_GOOD_BITSET
-	mh_bitset_index_delete(m_tuple_to_id);
-	matras_destroy(m_id_to_tuple);
-	free(m_id_to_tuple);
-#endif /* #ifndef OLD_GOOD_BITSET */
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	return bitset_index_size(&index->index);
 }
 
-size_t
-MemtxBitset::size()
+static size_t
+memtx_bitset_index_bsize(struct index *base)
 {
-	return bitset_index_size(&m_index);
-}
-
-size_t
-MemtxBitset::bsize()
-{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 	size_t result = 0;
-	result += bitset_index_bsize(&m_index);
+	result += bitset_index_bsize(&index->index);
 #ifndef OLD_GOOD_BITSET
-	result += matras_extent_count(m_id_to_tuple) * MEMTX_EXTENT_SIZE;
-	result += mh_bitset_index_memsize(m_tuple_to_id);
+	result += matras_extent_count(index->id_to_tuple) * MEMTX_EXTENT_SIZE;
+	result += mh_bitset_index_memsize(index->tuple_to_id);
 #endif /* #ifndef OLD_GOOD_BITSET */
 	return result;
 }
 
-struct iterator *
-MemtxBitset::allocIterator()
+static struct iterator *
+memtx_bitset_index_alloc_iterator(void)
 {
 	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
 			malloc(sizeof(*it));
@@ -249,12 +237,6 @@ MemtxBitset::allocIterator()
 	memset(it, 0, sizeof(*it));
 	it->base.next = bitset_index_iterator_next;
 	it->base.free = bitset_index_iterator_free;
-
-	bitset_iterator_create(&it->bitset_it, realloc);
-#ifndef OLD_GOOD_BITSET
-	it->bitset_index = this;
-#endif
-
 	return (struct iterator *) it;
 }
 
@@ -278,11 +260,13 @@ make_key(const char *field, uint32_t *key_len)
 	}
 }
 
-struct tuple *
-MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-		     enum dup_replace_mode mode)
+static struct tuple *
+memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
+			   struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	assert(!def->opts.is_unique);
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+
+	assert(!base->def->opts.is_unique);
 	assert(old_tuple != NULL || new_tuple != NULL);
 	(void) mode;
 
@@ -290,56 +274,59 @@ MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 	if (old_tuple != NULL) {
 #ifndef OLD_GOOD_BITSET
-		uint32_t value = tupleToValue(old_tuple);
+		uint32_t value = memtx_bitset_index_tuple_to_value(index, old_tuple);
 #else /* #ifndef OLD_GOOD_BITSET */
 		size_t value = tuple_to_value(old_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		if (bitset_index_contains_value(&m_index, (size_t)value)) {
+		if (bitset_index_contains_value(&index->index, (size_t)value)) {
 			ret = old_tuple;
 
 			assert(old_tuple != new_tuple);
-			bitset_index_remove_value(&m_index, value);
+			bitset_index_remove_value(&index->index, value);
 #ifndef OLD_GOOD_BITSET
-			unregisterTuple(old_tuple);
+			memtx_bitset_index_unregister_tuple(index, old_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
 		}
 	}
 
 	if (new_tuple != NULL) {
 		const char *field;
-		field = tuple_field(new_tuple, def->key_def->parts[0].fieldno);
+		field = tuple_field(new_tuple, base->def->key_def->parts[0].fieldno);
 		uint32_t key_len;
 		const void *key = make_key(field, &key_len);
 #ifndef OLD_GOOD_BITSET
-		registerTuple(new_tuple);
-		uint32_t value = tupleToValue(new_tuple);
+		memtx_bitset_index_register_tuple(index, new_tuple);
+		uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
 #else /* #ifndef OLD_GOOD_BITSET */
 		uint32_t value = tuple_to_value(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		if (bitset_index_insert(&m_index, key, key_len, value) < 0) {
+		if (bitset_index_insert(&index->index, key, key_len, value) < 0) {
 #ifndef OLD_GOOD_BITSET
-			unregisterTuple(new_tuple);
+			memtx_bitset_index_unregister_tuple(index, new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-			tnt_raise(OutOfMemory, 0, "MemtxBitset", "insert");
+			tnt_raise(OutOfMemory, 0, "memtx_bitset_index", "insert");
 		}
 	}
 
 	return ret;
 }
 
-void
-MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
-			  const char *key, uint32_t part_count)
+static void
+memtx_bitset_index_init_iterator(struct index *base, struct iterator *iterator,
+				 enum iterator_type type,
+				 const char *key, uint32_t part_count)
 {
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+
 	assert(iterator->free == bitset_index_iterator_free);
 	assert(part_count == 0 || key != NULL);
 	(void) part_count;
 
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+	bitset_iterator_create(&it->bitset_it, realloc);
 #ifndef OLD_GOOD_BITSET
-	assert(it->bitset_index == this);
-#endif /* #ifndef OLD_GOOD_BITSET */
-
+	it->bitset_index = index;
+#endif
 	const void *bitset_key = NULL;
 	uint32_t bitset_key_size = 0;
 
@@ -373,19 +360,19 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 						       bitset_key_size);
 			break;
 		default:
-			tnt_raise(UnsupportedIndexFeature, this,
+			tnt_raise(UnsupportedIndexFeature, base->def,
 				  "requested iterator type");
 		}
 
 		if (rc != 0) {
-			tnt_raise(OutOfMemory, 0, "MemtxBitset",
+			tnt_raise(OutOfMemory, 0, "memtx_bitset_index",
 				  "iterator expression");
 		}
 
-		if (bitset_index_init_iterator((bitset_index *) &m_index,
+		if (bitset_index_init_iterator((bitset_index *)&index->index,
 					       &it->bitset_it,
 					       &expr) != 0) {
-			tnt_raise(OutOfMemory, 0, "MemtxBitset",
+			tnt_raise(OutOfMemory, 0, "memtx_bitset_index",
 				  "iterator state");
 		}
 
@@ -396,24 +383,14 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 	}
 }
 
-struct tuple *
-MemtxBitset::min(const char *key, uint32_t part_count)
+static size_t
+memtx_bitset_index_count(struct index *base, enum iterator_type type,
+			 const char *key, uint32_t part_count)
 {
-	return memtx_index_min(this, key, part_count);
-}
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
-struct tuple *
-MemtxBitset::max(const char *key, uint32_t part_count)
-{
-	return memtx_index_max(this, key, part_count);
-}
-
-size_t
-MemtxBitset::count(enum iterator_type type, const char *key,
-		   uint32_t part_count)
-{
 	if (type == ITER_ALL)
-		return bitset_index_size(&m_index);
+		return bitset_index_size(&index->index);
 
 	assert(part_count == 1); /* checked by key_validate() */
 	uint32_t bitset_key_size = 0;
@@ -433,7 +410,7 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 		 * bitset_index_count().
 		 */
 		if (bit_iterator_next(&bit_it) == SIZE_MAX)
-			return bitset_index_count(&m_index, bit);
+			return bitset_index_count(&index->index, bit);
 	} else if (type == ITER_BITS_ALL_SET) {
 		/**
 		 * Optimization: for an empty key return 0.
@@ -447,7 +424,7 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 		 * bitset_index_count().
 		 */
 		if (bit_iterator_next(&bit_it) == SIZE_MAX)
-			return bitset_index_count(&m_index, bit);
+			return bitset_index_count(&index->index, bit);
 	} else if (type == ITER_BITS_ALL_NOT_SET) {
 		/**
 		 * Optimization: for an empty key return the number of items
@@ -456,15 +433,74 @@ MemtxBitset::count(enum iterator_type type, const char *key,
 		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
 		bit = bit_iterator_next(&bit_it);
 		if (bit == SIZE_MAX)
-			return bitset_index_size(&m_index);
+			return bitset_index_size(&index->index);
 		/**
 		 * Optimiation: for the single bit key use
 		 * bitset_index_count().
 		 */
 		if (bit_iterator_next(&bit_it) == SIZE_MAX)
-			return bitset_index_size(&m_index) - bitset_index_count(&m_index, bit);
+			return bitset_index_size(&index->index) -
+				bitset_index_count(&index->index, bit);
 	}
 
 	/* Call generic method */
-	return memtx_index_count(this, type, key, part_count);
+	return memtx_index_count(base, type, key, part_count);
+}
+
+static const struct index_vtab memtx_bitset_index_vtab = {
+	/* .destroy = */ memtx_bitset_index_destroy,
+	/* .commit_create = */ generic_index_commit_create,
+	/* .commit_drop = */ generic_index_commit_drop,
+	/* .size = */ memtx_bitset_index_size,
+	/* .bsize = */ memtx_bitset_index_bsize,
+	/* .min = */ memtx_index_min,
+	/* .max = */ memtx_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ memtx_bitset_index_count,
+	/* .get = */ generic_index_get,
+	/* .replace = */ memtx_bitset_index_replace,
+	/* .alloc_iterator = */ memtx_bitset_index_alloc_iterator,
+	/* .init_iterator = */ memtx_bitset_index_init_iterator,
+	/* .create_snapshot_iterator = */
+		generic_index_create_snapshot_iterator,
+	/* .info = */ generic_index_info,
+	/* .begin_build = */ generic_index_begin_build,
+	/* .reserve = */ generic_index_reserve,
+	/* .build_next = */ generic_index_build_next,
+	/* .end_build = */ generic_index_end_build,
+};
+
+struct memtx_bitset_index *
+memtx_bitset_index_new(struct index_def *def)
+{
+	assert(!def->opts.is_unique);
+
+	memtx_index_arena_init();
+
+	struct memtx_bitset_index *index =
+		(struct memtx_bitset_index *)calloc(1, sizeof(*index));
+	if (index == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*index),
+			  "malloc", "struct memtx_bitset_index");
+	}
+	if (index_create(&index->base, &memtx_bitset_index_vtab, def) != 0) {
+		free(index);
+		diag_raise();
+	}
+
+#ifndef OLD_GOOD_BITSET
+	index->spare_id = SPARE_ID_END;
+	index->id_to_tuple = (struct matras *)malloc(sizeof(*index->id_to_tuple));
+	if (index->id_to_tuple == NULL)
+		panic("failed to allocate memtx bitset index");
+	matras_create(index->id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
+		      memtx_index_extent_alloc, memtx_index_extent_free, NULL);
+
+	index->tuple_to_id = mh_bitset_index_new();
+	if (index->tuple_to_id == NULL)
+		panic("failed to allocate memtx bitset index");
+#endif /* #ifndef OLD_GOOD_BITSET */
+
+	bitset_index_create(&index->index, realloc);
+	return index;
 }

@@ -42,13 +42,13 @@
 
 /**
  * Get (struct vy_index *) by (struct index *).
- * @param index VinylIndex to convert.
+ * @param index vinyl_index to convert.
  * @retval Pointer to index->db.
  */
 extern "C" struct vy_index *
 vy_index(struct index *index)
 {
-	return ((struct VinylIndex *) index)->db;
+	return ((struct vinyl_index *) index)->db;
 }
 
 struct vinyl_iterator {
@@ -57,43 +57,34 @@ struct vinyl_iterator {
 	struct vy_cursor *cursor;
 };
 
-VinylIndex::VinylIndex(struct vy_env *env, struct index_def *index_def,
-		       struct tuple_format *format, struct vy_index *pk)
-	: index(index_def), env(env)
+static void
+vinyl_index_destroy(struct index *base)
 {
-	db = vy_new_index(env, index_def, format, pk);
-	if (db == NULL)
-		diag_raise();
+	struct vinyl_index *index = (struct vinyl_index *)base;
+	vy_delete_index(index->env, index->db);
+	free(index);
 }
 
-VinylIndex::~VinylIndex()
+static void
+vinyl_index_commit_create(struct index *base, int64_t signature)
 {
-	vy_delete_index(env, db);
+	struct vinyl_index *index = (struct vinyl_index *)base;
+	vy_index_commit_create(index->env, index->db, signature);
 }
 
-void
-VinylIndex::open()
+static void
+vinyl_index_commit_drop(struct index *base)
 {
-	if (vy_index_open(env, db, cfg_geti("force_recovery")) != 0)
-		diag_raise();
+	struct vinyl_index *index = (struct vinyl_index *)base;
+	vy_index_commit_drop(index->env, index->db);
 }
 
-void
-VinylIndex::commitCreate(int64_t signature)
+static struct tuple *
+vinyl_index_get(struct index *base, const char *key, uint32_t part_count)
 {
-	vy_index_commit_create(env, db, signature);
-}
-
-void
-VinylIndex::commitDrop()
-{
-	vy_index_commit_drop(env, db);
-}
-
-struct tuple*
-VinylIndex::findByKey(const char *key, uint32_t part_count)
-{
-	assert(def->opts.is_unique && part_count == def->key_def->part_count);
+	assert(base->def->opts.is_unique &&
+	       part_count == base->def->key_def->part_count);
+	struct vinyl_index *index = (struct vinyl_index *)base;
 	/*
 	 * engine_tx might be empty, even if we are in txn context.
 	 * This can happen on a first-read statement.
@@ -101,7 +92,8 @@ VinylIndex::findByKey(const char *key, uint32_t part_count)
 	struct vy_tx *transaction = in_txn() ?
 		(struct vy_tx *) in_txn()->engine_tx : NULL;
 	struct tuple *tuple = NULL;
-	if (vy_get(env, transaction, db, key, part_count, &tuple) != 0)
+	if (vy_get(index->env, transaction, index->db,
+		   key, part_count, &tuple) != 0)
 		diag_raise();
 	if (tuple != NULL) {
 		tuple = tuple_bless_xc(tuple);
@@ -110,37 +102,38 @@ VinylIndex::findByKey(const char *key, uint32_t part_count)
 	return tuple;
 }
 
-size_t
-VinylIndex::bsize()
+static size_t
+vinyl_index_bsize(struct index *base)
 {
-	return vy_index_bsize(db);
+	struct vinyl_index *index = (struct vinyl_index *)base;
+	return vy_index_bsize(index->db);
 }
 
-struct tuple *
-VinylIndex::min(const char *key, uint32_t part_count)
+static struct tuple *
+vinyl_index_min(struct index *index, const char *key, uint32_t part_count)
 {
-	struct iterator *it = allocIterator();
+	struct iterator *it = index_alloc_iterator_xc(index);
 	auto guard = make_scoped_guard([=]{it->free(it);});
-	initIterator(it, ITER_GE, key, part_count);
+	index_init_iterator_xc(index, it, ITER_GE, key, part_count);
 	return iterator_next_xc(it);
 }
 
-struct tuple *
-VinylIndex::max(const char *key, uint32_t part_count)
+static struct tuple *
+vinyl_index_max(struct index *index, const char *key, uint32_t part_count)
 {
-	struct iterator *it = allocIterator();
+	struct iterator *it = index_alloc_iterator_xc(index);
 	auto guard = make_scoped_guard([=]{it->free(it);});
-	initIterator(it, ITER_LE, key, part_count);
+	index_init_iterator_xc(index, it, ITER_LE, key, part_count);
 	return iterator_next_xc(it);
 }
 
-size_t
-VinylIndex::count(enum iterator_type type, const char *key,
-		  uint32_t part_count)
+static size_t
+vinyl_index_count(struct index *index, enum iterator_type type,
+		  const char *key, uint32_t part_count)
 {
-	struct iterator *it = allocIterator();
+	struct iterator *it = index_alloc_iterator_xc(index);
 	auto guard = make_scoped_guard([=]{it->free(it);});
-	initIterator(it, type, key, part_count);
+	index_init_iterator_xc(index, it, type, key, part_count);
 	size_t count = 0;
 	struct tuple *tuple = NULL;
 	while ((tuple = iterator_next_xc(it)) != NULL)
@@ -199,8 +192,8 @@ vinyl_iterator_free(struct iterator *ptr)
 	free(ptr);
 }
 
-struct iterator*
-VinylIndex::allocIterator()
+static struct iterator *
+vinyl_index_alloc_iterator(void)
 {
 	struct vinyl_iterator *it =
 	        (struct vinyl_iterator *) calloc(1, sizeof(*it));
@@ -213,29 +206,88 @@ VinylIndex::allocIterator()
 	return (struct iterator *) it;
 }
 
-void
-VinylIndex::initIterator(struct iterator *ptr,
-                         enum iterator_type type,
-                         const char *key, uint32_t part_count)
+static void
+vinyl_index_init_iterator(struct index *base, struct iterator *ptr,
+			  enum iterator_type type,
+			  const char *key, uint32_t part_count)
 {
 	assert(part_count == 0 || key != NULL);
+	struct vinyl_index *index = (struct vinyl_index *)base;
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
 	struct vy_tx *tx =
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
-	it->env = this->env;
+	it->env = index->env;
 	ptr->next = vinyl_iterator_next;
 	if (type > ITER_GT || type < 0)
-		tnt_raise(UnsupportedIndexFeature, this,
+		tnt_raise(UnsupportedIndexFeature, base->def,
 			  "requested iterator type");
 
-	it->cursor = vy_cursor_new(env, tx, db, key, part_count, type);
+	it->cursor = vy_cursor_new(index->env, tx, index->db,
+				   key, part_count, type);
 	if (it->cursor == NULL)
 		diag_raise();
 }
 
-void
-VinylIndex::info(struct info_handler *handler)
+static void
+vinyl_index_info(struct index *base, struct info_handler *handler)
 {
-	vy_index_info(db, handler);
+	struct vinyl_index *index = (struct vinyl_index *)base;
+	vy_index_info(index->db, handler);
+}
+
+static const struct index_vtab vinyl_index_vtab = {
+	/* .destroy = */ vinyl_index_destroy,
+	/* .commit_create = */ vinyl_index_commit_create,
+	/* .commit_drop = */ vinyl_index_commit_drop,
+	/* .size = */ generic_index_size,
+	/* .bsize = */ vinyl_index_bsize,
+	/* .min = */ vinyl_index_min,
+	/* .max = */ vinyl_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ vinyl_index_count,
+	/* .get = */ vinyl_index_get,
+	/* .replace = */ generic_index_replace,
+	/* .alloc_iterator = */ vinyl_index_alloc_iterator,
+	/* .init_iterator = */ vinyl_index_init_iterator,
+	/* .create_snapshot_iterator = */
+		generic_index_create_snapshot_iterator,
+	/* .info = */ vinyl_index_info,
+	/* .begin_build = */ generic_index_begin_build,
+	/* .reserve = */ generic_index_reserve,
+	/* .build_next = */ generic_index_build_next,
+	/* .end_build = */ generic_index_end_build,
+};
+
+struct vinyl_index *
+vinyl_index_new(struct vy_env *env, struct index_def *def,
+		struct tuple_format *format, struct vy_index *pk)
+{
+	struct vinyl_index *index =
+		(struct vinyl_index *)calloc(1, sizeof(*index));
+	if (index == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*index),
+			  "malloc", "struct vinyl_index");
+	}
+	struct vy_index *db = vy_new_index(env, def, format, pk);
+	if (db == NULL) {
+		free(index);
+		diag_raise();
+	}
+	if (index_create(&index->base, &vinyl_index_vtab, def) != 0) {
+		vy_delete_index(env, db);
+		free(index);
+		diag_raise();
+	}
+	index->env = env;
+	index->db = db;
+	return index;
+}
+
+void
+vinyl_index_open(struct vinyl_index *index)
+{
+	if (vy_index_open(index->env, index->db,
+			  cfg_geti("force_recovery")) != 0)
+	    diag_raise();
 }

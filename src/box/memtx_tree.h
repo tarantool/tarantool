@@ -30,6 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stddef.h>
+#include <stdint.h>
 
 #include "index.h"
 #include "memtx_engine.h"
@@ -85,47 +87,14 @@ memtx_tree_compare_key(const tuple *tuple,
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
 
-class MemtxTree: public index {
-public:
-	MemtxTree(struct index_def *index_def);
-	virtual ~MemtxTree() override;
-
-	virtual void beginBuild() override;
-	virtual void reserve(uint32_t size_hint) override;
-	virtual void buildNext(struct tuple *tuple) override;
-	virtual void endBuild() override;
-	virtual size_t size() override;
-	virtual struct tuple *min(const char *key,
-				  uint32_t part_count) override;
-	virtual struct tuple *max(const char *key,
-				  uint32_t part_count) override;
-	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) override;
-	virtual struct tuple *random(uint32_t rnd) override;
-	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) override;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode) override;
-
-	virtual size_t bsize() override;
-	virtual struct iterator *allocIterator() override;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key,
-				  uint32_t part_count) override;
-
-	/**
-	 * Create an ALL iterator with personal read view so further
-	 * index modifications will not affect the iteration results.
-	 * Must be destroyed by iterator->free after usage.
-	 */
-	struct snapshot_iterator *createSnapshotIterator() override;
-
-private:
+struct memtx_tree_index {
+	struct index base;
 	struct memtx_tree tree;
 	struct tuple **build_array;
 	size_t build_array_size, build_array_alloc_size;
 };
+
+struct memtx_tree_index *
+memtx_tree_index_new(struct index_def *);
 
 #endif /* TARANTOOL_BOX_MEMTX_TREE_H_INCLUDED */

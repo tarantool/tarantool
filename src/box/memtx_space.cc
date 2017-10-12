@@ -593,18 +593,25 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	}
 }
 
-class SequenceDataIndex: public MemtxHash {
-public:
-	SequenceDataIndex(struct index_def *index_def)
-		: MemtxHash(index_def) {}
-	struct snapshot_iterator *createSnapshotIterator() override
-	{
-		struct snapshot_iterator *ret = sequence_data_iterator_create();
-		if (ret == NULL)
-			diag_raise();
-		return ret;
-	}
-};
+static struct snapshot_iterator *
+sequence_data_index_create_snapshot_iterator(struct index *)
+{
+	struct snapshot_iterator *ret = sequence_data_iterator_create();
+	if (ret == NULL)
+		diag_raise();
+	return ret;
+}
+
+static struct index *
+sequence_data_index_new(struct index_def *def)
+{
+	struct memtx_hash_index *index = memtx_hash_index_new(def);
+	static struct index_vtab vtab = *index->base.vtab;
+	vtab.create_snapshot_iterator =
+		sequence_data_index_create_snapshot_iterator;
+	index->base.vtab = &vtab;
+	return &index->base;
+}
 
 static struct index *
 memtx_space_create_index(struct space *space, struct index_def *index_def)
@@ -617,18 +624,18 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		 * written to snapshot, use a special snapshot
 		 * iterator that walks over the sequence cache.
 		 */
-		return new SequenceDataIndex(index_def);
+		return sequence_data_index_new(index_def);
 	}
 
 	switch (index_def->type) {
 	case HASH:
-		return new MemtxHash(index_def);
+		return (struct index *)memtx_hash_index_new(index_def);
 	case TREE:
-		return new MemtxTree(index_def);
+		return (struct index *)memtx_tree_index_new(index_def);
 	case RTREE:
-		return new MemtxRTree(index_def);
+		return (struct index *)memtx_rtree_index_new(index_def);
 	case BITSET:
-		return new MemtxBitset(index_def);
+		return (struct index *)memtx_bitset_index_new(index_def);
 	default:
 		unreachable();
 		return NULL;

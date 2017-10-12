@@ -155,114 +155,72 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 
 /* {{{ MemtxRTree  **********************************************************/
 
-MemtxRTree::~MemtxRTree()
+static void
+memtx_rtree_index_destroy(struct index *base)
 {
-	// Iterator has to be destroyed prior to tree
-	if (m_position != NULL) {
-		index_rtree_iterator_free(m_position);
-		m_position = NULL;
-	}
-	rtree_destroy(&m_tree);
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+	rtree_destroy(&index->tree);
+	free(index);
 }
 
-MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
-	: index(index_def_arg)
+static size_t
+memtx_rtree_index_size(struct index *base)
 {
-	assert(def->key_def->part_count == 1);
-	assert(def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
-	assert(def->opts.is_unique == false);
-
-	m_dimension = def->opts.dimension;
-	if (m_dimension < 1 || m_dimension > RTREE_MAX_DIMENSION) {
-		char message[64];
-		snprintf(message, 64, "dimension (%u): must belong to range "
-			 "[%u, %u]", m_dimension, 1, RTREE_MAX_DIMENSION);
-		tnt_raise(UnsupportedIndexFeature, this, message);
-	}
-
-	memtx_index_arena_init();
-	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
-	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
-	enum rtree_distance_type distance_type =
-		(enum rtree_distance_type)(int)def->opts.distance;
-	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
-		   memtx_index_extent_alloc, memtx_index_extent_free, NULL,
-		   distance_type);
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+	return rtree_number_of_records(&index->tree);
 }
 
-size_t
-MemtxRTree::size()
+static size_t
+memtx_rtree_index_bsize(struct index *base)
 {
-	return rtree_number_of_records(&m_tree);
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+	return rtree_used_size(&index->tree);
 }
 
-size_t
-MemtxRTree::bsize()
+static struct tuple *
+memtx_rtree_index_get(struct index *base, const char *key, uint32_t part_count)
 {
-	return rtree_used_size(&m_tree);
-}
-
-struct tuple *
-MemtxRTree::min(const char *key, uint32_t part_count)
-{
-	return memtx_index_min(this, key, part_count);
-}
-
-struct tuple *
-MemtxRTree::max(const char *key, uint32_t part_count)
-{
-	return memtx_index_max(this, key, part_count);
-}
-
-size_t
-MemtxRTree::count(enum iterator_type type, const char *key,
-		  uint32_t part_count)
-{
-	return memtx_index_count(this, type, key, part_count);
-}
-
-struct tuple *
-MemtxRTree::findByKey(const char *key, uint32_t part_count)
-{
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct rtree_iterator iterator;
 	rtree_iterator_init(&iterator);
 
 	rtree_rect rect;
-	if (mp_decode_rect_from_key(&rect, m_dimension, key, part_count))
+	if (mp_decode_rect_from_key(&rect, index->dimension, key, part_count))
 		unreachable();
 
 	struct tuple *result = NULL;
-	if (rtree_search(&m_tree, &rect, SOP_OVERLAPS, &iterator))
+	if (rtree_search(&index->tree, &rect, SOP_OVERLAPS, &iterator))
 		result = (struct tuple *)rtree_iterator_next(&iterator);
 	rtree_iterator_destroy(&iterator);
 	return result;
 }
 
-struct tuple *
-MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-		    enum dup_replace_mode)
+static struct tuple *
+memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
+			  struct tuple *new_tuple, enum dup_replace_mode)
 {
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct rtree_rect rect;
 	if (new_tuple) {
-		extract_rectangle(&rect, new_tuple, def);
-		rtree_insert(&m_tree, &rect, new_tuple);
+		extract_rectangle(&rect, new_tuple, base->def);
+		rtree_insert(&index->tree, &rect, new_tuple);
 	}
 	if (old_tuple) {
-		extract_rectangle(&rect, old_tuple, def);
-		if (!rtree_remove(&m_tree, &rect, old_tuple))
+		extract_rectangle(&rect, old_tuple, base->def);
+		if (!rtree_remove(&index->tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}
 	return old_tuple;
 }
 
-struct iterator *
-MemtxRTree::allocIterator()
+static struct iterator *
+memtx_rtree_index_alloc_iterator(void)
 {
 	struct index_rtree_iterator *it = (struct index_rtree_iterator *)
 		malloc(sizeof(*it));
 	if (it == NULL) {
 		tnt_raise(OutOfMemory, sizeof(struct index_rtree_iterator),
-			  "MemtxRTree", "iterator");
+			  "memtx_rtree_index", "iterator");
 	}
 	memset(it, 0, sizeof(*it));
 	rtree_iterator_init(&it->impl);
@@ -271,22 +229,24 @@ MemtxRTree::allocIterator()
 	return &it->base;
 }
 
-void
-MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
-			 const char *key, uint32_t part_count)
+static void
+memtx_rtree_index_init_iterator(struct index *base, struct iterator *iterator,
+				enum iterator_type type,
+				const char *key, uint32_t part_count)
 {
-	index_rtree_iterator *it = (index_rtree_iterator *)iterator;
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+	struct index_rtree_iterator *it = (index_rtree_iterator *)iterator;
 
 	struct rtree_rect rect;
 	if (part_count == 0) {
 		if (type != ITER_ALL) {
-			tnt_raise(UnsupportedIndexFeature, this,
+			tnt_raise(UnsupportedIndexFeature, base->def,
 				  "empty keys for requested iterator type");
 		}
-	} else if (mp_decode_rect_from_key(&rect, m_dimension,
+	} else if (mp_decode_rect_from_key(&rect, index->dimension,
 					   key, part_count)) {
 		tnt_raise(ClientError, ER_RTREE_RECT,
-			  "Key", m_dimension, m_dimension * 2);
+			  "Key", index->dimension, index->dimension * 2);
 	}
 
 	spatial_search_op op;
@@ -316,15 +276,78 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		tnt_raise(UnsupportedIndexFeature, this,
+		tnt_raise(UnsupportedIndexFeature, base->def,
 			  "requested iterator type");
 	}
-	rtree_search(&m_tree, &rect, op, &it->impl);
+	rtree_search(&index->tree, &rect, op, &it->impl);
 }
 
-void
-MemtxRTree::beginBuild()
+static void
+memtx_rtree_index_begin_build(struct index *base)
 {
-	rtree_purge(&m_tree);
+	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+	rtree_purge(&index->tree);
 }
 
+static const struct index_vtab memtx_rtree_index_vtab = {
+	/* .destroy = */ memtx_rtree_index_destroy,
+	/* .commit_create = */ generic_index_commit_create,
+	/* .commit_drop = */ generic_index_commit_drop,
+	/* .size = */ memtx_rtree_index_size,
+	/* .bsize = */ memtx_rtree_index_bsize,
+	/* .min = */ memtx_index_min,
+	/* .max = */ memtx_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ memtx_index_count,
+	/* .get = */ memtx_rtree_index_get,
+	/* .replace = */ memtx_rtree_index_replace,
+	/* .alloc_iterator = */ memtx_rtree_index_alloc_iterator,
+	/* .init_iterator = */ memtx_rtree_index_init_iterator,
+	/* .create_snapshot_iterator = */
+		generic_index_create_snapshot_iterator,
+	/* .info = */ generic_index_info,
+	/* .begin_build = */ memtx_rtree_index_begin_build,
+	/* .reserve = */ generic_index_reserve,
+	/* .build_next = */ generic_index_build_next,
+	/* .end_build = */ generic_index_end_build,
+};
+
+struct memtx_rtree_index *
+memtx_rtree_index_new(struct index_def *def)
+{
+	assert(def->key_def->part_count == 1);
+	assert(def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
+	assert(def->opts.is_unique == false);
+
+	if (def->opts.dimension < 1 ||
+	    def->opts.dimension > RTREE_MAX_DIMENSION) {
+		tnt_raise(UnsupportedIndexFeature, def,
+			  tt_sprintf("dimension (%u): must belong to "
+				     "range [%u, %u]", def->opts.dimension,
+				     1, RTREE_MAX_DIMENSION));
+	}
+
+	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
+	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
+	enum rtree_distance_type distance_type =
+		(enum rtree_distance_type)def->opts.distance;
+
+	memtx_index_arena_init();
+
+	struct memtx_rtree_index *index =
+		(struct memtx_rtree_index *)calloc(1, sizeof(*index));
+	if (index == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*index),
+			  "malloc", "struct memtx_rtree_index");
+	}
+	if (index_create(&index->base, &memtx_rtree_index_vtab, def) != 0) {
+		free(index);
+		diag_raise();
+	}
+
+	index->dimension = def->opts.dimension;
+	rtree_init(&index->tree, index->dimension, MEMTX_EXTENT_SIZE,
+		   memtx_index_extent_alloc, memtx_index_extent_free, NULL,
+		   distance_type);
+	return index;
+}

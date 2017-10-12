@@ -93,22 +93,7 @@ sysview_space_check_index_def(struct space *, struct index_def *)
 static struct index *
 sysview_space_create_index(struct space *space, struct index_def *index_def)
 {
-	assert(index_def->type == TREE);
-	switch (index_def->space_id) {
-	case BOX_VSPACE_ID:
-		return new SysviewVspaceIndex(index_def);
-	case BOX_VINDEX_ID:
-		return new SysviewVindexIndex(index_def);
-	case BOX_VUSER_ID:
-		return new SysviewVuserIndex(index_def);
-	case BOX_VFUNC_ID:
-		return new SysviewVfuncIndex(index_def);
-	case BOX_VPRIV_ID:
-		return new SysviewVprivIndex(index_def);
-	default:
-		tnt_raise(ClientError, ER_MODIFY_INDEX, index_def->name,
-			  space_name(space), "unknown space for system view");
-	}
+	return (struct index *)sysview_index_new(index_def, space_name(space));
 }
 
 static void
