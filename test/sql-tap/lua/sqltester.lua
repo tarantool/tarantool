@@ -263,12 +263,36 @@ local function explain_no_trace(self, sql)
     return tr
 end
 test.explain_no_trace = explain_no_trace
+json = require("json")
+function test.find_spaces_by_sql_statement(self, statement)
+    local spaces = box.space._space:select{}
+    local res = {}
+    for _, space in ipairs(spaces) do
+        local name_num = 3-- [3] is space name
+        local options_num = 6-- [6] is space options
+        if not space[name_num]:startswith("_") and space[options_num]["sql"] then
+            if string.find(space[options_num]["sql"], statement) then
+                table.insert(res, space[name_num])
+            end
+        end
+    end
+    return res
+end
 
 function test.drop_all_tables(self)
-    local tables = test:execsql("SELECT name FROM _space WHERE name NOT LIKE '\\_%' ESCAPE '\\';")
+    local tables = test:find_spaces_by_sql_statement("CREATE TABLE")
     for _, table in ipairs(tables) do
         test:execsql("DROP TABLE "..table..";")
     end
+    return tables
+end
+
+function test.drop_all_views(self)
+    local views = test:find_spaces_by_sql_statement("CREATE VIEW")
+    for _, view in ipairs(views) do
+        test:execsql("DROP VIEW "..view..";")
+    end
+    return views
 end
 
 function test.do_select_tests(self, label, tests)
