@@ -43,6 +43,17 @@ test_say(lua_State *L)
 	return 1;
 }
 
+static int
+test_log_error(lua_State *L)
+{
+	log_error(S_INFO, __FILE__, __LINE__, SF_PLAIN, "test plain");
+	log_error(S_INFO, __FILE__, __LINE__, SF_JSON, "{\"message\": \"test json\"}");
+	errno = 0;
+	log_error(S_SYSERROR, __FILE__, __LINE__, SF_PLAIN, "test syserror");
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 static ssize_t
 coio_call_func(va_list ap)
 {
@@ -408,6 +419,7 @@ luaopen_module_api(lua_State *L)
 	(void) consts;
 	static const struct luaL_Reg lib[] = {
 		{"test_say", test_say },
+		{"test_log_error", test_log_error },
 		{"test_coio_call", test_coio_call },
 		{"test_coio_getaddrinfo", test_coio_getaddrinfo },
 		{"test_pushcheck_cdata", test_pushcheck_cdata },
