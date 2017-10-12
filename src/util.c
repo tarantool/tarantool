@@ -41,6 +41,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include <msgpuck/msgpuck.h> /* mp_char2escape[] table */
+
 #include "say.h"
 
 /** Find a string in an array of strings.
@@ -277,6 +279,24 @@ utf8_check_printable(const char *start, size_t length)
 		pointer += width;
 	}
 	return 1;
+}
+
+int
+json_escape(char *buf, int size, const char *data)
+{
+	int total = 0;
+	int data_len = strlen(data);
+	for (int i = 0; i < data_len; i++) {
+		unsigned char c = (unsigned char ) data[i];
+		if (c < 128 && mp_char2escape[c] != NULL) {
+			/* Escape character */
+			SNPRINT(total, snprintf, buf, size, "%s",
+					  mp_char2escape[c]);
+		} else {
+			SNPRINT(total, snprintf, buf, size, "%c", c);
+		}
+	}
+	return total;
 }
 
 const char *precision_fmts[] = {

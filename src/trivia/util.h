@@ -534,6 +534,12 @@ tt_sprintf(const char *format, ...)
 }
 
 /**
+ * Escape special characters in @a data to @a buf
+ */
+int
+json_escape(char *buf, int size, const char *data);
+
+/**
  * Helper macro to handle easily snprintf() result
  */
 #define SNPRINT(_total, _fun, _buf, _size, ...) do {				\

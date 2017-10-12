@@ -60,7 +60,8 @@ enum say_level {
 /** Log formats */
 enum say_format {
 	SF_PLAIN,
-	SF_JSON
+	SF_JSON,
+	say_format_MAX
 };
 
 extern int log_level;
@@ -74,14 +75,26 @@ say_log_level_is_enabled(int level)
 
 /** \endcond public */
 
+/**
+ * Set log level
+ */
 void
 say_set_log_level(int new_level);
 
+/**
+ * Set log format
+ */
 void
-say_set_log_format(int new_format);
+say_set_log_format(enum say_format new_format);
 
-int
-say_convert_log_format(const char *format_name);
+/**
+ * Return say format by name.
+ * @param format_name format name.
+ * @retval say_format_MAX on error
+ * @retval say_format otherwise
+ */
+enum say_format
+say_format_by_name(const char *format);
 
 void
 say_logrotate(int /* signo */);

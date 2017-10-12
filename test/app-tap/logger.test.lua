@@ -73,7 +73,7 @@ test:is(type(message), 'table', "json valid in log.error")
 test:is(message.level, "ERROR", "check type error")
 test:is(message.message, "error", "check error message")
 
-log.info({key="value"})
+log.info({key="value", level=48})
 local line = file:read()
 message = json.decode(line)
 test:is(type(message), 'table', "json valid in log.info")

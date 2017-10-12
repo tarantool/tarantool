@@ -470,6 +470,16 @@ box_check_log(const char *log)
 	}
 }
 
+static enum say_format
+box_check_log_format(const char *log_format)
+{
+	enum say_format format = say_format_by_name(log_format);
+	if (format == say_format_MAX)
+		tnt_raise(ClientError, ER_CFG, "log_format",
+			  "expected 'plain' or 'json'");
+	return format;
+}
+
 static void
 box_check_uri(const char *source, const char *option_name)
 {
@@ -561,6 +571,7 @@ void
 box_check_config()
 {
 	box_check_log(cfg_gets("log"));
+	box_check_log_format(cfg_gets("log_format"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication();
 	box_check_replication_timeout();
@@ -690,7 +701,8 @@ box_set_log_level(void)
 void
 box_set_log_format(void)
 {
-	say_set_log_format(say_convert_log_format(cfg_gets("log_format")));
+	enum say_format format = box_check_log_format(cfg_gets("log_format"));
+	say_set_log_format(format);
 }
 
 void

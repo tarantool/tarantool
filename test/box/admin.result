@@ -34,6 +34,8 @@ cfg_filter(box.cfg)
     - <hidden>
   - - log
     - <hidden>
+  - - log_format
+    - plain
   - - log_level
     - 5
   - - log_nonblock
