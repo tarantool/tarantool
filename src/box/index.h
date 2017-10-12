@@ -349,7 +349,6 @@ public:
 	virtual size_t count(enum iterator_type type, const char *key,
 			     uint32_t part_count);
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count);
-	virtual struct tuple *findByTuple(struct tuple *tuple);
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);
@@ -442,26 +441,6 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 		}
 	}
 	return 0;
-}
-
-/** Get index ordinal number in space. */
-static inline uint32_t
-index_id(struct index *index)
-{
-	return index->def->iid;
-}
-
-static inline const char *
-index_name(struct index *index)
-{
-	return index->def->name;
-}
-
-/** True if this index is a primary key. */
-static inline bool
-index_is_primary(struct index *index)
-{
-	return index_id(index) == 0;
 }
 
 /** Build this index based on the contents of another index. */

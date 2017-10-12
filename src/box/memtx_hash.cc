@@ -244,7 +244,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 				}
 			}
 			struct space *sp = space_cache_find(def->space_id);
-			tnt_raise(ClientError, errcode, index_name(this),
+			tnt_raise(ClientError, errcode, def->name,
 				  space_name(sp));
 		}
 
@@ -309,7 +309,8 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		return index::initIterator(ptr, type, key, part_count);
+		tnt_raise(UnsupportedIndexFeature, this,
+			  "requested iterator type");
 	}
 }
 

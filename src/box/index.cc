@@ -233,14 +233,6 @@ index::findByKey(const char *key, uint32_t part_count)
 }
 
 struct tuple *
-index::findByTuple(struct tuple *tuple)
-{
-	(void) tuple;
-	tnt_raise(UnsupportedIndexFeature, this, "findByTuple()");
-	return NULL;
-}
-
-struct tuple *
 index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		     enum dup_replace_mode mode)
 {
@@ -255,17 +247,6 @@ size_t
 index::bsize()
 {
 	return 0;
-}
-
-void
-index::initIterator(struct iterator *ptr, enum iterator_type type,
-		    const char *key, uint32_t part_count)
-{
-	(void) ptr;
-	(void) type;
-	(void) key;
-	(void) part_count;
-	tnt_raise(UnsupportedIndexFeature, this, "requested iterator type");
 }
 
 /**
@@ -582,7 +563,7 @@ index_build(struct index *index, struct index *pk)
 	if (n_tuples > 0) {
 		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
 			 n_tuples, index_type_strs[index->def->type],
-			 index_name(index));
+			 index->def->name);
 	}
 
 	struct iterator *it = pk->position();

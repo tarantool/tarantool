@@ -373,8 +373,8 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 						       bitset_key_size);
 			break;
 		default:
-			return index::initIterator(iterator, type, key,
-						   part_count);
+			tnt_raise(UnsupportedIndexFeature, this,
+				  "requested iterator type");
 		}
 
 		if (rc != 0) {

@@ -316,7 +316,8 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		return index::initIterator(iterator, type, key, part_count);
+		tnt_raise(UnsupportedIndexFeature, this,
+			  "requested iterator type");
 	}
 	rtree_search(&m_tree, &rect, op, &it->impl);
 }

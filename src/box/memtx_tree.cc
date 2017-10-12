@@ -378,7 +378,7 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			if (dup_tuple)
 				memtx_tree_insert(&tree, dup_tuple, 0);
 			struct space *sp = space_cache_find(def->space_id);
-			tnt_raise(ClientError, errcode, index_name(this),
+			tnt_raise(ClientError, errcode, def->name,
 				  space_name(sp));
 		}
 		if (dup_tuple)
@@ -416,7 +416,8 @@ MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	if (type < 0 || type > ITER_GT) /* Unsupported type */
-		return index::initIterator(iterator, type, key, part_count);
+		tnt_raise(UnsupportedIndexFeature, this,
+			  "requested iterator type");
 
 	if (part_count == 0) {
 		/*

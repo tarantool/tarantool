@@ -226,7 +226,8 @@ VinylIndex::initIterator(struct iterator *ptr,
 	it->env = this->env;
 	ptr->next = vinyl_iterator_next;
 	if (type > ITER_GT || type < 0)
-		return index::initIterator(ptr, type, key, part_count);
+		tnt_raise(UnsupportedIndexFeature, this,
+			  "requested iterator type");
 
 	it->cursor = vy_cursor_new(env, tx, db, key, part_count, type);
 	if (it->cursor == NULL)
