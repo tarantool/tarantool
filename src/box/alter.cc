@@ -1479,7 +1479,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 					 BOX_INDEX_FIELD_SPACE_ID);
 	uint32_t iid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
 					  BOX_INDEX_FIELD_ID);
-	struct space *old_space = space_cache_find(id);
+	struct space *old_space = space_cache_find_xc(id);
 	access_check_ddl(old_space->def->uid, SC_SPACE);
 	struct index *old_index = space_index(old_space, iid);
 
@@ -1653,7 +1653,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		tuple_field_u32_xc(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID);
 	uint64_t truncate_count =
 		tuple_field_u64_xc(new_tuple, BOX_TRUNCATE_FIELD_COUNT);
-	struct space *old_space = space_cache_find(space_id);
+	struct space *old_space = space_cache_find_xc(space_id);
 
 	if (stmt->row->type == IPROTO_INSERT) {
 		/*
@@ -2307,7 +2307,7 @@ priv_def_check(struct priv_def *priv)
 		break;
 	case SC_SPACE:
 	{
-		struct space *space = space_cache_find(priv->object_id);
+		struct space *space = space_cache_find_xc(priv->object_id);
 		if (space->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
@@ -2825,7 +2825,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	bool is_generated = tuple_field_bool_xc(tuple,
 				BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED);
 
-	struct space *space = space_cache_find(space_id);
+	struct space *space = space_cache_find_xc(space_id);
 	struct sequence *seq = sequence_cache_find(sequence_id);
 
 	access_check_ddl(space->def->uid, SC_SPACE);

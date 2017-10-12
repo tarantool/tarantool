@@ -217,7 +217,7 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			struct space *sp = space_cache_find(base->def->space_id);
+			struct space *sp = space_cache_find_xc(base->def->space_id);
 			tnt_raise(ClientError, errcode, base->def->name,
 				  space_name(sp));
 		}

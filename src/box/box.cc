@@ -412,7 +412,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
 	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find(request->space_id);
+	struct space *space = space_cache_find_xc(request->space_id);
 	process_rw(request, space, NULL);
 }
 
@@ -450,7 +450,7 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
 	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find(request->space_id);
+	struct space *space = space_cache_find_xc(request->space_id);
 	/* no access checks here - applier always works with admin privs */
 	space->vtab->apply_initial_join_row(space, request);
 }
@@ -822,7 +822,7 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 		unreachable();
 	}
 	try {
-		struct space *space = space_cache_find(space_id);
+		struct space *space = space_cache_find_xc(space_id);
 		process_rw(request, space, NULL);
 	} catch (Exception *e) {
 		return -1;
@@ -895,7 +895,7 @@ box_process1(struct request *request, box_tuple_t **result)
 {
 	try {
 		/* Allow to write to temporary spaces in read-only mode. */
-		struct space *space = space_cache_find(request->space_id);
+		struct space *space = space_cache_find_xc(request->space_id);
 		if (!space->def->opts.temporary)
 			box_check_writable();
 		process_rw(request, space, result);
@@ -913,7 +913,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
 	try {
-		struct space *space = space_cache_find(space_id);
+		struct space *space = space_cache_find_xc(space_id);
 		access_check_space(space, PRIV_R);
 		struct txn *txn = txn_begin_ro_stmt(space);
 		space->vtab->execute_select(space, txn, index_id, iterator,
@@ -1048,7 +1048,7 @@ int
 box_truncate(uint32_t space_id)
 {
 	try {
-		struct space *space = space_cache_find(space_id);
+		struct space *space = space_cache_find_xc(space_id);
 		space_truncate(space);
 		return 0;
 	} catch (Exception *exc) {
@@ -1176,7 +1176,7 @@ box_on_join(const tt_uuid *instance_uuid)
 		return; /* nothing to do - already registered */
 
 	/** Find the largest existing replica id. */
-	struct space *space = space_cache_find(BOX_CLUSTER_ID);
+	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 	struct index *index = index_find_system(space, 0);
 	struct iterator *it = index_position_xc(index);
 	index_init_iterator_xc(index, it, ITER_ALL, NULL, 0);
@@ -1267,7 +1267,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Check permissions */
 	access_check_universe(PRIV_R);
-	access_check_space(space_cache_find(BOX_CLUSTER_ID), PRIV_W);
+	access_check_space(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
 	box_check_writable();

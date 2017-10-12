@@ -107,7 +107,7 @@ sysview_index_init_iterator(struct index *base, struct iterator *iterator,
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_index *index = (struct sysview_index *)base;
 	struct sysview_iterator *it = sysview_iterator(iterator);
-	struct space *source = space_cache_find(index->source_space_id);
+	struct space *source = space_cache_find_xc(index->source_space_id);
 	struct index *pk = index_find_xc(source, index->source_index_id);
 	/*
 	 * Explicitly validate that key matches source's index_def.
@@ -136,7 +136,7 @@ static struct tuple *
 sysview_index_get(struct index *base, const char *key, uint32_t part_count)
 {
 	struct sysview_index *index = (struct sysview_index *)base;
-	struct space *source = space_cache_find(index->source_space_id);
+	struct space *source = space_cache_find_xc(index->source_space_id);
 	struct index *pk = index_find_xc(source, index->source_index_id);
 	if (!pk->def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
@@ -181,7 +181,7 @@ vspace_filter(struct space *source, struct tuple *tuple)
 		return true; /* read access to original space */
 
 	uint32_t space_id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
-	struct space *space = space_cache_find(space_id);
+	struct space *space = space_cache_find_xc(space_id);
 	uint8_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
 		space->def->uid == cr->uid);

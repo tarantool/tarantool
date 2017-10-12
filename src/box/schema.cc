@@ -79,7 +79,7 @@ space_is_system(struct space *space)
 }
 
 /** Return space by its number */
-extern "C" struct space *
+struct space *
 space_by_id(uint32_t id)
 {
 	mh_int_t space = mh_i32ptr_find(spaces, id, NULL);
@@ -89,7 +89,7 @@ space_by_id(uint32_t id)
 }
 
 /** Return current schema version */
-extern "C" uint32_t
+uint32_t
 box_schema_version()
 {
 	return schema_version;
@@ -125,7 +125,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 			/* Get space id, primary key, field 0. */
 			uint32_t id =
 				tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
-			space = space_cache_find(id);
+			space = space_cache_find_xc(id);
 			if (! space_is_system(space))
 				break;
 			func(space, udata);
@@ -221,7 +221,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 {
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
-	struct space *space = space_cache_find(system_space_id);
+	struct space *space = space_cache_find_xc(system_space_id);
 	struct index *index = index_find_system(space, index_id);
 	uint32_t size = mp_sizeof_str(len);
 	struct region *region = &fiber()->gc;
@@ -440,7 +440,7 @@ func_by_name(const char *name, uint32_t name_len)
 bool
 schema_find_grants(const char *type, uint32_t id)
 {
-	struct space *priv = space_cache_find(BOX_PRIV_ID);
+	struct space *priv = space_cache_find_xc(BOX_PRIV_ID);
 	/** "object" index */
 	struct index *index = index_find_system(priv, 2);
 	struct iterator *it = index_position_xc(index);

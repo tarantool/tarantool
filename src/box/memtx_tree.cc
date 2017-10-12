@@ -340,7 +340,7 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 			memtx_tree_delete(&index->tree, new_tuple);
 			if (dup_tuple)
 				memtx_tree_insert(&index->tree, dup_tuple, 0);
-			struct space *sp = space_cache_find(base->def->space_id);
+			struct space *sp = space_cache_find_xc(base->def->space_id);
 			tnt_raise(ClientError, errcode, base->def->name,
 				  space_name(sp));
 		}

@@ -205,7 +205,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 	}
 
 	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find(request->space_id);
+	struct space *space = space_cache_find_xc(request->space_id);
 	/* memtx snapshot must contain only memtx spaces */
 	if (space->engine != this)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);

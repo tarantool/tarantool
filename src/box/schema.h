@@ -37,6 +37,10 @@
 #include "space.h"
 #include "latch.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 extern uint32_t schema_version;
 
 /**
@@ -49,22 +53,16 @@ extern uint32_t dd_version_id;
  */
 extern struct latch schema_lock;
 
-#if defined(__cplusplus)
-
-/** Call a visitor function on every space in the space cache. */
-void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
-
 /**
  * Try to look up a space by space number in the space cache.
  * FFI-friendly no-exception-thrown space lookup function.
  *
  * @return NULL if space not found, otherwise space object.
  */
-extern "C" struct space *
+struct space *
 space_by_id(uint32_t id);
 
-extern "C" uint32_t
+uint32_t
 box_schema_version();
 
 static inline struct space *
@@ -80,7 +78,24 @@ space_cache_find(uint32_t id)
 		prev_schema_version = schema_version;
 		return space;
 	}
-	tnt_raise(ClientError, ER_NO_SUCH_SPACE, int2str(id));
+	diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));
+	return NULL;
+}
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+/** Call a visitor function on every space in the space cache. */
+void
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
+
+static inline struct space *
+space_cache_find_xc(uint32_t id)
+{
+	struct space *space = space_cache_find(id);
+	if (space == NULL)
+		diag_raise();
+	return space;
 }
 
 /**

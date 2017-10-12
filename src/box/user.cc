@@ -285,7 +285,7 @@ user_reload_privs(struct user *user)
 	privset_new(&user->privs);
 	/* Load granted privs from _priv space. */
 	{
-		struct space *space = space_cache_find(BOX_PRIV_ID);
+		struct space *space = space_cache_find_xc(BOX_PRIV_ID);
 		char key[6];
 		/** Primary key - by user id */
 		struct index *index = index_find_system(space, 0);
