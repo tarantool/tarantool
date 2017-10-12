@@ -147,16 +147,6 @@ xrow_decode_dml(struct xrow_header *xrow, struct request *request,
 		uint64_t key_map);
 
 /**
- * Decode a request from the @row using fiber->gc.
- * @param row Xrow.
- * @retval not NULL Decoded request.
- *
- * @retval     NULL Memory or binary format error.
- */
-struct request *
-xrow_decode_dml_gc(struct xrow_header *row);
-
-/**
  * Encode the request fields to iovec using region_alloc().
  * @param request request to encode
  * @param iov[out] iovec to fill
@@ -450,16 +440,6 @@ xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 {
 	if (xrow_decode_dml(row, request, key_map) != 0)
 		diag_raise();
-}
-
-/** @copydoc xrow_decode_request. */
-static inline struct request *
-xrow_decode_dml_gc_xc(struct xrow_header *row)
-{
-	struct request *ret = xrow_decode_dml_gc(row);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
 }
 
 static inline int

@@ -514,25 +514,6 @@ xrow_encode_dml(const struct request *request, struct iovec *iov)
 	return iovcnt;
 }
 
-struct request *
-xrow_decode_dml_gc(struct xrow_header *row)
-{
-	struct region *region = &fiber()->gc;
-	size_t used = region_used(region);
-	struct request *request = region_alloc_object(region, struct request);
-	if (request == NULL) {
-		diag_set(OutOfMemory, sizeof(*request), "region_alloc_object",
-			 "request");
-		return NULL;
-	}
-	uint64_t key_map = dml_request_key_map(row->type);
-	if (xrow_decode_dml(row, request, key_map) != 0) {
-		region_truncate(region, used);
-		return NULL;
-	}
-	return request;
-}
-
 int
 xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 {

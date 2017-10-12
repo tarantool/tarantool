@@ -208,10 +208,10 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		return -1;
 	}
 
-	struct request *request = xrow_decode_dml_gc(row);
-	if (request == NULL)
+	struct request request;
+	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
-	struct space *space = space_cache_find(request->space_id);
+	struct space *space = space_cache_find(request.space_id);
 	if (space == NULL)
 		return -1;
 	/* memtx snapshot must contain only memtx spaces */
@@ -220,7 +220,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		return -1;
 	}
 	/* no access checks here - applier always works with admin privs */
-	if (space_apply_initial_join_row(space, request) != 0)
+	if (space_apply_initial_join_row(space, &request) != 0)
 		return -1;
 	/*
 	 * Don't let gc pool grow too much. Yet to
