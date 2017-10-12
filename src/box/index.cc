@@ -302,8 +302,9 @@ box_index_len(uint32_t space_id, uint32_t index_id)
 {
 	try {
 		struct space *space;
+		struct index *index = check_index(space_id, index_id, &space);
 		/* no tx management, len is approximate in vinyl anyway. */
-		return check_index(space_id, index_id, &space)->size();
+		return index_size_xc(index);
 	} catch (Exception *) {
 		return (size_t) -1; /* handled by box.error() in Lua */
 	}
@@ -315,7 +316,8 @@ box_index_bsize(uint32_t space_id, uint32_t index_id)
        try {
 	       /* no tx management for statistics */
 	       struct space *space;
-	       return check_index(space_id, index_id, &space)->bsize();
+	       struct index *index = check_index(space_id, index_id, &space);
+	       return index_bsize_xc(index);
        } catch (Exception *) {
                return (size_t) -1; /* handled by box.error() in Lua */
        }
@@ -330,7 +332,7 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 		struct space *space;
 		/* no tx management, random() is for approximation anyway */
 		struct index *index = check_index(space_id, index_id, &space);
-		struct tuple *tuple = index->random(rnd);
+		struct tuple *tuple = index_random_xc(index, rnd);
 		*result = tuple_bless_null_xc(tuple);
 		return 0;
 	}  catch (Exception *) {
@@ -354,7 +356,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 			diag_raise();
 		/* Start transaction in the engine. */
 		struct txn *txn = txn_begin_ro_stmt(space);
-		struct tuple *tuple = index->findByKey(key, part_count);
+		struct tuple *tuple = index_get_xc(index, key, part_count);
 		/* Count statistics */
 		rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
@@ -385,7 +387,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
-		struct tuple *tuple = index->min(key, part_count);
+		struct tuple *tuple = index_min_xc(index, key, part_count);
 		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
@@ -413,7 +415,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
-		struct tuple *tuple = index->max(key, part_count);
+		struct tuple *tuple = index_max_xc(index, key, part_count);
 		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
 		return 0;
@@ -438,7 +440,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
-		ssize_t count = index->count(itype, key, part_count);
+		ssize_t count = index_count_xc(index, itype, key, part_count);
 		txn_commit_ro_stmt(txn);
 		return count;
 	} catch (Exception *) {
@@ -467,8 +469,8 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->def, itype, key, part_count))
 			diag_raise();
-		it = index->allocIterator();
-		index->initIterator(it, itype, key, part_count);
+		it = index_alloc_iterator_xc(index);
+		index_init_iterator_xc(index, it, itype, key, part_count);
 		it->schema_version = schema_version;
 		it->space_id = space_id;
 		it->index_id = index_id;
@@ -542,7 +544,7 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 	try {
 		struct space *space;
 		struct index *index = check_index(space_id, index_id, &space);
-		index->info(info);
+		index_info(index, info);
 		return 0;
 	}  catch (Exception *) {
 		return -1;
@@ -554,11 +556,11 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 void
 index_build(struct index *index, struct index *pk)
 {
-	uint32_t n_tuples = pk->size();
+	uint32_t n_tuples = index_size_xc(pk);
 	uint32_t estimated_tuples = n_tuples * 1.2;
 
-	index->beginBuild();
-	index->reserve(estimated_tuples);
+	index_begin_build(index);
+	index_reserve_xc(index, estimated_tuples);
 
 	if (n_tuples > 0) {
 		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
@@ -566,11 +568,11 @@ index_build(struct index *index, struct index *pk)
 			 index->def->name);
 	}
 
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
+	struct iterator *it = index_position_xc(pk);
+	index_init_iterator_xc(pk, it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
 	while ((tuple = iterator_next_xc(it)) != NULL)
-		index->buildNext(tuple);
+		index_build_next_xc(index, tuple);
 
-	index->endBuild();
+	index_end_build(index);
 }

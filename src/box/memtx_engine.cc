@@ -82,7 +82,7 @@ memtx_end_build_primary_key(struct space *space, void *param)
 	    memtx_space->replace == memtx_space_replace_all_keys)
 		return;
 
-	space->index[0]->endBuild();
+	index_end_build(space->index[0]);
 	memtx_space->replace = memtx_space_replace_primary_key;
 }
 
@@ -102,7 +102,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 
 	if (space->index_id_max > 0) {
 		struct index *pk = space->index[0];
-		uint32_t n_tuples = pk->size();
+		uint32_t n_tuples = index_size_xc(pk);
 
 		if (n_tuples > 0) {
 			say_info("Building secondary indexes in space '%s'...",
@@ -368,7 +368,8 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 
 	for (int i = 0; i < index_count; i++) {
 		struct index *index = space->index[i];
-		index->replace(stmt->new_tuple, stmt->old_tuple, DUP_INSERT);
+		index_replace_xc(index, stmt->new_tuple,
+				 stmt->old_tuple, DUP_INSERT);
 	}
 	/** Reset to old bsize, if it was changed. */
 	if (stmt->engine_savepoint != NULL)
@@ -553,7 +554,7 @@ checkpoint_add_space(struct space *sp, void *data)
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
-	entry->iterator = pk->createSnapshotIterator();
+	entry->iterator = index_create_snapshot_iterator_xc(pk);
 };
 
 int

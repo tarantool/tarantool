@@ -120,10 +120,10 @@ SysviewIndex::initIterator(struct iterator *iterator,
 		it->source = NULL;
 	}
 	if (it->source == NULL) {
-		it->source = pk->allocIterator();
+		it->source = index_alloc_iterator_xc(pk);
 		it->source->schema_version = ::schema_version;
 	}
-	pk->initIterator(it->source, type, key, part_count);
+	index_init_iterator_xc(pk, it->source, type, key, part_count);
 	iterator->index = (struct index *) this;
 	iterator->next = sysview_iterator_next;
 	it->space = source;
@@ -138,7 +138,7 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		diag_raise();
-	struct tuple *tuple = pk->findByKey(key, part_count);
+	struct tuple *tuple = index_get_xc(pk, key, part_count);
 	if (tuple == NULL || !filter(source, tuple))
 		return NULL;
 	return tuple;

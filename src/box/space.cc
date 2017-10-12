@@ -156,7 +156,7 @@ space_noop(struct space * /* space */)
 uint32_t
 space_size(struct space *space)
 {
-	return space_index(space, 0)->size();
+	return index_size_xc(space_index(space, 0));
 }
 
 void
@@ -234,9 +234,9 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 	if (key_validate(index->def, type, key, part_count))
 		diag_raise();
 
-	struct iterator *it = index->allocIterator();
+	struct iterator *it = index_alloc_iterator_xc(index);
 	IteratorGuard guard(it);
-	index->initIterator(it, type, key, part_count);
+	index_init_iterator_xc(index, it, type, key, part_count);
 
 	struct tuple *tuple;
 	while (found < limit && (tuple = iterator_next_xc(it)) != NULL) {

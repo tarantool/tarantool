@@ -529,9 +529,9 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
-	struct iterator *it = index->position();
+	struct iterator *it = index_position_xc(index);
 
-	index->initIterator(it, ITER_EQ, key, 1);
+	index_init_iterator_xc(index, it, ITER_EQ, key, 1);
 	if (iterator_next_xc(it) != NULL)
 		return true;
 	return false;
@@ -935,7 +935,7 @@ DropIndex::commit(struct alter_space *alter, int64_t /* signature */)
 {
 	struct index *index = index_find_xc(alter->old_space,
 					    old_index_def->iid);
-	index->commitDrop();
+	index_commit_drop(index);
 }
 
 /**
@@ -1100,7 +1100,7 @@ CreateIndex::commit(struct alter_space *alter, int64_t signature)
 {
 	struct index *new_index = index_find_xc(alter->new_space,
 						new_index_def->iid);
-	new_index->commitCreate(signature);
+	index_commit_create(new_index, signature);
 }
 
 CreateIndex::~CreateIndex()
@@ -1164,8 +1164,8 @@ RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 					      old_index_def->iid);
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
-	old_index->commitDrop();
-	new_index->commitCreate(signature);
+	index_commit_drop(old_index);
+	index_commit_create(new_index, signature);
 }
 
 RebuildIndex::~RebuildIndex()

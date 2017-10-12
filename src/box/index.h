@@ -447,6 +447,124 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 void
 index_build(struct index *index, struct index *pk);
 
+static inline void
+index_commit_create(struct index *index, int64_t signature)
+{
+	index->commitCreate(signature);
+}
+
+static inline void
+index_commit_drop(struct index *index)
+{
+	index->commitDrop();
+}
+
+static inline size_t
+index_size_xc(struct index *index)
+{
+	return index->size();
+}
+
+static inline size_t
+index_bsize_xc(struct index *index)
+{
+	return index->bsize();
+}
+
+static inline struct tuple *
+index_min_xc(struct index *index, const char *key, uint32_t part_count)
+{
+	return index->min(key, part_count);
+}
+
+static inline struct tuple *
+index_max_xc(struct index *index, const char *key, uint32_t part_count)
+{
+	return index->max(key, part_count);
+}
+
+static inline struct tuple *
+index_random_xc(struct index *index, uint32_t rnd)
+{
+	return index->random(rnd);
+}
+
+static inline size_t
+index_count_xc(struct index *index, enum iterator_type type,
+	       const char *key, uint32_t part_count)
+{
+	return index->count(type, key, part_count);
+}
+
+static inline struct tuple *
+index_get_xc(struct index *index, const char *key, uint32_t part_count)
+{
+	return index->findByKey(key, part_count);
+}
+
+static inline struct tuple *
+index_replace_xc(struct index *index, struct tuple *old_tuple,
+		 struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	return index->replace(old_tuple, new_tuple, mode);
+}
+
+static inline struct iterator *
+index_alloc_iterator_xc(struct index *index)
+{
+	return index->allocIterator();
+}
+
+static inline void
+index_init_iterator_xc(struct index *index, struct iterator *iterator,
+		       enum iterator_type type,
+		       const char *key, uint32_t part_count)
+{
+	index->initIterator(iterator, type, key, part_count);
+}
+
+static inline struct iterator *
+index_position_xc(struct index *index)
+{
+	return index->position();
+}
+
+static inline struct snapshot_iterator *
+index_create_snapshot_iterator_xc(struct index *index)
+{
+	return index->createSnapshotIterator();
+}
+
+static inline void
+index_info(struct index *index, struct info_handler *handler)
+{
+	index->info(handler);
+}
+
+static inline void
+index_begin_build(struct index *index)
+{
+	index->beginBuild();
+}
+
+static inline void
+index_reserve_xc(struct index *index, uint32_t size_hint)
+{
+	index->reserve(size_hint);
+}
+
+static inline void
+index_build_next_xc(struct index *index, struct tuple *tuple)
+{
+	index->buildNext(tuple);
+}
+
+static inline void
+index_end_build(struct index *index)
+{
+	index->endBuild();
+}
+
 /**
  * Wrapper around iterator::next() that throws
  * an exception in case of error.
