@@ -1011,7 +1011,7 @@ ModifyIndex::alter(struct alter_space *alter)
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
 	assert(new_index != NULL);
-	index_def_swap(old_index->index_def, new_index->index_def);
+	index_def_swap(old_index->def, new_index->def);
 }
 
 void
@@ -1029,7 +1029,7 @@ ModifyIndex::rollback(struct alter_space *alter)
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
 	assert(new_index != NULL);
-	index_def_swap(old_index->index_def, new_index->index_def);
+	index_def_swap(old_index->def, new_index->def);
 }
 
 ModifyIndex::~ModifyIndex()
@@ -1243,7 +1243,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		struct index *old_index = space_index(old_space, index_id);
 		if (old_index == NULL)
 			continue;
-		struct index_def *old_def = old_index->index_def;
+		struct index_def *old_def = old_index->def;
 		if (old_def->opts.is_unique || old_def->type != TREE ||
 		    alter->pk_def == NULL) {
 
@@ -1539,7 +1539,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	alter_space_move_indexes(alter, 0, iid);
 	/* Case 1: drop the index, if it is dropped. */
 	if (old_index != NULL && new_tuple == NULL) {
-		(void) new DropIndex(alter, old_index->index_def);
+		(void) new DropIndex(alter, old_index->def);
 	}
 	/* Case 2: create an index, if it is simply created. */
 	if (old_index == NULL && new_tuple != NULL) {
@@ -1553,23 +1553,23 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		index_def = index_def_new_from_tuple(new_tuple, old_space);
 		auto index_def_guard =
 			make_scoped_guard([=] { index_def_delete(index_def); });
-		if (index_def_cmp(index_def, old_index->index_def) == 0) {
+		if (index_def_cmp(index_def, old_index->def) == 0) {
 			/* Index is not changed so just move it. */
-			(void) new MoveIndex(alter, old_index->index_def->iid);
+			(void) new MoveIndex(alter, old_index->def->iid);
 		}
-		else if (index_def_change_requires_rebuild(old_index->index_def, index_def)) {
+		else if (index_def_change_requires_rebuild(old_index->def, index_def)) {
 			/*
 			 * Operation demands an index rebuild.
 			 */
 			(void) new RebuildIndex(alter, index_def,
-						old_index->index_def);
+						old_index->def);
 			index_def_guard.is_active = false;
 		} else {
 			/*
 			 * Operation can be done without index rebuild.
 			 */
 			(void) new ModifyIndex(alter, index_def,
-					       old_index->index_def);
+					       old_index->def);
 			index_def_guard.is_active = false;
 		}
 	}
@@ -2837,7 +2837,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
 		struct index *pk = index_find(space, 0);
-		index_def_check_sequence(pk->index_def, space_name(space));
+		index_def_check_sequence(pk->def, space_name(space));
 		if (seq->is_generated) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(space),

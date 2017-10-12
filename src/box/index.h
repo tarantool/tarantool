@@ -301,7 +301,7 @@ enum dup_replace_mode {
 struct index {
 public:
 	/* Description of a possibly multipart key. */
-	struct index_def *index_def;
+	struct index_def *def;
 	/* Schema version on index construction moment */
 	uint32_t schema_version;
 
@@ -319,7 +319,7 @@ protected:
 	 *
 	 * @param index_def  key part description
 	 */
-	index(struct index_def *index_def);
+	index(struct index_def *def);
 
 public:
 	virtual ~index();
@@ -448,13 +448,13 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 static inline uint32_t
 index_id(struct index *index)
 {
-	return index->index_def->iid;
+	return index->def->iid;
 }
 
 static inline const char *
 index_name(struct index *index)
 {
-	return index->index_def->name;
+	return index->def->name;
 }
 
 /** True if this index is a primary key. */

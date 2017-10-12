@@ -112,7 +112,7 @@ SysviewIndex::initIterator(struct iterator *iterator,
 	 * It is possible to change a source space without changing
 	 * the view.
 	 */
-	if (key_validate(pk->index_def, type, key, part_count))
+	if (key_validate(pk->def, type, key, part_count))
 		diag_raise();
 	/* Re-allocate iterator if schema was changed */
 	if (it->source != NULL && it->source->schema_version != ::schema_version) {
@@ -134,9 +134,9 @@ SysviewIndex::findByKey(const char *key, uint32_t part_count)
 {
 	struct space *source = space_cache_find(source_space_id);
 	struct index *pk = index_find_xc(source, source_index_id);
-	if (!pk->index_def->opts.is_unique)
+	if (!pk->def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
-	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		diag_raise();
 	struct tuple *tuple = pk->findByKey(key, part_count);
 	if (tuple == NULL || !filter(source, tuple))

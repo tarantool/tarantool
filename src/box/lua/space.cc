@@ -162,7 +162,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		struct index *index = space_index(space, k);
 		if (index == NULL)
 			continue;
-		struct index_def *index_def = index->index_def;
+		struct index_def *index_def = index->def;
 		struct index_opts *index_opts = &index_def->opts;
 		lua_pushnumber(L, index_def->iid);
 		lua_newtable(L);		/* space.index[k] */

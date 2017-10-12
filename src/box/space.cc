@@ -166,15 +166,14 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 
 	/** Ensure the primary key is added first. */
 	for (unsigned j = 0; j < space->index_count; j++)
-		rlist_add_tail_entry(key_list, space->index[j]->index_def,
-				     link);
+		rlist_add_tail_entry(key_list, space->index[j]->def, link);
 }
 
 struct key_def *
 space_index_key_def(struct space *space, uint32_t id)
 {
 	if (id <= space->index_id_max && space->index_map[id])
-		return space->index_map[id]->index_def->key_def;
+		return space->index_map[id]->def->key_def;
 	return NULL;
 }
 
@@ -202,7 +201,7 @@ space_bsize(struct space *space)
 struct index_def *
 space_index_def(struct space *space, int n)
 {
-	return space->index[n]->index_def;
+	return space->index[n]->def;
 }
 
 const char *
@@ -210,7 +209,7 @@ index_name_by_id(struct space *space, uint32_t id)
 {
 	struct index *index = space_index(space, id);
 	if (index != NULL)
-		return index->index_def->name;
+		return index->def->name;
 	return NULL;
 }
 
@@ -232,7 +231,7 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	if (key_validate(index->index_def, type, key, part_count))
+	if (key_validate(index->def, type, key, part_count))
 		diag_raise();
 
 	struct iterator *it = index->allocIterator();

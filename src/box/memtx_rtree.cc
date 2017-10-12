@@ -168,11 +168,11 @@ MemtxRTree::~MemtxRTree()
 MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
 	: index(index_def_arg)
 {
-	assert(index_def->key_def->part_count == 1);
-	assert(index_def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
-	assert(index_def->opts.is_unique == false);
+	assert(def->key_def->part_count == 1);
+	assert(def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
+	assert(def->opts.is_unique == false);
 
-	m_dimension = index_def->opts.dimension;
+	m_dimension = def->opts.dimension;
 	if (m_dimension < 1 || m_dimension > RTREE_MAX_DIMENSION) {
 		char message[64];
 		snprintf(message, 64, "dimension (%u): must belong to range "
@@ -184,7 +184,7 @@ MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
 	assert((int)RTREE_EUCLID == (int)RTREE_INDEX_DISTANCE_TYPE_EUCLID);
 	assert((int)RTREE_MANHATTAN == (int)RTREE_INDEX_DISTANCE_TYPE_MANHATTAN);
 	enum rtree_distance_type distance_type =
-		(enum rtree_distance_type)(int)index_def->opts.distance;
+		(enum rtree_distance_type)(int)def->opts.distance;
 	rtree_init(&m_tree, m_dimension, MEMTX_EXTENT_SIZE,
 		   memtx_index_extent_alloc, memtx_index_extent_free, NULL,
 		   distance_type);
@@ -244,11 +244,11 @@ MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 {
 	struct rtree_rect rect;
 	if (new_tuple) {
-		extract_rectangle(&rect, new_tuple, index_def);
+		extract_rectangle(&rect, new_tuple, def);
 		rtree_insert(&m_tree, &rect, new_tuple);
 	}
 	if (old_tuple) {
-		extract_rectangle(&rect, old_tuple, index_def);
+		extract_rectangle(&rect, old_tuple, def);
 		if (!rtree_remove(&m_tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}

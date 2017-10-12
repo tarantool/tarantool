@@ -289,10 +289,10 @@ MemtxTree::MemtxTree(struct index_def *index_def_arg)
 	 * tuple_compare.cc.
 	 */
 	struct key_def *cmp_def;
-	if (index_def->opts.is_unique && !index_def->key_def->is_nullable)
-		cmp_def = index_def->key_def;
+	if (def->opts.is_unique && !def->key_def->is_nullable)
+		cmp_def = def->key_def;
 	else
-		cmp_def = index_def->cmp_def;
+		cmp_def = def->cmp_def;
 	memtx_tree_create(&tree, cmp_def,
 			  memtx_index_extent_alloc,
 			  memtx_index_extent_free, NULL);
@@ -345,7 +345,7 @@ MemtxTree::random(uint32_t rnd)
 struct tuple *
 MemtxTree::findByKey(const char *key, uint32_t part_count)
 {
-	assert(index_def->opts.is_unique && part_count == index_def->key_def->part_count);
+	assert(def->opts.is_unique && part_count == def->key_def->part_count);
 
 	struct memtx_tree_key_data key_data;
 	key_data.key = key;
@@ -377,7 +377,7 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			memtx_tree_delete(&tree, new_tuple);
 			if (dup_tuple)
 				memtx_tree_insert(&tree, dup_tuple, 0);
-			struct space *sp = space_cache_find(index_def->space_id);
+			struct space *sp = space_cache_find(def->space_id);
 			tnt_raise(ClientError, errcode, index_name(this),
 				  space_name(sp));
 		}
@@ -400,7 +400,7 @@ MemtxTree::allocIterator()
 			  "MemtxTree", "iterator");
 	}
 
-	it->index_def = index_def;
+	it->index_def = def;
 	it->tree = &tree;
 	it->base.free = tree_iterator_free;
 	it->current_tuple = NULL;
@@ -493,8 +493,8 @@ void
 MemtxTree::endBuild()
 {
 	/** Use extended key def only for non-unique indexes. */
-	struct key_def *cmp_def = index_def->opts.is_unique ?
-		index_def->key_def : index_def->cmp_def;
+	struct key_def *cmp_def = def->opts.is_unique ?
+			def->key_def : def->cmp_def;
 	qsort_arg(build_array, build_array_size,
 		  sizeof(struct tuple *),
 		  memtx_tree_qcompare, cmp_def);

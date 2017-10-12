@@ -235,7 +235,7 @@ memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 	try {
 		/* Update the primary key */
 		struct index *pk = index_find_xc(space, 0);
-		assert(pk->index_def->opts.is_unique);
+		assert(pk->def->opts.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
 		 * has to find and delete it, or raise an
@@ -313,7 +313,7 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	struct index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 	if (stmt->old_tuple)
@@ -331,7 +331,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	struct index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 
@@ -372,12 +372,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 
 	struct index *index = index_find_unique(space, 0);
 
-	struct index_def *index_def = index->index_def;
-	uint32_t part_count = index->index_def->key_def->part_count;
+	uint32_t part_count = index->def->key_def->part_count;
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
-						index_def->key_def, NULL);
+						index->def->key_def, NULL);
 	if (key == NULL)
 		diag_raise();
 	/* Cut array header */
@@ -438,13 +437,13 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		tuple_ref(stmt->new_tuple);
 
 		struct index *pk = space->index[0];
-		if (!key_update_can_be_skipped(pk->index_def->key_def->column_mask,
+		if (!key_update_can_be_skipped(pk->def->key_def->column_mask,
 					       column_mask) &&
 		    tuple_compare(stmt->old_tuple, stmt->new_tuple,
-				  pk->index_def->key_def) != 0) {
+				  pk->def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 pk->index_def->name, space_name(space));
+				 pk->def->name, space_name(space));
 			diag_log();
 			tuple_unref(stmt->new_tuple);
 			stmt->old_tuple = NULL;
@@ -482,7 +481,7 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 	enum iterator_type type = (enum iterator_type) iterator;
 
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	if (key_validate(index->index_def, type, key, part_count))
+	if (key_validate(index->def, type, key, part_count))
 		diag_raise();
 
 	struct iterator *it = index->position();
@@ -717,12 +716,11 @@ memtx_space_build_secondary_key(struct space *old_space,
 				struct space *new_space,
 				struct index *new_index)
 {
-	struct index_def *new_index_def = new_index->index_def;
 	/**
 	 * If it's a secondary key, and we're not building them
 	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
 	 */
-	if (new_index_def->iid != 0) {
+	if (new_index->def->iid != 0) {
 		struct memtx_space *memtx_space;
 		memtx_space = (struct memtx_space *)new_space;
 		if (!(memtx_space->replace == memtx_space_replace_all_keys))
@@ -731,7 +729,7 @@ memtx_space_build_secondary_key(struct space *old_space,
 	struct index *pk = index_find_xc(old_space, 0);
 
 	struct errinj *inj = errinj(ERRINJ_BUILD_SECONDARY, ERRINJ_INT);
-	if (inj != NULL && inj->iparam == (int)new_index->index_def->iid) {
+	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
 		tnt_raise(ClientError, ER_INJECTION, "buildSecondaryKey");
 	}
 

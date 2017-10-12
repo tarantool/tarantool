@@ -367,7 +367,7 @@ static inline struct index *
 index_find_unique(struct space *space, uint32_t index_id)
 {
 	struct index *index = index_find_xc(space, index_id);
-	if (! index->index_def->opts.is_unique)
+	if (!index->def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	return index;
 }

@@ -159,10 +159,9 @@ static void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple)
 {
-	struct index *primary = index_find_xc(space, 0);
+	struct index *pk = index_find_xc(space, 0);
 	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple,
-			primary->index_def->key_def, &key_len);
+	char *key = tuple_extract_key(found_tuple, pk->def->key_def, &key_len);
 	if (key == NULL)
 		diag_raise();
 	request->key = key;
@@ -202,7 +201,7 @@ request_handle_sequence(struct request *request, struct space *space)
 	const char *data = request->tuple;
 	const char *data_end = request->tuple_end;
 	int len = mp_decode_array(&data);
-	int fieldno = pk->index_def->key_def->parts[0].fieldno;
+	int fieldno = pk->def->key_def->parts[0].fieldno;
 	if (unlikely(len < fieldno + 1))
 		return;
 

@@ -45,7 +45,7 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 	unsigned line, struct index *index, const char *what)
 	: ClientError(file, line, ER_UNKNOWN)
 {
-	struct index_def *index_def = index->index_def;
+	struct index_def *index_def = index->def;
 	struct space *space = space_cache_find(index_def->space_id);
 	m_errcode = ER_UNSUPPORTED_INDEX_FEATURE;
 	error_format_msg(this, tnt_errcode_desc(m_errcode), index_def->name,
@@ -151,8 +151,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 	try {
 		struct space *space = space_by_id(space_id);
 		struct index *index = index_find_xc(space, index_id);
-		return tuple_extract_key(tuple, index->index_def->key_def,
-					 key_size);
+		return tuple_extract_key(tuple, index->def->key_def, key_size);
 	} catch (ClientError *e) {
 		return NULL;
 	}
@@ -163,10 +162,10 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /* {{{ Index -- base class for all indexes. ********************/
 
 index::index(struct index_def *index_def_arg)
-	:index_def(NULL), schema_version(::schema_version), m_position(NULL)
+	:def(NULL), schema_version(::schema_version), m_position(NULL)
 {
-	index_def = index_def_dup(index_def_arg);
-	if (index_def == NULL)
+	def = index_def_dup(index_def_arg);
+	if (def == NULL)
 		diag_raise();
 }
 
@@ -174,7 +173,7 @@ index::~index()
 {
 	if (m_position != NULL)
 		m_position->free(m_position);
-	index_def_delete(index_def);
+	index_def_delete(def);
 }
 
 void
@@ -367,11 +366,10 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	try {
 		struct space *space;
 		struct index *index = check_index(space_id, index_id, &space);
-		if (!index->index_def->opts.is_unique)
+		if (!index->def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = mp_decode_array(&key);
-		if (exact_key_validate(index->index_def->key_def, key,
-					 part_count))
+		if (exact_key_validate(index->def->key_def, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine. */
 		struct txn *txn = txn_begin_ro_stmt(space);
@@ -397,12 +395,12 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	try {
 		struct space *space;
 		struct index *index = check_index(space_id, index_id, &space);
-		if (index->index_def->type != TREE) {
+		if (index->def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "min()");
 		}
 		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, ITER_GE, key, part_count))
+		if (key_validate(index->def, ITER_GE, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
@@ -425,12 +423,12 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	try {
 		struct space *space;
 		struct index *index = check_index(space_id, index_id, &space);
-		if (index->index_def->type != TREE) {
+		if (index->def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "max()");
 		}
 		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, ITER_LE, key, part_count))
+		if (key_validate(index->def, ITER_LE, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
@@ -455,7 +453,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		struct space *space;
 		struct index *index = check_index(space_id, index_id, &space);
 		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, itype, key, part_count))
+		if (key_validate(index->def, itype, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
 		struct txn *txn = txn_begin_ro_stmt(space);
@@ -486,7 +484,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		struct txn *txn = txn_begin_ro_stmt(space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, itype, key, part_count))
+		if (key_validate(index->def, itype, key, part_count))
 			diag_raise();
 		it = index->allocIterator();
 		index->initIterator(it, itype, key, part_count);
@@ -583,7 +581,7 @@ index_build(struct index *index, struct index *pk)
 
 	if (n_tuples > 0) {
 		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
-			 n_tuples, index_type_strs[index->index_def->type],
+			 n_tuples, index_type_strs[index->def->type],
 			 index_name(index));
 	}
 
