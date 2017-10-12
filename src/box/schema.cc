@@ -98,8 +98,8 @@ box_schema_version()
 /**
  * Visit all spaces and apply 'func'.
  */
-void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
+int
+space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 {
 	mh_int_t i;
 	struct space *space;
@@ -116,28 +116,43 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 	space = space_by_id(BOX_SPACE_ID);
 	struct index *pk = space ? space_index(space, 0) : NULL;
 	if (pk) {
-		struct iterator *it = index_alloc_iterator_xc(pk);
-		auto scoped_guard = make_scoped_guard([=] { it->free(it); });
-		index_init_iterator_xc(pk, it, ITER_GE, key, 1);
+		struct iterator *it = index_alloc_iterator(pk);
+		if (it == NULL)
+			return -1;
+		if (index_init_iterator(pk, it, ITER_GE, key, 1) != 0) {
+			it->free(it);
+			return -1;
+		}
 
+		int rc;
 		struct tuple *tuple;
-		while ((tuple = iterator_next_xc(it)) != NULL) {
-			/* Get space id, primary key, field 0. */
-			uint32_t id =
-				tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
-			space = space_cache_find_xc(id);
+		while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
+			uint32_t id;
+			if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &id) != 0)
+				continue;
+			space = space_cache_find(id);
+			if (space == NULL)
+				continue;
 			if (! space_is_system(space))
 				break;
-			func(space, udata);
+			rc = func(space, udata);
+			if (rc != 0)
+				break;
 		}
+		it->free(it);
+		if (rc != 0)
+			return -1;
 	}
 
 	mh_foreach(spaces, i) {
 		space = (struct space *) mh_i32ptr_node(spaces, i)->val;
 		if (space_is_system(space))
 			continue;
-		func(space, udata);
+		if (func(space, udata) != 0)
+			return -1;
 	}
+
+	return 0;
 }
 
 /** Delete a space from the space cache and Lua. */

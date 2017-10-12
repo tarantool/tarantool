@@ -74,16 +74,17 @@ txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
 	txn_rollback(); /* doesn't throw */
 }
 
-static void
+static int
 memtx_end_build_primary_key(struct space *space, void *param)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	if (space->engine != param || space_index(space, 0) == NULL ||
 	    memtx_space->replace == memtx_space_replace_all_keys)
-		return;
+		return 0;
 
 	index_end_build(space->index[0]);
 	memtx_space->replace = memtx_space_replace_primary_key;
+	return 0;
 }
 
 /**
@@ -92,31 +93,35 @@ memtx_end_build_primary_key(struct space *space, void *param)
  * Data dictionary spaces are an exception, they are fully
  * built right from the start.
  */
-void
+static int
 memtx_build_secondary_keys(struct space *space, void *param)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	if (space->engine != param || space_index(space, 0) == NULL ||
 	    memtx_space->replace == memtx_space_replace_all_keys)
-		return;
+		return 0;
 
 	if (space->index_id_max > 0) {
 		struct index *pk = space->index[0];
-		uint32_t n_tuples = index_size_xc(pk);
+		ssize_t n_tuples = index_size(pk);
+		assert(n_tuples >= 0);
 
 		if (n_tuples > 0) {
 			say_info("Building secondary indexes in space '%s'...",
 				 space_name(space));
 		}
 
-		for (uint32_t j = 1; j < space->index_count; j++)
-			index_build_xc(space->index[j], pk);
+		for (uint32_t j = 1; j < space->index_count; j++) {
+			if (index_build(space->index[j], pk) < 0)
+				return -1;
+		}
 
 		if (n_tuples > 0) {
 			say_info("Space '%s': done", space_name(space));
 		}
 	}
 	memtx_space->replace = memtx_space_replace_all_keys;
+	return 0;
 }
 
 static void
@@ -252,7 +257,8 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		 * unique keys.
 		 */
 		memtx->state = MEMTX_OK;
-		space_foreach(memtx_build_secondary_keys, memtx);
+		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
+			diag_raise();
 	}
 }
 
@@ -269,7 +275,8 @@ memtx_engine_end_recovery(struct engine *engine)
 	if (memtx->state != MEMTX_OK) {
 		assert(memtx->state == MEMTX_FINAL_RECOVERY);
 		memtx->state = MEMTX_OK;
-		space_foreach(memtx_build_secondary_keys, memtx);
+		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
+			diag_raise();
 	}
 }
 
@@ -497,7 +504,7 @@ struct checkpoint {
 	bool touch;
 };
 
-static void
+static int
 checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 		uint64_t snap_io_rate_limit)
 {
@@ -507,11 +514,14 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
 	ckpt->vclock = (struct vclock *) malloc(sizeof(*ckpt->vclock));
-	if (ckpt->vclock == NULL)
-		tnt_raise(OutOfMemory, sizeof(*ckpt->vclock),
-			  "malloc", "vclock");
+	if (ckpt->vclock == NULL) {
+		diag_set(OutOfMemory, sizeof(*ckpt->vclock),
+			 "malloc", "vclock");
+		return -1;
+	}
 	vclock_create(ckpt->vclock);
 	ckpt->touch = false;
+	return 0;
 }
 
 static void
@@ -527,23 +537,32 @@ checkpoint_destroy(struct checkpoint *ckpt)
 }
 
 
-static void
+static int
 checkpoint_add_space(struct space *sp, void *data)
 {
 	if (space_is_temporary(sp))
-		return;
+		return 0;
 	if (!space_is_memtx(sp))
-		return;
+		return 0;
 	struct index *pk = space_index(sp, 0);
 	if (!pk)
-		return;
+		return 0;
 	struct checkpoint *ckpt = (struct checkpoint *)data;
 	struct checkpoint_entry *entry;
-	entry = region_alloc_object_xc(&fiber()->gc, struct checkpoint_entry);
+	entry = region_alloc_object(&fiber()->gc, struct checkpoint_entry);
+	if (entry == NULL) {
+		diag_set(OutOfMemory, sizeof(*entry),
+			 "region", "struct checkpoint_entry");
+		return -1;
+	}
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
 
 	entry->space = sp;
-	entry->iterator = index_create_snapshot_iterator_xc(pk);
+	entry->iterator = index_create_snapshot_iterator(pk);
+	if (entry->iterator == NULL)
+		return -1;
+
+	return 0;
 };
 
 static int
@@ -591,11 +610,22 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
 	assert(memtx->checkpoint == NULL);
-	memtx->checkpoint = region_alloc_object_xc(&fiber()->gc, struct checkpoint);
+	memtx->checkpoint = region_alloc_object(&fiber()->gc, struct checkpoint);
+	if (memtx->checkpoint == NULL) {
+		diag_set(OutOfMemory, sizeof(*memtx->checkpoint),
+			 "region", "struct checkpoint");
+		return -1;
+	}
 
-	checkpoint_init(memtx->checkpoint, memtx->snap_dir.dirname,
-			memtx->snap_io_rate_limit);
-	space_foreach(checkpoint_add_space, memtx->checkpoint);
+	if (checkpoint_init(memtx->checkpoint, memtx->snap_dir.dirname,
+			    memtx->snap_io_rate_limit) != 0)
+		return -1;
+
+	if (space_foreach(checkpoint_add_space, memtx->checkpoint) != 0) {
+		checkpoint_destroy(memtx->checkpoint);
+		memtx->checkpoint = NULL;
+		return -1;
+	}
 
 	/* increment snapshot version; set tuple deletion to delayed mode */
 	memtx_tuple_begin_snapshot();

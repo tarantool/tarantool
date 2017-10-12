@@ -85,12 +85,12 @@ space_cache_find(uint32_t id)
 struct func *
 func_by_name(const char *name, uint32_t name_len);
 
+/** Call a visitor function on every space in the space cache. */
+int
+space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
+
 #if defined(__cplusplus)
 } /* extern "C" */
-
-/** Call a visitor function on every space in the space cache. */
-void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 
 static inline struct space *
 space_cache_find_xc(uint32_t id)
