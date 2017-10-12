@@ -80,7 +80,7 @@ sysview_index_destroy(struct index *index)
 	free(index);
 }
 
-static size_t
+static ssize_t
 sysview_index_bsize(struct index *)
 {
 	return 0;
@@ -92,14 +92,15 @@ sysview_index_alloc_iterator(void)
 	struct sysview_iterator *it = (struct sysview_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(OutOfMemory, sizeof(struct sysview_iterator),
-			  "malloc", "struct sysview_iterator");
+		diag_set(OutOfMemory, sizeof(struct sysview_iterator),
+			 "malloc", "struct sysview_iterator");
+		return NULL;
 	}
 	it->base.free = sysview_iterator_free;
 	return (struct iterator *) it;
 }
 
-static void
+static int
 sysview_index_init_iterator(struct index *base, struct iterator *iterator,
 			    enum iterator_type type,
 			    const char *key, uint32_t part_count)
@@ -107,15 +108,19 @@ sysview_index_init_iterator(struct index *base, struct iterator *iterator,
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_index *index = (struct sysview_index *)base;
 	struct sysview_iterator *it = sysview_iterator(iterator);
-	struct space *source = space_cache_find_xc(index->source_space_id);
-	struct index *pk = index_find_xc(source, index->source_index_id);
+	struct space *source = space_cache_find(index->source_space_id);
+	if (source == NULL)
+		return -1;
+	struct index *pk = index_find(source, index->source_index_id);
+	if (pk == NULL)
+		return -1;
 	/*
 	 * Explicitly validate that key matches source's index_def.
 	 * It is possible to change a source space without changing
 	 * the view.
 	 */
 	if (key_validate(pk->def, type, key, part_count))
-		diag_raise();
+		return -1;
 	/* Re-allocate iterator if schema was changed */
 	if (it->source != NULL &&
 	    it->source->schema_version != schema_version) {
@@ -123,29 +128,44 @@ sysview_index_init_iterator(struct index *base, struct iterator *iterator,
 		it->source = NULL;
 	}
 	if (it->source == NULL) {
-		it->source = index_alloc_iterator_xc(pk);
+		it->source = index_alloc_iterator(pk);
+		if (it->source == NULL)
+			return -1;
 		it->source->schema_version = schema_version;
 	}
-	index_init_iterator_xc(pk, it->source, type, key, part_count);
+	if (index_init_iterator(pk, it->source, type, key, part_count) != 0)
+		return -1;
 	iterator->index = (struct index *) index;
 	iterator->next = sysview_iterator_next;
 	it->space = source;
+	return 0;
 }
 
-static struct tuple *
-sysview_index_get(struct index *base, const char *key, uint32_t part_count)
+static int
+sysview_index_get(struct index *base, const char *key,
+		  uint32_t part_count, struct tuple **result)
 {
 	struct sysview_index *index = (struct sysview_index *)base;
-	struct space *source = space_cache_find_xc(index->source_space_id);
-	struct index *pk = index_find_xc(source, index->source_index_id);
-	if (!pk->def->opts.is_unique)
-		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
+	struct space *source = space_cache_find(index->source_space_id);
+	if (source == NULL)
+		return -1;
+	struct index *pk = index_find(source, index->source_index_id);
+	if (pk == NULL)
+		return -1;
+	if (!pk->def->opts.is_unique) {
+		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		return -1;
+	}
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
-		diag_raise();
-	struct tuple *tuple = index_get_xc(pk, key, part_count);
+		return -1;
+	struct tuple *tuple;
+	if (index_get(pk, key, part_count, &tuple) != 0)
+		return -1;
 	if (tuple == NULL || !index->filter(source, tuple))
-		return NULL;
-	return tuple;
+		*result = NULL;
+	else
+		*result = tuple;
+	return 0;
 }
 
 static const struct index_vtab sysview_index_vtab = {
@@ -180,8 +200,12 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	uint32_t space_id = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
-	struct space *space = space_cache_find_xc(space_id);
+	uint32_t space_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &space_id) != 0)
+		return false;
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return false;
 	uint8_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
 		space->def->uid == cr->uid);
@@ -196,8 +220,12 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	uint32_t uid = tuple_field_u32_xc(tuple, BOX_USER_FIELD_ID);
-	uint32_t owner_id = tuple_field_u32_xc(tuple, BOX_USER_FIELD_UID);
+	uint32_t uid;
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
+		return false;
+	uint32_t owner_id;
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_UID, &owner_id) != 0)
+		return false;
 	return uid == cr->uid || owner_id == cr->uid;
 }
 
@@ -210,8 +238,12 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	uint32_t grantor_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_ID);
-	uint32_t grantee_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_UID);
+	uint32_t grantor_id;
+	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_ID, &grantor_id) != 0)
+		return false;
+	uint32_t grantee_id;
+	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_UID, &grantee_id) != 0)
+		return false;
 	return grantor_id == cr->uid || grantee_id == cr->uid;
 }
 
@@ -224,7 +256,9 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to original space */
 
-	const char *name = tuple_field_cstr_xc(tuple, BOX_FUNC_FIELD_NAME);
+	const char *name = tuple_field_cstr(tuple, BOX_FUNC_FIELD_NAME);
+	if (name == NULL)
+		return false;
 	uint32_t name_len = strlen(name);
 	struct func *func = func_by_name(name, name_len);
 	assert(func != NULL);
@@ -270,20 +304,22 @@ sysview_index_new(struct index_def *def, const char *space_name)
 		filter = vpriv_filter;
 		break;
 	default:
-		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  def->name, space_name,
-			  "unknown space for system view");
+		diag_set(ClientError, ER_MODIFY_INDEX,
+			 def->name, space_name,
+			 "unknown space for system view");
+		return NULL;
 	}
 
 	struct sysview_index *index =
 		(struct sysview_index *)calloc(1, sizeof(*index));
 	if (index == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*index),
-			  "malloc", "struct sysview_index");
+		diag_set(OutOfMemory, sizeof(*index),
+			 "malloc", "struct sysview_index");
+		return NULL;
 	}
 	if (index_create(&index->base, &sysview_index_vtab, def) != 0) {
 		free(index);
-		diag_raise();
+		return NULL;
 	}
 
 	index->source_space_id = source_space_id;

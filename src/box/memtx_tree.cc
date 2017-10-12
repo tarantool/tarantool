@@ -283,30 +283,32 @@ memtx_tree_index_destroy(struct index *base)
 	free(index);
 }
 
-static size_t
+static ssize_t
 memtx_tree_index_size(struct index *base)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	return memtx_tree_size(&index->tree);
 }
 
-static size_t
+static ssize_t
 memtx_tree_index_bsize(struct index *base)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	return memtx_tree_mem_used(&index->tree);
 }
 
-static struct tuple *
-memtx_tree_index_random(struct index *base, uint32_t rnd)
+static int
+memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	struct tuple **res = memtx_tree_random(&index->tree, rnd);
-	return res != NULL ? *res : NULL;
+	*result = res != NULL ? *res : NULL;
+	return 0;
 }
 
-static struct tuple *
-memtx_tree_index_get(struct index *base, const char *key, uint32_t part_count)
+static int
+memtx_tree_index_get(struct index *base, const char *key,
+		     uint32_t part_count, struct tuple **result)
 {
 	assert(base->def->opts.is_unique &&
 	       part_count == base->def->key_def->part_count);
@@ -315,12 +317,14 @@ memtx_tree_index_get(struct index *base, const char *key, uint32_t part_count)
 	key_data.key = key;
 	key_data.part_count = part_count;
 	struct tuple **res = memtx_tree_find(&index->tree, &key_data);
-	return res != NULL ? *res : NULL;
+	*result = res != NULL ? *res : NULL;
+	return 0;
 }
 
-static struct tuple *
+static int
 memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode)
+			 struct tuple *new_tuple, enum dup_replace_mode mode,
+			 struct tuple **result)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	if (new_tuple) {
@@ -330,8 +334,9 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 		int tree_res = memtx_tree_insert(&index->tree,
 						 new_tuple, &dup_tuple);
 		if (tree_res) {
-			tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
-				  "memtx_tree_index", "replace");
+			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+				 "memtx_tree_index", "replace");
+			return -1;
 		}
 
 		uint32_t errcode = replace_check_dup(old_tuple,
@@ -340,17 +345,22 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 			memtx_tree_delete(&index->tree, new_tuple);
 			if (dup_tuple)
 				memtx_tree_insert(&index->tree, dup_tuple, 0);
-			struct space *sp = space_cache_find_xc(base->def->space_id);
-			tnt_raise(ClientError, errcode, base->def->name,
-				  space_name(sp));
+			struct space *sp = space_cache_find(base->def->space_id);
+			if (sp != NULL)
+				diag_set(ClientError, errcode, base->def->name,
+					 space_name(sp));
+			return -1;
 		}
-		if (dup_tuple)
-			return dup_tuple;
+		if (dup_tuple) {
+			*result = dup_tuple;
+			return 0;
+		}
 	}
 	if (old_tuple) {
 		memtx_tree_delete(&index->tree, old_tuple);
 	}
-	return old_tuple;
+	*result = old_tuple;
+	return 0;
 }
 
 static struct iterator *
@@ -359,14 +369,15 @@ memtx_tree_index_alloc_iterator(void)
 	struct tree_iterator *it = (struct tree_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(OutOfMemory, sizeof(struct tree_iterator),
-			  "memtx_tree_index", "iterator");
+		diag_set(OutOfMemory, sizeof(struct tree_iterator),
+			 "memtx_tree_index", "iterator");
+		return NULL;
 	}
 	it->base.free = tree_iterator_free;
 	return (struct iterator *) it;
 }
 
-static void
+static int
 memtx_tree_index_init_iterator(struct index *base, struct iterator *iterator,
 			       enum iterator_type type,
 			       const char *key, uint32_t part_count)
@@ -375,9 +386,11 @@ memtx_tree_index_init_iterator(struct index *base, struct iterator *iterator,
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	if (type < 0 || type > ITER_GT) /* Unsupported type */
-		tnt_raise(UnsupportedIndexFeature, base->def,
-			  "requested iterator type");
+	if (type < 0 || type > ITER_GT) { /* Unsupported type */
+		diag_set(UnsupportedIndexFeature, base->def,
+			 "requested iterator type");
+		return -1;
+	}
 
 	if (part_count == 0) {
 		/*
@@ -402,6 +415,7 @@ memtx_tree_index_init_iterator(struct index *base, struct iterator *iterator,
 	it->tree = &index->tree;
 	it->base.next = tree_iterator_start;
 	it->tree_iterator = memtx_tree_invalid_iterator();
+	return 0;
 }
 
 static void
@@ -412,30 +426,34 @@ memtx_tree_index_begin_build(struct index *base)
 	(void)index;
 }
 
-static void
+static int
 memtx_tree_index_reserve(struct index *base, uint32_t size_hint)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	if (size_hint < index->build_array_alloc_size)
-		return;
+		return 0;
 	struct tuple **tmp = (struct tuple **)realloc(index->build_array,
 						      size_hint * sizeof(*tmp));
-	if (tmp == NULL)
-		tnt_raise(OutOfMemory, size_hint * sizeof(*tmp),
-			  "memtx_tree_index", "reserve");
+	if (tmp == NULL) {
+		diag_set(OutOfMemory, size_hint * sizeof(*tmp),
+			 "memtx_tree_index", "reserve");
+		return -1;
+	}
 	index->build_array = tmp;
 	index->build_array_alloc_size = size_hint;
+	return 0;
 }
 
-static void
+static int
 memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	if (index->build_array == NULL) {
 		index->build_array = (struct tuple **)malloc(MEMTX_EXTENT_SIZE);
 		if (index->build_array == NULL) {
-			tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
-				  "memtx_tree_index", "build_next");
+			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+				 "memtx_tree_index", "build_next");
+			return -1;
 		}
 		index->build_array_alloc_size =
 			MEMTX_EXTENT_SIZE / sizeof(struct tuple*);
@@ -448,12 +466,14 @@ memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 			realloc(index->build_array,
 				index->build_array_alloc_size * sizeof(*tmp));
 		if (tmp == NULL) {
-			tnt_raise(OutOfMemory, index->build_array_alloc_size *
-				sizeof(*tmp), "memtx_tree_index", "build_next");
+			diag_set(OutOfMemory, index->build_array_alloc_size *
+				 sizeof(*tmp), "memtx_tree_index", "build_next");
+			return -1;
 		}
 		index->build_array = tmp;
 	}
 	index->build_array[index->build_array_size++] = tuple;
+	return 0;
 }
 
 static void
@@ -516,9 +536,11 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	struct tree_snapshot_iterator *it = (struct tree_snapshot_iterator *)
 		calloc(1, sizeof(*it));
-	if (it == NULL)
-		tnt_raise(OutOfMemory, sizeof(struct tree_snapshot_iterator),
-			  "memtx_tree_index", "create_snapshot_iterator");
+	if (it == NULL) {
+		diag_set(OutOfMemory, sizeof(struct tree_snapshot_iterator),
+			 "memtx_tree_index", "create_snapshot_iterator");
+		return NULL;
+	}
 
 	it->base.free = tree_snapshot_iterator_free;
 	it->base.next = tree_snapshot_iterator_next;
@@ -559,12 +581,13 @@ memtx_tree_index_new(struct index_def *def)
 	struct memtx_tree_index *index =
 		(struct memtx_tree_index *)calloc(1, sizeof(*index));
 	if (index == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*index),
-			  "malloc", "struct memtx_tree_index");
+		diag_set(OutOfMemory, sizeof(*index),
+			 "malloc", "struct memtx_tree_index");
+		return NULL;
 	}
 	if (index_create(&index->base, &memtx_tree_index_vtab, def) != 0) {
 		free(index);
-		diag_raise();
+		return NULL;
 	}
 
 	/**

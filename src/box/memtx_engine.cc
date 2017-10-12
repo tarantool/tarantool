@@ -834,12 +834,17 @@ memtx_index_extent_alloc(void *ctx)
 			memtx_index_reserved_extents;
 		return result;
 	}
-	ERROR_INJECT(ERRINJ_INDEX_ALLOC,
-		     /* same error as in mempool_alloc */
-		     tnt_raise(OutOfMemory, MEMTX_EXTENT_SIZE,
-			       "mempool", "new slab")
-		    );
-	return mempool_alloc_xc(&memtx_index_extent_pool);
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
+		/* same error as in mempool_alloc */
+		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+			 "mempool", "new slab");
+		return NULL;
+	});
+	void *ret = mempool_alloc(&memtx_index_extent_pool);
+	if (ret == NULL)
+		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+			 "mempool", "new slab");
+	return ret;
 }
 
 /**

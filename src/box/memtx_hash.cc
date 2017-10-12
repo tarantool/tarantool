@@ -134,14 +134,14 @@ memtx_hash_index_destroy(struct index *base)
 	free(index);
 }
 
-static size_t
+static ssize_t
 memtx_hash_index_size(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	return index->hash_table->count;
 }
 
-static size_t
+static ssize_t
 memtx_hash_index_bsize(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
@@ -149,24 +149,27 @@ memtx_hash_index_bsize(struct index *base)
 					HASH_INDEX_EXTENT_SIZE;
 }
 
-static struct tuple *
-memtx_hash_index_random(struct index *base, uint32_t rnd)
+static int
+memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct light_index_core *hash_table = index->hash_table;
 
+	*result = NULL;
 	if (hash_table->count == 0)
-		return NULL;
+		return 0;
 	rnd %= (hash_table->table_size);
 	while (!light_index_pos_valid(hash_table, rnd)) {
 		rnd++;
 		rnd %= (hash_table->table_size);
 	}
-	return light_index_get(hash_table, rnd);
+	*result = light_index_get(hash_table, rnd);
+	return 0;
 }
 
-static struct tuple *
-memtx_hash_index_get(struct index *base, const char *key, uint32_t part_count)
+static int
+memtx_hash_index_get(struct index *base, const char *key,
+		     uint32_t part_count, struct tuple **result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -174,17 +177,18 @@ memtx_hash_index_get(struct index *base, const char *key, uint32_t part_count)
 	       part_count == base->def->key_def->part_count);
 	(void) part_count;
 
-	struct tuple *ret = NULL;
+	*result = NULL;
 	uint32_t h = key_hash(key, base->def->key_def);
 	uint32_t k = light_index_find_key(index->hash_table, h, key);
 	if (k != light_index_end)
-		ret = light_index_get(index->hash_table, k);
-	return ret;
+		*result = light_index_get(index->hash_table, k);
+	return 0;
 }
 
-static struct tuple *
+static int
 memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode)
+			 struct tuple *new_tuple, enum dup_replace_mode mode,
+			 struct tuple **result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct light_index_core *hash_table = index->hash_table;
@@ -203,8 +207,9 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		});
 
 		if (pos == light_index_end) {
-			tnt_raise(OutOfMemory, (ssize_t)hash_table->count,
-				  "hash_table", "key");
+			diag_set(OutOfMemory, (ssize_t)hash_table->count,
+				 "hash_table", "key");
+			return -1;
 		}
 		uint32_t errcode = replace_check_dup(old_tuple,
 						     dup_tuple, mode);
@@ -217,13 +222,17 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 					      "recover of int hash_table");
 				}
 			}
-			struct space *sp = space_cache_find_xc(base->def->space_id);
-			tnt_raise(ClientError, errcode, base->def->name,
-				  space_name(sp));
+			struct space *sp = space_cache_find(base->def->space_id);
+			if (sp != NULL)
+				diag_set(ClientError, errcode, base->def->name,
+					 space_name(sp));
+			return -1;
 		}
 
-		if (dup_tuple)
-			return dup_tuple;
+		if (dup_tuple) {
+			*result = dup_tuple;
+			return 0;
+		}
 	}
 
 	if (old_tuple) {
@@ -231,7 +240,8 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		int res = light_index_delete_value(hash_table, h, old_tuple);
 		assert(res == 0); (void) res;
 	}
-	return old_tuple;
+	*result = old_tuple;
+	return 0;
 }
 
 static struct iterator *
@@ -240,14 +250,15 @@ memtx_hash_index_alloc_iterator(void)
 	struct hash_iterator *it = (struct hash_iterator *)
 			calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(OutOfMemory, sizeof(struct hash_iterator),
-			  "memtx_hash_index", "iterator");
+		diag_set(OutOfMemory, sizeof(struct hash_iterator),
+			 "memtx_hash_index", "iterator");
+		return NULL;
 	}
 	it->base.free = hash_iterator_free;
 	return (struct iterator *) it;
 }
 
-static void
+static int
 memtx_hash_index_init_iterator(struct index *base, struct iterator *ptr,
 			       enum iterator_type type,
 			       const char *key, uint32_t part_count)
@@ -284,9 +295,11 @@ memtx_hash_index_init_iterator(struct index *base, struct iterator *ptr,
 		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		tnt_raise(UnsupportedIndexFeature, base->def,
-			  "requested iterator type");
+		diag_set(UnsupportedIndexFeature, base->def,
+			 "requested iterator type");
+		return -1;
 	}
+	return 0;
 }
 
 struct hash_snapshot_iterator {
@@ -340,8 +353,9 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 	struct hash_snapshot_iterator *it = (struct hash_snapshot_iterator *)
 		calloc(1, sizeof(*it));
 	if (it == NULL) {
-		tnt_raise(OutOfMemory, sizeof(struct hash_snapshot_iterator),
-			  "memtx_hash_index", "iterator");
+		diag_set(OutOfMemory, sizeof(struct hash_snapshot_iterator),
+			 "memtx_hash_index", "iterator");
+		return NULL;
 	}
 
 	it->base.next = hash_snapshot_iterator_next;
@@ -383,20 +397,22 @@ memtx_hash_index_new(struct index_def *def)
 	struct memtx_hash_index *index =
 		(struct memtx_hash_index *)calloc(1, sizeof(*index));
 	if (index == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*index),
-			  "malloc", "struct memtx_hash_index");
+		diag_set(OutOfMemory, sizeof(*index),
+			 "malloc", "struct memtx_hash_index");
+		return NULL;
 	}
 	struct light_index_core *hash_table =
 		(struct light_index_core *)malloc(sizeof(*hash_table));
 	if (hash_table == NULL) {
 		free(index);
-		tnt_raise(OutOfMemory, sizeof(*hash_table),
-			  "malloc", "struct light_index_core");
+		diag_set(OutOfMemory, sizeof(*hash_table),
+			 "malloc", "struct light_index_core");
+		return NULL;
 	}
 	if (index_create(&index->base, &memtx_hash_index_vtab, def) != 0) {
 		free(hash_table);
 		free(index);
-		diag_raise();
+		return NULL;
 	}
 
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,

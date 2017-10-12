@@ -42,15 +42,15 @@ struct tuple;
  * Index methods common to all memtx indexes.
  */
 
-struct tuple *
-memtx_index_min(struct index *index,
-		const char *key, uint32_t part_count);
+int
+memtx_index_min(struct index *index, const char *key,
+		uint32_t part_count, struct tuple **result);
 
-struct tuple *
-memtx_index_max(struct index *index,
-		const char *key, uint32_t part_count);
+int
+memtx_index_max(struct index *index, const char *key,
+		uint32_t part_count, struct tuple **result);
 
-size_t
+ssize_t
 memtx_index_count(struct index *index, enum iterator_type type,
 		  const char *key, uint32_t part_count);
 

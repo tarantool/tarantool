@@ -248,6 +248,12 @@ BuildSystemError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildXlogError(const char *file, unsigned line, const char *format, ...);
 
+struct index_def;
+
+struct error *
+BuildUnsupportedIndexFeature(const char *file, unsigned line,
+			     struct index_def *index_def, const char *what);
+
 #define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	struct error *e;						\

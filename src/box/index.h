@@ -318,29 +318,28 @@ struct index_vtab {
 	 */
 	void (*commit_drop)(struct index *);
 
-	size_t (*size)(struct index *);
-	size_t (*bsize)(struct index *);
-	struct tuple *(*min)(struct index *index,
-			     const char *key, uint32_t part_count);
-	struct tuple *(*max)(struct index *index,
-			     const char *key, uint32_t part_count);
-	struct tuple *(*random)(struct index *index, uint32_t rnd);
-	size_t (*count)(struct index *index, enum iterator_type type,
-			const char *key, uint32_t part_count);
-	struct tuple *(*get)(struct index *index,
-			     const char *key, uint32_t part_count);
-	struct tuple *(*replace)(struct index *index,
-				 struct tuple *old_tuple,
-				 struct tuple *new_tuple,
-				 enum dup_replace_mode mode);
+	ssize_t (*size)(struct index *);
+	ssize_t (*bsize)(struct index *);
+	int (*min)(struct index *index, const char *key,
+		   uint32_t part_count, struct tuple **result);
+	int (*max)(struct index *index, const char *key,
+		   uint32_t part_count, struct tuple **result);
+	int (*random)(struct index *index, uint32_t rnd, struct tuple **result);
+	ssize_t (*count)(struct index *index, enum iterator_type type,
+			 const char *key, uint32_t part_count);
+	int (*get)(struct index *index, const char *key,
+		   uint32_t part_count, struct tuple **result);
+	int (*replace)(struct index *index, struct tuple *old_tuple,
+		       struct tuple *new_tuple, enum dup_replace_mode mode,
+		       struct tuple **result);
 	/**
 	 * Create a structure to represent an iterator.
 	 * Must be initialized separately.
 	 */
 	struct iterator *(*alloc_iterator)(void);
-	void (*init_iterator)(struct index *index, struct iterator *iterator,
-			      enum iterator_type type,
-			      const char *key, uint32_t part_count);
+	int (*init_iterator)(struct index *index, struct iterator *iterator,
+			     enum iterator_type type,
+			     const char *key, uint32_t part_count);
 	/**
 	 * Create an ALL iterator with personal read view so further
 	 * index modifications will not affect the iteration results.
@@ -358,8 +357,8 @@ struct index_vtab {
 	 * the total size of the index. Called after
 	 * begin_build().
 	 */
-	void (*reserve)(struct index *index, uint32_t size_hint);
-	void (*build_next)(struct index *index, struct tuple *tuple);
+	int (*reserve)(struct index *index, uint32_t size_hint);
+	int (*build_next)(struct index *index, struct tuple *tuple);
 	void (*end_build)(struct index *index);
 };
 
@@ -455,80 +454,85 @@ index_commit_drop(struct index *index)
 	index->vtab->commit_drop(index);
 }
 
-static inline size_t
-index_size_xc(struct index *index)
+static inline ssize_t
+index_size(struct index *index)
 {
 	return index->vtab->size(index);
 }
 
-static inline size_t
-index_bsize_xc(struct index *index)
+static inline ssize_t
+index_bsize(struct index *index)
 {
 	return index->vtab->bsize(index);
 }
 
-static inline struct tuple *
-index_min_xc(struct index *index, const char *key, uint32_t part_count)
+static inline int
+index_min(struct index *index, const char *key,
+	  uint32_t part_count, struct tuple **result)
 {
-	return index->vtab->min(index, key, part_count);
+	return index->vtab->min(index, key, part_count, result);
 }
 
-static inline struct tuple *
-index_max_xc(struct index *index, const char *key, uint32_t part_count)
+static inline int
+index_max(struct index *index, const char *key,
+	     uint32_t part_count, struct tuple **result)
 {
-	return index->vtab->max(index, key, part_count);
+	return index->vtab->max(index, key, part_count, result);
 }
 
-static inline struct tuple *
-index_random_xc(struct index *index, uint32_t rnd)
+static inline int
+index_random(struct index *index, uint32_t rnd, struct tuple **result)
 {
-	return index->vtab->random(index, rnd);
+	return index->vtab->random(index, rnd, result);
 }
 
-static inline size_t
-index_count_xc(struct index *index, enum iterator_type type,
-	       const char *key, uint32_t part_count)
+static inline ssize_t
+index_count(struct index *index, enum iterator_type type,
+	    const char *key, uint32_t part_count)
 {
 	return index->vtab->count(index, type, key, part_count);
 }
 
-static inline struct tuple *
-index_get_xc(struct index *index, const char *key, uint32_t part_count)
+static inline int
+index_get(struct index *index, const char *key,
+	   uint32_t part_count, struct tuple **result)
 {
-	return index->vtab->get(index, key, part_count);
+	return index->vtab->get(index, key, part_count, result);
 }
 
-static inline struct tuple *
-index_replace_xc(struct index *index, struct tuple *old_tuple,
-		 struct tuple *new_tuple, enum dup_replace_mode mode)
+static inline int
+index_replace(struct index *index, struct tuple *old_tuple,
+	      struct tuple *new_tuple, enum dup_replace_mode mode,
+	      struct tuple **result)
 {
-	return index->vtab->replace(index, old_tuple, new_tuple, mode);
+	return index->vtab->replace(index, old_tuple, new_tuple, mode, result);
 }
 
 static inline struct iterator *
-index_alloc_iterator_xc(struct index *index)
+index_alloc_iterator(struct index *index)
 {
 	return index->vtab->alloc_iterator();
 }
 
-static inline void
-index_init_iterator_xc(struct index *index, struct iterator *iterator,
-		       enum iterator_type type,
-		       const char *key, uint32_t part_count)
+static inline int
+index_init_iterator(struct index *index, struct iterator *iterator,
+		    enum iterator_type type,
+		    const char *key, uint32_t part_count)
 {
-	index->vtab->init_iterator(index, iterator, type, key, part_count);
+	return index->vtab->init_iterator(index, iterator, type,
+					  key, part_count);
 }
 
 static inline struct iterator *
-index_position_xc(struct index *index)
+index_position(struct index *index)
 {
 	if (index->position == NULL)
-		index->position = index_alloc_iterator_xc(index);
+		index->position = index_alloc_iterator(index);
 	return index->position;
 }
 
 static inline struct snapshot_iterator *
-index_create_snapshot_iterator_xc(struct index *index)
+index_create_snapshot_iterator(struct index *index)
 {
 	return index->vtab->create_snapshot_iterator(index);
 }
@@ -545,16 +549,16 @@ index_begin_build(struct index *index)
 	index->vtab->begin_build(index);
 }
 
-static inline void
-index_reserve_xc(struct index *index, uint32_t size_hint)
+static inline int
+index_reserve(struct index *index, uint32_t size_hint)
 {
-	index->vtab->reserve(index, size_hint);
+	return index->vtab->reserve(index, size_hint);
 }
 
-static inline void
-index_build_next_xc(struct index *index, struct tuple *tuple)
+static inline int
+index_build_next(struct index *index, struct tuple *tuple)
 {
-	index->vtab->build_next(index, tuple);
+	return index->vtab->build_next(index, tuple);
 }
 
 static inline void
@@ -568,27 +572,153 @@ index_end_build(struct index *index)
  */
 void generic_index_commit_create(struct index *, int64_t);
 void generic_index_commit_drop(struct index *);
-size_t generic_index_size(struct index *);
-struct tuple *generic_index_min(struct index *, const char *, uint32_t);
-struct tuple *generic_index_max(struct index *, const char *, uint32_t);
-struct tuple *generic_index_random(struct index *, uint32_t);
-size_t generic_index_count(struct index *, enum iterator_type,
-			   const char *, uint32_t);
-struct tuple *generic_index_get(struct index *index,
-				const char *key, uint32_t part_count);
-struct tuple *generic_index_replace(struct index *, struct tuple *,
-				    struct tuple *, enum dup_replace_mode);
+ssize_t generic_index_size(struct index *);
+int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
+int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);
+int generic_index_random(struct index *, uint32_t, struct tuple **);
+ssize_t generic_index_count(struct index *, enum iterator_type,
+			    const char *, uint32_t);
+int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
+int generic_index_replace(struct index *, struct tuple *, struct tuple *,
+			  enum dup_replace_mode, struct tuple **);
 struct snapshot_iterator *generic_index_create_snapshot_iterator(struct index *);
 void generic_index_info(struct index *, struct info_handler *);
 void generic_index_begin_build(struct index *);
-void generic_index_reserve(struct index *, uint32_t);
-void generic_index_build_next(struct index *, struct tuple *);
+int generic_index_reserve(struct index *, uint32_t);
+int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
 
-/**
- * Wrapper around iterator::next() that throws
- * an exception in case of error.
+/*
+ * C++ wrappers around index methods.
+ * They throw an exception in case of error.
  */
+
+static inline size_t
+index_size_xc(struct index *index)
+{
+	ssize_t ret = index_size(index);
+	if (ret < 0)
+		diag_raise();
+	return ret;
+}
+
+static inline size_t
+index_bsize_xc(struct index *index)
+{
+	ssize_t ret = index_bsize(index);
+	if (ret < 0)
+		diag_raise();
+	return ret;
+}
+
+static inline struct tuple *
+index_min_xc(struct index *index, const char *key, uint32_t part_count)
+{
+	struct tuple *result;
+	if (index_min(index, key, part_count, &result) < 0)
+		diag_raise();
+	return result;
+}
+
+static inline struct tuple *
+index_max_xc(struct index *index, const char *key, uint32_t part_count)
+{
+	struct tuple *result;
+	if (index_max(index, key, part_count, &result) < 0)
+		diag_raise();
+	return result;
+}
+
+static inline struct tuple *
+index_random_xc(struct index *index, uint32_t rnd)
+{
+	struct tuple *result;
+	if (index_random(index, rnd, &result) < 0)
+		diag_raise();
+	return result;
+}
+
+static inline size_t
+index_count_xc(struct index *index, enum iterator_type type,
+	       const char *key, uint32_t part_count)
+{
+	ssize_t ret = index_count(index, type, key, part_count);
+	if (ret < 0)
+		diag_raise();
+	return ret;
+}
+
+static inline struct tuple *
+index_get_xc(struct index *index, const char *key, uint32_t part_count)
+{
+	struct tuple *result;
+	if (index_get(index, key, part_count, &result) < 0)
+		diag_raise();
+	return result;
+}
+
+static inline struct tuple *
+index_replace_xc(struct index *index, struct tuple *old_tuple,
+		 struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	struct tuple *result;
+	if (index_replace(index, old_tuple, new_tuple, mode, &result) < 0)
+		diag_raise();
+	return result;
+}
+
+static inline struct iterator *
+index_alloc_iterator_xc(struct index *index)
+{
+	struct iterator *it = index->vtab->alloc_iterator();
+	if (it == NULL)
+		diag_raise();
+	return it;
+}
+
+static inline void
+index_init_iterator_xc(struct index *index, struct iterator *iterator,
+		       enum iterator_type type,
+		       const char *key, uint32_t part_count)
+{
+	if (index->vtab->init_iterator(index, iterator, type,
+				       key, part_count) < 0)
+		diag_raise();
+}
+
+static inline struct iterator *
+index_position_xc(struct index *index)
+{
+	struct iterator *it = index_position(index);
+	if (it == NULL)
+		diag_raise();
+	return it;
+}
+
+static inline struct snapshot_iterator *
+index_create_snapshot_iterator_xc(struct index *index)
+{
+	struct snapshot_iterator *it =
+		index->vtab->create_snapshot_iterator(index);
+	if (it == NULL)
+		diag_raise();
+	return it;
+}
+
+static inline void
+index_reserve_xc(struct index *index, uint32_t size_hint)
+{
+	if (index->vtab->reserve(index, size_hint) < 0)
+		diag_raise();
+}
+
+static inline void
+index_build_next_xc(struct index *index, struct tuple *tuple)
+{
+	if (index->vtab->build_next(index, tuple) < 0)
+		diag_raise();
+}
+
 static inline struct tuple *
 iterator_next_xc(struct iterator *it)
 {

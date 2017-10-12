@@ -93,7 +93,11 @@ sysview_space_check_index_def(struct space *, struct index_def *)
 static struct index *
 sysview_space_create_index(struct space *space, struct index_def *index_def)
 {
-	return (struct index *)sysview_index_new(index_def, space_name(space));
+	struct index *index = (struct index *)
+		sysview_index_new(index_def, space_name(space));
+	if (index == NULL)
+		diag_raise();
+	return index;
 }
 
 static void

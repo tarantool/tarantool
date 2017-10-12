@@ -596,16 +596,15 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 static struct snapshot_iterator *
 sequence_data_index_create_snapshot_iterator(struct index *)
 {
-	struct snapshot_iterator *ret = sequence_data_iterator_create();
-	if (ret == NULL)
-		diag_raise();
-	return ret;
+	return sequence_data_iterator_create();
 }
 
 static struct index *
 sequence_data_index_new(struct index_def *def)
 {
 	struct memtx_hash_index *index = memtx_hash_index_new(def);
+	if (index == NULL)
+		return NULL;
 	static struct index_vtab vtab = *index->base.vtab;
 	vtab.create_snapshot_iterator =
 		sequence_data_index_create_snapshot_iterator;
@@ -616,6 +615,8 @@ sequence_data_index_new(struct index_def *def)
 static struct index *
 memtx_space_create_index(struct space *space, struct index_def *index_def)
 {
+	struct index *index;
+
 	if (space->def->id == BOX_SEQUENCE_DATA_ID) {
 		/*
 		 * The content of _sequence_data is not updated
@@ -624,22 +625,32 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		 * written to snapshot, use a special snapshot
 		 * iterator that walks over the sequence cache.
 		 */
-		return sequence_data_index_new(index_def);
+		index = sequence_data_index_new(index_def);
+		if (index == NULL)
+			diag_raise();
+		return index;
 	}
 
 	switch (index_def->type) {
 	case HASH:
-		return (struct index *)memtx_hash_index_new(index_def);
+		index = (struct index *)memtx_hash_index_new(index_def);
+		break;
 	case TREE:
-		return (struct index *)memtx_tree_index_new(index_def);
+		index = (struct index *)memtx_tree_index_new(index_def);
+		break;
 	case RTREE:
-		return (struct index *)memtx_rtree_index_new(index_def);
+		index = (struct index *)memtx_rtree_index_new(index_def);
+		break;
 	case BITSET:
-		return (struct index *)memtx_bitset_index_new(index_def);
+		index = (struct index *)memtx_bitset_index_new(index_def);
+		break;
 	default:
 		unreachable();
 		return NULL;
 	}
+	if (index == NULL)
+		diag_raise();
+	return index;
 }
 
 /**

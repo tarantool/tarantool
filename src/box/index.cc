@@ -52,6 +52,17 @@ UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
 			 space->def->name, space->def->engine_name, what);
 }
 
+struct error *
+BuildUnsupportedIndexFeature(const char *file, unsigned line,
+			     struct index_def *index_def, const char *what)
+{
+	try {
+		return new UnsupportedIndexFeature(file, line, index_def, what);
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}
+
 int
 key_validate(const struct index_def *index_def, enum iterator_type type,
 	     const char *key, uint32_t part_count)
@@ -489,71 +500,84 @@ generic_index_commit_drop(struct index *)
 {
 }
 
-size_t
+ssize_t
 generic_index_size(struct index *index)
 {
-	tnt_raise(UnsupportedIndexFeature, index->def, "size()");
-	return 0;
+	diag_set(UnsupportedIndexFeature, index->def, "size()");
+	return -1;
 }
 
-struct tuple *
-generic_index_min(struct index *index, const char *key, uint32_t part_count)
+int
+generic_index_min(struct index *index, const char *key,
+		  uint32_t part_count, struct tuple **result)
 {
 	(void)key;
 	(void)part_count;
-	tnt_raise(UnsupportedIndexFeature, index->def, "min()");
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "min()");
+	return -1;
 }
 
-struct tuple *
-generic_index_max(struct index *index, const char *key, uint32_t part_count)
+int
+generic_index_max(struct index *index, const char *key,
+		  uint32_t part_count, struct tuple **result)
 {
 	(void)key;
 	(void)part_count;
-	tnt_raise(UnsupportedIndexFeature, index->def, "max()");
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "max()");
+	return -1;
 }
 
-struct tuple *
-generic_index_random(struct index *index, uint32_t rnd)
+int
+generic_index_random(struct index *index, uint32_t rnd, struct tuple **result)
 {
 	(void)rnd;
-	tnt_raise(UnsupportedIndexFeature, index->def, "random()");
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "random()");
+	return -1;
 }
 
-size_t
+ssize_t
 generic_index_count(struct index *index, enum iterator_type type,
 		    const char *key, uint32_t part_count)
 {
 	(void)type;
 	(void)key;
 	(void)part_count;
-	tnt_raise(UnsupportedIndexFeature, index->def, "count()");
+	diag_set(UnsupportedIndexFeature, index->def, "count()");
+	return -1;
 }
 
-struct tuple *
-generic_index_get(struct index *index,
-		   const char *key, uint32_t part_count)
+int
+generic_index_get(struct index *index, const char *key,
+		  uint32_t part_count, struct tuple **result)
 {
 	(void)key;
 	(void)part_count;
-	tnt_raise(UnsupportedIndexFeature, index->def, "get()");
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "get()");
+	return -1;
 }
 
-struct tuple *
-generic_index_replace(struct index *index,
-		      struct tuple *old_tuple,
-		      struct tuple *new_tuple,
-		      enum dup_replace_mode mode)
+int
+generic_index_replace(struct index *index, struct tuple *old_tuple,
+		      struct tuple *new_tuple, enum dup_replace_mode mode,
+		      struct tuple **result)
 {
 	(void)old_tuple;
 	(void)new_tuple;
 	(void)mode;
-	tnt_raise(UnsupportedIndexFeature, index->def, "replace()");
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "replace()");
+	return -1;
 }
 
 struct snapshot_iterator *
 generic_index_create_snapshot_iterator(struct index *index)
 {
-	tnt_raise(UnsupportedIndexFeature, index->def, "consistent read view");
+	diag_set(UnsupportedIndexFeature, index->def, "consistent read view");
+	return NULL;
 }
 
 void
@@ -569,15 +593,17 @@ generic_index_begin_build(struct index *)
 {
 }
 
-void
+int
 generic_index_reserve(struct index *, uint32_t)
 {
+	return 0;
 }
 
-void
+int
 generic_index_build_next(struct index *index, struct tuple *tuple)
 {
-	index_replace_xc(index, NULL, tuple, DUP_INSERT);
+	struct tuple *unused;
+	return index_replace(index, NULL, tuple, DUP_INSERT, &unused);
 }
 
 void

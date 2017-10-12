@@ -220,15 +220,19 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		pk = vy_index(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	return (struct index *)vinyl_index_new(engine->env, index_def,
-					       space->format, pk);
+	struct index *index = (struct index *)vinyl_index_new(engine->env,
+					index_def, space->format, pk);
+	if (index == NULL)
+		diag_raise();
+	return index;
 }
 
 static void
 vinyl_space_add_primary_key(struct space *space)
 {
 	struct index *pk = index_find_xc(space, 0);
-	vinyl_index_open((struct vinyl_index *)pk);
+	if (vinyl_index_open((struct vinyl_index *)pk) != 0)
+		diag_raise();
 }
 
 static void
@@ -263,7 +267,8 @@ vinyl_space_build_secondary_key(struct space *old_space,
 	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
 	 *  but aware of three cases mentioned above.
 	 */
-	vinyl_index_open((struct vinyl_index *)new_index);
+	if (vinyl_index_open((struct vinyl_index *)new_index) != 0)
+		diag_raise();
 }
 
 static void

@@ -45,7 +45,7 @@ struct vinyl_index *
 vinyl_index_new(struct vy_env *env, struct index_def *def,
 		struct tuple_format *format, struct vy_index *pk);
 
-void
+int
 vinyl_index_open(struct vinyl_index *index);
 
 #endif /* TARANTOOL_BOX_VINYL_INDEX_H_INCLUDED */

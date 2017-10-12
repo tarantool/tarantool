@@ -35,35 +35,45 @@
 #include "index.h"
 #include "memtx_index.h"
 
-struct tuple *
-memtx_index_min(struct index *index,
-		const char *key, uint32_t part_count)
+int
+memtx_index_min(struct index *index, const char *key,
+		uint32_t part_count, struct tuple **result)
 {
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, ITER_GE, key, part_count);
-	return iterator_next_xc(it);
+	struct iterator *it = index_position(index);
+	if (it == NULL)
+		return -1;
+	if (index_init_iterator(index, it, ITER_GE, key, part_count) < 0)
+		return -1;
+	return it->next(it, result);
 }
 
-struct tuple *
-memtx_index_max(struct index *index,
-		const char *key, uint32_t part_count)
+int
+memtx_index_max(struct index *index, const char *key,
+		uint32_t part_count, struct tuple **result)
 {
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, ITER_LE, key, part_count);
-	return iterator_next_xc(it);
+	struct iterator *it = index_position(index);
+	if (it == NULL)
+		return -1;
+	if (index_init_iterator(index, it, ITER_LE, key, part_count) < 0)
+		return -1;
+	return it->next(it, result);
 }
 
-size_t
+ssize_t
 memtx_index_count(struct index *index, enum iterator_type type,
 		  const char *key, uint32_t part_count)
 {
 	if (type == ITER_ALL)
-		return index_size_xc(index); /* optimization */
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, type, key, part_count);
+		return index_size(index); /* optimization */
+	struct iterator *it = index_position(index);
+	if (index_init_iterator(index, it, type, key, part_count) < 0)
+		return -1;
+	int rc = 0;
 	size_t count = 0;
 	struct tuple *tuple = NULL;
-	while ((tuple = iterator_next_xc(it)) != NULL)
+	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
 		++count;
+	if (rc < 0)
+		return rc;
 	return count;
 }
