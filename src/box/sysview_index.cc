@@ -76,7 +76,7 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 
 SysviewIndex::SysviewIndex(struct index_def *index_def, uint32_t source_space_id,
 		     uint32_t source_index_id, sysview_filter_f filter)
-	: Index(index_def), source_space_id(source_space_id),
+	: index(index_def), source_space_id(source_space_id),
 	  source_index_id(source_index_id), filter(filter)
 {
 }
@@ -86,7 +86,7 @@ SysviewIndex::~SysviewIndex()
 }
 
 struct iterator *
-SysviewIndex::allocIterator() const
+SysviewIndex::allocIterator()
 {
 	struct sysview_iterator *it = (struct sysview_iterator *)
 			calloc(1, sizeof(*it));
@@ -101,12 +101,12 @@ SysviewIndex::allocIterator() const
 void
 SysviewIndex::initIterator(struct iterator *iterator,
 			   enum iterator_type type,
-			   const char *key, uint32_t part_count) const
+			   const char *key, uint32_t part_count)
 {
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_iterator *it = sysview_iterator(iterator);
 	struct space *source = space_cache_find(source_space_id);
-	struct Index *pk = index_find_xc(source, source_index_id);
+	struct index *pk = index_find_xc(source, source_index_id);
 	/*
 	 * Explicitly validate that key matches source's index_def.
 	 * It is possible to change a source space without changing
@@ -124,16 +124,16 @@ SysviewIndex::initIterator(struct iterator *iterator,
 		it->source->schema_version = ::schema_version;
 	}
 	pk->initIterator(it->source, type, key, part_count);
-	iterator->index = (Index *) this;
+	iterator->index = (struct index *) this;
 	iterator->next = sysview_iterator_next;
 	it->space = source;
 }
 
 struct tuple *
-SysviewIndex::findByKey(const char *key, uint32_t part_count) const
+SysviewIndex::findByKey(const char *key, uint32_t part_count)
 {
 	struct space *source = space_cache_find(source_space_id);
-	struct Index *pk = index_find_xc(source, source_index_id);
+	struct index *pk = index_find_xc(source, source_index_id);
 	if (!pk->index_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)

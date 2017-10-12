@@ -223,12 +223,12 @@ struct iterator {
 	uint32_t schema_version;
 	uint32_t space_id;
 	uint32_t index_id;
-	struct Index *index;
+	struct index *index;
 };
 
 /**
  * Snapshot iterator.
- * \sa Index::createSnapshotIterator().
+ * \sa index::createSnapshotIterator().
  */
 struct snapshot_iterator {
 	/**
@@ -298,7 +298,7 @@ enum dup_replace_mode {
 	DUP_REPLACE
 };
 
-struct Index {
+struct index {
 public:
 	/* Description of a possibly multipart key. */
 	struct index_def *index_def;
@@ -311,7 +311,7 @@ protected:
 	 * box_process(). Should not be used elsewhere.
 	 * Safe to use only if the index iterator does not yield.
 	 */
-	mutable struct iterator *m_position;
+	struct iterator *m_position;
 
 	/**
 	 * Initialize index instance. The created
@@ -319,13 +319,13 @@ protected:
 	 *
 	 * @param index_def  key part description
 	 */
-	Index(struct index_def *index_def);
+	index(struct index_def *index_def);
 
 public:
-	virtual ~Index();
+	virtual ~index();
 
-	Index(const Index &) = delete;
-	Index& operator=(const Index&) = delete;
+	index(index &) = delete;
+	index& operator=(const index&) = delete;
 
 	/**
 	 * Called after WAL write to commit index creation.
@@ -342,27 +342,27 @@ public:
 	 */
 	virtual void commitDrop();
 
-	virtual size_t size() const;
-	virtual struct tuple *min(const char *key, uint32_t part_count) const;
-	virtual struct tuple *max(const char *key, uint32_t part_count) const;
-	virtual struct tuple *random(uint32_t rnd) const;
+	virtual size_t size();
+	virtual struct tuple *min(const char *key, uint32_t part_count);
+	virtual struct tuple *max(const char *key, uint32_t part_count);
+	virtual struct tuple *random(uint32_t rnd);
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const;
-	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
-	virtual struct tuple *findByTuple(struct tuple *tuple) const;
+			     uint32_t part_count);
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count);
+	virtual struct tuple *findByTuple(struct tuple *tuple);
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);
-	virtual size_t bsize() const;
+	virtual size_t bsize();
 
 	/**
 	 * Create a structure to represent an iterator. Must be
 	 * initialized separately.
 	 */
-	virtual struct iterator *allocIterator() const = 0;
+	virtual struct iterator *allocIterator() = 0;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, uint32_t part_count) const = 0;
+				  const char *key, uint32_t part_count) = 0;
 
 	/**
 	 * Create an ALL iterator with personal read view so further
@@ -372,9 +372,9 @@ public:
 	virtual struct snapshot_iterator *createSnapshotIterator();
 
 	/** Introspection (index:info()) */
-	virtual void info(struct info_handler *handler) const;
+	virtual void info(struct info_handler *handler);
 
-	inline struct iterator *position() const
+	inline struct iterator *position()
 	{
 		if (m_position == NULL)
 			m_position = allocIterator();
@@ -402,7 +402,7 @@ public:
 class UnsupportedIndexFeature: public ClientError {
 public:
 	UnsupportedIndexFeature(const char *file, unsigned line,
-				const Index *index, const char *what);
+				struct index *index, const char *what);
 };
 
 struct IteratorGuard
@@ -446,27 +446,27 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 
 /** Get index ordinal number in space. */
 static inline uint32_t
-index_id(const Index *index)
+index_id(struct index *index)
 {
 	return index->index_def->iid;
 }
 
 static inline const char *
-index_name(const Index *index)
+index_name(struct index *index)
 {
 	return index->index_def->name;
 }
 
 /** True if this index is a primary key. */
 static inline bool
-index_is_primary(const Index *index)
+index_is_primary(struct index *index)
 {
 	return index_id(index) == 0;
 }
 
 /** Build this index based on the contents of another index. */
 void
-index_build(struct Index *index, struct Index *pk);
+index_build(struct index *index, struct index *pk);
 
 /**
  * Wrapper around iterator::next() that throws

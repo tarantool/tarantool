@@ -2193,7 +2193,7 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 static struct vy_index *
 vy_index_find(struct space *space, uint32_t iid)
 {
-	struct Index *index = index_find(space, iid);
+	struct index *index = index_find(space, iid);
 	if (index == NULL)
 		return NULL;
 	return vy_index(index);

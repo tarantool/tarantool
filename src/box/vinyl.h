@@ -49,6 +49,7 @@ struct tuple_format;
 struct vclock;
 struct request;
 struct space;
+struct index;
 struct txn_stmt;
 struct xrow_header;
 struct xstream;
@@ -235,13 +236,12 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * Index
  */
 
-struct Index;
 /**
  * Extract vy_index from a VinylIndex object.
  * Defined in vinyl_index.cc
  */
 struct vy_index *
-vy_index(struct Index *index);
+vy_index(struct index *index);
 
 struct field_def;
 /**

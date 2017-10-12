@@ -207,7 +207,7 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 	}
 }
 
-static struct Index *
+static struct index *
 vinyl_space_create_index(struct space *space, struct index_def *index_def)
 {
 	VinylEngine *engine = (VinylEngine *) space->engine;
@@ -238,7 +238,7 @@ vinyl_space_drop_primary_key(struct space *)
 static void
 vinyl_space_build_secondary_key(struct space *old_space,
 				struct space *new_space,
-				struct Index *new_index)
+				struct index *new_index)
 {
 	(void)old_space;
 	(void)new_space;

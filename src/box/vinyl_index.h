@@ -39,7 +39,7 @@ struct field_def;
 /**
  * C++ wrapper for struct vy_index.
  */
-struct VinylIndex: public Index
+struct VinylIndex: public index
 {
 public:
 	VinylIndex(struct vy_env *env, struct index_def *index_def,
@@ -56,31 +56,31 @@ public:
 	virtual void commitDrop() override;
 
 	virtual struct tuple*
-	findByKey(const char *key, uint32_t) const override;
+	findByKey(const char *key, uint32_t) override;
 
 	virtual struct iterator*
-	allocIterator() const override;
+	allocIterator() override;
 
 	virtual void
 	initIterator(struct iterator *iterator,
 		     enum iterator_type type,
-		     const char *key, uint32_t part_count) const override;
+		     const char *key, uint32_t part_count) override;
 
 	virtual size_t
-	bsize() const override;
+	bsize() override;
 
 	virtual struct tuple *
-	min(const char *key, uint32_t part_count) const override;
+	min(const char *key, uint32_t part_count) override;
 
 	virtual struct tuple *
-	max(const char *key, uint32_t part_count) const override;
+	max(const char *key, uint32_t part_count) override;
 
 	virtual size_t
 	count(enum iterator_type type, const char *key, uint32_t part_count)
-		const override;
+		override;
 
 	virtual void
-	info(struct info_handler *handler) const override;
+	info(struct info_handler *handler) override;
 
 	struct vy_env *env;
 	struct vy_index *db;

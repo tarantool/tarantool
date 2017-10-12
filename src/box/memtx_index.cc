@@ -36,7 +36,7 @@
 #include "memtx_index.h"
 
 struct tuple *
-memtx_index_min(const struct Index *index,
+memtx_index_min(struct index *index,
 		const char *key, uint32_t part_count)
 {
 	struct iterator *it = index->position();
@@ -45,7 +45,7 @@ memtx_index_min(const struct Index *index,
 }
 
 struct tuple *
-memtx_index_max(const struct Index *index,
+memtx_index_max(struct index *index,
 		const char *key, uint32_t part_count)
 {
 	struct iterator *it = index->position();
@@ -54,7 +54,7 @@ memtx_index_max(const struct Index *index,
 }
 
 size_t
-memtx_index_count(const struct Index *index, enum iterator_type type,
+memtx_index_count(struct index *index, enum iterator_type type,
 		  const char *key, uint32_t part_count)
 {
 	if (type == ITER_ALL)

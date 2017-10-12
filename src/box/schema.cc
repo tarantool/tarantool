@@ -114,7 +114,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 	 * snapshot, and harmless otherwise.
 	 */
 	space = space_by_id(BOX_SPACE_ID);
-	Index *pk = space ? space_index(space, 0) : NULL;
+	struct index *pk = space ? space_index(space, 0) : NULL;
 	if (pk) {
 		struct iterator *it = pk->allocIterator();
 		auto scoped_guard = make_scoped_guard([=] { it->free(it); });
@@ -222,7 +222,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
 	struct space *space = space_cache_find(system_space_id);
-	struct Index *index = index_find_system(space, index_id);
+	struct index *index = index_find_system(space, index_id);
 	uint32_t size = mp_sizeof_str(len);
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
@@ -442,7 +442,7 @@ schema_find_grants(const char *type, uint32_t id)
 {
 	struct space *priv = space_cache_find(BOX_PRIV_ID);
 	/** "object" index */
-	struct Index *index = index_find_system(priv, 2);
+	struct index *index = index_find_system(priv, 2);
 	struct iterator *it = index->position();
 	/*
 	 * +10 = max(mp_sizeof_uint32) +

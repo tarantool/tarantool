@@ -43,32 +43,32 @@ struct matras;
 struct mh_bitset_index_t;
 #endif /*#ifndef OLD_GOOD_BITSET*/
 
-class MemtxBitset: public Index {
+class MemtxBitset: public index {
 public:
 	MemtxBitset(struct index_def *index_def);
 	virtual ~MemtxBitset() override;
-	virtual size_t size() const override;
+	virtual size_t size() override;
 	virtual struct tuple *min(const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 	virtual struct tuple *max(const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const override;
+			     uint32_t part_count) override;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode) override;
 
-	virtual size_t bsize() const override;
-	virtual struct iterator *allocIterator() const override;
+	virtual size_t bsize() override;
+	virtual struct iterator *allocIterator() override;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 #ifndef OLD_GOOD_BITSET
 	void registerTuple(struct tuple *tuple);
 	void unregisterTuple(struct tuple *tuple);
-	uint32_t tupleToValue(struct tuple *tuple) const;
-	struct tuple *valueToTuple(uint32_t value) const;
+	uint32_t tupleToValue(struct tuple *tuple);
+	struct tuple *valueToTuple(uint32_t value);
 #endif /*#ifndef OLD_GOOD_BITSET*/
 private:
 	struct bitset_index m_index;

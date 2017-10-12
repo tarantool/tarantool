@@ -107,7 +107,7 @@ MemtxBitset::unregisterTuple(struct tuple *tuple)
 }
 
 uint32_t
-MemtxBitset::tupleToValue(struct tuple *tuple) const
+MemtxBitset::tupleToValue(struct tuple *tuple)
 {
 	uint32_t k = mh_bitset_index_find(m_tuple_to_id, tuple, 0);
 	struct bitset_hash_entry *e = mh_bitset_index_node(m_tuple_to_id, k);
@@ -115,7 +115,7 @@ MemtxBitset::tupleToValue(struct tuple *tuple) const
 }
 
 struct tuple *
-MemtxBitset::valueToTuple(uint32_t value) const
+MemtxBitset::valueToTuple(uint32_t value)
 {
 	void *mem = matras_get(m_id_to_tuple, value);
 	return *(struct tuple **)mem;
@@ -149,7 +149,7 @@ struct bitset_index_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct bitset_iterator bitset_it;
 #ifndef OLD_GOOD_BITSET
-	const class MemtxBitset *bitset_index;
+	class MemtxBitset *bitset_index;
 #endif /* #ifndef OLD_GOOD_BITSET */
 };
 
@@ -190,7 +190,7 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 }
 
 MemtxBitset::MemtxBitset(struct index_def *index_def_arg)
-	: Index(index_def_arg)
+	: index(index_def_arg)
 {
 	assert(!this->index_def->opts.is_unique);
 
@@ -221,13 +221,13 @@ MemtxBitset::~MemtxBitset()
 }
 
 size_t
-MemtxBitset::size() const
+MemtxBitset::size()
 {
 	return bitset_index_size(&m_index);
 }
 
 size_t
-MemtxBitset::bsize() const
+MemtxBitset::bsize()
 {
 	size_t result = 0;
 	result += bitset_index_bsize(&m_index);
@@ -239,7 +239,7 @@ MemtxBitset::bsize() const
 }
 
 struct iterator *
-MemtxBitset::allocIterator() const
+MemtxBitset::allocIterator()
 {
 	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
 			malloc(sizeof(*it));
@@ -329,7 +329,7 @@ MemtxBitset::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 void
 MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
-			  const char *key, uint32_t part_count) const
+			  const char *key, uint32_t part_count)
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	assert(part_count == 0 || key != NULL);
@@ -373,7 +373,7 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 						       bitset_key_size);
 			break;
 		default:
-			return Index::initIterator(iterator, type, key,
+			return index::initIterator(iterator, type, key,
 						   part_count);
 		}
 
@@ -397,20 +397,20 @@ MemtxBitset::initIterator(struct iterator *iterator, enum iterator_type type,
 }
 
 struct tuple *
-MemtxBitset::min(const char *key, uint32_t part_count) const
+MemtxBitset::min(const char *key, uint32_t part_count)
 {
 	return memtx_index_min(this, key, part_count);
 }
 
 struct tuple *
-MemtxBitset::max(const char *key, uint32_t part_count) const
+MemtxBitset::max(const char *key, uint32_t part_count)
 {
 	return memtx_index_max(this, key, part_count);
 }
 
 size_t
 MemtxBitset::count(enum iterator_type type, const char *key,
-		   uint32_t part_count) const
+		   uint32_t part_count)
 {
 	if (type == ITER_ALL)
 		return bitset_index_size(&m_index);

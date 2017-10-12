@@ -34,32 +34,32 @@
 
 #include <salad/rtree.h>
 
-class MemtxRTree: public Index
+class MemtxRTree: public index
 {
 public:
 	MemtxRTree(struct index_def *index_def);
 	~MemtxRTree();
 
 	virtual void beginBuild() override;
-	virtual size_t size() const override;
+	virtual size_t size() override;
 	virtual struct tuple *min(const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 	virtual struct tuple *max(const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const override;
+			     uint32_t part_count) override;
 	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) const override;
+					uint32_t part_count) override;
 	virtual struct tuple *replace(struct tuple *old_tuple,
                                       struct tuple *new_tuple,
                                       enum dup_replace_mode mode) override;
 
-	virtual size_t bsize() const override;
-	virtual struct iterator *allocIterator() const override;
+	virtual size_t bsize() override;
+	virtual struct iterator *allocIterator() override;
 	virtual void initIterator(struct iterator *iterator,
                                   enum iterator_type type,
                                   const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 
 protected:
 	unsigned m_dimension;

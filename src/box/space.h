@@ -40,7 +40,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct space;
-struct Index;
+struct index;
 struct index_def;
 struct Engine;
 struct sequence;
@@ -80,7 +80,7 @@ struct space_vtab {
 	 * space before commit to WAL. The created index is
 	 * deleted with delete operator.
 	 */
-	struct Index *(*create_index)(struct space *, struct index_def *);
+	struct index *(*create_index)(struct space *, struct index_def *);
 	/**
 	 * Called by alter when a primary key is added,
 	 * after create_index is invoked for the new
@@ -106,7 +106,7 @@ struct space_vtab {
 	 */
 	void (*build_secondary_key)(struct space *old_space,
 				    struct space *new_space,
-				    struct Index *new_index);
+				    struct index *new_index);
 	/**
 	 * Notify the enigne about upcoming space truncation
 	 * so that it can prepare new_space object.
@@ -186,12 +186,12 @@ struct space {
 	 * Sparse array of indexes defined on the space, indexed
 	 * by id. Used to quickly find index by id (for SELECTs).
 	 */
-	struct Index **index_map;
+	struct index **index_map;
 	/**
 	 * Dense array of indexes defined on the space, in order
 	 * of index id.
 	 */
-	struct Index **index;
+	struct index **index;
 };
 
 /** Get space ordinal number. */
@@ -216,7 +216,7 @@ space_run_triggers(struct space *space, bool yesno);
  * Get index by index id.
  * @return NULL if the index is not found.
  */
-static inline struct Index *
+static inline struct index *
 space_index(struct space *space, uint32_t id)
 {
 	if (id <= space->index_id_max)
@@ -234,10 +234,10 @@ space_index_key_def(struct space *space, uint32_t id);
 /**
  * Look up the index by id.
  */
-static inline struct Index *
+static inline struct index *
 index_find(struct space *space, uint32_t index_id)
 {
-	struct Index *index = space_index(space, index_id);
+	struct index *index = space_index(space, index_id);
 	if (index == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_INDEX, index_id,
 			 space_name(space));
@@ -354,19 +354,19 @@ space_fill_index_map(struct space *space);
 /**
  * Look up the index by id, and throw an exception if not found.
  */
-static inline struct Index *
+static inline struct index *
 index_find_xc(struct space *space, uint32_t index_id)
 {
-	struct Index *index = index_find(space, index_id);
+	struct index *index = index_find(space, index_id);
 	if (index == NULL)
 		diag_raise();
 	return index;
 }
 
-static inline struct Index *
+static inline struct index *
 index_find_unique(struct space *space, uint32_t index_id)
 {
-	struct Index *index = index_find_xc(space, index_id);
+	struct index *index = index_find_xc(space, index_id);
 	if (! index->index_def->opts.is_unique)
 		tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 	return index;
@@ -377,7 +377,7 @@ index_find_unique(struct space *space, uint32_t index_id)
  * if we somehow deal with a non-memtx space (it can't
  * be used for system spaces.
  */
-static inline struct Index *
+static inline struct index *
 index_find_system(struct space *space, uint32_t index_id)
 {
 	if (! space_is_memtx(space)) {

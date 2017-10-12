@@ -101,7 +101,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		return;
 
 	if (space->index_id_max > 0) {
-		struct Index *pk = space->index[0];
+		struct index *pk = space->index[0];
 		uint32_t n_tuples = pk->size();
 
 		if (n_tuples > 0) {
@@ -367,7 +367,7 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 		panic("transaction rolled back during snapshot recovery");
 
 	for (int i = 0; i < index_count; i++) {
-		Index *index = space->index[i];
+		struct index *index = space->index[i];
 		index->replace(stmt->new_tuple, stmt->old_tuple, DUP_INSERT);
 	}
 	/** Reset to old bsize, if it was changed. */
@@ -544,7 +544,7 @@ checkpoint_add_space(struct space *sp, void *data)
 		return;
 	if (!space_is_memtx(sp))
 		return;
-	Index *pk = space_index(sp, 0);
+	struct index *pk = space_index(sp, 0);
 	if (!pk)
 		return;
 	struct checkpoint *ckpt = (struct checkpoint *)data;

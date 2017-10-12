@@ -35,31 +35,31 @@
 
 struct light_index_core;
 
-class MemtxHash: public Index {
+class MemtxHash: public index {
 public:
 	MemtxHash(struct index_def *index_def);
 	virtual ~MemtxHash() override;
 
 	virtual void reserve(uint32_t size_hint) override;
-	virtual size_t size() const override;
+	virtual size_t size() override;
 	virtual struct tuple *min(const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 	virtual struct tuple *max(const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 	virtual size_t count(enum iterator_type type, const char *key,
-			     uint32_t part_count) const override;
-	virtual struct tuple *random(uint32_t rnd) const override;
+			     uint32_t part_count) override;
+	virtual struct tuple *random(uint32_t rnd) override;
 	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) const override;
+					uint32_t part_count) override;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode) override;
 
-	virtual struct iterator *allocIterator() const override;
+	virtual struct iterator *allocIterator() override;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key,
-				  uint32_t part_count) const override;
+				  uint32_t part_count) override;
 
 	/**
 	 * Create an ALL iterator with personal read view so further
@@ -68,7 +68,7 @@ public:
 	 */
 	struct snapshot_iterator *createSnapshotIterator() override;
 
-	virtual size_t bsize() const override;
+	virtual size_t bsize() override;
 
 protected:
 	struct light_index_core *hash_table;

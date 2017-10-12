@@ -275,7 +275,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 /* {{{ MemtxTree  **********************************************************/
 
 MemtxTree::MemtxTree(struct index_def *index_def_arg)
-	: Index(index_def_arg),
+	: index(index_def_arg),
 	build_array(0),
 	build_array_size(0),
 	build_array_alloc_size(0)
@@ -305,45 +305,45 @@ MemtxTree::~MemtxTree()
 }
 
 size_t
-MemtxTree::size() const
+MemtxTree::size()
 {
 	return memtx_tree_size(&tree);
 }
 
 size_t
-MemtxTree::bsize() const
+MemtxTree::bsize()
 {
 	return memtx_tree_mem_used(&tree);
 }
 
 struct tuple *
-MemtxTree::min(const char *key, uint32_t part_count) const
+MemtxTree::min(const char *key, uint32_t part_count)
 {
 	return memtx_index_min(this, key, part_count);
 }
 
 struct tuple *
-MemtxTree::max(const char *key, uint32_t part_count) const
+MemtxTree::max(const char *key, uint32_t part_count)
 {
 	return memtx_index_max(this, key, part_count);
 }
 
 size_t
 MemtxTree::count(enum iterator_type type, const char *key,
-		 uint32_t part_count) const
+		 uint32_t part_count)
 {
 	return memtx_index_count(this, type, key, part_count);
 }
 
 struct tuple *
-MemtxTree::random(uint32_t rnd) const
+MemtxTree::random(uint32_t rnd)
 {
 	struct tuple **res = memtx_tree_random(&tree, rnd);
 	return res ? *res : 0;
 }
 
 struct tuple *
-MemtxTree::findByKey(const char *key, uint32_t part_count) const
+MemtxTree::findByKey(const char *key, uint32_t part_count)
 {
 	assert(index_def->opts.is_unique && part_count == index_def->key_def->part_count);
 
@@ -391,7 +391,7 @@ MemtxTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 struct iterator *
-MemtxTree::allocIterator() const
+MemtxTree::allocIterator()
 {
 	struct tree_iterator *it = (struct tree_iterator *)
 			calloc(1, sizeof(*it));
@@ -410,13 +410,13 @@ MemtxTree::allocIterator() const
 
 void
 MemtxTree::initIterator(struct iterator *iterator, enum iterator_type type,
-			const char *key, uint32_t part_count) const
+			const char *key, uint32_t part_count)
 {
 	assert(part_count == 0 || key != NULL);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	if (type < 0 || type > ITER_GT) /* Unsupported type */
-		return Index::initIterator(iterator, type, key, part_count);
+		return index::initIterator(iterator, type, key, part_count);
 
 	if (part_count == 0) {
 		/*

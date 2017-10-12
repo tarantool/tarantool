@@ -70,7 +70,7 @@ space_fill_index_map(struct space *space)
 {
 	uint32_t index_count = 0;
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
-		Index *index = space->index_map[j];
+		struct index *index = space->index_map[j];
 		if (index) {
 			assert(index_count < space->index_count);
 			space->index[index_count++] = index;
@@ -113,11 +113,11 @@ space_new(struct space_def *def, struct rlist *key_list)
 	if (space->format != NULL)
 		tuple_format_ref(space->format);
 	/** Initialize index map. */
-	space->index_map = (Index **)calloc(index_count + index_id_max + 1,
-					    sizeof(Index *));
+	space->index_map = (struct index **)
+		calloc(index_count + index_id_max + 1, sizeof(struct index *));
 	if (space->index_map == NULL) {
-		tnt_raise(OutOfMemory, (index_id_max + 1) * sizeof(Index *),
-			  "malloc", "index_map");
+		tnt_raise(OutOfMemory, (index_count + index_id_max + 1) *
+			  sizeof(struct index *), "malloc", "index_map");
 	}
 	space->index = space->index_map + index_id_max + 1;
 	rlist_foreach_entry(index_def, key_list, link) {
@@ -135,7 +135,7 @@ space_delete(struct space *space)
 {
 	for (uint32_t j = 0; space->index_map != NULL &&
 			     j <= space->index_id_max; j++) {
-		Index *index = space->index_map[j];
+		struct index *index = space->index_map[j];
 		if (index)
 			delete index;
 	}
@@ -182,7 +182,7 @@ void
 space_swap_index(struct space *lhs, struct space *rhs,
 		 uint32_t lhs_id, uint32_t rhs_id)
 {
-	Index *tmp = lhs->index_map[lhs_id];
+	struct index *tmp = lhs->index_map[lhs_id];
 	lhs->index_map[lhs_id] = rhs->index_map[rhs_id];
 	rhs->index_map[rhs_id] = tmp;
 }
@@ -208,7 +208,7 @@ space_index_def(struct space *space, int n)
 const char *
 index_name_by_id(struct space *space, uint32_t id)
 {
-	struct Index *index = space_index(space, id);
+	struct index *index = space_index(space, id);
 	if (index != NULL)
 		return index->index_def->name;
 	return NULL;
@@ -224,7 +224,7 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)key_end;
 
-	Index *index = index_find_xc(space, index_id);
+	struct index *index = index_find_xc(space, index_id);
 
 	uint32_t found = 0;
 	if (iterator >= iterator_type_MAX)

@@ -42,7 +42,7 @@
 /* {{{ Utilities. **********************************************/
 
 UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
-	unsigned line, const Index *index, const char *what)
+	unsigned line, struct index *index, const char *what)
 	: ClientError(file, line, ER_UNKNOWN)
 {
 	struct index_def *index_def = index->index_def;
@@ -150,7 +150,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 {
 	try {
 		struct space *space = space_by_id(space_id);
-		Index *index = index_find_xc(space, index_id);
+		struct index *index = index_find_xc(space, index_id);
 		return tuple_extract_key(tuple, index->index_def->key_def,
 					 key_size);
 	} catch (ClientError *e) {
@@ -162,7 +162,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 
 /* {{{ Index -- base class for all indexes. ********************/
 
-Index::Index(struct index_def *index_def_arg)
+index::index(struct index_def *index_def_arg)
 	:index_def(NULL), schema_version(::schema_version), m_position(NULL)
 {
 	index_def = index_def_dup(index_def_arg);
@@ -170,7 +170,7 @@ Index::Index(struct index_def *index_def_arg)
 		diag_raise();
 }
 
-Index::~Index()
+index::~index()
 {
 	if (m_position != NULL)
 		m_position->free(m_position);
@@ -178,38 +178,38 @@ Index::~Index()
 }
 
 void
-Index::commitCreate(int64_t /* signature */)
+index::commitCreate(int64_t /* signature */)
 {
 }
 
 void
-Index::commitDrop()
+index::commitDrop()
 {
 }
 
 size_t
-Index::size() const
+index::size()
 {
 	tnt_raise(UnsupportedIndexFeature, this, "size()");
 	return 0;
 }
 
 struct tuple *
-Index::min(const char* /* key */, uint32_t /* part_count */) const
+index::min(const char* /* key */, uint32_t /* part_count */)
 {
 	tnt_raise(UnsupportedIndexFeature, this, "min()");
 	return NULL;
 }
 
 struct tuple *
-Index::max(const char* /* key */, uint32_t /* part_count */) const
+index::max(const char* /* key */, uint32_t /* part_count */)
 {
 	tnt_raise(UnsupportedIndexFeature, this, "max()");
 	return NULL;
 }
 
 struct tuple *
-Index::random(uint32_t rnd) const
+index::random(uint32_t rnd)
 {
 	(void) rnd;
 	tnt_raise(UnsupportedIndexFeature, this, "random()");
@@ -217,15 +217,15 @@ Index::random(uint32_t rnd) const
 }
 
 size_t
-Index::count(enum iterator_type /* type */, const char* /* key */,
-             uint32_t /* part_count */) const
+index::count(enum iterator_type /* type */, const char* /* key */,
+             uint32_t /* part_count */)
 {
 	tnt_raise(UnsupportedIndexFeature, this, "count()");
 	return 0;
 }
 
 struct tuple *
-Index::findByKey(const char *key, uint32_t part_count) const
+index::findByKey(const char *key, uint32_t part_count)
 {
 	(void) key;
 	(void) part_count;
@@ -234,7 +234,7 @@ Index::findByKey(const char *key, uint32_t part_count) const
 }
 
 struct tuple *
-Index::findByTuple(struct tuple *tuple) const
+index::findByTuple(struct tuple *tuple)
 {
 	(void) tuple;
 	tnt_raise(UnsupportedIndexFeature, this, "findByTuple()");
@@ -242,7 +242,7 @@ Index::findByTuple(struct tuple *tuple) const
 }
 
 struct tuple *
-Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		     enum dup_replace_mode mode)
 {
 	(void) old_tuple;
@@ -253,14 +253,14 @@ Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 size_t
-Index::bsize() const
+index::bsize()
 {
 	return 0;
 }
 
 void
-Index::initIterator(struct iterator *ptr, enum iterator_type type,
-		    const char *key, uint32_t part_count) const
+index::initIterator(struct iterator *ptr, enum iterator_type type,
+		    const char *key, uint32_t part_count)
 {
 	(void) ptr;
 	(void) type;
@@ -275,33 +275,33 @@ Index::initIterator(struct iterator *ptr, enum iterator_type type,
  * Must be destroyed by iterator->free after usage.
  */
 struct snapshot_iterator *
-Index::createSnapshotIterator()
+index::createSnapshotIterator()
 {
 	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
 }
 
 void
-Index::beginBuild()
+index::beginBuild()
 {
 }
 
 void
-Index::reserve(uint32_t /* size_hint */)
+index::reserve(uint32_t /* size_hint */)
 {
 }
 
 void
-Index::buildNext(struct tuple *tuple)
+index::buildNext(struct tuple *tuple)
 {
 	replace(NULL, tuple, DUP_INSERT);
 }
 
 void
-Index::endBuild()
+index::endBuild()
 {
 }
 
-static inline Index *
+static inline struct index *
 check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 {
 	*space = space_cache_find(space_id);
@@ -349,7 +349,7 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 	try {
 		struct space *space;
 		/* no tx management, random() is for approximation anyway */
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		struct tuple *tuple = index->random(rnd);
 		*result = tuple_bless_null_xc(tuple);
 		return 0;
@@ -366,7 +366,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	try {
 		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		if (!index->index_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = mp_decode_array(&key);
@@ -396,7 +396,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	mp_tuple_assert(key, key_end);
 	try {
 		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		if (index->index_def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "min()");
@@ -424,7 +424,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	assert(result != NULL);
 	try {
 		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		if (index->index_def->type != TREE) {
 			/* Show nice error messages in Lua */
 			tnt_raise(UnsupportedIndexFeature, index, "max()");
@@ -453,7 +453,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
 		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->index_def, itype, key, part_count))
 			diag_raise();
@@ -482,7 +482,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
 		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		struct txn *txn = txn_begin_ro_stmt(space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
@@ -513,8 +513,8 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 		if (itr->schema_version != schema_version) {
 			struct space *space;
 			/* no tx management */
-			Index *index = check_index(itr->space_id, itr->index_id,
-						   &space);
+			struct index *index = check_index(itr->space_id,
+						itr->index_id, &space);
 			if (index != itr->index) {
 				*result = NULL;
 				return 0;
@@ -550,7 +550,7 @@ box_iterator_free(box_iterator_t *it)
 /* {{{ Introspection */
 
 void
-Index::info(struct info_handler *info) const
+index::info(struct info_handler *info)
 {
 	info_begin(info);
 	info_end(info);
@@ -562,7 +562,7 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 {
 	try {
 		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
+		struct index *index = check_index(space_id, index_id, &space);
 		index->info(info);
 		return 0;
 	}  catch (Exception *) {
@@ -573,7 +573,7 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 /* }}} */
 
 void
-index_build(struct Index *index, struct Index *pk)
+index_build(struct index *index, struct index *pk)
 {
 	uint32_t n_tuples = pk->size();
 	uint32_t estimated_tuples = n_tuples * 1.2;

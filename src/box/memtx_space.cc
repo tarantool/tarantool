@@ -78,7 +78,7 @@ void
 memtx_space_replace_no_keys(struct space *space, struct txn_stmt *,
 			    enum dup_replace_mode)
 {
-	Index *index = index_find_xc(space, 0);
+	struct index *index = index_find_xc(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
 }
@@ -234,7 +234,7 @@ memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 	uint32_t i = 0;
 	try {
 		/* Update the primary key */
-		Index *pk = index_find_xc(space, 0);
+		struct index *pk = index_find_xc(space, 0);
 		assert(pk->index_def->opts.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
@@ -246,13 +246,13 @@ memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 		assert(old_tuple || new_tuple);
 		/* Update secondary keys. */
 		for (i++; i < space->index_count; i++) {
-			Index *index = space->index[i];
+			struct index *index = space->index[i];
 			index->replace(old_tuple, new_tuple, DUP_INSERT);
 		}
 	} catch (Exception *e) {
 		/* Rollback all changes */
 		for (; i > 0; i--) {
-			Index *index = space->index[i-1];
+			struct index *index = space->index[i-1];
 			index->replace(new_tuple, old_tuple, DUP_INSERT);
 		}
 		throw;
@@ -310,7 +310,7 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	Index *pk = index_find_unique(space, request->index_id);
+	struct index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
@@ -328,7 +328,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	Index *pk = index_find_unique(space, request->index_id);
+	struct index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
@@ -370,7 +370,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	if (tuple_validate_raw(space->format, request->tuple))
 		diag_raise();
 
-	Index *index = index_find_unique(space, 0);
+	struct index *index = index_find_unique(space, 0);
 
 	struct index_def *index_def = index->index_def;
 	uint32_t part_count = index->index_def->key_def->part_count;
@@ -437,7 +437,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 						     new_data + new_size);
 		tuple_ref(stmt->new_tuple);
 
-		Index *pk = space->index[0];
+		struct index *pk = space->index[0];
 		if (!key_update_can_be_skipped(pk->index_def->key_def->column_mask,
 					       column_mask) &&
 		    tuple_compare(stmt->old_tuple, stmt->new_tuple,
@@ -472,7 +472,7 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 	(void)txn;
 	(void)key_end;
 
-	struct Index *index = index_find_xc(space, index_id);
+	struct index *index = index_find_xc(space, index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
@@ -607,7 +607,7 @@ public:
 	}
 };
 
-static struct Index *
+static struct index *
 memtx_space_create_index(struct space *space, struct index_def *index_def)
 {
 	if (space->def->id == BOX_SEQUENCE_DATA_ID) {
@@ -683,7 +683,7 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 {
 	if (old_space->index_count == 0 || space_size(old_space) == 0)
 		return;
-	Index *pk = index_find_xc(old_space, 0);
+	struct index *pk = index_find_xc(old_space, 0);
 	struct iterator *it = pk->allocIterator();
 	IteratorGuard guard(it);
 	pk->initIterator(it, ITER_ALL, NULL, 0);
@@ -715,7 +715,7 @@ memtx_init_system_space(struct space *space)
 static void
 memtx_space_build_secondary_key(struct space *old_space,
 				struct space *new_space,
-				struct Index *new_index)
+				struct index *new_index)
 {
 	struct index_def *new_index_def = new_index->index_def;
 	/**
@@ -728,7 +728,7 @@ memtx_space_build_secondary_key(struct space *old_space,
 		if (!(memtx_space->replace == memtx_space_replace_all_keys))
 			return;
 	}
-	Index *pk = index_find_xc(old_space, 0);
+	struct index *pk = index_find_xc(old_space, 0);
 
 	struct errinj *inj = errinj(ERRINJ_BUILD_SECONDARY, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)new_index->index_def->iid) {
@@ -778,7 +778,7 @@ memtx_space_prepare_truncate(struct space *old_space,
 static void
 memtx_space_prune(struct space *space)
 {
-	struct Index *index = space_index(space, 0);
+	struct index *index = space_index(space, 0);
 	if (index == NULL)
 		return;
 

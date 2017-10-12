@@ -90,7 +90,7 @@ sysview_space_check_index_def(struct space *, struct index_def *)
 {
 }
 
-static struct Index *
+static struct index *
 sysview_space_create_index(struct space *space, struct index_def *index_def)
 {
 	assert(index_def->type == TREE);
@@ -123,7 +123,7 @@ sysview_space_drop_primary_key(struct space *)
 
 static void
 sysview_space_build_secondary_key(struct space *, struct space *,
-				  struct Index *)
+				  struct index *)
 {
 }
 

@@ -35,7 +35,7 @@
 
 #include "iterator_type.h"
 
-struct Index;
+struct index;
 struct tuple;
 
 /*
@@ -43,15 +43,15 @@ struct tuple;
  */
 
 struct tuple *
-memtx_index_min(const struct Index *index,
+memtx_index_min(struct index *index,
 		const char *key, uint32_t part_count);
 
 struct tuple *
-memtx_index_max(const struct Index *index,
+memtx_index_max(struct index *index,
 		const char *key, uint32_t part_count);
 
 size_t
-memtx_index_count(const struct Index *index, enum iterator_type type,
+memtx_index_count(struct index *index, enum iterator_type type,
 		  const char *key, uint32_t part_count);
 
 #endif /* TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED */

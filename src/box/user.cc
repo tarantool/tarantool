@@ -288,7 +288,7 @@ user_reload_privs(struct user *user)
 		struct space *space = space_cache_find(BOX_PRIV_ID);
 		char key[6];
 		/** Primary key - by user id */
-		struct Index *index = index_find_system(space, 0);
+		struct index *index = index_find_system(space, 0);
 		mp_encode_uint(key, user->def->uid);
 
 		struct iterator *it = index->position();

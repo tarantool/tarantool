@@ -126,7 +126,7 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
 MemtxHash::MemtxHash(struct index_def *index_def_arg)
-	: Index(index_def_arg)
+	: index(index_def_arg)
 {
 	memtx_index_arena_init();
 	hash_table = (struct light_index_core *) malloc(sizeof(*hash_table));
@@ -152,38 +152,38 @@ MemtxHash::reserve(uint32_t size_hint)
 }
 
 size_t
-MemtxHash::size() const
+MemtxHash::size()
 {
 	return hash_table->count;
 }
 
 size_t
-MemtxHash::bsize() const
+MemtxHash::bsize()
 {
         return matras_extent_count(&hash_table->mtable) * HASH_INDEX_EXTENT_SIZE;
 }
 
 struct tuple *
-MemtxHash::min(const char *key, uint32_t part_count) const
+MemtxHash::min(const char *key, uint32_t part_count)
 {
 	return memtx_index_min(this, key, part_count);
 }
 
 struct tuple *
-MemtxHash::max(const char *key, uint32_t part_count) const
+MemtxHash::max(const char *key, uint32_t part_count)
 {
 	return memtx_index_max(this, key, part_count);
 }
 
 size_t
 MemtxHash::count(enum iterator_type type, const char *key,
-		 uint32_t part_count) const
+		 uint32_t part_count)
 {
 	return memtx_index_count(this, type, key, part_count);
 }
 
 struct tuple *
-MemtxHash::random(uint32_t rnd) const
+MemtxHash::random(uint32_t rnd)
 {
 	if (hash_table->count == 0)
 		return NULL;
@@ -196,7 +196,7 @@ MemtxHash::random(uint32_t rnd) const
 }
 
 struct tuple *
-MemtxHash::findByKey(const char *key, uint32_t part_count) const
+MemtxHash::findByKey(const char *key, uint32_t part_count)
 {
 	assert(index_def->opts.is_unique && part_count == index_def->key_def->part_count);
 	(void) part_count;
@@ -261,7 +261,7 @@ MemtxHash::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 struct iterator *
-MemtxHash::allocIterator() const
+MemtxHash::allocIterator()
 {
 	struct hash_iterator *it = (struct hash_iterator *)
 			calloc(1, sizeof(*it));
@@ -279,7 +279,7 @@ MemtxHash::allocIterator() const
 
 void
 MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
-			const char *key, uint32_t part_count) const
+			const char *key, uint32_t part_count)
 {
 	assert(part_count == 0 || key != NULL);
 	(void) part_count;
@@ -309,7 +309,7 @@ MemtxHash::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		return Index::initIterator(ptr, type, key, part_count);
+		return index::initIterator(ptr, type, key, part_count);
 	}
 }
 

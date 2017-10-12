@@ -159,7 +159,7 @@ static void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple)
 {
-	Index *primary = index_find_xc(space, 0);
+	struct index *primary = index_find_xc(space, 0);
 	uint32_t key_len;
 	char *key = tuple_extract_key(found_tuple,
 			primary->index_def->key_def, &key_len);
@@ -192,7 +192,7 @@ request_handle_sequence(struct request *request, struct space *space)
 	    access_check_sequence(seq) != 0)
 		diag_raise();
 
-	struct Index *pk = space_index(space, 0);
+	struct index *pk = space_index(space, 0);
 	if (unlikely(pk == NULL))
 		return;
 
@@ -1178,7 +1178,7 @@ box_on_join(const tt_uuid *instance_uuid)
 
 	/** Find the largest existing replica id. */
 	struct space *space = space_cache_find(BOX_CLUSTER_ID);
-	struct Index *index = index_find_system(space, 0);
+	struct index *index = index_find_system(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;

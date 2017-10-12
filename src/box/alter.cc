@@ -525,7 +525,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	if (space_index(space, iid) == NULL)
 		return false;
 
-	struct Index *index = index_find_system(space, iid);
+	struct index *index = index_find_system(space, iid);
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
@@ -890,7 +890,7 @@ class DropIndex: public AlterSpaceOp {
 public:
 	DropIndex(struct alter_space *alter, struct index_def *def_arg)
 		:AlterSpaceOp(alter), old_index_def(def_arg) {}
-	/** A reference to Index key def of the dropped index. */
+	/** A reference to the definition of the dropped index. */
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
@@ -933,7 +933,8 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter, int64_t /* signature */)
 {
-	Index *index = index_find_xc(alter->old_space, old_index_def->iid);
+	struct index *index = index_find_xc(alter->old_space,
+					    old_index_def->iid);
 	index->commitDrop();
 }
 
@@ -1004,9 +1005,11 @@ ModifyIndex::alter(struct alter_space *alter)
 	 */
 	space_swap_index(alter->old_space, alter->new_space,
 			 old_index_def->iid, new_index_def->iid);
-	Index *old_index = space_index(alter->old_space, old_index_def->iid);
+	struct index *old_index = space_index(alter->old_space,
+					      old_index_def->iid);
 	assert(old_index != NULL);
-	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
 	assert(new_index != NULL);
 	index_def_swap(old_index->index_def, new_index->index_def);
 }
@@ -1020,9 +1023,11 @@ ModifyIndex::rollback(struct alter_space *alter)
 	 */
 	space_swap_index(alter->old_space, alter->new_space,
 			 old_index_def->iid, new_index_def->iid);
-	Index *old_index = space_index(alter->old_space, old_index_def->iid);
+	struct index *old_index = space_index(alter->old_space,
+					      old_index_def->iid);
 	assert(old_index != NULL);
-	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
 	assert(new_index != NULL);
 	index_def_swap(old_index->index_def, new_index->index_def);
 }
@@ -1084,7 +1089,8 @@ CreateIndex::alter(struct alter_space *alter)
 	/**
 	 * Get the new index and build it.
 	 */
-	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
+	struct index *new_index = index_find_xc(alter->new_space,
+						new_index_def->iid);
 	alter->new_space->vtab->build_secondary_key(alter->new_space,
 					alter->new_space, new_index);
 }
@@ -1092,7 +1098,8 @@ CreateIndex::alter(struct alter_space *alter)
 void
 CreateIndex::commit(struct alter_space *alter, int64_t signature)
 {
-	Index *new_index = index_find_xc(alter->new_space, new_index_def->iid);
+	struct index *new_index = index_find_xc(alter->new_space,
+						new_index_def->iid);
 	new_index->commitCreate(signature);
 }
 
@@ -1142,7 +1149,8 @@ void
 RebuildIndex::alter(struct alter_space *alter)
 {
 	/* Get the new index and build it.  */
-	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
 	assert(new_index != NULL);
 	alter->new_space->vtab->build_secondary_key(new_index_def->iid != 0 ?
 					alter->new_space : alter->old_space,
@@ -1152,8 +1160,10 @@ RebuildIndex::alter(struct alter_space *alter)
 void
 RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 {
-	Index *old_index = space_index(alter->old_space, old_index_def->iid);
-	Index *new_index = space_index(alter->new_space, new_index_def->iid);
+	struct index *old_index = space_index(alter->old_space,
+					      old_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
 	old_index->commitDrop();
 	new_index->commitCreate(signature);
 }
@@ -1230,7 +1240,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 {
 	struct space *old_space = alter->old_space;
 	for (uint32_t index_id = begin; index_id < end; ++index_id) {
-		Index *old_index = space_index(old_space, index_id);
+		struct index *old_index = space_index(old_space, index_id);
 		if (old_index == NULL)
 			continue;
 		struct index_def *old_def = old_index->index_def;
@@ -1471,7 +1481,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 					  BOX_INDEX_FIELD_ID);
 	struct space *old_space = space_cache_find(id);
 	access_check_ddl(old_space->def->uid, SC_SPACE);
-	Index *old_index = space_index(old_space, iid);
+	struct index *old_index = space_index(old_space, iid);
 
 	/*
 	 * Deal with various cases of dropping of the primary key.
@@ -2826,7 +2836,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	txn_on_commit(txn, on_commit);
 
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
-		struct Index *pk = index_find(space, 0);
+		struct index *pk = index_find(space, 0);
 		index_def_check_sequence(pk->index_def, space_name(space));
 		if (seq->is_generated) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,

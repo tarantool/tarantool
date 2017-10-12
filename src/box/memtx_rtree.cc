@@ -166,7 +166,7 @@ MemtxRTree::~MemtxRTree()
 }
 
 MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
-	: Index(index_def_arg)
+	: index(index_def_arg)
 {
 	assert(index_def->key_def->part_count == 1);
 	assert(index_def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
@@ -191,38 +191,38 @@ MemtxRTree::MemtxRTree(struct index_def *index_def_arg)
 }
 
 size_t
-MemtxRTree::size() const
+MemtxRTree::size()
 {
 	return rtree_number_of_records(&m_tree);
 }
 
 size_t
-MemtxRTree::bsize() const
+MemtxRTree::bsize()
 {
 	return rtree_used_size(&m_tree);
 }
 
 struct tuple *
-MemtxRTree::min(const char *key, uint32_t part_count) const
+MemtxRTree::min(const char *key, uint32_t part_count)
 {
 	return memtx_index_min(this, key, part_count);
 }
 
 struct tuple *
-MemtxRTree::max(const char *key, uint32_t part_count) const
+MemtxRTree::max(const char *key, uint32_t part_count)
 {
 	return memtx_index_max(this, key, part_count);
 }
 
 size_t
 MemtxRTree::count(enum iterator_type type, const char *key,
-		  uint32_t part_count) const
+		  uint32_t part_count)
 {
 	return memtx_index_count(this, type, key, part_count);
 }
 
 struct tuple *
-MemtxRTree::findByKey(const char *key, uint32_t part_count) const
+MemtxRTree::findByKey(const char *key, uint32_t part_count)
 {
 	struct rtree_iterator iterator;
 	rtree_iterator_init(&iterator);
@@ -256,7 +256,7 @@ MemtxRTree::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 }
 
 struct iterator *
-MemtxRTree::allocIterator() const
+MemtxRTree::allocIterator()
 {
 	struct index_rtree_iterator *it = (struct index_rtree_iterator *)
 		malloc(sizeof(*it));
@@ -273,7 +273,7 @@ MemtxRTree::allocIterator() const
 
 void
 MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
-			 const char *key, uint32_t part_count) const
+			 const char *key, uint32_t part_count)
 {
 	index_rtree_iterator *it = (index_rtree_iterator *)iterator;
 
@@ -316,7 +316,7 @@ MemtxRTree::initIterator(struct iterator *iterator, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		return Index::initIterator(iterator, type, key, part_count);
+		return index::initIterator(iterator, type, key, part_count);
 	}
 	rtree_search(&m_tree, &rect, op, &it->impl);
 }
