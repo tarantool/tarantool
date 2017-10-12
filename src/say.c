@@ -38,9 +38,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-#ifndef PIPE_BUF
-#include <sys/param.h>
-#endif
 #include <syslog.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -655,7 +652,18 @@ say_format_syslog(char *buf, int len, int level, const char *filename,
 
 /** {{{ Loggers */
 
-static __thread char buf[PIPE_BUF];
+/*
+ * From pipe(7):
+ * POSIX.1 says that write(2)s of less than PIPE_BUF bytes must be atomic:
+ * the output data is written to the pipe as a contiguous sequence. Writes
+ * of more than PIPE_BUF bytes may be nonatomic: the kernel may interleave
+ * the data with data written by other processes. PIPE_BUF is 4k on Linux.
+ *
+ * Nevertheless, let's ignore the fact that messages can be interleaved in
+ * some situations and set SAY_BUF_LEN_MAX to 16k for now.
+ */
+enum { SAY_BUF_LEN_MAX = 16 * 1024 };
+static __thread char buf[SAY_BUF_LEN_MAX];
 
 /**
  * Boot-time logger.
