@@ -16,6 +16,8 @@ box.cfg{
     vinyl_write_threads = 3,
     vinyl_range_size    = 64 * 1024,
     vinyl_page_size     = 1024,
+    memtx_max_tuple_size = 1024 * 1024 * 100,
+    vinyl_max_tuple_size = 1024 * 1024 * 100,
 }
 
 require('console').listen(os.getenv('ADMIN'))

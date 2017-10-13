@@ -1486,6 +1486,7 @@ engine_init()
 					     cfg_geti("memtx_min_tuple_size"),
 					     cfg_getd("slab_alloc_factor"));
 	engine_register(memtx);
+	box_set_memtx_max_tuple_size();
 
 	SysviewEngine *sysview = new SysviewEngine();
 	engine_register(sysview);
@@ -1493,6 +1494,7 @@ engine_init()
 	VinylEngine *vinyl = new VinylEngine();
 	vinyl->init();
 	engine_register(vinyl);
+	box_set_vinyl_max_tuple_size();
 }
 
 /**

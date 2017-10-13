@@ -26,6 +26,9 @@ engine_max_tuple_size = engine ..'_max_tuple_size'
 engine_tuple_size = engine == 'memtx' and 16 or 32
 ---
 ...
+box.cfg{[engine_max_tuple_size] = 1024 * 1024}
+---
+...
 -- check max_tuple_size limit
 max_tuple_size = box.cfg[engine_max_tuple_size]
 ---
@@ -415,6 +418,39 @@ t.skwjhfjwhfwfhwkhfwkjh43avjnbknwkvbwekjf
 - 43
 ...
 box.space.test:drop()
+---
+...
+--
+-- gh-2773: correctly reset max tuple size on restart.
+--
+box.cfg{[engine_max_tuple_size] = 1024 * 1024 * 100}
+---
+...
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+_ = s:replace({1, string.rep('*', 1024 * 1024)})
+---
+...
+_ = s:replace({2, string.rep('*', 1024 * 1024 * 2)})
+---
+...
+pk:count()
+---
+- 2
+...
+test_run:cmd('restart server default')
+s = box.space.test
+---
+...
+s:count()
+---
+- 2
+...
+s:drop()
 ---
 ...
 engine = nil
