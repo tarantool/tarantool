@@ -49,13 +49,13 @@ struct field_def;
 struct tuple_format;
 
 /** Engine instance */
-struct Engine {
+struct engine {
 public:
-	Engine(const char *engine_name);
+	engine(const char *engine_name);
 
-	Engine(const Engine &) = delete;
-	Engine& operator=(const Engine&) = delete;
-	virtual ~Engine() {}
+	engine(const engine &) = delete;
+	engine& operator=(const engine&) = delete;
+	virtual ~engine() {}
 	/** Called once at startup. */
 	virtual void init();
 	/**
@@ -155,7 +155,7 @@ public:
 	 * collection is aborted, i.e. this method isn't called
 	 * for other engines and xlog files aren't deleted.
 	 *
-	 * Used to abort garbage collection in case MemtxEngine
+	 * Used to abort garbage collection in case memtx engine
 	 * fails to delete a snapshot file, because we recover
 	 * checkpoint list by scanning the snapshot directory.
 	 */
@@ -184,13 +184,13 @@ public:
 };
 
 /** Register engine engine instance. */
-void engine_register(Engine *engine);
+void engine_register(struct engine *engine);
 
 /** Call a visitor function on every registered engine. */
 #define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
 
 /** Find engine engine by name. */
-Engine *engine_find(const char *name);
+struct engine *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();

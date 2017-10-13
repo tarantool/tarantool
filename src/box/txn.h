@@ -44,7 +44,7 @@ extern "C" {
 /** box statistics */
 extern struct rmean *rmean_box;
 
-struct Engine;
+struct engine;
 struct space;
 struct tuple;
 struct xrow_header;
@@ -115,7 +115,7 @@ struct txn {
 	int in_sub_stmt;
 	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
-	struct Engine *engine;
+	struct engine *engine;
 	/** Engine-specific transaction data */
 	void *engine_tx;
 	/**
@@ -192,7 +192,7 @@ struct txn *
 txn_begin_stmt(struct space *space);
 
 void
-txn_begin_in_engine(Engine *engine, struct txn *txn);
+txn_begin_in_engine(struct engine *engine, struct txn *txn);
 
 /**
  * This is an optimization, which exists to speed up selects
@@ -206,7 +206,7 @@ txn_begin_ro_stmt(struct space *space)
 {
 	struct txn *txn = in_txn();
 	if (txn) {
-		Engine *engine = space->engine;
+		struct engine *engine = space->engine;
 		txn_begin_in_engine(engine, txn);
 	}
 	return txn;

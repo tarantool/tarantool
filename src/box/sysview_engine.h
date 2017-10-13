@@ -32,9 +32,9 @@
  */
 #include "engine.h"
 
-struct SysviewEngine: public Engine {
+struct sysview_engine: public engine {
 public:
-	SysviewEngine();
+	sysview_engine();
 	virtual struct space *createSpace() override;
 };
 

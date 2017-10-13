@@ -39,14 +39,14 @@
 int64_t
 checkpoint_last(struct vclock *vclock)
 {
-	struct MemtxEngine *memtx = (MemtxEngine *)engine_find("memtx");
+	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
 	return memtx->lastSnapshot(vclock);
 }
 
 const struct vclock *
 checkpoint_iterator_next(struct checkpoint_iterator *it)
 {
-	struct MemtxEngine *memtx = (MemtxEngine *)engine_find("memtx");
+	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
 	it->curr = memtx->nextSnapshot(it->curr);
 	return it->curr;
 }
@@ -54,7 +54,7 @@ checkpoint_iterator_next(struct checkpoint_iterator *it)
 const struct vclock *
 checkpoint_iterator_prev(struct checkpoint_iterator *it)
 {
-	struct MemtxEngine *memtx = (MemtxEngine *)engine_find("memtx");
+	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
 	it->curr = memtx->prevSnapshot(it->curr);
 	return it->curr;
 }

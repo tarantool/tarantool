@@ -187,7 +187,7 @@ gc_run(void)
 	 *
 	 * The order is important here: we must invoke garbage
 	 * collection for memtx snapshots first and abort if it
-	 * fails - see the comment to MemtxEngine::collectGarbage.
+	 * fails - see the comment to memtx_engine::collectGarbage.
 	 */
 	if (engine_collect_garbage(gc_signature) != 0) {
 		say_error("box garbage collection failed: %s",

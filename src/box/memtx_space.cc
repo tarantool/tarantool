@@ -748,7 +748,7 @@ static int
 memtx_space_add_primary_key(struct space *space)
 {
 	memtx_space_do_add_primary_key(space,
-		((MemtxEngine *)space->engine)->m_state);
+		((struct memtx_engine *)space->engine)->m_state);
 	return 0;
 }
 

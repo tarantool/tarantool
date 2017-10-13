@@ -171,12 +171,12 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .commit_alter = */ sysview_space_commit_alter,
 };
 
-SysviewEngine::SysviewEngine()
-	:Engine("sysview")
+sysview_engine::sysview_engine()
+	: engine("sysview")
 {
 }
 
-struct space *SysviewEngine::createSpace()
+struct space *sysview_engine::createSpace()
 {
 	struct space *space = (struct space *)calloc(1, sizeof(*space));
 	if (space == NULL)

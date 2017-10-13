@@ -112,7 +112,7 @@ txn_begin(bool is_autocommit)
 }
 
 void
-txn_begin_in_engine(Engine *engine, struct txn *txn)
+txn_begin_in_engine(struct engine *engine, struct txn *txn)
 {
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
@@ -137,7 +137,7 @@ txn_begin_stmt(struct space *space)
 		tnt_raise(ClientError, ER_SUB_STMT_MAX);
 
 	trigger_run(&space->on_stmt_begin, txn);
-	Engine *engine = space->engine;
+	struct engine *engine = space->engine;
 	txn_begin_in_engine(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	stmt->space = space;

@@ -52,24 +52,24 @@
 extern "C" struct vy_env *
 vinyl_engine_get_env()
 {
-	VinylEngine *e = (VinylEngine *)engine_find("vinyl");
+	struct vinyl_engine *e = (struct vinyl_engine *)engine_find("vinyl");
 	return e->env;
 }
 
-VinylEngine::VinylEngine()
-	:Engine("vinyl")
+vinyl_engine::vinyl_engine()
+	: engine("vinyl")
 {
 	env = NULL;
 }
 
-VinylEngine::~VinylEngine()
+vinyl_engine::~vinyl_engine()
 {
 	if (env)
 		vy_env_delete(env);
 }
 
 void
-VinylEngine::init()
+vinyl_engine::init()
 {
 	env = vy_env_new(cfg_gets("vinyl_dir"),
 			 cfg_geti64("vinyl_memory"),
@@ -82,28 +82,28 @@ VinylEngine::init()
 }
 
 void
-VinylEngine::bootstrap()
+vinyl_engine::bootstrap()
 {
 	if (vy_bootstrap(env) != 0)
 		diag_raise();
 }
 
 void
-VinylEngine::beginInitialRecovery(const struct vclock *recovery_vclock)
+vinyl_engine::beginInitialRecovery(const struct vclock *recovery_vclock)
 {
 	if (vy_begin_initial_recovery(env, recovery_vclock) != 0)
 		diag_raise();
 }
 
 void
-VinylEngine::beginFinalRecovery()
+vinyl_engine::beginFinalRecovery()
 {
 	if (vy_begin_final_recovery(env) != 0)
 		diag_raise();
 }
 
 void
-VinylEngine::endRecovery()
+vinyl_engine::endRecovery()
 {
 	/* complete two-phase recovery */
 	if (vy_end_recovery(env) != 0)
@@ -111,9 +111,9 @@ VinylEngine::endRecovery()
 }
 
 struct tuple_format *
-VinylEngine::createFormat(struct key_def **keys, uint32_t key_count,
-			  struct field_def *fields, uint32_t field_count,
-			  uint32_t exact_field_count)
+vinyl_engine::createFormat(struct key_def **keys, uint32_t key_count,
+			   struct field_def *fields, uint32_t field_count,
+			   uint32_t exact_field_count)
 {
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
 						       keys, key_count, 0,
@@ -125,7 +125,7 @@ VinylEngine::createFormat(struct key_def **keys, uint32_t key_count,
 }
 
 struct space *
-VinylEngine::createSpace()
+vinyl_engine::createSpace()
 {
 	struct space *space = (struct space *)calloc(1, sizeof(*space));
 	if (space == NULL)
@@ -136,7 +136,7 @@ VinylEngine::createSpace()
 }
 
 void
-VinylEngine::join(struct vclock *vclock, struct xstream *stream)
+vinyl_engine::join(struct vclock *vclock, struct xstream *stream)
 {
 	if (vy_join(env, vclock, stream) != 0)
 		diag_raise();
@@ -144,7 +144,7 @@ VinylEngine::join(struct vclock *vclock, struct xstream *stream)
 
 
 void
-VinylEngine::begin(struct txn *txn)
+vinyl_engine::begin(struct txn *txn)
 {
 	assert(txn->engine_tx == NULL);
 	txn->engine_tx = vy_begin(env);
@@ -153,7 +153,7 @@ VinylEngine::begin(struct txn *txn)
 }
 
 void
-VinylEngine::beginStatement(struct txn *txn)
+vinyl_engine::beginStatement(struct txn *txn)
 {
 	assert(txn != NULL);
 	struct vy_tx *tx = (struct vy_tx *)(txn->engine_tx);
@@ -162,7 +162,7 @@ VinylEngine::beginStatement(struct txn *txn)
 }
 
 void
-VinylEngine::prepare(struct txn *txn)
+vinyl_engine::prepare(struct txn *txn)
 {
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 
@@ -182,7 +182,7 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 }
 
 void
-VinylEngine::commit(struct txn *txn)
+vinyl_engine::commit(struct txn *txn)
 {
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 	struct txn_stmt *stmt;
@@ -196,7 +196,7 @@ VinylEngine::commit(struct txn *txn)
 }
 
 void
-VinylEngine::rollback(struct txn *txn)
+vinyl_engine::rollback(struct txn *txn)
 {
 	if (txn->engine_tx == NULL)
 		return;
@@ -211,7 +211,7 @@ VinylEngine::rollback(struct txn *txn)
 }
 
 void
-VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
+vinyl_engine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
 {
 	txn_stmt_unref_tuples(stmt);
 	vy_rollback_to_savepoint(env, (struct vy_tx *)txn->engine_tx,
@@ -220,58 +220,58 @@ VinylEngine::rollbackStatement(struct txn *txn, struct txn_stmt *stmt)
 
 
 int
-VinylEngine::beginCheckpoint()
+vinyl_engine::beginCheckpoint()
 {
 	return vy_begin_checkpoint(env);
 }
 
 int
-VinylEngine::waitCheckpoint(struct vclock *vclock)
+vinyl_engine::waitCheckpoint(struct vclock *vclock)
 {
 	return vy_wait_checkpoint(env, vclock);
 }
 
 void
-VinylEngine::commitCheckpoint(struct vclock *vclock)
+vinyl_engine::commitCheckpoint(struct vclock *vclock)
 {
 	vy_commit_checkpoint(env, vclock);
 }
 
 void
-VinylEngine::abortCheckpoint()
+vinyl_engine::abortCheckpoint()
 {
 	vy_abort_checkpoint(env);
 }
 
 int
-VinylEngine::collectGarbage(int64_t lsn)
+vinyl_engine::collectGarbage(int64_t lsn)
 {
 	vy_collect_garbage(env, lsn);
 	return 0;
 }
 
 int
-VinylEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
+vinyl_engine::backup(struct vclock *vclock, engine_backup_cb cb, void *arg)
 {
 	return vy_backup(env, vclock, cb, arg);
 }
 
 void
-VinylEngine::setMaxTupleSize(size_t max_size)
+vinyl_engine::setMaxTupleSize(size_t max_size)
 {
 	if (vy_set_max_tuple_size(env, max_size) != 0)
 		diag_raise();
 }
 
 void
-VinylEngine::setTimeout(double timeout)
+vinyl_engine::setTimeout(double timeout)
 {
 	if (vy_set_timeout(env, timeout) != 0)
 		diag_raise();
 }
 
 void
-VinylEngine::checkSpaceDef(struct space_def *def)
+vinyl_engine::checkSpaceDef(struct space_def *def)
 {
 	if (def->opts.temporary) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,

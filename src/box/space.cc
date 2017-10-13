@@ -97,7 +97,7 @@ space_new_xc(struct space_def *def, struct rlist *key_list)
 	/* A space with a secondary key without a primary is illegal. */
 	assert(index_count == 0 || pk->iid == 0);
 	/* Allocate a space engine instance. */
-	Engine *engine = engine_find(def->engine_name);
+	struct engine *engine = engine_find(def->engine_name);
 	struct space *space = engine->createSpace();
 	auto scoped_guard = make_scoped_guard([=] { space_delete(space); });
 	space->engine = engine;

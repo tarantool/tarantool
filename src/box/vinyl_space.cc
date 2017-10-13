@@ -60,7 +60,7 @@ static int
 vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 {
 	assert(request->header != NULL);
-	struct vy_env *env = ((VinylEngine *)space->engine)->env;
+	struct vy_env *env = ((struct vinyl_engine *)space->engine)->env;
 
 	struct vy_tx *tx = vy_begin(env);
 	if (tx == NULL)
@@ -114,7 +114,7 @@ vinyl_space_execute_replace(struct space *space, struct txn *txn,
 			    struct request *request, struct tuple **result)
 {
 	assert(request->index_id == 0);
-	VinylEngine *engine = (VinylEngine *) space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)space->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
@@ -128,7 +128,7 @@ static int
 vinyl_space_execute_delete(struct space *space, struct txn *txn,
 			   struct request *request, struct tuple **result)
 {
-	VinylEngine *engine = (VinylEngine *) space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)space->engine;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct vy_tx *tx = (struct vy_tx *) txn->engine_tx;
 	if (vy_delete(engine->env, tx, stmt, space, request))
@@ -145,7 +145,7 @@ static int
 vinyl_space_execute_update(struct space *space, struct txn *txn,
 			   struct request *request, struct tuple **result)
 {
-	VinylEngine *engine = (VinylEngine *) space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)space->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_update(engine->env, tx, stmt, space, request) != 0)
@@ -158,7 +158,7 @@ static int
 vinyl_space_execute_upsert(struct space *space, struct txn *txn,
                            struct request *request)
 {
-	VinylEngine *engine = (VinylEngine *) space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)space->engine;
 	struct vy_tx *tx = (struct vy_tx *)txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	return vy_upsert(engine->env, tx, stmt, space, request);
@@ -177,7 +177,7 @@ vinyl_init_system_space(struct space *)
 static int
 vinyl_space_check_format(struct space *new_space, struct space *old_space)
 {
-	VinylEngine *engine = (VinylEngine *) new_space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)new_space->engine;
 	return vy_check_format(engine->env, old_space);
 }
 
@@ -216,7 +216,7 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 static struct index *
 vinyl_space_create_index(struct space *space, struct index_def *index_def)
 {
-	VinylEngine *engine = (VinylEngine *) space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)space->engine;
 	if (index_def->type != TREE) {
 		unreachable();
 		return NULL;
@@ -278,7 +278,7 @@ static int
 vinyl_space_prepare_truncate(struct space *old_space,
 			     struct space *new_space)
 {
-	VinylEngine *engine = (VinylEngine *) old_space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)old_space->engine;
 	return vy_prepare_truncate_space(engine->env, old_space, new_space);
 }
 
@@ -286,22 +286,21 @@ static void
 vinyl_space_commit_truncate(struct space *old_space,
 			    struct space *new_space)
 {
-	VinylEngine *engine = (VinylEngine *) old_space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)old_space->engine;
 	vy_commit_truncate_space(engine->env, old_space, new_space);
 }
 
 static int
 vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
-	VinylEngine *engine = (VinylEngine *) old_space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)old_space->engine;
 	return vy_prepare_alter_space(engine->env, old_space, new_space);
 }
 
 static void
 vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 {
-	(void) old_space;
-	VinylEngine *engine = (VinylEngine *) old_space->engine;
+	struct vinyl_engine *engine = (struct vinyl_engine *)old_space->engine;
 	if (new_space == NULL || new_space->index_count == 0) {
 		/* This is a drop space. */
 		return;

@@ -72,11 +72,11 @@ enum memtx_recovery_state {
 /** Memtx extents pool, available to statistics. */
 extern struct mempool memtx_index_extent_pool;
 
-struct MemtxEngine: public Engine {
-	MemtxEngine(const char *snap_dirname, bool force_recovery,
-		    uint64_t tuple_arena_max_size,
-		    uint32_t objsize_min, float alloc_factor);
-	~MemtxEngine();
+struct memtx_engine: public engine {
+	memtx_engine(const char *snap_dirname, bool force_recovery,
+		     uint64_t tuple_arena_max_size,
+		     uint32_t objsize_min, float alloc_factor);
+	~memtx_engine();
 	virtual struct tuple_format *
 	createFormat(struct key_def **keys, uint32_t key_count,
 		     struct field_def *fields, uint32_t field_count,

@@ -42,86 +42,86 @@
 
 RLIST_HEAD(engines);
 
-Engine::Engine(const char *engine_name)
+engine::engine(const char *engine_name)
 	:name(engine_name),
 	 id(-1),
 	 link(RLIST_HEAD_INITIALIZER(link))
 {}
 
-void Engine::init()
+void engine::init()
 {}
 
 struct tuple_format *
-Engine::createFormat(struct key_def **, uint32_t,
+engine::createFormat(struct key_def **, uint32_t,
 		     struct field_def *, uint32_t, uint32_t)
 {
 	return NULL;
 }
 
-void Engine::begin(struct txn *)
+void engine::begin(struct txn *)
 {}
 
-void Engine::beginStatement(struct txn *)
+void engine::beginStatement(struct txn *)
 {}
 
-void Engine::prepare(struct txn *)
+void engine::prepare(struct txn *)
 {}
 
-void Engine::commit(struct txn *)
+void engine::commit(struct txn *)
 {}
 
-void Engine::rollback(struct txn *)
+void engine::rollback(struct txn *)
 {}
 
-void Engine::rollbackStatement(struct txn *, struct txn_stmt *)
+void engine::rollbackStatement(struct txn *, struct txn_stmt *)
 {}
 
-void Engine::bootstrap()
+void engine::bootstrap()
 {}
 
-void Engine::beginInitialRecovery(const struct vclock *)
+void engine::beginInitialRecovery(const struct vclock *)
 {
 }
 
-void Engine::beginFinalRecovery()
+void engine::beginFinalRecovery()
 {}
 
-void Engine::endRecovery()
+void engine::endRecovery()
 {}
 
 int
-Engine::beginCheckpoint()
+engine::beginCheckpoint()
 {
 	return 0;
 }
 
 int
-Engine::waitCheckpoint(struct vclock *vclock)
+engine::waitCheckpoint(struct vclock *vclock)
 {
 	(void) vclock;
 	return 0;
 }
 
 void
-Engine::commitCheckpoint(struct vclock *vclock)
+engine::commitCheckpoint(struct vclock *vclock)
 {
 	(void) vclock;
 }
 
 void
-Engine::abortCheckpoint()
+engine::abortCheckpoint()
 {
 }
 
 int
-Engine::collectGarbage(int64_t lsn)
+engine::collectGarbage(int64_t lsn)
 {
 	(void) lsn;
 	return 0;
 }
 
 int
-Engine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
+engine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
 	(void) vclock;
 	(void) cb;
@@ -130,21 +130,21 @@ Engine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 }
 
 void
-Engine::join(struct vclock *vclock, struct xstream *stream)
+engine::join(struct vclock *vclock, struct xstream *stream)
 {
 	(void) vclock;
 	(void) stream;
 }
 
 void
-Engine::checkSpaceDef(struct space_def * /* def */)
+engine::checkSpaceDef(struct space_def * /* def */)
 {
 }
 
 /* {{{ Engine API */
 
 /** Register engine instance. */
-void engine_register(Engine *engine)
+void engine_register(struct engine *engine)
 {
 	static int n_engines;
 	rlist_add_tail_entry(&engines, engine, link);
@@ -152,10 +152,10 @@ void engine_register(Engine *engine)
 }
 
 /** Find engine by name. */
-Engine *
+struct engine *
 engine_find(const char *name)
 {
-	Engine *e;
+	struct engine *e;
 	engine_foreach(e) {
 		if (strcmp(e->name, name) == 0)
 			return e;
@@ -166,7 +166,7 @@ engine_find(const char *name)
 /** Shutdown all engine factories. */
 void engine_shutdown()
 {
-	Engine *e, *tmp;
+	struct engine *e, *tmp;
 	rlist_foreach_entry_safe(e, &engines, link, tmp) {
 		delete e;
 	}
@@ -175,7 +175,7 @@ void engine_shutdown()
 void
 engine_bootstrap()
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		engine->bootstrap();
 	}
@@ -184,7 +184,7 @@ engine_bootstrap()
 void
 engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		engine->beginInitialRecovery(recovery_vclock);
 	}
@@ -193,7 +193,7 @@ engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 void
 engine_begin_final_recovery()
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine)
 		engine->beginFinalRecovery();
 }
@@ -205,7 +205,7 @@ engine_end_recovery()
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.
 	 */
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine)
 		engine->endRecovery();
 }
@@ -213,7 +213,7 @@ engine_end_recovery()
 int
 engine_begin_checkpoint()
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->beginCheckpoint() < 0)
 			return -1;
@@ -224,7 +224,7 @@ engine_begin_checkpoint()
 int
 engine_commit_checkpoint(struct vclock *vclock)
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->waitCheckpoint(vclock) < 0)
 			return -1;
@@ -238,7 +238,7 @@ engine_commit_checkpoint(struct vclock *vclock)
 void
 engine_abort_checkpoint()
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine)
 		engine->abortCheckpoint();
 }
@@ -246,7 +246,7 @@ engine_abort_checkpoint()
 int
 engine_collect_garbage(int64_t lsn)
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->collectGarbage(lsn) < 0)
 			return -1;
@@ -257,7 +257,7 @@ engine_collect_garbage(int64_t lsn)
 int
 engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->backup(vclock, cb, cb_arg) < 0)
 			return -1;
@@ -268,7 +268,7 @@ engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 void
 engine_join(struct vclock *vclock, struct xstream *stream)
 {
-	Engine *engine;
+	struct engine *engine;
 	engine_foreach(engine) {
 		engine->join(vclock, stream);
 	}

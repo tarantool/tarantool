@@ -710,14 +710,14 @@ box_set_io_collect_interval(void)
 void
 box_set_snap_io_rate_limit(void)
 {
-	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
 	memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
 }
 
 void
 box_set_memtx_max_tuple_size(void)
 {
-	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
 	memtx->setMaxTupleSize(cfg_geti("memtx_max_tuple_size"));
 }
 
@@ -746,14 +746,14 @@ box_set_checkpoint_count(void)
 void
 box_set_vinyl_max_tuple_size(void)
 {
-	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine_find("vinyl");
 	vinyl->setMaxTupleSize(cfg_geti("vinyl_max_tuple_size"));
 }
 
 void
 box_set_vinyl_timeout(void)
 {
-	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine_find("vinyl");
 	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
 }
 
@@ -1476,18 +1476,19 @@ engine_init()
 	 * in checkpoints (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
-	MemtxEngine *memtx = new MemtxEngine(cfg_gets("memtx_dir"),
-					     cfg_geti("force_recovery"),
-					     cfg_getd("memtx_memory"),
-					     cfg_geti("memtx_min_tuple_size"),
-					     cfg_getd("slab_alloc_factor"));
+	struct memtx_engine *memtx;
+	memtx = new memtx_engine(cfg_gets("memtx_dir"),
+				 cfg_geti("force_recovery"),
+				 cfg_getd("memtx_memory"),
+				 cfg_geti("memtx_min_tuple_size"),
+				 cfg_getd("slab_alloc_factor"));
 	engine_register(memtx);
 	box_set_memtx_max_tuple_size();
 
-	SysviewEngine *sysview = new SysviewEngine();
+	struct sysview_engine *sysview = new sysview_engine();
 	engine_register(sysview);
 
-	VinylEngine *vinyl = new VinylEngine();
+	struct vinyl_engine *vinyl = new vinyl_engine();
 	vinyl->init();
 	engine_register(vinyl);
 	box_set_vinyl_max_tuple_size();
@@ -1712,7 +1713,8 @@ box_cfg_xc(void)
 		 * explicitly pass the statement LSN to it.
 		 */
 		engine_begin_initial_recovery(&recovery->vclock);
-		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+		struct memtx_engine *memtx =
+			(struct memtx_engine *)engine_find("memtx");
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, &recovery->vclock);

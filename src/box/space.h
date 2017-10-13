@@ -41,7 +41,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct space;
-struct Engine;
+struct engine;
 struct sequence;
 struct txn;
 struct request;
@@ -146,7 +146,7 @@ struct space {
 	/** Cached runtime access information. */
 	struct access access[BOX_USER_MAX];
 	/** Engine used by this space. */
-	struct Engine *engine;
+	struct engine *engine;
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
 	/** Triggers fired before space statement */

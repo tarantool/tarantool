@@ -119,10 +119,10 @@ memtx_build_secondary_keys(struct space *space, void *param)
 	memtx_space->replace = memtx_space_replace_all_keys;
 }
 
-MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
-			 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-			 float alloc_factor)
-	:Engine("memtx"),
+memtx_engine::memtx_engine(const char *snap_dirname, bool force_recovery,
+			   uint64_t tuple_arena_max_size, uint32_t objsize_min,
+			   float alloc_factor)
+	: engine("memtx"),
 	m_state(MEMTX_INITIALIZED),
 	m_checkpoint(0),
 	m_snap_io_rate_limit(0),
@@ -135,7 +135,7 @@ MemtxEngine::MemtxEngine(const char *snap_dirname, bool force_recovery,
 	xdir_scan_xc(&m_snap_dir);
 }
 
-MemtxEngine::~MemtxEngine()
+memtx_engine::~memtx_engine()
 {
 	xdir_destroy(&m_snap_dir);
 
@@ -143,13 +143,13 @@ MemtxEngine::~MemtxEngine()
 }
 
 void
-MemtxEngine::setMaxTupleSize(size_t max_size)
+memtx_engine::setMaxTupleSize(size_t max_size)
 {
 	memtx_max_tuple_size = max_size;
 }
 
 void
-MemtxEngine::recoverSnapshot(const struct vclock *vclock)
+memtx_engine::recoverSnapshot(const struct vclock *vclock)
 {
 	/* Process existing snapshot */
 	say_info("recovery start");
@@ -196,7 +196,7 @@ MemtxEngine::recoverSnapshot(const struct vclock *vclock)
 }
 
 void
-MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
+memtx_engine::recoverSnapshotRow(struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
@@ -221,7 +221,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 
 /** Called at start to tell memtx to recover to a given LSN. */
 void
-MemtxEngine::beginInitialRecovery(const struct vclock *)
+memtx_engine::beginInitialRecovery(const struct vclock *)
 {
 	assert(m_state == MEMTX_INITIALIZED);
 	/*
@@ -237,7 +237,7 @@ MemtxEngine::beginInitialRecovery(const struct vclock *)
 }
 
 void
-MemtxEngine::beginFinalRecovery()
+memtx_engine::beginFinalRecovery()
 {
 	if (m_state == MEMTX_OK)
 		return;
@@ -267,7 +267,7 @@ MemtxEngine::beginFinalRecovery()
 }
 
 void
-MemtxEngine::endRecovery()
+memtx_engine::endRecovery()
 {
 	/*
 	 * Recovery is started with enabled keys when:
@@ -283,9 +283,9 @@ MemtxEngine::endRecovery()
 }
 
 struct tuple_format *
-MemtxEngine::createFormat(struct key_def **keys, uint32_t key_count,
-			  struct field_def *fields, uint32_t field_count,
-			  uint32_t exact_field_count)
+memtx_engine::createFormat(struct key_def **keys, uint32_t key_count,
+			   struct field_def *fields, uint32_t field_count,
+			   uint32_t exact_field_count)
 {
 	struct tuple_format *format = tuple_format_new(&memtx_tuple_format_vtab,
 						       keys, key_count, 0,
@@ -296,7 +296,7 @@ MemtxEngine::createFormat(struct key_def **keys, uint32_t key_count,
 	return format;
 }
 
-struct space *MemtxEngine::createSpace()
+struct space *memtx_engine::createSpace()
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)
 		calloc(1, sizeof(*memtx_space));
@@ -309,7 +309,7 @@ struct space *MemtxEngine::createSpace()
 }
 
 void
-MemtxEngine::prepare(struct txn *txn)
+memtx_engine::prepare(struct txn *txn)
 {
 	if (txn->is_autocommit)
 		return;
@@ -323,7 +323,7 @@ MemtxEngine::prepare(struct txn *txn)
 }
 
 void
-MemtxEngine::begin(struct txn *txn)
+memtx_engine::begin(struct txn *txn)
 {
 	/*
 	 * Register a trigger to rollback transaction on yield.
@@ -348,7 +348,7 @@ MemtxEngine::begin(struct txn *txn)
 }
 
 void
-MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
+memtx_engine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 {
 	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
 		return;
@@ -384,7 +384,7 @@ MemtxEngine::rollbackStatement(struct txn *, struct txn_stmt *stmt)
 }
 
 void
-MemtxEngine::rollback(struct txn *txn)
+memtx_engine::rollback(struct txn *txn)
 {
 	prepare(txn);
 	struct txn_stmt *stmt;
@@ -394,7 +394,7 @@ MemtxEngine::rollback(struct txn *txn)
 }
 
 void
-MemtxEngine::commit(struct txn *txn)
+memtx_engine::commit(struct txn *txn)
 {
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
@@ -404,7 +404,7 @@ MemtxEngine::commit(struct txn *txn)
 }
 
 void
-MemtxEngine::bootstrap()
+memtx_engine::bootstrap()
 {
 	assert(m_state == MEMTX_INITIALIZED);
 	m_state = MEMTX_OK;
@@ -597,7 +597,7 @@ checkpoint_f(va_list ap)
 }
 
 int
-MemtxEngine::beginCheckpoint()
+memtx_engine::beginCheckpoint()
 {
 	assert(m_checkpoint == 0);
 
@@ -612,7 +612,7 @@ MemtxEngine::beginCheckpoint()
 }
 
 int
-MemtxEngine::waitCheckpoint(struct vclock *vclock)
+memtx_engine::waitCheckpoint(struct vclock *vclock)
 {
 	assert(m_checkpoint);
 	/*
@@ -639,7 +639,7 @@ MemtxEngine::waitCheckpoint(struct vclock *vclock)
 }
 
 void
-MemtxEngine::commitCheckpoint(struct vclock *vclock)
+memtx_engine::commitCheckpoint(struct vclock *vclock)
 {
 	(void) vclock;
 	/* beginCheckpoint() must have been done */
@@ -675,7 +675,7 @@ MemtxEngine::commitCheckpoint(struct vclock *vclock)
 }
 
 void
-MemtxEngine::abortCheckpoint()
+memtx_engine::abortCheckpoint()
 {
 	/**
 	 * An error in the other engine's first phase.
@@ -701,7 +701,7 @@ MemtxEngine::abortCheckpoint()
 }
 
 int
-MemtxEngine::collectGarbage(int64_t lsn)
+memtx_engine::collectGarbage(int64_t lsn)
 {
 	/*
 	 * We recover the checkpoint list by scanning the snapshot
@@ -718,7 +718,7 @@ MemtxEngine::collectGarbage(int64_t lsn)
 }
 
 int
-MemtxEngine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
+memtx_engine::backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
 	char *filename = xdir_format_filename(&m_snap_dir,
 					      vclock_sum(vclock), NONE);
@@ -775,7 +775,7 @@ memtx_initial_join_f(va_list ap)
 }
 
 void
-MemtxEngine::join(struct vclock *vclock, struct xstream *stream)
+memtx_engine::join(struct vclock *vclock, struct xstream *stream)
 {
 	/*
 	 * cord_costart() passes only void * pointer as an argument.

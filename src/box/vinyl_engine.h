@@ -34,9 +34,9 @@
 
 struct vy_env;
 
-struct VinylEngine: public Engine {
-	VinylEngine();
-	~VinylEngine();
+struct vinyl_engine: public engine {
+	vinyl_engine();
+	~vinyl_engine();
 	virtual void init() override;
 	virtual struct tuple_format *
 	createFormat(struct key_def **keys, uint32_t key_count,
