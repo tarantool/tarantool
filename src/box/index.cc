@@ -171,7 +171,7 @@ static inline struct index *
 check_index(uint32_t space_id, uint32_t index_id, struct space **space)
 {
 	*space = space_cache_find_xc(space_id);
-	access_check_space(*space, PRIV_R);
+	access_check_space_xc(*space, PRIV_R);
 	return index_find_xc(*space, index_id);
 }
 

@@ -310,7 +310,7 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	struct index *pk = index_find_unique(space, request->index_id);
+	struct index *pk = index_find_unique_xc(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
@@ -328,7 +328,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
-	struct index *pk = index_find_unique(space, request->index_id);
+	struct index *pk = index_find_unique_xc(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
@@ -370,7 +370,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	if (tuple_validate_raw(space->format, request->tuple))
 		diag_raise();
 
-	struct index *index = index_find_unique(space, 0);
+	struct index *index = index_find_unique_xc(space, 0);
 
 	uint32_t part_count = index->def->key_def->part_count;
 	/* Extract the primary key from tuple. */

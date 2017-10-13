@@ -194,7 +194,7 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
-	struct space *space = space_new(def, &key_list);
+	struct space *space = space_new_xc(def, &key_list);
 	(void) space_cache_replace(space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);
@@ -222,7 +222,7 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
 	struct space *space = space_cache_find_xc(system_space_id);
-	struct index *index = index_find_system(space, index_id);
+	struct index *index = index_find_system_xc(space, index_id);
 	uint32_t size = mp_sizeof_str(len);
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
@@ -442,7 +442,7 @@ schema_find_grants(const char *type, uint32_t id)
 {
 	struct space *priv = space_cache_find_xc(BOX_PRIV_ID);
 	/** "object" index */
-	struct index *index = index_find_system(priv, 2);
+	struct index *index = index_find_system_xc(priv, 2);
 	struct iterator *it = index_position_xc(index);
 	/*
 	 * +10 = max(mp_sizeof_uint32) +

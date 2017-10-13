@@ -39,7 +39,7 @@
 #include "session.h"
 #include "port.h"
 
-void
+int
 access_check_space(struct space *space, uint8_t access)
 {
 	struct credentials *cr = current_user();
@@ -59,10 +59,14 @@ access_check_space(struct space *space, uint8_t access)
 		 * It is possible that the user was dropped
 		 * from a different connection.
 		 */
-		struct user *user = user_find_xc(cr->uid);
-		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->def->name, space->def->name);
+		struct user *user = user_find(cr->uid);
+		if (user != NULL)
+			diag_set(ClientError, ER_SPACE_ACCESS_DENIED,
+				 priv_name(access), user->def->name,
+				 space->def->name);
+		return -1;
 	}
+	return 0;
 }
 
 void
@@ -79,7 +83,7 @@ space_fill_index_map(struct space *space)
 }
 
 struct space *
-space_new(struct space_def *def, struct rlist *key_list)
+space_new_xc(struct space_def *def, struct rlist *key_list)
 {
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;

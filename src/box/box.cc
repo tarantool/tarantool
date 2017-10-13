@@ -271,7 +271,7 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 	rmean_collect(rmean_box, request->type, 1);
 	try {
 		struct txn *txn = txn_begin_stmt(space);
-		access_check_space(space, PRIV_W);
+		access_check_space_xc(space, PRIV_W);
 		struct tuple *tuple;
 		switch (request->type) {
 		case IPROTO_INSERT:
@@ -911,7 +911,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 
 	try {
 		struct space *space = space_cache_find_xc(space_id);
-		access_check_space(space, PRIV_R);
+		access_check_space_xc(space, PRIV_R);
 		struct txn *txn = txn_begin_ro_stmt(space);
 		space_execute_select_xc(space, txn, index_id, iterator,
 					offset, limit, key, key_end, port);
@@ -1174,7 +1174,7 @@ box_on_join(const tt_uuid *instance_uuid)
 
 	/** Find the largest existing replica id. */
 	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
-	struct index *index = index_find_system(space, 0);
+	struct index *index = index_find_system_xc(space, 0);
 	struct iterator *it = index_position_xc(index);
 	index_init_iterator_xc(index, it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
@@ -1264,7 +1264,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Check permissions */
 	access_check_universe(PRIV_R);
-	access_check_space(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
+	access_check_space_xc(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
 	box_check_writable();

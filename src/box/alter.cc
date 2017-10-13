@@ -525,7 +525,7 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	if (space_index(space, iid) == NULL)
 		return false;
 
-	struct index *index = index_find_system(space, iid);
+	struct index *index = index_find_system_xc(space, iid);
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
@@ -737,7 +737,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * Create a new (empty) space for the new definition.
 	 * Sic: the triggers are not moved over yet.
 	 */
-	alter->new_space = space_new(alter->space_def, &alter->key_list);
+	alter->new_space = space_new_xc(alter->space_def, &alter->key_list);
 	/*
 	 * Copy the replace function, the new space is at the same recovery
 	 * phase as the old one. This hack is especially necessary for
@@ -1350,7 +1350,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		RLIST_HEAD(empty_list);
-		struct space *space = space_new(def, &empty_list);
+		struct space *space = space_new_xc(def, &empty_list);
 		/**
 		 * The new space must be inserted in the space
 		 * cache right away to achieve linearisable
@@ -1673,7 +1673,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/*
 	 * Check if a write privilege was given, raise an error if not.
 	 */
-	access_check_space(old_space, PRIV_W);
+	access_check_space_xc(old_space, PRIV_W);
 
 	/*
 	 * Truncate counter is updated - truncate the space.
@@ -1684,7 +1684,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	/* Create an empty copy of the old space. */
 	struct rlist key_list;
 	space_dump_def(old_space, &key_list);
-	struct space *new_space = space_new(old_space->def, &key_list);
+	struct space *new_space = space_new_xc(old_space->def, &key_list);
 	new_space->truncate_count = truncate_count;
 	auto space_guard = make_scoped_guard([=] { space_delete(new_space); });
 
