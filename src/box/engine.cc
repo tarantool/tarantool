@@ -153,14 +153,14 @@ void engine_register(struct engine *engine)
 
 /** Find engine by name. */
 struct engine *
-engine_find(const char *name)
+engine_by_name(const char *name)
 {
 	struct engine *e;
 	engine_foreach(e) {
 		if (strcmp(e->name, name) == 0)
 			return e;
 	}
-	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
+	return NULL;
 }
 
 /** Shutdown all engine factories. */

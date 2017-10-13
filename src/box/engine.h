@@ -190,7 +190,18 @@ void engine_register(struct engine *engine);
 #define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
 
 /** Find engine engine by name. */
-struct engine *engine_find(const char *name);
+struct engine *
+engine_by_name(const char *name);
+
+/** Find engine by name and raise error if not found. */
+static inline struct engine *
+engine_find(const char *name)
+{
+	struct engine *engine = engine_by_name(name);
+	if (engine == NULL)
+		tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
+	return engine;
+}
 
 /** Shutdown all engine factories. */
 void engine_shutdown();

@@ -710,14 +710,18 @@ box_set_io_collect_interval(void)
 void
 box_set_snap_io_rate_limit(void)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
 	memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
 }
 
 void
 box_set_memtx_max_tuple_size(void)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)engine_find("memtx");
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
 	memtx->setMaxTupleSize(cfg_geti("memtx_max_tuple_size"));
 }
 
@@ -746,14 +750,18 @@ box_set_checkpoint_count(void)
 void
 box_set_vinyl_max_tuple_size(void)
 {
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine_find("vinyl");
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
 	vinyl->setMaxTupleSize(cfg_geti("vinyl_max_tuple_size"));
 }
 
 void
 box_set_vinyl_timeout(void)
 {
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine_find("vinyl");
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
 	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
 }
 
@@ -1713,8 +1721,10 @@ box_cfg_xc(void)
 		 * explicitly pass the statement LSN to it.
 		 */
 		engine_begin_initial_recovery(&recovery->vclock);
-		struct memtx_engine *memtx =
-			(struct memtx_engine *)engine_find("memtx");
+
+		struct memtx_engine *memtx;
+		memtx = (struct memtx_engine *)engine_by_name("memtx");
+		assert(memtx != NULL);
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, &recovery->vclock);

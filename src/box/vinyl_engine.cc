@@ -52,8 +52,10 @@
 extern "C" struct vy_env *
 vinyl_engine_get_env()
 {
-	struct vinyl_engine *e = (struct vinyl_engine *)engine_find("vinyl");
-	return e->env;
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	return vinyl->env;
 }
 
 vinyl_engine::vinyl_engine()
