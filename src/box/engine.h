@@ -188,7 +188,7 @@ engine_by_name(const char *name);
 
 /** Find engine by name and raise error if not found. */
 static inline struct engine *
-engine_find(const char *name)
+engine_find_xc(const char *name)
 {
 	struct engine *engine = engine_by_name(name);
 	if (engine == NULL)
@@ -197,26 +197,26 @@ engine_find(const char *name)
 }
 
 static inline struct space *
-engine_create_space(struct engine *engine, struct space_def *def,
+engine_create_space_xc(struct engine *engine, struct space_def *def,
 		    struct rlist *key_list)
 {
 	return engine->vtab->create_space(engine, def, key_list);
 }
 
 static inline void
-engine_begin(struct engine *engine, struct txn *txn)
+engine_begin_xc(struct engine *engine, struct txn *txn)
 {
 	engine->vtab->begin(engine, txn);
 }
 
 static inline void
-engine_begin_statement(struct engine *engine, struct txn *txn)
+engine_begin_statement_xc(struct engine *engine, struct txn *txn)
 {
 	engine->vtab->begin_statement(engine, txn);
 }
 
 static inline void
-engine_prepare(struct engine *engine, struct txn *txn)
+engine_prepare_xc(struct engine *engine, struct txn *txn)
 {
 	engine->vtab->prepare(engine, txn);
 }
@@ -241,7 +241,7 @@ engine_rollback(struct engine *engine, struct txn *txn)
 }
 
 static inline void
-engine_check_space_def(struct engine *engine, struct space_def *def)
+engine_check_space_def_xc(struct engine *engine, struct space_def *def)
 {
 	engine->vtab->check_space_def(def);
 }
@@ -253,34 +253,34 @@ void engine_shutdown();
  * Initialize an empty data directory
  */
 void
-engine_bootstrap();
+engine_bootstrap_xc();
 
 /**
  * Called at the start of recovery.
  */
 void
-engine_begin_initial_recovery(const struct vclock *recovery_vclock);
+engine_begin_initial_recovery_xc(const struct vclock *recovery_vclock);
 
 /**
  * Called in the middle of JOIN stage,
  * when xlog catch-up process is started
  */
 void
-engine_begin_final_recovery();
+engine_begin_final_recovery_xc();
 
 /**
  * Called at the end of recovery.
  * Build secondary keys in all spaces.
  */
 void
-engine_end_recovery();
+engine_end_recovery_xc();
 
 /**
  * Feed checkpoint data as join events to the replicas.
  * (called on the master).
  */
 void
-engine_join(struct vclock *vclock, struct xstream *stream);
+engine_join_xc(struct vclock *vclock, struct xstream *stream);
 
 extern "C" {
 #endif /* defined(__cplusplus) */

@@ -170,7 +170,7 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 	struct relay relay;
 	relay_init(&relay, fd, sync, relay_send_initial_join_row);
 	assert(relay.stream.write != NULL);
-	engine_join(vclock, &relay.stream);
+	engine_join_xc(vclock, &relay.stream);
 }
 
 int

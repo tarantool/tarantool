@@ -117,7 +117,7 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
-		engine_begin(engine, txn);
+		engine_begin_xc(engine, txn);
 	} else if (txn->engine != engine) {
 		/**
 		 * Only one engine can be used in
@@ -142,7 +142,7 @@ txn_begin_stmt(struct space *space)
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	stmt->space = space;
 
-	engine_begin_statement(engine, txn);
+	engine_begin_statement_xc(engine, txn);
 	return txn;
 }
 
@@ -235,7 +235,7 @@ txn_commit(struct txn *txn)
 
 	/* Do transaction conflict resolving */
 	if (txn->engine) {
-		engine_prepare(txn->engine, txn);
+		engine_prepare_xc(txn->engine, txn);
 
 		if (txn->n_rows > 0)
 			txn->signature = txn_write_to_wal(txn);

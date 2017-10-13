@@ -37,6 +37,6 @@ struct sysview_engine {
 };
 
 struct sysview_engine *
-sysview_engine_new(void);
+sysview_engine_new_xc(void);
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

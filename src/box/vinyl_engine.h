@@ -42,8 +42,8 @@ struct vinyl_engine {
 };
 
 struct vinyl_engine *
-vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout);
+vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
+		    int read_threads, int write_threads, double timeout);
 
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);

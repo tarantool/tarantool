@@ -91,13 +91,13 @@ struct memtx_engine {
 };
 
 struct memtx_engine *
-memtx_engine_new(const char *snap_dirname, bool force_recovery,
-		 uint64_t tuple_arena_max_size,
-		 uint32_t objsize_min, float alloc_factor);
+memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
+		    uint64_t tuple_arena_max_size,
+		    uint32_t objsize_min, float alloc_factor);
 
 void
-memtx_engine_recover_snapshot(struct memtx_engine *memtx,
-			      const struct vclock *vclock);
+memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
+				 const struct vclock *vclock);
 
 void
 memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);

@@ -155,8 +155,8 @@ fail:
 struct space *
 space_new_xc(struct space_def *def, struct rlist *key_list)
 {
-	struct engine *engine = engine_find(def->engine_name);
-	return engine_create_space(engine, def, key_list);
+	struct engine *engine = engine_find_xc(def->engine_name);
+	return engine_create_space_xc(engine, def, key_list);
 }
 
 void

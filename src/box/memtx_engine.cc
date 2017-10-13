@@ -133,8 +133,8 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 				  struct xrow_header *row);
 
 void
-memtx_engine_recover_snapshot(struct memtx_engine *memtx,
-			      const struct vclock *vclock)
+memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
+				 const struct vclock *vclock)
 {
 	/* Process existing snapshot */
 	say_info("recovery start");
@@ -828,9 +828,9 @@ static const struct engine_vtab memtx_engine_vtab = {
 };
 
 struct memtx_engine *
-memtx_engine_new(const char *snap_dirname, bool force_recovery,
-		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
-		 float alloc_factor)
+memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
+		    uint64_t tuple_arena_max_size, uint32_t objsize_min,
+		    float alloc_factor)
 {
 	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
 

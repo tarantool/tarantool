@@ -1488,24 +1488,24 @@ engine_init()
 	 * so it must be registered first.
 	 */
 	struct memtx_engine *memtx;
-	memtx = memtx_engine_new(cfg_gets("memtx_dir"),
-				 cfg_geti("force_recovery"),
-				 cfg_getd("memtx_memory"),
-				 cfg_geti("memtx_min_tuple_size"),
-				 cfg_getd("slab_alloc_factor"));
+	memtx = memtx_engine_new_xc(cfg_gets("memtx_dir"),
+				    cfg_geti("force_recovery"),
+				    cfg_getd("memtx_memory"),
+				    cfg_geti("memtx_min_tuple_size"),
+				    cfg_getd("slab_alloc_factor"));
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();
 
-	struct sysview_engine *sysview = sysview_engine_new();
+	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);
 
 	struct vinyl_engine *vinyl;
-	vinyl = vinyl_engine_new(cfg_gets("vinyl_dir"),
-				 cfg_geti64("vinyl_memory"),
-				 cfg_geti64("vinyl_cache"),
-				 cfg_geti("vinyl_read_threads"),
-				 cfg_geti("vinyl_write_threads"),
-				 cfg_getd("vinyl_timeout"));
+	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
+				    cfg_geti64("vinyl_memory"),
+				    cfg_geti64("vinyl_cache"),
+				    cfg_geti("vinyl_read_threads"),
+				    cfg_geti("vinyl_write_threads"),
+				    cfg_getd("vinyl_timeout"));
 	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
 }
@@ -1516,7 +1516,7 @@ engine_init()
 static void
 bootstrap_master(void)
 {
-	engine_bootstrap();
+	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
 
@@ -1571,7 +1571,7 @@ bootstrap_from_master(struct replica *master)
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
-	engine_begin_initial_recovery(NULL);
+	engine_begin_initial_recovery_xc(NULL);
 	struct join_journal join_journal;
 	join_journal_create(&join_journal);
 	journal_set(&join_journal.base);
@@ -1580,7 +1580,7 @@ bootstrap_from_master(struct replica *master)
 	/*
 	 * Process final data (WALs).
 	 */
-	engine_begin_final_recovery();
+	engine_begin_final_recovery_xc();
 	struct recovery_journal journal;
 	recovery_journal_create(&journal, &replicaset_vclock);
 	journal_set(&journal.base);
@@ -1591,7 +1591,7 @@ bootstrap_from_master(struct replica *master)
 	journal_set(NULL);
 
 	/* Finalize the new replica */
-	engine_end_recovery();
+	engine_end_recovery_xc();
 
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
@@ -1728,7 +1728,7 @@ box_cfg_xc(void)
 		 * should introduce Engine::applyWALRow method and
 		 * explicitly pass the statement LSN to it.
 		 */
-		engine_begin_initial_recovery(&recovery->vclock);
+		engine_begin_initial_recovery_xc(&recovery->vclock);
 
 		struct memtx_engine *memtx;
 		memtx = (struct memtx_engine *)engine_by_name("memtx");
@@ -1745,9 +1745,10 @@ box_cfg_xc(void)
 		 * recovery of system spaces issue DDL events in
 		 * other engines.
 		 */
-		memtx_engine_recover_snapshot(memtx, &last_checkpoint_vclock);
+		memtx_engine_recover_snapshot_xc(memtx,
+				&last_checkpoint_vclock);
 
-		engine_begin_final_recovery();
+		engine_begin_final_recovery_xc();
 		title("orphan");
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 				      cfg_getd("wal_dir_rescan_delay"));
@@ -1771,7 +1772,7 @@ box_cfg_xc(void)
 			box_bind();
 		}
 		recovery_finalize(recovery, &wal_stream.base);
-		engine_end_recovery();
+		engine_end_recovery_xc();
 
 		/* Clear the pointer to journal before it goes out of scope */
 		journal_set(NULL);

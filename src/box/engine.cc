@@ -66,7 +66,7 @@ engine_shutdown()
 }
 
 void
-engine_bootstrap()
+engine_bootstrap_xc()
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -75,7 +75,7 @@ engine_bootstrap()
 }
 
 void
-engine_begin_initial_recovery(const struct vclock *recovery_vclock)
+engine_begin_initial_recovery_xc(const struct vclock *recovery_vclock)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -84,7 +84,7 @@ engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 }
 
 void
-engine_begin_final_recovery()
+engine_begin_final_recovery_xc()
 {
 	struct engine *engine;
 	engine_foreach(engine)
@@ -92,7 +92,7 @@ engine_begin_final_recovery()
 }
 
 void
-engine_end_recovery()
+engine_end_recovery_xc()
 {
 	/*
 	 * For all new spaces created after recovery is complete,
@@ -159,7 +159,7 @@ engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 }
 
 void
-engine_join(struct vclock *vclock, struct xstream *stream)
+engine_join_xc(struct vclock *vclock, struct xstream *stream)
 {
 	struct engine *engine;
 	engine_foreach(engine) {

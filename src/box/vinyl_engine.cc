@@ -275,8 +275,8 @@ static const struct engine_vtab vinyl_engine_vtab = {
 };
 
 struct vinyl_engine *
-vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout)
+vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
+		    int read_threads, int write_threads, double timeout)
 {
 	struct vinyl_engine *vinyl =
 		(struct vinyl_engine *)calloc(1, sizeof(*vinyl));

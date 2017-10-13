@@ -314,7 +314,7 @@ static const struct engine_vtab sysview_engine_vtab = {
 };
 
 struct sysview_engine *
-sysview_engine_new(void)
+sysview_engine_new_xc(void)
 {
 	struct sysview_engine *sysview =
 		(struct sysview_engine *)calloc(1, sizeof(*sysview));
