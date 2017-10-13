@@ -142,9 +142,6 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 	} while (0)
 #endif
 
-#define ERROR_INJECT_EXCEPTION(ID) \
-	ERROR_INJECT(ID, tnt_raise(ErrorInjection, #ID))
-
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
 
 #if defined(__cplusplus)

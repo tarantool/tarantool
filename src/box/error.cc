@@ -148,12 +148,6 @@ ClientError::get_errcode(const struct error *e)
 	return ER_PROC_LUA;
 }
 
-ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
-	: LoggedError(file, line, ER_INJECTION, msg)
-{
-	/* nothing */
-}
-
 const struct type_info type_XlogError = make_type("XlogError", &type_Exception);
 
 struct error *
