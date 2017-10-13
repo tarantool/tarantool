@@ -278,14 +278,12 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 		case IPROTO_REPLACE:
 			if (space->sequence != NULL)
 				request_handle_sequence(request, space);
-			tuple = space->vtab->execute_replace(space, txn,
-							     request);
+			tuple = space_execute_replace_xc(space, txn, request);
 
 
 			break;
 		case IPROTO_UPDATE:
-			tuple = space->vtab->execute_update(space, txn,
-							    request);
+			tuple = space_execute_update_xc(space, txn, request);
 			if (tuple && request->index_id != 0) {
 				/*
 				 * XXX: this is going to break with
@@ -299,15 +297,14 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 			}
 			break;
 		case IPROTO_DELETE:
-			tuple = space->vtab->execute_delete(space, txn,
-							    request);
+			tuple = space_execute_delete_xc(space, txn, request);
 			if (tuple && request->index_id != 0) {
 				request_rebind_to_primary_key(request, space,
 							      tuple);
 			}
 			break;
 		case IPROTO_UPSERT:
-			space->vtab->execute_upsert(space, txn, request);
+			space_execute_upsert_xc(space, txn, request);
 			tuple = NULL;
 			break;
 		default:
@@ -452,7 +449,7 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find_xc(request->space_id);
 	/* no access checks here - applier always works with admin privs */
-	space->vtab->apply_initial_join_row(space, request);
+	space_apply_initial_join_row_xc(space, request);
 }
 
 /* {{{ configuration bindings */
@@ -916,8 +913,8 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 		struct space *space = space_cache_find_xc(space_id);
 		access_check_space(space, PRIV_R);
 		struct txn *txn = txn_begin_ro_stmt(space);
-		space->vtab->execute_select(space, txn, index_id, iterator,
-					    offset, limit, key, key_end, port);
+		space_execute_select_xc(space, txn, index_id, iterator,
+					offset, limit, key, key_end, port);
 		txn_commit_ro_stmt(txn);
 		return 0;
 	} catch (Exception *e) {

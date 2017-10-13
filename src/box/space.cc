@@ -122,7 +122,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index = space->index_map + index_id_max + 1;
 	rlist_foreach_entry(index_def, key_list, link) {
 		space->index_map[index_def->iid] =
-			space->vtab->create_index(space, index_def);
+			space_create_index_xc(space, index_def);
 	}
 	space_fill_index_map(space);
 	space->run_triggers = true;

@@ -283,6 +283,32 @@ space_def_check_compatibility(const struct space_def *old_def,
 			      const struct space_def *new_def,
 			      bool is_space_empty);
 
+static inline void
+init_system_space(struct space *space)
+{
+	space->vtab->init_system_space(space);
+}
+
+static inline void
+space_drop_primary_key(struct space *space)
+{
+	space->vtab->drop_primary_key(space);
+}
+
+static inline void
+space_commit_truncate(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->commit_truncate(old_space, new_space);
+}
+
+static inline void
+space_commit_alter(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->commit_alter(old_space, new_space);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -394,6 +420,98 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 			     uint32_t offset, uint32_t limit,
 			     const char *key, const char *key_end,
 			     struct port *port);
+
+static inline void
+space_apply_initial_join_row_xc(struct space *space, struct request *request)
+{
+	space->vtab->apply_initial_join_row(space, request);
+}
+
+static inline struct tuple *
+space_execute_replace_xc(struct space *space, struct txn *txn,
+			 struct request *request)
+{
+	return space->vtab->execute_replace(space, txn, request);
+}
+
+static inline struct tuple *
+space_execute_delete_xc(struct space *space, struct txn *txn,
+			struct request *request)
+{
+	return space->vtab->execute_delete(space, txn, request);
+}
+
+static inline struct tuple *
+space_execute_update_xc(struct space *space, struct txn *txn,
+			struct request *request)
+{
+	return space->vtab->execute_update(space, txn, request);
+}
+
+static inline void
+space_execute_upsert_xc(struct space *space, struct txn *txn,
+			struct request *request)
+{
+	space->vtab->execute_upsert(space, txn, request);
+}
+
+static inline void
+space_execute_select_xc(struct space *space, struct txn *txn,
+			uint32_t index_id, uint32_t iterator,
+			uint32_t offset, uint32_t limit,
+			const char *key, const char *key_end,
+			struct port *port)
+{
+	space->vtab->execute_select(space, txn, index_id, iterator,
+				    offset, limit, key, key_end, port);
+}
+
+static inline void
+space_check_index_def_xc(struct space *space, struct index_def *index_def)
+{
+	space->vtab->check_index_def(space, index_def);
+}
+
+static inline struct index *
+space_create_index_xc(struct space *space, struct index_def *index_def)
+{
+	return space->vtab->create_index(space, index_def);
+}
+
+static inline void
+space_add_primary_key_xc(struct space *space)
+{
+	space->vtab->add_primary_key(space);
+}
+
+static inline void
+space_check_format_xc(struct space *new_space, struct space *old_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->check_format(new_space, old_space);
+}
+
+static inline void
+space_build_secondary_key_xc(struct space *old_space,
+			     struct space *new_space, struct index *new_index)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->build_secondary_key(old_space, new_space, new_index);
+}
+
+static inline void
+space_prepare_truncate_xc(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->prepare_truncate(old_space, new_space);
+}
+
+static inline void
+space_prepare_alter_xc(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	new_space->vtab->prepare_alter(old_space, new_space);
+}
 
 #endif /* defined(__cplusplus) */
 

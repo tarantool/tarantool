@@ -278,7 +278,7 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 	request->header->replica_id = 0;
 	struct txn *txn = txn_begin_stmt(space);
 	try {
-		space->vtab->execute_replace(space, txn, request);
+		space_execute_replace_xc(space, txn, request);
 		txn_commit_stmt(txn, request);
 	} catch (Exception *e) {
 		say_error("rollback: %s", e->errmsg);

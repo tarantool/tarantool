@@ -210,7 +210,7 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	 *   ensures validation of tuples when starting from
 	 *   a snapshot of older version.
 	 */
-	space->vtab->init_system_space(space);
+	init_system_space(space);
 
 	trigger_run(&on_alter_space, space);
 }

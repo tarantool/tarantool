@@ -210,7 +210,7 @@ MemtxEngine::recoverSnapshotRow(struct xrow_header *row)
 	if (space->engine != this)
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	/* no access checks here - applier always works with admin privs */
-	space->vtab->apply_initial_join_row(space, request);
+	space_apply_initial_join_row_xc(space, request);
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
