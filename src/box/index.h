@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include "trivia/util.h"
 #include "iterator_type.h"
+#include "index_def.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -243,12 +244,6 @@ struct snapshot_iterator {
 	void (*free)(struct snapshot_iterator *);
 };
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-#include "diag.h"
-#include "index_def.h"
-
 /**
  * Check that the key has correct part count and correct part size
  * for use in an index iterator.
@@ -375,23 +370,6 @@ struct index {
 	 * Safe to use only if the index iterator does not yield.
 	 */
 	struct iterator *position;
-};
-
-/*
- * A wrapper for ClientError(ER_UNSUPPORTED_INDEX_FEATURE, ...) to format
- * nice error messages (see gh-1042). You never need to catch this class.
- */
-class UnsupportedIndexFeature: public ClientError {
-public:
-	UnsupportedIndexFeature(const char *file, unsigned line,
-				struct index_def *index_def, const char *what);
-};
-
-struct IteratorGuard
-{
-	struct iterator *it;
-	IteratorGuard(struct iterator *it_arg) : it(it_arg) {}
-	~IteratorGuard() { it->free(it); }
 };
 
 /**
@@ -587,6 +565,28 @@ void generic_index_begin_build(struct index *);
 int generic_index_reserve(struct index *, uint32_t);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+/*
+ * A wrapper for ClientError(ER_UNSUPPORTED_INDEX_FEATURE, ...) to format
+ * nice error messages (see gh-1042). You never need to catch this class.
+ */
+class UnsupportedIndexFeature: public ClientError {
+public:
+	UnsupportedIndexFeature(const char *file, unsigned line,
+				struct index_def *index_def, const char *what);
+};
+
+struct IteratorGuard
+{
+	struct iterator *it;
+	IteratorGuard(struct iterator *it_arg) : it(it_arg) {}
+	~IteratorGuard() { it->free(it); }
+};
 
 /*
  * C++ wrappers around index methods.

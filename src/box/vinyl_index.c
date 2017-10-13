@@ -33,7 +33,6 @@
 #include <stdio.h>
 
 #include "trivia/util.h"
-#include "scoped_guard.h"
 #include "schema.h"
 #include "txn.h"
 #include "vinyl.h"
@@ -45,7 +44,7 @@
  * @param index vinyl_index to convert.
  * @retval Pointer to index->db.
  */
-extern "C" struct vy_index *
+struct vy_index *
 vy_index(struct index *index)
 {
 	return ((struct vinyl_index *) index)->db;

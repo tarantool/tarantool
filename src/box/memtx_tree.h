@@ -37,6 +37,10 @@
 #include "memtx_engine.h"
 #include "tuple_compare.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * Struct that is used as a key in BPS tree definition.
  */
@@ -59,7 +63,7 @@ struct memtx_tree_key_data
  * @retval >0 if tuple > key in terms of def.
  */
 static inline int
-memtx_tree_compare_key(const tuple *tuple,
+memtx_tree_compare_key(const struct tuple *tuple,
 		       const struct memtx_tree_key_data *key_data,
 		       struct key_def *def)
 {
@@ -96,5 +100,9 @@ struct memtx_tree_index {
 
 struct memtx_tree_index *
 memtx_tree_index_new(struct index_def *);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_TREE_H_INCLUDED */

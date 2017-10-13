@@ -38,6 +38,10 @@
 #include "index.h"
 #include "bitset/index.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 #ifndef OLD_GOOD_BITSET
 struct matras;
 struct mh_bitset_index_t;
@@ -55,5 +59,9 @@ struct memtx_bitset_index {
 
 struct memtx_bitset_index *
 memtx_bitset_index_new(struct index_def *);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_BITSET_H_INCLUDED */

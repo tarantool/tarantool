@@ -175,7 +175,7 @@ memtx_rtree_index_get(struct index *base, const char *key,
 	struct rtree_iterator iterator;
 	rtree_iterator_init(&iterator);
 
-	rtree_rect rect;
+	struct rtree_rect rect;
 	if (mp_decode_rect_from_key(&rect, index->dimension, key, part_count))
 		unreachable();
 
@@ -188,9 +188,10 @@ memtx_rtree_index_get(struct index *base, const char *key,
 
 static int
 memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode,
+			  struct tuple *new_tuple, enum dup_replace_mode mode,
 			  struct tuple **result)
 {
+	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct rtree_rect rect;
 	if (new_tuple) {
@@ -231,7 +232,7 @@ memtx_rtree_index_init_iterator(struct index *base, struct iterator *iterator,
 				const char *key, uint32_t part_count)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
-	struct index_rtree_iterator *it = (index_rtree_iterator *)iterator;
+	struct index_rtree_iterator *it = (struct index_rtree_iterator *)iterator;
 
 	struct rtree_rect rect;
 	if (part_count == 0) {
@@ -245,7 +246,7 @@ memtx_rtree_index_init_iterator(struct index *base, struct iterator *iterator,
 		return -1;
 	}
 
-	spatial_search_op op;
+	enum spatial_search_op op;
 	switch (type) {
 	case ITER_ALL:
 		op = SOP_ALL;

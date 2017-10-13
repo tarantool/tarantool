@@ -378,8 +378,7 @@ memtx_bitset_index_init_iterator(struct index *base, struct iterator *iterator,
 		goto fail;
 	}
 
-	if (bitset_index_init_iterator((bitset_index *)&index->index,
-				       &it->bitset_it,
+	if (bitset_index_init_iterator(&index->index, &it->bitset_it,
 				       &expr) != 0) {
 		diag_set(OutOfMemory, 0, "memtx_bitset_index",
 			 "iterator state");

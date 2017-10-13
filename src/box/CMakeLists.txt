@@ -56,20 +56,20 @@ add_library(box STATIC
     index.cc
     index_def.c
     iterator_type.c
-    memtx_index.cc
-    memtx_hash.cc
-    memtx_tree.cc
-    memtx_rtree.cc
-    memtx_bitset.cc
+    memtx_index.c
+    memtx_hash.c
+    memtx_tree.c
+    memtx_rtree.c
+    memtx_bitset.c
     engine.cc
     memtx_engine.cc
     memtx_space.cc
     memtx_tuple.cc
     sysview_engine.cc
-    sysview_index.cc
+    sysview_index.c
     vinyl_engine.cc
     vinyl_space.cc
-    vinyl_index.cc
+    vinyl_index.c
     vinyl.c
     vy_stmt.c
     vy_mem.c

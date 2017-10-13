@@ -37,6 +37,10 @@
 
 #include "index.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct memtx_rtree_index {
 	struct index base;
 	unsigned dimension;
@@ -45,5 +49,9 @@ struct memtx_rtree_index {
 
 struct memtx_rtree_index *
 memtx_rtree_index_new(struct index_def *);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED */

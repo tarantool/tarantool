@@ -82,6 +82,9 @@ space_cache_find(uint32_t id)
 	return NULL;
 }
 
+struct func *
+func_by_name(const char *name, uint32_t name_len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -154,9 +157,6 @@ func_cache_find(uint32_t fid)
 		tnt_raise(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
 	return func;
 }
-
-struct func *
-func_by_name(const char *name, uint32_t name_len);
 
 
 /**

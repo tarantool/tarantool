@@ -81,8 +81,9 @@ sysview_index_destroy(struct index *index)
 }
 
 static ssize_t
-sysview_index_bsize(struct index *)
+sysview_index_bsize(struct index *index)
 {
+	(void)index;
 	return 0;
 }
 

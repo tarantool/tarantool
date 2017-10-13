@@ -32,8 +32,13 @@
  */
 #include "index.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct vy_index;
 struct vy_env;
+struct tuple_format;
 
 struct vinyl_index {
 	struct index base;
@@ -47,5 +52,9 @@ vinyl_index_new(struct vy_env *env, struct index_def *def,
 
 int
 vinyl_index_open(struct vinyl_index *index);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_VINYL_INDEX_H_INCLUDED */

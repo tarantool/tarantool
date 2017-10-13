@@ -32,6 +32,10 @@
  */
 #include "index.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct light_index_core;
 
 struct memtx_hash_index {
@@ -41,5 +45,9 @@ struct memtx_hash_index {
 
 struct memtx_hash_index *
 memtx_hash_index_new(struct index_def *);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_HASH_H_INCLUDED */

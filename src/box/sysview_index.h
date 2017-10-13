@@ -32,6 +32,10 @@
  */
 #include "index.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct space;
 struct tuple;
 
@@ -46,5 +50,9 @@ struct sysview_index {
 
 struct sysview_index *
 sysview_index_new(struct index_def *def, const char *space_name);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED */

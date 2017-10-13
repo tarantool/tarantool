@@ -36,6 +36,7 @@ struct request;
 struct space;
 struct tuple;
 struct relay;
+struct vclock;
 
 extern struct rlist engines;
 

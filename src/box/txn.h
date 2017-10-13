@@ -33,6 +33,9 @@
 
 #include <stdbool.h>
 #include "salad/stailq.h"
+#include "trigger.h"
+#include "fiber.h"
+#include "space.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -41,6 +44,7 @@ extern "C" {
 /** box statistics */
 extern struct rmean *rmean_box;
 
+struct Engine;
 struct space;
 struct tuple;
 struct xrow_header;
@@ -87,13 +91,6 @@ struct txn_savepoint {
 	bool is_first;
 };
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-#include "space.h"
-#include "trigger.h"
-#include "fiber.h"
-
 extern double too_long_threshold;
 
 struct txn {
@@ -118,7 +115,7 @@ struct txn {
 	int in_sub_stmt;
 	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
-	Engine *engine;
+	struct Engine *engine;
 	/** Engine-specific transaction data */
 	void *engine_tx;
 	/**
@@ -136,6 +133,9 @@ in_txn()
 {
 	return (struct txn *) fiber_get_key(fiber(), FIBER_KEY_TXN);
 }
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /**
  * Start a transaction explicitly.

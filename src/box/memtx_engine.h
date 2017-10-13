@@ -30,6 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#if defined(__cplusplus)
+
 #include "engine.h"
 #include "xlog.h"
 
@@ -153,6 +155,9 @@ private:
 	bool m_force_recovery;
 };
 
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum {
 	MEMTX_EXTENT_SIZE = 16 * 1024,
 	MEMTX_SLAB_SIZE = 4 * 1024 * 1024
@@ -179,11 +184,16 @@ memtx_index_extent_alloc(void *ctx);
 void
 memtx_index_extent_free(void *ctx, void *extent);
 
+#if defined(__cplusplus)
+} /* extern "C" */
+
 /**
  * Reserve num extents in pool.
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 void
 memtx_index_extent_reserve(int num);
+
+#endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_ENGINE_H_INCLUDED */

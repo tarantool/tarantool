@@ -35,6 +35,10 @@
 
 #include "iterator_type.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct index;
 struct tuple;
 
@@ -53,5 +57,9 @@ memtx_index_max(struct index *index, const char *key,
 ssize_t
 memtx_index_count(struct index *index, enum iterator_type type,
 		  const char *key, uint32_t part_count);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_INDEX_H_INCLUDED */
