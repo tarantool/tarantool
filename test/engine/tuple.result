@@ -443,12 +443,149 @@ pk:count()
 - 2
 ...
 test_run:cmd('restart server default')
+engine = test_run:get_cfg('engine')
+---
+...
 s = box.space.test
 ---
 ...
 s:count()
 ---
 - 2
+...
+s:drop()
+---
+...
+--
+-- gh-2821: tuple:tomap().
+--
+format = {}
+---
+...
+format[1] = {'field1', 'unsigned'}
+---
+...
+format[2] = {'field2', 'unsigned'}
+---
+...
+format[3] = {'field3', 'unsigned'}
+---
+...
+format[4] = {'field4', 'array'}
+---
+...
+s = box.schema.space.create('test', {format = format, engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t1 = s:replace{1, 2, 3, {'a', 'b', 'c'}}
+---
+...
+t1map = t1:tomap()
+---
+...
+function maplen(map) local count = 0 for _ in pairs(map) do count = count + 1 end return count end
+---
+...
+maplen(t1map), t1map.field1, t1map.field2, t1map.field3, t1map.field4
+---
+- 8
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+...
+t1map[1], t1map[2], t1map[3], t1map[4]
+---
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+...
+-- Fields with table type are stored once for name and for index.
+t1map[4] == t1map.field4
+---
+- true
+...
+t2 = s:replace{4, 5, 6, {'a', 'b', 'c'}, 'extra1'}
+---
+...
+t2map = t2:tomap()
+---
+...
+maplen(t2map), t2map.field1, t2map.field2, t2map.field3, t2map.field4
+---
+- 9
+- 4
+- 5
+- 6
+- ['a', 'b', 'c']
+...
+t1map[1], t1map[2], t1map[3], t2map[4], t2map[5]
+---
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+- extra1
+...
+-- Use box.tuple.tomap alias.
+t3 = s:replace{7, 8, 9, {'a', 'b', 'c'}, 'extra1', 'extra2'}
+---
+...
+t3map = box.tuple.tomap(t3)
+---
+...
+maplen(t3map), t3map.field1, t3map.field2, t3map.field3, t3map.field4
+---
+- 10
+- 7
+- 8
+- 9
+- ['a', 'b', 'c']
+...
+t1map[1], t1map[2], t1map[3], t3map[4], t3map[5], t3map[6]
+---
+- 1
+- 2
+- 3
+- ['a', 'b', 'c']
+- extra1
+- extra2
+...
+-- Invalid arguments.
+t3.tomap('123')
+---
+- error: 'Invalid argument #1 (box.tuple expected, got string)'
+...
+box.tuple.tomap('456')
+---
+- error: 'Invalid argument #1 (box.tuple expected, got string)'
+...
+s:drop()
+---
+...
+-- No names, no format.
+s = box.schema.space.create('test', { engine = engine })
+---
+...
+pk = s:create_index('pk')
+---
+...
+t1 = s:replace{1, 2, 3}
+---
+...
+t1map = t1:tomap()
+---
+...
+maplen(t1map), t1map[1], t1map[2], t1map[3]
+---
+- 3
+- 1
+- 2
+- 3
 ...
 s:drop()
 ---

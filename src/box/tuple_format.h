@@ -147,6 +147,9 @@ struct tuple_format {
 
 extern struct tuple_format **tuple_formats;
 
+int
+tuple_format_named_fields(const struct tuple_format *format);
+
 static inline uint32_t
 tuple_format_id(const struct tuple_format *format)
 {

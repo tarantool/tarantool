@@ -66,6 +66,12 @@ static const struct tuple_field tuple_field_default = {
 	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false, NULL, false,
 };
 
+int
+tuple_format_named_fields(const struct tuple_format *format)
+{
+	return format->names == NULL ? 0 : mh_size(format->names);
+}
+
 /**
  * Add @a name to a name hash of @a format.
  * @param format Format to add name.
