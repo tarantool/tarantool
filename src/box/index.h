@@ -439,7 +439,7 @@ void
 index_delete(struct index *index);
 
 /** Build this index based on the contents of another index. */
-void
+int
 index_build(struct index *index, struct index *pk);
 
 static inline void
@@ -716,6 +716,13 @@ static inline void
 index_build_next_xc(struct index *index, struct tuple *tuple)
 {
 	if (index->vtab->build_next(index, tuple) < 0)
+		diag_raise();
+}
+
+static inline void
+index_build_xc(struct index *index, struct index *pk)
+{
+	if (index_build(index, pk) != 0)
 		diag_raise();
 }
 

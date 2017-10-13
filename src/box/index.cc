@@ -462,28 +462,42 @@ index_delete(struct index *index)
 	index->vtab->destroy(index);
 }
 
-void
+int
 index_build(struct index *index, struct index *pk)
 {
-	uint32_t n_tuples = index_size_xc(pk);
+	ssize_t n_tuples = index_size(pk);
+	if (n_tuples < 0)
+		return -1;
 	uint32_t estimated_tuples = n_tuples * 1.2;
 
 	index_begin_build(index);
-	index_reserve_xc(index, estimated_tuples);
+	if (index_reserve(index, estimated_tuples) < 0)
+		return -1;
 
 	if (n_tuples > 0) {
-		say_info("Adding %" PRIu32 " keys to %s index '%s' ...",
+		say_info("Adding %zd keys to %s index '%s' ...",
 			 n_tuples, index_type_strs[index->def->type],
 			 index->def->name);
 	}
 
-	struct iterator *it = index_position_xc(pk);
-	index_init_iterator_xc(pk, it, ITER_ALL, NULL, 0);
-	struct tuple *tuple;
-	while ((tuple = iterator_next_xc(it)) != NULL)
-		index_build_next_xc(index, tuple);
+	struct iterator *it = index_position(pk);
+	if (it == NULL)
+		return -1;
+	if (index_init_iterator(pk, it, ITER_ALL, NULL, 0) != 0)
+		return -1;
+
+	while (true) {
+		struct tuple *tuple;
+		if (it->next(it, &tuple) != 0)
+			return -1;
+		if (tuple == NULL)
+			break;
+		if (index_build_next(index, tuple) != 0)
+			return -1;
+	}
 
 	index_end_build(index);
+	return 0;
 }
 
 /* }}} */

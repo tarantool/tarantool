@@ -110,7 +110,7 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++)
-			index_build(space->index[j], pk);
+			index_build_xc(space->index[j], pk);
 
 		if (n_tuples > 0) {
 			say_info("Space '%s': done", space_name(space));
