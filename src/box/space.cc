@@ -293,6 +293,15 @@ space_def_check_compatibility(const struct space_def *old_def,
 				 msg);
 			return -1;
 		}
+		if (old_def->fields[i].is_nullable &&
+		    !new_def->fields[i].is_nullable) {
+			const char *msg =
+				tt_sprintf("Can not disable is_nullable "\
+					   "on a not empty space");
+			diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+				 msg);
+			return -1;
+		}
 	}
 	return 0;
 }

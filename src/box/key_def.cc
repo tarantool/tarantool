@@ -184,6 +184,9 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 		if (part1->coll != part2->coll)
 			return (uintptr_t) part1->coll <
 			       (uintptr_t) part2->coll ? -1 : 1;
+		if (part1->is_nullable != part2->is_nullable)
+			return part1->is_nullable <
+			       part2->is_nullable ? -1 : 1;
 	}
 	return part_count1 < part_count2 ? -1 : part_count1 > part_count2;
 }
@@ -204,6 +207,8 @@ key_part_check_compatibility(const struct key_part *old_parts,
 		if (! field_type_is_compatible(old_part->type, new_part->type))
 			return false;
 		if (old_part->coll != new_part->coll)
+			return false;
+		if (old_part->is_nullable != new_part->is_nullable)
 			return false;
 	}
 	return true;
@@ -489,7 +494,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
-		   uint32_t part_count)
+		   uint32_t part_count, bool allow_nullable)
 {
 	for (uint32_t i = 0; i < part_count; i++) {
 		enum mp_type mp_type = mp_typeof(*key);
@@ -497,7 +502,7 @@ key_validate_parts(const struct key_def *key_def, const char *key,
 		mp_next(&key);
 
 		if (key_mp_type_validate(part->type, mp_type, ER_KEY_PART_TYPE,
-					 i, part->is_nullable))
+					 i, part->is_nullable && allow_nullable))
 			return -1;
 	}
 	return 0;

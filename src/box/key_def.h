@@ -242,13 +242,14 @@ key_def_merge(const struct key_def *first, const struct key_def *second);
  * @param key_def Key definition.
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
+ * @param allow_nullable True if nullable parts are allowed.
  *
  * @retval 0  The key is valid.
  * @retval -1 The key is invalid.
  */
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
-		   uint32_t part_count);
+		   uint32_t part_count, bool allow_nullable);
 
 /**
  * Return true if @a index_def defines a sequential key without

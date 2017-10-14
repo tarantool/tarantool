@@ -125,15 +125,15 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 			return -1;
 		}
 		if (key_validate_parts(index_def->key_def, key,
-				       part_count) != 0)
+				       part_count, true) != 0)
 			return -1;
 	}
 	return 0;
 }
 
 int
-primary_key_validate(struct key_def *key_def, const char *key,
-		     uint32_t part_count)
+exact_key_validate(struct key_def *key_def, const char *key,
+		   uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
 	if (key_def->part_count != part_count) {
@@ -141,7 +141,7 @@ primary_key_validate(struct key_def *key_def, const char *key,
 			 part_count);
 		return -1;
 	}
-	return key_validate_parts(key_def, key, part_count);
+	return key_validate_parts(key_def, key, part_count, false);
 }
 
 char *
@@ -347,7 +347,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		if (!index->index_def->opts.is_unique)
 			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		uint32_t part_count = mp_decode_array(&key);
-		if (primary_key_validate(index->index_def->key_def, key,
+		if (exact_key_validate(index->index_def->key_def, key,
 					 part_count))
 			diag_raise();
 		/* Start transaction in the engine. */

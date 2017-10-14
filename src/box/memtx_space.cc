@@ -313,7 +313,7 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->index_def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 	if (stmt->old_tuple)
@@ -331,7 +331,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	Index *pk = index_find_unique(space, request->index_id);
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (primary_key_validate(pk->index_def->key_def, key, part_count) != 0)
+	if (exact_key_validate(pk->index_def->key_def, key, part_count) != 0)
 		diag_raise();
 	stmt->old_tuple = pk->findByKey(key, part_count);
 

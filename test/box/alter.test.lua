@@ -583,3 +583,45 @@ format[1] = {name = 'field1', type = 'unsigned'}
 format[2] = {name = 'field2', type = 'unsigned'}
 s:format(format)
 s:drop()
+
+--
+-- gh-1557: NULL in indexes.
+--
+
+NULL = require('msgpack').NULL
+
+format = {}
+format[1] = { name = 'field1', type = 'unsigned', is_nullable = true }
+format[2] = { name = 'field2', type = 'unsigned', is_nullable = true }
+s = box.schema.space.create('test', { format = format })
+s:create_index('primary', { parts = { 'field1' } })
+s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+format[1].is_nullable = false
+s:format(format)
+s:create_index('primary', { parts = {{'field1', is_nullable = true}} })
+
+s:create_index('primary', { parts = {'field1'} })
+
+-- Check that is_nullable can't be set to false on non-empty space
+s:insert({1, NULL})
+format[1].is_nullable = true
+s:format(format)
+format[1].is_nullable = false
+format[2].is_nullable = false
+s:format(format)
+s:delete(1)
+-- Disable is_nullable on empty space
+s:format(format)
+s:format({})
+
+s:create_index('secondary', { parts = {{2, 'string', is_nullable = true}} })
+s:insert({1, NULL})
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+s:delete({1})
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+s:insert({1, NULL})
+s:insert({2, 'xxx'})
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = true} }})
+s:insert({1, NULL})
+
+s:drop()

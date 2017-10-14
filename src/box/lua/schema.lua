@@ -548,8 +548,8 @@ local function update_index_parts(space_id, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: field (number) must be one-based")
         end
+        local fmt = box.space[space_id]:format()[part.field]
         if part.type == nil then
-            local fmt = box.space[space_id]:format()[part.field]
             if fmt and fmt.type then
                 part.type = fmt.type
             else
@@ -558,6 +558,14 @@ local function update_index_parts(space_id, parts)
         elseif type(part.type) ~= 'string' then
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: type (string) is expected")
+        end
+        if part.is_nullable == nil then
+            if fmt and fmt.is_nullable then
+                part.is_nullable = true
+            end
+        elseif type(part.is_nullable) ~= 'boolean' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts[" .. i .. "]: type (boolean) is expected")
         end
         part.field = part.field - 1
         table.insert(result, part)

@@ -30,7 +30,7 @@ ok = pcall(s.create_index, s, 'sk', { parts = parts, type = 'hash' }) -- Fail.
 ok
 
 -- Conflict of is_nullable in format and in parts.
-parts[1].is_nullable = nil
+parts[1].is_nullable = false
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 
 -- Try skip nullable in format and specify in part.
@@ -54,14 +54,26 @@ s:insert{1, 1}
 s:insert{2, NULL}
 s:insert{3, NULL}
 s:insert{4, 1} -- Fail.
+s:insert{4, 4}
 s:insert{5, NULL}
 
 pk:select{}
 sk:select{}
 
+-- Test exact match.
+
+sk:get({1})
+sk:get({NULL}) -- Fail.
+
+sk:update({1}, {})
+sk:update({NULL}, {}) -- Fail.
+
+_ = sk:delete({1})
+sk:delete({NULL}) -- Fail.
+s:insert({1, 1})
+
 -- Test iterators.
 
-sk:get{NULL}
 sk:select{NULL}
 sk:select({NULL}, {iterator = 'LE'})
 sk:select({NULL}, {iterator = 'LT'})
@@ -133,12 +145,6 @@ sk2:select{}
 s:replace{4, 4, 3} -- fail
 s:replace{4, 4, NULL} -- ok
 
-pk:select{}
-sk:select{}
-sk2:select{}
-
--- Check delete works correctrly with multiple secondary indexes.
-_ = sk2:delete{NULL}
 pk:select{}
 sk:select{}
 sk2:select{}

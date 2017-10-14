@@ -264,8 +264,8 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
  * @retval -1 The key is invalid.
  */
 int
-primary_key_validate(struct key_def *key_def, const char *key,
-		     uint32_t part_count);
+exact_key_validate(struct key_def *key_def, const char *key,
+		   uint32_t part_count);
 
 /**
  * The manner in which replace in a unique index must treat

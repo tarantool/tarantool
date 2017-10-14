@@ -3063,7 +3063,7 @@ vy_unique_key_validate(struct vy_index *index, const char *key,
 			 original_part_count, part_count);
 		return -1;
 	}
-	return key_validate_parts(index->cmp_def, key, part_count);
+	return key_validate_parts(index->cmp_def, key, part_count, false);
 }
 
 /**
