@@ -40,59 +40,77 @@ sysview_space_destroy(struct space *space)
 }
 
 static size_t
-sysview_space_bsize(struct space *)
+sysview_space_bsize(struct space *space)
 {
+	(void)space;
 	return 0;
 }
 
 static int
-sysview_space_apply_initial_join_row(struct space *, struct request *)
+sysview_space_apply_initial_join_row(struct space *space,
+				     struct request *request)
 {
+	(void)space;
+	(void)request;
 	unreachable();
 	return 0;
 }
 
 static int
-sysview_space_execute_replace(struct space *space, struct txn *,
-			      struct request *, struct tuple **)
+sysview_space_execute_replace(struct space *space, struct txn *txn,
+			      struct request *request, struct tuple **result)
 {
+	(void)txn;
+	(void)request;
+	(void)result;
 	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return -1;
 }
 
 static int
-sysview_space_execute_delete(struct space *space, struct txn *,
-			     struct request *, struct tuple **)
+sysview_space_execute_delete(struct space *space, struct txn *txn,
+			     struct request *request, struct tuple **result)
 {
+	(void)txn;
+	(void)request;
+	(void)result;
 	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return -1;
 }
 
 static int
-sysview_space_execute_update(struct space *space, struct txn *,
-			     struct request *, struct tuple **)
+sysview_space_execute_update(struct space *space, struct txn *txn,
+			     struct request *request, struct tuple **result)
 {
+	(void)txn;
+	(void)request;
+	(void)result;
 	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return -1;
 }
 
 static int
-sysview_space_execute_upsert(struct space *space, struct txn *,
-			     struct request *)
+sysview_space_execute_upsert(struct space *space, struct txn *txn,
+			     struct request *request)
 {
+	(void)txn;
+	(void)request;
 	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
 	return -1;
 }
 
 static void
-sysview_init_system_space(struct space *)
+sysview_init_system_space(struct space *space)
 {
+	(void)space;
 	unreachable();
 }
 
 static int
-sysview_space_check_index_def(struct space *, struct index_def *)
+sysview_space_check_index_def(struct space *space, struct index_def *index_def)
 {
+	(void)space;
+	(void)index_def;
 	return 0;
 }
 
@@ -103,48 +121,64 @@ sysview_space_create_index(struct space *space, struct index_def *index_def)
 }
 
 static int
-sysview_space_add_primary_key(struct space *)
+sysview_space_add_primary_key(struct space *space)
 {
+	(void)space;
 	return 0;
 }
 
 static void
-sysview_space_drop_primary_key(struct space *)
+sysview_space_drop_primary_key(struct space *space)
 {
+	(void)space;
 }
 
 static int
-sysview_space_build_secondary_key(struct space *, struct space *,
-				  struct index *)
+sysview_space_build_secondary_key(struct space *old_space,
+				  struct space *new_space,
+				  struct index *new_index)
 {
+	(void)old_space;
+	(void)new_space;
+	(void)new_index;
 	return 0;
 }
 
 static int
-sysview_space_prepare_truncate(struct space *, struct space *)
+sysview_space_prepare_truncate(struct space *old_space, struct space *new_space)
 {
-	return 0;
-}
-
-static void
-sysview_space_commit_truncate(struct space *, struct space *)
-{
-}
-
-static int
-sysview_space_prepare_alter(struct space *, struct space *)
-{
+	(void)old_space;
+	(void)new_space;
 	return 0;
 }
 
 static void
-sysview_space_commit_alter(struct space *, struct space *)
+sysview_space_commit_truncate(struct space *old_space, struct space *new_space)
 {
+	(void)old_space;
+	(void)new_space;
 }
 
 static int
-sysview_space_check_format(struct space *, struct space *)
+sysview_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
+	(void)old_space;
+	(void)new_space;
+	return 0;
+}
+
+static void
+sysview_space_commit_alter(struct space *old_space, struct space *new_space)
+{
+	(void)old_space;
+	(void)new_space;
+}
+
+static int
+sysview_space_check_format(struct space *new_space, struct space *old_space)
+{
+	(void)old_space;
+	(void)new_space;
 	unreachable();
 	return 0;
 }
@@ -196,108 +230,143 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 }
 
 static int
-sysview_engine_begin(struct engine *, struct txn *)
+sysview_engine_begin(struct engine *engine, struct txn *txn)
 {
+	(void)engine;
+	(void)txn;
 	return 0;
 }
 
 static int
-sysview_engine_begin_statement(struct engine *, struct txn *)
+sysview_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
+	(void)engine;
+	(void)txn;
 	return 0;
 }
 
 static int
-sysview_engine_prepare(struct engine *, struct txn *)
+sysview_engine_prepare(struct engine *engine, struct txn *txn)
 {
-	return 0;
-}
-
-static void
-sysview_engine_commit(struct engine *, struct txn *)
-{
-}
-
-static void
-sysview_engine_rollback(struct engine *, struct txn *)
-{
-}
-
-static void
-sysview_engine_rollback_statement(struct engine *, struct txn *,
-				  struct txn_stmt *)
-{
-}
-
-static int
-sysview_engine_bootstrap(struct engine *)
-{
-	return 0;
-}
-
-static int
-sysview_engine_begin_initial_recovery(struct engine *, const struct vclock *)
-{
-	return 0;
-}
-
-static int
-sysview_engine_begin_final_recovery(struct engine *)
-{
-	return 0;
-}
-
-static int
-sysview_engine_end_recovery(struct engine *)
-{
-	return 0;
-}
-
-static int
-sysview_engine_join(struct engine *, struct vclock *,
-		    struct xstream *)
-{
-	return 0;
-}
-
-static int
-sysview_engine_begin_checkpoint(struct engine *)
-{
-	return 0;
-}
-
-static int
-sysview_engine_wait_checkpoint(struct engine *, struct vclock *)
-{
+	(void)engine;
+	(void)txn;
 	return 0;
 }
 
 static void
-sysview_engine_commit_checkpoint(struct engine *, struct vclock *)
+sysview_engine_commit(struct engine *engine, struct txn *txn)
 {
+	(void)engine;
+	(void)txn;
 }
 
 static void
-sysview_engine_abort_checkpoint(struct engine *)
+sysview_engine_rollback(struct engine *engine, struct txn *txn)
 {
+	(void)engine;
+	(void)txn;
+}
+
+static void
+sysview_engine_rollback_statement(struct engine *engine, struct txn *txn,
+				  struct txn_stmt *stmt)
+{
+	(void)engine;
+	(void)txn;
+	(void)stmt;
 }
 
 static int
-sysview_engine_collect_garbage(struct engine *, int64_t)
+sysview_engine_bootstrap(struct engine *engine)
 {
+	(void)engine;
 	return 0;
 }
 
 static int
-sysview_engine_backup(struct engine *, struct vclock *,
-		      engine_backup_cb, void *)
+sysview_engine_begin_initial_recovery(struct engine *engine,
+				      const struct vclock *vclock)
 {
+	(void)engine;
+	(void)vclock;
 	return 0;
 }
 
 static int
-sysview_engine_check_space_def(struct space_def *)
+sysview_engine_begin_final_recovery(struct engine *engine)
 {
+	(void)engine;
+	return 0;
+}
+
+static int
+sysview_engine_end_recovery(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+static int
+sysview_engine_join(struct engine *engine, struct vclock *vclock,
+		    struct xstream *stream)
+{
+	(void)engine;
+	(void)vclock;
+	(void)stream;
+	return 0;
+}
+
+static int
+sysview_engine_begin_checkpoint(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+static int
+sysview_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
+{
+	(void)engine;
+	(void)vclock;
+	return 0;
+}
+
+static void
+sysview_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
+{
+	(void)engine;
+	(void)vclock;
+}
+
+static void
+sysview_engine_abort_checkpoint(struct engine *engine)
+{
+	(void)engine;
+}
+
+static int
+sysview_engine_collect_garbage(struct engine *engine, int64_t lsn)
+{
+	(void)engine;
+	(void)lsn;
+	return 0;
+}
+
+static int
+sysview_engine_backup(struct engine *engine, struct vclock *vclock,
+		      engine_backup_cb cb, void *cb_arg)
+{
+	(void)engine;
+	(void)vclock;
+	(void)cb;
+	(void)cb_arg;
+	return 0;
+}
+
+static int
+sysview_engine_check_space_def(struct space_def *def)
+{
+	(void)def;
 	return 0;
 }
 
@@ -327,8 +396,7 @@ static const struct engine_vtab sysview_engine_vtab = {
 struct sysview_engine *
 sysview_engine_new(void)
 {
-	struct sysview_engine *sysview =
-		(struct sysview_engine *)calloc(1, sizeof(*sysview));
+	struct sysview_engine *sysview = calloc(1, sizeof(*sysview));
 	if (sysview == NULL) {
 		diag_set(OutOfMemory, sizeof(*sysview),
 			 "malloc", "struct sysview_engine");

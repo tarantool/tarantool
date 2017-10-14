@@ -119,7 +119,7 @@ enum {
  * Can be called several times, only first call do the work.
  */
 void
-memtx_index_arena_init();
+memtx_index_arena_init(void);
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index

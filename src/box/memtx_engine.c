@@ -66,8 +66,10 @@ static int memtx_index_num_reserved_extents;
 static void *memtx_index_reserved_extents;
 
 static void
-txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
+txn_on_yield_or_stop(struct trigger *trigger, void *event)
 {
+	(void)trigger;
+	(void)event;
 	txn_rollback(); /* doesn't throw */
 }
 
@@ -222,8 +224,9 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 /** Called at start to tell memtx to recover to a given LSN. */
 static int
 memtx_engine_begin_initial_recovery(struct engine *engine,
-				    const struct vclock *)
+				    const struct vclock *vclock)
 {
+	(void)vclock;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	assert(memtx->state == MEMTX_INITIALIZED);
 	/*
@@ -344,8 +347,10 @@ memtx_engine_begin(struct engine *engine, struct txn *txn)
 }
 
 static int
-memtx_engine_begin_statement(struct engine *, struct txn *)
+memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
+	(void)engine;
+	(void)txn;
 	return 0;
 }
 
@@ -525,12 +530,12 @@ static int
 checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 		uint64_t snap_io_rate_limit)
 {
-	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
+	rlist_create(&ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	/* May be used in abortCheckpoint() */
-	ckpt->vclock = (struct vclock *) malloc(sizeof(*ckpt->vclock));
+	ckpt->vclock = malloc(sizeof(*ckpt->vclock));
 	if (ckpt->vclock == NULL) {
 		diag_set(OutOfMemory, sizeof(*ckpt->vclock),
 			 "malloc", "vclock");
@@ -548,7 +553,7 @@ checkpoint_destroy(struct checkpoint *ckpt)
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
 		entry->iterator->free(entry->iterator);
 	}
-	ckpt->entries = RLIST_HEAD_INITIALIZER(ckpt->entries);
+	rlist_create(&ckpt->entries);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt->vclock);
 }
@@ -852,8 +857,9 @@ memtx_engine_join(struct engine *engine, struct vclock *vclock,
 }
 
 static int
-memtx_engine_check_space_def(struct space_def *)
+memtx_engine_check_space_def(struct space_def *def)
 {
+	(void)def;
 	return 0;
 }
 
@@ -887,8 +893,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 {
 	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
 
-	struct memtx_engine *memtx =
-		(struct memtx_engine *)calloc(1, sizeof(*memtx));
+	struct memtx_engine *memtx = calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
 		diag_set(OutOfMemory, sizeof(*memtx),
 			 "malloc", "struct memtx_engine");
@@ -932,7 +937,7 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
  * Can be called several times, only first call do the work.
  */
 void
-memtx_index_arena_init()
+memtx_index_arena_init(void)
 {
 	if (memtx_index_arena_initialized) {
 		/* already done.. */

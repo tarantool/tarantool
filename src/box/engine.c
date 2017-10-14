@@ -57,7 +57,7 @@ engine_by_name(const char *name)
 }
 
 void
-engine_shutdown()
+engine_shutdown(void)
 {
 	struct engine *engine, *tmp;
 	rlist_foreach_entry_safe(engine, &engines, link, tmp) {
@@ -66,7 +66,7 @@ engine_shutdown()
 }
 
 int
-engine_bootstrap()
+engine_bootstrap(void)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -89,7 +89,7 @@ engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 }
 
 int
-engine_begin_final_recovery()
+engine_begin_final_recovery(void)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -100,7 +100,7 @@ engine_begin_final_recovery()
 }
 
 int
-engine_end_recovery()
+engine_end_recovery(void)
 {
 	/*
 	 * For all new spaces created after recovery is complete,
@@ -115,7 +115,7 @@ engine_end_recovery()
 }
 
 int
-engine_begin_checkpoint()
+engine_begin_checkpoint(void)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -140,7 +140,7 @@ engine_commit_checkpoint(struct vclock *vclock)
 }
 
 void
-engine_abort_checkpoint()
+engine_abort_checkpoint(void)
 {
 	struct engine *engine;
 	engine_foreach(engine)

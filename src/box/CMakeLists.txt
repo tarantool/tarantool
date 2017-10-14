@@ -61,13 +61,13 @@ add_library(box STATIC
     memtx_tree.c
     memtx_rtree.c
     memtx_bitset.c
-    engine.cc
-    memtx_engine.cc
+    engine.c
+    memtx_engine.c
     memtx_space.c
     memtx_tuple.cc
-    sysview_engine.cc
+    sysview_engine.c
     sysview_index.c
-    vinyl_engine.cc
+    vinyl_engine.c
     vinyl_space.c
     vinyl_index.c
     vinyl.c

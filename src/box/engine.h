@@ -251,14 +251,17 @@ engine_check_space_def(struct engine *engine, struct space_def *def)
 	return engine->vtab->check_space_def(def);
 }
 
-/** Shutdown all engine factories. */
-void engine_shutdown();
+/**
+ * Shutdown all engine factories.
+ */
+void
+engine_shutdown(void);
 
 /**
  * Initialize an empty data directory
  */
 int
-engine_bootstrap();
+engine_bootstrap(void);
 
 /**
  * Called at the start of recovery.
@@ -271,14 +274,14 @@ engine_begin_initial_recovery(const struct vclock *recovery_vclock);
  * when xlog catch-up process is started
  */
 int
-engine_begin_final_recovery();
+engine_begin_final_recovery(void);
 
 /**
  * Called at the end of recovery.
  * Build secondary keys in all spaces.
  */
 int
-engine_end_recovery();
+engine_end_recovery(void);
 
 /**
  * Feed checkpoint data as join events to the replicas.
@@ -288,7 +291,7 @@ int
 engine_join(struct vclock *vclock, struct xstream *stream);
 
 int
-engine_begin_checkpoint();
+engine_begin_checkpoint(void);
 
 /**
  * Create a checkpoint.
@@ -297,7 +300,7 @@ int
 engine_commit_checkpoint(struct vclock *vclock);
 
 void
-engine_abort_checkpoint();
+engine_abort_checkpoint(void);
 
 int
 engine_collect_garbage(int64_t lsn);
@@ -356,7 +359,7 @@ engine_check_space_def_xc(struct engine *engine, struct space_def *def)
 }
 
 static inline void
-engine_bootstrap_xc()
+engine_bootstrap_xc(void)
 {
 	if (engine_bootstrap() != 0)
 		diag_raise();
@@ -370,14 +373,14 @@ engine_begin_initial_recovery_xc(const struct vclock *recovery_vclock)
 }
 
 static inline void
-engine_begin_final_recovery_xc()
+engine_begin_final_recovery_xc(void)
 {
 	if (engine_begin_final_recovery() != 0)
 		diag_raise();
 }
 
 static inline void
-engine_end_recovery_xc()
+engine_end_recovery_xc(void)
 {
 	if (engine_end_recovery() != 0)
 		diag_raise();

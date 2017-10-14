@@ -36,19 +36,16 @@
 
 #include "trivia/util.h"
 
-#include "vinyl_index.h"
 #include "vinyl_space.h"
 #include "xrow.h"
 #include "tuple.h"
 #include "txn.h"
 #include "space.h"
-#include "schema.h"
-#include "iproto_constants.h"
 #include "vinyl.h"
 
 /* Used by lua/info.c */
-extern "C" struct vy_env *
-vinyl_engine_get_env()
+struct vy_env *
+vinyl_engine_get_env(void)
 {
 	struct vinyl_engine *vinyl;
 	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
@@ -272,8 +269,7 @@ struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory, size_t cache,
 		 int read_threads, int write_threads, double timeout)
 {
-	struct vinyl_engine *vinyl =
-		(struct vinyl_engine *)calloc(1, sizeof(*vinyl));
+	struct vinyl_engine *vinyl = calloc(1, sizeof(*vinyl));
 	if (vinyl == NULL) {
 		diag_set(OutOfMemory, sizeof(*vinyl),
 			 "malloc", "struct vinyl_engine");
