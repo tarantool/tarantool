@@ -282,30 +282,13 @@ memtx_engine::endRecovery()
 	}
 }
 
-struct tuple_format *
-memtx_engine::createFormat(struct key_def **keys, uint32_t key_count,
-			   struct field_def *fields, uint32_t field_count,
-			   uint32_t exact_field_count)
+struct space *
+memtx_engine::createSpace(struct space_def *def, struct rlist *key_list)
 {
-	struct tuple_format *format = tuple_format_new(&memtx_tuple_format_vtab,
-						       keys, key_count, 0,
-						       fields, field_count);
-	if (format == NULL)
+	struct space *space = memtx_space_new(this, def, key_list);
+	if (space == NULL)
 		diag_raise();
-	format->exact_field_count = exact_field_count;
-	return format;
-}
-
-struct space *memtx_engine::createSpace()
-{
-	struct memtx_space *memtx_space = (struct memtx_space *)
-		calloc(1, sizeof(*memtx_space));
-	if (memtx_space == NULL)
-		tnt_raise(OutOfMemory, sizeof(*memtx_space),
-			  "malloc", "struct memtx_space");
-	memtx_space->base.vtab = &memtx_space_vtab;
-	memtx_space->replace = memtx_space_replace_no_keys;
-	return &memtx_space->base;
+	return space;
 }
 
 void

@@ -45,9 +45,6 @@ engine_backup_cb(const char *path, void *arg);
 
 #if defined(__cplusplus)
 
-struct field_def;
-struct tuple_format;
-
 /** Engine instance */
 struct engine {
 public:
@@ -56,17 +53,9 @@ public:
 	engine(const engine &) = delete;
 	engine& operator=(const engine&) = delete;
 	virtual ~engine() {}
-	/**
-	 * Construct a tuple format for a new space.
-	 * Returns NULL if the engine does not support format
-	 * (sysview, for example).
-	 */
-	virtual struct tuple_format *
-	createFormat(struct key_def **keys, uint32_t key_count,
-		     struct field_def *fields, uint32_t field_count,
-		     uint32_t exact_field_count);
 	/** Allocate a new space instance. */
-	virtual struct space *createSpace() = 0;
+	virtual struct space *createSpace(struct space_def *def,
+					  struct rlist *key_list) = 0;
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */

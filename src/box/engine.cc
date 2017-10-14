@@ -48,13 +48,6 @@ engine::engine(const char *engine_name)
 	 link(RLIST_HEAD_INITIALIZER(link))
 {}
 
-struct tuple_format *
-engine::createFormat(struct key_def **, uint32_t,
-		     struct field_def *, uint32_t, uint32_t)
-{
-	return NULL;
-}
-
 void engine::begin(struct txn *)
 {}
 

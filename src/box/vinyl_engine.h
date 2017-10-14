@@ -38,11 +38,8 @@ struct vinyl_engine: public engine {
 	vinyl_engine(const char *dir, size_t memory, size_t cache,
 		     int read_threads, int write_threads, double timeout);
 	~vinyl_engine();
-	virtual struct tuple_format *
-	createFormat(struct key_def **keys, uint32_t key_count,
-		     struct field_def *fields, uint32_t field_count,
-		     uint32_t exact_field_count) override;
-	virtual struct space *createSpace() override;
+	virtual struct space *createSpace(struct space_def *def,
+					  struct rlist *key_list) override;
 	virtual void beginStatement(struct txn *txn) override;
 	virtual void begin(struct txn *txn) override;
 	virtual void prepare(struct txn *txn) override;

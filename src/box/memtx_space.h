@@ -32,6 +32,8 @@
  */
 #include "space.h"
 
+struct memtx_engine;
+
 struct memtx_space {
 	struct space base;
 	/* Number of bytes used in memory by tuples in the space. */
@@ -71,6 +73,8 @@ int
 memtx_space_replace_all_keys(struct space *, struct txn_stmt *,
 			     enum dup_replace_mode);
 
-extern const struct space_vtab memtx_space_vtab;
+struct space *
+memtx_space_new(struct memtx_engine *memtx,
+		struct space_def *def, struct rlist *key_list);
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */

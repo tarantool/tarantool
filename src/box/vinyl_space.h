@@ -32,6 +32,10 @@
  */
 #include "space.h"
 
-extern const struct space_vtab vinyl_space_vtab;
+struct vinyl_engine;
+
+struct space *
+vinyl_space_new(struct vinyl_engine *vinyl,
+		struct space_def *def, struct rlist *key_list);
 
 #endif /* TARANTOOL_BOX_VINYL_SPACE_H_INCLUDED */

@@ -33,7 +33,6 @@
 #include <string.h>
 #include "tuple.h"
 #include "tuple_compare.h"
-#include "scoped_guard.h"
 #include "trigger.h"
 #include "user.h"
 #include "session.h"
@@ -82,65 +81,90 @@ space_fill_index_map(struct space *space)
 	}
 }
 
-struct space *
-space_new_xc(struct space_def *def, struct rlist *key_list)
+int
+space_create(struct space *space, struct engine *engine,
+	     const struct space_vtab *vtab, struct space_def *def,
+	     struct rlist *key_list, struct tuple_format *format)
 {
+	if (!rlist_empty(key_list)) {
+		/* Primary key must go first. */
+		struct index_def *pk = rlist_first_entry(key_list,
+					struct index_def, link);
+		assert(pk->iid == 0);
+		(void)pk;
+	}
+
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
 	struct index_def *index_def;
-	MAYBE_UNUSED struct index_def *pk = rlist_empty(key_list) ? NULL :
-		rlist_first_entry(key_list, struct index_def, link);
 	rlist_foreach_entry(index_def, key_list, link) {
 		index_count++;
 		index_id_max = MAX(index_id_max, index_def->iid);
 	}
-	/* A space with a secondary key without a primary is illegal. */
-	assert(index_count == 0 || pk->iid == 0);
-	/* Allocate a space engine instance. */
-	struct engine *engine = engine_find(def->engine_name);
-	struct space *space = engine->createSpace();
-	auto scoped_guard = make_scoped_guard([=] { space_delete(space); });
+
+	memset(space, 0, sizeof(*space));
+	space->vtab = vtab;
 	space->engine = engine;
 	space->index_count = index_count;
 	space->index_id_max = index_id_max;
 	rlist_create(&space->on_replace);
 	rlist_create(&space->on_stmt_begin);
-	space->def = space_def_dup_xc(def);
-	/* Construct a tuple format for the new space. */
-	uint32_t key_no = 0;
-	struct key_def **keys = (struct key_def **)
-		region_alloc_xc(&fiber()->gc, sizeof(*keys) * index_count);
-	rlist_foreach_entry(index_def, key_list, link)
-		keys[key_no++] = index_def->key_def;
-	space->format = engine->createFormat(keys, index_count,
-		def->fields, def->field_count, def->exact_field_count);
-	if (space->format != NULL)
-		tuple_format_ref(space->format);
-	/** Initialize index map. */
+	space->run_triggers = true;
+
+	space->format = format;
+	if (format != NULL)
+		tuple_format_ref(format);
+
+	space->def = space_def_dup(def);
+	if (space->def == NULL)
+		goto fail;
+
+	/* Create indexes and fill the index map. */
 	space->index_map = (struct index **)
 		calloc(index_count + index_id_max + 1, sizeof(struct index *));
 	if (space->index_map == NULL) {
-		tnt_raise(OutOfMemory, (index_count + index_id_max + 1) *
-			  sizeof(struct index *), "malloc", "index_map");
+		diag_set(OutOfMemory, (index_count + index_id_max + 1) *
+			 sizeof(struct index *), "malloc", "index_map");
+		goto fail;
 	}
 	space->index = space->index_map + index_id_max + 1;
 	rlist_foreach_entry(index_def, key_list, link) {
-		space->index_map[index_def->iid] =
-			space_create_index_xc(space, index_def);
+		struct index *index = space_create_index(space, index_def);
+		if (index == NULL)
+			goto fail_free_indexes;
+		space->index_map[index_def->iid] = index;
 	}
 	space_fill_index_map(space);
-	space->run_triggers = true;
-	scoped_guard.is_active = false;
-	return space;
+	return 0;
+
+fail_free_indexes:
+	for (uint32_t i = 0; i <= index_id_max; i++) {
+		struct index *index = space->index_map[i];
+		if (index != NULL)
+			index_delete(index);
+	}
+fail:
+	free(space->index_map);
+	if (space->def != NULL)
+		space_def_delete(space->def);
+	if (space->format != NULL)
+		tuple_format_unref(space->format);
+	return -1;
+}
+
+struct space *
+space_new_xc(struct space_def *def, struct rlist *key_list)
+{
+	struct engine *engine = engine_find(def->engine_name);
+	return engine->createSpace(def, key_list);
 }
 
 void
 space_delete(struct space *space)
 {
-	for (uint32_t j = 0; space->index_map != NULL &&
-			     j <= space->index_id_max; j++) {
+	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
-		if (index)
+		if (index != NULL)
 			index_delete(index);
 	}
 	free(space->index_map);

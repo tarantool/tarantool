@@ -176,12 +176,17 @@ sysview_engine::sysview_engine()
 {
 }
 
-struct space *sysview_engine::createSpace()
+struct space *
+sysview_engine::createSpace(struct space_def *def, struct rlist *key_list)
 {
 	struct space *space = (struct space *)calloc(1, sizeof(*space));
 	if (space == NULL)
 		tnt_raise(OutOfMemory, sizeof(*space),
 			  "malloc", "struct space");
-	space->vtab = &sysview_space_vtab;
+	if (space_create(space, (struct engine *)this,
+			 &sysview_space_vtab, def, key_list, NULL) != 0) {
+		free(space);
+		diag_raise();
+	}
 	return space;
 }

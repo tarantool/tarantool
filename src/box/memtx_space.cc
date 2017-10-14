@@ -941,7 +941,7 @@ memtx_space_commit_alter(struct space *old_space, struct space *new_space)
 
 /* }}} DDL */
 
-const struct space_vtab memtx_space_vtab = {
+static const struct space_vtab memtx_space_vtab = {
 	/* .destroy = */ memtx_space_destroy,
 	/* .bsize = */ memtx_space_bsize,
 	/* .apply_initial_join_row = */ memtx_space_apply_initial_join_row,
@@ -962,3 +962,54 @@ const struct space_vtab memtx_space_vtab = {
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 	/* .commit_alter = */ memtx_space_commit_alter,
 };
+
+struct space *
+memtx_space_new(struct memtx_engine *memtx,
+		struct space_def *def, struct rlist *key_list)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)
+		malloc(sizeof(*memtx_space));
+	if (memtx_space == NULL) {
+		diag_set(OutOfMemory, sizeof(*memtx_space),
+			 "malloc", "struct memtx_space");
+		return NULL;
+	}
+
+	/* Create a format from key and field definitions. */
+	int key_count = 0;
+	struct index_def *index_def;
+	rlist_foreach_entry(index_def, key_list, link)
+		key_count++;
+	struct key_def **keys = (struct key_def **)
+		region_alloc(&fiber()->gc, sizeof(*keys) * key_count);
+	if (keys == NULL) {
+		free(memtx_space);
+		return NULL;
+	}
+	key_count = 0;
+	rlist_foreach_entry(index_def, key_list, link)
+		keys[key_count++] = index_def->key_def;
+
+	struct tuple_format *format = tuple_format_new(&memtx_tuple_format_vtab,
+			keys, key_count, 0, def->fields, def->field_count);
+	if (format == NULL) {
+		free(memtx_space);
+		return NULL;
+	}
+	format->exact_field_count = def->exact_field_count;
+	tuple_format_ref(format);
+
+	if (space_create((struct space *)memtx_space, (struct engine *)memtx,
+			 &memtx_space_vtab, def, key_list, format) != 0) {
+		tuple_format_unref(format);
+		free(memtx_space);
+		return NULL;
+	}
+
+	/* Format is now referenced by the space. */
+	tuple_format_unref(format);
+
+	memtx_space->bsize = 0;
+	memtx_space->replace = memtx_space_replace_no_keys;
+	return (struct space *)memtx_space;
+}

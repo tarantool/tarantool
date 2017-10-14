@@ -194,6 +194,12 @@ struct space {
 	struct index **index;
 };
 
+/** Initialize a base space instance. */
+int
+space_create(struct space *space, struct engine *engine,
+	     const struct space_vtab *vtab, struct space_def *def,
+	     struct rlist *key_list, struct tuple_format *format);
+
 /** Get space ordinal number. */
 static inline uint32_t
 space_id(struct space *space) { return space->def->id; }

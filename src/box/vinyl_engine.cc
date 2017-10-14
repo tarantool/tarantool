@@ -45,7 +45,6 @@
 #include "schema.h"
 #include "iproto_constants.h"
 #include "vinyl.h"
-#include "vy_stmt.h"
 
 /* Used by lua/info.c */
 extern "C" struct vy_env *
@@ -102,28 +101,12 @@ vinyl_engine::endRecovery()
 		diag_raise();
 }
 
-struct tuple_format *
-vinyl_engine::createFormat(struct key_def **keys, uint32_t key_count,
-			   struct field_def *fields, uint32_t field_count,
-			   uint32_t exact_field_count)
-{
-	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       keys, key_count, 0,
-						       fields, field_count);
-	if (format == NULL)
-		diag_raise();
-	format->exact_field_count = exact_field_count;
-	return format;
-}
-
 struct space *
-vinyl_engine::createSpace()
+vinyl_engine::createSpace(struct space_def *def, struct rlist *key_list)
 {
-	struct space *space = (struct space *)calloc(1, sizeof(*space));
+	struct space *space = vinyl_space_new(this, def, key_list);
 	if (space == NULL)
-		tnt_raise(OutOfMemory, sizeof(*space),
-			  "malloc", "struct space");
-	space->vtab = &vinyl_space_vtab;
+		diag_raise();
 	return space;
 }
 
