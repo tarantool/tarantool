@@ -394,13 +394,13 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 /**
  * Update max tuple size.
  */
-int
+void
 vy_set_max_tuple_size(struct vy_env *env, size_t max_size);
 
 /**
  * Update query timeout.
  */
-int
+void
 vy_set_timeout(struct vy_env *env, double timeout);
 
 #ifdef __cplusplus

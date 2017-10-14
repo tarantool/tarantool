@@ -3965,19 +3965,17 @@ vy_env_delete(struct vy_env *e)
 	free(e);
 }
 
-int
+void
 vy_set_max_tuple_size(struct vy_env *env, size_t max_size)
 {
 	(void) env;
 	vy_max_tuple_size = max_size;
-	return 0;
 }
 
-int
+void
 vy_set_timeout(struct vy_env *env, double timeout)
 {
 	env->timeout = timeout;
-	return 0;
 }
 
 /** }}} Environment */

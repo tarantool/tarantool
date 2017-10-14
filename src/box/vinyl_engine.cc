@@ -300,13 +300,11 @@ vinyl_engine_new(const char *dir, size_t memory, size_t cache,
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
 {
-	if (vy_set_max_tuple_size(vinyl->env, max_size) != 0)
-		diag_raise();
+	vy_set_max_tuple_size(vinyl->env, max_size);
 }
 
 void
 vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout)
 {
-	if (vy_set_timeout(vinyl->env, timeout) != 0)
-		diag_raise();
+	vy_set_timeout(vinyl->env, timeout);
 }
