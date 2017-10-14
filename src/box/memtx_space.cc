@@ -698,7 +698,8 @@ memtx_space_add_primary_key(struct space *space)
 static void
 memtx_space_check_format(struct space *new_space, struct space *old_space)
 {
-	if (old_space->index_count == 0 || space_size(old_space) == 0)
+	if (old_space->index_count == 0 ||
+	    index_size(old_space->index[0]) == 0)
 		return;
 	struct index *pk = index_find_xc(old_space, 0);
 	struct iterator *it = index_alloc_iterator_xc(pk);
@@ -819,8 +820,8 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	new_memtx_space->replace = old_memtx_space->replace;
-	bool is_empty = space_index(old_space, 0) == NULL ||
-			space_size(old_space) == 0;
+	bool is_empty = old_space->index_count == 0 ||
+			index_size(old_space->index[0]) == 0;
 	space_def_check_compatibility_xc(old_space->def, new_space->def,
 					 is_empty);
 }

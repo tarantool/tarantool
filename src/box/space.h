@@ -340,9 +340,6 @@ space_is_vinyl(struct space *space) { return strcmp(space->engine->name, "vinyl"
 
 void space_noop(struct space *space);
 
-uint32_t
-space_size(struct space *space);
-
 struct field_def;
 /**
  * Allocate and initialize a space.

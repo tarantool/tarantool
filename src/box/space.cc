@@ -153,12 +153,6 @@ void
 space_noop(struct space * /* space */)
 {}
 
-uint32_t
-space_size(struct space *space)
-{
-	return index_size_xc(space_index(space, 0));
-}
-
 void
 space_dump_def(const struct space *space, struct rlist *key_list)
 {
