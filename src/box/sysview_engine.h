@@ -39,4 +39,7 @@ public:
 					  struct rlist *key_list) override;
 };
 
+struct sysview_engine *
+sysview_engine_new(void);
+
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

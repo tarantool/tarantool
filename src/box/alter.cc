@@ -494,7 +494,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 				 field_count);
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct engine *engine = engine_find(def->engine_name);
-	engine->checkSpaceDef(def);
+	engine_check_space_def(engine, def);
 	def_guard.is_active = false;
 	return def;
 }

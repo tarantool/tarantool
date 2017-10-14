@@ -156,7 +156,7 @@ struct space *
 space_new_xc(struct space_def *def, struct rlist *key_list)
 {
 	struct engine *engine = engine_find(def->engine_name);
-	return engine->createSpace(def, key_list);
+	return engine_create_space(engine, def, key_list);
 }
 
 void

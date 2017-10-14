@@ -152,6 +152,21 @@ private:
 	bool m_force_recovery;
 };
 
+struct memtx_engine *
+memtx_engine_new(const char *snap_dirname, bool force_recovery,
+		 uint64_t tuple_arena_max_size,
+		 uint32_t objsize_min, float alloc_factor);
+
+void
+memtx_engine_recover_snapshot(struct memtx_engine *memtx,
+			      const struct vclock *vclock);
+
+void
+memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
+
+void
+memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
+
 extern "C" {
 #endif /* defined(__cplusplus) */
 

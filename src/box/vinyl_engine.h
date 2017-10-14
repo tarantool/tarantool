@@ -67,4 +67,14 @@ public:
 	struct vy_env *env;
 };
 
+struct vinyl_engine *
+vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+		 int read_threads, int write_threads, double timeout);
+
+void
+vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
+
+void
+vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
+
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */

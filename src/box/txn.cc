@@ -117,7 +117,7 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
-		engine->begin(txn);
+		engine_begin(engine, txn);
 	} else if (txn->engine != engine) {
 		/**
 		 * Only one engine can be used in
@@ -142,7 +142,7 @@ txn_begin_stmt(struct space *space)
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	stmt->space = space;
 
-	engine->beginStatement(txn);
+	engine_begin_statement(engine, txn);
 	return txn;
 }
 
@@ -235,7 +235,7 @@ txn_commit(struct txn *txn)
 
 	/* Do transaction conflict resolving */
 	if (txn->engine) {
-		txn->engine->prepare(txn);
+		engine_prepare(txn->engine, txn);
 
 		if (txn->n_rows > 0)
 			txn->signature = txn_write_to_wal(txn);
@@ -247,7 +247,7 @@ txn_commit(struct txn *txn)
 		if (txn->has_triggers)
 			trigger_run(&txn->on_commit, txn);
 
-		txn->engine->commit(txn);
+		engine_commit(txn->engine, txn);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */
@@ -273,7 +273,7 @@ txn_rollback_stmt()
 		return;
 	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
 						  next);
-	txn->engine->rollbackStatement(txn, stmt);
+	engine_rollback_statement(txn->engine, txn, stmt);
 	if (stmt->row != NULL) {
 		stmt->row = NULL;
 		--txn->n_rows;
@@ -291,7 +291,7 @@ txn_rollback()
 	if (txn->has_triggers)
 		trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	if (txn->engine)
-		txn->engine->rollback(txn);
+		engine_rollback(txn->engine, txn);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
@@ -439,7 +439,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	}
 	stailq_reverse(&rollback_stmts);
 	stailq_foreach_entry(stmt, &rollback_stmts, next) {
-		txn->engine->rollbackStatement(txn, stmt);
+		engine_rollback_statement(txn->engine, txn, stmt);
 		if (stmt->row != NULL) {
 			stmt->row = NULL;
 			--txn->n_rows;

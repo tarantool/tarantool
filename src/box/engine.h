@@ -190,6 +190,56 @@ engine_find(const char *name)
 	return engine;
 }
 
+static inline struct space *
+engine_create_space(struct engine *engine, struct space_def *def,
+		    struct rlist *key_list)
+{
+	return engine->createSpace(def, key_list);
+}
+
+static inline void
+engine_begin(struct engine *engine, struct txn *txn)
+{
+	engine->begin(txn);
+}
+
+static inline void
+engine_begin_statement(struct engine *engine, struct txn *txn)
+{
+	engine->beginStatement(txn);
+}
+
+static inline void
+engine_prepare(struct engine *engine, struct txn *txn)
+{
+	engine->prepare(txn);
+}
+
+static inline void
+engine_commit(struct engine *engine, struct txn *txn)
+{
+	engine->commit(txn);
+}
+
+static inline void
+engine_rollback_statement(struct engine *engine, struct txn *txn,
+			  struct txn_stmt *stmt)
+{
+	engine->rollbackStatement(txn, stmt);
+}
+
+static inline void
+engine_rollback(struct engine *engine, struct txn *txn)
+{
+	engine->rollback(txn);
+}
+
+static inline void
+engine_check_space_def(struct engine *engine, struct space_def *def)
+{
+	engine->checkSpaceDef(def);
+}
+
 /** Shutdown all engine factories. */
 void engine_shutdown();
 

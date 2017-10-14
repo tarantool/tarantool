@@ -776,6 +776,35 @@ memtx_engine::join(struct vclock *vclock, struct xstream *stream)
 		diag_raise();
 }
 
+struct memtx_engine *
+memtx_engine_new(const char *snap_dirname, bool force_recovery,
+		 uint64_t tuple_arena_max_size,
+		 uint32_t objsize_min, float alloc_factor)
+{
+	return new memtx_engine(snap_dirname, force_recovery,
+				tuple_arena_max_size,
+				objsize_min, alloc_factor);
+}
+
+void
+memtx_engine_recover_snapshot(struct memtx_engine *memtx,
+			      const struct vclock *vclock)
+{
+	memtx->recoverSnapshot(vclock);
+}
+
+void
+memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit)
+{
+	memtx->setSnapIoRateLimit(limit);
+}
+
+void
+memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
+{
+	memtx->setMaxTupleSize(max_size);
+}
+
 /**
  * Initialize arena for indexes.
  * The arena is used for memtx_index_extent_alloc

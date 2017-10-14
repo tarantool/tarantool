@@ -253,3 +253,23 @@ vinyl_engine::checkSpaceDef(struct space_def *def)
 			  def->name, "engine does not support temporary flag");
 	}
 }
+
+struct vinyl_engine *
+vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+		 int read_threads, int write_threads, double timeout)
+{
+	return new vinyl_engine(dir, memory, cache, read_threads,
+				write_threads, timeout);
+}
+
+void
+vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
+{
+	vinyl->setMaxTupleSize(max_size);
+}
+
+void
+vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout)
+{
+	vinyl->setTimeout(timeout);
+}

@@ -713,7 +713,8 @@ box_set_snap_io_rate_limit(void)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
+	memtx_engine_set_snap_io_rate_limit(memtx,
+			cfg_getd("snap_io_rate_limit"));
 }
 
 void
@@ -722,7 +723,8 @@ box_set_memtx_max_tuple_size(void)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	memtx->setMaxTupleSize(cfg_geti("memtx_max_tuple_size"));
+	memtx_engine_set_max_tuple_size(memtx,
+			cfg_geti("memtx_max_tuple_size"));
 }
 
 void
@@ -753,7 +755,8 @@ box_set_vinyl_max_tuple_size(void)
 	struct vinyl_engine *vinyl;
 	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
 	assert(vinyl != NULL);
-	vinyl->setMaxTupleSize(cfg_geti("vinyl_max_tuple_size"));
+	vinyl_engine_set_max_tuple_size(vinyl,
+			cfg_geti("vinyl_max_tuple_size"));
 }
 
 void
@@ -762,7 +765,7 @@ box_set_vinyl_timeout(void)
 	struct vinyl_engine *vinyl;
 	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
 	assert(vinyl != NULL);
-	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
+	vinyl_engine_set_timeout(vinyl,	cfg_getd("vinyl_timeout"));
 }
 
 /* }}} configuration bindings */
@@ -1485,25 +1488,25 @@ engine_init()
 	 * so it must be registered first.
 	 */
 	struct memtx_engine *memtx;
-	memtx = new memtx_engine(cfg_gets("memtx_dir"),
+	memtx = memtx_engine_new(cfg_gets("memtx_dir"),
 				 cfg_geti("force_recovery"),
 				 cfg_getd("memtx_memory"),
 				 cfg_geti("memtx_min_tuple_size"),
 				 cfg_getd("slab_alloc_factor"));
-	engine_register(memtx);
+	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();
 
-	struct sysview_engine *sysview = new sysview_engine();
-	engine_register(sysview);
+	struct sysview_engine *sysview = sysview_engine_new();
+	engine_register((struct engine *)sysview);
 
 	struct vinyl_engine *vinyl;
-	vinyl = new vinyl_engine(cfg_gets("vinyl_dir"),
+	vinyl = vinyl_engine_new(cfg_gets("vinyl_dir"),
 				 cfg_geti64("vinyl_memory"),
 				 cfg_geti64("vinyl_cache"),
 				 cfg_geti("vinyl_read_threads"),
 				 cfg_geti("vinyl_write_threads"),
 				 cfg_getd("vinyl_timeout"));
-	engine_register(vinyl);
+	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
 }
 
@@ -1742,7 +1745,7 @@ box_cfg_xc(void)
 		 * recovery of system spaces issue DDL events in
 		 * other engines.
 		 */
-		memtx->recoverSnapshot(&last_checkpoint_vclock);
+		memtx_engine_recover_snapshot(memtx, &last_checkpoint_vclock);
 
 		engine_begin_final_recovery();
 		title("orphan");

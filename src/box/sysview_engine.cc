@@ -190,3 +190,9 @@ sysview_engine::createSpace(struct space_def *def, struct rlist *key_list)
 	}
 	return space;
 }
+
+struct sysview_engine *
+sysview_engine_new(void)
+{
+	return new sysview_engine();
+}
