@@ -35,7 +35,6 @@
 #include <string.h>
 
 #include "trivia/util.h"
-#include "cfg.h"
 
 #include "vinyl_index.h"
 #include "vinyl_space.h"
@@ -58,29 +57,20 @@ vinyl_engine_get_env()
 	return vinyl->env;
 }
 
-vinyl_engine::vinyl_engine()
+vinyl_engine::vinyl_engine(const char *dir, size_t memory, size_t cache,
+			   int read_threads, int write_threads, double timeout)
 	: engine("vinyl")
 {
-	env = NULL;
+	env = vy_env_new(dir, memory, cache, read_threads,
+			 write_threads, timeout);
+	if (env == NULL)
+		diag_raise();
 }
 
 vinyl_engine::~vinyl_engine()
 {
 	if (env)
 		vy_env_delete(env);
-}
-
-void
-vinyl_engine::init()
-{
-	env = vy_env_new(cfg_gets("vinyl_dir"),
-			 cfg_geti64("vinyl_memory"),
-			 cfg_geti64("vinyl_cache"),
-			 cfg_geti("vinyl_read_threads"),
-			 cfg_geti("vinyl_write_threads"),
-			 cfg_getd("vinyl_timeout"));
-	if (env == NULL)
-		panic("failed to create vinyl environment");
 }
 
 void

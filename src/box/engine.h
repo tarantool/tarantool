@@ -56,8 +56,6 @@ public:
 	engine(const engine &) = delete;
 	engine& operator=(const engine&) = delete;
 	virtual ~engine() {}
-	/** Called once at startup. */
-	virtual void init();
 	/**
 	 * Construct a tuple format for a new space.
 	 * Returns NULL if the engine does not support format

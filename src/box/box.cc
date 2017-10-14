@@ -1496,8 +1496,13 @@ engine_init()
 	struct sysview_engine *sysview = new sysview_engine();
 	engine_register(sysview);
 
-	struct vinyl_engine *vinyl = new vinyl_engine();
-	vinyl->init();
+	struct vinyl_engine *vinyl;
+	vinyl = new vinyl_engine(cfg_gets("vinyl_dir"),
+				 cfg_geti64("vinyl_memory"),
+				 cfg_geti64("vinyl_cache"),
+				 cfg_geti("vinyl_read_threads"),
+				 cfg_geti("vinyl_write_threads"),
+				 cfg_getd("vinyl_timeout"));
 	engine_register(vinyl);
 	box_set_vinyl_max_tuple_size();
 }

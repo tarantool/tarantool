@@ -35,9 +35,9 @@
 struct vy_env;
 
 struct vinyl_engine: public engine {
-	vinyl_engine();
+	vinyl_engine(const char *dir, size_t memory, size_t cache,
+		     int read_threads, int write_threads, double timeout);
 	~vinyl_engine();
-	virtual void init() override;
 	virtual struct tuple_format *
 	createFormat(struct key_def **keys, uint32_t key_count,
 		     struct field_def *fields, uint32_t field_count,
