@@ -185,10 +185,10 @@ _index:select{}
   - [276, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [276, 1, 'name', 'tree', {'unique': true}, [[1, 'string']]]
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'unsigned']
-  - [280, 1, 'owner', 'tree', {'unique': false}, [{'field': 1, 'type': 'unsigned'}]]
+  - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [281, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
-  - [281, 1, 'owner', 'tree', {'unique': false}, [{'field': 1, 'type': 'unsigned'}]]
+  - [281, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [281, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [284, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [284, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
@@ -515,7 +515,7 @@ space.index.primary.parts[2].type == 'string'
 ...
 box.space._index:get({space.id, 0})[6]
 ---
-- [{'field': 0, 'type': 'number'}, {'field': 1, 'type': 'string'}]
+- [[0, 'number'], [1, 'string']]
 ...
 space:drop()
 ---
@@ -543,8 +543,7 @@ space.index.primary.parts[3].type == 'string'
 ...
 box.space._index:get({space.id, 0})[6]
 ---
-- [{'field': 0, 'type': 'unsigned'}, {'field': 1, 'type': 'integer'}, {'field': 2,
-    'type': 'string'}]
+- [[0, 'unsigned'], [1, 'integer'], [2, 'string']]
 ...
 space:drop()
 ---
@@ -565,7 +564,7 @@ space.index.primary.parts[1].type == 'unsigned'
 ...
 box.space._index:get({space.id, 0})[6]
 ---
-- [{'field': 0, 'type': 'unsigned'}]
+- [[0, 'unsigned']]
 ...
 space:drop()
 ---
