@@ -33,6 +33,7 @@
 #include "user_def.h"
 #include "space_def.h"
 #include "small/rlist.h"
+#include "engine.h"
 #include "index.h"
 #include "error.h"
 
@@ -438,21 +439,6 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 			     const char *key, const char *key_end,
 			     struct port *port);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-#include "engine.h"
-
-static inline void
-space_def_check_compatibility_xc(const struct space_def *old_def,
-				 const struct space_def *new_def,
-				 bool is_space_empty)
-{
-	if (space_def_check_compatibility(old_def, new_def,
-					  is_space_empty) != 0)
-		diag_raise();
-}
-
 static inline bool
 space_is_memtx(struct space *space) { return space->engine->id == 0; }
 
@@ -470,7 +456,7 @@ struct field_def;
  * @retval Space object.
  */
 struct space *
-space_new_xc(struct space_def *space_def, struct rlist *key_list);
+space_new(struct space_def *space_def, struct rlist *key_list);
 
 /** Destroy and free a space. */
 void
@@ -495,6 +481,28 @@ space_swap_index(struct space *lhs, struct space *rhs,
 /** Rebuild index map in a space after a series of swap index. */
 void
 space_fill_index_map(struct space *space);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+static inline void
+space_def_check_compatibility_xc(const struct space_def *old_def,
+				 const struct space_def *new_def,
+				 bool is_space_empty)
+{
+	if (space_def_check_compatibility(old_def, new_def,
+					  is_space_empty) != 0)
+		diag_raise();
+}
+
+static inline struct space *
+space_new_xc(struct space_def *space_def, struct rlist *key_list)
+{
+	struct space *space = space_new(space_def, key_list);
+	if (space == NULL)
+		diag_raise();
+	return space;
+}
 
 static inline void
 access_check_space_xc(struct space *space, uint8_t access)

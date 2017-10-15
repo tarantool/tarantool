@@ -153,10 +153,12 @@ fail:
 }
 
 struct space *
-space_new_xc(struct space_def *def, struct rlist *key_list)
+space_new(struct space_def *def, struct rlist *key_list)
 {
-	struct engine *engine = engine_find_xc(def->engine_name);
-	return engine_create_space_xc(engine, def, key_list);
+	struct engine *engine = engine_find(def->engine_name);
+	if (engine == NULL)
+		return NULL;
+	return engine_create_space(engine, def, key_list);
 }
 
 void
@@ -178,8 +180,10 @@ space_delete(struct space *space)
 
 /** Do nothing if the space is already recovered. */
 void
-space_noop(struct space * /* space */)
-{}
+space_noop(struct space *space)
+{
+	(void)space;
+}
 
 void
 space_dump_def(const struct space *space, struct rlist *key_list)
@@ -208,7 +212,7 @@ space_swap_index(struct space *lhs, struct space *rhs,
 	rhs->index_map[rhs_id] = tmp;
 }
 
-extern "C" void
+void
 space_run_triggers(struct space *space, bool yesno)
 {
 	space->run_triggers = yesno;

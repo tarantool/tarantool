@@ -49,8 +49,9 @@ vinyl_space_destroy(struct space *space)
 }
 
 static size_t
-vinyl_space_bsize(struct space *)
+vinyl_space_bsize(struct space *space)
 {
+	(void)space;
 	return 0;
 }
 
@@ -169,8 +170,9 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 /* {{{ DDL */
 
 static void
-vinyl_init_system_space(struct space *)
+vinyl_init_system_space(struct space *space)
 {
+	(void)space;
 	unreachable();
 }
 
@@ -240,8 +242,9 @@ vinyl_space_add_primary_key(struct space *space)
 }
 
 static void
-vinyl_space_drop_primary_key(struct space *)
+vinyl_space_drop_primary_key(struct space *space)
 {
+	(void)space;
 }
 
 static int
@@ -342,7 +345,7 @@ struct space *
 vinyl_space_new(struct vinyl_engine *vinyl,
 		struct space_def *def, struct rlist *key_list)
 {
-	struct space *space = (struct space *)malloc(sizeof(*space));
+	struct space *space = malloc(sizeof(*space));
 	if (space == NULL) {
 		diag_set(OutOfMemory, sizeof(*space),
 			 "malloc", "struct space");
@@ -354,8 +357,8 @@ vinyl_space_new(struct vinyl_engine *vinyl,
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, key_list, link)
 		key_count++;
-	struct key_def **keys = (struct key_def **)
-		region_alloc(&fiber()->gc, sizeof(*keys) * key_count);
+	struct key_def **keys = region_alloc(&fiber()->gc,
+					     sizeof(*keys) * key_count);
 	if (keys == NULL) {
 		free(space);
 		return NULL;

@@ -32,6 +32,10 @@
  */
 #include "space.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct memtx_engine;
 
 struct memtx_space {
@@ -76,5 +80,9 @@ memtx_space_replace_all_keys(struct space *, struct txn_stmt *,
 struct space *
 memtx_space_new(struct memtx_engine *memtx,
 		struct space_def *def, struct rlist *key_list);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_SPACE_H_INCLUDED */

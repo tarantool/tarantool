@@ -63,12 +63,12 @@ add_library(box STATIC
     memtx_bitset.c
     engine.cc
     memtx_engine.cc
-    memtx_space.cc
+    memtx_space.c
     memtx_tuple.cc
     sysview_engine.cc
     sysview_index.c
     vinyl_engine.cc
-    vinyl_space.cc
+    vinyl_space.c
     vinyl_index.c
     vinyl.c
     vy_stmt.c
@@ -84,7 +84,7 @@ add_library(box STATIC
     vy_log.c
     vy_upsert.c
     vy_read_set.c
-    space.cc
+    space.c
     space_def.c
     sequence.c
     func.c

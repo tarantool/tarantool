@@ -33,6 +33,7 @@
 #include "iproto_constants.h"
 #include "txn.h"
 #include "tuple_compare.h"
+#include "tuple_update.h"
 #include "xrow.h"
 #include "memtx_hash.h"
 #include "memtx_tree.h"
@@ -75,9 +76,11 @@ memtx_space_update_bsize(struct space *space,
  * no indexes (is not yet fully built).
  */
 int
-memtx_space_replace_no_keys(struct space *space, struct txn_stmt *,
-			    enum dup_replace_mode)
+memtx_space_replace_no_keys(struct space *space, struct txn_stmt *stmt,
+			    enum dup_replace_mode mode)
 {
+	(void)stmt;
+	(void)mode;
 	struct index *index = index_find(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
@@ -296,17 +299,20 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 		return -1;
 	}
 	request->header->replica_id = 0;
-	try {
-		struct txn *txn = txn_begin_stmt_xc(space);
-		space_execute_replace_xc(space, txn, request);
-		txn_commit_stmt_xc(txn, request);
-	} catch (Exception *e) {
-		say_error("rollback: %s", e->errmsg);
-		txn_rollback_stmt();
-		return -1;
-	}
+	struct txn *txn = txn_begin_stmt(space);
+	if (txn == NULL)
+		goto rollback;
+	struct tuple *unused;
+	if (space_execute_replace(space, txn, request, &unused) != 0)
+		goto rollback;
+	if (txn_commit_stmt(txn, request) != 0)
+		goto rollback;
 	/** The new tuple is referenced by the primary key. */
 	return 0;
+rollback:
+	say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
+	txn_rollback_stmt();
+	return -1;
 }
 
 static int
@@ -662,8 +668,9 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 }
 
 static struct snapshot_iterator *
-sequence_data_index_create_snapshot_iterator(struct index *)
+sequence_data_index_create_snapshot_iterator(struct index *index)
 {
+	(void)index;
 	return sequence_data_iterator_create();
 }
 
@@ -673,9 +680,16 @@ sequence_data_index_new(struct index_def *def)
 	struct memtx_hash_index *index = memtx_hash_index_new(def);
 	if (index == NULL)
 		return NULL;
-	static struct index_vtab vtab = *index->base.vtab;
-	vtab.create_snapshot_iterator =
-		sequence_data_index_create_snapshot_iterator;
+
+	static struct index_vtab vtab;
+	static bool vtab_initialized;
+	if (!vtab_initialized) {
+		vtab = *index->base.vtab;
+		vtab.create_snapshot_iterator =
+			sequence_data_index_create_snapshot_iterator;
+		vtab_initialized = true;
+	}
+
 	index->base.vtab = &vtab;
 	return &index->base;
 }
@@ -967,8 +981,7 @@ struct space *
 memtx_space_new(struct memtx_engine *memtx,
 		struct space_def *def, struct rlist *key_list)
 {
-	struct memtx_space *memtx_space = (struct memtx_space *)
-		malloc(sizeof(*memtx_space));
+	struct memtx_space *memtx_space = malloc(sizeof(*memtx_space));
 	if (memtx_space == NULL) {
 		diag_set(OutOfMemory, sizeof(*memtx_space),
 			 "malloc", "struct memtx_space");
@@ -980,8 +993,8 @@ memtx_space_new(struct memtx_engine *memtx,
 	struct index_def *index_def;
 	rlist_foreach_entry(index_def, key_list, link)
 		key_count++;
-	struct key_def **keys = (struct key_def **)
-		region_alloc(&fiber()->gc, sizeof(*keys) * key_count);
+	struct key_def **keys = region_alloc(&fiber()->gc,
+					     sizeof(*keys) * key_count);
 	if (keys == NULL) {
 		free(memtx_space);
 		return NULL;
