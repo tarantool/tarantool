@@ -610,6 +610,64 @@ s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- err
 - error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
     cannot be used with a secondary key'
 ...
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
+---
+...
+sk:alter{sequence = 'test'} -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+sk:alter{sequence = true} -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+sk:alter{parts = {2, 'string'}} -- ok
+---
+...
+sk:alter{sequence = false} -- ok (ignored)
+---
+...
+pk:alter{sequence = 'test'} -- ok
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+sk:alter{sequence = 'test'} -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+sk:alter{sequence = true} -- error
+---
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
+    cannot be used with a secondary key'
+...
+sk:alter{parts = {2, 'unsigned'}} -- ok
+---
+...
+sk:alter{sequence = false} -- ok (ignored)
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
+sk:drop()
+---
+...
+s.index.pk.sequence_id == sq.id
+---
+- true
+...
 pk:drop()
 ---
 ...

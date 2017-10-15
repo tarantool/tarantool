@@ -203,6 +203,21 @@ pk:drop()
 
 pk = s:create_index('pk') -- ok
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
+sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
+sk:alter{sequence = 'test'} -- error
+sk:alter{sequence = true} -- error
+sk:alter{parts = {2, 'string'}} -- ok
+sk:alter{sequence = false} -- ok (ignored)
+pk:alter{sequence = 'test'} -- ok
+s.index.pk.sequence_id == sq.id
+sk:alter{sequence = 'test'} -- error
+sk:alter{sequence = true} -- error
+sk:alter{parts = {2, 'unsigned'}} -- ok
+sk:alter{sequence = false} -- ok (ignored)
+s.index.pk.sequence_id == sq.id
+sk:drop()
+s.index.pk.sequence_id == sq.id
 pk:drop()
 
 pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok

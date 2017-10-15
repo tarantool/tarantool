@@ -861,14 +861,19 @@ box.schema.index.alter = function(space_id, index_id, options)
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_is_generated = false
     local sequence = options.sequence
-    local sequence_tuple = _space_sequence:get(space_id)
-    if sequence or (sequence ~= false and sequence_tuple ~= nil) then
-        if index_id ~= 0 then
+    local sequence_tuple
+    if index_id ~= 0 then
+        if sequence then
             box.error(box.error.MODIFY_INDEX,
                       options.name, box.space[space_id].name,
                       "sequence cannot be used with a secondary key")
         end
-        if #parts >= 1 and (parts[1].type or parts[1][2]) ~= 'integer' and
+        -- ignore 'sequence = false' for secondary indexes
+        sequence = nil
+    else
+        sequence_tuple = _space_sequence:get(space_id)
+        if (sequence or (sequence ~= false and sequence_tuple ~= nil)) and
+           #parts >= 1 and (parts[1].type or parts[1][2]) ~= 'integer' and
                            (parts[1].type or parts[1][2]) ~= 'unsigned' then
             box.error(box.error.MODIFY_INDEX,
                       options.name, box.space[space_id].name,
