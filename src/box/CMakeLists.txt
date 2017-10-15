@@ -94,7 +94,7 @@ add_library(box STATIC
     schema_def.c
     session.cc
     port.c
-    txn.cc
+    txn.c
     box.cc
     gc.c
     checkpoint.cc
