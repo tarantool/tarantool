@@ -1321,7 +1321,7 @@ static void
 on_replace_dd_space(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _space");
+	txn_check_singlestatement_xc(txn, "Space _space");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -1469,7 +1469,7 @@ static void
 on_replace_dd_index(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _index");
+	txn_check_singlestatement_xc(txn, "Space _index");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -1638,7 +1638,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	txn_check_singlestatement(txn, "Space _truncate");
+	txn_check_singlestatement_xc(txn, "Space _truncate");
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	if (new_tuple == NULL) {
@@ -1902,7 +1902,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	txn_check_singlestatement(txn, "Space _user");
+	txn_check_singlestatement_xc(txn, "Space _user");
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -2034,7 +2034,7 @@ static void
 on_replace_dd_func(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _func");
+	txn_check_singlestatement_xc(txn, "Space _func");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2203,7 +2203,7 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
-	txn_check_singlestatement(txn, "Space _collation");
+	txn_check_singlestatement_xc(txn, "Space _collation");
 	struct coll *old_coll = NULL;
 	if (old_tuple != NULL) {
 		/* TODO: Check that no index uses the collation */
@@ -2426,7 +2426,7 @@ static void
 on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _priv");
+	txn_check_singlestatement_xc(txn, "Space _priv");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2472,7 +2472,7 @@ static void
 on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _schema");
+	txn_check_singlestatement_xc(txn, "Space _schema");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2569,7 +2569,7 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _cluster");
+	txn_check_singlestatement_xc(txn, "Space _cluster");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2713,7 +2713,7 @@ static void
 on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _sequence");
+	txn_check_singlestatement_xc(txn, "Space _sequence");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
@@ -2811,7 +2811,7 @@ static void
 on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	txn_check_singlestatement(txn, "Space _space_sequence");
+	txn_check_singlestatement_xc(txn, "Space _space_sequence");
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	struct tuple *tuple = stmt->new_tuple ?: stmt->old_tuple;
 

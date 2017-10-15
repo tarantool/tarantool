@@ -245,7 +245,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		if (exact_key_validate(index->def->key_def, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine. */
-		struct txn *txn = txn_begin_ro_stmt(space);
+		struct txn *txn = txn_begin_ro_stmt_xc(space);
 		struct tuple *tuple = index_get_xc(index, key, part_count);
 		/* Count statistics */
 		rmean_collect(rmean_box, IPROTO_SELECT, 1);
@@ -276,7 +276,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		if (key_validate(index->def, ITER_GE, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
-		struct txn *txn = txn_begin_ro_stmt(space);
+		struct txn *txn = txn_begin_ro_stmt_xc(space);
 		struct tuple *tuple = index_min_xc(index, key, part_count);
 		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
@@ -304,7 +304,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		if (key_validate(index->def, ITER_LE, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
-		struct txn *txn = txn_begin_ro_stmt(space);
+		struct txn *txn = txn_begin_ro_stmt_xc(space);
 		struct tuple *tuple = index_max_xc(index, key, part_count);
 		*result = tuple_bless_null_xc(tuple);
 		txn_commit_ro_stmt(txn);
@@ -329,7 +329,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		if (key_validate(index->def, itype, key, part_count))
 			diag_raise();
 		/* Start transaction in the engine */
-		struct txn *txn = txn_begin_ro_stmt(space);
+		struct txn *txn = txn_begin_ro_stmt_xc(space);
 		ssize_t count = index_count_xc(index, itype, key, part_count);
 		txn_commit_ro_stmt(txn);
 		return count;
@@ -354,7 +354,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	try {
 		struct space *space;
 		struct index *index = check_index(space_id, index_id, &space);
-		struct txn *txn = txn_begin_ro_stmt(space);
+		struct txn *txn = txn_begin_ro_stmt_xc(space);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
 		if (key_validate(index->def, itype, key, part_count))

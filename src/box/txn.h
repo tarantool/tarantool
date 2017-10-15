@@ -142,14 +142,14 @@ in_txn()
  * @pre no transaction is active
  */
 struct txn *
-txn_begin(bool is_autocommit);
+txn_begin_xc(bool is_autocommit);
 
 /**
  * Commit a transaction.
  * @pre txn == in_txn()
  */
 void
-txn_commit(struct txn *txn);
+txn_commit_xc(struct txn *txn);
 
 /** Rollback a transaction, if any. */
 void
@@ -189,10 +189,10 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
  * start a new transaction with autocommit = true.
  */
 struct txn *
-txn_begin_stmt(struct space *space);
+txn_begin_stmt_xc(struct space *space);
 
 void
-txn_begin_in_engine(struct engine *engine, struct txn *txn);
+txn_begin_in_engine_xc(struct engine *engine, struct txn *txn);
 
 /**
  * This is an optimization, which exists to speed up selects
@@ -202,12 +202,12 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn);
  * select.
  */
 static inline struct txn *
-txn_begin_ro_stmt(struct space *space)
+txn_begin_ro_stmt_xc(struct space *space)
 {
 	struct txn *txn = in_txn();
 	if (txn) {
 		struct engine *engine = space->engine;
-		txn_begin_in_engine(engine, txn);
+		txn_begin_in_engine_xc(engine, txn);
 	}
 	return txn;
 }
@@ -229,7 +229,7 @@ txn_commit_ro_stmt(struct txn *txn)
  * the current transaction as well.
  */
 void
-txn_commit_stmt(struct txn *txn, struct request *request);
+txn_commit_stmt_xc(struct txn *txn, struct request *request);
 
 /**
  * Rollback a statement. In autocommit mode,
@@ -244,7 +244,7 @@ txn_rollback_stmt();
  * transaction and must be run in autocommit mode.
  */
 void
-txn_check_singlestatement(struct txn *txn, const char *where);
+txn_check_singlestatement_xc(struct txn *txn, const char *where);
 
 /** The current statement of the transaction. */
 static inline struct txn_stmt *

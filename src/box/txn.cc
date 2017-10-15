@@ -91,7 +91,7 @@ txn_stmt_new(struct txn *txn)
 }
 
 struct txn *
-txn_begin(bool is_autocommit)
+txn_begin_xc(bool is_autocommit)
 {
 	static int64_t txn_id = 0;
 	assert(! in_txn());
@@ -112,7 +112,7 @@ txn_begin(bool is_autocommit)
 }
 
 void
-txn_begin_in_engine(struct engine *engine, struct txn *txn)
+txn_begin_in_engine_xc(struct engine *engine, struct txn *txn)
 {
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
@@ -128,17 +128,17 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 }
 
 struct txn *
-txn_begin_stmt(struct space *space)
+txn_begin_stmt_xc(struct space *space)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL)
-		txn = txn_begin(true);
+		txn = txn_begin_xc(true);
 	else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
 		tnt_raise(ClientError, ER_SUB_STMT_MAX);
 
 	trigger_run_xc(&space->on_stmt_begin, txn);
 	struct engine *engine = space->engine;
-	txn_begin_in_engine(engine, txn);
+	txn_begin_in_engine_xc(engine, txn);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	stmt->space = space;
 
@@ -151,7 +151,7 @@ txn_begin_stmt(struct space *space)
  * the current transaction as well.
  */
 void
-txn_commit_stmt(struct txn *txn, struct request *request)
+txn_commit_stmt_xc(struct txn *txn, struct request *request)
 {
 	assert(txn->in_sub_stmt > 0);
 	/*
@@ -181,7 +181,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	}
 	--txn->in_sub_stmt;
 	if (txn->is_autocommit && txn->in_sub_stmt == 0)
-		txn_commit(txn);
+		txn_commit_xc(txn);
 }
 
 
@@ -227,7 +227,7 @@ txn_write_to_wal(struct txn *txn)
 }
 
 void
-txn_commit(struct txn *txn)
+txn_commit_xc(struct txn *txn)
 {
 	assert(txn == in_txn());
 
@@ -308,7 +308,7 @@ txn_rollback()
 }
 
 void
-txn_check_singlestatement(struct txn *txn, const char *where)
+txn_check_singlestatement_xc(struct txn *txn, const char *where)
 {
 	if (!txn->is_autocommit ||
 	    stailq_last(&txn->stmts) != stailq_first(&txn->stmts)) {
@@ -341,7 +341,7 @@ box_txn_begin()
 	try {
 		if (in_txn())
 			tnt_raise(ClientError, ER_ACTIVE_TRANSACTION);
-		(void) txn_begin(false);
+		(void) txn_begin_xc(false);
 	} catch (Exception  *e) {
 		return -1; /* pass exception  through FFI */
 	}
@@ -365,7 +365,7 @@ box_txn_commit()
 		return -1;
 	}
 	try {
-		txn_commit(txn);
+		txn_commit_xc(txn);
 	} catch (Exception *e) {
 		txn_rollback();
 		return -1;

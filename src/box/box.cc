@@ -270,7 +270,7 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
 	try {
-		struct txn *txn = txn_begin_stmt(space);
+		struct txn *txn = txn_begin_stmt_xc(space);
 		access_check_space_xc(space, PRIV_W);
 		struct tuple *tuple;
 		switch (request->type) {
@@ -316,7 +316,7 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 		 * when WAL is written in autocommit mode.
 		 */
 		TupleRefNil ref(tuple);
-		txn_commit_stmt(txn, request);
+		txn_commit_stmt_xc(txn, request);
 		if (result) {
 			if (tuple)
 				tuple_bless_xc(tuple);
@@ -923,7 +923,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	try {
 		struct space *space = space_cache_find_xc(space_id);
 		access_check_space_xc(space, PRIV_R);
-		struct txn *txn = txn_begin_ro_stmt(space);
+		struct txn *txn = txn_begin_ro_stmt_xc(space);
 		space_execute_select_xc(space, txn, index_id, iterator,
 					offset, limit, key, key_end, port);
 		txn_commit_ro_stmt(txn);
