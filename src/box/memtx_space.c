@@ -301,18 +301,14 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 	request->header->replica_id = 0;
 	struct txn *txn = txn_begin_stmt(space);
 	if (txn == NULL)
-		goto rollback;
+		return -1;
 	struct tuple *unused;
-	if (space_execute_replace(space, txn, request, &unused) != 0)
-		goto rollback;
-	if (txn_commit_stmt(txn, request) != 0)
-		goto rollback;
-	/** The new tuple is referenced by the primary key. */
-	return 0;
-rollback:
-	say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
-	txn_rollback_stmt();
-	return -1;
+	if (space_execute_replace(space, txn, request, &unused) != 0) {
+		say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
+		txn_rollback_stmt();
+		return -1;
+	}
+	return txn_commit_stmt(txn, request);
 }
 
 static int

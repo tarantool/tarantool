@@ -153,27 +153,31 @@ txn_begin_stmt(struct space *space)
 	if (txn == NULL) {
 		txn = txn_begin(true);
 		if (txn == NULL)
-			return NULL;
+			goto fail;
 	} else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
 		diag_set(ClientError, ER_SUB_STMT_MAX);
-		return NULL;
+		goto fail;
 	}
 
 	if (trigger_run(&space->on_stmt_begin, txn) != 0)
-		return NULL;
+		goto fail;
 
 	struct engine *engine = space->engine;
 	if (txn_begin_in_engine(engine, txn) != 0)
-		return NULL;
+		goto fail;
 
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	if (stmt == NULL)
-		return NULL;
+		goto fail;
 	stmt->space = space;
 
 	if (engine_begin_statement(engine, txn) != 0)
-		return NULL;
+		goto fail;
+
 	return txn;
+fail:
+	txn_rollback_stmt();
+	return NULL;
 }
 
 /**
@@ -194,7 +198,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	/* Create WAL record for the write requests in non-temporary spaces */
 	if (!space_is_temporary(stmt->space)) {
 		if (txn_add_redo(stmt, request) != 0)
-			return -1;
+			goto fail;
 		++txn->n_rows;
 	}
 	/*
@@ -209,12 +213,15 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
 		if (trigger_run(&stmt->space->on_replace, txn) != 0)
-			return -1;
+			goto fail;
 	}
 	--txn->in_sub_stmt;
 	if (txn->is_autocommit && txn->in_sub_stmt == 0)
 		return txn_commit(txn);
 	return 0;
+fail:
+	txn_rollback_stmt();
+	return -1;
 }
 
 
@@ -270,12 +277,12 @@ txn_commit(struct txn *txn)
 	/* Do transaction conflict resolving */
 	if (txn->engine) {
 		if (engine_prepare(txn->engine, txn) != 0)
-			return -1;
+			goto fail;
 
 		if (txn->n_rows > 0) {
 			txn->signature = txn_write_to_wal(txn);
 			if (txn->signature < 0)
-				return -1;
+				goto fail;
 		}
 		/*
 		 * The transaction is in the binary log. No action below
@@ -296,6 +303,9 @@ txn_commit(struct txn *txn)
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
 	return 0;
+fail:
+	txn_rollback();
+	return -1;
 }
 
 /**
@@ -402,11 +412,7 @@ box_txn_commit()
 		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
 		return -1;
 	}
-	if (txn_commit(txn) != 0) {
-		txn_rollback();
-		return -1;
-	}
-	return 0;
+	return txn_commit(txn);
 }
 
 int

@@ -144,6 +144,9 @@ txn_begin(bool is_autocommit);
 /**
  * Commit a transaction.
  * @pre txn == in_txn()
+ *
+ * Return 0 on success. On error, rollback
+ * the transaction and return -1.
  */
 int
 txn_commit(struct txn *txn);
@@ -224,6 +227,9 @@ txn_commit_ro_stmt(struct txn *txn)
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.
+ *
+ * Return 0 on success. On error, rollback
+ * the statement and return -1.
  */
 int
 txn_commit_stmt(struct txn *txn, struct request *request);
