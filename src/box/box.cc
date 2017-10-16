@@ -129,12 +129,23 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
-static void
+static int
 box_check_writable(void)
 {
 	/* box is only writable if box.cfg.read_only == false and */
-	if (is_ro)
-		tnt_raise(LoggedError, ER_READONLY);
+	if (is_ro) {
+		diag_set(ClientError, ER_READONLY);
+		diag_log();
+		return -1;
+	}
+	return 0;
+}
+
+static void
+box_check_writable_xc(void)
+{
+	if (box_check_writable() != 0)
+		diag_raise();
 }
 
 static void
@@ -146,49 +157,55 @@ box_check_memtx_min_tuple_size(ssize_t memtx_min_tuple_size)
 		  "specified value is out of bounds");
 }
 
-static void
+static int
 process_rw(struct request *request, struct space *space, struct tuple **result)
 {
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
-	try {
-		struct txn *txn = txn_begin_stmt_xc(space);
-		access_check_space_xc(space, PRIV_W);
-		struct tuple *tuple;
-		switch (request->type) {
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-			tuple = space_execute_replace_xc(space, txn, request);
-			break;
-		case IPROTO_UPDATE:
-			tuple = space_execute_update_xc(space, txn, request);
-			break;
-		case IPROTO_DELETE:
-			tuple = space_execute_delete_xc(space, txn, request);
-			break;
-		case IPROTO_UPSERT:
-			space_execute_upsert_xc(space, txn, request);
-			tuple = NULL;
-			break;
-		default:
-			tuple = NULL;
-		}
-		/*
-		 * Pin the tuple locally before the commit,
-		 * otherwise it may go away during yield in
-		 * when WAL is written in autocommit mode.
-		 */
-		TupleRefNil ref(tuple);
-		txn_commit_stmt_xc(txn, request);
-		if (result) {
-			if (tuple)
-				tuple_bless_xc(tuple);
-			*result = tuple;
-		}
-	} catch (Exception *e) {
-		txn_rollback_stmt();
-		throw;
+	if (access_check_space(space, PRIV_W) != 0)
+		return -1;
+	struct txn *txn = txn_begin_stmt(space);
+	if (txn == NULL)
+		return -1;
+	int rc;
+	struct tuple *tuple;
+	switch (request->type) {
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+		rc = space_execute_replace(space, txn, request, &tuple);
+		break;
+	case IPROTO_UPDATE:
+		rc = space_execute_update(space, txn, request, &tuple);
+		break;
+	case IPROTO_DELETE:
+		rc = space_execute_delete(space, txn, request, &tuple);
+		break;
+	case IPROTO_UPSERT:
+		rc = space_execute_upsert(space, txn, request);
+		tuple = NULL;
+		break;
+	default:
+		rc = 0;
+		tuple = NULL;
 	}
+	if (rc != 0) {
+		txn_rollback_stmt();
+		return -1;
+	}
+	/*
+	 * Pin the tuple locally before the commit,
+	 * otherwise it may go away during yield in
+	 * when WAL is written in autocommit mode.
+	 */
+	TupleRefNil ref(tuple);
+	if (txn_commit_stmt(txn, request) != 0)
+		return -1;
+	if (result != NULL) {
+		if (tuple != NULL && tuple_bless(tuple) == NULL)
+			return -1;
+		*result = tuple;
+	}
+	return 0;
 }
 
 void
@@ -273,7 +290,8 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	(void) stream;
 	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find_xc(request->space_id);
-	process_rw(request, space, NULL);
+	if (process_rw(request, space, NULL) != 0)
+		diag_raise();
 }
 
 static void
@@ -692,13 +710,10 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	default:
 		unreachable();
 	}
-	try {
-		struct space *space = space_cache_find_xc(space_id);
-		process_rw(request, space, NULL);
-	} catch (Exception *e) {
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
 		return -1;
-	}
-	return 0;
+	return process_rw(request, space, NULL);
 }
 
 int
@@ -764,16 +779,13 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 int
 box_process1(struct request *request, box_tuple_t **result)
 {
-	try {
-		/* Allow to write to temporary spaces in read-only mode. */
-		struct space *space = space_cache_find_xc(request->space_id);
-		if (!space->def->opts.temporary)
-			box_check_writable();
-		process_rw(request, space, result);
-		return 0;
-	} catch (Exception *e) {
+	/* Allow to write to temporary spaces in read-only mode. */
+	struct space *space = space_cache_find(request->space_id);
+	if (space == NULL)
 		return -1;
-	}
+	if (!space->def->opts.temporary && box_check_writable() != 0)
+		return -1;
+	return process_rw(request, space, result);
 }
 
 int
@@ -782,20 +794,21 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	   const char *key, const char *key_end)
 {
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
-
-	try {
-		struct space *space = space_cache_find_xc(space_id);
-		access_check_space_xc(space, PRIV_R);
-		struct txn *txn = txn_begin_ro_stmt_xc(space);
-		space_execute_select_xc(space, txn, index_id, iterator,
-					offset, limit, key, key_end, port);
-		txn_commit_ro_stmt(txn);
-		return 0;
-	} catch (Exception *e) {
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	if (access_check_space(space, PRIV_R) != 0)
+		return -1;
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return -1;
+	if (space_execute_select(space, txn, index_id, iterator,
+				 offset, limit, key, key_end, port) != 0) {
 		txn_rollback_stmt();
-		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
+	txn_commit_ro_stmt(txn);
+	return 0;
 }
 
 int
@@ -1041,7 +1054,7 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 static void
 box_on_join(const tt_uuid *instance_uuid)
 {
-	box_check_writable();
+	box_check_writable_xc();
 	struct replica *replica = replica_by_uuid(instance_uuid);
 	if (replica != NULL)
 		return; /* nothing to do - already registered */
@@ -1141,7 +1154,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	access_check_space_xc(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
-	box_check_writable();
+	box_check_writable_xc();
 
 	/* Forbid replication with disabled WAL */
 	if (wal_mode() == WAL_NONE) {
