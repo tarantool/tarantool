@@ -146,124 +146,6 @@ box_check_memtx_min_tuple_size(ssize_t memtx_min_tuple_size)
 		  "specified value is out of bounds");
 }
 
-/**
- * Convert a request accessing a secondary key to a primary key undo
- * record, given it found a tuple.
- * Flush iproto header of the request to be reconstructed in txn_add_redo().
- *
- * @param request - request to fix
- * @param space - space corresponding to request
- * @param found_tuple - tuple found by secondary key
- */
-static void
-request_rebind_to_primary_key(struct request *request, struct space *space,
-			      struct tuple *found_tuple)
-{
-	struct index *pk = index_find_xc(space, 0);
-	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple, pk->def->key_def, &key_len);
-	if (key == NULL)
-		diag_raise();
-	request->key = key;
-	request->key_end = key + key_len;
-	request->index_id = 0;
-	/* Clear the *body* to ensure it's rebuilt at commit. */
-	request->header = NULL;
-}
-
-/**
- * Handle INSERT/REPLACE in a space with a sequence attached.
- */
-static void
-request_handle_sequence(struct request *request, struct space *space)
-{
-	struct sequence *seq = space->sequence;
-
-	assert(seq != NULL);
-	assert(request->type == IPROTO_INSERT ||
-	       request->type == IPROTO_REPLACE);
-
-	/*
-	 * An automatically generated sequence inherits
-	 * privileges of the space it is used with.
-	 */
-	if (!seq->is_generated &&
-	    access_check_sequence(seq) != 0)
-		diag_raise();
-
-	struct index *pk = space_index(space, 0);
-	if (unlikely(pk == NULL))
-		return;
-
-	/*
-	 * Look up the first field of the primary key.
-	 */
-	const char *data = request->tuple;
-	const char *data_end = request->tuple_end;
-	int len = mp_decode_array(&data);
-	int fieldno = pk->def->key_def->parts[0].fieldno;
-	if (unlikely(len < fieldno + 1))
-		return;
-
-	const char *key = data;
-	if (unlikely(fieldno > 0)) {
-		do {
-			mp_next(&key);
-		} while (--fieldno > 0);
-	}
-
-	int64_t value;
-	if (mp_typeof(*key) == MP_NIL) {
-		/*
-		 * If the first field of the primary key is nil,
-		 * this is an auto increment request and we need
-		 * to replace the nil with the next value generated
-		 * by the space sequence.
-		 */
-		if (unlikely(sequence_next(seq, &value) != 0))
-			diag_raise();
-
-		const char *key_end = key;
-		mp_decode_nil(&key_end);
-
-		size_t buf_size = (request->tuple_end - request->tuple) +
-						mp_sizeof_uint(UINT64_MAX);
-		char *tuple = (char *) region_alloc_xc(&fiber()->gc, buf_size);
-		char *tuple_end = mp_encode_array(tuple, len);
-
-		if (unlikely(key != data)) {
-			memcpy(tuple_end, data, key - data);
-			tuple_end += key - data;
-		}
-
-		if (value >= 0)
-			tuple_end = mp_encode_uint(tuple_end, value);
-		else
-			tuple_end = mp_encode_int(tuple_end, value);
-
-		memcpy(tuple_end, key_end, data_end - key_end);
-		tuple_end += data_end - key_end;
-
-		assert(tuple_end <= tuple + buf_size);
-
-		request->tuple = tuple;
-		request->tuple_end = tuple_end;
-	} else {
-		/*
-		 * If the first field is not nil, update the space
-		 * sequence with its value, to make sure that an
-		 * auto increment request never tries to insert a
-		 * value that is already in the space. Note, this
-		 * code is also invoked on final recovery to restore
-		 * the sequence value from WAL.
-		 */
-		if (likely(mp_read_int64(&key, &value) == 0)) {
-			if (sequence_update(seq, value) != 0)
-				diag_raise();
-		}
-	}
-}
-
 static void
 process_rw(struct request *request, struct space *space, struct tuple **result)
 {
@@ -276,32 +158,13 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 		switch (request->type) {
 		case IPROTO_INSERT:
 		case IPROTO_REPLACE:
-			if (space->sequence != NULL)
-				request_handle_sequence(request, space);
 			tuple = space_execute_replace_xc(space, txn, request);
-
-
 			break;
 		case IPROTO_UPDATE:
 			tuple = space_execute_update_xc(space, txn, request);
-			if (tuple && request->index_id != 0) {
-				/*
-				 * XXX: this is going to break with
-				 * sync replication for cases when
-				 * tuple is NULL, since the leader
-				 * will be unable to certify such
-				 * updates correctly.
-				 */
-				request_rebind_to_primary_key(request, space,
-							      tuple);
-			}
 			break;
 		case IPROTO_DELETE:
 			tuple = space_execute_delete_xc(space, txn, request);
-			if (tuple && request->index_id != 0) {
-				request_rebind_to_primary_key(request, space,
-							      tuple);
-			}
 			break;
 		case IPROTO_UPSERT:
 			space_execute_upsert_xc(space, txn, request);

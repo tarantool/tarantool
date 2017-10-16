@@ -318,33 +318,21 @@ space_apply_initial_join_row(struct space *space, struct request *request)
 	return space->vtab->apply_initial_join_row(space, request);
 }
 
-static inline int
+int
 space_execute_replace(struct space *space, struct txn *txn,
-		      struct request *request, struct tuple **result)
-{
-	return space->vtab->execute_replace(space, txn, request, result);
-}
+		      struct request *request, struct tuple **result);
 
-static inline int
+int
 space_execute_delete(struct space *space, struct txn *txn,
-		     struct request *request, struct tuple **result)
-{
-	return space->vtab->execute_delete(space, txn, request, result);
-}
+		     struct request *request, struct tuple **result);
 
-static inline int
+int
 space_execute_update(struct space *space, struct txn *txn,
-		     struct request *request, struct tuple **result)
-{
-	return space->vtab->execute_update(space, txn, request, result);
-}
+		     struct request *request, struct tuple **result);
 
-static inline int
+int
 space_execute_upsert(struct space *space, struct txn *txn,
-		     struct request *request)
-{
-	return space->vtab->execute_upsert(space, txn, request);
-}
+		     struct request *request);
 
 static inline int
 space_execute_select(struct space *space, struct txn *txn,
