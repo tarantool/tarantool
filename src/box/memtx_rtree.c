@@ -312,7 +312,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 };
 
 struct memtx_rtree_index *
-memtx_rtree_index_new(struct index_def *def)
+memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	assert(def->key_def->part_count == 1);
 	assert(def->key_def->parts[0].type == FIELD_TYPE_ARRAY);
@@ -341,7 +341,8 @@ memtx_rtree_index_new(struct index_def *def)
 			 "malloc", "struct memtx_rtree_index");
 		return NULL;
 	}
-	if (index_create(&index->base, &memtx_rtree_index_vtab, def) != 0) {
+	if (index_create(&index->base, (struct engine *)memtx,
+			 &memtx_rtree_index_vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}

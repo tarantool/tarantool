@@ -37,17 +37,16 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct vy_index;
-struct vy_env;
 struct tuple_format;
+struct vinyl_engine;
 
 struct vinyl_index {
 	struct index base;
-	struct vy_env *env;
 	struct vy_index *db;
 };
 
 struct vinyl_index *
-vinyl_index_new(struct vy_env *env, struct index_def *def,
+vinyl_index_new(struct vinyl_engine *vinyl, struct index_def *def,
 		struct tuple_format *format, struct vy_index *pk);
 
 int

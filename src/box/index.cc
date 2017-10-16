@@ -441,14 +441,15 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 /* {{{ Internal API */
 
 int
-index_create(struct index *index, const struct index_vtab *vtab,
-	     struct index_def *def)
+index_create(struct index *index, struct engine *engine,
+	     const struct index_vtab *vtab, struct index_def *def)
 {
 	def = index_def_dup(def);
 	if (def == NULL)
 		return -1;
 
 	index->vtab = vtab;
+	index->engine = engine;
 	index->def = def;
 	index->schema_version = schema_version;
 	index->position = NULL;

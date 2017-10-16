@@ -41,6 +41,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct memtx_engine;
+
 /**
  * Struct that is used as a key in BPS tree definition.
  */
@@ -99,7 +101,7 @@ struct memtx_tree_index {
 };
 
 struct memtx_tree_index *
-memtx_tree_index_new(struct index_def *);
+memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

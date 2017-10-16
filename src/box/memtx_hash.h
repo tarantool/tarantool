@@ -36,6 +36,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct memtx_engine;
 struct light_index_core;
 
 struct memtx_hash_index {
@@ -44,7 +45,7 @@ struct memtx_hash_index {
 };
 
 struct memtx_hash_index *
-memtx_hash_index_new(struct index_def *);
+memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

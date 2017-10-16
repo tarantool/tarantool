@@ -671,9 +671,9 @@ sequence_data_index_create_snapshot_iterator(struct index *index)
 }
 
 static struct index *
-sequence_data_index_new(struct index_def *def)
+sequence_data_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	struct memtx_hash_index *index = memtx_hash_index_new(def);
+	struct memtx_hash_index *index = memtx_hash_index_new(memtx, def);
 	if (index == NULL)
 		return NULL;
 
@@ -693,6 +693,8 @@ sequence_data_index_new(struct index_def *def)
 static struct index *
 memtx_space_create_index(struct space *space, struct index_def *index_def)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+
 	if (space->def->id == BOX_SEQUENCE_DATA_ID) {
 		/*
 		 * The content of _sequence_data is not updated
@@ -701,18 +703,18 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		 * written to snapshot, use a special snapshot
 		 * iterator that walks over the sequence cache.
 		 */
-		return sequence_data_index_new(index_def);
+		return sequence_data_index_new(memtx, index_def);
 	}
 
 	switch (index_def->type) {
 	case HASH:
-		return (struct index *)memtx_hash_index_new(index_def);
+		return (struct index *)memtx_hash_index_new(memtx, index_def);
 	case TREE:
-		return (struct index *)memtx_tree_index_new(index_def);
+		return (struct index *)memtx_tree_index_new(memtx, index_def);
 	case RTREE:
-		return (struct index *)memtx_rtree_index_new(index_def);
+		return (struct index *)memtx_rtree_index_new(memtx, index_def);
 	case BITSET:
-		return (struct index *)memtx_bitset_index_new(index_def);
+		return (struct index *)memtx_bitset_index_new(memtx, index_def);
 	default:
 		unreachable();
 		return NULL;

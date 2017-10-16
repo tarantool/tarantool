@@ -270,7 +270,8 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 }
 
 struct sysview_index *
-sysview_index_new(struct index_def *def, const char *space_name)
+sysview_index_new(struct sysview_engine *sysview,
+		  struct index_def *def, const char *space_name)
 {
 	assert(def->type == TREE);
 
@@ -318,7 +319,8 @@ sysview_index_new(struct index_def *def, const char *space_name)
 			 "malloc", "struct sysview_index");
 		return NULL;
 	}
-	if (index_create(&index->base, &sysview_index_vtab, def) != 0) {
+	if (index_create(&index->base, (struct engine *)sysview,
+			 &sysview_index_vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}

@@ -41,6 +41,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct memtx_engine;
+
 struct memtx_rtree_index {
 	struct index base;
 	unsigned dimension;
@@ -48,7 +50,7 @@ struct memtx_rtree_index {
 };
 
 struct memtx_rtree_index *
-memtx_rtree_index_new(struct index_def *);
+memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

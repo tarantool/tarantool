@@ -580,7 +580,7 @@ static const struct index_vtab memtx_tree_index_vtab = {
 };
 
 struct memtx_tree_index *
-memtx_tree_index_new(struct index_def *def)
+memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	memtx_index_arena_init();
 
@@ -591,7 +591,8 @@ memtx_tree_index_new(struct index_def *def)
 			 "malloc", "struct memtx_tree_index");
 		return NULL;
 	}
-	if (index_create(&index->base, &memtx_tree_index_vtab, def) != 0) {
+	if (index_create(&index->base, (struct engine *)memtx,
+			 &memtx_tree_index_vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}

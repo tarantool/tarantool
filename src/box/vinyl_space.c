@@ -228,8 +228,8 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		pk = vy_index(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	return (struct index *)vinyl_index_new(engine->env,
-				index_def, space->format, pk);
+	return (struct index *)vinyl_index_new(engine, index_def,
+					       space->format, pk);
 }
 
 static int

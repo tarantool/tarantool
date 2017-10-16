@@ -117,7 +117,9 @@ sysview_space_check_index_def(struct space *space, struct index_def *index_def)
 static struct index *
 sysview_space_create_index(struct space *space, struct index_def *index_def)
 {
-	return (struct index *)sysview_index_new(index_def, space_name(space));
+	struct sysview_engine *sysview = (struct sysview_engine *)space->engine;
+	return (struct index *)sysview_index_new(sysview, index_def,
+						 space_name(space));
 }
 
 static int

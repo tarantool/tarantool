@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "vinyl_index.h"
+#include "vinyl_engine.h"
 
 #include <stdio.h>
 
@@ -60,7 +61,8 @@ static void
 vinyl_index_destroy(struct index *base)
 {
 	struct vinyl_index *index = (struct vinyl_index *)base;
-	vy_delete_index(index->env, index->db);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
+	vy_delete_index(vinyl->env, index->db);
 	free(index);
 }
 
@@ -68,14 +70,16 @@ static void
 vinyl_index_commit_create(struct index *base, int64_t signature)
 {
 	struct vinyl_index *index = (struct vinyl_index *)base;
-	vy_index_commit_create(index->env, index->db, signature);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
+	vy_index_commit_create(vinyl->env, index->db, signature);
 }
 
 static void
 vinyl_index_commit_drop(struct index *base)
 {
 	struct vinyl_index *index = (struct vinyl_index *)base;
-	vy_index_commit_drop(index->env, index->db);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
+	vy_index_commit_drop(vinyl->env, index->db);
 }
 
 static int
@@ -85,6 +89,7 @@ vinyl_index_get(struct index *base, const char *key,
 	assert(base->def->opts.is_unique &&
 	       part_count == base->def->key_def->part_count);
 	struct vinyl_index *index = (struct vinyl_index *)base;
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
 	/*
 	 * engine_tx might be empty, even if we are in txn context.
 	 * This can happen on a first-read statement.
@@ -92,7 +97,7 @@ vinyl_index_get(struct index *base, const char *key,
 	struct vy_tx *transaction = in_txn() ?
 		(struct vy_tx *) in_txn()->engine_tx : NULL;
 	struct tuple *tuple = NULL;
-	if (vy_get(index->env, transaction, index->db,
+	if (vy_get(vinyl->env, transaction, index->db,
 		   key, part_count, &tuple) != 0)
 		return -1;
 	if (tuple != NULL) {
@@ -235,11 +240,12 @@ vinyl_index_init_iterator(struct index *base, struct iterator *ptr,
 {
 	assert(part_count == 0 || key != NULL);
 	struct vinyl_index *index = (struct vinyl_index *)base;
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
 	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
 	struct vy_tx *tx =
 		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
 	assert(it->cursor == NULL);
-	it->env = index->env;
+	it->env = vinyl->env;
 	ptr->next = vinyl_iterator_next;
 	if (type > ITER_GT || type < 0) {
 		diag_set(UnsupportedIndexFeature, base->def,
@@ -247,7 +253,7 @@ vinyl_index_init_iterator(struct index *base, struct iterator *ptr,
 		return -1;
 	}
 
-	it->cursor = vy_cursor_new(index->env, tx, index->db,
+	it->cursor = vy_cursor_new(it->env, tx, index->db,
 				   key, part_count, type);
 	if (it->cursor == NULL)
 		return -1;
@@ -286,7 +292,7 @@ static const struct index_vtab vinyl_index_vtab = {
 };
 
 struct vinyl_index *
-vinyl_index_new(struct vy_env *env, struct index_def *def,
+vinyl_index_new(struct vinyl_engine *vinyl, struct index_def *def,
 		struct tuple_format *format, struct vy_index *pk)
 {
 	struct vinyl_index *index =
@@ -296,17 +302,17 @@ vinyl_index_new(struct vy_env *env, struct index_def *def,
 			 "malloc", "struct vinyl_index");
 		return NULL;
 	}
-	struct vy_index *db = vy_new_index(env, def, format, pk);
+	struct vy_index *db = vy_new_index(vinyl->env, def, format, pk);
 	if (db == NULL) {
 		free(index);
 		return NULL;
 	}
-	if (index_create(&index->base, &vinyl_index_vtab, def) != 0) {
-		vy_delete_index(env, db);
+	if (index_create(&index->base, (struct engine *)vinyl,
+			 &vinyl_index_vtab, def) != 0) {
+		vy_delete_index(vinyl->env, db);
 		free(index);
 		return NULL;
 	}
-	index->env = env;
 	index->db = db;
 	return index;
 }
@@ -314,6 +320,7 @@ vinyl_index_new(struct vy_env *env, struct index_def *def,
 int
 vinyl_index_open(struct vinyl_index *index)
 {
-	return vy_index_open(index->env, index->db,
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)index->base.engine;
+	return vy_index_open(vinyl->env, index->db,
 			     cfg_geti("force_recovery"));
 }

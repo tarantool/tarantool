@@ -480,7 +480,7 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 };
 
 struct memtx_bitset_index *
-memtx_bitset_index_new(struct index_def *def)
+memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	assert(!def->opts.is_unique);
 
@@ -493,7 +493,8 @@ memtx_bitset_index_new(struct index_def *def)
 			 "malloc", "struct memtx_bitset_index");
 		return NULL;
 	}
-	if (index_create(&index->base, &memtx_bitset_index_vtab, def) != 0) {
+	if (index_create(&index->base, (struct engine *)memtx,
+			 &memtx_bitset_index_vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}

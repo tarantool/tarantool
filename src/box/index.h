@@ -294,6 +294,7 @@ enum dup_replace_mode {
 };
 
 struct index;
+struct engine;
 
 struct index_vtab {
 	/** Free an index instance. */
@@ -360,6 +361,8 @@ struct index_vtab {
 struct index {
 	/** Virtual function table. */
 	const struct index_vtab *vtab;
+	/** Engine used by this index. */
+	struct engine *engine;
 	/* Description of a possibly multipart key. */
 	struct index_def *def;
 	/* Schema version at the time of construction. */
@@ -409,8 +412,8 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
  * Note, this function copies the given index definition.
  */
 int
-index_create(struct index *index, const struct index_vtab *vtab,
-	     struct index_def *def);
+index_create(struct index *index, struct engine *engine,
+	     const struct index_vtab *vtab, struct index_def *def);
 
 /** Free an index instance. */
 void

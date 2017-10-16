@@ -38,6 +38,7 @@ extern "C" {
 
 struct space;
 struct tuple;
+struct sysview_engine;
 
 typedef bool (*sysview_filter_f)(struct space *source, struct tuple *);
 
@@ -49,7 +50,8 @@ struct sysview_index {
 };
 
 struct sysview_index *
-sysview_index_new(struct index_def *def, const char *space_name);
+sysview_index_new(struct sysview_engine *sysview,
+		  struct index_def *def, const char *space_name);
 
 #if defined(__cplusplus)
 } /* extern "C" */
