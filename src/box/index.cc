@@ -378,10 +378,6 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		return NULL;
 	}
 	txn_commit_ro_stmt(txn);
-	it->schema_version = schema_version;
-	it->space_id = space_id;
-	it->index_id = index_id;
-	it->index = index;
 	return it;
 }
 
@@ -389,20 +385,7 @@ int
 box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 {
 	assert(result != NULL);
-	assert(itr->next != NULL);
-	if (itr->schema_version != schema_version) {
-		struct space *space;
-		struct index *index;
-		if (check_index(itr->space_id, itr->index_id,
-				&space, &index) != 0 ||
-		    index != itr->index ||
-		    index->schema_version > itr->schema_version) {
-			*result = NULL; /* invalidate iterator */
-			return 0;
-		}
-		itr->schema_version = schema_version;
-	}
-	if (itr->next(itr, result) != 0)
+	if (iterator_next(itr, result) != 0)
 		return -1;
 	if (*result != NULL && tuple_bless(*result) == NULL)
 		return -1;
@@ -412,8 +395,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 void
 box_iterator_free(box_iterator_t *it)
 {
-	if (it->free)
-		it->free(it);
+	iterator_delete(it);
 }
 
 /* }}} */
@@ -435,6 +417,45 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 /* }}} */
 
 /* {{{ Internal API */
+
+void
+iterator_create(struct iterator *it, struct index *index)
+{
+	it->next = NULL;
+	it->free = NULL;
+	it->schema_version = schema_version;
+	it->space_id = index->def->space_id;
+	it->index_id = index->def->iid;
+	it->index = index;
+}
+
+int
+iterator_next(struct iterator *it, struct tuple **ret)
+{
+	assert(it->next != NULL);
+	if (unlikely(it->schema_version != schema_version)) {
+		struct space *space = space_by_id(it->space_id);
+		if (space == NULL)
+			goto invalidate;
+		struct index *index = space_index(space, it->index_id);
+		if (index != it->index ||
+		    index->schema_version > it->schema_version)
+			goto invalidate;
+		it->schema_version = schema_version;
+	}
+	return it->next(it, ret);
+
+invalidate:
+	*ret = NULL;
+	return 0;
+}
+
+void
+iterator_delete(struct iterator *it)
+{
+	assert(it->free != NULL);
+	it->free(it);
+}
 
 int
 index_create(struct index *index, struct engine *engine,
@@ -483,7 +504,7 @@ index_build(struct index *index, struct index *pk)
 	int rc = 0;
 	while (true) {
 		struct tuple *tuple;
-		rc = it->next(it, &tuple);
+		rc = iterator_next(it, &tuple);
 		if (rc != 0)
 			break;
 		if (tuple == NULL)
@@ -492,7 +513,7 @@ index_build(struct index *index, struct index *pk)
 		if (rc != 0)
 			break;
 	}
-	it->free(it);
+	iterator_delete(it);
 	if (rc != 0)
 		return -1;
 
@@ -529,8 +550,8 @@ generic_index_min(struct index *index, const char *key,
 						    key, part_count);
 	if (it == NULL)
 		return -1;
-	int rc = it->next(it, result);
-	it->free(it);
+	int rc = iterator_next(it, result);
+	iterator_delete(it);
 	return rc;
 }
 
@@ -542,8 +563,8 @@ generic_index_max(struct index *index, const char *key,
 						    key, part_count);
 	if (it == NULL)
 		return -1;
-	int rc = it->next(it, result);
-	it->free(it);
+	int rc = iterator_next(it, result);
+	iterator_delete(it);
 	return rc;
 }
 
@@ -567,9 +588,9 @@ generic_index_count(struct index *index, enum iterator_type type,
 	int rc = 0;
 	size_t count = 0;
 	struct tuple *tuple = NULL;
-	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
 		++count;
-	it->free(it);
+	iterator_delete(it);
 	if (rc < 0)
 		return rc;
 	return count;

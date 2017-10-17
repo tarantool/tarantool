@@ -276,7 +276,7 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 			 "memtx_rtree_index", "iterator");
 		return NULL;
 	}
-	memset(it, 0, sizeof(*it));
+	iterator_create(&it->base, base);
 	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next = index_rtree_iterator_next;
 	it->base.free = index_rtree_iterator_free;

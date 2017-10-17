@@ -122,7 +122,7 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 			return -1;
 		int rc;
 		struct tuple *tuple;
-		while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
+		while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
 			uint32_t id;
 			if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &id) != 0)
 				continue;
@@ -135,7 +135,7 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 			if (rc != 0)
 				break;
 		}
-		it->free(it);
+		iterator_delete(it);
 		if (rc != 0)
 			return -1;
 	}

@@ -722,7 +722,7 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 
 	int rc;
 	struct tuple *tuple;
-	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
@@ -731,7 +731,7 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 		if (rc != 0)
 			break;
 	}
-	it->free(it);
+	iterator_delete(it);
 	return rc;
 }
 
@@ -788,7 +788,7 @@ memtx_space_build_secondary_key(struct space *old_space,
 	/* Build the new index. */
 	int rc;
 	struct tuple *tuple;
-	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
@@ -807,7 +807,7 @@ memtx_space_build_secondary_key(struct space *old_space,
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
 		(void) old_tuple;
 	}
-	it->free(it);
+	iterator_delete(it);
 	return rc;
 }
 
@@ -833,9 +833,9 @@ memtx_space_prune(struct space *space)
 		goto fail;
 	int rc;
 	struct tuple *tuple;
-	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
 		tuple_unref(tuple);
-	it->free(it);
+	iterator_delete(it);
 	if (rc == 0)
 		return;
 fail:

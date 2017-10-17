@@ -192,7 +192,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 			 "mempool", "struct vinyl_iterator");
 		return NULL;
 	}
-	memset(it, 0, sizeof(*it));
+	iterator_create(&it->base, base);
 	it->pool = &vinyl->iterator_pool;
 	it->base.next = vinyl_iterator_next;
 	it->base.free = vinyl_iterator_free;

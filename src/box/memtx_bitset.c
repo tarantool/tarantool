@@ -322,7 +322,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	}
 
-	memset(it, 0, sizeof(*it));
+	iterator_create(&it->base, base);
 	it->pool = &memtx->bitset_iterator_pool;
 	it->base.next = bitset_index_iterator_next;
 	it->base.free = bitset_index_iterator_free;

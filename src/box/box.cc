@@ -838,7 +838,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	uint32_t found = 0;
 	struct tuple *tuple;
 	while (found < limit) {
-		rc = it->next(it, &tuple);
+		rc = iterator_next(it, &tuple);
 		if (rc != 0 || tuple == NULL)
 			break;
 		if (offset > 0) {
@@ -850,7 +850,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 			break;
 		found++;
 	}
-	it->free(it);
+	iterator_delete(it);
 
 	if (rc != 0) {
 		txn_rollback_stmt();

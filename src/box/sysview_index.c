@@ -56,7 +56,7 @@ static void
 sysview_iterator_free(struct iterator *ptr)
 {
 	struct sysview_iterator *it = sysview_iterator(ptr);
-	it->source->free(it->source);
+	iterator_delete(it->source);
 	mempool_free(it->pool, it);
 }
 
@@ -70,7 +70,7 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 		return 0; /* invalidate iterator */
 	struct sysview_index *index = (struct sysview_index *)iterator->index;
 	int rc;
-	while ((rc = it->source->next(it->source, ret)) == 0 && *ret != NULL) {
+	while ((rc = iterator_next(it->source, ret)) == 0 && *ret != NULL) {
 		if (index->filter(it->space, *ret))
 			break;
 	}
@@ -117,9 +117,8 @@ sysview_index_create_iterator(struct index *base, enum iterator_type type,
 			 "mempool", "struct sysview_iterator");
 		return NULL;
 	}
-	memset(it, 0, sizeof(*it));
+	iterator_create(&it->base, base);
 	it->pool = &sysview->iterator_pool;
-	it->base.index = base;
 	it->base.next = sysview_iterator_next;
 	it->base.free = sysview_iterator_free;
 
@@ -128,7 +127,6 @@ sysview_index_create_iterator(struct index *base, enum iterator_type type,
 		mempool_free(&sysview->iterator_pool, it);
 		return NULL;
 	}
-	it->source->schema_version = schema_version;
 	it->space = source;
 	return (struct iterator *)it;
 }

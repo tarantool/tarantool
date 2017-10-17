@@ -39,10 +39,17 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-typedef struct tuple box_tuple_t;
+struct tuple;
+struct engine;
+struct index;
+struct index_def;
+struct key_def;
+struct info_handler;
 
 /** \cond public */
-/** A space iterator */
+
+typedef struct tuple box_tuple_t;
+typedef struct key_def box_key_def_t;
 typedef struct iterator box_iterator_t;
 
 /**
@@ -81,12 +88,6 @@ box_iterator_next(box_iterator_t *iterator, box_tuple_t **result);
  */
 void
 box_iterator_free(box_iterator_t *iterator);
-
-/** \endcond public */
-
-typedef struct key_def box_key_def_t;
-
-/** \cond public */
 
 /**
  * Return the number of element in the index.
@@ -196,8 +197,6 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 
 /** \endcond public */
 
-struct info_handler;
-
 /**
  * Index introspection (index:info())
  *
@@ -220,12 +219,44 @@ struct iterator {
 	int (*next)(struct iterator *it, struct tuple **ret);
 	/** Destroy the iterator. */
 	void (*free)(struct iterator *);
-	/* optional parameters used in lua */
+	/** Schema version at the time of the last index lookup. */
 	uint32_t schema_version;
+	/** ID of the space the iterator is for. */
 	uint32_t space_id;
+	/** ID of the index the iterator is for. */
 	uint32_t index_id;
+	/**
+	 * Pointer to the index the iterator is for.
+	 * Guaranteed to be valid only if the schema
+	 * version has not changed since the last lookup.
+	 */
 	struct index *index;
 };
+
+/**
+ * Initialize a base iterator structure.
+ *
+ * This function is supposed to be used only by
+ * index implementation so never call it directly,
+ * use index_create_iterator() instead.
+ */
+void
+iterator_create(struct iterator *it, struct index *index);
+
+/**
+ * Iterate to the next tuple.
+ *
+ * The tuple is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on error.
+ */
+int
+iterator_next(struct iterator *it, struct tuple **ret);
+
+/**
+ * Destroy an iterator instance and free associated memory.
+ */
+void
+iterator_delete(struct iterator *it);
 
 /**
  * Snapshot iterator.
@@ -293,9 +324,6 @@ enum dup_replace_mode {
 	DUP_REPLACE
 };
 
-struct index;
-struct engine;
-
 struct index_vtab {
 	/** Free an index instance. */
 	void (*destroy)(struct index *);
@@ -335,7 +363,7 @@ struct index_vtab {
 	/**
 	 * Create an ALL iterator with personal read view so further
 	 * index modifications will not affect the iteration results.
-	 * Must be destroyed by iterator->free after usage.
+	 * Must be destroyed by iterator_delete() after usage.
 	 */
 	struct snapshot_iterator *(*create_snapshot_iterator)(struct index *);
 	/** Introspection (index:info()) */
@@ -562,7 +590,7 @@ struct IteratorGuard
 {
 	struct iterator *it;
 	IteratorGuard(struct iterator *it_arg) : it(it_arg) {}
-	~IteratorGuard() { it->free(it); }
+	~IteratorGuard() { iterator_delete(it); }
 };
 
 /*
@@ -690,7 +718,7 @@ static inline struct tuple *
 iterator_next_xc(struct iterator *it)
 {
 	struct tuple *tuple;
-	if (it->next(it, &tuple) != 0)
+	if (iterator_next(it, &tuple) != 0)
 		diag_raise();
 	return tuple;
 }

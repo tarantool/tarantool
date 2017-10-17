@@ -272,10 +272,9 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 			 "memtx_hash_index", "iterator");
 		return NULL;
 	}
-	memset(it, 0, sizeof(*it));
+	iterator_create(&it->base, base);
 	it->pool = &memtx->hash_iterator_pool;
 	it->base.free = hash_iterator_free;
-
 	it->hash_table = index->hash_table;
 	light_index_iterator_begin(it->hash_table, &it->iterator);
 

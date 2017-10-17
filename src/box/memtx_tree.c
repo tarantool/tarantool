@@ -409,7 +409,7 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 			 "memtx_tree_index", "iterator");
 		return NULL;
 	}
-	memset(it, 0, sizeof(*it));
+	iterator_create(&it->base, base);
 	it->pool = &memtx->tree_iterator_pool;
 	it->base.next = tree_iterator_start;
 	it->base.free = tree_iterator_free;
@@ -419,6 +419,7 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	it->index_def = base->def;
 	it->tree = &index->tree;
 	it->tree_iterator = memtx_tree_invalid_iterator();
+	it->current_tuple = NULL;
 	return (struct iterator *)it;
 }
 
