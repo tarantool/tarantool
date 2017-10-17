@@ -1062,8 +1062,9 @@ box_on_join(const tt_uuid *instance_uuid)
 	/** Find the largest existing replica id. */
 	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 	struct index *index = index_find_system_xc(space, 0);
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, ITER_ALL, NULL, 0);
+	struct iterator *it = index_create_iterator_xc(index, ITER_ALL,
+						       NULL, 0);
+	IteratorGuard iter_guard(it);
 	struct tuple *tuple;
 	/** Assign a new replica id. */
 	uint32_t replica_id = 1;

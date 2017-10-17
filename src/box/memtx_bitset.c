@@ -232,25 +232,6 @@ memtx_bitset_index_bsize(struct index *base)
 	return result;
 }
 
-static struct iterator *
-memtx_bitset_index_alloc_iterator(struct index *base)
-{
-	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	struct bitset_index_iterator *it;
-	it = mempool_alloc(&memtx->bitset_iterator_pool);
-	if (!it) {
-		diag_set(OutOfMemory, sizeof(*it),
-			 "memtx_bitset_index", "iterator");
-		return NULL;
-	}
-
-	memset(it, 0, sizeof(*it));
-	it->pool = &memtx->bitset_iterator_pool;
-	it->base.next = bitset_index_iterator_next;
-	it->base.free = bitset_index_iterator_free;
-	return (struct iterator *) it;
-}
-
 static inline const char *
 make_key(const char *field, uint32_t *key_len)
 {
@@ -324,18 +305,29 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
-static int
-memtx_bitset_index_init_iterator(struct index *base, struct iterator *iterator,
-				 enum iterator_type type,
-				 const char *key, uint32_t part_count)
+static struct iterator *
+memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
+				   const char *key, uint32_t part_count)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 
-	assert(iterator->free == bitset_index_iterator_free);
 	assert(part_count == 0 || key != NULL);
 	(void) part_count;
 
-	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
+	struct bitset_index_iterator *it;
+	it = mempool_alloc(&memtx->bitset_iterator_pool);
+	if (!it) {
+		diag_set(OutOfMemory, sizeof(*it),
+			 "memtx_bitset_index", "iterator");
+		return NULL;
+	}
+
+	memset(it, 0, sizeof(*it));
+	it->pool = &memtx->bitset_iterator_pool;
+	it->base.next = bitset_index_iterator_next;
+	it->base.free = bitset_index_iterator_free;
+
 	bitset_iterator_create(&it->bitset_it, realloc);
 #ifndef OLD_GOOD_BITSET
 	it->bitset_index = index;
@@ -392,10 +384,11 @@ memtx_bitset_index_init_iterator(struct index *base, struct iterator *iterator,
 	}
 
 	bitset_expr_destroy(&expr);
-	return 0;
+	return (struct iterator *)it;
 fail:
 	bitset_expr_destroy(&expr);
-	return -1;
+	mempool_free(&memtx->bitset_iterator_pool, it);
+	return NULL;
 }
 
 static ssize_t
@@ -474,8 +467,7 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .count = */ memtx_bitset_index_count,
 	/* .get = */ generic_index_get,
 	/* .replace = */ memtx_bitset_index_replace,
-	/* .alloc_iterator = */ memtx_bitset_index_alloc_iterator,
-	/* .init_iterator = */ memtx_bitset_index_init_iterator,
+	/* .create_iterator = */ memtx_bitset_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,

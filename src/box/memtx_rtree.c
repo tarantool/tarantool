@@ -212,41 +212,22 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 }
 
 static struct iterator *
-memtx_rtree_index_alloc_iterator(struct index *base)
-{
-	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	struct index_rtree_iterator *it = mempool_alloc(&memtx->rtree_iterator_pool);
-	if (it == NULL) {
-		diag_set(OutOfMemory, sizeof(struct index_rtree_iterator),
-			 "memtx_rtree_index", "iterator");
-		return NULL;
-	}
-	memset(it, 0, sizeof(*it));
-	rtree_iterator_init(&it->impl);
-	it->pool = &memtx->rtree_iterator_pool;
-	it->base.next = index_rtree_iterator_next;
-	it->base.free = index_rtree_iterator_free;
-	return &it->base;
-}
-
-static int
-memtx_rtree_index_init_iterator(struct index *base, struct iterator *iterator,
-				enum iterator_type type,
-				const char *key, uint32_t part_count)
+memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
+				  const char *key, uint32_t part_count)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
-	struct index_rtree_iterator *it = (struct index_rtree_iterator *)iterator;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 
 	struct rtree_rect rect;
 	if (part_count == 0) {
 		if (type != ITER_ALL) {
 			diag_set(UnsupportedIndexFeature, base->def,
 				 "empty keys for requested iterator type");
-			return -1;
+			return NULL;
 		}
 	} else if (mp_decode_rect_from_key(&rect, index->dimension,
 					   key, part_count)) {
-		return -1;
+		return NULL;
 	}
 
 	enum spatial_search_op op;
@@ -278,10 +259,22 @@ memtx_rtree_index_init_iterator(struct index *base, struct iterator *iterator,
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
-		return -1;
+		return NULL;
 	}
+
+	struct index_rtree_iterator *it = mempool_alloc(&memtx->rtree_iterator_pool);
+	if (it == NULL) {
+		diag_set(OutOfMemory, sizeof(struct index_rtree_iterator),
+			 "memtx_rtree_index", "iterator");
+		return NULL;
+	}
+	memset(it, 0, sizeof(*it));
+	it->pool = &memtx->rtree_iterator_pool;
+	it->base.next = index_rtree_iterator_next;
+	it->base.free = index_rtree_iterator_free;
+	rtree_iterator_init(&it->impl);
 	rtree_search(&index->tree, &rect, op, &it->impl);
-	return 0;
+	return (struct iterator *)it;
 }
 
 static void
@@ -303,8 +296,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .count = */ memtx_index_count,
 	/* .get = */ memtx_rtree_index_get,
 	/* .replace = */ memtx_rtree_index_replace,
-	/* .alloc_iterator = */ memtx_rtree_index_alloc_iterator,
-	/* .init_iterator = */ memtx_rtree_index_init_iterator,
+	/* .create_iterator = */ memtx_rtree_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,

@@ -373,34 +373,17 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 }
 
 static struct iterator *
-memtx_tree_index_alloc_iterator(struct index *base)
+memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
+				 const char *key, uint32_t part_count)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	struct tree_iterator *it = mempool_alloc(&memtx->tree_iterator_pool);
-	if (it == NULL) {
-		diag_set(OutOfMemory, sizeof(struct tree_iterator),
-			 "memtx_tree_index", "iterator");
-		return NULL;
-	}
-	memset(it, 0, sizeof(*it));
-	it->pool = &memtx->tree_iterator_pool;
-	it->base.free = tree_iterator_free;
-	return (struct iterator *) it;
-}
-
-static int
-memtx_tree_index_init_iterator(struct index *base, struct iterator *iterator,
-			       enum iterator_type type,
-			       const char *key, uint32_t part_count)
-{
-	assert(part_count == 0 || key != NULL);
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
-	struct tree_iterator *it = tree_iterator(iterator);
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 
+	assert(part_count == 0 || key != NULL);
 	if (type < 0 || type > ITER_GT) { /* Unsupported type */
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
-		return -1;
+		return NULL;
 	}
 
 	if (part_count == 0) {
@@ -411,22 +394,24 @@ memtx_tree_index_init_iterator(struct index *base, struct iterator *iterator,
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = NULL;
 	}
-	if (it->current_tuple) {
-		/*
-		 * Free possible leftover tuple if the iterator
-		 * is reused.
-		 */
-		tuple_unref(it->current_tuple);
-		it->current_tuple = NULL;
+
+	struct tree_iterator *it = mempool_alloc(&memtx->tree_iterator_pool);
+	if (it == NULL) {
+		diag_set(OutOfMemory, sizeof(struct tree_iterator),
+			 "memtx_tree_index", "iterator");
+		return NULL;
 	}
+	memset(it, 0, sizeof(*it));
+	it->pool = &memtx->tree_iterator_pool;
+	it->base.next = tree_iterator_start;
+	it->base.free = tree_iterator_free;
 	it->type = type;
 	it->key_data.key = key;
 	it->key_data.part_count = part_count;
 	it->index_def = base->def;
 	it->tree = &index->tree;
-	it->base.next = tree_iterator_start;
 	it->tree_iterator = memtx_tree_invalid_iterator();
-	return 0;
+	return (struct iterator *)it;
 }
 
 static void
@@ -574,8 +559,7 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .count = */ memtx_index_count,
 	/* .get = */ memtx_tree_index_get,
 	/* .replace = */ memtx_tree_index_replace,
-	/* .alloc_iterator = */ memtx_tree_index_alloc_iterator,
-	/* .init_iterator = */ memtx_tree_index_init_iterator,
+	/* .create_iterator = */ memtx_tree_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		memtx_tree_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,

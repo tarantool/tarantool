@@ -529,9 +529,8 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 	char key[6];
 	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, uid);
-	struct iterator *it = index_position_xc(index);
-
-	index_init_iterator_xc(index, it, ITER_EQ, key, 1);
+	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 1);
+	IteratorGuard iter_guard(it);
 	if (iterator_next_xc(it) != NULL)
 		return true;
 	return false;

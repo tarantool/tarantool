@@ -543,10 +543,9 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
 
-	struct iterator *it = index_position(index);
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
 	if (it == NULL)
-		return -1;
-	if (index_init_iterator(index, it, type, key, part_count) != 0)
 		return -1;
 
 	int rc = 0;
@@ -564,6 +563,7 @@ memtx_space_execute_select(struct space *space, struct txn *txn,
 			break;
 		found++;
 	}
+	it->free(it);
 	return rc;
 }
 
@@ -773,13 +773,9 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 	if (index_size(pk) == 0)
 		return 0;
 
-	struct iterator *it = index_alloc_iterator(pk);
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
 		return -1;
-	if (index_init_iterator(pk, it, ITER_ALL, NULL, 0) != 0) {
-		it->free(it);
-		return -1;
-	}
 
 	int rc;
 	struct tuple *tuple;
@@ -835,14 +831,9 @@ memtx_space_build_secondary_key(struct space *old_space,
 	}
 
 	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = index_alloc_iterator(pk);
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
 		return -1;
-
-	if (index_init_iterator(pk, it, ITER_ALL, NULL, 0) != 0) {
-		it->free(it);
-		return -1;
-	}
 
 	/*
 	 * The index has to be built tuple by tuple, since
@@ -894,15 +885,14 @@ memtx_space_prune(struct space *space)
 	if (index == NULL)
 		return;
 
-	struct iterator *it = index_position(index);
+	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
 	if (it == NULL)
-		goto fail;
-	if (index_init_iterator(index, it, ITER_ALL, NULL, 0) != 0)
 		goto fail;
 	int rc;
 	struct tuple *tuple;
 	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
 		tuple_unref(tuple);
+	it->free(it);
 	if (rc == 0)
 		return;
 fail:

@@ -328,14 +328,10 @@ struct index_vtab {
 	int (*replace)(struct index *index, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
 		       struct tuple **result);
-	/**
-	 * Create a structure to represent an iterator.
-	 * Must be initialized separately.
-	 */
-	struct iterator *(*alloc_iterator)(struct index *index);
-	int (*init_iterator)(struct index *index, struct iterator *iterator,
-			     enum iterator_type type,
-			     const char *key, uint32_t part_count);
+	/** Create an index iterator. */
+	struct iterator *(*create_iterator)(struct index *index,
+			enum iterator_type type,
+			const char *key, uint32_t part_count);
 	/**
 	 * Create an ALL iterator with personal read view so further
 	 * index modifications will not affect the iteration results.
@@ -367,12 +363,6 @@ struct index {
 	struct index_def *def;
 	/* Schema version at the time of construction. */
 	uint32_t schema_version;
-	/*
-	 * Pre-allocated iterator to speed up the main case of
-	 * box_process(). Should not be used elsewhere.
-	 * Safe to use only if the index iterator does not yield.
-	 */
-	struct iterator *position;
 };
 
 /**
@@ -490,26 +480,10 @@ index_replace(struct index *index, struct tuple *old_tuple,
 }
 
 static inline struct iterator *
-index_alloc_iterator(struct index *index)
+index_create_iterator(struct index *index, enum iterator_type type,
+		      const char *key, uint32_t part_count)
 {
-	return index->vtab->alloc_iterator(index);
-}
-
-static inline int
-index_init_iterator(struct index *index, struct iterator *iterator,
-		    enum iterator_type type,
-		    const char *key, uint32_t part_count)
-{
-	return index->vtab->init_iterator(index, iterator, type,
-					  key, part_count);
-}
-
-static inline struct iterator *
-index_position(struct index *index)
-{
-	if (index->position == NULL)
-		index->position = index_alloc_iterator(index);
-	return index->position;
+	return index->vtab->create_iterator(index, type, key, part_count);
 }
 
 static inline struct snapshot_iterator *
@@ -671,28 +645,11 @@ index_replace_xc(struct index *index, struct tuple *old_tuple,
 }
 
 static inline struct iterator *
-index_alloc_iterator_xc(struct index *index)
+index_create_iterator_xc(struct index *index, enum iterator_type type,
+			 const char *key, uint32_t part_count)
 {
-	struct iterator *it = index->vtab->alloc_iterator(index);
-	if (it == NULL)
-		diag_raise();
-	return it;
-}
-
-static inline void
-index_init_iterator_xc(struct index *index, struct iterator *iterator,
-		       enum iterator_type type,
-		       const char *key, uint32_t part_count)
-{
-	if (index->vtab->init_iterator(index, iterator, type,
-				       key, part_count) < 0)
-		diag_raise();
-}
-
-static inline struct iterator *
-index_position_xc(struct index *index)
-{
-	struct iterator *it = index_position(index);
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
 	if (it == NULL)
 		diag_raise();
 	return it;

@@ -56,9 +56,7 @@ static void
 sysview_iterator_free(struct iterator *ptr)
 {
 	struct sysview_iterator *it = sysview_iterator(ptr);
-	if (it->source != NULL) {
-		it->source->free(it->source);
-	}
+	it->source->free(it->source);
 	mempool_free(it->pool, it);
 }
 
@@ -93,9 +91,26 @@ sysview_index_bsize(struct index *index)
 }
 
 static struct iterator *
-sysview_index_alloc_iterator(struct index *base)
+sysview_index_create_iterator(struct index *base, enum iterator_type type,
+			      const char *key, uint32_t part_count)
 {
+	struct sysview_index *index = (struct sysview_index *)base;
 	struct sysview_engine *sysview = (struct sysview_engine *)base->engine;
+
+	struct space *source = space_cache_find(index->source_space_id);
+	if (source == NULL)
+		return NULL;
+	struct index *pk = index_find(source, index->source_index_id);
+	if (pk == NULL)
+		return NULL;
+	/*
+	 * Explicitly validate that key matches source's index_def.
+	 * It is possible to change a source space without changing
+	 * the view.
+	 */
+	if (key_validate(pk->def, type, key, part_count))
+		return NULL;
+
 	struct sysview_iterator *it = mempool_alloc(&sysview->iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct sysview_iterator),
@@ -104,49 +119,18 @@ sysview_index_alloc_iterator(struct index *base)
 	}
 	memset(it, 0, sizeof(*it));
 	it->pool = &sysview->iterator_pool;
+	it->base.index = base;
+	it->base.next = sysview_iterator_next;
 	it->base.free = sysview_iterator_free;
-	return (struct iterator *) it;
-}
 
-static int
-sysview_index_init_iterator(struct index *base, struct iterator *iterator,
-			    enum iterator_type type,
-			    const char *key, uint32_t part_count)
-{
-	assert(iterator->free == sysview_iterator_free);
-	struct sysview_index *index = (struct sysview_index *)base;
-	struct sysview_iterator *it = sysview_iterator(iterator);
-	struct space *source = space_cache_find(index->source_space_id);
-	if (source == NULL)
-		return -1;
-	struct index *pk = index_find(source, index->source_index_id);
-	if (pk == NULL)
-		return -1;
-	/*
-	 * Explicitly validate that key matches source's index_def.
-	 * It is possible to change a source space without changing
-	 * the view.
-	 */
-	if (key_validate(pk->def, type, key, part_count))
-		return -1;
-	/* Re-allocate iterator if schema was changed */
-	if (it->source != NULL &&
-	    it->source->schema_version != schema_version) {
-		it->source->free(it->source);
-		it->source = NULL;
-	}
+	it->source = index_create_iterator(pk, type, key, part_count);
 	if (it->source == NULL) {
-		it->source = index_alloc_iterator(pk);
-		if (it->source == NULL)
-			return -1;
-		it->source->schema_version = schema_version;
+		mempool_free(&sysview->iterator_pool, it);
+		return NULL;
 	}
-	if (index_init_iterator(pk, it->source, type, key, part_count) != 0)
-		return -1;
-	iterator->index = (struct index *) index;
-	iterator->next = sysview_iterator_next;
+	it->source->schema_version = schema_version;
 	it->space = source;
-	return 0;
+	return (struct iterator *)it;
 }
 
 static int
@@ -188,8 +172,7 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .count = */ generic_index_count,
 	/* .get = */ sysview_index_get,
 	/* .replace = */ generic_index_replace,
-	/* .alloc_iterator = */ sysview_index_alloc_iterator,
-	/* .init_iterator = */ sysview_index_init_iterator,
+	/* .create_iterator = */ sysview_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,

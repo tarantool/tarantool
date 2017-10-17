@@ -116,14 +116,10 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 	space = space_by_id(BOX_SPACE_ID);
 	struct index *pk = space ? space_index(space, 0) : NULL;
 	if (pk) {
-		struct iterator *it = index_alloc_iterator(pk);
+		struct iterator *it = index_create_iterator(pk, ITER_GE,
+							    key, 1);
 		if (it == NULL)
 			return -1;
-		if (index_init_iterator(pk, it, ITER_GE, key, 1) != 0) {
-			it->free(it);
-			return -1;
-		}
-
 		int rc;
 		struct tuple *tuple;
 		while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL) {
@@ -245,8 +241,8 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
 	mp_encode_str(key, name, len);
 
-	struct iterator *it = index_position_xc(index);
-	index_init_iterator_xc(index, it, ITER_EQ, key, 1);
+	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 1);
+	IteratorGuard iter_guard(it);
 
 	struct tuple *tuple = iterator_next_xc(it);
 	if (tuple) {
@@ -458,7 +454,6 @@ schema_find_grants(const char *type, uint32_t id)
 	struct space *priv = space_cache_find_xc(BOX_PRIV_ID);
 	/** "object" index */
 	struct index *index = index_find_system_xc(priv, 2);
-	struct iterator *it = index_position_xc(index);
 	/*
 	 * +10 = max(mp_sizeof_uint32) +
 	 *       max(mp_sizeof_strl(uint32)).
@@ -466,7 +461,8 @@ schema_find_grants(const char *type, uint32_t id)
 	char key[GRANT_NAME_MAX + 10];
 	assert(strlen(type) <= GRANT_NAME_MAX);
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
-	index_init_iterator_xc(index, it, ITER_EQ, key, 2);
+	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 2);
+	IteratorGuard iter_guard(it);
 	return iterator_next_xc(it);
 }
 

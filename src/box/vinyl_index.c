@@ -125,12 +125,11 @@ static int
 vinyl_index_min(struct index *index, const char *key,
 		uint32_t part_count, struct tuple **result)
 {
-	struct iterator *it = index_alloc_iterator(index);
+	struct iterator *it = index_create_iterator(index, ITER_GE,
+						    key, part_count);
 	if (it == NULL)
 		return -1;
-	int rc = index_init_iterator(index, it, ITER_GE, key, part_count);
-	if (rc == 0)
-		rc = it->next(it, result);
+	int rc = it->next(it, result);
 	it->free(it);
 	return rc;
 }
@@ -139,12 +138,11 @@ static int
 vinyl_index_max(struct index *index, const char *key,
 		uint32_t part_count, struct tuple **result)
 {
-	struct iterator *it = index_alloc_iterator(index);
+	struct iterator *it = index_create_iterator(index, ITER_LE,
+						    key, part_count);
 	if (it == NULL)
 		return -1;
-	int rc = index_init_iterator(index, it, ITER_LE, key, part_count);
-	if (rc == 0)
-		rc = it->next(it, result);
+	int rc = it->next(it, result);
 	it->free(it);
 	return rc;
 }
@@ -153,13 +151,10 @@ static ssize_t
 vinyl_index_count(struct index *index, enum iterator_type type,
 		  const char *key, uint32_t part_count)
 {
-	struct iterator *it = index_alloc_iterator(index);
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
 	if (it == NULL)
 		return -1;
-	if (index_init_iterator(index, it, type, key, part_count) != 0) {
-		it->free(it);
-		return -1;
-	}
 	int rc = 0;
 	size_t count = 0;
 	struct tuple *tuple = NULL;
@@ -223,9 +218,19 @@ vinyl_iterator_free(struct iterator *ptr)
 }
 
 static struct iterator *
-vinyl_index_alloc_iterator(struct index *index)
+vinyl_index_create_iterator(struct index *base, enum iterator_type type,
+			    const char *key, uint32_t part_count)
 {
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)index->engine;
+	struct vinyl_index *index = (struct vinyl_index *)base;
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
+
+	assert(part_count == 0 || key != NULL);
+	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	if (type > ITER_GT || type < 0) {
+		diag_set(UnsupportedIndexFeature, base->def,
+			 "requested iterator type");
+		return NULL;
+	}
 	struct vinyl_iterator *it = mempool_alloc(&vinyl->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
@@ -234,37 +239,17 @@ vinyl_index_alloc_iterator(struct index *index)
 	}
 	memset(it, 0, sizeof(*it));
 	it->pool = &vinyl->iterator_pool;
-	it->base.next = vinyl_iterator_last;
+	it->base.next = vinyl_iterator_next;
 	it->base.free = vinyl_iterator_free;
-	return (struct iterator *) it;
-}
 
-static int
-vinyl_index_init_iterator(struct index *base, struct iterator *ptr,
-			  enum iterator_type type,
-			  const char *key, uint32_t part_count)
-{
-	assert(part_count == 0 || key != NULL);
-	struct vinyl_index *index = (struct vinyl_index *)base;
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
-	struct vinyl_iterator *it = (struct vinyl_iterator *) ptr;
-	struct vy_tx *tx =
-		in_txn() ? (struct vy_tx *) in_txn()->engine_tx : NULL;
-	assert(it->cursor == NULL);
 	it->env = vinyl->env;
-	ptr->next = vinyl_iterator_next;
-	if (type > ITER_GT || type < 0) {
-		diag_set(UnsupportedIndexFeature, base->def,
-			 "requested iterator type");
-		return -1;
-	}
-
 	it->cursor = vy_cursor_new(it->env, tx, index->db,
 				   key, part_count, type);
-	if (it->cursor == NULL)
-		return -1;
-
-	return 0;
+	if (it->cursor == NULL) {
+		mempool_free(&vinyl->iterator_pool, it);
+		return NULL;
+	}
+	return (struct iterator *)it;
 }
 
 static void
@@ -286,8 +271,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .count = */ vinyl_index_count,
 	/* .get = */ vinyl_index_get,
 	/* .replace = */ generic_index_replace,
-	/* .alloc_iterator = */ vinyl_index_alloc_iterator,
-	/* .init_iterator = */ vinyl_index_init_iterator,
+	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ vinyl_index_info,

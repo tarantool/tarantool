@@ -368,17 +368,13 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	uint32_t part_count = mp_decode_array(&key);
 	if (key_validate(index->def, itype, key, part_count))
 		return NULL;
-	struct iterator *it = index_alloc_iterator(index);
-	if (it == NULL)
-		return NULL;
 	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0) {
-		it->free(it);
+	if (txn_begin_ro_stmt(space, &txn) != 0)
 		return NULL;
-	}
-	if (index_init_iterator(index, it, itype, key, part_count) != 0) {
+	struct iterator *it = index_create_iterator(index, itype,
+						    key, part_count);
+	if (it == NULL) {
 		txn_rollback_stmt();
-		it->free(it);
 		return NULL;
 	}
 	txn_commit_ro_stmt(txn);
@@ -452,15 +448,12 @@ index_create(struct index *index, struct engine *engine,
 	index->engine = engine;
 	index->def = def;
 	index->schema_version = schema_version;
-	index->position = NULL;
 	return 0;
 }
 
 void
 index_delete(struct index *index)
 {
-	if (index->position != NULL)
-		index->position->free(index->position);
 	index_def_delete(index->def);
 	index->vtab->destroy(index);
 }
@@ -483,21 +476,25 @@ index_build(struct index *index, struct index *pk)
 			 index->def->name);
 	}
 
-	struct iterator *it = index_position(pk);
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
 		return -1;
-	if (index_init_iterator(pk, it, ITER_ALL, NULL, 0) != 0)
-		return -1;
 
+	int rc = 0;
 	while (true) {
 		struct tuple *tuple;
-		if (it->next(it, &tuple) != 0)
-			return -1;
+		rc = it->next(it, &tuple);
+		if (rc != 0)
+			break;
 		if (tuple == NULL)
 			break;
-		if (index_build_next(index, tuple) != 0)
-			return -1;
+		rc = index_build_next(index, tuple);
+		if (rc != 0)
+			break;
 	}
+	it->free(it);
+	if (rc != 0)
+		return -1;
 
 	index_end_build(index);
 	return 0;

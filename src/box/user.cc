@@ -291,8 +291,9 @@ user_reload_privs(struct user *user)
 		struct index *index = index_find_system_xc(space, 0);
 		mp_encode_uint(key, user->def->uid);
 
-		struct iterator *it = index_position_xc(index);
-		index_init_iterator_xc(index, it, ITER_EQ, key, 1);
+		struct iterator *it = index_create_iterator_xc(index, ITER_EQ,
+							       key, 1);
+		IteratorGuard iter_guard(it);
 
 		struct tuple *tuple;
 		while ((tuple = iterator_next_xc(it)) != NULL) {

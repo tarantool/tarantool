@@ -250,9 +250,14 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 }
 
 static struct iterator *
-memtx_hash_index_alloc_iterator(struct index *base)
+memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
+				 const char *key, uint32_t part_count)
 {
+	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+
+	assert(part_count == 0 || key != NULL);
+
 	struct hash_iterator *it = mempool_alloc(&memtx->hash_iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct hash_iterator),
@@ -262,21 +267,7 @@ memtx_hash_index_alloc_iterator(struct index *base)
 	memset(it, 0, sizeof(*it));
 	it->pool = &memtx->hash_iterator_pool;
 	it->base.free = hash_iterator_free;
-	return (struct iterator *) it;
-}
 
-static int
-memtx_hash_index_init_iterator(struct index *base, struct iterator *ptr,
-			       enum iterator_type type,
-			       const char *key, uint32_t part_count)
-{
-	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-
-	assert(part_count == 0 || key != NULL);
-	(void) part_count;
-	assert(ptr->free == hash_iterator_free);
-
-	struct hash_iterator *it = (struct hash_iterator *) ptr;
 	it->hash_table = index->hash_table;
 	light_index_iterator_begin(it->hash_table, &it->iterator);
 
@@ -304,9 +295,10 @@ memtx_hash_index_init_iterator(struct index *base, struct iterator *ptr,
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
-		return -1;
+		mempool_free(&memtx->hash_iterator_pool, it);
+		return NULL;
 	}
-	return 0;
+	return (struct iterator *)it;
 }
 
 struct hash_snapshot_iterator {
@@ -385,8 +377,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .count = */ memtx_index_count,
 	/* .get = */ memtx_hash_index_get,
 	/* .replace = */ memtx_hash_index_replace,
-	/* .alloc_iterator = */ memtx_hash_index_alloc_iterator,
-	/* .init_iterator = */ memtx_hash_index_init_iterator,
+	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		memtx_hash_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,

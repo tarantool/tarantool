@@ -269,13 +269,10 @@ generic_space_execute_select(struct space *space, struct txn *txn,
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
 
-	struct iterator *it = index_alloc_iterator(index);
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
 	if (it == NULL)
 		return -1;
-	if (index_init_iterator(index, it, type, key, part_count) != 0) {
-		it->free(it);
-		return -1;
-	}
 
 	int rc = 0;
 	struct tuple *tuple;
