@@ -32,6 +32,8 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
+#include <small/mempool.h>
+
 #include "coio_file.h"
 #include "tuple.h"
 #include "txn.h"
@@ -127,6 +129,14 @@ static void
 memtx_engine_shutdown(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	if (mempool_is_initialized(&memtx->tree_iterator_pool))
+		mempool_destroy(&memtx->tree_iterator_pool);
+	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
+		mempool_destroy(&memtx->rtree_iterator_pool);
+	if (mempool_is_initialized(&memtx->hash_iterator_pool))
+		mempool_destroy(&memtx->hash_iterator_pool);
+	if (mempool_is_initialized(&memtx->bitset_iterator_pool))
+		mempool_destroy(&memtx->bitset_iterator_pool);
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
 	memtx_tuple_free();

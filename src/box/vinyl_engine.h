@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stddef.h>
+#include <small/mempool.h>
 
 #include "engine.h"
 
@@ -43,6 +44,8 @@ struct vy_env;
 struct vinyl_engine {
 	struct engine base;
 	struct vy_env *env;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
 };
 
 struct vinyl_engine *

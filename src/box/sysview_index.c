@@ -29,6 +29,9 @@
  * SUCH DAMAGE.
  */
 #include "sysview_index.h"
+#include "sysview_engine.h"
+#include <small/mempool.h>
+#include "fiber.h"
 #include "schema.h"
 #include "space.h"
 #include "func.h"
@@ -39,6 +42,8 @@ struct sysview_iterator {
 	struct iterator base;
 	struct iterator *source;
 	struct space *space;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 };
 
 static inline struct sysview_iterator *
@@ -54,7 +59,7 @@ sysview_iterator_free(struct iterator *ptr)
 	if (it->source != NULL) {
 		it->source->free(it->source);
 	}
-	free(it);
+	mempool_free(it->pool, it);
 }
 
 static int
@@ -88,15 +93,17 @@ sysview_index_bsize(struct index *index)
 }
 
 static struct iterator *
-sysview_index_alloc_iterator(void)
+sysview_index_alloc_iterator(struct index *base)
 {
-	struct sysview_iterator *it = (struct sysview_iterator *)
-			calloc(1, sizeof(*it));
+	struct sysview_engine *sysview = (struct sysview_engine *)base->engine;
+	struct sysview_iterator *it = mempool_alloc(&sysview->iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct sysview_iterator),
-			 "malloc", "struct sysview_iterator");
+			 "mempool", "struct sysview_iterator");
 		return NULL;
 	}
+	memset(it, 0, sizeof(*it));
+	it->pool = &sysview->iterator_pool;
 	it->base.free = sysview_iterator_free;
 	return (struct iterator *) it;
 }
@@ -274,6 +281,11 @@ sysview_index_new(struct sysview_engine *sysview,
 		  struct index_def *def, const char *space_name)
 {
 	assert(def->type == TREE);
+
+	if (!mempool_is_initialized(&sysview->iterator_pool)) {
+		mempool_create(&sysview->iterator_pool, cord_slab_cache(),
+			       sizeof(struct sysview_iterator));
+	}
 
 	uint32_t source_space_id;
 	uint32_t source_index_id;

@@ -30,6 +30,7 @@
  */
 #include "memtx_hash.h"
 #include "say.h"
+#include "fiber.h"
 #include "tuple.h"
 #include "tuple_compare.h"
 #include "tuple_hash.h"
@@ -40,6 +41,7 @@
 #include "errinj.h"
 
 #include "third_party/PMurHash.h"
+#include <small/mempool.h>
 
 static inline bool
 equal(struct tuple *tuple_a, struct tuple *tuple_b,
@@ -72,13 +74,16 @@ struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct light_index_core *hash_table;
 	struct light_index_iterator iterator;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 };
 
 static void
 hash_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->free == hash_iterator_free);
-	free(iterator);
+	struct hash_iterator *it = (struct hash_iterator *) iterator;
+	mempool_free(it->pool, it);
 }
 
 static int
@@ -245,15 +250,17 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 }
 
 static struct iterator *
-memtx_hash_index_alloc_iterator(void)
+memtx_hash_index_alloc_iterator(struct index *base)
 {
-	struct hash_iterator *it = (struct hash_iterator *)
-			calloc(1, sizeof(*it));
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	struct hash_iterator *it = mempool_alloc(&memtx->hash_iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct hash_iterator),
 			 "memtx_hash_index", "iterator");
 		return NULL;
 	}
+	memset(it, 0, sizeof(*it));
+	it->pool = &memtx->hash_iterator_pool;
 	it->base.free = hash_iterator_free;
 	return (struct iterator *) it;
 }
@@ -393,6 +400,11 @@ struct memtx_hash_index *
 memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	memtx_index_arena_init();
+
+	if (!mempool_is_initialized(&memtx->hash_iterator_pool)) {
+		mempool_create(&memtx->hash_iterator_pool, cord_slab_cache(),
+			       sizeof(struct hash_iterator));
+	}
 
 	struct memtx_hash_index *index =
 		(struct memtx_hash_index *)calloc(1, sizeof(*index));

@@ -210,6 +210,9 @@ static const struct space_vtab sysview_space_vtab = {
 static void
 sysview_engine_shutdown(struct engine *engine)
 {
+	struct sysview_engine *sysview = (struct sysview_engine *)engine;
+	if (mempool_is_initialized(&sysview->iterator_pool))
+		mempool_destroy(&sysview->iterator_pool);
 	free(engine);
 }
 

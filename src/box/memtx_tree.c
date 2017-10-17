@@ -30,12 +30,14 @@
  */
 #include "memtx_tree.h"
 #include "memtx_index.h"
+#include "memtx_engine.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */
 #include "errinj.h"
 #include "memory.h"
 #include "fiber.h"
 #include <third_party/qsort_arg.h>
+#include <small/mempool.h>
 
 /* {{{ Utilities. *************************************************/
 
@@ -55,6 +57,8 @@ struct tree_iterator {
 	enum iterator_type type;
 	struct memtx_tree_key_data key_data;
 	struct tuple *current_tuple;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 };
 
 static void
@@ -73,7 +77,7 @@ tree_iterator_free(struct iterator *iterator)
 	struct tree_iterator *it = tree_iterator(iterator);
 	if (it->current_tuple != NULL)
 		tuple_unref(it->current_tuple);
-	free(iterator);
+	mempool_free(it->pool, it);
 }
 
 static int
@@ -369,15 +373,17 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 }
 
 static struct iterator *
-memtx_tree_index_alloc_iterator(void)
+memtx_tree_index_alloc_iterator(struct index *base)
 {
-	struct tree_iterator *it = (struct tree_iterator *)
-			calloc(1, sizeof(*it));
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	struct tree_iterator *it = mempool_alloc(&memtx->tree_iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct tree_iterator),
 			 "memtx_tree_index", "iterator");
 		return NULL;
 	}
+	memset(it, 0, sizeof(*it));
+	it->pool = &memtx->tree_iterator_pool;
 	it->base.free = tree_iterator_free;
 	return (struct iterator *) it;
 }
@@ -583,6 +589,11 @@ struct memtx_tree_index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	memtx_index_arena_init();
+
+	if (!mempool_is_initialized(&memtx->tree_iterator_pool)) {
+		mempool_create(&memtx->tree_iterator_pool, cord_slab_cache(),
+			       sizeof(struct tree_iterator));
+	}
 
 	struct memtx_tree_index *index =
 		(struct memtx_tree_index *)calloc(1, sizeof(*index));

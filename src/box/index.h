@@ -332,7 +332,7 @@ struct index_vtab {
 	 * Create a structure to represent an iterator.
 	 * Must be initialized separately.
 	 */
-	struct iterator *(*alloc_iterator)(void);
+	struct iterator *(*alloc_iterator)(struct index *index);
 	int (*init_iterator)(struct index *index, struct iterator *iterator,
 			     enum iterator_type type,
 			     const char *key, uint32_t part_count);
@@ -492,7 +492,7 @@ index_replace(struct index *index, struct tuple *old_tuple,
 static inline struct iterator *
 index_alloc_iterator(struct index *index)
 {
-	return index->vtab->alloc_iterator();
+	return index->vtab->alloc_iterator(index);
 }
 
 static inline int
@@ -673,7 +673,7 @@ index_replace_xc(struct index *index, struct tuple *old_tuple,
 static inline struct iterator *
 index_alloc_iterator_xc(struct index *index)
 {
-	struct iterator *it = index->vtab->alloc_iterator();
+	struct iterator *it = index->vtab->alloc_iterator(index);
 	if (it == NULL)
 		diag_raise();
 	return it;

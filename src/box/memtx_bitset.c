@@ -32,14 +32,16 @@
 #include "memtx_bitset.h"
 
 #include <string.h>
+#include <small/mempool.h>
 
 #include "trivia/util.h"
 
+#include "fiber.h"
 #include "tuple.h"
 #include "memtx_index.h"
+#include "memtx_engine.h"
 
 #ifndef OLD_GOOD_BITSET
-#include "memtx_engine.h"
 #include "small/matras.h"
 
 struct bitset_hash_entry {
@@ -157,6 +159,8 @@ struct bitset_index_iterator {
 #ifndef OLD_GOOD_BITSET
 	struct memtx_bitset_index *bitset_index;
 #endif /* #ifndef OLD_GOOD_BITSET */
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 };
 
 static struct bitset_index_iterator *
@@ -172,7 +176,7 @@ bitset_index_iterator_free(struct iterator *iterator)
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	bitset_iterator_destroy(&it->bitset_it);
-	free(it);
+	mempool_free(it->pool, it);
 }
 
 static int
@@ -229,10 +233,11 @@ memtx_bitset_index_bsize(struct index *base)
 }
 
 static struct iterator *
-memtx_bitset_index_alloc_iterator(void)
+memtx_bitset_index_alloc_iterator(struct index *base)
 {
-	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
-			malloc(sizeof(*it));
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	struct bitset_index_iterator *it;
+	it = mempool_alloc(&memtx->bitset_iterator_pool);
 	if (!it) {
 		diag_set(OutOfMemory, sizeof(*it),
 			 "memtx_bitset_index", "iterator");
@@ -240,6 +245,7 @@ memtx_bitset_index_alloc_iterator(void)
 	}
 
 	memset(it, 0, sizeof(*it));
+	it->pool = &memtx->bitset_iterator_pool;
 	it->base.next = bitset_index_iterator_next;
 	it->base.free = bitset_index_iterator_free;
 	return (struct iterator *) it;
@@ -485,6 +491,11 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	assert(!def->opts.is_unique);
 
 	memtx_index_arena_init();
+
+	if (!mempool_is_initialized(&memtx->bitset_iterator_pool)) {
+		mempool_create(&memtx->bitset_iterator_pool, cord_slab_cache(),
+			       sizeof(struct bitset_index_iterator));
+	}
 
 	struct memtx_bitset_index *index =
 		(struct memtx_bitset_index *)calloc(1, sizeof(*index));

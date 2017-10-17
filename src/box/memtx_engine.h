@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <small/mempool.h>
 
 #include "engine.h"
 #include "xlog.h"
@@ -90,6 +91,14 @@ struct memtx_engine {
 	uint64_t snap_io_rate_limit;
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
+	/** Memory pool for tree index iterator. */
+	struct mempool tree_iterator_pool;
+	/** Memory pool for rtree index iterator. */
+	struct mempool rtree_iterator_pool;
+	/** Memory pool for hash index iterator. */
+	struct mempool hash_iterator_pool;
+	/** Memory pool for bitset index iterator. */
+	struct mempool bitset_iterator_pool;
 };
 
 struct memtx_engine *

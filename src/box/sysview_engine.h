@@ -30,6 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <small/mempool.h>
+
 #include "engine.h"
 
 #if defined(__cplusplus)
@@ -38,6 +40,8 @@ extern "C" {
 
 struct sysview_engine {
 	struct engine base;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
 };
 
 struct sysview_engine *

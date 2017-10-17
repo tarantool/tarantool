@@ -31,6 +31,7 @@
 #include "memtx_rtree.h"
 
 #include <small/small.h>
+#include <small/mempool.h>
 
 #include "errinj.h"
 #include "fiber.h"
@@ -122,6 +123,8 @@ extract_rectangle(struct rtree_rect *rect, const struct tuple *tuple,
 struct index_rtree_iterator {
         struct iterator base;
         struct rtree_iterator impl;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 };
 
 static void
@@ -129,8 +132,7 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
-	TRASH(itr);
-	free(itr);
+	mempool_free(itr->pool, itr);
 }
 
 static int
@@ -210,10 +212,10 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 }
 
 static struct iterator *
-memtx_rtree_index_alloc_iterator(void)
+memtx_rtree_index_alloc_iterator(struct index *base)
 {
-	struct index_rtree_iterator *it = (struct index_rtree_iterator *)
-		malloc(sizeof(*it));
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	struct index_rtree_iterator *it = mempool_alloc(&memtx->rtree_iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct index_rtree_iterator),
 			 "memtx_rtree_index", "iterator");
@@ -221,6 +223,7 @@ memtx_rtree_index_alloc_iterator(void)
 	}
 	memset(it, 0, sizeof(*it));
 	rtree_iterator_init(&it->impl);
+	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next = index_rtree_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	return &it->base;
@@ -333,6 +336,11 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 		(enum rtree_distance_type)def->opts.distance;
 
 	memtx_index_arena_init();
+
+	if (!mempool_is_initialized(&memtx->rtree_iterator_pool)) {
+		mempool_create(&memtx->rtree_iterator_pool, cord_slab_cache(),
+			       sizeof(struct index_rtree_iterator));
+	}
 
 	struct memtx_rtree_index *index =
 		(struct memtx_rtree_index *)calloc(1, sizeof(*index));

@@ -32,8 +32,10 @@
 #include "vinyl_engine.h"
 
 #include <stdio.h>
+#include <small/mempool.h>
 
 #include "trivia/util.h"
+#include "fiber.h"
 #include "schema.h"
 #include "txn.h"
 #include "vinyl.h"
@@ -55,6 +57,8 @@ struct vinyl_iterator {
 	struct iterator base;
 	struct vy_env *env;
 	struct vy_cursor *cursor;
+	/** Memory pool the iterator was allocated from. */
+	struct mempool *pool;
 };
 
 static void
@@ -215,19 +219,21 @@ vinyl_iterator_free(struct iterator *ptr)
 		vy_cursor_delete(it->env, it->cursor);
 		it->cursor = NULL;
 	}
-	free(ptr);
+	mempool_free(it->pool, it);
 }
 
 static struct iterator *
-vinyl_index_alloc_iterator(void)
+vinyl_index_alloc_iterator(struct index *index)
 {
-	struct vinyl_iterator *it =
-	        (struct vinyl_iterator *) calloc(1, sizeof(*it));
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)index->engine;
+	struct vinyl_iterator *it = mempool_alloc(&vinyl->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
-			 "calloc", "vinyl_iterator");
+			 "mempool", "struct vinyl_iterator");
 		return NULL;
 	}
+	memset(it, 0, sizeof(*it));
+	it->pool = &vinyl->iterator_pool;
 	it->base.next = vinyl_iterator_last;
 	it->base.free = vinyl_iterator_free;
 	return (struct iterator *) it;
@@ -295,6 +301,11 @@ struct vinyl_index *
 vinyl_index_new(struct vinyl_engine *vinyl, struct index_def *def,
 		struct tuple_format *format, struct vy_index *pk)
 {
+	if (!mempool_is_initialized(&vinyl->iterator_pool)) {
+		mempool_create(&vinyl->iterator_pool, cord_slab_cache(),
+			       sizeof(struct vinyl_iterator));
+	}
+
 	struct vinyl_index *index =
 		(struct vinyl_index *)calloc(1, sizeof(*index));
 	if (index == NULL) {

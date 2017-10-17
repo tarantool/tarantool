@@ -33,9 +33,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <small/mempool.h>
 
 #include "trivia/util.h"
-
 #include "vinyl_space.h"
 #include "xrow.h"
 #include "tuple.h"
@@ -57,6 +57,8 @@ static void
 vinyl_engine_shutdown(struct engine *engine)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	if (mempool_is_initialized(&vinyl->iterator_pool))
+		mempool_destroy(&vinyl->iterator_pool);
 	vy_env_delete(vinyl->env);
 	free(vinyl);
 }
