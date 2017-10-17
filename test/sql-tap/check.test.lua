@@ -762,7 +762,7 @@ test:do_test(
         return test:catchsql(" INSERT INTO t6 VALUES(8) ") --, "db2")
     end, {
         -- <7.5>
-        1, "unknown function: myfunc()"
+        1, "unknown function: MYFUNC()"
         -- </7.5>
     })
 
@@ -772,7 +772,7 @@ test:do_test(
         return test:catchsql(" CREATE TABLE t7(a CHECK (myfunc(a))) ") --, "db2")
     end, {
         -- <7.6>
-        1, "no such function: myfunc"
+        1, "no such function: MYFUNC"
         -- </7.6>
     })
 

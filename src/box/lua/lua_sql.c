@@ -149,7 +149,10 @@ int lbox_sql_create_function(struct lua_State *L)
 	int argc = lua_gettop(L);
 	int func_arg_num = -1; // -1 is any arg num
 	const char *name;
+	size_t name_len;
+	char *normalized_name;
 	struct lua_sql_func_info *func_info;
+	int rc;
 	sqlite3 *db = sql_get();
 	/**
 	 * Check args. Two types are possible:
@@ -172,11 +175,16 @@ int lbox_sql_create_function(struct lua_State *L)
 		lua_pop(L, 1);
 	}
 	name = lua_tostring(L, 1);
+	name_len = strlen(name);
+	normalized_name = (char*) malloc(name_len+1);
+	memcpy(normalized_name, name, name_len+1);
+	sqlite3NormalizeName(normalized_name);
 	func_info = (struct lua_sql_func_info*)malloc(sizeof(struct lua_sql_func_info));
 	func_info->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	sqlite3_create_function_v2(db, name, func_arg_num,
+	rc = sqlite3_create_function_v2(db, normalized_name, func_arg_num,
 				   SQLITE_UTF8, func_info,
 				   lua_sql_call, NULL, NULL, lua_sql_destroy);
-	return 0;
+	free(normalized_name);
+	return rc;
 }
 

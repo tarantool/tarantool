@@ -1776,12 +1776,12 @@ sqlite3RegisterLikeFunctions(sqlite3 * db, int caseSensitive)
 	} else {
 		pInfo = (struct compareInfo *)&likeInfoNorm;
 	}
-	sqlite3CreateFunc(db, "like", 2, SQLITE_UTF8, pInfo, likeFunc, 0, 0, 0);
-	sqlite3CreateFunc(db, "like", 3, SQLITE_UTF8, pInfo, likeFunc, 0, 0, 0);
-	sqlite3CreateFunc(db, "glob", 2, SQLITE_UTF8,
+	sqlite3CreateFunc(db, "LIKE", 2, SQLITE_UTF8, pInfo, likeFunc, 0, 0, 0);
+	sqlite3CreateFunc(db, "LIKE", 3, SQLITE_UTF8, pInfo, likeFunc, 0, 0, 0);
+	sqlite3CreateFunc(db, "GLOB", 2, SQLITE_UTF8,
 			  (struct compareInfo *)&globInfo, likeFunc, 0, 0, 0);
-	setLikeOptFlag(db, "glob", SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE);
-	setLikeOptFlag(db, "like",
+	setLikeOptFlag(db, "GLOB", SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE);
+	setLikeOptFlag(db, "LIKE",
 		       caseSensitive ? (SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE) :
 		       SQLITE_FUNC_LIKE);
 }

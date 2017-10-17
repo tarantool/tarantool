@@ -244,7 +244,7 @@ test:do_catchsql_test(
         SELECT count(f1,f2) FROM test1
     ]], {
         -- <select1-2.1>
-        1, "wrong number of arguments to function count()"
+        1, "wrong number of arguments to function COUNT()"
         -- </select1-2.1>
     })
 
@@ -324,7 +324,7 @@ test:do_catchsql_test(
         SELECT min(*) FROM test1
     ]], {
         -- <select1-2.6>
-        1, "wrong number of arguments to function min()"
+        1, "wrong number of arguments to function MIN()"
         -- </select1-2.6>
     })
 
@@ -489,7 +489,7 @@ test:do_catchsql_test(
         SELECT sum(f1,f2) FROM test1
     ]], {
         -- <select1-2.16>
-        1, "wrong number of arguments to function sum()"
+        1, "wrong number of arguments to function SUM()"
         -- </select1-2.16>
     })
 
@@ -691,7 +691,7 @@ test:do_catchsql_test(
         SELECT f1 FROM test1 WHERE count(f1,f2)!=11
     ]], {
         -- <select1-3.9>
-        1, "wrong number of arguments to function count()"
+        1, "wrong number of arguments to function COUNT()"
         -- </select1-3.9>
     })
 

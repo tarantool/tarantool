@@ -149,7 +149,7 @@ if (0 > 0)
             SELECT regexp('a[abc]c.*') 
         ]=], {
             -- <icu-5.2>
-            1, "wrong number of arguments to function regexp()"
+            1, "wrong number of arguments to function REGEXP()"
             -- </icu-5.2>
         })
 
@@ -159,7 +159,7 @@ if (0 > 0)
             SELECT regexp('a[abc]c.*', 'abc', 'c') 
         ]=], {
             -- <icu-5.3>
-            1, "wrong number of arguments to function regexp()"
+            1, "wrong number of arguments to function REGEXP()"
             -- </icu-5.3>
         })
 

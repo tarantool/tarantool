@@ -69,7 +69,7 @@ test:do_catchsql_test(
         SELECT length(*) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.1>
-        1, "wrong number of arguments to function length()"
+        1, "wrong number of arguments to function LENGTH()"
         -- </func-1.1>
     })
 
@@ -79,7 +79,7 @@ test:do_catchsql_test(
         SELECT length(t1,5) FROM tbl1 ORDER BY t1
     ]], {
         -- <func-1.2>
-        1, "wrong number of arguments to function length()"
+        1, "wrong number of arguments to function LENGTH()"
         -- </func-1.2>
     })
 
@@ -365,7 +365,7 @@ test:do_test(
         return test:catchsql("SELECT abs(a,b) FROM t1")
     end, {
         -- <func-4.1>
-        1, "wrong number of arguments to function abs()"
+        1, "wrong number of arguments to function ABS()"
         -- </func-4.1>
     })
 
@@ -377,7 +377,7 @@ test:do_catchsql_test(
         SELECT abs() FROM t1
     ]], {
         -- <func-4.2>
-        1, "wrong number of arguments to function abs()"
+        1, "wrong number of arguments to function ABS()"
         -- </func-4.2>
     })
 
@@ -428,7 +428,7 @@ test:do_catchsql_test(
         SELECT round(a,b,c) FROM t1
     ]], {
         -- <func-4.5>
-        1, "wrong number of arguments to function round()"
+        1, "wrong number of arguments to function ROUND()"
         -- </func-4.5>
     })
 
@@ -488,7 +488,7 @@ test:do_catchsql_test(
         SELECT round() FROM t1 ORDER BY a
     ]], {
         -- <func-4.11>
-        1, "wrong number of arguments to function round()"
+        1, "wrong number of arguments to function ROUND()"
         -- </func-4.11>
     })
 
@@ -778,7 +778,7 @@ test:do_catchsql_test(
         SELECT upper(*) FROM t2
     ]], {
         -- <func-5.5>
-        1, "wrong number of arguments to function upper()"
+        1, "wrong number of arguments to function UPPER()"
         -- </func-5.5>
     })
 
@@ -1772,7 +1772,7 @@ test:do_catchsql_test(
         SELECT match(1,2,3);
     ]], {
         -- <func-19.4>
-        1, "wrong number of arguments to function match()"
+        1, "wrong number of arguments to function MATCH()"
         -- </func-19.4>
     })
 
@@ -1815,7 +1815,7 @@ test:do_catchsql_test(
         SELECT replace(1,2);
     ]], {
         -- <func-21.1>
-        1, "wrong number of arguments to function replace()"
+        1, "wrong number of arguments to function REPLACE()"
         -- </func-21.1>
     })
 
@@ -1825,7 +1825,7 @@ test:do_catchsql_test(
         SELECT replace(1,2,3,4);
     ]], {
         -- <func-21.2>
-        1, "wrong number of arguments to function replace()"
+        1, "wrong number of arguments to function REPLACE()"
         -- </func-21.2>
     })
 
@@ -1915,7 +1915,7 @@ test:do_catchsql_test(
         SELECT trim(1,2,3)
     ]], {
         -- <func-22.1>
-        1, "wrong number of arguments to function trim()"
+        1, "wrong number of arguments to function TRIM()"
         -- </func-22.1>
     })
 
@@ -1925,7 +1925,7 @@ test:do_catchsql_test(
         SELECT ltrim(1,2,3)
     ]], {
         -- <func-22.2>
-        1, "wrong number of arguments to function ltrim()"
+        1, "wrong number of arguments to function LTRIM()"
         -- </func-22.2>
     })
 
@@ -1935,7 +1935,7 @@ test:do_catchsql_test(
         SELECT rtrim(1,2,3)
     ]], {
         -- <func-22.3>
-        1, "wrong number of arguments to function rtrim()"
+        1, "wrong number of arguments to function RTRIM()"
         -- </func-22.3>
     })
 
@@ -2390,7 +2390,7 @@ test:do_catchsql_test(
         SELECT coalesce()
     ]], {
         -- <func-27.1>
-        1, "wrong number of arguments to function coalesce()"
+        1, "wrong number of arguments to function COALESCE()"
         -- </func-27.1>
     })
 
@@ -2400,7 +2400,7 @@ test:do_catchsql_test(
         SELECT coalesce(1)
     ]], {
         -- <func-27.2>
-        1, "wrong number of arguments to function coalesce()"
+        1, "wrong number of arguments to function COALESCE()"
         -- </func-27.2>
     })
 
@@ -2428,7 +2428,7 @@ test:do_test(
         ]])
     end, {
         -- <func-28.1>
-        1, "unknown function: nosuchfunc()"
+        1, "unknown function: NOSUCHFUNC()"
         -- </func-28.1>
     })
 

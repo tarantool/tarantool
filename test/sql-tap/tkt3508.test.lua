@@ -39,7 +39,7 @@ test:do_catchsql_test(
           from modificationsTmp where c > 1 group by SUBSTRATE_HPRD_ID;
     ]], {
         -- <tkt3508-1.1>
-        1, "misuse of aggregate: count()"
+        1, "misuse of aggregate: COUNT()"
         -- </tkt3508-1.1>
     })
 

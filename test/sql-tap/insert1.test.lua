@@ -273,7 +273,7 @@ test:do_catchsql_test("insert-4.6", [[
   INSERT INTO t3 VALUES(notafunc(2,3),2,3);
 ]], {
   -- <insert-4.6>
-  1, "no such function: notafunc"
+  1, "no such function: NOTAFUNC"
   -- </insert-4.6>
 })
 

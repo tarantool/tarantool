@@ -873,7 +873,9 @@ sqlite3ExprAlloc(sqlite3 * db,	/* Handle for sqlite3DbMallocRawNN() */
 				if (dequote){
 					if (pNew->u.zToken[0] == '"')
 						pNew->flags |= EP_DblQuoted;
-					if (pNew->op == TK_ID || pNew->op == TK_COLLATE){
+					if (pNew->op == TK_ID ||
+					    pNew->op == TK_COLLATE ||
+					    pNew->op == TK_FUNCTION){
 						sqlite3NormalizeName(pNew->u.zToken);
 					}else{
 						sqlite3Dequote(pNew->u.zToken);

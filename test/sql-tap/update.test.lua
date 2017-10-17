@@ -862,7 +862,7 @@ test:do_catchsql_test("update-9.2", [[
   UPDATE test1 SET f1=x(11) WHERE f1=1025
 ]], {
   -- <update-9.2>
-  1, "no such function: x"
+  1, "no such function: X"
   -- </update-9.2>
 })
 
@@ -878,7 +878,7 @@ test:do_catchsql_test("update-9.4", [[
   UPDATE test1 SET f1=11 WHERE x(f1)=1025
 ]], {
   -- <update-9.4>
-  1, "no such function: x"
+  1, "no such function: X"
   -- </update-9.4>
 })
 
