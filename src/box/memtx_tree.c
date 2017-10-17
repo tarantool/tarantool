@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "memtx_tree.h"
-#include "memtx_index.h"
 #include "memtx_engine.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */
@@ -315,6 +314,15 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 	return 0;
 }
 
+static ssize_t
+memtx_tree_index_count(struct index *base, enum iterator_type type,
+		       const char *key, uint32_t part_count)
+{
+	if (type == ITER_ALL)
+		return memtx_tree_index_size(base); /* optimization */
+	return generic_index_count(base, type, key, part_count);
+}
+
 static int
 memtx_tree_index_get(struct index *base, const char *key,
 		     uint32_t part_count, struct tuple **result)
@@ -553,10 +561,10 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .size = */ memtx_tree_index_size,
 	/* .bsize = */ memtx_tree_index_bsize,
-	/* .min = */ memtx_index_min,
-	/* .max = */ memtx_index_max,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
 	/* .random = */ memtx_tree_index_random,
-	/* .count = */ memtx_index_count,
+	/* .count = */ memtx_tree_index_count,
 	/* .get = */ memtx_tree_index_get,
 	/* .replace = */ memtx_tree_index_replace,
 	/* .create_iterator = */ memtx_tree_index_create_iterator,

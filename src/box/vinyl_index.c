@@ -122,51 +122,6 @@ vinyl_index_bsize(struct index *base)
 }
 
 static int
-vinyl_index_min(struct index *index, const char *key,
-		uint32_t part_count, struct tuple **result)
-{
-	struct iterator *it = index_create_iterator(index, ITER_GE,
-						    key, part_count);
-	if (it == NULL)
-		return -1;
-	int rc = it->next(it, result);
-	it->free(it);
-	return rc;
-}
-
-static int
-vinyl_index_max(struct index *index, const char *key,
-		uint32_t part_count, struct tuple **result)
-{
-	struct iterator *it = index_create_iterator(index, ITER_LE,
-						    key, part_count);
-	if (it == NULL)
-		return -1;
-	int rc = it->next(it, result);
-	it->free(it);
-	return rc;
-}
-
-static ssize_t
-vinyl_index_count(struct index *index, enum iterator_type type,
-		  const char *key, uint32_t part_count)
-{
-	struct iterator *it = index_create_iterator(index, type,
-						    key, part_count);
-	if (it == NULL)
-		return -1;
-	int rc = 0;
-	size_t count = 0;
-	struct tuple *tuple = NULL;
-	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
-		++count;
-	it->free(it);
-	if (rc < 0)
-		return rc;
-	return count;
-}
-
-static int
 vinyl_iterator_last(MAYBE_UNUSED struct iterator *ptr, struct tuple **ret)
 {
 	*ret = NULL;
@@ -265,10 +220,10 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .size = */ generic_index_size,
 	/* .bsize = */ vinyl_index_bsize,
-	/* .min = */ vinyl_index_min,
-	/* .max = */ vinyl_index_max,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
-	/* .count = */ vinyl_index_count,
+	/* .count = */ generic_index_count,
 	/* .get = */ vinyl_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,

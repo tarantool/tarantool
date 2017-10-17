@@ -38,7 +38,6 @@
 
 #include "fiber.h"
 #include "tuple.h"
-#include "memtx_index.h"
 #include "memtx_engine.h"
 
 #ifndef OLD_GOOD_BITSET
@@ -452,7 +451,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	}
 
 	/* Call generic method */
-	return memtx_index_count(base, type, key, part_count);
+	return generic_index_count(base, type, key, part_count);
 }
 
 static const struct index_vtab memtx_bitset_index_vtab = {
@@ -461,8 +460,8 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .size = */ memtx_bitset_index_size,
 	/* .bsize = */ memtx_bitset_index_bsize,
-	/* .min = */ memtx_index_min,
-	/* .max = */ memtx_index_max,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ memtx_bitset_index_count,
 	/* .get = */ generic_index_get,

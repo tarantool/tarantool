@@ -525,22 +525,26 @@ int
 generic_index_min(struct index *index, const char *key,
 		  uint32_t part_count, struct tuple **result)
 {
-	(void)key;
-	(void)part_count;
-	(void)result;
-	diag_set(UnsupportedIndexFeature, index->def, "min()");
-	return -1;
+	struct iterator *it = index_create_iterator(index, ITER_GE,
+						    key, part_count);
+	if (it == NULL)
+		return -1;
+	int rc = it->next(it, result);
+	it->free(it);
+	return rc;
 }
 
 int
 generic_index_max(struct index *index, const char *key,
 		  uint32_t part_count, struct tuple **result)
 {
-	(void)key;
-	(void)part_count;
-	(void)result;
-	diag_set(UnsupportedIndexFeature, index->def, "max()");
-	return -1;
+	struct iterator *it = index_create_iterator(index, ITER_LE,
+						    key, part_count);
+	if (it == NULL)
+		return -1;
+	int rc = it->next(it, result);
+	it->free(it);
+	return rc;
 }
 
 int
@@ -556,11 +560,19 @@ ssize_t
 generic_index_count(struct index *index, enum iterator_type type,
 		    const char *key, uint32_t part_count)
 {
-	(void)type;
-	(void)key;
-	(void)part_count;
-	diag_set(UnsupportedIndexFeature, index->def, "count()");
-	return -1;
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
+	if (it == NULL)
+		return -1;
+	int rc = 0;
+	size_t count = 0;
+	struct tuple *tuple = NULL;
+	while ((rc = it->next(it, &tuple)) == 0 && tuple != NULL)
+		++count;
+	it->free(it);
+	if (rc < 0)
+		return rc;
+	return count;
 }
 
 int

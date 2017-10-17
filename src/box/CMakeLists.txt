@@ -56,7 +56,6 @@ add_library(box STATIC
     index.cc
     index_def.c
     iterator_type.c
-    memtx_index.c
     memtx_hash.c
     memtx_tree.c
     memtx_rtree.c

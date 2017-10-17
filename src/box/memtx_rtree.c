@@ -40,7 +40,6 @@
 #include "tuple.h"
 #include "space.h"
 #include "memtx_engine.h"
-#include "memtx_index.h"
 
 /* {{{ Utilities. *************************************************/
 
@@ -169,6 +168,15 @@ memtx_rtree_index_bsize(struct index *base)
 	return rtree_used_size(&index->tree);
 }
 
+static ssize_t
+memtx_rtree_index_count(struct index *base, enum iterator_type type,
+			const char *key, uint32_t part_count)
+{
+	if (type == ITER_ALL)
+		return memtx_rtree_index_size(base); /* optimization */
+	return generic_index_count(base, type, key, part_count);
+}
+
 static int
 memtx_rtree_index_get(struct index *base, const char *key,
 		      uint32_t part_count, struct tuple **result)
@@ -290,10 +298,10 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .size = */ memtx_rtree_index_size,
 	/* .bsize = */ memtx_rtree_index_bsize,
-	/* .min = */ memtx_index_min,
-	/* .max = */ memtx_index_max,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
-	/* .count = */ memtx_index_count,
+	/* .count = */ memtx_rtree_index_count,
 	/* .get = */ memtx_rtree_index_get,
 	/* .replace = */ memtx_rtree_index_replace,
 	/* .create_iterator = */ memtx_rtree_index_create_iterator,

@@ -35,7 +35,6 @@
 #include "tuple_compare.h"
 #include "tuple_hash.h"
 #include "memtx_engine.h"
-#include "memtx_index.h"
 #include "space.h"
 #include "schema.h" /* space_cache_find() */
 #include "errinj.h"
@@ -170,6 +169,15 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 	}
 	*result = light_index_get(hash_table, rnd);
 	return 0;
+}
+
+static ssize_t
+memtx_hash_index_count(struct index *base, enum iterator_type type,
+		       const char *key, uint32_t part_count)
+{
+	if (type == ITER_ALL)
+		return memtx_hash_index_size(base); /* optimization */
+	return generic_index_count(base, type, key, part_count);
 }
 
 static int
@@ -371,10 +379,10 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .size = */ memtx_hash_index_size,
 	/* .bsize = */ memtx_hash_index_bsize,
-	/* .min = */ memtx_index_min,
-	/* .max = */ memtx_index_max,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
 	/* .random = */ memtx_hash_index_random,
-	/* .count = */ memtx_index_count,
+	/* .count = */ memtx_hash_index_count,
 	/* .get = */ memtx_hash_index_get,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
