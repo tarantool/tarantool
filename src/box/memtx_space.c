@@ -39,7 +39,6 @@
 #include "memtx_tree.h"
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
-#include "port.h"
 #include "memtx_tuple.h"
 #include "column_mask.h"
 #include "sequence.h"
@@ -511,62 +510,6 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	return 0;
 }
 
-static int
-memtx_space_execute_select(struct space *space, struct txn *txn,
-			   uint32_t index_id, uint32_t iterator,
-			   uint32_t offset, uint32_t limit,
-			   const char *key, const char *key_end,
-			   struct port *port)
-{
-	(void)txn;
-	(void)key_end;
-
-	struct index *index = index_find(space, index_id);
-	if (index == NULL)
-		return -1;
-
-	ERROR_INJECT(ERRINJ_TESTING, {
-		diag_set(ClientError, ER_INJECTION, "ERRINJ_TESTING");
-		return -1;
-	});
-
-	uint32_t found = 0;
-	if (iterator >= iterator_type_MAX) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 "Invalid iterator type");
-		diag_log();
-		return -1;
-	}
-	enum iterator_type type = (enum iterator_type) iterator;
-
-	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	if (key_validate(index->def, type, key, part_count))
-		return -1;
-
-	struct iterator *it = index_create_iterator(index, type,
-						    key, part_count);
-	if (it == NULL)
-		return -1;
-
-	int rc = 0;
-	struct tuple *tuple;
-	while (found < limit) {
-		rc = it->next(it, &tuple);
-		if (rc != 0 || tuple == NULL)
-			break;
-		if (offset > 0) {
-			offset--;
-			continue;
-		}
-		rc = port_add_tuple(port, tuple);
-		if (rc != 0)
-			break;
-		found++;
-	}
-	it->free(it);
-	return rc;
-}
-
 /* }}} DML */
 
 /* {{{ DDL */
@@ -951,7 +894,6 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_delete = */ memtx_space_execute_delete,
 	/* .execute_update = */ memtx_space_execute_update,
 	/* .execute_upsert = */ memtx_space_execute_upsert,
-	/* .execute_select = */ memtx_space_execute_select,
 	/* .init_system_space = */ memtx_init_system_space,
 	/* .check_index_def = */ memtx_space_check_index_def,
 	/* .create_index = */ memtx_space_create_index,

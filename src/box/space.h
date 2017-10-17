@@ -64,11 +64,6 @@ struct space_vtab {
 	int (*execute_update)(struct space *, struct txn *,
 			      struct request *, struct tuple **result);
 	int (*execute_upsert)(struct space *, struct txn *, struct request *);
-	int (*execute_select)(struct space *space, struct txn *txn,
-			      uint32_t index_id, uint32_t iterator,
-			      uint32_t offset, uint32_t limit,
-			      const char *key, const char *key_end,
-			      struct port *port);
 
 	void (*init_system_space)(struct space *);
 	/**
@@ -334,17 +329,6 @@ int
 space_execute_upsert(struct space *space, struct txn *txn,
 		     struct request *request);
 
-static inline int
-space_execute_select(struct space *space, struct txn *txn,
-		     uint32_t index_id, uint32_t iterator,
-		     uint32_t offset, uint32_t limit,
-		     const char *key, const char *key_end,
-		     struct port *port)
-{
-	return space->vtab->execute_select(space, txn, index_id, iterator,
-					   offset, limit, key, key_end, port);
-}
-
 static inline void
 init_system_space(struct space *space)
 {
@@ -418,14 +402,6 @@ space_commit_alter(struct space *old_space, struct space *new_space)
 	assert(old_space->vtab == new_space->vtab);
 	new_space->vtab->commit_alter(old_space, new_space);
 }
-
-/** Generic implementation of space_vtab::execute_select method. */
-int
-generic_space_execute_select(struct space *space, struct txn *txn,
-			     uint32_t index_id, uint32_t iterator,
-			     uint32_t offset, uint32_t limit,
-			     const char *key, const char *key_end,
-			     struct port *port);
 
 static inline bool
 space_is_memtx(struct space *space) { return space->engine->id == 0; }
@@ -577,18 +553,6 @@ space_execute_upsert_xc(struct space *space, struct txn *txn,
 			struct request *request)
 {
 	if (space_execute_upsert(space, txn, request) != 0)
-		diag_raise();
-}
-
-static inline void
-space_execute_select_xc(struct space *space, struct txn *txn,
-			uint32_t index_id, uint32_t iterator,
-			uint32_t offset, uint32_t limit,
-			const char *key, const char *key_end,
-			struct port *port)
-{
-	if (space_execute_select(space, txn, index_id, iterator,
-				 offset, limit, key, key_end, port) != 0)
 		diag_raise();
 }
 

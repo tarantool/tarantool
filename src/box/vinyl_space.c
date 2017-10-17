@@ -327,7 +327,6 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_delete = */ vinyl_space_execute_delete,
 	/* .execute_update = */ vinyl_space_execute_update,
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
-	/* .execute_select = */ generic_space_execute_select,
 	/* .init_system_space = */ vinyl_init_system_space,
 	/* .check_index_def = */ vinyl_space_check_index_def,
 	/* .create_index = */ vinyl_space_create_index,

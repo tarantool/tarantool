@@ -193,7 +193,6 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .execute_delete = */ sysview_space_execute_delete,
 	/* .execute_update = */ sysview_space_execute_update,
 	/* .execute_upsert = */ sysview_space_execute_upsert,
-	/* .execute_select = */ generic_space_execute_select,
 	/* .init_system_space = */ sysview_init_system_space,
 	/* .check_index_def = */ sysview_space_check_index_def,
 	/* .create_index = */ sysview_space_create_index,

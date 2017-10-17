@@ -793,17 +793,66 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end)
 {
+	(void)key_end;
+
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
+
+	if (iterator >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
+		diag_log();
+		return -1;
+	}
+
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)
 		return -1;
 	if (access_check_space(space, PRIV_R) != 0)
 		return -1;
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+
+	enum iterator_type type = (enum iterator_type) iterator;
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	if (key_validate(index->def, type, key, part_count))
+		return -1;
+
+	ERROR_INJECT(ERRINJ_TESTING, {
+		diag_set(ClientError, ER_INJECTION, "ERRINJ_TESTING");
+		return -1;
+	});
+
 	struct txn *txn;
 	if (txn_begin_ro_stmt(space, &txn) != 0)
 		return -1;
-	if (space_execute_select(space, txn, index_id, iterator,
-				 offset, limit, key, key_end, port) != 0) {
+
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
+	if (it == NULL) {
+		txn_rollback_stmt();
+		return -1;
+	}
+
+	int rc = 0;
+	uint32_t found = 0;
+	struct tuple *tuple;
+	while (found < limit) {
+		rc = it->next(it, &tuple);
+		if (rc != 0 || tuple == NULL)
+			break;
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		rc = port_add_tuple(port, tuple);
+		if (rc != 0)
+			break;
+		found++;
+	}
+	it->free(it);
+
+	if (rc != 0) {
 		txn_rollback_stmt();
 		return -1;
 	}
