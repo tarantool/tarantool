@@ -43,8 +43,20 @@
 #include "rmean.h"
 #include "small/obuf.h"
 
-static inline struct func *
-access_check_func(const char *name, uint32_t name_len)
+/**
+ * Find a function by name and check "EXECUTE" permissions.
+ *
+ * @param name function name
+ * @param name_len length of @a name
+ * @param[out] funcp function object
+ * Sic: *pfunc == NULL means that perhaps the user has a global
+ * "EXECUTE" privilege, so no specific grant to a function.
+ *
+ * @retval -1 on access denied
+ * @retval  0 on success
+ */
+static inline int
+access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 {
 	struct func *func = func_by_name(name, name_len);
 	struct credentials *credentials = current_user();
@@ -53,19 +65,25 @@ access_check_func(const char *name, uint32_t name_len)
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL)
-		return func;
+	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL) {
+		*funcp = func;
+		return 0;
+	}
+
 	uint8_t access = PRIV_X & ~credentials->universal_access;
 	if (func == NULL || (func->def->uid != credentials->uid &&
 	     access & ~func->access[credentials->auth_token].effective)) {
 		/* Access violation, report error. */
-		struct user *user = user_find_xc(credentials->uid);
-		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->def->name,
-			  tt_cstr(name, name_len));
+		struct user *user = user_find(credentials->uid);
+		if (user != NULL)
+			diag_set(ClientError, ER_FUNCTION_ACCESS_DENIED,
+				 priv_name(access), user->def->name,
+				 tt_cstr(name, name_len));
+		return -1;
 	}
 
-	return func;
+	*funcp = func;
+	return 0;
 }
 
 static int
@@ -133,7 +151,13 @@ int
 box_func_reload(const char *name)
 {
 	size_t name_len = strlen(name);
-	struct func *func = access_check_func(name, name_len);
+	struct func *func = NULL;
+	if ((access_check_func(name, name_len, &func)) != 0)
+		return -1;
+	if (func == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FUNCTION, name);
+		return -1;
+	}
 	if (func->def->language != FUNC_LANGUAGE_C || func->func == NULL)
 		return 0; /* Nothing to do */
 	if (func_reload(func) == 0)
@@ -151,11 +175,14 @@ box_process_call(struct call_request *request, struct obuf *out)
 	const char *name = request->name;
 	assert(name != NULL);
 	uint32_t name_len = mp_decode_strl(&name);
-	struct func *func = access_check_func(name, name_len);
-	/*
+
+	struct func *func = NULL;
+	/**
 	 * Sic: func == NULL means that perhaps the user has a global
 	 * "EXECUTE" privilege, so no specific grant to a function.
 	 */
+	if ((access_check_func(name, name_len, &func)) < 0)
+		diag_raise(); /* permission denied */
 
 	/**
 	 * Change the current user id if the function is
