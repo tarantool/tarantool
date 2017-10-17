@@ -106,23 +106,25 @@ local special_headers = {
 local function parse_list(list)
     local result = {}
     for _,str in pairs(list) do
-        if str ~= '' then
-            local h = str:split(':', 1)
+        local h = str:split(':', 1)
+        if #h > 1 then
             local key = h[1]:lower()
             local val = string.gsub(h[2], "^%s*(.-)%s*$", "%1")
             local prev_val = result[key]
             -- pack headers
             if not special_headers[key] then
-                    if prev_val == nil then
-                        result[key] = {}
-                        table.insert(result[key], val)
-                    else
-                        table.insert(prev_val, val)
-                    end
-                else if not prev_val then
-                        result[key] = val
-                    end
+                if prev_val == nil then
+                    result[key] = {}
+                    table.insert(result[key], val)
+                else
+                    table.insert(prev_val, val)
                 end
+            else if not prev_val then
+                result[key] = val
+               end
+            end
+        elseif string.match(str, "HTTP/%d%.%d %d%d%d") then
+            result = {}
         end
     end
 
