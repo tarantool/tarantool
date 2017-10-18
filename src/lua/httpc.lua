@@ -103,46 +103,17 @@ local special_headers = {
     ["user-agent"] = true,
 }
 
-local function parse_list(list)
-    local result = {}
-    for _,str in pairs(list) do
-        local h = str:split(':', 1)
-        if #h > 1 then
-            local key = h[1]:lower()
-            local val = string.gsub(h[2], "^%s*(.-)%s*$", "%1")
-            local prev_val = result[key]
-            -- pack headers
-            if not special_headers[key] then
-                if prev_val == nil then
-                    result[key] = {}
-                    table.insert(result[key], val)
-                else
-                    table.insert(prev_val, val)
-                end
-            else if not prev_val then
-                result[key] = val
-               end
+local function process_headers(headers)
+    for header, value in pairs(headers) do
+        if type(value) == 'table' then
+            if special_headers[header] then
+                headers[header] = value[1]
+            else
+                headers[header] = table.concat(value, ',')
             end
-        elseif string.match(str, "HTTP/%d%.%d %d%d%d") then
-            result = {}
         end
     end
-
-    for key, value in pairs(result) do
-        if not special_headers[key] then
-            result[key] = table.concat(result[key], ",")
-        end
-    end
-    return result
-end
-
-local function parse_headers(resp)
-    local list = resp.headers:split('\r\n')
-    local h1 = table.remove(list, 1):split(' ')
-    local proto = h1[1]:split('/')[2]:split('.')
-    resp.proto = { tonumber(proto[1]), tonumber(proto[2]) }
-    resp.headers = parse_list(list)
-    return resp
+    return headers
 end
 
 --
@@ -214,7 +185,7 @@ curl_mt = {
             end
             local resp = self.curl:request(method, url, body, opts or {})
             if resp and resp.headers then
-                resp = parse_headers(resp)
+                resp.headers = process_headers(resp.headers)
             end
             return resp
         end,

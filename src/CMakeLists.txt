@@ -93,6 +93,7 @@ set (core_sources
      util.c
      random.c
      trigger.cc
+     http_parser.c
  )
 
 if (TARGET_OS_NETBSD)
