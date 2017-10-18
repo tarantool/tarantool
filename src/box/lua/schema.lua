@@ -318,7 +318,7 @@ end
 
 function update_format(format)
     local result = {}
-    for i,given in pairs(format) do
+    for i, given in ipairs(format) do
         local field = {}
         if type(given) ~= "table" then
             field.name = given

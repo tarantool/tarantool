@@ -625,3 +625,19 @@ s.index.secondary:alter({ parts = {{2, 'string', is_nullable = true} }})
 s:insert({1, NULL})
 
 s:drop()
+
+s = box.schema.create_space('test')
+test_run:cmd("setopt delimiter ';'")
+s:format({
+    [1] = { name = 'id1', type = 'unsigned'},
+    [2] = { name = 'id2', type = 'unsigned'},
+    [3] = { name = 'id3', type = 'string'},
+    [4] = { name = 'id4', type = 'string'},
+    [5] = { name = 'id5', type = 'string'},
+    [6] = { name = 'id6', type = 'string'},
+});
+test_run:cmd("setopt delimiter ''");
+s:format()
+_ = s:create_index('primary')
+s:insert({1, 1, 'a', 'b', 'c', 'd'})
+s:drop()
