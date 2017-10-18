@@ -388,7 +388,7 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 
 	assert(part_count == 0 || key != NULL);
-	if (type < 0 || type > ITER_GT) { /* Unsupported type */
+	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
 		return NULL;

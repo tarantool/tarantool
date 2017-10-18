@@ -797,7 +797,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
-	if (iterator >= iterator_type_MAX) {
+	if (iterator < 0 || iterator >= iterator_type_MAX) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
 			 "Invalid iterator type");
 		diag_log();

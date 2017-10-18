@@ -451,8 +451,8 @@ box_txn_savepoint()
 		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
 							struct txn_savepoint);
 	if (svp == NULL) {
-		diag_set(OutOfMemory, sizeof(*svp) + alignof(*svp) - 1,
-			 "region_alloc_object", "svp");
+		diag_set(OutOfMemory, sizeof(*svp),
+			 "region", "struct txn_savepoint");
 		return NULL;
 	}
 	if (stailq_empty(&txn->stmts)) {

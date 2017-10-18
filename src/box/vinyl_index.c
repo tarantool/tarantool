@@ -181,7 +181,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 
 	assert(part_count == 0 || key != NULL);
 	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
-	if (type > ITER_GT || type < 0) {
+	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
 		return NULL;
