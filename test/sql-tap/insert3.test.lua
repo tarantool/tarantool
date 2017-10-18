@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(16)
+test:plan(18)
 
 --!./tcltestrunner.lua
 -- 2005 January 13
@@ -37,7 +37,7 @@ test:do_execsql_test(
             INSERT INTO t1(a, b) VALUES('hello','world');
             INSERT INTO t1(a, b) VALUES(5,10);
             SELECT x,y FROM log ORDER BY x;
-        ]], {
+    ]], {
         -- <insert3-1.0>
         5, 1, "hello", 1
         -- </insert3-1.0>
@@ -48,7 +48,7 @@ test:do_execsql_test(
     [[
             INSERT INTO t1(a, b) SELECT a, b+10 FROM t1;
             SELECT x, y FROM log ORDER BY x;
-        ]], {
+    ]], {
         -- <insert3-1.1>
         5, 2, "hello", 2
         -- </insert3-1.1>
@@ -64,7 +64,7 @@ test:do_execsql_test(
             END;
             INSERT INTO t1(a, b) VALUES(453,'hi');
             SELECT x,y FROM log ORDER BY x;
-        ]], {
+    ]], {
         -- <insert3-1.2>
         5, 2, 453, 1, "hello", 2
         -- </insert3-1.2>
@@ -74,7 +74,7 @@ test:do_execsql_test(
     "insert3-1.3",
     [[
             SELECT x,y FROM log2 ORDER BY x;
-        ]], {
+    ]], {
         -- <insert3-1.3>
         "hi", 1
         -- </insert3-1.3>
@@ -86,7 +86,7 @@ test:do_execsql_test(
             INSERT INTO t1(a,b) SELECT a,b FROM t1;
             SELECT 'a:', x, y FROM log UNION ALL
                 SELECT 'b:', x, y FROM log2 ORDER BY x;
-        ]], {
+    ]], {
         -- <insert3-1.4.1>
         "a:", 5, 4, "b:", 10, 2, "b:", 20, 1, "a:", 453, 2, "a:", "hello", 4, "b:", "hi", 2, "b:", "world", 1
         -- </insert3-1.4.1>
@@ -97,7 +97,7 @@ test:do_execsql_test(
     [[
             SELECT 'a:', x, y FROM log UNION ALL
                 SELECT 'b:', x, y FROM log2 ORDER BY x, y;
-        ]], {
+    ]], {
         -- <insert3-1.4.2>
         "a:", 5, 4, "b:", 10, 2, "b:", 20, 1, "a:", 453, 2, "a:", "hello", 4, "b:", "hi", 2, "b:", "world", 1
         -- </insert3-1.4.2>
@@ -108,7 +108,7 @@ test:do_execsql_test(
     [[
             INSERT INTO t1(a) VALUES('xyz');
             SELECT x,y FROM log ORDER BY x;
-        ]], {
+    ]], {
         -- <insert3-1.5>
         5, 4, 453, 2, "hello", 4, "xyz", 1
         -- </insert3-1.5>
@@ -132,7 +132,7 @@ test:do_execsql_test(
             INSERT INTO t2(b) VALUES(234);
             INSERT INTO t2(c) VALUES(345);
             SELECT * FROM t2dup;
-        ]], {
+    ]], {
         -- <insert3-2.1>
         1, 123, "b", "c", 2, -1, 234, "c", 3, -1, "b", 345
         -- </insert3-2.1>
@@ -146,7 +146,7 @@ test:do_execsql_test(
             INSERT INTO t2(b) SELECT 987 FROM t1 LIMIT 1;
             INSERT INTO t2(c) SELECT 876 FROM t1 LIMIT 1;
             SELECT * FROM t2dup;
-        ]], {
+    ]], {
         -- <insert3-2.2>
         4, 1, "b", "c", 5, -1, 987, "c", 6, -1, "b", 876
         -- </insert3-2.2>
@@ -161,7 +161,7 @@ test:do_execsql_test(
             CREATE TRIGGER t3r1 BEFORE INSERT on t3 WHEN nosuchcol BEGIN
               SELECT 'illegal WHEN clause';
             END;
-        ]], {
+    ]], {
         -- <insert3-3.1>
         -- </insert3-3.1>
 })
@@ -170,7 +170,7 @@ test:do_catchsql_test(
     "insert3-3.2",
     [[
             INSERT INTO t3 (a,b,c)VALUES(1,2,3)
-        ]], {
+    ]], {
         -- <insert3-3.2>
         1, "no such column: nosuchcol"
         -- </insert3-3.2>
@@ -183,7 +183,7 @@ test:do_execsql_test(
             CREATE TRIGGER t4r1 AFTER INSERT on t4 WHEN nosuchcol BEGIN
               SELECT 'illegal WHEN clause';
             END;
-        ]], {
+    ]], {
         -- <insert3-3.3>
 
         -- </insert3-3.3>
@@ -193,7 +193,7 @@ test:do_catchsql_test(
     "insert3-3.4",
     [[
             INSERT INTO t4 (a,b,c)VALUES(1,2,3)
-        ]], {
+    ]], {
         -- <insert3-3.4>
         1, "no such column: nosuchcol"
         -- </insert3-3.4>
@@ -213,7 +213,7 @@ test:do_execsql_test(
             );
             INSERT INTO t5 DEFAULT VALUES;
             SELECT * FROM t5;
-        ]], {
+    ]], {
         -- <insert3-3.5>
         1, "xyz"
         -- </insert3-3.5>
@@ -224,7 +224,7 @@ test:do_execsql_test(
     [[
             INSERT INTO t5 DEFAULT VALUES;
             SELECT * FROM t5;
-        ]], {
+    ]], {
         -- <insert3-3.6>
         1, "xyz", 2, "xyz"
         -- </insert3-3.6>
@@ -236,13 +236,31 @@ test:do_execsql_test(
             CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x,y DEFAULT 4.3, z DEFAULT x'6869');
             INSERT INTO t6 DEFAULT VALUES;
             SELECT * FROM t6;
-        ]], {
+    ]], {
         -- <insert3-3.7>
         1, "", 4.3, "hi"
         -- </insert3-3.7>
 })
 
+test:execsql("CREATE TABLE t7(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT DEFAULT 1);")
 
+test:do_execsql_test(
+	"insert3-4.1",
+	[[
+		INSERT INTO t7 DEFAULT VALUES;
+	]], {
+		-- <insert3-4.1>
+		-- <insert3-4.1>
+})
+
+test:do_execsql_test(
+	"insert3-4.1",
+	[[
+		INSERT INTO t7(a) VALUES(10);
+	]], {
+		-- <insert3-4.1>
+		-- <insert3-4.1>
+})
 
 test:drop_all_tables()
 ---------------------------------------------------------------------------
