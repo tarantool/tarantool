@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(4)
+test:plan(1)
 
 --!./tcltestrunner.lua
 -- 2005-02-14
@@ -52,44 +52,45 @@ test:do_execsql_test(
 -- identifiers for the the column names continue to work correctly.
 -- This is undocumented behavior retained for backwards compatiblity.
 --
-test:do_execsql_test(
-    "index3-2.1",
-    [[
-        DROP TABLE t1;
-        CREATE TABLE t1(a, b, c, d, e, 
-                        PRIMARY KEY(a), UNIQUE(b COLLATE nocase DESC));
-        CREATE INDEX t1c ON t1('c');
-        CREATE INDEX t1d ON t1(d COLLATE binary ASC);
-        WITH RECURSIVE c(x) AS (VALUES(1) UNION SELECT x+1 FROM c WHERE x<30)
-          INSERT INTO t1(a,b,c,d,e) 
-            SELECT x, printf('ab%03xxy',x), x, x, x FROM c;
-    ]], {
-        -- <index3-2.1>
+-- Commented due to: #2121
+-- test:do_execsql_test(
+--     "index3-2.1",
+--     [[
+--         DROP TABLE t1;
+--         CREATE TABLE t1(a, b, c, d, e, 
+--                         PRIMARY KEY(a), UNIQUE(b COLLATE nocase DESC));
+--         CREATE INDEX t1c ON t1('c');
+--         CREATE INDEX t1d ON t1(d COLLATE binary ASC);
+--         WITH RECURSIVE c(x) AS (VALUES(1) UNION SELECT x+1 FROM c WHERE x<30)
+--           INSERT INTO t1(a,b,c,d,e) 
+--             SELECT x, printf('ab%03xxy',x), x, x, x FROM c;
+--     ]], {
+--         -- <index3-2.1>
         
-        -- </index3-2.1>
-    })
+--         -- </index3-2.1>
+--     })
 
-test:do_execsql_test(
-    "index3-2.2",
-    [[
-        SELECT a FROM t1 WHERE b='ab005xy' COLLATE nocase;
-    ]], {
-        -- <index3-2.2>
-        5
-        -- </index3-2.2>
-    })
+-- test:do_execsql_test(
+--     "index3-2.2",
+--     [[
+--         SELECT a FROM t1 WHERE b='ab005xy' COLLATE nocase;
+--     ]], {
+--         -- <index3-2.2>
+--         5
+--         -- </index3-2.2>
+--     })
 
--- MUST_WORK_TEST
-test:do_execsql_test(
-    "index3-2.2eqp",
-    [[
-        EXPLAIN QUERY PLAN
-        SELECT a FROM t1 WHERE b='ab005xy' COLLATE nocase;
-    ]], {
-        -- <index3-2.2eqp>
-        "/SEARCH TABLE t1/"
-        -- </index3-2.2eqp>
-    })
+-- -- MUST_WORK_TEST
+-- test:do_execsql_test(
+--     "index3-2.2eqp",
+--     [[
+--         EXPLAIN QUERY PLAN
+--         SELECT a FROM t1 WHERE b='ab005xy' COLLATE nocase;
+--     ]], {
+--         -- <index3-2.2eqp>
+--         "/SEARCH TABLE t1/"
+--         -- </index3-2.2eqp>
+--     })
 
 -- # This test corrupts the database file so it must be the last test
 -- # in the series.

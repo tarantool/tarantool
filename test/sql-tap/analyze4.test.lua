@@ -70,7 +70,9 @@ test:do_test(
     function()
         return test:execsql([[
             UPDATE t1 SET b='x' WHERE a%2;
+-- pragma vdbe_debug=1;
             ANALYZE;
+-- pragma vdbe_debug=0;
             SELECT idx, stat FROM _sql_stat1 WHERE tbl='t1' ORDER BY idx;
         ]])
     end, {
