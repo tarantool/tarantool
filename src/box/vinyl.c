@@ -2329,6 +2329,14 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 	stmt->new_tuple = NULL;
 }
 
+static void
+txn_on_stop(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	(void)event;
+	txn_rollback();
+}
+
 static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
@@ -2337,6 +2345,10 @@ vinyl_engine_begin(struct engine *engine, struct txn *txn)
 	txn->engine_tx = vy_tx_begin(env->xm);
 	if (txn->engine_tx == NULL)
 		return -1;
+	if (!txn->is_autocommit) {
+		trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
+		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+	}
 	return 0;
 }
 
@@ -2426,6 +2438,9 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_unref_tuples(stmt);
 	txn->engine_tx = NULL;
+
+	if (!txn->is_autocommit)
+		trigger_clear(&txn->fiber_on_stop);
 }
 
 static void
@@ -2442,6 +2457,9 @@ vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_unref_tuples(stmt);
 	txn->engine_tx = NULL;
+
+	if (!txn->is_autocommit)
+		trigger_clear(&txn->fiber_on_stop);
 }
 
 static int
