@@ -713,14 +713,6 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	}
 	sqlite3VdbeResolveLabel(v, labelBreak);
 
-	/* Update the sqlite_sequence table by storing the content of the
-	 * maximum rowid counter values recorded while inserting into
-	 * autoincrement tables.
-	 */
-	if (pParse->nested == 0 && pParse->pTriggerTab == 0) {
-		sqlite3AutoincrementEnd(pParse);
-	}
-
 	/*
 	 * Return the number of rows that were changed. If this routine is
 	 * generating code because of a call to sqlite3NestedParse(), do not

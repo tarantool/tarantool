@@ -596,14 +596,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		}
 	}			/* End non-truncate path */
 
-	/* Update the sqlite_sequence table by storing the content of the
-	 * maximum rowid counter values recorded while inserting into
-	 * autoincrement tables.
-	 */
-	if (pParse->nested == 0 && pParse->pTriggerTab == 0) {
-		sqlite3AutoincrementEnd(pParse);
-	}
-
 	/* Return the number of rows that were deleted. If this routine is
 	 * generating code because of a call to sqlite3NestedParse(), do not
 	 * invoke the callback function.

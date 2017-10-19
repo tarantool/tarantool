@@ -122,7 +122,7 @@ const char *sqlite3OpcodeName(int i){
     /* 108 */ "Close"            OpHelp(""),
     /* 109 */ "ColumnsUsed"      OpHelp(""),
     /* 110 */ "Sequence"         OpHelp("r[P2]=cursor[P1].ctr++"),
-    /* 111 */ "MaxId"            OpHelp("r[P3]=get_max(space_index[P1]{Column[P2]})"),
+    /* 111 */ "NextId"           OpHelp("r[P3]=get_max(space_index[P1]{Column[P2]})"),
     /* 112 */ "FCopy"            OpHelp("reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)]"),
     /* 113 */ "NewRowid"         OpHelp("r[P2]=rowid"),
     /* 114 */ "Insert"           OpHelp("intkey=r[P3] data=r[P2]"),

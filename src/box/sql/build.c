@@ -238,10 +238,6 @@ sqlite3FinishCoding(Parse * pParse)
 			 */
 			codeTableLocks(pParse);
 
-			/* Initialize any AUTOINCREMENT data structures required.
-			 */
-			sqlite3AutoincrementBegin(pParse);
-
 			/* Code constant expressions that where factored out of inner loops */
 			if (pParse->pConstExpr) {
 				ExprList *pEL = pParse->pConstExpr;
@@ -868,6 +864,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	}
 	pTable->zName = zName;
 	pTable->iPKey = -1;
+	pTable->iAutoIncPKey = -1;
 	pTable->pSchema = db->mdb.pSchema;
 	sqlite3HashInit(&pTable->idxHash);
 	pTable->nTabRef = 1;
@@ -876,12 +873,12 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	assert(pParse->pNewTable == 0);
 	pParse->pNewTable = pTable;
 
-	/* If this is the magic _sql_sequence table used by autoincrement,
+	/* If this is the magic _sequence table used by autoincrement,
 	 * then record a pointer to this table in the main database structure
 	 * so that INSERT can find the table easily.
 	 */
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-	if (!pParse->nested && strcmp(zName, "_sql_sequence") == 0) {
+	if (!pParse->nested && strcmp(zName, "_sequence") == 0) {
 		assert(sqlite3SchemaMutexHeld(db, 0));
 		pTable->pSchema->pSeqTab = pTable;
 	}
@@ -1220,13 +1217,13 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 			}
 		}
 	}
-	pTab->iAutoIncPKey = -1;
 	if (nTerm == 1
 	    && pCol
 	    && sqlite3StrICmp(sqlite3ColumnType(pCol, ""), "INTEGER") == 0
 	    && sortOrder != SQLITE_SO_DESC) {
 		pTab->iPKey = iCol;
-		pTab->iAutoIncPKey = iCol;
+		if (autoInc)
+			pTab->iAutoIncPKey = iCol;
 		pTab->keyConf = (u8) onError;
 		assert(autoInc == 0 || autoInc == 1);
 		pTab->tabFlags |= autoInc * TF_Autoincrement;
@@ -1911,6 +1908,76 @@ parseTableSchemaRecord(Parse * pParse, int iSpaceId, char *zStmt)
 	sqlite3VdbeAddParseSchema2Op(v, 0, iTop, pParse->nMem - iTop + 1);
 }
 
+int
+emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
+{
+	Vdbe *v = sqlite3GetVdbe(pParse);
+	sqlite3 *db = pParse->db;
+	int first_col = pParse->nMem + 1;
+	pParse->nMem += 10; /* 9 fields + new record pointer  */
+
+	const long long int min_usigned_long_long = 0;
+	const long long int max_usigned_long_long = LLONG_MAX;
+	const bool const_false = false;
+
+	/* 1. New sequence id  */
+	sqlite3VdbeAddOp2(v, OP_SCopy, reg_seq_id, first_col + 1);
+	/* 2. user is  */
+	sqlite3VdbeAddOp2(v, OP_Integer, current_user()->uid, first_col + 2);
+	/* 3. New sequence name  */
+        sqlite3VdbeAddOp4(v, OP_String8, 0, first_col + 3, 0,
+			  sqlite3DbStrDup(pParse->db, seq_name), P4_DYNAMIC);
+
+	/* 4. Step  */
+	sqlite3VdbeAddOp2(v, OP_Integer, 1, first_col + 4);
+
+	/* 5. Minimum  */
+	sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 5, 0,
+			      (unsigned char*)&min_usigned_long_long, P4_INT64);
+	/* 6. Maximum  */
+	sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 6, 0,
+			      (unsigned char*)&max_usigned_long_long, P4_INT64);
+	/* 7. Start  */
+	sqlite3VdbeAddOp2(v, OP_Integer, 1, first_col + 7);
+
+	/* 8. Cache  */
+	sqlite3VdbeAddOp2(v, OP_Integer, 0, first_col + 8);
+
+	/* 9. Cycle  */
+	sqlite3VdbeAddOp2(v, OP_Bool, 0, first_col + 9);
+	sqlite3VdbeChangeP4(v, -1, (char*)&const_false, P4_BOOL);
+
+	sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col + 1, 9, first_col);
+
+	if (db->mallocFailed)
+		return -1;
+	else
+		return first_col;
+}
+
+int
+emitNewSysSpaceSequenceRecord(Parse *pParse, int space_id, const char reg_seq_id)
+{
+	Vdbe *v = sqlite3GetVdbe(pParse);
+	const bool const_true = true;
+	int first_col = pParse->nMem + 1;
+	pParse->nMem += 4; /* 3 fields + new record pointer  */
+
+	/* 1. Space id  */
+	sqlite3VdbeAddOp2(v, OP_SCopy, space_id, first_col + 1);
+	
+	/* 2. Sequence id  */
+	sqlite3VdbeAddOp2(v, OP_IntCopy, reg_seq_id, first_col + 2);
+
+	/* 3. True, which is 1 in SQL  */
+	sqlite3VdbeAddOp2(v, OP_Bool, 0, first_col + 3);
+	sqlite3VdbeChangeP4(v, -1, (char*)&const_true, P4_BOOL);
+
+	sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col + 1, 3, first_col);
+
+	return first_col;
+}
+
 /*
  * This routine is called to report the final ")" that terminates
  * a CREATE TABLE statement.
@@ -2125,16 +2192,57 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
 #ifndef SQLITE_OMIT_AUTOINCREMENT
-		/* Check to see if we need to create an _sql_sequence table for
+		/* Check to see if we need to create an _sequence table for
 		 * keeping track of autoincrement keys.
 		 */
 		if ((p->tabFlags & TF_Autoincrement) != 0) {
-			Db *pDb = &db->mdb;
-			assert(sqlite3SchemaMutexHeld(db, 0));
-			if (pDb->pSchema->pSeqTab == 0) {
-				sqlite3NestedParse(pParse,
-						   "CREATE TABLE _sql_sequence(name PRIMARY KEY,seq)");
-			}
+			Table *sys_sequence, *sys_space_sequence;
+			int reg_seq_id;
+			int reg_seq_record, reg_space_seq_record;
+			assert(iSpaceId);
+
+			/* Do an insertion into _sequence  */
+			sys_sequence = sqlite3HashFind(
+				&pParse->db->mdb.pSchema->tblHash,
+				TARANTOOL_SYS_SEQUENCE_NAME);
+			if (NEVER(!sys_sequence))
+				return;
+
+			sqlite3OpenTable(pParse, iCursor, sys_sequence,
+					 OP_OpenWrite);
+			reg_seq_id = ++pParse->nMem;
+			sqlite3VdbeAddOp3(v, OP_NextId, iCursor, 0, reg_seq_id);
+
+			reg_seq_record = emitNewSysSequenceRecord(pParse,
+								  reg_seq_id,
+								  p->zName);
+			if (reg_seq_record < 0)
+				return;
+			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor,
+					     reg_seq_record,
+					     reg_seq_record + 1, 9);
+			sqlite3VdbeAddOp1(v, OP_Close, iCursor);
+
+			/* Do an insertion into _space_sequence  */
+			sys_space_sequence = sqlite3HashFind(
+				&pParse->db->mdb.pSchema->tblHash,
+				TARANTOOL_SYS_SPACE_SEQUENCE_NAME);
+			if (NEVER(!sys_space_sequence))
+				return;
+
+			sqlite3OpenTable(pParse, iCursor, sys_space_sequence,
+					 OP_OpenWrite);
+			
+			reg_space_seq_record = emitNewSysSpaceSequenceRecord(
+				pParse,
+				iSpaceId,
+				reg_seq_id);
+
+			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor,
+					     reg_space_seq_record,
+					     reg_space_seq_record + 1, 3);
+
+			sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 		}
 #endif
 
@@ -2435,14 +2543,19 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	}
 	pParse->nested--;
 
-	/* Remove any entries of the _sql_sequence table associated with
+	/* Remove any entries of the _sequence table associated with
 	 * the table being dropped. This is done before the table is dropped
-	 * at the btree level, in case the _sql_sequence table needs to
+	 * at the btree level, in case the _sequence table needs to
 	 * move as a result of the drop.
 	 */
 	if (pTab->tabFlags & TF_Autoincrement) {
 		sqlite3NestedParse(pParse,
-				   "DELETE FROM _sql_sequence WHERE name=%Q",
+				   "DELETE FROM %s WHERE space_id=%d",
+				   TARANTOOL_SYS_SPACE_SEQUENCE_NAME,
+				   SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+		sqlite3NestedParse(pParse,
+				   "DELETE FROM %s WHERE name=%Q",
+				   TARANTOOL_SYS_SEQUENCE_NAME,
 				   pTab->zName);
 	}
 

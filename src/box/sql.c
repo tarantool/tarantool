@@ -740,6 +740,15 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		" (id INT PRIMARY KEY, count INT NOT NULL)"
 	);
 
+	sql_schema_put(init, TARANTOOL_SYS_SEQUENCE_NAME, BOX_SEQUENCE_ID, 0,
+		       "CREATE TABLE "TARANTOOL_SYS_SEQUENCE_NAME
+		       " (id INT PRIMARY KEY, uid INT, name TEXT, step INT, "
+		       "max INT, min INT, start INT, cache INT, cycle INT)");
+
+	sql_schema_put(init, TARANTOOL_SYS_SPACE_SEQUENCE_NAME, BOX_SPACE_SEQUENCE_ID, 0,
+		       "CREATE TABLE "TARANTOOL_SYS_SPACE_SEQUENCE_NAME
+		       " (space_id INT PRIMARY KEY, sequence_id INT, flag INT)");
+
 	/* Read _space */
 	if (space_foreach(space_foreach_put_cb, init) != 0) {
 		init->rc = SQLITE_TARANTOOL_ERROR;

@@ -3764,6 +3764,7 @@ case OP_SeekGT: {       /* jump, in3 */
 #ifdef SQLITE_DEBUG
 	pC->seekOp = pOp->opcode;
 #endif
+	iKey = 0;
 	reg_ipk = pOp->p5;
 	if (pC->isTable)
 		reg_ipk = pOp->p3;
@@ -4163,16 +4164,17 @@ case OP_Sequence: {           /* out2 */
 	break;
 }
 
-/* Opcode: MaxId P1 P2 P3 * *
+/* Opcode: NextId P1 P2 P3 * *
  * Synopsis: r[P3]=get_max(space_index[P1]{Column[P2]})
  *
  * Get next Id of the table. P1 is a table cursor, P2 is column
- * number. Return in P3 maximum id found in provided column.
+ * number. Return in P3 maximum id found in provided column,
+ * incremented by one.
  *
  * This opcode is Tarantool specific and will segfault in case
  * of SQLite cursor.
  */
-case OP_MaxId: {     /* out3 */
+case OP_NextId: {     /* out3 */
 	VdbeCursor *pC;    /* The VDBE cursor */
 	int p2;            /* Column number, which stores the id */
 	int pgno;          /* Page number of the cursor */
@@ -4190,6 +4192,7 @@ case OP_MaxId: {     /* out3 */
 			     p2,
 			     (uint64_t *) &pOut->u.i);
 
+	pOut->u.i += 1;
 	pOut->flags = MEM_Int;
 	break;
 }
@@ -4401,7 +4404,7 @@ case OP_NewRowid: {           /* out2 */
  * cause any problems.)
  *
  * This instruction only works on tables.  The equivalent instruction
- * for indices is OP_IdxInsert.
+ * for indices is OP_IdxInsert
  */
 /* Opcode: InsertInt P1 P2 P3 P4 P5
  * Synopsis: intkey=P3 data=r[P2]

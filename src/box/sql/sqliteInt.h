@@ -3461,13 +3461,6 @@ int sqlite3DbMaskAllZero(yDbMask);
 void sqlite3DropTable(Parse *, SrcList *, int, int);
 void sqlite3CodeDropTable(Parse *, Table *, int);
 void sqlite3DeleteTable(sqlite3 *, Table *);
-#ifndef SQLITE_OMIT_AUTOINCREMENT
-void sqlite3AutoincrementBegin(Parse * pParse);
-void sqlite3AutoincrementEnd(Parse * pParse);
-#else
-#define sqlite3AutoincrementBegin(X)
-#define sqlite3AutoincrementEnd(X)
-#endif
 void sqlite3Insert(Parse *, SrcList *, Select *, IdList *, int);
 void *sqlite3ArrayAllocate(sqlite3 *, void *, int, int *, int *);
 IdList *sqlite3IdListAppend(sqlite3 *, IdList *, Token *);

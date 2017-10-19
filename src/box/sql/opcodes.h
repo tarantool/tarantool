@@ -111,7 +111,7 @@
 #define OP_Close         108
 #define OP_ColumnsUsed   109
 #define OP_Sequence      110 /* synopsis: r[P2]=cursor[P1].ctr++           */
-#define OP_MaxId         111 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
+#define OP_NextId        111 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
 #define OP_FCopy         112 /* synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)] */
 #define OP_NewRowid      113 /* synopsis: r[P2]=rowid                      */
 #define OP_Insert        114 /* synopsis: intkey=r[P3] data=r[P2]          */

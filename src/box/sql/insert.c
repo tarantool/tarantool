@@ -219,195 +219,6 @@ readsTable(Parse * p, Table * pTab)
 	return 0;
 }
 
-#ifndef SQLITE_OMIT_AUTOINCREMENT
-/*
- * Locate or create an AutoincInfo structure associated with table pTab
- * which is in database.  Return the register number for the register
- * that holds the maximum rowid.  Return zero if pTab is not an AUTOINCREMENT
- * table.
- * There is at most one AutoincInfo structure per table even if the
- * same table is autoincremented multiple times due to inserts within
- * triggers.  A new AutoincInfo structure is created if this is the
- * first use of table pTab.  On 2nd and subsequent uses, the original
- * AutoincInfo structure is used.
- *
- * Three memory locations are allocated:
- *
- *   (1)  Register to hold the name of the pTab table.
- *   (2)  Register to hold the maximum ROWID of pTab.
- *   (3)  Register to hold the rowid in _sql_sequence of pTab
- *
- * The 2nd register is the one that is returned.  That is all the
- * insert routine needs to know about.
- */
-static int
-autoIncBegin(Parse * pParse,	/* Parsing context */
-	     Table * pTab)	/* The table we are writing to */
-{
-	int memId = 0;		/* Register holding maximum rowid */
-	if ((pTab->tabFlags & TF_Autoincrement) != 0) {
-		Parse *pToplevel = sqlite3ParseToplevel(pParse);
-		AutoincInfo *pInfo;
-
-		pInfo = pToplevel->pAinc;
-		while (pInfo && pInfo->pTab != pTab) {
-			pInfo = pInfo->pNext;
-		}
-		if (pInfo == 0) {
-			pInfo =
-			    sqlite3DbMallocRawNN(pParse->db, sizeof(*pInfo));
-			if (pInfo == 0)
-				return 0;
-			pInfo->pNext = pToplevel->pAinc;
-			pToplevel->pAinc = pInfo;
-			pInfo->pTab = pTab;
-			pToplevel->nMem++;	/* Register to hold name of table */
-			pInfo->regCtr = ++pToplevel->nMem;	/* Max rowid register */
-			pToplevel->nMem++;	/* Rowid in _sql_sequence */
-		}
-		memId = pInfo->regCtr;
-	}
-	return memId;
-}
-
-/*
- * This routine generates code that will initialize all of the
- * register used by the autoincrement tracker.
- */
-void
-sqlite3AutoincrementBegin(Parse * pParse)
-{
-	AutoincInfo *p;		/* Information about an AUTOINCREMENT */
-	sqlite3 *db = pParse->db;	/* The database connection */
-	Db *pDb;		/* Database only autoinc table */
-	int memId;		/* Register holding max rowid */
-	Vdbe *v = pParse->pVdbe;	/* VDBE under construction */
-
-	/* This routine is never called during trigger-generation.  It is
-	 * only called from the top-level
-	 */
-	assert(pParse->pTriggerTab == 0);
-	assert(sqlite3IsToplevel(pParse));
-
-	assert(v);		/* We failed long ago if this is not so */
-	for (p = pParse->pAinc; p; p = p->pNext) {
-		static const int iLn = VDBE_OFFSET_LINENO(2);
-		static const VdbeOpList autoInc[] = {
-			/* 0  */ {OP_Null, 0, 0, 0},
-			/* 1  */ {OP_Rewind, 0, 9, 0},
-			/* 2  */ {OP_Column, 0, 0, 0},
-			/* 3  */ {OP_Ne, 0, 6, 0},
-			/* 4  */ {OP_Column, 0, 1, 0},
-			/* 5  */ {OP_Goto, 0, 8, 0},
-			/* 6  */ {OP_Next, 0, 2, 0},
-			/* 7  */ {OP_Integer, 0, 0, 0},
-			/* 8  */ {OP_Close, 0, 0, 0}
-		};
-		VdbeOp *aOp;
-		pDb = &db->mdb;
-		memId = p->regCtr;
-		assert(sqlite3SchemaMutexHeld(db, pDb->pSchema));
-		sqlite3OpenTable(pParse, 0, pDb->pSchema->pSeqTab, OP_OpenRead);
-		sqlite3VdbeLoadString(v, memId - 1, p->pTab->zName);
-		aOp = sqlite3VdbeAddOpList(v, ArraySize(autoInc), autoInc, iLn);
-		if (aOp == 0)
-			break;
-		aOp[0].p2 = memId;
-		aOp[0].p3 = memId + 1;
-		aOp[2].p3 = memId;
-		aOp[3].p1 = memId - 1;
-		aOp[3].p3 = memId;
-		aOp[3].p5 = SQLITE_JUMPIFNULL;
-		aOp[4].p3 = memId;
-		aOp[7].p2 = memId;
-	}
-}
-
-/*
- * Update the maximum rowid for an autoincrement calculation.
- *
- * This routine should be called when the regRowid register holds a
- * new rowid that is about to be inserted.  If that new rowid is
- * larger than the maximum rowid in the memId memory cell, then the
- * memory cell is updated.
- */
-static void
-autoIncStep(Parse * pParse, int memId, int regRowid)
-{
-	if (memId > 0) {
-		sqlite3VdbeAddOp2(pParse->pVdbe, OP_MemMax, memId, regRowid);
-	}
-}
-
-/*
- * This routine generates the code needed to write autoincrement
- * maximum rowid values back into the _sql_sequence register.
- * Every statement that might do an INSERT into an autoincrement
- * table (either directly or through triggers) needs to call this
- * routine just before the "exit" code.
- */
-static SQLITE_NOINLINE void
-autoIncrementEnd(Parse * pParse)
-{
-	AutoincInfo *p;
-	Vdbe *v = pParse->pVdbe;
-	sqlite3 *db = pParse->db;
-
-	assert(v);
-	for (p = pParse->pAinc; p; p = p->pNext) {
-		static const int iLn = VDBE_OFFSET_LINENO(2);
-		static const VdbeOpList autoIncEnd[] = {
-			/* 0 */ {OP_SeekGE, 0, 3, 0},
-			/* 1 */ {OP_IdxGT, 0, 3, 0},
-			/* 2 */ {OP_Delete, 0, 0, 0},
-			/* 3 */ {OP_MakeRecord, 0, 2, 0},
-			/* 4 */ {OP_IdxInsert, 0, 0, 0},
-			/* 5 */ {OP_Close, 0, 0, 0}
-		};
-		VdbeOp *aOp;
-		Db *pDb = &db->mdb;
-		int iRec;
-		int memId = p->regCtr;
-
-		iRec = sqlite3GetTempReg(pParse);
-		assert(sqlite3SchemaMutexHeld(db, pDb->pSchema));
-		sqlite3OpenTable(pParse, 0, pDb->pSchema->pSeqTab,
-				 OP_OpenWrite);
-		aOp =
-		    sqlite3VdbeAddOpList(v, ArraySize(autoIncEnd), autoIncEnd,
-					 iLn);
-		if (aOp == 0)
-			break;
-		aOp[0].p3 = memId - 1;
-		aOp[0].p4.i = 1;
-		aOp[0].p4type = P4_INT32;
-		aOp[1].p3 = memId - 1;
-		aOp[1].p4.i = 1;
-		aOp[1].p4type = P4_INT32;
-		aOp[2].p2 = memId + 1;
-		aOp[3].p1 = memId - 1;
-		aOp[3].p3 = iRec;
-		aOp[4].p2 = iRec;
-		aOp[4].p3 = memId + 1;
-		aOp[4].p5 = OPFLAG_APPEND;
-		sqlite3ReleaseTempReg(pParse, iRec);
-	}
-}
-
-void
-sqlite3AutoincrementEnd(Parse * pParse)
-{
-	if (pParse->pAinc)
-		autoIncrementEnd(pParse);
-}
-#else
-/*
- * If SQLITE_OMIT_AUTOINCREMENT is defined, then the three routines
- * above are all no-ops
- */
-#define autoIncBegin(A,B,C) (0)
-#define autoIncStep(A,B,C)
-#endif				/* SQLITE_OMIT_AUTOINCREMENT */
 
 /* Forward declaration */
 static int
@@ -545,13 +356,10 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 
 	/* Register allocations */
 	int regFromSelect = 0;	/* Base register for data coming from SELECT */
-	int regAutoinc = 0;	/* Register holding the AUTOINCREMENT counter */
 	int regRowCount = 0;	/* Memory cell used for the row counter */
 	int regIns;		/* Block of regs holding rowid+data being inserted */
 	int regRowid;		/* registers holding insert rowid */
 	int regData;		/* register holding first column to insert */
-	int regPK;		/* register containing PK for autoinc prepared
-				   for MakeRecord */
 	int *aRegIdx = 0;	/* One register allocated to each index */
 
 #ifndef SQLITE_OMIT_TRIGGER
@@ -649,11 +457,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		goto insert_end;
 	}
 #endif				/* SQLITE_OMIT_XFER_OPT */
-
-	/* If this is an AUTOINCREMENT table, look up the sequence number in the
-	 * _sql_sequence table and store it in memory cell regAutoinc.
-	 */
-	regAutoinc = autoIncBegin(pParse, pTab);
 
 	/* Allocate registers for holding the rowid of the new row,
 	 * the content of the new row, and the assembled row record.
@@ -886,34 +689,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (tmask & TRIGGER_BEFORE) {
 		int regCols = sqlite3GetTempRange(pParse, pTab->nCol + 1);
 
-		/* build the NEW.* reference row.  Note that if there is an INTEGER
-		 * PRIMARY KEY into which a NULL is being inserted, that NULL will be
-		 * translated into a unique ID for the row.  But on a BEFORE trigger,
-		 * we do not know what the unique ID will be (because the insert has
-		 * not happened yet) so we substitute a rowid of -1
-		 */
-		if (ipkColumn < 0) {
-			sqlite3VdbeAddOp2(v, OP_Integer, -1, regCols);
-		} else {
-			int addr1;
-			assert(!withoutRowid);
-			if (useTempTable) {
-				sqlite3VdbeAddOp3(v, OP_Column, srcTab,
-						  ipkColumn, regCols);
-			} else {
-				assert(pSelect == 0);	/* Otherwise useTempTable is true */
-				sqlite3ExprCode(pParse,
-						pList->a[ipkColumn].pExpr,
-						regCols);
-			}
-			addr1 = sqlite3VdbeAddOp1(v, OP_NotNull, regCols);
-			VdbeCoverage(v);
-			sqlite3VdbeAddOp2(v, OP_Integer, -1, regCols);
-			sqlite3VdbeJumpHere(v, addr1);
-			sqlite3VdbeAddOp1(v, OP_MustBeInt, regCols);
-			VdbeCoverage(v);
-		}
-
 		/* Create the new column data
 		 */
 		for (i = j = 0; i < pTab->nCol; i++) {
@@ -927,8 +702,13 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			    || (pColumn && j >= pColumn->nId)
 			    || (pColumn == 0
 				&& IsOrdinaryHiddenColumn(&pTab->aCol[i]))) {
-				sqlite3ExprCode(pParse, pTab->aCol[i].pDflt,
-						regCols + i + 1);
+				if (i == pTab->iAutoIncPKey)
+					sqlite3VdbeAddOp2(v, OP_Integer, -1,
+							  regCols + i + 1);
+				else
+					sqlite3ExprCode(pParse,
+							pTab->aCol[i].pDflt,
+							regCols + i + 1);
 			} else if (useTempTable) {
 				sqlite3VdbeAddOp3(v, OP_Column, srcTab, j,
 						  regCols + i + 1);
@@ -984,7 +764,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					pOp->opcode = OP_NewRowid;
 					pOp->p1 = iDataCur;
 					pOp->p2 = regRowid;
-					pOp->p3 = regAutoinc;
+					pOp->p3 = 0;
 				}
 			}
 			/* If the PRIMARY KEY expression is NULL, then use OP_NewRowid
@@ -997,48 +777,24 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				VdbeCoverage(v);
 				sqlite3VdbeAddOp3(v, OP_NewRowid,
 						  iDataCur, regRowid,
-						  regAutoinc);
+						  0);
 				sqlite3VdbeJumpHere(v, addr1);
 				sqlite3VdbeAddOp1(v, OP_MustBeInt, regRowid);
 				VdbeCoverage(v);
 			}
 		} else if (withoutRowid) {
-			if (pTab->iAutoIncPKey >= 0)
-				sqlite3VdbeAddOp3(v, OP_MaxId, iDataCur,
-						  pTab->iAutoIncPKey, regRowid);
-			else
-				sqlite3VdbeAddOp2(v, OP_Null, 0, regRowid);
+			sqlite3VdbeAddOp2(v, OP_Null, 0, regRowid);
 		} else {
 			sqlite3VdbeAddOp3(v, OP_NewRowid, iDataCur, regRowid,
-					  regAutoinc);
+					  0);
 		}
-		autoIncStep(pParse, regAutoinc, regRowid);
 
 		/* Compute data for all columns of the new entry, beginning
 		 * with the first column.
 		 */
 		nHidden = 0;
-		regPK = -1;
 		for (i = 0; i < pTab->nCol; i++) {
 			int iRegStore = regRowid + 1 + i;
-			if (i == pTab->iAutoIncPKey) {
-				/* PK was not specified in IDLIST and marked for
-				 * autoincrementation. Extract max ID from the
-				 * index and increment it. This'll be compared
-				 * w/ corresponding value extracted from
-				 * _sql_sequence for given index later.
-				 */
-				if ((pTab->tabFlags & TF_Autoincrement)
-				    && (ipkColumn == -1)) {
-					sqlite3VdbeAddOp2(v,
-							  OP_FCopy,
-							  regAutoinc,
-							  iRegStore);
-					sqlite3VdbeAddOp2(v, OP_AddImm,
-							  iRegStore, 1);
-				}
-				regPK = iRegStore;
-			}
 			if (pColumn == 0) {
 				if (IsHiddenColumn(&pTab->aCol[i])) {
 					j = -1;
@@ -1054,8 +810,10 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			}
 			if (j < 0 || nColumn == 0
 			    || (pColumn && j >= pColumn->nId)) {
-				if (i == pTab->iAutoIncPKey)
+				if (i == pTab->iAutoIncPKey) {
+					sqlite3VdbeAddOp2(v, OP_Null, 0, iRegStore);
 					continue;
+				}
 				sqlite3ExprCodeFactorable(pParse,
 							  pTab->aCol[i].pDflt,
 							  iRegStore);
@@ -1102,9 +860,12 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					}
 				}
 			} else {
+
 				if (i == pTab->iAutoIncPKey) {
-					if (pList->a[j].pExpr->op == TK_NULL)
+					if (pList->a[j].pExpr->op == TK_NULL) {
+						sqlite3VdbeAddOp2(v, OP_Null, 0, iRegStore);
 						continue;
+					}
 
 					if (pList->a[j].pExpr->op ==
 					    TK_REGISTER) {
@@ -1127,15 +888,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				sqlite3ExprCode(pParse, pList->a[j].pExpr,
 						iRegStore);
 			}
-		}
-
-		/* If value in regAutoinc exceeds one contained in
-		   regPK, need to update it.  */
-		if (pTab->tabFlags & TF_Autoincrement) {
-			/* No way there's no PK in the table.  */
-			assert(regPK >= 0);
-
-			autoIncStep(pParse, regAutoinc, regPK);
 		}
 
 		/* Generate code to check constraints and generate index keys
@@ -1195,13 +947,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	}
 
  insert_end:
-	/* Update the _sql_sequence table by storing the content of the
-	 * maximum rowid counter values recorded while inserting into
-	 * autoincrement tables.
-	 */
-	if (pParse->nested == 0 && pParse->pTriggerTab == 0) {
-		sqlite3AutoincrementEnd(pParse);
-	}
 
 	/*
 	 * Return the number of rows inserted. If this routine is
@@ -1444,7 +1189,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			continue;
 		}
 		onError = pTab->aCol[i].notNull;
-		if (onError == OE_None)
+		if (onError == OE_None || (pTab->tabFlags & TF_Autoincrement && pTab->iAutoIncPKey == i))
 			continue;	/* This column is allowed to be NULL */
 		if (overrideError != OE_Default) {
 			onError = overrideError;
@@ -1686,7 +1431,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		if (aRegIdx[ix] == 0)
 			continue;	/* Skip indices that do not change */
 		if (bAffinityDone == 0) {
-			sqlite3TableAffinity(v, pTab, regNewData + 1);
+			sqlite3TableAffinity(v, pTab, regNewData+1);
 			bAffinityDone = 1;
 		}
 		iThisCur = iIdxCur + ix;
@@ -1733,15 +1478,25 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			}
 		}
 
+		bool table_ipk_autoinc = false;
+		int reg_pk = -1;
 		if (!HasRowid(pTab) && IsPrimaryKeyIndex(pIdx)) {
 			/* If PK is marked as INTEGER, use it as strict type,
 			 * not as affinity. Emit code for type checking */
 			if (pIdx->nKeyCol == 1) {
-				int pk = pIdx->aiColumn[0];
-				if (pTab->zColAff[pk] == 'D') {
+				reg_pk = regNewData + 1 + pIdx->aiColumn[0];
+				if (pTab->zColAff[pIdx->aiColumn[0]] == 'D') {
+					int skip_if_null = sqlite3VdbeMakeLabel(v);
+					if ((pTab->tabFlags & TF_Autoincrement) != 0) {
+						sqlite3VdbeAddOp2(v, OP_IsNull,
+								  reg_pk,
+								  skip_if_null);
+						table_ipk_autoinc = true;
+					}
 					sqlite3VdbeAddOp2(v, OP_MustBeInt,
-							  regNewData + 1 + pk,
+							  reg_pk,
 							  0);
+					sqlite3VdbeResolveLabel(v, skip_if_null);
 				}
 			}
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
@@ -1796,6 +1551,10 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		}
 
 		/* Check to see if the new index entry will be unique */
+		if (table_ipk_autoinc)
+			sqlite3VdbeAddOp2(v, OP_IsNull,
+					  reg_pk,
+					  addrUniqueOk);
 		sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur, addrUniqueOk,
 				     regIdx, pIdx->nKeyCol);
 		VdbeCoverage(v);
@@ -2163,7 +1922,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	int emptyDestTest = 0;	/* Address of test for empty pDest */
 	int emptySrcTest = 0;	/* Address of test for empty pSrc */
 	Vdbe *v;		/* The VDBE we are building */
-	int regAutoinc;		/* Memory register used by AUTOINC */
 	int destHasUniqueIdx = 0;	/* True if pDest has a UNIQUE index */
 	int regData, regRowid;	/* Registers holding data and rowid */
 	struct session *user_session = current_session();
@@ -2327,7 +2085,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	sqlite3CodeVerifySchema(pParse);
 	iSrc = pParse->nTab++;
 	iDest = pParse->nTab++;
-	regAutoinc = autoIncBegin(pParse, pDest);
 	regData = sqlite3GetTempReg(pParse);
 	regRowid = sqlite3GetTempReg(pParse);
 	sqlite3OpenTable(pParse, iDest, pDest, OP_OpenWrite);
@@ -2370,7 +2127,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			VdbeCoverage(v);
 			sqlite3RowidConstraint(pParse, onError, pDest);
 			sqlite3VdbeJumpHere(v, addr2);
-			autoIncStep(pParse, regAutoinc, regRowid);
 		} else if (pDest->pIndex == 0) {
 			addr1 =
 			    sqlite3VdbeAddOp2(v, OP_NewRowid, iDest, regRowid);
@@ -2425,7 +2181,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	sqlite3ReleaseTempReg(pParse, regRowid);
 	sqlite3ReleaseTempReg(pParse, regData);
 	if (emptyDestTest) {
-		sqlite3AutoincrementEnd(pParse);
 		sqlite3VdbeAddOp2(v, OP_Halt, SQLITE_OK, 0);
 		sqlite3VdbeJumpHere(v, emptyDestTest);
 		sqlite3VdbeAddOp2(v, OP_Close, iDest, 0);

@@ -134,7 +134,7 @@ test:do_execsql_test(
             SELECT * FROM t2dup;
         ]], {
         -- <insert3-2.1>
-        1, 123, "b", "c", 2, "", 234, "c", 3, "", "b", 345
+        1, 123, "b", "c", 2, -1, 234, "c", 3, -1, "b", 345
         -- </insert3-2.1>
 })
 
@@ -148,7 +148,7 @@ test:do_execsql_test(
             SELECT * FROM t2dup;
         ]], {
         -- <insert3-2.2>
-        4, 1, "b", "c", 5, "", 987, "c", 6, "", "b", 876
+        4, 1, "b", "c", 5, -1, 987, "c", 6, -1, "b", 876
         -- </insert3-2.2>
 })
 

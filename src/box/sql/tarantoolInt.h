@@ -11,9 +11,11 @@
 /*
  * Tarantool system spaces.
  */
+#define TARANTOOL_SYS_INDEX_NAME   "_index"
+#define TARANTOOL_SYS_SEQUENCE_NAME "_sequence"
+#define TARANTOOL_SYS_SPACE_SEQUENCE_NAME "_space_sequence"
 #define TARANTOOL_SYS_SCHEMA_NAME  "_schema"
 #define TARANTOOL_SYS_SPACE_NAME   "_space"
-#define TARANTOOL_SYS_INDEX_NAME   "_index"
 #define TARANTOOL_SYS_TRIGGER_NAME "_trigger"
 #define TARANTOOL_SYS_TRUNCATE_NAME "_truncate"
 

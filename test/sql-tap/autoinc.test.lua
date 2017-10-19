@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(53)
+test:plan(43)
 
 --!./tcltestrunner.lua
 -- 2004 November 12
@@ -37,15 +37,13 @@ test:do_execsql_test(
         -- </autoinc-1.2>
     })
 
--- The SQLITE_SEQUENCE table is initially empty
---
 test:do_execsql_test(
     "autoinc-1.3",
     [[
-        SELECT * FROM _sql_sequence;
+        SELECT * FROM _sequence;
     ]], {
         -- <autoinc-1.3>
-
+        1,1,"t1",1,0,9223372036854775807LL,1,0,4294967041
         -- </autoinc-1.3>
     })
 
@@ -57,7 +55,7 @@ test:do_execsql_test(
 --         db("close")
 --         sqlite3("db", "test.db")
 --         return test:execsql([[
---             SELECT * FROM _sql_sequence;
+--             SELECT * FROM _sequence;
 --         ]])
 --     end, {
 --         -- <autoinc-1.4>
@@ -70,10 +68,10 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "autoinc-1.5",
     [[
-        DROP TABLE _sql_sequence
+        DROP TABLE _sequence
     ]], {
         -- <autoinc-1.5>
-        1, "table _sql_sequence may not be dropped"
+        1, "table _sequence may not be dropped"
         -- </autoinc-1.5>
     })
 
@@ -93,7 +91,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.1",
     [[
-        --SELECT * FROM _sql_sequence
+        --SELECT * FROM _sequence
     ]], {
         -- <autoinc-2.1>
 
@@ -104,10 +102,8 @@ test:do_execsql_test(
     "autoinc-2.2",
     [[
         INSERT INTO t1 VALUES(12,34);
-        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.2>
-        "t1", 12
         -- </autoinc-2.2>
     })
 
@@ -115,10 +111,8 @@ test:do_execsql_test(
     "autoinc-2.3",
     [[
         INSERT INTO t1 VALUES(1,23);
-        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.3>
-        "t1", 12
         -- </autoinc-2.3>
     })
 
@@ -126,10 +120,8 @@ test:do_execsql_test(
     "autoinc-2.4",
     [[
         INSERT INTO t1 VALUES(123,456);
-        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.4>
-        "t1", 123
         -- </autoinc-2.4>
     })
 
@@ -137,10 +129,10 @@ test:do_execsql_test(
     "autoinc-2.5",
     [[
         INSERT INTO t1 VALUES(NULL,567);
-        SELECT * FROM _sql_sequence;
+        SELECT MAX(x) FROM t1;
     ]], {
         -- <autoinc-2.5>
-        "t1", 124
+        124
         -- </autoinc-2.5>
     })
 
@@ -148,10 +140,10 @@ test:do_execsql_test(
     "autoinc-2.6",
     [[
         DELETE FROM t1 WHERE y=567;
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1;
     ]], {
         -- <autoinc-2.6>
-        "t1", 124
+        123
         -- </autoinc-2.6>
     })
 
@@ -159,10 +151,10 @@ test:do_execsql_test(
     "autoinc-2.7",
     [[
         INSERT INTO t1 VALUES(NULL,567);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1;
     ]], {
         -- <autoinc-2.7>
-        "t1", 125
+        125
         -- </autoinc-2.7>
     })
 
@@ -170,10 +162,8 @@ test:do_execsql_test(
     "autoinc-2.8",
     [[
         DELETE FROM t1;
-        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.8>
-        "t1", 125
         -- </autoinc-2.8>
     })
 
@@ -181,10 +171,10 @@ test:do_execsql_test(
     "autoinc-2.9",
     [[
         INSERT INTO t1 VALUES(12,34);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1;
     ]], {
         -- <autoinc-2.9>
-        "t1", 125
+        12
         -- </autoinc-2.9>
     })
 
@@ -192,10 +182,10 @@ test:do_execsql_test(
     "autoinc-2.10",
     [[
         INSERT INTO t1 VALUES(125,456);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1;
     ]], {
         -- <autoinc-2.10>
-        "t1", 125
+        125
         -- </autoinc-2.10>
     })
 
@@ -203,10 +193,10 @@ test:do_execsql_test(
     "autoinc-2.11",
     [[
         INSERT INTO t1 VALUES(-1234567,-1);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1;
     ]], {
         -- <autoinc-2.11>
-        "t1", 125
+        125
         -- </autoinc-2.11>
     })
 
@@ -214,22 +204,21 @@ test:do_execsql_test(
     "autoinc-2.12",
     [[
         INSERT INTO t1 VALUES(234,5678);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1;
     ]], {
         -- <autoinc-2.12>
-        "t1", 234
+        234
         -- </autoinc-2.12>
     })
 
+-- Autoincrement is now handled inside Tarantool
 test:do_execsql_test(
     "autoinc-2.13",
     [[
         DELETE FROM t1;
         INSERT INTO t1 VALUES(NULL,1);
-        SELECT * FROM _sql_sequence;
     ]], {
         -- <autoinc-2.13>
-        "t1", 235
         -- </autoinc-2.13>
     })
 
@@ -248,112 +237,12 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.20",
     [[
-        UPDATE _sql_sequence SET seq=1234 WHERE name='t1';
         INSERT INTO t1 VALUES(NULL,2);
         SELECT * FROM t1;
     ]], {
         -- <autoinc-2.20>
-        235, 1, 1235, 2
+        235, 1, 236, 2
         -- </autoinc-2.20>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.21",
-    [[
-        SELECT * FROM _sql_sequence;
-    ]], {
-        -- <autoinc-2.21>
-        "t1", 1235
-        -- </autoinc-2.21>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.22",
-    [[
-        UPDATE _sql_sequence SET seq=NULL WHERE name='t1';
-        INSERT INTO t1 VALUES(NULL,3);
-        SELECT * FROM t1;
-    ]], {
-        -- <autoinc-2.22>
-        235, 1, 1235, 2, 1236, 3
-        -- </autoinc-2.22>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.23",
-    [[
-        SELECT * FROM _sql_sequence;
-    ]], {
-        -- <autoinc-2.23>
-        "t1", 1236
-        -- </autoinc-2.23>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.24",
-    [[
-        UPDATE _sql_sequence SET seq='a-string' WHERE name='t1';
-        INSERT INTO t1 VALUES(NULL,4);
-        SELECT * FROM t1;
-    ]], {
-        -- <autoinc-2.24>
-        235, 1, 1235, 2, 1236, 3, 1237, 4
-        -- </autoinc-2.24>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.25",
-    [[
-        SELECT * FROM _sql_sequence;
-    ]], {
-        -- <autoinc-2.25>
-        "t1", 1237
-        -- </autoinc-2.25>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.26",
-    [[
-        DELETE FROM _sql_sequence WHERE name='t1';
-        INSERT INTO t1 VALUES(NULL,5);
-        SELECT * FROM t1;
-    ]], {
-        -- <autoinc-2.26>
-        235, 1, 1235, 2, 1236, 3, 1237, 4, 1238, 5
-        -- </autoinc-2.26>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.27",
-    [[
-        SELECT * FROM _sql_sequence;
-    ]], {
-        -- <autoinc-2.27>
-        "t1", 1238
-        -- </autoinc-2.27>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.28",
-    [[
-        UPDATE _sql_sequence SET seq='-12345678901234567890'
-          WHERE name='t1';
-        INSERT INTO t1 VALUES(NULL,6);
-        SELECT * FROM t1;
-    ]], {
-        -- <autoinc-2.28>
-        235, 1, 1235, 2, 1236, 3, 1237, 4, 1238, 5, 1239, 6
-        -- </autoinc-2.28>
-    })
-
-test:do_execsql_test(
-    "autoinc-2.29",
-    [[
-        SELECT * FROM _sql_sequence;
-    ]], {
-        -- <autoinc-2.29>
-        "t1", 1239
-        -- </autoinc-2.29>
     })
 
 -- # Test multi-row inserts
@@ -366,48 +255,10 @@ test:do_execsql_test(
         SELECT * FROM t1;
     ]], {
         -- <autoinc-2.50>
-        235, 1, 1235, 2, 1240, 3, 1241, 4
+        235, 1, 236, 2, 237, 3, 238, 4
         -- </autoinc-2.50>
     })
 
-test:do_execsql_test(
-    "autoinc-2.51",
-    [[
-        SELECT * FROM _sql_sequence
-    ]], {
-        -- <autoinc-2.51>
-        "t1", 1241
-        -- </autoinc-2.51>
-    })
-
--- ifcapable tempdb {
---   do_test autoinc-2.52 {
---     execsql {
---       CREATE TEMP TABLE t2 AS SELECT y FROM t1;
---     }
---     execsql {
---       INSERT INTO t1 SELECT NULL, y+4 FROM t2;
---       SELECT * FROM t1;
---     }
---   } {235 1 1235 2 1240 3 1241 4 1242 5 1243 6 1244 7 1245 8}
---   do_test autoinc-2.53 {
---     execsql {
---       SELECT * FROM sqlite_sequence
---     }
---   } {t1 1245}
---   do_test autoinc-2.54 {
---     execsql {
---       DELETE FROM t1;
---       INSERT INTO t1 SELECT NULL, y FROM t2;
---       SELECT * FROM t1;
---     }
---   } {1246 1 1247 2 1248 3 1249 4}
---   do_test autoinc-2.55 {
---     execsql {
---       SELECT * FROM sqlite_sequence
---     }
---   } {t1 1249}
--- }
 -- # Create multiple AUTOINCREMENT tables.  Make sure all sequences are
 -- # tracked separately and do not interfere with one another.
 -- #
@@ -420,11 +271,9 @@ test:do_test(
         return test:execsql([[
             CREATE TABLE t2(d, e INTEGER PRIMARY KEY AUTOINCREMENT, f);
             INSERT INTO t2(d) VALUES(1);
-            SELECT * FROM _sql_sequence;
         ]])
     end, {
         -- <autoinc-2.70>
-        "t1", 1241, "t2", 1
         -- </autoinc-2.70>
     })
 
@@ -432,10 +281,10 @@ test:do_execsql_test(
     "autoinc-2.71",
     [[
         INSERT INTO t2(d) VALUES(2);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2;
     ]], {
         -- <autoinc-2.71>
-        "t1", 1241, "t2", 2
+        2, 238
         -- </autoinc-2.71>
     })
 
@@ -443,10 +292,10 @@ test:do_execsql_test(
     "autoinc-2.72",
     [[
         INSERT INTO t1(x) VALUES(10000);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2;
     ]], {
         -- <autoinc-2.72>
-        "t1", 10000, "t2", 2
+        2, 10000
         -- </autoinc-2.72>
     })
 
@@ -455,10 +304,11 @@ test:do_execsql_test(
     [[
         CREATE TABLE t3(g INTEGER PRIMARY KEY AUTOINCREMENT, h);
         INSERT INTO t3(h) VALUES(1);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2
+          UNION SELECT max(g) FROM t3;
     ]], {
         -- <autoinc-2.73>
-        "t1", 10000, "t2", 2, "t3", 1
+        1, 2, 10000
         -- </autoinc-2.73>
     })
 
@@ -466,10 +316,11 @@ test:do_execsql_test(
     "autoinc-2.74",
     [[
         INSERT INTO t2(d,e) VALUES(3,100);
-        SELECT * FROM _sql_sequence;
+        SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2
+          UNION SELECT max(g) FROM t3;
     ]], {
         -- <autoinc-2.74>
-        "t1", 10000, "t2", 100, "t3", 1
+        1, 100, 10000
         -- </autoinc-2.74>
     })
 
@@ -480,7 +331,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-3.1",
     [[
-        SELECT name FROM _sql_sequence
+        SELECT name FROM _sequence
     ]], {
         -- <autoinc-3.1>
         "t1", "t2", "t3"
@@ -491,7 +342,7 @@ test:do_execsql_test(
     "autoinc-3.2",
     [[
         DROP TABLE t1;
-        SELECT name FROM _sql_sequence;
+        SELECT name FROM _sequence;
     ]], {
         -- <autoinc-3.2>
         "t2", "t3"
@@ -502,7 +353,7 @@ test:do_execsql_test(
     "autoinc-3.3",
     [[
         DROP TABLE t3;
-        SELECT name FROM _sql_sequence;
+        SELECT name FROM _sequence;
     ]], {
         -- <autoinc-3.3>
         "t2"
@@ -513,7 +364,7 @@ test:do_execsql_test(
     "autoinc-3.4",
     [[
         DROP TABLE t2;
-        SELECT name FROM _sql_sequence;
+        SELECT name FROM _sequence;
     ]], {
         -- <autoinc-3.4>
 
@@ -666,12 +517,11 @@ test:do_execsql_test(
     "autoinc-6.1",
     [[
         CREATE TABLE t6(v INTEGER PRIMARY KEY AUTOINCREMENT, w);
-        INSERT INTO t6 VALUES(9223372036854775808,1);
-        INSERT INTO t6 VALUES(NULL,1);
-        -- SELECT seq FROM _sql_sequence WHERE name='t6';
+        INSERT INTO t6 VALUES(9223372036854775807,1);
+        SELECT max(v) FROM t6;
     ]], {
         -- <autoinc-6.1>
-        -- 9223372036854775807
+        9223372036854775807LL
         -- </autoinc-6.1>
     })
 
@@ -681,7 +531,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL,1);
     ]], {
         -- <autoinc-6.2>
-        1, "UNIQUE constraint failed: t6.v"
+        1, "Sequence 't6' has overflowed"
         -- </autoinc-6.2>
     })
 
@@ -729,11 +579,11 @@ test:do_test(
             CREATE TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b);
             INSERT INTO t3 SELECT * FROM t2 WHERE y>1;
 
-            SELECT * FROM _sql_sequence WHERE name='t3';
+            SELECT max(a) FROM t3;
         ]])
     end, {
         -- <autoinc-9.1>
-        "t3", 0
+        ""
         -- </autoinc-9.1>
     })
 
@@ -767,11 +617,11 @@ test:do_test(
     "autoinc-3928.2",
     function()
         return test:execsql([[
-            SELECT * FROM _sql_sequence WHERE name='t3928'
+            SELECT max(a) FROM t3928;
         ]])
     end, {
         -- <autoinc-3928.2>
-        "t3928", 13
+        13
         -- </autoinc-3928.2>
     })
 
@@ -803,11 +653,11 @@ test:do_test(
     "autoinc-3928.4",
     function()
         return test:execsql([[
-            SELECT * FROM _sql_sequence WHERE name='t3928'
+            SELECT max(a) FROM t3928;
         ]])
     end, {
         -- <autoinc-3928.4>
-        "t3928", 15
+        15
         -- </autoinc-3928.4>
     })
 
@@ -854,11 +704,11 @@ test:do_test(
     "autoinc-3928.7",
     function()
         return test:execsql([[
-            SELECT * FROM _sql_sequence WHERE name LIKE 't3928%' ORDER BY name;
+            SELECT max(a) FROM t3928 UNION SELECT max(y) FROM t3928c
         ]])
     end, {
         -- <autoinc-3928.7>
-        "t3928", 21, "t3928c", 6
+        6, 21
         -- </autoinc-3928.7>
     })
 
