@@ -208,12 +208,13 @@ struct Mem {
 	union MemValue {
 		double r;	/* Real value used when MEM_Real is set in flags */
 		i64 i;		/* Integer value used when MEM_Int is set in flags */
+		bool b;         /* Boolean value used when MEM_Bool is set in flags */
 		int nZero;	/* Used when bit MEM_Zero is set in flags */
 		FuncDef *pDef;	/* Used only when flags==MEM_Agg */
 		RowSet *pRowSet;	/* Used only when flags==MEM_RowSet */
 		VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 	} u;
-	u16 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
+	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
 	u8 enc;			/* SQLITE_UTF8, SQLITE_UTF16BE, SQLITE_UTF16LE */
 	u8 eSubtype;		/* Subtype for this value */
 	int n;			/* Number of characters in string value, excluding '\0' */
@@ -253,25 +254,26 @@ struct Mem {
 #define MEM_Int       0x0004	/* Value is an integer */
 #define MEM_Real      0x0008	/* Value is a real number */
 #define MEM_Blob      0x0010	/* Value is a BLOB */
-#define MEM_AffMask   0x001f	/* Mask of affinity bits */
-#define MEM_RowSet    0x0020	/* Value is a RowSet object */
-#define MEM_Frame     0x0040	/* Value is a VdbeFrame object */
-#define MEM_Undefined 0x0080	/* Value is undefined */
-#define MEM_Cleared   0x0100	/* NULL set by OP_Null, not from data */
-#define MEM_TypeMask  0x81ff	/* Mask of type bits */
+#define MEM_Bool      0x0020    /* Value is a bool */
+#define MEM_AffMask   0x003f	/* Mask of affinity bits */
+#define MEM_RowSet    0x0040	/* Value is a RowSet object */
+#define MEM_Frame     0x0080	/* Value is a VdbeFrame object */
+#define MEM_Undefined 0x0100	/* Value is undefined */
+#define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
+#define MEM_TypeMask  0x83ff	/* Mask of type bits */
 
 /* Whenever Mem contains a valid string or blob representation, one of
  * the following flags must be set to determine the memory management
  * policy for Mem.z.  The MEM_Term flag tells us whether or not the
  * string is \000 or \u0000 terminated
  */
-#define MEM_Term      0x0200	/* String rep is nul terminated */
-#define MEM_Dyn       0x0400	/* Need to call Mem.xDel() on Mem.z */
-#define MEM_Static    0x0800	/* Mem.z points to a static string */
-#define MEM_Ephem     0x1000	/* Mem.z points to an ephemeral string */
-#define MEM_Agg       0x2000	/* Mem.z points to an agg function context */
-#define MEM_Zero      0x4000	/* Mem.i contains count of 0s appended to blob */
-#define MEM_Subtype   0x8000	/* Mem.eSubtype is valid */
+#define MEM_Term      0x0400	/* String rep is nul terminated */
+#define MEM_Dyn       0x0800	/* Need to call Mem.xDel() on Mem.z */
+#define MEM_Static    0x1000	/* Mem.z points to a static string */
+#define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
+#define MEM_Agg       0x4000	/* Mem.z points to an agg function context */
+#define MEM_Zero      0x8000	/* Mem.i contains count of 0s appended to blob */
+#define MEM_Subtype   0x10000	/* Mem.eSubtype is valid */
 #ifdef SQLITE_OMIT_INCRBLOB
 #undef MEM_Zero
 #define MEM_Zero 0x0000
@@ -504,7 +506,7 @@ void sqlite3VdbeMemSetInt64(Mem *, i64);
 #else
 void sqlite3VdbeMemSetDouble(Mem *, double);
 #endif
-void sqlite3VdbeMemInit(Mem *, sqlite3 *, u16);
+void sqlite3VdbeMemInit(Mem *, sqlite3 *, u32);
 void sqlite3VdbeMemSetNull(Mem *);
 void sqlite3VdbeMemSetZeroBlob(Mem *, int);
 void sqlite3VdbeMemSetRowSet(Mem *);

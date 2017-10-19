@@ -77,6 +77,7 @@ struct VdbeOp {
 		sqlite3_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
 		CollSeq *pColl;	/* Used when p4type is P4_COLLSEQ */
 		Mem *pMem;	/* Used when p4type is P4_MEM */
+		bool b;         /* Used when p4type is P4_BOOL */
 		KeyInfo *pKeyInfo;	/* Used when p4type is P4_KEYINFO */
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
@@ -145,6 +146,8 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_TABLE    (-15)	/* P4 is a pointer to a Table structure */
 #define P4_INDEX    (-16)	/* P4 is a pointer to a Index structure */
 #define P4_FUNCCTX  (-17)	/* P4 is a pointer to an sqlite3_context object */
+#define P4_BOOL     (-18)	/* P4 is a bool value */
+
 
 /* Error message codes for OP_Halt */
 #define P5_ConstraintNotNull 1

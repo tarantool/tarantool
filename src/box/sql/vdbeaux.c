@@ -1138,6 +1138,9 @@ sqlite3VdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 		 */
 		pOp->p4.i = SQLITE_PTR_TO_INT(zP4);
 		pOp->p4type = P4_INT32;
+	} if (n == P4_BOOL) {
+		pOp->p4.b = *(bool*)zP4;
+		pOp->p4type = P4_BOOL;
 	} else if (zP4 != 0) {
 		assert(n < 0);
 		pOp->p4.p = (void *)zP4;
@@ -1593,6 +1596,9 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			break;
 		}
 #endif
+	case P4_BOOL:
+			sqlite3XPrintf(&x, "%d", pOp->p4.b);
+			break;
 	case P4_INT64:{
 			sqlite3XPrintf(&x, "%lld", *pOp->p4.pI64);
 			break;
@@ -1776,7 +1782,7 @@ sqlite3VdbePrintOp(FILE * pOut, int pc, Op * pOp)
  * Initialize an array of N Mem element.
  */
 static void
-initMemArray(Mem * p, int N, sqlite3 * db, u16 flags)
+initMemArray(Mem * p, int N, sqlite3 * db, u32 flags)
 {
 	while ((N--) > 0) {
 		p->db = db;
@@ -4746,7 +4752,7 @@ sqlite3VdbeMsgpackRecordLen(Mem * pRec, u32 n)
 	assert(n != 0);
 	do {
 		assert(memIsValid(pRec));
-		if (pRec->flags & MEM_Null) {
+		if (pRec->flags & (MEM_Null | MEM_Bool)) {
 			nByte += 1;
 		} else if (pRec->flags & (MEM_Int | MEM_Real)) {
 			nByte += 9;
@@ -4783,6 +4789,9 @@ sqlite3VdbeMsgpackRecordPut(u8 * pBuf, Mem * pRec, u32 n)
 		} else if (pRec->flags & MEM_Str) {
 			zNewRecord =
 			    mp_encode_str(zNewRecord, pRec->z, pRec->n);
+		} else if (pRec->flags & MEM_Bool) {
+			zNewRecord =
+			    mp_encode_bool(zNewRecord, pRec->u.b);
 		} else {
 			/* Emit BIN header iff the BLOB doesn't store MsgPack content */
 			if ((pRec->flags & MEM_Subtype) == 0

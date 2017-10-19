@@ -464,6 +464,7 @@ sqlite3VdbeMemPrettyPrint(Mem *pMem, char *zBuf)
 			else *zCsr++ = z;
 		}
 
+		assert (pMem->enc < 5);
 		sqlite3_snprintf(100, zCsr, "]%s", encnames[pMem->enc]);
 		zCsr += sqlite3Strlen30(zCsr);
 		if (f & MEM_Zero) {
@@ -1082,6 +1083,19 @@ case OP_Integer: {         /* out2 */
 	break;
 }
 
+/* Opcode: Bool P1 P2 * * *
+ * Synopsis: r[P2]=P1
+ *
+ * The boolean value P1 is written into register P2.
+ */
+case OP_Bool: {         /* out2 */
+	pOut = out2Prerelease(p, pOp);
+	assert(pOp->p4type == P4_BOOL);
+	pOut->flags = MEM_Bool;
+	pOut->u.b = pOp->p4.p;
+	break;
+}
+
 /* Opcode: Int64 * P2 * P4 *
  * Synopsis: r[P2]=P4
  *
@@ -1558,7 +1572,7 @@ case OP_Multiply:              /* same as TK_STAR, in1, in2, out3 */
 case OP_Divide:                /* same as TK_SLASH, in1, in2, out3 */
 case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	char bIntint;   /* Started out as two integer operands */
-	u16 flags;      /* Combined MEM_* flags from both inputs */
+	u32 flags;      /* Combined MEM_* flags from both inputs */
 	u16 type1;      /* Numeric type of left operand */
 	u16 type2;      /* Numeric type of right operand */
 	i64 iA;         /* Integer value of left operand */
@@ -2058,8 +2072,8 @@ case OP_Gt:               /* same as TK_GT, jump, in1, in3 */
 case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 	int res, res2;      /* Result of the comparison of pIn1 against pIn3 */
 	char affinity;      /* Affinity to use for comparison */
-	u16 flags1;         /* Copy of initial value of pIn1->flags */
-	u16 flags3;         /* Copy of initial value of pIn3->flags */
+	u32 flags1;         /* Copy of initial value of pIn1->flags */
+	u32 flags3;         /* Copy of initial value of pIn3->flags */
 
 	pIn1 = &aMem[pOp->p1];
 	pIn3 = &aMem[pOp->p3];

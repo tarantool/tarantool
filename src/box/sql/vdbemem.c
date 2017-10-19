@@ -704,7 +704,7 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff, u8 encoding)
  * The minimum amount of initialization feasible is performed.
  */
 void
-sqlite3VdbeMemInit(Mem * pMem, sqlite3 * db, u16 flags)
+sqlite3VdbeMemInit(Mem * pMem, sqlite3 * db, u32 flags)
 {
 	assert((flags & ~MEM_TypeMask) == 0);
 	pMem->flags = flags;
@@ -967,7 +967,7 @@ sqlite3VdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 {
 	int nByte = n;		/* New value for pMem->n */
 	int iLimit;		/* Maximum allowed string or blob size */
-	u16 flags = 0;		/* New value for pMem->flags */
+	u32 flags = 0;		/* New value for pMem->flags */
 
 	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert((pMem->flags & MEM_RowSet) == 0);

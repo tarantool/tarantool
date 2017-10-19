@@ -993,7 +993,7 @@ columnNullValue(void)
 	    = {
 		/* .u          = */  {
 		0},
-		    /* .flags      = */ (u16) MEM_Null,
+		    /* .flags      = */ (u32) MEM_Null,
 		    /* .enc        = */ (u8) 0,
 		    /* .eSubtype   = */ (u8) 0,
 		    /* .n          = */ (int)0,
