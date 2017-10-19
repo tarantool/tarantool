@@ -63,6 +63,10 @@ enum field_type {
 
 extern const char *field_type_strs[];
 
+/** Check if @a new_type can store values of @an old_type. */
+bool
+field_type_is_compatible(enum field_type old_type, enum field_type new_type);
+
 /**
  * Get field type by name
  */
@@ -87,6 +91,8 @@ struct field_def {
 	enum field_type type;
 	/** 0-terminated field name. */
 	char *name;
+	/** True, if a field can store NULL. */
+	bool is_nullable;
 };
 
 #if defined(__cplusplus)

@@ -38,9 +38,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-#ifndef PIPE_BUF
-#include <sys/param.h>
-#endif
 #include <syslog.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -48,12 +45,11 @@
 
 pid_t log_pid = 0;
 int log_level = S_INFO;
+int log_format = SF_PLAIN;
 
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
 
-static bool booting = true;
-static enum say_logger_type logger_type = SAY_LOGGER_STDERR;
 static bool logger_background = true;
 static int logger_nonblock;
 
@@ -63,34 +59,52 @@ static char *log_path; /* iff logger_type == SAY_LOGGER_FILE */
 static char *syslog_ident = NULL;
 
 static void
-sayf(int level, const char *filename, int line, const char *error,
-     const char *format, ...);
+say_logger_boot(int level, const char *filename, int line, const char *error,
+		const char *format, ...);
+static void
+say_logger_file(int level, const char *filename, int line, const char *error,
+		const char *format, ...);
+static void
+say_logger_syslog(int level, const char *filename, int line, const char *error,
+		  const char *format, ...);
 
-sayfunc_t _say = sayf;
+static enum say_logger_type logger_type = SAY_LOGGER_BOOT;
+sayfunc_t _say = say_logger_boot;
+
+static const char level_chars[] = {
+	[S_FATAL] = 'F',
+	[S_SYSERROR] = '!',
+	[S_ERROR] = 'E',
+	[S_CRIT] = 'C',
+	[S_WARN] = 'W',
+	[S_INFO] = 'I',
+	[S_VERBOSE] = 'V',
+	[S_DEBUG] = 'D',
+};
 
 static char
 level_to_char(int level)
 {
-	switch (level) {
-	case S_FATAL:
-		return 'F';
-	case S_SYSERROR:
-		return '!';
-	case S_ERROR:
-		return 'E';
-	case S_CRIT:
-		return 'C';
-	case S_WARN:
-		return 'W';
-	case S_INFO:
-		return 'I';
-	case S_VERBOSE:
-		return 'V';
-	case S_DEBUG:
-		return 'D';
-	default:
-		return '_';
-	}
+	assert(level >= S_FATAL && level <= S_DEBUG);
+	return level_chars[level];
+}
+
+static const char *level_strs[] = {
+	[S_FATAL] = "FATAL",
+	[S_SYSERROR] = "SYSERROR",
+	[S_ERROR] = "ERROR",
+	[S_CRIT] = "CRIT",
+	[S_WARN] = "WARN",
+	[S_INFO] = "INFO",
+	[S_VERBOSE] = "VERBOSE",
+	[S_DEBUG] = "DEBUG",
+};
+
+static const char*
+level_to_string(int level)
+{
+	assert(level >= S_FATAL && level <= S_DEBUG);
+	return level_strs[level];
 }
 
 static int
@@ -122,6 +136,25 @@ void
 say_set_log_level(int new_level)
 {
 	log_level = new_level;
+}
+
+void
+say_set_log_format(enum say_format format)
+{
+	assert(format >= SF_PLAIN && format <= SF_JSON);
+	log_format = format;
+}
+
+static const char *say_format_strs[] = {
+	[SF_PLAIN] = "plain",
+	[SF_JSON] = "json",
+	[say_format_MAX] = "unknown"
+};
+
+enum say_format
+say_format_by_name(const char *format)
+{
+	return STR2ENUM(say_format, format);
 }
 
 /**
@@ -194,6 +227,7 @@ say_pipe_init(const char *init_str)
 	log_fd = pipefd[1];
 	say_info("started logging into a pipe, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_PIPE;
+	_say = say_logger_file;
 	return;
 error:
 	say_syserror("can't start logger: %s", init_str);
@@ -257,6 +291,7 @@ say_file_init(const char *init_str)
 	log_fd = fd;
 	signal(SIGHUP, say_logrotate); /* will access log_fd */
 	logger_type = SAY_LOGGER_FILE;
+	_say = say_logger_file;
 }
 
 /**
@@ -322,6 +357,7 @@ say_syslog_init(const char *init_str)
 	}
 	say_info("started logging to syslog, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_SYSLOG;
+	_say = say_logger_syslog;
 	return;
 }
 
@@ -329,9 +365,10 @@ say_syslog_init(const char *init_str)
  * Initialize logging subsystem to use in daemon mode.
  */
 void
-say_logger_init(const char *init_str, int level, int nonblock, int background)
+say_logger_init(const char *init_str, int level, int nonblock, const char *format, int background)
 {
 	log_level = level;
+	say_set_log_format(say_format_by_name(format));
 	logger_nonblock = nonblock;
 	logger_background = background;
 	setvbuf(stderr, NULL, _IONBF, 0);
@@ -348,6 +385,11 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 			say_pipe_init(init_str);
 			break;
 		case SAY_LOGGER_SYSLOG:
+			if (log_format != SF_PLAIN) {
+				fprintf(stderr, "logger: syslog does not "
+						"support non-plain formats\n");
+				exit(EXIT_FAILURE);
+			}
 			say_syslog_init(init_str);
 			break;
 		case SAY_LOGGER_FILE:
@@ -367,6 +409,9 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 				fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
 				say_syserror("fcntl, fd=%i", log_fd);
 		}
+	} else {
+		logger_type = SAY_LOGGER_STDERR;
+		_say = say_logger_file;
 	}
 
 	if (background) {
@@ -384,7 +429,6 @@ say_logger_init(const char *init_str, int level, int nonblock, int background)
 			dup2(log_fd, STDOUT_FILENO);
 		}
 	}
-	booting = false;
 }
 
 void
@@ -395,128 +439,322 @@ say_logger_free()
 	free(syslog_ident);
 }
 
+/** {{{ Formatters */
+
 /**
- * Encode log message header, using syslog protocol. See RFC 5424
- * and RFC 3164. The 3164 is compatible with 5424, so it is
- * implemented.
- * Protocol:
- * <PRIORITY_VALUE>TIMESTAMP IDENTATION[PID]: MSG
- * - Priority value is encoded as message subject * 8 and bitwise
- *   OR with message level;
- * - Timestamp must be encoded in the format: Mmm dd hh:mm:ss;
- *   Mmm - moth abbreviation;
- * - Identation is application name. By default it is "tarantool";
- * - Pid - process identifier;
- * - Msg - log message in any format. Encoded in vsay().
+ * Format the log message in compact form:
+ * MESSAGE: ERROR
  *
- * @param level Tarantool log level.
- * @param buf Buffer to encode to.
- * @param len Length of @a buf.
- * @param tm Timestamp.
- * @param pid Process identifier.
- *
- * @retval Number of encoded bytes.
+ * Used during boot time, e.g. without box.cfg().
  */
 static int
-say_encode_syslog_header(int level, char *buf, int len, struct tm *tm, int pid)
+say_format_boot(char *buf, int len, const char *error,
+		 const char *format, va_list ap)
 {
-	int prio = level_to_syslog_priority(level);
-	int pos = 0;
-	pos += snprintf(buf + pos, len - pos, "<%d>", LOG_MAKEPRI(1, prio));
-	pos += strftime(buf + pos, len - pos, "%h %e %T ", tm);
-	pos += snprintf(buf + pos, len - pos, "%s[%d]:", syslog_ident, pid);
-	return pos;
+	int total = 0;
+	SNPRINT(total, vsnprintf, buf, len, format, ap);
+	if (error != NULL)
+		SNPRINT(total, snprintf, buf, len, ": %s", error);
+	SNPRINT(total, snprintf, buf, len, "\n");
+	return total;
 }
 
 /**
- * Encode log message header using tarantool protocol:
- * TIMESTAMP [PID]: MSG
- * - Timestamp must be encoded in the format:
- *   yyyy-mm-dd hh:mm:ss.ms;
- * - Pid - process identifier;
- * - Msg - log message in any format. Encoded in vsay().
- *
- * @param buf Buffer to encode to.
- * @param len Length of @a buf.
- * @param tm Timestamp.
- * @param now Libev timestamp.
- * @param now_seconds Seconds part of @a now.
- * @param pid Process identifier.
- *
- * @retval Number of encoded bytes.
+ * The common helper for say_format_plain() and say_format_syslog()
  */
 static int
-say_encode_tarantool_header(char *buf, int len, struct tm *tm, ev_tstamp now,
-			    time_t now_seconds, int pid)
+say_format_plain_tail(char *buf, int len, int level, const char *filename,
+		      int line, const char *error, const char *format,
+		      va_list ap)
 {
-	int pos = 0;
-	/* Print time in format 2012-08-07 18:30:00.634 */
-	pos += strftime(buf + pos, len - pos, "%F %H:%M", tm);
-	pos += snprintf(buf + pos, len - pos, ":%06.3f",
-			now - now_seconds + tm->tm_sec);
-	pos += snprintf(buf + pos, len - pos, " [%i]", pid);
-	return pos;
-}
+	int total = 0;
 
-void
-vsay(int level, const char *filename, int line, const char *error,
-     const char *format, va_list ap)
-{
-	size_t p = 0, len = PIPE_BUF;
-	const char *f;
-	static __thread char buf[PIPE_BUF];
-	int pid = getpid();
-
-	if (booting) {
-		vfprintf(stderr, format, ap);
-		if (error)
-			fprintf(stderr, ": %s", error);
-		fprintf(stderr, "\n");
-		return;
+	struct cord *cord = cord();
+	if (cord) {
+		SNPRINT(total, snprintf, buf, len, " %s", cord->name);
+		if (fiber() && fiber()->fid != 1) {
+			SNPRINT(total, snprintf, buf, len, "/%i/%s",
+				fiber()->fid, fiber_name(fiber()));
+		}
 	}
 
-	for (f = filename; *f; f++)
-		if (*f == '/' && *(f + 1) != '\0')
-			filename = f + 1;
+	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR) {
+		/* Primitive basename(filename) */
+		for (const char *f = filename; *f; f++)
+			if (*f == '/' && *(f + 1) != '\0')
+				filename = f + 1;
+		SNPRINT(total, snprintf, buf, len, " %s:%i", filename, line);
+	}
+
+	SNPRINT(total, snprintf, buf, len, " %c> ", level_to_char(level));
+
+	SNPRINT(total, vsnprintf, buf, len, format, ap);
+	if (error != NULL)
+		SNPRINT(total, snprintf, buf, len, ": %s", error);
+
+	SNPRINT(total, snprintf, buf, len, "\n");
+	return total;
+}
+
+/**
+ * Format the log message in Tarantool format:
+ * YYYY-MM-DD hh:mm:ss.ms [PID]: CORD/FID/FIBERNAME LEVEL> MSG
+ */
+static int
+say_format_plain(char *buf, int len, int level, const char *filename, int line,
+		 const char *error, const char *format, va_list ap)
+{
+	/* Don't use ev_now() since it requires a working event loop. */
+	ev_tstamp now = ev_time();
+	time_t now_seconds = (time_t) now;
+	struct tm tm;
+	localtime_r(&now_seconds, &tm);
+
+	/* Print time in format 2012-08-07 18:30:00.634 */
+	int total = strftime(buf, len, "%F %H:%M", &tm);
+	buf += total, len -= total;
+	SNPRINT(total, snprintf, buf, len, ":%06.3f",
+		now - now_seconds + tm.tm_sec);
+
+	/* Print pid */
+	SNPRINT(total, snprintf, buf, len, " [%i]", getpid());
+
+	/* Print remaining parts */
+	SNPRINT(total, say_format_plain_tail, buf, len, level, filename, line,
+		error, format, ap);
+
+	return total;
+}
+
+/**
+ * Format log message in json format:
+ * {"time": 1507026445.23232, "level": "WARN", "message": <message>, "pid": <pid>,
+ * "cord_name": <name>, "fiber_id": <id>, "fiber_name": <fiber_name>, filename": <filename>, "line": <fds>}
+ */
+static int
+say_format_json(char *buf, int len, int level, const char *filename, int line,
+		 const char *error, const char *format, va_list ap)
+{
+	int total = 0;
+
+	SNPRINT(total, snprintf, buf, len, "{\"time\": \"");
 
 	/* Don't use ev_now() since it requires a working event loop. */
 	ev_tstamp now = ev_time();
 	time_t now_seconds = (time_t) now;
 	struct tm tm;
 	localtime_r(&now_seconds, &tm);
-	if (logger_type != SAY_LOGGER_SYSLOG) {
-		p += say_encode_tarantool_header(buf + p, len - p, &tm, now,
-						 now_seconds, pid);
+	int written = strftime(buf, len, "%FT%H:%M", &tm);
+	buf += written, len -= written, total += written;
+	SNPRINT(total, snprintf, buf, len, ":%06.3f",
+			now - now_seconds + tm.tm_sec);
+	written = strftime(buf, len, "%z", &tm);
+	buf += written, len -= written, total += written;
+	SNPRINT(total, snprintf, buf, len, "\", ");
+
+	SNPRINT(total, snprintf, buf, len, "\"level\": \"%s\", ",
+			level_to_string(level));
+
+	if (strncmp(format, "json", sizeof("json")) == 0) {
+		/*
+		 * Message is already JSON-formatted.
+		 * Get rid of {} brackets and append to the output buffer.
+		 */
+		const char *str = va_arg(ap, const char *);
+		assert(str != NULL);
+		int str_len = strlen(str);
+		assert(str_len > 2 && str[0] == '{' && str[str_len - 1] == '}');
+		SNPRINT(total, snprintf, buf, len, "%.*s, ",
+			str_len - 2, str + 1);
 	} else {
-		p += say_encode_syslog_header(level, buf + p, len - p, &tm,
-					      pid);
+		/* Format message */
+		char *tmp = tt_static_buf();
+		if (vsnprintf(tmp, TT_STATIC_BUF_LEN, format, ap) < 0)
+			return -1;
+		SNPRINT(total, snprintf, buf, len, "\"message\": \"");
+		/* Escape and print message */
+		SNPRINT(total, json_escape, buf, len, tmp);
+		SNPRINT(total, snprintf, buf, len, "\", ");
 	}
+
+	/* in case of system errors */
+	if (error) {
+		SNPRINT(total, snprintf, buf, len, "\"error\": \"");
+		SNPRINT(total, json_escape, buf, len, error);
+		SNPRINT(total, snprintf, buf, len, "\", ");
+	}
+
+	SNPRINT(total, snprintf, buf, len, "\"pid\": %i, ", getpid());
 
 	struct cord *cord = cord();
 	if (cord) {
-		p += snprintf(buf + p, len - p, " %s", cord->name);
+		SNPRINT(total, snprintf, buf, len, "\"cord_name\": \"");
+		SNPRINT(total, json_escape, buf, len, cord->name);
+		SNPRINT(total, snprintf, buf, len, "\", ");
 		if (fiber() && fiber()->fid != 1) {
-			p += snprintf(buf + p, len - p, "/%i/%s",
-				      fiber()->fid, fiber_name(fiber()));
+			SNPRINT(total, snprintf, buf, len,
+				"\"fiber_id\": %i, ", fiber()->fid);
+			SNPRINT(total, snprintf, buf, len,
+				"\"fiber_name\": \"");
+			SNPRINT(total, json_escape, buf, len,
+				fiber()->name);
+			SNPRINT(total, snprintf, buf, len, "\", ");
 		}
 	}
 
-	if (level == S_WARN || level == S_ERROR || level == S_SYSERROR)
-		p += snprintf(buf + p, len - p, " %s:%i", filename, line);
+	SNPRINT(total, snprintf, buf, len, "\"file\": \"");
+	SNPRINT(total, json_escape, buf, len, filename);
+	SNPRINT(total, snprintf, buf, len, "\", ");
+	SNPRINT(total, snprintf, buf, len, "\"line\": %i}", line);
+	SNPRINT(total, snprintf, buf, len, "\n");
+	return total;
+}
 
-	p += snprintf(buf + p, len - p, " %c> ", level_to_char(level));
-	/* until here it is guaranteed that p < len */
+/**
+ * Format the log message in syslog format.
+ *
+ * See RFC 5424 and RFC 3164. RFC 3164 is compatible with RFC 5424,
+ * so it is implemented.
+ * Protocol:
+ * <PRIORITY_VALUE>TIMESTAMP IDENTATION[PID]: CORD/FID/FIBERNAME LEVEL> MSG
+ * - Priority value is encoded as message subject * 8 and bitwise
+ *   OR with message level;
+ * - Timestamp must be encoded in the format: Mmm dd hh:mm:ss;
+ *   Mmm - moth abbreviation;
+ * - Identation is application name. By default it is "tarantool";
+ */
+static int
+say_format_syslog(char *buf, int len, int level, const char *filename,
+		  int line, const char *error, const char *format, va_list ap)
+{
+	/* Don't use ev_now() since it requires a working event loop. */
+	ev_tstamp now = ev_time();
+	time_t now_seconds = (time_t) now;
+	struct tm tm;
+	localtime_r(&now_seconds, &tm);
 
-	p += vsnprintf(buf + p, len - p, format, ap);
-	if (error && p < len - 1)
-		p += snprintf(buf + p, len - p, ": %s", error);
+	int total = 0;
 
-	if (p >= len - 1)
-		p = len - 1;
-	*(buf + p) = '\n';
-	if (logger_type != SAY_LOGGER_SYSLOG) {
-		(void) write(log_fd, buf, p + 1);
-	} else if (log_fd < 0 || write(log_fd, buf, p + 1) <= 0) {
+	/* Format syslog header according to RFC */
+	int prio = level_to_syslog_priority(level);
+	SNPRINT(total, snprintf, buf, len, "<%d>", LOG_MAKEPRI(1, prio));
+	SNPRINT(total, strftime, buf, len, "%h %e %T ", &tm);
+	SNPRINT(total, snprintf, buf, len, "%s[%d]:", syslog_ident, getpid());
+
+	/* Format message */
+	SNPRINT(total, say_format_plain_tail, buf, len, level, filename, line,
+		error, format, ap);
+
+	return total;
+}
+
+/** Formatters }}} */
+
+/** {{{ Loggers */
+
+/*
+ * From pipe(7):
+ * POSIX.1 says that write(2)s of less than PIPE_BUF bytes must be atomic:
+ * the output data is written to the pipe as a contiguous sequence. Writes
+ * of more than PIPE_BUF bytes may be nonatomic: the kernel may interleave
+ * the data with data written by other processes. PIPE_BUF is 4k on Linux.
+ *
+ * Nevertheless, let's ignore the fact that messages can be interleaved in
+ * some situations and set SAY_BUF_LEN_MAX to 16k for now.
+ */
+enum { SAY_BUF_LEN_MAX = 16 * 1024 };
+static __thread char buf[SAY_BUF_LEN_MAX];
+
+/**
+ * Boot-time logger.
+ *
+ * Used without box.cfg()
+ */
+static void
+say_logger_boot(int level, const char *filename, int line, const char *error,
+		const char *format, ...)
+{
+	assert(logger_type == SAY_LOGGER_BOOT);
+	(void) filename;
+	(void) line;
+	if (!say_log_level_is_enabled(level))
+		return;
+
+	int errsv = errno; /* Preserve the errno. */
+	va_list ap;
+	va_start(ap, format);
+	int total = say_format_boot(buf, sizeof(buf), error, format, ap);
+	assert(total >= 0);
+	(void) write(STDERR_FILENO, buf, total);
+	va_end(ap);
+	errno = errsv; /* Preserve the errno. */
+}
+
+/**
+ * File and pipe logger
+ */
+static void
+say_logger_file(int level, const char *filename, int line, const char *error,
+		const char *format, ...)
+{
+	assert(logger_type == SAY_LOGGER_FILE ||
+	       logger_type == SAY_LOGGER_PIPE ||
+	       logger_type == SAY_LOGGER_STDERR);
+	if (!say_log_level_is_enabled(level))
+		return;
+
+	int errsv = errno; /* Preserve the errno. */
+	va_list ap;
+	va_start(ap, format);
+	int total = 0;
+	switch (log_format) {
+		case SF_PLAIN:
+			total = say_format_plain(buf, sizeof(buf), level,
+						 filename, line, error,
+						 format, ap);
+			break;
+		case SF_JSON:
+			total = say_format_json(buf, sizeof(buf), level,
+						filename, line, error,
+						format, ap);
+			break;
+		default:
+			unreachable();
+	}
+	assert(total >= 0);
+	(void) write(log_fd, buf, total);
+	/* Log fatal errors to STDERR */
+	if (level == S_FATAL && log_fd != STDERR_FILENO)
+		(void) write(STDERR_FILENO, buf, total);
+
+	va_end(ap);
+	errno = errsv; /* Preserve the errno. */
+}
+
+/**
+ * Syslog logger
+ */
+static void
+say_logger_syslog(int level, const char *filename, int line, const char *error,
+		  const char *format, ...)
+{
+	assert(logger_type == SAY_LOGGER_SYSLOG);
+
+	if (!say_log_level_is_enabled(level))
+		return;
+
+	int errsv = errno; /* Preserve the errno. */
+	va_list ap;
+	va_start(ap, format);
+
+	int total = say_format_syslog(buf, sizeof(buf), level, filename, line,
+				       error, format, ap);
+	assert(total >= 0);
+
+	if (level == S_FATAL && log_fd != STDERR_FILENO)
+		(void) write(STDERR_FILENO, buf, total);
+
+	if (log_fd < 0 || write(log_fd, buf, total) <= 0) {
 		/*
 		 * Try to reconnect, if write to syslog has
 		 * failed. Syslog write can fail, if, for example,
@@ -533,27 +771,15 @@ vsay(int level, const char *filename, int line, const char *error,
 			 * it would block thread. Try to reconnect
 			 * on next vsay().
 			 */
-			(void) write(log_fd, buf, p + 1);
+			(void) write(log_fd, buf, total);
 		}
 	}
 
-	if (level == S_FATAL && log_fd != STDERR_FILENO)
-		(void) write(STDERR_FILENO, buf, p + 1);
-}
-
-static void
-sayf(int level, const char *filename, int line, const char *error,
-     const char *format, ...)
-{
-	int errsv = errno; /* Preserve the errno. */
-	if (!say_log_level_is_enabled(level))
-		return;
-	va_list ap;
-	va_start(ap, format);
-	vsay(level, filename, line, error, format, ap);
 	va_end(ap);
 	errno = errsv; /* Preserve the errno. */
 }
+
+/** Loggers }}} */
 
 /*
  * Init string parser(s)

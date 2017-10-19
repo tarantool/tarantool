@@ -11,6 +11,7 @@ include_directories(${READLINE_INCLUDE_DIRS})
 include_directories(${LIBYAML_INCLUDE_DIRS})
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
+include_directories(${ICU_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
@@ -91,6 +92,7 @@ set (core_sources
      assoc.c
      util.c
      random.c
+     trigger.cc
  )
 
 if (TARGET_OS_NETBSD)
@@ -106,6 +108,7 @@ target_link_libraries(core
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
+    ${MSGPUCK_LIBRARIES}
 )
 
 add_library(stat STATIC rmean.c latency.c histogram.c)
@@ -210,7 +213,7 @@ target_link_libraries(server core bit uri uuid)
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
 set (reexport_libraries server core misc bitset csv
-     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES})
+     ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
 
 set (common_libraries
     ${reexport_libraries}

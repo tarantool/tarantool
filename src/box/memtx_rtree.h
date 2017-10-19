@@ -30,34 +30,30 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "memtx_index.h"
+#include <stddef.h>
+#include <stdint.h>
 
 #include <salad/rtree.h>
 
-class MemtxRTree: public MemtxIndex
-{
-public:
-	MemtxRTree(struct index_def *index_def);
-	~MemtxRTree();
+#include "index.h"
 
-	virtual void beginBuild() override;
-	virtual size_t size() const override;
-	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) const override;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-                                      struct tuple *new_tuple,
-                                      enum dup_replace_mode mode) override;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-	virtual size_t bsize() const override;
-	virtual struct iterator *allocIterator() const override;
-	virtual void initIterator(struct iterator *iterator,
-                                  enum iterator_type type,
-                                  const char *key,
-				  uint32_t part_count) const override;
+struct memtx_engine;
 
-protected:
-	unsigned m_dimension;
-	struct rtree m_tree;
+struct memtx_rtree_index {
+	struct index base;
+	unsigned dimension;
+	struct rtree tree;
 };
+
+struct memtx_rtree_index *
+memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_RTREE_H_INCLUDED */

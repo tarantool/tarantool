@@ -36,6 +36,7 @@
 #include <msgpuck.h>
 #include <limits.h>
 #include "field_def.h"
+#include "coll.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -46,8 +47,14 @@ extern const char *mp_type_strs[];
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
+	/** Tuple field index for this part */
 	uint32_t fieldno;
+	/** Type of the tuple field */
 	enum field_type type;
+	/** Collation definition for string comparison */
+	struct coll *coll;
+	/** True if a part can store NULLs. */
+	bool is_nullable;
 };
 
 struct key_def;
@@ -92,6 +99,16 @@ struct key_def {
 	tuple_hash_t tuple_hash;
 	/** @see key_hash() */
 	key_hash_t key_hash;
+	/**
+	 * Minimal part count which always is unique. For example,
+	 * if a secondary index is unique, then
+	 * unique_part_count == secondary index part count. But if
+	 * a secondary index is not unique, then
+	 * unique_part_count == part count of a merged key_def.
+	 */
+	uint32_t unique_part_count;
+	/** True, if at least one part can store NULL. */
+	bool is_nullable;
 	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
 	/** The size of the 'parts' array. */
@@ -153,8 +170,8 @@ key_def_new(uint32_t part_count);
  * @pre part_no < part_count
  */
 void
-key_def_set_part(struct key_def *def, uint32_t part_no,
-		 uint32_t fieldno, enum field_type type);
+key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
+		 enum field_type type, bool is_nullable, struct coll *coll);
 
 /**
  * An snprint-style function to print a key definition.
@@ -182,9 +199,12 @@ key_def_encode_parts(char *data, const struct key_def *key_def);
  *  resulting values field_no and field_type
  * Parts expected to be a sequence of <part_count> arrays like this:
  *  [NUM, STR, ..][NUM, STR, ..]..,
+ *  OR
+ *  {field=NUM, type=STR, ..}{field=NUM, type=STR, ..}..,
  */
 int
-key_def_decode_parts(struct key_def *key_def, const char **data);
+key_def_decode_parts(struct key_def *key_def, const char **data,
+		     const struct field_def *fields, uint32_t field_count);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.
@@ -209,13 +229,14 @@ key_def_merge(const struct key_def *first, const struct key_def *second);
  * @param key_def Key definition.
  * @param key MessagePack'ed data for matching.
  * @param part_count Field count in the key.
+ * @param allow_nullable True if nullable parts are allowed.
  *
  * @retval 0  The key is valid.
  * @retval -1 The key is invalid.
  */
 int
-key_validate_parts(struct key_def *key_def, const char *key,
-		   uint32_t part_count);
+key_validate_parts(const struct key_def *key_def, const char *key,
+		   uint32_t part_count, bool allow_nullable);
 
 /**
  * Return true if @a index_def defines a sequential key without
@@ -235,6 +256,23 @@ key_def_is_sequential(const struct key_def *key_def)
 	return true;
 }
 
+/**
+ * Return true if @a key_def defines has fields that requires
+ * special collation comparison.
+ * @param key_def key_def
+ * @retval true if the key_def has collation fields
+ * @retval false otherwise
+ */
+static inline bool
+key_def_has_collation(const struct key_def *key_def)
+{
+	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
+		if (key_def->parts[part_id].coll != NULL)
+			return true;
+	}
+	return false;
+}
+
 /** A helper table for key_mp_type_validate */
 extern const uint32_t key_mp_type[];
 
@@ -249,24 +287,20 @@ extern const uint32_t key_mp_type[];
  */
 static inline int
 key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
-	       int err, uint32_t field_no)
+		     int err, uint32_t field_no, bool is_nullable)
 {
 	assert(key_type < field_type_MAX);
 	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
-	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0)) {
+	uint32_t mask = key_mp_type[key_type] | (is_nullable * (1U << MP_NIL));
+	if (unlikely((mask & (1U << mp_type)) == 0)) {
 		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
 		return -1;
 	}
 	return 0;
 }
 
-/** Compare two key part arrays.
- *
- * This function is used to find out whether alteration
- * of an index has changed it substantially enough to warrant
- * a rebuild or not. For example, change of index id is
- * not a substantial change, whereas change of index type
- * or key parts requires a rebuild.
+/**
+ * Compare two key part arrays.
  *
  * One key part is considered to be greater than the other if:
  * - its fieldno is greater
@@ -279,6 +313,19 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2);
+
+/**
+ * Find out whether alteration of an index has changed it
+ * substantially enough to warrant a rebuild or not. For example,
+ * change of index id is not a substantial change, whereas change
+ * of index type or incompatible change of key parts requires
+ * a rebuild.
+ */
+bool
+key_part_check_compatibility(const struct key_part *old_parts,
+			     uint32_t old_part_count,
+			     const struct key_part *new_parts,
+			     uint32_t new_part_count);
 
 #if defined(__cplusplus)
 } /* extern "C" */

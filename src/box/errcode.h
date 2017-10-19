@@ -201,12 +201,17 @@ struct errcode_record {
 	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
 	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
 	/*148 */_(ER_SEQUENCE_ACCESS_DENIED,	"%s access is denied for user '%s' to sequence '%s'") \
-	/*149 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
-	/*150 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
-	/*151 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
-	/*152 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
-	/*153 */_(ER_SQL,			"SQL error: %s") \
-	/*154 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
+	/*149 */_(ER_SPACE_FIELD_IS_DUPLICATE,	"Space field '%s' is duplicate") \
+	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
+	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
+	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of the space '%s' can not contain nullable parts") \
+	/*153 */_(ER_NULLABLE_MISMATCH,		"Field %d is %s in space format, but %s in index parts") \
+	/*154 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
+	/*155 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
+	/*156 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
+	/*157 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
+	/*158 */_(ER_SQL,			"SQL error: %s") \
+	/*159 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

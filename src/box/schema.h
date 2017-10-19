@@ -37,18 +37,16 @@
 #include "space.h"
 #include "latch.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 extern uint32_t schema_version;
 
 /**
  * Lock of schema modification
  */
 extern struct latch schema_lock;
-
-#if defined(__cplusplus)
-extern "C" {
-#endif /* __cplusplus */
-int
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 
 /**
  * Try to look up a space by space number in the space cache.
@@ -59,13 +57,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 struct space *
 space_by_id(uint32_t id);
 
-#if defined(__cplusplus)
-}
-/** Call a visitor function on every space in the space cache. */
-void
-space_foreach_xc(void (*func)(struct space *sp, void *udata), void *udata);
-
-extern "C" uint32_t
+uint32_t
 box_schema_version();
 
 static inline struct space *
@@ -81,7 +73,27 @@ space_cache_find(uint32_t id)
 		prev_schema_version = schema_version;
 		return space;
 	}
-	tnt_raise(ClientError, ER_NO_SUCH_SPACE, int2str(id));
+	diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));
+	return NULL;
+}
+
+struct func *
+func_by_name(const char *name, uint32_t name_len);
+
+/** Call a visitor function on every space in the space cache. */
+int
+space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+static inline struct space *
+space_cache_find_xc(uint32_t id)
+{
+	struct space *space = space_cache_find(id);
+	if (space == NULL)
+		diag_raise();
+	return space;
 }
 
 /**
@@ -140,9 +152,6 @@ func_cache_find(uint32_t fid)
 		tnt_raise(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
 	return func;
 }
-
-struct func *
-func_by_name(const char *name, uint32_t name_len);
 
 
 /**

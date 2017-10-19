@@ -19,7 +19,6 @@ box.space._vspace:update(1, {{'=', 2, 48}})
 -- error: Index 'primary' of space '_vspace' (sysview) does not support xxx()
 box.space._vspace.index.primary:len()
 box.space._vspace.index.primary:random(48)
-box.space._vspace.index.primary:min()
 
 session.su('guest')
 

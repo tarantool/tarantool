@@ -57,7 +57,15 @@ enum say_level {
 	S_DEBUG
 };
 
+/** Log formats */
+enum say_format {
+	SF_PLAIN,
+	SF_JSON,
+	say_format_MAX
+};
+
 extern int log_level;
+extern int log_format;
 
 static inline bool
 say_log_level_is_enabled(int level)
@@ -67,15 +75,35 @@ say_log_level_is_enabled(int level)
 
 /** \endcond public */
 
+/**
+ * Set log level
+ */
 void
 say_set_log_level(int new_level);
+
+/**
+ * Set log format
+ */
+void
+say_set_log_format(enum say_format new_format);
+
+/**
+ * Return say format by name.
+ * @param format_name format name.
+ * @retval say_format_MAX on error
+ * @retval say_format otherwise
+ */
+enum say_format
+say_format_by_name(const char *format);
 
 void
 say_logrotate(int /* signo */);
 
 /* Init logger. */
 void say_logger_init(const char *init_str,
-                     int log_level, int nonblock, int background);
+                     int log_level, int nonblock,
+					 const char *log_format,
+					 int background);
 
 void
 say_logger_free();
@@ -148,6 +176,7 @@ say_check_init_str(const char *str, char **error);
 /* internals, for unit testing */
 
 enum say_logger_type {
+	SAY_LOGGER_BOOT,
 	SAY_LOGGER_STDERR,
 	SAY_LOGGER_FILE,
 	SAY_LOGGER_PIPE,

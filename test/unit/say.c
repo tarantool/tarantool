@@ -10,6 +10,8 @@ parse_logger_type(const char *input)
 
 	if (rc == 0)
 		switch (type) {
+		case SAY_LOGGER_BOOT:
+			note("type: boot"); break;
 		case SAY_LOGGER_STDERR:
 			note("type: stderr"); break;
 		case SAY_LOGGER_FILE:
@@ -44,7 +46,7 @@ parse_syslog_opts(const char *input)
 
 int main()
 {
-	say_logger_init("/dev/null", S_INFO, 0, 0);
+	say_logger_init("/dev/null", S_INFO, 0, "plain", 0);
 
 	plan(20);
 

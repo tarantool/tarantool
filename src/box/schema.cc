@@ -31,7 +31,7 @@
 #include "schema.h"
 #include "user_def.h"
 #include "engine.h"
-#include "memtx_index.h"
+#include "index.h"
 #include "func.h"
 #include "sequence.h"
 #include "tuple.h"
@@ -87,7 +87,7 @@ space_by_id(uint32_t id)
 }
 
 /** Return current schema version */
-extern "C" uint32_t
+uint32_t
 box_schema_version()
 {
 	return schema_version;
@@ -96,8 +96,8 @@ box_schema_version()
 /**
  * Visit all spaces and apply 'func'.
  */
-void
-space_foreach_xc(void (*func)(struct space *sp, void *udata), void *udata)
+int
+space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 {
 	mh_int_t i;
 	struct space *space;
@@ -112,41 +112,40 @@ space_foreach_xc(void (*func)(struct space *sp, void *udata), void *udata)
 	 * snapshot, and harmless otherwise.
 	 */
 	space = space_by_id(BOX_SPACE_ID);
-	Index *pk = space ? space_index(space, 0) : NULL;
+	struct index *pk = space ? space_index(space, 0) : NULL;
 	if (pk) {
-		struct iterator *it = pk->allocIterator();
-		auto scoped_guard = make_scoped_guard([=] { it->free(it); });
-		pk->initIterator(it, ITER_GE, key, 1);
-
+		struct iterator *it = index_create_iterator(pk, ITER_GE,
+							    key, 1);
+		if (it == NULL)
+			return -1;
+		int rc;
 		struct tuple *tuple;
-		while ((tuple = it->next(it))) {
-			/* Get space id, primary key, field 0. */
-			uint32_t id =
-				tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_ID);
+		while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
+			uint32_t id;
+			if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &id) != 0)
+				continue;
 			space = space_cache_find(id);
+			if (space == NULL)
+				continue;
 			if (! space_is_system(space))
 				break;
-			func(space, udata);
+			rc = func(space, udata);
+			if (rc != 0)
+				break;
 		}
+		iterator_delete(it);
+		if (rc != 0)
+			return -1;
 	}
 
 	mh_foreach(spaces, i) {
 		space = (struct space *) mh_i32ptr_node(spaces, i)->val;
 		if (space_is_system(space))
 			continue;
-		func(space, udata);
+		if (func(space, udata) != 0)
+			return -1;
 	}
-}
 
-int
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
-{
-	try {
-		space_foreach_xc(func, udata);
-	}
-	catch(Exception *) {
-		return -1;
-	}
 	return 0;
 }
 
@@ -204,7 +203,7 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);
-	struct space *space = space_new(def, &key_list);
+	struct space *space = space_new_xc(def, &key_list);
 	(void) space_cache_replace(space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);
@@ -220,9 +219,9 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	 *   ensures validation of tuples when starting from
 	 *   a snapshot of older version.
 	 */
-	space->handler->initSystemSpace(space);
+	init_system_space(space);
 
-	trigger_run(&on_alter_space, space);
+	trigger_run_xc(&on_alter_space, space);
 }
 
 uint32_t
@@ -231,8 +230,8 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 {
 	if (len > BOX_NAME_MAX)
 		return BOX_ID_NIL;
-	struct space *space = space_cache_find(system_space_id);
-	MemtxIndex *index = index_find_system(space, index_id);
+	struct space *space = space_cache_find_xc(system_space_id);
+	struct index *index = index_find_system_xc(space, index_id);
 	uint32_t size = mp_sizeof_str(len);
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
@@ -240,10 +239,10 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
 	mp_encode_str(key, name, len);
 
-	struct iterator *it = index->position();
-	index->initIterator(it, ITER_EQ, key, 1);
+	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 1);
+	IteratorGuard iter_guard(it);
 
-	struct tuple *tuple = it->next(it);
+	struct tuple *tuple = iterator_next_xc(it);
 	if (tuple) {
 		/* id is always field #1 */
 		return tuple_field_u32_xc(tuple, 0);
@@ -282,13 +281,18 @@ schema_init()
 	auto key_def_guard = make_scoped_guard([&] { box_key_def_delete(key_def); });
 
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_STRING);
+			 FIELD_TYPE_STRING, false, NULL);
 	sc_space_new(BOX_SCHEMA_ID, "_schema", key_def, &on_replace_schema,
 		     NULL);
 
 	/* _space - home for all spaces. */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_UNSIGNED);
+			 FIELD_TYPE_UNSIGNED, false, NULL);
+
+	/* _collation - collation description. */
+	sc_space_new(BOX_COLLATION_ID, "_collation", key_def,
+		     &on_replace_collation, NULL);
+
 	sc_space_new(BOX_SPACE_ID, "_space", key_def,
 		     &alter_space_on_replace_space, &on_stmt_begin_space);
 
@@ -326,7 +330,8 @@ schema_init()
 		     NULL);
 
 	/* _trigger - all existing SQL triggers */
-	key_def_set_part(key_def, 0, 0, FIELD_TYPE_STRING);
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
+			 FIELD_TYPE_STRING, false, NULL);
 	sc_space_new(BOX_TRIGGER_ID, "_trigger", key_def, NULL, NULL);
 
 	free(key_def);
@@ -335,10 +340,10 @@ schema_init()
 		diag_raise();
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_UNSIGNED);
+			 FIELD_TYPE_UNSIGNED, false, NULL);
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
-			 FIELD_TYPE_UNSIGNED);
+			 FIELD_TYPE_UNSIGNED, false, NULL);
 	sc_space_new(BOX_INDEX_ID, "_index", key_def,
 		     &alter_space_on_replace_index, &on_stmt_begin_index);
 }
@@ -449,10 +454,9 @@ func_by_name(const char *name, uint32_t name_len)
 bool
 schema_find_grants(const char *type, uint32_t id)
 {
-	struct space *priv = space_cache_find(BOX_PRIV_ID);
+	struct space *priv = space_cache_find_xc(BOX_PRIV_ID);
 	/** "object" index */
-	MemtxIndex *index = index_find_system(priv, 2);
-	struct iterator *it = index->position();
+	struct index *index = index_find_system_xc(priv, 2);
 	/*
 	 * +10 = max(mp_sizeof_uint32) +
 	 *       max(mp_sizeof_strl(uint32)).
@@ -460,8 +464,9 @@ schema_find_grants(const char *type, uint32_t id)
 	char key[GRANT_NAME_MAX + 10];
 	assert(strlen(type) <= GRANT_NAME_MAX);
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
-	index->initIterator(it, ITER_EQ, key, 2);
-	return it->next(it);
+	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 2);
+	IteratorGuard iter_guard(it);
+	return iterator_next_xc(it);
 }
 
 struct sequence *

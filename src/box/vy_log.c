@@ -624,8 +624,10 @@ vy_log_record_decode(struct vy_log_record *record,
 				return -1;
 			}
 			memset(key_def, 0, key_def_sizeof(part_count));
+			key_def->is_nullable = false;
+			key_def->unique_part_count = part_count;
 			key_def->part_count = part_count;
-			if (key_def_decode_parts(key_def, &pos) != 0) {
+			if (key_def_decode_parts(key_def, &pos, NULL, 0) != 0) {
 				diag_log();
 				diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 					 "Bad record: failed to decode "

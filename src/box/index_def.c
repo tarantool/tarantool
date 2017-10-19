@@ -50,15 +50,15 @@ const struct index_opts index_opts_default = {
 
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
-	OPT_DEF("dimension", OPT_INT, struct index_opts, dimension),
+	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
 	OPT_DEF_ENUM("distance", rtree_index_distance_type, struct index_opts,
 		     distance, NULL),
-	OPT_DEF("range_size", OPT_INT, struct index_opts, range_size),
-	OPT_DEF("page_size", OPT_INT, struct index_opts, page_size),
-	OPT_DEF("run_count_per_level", OPT_INT, struct index_opts, run_count_per_level),
+	OPT_DEF("range_size", OPT_INT64, struct index_opts, range_size),
+	OPT_DEF("page_size", OPT_INT64, struct index_opts, page_size),
+	OPT_DEF("run_count_per_level", OPT_INT64, struct index_opts, run_count_per_level),
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
 	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
-	OPT_DEF("lsn", OPT_INT, struct index_opts, lsn),
+	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
 	OPT_DEF("sql", OPT_STRPTR, struct index_opts, sql),
 	OPT_END,
 };
@@ -88,10 +88,18 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		return NULL;
 	}
 	def->key_def = key_def_dup(key_def);
-	if (pk_def)
+	if (pk_def != NULL) {
 		def->cmp_def = key_def_merge(key_def, pk_def);
-	else
+		if (! opts->is_unique) {
+			def->cmp_def->unique_part_count =
+				def->cmp_def->part_count;
+		} else {
+			def->cmp_def->unique_part_count =
+				def->key_def->part_count;
+		}
+	} else {
 		def->cmp_def = key_def_dup(key_def);
+	}
 	if (def->key_def == NULL || def->cmp_def == NULL) {
 		index_def_delete(def);
 		return NULL;
@@ -187,16 +195,16 @@ index_def_delete(struct index_def *index_def)
 }
 
 bool
-index_def_change_requires_rebuild(struct index_def *old_index_def,
-				  struct index_def *new_index_def)
+index_def_change_requires_rebuild(const struct index_def *old_index_def,
+				  const struct index_def *new_index_def)
 {
 	if (old_index_def->iid != new_index_def->iid ||
 	    old_index_def->type != new_index_def->type ||
 	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
-	    key_part_cmp(old_index_def->key_def->parts,
-			 old_index_def->key_def->part_count,
-			 new_index_def->key_def->parts,
-			 new_index_def->key_def->part_count) != 0) {
+	    !key_part_check_compatibility(old_index_def->key_def->parts,
+					  old_index_def->key_def->part_count,
+					  new_index_def->key_def->parts,
+					  new_index_def->key_def->part_count)) {
 		return true;
 	}
 	if (old_index_def->type == RTREE) {

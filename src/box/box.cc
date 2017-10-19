@@ -31,6 +31,8 @@
 #include "box/box.h"
 
 #include "trivia/config.h"
+
+#include "lua/utils.h" /* lua_hash() */
 #include "fiber_pool.h"
 #include <say.h>
 #include <scoped_guard.h>
@@ -47,10 +49,10 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
-#include "memtx_index.h"
 #include "sysview_engine.h"
 #include "vinyl_engine.h"
 #include "space.h"
+#include "index.h"
 #include "port.h"
 #include "txn.h"
 #include "user.h"
@@ -128,12 +130,23 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
-static void
+static int
 box_check_writable(void)
 {
 	/* box is only writable if box.cfg.read_only == false and */
-	if (is_ro)
-		tnt_raise(LoggedError, ER_READONLY);
+	if (is_ro) {
+		diag_set(ClientError, ER_READONLY);
+		diag_log();
+		return -1;
+	}
+	return 0;
+}
+
+static void
+box_check_writable_xc(void)
+{
+	if (box_check_writable() != 0)
+		diag_raise();
 }
 
 static void
@@ -145,190 +158,55 @@ box_check_memtx_min_tuple_size(ssize_t memtx_min_tuple_size)
 		  "specified value is out of bounds");
 }
 
-/**
- * Convert a request accessing a secondary key to a primary key undo
- * record, given it found a tuple.
- * Flush iproto header of the request to be reconstructed in txn_add_redo().
- *
- * @param request - request to fix
- * @param space - space corresponding to request
- * @param found_tuple - tuple found by secondary key
- */
-static void
-request_rebind_to_primary_key(struct request *request, struct space *space,
-			      struct tuple *found_tuple)
-{
-	Index *primary = index_find_xc(space, 0);
-	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple,
-			primary->index_def->key_def, &key_len);
-	if (key == NULL)
-		diag_raise();
-	request->key = key;
-	request->key_end = key + key_len;
-	request->index_id = 0;
-	/* Clear the *body* to ensure it's rebuilt at commit. */
-	request->header = NULL;
-}
-
-/**
- * Handle INSERT/REPLACE in a space with a sequence attached.
- */
-static void
-request_handle_sequence(struct request *request, struct space *space)
-{
-	struct sequence *seq = space->sequence;
-
-	assert(seq != NULL);
-	assert(request->type == IPROTO_INSERT ||
-	       request->type == IPROTO_REPLACE);
-
-	/*
-	 * An automatically generated sequence inherits
-	 * privileges of the space it is used with.
-	 */
-	if (!seq->is_generated &&
-	    access_check_sequence(seq) != 0)
-		diag_raise();
-
-	struct Index *pk = space_index(space, 0);
-	if (unlikely(pk == NULL))
-		return;
-
-	/*
-	 * Look up the first field of the primary key.
-	 */
-	const char *data = request->tuple;
-	const char *data_end = request->tuple_end;
-	int len = mp_decode_array(&data);
-	int fieldno = pk->index_def->key_def->parts[0].fieldno;
-	if (unlikely(len < fieldno + 1))
-		return;
-
-	const char *key = data;
-	if (unlikely(fieldno > 0)) {
-		do {
-			mp_next(&key);
-		} while (--fieldno > 0);
-	}
-
-	int64_t value;
-	if (mp_typeof(*key) == MP_NIL) {
-		/*
-		 * If the first field of the primary key is nil,
-		 * this is an auto increment request and we need
-		 * to replace the nil with the next value generated
-		 * by the space sequence.
-		 */
-		if (unlikely(sequence_next(seq, &value) != 0))
-			diag_raise();
-
-		const char *key_end = key;
-		mp_decode_nil(&key_end);
-
-		size_t buf_size = (request->tuple_end - request->tuple) +
-						mp_sizeof_uint(UINT64_MAX);
-		char *tuple = (char *) region_alloc_xc(&fiber()->gc, buf_size);
-		char *tuple_end = mp_encode_array(tuple, len);
-
-		if (unlikely(key != data)) {
-			memcpy(tuple_end, data, key - data);
-			tuple_end += key - data;
-		}
-
-		if (value >= 0)
-			tuple_end = mp_encode_uint(tuple_end, value);
-		else
-			tuple_end = mp_encode_int(tuple_end, value);
-
-		memcpy(tuple_end, key_end, data_end - key_end);
-		tuple_end += data_end - key_end;
-
-		assert(tuple_end <= tuple + buf_size);
-
-		request->tuple = tuple;
-		request->tuple_end = tuple_end;
-	} else {
-		/*
-		 * If the first field is not nil, update the space
-		 * sequence with its value, to make sure that an
-		 * auto increment request never tries to insert a
-		 * value that is already in the space. Note, this
-		 * code is also invoked on final recovery to restore
-		 * the sequence value from WAL.
-		 */
-		if (likely(mp_read_int64(&key, &value) == 0)) {
-			if (sequence_update(seq, value) != 0)
-				diag_raise();
-		}
-	}
-}
-
-static void
+static int
 process_rw(struct request *request, struct space *space, struct tuple **result)
 {
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
-	try {
-		struct txn *txn = txn_begin_stmt(space);
-		access_check_space(space, PRIV_W);
-		struct tuple *tuple;
-		switch (request->type) {
-		case IPROTO_INSERT:
-		case IPROTO_REPLACE:
-			if (space->sequence != NULL)
-				request_handle_sequence(request, space);
-			tuple = space->handler->executeReplace(txn, space,
-							       request);
-
-
-			break;
-		case IPROTO_UPDATE:
-			tuple = space->handler->executeUpdate(txn, space,
-							      request);
-			if (tuple && request->index_id != 0) {
-				/*
-				 * XXX: this is going to break with
-				 * sync replication for cases when
-				 * tuple is NULL, since the leader
-				 * will be unable to certify such
-				 * updates correctly.
-				 */
-				request_rebind_to_primary_key(request, space,
-							      tuple);
-			}
-			break;
-		case IPROTO_DELETE:
-			tuple = space->handler->executeDelete(txn, space,
-							      request);
-			if (tuple && request->index_id != 0) {
-				request_rebind_to_primary_key(request, space,
-							      tuple);
-			}
-			break;
-		case IPROTO_UPSERT:
-			space->handler->executeUpsert(txn, space, request);
-			tuple = NULL;
-			break;
-		default:
-			tuple = NULL;
-		}
-		/*
-		 * Pin the tuple locally before the commit,
-		 * otherwise it may go away during yield in
-		 * when WAL is written in autocommit mode.
-		 */
-		TupleRefNil ref(tuple);
-		txn_commit_stmt(txn, request);
-		if (result) {
-			if (tuple)
-				tuple_bless_xc(tuple);
-			*result = tuple;
-		}
-	} catch (Exception *e) {
-		txn_rollback_stmt();
-		throw;
+	if (access_check_space(space, PRIV_W) != 0)
+		return -1;
+	struct txn *txn = txn_begin_stmt(space);
+	if (txn == NULL)
+		return -1;
+	int rc;
+	struct tuple *tuple;
+	switch (request->type) {
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+		rc = space_execute_replace(space, txn, request, &tuple);
+		break;
+	case IPROTO_UPDATE:
+		rc = space_execute_update(space, txn, request, &tuple);
+		break;
+	case IPROTO_DELETE:
+		rc = space_execute_delete(space, txn, request, &tuple);
+		break;
+	case IPROTO_UPSERT:
+		rc = space_execute_upsert(space, txn, request);
+		tuple = NULL;
+		break;
+	default:
+		rc = 0;
+		tuple = NULL;
 	}
+	if (rc != 0) {
+		txn_rollback_stmt();
+		return -1;
+	}
+	/*
+	 * Pin the tuple locally before the commit,
+	 * otherwise it may go away during yield in
+	 * when WAL is written in autocommit mode.
+	 */
+	TupleRefNil ref(tuple);
+	if (txn_commit_stmt(txn, request) != 0)
+		return -1;
+	if (result != NULL) {
+		if (tuple != NULL && tuple_bless(tuple) == NULL)
+			return -1;
+		*result = tuple;
+	}
+	return 0;
 }
 
 void
@@ -412,8 +290,9 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
 	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find(request->space_id);
-	process_rw(request, space, NULL);
+	struct space *space = space_cache_find_xc(request->space_id);
+	if (process_rw(request, space, NULL) != 0)
+		diag_raise();
 }
 
 static void
@@ -450,9 +329,9 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
 	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find(request->space_id);
+	struct space *space = space_cache_find_xc(request->space_id);
 	/* no access checks here - applier always works with admin privs */
-	space->handler->applyInitialJoinRow(space, request);
+	space_apply_initial_join_row_xc(space, request);
 }
 
 /* {{{ configuration bindings */
@@ -467,6 +346,16 @@ box_check_log(const char *log)
 		auto guard = make_scoped_guard([=]{ free(error_msg); });
 		tnt_raise(ClientError, ER_CFG, "log", error_msg);
 	}
+}
+
+static enum say_format
+box_check_log_format(const char *log_format)
+{
+	enum say_format format = say_format_by_name(log_format);
+	if (format == say_format_MAX)
+		tnt_raise(ClientError, ER_CFG, "log_format",
+			  "expected 'plain' or 'json'");
+	return format;
 }
 
 static void
@@ -560,6 +449,7 @@ void
 box_check_config()
 {
 	box_check_log(cfg_gets("log"));
+	box_check_log_format(cfg_gets("log_format"));
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_replication();
 	box_check_replication_timeout();
@@ -687,6 +577,13 @@ box_set_log_level(void)
 }
 
 void
+box_set_log_format(void)
+{
+	enum say_format format = box_check_log_format(cfg_gets("log_format"));
+	say_set_log_format(format);
+}
+
+void
 box_set_io_collect_interval(void)
 {
 	ev_set_io_collect_interval(loop(), cfg_getd("io_collect_interval"));
@@ -695,15 +592,21 @@ box_set_io_collect_interval(void)
 void
 box_set_snap_io_rate_limit(void)
 {
-	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
-	memtx->setSnapIoRateLimit(cfg_getd("snap_io_rate_limit"));
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	memtx_engine_set_snap_io_rate_limit(memtx,
+			cfg_getd("snap_io_rate_limit"));
 }
 
 void
 box_set_memtx_max_tuple_size(void)
 {
-	MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
-	memtx->setMaxTupleSize(cfg_geti("memtx_max_tuple_size"));
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	memtx_engine_set_max_tuple_size(memtx,
+			cfg_geti("memtx_max_tuple_size"));
 }
 
 void
@@ -731,15 +634,20 @@ box_set_checkpoint_count(void)
 void
 box_set_vinyl_max_tuple_size(void)
 {
-	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
-	vinyl->setMaxTupleSize(cfg_geti("vinyl_max_tuple_size"));
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_max_tuple_size(vinyl,
+			cfg_geti("vinyl_max_tuple_size"));
 }
 
 void
 box_set_vinyl_timeout(void)
 {
-	VinylEngine *vinyl = (VinylEngine *) engine_find("vinyl");
-	vinyl->setTimeout(cfg_getd("vinyl_timeout"));
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_timeout(vinyl,	cfg_getd("vinyl_timeout"));
 }
 
 /* }}} configuration bindings */
@@ -803,13 +711,10 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	default:
 		unreachable();
 	}
-	try {
-		struct space *space = space_cache_find(space_id);
-		process_rw(request, space, NULL);
-	} catch (Exception *e) {
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
 		return -1;
-	}
-	return 0;
+	return process_rw(request, space, NULL);
 }
 
 int
@@ -875,16 +780,13 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 int
 box_process1(struct request *request, box_tuple_t **result)
 {
-	try {
-		/* Allow to write to temporary spaces in read-only mode. */
-		struct space *space = space_cache_find(request->space_id);
-		if (!space->def->opts.temporary)
-			box_check_writable();
-		process_rw(request, space, result);
-		return 0;
-	} catch (Exception *e) {
+	/* Allow to write to temporary spaces in read-only mode. */
+	struct space *space = space_cache_find(request->space_id);
+	if (space == NULL)
 		return -1;
-	}
+	if (!space->def->opts.temporary && box_check_writable() != 0)
+		return -1;
+	return process_rw(request, space, result);
 }
 
 int
@@ -892,21 +794,71 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end)
 {
+	(void)key_end;
+
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
-	try {
-		struct space *space = space_cache_find(space_id);
-		access_check_space(space, PRIV_R);
-		struct txn *txn = txn_begin_ro_stmt(space);
-		space->handler->executeSelect(txn, space, index_id, iterator,
-					      offset, limit, key, key_end, port);
-		txn_commit_ro_stmt(txn);
-		return 0;
-	} catch (Exception *e) {
-		txn_rollback_stmt();
-		/* will be hanled by box.error() in Lua */
+	if (iterator < 0 || iterator >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
+		diag_log();
 		return -1;
 	}
+
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	if (access_check_space(space, PRIV_R) != 0)
+		return -1;
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+
+	enum iterator_type type = (enum iterator_type) iterator;
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
+	if (key_validate(index->def, type, key, part_count))
+		return -1;
+
+	ERROR_INJECT(ERRINJ_TESTING, {
+		diag_set(ClientError, ER_INJECTION, "ERRINJ_TESTING");
+		return -1;
+	});
+
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return -1;
+
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
+	if (it == NULL) {
+		txn_rollback_stmt();
+		return -1;
+	}
+
+	int rc = 0;
+	uint32_t found = 0;
+	struct tuple *tuple;
+	while (found < limit) {
+		rc = iterator_next(it, &tuple);
+		if (rc != 0 || tuple == NULL)
+			break;
+		if (offset > 0) {
+			offset--;
+			continue;
+		}
+		rc = port_add_tuple(port, tuple);
+		if (rc != 0)
+			break;
+		found++;
+	}
+	iterator_delete(it);
+
+	if (rc != 0) {
+		txn_rollback_stmt();
+		return -1;
+	}
+	txn_commit_ro_stmt(txn);
+	return 0;
 }
 
 int
@@ -1030,7 +982,7 @@ int
 box_truncate(uint32_t space_id)
 {
 	try {
-		struct space *space = space_cache_find(space_id);
+		struct space *space = space_cache_find_xc(space_id);
 		space_truncate(space);
 		return 0;
 	} catch (Exception *exc) {
@@ -1152,20 +1104,21 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 static void
 box_on_join(const tt_uuid *instance_uuid)
 {
-	box_check_writable();
+	box_check_writable_xc();
 	struct replica *replica = replica_by_uuid(instance_uuid);
 	if (replica != NULL)
 		return; /* nothing to do - already registered */
 
 	/** Find the largest existing replica id. */
-	struct space *space = space_cache_find(BOX_CLUSTER_ID);
-	class MemtxIndex *index = index_find_system(space, 0);
-	struct iterator *it = index->position();
-	index->initIterator(it, ITER_ALL, NULL, 0);
+	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
+	struct index *index = index_find_system_xc(space, 0);
+	struct iterator *it = index_create_iterator_xc(index, ITER_ALL,
+						       NULL, 0);
+	IteratorGuard iter_guard(it);
 	struct tuple *tuple;
 	/** Assign a new replica id. */
 	uint32_t replica_id = 1;
-	while ((tuple = it->next(it))) {
+	while ((tuple = iterator_next_xc(it)) != NULL) {
 		if (tuple_field_u32_xc(tuple,
 				       BOX_CLUSTER_FIELD_ID) != replica_id)
 			break;
@@ -1249,10 +1202,10 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Check permissions */
 	access_check_universe(PRIV_R);
-	access_check_space(space_cache_find(BOX_CLUSTER_ID), PRIV_W);
+	access_check_space_xc(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
-	box_check_writable();
+	box_check_writable_xc();
 
 	/* Forbid replication with disabled WAL */
 	if (wal_mode() == WAL_NONE) {
@@ -1462,19 +1415,27 @@ engine_init()
 	 * in checkpoints (in enigne_foreach order),
 	 * so it must be registered first.
 	 */
-	MemtxEngine *memtx = new MemtxEngine(cfg_gets("memtx_dir"),
-					     cfg_geti("force_recovery"),
-					     cfg_getd("memtx_memory"),
-					     cfg_geti("memtx_min_tuple_size"),
-					     cfg_getd("slab_alloc_factor"));
-	engine_register(memtx);
+	struct memtx_engine *memtx;
+	memtx = memtx_engine_new_xc(cfg_gets("memtx_dir"),
+				    cfg_geti("force_recovery"),
+				    cfg_getd("memtx_memory"),
+				    cfg_geti("memtx_min_tuple_size"),
+				    cfg_getd("slab_alloc_factor"));
+	engine_register((struct engine *)memtx);
+	box_set_memtx_max_tuple_size();
 
-	SysviewEngine *sysview = new SysviewEngine();
-	engine_register(sysview);
+	struct sysview_engine *sysview = sysview_engine_new_xc();
+	engine_register((struct engine *)sysview);
 
-	VinylEngine *vinyl = new VinylEngine();
-	vinyl->init();
-	engine_register(vinyl);
+	struct vinyl_engine *vinyl;
+	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
+				    cfg_geti64("vinyl_memory"),
+				    cfg_geti64("vinyl_cache"),
+				    cfg_geti("vinyl_read_threads"),
+				    cfg_geti("vinyl_write_threads"),
+				    cfg_getd("vinyl_timeout"));
+	engine_register((struct engine *)vinyl);
+	box_set_vinyl_max_tuple_size();
 }
 
 /**
@@ -1483,7 +1444,7 @@ engine_init()
 static void
 bootstrap_master(void)
 {
-	engine_bootstrap();
+	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
 
@@ -1538,7 +1499,7 @@ bootstrap_from_master(struct replica *master)
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
-	engine_begin_initial_recovery(NULL);
+	engine_begin_initial_recovery_xc(NULL);
 	struct join_journal join_journal;
 	join_journal_create(&join_journal);
 	journal_set(&join_journal.base);
@@ -1547,7 +1508,7 @@ bootstrap_from_master(struct replica *master)
 	/*
 	 * Process final data (WALs).
 	 */
-	engine_begin_final_recovery();
+	engine_begin_final_recovery_xc();
 	struct recovery_journal journal;
 	recovery_journal_create(&journal, &replicaset_vclock);
 	journal_set(&journal.base);
@@ -1558,7 +1519,7 @@ bootstrap_from_master(struct replica *master)
 	journal_set(NULL);
 
 	/* Finalize the new replica */
-	engine_end_recovery();
+	engine_end_recovery_xc();
 
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
@@ -1609,7 +1570,7 @@ box_init(void)
 	 */
 	session_init();
 
-	if (tuple_init() != 0)
+	if (tuple_init(lua_hash) != 0)
 		diag_raise();
 
 	sequence_init();
@@ -1695,8 +1656,11 @@ box_cfg_xc(void)
 		 * should introduce Engine::applyWALRow method and
 		 * explicitly pass the statement LSN to it.
 		 */
-		engine_begin_initial_recovery(&recovery->vclock);
-		MemtxEngine *memtx = (MemtxEngine *) engine_find("memtx");
+		engine_begin_initial_recovery_xc(&recovery->vclock);
+
+		struct memtx_engine *memtx;
+		memtx = (struct memtx_engine *)engine_by_name("memtx");
+		assert(memtx != NULL);
 
 		struct recovery_journal journal;
 		recovery_journal_create(&journal, &recovery->vclock);
@@ -1709,9 +1673,10 @@ box_cfg_xc(void)
 		 * recovery of system spaces issue DDL events in
 		 * other engines.
 		 */
-		memtx->recoverSnapshot(&last_checkpoint_vclock);
+		memtx_engine_recover_snapshot_xc(memtx,
+				&last_checkpoint_vclock);
 
-		engine_begin_final_recovery();
+		engine_begin_final_recovery_xc();
 		title("orphan");
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 				      cfg_getd("wal_dir_rescan_delay"));
@@ -1735,7 +1700,7 @@ box_cfg_xc(void)
 			box_bind();
 		}
 		recovery_finalize(recovery, &wal_stream.base);
-		engine_end_recovery();
+		engine_end_recovery_xc();
 
 		/* Clear the pointer to journal before it goes out of scope */
 		journal_set(NULL);

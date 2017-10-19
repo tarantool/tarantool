@@ -1006,6 +1006,60 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
+--
+-- gh-1014: tuple field names and tuple methods aliases.
+--
+t = box.tuple.new({1, 2, 3})
+---
+...
+box.tuple.next == t.next
+---
+- true
+...
+box.tuple.ipairs == t.ipairs
+---
+- true
+...
+box.tuple.pairs == t.pairs
+---
+- true
+...
+box.tuple.slice == t.slice
+---
+- true
+...
+box.tuple.transform == t.transform
+---
+- true
+...
+box.tuple.find == t.find
+---
+- true
+...
+box.tuple.findall == t.findall
+---
+- true
+...
+box.tuple.unpack == t.unpack
+---
+- true
+...
+box.tuple.totable == t.totable
+---
+- true
+...
+box.tuple.update == t.update
+---
+- true
+...
+box.tuple.upsert == t.upsert
+---
+- true
+...
+box.tuple.bsize == t.bsize
+---
+- true
+...
 test_run:cmd("clear filter")
 ---
 - true

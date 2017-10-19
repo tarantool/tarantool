@@ -47,10 +47,6 @@ box.space._vspace.index.primary:random(48)
 ---
 - error: Index 'primary' (TREE) of space '_vspace' (sysview) does not support random()
 ...
-box.space._vspace.index.primary:min()
----
-- error: Index 'primary' (TREE) of space '_vspace' (sysview) does not support min()
-...
 session.su('guest')
 ---
 ...
@@ -138,11 +134,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 6
+- 7
 ...
 #box.space._vindex:select{}
 ---
-- 15
+- 17
 ...
 box.session.su('admin')
 ---
@@ -230,11 +226,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 18
+- 19
 ...
 #box.space._vindex:select{}
 ---
-- 40
+- 42
 ...
 #box.space._vuser:select{}
 ---
@@ -242,7 +238,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 12
+- 13
 ...
 #box.space._vfunc:select{}
 ---
@@ -262,7 +258,7 @@ box.session.su('guest')
 ...
 #box.space._vindex:select{}
 ---
-- 40
+- 42
 ...
 #box.space._vuser:select{}
 ---

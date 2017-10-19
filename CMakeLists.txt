@@ -300,6 +300,13 @@ set(Readline_FIND_REQUIRED ON)
 find_package(Readline)
 
 #
+# ICU
+#
+
+set(ICU_FIND_REQUIRED ON)
+find_package(ICU)
+
+#
 # LuaJIT
 #
 # Patched.

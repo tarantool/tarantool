@@ -30,15 +30,37 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <small/mempool.h>
+
 #include "engine.h"
 
-struct SysviewEngine: public Engine {
-public:
-	SysviewEngine();
-	virtual Handler *createSpace(struct rlist *key_list,
-				     struct field_def *fields,
-				     uint32_t field_count, uint32_t index_count,
-				     uint32_t exact_field_count) override;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct sysview_engine {
+	struct engine base;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
 };
+
+struct sysview_engine *
+sysview_engine_new(void);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+static inline struct sysview_engine *
+sysview_engine_new_xc(void)
+{
+	struct sysview_engine *sysview = sysview_engine_new();
+	if (sysview == NULL)
+		diag_raise();
+	return sysview;
+}
+
+#endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_SYSVIEW_ENGINE_H_INCLUDED */

@@ -33,7 +33,7 @@ deps_ubuntu:
 	sudo apt-get update && apt-get install -y -f \
 		build-essential cmake coreutils sed \
 		libreadline-dev libncurses5-dev libyaml-dev libssl-dev \
-		libcurl4-openssl-dev libunwind-dev \
+		libcurl4-openssl-dev libunwind-dev libicu-dev \
 		python python-pip python-setuptools python-dev \
 		python-msgpack python-yaml python-argparse python-six python-gevent \
 		lcov ruby tcl
@@ -44,7 +44,8 @@ test_ubuntu: deps_ubuntu
 	cd test && /usr/bin/python test-run.py -j -1
 
 deps_osx:
-	brew install openssl readline curl --force
+	brew update
+	brew install openssl readline curl icu4c --force
 	pip install -r test-run/requirements.txt --user
 
 test_osx: deps_osx

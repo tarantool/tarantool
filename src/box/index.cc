@@ -42,20 +42,30 @@
 /* {{{ Utilities. **********************************************/
 
 UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
-	unsigned line, const Index *index, const char *what)
+	unsigned line, struct index_def *index_def, const char *what)
 	: ClientError(file, line, ER_UNKNOWN)
 {
-	struct index_def *index_def = index->index_def;
-	struct space *space = space_cache_find(index_def->space_id);
+	struct space *space = space_cache_find_xc(index_def->space_id);
 	m_errcode = ER_UNSUPPORTED_INDEX_FEATURE;
 	error_format_msg(this, tnt_errcode_desc(m_errcode), index_def->name,
 			 index_type_strs[index_def->type],
 			 space->def->name, space->def->engine_name, what);
 }
 
+struct error *
+BuildUnsupportedIndexFeature(const char *file, unsigned line,
+			     struct index_def *index_def, const char *what)
+{
+	try {
+		return new UnsupportedIndexFeature(file, line, index_def, what);
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}
+
 int
-key_validate(struct index_def *index_def, enum iterator_type type, const char *key,
-	     uint32_t part_count)
+key_validate(const struct index_def *index_def, enum iterator_type type,
+	     const char *key, uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
 	if (part_count == 0) {
@@ -81,7 +91,7 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 		if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
 			if (key_mp_type_validate(FIELD_TYPE_ARRAY, mp_type,
-						 ER_KEY_PART_TYPE, 0))
+						 ER_KEY_PART_TYPE, 0, false))
 				return -1;
 			uint32_t array_size = mp_decode_array(&key);
 			if (array_size != d && array_size != d * 2) {
@@ -94,7 +104,8 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 				mp_next(&key);
 				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
 							 mp_type,
-							 ER_KEY_PART_TYPE, 0))
+							 ER_KEY_PART_TYPE, 0,
+							 false))
 					return -1;
 			}
 		} else {
@@ -104,7 +115,7 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 				if (key_mp_type_validate(FIELD_TYPE_NUMBER,
 							 mp_type,
 							 ER_KEY_PART_TYPE,
-							 part))
+							 part, false))
 					return -1;
 			}
 		}
@@ -124,15 +135,15 @@ key_validate(struct index_def *index_def, enum iterator_type type, const char *k
 			return -1;
 		}
 		if (key_validate_parts(index_def->key_def, key,
-				       part_count) != 0)
+				       part_count, true) != 0)
 			return -1;
 	}
 	return 0;
 }
 
 int
-primary_key_validate(struct key_def *key_def, const char *key,
-		     uint32_t part_count)
+exact_key_validate(struct key_def *key_def, const char *key,
+		   uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
 	if (key_def->part_count != part_count) {
@@ -140,187 +151,67 @@ primary_key_validate(struct key_def *key_def, const char *key,
 			 part_count);
 		return -1;
 	}
-	return key_validate_parts(key_def, key, part_count);
+	return key_validate_parts(key_def, key, part_count, false);
 }
 
 char *
 box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 	uint32_t index_id, uint32_t *key_size)
 {
-	try {
-		struct space *space = space_by_id(space_id);
-		Index *index = index_find_xc(space, index_id);
-		return tuple_extract_key(tuple, index->index_def->key_def,
-					 key_size);
-	} catch (ClientError *e) {
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
 		return NULL;
-	}
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return NULL;
+	return tuple_extract_key(tuple, index->def->key_def, key_size);
+}
+
+static inline int
+check_index(uint32_t space_id, uint32_t index_id,
+	    struct space **space, struct index **index)
+{
+	*space = space_cache_find(space_id);
+	if (*space == NULL)
+		return -1;
+	if (access_check_space(*space, PRIV_R) != 0)
+		return -1;
+	*index = index_find(*space, index_id);
+	if (*index == NULL)
+		return -1;
+	return 0;
 }
 
 /* }}} */
 
-/* {{{ Index -- base class for all indexes. ********************/
-
-Index::Index(struct index_def *index_def_arg)
-	:index_def(NULL), schema_version(::schema_version)
-{
-	index_def = index_def_dup(index_def_arg);
-	if (index_def == NULL)
-		diag_raise();
-}
-
-Index::~Index()
-{
-	index_def_delete(index_def);
-}
-
-void
-Index::commitCreate(int64_t /* signature */)
-{
-}
-
-void
-Index::commitDrop()
-{
-}
-
-size_t
-Index::size() const
-{
-	tnt_raise(UnsupportedIndexFeature, this, "size()");
-	return 0;
-}
-
-struct tuple *
-Index::min(const char* /* key */, uint32_t /* part_count */) const
-{
-	tnt_raise(UnsupportedIndexFeature, this, "min()");
-	return NULL;
-}
-
-struct tuple *
-Index::max(const char* /* key */, uint32_t /* part_count */) const
-{
-	tnt_raise(UnsupportedIndexFeature, this, "max()");
-	return NULL;
-}
-
-struct tuple *
-Index::random(uint32_t rnd) const
-{
-	(void) rnd;
-	tnt_raise(UnsupportedIndexFeature, this, "random()");
-	return NULL;
-}
-
-size_t
-Index::count(enum iterator_type /* type */, const char* /* key */,
-             uint32_t /* part_count */) const
-{
-	tnt_raise(UnsupportedIndexFeature, this, "count()");
-	return 0;
-}
-
-struct tuple *
-Index::findByKey(const char *key, uint32_t part_count) const
-{
-	(void) key;
-	(void) part_count;
-	tnt_raise(UnsupportedIndexFeature, this, "findByKey()");
-	return NULL;
-}
-
-struct tuple *
-Index::findByTuple(struct tuple *tuple) const
-{
-	(void) tuple;
-	tnt_raise(UnsupportedIndexFeature, this, "findByTuple()");
-	return NULL;
-}
-
-struct tuple *
-Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
-		     enum dup_replace_mode mode)
-{
-	(void) old_tuple;
-	(void) new_tuple;
-	(void) mode;
-	tnt_raise(UnsupportedIndexFeature, this, "replace()");
-	return NULL;
-}
-
-size_t
-Index::bsize() const
-{
-	return 0;
-}
-
-void
-Index::initIterator(struct iterator *ptr, enum iterator_type type,
-		    const char *key, uint32_t part_count) const
-{
-	(void) ptr;
-	(void) type;
-	(void) key;
-	(void) part_count;
-	tnt_raise(UnsupportedIndexFeature, this, "requested iterator type");
-}
-
-/**
- * Create an ALL iterator with personal read view so further
- * index modifications will not affect the iteration results.
- * Must be destroyed by iterator->free after usage.
- */
-struct snapshot_iterator *
-Index::createSnapshotIterator()
-{
-	tnt_raise(UnsupportedIndexFeature, this, "consistent read view");
-}
-
-static inline Index *
-check_index(uint32_t space_id, uint32_t index_id, struct space **space)
-{
-	*space = space_cache_find(space_id);
-	access_check_space(*space, PRIV_R);
-	return index_find_xc(*space, index_id);
-}
-
-static inline box_tuple_t *
-tuple_bless_null_xc(struct tuple *tuple)
-{
-	if (tuple != NULL)
-		return tuple_bless_xc(tuple);
-	return NULL;
-}
+/* {{{ Public API */
 
 const box_key_def_t *
 box_iterator_key_def(box_iterator_t *iterator)
 {
-  return iterator->index->index_def->key_def;
+	return iterator->index->def->key_def;
 }
 
 ssize_t
 box_index_len(uint32_t space_id, uint32_t index_id)
 {
-	try {
-		struct space *space;
-		/* no tx management, len is approximate in vinyl anyway. */
-		return check_index(space_id, index_id, &space)->size();
-	} catch (Exception *) {
-		return (size_t) -1; /* handled by box.error() in Lua */
-	}
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	/* No tx management, len() doesn't work in vinyl anyway. */
+	return index_size(index);
 }
 
 ssize_t
 box_index_bsize(uint32_t space_id, uint32_t index_id)
 {
-       try {
-	       /* no tx management for statistics */
-	       struct space *space;
-	       return check_index(space_id, index_id, &space)->bsize();
-       } catch (Exception *) {
-               return (size_t) -1; /* handled by box.error() in Lua */
-       }
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	/* No tx management for statistics. */
+	return index_bsize(index);
 }
 
 int
@@ -328,16 +219,16 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 		box_tuple_t **result)
 {
 	assert(result != NULL);
-	try {
-		struct space *space;
-		/* no tx management, random() is for approximation anyway */
-		Index *index = check_index(space_id, index_id, &space);
-		struct tuple *tuple = index->random(rnd);
-		*result = tuple_bless_null_xc(tuple);
-		return 0;
-	}  catch (Exception *) {
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
-	}
+	/* No tx management, random() is for approximation anyway. */
+	if (index_random(index, rnd, result) != 0)
+		return -1;
+	if (*result != NULL && tuple_bless(*result) == NULL)
+		return -1;
+	return 0;
 }
 
 int
@@ -346,28 +237,31 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 {
 	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	try {
-		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
-		if (!index->index_def->opts.is_unique)
-			tnt_raise(ClientError, ER_MORE_THAN_ONE_TUPLE);
-		uint32_t part_count = mp_decode_array(&key);
-		if (primary_key_validate(index->index_def->key_def, key,
-					 part_count))
-			diag_raise();
-		/* Start transaction in the engine. */
-		struct txn *txn = txn_begin_ro_stmt(space);
-		struct tuple *tuple = index->findByKey(key, part_count);
-		/* Count statistics */
-		rmean_collect(rmean_box, IPROTO_SELECT, 1);
-
-		*result = tuple_bless_null_xc(tuple);
-		txn_commit_ro_stmt(txn);
-		return 0;
-	}  catch (Exception *) {
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	if (!index->def->opts.is_unique) {
+		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
+		return -1;
+	}
+	uint32_t part_count = mp_decode_array(&key);
+	if (exact_key_validate(index->def->key_def, key, part_count))
+		return -1;
+	/* Start transaction in the engine. */
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return -1;
+	if (index_get(index, key, part_count, result) != 0) {
 		txn_rollback_stmt();
 		return -1;
 	}
+	txn_commit_ro_stmt(txn);
+	/* Count statistics. */
+	rmean_collect(rmean_box, IPROTO_SELECT, 1);
+	if (*result != NULL && tuple_bless(*result) == NULL)
+		return -1;
+	return 0;
 }
 
 int
@@ -376,26 +270,30 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 {
 	assert(key != NULL && key_end != NULL && result != NULL);
 	mp_tuple_assert(key, key_end);
-	try {
-		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
-		if (index->index_def->type != TREE) {
-			/* Show nice error messages in Lua */
-			tnt_raise(UnsupportedIndexFeature, index, "min()");
-		}
-		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, ITER_GE, key, part_count))
-			diag_raise();
-		/* Start transaction in the engine */
-		struct txn *txn = txn_begin_ro_stmt(space);
-		struct tuple *tuple = index->min(key, part_count);
-		*result = tuple_bless_null_xc(tuple);
-		txn_commit_ro_stmt(txn);
-		return 0;
-	}  catch (Exception *) {
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	if (index->def->type != TREE) {
+		/* Show nice error messages in Lua. */
+		diag_set(UnsupportedIndexFeature, index->def, "min()");
+		return -1;
+	}
+	uint32_t part_count = mp_decode_array(&key);
+	if (key_validate(index->def, ITER_GE, key, part_count))
+		return -1;
+	/* Start transaction in the engine. */
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return -1;
+	if (index_min(index, key, part_count, result) != 0) {
 		txn_rollback_stmt();
 		return -1;
 	}
+	txn_commit_ro_stmt(txn);
+	if (*result != NULL && tuple_bless(*result) == NULL)
+		return -1;
+	return 0;
 }
 
 int
@@ -404,26 +302,30 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 {
 	mp_tuple_assert(key, key_end);
 	assert(result != NULL);
-	try {
-		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
-		if (index->index_def->type != TREE) {
-			/* Show nice error messages in Lua */
-			tnt_raise(UnsupportedIndexFeature, index, "max()");
-		}
-		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, ITER_LE, key, part_count))
-			diag_raise();
-		/* Start transaction in the engine */
-		struct txn *txn = txn_begin_ro_stmt(space);
-		struct tuple *tuple = index->max(key, part_count);
-		*result = tuple_bless_null_xc(tuple);
-		txn_commit_ro_stmt(txn);
-		return 0;
-	}  catch (Exception *) {
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	if (index->def->type != TREE) {
+		/* Show nice error messages in Lua. */
+		diag_set(UnsupportedIndexFeature, index->def, "max()");
+		return -1;
+	}
+	uint32_t part_count = mp_decode_array(&key);
+	if (key_validate(index->def, ITER_LE, key, part_count))
+		return -1;
+	/* Start transaction in the engine. */
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return -1;
+	if (index_max(index, key, part_count, result) != 0) {
 		txn_rollback_stmt();
 		return -1;
 	}
+	txn_commit_ro_stmt(txn);
+	if (*result != NULL && tuple_bless(*result) == NULL)
+		return -1;
+	return 0;
 }
 
 ssize_t
@@ -432,22 +334,30 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
-	enum iterator_type itype = (enum iterator_type) type;
-	try {
-		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
-		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, itype, key, part_count))
-			diag_raise();
-		/* Start transaction in the engine */
-		struct txn *txn = txn_begin_ro_stmt(space);
-		ssize_t count = index->count(itype, key, part_count);
-		txn_commit_ro_stmt(txn);
-		return count;
-	} catch (Exception *) {
-		txn_rollback_stmt();
-		return -1; /* handled by box.error() in Lua */
+	if (type < 0 || type >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
+		return -1;
 	}
+	enum iterator_type itype = (enum iterator_type) type;
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	uint32_t part_count = mp_decode_array(&key);
+	if (key_validate(index->def, itype, key, part_count))
+		return -1;
+	/* Start transaction in the engine. */
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return -1;
+	ssize_t count = index_count(index, itype, key, part_count);
+	if (count < 0) {
+		txn_rollback_stmt();
+		return -1;
+	}
+	txn_commit_ro_stmt(txn);
+	return count;
 }
 
 /* }}} */
@@ -460,96 +370,308 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
-	struct iterator *it = NULL;
-	enum iterator_type itype = (enum iterator_type) type;
-	try {
-		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
-		struct txn *txn = txn_begin_ro_stmt(space);
-		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
-		uint32_t part_count = mp_decode_array(&key);
-		if (key_validate(index->index_def, itype, key, part_count))
-			diag_raise();
-		it = index->allocIterator();
-		index->initIterator(it, itype, key, part_count);
-		it->schema_version = schema_version;
-		it->space_id = space_id;
-		it->index_id = index_id;
-		it->index = index;
-		txn_commit_ro_stmt(txn);
-		return it;
-	} catch (Exception *) {
-		if (it)
-			it->free(it);
-		/* will be hanled by box.error() in Lua */
+	if (type < 0 || type >= iterator_type_MAX) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "Invalid iterator type");
 		return NULL;
 	}
+	enum iterator_type itype = (enum iterator_type) type;
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return NULL;
+	assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
+	uint32_t part_count = mp_decode_array(&key);
+	if (key_validate(index->def, itype, key, part_count))
+		return NULL;
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		return NULL;
+	struct iterator *it = index_create_iterator(index, itype,
+						    key, part_count);
+	if (it == NULL) {
+		txn_rollback_stmt();
+		return NULL;
+	}
+	txn_commit_ro_stmt(txn);
+	return it;
 }
 
 int
 box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 {
 	assert(result != NULL);
-	assert(itr->next != NULL);
-	try {
-		if (itr->schema_version != schema_version) {
-			struct space *space;
-			/* no tx management */
-			Index *index = check_index(itr->space_id, itr->index_id,
-						   &space);
-			if (index != itr->index) {
-				*result = NULL;
-				return 0;
-			}
-			if (index->schema_version > itr->schema_version) {
-				*result = NULL; /* invalidate iterator */
-				return 0;
-			}
-			itr->schema_version = schema_version;
-		}
-	} catch (Exception *) {
-		*result = NULL;
-		return 0; /* invalidate iterator */
-	}
-	try {
-		struct tuple *tuple = itr->next(itr);
-		*result = tuple_bless_null_xc(tuple);
-		return 0;
-	} catch (Exception *) {
+	if (iterator_next(itr, result) != 0)
 		return -1;
-	}
+	if (*result != NULL && tuple_bless(*result) == NULL)
+		return -1;
+	return 0;
 }
 
 void
 box_iterator_free(box_iterator_t *it)
 {
-	if (it->free)
-		it->free(it);
+	iterator_delete(it);
 }
 
 /* }}} */
 
 /* {{{ Introspection */
 
-void
-Index::info(struct info_handler *info) const
-{
-	info_begin(info);
-	info_end(info);
-}
-
 int
 box_index_info(uint32_t space_id, uint32_t index_id,
 	       struct info_handler *info)
 {
-	try {
-		struct space *space;
-		Index *index = check_index(space_id, index_id, &space);
-		index->info(info);
-		return 0;
-	}  catch (Exception *) {
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
+	index_info(index, info);
+	return 0;
+}
+
+/* }}} */
+
+/* {{{ Internal API */
+
+void
+iterator_create(struct iterator *it, struct index *index)
+{
+	it->next = NULL;
+	it->free = NULL;
+	it->schema_version = schema_version;
+	it->space_id = index->def->space_id;
+	it->index_id = index->def->iid;
+	it->index = index;
+}
+
+int
+iterator_next(struct iterator *it, struct tuple **ret)
+{
+	assert(it->next != NULL);
+	if (unlikely(it->schema_version != schema_version)) {
+		struct space *space = space_by_id(it->space_id);
+		if (space == NULL)
+			goto invalidate;
+		struct index *index = space_index(space, it->index_id);
+		if (index != it->index ||
+		    index->schema_version > it->schema_version)
+			goto invalidate;
+		it->schema_version = schema_version;
 	}
+	return it->next(it, ret);
+
+invalidate:
+	*ret = NULL;
+	return 0;
+}
+
+void
+iterator_delete(struct iterator *it)
+{
+	assert(it->free != NULL);
+	it->free(it);
+}
+
+int
+index_create(struct index *index, struct engine *engine,
+	     const struct index_vtab *vtab, struct index_def *def)
+{
+	def = index_def_dup(def);
+	if (def == NULL)
+		return -1;
+
+	index->vtab = vtab;
+	index->engine = engine;
+	index->def = def;
+	index->schema_version = schema_version;
+	return 0;
+}
+
+void
+index_delete(struct index *index)
+{
+	index_def_delete(index->def);
+	index->vtab->destroy(index);
+}
+
+int
+index_build(struct index *index, struct index *pk)
+{
+	ssize_t n_tuples = index_size(pk);
+	if (n_tuples < 0)
+		return -1;
+	uint32_t estimated_tuples = n_tuples * 1.2;
+
+	index_begin_build(index);
+	if (index_reserve(index, estimated_tuples) < 0)
+		return -1;
+
+	if (n_tuples > 0) {
+		say_info("Adding %zd keys to %s index '%s' ...",
+			 n_tuples, index_type_strs[index->def->type],
+			 index->def->name);
+	}
+
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
+
+	int rc = 0;
+	while (true) {
+		struct tuple *tuple;
+		rc = iterator_next(it, &tuple);
+		if (rc != 0)
+			break;
+		if (tuple == NULL)
+			break;
+		rc = index_build_next(index, tuple);
+		if (rc != 0)
+			break;
+	}
+	iterator_delete(it);
+	if (rc != 0)
+		return -1;
+
+	index_end_build(index);
+	return 0;
+}
+
+/* }}} */
+
+/* {{{ Virtual method stubs */
+
+void
+generic_index_commit_create(struct index *, int64_t)
+{
+}
+
+void
+generic_index_commit_drop(struct index *)
+{
+}
+
+ssize_t
+generic_index_size(struct index *index)
+{
+	diag_set(UnsupportedIndexFeature, index->def, "size()");
+	return -1;
+}
+
+int
+generic_index_min(struct index *index, const char *key,
+		  uint32_t part_count, struct tuple **result)
+{
+	struct iterator *it = index_create_iterator(index, ITER_GE,
+						    key, part_count);
+	if (it == NULL)
+		return -1;
+	int rc = iterator_next(it, result);
+	iterator_delete(it);
+	return rc;
+}
+
+int
+generic_index_max(struct index *index, const char *key,
+		  uint32_t part_count, struct tuple **result)
+{
+	struct iterator *it = index_create_iterator(index, ITER_LE,
+						    key, part_count);
+	if (it == NULL)
+		return -1;
+	int rc = iterator_next(it, result);
+	iterator_delete(it);
+	return rc;
+}
+
+int
+generic_index_random(struct index *index, uint32_t rnd, struct tuple **result)
+{
+	(void)rnd;
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "random()");
+	return -1;
+}
+
+ssize_t
+generic_index_count(struct index *index, enum iterator_type type,
+		    const char *key, uint32_t part_count)
+{
+	struct iterator *it = index_create_iterator(index, type,
+						    key, part_count);
+	if (it == NULL)
+		return -1;
+	int rc = 0;
+	size_t count = 0;
+	struct tuple *tuple = NULL;
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
+		++count;
+	iterator_delete(it);
+	if (rc < 0)
+		return rc;
+	return count;
+}
+
+int
+generic_index_get(struct index *index, const char *key,
+		  uint32_t part_count, struct tuple **result)
+{
+	(void)key;
+	(void)part_count;
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "get()");
+	return -1;
+}
+
+int
+generic_index_replace(struct index *index, struct tuple *old_tuple,
+		      struct tuple *new_tuple, enum dup_replace_mode mode,
+		      struct tuple **result)
+{
+	(void)old_tuple;
+	(void)new_tuple;
+	(void)mode;
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "replace()");
+	return -1;
+}
+
+struct snapshot_iterator *
+generic_index_create_snapshot_iterator(struct index *index)
+{
+	diag_set(UnsupportedIndexFeature, index->def, "consistent read view");
+	return NULL;
+}
+
+void
+generic_index_info(struct index *index, struct info_handler *handler)
+{
+	(void)index;
+	info_begin(handler);
+	info_end(handler);
+}
+
+void
+generic_index_begin_build(struct index *)
+{
+}
+
+int
+generic_index_reserve(struct index *, uint32_t)
+{
+	return 0;
+}
+
+int
+generic_index_build_next(struct index *index, struct tuple *tuple)
+{
+	struct tuple *unused;
+	return index_replace(index, NULL, tuple, DUP_INSERT, &unused);
+}
+
+void
+generic_index_end_build(struct index *)
+{
 }
 
 /* }}} */

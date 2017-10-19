@@ -58,7 +58,7 @@ applier_set_state(struct applier *applier, enum applier_state state)
 	applier->state = state;
 	say_debug("=> %s", applier_state_strs[state] +
 		  strlen("APPLIER_"));
-	trigger_run(&applier->on_state, applier);
+	trigger_run_xc(&applier->on_state, applier);
 }
 
 /**

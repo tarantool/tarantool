@@ -30,42 +30,25 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "index.h"
 
-#include "memtx_index.h"
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
+struct memtx_engine;
 struct light_index_core;
 
-class MemtxHash: public MemtxIndex {
-public:
-	MemtxHash(struct index_def *index_def);
-	virtual ~MemtxHash() override;
-
-	virtual void reserve(uint32_t size_hint) override;
-	virtual size_t size() const override;
-	virtual struct tuple *random(uint32_t rnd) const override;
-	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) const override;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode) override;
-
-	virtual struct iterator *allocIterator() const override;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key,
-				  uint32_t part_count) const override;
-
-	/**
-	 * Create an ALL iterator with personal read view so further
-	 * index modifications will not affect the iteration results.
-	 * Must be destroyed by iterator->free after usage.
-	 */
-	struct snapshot_iterator *createSnapshotIterator() override;
-
-	virtual size_t bsize() const override;
-
-protected:
+struct memtx_hash_index {
+	struct index base;
 	struct light_index_core *hash_table;
 };
+
+struct memtx_hash_index *
+memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_MEMTX_HASH_H_INCLUDED */

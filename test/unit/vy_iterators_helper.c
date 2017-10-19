@@ -10,7 +10,7 @@ vy_iterator_C_test_init(size_t cache_size)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init();
+	tuple_init(NULL);
 	vy_cache_env_create(&cache_env, cord_slab_cache(), cache_size);
 	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, 0, 0,
 					 NULL, 0);

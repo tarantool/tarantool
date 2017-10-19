@@ -96,6 +96,7 @@ extern "C" {
 	const char *enum_name##_strs[(unsigned) enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) 0}
 #endif
 #define STR2ENUM(enum_name, str) ((enum enum_name) strindex(enum_name##_strs, str, enum_name##_MAX))
+#define STRN2ENUM(enum_name, str, len) ((enum enum_name) strnindex(enum_name##_strs, str, len, enum_name##_MAX))
 
 uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax);
@@ -536,6 +537,12 @@ tt_sprintf(const char *format, ...)
 	va_end(ap);
 	return result;
 }
+
+/**
+ * Escape special characters in @a data to @a buf
+ */
+int
+json_escape(char *buf, int size, const char *data);
 
 /**
  * Helper macro to handle easily snprintf() result

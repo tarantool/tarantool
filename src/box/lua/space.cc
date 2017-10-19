@@ -85,7 +85,7 @@ lbox_space_on_replace(struct lua_State *L)
 	}
 	lua_getfield(L, 1, "id"); /* Get space id. */
 	uint32_t id = lua_tonumber(L, lua_gettop(L));
-	struct space *space = space_cache_find(id);
+	struct space *space = space_cache_find_xc(id);
 	lua_pop(L, 1);
 
 	return lbox_trigger_reset(L, 3, &space->on_replace,
@@ -160,10 +160,10 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	 * all defined indexes.
 	 */
 	for (unsigned k = 0; k <= space->index_id_max; k++) {
-		Index *index = space_index(space, k);
+		struct index *index = space_index(space, k);
 		if (index == NULL)
 			continue;
-		struct index_def *index_def = index->index_def;
+		struct index_def *index_def = index->def;
 		struct index_opts *index_opts = &index_def->opts;
 		lua_pushnumber(L, index_def->iid);
 		lua_newtable(L);		/* space.index[k] */
@@ -194,13 +194,17 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		for (uint32_t j = 0; j < index_def->key_def->part_count; j++) {
 			lua_pushnumber(L, j + 1);
 			lua_newtable(L);
+			const struct key_part *part =
+				&index_def->key_def->parts[j];
 
-			lua_pushstring(L,
-			       field_type_strs[index_def->key_def->parts[j].type]);
+			lua_pushstring(L, field_type_strs[part->type]);
 			lua_setfield(L, -2, "type");
 
-			lua_pushnumber(L, index_def->key_def->parts[j].fieldno + 1);
+			lua_pushnumber(L, part->fieldno + TUPLE_INDEX_BASE);
 			lua_setfield(L, -2, "fieldno");
+
+			lua_pushboolean(L, part->is_nullable);
+			lua_setfield(L, -2, "is_nullable");
 
 			lua_settable(L, -3); /* index[k].parts[j] */
 		}
@@ -352,6 +356,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "VUSER_ID");
 	lua_pushnumber(L, BOX_FUNC_ID);
 	lua_setfield(L, -2, "FUNC_ID");
+	lua_pushnumber(L, BOX_COLLATION_ID);
+	lua_setfield(L, -2, "COLLATION_ID");
 	lua_pushnumber(L, BOX_VFUNC_ID);
 	lua_setfield(L, -2, "VFUNC_ID");
 	lua_pushnumber(L, BOX_PRIV_ID);

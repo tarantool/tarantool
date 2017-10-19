@@ -145,6 +145,7 @@ void box_bind(void);
 void box_listen(void);
 void box_set_replication(void);
 void box_set_log_level(void);
+void box_set_log_format(void);
 void box_set_io_collect_interval(void);
 void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);

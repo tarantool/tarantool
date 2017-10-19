@@ -422,14 +422,7 @@ index = s:create_index('test', { type = 'bitset', parts = {1, 'unsigned', 2, 'un
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = {}})
 ---
-- error: 'Can''t create or modify index ''test'' in space ''test'': part count must
-    be positive'
-...
--- part count must be positive
-index = s:create_index('test', { type = 'hash', parts = { 1 }})
----
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: Illegal parameters, options.parts must have at least one part
 ...
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
@@ -470,8 +463,7 @@ index = s:create_index('test', { type = 'rtree', parts = { 2, 'map' }})
 -- bad field no
 index = s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 ---
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''qq'''
 ...
 -- big field no
 index = s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'unsigned' }})

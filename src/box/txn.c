@@ -51,24 +51,32 @@ fiber_set_txn(struct fiber *fiber, struct txn *txn)
 	fiber_set_key(fiber, FIBER_KEY_TXN, (void *) txn);
 }
 
-static void
+static int
 txn_add_redo(struct txn_stmt *stmt, struct request *request)
 {
 	stmt->row = request->header;
 	if (request->header != NULL)
-		return;
+		return 0;
 
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row;
-	row = region_alloc_object_xc(&fiber()->gc, struct xrow_header);
+	row = region_alloc_object(&fiber()->gc, struct xrow_header);
+	if (row == NULL) {
+		diag_set(OutOfMemory, sizeof(*row),
+			 "region", "struct xrow_header");
+		return -1;
+	}
 	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
 	row->replica_id = 0;
 	row->lsn = 0;
 	row->sync = 0;
 	row->tm = 0;
-	row->bodycnt = xrow_encode_dml_xc(request, row->body);
+	row->bodycnt = xrow_encode_dml(request, row->body);
+	if (row->bodycnt < 0)
+		return -1;
 	stmt->row = row;
+	return 0;
 }
 
 /** Initialize a new stmt object within txn. */
@@ -76,7 +84,12 @@ static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object_xc(&fiber()->gc, struct txn_stmt);
+	stmt = region_alloc_object(&fiber()->gc, struct txn_stmt);
+	if (stmt == NULL) {
+		diag_set(OutOfMemory, sizeof(*stmt),
+			 "region", "struct txn_stmt");
+		return NULL;
+	}
 
 	/* Initialize members explicitly to save time on memset() */
 	stmt->space = NULL;
@@ -95,7 +108,11 @@ txn_begin(bool is_autocommit)
 {
 	static int64_t txn_id = 0;
 	assert(! in_txn());
-	struct txn *txn = region_alloc_object_xc(&fiber()->gc, struct txn);
+	struct txn *txn = region_alloc_object(&fiber()->gc, struct txn);
+	if (txn == NULL) {
+		diag_set(OutOfMemory, sizeof(*txn), "region", "struct txn");
+		return NULL;
+	}
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
 	txn->n_rows = 0;
@@ -111,46 +128,63 @@ txn_begin(bool is_autocommit)
 	return txn;
 }
 
-void
-txn_begin_in_engine(Engine *engine, struct txn *txn)
+int
+txn_begin_in_engine(struct engine *engine, struct txn *txn)
 {
 	if (txn->engine == NULL) {
 		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
-		engine->begin(txn);
+		return engine_begin(engine, txn);
 	} else if (txn->engine != engine) {
 		/**
 		 * Only one engine can be used in
 		 * a multi-statement transaction currently.
 		 */
-		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+		return -1;
 	}
+	return 0;
 }
 
 struct txn *
 txn_begin_stmt(struct space *space)
 {
 	struct txn *txn = in_txn();
-	if (txn == NULL)
+	if (txn == NULL) {
 		txn = txn_begin(true);
-	else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX)
-		tnt_raise(ClientError, ER_SUB_STMT_MAX);
+		if (txn == NULL)
+			goto fail;
+	} else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
+		diag_set(ClientError, ER_SUB_STMT_MAX);
+		goto fail;
+	}
 
-	trigger_run(&space->on_stmt_begin, txn);
-	Engine *engine = space->handler->engine;
-	txn_begin_in_engine(engine, txn);
+	if (trigger_run(&space->on_stmt_begin, txn) != 0)
+		goto fail;
+
+	struct engine *engine = space->engine;
+	if (txn_begin_in_engine(engine, txn) != 0)
+		goto fail;
+
 	struct txn_stmt *stmt = txn_stmt_new(txn);
+	if (stmt == NULL)
+		goto fail;
 	stmt->space = space;
 
-	engine->beginStatement(txn);
+	if (engine_begin_statement(engine, txn) != 0)
+		goto fail;
+
 	return txn;
+fail:
+	txn_rollback_stmt();
+	return NULL;
 }
 
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.
  */
-void
+int
 txn_commit_stmt(struct txn *txn, struct request *request)
 {
 	assert(txn->in_sub_stmt > 0);
@@ -163,7 +197,8 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 
 	/* Create WAL record for the write requests in non-temporary spaces */
 	if (!space_is_temporary(stmt->space)) {
-		txn_add_redo(stmt, request);
+		if (txn_add_redo(stmt, request) != 0)
+			goto fail;
 		++txn->n_rows;
 	}
 	/*
@@ -177,11 +212,16 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (!rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
-		trigger_run(&stmt->space->on_replace, txn);
+		if (trigger_run(&stmt->space->on_replace, txn) != 0)
+			goto fail;
 	}
 	--txn->in_sub_stmt;
 	if (txn->is_autocommit && txn->in_sub_stmt == 0)
-		txn_commit(txn);
+		return txn_commit(txn);
+	return 0;
+fail:
+	txn_rollback_stmt();
+	return -1;
 }
 
 
@@ -192,7 +232,7 @@ txn_write_to_wal(struct txn *txn)
 
 	struct journal_entry *req = journal_entry_new(txn->n_rows);
 	if (req == NULL)
-		diag_raise();
+		return -1;
 
 	struct txn_stmt *stmt;
 	struct xrow_header **row = req->rows;
@@ -218,7 +258,8 @@ txn_write_to_wal(struct txn *txn)
 		 * pending rollbacks are processed.
 		 */
 		fiber_reschedule();
-		tnt_raise(LoggedError, ER_WAL_IO);
+		diag_set(ClientError, ER_WAL_IO);
+		diag_log();
 	}
 	/*
 	 * Use vclock_sum() from WAL writer as transaction signature.
@@ -226,7 +267,7 @@ txn_write_to_wal(struct txn *txn)
 	return res;
 }
 
-void
+int
 txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
@@ -235,24 +276,36 @@ txn_commit(struct txn *txn)
 
 	/* Do transaction conflict resolving */
 	if (txn->engine) {
-		txn->engine->prepare(txn);
+		if (engine_prepare(txn->engine, txn) != 0)
+			goto fail;
 
-		if (txn->n_rows > 0)
+		if (txn->n_rows > 0) {
 			txn->signature = txn_write_to_wal(txn);
+			if (txn->signature < 0)
+				goto fail;
+		}
 		/*
 		 * The transaction is in the binary log. No action below
 		 * may throw. In case an error has happened, there is
 		 * no other option but terminate.
 		 */
-		if (txn->has_triggers)
-			trigger_run(&txn->on_commit, txn);
+		if (txn->has_triggers &&
+		    trigger_run(&txn->on_commit, txn) != 0) {
+			diag_log();
+			unreachable();
+			panic("commit trigger failed");
+		}
 
-		txn->engine->commit(txn);
+		engine_commit(txn->engine, txn);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
+	return 0;
+fail:
+	txn_rollback();
+	return -1;
 }
 
 /**
@@ -273,7 +326,7 @@ txn_rollback_stmt()
 		return;
 	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
 						  next);
-	txn->engine->rollbackStatement(txn, stmt);
+	engine_rollback_statement(txn->engine, txn, stmt);
 	if (stmt->row != NULL) {
 		stmt->row = NULL;
 		--txn->n_rows;
@@ -288,27 +341,32 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	if (txn->has_triggers)
-		trigger_run(&txn->on_rollback, txn); /* must not throw. */
+	/* Rollback triggers must not throw. */
+	if (txn->has_triggers &&
+	    trigger_run(&txn->on_rollback, txn) != 0) {
+		diag_log();
+		unreachable();
+		panic("rollback trigger failed");
+	}
 	if (txn->engine)
-		txn->engine->rollback(txn);
+		engine_rollback(txn->engine, txn);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
 }
 
-void
+int
 txn_check_singlestatement(struct txn *txn, const char *where)
 {
 	if (!txn->is_autocommit ||
 	    stailq_last(&txn->stmts) != stailq_first(&txn->stmts)) {
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  where, "multi-statement transactions");
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 where, "multi-statement transactions");
+		return -1;
 	}
+	return 0;
 }
-
-extern "C" {
 
 int64_t
 box_txn_id(void)
@@ -329,13 +387,12 @@ box_txn()
 int
 box_txn_begin()
 {
-	try {
-		if (in_txn())
-			tnt_raise(ClientError, ER_ACTIVE_TRANSACTION);
-		(void) txn_begin(false);
-	} catch (Exception  *e) {
-		return -1; /* pass exception  through FFI */
+	if (in_txn()) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return -1;
 	}
+	if (txn_begin(false) == NULL)
+		return -1;
 	return 0;
 }
 
@@ -355,13 +412,7 @@ box_txn_commit()
 		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
 		return -1;
 	}
-	try {
-		txn_commit(txn);
-	} catch (Exception *e) {
-		txn_rollback();
-		return -1;
-	}
-	return 0;
+	return txn_commit(txn);
 }
 
 int
@@ -400,8 +451,8 @@ box_txn_savepoint()
 		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
 							struct txn_savepoint);
 	if (svp == NULL) {
-		diag_set(OutOfMemory, sizeof(*svp) + alignof(*svp) - 1,
-			 "region_alloc_object", "svp");
+		diag_set(OutOfMemory, sizeof(*svp),
+			 "region", "struct txn_savepoint");
 		return NULL;
 	}
 	if (stailq_empty(&txn->stmts)) {
@@ -439,7 +490,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	}
 	stailq_reverse(&rollback_stmts);
 	stailq_foreach_entry(stmt, &rollback_stmts, next) {
-		txn->engine->rollbackStatement(txn, stmt);
+		engine_rollback_statement(txn->engine, txn, stmt);
 		if (stmt->row != NULL) {
 			stmt->row = NULL;
 			--txn->n_rows;
@@ -449,5 +500,3 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	}
 	return 0;
 }
-
-} /* extern "C" */

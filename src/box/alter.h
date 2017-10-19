@@ -38,6 +38,7 @@ extern struct trigger on_replace_truncate;
 extern struct trigger on_replace_schema;
 extern struct trigger on_replace_user;
 extern struct trigger on_replace_func;
+extern struct trigger on_replace_collation;
 extern struct trigger on_replace_priv;
 extern struct trigger on_replace_cluster;
 extern struct trigger on_replace_sequence;

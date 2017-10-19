@@ -4872,8 +4872,8 @@ bps_tree_debug_check_insert_into_leaf(struct bps_tree *tree, bool assertme)
 
 			bps_tree_insert_into_leaf(tree, &path_elem, ins);
 
-			if (block.header.size != bps_tree_pos_t(i + 1)
-				|| tree->size != bps_tree_pos_t(1)) {
+			if (block.header.size != (bps_tree_pos_t)(i + 1)
+				|| tree->size != (bps_tree_pos_t)1) {
 				result |= (1 << 0);
 				assert(!assertme);
 			}
@@ -4927,8 +4927,8 @@ bps_tree_debug_check_delete_from_leaf(struct bps_tree *tree, bool assertme)
 
 			bps_tree_delete_from_leaf(tree, &path_elem);
 
-			if (block.header.size != bps_tree_pos_t(i - 1)
-				|| tree->size != bps_tree_pos_t(0)) {
+			if (block.header.size != (bps_tree_pos_t)(i - 1)
+				|| tree->size != (bps_tree_pos_t)0) {
 				result |= (1 << 2);
 				assert(!assertme);
 			}

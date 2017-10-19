@@ -330,3 +330,16 @@ i3:select{}
 box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
 
 s:drop()
+
+--
+-- Do not rebuild index if the only change is a key part type
+-- compatible change.
+--
+s = box.schema.space.create('test')
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+s:replace{1, 1}
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', sk.id)
+sk:alter({parts = {2, 'number'}})
+box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
+s:drop()

@@ -38,7 +38,7 @@
 /**
  * This module implements a simple API for working with checkpoints.
  * As checkpoints are, in fact, memtx snapshots, functions exported
- * by this module are C wrappers around corresponding MemtxEngine
+ * by this module are C wrappers around corresponding memtx_engine
  * methods.
  */
 

@@ -533,6 +533,7 @@ i.dimension
 i.parts
 ---
 - - type: array
+    is_nullable: false
     fieldno: 2
 ...
 i:drop()
@@ -602,13 +603,10 @@ f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'},
 ---
 - error: 'Wrong index options (field 4): unexpected option ''holy'''
 ...
--- unknown args ignored
-f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'array', {part = 'opts'}}}})
+-- unknown part args are no more ignored (#2649)
+f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{field=2, type='array', part = 'opts'}}})
 ---
-- [0, 2, 's', 'rtree', {'unique': false}, [[2, 'array', {'part': 'opts'}]]]
-...
-s.index.s:drop()
----
+- error: 'Wrong index options (field 1): unexpected option ''part'''
 ...
 -- alter
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})

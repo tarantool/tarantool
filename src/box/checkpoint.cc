@@ -39,22 +39,34 @@
 int64_t
 checkpoint_last(struct vclock *vclock)
 {
-	struct MemtxEngine *memtx = (MemtxEngine *)engine_find("memtx");
-	return memtx->lastSnapshot(vclock);
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	return xdir_last_vclock(&memtx->snap_dir, vclock);
 }
 
 const struct vclock *
 checkpoint_iterator_next(struct checkpoint_iterator *it)
 {
-	struct MemtxEngine *memtx = (MemtxEngine *)engine_find("memtx");
-	it->curr = memtx->nextSnapshot(it->curr);
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	it->curr = it->curr == NULL ?
+		vclockset_first(&memtx->snap_dir.index) :
+		vclockset_next(&memtx->snap_dir.index,
+			       (struct vclock *)it->curr);
 	return it->curr;
 }
 
 const struct vclock *
 checkpoint_iterator_prev(struct checkpoint_iterator *it)
 {
-	struct MemtxEngine *memtx = (MemtxEngine *)engine_find("memtx");
-	it->curr = memtx->prevSnapshot(it->curr);
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	it->curr = it->curr == NULL ?
+		vclockset_last(&memtx->snap_dir.index) :
+		vclockset_prev(&memtx->snap_dir.index,
+			       (struct vclock *)it->curr);
 	return it->curr;
 }

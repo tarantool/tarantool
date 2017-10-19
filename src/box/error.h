@@ -172,20 +172,6 @@ public:
 	}
 };
 
-class IllegalParams: public LoggedError {
-public:
-	template <typename ... Args>
-	IllegalParams(const char *file, unsigned line, const char *format,
-		      Args ... args)
-		:LoggedError(file, line, ER_ILLEGAL_PARAMS,
-			     format, args...) {}
-};
-
-class ErrorInjection: public LoggedError {
-public:
-	ErrorInjection(const char *file, unsigned line, const char *msg);
-};
-
 /**
  * XlogError is raised when there is an error with contents
  * of the data directory or a log file. A special subclass

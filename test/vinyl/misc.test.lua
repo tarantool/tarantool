@@ -31,3 +31,8 @@ s:delete(1)
 box.snapshot()
 s:select()
 s:drop()
+
+-- Collation is disabled
+s = box.schema.space.create('test', { engine = 'vinyl' })
+i1 = s:create_index('i1', { type = 'tree', parts = {{1, 'str', collation='unicode'}}, unique = true })
+s:drop()

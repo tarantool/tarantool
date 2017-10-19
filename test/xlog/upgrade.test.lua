@@ -25,6 +25,7 @@ box.space._space:select()
 box.space._index:select()
 box.space._user:select()
 box.space._func:select()
+box.space._collation:select()
 box.space._priv:select()
 
 box.space._vspace ~= nil

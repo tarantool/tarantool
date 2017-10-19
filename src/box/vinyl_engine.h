@@ -30,43 +30,51 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stddef.h>
+#include <small/mempool.h>
+
 #include "engine.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 struct vy_env;
 
-struct VinylEngine: public Engine {
-	VinylEngine();
-	~VinylEngine();
-	virtual void init() override;
-	virtual Handler *createSpace(struct rlist *key_list,
-				     struct field_def *fields,
-				     uint32_t field_count, uint32_t index_count,
-				     uint32_t exact_field_count) override;
-	virtual void beginStatement(struct txn *txn) override;
-	virtual void begin(struct txn *txn) override;
-	virtual void prepare(struct txn *txn) override;
-	virtual void commit(struct txn *txn) override;
-	virtual void rollback(struct txn *txn) override;
-	virtual void rollbackStatement(struct txn *txn,
-				       struct txn_stmt *stmt) override;
-	virtual void bootstrap() override;
-	virtual void beginInitialRecovery(const struct vclock *) override;
-	virtual void beginFinalRecovery() override;
-	virtual void endRecovery() override;
-	virtual void join(struct vclock *vclock,
-			  struct xstream *stream) override;
-	virtual int beginCheckpoint() override;
-	virtual int waitCheckpoint(struct vclock *vclock) override;
-	virtual void commitCheckpoint(struct vclock *vclock) override;
-	virtual void abortCheckpoint() override;
-	virtual int collectGarbage(int64_t lsn) override;
-	virtual int backup(struct vclock *vclock,
-			   engine_backup_cb cb, void *arg) override;
-	void setMaxTupleSize(size_t max_size);
-	void setTimeout(double timeout);
-	virtual void checkSpaceDef(struct space_def *def) override;
-public:
+struct vinyl_engine {
+	struct engine base;
 	struct vy_env *env;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
 };
+
+struct vinyl_engine *
+vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+		 int read_threads, int write_threads, double timeout);
+
+void
+vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
+
+void
+vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+static inline struct vinyl_engine *
+vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
+		    int read_threads, int write_threads, double timeout)
+{
+	struct vinyl_engine *vinyl;
+	vinyl = vinyl_engine_new(dir, memory, cache, read_threads,
+				 write_threads, timeout);
+	if (vinyl == NULL)
+		diag_raise();
+	return vinyl;
+}
+
+#endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */

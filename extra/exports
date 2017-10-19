@@ -51,6 +51,7 @@ tt_uuid_is_nil
 tt_uuid_bswap
 tt_uuid_from_string
 log_level
+log_format
 uri_parse
 uri_format
 PMurHash32
@@ -333,6 +334,10 @@ luaL_execresult
 luaL_loadfilex
 luaL_loadbufferx
 luaL_traceback
+luaL_setfuncs
+luaL_pushmodule
+luaL_testudata
+luaL_setmetatable
 luaL_buffinit
 luaL_prepbuffer
 luaL_addlstring

@@ -50,16 +50,43 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
 	return field_type_by_name(str, len);
 }
 
+/**
+ * Table of a field types compatibility.
+ * For an i row and j column the value is true, if the i type
+ * values can be stored in the j type.
+ */
+static const bool field_type_compatibility[] = {
+	   /*   ANY   UNSIGNED  STRING   NUMBER  INTEGER  BOOLEAN   SCALAR   ARRAY     MAP */
+/*   ANY    */ true,   false,   false,   false,   false,   false,   false,   false,   false,
+/* UNSIGNED */ true,   true,    false,   true,    true,    false,   true,    false,   false,
+/*  STRING  */ true,   false,   true,    false,   false,   false,   true,    false,   false,
+/*  NUMBER  */ true,   false,   false,   true,    false,   false,   true,    false,   false,
+/*  INTEGER */ true,   false,   false,   true,    true,    false,   true,    false,   false,
+/*  BOOLEAN */ true,   false,   false,   false,   false,   true,    true,    false,   false,
+/*  SCALAR  */ true,   false,   false,   false,   false,   false,   true,    false,   false,
+/*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,   true,    false,
+/*    MAP   */ true,   false,   false,   false,   false,   false,   false,   false,   true,
+};
+
+bool
+field_type_is_compatible(enum field_type old_type, enum field_type new_type)
+{
+	int idx = old_type * field_type_MAX + new_type;
+	return field_type_compatibility[idx];
+}
+
 const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("type", field_type, struct field_def, type,
 		     field_type_by_name_wrapper),
 	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
+	OPT_DEF("is_nullable", OPT_BOOL, struct field_def, is_nullable),
 	OPT_END,
 };
 
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
 	.name = NULL,
+	.is_nullable = false,
 };
 
 enum field_type

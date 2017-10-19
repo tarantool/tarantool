@@ -33,7 +33,9 @@
 
 #include <stdbool.h>
 #include "salad/stailq.h"
-#include "trivia/util.h"
+#include "trigger.h"
+#include "fiber.h"
+#include "space.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -42,6 +44,7 @@ extern "C" {
 /** box statistics */
 extern struct rmean *rmean_box;
 
+struct engine;
 struct space;
 struct tuple;
 struct xrow_header;
@@ -88,13 +91,6 @@ struct txn_savepoint {
 	bool is_first;
 };
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
-#include "space.h"
-#include "trigger.h"
-#include "fiber.h"
-
 extern double too_long_threshold;
 
 struct txn {
@@ -119,7 +115,7 @@ struct txn {
 	int in_sub_stmt;
 	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
-	Engine *engine;
+	struct engine *engine;
 	/** Engine-specific transaction data */
 	void *engine_tx;
 	/**
@@ -148,8 +144,11 @@ txn_begin(bool is_autocommit);
 /**
  * Commit a transaction.
  * @pre txn == in_txn()
+ *
+ * Return 0 on success. On error, rollback
+ * the transaction and return -1.
  */
-void
+int
 txn_commit(struct txn *txn);
 
 /** Rollback a transaction, if any. */
@@ -192,8 +191,8 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
 struct txn *
 txn_begin_stmt(struct space *space);
 
-void
-txn_begin_in_engine(Engine *engine, struct txn *txn);
+int
+txn_begin_in_engine(struct engine *engine, struct txn *txn);
 
 /**
  * This is an optimization, which exists to speed up selects
@@ -202,15 +201,15 @@ txn_begin_in_engine(Engine *engine, struct txn *txn);
  * off, however, we must start engine transaction with the first
  * select.
  */
-static inline struct txn *
-txn_begin_ro_stmt(struct space *space)
+static inline int
+txn_begin_ro_stmt(struct space *space, struct txn **txn)
 {
-	struct txn *txn = in_txn();
-	if (txn) {
-		Engine *engine = space->handler->engine;
-		txn_begin_in_engine(engine, txn);
+	*txn = in_txn();
+	if (*txn != NULL) {
+		struct engine *engine = space->engine;
+		return txn_begin_in_engine(engine, *txn);
 	}
-	return txn;
+	return 0;
 }
 
 static inline void
@@ -228,8 +227,11 @@ txn_commit_ro_stmt(struct txn *txn)
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.
+ *
+ * Return 0 on success. On error, rollback
+ * the statement and return -1.
  */
-void
+int
 txn_commit_stmt(struct txn *txn, struct request *request);
 
 /**
@@ -244,7 +246,7 @@ txn_rollback_stmt();
  * transaction: DDL can not be part of a multi-statement
  * transaction and must be run in autocommit mode.
  */
-void
+int
 txn_check_singlestatement(struct txn *txn, const char *where);
 
 /** The current statement of the transaction. */
@@ -262,8 +264,6 @@ txn_last_stmt(struct txn *txn)
 {
 	return stailq_last_entry(&txn->stmts, struct txn_stmt, next);
 }
-
-#endif /* defined(__cplusplus) */
 
 /**
  * FFI bindings: do not throw exceptions, do not accept extra
@@ -351,5 +351,44 @@ box_txn_savepoint(void);
  */
 API_EXPORT int
 box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "diag.h"
+
+static inline struct txn *
+txn_begin_stmt_xc(struct space *space)
+{
+	struct txn *txn = txn_begin_stmt(space);
+	if (txn == NULL)
+		diag_raise();
+	return txn;
+}
+
+static inline struct txn *
+txn_begin_ro_stmt_xc(struct space *space)
+{
+	struct txn *txn;
+	if (txn_begin_ro_stmt(space, &txn) != 0)
+		diag_raise();
+	return txn;
+}
+
+static inline void
+txn_commit_stmt_xc(struct txn *txn, struct request *request)
+{
+	if (txn_commit_stmt(txn, request) != 0)
+		diag_raise();
+}
+
+static inline void
+txn_check_singlestatement_xc(struct txn *txn, const char *where)
+{
+	if (txn_check_singlestatement(txn, where) != 0)
+		diag_raise();
+}
+
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

@@ -170,9 +170,20 @@ _index:replace{_index.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'},
 ---
 - [288, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
 ...
+-- access_sysview.test changes output of _index:select{}.
+-- let's change _index space in such a way that it will be
+-- uniformn weather access_sysview.test is completed of not.
+box.space._space.index.owner:alter{parts = {2, 'unsigned'}}
+---
+...
+box.space._vspace.index.owner:alter{parts = {2, 'unsigned'}}
+---
+...
 _index:select{}
 ---
 - - [272, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [276, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [276, 1, 'name', 'tree', {'unique': true}, [[1, 'string']]]
   - [280, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [280, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [280, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
@@ -445,8 +456,7 @@ index = s:create_index('primary', {unique = true, parts = {0, 'unsigned', 1, 'st
 ...
 index = s:create_index('primary', {unique = true, parts = {'unsigned', 1, 'string', 2}})
 ---
-- error: 'Illegal parameters, options.parts: expected field_no (number), type (string)
-    pairs'
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''unsigned'''
 ...
 index = s:create_index('primary', {unique = true, parts = 'bug'})
 ---
@@ -615,8 +625,10 @@ s.index.pk
 - unique: true
   parts:
   - type: unsigned
+    is_nullable: false
     fieldno: 1
   - type: unsigned
+    is_nullable: false
     fieldno: 2
   id: 0
   space_id: 731
@@ -646,6 +658,7 @@ s.index.pk
 - unique: true
   parts:
   - type: unsigned
+    is_nullable: false
     fieldno: 1
   id: 0
   space_id: 731
@@ -657,6 +670,7 @@ s.index.secondary
 - unique: true
   parts:
   - type: unsigned
+    is_nullable: false
     fieldno: 2
   id: 1
   space_id: 731
@@ -764,23 +778,12 @@ s = box.schema.space.create('test', { format = "format" })
 ---
 - error: Illegal parameters, options parameter 'format' should be of type table
 ...
-s = box.schema.space.create('test', { format = { "not_map" } })
----
-- error: 'Failed to create space ''test'': field 1 is not map'
-...
-format = { utils.setmap({'unsigned'}) }
----
-...
-s = box.schema.space.create('test', { format = format })
----
-- error: 'Failed to create space ''test'': field 1 format is not map with string keys'
-...
 format = { { name = 100 } }
 ---
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Wrong space format (field 1): ''name'' must be string'
+- error: 'Illegal parameters, format[1]: name (string) is expected'
 ...
 long = string.rep('a', box.schema.NAME_MAX + 1)
 ---
@@ -804,7 +807,7 @@ format = { utils.setmap({}) }
 ...
 s = box.schema.space.create('test', { format = format })
 ---
-- error: 'Failed to create space ''test'': field 1 name is not specified'
+- error: 'Illegal parameters, format[1]: name (string) is expected'
 ...
 -- Ensure the format is updated after index drop.
 format = { { name = 'id', type = 'unsigned' } }
@@ -873,6 +876,7 @@ s:format()
 s.index.sk3.parts
 ---
 - - type: string
+    is_nullable: false
     fieldno: 2
 ...
 -- Space format can be updated, if conflicted index is deleted.
@@ -993,6 +997,699 @@ s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
 ---
 - error: Tuple field count 8 is less than required by a defined index (expected 9)
+...
+s:truncate()
+---
+...
+--
+-- gh-1014: field names.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2'}
+---
+...
+format[3] = {name = 'field1'}
+---
+...
+s:format(format)
+---
+- error: Space field 'field1' is duplicate
+...
+s:drop()
+---
+...
+-- https://github.com/tarantool/tarantool/issues/2815
+-- Extend space format definition syntax
+format = {{name='key',type='unsigned'}, {name='value',type='string'}}
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+s:format()
+---
+- [{'name': 'key', 'type': 'unsigned'}, {'name': 'value', 'type': 'string'}]
+...
+s:format({'id', 'name'})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name', 'type': 'any'}]
+...
+s:format({'id', {'name1'}})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name1', 'type': 'any'}]
+...
+s:format({'id', {'name2', 'string'}})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name2', 'type': 'string'}]
+...
+s:format({'id', {'name', type = 'string'}})
+---
+...
+s:format()
+---
+- [{'name': 'id', 'type': 'any'}, {'name': 'name', 'type': 'string'}]
+...
+s:drop()
+---
+...
+format = {'key', {'value',type='string'}}
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+s:format()
+---
+- [{'name': 'key', 'type': 'any'}, {'name': 'value', 'type': 'string'}]
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test')
+---
+...
+s:create_index('test', {parts = {'test'}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{field = 'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {1}}).parts
+---
+- - type: scalar
+    is_nullable: false
+    fieldno: 1
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test')
+---
+...
+s:format{{'test1', 'integer'}, 'test2', {'test3', 'integer'}, {'test4','scalar'}}
+---
+...
+s:create_index('test', {parts = {'test'}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test', {parts = {{field = 'test'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field was not found by name ''test'''
+...
+s:create_index('test1', {parts = {'test1'}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 1
+...
+s:create_index('test2', {parts = {'test2'}}).parts
+---
+- error: 'Can''t create or modify index ''test2'' in space ''test'': field type ''any''
+    is not supported'
+...
+s:create_index('test3', {parts = {{'test1', 'integer'}}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 1
+...
+s:create_index('test4', {parts = {{'test2', 'integer'}}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 2
+...
+s:create_index('test5', {parts = {{'test2', 'integer'}}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 2
+...
+s:create_index('test6', {parts = {1, 3}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 1
+  - type: integer
+    is_nullable: false
+    fieldno: 3
+...
+s:create_index('test7', {parts = {'test1', 4}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 1
+  - type: scalar
+    is_nullable: false
+    fieldno: 4
+...
+s:create_index('test8', {parts = {{1, 'integer'}, {'test4', 'scalar'}}}).parts
+---
+- - type: integer
+    is_nullable: false
+    fieldno: 1
+  - type: scalar
+    is_nullable: false
+    fieldno: 4
+...
+s:drop()
+---
+...
+--
+-- gh-2800: space formats checking is broken.
+--
+-- Ensure that vinyl correctly process field count change.
+s = box.schema.space.create('test', {engine = 'vinyl', field_count = 2})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 2}
+---
+- [1, 2]
+...
+t = box.space._space:select{s.id}[1]:totable()
+---
+...
+t[5] = 1
+---
+...
+box.space._space:replace(t)
+---
+- error: 'Can''t modify space ''test'': can not change field count on a non-empty
+    space'
+...
+s:drop()
+---
+...
+-- Check field type changes.
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'any'}
+---
+...
+format[3] = {name = 'field3', type = 'unsigned'}
+---
+...
+format[4] = {name = 'field4', type = 'string'}
+---
+...
+format[5] = {name = 'field5', type = 'number'}
+---
+...
+format[6] = {name = 'field6', type = 'integer'}
+---
+...
+format[7] = {name = 'field7', type = 'boolean'}
+---
+...
+format[8] = {name = 'field8', type = 'scalar'}
+---
+...
+format[9] = {name = 'field9', type = 'array'}
+---
+...
+format[10] = {name = 'field10', type = 'map'}
+---
+...
+s = box.schema.space.create('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = s:replace{1, 2, 3, '4', 5.5, -6, true, 8, {9, 9}, {val = 10}}
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function fail_format_change(fieldno, new_type)
+    local old_type = format[fieldno].type
+    format[fieldno].type = new_type
+    local ok, msg = pcall(s.format, s, format)
+    format[fieldno].type = old_type
+    return msg
+end;
+---
+...
+function ok_format_change(fieldno, new_type)
+    local old_type = format[fieldno].type
+    format[fieldno].type = new_type
+    s:format(format)
+    s:delete{1}
+    format[fieldno].type = old_type
+    s:format(format)
+    s:replace(t)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+-- any --X--> unsigned
+fail_format_change(2, 'unsigned')
+---
+- 'Can''t modify space ''test'': Can not change a field type from any to unsigned
+  on a not empty space'
+...
+-- unsigned -----> any
+ok_format_change(3, 'any')
+---
+...
+-- unsigned --X--> string
+fail_format_change(3, 'string')
+---
+- 'Can''t modify space ''test'': Can not change a field type from unsigned to string
+  on a not empty space'
+...
+-- unsigned -----> number
+ok_format_change(3, 'number')
+---
+...
+-- unsigned -----> integer
+ok_format_change(3, 'integer')
+---
+...
+-- unsigned -----> scalar
+ok_format_change(3, 'scalar')
+---
+...
+-- unsigned --X--> map
+fail_format_change(3, 'map')
+---
+- 'Can''t modify space ''test'': Can not change a field type from unsigned to map
+  on a not empty space'
+...
+-- string -----> any
+ok_format_change(4, 'any')
+---
+...
+-- string -----> scalar
+ok_format_change(4, 'scalar')
+---
+...
+-- string --X--> boolean
+fail_format_change(4, 'boolean')
+---
+- 'Can''t modify space ''test'': Can not change a field type from string to boolean
+  on a not empty space'
+...
+-- number -----> any
+ok_format_change(5, 'any')
+---
+...
+-- number -----> scalar
+ok_format_change(5, 'scalar')
+---
+...
+-- number --X--> integer
+fail_format_change(5, 'integer')
+---
+- 'Can''t modify space ''test'': Can not change a field type from number to integer
+  on a not empty space'
+...
+-- integer -----> any
+ok_format_change(6, 'any')
+---
+...
+-- integer -----> number
+ok_format_change(6, 'number')
+---
+...
+-- integer -----> scalar
+ok_format_change(6, 'scalar')
+---
+...
+-- integer --X--> unsigned
+fail_format_change(6, 'unsigned')
+---
+- 'Can''t modify space ''test'': Can not change a field type from integer to unsigned
+  on a not empty space'
+...
+-- boolean -----> any
+ok_format_change(7, 'any')
+---
+...
+-- boolean -----> scalar
+ok_format_change(7, 'scalar')
+---
+...
+-- boolean --X--> string
+fail_format_change(7, 'string')
+---
+- 'Can''t modify space ''test'': Can not change a field type from boolean to string
+  on a not empty space'
+...
+-- scalar -----> any
+ok_format_change(8, 'any')
+---
+...
+-- scalar --X--> unsigned
+fail_format_change(8, 'unsigned')
+---
+- 'Can''t modify space ''test'': Can not change a field type from scalar to unsigned
+  on a not empty space'
+...
+-- array -----> any
+ok_format_change(9, 'any')
+---
+...
+-- array --X--> scalar
+fail_format_change(9, 'scalar')
+---
+- 'Can''t modify space ''test'': Can not change a field type from array to scalar
+  on a not empty space'
+...
+-- map -----> any
+ok_format_change(10, 'any')
+---
+...
+-- map --X--> scalar
+fail_format_change(10, 'scalar')
+---
+- 'Can''t modify space ''test'': Can not change a field type from map to scalar on
+  a not empty space'
+...
+s:drop()
+---
+...
+-- Check new fields adding.
+format = {}
+---
+...
+s = box.schema.space.create('test')
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+s:format(format) -- Ok, no indexes.
+---
+...
+pk = s:create_index('pk')
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+s:format(format) -- Ok, empty space.
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+format[2] = nil
+---
+...
+s:format(format) -- Ok, can delete fields with no checks.
+---
+...
+s:delete{1}
+---
+- [1, 1]
+...
+sk1 = s:create_index('sk1', {parts = {2, 'unsigned'}})
+---
+...
+sk2 = s:create_index('sk2', {parts = {3, 'unsigned'}})
+---
+...
+sk5 = s:create_index('sk5', {parts = {5, 'unsigned'}})
+---
+...
+s:replace{1, 1, 1, 1, 1}
+---
+- [1, 1, 1, 1, 1]
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+format[3] = {name = 'field3', type = 'unsigned'}
+---
+...
+format[4] = {name = 'field4', type = 'any'}
+---
+...
+format[5] = {name = 'field5', type = 'unsigned'}
+---
+...
+-- Ok, all new fields are indexed or have type ANY, and new
+-- field_count <= old field_count.
+s:format(format)
+---
+...
+s:replace{1, 1, 1, 1, 1, 1}
+---
+- [1, 1, 1, 1, 1, 1]
+...
+format[6] = {name = 'field6', type = 'unsigned'}
+---
+...
+-- Ok, but check existing tuples for a new field[6].
+s:format(format)
+---
+...
+-- Fail, not enough fields.
+s:replace{2, 2, 2, 2, 2}
+---
+- error: Tuple field count 5 is less than required by a defined index (expected 6)
+...
+s:replace{2, 2, 2, 2, 2, 2, 2}
+---
+- [2, 2, 2, 2, 2, 2, 2]
+...
+format[7] = {name = 'field7', type = 'unsigned'}
+---
+...
+-- Fail, the tuple {1, ... 1} is invalid for a new format.
+s:format(format)
+---
+- error: Tuple field count 6 is less than required by a defined index (expected 7)
+...
+s:drop()
+---
+...
+-- Vinyl does not support adding fields to a not empty space.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1,1}
+---
+- [1, 1]
+...
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+s:format(format)
+---
+- error: Vinyl does not support adding new fields to a non-empty space
+...
+s:drop()
+---
+...
+--
+-- gh-1557: NULL in indexes.
+--
+NULL = require('msgpack').NULL
+---
+...
+format = {}
+---
+...
+format[1] = { name = 'field1', type = 'unsigned', is_nullable = true }
+---
+...
+format[2] = { name = 'field2', type = 'unsigned', is_nullable = true }
+---
+...
+s = box.schema.space.create('test', { format = format })
+---
+...
+s:create_index('primary', { parts = { 'field1' } })
+---
+- error: Primary index of the space 'test' can not contain nullable parts
+...
+s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+---
+- error: Field 1 is nullable in space format, but not nullable in index parts
+...
+format[1].is_nullable = false
+---
+...
+s:format(format)
+---
+...
+s:create_index('primary', { parts = {{'field1', is_nullable = true}} })
+---
+- error: Primary index of the space 'test' can not contain nullable parts
+...
+s:create_index('primary', { parts = {'field1'} })
+---
+- unique: true
+  parts:
+  - type: unsigned
+    is_nullable: false
+    fieldno: 1
+  id: 0
+  space_id: 747
+  name: primary
+  type: TREE
+...
+-- Check that is_nullable can't be set to false on non-empty space
+s:insert({1, NULL})
+---
+- [1, null]
+...
+format[1].is_nullable = true
+---
+...
+s:format(format)
+---
+- error: Field 1 is nullable in space format, but not nullable in index parts
+...
+format[1].is_nullable = false
+---
+...
+format[2].is_nullable = false
+---
+...
+s:format(format)
+---
+- error: 'Can''t modify space ''test'': Can not disable is_nullable on a not empty
+    space'
+...
+s:delete(1)
+---
+- [1, null]
+...
+-- Disable is_nullable on empty space
+s:format(format)
+---
+...
+s:format({})
+---
+...
+s:create_index('secondary', { parts = {{2, 'string', is_nullable = true}} })
+---
+- unique: true
+  parts:
+  - type: string
+    is_nullable: true
+    fieldno: 2
+  id: 1
+  space_id: 747
+  name: secondary
+  type: TREE
+...
+s:insert({1, NULL})
+---
+- [1, null]
+...
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+s:delete({1})
+---
+- [1, null]
+...
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+---
+...
+s:insert({1, NULL})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+s:insert({2, 'xxx'})
+---
+- [2, 'xxx']
+...
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = true} }})
+---
+...
+s:insert({1, NULL})
+---
+- [1, null]
+...
+s:drop()
+---
+...
+s = box.schema.create_space('test')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+s:format({
+    [1] = { name = 'id1', type = 'unsigned'},
+    [2] = { name = 'id2', type = 'unsigned'},
+    [3] = { name = 'id3', type = 'string'},
+    [4] = { name = 'id4', type = 'string'},
+    [5] = { name = 'id5', type = 'string'},
+    [6] = { name = 'id6', type = 'string'},
+});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s:format()
+---
+- [{'name': 'id1', 'type': 'unsigned'}, {'name': 'id2', 'type': 'unsigned'}, {'name': 'id3',
+    'type': 'string'}, {'name': 'id4', 'type': 'string'}, {'name': 'id5', 'type': 'string'},
+  {'name': 'id6', 'type': 'string'}]
+...
+_ = s:create_index('primary')
+---
+...
+s:insert({1, 1, 'a', 'b', 'c', 'd'})
+---
+- [1, 1, 'a', 'b', 'c', 'd']
 ...
 s:drop()
 ---

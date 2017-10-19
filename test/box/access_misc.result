@@ -623,6 +623,10 @@ box.space._user:select()
 box.space._space:select()
 ---
 - - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}]]
+  - [276, 1, '_collation', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {
+        'name': 'name', 'type': 'string'}, {'name': 'owner', 'type': 'unsigned'},
+      {'name': 'type', 'type': 'string'}, {'name': 'locale', 'type': 'string'}, {
+        'name': 'opts', 'type': 'map'}]]
   - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
         'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',

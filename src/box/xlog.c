@@ -1899,6 +1899,7 @@ xlog_cursor_reset(struct xlog_cursor *cursor)
 void
 xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 {
+	bool eof = (i->state == XLOG_CURSOR_EOF);
 	if (i->fd >= 0 && !reuse_fd)
 		close(i->fd);
 	ibuf_destroy(&i->rbuf);
@@ -1906,7 +1907,7 @@ xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 		xlog_tx_cursor_destroy(&i->tx_cursor);
 	ZSTD_freeDStream(i->zdctx);
 	TRASH(i);
-	i->state = XLOG_CURSOR_CLOSED;
+	i->state = eof ? XLOG_CURSOR_EOF_CLOSED : XLOG_CURSOR_CLOSED;
 }
 
 /* }}} */

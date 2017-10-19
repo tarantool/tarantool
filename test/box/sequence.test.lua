@@ -203,6 +203,21 @@ pk:drop()
 
 pk = s:create_index('pk') -- ok
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
+s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
+sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
+sk:alter{sequence = 'test'} -- error
+sk:alter{sequence = true} -- error
+sk:alter{parts = {2, 'string'}} -- ok
+sk:alter{sequence = false} -- ok (ignored)
+pk:alter{sequence = 'test'} -- ok
+s.index.pk.sequence_id == sq.id
+sk:alter{sequence = 'test'} -- error
+sk:alter{sequence = true} -- error
+sk:alter{parts = {2, 'unsigned'}} -- ok
+sk:alter{sequence = false} -- ok (ignored)
+s.index.pk.sequence_id == sq.id
+sk:drop()
+s.index.pk.sequence_id == sq.id
 pk:drop()
 
 pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
@@ -408,6 +423,11 @@ s2:drop()
 
 -- Sanity checks.
 box.schema.user.create('user')
+-- Setup read permissions for box.schema.user.info() to work.
+box.schema.user.grant('user', 'read', 'space', '_priv')
+box.schema.user.grant('user', 'read', 'space', '_user')
+box.schema.user.grant('user', 'read', 'space', '_space')
+box.schema.user.grant('user', 'read', 'space', '_sequence')
 sq = box.schema.sequence.create('seq')
 box.schema.user.grant('user', 'write', 'sequence', 'test') -- error: no such sequence
 box.schema.user.grant('user', 'write', 'sequence', 'seq') -- ok
@@ -426,6 +446,7 @@ sq:reset() -- error
 box.session.su('admin')
 box.schema.user.grant('user', 'write', 'sequence', 'seq')
 box.session.su('user')
+box.schema.user.info()
 sq:set(100) -- ok
 sq:next() -- ok
 sq:reset() -- ok

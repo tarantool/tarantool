@@ -921,8 +921,8 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
             end
         else
             for k = 1, #index[PARTS] do
-                local pktype = index[PARTS][k][2]
-                local pkfield = index[PARTS][k][1]
+                local pktype = index[PARTS][k][2] or index[PARTS][k].type
+                local pkfield = index[PARTS][k][1] or index[PARTS][k].field
 
                 local pk = {
                     type = pktype,

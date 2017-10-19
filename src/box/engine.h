@@ -30,42 +30,40 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
+#include <stdint.h>
+#include <small/rlist.h>
 
-struct request;
+#include "diag.h"
+#include "error.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct engine;
+struct txn;
+struct txn_stmt;
 struct space;
-struct tuple;
-struct relay;
+struct space_def;
+struct vclock;
+struct xstream;
 
 extern struct rlist engines;
 
 typedef int
 engine_backup_cb(const char *path, void *arg);
 
-#if defined(__cplusplus)
-
-struct Handler;
-struct field_def;
-
-/** Engine instance */
-class Engine {
-public:
-	Engine(const char *engine_name);
-
-	Engine(const Engine &) = delete;
-	Engine& operator=(const Engine&) = delete;
-	virtual ~Engine() {}
-	/** Called once at startup. */
-	virtual void init();
-	/** Create a new engine instance for a space. */
-	virtual Handler *createSpace(struct rlist *key_list,
-				     struct field_def *fields,
-				     uint32_t field_count, uint32_t index_count,
-				     uint32_t exact_field_count) = 0;
+struct engine_vtab {
+	/** Destroy an engine instance. */
+	void (*shutdown)(struct engine *);
+	/** Allocate a new space instance. */
+	struct space *(*create_space)(struct engine *engine,
+			struct space_def *def, struct rlist *key_list);
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
-	virtual void join(struct vclock *vclock, struct xstream *stream);
+	int (*join)(struct engine *engine, struct vclock *vclock,
+		    struct xstream *stream);
 	/**
 	 * Begin a new single or multi-statement transaction.
 	 * Called on first statement in a transaction, not when
@@ -73,73 +71,75 @@ public:
 	 * transaction in the engine begins with the first
 	 * statement.
 	 */
-	virtual void begin(struct txn *);
+	int (*begin)(struct engine *, struct txn *);
 	/**
 	 * Begine one statement in existing transaction.
 	 */
-	virtual void beginStatement(struct txn *);
+	int (*begin_statement)(struct engine *, struct txn *);
 	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
 	 */
-	virtual void prepare(struct txn *);
+	int (*prepare)(struct engine *, struct txn *);
 	/**
 	 * End the transaction in the engine, the transaction
 	 * has been successfully written to the WAL.
 	 * This method can't throw: if any error happens here,
 	 * there is no better option than panic.
 	 */
-	virtual void commit(struct txn *);
+	void (*commit)(struct engine *, struct txn *);
 	/*
 	 * Called to roll back effects of a statement if an
 	 * error happens, e.g., in a trigger.
 	 */
-	virtual void rollbackStatement(struct txn *, struct txn_stmt *);
+	void (*rollback_statement)(struct engine *, struct txn *,
+				   struct txn_stmt *);
 	/*
 	 * Roll back and end the transaction in the engine.
 	 */
-	virtual void rollback(struct txn *);
+	void (*rollback)(struct engine *, struct txn *);
 	/**
 	 * Bootstrap an empty data directory
 	 */
-	virtual void bootstrap();
+	int (*bootstrap)(struct engine *);
 	/**
 	 * Begin initial recovery from checkpoint or dirty disk data.
 	 * On local recovery @recovery_vclock points to the vclock
 	 * used for assigning LSNs to statements replayed from WAL.
 	 * On remote recovery, it is set to NULL.
 	 */
-	virtual void beginInitialRecovery(const struct vclock *recovery_vclock);
+	int (*begin_initial_recovery)(struct engine *engine,
+			const struct vclock *recovery_vclock);
 	/**
 	 * Notify engine about a start of recovering from WALs
 	 * that could be local WALs during local recovery
 	 * of WAL catch up durin join on slave side
 	 */
-	virtual void beginFinalRecovery();
+	int (*begin_final_recovery)(struct engine *);
 	/**
 	 * Inform the engine about the end of recovery from the
 	 * binary log.
 	 */
-	virtual void endRecovery();
+	int (*end_recovery)(struct engine *);
 	/**
 	 * Begin a two-phase checkpoint creation in this
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 * Must not yield.
 	 */
-	virtual int beginCheckpoint();
+	int (*begin_checkpoint)(struct engine *);
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
-	virtual int waitCheckpoint(struct vclock *vclock);
+	int (*wait_checkpoint)(struct engine *, struct vclock *);
 	/**
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
 	 */
-	virtual void commitCheckpoint(struct vclock *vclock);
+	void (*commit_checkpoint)(struct engine *, struct vclock *);
 	/**
 	 * An error in one of the engines, abort checkpoint.
 	 */
-	virtual void abortCheckpoint();
+	void (*abort_checkpoint)(struct engine *);
 	/**
 	 * Remove files that are not needed to recover
 	 * from checkpoint with @lsn or newer.
@@ -148,27 +148,30 @@ public:
 	 * collection is aborted, i.e. this method isn't called
 	 * for other engines and xlog files aren't deleted.
 	 *
-	 * Used to abort garbage collection in case MemtxEngine
+	 * Used to abort garbage collection in case memtx engine
 	 * fails to delete a snapshot file, because we recover
 	 * checkpoint list by scanning the snapshot directory.
 	 */
-	virtual int collectGarbage(int64_t lsn);
+	int (*collect_garbage)(struct engine *engine, int64_t lsn);
 	/**
 	 * Backup callback. It is supposed to call @cb for each file
 	 * that needs to be backed up in order to restore from the
 	 * checkpoint @vclock.
 	 */
-	virtual int backup(struct vclock *vclock,
-			   engine_backup_cb cb, void *cb_arg);
-
+	int (*backup)(struct engine *engine, struct vclock *vclock,
+		      engine_backup_cb cb, void *cb_arg);
 	/**
 	 * Check definition of a new space for engine-specific
 	 * limitations. E.g. not all engines support temporary
 	 * tables.
 	 */
-	virtual void checkSpaceDef(struct space_def *def);
-public:
-	/** Name of the engine. */
+	int (*check_space_def)(struct space_def *);
+};
+
+struct engine {
+	/** Virtual function table. */
+	const struct engine_vtab *vtab;
+	/** Engine name. */
 	const char *name;
 	/** Engine id. */
 	uint32_t id;
@@ -176,173 +179,119 @@ public:
 	struct rlist link;
 };
 
-/** Engine handle - an operator of a space */
-
-struct Handler {
-public:
-	Handler(Engine *f);
-	virtual ~Handler() {}
-	Handler(const Handler &) = delete;
-	Handler& operator=(const Handler&) = delete;
-
-	virtual void
-	applyInitialJoinRow(struct space *space, struct request *);
-
-	virtual struct tuple *
-	executeReplace(struct txn *, struct space *,
-		       struct request *);
-	virtual struct tuple *
-	executeDelete(struct txn *, struct space *,
-		      struct request *);
-	virtual struct tuple *
-	executeUpdate(struct txn *, struct space *,
-		      struct request *);
-	virtual void
-	executeUpsert(struct txn *, struct space *,
-		      struct request *);
-
-	virtual void
-	executeSelect(struct txn *, struct space *,
-		      uint32_t index_id, uint32_t iterator,
-		      uint32_t offset, uint32_t limit,
-		      const char *key, const char *key_end,
-		      struct port *);
-
-	virtual void initSystemSpace(struct space *space);
-	/**
-	 * Check an index definition for violation of
-	 * various limits.
-	 */
-	virtual void checkIndexDef(struct space *new_space, struct index_def *);
-	/**
-	 * Create an instance of space index. Used in alter
-	 * space before commit to WAL. The created index
-	 * is deleted with delete operator.
-	 */
-	virtual Index *createIndex(struct space *new_space, struct index_def *) = 0;
-	/**
-	 * Called by alter when a primary key added,
-	 * after createIndex is invoked for the new
-	 * key and before the write to WAL.
-	 */
-	virtual void addPrimaryKey(struct space *new_space);
-	/**
-	 * Called by alter when the primary key is dropped.
-	 * Do whatever is necessary with space/handler object,
-	 * to not crash in DML.
-	 */
-	virtual void dropPrimaryKey(struct space *new_space);
-	/**
-	 * Called with the new empty secondary index. Fill the new index
-	 * with data from the primary key of the space.
-	 */
-	virtual void buildSecondaryKey(struct space *old_space,
-				       struct space *new_space,
-				       Index *new_index);
-	/**
-	 * Notify the enigne about upcoming space truncation
-	 * so that it can prepare new_space object.
-	 */
-	virtual void prepareTruncateSpace(struct space *old_space,
-					  struct space *new_space);
-	/**
-	 * Commit space truncation. Called after space truncate
-	 * record was written to WAL hence must not fail.
-	 *
-	 * The old_space is the space that was replaced with the
-	 * new_space as a result of truncation. The callback is
-	 * supposed to release resources associated with the
-	 * old_space and commit the new_space.
-	 */
-	virtual void commitTruncateSpace(struct space *old_space,
-					 struct space *new_space);
-	/**
-	 * Notify the engine about the changed space,
-	 * before it's done, to prepare 'new_space'
-	 * object.
-	 */
-	virtual void prepareAlterSpace(struct space *old_space,
-				       struct space *new_space);
-
-	/**
-	 * Notify the engine engine after altering a space and
-	 * replacing old_space with new_space in the space cache,
-	 * to, e.g., update all references to struct space
-	 * and replace old_space with new_space.
-	 */
-	virtual void commitAlterSpace(struct space *old_space,
-				      struct space *new_space);
-	/**
-	 * Get format of a space.
-	 * @retval not NULL Space format.
-	 * @retval     NULL Space has no format (Sysview engine,
-	 *         for example).
-	 */
-	virtual struct tuple_format *
-	format();
-	/** Binary size of a space. */
-	virtual size_t
-	bsize() const;
-
-	Engine *engine;
-};
-
 /** Register engine engine instance. */
-void engine_register(Engine *engine);
+void engine_register(struct engine *engine);
 
 /** Call a visitor function on every registered engine. */
 #define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
 
 /** Find engine engine by name. */
-Engine *engine_find(const char *name);
+struct engine *
+engine_by_name(const char *name);
 
-/** Shutdown all engine factories. */
-void engine_shutdown();
-
-static inline uint32_t
-engine_id(Handler *space)
+/** Find engine by name and raise error if not found. */
+static inline struct engine *
+engine_find(const char *name)
 {
-	return space->engine->id;
+	struct engine *engine = engine_by_name(name);
+	if (engine == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_ENGINE, name);
+		diag_log();
+	}
+	return engine;
 }
+
+static inline struct space *
+engine_create_space(struct engine *engine, struct space_def *def,
+		    struct rlist *key_list)
+{
+	return engine->vtab->create_space(engine, def, key_list);
+}
+
+static inline int
+engine_begin(struct engine *engine, struct txn *txn)
+{
+	return engine->vtab->begin(engine, txn);
+}
+
+static inline int
+engine_begin_statement(struct engine *engine, struct txn *txn)
+{
+	return engine->vtab->begin_statement(engine, txn);
+}
+
+static inline int
+engine_prepare(struct engine *engine, struct txn *txn)
+{
+	return engine->vtab->prepare(engine, txn);
+}
+
+static inline void
+engine_commit(struct engine *engine, struct txn *txn)
+{
+	engine->vtab->commit(engine, txn);
+}
+
+static inline void
+engine_rollback_statement(struct engine *engine, struct txn *txn,
+			  struct txn_stmt *stmt)
+{
+	engine->vtab->rollback_statement(engine, txn, stmt);
+}
+
+static inline void
+engine_rollback(struct engine *engine, struct txn *txn)
+{
+	engine->vtab->rollback(engine, txn);
+}
+
+static inline int
+engine_check_space_def(struct engine *engine, struct space_def *def)
+{
+	return engine->vtab->check_space_def(def);
+}
+
+/**
+ * Shutdown all engine factories.
+ */
+void
+engine_shutdown(void);
 
 /**
  * Initialize an empty data directory
  */
-void
-engine_bootstrap();
+int
+engine_bootstrap(void);
 
 /**
  * Called at the start of recovery.
  */
-void
+int
 engine_begin_initial_recovery(const struct vclock *recovery_vclock);
 
 /**
  * Called in the middle of JOIN stage,
  * when xlog catch-up process is started
  */
-void
-engine_begin_final_recovery();
+int
+engine_begin_final_recovery(void);
 
 /**
  * Called at the end of recovery.
  * Build secondary keys in all spaces.
  */
-void
-engine_end_recovery();
+int
+engine_end_recovery(void);
 
 /**
  * Feed checkpoint data as join events to the replicas.
  * (called on the master).
  */
-void
+int
 engine_join(struct vclock *vclock, struct xstream *stream);
 
-extern "C" {
-#endif /* defined(__cplusplus) */
-
 int
-engine_begin_checkpoint();
+engine_begin_checkpoint(void);
 
 /**
  * Create a checkpoint.
@@ -351,7 +300,7 @@ int
 engine_commit_checkpoint(struct vclock *vclock);
 
 void
-engine_abort_checkpoint();
+engine_abort_checkpoint(void);
 
 int
 engine_collect_garbage(int64_t lsn);
@@ -361,6 +310,89 @@ engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+static inline struct engine *
+engine_find_xc(const char *name)
+{
+	struct engine *engine = engine_find(name);
+	if (engine == NULL)
+		diag_raise();
+	return engine;
+}
+
+static inline struct space *
+engine_create_space_xc(struct engine *engine, struct space_def *def,
+		    struct rlist *key_list)
+{
+	struct space *space = engine_create_space(engine, def, key_list);
+	if (space == NULL)
+		diag_raise();
+	return space;
+}
+
+static inline void
+engine_begin_xc(struct engine *engine, struct txn *txn)
+{
+	if (engine_begin(engine, txn) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_begin_statement_xc(struct engine *engine, struct txn *txn)
+{
+	if (engine_begin_statement(engine, txn) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_prepare_xc(struct engine *engine, struct txn *txn)
+{
+	if (engine_prepare(engine, txn) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_check_space_def_xc(struct engine *engine, struct space_def *def)
+{
+	if (engine_check_space_def(engine, def) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_bootstrap_xc(void)
+{
+	if (engine_bootstrap() != 0)
+		diag_raise();
+}
+
+static inline void
+engine_begin_initial_recovery_xc(const struct vclock *recovery_vclock)
+{
+	if (engine_begin_initial_recovery(recovery_vclock) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_begin_final_recovery_xc(void)
+{
+	if (engine_begin_final_recovery() != 0)
+		diag_raise();
+}
+
+static inline void
+engine_end_recovery_xc(void)
+{
+	if (engine_end_recovery() != 0)
+		diag_raise();
+}
+
+static inline void
+engine_join_xc(struct vclock *vclock, struct xstream *stream)
+{
+	if (engine_join(vclock, stream) != 0)
+		diag_raise();
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

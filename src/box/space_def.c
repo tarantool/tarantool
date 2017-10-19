@@ -150,6 +150,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 			def->fields[i].name[len] = 0;
 			def->fields[i].type = fields[i].type;
 			name_pos += len + 1;
+			def->fields[i].is_nullable = fields[i].is_nullable;
 		}
 	}
 	return def;

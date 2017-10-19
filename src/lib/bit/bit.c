@@ -67,6 +67,9 @@ store_float(void *p, float v);
 extern inline void
 store_double(void *p, double v);
 
+extern inline void
+store_bool(void *p, bool v);
+
 extern inline bool
 bit_test(const void *data, size_t pos);
 

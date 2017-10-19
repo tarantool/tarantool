@@ -289,3 +289,63 @@ box.space._index:select{space.id}[1][3]
 space:drop()
 ---
 ...
+--new index format
+space = box.schema.space.create('test', {engine = engine})
+---
+...
+pk = space:create_index('pk', {parts={{field1 = 1, type = 'unsigned'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field (name or number) is expected'
+...
+pk = space:create_index('pk', {parts={{field = 0, type = 'unsigned'}}})
+---
+- error: 'Illegal parameters, options.parts[1]: field (number) must be one-based'
+...
+pk = space:create_index('pk', {parts={{field = 1, type = 'const char *'}}})
+---
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
+    type (string), ...'
+...
+pk = space:create_index('pk', {parts={{field = 1, type = 'unsigned'}}})
+---
+...
+pk.parts
+---
+- - type: unsigned
+    is_nullable: false
+    fieldno: 1
+...
+pk:drop()
+---
+...
+pk = space:create_index('pk', {parts={{1, 'unsigned'}}})
+---
+...
+pk.parts
+---
+- - type: unsigned
+    is_nullable: false
+    fieldno: 1
+...
+pk:drop()
+---
+...
+pk = space:create_index('pk', {parts={{1, type='unsigned'}}})
+---
+...
+pk.parts
+---
+- - type: unsigned
+    is_nullable: false
+    fieldno: 1
+...
+space:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+pk:drop()
+---
+...
+space:drop()
+---
+...

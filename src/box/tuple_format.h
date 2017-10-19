@@ -95,7 +95,15 @@ struct tuple_field {
 	int32_t offset_slot;
 	/** True if this field is used by an index. */
 	bool is_key_part;
+	/** Tuple field name, specified by a user. Can be NULL. */
+	char *name;
+	/** True, if a field can store NULL. */
+	bool is_nullable;
 };
+
+struct mh_strnu32_t;
+typedef uint32_t (*field_name_hash_f)(const char *str, uint32_t len);
+extern field_name_hash_f field_name_hash;
 
 /**
  * @brief Tuple format
@@ -131,6 +139,8 @@ struct tuple_format {
 	uint32_t index_field_count;
 	/* Length of 'fields' array. */
 	uint32_t field_count;
+	/** Field names hash. Key - name, value - field number. */
+	struct mh_strnu32_t *names;
 	/* Formats of the fields */
 	struct tuple_field fields[0];
 };
@@ -306,6 +316,23 @@ tuple_field_raw(const struct tuple_format *format, const char *tuple,
 		mp_next(&tuple);
 	return tuple;
 }
+
+/**
+ * Get tuple field by its name.
+ * @param format Tuple format.
+ * @param tuple MessagePack tuple's body.
+ * @param field_map Tuple field map.
+ * @param name Field name.
+ * @param name_len Length of @a name.
+ * @param name_hash Hash of @a name.
+ *
+ * @retval not NULL MessagePack field.
+ * @retval     NULL No field with @a name.
+ */
+const char *
+tuple_field_raw_by_name(struct tuple_format *format, const char *tuple,
+			const uint32_t *field_map, const char *name,
+			uint32_t name_len, uint32_t name_hash);
 
 #if defined(__cplusplus)
 } /* extern "C" */

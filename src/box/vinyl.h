@@ -49,6 +49,7 @@ struct tuple_format;
 struct vclock;
 struct request;
 struct space;
+struct index;
 struct txn_stmt;
 struct xrow_header;
 struct xstream;
@@ -235,13 +236,12 @@ vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp);
  * Index
  */
 
-struct Index;
 /**
  * Extract vy_index from a VinylIndex object.
  * Defined in vinyl_index.cc
  */
 struct vy_index *
-vy_index(struct Index *index);
+vy_index(struct index *index);
 
 struct field_def;
 /**
@@ -292,6 +292,18 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 int
 vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 		       struct space *new_space);
+
+/**
+ * Check that new fields of a space format are
+ * compatible with existing tuples.
+ * @param env Vinyl environment.
+ * @param old_space Old space.
+ *
+ * @retval  0 Success.
+ * @retval -1 Client error.
+ */
+int
+vy_check_format(struct vy_env *env, struct space *old_space);
 
 /**
  * Hook on an alter space commit event. It is called on each
@@ -382,13 +394,13 @@ vy_backup(struct vy_env *env, struct vclock *vclock,
 /**
  * Update max tuple size.
  */
-int
+void
 vy_set_max_tuple_size(struct vy_env *env, size_t max_size);
 
 /**
  * Update query timeout.
  */
-int
+void
 vy_set_timeout(struct vy_env *env, double timeout);
 
 #ifdef __cplusplus

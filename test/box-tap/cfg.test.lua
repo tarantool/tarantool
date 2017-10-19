@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(63)
+test:plan(70)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -30,6 +30,7 @@ invalid('rows_per_wal', -1)
 invalid('listen', '//!')
 invalid('log', ':')
 invalid('log', 'syslog:xxx=')
+invalid('log_level', 'unknown')
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
@@ -70,6 +71,12 @@ test:isnil(io.open("vinyl", 'r'), 'vinyl_dir is not auto-created')
 
 status, result = pcall(testfun)
 test:ok(status and result == 'table', 'configured box')
+
+--------------------------------------------------------------------------------
+-- Dynamic configuration
+--------------------------------------------------------------------------------
+
+invalid('log_level', 'unknown')
 
 --------------------------------------------------------------------------------
 -- gh-534: Segmentation fault after two bad wal_mode settings

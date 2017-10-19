@@ -30,55 +30,31 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "index.h"
 
-struct sysview_iterator;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct space;
+struct tuple;
+struct sysview_engine;
 
 typedef bool (*sysview_filter_f)(struct space *source, struct tuple *);
 
-class SysviewIndex: public Index {
-public:
-	SysviewIndex(struct index_def *index_def, uint32_t source_space_id,
-		     uint32_t source_index_id, sysview_filter_f filter);
-	virtual ~SysviewIndex() override;
-	virtual struct tuple *findByKey(const char *key,
-					uint32_t part_count) const override;
-
-	virtual struct iterator *allocIterator() const override;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key,
-				  uint32_t part_count) const override;
-
+struct sysview_index {
+	struct index base;
 	uint32_t source_space_id;
 	uint32_t source_index_id;
 	sysview_filter_f filter;
 };
 
-class SysviewVspaceIndex: public SysviewIndex {
-public:
-	SysviewVspaceIndex(struct index_def *index_def);
-};
+struct sysview_index *
+sysview_index_new(struct sysview_engine *sysview,
+		  struct index_def *def, const char *space_name);
 
-class SysviewVindexIndex: public SysviewIndex {
-public:
-	SysviewVindexIndex(struct index_def *index_def);
-};
-
-class SysviewVuserIndex: public SysviewIndex {
-public:
-	SysviewVuserIndex(struct index_def *index_def);
-};
-
-class SysviewVprivIndex: public SysviewIndex {
-public:
-	SysviewVprivIndex(struct index_def *index_def);
-};
-
-class SysviewVfuncIndex: public SysviewIndex {
-public:
-	SysviewVfuncIndex(struct index_def *index_def);
-};
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED */

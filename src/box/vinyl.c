@@ -2193,7 +2193,7 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 static struct vy_index *
 vy_index_find(struct space *space, uint32_t iid)
 {
-	struct Index *index = index_find(space, iid);
+	struct index *index = index_find(space, iid);
 	if (index == NULL)
 		return NULL;
 	return vy_index(index);
@@ -2548,6 +2548,9 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 	if (pk->stat.disk.count.rows == 0 &&
 	    pk->stat.memory.count.rows == 0)
 		return 0;
+	if (space_def_check_compatibility(old_space->def, new_space->def,
+					  false) != 0)
+		return -1;
 	if (old_space->index_count < new_space->index_count) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "adding an index to a non-empty space");
@@ -2565,7 +2568,11 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 			 * vinyl yet.
 			 */
 			if (index_def_change_requires_rebuild(old_def,
-							      new_def)) {
+							      new_def) ||
+			    key_part_cmp(old_def->key_def->parts,
+					 old_def->key_def->part_count,
+					 new_def->key_def->parts,
+					 new_def->key_def->part_count) != 0) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 					 "changing the definition of a non-empty "\
 					 "index");
@@ -2575,6 +2582,22 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 	}
 	/* Drop index or a change in index options. */
 	return 0;
+}
+
+int
+vy_check_format(struct vy_env *env, struct space *old_space)
+{
+	/* @sa vy_prepare_alter_space for checks below. */
+	if (old_space->index_count == 0)
+		return 0;
+	struct vy_index *pk = vy_index(old_space->index[0]);
+	if (env->status != VINYL_ONLINE)
+		return 0;
+	if (pk->stat.disk.count.rows == 0 && pk->stat.memory.count.rows == 0)
+		return 0;
+	diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+		 "adding new fields to a non-empty space");
+	return -1;
 }
 
 int
@@ -2838,7 +2861,9 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * conflict with existing tuples. If the index is not
 	 * unique a conflict is impossible.
 	 */
-	if (index->opts.is_unique) {
+	if (index->opts.is_unique &&
+	    (!index->key_def->is_nullable ||
+	     !vy_tuple_key_contains_null(stmt, index->key_def))) {
 		uint32_t key_len;
 		const char *key = tuple_extract_key(stmt, index->cmp_def,
 						    &key_len);
@@ -3038,7 +3063,7 @@ vy_unique_key_validate(struct vy_index *index, const char *key,
 			 original_part_count, part_count);
 		return -1;
 	}
-	return key_validate_parts(index->cmp_def, key, part_count);
+	return key_validate_parts(index->cmp_def, key, part_count, false);
 }
 
 /**
@@ -3940,19 +3965,17 @@ vy_env_delete(struct vy_env *e)
 	free(e);
 }
 
-int
+void
 vy_set_max_tuple_size(struct vy_env *env, size_t max_size)
 {
 	(void) env;
 	vy_max_tuple_size = max_size;
-	return 0;
 }
 
-int
+void
 vy_set_timeout(struct vy_env *env, double timeout)
 {
 	env->timeout = timeout;
-	return 0;
 }
 
 /** }}} Environment */

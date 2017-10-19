@@ -700,6 +700,23 @@ vy_stmt_extract_key(struct xrow_header *xrow,
 		    struct tuple_format *upsert_format,
 		    bool is_primary);
 
+/**
+ * Check if a key of @a tuple contains NULL.
+ * @param tuple Tuple to check.
+ * @param def Key def to check by.
+ * @retval Does the key contain NULL or not?
+ */
+static inline bool
+vy_tuple_key_contains_null(const struct tuple *tuple, const struct key_def *def)
+{
+	for (uint32_t i = 0; i < def->part_count; ++i) {
+		const char *field = tuple_field(tuple, def->parts[i].fieldno);
+		if (mp_typeof(*field) == MP_NIL)
+			return true;
+	}
+	return false;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

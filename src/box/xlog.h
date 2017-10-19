@@ -544,7 +544,9 @@ enum xlog_cursor_state {
 	/* The Cursor is open and a tx is read */
 	XLOG_CURSOR_TX = 2,
 	/* The cursor is open but is at the end of file. */
-	XLOG_CURSOR_EOF = 3
+	XLOG_CURSOR_EOF = 3,
+	/* The cursor was closed after reaching EOF. */
+	XLOG_CURSOR_EOF_CLOSED = 4,
 };
 
 /**
@@ -568,6 +570,28 @@ struct xlog_cursor
 	/** ZSTD context for decompression */
 	ZSTD_DStream *zdctx;
 };
+
+/**
+ * Return true if the cursor was opened and has not
+ * been closed yet.
+ */
+static inline bool
+xlog_cursor_is_open(const struct xlog_cursor *cursor)
+{
+	return (cursor->state != XLOG_CURSOR_CLOSED &&
+		cursor->state != XLOG_CURSOR_EOF_CLOSED);
+}
+
+/**
+ * Return true if the cursor has reached EOF.
+ * The cursor may be closed or still open.
+ */
+static inline bool
+xlog_cursor_is_eof(const struct xlog_cursor *cursor)
+{
+	return (cursor->state == XLOG_CURSOR_EOF ||
+		cursor->state == XLOG_CURSOR_EOF_CLOSED);
+}
 
 /**
  * Open cursor from file descriptor

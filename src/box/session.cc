@@ -152,12 +152,7 @@ session_run_triggers(struct session *session, struct rlist *triggers)
 	/* Run triggers with admin credentials */
 	fiber_set_user(fiber, &admin_credentials);
 
-	int rc = 0;
-	try {
-		trigger_run(triggers, NULL);
-	} catch (Exception *e) {
-		rc = -1;
-	}
+	int rc = trigger_run(triggers, NULL);
 
 	/* Restore original credentials */
 	fiber_set_user(fiber, &session->credentials);
@@ -182,12 +177,7 @@ session_run_on_connect_triggers(struct session *session)
 int
 session_run_on_auth_triggers(const char *user_name)
 {
-	try {
-		trigger_run(&session_on_auth, (void *)user_name);
-		return 0;
-	} catch(Exception *e) {
-		return -1;
-	}
+	return trigger_run(&session_on_auth, (void *)user_name);
 }
 
 void

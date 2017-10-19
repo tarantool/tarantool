@@ -54,11 +54,12 @@ fio.symlink(loaderslib_path, fio.pathjoin(pr1_dir, lib_dir, "loaderslib."..soext
 orig_cwd = fio.cwd()
 
 fio.chdir(pr2_dir)
-rocks_loader = package.loaders[3]
+rocks_loader = package.loaders[4]
+rocks_loader_dyn = package.loaders[5]
 f = rocks_loader("loaders")
 type(f)
 f()
-f = rocks_loader("loaderslib")
+f = rocks_loader_dyn("loaderslib")
 type(f)
 f()
 f = rocks_loader("loaders1")
@@ -73,7 +74,7 @@ type(f)
 f()
 f = rocks_loader("loaders1")
 type(f) -- error
-f = rocks_loader("loaderslib")
+f = rocks_loader_dyn("loaderslib")
 type(f) -- error
 
 fio.chdir(orig_cwd)

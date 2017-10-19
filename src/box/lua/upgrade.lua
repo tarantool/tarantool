@@ -327,8 +327,6 @@ end
 
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
---------------------------------------------------------------------------------
-
 local function create_sequence_space()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
@@ -372,8 +370,32 @@ local function create_sequence_space()
     _index:insert{_space_sequence.id, 1, 'sequence', 'tree', {unique = false}, {{1, 'unsigned'}}}
 end
 
+local function create_collation_space()
+    local _collation = box.space[box.schema.COLLATION_ID]
+
+    log.info("create space _collation")
+    box.space._space:insert{_collation.id, ADMIN, '_collation', 'memtx', 0, setmap({}),
+        { { name = 'id', type = 'unsigned' }, { name = 'name', type = 'string' },
+          { name = 'owner', type = 'unsigned' }, { name = 'type', type = 'string' },
+          { name = 'locale', type = 'string' }, { name = 'opts', type = 'map' } } }
+
+    log.info("create index primary on _collation")
+    box.space._index:insert{_collation.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
+
+    log.info("create index name on _collation")
+    box.space._index:insert{_collation.id, 1, 'name', 'tree', {unique = true}, {{1, 'string'}}}
+
+    log.info("create predefined collations")
+    box.space._collation:replace{0, "unicode", ADMIN, "ICU", "", setmap{}}
+    box.space._collation:replace{1, "unicode_s1", ADMIN, "ICU", "", {strength='primary'}}
+
+    local _priv = box.space[box.schema.PRIV_ID]
+    _priv:insert{ADMIN, PUBLIC, 'space', _collation.id, 2}
+end
+
 local function upgrade_to_1_7_6()
     create_sequence_space()
+    create_collation_space()
 end
 
 --------------------------------------------------------------------------------

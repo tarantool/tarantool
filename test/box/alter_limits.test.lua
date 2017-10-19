@@ -152,8 +152,6 @@ index = s:create_index('test', { type = 'bitset', unique = true })
 index = s:create_index('test', { type = 'bitset', parts = {1, 'unsigned', 2, 'unsigned'}})
 -- part count must be positive
 index = s:create_index('test', { type = 'hash', parts = {}})
--- part count must be positive
-index = s:create_index('test', { type = 'hash', parts = { 1 }})
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
 index = s:create_index('test', { type = 'hash', parts = { 2, 'any' }})

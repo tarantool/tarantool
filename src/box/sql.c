@@ -680,11 +680,11 @@ struct space;
 struct space *
 space_by_id(uint32_t id);
 
-static void
+static int
 space_foreach_put_cb(struct space *space, void *udata)
 {
 	if (space->def->opts.sql == NULL)
-		return; /* Not SQL space. */
+		return 0; /* Not SQL space. */
 	sql_schema_put((InitData *) udata, space->def->name, space->def->id, 0,
 		       space->def->opts.sql);
 	for (uint32_t i = 0; i < space->index_count; ++i) {
@@ -694,6 +694,7 @@ space_foreach_put_cb(struct space *space, void *udata)
 				       def->space_id, def->iid, def->opts.sql);
 		}
 	}
+	return 0;
 }
 
 /* Load database schema from Tarantool. */
