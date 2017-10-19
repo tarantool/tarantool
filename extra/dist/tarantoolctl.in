@@ -21,6 +21,7 @@ ffi.cdef[[
 int kill(int pid, int sig);
 int isatty(int fd);
 int getppid(void);
+int chdir(const char *path);
 ]]
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
@@ -875,17 +876,16 @@ local function rocks()
        list = "luarocks.list",
        remove = "luarocks.remove",
        show = "luarocks.show",
+       make = "luarocks.make",
     }
     rawset(_G, 'commands', commands)
 
-    -- Shift arguments in order to remove "rocks"
-    local luarocks_arguments = {}
-    for i=2,#lua_arguments do
-        luarocks_arguments[i - 1] = lua_arguments[i]
+    if keyword_arguments.chdir then
+        ffi.C.chdir(keyword_arguments.chdir)
     end
 
     -- Call LuaRocks
-    command_line.run_command(unpack(luarocks_arguments))
+    command_line.run_command(unpack(positional_arguments))
 end
 
 local function exit_wrapper(func)
@@ -1250,6 +1250,7 @@ do
         { 'help',        'boolean' },
         { 'format',      'string'  },
         { 'replica',     'number+' },
+        { 'chdir',       'string'  },
     })
 
     local cmd_name
