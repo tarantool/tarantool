@@ -1777,14 +1777,12 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			   int *piIdxCur)	/* Write the first index cursor number here */
 {
 	int i;
-	int iDb;
 	int iDataCur;
 	Index *pIdx;
 	Vdbe *v;
 
 	assert(op == OP_OpenRead || op == OP_OpenWrite);
 	assert(op == OP_OpenWrite || p5 == 0);
-	iDb = sqlite3SchemaToIndex(pParse->db, pTab->pSchema);
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
 	if (iBase < 0)
@@ -1809,7 +1807,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			p5 = 0;
 		}
 		if (aToOpen == 0 || aToOpen[i + 1]) {
-			sqlite3VdbeAddOp3(v, op, iIdxCur, pIdx->tnum, iDb);
+			sqlite3VdbeAddOp3(v, op, iIdxCur, pIdx->tnum, 0);
 			sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
 			sqlite3VdbeChangeP5(v, p5);
 			VdbeComment((v, "%s", pIdx->zName));
@@ -1910,13 +1908,11 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		 Select * pSelect,	/* A SELECT statement to use as the data source */
 		 int onError)		/* How to handle constraint errors */
 {
-	sqlite3 *db = pParse->db;
 	ExprList *pEList;	/* The result set of the SELECT */
 	Table *pSrc;		/* The table in the FROM clause of SELECT */
 	Index *pSrcIdx, *pDestIdx;	/* Source and destination indices */
 	struct SrcList_item *pItem;	/* An element of pSelect->pSrc */
 	int i;			/* Loop counter */
-	int iDbSrc;		/* The database of pSrc */
 	int iSrc, iDest;	/* Cursors from source and destination */
 	int addr1, addr2;	/* Loop addresses */
 	int emptyDestTest = 0;	/* Address of test for empty pDest */
@@ -2080,7 +2076,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 #ifdef SQLITE_TEST
 	sqlite3_xferopt_count++;
 #endif
-	iDbSrc = sqlite3SchemaToIndex(db, pSrc->pSchema);
 	v = sqlite3GetVdbe(pParse);
 	sqlite3CodeVerifySchema(pParse);
 	iSrc = pParse->nTab++;
@@ -2155,7 +2150,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 				break;
 		}
 		assert(pSrcIdx);
-		sqlite3VdbeAddOp3(v, OP_OpenRead, iSrc, pSrcIdx->tnum, iDbSrc);
+		sqlite3VdbeAddOp3(v, OP_OpenRead, iSrc, pSrcIdx->tnum, 0);
 		sqlite3VdbeSetP4KeyInfo(pParse, pSrcIdx);
 		VdbeComment((v, "%s", pSrcIdx->zName));
 		sqlite3VdbeAddOp3(v, OP_OpenWrite, iDest, pDestIdx->tnum, 0);

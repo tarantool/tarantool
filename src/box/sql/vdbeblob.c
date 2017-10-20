@@ -53,7 +53,6 @@ struct Incrblob {
 	BtCursor *pCsr;		/* Cursor pointing at blob row */
 	sqlite3_stmt *pStmt;	/* Statement holding cursor open */
 	sqlite3 *db;		/* The associated database */
-	char *zDb;		/* Database name */
 	Table *pTab;		/* Table object */
 };
 
@@ -219,7 +218,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 			goto blob_open_out;
 		}
 		pBlob->pTab = pTab;
-		pBlob->zDb = db->mdb.zDbSName;
 
 		/* Now search pTab for the exact column. */
 		for (iCol = 0; iCol < pTab->nCol; iCol++) {
@@ -477,7 +475,7 @@ blobReadWrite(sqlite3_blob * pBlob,
 			sqlite3_int64 iKey;
 			iKey = sqlite3BtreeIntegerKey(p->pCsr);
 			sqlite3VdbePreUpdateHook(v, v->apCsr[0], SQLITE_DELETE,
-						 p->zDb, p->pTab, iKey, -1);
+						 0, p->pTab, iKey, -1);
 		}
 #endif
 

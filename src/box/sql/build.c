@@ -57,7 +57,6 @@
  * codeTableLocks() functions.
  */
 struct TableLock {
-	int iDb;		/* The database containing the table to be locked */
 	int iTab;		/* The root page of the table to be locked */
 	u8 isWriteLock;		/* True for write lock.  False for a read lock */
 	const char *zLockName;	/* Name of the table */
@@ -66,7 +65,7 @@ struct TableLock {
 /*
  * Record the fact that we want to lock a table at run-time.
  *
- * The table to be locked has root page iTab and is found in database iDb.
+ * The table to be locked has root page iTab and is found in database.
  * A read or a write lock can be taken depending on isWritelock.
  *
  * This routine just records the fact that the lock is desired.  The
@@ -101,7 +100,6 @@ sqlite3TableLock(Parse * pParse,	/* Parsing context */
 				   nBytes);
 	if (pToplevel->aTableLock) {
 		p = &pToplevel->aTableLock[pToplevel->nTableLock++];
-		p->iDb = 0;
 		p->iTab = iTab;
 		p->isWriteLock = isWriteLock;
 		p->zLockName = zName;
@@ -126,8 +124,7 @@ codeTableLocks(Parse * pParse)
 
 	for (i = 0; i < pParse->nTableLock; i++) {
 		TableLock *p = &pParse->aTableLock[i];
-		int p1 = p->iDb;
-		sqlite3VdbeAddOp4(pVdbe, OP_TableLock, p1, p->iTab,
+		sqlite3VdbeAddOp4(pVdbe, OP_TableLock, 0, p->iTab,
 				  p->isWriteLock, p->zLockName, P4_STATIC);
 	}
 }
@@ -403,7 +400,6 @@ sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
 Table *
 sqlite3LocateTableItem(Parse * pParse, u32 flags, struct SrcList_item * p)
 {
-	assert(p->pSchema == 0 || p->zDatabase == 0);
 	return sqlite3LocateTable(pParse, flags, p->zName);
 }
 
@@ -499,15 +495,14 @@ sqlite3UnlinkAndDeleteIndex(sqlite3 * db, Index * pIndex)
 }
 
 /*
- * Reset the schema for the database at index iDb.  Also reset the
- * TEMP schema.
+ * Reset the schema for the database.
  */
 void
 sqlite3ResetOneSchema(sqlite3 * db)
 {
 	Db *pDb;
 
-	/* Case 1:  Reset the single schema identified by iDb */
+	/* Case 1:  Reset the single schema of the database  */
 	pDb = &db->mdb;
 	assert(sqlite3SchemaMutexHeld(db, 0));
 	assert(pDb->pSchema != 0);
@@ -719,7 +714,7 @@ sqlite3FindDb(sqlite3 * db, Token * pName)
  * is reserved for internal use.
  */
 int
-sqlite3CheckObjectName(Parse * pParse, const char *zName)
+sqlite3CheckObjectName(Parse * pParse, char *zName)
 {
 	if (!pParse->db->init.busy && pParse->nested == 0
 	    && 0 == sqlite3StrNICmp(zName, "sqlite_", 7)) {
@@ -1904,7 +1899,7 @@ parseTableSchemaRecord(Parse * pParse, int iSpaceId, char *zStmt)
 	}
 
 	sqlite3ChangeCookie(pParse);
-	sqlite3VdbeAddParseSchema2Op(v, 0, iTop, pParse->nMem - iTop + 1);
+	sqlite3VdbeAddParseSchema2Op(v, iTop, pParse->nMem - iTop + 1);
 }
 
 int
@@ -2007,7 +2002,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 {
 	Table *p;		/* The new table */
 	sqlite3 *db = pParse->db;	/* The database connection */
-	int iDb;		/* Database in which the table lives */
 	Index *pIdx;		/* An implied index of the table */
 
 	if (pEnd == 0 && pSelect == 0) {
@@ -2042,8 +2036,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			convertToWithoutRowidTable(pParse, p);
 		}
 	}
-
-	iDb = sqlite3SchemaToIndex(db, p->pSchema);
 
 #ifndef SQLITE_OMIT_CHECK
 	/* Resolve names in all CHECK constraint expressions.
@@ -2134,7 +2126,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			assert(pParse->nTab == 1);
 			sqlite3MayAbort(pParse);
 			sqlite3VdbeAddOp3(v, OP_OpenWrite, 1, pParse->regRoot,
-					  iDb);
+					  0);
 			sqlite3VdbeChangeP5(v, OPFLAG_P2ISREG);
 			pParse->nTab = 2;
 			addrTop = sqlite3VdbeCurrentAddr(v) + 1;
@@ -2613,7 +2605,6 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	Table *pTab;
 	Vdbe *v = sqlite3GetVdbe(pParse);
 	sqlite3 *db = pParse->db;
-	int iDb;
 
 	if (v == NULL || db->mallocFailed) {
 		goto exit_drop_table;
@@ -2637,12 +2628,9 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 
 	if (pTab == 0) {
 		if (noErr)
-			sqlite3CodeVerifyNamedSchema(pParse,
-						     pName->a[0].zDatabase);
+			sqlite3CodeVerifySchema(pParse);
 		goto exit_drop_table;
 	}
-	iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-	assert(iDb == 0);
 #ifndef SQLITE_OMIT_AUTHORIZATION
 	{
 		int code;
@@ -2879,15 +2867,12 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	KeyInfo *pKey;		/* KeyInfo for index */
 	int regRecord;		/* Register holding assembled index record */
 	sqlite3 *db = pParse->db;	/* The database connection */
-	int iDb = sqlite3SchemaToIndex(db, pIndex->pSchema);
-	assert(iDb == 0);
 #ifndef SQLITE_OMIT_AUTHORIZATION
 	if (sqlite3AuthCheck(pParse, SQLITE_REINDEX, pIndex->zName, 0,
 			     db->mdb.zDbSName)) {
 		return;
 	}
 #endif
-
 	/* Require a write-lock on the table to perform this operation */
 	sqlite3TableLock(pParse, pTab->tnum, 1, pTab->zName);
 
@@ -2924,8 +2909,8 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	VdbeCoverage(v);
 	sqlite3VdbeJumpHere(v, addr1);
 	if (memRootPage < 0)
-		sqlite3VdbeAddOp2(v, OP_Clear, tnum, iDb);
-	sqlite3VdbeAddOp4(v, OP_OpenWrite, iIdx, tnum, iDb,
+		sqlite3VdbeAddOp2(v, OP_Clear, tnum, 0);
+	sqlite3VdbeAddOp4(v, OP_OpenWrite, iIdx, tnum, 0,
 			  (char *)pKey, P4_KEYINFO);
 	sqlite3VdbeChangeP5(v,
 			    OPFLAG_BULKCSR | ((memRootPage >= 0) ?
@@ -3113,7 +3098,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	int sortOrderMask;	/* 1 to honor DESC in index.  0 to ignore. */
 	sqlite3 *db = pParse->db;
 	Db *pDb;		/* The specific table containing the indexed database */
-	int iDb;		/* Index of the database that is being written */
 	struct ExprList_item *pListItem;	/* For looping over pList */
 	int nExtra = 0;		/* Space allocated for zExtra[] */
 	char *zExtra = 0;	/* Extra space after the Index object */
@@ -3162,20 +3146,18 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		if (!HasRowid(pTab))
 			sqlite3PrimaryKeyIndex(pTab);
-		iDb = 0;
 	} else {
 		assert(pName == 0);
 		assert(pStart == 0);
 		pTab = pParse->pNewTable;
 		if (!pTab)
 			goto exit_create_index;
-		iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
 	}
 	pDb = &db->mdb;
 
 	assert(pTab != 0);
 	assert(pParse->nErr == 0);
-	if (sqlite3StrNICmp(pTab->zName, "sqlite_", 7) == 0
+	if (sqlite3CheckObjectName(pParse, pTab->zName) != 0
 	    && db->init.busy == 0
 #if SQLITE_USER_AUTHENTICATION
 	    && sqlite3UserAuthTable(pTab->zName) == 0
@@ -3545,7 +3527,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		 * to invalidate all pre-compiled statements.
 		 */
 		sqlite3ChangeCookie(pParse);
-		sqlite3VdbeAddParseSchema2Op(v, iDb, iFirstSchemaCol, 4);
+		sqlite3VdbeAddParseSchema2Op(v, iFirstSchemaCol, 4);
 		sqlite3VdbeAddOp0(v, OP_Expire);
 	}
 
@@ -3927,12 +3909,10 @@ sqlite3SrcListEnlarge(sqlite3 * db,	/* Database connection to notify of OOM erro
 SrcList *
 sqlite3SrcListAppend(sqlite3 * db,	/* Connection to notify of malloc failures */
 		     SrcList * pList,	/* Append to this SrcList. NULL creates a new SrcList */
-		     Token * pTable,	/* Table to append */
-		     Token * pDatabase	/* Database of the table */
+		     Token * pTable	/* Table to append */
     )
 {
 	struct SrcList_item *pItem;
-	assert(pDatabase == 0 || pTable != 0);	/* Cannot have C without B */
 	assert(db != 0);
 	if (pList == 0) {
 		pList = sqlite3DbMallocRawNN(db, sizeof(SrcList));
@@ -3950,16 +3930,7 @@ sqlite3SrcListAppend(sqlite3 * db,	/* Connection to notify of malloc failures */
 		return 0;
 	}
 	pItem = &pList->a[pList->nSrc - 1];
-	if (pDatabase && pDatabase->z == 0) {
-		pDatabase = 0;
-	}
-	if (pDatabase) {
-		Token *pTemp = pDatabase;
-		pDatabase = pTable;
-		pTable = pTemp;
-	}
 	pItem->zName = sqlite3NameFromToken(db, pTable);
-	pItem->zDatabase = sqlite3NameFromToken(db, pDatabase);
 	return pList;
 }
 
@@ -3997,7 +3968,6 @@ sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
 	if (pList == 0)
 		return;
 	for (pItem = pList->a, i = 0; i < pList->nSrc; i++, pItem++) {
-		sqlite3DbFree(db, pItem->zDatabase);
 		sqlite3DbFree(db, pItem->zName);
 		sqlite3DbFree(db, pItem->zAlias);
 		if (pItem->fg.isIndexedBy)
@@ -4032,7 +4002,6 @@ SrcList *
 sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 			     SrcList * p,	/* The left part of the FROM clause already seen */
 			     Token * pTable,	/* Name of the table to add to the FROM clause */
-			     Token * pDatabase,	/* Name of the database containing pTable */
 			     Token * pAlias,	/* The right-hand side of the AS subexpression */
 			     Select * pSubquery,	/* A subquery used in place of a table name */
 			     Expr * pOn,	/* The ON clause of a join */
@@ -4047,7 +4016,7 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 		    );
 		goto append_from_error;
 	}
-	p = sqlite3SrcListAppend(db, p, pTable, pDatabase);
+	p = sqlite3SrcListAppend(db, p, pTable);
 	if (p == 0 || NEVER(p->nSrc == 0)) {
 		goto append_from_error;
 	}
@@ -4243,17 +4212,6 @@ sqlite3CodeVerifySchema(Parse * pParse)
 	if (DbMaskTest(pToplevel->cookieMask, 0) == 0) {
 		DbMaskSet(pToplevel->cookieMask, 0);
 	}
-}
-
-/*
- * If argument zDb is NULL, then call sqlite3CodeVerifySchema() for each
- * attached database. Otherwise, invoke it for the database named zDb only.
- */
-void
-sqlite3CodeVerifyNamedSchema(Parse * pParse, const char *zDb)
-{
-	assert(sqlite3_stricmp("main", zDb) == 0 || zDb == 0);
-	sqlite3CodeVerifySchema(pParse);
 }
 
 /*

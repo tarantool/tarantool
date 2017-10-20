@@ -378,16 +378,16 @@ sqlite3VdbeAddOp4Dup8(Vdbe * p,	/* Add the opcode to this VM */
  * This routine will take ownership of the allocated memory.
  */
 void
-sqlite3VdbeAddParseSchemaOp(Vdbe * p, int iDb, char *zWhere)
+sqlite3VdbeAddParseSchemaOp(Vdbe * p, char *zWhere)
 {
-	sqlite3VdbeAddOp4(p, OP_ParseSchema, iDb, 0, 0, zWhere, P4_DYNAMIC);
+	sqlite3VdbeAddOp4(p, OP_ParseSchema, 0, 0, 0, zWhere, P4_DYNAMIC);
 	sqlite3VdbeUsesBtree(p);
 }
 
 void
-sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iDb, int iRec, int n)
+sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iRec, int n)
 {
-	sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, iDb);
+	sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, 0);
 	sqlite3VdbeUsesBtree(p);
 }
 
@@ -395,9 +395,9 @@ sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iDb, int iRec, int n)
  * Add an OP_ParseSchema3 opcode which in turn will create a trigger
  */
 void
-sqlite3VdbeAddParseSchema3Op(Vdbe * p, int iDb, int iRec)
+sqlite3VdbeAddParseSchema3Op(Vdbe * p, int iRec)
 {
-	sqlite3VdbeAddOp2(p, OP_ParseSchema3, iRec, iDb);
+	sqlite3VdbeAddOp2(p, OP_ParseSchema3, iRec, 0);
 	sqlite3VdbeUsesBtree(p);
 }
 
@@ -4691,7 +4691,6 @@ void
 sqlite3VdbePreUpdateHook(Vdbe * v,		/* Vdbe pre-update hook is invoked by */
 			 VdbeCursor * pCsr,	/* Cursor to grab old.* values from */
 			 int op,		/* SQLITE_INSERT, UPDATE or DELETE */
-			 const char *zDb,	/* Database name */
 			 Table * pTab,		/* Modified table */
 			 i64 iKey1,		/* Initial key value */
 			 int iReg)		/* Register for new.* record */
@@ -4728,7 +4727,7 @@ sqlite3VdbePreUpdateHook(Vdbe * v,		/* Vdbe pre-update hook is invoked by */
 	preupdate.pTab = pTab;
 
 	db->pPreUpdate = &preupdate;
-	db->xPreUpdateCallback(db->pPreUpdateArg, db, op, zDb, zTbl, iKey1,
+	db->xPreUpdateCallback(db->pPreUpdateArg, db, op, zTbl, iKey1,
 			       iKey2);
 	db->pPreUpdate = 0;
 	sqlite3DbFree(db, preupdate.aRecord);

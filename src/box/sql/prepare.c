@@ -418,11 +418,10 @@ schemaIsValid(Parse * pParse)
 }
 
 /*
- * Convert a schema pointer into the iDb index that indicates
- * which database file in db->aDb[] the schema refers to.
- *
- * If the same database is attached more than once, the first
- * attached database is returned.
+ * Convert a schema pointer into the 0 index that indicates
+ * that schema refers to a single database.
+ * This method is inherited from SQLite, which has several dbs.
+ * But we have only one, so it is used only in assertions.
  */
 int
 sqlite3SchemaToIndex(sqlite3 * db, Schema * pSchema)

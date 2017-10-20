@@ -4587,12 +4587,10 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 	 */
 	for (ii = 0, pLevel = pWInfo->a; ii < nTabList; ii++, pLevel++) {
 		Table *pTab;	/* Table to open */
-		int iDb;	/* Index of database containing table/index */
 		struct SrcList_item *pTabItem;
 
 		pTabItem = &pTabList->a[pLevel->iFrom];
 		pTab = pTabItem->pTab;
-		iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
 		pLoop = pLevel->pWLoop;
 		if ((pTab->tabFlags & TF_Ephemeral) != 0 || pTab->pSelect) {
 			/* Do nothing */
@@ -4674,7 +4672,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			assert(iIndexCur >= 0);
 			if (op) {
 				sqlite3VdbeAddOp3(v, op, iIndexCur, pIx->tnum,
-						  iDb);
+						  0);
 				sqlite3VdbeSetP4KeyInfo(pParse, pIx);
 				if ((pLoop->wsFlags & WHERE_CONSTRAINT) != 0
 				    && (pLoop->
@@ -4711,8 +4709,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 #endif				/* SQLITE_ENABLE_COLUMN_USED_MASK */
 			}
 		}
-		if (iDb == 0)
-			sqlite3CodeVerifySchema(pParse);
+		sqlite3CodeVerifySchema(pParse);
 	}
 	pWInfo->iTop = sqlite3VdbeCurrentAddr(v);
 	if (db->mallocFailed)

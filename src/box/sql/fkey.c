@@ -366,7 +366,6 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
  */
 static void
 fkLookupParent(Parse * pParse,	/* Parse context */
-	       int iDb,		/* Index of database housing pTab */
 	       Table * pTab,	/* Parent table of FK pFKey */
 	       Index * pIdx,	/* Unique index on parent key columns in pTab */
 	       FKey * pFKey,	/* Foreign key constraint */
@@ -445,7 +444,7 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			int regRec = sqlite3GetTempReg(pParse);
 
 			sqlite3VdbeAddOp3(v, OP_OpenRead, iCur, pIdx->tnum,
-					  iDb);
+					  0);
 			sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
 			for (i = 0; i < nCol; i++) {
 				sqlite3VdbeAddOp2(v, OP_Copy,
@@ -967,7 +966,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 {
 	sqlite3 *db = pParse->db;	/* Database handle */
 	FKey *pFKey;		/* Used to iterate through FKs */
-	int iDb;		/* Index of database containing pTab */
 	int isIgnoreErrors = pParse->disableTriggers;
 	struct session *user_session = current_session();
 
@@ -977,9 +975,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 	/* If foreign-keys are disabled, this function is a no-op. */
 	if ((user_session->sql_flags & SQLITE_ForeignKeys) == 0)
 		return;
-
-	iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-	assert(iDb == 0);
 
 	/* Loop through all the foreign key constraints for which pTab is the
 	 * child table (the table that the foreign key definition is part of).
@@ -1083,7 +1078,7 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 			 * If the parent does not exist, removing the child row resolves an
 			 * outstanding foreign key constraint violation.
 			 */
-			fkLookupParent(pParse, iDb, pTo, pIdx, pFKey, aiCol,
+			fkLookupParent(pParse, pTo, pIdx, pFKey, aiCol,
 				       regOld, -1, bIgnore);
 		}
 		if (regNew != 0 && !isSetNullAction(pParse, pFKey)) {
@@ -1096,7 +1091,7 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 			 * values are guaranteed to be NULL, it is not possible for adding
 			 * this row to cause an FK violation.
 			 */
-			fkLookupParent(pParse, iDb, pTo, pIdx, pFKey, aiCol,
+			fkLookupParent(pParse, pTo, pIdx, pFKey, aiCol,
 				       regNew, +1, bIgnore);
 		}
 
@@ -1137,7 +1132,7 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 		/* Create a SrcList structure containing the child table.  We need the
 		 * child table as a SrcList for sqlite3WhereBegin()
 		 */
-		pSrc = sqlite3SrcListAppend(db, 0, 0, 0);
+		pSrc = sqlite3SrcListAppend(db, 0, 0);
 		if (pSrc) {
 			struct SrcList_item *pItem = pSrc->a;
 			pItem->pTab = pFKey->pFrom;
@@ -1459,8 +1454,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 									 0,
 									 pRaise),
 						   sqlite3SrcListAppend(db, 0,
-									&tFrom,
-									0),
+									&tFrom),
 						   pWhere, 0, 0, 0, 0, 0, 0);
 			pWhere = 0;
 		}

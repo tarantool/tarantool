@@ -115,11 +115,10 @@ sqlite3MaterializeView(Parse * pParse,	/* Parsing context */
 	sqlite3 *db = pParse->db;
 	assert(sqlite3SchemaToIndex(db, pView->pSchema) == 0);
 	pWhere = sqlite3ExprDup(db, pWhere, 0);
-	pFrom = sqlite3SrcListAppend(db, 0, 0, 0);
+	pFrom = sqlite3SrcListAppend(db, 0, 0);
 	if (pFrom) {
 		assert(pFrom->nSrc == 1);
 		pFrom->a[0].zName = sqlite3DbStrDup(db, pView->zName);
-		pFrom->a[0].zDatabase = sqlite3DbStrDup(db, db->mdb.zDbSName);
 		assert(pFrom->a[0].pOn == 0);
 		assert(pFrom->a[0].pUsing == 0);
 	}
@@ -246,7 +245,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	sqlite3 *db;		/* Main database structure */
 	AuthContext sContext;	/* Authorization context */
 	NameContext sNC;	/* Name context to resolve expressions in */
-	int iDb;		/* Database number */
 	int memCnt = -1;	/* Memory cell used for change counting */
 	int rcauth;		/* Value returned by authorization callback */
 	int eOnePass;		/* ONEPASS_OFF or _SINGLE or _MULTI */
@@ -313,12 +311,10 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	if (sqlite3IsReadOnly(pParse, pTab, (pTrigger ? 1 : 0))) {
 		goto delete_from_cleanup;
 	}
-	iDb = sqlite3SchemaToIndex(db, pTab->pSchema);
-	assert(iDb == 0);
 	rcauth = sqlite3AuthCheck(pParse, SQLITE_DELETE, pTab->zName, 0,
-				  db->mdb.zDbSName);
+			          "main");
 	assert(rcauth == SQLITE_OK || rcauth == SQLITE_DENY
-	       || rcauth == SQLITE_IGNORE);
+			|| rcauth == SQLITE_IGNORE);
 	if (rcauth == SQLITE_DENY) {
 		goto delete_from_cleanup;
 	}
@@ -388,12 +384,12 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		assert(!isView);
 		sqlite3TableLock(pParse, pTab->tnum, 1, pTab->zName);
 		if (HasRowid(pTab)) {
-			sqlite3VdbeAddOp4(v, OP_Clear, pTab->tnum, iDb, memCnt,
+			sqlite3VdbeAddOp4(v, OP_Clear, pTab->tnum, 0, memCnt,
 					  pTab->zName, P4_STATIC);
 		}
 		for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
 			assert(pIdx->pSchema == pTab->pSchema);
-			sqlite3VdbeAddOp2(v, OP_Clear, pIdx->tnum, iDb);
+			sqlite3VdbeAddOp2(v, OP_Clear, pIdx->tnum, 0);
 		}
 
 		/* Do not start Tarantool's transaction in case of truncate optimization.
@@ -641,7 +637,7 @@ sqlite3DeleteByKey(Parse * pParse, Token * pTab, const char **columns,
 	assert(nPairs > 0);
 	if (pParse->nErr > 0 || pParse->db->mallocFailed)
 		goto error;
-	SrcList *src = sqlite3SrcListAppend(pParse->db, NULL, pTab, NULL);
+	SrcList *src = sqlite3SrcListAppend(pParse->db, NULL, pTab);
 	if (src == NULL)
 		goto error;
 	/* Dummy init of INDEXED BY clause. */

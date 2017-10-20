@@ -5290,7 +5290,6 @@ sqlite3_key(sqlite3 * db,	/* Database to be rekeyed */
 
 SQLITE_API int
 sqlite3_key_v2(sqlite3 * db,	/* Database to be rekeyed */
-	       const char *zDbName,	/* Name of the database */
 	       const void *pKey, int nKey	/* The key */
 	);
 
@@ -5309,7 +5308,6 @@ sqlite3_rekey(sqlite3 * db,	/* Database to be rekeyed */
 
 SQLITE_API int
 sqlite3_rekey_v2(sqlite3 * db,	/* Database to be rekeyed */
-		 const char *zDbName,	/* Name of the database */
 		 const void *pKey, int nKey	/* The new key */
 	);
 
@@ -5504,8 +5502,7 @@ sqlite3_db_handle(sqlite3_stmt *);
  * to open the database originally was a URI or relative pathname.
 */
 SQLITE_API const char *
-sqlite3_db_filename(sqlite3 * db,
-		    const char *zDbName);
+sqlite3_db_filename(sqlite3 * db);
 
 /*
  * CAPI3REF: Determine if a database is read-only
@@ -5516,7 +5513,7 @@ sqlite3_db_filename(sqlite3 * db,
  * the name of a database on connection D.
 */
 SQLITE_API int
-sqlite3_db_readonly(sqlite3 * db, const char *zDbName);
+sqlite3_db_readonly(sqlite3 * db);
 
 /*
  * CAPI3REF: Find the next prepared statement
@@ -6462,8 +6459,7 @@ sqlite3_db_mutex(sqlite3 *);
  * See also: [SQLITE_FCNTL_LOCKSTATE]
 */
 SQLITE_API int
-sqlite3_file_control(sqlite3 *, const char *zDbName,
-		     int op, void *);
+sqlite3_file_control(sqlite3 *, int op, void *);
 
 /*
  * CAPI3REF: Testing Interface
@@ -7388,7 +7384,7 @@ sqlite3_wal_autocheckpoint(sqlite3 * db, int N);
  * complication) of [sqlite3_wal_checkpoint_v2()].
 */
 SQLITE_API int
-sqlite3_wal_checkpoint(sqlite3 * db, const char *zDb);
+sqlite3_wal_checkpoint(sqlite3 * db);
 
 /*
  * CAPI3REF: Checkpoint Mode Values
@@ -7624,7 +7620,6 @@ SQLITE_API void
 */
 							  sqlite3 * db,	/* Database handle */
 							  int op,	/* SQLITE_UPDATE, DELETE or INSERT */
-							  char const *zDb,	/* Database name */
 							  char const *zName,	/* Table name */
 							  sqlite3_int64 iKey1,	/* Rowid of row about to be deleted/updated */
 							  sqlite3_int64 iKey2	/* New rowid value (for a rowid UPDATE) */

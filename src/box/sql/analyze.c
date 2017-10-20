@@ -896,12 +896,6 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	assert(sqlite3BtreeHoldsAllMutexes(db));
 	assert(sqlite3SchemaToIndex(db, pTab->pSchema) == 0);
 	assert(sqlite3SchemaMutexHeld(db, 0));
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	if (sqlite3AuthCheck(pParse, SQLITE_ANALYZE, pTab->zName, 0,
-			     db->mdb.zDbSName)) {
-		return;
-	}
-#endif
 
 	/* Establish a read-lock on the table at the shared-cache level.
 	 * Open a read-only cursor on the table. Also allocate a cursor number
@@ -1212,7 +1206,7 @@ static void
 analyzeDatabase(Parse * pParse)
 {
 	sqlite3 *db = pParse->db;
-	Schema *pSchema = db->mdb.pSchema;	/* Schema of database iDb */
+	Schema *pSchema = db->mdb.pSchema;	/* Schema of database */
 	HashElem *k;
 	int iStatCur;
 	int iMem;
@@ -1310,7 +1304,6 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 typedef struct analysisInfo analysisInfo;
 struct analysisInfo {
 	sqlite3 *db;
-	const char *zDatabase;
 };
 
 /*

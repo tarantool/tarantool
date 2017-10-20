@@ -263,7 +263,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	char *zLeft = 0;	/* Nul-terminated UTF-8 string <id> */
 	char *zRight = 0;	/* Nul-terminated UTF-8 string <value>, or NULL */
 	char *zTable = 0;	/* Nul-terminated UTF-8 string <value2> or NULL */
-	const char *zDb = 0;	/* The database name */
 	char *aFcntl[4];	/* Argument to SQLITE_FCNTL_PRAGMA */
 	int rc;			/* return value form SQLITE_FCNTL_PRAGMA */
 	sqlite3 *db = pParse->db;	/* The database connection */
@@ -288,10 +287,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	}
 	zTable = sqlite3NameFromToken(db, pValue2);
 
-	zDb = 0;
-	if (sqlite3AuthCheck(pParse, SQLITE_PRAGMA, zLeft, zRight, zDb)) {
-		goto pragma_out;
-	}
 	/* Send an SQLITE_FCNTL_PRAGMA file-control to the underlying VFS *
 	 * connection.  If it returns SQLITE_OK, then assume that the VFS *
 	 * handled the pragma and generate a no-op prepared statement. *
@@ -313,7 +308,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	aFcntl[2] = zRight;
 	aFcntl[3] = 0;
 	db->busyHandler.nBusy = 0;
-	rc = sqlite3_file_control(db, zDb, SQLITE_FCNTL_PRAGMA, (void *)aFcntl);
+	rc = sqlite3_file_control(db, SQLITE_FCNTL_PRAGMA, (void *)aFcntl);
 	if (rc == SQLITE_OK) {
 		sqlite3VdbeSetNumCols(v, 1);
 		sqlite3VdbeSetColName(v, 0, COLNAME_NAME,
@@ -623,19 +618,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					}
 				}
 			}
-			break;
-		}
-
-	case PragTyp_DATABASE_LIST:{
-			pParse->nMem = 3;
-			assert(db->mdb.pBt == 0);
-			assert(db->mdb.zDbSName != 0);
-			sqlite3VdbeMultiLoad(v, 1, "iss",
-					     0,
-					     db->mdb.zDbSName,
-					     sqlite3BtreeGetFilename(db->mdb.
-								     pBt));
-			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 3);
 			break;
 		}
 
@@ -1199,13 +1181,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 #ifdef SQLITE_HAS_CODEC
 	case PragTyp_KEY:{
 			if (zRight)
-				sqlite3_key_v2(db, zDb, zRight,
+			sqlite3_key_v2(db, 0, zRight,
 					       sqlite3Strlen30(zRight));
 			break;
 		}
 	case PragTyp_REKEY:{
 			if (zRight)
-				sqlite3_rekey_v2(db, zDb, zRight,
+				sqlite3_rekey_v2(db, 0, zRight,
 						 sqlite3Strlen30(zRight));
 			break;
 		}
@@ -1224,9 +1206,9 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						zKey[i / 2] = iByte;
 				}
 				if ((zLeft[3] & 0xf) == 0xb) {
-					sqlite3_key_v2(db, zDb, zKey, i / 2);
+					sqlite3_key_v2(db, zKey, i / 2);
 				} else {
-					sqlite3_rekey_v2(db, zDb, zKey, i / 2);
+					sqlite3_rekey_v2(db, zKey, i / 2);
 				}
 			}
 			break;

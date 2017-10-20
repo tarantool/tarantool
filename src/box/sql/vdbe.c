@@ -221,7 +221,6 @@ allocateCursor(
 	Vdbe *p,              /* The virtual machine */
 	int iCur,             /* Index of the new VdbeCursor */
 	int nField,           /* Number of fields in the table or index */
-	int iDb,              /* Database the cursor belongs to, or -1 */
 	u8 eCurType           /* Type of the new cursor */
 	)
 {
@@ -260,7 +259,6 @@ allocateCursor(
 		p->apCsr[iCur] = pCx = (VdbeCursor*)pMem->z;
 		memset(pCx, 0, offsetof(VdbeCursor,pAltCursor));
 		pCx->eCurType = eCurType;
-		pCx->iDb = iDb;
 		pCx->nField = nField;
 		if (eCurType==CURTYPE_BTREE) {
 			pCx->uc.pCursor = (BtCursor*)
@@ -3210,16 +3208,13 @@ case OP_TTransaction: {
  */
 case OP_ReadCookie: {               /* out2 */
 	int iMeta;
-	int iDb;
 	int iCookie;
 
 	assert(p->bIsReader);
-	iDb = pOp->p1;
 	iCookie = pOp->p3;
 	assert(pOp->p3<SQLITE_N_BTREE_META);
-	assert(iDb==0);
 	assert(db->mdb.pBt!=0);
-	assert(DbMaskTest(p->btreeMask, iDb));
+	assert(DbMaskTest(p->btreeMask, 0));
 
 	sqlite3BtreeGetMeta(db->mdb.pBt, iCookie, (u32 *)&iMeta);
 	pOut = out2Prerelease(p, pOp);
@@ -3336,7 +3331,6 @@ case OP_ReopenIdx: {
 	int nField;
 	KeyInfo *pKeyInfo;
 	int p2;
-	int iDb;
 	int wrFlag;
 	Btree *pX;
 	VdbeCursor *pCur;
@@ -3346,7 +3340,6 @@ case OP_ReopenIdx: {
 	assert(pOp->p4type==P4_KEYINFO);
 	pCur = p->apCsr[pOp->p1];
 	if (pCur && pCur->pgnoRoot==(u32)pOp->p2) {
-		assert(pCur->iDb==pOp->p3);      /* Guaranteed by the code generator */
 		goto open_cursor_set_hints;
 	}
 	/* If the cursor is not currently open or is open on a different
@@ -3368,9 +3361,7 @@ case OP_OpenWrite:
 	nField = 0;
 	pKeyInfo = 0;
 	p2 = pOp->p2;
-	iDb = pOp->p3;
-	assert(iDb==0);
-	assert(DbMaskTest(p->btreeMask, iDb));
+	assert(DbMaskTest(p->btreeMask, 0));
 	pDb = &db->mdb;
 	pX = pDb->pBt;
 	assert(pX!=0);
@@ -3434,7 +3425,7 @@ case OP_OpenWrite:
 	assert(pOp->p1>=0);
 	assert(nField>=0);
 	testcase( nField==0);  /* Table with INTEGER PRIMARY KEY and nothing else */
-	pCur = allocateCursor(p, pOp->p1, nField, iDb, CURTYPE_BTREE);
+	pCur = allocateCursor(p, pOp->p1, nField, CURTYPE_BTREE);
 	if (pCur==0) goto no_mem;
 	pCur->nullRow = 1;
 	pCur->isOrdered = 1;
@@ -3504,7 +3495,7 @@ case OP_OpenEphemeral: {
 		SQLITE_OPEN_MEMORY;
 	assert(pOp->p1>=0);
 	assert(pOp->p2>=0);
-	pCx = allocateCursor(p, pOp->p1, pOp->p2, -1, CURTYPE_BTREE);
+	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_BTREE);
 	if (pCx==0) goto no_mem;
 	pCx->nullRow = 1;
 	pCx->isEphemeral = 1;
@@ -3557,7 +3548,7 @@ case OP_SorterOpen: {
 
 	assert(pOp->p1>=0);
 	assert(pOp->p2>=0);
-	pCx = allocateCursor(p, pOp->p1, pOp->p2, -1, CURTYPE_SORTER);
+	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_SORTER);
 	if (pCx==0) goto no_mem;
 	pCx->pKeyInfo = pOp->p4.pKeyInfo;
 	assert(pCx->pKeyInfo->db==db);
@@ -3606,7 +3597,7 @@ case OP_OpenPseudo: {
 
 	assert(pOp->p1>=0);
 	assert(pOp->p3>=0);
-	pCx = allocateCursor(p, pOp->p1, pOp->p3, -1, CURTYPE_PSEUDO);
+	pCx = allocateCursor(p, pOp->p1, pOp->p3, CURTYPE_PSEUDO);
 	if (pCx==0) goto no_mem;
 	pCx->nullRow = 1;
 	pCx->uc.pseudoTableReg = pOp->p2;
@@ -4425,7 +4416,6 @@ case OP_InsertInt: {
 	Mem *pKey;        /* MEM cell holding key  for the record */
 	VdbeCursor *pC;   /* Cursor to table into which insert is written */
 	int seekResult;   /* Result of prior seek or 0 if no USESEEKRESULT flag */
-	const char *zDb;  /* database name - used by the update hook */
 	Table *pTab;      /* Table structure - used by update and pre-update hooks */
 	int op;           /* Opcode for update hook: SQLITE_UPDATE or SQLITE_INSERT */
 	BtreePayload x;   /* Payload to be inserted */
@@ -4455,14 +4445,11 @@ case OP_InsertInt: {
 
 	if (pOp->p4type==P4_TABLE && HAS_UPDATE_HOOK(db)) {
 		assert(pC->isTable);
-		assert(pC->iDb==0);
-		zDb = db->mdb.zDbSName;
 		pTab = pOp->p4.pTab;
 		assert(HasRowid(pTab));
 		op = ((pOp->p5 & OPFLAG_ISUPDATE) ? SQLITE_UPDATE : SQLITE_INSERT);
 	} else {
 		pTab = 0; /* Not needed.  Silence a comiler warning. */
-		zDb = 0;  /* Not needed.  Silence a compiler warning. */
 	}
 
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
@@ -4471,7 +4458,7 @@ case OP_InsertInt: {
 	    && pOp->p4type==P4_TABLE
 	    && !(pOp->p5 & OPFLAG_ISUPDATE)
 		) {
-		sqlite3VdbePreUpdateHook(p, pC, SQLITE_INSERT, zDb, pTab, x.nKey, pOp->p2);
+		sqlite3VdbePreUpdateHook(p, pC, SQLITE_INSERT, 0, pTab, x.nKey, pOp->p2);
 	}
 #endif
 
@@ -4501,7 +4488,7 @@ case OP_InsertInt: {
 	/* Invoke the update-hook if required. */
 	if (rc) goto abort_due_to_error;
 	if (db->xUpdateCallback && op) {
-		db->xUpdateCallback(db->pUpdateArg, op, zDb, pTab->zName, x.nKey);
+		db->xUpdateCallback(db->pUpdateArg, op, 0, pTab->zName, x.nKey);
 	}
 	break;
 }
@@ -4543,7 +4530,6 @@ case OP_InsertInt: {
  */
 case OP_Delete: {
 	VdbeCursor *pC;
-	const char *zDb;
 	Table *pTab;
 	int opflags;
 
@@ -4566,22 +4552,19 @@ case OP_Delete: {
 	}
 #endif
 
-	/* If the update-hook or pre-update-hook will be invoked, set zDb to
-	 * the name of the db to pass as to it. Also set local pTab to a copy
+	/* If the update-hook or pre-update-hook will be invoked, set
+	 * local pTab to a copy
 	 * of p4.pTab. Finally, if p5 is true, indicating that this cursor was
 	 * last moved with OP_Next or OP_Prev, not Seek or NotFound, set
 	 * VdbeCursor.movetoTarget to the current rowid.
 	 */
 	if (pOp->p4type==P4_TABLE && HAS_UPDATE_HOOK(db)) {
-		assert(pC->iDb==0);
 		assert(pOp->p4.pTab!=0);
-		zDb = db->mdb.zDbSName;
 		pTab = pOp->p4.pTab;
 		if ((pOp->p5 & OPFLAG_SAVEPOSITION)!=0 && pC->isTable) {
 			pC->movetoTarget = sqlite3BtreeIntegerKey(pC->uc.pCursor);
 		}
 	} else {
-		zDb = 0;   /* Not needed.  Silence a compiler warning. */
 		pTab = 0;  /* Not needed.  Silence a compiler warning. */
 	}
 
@@ -4591,7 +4574,7 @@ case OP_Delete: {
 		assert(!(opflags & OPFLAG_ISUPDATE) || (aMem[pOp->p3].flags & MEM_Int));
 		sqlite3VdbePreUpdateHook(p, pC,
 					 (opflags & OPFLAG_ISUPDATE) ? SQLITE_UPDATE : SQLITE_DELETE,
-					 zDb, pTab, pC->movetoTarget,
+					 0, pTab, pC->movetoTarget,
 					 pOp->p3
 			);
 	}
@@ -4626,9 +4609,8 @@ case OP_Delete: {
 	if (opflags & OPFLAG_NCHANGE) {
 		p->nChange++;
 		if (db->xUpdateCallback && HasRowid(pTab)) {
-			db->xUpdateCallback(db->pUpdateArg, SQLITE_DELETE, zDb, pTab->zName,
+			db->xUpdateCallback(db->pUpdateArg, SQLITE_DELETE, 0, pTab->zName,
 					    pC->movetoTarget);
-			assert(pC->iDb>=0);
 		}
 	}
 
@@ -5376,7 +5358,6 @@ case OP_IdxGE:  {       /* jump */
  */
 case OP_Destroy: {     /* out2 */
 	int iMoved;
-	int iDb;
 
 	assert(p->readOnly==0);
 	assert(pOp->p1>1);
@@ -5387,8 +5368,7 @@ case OP_Destroy: {     /* out2 */
 		p->errorAction = OE_Abort;
 		goto abort_due_to_error;
 	} else {
-		iDb = pOp->p3;
-		assert(DbMaskTest(p->btreeMask, iDb));
+		assert(DbMaskTest(p->btreeMask, 0));
 		iMoved = 0;  /* Not needed.  Only to silence a warning. */
 		rc = sqlite3BtreeDropTable(db->mdb.pBt, pOp->p1, &iMoved);
 		pOut->flags = MEM_Int;
@@ -5521,7 +5501,6 @@ case OP_ParseSchema: {
  *  <name, pageno (which is hash(spaceId, indexId)), sql>
  */
 case OP_ParseSchema2: {
-	int iDb;
 	InitData initData;
 	Mem *pRec, *pRecEnd;
 	char *argv[4] = {NULL, NULL, NULL, NULL};
@@ -5534,12 +5513,9 @@ case OP_ParseSchema2: {
 	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
 #endif
 
-	iDb = pOp->p3;
-	assert(iDb==0);
 	assert(DbHasProperty(db, DB_SchemaLoaded));
 
 	initData.db = db;
-	initData.iDb = iDb;
 	initData.pzErrMsg = &p->zErrMsg;
 
 	assert(db->init.busy==0);
@@ -5587,7 +5563,6 @@ case OP_ParseSchema2: {
  * in database P2
  */
 case OP_ParseSchema3: {
-	int iDb;
 	InitData initData;
 	Mem *pRec;
 	char zPgnoBuf[16];
@@ -5601,12 +5576,9 @@ case OP_ParseSchema3: {
 	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
 #endif
 
-	iDb = pOp->p2;
-	assert(iDb==0);
 	assert(DbHasProperty(db, DB_SchemaLoaded));
 
 	initData.db = db;
-	initData.iDb = iDb;
 	initData.pzErrMsg = &p->zErrMsg;
 
 	assert(db->init.busy==0);
@@ -6538,16 +6510,6 @@ case OP_Init: {          /* jump */
 			(void)db->xTrace(SQLITE_TRACE_STMT, db->pTraceArg, p, zTrace);
 		}
 	}
-#ifdef SQLITE_USE_FCNTL_TRACE
-	zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql);
-	if (zTrace) {
-		int j;
-		for(j=0; j<db->nDb; j++) {
-			if (DbMaskTest(p->btreeMask, j)==0) continue;
-			sqlite3_file_control(db, db->aDb[j].zDbSName, SQLITE_FCNTL_TRACE, zTrace);
-		}
-	}
-#endif /* SQLITE_USE_FCNTL_TRACE */
 #ifdef SQLITE_DEBUG
 	if ((user_session->sql_flags & SQLITE_SqlTrace)!=0
 	    && (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql))!=0

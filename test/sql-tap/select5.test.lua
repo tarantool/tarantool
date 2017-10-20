@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(33)
+test:plan(32)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -90,16 +90,6 @@ test:do_catchsql_test(
         -- <select5-2.1.1>
         1, "no such column: Z"
         -- </select5-2.1.1>
-    })
-
-test:do_catchsql_test(
-    "select5-2.1.2",
-    [[
-        SELECT y, count(*) FROM t1 GROUP BY temp.t1.y ORDER BY y
-    ]], {
-        -- <select5-2.1.2>
-        1, "no such column: TEMP.T1.Y"
-        -- </select5-2.1.2>
     })
 
 test:do_catchsql_test(

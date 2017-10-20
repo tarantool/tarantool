@@ -49,7 +49,6 @@ sqlite3FixInit(DbFixer * pFix,	/* The fixer to be initialized */
 
 	db = pParse->db;
 	pFix->pParse = pParse;
-	pFix->zDb = db->mdb.zDbSName;
 	pFix->pSchema = db->mdb.pSchema;
 	pFix->zType = zType;
 	pFix->pName = pName;
@@ -76,24 +75,12 @@ sqlite3FixSrcList(DbFixer * pFix,	/* Context of the fixation */
     )
 {
 	int i;
-	const char *zDb;
 	struct SrcList_item *pItem;
 
 	if (NEVER(pList == 0))
 		return 0;
-	zDb = pFix->zDb;
 	for (i = 0, pItem = pList->a; i < pList->nSrc; i++, pItem++) {
 		if (pFix->bVarOnly == 0) {
-			if (pItem->zDatabase
-			    && sqlite3StrICmp(pItem->zDatabase, zDb)) {
-				sqlite3ErrorMsg(pFix->pParse,
-						"%s %T cannot reference objects in database %s",
-						pFix->zType, pFix->pName,
-						pItem->zDatabase);
-				return 1;
-			}
-			sqlite3DbFree(pFix->pParse->db, pItem->zDatabase);
-			pItem->zDatabase = 0;
 			pItem->pSchema = pFix->pSchema;
 		}
 #if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_TRIGGER)

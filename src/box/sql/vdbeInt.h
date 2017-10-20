@@ -93,7 +93,6 @@ typedef struct AuxData AuxData;
 typedef struct VdbeCursor VdbeCursor;
 struct VdbeCursor {
 	u8 eCurType;		/* One of the CURTYPE_* values above */
-	i8 iDb;			/* Index of cursor database in db->aDb[] (or -1) */
 	u8 nullRow;		/* True if pointing to a row with no data */
 	u8 deferredMoveto;	/* A call to sqlite3BtreeMoveto() is needed */
 	u8 isTable;		/* True for rowid tables.  False for indexes */

@@ -1082,7 +1082,6 @@ typedef int VList;
  * databases may be attached.
  */
 struct Db {
-	char *zDbSName;		/* Name of this database. (schema name, not filename) */
 	Btree *pBt;		/* The B*Tree structure for this database file */
 	u8 safety_level;	/* How aggressive at syncing data to disk */
 	u8 bSyncSet;		/* True if "PRAGMA synchronous=N" has been run */
@@ -2345,7 +2344,6 @@ struct SrcList {
 	u32 nAlloc;		/* Number of entries allocated in a[] below */
 	struct SrcList_item {
 		Schema *pSchema;	/* Schema to which this item is fixed */
-		char *zDatabase;	/* Name of database holding this table */
 		char *zName;	/* Name of the table */
 		char *zAlias;	/* The "B" part of a "A AS B" phrase.  zName is the "A" */
 		Table *pTab;	/* An SQL table corresponding to zName */
@@ -2978,7 +2976,6 @@ struct DbFixer {
 	Parse *pParse;		/* The parsing context.  Error messages written here */
 	Schema *pSchema;	/* Fix items to this schema */
 	int bVarOnly;		/* Check for variable references only */
-	const char *zDb;	/* Make sure all objects are contained in this database */
 	const char *zType;	/* Type of the container - used for error messages */
 	const Token *pName;	/* Name of the container - used for error messages */
 };
@@ -3012,7 +3009,6 @@ struct StrAccum {
 typedef struct {
 	sqlite3 *db;		/* The database being initialized */
 	char **pzErrMsg;	/* Error message stored here */
-	int iDb;		/* 0 for main database.  1 for TEMP, 2.. for ATTACHed */
 	int rc;			/* Result code stored here */
 } InitData;
 
@@ -3416,7 +3412,6 @@ void sqlite3AddCollateType(Parse *, Token *);
 void sqlite3EndTable(Parse *, Token *, Token *, u8, Select *);
 int sqlite3ParseUri(const char *, const char *, unsigned int *,
 		    sqlite3_vfs **, char **, char **);
-Btree *sqlite3DbNameToBtree(sqlite3 *, const char *);
 
 #ifdef SQLITE_UNTESTABLE
 #define sqlite3FaultSim(X) SQLITE_OK
@@ -3460,8 +3455,8 @@ void *sqlite3ArrayAllocate(sqlite3 *, void *, int, int *, int *);
 IdList *sqlite3IdListAppend(sqlite3 *, IdList *, Token *);
 int sqlite3IdListIndex(IdList *, const char *);
 SrcList *sqlite3SrcListEnlarge(sqlite3 *, SrcList *, int, int);
-SrcList *sqlite3SrcListAppend(sqlite3 *, SrcList *, Token *, Token *);
-SrcList *sqlite3SrcListAppendFromTerm(Parse *, SrcList *, Token *, Token *,
+SrcList *sqlite3SrcListAppend(sqlite3 *, SrcList *, Token *);
+SrcList *sqlite3SrcListAppendFromTerm(Parse *, SrcList *, Token *,
 				      Token *, Select *, Expr *, IdList *);
 void sqlite3SrcListIndexedBy(Parse *, SrcList *, Token *);
 void sqlite3SrcListFuncArgs(Parse *, SrcList *, ExprList *);
@@ -3552,7 +3547,6 @@ void sqlite3PrngRestoreState(void);
 #endif
 void sqlite3RollbackAll(Vdbe *, int);
 void sqlite3CodeVerifySchema(Parse *);
-void sqlite3CodeVerifyNamedSchema(Parse *, const char *zDb);
 void sqlite3BeginTransaction(Parse *, int);
 void sqlite3CommitTransaction(Parse *);
 void sqlite3RollbackTransaction(Parse *);
@@ -3730,7 +3724,7 @@ Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlite3ExprAddCollateString(Parse *, Expr *, const char *);
 Expr *sqlite3ExprSkipCollate(Expr *);
 int sqlite3CheckCollSeq(Parse *, CollSeq *);
-int sqlite3CheckObjectName(Parse *, const char *);
+int sqlite3CheckObjectName(Parse *, char *);
 void sqlite3VdbeSetChanges(sqlite3 *, int);
 int sqlite3AddInt64(i64 *, i64);
 int sqlite3SubInt64(i64 *, i64);
@@ -3774,8 +3768,7 @@ void sqlite3ExpirePreparedStatements(sqlite3 *);
 int sqlite3CodeSubselect(Parse *, Expr *, int, int);
 void sqlite3SelectPrep(Parse *, Select *, NameContext *);
 void sqlite3SelectWrongNumTermsError(Parse * pParse, Select * p);
-int sqlite3MatchSpanName(const char *, const char *, const char *,
-			 const char *);
+int sqlite3MatchSpanName(const char *, const char *, const char *);
 int sqlite3ResolveExprNames(NameContext *, Expr *);
 int sqlite3ResolveExprListNames(NameContext *, ExprList *);
 void sqlite3ResolveSelectNames(Parse *, Select *, NameContext *);

@@ -811,12 +811,6 @@ sqlite3VXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 				struct SrcList_item *pItem = &pSrc->a[k];
 				assert(bArgList == 0);
 				assert(k >= 0 && k < pSrc->nSrc);
-				if (pItem->zDatabase) {
-					sqlite3StrAccumAppendAll(pAccum,
-								 pItem->
-								 zDatabase);
-					sqlite3StrAccumAppend(pAccum, ".", 1);
-				}
 				sqlite3StrAccumAppendAll(pAccum, pItem->zName);
 				length = width = 0;
 				break;

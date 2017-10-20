@@ -306,7 +306,6 @@ reloadTableSchema(Parse * pParse, Table * pTab, const char *zName)
 {
 	Vdbe *v;
 	char *zWhere;
-	int iDb;		/* Index of database containing pTab */
 #ifndef SQLITE_OMIT_TRIGGER
 	Trigger *pTrig;
 #endif
@@ -315,30 +314,28 @@ reloadTableSchema(Parse * pParse, Table * pTab, const char *zName)
 	if (NEVER(v == 0))
 		return;
 	assert(sqlite3BtreeHoldsAllMutexes(pParse->db));
-	iDb = sqlite3SchemaToIndex(pParse->db, pTab->pSchema);
-	assert(iDb == 0);
 
 #ifndef SQLITE_OMIT_TRIGGER
 	/* Drop any table triggers from the internal schema. */
 	for (pTrig = pTab->pTrigger; pTrig; pTrig = pTrig->pNext) {
-		assert(sqlite3SchemaToIndex(pParse->db, pTrig->pSchema) == iDb);
-		sqlite3VdbeAddOp4(v, OP_DropTrigger, iDb, 0, 0, pTrig->zName,
+		assert(sqlite3SchemaToIndex(pParse->db, pTrig->pSchema) == 0);
+		sqlite3VdbeAddOp4(v, OP_DropTrigger, 0, 0, 0, pTrig->zName,
 				  0);
 	}
 #endif
 
 	/* Drop the table and index from the internal schema.  */
-	sqlite3VdbeAddOp4(v, OP_DropTable, iDb, 0, 0, pTab->zName, 0);
+	sqlite3VdbeAddOp4(v, OP_DropTable, 0, 0, 0, pTab->zName, 0);
 
 	/* Reload the table, index and permanent trigger schemas. */
 	zWhere = sqlite3MPrintf(pParse->db, "tbl_name=%Q", zName);
 	if (!zWhere)
 		return;
-	sqlite3VdbeAddParseSchemaOp(v, iDb, zWhere);
+	sqlite3VdbeAddParseSchemaOp(v, zWhere);
 
 #ifndef SQLITE_OMIT_TRIGGER
 	/* Don't use IN(...) in case SQLITE_OMIT_SUBQUERY is defined. */
-	sqlite3VdbeAddParseSchemaOp(v, 1, zWhere);
+	sqlite3VdbeAddParseSchemaOp(v, zWhere);
 #endif
 }
 

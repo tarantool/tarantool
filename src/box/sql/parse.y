@@ -444,7 +444,7 @@ selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
     Token x;
     x.n = 0;
     parserDoubleLinkSelect(pParse, pRhs);
-    pFrom = sqlite3SrcListAppendFromTerm(pParse,0,0,0,&x,pRhs,0,0);
+    pFrom = sqlite3SrcListAppendFromTerm(pParse,0,0,&x,pRhs,0,0);
     pRhs = sqlite3SelectNew(pParse,0,pFrom,0,0,0,0,0,0,0);
   }
   if( pRhs ){
@@ -582,32 +582,31 @@ stl_prefix(A) ::= seltablist(A) joinop(Y).    {
 stl_prefix(A) ::= .                           {A = 0;}
 seltablist(A) ::= stl_prefix(A) nm(Y) as(Z) indexed_opt(I)
                   on_opt(N) using_opt(U). {
-  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,0,&Z,0,N,U);
+  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
   sqlite3SrcListIndexedBy(pParse, A, &I);
 }
 seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
                   on_opt(N) using_opt(U). {
-  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,0,&Z,0,N,U);
+  A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
   sqlite3SrcListFuncArgs(pParse, A, E);
 }
 %ifndef SQLITE_OMIT_SUBQUERY
   seltablist(A) ::= stl_prefix(A) LP select(S) RP
                     as(Z) on_opt(N) using_opt(U). {
-    A = sqlite3SrcListAppendFromTerm(pParse,A,0,0,&Z,S,N,U);
+    A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,S,N,U);
   }
   seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
                     as(Z) on_opt(N) using_opt(U). {
     if( A==0 && Z.n==0 && N==0 && U==0 ){
       A = F;
     }else if( F->nSrc==1 ){
-      A = sqlite3SrcListAppendFromTerm(pParse,A,0,0,&Z,0,N,U);
+      A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,0,N,U);
       if( A ){
         struct SrcList_item *pNew = &A->a[A->nSrc-1];
         struct SrcList_item *pOld = F->a;
         pNew->zName = pOld->zName;
-        pNew->zDatabase = pOld->zDatabase;
         pNew->pSelect = pOld->pSelect;
-        pOld->zName = pOld->zDatabase = 0;
+        pOld->zName =  0;
         pOld->pSelect = 0;
       }
       sqlite3SrcListDelete(pParse->db, F);
@@ -615,7 +614,7 @@ seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
       Select *pSubquery;
       sqlite3SrcListShiftJoinType(F);
       pSubquery = sqlite3SelectNew(pParse,0,F,0,0,0,0,SF_NestedFrom,0,0);
-      A = sqlite3SrcListAppendFromTerm(pParse,A,0,0,&Z,pSubquery,N,U);
+      A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,pSubquery,N,U);
     }
   }
 %endif  SQLITE_OMIT_SUBQUERY
@@ -623,7 +622,7 @@ seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
 %type fullname {SrcList*}
 %destructor fullname {sqlite3SrcListDelete(pParse->db, $$);}
 fullname(A) ::= nm(X).  
-   {A = sqlite3SrcListAppend(pParse->db,0,&X,0); /*A-overwrites-X*/}
+   {A = sqlite3SrcListAppend(pParse->db,0,&X); /*A-overwrites-X*/}
 
 %type joinop {int}
 join_nm(A) ::= id(A).
@@ -887,14 +886,6 @@ expr(A) ::= nm(X) DOT nm(Y). {
   Expr *temp2 = sqlite3ExprAlloc(pParse->db, TK_ID, &Y, 1);
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sqlite3PExpr(pParse, TK_DOT, temp1, temp2);
-}
-expr(A) ::= nm(X) DOT nm(Y) DOT nm(Z). {
-  Expr *temp1 = sqlite3ExprAlloc(pParse->db, TK_ID, &X, 1);
-  Expr *temp2 = sqlite3ExprAlloc(pParse->db, TK_ID, &Y, 1);
-  Expr *temp3 = sqlite3ExprAlloc(pParse->db, TK_ID, &Z, 1);
-  Expr *temp4 = sqlite3PExpr(pParse, TK_DOT, temp2, temp3);
-  spanSet(&A,&X,&Z); /*A-overwrites-X*/
-  A.pExpr = sqlite3PExpr(pParse, TK_DOT, temp1, temp4);
 }
 term(A) ::= FLOAT|BLOB(X). {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= STRING(X).     {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
@@ -1183,7 +1174,7 @@ expr(A) ::= expr(A) between_op(N) expr(X) AND expr(Y). [BETWEEN] {
     A.zEnd = &E.z[E.n];
   }
   expr(A) ::= expr(A) in_op(N) nm(Y) paren_exprlist(E). [IN] {
-    SrcList *pSrc = sqlite3SrcListAppend(pParse->db, 0,&Y,0);
+    SrcList *pSrc = sqlite3SrcListAppend(pParse->db, 0,&Y);
     Select *pSelect = sqlite3SelectNew(pParse, 0,pSrc,0,0,0,0,0,0,0);
     if( E )  sqlite3SrcListFuncArgs(pParse, pSelect ? pSrc : 0, E);
     A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
@@ -1257,7 +1248,7 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP where_opt(W). {
   sqlite3CreateIndex(pParse, &X, 
-                     sqlite3SrcListAppend(pParse->db,0,&Y,0), Z, U,
+                     sqlite3SrcListAppend(pParse->db,0,&Y), Z, U,
                       &S, W, SQLITE_SO_ASC, NE, SQLITE_IDXTYPE_APPDEF);
 }
 

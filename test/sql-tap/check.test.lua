@@ -804,8 +804,7 @@ end
 test:do_execsql_test(
     8.1,
     [[
-        CREATE TABLE t810(a primary key, CHECK( main.t810.a>0 ));
-        CREATE TABLE t811(b primary key, CHECK( xyzzy.t811.b BETWEEN 5 AND 10 ));
+        CREATE TABLE t810(a primary key, CHECK( t810.a>0 ));
     ]], {
         -- <8.1>
 

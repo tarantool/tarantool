@@ -320,7 +320,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 				  OP_String8, 0, iFirstCol + 1, 0,
 				  zSql, P4_DYNAMIC);
 		sqlite3ChangeCookie(pParse);
-		sqlite3VdbeAddParseSchema3Op(v, 0, iFirstCol);
+		sqlite3VdbeAddParseSchema3Op(v, iFirstCol);
 	}
 
 	if (db->init.busy) {
@@ -513,7 +513,6 @@ void
 sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 {
 	Trigger *pTrigger = 0;
-	const char *zDb;
 	const char *zName;
 	sqlite3 *db = pParse->db;
 
@@ -535,12 +534,8 @@ sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 	}
 
 	assert(pName->nSrc == 1);
-	zDb = pName->a[0].zDatabase;
 	zName = pName->a[0].zName;
 	assert(sqlite3BtreeHoldsAllMutexes(db));
-	if (zDb) {
-		assert(sqlite3StrICmp(db->mdb.zDbSName, zDb) == 0);
-	}
 	assert(sqlite3SchemaMutexHeld(db, 0));
 	pTrigger = sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName);
 	if (!pTrigger) {
@@ -548,7 +543,7 @@ sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 			sqlite3ErrorMsg(pParse, "no such trigger: %S", pName,
 					0);
 		} else {
-			sqlite3CodeVerifyNamedSchema(pParse, zDb);
+			sqlite3CodeVerifySchema(pParse);
 		}
 		pParse->checkSchema = 1;
 		goto drop_trigger_cleanup;
@@ -696,12 +691,6 @@ sqlite3TriggersExist(Table * pTab,	/* The table the contains the triggers */
 /*
  * Convert the pStep->zTarget string into a SrcList and return a pointer
  * to that SrcList.
- *
- * This routine adds a specific database name, if needed, to the target when
- * forming the SrcList.  This prevents a trigger in one database from
- * referring to a target in another database.  An exception is when the
- * trigger is in TEMP in which case it can refer to any other database it
- * wants.
  */
 static SrcList *
 targetSrcList(Parse * pParse,	/* The parsing context */
@@ -711,15 +700,12 @@ targetSrcList(Parse * pParse,	/* The parsing context */
 	sqlite3 *db = pParse->db;
 	SrcList *pSrc;		/* SrcList to be returned */
 
-	pSrc = sqlite3SrcListAppend(db, 0, 0, 0);
+	pSrc = sqlite3SrcListAppend(db, 0, 0);
 	if (pSrc) {
 		assert(pSrc->nSrc > 0);
 		pSrc->a[pSrc->nSrc - 1].zName =
 		    sqlite3DbStrDup(db, pStep->zTarget);
-		const char *zDb;
 		assert(sqlite3SchemaToIndex(db, pStep->pTrig->pSchema) == 0);
-		zDb = db->mdb.zDbSName;
-		pSrc->a[pSrc->nSrc - 1].zDatabase = sqlite3DbStrDup(db, zDb);
 	}
 	return pSrc;
 }

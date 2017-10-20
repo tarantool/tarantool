@@ -873,11 +873,6 @@ sqlite3_db_config(sqlite3 * db, int op, ...)
 
 	va_start(ap, op);
 	switch (op) {
-	case SQLITE_DBCONFIG_MAINDBNAME:{
-			db->mdb.zDbSName = va_arg(ap, char *);
-			rc = SQLITE_OK;
-			break;
-		}
 	case SQLITE_DBCONFIG_LOOKASIDE:{
 			void *pBuf = va_arg(ap, void *);	/* IMP: R-26835-10964 */
 			int sz = va_arg(ap, int);	/* IMP: R-47871-25994 */
@@ -2041,7 +2036,7 @@ sqlite3_rollback_hook(sqlite3 * db,	/* Attach the hook to this database */
 void *
 sqlite3_preupdate_hook(sqlite3 * db,		/* Attach the hook to this database */
 		       void (*xCallback) (	/* Callback function */
-			       void *, sqlite3 *, int, char const *,
+			       void *, sqlite3 *, int,
 			       char const *, sqlite3_int64, sqlite3_int64),
 		       void *pArg)		/* First callback argument */
 {
@@ -2826,7 +2821,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	/* The default safety_level for the main database is FULL; for the temp
 	 * database it is OFF. This matches the pager layer defaults.
 	 */
-	db->mdb.zDbSName = "main";
 	db->mdb.safety_level = SQLITE_DEFAULT_SYNCHRONOUS + 1;
 
 	db->magic = SQLITE_MAGIC_OPEN;
@@ -3337,7 +3331,7 @@ sqlite3_extended_result_codes(sqlite3 * db, int onoff)
  * Invoke the xFileControl method on a particular database.
  */
 int
-sqlite3_file_control(sqlite3 * db, const char *zDbName, int op, void *pArg)
+sqlite3_file_control(sqlite3 * db, int op, void *pArg)
 {
 	int rc = SQLITE_ERROR;
 	Btree *pBtree;
@@ -3347,7 +3341,7 @@ sqlite3_file_control(sqlite3 * db, const char *zDbName, int op, void *pArg)
 		return SQLITE_MISUSE_BKPT;
 #endif
 	sqlite3_mutex_enter(db->mutex);
-	pBtree = sqlite3DbNameToBtree(db, zDbName);
+	pBtree = db->mdb.pBt;
 	if (pBtree) {
 		Pager *pPager;
 		sqlite3_file *fd;
@@ -3784,21 +3778,11 @@ sqlite3_uri_int64(const char *zFilename,	/* Filename as passed to xOpen */
 }
 
 /*
- * Return the Btree pointer identified by zDbName.  Return NULL if not found.
- */
-Btree *
-sqlite3DbNameToBtree(sqlite3 * db, const char *zDbName)
-{
-	int iDb = zDbName ? sqlite3FindDbName(zDbName) : 0;
-	return iDb < 0 ? 0 : db->mdb.pBt;
-}
-
-/*
  * Return the filename of the database associated with a database
  * connection.
  */
 const char *
-sqlite3_db_filename(sqlite3 * db, const char *zDbName)
+sqlite3_db_filename(sqlite3 * db)
 {
 	Btree *pBt;
 #ifdef SQLITE_ENABLE_API_ARMOR
@@ -3807,7 +3791,7 @@ sqlite3_db_filename(sqlite3 * db, const char *zDbName)
 		return 0;
 	}
 #endif
-	pBt = sqlite3DbNameToBtree(db, zDbName);
+	pBt = db->mdb.pBt;
 	return pBt ? sqlite3BtreeGetFilename(pBt) : 0;
 }
 
@@ -3816,7 +3800,7 @@ sqlite3_db_filename(sqlite3 * db, const char *zDbName)
  * no such database exists.
  */
 int
-sqlite3_db_readonly(sqlite3 * db, const char *zDbName)
+sqlite3_db_readonly(sqlite3 * db)
 {
 	Btree *pBt;
 #ifdef SQLITE_ENABLE_API_ARMOR
@@ -3825,7 +3809,7 @@ sqlite3_db_readonly(sqlite3 * db, const char *zDbName)
 		return -1;
 	}
 #endif
-	pBt = sqlite3DbNameToBtree(db, zDbName);
+	pBt = db->mdb.pBt;
 	return pBt ? sqlite3BtreeIsReadonly(pBt) : -1;
 }
 
@@ -3861,7 +3845,6 @@ int
 sqlite3_snapshot_recover(sqlite3 * db, const char *zDb)
 {
 	int rc = SQLITE_ERROR;
-	int iDb;
 	return rc;
 }
 

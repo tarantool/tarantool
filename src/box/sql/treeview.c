@@ -219,11 +219,7 @@ sqlite3TreeViewSelect(TreeView * pView, const Select * p, u8 moreToFollow)
 				sqlite3StrAccumInit(&x, 0, zLine, sizeof(zLine),
 						    0);
 				sqlite3XPrintf(&x, "{%d,*}", pItem->iCursor);
-				if (pItem->zDatabase) {
-					sqlite3XPrintf(&x, " %s.%s",
-						       pItem->zDatabase,
-						       pItem->zName);
-				} else if (pItem->zName) {
+				if (pItem->zName) {
 					sqlite3XPrintf(&x, " %s", pItem->zName);
 				}
 				if (pItem->pTab) {
