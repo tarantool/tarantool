@@ -1476,7 +1476,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 	} else if (op == TK_UMINUS) {
 		/* This branch happens for multiple negative signs.  Ex: -(-5) */
 		if (SQLITE_OK ==
-		    sqlite3ValueFromExpr(db, pExpr->pLeft, enc, affinity, &pVal)
+		    valueFromExpr(db, pExpr->pLeft, enc, affinity, &pVal, pCtx)
 		    && pVal != 0) {
 			sqlite3VdbeMemNumerify(pVal);
 			if (pVal->flags & MEM_Real) {

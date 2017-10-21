@@ -16,11 +16,6 @@ test:plan(34)
 -- This file implements regression tests for SQLite library.
 -- This file implements tests for the ANALYZE command.
 --
--- $Id: analyze.test,v 1.9 2008/08/11 18:44:58 drh Exp $
--- ["set","testdir",[["file","dirname",["argv0"]]]]
--- ["source",[["testdir"],"\/tester.tcl"]]
--- There is nothing to test if ANALYZE is disable for this build.
---
 
 
 -- Basic sanity checks.
@@ -45,17 +40,6 @@ test:do_execsql_test(
         -- </analyze-1.2>
     })
 
--- test:do_catchsql_test(
---     "analyze-1.3",
---     [[
---         ANALYZE no_such_db.no_such_table
---     ]], {
---         -- <analyze-1.3>
---         1, "unknown database no_such_db"
---         -- </analyze-1.3>
---     })
-
--- MUST_WORK_TEST
 test:do_catchsql_test(
     "analyze-1.5.1",
     [[
@@ -145,16 +129,6 @@ test:do_execsql_test(
     ]], {
         -- <analyze-1.11>
         -- </analyze-1.11>
-    })
-
-test:do_catchsql_test(
-    "analyze-1.12",
-    [[
-        ANALYZE t1;
-    ]], {
-        -- <analyze-1.12>
-        0
-        -- </analyze-1.12>
     })
 
 -- Create some indices that can be analyzed.  But do not yet add
@@ -298,8 +272,7 @@ test:do_execsql_test(
         DROP TABLE t2;
         SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
     ]], {
-        -- <analyze-3.8>
-        
+        -- <analyze-3.8>      
         -- </analyze-3.8>
     })
 
@@ -353,6 +326,48 @@ test:do_execsql_test(
 --         -- </analyze-3.11>
 --     })
 
+-- Try corrupting the sqlite_stat1 table and make sure that
+-- the database is still able to function.
+--
+test:do_execsql_test(
+    "analyze-4.0",
+    [[
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x,y,z);
+        CREATE INDEX t4i1 ON t4(x);
+        CREATE INDEX t4i2 ON t4(y);
+        INSERT INTO t4 SELECT id,a,b,c FROM t3;
+        ANALYZE;
+        SELECT idx, stat FROM _sql_stat1 ORDER BY idx;
+    ]], {
+        -- <analyze-4.0>
+        "t3", "5 1", "t3i1", "5 3", "t3i2", "5 3 1 1 1", "t3i3", "5 5 2 1 1", "t4", "5 1", "t4i1", "5 3", "t4i2", "5 2"
+        -- </analyze-4.0>
+    })
+
+test:do_execsql_test(
+    "analyze-4.1",
+    [[
+        DELETE FROM _sql_stat1;
+        INSERT INTO _sql_stat1 VALUES('t4', 't4i1', 'nonsense');
+        INSERT INTO _sql_stat1 VALUES('t4', 't4i2', '432653287412874653284129847632');
+        SELECT * FROM t4 WHERE x = 1234;
+    ]], {
+        -- <analyze-4.1>
+        -- </analyze-4.1>
+    })
+
+test:do_execsql_test(
+    "analyze-4.2",
+    [[
+        INSERT INTO _sql_stat1 VALUES('t4', 'xyzzy', '0 1 2 3');
+        SELECT * FROM t4 WHERE x = 1234;
+    ]], {
+        -- <analyze-4.2>
+        -- </analyze-4.2>
+    })
+
+
+
 -- Verify that DROP TABLE and DROP INDEX remove entries from the 
 -- sqlite_stat1, sqlite_stat3 and sqlite_stat4 tables.
 --
@@ -360,6 +375,7 @@ test:do_execsql_test(
     "analyze-5.0",
     [[
         DELETE FROM t3;
+        DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(ud INTEGER PRIMARY KEY AUTOINCREMENT, x,y,z);
         CREATE INDEX t4i1 ON t4(x);
         CREATE INDEX t4i2 ON t4(y);
@@ -398,7 +414,7 @@ test:do_execsql_test(
         -- <analyze-5.1>
         "t3", "t3i1", "t3i2", "t3i3", "t4", "t4i1", "t4i2"
         -- </analyze-5.1>
-})
+    })
 
 test:do_execsql_test(
     "analyze-5.1.1",
@@ -408,7 +424,7 @@ test:do_execsql_test(
         -- <analyze-5.1>
         "t3", "t4"
         -- </analyze-5.1>
-})
+    })
 
 test:do_execsql_test(
     "analyze-5.2",
@@ -440,7 +456,7 @@ test:do_execsql_test(
         -- <analyze-5.3>
         "t3", "t3i1", "t3i3", "t4", "t4i1", "t4i2"
         -- </analyze-5.3>
-})
+    })
 
 test:do_execsql_test(
     "analyze-5.3.1",
@@ -450,12 +466,12 @@ test:do_execsql_test(
         -- <analyze-5.3>
         "t3", "t4"
         -- </analyze-5.3>
-})
+    })
 
 test:do_execsql_test(
     "analyze-5.4",
     [[
-        DROP TABLE t3;
+        DROP TABLE IF EXISTS t3;
         ANALYZE;
         SELECT DISTINCT idx FROM _sql_stat1 ORDER BY 1;
     ]], {
@@ -482,7 +498,7 @@ test:do_execsql_test(
         -- <analyze-5.5>
         "t4", "t4i1", "t4i2"
         -- </analyze-5.5>
-})
+    })
 
 test:do_execsql_test(
     "analyze-5.5.1",
@@ -492,7 +508,7 @@ test:do_execsql_test(
         -- <analyze-5.5>
         "t4"
         -- </analyze-5.5>
-})
+    })
 -- # This test corrupts the database file so it must be the last test
 -- # in the series.
 -- #

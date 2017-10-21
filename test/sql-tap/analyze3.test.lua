@@ -2,6 +2,8 @@
 test = require("sqltester")
 test:plan(34)
 
+testprefix = "analyze3"
+
 --!./tcltestrunner.lua
 -- 2009 August 06
 --
@@ -18,14 +20,6 @@ test:plan(34)
 -- implements tests for range and LIKE constraints that use bound variables
 -- instead of literal constant arguments.
 --
--- ["set","testdir",[["file","dirname",["argv0"]]]]
--- ["source",[["testdir"],"\/tester.tcl"]]
-testprefix = "analyze3"
---if X(0, "X!capable", [["!stat4&&!stat3"]]) then
-    
---    return 
---end
-
 ------------------------------------------------------------------------
 -- Test Organization:
 --
@@ -53,23 +47,14 @@ testprefix = "analyze3"
 -- analyze3-7.*: Test that some memory leaks discovered by fuzz testing 
 --               have been fixed.
 --
---local function getvar(varname)
---    X(57, "X!cmd", [=[["uplevel","#0","set",["varname"]]]=])
---end
 
---db("function", "var", "getvar")
 local function eqp(sql)
     return test:execsql("EXPLAIN QUERY PLAN"..sql)
-    -- X(61, "X!cmd", [=[["uplevel","execsql",[["list",["EXPLAIN QUERY PLAN ",["sql"],""]]],["db"]]]=])
 end
 
 local function sf_execsql(sql, db)
-    -- db = db or "db"
-    -- sqlite_search_count = 0
-    -- r = X(67, "X!cmd", [=[["uplevel",[["list","execsql",["sql"],["db"]]]]]=])
     r = test:execsql(sql)
     return {box.sql.debug().sqlite_search_count, r}
-    -- X(68, "X!cmd", [=[["concat",["::sqlite_search_count"],[[["db"],"status","step"]],["r"]]]=])
 end
 
 ---------------------------------------------------------------------------
@@ -93,7 +78,6 @@ end
 --   affinities when estimating the number of rows scanned by the "use 
 --   index strategy".
 --
--- MUST_WORK_TEST
 test:do_test(
     "analyze3-1.1.1",
     function()
@@ -102,7 +86,6 @@ test:do_test(
             CREATE INDEX i1 ON t1(x);
             BEGIN;
         ]])
-        -- for _ in X(0, "X!for", [=[["set i 0","$i < 1000","incr i"]]=]) do
         for i=1,1000 do
             test:execsql(string.format(" INSERT INTO t1 VALUES(%s, %s+99, %s-1) ", i, i, i))
         end
@@ -153,15 +136,17 @@ test:do_eqp_test(
         -- </analyze3-1.1.2>
     })
 
--- test:do_eqp_test(
---     "analyze3-1.1.3",
---     [[
---         SELECT sum(y) FROM t1 WHERE x>0 AND x<1100 
---     ]], {
---         -- <analyze3-1.1.3>
---         0, 0, 0, "SCAN TABLE t1"
---         -- </analyze3-1.1.3>
---     })
+test:do_eqp_test(
+    "analyze3-1.1.3",
+    [[
+        SELECT sum(y) FROM t1 WHERE x>0 AND x<1100 
+    ]], {
+        -- Tarantool: index is always covering, thus there is no need to scan table.
+        -- <analyze3-1.1.3>
+        -- 0, 0, 0, "SCAN TABLE t1"
+        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (x>? AND x<?)"}
+        -- </analyze3-1.1.3>
+    })
 
 test:do_sf_execsql_test(
     "analyze3-1.1.4",
@@ -209,8 +194,6 @@ test:do_sf_execsql_test(
 test:do_test(
     "analyze3-1.1.8",
     function()
-        -- l = X(150, "X!cmd", [=[["string","range","0","0","end"]]=])
-        -- u = X(151, "X!cmd", [=[["string","range","1100","0","end"]]=])
         return test:sf_execsql([[ SELECT sum(y) FROM t1 WHERE x>'0' AND x<'1100' ]])
     end, {
         -- <analyze3-1.1.8>
@@ -221,8 +204,6 @@ test:do_test(
 test:do_test(
     "analyze3-1.1.9",
     function()
-        -- l = round_to_zero(0)
-        -- u = round_to_zero(1100)
         return test:sf_execsql(" SELECT sum(y) FROM t1 WHERE x>0.0 AND x<1100.0 ")
     end, {
         -- <analyze3-1.1.9>
@@ -230,7 +211,6 @@ test:do_test(
         -- </analyze3-1.1.9>
     })
 
--- MUST_WORK_TEST
 -- The following tests are similar to the block above. The difference is
 -- that the indexed column has TEXT affinity in this case. In the tests
 -- above the affinity is INTEGER.
@@ -281,15 +261,16 @@ test:do_eqp_test(
     })
 
 -- Tarantool: same as for 1.1.3
--- test:do_eqp_test(
---     "analyze3-1.2.3",
---     [[
---         SELECT sum(y) FROM t2 WHERE x>0 AND x<99
---     ]], {
---         -- <analyze3-1.2.3>
---         0, 0, 0, "SCAN TABLE t2"
---         -- </analyze3-1.2.3>
---     })
+test:do_eqp_test(
+    "analyze3-1.2.3",
+    [[
+        SELECT sum(y) FROM t2 WHERE x>0 AND x<99
+    ]], {
+        -- <analyze3-1.2.3>
+        -- 0, 0, 0, "SCAN TABLE t2"
+        {0, 0, 0, "SEARCH TABLE t2 USING COVERING INDEX i2 (x>? AND x<?)"}
+        -- </analyze3-1.2.3>
+    })
 
  test:do_sf_execsql_test(
     "analyze3-1.2.4",
@@ -304,8 +285,6 @@ test:do_eqp_test(
 test:do_test(
     "analyze3-1.2.5",
     function()
-        -- l = X(192, "X!cmd", [=[["string","range","12","0","end"]]=])
-        -- u = X(193, "X!cmd", [=[["string","range","20","0","end"]]=])
         return test:sf_execsql([[SELECT typeof('12'), typeof('20'), sum(y) FROM t2 WHERE x>'12' AND x<'20']])
     end, {
         -- <analyze3-1.2.5>
@@ -316,8 +295,6 @@ test:do_test(
 test:do_test(
     "analyze3-1.2.6",
     function()
-        -- l = round_to_zero(12)
-        -- u = round_to_zero(20)
         return test:sf_execsql("SELECT typeof(12), typeof(20), sum(y) FROM t2 WHERE x>12 AND x<20")
     end, {
         -- <analyze3-1.2.6>
@@ -338,8 +315,6 @@ test:do_sf_execsql_test(
 test:do_test(
     "analyze3-1.2.8",
     function()
-        -- l = X(205, "X!cmd", [=[["string","range","0","0","end"]]=])
-        -- u = X(206, "X!cmd", [=[["string","range","99","0","end"]]=])
         return test:sf_execsql([[SELECT typeof('0'), typeof('99'), sum(y) FROM t2 WHERE x>'0' AND x<'99']])
     end, {
         -- <analyze3-1.2.8>
@@ -350,8 +325,6 @@ test:do_test(
 test:do_test(
     "analyze3-1.2.9",
     function()
-        -- l = round_to_zero(0)
-        -- u = round_to_zero(99)
         return test:sf_execsql("SELECT typeof(0), typeof(99), sum(y) FROM t2 WHERE x>0 AND x<99")
     end, {
         -- <analyze3-1.2.9>
@@ -409,15 +382,17 @@ test:do_eqp_test(
     })
 
 -- Tarantool: same as 1.1.3
--- test:do_eqp_test(
---     "analyze3-1.3.3",
---     [[
---         SELECT sum(y) FROM t3 WHERE x>0 AND x<1100
---     ]], {
---         -- <analyze3-1.3.3>
---         0, 0, 0, "SCAN TABLE t3"
---         -- </analyze3-1.3.3>
---     })
+test:do_eqp_test(
+    "analyze3-1.3.3",
+    [[
+        SELECT sum(y) FROM t3 WHERE x>0 AND x<1100
+    ]], {
+        -- <analyze3-1.3.3>
+        -- 0, 0, 0, "SCAN TABLE t3"
+        {0, 0, 0, "SEARCH TABLE t3 USING COVERING INDEX i3 (x>? AND x<?)"}
+        -- </analyze3-1.3.3>
+    })
+
 
 test:do_sf_execsql_test(
     "analyze3-1.3.4",
@@ -432,8 +407,6 @@ test:do_sf_execsql_test(
 test:do_test(
     "analyze3-1.3.5",
     function()
-        -- l = X(244, "X!cmd", [=[["string","range","200","0","end"]]=])
-        -- u = X(245, "X!cmd", [=[["string","range","300","0","end"]]=])
         return test:sf_execsql([[ SELECT sum(y) FROM t3 WHERE x>'200' AND x<'300' ]])
     end, {
         -- <analyze3-1.3.5>
@@ -444,8 +417,6 @@ test:do_test(
 test:do_test(
     "analyze3-1.3.6",
     function()
-        -- l = round_to_zero(200)
-        -- u = round_to_zero(300)
         return test:sf_execsql(" SELECT sum(y) FROM t3 WHERE x>200 AND x<300 ")
     end, {
         -- <analyze3-1.3.6>
@@ -466,8 +437,6 @@ test:do_sf_execsql_test(
 test:do_test(
     "analyze3-1.3.8",
     function()
-        -- l = X(257, "X!cmd", [=[["string","range","0","0","end"]]=])
-        -- u = X(258, "X!cmd", [=[["string","range","1100","0","end"]]=])
         return test:sf_execsql([[ SELECT sum(y) FROM t3 WHERE x>'0' AND x<'1100' ]])
     end, {
         -- <analyze3-1.3.8>
@@ -478,8 +447,6 @@ test:do_test(
 test:do_test(
     "analyze3-1.3.9",
     function()
-        -- l = round_to_zero(0)
-        -- u = round_to_zero(1100)
         return test:sf_execsql(" SELECT sum(y) FROM t3 WHERE x>0 AND x<1100 ")
     end, {
         -- <analyze3-1.3.9>
@@ -629,7 +596,6 @@ test:do_test(
         test:execsql(" DROP TABLE IF EXISTS t1 ")
         test:execsql(" CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b, c) ")
         test:execsql("BEGIN")
-        --- for _ in X(0, "X!for", [=[["set i 0","$i < 1000","incr i"]]=]) do
         for i=1,1000 do
             test:execsql(string.format("INSERT INTO t1 VALUES(%s, %s, 'x', %s)", i, ((i-1) / 100), ((i-1) / 10)))
         end
