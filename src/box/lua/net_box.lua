@@ -597,8 +597,17 @@ local function connect(...)
     local user, password = opts.user, opts.password; opts.password = nil
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
     local function callback(what, ...)
-        if      what == 'state_changed' then
+        if what == 'state_changed' then
             local state, errno, err = ...
+            if (remote.state == 'active' or remote.state == 'fetch_schema') and
+               (state == 'error' or state == 'closed' or
+                state == 'error_reconnect') then
+               remote._on_disconnect:run(remote)
+            end
+            if remote.state ~= 'error' and remote.state ~= 'error_reconnect' and
+               state == 'active' then
+                remote._on_connect:run(remote)
+            end
             remote.state, remote.error = state, err
             if state == 'error_reconnect' then
                 log.warn('%s:%s: %s', host or "", port or "", err)
@@ -639,6 +648,8 @@ local function connect(...)
         end
     end
     remote._on_schema_reload = trigger.new("on_schema_reload")
+    remote._on_disconnect = trigger.new("on_disconnect")
+    remote._on_connect = trigger.new("on_connect")
     remote._transport = create_transport(host, port, user, password, callback)
     remote._transport.connect()
     if opts.wait_connected ~= false then
@@ -676,6 +687,16 @@ end
 function remote_methods:on_schema_reload(...)
     check_remote_arg(self, 'on_schema_reload')
     return self._on_schema_reload(...)
+end
+
+function remote_methods:on_disconnect(...)
+    check_remote_arg(self, 'on_disconnect')
+    return self._on_disconnect(...)
+end
+
+function remote_methods:on_connect(...)
+    check_remote_arg(self, 'on_connect')
+    return self._on_connect(...)
 end
 
 function remote_methods:is_connected()
@@ -901,6 +922,8 @@ end
 -- console methods
 console_methods.close = remote_methods.close
 console_methods.on_schema_reload = remote_methods.on_schema_reload
+console_methods.on_disconnect = remote_methods.on_disconnect
+console_methods.on_connect = remote_methods.on_connect
 console_methods.is_connected = remote_methods.is_connected
 console_methods.wait_state = remote_methods.wait_state
 function console_methods:eval(line, timeout)

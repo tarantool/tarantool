@@ -753,9 +753,33 @@ c:close()
 box.schema.user.grant('guest','read,write,execute','universe')
 c = net.connect(box.cfg.listen)
 c:call("box.session.type")
+c:close()
+
+--
+-- On_connect/disconnect triggers.
+--
+test_run:cmd('create server connecter with script = "box/proxy.lua"')
+test_run:cmd('start server connecter')
+test_run:cmd("set variable connect_to to 'connecter.listen'")
+conn = net.connect(connect_to, { reconnect_after = 0.1 })
+conn.state
+connected_cnt = 0
+disconnected_cnt = 0
+function on_connect() connected_cnt = connected_cnt + 1 end
+function on_disconnect() disconnected_cnt = disconnected_cnt + 1 end
+conn:on_connect(on_connect)
+conn:on_disconnect(on_disconnect)
+test_run:cmd('stop server connecter')
+test_run:cmd('start server connecter')
+while conn.state ~= 'active' do fiber.sleep(0.1) end
+connected_cnt
+disconnected_cnt
+conn:close()
+disconnected_cnt
+test_run:cmd('stop server connecter')
+test_run:cmd('cleanup server connecter')
 
 -- cleanup
-c:close()
 box.schema.user.revoke('guest','read,write,execute','universe')
 
 space:drop()
