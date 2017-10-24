@@ -779,6 +779,21 @@ disconnected_cnt
 test_run:cmd('stop server connecter')
 test_run:cmd('cleanup server connecter')
 
+--
+-- gh-2401 update pseudo objects not replace them
+--
+space:drop()
+space = box.schema.space.create('test')
+c = net.connect(box.cfg.listen)
+cspace = c.space.test
+space.index.test_index == nil
+cspace.index.test_index == nil
+_ = space:create_index("test_index", {parts={1, 'string'}})
+c:reload_schema()
+space.index.test_index ~= nil
+cspace.index.test_index ~= nil
+c.space.test.index.test_index ~= nil
+
 -- cleanup
 box.schema.user.revoke('guest','read,write,execute','universe')
 

@@ -839,18 +839,21 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
         local engine = space[4]
         local field_count = space[5]
         local format = space[7] or {}
-
-        local s = {
-            id              = id,
-            name            = name,
-            engine          = engine,
-            field_count     = field_count,
-            enabled         = true,
-            index           = {},
-            temporary       = false,
-            _format         = format,
-            connection      = self
-        }
+        local s = {}
+        if self.space ~= nil and self.space[id] ~= nil then
+            s = self.space[id]
+        else
+            setmetatable(s, space_mt)
+        end
+        s.id = id
+        s.name = name
+        s.engine = engine
+        s.field_count = field_count
+        s.enabled = true
+        s.index = {}
+        s.temporary = false
+        s._format = format
+        s.connection = self
         if #space > 5 then
             local opts = space[6]
             if type(opts) == 'table' then
@@ -861,8 +864,6 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
                 s.temporary = string.match(opts, 'temporary') ~= nil
             end
         end
-
-        setmetatable(s, space_mt)
 
         sl[id] = s
         sl[name] = s

@@ -641,3 +641,8 @@ s:format()
 _ = s:create_index('primary')
 s:insert({1, 1, 'a', 'b', 'c', 'd'})
 s:drop()
+
+s = box.schema.create_space('test')
+idx = s:create_index('idx')
+box.space.test == s
+s:drop()

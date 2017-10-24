@@ -13,15 +13,14 @@ space = conn.space.test
 index = box.space.test:create_index('primary', { type = 'hash' })
 _ = box.space.test1:create_index('primary', { type = 'hash' })
 _ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'string'}})
-conn:ping()
 
--- xxx: bug  currently selects no rows
+--  send request to remote server to force schema reloading
+conn:reload_schema()
+
 space:select{}
 space:insert{1, 'I am a tuple'}
 space:select{1}
 
--- currently there is no way to find out how many records
--- a space contains 
 space:select{0}
 space:select{2}
 
