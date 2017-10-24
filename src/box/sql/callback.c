@@ -35,6 +35,7 @@
  * of user defined functions and collation sequences.
  */
 
+#include <box/coll_cache.h>
 #include "sqliteInt.h"
 #include "box/session.h"
 
@@ -155,53 +156,41 @@ sqlite3CheckCollSeq(Parse * pParse, CollSeq * pColl)
 }
 
 /*
- * Locate and return an entry from the db.aCollSeq hash table. If the entry
- * specified by zName and nName is not found and parameter 'create' is
- * true, then create a new entry. Otherwise return NULL.
- *
- * Each pointer stored in the sqlite3.aCollSeq hash table contains an
- * array of three CollSeq structures. The first is the collation sequence
- * preferred for UTF-8, the second UTF-16le, and the third UTF-16be.
- *
- * Stored immediately after the three collation sequences is a copy of
- * the collation sequence name. A pointer to this string is stored in
- * each collation sequence structure.
+ * This is the default collating function named "BINARY" which is always
+ * available.
+ * It is hardcoded to support Tarantool's collation interface.
  */
-static CollSeq *
-findCollSeqEntry(sqlite3 * db,	/* Database connection */
-		 const char *zName,	/* Name of the collating sequence */
-		 int create	/* Create a new entry if true */
-    )
+static int
+binCollFunc(const char *pKey1, size_t nKey1, const char *pKey2, size_t nKey2, const struct coll * collation)
 {
-	CollSeq *pColl;
-	pColl = sqlite3HashFind(&db->aCollSeq, zName);
-
-	if (0 == pColl && create) {
-		int nName = sqlite3Strlen30(zName);
-		pColl = sqlite3DbMallocZero(db, 1 * sizeof(*pColl) + nName + 1);
-		if (pColl) {
-			CollSeq *pDel = 0;
-			pColl[0].zName = (char *)&pColl[1];
-			memcpy(pColl[0].zName, zName, nName);
-			pColl[0].zName[nName] = 0;
-			pDel =
-			    sqlite3HashInsert(&db->aCollSeq, pColl[0].zName,
-					      pColl);
-
-			/* If a malloc() failure occurred in sqlite3HashInsert(), it will
-			 * return the pColl pointer to be deleted (because it wasn't added
-			 * to the hash table).
-			 */
-			assert(pDel == 0 || pDel == pColl);
-			if (pDel != 0) {
-				sqlite3OomFault(db);
-				sqlite3DbFree(db, pDel);
-				pColl = 0;
-			}
-		}
+	int rc;
+	size_t n;
+	(void) collation;
+	n = nKey1 < nKey2 ? nKey1 : nKey2;
+	/* EVIDENCE-OF: R-65033-28449 The built-in BINARY collation compares
+	 * strings byte by byte using the memcmp() function from the standard C
+	 * library.
+	 */
+	rc = memcmp(pKey1, pKey2, n);
+	if (rc == 0) {
+		rc = (int)nKey1 - (int)nKey2;
 	}
-	return pColl;
+	return rc;
 }
+
+/*
+ * This hardcoded structure created just to be called the same way
+ * as collations in Tarantool, to support binary collation easily.
+ */
+
+struct coll_binary_struct{
+    struct coll collation;
+    char name[sizeof("BINARY")];
+};
+static struct coll_binary_struct binary_coll_with_name =
+	{{0, 0, COLL_TYPE_ICU, {0}, binCollFunc, 0, sizeof("BINARY"), {}},
+		"BINARY"};
+static struct coll * binary_coll = (struct coll*)&binary_coll_with_name;
 
 /*
  * Parameter zName points to a UTF-8 encoded string nName bytes long.
@@ -221,12 +210,17 @@ findCollSeqEntry(sqlite3 * db,	/* Database connection */
 CollSeq *
 sqlite3FindCollSeq(sqlite3 * db, const char *zName, int create)
 {
+	(void)db;
+	(void)create;
 	CollSeq *pColl;
-	if (zName) {
-		pColl = findCollSeqEntry(db, zName, create);
-	} else {
-		pColl = db->pDfltColl;
+	struct coll * collation;
+	if (zName == NULL || sqlite3StrICmp(zName, "binary")==0){
+		collation = binary_coll;
+	} else{
+		collation = coll_by_name("unicode", strlen("unicode"));
 	}
+	pColl = (CollSeq*) malloc(sizeof(CollSeq));
+	pColl->xCmp = collation;
 	return pColl;
 }
 

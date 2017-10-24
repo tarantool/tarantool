@@ -37,6 +37,7 @@
  * so is applicable.  Because this module is responsible for selecting
  * indices, you might also think of this module as the "query optimizer".
  */
+#include <box/coll.h>
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "whereInt.h"
@@ -314,7 +315,7 @@ whereScanNext(WhereScan * pScan)
 							if (pColl == 0)
 								pColl =
 								    pParse->db->pDfltColl;
-							if (strcmp(pColl->zName,
+							if (strcmp(pColl->xCmp->name,
 									   pScan->zCollName)) {
 								continue;
 							}
@@ -2263,7 +2264,7 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		pColl = sqlite3BinaryCompareCollSeq(pParse, pLhs, pRhs);
 		if (pColl == 0)
 			break;
-		if (strcmp(pColl->zName, pIdx->azColl[i + nEq]))
+		if (strcmp(pColl->xCmp->name, pIdx->azColl[i + nEq]))
 			break;
 	}
 	return i;
@@ -3447,7 +3448,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 								       pOrderBy->a[i].pExpr);
 						if (!pColl)
 							pColl = db->pDfltColl;
-						if (strcmp(pColl->zName,
+						if (strcmp(pColl->xCmp->name,
 								   pIndex->azColl[j]) != 0)
 							continue;
 					}

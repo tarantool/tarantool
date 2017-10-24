@@ -33,6 +33,7 @@
  * This file contains code used for creating, destroying, and populating
  * a VDBE (or an "sqlite3_stmt" as it is known to the outside world.)
  */
+#include <box/coll_cache.h>
 #include "box/txn.h"
 #include "fiber.h"
 #include "box/session.h"
@@ -3930,12 +3931,10 @@ vdbeCompareMemString(const Mem * pMem1, const Mem * pMem2,
 		     const CollSeq * pColl,
 		     u8 * prcErr)	/* If an OOM occurs, set to SQLITE_NOMEM */
 {
-	/* The strings are already in the correct encoding.  Call the
-	 * comparison function directly
-	 */
 	(void) prcErr;
-	return pColl->xCmp(pColl->pUser, pMem1->n, pMem1->z, pMem2->n,
-			   pMem2->z);
+	struct coll * collation = pColl->xCmp;
+	return collation->cmp(pMem1->z, (size_t)pMem1->n,
+			      pMem2->z, (size_t)pMem2->n, collation);
 }
 
 /*
@@ -4108,8 +4107,6 @@ sqlite3MemCompare(const Mem * pMem1, const Mem * pMem2, const CollSeq * pColl)
 		 * the user deletes the collation sequence after the vdbe program is
 		 * compiled (this was not always the case).
 		 */
-		assert(!pColl || pColl->xCmp);
-
 		if (pColl) {
 			return vdbeCompareMemString(pMem1, pMem2, pColl, 0);
 		}

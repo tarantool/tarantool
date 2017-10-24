@@ -32,6 +32,10 @@
 /*
  * This file contains code used to implement the PRAGMA command.
  */
+#include <box/coll.h>
+#include <box/index.h>
+#include <box/box.h>
+#include <box/tuple.h>
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "box/session.h"
@@ -622,18 +626,29 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		}
 
 	case PragTyp_COLLATION_LIST:{
-			int i = 0;
-			HashElem *p;
-			pParse->nMem = 2;
-			for (p = sqliteHashFirst(&db->aCollSeq); p;
-			     p = sqliteHashNext(p)) {
-				CollSeq *pColl = (CollSeq *) sqliteHashData(p);
-				sqlite3VdbeMultiLoad(v, 1, "is", i++,
-						     pColl->zName);
-				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 2);
-			}
-			break;
+		int i = 0;
+		uint32_t space_id;
+		space_id = box_space_id_by_name("_collation",
+						(uint32_t) strlen("_collation"));
+		char key_buf[16]; /* 16 is enough to encode 0 len array */
+		char *key_end = key_buf;
+		key_end = mp_encode_array(key_end, 0);
+		box_tuple_t *tuple;
+		box_iterator_t* iter;
+		iter = box_index_iterator(space_id, 0,ITER_ALL, key_buf, key_end);
+		rc = box_iterator_next(iter, &tuple);
+		assert(rc==0);
+		for (i = 0; tuple!=NULL; i++, box_iterator_next(iter, &tuple)){
+			/* 1 is name field number */
+			const char *str = tuple_field_cstr(tuple, 1);
+			assert(str != NULL);
+			/* this procedure should reallocate and copy str */
+			sqlite3VdbeMultiLoad(v, 1, "is", i, str);
+			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 2);
 		}
+		box_iterator_free(iter);
+		break;
+	}
 #endif				/* SQLITE_OMIT_SCHEMA_PRAGMAS */
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY

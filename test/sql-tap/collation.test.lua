@@ -1,8 +1,29 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(40)
+test:plan(42)
 
 local prefix = "collation-"
+
+test:do_test(
+    prefix.."0.1",
+    function ()
+        box.internal.collation.create('unicode_numeric', 'ICU', 'ru-RU', {numeric_collation="ON"})
+        box.internal.collation.create('unicode_numeric_s2', 'ICU', 'ru-RU', {numeric_collation="ON", strength="secondary"})
+        box.internal.collation.create('unicode_tur_s2', 'ICU', 'tu', {strength="secondary"})
+    end
+)
+
+test:do_execsql_test(
+    prefix.."0.2",
+    "pragma collation_list",
+    {
+        0,"unicode",
+        1,"unicode_ci",
+        2,"unicode_numeric",
+        3,"unicode_numeric_s2",
+        4,"unicode_tur_s2"
+    }
+)
 
 -- we suppose that tables are immutable
 local function merge_tables(...)
