@@ -424,7 +424,7 @@ parseDateOrTime(sqlite3_context * context, const char *zDate, DateTime * p)
 		return 0;
 	} else if (sqlite3StrICmp(zDate, "now") == 0) {
 		return setDateTimeToCurrent(context, p);
-	} else if (sqlite3AtoF(zDate, &r, sqlite3Strlen30(zDate), SQLITE_UTF8)) {
+	} else if (sqlite3AtoF(zDate, &r, sqlite3Strlen30(zDate))) {
 		setRawDateNumber(p, r);
 		return 0;
 	}
@@ -761,8 +761,7 @@ parseModifier(sqlite3_context * pCtx,	/* Function context */
 			 * date is already on the appropriate weekday, this is a no-op.
 			 */
 			if (sqlite3_strnicmp(z, "weekday ", 8) == 0
-			    && sqlite3AtoF(&z[8], &r, sqlite3Strlen30(&z[8]),
-					   SQLITE_UTF8)
+			    && sqlite3AtoF(&z[8], &r, sqlite3Strlen30(&z[8]))
 			    && (n = (int)r) == r && n >= 0 && r < 7) {
 				sqlite3_int64 Z;
 				computeYMD_HMS(p);
@@ -825,7 +824,7 @@ parseModifier(sqlite3_context * pCtx,	/* Function context */
 			     z[n] && z[n] != ':' && !sqlite3Isspace(z[n]);
 			     n++) {
 			}
-			if (!sqlite3AtoF(z, &r, n, SQLITE_UTF8)) {
+			if (!sqlite3AtoF(z, &r, n)) {
 				rc = 1;
 				break;
 			}

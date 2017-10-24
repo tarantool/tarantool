@@ -569,7 +569,7 @@ exprProbability(Expr * p)
 	double r = -1.0;
 	if (p->op != TK_FLOAT)
 		return -1;
-	sqlite3AtoF(p->u.zToken, &r, sqlite3Strlen30(p->u.zToken), SQLITE_UTF8);
+	sqlite3AtoF(p->u.zToken, &r, sqlite3Strlen30(p->u.zToken));
 	assert(r >= 0.0);
 	if (r > 1.0)
 		return -1;
@@ -674,16 +674,14 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			int nId;	/* Number of characters in function name */
 			const char *zId;	/* The function name. */
 			FuncDef *pDef;	/* Information about the function */
-			u8 enc = ENC(pParse->db);	/* The database encoding */
 
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			zId = pExpr->u.zToken;
 			nId = sqlite3Strlen30(zId);
-			pDef = sqlite3FindFunction(pParse->db, zId, n, enc, 0);
+			pDef = sqlite3FindFunction(pParse->db, zId, n, 0);
 			if (pDef == 0) {
 				pDef =
-				    sqlite3FindFunction(pParse->db, zId, -2,
-							enc, 0);
+				    sqlite3FindFunction(pParse->db, zId, -2,0);
 				if (pDef == 0) {
 					no_such_func = 1;
 				} else {

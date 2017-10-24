@@ -223,8 +223,7 @@ sqlite3ErrorWithMsg(sqlite3 * db, int err_code, const char *zFormat, ...)
 		va_start(ap, zFormat);
 		z = sqlite3VMPrintf(db, zFormat, ap);
 		va_end(ap);
-		sqlite3ValueSetStr(db->pErr, -1, z, SQLITE_UTF8,
-				   SQLITE_DYNAMIC);
+		sqlite3ValueSetStr(db->pErr, -1, z, SQLITE_DYNAMIC);
 	}
 }
 
@@ -418,10 +417,10 @@ sqlite3_strnicmp(const char *zLeft, const char *zRight, int N)
  * into *pResult.
  */
 int
-sqlite3AtoF(const char *z, double *pResult, int length, u8 enc)
+sqlite3AtoF(const char *z, double *pResult, int length)
 {
 #ifndef SQLITE_OMIT_FLOATING_POINT
-	int incr;
+	int incr = 1; // UTF-8
 	const char *zEnd = z + length;
 	/* sign * significand * (10 ^ (esign * exponent)) */
 	int sign = 1;		/* sign of significand */
@@ -434,23 +433,8 @@ sqlite3AtoF(const char *z, double *pResult, int length, u8 enc)
 	int nDigits = 0;
 	int nonNum = 0;		/* True if input contains UTF16 with high byte non-zero */
 
-	assert(enc == SQLITE_UTF8 || enc == SQLITE_UTF16LE
-	       || enc == SQLITE_UTF16BE);
 	*pResult = 0.0;		/* Default return value, in case of an error
 	*/
-
-	if (enc == SQLITE_UTF8) {
-		incr = 1;
-	} else {
-		int i;
-		incr = 2;
-		assert(SQLITE_UTF16LE == 2 && SQLITE_UTF16BE == 3);
-		for (i = 3 - enc; i < length && z[i] == 0; i += 2) {
-		}
-		nonNum = i < length;
-		zEnd = &z[i ^ 1];
-		z += (enc & 1);
-	}
 
 	/* skip leading spaces */
 	while (z < zEnd && sqlite3Isspace(*z))
@@ -617,7 +601,7 @@ sqlite3AtoF(const char *z, double *pResult, int length, u8 enc)
 	/* return true if number and no extra non-whitespace chracters after */
 	return z == zEnd && nDigits > 0 && eValid && nonNum == 0;
 #else
-	return !sqlite3Atoi64(z, pResult, length, enc);
+	return !sqlite3Atoi64(z, pResult, length);
 #endif				/* SQLITE_OMIT_FLOATING_POINT */
 }
 
@@ -674,9 +658,9 @@ compare2pow63(const char *zNum, int incr)
  * given by enc.
  */
 int
-sqlite3Atoi64(const char *zNum, i64 * pNum, int length, u8 enc)
+sqlite3Atoi64(const char *zNum, i64 * pNum, int length)
 {
-	int incr;
+	int incr = 1; // UTF-8
 	u64 u = 0;
 	int neg = 0;		/* assume positive */
 	int i;
@@ -684,19 +668,7 @@ sqlite3Atoi64(const char *zNum, i64 * pNum, int length, u8 enc)
 	int nonNum = 0;		/* True if input contains UTF16 with high byte non-zero */
 	const char *zStart;
 	const char *zEnd = zNum + length;
-	assert(enc == SQLITE_UTF8 || enc == SQLITE_UTF16LE
-	       || enc == SQLITE_UTF16BE);
-	if (enc == SQLITE_UTF8) {
-		incr = 1;
-	} else {
-		incr = 2;
-		assert(SQLITE_UTF16LE == 2 && SQLITE_UTF16BE == 3);
-		for (i = 3 - enc; i < length && zNum[i] == 0; i += 2) {
-		}
-		nonNum = i < length;
-		zEnd = &zNum[i ^ 1];
-		zNum += (enc & 1);
-	}
+	incr = 1;
 	while (zNum < zEnd && sqlite3Isspace(*zNum))
 		zNum += incr;
 	if (zNum < zEnd) {
@@ -787,7 +759,7 @@ sqlite3DecOrHexToI64(const char *z, i64 * pOut)
 	} else
 #endif				/* SQLITE_OMIT_HEX_INTEGER */
 	{
-		return sqlite3Atoi64(z, pOut, sqlite3Strlen30(z), SQLITE_UTF8);
+		return sqlite3Atoi64(z, pOut, sqlite3Strlen30(z));
 	}
 }
 

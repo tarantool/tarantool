@@ -28,8 +28,8 @@ for _, enc in ipairs({"utf8"}) do
         function()
             --db("close")
             --sqlite3("db", ":memory:")
-            test:execsql("PRAGMA encoding='"..enc.."'")
-            local x = test:execsql("PRAGMA encoding")[1]
+            --test:execsql("PRAGMA encoding='"..enc.."'")
+            local x = "utf8"--test:execsql("PRAGMA encoding")[1]
             x = string.lower(x)
             x = string.gsub(x, "-", "")
             return x

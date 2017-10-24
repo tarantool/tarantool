@@ -34,7 +34,7 @@ test:plan(7)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
 test:execsql([[
-    PRAGMA encoding='UTF8';
+    --PRAGMA encoding='UTF8';
     CREATE TABLE t1(a PRIMARY KEY,b TEXT COLLATE nocase);
     INSERT INTO t1(a,b)
        VALUES(1,'abc'),

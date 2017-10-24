@@ -214,7 +214,6 @@ struct Mem {
 		VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 	} u;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
-	u8 enc;			/* SQLITE_UTF8, SQLITE_UTF16BE, SQLITE_UTF16LE */
 	u8 eSubtype;		/* Subtype for this value */
 	int n;			/* Number of characters in string value, excluding '\0' */
 	char *z;		/* String or BLOB value */
@@ -492,7 +491,6 @@ int sqlite3VdbeIdxRowid(sqlite3 *, BtCursor *, i64 *);
 int sqlite3VdbeExec(Vdbe *);
 int sqlite3VdbeList(Vdbe *);
 int sqlite3VdbeHalt(Vdbe *);
-int sqlite3VdbeChangeEncoding(Mem *, int);
 int sqlite3VdbeMemTooBig(Mem *);
 int sqlite3VdbeMemCopy(Mem *, const Mem *);
 void sqlite3VdbeMemShallowCopy(Mem *, const Mem *, int);
@@ -510,14 +508,14 @@ void sqlite3VdbeMemSetNull(Mem *);
 void sqlite3VdbeMemSetZeroBlob(Mem *, int);
 void sqlite3VdbeMemSetRowSet(Mem *);
 int sqlite3VdbeMemMakeWriteable(Mem *);
-int sqlite3VdbeMemStringify(Mem *, u8, u8);
+int sqlite3VdbeMemStringify(Mem *, u8);
 i64 sqlite3VdbeIntValue(Mem *);
 int sqlite3VdbeMemIntegerify(Mem *);
 double sqlite3VdbeRealValue(Mem *);
 void sqlite3VdbeIntegerAffinity(Mem *);
 int sqlite3VdbeMemRealify(Mem *);
 int sqlite3VdbeMemNumerify(Mem *);
-void sqlite3VdbeMemCast(Mem *, u8, u8);
+void sqlite3VdbeMemCast(Mem *, u8);
 int sqlite3VdbeMemFromBtree(BtCursor *, u32, u32, Mem *);
 void sqlite3VdbeMemRelease(Mem * p);
 int sqlite3VdbeMemFinalize(Mem *, FuncDef *);

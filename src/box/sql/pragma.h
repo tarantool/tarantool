@@ -182,13 +182,6 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_NullCallback},
 #endif
-#if !defined(SQLITE_OMIT_UTF16)
-	{ /* zName:     */ "encoding",
-	 /* ePragTyp:  */ PragTyp_ENCODING,
-	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
-	 /* ColNames:  */ 0, 0,
-	 /* iArg:      */ 0},
-#endif
 #if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
 	{ /* zName:     */ "foreign_key_check",
 	 /* ePragTyp:  */ PragTyp_FOREIGN_KEY_CHECK,

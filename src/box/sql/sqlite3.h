@@ -3801,8 +3801,7 @@ sqlite3_bind_text(sqlite3_stmt *, int, const char *, int,
 
 SQLITE_API int
 sqlite3_bind_text64(sqlite3_stmt *, int, const char *,
-		    sqlite3_uint64, void (*)(void *),
-		    unsigned char encoding);
+		    sqlite3_uint64, void (*)(void *));
 SQLITE_API int
 sqlite3_bind_value(sqlite3_stmt *, int,
 		   const sqlite3_value *);
@@ -4521,7 +4520,7 @@ SQLITE_API int
 sqlite3_create_function(sqlite3 * db,
 			const char *zFunctionName,
 			int nArg,
-			int eTextRep,
+			int flags,
 			void *pApp,
 			void (*xFunc) (sqlite3_context *,
 				       int,
@@ -4532,26 +4531,12 @@ sqlite3_create_function(sqlite3 * db,
 			void (*xFinal) (sqlite3_context *)
 	);
 
-SQLITE_API int
-sqlite3_create_function16(sqlite3 * db,
-			  const void *zFunctionName,
-			  int nArg,
-			  int eTextRep,
-			  void *pApp,
-			  void (*xFunc) (sqlite3_context *,
-					 int,
-					 sqlite3_value **),
-			  void (*xStep) (sqlite3_context *,
-					 int,
-					 sqlite3_value **),
-			  void (*xFinal) (sqlite3_context *)
-	);
 
 SQLITE_API int
 sqlite3_create_function_v2(sqlite3 * db,
 			   const char *zFunctionName,
 			   int nArg,
-			   int eTextRep,
+			   int flags,
 			   void *pApp,
 			   void (*xFunc) (sqlite3_context *,
 					  int,
@@ -4563,19 +4548,6 @@ sqlite3_create_function_v2(sqlite3 * db,
 			   (sqlite3_context *),
 			   void (*xDestroy) (void *)
 	);
-
-/*
- * CAPI3REF: Text Encodings
- *
- * These constant define integer codes that represent the various
- * text encodings supported by SQLite.
-*/
-#define SQLITE_UTF8           1	/* IMP: R-37514-35566 */
-#define SQLITE_UTF16LE        2	/* IMP: R-03371-37637 */
-#define SQLITE_UTF16BE        3	/* IMP: R-51971-34154 */
-#define SQLITE_UTF16          4	/* Use native byte order */
-#define SQLITE_ANY            5	/* Deprecated */
-#define SQLITE_UTF16_ALIGNED  8	/* sqlite3_create_collation only */
 
 /*
  * CAPI3REF: Function Flags
@@ -4660,8 +4632,7 @@ sqlite3_memory_alarm(void (*)(void *, sqlite3_int64, int), void *,
  * Please pay particular attention to the fact that the pointer returned
  * from [sqlite3_value_blob()], [sqlite3_value_text()], or
  * [sqlite3_value_text16()] can be invalidated by a subsequent call to
- * [sqlite3_value_bytes()], [sqlite3_value_bytes16()], [sqlite3_value_text()],
- * or [sqlite3_value_text16()].
+ * [sqlite3_value_bytes()], [sqlite3_value_text()].
  *
  * These routines must be called from the same thread as
  * the SQL function that supplied the [sqlite3_value*] parameters.
@@ -4671,9 +4642,6 @@ sqlite3_value_blob(sqlite3_value *);
 
 SQLITE_API int
 sqlite3_value_bytes(sqlite3_value *);
-
-SQLITE_API int
-sqlite3_value_bytes16(sqlite3_value *);
 
 SQLITE_API double
 sqlite3_value_double(sqlite3_value *);
@@ -5034,8 +5002,7 @@ sqlite3_result_text(sqlite3_context *, const char *,
 
 SQLITE_API void
 sqlite3_result_text64(sqlite3_context *, const char *,
-		      sqlite3_uint64, void (*)(void *),
-		      unsigned char encoding);
+		      sqlite3_uint64, void (*)(void *));
 
 SQLITE_API void
 sqlite3_result_value(sqlite3_context *,
@@ -5146,7 +5113,6 @@ sqlite3_result_subtype(sqlite3_context *, unsigned int);
 SQLITE_API int
 sqlite3_create_collation(sqlite3 *,
 			 const char *zName,
-			 int eTextRep,
 			 void *pArg,
 			 int (*xCompare) (void *, int,
 					  const void *,
@@ -5157,7 +5123,6 @@ sqlite3_create_collation(sqlite3 *,
 SQLITE_API int
 sqlite3_create_collation_v2(sqlite3 *,
 			    const char *zName,
-			    int eTextRep,
 			    void *pArg,
 			    int (*xCompare) (void *, int,
 					     const void *,
@@ -5197,7 +5162,6 @@ SQLITE_API int
 sqlite3_collation_needed(sqlite3 *,
 			 void *,
 			 void (*)(void *, sqlite3 *,
-				  int eTextRep,
 				  const char *)
 	);
 

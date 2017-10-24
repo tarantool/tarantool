@@ -1325,16 +1325,13 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 CollSeq *
 sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName)
 {
-	u8 enc;
 	u8 initbusy;
 	CollSeq *pColl;
-
-	enc = ENC(db);
 	initbusy = db->init.busy;
 
-	pColl = sqlite3FindCollSeq(db, enc, zName, initbusy);
+	pColl = sqlite3FindCollSeq(db, zName, initbusy);
 	if (!initbusy && (!pColl || !pColl->xCmp)) {
-		pColl = sqlite3GetCollSeq(pParse, db, enc, pColl, zName);
+		pColl = sqlite3GetCollSeq(pParse, db, pColl, zName);
 	}
 
 	return pColl;
@@ -4460,7 +4457,7 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 		zColl = sqlite3NameFromToken(pParse->db, pName1);
 		if (!zColl)
 			return;
-		pColl = sqlite3FindCollSeq(db, ENC(db), zColl, 0);
+		pColl = sqlite3FindCollSeq(db, zColl, 0);
 		if (pColl) {
 			reindexDatabases(pParse, zColl);
 			sqlite3DbFree(db, zColl);

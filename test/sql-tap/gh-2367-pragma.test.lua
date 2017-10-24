@@ -1,23 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 
-test:plan(3)
-
-test:do_execsql_test(
-	"pragma-1.1",
-	[[
-		PRAGMA encoding = 'utf8';
-	]], {
-
-	})
-
-test:do_catchsql_test(
-	"pragma-1.2",
-	[[
-		PRAGMA encoding = 'utf16le';
-	]], {
-		1, "unsupported encoding: utf16le"
-	})
+test:plan(1)
 
 test:do_catchsql_test(
 	"pragma-1.3",

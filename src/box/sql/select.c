@@ -1180,7 +1180,6 @@ sqlite3KeyInfoAlloc(sqlite3 * db, int N, int X)
 		p->aSortOrder = (u8 *) & p->aColl[N + X];
 		p->nField = (u16) N;
 		p->nXField = (u16) X;
-		p->enc = ENC(db);
 		p->db = db;
 		p->nRef = 1;
 		memset(&p[1], 0, nExtra);

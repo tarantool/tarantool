@@ -671,14 +671,12 @@ typedef u64 uptr;
 #define SQLITE_BYTEORDER    1234
 #define SQLITE_BIGENDIAN    0
 #define SQLITE_LITTLEENDIAN 1
-#define SQLITE_UTF16NATIVE  SQLITE_UTF16LE
 #endif
 #if (defined(sparc)    || defined(__ppc__))  \
     && !defined(SQLITE_RUNTIME_BYTEORDER)
 #define SQLITE_BYTEORDER    4321
 #define SQLITE_BIGENDIAN    1
 #define SQLITE_LITTLEENDIAN 0
-#define SQLITE_UTF16NATIVE  SQLITE_UTF16BE
 #endif
 #if !defined(SQLITE_BYTEORDER)
 #ifdef SQLITE_AMALGAMATION
@@ -1177,8 +1175,7 @@ struct sqlite3 {
 					   sqlite3_int64);
 	PreUpdate *pPreUpdate;	/* Context for active pre-update callback */
 #endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
-	void (*xCollNeeded) (void *, sqlite3 *, int eTextRep, const char *);
-	void (*xCollNeeded16) (void *, sqlite3 *, int eTextRep, const void *);
+	void (*xCollNeeded) (void *, sqlite3 *, const char *);
 	void *pCollNeededArg;
 	sqlite3_value *pErr;	/* Most recent error message */
 	union {
@@ -1221,12 +1218,6 @@ struct sqlite3 {
 	sqlite3_userauth auth;	/* User authentication information */
 #endif
 };
-
-/*
- * A macro to discover the encoding of a database.
- */
-#define SCHEMA_ENC(db) ((db)->mdb.pSchema->enc)
-#define ENC(db)        ((db)->enc)
 
 /*
  * Possible values for the sqlite3.flags.
@@ -1357,9 +1348,7 @@ struct FuncDestructor {
  *     SQLITE_FUNC_LENGTH    ==  OPFLAG_LENGTHARG
  *     SQLITE_FUNC_TYPEOF    ==  OPFLAG_TYPEOFARG
  *     SQLITE_FUNC_CONSTANT  ==  SQLITE_DETERMINISTIC from the API
- *     SQLITE_FUNC_ENCMASK   depends on SQLITE_UTF* macros in the API
  */
-#define SQLITE_FUNC_ENCMASK  0x0003	/* SQLITE_UTF8, SQLITE_UTF16BE or UTF16LE */
 #define SQLITE_FUNC_LIKE     0x0004	/* Candidate for the LIKE optimization */
 #define SQLITE_FUNC_CASE     0x0008	/* Case-sensitive LIKE-type function */
 #define SQLITE_FUNC_EPHEM    0x0010	/* Ephemeral.  Delete with VDBE */
@@ -1410,28 +1399,28 @@ struct FuncDestructor {
  *     parameter.
  */
 #define FUNCTION(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_CONSTANT|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, SQLITE_FUNC_CONSTANT|(bNC*SQLITE_FUNC_NEEDCOLL), \
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
 #define VFUNCTION(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, (bNC*SQLITE_FUNC_NEEDCOLL), \
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
 #define DFUNCTION(zName, nArg, iArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, SQLITE_FUNC_SLOCHNG|(bNC*SQLITE_FUNC_NEEDCOLL), \
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
 #define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags) \
-  {nArg,SQLITE_FUNC_CONSTANT|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL)|extraFlags,\
+  {nArg,SQLITE_FUNC_CONSTANT|(bNC*SQLITE_FUNC_NEEDCOLL)|extraFlags,\
    SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
 #define STR_FUNCTION(zName, nArg, pArg, bNC, xFunc) \
-  {nArg, SQLITE_FUNC_SLOCHNG|SQLITE_UTF8|(bNC*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, SQLITE_FUNC_SLOCHNG|(bNC*SQLITE_FUNC_NEEDCOLL), \
    pArg, 0, xFunc, 0, #zName, }
 #define LIKEFUNC(zName, nArg, arg, flags) \
-  {nArg, SQLITE_FUNC_CONSTANT|SQLITE_UTF8|flags, \
+  {nArg, SQLITE_FUNC_CONSTANT|flags, \
    (void *)arg, 0, likeFunc, 0, #zName, {0} }
 #define AGGREGATE(zName, nArg, arg, nc, xStep, xFinal) \
-  {nArg, SQLITE_UTF8|(nc*SQLITE_FUNC_NEEDCOLL), \
+  {nArg, (nc*SQLITE_FUNC_NEEDCOLL), \
    SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}}
 #define AGGREGATE2(zName, nArg, arg, nc, xStep, xFinal, extraFlags) \
-  {nArg, SQLITE_UTF8|(nc*SQLITE_FUNC_NEEDCOLL)|extraFlags, \
+  {nArg, (nc*SQLITE_FUNC_NEEDCOLL)|extraFlags, \
    SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}}
 
 /*
@@ -3470,7 +3459,7 @@ void sqlite3SelectSetName(Select *, const char *);
 #define sqlite3SelectSetName(A,B)
 #endif
 void sqlite3InsertBuiltinFuncs(FuncDef *, int);
-FuncDef *sqlite3FindFunction(sqlite3 *, const char *, int, u8, u8);
+FuncDef *sqlite3FindFunction(sqlite3 *, const char *, int, u8);
 void sqlite3RegisterBuiltinFunctions(void);
 void sqlite3RegisterDateTimeFunctions(void);
 void sqlite3RegisterPerConnectionBuiltinFunctions(sqlite3 *);
@@ -3540,10 +3529,9 @@ int sqlite3FixSelect(DbFixer *, Select *);
 int sqlite3FixExpr(DbFixer *, Expr *);
 int sqlite3FixExprList(DbFixer *, ExprList *);
 int sqlite3FixTriggerStep(DbFixer *, TriggerStep *);
-int sqlite3AtoF(const char *z, double *, int, u8);
+int sqlite3AtoF(const char *z, double *, int);
 int sqlite3GetInt32(const char *, int *);
 int sqlite3Atoi(const char *);
-int sqlite3Utf16ByteLen(const void *pData, int nChar);
 int sqlite3Utf8CharLen(const char *pData, int nByte);
 u32 sqlite3Utf8Read(const u8 **);
 LogEst sqlite3LogEst(u64);
@@ -3582,7 +3570,7 @@ char sqlite3CompareAffinity(Expr * pExpr, char aff2);
 int sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity);
 char sqlite3TableColumnAffinity(Table *, int);
 char sqlite3ExprAffinity(Expr * pExpr);
-int sqlite3Atoi64(const char *, i64 *, int, u8);
+int sqlite3Atoi64(const char *, i64 *, int);
 int sqlite3DecOrHexToI64(const char *, i64 *);
 void sqlite3ErrorWithMsg(sqlite3 *, int, const char *, ...);
 void sqlite3Error(sqlite3 *, int);
@@ -3596,7 +3584,7 @@ const char *sqlite3ErrName(int);
 
 const char *sqlite3ErrStr(int);
 int sqlite3ReadSchema(Parse * pParse);
-CollSeq *sqlite3FindCollSeq(sqlite3 *, u8 enc, const char *, int);
+CollSeq *sqlite3FindCollSeq(sqlite3 *, const char *, int);
 CollSeq *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
 CollSeq *sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr);
 Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
@@ -3616,16 +3604,15 @@ void sqlite3FileSuffix3(const char *, char *);
 #endif
 u8 sqlite3GetBoolean(const char *z, u8);
 
-const void *sqlite3ValueText(sqlite3_value *, u8);
-int sqlite3ValueBytes(sqlite3_value *, u8);
-void sqlite3ValueSetStr(sqlite3_value *, int, const void *, u8,
+const void *sqlite3ValueText(sqlite3_value *);
+int sqlite3ValueBytes(sqlite3_value *);
+void sqlite3ValueSetStr(sqlite3_value *, int, const void *,
 			void (*)(void *));
 void sqlite3ValueSetNull(sqlite3_value *);
 void sqlite3ValueFree(sqlite3_value *);
 sqlite3_value *sqlite3ValueNew(sqlite3 *);
-char *sqlite3Utf16to8(sqlite3 *, const void *, int, u8);
-int sqlite3ValueFromExpr(sqlite3 *, Expr *, u8, u8, sqlite3_value **);
-void sqlite3ValueApplyAffinity(sqlite3_value *, u8, u8);
+int sqlite3ValueFromExpr(sqlite3 *, Expr *, u8, sqlite3_value **);
+void sqlite3ValueApplyAffinity(sqlite3_value *, u8);
 #ifndef SQLITE_AMALGAMATION
 extern const unsigned char sqlite3OpcodeProperty[];
 extern const char sqlite3StrBINARY[];
@@ -3655,7 +3642,7 @@ int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
 void sqlite3ColumnDefault(Vdbe *, Table *, int, int);
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
-CollSeq *sqlite3GetCollSeq(Parse *, sqlite3 *, u8, CollSeq *, const char *);
+CollSeq *sqlite3GetCollSeq(Parse *, sqlite3 *, CollSeq *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 int sqlite3InvokeBusyHandler(BusyHandler *);

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(128)
+test:plan(127)
 
 testprefix = "analyze9"
 
@@ -370,17 +370,6 @@ test:do_execsql_test(
         5930, 6220, 6710, 7000, 7710, 7830, 7970, 8890, 8950, 9240, 9250, 9680
         -- </4.9>
     })
-
----------------------------------------------------------------------------
--- The following would cause a crash at one point.
---
-test:do_execsql_test(
-        5.1,
-        [[
-            PRAGMA encoding = 'utf-16';
-            CREATE TABLE t0(v PRIMARY KEY);
-            ANALYZE;
-        ]])
 
 ---------------------------------------------------------------------------
 -- This was also crashing (corrupt sqlite_stat4 table).

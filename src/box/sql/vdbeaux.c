@@ -1984,7 +1984,6 @@ sqlite3VdbeList(Vdbe * p)
 			pMem->z = (char *)sqlite3OpcodeName(pOp->opcode);	/* Opcode */
 			assert(pMem->z != 0);
 			pMem->n = sqlite3Strlen30(pMem->z);
-			pMem->enc = SQLITE_UTF8;
 			pMem++;
 
 			/* When an OP_Program opcode is encounter (the only opcode that has
@@ -2032,11 +2031,10 @@ sqlite3VdbeList(Vdbe * p)
 		zP4 = displayP4(pOp, pMem->z, pMem->szMalloc);
 		if (zP4 != pMem->z) {
 			pMem->n = 0;
-			sqlite3VdbeMemSetStr(pMem, zP4, -1, SQLITE_UTF8, 0);
+			sqlite3VdbeMemSetStr(pMem, zP4, -1, 1, 0);
 		} else {
 			assert(pMem->z != 0);
 			pMem->n = sqlite3Strlen30(pMem->z);
-			pMem->enc = SQLITE_UTF8;
 		}
 		pMem++;
 
@@ -2048,7 +2046,6 @@ sqlite3VdbeList(Vdbe * p)
 			pMem->flags = MEM_Str | MEM_Term;
 			pMem->n = 2;
 			sqlite3_snprintf(3, pMem->z, "%.2x", pOp->p5);	/* P5 */
-			pMem->enc = SQLITE_UTF8;
 			pMem++;
 
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
@@ -2058,7 +2055,6 @@ sqlite3VdbeList(Vdbe * p)
 			}
 			pMem->flags = MEM_Str | MEM_Term;
 			pMem->n = displayComment(pOp, zP4, pMem->z, 500);
-			pMem->enc = SQLITE_UTF8;
 #else
 			pMem->flags = MEM_Null;	/* Comment */
 #endif
@@ -2533,7 +2529,7 @@ sqlite3VdbeSetColName(Vdbe * p,			/* Vdbe being configured */
 	}
 	assert(p->aColName != 0);
 	pColName = &(p->aColName[idx + var * p->nResColumn]);
-	rc = sqlite3VdbeMemSetStr(pColName, zName, -1, SQLITE_UTF8, xDel);
+	rc = sqlite3VdbeMemSetStr(pColName, zName, -1, 1, xDel);
 	assert(rc != 0 || !zName || (pColName->flags & MEM_Term) != 0);
 	return rc;
 }
@@ -3015,8 +3011,7 @@ sqlite3VdbeTransferError(Vdbe * p)
 		sqlite3BeginBenignMalloc();
 		if (db->pErr == 0)
 			db->pErr = sqlite3ValueNew(db);
-		sqlite3ValueSetStr(db->pErr, -1, p->zErrMsg, SQLITE_UTF8,
-				   SQLITE_TRANSIENT);
+		sqlite3ValueSetStr(db->pErr, -1, p->zErrMsg, SQLITE_TRANSIENT);
 		sqlite3EndBenignMalloc();
 		db->bBenignMalloc--;
 		db->errCode = rc;
@@ -3836,7 +3831,6 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
 	pKeyInfo = pPKey2->pKeyInfo;
 	if (pKeyInfo->db == 0)
 		return 1;
-	mem1.enc = pKeyInfo->enc;
 	mem1.db = pKeyInfo->db;
 	/* mem1.flags = 0;  // Will be initialized by sqlite3VdbeSerialGet() */
 	VVA_ONLY(mem1.szMalloc = 0;
@@ -3928,39 +3922,20 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
  * using the collation sequence pColl. As usual, return a negative , zero
  * or positive value if *pMem1 is less than, equal to or greater than
  * *pMem2, respectively. Similar in spirit to "rc = (*pMem1) - (*pMem2);".
+ *
+ * Strungs assume to be UTF-8 encoded
  */
 static int
 vdbeCompareMemString(const Mem * pMem1, const Mem * pMem2,
 		     const CollSeq * pColl,
 		     u8 * prcErr)	/* If an OOM occurs, set to SQLITE_NOMEM */
 {
-	if (pMem1->enc == pColl->enc) {
-		/* The strings are already in the correct encoding.  Call the
-		 * comparison function directly
-		 */
-		return pColl->xCmp(pColl->pUser, pMem1->n, pMem1->z, pMem2->n,
-				   pMem2->z);
-	} else {
-		int rc;
-		const void *v1, *v2;
-		int n1, n2;
-		Mem c1;
-		Mem c2;
-		sqlite3VdbeMemInit(&c1, pMem1->db, MEM_Null);
-		sqlite3VdbeMemInit(&c2, pMem1->db, MEM_Null);
-		sqlite3VdbeMemShallowCopy(&c1, pMem1, MEM_Ephem);
-		sqlite3VdbeMemShallowCopy(&c2, pMem2, MEM_Ephem);
-		v1 = sqlite3ValueText((sqlite3_value *) & c1, pColl->enc);
-		n1 = v1 == 0 ? 0 : c1.n;
-		v2 = sqlite3ValueText((sqlite3_value *) & c2, pColl->enc);
-		n2 = v2 == 0 ? 0 : c2.n;
-		rc = pColl->xCmp(pColl->pUser, n1, v1, n2, v2);
-		if ((v1 == 0 || v2 == 0) && prcErr)
-			*prcErr = SQLITE_NOMEM_BKPT;
-		sqlite3VdbeMemRelease(&c1);
-		sqlite3VdbeMemRelease(&c2);
-		return rc;
-	}
+	/* The strings are already in the correct encoding.  Call the
+	 * comparison function directly
+	 */
+	(void) prcErr;
+	return pColl->xCmp(pColl->pUser, pMem1->n, pMem1->z, pMem2->n,
+			   pMem2->z);
 }
 
 /*
@@ -4129,12 +4104,6 @@ sqlite3MemCompare(const Mem * pMem1, const Mem * pMem2, const CollSeq * pColl)
 		if ((f2 & MEM_Str) == 0) {
 			return -1;
 		}
-
-		assert(pMem1->enc == pMem2->enc || pMem1->db->mallocFailed);
-		assert(pMem1->enc == SQLITE_UTF8 ||
-		       pMem1->enc == SQLITE_UTF16LE
-		       || pMem1->enc == SQLITE_UTF16BE);
-
 		/* The collation sequence must be defined at this point, even if
 		 * the user deletes the collation sequence after the vdbe program is
 		 * compiled (this was not always the case).
@@ -4336,7 +4305,6 @@ sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
 					    (u8) SQLITE_CORRUPT_BKPT;
 					return 0;	/* Corruption */
 				} else if (pKeyInfo->aColl[i]) {
-					mem1.enc = pKeyInfo->enc;
 					mem1.db = pKeyInfo->db;
 					mem1.flags = MEM_Str;
 					mem1.z = (char *)&aKey1[d1];
@@ -4637,8 +4605,7 @@ sqlite3VdbeGetBoundValue(Vdbe * v, int iVar, u8 aff)
 			sqlite3_value *pRet = sqlite3ValueNew(v->db);
 			if (pRet) {
 				sqlite3VdbeMemCopy((Mem *) pRet, pMem);
-				sqlite3ValueApplyAffinity(pRet, aff,
-							  SQLITE_UTF8);
+				sqlite3ValueApplyAffinity(pRet, aff);
 			}
 			return pRet;
 		}
@@ -4726,7 +4693,6 @@ sqlite3VdbePreUpdateHook(Vdbe * v,		/* Vdbe pre-update hook is invoked by */
 	preupdate.op = op;
 	preupdate.iNewReg = iReg;
 	preupdate.keyinfo.db = db;
-	preupdate.keyinfo.enc = ENC(db);
 	preupdate.keyinfo.nField = pTab->nCol;
 	preupdate.keyinfo.aSortOrder = (u8 *) & fakeSortOrder;
 	preupdate.iKey1 = iKey1;
@@ -4900,7 +4866,6 @@ sqlite3VdbeCompareMsgpack(const char **pKey1,
 				mem1.z = (char *)aKey1;
 				aKey1 += mem1.n;
 				if (pKeyInfo->aColl[iKey2]) {
-					mem1.enc = pKeyInfo->enc;
 					mem1.db = pKeyInfo->db;
 					mem1.flags = MEM_Str;
 					rc = vdbeCompareMemString(&mem1, pKey2,
@@ -5070,7 +5035,6 @@ sqlite3VdbeRecordUnpackMsgpack(KeyInfo * pKeyInfo,	/* Information about the reco
 	n = p->nField = MIN(n, pKeyInfo->nField);
 	p->default_rc = 0;
 	while (n--) {
-		pMem->enc = pKeyInfo->enc;
 		pMem->db = pKeyInfo->db;
 		/* pMem->flags = 0; // sqlite3VdbeSerialGet() will set this for us */
 		pMem->szMalloc = 0;

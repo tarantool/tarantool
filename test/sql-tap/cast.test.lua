@@ -817,7 +817,7 @@ test:do_execsql_test(
 
 
 
-if test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
+if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
     test:do_execsql_test(
         "cast-3.21",
         [[

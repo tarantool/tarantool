@@ -400,7 +400,6 @@ typedef int (*sqlite3_loadext_entry) (sqlite3 * db,	/* Handle to the database. *
 #define sqlite3_user_data              sqlite3_api->user_data
 #define sqlite3_value_blob             sqlite3_api->value_blob
 #define sqlite3_value_bytes            sqlite3_api->value_bytes
-#define sqlite3_value_bytes16          sqlite3_api->value_bytes16
 #define sqlite3_value_double           sqlite3_api->value_double
 #define sqlite3_value_int              sqlite3_api->value_int
 #define sqlite3_value_int64            sqlite3_api->value_int64

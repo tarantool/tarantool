@@ -458,7 +458,7 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
 		 * use SQLITE_STATIC.
 		 */
 		rc = sqlite3_bind_text64(stmt, pos, p->s, p->bytes,
-					 SQLITE_STATIC, SQLITE_UTF8);
+					 SQLITE_STATIC);
 		break;
 	case SQLITE_NULL:
 		rc = sqlite3_bind_null(stmt, pos);

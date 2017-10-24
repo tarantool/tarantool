@@ -24,7 +24,7 @@ test:plan(25)
 test:do_test(
     "badutf-1.1",
     function()
-        test:execsql "PRAGMA encoding='UTF8'"
+        --test:execsql "PRAGMA encoding='UTF8'"
         return test:execsql2("SELECT hex('\x80') AS x")
     end, {
         -- <badutf-1.1>

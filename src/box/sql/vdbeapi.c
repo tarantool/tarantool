@@ -225,13 +225,7 @@ sqlite3_value_blob(sqlite3_value * pVal)
 int
 sqlite3_value_bytes(sqlite3_value * pVal)
 {
-	return sqlite3ValueBytes(pVal, SQLITE_UTF8);
-}
-
-int
-sqlite3_value_bytes16(sqlite3_value * pVal)
-{
-	return sqlite3ValueBytes(pVal, SQLITE_UTF16NATIVE);
+	return sqlite3ValueBytes(pVal);
 }
 
 double
@@ -262,7 +256,7 @@ sqlite3_value_subtype(sqlite3_value * pVal)
 const unsigned char *
 sqlite3_value_text(sqlite3_value * pVal)
 {
-	return (const unsigned char *)sqlite3ValueText(pVal, SQLITE_UTF8);
+	return (const unsigned char *)sqlite3ValueText(pVal);
 }
 
 /* EVIDENCE-OF: R-12793-43283 Every value in SQLite has one of five
@@ -359,11 +353,10 @@ static void
 setResultStrOrError(sqlite3_context * pCtx,	/* Function context */
 		    const char *z,	/* String pointer */
 		    int n,	/* Bytes in string, or negative */
-		    u8 enc,	/* Encoding of z.  0 for BLOBs */
 		    void (*xDel) (void *)	/* Destructor function */
     )
 {
-	if (sqlite3VdbeMemSetStr(pCtx->pOut, z, n, enc, xDel) == SQLITE_TOOBIG) {
+	if (sqlite3VdbeMemSetStr(pCtx->pOut, z, n,1, xDel) == SQLITE_TOOBIG) {
 		sqlite3_result_error_toobig(pCtx);
 	}
 }
@@ -394,7 +387,9 @@ sqlite3_result_blob(sqlite3_context * pCtx,
 {
 	assert(n >= 0);
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
-	setResultStrOrError(pCtx, z, n, 0, xDel);
+	if (sqlite3VdbeMemSetStr(pCtx->pOut, z, n,0, xDel) == SQLITE_TOOBIG) {
+		sqlite3_result_error_toobig(pCtx);
+	}
 }
 
 void
@@ -407,7 +402,7 @@ sqlite3_result_blob64(sqlite3_context * pCtx,
 	if (n > 0x7fffffff) {
 		(void)invokeValueDestructor(z, xDel, pCtx);
 	} else {
-		setResultStrOrError(pCtx, z, (int)n, 0, xDel);
+		setResultStrOrError(pCtx, z, (int)n, xDel);
 	}
 }
 
@@ -424,7 +419,7 @@ sqlite3_result_error(sqlite3_context * pCtx, const char *z, int n)
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	pCtx->isError = SQLITE_ERROR;
 	pCtx->fErrorOrAux = 1;
-	sqlite3VdbeMemSetStr(pCtx->pOut, z, n, SQLITE_UTF8, SQLITE_TRANSIENT);
+	sqlite3VdbeMemSetStr(pCtx->pOut, z, n, 1, SQLITE_TRANSIENT);
 }
 
 void
@@ -463,23 +458,21 @@ sqlite3_result_text(sqlite3_context * pCtx,
     )
 {
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
-	setResultStrOrError(pCtx, z, n, SQLITE_UTF8, xDel);
+	setResultStrOrError(pCtx, z, n, xDel);
 }
 
 void
 sqlite3_result_text64(sqlite3_context * pCtx,
 		      const char *z,
 		      sqlite3_uint64 n,
-		      void (*xDel) (void *), unsigned char enc)
+		      void (*xDel) (void *))
 {
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	assert(xDel != SQLITE_DYNAMIC);
-	if (enc == SQLITE_UTF16)
-		enc = SQLITE_UTF16NATIVE;
 	if (n > 0x7fffffff) {
 		(void)invokeValueDestructor(z, xDel, pCtx);
 	} else {
-		setResultStrOrError(pCtx, z, (int)n, enc, xDel);
+		setResultStrOrError(pCtx, z, (int)n, xDel);
 	}
 }
 
@@ -519,8 +512,8 @@ sqlite3_result_error_code(sqlite3_context * pCtx, int errCode)
 		pCtx->pVdbe->rcApp = errCode;
 #endif
 	if (pCtx->pOut->flags & MEM_Null) {
-		sqlite3VdbeMemSetStr(pCtx->pOut, sqlite3ErrStr(errCode), -1,
-				     SQLITE_UTF8, SQLITE_STATIC);
+		sqlite3VdbeMemSetStr(pCtx->pOut, sqlite3ErrStr(errCode), -1, 1,
+				     SQLITE_STATIC);
 	}
 }
 
@@ -531,8 +524,8 @@ sqlite3_result_error_toobig(sqlite3_context * pCtx)
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	pCtx->isError = SQLITE_TOOBIG;
 	pCtx->fErrorOrAux = 1;
-	sqlite3VdbeMemSetStr(pCtx->pOut, "string or blob too big", -1,
-			     SQLITE_UTF8, SQLITE_STATIC);
+	sqlite3VdbeMemSetStr(pCtx->pOut, "string or blob too big", -1, 1,
+			     SQLITE_STATIC);
 }
 
 /* An SQLITE_NOMEM error. */
@@ -986,8 +979,7 @@ columnNullValue(void)
 	    = {
 		/* .u          = */  {
 		0},
-		    /* .flags      = */ (u32) MEM_Null,
-		    /* .enc        = */ (u8) 0,
+		    /* .flags      = */ (u16) MEM_Null,
 		    /* .eSubtype   = */ (u8) 0,
 		    /* .n          = */ (int)0,
 		    /* .z          = */ (char *)0,
@@ -1085,14 +1077,6 @@ int
 sqlite3_column_bytes(sqlite3_stmt * pStmt, int i)
 {
 	int val = sqlite3_value_bytes(columnMem(pStmt, i));
-	columnMallocFailure(pStmt);
-	return val;
-}
-
-int
-sqlite3_column_bytes16(sqlite3_stmt * pStmt, int i)
-{
-	int val = sqlite3_value_bytes16(columnMem(pStmt, i));
 	columnMallocFailure(pStmt);
 	return val;
 }
@@ -1339,8 +1323,7 @@ bindText(sqlite3_stmt * pStmt,	/* The statement to bind against */
 	 int i,			/* Index of the parameter to bind */
 	 const void *zData,	/* Pointer to the data to be bound */
 	 int nData,		/* Number of bytes of data to be bound */
-	 void (*xDel) (void *),	/* Destructor for the data */
-	 u8 encoding		/* Encoding for the data */
+	 void (*xDel) (void *)	/* Destructor for the data */
     )
 {
 	Vdbe *p = (Vdbe *) pStmt;
@@ -1351,12 +1334,7 @@ bindText(sqlite3_stmt * pStmt,	/* The statement to bind against */
 	if (rc == SQLITE_OK) {
 		if (zData != 0) {
 			pVar = &p->aVar[i - 1];
-			rc = sqlite3VdbeMemSetStr(pVar, zData, nData, encoding,
-						  xDel);
-			if (rc == SQLITE_OK && encoding != 0) {
-				rc = sqlite3VdbeChangeEncoding(pVar,
-							       ENC(p->db));
-			}
+			rc = sqlite3VdbeMemSetStr(pVar, zData, nData, 1, xDel);
 			sqlite3Error(p->db, rc);
 			rc = sqlite3ApiExit(p->db, rc);
 		}
@@ -1379,7 +1357,7 @@ sqlite3_bind_blob(sqlite3_stmt * pStmt,
 	if (nData < 0)
 		return SQLITE_MISUSE_BKPT;
 #endif
-	return bindText(pStmt, i, zData, nData, xDel, 0);
+	return bindText(pStmt, i, zData, nData, xDel);
 }
 
 int
@@ -1393,7 +1371,7 @@ sqlite3_bind_blob64(sqlite3_stmt * pStmt,
 	if (nData > 0x7fffffff) {
 		return invokeValueDestructor(zData, xDel, 0);
 	} else {
-		return bindText(pStmt, i, zData, (int)nData, xDel, 0);
+		return bindText(pStmt, i, zData, (int)nData, xDel);
 	}
 }
 
@@ -1446,7 +1424,7 @@ sqlite3_bind_text(sqlite3_stmt * pStmt,
 		  int i, const char *zData, int nData, void (*xDel) (void *)
     )
 {
-	return bindText(pStmt, i, zData, nData, xDel, SQLITE_UTF8);
+	return bindText(pStmt, i, zData, nData, xDel);
 }
 
 int
@@ -1454,15 +1432,13 @@ sqlite3_bind_text64(sqlite3_stmt * pStmt,
 		    int i,
 		    const char *zData,
 		    sqlite3_uint64 nData,
-		    void (*xDel) (void *), unsigned char enc)
+		    void (*xDel) (void *))
 {
 	assert(xDel != SQLITE_DYNAMIC);
 	if (nData > 0x7fffffff) {
 		return invokeValueDestructor(zData, xDel, 0);
 	} else {
-		if (enc == SQLITE_UTF16)
-			enc = SQLITE_UTF16NATIVE;
-		return bindText(pStmt, i, zData, (int)nData, xDel, enc);
+		return bindText(pStmt, i, zData, (int)nData, xDel);
 	}
 }
 
@@ -1492,7 +1468,7 @@ sqlite3_bind_value(sqlite3_stmt * pStmt, int i, const sqlite3_value * pValue)
 		}
 	case SQLITE_TEXT:{
 			rc = bindText(pStmt, i, pValue->z, pValue->n,
-				      SQLITE_TRANSIENT, pValue->enc);
+				      SQLITE_TRANSIENT);
 			break;
 		}
 	default:{

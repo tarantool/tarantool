@@ -72,11 +72,10 @@ sqlite3ColumnDefault(Vdbe * v, Table * pTab, int i, int iReg)
 	assert(pTab != 0);
 	if (!pTab->pSelect) {
 		sqlite3_value *pValue = 0;
-		u8 enc = ENC(sqlite3VdbeDb(v));
 		Column *pCol = &pTab->aCol[i];
 		VdbeComment((v, "%s.%s", pTab->zName, pCol->zName));
 		assert(i < pTab->nCol);
-		sqlite3ValueFromExpr(sqlite3VdbeDb(v), pCol->pDflt, enc,
+		sqlite3ValueFromExpr(sqlite3VdbeDb(v), pCol->pDflt,
 				     pCol->affinity, &pValue);
 		if (pValue) {
 			sqlite3VdbeAppendP4(v, pValue, P4_MEM);

@@ -390,7 +390,7 @@ substrFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 			SQLITE_SKIP_UTF8(z2);
 		}
 		sqlite3_result_text64(context, (char *)z, z2 - z,
-				      SQLITE_TRANSIENT, SQLITE_UTF8);
+				      SQLITE_TRANSIENT);
 	} else {
 		if (p1 + p2 > len) {
 			p2 = len - p1;
@@ -439,7 +439,7 @@ roundFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 			sqlite3_result_error_nomem(context);
 			return;
 		}
-		sqlite3AtoF(zBuf, &r, sqlite3Strlen30(zBuf), SQLITE_UTF8);
+		sqlite3AtoF(zBuf, &r, sqlite3Strlen30(zBuf));
 		sqlite3_free(zBuf);
 	}
 	sqlite3_result_double(context, r);
@@ -1043,7 +1043,7 @@ quoteFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 			char zBuf[50];
 			r1 = sqlite3_value_double(argv[0]);
 			sqlite3_snprintf(sizeof(zBuf), zBuf, "%!.15g", r1);
-			sqlite3AtoF(zBuf, &r2, 20, SQLITE_UTF8);
+			sqlite3AtoF(zBuf, &r2, 20);
 			if (r1 != r2) {
 				sqlite3_snprintf(sizeof(zBuf), zBuf, "%!.20e",
 						 r1);
@@ -1169,8 +1169,7 @@ charFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 			*zOut++ = 0x80 + (u8) (c & 0x3F);
 		}
 	}
-	sqlite3_result_text64(context, (char *)z, zOut - z, sqlite3_free,
-			      SQLITE_UTF8);
+	sqlite3_result_text64(context, (char *)z, zOut - z, sqlite3_free);
 }
 
 /*
@@ -1725,9 +1724,8 @@ sqlite3_overload_function(sqlite3 * db, const char *zName, int nArg)
 	}
 #endif
 	sqlite3_mutex_enter(db->mutex);
-	if (sqlite3FindFunction(db, zName, nArg, SQLITE_UTF8, 0) == 0) {
-		rc = sqlite3CreateFunc(db, zName, nArg, SQLITE_UTF8,
-				       0, sqlite3InvalidFunction, 0, 0, 0);
+	if (sqlite3FindFunction(db, zName, nArg, 0) == 0) {
+		rc = sqlite3CreateFunc(db, zName, nArg, 0, 0, sqlite3InvalidFunction, 0, 0, 0);
 	}
 	rc = sqlite3ApiExit(db, rc);
 	sqlite3_mutex_leave(db->mutex);
@@ -1756,7 +1754,7 @@ static void
 setLikeOptFlag(sqlite3 * db, const char *zName, u8 flagVal)
 {
 	FuncDef *pDef;
-	pDef = sqlite3FindFunction(db, zName, 2, SQLITE_UTF8, 0);
+	pDef = sqlite3FindFunction(db, zName, 2, 0);
 	if (ALWAYS(pDef)) {
 		pDef->funcFlags |= flagVal;
 	}
@@ -1776,10 +1774,9 @@ sqlite3RegisterLikeFunctions(sqlite3 * db, int caseSensitive)
 	} else {
 		pInfo = (struct compareInfo *)&likeInfoNorm;
 	}
-	sqlite3CreateFunc(db, "LIKE", 2, SQLITE_UTF8, pInfo, likeFunc, 0, 0, 0);
-	sqlite3CreateFunc(db, "LIKE", 3, SQLITE_UTF8, pInfo, likeFunc, 0, 0, 0);
-	sqlite3CreateFunc(db, "GLOB", 2, SQLITE_UTF8,
-			  (struct compareInfo *)&globInfo, likeFunc, 0, 0, 0);
+	sqlite3CreateFunc(db, "LIKE", 2, 0, pInfo, likeFunc, 0, 0, 0);
+	sqlite3CreateFunc(db, "LIKE", 3, 0, pInfo, likeFunc, 0, 0, 0);
+	sqlite3CreateFunc(db, "GLOB", 2, 0, (struct compareInfo *)&globInfo, likeFunc, 0, 0, 0);
 	setLikeOptFlag(db, "GLOB", SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE);
 	setLikeOptFlag(db, "LIKE",
 		       caseSensitive ? (SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE) :
@@ -1807,7 +1804,7 @@ sqlite3IsLikeFunction(sqlite3 * db, Expr * pExpr, int *pIsNocase, char *aWc)
 		return 0;
 	}
 	assert(!ExprHasProperty(pExpr, EP_xIsSelect));
-	pDef = sqlite3FindFunction(db, pExpr->u.zToken, 2, SQLITE_UTF8, 0);
+	pDef = sqlite3FindFunction(db, pExpr->u.zToken, 2, 0);
 	if (NEVER(pDef == 0) || (pDef->funcFlags & SQLITE_FUNC_LIKE) == 0) {
 		return 0;
 	}

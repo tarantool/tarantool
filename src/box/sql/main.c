@@ -1647,7 +1647,7 @@ int
 sqlite3CreateFunc(sqlite3 * db,
 		  const char *zFunctionName,
 		  int nArg,
-		  int enc,
+		  int flags,
 		  void *pUserData,
 		  void (*xSFunc) (sqlite3_context *, int, sqlite3_value **),
 		  void (*xStep) (sqlite3_context *, int, sqlite3_value **),
@@ -1668,46 +1668,16 @@ sqlite3CreateFunc(sqlite3 * db,
 	}
 
 	assert(SQLITE_FUNC_CONSTANT == SQLITE_DETERMINISTIC);
-	extraFlags = enc & SQLITE_DETERMINISTIC;
-	enc &= (SQLITE_FUNC_ENCMASK | SQLITE_ANY);
+	extraFlags = flags & SQLITE_DETERMINISTIC;
 
-#ifndef SQLITE_OMIT_UTF16
-	/* If SQLITE_UTF16 is specified as the encoding type, transform this
-	 * to one of SQLITE_UTF16LE or SQLITE_UTF16BE using the
-	 * SQLITE_UTF16NATIVE macro. SQLITE_UTF16 is not used internally.
-	 *
-	 * If SQLITE_ANY is specified, add three versions of the function
-	 * to the hash table.
-	 */
-	if (enc == SQLITE_UTF16) {
-		enc = SQLITE_UTF16NATIVE;
-	} else if (enc == SQLITE_ANY) {
-		int rc;
-		rc = sqlite3CreateFunc(db, zFunctionName, nArg,
-				       SQLITE_UTF8 | extraFlags, pUserData,
-				       xSFunc, xStep, xFinal, pDestructor);
-		if (rc == SQLITE_OK) {
-			rc = sqlite3CreateFunc(db, zFunctionName, nArg,
-					       SQLITE_UTF16LE | extraFlags,
-					       pUserData, xSFunc, xStep, xFinal,
-					       pDestructor);
-		}
-		if (rc != SQLITE_OK) {
-			return rc;
-		}
-		enc = SQLITE_UTF16BE;
-	}
-#else
-	enc = SQLITE_UTF8;
-#endif
 
 	/* Check if an existing function is being overridden or deleted. If so,
 	 * and there are active VMs, then return SQLITE_BUSY. If a function
 	 * is being overridden/deleted but there are no active VMs, allow the
 	 * operation to continue but invalidate all precompiled statements.
 	 */
-	p = sqlite3FindFunction(db, zFunctionName, nArg, (u8) enc, 0);
-	if (p && (p->funcFlags & SQLITE_FUNC_ENCMASK) == enc && p->nArg == nArg) {
+	p = sqlite3FindFunction(db, zFunctionName, nArg, 0);
+	if (p && p->nArg == nArg) {
 		if (db->nVdbeActive) {
 			sqlite3ErrorWithMsg(db, SQLITE_BUSY,
 					    "unable to delete/modify user-function due to active statements");
@@ -1718,7 +1688,7 @@ sqlite3CreateFunc(sqlite3 * db,
 		}
 	}
 
-	p = sqlite3FindFunction(db, zFunctionName, nArg, (u8) enc, 1);
+	p = sqlite3FindFunction(db, zFunctionName, nArg, 1);
 	assert(p || db->mallocFailed);
 	if (!p) {
 		return SQLITE_NOMEM_BKPT;
@@ -1733,7 +1703,7 @@ sqlite3CreateFunc(sqlite3 * db,
 		pDestructor->nRef++;
 	}
 	p->u.pDestructor = pDestructor;
-	p->funcFlags = (p->funcFlags & SQLITE_FUNC_ENCMASK) | extraFlags;
+	p->funcFlags = extraFlags;
 	testcase(p->funcFlags & SQLITE_DETERMINISTIC);
 	p->xSFunc = xSFunc ? xSFunc : xStep;
 	p->xFinalize = xFinal;
@@ -1749,7 +1719,7 @@ int
 sqlite3_create_function(sqlite3 * db,
 			const char *zFunc,
 			int nArg,
-			int enc,
+			int flags,
 			void *p,
 			void (*xSFunc) (sqlite3_context *, int,
 					sqlite3_value **),
@@ -1757,7 +1727,7 @@ sqlite3_create_function(sqlite3 * db,
 				       sqlite3_value **),
 			void (*xFinal) (sqlite3_context *))
 {
-	return sqlite3_create_function_v2(db, zFunc, nArg, enc, p, xSFunc,
+	return sqlite3_create_function_v2(db, zFunc, nArg, flags, p, xSFunc,
 					  xStep, xFinal, 0);
 }
 
@@ -1765,7 +1735,7 @@ int
 sqlite3_create_function_v2(sqlite3 * db,
 			   const char *zFunc,
 			   int nArg,
-			   int enc,
+			   int flags,
 			   void *p,
 			   void (*xSFunc) (sqlite3_context *, int,
 					   sqlite3_value **),
@@ -1795,7 +1765,7 @@ sqlite3_create_function_v2(sqlite3 * db,
 		pArg->xDestroy = xDestroy;
 		pArg->pUserData = p;
 	}
-	rc = sqlite3CreateFunc(db, zFunc, nArg, enc, p, xSFunc, xStep, xFinal,
+	rc = sqlite3CreateFunc(db, zFunc, nArg, flags, p, xSFunc, xStep, xFinal,
 			       pArg);
 	if (pArg && pArg->nRef == 0) {
 		assert(rc != SQLITE_OK);
@@ -2134,35 +2104,19 @@ sqlite3_errstr(int rc)
 static int
 createCollation(sqlite3 * db,
 		const char *zName,
-		u8 enc,
 		void *pCtx,
 		int (*xCompare) (void *, int, const void *, int, const void *),
 		void (*xDel) (void *))
 {
 	CollSeq *pColl;
-	int enc2;
 
 	assert(sqlite3_mutex_held(db->mutex));
-
-	/* If SQLITE_UTF16 is specified as the encoding type, transform this
-	 * to one of SQLITE_UTF16LE or SQLITE_UTF16BE using the
-	 * SQLITE_UTF16NATIVE macro. SQLITE_UTF16 is not used internally.
-	 */
-	enc2 = enc;
-	testcase(enc2 == SQLITE_UTF16);
-	testcase(enc2 == SQLITE_UTF16_ALIGNED);
-	if (enc2 == SQLITE_UTF16 || enc2 == SQLITE_UTF16_ALIGNED) {
-		enc2 = SQLITE_UTF16NATIVE;
-	}
-	if (enc2 < SQLITE_UTF8 || enc2 > SQLITE_UTF16BE) {
-		return SQLITE_MISUSE_BKPT;
-	}
 
 	/* Check if this call is removing or replacing an existing collation
 	 * sequence. If so, and there are active VMs, return busy. If there
 	 * are no active VMs, invalidate any pre-compiled statements.
 	 */
-	pColl = sqlite3FindCollSeq(db, (u8) enc2, zName, 0);
+	pColl = sqlite3FindCollSeq(db, zName, 0);
 	if (pColl && pColl->xCmp) {
 		if (db->nVdbeActive) {
 			sqlite3ErrorWithMsg(db, SQLITE_BUSY,
@@ -2177,28 +2131,23 @@ createCollation(sqlite3 * db,
 		 * Also, collation destructor - CollSeq.xDel() - function may need
 		 * to be called.
 		 */
-		if ((pColl->enc & ~SQLITE_UTF16_ALIGNED) == enc2) {
-			CollSeq *aColl = sqlite3HashFind(&db->aCollSeq, zName);
-			int j;
-			for (j = 0; j < 3; j++) {
-				CollSeq *p = &aColl[j];
-				if (p->enc == pColl->enc) {
-					if (p->xDel) {
-						p->xDel(p->pUser);
-					}
-					p->xCmp = 0;
-				}
+
+		CollSeq *aColl = sqlite3HashFind(&db->aCollSeq, zName);
+		CollSeq *p = &aColl[0];
+		if (p->enc == pColl->enc) {
+			if (p->xDel) {
+				p->xDel(p->pUser);
 			}
+			p->xCmp = 0;
 		}
 	}
 
-	pColl = sqlite3FindCollSeq(db, (u8) enc2, zName, 1);
+	pColl = sqlite3FindCollSeq(db, zName, 1);
 	if (pColl == 0)
 		return SQLITE_NOMEM_BKPT;
 	pColl->xCmp = xCompare;
 	pColl->pUser = pCtx;
 	pColl->xDel = xDel;
-	pColl->enc = (u8) (enc2 | (enc & SQLITE_UTF16_ALIGNED));
 	sqlite3Error(db, SQLITE_OK);
 	return SQLITE_OK;
 }
@@ -2722,9 +2671,9 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	 * EVIDENCE-OF: R-52786-44878 SQLite defines three built-in collating
 	 * functions:
 	 */
-	createCollation(db, sqlite3StrBINARY, SQLITE_UTF8, 0, binCollFunc, 0);
-	createCollation(db, "NOCASE", SQLITE_UTF8, 0, nocaseCollatingFunc, 0);
-	createCollation(db, "RTRIM", SQLITE_UTF8, (void *)1, binCollFunc, 0);
+	createCollation(db, sqlite3StrBINARY, 0, binCollFunc, 0);
+	createCollation(db, "NOCASE", 0, nocaseCollatingFunc, 0);
+	createCollation(db, "RTRIM", (void *)1, binCollFunc, 0);
 	if (db->mallocFailed) {
 		goto opendb_out;
 	}
@@ -2732,7 +2681,7 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	 * strings is BINARY.
 	 */
 	db->pDfltColl =
-	    sqlite3FindCollSeq(db, SQLITE_UTF8, sqlite3StrBINARY, 0);
+	    sqlite3FindCollSeq(db, sqlite3StrBINARY, 0);
 	assert(db->pDfltColl != 0);
 
 	db->openFlags = flags;
@@ -2759,8 +2708,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	}
 	sqlite3BtreeEnter(db->mdb.pBt);
 	db->mdb.pSchema = sqlite3SchemaGet(db, db->mdb.pBt);
-	if (!db->mallocFailed)
-		ENC(db) = SCHEMA_ENC(db);
 	sqlite3BtreeLeave(db->mdb.pBt);
 	db->mdb.pSchema = sqlite3SchemaGet(db, 0);
 
@@ -2919,13 +2866,12 @@ sqlite3_open_v2(const char *filename,	/* Database filename (UTF-8) */
 int
 sqlite3_create_collation(sqlite3 * db,
 			 const char *zName,
-			 int enc,
 			 void *pCtx,
 			 int (*xCompare) (void *, int, const void *, int,
 					  const void *)
     )
 {
-	return sqlite3_create_collation_v2(db, zName, enc, pCtx, xCompare, 0);
+	return sqlite3_create_collation_v2(db, zName, pCtx, xCompare, 0);
 }
 
 /*
@@ -2934,7 +2880,6 @@ sqlite3_create_collation(sqlite3 * db,
 int
 sqlite3_create_collation_v2(sqlite3 * db,
 			    const char *zName,
-			    int enc,
 			    void *pCtx,
 			    int (*xCompare) (void *, int, const void *, int,
 					     const void *),
@@ -2948,43 +2893,11 @@ sqlite3_create_collation_v2(sqlite3 * db,
 #endif
 	sqlite3_mutex_enter(db->mutex);
 	assert(!db->mallocFailed);
-	rc = createCollation(db, zName, (u8) enc, pCtx, xCompare, xDel);
+	rc = createCollation(db, zName, pCtx, xCompare, xDel);
 	rc = sqlite3ApiExit(db, rc);
 	sqlite3_mutex_leave(db->mutex);
 	return rc;
 }
-
-#ifndef SQLITE_OMIT_UTF16
-/*
- * Register a new collation sequence with the database handle db.
- */
-int
-sqlite3_create_collation16(sqlite3 * db,
-			   const void *zName,
-			   int enc,
-			   void *pCtx,
-			   int (*xCompare) (void *, int, const void *, int,
-					    const void *))
-{
-	int rc = SQLITE_OK;
-	char *zName8;
-
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db) || zName == 0)
-		return SQLITE_MISUSE_BKPT;
-#endif
-	sqlite3_mutex_enter(db->mutex);
-	assert(!db->mallocFailed);
-	zName8 = sqlite3Utf16to8(db, zName, -1, SQLITE_UTF16NATIVE);
-	if (zName8) {
-		rc = createCollation(db, zName8, (u8) enc, pCtx, xCompare, 0);
-		sqlite3DbFree(db, zName8);
-	}
-	rc = sqlite3ApiExit(db, rc);
-	sqlite3_mutex_leave(db->mutex);
-	return rc;
-}
-#endif				/* SQLITE_OMIT_UTF16 */
 
 /*
  * Register a collation sequence factory callback with the database handle
@@ -2993,8 +2906,7 @@ sqlite3_create_collation16(sqlite3 * db,
 int
 sqlite3_collation_needed(sqlite3 * db,
 			 void *pCollNeededArg,
-			 void (*xCollNeeded) (void *, sqlite3 *, int eTextRep,
-					      const char *))
+			 void (*xCollNeeded) (void *, sqlite3 *, const char *))
 {
 #ifdef SQLITE_ENABLE_API_ARMOR
 	if (!sqlite3SafetyCheckOk(db))
@@ -3002,35 +2914,10 @@ sqlite3_collation_needed(sqlite3 * db,
 #endif
 	sqlite3_mutex_enter(db->mutex);
 	db->xCollNeeded = xCollNeeded;
-	db->xCollNeeded16 = 0;
 	db->pCollNeededArg = pCollNeededArg;
 	sqlite3_mutex_leave(db->mutex);
 	return SQLITE_OK;
 }
-
-#ifndef SQLITE_OMIT_UTF16
-/*
- * Register a collation sequence factory callback with the database handle
- * db. Replace any previously installed collation sequence factory.
- */
-int
-sqlite3_collation_needed16(sqlite3 * db,
-			   void *pCollNeededArg,
-			   void (*xCollNeeded16) (void *, sqlite3 *,
-						  int eTextRep, const void *))
-{
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db))
-		return SQLITE_MISUSE_BKPT;
-#endif
-	sqlite3_mutex_enter(db->mutex);
-	db->xCollNeeded = 0;
-	db->xCollNeeded16 = xCollNeeded16;
-	db->pCollNeededArg = pCollNeededArg;
-	sqlite3_mutex_leave(db->mutex);
-	return SQLITE_OK;
-}
-#endif				/* SQLITE_OMIT_UTF16 */
 
 #ifndef SQLITE_OMIT_DEPRECATED
 /*
