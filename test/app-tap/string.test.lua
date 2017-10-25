@@ -47,7 +47,7 @@ end)
 
 -- gh-2214 - string.ljust()/string.rjust() Lua API
 test:test("ljust/rjust/center", function(test)
-    test:plan(15)
+    test:plan(18)
 
     test:is(("help"):ljust(0),  "help", "ljust, length 0, do nothing")
     test:is(("help"):rjust(0),  "help", "rjust, length 0, do nothing")
@@ -68,11 +68,18 @@ test:test("ljust/rjust/center", function(test)
     test:is(("help"):ljust(6, '.'),  "help..", "ljust, length 6, two extra charachters, custom fill char")
     test:is(("help"):rjust(6, '.'),  "..help", "rjust, length 6, two extra charachters, custom fill char")
     test:is(("help"):center(6, '.'), ".help.", "center, length 6, two extra charachters, custom fill char")
+    local errmsg = "%(char expected, got string%)"
+    local _, err = pcall(function() ("help"):ljust(6, "XX") end)
+    test:ok(err and err:match(errmsg), "wrong params")
+    _, err = pcall(function() ("help"):rjust(6, "XX") end)
+    test:ok(err and err:match(errmsg), "wrong params")
+    _, err = pcall(function() ("help"):center(6, "XX") end)
+    test:ok(err and err:match(errmsg), "wrong params")
 end)
 
 -- gh-2215 - string.startswith()/string.endswith() Lua API
 test:test("startswith/endswith", function(test)
-    test:plan(20)
+    test:plan(21)
 
     test:ok((""):startswith(""),      "empty+empty startswith")
     test:ok((""):endswith(""),        "empty+empty endswith")
@@ -96,6 +103,9 @@ test:test("startswith/endswith", function(test)
     test:ok(("12345"):endswith("345", -3, -1)      , "endswith with good begin/end")
     test:ok(not ("12345"):endswith("345", 1, 4)    , "bad endswith with good begin/end")
     test:ok(not ("12345"):endswith("345", 4, 5)    , "bad endswith with good begin/end")
+
+    local _, err = pcall(function() ("help"):startswith({'n', 1}) end)
+    test:ok(err and err:match("%(string expected, got table%)"), "wrong params")
 end)
 
 test:test("hex", function(test)

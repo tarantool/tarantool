@@ -106,8 +106,8 @@ local function string_ljust(inp, width, char)
                                     type(width)), 2)
     end
     if char ~= nil and (type(char) ~= 'string' or #char ~= 1) then
-        error(err_string_arg:format(2, 'string.ljust', 'char',
-                                    type(width)), 2)
+        error(err_string_arg:format(3, 'string.ljust', 'char',
+                                    type(char)), 2)
     end
     char = char or " "
     local delta = width - #inp
@@ -133,8 +133,8 @@ local function string_rjust(inp, width, char)
                                     type(width)), 2)
     end
     if char ~= nil and (type(char) ~= 'string' or #char ~= 1) then
-        error(err_string_arg:format(2, 'string.rjust', 'char',
-                                    type(width)), 2)
+        error(err_string_arg:format(3, 'string.rjust', 'char',
+                                    type(char)), 2)
     end
     char = char or " "
     local delta = width - #inp
@@ -161,8 +161,8 @@ local function string_center(inp, width, char)
                                     type(width)), 2)
     end
     if char ~= nil and (type(char) ~= 'string' or #char ~= 1) then
-        error(err_string_arg:format(2, 'string.center', 'char',
-                                    type(width)), 2)
+        error(err_string_arg:format(3, 'string.center', 'char',
+                                    type(char)), 2)
     end
     char = char or " "
     local delta = width - #inp
@@ -192,15 +192,15 @@ local function string_startswith(inp, head, _start, _end)
     end
     if type(head) ~= 'string' then
         error(err_string_arg:format(2, 'string.startswith', 'string',
-                                    type(inp)), 2)
+                                    type(head)), 2)
     end
     if _start ~= nil and type(_start) ~= 'number' then
         error(err_string_arg:format(3, 'string.startswith', 'integer',
-                                    type(inp)), 2)
+                                    type(_start)), 2)
     end
     if _end ~= nil and type(_end) ~= 'number' then
         error(err_string_arg:format(4, 'string.startswith', 'integer',
-                                    type(inp)), 2)
+                                    type(_end)), 2)
     end
     -- prepare input arguments (move negative values [offset from the end] to
     -- positive ones and/or assign default values)
