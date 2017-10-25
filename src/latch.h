@@ -118,7 +118,7 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 
 	rlist_add_tail_entry(&l->queue, fiber(), state);
 	bool was_cancellable = fiber_set_cancellable(false);
-	ev_tstamp start = timeout;
+	ev_tstamp start = ev_monotonic_now(loop());
 	int result = 0;
 	while (true) {
 		fiber_yield_timeout(timeout);
