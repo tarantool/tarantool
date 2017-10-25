@@ -84,3 +84,13 @@ source_deploy:
 	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 \
 		cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" \
 		--acl public-read
+
+TARANTOOL_VERSION:=$(shell git describe)
+trigger_progaudi_docker_build:
+	curl -s -X POST \
+		-H "Content-Type: application/json" \
+		-H "Accept: application/json" \
+		-H "Travis-API-Version: 3" \
+		-H "Authorization: token ${PROGAUDI_ACCESS_TOKEN}" \
+		-d '{"request": {"branch":"develop","config": {"env": {"TARANTOOL_VERSION": "${TARANTOOL_VERSION}"}}}}' \
+		https://api.travis-ci.org/repo/progaudi%2Ftarantool-docker/requests
