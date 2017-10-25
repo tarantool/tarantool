@@ -314,6 +314,8 @@ iproto_connection_is_idle(struct iproto_connection *con)
 static inline void
 iproto_connection_stop(struct iproto_connection *con)
 {
+	say_warn("readahead limit reached, stopping input on connection %s",
+		 sio_socketname(con->input.fd));
 	assert(rlist_empty(&con->in_stop_list));
 	ev_io_stop(con->loop, &con->input);
 	rlist_add_tail(&stopped_connections, &con->in_stop_list);
@@ -480,9 +482,8 @@ static const struct cmsg_hop sync_route[] = {
 };
 
 static struct iproto_connection *
-iproto_connection_new(const char *name, int fd)
+iproto_connection_new(int fd)
 {
-	(void) name;
 	struct iproto_connection *con = (struct iproto_connection *)
 		mempool_alloc_xc(&iproto_connection_pool);
 	con->input.data = con->output.data = con;
@@ -1251,13 +1252,11 @@ static void
 iproto_on_accept(struct evio_service * /* service */, int fd,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
-	char name[SERVICE_NAME_MAXLEN];
-	snprintf(name, sizeof(name), "%s/%s", "iobuf",
-		sio_strfaddr(addr, addrlen));
-
+	(void) addr;
+	(void) addrlen;
 	struct iproto_connection *con;
 
-	con = iproto_connection_new(name, fd);
+	con = iproto_connection_new(fd);
 	/*
 	 * Ignore msg allocation failure - the queue size is
 	 * fixed so there is a limited number of msgs in

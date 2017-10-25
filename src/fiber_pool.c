@@ -129,6 +129,8 @@ fiber_pool_cb(ev_loop *loop, struct ev_watcher *watcher, int events)
 			 * get scheduled again - there are enough
 			 * worker fibers already, so just leave.
 			 */
+			say_warn("fiber pool size %d reached on endpoint %s",
+				 pool->max_size, pool->endpoint.name);
 			break;
 		}
 	}
