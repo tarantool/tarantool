@@ -1,4 +1,4 @@
-1..2
+1..3
     1..40
     ok 1 - round trip
     ok 2 - roundtrip.version_id
@@ -53,3 +53,6 @@ ok 1 - subtests
     ok 9 - decoded sync
     ok 10 - decoded bodycnt
 ok 2 - subtests
+    1..1
+    ok 1 - request_str
+ok 3 - subtests
