@@ -1001,3 +1001,22 @@ test_run:grep_log("default", "password")
 ---
 - password
 ...
+-- some collation test
+s = box.schema.space.create('test')
+---
+...
+not not s:create_index('test1', {parts = {{1, 'string', collation = 'Unicode'}}})
+---
+- true
+...
+not not s:create_index('test2', {parts = {{2, 'string', collation = 'UNICODE'}}})
+---
+- true
+...
+not not s:create_index('test3', {parts = {{3, 'string', collation = 'UnIcOdE'}}}) -- I'd prefer to panic on that
+---
+- true
+...
+s:drop()
+---
+...

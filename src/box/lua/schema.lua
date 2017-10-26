@@ -522,6 +522,9 @@ local function update_index_parts(space_id, parts)
                     -- find ID by name
                     local coll = box.space._collation.index.name:get{v}
                     if not coll then
+                        coll = box.space._collation.index.name:get{v:lower()}
+                    end
+                    if not coll then
                         box.error(box.error.ILLEGAL_PARAMS,
                             "options.parts[" .. i .. "]: collation was not found by name '" .. v .. "'")
                     end

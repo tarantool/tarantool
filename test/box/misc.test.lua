@@ -272,3 +272,10 @@ test_run:cmd("clear filter")
 -- test test_run:grep_log()
 require('log').info('Incorrect password supplied')
 test_run:grep_log("default", "password")
+
+-- some collation test
+s = box.schema.space.create('test')
+not not s:create_index('test1', {parts = {{1, 'string', collation = 'Unicode'}}})
+not not s:create_index('test2', {parts = {{2, 'string', collation = 'UNICODE'}}})
+not not s:create_index('test3', {parts = {{3, 'string', collation = 'UnIcOdE'}}}) -- I'd prefer to panic on that
+s:drop()
