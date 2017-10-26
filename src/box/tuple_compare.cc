@@ -345,6 +345,17 @@ mp_compare_scalar(const char *field_a, const char *field_b)
 					   field_b, mp_typeof(*field_b));
 }
 
+static inline int
+mp_compare_scalar_coll(const char *field_a, const char *field_b,
+		       struct coll *coll)
+{
+	enum mp_type type_a = mp_typeof(*field_a);
+	enum mp_type type_b = mp_typeof(*field_b);
+	if (type_a == MP_STR && type_b == MP_STR)
+		return mp_compare_str_coll(field_a, field_b, coll);
+	return mp_compare_scalar_with_hint(field_a, type_a, field_b, type_b);
+}
+
 /**
  * @brief Compare two fields parts using a type definition
  * @param field_a field
@@ -375,7 +386,9 @@ tuple_compare_field(const char *field_a, const char *field_b,
 	case FIELD_TYPE_BOOLEAN:
 		return mp_compare_bool(field_a, field_b);
 	case FIELD_TYPE_SCALAR:
-		return mp_compare_scalar(field_a, field_b);
+		return coll != NULL ?
+		       mp_compare_scalar_coll(field_a, field_b, coll) :
+		       mp_compare_scalar(field_a, field_b);
 	default:
 		unreachable();
 		return 0;
@@ -401,7 +414,9 @@ tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
 		return mp_compare_number_with_hint(field_a, a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_SCALAR:
-		return mp_compare_scalar_with_hint(field_a, a_type,
+		return coll != NULL ?
+		       mp_compare_scalar_coll(field_a, field_b, coll) :
+		       mp_compare_scalar_with_hint(field_a, a_type,
 						   field_b, b_type);
 	default:
 		unreachable();

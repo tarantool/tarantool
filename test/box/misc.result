@@ -1033,3 +1033,40 @@ s:create_index('test5', {parts = {{5, 'string', collation = 'Unicode'}}}).parts
 s:drop()
 ---
 ...
+s = box.schema.space.create('test')
+---
+...
+not not s:create_index('test1', {parts = {{1, 'scalar', collation = 'unicode_s1'}}})
+---
+- true
+...
+s:replace{1} s:replace{1.1} s:replace{false}
+---
+...
+s:replace{'Блин'} s:replace{'Ёж'} s:replace{'ешь'} s:replace{'Же'} s:replace{'Уже'}
+---
+...
+s:replace{'drop'} s:replace{'table'} s:replace{'users'}
+---
+...
+s:select{}
+---
+- - [false]
+  - [1]
+  - [1.1]
+  - ['drop']
+  - ['table']
+  - ['users']
+  - ['Блин']
+  - ['Ёж']
+  - ['ешь']
+  - ['Же']
+  - ['Уже']
+...
+s:select{'еж'}
+---
+- - ['Ёж']
+...
+s:drop()
+---
+...
