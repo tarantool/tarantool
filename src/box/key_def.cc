@@ -394,6 +394,14 @@ key_def_decode_parts(struct key_def *key_def, const char **data,
 		}
 		struct coll *coll = NULL;
 		if (part.coll_id != UINT32_MAX) {
+			if (part.type != FIELD_TYPE_STRING &&
+			    part.type != FIELD_TYPE_SCALAR) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 i + 1,
+					 "collation is reasonable only for "
+						 "string and scalar parts");
+				return -1;
+			}
 			coll = coll_cache_find(part.coll_id);
 			if (coll == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,

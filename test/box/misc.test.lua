@@ -290,3 +290,10 @@ s:replace{'drop'} s:replace{'table'} s:replace{'users'}
 s:select{}
 s:select{'еж'}
 s:drop()
+
+s = box.schema.space.create('test')
+not not s:create_index('test1', {parts = {{1, 'number', collation = 'unicode_s1'}}})
+not not s:create_index('test2', {parts = {{2, 'unsigned', collation = 'unicode_s1'}}})
+not not s:create_index('test3', {parts = {{3, 'integer', collation = 'unicode_s1'}}})
+not not s:create_index('test4', {parts = {{4, 'boolean', collation = 'unicode_s1'}}})
+s:drop()
