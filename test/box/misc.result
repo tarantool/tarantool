@@ -1017,6 +1017,19 @@ not not s:create_index('test3', {parts = {{3, 'string', collation = 'UnIcOdE'}}}
 ---
 - true
 ...
+s:create_index('test4', {parts = {{4, 'string'}}}).parts
+---
+- - type: string
+    is_nullable: false
+    fieldno: 4
+...
+s:create_index('test5', {parts = {{5, 'string', collation = 'Unicode'}}}).parts
+---
+- - type: string
+    is_nullable: false
+    collation: unicode
+    fieldno: 5
+...
 s:drop()
 ---
 ...

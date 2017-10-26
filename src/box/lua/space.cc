@@ -205,6 +205,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_pushboolean(L, part->is_nullable);
 			lua_setfield(L, -2, "is_nullable");
 
+			if (part->coll != NULL) {
+				lua_pushstring(L, part->coll->name);
+				lua_setfield(L, -2, "collation");
+			}
+
 			lua_settable(L, -3); /* index[k].parts[j] */
 		}
 
