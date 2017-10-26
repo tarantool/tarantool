@@ -7,7 +7,7 @@ local net_box = require("net.box")
 local test_run = require('test_run')
 local inspector = test_run.new()
 
-test:plan(9)
+test:plan(15)
 
 test:is(
     inspector:cmd("create server session_storage with script='box/tiny.lua'\n"),

@@ -50,12 +50,17 @@ for _, env in ipairs({
 }) do
     for _, res in ipairs({
         {' is empty', '', ''},
-        {' isn\'t empty (without ";;")', 'bla-bla.lua', 'bla-bla.lua'},
-        {' isn\'t empty (without ";;")', 'bla-bla.lua;', 'bla-bla.lua;'},
-        {' isn\'t empty (without ";;")', 'bla-bla.lua;;', 'bla-bla.lua;' .. env[3] .. ';'},
+        {' isn\'t empty (without ";;")', 'bla-bla.lua',      'bla-bla.lua'            },
+        {' isn\'t empty (without ";;")', 'bla-bla.lua;',     'bla-bla.lua;'           },
+        {' isn\'t empty (with ";;")',    'bla-bla.lua;.*;;', 'bla-bla.lua;' .. env[3] },
     }) do
-        local fh = io.popen(env[1] .. "='" .. res[2] .. "' tarantool ./" .. env[2])
-        tap:is(fh:read(), res[3], env[1] .. res[1])
+        local cmd = table.concat({
+            ("%s='%s'"):format(env[1], res[2]),
+            ('tarantool %s'):format(env[2]),
+        }, ' ')
+        local fh = io.popen(cmd)
+        local rv = fh:read():gsub('-', '%%-'):gsub('+', '%%+'):gsub('?', '%%?')
+        tap:like(res[3], rv, env[1] .. res[1])
         fh:close()
     end
 end
