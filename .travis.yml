@@ -107,6 +107,13 @@ deploy:
     on:
       branch: "1.7"
       condition: "x${TARGET} = xsource"
+  # Trigger build of proguadi/tarantool docker image
+  - provider: script
+    script: make -f .travis.mk trigger_progaudi_docker_build
+    skip_cleanup: true
+    on:
+      branch: "1.7"
+      condition: "x${TARGET} = xsource"
 
 notifications:
   email:
