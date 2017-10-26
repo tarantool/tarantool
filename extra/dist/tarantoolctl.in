@@ -492,7 +492,7 @@ local function start_check()
 end
 
 local function start()
-    log.info("Starting instance...")
+    log.info("Starting instance %s...", instance_name)
     if forward_to_systemd() then
         local cmd = "systemctl start tarantool@" .. instance_name
         log.info("Forwarding to '" .. cmd .. "'")
@@ -531,7 +531,7 @@ local function start()
 end
 
 local function stop()
-    log.info("Stopping instance...")
+    log.info("Stopping instance %s...", instance_name)
     if forward_to_systemd() then
         local cmd = "systemctl stop tarantool@" .. instance_name
         log.info("Forwarding to '" .. cmd .. "'")
