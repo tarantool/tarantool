@@ -4,13 +4,13 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(69)
+test:plan(70)
 
 --------------------------------------------------------------------------------
 -- Invalid values
 --------------------------------------------------------------------------------
 
-test:is(type(box.cfg), 'function', 'box cfg is a function')
+test:is(type(box.cfg), 'function', 'box is not started')
 
 local function invalid(name, val)
     local status, result = pcall(box.cfg, {[name]=val})
@@ -32,7 +32,7 @@ invalid('log', ':')
 invalid('log', 'syslog:xxx=')
 invalid('log_level', 'unknown')
 
-test:is(type(box.cfg), 'function', 'box is a function')
+test:is(type(box.cfg), 'function', 'box is not started')
 
 --------------------------------------------------------------------------------
 -- All box members must raise an exception on access if box.cfg{} wasn't called
@@ -42,6 +42,11 @@ local box = require('box')
 local function testfun()
     return type(box.space)
 end
+
+local status, result = pcall(testfun)
+
+test:ok(not status and result:match('Please call box.cfg{}'),
+    'exception on unconfigured box')
 
 status, result = pcall(box.error, box.error.ILLEGAL_PARAMS, 'xx')
 test:ok(result.code == box.error.ILLEGAL_PARAMS, "box.error without box.cfg")
