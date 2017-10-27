@@ -3,7 +3,7 @@
 local tap = require('tap')
 local test = tap.test("string extensions")
 
-test:plan(4)
+test:plan(5)
 
 test:test("split", function(test)
     test:plan(10)
@@ -113,5 +113,19 @@ test:test("hex", function(test)
     test:is(string.hex("hello"), "68656c6c6f", "hex non-empty string")
     test:is(string.hex(""), "", "hex empty string")
 end)
+
+test:test("strip", function(test)
+    test:plan(6)
+    local str = "  hello hello "
+    test:is(string.len(string.strip(str)), 11, "strip")
+    test:is(string.len(string.lstrip(str)), 12, "lstrip")
+    test:is(string.len(string.rstrip(str)), 13, "rstrip")
+    local _, err = pcall(string.strip, 12)
+    test:ok(err and err:match("%(string expected, got number%)"))
+    _, err = pcall(string.lstrip, 12)
+    test:ok(err and err:match("%(string expected, got number%)"))
+    _, err = pcall(string.rstrip, 12)
+    test:ok(err and err:match("%(string expected, got number%)"))
+end )
 
 os.exit(test:check() == true and 0 or -1)
