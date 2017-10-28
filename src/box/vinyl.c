@@ -413,8 +413,6 @@ struct vy_scheduler {
 	 */
 	struct ev_async scheduler_async;
 	struct fiber_cond scheduler_cond;
-	/** Used for throttling tx when quota is full. */
-	struct fiber_cond quota_cond;
 	/**
 	 * A queue with all vy_task objects created by the
 	 * scheduler and not yet taken by a worker.
@@ -1271,31 +1269,6 @@ static int
 vy_scheduler_f(va_list va);
 
 static void
-vy_scheduler_quota_exceeded_cb(struct vy_quota *quota)
-{
-	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	fiber_cond_signal(&env->scheduler->scheduler_cond);
-}
-
-static ev_tstamp
-vy_scheduler_quota_throttled_cb(struct vy_quota *quota, ev_tstamp timeout)
-{
-	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	ev_tstamp wait_start = ev_monotonic_now(loop());
-	if (fiber_cond_wait_timeout(&env->scheduler->quota_cond, timeout) != 0)
-		return 0; /* timed out */
-	ev_tstamp wait_end = ev_monotonic_now(loop());
-	return timeout - (wait_end - wait_start);
-}
-
-static void
-vy_scheduler_quota_released_cb(struct vy_quota *quota)
-{
-	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	fiber_cond_broadcast(&env->scheduler->quota_cond);
-}
-
-static void
 vy_scheduler_async_cb(ev_loop *loop, struct ev_async *watcher, int events)
 {
 	(void) loop;
@@ -1324,7 +1297,6 @@ vy_scheduler_new(struct vy_env *env)
 	scheduler->loop = loop();
 	ev_async_init(&scheduler->scheduler_async, vy_scheduler_async_cb);
 	fiber_cond_create(&scheduler->scheduler_cond);
-	fiber_cond_create(&scheduler->quota_cond);
 	mempool_create(&scheduler->task_pool, cord_slab_cache(),
 			sizeof(struct vy_task));
 	/* Start scheduler fiber. */
@@ -1353,7 +1325,6 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	tt_pthread_cond_destroy(&scheduler->worker_cond);
 	TRASH(&scheduler->scheduler_async);
 	fiber_cond_destroy(&scheduler->scheduler_cond);
-	fiber_cond_destroy(&scheduler->quota_cond);
 	tt_pthread_mutex_destroy(&scheduler->mutex);
 	free(scheduler);
 }
@@ -3865,6 +3836,13 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	vy_quota_set_watermark(&e->quota, watermark);
 }
 
+static void
+vy_env_quota_exceeded_cb(struct vy_quota *quota)
+{
+	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	fiber_cond_signal(&env->scheduler->scheduler_cond);
+}
+
 static struct vy_squash_queue *
 vy_squash_queue_new(void);
 static void
@@ -3918,9 +3896,7 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->cursor_pool, slab_cache,
 	               sizeof(struct vy_cursor));
-	vy_quota_init(&e->quota, vy_scheduler_quota_exceeded_cb,
-		                 vy_scheduler_quota_throttled_cb,
-				 vy_scheduler_quota_released_cb);
+	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0, 1.);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
@@ -3958,6 +3934,7 @@ vy_env_delete(struct vy_env *e)
 	vy_index_env_destroy(&e->index_env);
 	vy_stmt_env_destroy(&e->stmt_env);
 	vy_cache_env_destroy(&e->cache_env);
+	vy_quota_destroy(&e->quota);
 	if (e->recovery != NULL)
 		vy_recovery_delete(e->recovery);
 	vy_log_free();

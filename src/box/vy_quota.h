@@ -31,9 +31,12 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <tarantool_ev.h>
 
-#include <tarantool_ev.h> /* ev_tstamp */
+#include "fiber.h"
+#include "fiber_cond.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -41,29 +44,8 @@ extern "C" {
 
 struct vy_quota;
 
-/**
- * Called when quota is consumed if used >= watermark.
- * It is supposed to instigate memory reclaim.
- */
 typedef void
 (*vy_quota_exceeded_f)(struct vy_quota *quota);
-
-/**
- * Called when quota is consumed if used >= limit.
- * It is supposed to put the current fiber to sleep
- * until enough memory is freed. @timeout sepcifies
- * the maximal time to wait. The function should
- * return the time left or 0 on timeout.
- */
-typedef ev_tstamp
-(*vy_quota_throttled_f)(struct vy_quota *quota, ev_tstamp timeout);
-
-/**
- * Called when quota is released if used < limit.
- * It is supposed to wake up all throttled fibers.
- */
-typedef void
-(*vy_quota_released_f)(struct vy_quota *quota);
 
 /**
  * Quota used for accounting and limiting memory consumption
@@ -83,24 +65,32 @@ struct vy_quota {
 	size_t watermark;
 	/** Current memory consumption. */
 	size_t used;
-	/** Used-defined callbacks. */
+	/**
+	 * Condition variable used for throttling consumers when
+	 * there is no quota left.
+	 */
+	struct fiber_cond cond;
+	/**
+	 * Called when quota is consumed if used >= watermark.
+	 * It is supposed to trigger memory reclaim.
+	 */
 	vy_quota_exceeded_f quota_exceeded_cb;
-	vy_quota_throttled_f quota_throttled_cb;
-	vy_quota_released_f quota_released_cb;
 };
 
 static inline void
-vy_quota_init(struct vy_quota *q,
-	      vy_quota_exceeded_f quota_exceeded_cb,
-	      vy_quota_throttled_f quota_throttled_cb,
-	      vy_quota_released_f quota_released_cb)
+vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 {
 	q->limit = SIZE_MAX;
 	q->watermark = SIZE_MAX;
 	q->used = 0;
 	q->quota_exceeded_cb = quota_exceeded_cb;
-	q->quota_throttled_cb = quota_throttled_cb;
-	q->quota_released_cb = quota_released_cb;
+	fiber_cond_create(&q->cond);
+}
+
+static inline void
+vy_quota_destroy(struct vy_quota *q)
+{
+	fiber_cond_destroy(&q->cond);
 }
 
 /**
@@ -157,7 +147,7 @@ vy_quota_release(struct vy_quota *q, size_t size)
 	assert(q->used >= size);
 	q->used -= size;
 	if (q->used < q->limit)
-		q->quota_released_cb(q);
+		fiber_cond_broadcast(&q->cond);
 }
 
 /**
@@ -166,11 +156,16 @@ vy_quota_release(struct vy_quota *q, size_t size)
  * time to wait. Return 0 on success, -1 on timeout.
  */
 static inline int
-vy_quota_use(struct vy_quota *q, size_t size, ev_tstamp timeout)
+vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 {
 	vy_quota_force_use(q, size);
-	while (q->used >= q->limit && timeout > 0)
-		timeout = q->quota_throttled_cb(q, timeout);
+	while (q->used >= q->limit && timeout > 0) {
+		double wait_start = ev_monotonic_now(loop());
+		if (fiber_cond_wait_timeout(&q->cond, timeout) != 0)
+			break; /* timed out */
+		double wait_end = ev_monotonic_now(loop());
+		timeout -= (wait_end - wait_start);
+	}
 	if (q->used > q->limit) {
 		vy_quota_release(q, size);
 		return -1;
