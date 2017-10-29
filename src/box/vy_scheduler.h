@@ -52,10 +52,11 @@ struct cord;
 struct fiber;
 struct vy_index;
 struct vy_run_env;
+struct vy_scheduler;
 
 typedef void
-(*vy_scheduler_dump_complete_f)(int64_t dump_generation,
-				double dump_duration, void *arg);
+(*vy_scheduler_dump_complete_f)(struct vy_scheduler *scheduler,
+				int64_t dump_generation, double dump_duration);
 
 struct vy_scheduler {
 	/** Scheduler fiber. */
@@ -162,8 +163,6 @@ struct vy_scheduler {
 	 * by the dump.
 	 */
 	vy_scheduler_dump_complete_f dump_complete_cb;
-	/** Argument passed to dump_complete_cb(). */
-	void *cb_arg;
 	/** List of read views, see tx_manager::read_views. */
 	struct rlist *read_views;
 	/** Context needed for writing runs. */
@@ -173,16 +172,16 @@ struct vy_scheduler {
 /**
  * Create a scheduler instance.
  */
-struct vy_scheduler *
-vy_scheduler_new(int write_threads,
-		 vy_scheduler_dump_complete_f dump_complete_cb, void *cb_arg,
-		 struct vy_run_env *run_env, struct rlist *read_views);
+void
+vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
+		    vy_scheduler_dump_complete_f dump_complete_cb,
+		    struct vy_run_env *run_env, struct rlist *read_views);
 
 /**
  * Destroy a scheduler instance.
  */
 void
-vy_scheduler_delete(struct vy_scheduler *scheduler);
+vy_scheduler_destroy(struct vy_scheduler *scheduler);
 
 /**
  * Add an index to scheduler dump/compaction queues.

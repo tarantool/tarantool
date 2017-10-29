@@ -304,20 +304,14 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 	}
 }
 
-struct vy_scheduler *
-vy_scheduler_new(int write_threads,
-		 vy_scheduler_dump_complete_f dump_complete_cb, void *cb_arg,
-		 struct vy_run_env *run_env, struct rlist *read_views)
+void
+vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
+		    vy_scheduler_dump_complete_f dump_complete_cb,
+		    struct vy_run_env *run_env, struct rlist *read_views)
 {
-	struct vy_scheduler *scheduler = calloc(1, sizeof(*scheduler));
-	if (scheduler == NULL) {
-		diag_set(OutOfMemory, sizeof(*scheduler),
-			 "malloc", "struct vy_scheduler");
-		return NULL;
-	}
+	memset(scheduler, 0, sizeof(*scheduler));
 
 	scheduler->dump_complete_cb = dump_complete_cb;
-	scheduler->cb_arg = cb_arg;
 	scheduler->read_views = read_views;
 	scheduler->run_env = run_env;
 
@@ -346,11 +340,10 @@ vy_scheduler_new(int write_threads,
 	fiber_cond_create(&scheduler->dump_cond);
 
 	fiber_start(scheduler->scheduler_fiber, scheduler);
-	return scheduler;
 }
 
 void
-vy_scheduler_delete(struct vy_scheduler *scheduler)
+vy_scheduler_destroy(struct vy_scheduler *scheduler)
 {
 	/* Stop scheduler fiber. */
 	scheduler->scheduler_fiber = NULL;
@@ -371,7 +364,6 @@ vy_scheduler_delete(struct vy_scheduler *scheduler)
 	vy_compact_heap_destroy(&scheduler->compact_heap);
 
 	TRASH(scheduler);
-	free(scheduler);
 }
 
 void
@@ -494,8 +486,8 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	double dump_duration = now - scheduler->dump_start;
 	scheduler->dump_start = now;
 	scheduler->dump_generation = min_generation;
-	scheduler->dump_complete_cb(min_generation - 1, dump_duration,
-				    scheduler->cb_arg);
+	scheduler->dump_complete_cb(scheduler,
+			min_generation - 1, dump_duration);
 	fiber_cond_signal(&scheduler->dump_cond);
 }
 

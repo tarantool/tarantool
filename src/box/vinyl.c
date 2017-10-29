@@ -89,8 +89,6 @@ struct vy_env {
 	enum vy_status status;
 	/** TX manager */
 	struct tx_manager   *xm;
-	/** Scheduler */
-	struct vy_scheduler *scheduler;
 	/** Statistics */
 	struct vy_stat      *stat;
 	/** Upsert squash queue */
@@ -109,6 +107,8 @@ struct vy_env {
 	struct vy_run_env run_env;
 	/** Environment for statements subsystem. */
 	struct vy_stmt_env stmt_env;
+	/** Scheduler */
+	struct vy_scheduler scheduler;
 	/** Local recovery context. */
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
@@ -117,7 +117,6 @@ struct vy_env {
 	char *path;
 	/** Max size of the memory level. */
 	size_t memory;
-	/** Max size of the tuple cache. */
 	/** Max time a transaction may wait for memory. */
 	double timeout;
 	/** Max number of threads used for reading. */
@@ -602,7 +601,7 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 		 * need to retry to log it now.
 		 */
 		if (index->commit_lsn >= 0) {
-			vy_scheduler_add_index(env->scheduler, index);
+			vy_scheduler_add_index(&env->scheduler, index);
 			return;
 		}
 	}
@@ -641,7 +640,7 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 	 * After we committed the index in the log, we can schedule
 	 * a task for it.
 	 */
-	vy_scheduler_add_index(env->scheduler, index);
+	vy_scheduler_add_index(&env->scheduler, index);
 }
 
 /*
@@ -672,7 +671,7 @@ vy_log_index_prune(struct vy_index *index, int64_t gc_lsn)
 void
 vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
 {
-	vy_scheduler_remove_index(env->scheduler, index);
+	vy_scheduler_remove_index(&env->scheduler, index);
 
 	/*
 	 * We can't abort here, because the index drop request has
@@ -743,8 +742,8 @@ vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
 			vy_index_swap(old_index, new_index);
 			new_index->is_dropped = old_index->is_dropped;
 			new_index->truncate_count = old_index->truncate_count;
-			vy_scheduler_remove_index(env->scheduler, old_index);
-			vy_scheduler_add_index(env->scheduler, new_index);
+			vy_scheduler_remove_index(&env->scheduler, old_index);
+			vy_scheduler_add_index(&env->scheduler, new_index);
 			continue;
 		}
 
@@ -782,7 +781,7 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct vy_index *index = vy_index(old_space->index[i]);
 		index->is_dropped = true;
-		vy_scheduler_remove_index(env->scheduler, index);
+		vy_scheduler_remove_index(&env->scheduler, index);
 	}
 
 	/*
@@ -820,7 +819,7 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 	 */
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct vy_index *index = vy_index(new_space->index[i]);
-		vy_scheduler_add_index(env->scheduler, index);
+		vy_scheduler_add_index(&env->scheduler, index);
 	}
 }
 
@@ -2192,14 +2191,14 @@ vy_env_quota_exceeded_cb(struct vy_quota *quota)
 		 */
 		return;
 	}
-	vy_scheduler_trigger_dump(env->scheduler);
+	vy_scheduler_trigger_dump(&env->scheduler);
 }
 
 static void
-vy_env_dump_complete_cb(int64_t dump_generation, double dump_duration,
-			void *arg)
+vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
+			int64_t dump_generation, double dump_duration)
 {
-	struct vy_env *env = arg;
+	struct vy_env *env = container_of(scheduler, struct vy_env, scheduler);
 
 	/* Free memory and release quota. */
 	struct lsregion *allocator = &env->stmt_env.allocator;
@@ -2252,21 +2251,19 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	e->stat = vy_stat_new();
 	if (e->stat == NULL)
 		goto error_stat;
-	e->scheduler = vy_scheduler_new(e->write_threads,
-					vy_env_dump_complete_cb, e,
-					&e->run_env, &e->xm->read_views);
-	if (e->scheduler == NULL)
-		goto error_sched;
 	e->squash_queue = vy_squash_queue_new();
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
 	vy_stmt_env_create(&e->stmt_env, e->memory);
+	vy_scheduler_create(&e->scheduler, e->write_threads,
+			    vy_env_dump_complete_cb,
+			    &e->run_env, &e->xm->read_views);
 
 	if (vy_index_env_create(&e->index_env, e->path,
 				&e->stmt_env.allocator,
-				&e->scheduler->generation, vy_squash_schedule,
-				e) != 0)
+				&e->scheduler.generation,
+				vy_squash_schedule, e) != 0)
 		goto error_index_env;
 
 	struct slab_cache *slab_cache = cord_slab_cache();
@@ -2282,10 +2279,9 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	return e;
 error_index_env:
 	vy_stmt_env_destroy(&e->stmt_env);
+	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
-	vy_scheduler_delete(e->scheduler);
-error_sched:
 	vy_stat_delete(e->stat);
 error_stat:
 	tx_manager_delete(e->xm);
@@ -2300,8 +2296,8 @@ void
 vy_env_delete(struct vy_env *e)
 {
 	ev_timer_stop(loop(), &e->quota_timer);
+	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
-	vy_scheduler_delete(e->scheduler);
 	tx_manager_delete(e->xm);
 	free(e->path);
 	vy_stat_delete(e->stat);
@@ -2346,7 +2342,7 @@ vy_begin_checkpoint(struct vy_env *env)
 	 */
 	if (lsregion_used(&env->stmt_env.allocator) == 0)
 		return 0;
-	if (vy_scheduler_begin_checkpoint(env->scheduler) != 0)
+	if (vy_scheduler_begin_checkpoint(&env->scheduler) != 0)
 		return -1;
 	return 0;
 }
@@ -2355,7 +2351,7 @@ int
 vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	assert(env->status == VINYL_ONLINE);
-	if (vy_scheduler_wait_checkpoint(env->scheduler) != 0)
+	if (vy_scheduler_wait_checkpoint(&env->scheduler) != 0)
 		return -1;
 	if (vy_log_rotate(vclock) != 0)
 		return -1;
@@ -2367,14 +2363,14 @@ vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
 {
 	(void)vclock;
 	assert(env->status == VINYL_ONLINE);
-	vy_scheduler_end_checkpoint(env->scheduler);
+	vy_scheduler_end_checkpoint(&env->scheduler);
 }
 
 void
 vy_abort_checkpoint(struct vy_env *env)
 {
 	assert(env->status == VINYL_ONLINE);
-	vy_scheduler_end_checkpoint(env->scheduler);
+	vy_scheduler_end_checkpoint(&env->scheduler);
 }
 
 /* }}} Checkpoint */
