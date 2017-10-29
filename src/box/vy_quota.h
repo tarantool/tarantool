@@ -94,15 +94,6 @@ vy_quota_destroy(struct vy_quota *q)
 }
 
 /**
- * Return true if memory reclaim should be triggered.
- */
-static inline bool
-vy_quota_is_exceeded(struct vy_quota *q)
-{
-	return q->used > q->watermark;
-}
-
-/**
  * Set memory limit. If current memory usage exceeds
  * the new limit, invoke the callback.
  */
@@ -146,8 +137,7 @@ vy_quota_release(struct vy_quota *q, size_t size)
 {
 	assert(q->used >= size);
 	q->used -= size;
-	if (q->used < q->limit)
-		fiber_cond_broadcast(&q->cond);
+	fiber_cond_broadcast(&q->cond);
 }
 
 /**
@@ -158,18 +148,19 @@ vy_quota_release(struct vy_quota *q, size_t size)
 static inline int
 vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 {
-	vy_quota_force_use(q, size);
-	while (q->used >= q->limit && timeout > 0) {
+	while (q->used + size > q->limit && timeout > 0) {
+		q->quota_exceeded_cb(q);
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&q->cond, timeout) != 0)
 			break; /* timed out */
 		double wait_end = ev_monotonic_now(loop());
 		timeout -= (wait_end - wait_start);
 	}
-	if (q->used > q->limit) {
-		vy_quota_release(q, size);
+	if (q->used + size > q->limit)
 		return -1;
-	}
+	q->used += size;
+	if (q->used >= q->watermark)
+		q->quota_exceeded_cb(q);
 	return 0;
 }
 

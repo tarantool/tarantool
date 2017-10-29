@@ -439,6 +439,13 @@ struct vy_scheduler {
 	/** Set if checkpoint is in progress. */
 	bool checkpoint_in_progress;
 	/**
+	 * In order to guarantee checkpoint consistency, we must not
+	 * dump in-memory trees created after checkpoint was started
+	 * so we set this flag instead, which will make the scheduler
+	 * schedule a dump as soon as checkpoint is complete.
+	 */
+	bool dump_pending;
+	/**
 	 * Current generation of in-memory data.
 	 *
 	 * New in-memory trees inherit the current generation, while
@@ -1401,8 +1408,14 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
 retry:
 	*ptask = NULL;
-	bool dump_in_progress = (scheduler->dump_generation <
-				 scheduler->generation);
+	assert(scheduler->dump_generation <= scheduler->generation);
+	if (scheduler->dump_generation == scheduler->generation) {
+		/*
+		 * All memory trees of past generations have
+		 * been dumped, nothing to do.
+		 */
+		return 0;
+	}
 	/*
 	 * Look up the oldest index eligible for dump.
 	 */
@@ -1410,18 +1423,13 @@ retry:
 	if (pn == NULL) {
 		/*
 		 * There is no vinyl index and so no task to schedule.
-		 * If a dump round is in progress, complete it.
+		 * Complete the current dump round.
 		 */
-		if (dump_in_progress)
-			vy_scheduler_complete_dump(scheduler);
+		vy_scheduler_complete_dump(scheduler);
 		return 0;
 	}
 	struct vy_index *index = container_of(pn, struct vy_index, in_dump);
-	if (index->is_dumping || index->pin_count > 0) {
-		/* All eligible indexes are already being dumped. */
-		return 0;
-	}
-	if (dump_in_progress &&
+	if (!index->is_dumping && index->pin_count == 0 &&
 	    vy_index_generation(index) == scheduler->dump_generation) {
 		/*
 		 * Dump is in progress and there is an index that
@@ -1439,44 +1447,13 @@ retry:
 		 */
 		goto retry;
 	}
-	if (dump_in_progress) {
-		/*
-		 * Dump is in progress, but there is no index eligible
-		 * for dump in the heap. Wait until the current round
-		 * is complete.
-		 */
-		assert(scheduler->dump_task_count > 0);
-		return 0;
-	}
 	/*
-	 * Nothing being dumped right now. Consider triggering
-	 * dump if memory quota is exceeded.
+	 * Dump is in progress, but all eligible indexes are
+	 * already being dumped. Wait until the current round
+	 * is complete.
 	 */
-	if (scheduler->checkpoint_in_progress) {
-		/*
-		 * Do not trigger another dump until checkpoint
-		 * is complete so as to make sure no statements
-		 * inserted after WAL rotation are written to
-		 * the snapshot.
-		 */
-		return 0;
-	}
-	if (!vy_quota_is_exceeded(&scheduler->env->quota)) {
-		/*
-		 * Memory consumption is below the watermark,
-		 * nothing to do.
-		 */
-		return 0;
-	}
-	if (lsregion_used(&scheduler->env->stmt_env.allocator) == 0) {
-		/*
-		 * Quota must be exceeded by a pending transaction,
-		 * there's nothing we can do about that.
-		 */
-		return 0;
-	}
-	vy_scheduler_trigger_dump(scheduler);
-	goto retry;
+	assert(scheduler->dump_task_count > 0);
+	return 0;
 }
 
 /**
@@ -1812,16 +1789,24 @@ static void
 vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 {
 	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->generation == scheduler->dump_generation) {
-		/*
-		 * We are about to start a new dump round.
-		 * Remember the current time so that we can update
-		 * dump bandwidth when the dump round is complete
-		 * (see vy_scheduler_complete_dump()).
-		 */
-		scheduler->dump_start = ev_monotonic_now(loop());
+	if (scheduler->dump_generation < scheduler->generation) {
+		/* Dump is already in progress, nothing to do. */
+		return;
 	}
+	if (scheduler->checkpoint_in_progress) {
+		/*
+		 * Do not trigger another dump until checkpoint
+		 * is complete so as to make sure no statements
+		 * inserted after WAL rotation are written to
+		 * the snapshot.
+		 */
+		scheduler->dump_pending = true;
+		return;
+	}
+	scheduler->dump_start = ev_monotonic_now(loop());
 	scheduler->generation++;
+	scheduler->dump_pending = false;
+	fiber_cond_signal(&scheduler->scheduler_cond);
 }
 
 /**
@@ -1913,7 +1898,17 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 		return -1;
 	}
 
-	vy_scheduler_trigger_dump(scheduler);
+	assert(scheduler->dump_generation <= scheduler->generation);
+	if (scheduler->generation == scheduler->dump_generation) {
+		/*
+		 * We are about to start a new dump round.
+		 * Remember the current time so that we can update
+		 * dump bandwidth when the dump round is complete
+		 * (see vy_scheduler_complete_dump()).
+		 */
+		scheduler->dump_start = ev_monotonic_now(loop());
+	}
+	scheduler->generation++;
 	scheduler->checkpoint_in_progress = true;
 	fiber_cond_signal(&scheduler->scheduler_cond);
 	return 0;
@@ -1958,13 +1953,15 @@ vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
 	if (!scheduler->checkpoint_in_progress)
 		return;
 
-	/*
-	 * Checkpoint blocks dumping of in-memory trees created after
-	 * checkpoint started, so wake up the scheduler after we are
-	 * done so that it can catch up.
-	 */
 	scheduler->checkpoint_in_progress = false;
-	fiber_cond_signal(&scheduler->scheduler_cond);
+	if (scheduler->dump_pending) {
+		/*
+		 * Dump was triggered while checkpoint was
+		 * in progress and hence it was postponed.
+		 * Schedule it now.
+		 */
+		vy_scheduler_trigger_dump(scheduler);
+	}
 }
 
 /* Scheduler }}} */
@@ -3840,7 +3837,16 @@ static void
 vy_env_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
-	fiber_cond_signal(&env->scheduler->scheduler_cond);
+	if (lsregion_used(&env->stmt_env.allocator) == 0) {
+		/*
+		 * The memory limit has been exceeded, but there's
+		 * nothing to dump. This may happen if all available
+		 * quota has been consumed by pending transactions.
+		 * There's nothing we can do about that.
+		 */
+		return;
+	}
+	vy_scheduler_trigger_dump(env->scheduler);
 }
 
 static struct vy_squash_queue *
