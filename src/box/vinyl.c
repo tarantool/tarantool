@@ -61,6 +61,7 @@
 #include "column_mask.h"
 #include "trigger.h"
 #include "checkpoint.h"
+#include "wal.h" /* wal_mode() */
 
 /**
  * Yield after iterating over this many objects (e.g. ranges).
@@ -484,6 +485,26 @@ vy_index_info(struct vy_index *index, struct info_handler *h)
 /** }}} Introspection */
 
 /**
+ * Check if WAL is enabled.
+ *
+ * Vinyl needs to log all operations done on indexes in its own
+ * journal - vylog. If we allowed to use it in conjunction with
+ * wal_mode = 'none', vylog and WAL could get out of sync, which
+ * can result in weird recovery errors. So we forbid DML/DDL
+ * operations in case WAL is disabled.
+ */
+static inline int
+vinyl_check_wal(struct vy_env *env, const char *what)
+{
+	if (env->status == VINYL_ONLINE && wal_mode() == WAL_NONE) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 tt_sprintf("%s if wal_mode = 'none'", what));
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * Given a space and an index id, return vy_index.
  * If index not found, return NULL and set diag.
  */
@@ -698,6 +719,9 @@ int
 vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
 			  struct space *new_space)
 {
+	if (vinyl_check_wal(env, "DDL") != 0)
+		return -1;
+
 	assert(old_space->index_count == new_space->index_count);
 	uint32_t index_count = new_space->index_count;
 	if (index_count == 0)
@@ -827,6 +851,8 @@ int
 vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 		       struct space *new_space)
 {
+	if (vinyl_check_wal(env, "DDL") != 0)
+		return -1;
 	/*
 	 * The space with no indexes can contain no rows.
 	 * Allow alter.
@@ -2029,6 +2055,10 @@ vy_begin(struct vy_env *env)
 int
 vy_prepare(struct vy_env *env, struct vy_tx *tx)
 {
+	if (tx->write_size > 0 &&
+	    vinyl_check_wal(env, "DML") != 0)
+		return -1;
+
 	/*
 	 * A replica receives a lot of data during initial join.
 	 * If the network connection is fast enough, it might fail
