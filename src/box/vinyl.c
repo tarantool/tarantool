@@ -2030,13 +2030,20 @@ int
 vy_prepare(struct vy_env *env, struct vy_tx *tx)
 {
 	/*
+	 * A replica receives a lot of data during initial join.
+	 * If the network connection is fast enough, it might fail
+	 * to keep up with dumps. To avoid replication failure due
+	 * to this, we ignore the quota timeout during bootstrap.
+	 */
+	double timeout = (env->status == VINYL_ONLINE ?
+			  env->timeout : TIMEOUT_INFINITY);
+	/*
 	 * Reserve quota needed by the transaction before allocating
 	 * memory. Since this may yield, which opens a time window for
 	 * the transaction to be sent to read view or aborted, we call
 	 * it before checking for conflicts.
 	 */
-	if (vy_quota_use(&env->quota, tx->write_size,
-			 env->timeout) != 0) {
+	if (vy_quota_use(&env->quota, tx->write_size, timeout) != 0) {
 		diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
 		return -1;
 	}
