@@ -31,7 +31,10 @@ end
 
 fio_methods.write = function(self, data)
     data = tostring(data)
-    local res = internal.write(self.fh, data, #data)
+    local res, err = internal.write(self.fh, data, #data)
+    if err ~= nil then
+        return false, err
+    end
     return res >= 0
 end
 
@@ -48,7 +51,10 @@ fio_methods.pwrite = function(self, data, offset)
         offset = tonumber(offset)
     end
 
-    local res = internal.pwrite(self.fh, data, len, offset)
+    local res, err = internal.pwrite(self.fh, data, len, offset)
+    if err ~= nil then
+        return false, err
+    end
     return res >= 0
 end
 
@@ -62,7 +68,6 @@ fio_methods.pread = function(self, len, offset)
 
     return internal.pread(self.fh, tonumber(len), tonumber(offset))
 end
-
 
 fio_methods.truncate = function(self, length)
     if length == nil then
@@ -85,16 +90,15 @@ fio_methods.seek = function(self, offset, whence)
     end
 
     local res = internal.lseek(self.fh, tonumber(offset), whence)
-
-    if res < 0 then
-        return nil
-    end
     return tonumber(res)
 end
 
 fio_methods.close = function(self)
-    local res = internal.close(self.fh)
+    local res, err = internal.close(self.fh)
     self.fh = -1
+    if err ~= nil then
+        return false, err
+    end
     return res
 end
 
@@ -106,7 +110,6 @@ fio_methods.fdatasync = function(self)
     return internal.fdatasync(self.fh)
 end
 
-
 fio_methods.stat = function(self)
     return internal.fstat(self.fh)
 end
@@ -117,12 +120,14 @@ local fio_mt = { __index = fio_methods }
 fio.open = function(path, flags, mode)
     local iflag = 0
     local imode = 0
-
+    if type(path) ~= 'string' then
+        error("Usage open(path[, flags[, mode]])")
+    end
     if type(flags) ~= 'table' then
         flags = { flags }
     end
     if type(mode) ~= 'table' then
-        mode = { mode or 0x1FF } -- 0777
+        mode = { mode or (bit.band(0x1FF, fio.umask())) }
     end
 
 
@@ -148,9 +153,9 @@ fio.open = function(path, flags, mode)
         end
     end
 
-    local fh = internal.open(tostring(path), iflag, imode)
-    if fh < 0 then
-        return nil
+    local fh, err = internal.open(tostring(path), iflag, imode)
+    if err ~= nil then
+        return nil, err
     end
 
     fh = { fh = fh }
@@ -190,8 +195,8 @@ fio.pathjoin = function(path, ...)
 end
 
 fio.basename = function(path, suffix)
-    if path == nil then
-        return nil
+    if type(path) ~= 'string' then
+        error("Usage fio.basename(path[, suffix])")
     end
 
     path = tostring(path)
@@ -209,10 +214,9 @@ fio.basename = function(path, suffix)
 end
 
 fio.dirname = function(path)
-    if path == nil then
-        return nil
+    if type(path) ~= 'string' then
+        error("Usage fio.dirname(path)")
     end
-    path = tostring(path)
     path = ffi.new('char[?]', #path + 1, path)
     return ffi.string(ffi.C.dirname(path))
 end
@@ -235,9 +239,9 @@ fio.abspath = function(path)
     -- following established conventions of fio module:
     -- letting nil through and converting path to string
     if path == nil then
-        return nil
+        error("Usage fio.abspath(path)")
     end
-    path = tostring(path)
+    path = path
     local joined_path = ''
     local path_tab = {}
     if string.sub(path, 1, 1) == '/' then
@@ -256,19 +260,19 @@ fio.abspath = function(path)
 end
 
 fio.chdir = function(path)
-    if path == nil or type(path)~='string' then
-        return false
+    if type(path)~='string' then
+        error("Usage: fio.chdir(path)")
     end
     return ffi.C.chdir(path) == 0
 end
 
 fio.listdir = function(path)
-    if path == nil or type(path) ~= 'string' then
-        return nil
+    if type(path) ~= 'string' then
+        error("Usage: fio.listdir(path)")
     end
-    local str = internal.listdir(path)
-    if str == nil then
-        return nil
+    local str, err = internal.listdir(path)
+    if err ~= nil then
+        return nil, string.format("can't listdir %s: %s", path, err)
     end
     local t = {}
     if str == "" then
@@ -282,34 +286,25 @@ fio.listdir = function(path)
 end
 
 fio.mktree = function(path, mode)
-    path = fio.abspath(path)
-    if path == nil then
-        return false
+    if type(path) ~= "string" then
+        error("Usage: fio.mktree(path[, mode])")
     end
+    path = fio.abspath(path)
+
     local path = string.gsub(path, '^/', '')
     local dirs = string.split(path, "/")
 
     if #dirs == 1 then
-        if mode then
-            return fio.mkdir(path, mode)
-        else
-            return fio.mkdir(path)
-        end
+        return fio.mkdir(path, mode)
     end
-
+    local st, err
     local current_dir = "/"
     for i, dir in ipairs(dirs) do
         current_dir = fio.pathjoin(current_dir, dir)
         if not fio.stat(current_dir) then
-            local res
-            if mode then
-                if not fio.mkdir(current_dir, mode) then
-                    res = false
-                end
-            else
-                if not fio.mkdir(current_dir) then
-                    res = false
-                end
+            st, err = fio.mkdir(current_dir, mode)
+            if err ~= nil  then
+                return false, "Error create dir " .. current_dir .. err
             end
         end
     end
@@ -317,22 +312,30 @@ fio.mktree = function(path, mode)
 end
 
 fio.rmtree = function(path)
-    if path == nil then
-        return false
+    if type(path) ~= 'string' then
+        error("Usage: fio.rmtree(path)")
     end
-    local path = tostring(path)
+    local status, err
     path = fio.abspath(path)
-    local ls = fio.listdir(path)
-
+    local ls, err = fio.listdir(path)
+    if err ~= nil then
+        return nil, err
+    end
     for i, f in ipairs(ls) do
         local tmppath = fio.pathjoin(path, f)
-        if fio.stat(tmppath):is_dir() then
-            if not fio.rmtree(tmppath) then
-                return false
+        local st = fio.stat(tmppath)
+        if st and st:is_dir() then
+            st, err = fio.rmtree(tmppath)
+            if err ~= nil  then
+                return nil, err
             end
         end
     end
-    return fio.rmdir(path)
+    status, err = fio.rmdir(path)
+    if err ~= nil then
+        return false, string.format("failed to remove %s: %s", path, err)
+    end
+    return true
 end
 
 fio.copyfile = function(from, to)
@@ -343,7 +346,11 @@ fio.copyfile = function(from, to)
     if st and st:is_dir() then
         to = fio.pathjoin(to, fio.basename(from))
     end
-    return internal.copyfile(from, to)
+    local _, err = internal.copyfile(from, to)
+    if err ~= nil then
+        return false, string.format("failed to copy %s to %s: %s", from, to, err)
+    end
+    return true
 end
 
 fio.copytree = function(from, to)
@@ -351,43 +358,47 @@ fio.copytree = function(from, to)
         error('Usage: fio.copytree(from, to)')
     end
     local status, reason
-    from = fio.abspath(from)
     local st = fio.stat(from)
-    if st == nil or not st:is_dir() then
+    if not st then
+        return false, string.format("Directory %s does not exist", from)
+    end
+    if not st:is_dir() then
         return false, errno.strerror(errno.ENOTDIR)
     end
-    local ls = fio.listdir(from)
-    to = fio.abspath(to)
+    local ls, err = fio.listdir(from)
+    if err ~= nil then
+        return false, err
+    end
 
     -- create tree of destination
-    local status, reason = fio.mktree(to)
-    if not status then
-        return status, reason
+    status, reason = fio.mktree(to)
+    if reason ~= nil then
+        return false, reason
     end
     for i, f in ipairs(ls) do
         local ffrom = fio.pathjoin(from, f)
         local fto = fio.pathjoin(to, f)
         local st = fio.lstat(ffrom)
-        if st:is_dir() then
+        if st and st:is_dir() then
             status, reason = fio.copytree(ffrom, fto)
-            if not status then
-                return status, reason
+            if reason ~= nil then
+                return false, reason
             end
         end
         if st:is_reg() then
             status, reason = fio.copyfile(ffrom, fto)
-            if not status then
-                return status, reason
+            if reason ~= nil then
+                return false, reason
             end
         end
         if st:is_link() then
             local link_to, reason = fio.readlink(ffrom)
-            if not link_to then
-                return status, reason
+            if reason ~= nil then
+                return false, reason
             end
             status, reason = fio.symlink(link_to, fto)
-            if not status then
-                return nil, "can't create symlink in place of existing file "..fto
+            if reason ~= nil then
+                return false, "can't create symlink in place of existing file "..fto
             end
         end
     end

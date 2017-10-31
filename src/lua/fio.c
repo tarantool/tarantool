@@ -47,6 +47,13 @@
 #include "lua/utils.h"
 #include "coio_file.h"
 
+static inline void
+lbox_fio_pushsyserror(struct lua_State *L)
+{
+	diag_set(SystemError, "fio: %s", strerror(errno));
+	luaT_pusherror(L, diag_get()->last);
+}
+
 static int
 lbox_fio_open(struct lua_State *L)
 {
@@ -62,6 +69,11 @@ usage:
 	int mode = lua_tointeger(L, 3);
 
 	int fh = coio_file_open(pathname, flags, mode);
+	if (fh < 0) {
+		lua_pushnil(L);
+		lbox_fio_pushsyserror(L);
+		return 2;
+	}
 	lua_pushinteger(L, fh);
 	return 1;
 }
@@ -77,6 +89,11 @@ lbox_fio_pwrite(struct lua_State *L)
 	size_t offset = lua_tonumber(L, 4);
 
 	int res = coio_pwrite(fh, buf, len, offset);
+	if (res < 0) {
+		lua_pushnil(L);
+		lbox_fio_pushsyserror(L);
+		return 2;
+	}
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -98,20 +115,31 @@ lbox_fio_pread(struct lua_State *L)
 	if (!buf) {
 		errno = ENOMEM;
 		lua_pushnil(L);
-		return 1;
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
 
-
 	int res = coio_pread(fh, buf, len, offset);
-
 
 	if (res < 0) {
 		lua_pop(L, 1);
 		lua_pushnil(L);
-		return 1;
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
 	lua_pushlstring(L, (char *)buf, res);
 	lua_remove(L, -2);
+	return 1;
+}
+
+static inline int
+lbox_fio_pushbool(struct lua_State *L, bool res)
+{
+	lua_pushboolean(L, res);
+	if (!res) {
+		lbox_fio_pushsyserror(L);
+		return 2;
+	}
 	return 1;
 }
 
@@ -131,8 +159,7 @@ usage:
 		goto usage;
 
 	int res = coio_rename(oldpath, newpath);
-	lua_pushboolean(L, res == 0);
-	return 1;
+	return lbox_fio_pushbool(L, res == 0);
 }
 
 static int
@@ -147,8 +174,7 @@ usage:
 	if (pathname == NULL)
 		goto usage;
 	int res = coio_unlink(pathname);
-	lua_pushboolean(L, res == 0);
-	return 1;
+	return lbox_fio_pushbool(L, res == 0);
 }
 
 static int
@@ -157,8 +183,7 @@ lbox_fio_ftruncate(struct lua_State *L)
 	int fd = lua_tointeger(L, 1);
 	off_t length = lua_tonumber(L, 2);
 	int res = coio_ftruncate(fd, length);
-	lua_pushboolean(L, res == 0);
-	return 1;
+	return lbox_fio_pushbool(L, res == 0);
 }
 
 static int
@@ -180,8 +205,7 @@ usage:
 		length = 0;
 	int res = coio_truncate(pathname, length);
 
-	lua_pushboolean(L, res == 0);
-	return 1;
+	return lbox_fio_pushbool(L, res == 0);
 }
 
 static int
@@ -194,6 +218,11 @@ lbox_fio_write(struct lua_State *L)
 
 	size_t len = lua_tonumber(L, 3);
 	int res = coio_write(fh, buf, len);
+	if (res < 0) {
+		lua_pushnil(L);
+		lbox_fio_pushsyserror(L);
+		return 2;
+	}
 	lua_pushinteger(L, res);
 	return 1;
 }
@@ -242,8 +271,7 @@ usage:
 		group = entry->gr_gid;
 	}
 	int res = coio_chown(pathname, owner, group);
-	lua_pushboolean(L, res == 0);
-	return 1;
+	return lbox_fio_pushbool(L, res == 0);
 }
 
 static int
@@ -259,8 +287,7 @@ usage:
 		goto usage;
 
 	mode_t mode = lua_tointeger(L, 2);
-	lua_pushboolean(L, coio_chmod(pathname, mode) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_chmod(pathname, mode) == 0);
 }
 
 static int
@@ -288,7 +315,8 @@ lbox_fio_read(struct lua_State *L)
 	if (res < 0) {
 		lua_pop(L, 1);
 		lua_pushnil(L);
-		return 1;
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
 	lua_pushlstring(L, (char *)buf, res);
 	lua_remove(L, -2);
@@ -357,8 +385,13 @@ DEF_STAT_METHOD(is_sock, S_ISSOCK);
 #endif
 
 static int
-lbox_fio_pushstat(struct lua_State *L, const struct stat *stat)
+lbox_fio_pushstat(struct lua_State *L, int res, const struct stat *stat)
 {
+	if (res < 0) {
+		lua_pushnil(L);
+		lbox_fio_pushsyserror(L);
+		return 2;
+	}
 	lua_newtable(L);
 
 	PUSHTABLE("dev", lua_pushinteger, stat->st_dev);
@@ -425,11 +458,7 @@ usage:
 	struct stat stat;
 
 	int res = coio_lstat(pathname, &stat);
-	if (res < 0) {
-		lua_pushnil(L);
-		return 1;
-	}
-	return lbox_fio_pushstat(L, &stat);
+	return lbox_fio_pushstat(L, res, &stat);
 }
 
 static int
@@ -446,11 +475,7 @@ usage:
 	struct stat stat;
 
 	int res = coio_stat(pathname, &stat);
-	if (res < 0) {
-		lua_pushnil(L);
-		return 1;
-	}
-	return lbox_fio_pushstat(L, &stat);
+	return lbox_fio_pushstat(L, res, &stat);
 }
 
 static int
@@ -459,11 +484,7 @@ lbox_fio_fstat(struct lua_State *L)
 	int fd = lua_tointeger(L, 1);
 	struct stat stat;
 	int res = coio_fstat(fd, &stat);
-	if (res < 0) {
-		lua_pushnil(L);
-		return 1;
-	}
-	return lbox_fio_pushstat(L, &stat);
+	return lbox_fio_pushstat(L, res, &stat);
 }
 
 
@@ -483,12 +504,11 @@ usage:
 
 	mode_t mode;
 
-	if (top >= 2)
+	if (top >= 2 && !lua_isnil(L, 2))
 		mode = lua_tointeger(L, 2);
 	else
 		mode = 0777;
-	lua_pushboolean(L, coio_mkdir(pathname, mode) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_mkdir(pathname, mode) == 0);
 }
 
 static int
@@ -502,28 +522,27 @@ usage:
 	pathname = lua_tostring(L, 1);
 	if (pathname == NULL)
 		goto usage;
-
-	lua_pushboolean(L, coio_rmdir(pathname) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_rmdir(pathname) == 0);
 }
 
 static int
-lbox_fio_listdir(struct lua_State *L) {
+lbox_fio_listdir(struct lua_State *L)
+{
 	const char *pathname;
 	if (lua_gettop(L) < 1) {
 		luaL_error(L, "Usage: fio.listdir(pathname)");
 	}
 	pathname = lua_tostring(L, 1);
 	char *buf;
-	if (coio_readdir(pathname, &buf) >= 0) {
-		lua_pushstring(L, buf);
-		free(buf);
-	} else {
+	if (coio_readdir(pathname, &buf) < 0) {
 		lua_pushnil(L);
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
+	lua_pushstring(L, buf);
+	free(buf);
 	return 1;
 }
-
 
 static int
 lbox_fio_glob(struct lua_State *L)
@@ -578,8 +597,7 @@ usage:
 	linkpath = lua_tostring(L, 2);
 	if (target == NULL || linkpath == NULL)
 		goto usage;
-	lua_pushboolean(L, coio_link(target, linkpath) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_link(target, linkpath) == 0);
 }
 
 static int
@@ -595,8 +613,7 @@ usage:
 	linkpath = lua_tostring(L, 2);
 	if (target == NULL || linkpath == NULL)
 		goto usage;
-	lua_pushboolean(L, coio_symlink(target, linkpath) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_symlink(target, linkpath) == 0);
 }
 
 static int
@@ -614,7 +631,8 @@ usage:
 	int res = coio_readlink(pathname, path, PATH_MAX);
 	if (res < 0) {
 		lua_pushnil(L);
-		return 1;
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
 	lua_pushlstring(L, path, res);
 	lua_remove(L, -2);
@@ -628,16 +646,17 @@ lbox_fio_tempdir(struct lua_State *L)
 	if (!buf) {
 		errno = ENOMEM;
 		lua_pushnil(L);
-		return 1;
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
 
-
-	if (coio_tempdir(buf, PATH_MAX) == 0) {
-		lua_pushstring(L, buf);
-		lua_remove(L, -2);
-	} else {
+	if (coio_tempdir(buf, PATH_MAX) != 0) {
 		lua_pushnil(L);
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
+	lua_pushstring(L, buf);
+	lua_remove(L, -2);
 	return 1;
 }
 
@@ -648,7 +667,8 @@ lbox_fio_cwd(struct lua_State *L)
 	if (!buf) {
 		errno = ENOMEM;
 		lua_pushnil(L);
-		return 1;
+		lbox_fio_pushsyserror(L);
+		return 2;
 	}
 
 
@@ -656,7 +676,9 @@ lbox_fio_cwd(struct lua_State *L)
 		lua_pushstring(L, buf);
 		lua_remove(L, -2);
 	} else {
+		lbox_fio_pushsyserror(L);
 		lua_pushnil(L);
+		return 2;
 	}
 	return 1;
 }
@@ -665,31 +687,27 @@ static int
 lbox_fio_fsync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
-	lua_pushboolean(L, coio_fsync(fd) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_fsync(fd) == 0);
 }
 
 static int
 lbox_fio_fdatasync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
-	lua_pushboolean(L, coio_fdatasync(fd) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_fdatasync(fd) == 0);
 }
 
 static int
 lbox_fio_sync(struct lua_State *L)
 {
-	lua_pushboolean(L, coio_sync() == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_sync() == 0);
 }
 
 static int
 lbox_fio_close(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
-	lua_pushboolean(L, coio_file_close(fd) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_file_close(fd) == 0);
 }
 
 static int
@@ -698,8 +716,7 @@ lbox_fio_copyfile(struct lua_State *L)
 	const char *source = lua_tostring(L, -2);
 	const char *dest = lua_tostring(L, -1);
 	assert(source != NULL && dest != NULL);
-	lua_pushboolean(L, coio_copyfile(source, dest) == 0);
-	return 1;
+	return lbox_fio_pushbool(L, coio_copyfile(source, dest) == 0);
 }
 
 
