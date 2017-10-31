@@ -40,6 +40,10 @@ extern "C" {
 unsigned char *
 SHA1internal(const unsigned char *d, size_t n, unsigned char *md);
 
+struct lua_State;
+
+void
+tarantool_lua_digest_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 }
