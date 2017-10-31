@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(70)
+test:plan(71)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -366,6 +366,24 @@ cnt2 = #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
 os.exit(cnt1 < cnt2 - 8 and 0 or 1)
 ]]
 test:is(run_script(code), 0, "wal_max_size xlog rotation")
+
+--
+-- gh-2872 bootstrap is aborted if vinyl_dir contains vylog files
+-- left from previous runs
+--
+vinyl_dir = fio.tempdir()
+run_script(string.format([[
+box.cfg{vinyl_dir = '%s'}
+s = box.schema.space.create('test', {engine = 'vinyl'})
+s:create_index('pk')
+os.exit(0)
+]], vinyl_dir))
+code = string.format([[
+box.cfg{vinyl_dir = '%s'}
+os.exit(0)
+]], vinyl_dir)
+test:is(run_script(code), PANIC, "bootstrap from non-empty vinyl_dir")
+fio.rmdir(vinyl_dir)
 
 test:check()
 os.exit(0)

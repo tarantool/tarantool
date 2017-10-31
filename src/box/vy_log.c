@@ -848,6 +848,15 @@ vy_log_next_id(void)
 int
 vy_log_bootstrap(void)
 {
+	/*
+	 * Scan the directory to make sure there is no
+	 * vylog files left from previous setups.
+	 */
+	if (xdir_scan(&vy_log.dir) < 0 && errno != ENOENT)
+		return -1;
+	if (xdir_last_vclock(&vy_log.dir, NULL) >= 0)
+		panic("vinyl directory is not empty");
+
 	/* Add initial vclock to the xdir. */
 	struct vclock *vclock = malloc(sizeof(*vclock));
 	if (vclock == NULL) {
