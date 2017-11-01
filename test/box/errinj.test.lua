@@ -196,6 +196,12 @@ errinj.set("ERRINJ_WAL_WRITE", false)
 errinj.set("ERRINJ_WAL_WRITE_DISK", true)
 _ = space:insert{1, require'digest'.urandom(192 * 1024)}
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
+
+_ = space:insert{1}
+
+errinj.set("ERRINJ_WAL_WRITE", true)
+box.snapshot()
+errinj.set("ERRINJ_WAL_WRITE", false)
 space:drop()
 
 --test space:bsize() in case of memory error
