@@ -1102,7 +1102,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 					regSample);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regTabname, 6,
 					regTemp);
-		sqlite3VdbeAddOp2(v, OP_IdxInsert, iStatCur + 1,
+		sqlite3VdbeAddOp2(v, OP_IdxReplace, iStatCur + 1,
 					regTemp);
 		sqlite3VdbeAddOp2(v, OP_Goto, 1, addrNext);	/* P1==1 for end-of-loop */
 		sqlite3VdbeJumpHere(v, addrIsNull);

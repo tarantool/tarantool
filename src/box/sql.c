@@ -534,24 +534,42 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 	return SQLITE_OK;
 }
 
-int tarantoolSqlite3Insert(BtCursor *pCur, const CursorPayload *pX)
+static int insertOrReplace(BtCursor *pCur, const CursorPayload *pX,
+		           int operationType)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
+	assert(operationType == TARANTOOL_INDEX_INSERT ||
+	       operationType == TARANTOOL_INDEX_REPLACE);
 
 	char *buf = (char*)region_alloc(&fiber()->gc, pX->nKey);
 	if (buf == NULL) {
-		diag_set(OutOfMemory, pX->nKey, "malloc", "buf");
+		diag_set(OutOfMemory, pX->nKey, "region", "buf");
 		return SQLITE_TARANTOOL_ERROR;
 	}
 
 	memcpy(buf, pX->pKey, pX->nKey);
-	if (box_replace(SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot),
-			buf, (const char *)buf + pX->nKey,
-			NULL)
-	    != 0) {
-		return SQLITE_TARANTOOL_ERROR;
+	int space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
+
+	int rc;
+	if (operationType == TARANTOOL_INDEX_INSERT) {
+		rc = box_insert(space_id, buf, (const char *)buf + pX->nKey,
+				NULL /* result */);
+	} else {
+		rc = box_replace(space_id, buf, (const char *)buf + pX->nKey,
+				 NULL /* result */);
 	}
-	return SQLITE_OK;
+
+	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;;
+}
+
+int tarantoolSqlite3Insert(BtCursor *pCur, const CursorPayload *pX)
+{
+	return insertOrReplace(pCur, pX, TARANTOOL_INDEX_INSERT);
+}
+
+int tarantoolSqlite3Replace(BtCursor *pCur, const CursorPayload *pX)
+{
+	return insertOrReplace(pCur, pX, TARANTOOL_INDEX_REPLACE);
 }
 
 /*
@@ -1825,18 +1843,16 @@ int tarantoolSqlite3MakeIdxOpts(SqliteIndex *index, const char *zSql, void *buf)
 	(void)index;
 
 	p = enc->encode_map(base, 2);
-	/* gh-2187
-	 *
-	 * Include all index columns, i.e. "key" columns followed by the
-	 * primary key columns, in secondary indices. It means that all
-	 * indices created via SQL engine are unique.
-	 */
+	/* Mark as unique pk and unique indexes */
 	p = enc->encode_str(p, "unique", 6);
-	/* By now uniqueness is checked by sqlite vdbe engine by extra
-	 * secondary index lookups because we did not implement
-	 * on conflict Replase, Ignore... features
-	 **/
-	p = enc->encode_bool(p, IsPrimaryKeyIndex(index));
+	/* If user didn't defined ON CONFLICT OPTIONS, all uniqueness checks
+	 * will be made by Tarantool. However, Tarantool doesn't have ON
+	 * CONFLIT option, so in that case (except ON CONFLICT ABORT, which is
+	 * default behavior) uniqueness will be checked by SQL.
+	 * INSERT OR REPLACE/IGNORE uniqueness checks will be also done by
+	 * Tarantool.
+	 */
+	p = enc->encode_bool(p, IsUniqueIndex(index));
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, zSql ? strlen(zSql) : 0);
 	return (int)(p - base);

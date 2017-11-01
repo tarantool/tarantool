@@ -519,7 +519,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite,
 						   OPFLAG_FORDELETE, iTabCur,
 						   aToOpen, &iDataCur,
-						   &iIdxCur);
+						   &iIdxCur, OE_None, 0);
 			assert(pPk || iDataCur == iTabCur);
 			assert(pPk || iIdxCur == iDataCur + 1);
 			if (eOnePass == ONEPASS_MULTI)

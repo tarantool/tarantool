@@ -1128,7 +1128,7 @@ test:do_execsql_test(
             INSERT INTO t7 VALUES(1);
         ]], {
             -- <index-19.2>
-            1, "UNIQUE constraint failed: T7.A"
+            1, "Duplicate key exists in unique index 'sqlite_autoindex_T7_1' in space 'T7'"
             -- </index-19.2>
         })
 

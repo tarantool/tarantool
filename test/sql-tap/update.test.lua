@@ -917,7 +917,7 @@ test:do_catchsql_test("update-10.3", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.3>
-  1, "UNIQUE constraint failed: T1.A"
+  1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_3' in space 'T1'"
   -- </update-10.3>
 })
 
@@ -943,7 +943,7 @@ test:do_catchsql_test("update-10.6", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.6>
-  1, "UNIQUE constraint failed: T1.B"
+  1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_1' in space 'T1'"
   -- </update-10.6>
 })
 
@@ -969,7 +969,7 @@ test:do_catchsql_test("update-10.9", [[
   SELECT * FROM t1;
 ]], {
   -- <update-10.9>
-  1, "UNIQUE constraint failed: T1.C, T1.D"
+  1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_2' in space 'T1'"
   -- </update-10.9>
 })
 

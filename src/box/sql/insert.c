@@ -618,7 +618,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		int nIdx;
 		nIdx =
 		    sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite, 0,
-					       -1, 0, &iDataCur, &iIdxCur);
+					       -1, 0, &iDataCur, &iIdxCur,
+					       onError, 0);
+
 		aRegIdx = sqlite3DbMallocRawNN(db, sizeof(int) * (nIdx + 1));
 		if (aRegIdx == 0) {
 			goto insert_cleanup;
@@ -860,7 +862,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						SQLITE_ForeignKeys) == 0 ||
 					       sqlite3FkReferences(pTab) == 0));
 		sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx,
-					 bUseSeek);
+					 bUseSeek, onError);
 	}
 
 	/* Update the count of rows that are inserted
@@ -1205,6 +1207,12 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		int regR;	/* Range of registers holding conflicting PK */
 		int iThisCur;	/* Cursor for this UNIQUE index */
 		int addrUniqueOk;	/* Jump here if the UNIQUE constraint is satisfied */
+		bool uniqueByteCodeNeeded = false;
+
+		if ((pIdx->onError != OE_Abort && pIdx->onError != OE_Default) ||
+		   (overrideError != OE_Abort && overrideError != OE_Default)) {
+			uniqueByteCodeNeeded = true;
+		}
 
 		if (aRegIdx[ix] == 0)
 			continue;	/* Skip indices that do not change */
@@ -1272,15 +1280,19 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					sqlite3VdbeResolveLabel(v, skip_if_null);
 				}
 			}
-			sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
-					  pTab->nCol, aRegIdx[ix]);
+			if (IsPrimaryKeyIndex(pIdx) || uniqueByteCodeNeeded) {
+				sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
+						  pTab->nCol, aRegIdx[ix]);
+				VdbeComment((v, "for %s", pIdx->zName));
+			}
 		} else {
 			/* kyukhin: for Tarantool, this should be evaluated to NOP.  */
-			sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx,
-					  pIdx->nColumn, aRegIdx[ix]);
+			if (IsPrimaryKeyIndex(pIdx) || uniqueByteCodeNeeded) {
+				sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx,
+						  pIdx->nColumn, aRegIdx[ix]);
+				VdbeComment((v, "for %s", pIdx->zName));
+			}
 		}
-
-		VdbeComment((v, "for %s", pIdx->zName));
 
 		/* In an UPDATE operation, if this index is the PRIMARY KEY
 		 * index and there has been no change the primary key, then no
@@ -1295,6 +1307,15 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		/* Find out what action to take in case there is a uniqueness conflict */
 		onError = pIdx->onError;
 		if (onError == OE_None) {
+			sqlite3VdbeResolveLabel(v, addrUniqueOk);
+			continue;	/* pIdx is not a UNIQUE index */
+		}
+		/* If pIdx is not a UNIQUE or we are doing INSERT OR IGNORE,
+		 * INSERT OR FAIL then skip uniqueness checks and let it to be
+		 * done by Tarantool.
+		 */
+		if (overrideError == OE_Fail ||
+		    overrideError == OE_Ignore || overrideError == OE_Abort) {
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
 			continue;	/* pIdx is not a UNIQUE index */
 		}
@@ -1326,8 +1347,11 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			sqlite3VdbeAddOp2(v, OP_IsNull,
 					  reg_pk,
 					  addrUniqueOk);
-		sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur, addrUniqueOk,
-				     regIdx, pIdx->nKeyCol);
+
+		if (uniqueByteCodeNeeded) {
+			sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur, addrUniqueOk,
+					     regIdx, pIdx->nKeyCol);
+		}
 		VdbeCoverage(v);
 
 		/* Generate code to handle collisions */
@@ -1350,7 +1374,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 						pTab->aCol[pPk->aiColumn[i]].zName));
 				}
 			}
-			if (isUpdate) {
+			if (isUpdate && uniqueByteCodeNeeded) {
 				/* Only conflict if the new PRIMARY KEY
 				 * values are actually different from the old.
 				 *
@@ -1363,6 +1387,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				int op = OP_Ne;
 				int regCmp = (IsPrimaryKeyIndex(pIdx) ?
 					      regIdx : regR);
+
 				for (i = 0; i < pPk->nKeyCol; i++) {
 					char *p4 = (char *)
 						sqlite3LocateCollSeq(pParse, db,
@@ -1388,10 +1413,12 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		       || onError == OE_Fail || onError == OE_Ignore
 		       || onError == OE_Replace);
 		switch (onError) {
-		case OE_Rollback:
-		case OE_Abort:
-		case OE_Fail:{
+		case OE_Fail:
+		case OE_Rollback:{
 				sqlite3UniqueConstraint(pParse, onError, pIdx);
+				break;
+			}
+		case OE_Abort:{
 				break;
 			}
 		case OE_Ignore:{
@@ -1443,11 +1470,13 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
 			 Table * pTab,		/* the table into which we are inserting */
 			 int iIdxCur,		/* Primary index cursor */
 			 int *aRegIdx,		/* Register used by each index.  0 for unused indices */
-			 int useSeekResult)	/* True to set the USESEEKRESULT flag on OP_[Idx]Insert */
+			 int useSeekResult,	/* True to set the USESEEKRESULT flag on OP_[Idx]Insert */
+			 u8 onError)
 {
 	Vdbe *v;		/* Prepared statements under construction */
 	Index *pIdx;		/* An index being inserted or updated */
-	u8 pik_flags;		/* flag values passed to the btree insert */
+	u16 pik_flags;		/* flag values passed to the btree insert */
+	int opcode;
 
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
@@ -1474,7 +1503,20 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
 		pik_flags |= OPFLAG_USESEEKRESULT;
 	}
 	assert(pParse->nested == 0);
-	sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur, aRegIdx[0],
+
+	if (onError == OE_Replace) {
+		opcode = OP_IdxReplace;
+	} else {
+		opcode = OP_IdxInsert;
+	}
+
+	if (onError == OE_Ignore) {
+		pik_flags |= OPFLAG_OE_IGNORE;
+	} else if (onError == OE_Fail) {
+		pik_flags |= OPFLAG_OE_FAIL;
+	}
+
+	sqlite3VdbeAddOp4Int(v, opcode, iIdxCur, aRegIdx[0],
 			     aRegIdx[0] + 1,
 			     pIdx->uniqNotNull ? pIdx->nKeyCol : pIdx->nColumn);
 	sqlite3VdbeChangeP5(v, pik_flags);
@@ -1503,7 +1545,9 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			   int iBase,		/* Use this for the table cursor, if there is one */
 			   u8 * aToOpen,	/* If not NULL: boolean for each table and index */
 			   int *piDataCur,	/* Write the database source cursor number here */
-			   int *piIdxCur)	/* Write the first index cursor number here */
+			   int *piIdxCur, 	/* Write the first index cursor number here */
+			   u8 overrideError,	/* Override error action for indexes */
+			   u8 isUpdate)		/* Opened for udpate or not */
 {
 	int i;
 	int iDataCur;
@@ -1521,19 +1565,55 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		*piDataCur = iDataCur;
 	if (piIdxCur)
 		*piIdxCur = iBase;
+
+	/* One iteration of this cycle adds OpenRead/OpenWrite which
+	 * opens cursor for current index.
+	 *
+	 * For update cursor on index is required, however if insertion
+	 * is done by Tarantool only, cursor is not needed so don't
+	 * open it.
+	 */
 	for (i = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, i++) {
-		int iIdxCur = iBase++;
-		assert(pIdx->pSchema == pTab->pSchema);
-		if (IsPrimaryKeyIndex(pIdx)) {
-			if (piDataCur)
-				*piDataCur = iIdxCur;
-			p5 = 0;
-		}
-		if (aToOpen == 0 || aToOpen[i + 1]) {
-			sqlite3VdbeAddOp2(v, op, iIdxCur, pIdx->tnum);
-			sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
-			sqlite3VdbeChangeP5(v, p5);
-			VdbeComment((v, "%s", pIdx->zName));
+		/* Cursor is needed:
+		 * 1) For indexes in UPDATE statement
+		 * 2) For PRIMARY KEY index
+		 * 3) For table mentioned in FOREIGN KEY constraint
+		 * 4) For an index which has ON CONFLICT action which require
+		 *    VDBE bytecode - ROLLBACK, IGNORE, FAIL, REPLACE:
+		 *    1. If user specified non-default ON CONFLICT (not OE_None
+		 *       or OE_Abort) clause
+		 *       for an non-primary unique index, then bytecode is needed
+		 *    	 for proper error action.
+		 *    2. INSERT/UPDATE OR IGNORE/ABORT/FAIL/REPLACE -
+		 *       Tarantool is able handle by itself.
+		 *       INSERT/UPDATE OR ROLLBACK - sql
+		 *       bytecode is needed in this case.
+		 *
+		 * If all conditions from list above are false then skip
+		 * iteration and don't open new index cursor
+		 */
+
+		if (isUpdate || 			/* Condition 1 */
+		    IsPrimaryKeyIndex(pIdx) ||		/* Condition 2 */
+		    sqlite3FkReferences(pTab) ||	/* Condition 3 */
+		    /* Condition 4 */
+		    (IsUniqueIndex(pIdx) && pIdx->onError != OE_Default &&
+		    pIdx->onError != OE_Abort) || 	/* Condition 4.1 */
+		    overrideError == OE_Rollback) {	/* Condition 4.2 */
+
+			int iIdxCur = iBase++;
+			assert(pIdx->pSchema == pTab->pSchema);
+			if (IsPrimaryKeyIndex(pIdx)) {
+				if (piDataCur)
+					*piDataCur = iIdxCur;
+				p5 = 0;
+			}
+			if (aToOpen == 0 || aToOpen[i + 1]) {
+				sqlite3VdbeAddOp2(v, op, iIdxCur, pIdx->tnum);
+				sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+				sqlite3VdbeChangeP5(v, p5);
+				VdbeComment((v, "%s", pIdx->zName));
+			}
 		}
 	}
 	if (iBase > pParse->nTab)

@@ -2584,6 +2584,8 @@ struct AuthContext {
 #define OPFLAG_ISUPDATE      0x04	/* This OP_Insert is an sql UPDATE */
 #define OPFLAG_APPEND        0x08	/* This is likely to be an append */
 #define OPFLAG_USESEEKRESULT 0x10	/* Try to avoid a seek in BtreeInsert() */
+#define OPFLAG_OE_IGNORE    0x200	/* OP_IdxInsert: Ignore flag */
+#define OPFLAG_OE_FAIL      0x400	/* OP_IdxInsert: Fail flag */
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
 #define OPFLAG_ISNOOP        0x40	/* OP_Delete does pre-update-hook only */
 #endif
@@ -3280,9 +3282,9 @@ int sqlite3GenerateIndexKey(Parse *, Index *, int, int, int, int *, Index *,
 void sqlite3ResolvePartIdxLabel(Parse *, int);
 void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
 				     int, u8, u8, int, int *, int *);
-void sqlite3CompleteInsertion(Parse *, Table *, int, int *, int);
+void sqlite3CompleteInsertion(Parse *, Table *, int, int *, int, u8);
 int sqlite3OpenTableAndIndices(Parse *, Table *, int, u8, int, u8 *, int *,
-			       int *);
+			       int *, u8, u8);
 void sqlite3BeginWriteOperation(Parse *, int);
 void sqlite3MultiWrite(Parse *);
 void sqlite3MayAbort(Parse *);

@@ -899,7 +899,7 @@ sqlite3VdbeChangeP3(Vdbe * p, u32 addr, int val)
 }
 
 void
-sqlite3VdbeChangeP5(Vdbe * p, u8 p5)
+sqlite3VdbeChangeP5(Vdbe * p, int p5)
 {
 	assert(p->nOp > 0 || p->db->mallocFailed);
 	if (p->nOp > 0)
@@ -2090,6 +2090,7 @@ sqlite3VdbeRewind(Vdbe * p)
 #endif
 	p->pc = -1;
 	p->rc = SQLITE_OK;
+	p->ignoreRaised = 0;
 	p->errorAction = OE_Abort;
 	p->nChange = 0;
 	p->cacheCtr = 1;

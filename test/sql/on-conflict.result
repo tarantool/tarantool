@@ -17,7 +17,7 @@ box.sql.execute("CREATE TABLE e (id INTEGER PRIMARY KEY, v INTEGER NOT NULL ON C
 -- Insert values and select them
 box.sql.execute("INSERT INTO t values (1, 1), (2, 2), (3, 1)")
 ---
-- error: 'UNIQUE constraint failed: T.V'
+- error: Duplicate key exists in unique index 'sqlite_autoindex_T_1' in space 'T'
 ...
 box.sql.execute("SELECT * FROM t")
 ---

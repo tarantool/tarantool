@@ -444,7 +444,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				aToOpen[aiCurOnePass[1] - iBaseCur] = 0;
 		}
 		sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite, 0,
-					   iBaseCur, aToOpen, 0, 0);
+					   iBaseCur, aToOpen, 0, 0, onError, 1);
 	}
 
 	/* Top of the update loop */
@@ -643,7 +643,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 
 		/* Insert the new index entries and the new record. */
-		sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx, 0);
+		sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx, 0, onError);
 
 		/* Do any ON CASCADE, SET NULL or SET DEFAULT operations required to
 		 * handle rows (possibly in other tables) that refer via a foreign key

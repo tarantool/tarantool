@@ -22,6 +22,10 @@
 /* Max space id seen so far. */
 #define TARANTOOL_SYS_SCHEMA_MAXID_KEY "max_id"
 
+/* Insert or replace operation types - necessary for vdbe */
+#define TARANTOOL_INDEX_INSERT 1
+#define TARANTOOL_INDEX_REPLACE 2
+
 /*
  * SQLite uses the root page number to identify a Table or Index BTree.
  * We switched it to using Tarantool spaces and indices instead of the
@@ -67,6 +71,7 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor * pCur, UnpackedRecord * pIdxKey,
 				   int *pRes);
 int tarantoolSqlite3Count(BtCursor * pCur, i64 * pnEntry);
 int tarantoolSqlite3Insert(BtCursor * pCur, const CursorPayload * pX);
+int tarantoolSqlite3Replace(BtCursor * pCur, const CursorPayload * pX);
 int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
 int tarantoolSqlite3ClearTable(int iTable);
 

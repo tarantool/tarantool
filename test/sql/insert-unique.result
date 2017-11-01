@@ -18,12 +18,13 @@ box.sql.execute("INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 -- PK must be unique
 box.sql.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
 ---
-- error: 'UNIQUE constraint failed: ZOOBAR.C2'
+- error: Duplicate key exists in unique index 'sqlite_autoindex_ZOOBAR_1' in space
+    'ZOOBAR'
 ...
 -- Unique index must be respected
 box.sql.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 ---
-- error: 'UNIQUE constraint failed: ZOOBAR.C1, ZOOBAR.C4'
+- error: Duplicate key exists in unique index 'ZOOBAR2' in space 'ZOOBAR'
 ...
 -- Cleanup
 box.sql.execute("DROP INDEX zoobar2 ON zoobar")

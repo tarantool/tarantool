@@ -96,7 +96,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(5,'second','entry');
     ]], {
         -- <intpkey-1.6>
-        1, "UNIQUE constraint failed: T1.A"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_1' in space 'T1'"
         -- </intpkey-1.6>
     })
 

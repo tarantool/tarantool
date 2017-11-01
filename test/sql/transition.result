@@ -14,7 +14,8 @@ box.sql.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ...
 box.sql.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
-- error: 'UNIQUE constraint failed: FOOBAR.FOO'
+- error: Duplicate key exists in unique index 'sqlite_autoindex_FOOBAR_1' in space
+    'FOOBAR'
 ...
 -- simple select
 box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -136,7 +137,8 @@ box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 -- prove barfoo2 was created
 box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
-- error: 'UNIQUE constraint failed: BARFOO.FOO'
+- error: Duplicate key exists in unique index 'sqlite_autoindex_BARFOO_1' in space
+    'BARFOO'
 ...
 box.sql.execute("SELECT foo, bar FROM barfoo")
 ---

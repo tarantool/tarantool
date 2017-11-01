@@ -70,7 +70,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(1,3,4)
     ]], {
         -- <unique-1.3>
-        1, "UNIQUE constraint failed: T1.A"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_1' in space 'T1'"
         -- </unique-1.3>
     })
 
@@ -91,7 +91,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(3,2,4)
     ]], {
         -- <unique-1.5>
-        1, "UNIQUE constraint failed: T1.B"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_2' in space 'T1'"
         -- </unique-1.5>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1,5);
     ]], {
         -- <unique-2.3>
-        1, "UNIQUE constraint failed: T2.A"
+        1, "Duplicate key exists in unique index 'I2' in space 'T2'"
         -- </unique-2.3>
     })
 
@@ -287,7 +287,7 @@ test:do_catchsql_test(
         SELECT a,b,c,d FROM t3 ORDER BY a,b,c,d;
     ]], {
         -- <unique-3.4>
-        1, "UNIQUE constraint failed: T3.A, T3.C, T3.D"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T3_2' in space 'T3'"
         -- </unique-3.4>
     })
 
@@ -444,7 +444,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(2, 1,2,3,4,5,6);
     ]], {
         -- <unique-5.2>
-        1, "UNIQUE constraint failed: T5.FIRST_COLUMN_WITH_LONG_NAME, T5.SECOND_COLUMN_WITH_LONG_NAME, T5.THIRD_COLUMN_WITH_LONG_NAME, T5.FOURTH_COLUMN_WITH_LONG_NAME, T5.FIFTH_COLUMN_WITH_LONG_NAME, T5.SIXTH_COLUMN_WITH_LONG_NAME"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T5_2' in space 'T5'"
         -- </unique-5.2>
     })
 

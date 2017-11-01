@@ -4012,6 +4012,7 @@ case OP_Delete: {
 case OP_ResetCount: {
 	sqlite3VdbeSetChanges(db, p->nChange);
 	p->nChange = 0;
+	p->ignoreRaised = 0;
 	break;
 }
 
@@ -4448,6 +4449,12 @@ case OP_Next:          /* jump */
  *
  * This instruction only works for indices.
  */
+/* Opcode: IdxReplace P1 P2 P3 P4 P5
+ * Synopsis: key=r[P2]
+ *
+ * This opcode works exactly as IdxInsert does, but in Tarantool
+ * internals it invokes box_replace() instead of box_insert().
+ */
 /* Opcode: SorterInsert P1 P2 * * *
  * Synopsis: key=r[P2]
  *
@@ -4456,7 +4463,8 @@ case OP_Next:          /* jump */
  * into the sorter P1.  Data for the entry is nil.
  */
 case OP_SorterInsert:       /* in2 */
-case OP_IdxInsert: {       /* in2 */
+case OP_IdxReplace:
+case OP_IdxInsert: {        /* in2 */
 	VdbeCursor *pC;
 	CursorPayload x;
 
@@ -4481,7 +4489,10 @@ case OP_IdxInsert: {       /* in2 */
 		BtCursor *pBtCur = pC->uc.pCursor;
 		assert((x.pKey == 0) == (pBtCur->pKeyInfo == 0));
 		if (pBtCur->curFlags & BTCF_TaCursor) {
-			rc = tarantoolSqlite3Insert(pBtCur, &x);
+			if (pOp->opcode == OP_IdxInsert)
+				rc = tarantoolSqlite3Insert(pBtCur, &x);
+			else
+				rc = tarantoolSqlite3Replace(pBtCur, &x);
 		} else if (pBtCur->curFlags & BTCF_TEphemCursor) {
 			rc = tarantoolSqlite3EphemeralInsert(pBtCur, &x);
 		} else {
@@ -4490,6 +4501,19 @@ case OP_IdxInsert: {       /* in2 */
 		assert(pC->deferredMoveto==0);
 		pC->cacheStatus = CACHE_STALE;
 	}
+
+	if (pOp->p5 & OPFLAG_OE_IGNORE) {
+		/* Ignore any kind of failes and do not raise error message */
+		rc = SQLITE_OK;
+		/* If we are in trigger, increment ignore raised counter */
+		if (p->pFrame) {
+			p->ignoreRaised++;
+		}
+	} else if (pOp->p5 & OPFLAG_OE_FAIL) {
+		p->errorAction = OE_Fail;
+	}
+
+	assert(p->errorAction == OE_Abort || p->errorAction == OE_Fail);
 	if (rc) goto abort_due_to_error;
 	break;
 }
@@ -5007,6 +5031,10 @@ case OP_Program: {        /* jump */
 		t = pProgram->token;
 		for(pFrame=p->pFrame; pFrame && pFrame->token!=t; pFrame=pFrame->pParent);
 		if (pFrame) break;
+	}
+
+	if (p->ignoreRaised > 0) {
+		break;
 	}
 
 	if (p->nFrame>=db->aLimit[SQLITE_LIMIT_TRIGGER_DEPTH]) {
