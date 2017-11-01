@@ -1225,7 +1225,6 @@ struct ValueNewStat4Ctx {
 static sqlite3_value *
 valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 {
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	if (p) {
 		UnpackedRecord *pRec = p->ppRec[0];
 
@@ -1265,9 +1264,7 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 		pRec->nField = p->iVal + 1;
 		return &pRec->aMem[p->iVal];
 	}
-#else
-	UNUSED_PARAMETER(p);
-#endif				/* defined(SQLITE_ENABLE_STAT3_OR_STAT4) */
+
 	return sqlite3ValueNew(db);
 }
 
@@ -1291,7 +1288,6 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
  * and sets (*ppVal) to NULL. Or, if an error occurs, (*ppVal) is set to
  * NULL and an SQLite error code returned.
  */
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 static int
 valueFromFunction(sqlite3 * db,	/* The database connection */
 		  Expr * p,	/* The expression to evaluate */
@@ -1379,9 +1375,6 @@ valueFromFunction(sqlite3 * db,	/* The database connection */
 	*ppVal = pVal;
 	return rc;
 }
-#else
-#define valueFromFunction(a,b,c,d,e,f) SQLITE_OK
-#endif				/* defined(SQLITE_ENABLE_STAT3_OR_STAT4) */
 
 /*
  * Extract a value from the supplied expression in the manner described
@@ -1511,11 +1504,9 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 	}
 #endif
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	else if (op == TK_FUNCTION && pCtx != 0) {
 		rc = valueFromFunction(db, pExpr, enc, affinity, &pVal, pCtx);
 	}
-#endif
 
 	*ppVal = pVal;
 	return rc;
@@ -1524,13 +1515,9 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 	sqlite3OomFault(db);
 	sqlite3DbFree(db, zVal);
 	assert(*ppVal == 0);
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	if (pCtx == 0)
 		sqlite3ValueFree(pVal);
-#else
-	assert(pCtx == 0);
-	sqlite3ValueFree(pVal);
-#endif
+
 	return SQLITE_NOMEM_BKPT;
 }
 
@@ -1555,14 +1542,13 @@ sqlite3ValueFromExpr(sqlite3 * db,	/* The database connection */
 	return pExpr ? valueFromExpr(db, pExpr, enc, affinity, ppVal, 0) : 0;
 }
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 /*
  * The implementation of the sqlite_record() function. This function accepts
  * a single argument of any type. The return value is a formatted database
  * record (a blob) containing the argument value.
  *
  * This is used to convert the value stored in the 'sample' column of the
- * sql_stat3 table to the record format SQLite uses internally.
+ * sql_stat4 table to the record format SQLite uses internally.
  */
 static void
 recordFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
@@ -1841,7 +1827,6 @@ sqlite3Stat4ProbeFree(UnpackedRecord * pRec)
 		sqlite3DbFree(db, pRec);
 	}
 }
-#endif				/* ifdef SQLITE_ENABLE_STAT4 */
 
 /*
  * Change the string value of an sqlite3_value object

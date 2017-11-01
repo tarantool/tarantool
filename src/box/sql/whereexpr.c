@@ -1291,8 +1291,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			markTermAsChild(pWC, idxNew, idxTerm);
 		}
 	}
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
-	/* When sql_stat3 histogram data is available an operator of the
+	/* When sql_stat4 histogram data is available an operator of the
 	 * form "x IS NOT NULL" can sometimes be evaluated more efficiently
 	 * as "x>NULL" if x is not an INTEGER PRIMARY KEY.  So construct a
 	 * virtual term of that form.
@@ -1302,7 +1301,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	if (pExpr->op == TK_NOTNULL
 	    && pExpr->pLeft->op == TK_COLUMN
 	    && pExpr->pLeft->iColumn >= 0
-	    && OptimizationEnabled(db, SQLITE_Stat34)
+	    && OptimizationEnabled(db, SQLITE_Stat4)
 	    ) {
 		Expr *pNewExpr;
 		Expr *pLeft = pExpr->pLeft;
@@ -1328,7 +1327,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			pNewTerm->prereqAll = pTerm->prereqAll;
 		}
 	}
-#endif				/* SQLITE_ENABLE_STAT3_OR_STAT4 */
 
 	/* Prevent ON clause terms of a LEFT JOIN from being used to drive
 	 * an index for tables to the left of the join.

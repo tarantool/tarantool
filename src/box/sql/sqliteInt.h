@@ -878,20 +878,6 @@ extern const int sqlite3one;
 #endif
 
 /*
- * Only one of SQLITE_ENABLE_STAT3 or SQLITE_ENABLE_STAT4 can be defined.
- * Priority is given to SQLITE_ENABLE_STAT4.  If either are defined, also
- * define SQLITE_ENABLE_STAT3_OR_STAT4
- */
-#ifdef SQLITE_ENABLE_STAT4
-#undef SQLITE_ENABLE_STAT3
-#define SQLITE_ENABLE_STAT3_OR_STAT4 1
-#elif SQLITE_ENABLE_STAT3
-#define SQLITE_ENABLE_STAT3_OR_STAT4 1
-#elif SQLITE_ENABLE_STAT3_OR_STAT4
-#undef SQLITE_ENABLE_STAT3_OR_STAT4
-#endif
-
-/*
  * SELECTTRACE_ENABLED will be either 1 or 0 depending on whether or not
  * the Select query generator tracing logic is turned on.
  */
@@ -1410,7 +1396,7 @@ struct sqlite3 {
 #define SQLITE_SubqCoroutine  0x0100	/* Evaluate subqueries as coroutines */
 #define SQLITE_Transitive     0x0200	/* Transitive constraints */
 #define SQLITE_OmitNoopJoin   0x0400	/* Omit unused tables in joins */
-#define SQLITE_Stat34         0x0800	/* Use STAT3 or STAT4 data */
+#define SQLITE_Stat4          0x0800	/* Use STAT4 data */
 #define SQLITE_CursorHints    0x2000	/* Add OP_CursorHint opcodes */
 #define SQLITE_AllOpts        0xffff	/* All optimizations */
 
@@ -1955,14 +1941,12 @@ struct Index {
 	unsigned isResized:1;	/* True if resizeIndexObject() has been called */
 	unsigned isCovering:1;	/* True if this is a covering index */
 	unsigned noSkipScan:1;	/* Do not try to use skip-scan if true */
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	int nSample;		/* Number of elements in aSample[] */
 	int nSampleCol;		/* Size of IndexSample.anEq[] and so on */
 	tRowcnt *aAvgEq;	/* Average nEq values for keys not in aSample */
 	IndexSample *aSample;	/* Samples of the left-most key */
 	tRowcnt *aiRowEst;	/* Non-logarithmic stat1 data for this index */
 	tRowcnt nRowEst0;	/* Non-logarithmic number of rows in the index */
-#endif
 };
 
 /*
@@ -1985,7 +1969,7 @@ struct Index {
 #define XN_EXPR      (-2)	/* Indexed column is an expression */
 
 /*
- * Each sample stored in the sql_stat3 table is represented in memory
+ * Each sample stored in the sql_stat4 table is represented in memory
  * using a structure of this type.  See documentation at the top of the
  * analyze.c source file for additional information.
  */
@@ -3691,11 +3675,7 @@ int sqlite3Utf8CharLen(const char *pData, int nByte);
 u32 sqlite3Utf8Read(const u8 **);
 LogEst sqlite3LogEst(u64);
 LogEst sqlite3LogEstAdd(LogEst, LogEst);
-#if defined(SQLITE_ENABLE_STMT_SCANSTATUS) || \
-    defined(SQLITE_ENABLE_STAT3_OR_STAT4) || \
-    defined(SQLITE_EXPLAIN_ESTIMATED_ROWS)
 u64 sqlite3LogEstToInt(LogEst);
-#endif
 VList *sqlite3VListAdd(sqlite3 *, VList *, const char *, int, int);
 const char *sqlite3VListNumToName(VList *, int);
 int sqlite3VListNameToNum(VList *, const char *, int);
@@ -3849,7 +3829,6 @@ int sqlite3ExprCheckIN(Parse *, Expr *);
 #define sqlite3ExprCheckIN(x,y) SQLITE_OK
 #endif
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 void sqlite3AnalyzeFunctions(void);
 int sqlite3Stat4ProbeSetValue(Parse *, Index *, UnpackedRecord **, Expr *, int,
 			      int, int *);
@@ -3857,7 +3836,6 @@ int sqlite3Stat4ValueFromExpr(Parse *, Expr *, u8, sqlite3_value **);
 void sqlite3Stat4ProbeFree(UnpackedRecord *);
 int sqlite3Stat4Column(sqlite3 *, const void *, int, int, sqlite3_value **);
 char sqlite3IndexColumnAffinity(sqlite3 *, Index *, int);
-#endif
 
 /*
  * The interface to the LEMON-generated parser

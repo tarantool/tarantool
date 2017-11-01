@@ -280,11 +280,7 @@ struct WhereTerm {
 #define TERM_ORINFO     0x10	/* Need to free the WhereTerm.u.pOrInfo object */
 #define TERM_ANDINFO    0x20	/* Need to free the WhereTerm.u.pAndInfo obj */
 #define TERM_OR_OK      0x40	/* Used during OR-clause processing */
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
-#define TERM_VNULL    0x80	/* Manufactured x>NULL or x<=NULL term */
-#else
-#define TERM_VNULL    0x00	/* Disabled if not using stat3 */
-#endif
+#define TERM_VNULL      0x80	/* Manufactured x>NULL or x<=NULL term */
 #define TERM_LIKEOPT    0x100	/* Virtual terms from the LIKE optimization */
 #define TERM_LIKECOND   0x200	/* Conditionally this LIKE operator term */
 #define TERM_LIKE       0x400	/* The original LIKE operator */
@@ -397,10 +393,8 @@ struct WhereLoopBuilder {
 	ExprList *pOrderBy;	/* ORDER BY clause */
 	WhereLoop *pNew;	/* Template WhereLoop */
 	WhereOrSet *pOrSet;	/* Record best loops here, if not NULL */
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	UnpackedRecord *pRec;	/* Probe for stat4 (if required) */
 	int nRecValid;		/* Number of valid fields currently in pRec */
-#endif
 };
 
 /*

@@ -887,7 +887,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 }
 #endif				/* SQLITE_OMIT_AUTOMATIC_INDEX */
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 /*
  * Estimate the location of a particular key among all keys in an
  * index.  Store the results in aStat as follows:
@@ -1097,7 +1096,6 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	pRec->nField = nField;
 	return i;
 }
-#endif				/* SQLITE_ENABLE_STAT3_OR_STAT4 */
 
 /*
  * If it is not NULL, pTerm is a term that provides an upper or lower
@@ -1125,7 +1123,6 @@ whereRangeAdjust(WhereTerm * pTerm, LogEst nNew)
 	return nRet;
 }
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 /*
  * Return the affinity for a single column of an index.
  */
@@ -1139,9 +1136,7 @@ sqlite3IndexColumnAffinity(sqlite3 * db, Index * pIdx, int iCol)
 	}
 	return pIdx->zColAff[iCol];
 }
-#endif
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 /*
  * This function is called to estimate the number of rows visited by a
  * range-scan on a skip-scan index. For example:
@@ -1256,7 +1251,6 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 
 	return rc;
 }
-#endif				/* SQLITE_ENABLE_STAT3_OR_STAT4 */
 
 /*
  * This function is used to estimate the number of rows that will be visited
@@ -1308,7 +1302,6 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 	int nOut = pLoop->nOut;
 	LogEst nNew;
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	Index *p = pLoop->pIndex;
 	int nEq = pLoop->nEq;
 
@@ -1430,7 +1423,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 					/* TUNING:  If both iUpper and iLower are derived from the same
 					 * sample, then assume they are 4x more selective.  This brings
 					 * the estimated selectivity more in line with what it would be
-					 * if estimated without the use of STAT3/4 tables.
+					 * if estimated without the use of STAT4 table.
 					 */
 					if (iLwrIdx == iUprIdx)
 						nNew -= 20;
@@ -1454,11 +1447,6 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 				return rc;
 		}
 	}
-#else
-	UNUSED_PARAMETER(pParse);
-	UNUSED_PARAMETER(pBuilder);
-	assert(pLower || pUpper);
-#endif
 	assert(pUpper == 0 || (pUpper->wtFlags & TERM_VNULL) == 0);
 	nNew = whereRangeAdjust(pLower, nOut);
 	nNew = whereRangeAdjust(pUpper, nNew);
@@ -1489,12 +1477,11 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 	return rc;
 }
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 /*
  * Estimate the number of rows that will be returned based on
  * an equality constraint x=VALUE and where that VALUE occurs in
  * the histogram data.  This only works when x is the left-most
- * column of an index and sql_stat3 histogram data is available
+ * column of an index and sql_stat4 histogram data is available
  * for that index.  When pExpr==NULL that means the constraint is
  * "x IS NULL" instead of "x=VALUE".
  *
@@ -1548,9 +1535,7 @@ whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
 
 	return rc;
 }
-#endif				/* SQLITE_ENABLE_STAT3_OR_STAT4 */
 
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 /*
  * Estimate the number of rows that will be returned based on
  * an IN constraint where the right-hand side of the IN operator
@@ -1598,7 +1583,6 @@ whereInScanEst(Parse * pParse,	/* Parsing & code generating context */
 	assert(pBuilder->nRecValid == nRecValid);
 	return rc;
 }
-#endif				/* SQLITE_ENABLE_STAT3_OR_STAT4 */
 
 #ifdef WHERETRACE_ENABLED
 /*
@@ -2371,9 +2355,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		LogEst rCostIdx;
 		LogEst nOutUnadjusted;	/* nOut before IN() and WHERE adjustments */
 		int nIn = 0;
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 		int nRecValid = pBuilder->nRecValid;
-#endif
 		if ((eOp == WO_ISNULL || (pTerm->wtFlags & TERM_VNULL) != 0)
 		    && indexColumnNotNull(pProbe, saved_nEq)
 		    ) {
@@ -2506,7 +2488,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		 */
 		assert(pNew->nOut == saved_nOut);
 		if (pNew->wsFlags & WHERE_COLUMN_RANGE) {
-			/* Adjust nOut using stat3/stat4 data. Or, if there is no stat3/stat4
+			/* Adjust nOut using stat4 data. Or, if there is no stat4
 			 * data, using some other estimate.
 			 */
 			whereRangeScanEst(pParse, pBuilder, pBtm, pTop, pNew);
@@ -2522,7 +2504,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 				pNew->nOut += pTerm->truthProb;
 				pNew->nOut -= nIn;
 			} else {
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 				tRowcnt nOut = 0;
 				if (nInMul == 0
 				    && pProbe->nSample
@@ -2559,9 +2540,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 						pNew->nOut -= nIn;
 					}
 				}
-				if (nOut == 0)
-#endif
-				{
+				if (nOut == 0) {
 					pNew->nOut +=
 					    (pProbe->aiRowLogEst[nEq] -
 					     pProbe->aiRowLogEst[nEq - 1]);
@@ -2609,9 +2588,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 					       nInMul + nIn);
 		}
 		pNew->nOut = saved_nOut;
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 		pBuilder->nRecValid = nRecValid;
-#endif
 	}
 	pNew->prereq = saved_prereq;
 	pNew->nEq = saved_nEq;
@@ -2996,11 +2973,9 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		}
 
 		rc = whereLoopAddBtreeIndex(pBuilder, pSrc, pProbe, 0);
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 		sqlite3Stat4ProbeFree(pBuilder->pRec);
 		pBuilder->nRecValid = 0;
 		pBuilder->pRec = 0;
-#endif
 
 		/* If there was an INDEXED BY clause, then only that one index is
 		 * considered.

@@ -771,7 +771,7 @@ sqlite3_int64
 sqlite3StmtCurrentTime(sqlite3_context * p)
 {
 	int rc;
-#ifndef SQLITE_ENABLE_STAT3_OR_STAT4
+#ifndef SQLITE_ENABLE_OR_STAT4
 	sqlite3_int64 *piTime = &p->pVdbe->iCurrentTime;
 	assert(p->pVdbe != 0);
 #else
@@ -861,12 +861,9 @@ sqlite3_get_auxdata(sqlite3_context * pCtx, int iArg)
 	AuxData *pAuxData;
 
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
-#if SQLITE_ENABLE_STAT3_OR_STAT4
 	if (pCtx->pVdbe == 0)
 		return 0;
-#else
-	assert(pCtx->pVdbe != 0);
-#endif
+
 	for (pAuxData = pCtx->pVdbe->pAuxData; pAuxData;
 	     pAuxData = pAuxData->pNext) {
 		if (pAuxData->iOp == pCtx->iOp && pAuxData->iArg == iArg)
@@ -892,12 +889,8 @@ sqlite3_set_auxdata(sqlite3_context * pCtx,
 	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	if (iArg < 0)
 		goto failed;
-#ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	if (pVdbe == 0)
 		goto failed;
-#else
-	assert(pVdbe != 0);
-#endif
 
 	for (pAuxData = pVdbe->pAuxData; pAuxData; pAuxData = pAuxData->pNext) {
 		if (pAuxData->iOp == pCtx->iOp && pAuxData->iArg == iArg)

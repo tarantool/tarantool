@@ -3578,8 +3578,7 @@ sqlite3_limit(sqlite3 *, int id, int newVal);
  * to the [sqlite3_bind_text | bindings] of that [parameter].
  * ^The specific value of WHERE-clause [parameter] might influence the
  * choice of query plan if the parameter is the left-hand side of a [LIKE]
- * or [GLOB] operator or if the parameter is compared to an indexed column
- * and the [SQLITE_ENABLE_STAT3] compile-time option is enabled.
+ * or [GLOB] operator or if the parameter is compared to an indexed column.
  * </li>
  * </ol>
 */
