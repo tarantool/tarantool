@@ -21,13 +21,13 @@ _ = s:create_index('pk')
 pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 s:count()
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 
 -- Since the following operation requires more memory than configured
 -- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
 _ = s:auto_increment{pad}
 s:count()
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 
 s:drop()
 
@@ -43,13 +43,13 @@ s2 = box.schema.space.create('test2', {engine = 'vinyl'})
 _ = s2:create_index('pk')
 
 _ = s1:auto_increment{}
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 
 pad = string.rep('x', box.cfg.vinyl_memory)
 _ = s2:auto_increment{pad}
 
-while box.info.vinyl().memory.used > 0 do fiber.sleep(0.01) end
-box.info.vinyl().memory.used
+while box.info.vinyl().quota.used > 0 do fiber.sleep(0.01) end
+box.info.vinyl().quota.used
 
 --
 -- Check that exceeding quota doesn't hang the scheduler

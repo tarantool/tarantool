@@ -289,7 +289,6 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	vy_tx_read_set_new(&tx->read_set);
 	tx->psn = 0;
 	rlist_create(&tx->on_destroy);
-	xm->stat.active++;
 }
 
 void
@@ -308,8 +307,6 @@ vy_tx_destroy(struct vy_tx *tx)
 	}
 
 	vy_tx_read_set_iter(&tx->read_set, NULL, vy_tx_read_set_free_cb, NULL);
-
-	tx->xm->stat.active--;
 }
 
 /** Return true if the transaction is read-only. */
@@ -818,7 +815,6 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	if (old != NULL) {
 		/* Leave the old txv in TX log but remove it from write set */
 		assert(tx->write_size >= tuple_size(old->stmt));
-		tx->write_count--;
 		tx->write_size -= tuple_size(old->stmt);
 		write_set_remove(&tx->write_set, old);
 		old->is_overwritten = true;
@@ -838,7 +834,6 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	v->overwritten = old;
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
-	tx->write_count++;
 	tx->write_size += tuple_size(stmt);
 	vy_stmt_counter_acct_tuple(&index->stat.txw.count, stmt);
 	stailq_add_tail_entry(&tx->log, v, next_in_log);

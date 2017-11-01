@@ -1587,8 +1587,8 @@ s:replace{1, 2, 3}
 s:replace{4, 5, 6}
 s:replace{7, 8, 9}
 
-box.info.vinyl().performance.read_view -- 0 (no read views needed)
-box.info.vinyl().performance.tx_allocated -- 0
+box.info.vinyl().tx.read_views -- 0 (no read views needed)
+box.info.vinyl().tx.transactions -- 0
 
 c1 = txn_proxy.new()
 c2 = txn_proxy.new()
@@ -1600,40 +1600,40 @@ c2:begin()
 c3:begin()
 c4:begin()
 
-box.info.vinyl().performance.read_view -- 0 (no read views needed)
-box.info.vinyl().performance.tx_allocated -- 0
+box.info.vinyl().tx.read_views -- 0 (no read views needed)
+box.info.vinyl().tx.transactions -- 0
 
 c1("s:select{1}")
 c2("s:select{1}")
 c3("s:select{1}")
 c4("s:select{1}")
 
-box.info.vinyl().performance.read_view -- 0 (no read views needed)
-box.info.vinyl().performance.tx_allocated -- 4
+box.info.vinyl().tx.read_views -- 0 (no read views needed)
+box.info.vinyl().tx.transactions -- 4
 
 c4("s:replace{1, 0, 0}")
 
-box.info.vinyl().performance.read_view -- 0 (no read views needed)
-box.info.vinyl().performance.tx_allocated -- 4
+box.info.vinyl().tx.read_views -- 0 (no read views needed)
+box.info.vinyl().tx.transactions -- 4
 
 c4:commit()
 
-box.info.vinyl().performance.read_view -- 1 (one read view for all TXs)
-box.info.vinyl().performance.tx_allocated -- 3
+box.info.vinyl().tx.read_views -- 1 (one read view for all TXs)
+box.info.vinyl().tx.transactions -- 3
 
 c1:commit()
 
-box.info.vinyl().performance.read_view -- 1 (one read view for all TXs)
-box.info.vinyl().performance.tx_allocated-- 2
+box.info.vinyl().tx.read_views -- 1 (one read view for all TXs)
+box.info.vinyl().tx.transactions -- 2
 
 c2:rollback()
 
-box.info.vinyl().performance.read_view -- 1 (one read view for all TXs)
-box.info.vinyl().performance.tx_allocated -- 1
+box.info.vinyl().tx.read_views -- 1 (one read view for all TXs)
+box.info.vinyl().tx.transactions -- 1
 
 c3:commit()
 
-box.info.vinyl().performance.read_view -- 0 (no read views needed)
-box.info.vinyl().performance.tx_allocated -- 0 (all done)
+box.info.vinyl().tx.read_views -- 0 (no read views needed)
+box.info.vinyl().tx.transactions -- 0 (all done)
 
 s:drop()

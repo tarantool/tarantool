@@ -178,8 +178,6 @@ struct vy_cache_stat {
 
 /** Transaction statistics. */
 struct vy_tx_stat {
-	/** Number of active transactions. */
-	int32_t active;
 	/** Number of committed transactions. */
 	int64_t commit;
 	/** Number of rolled back transactions. */

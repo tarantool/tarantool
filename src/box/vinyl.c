@@ -74,7 +74,6 @@ enum { VY_YIELD_LOOPS = 128 };
 enum { VY_YIELD_LOOPS = 2 };
 #endif
 
-struct vy_stat;
 struct vy_squash_queue;
 
 enum vy_status {
@@ -91,8 +90,6 @@ struct vy_env {
 	enum vy_status status;
 	/** TX manager */
 	struct tx_manager   *xm;
-	/** Statistics */
-	struct vy_stat      *stat;
 	/** Upsert squash queue */
 	struct vy_squash_queue *squash_queue;
 	/** Mempool for struct vy_cursor */
@@ -112,6 +109,18 @@ struct vy_env {
 	 * moving average of quota_use_curr.
 	 */
 	size_t quota_use_rate;
+	/**
+	 * Dump bandwidth is needed for calculating the quota watermark.
+	 * The higher the bandwidth, the later we can start dumping w/o
+	 * suffering from transaction throttling. So we want to be very
+	 * conservative about estimating the bandwidth.
+	 *
+	 * To make sure we don't overestimate it, we maintain a
+	 * histogram of all observed measurements and assume the
+	 * bandwidth to be equal to the 10th percentile, i.e. the
+	 * best result among 10% worst measurements.
+	 */
+	struct histogram *dump_bw;
 	/** Common index environment. */
 	struct vy_index_env index_env;
 	/** Environment for cache subsystem */
@@ -151,6 +160,13 @@ enum {
 	VY_QUOTA_RATE_AVG_PERIOD = 5,
 };
 
+static inline int64_t
+vy_dump_bandwidth(struct vy_env *env)
+{
+	/* See comment to vy_env::dump_bw. */
+	return histogram_percentile(env->dump_bw, 10);
+}
+
 /** Mask passed to vy_gc(). */
 enum {
 	/** Delete incomplete runs. */
@@ -162,100 +178,6 @@ enum {
 static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
-
-enum vy_stat_name {
-	VY_STAT_GET,
-	VY_STAT_TX,
-	VY_STAT_TX_OPS,
-	VY_STAT_TX_WRITE,
-	VY_STAT_CURSOR,
-	VY_STAT_CURSOR_OPS,
-	VY_STAT_LAST,
-};
-
-static const char *vy_stat_strings[] = {
-	"get",
-	"tx",
-	"tx_ops",
-	"tx_write",
-	"cursor",
-	"cursor_ops",
-};
-
-struct vy_stat {
-	struct rmean *rmean;
-	/**
-	 * Dump bandwidth is needed for calculating the quota watermark.
-	 * The higher the bandwidth, the later we can start dumping w/o
-	 * suffering from transaction throttling. So we want to be very
-	 * conservative about estimating the bandwidth.
-	 *
-	 * To make sure we don't overestimate it, we maintain a
-	 * histogram of all observed measurements and assume the
-	 * bandwidth to be equal to the 10th percentile, i.e. the
-	 * best result among 10% worst measurements.
-	 */
-	struct histogram *dump_bw;
-};
-
-static struct vy_stat *
-vy_stat_new()
-{
-	enum { KB = 1000, MB = 1000 * 1000 };
-	static int64_t bandwidth_buckets[] = {
-		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB,
-		  1 * MB,   2 * MB,   3 * MB,   4 * MB,   5 * MB,
-		 10 * MB,  20 * MB,  30 * MB,  40 * MB,  50 * MB,
-		 60 * MB,  70 * MB,  80 * MB,  90 * MB, 100 * MB,
-		110 * MB, 120 * MB, 130 * MB, 140 * MB, 150 * MB,
-		160 * MB, 170 * MB, 180 * MB, 190 * MB, 200 * MB,
-		220 * MB, 240 * MB, 260 * MB, 280 * MB, 300 * MB,
-		320 * MB, 340 * MB, 360 * MB, 380 * MB, 400 * MB,
-		450 * MB, 500 * MB, 550 * MB, 600 * MB, 650 * MB,
-		700 * MB, 750 * MB, 800 * MB, 850 * MB, 900 * MB,
-		950 * MB, 1000 * MB,
-	};
-
-	struct vy_stat *s = calloc(1, sizeof(*s));
-	if (s == NULL) {
-		diag_set(OutOfMemory, sizeof(*s), "stat", "struct");
-		return NULL;
-	}
-	s->dump_bw = histogram_new(bandwidth_buckets,
-				   lengthof(bandwidth_buckets));
-	if (s->dump_bw == NULL) {
-		free(s);
-		return NULL;
-	}
-	/*
-	 * Until we dump anything, assume bandwidth to be 10 MB/s,
-	 * which should be fine for initial guess.
-	 */
-	histogram_collect(s->dump_bw, 10 * MB);
-
-	s->rmean = rmean_new(vy_stat_strings, VY_STAT_LAST);
-	if (s->rmean == NULL) {
-		histogram_delete(s->dump_bw);
-		free(s);
-		return NULL;
-	}
-	return s;
-}
-
-static void
-vy_stat_delete(struct vy_stat *s)
-{
-	histogram_delete(s->dump_bw);
-	rmean_delete(s->rmean);
-	free(s);
-}
-
-static int64_t
-vy_stat_dump_bandwidth(struct vy_stat *s)
-{
-	/* See comment to vy_stat->dump_bw. */
-	return histogram_percentile(s->dump_bw, 10);
-}
 
 /** Cursor. */
 struct vy_cursor {
@@ -318,56 +240,56 @@ struct vy_cursor {
 /** {{{ Introspection */
 
 static void
-vy_info_append_memory(struct vy_env *env, struct info_handler *h)
+vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 {
-	char buf[16];
 	struct vy_quota *q = &env->quota;
-	info_table_begin(h, "memory");
+
+	info_table_begin(h, "quota");
 	info_append_int(h, "used", q->used);
 	info_append_int(h, "limit", q->limit);
 	info_append_int(h, "watermark", q->watermark);
-	snprintf(buf, sizeof(buf), "%d%%", (int)(100 * q->used / q->limit));
-	info_append_str(h, "ratio", buf);
+	info_append_int(h, "use_rate", env->quota_use_rate);
+	info_append_int(h, "dump_bandwidth", vy_dump_bandwidth(env));
 	info_table_end(h);
-}
-
-static int
-vy_info_append_stat_rmean(const char *name, int rps, int64_t total, void *ctx)
-{
-	struct info_handler *h = ctx;
-	info_table_begin(h, name);
-	info_append_int(h, "rps", rps);
-	info_append_int(h, "total", total);
-	info_table_end(h);
-	return 0;
 }
 
 static void
-vy_info_append_performance(struct vy_env *env, struct info_handler *h)
+vy_info_append_cache(struct vy_env *env, struct info_handler *h)
 {
-	struct vy_stat *stat = env->stat;
+	struct vy_cache_env *c = &env->cache_env;
 
-	info_table_begin(h, "performance");
+	info_table_begin(h, "cache");
 
-	rmean_foreach(stat->rmean, vy_info_append_stat_rmean, h);
+	info_append_int(h, "used", c->mem_used);
+	info_append_int(h, "limit", c->mem_quota);
 
 	struct mempool_stats mstats;
-	mempool_stats(&env->xm->tx_mempool, &mstats);
-	info_append_int(h, "tx_allocated", mstats.objcount);
-	mempool_stats(&env->xm->txv_mempool, &mstats);
-	info_append_int(h, "txv_allocated", mstats.objcount);
-	mempool_stats(&env->xm->read_interval_mempool, &mstats);
-	info_append_int(h, "read_interval", mstats.objcount);
-	mempool_stats(&env->xm->read_view_mempool, &mstats);
-	info_append_int(h, "read_view", mstats.objcount);
+	mempool_stats(&c->cache_entry_mempool, &mstats);
+	info_append_int(h, "tuples", mstats.objcount);
 
-	info_append_int(h, "dump_bandwidth", vy_stat_dump_bandwidth(stat));
-
-	struct vy_cache_env *ce = &env->cache_env;
-	info_table_begin(h, "cache");
-	info_append_int(h, "count", ce->cached_count);
-	info_append_int(h, "used", ce->mem_used);
 	info_table_end(h);
+}
+
+static void
+vy_info_append_tx(struct vy_env *env, struct info_handler *h)
+{
+	struct tx_manager *xm = env->xm;
+
+	info_table_begin(h, "tx");
+
+	info_append_int(h, "commit", xm->stat.commit);
+	info_append_int(h, "rollback", xm->stat.rollback);
+	info_append_int(h, "conflict", xm->stat.conflict);
+
+	struct mempool_stats mstats;
+	mempool_stats(&xm->tx_mempool, &mstats);
+	info_append_int(h, "transactions", mstats.objcount);
+	mempool_stats(&xm->txv_mempool, &mstats);
+	info_append_int(h, "statements", mstats.objcount);
+	mempool_stats(&xm->read_interval_mempool, &mstats);
+	info_append_int(h, "gap_locks", mstats.objcount);
+	mempool_stats(&xm->read_view_mempool, &mstats);
+	info_append_int(h, "read_views", mstats.objcount);
 
 	info_table_end(h);
 }
@@ -376,19 +298,9 @@ void
 vy_info(struct vy_env *env, struct info_handler *h)
 {
 	info_begin(h);
-
-	vy_info_append_memory(env, h);
-	vy_info_append_performance(env, h);
-	info_append_int(h, "lsn", env->xm->lsn);
-
-	struct vy_tx_stat *tx_stat = &env->xm->stat;
-	info_table_begin(h, "tx");
-	info_append_int(h, "active", tx_stat->active);
-	info_append_int(h, "commit", tx_stat->commit);
-	info_append_int(h, "rollback", tx_stat->rollback);
-	info_append_int(h, "conflict", tx_stat->conflict);
-	info_table_end(h);
-
+	vy_info_append_quota(env, h);
+	vy_info_append_cache(env, h);
+	vy_info_append_tx(env, h);
 	info_end(h);
 }
 
@@ -1103,10 +1015,7 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	if (*result != NULL)
 		tuple_ref(*result);
 	vy_read_iterator_close(&itr);
-	if (rc != 0)
-		return -1;
-	rmean_collect(env->stat->rmean, VY_STAT_GET, 1);
-	return 0;
+	return rc;
 }
 
 /**
@@ -2123,9 +2032,6 @@ vy_prepare(struct vy_env *env, struct vy_tx *tx)
 	if (rc != 0)
 		return -1;
 
-	rmean_collect(env->stat->rmean, VY_STAT_TX, 1);
-	rmean_collect(env->stat->rmean, VY_STAT_TX_OPS, tx->write_count);
-	rmean_collect(env->stat->rmean, VY_STAT_TX_WRITE, write_size);
 	env->quota_use_curr += write_size;
 	return 0;
 }
@@ -2208,8 +2114,6 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 		weight * e->quota_use_curr / VY_QUOTA_UPDATE_INTERVAL;
 	e->quota_use_curr = 0;
 
-	int64_t dump_bandwidth = vy_stat_dump_bandwidth(e->stat);
-
 	/*
 	 * Due to log structured nature of the lsregion allocator,
 	 * which is used for allocating statements, we cannot free
@@ -2221,6 +2125,7 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	 *   ----------------- = --------------
 	 *     quota_use_rate    dump_bandwidth
 	 */
+	int64_t dump_bandwidth = vy_dump_bandwidth(e);
 	size_t watermark = ((double)e->quota.limit * dump_bandwidth /
 			    (dump_bandwidth + e->quota_use_rate + 1));
 
@@ -2277,7 +2182,7 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 
 	/* Account dump bandwidth. */
 	if (dump_duration > 0)
-		histogram_collect(env->stat->dump_bw,
+		histogram_collect(env->dump_bw,
 				  mem_dumped / dump_duration);
 }
 
@@ -2293,6 +2198,21 @@ struct vy_env *
 vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	   int write_threads, double timeout)
 {
+	enum { KB = 1000, MB = 1000 * 1000 };
+	static int64_t dump_bandwidth_buckets[] = {
+		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB,
+		  1 * MB,   2 * MB,   3 * MB,   4 * MB,   5 * MB,
+		 10 * MB,  20 * MB,  30 * MB,  40 * MB,  50 * MB,
+		 60 * MB,  70 * MB,  80 * MB,  90 * MB, 100 * MB,
+		110 * MB, 120 * MB, 130 * MB, 140 * MB, 150 * MB,
+		160 * MB, 170 * MB, 180 * MB, 190 * MB, 200 * MB,
+		220 * MB, 240 * MB, 260 * MB, 280 * MB, 300 * MB,
+		320 * MB, 340 * MB, 360 * MB, 380 * MB, 400 * MB,
+		450 * MB, 500 * MB, 550 * MB, 600 * MB, 650 * MB,
+		700 * MB, 750 * MB, 800 * MB, 850 * MB, 900 * MB,
+		950 * MB, 1000 * MB,
+	};
+
 	struct vy_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL)) {
 		diag_set(OutOfMemory, sizeof(*e), "malloc", "struct vy_env");
@@ -2310,12 +2230,23 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 			 "malloc", "env->path");
 		goto error_path;
 	}
+
+	e->dump_bw = histogram_new(dump_bandwidth_buckets,
+				   lengthof(dump_bandwidth_buckets));
+	if (e->dump_bw == NULL) {
+		diag_set(OutOfMemory, 0, "histogram_new",
+			 "dump bandwidth histogram");
+		goto error_dump_bw;
+	}
+	/*
+	 * Until we dump anything, assume bandwidth to be 10 MB/s,
+	 * which should be fine for initial guess.
+	 */
+	histogram_collect(e->dump_bw, 10 * MB);
+
 	e->xm = tx_manager_new();
 	if (e->xm == NULL)
 		goto error_xm;
-	e->stat = vy_stat_new();
-	if (e->stat == NULL)
-		goto error_stat;
 	e->squash_queue = vy_squash_queue_new();
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
@@ -2348,10 +2279,10 @@ error_index_env:
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
-	vy_stat_delete(e->stat);
-error_stat:
 	tx_manager_delete(e->xm);
 error_xm:
+	histogram_delete(e->dump_bw);
+error_dump_bw:
 	free(e->path);
 error_path:
 	free(e);
@@ -2366,7 +2297,7 @@ vy_env_delete(struct vy_env *e)
 	vy_squash_queue_delete(e->squash_queue);
 	tx_manager_delete(e->xm);
 	free(e->path);
-	vy_stat_delete(e->stat);
+	histogram_delete(e->dump_bw);
 	mempool_destroy(&e->cursor_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_index_env_destroy(&e->index_env);
@@ -3446,8 +3377,6 @@ vy_cursor_delete(struct vy_env *env, struct vy_cursor *c)
 	if (c->key)
 		tuple_unref(c->key);
 	vy_index_unref(c->index);
-	rmean_collect(env->stat->rmean, VY_STAT_CURSOR, 1);
-	rmean_collect(env->stat->rmean, VY_STAT_CURSOR_OPS, c->n_reads);
 	TRASH(c);
 	mempool_free(&env->cursor_pool, c);
 }

@@ -142,8 +142,6 @@ struct vy_tx {
 	 * (insert/remove), the version is incremented.
 	 */
 	uint32_t write_set_version;
-	/** Number of statements in the write set. */
-	int write_count;
 	/**
 	 * Total size of memory occupied by statements of
 	 * the write set.
