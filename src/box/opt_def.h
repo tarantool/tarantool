@@ -33,6 +33,7 @@
 
 #include "trivia/util.h"
 #include <stddef.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -88,12 +89,24 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
 	    uint32_t errcode, uint32_t field_no, struct region *region);
 
 /**
- * Populate one options from msgpack-encoded representation
+ * Decode one option and store it into @a opts struct as a field.
+ * @param opts[out] Options to decode to.
+ * @param reg Options definition.
+ * @param key Name of an option.
+ * @param key_len Length of @a key.
+ * @param data Option value.
+ * @param errcode Code of error to set if something is wrong.
+ * @param field_no Field number of an option in a parent element.
+ * @param region Region to allocate OPT_STRPTR option.
+ * @param skip_unknown_options If true, do not set error, if an
+ *        option is unknown. Useful, when it is neccessary to
+ *        allow to store custom fields in options.
  */
 int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t key_len, const char **data, uint32_t errcode,
-	       uint32_t field_no, struct region *region);
+	       uint32_t field_no, struct region *region,
+	       bool skip_unknown_options);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -372,8 +372,9 @@ field_def_decode(struct field_def *field, const char **data,
 		uint32_t key_len;
 		const char *key = mp_decode_str(data, &key_len);
 		if (opts_parse_key(field, field_def_reg, key, key_len, data,
-			       ER_WRONG_SPACE_FORMAT,
-			       fieldno + TUPLE_INDEX_BASE, region) != 0)
+				   ER_WRONG_SPACE_FORMAT,
+				   fieldno + TUPLE_INDEX_BASE, region,
+				   true) != 0)
 			diag_raise();
 	}
 	if (field->name == NULL) {
