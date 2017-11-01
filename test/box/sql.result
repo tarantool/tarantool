@@ -296,7 +296,7 @@ s:truncate()
 -- get away with it.
 space:insert{'Britney'}
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
+- error: Tuple field count 1 is less than required (expected at least 2)
 ...
 sorted(space.index.secondary:select('Anything'))
 ---
@@ -304,7 +304,7 @@ sorted(space.index.secondary:select('Anything'))
 ...
 space:insert{'Stephanie'}
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
+- error: Tuple field count 1 is less than required (expected at least 2)
 ...
 sorted(space.index.secondary:select('Anything'))
 ---
@@ -633,7 +633,7 @@ sorted(space.index.secondary:select('Britney'))
 -- try to insert the incoplete tuple
 space:replace{'Spears'}
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
+- error: Tuple field count 1 is less than required (expected at least 2)
 ...
 -- check that nothing has been updated
 space:select{'Spears'}

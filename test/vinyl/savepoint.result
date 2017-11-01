@@ -124,7 +124,7 @@ index2 = space:create_index('secondary', { parts = {2, 'int', 3, 'str'} })
 ...
 space:insert({1})
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 3)
+- error: Tuple field count 1 is less than required (expected at least 3)
 ...
 space:insert({1, 1, 'a'})
 ---
@@ -622,7 +622,7 @@ space:insert({4, 2, 'b'})
 ...
 space:upsert({2}, {{'=', 4, 1000}})
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 3)
+- error: Tuple field count 1 is less than required (expected at least 3)
 ...
 index3:delete({3, 'a'})
 ---

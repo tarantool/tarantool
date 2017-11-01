@@ -455,3 +455,162 @@ sk2:select{}
 s:drop()
 ---
 ...
+--
+-- gh-2880: allow to store less field count than specified in a
+-- format.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+format[3] = {name = 'field3'}
+---
+...
+format[4] = {name = 'field4', is_nullable = true}
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s:replace{1, 2} -- error
+---
+- error: Tuple field count 2 is less than required (expected at least 3)
+...
+t1 = s:replace{2, 3, 4}
+---
+...
+t2 = s:replace{3, 4, 5, 6}
+---
+...
+t1.field1, t1.field2, t1.field3, t1.field4
+---
+- 2
+- 3
+- 4
+- null
+...
+t2.field1, t2.field2, t2.field3, t2.field4
+---
+- 3
+- 4
+- 5
+- 6
+...
+ -- Ensure the tuple is read ok from disk in a case of vinyl.
+---
+...
+if engine == 'vinyl' then box.snapshot() end
+---
+...
+s:select{2}
+---
+- - [2, 3, 4]
+...
+s:drop()
+---
+...
+-- Check the case when not contiguous format tail is nullable.
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+format[3] = {name = 'field3'}
+---
+...
+format[4] = {name = 'field4', is_nullable = true}
+---
+...
+format[5] = {name = 'field5'}
+---
+...
+format[6] = {name = 'field6', is_nullable = true}
+---
+...
+format[7] = {name = 'field7', is_nullable = true}
+---
+...
+s = box.schema.create_space('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s:replace{1, 2} -- error
+---
+- error: Tuple field count 2 is less than required (expected at least 5)
+...
+s:replace{2, 3, 4} -- error
+---
+- error: Tuple field count 3 is less than required (expected at least 5)
+...
+s:replace{3, 4, 5, 6} -- error
+---
+- error: Tuple field count 4 is less than required (expected at least 5)
+...
+t1 = s:replace{4, 5, 6, 7, 8}
+---
+...
+t2 = s:replace{5, 6, 7, 8, 9, 10}
+---
+...
+t3 = s:replace{6, 7, 8, 9, 10, 11, 12}
+---
+...
+t1.field1, t1.field2, t1.field3, t1.field4, t1.field5, t1.field6, t1.field7
+---
+- 4
+- 5
+- 6
+- 7
+- 8
+- null
+- null
+...
+t2.field1, t2.field2, t2.field3, t2.field4, t2.field5, t2.field6, t2.field7
+---
+- 5
+- 6
+- 7
+- 8
+- 9
+- 10
+- null
+...
+t3.field1, t3.field2, t3.field3, t3.field4, t3.field5, t3.field6, t3.field7
+---
+- 6
+- 7
+- 8
+- 9
+- 10
+- 11
+- 12
+...
+s:select{}
+---
+- - [4, 5, 6, 7, 8]
+  - [5, 6, 7, 8, 9, 10]
+  - [6, 7, 8, 9, 10, 11, 12]
+...
+s:drop()
+---
+...
