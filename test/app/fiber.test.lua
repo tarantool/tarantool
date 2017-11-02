@@ -325,6 +325,11 @@ info[f1:id()] ~= nil
 info[f2:id()] ~= nil
 info[f3:id()] ~= nil
 
+info = fiber.info({bt = false})
+info[f1:id()].backtrace == nil
+info = fiber.info({backtrace = false})
+info[f1:id()].backtrace == nil
+
 f1:cancel()
 f2:cancel()
 f3:cancel()
