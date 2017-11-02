@@ -459,14 +459,15 @@ applier_subscribe(struct applier *applier)
 static inline void
 applier_disconnect(struct applier *applier, enum applier_state state)
 {
+	applier_set_state(applier, state);
 	if (applier->writer != NULL) {
 		fiber_cancel(applier->writer);
+		fiber_join(applier->writer);
 		applier->writer = NULL;
 	}
 
 	coio_close(loop(), &applier->io);
 	iobuf_reset(applier->iobuf);
-	applier_set_state(applier, state);
 	fiber_gc();
 }
 
@@ -525,11 +526,11 @@ applier_f(va_list ap)
 				/* Unrecoverable errors */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_STOPPED);
-				throw;
+				return -1;
 			}
 		} catch (FiberIsCancelled *e) {
 			applier_disconnect(applier, APPLIER_OFF);
-			throw;
+			break;
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
 			goto reconnect;
