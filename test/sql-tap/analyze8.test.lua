@@ -181,10 +181,8 @@ test:do_eqp_test(
        WHERE b BETWEEN 30 AND 34 AND c BETWEEN 800000 AND 900000]],
     {
         -- <3.2>
-        -- TODO Tarantool: need to investigate, why we choose worse plan here.
-        -- Good one is commented
-        -- {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1c (c>? AND c<?)"}
-        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)"}        
+        {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1c (c>? AND c<?)"}
+        -- {0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1b (b>? AND b<?)"}        
         -- </3.2>
     })
 

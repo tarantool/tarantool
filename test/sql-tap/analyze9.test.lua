@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(101)
+test:plan(128)
 
 testprefix = "analyze9"
 
@@ -186,7 +186,7 @@ test:do_execsql_test(
     [[
         ANALYZE;
         SELECT lrange(nEq, 1, 1) FROM _sql_stat4 WHERE idx = 'i2';
-    ]], generate_tens_str(22))
+    ]], generate_tens_str(24))
 
 ---------------------------------------------------------------------------
 -- 
@@ -684,297 +684,294 @@ test:do_execsql_test(
 -- Check that stat4 data is used correctly with non-default collation
 -- sequences.
 --
--- Commented due to assertion(#2834)
--- test:do_execsql_test(
---     "11.0",
---     [[
---         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a COLLATE nocase, b);
---         CREATE INDEX t4a ON t4(a);
---         CREATE INDEX t4b ON t4(b);
---     ]], {
---         -- <11.0>
---         -- </11.0>
---     })
+test:do_execsql_test(
+    "11.0",
+    [[
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a COLLATE nocase, b);
+        CREATE INDEX t4a ON t4(a);
+        CREATE INDEX t4b ON t4(b);
+    ]], {
+        -- <11.0>
+        -- </11.0>
+    })
 
--- test:do_test(
---     11.1,
---     function()
---         local a = 0
---         for i = 0, 100 do
---             if i % 10 == 0 then 
---                 a = "\"ABC\""
---             else
---                 a = "\"DEF\""
---             end
---             b = i % 5
---             test:execsql(string.format("INSERT INTO t4 VALUES(null, %s, %s)", a, b))
---         test:execsql("ANALYZE")
---         end
---     end, {
---         -- <11.1>
---         -- </11.1>
---     })
+test:do_test(
+    11.1,
+    function()
+        local a = 0
+        for i = 0, 100 do
+            if i % 10 == 0 then 
+                a = "\"ABC\""
+            else
+                a = "\"DEF\""
+            end
+            b = i % 5
+            test:execsql(string.format("INSERT INTO t4 VALUES(null, '%s', '%s')", a, b))
+        test:execsql("ANALYZE")
+        end
+    end, {
+        -- <11.1>
+        -- </11.1>
+    })
 
--- test:do_execsql_test(
---     "11.2", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'def' AND b = 3;
---     ]], {
---         -- <11.2>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
---         -- </11.2>
---     })
+test:do_execsql_test(
+    "11.2", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'def' AND b = 3;
+    ]], {
+        -- <11.2>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        -- </11.2>
+    })
 
--- test:do_execsql_test(
---     "11.3", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' AND b = 3;
---     ]], {
---         -- <11.3>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
---         -- </11.3>
---     })
+test:do_execsql_test(
+    "11.3", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' AND b = 3;
+    ]], {
+        -- <11.3>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        -- </11.3>
+    })
 
--- test:do_execsql_test(
---     "11.4",
---     [[
---         DROP TABLE IF EXISTS t4;
---         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b);
---         CREATE INDEX t4a ON t4(a COLLATE nocase);
---         CREATE INDEX t4b ON t4(b);
---     ]], {
---         -- <11.4>
---         -- </11.4>
---     })
+test:do_execsql_test(
+    "11.4",
+    [[
+        DROP TABLE IF EXISTS t4;
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b);
+        CREATE INDEX t4a ON t4(a COLLATE nocase);
+        CREATE INDEX t4b ON t4(b);
+    ]], {
+        -- <11.4>
+        -- </11.4>
+    })
 
--- test:do_test(
---     11.5,
---     function()
---         local a = 0
---         for i = 0, 100 do
---             if i % 10 == 0 then 
---                 a = "\"ABC\""
---             else
---                 a = "\"DEF\""
---             end
---             b = i % 5
---             test:execsql(string.format("INSERT INTO t4 VALUES(null, %s, %s)", a, b))
---         test:execsql("ANALYZE")
---         end
---     end, {
---         -- <11.5>
---         -- </11.5>
---     })
+test:do_test(
+    11.5,
+    function()
+        local a = 0
+        for i = 0, 100 do
+            if i % 10 == 0 then 
+                a = "\"ABC\""
+            else
+                a = "\"DEF\""
+            end
+            b = i % 5
+            test:execsql(string.format("INSERT INTO t4 VALUES(null, '%s', '%s')", a, b))
+        test:execsql("ANALYZE")
+        end
+    end, {
+        -- <11.5>
+        -- </11.5>
+    })
 
--- test:do_execsql_test(
---     "11.6", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'def' AND b = 3;
---     ]], {
---         -- <11.6>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
---         -- </11.6>
---     })
+test:do_execsql_test(
+    "11.6", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'def' AND b = 3;
+    ]], {
+        -- <11.6>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        -- </11.6>
+    })
 
--- test:do_execsql_test(
---     "11.7", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' COLLATE nocase AND b = 3;
---     ]], {
---         -- <11.7>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
---         -- </11.7>
---     })
+test:do_execsql_test(
+    "11.7", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' COLLATE nocase AND b = 3;
+    ]], {
+        -- <11.7>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        -- </11.7>
+    })
 
--- test:do_execsql_test(
---     "11.8", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a COLLATE nocase = 'abc' AND b = 3;
---     ]], {
---         -- <11.8>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
---         -- </11.8>
---     })
+test:do_execsql_test(
+    "11.8", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a COLLATE nocase = 'abc' AND b = 3;
+    ]], {
+        -- <11.8>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (b=?)"
+        -- </11.8>
+    })
 
--- Commented due to assertion(#2834)
--- test:do_execsql_test(
---     "12.0",
---     [[
---         DROP TABLE IF EXISTS t4;
---         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a COLLATE nocase, b);
---         CREATE INDEX t4a ON t4(x, a);
---         CREATE INDEX t4b ON t4(x, b);
---     ]], {
---         -- <12.0>
---         -- </12.0>
---     })
+test:do_execsql_test(
+    "12.0",
+    [[
+        DROP TABLE IF EXISTS t4;
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a COLLATE nocase, b);
+        CREATE INDEX t4a ON t4(x, a);
+        CREATE INDEX t4b ON t4(x, b);
+    ]], {
+        -- <12.0>
+        -- </12.0>
+    })
 
--- test:do_test(
---     12.1,
---     function()
---         local a = 0
---         for i = 0, 100 do
---             if i % 10 == 0 then 
---                 a = "\"ABC\""
---             else
---                 a = "\"DEF\""
---             end
---             b = i % 5
---             test:execsql(string.format("INSERT INTO t4 VALUES(null, 'abcdef, '%s, %s)", a, b))
---         test:execsql("ANALYZE")
---         end
---     end, {
---         -- <12.1>
---         -- </12.1>
---     })
+test:do_test(
+    12.1,
+    function()
+        local a = 0
+        for i = 0, 100 do
+            if i % 10 == 0 then 
+                a = "\"ABC\""
+            else
+                a = "\"DEF\""
+            end
+            b = i % 5
+            test:execsql(string.format("INSERT INTO t4 VALUES(null, 'abcdef', '%s', '%s')", a, b))
+        test:execsql("ANALYZE")
+        end
+    end, {
+        -- <12.1>
+        -- </12.1>
+    })
 
--- test:do_execsql_test(
---     "12.2", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
---     ]], {
---         -- <12.2>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
---         -- </12.2>
---     })
+test:do_execsql_test(
+    "12.2", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
+    ]], {
+        -- <12.2>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        -- </12.2>
+    })
 
--- test:do_execsql_test(
---     "12.3", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'abc' AND b = 3;
---     ]], {
---         -- <12.3>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
---         -- </12.3>
---     })
+test:do_execsql_test(
+    "12.3", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'abc' AND b = 3;
+    ]], {
+        -- <12.3>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        -- </12.3>
+    })
 
--- test:do_execsql_test(
---     "12.4",
---     [[
---         DROP TABLE IF EXISTS t4;
---         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a, b);
---         CREATE INDEX t4a ON t4(x, a COLLATE nocase);
---         CREATE INDEX t4b ON t4(x, b);
---     ]], {
---         -- <12.4>
---         -- </12.4>
---     })
+test:do_execsql_test(
+    "12.4",
+    [[
+        DROP TABLE IF EXISTS t4;
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a, b);
+        CREATE INDEX t4a ON t4(x, a COLLATE nocase);
+        CREATE INDEX t4b ON t4(x, b);
+    ]], {
+        -- <12.4>
+        -- </12.4>
+    })
 
--- test:do_test(
---     12.5,
---     function()
---         local a = 0
---         for i = 0, 100 do
---             if i % 10 == 0 then 
---                 a = "\"ABC\""
---             else
---                 a = "\"DEF\""
---             end
---             b = i % 5
---             test:execsql(string.format("INSERT INTO t4 VALUES(null, 'abcdef', %s, %s)", a, b))
---         test:execsql("ANALYZE")
---         end
---     end, {
---         -- <12.5>
---         -- </12.5>
---     })
+test:do_test(
+    12.5,
+    function()
+        local a = 0
+        for i = 0, 100 do
+            if i % 10 == 0 then 
+                a = "\"ABC\""
+            else
+                a = "\"DEF\""
+            end
+            b = i % 5
+            test:execsql(string.format("INSERT INTO t4 VALUES(null, 'abcdef', '%s', '%s')", a, b))
+        test:execsql("ANALYZE")
+        end
+    end, {
+        -- <12.5>
+        -- </12.5>
+    })
 
--- test:do_execsql_test(
---     "12.6", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
---     ]], {
---         -- <12.6>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
---         -- </12.6>
---     })
+test:do_execsql_test(
+    "12.6", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a = 'def' AND b = 3;
+    ]], {
+        -- <12.6>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        -- </12.6>
+    })
 
--- test:do_execsql_test(
---     "12.7", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x= 'abcdef' AND a = 'abc' COLLATE nocase AND b = 3;
---     ]], {
---         -- <12.7>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
---         -- </12.7>
---     })
+test:do_execsql_test(
+    "12.7", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x= 'abcdef' AND a = 'abc' COLLATE nocase AND b = 3;
+    ]], {
+        -- <12.7>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        -- </12.7>
+    })
 
--- test:do_execsql_test(
---     "12.8", 
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a COLLATE nocase = 'abc' AND b = 3;
---     ]], {
---         -- <12.8>
---         0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
---         -- </12.8>
---     })
+test:do_execsql_test(
+    "12.8", 
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a COLLATE nocase = 'abc' AND b = 3;
+    ]], {
+        -- <12.8>
+        0, 0, 0, "SEARCH TABLE t4 USING COVERING INDEX t4b (x=? AND b=?)"
+        -- </12.8>
+    })
 
 ---------------------------------------------------------------------------
 -- Check that affinities are taken into account when using stat4 data to
 -- estimate the number of rows scanned by an id constraint.
---
--- Commented due to assertion(#2834)
--- test:do_test(
---     13.1,
---     function()
---         test:execsql("DROP TABLE IF EXISTS t1;")
---         test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b, c, d);")
---         test:execsql("CREATE INDEX i1 ON t1(a);")
---         test:execsql("CREATE INDEX i2 ON t1(b, c);")
---         local a = 0
---         for i = 0, 100 do
---             if i % 2 == 1 then
---                 a = "\"abc\""
---             else
---                 a = "\"def\""
---             end
---             test:execsql(string.format("INSERT INTO t1(id, a, b, c) VALUES(null, %s, %s, %s)", a, i, i))
---         test:execsql("ANALYZE;")
---         end
---     end, {
---         -- <13.1>
---         -- </13.1>
---     })
 
--- test:do_execsql_test(
---     "13.2.1",
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<15 AND b<12;
---     ]], {
---         -- <13.2.1>
---         0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
---         -- </13.2.1>
---     })
+test:do_test(
+    13.1,
+    function()
+        test:execsql("DROP TABLE IF EXISTS t1;")
+        test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b, c, d);")
+        test:execsql("CREATE INDEX i1 ON t1(a);")
+        test:execsql("CREATE INDEX i2 ON t1(b, c);")
+        local a = 0
+        for i = 0, 100 do
+            if i % 2 == 1 then
+                a = "\"abc\""
+            else
+                a = "\"def\""
+            end
+            test:execsql(string.format("INSERT INTO t1(id, a, b, c) VALUES(null, '%s', %s, %s)", a, i, i))
+        test:execsql("ANALYZE;")
+        end
+    end, {
+        -- <13.1>
+        -- </13.1>
+    })
 
--- test:do_execsql_test(
---     "13.2.2",
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<'15' AND b<12;
---     ]], {
---         -- <13.2.2>
---         0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
---         -- </13.2.2>
---     })
+test:do_execsql_test(
+    "13.2.1",
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<15 AND b<12;
+    ]], {
+        -- <13.2.1>
+        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        -- </13.2.1>
+    })
 
--- test:do_execsql_test(
---     "13.3.1",
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<100 AND b<12;
---     ]], {
---         -- <13.3.1>
---         0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
---         -- </13.3.1>
---     })
+test:do_execsql_test(
+    "13.2.2",
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<'15' AND b<12;
+    ]], {
+        -- <13.2.2>
+        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        -- </13.2.2>
+    })
 
--- test:do_execsql_test(
---     "13.3.2",
---     [[
---         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<'100' AND b<12;
---     ]], {
---         -- <13.3.2>
---         0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
---         -- </13.3.2>
---     })
+test:do_execsql_test(
+    "13.3.1",
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<100 AND b<12;
+    ]], {
+        -- <13.3.1>
+        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        -- </13.3.1>
+    })
+
+test:do_execsql_test(
+    "13.3.2",
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a='abc' AND id<'100' AND b<12;
+    ]], {
+        -- <13.3.2>
+        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX i1 (a=?)"
+        -- </13.3.2>
+    })
 
 ---------------------------------------------------------------------------
 -- Check also that affinities are taken into account when using stat4 data 
@@ -1535,50 +1532,50 @@ test:do_execsql_test(
 -- resolved (see below).
 --
 -- Commented due to assertion(#2834)
--- test:do_test(
---     "26.1.1",
---     function()
---         test:execsql([[
---             DROP TABLE IF EXISTS t1;
---             CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, x, y, z);
---             CREATE INDEX t1xy ON t1(x, y);
---             CREATE INDEX t1z ON t1(z);
---         ]])
---         for i = 0, 10000 do
---             test:execsql(string.format("INSERT INTO t1(id, x, y) VALUES(null, %s, %s)", i, i))
---         end
---         for i = 0, 10 do
---             test:execsql(string.format(
---                 "WITH cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x<100) INSERT INTO t1(id, x, y) SELECT null, %s, x FROM cnt;", i+10000))
---             test:execsql(string.format("INSERT INTO t1(id, x, y) SELECT null, %s, 100;", i+10000))    
---         end
---         test:execsql([[
---                 UPDATE t1 SET z = id / 20;
---                 ANALYZE;
---         ]]) end, {
---             -- <26.1.1>
---             -- </26.1.1>
---         })
+test:do_test(
+    "26.1.1",
+    function()
+        test:execsql([[
+            DROP TABLE IF EXISTS t1;
+            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, x, y, z);
+            CREATE INDEX t1xy ON t1(x, y);
+            CREATE INDEX t1z ON t1(z);
+        ]])
+        for i = 0, 10000 do
+            test:execsql(string.format("INSERT INTO t1(id, x, y) VALUES(null, %s, %s)", i, i))
+        end
+        for i = 0, 10 do
+            test:execsql(string.format(
+                "WITH cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x<100) INSERT INTO t1(id, x, y) SELECT null, %s, x FROM cnt;", i+10000))
+            test:execsql(string.format("INSERT INTO t1(id, x, y) SELECT null, %s, 100;", i+10000))    
+        end
+        test:execsql([[
+                UPDATE t1 SET z = id / 20;
+                ANALYZE;
+        ]]) end, {
+            -- <26.1.1>
+            -- </26.1.1>
+        })
 
--- test:do_execsql_test(
---     "26.1.2",
---     [[
---         SELECT count(*) FROM t1 WHERE x = 10000 AND y < 50;
---     ]], {
---         -- <26.1.2>
---         49
---         -- </26.1.2>
---     })
+test:do_execsql_test(
+    "26.1.2",
+    [[
+        SELECT count(*) FROM t1 WHERE x = 10000 AND y < 50;
+    ]], {
+        -- <26.1.2>
+        49
+        -- </26.1.2>
+    })
 
--- test:do_execsql_test(
---     "26.1.3",
---     [[
---         SELECT count(*) FROM t1 WHERE z = 444;
---     ]], {
---         -- <26.1.3>
---         20
---         -- </26.1.3>
---     })
+test:do_execsql_test(
+    "26.1.3",
+    [[
+        SELECT count(*) FROM t1 WHERE z = 444;
+    ]], {
+        -- <26.1.3>
+        20
+        -- </26.1.3>
+    })
 
 -- The analyzer knows that any (z=?) expression matches 20 rows. So it
 -- will use index "t1z" if the estimate of hits for (x=10000 AND y<50)
@@ -1595,15 +1592,15 @@ test:do_execsql_test(
 -- At one point though, due to a problem in whereKeyStats(), the planner was
 -- estimating that (x=10000 AND y<50) would match only 2 rows.
 --
--- test:do_eqp_test(
---     "26.1.4",
---     [[
---         SELECT * FROM t1 WHERE x = 10000 AND y < 50 AND z = 444;
---     ]], {
---         -- <26.1.4>
---         0, 0, 0, "SEARCH TABLE t1 USING INDEX t1z (z=?)"
---         -- </26.1.4>
---     })
+test:do_execsql_test(
+    "26.1.4",
+    [[
+        EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE x = 10000 AND y < 50 AND z = 444;
+    ]], {
+        -- <26.1.4>
+        0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1z (z=?)"
+        -- </26.1.4>
+    })
 
 -- This test - 26.2.* - tests that another manifestation of the same problem
 -- is no longer present in the library. Assuming:

@@ -395,9 +395,9 @@ sampleCopy(Stat4Accum * p, Stat4Sample * pTo, Stat4Sample * pFrom)
 	pTo->isPSample = pFrom->isPSample;
 	pTo->iCol = pFrom->iCol;
 	pTo->iHash = pFrom->iHash;
-	memcpy(pTo->anEq, pFrom->anEq, sizeof(tRowcnt) * p->nCol);
-	memcpy(pTo->anLt, pFrom->anLt, sizeof(tRowcnt) * p->nCol);
-	memcpy(pTo->anDLt, pFrom->anDLt, sizeof(tRowcnt) * p->nCol);
+	memcpy(pTo->anEq, pFrom->anEq, sizeof(tRowcnt) * (p->nCol+1));
+	memcpy(pTo->anLt, pFrom->anLt, sizeof(tRowcnt) * (p->nCol+1));
+	memcpy(pTo->anDLt, pFrom->anDLt, sizeof(tRowcnt) * (p->nCol+1));
 	if (pFrom->nRowid) {
 		sampleSetRowid(p->db, pTo, pFrom->nRowid, pFrom->u.aRowid);
 	} else {
@@ -464,7 +464,12 @@ statInit(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	UNUSED_PARAMETER(argc);
 	nCol = sqlite3_value_int(argv[0]);
 	assert(nCol > 0);
-	nColUp = sizeof(tRowcnt) < 8 ? (nCol + 1) & ~1 : nCol;
+	/* Tarantool: we use an additional artificial column for the reason
+	 * that Tarantool's indexes don't contain PK columns after key columns.
+	 * Hence, in order to correctly gather statistics when dealing with 
+	 * identical rows, we have to use this artificial column.
+	 */
+	nColUp = sizeof(tRowcnt) < 8 ? (nCol + 2) & ~1 : nCol + 1;
 	nKeyCol = sqlite3_value_int(argv[1]);
 	assert(nKeyCol <= nCol);
 	assert(nKeyCol > 0);
@@ -475,8 +480,8 @@ statInit(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	    + sizeof(tRowcnt) * nColUp	/* Stat4Accum.anDLt */
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 	    + sizeof(tRowcnt) * nColUp	/* Stat4Accum.anLt */
-	    + sizeof(Stat4Sample) * (nCol + mxSample)	/* Stat4Accum.aBest[], a[] */
-	    +sizeof(tRowcnt) * 3 * nColUp * (nCol + mxSample)
+	    + sizeof(Stat4Sample) * (nCol + 1 + mxSample)	/* Stat4Accum.aBest[], a[] */
+	    +sizeof(tRowcnt) * 3 * nColUp * (nCol + 1 + mxSample)
 #endif
 	    ;
 	db = sqlite3_context_db_handle(context);
@@ -511,8 +516,8 @@ statInit(sqlite3_context * context, int argc, sqlite3_value ** argv)
 		/* Set up the Stat4Accum.a[] and aBest[] arrays */
 		p->a = (struct Stat4Sample *)&p->current.anLt[nColUp];
 		p->aBest = &p->a[mxSample];
-		pSpace = (u8 *) (&p->a[mxSample + nCol]);
-		for (i = 0; i < (mxSample + nCol); i++) {
+		pSpace = (u8 *) (&p->a[mxSample + nCol + 1]);
+		for (i = 0; i < (mxSample + nCol + 1); i++) {
 			p->a[i].anEq = (tRowcnt *) pSpace;
 			pSpace += (sizeof(tRowcnt) * nColUp);
 			p->a[i].anLt = (tRowcnt *) pSpace;
@@ -522,7 +527,7 @@ statInit(sqlite3_context * context, int argc, sqlite3_value ** argv)
 		}
 		assert((pSpace - (u8 *) p) == n);
 
-		for (i = 0; i < nCol; i++) {
+		for (i = 0; i < nCol + 1; i++) {
 			p->aBest[i].iCol = i;
 		}
 	}
@@ -565,7 +570,7 @@ sampleIsBetterPost(Stat4Accum * pAccum, Stat4Sample * pNew, Stat4Sample * pOld)
 	int nCol = pAccum->nCol;
 	int i;
 	assert(pNew->iCol == pOld->iCol);
-	for (i = pNew->iCol + 1; i < nCol; i++) {
+	for (i = pNew->iCol + 1; i < nCol + 1; i++) {
 		if (pNew->anEq[i] > pOld->anEq[i])
 			return 1;
 		if (pNew->anEq[i] < pOld->anEq[i])
@@ -670,6 +675,8 @@ sampleInsert(Stat4Accum * p, Stat4Sample * pNew, int nEqZero)
 		p->nSample = p->mxSample - 1;
 	}
 
+	assert(p->nSample==0 || pNew->anLt[p->nCol] > p->a[p->nSample-1].anLt[p->nCol]);
+
 	/* Insert the new sample */
 	pSample = &p->a[p->nSample];
 	sampleCopy(p, pSample, pNew);
@@ -703,12 +710,12 @@ sampleInsert(Stat4Accum * p, Stat4Sample * pNew, int nEqZero)
  * index. The value of anEq[iChng] and subsequent anEq[] elements are
  * correct at this point.
  */
+
 static void
 samplePushPrevious(Stat4Accum * p, int iChng)
 {
 #ifdef SQLITE_ENABLE_STAT4
 	int i;
-
 	/* Check if any samples from the aBest[] array should be pushed
 	 * into IndexSample.a[] at this point.
 	 */
@@ -724,7 +731,7 @@ samplePushPrevious(Stat4Accum * p, int iChng)
 	/* Update the anEq[] fields of any samples already collected. */
 	for (i = p->nSample - 1; i >= 0; i--) {
 		int j;
-		for (j = iChng; j < p->nCol; j++) {
+		for (j = iChng; j < p->nCol + 1; j++) {
 			if (p->a[i].anEq[j] == 0)
 				p->a[i].anEq[j] = p->current.anEq[j];
 		}
@@ -777,7 +784,6 @@ static void
 statPush(sqlite3_context * context, int argc, sqlite3_value ** argv)
 {
 	int i;
-
 	/* The three function arguments */
 	Stat4Accum *p = (Stat4Accum *) sqlite3_value_blob(argv[0]);
 	int iChng = sqlite3_value_int(argv[1]);
@@ -785,11 +791,11 @@ statPush(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	UNUSED_PARAMETER(argc);
 	UNUSED_PARAMETER(context);
 	assert(p->nCol > 0);
+	/* iChng == p->nCol means that the current and previous rows are identical */
 	assert(iChng <= p->nCol);
-
 	if (p->nRow == 0) {
 		/* This is the first call to this function. Do initialization. */
-		for (i = 0; i < p->nCol; i++)
+		for (i = 0; i < p->nCol + 1; i++)
 			p->current.anEq[i] = 1;
 	} else {
 		/* Second and subsequent calls get processed here */
@@ -801,7 +807,7 @@ statPush(sqlite3_context * context, int argc, sqlite3_value ** argv)
 		for (i = 0; i < iChng; i++) {
 			p->current.anEq[i]++;
 		}
-		for (i = iChng; i < p->nCol; i++) {
+		for (i = iChng; i < p->nCol + 1; i++) {
 			p->current.anDLt[i]++;
 #ifdef SQLITE_ENABLE_STAT3_OR_STAT4
 			p->current.anLt[i] += p->current.anEq[i];
@@ -823,16 +829,15 @@ statPush(sqlite3_context * context, int argc, sqlite3_value ** argv)
 
 #ifdef SQLITE_ENABLE_STAT4
 	{
-		tRowcnt nLt = p->current.anLt[p->nCol - 1];
+		tRowcnt nLt = p->current.anLt[p->nCol];
 
 		/* Check if this is to be a periodic sample. If so, add it. */
 		if ((nLt / p->nPSample) != (nLt + 1) / p->nPSample) {
 			p->current.isPSample = 1;
 			p->current.iCol = 0;
-			sampleInsert(p, &p->current, p->nCol - 1);
+			sampleInsert(p, &p->current, p->nCol);
 			p->current.isPSample = 0;
 		}
-
 		/* Update the aBest[] array. */
 		for (i = 0; i < p->nCol; i++) {
 			p->current.iCol = i;
@@ -1452,7 +1457,7 @@ analyzeTable(Parse * pParse, Table * pTab, Index * pOnlyIdx)
  * Form 2 analyzes all indices associated with the named table.
  */
 void
-sqlite3Analyze(Parse * pParse, Token * pName1)
+sqlite3Analyze(Parse * pParse, Token * pName)
 {
 	sqlite3 *db = pParse->db;
 	char *z;
@@ -1467,12 +1472,12 @@ sqlite3Analyze(Parse * pParse, Token * pName1)
 		return;
 	}
 
-	if (pName1 == 0) {
+	if (pName == 0) {
 		/* Form 1:  Analyze everything */
 		analyzeDatabase(pParse);
 	} else {
 		/* Form 2:  Analyze table named */
-		z = sqlite3NameFromToken(db, pName1);
+		z = sqlite3NameFromToken(db, pName);
 		if (z) {
 			if ((pTab = sqlite3LocateTable(pParse, 0, z)) != 0) {
 				analyzeTable(pParse, pTab, 0);
