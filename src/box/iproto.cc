@@ -384,7 +384,9 @@ net_send_msg(struct cmsg *msg);
 static void
 tx_process_join_subscribe(struct cmsg *msg);
 static void
-net_end_join_subscribe(struct cmsg *msg);
+net_end_join(struct cmsg *msg);
+static void
+net_end_subscribe(struct cmsg *msg);
 
 static void
 tx_fiber_init(struct session *session, uint64_t sync)
@@ -476,9 +478,14 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	misc_route                              /* IPROTO_CALL */
 };
 
-static const struct cmsg_hop sync_route[] = {
+static const struct cmsg_hop join_route[] = {
 	{ tx_process_join_subscribe, &net_pipe },
-	{ net_end_join_subscribe, NULL },
+	{ net_end_join, NULL },
+};
+
+static const struct cmsg_hop subscribe_route[] = {
+	{ tx_process_join_subscribe, &net_pipe },
+	{ net_end_subscribe, NULL },
 };
 
 static struct iproto_connection *
@@ -702,8 +709,11 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_JOIN:
+		cmsg_init(msg, join_route);
+		*stop_input = true;
+		break;
 	case IPROTO_SUBSCRIBE:
-		cmsg_init(msg, sync_route);
+		cmsg_init(msg, subscribe_route);
 		*stop_input = true;
 		break;
 	case IPROTO_AUTH:
@@ -1151,7 +1161,7 @@ net_send_msg(struct cmsg *m)
 }
 
 static void
-net_end_join_subscribe(struct cmsg *m)
+net_end_join(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
@@ -1165,6 +1175,20 @@ net_end_join_subscribe(struct cmsg *m)
 	 * queue. Will simply start input otherwise.
 	 */
 	iproto_enqueue_batch(con, msg->p_ibuf);
+}
+
+static void
+net_end_subscribe(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+
+	msg->p_ibuf->rpos += msg->len;
+	iproto_msg_delete(msg);
+
+	assert(! ev_is_active(&con->input));
+
+	iproto_connection_close(con);
 }
 
 /**
