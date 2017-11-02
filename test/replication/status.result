@@ -230,6 +230,10 @@ master.upstream.idle < 1
 ---
 - true
 ...
+master.upstream.peer:match("localhost")
+---
+- localhost
+...
 master.downstream == nil
 ---
 - true
@@ -268,10 +272,6 @@ replica.upstream == nil
 - true
 ...
 replica.downstream == nil
----
-- true
-...
-test_run:cmd('switch default')
 ---
 - true
 ...
@@ -327,6 +327,53 @@ test_run:grep_log('replica', 'error applying row: .*')
   ["dup"]}'
 ...
 test_run:cmd("clear filter")
+---
+- true
+...
+--
+-- Check box.info.replication login
+--
+test_run:cmd('switch replica')
+---
+- true
+...
+test_run:cmd("set variable master_port to 'replica.master'")
+---
+- true
+...
+replica_uri = os.getenv("LISTEN")
+---
+...
+box.cfg{replication = {"guest@localhost:" .. master_port, replica_uri}}
+---
+...
+master_id = test_run:get_server_id('default')
+---
+...
+master = box.info.replication[master_id]
+---
+...
+master.id == master_id
+---
+- true
+...
+master.upstream.status == "follow"
+---
+- false
+...
+master.upstream.peer:match("guest")
+---
+- guest
+...
+master.upstream.peer:match("localhost")
+---
+- localhost
+...
+master.downstream == nil
+---
+- true
+...
+test_run:cmd('switch default')
 ---
 - true
 ...

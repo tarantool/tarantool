@@ -92,6 +92,13 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 			       applier->last_row_time);
 		lua_settable(L, -3);
 
+		char name[FIBER_NAME_MAX];
+		int total = uri_format(name, sizeof(name), &applier->uri, false);
+
+		lua_pushstring(L, "peer");
+		lua_pushlstring(L, name, total);
+		lua_settable(L, -3);
+
 		struct error *e = diag_last_error(&applier->reader->diag);
 		if (e != NULL) {
 			lua_pushstring(L, "message");
