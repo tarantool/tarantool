@@ -33,6 +33,7 @@
  * This file contains routines used for analyzing expressions and
  * for generating VDBE code that evaluates expressions in SQLite.
  */
+#include <box/coll.h>
 #include "sqliteInt.h"
 #include "box/session.h"
 
@@ -166,11 +167,11 @@ sqlite3ExprSkipCollate(Expr * pExpr)
  * COLLATE operators take first precedence.  Left operands take
  * precedence over right operands.
  */
-CollSeq *
+struct coll *
 sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
 {
 	sqlite3 *db = pParse->db;
-	CollSeq *pColl = 0;
+	struct coll *pColl = 0;
 	Expr *p = pExpr;
 	while (p) {
 		int op = p->op;
@@ -341,10 +342,10 @@ binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
  * Argument pRight (but not pLeft) may be a null pointer. In this case,
  * it is not considered.
  */
-CollSeq *
+struct coll *
 sqlite3BinaryCompareCollSeq(Parse * pParse, Expr * pLeft, Expr * pRight)
 {
-	CollSeq *pColl;
+	struct coll *pColl;
 	assert(pLeft);
 	if (pLeft->flags & EP_Collate) {
 		pColl = sqlite3ExprCollSeq(pParse, pLeft);
@@ -374,7 +375,7 @@ codeCompare(Parse * pParse,	/* The parsing (and code generating) context */
 {
 	int p5;
 	int addr;
-	CollSeq *p4;
+	struct coll *p4;
 
 	p4 = sqlite3BinaryCompareCollSeq(pParse, pLeft, pRight);
 	p5 = binaryCompareP5(pLeft, pRight, jumpIfNull);
@@ -2573,7 +2574,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 						    sqlite3VectorFieldSubexpr
 						    (pX->pLeft, i);
 						Expr *pRhs = pEList->a[i].pExpr;
-						CollSeq *pReq =
+						struct coll *pReq =
 						    sqlite3BinaryCompareCollSeq
 						    (pParse, pLhs, pRhs);
 						int j;
@@ -2590,7 +2591,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							if (pReq != 0
 							    &&
 							    strcmp
-							    (pReq->zName,
+							    (pReq->name,
 							     pIdx->azColl[j]) !=
 							    0) {
 								continue;
@@ -3282,7 +3283,7 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 */
 	if (eType == IN_INDEX_NOOP) {
 		ExprList *pList = pExpr->x.pList;
-		CollSeq *pColl = sqlite3ExprCollSeq(pParse, pExpr->pLeft);
+		struct coll *pColl = sqlite3ExprCollSeq(pParse, pExpr->pLeft);
 		int labelOk = sqlite3VdbeMakeLabel(v);
 		int r2, regToFree;
 		int regCkNull = 0;
@@ -3429,7 +3430,7 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	}
 	for (i = 0; i < nVector; i++) {
 		Expr *p;
-		CollSeq *pColl;
+		struct coll *pColl;
 		int r3 = sqlite3GetTempReg(pParse);
 		p = sqlite3VectorFieldSubexpr(pLeft, i);
 		pColl = sqlite3ExprCollSeq(pParse, p);
@@ -4227,7 +4228,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			u32 constMask = 0;	/* Mask of function arguments that are constant */
 			int i;	/* Loop counter */
 			sqlite3 *db = pParse->db;	/* The database connection */
-			CollSeq *pColl = 0;	/* A collating sequence */
+			struct coll *pColl = 0;	/* A collating sequence */
 
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			if (ExprHasProperty(pExpr, EP_TokenOnly)) {

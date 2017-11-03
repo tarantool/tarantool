@@ -1322,15 +1322,15 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
  *
  * See also: sqlite3FindCollSeq(), sqlite3GetCollSeq()
  */
-CollSeq *
+struct coll *
 sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName)
 {
 	u8 initbusy;
-	CollSeq *pColl;
+	struct coll *pColl;
 	initbusy = db->init.busy;
 
 	pColl = sqlite3FindCollSeq(db, zName, initbusy);
-	if (!initbusy && (!pColl || !pColl->xCmp)) {
+	if (!initbusy && (!pColl)) {
 		pColl = sqlite3GetCollSeq(pParse, db, pColl, zName);
 	}
 
@@ -4434,7 +4434,7 @@ reindexDatabases(Parse * pParse, char const *zColl)
 void
 sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 {
-	CollSeq *pColl;		/* Collating sequence to be reindexed, or NULL */
+	struct coll *pColl;		/* Collating sequence to be reindexed, or NULL */
 	char *z = 0;		/* Name of index */
 	char *zTable = 0;	/* Name of indexed table */
 	Table *pTab;		/* A table in the database */

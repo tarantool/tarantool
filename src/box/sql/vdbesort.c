@@ -882,7 +882,7 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 	assert(pCsr->pKeyInfo && pCsr->pBtx == 0);
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	szKeyInfo =
-	    sizeof(KeyInfo) + (pCsr->pKeyInfo->nField - 1) * sizeof(CollSeq *);
+	    sizeof(KeyInfo) + (pCsr->pKeyInfo->nField - 1) * sizeof(struct coll *);
 	sz = sizeof(VdbeSorter) + nWorker * sizeof(SortSubtask);
 
 	pSorter = (VdbeSorter *) sqlite3DbMallocZero(db, sz + szKeyInfo);

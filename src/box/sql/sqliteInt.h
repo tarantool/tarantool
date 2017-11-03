@@ -859,7 +859,6 @@ typedef struct AggInfo AggInfo;
 typedef struct AuthContext AuthContext;
 typedef struct AutoincInfo AutoincInfo;
 typedef struct Bitvec Bitvec;
-typedef struct CollSeq CollSeq;
 typedef struct Column Column;
 typedef struct Db Db;
 typedef struct Schema Schema;
@@ -1124,7 +1123,7 @@ typedef int (*sqlite3_xauth) (void *, int, const char *, const char *,
 struct sqlite3 {
 	sqlite3_vfs *pVfs;	/* OS Interface */
 	struct Vdbe *pVdbe;	/* List of active virtual machines */
-	CollSeq *pDfltColl;	/* The default collating sequence (BINARY) */
+	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
 	sqlite3_mutex *mutex;	/* Connection mutex */
 	Db mdb;			/* All backends */
 	i64 lastRowid;		/* ROWID of most recent insert (see above) */
@@ -1193,7 +1192,6 @@ struct sqlite3 {
 	unsigned nProgressOps;	/* Number of opcodes for progress callback */
 #endif
 	Hash aFunc;		/* Hash table of connection functions */
-	Hash aCollSeq;		/* All collating sequences */
 	BusyHandler busyHandler;	/* Busy callback */
 	int busyTimeout;	/* Busy handler timeout, in msec */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
@@ -1465,23 +1463,6 @@ struct Column {
 #define COLFLAG_HASTYPE  0x0004	/* Type name follows column name */
 
 /*
- * A "Collating Sequence" is defined by an instance of the following
- * structure. Conceptually, a collating sequence consists of a name and
- * a comparison routine that defines the order of that sequence.
- *
- * If CollSeq.xCmp is NULL, it means that the
- * collating sequence is undefined.  Indices built on an undefined
- * collating sequence may not be read or written.
- */
-struct CollSeq {
-	char *zName;		/* Name of the collating sequence, UTF-8 encoded */
-	u8 enc;			/* Text encoding handled by xCmp() */
-	void *pUser;		/* First argument to xCmp() */
-	struct coll* xCmp;
-	void (*xDel) (void *);	/* Destructor for pUser */
-};
-
-/*
  * A sort order can be either ASC or DESC.
  */
 #define SQLITE_SO_ASC       0	/* Sort in ascending order */
@@ -1699,7 +1680,7 @@ struct KeyInfo {
 	u16 nXField;		/* Number of columns beyond the key columns */
 	sqlite3 *db;		/* The database connection */
 	u8 *aSortOrder;		/* Sort order for each column. */
-	CollSeq *aColl[1];	/* Collating sequence for each term of the key */
+	struct coll *aColl[1];	/* Collating sequence for each term of the key */
 };
 
 /*
@@ -3584,13 +3565,13 @@ const char *sqlite3ErrName(int);
 
 const char *sqlite3ErrStr(int);
 int sqlite3ReadSchema(Parse * pParse);
-CollSeq *sqlite3FindCollSeq(sqlite3 *, const char *, int);
-CollSeq *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
-CollSeq *sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr);
+struct coll *sqlite3FindCollSeq(sqlite3 *, const char *, int);
+struct coll *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
+struct coll *sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr);
 Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlite3ExprAddCollateString(Parse *, Expr *, const char *);
 Expr *sqlite3ExprSkipCollate(Expr *);
-int sqlite3CheckCollSeq(Parse *, CollSeq *);
+int sqlite3CheckCollSeq(Parse *, struct coll *);
 int sqlite3CheckObjectName(Parse *, char *);
 void sqlite3VdbeSetChanges(sqlite3 *, int);
 int sqlite3AddInt64(i64 *, i64);
@@ -3642,7 +3623,7 @@ int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
 void sqlite3ColumnDefault(Vdbe *, Table *, int, int);
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
-CollSeq *sqlite3GetCollSeq(Parse *, sqlite3 *, CollSeq *, const char *);
+struct coll *sqlite3GetCollSeq(Parse *, sqlite3 *, struct coll *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 int sqlite3InvokeBusyHandler(BusyHandler *);
@@ -3722,7 +3703,7 @@ int sqlite3TransferBindings(sqlite3_stmt *, sqlite3_stmt *);
 void sqlite3ParserReset(Parse *);
 int sqlite3Reprepare(Vdbe *);
 void sqlite3ExprListCheckLength(Parse *, ExprList *, const char *);
-CollSeq *sqlite3BinaryCompareCollSeq(Parse *, Expr *, Expr *);
+struct coll *sqlite3BinaryCompareCollSeq(Parse *, Expr *, Expr *);
 int sqlite3TempInMemory(const sqlite3 *);
 const char *sqlite3JournalModename(int);
 #ifndef SQLITE_OMIT_CTE

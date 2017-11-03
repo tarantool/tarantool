@@ -33,6 +33,7 @@
  * This file contains code used by the compiler to add foreign key
  * support to compiled SQL statements.
  */
+#include <box/coll.h>
 #include "sqliteInt.h"
 #include "box/session.h"
 
@@ -545,7 +546,7 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 			pExpr->affinity = pCol->affinity;
 			zColl = pCol->zColl;
 			if (zColl == 0)
-				zColl = db->pDfltColl->zName;
+				zColl = db->pDfltColl->name;
 			pExpr =
 			    sqlite3ExprAddCollateString(pParse, pExpr, zColl);
 		} else {

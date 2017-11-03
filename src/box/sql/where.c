@@ -300,7 +300,7 @@ whereScanNext(WhereScan * pScan)
 						/* Verify the affinity and collating sequence match */
 						if (pScan->zCollName
 						    && (pTerm->eOperator & WO_ISNULL) == 0) {
-							CollSeq *pColl;
+							struct coll *pColl;
 							Parse *pParse =
 							    pWC->pWInfo->pParse;
 							pX = pTerm->pExpr;
@@ -315,7 +315,7 @@ whereScanNext(WhereScan * pScan)
 							if (pColl == 0)
 								pColl =
 								    pParse->db->pDfltColl;
-							if (strcmp(pColl->xCmp->name,
+							if (strcmp(pColl->name,
 									   pScan->zCollName)) {
 								continue;
 							}
@@ -474,9 +474,9 @@ findIndexCol(Parse * pParse,	/* Parse context */
 		Expr *p = sqlite3ExprSkipCollate(pList->a[i].pExpr);
 		if (p->op == TK_COLUMN && p->iColumn == pIdx->aiColumn[iCol]
 		    && p->iTable == iBase) {
-			CollSeq *pColl =
+			struct coll *pColl =
 			    sqlite3ExprCollSeq(pParse, pList->a[i].pExpr);
-			if (pColl && 0 == strcmp(pColl->zName, zColl)) {
+			if (pColl && 0 == strcmp(pColl->name, zColl)) {
 				return i;
 			}
 		}
@@ -686,7 +686,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	int n;			/* Column counter */
 	int i;			/* Loop counter */
 	int mxBitCol;		/* Maximum column in pSrc->colUsed */
-	CollSeq *pColl;		/* Collating sequence to on a column */
+	struct coll *pColl;		/* Collating sequence to on a column */
 	WhereLoop *pLoop;	/* The Loop object */
 	char *zNotUsed;		/* Extra space on the end of pIdx */
 	Bitmask idxCols;	/* Bitmap of columns used for indexing */
@@ -801,7 +801,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 								pX->pLeft,
 								pX->pRight);
 				pIdx->azColl[n] =
-				    pColl ? pColl->zName : sqlite3StrBINARY;
+				    pColl ? pColl->name : sqlite3StrBINARY;
 				n++;
 			}
 		}
@@ -1187,7 +1187,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	int nUpper = p->nSample + 1;
 	int rc = SQLITE_OK;
 	u8 aff = sqlite3IndexColumnAffinity(db, p, nEq);
-	CollSeq *pColl;
+	struct coll *pColl;
 
 	sqlite3_value *p1 = 0;	/* Value extracted from pLower */
 	sqlite3_value *p2 = 0;	/* Value extracted from pUpper */
@@ -2232,7 +2232,7 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		 */
 		char aff;	/* Comparison affinity */
 		char idxaff = 0;	/* Indexed columns affinity */
-		CollSeq *pColl;	/* Comparison collation sequence */
+		struct coll *pColl;	/* Comparison collation sequence */
 		Expr *pLhs = pTerm->pExpr->pLeft->x.pList->a[i].pExpr;
 		Expr *pRhs = pTerm->pExpr->pRight;
 		if (pRhs->flags & EP_xIsSelect) {
@@ -2264,7 +2264,7 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		pColl = sqlite3BinaryCompareCollSeq(pParse, pLhs, pRhs);
 		if (pColl == 0)
 			break;
-		if (strcmp(pColl->xCmp->name, pIdx->azColl[i + nEq]))
+		if (strcmp(pColl->name, pIdx->azColl[i + nEq]))
 			break;
 	}
 	return i;
@@ -3209,7 +3209,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	WhereLoop *pLoop = 0;	/* Current WhereLoop being processed. */
 	WhereTerm *pTerm;	/* A single term of the WHERE clause */
 	Expr *pOBExpr;		/* An expression from the ORDER BY clause */
-	CollSeq *pColl;		/* COLLATE function from an ORDER BY clause term */
+	struct coll *pColl;		/* COLLATE function from an ORDER BY clause term */
 	Index *pIndex;		/* The index associated with pLoop */
 	sqlite3 *db = pWInfo->pParse->db;	/* Database connection */
 	Bitmask obSat = 0;	/* Mask of ORDER BY terms satisfied so far */
@@ -3307,13 +3307,13 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						       pOrderBy->a[i].pExpr);
 				if (!pColl)
 					pColl = db->pDfltColl;
-				z1 = pColl->zName;
+				z1 = pColl->name;
 				pColl =
 				    sqlite3ExprCollSeq(pWInfo->pParse,
 						       pTerm->pExpr);
 				if (!pColl)
 					pColl = db->pDfltColl;
-				z2 = pColl->zName;
+				z2 = pColl->name;
 				if (strcmp(z1, z2) != 0)
 					continue;
 				testcase(pTerm->pExpr->op == TK_IS);
@@ -3448,7 +3448,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 								       pOrderBy->a[i].pExpr);
 						if (!pColl)
 							pColl = db->pDfltColl;
-						if (strcmp(pColl->xCmp->name,
+						if (strcmp(pColl->name,
 								   pIndex->azColl[j]) != 0)
 							continue;
 					}

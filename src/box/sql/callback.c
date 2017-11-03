@@ -40,46 +40,6 @@
 #include "box/session.h"
 
 /*
- * Invoke the 'collation needed' callback to request a collation sequence
- * in the encoding enc of name zName, length nName.
- */
-static void
-callCollNeeded(sqlite3 * db, const char *zName)
-{
-	if (db->xCollNeeded) {
-		char *zExternal = sqlite3DbStrDup(db, zName);
-		if (!zExternal)
-			return;
-		db->xCollNeeded(db->pCollNeededArg, db, zExternal);
-		sqlite3DbFree(db, zExternal);
-	}
-}
-
-/*
- * This routine is called if the collation factory fails to deliver a
- * collation function in the best encoding but there may be other versions
- * of this collation function (for other text encodings) available. Use one
- * of these instead if they exist. Avoid a UTF-8 <-> UTF-16 conversion if
- * possible.
- */
-static int
-synthCollSeq(sqlite3 * db, CollSeq * pColl)
-{
-	CollSeq *pColl2;
-	char *z = pColl->zName;
-	int i;
-	for (i = 0; i < 3; i++) {
-		pColl2 = sqlite3FindCollSeq(db, z, 0);
-		if (pColl2->xCmp != 0) {
-			memcpy(pColl, pColl2, sizeof(CollSeq));
-			pColl->xDel = 0;	/* Do not copy the destructor */
-			return SQLITE_OK;
-		}
-	}
-	return SQLITE_ERROR;
-}
-
-/*
  * This function is responsible for invoking the collation factory callback
  * or substituting a collation sequence of a different encoding when the
  * requested collation sequence is not available in the desired encoding.
@@ -93,30 +53,19 @@ synthCollSeq(sqlite3 * db, CollSeq * pColl)
  *
  * See also: sqlite3LocateCollSeq(), sqlite3FindCollSeq()
  */
-CollSeq *
+struct coll *
 sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
 		  sqlite3 * db,	/* if called during runtime - pointer to the DB */
-		  CollSeq * pColl,	/* Collating sequence with native encoding, or NULL */
+		  struct coll * pColl,	/* Collating sequence with native encoding, or NULL */
 		  const char *zName	/* Collating sequence name */
     )
 {
-	CollSeq *p;
+	struct coll *p;
 
 	p = pColl;
 	if (!p) {
 		p = sqlite3FindCollSeq(db, zName, 0);
 	}
-	if (!p || !p->xCmp) {
-		/* No collation sequence of this type for this encoding is registered.
-		 * Call the collation factory to see if it can supply us with one.
-		 */
-		callCollNeeded(db, zName);
-		p = sqlite3FindCollSeq(db, zName, 0);
-	}
-	if (p && !p->xCmp && synthCollSeq(db, p)) {
-		p = 0;
-	}
-	assert(!p || p->xCmp);
 	if (p == 0) {
 		if (pParse)
 			sqlite3ErrorMsg(pParse,
@@ -140,11 +89,11 @@ sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
  * from the main database is substituted, if one is available.
  */
 int
-sqlite3CheckCollSeq(Parse * pParse, CollSeq * pColl)
+sqlite3CheckCollSeq(Parse * pParse, struct coll * pColl)
 {
 	if (pColl) {
-		const char *zName = pColl->zName;
-		CollSeq *p =
+		const char *zName = pColl->name;
+		struct coll *p =
 		    sqlite3GetCollSeq(pParse, pParse->db, pColl,
 				      zName);
 		if (!p) {
@@ -183,11 +132,11 @@ binCollFunc(const char *pKey1, size_t nKey1, const char *pKey2, size_t nKey2, co
  * as collations in Tarantool, to support binary collation easily.
  */
 
-struct coll_binary_struct{
+struct coll_plus_name_struct{
     struct coll collation;
-    char name[sizeof("BINARY")];
+    char name[20]; /* max of possible name lengths */
 };
-static struct coll_binary_struct binary_coll_with_name =
+static struct coll_plus_name_struct binary_coll_with_name =
 	{{0, 0, COLL_TYPE_ICU, {0}, binCollFunc, 0, sizeof("BINARY"), {}},
 		"BINARY"};
 static struct coll * binary_coll = (struct coll*)&binary_coll_with_name;
@@ -207,21 +156,18 @@ static struct coll * binary_coll = (struct coll*)&binary_coll_with_name;
  *
  * See also: sqlite3LocateCollSeq(), sqlite3GetCollSeq()
  */
-CollSeq *
+struct coll *
 sqlite3FindCollSeq(sqlite3 * db, const char *zName, int create)
 {
 	(void)db;
 	(void)create;
-	CollSeq *pColl;
-	struct coll * collation;
 	if (zName == NULL || sqlite3StrICmp(zName, "binary")==0){
-		collation = binary_coll;
-	} else{
-		collation = coll_by_name("unicode", strlen("unicode"));
+		return binary_coll;
 	}
-	pColl = (CollSeq*) malloc(sizeof(CollSeq));
-	pColl->xCmp = collation;
-	return pColl;
+	if (sqlite3StrICmp(zName, "nocase")==0){
+		return coll_by_name("unicode", strlen("unicode"));
+	}
+	return coll_by_name(zName, strlen(zName));
 }
 
 /* During the search for the best function definition, this procedure

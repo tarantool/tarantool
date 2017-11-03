@@ -42,7 +42,7 @@
 /*
  * Return the collating function associated with a function.
  */
-static CollSeq *
+static struct coll *
 sqlite3GetFuncCollSeq(sqlite3_context * context)
 {
 	VdbeOp *pOp;
@@ -72,7 +72,7 @@ minmaxFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	int i;
 	int mask;		/* 0 for min() or 0xffffffff for max() */
 	int iBest;
-	CollSeq *pColl;
+	struct coll *pColl;
 
 	assert(argc > 1);
 	mask = sqlite3_user_data(context) == 0 ? 0 : -1;
@@ -967,7 +967,7 @@ likeFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 static void
 nullifFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 {
-	CollSeq *pColl = sqlite3GetFuncCollSeq(context);
+	struct coll *pColl = sqlite3GetFuncCollSeq(context);
 	UNUSED_PARAMETER(NotUsed);
 	if (sqlite3MemCompare(argv[0], argv[1], pColl) != 0) {
 		sqlite3_result_value(context, argv[0]);
@@ -1617,7 +1617,7 @@ minmaxStep(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 	} else if (pBest->flags) {
 		int max;
 		int cmp;
-		CollSeq *pColl = sqlite3GetFuncCollSeq(context);
+		struct coll *pColl = sqlite3GetFuncCollSeq(context);
 		/* This step function is used for both the min() and max() aggregates,
 		 * the only difference between the two being that the sense of the
 		 * comparison is inverted. For the max() aggregate, the

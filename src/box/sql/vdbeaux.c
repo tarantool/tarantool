@@ -1567,9 +1567,9 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 				assert(pKeyInfo->aSortOrder != 0);
 				sqlite3XPrintf(&x, "k(%d", pKeyInfo->nField);
 				for (j = 0; j < pKeyInfo->nField; j++) {
-					CollSeq *pColl = pKeyInfo->aColl[j];
+					struct coll *pColl = pKeyInfo->aColl[j];
 					const char *zColl =
-					    pColl ? pColl->zName : "";
+					    pColl ? pColl->name : "";
 					if (strcmp(zColl, "BINARY") == 0)
 						zColl = "B";
 					sqlite3XPrintf(&x, ",%s%s",
@@ -1588,8 +1588,8 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 		}
 #endif
 	case P4_COLLSEQ:{
-			CollSeq *pColl = pOp->p4.pColl;
-			sqlite3XPrintf(&x, "(%.20s)", pColl->zName);
+			struct coll *pColl = pOp->p4.pColl;
+			sqlite3XPrintf(&x, "(%.20s)", pColl->name);
 			break;
 		}
 	case P4_FUNCDEF:{
@@ -3928,13 +3928,12 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
  */
 static int
 vdbeCompareMemString(const Mem * pMem1, const Mem * pMem2,
-		     const CollSeq * pColl,
+		     const struct coll * pColl,
 		     u8 * prcErr)	/* If an OOM occurs, set to SQLITE_NOMEM */
 {
 	(void) prcErr;
-	struct coll * collation = pColl->xCmp;
-	return collation->cmp(pMem1->z, (size_t)pMem1->n,
-			      pMem2->z, (size_t)pMem2->n, collation);
+	return pColl->cmp(pMem1->z, (size_t)pMem1->n,
+			      pMem2->z, (size_t)pMem2->n, pColl);
 }
 
 /*
@@ -4040,7 +4039,7 @@ sqlite3IntFloatCompare(i64 i, double r)
  * Two NULL values are considered equal by this function.
  */
 int
-sqlite3MemCompare(const Mem * pMem1, const Mem * pMem2, const CollSeq * pColl)
+sqlite3MemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 {
 	int f1, f2;
 	int combined_flags;

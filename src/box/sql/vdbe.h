@@ -75,7 +75,7 @@ struct VdbeOp {
 		double *pReal;	/* Used when p4type is P4_REAL */
 		FuncDef *pFunc;	/* Used when p4type is P4_FUNCDEF */
 		sqlite3_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
-		CollSeq *pColl;	/* Used when p4type is P4_COLLSEQ */
+		struct coll *pColl;	/* Used when p4type is P4_COLLSEQ */
 		Mem *pMem;	/* Used when p4type is P4_MEM */
 		bool b;         /* Used when p4type is P4_BOOL */
 		KeyInfo *pKeyInfo;	/* Used when p4type is P4_KEYINFO */
@@ -257,7 +257,7 @@ void sqlite3VdbeSetVarmask(Vdbe *, int);
 #ifndef SQLITE_OMIT_TRACE
 char *sqlite3VdbeExpandSql(Vdbe *, const char *);
 #endif
-int sqlite3MemCompare(const Mem *, const Mem *, const CollSeq *);
+int sqlite3MemCompare(const Mem *, const Mem *, const struct coll *);
 
 void sqlite3VdbeRecordUnpackMsgpack(KeyInfo *, int, const void *,
 				    UnpackedRecord *);

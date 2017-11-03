@@ -37,6 +37,7 @@
  * readability and editabiliity.  This file contains utility routines for
  * analyzing Expr objects in the WHERE clause.
  */
+#include <box/coll.h>
 #include "sqliteInt.h"
 #include "whereInt.h"
 
@@ -826,7 +827,7 @@ static int
 termIsEquivalence(Parse * pParse, Expr * pExpr)
 {
 	char aff1, aff2;
-	CollSeq *pColl;
+	struct coll *pColl;
 	const char *zColl1, *zColl2;
 	if (!OptimizationEnabled(pParse->db, SQLITE_Transitive))
 		return 0;
@@ -844,12 +845,12 @@ termIsEquivalence(Parse * pParse, Expr * pExpr)
 	}
 	pColl =
 	    sqlite3BinaryCompareCollSeq(pParse, pExpr->pLeft, pExpr->pRight);
-	if (pColl == 0 || sqlite3StrICmp(pColl->zName, "BINARY") == 0)
+	if (pColl == 0 || sqlite3StrICmp(pColl->name, "BINARY") == 0)
 		return 1;
 	pColl = sqlite3ExprCollSeq(pParse, pExpr->pLeft);
-	zColl1 = pColl ? pColl->zName : 0;
+	zColl1 = pColl ? pColl->name : 0;
 	pColl = sqlite3ExprCollSeq(pParse, pExpr->pRight);
-	zColl2 = pColl ? pColl->zName : 0;
+	zColl2 = pColl ? pColl->name : 0;
 	return sqlite3_stricmp(zColl1, zColl2) == 0;
 }
 

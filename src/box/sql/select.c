@@ -33,6 +33,7 @@
  * This file contains C code routines that are called by the parser
  * to handle SELECT statements in SQLite.
  */
+#include <box/coll.h>
 #include "sqliteInt.h"
 #include "box/session.h"
 
@@ -894,7 +895,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 
 				iJump = sqlite3VdbeCurrentAddr(v) + nResultCol;
 				for (i = 0; i < nResultCol; i++) {
-					CollSeq *pColl =
+					struct coll *pColl =
 					    sqlite3ExprCollSeq(pParse,
 							       pEList->a[i].
 							       pExpr);
@@ -1174,7 +1175,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 KeyInfo *
 sqlite3KeyInfoAlloc(sqlite3 * db, int N, int X)
 {
-	int nExtra = (N + X) * (sizeof(CollSeq *) + 1);
+	int nExtra = (N + X) * (sizeof(struct coll *) + 1);
 	KeyInfo *p = sqlite3DbMallocRawNN(db, sizeof(KeyInfo) + nExtra);
 	if (p) {
 		p->aSortOrder = (u8 *) & p->aColl[N + X];
@@ -1262,7 +1263,7 @@ keyInfoFromExprList(Parse * pParse,	/* Parsing context */
 		assert(sqlite3KeyInfoIsWriteable(pInfo));
 		for (i = iStart, pItem = pList->a + iStart; i < nExpr;
 		     i++, pItem++) {
-			CollSeq *pColl;
+			struct coll *pColl;
 			pColl = sqlite3ExprCollSeq(pParse, pItem->pExpr);
 			if (!pColl)
 				pColl = db->pDfltColl;
@@ -1972,7 +1973,7 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	sqlite3 *db = pParse->db;
 	NameContext sNC;
 	Column *pCol;
-	CollSeq *pColl;
+	struct coll *pColl;
 	int i;
 	Expr *p;
 	struct ExprList_item *a;
@@ -2006,7 +2007,7 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 			pCol->affinity = SQLITE_AFF_BLOB;
 		pColl = sqlite3ExprCollSeq(pParse, p);
 		if (pColl && pCol->zColl == 0) {
-			pCol->zColl = sqlite3DbStrDup(db, pColl->zName);
+			pCol->zColl = sqlite3DbStrDup(db, pColl->name);
 		}
 	}
 	pTab->szTabRow = sqlite3LogEst(szAll * 4);
@@ -2167,10 +2168,10 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
  * The collating sequence for the compound select is taken from the
  * left-most term of the select that has a collating sequence.
  */
-static CollSeq *
+static struct coll *
 multiSelectCollSeq(Parse * pParse, Select * p, int iCol)
 {
-	CollSeq *pRet;
+	struct coll *pRet;
 	if (p->pPrior) {
 		pRet = multiSelectCollSeq(pParse, p->pPrior, iCol);
 	} else {
@@ -2208,7 +2209,7 @@ multiSelectOrderByKeyInfo(Parse * pParse, Select * p, int nExtra)
 		for (i = 0; i < nOrderBy; i++) {
 			struct ExprList_item *pItem = &pOrderBy->a[i];
 			Expr *pTerm = pItem->pExpr;
-			CollSeq *pColl;
+			struct coll *pColl;
 
 			if (pTerm->flags & EP_Collate) {
 				pColl = sqlite3ExprCollSeq(pParse, pTerm);
@@ -2220,7 +2221,7 @@ multiSelectOrderByKeyInfo(Parse * pParse, Select * p, int nExtra)
 					pColl = db->pDfltColl;
 				pOrderBy->a[i].pExpr =
 				    sqlite3ExprAddCollateString(pParse, pTerm,
-								pColl->zName);
+								pColl->name);
 			}
 			assert(sqlite3KeyInfoIsWriteable(pRet));
 			pRet->aColl[i] = pColl;
@@ -2858,7 +2859,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 		int i;		/* Loop counter */
 		KeyInfo *pKeyInfo;	/* Collating sequence for the result set */
 		Select *pLoop;	/* For looping through SELECT statements */
-		CollSeq **apColl;	/* For looping through pKeyInfo->aColl[] */
+		struct coll **apColl;	/* For looping through pKeyInfo->aColl[] */
 		int nCol;	/* Number of columns in result set */
 
 		assert(p->pNext == 0);
@@ -5301,7 +5302,7 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 				     regAgg);
 		}
 		if (pF->pFunc->funcFlags & SQLITE_FUNC_NEEDCOLL) {
-			CollSeq *pColl = 0;
+			struct coll *pColl = 0;
 			struct ExprList_item *pItem;
 			int j;
 			assert(pList != 0);	/* pList!=0 if pF->pFunc has NEEDCOLL */

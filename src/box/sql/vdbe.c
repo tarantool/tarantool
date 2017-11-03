@@ -2240,7 +2240,7 @@ case OP_Compare: {
 	int p2;
 	const KeyInfo *pKeyInfo;
 	int idx;
-	CollSeq *pColl;    /* Collating sequence to use on this term */
+	struct coll *pColl;    /* Collating sequence to use on this term */
 	int bRev;          /* True for DESCENDING sort order */
 
 	if ((pOp->p5 & OPFLAG_PERMUTE)==0) aPermute = 0;
