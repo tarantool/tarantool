@@ -207,11 +207,6 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
-	if (key_def_has_collation(index_def->key_def)) {
-		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
-			 space_name(space), "vinyl does not support collation");
-		return -1;
-	}
 	return 0;
 }
 
