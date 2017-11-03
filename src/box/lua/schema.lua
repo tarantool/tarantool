@@ -2114,3 +2114,5 @@ box.internal.schema = {}
 box.internal.schema.init = function()
     box_sequence_init()
 end
+
+box.NULL = msgpack.NULL

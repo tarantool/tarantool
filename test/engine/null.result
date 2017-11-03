@@ -7,12 +7,25 @@ test_run = env.new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-NULL = require('msgpack').NULL
+msgpack = require('msgpack')
 ---
 ...
 --
--- gh-1557: NULL in indexes.
+-- gh-1557: box.NULL in indexes.
 --
+box.NULL == msgpack.NULL
+---
+- true
+...
+box.NULL == nil
+---
+- true
+...
+msgpack.decode(msgpack.encode({box.NULL}))
+---
+- [null]
+- 3
+...
 format = {}
 ---
 ...
@@ -105,11 +118,11 @@ s:insert{1, 1}
 ---
 - [1, 1]
 ...
-s:insert{2, NULL}
+s:insert{2, box.NULL}
 ---
 - [2, null]
 ...
-s:insert{3, NULL}
+s:insert{3, box.NULL}
 ---
 - [3, null]
 ...
@@ -121,7 +134,7 @@ s:insert{4, 4}
 ---
 - [4, 4]
 ...
-s:insert{5, NULL}
+s:insert{5, box.NULL}
 ---
 - [5, null]
 ...
@@ -146,7 +159,7 @@ sk:get({1})
 ---
 - [1, 1]
 ...
-sk:get({NULL}) -- Fail.
+sk:get({box.NULL}) -- Fail.
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
@@ -154,14 +167,14 @@ sk:update({1}, {})
 ---
 - [1, 1]
 ...
-sk:update({NULL}, {}) -- Fail.
+sk:update({box.NULL}, {}) -- Fail.
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
 _ = sk:delete({1})
 ---
 ...
-sk:delete({NULL}) -- Fail.
+sk:delete({box.NULL}) -- Fail.
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
@@ -170,23 +183,23 @@ s:insert({1, 1})
 - [1, 1]
 ...
 -- Test iterators.
-sk:select{NULL}
+sk:select{box.NULL}
 ---
 - - [2, null]
   - [3, null]
   - [5, null]
 ...
-sk:select({NULL}, {iterator = 'LE'})
+sk:select({box.NULL}, {iterator = 'LE'})
 ---
 - - [5, null]
   - [3, null]
   - [2, null]
 ...
-sk:select({NULL}, {iterator = 'LT'})
+sk:select({box.NULL}, {iterator = 'LT'})
 ---
 - []
 ...
-sk:select({NULL}, {iterator = 'GE'})
+sk:select({box.NULL}, {iterator = 'GE'})
 ---
 - - [2, null]
   - [3, null]
@@ -194,12 +207,12 @@ sk:select({NULL}, {iterator = 'GE'})
   - [1, 1]
   - [4, 4]
 ...
-sk:select({NULL}, {iterator = 'GT'})
+sk:select({box.NULL}, {iterator = 'GT'})
 ---
 - - [1, 1]
   - [4, 4]
 ...
-_ = sk:delete{NULL}
+_ = sk:delete{box.NULL}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected unsigned'
 ...
@@ -223,7 +236,7 @@ pk:select{}
 create_iterator = require('utils').create_iterator
 ---
 ...
-iter = create_iterator(sk, {NULL})
+iter = create_iterator(sk, {box.NULL})
 ---
 ...
 iter.next()
@@ -260,11 +273,11 @@ s:replace{2, 2}
 ---
 - [2, 2]
 ...
-s:replace{3, NULL} -- no changes.
+s:replace{3, box.NULL} -- no changes.
 ---
 - [3, null]
 ...
-s:replace{6, NULL}
+s:replace{6, box.NULL}
 ---
 - [6, null]
 ...
@@ -300,11 +313,11 @@ s:insert{1, 1}
 ---
 - [1, 1]
 ...
-s:insert{2, NULL}
+s:insert{2, box.NULL}
 ---
 - [2, null]
 ...
-s:insert{3, NULL}
+s:insert{3, box.NULL}
 ---
 - [3, null]
 ...
@@ -312,7 +325,7 @@ s:insert{4, 1}
 ---
 - [4, 1]
 ...
-s:insert{5, NULL}
+s:insert{5, box.NULL}
 ---
 - [5, null]
 ...
@@ -359,15 +372,15 @@ s:replace{3, 3, 3}
 ---
 - [3, 3, 3]
 ...
-s:replace{2, NULL, NULL}
+s:replace{2, box.NULL, box.NULL}
 ---
 - [2, null, null]
 ...
-s:replace{1, NULL, 1}
+s:replace{1, box.NULL, 1}
 ---
 - [1, null, 1]
 ...
-s:replace{0, 0, NULL}
+s:replace{0, 0, box.NULL}
 ---
 - [0, 0, null]
 ...
@@ -400,7 +413,7 @@ s:replace{4, 4, 3} -- fail
 ---
 - error: Duplicate key exists in unique index 'sk2' in space 'test'
 ...
-s:replace{4, 4, NULL} -- ok
+s:replace{4, 4, box.NULL} -- ok
 ---
 - [4, 4, null]
 ...

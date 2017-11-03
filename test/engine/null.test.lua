@@ -1,11 +1,17 @@
 env = require('test_run')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
-NULL = require('msgpack').NULL
+msgpack = require('msgpack')
 
 --
--- gh-1557: NULL in indexes.
+-- gh-1557: box.NULL in indexes.
 --
+
+
+box.NULL == msgpack.NULL
+box.NULL == nil
+
+msgpack.decode(msgpack.encode({box.NULL}))
 
 format = {}
 format[1] = { name = 'field1', type = 'unsigned' }
@@ -51,11 +57,11 @@ s:format(format) -- Ok.
 -- Test insert.
 
 s:insert{1, 1}
-s:insert{2, NULL}
-s:insert{3, NULL}
+s:insert{2, box.NULL}
+s:insert{3, box.NULL}
 s:insert{4, 1} -- Fail.
 s:insert{4, 4}
-s:insert{5, NULL}
+s:insert{5, box.NULL}
 
 pk:select{}
 sk:select{}
@@ -63,24 +69,24 @@ sk:select{}
 -- Test exact match.
 
 sk:get({1})
-sk:get({NULL}) -- Fail.
+sk:get({box.NULL}) -- Fail.
 
 sk:update({1}, {})
-sk:update({NULL}, {}) -- Fail.
+sk:update({box.NULL}, {}) -- Fail.
 
 _ = sk:delete({1})
-sk:delete({NULL}) -- Fail.
+sk:delete({box.NULL}) -- Fail.
 s:insert({1, 1})
 
 -- Test iterators.
 
-sk:select{NULL}
-sk:select({NULL}, {iterator = 'LE'})
-sk:select({NULL}, {iterator = 'LT'})
-sk:select({NULL}, {iterator = 'GE'})
-sk:select({NULL}, {iterator = 'GT'})
+sk:select{box.NULL}
+sk:select({box.NULL}, {iterator = 'LE'})
+sk:select({box.NULL}, {iterator = 'LT'})
+sk:select({box.NULL}, {iterator = 'GE'})
+sk:select({box.NULL}, {iterator = 'GT'})
 
-_ = sk:delete{NULL}
+_ = sk:delete{box.NULL}
 sk:select{}
 pk:select{}
 
@@ -88,7 +94,7 @@ pk:select{}
 
 create_iterator = require('utils').create_iterator
 
-iter = create_iterator(sk, {NULL})
+iter = create_iterator(sk, {box.NULL})
 iter.next()
 
 box.snapshot()
@@ -100,8 +106,8 @@ pk:select{}
 -- Test replace.
 
 s:replace{2, 2}
-s:replace{3, NULL} -- no changes.
-s:replace{6, NULL}
+s:replace{3, box.NULL} -- no changes.
+s:replace{6, box.NULL}
 
 pk:select{}
 sk:select{}
@@ -113,10 +119,10 @@ sk:drop()
 sk = s:create_index('sk', { parts = parts, unique = false })
 
 s:insert{1, 1}
-s:insert{2, NULL}
-s:insert{3, NULL}
+s:insert{2, box.NULL}
+s:insert{3, box.NULL}
 s:insert{4, 1}
-s:insert{5, NULL}
+s:insert{5, box.NULL}
 
 pk:select{}
 sk:select{}
@@ -132,9 +138,9 @@ sk2 = s:create_index('sk2', { parts = parts })
 
 s:replace{4, 3, 4}
 s:replace{3, 3, 3}
-s:replace{2, NULL, NULL}
-s:replace{1, NULL, 1}
-s:replace{0, 0, NULL}
+s:replace{2, box.NULL, box.NULL}
+s:replace{1, box.NULL, 1}
+s:replace{0, 0, box.NULL}
 
 pk:select{}
 sk:select{}
@@ -143,7 +149,7 @@ sk2:select{}
 -- Check duplicate conflict on replace.
 
 s:replace{4, 4, 3} -- fail
-s:replace{4, 4, NULL} -- ok
+s:replace{4, 4, box.NULL} -- ok
 
 pk:select{}
 sk:select{}
