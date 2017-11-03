@@ -2108,8 +2108,8 @@ vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	/*
 	 * Update the quota use rate with the new measurement.
 	 */
-	static const double weight = 1 - exp(-VY_QUOTA_UPDATE_INTERVAL /
-					     (double)VY_QUOTA_RATE_AVG_PERIOD);
+	const double weight = 1 - exp(-VY_QUOTA_UPDATE_INTERVAL /
+				      (double)VY_QUOTA_RATE_AVG_PERIOD);
 	e->quota_use_rate = (1 - weight) * e->quota_use_rate +
 		weight * e->quota_use_curr / VY_QUOTA_UPDATE_INTERVAL;
 	e->quota_use_curr = 0;
