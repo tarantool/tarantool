@@ -48,12 +48,18 @@ part_type_by_name_wrapper(const char *str, uint32_t len)
 	return field_type_by_name(str, len);
 }
 
+#define PART_OPT_TYPE		"type"
+#define PART_OPT_FIELD		"field"
+#define PART_OPT_COLLATION	"collation"
+#define PART_OPT_NULLABILITY	"is_nullable"
+
 const struct opt_def part_def_reg[] = {
-	OPT_DEF_ENUM("type", field_type, struct key_part_def, type,
+	OPT_DEF_ENUM(PART_OPT_TYPE, field_type, struct key_part_def, type,
 		     part_type_by_name_wrapper),
-	OPT_DEF("field", OPT_UINT32, struct key_part_def, fieldno),
-	OPT_DEF("collation", OPT_UINT32, struct key_part_def, coll_id),
-	OPT_DEF("is_nullable", OPT_BOOL, struct key_part_def, is_nullable),
+	OPT_DEF(PART_OPT_FIELD, OPT_UINT32, struct key_part_def, fieldno),
+	OPT_DEF(PART_OPT_COLLATION, OPT_UINT32, struct key_part_def, coll_id),
+	OPT_DEF(PART_OPT_NULLABILITY, OPT_BOOL, struct key_part_def,
+		is_nullable),
 	OPT_END,
 };
 
@@ -69,19 +75,6 @@ const char *mp_type_strs[] = {
 	/* .MP_FLOAT  = */ "float",
 	/* .MP_DOUBLE = */ "double",
 	/* .MP_EXT    = */ "extension",
-};
-
-enum part_option {
-	PART_OPTION_FIELD = 0,
-	PART_OPTION_TYPE = 1,
-	PART_OPTION_COLLATION = 2,
-	field_type_option_MAX
-};
-
-const char *field_type_option_strs[] = {
-	"field",
-	"type",
-	"collation",
 };
 
 const uint32_t key_mp_type[] = {
@@ -294,18 +287,24 @@ key_def_sizeof_parts(const struct key_part_def *parts, uint32_t part_count)
 	size_t size = 0;
 	for (uint32_t i = 0; i < part_count; i++) {
 		const struct key_part_def *part = &parts[i];
-		size += mp_sizeof_map(part->coll_id == COLL_NONE ? 2 : 3);
-		const char *opt = field_type_option_strs[PART_OPTION_FIELD];
-		size += mp_sizeof_str(strlen(opt));
+		int count = 2;
+		if (part->coll_id != COLL_NONE)
+			count++;
+		if (part->is_nullable)
+			count++;
+		size += mp_sizeof_map(count);
+		size += mp_sizeof_str(strlen(PART_OPT_FIELD));
 		size += mp_sizeof_uint(part->fieldno);
 		assert(part->type < field_type_MAX);
-		opt = field_type_option_strs[PART_OPTION_TYPE];
-		size += mp_sizeof_str(strlen(opt));
+		size += mp_sizeof_str(strlen(PART_OPT_TYPE));
 		size += mp_sizeof_str(strlen(field_type_strs[part->type]));
 		if (part->coll_id != COLL_NONE) {
-			opt = field_type_option_strs[PART_OPTION_COLLATION];
-			size += mp_sizeof_str(strlen(opt));
+			size += mp_sizeof_str(strlen(PART_OPT_COLLATION));
 			size += mp_sizeof_uint(part->coll_id);
+		}
+		if (part->is_nullable) {
+			size += mp_sizeof_str(strlen(PART_OPT_NULLABILITY));
+			size += mp_sizeof_bool(part->is_nullable);
 		}
 	}
 	return size;
@@ -317,19 +316,29 @@ key_def_encode_parts(char *data, const struct key_part_def *parts,
 {
 	for (uint32_t i = 0; i < part_count; i++) {
 		const struct key_part_def *part = &parts[i];
-		data = mp_encode_map(data, part->coll_id == COLL_NONE ? 2 : 3);
-		const char *opt = field_type_option_strs[PART_OPTION_FIELD];
-		data = mp_encode_str(data, opt, strlen(opt));
+		int count = 2;
+		if (part->coll_id != COLL_NONE)
+			count++;
+		if (part->is_nullable)
+			count++;
+		data = mp_encode_map(data, count);
+		data = mp_encode_str(data, PART_OPT_FIELD,
+				     strlen(PART_OPT_FIELD));
 		data = mp_encode_uint(data, part->fieldno);
-		opt = field_type_option_strs[PART_OPTION_TYPE];
-		data = mp_encode_str(data, opt, strlen(opt));
+		data = mp_encode_str(data, PART_OPT_TYPE,
+				     strlen(PART_OPT_TYPE));
 		assert(part->type < field_type_MAX);
 		const char *type_str = field_type_strs[part->type];
 		data = mp_encode_str(data, type_str, strlen(type_str));
 		if (part->coll_id != COLL_NONE) {
-			opt = field_type_option_strs[PART_OPTION_COLLATION];
-			data = mp_encode_str(data, opt, strlen(opt));
+			data = mp_encode_str(data, PART_OPT_COLLATION,
+					     strlen(PART_OPT_COLLATION));
 			data = mp_encode_uint(data, part->coll_id);
+		}
+		if (part->is_nullable) {
+			data = mp_encode_str(data, PART_OPT_NULLABILITY,
+					     strlen(PART_OPT_NULLABILITY));
+			data = mp_encode_bool(data, part->is_nullable);
 		}
 	}
 	return data;
