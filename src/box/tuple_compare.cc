@@ -413,6 +413,8 @@ tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
 	case FIELD_TYPE_NUMBER:
 		return mp_compare_number_with_hint(field_a, a_type,
 						   field_b, b_type);
+	case FIELD_TYPE_BOOLEAN:
+		return mp_compare_bool(field_a, field_b);
 	case FIELD_TYPE_SCALAR:
 		return coll != NULL ?
 		       mp_compare_scalar_coll(field_a, field_b, coll) :

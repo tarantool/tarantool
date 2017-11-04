@@ -211,3 +211,31 @@ t3.field1, t3.field2, t3.field3, t3.field4, t3.field5, t3.field6, t3.field7
 s:select{}
 
 s:drop()
+
+-- Check nullable indexes with other types
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+_ = s:create_index('i1', {parts = {{2, 'string', is_nullable = true}}})
+_ = s:create_index('i2', {parts = {{3, 'number', is_nullable = true}}})
+_ = s:create_index('i3', {parts = {{4, 'integer', is_nullable = true}}})
+_ = s:create_index('i4', {parts = {{5, 'boolean', is_nullable = true}}, unique = false})
+_ = s:create_index('i5', {parts = {{6, 'scalar', is_nullable = true}}})
+
+_ = s:auto_increment{box.NULL, 1.11, -111, false, '111'}
+_ = s:auto_increment{'222', box.NULL, -222, true, 222}
+_ = s:auto_increment{'333', 3.33, box.NULL, false, 3.33}
+_ = s:auto_increment{'444', 4.44, -444, box.NULL, true}
+_ = s:auto_increment{'555', 5.55, -555, false, box.NULL}
+_ = s:auto_increment{box.NULL, 6.66, -666, true, '666'}
+_ = s:auto_increment{'777', box.NULL, -777, false, 777}
+_ = s:auto_increment{'888', 8.88, box.NULL, true, 8.88}
+_ = s:auto_increment{'999', 9.99, -999, box.NULL, false}
+_ = s:auto_increment{'000', 0.00, -000, true, box.NULL}
+
+s.index.i1:select()
+s.index.i2:select()
+s.index.i3:select()
+s.index.i4:select()
+s.index.i5:select()
+
+s:drop()
