@@ -1253,9 +1253,9 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		if (old_index == NULL)
 			continue;
 		struct index_def *old_def = old_index->def;
-		if (old_def->opts.is_unique || old_def->type != TREE ||
-		    alter->pk_def == NULL) {
-
+		if ((old_def->opts.is_unique &&
+		     !old_def->key_def->is_nullable) ||
+		    old_def->type != TREE || alter->pk_def == NULL) {
 			(void) new MoveIndex(alter, old_def->iid);
 			continue;
 		}
