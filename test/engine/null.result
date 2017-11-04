@@ -664,6 +664,10 @@ _ = s:auto_increment{'444', 4.44, -444, box.NULL, true}
 _ = s:auto_increment{'555', 5.55, -555, false, box.NULL}
 ---
 ...
+box.snapshot()
+---
+- ok
+...
 _ = s:auto_increment{box.NULL, 6.66, -666, true, '666'}
 ---
 ...

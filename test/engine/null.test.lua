@@ -226,6 +226,9 @@ _ = s:auto_increment{'222', box.NULL, -222, true, 222}
 _ = s:auto_increment{'333', 3.33, box.NULL, false, 3.33}
 _ = s:auto_increment{'444', 4.44, -444, box.NULL, true}
 _ = s:auto_increment{'555', 5.55, -555, false, box.NULL}
+
+box.snapshot()
+
 _ = s:auto_increment{box.NULL, 6.66, -666, true, '666'}
 _ = s:auto_increment{'777', box.NULL, -777, false, 777}
 _ = s:auto_increment{'888', 8.88, box.NULL, true, 8.88}

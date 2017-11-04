@@ -260,13 +260,13 @@ slowpath:
 
 static uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-		enum field_type type, struct coll *coll)
+		 struct coll *coll)
 {
 	const char *f = *field;
 	uint32_t size;
 
-	switch (type) {
-	case FIELD_TYPE_STRING:
+	switch (mp_typeof(**field)) {
+	case MP_STR:
 		/*
 		 * (!) MP_STR fields hashed **excluding** MsgPack format
 		 * indentifier. We have to do that to keep compatibility
@@ -274,6 +274,8 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 * \sa https://github.com/tarantool/tarantool/issues/522
 		 */
 		f = mp_decode_str(field, &size);
+		if (coll != NULL)
+			return coll->hash(f, size, ph1, pcarry, coll);
 		break;
 	default:
 		mp_next(field);
@@ -289,10 +291,6 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		break;
 	}
 	assert(size < INT32_MAX);
-	if (coll != NULL) {
-		assert(type == FIELD_TYPE_STRING);
-		return coll->hash(f, size, ph1, pcarry, coll);
-	}
 	PMurHash32_Process(ph1, pcarry, f, size);
 	return size;
 }
@@ -307,7 +305,7 @@ tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def)
 	uint32_t prev_fieldno = key_def->parts[0].fieldno;
 	const char* field = tuple_field(tuple, key_def->parts[0].fieldno);
 	total_size += tuple_hash_field(&h, &carry, &field,
-		key_def->parts[0].type, key_def->parts[0].coll);
+				       key_def->parts[0].coll);
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
 		/* If parts of key_def are not sequential we need to call
 		 * tuple_field. Otherwise, tuple is hashed sequentially without
@@ -317,7 +315,6 @@ tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def)
 			field = tuple_field(tuple, key_def->parts[part_id].fieldno);
 		}
 		total_size += tuple_hash_field(&h, &carry, &field,
-					       key_def->parts[part_id].type,
 					       key_def->parts[part_id].coll);
 		prev_fieldno = key_def->parts[part_id].fieldno;
 	}
@@ -334,8 +331,7 @@ key_hash_slowpath(const char *key, const struct key_def *key_def)
 
 	for (const struct key_part *part = key_def->parts;
 	     part < key_def->parts + key_def->part_count; part++) {
-		total_size += tuple_hash_field(&h, &carry, &key,
-					       part->type, part->coll);
+		total_size += tuple_hash_field(&h, &carry, &key, part->coll);
 	}
 
 	return PMurHash32_Result(h, carry, total_size);

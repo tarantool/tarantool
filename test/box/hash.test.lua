@@ -210,9 +210,30 @@ hash:delete{'key 5'}
 hash:delete{'key 1', 'key 2'}
 hash:truncate()
 
+-------------------------------------------------------------------------------
+-- Collation test
+-------------------------------------------------------------------------------
+hash.index['primary']:drop()
+tmp = hash:create_index('primary', { type = 'hash', parts = {{1, 'string', collation = 'unicode_s1'}}, unique = true})
+tmp = hash:create_index('secondary', { type = 'hash', parts = {{2, 'scalar', collation = 'unicode_s1'}}, unique = true})
+
+hash:insert{'Ёж', 'Hedgehog'}
+hash:insert{'Ёлка', 'Spruce'}
+hash:insert{'Jogurt', 'Йогурт'}
+hash:insert{'Один', 1}
+
+hash.index.primary:get('ёж')
+hash.index.primary:get('елка')
+hash.index.secondary:get('spruce')
+hash.index.secondary:get('йогурт')
+hash.index.secondary:get(1)
+hash.index.secondary:get('иогурт')
+hash.index.secondary:get(2)
+
 ------------------------
 -- hash::replace tests
 ------------------------
+hash.index['secondary']:drop()
 hash.index['primary']:drop()
 tmp = hash:create_index('primary', { type = 'hash', parts = {1, 'unsigned'}, unique = true })
 tmp = hash:create_index('field1', { type = 'hash', parts = {2, 'unsigned'}, unique = true })
