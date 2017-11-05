@@ -48,6 +48,7 @@
 #include "info.h"
 #include "schema.h"
 #include "box.h"
+#include "txn.h"
 #include "space_def.h"
 #include "index_def.h"
 #include "tuple.h"
@@ -394,15 +395,40 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
 }
 
+/*
+ * Removes all instances from table. If there is no active transaction,
+ * then truncate is used. Otherwise, manually deletes one-by-one all tuples.
+ */
 int tarantoolSqlite3ClearTable(int iTable)
 {
-  int space_id = SQLITE_PAGENO_TO_SPACEID(iTable);
+	int space_id = SQLITE_PAGENO_TO_SPACEID(iTable);
+	
+	if (box_txn()) {
+		int primary_index_id = 0;
+		char *key;
+		uint32_t key_size;
+		box_tuple_t *tuple;
+                int rc;
+		box_iterator_t *iter;
+		iter = box_index_iterator(space_id, primary_index_id, ITER_ALL,
+					  nil_key, nil_key + sizeof(nil_key));
+		if (iter == NULL)
+			return SQLITE_TARANTOOL_ERROR;
+		while (box_iterator_next(iter, &tuple) == 0 && tuple != NULL) {
+			key = tuple_extract_key(tuple,
+						box_iterator_key_def(iter),
+						&key_size);
+			rc = box_delete(space_id, primary_index_id, key,
+					key + key_size, NULL);
+			if (rc != 0)
+				return SQLITE_TARANTOOL_ERROR;
+		}
+		box_iterator_free(iter);
+	} else if (box_truncate(space_id) != 0) {
+		return SQLITE_TARANTOOL_ERROR;
+	}
 
-  if (box_truncate(space_id) != 0) {
-    return SQLITE_TARANTOOL_ERROR;
-  }
-
-  return SQLITE_OK;
+	return SQLITE_OK;
 }
 
 /*
