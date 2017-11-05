@@ -45,6 +45,23 @@ extern "C" {
 /* MsgPack type names */
 extern const char *mp_type_strs[];
 
+struct key_part_def {
+	/** Tuple field index for this part. */
+	uint32_t fieldno;
+	/** Type of the tuple field. */
+	enum field_type type;
+	/** Collation ID for string comparison. */
+	uint32_t coll_id;
+	/** True if a key part can store NULLs. */
+	bool is_nullable;
+};
+
+/**
+ * Set key_part_def.coll_id to COLL_NONE if
+ * the field does not have a collation.
+ */
+#define COLL_NONE UINT32_MAX
+
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
 	/** Tuple field index for this part */
@@ -166,6 +183,19 @@ struct key_def *
 key_def_new(uint32_t part_count);
 
 /**
+ * Allocate a new key_def with the given part count
+ * and initialize its parts.
+ */
+struct key_def *
+key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count);
+
+/**
+ * Dump part definitions of the given key def.
+ */
+void
+key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
+
+/**
  * Set a single key part in a key def.
  * @pre part_no < part_count
  */
@@ -177,21 +207,23 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
  * An snprint-style function to print a key definition.
  */
 int
-key_def_snprint(char *buf, int size, const struct key_def *key_def);
+key_def_snprint_parts(char *buf, int size, const struct key_part_def *parts,
+		      uint32_t part_count);
 
 /**
  * Return size of key parts array when encoded in MsgPack.
  * See also key_def_encode_parts().
  */
 size_t
-key_def_sizeof_parts(const struct key_def *key_def);
+key_def_sizeof_parts(const struct key_part_def *parts, uint32_t part_count);
 
 /**
  * Encode key parts array in MsgPack and return a pointer following
  * the end of encoded data.
  */
 char *
-key_def_encode_parts(char *data, const struct key_def *key_def);
+key_def_encode_parts(char *data, const struct key_part_def *parts,
+		     uint32_t part_count);
 
 /**
  * 1.6.6+
@@ -204,8 +236,9 @@ key_def_encode_parts(char *data, const struct key_def *key_def);
  *  {field=NUM, type=STR, ..}{field=NUM, type=STR, ..}..,
  */
 int
-key_def_decode_parts(struct key_def *key_def, const char **data,
-		     const struct field_def *fields, uint32_t field_count);
+key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
+		     const char **data, const struct field_def *fields,
+		     uint32_t field_count);
 
 /**
  * 1.6.0-1.6.5
@@ -216,8 +249,9 @@ key_def_decode_parts(struct key_def *key_def, const char **data,
  *  NUM, STR, NUM, STR, ..,
  */
 int
-key_def_decode_parts_160(struct key_def *key_def, const char **data,
-			 const struct field_def *fields, uint32_t field_count);
+key_def_decode_parts_160(struct key_part_def *parts, uint32_t part_count,
+			 const char **data, const struct field_def *fields,
+			 uint32_t field_count);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.

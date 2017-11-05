@@ -268,22 +268,33 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(space), "index name is too long");
 	}
-	struct key_def *key_def = key_def_new(part_count);
-	if (key_def == NULL)
-		diag_raise();
-	auto key_def_guard = make_scoped_guard([=] { box_key_def_delete(key_def); });
+	struct key_def *key_def = NULL;
+	struct key_part_def *part_def = (struct key_part_def *)
+			malloc(sizeof(*part_def) * part_count);
+	if (part_def == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*part_def) * part_count,
+			  "malloc", "key_part_def");
+	}
+	auto key_def_guard = make_scoped_guard([=] {
+		free(part_def);
+		free(key_def);
+	});
 	if (is_166plus) {
 		/* 1.6.6+ */
-		if (key_def_decode_parts(key_def, &parts, space->def->fields,
+		if (key_def_decode_parts(part_def, part_count, &parts,
+					 space->def->fields,
 					 space->def->field_count) != 0)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_160(key_def, &parts,
+		if (key_def_decode_parts_160(part_def, part_count, &parts,
 					     space->def->fields,
 					     space->def->field_count) != 0)
 			diag_raise();
 	}
+	key_def = key_def_new_with_parts(part_def, part_count);
+	if (key_def == NULL)
+		diag_raise();
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, type,
 			      &opts, key_def, space_index_key_def(space, 0));

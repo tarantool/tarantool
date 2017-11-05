@@ -57,6 +57,7 @@ extern "C" {
 struct xlog;
 struct vclock;
 struct key_def;
+struct key_part_def;
 
 struct vy_recovery;
 
@@ -195,6 +196,10 @@ struct vy_log_record {
 	uint32_t space_id;
 	/** Index key definition, as defined by the user. */
 	const struct key_def *key_def;
+	/** Array of key part definitions. */
+	struct key_part_def *key_parts;
+	/** Number of key parts. */
+	uint32_t key_part_count;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**

@@ -194,8 +194,10 @@ struct vy_index_recovery_info {
 	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
-	/** Index key definition. */
-	struct key_def *key_def;
+	/** Array of key part definitions. */
+	struct key_part_def *key_parts;
+	/** Number of key parts. */
+	uint32_t key_part_count;
 	/** True if the index was dropped. */
 	bool is_dropped;
 	/** LSN of the last index dump. */
@@ -328,10 +330,11 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
 			vy_log_key_name[VY_LOG_KEY_SPACE_ID],
 			record->space_id);
-	if (record->key_def != NULL) {
+	if (record->key_parts != NULL) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_DEF]);
-		SNPRINT(total, key_def_snprint, buf, size, record->key_def);
+		SNPRINT(total, key_def_snprint_parts, buf, size,
+			record->key_parts, record->key_part_count);
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
 	if (record->slice_id > 0)
@@ -434,10 +437,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->space_id);
 		n_keys++;
 	}
-	if (record->key_def != NULL) {
+	if (record->key_parts != NULL) {
 		size += mp_sizeof_uint(VY_LOG_KEY_DEF);
-		size += mp_sizeof_array(record->key_def->part_count);
-		size += key_def_sizeof_parts(record->key_def);
+		size += mp_sizeof_array(record->key_part_count);
+		size += key_def_sizeof_parts(record->key_parts,
+					     record->key_part_count);
 		n_keys++;
 	}
 	if (record->slice_id > 0) {
@@ -508,10 +512,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_ID);
 		pos = mp_encode_uint(pos, record->space_id);
 	}
-	if (record->key_def != NULL) {
+	if (record->key_parts != NULL) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
-		pos = mp_encode_array(pos, record->key_def->part_count);
-		pos = key_def_encode_parts(pos, record->key_def);
+		pos = mp_encode_array(pos, record->key_part_count);
+		pos = key_def_encode_parts(pos, record->key_parts,
+					   record->key_part_count);
 	}
 	if (record->slice_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SLICE_ID);
@@ -615,26 +620,24 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_DEF: {
 			uint32_t part_count = mp_decode_array(&pos);
-			struct key_def *key_def =
-				region_alloc(&fiber()->gc, key_def_sizeof(part_count));
-			if (key_def == NULL) {
+			struct key_part_def *parts = region_alloc(&fiber()->gc,
+						sizeof(*parts) * part_count);
+			if (parts == NULL) {
 				diag_set(OutOfMemory,
-					 key_def_sizeof(part_count),
-					 "region", "struct key_def");
+					 sizeof(*parts) * part_count,
+					 "region", "struct key_part_def");
 				return -1;
 			}
-			memset(key_def, 0, key_def_sizeof(part_count));
-			key_def->is_nullable = false;
-			key_def->unique_part_count = part_count;
-			key_def->part_count = part_count;
-			if (key_def_decode_parts(key_def, &pos, NULL, 0) != 0) {
+			if (key_def_decode_parts(parts, part_count, &pos,
+						 NULL, 0) != 0) {
 				diag_log();
 				diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 					 "Bad record: failed to decode "
 					 "index key definition");
 				goto fail;
 			}
-			record->key_def = key_def;
+			record->key_parts = parts;
+			record->key_part_count = part_count;
 			break;
 		}
 		case VY_LOG_KEY_SLICE_ID:
@@ -705,11 +708,17 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 		memcpy((char *)dst->end, src->end, size);
 	}
 	if (src->key_def != NULL) {
-		size_t size = key_def_sizeof(src->key_def->part_count);
-		dst->key_def = region_alloc(pool, size);
-		if (dst->key_def == NULL)
+		size_t size = src->key_def->part_count *
+				sizeof(struct key_part_def);
+		dst->key_parts = region_alloc(pool, size);
+		if (dst->key_parts == NULL) {
+			diag_set(OutOfMemory, size, "region",
+				 "struct key_part_def");
 			goto err;
-		memcpy((char*) dst->key_def, src->key_def, size);
+		}
+		key_def_dump_parts(src->key_def, dst->key_parts);
+		dst->key_part_count = src->key_def->part_count;
+		dst->key_def = NULL;
 	}
 	return dst;
 
@@ -1222,8 +1231,6 @@ vy_log_write(const struct vy_log_record *record)
 {
 	assert(latch_owner(&vy_log.latch) == fiber());
 
-	say_debug("%s: %s", __func__, vy_log_record_str(record));
-
 	size_t svp = region_used(&vy_log.pool);
 
 	struct vy_log_record *tx_record = vy_log_record_dup(&vy_log.pool,
@@ -1233,6 +1240,8 @@ vy_log_write(const struct vy_log_record *record)
 		vy_log.tx_failed = true;
 		return;
 	}
+
+	say_debug("%s: %s", __func__, vy_log_record_str(tx_record));
 
 	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
 	vy_log.tx_size++;
@@ -1318,10 +1327,11 @@ vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
 static int
 vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 			 uint32_t index_id, uint32_t space_id,
-			 const struct key_def *key_def)
+			 const struct key_part_def *key_parts,
+			 uint32_t key_part_count)
 {
 	struct vy_index_recovery_info *index;
-	struct key_def *key_def_copy;
+	struct key_part_def *key_parts_copy;
 	struct mh_i64ptr_node_t node;
 	struct mh_i64ptr_t *h;
 	mh_int_t k;
@@ -1330,15 +1340,19 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 	 * Make a copy of the key definition to be used for
 	 * the new index incarnation.
 	 */
-	if (key_def == NULL) {
+	if (key_parts == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Missing key definition for index %lld",
 				    (long long)index_lsn));
 		return -1;
 	}
-	key_def_copy = key_def_dup(key_def);
-	if (key_def_copy == NULL)
+	key_parts_copy = malloc(sizeof(*key_parts) * key_part_count);
+	if (key_parts_copy == NULL) {
+		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
+			 "malloc", "struct key_part_def");
 		return -1;
+	}
+	memcpy(key_parts_copy, key_parts, sizeof(*key_parts) * key_part_count);
 
 	/*
 	 * Look up the index in the hash.
@@ -1359,7 +1373,7 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 		if (index == NULL) {
 			diag_set(OutOfMemory, sizeof(*index),
 				 "malloc", "struct vy_index_recovery_info");
-			free(key_def_copy);
+			free(key_parts_copy);
 			return -1;
 		}
 		index->index_id = index_id;
@@ -1371,7 +1385,7 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 		if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
 			diag_set(OutOfMemory, 0, "mh_i64ptr_put",
 				 "mh_i64ptr_node_t");
-			free(key_def_copy);
+			free(key_parts_copy);
 			free(index);
 			return -1;
 		}
@@ -1387,16 +1401,17 @@ vy_recovery_create_index(struct vy_recovery *recovery, int64_t index_lsn,
 				 tt_sprintf("Index %u/%u created twice",
 					    (unsigned)space_id,
 					    (unsigned)index_id));
-			free(key_def_copy);
+			free(key_parts_copy);
 			return -1;
 		}
 		assert(index->index_id == index_id);
 		assert(index->space_id == space_id);
-		free(index->key_def);
+		free(index->key_parts);
 	}
 
 	index->index_lsn = index_lsn;
-	index->key_def = key_def_copy;
+	index->key_parts = key_parts_copy;
+	index->key_part_count = key_part_count;
 	index->is_dropped = false;
 	index->dump_lsn = -1;
 	index->truncate_count = 0;
@@ -1920,7 +1935,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_CREATE_INDEX:
 		rc = vy_recovery_create_index(recovery, record->index_lsn,
 				record->index_id, record->space_id,
-				record->key_def);
+				record->key_parts, record->key_part_count);
 		break;
 	case VY_LOG_DROP_INDEX:
 		rc = vy_recovery_drop_index(recovery, record->index_lsn);
@@ -2094,7 +2109,7 @@ vy_recovery_delete(struct vy_recovery *recovery)
 		mh_foreach(recovery->index_id_hash, i) {
 			struct vy_index_recovery_info *index;
 			index = mh_i64ptr_node(recovery->index_id_hash, i)->val;
-			free(index->key_def);
+			free(index->key_parts);
 			free(index);
 		}
 		mh_i64ptr_delete(recovery->index_id_hash);
@@ -2136,7 +2151,8 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 	record.index_lsn = index->index_lsn;
 	record.index_id = index->index_id;
 	record.space_id = index->space_id;
-	record.key_def = index->key_def;
+	record.key_parts = index->key_parts;
+	record.key_part_count = index->key_part_count;
 	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
 		return -1;
 
