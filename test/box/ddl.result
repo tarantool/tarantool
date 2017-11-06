@@ -337,7 +337,7 @@ box.space._collation:auto_increment{'test', 0, 'ICU', 42}
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 ---
@@ -345,7 +345,7 @@ box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 ...
 box.space._collation.index.name:delete{'test'} -- ok
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation.index.name:delete{'nothing'} -- allowed
 ---
@@ -461,24 +461,24 @@ _ = box.space._collation.index.name:delete{'test'} -- ok
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation:select{}
 ---
-- - [0, 'unicode', 1, 'ICU', '', {}]
-  - [1, 'unicode_s1', 1, 'ICU', '', {'strength': 'primary'}]
-  - [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- - [1, 'unicode', 1, 'ICU', '', {}]
+  - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
+  - [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 test_run:cmd('restart server default')
 box.space._collation:select{}
 ---
-- - [0, 'unicode', 1, 'ICU', '', {}]
-  - [1, 'unicode_s1', 1, 'ICU', '', {'strength': 'primary'}]
-  - [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- - [1, 'unicode', 1, 'ICU', '', {}]
+  - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
+  - [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation.index.name:delete{'test'}
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 --
 -- gh-2839: allow to store custom fields in field definition.

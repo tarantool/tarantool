@@ -10,7 +10,7 @@ _ = space:create_index('secondary', { type = index, unique = false, parts = {2, 
 space2 = box.schema.space.create('test2', { id = 99998, engine = engine})
 _ = space2:create_index('primary', { parts = {1, 'unsigned', 2, 'string'}})
 space3 = box.schema.space.create('test3', { id = 99997, engine = engine})
-_ = space3:create_index('primary', { parts = {{1, 'string', collation = 'unicode_s1'}}})
+_ = space3:create_index('primary', { parts = {{1, 'string', collation = 'unicode_ci'}}})
 box.snapshot()
 
 -- replica join

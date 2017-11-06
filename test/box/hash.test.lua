@@ -214,8 +214,8 @@ hash:truncate()
 -- Collation test
 -------------------------------------------------------------------------------
 hash.index['primary']:drop()
-tmp = hash:create_index('primary', { type = 'hash', parts = {{1, 'string', collation = 'unicode_s1'}}, unique = true})
-tmp = hash:create_index('secondary', { type = 'hash', parts = {{2, 'scalar', collation = 'unicode_s1'}}, unique = true})
+tmp = hash:create_index('primary', { type = 'hash', parts = {{1, 'string', collation = 'unicode_ci'}}, unique = true})
+tmp = hash:create_index('secondary', { type = 'hash', parts = {{2, 'scalar', collation = 'unicode_ci'}}, unique = true})
 
 hash:insert{'Ёж', 'Hedgehog'}
 hash:insert{'Ёлка', 'Spruce'}

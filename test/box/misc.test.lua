@@ -283,7 +283,7 @@ s:create_index('test5', {parts = {{5, 'string', collation = 'Unicode'}}}).parts
 s:drop()
 
 s = box.schema.space.create('test')
-not not s:create_index('test1', {parts = {{1, 'scalar', collation = 'unicode_s1'}}})
+not not s:create_index('test1', {parts = {{1, 'scalar', collation = 'unicode_ci'}}})
 s:replace{1} s:replace{1.1} s:replace{false}
 s:replace{'Блин'} s:replace{'Ёж'} s:replace{'ешь'} s:replace{'Же'} s:replace{'Уже'}
 s:replace{'drop'} s:replace{'table'} s:replace{'users'}
@@ -292,8 +292,8 @@ s:select{'еж'}
 s:drop()
 
 s = box.schema.space.create('test')
-not not s:create_index('test1', {parts = {{1, 'number', collation = 'unicode_s1'}}})
-not not s:create_index('test2', {parts = {{2, 'unsigned', collation = 'unicode_s1'}}})
-not not s:create_index('test3', {parts = {{3, 'integer', collation = 'unicode_s1'}}})
-not not s:create_index('test4', {parts = {{4, 'boolean', collation = 'unicode_s1'}}})
+not not s:create_index('test1', {parts = {{1, 'number', collation = 'unicode_ci'}}})
+not not s:create_index('test2', {parts = {{2, 'unsigned', collation = 'unicode_ci'}}})
+not not s:create_index('test3', {parts = {{3, 'integer', collation = 'unicode_ci'}}})
+not not s:create_index('test4', {parts = {{4, 'boolean', collation = 'unicode_ci'}}})
 s:drop()

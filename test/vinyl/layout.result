@@ -124,7 +124,7 @@ result
     - - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {0: 3, 7: [{'field': 0, 'collation': 0, 'type': 'string'}], 6: 512}]
+          tuple: [0, {0: 3, 7: [{'field': 0, 'collation': 1, 'type': 'string'}], 6: 512}]
       - HEADER:
           type: INSERT
         BODY:

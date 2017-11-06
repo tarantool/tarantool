@@ -89,6 +89,7 @@ local function erase()
     truncate(box.space._sequence_data)
     truncate(box.space._sequence)
     truncate(box.space._truncate)
+    truncate(box.space._collation)
     --truncate(box.space._schema)
     box.space._schema:delete('version')
     box.space._schema:delete('max_id')
@@ -896,8 +897,8 @@ local function create_collation_space()
     box.space._index:insert{_collation.id, 1, 'name', 'tree', {unique = true}, {{1, 'string'}}}
 
     log.info("create predefined collations")
-    box.space._collation:replace{0, "unicode", ADMIN, "ICU", "", setmap{}}
-    box.space._collation:replace{1, "unicode_s1", ADMIN, "ICU", "", {strength='primary'}}
+    box.space._collation:replace{1, "unicode", ADMIN, "ICU", "", setmap{}}
+    box.space._collation:replace{2, "unicode_ci", ADMIN, "ICU", "", {strength='primary'}}
 
     local _priv = box.space[box.schema.PRIV_ID]
     _priv:insert{ADMIN, PUBLIC, 'space', _collation.id, 2}
