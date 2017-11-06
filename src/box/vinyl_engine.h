@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
 #include <stddef.h>
 #include <small/mempool.h>
 
@@ -50,7 +51,8 @@ struct vinyl_engine {
 
 struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout);
+		 int read_threads, int write_threads, double timeout,
+		 bool force_recovery);
 
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
@@ -65,11 +67,12 @@ vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
 
 static inline struct vinyl_engine *
 vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
-		    int read_threads, int write_threads, double timeout)
+		    int read_threads, int write_threads, double timeout,
+		    bool force_recovery)
 {
 	struct vinyl_engine *vinyl;
 	vinyl = vinyl_engine_new(dir, memory, cache, read_threads,
-				 write_threads, timeout);
+				 write_threads, timeout, force_recovery);
 	if (vinyl == NULL)
 		diag_raise();
 	return vinyl;

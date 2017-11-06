@@ -269,7 +269,8 @@ static const struct engine_vtab vinyl_engine_vtab = {
 
 struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout)
+		 int read_threads, int write_threads, double timeout,
+		 bool force_recovery)
 {
 	struct vinyl_engine *vinyl = calloc(1, sizeof(*vinyl));
 	if (vinyl == NULL) {
@@ -279,7 +280,7 @@ vinyl_engine_new(const char *dir, size_t memory, size_t cache,
 	}
 
 	vinyl->env = vy_env_new(dir, memory, cache, read_threads,
-				write_threads, timeout);
+				write_threads, timeout, force_recovery);
 	if (vinyl->env == NULL) {
 		free(vinyl);
 		return NULL;

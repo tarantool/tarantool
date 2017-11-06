@@ -145,6 +145,8 @@ struct vy_env {
 	int read_threads;
 	/** Max number of threads used for writing. */
 	int write_threads;
+	/** Try to recover corrupted data if set. */
+	bool force_recovery;
 };
 
 enum {
@@ -490,7 +492,7 @@ vy_delete_index(struct vy_env *env, struct vy_index *index)
  * account.
  */
 int
-vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
+vy_index_open(struct vy_env *env, struct vy_index *index)
 {
 	/* Ensure vinyl data directory exists. */
 	if (access(env->path, F_OK) != 0) {
@@ -531,7 +533,7 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		rc = vy_index_recover(index, env->recovery,
 				vclock_sum(env->recovery_vclock),
 				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
-				force_recovery);
+				env->force_recovery);
 		break;
 	default:
 		unreachable();
@@ -2196,7 +2198,7 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt,
 
 struct vy_env *
 vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
-	   int write_threads, double timeout)
+	   int write_threads, double timeout, bool force_recovery)
 {
 	enum { KB = 1000, MB = 1000 * 1000 };
 	static int64_t dump_bandwidth_buckets[] = {
@@ -2224,6 +2226,7 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	e->timeout = timeout;
 	e->read_threads = read_threads;
 	e->write_threads = write_threads;
+	e->force_recovery = force_recovery;
 	e->path = strdup(path);
 	if (e->path == NULL) {
 		diag_set(OutOfMemory, strlen(path),

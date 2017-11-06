@@ -1432,7 +1432,8 @@ engine_init()
 				    cfg_geti64("vinyl_cache"),
 				    cfg_geti("vinyl_read_threads"),
 				    cfg_geti("vinyl_write_threads"),
-				    cfg_getd("vinyl_timeout"));
+				    cfg_getd("vinyl_timeout"),
+				    cfg_geti("force_recovery"));
 	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
 }

@@ -40,7 +40,6 @@
 #include "txn.h"
 #include "vinyl.h"
 #include "tuple.h"
-#include "cfg.h"
 
 /**
  * Get (struct vy_index *) by (struct index *).
@@ -271,6 +270,5 @@ int
 vinyl_index_open(struct vinyl_index *index)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)index->base.engine;
-	return vy_index_open(vinyl->env, index->db,
-			     cfg_geti("force_recovery"));
+	return vy_index_open(vinyl->env, index->db);
 }
