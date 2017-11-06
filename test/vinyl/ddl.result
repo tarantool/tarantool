@@ -648,13 +648,13 @@ s:replace{7, 8, 9}
 _ = fiber.create(function () s:drop() ch:put(true) end)
 ---
 ...
-ch:get()
----
-- true
-...
 box.commit()
 ---
 - error: Transaction has been aborted by conflict
+...
+ch:get()
+---
+- true
 ...
 -- check invalid field types
 space = box.schema.space.create('test', { engine = 'vinyl' })
