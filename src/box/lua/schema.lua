@@ -714,7 +714,7 @@ box.schema.index.create = function(space_id, name, options)
         part.type = field_type_aliases[field_type] or field_type
         if field_type == 'num' then
             log.warn("field type '%s' is deprecated since Tarantool 1.7, "..
-                     "please use '%s' instead", field_type, part[2])
+                     "please use '%s' instead", field_type, part.type)
         end
     end
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
