@@ -45,13 +45,13 @@
 #include "box/wal.h"
 #include "box/replication.h"
 #include "box/info.h"
+#include "box/engine.h"
+#include "box/vinyl.h"
 #include "main.h"
 #include "version.h"
 #include "box/box.h"
 #include "lua/utils.h"
 #include "fiber.h"
-
-#include "box/vinyl.h"
 
 static void
 lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
@@ -363,7 +363,10 @@ lbox_info_vinyl_call(struct lua_State *L)
 {
 	struct info_handler h;
 	luaT_info_handler_create(&h, L);
-	vy_info(vinyl_engine_get_env(), &h);
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_info(vinyl, &h);
 	return 1;
 }
 

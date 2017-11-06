@@ -50,7 +50,7 @@
 #include "engine.h"
 #include "memtx_engine.h"
 #include "sysview_engine.h"
-#include "vinyl_engine.h"
+#include "vinyl.h"
 #include "space.h"
 #include "index.h"
 #include "port.h"
