@@ -100,8 +100,8 @@ struct vy_env {
 	struct tx_manager   *xm;
 	/** Upsert squash queue */
 	struct vy_squash_queue *squash_queue;
-	/** Mempool for struct vy_cursor */
-	struct mempool      cursor_pool;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
 	/** Memory quota */
 	struct vy_quota     quota;
 	/** Timer for updating quota watermark. */
@@ -181,8 +181,6 @@ struct vinyl_engine {
 	struct engine base;
 	/** Vinyl environment. */
 	struct vy_env *env;
-	/** Memory pool for index iterator. */
-	struct mempool iterator_pool;
 };
 
 /** Extract vy_env from an engine object. */
@@ -217,39 +215,29 @@ static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
 
-/** Cursor. */
-struct vy_cursor {
-	/**
-	 * A built-in transaction created when a cursor is open
-	 * in autocommit mode.
-	 */
-	struct vy_tx tx_autocommit;
-	struct vy_index *index;
-	struct tuple *key;
-	/**
-	 * Points either to tx_autocommit for autocommit mode or
-	 * to a multi-statement transaction active when the cursor
-	 * was created.
-	 */
-	struct vy_tx *tx;
-	/** The number of vy_cursor_next() invocations. */
-	int n_reads;
-	/** Cursor creation time, used for statistics. */
-	ev_tstamp start;
-	/** Trigger invoked when tx ends to close the cursor. */
-	struct trigger on_tx_destroy;
-	/** Iterator over index */
-	struct vy_read_iterator iterator;
-};
-
 struct vinyl_iterator {
 	struct iterator base;
 	/** Vinyl environment. */
 	struct vy_env *env;
-	/** Vinyl cursor. */
-	struct vy_cursor *cursor;
-	/** Memory pool the iterator was allocated from. */
-	struct mempool *pool;
+	/** Vinyl index this iterator is for. */
+	struct vy_index *index;
+	/**
+	 * Points either to tx_autocommit for autocommit mode
+	 * or to a multi-statement transaction active when the
+	 * iterator was created.
+	 */
+	struct vy_tx *tx;
+	/** Search key. */
+	struct tuple *key;
+	/** Vinyl read iterator. */
+	struct vy_read_iterator iterator;
+	/**
+	 * Built-in transaction created when iterator is opened
+	 * in autocommit mode.
+	 */
+	struct vy_tx tx_autocommit;
+	/** Trigger invoked when tx ends to close the iterator. */
+	struct trigger on_tx_destroy;
 };
 
 static const struct engine_vtab vinyl_engine_vtab;
@@ -614,11 +602,6 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 {
 	assert(index_def->type == TREE);
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)space->engine;
-
-	if (!mempool_is_initialized(&vinyl->iterator_pool)) {
-		mempool_create(&vinyl->iterator_pool, cord_slab_cache(),
-			       sizeof(struct vinyl_iterator));
-	}
 	struct vinyl_index *index = calloc(1, sizeof(*index));
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(*index),
@@ -2656,8 +2639,8 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 		goto error_index_env;
 
 	struct slab_cache *slab_cache = cord_slab_cache();
-	mempool_create(&e->cursor_pool, slab_cache,
-	               sizeof(struct vy_cursor));
+	mempool_create(&e->iterator_pool, slab_cache,
+	               sizeof(struct vinyl_iterator));
 	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0,
 		      VY_QUOTA_UPDATE_INTERVAL);
@@ -2691,7 +2674,7 @@ vy_env_delete(struct vy_env *e)
 	tx_manager_delete(e->xm);
 	free(e->path);
 	histogram_delete(e->dump_bw);
-	mempool_destroy(&e->cursor_pool);
+	mempool_destroy(&e->iterator_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_index_env_destroy(&e->index_env);
 	vy_stmt_env_destroy(&e->stmt_env);
@@ -2732,8 +2715,6 @@ static void
 vinyl_engine_shutdown(struct engine *engine)
 {
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
-	if (mempool_is_initialized(&vinyl->iterator_pool))
-		mempool_destroy(&vinyl->iterator_pool);
 	vy_env_delete(vinyl->env);
 	free(vinyl);
 }
@@ -3783,115 +3764,12 @@ fail:
 /* {{{ Cursor */
 
 static void
-vy_cursor_on_tx_destroy(struct trigger *trigger, void *event)
+vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct vy_cursor *c = container_of(trigger, struct vy_cursor,
-					   on_tx_destroy);
-	c->tx = NULL;
-}
-
-/**
- * Create a cursor. If tx is not NULL, the cursor life time is
- * bound by the transaction life time. Otherwise, the cursor
- * allocates its own transaction.
- */
-static struct vy_cursor *
-vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
-	      const char *key, uint32_t part_count, enum iterator_type type)
-{
-	struct vy_cursor *c = mempool_alloc(&env->cursor_pool);
-	if (c == NULL) {
-		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
-		return NULL;
-	}
-	assert(part_count <= index->cmp_def->part_count);
-	c->key = vy_stmt_new_select(index->env->key_format, key, part_count);
-	if (c->key == NULL) {
-		mempool_free(&env->cursor_pool, c);
-		return NULL;
-	}
-	c->index = index;
-	c->n_reads = 0;
-	trigger_create(&c->on_tx_destroy, vy_cursor_on_tx_destroy, NULL, NULL);
-	if (tx == NULL) {
-		tx = &c->tx_autocommit;
-		vy_tx_create(env->xm, tx);
-	} else {
-		/*
-		 * Register a trigger that will abort this cursor
-		 * when the transaction ends.
-		 */
-		trigger_add(&tx->on_destroy, &c->on_tx_destroy);
-	}
-	c->tx = tx;
-	vy_read_iterator_open(&c->iterator, &env->run_env, index, tx,
-			      type, c->key,
-			      (const struct vy_read_view **)&tx->read_view);
-	vy_index_ref(c->index);
-	return c;
-}
-
-static int
-vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
-{
-	struct tuple *vyresult = NULL;
-	struct vy_index *index = c->index;
-	*result = NULL;
-
-	if (c->tx == NULL) {
-		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
-		return -1;
-	}
-	if (c->tx->state == VINYL_TX_ABORT || c->tx->read_view->is_aborted) {
-		diag_set(ClientError, ER_READ_VIEW_ABORTED);
-		return -1;
-	}
-
-	assert(c->key != NULL);
-	int rc = vy_read_iterator_next(&c->iterator, &vyresult);
-	if (rc)
-		return -1;
-	c->n_reads++;
-	if (vyresult == NULL)
-		return 0;
-	if (index->id > 0 && vy_index_full_by_stmt(env, c->tx, index, vyresult,
-						   &vyresult))
-		return -1;
-	*result = vyresult;
-	/**
-	 * If the index is not primary (def->iid != 0) then no
-	 * need to reference the tuple, because it is returned
-	 * from vy_index_full_by_stmt() as new statement with 1
-	 * reference.
-	 */
-	if (index->id == 0)
-		tuple_ref(vyresult);
-	return *result != NULL ? 0 : -1;
-}
-
-static void
-vy_cursor_delete(struct vy_env *env, struct vy_cursor *c)
-{
-	vy_read_iterator_close(&c->iterator);
-	if (c->tx != NULL) {
-		if (c->tx == &c->tx_autocommit) {
-			/*
-			 * Rollback the automatic transaction,
-			 * use vy_tx_destroy() to not spoil
-			 * the statistics of rollbacks issued
-			 * by user transactions.
-			 */
-			vy_tx_destroy(c->tx);
-		} else {
-			trigger_clear(&c->on_tx_destroy);
-		}
-	}
-	if (c->key)
-		tuple_unref(c->key);
-	vy_index_unref(c->index);
-	TRASH(c);
-	mempool_free(&env->cursor_pool, c);
+	struct vinyl_iterator *it = container_of(trigger,
+			struct vinyl_iterator, on_tx_destroy);
+	it->tx = NULL;
 }
 
 static int
@@ -3902,6 +3780,29 @@ vinyl_iterator_last(struct iterator *base, struct tuple **ret)
 	return 0;
 }
 
+static void
+vinyl_iterator_close(struct vinyl_iterator *it)
+{
+	vy_read_iterator_close(&it->iterator);
+	vy_index_unref(it->index);
+	it->index = NULL;
+	tuple_unref(it->key);
+	it->key = NULL;
+	if (it->tx == &it->tx_autocommit) {
+		/*
+		 * Rollback the automatic transaction.
+		 * Use vy_tx_destroy() so as not to spoil
+		 * the statistics of rollbacks issued by
+		 * user transactions.
+		 */
+		vy_tx_destroy(it->tx);
+	} else {
+		trigger_clear(&it->on_tx_destroy);
+	}
+	it->tx = NULL;
+	it->base.next = vinyl_iterator_last;
+}
+
 static int
 vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 {
@@ -3909,22 +3810,41 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	struct tuple *tuple;
 
-	if (vy_cursor_next(it->env, it->cursor, &tuple) != 0) {
-		vy_cursor_delete(it->env, it->cursor);
-		it->cursor = NULL;
-		it->base.next = vinyl_iterator_last;
-		return -1;
+	if (it->tx == NULL) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		goto fail;
 	}
-	if (tuple != NULL) {
-		*ret = tuple_bless(tuple);
-		tuple_unref(tuple);
-		return *ret == NULL ? -1 : 0;
+	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
+		diag_set(ClientError, ER_READ_VIEW_ABORTED);
+		goto fail;
 	}
-	vy_cursor_delete(it->env, it->cursor);
-	it->cursor = NULL;
-	it->base.next = vinyl_iterator_last;
-	*ret = NULL;
+
+	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
+		goto fail;
+
+	if (tuple == NULL) {
+		/* EOF. Close the iterator immediately. */
+		vinyl_iterator_close(it);
+		*ret = NULL;
+		return 0;
+	}
+
+	if (it->index->id > 0) {
+		/* Get the full tuple from the primary index. */
+		if (vy_index_full_by_stmt(it->env, it->tx, it->index,
+					  tuple, &tuple) != 0)
+			goto fail;
+	} else {
+		tuple_ref(tuple);
+	}
+	*ret = tuple_bless(tuple);
+	tuple_unref(*ret);
+	if (*ret == NULL)
+		goto fail;
 	return 0;
+fail:
+	vinyl_iterator_close(it);
+	return -1;
 }
 
 static void
@@ -3932,45 +3852,63 @@ vinyl_iterator_free(struct iterator *base)
 {
 	assert(base->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	if (it->cursor) {
-		vy_cursor_delete(it->env, it->cursor);
-		it->cursor = NULL;
-	}
-	mempool_free(it->pool, it);
+	if (base->next != vinyl_iterator_last)
+		vinyl_iterator_close(it);
+	mempool_free(&it->env->iterator_pool, it);
 }
 
 static struct iterator *
 vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 			    const char *key, uint32_t part_count)
 {
-	struct vinyl_index *index = (struct vinyl_index *)base;
-	struct vinyl_engine *vinyl = (struct vinyl_engine *)base->engine;
+	struct vy_index *index = vy_index(base);
+	struct vy_env *env = vy_env(base->engine);
 
-	assert(part_count == 0 || key != NULL);
-	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
 	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
 		return NULL;
 	}
-	struct vinyl_iterator *it = mempool_alloc(&vinyl->iterator_pool);
+
+	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
 			 "mempool", "struct vinyl_iterator");
 		return NULL;
 	}
+	it->key = vy_stmt_new_select(index->env->key_format, key, part_count);
+	if (it->key == NULL) {
+		mempool_free(&env->iterator_pool, it);
+		return NULL;
+	}
+
 	iterator_create(&it->base, base);
-	it->pool = &vinyl->iterator_pool;
 	it->base.next = vinyl_iterator_next;
 	it->base.free = vinyl_iterator_free;
 
-	it->env = vinyl->env;
-	it->cursor = vy_cursor_new(it->env, tx, index->db,
-				   key, part_count, type);
-	if (it->cursor == NULL) {
-		mempool_free(&vinyl->iterator_pool, it);
-		return NULL;
+	it->env = env;
+	it->index = index;
+	vy_index_ref(index);
+
+	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
+	if (tx != NULL) {
+		/*
+		 * Register a trigger that will abort this iterator
+		 * when the transaction ends.
+		 */
+		trigger_create(&it->on_tx_destroy,
+			       vinyl_iterator_on_tx_destroy, NULL, NULL);
+		trigger_add(&tx->on_destroy, &it->on_tx_destroy);
+	} else {
+		tx = &it->tx_autocommit;
+		vy_tx_create(env->xm, tx);
 	}
+	it->tx = tx;
+
+	vy_read_iterator_open(&it->iterator, &env->run_env,
+			      index, tx, type, it->key,
+			      (const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
 }
 
