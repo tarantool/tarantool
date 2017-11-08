@@ -126,7 +126,7 @@ Exception::Exception(const struct type_info *type_arg, const char *file,
 void
 Exception::log() const
 {
-	_say(S_ERROR, file, line, errmsg, "%s", type->name);
+	say_file_line(S_ERROR, file, line, errmsg, "%s", type->name);
 }
 
 static const struct method_info systemerror_methods[] = {
@@ -159,8 +159,8 @@ SystemError::SystemError(const char *file, unsigned line,
 void
 SystemError::log() const
 {
-	_say(S_SYSERROR, file, line, strerror(m_errno), "SystemError %s",
-	     errmsg);
+	say_file_line(S_SYSERROR, file, line, strerror(m_errno),
+		      "SystemError %s", errmsg);
 }
 
 const struct type_info type_OutOfMemory =

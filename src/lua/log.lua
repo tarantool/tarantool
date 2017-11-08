@@ -39,7 +39,13 @@ local S_VERBOSE = ffi.C.S_VERBOSE
 local S_DEBUG = ffi.C.S_DEBUG
 local S_ERROR = ffi.C.S_ERROR
 
-local json = require("json")
+local json = require("json").new()
+json.cfg{
+    encode_invalid_numbers = true,
+    encode_load_metatables = true,
+    encode_use_tostring    = true,
+    encode_invalid_as_nil  = true,
+}
 
 local special_fields = {
     "file",

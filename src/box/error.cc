@@ -131,7 +131,8 @@ BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 void
 ClientError::log() const
 {
-	_say(S_ERROR, file, line, errmsg, "%s", tnt_errcode_str(m_errcode));
+	say_file_line(S_ERROR, file, line, errmsg, "%s",
+		      tnt_errcode_str(m_errcode));
 }
 
 
