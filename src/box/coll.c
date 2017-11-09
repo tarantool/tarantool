@@ -46,7 +46,7 @@ enum {
  */
 static int
 coll_icu_cmp(const char *s, size_t slen, const char *t, size_t tlen,
-	     struct coll *coll)
+	     const struct coll *coll)
 {
 	assert(coll->icu.collator != NULL);
 

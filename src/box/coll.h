@@ -43,7 +43,7 @@ struct coll;
 
 typedef int (*coll_cmp_f)(const char *s, size_t s_len,
 			  const char *t, size_t t_len,
-			  struct coll *coll);
+			  const struct coll *coll);
 
 typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len,
 				uint32_t *ph, uint32_t *pcarry,
