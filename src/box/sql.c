@@ -1414,14 +1414,29 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	for (i = 0; i < n; i++) {
 		int col = pIndex->aiColumn[i];
 		const char *t;
+		struct coll * collation = NULL;
 		if (pk_forced_int == col)
 			t = "integer";
 		else
 			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
-
-		p = enc->encode_array(p, 2),
-		p = enc->encode_uint(p, col);
+		/* do not decode default collation */
+		if (sqlite3StrICmp(pIndex->azColl[i], "binary") != 0){
+			collation = sqlite3FindCollSeq(NULL, pIndex->azColl[i], 0);
+			/* 
+			 * At this point, the collation has already been found 
+			 * once and the assert should not fire.
+			 */
+			assert(collation);
+		}
+		p = enc->encode_map(p, collation == NULL ? 2 : 3);
+		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
+		p = enc->encode_str(p, "field", sizeof("field")-1);
+		p = enc->encode_uint(p, col);
+		if (collation != NULL){
+			p = enc->encode_str(p, "collation", sizeof("collation")-1);
+			p = enc->encode_uint(p, collation->id);
+		}
 	}
 	return (int)(p - base);
 }
