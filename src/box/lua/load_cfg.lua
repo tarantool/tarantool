@@ -383,7 +383,7 @@ local function load_cfg(cfg)
             end
         end
     end
-    if not box.cfg.read_only then
+    if not box.cfg.read_only and not box.cfg.replication then
         box.schema.upgrade{auto = true}
     end
 end
