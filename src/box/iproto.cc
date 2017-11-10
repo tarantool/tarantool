@@ -1084,7 +1084,9 @@ tx_process_misc(struct cmsg *m)
 			box_process_eval(&msg->call_request, out);
 			break;
 		case IPROTO_AUTH:
-			box_process_auth(&msg->auth_request, out);
+			box_process_auth(&msg->auth_request);
+			iproto_reply_ok_xc(out, msg->header.sync,
+					   ::schema_version);
 			break;
 		case IPROTO_PING:
 			iproto_reply_ok_xc(out, msg->header.sync,

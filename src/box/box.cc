@@ -1129,7 +1129,7 @@ box_on_join(const tt_uuid *instance_uuid)
 }
 
 void
-box_process_auth(struct auth_request *request, struct obuf *out)
+box_process_auth(struct auth_request *request)
 {
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 
@@ -1140,7 +1140,6 @@ box_process_auth(struct auth_request *request, struct obuf *out)
 	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
 	authenticate(user, len, request->scramble);
-	iproto_reply_ok_xc(out, request->header->sync, ::schema_version);
 }
 
 void

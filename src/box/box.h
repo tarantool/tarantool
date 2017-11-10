@@ -126,7 +126,7 @@ const char *box_status(void);
 } /* extern "C" */
 
 void
-box_process_auth(struct auth_request *request, struct obuf *out);
+box_process_auth(struct auth_request *request);
 
 void
 box_process_join(struct ev_io *io, struct xrow_header *header);
