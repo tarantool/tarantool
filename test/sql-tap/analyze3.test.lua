@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(34)
+test:plan(37)
 
 testprefix = "analyze3"
 
