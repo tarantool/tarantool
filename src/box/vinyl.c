@@ -143,6 +143,17 @@ struct vy_env {
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
 	const struct vclock *recovery_vclock;
+	/**
+	 * LSN to assign to the next statement received during
+	 * initial join.
+	 *
+	 * We can't use original statements' LSNs, because we
+	 * send statements not in the chronological order while
+	 * the receiving end expects LSNs to grow monotonically
+	 * due to the design of the lsregion allocator, which is
+	 * used for storing statements in memory.
+	 */
+	int64_t join_lsn;
 	/** Path to the data directory. */
 	char *path;
 	/** Max size of the memory level. */
@@ -724,6 +735,15 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 			vy_scheduler_add_index(&env->scheduler, index);
 			return;
 		}
+	}
+
+	if (env->status == VINYL_INITIAL_RECOVERY_REMOTE) {
+		/*
+		 * Records received during initial join do not
+		 * have LSNs so we use a fake one to identify
+		 * the index in vylog.
+		 */
+		lsn = ++env->join_lsn;
 	}
 
 	/*
@@ -2942,16 +2962,6 @@ struct vy_join_ctx {
 	 * is to the head of the list.
 	 */
 	struct rlist slices;
-	/**
-	 * LSN to assign to the next statement.
-	 *
-	 * We can't use original statements' LSNs, because we
-	 * send statements not in the chronological order while
-	 * the receiving end expects LSNs to grow monotonically
-	 * due to the design of the lsregion allocator, which is
-	 * used for storing statements in memory.
-	 */
-	int64_t lsn;
 };
 
 static int
@@ -2970,8 +2980,11 @@ vy_send_range_f(struct cbus_call_msg *cmsg)
 					    ctx->space_id, &xrow);
 		if (rc != 0)
 			break;
-		/* See comment to vy_join_ctx::lsn. */
-		xrow.lsn = ++ctx->lsn;
+		/*
+		 * Reset the LSN as the replica will ignore it
+		 * anyway - see comment to vy_env::join_lsn.
+		 */
+		xrow.lsn = 0;
 		rc = xstream_write(ctx->stream, &xrow);
 		if (rc != 0)
 			break;
@@ -3209,8 +3222,6 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	if (tx == NULL)
 		return -1;
 
-	int64_t signature = request->header->lsn;
-
 	struct txn_stmt stmt;
 	memset(&stmt, 0, sizeof(stmt));
 
@@ -3247,7 +3258,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 	rc = vy_tx_prepare(tx);
 	if (rc == 0)
-		vy_tx_commit(tx, signature);
+		vy_tx_commit(tx, ++env->join_lsn);
 	else
 		vy_tx_rollback(tx);
 
