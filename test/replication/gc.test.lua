@@ -101,6 +101,22 @@ box.snapshot()
 test_run:cleanup_cluster()
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
+--
+-- Test that concurrent invocation of the garbage collector works fine.
+--
+s:truncate()
+for i = 1, 10 do s:replace{i} end
+box.snapshot()
+
+replica_set.join(test_run, 3)
+replica_set.stop_all(test_run)
+
+for i = 11, 50 do s:replace{i} if i % 10 == 0 then box.snapshot() end end
+
+replica_set.start_all(test_run)
+replica_set.wait_all(test_run)
+replica_set.drop_all(test_run)
+
 -- Cleanup.
 s:drop()
 box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
