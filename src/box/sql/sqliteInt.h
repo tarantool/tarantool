@@ -901,6 +901,12 @@ extern const int sqlite3one;
 #define SELECTTRACE_ENABLED 0
 #endif
 
+#if defined(SQLITE_DEBUG) || defined(SQLITE_ENABLE_WHERETRACE)
+#define WHERETRACE_ENABLED 1
+#else
+#define WHERETRACE_ENABLED 0
+#endif
+
 /*
  * An instance of the following structure is used to store the busy-handler
  * callback for a given sqlite handle.
@@ -1371,6 +1377,8 @@ struct sqlite3 {
 #define SQLITE_NullCallback   0x00000100	/* Invoke the callback once if the */
 					  /*   result set is empty */
 #define SQLITE_SqlTrace       0x00000200	/* Debug print SQL as it executes */
+#define SQLITE_SelectTrace    0x00000800       /* Debug info about select statement */
+#define SQLITE_WhereTrace     0x00008000       /* Debug info about optimizer's work */
 #define SQLITE_VdbeListing    0x00000400	/* Debug listings of VDBE programs */
 #define SQLITE_VdbeAddopTrace 0x00001000	/* Trace sqlite3VdbeAddOp() calls */
 #define SQLITE_IgnoreChecks   0x00002000	/* Do not enforce check constraints */

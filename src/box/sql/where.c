@@ -46,7 +46,7 @@
 static int whereLoopResize(sqlite3 *, WhereLoop *, int);
 
 /* Test variable that can be set to enable WHERE tracing */
-#if defined(SQLITE_TEST) || defined(SQLITE_DEBUG)
+#if WHERETRACE_ENABLED
 /***/ int sqlite3WhereTrace = 0; /* -1; */
 #endif
 
@@ -4303,6 +4303,12 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 	u8 bFordelete = 0;	/* OPFLAG_FORDELETE or zero, as appropriate */
 	struct session *user_session = current_session();
 
+#ifdef WHERETRACE_ENABLED
+	if (user_session->sql_flags & SQLITE_WhereTrace)
+		sqlite3WhereTrace = 0xfff;
+	else
+		sqlite3WhereTrace = 0;
+#endif
 	assert((wctrlFlags & WHERE_ONEPASS_MULTIROW) == 0 || ((wctrlFlags &
 							       WHERE_ONEPASS_DESIRED)
 							      != 0

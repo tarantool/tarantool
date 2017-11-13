@@ -149,6 +149,7 @@ sqlite3SelectNew(Parse * pParse,	/* Parsing context */
 		    sqlite3ExprListAppend(pParse, 0,
 					  sqlite3Expr(db, TK_ASTERISK, 0));
 	}
+	struct session *user_session = current_session();
 	pNew->pEList = pEList;
 	pNew->op = TK_SELECT;
 	pNew->selFlags = selFlags;
@@ -156,6 +157,10 @@ sqlite3SelectNew(Parse * pParse,	/* Parsing context */
 	pNew->iOffset = 0;
 #if SELECTTRACE_ENABLED
 	pNew->zSelName[0] = 0;
+	if (user_session->sql_flags & SQLITE_SelectTrace)
+		sqlite3SelectTrace = 0xfff;
+	else
+		sqlite3SelectTrace = 0;
 #endif
 	pNew->addrOpenEphm[0] = -1;
 	pNew->addrOpenEphm[1] = -1;

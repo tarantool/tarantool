@@ -327,6 +327,13 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ 0},
 #endif
+#if !defined(SQLITE_OMIT_FLAG_PRAGMAS) && defined(SQLITE_ENABLE_SELECTTRACE)
+	{ /* zName:     */ "select_trace",
+	/* ePragTyp:  */ PragTyp_FLAG,
+	/* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
+	/* ColNames:  */ 0, 0,
+	/* iArg:      */ SQLITE_SelectTrace},
+#endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 	{ /* zName:     */ "short_column_names",
 	 /* ePragTyp:  */ PragTyp_FLAG,
@@ -432,6 +439,13 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 41, 3,
 	 /* iArg:      */ 0},
 #endif
-};
+#if !defined(SQLITE_OMIT_FLAG_PRAGMAS) && defined(SQLITE_ENABLE_WHERETRACE)
 
+	{ /* zName:     */ "where_trace",
+	/* ePragTyp:  */ PragTyp_FLAG,
+	/* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
+	/* ColNames:  */ 0, 0,
+	/* iArg:      */ SQLITE_WhereTrace},
+};
+#endif
 /* Number of pragmas: 36 on by default, 47 total. */
