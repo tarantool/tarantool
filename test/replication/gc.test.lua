@@ -86,6 +86,44 @@ test_run:cmd("switch default")
 fiber.sleep(0.1) -- wait for relay to notify tx
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
+--
+-- Check that the master doesn't delete xlog files sent to the
+-- replica until it receives a confirmation that the data has
+-- been applied (gh-2825).
+--
+test_run:cmd("switch replica")
+-- Prevent the replica from applying any rows.
+box.error.injection.set("ERRINJ_WAL_DELAY", true)
+test_run:cmd("switch default")
+-- Generate some data on the master.
+for i = 1, 5 do s:auto_increment{} end
+box.snapshot() -- rotate xlog
+for i = 1, 5 do s:auto_increment{} end
+fiber.sleep(0.1) -- wait for master to relay data
+-- Garbage collection must not delete the old xlog file
+-- (and the corresponding snapshot), because it is still
+-- needed by the replica.
+#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+test_run:cmd("switch replica")
+-- Unblock the replica and make it fail to apply a row.
+box.info.replication[1].upstream.message == nil
+box.error.injection.set("ERRINJ_WAL_WRITE", true)
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+while box.info.replication[1].upstream.message == nil do fiber.sleep(0.01) end
+box.info.replication[1].upstream.message
+test_run:cmd("switch default")
+-- Restart the replica to reestablish replication.
+test_run:cmd("restart server replica")
+-- Wait for the replica to catch up.
+test_run:cmd("switch replica")
+fiber = require('fiber')
+while box.space.test:count() < 310 do fiber.sleep(0.01) end
+box.space.test:count()
+test_run:cmd("switch default")
+-- Now it's safe to drop the old xlog.
+fiber.sleep(0.1) -- wait for relay to notify tx
+#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+
 -- Stop the replica.
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
