@@ -378,6 +378,10 @@ static void
 tx_process1(struct cmsg *msg);
 static void
 tx_process_select(struct cmsg *msg);
+
+static void
+tx_reply_error(struct iproto_msg *msg);
+
 static void
 net_send_msg(struct cmsg *msg);
 
@@ -997,6 +1001,18 @@ tx_check_schema(uint32_t new_schema_version)
 	return 0;
 }
 
+/**
+ * Write error message to the output buffer and advance
+ * write position. Doesn't throw.
+ */
+static void
+tx_reply_error(struct iproto_msg *msg)
+{
+	iproto_reply_error(msg->p_obuf, diag_last_error(&fiber()->diag),
+			   msg->header.sync, ::schema_version);
+	msg->write_end = obuf_create_svp(msg->p_obuf);
+}
+
 static void
 tx_process1(struct cmsg *m)
 {
@@ -1019,9 +1035,7 @@ tx_process1(struct cmsg *m)
 	msg->write_end = obuf_create_svp(out);
 	return;
 error:
-	iproto_reply_error(out, diag_last_error(&fiber()->diag),
-			   msg->header.sync, ::schema_version);
-	msg->write_end = obuf_create_svp(out);
+	tx_reply_error(msg);
 }
 
 static void
@@ -1058,9 +1072,7 @@ tx_process_select(struct cmsg *m)
 	msg->write_end = obuf_create_svp(out);
 	return;
 error:
-	iproto_reply_error(out, diag_last_error(&fiber()->diag),
-			   msg->header.sync, ::schema_version);
-	msg->write_end = obuf_create_svp(out);
+	tx_reply_error(msg);
 }
 
 static void
@@ -1095,16 +1107,13 @@ tx_process_misc(struct cmsg *m)
 		default:
 			unreachable();
 		}
+		msg->write_end = obuf_create_svp(out);
 	} catch (Exception *e) {
-		iproto_reply_error(out, diag_last_error(&fiber()->diag),
-				   msg->header.sync, ::schema_version);
+		tx_reply_error(msg);
 	}
-	msg->write_end = obuf_create_svp(out);
 	return;
 error:
-	iproto_reply_error(out, diag_last_error(&fiber()->diag),
-			   msg->header.sync, ::schema_version);
-	msg->write_end = obuf_create_svp(out);
+	tx_reply_error(msg);
 }
 
 static void
@@ -1221,8 +1230,7 @@ tx_process_connect(struct cmsg *m)
 		}
 		msg->write_end = obuf_create_svp(out);
 	} catch (Exception *e) {
-		/* zero sync for connect errors */
-		iproto_reply_error(out, e, 0, ::schema_version);
+		tx_reply_error(msg);
 		msg->close_connection = true;
 	}
 }
