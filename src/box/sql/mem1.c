@@ -38,8 +38,8 @@
  * This file contains implementations of the low-level memory allocation
  * routines specified in the sqlite3_mem_methods object.  The content of
  * this file is only used if SQLITE_SYSTEM_MALLOC is defined.  The
- * SQLITE_SYSTEM_MALLOC macro is defined automatically if neither the
- * SQLITE_MEMDEBUG nor the SQLITE_WIN32_MALLOC macros are defined.  The
+ * SQLITE_SYSTEM_MALLOC macro is defined automatically if
+ * SQLITE_MEMDEBUG macro is not defined.  The
  * default configuration is to use memory allocation routines in this
  * file.
  *
@@ -57,10 +57,6 @@
  *                                memory allocator.  Set this symbol to enable
  *                                building on older macs.
  *
- *    SQLITE_WITHOUT_MSIZE        Set this symbol to disable the use of
- *                                _msize() on windows systems.  This might
- *                                be necessary when compiling for Delphi,
- *                                for example.
  */
 #include "sqliteInt.h"
 
@@ -103,21 +99,12 @@ static malloc_zone_t *_sqliteZone_;
 #if HAVE_MALLOC_H && HAVE_MALLOC_USABLE_SIZE
 #define SQLITE_USE_MALLOC_H 1
 #define SQLITE_USE_MALLOC_USABLE_SIZE 1
-/*
- * The MSVCRT has malloc_usable_size(), but it is called _msize().  The
- * use of _msize() is automatic, but can be disabled by compiling with
- * -DSQLITE_WITHOUT_MSIZE.  Using the _msize() function also requires
- * the malloc.h header file.
- */
-#elif defined(_MSC_VER) && !defined(SQLITE_WITHOUT_MSIZE)
-#define SQLITE_USE_MALLOC_H
-#define SQLITE_USE_MSIZE
 #endif
 
 /*
  * Include the malloc.h header file, if necessary.  Also set define macro
- * SQLITE_MALLOCSIZE to the appropriate function name, which is _msize()
- * for MSVC and malloc_usable_size() for most other systems (e.g. Linux).
+ * SQLITE_MALLOCSIZE to the appropriate function name, which is
+ * malloc_usable_size() for most systems (e.g. Linux).
  * The memory size function can always be overridden manually by defining
  * the macro SQLITE_MALLOCSIZE to the desired function name.
  */

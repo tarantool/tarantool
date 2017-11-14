@@ -1202,11 +1202,9 @@ sqlite3_log(int iErrCode, const char *zFormat, ...)
 	}
 }
 
-#if defined(SQLITE_DEBUG) || defined(SQLITE_HAVE_OS_TRACE)
+#if defined(SQLITE_DEBUG)
 /*
  * A version of printf() that understands %lld.  Used for debugging.
- * The printf() built into some versions of windows does not understand %lld
- * and segfaults if you give it a long long int.
  */
 void
 sqlite3DebugPrintf(const char *zFormat, ...)

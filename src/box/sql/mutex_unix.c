@@ -85,9 +85,7 @@ struct sqlite3_mutex {
  * deliver incorrect results.  In particular, if pthread_equal() is
  * not an atomic operation, then these routines might delivery
  * incorrect results.  On most platforms, pthread_equal() is a
- * comparison of two integers and is therefore atomic.  But we are
- * told that HPUX is not such a platform.  If so, then these routines
- * will not always work correctly on HPUX.
+ * comparison of two integers and is therefore atomic.
  *
  * On those platforms where pthread_equal() is not atomic, SQLite
  * should be compiled without -DSQLITE_DEBUG and with -DNDEBUG to

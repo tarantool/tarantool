@@ -64,8 +64,7 @@ typedef struct Pager Pager;
 typedef struct PgHdr DbPage;
 
 /*
- * Page number PAGER_MJ_PGNO is never used in an SQLite database (it is
- * reserved for working around a windows/posix incompatibility). It is
+ * Page number PAGER_MJ_PGNO is never used in an SQLite database. It is
  * used in the journal to signify that the remainder of the journal file
  * is devoted to storing a master journal name - there are no more pages to
  * roll back. See comments for function writeMasterJournal() in pager.c

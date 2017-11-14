@@ -54,20 +54,12 @@
  *                             start-time.
  *
  *   SQLITE_MUTEX_PTHREADS     For multi-threaded applications on Unix.
- *
- *   SQLITE_MUTEX_W32          For multi-threaded applications on Win32.
  */
 #if !SQLITE_THREADSAFE
 #define SQLITE_MUTEX_OMIT
 #endif
 #if SQLITE_THREADSAFE && !defined(SQLITE_MUTEX_NOOP)
-#if SQLITE_OS_UNIX
 #define SQLITE_MUTEX_PTHREADS
-#elif SQLITE_OS_WIN
-#define SQLITE_MUTEX_W32
-#else
-#define SQLITE_MUTEX_NOOP
-#endif
 #endif
 
 #ifdef SQLITE_MUTEX_OMIT

@@ -33,19 +33,13 @@
  *
  * This header file (together with is companion C source-code file
  * "os.c") attempt to abstract the underlying operating system so that
- * the SQLite library will work on both POSIX and windows systems.
+ * the SQLite library will work on POSIX.
  *
  * This header file is #include-ed by sqliteInt.h and thus ends up
  * being included by every source file.
  */
 #ifndef _SQLITE_OS_H_
 #define _SQLITE_OS_H_
-
-/*
- * Attempt to automatically detect the operating system and setup the
- * necessary pre-processor macros for it.
- */
-#include "os_setup.h"
 
 /* If the SET_FULLSYNC macro is not defined above, then make it
  * a no-op
@@ -110,11 +104,8 @@
 #define EXCLUSIVE_LOCK  4
 
 /*
- * File Locking Notes:  (Mostly about windows but also some info for Unix)
+ * File Locking Notes:
  *
- * We cannot use LockFileEx() or UnlockFileEx() on Win95/98/ME because
- * those functions are not available.  So we use only LockFile() and
- * UnlockFile().
  *
  * LockFile() prevents not just writing but also reading by other processes.
  * A SHARED_LOCK is obtained by locking a single randomly-chosen
@@ -127,35 +118,10 @@
  * A PENDING_LOCK is obtained by locking a designated byte different from
  * the RESERVED_LOCK byte.
  *
- * On WinNT/2K/XP systems, LockFileEx() and UnlockFileEx() are available,
- * which means we can use reader/writer locks.  When reader/writer locks
- * are used, the lock is placed on the same range of bytes that is used
- * for probabilistic locking in Win95/98/ME.  Hence, the locking scheme
- * will support two or more Win95 readers or two or more WinNT readers.
- * But a single Win95 reader will lock out all WinNT readers and a single
- * WinNT reader will lock out all other Win95 readers.
- *
  * The following #defines specify the range of bytes used for locking.
  * SHARED_SIZE is the number of bytes available in the pool from which
  * a random byte is selected for a shared lock.  The pool of bytes for
  * shared locks begins at SHARED_FIRST.
- *
- * The same locking strategy and
- * byte ranges are used for Unix.  This leaves open the possibility of having
- * clients on win95, winNT, and unix all talking to the same shared file
- * and all locking correctly.  To do so would require that samba (or whatever
- * tool is being used for file sharing) implements locks correctly between
- * windows and unix.  I'm guessing that isn't likely to happen, but by
- * using the same locking range we are at least open to the possibility.
- *
- * Locking in windows is manditory.  For this reason, we cannot store
- * actual data in the bytes used for locking.  The pager never allocates
- * the pages involved in locking therefore.  SHARED_SIZE is selected so
- * that all locks will fit on a single page even at the minimum page size.
- * PENDING_BYTE defines the beginning of the locks.  By default PENDING_BYTE
- * is set high so that we don't have to allocate an unused page except
- * for very large databases.  But one should test the page skipping logic
- * by setting PENDING_BYTE low and running the entire regression suite.
  *
  * Changing the value of PENDING_BYTE results in a subtly incompatible
  * file format.  Depending on how it is changed, you might not notice

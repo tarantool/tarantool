@@ -845,23 +845,6 @@ struct sqlite3_io_methods {
  * [sqlite3_file_control()] with this opcode as doing so may disrupt the
  * operation of the specialized VFSes that do require it.
  *
- * <li>[[SQLITE_FCNTL_WIN32_AV_RETRY]]
- * ^The [SQLITE_FCNTL_WIN32_AV_RETRY] opcode is used to configure automatic
- * retry counts and intervals for certain disk I/O operations for the
- * windows [VFS] in order to provide robustness in the presence of
- * anti-virus programs.  By default, the windows VFS will retry file read,
- * file write, and file delete operations up to 10 times, with a delay
- * of 25 milliseconds before the first retry and with the delay increasing
- * by an additional 25 milliseconds with each subsequent retry.  This
- * opcode allows these two values (10 retries and 25 milliseconds of delay)
- * to be adjusted.  The values are changed for all database connections
- * within the same process.  The argument is a pointer to an array of two
- * integers where the first integer i the new retry count and the second
- * integer is the delay.  If either integer is negative, then the setting
- * is not changed but instead the prior value of that setting is written
- * into the array entry, allowing the current retry settings to be
- * interrogated.  The zDbName parameter is ignored.
- *
  * <li>[[SQLITE_FCNTL_PERSIST_WAL]]
  * ^The [SQLITE_FCNTL_PERSIST_WAL] opcode is used to set or query the
  * persistent [WAL | Write Ahead Log] setting.  By default, the auxiliary
@@ -984,18 +967,6 @@ struct sqlite3_io_methods {
  * on whether or not the file has been renamed, moved, or deleted since it
  * was first opened.
  *
- * <li>[[SQLITE_FCNTL_WIN32_GET_HANDLE]]
- * The [SQLITE_FCNTL_WIN32_GET_HANDLE] opcode can be used to obtain the
- * underlying native file handle associated with a file handle.  This file
- * control interprets its argument as a pointer to a native file handle and
- * writes the resulting value there.
- *
- * <li>[[SQLITE_FCNTL_WIN32_SET_HANDLE]]
- * The [SQLITE_FCNTL_WIN32_SET_HANDLE] opcode is used for debugging.  This
- * opcode causes the xFileControl method to swap the file handle with the one
- * pointed to by the pArg argument.  This capability is used during testing
- * and only needs to be supported when SQLITE_TEST is defined.
- *
  * <li>[[SQLITE_FCNTL_WAL_BLOCK]]
  * The [SQLITE_FCNTL_WAL_BLOCK] is a signal to the VFS layer that it might
  * be advantageous to block on the next WAL lock if the lock is not immediately
@@ -1021,27 +992,24 @@ struct sqlite3_io_methods {
 #define SQLITE_FCNTL_CHUNK_SIZE              6
 #define SQLITE_FCNTL_FILE_POINTER            7
 #define SQLITE_FCNTL_SYNC_OMITTED            8
-#define SQLITE_FCNTL_WIN32_AV_RETRY          9
-#define SQLITE_FCNTL_PERSIST_WAL            10
-#define SQLITE_FCNTL_OVERWRITE              11
-#define SQLITE_FCNTL_VFSNAME                12
-#define SQLITE_FCNTL_POWERSAFE_OVERWRITE    13
-#define SQLITE_FCNTL_PRAGMA                 14
-#define SQLITE_FCNTL_BUSYHANDLER            15
-#define SQLITE_FCNTL_TEMPFILENAME           16
-#define SQLITE_FCNTL_MMAP_SIZE              18
-#define SQLITE_FCNTL_TRACE                  19
-#define SQLITE_FCNTL_HAS_MOVED              20
-#define SQLITE_FCNTL_SYNC                   21
-#define SQLITE_FCNTL_COMMIT_PHASETWO        22
-#define SQLITE_FCNTL_WIN32_SET_HANDLE       23
-#define SQLITE_FCNTL_WAL_BLOCK              24
-#define SQLITE_FCNTL_ZIPVFS                 25
-#define SQLITE_FCNTL_RBU                    26
-#define SQLITE_FCNTL_VFS_POINTER            27
-#define SQLITE_FCNTL_JOURNAL_POINTER        28
-#define SQLITE_FCNTL_WIN32_GET_HANDLE       29
-#define SQLITE_FCNTL_PDB                    30
+#define SQLITE_FCNTL_PERSIST_WAL             9
+#define SQLITE_FCNTL_OVERWRITE              10
+#define SQLITE_FCNTL_VFSNAME                11
+#define SQLITE_FCNTL_POWERSAFE_OVERWRITE    12
+#define SQLITE_FCNTL_PRAGMA                 13
+#define SQLITE_FCNTL_BUSYHANDLER            14
+#define SQLITE_FCNTL_TEMPFILENAME           15
+#define SQLITE_FCNTL_MMAP_SIZE              16
+#define SQLITE_FCNTL_TRACE                  17
+#define SQLITE_FCNTL_HAS_MOVED              18
+#define SQLITE_FCNTL_SYNC                   19
+#define SQLITE_FCNTL_COMMIT_PHASETWO        20
+#define SQLITE_FCNTL_WAL_BLOCK              21
+#define SQLITE_FCNTL_ZIPVFS                 22
+#define SQLITE_FCNTL_RBU                    23
+#define SQLITE_FCNTL_VFS_POINTER            24
+#define SQLITE_FCNTL_JOURNAL_POINTER        25
+#define SQLITE_FCNTL_PDB                    26
 
 /* deprecated names */
 #define SQLITE_GET_LOCKPROXYFILE      SQLITE_FCNTL_GET_LOCKPROXYFILE
@@ -1401,14 +1369,7 @@ struct sqlite3_vfs {
  * interface is called automatically by sqlite3_initialize() and
  * sqlite3_os_end() is called by sqlite3_shutdown().  Appropriate
  * implementations for sqlite3_os_init() and sqlite3_os_end()
- * are built into SQLite when it is compiled for Unix, Windows, or OS/2.
- * When [custom builds | built for other platforms]
- * (using the [SQLITE_OS_OTHER=1] compile-time
- * option) the application must supply a suitable implementation for
- * sqlite3_os_init() and sqlite3_os_end().  An application-supplied
- * implementation of sqlite3_os_init() or sqlite3_os_end()
- * must return [SQLITE_OK] on success and some other [error code] upon
- * failure.
+ * are built into SQLite when it is compiled for Unix or OS/2.
 */
 SQLITE_API int
 sqlite3_initialize(void);
@@ -1844,13 +1805,6 @@ struct sqlite3_mem_methods {
  * ^If either argument to this option is negative, then that argument is
  * changed to its compile-time default.
  *
- * [[SQLITE_CONFIG_WIN32_HEAPSIZE]]
- * <dt>SQLITE_CONFIG_WIN32_HEAPSIZE
- * <dd>^The SQLITE_CONFIG_WIN32_HEAPSIZE option is only available if SQLite is
- * compiled for Windows with the [SQLITE_WIN32_MALLOC] pre-processor macro
- * defined. ^SQLITE_CONFIG_WIN32_HEAPSIZE takes a 32-bit unsigned integer value
- * that specifies the maximum size of the created heap.
- *
  * [[SQLITE_CONFIG_PCACHE_HDRSZ]]
  * <dt>SQLITE_CONFIG_PCACHE_HDRSZ
  * <dd>^The SQLITE_CONFIG_PCACHE_HDRSZ option takes a single parameter which
@@ -1907,10 +1861,9 @@ struct sqlite3_mem_methods {
 #define SQLITE_CONFIG_COVERING_INDEX_SCAN 20	/* int */
 #define SQLITE_CONFIG_SQLLOG       21	/* xSqllog, void* */
 #define SQLITE_CONFIG_MMAP_SIZE    22	/* sqlite3_int64, sqlite3_int64 */
-#define SQLITE_CONFIG_WIN32_HEAPSIZE      23	/* int nByte */
-#define SQLITE_CONFIG_PCACHE_HDRSZ        24	/* int *psz */
-#define SQLITE_CONFIG_PMASZ               25	/* unsigned int szPma */
-#define SQLITE_CONFIG_STMTJRNL_SPILL      26	/* int nByte */
+#define SQLITE_CONFIG_PCACHE_HDRSZ        23	/* int *psz */
+#define SQLITE_CONFIG_PMASZ               24	/* unsigned int szPma */
+#define SQLITE_CONFIG_STMTJRNL_SPILL      25	/* int nByte */
 
 /*
  * CAPI3REF: Database Connection Configuration Options
@@ -2538,8 +2491,7 @@ sqlite3_vsnprintf(int, char *, const char *, va_list);
  *
  * The SQLite core uses these three routines for all of its own
  * internal memory allocation needs. "Core" in the previous sentence
- * does not include operating-system specific VFS implementation.  The
- * Windows VFS uses native malloc() and free() for some operations.
+ * does not include operating-system specific VFS implementation.
  *
  * ^The sqlite3_malloc() routine returns a pointer to a block
  * of memory at least N bytes in length, where N is the parameter.
@@ -2603,14 +2555,6 @@ sqlite3_vsnprintf(int, char *, const char *, va_list);
  * the SQLITE_OMIT_MEMORY_ALLOCATION which would cause the built-in
  * implementation of these routines to be omitted.  That capability
  * is no longer provided.  Only built-in memory allocators can be used.
- *
- * Prior to SQLite version 3.7.10, the Windows OS interface layer called
- * the system malloc() and free() directly when converting
- * filenames between the UTF-8 encoding used by SQLite
- * and whatever filename encoding is used by the particular Windows
- * installation.  Memory allocation errors were detected, but
- * they were reported back as [SQLITE_CANTOPEN] or
- * [SQLITE_IOERR] rather than [SQLITE_NOMEM].
  *
  * The pointer arguments to [sqlite3_free()] and [sqlite3_realloc()]
  * must be either NULL or else pointers obtained from a prior
@@ -3129,8 +3073,6 @@ sqlite3_progress_handler(sqlite3 *, int,
  * then it is interpreted as an absolute path. ^If the path does not begin
  * with a '/' (meaning that the authority section is omitted from the URI)
  * then the path is interpreted as a relative path.
- * ^(On windows, the first component of an absolute path
- * is a drive specification (e.g. "C:").)^
  *
  * [[core URI query parameters]]
  * The query component of a URI may contain parameters that are interpreted
@@ -3211,12 +3153,6 @@ sqlite3_progress_handler(sqlite3 *, int,
  *          Open the database file "/home/fred/data.db".
  * <tr><td> file://darkstar/home/fred/data.db <td>
  *          An error. "darkstar" is not a recognized authority.
- * <tr><td style="white-space:nowrap">
- *          file:///C:/Documents%20and%20Settings/fred/Desktop/data.db
- *     <td> Windows only: Open the file "data.db" on fred's desktop on drive
- *          C:. Note that the %20 escaping in this example is not strictly
- *          necessary - space characters can be used literally
- *          in URI filenames.
  * <tr><td> file:data.db?mode=ro&cache=private <td>
  *          Open file "data.db" in the current directory for read-only access.
  *          Regardless of whether or not shared-cache mode is enabled by
@@ -3236,16 +3172,6 @@ sqlite3_progress_handler(sqlite3 *, int,
  * hexadecimal escape sequences replaced by a single byte containing the
  * corresponding octet. If this process generates an invalid UTF-8 encoding,
  * the results are undefined.
- *
- * <b>Note to Windows users:</b>  The encoding used for the filename argument
- * of sqlite3_open() and sqlite3_open_v2() must be UTF-8, not whatever
- * codepage is currently defined.  Filenames containing international
- * characters must be converted to UTF-8 prior to passing them into
- * sqlite3_open() or sqlite3_open_v2().
- *
- * <b>Note to Windows Runtime users:</b>  The temporary directory must be set
- * prior to calling sqlite3_open() or sqlite3_open_v2().  Otherwise, various
- * features that require the use of temporary files may fail.
  *
  * See also: [sqlite3_temp_directory]
 */
@@ -5361,8 +5287,7 @@ sqlite3_sleep(int);
  * temporary file directory.
  *
  * Applications are strongly discouraged from using this global variable.
- * It is required to set a temporary folder on Windows Runtime (WinRT).
- * But for all other platforms, it is highly recommended that applications
+ * It is highly recommended that applications
  * neither read nor write this variable.  This global variable is a relic
  * that exists for backwards compatibility of legacy applications and should
  * be avoided in new projects.
@@ -5390,21 +5315,6 @@ sqlite3_sleep(int);
  * the application wants that memory to be freed, it must do
  * so itself, taking care to only do so after all [database connection]
  * objects have been destroyed.
- *
- * <b>Note to Windows Runtime users:</b>  The temporary directory must be set
- * prior to calling [sqlite3_open] or [sqlite3_open_v2].  Otherwise, various
- * features that require the use of temporary files may fail.  Here is an
- * example of how to do this using C++ with the Windows Runtime:
- *
- * <blockquote><pre>
- * LPCWSTR zPath = Windows::Storage::ApplicationData::Current->
- * &nbsp;     TemporaryFolder->Path->Data();
- * char zPathBuf&#91;MAX_PATH + 1&#93;;
- * memset(zPathBuf, 0, sizeof(zPathBuf));
- * WideCharToMultiByte(CP_UTF8, 0, zPath, -1, zPathBuf, sizeof(zPathBuf),
- * &nbsp;     NULL, NULL);
- * sqlite3_temp_directory = sqlite3_mprintf("%s", zPathBuf);
- * </pre></blockquote>
 */
 SQLITE_API SQLITE_EXTERN char *
 sqlite3_temp_directory;
@@ -5419,8 +5329,7 @@ sqlite3_temp_directory;
  * to be relative to that directory.)^ ^If this variable is a NULL
  * pointer, then SQLite assumes that all database files specified
  * with a relative pathname are relative to the current directory
- * for the process.  Only the windows VFS makes use of this global
- * variable; it is ignored by the unix VFS.
+ * for the process. It is ignored by the unix VFS.
  *
  * Changing the value of this variable while a database connection is
  * open can result in a corrupt database.
@@ -6162,9 +6071,7 @@ sqlite3_vfs_unregister(sqlite3_vfs *);
  *
  * The SQLITE_MUTEX_NOOP implementation is a set of routines
  * that does no real locking and is appropriate for use in
- * a single-threaded application.  The SQLITE_MUTEX_PTHREADS and
- * SQLITE_MUTEX_W32 implementations are appropriate for use on Unix
- * and Windows.
+ * a single-threaded application.
  *
  * If SQLite is compiled with the SQLITE_MUTEX_APPDEF preprocessor
  * macro defined (with "-DSQLITE_MUTEX_APPDEF=1"), then no mutex
@@ -6237,12 +6144,6 @@ sqlite3_vfs_unregister(sqlite3_vfs *);
  * mutex must be exited an equal number of times before another thread
  * can enter.)^  If the same thread tries to enter any mutex other
  * than an SQLITE_MUTEX_RECURSIVE more than once, the behavior is undefined.
- *
- * ^(Some systems (for example, Windows 95) do not support the operation
- * implemented by sqlite3_mutex_try().  On those systems, sqlite3_mutex_try()
- * will always return SQLITE_BUSY. The SQLite core only ever uses
- * sqlite3_mutex_try() as an optimization so this is acceptable
- * behavior.)^
  *
  * ^The sqlite3_mutex_leave() routine exits a mutex that was
  * previously entered by the same thread.   The behavior

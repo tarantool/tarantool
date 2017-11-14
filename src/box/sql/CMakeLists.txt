@@ -65,11 +65,9 @@ add_library(sql STATIC
     mutex.c
     mutex_noop.c
     mutex_unix.c
-    mutex_w32.c
     notify.c
     os.c
     os_unix.c
-    os_win.c
     pager.c
     pcache.c
     pcache1.c

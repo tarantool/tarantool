@@ -100,18 +100,6 @@ sqlite3_threadsafe(void)
 	return SQLITE_THREADSAFE;
 }
 
-/*
- * When compiling the test fixture or with debugging enabled (on Win32),
- * this variable being set to non-zero will cause OSTRACE macros to emit
- * extra diagnostic information.
- */
-#ifdef SQLITE_HAVE_OS_TRACE
-#ifndef SQLITE_DEBUG_OS_TRACE
-#define SQLITE_DEBUG_OS_TRACE 0
-#endif
-int sqlite3OSTrace = SQLITE_DEBUG_OS_TRACE;
-#endif
-
 #if !defined(SQLITE_OMIT_TRACE) && defined(SQLITE_ENABLE_IOTRACE)
 /*
  * If the following function pointer is not NULL and if
@@ -628,10 +616,6 @@ sqlite3_config(int op, ...)
 		 * NULL.
 		 */
 	case SQLITE_CONFIG_LOG:{
-			/* MSVC is picky about pulling func ptrs from va lists.
-			 * http://support.microsoft.com/kb/47961
-			 * sqlite3GlobalConfig.xLog = va_arg(ap, void(*)(void*,int,const char*));
-			 */
 			typedef void (*LOGFUNC_t) (void *, int, const char *);
 			sqlite3GlobalConfig.xLog = va_arg(ap, LOGFUNC_t);
 			sqlite3GlobalConfig.pLogArg = va_arg(ap, void *);
@@ -700,17 +684,6 @@ sqlite3_config(int op, ...)
 			sqlite3GlobalConfig.szMmap = szMmap;
 			break;
 		}
-
-#if SQLITE_OS_WIN && defined(SQLITE_WIN32_MALLOC)	/* IMP: R-04780-55815 */
-	case SQLITE_CONFIG_WIN32_HEAPSIZE:{
-			/* EVIDENCE-OF: R-34926-03360 SQLITE_CONFIG_WIN32_HEAPSIZE takes a 32-bit
-			 * unsigned integer value that specifies the maximum size of the created
-			 * heap.
-			 */
-			sqlite3GlobalConfig.nHeap = va_arg(ap, int);
-			break;
-		}
-#endif
 
 	case SQLITE_CONFIG_PMASZ:{
 			sqlite3GlobalConfig.szPma = va_arg(ap, unsigned int);
@@ -1547,32 +1520,6 @@ static int
 sqliteDefaultBusyCallback(void *ptr,	/* Database connection */
 			  int count)	/* Number of times table has been busy */
 {
-#if SQLITE_OS_WIN || HAVE_USLEEP
-	static const u8 delays[] =
-	    { 1, 2, 5, 10, 15, 20, 25, 25, 25, 50, 50, 100 };
-	static const u8 totals[] =
-	    { 0, 1, 3, 8, 18, 33, 53, 78, 103, 128, 178, 228 };
-#define NDELAY ArraySize(delays)
-	sqlite3 *db = (sqlite3 *) ptr;
-	int timeout = db->busyTimeout;
-	int delay, prior;
-
-	assert(count >= 0);
-	if (count < NDELAY) {
-		delay = delays[count];
-		prior = totals[count];
-	} else {
-		delay = delays[NDELAY - 1];
-		prior = totals[NDELAY - 1] + delay * (count - (NDELAY - 1));
-	}
-	if (prior + delay > timeout) {
-		delay = timeout - prior;
-		if (delay <= 0)
-			return 0;
-	}
-	sqlite3OsSleep(db->pVfs, delay * 1000);
-	return 1;
-#else
 	sqlite3 *db = (sqlite3 *) ptr;
 	int timeout = ((sqlite3 *) ptr)->busyTimeout;
 	if ((count + 1) * 1000 > timeout) {
@@ -1580,7 +1527,6 @@ sqliteDefaultBusyCallback(void *ptr,	/* Database connection */
 	}
 	sqlite3OsSleep(db->pVfs, 1000000);
 	return 1;
-#endif
 }
 
 /*
@@ -3436,10 +3382,6 @@ sqlite3_test_control(int op, ...)
 		 * sqlite3_test_control().
 		 */
 	case SQLITE_TESTCTRL_FAULT_INSTALL:{
-			/* MSVC is picky about pulling func ptrs from va lists.
-			 * http://support.microsoft.com/kb/47961
-			 * sqlite3GlobalConfig.xTestCallback = va_arg(ap, int(*)(int));
-			 */
 			typedef int (*TESTCALLBACKFUNC_t) (int);
 			sqlite3GlobalConfig.xTestCallback =
 			    va_arg(ap, TESTCALLBACKFUNC_t);

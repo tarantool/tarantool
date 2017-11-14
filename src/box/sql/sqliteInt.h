@@ -74,31 +74,11 @@
 #define SQLITE_TCLAPI
 #endif
 
-/*
- * Make sure that rand_s() is available on Windows systems with MSVC 2005
- * or higher.
- */
-#if defined(_MSC_VER) && _MSC_VER>=1400
-#define _CRT_RAND_S
-#endif
-
-/*
- * Include the header file used to customize the compiler options for MSVC.
- * This should be done first so that it can successfully prevent spurious
- * compiler warnings due to subsequent content in this file and other files
- * that are included by this file.
- */
-#include "msvc.h"
-
-/*
- * Special setup for VxWorks
- */
-#include "vxworks.h"
 
 /*
  * These #defines should enable >2GB file support on POSIX if the
  * underlying operating system supports it.  If the OS lacks
- * large file support, or if the OS is windows, these should be no-ops.
+ * large file support, these should be no-ops.
  *
  * Ticket #2739:  The _LARGEFILE_SOURCE macro must appear before any
  * system #includes.  Hence, this block of code must be the very first
@@ -139,46 +119,7 @@
 #define _GNU_SOURCE
 #endif
 
-#if defined(__OpenBSD__) && !defined(_BSD_SOURCE)
-#define _BSD_SOURCE
-#endif
-
-/*
- * For MinGW, check to see if we can include the header file containing its
- * version information, among other things.  Normally, this internal MinGW
- * header file would [only] be included automatically by other MinGW header
- * files; however, the contained version information is now required by this
- * header file to work around binary compatibility issues (see below) and
- * this is the only known way to reliably obtain it.  This entire #if block
- * would be completely unnecessary if there was any other way of detecting
- * MinGW via their preprocessor (e.g. if they customized their GCC to define
- * some MinGW-specific macros).  When compiling for MinGW, either the
- * _HAVE_MINGW_H or _HAVE__MINGW_H (note the extra underscore) macro must be
- * defined; otherwise, detection of conditions specific to MinGW will be
- * disabled.
- */
-#if defined(_HAVE_MINGW_H)
-#include "mingw.h"
-#elif defined(_HAVE__MINGW_H)
-#include "_mingw.h"
-#endif
-
-/*
- * For MinGW version 4.x (and higher), check to see if the _USE_32BIT_TIME_T
- * define is required to maintain binary compatibility with the MSVC runtime
- * library in use (e.g. for Windows XP).
- */
-#if !defined(_USE_32BIT_TIME_T) && !defined(_USE_64BIT_TIME_T) && \
-    defined(_WIN32) && !defined(_WIN64) && \
-    defined(__MINGW_MAJOR_VERSION) && __MINGW_MAJOR_VERSION >= 4 && \
-    defined(__MSVCRT__)
-#define _USE_32BIT_TIME_T
-#endif
-
-/* The public SQLite interface.  The _FILE_OFFSET_BITS macro must appear
- * first in QNX.  Also, the _USE_32BIT_TIME_T macro must appear first for
- * MinGW.
- */
+/* The public SQLite interface. */
 #include "sqlite3.h"
 
 #include "sqliteLimit.h"
@@ -214,9 +155,7 @@
  * that vary from one machine to the next.
  *
  * Ticket #3860:  The llvm-gcc-4.2 compiler from Apple chokes on
- * the ((void*)&((char*)0)[X]) construct.  But MSVC chokes on ((void*)(X)).
- * So we have to define the macros in different ways depending on the
- * compiler.
+ * the ((void*)&((char*)0)[X]) construct.
  */
 #if defined(__PTRDIFF_TYPE__)	/* This case should work for GCC */
 #define SQLITE_INT_TO_PTR(X)  ((void*)(__PTRDIFF_TYPE__)(X))
@@ -238,29 +177,10 @@
  */
 #if defined(__GNUC__)
 #define SQLITE_NOINLINE  __attribute__((noinline))
-#elif defined(_MSC_VER) && _MSC_VER>=1310
-#define SQLITE_NOINLINE  __declspec(noinline)
 #else
 #define SQLITE_NOINLINE
 #endif
 
-/*
- * Make sure that the compiler intrinsics we desire are enabled when
- * compiling with an appropriate version of MSVC unless prevented by
- * the SQLITE_DISABLE_INTRINSIC define.
- */
-#if !defined(SQLITE_DISABLE_INTRINSIC)
-#if defined(_MSC_VER) && _MSC_VER>=1400
-#if !defined(_WIN32_WCE)
-#include <intrin.h>
-#pragma intrinsic(_byteswap_ushort)
-#pragma intrinsic(_byteswap_ulong)
-#pragma intrinsic(_ReadWriteBarrier)
-#else
-#include <cmnintrin.h>
-#endif
-#endif
-#endif
 
 /*
  * The SQLITE_THREADSAFE macro must be defined as 0, 1, or 2.
@@ -303,29 +223,21 @@
  * specify which memory allocation subsystem to use.
  *
  *     SQLITE_SYSTEM_MALLOC          // Use normal system malloc()
- *     SQLITE_WIN32_MALLOC           // Use Win32 native heap API
  *     SQLITE_ZERO_MALLOC            // Use a stub allocator that always fails
  *     SQLITE_MEMDEBUG               // Debugging version of system malloc()
- *
- * On Windows, if the SQLITE_WIN32_MALLOC_VALIDATE macro is defined and the
- * assert() macro is enabled, each call into the Win32 native heap subsystem
- * will cause HeapValidate to be called.  If heap validation should fail, an
- * assertion will be triggered.
  *
  * If none of the above are defined, then set SQLITE_SYSTEM_MALLOC as
  * the default.
  */
 #if defined(SQLITE_SYSTEM_MALLOC) \
-  + defined(SQLITE_WIN32_MALLOC) \
   + defined(SQLITE_ZERO_MALLOC) \
   + defined(SQLITE_MEMDEBUG)>1
 #error "Two or more of the following compile-time configuration options\
  are defined but at most one is allowed:\
- SQLITE_SYSTEM_MALLOC, SQLITE_WIN32_MALLOC, SQLITE_MEMDEBUG,\
+ SQLITE_SYSTEM_MALLOC, SQLITE_MEMDEBUG,\
  SQLITE_ZERO_MALLOC"
 #endif
 #if defined(SQLITE_SYSTEM_MALLOC) \
-  + defined(SQLITE_WIN32_MALLOC) \
   + defined(SQLITE_ZERO_MALLOC) \
   + defined(SQLITE_MEMDEBUG)==0
 #define SQLITE_SYSTEM_MALLOC 1
@@ -462,26 +374,11 @@ void sqlite3Coverage(int);
 #endif
 
 /*
- * Declarations used for tracing the operating system interfaces.
- */
-#if defined(SQLITE_FORCE_OS_TRACE) || defined(SQLITE_TEST) || \
-    (defined(SQLITE_DEBUG) && SQLITE_OS_WIN)
-extern int sqlite3OSTrace;
-#define OSTRACE(X)          if( sqlite3OSTrace ) sqlite3DebugPrintf X
-#define SQLITE_HAVE_OS_TRACE
-#else
-#define OSTRACE(X)
-#undef  SQLITE_HAVE_OS_TRACE
-#endif
-
-/*
  * Is the sqlite3ErrName() function needed in the build?  Currently,
- * it is needed by "mutex_w32.c" (when debugging), "os_win.c" (when
- * OSTRACE is enabled), and by several "test*.c" files (which are
+ * it is needed by several "test*.c" files (which are
  * compiled using SQLITE_TEST).
  */
-#if defined(SQLITE_HAVE_OS_TRACE) || defined(SQLITE_TEST) || \
-    (defined(SQLITE_DEBUG) && SQLITE_OS_WIN)
+#if defined(SQLITE_TEST)
 #define SQLITE_NEED_ERR_NAME
 #else
 #undef  SQLITE_NEED_ERR_NAME
@@ -836,14 +733,6 @@ extern const int sqlite3one;
 #endif
 
 /*
- * Disable MMAP on platforms where it is known to not work
- */
-#if defined(__OpenBSD__) || defined(__QNXNTO__)
-#undef SQLITE_MAX_MMAP_SIZE
-#define SQLITE_MAX_MMAP_SIZE 0
-#endif
-
-/*
  * Default maximum size of memory used by memory-mapped I/O in the VFS
  */
 #ifdef __APPLE__
@@ -851,11 +740,7 @@ extern const int sqlite3one;
 #endif
 #ifndef SQLITE_MAX_MMAP_SIZE
 #if defined(__linux__) \
-  || defined(_WIN32) \
-  || (defined(__APPLE__) && defined(__MACH__)) \
-  || defined(__sun) \
-  || defined(__FreeBSD__) \
-  || defined(__DragonFly__)
+  || (defined(__APPLE__) && defined(__MACH__))
 #define SQLITE_MAX_MMAP_SIZE 0x7fff0000	/* 2147418112 */
 #else
 #define SQLITE_MAX_MMAP_SIZE 0
@@ -3337,7 +3222,7 @@ void sqlite3VXPrintf(StrAccum *, const char *, va_list);
 void sqlite3XPrintf(StrAccum *, const char *, ...);
 char *sqlite3MPrintf(sqlite3 *, const char *, ...);
 char *sqlite3VMPrintf(sqlite3 *, const char *, va_list);
-#if defined(SQLITE_DEBUG) || defined(SQLITE_HAVE_OS_TRACE)
+#if defined(SQLITE_DEBUG)
 void sqlite3DebugPrintf(const char *, ...);
 #endif
 #if defined(SQLITE_TEST)
