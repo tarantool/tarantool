@@ -1623,9 +1623,6 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 	assert(pPk != 0);
 	if (!db->init.imposterTable)
 		pPk->uniqNotNull = 1;
-
-	/* The root page of the PRIMARY KEY is the table root page */
-	pPk->tnum = pTab->tnum;
 }
 
 /*
@@ -3458,9 +3455,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		}
 		user_session->sql_flags |= SQLITE_InternChanges;
-		if (pTblName != 0) {
-			pIndex->tnum = db->init.newTnum;
-		}
+		pIndex->tnum = db->init.newTnum;
 	}
 
 	/* If this is the initial CREATE INDEX statement (or CREATE TABLE if the
