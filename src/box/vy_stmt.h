@@ -631,14 +631,6 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	       bool is_primary);
 
 /**
- * Format a key into string.
- * Example: [1, 2, "string"]
- * \sa mp_snprint()
- */
-int
-vy_key_snprint(char *buf, int size, const char *key);
-
-/**
  * Format a statement into string.
  * Example: REPLACE([1, 2, "string"], lsn=48)
  */
@@ -646,18 +638,10 @@ int
 vy_stmt_snprint(char *buf, int size, const struct tuple *stmt);
 
 /*
-* Format a key into string using a static buffer.
-* Useful for gdb and say_debug().
-* \sa vy_key_snprint()
-*/
-const char *
-vy_key_str(const char *key);
-
-/*
-* Format a statement into string using a static buffer.
-* Useful for gdb and say_debug().
-* \sa vy_stmt_snprint()
-*/
+ * Format a statement into string using a static buffer.
+ * Useful for gdb and say_debug().
+ * \sa vy_stmt_snprint()
+ */
 const char *
 vy_stmt_str(const struct tuple *stmt);
 
