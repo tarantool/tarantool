@@ -149,6 +149,11 @@ struct vy_env {
 	size_t memory;
 	/** Max time a transaction may wait for memory. */
 	double timeout;
+	/**
+	 * If read of a single statement takes longer than
+	 * the given value, warn about it in the log.
+	 */
+	double too_long_threshold;
 	/** Max number of threads used for reading. */
 	int read_threads;
 	/** Max number of threads used for writing. */
@@ -1246,8 +1251,8 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, &env->run_env, index, tx,
-			      ITER_EQ, vykey, p_read_view);
+	vy_read_iterator_open(&itr, &env->run_env, index, tx, ITER_EQ, vykey,
+			      p_read_view, env->too_long_threshold);
 	int rc = vy_read_iterator_next(&itr, result);
 	tuple_unref(vykey);
 	if (*result != NULL)
@@ -2570,8 +2575,8 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt,
 		   void /* struct vy_env */ *arg);
 
 static struct vy_env *
-vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
-	   int write_threads, double timeout, bool force_recovery)
+vy_env_new(const char *path, size_t memory, size_t cache,
+	   int read_threads, int write_threads, bool force_recovery)
 {
 	enum { KB = 1000, MB = 1000 * 1000 };
 	static int64_t dump_bandwidth_buckets[] = {
@@ -2596,7 +2601,8 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	memset(e, 0, sizeof(*e));
 	e->status = VINYL_OFFLINE;
 	e->memory = memory;
-	e->timeout = timeout;
+	e->timeout = TIMEOUT_INFINITY;
+	e->too_long_threshold = TIMEOUT_INFINITY;
 	e->read_threads = read_threads;
 	e->write_threads = write_threads;
 	e->force_recovery = force_recovery;
@@ -2689,8 +2695,7 @@ vy_env_delete(struct vy_env *e)
 
 struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout,
-		 bool force_recovery)
+		 int read_threads, int write_threads, bool force_recovery)
 {
 	struct vinyl_engine *vinyl = calloc(1, sizeof(*vinyl));
 	if (vinyl == NULL) {
@@ -2700,7 +2705,7 @@ vinyl_engine_new(const char *dir, size_t memory, size_t cache,
 	}
 
 	vinyl->env = vy_env_new(dir, memory, cache, read_threads,
-				write_threads, timeout, force_recovery);
+				write_threads, force_recovery);
 	if (vinyl->env == NULL) {
 		free(vinyl);
 		return NULL;
@@ -2730,6 +2735,13 @@ void
 vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout)
 {
 	vinyl->env->timeout = timeout;
+}
+
+void
+vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
+				    double too_long_threshold)
+{
+	vinyl->env->too_long_threshold = too_long_threshold;
 }
 
 /** }}} Environment */
@@ -3521,7 +3533,8 @@ vy_squash_process(struct vy_squash *squash)
 	 * prepared, but not committed statements.
 	 */
 	vy_read_iterator_open(&itr, &env->run_env, index, NULL, ITER_EQ,
-			      squash->stmt, &env->xm->p_committed_read_view);
+			      squash->stmt, &env->xm->p_committed_read_view,
+			      env->too_long_threshold);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
 	if (rc == 0 && result != NULL)
@@ -3908,7 +3921,8 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 
 	vy_read_iterator_open(&it->iterator, &env->run_env,
 			      index, tx, type, it->key,
-			      (const struct vy_read_view **)&tx->read_view);
+			      (const struct vy_read_view **)&tx->read_view,
+			      env->too_long_threshold);
 	return (struct iterator *)it;
 }
 

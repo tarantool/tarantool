@@ -614,6 +614,11 @@ void
 box_set_too_long_threshold(void)
 {
 	too_long_threshold = cfg_getd("too_long_threshold");
+
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_too_long_threshold(vinyl, too_long_threshold);
 }
 
 void
@@ -1432,10 +1437,10 @@ engine_init()
 				    cfg_geti64("vinyl_cache"),
 				    cfg_geti("vinyl_read_threads"),
 				    cfg_geti("vinyl_write_threads"),
-				    cfg_getd("vinyl_timeout"),
 				    cfg_geti("force_recovery"));
 	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
+	box_set_vinyl_timeout();
 }
 
 /**

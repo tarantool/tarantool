@@ -60,6 +60,11 @@ struct vy_read_iterator {
 	/** Read view the iterator lives in. */
 	const struct vy_read_view **read_view;
 	/**
+	 * If a read iteration takes longer than the given value,
+	 * warn about it in the log.
+	 */
+	double too_long_threshold;
+	/**
 	 * Set if the resulting statement needs to be
 	 * checked to match the search key.
 	 */
@@ -128,7 +133,7 @@ void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum iterator_type iterator_type, struct tuple *key,
-		      const struct vy_read_view **rv);
+		      const struct vy_read_view **rv, double too_long_threshold);
 
 /**
  * Get the next statement with another key, or start the iterator,

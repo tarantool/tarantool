@@ -43,8 +43,7 @@ struct vinyl_engine;
 
 struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout,
-		 bool force_recovery);
+		 int read_threads, int write_threads, bool force_recovery);
 
 /**
  * Engine introspection (box.info.vinyl())
@@ -64,6 +63,13 @@ vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
 void
 vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
 
+/**
+ * Update too_long_threshold.
+ */
+void
+vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
+				    double too_long_threshold);
+
 #ifdef __cplusplus
 } /* extern "C" */
 
@@ -71,12 +77,11 @@ vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
 
 static inline struct vinyl_engine *
 vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
-		    int read_threads, int write_threads, double timeout,
-		    bool force_recovery)
+		    int read_threads, int write_threads, bool force_recovery)
 {
 	struct vinyl_engine *vinyl;
 	vinyl = vinyl_engine_new(dir, memory, cache, read_threads,
-				 write_threads, timeout, force_recovery);
+				 write_threads, force_recovery);
 	if (vinyl == NULL)
 		diag_raise();
 	return vinyl;

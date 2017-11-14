@@ -282,6 +282,40 @@ s:select()
   - [9, 'test str9']
   - [10, 'test str10']
 ...
+-- gh-2871: check that long reads are logged
+too_long_threshold = box.cfg.too_long_threshold
+---
+...
+box.cfg{too_long_threshold = 0.01}
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+---
+- ok
+...
+#s:select(5, {iterator = 'LE'}) == 5
+---
+- true
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+---
+- ok
+...
+test_run:cmd("push filter 'lsn=[0-9]+' to 'lsn=<lsn>'")
+---
+- true
+...
+test_run:grep_log('default', 'select.* took too long')
+---
+- select([5], LE) => REPLACE([5, "test str5"], lsn=<lsn>) took too long
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+box.cfg{too_long_threshold = too_long_threshold}
+---
+...
 s:drop()
 ---
 ...
