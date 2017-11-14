@@ -1,0 +1,165 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+upper_lower_test = function (str)
+    return box.sql.execute(string.format("select lower('%s'), upper('%s')", str, str))
+end;
+---
+...
+-- Some pangrams
+-- Azerbaijanian
+upper_lower_test([[
+    Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq.
+]]);
+---
+- - ['     zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq. ',
+    '     ZƏFƏR, JAKETINI DƏ, PAPAĞINI DA GÖTÜR, BU AXŞAM HAVA ÇOX SOYUQ OLACAQ. ']
+...
+upper_lower_test([[
+    The quick brown fox jumps over the lazy dog.
+]]);
+---
+- - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
+      JUMPS OVER THE LAZY DOG. ']
+...
+-- English
+upper_lower_test([[
+    The quick brown fox jumps over the lazy dog.
+]]);
+---
+- - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
+      JUMPS OVER THE LAZY DOG. ']
+...
+-- Armenian
+upper_lower_test([[
+    Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք
+]]);
+---
+- - ['     բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք ', '     ԲԵԼ
+      ԴՂՅԱԿԻ ՁԱԽ ԺԱՄՆ ՕՖ ԱԶԳՈՒԹՅԱՆԸ ՑՊԱՀԱՆՋ ՉՃՇՏԱԾ ՎՆԱՍ ԷՐ ԵՒ ՓԱՌՔ ']
+...
+-- Belarussian
+upper_lower_test([[
+    У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай
+]]);
+---
+- - ['     у іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай ',
+    '     У ІЎІ ХУДЫ ЖВАВЫ ЧОРТ У ЗЯЛЁНАЙ КАМІЗЭЛЬЦЫ ПАБЕГ ПАД’ЕСЦІ ФАРШУ З ЮШКАЙ ']
+...
+-- Greek
+upper_lower_test([[
+    Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
+]]);
+---
+- - ['     τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός ', '     ΤΆΧΙΣΤΗ
+      ΑΛΏΠΗΞ ΒΑΦΉΣ ΨΗΜΈΝΗ ΓΗ, ΔΡΑΣΚΕΛΊΖΕΙ ΥΠΈΡ ΝΩΘΡΟΎ ΚΥΝΌΣ ']
+...
+-- Irish
+upper_lower_test([[
+    Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig
+]]);
+---
+- - ['     chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig ',
+    '     CHUAIGH BÉ MHÓRSHÁCH LE DLÚTHSPÁD FÍORFHINN TRÍ HATA MO DHEA-PHORCÁIN BHIG ']
+...
+-- Spain
+upper_lower_test([[
+    Quiere la boca exhausta vid, kiwi, piña y fugaz jamón
+]]);
+---
+- - ['     quiere la boca exhausta vid, kiwi, piña y fugaz jamón ', '     QUIERE LA
+      BOCA EXHAUSTA VID, KIWI, PIÑA Y FUGAZ JAMÓN ']
+...
+-- Korean
+upper_lower_test([[
+    키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다
+]]);
+---
+- - ['     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ', '     키스의 고유조건은 입술끼리 만나야 하고 특별한
+      기술은 필요치 않다 ']
+...
+-- Latvian
+upper_lower_test([[
+    Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus
+]]);
+---
+- - ['     glāžšķūņa rūķīši dzērumā čiepj baha koncertflīģeļu vākus ', '     GLĀŽŠĶŪŅA
+      RŪĶĪŠI DZĒRUMĀ ČIEPJ BAHA KONCERTFLĪĢEĻU VĀKUS ']
+...
+-- German
+upper_lower_test([[
+    Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
+]]);
+---
+- - ['     zwölf große boxkämpfer jagen viktor quer über den sylter deich ', '     ZWÖLF
+      GROSSE BOXKÄMPFER JAGEN VIKTOR QUER ÜBER DEN SYLTER DEICH ']
+...
+-- Polish
+upper_lower_test([[
+    Pchnąć w tę łódź jeża lub ośm skrzyń fig.
+]]);
+---
+- - ['     pchnąć w tę łódź jeża lub ośm skrzyń fig. ', '     PCHNĄĆ W TĘ ŁÓDŹ JEŻA
+      LUB OŚM SKRZYŃ FIG. ']
+...
+-- Ukrainian
+upper_lower_test([[
+    Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів!
+]]);
+---
+- - ['     чуєш їх, доцю, га? кумедна ж ти, прощайся без ґольфів! ', '     ЧУЄШ ЇХ,
+      ДОЦЮ, ГА? КУМЕДНА Ж ТИ, ПРОЩАЙСЯ БЕЗ ҐОЛЬФІВ! ']
+...
+-- Czech
+upper_lower_test([[
+    Příliš žluťoučký kůň úpěl ďábelské ódy
+]]);
+---
+- - ['     příliš žluťoučký kůň úpěl ďábelské ódy ', '     PŘÍLIŠ ŽLUŤOUČKÝ KŮŇ ÚPĚL
+      ĎÁBELSKÉ ÓDY ']
+...
+-- Esperanto
+upper_lower_test([[
+    Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
+]]);
+---
+- - ['     laŭ ludoviko zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj ', '     LAŬ
+      LUDOVIKO ZAMENHOF BONGUSTAS FREŜA ĈEĤA MANĜAĴO KUN SPICOJ ']
+...
+-- Japanese
+upper_lower_test([[
+    いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす
+]]);
+---
+- - ['     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ', '     いろはにほへと
+      ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ']
+...
+-- Turkish
+upper_lower_test([[
+    Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ
+]]);
+---
+- - ['     pijamalı hasta yağız şoföre çabucak güvendi. extra: i̇ ', '     PIJAMALI
+      HASTA YAĞIZ ŞOFÖRE ÇABUCAK GÜVENDI. EXTRA: İ ']
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+-- Bad test cases
+box.sql.execute("select upper('1', 2)")
+---
+- error: wrong number of arguments to function UPPER()
+...
+box.sql.execute("select upper(\"1\")")
+---
+- error: 'no such column: 1'
+...
+box.sql.execute("select upper()")
+---
+- error: wrong number of arguments to function UPPER()
+...

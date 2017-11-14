@@ -35,9 +35,9 @@
  * time functions, are implemented separately.)
  */
 #include "sqliteInt.h"
-#include <stdlib.h>
-#include <assert.h>
 #include "vdbeInt.h"
+#include <unicode/ustring.h>
+#include <unicode/ucasemap.h>
 
 /*
  * Return the collating function associated with a function.
@@ -476,49 +476,49 @@ contextMalloc(sqlite3_context * context, i64 nByte)
 /*
  * Implementation of the upper() and lower() SQL functions.
  */
-static void
-upperFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
-{
-	char *z1;
-	const char *z2;
-	int i, n;
-	UNUSED_PARAMETER(argc);
-	z2 = (char *)sqlite3_value_text(argv[0]);
-	n = sqlite3_value_bytes(argv[0]);
-	/* Verify that the call to _bytes() does not invalidate the _text() pointer */
-	assert(z2 == (char *)sqlite3_value_text(argv[0]));
-	if (z2) {
-		z1 = contextMalloc(context, ((i64) n) + 1);
-		if (z1) {
-			for (i = 0; i < n; i++) {
-				z1[i] = (char)sqlite3Toupper(z2[i]);
-			}
-			sqlite3_result_text(context, z1, n, sqlite3_free);
-		}
-	}
-}
 
-static void
-lowerFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
-{
-	char *z1;
-	const char *z2;
-	int i, n;
-	UNUSED_PARAMETER(argc);
-	z2 = (char *)sqlite3_value_text(argv[0]);
-	n = sqlite3_value_bytes(argv[0]);
-	/* Verify that the call to _bytes() does not invalidate the _text() pointer */
-	assert(z2 == (char *)sqlite3_value_text(argv[0]));
-	if (z2) {
-		z1 = contextMalloc(context, ((i64) n) + 1);
-		if (z1) {
-			for (i = 0; i < n; i++) {
-				z1[i] = sqlite3Tolower(z2[i]);
-			}
-			sqlite3_result_text(context, z1, n, sqlite3_free);
-		}
-	}
-}
+static UCaseMap *pUCaseMap;
+
+#define ICU_CASE_CONVERT(case_type)                                            \
+static void                                                                    \
+case_type##ICUFunc(sqlite3_context *context, int argc, sqlite3_value **argv)   \
+{                                                                              \
+	char *z1;                                                              \
+	const char *z2;                                                        \
+	int n;                                                                 \
+	UNUSED_PARAMETER(argc);                                                \
+	z2 = (char *)sqlite3_value_text(argv[0]);                              \
+	n = sqlite3_value_bytes(argv[0]);                                      \
+	/*                                                                     \
+	 * Verify that the call to _bytes()                                    \
+	 * does not invalidate the _text() pointer.                            \
+	 */                                                                    \
+	assert(z2 == (char *)sqlite3_value_text(argv[0]));                     \
+	if (!z2)                                                               \
+		return;                                                        \
+	z1 = contextMalloc(context, ((i64) n) + 1);                            \
+	if (!z1) {                                                             \
+		sqlite3_result_error_nomem(context);                           \
+		return;                                                        \
+	}                                                                      \
+	UErrorCode status = U_ZERO_ERROR;                                      \
+	int len = ucasemap_utf8To##case_type(pUCaseMap, z1, n, z2, n, &status);\
+	if (len > n) {                                                         \
+		status = U_ZERO_ERROR;                                         \
+		sqlite3_free(z1);                                              \
+		z1 = contextMalloc(context, ((i64) len) + 1);                  \
+		if (!z1) {                                                     \
+			sqlite3_result_error_nomem(context);                   \
+			return;                                                \
+		}                                                              \
+		ucasemap_utf8To##case_type(pUCaseMap, z1, len, z2, n, &status);\
+	}                                                                      \
+	sqlite3_result_text(context, z1, len, sqlite3_free);                   \
+}                                                                              \
+
+ICU_CASE_CONVERT(Lower);
+ICU_CASE_CONVERT(Upper);
+
 
 /*
  * Some functions like COALESCE() and IFNULL() and UNLIKELY() are implemented
@@ -1815,6 +1815,14 @@ void
 sqlite3RegisterBuiltinFunctions(void)
 {
 	/*
+	 * Initialize default case map for UPPER/LOWER functions
+	 * This structure is not freed at db exit, but that is ok.
+	 */
+	UErrorCode status = U_ZERO_ERROR;
+
+	pUCaseMap = ucasemap_open(NULL, 0, &status);
+	assert(pUCaseMap);
+	/*
 	 * The following array holds FuncDef structures for all of the functions
 	 * defined in this file.
 	 *
@@ -1859,8 +1867,8 @@ sqlite3RegisterBuiltinFunctions(void)
 		FUNCTION(round, 1, 0, 0, roundFunc),
 		FUNCTION(round, 2, 0, 0, roundFunc),
 #endif
-		FUNCTION(upper, 1, 0, 0, upperFunc),
-		FUNCTION(lower, 1, 0, 0, lowerFunc),
+		FUNCTION(upper, 1, 0, 0, UpperICUFunc),
+		FUNCTION(lower, 1, 0, 0, LowerICUFunc),
 		FUNCTION(hex, 1, 0, 0, hexFunc),
 		FUNCTION2(ifnull, 2, 0, 0, noopFunc, SQLITE_FUNC_COALESCE),
 		VFUNCTION(random, 0, 0, 0, randomFunc),
