@@ -763,8 +763,7 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct txv *v = write_set_search_key(&tx->write_set, index, stmt);
-	if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
-			  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
+	if (v != NULL && vy_stmt_type(v->stmt) != IPROTO_UPSERT) {
 		/* Reading from own write set is serializable. */
 		return 0;
 	}
@@ -790,6 +789,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		assert(index->id == 0);
 		uint8_t old_type = vy_stmt_type(old->stmt);
 		assert(old_type == IPROTO_UPSERT ||
+		       old_type == IPROTO_INSERT ||
 		       old_type == IPROTO_REPLACE ||
 		       old_type == IPROTO_DELETE);
 		(void) old_type;

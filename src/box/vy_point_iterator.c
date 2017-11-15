@@ -106,6 +106,7 @@ vy_point_iterator_history_is_terminal(struct rlist *history)
 		rlist_last_entry(history, struct vy_stmt_history_node, link);
 	assert(vy_stmt_type(node->stmt) == IPROTO_REPLACE ||
 	       vy_stmt_type(node->stmt) == IPROTO_DELETE ||
+	       vy_stmt_type(node->stmt) == IPROTO_INSERT ||
 	       vy_stmt_type(node->stmt) == IPROTO_UPSERT);
        return vy_stmt_type(node->stmt) != IPROTO_UPSERT;
 }

@@ -193,7 +193,8 @@ static inline uint64_t
 vy_stmt_column_mask(const struct tuple *tuple)
 {
 	enum iproto_type type = vy_stmt_type(tuple);
-	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_DELETE);
 	(void) type;
 	if (tuple_format(tuple)->extra_size == sizeof(uint64_t)) {
 		/* Tuple has column mask */
@@ -212,7 +213,8 @@ static inline void
 vy_stmt_set_column_mask(struct tuple *tuple, uint64_t column_mask)
 {
 	enum iproto_type type = vy_stmt_type(tuple);
-	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_DELETE);
 	assert(tuple_format(tuple)->extra_size == sizeof(uint64_t));
 	(void) type;
 	char *extra = (char *) tuple_extra(tuple);
@@ -334,12 +336,14 @@ static inline int
 vy_tuple_compare(const struct tuple *a, const struct tuple *b,
 		 const struct key_def *cmp_def)
 {
-	assert(vy_stmt_type(a) == IPROTO_REPLACE ||
-	       vy_stmt_type(a) == IPROTO_UPSERT ||
-	       vy_stmt_type(a) == IPROTO_DELETE);
-	assert(vy_stmt_type(b) == IPROTO_REPLACE ||
-	       vy_stmt_type(b) == IPROTO_UPSERT ||
-	       vy_stmt_type(b) == IPROTO_DELETE);
+	enum iproto_type type;
+	type = vy_stmt_type(a);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_UPSERT || type == IPROTO_DELETE);
+	type = vy_stmt_type(b);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_UPSERT || type == IPROTO_DELETE);
+	(void)type;
 	return tuple_compare(a, b, cmp_def);
 }
 
@@ -380,12 +384,8 @@ static inline int
 vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 		const struct key_def *key_def)
 {
-	bool a_is_tuple = vy_stmt_type(a) == IPROTO_REPLACE ||
-			  vy_stmt_type(a) == IPROTO_UPSERT ||
-			  vy_stmt_type(a) == IPROTO_DELETE;
-	bool b_is_tuple = vy_stmt_type(b) == IPROTO_REPLACE ||
-			  vy_stmt_type(b) == IPROTO_UPSERT ||
-			  vy_stmt_type(b) == IPROTO_DELETE;
+	bool a_is_tuple = vy_stmt_type(a) != IPROTO_SELECT;
+	bool b_is_tuple = vy_stmt_type(b) != IPROTO_SELECT;
 	if (a_is_tuple && b_is_tuple) {
 		return vy_tuple_compare(a, b, key_def);
 	} else if (a_is_tuple && !b_is_tuple) {
@@ -403,9 +403,7 @@ static inline int
 vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 			     const struct key_def *key_def)
 {
-	if (vy_stmt_type(stmt) == IPROTO_REPLACE ||
-	    vy_stmt_type(stmt) == IPROTO_UPSERT ||
-	    vy_stmt_type(stmt) == IPROTO_DELETE)
+	if (vy_stmt_type(stmt) != IPROTO_SELECT)
 		return vy_tuple_compare_with_raw_key(stmt, key, key_def);
 	return key_compare(tuple_data(stmt), key, key_def);
 }
@@ -496,6 +494,20 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 struct tuple *
 vy_stmt_new_replace(struct tuple_format *format, const char *tuple,
                     const char *tuple_end);
+
+/**
+ * Create the INSERT statement from raw MessagePack data.
+ * @param format Format of a tuple for offsets generating.
+ * @param tuple_begin MessagePack data that contain an array of fields WITH the
+ *                    array header.
+ * @param tuple_end End of the array that begins from @param tuple_begin.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+struct tuple *
+vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end);
 
  /**
  * Create the UPSERT statement from raw MessagePack data.

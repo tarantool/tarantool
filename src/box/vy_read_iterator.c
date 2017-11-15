@@ -1009,7 +1009,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		if (itr->last_stmt != NULL)
 			tuple_unref(itr->last_stmt);
 		itr->last_stmt = t;
-		if (vy_stmt_type(t) == IPROTO_REPLACE)
+		if (vy_stmt_type(t) == IPROTO_INSERT ||
+		    vy_stmt_type(t) == IPROTO_REPLACE)
 			break;
 		assert(vy_stmt_type(t) == IPROTO_DELETE);
 		if (vy_stmt_lsn(t) == INT64_MAX) /* t is from write set */
@@ -1017,7 +1018,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	}
 
 	*result = itr->last_stmt;
-	assert(*result == NULL || vy_stmt_type(*result) == IPROTO_REPLACE);
+	assert(*result == NULL ||
+	       vy_stmt_type(*result) == IPROTO_INSERT ||
+	       vy_stmt_type(*result) == IPROTO_REPLACE);
 	if (*result != NULL)
 		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
 

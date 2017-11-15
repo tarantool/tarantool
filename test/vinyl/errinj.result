@@ -307,7 +307,7 @@ test_run:cmd("push filter 'lsn=[0-9]+' to 'lsn=<lsn>'")
 ...
 test_run:grep_log('default', 'select.* took too long')
 ---
-- select([5], LE) => REPLACE([5, "test str5"], lsn=<lsn>) took too long
+- select([5], LE) => INSERT([5, "test str5"], lsn=<lsn>) took too long
 ...
 test_run:cmd("clear filter")
 ---

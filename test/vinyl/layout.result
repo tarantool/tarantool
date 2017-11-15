@@ -257,17 +257,17 @@ result
   - - 00000000000000000006.run
     - - HEADER:
           lsn: 9
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: ['ёёё', null]
       - HEADER:
           lsn: 8
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: ['эээ', null]
       - HEADER:
           lsn: 7
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: ['ЭЭЭ', null]
       - HEADER:
@@ -301,12 +301,12 @@ result
           tuple: ['ёёё', 123]
       - HEADER:
           lsn: 12
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: ['ююю', 789]
       - HEADER:
           lsn: 11
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: ['ЮЮЮ', 456]
       - HEADER:
@@ -335,17 +335,17 @@ result
   - - 00000000000000000004.run
     - - HEADER:
           lsn: 9
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: [null, 'ёёё']
       - HEADER:
           lsn: 8
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: [null, 'эээ']
       - HEADER:
           lsn: 7
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: [null, 'ЭЭЭ']
       - HEADER:
@@ -384,12 +384,12 @@ result
           tuple: [123, 'ёёё']
       - HEADER:
           lsn: 11
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: [456, 'ЮЮЮ']
       - HEADER:
           lsn: 12
-          type: REPLACE
+          type: INSERT
         BODY:
           tuple: [789, 'ююю']
       - HEADER:

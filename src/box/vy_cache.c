@@ -264,8 +264,11 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	}
 	TRASH(&order);
 
-	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
-	assert(prev_stmt == NULL || vy_stmt_type(prev_stmt) == IPROTO_REPLACE);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(prev_stmt == NULL ||
+	       vy_stmt_type(prev_stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(prev_stmt) == IPROTO_REPLACE);
 	cache->version++;
 
 	/* Insert/replace new entry to the tree */
@@ -459,7 +462,8 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 		assert(entry != NULL);
 		cache->version++;
 		struct vy_cache_entry *to_delete = *entry;
-		assert(vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
+		assert(vy_stmt_type(to_delete->stmt) == IPROTO_INSERT ||
+		       vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
 		if (deleted != NULL) {
 			*deleted = to_delete->stmt;
 			tuple_ref(to_delete->stmt);

@@ -312,6 +312,16 @@ vy_stmt_new_replace(struct tuple_format *format, const char *tuple_begin,
 }
 
 struct tuple *
+vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end)
+{
+	/* INSERT mustn't have n_upserts field. */
+	assert(format->extra_size != sizeof(uint8_t));
+	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				    NULL, 0, IPROTO_INSERT);
+}
+
+struct tuple *
 vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 			    const struct tuple *upsert)
 {
@@ -493,6 +503,7 @@ vy_stmt_encode_primary(const struct tuple *value,
 		request.key = extracted;
 		request.key_end = request.key + size;
 		break;
+	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 		request.tuple = tuple_data_range(value, &size);
 		request.tuple_end = request.tuple + size;
@@ -530,7 +541,7 @@ vy_stmt_encode_secondary(const struct tuple *value,
 	const char *extracted = tuple_extract_key(value, cmp_def, &size);
 	if (extracted == NULL)
 		return -1;
-	if (type == IPROTO_REPLACE) {
+	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
 		request.tuple = extracted;
 		request.tuple_end = extracted + size;
 	} else {
@@ -567,13 +578,15 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 						      IPROTO_DELETE,
 						      key_def, format);
 		break;
+	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 		if (is_primary) {
-			stmt = vy_stmt_new_replace(format, request.tuple,
-					    request.tuple_end);
+			stmt = vy_stmt_new_with_ops(format, request.tuple,
+						    request.tuple_end,
+						    NULL, 0, request.type);
 		} else {
 			stmt = vy_stmt_new_surrogate_from_key(request.tuple,
-							      IPROTO_REPLACE,
+							      request.type,
 							      key_def, format);
 		}
 		break;

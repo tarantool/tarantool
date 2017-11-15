@@ -155,10 +155,10 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	 * Apply new operations to the old stmt
 	 */
 	const char *result_mp;
-	if (vy_stmt_type(old_stmt) == IPROTO_REPLACE)
-		result_mp = tuple_data_range(old_stmt, &mp_size);
-	else
+	if (vy_stmt_type(old_stmt) == IPROTO_UPSERT)
 		result_mp = vy_upsert_data_range(old_stmt, &mp_size);
+	else
+		result_mp = tuple_data_range(old_stmt, &mp_size);
 	const char *result_mp_end = result_mp + mp_size;
 	struct tuple *result_stmt = NULL;
 	struct region *region = &fiber()->gc;
@@ -168,7 +168,8 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
 			    new_ops_end, suppress_error, &column_mask);
 	if (old_type != IPROTO_UPSERT) {
-		assert(old_type == IPROTO_DELETE || old_type == IPROTO_REPLACE);
+		assert(old_type == IPROTO_INSERT ||
+		       old_type == IPROTO_REPLACE);
 		/*
 		 * UPDATE case: return the updated old stmt.
 		 */

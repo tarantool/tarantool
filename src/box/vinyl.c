@@ -1335,7 +1335,7 @@ static inline int
 vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		  struct vy_index *pk, struct tuple *stmt)
 {
-	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	const char *key;
 	assert(pk->id == 0);
@@ -1367,7 +1367,8 @@ static int
 vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		    struct vy_index *index, struct tuple *stmt)
 {
-	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(index->id > 0);
 	/*
@@ -1492,6 +1493,14 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	/* Get full tuple from the primary index. */
 	if (vy_index_get(env, tx, pk, key, part_count, &old_stmt) != 0)
 		goto error;
+
+	if (old_stmt == NULL) {
+		/*
+		 * We can turn REPLACE into INSERT if the new key
+		 * does not have history.
+		 */
+		vy_stmt_set_type(new_stmt, IPROTO_INSERT);
+	}
 
 	/*
 	 * Replace in the primary index without explicit deletion
@@ -1942,7 +1951,7 @@ vy_insert_first_upsert(struct vy_env *env, struct vy_tx *tx,
 {
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(space->index_count > 0);
-	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk->id == 0);
 	if (vy_tx_set(tx, pk, stmt) != 0)
@@ -2129,8 +2138,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * turns into INSERT.
 	 */
 	if (stmt->old_tuple == NULL) {
-		stmt->new_tuple =
-			vy_stmt_new_replace(pk->mem_format, tuple, tuple_end);
+		stmt->new_tuple = vy_stmt_new_insert(pk->mem_format,
+						     tuple, tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		return vy_insert_first_upsert(env, tx, space, stmt->new_tuple);
@@ -2244,9 +2253,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	/* First insert into the primary index. */
-	stmt->new_tuple =
-		vy_stmt_new_replace(pk->mem_format, request->tuple,
-				    request->tuple_end);
+	stmt->new_tuple = vy_stmt_new_insert(pk->mem_format, request->tuple,
+					     request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	if (vy_insert_primary(env, tx, space, pk, stmt->new_tuple) != 0)
@@ -3225,6 +3233,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 	int rc = -1;
 	switch (request->type) {
+	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 		rc = vy_replace(env, tx, &stmt, space, request);
 		break;

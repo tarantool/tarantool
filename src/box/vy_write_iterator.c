@@ -653,6 +653,7 @@ vy_write_iterator_build_history(struct region *region,
 		 * by a REPLACE or DELETE.
 		 */
 		if (vy_stmt_type(src->tuple) == IPROTO_REPLACE ||
+		    vy_stmt_type(src->tuple) == IPROTO_INSERT ||
 		    vy_stmt_type(src->tuple) == IPROTO_DELETE) {
 			uint64_t stmt_mask = vy_stmt_column_mask(src->tuple);
 			/*
