@@ -9,6 +9,8 @@ test_run:cleanup_cluster()
 default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 
+function wait_gc(n) while #box.internal.gc.info().checkpoints > n do fiber.sleep(0.01) end end
+
 -- Grant permissions needed for replication.
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'replication')
@@ -56,7 +58,7 @@ test_run:cmd("switch default")
 
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-fiber.sleep(0.1) -- wait for relay to notify tx
+wait_gc(1)
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
 -- Make sure the replica will receive data it is subscribed
@@ -83,7 +85,7 @@ test_run:cmd("switch default")
 
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-fiber.sleep(0.1) -- wait for relay to notify tx
+wait_gc(1)
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
 --
@@ -121,7 +123,7 @@ while box.space.test:count() < 310 do fiber.sleep(0.01) end
 box.space.test:count()
 test_run:cmd("switch default")
 -- Now it's safe to drop the old xlog.
-fiber.sleep(0.1) -- wait for relay to notify tx
+wait_gc(1)
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
 -- Stop the replica.
