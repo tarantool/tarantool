@@ -1282,6 +1282,12 @@ vy_check_dup_key(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	struct tuple *found;
 	(void) part_count;
 	/*
+	 * During recovery we apply rows that were successfully
+	 * applied before restart so no conflict is possible.
+	 */
+	if (env->status != VINYL_ONLINE)
+		return 0;
+	/*
 	 * Expect a full tuple as input (secondary key || primary key)
 	 * but use only  the secondary key fields (partial key look
 	 * up) to check for duplicates.
@@ -2219,6 +2225,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		/* The space hasn't the primary index. */
 		return -1;
 	assert(pk->id == 0);
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(env, space, pk));
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	/* First insert into the primary index. */
@@ -2232,6 +2240,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index = vy_index(space->index[iid]);
+		if (vy_is_committed_one(env, space, index))
+			continue;
 		if (vy_insert_secondary(env, tx, space, index,
 					stmt->new_tuple) != 0)
 			return -1;
@@ -2259,7 +2269,7 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 {
 	if (vy_is_committed(env, space))
 		return 0;
-	if (request->type == IPROTO_INSERT && env->status == VINYL_ONLINE)
+	if (request->type == IPROTO_INSERT)
 		return vy_insert(env, tx, stmt, space, request);
 
 	if (space->index_count == 1) {
