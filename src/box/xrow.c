@@ -654,7 +654,6 @@ error:
 	}
 
 	memset(request, 0, sizeof(*request));
-	request->header = row;
 
 	uint32_t map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; ++i) {

@@ -196,8 +196,6 @@ xrow_decode_call(const struct xrow_header *row, struct call_request *request);
  * AUTH request
  */
 struct auth_request {
-	/** Request header */
-	const struct xrow_header *header;
 	/** MessagePack encoded name of the user to authenticate. */
 	const char *user_name;
 	/** Auth scramble. @sa scramble.h */

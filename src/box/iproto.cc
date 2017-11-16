@@ -95,11 +95,11 @@ struct iproto_msg: public cmsg
 	struct xrow_header header;
 	union {
 		/* Box request, if this is a DML */
-		struct request dml_request;
+		struct request dml;
 		/* Box request, if this is misc (call, eval). */
-		struct call_request call_request;
+		struct call_request call;
 		/* Authentication request. */
-		struct auth_request auth_request;
+		struct auth_request auth;
 	};
 	/** Output buffer to write response and flush. */
 	struct obuf *p_obuf;
@@ -698,7 +698,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
-		xrow_decode_dml_xc(&msg->header, &msg->dml_request,
+		xrow_decode_dml_xc(&msg->header, &msg->dml,
 				   dml_request_key_map(type));
 		assert(type < sizeof(dml_route)/sizeof(*dml_route));
 		cmsg_init(msg, dml_route[type]);
@@ -706,7 +706,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
 	case IPROTO_EVAL:
-		xrow_decode_call_xc(&msg->header, &msg->call_request);
+		xrow_decode_call_xc(&msg->header, &msg->call);
 		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_PING:
@@ -721,7 +721,7 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		*stop_input = true;
 		break;
 	case IPROTO_AUTH:
-		xrow_decode_auth_xc(&msg->header, &msg->auth_request);
+		xrow_decode_auth_xc(&msg->header, &msg->auth);
 		cmsg_init(msg, misc_route);
 		break;
 	default:
@@ -1025,7 +1025,7 @@ tx_process1(struct cmsg *m)
 
 	struct tuple *tuple;
 	struct obuf_svp svp;
-	if (box_process1(&msg->dml_request, &tuple) ||
+	if (box_process1(&msg->dml, &tuple) ||
 	    iproto_prepare_select(out, &svp))
 		goto error;
 	if (tuple && tuple_to_obuf(tuple, out))
@@ -1046,7 +1046,7 @@ tx_process_select(struct cmsg *m)
 	struct obuf_svp svp;
 	struct port port;
 	int rc;
-	struct request *req = &msg->dml_request;
+	struct request *req = &msg->dml;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
@@ -1090,13 +1090,13 @@ tx_process_misc(struct cmsg *m)
 		switch (msg->header.type) {
 		case IPROTO_CALL:
 		case IPROTO_CALL_16:
-			box_process_call(&msg->call_request, out);
+			box_process_call(&msg->call, out);
 			break;
 		case IPROTO_EVAL:
-			box_process_eval(&msg->call_request, out);
+			box_process_eval(&msg->call, out);
 			break;
 		case IPROTO_AUTH:
-			box_process_auth(&msg->auth_request);
+			box_process_auth(&msg->auth);
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
