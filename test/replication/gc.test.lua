@@ -9,6 +9,8 @@ test_run:cleanup_cluster()
 default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 
+function wait_gc(n) while #box.internal.gc.info().checkpoints > n do fiber.sleep(0.01) end end
+
 -- Grant permissions needed for replication.
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'replication')
@@ -56,7 +58,7 @@ test_run:cmd("switch default")
 
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-fiber.sleep(0.1) -- wait for relay to notify tx
+wait_gc(1)
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
 -- Make sure the replica will receive data it is subscribed
@@ -83,7 +85,45 @@ test_run:cmd("switch default")
 
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-fiber.sleep(0.1) -- wait for relay to notify tx
+wait_gc(1)
+#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+
+--
+-- Check that the master doesn't delete xlog files sent to the
+-- replica until it receives a confirmation that the data has
+-- been applied (gh-2825).
+--
+test_run:cmd("switch replica")
+-- Prevent the replica from applying any rows.
+box.error.injection.set("ERRINJ_WAL_DELAY", true)
+test_run:cmd("switch default")
+-- Generate some data on the master.
+for i = 1, 5 do s:auto_increment{} end
+box.snapshot() -- rotate xlog
+for i = 1, 5 do s:auto_increment{} end
+fiber.sleep(0.1) -- wait for master to relay data
+-- Garbage collection must not delete the old xlog file
+-- (and the corresponding snapshot), because it is still
+-- needed by the replica.
+#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+test_run:cmd("switch replica")
+-- Unblock the replica and make it fail to apply a row.
+box.info.replication[1].upstream.message == nil
+box.error.injection.set("ERRINJ_WAL_WRITE", true)
+box.error.injection.set("ERRINJ_WAL_DELAY", false)
+while box.info.replication[1].upstream.message == nil do fiber.sleep(0.01) end
+box.info.replication[1].upstream.message
+test_run:cmd("switch default")
+-- Restart the replica to reestablish replication.
+test_run:cmd("restart server replica")
+-- Wait for the replica to catch up.
+test_run:cmd("switch replica")
+fiber = require('fiber')
+while box.space.test:count() < 310 do fiber.sleep(0.01) end
+box.space.test:count()
+test_run:cmd("switch default")
+-- Now it's safe to drop the old xlog.
+wait_gc(1)
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
 
 -- Stop the replica.
@@ -100,6 +140,22 @@ box.snapshot()
 -- is unregistered.
 test_run:cleanup_cluster()
 #box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+
+--
+-- Test that concurrent invocation of the garbage collector works fine.
+--
+s:truncate()
+for i = 1, 10 do s:replace{i} end
+box.snapshot()
+
+replica_set.join(test_run, 3)
+replica_set.stop_all(test_run)
+
+for i = 11, 50 do s:replace{i} if i % 10 == 0 then box.snapshot() end end
+
+replica_set.start_all(test_run)
+replica_set.wait_all(test_run)
+replica_set.drop_all(test_run)
 
 -- Cleanup.
 s:drop()

@@ -27,6 +27,18 @@ function unregister(inspector, id)
     box.space._cluster:delete{id}
 end
 
+function start(inspector, id)
+    inspector:cmd('start server replica'..tostring(id - 1))
+end
+
+function stop(inspector, id)
+    inspector:cmd('stop server replica'..tostring(id - 1))
+end
+
+function wait(inspector, id)
+    inspector:wait_lsn('replica'..tostring(id - 1), 'default')
+end
+
 function delete(inspector, id)
     inspector:cmd('stop server replica'..tostring(id - 1))
     inspector:cmd('delete server replica'..tostring(id - 1))
@@ -35,6 +47,18 @@ end
 function drop(inspector, id)
     unregister(inspector, id)
     delete(inspector, id)
+end
+
+function start_all(inspector)
+    call_all(function (id) start(inspector, id) end)
+end
+
+function stop_all(inspector)
+    call_all(function (id) stop(inspector, id) end)
+end
+
+function wait_all(inspector)
+    call_all(function (id) wait(inspector, id) end)
 end
 
 function drop_all(inspector)
@@ -56,6 +80,9 @@ end
 
 return {
     join = join;
+    start_all = start_all;
+    stop_all = stop_all;
+    wait_all = wait_all;
     drop_all = drop_all;
     vclock_diff = vclock_diff;
     unregister = unregister;

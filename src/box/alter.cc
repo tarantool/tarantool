@@ -1395,7 +1395,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "the space has grants");
 		}
-		if (space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id))
+		/*
+		 * Before 1.7.6 a space record was removed before
+		 * the corresponding record in the _truncate system
+		 * space so the following check should be disabled.
+		 */
+		if (dd_version_id >= version_id(1, 7, 6) &&
+		    space_has_data(BOX_TRUNCATE_ID, 0, old_space->def->id))
 			tnt_raise(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has truncate record");

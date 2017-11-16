@@ -123,8 +123,6 @@ errinj = box.error.injection
 errinj.set("ERRINJ_RELAY_EXIT_DELAY", 0.01)
 
 test_run:cmd("start server replica")
-
-
 test_run:cmd("switch replica")
 fiber = require('fiber')
 old_repl = box.cfg.replication
@@ -136,9 +134,21 @@ box.cfg{replication = {old_repl}}
 while box.info.replication[1].upstream.status ~= 'disconnected' do fiber.sleep(0.0001) end
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+
+box.snapshot()
+for i = 0, 9999 do box.space.test:replace({i, 4, 5, 'test'}) end
+
+test_run:cmd("create server replica_ack with rpl_master=default, script='replication/replica_ack.lua'")
+test_run:cmd("start server replica_ack")
+test_run:cmd("switch replica_ack")
+box.info.replication[1].upstream.status
+
 test_run:cmd("stop server default")
 test_run:cmd("deploy server default")
 test_run:cmd("start server default")
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
+test_run:cmd("stop server replica_ack")
+test_run:cmd("cleanup server replica_ack")

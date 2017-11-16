@@ -111,9 +111,8 @@ applier_writer_f(va_list ap)
 	while (!fiber_is_cancelled()) {
 		fiber_cond_wait_timeout(&applier->writer_cond,
 					applier_timeout);
-		/* Send ACKs only when in FINAL JOIN and FOLLOW modes */
-		if (applier->state != APPLIER_FOLLOW &&
-		    applier->state != APPLIER_FINAL_JOIN)
+		/* Send ACKs only when in FOLLOW mode ,*/
+		if (applier->state != APPLIER_FOLLOW)
 			continue;
 		try {
 			struct xrow_header xrow;
@@ -230,18 +229,6 @@ done:
 	say_info("authenticated");
 	applier_set_state(applier, APPLIER_READY);
 
-	if (applier->version_id >= version_id(1, 7, 4)) {
-		/* Enable replication ACKs for newer servers */
-		assert(applier->writer == NULL);
-
-		char name[FIBER_NAME_MAX];
-		int pos = snprintf(name, sizeof(name), "applierw/");
-		uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
-
-		applier->writer = fiber_new_xc(name, applier_writer_f);
-		fiber_set_joinable(applier->writer, true);
-		fiber_start(applier->writer, applier);
-	}
 }
 
 /**
@@ -408,6 +395,18 @@ applier_subscribe(struct applier *applier)
 
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
 	applier->last_logged_errcode = 0;
+	if (applier->version_id >= version_id(1, 7, 4)) {
+		/* Enable replication ACKs for newer servers */
+		assert(applier->writer == NULL);
+
+		char name[FIBER_NAME_MAX];
+		int pos = snprintf(name, sizeof(name), "applierw/");
+		uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
+
+		applier->writer = fiber_new_xc(name, applier_writer_f);
+		fiber_set_joinable(applier->writer, true);
+		fiber_start(applier->writer, applier);
+	}
 
 	/*
 	 * Process a stream of rows from the binary log.
@@ -450,7 +449,8 @@ applier_subscribe(struct applier *applier)
 				      row.lsn);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		}
-		fiber_cond_signal(&applier->writer_cond);
+		if (applier->state == APPLIER_FOLLOW)
+			fiber_cond_signal(&applier->writer_cond);
 		iobuf_reset(iobuf);
 		fiber_gc();
 	}
