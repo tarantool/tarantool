@@ -852,6 +852,18 @@ vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 
 	assert(scheduler->dump_task_count > 0);
 	scheduler->dump_task_count--;
+
+	/*
+	 * If the index was dropped during dump, we abort the
+	 * dump task, but we should still poke the scheduler
+	 * to check if the current dump round is complete.
+	 * If we don't and this index happens to be the last
+	 * one of the current generation, the scheduler will
+	 * never be notified about dump completion and hence
+	 * memory will never be released.
+	 */
+	if (index->is_dropped)
+		vy_scheduler_complete_dump(scheduler);
 }
 
 /**
