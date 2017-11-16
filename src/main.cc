@@ -136,7 +136,8 @@ signal_sigwinch_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	(void) loop;
 	(void) w;
 	(void) revents;
-	rl_resize_terminal();
+	if (rl_instream)
+		rl_resize_terminal();
 }
 
 /** Try to log as much as possible before dumping a core.
