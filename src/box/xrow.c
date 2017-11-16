@@ -283,7 +283,6 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 	/* Malformed packet appears to be a lesser evil than abort. */
 	return obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
 	       obuf_dup(out, e->errmsg, msg_len) != msg_len ? -1 : 0;
-
 }
 
 void

@@ -81,6 +81,16 @@ iproto_reset_input(struct ibuf *ibuf)
 
 /* {{{ iproto_msg - declaration */
 
+/*
+ * When there is an error in iproto thread, we can't
+ * simply append the error to out buffer, since it's
+ * controlled by tx thread, so send a message to tx thread
+ * to append the error.
+ */
+struct iproto_error_request {
+	struct diag diag;
+};
+
 /**
  * A single msg from io thread. All requests
  * from all connections are queued into a single queue
@@ -94,12 +104,14 @@ struct iproto_msg: public cmsg
 	/* Request message code and sync. */
 	struct xrow_header header;
 	union {
-		/* Box request, if this is a DML */
+		/** Box request, if this is a DML */
 		struct request dml;
-		/* Box request, if this is misc (call, eval). */
+		/** Box request, if this is a call or eval. */
 		struct call_request call;
-		/* Authentication request. */
+		/** Authentication request. */
 		struct auth_request auth;
+		/** In case of iproto parse error, saved diagnostics. */
+		struct diag diag;
 	};
 	/** Output buffer to write response and flush. */
 	struct obuf *p_obuf;
@@ -531,6 +543,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
+			cpipe_flush_input(&tx_pipe);
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "packet length");
 		}
@@ -543,48 +556,19 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		struct iproto_msg *msg = iproto_msg_new(con);
 		msg->p_ibuf = con->p_ibuf;
 		msg->p_obuf = p_obuf;
-		auto guard = make_scoped_guard([=] { iproto_msg_delete(msg); });
 
 		msg->len = reqend - reqstart; /* total request length */
 
-		try {
-			iproto_msg_decode(msg, &pos, reqend, &stop_input);
-			/*
-			 * This can't throw, but should not be
-			 * done in case of exception.
-			 */
-			cpipe_push_input(&tx_pipe, msg);
-			guard.is_active = false;
-			n_requests++;
-		} catch (Exception *e) {
-			/*
-			 * Do not close connection if we failed to
-			 * decode a request, as we have enough info
-			 * to proceed to the next one.
-			 */
-			struct obuf *out = msg->p_obuf;
-			/*
-			 * Advance read position right away: the
-			 * message is so no need to hold the input
-			 * buffer.
-			 */
-			in->rpos += msg->len;
-			iproto_reply_error(out, e, msg->header.sync,
-					   ::schema_version);
-			out->wend = obuf_create_svp(out);
-			if (!ev_is_active(&con->output))
-				ev_feed_event(con->loop, &con->output, EV_WRITE);
-			e->log();
-		}
-
+		iproto_msg_decode(msg, &pos, reqend, &stop_input);
+		/*
+		 * This can't throw, but should not be
+		 * done in case of exception.
+		 */
+		cpipe_push_input(&tx_pipe, msg);
+		n_requests++;
 		/* Request is parsed */
 		assert(reqend > reqstart);
 		assert(con->parse_size >= (size_t) (reqend - reqstart));
-		/*
-		 * sic: in case of exception con->parse_size
-		 * must not be advanced to stay in sync with
-		 * in->rpos.
-		 */
 		con->parse_size -= reqend - reqstart;
 	}
 	if (stop_input) {
@@ -840,7 +824,13 @@ static void
 tx_reply_error(struct iproto_msg *msg);
 
 static void
+tx_reply_iproto_error(struct cmsg *m);
+
+static void
 net_send_msg(struct cmsg *msg);
+
+static void
+net_send_error(struct cmsg *msg);
 
 static void
 tx_process_join_subscribe(struct cmsg *msg);
@@ -890,13 +880,22 @@ static const struct cmsg_hop subscribe_route[] = {
 	{ net_end_subscribe, NULL },
 };
 
+static const struct cmsg_hop error_route[] = {
+	{ tx_reply_iproto_error, &net_pipe },
+	{ net_send_error, NULL },
+};
+
 static void
 iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		  bool *stop_input)
 {
-	xrow_header_decode_xc(&msg->header, pos, reqend);
+	uint8_t type;
+
+	if (xrow_header_decode(&msg->header, pos, reqend))
+		goto error;
 	assert(*pos == reqend);
-	uint8_t type = msg->header.type;
+
+	type = msg->header.type;
 
 	/*
 	 * Parse request before putting it into the queue
@@ -910,15 +909,17 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_UPDATE:
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
-		xrow_decode_dml_xc(&msg->header, &msg->dml,
-				   dml_request_key_map(type));
+		if (xrow_decode_dml(&msg->header, &msg->dml,
+				    dml_request_key_map(type)))
+			goto error;
 		assert(type < sizeof(dml_route)/sizeof(*dml_route));
 		cmsg_init(msg, dml_route[type]);
 		break;
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
 	case IPROTO_EVAL:
-		xrow_decode_call_xc(&msg->header, &msg->call);
+		if (xrow_decode_call(&msg->header, &msg->call))
+			goto error;
 		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_PING:
@@ -933,15 +934,22 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		*stop_input = true;
 		break;
 	case IPROTO_AUTH:
-		xrow_decode_auth_xc(&msg->header, &msg->auth);
+		if (xrow_decode_auth(&msg->header, &msg->auth))
+			goto error;
 		cmsg_init(msg, misc_route);
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) type);
-		break;
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+			 (uint32_t) type);
+		goto error;
 	}
 	return;
+error:
+	/** Log and send the error. */
+	diag_log();
+	diag_create(&msg->diag);
+	diag_move(&fiber()->diag, &msg->diag);
+	cmsg_init(msg, error_route);
 }
 
 static void
@@ -1020,6 +1028,19 @@ static void
 tx_reply_error(struct iproto_msg *msg)
 {
 	iproto_reply_error(msg->p_obuf, diag_last_error(&fiber()->diag),
+			   msg->header.sync, ::schema_version);
+	msg->write_end = obuf_create_svp(msg->p_obuf);
+}
+
+/**
+ * Write error from iproto thread to the output buffer and advance
+ * write position. Doesn't throw.
+ */
+static void
+tx_reply_iproto_error(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	iproto_reply_error(msg->p_obuf, diag_last_error(&msg->diag),
 			   msg->header.sync, ::schema_version);
 	msg->write_end = obuf_create_svp(msg->p_obuf);
 }
@@ -1180,6 +1201,19 @@ net_send_msg(struct cmsg *m)
 		iproto_connection_close(con);
 	}
 	iproto_msg_delete(msg);
+}
+
+/**
+ * Complete sending an iproto error: 
+ * recycle the error object and flush output.
+ */
+static void
+net_send_error(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	/* Recycle the exception. */
+	diag_move(&msg->diag, &fiber()->diag);
+	net_send_msg(m);
 }
 
 static void
