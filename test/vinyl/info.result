@@ -575,7 +575,7 @@ stat_diff(istat(), st)
     evict:
       rows: 37
       bytes: 39257
-    lookup: 2
+    lookup: 1
     put:
       rows: 51
       bytes: 54111
@@ -592,16 +592,16 @@ stat_diff(istat(), st)
         bytes: 106100
   txw:
     iterator:
-      lookup: 2
+      lookup: 1
       get:
-        rows: 51
-        bytes: 54111
+        rows: 50
+        bytes: 53050
   memory:
     iterator:
-      lookup: 2
+      lookup: 1
       get:
-        rows: 101
-        bytes: 107161
+        rows: 100
+        bytes: 106100
   lookup: 1
   get:
     rows: 100
