@@ -218,6 +218,7 @@ txv_new(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	tuple_ref(stmt);
 	v->region_stmt = NULL;
 	v->tx = tx;
+	v->is_first_insert = false;
 	v->is_overwritten = false;
 	v->overwritten = NULL;
 	return v;
@@ -524,13 +525,37 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (v->is_overwritten)
 			continue;
 
+		enum iproto_type type = vy_stmt_type(v->stmt);
+
+		/* Optimize out INSERT + DELETE for the same key. */
+		if (v->is_first_insert && type == IPROTO_DELETE)
+			continue;
+
+		if (v->is_first_insert && type == IPROTO_REPLACE) {
+			/*
+			 * There is no committed statement for the
+			 * given key or the last statement is DELETE
+			 * so we can turn REPLACE into INSERT.
+			 */
+			type = IPROTO_INSERT;
+			vy_stmt_set_type(v->stmt, type);
+		}
+
+		if (!v->is_first_insert && type == IPROTO_INSERT) {
+			/*
+			 * INSERT following REPLACE means nothing,
+			 * turn it into REPLACE.
+			 */
+			type = IPROTO_REPLACE;
+			vy_stmt_set_type(v->stmt, type);
+		}
+
 		if (vy_tx_write_prepare(v) != 0)
 			return -1;
 		assert(v->mem != NULL);
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
-		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
 		if (vy_tx_write(index, v->mem, v->stmt, region_stmt) != 0)
@@ -818,7 +843,11 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		tx->write_size -= tuple_size(old->stmt);
 		write_set_remove(&tx->write_set, old);
 		old->is_overwritten = true;
+		v->is_first_insert = old->is_first_insert;
 	}
+
+	if (old == NULL && vy_stmt_type(stmt) == IPROTO_INSERT)
+		v->is_first_insert = true;
 
 	if (old != NULL && vy_stmt_type(stmt) != IPROTO_UPSERT) {
 		/*

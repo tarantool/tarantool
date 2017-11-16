@@ -89,6 +89,13 @@ struct txv {
 	/** Member the transaction write set. */
 	rb_node(struct txv) in_set;
 	/**
+	 * True if there is no tuple committed to the database
+	 * matching the key this operation is for, i.e. either
+	 * there is no statements for this key at all or the
+	 * last committed statement is DELETE.
+	 */
+	bool is_first_insert;
+	/**
 	 * True if the txv was overwritten by another txv of
 	 * the same transaction.
 	 */
