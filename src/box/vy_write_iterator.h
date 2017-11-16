@@ -164,6 +164,22 @@
  *
  * See implementation details in
  * vy_write_iterator_build_read_views.
+ *
+ * ---------------------------------------------------------------
+ * Optimization #5: discard a tautological DELETE statement, i.e.
+ * a statement that was not removed from the history because it
+ * is referenced by read view, but that is preceeded by another
+ * DELETE and hence not needed.
+ *
+ *                         --------
+ *                         SAME KEY
+ *                         --------
+ *
+ * VLSN(i)                   VLSN(i+1)                   VLSN(i+2)
+ *   |                          |                           |
+ *   | LSN1  LSN2  ...  DELETE  | LSNi  LSNi+1  ...  DELETE |
+ *   \________________/\_______/ \_________________/\______/
+ *          skip         keep           skip         discard
  */
 
 struct vy_write_iterator;

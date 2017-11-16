@@ -75,7 +75,7 @@ void
 test_basic(void)
 {
 	header();
-	plan(36);
+	plan(38);
 
 	/* Create key_def */
 	uint32_t fields[] = { 0 };
@@ -389,6 +389,36 @@ test_basic(void)
 	};
 	const struct vy_stmt_template expected[] = { content[2] };
 	const int vlsns[] = {};
+	int content_count = sizeof(content) / sizeof(content[0]);
+	int expected_count = sizeof(expected) / sizeof(expected[0]);
+	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
+	compare_write_iterator_results(key_def, content, content_count,
+				       expected, expected_count,
+				       vlsns, vlsns_count, true, false);
+}
+{
+/*
+ * STATEMENT: REPL DEL REPL DEL REPL DEL
+ * LSN:        4    5   6    7    8    9
+ * READ VIEW:       *        *         *
+ *            \_______/\_______________/
+ *              merge         skip
+ *
+ * is_last_level = false
+ *
+ * Check that tautological DELETEs referenced by newer
+ * read views are skipped.
+ */
+	const struct vy_stmt_template content[] = {
+		STMT_TEMPLATE(4, REPLACE, 1, 1),
+		STMT_TEMPLATE(5, DELETE, 1),
+		STMT_TEMPLATE(6, REPLACE, 1, 2),
+		STMT_TEMPLATE(7, DELETE, 1),
+		STMT_TEMPLATE(8, REPLACE, 1, 3),
+		STMT_TEMPLATE(9, DELETE, 1),
+	};
+	const struct vy_stmt_template expected[] = { content[1] };
+	const int vlsns[] = {5, 7, 9};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);

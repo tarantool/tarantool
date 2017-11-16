@@ -721,6 +721,17 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 	assert(rv->history != NULL);
 	struct vy_write_history *h = rv->history;
 	/*
+	 * Optimization 5: discard a DELETE statement referenced
+	 * by a read view if it is preceded by another DELETE for
+	 * the same key.
+	 */
+	if (hint != NULL && vy_stmt_type(hint) == IPROTO_DELETE &&
+	    vy_stmt_type(h->tuple) == IPROTO_DELETE) {
+		vy_write_history_destroy(h);
+		rv->history = NULL;
+		return 0;
+	}
+	/*
 	 * Two possible hints to remove the current UPSERT.
 	 * 1. If the stream is working on the last level, we
 	 *    know that this UPSERT is the oldest version of
@@ -815,10 +826,12 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 			continue;
 		if (vy_read_view_merge(stream, hint, rv) != 0)
 			goto error;
+		assert(rv->history == NULL);
+		if (rv->tuple == NULL)
+			continue;
 		stream->rv_used_count++;
 		++*count;
 		hint = rv->tuple;
-		assert(rv->history == NULL);
 	}
 	region_truncate(region, used);
 	return 0;
