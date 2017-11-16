@@ -115,7 +115,9 @@ r.upstream.status == "stopped"
 r.upstream.message:match('Duplicate') ~= nil
 test_run:cmd('switch default')
 box.space._schema:delete({'dup'})
-
+test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")
+test_run:grep_log('replica', 'error applying row: .*')
+test_run:cmd("clear filter")
 --
 -- Cleanup
 --

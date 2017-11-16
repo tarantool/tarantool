@@ -55,7 +55,8 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - atomic
+- - NULL
+  - atomic
   - backup
   - begin
   - cfg
@@ -1008,4 +1009,99 @@ require('log').info('Incorrect password supplied')
 test_run:grep_log("default", "password")
 ---
 - password
+...
+-- some collation test
+s = box.schema.space.create('test')
+---
+...
+not not s:create_index('test1', {parts = {{1, 'string', collation = 'Unicode'}}})
+---
+- true
+...
+not not s:create_index('test2', {parts = {{2, 'string', collation = 'UNICODE'}}})
+---
+- true
+...
+not not s:create_index('test3', {parts = {{3, 'string', collation = 'UnIcOdE'}}}) -- I'd prefer to panic on that
+---
+- true
+...
+s:create_index('test4', {parts = {{4, 'string'}}}).parts
+---
+- - type: string
+    is_nullable: false
+    fieldno: 4
+...
+s:create_index('test5', {parts = {{5, 'string', collation = 'Unicode'}}}).parts
+---
+- - type: string
+    is_nullable: false
+    collation: unicode
+    fieldno: 5
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test')
+---
+...
+not not s:create_index('test1', {parts = {{1, 'scalar', collation = 'unicode_ci'}}})
+---
+- true
+...
+s:replace{1} s:replace{1.1} s:replace{false}
+---
+...
+s:replace{'Блин'} s:replace{'Ёж'} s:replace{'ешь'} s:replace{'Же'} s:replace{'Уже'}
+---
+...
+s:replace{'drop'} s:replace{'table'} s:replace{'users'}
+---
+...
+s:select{}
+---
+- - [false]
+  - [1]
+  - [1.1]
+  - ['drop']
+  - ['table']
+  - ['users']
+  - ['Блин']
+  - ['Ёж']
+  - ['ешь']
+  - ['Же']
+  - ['Уже']
+...
+s:select{'еж'}
+---
+- - ['Ёж']
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test')
+---
+...
+not not s:create_index('test1', {parts = {{1, 'number', collation = 'unicode_ci'}}})
+---
+- error: 'Wrong index options (field 1): collation is reasonable only for string and
+    scalar parts'
+...
+not not s:create_index('test2', {parts = {{2, 'unsigned', collation = 'unicode_ci'}}})
+---
+- error: 'Wrong index options (field 1): collation is reasonable only for string and
+    scalar parts'
+...
+not not s:create_index('test3', {parts = {{3, 'integer', collation = 'unicode_ci'}}})
+---
+- error: 'Wrong index options (field 1): collation is reasonable only for string and
+    scalar parts'
+...
+not not s:create_index('test4', {parts = {{4, 'boolean', collation = 'unicode_ci'}}})
+---
+- error: 'Wrong index options (field 1): collation is reasonable only for string and
+    scalar parts'
+...
+s:drop()
+---
 ...

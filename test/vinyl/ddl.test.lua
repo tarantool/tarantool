@@ -252,8 +252,8 @@ s:replace{1, 2, 3}
 s:replace{4, 5, 6}
 s:replace{7, 8, 9}
 _ = fiber.create(function () s:drop() ch:put(true) end)
-ch:get()
 box.commit()
+ch:get()
 
 -- check invalid field types
 space = box.schema.space.create('test', { engine = 'vinyl' })

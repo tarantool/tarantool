@@ -291,8 +291,10 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	(void) stream;
 	struct request *request = xrow_decode_dml_gc_xc(row);
 	struct space *space = space_cache_find_xc(request->space_id);
-	if (process_rw(request, space, NULL) != 0)
+	if (process_rw(request, space, NULL) != 0) {
+		say_error("error applying row: %s", request_str(request));
 		diag_raise();
+	}
 }
 
 static void

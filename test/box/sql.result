@@ -34,14 +34,13 @@ _ = box.space.test1:create_index('primary', { type = 'hash' })
 _ = box.space.test1:create_index('secondary', { type = 'hash', parts = {2, 'string'}})
 ---
 ...
-conn:ping()
+--  send request to remote server to force schema reloading
+conn:reload_schema()
 ---
-- true
 ...
--- xxx: bug  currently selects no rows
 space:select{}
 ---
-- error: 'No index #0 is defined in space ''test'''
+- []
 ...
 space:insert{1, 'I am a tuple'}
 ---
@@ -49,17 +48,15 @@ space:insert{1, 'I am a tuple'}
 ...
 space:select{1}
 ---
-- error: 'No index #0 is defined in space ''test'''
+- - [1, 'I am a tuple']
 ...
--- currently there is no way to find out how many records
--- a space contains 
 space:select{0}
 ---
-- error: 'No index #0 is defined in space ''test'''
+- []
 ...
 space:select{2}
 ---
-- error: 'No index #0 is defined in space ''test'''
+- []
 ...
 test_run:cmd('restart server default')
 net_box = require('net.box')
@@ -299,7 +296,7 @@ s:truncate()
 -- get away with it.
 space:insert{'Britney'}
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
+- error: Tuple field count 1 is less than required (expected at least 2)
 ...
 sorted(space.index.secondary:select('Anything'))
 ---
@@ -307,7 +304,7 @@ sorted(space.index.secondary:select('Anything'))
 ...
 space:insert{'Stephanie'}
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
+- error: Tuple field count 1 is less than required (expected at least 2)
 ...
 sorted(space.index.secondary:select('Anything'))
 ---
@@ -636,7 +633,7 @@ sorted(space.index.secondary:select('Britney'))
 -- try to insert the incoplete tuple
 space:replace{'Spears'}
 ---
-- error: Tuple field count 1 is less than required by a defined index (expected 2)
+- error: Tuple field count 1 is less than required (expected at least 2)
 ...
 -- check that nothing has been updated
 space:select{'Spears'}

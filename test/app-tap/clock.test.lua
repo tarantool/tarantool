@@ -2,7 +2,7 @@
 
 clock = require("clock")
 test = require("tap").test("csv")
-test:plan(9)
+test:plan(10)
 test:ok(clock.realtime() > 0, "realtime")
 test:ok(clock.thread() > 0, "thread")
 test:ok(clock.monotonic() > 0, "monotonic")

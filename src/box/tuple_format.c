@@ -66,6 +66,12 @@ static const struct tuple_field tuple_field_default = {
 	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false, NULL, false,
 };
 
+int
+tuple_format_named_fields(const struct tuple_format *format)
+{
+	return format->names == NULL ? 0 : mh_size(format->names);
+}
+
 /**
  * Add @a name to a name hash of @a format.
  * @param format Format to add name.
@@ -131,6 +137,8 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		if (tuple_format_add_name(format, name_pos, len, i, true) != 0)
 			return -1;
 		name_pos += len + 1;
+		if (i + 1 > format->min_field_count && !fields[i].is_nullable)
+			format->min_field_count = i + 1;
 	}
 	/* Initialize remaining fields */
 	for (uint32_t i = field_count; i < format->field_count; i++)
@@ -297,6 +305,7 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	format->field_count = field_count;
 	format->index_field_count = index_field_count;
 	format->exact_field_count = 0;
+	format->min_field_count = index_field_count;
 	return format;
 
 error_name_hash_reserve:
@@ -447,10 +456,10 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 			 (unsigned) format->exact_field_count);
 		return -1;
 	}
-	if (unlikely(field_count < format->field_count)) {
+	if (unlikely(field_count < format->min_field_count)) {
 		diag_set(ClientError, ER_INDEX_FIELD_COUNT,
 			 (unsigned) field_count,
-			 (unsigned) format->field_count);
+			 (unsigned) format->min_field_count);
 		return -1;
 	}
 
@@ -463,7 +472,9 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	mp_next(&pos);
 	/* other fields...*/
 	++field;
-	for (uint32_t i = 1; i < format->field_count; i++, ++field) {
+	uint32_t i = 1;
+	uint32_t defined_field_count = MIN(field_count, format->field_count);
+	for (; i < defined_field_count; ++i, ++field) {
 		mp_type = mp_typeof(*pos);
 		if (key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
 					 i + TUPLE_INDEX_BASE,

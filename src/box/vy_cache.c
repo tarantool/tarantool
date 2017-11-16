@@ -59,7 +59,6 @@ vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache,
 	e->mem_quota = mem_quota;
 	mempool_create(&e->cache_entry_mempool, slab_cache,
 		       sizeof(struct vy_cache_entry));
-	e->cached_count = 0;
 }
 
 void
@@ -90,7 +89,6 @@ vy_cache_entry_new(struct vy_cache_env *env, struct vy_cache *cache,
 	entry->right_boundary_level = cache->cmp_def->part_count;
 	rlist_add(&env->cache_lru, &entry->in_lru);
 	env->mem_used += vy_cache_entry_size(entry);
-	env->cached_count++;
 	vy_stmt_counter_acct_tuple(&cache->stat.count, stmt);
 	return entry;
 }
@@ -99,8 +97,6 @@ static void
 vy_cache_entry_delete(struct vy_cache_env *env, struct vy_cache_entry *entry)
 {
 	vy_stmt_counter_unacct_tuple(&entry->cache->stat.count, entry->stmt);
-	assert(env->cached_count > 0);
-	env->cached_count--;
 	assert(env->mem_used >= vy_cache_entry_size(entry));
 	env->mem_used -= vy_cache_entry_size(entry);
 	tuple_unref(entry->stmt);

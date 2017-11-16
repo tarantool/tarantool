@@ -753,9 +753,48 @@ c:close()
 box.schema.user.grant('guest','read,write,execute','universe')
 c = net.connect(box.cfg.listen)
 c:call("box.session.type")
+c:close()
+
+--
+-- On_connect/disconnect triggers.
+--
+test_run:cmd('create server connecter with script = "box/proxy.lua"')
+test_run:cmd('start server connecter')
+test_run:cmd("set variable connect_to to 'connecter.listen'")
+conn = net.connect(connect_to, { reconnect_after = 0.1 })
+conn.state
+connected_cnt = 0
+disconnected_cnt = 0
+function on_connect() connected_cnt = connected_cnt + 1 end
+function on_disconnect() disconnected_cnt = disconnected_cnt + 1 end
+conn:on_connect(on_connect)
+conn:on_disconnect(on_disconnect)
+test_run:cmd('stop server connecter')
+test_run:cmd('start server connecter')
+while conn.state ~= 'active' do fiber.sleep(0.1) end
+connected_cnt
+disconnected_cnt
+conn:close()
+disconnected_cnt
+test_run:cmd('stop server connecter')
+test_run:cmd('cleanup server connecter')
+
+--
+-- gh-2401 update pseudo objects not replace them
+--
+space:drop()
+space = box.schema.space.create('test')
+c = net.connect(box.cfg.listen)
+cspace = c.space.test
+space.index.test_index == nil
+cspace.index.test_index == nil
+_ = space:create_index("test_index", {parts={1, 'string'}})
+c:reload_schema()
+space.index.test_index ~= nil
+cspace.index.test_index ~= nil
+c.space.test.index.test_index ~= nil
 
 -- cleanup
-c:close()
 box.schema.user.revoke('guest','read,write,execute','universe')
 
 space:drop()

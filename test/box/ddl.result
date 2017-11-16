@@ -313,31 +313,31 @@ box.internal.collation.drop('test')
 ...
 box.space._collation:auto_increment{'test'}
 ---
-- error: Tuple field count 2 is less than required by a defined index (expected 6)
+- error: Tuple field count 2 is less than required (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU'}
 ---
-- error: Tuple field count 4 is less than required by a defined index (expected 6)
+- error: Tuple field count 4 is less than required (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by a defined index (expected 6)
+- error: Tuple field count 5 is less than required (expected at least 6)
 ...
 box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by a defined index (expected 6)
+- error: Tuple field count 5 is less than required (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by a defined index (expected 6)
+- error: Tuple field count 5 is less than required (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 42}
 ---
-- error: Tuple field count 5 is less than required by a defined index (expected 6)
+- error: Tuple field count 5 is less than required (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 ---
@@ -345,7 +345,7 @@ box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 ...
 box.space._collation.index.name:delete{'test'} -- ok
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation.index.name:delete{'nothing'} -- allowed
 ---
@@ -461,22 +461,47 @@ _ = box.space._collation.index.name:delete{'test'} -- ok
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation:select{}
 ---
-- - [0, 'unicode', 1, 'ICU', '', {}]
-  - [1, 'unicode_s1', 1, 'ICU', '', {'strength': 'primary'}]
-  - [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- - [1, 'unicode', 1, 'ICU', '', {}]
+  - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
+  - [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 test_run:cmd('restart server default')
 box.space._collation:select{}
 ---
-- - [0, 'unicode', 1, 'ICU', '', {}]
-  - [1, 'unicode_s1', 1, 'ICU', '', {'strength': 'primary'}]
-  - [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- - [1, 'unicode', 1, 'ICU', '', {}]
+  - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
+  - [3, 'test', 0, 'ICU', 'ru_RU', {}]
 ...
 box.space._collation.index.name:delete{'test'}
 ---
-- [2, 'test', 0, 'ICU', 'ru_RU', {}]
+- [3, 'test', 0, 'ICU', 'ru_RU', {}]
+...
+--
+-- gh-2839: allow to store custom fields in field definition.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {'field2', 'unsigned'}
+---
+...
+format[3] = {'field3', 'unsigned', custom_field = 'custom_value'}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+s:format()[3].custom_field
+---
+- custom_value
+...
+s:drop()
+---
 ...

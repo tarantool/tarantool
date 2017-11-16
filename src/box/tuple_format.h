@@ -137,6 +137,11 @@ struct tuple_format {
 	 * element is used by an index.
 	 */
 	uint32_t index_field_count;
+	/**
+	 * The minimal field count that must be specified.
+	 * index_field_count <= min_field_count <= field_count.
+	 */
+	uint32_t min_field_count;
 	/* Length of 'fields' array. */
 	uint32_t field_count;
 	/** Field names hash. Key - name, value - field number. */
@@ -146,6 +151,9 @@ struct tuple_format {
 };
 
 extern struct tuple_format **tuple_formats;
+
+int
+tuple_format_named_fields(const struct tuple_format *format);
 
 static inline uint32_t
 tuple_format_id(const struct tuple_format *format)

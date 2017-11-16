@@ -144,7 +144,8 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t key_len, const char **data, uint32_t errcode,
-	       uint32_t field_no, struct region *region)
+	       uint32_t field_no, struct region *region,
+	       bool skip_unknown_options)
 {
 	char errmsg[DIAG_ERRMSG_MAX];
 	bool found = false;
@@ -163,10 +164,14 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 		break;
 	}
 	if (!found) {
-		snprintf(errmsg, sizeof(errmsg), "unexpected option '%.*s'",
-			 key_len, key);
-		diag_set(ClientError, errcode, field_no, errmsg);
-		return -1;
+		if (skip_unknown_options) {
+			mp_next(data);
+		} else {
+			snprintf(errmsg, sizeof(errmsg),
+				 "unexpected option '%.*s'", key_len, key);
+			diag_set(ClientError, errcode, field_no, errmsg);
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -195,7 +200,7 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
 		uint32_t key_len;
 		const char *key = mp_decode_str(map, &key_len);
 		if (opts_parse_key(opts, reg, key, key_len, map, errcode,
-				   field_no, region) != 0)
+				   field_no, region, false) != 0)
 			return -1;
 	}
 	return 0;

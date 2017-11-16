@@ -418,7 +418,7 @@ box_lua_eval(struct call_request *request, struct obuf *out)
 static int
 lbox_func_reload(lua_State *L)
 {
-	const char *name = luaL_optstring(L, 1, "function name");
+	const char *name = luaL_checkstring(L, 1);
 	if (box_func_reload(name) != 0)
 		return luaT_error(L);
 	return 0;

@@ -282,6 +282,23 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 
 /* {{{ MemtxTree  **********************************************************/
 
+/**
+ * Return the key def to use for comparing tuples stored
+ * in the given tree index.
+ *
+ * We use extended key def for non-unique and nullable
+ * indexes. Unique but nullable index can store multiple
+ * NULLs. To correctly compare these NULLs extended key
+ * def must be used. For details @sa tuple_compare.cc.
+ */
+static struct key_def *
+memtx_tree_index_cmp_def(struct memtx_tree_index *index)
+{
+	struct index_def *def = index->base.def;
+	return def->opts.is_unique && !def->key_def->is_nullable ?
+		def->key_def : def->cmp_def;
+}
+
 static void
 memtx_tree_index_destroy(struct index *base)
 {
@@ -485,9 +502,7 @@ static void
 memtx_tree_index_end_build(struct index *base)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
-	/** Use extended key def only for non-unique indexes. */
-	struct key_def *cmp_def = base->def->opts.is_unique ?
-			base->def->key_def : base->def->cmp_def;
+	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
 	qsort_arg(index->build_array, index->build_array_size,
 		  sizeof(struct tuple *),
 		  memtx_tree_qcompare, cmp_def);
@@ -601,18 +616,7 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 		return NULL;
 	}
 
-	/**
-	 * Use extended key def for non-unique and nullable
-	 * indexes. Unique, but nullable, index can store
-	 * multiple NULLs. To correctly compare these NULLs
-	 * extended key def must be used. For details @sa
-	 * tuple_compare.cc.
-	 */
-	struct key_def *cmp_def;
-	if (def->opts.is_unique && !def->key_def->is_nullable)
-		cmp_def = index->base.def->key_def;
-	else
-		cmp_def = index->base.def->cmp_def;
+	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
 	memtx_tree_create(&index->tree, cmp_def,
 			  memtx_index_extent_alloc,
 			  memtx_index_extent_free, NULL);

@@ -219,7 +219,7 @@ s:drop()
 ----------------------------------------------------------------
 -- Interval merging
 ----------------------------------------------------------------
-function gap_lock_count() return box.info.vinyl().performance.read_interval end
+function gap_lock_count() return box.info.vinyl().tx.gap_locks end
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')

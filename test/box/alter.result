@@ -992,11 +992,11 @@ s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
 ---
-- error: Tuple field count 7 is less than required by a defined index (expected 9)
+- error: Tuple field count 7 is less than required (expected at least 9)
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
 ---
-- error: Tuple field count 8 is less than required by a defined index (expected 9)
+- error: Tuple field count 8 is less than required (expected at least 9)
 ...
 s:truncate()
 ---
@@ -1486,7 +1486,7 @@ s:format(format)
 -- Fail, not enough fields.
 s:replace{2, 2, 2, 2, 2}
 ---
-- error: Tuple field count 5 is less than required by a defined index (expected 6)
+- error: Tuple field count 5 is less than required (expected at least 6)
 ...
 s:replace{2, 2, 2, 2, 2, 2, 2}
 ---
@@ -1498,7 +1498,7 @@ format[7] = {name = 'field7', type = 'unsigned'}
 -- Fail, the tuple {1, ... 1} is invalid for a new format.
 s:format(format)
 ---
-- error: Tuple field count 6 is less than required by a defined index (expected 7)
+- error: Tuple field count 6 is less than required (expected at least 7)
 ...
 s:drop()
 ---
@@ -1690,6 +1690,19 @@ _ = s:create_index('primary')
 s:insert({1, 1, 'a', 'b', 'c', 'd'})
 ---
 - [1, 1, 'a', 'b', 'c', 'd']
+...
+s:drop()
+---
+...
+s = box.schema.create_space('test')
+---
+...
+idx = s:create_index('idx')
+---
+...
+box.space.test == s
+---
+- true
 ...
 s:drop()
 ---

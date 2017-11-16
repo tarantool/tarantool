@@ -57,9 +57,6 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
 	 int64_t wal_max_rows, int64_t wal_max_size);
 
-enum wal_mode
-wal_mode();
-
 void
 wal_thread_stop();
 
@@ -143,6 +140,9 @@ wal_atfork();
 
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+enum wal_mode
+wal_mode();
 
 /**
  * Wait till all pending changes to the WAL are flushed.

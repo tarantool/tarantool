@@ -29,6 +29,13 @@ for i = 1001,2000 do s:insert{i, pad} end
 ...
 -- Replica has memory limit set to 1 MB so replication would hang
 -- if the scheduler didn't work on the destination.
+--
+-- Also check that quota timeout isn't taken into account while
+-- the replica is joining (see gh-2873). To do that, we set
+-- vinyl_timeout to 1 ms on the replica, which isn't enough for
+-- a dump to complete and hence would result in bootstrap failure
+-- were the timeout not ignored.
+--
 _ = test_run:cmd("create server replica with rpl_master=default, script='vinyl/join_quota.lua'")
 ---
 ...

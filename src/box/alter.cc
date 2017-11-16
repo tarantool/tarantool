@@ -193,26 +193,35 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	uint32_t name_len;
 	const char *name = tuple_field_str_xc(tuple, BOX_INDEX_FIELD_NAME,
 					      &name_len);
+	const char *opts_field =
+		tuple_field_with_type_xc(tuple, BOX_INDEX_FIELD_OPTS,
+					 MP_MAP);
+	index_opts_decode(&opts, opts_field, &fiber()->gc);
+	const char *parts = tuple_field(tuple, BOX_INDEX_FIELD_PARTS);
+	uint32_t part_count = mp_decode_array(&parts);
 	if (name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(space), "index name is too long");
 	}
-	index_opts_decode(&opts,
-			  tuple_field_with_type_xc(tuple, BOX_INDEX_FIELD_OPTS,
-						   MP_MAP), &fiber()->gc);
-	struct index_opts *opts_p = &opts;
-	auto opts_guard = make_scoped_guard([=] { index_opts_destroy(opts_p); });
-	const char *parts =
-		tuple_field_with_type_xc(tuple, BOX_INDEX_FIELD_PARTS,
-					 MP_ARRAY);
-	uint32_t part_count = mp_decode_array(&parts);
-	struct key_def *key_def = key_def_new(part_count);
-	if (key_def == NULL)
-		diag_raise();
-	auto key_def_guard = make_scoped_guard([=] { box_key_def_delete(key_def); });
-	if (key_def_decode_parts(key_def, &parts, space->def->fields,
+
+	struct key_def *key_def = NULL;
+	struct key_part_def *part_def = (struct key_part_def *)
+			malloc(sizeof(*part_def) * part_count);
+	if (part_def == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*part_def) * part_count,
+			  "malloc", "key_part_def");
+	}
+	auto key_def_guard = make_scoped_guard([=] {
+		free(part_def);
+		free(key_def);
+	});
+	if (key_def_decode_parts(part_def, part_count, &parts,
+				 space->def->fields,
 				 space->def->field_count) != 0)
+		diag_raise();
+	key_def = key_def_new_with_parts(part_def, part_count);
+	if (key_def == NULL)
 		diag_raise();
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, type,
@@ -287,8 +296,9 @@ field_def_decode(struct field_def *field, const char **data,
 		uint32_t key_len;
 		const char *key = mp_decode_str(data, &key_len);
 		if (opts_parse_key(field, field_def_reg, key, key_len, data,
-			       ER_WRONG_SPACE_FORMAT,
-			       fieldno + TUPLE_INDEX_BASE, region) != 0)
+				   ER_WRONG_SPACE_FORMAT,
+				   fieldno + TUPLE_INDEX_BASE, region,
+				   true) != 0)
 			diag_raise();
 	}
 	if (field->name == NULL) {
@@ -1149,9 +1159,9 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		if (old_index == NULL)
 			continue;
 		struct index_def *old_def = old_index->def;
-		if (old_def->opts.is_unique || old_def->type != TREE ||
-		    alter->pk_def == NULL) {
-
+		if ((old_def->opts.is_unique &&
+		     !old_def->key_def->is_nullable) ||
+		    old_def->type != TREE || alter->pk_def == NULL) {
 			(void) new MoveIndex(alter, old_def->iid);
 			continue;
 		}

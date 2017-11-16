@@ -3,7 +3,7 @@
 local tap = require('tap')
 local test = tap.test("string extensions")
 
-test:plan(4)
+test:plan(5)
 
 test:test("split", function(test)
     test:plan(10)
@@ -47,7 +47,7 @@ end)
 
 -- gh-2214 - string.ljust()/string.rjust() Lua API
 test:test("ljust/rjust/center", function(test)
-    test:plan(15)
+    test:plan(18)
 
     test:is(("help"):ljust(0),  "help", "ljust, length 0, do nothing")
     test:is(("help"):rjust(0),  "help", "rjust, length 0, do nothing")
@@ -68,11 +68,18 @@ test:test("ljust/rjust/center", function(test)
     test:is(("help"):ljust(6, '.'),  "help..", "ljust, length 6, two extra charachters, custom fill char")
     test:is(("help"):rjust(6, '.'),  "..help", "rjust, length 6, two extra charachters, custom fill char")
     test:is(("help"):center(6, '.'), ".help.", "center, length 6, two extra charachters, custom fill char")
+    local errmsg = "%(char expected, got string%)"
+    local _, err = pcall(function() ("help"):ljust(6, "XX") end)
+    test:ok(err and err:match(errmsg), "wrong params")
+    _, err = pcall(function() ("help"):rjust(6, "XX") end)
+    test:ok(err and err:match(errmsg), "wrong params")
+    _, err = pcall(function() ("help"):center(6, "XX") end)
+    test:ok(err and err:match(errmsg), "wrong params")
 end)
 
 -- gh-2215 - string.startswith()/string.endswith() Lua API
 test:test("startswith/endswith", function(test)
-    test:plan(20)
+    test:plan(21)
 
     test:ok((""):startswith(""),      "empty+empty startswith")
     test:ok((""):endswith(""),        "empty+empty endswith")
@@ -96,6 +103,9 @@ test:test("startswith/endswith", function(test)
     test:ok(("12345"):endswith("345", -3, -1)      , "endswith with good begin/end")
     test:ok(not ("12345"):endswith("345", 1, 4)    , "bad endswith with good begin/end")
     test:ok(not ("12345"):endswith("345", 4, 5)    , "bad endswith with good begin/end")
+
+    local _, err = pcall(function() ("help"):startswith({'n', 1}) end)
+    test:ok(err and err:match("%(string expected, got table%)"), "wrong params")
 end)
 
 test:test("hex", function(test)
@@ -103,5 +113,19 @@ test:test("hex", function(test)
     test:is(string.hex("hello"), "68656c6c6f", "hex non-empty string")
     test:is(string.hex(""), "", "hex empty string")
 end)
+
+test:test("strip", function(test)
+    test:plan(6)
+    local str = "  hello hello "
+    test:is(string.len(string.strip(str)), 11, "strip")
+    test:is(string.len(string.lstrip(str)), 12, "lstrip")
+    test:is(string.len(string.rstrip(str)), 13, "rstrip")
+    local _, err = pcall(string.strip, 12)
+    test:ok(err and err:match("%(string expected, got number%)"))
+    _, err = pcall(string.lstrip, 12)
+    test:ok(err and err:match("%(string expected, got number%)"))
+    _, err = pcall(string.rstrip, 12)
+    test:ok(err and err:match("%(string expected, got number%)"))
+end )
 
 os.exit(test:check() == true and 0 or -1)

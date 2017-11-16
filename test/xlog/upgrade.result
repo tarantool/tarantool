@@ -163,8 +163,8 @@ box.space._func:select()
 ...
 box.space._collation:select()
 ---
-- - [0, 'unicode', 1, 'ICU', '', {}]
-  - [1, 'unicode_s1', 1, 'ICU', '', {'strength': 'primary'}]
+- - [1, 'unicode', 1, 'ICU', '', {}]
+  - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
 ...
 box.space._priv:select()
 ---

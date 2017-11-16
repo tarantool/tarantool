@@ -239,18 +239,50 @@ test_xrow_header_encode_decode()
 	check_plan();
 }
 
+void
+test_request_str()
+{
+	plan(1);
+	struct xrow_header header;
+	header.lsn = 100;
+	struct request request;
+	request.header = &header;
+	request.type = 1;
+	request.space_id = 512;
+	request.index_id = 1;
+
+	char buffer[2048];
+	request.key = buffer;
+	char *pos = mp_encode_array(buffer, 1);
+	pos = mp_encode_uint(pos, 200);
+
+	request.tuple = pos;
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_uint(pos, 300);
+
+	request.ops = pos;
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_uint(pos, 400);
+	is(strcmp("{type: 'SELECT', lsn: 100, space_id: 512, index_id: 1, "\
+		  "key: [200], tuple: [300], ops: [400]}",
+		  request_str(&request)), 0, "request_str");
+
+	check_plan();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	plan(2);
+	plan(3);
 
 	random_init();
 
 	test_iproto_constants();
 	test_greeting();
 	test_xrow_header_encode_decode();
+	test_request_str();
 
 	random_free();
 	fiber_free();

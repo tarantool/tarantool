@@ -267,3 +267,11 @@ box.schema.func.drop("reload.test_reload_fail")
 _ = fio.unlink(reload_path)
 ---
 ...
+box.schema.func.reload()
+---
+- error: 'bad argument #1 to ''?'' (string expected, got no value)'
+...
+box.schema.func.reload("non-existing")
+---
+- error: Function 'non-existing' does not exist
+...

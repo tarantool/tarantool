@@ -196,39 +196,43 @@ s0 = nil
 s = box.schema.space.create('test')
 i1 = s:create_index('i1', { type = 'tree', parts = {1, 'unsigned'}, unique = true })
 i2 = s:create_index('i2', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
-s:replace{5, 1, 1}
-s:replace{4, 1, 3}
-s:replace{6, 1, 2}
-s:replace{3, 1, 0}
-s:replace{7, 1, 100}
-s:replace{15, 2, 11}
-s:replace{14, 2, 41}
-s:replace{16, 2, 31}
-s:replace{13, 2, 13}
-s:replace{17, 2, 10}
+i3 = s:create_index('i3', { type = 'tree', parts = {{3, 'unsigned', is_nullable = true}}, unique = true })
+_ = s:replace{5, 1, box.NULL, 1}
+_ = s:replace{4, 1, box.NULL, 3}
+_ = s:replace{6, 1, box.NULL, 2}
+_ = s:replace{3, 1, box.NULL, 0}
+_ = s:replace{7, 1, box.NULL, 100}
+_ = s:replace{15, 2, 100, 11}
+_ = s:replace{14, 2, 500, 41}
+_ = s:replace{16, 2, 200, 31}
+_ = s:replace{13, 2, 300, 13}
+_ = s:replace{17, 2, 400, 10}
 i2:select{1}
 i2:select{2}
 i2:select{1, 5}
+i3:select{box.NULL}
 
-i1:alter{parts = {3, 'unsigned'}}
+i1:alter{parts = {4, 'unsigned'}}
 i2:select{1}
 i2:select{2}
 i2:select{1, 1}
+i3:select{box.NULL}
 
 s:truncate()
 i1:alter{parts = {1, 'str'}}
-s:replace{"5", 1}
-s:replace{"4", 1}
-s:replace{"6", 1}
-s:replace{"3", 1}
-s:replace{"7", 1}
-s:replace{"15", 2}
-s:replace{"14", 2}
-s:replace{"16", 2}
-s:replace{"13", 2}
-s:replace{"17", 2}
+_ = s:replace{"5", 1, box.NULL}
+_ = s:replace{"4", 1, box.NULL}
+_ = s:replace{"6", 1, box.NULL}
+_ = s:replace{"3", 1, box.NULL}
+_ = s:replace{"7", 1, box.NULL}
+_ = s:replace{"15", 2, 100}
+_ = s:replace{"14", 2, 500}
+_ = s:replace{"16", 2, 200}
+_ = s:replace{"13", 2, 300}
+_ = s:replace{"17", 2, 400}
 i2:select{1}
 i2:select{2}
+i3:select{box.NULL}
 
 s:drop()
 

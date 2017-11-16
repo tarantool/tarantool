@@ -4,7 +4,7 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(70)
+test:plan(72)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -366,6 +366,51 @@ cnt2 = #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
 os.exit(cnt1 < cnt2 - 8 and 0 or 1)
 ]]
 test:is(run_script(code), 0, "wal_max_size xlog rotation")
+
+--
+-- gh-2872 bootstrap is aborted if vinyl_dir contains vylog files
+-- left from previous runs
+--
+vinyl_dir = fio.tempdir()
+run_script(string.format([[
+box.cfg{vinyl_dir = '%s'}
+s = box.schema.space.create('test', {engine = 'vinyl'})
+s:create_index('pk')
+os.exit(0)
+]], vinyl_dir))
+code = string.format([[
+box.cfg{vinyl_dir = '%s'}
+os.exit(0)
+]], vinyl_dir)
+test:is(run_script(code), PANIC, "bootstrap from non-empty vinyl_dir")
+fio.rmdir(vinyl_dir)
+
+--
+-- gh-2278 vinyl does not support DDL/DML if wal_mode = 'none'
+--
+dir = fio.tempdir()
+cfg = string.format("wal_dir = '%s', memtx_dir = '%s', vinyl_dir = '%s'", dir, dir, dir)
+run_script(string.format([[
+box.cfg{%s}
+s = box.schema.space.create('test', {engine = 'vinyl'})
+s:create_index('primary')
+os.exit(0)
+]], cfg))
+
+code = string.format([[
+box.cfg{wal_mode = 'none', %s}
+s = box.space.test
+ok = true
+ok = ok and not pcall(s.create_index, s, 'secondary')
+ok = ok and not pcall(s.index.primary.drop, s.index.primary)
+ok = ok and not pcall(s.drop, s)
+ok = ok and not pcall(s.truncate, s)
+ok = ok and not pcall(s.insert, s, {1})
+ok = ok and pcall(s.select, s)
+os.exit(ok and 0 or 1)
+]], cfg)
+test:is(run_script(code), 0, "wal_mode none -> vinyl DDL/DML is not supported")
+fio.rmdir(dir)
 
 test:check()
 os.exit(0)

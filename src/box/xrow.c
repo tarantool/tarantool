@@ -494,6 +494,34 @@ error:
 	return 0;
 }
 
+const char *
+request_str(const struct request *request)
+{
+	char *buf = tt_static_buf();
+	char *end = buf + TT_STATIC_BUF_LEN;
+	char *pos = buf;
+	pos += snprintf(pos, end - pos, "{type: '%s', lsn: %lld, "\
+			"space_id: %u, index_id: %u",
+			iproto_type_name(request->type),
+			(long long) request->header->lsn,
+			(unsigned) request->space_id,
+			(unsigned) request->index_id);
+	if (request->key != NULL) {
+		pos += snprintf(pos, end - pos, ", key: ");
+		pos += mp_snprint(pos, end - pos, request->key);
+	}
+	if (request->tuple != NULL) {
+		pos += snprintf(pos, end - pos, ", tuple: ");
+		pos += mp_snprint(pos, end - pos, request->tuple);
+	}
+	if (request->ops != NULL) {
+		pos += snprintf(pos, end - pos, ", ops: ");
+		pos += mp_snprint(pos, end - pos, request->ops);
+	}
+	pos += snprintf(pos, end - pos, "}");
+	return buf;
+}
+
 int
 xrow_encode_dml(const struct request *request, struct iovec *iov)
 {

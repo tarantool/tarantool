@@ -12,7 +12,7 @@ test_run:cmd('restart server default')
 --
 -- gh-1863 add BPS tree extents to memory quota
 --
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 0
 ...
@@ -29,7 +29,7 @@ space:insert({1, 1})
 ---
 - [1, 1]
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 98343
 ...
@@ -37,7 +37,7 @@ space:insert({1, 1})
 ---
 - error: Duplicate key exists in unique index 'pk' in space 'test'
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 98343
 ...
@@ -45,7 +45,7 @@ space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 ---
 - error: Attempt to modify a tuple field which is part of index 'pk' in space 'test'
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 98343
 ...
@@ -61,7 +61,7 @@ space:insert({4, 4})
 ---
 - [4, 4]
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 98460
 ...
@@ -69,7 +69,7 @@ box.snapshot()
 ---
 - ok
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 0
 ...
@@ -80,14 +80,14 @@ space:select{}
   - [3, 3]
   - [4, 4]
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 0
 ...
 _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 ---
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 5341228
 ...

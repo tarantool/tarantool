@@ -31,6 +31,12 @@ space2 = box.schema.space.create('test2', { id = 99998, engine = engine})
 _ = space2:create_index('primary', { parts = {1, 'unsigned', 2, 'string'}})
 ---
 ...
+space3 = box.schema.space.create('test3', { id = 99997, engine = engine})
+---
+...
+_ = space3:create_index('primary', { parts = {{1, 'string', collation = 'unicode_ci'}}})
+---
+...
 box.snapshot()
 ---
 - ok
@@ -56,6 +62,14 @@ box.space.test:select()
 - []
 ...
 box.space.test.index.secondary:select()
+---
+- []
+...
+box.space.test2:select()
+---
+- []
+...
+box.space.test3:select()
 ---
 - []
 ...
@@ -87,6 +101,24 @@ _ = box.space.test2:upsert({2, 'test2', 20}, {{'=', 3, 20}})
 ---
 ...
 _ = box.space.test2:insert{3, 'test3', 30}
+---
+...
+_ = box.space.test3:insert{'Ёж'}
+---
+...
+_ = box.space.test3:insert{'ель'}
+---
+...
+_ = box.space.test3:insert{'Юла'}
+---
+...
+_ = box.space.test3:insert{'Эль'}
+---
+...
+_ = box.space.test3:insert{'ёлка'}
+---
+...
+_ = box.space.test3:insert{'йогурт'}
 ---
 ...
 -- replica join
@@ -148,6 +180,15 @@ box.space.test2:select()
 - - [1, 'test1', 10]
   - [2, 'test2', 20]
   - [3, 'test3', 30]
+...
+box.space.test3:select()
+---
+- - ['Ёж']
+  - ['ёлка']
+  - ['ель']
+  - ['йогурт']
+  - ['Эль']
+  - ['Юла']
 ...
 test_run:cmd('switch default')
 ---
@@ -225,6 +266,15 @@ box.space.test2:select()
   - [2, 'test2', 20]
   - [3, 'test3', 30]
 ...
+box.space.test3:select()
+---
+- - ['Ёж']
+  - ['ёлка']
+  - ['ель']
+  - ['йогурт']
+  - ['Эль']
+  - ['Юла']
+...
 test_run:cmd('switch default')
 ---
 - true
@@ -250,6 +300,15 @@ _ = box.space.test2:update({2, 'test2'}, {{'+', 3, 2}})
 ---
 ...
 _ = box.space.test2:delete{3, 'test3'}
+---
+...
+_ = box.space.test3:upsert({'ёж', 123}, {{'!', 2, 123}})
+---
+...
+_ = box.space.test3:update('ЭЛЬ', {{'!', 2, 456}})
+---
+...
+_ = box.space.test3:delete('ёлка')
 ---
 ...
 box.snapshot()
@@ -299,6 +358,14 @@ box.space.test2:select()
 - - [1, 'test1', 11]
   - [2, 'test2', 22]
 ...
+box.space.test3:select()
+---
+- - ['Ёж', 123]
+  - ['ель']
+  - ['йогурт']
+  - ['Эль', 456]
+  - ['Юла']
+...
 test_run:cmd('switch default')
 ---
 - true
@@ -321,6 +388,10 @@ _ = space:create_index('primary', { type = index})
 ---
 ...
 _ = space:insert{12345}
+---
+...
+-- truncate space
+space3:truncate()
 ---
 ...
 -- replica join
@@ -352,6 +423,10 @@ box.space.test2:select()
 - - [1, 'test1', 11]
   - [2, 'test2', 22]
 ...
+box.space.test3:select()
+---
+- []
+...
 test_run:cmd('switch default')
 ---
 - true
@@ -367,6 +442,9 @@ space:drop()
 ---
 ...
 space2:drop()
+---
+...
+space3:drop()
 ---
 ...
 box.snapshot()

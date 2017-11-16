@@ -316,6 +316,8 @@ iproto_connection_is_idle(struct iproto_connection *con)
 static inline void
 iproto_connection_stop(struct iproto_connection *con)
 {
+	say_warn("readahead limit reached, stopping input on connection %s",
+		 sio_socketname(con->input.fd));
 	assert(rlist_empty(&con->in_stop_list));
 	ev_io_stop(con->loop, &con->input);
 	rlist_add_tail(&stopped_connections, &con->in_stop_list);
@@ -386,7 +388,9 @@ net_send_msg(struct cmsg *msg);
 static void
 tx_process_join_subscribe(struct cmsg *msg);
 static void
-net_end_join_subscribe(struct cmsg *msg);
+net_end_join(struct cmsg *msg);
+static void
+net_end_subscribe(struct cmsg *msg);
 
 static void
 tx_fiber_init(struct session *session, uint64_t sync)
@@ -484,15 +488,19 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	sql_route,                              /* IPROTO_EXECUTE */
 };
 
-static const struct cmsg_hop sync_route[] = {
+static const struct cmsg_hop join_route[] = {
 	{ tx_process_join_subscribe, &net_pipe },
-	{ net_end_join_subscribe, NULL },
+	{ net_end_join, NULL },
+};
+
+static const struct cmsg_hop subscribe_route[] = {
+	{ tx_process_join_subscribe, &net_pipe },
+	{ net_end_subscribe, NULL },
 };
 
 static struct iproto_connection *
-iproto_connection_new(const char *name, int fd)
+iproto_connection_new(int fd)
 {
-	(void) name;
 	struct iproto_connection *con = (struct iproto_connection *)
 		mempool_alloc_xc(&iproto_connection_pool);
 	con->input.data = con->output.data = con;
@@ -711,8 +719,11 @@ iproto_decode_msg(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(msg, misc_route);
 		break;
 	case IPROTO_JOIN:
+		cmsg_init(msg, join_route);
+		*stop_input = true;
+		break;
 	case IPROTO_SUBSCRIBE:
-		cmsg_init(msg, sync_route);
+		cmsg_init(msg, subscribe_route);
 		*stop_input = true;
 		break;
 	case IPROTO_EXECUTE:
@@ -1188,7 +1199,7 @@ net_send_msg(struct cmsg *m)
 }
 
 static void
-net_end_join_subscribe(struct cmsg *m)
+net_end_join(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
@@ -1202,6 +1213,20 @@ net_end_join_subscribe(struct cmsg *m)
 	 * queue. Will simply start input otherwise.
 	 */
 	iproto_enqueue_batch(con, msg->p_ibuf);
+}
+
+static void
+net_end_subscribe(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	struct iproto_connection *con = msg->connection;
+
+	msg->p_ibuf->rpos += msg->len;
+	iproto_msg_delete(msg);
+
+	assert(! ev_is_active(&con->input));
+
+	iproto_connection_close(con);
 }
 
 /**
@@ -1289,13 +1314,11 @@ static void
 iproto_on_accept(struct evio_service * /* service */, int fd,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
-	char name[SERVICE_NAME_MAXLEN];
-	snprintf(name, sizeof(name), "%s/%s", "iobuf",
-		sio_strfaddr(addr, addrlen));
-
+	(void) addr;
+	(void) addrlen;
 	struct iproto_connection *con;
 
-	con = iproto_connection_new(name, fd);
+	con = iproto_connection_new(fd);
 	/*
 	 * Ignore msg allocation failure - the queue size is
 	 * fixed so there is a limited number of msgs in

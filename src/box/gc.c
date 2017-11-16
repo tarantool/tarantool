@@ -42,6 +42,7 @@
 
 #include "diag.h"
 #include "say.h"
+#include "latch.h"
 #include "vclock.h"
 #include "checkpoint.h"
 #include "engine.h"		/* engine_collect_garbage() */
@@ -72,6 +73,11 @@ struct gc_state {
 	int64_t signature;
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
+	/**
+	 * Latch serializing concurrent invocations of engine
+	 * garbage collection callbacks.
+	 */
+	struct latch latch;
 };
 static struct gc_state gc;
 
@@ -131,6 +137,7 @@ gc_init(void)
 {
 	gc.signature = -1;
 	gc_tree_new(&gc.consumers);
+	latch_create(&gc.latch);
 }
 
 void
@@ -145,6 +152,7 @@ gc_free(void)
 		gc_consumer_delete(consumer);
 		consumer = next;
 	}
+	latch_destroy(&gc.latch);
 }
 
 void
@@ -183,18 +191,26 @@ gc_run(void)
 	gc.signature = gc_signature;
 
 	/*
+	 * Engine callbacks may sleep, because they use coio for
+	 * removing files. Make sure we won't try to remove the
+	 * same file multiple times by serializing concurrent gc
+	 * executions.
+	 */
+	latch_lock(&gc.latch);
+	/*
 	 * Run garbage collection.
 	 *
 	 * The order is important here: we must invoke garbage
 	 * collection for memtx snapshots first and abort if it
-	 * fails - see the comment to memtx_engine::collectGarbage.
+	 * fails - see comment to memtx_engine_collect_garbage().
 	 */
 	if (engine_collect_garbage(gc_signature) != 0) {
 		say_error("box garbage collection failed: %s",
 			  diag_last_error(diag_get())->errmsg);
-		return;
+	} else {
+		wal_collect_garbage(gc_signature);
 	}
-	wal_collect_garbage(gc_signature);
+	latch_unlock(&gc.latch);
 }
 
 void

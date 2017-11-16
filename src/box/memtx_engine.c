@@ -634,7 +634,10 @@ checkpoint_f(va_list ap)
 			}
 		}
 	}
-	xlog_flush(&snap);
+	if (xlog_flush(&snap) < 0) {
+		xlog_close(&snap, false);
+		return -1;
+	}
 	xlog_close(&snap, false);
 	say_info("done");
 	return 0;

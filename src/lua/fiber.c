@@ -197,7 +197,7 @@ fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset,
 #endif
 
 static int
-lbox_fiber_statof(struct fiber *f, void *cb_ctx)
+lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
@@ -227,16 +227,29 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 	lua_settable(L, -3);
 	lua_settable(L, -3);
 
+	if (backtrace) {
 #ifdef ENABLE_BACKTRACE
-	lua_pushstring(L, "backtrace");
-	lua_newtable(L);
-	if (f != fiber())
-		backtrace_foreach(fiber_backtrace_cb, &f->ctx, L);
-	lua_settable(L, -3);
+		lua_pushstring(L, "backtrace");
+		lua_newtable(L);
+		if (f != fiber())
+			backtrace_foreach(fiber_backtrace_cb, &f->ctx, L);
+		lua_settable(L, -3);
 #endif /* ENABLE_BACKTRACE */
-
+	}
 	lua_settable(L, -3);
 	return 0;
+}
+
+static int
+lbox_fiber_statof_bt(struct fiber *f, void *cb_ctx)
+{
+	return lbox_fiber_statof(f, cb_ctx, true);
+}
+
+static int
+lbox_fiber_statof_nobt(struct fiber *f, void *cb_ctx)
+{
+	return lbox_fiber_statof(f, cb_ctx, false);
 }
 
 /**
@@ -245,8 +258,21 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 static int
 lbox_fiber_info(struct lua_State *L)
 {
+	bool do_backtrace = true;
+	if (lua_istable(L, 1)) {
+		lua_pushstring(L, "backtrace");
+		lua_gettable(L, 1);
+		if (lua_isnil(L, -1)){
+			lua_pop(L, 1);
+			lua_pushstring(L, "bt");
+			lua_gettable(L, 1);
+		}
+		if (!lua_isnil(L, -1))
+			do_backtrace = lua_toboolean(L, -1);
+		lua_pop(L, 1);
+	}
 	lua_newtable(L);
-	fiber_stat(lbox_fiber_statof, L);
+	fiber_stat(do_backtrace ? lbox_fiber_statof_bt : lbox_fiber_statof_nobt, L);
 	lua_createtable(L, 0, 1);
 	lua_pushliteral(L, "mapping"); /* YAML will use block mode */
 	lua_setfield(L, -2, LUAL_SERIALIZE);

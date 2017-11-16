@@ -312,6 +312,41 @@ while box.info.replication[1].upstream.status ~= 'disconnected' do fiber.sleep(0
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 ---
 ...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+box.snapshot()
+---
+- ok
+...
+for i = 0, 9999 do box.space.test:replace({i, 4, 5, 'test'}) end
+---
+...
+test_run:cmd("create server replica_ack with rpl_master=default, script='replication/replica_ack.lua'")
+---
+- true
+...
+test_run:cmd("start server replica_ack")
+---
+- true
+...
+test_run:cmd("switch replica_ack")
+---
+- true
+...
+box.info.replication[1].upstream.status
+---
+- follow
+...
 test_run:cmd("stop server default")
 ---
 - true
@@ -328,11 +363,11 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server replica_ack")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server replica_ack")
 ---
 - true
 ...

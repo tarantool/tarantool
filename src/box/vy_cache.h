@@ -117,8 +117,6 @@ struct vy_cache_env {
 	struct rlist cache_lru;
 	/** Common mempool for vy_cache_entry struct */
 	struct mempool cache_entry_mempool;
-	/** Number of cached tuples */
-	size_t cached_count;
 	/** Size of memory occupied by cached tuples */
 	size_t mem_used;
 	/** Max memory size that can be used for cache */

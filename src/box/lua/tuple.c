@@ -273,6 +273,45 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 }
 
 /**
+ * Convert a tuple into lua table. Named fields are stored as
+ * {name = value} pairs. Not named fields are stored as
+ * {1-based_index_in_tuple = value}.
+ */
+static int
+lbox_tuple_to_map(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1)
+		luaL_error(L, "Usage: tuple:tomap()");
+	const struct tuple *tuple = lua_checktuple(L, 1);
+	const struct tuple_format *format = tuple_format(tuple);
+	const struct tuple_field *field = &format->fields[0];
+	const char *pos = tuple_data(tuple);
+	int field_count = (int)mp_decode_array(&pos);
+	int n_named = tuple_format_named_fields(format);
+	lua_createtable(L, field_count, n_named);
+	for (int i = 0; i < n_named; ++i, ++field) {
+		/* Access by name. */
+		lua_pushstring(L, field->name);
+		luamp_decode(L, luaL_msgpack_default, &pos);
+		lua_rawset(L, -3);
+		/*
+		 * Access the same field by an index. There is no
+		 * copy for tables - lua optimizes it and uses
+		 * references.
+		 */
+		lua_pushstring(L, field->name);
+		lua_rawget(L, -2);
+		lua_rawseti(L, -2, i + TUPLE_INDEX_BASE);
+	}
+	/* Access for not named fields by index. */
+	for (int i = n_named; i < field_count; ++i) {
+		luamp_decode(L, luaL_msgpack_default, &pos);
+		lua_rawseti(L, -2, i + TUPLE_INDEX_BASE);
+	}
+	return 1;
+}
+
+/**
  * Tuple transforming function.
  *
  * Remove the fields designated by 'offset' and 'len' from an tuple,
@@ -431,6 +470,7 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
 	{"tuple_field_by_name", lbox_tuple_field_by_name},
+	{"tuple_to_map", lbox_tuple_to_map},
 	{NULL, NULL}
 };
 

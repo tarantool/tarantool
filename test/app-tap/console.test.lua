@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(50)
+test:plan(57)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)

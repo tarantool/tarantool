@@ -7,21 +7,22 @@ xlog = require 'xlog'
 fun = require 'fun'
 
 space = box.schema.space.create('test', {engine='vinyl'})
-_ = space:create_index('pk', {run_count_per_level=3})
+_ = space:create_index('pk', {parts = {{1, 'string', collation = 'unicode'}}, run_count_per_level=3})
+_ = space:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}, run_count_per_level=3})
 
 -- Empty run
-space:insert{100}
-space:delete{100}
+space:insert{'ЁЁЁ', 777}
+space:delete{'ЁЁЁ'}
 box.snapshot()
 
-space:replace({1})
-space:replace({2})
-space:replace({3})
+space:replace{'ЭЭЭ', box.NULL}
+space:replace{'эээ', box.NULL}
+space:replace{'ёёё', box.NULL}
 box.snapshot()
 
-space:replace({4})
-space:replace({5})
-space:replace({6})
+space:replace{'ёёё', 123}
+space:replace{'ЮЮЮ', 456}
+space:replace{'ююю', 789}
 box.snapshot()
 space:drop()
 
@@ -54,5 +55,6 @@ box.backup.stop() -- resume the garbage collection process
 
 test_run:cmd("push filter 'timestamp: .*' to 'timestamp: <timestamp>'")
 test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
+test_run:cmd("push filter 'bloom_filter: .*' to 'bloom_filter: <bloom_filter>'")
 result
 test_run:cmd("clear filter")

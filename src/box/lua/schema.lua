@@ -522,6 +522,9 @@ local function update_index_parts(space_id, parts)
                     -- find ID by name
                     local coll = box.space._collation.index.name:get{v}
                     if not coll then
+                        coll = box.space._collation.index.name:get{v:lower()}
+                    end
+                    if not coll then
                         box.error(box.error.ILLEGAL_PARAMS,
                             "options.parts[" .. i .. "]: collation was not found by name '" .. v .. "'")
                     end
@@ -711,7 +714,7 @@ box.schema.index.create = function(space_id, name, options)
         part.type = field_type_aliases[field_type] or field_type
         if field_type == 'num' then
             log.warn("field type '%s' is deprecated since Tarantool 1.7, "..
-                     "please use '%s' instead", field_type, part[2])
+                     "please use '%s' instead", field_type, part.type)
         end
     end
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
@@ -2111,3 +2114,5 @@ box.internal.schema = {}
 box.internal.schema.init = function()
     box_sequence_init()
 end
+
+box.NULL = msgpack.NULL

@@ -246,7 +246,7 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 
 	const char *tmp = tuple_begin;
 	uint32_t field_count = mp_decode_array(&tmp);
-	assert(field_count >= format->field_count);
+	assert(field_count >= format->min_field_count);
 	(void) field_count;
 
 	size_t ops_size = 0;

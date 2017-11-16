@@ -667,6 +667,21 @@ errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 ---
 - ok
 ...
+_ = space:insert{1}
+---
+...
+errinj.set("ERRINJ_WAL_WRITE", true)
+---
+- ok
+...
+box.snapshot()
+---
+- error: Error injection 'xlog write injection'
+...
+errinj.set("ERRINJ_WAL_WRITE", false)
+---
+- ok
+...
 space:drop()
 ---
 ...

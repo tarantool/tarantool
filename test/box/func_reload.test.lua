@@ -90,3 +90,6 @@ c:call("reload.test_reload_fail")
 box.schema.func.drop("reload.test_reload")
 box.schema.func.drop("reload.test_reload_fail")
 _ = fio.unlink(reload_path)
+
+box.schema.func.reload()
+box.schema.func.reload("non-existing")

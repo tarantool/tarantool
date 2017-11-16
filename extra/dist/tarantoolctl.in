@@ -21,6 +21,7 @@ ffi.cdef[[
 int kill(int pid, int sig);
 int isatty(int fd);
 int getppid(void);
+int chdir(const char *path);
 ]]
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
@@ -419,18 +420,20 @@ local function wrapper_cfg(cfg)
     log.info('Run console at %s', console_sock)
     console.listen(console_sock)
 
-    -- gh-2782: socket can be owned by root
-    local console_sock = uri.parse(console_sock).service
-    if not fio.chown(console_sock, default_cfg.username, group_name) then
-        log.error("Can't chown(%s, %s, %s) [%d]: %s", console_sock,
-            default_cfg.username, group_name, errno(), errno.strerror())
-    end
+    if not usermode then
+        -- gh-2782: socket can be owned by root
+        local console_sock = uri.parse(console_sock).service
+        if not fio.chown(console_sock, default_cfg.username, group_name) then
+            log.error("Can't chown(%s, %s, %s) [%d]: %s", console_sock,
+                default_cfg.username, group_name, errno(), errno.strerror())
+        end
 
-    -- gh-1293: members of `tarantool` group should be able to do `enter`
-    local mode = '0664'
-    if not fio.chmod(console_sock, tonumber(mode, 8)) then
-        log.error("Can't chmod(%s, %s) [%d]: %s", console_sock, mode, errno(),
-                  errno.strerror())
+        -- gh-1293: members of `tarantool` group should be able to do `enter`
+        local mode = '0664'
+        if not fio.chmod(console_sock, tonumber(mode, 8)) then
+            log.error("Can't chmod(%s, %s) [%d]: %s", console_sock, mode,
+                      errno(), errno.strerror())
+        end
     end
 
     cfg = cfg or {}
@@ -489,7 +492,7 @@ local function start_check()
 end
 
 local function start()
-    log.info("Starting instance...")
+    log.info("Starting instance %s...", instance_name)
     if forward_to_systemd() then
         local cmd = "systemctl start tarantool@" .. instance_name
         log.info("Forwarding to '" .. cmd .. "'")
@@ -528,7 +531,7 @@ local function start()
 end
 
 local function stop()
-    log.info("Stopping instance...")
+    log.info("Stopping instance %s...", instance_name)
     if forward_to_systemd() then
         local cmd = "systemctl stop tarantool@" .. instance_name
         log.info("Forwarding to '" .. cmd .. "'")
@@ -875,17 +878,16 @@ local function rocks()
        list = "luarocks.list",
        remove = "luarocks.remove",
        show = "luarocks.show",
+       make = "luarocks.make",
     }
     rawset(_G, 'commands', commands)
 
-    -- Shift arguments in order to remove "rocks"
-    local luarocks_arguments = {}
-    for i=2,#lua_arguments do
-        luarocks_arguments[i - 1] = lua_arguments[i]
+    if keyword_arguments.chdir then
+        ffi.C.chdir(keyword_arguments.chdir)
     end
 
     -- Call LuaRocks
-    command_line.run_command(unpack(luarocks_arguments))
+    command_line.run_command(unpack(positional_arguments))
 end
 
 local function exit_wrapper(func)
@@ -1250,6 +1252,7 @@ do
         { 'help',        'boolean' },
         { 'format',      'string'  },
         { 'replica',     'number+' },
+        { 'chdir',       'string'  },
     })
 
     local cmd_name

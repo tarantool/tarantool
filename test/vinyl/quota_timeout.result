@@ -47,7 +47,7 @@ s:count()
 ---
 - 1
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 748241
 ...
@@ -61,7 +61,7 @@ s:count()
 ---
 - 1
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 748241
 ...
@@ -93,7 +93,7 @@ _ = s2:create_index('pk')
 _ = s1:auto_increment{}
 ---
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 49186
 ...
@@ -104,10 +104,10 @@ _ = s2:auto_increment{pad}
 ---
 - error: Timed out waiting for Vinyl memory quota
 ...
-while box.info.vinyl().memory.used > 0 do fiber.sleep(0.01) end
+while box.info.vinyl().quota.used > 0 do fiber.sleep(0.01) end
 ---
 ...
-box.info.vinyl().memory.used
+box.info.vinyl().quota.used
 ---
 - 0
 ...

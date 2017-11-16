@@ -317,6 +317,19 @@ box.space._schema:delete({'dup'})
 ---
 - ['dup']
 ...
+test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")
+---
+- true
+...
+test_run:grep_log('replica', 'error applying row: .*')
+---
+- 'error applying row: {type: ''INSERT'', lsn: <number>, space_id: 272, index_id: 0, tuple:
+  ["dup"]}'
+...
+test_run:cmd("clear filter")
+---
+- true
+...
 --
 -- Cleanup
 --
