@@ -68,19 +68,26 @@ vy_new_simple_stmt(struct tuple_format *format,
 	/*
 	 * Create the result statement, using one of the formats.
 	 */
-	if (templ->type == IPROTO_REPLACE || templ->type == IPROTO_DELETE) {
+	switch (templ->type) {
+	case IPROTO_INSERT: {
+		ret = vy_stmt_new_insert(format, buf, pos);
+		fail_if(ret == NULL);
+		break;
+	}
+	case IPROTO_REPLACE: {
 		ret = vy_stmt_new_replace(format, buf, pos);
 		fail_if(ret == NULL);
-		if (templ->type == IPROTO_REPLACE)
-			goto end;
-
-		struct tuple *tmp = vy_stmt_new_surrogate_delete(format, ret);
-		fail_if(tmp == NULL);
-		tuple_unref(ret);
-		ret = tmp;
-		goto end;
+		break;
 	}
-	if (templ->type == IPROTO_UPSERT) {
+	case IPROTO_DELETE: {
+		struct tuple *tmp = vy_stmt_new_replace(format, buf, pos);
+		fail_if(tmp == NULL);
+		ret = vy_stmt_new_surrogate_delete(format, tmp);
+		fail_if(ret == NULL);
+		tuple_unref(tmp);
+		break;
+	}
+	case IPROTO_UPSERT: {
 		/*
 		 * Create the upsert statement without operations.
 		 * Validation of result of UPSERT operations
@@ -104,17 +111,18 @@ vy_new_simple_stmt(struct tuple_format *format,
 		ret = vy_stmt_new_upsert(upsert_format, buf, pos,
 					 operations, 1);
 		fail_if(ret == NULL);
-		goto end;
+		break;
 	}
-	if (templ->type == IPROTO_SELECT) {
+	case IPROTO_SELECT: {
 		const char *key = buf;
 		uint part_count = mp_decode_array(&key);
 		ret = vy_stmt_new_select(vy_key_format, key, part_count);
 		fail_if(ret == NULL);
-		goto end;
+		break;
 	}
-	fail_if(true);
-end:
+	default:
+		fail_if(true);
+	}
 	free(buf);
 	vy_stmt_set_lsn(ret, templ->lsn);
 	if (templ->optimize_update)

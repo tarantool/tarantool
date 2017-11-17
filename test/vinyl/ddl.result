@@ -204,7 +204,7 @@ space:delete({1})
 ---
 ...
 -- Make sure the run is big enough to trigger compaction.
-space:insert({2, 3})
+space:replace({2, 3})
 ---
 - [2, 3]
 ...

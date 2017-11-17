@@ -568,15 +568,19 @@ vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
  * @param region History objects allocator.
  * @param stream Write iterator.
  * @param[out] count Count of statements saved in the history.
+ * @param[out] is_first_insert Set if the oldest statement for
+ * the current key among all sources is an INSERT.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static NODISCARD int
 vy_write_iterator_build_history(struct region *region,
-				struct vy_write_iterator *stream, int *count)
+				struct vy_write_iterator *stream,
+				int *count, bool *is_first_insert)
 {
 	*count = 0;
+	*is_first_insert = false;
 	assert(stream->stmt_i == -1);
 	struct heap_node *node = vy_source_heap_top(&stream->src_heap);
 	if (node == NULL)
@@ -615,6 +619,8 @@ vy_write_iterator_build_history(struct region *region,
 	uint64_t key_mask = stream->cmp_def->column_mask;
 
 	while (true) {
+		*is_first_insert = vy_stmt_type(src->tuple) == IPROTO_INSERT;
+
 		if (vy_stmt_lsn(src->tuple) > current_rv_lsn) {
 			/*
 			 * Skip statements invisible to the current read
@@ -709,13 +715,15 @@ next_lsn:
  * @param stream Write iterator.
  * @param hint   The tuple from a previous read view (can be NULL).
  * @param rv Read view to merge.
+ * @param is_first_insert Set if the oldest statement for the
+ * current key among all sources is an INSERT.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 static NODISCARD int
 vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
-		   struct vy_read_view_stmt *rv)
+		   struct vy_read_view_stmt *rv, bool is_first_insert)
 {
 	assert(rv != NULL);
 	assert(rv->tuple == NULL);
@@ -782,6 +790,46 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 	rv->history = NULL;
 	result->tuple = NULL;
 	assert(result->next == NULL);
+	if (hint != NULL) {
+		/* Not the first statement. */
+		return 0;
+	}
+	struct tuple *tuple = rv->tuple;
+	if (is_first_insert && vy_stmt_type(tuple) == IPROTO_DELETE) {
+		/*
+		 * Optimization 6: discard the first DELETE if
+		 * the oldest statement for the current key among
+		 * all sources is an INSERT and hence there's no
+		 * statements for this key in older runs or the
+		 * last statement is a DELETE.
+		 */
+		vy_stmt_unref_if_possible(tuple);
+		rv->tuple = NULL;
+	}
+	if ((is_first_insert && vy_stmt_type(tuple) == IPROTO_REPLACE) ||
+	    (!is_first_insert && vy_stmt_type(tuple) == IPROTO_INSERT)) {
+		/*
+		 * If the oldest statement among all sources is an
+		 * INSERT, convert the first REPLACE to an INSERT
+		 * so that if the key gets deleted later, we will
+		 * be able invoke optimization #6 to discard the
+		 * DELETE statement.
+		 *
+		 * Otherwise convert the first INSERT to a REPLACE
+		 * so as not to trigger optimization #6 on the next
+		 * compaction.
+		 */
+		uint32_t size;
+		const char *data = tuple_data_range(tuple, &size);
+		struct tuple *copy = is_first_insert ?
+			vy_stmt_new_insert(stream->format, data, data + size) :
+			vy_stmt_new_replace(stream->format, data, data + size);
+		if (copy == NULL)
+			return -1;
+		vy_stmt_set_lsn(copy, vy_stmt_lsn(tuple));
+		vy_stmt_unref_if_possible(tuple);
+		rv->tuple = copy;
+	}
 	return 0;
 }
 
@@ -801,10 +849,12 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 {
 	*count = 0;
 	int raw_count;
+	bool is_first_insert;
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	stream->rv_used_count = 0;
-	if (vy_write_iterator_build_history(region, stream, &raw_count) != 0)
+	if (vy_write_iterator_build_history(region, stream, &raw_count,
+					    &is_first_insert) != 0)
 		goto error;
 	if (raw_count == 0) {
 		/* A key is fully optimized. */
@@ -825,7 +875,8 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 	for (; rv >= &stream->read_views[0]; --rv) {
 		if (rv->history == NULL)
 			continue;
-		if (vy_read_view_merge(stream, hint, rv) != 0)
+		if (vy_read_view_merge(stream, hint, rv,
+				       is_first_insert) != 0)
 			goto error;
 		assert(rv->history == NULL);
 		if (rv->tuple == NULL)

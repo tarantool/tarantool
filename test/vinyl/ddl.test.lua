@@ -74,7 +74,7 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 -- the space is now empty and can be altered.
 space:delete({1})
 -- Make sure the run is big enough to trigger compaction.
-space:insert({2, 3})
+space:replace({2, 3})
 space:delete({2})
 box.snapshot()
 -- Wait until the dump is finished.
