@@ -773,9 +773,7 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 	vy_log_create_index(index->commit_lsn, index->id,
 			    index->space_id, index->key_def);
 	vy_log_insert_range(index->commit_lsn, range->id, NULL, NULL);
-	if (vy_log_tx_try_commit() != 0)
-		say_warn("failed to log index creation: %s",
-			 diag_last_error(diag_get())->errmsg);
+	vy_log_tx_try_commit();
 	/*
 	 * After we committed the index in the log, we can schedule
 	 * a task for it.
@@ -832,9 +830,7 @@ vinyl_index_commit_drop(struct index *base)
 	vy_log_tx_begin();
 	vy_log_index_prune(index, checkpoint_last(NULL));
 	vy_log_drop_index(index->commit_lsn);
-	if (vy_log_tx_try_commit() < 0)
-		say_warn("failed to log drop index: %s",
-			 diag_last_error(diag_get())->errmsg);
+	vy_log_tx_try_commit();
 }
 
 static void
@@ -964,9 +960,7 @@ vinyl_space_commit_truncate(struct space *old_space, struct space *new_space)
 		vy_log_truncate_index(new_index->commit_lsn,
 				      new_index->truncate_count);
 	}
-	if (vy_log_tx_try_commit() < 0)
-		say_warn("failed to log index truncation: %s",
-			 diag_last_error(diag_get())->errmsg);
+	vy_log_tx_try_commit();
 
 	/*
 	 * After we committed space truncation in the metadata log,
@@ -2590,6 +2584,8 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	size_t mem_dumped = mem_used_before - mem_used_after;
 	vy_quota_release(quota, mem_dumped);
 
+	say_info("dumped %zu bytes in %.1f sec", mem_dumped, dump_duration);
+
 	/* Account dump bandwidth. */
 	if (dump_duration > 0)
 		histogram_collect(env->dump_bw,
@@ -3183,8 +3179,10 @@ vinyl_engine_join(struct engine *engine, struct vclock *vclock,
 	 */
 	struct vy_recovery *recovery;
 	recovery = vy_recovery_new(vclock_sum(vclock), true);
-	if (recovery == NULL)
+	if (recovery == NULL) {
+		say_error("failed to recover vylog to join a replica");
 		goto out_join_cord;
+	}
 	rc = vy_recovery_iterate(recovery, vy_join_cb, ctx);
 	vy_recovery_delete(recovery);
 	/* Send the last range. */
@@ -3342,8 +3340,9 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 		vy_run_snprint_path(path, sizeof(path), arg->env->path,
 				    arg->space_id, arg->index_id,
 				    record->run_id, type);
+		say_info("removing %s", path);
 		if (coio_unlink(path) < 0 && errno != ENOENT) {
-			say_syserror("failed to delete file '%s'", path);
+			say_syserror("error while removing %s", path);
 			forget = false;
 		}
 	}
@@ -3354,11 +3353,13 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 	/* Forget the run on success. */
 	vy_log_tx_begin();
 	vy_log_forget_run(record->run_id);
-	if (vy_log_tx_commit() < 0) {
-		say_warn("failed to log vinyl run %lld cleanup: %s",
-			 (long long)record->run_id,
-			 diag_last_error(diag_get())->errmsg);
-	}
+	/*
+	 * Leave the record in the vylog buffer on disk error.
+	 * If we fail to flush it before restart, we will retry
+	 * to delete the run file next time garbage collection
+	 * is invoked, which is harmless.
+	 */
+	vy_log_tx_try_commit();
 out:
 	if (++arg->loops % VY_YIELD_LOOPS == 0)
 		fiber_sleep(0);
@@ -3390,8 +3391,7 @@ vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 	int64_t signature = checkpoint_last(NULL);
 	struct vy_recovery *recovery = vy_recovery_new(signature, false);
 	if (recovery == NULL) {
-		say_warn("vinyl garbage collection failed: %s",
-			 diag_last_error(diag_get())->errmsg);
+		say_error("failed to recover vylog for garbage collection");
 		return 0;
 	}
 	vy_gc(env, recovery, VY_GC_DROPPED, lsn);
@@ -3465,8 +3465,10 @@ vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
 	/* Backup run files. */
 	struct vy_recovery *recovery;
 	recovery = vy_recovery_new(vclock_sum(vclock), true);
-	if (recovery == NULL)
+	if (recovery == NULL) {
+		say_error("failed to recover vylog for backup");
 		return -1;
+	}
 	struct vy_backup_arg arg = {
 		.env = env,
 		.cb = cb,
@@ -3772,8 +3774,8 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt, void *arg)
 	struct vy_env *env = arg;
 	struct vy_squash_queue *sq = env->squash_queue;
 
-	say_debug("optimize upsert slow: %"PRIu32"/%"PRIu32": %s",
-		  index->space_id, index->id, vy_stmt_str(stmt));
+	say_verbose("%s: schedule upsert optimization for %s",
+		    vy_index_name(index), vy_stmt_str(stmt));
 
 	/* Start the upsert squashing fiber on demand. */
 	if (sq->fiber == NULL) {

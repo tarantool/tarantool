@@ -1,5 +1,6 @@
 #include "trivia/util.h"
 #include "unit.h"
+#include "say.h"
 #include "vy_index.h"
 #include "vy_cache.h"
 #include "vy_run.h"
@@ -19,6 +20,9 @@ test_basic()
 {
 	header();
 	plan(15);
+
+	/** Suppress info messages from vy_run_write(). */
+	say_set_log_level(S_WARN);
 
 	const size_t QUOTA = 100 * 1024 * 1024;
 	int64_t generation = 0;

@@ -825,7 +825,6 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 		}
 	}
 	if (size != sizeof(uint32_t) * row_count) {
-		/* TODO: report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
 			 tt_sprintf("Wrong row index size "
 				    "(expected %zu, got %u",
@@ -840,6 +839,15 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 	return 0;
 }
 
+/** Return the name of a run data file. */
+static inline const char *
+vy_run_filename(struct vy_run *run)
+{
+	char *buf = tt_static_buf();
+	vy_run_snprint_filename(buf, TT_STATIC_BUF_LEN, run->id, VY_FILE_RUN);
+	return buf;
+}
+
 /**
  * Read a page requests from vinyl xlog data file.
  *
@@ -847,8 +855,8 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
  * @retval -1 on error, check diag
  */
 static int
-vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
-	     ZSTD_DStream *zdctx)
+vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
+	     struct vy_run *run, ZSTD_DStream *zdctx)
 {
 	/* read xlog tx from xlog file */
 	size_t region_svp = region_used(&fiber()->gc);
@@ -857,18 +865,16 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 		diag_set(OutOfMemory, page_info->size, "region gc", "page");
 		return -1;
 	}
-	ssize_t readen = fio_pread(fd, data, page_info->size,
+	ssize_t readen = fio_pread(run->fd, data, page_info->size,
 				   page_info->offset);
 	ERROR_INJECT(ERRINJ_VYRUN_DATA_READ, {
 		readen = -1;
 		errno = EIO;});
 	if (readen < 0) {
-		/* TODO: report filename */
 		diag_set(SystemError, "failed to read from file");
 		goto error;
 	}
 	if (readen != (ssize_t)page_info->size) {
-		/* TODO: replace with XlogError, report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
 			 "Unexpected end of file");
 		goto error;
@@ -889,7 +895,6 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	if (xrow_header_decode(&xrow, &data_pos, data_end) == -1)
 		goto error;
 	if (xrow.type != VY_RUN_ROW_INDEX) {
-		/* TODO: report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
 			 tt_sprintf("Wrong row index type "
 				    "(expected %d, got %u)",
@@ -903,8 +908,12 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 		diag_set(ClientError, ER_INJECTION, "vinyl page read");
 		return -1;});
 	return 0;
-	error:
+error:
 	region_truncate(&fiber()->gc, region_svp);
+	diag_log();
+	say_error("error reading %s@%llu:%u", vy_run_filename(run),
+		  (unsigned long long)page_info->offset,
+		  (unsigned)page_info->size);
 	return -1;
 }
 
@@ -938,7 +947,7 @@ vy_page_read_cb(struct cbus_call_msg *base)
 	if (zdctx == NULL)
 		return -1;
 	return vy_page_read(task->page, &task->page_info,
-			    task->slice->run->fd, zdctx);
+			    task->slice->run, zdctx);
 }
 
 /**
@@ -1024,7 +1033,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			vy_page_delete(page);
 			return -1;
 		}
-		if (vy_page_read(page, page_info, slice->run->fd, zdctx) != 0) {
+		if (vy_page_read(page, page_info, slice->run, zdctx) != 0) {
 			vy_page_delete(page);
 			return -1;
 		}
@@ -1868,6 +1877,8 @@ fail_close:
 	xlog_cursor_close(&cursor, false);
 fail:
 	vy_run_clear(run);
+	diag_log();
+	say_error("failed to load `%s'", path);
 	return -1;
 }
 
@@ -2138,6 +2149,9 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
 			    space_id, iid, run->id, VY_FILE_RUN);
+
+	say_info("writing `%s'", path);
+
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_RUN,
@@ -2173,16 +2187,16 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	bloom_spectrum_choose(&bs, &run->info.bloom);
 	run->info.has_bloom = true;
 	bloom_spectrum_destroy(&bs, runtime.quota);
-	done:
+done:
 	wi->iface->stop(wi);
 	return 0;
 
-	err_close_xlog:
+err_close_xlog:
 	xlog_close(&data_xlog, false);
 	fiber_gc();
-	err_free_bloom:
+err_free_bloom:
 	bloom_spectrum_destroy(&bs, runtime.quota);
-	err:
+err:
 	wi->iface->stop(wi);
 	return -1;
 }
@@ -2378,6 +2392,8 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	vy_run_snprint_path(path, sizeof(path), dirpath,
 			    space_id, iid, run->id, VY_FILE_INDEX);
 
+	say_info("writing `%s'", path);
+
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_INDEX,
@@ -2470,7 +2486,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	vy_run_snprint_path(path, sizeof(path), dir,
 			    space_id, iid, run->id, VY_FILE_RUN);
 
-	say_warn("rebuilding run index from %s data file", path);
+	say_info("rebuilding index for `%s'", path);
 	if (xlog_cursor_open(&cursor, path))
 		return -1;
 
@@ -2604,7 +2620,7 @@ vy_slice_stream_read_page(struct vy_slice_stream *stream)
 		return -1;
 
 	if (vy_page_read(stream->page, page_info,
-			 stream->slice->run->fd, zdctx) != 0) {
+			 stream->slice->run, zdctx) != 0) {
 		vy_page_delete(stream->page);
 		stream->page = NULL;
 		return -1;

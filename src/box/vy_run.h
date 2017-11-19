@@ -372,12 +372,20 @@ enum vy_file_type {
 
 extern const char *vy_file_suffix[];
 
-static int
+static inline int
 vy_index_snprint_path(char *buf, int size, const char *dir,
 		      uint32_t space_id, uint32_t iid)
 {
 	return snprintf(buf, size, "%s/%u/%u",
 			dir, (unsigned)space_id, (unsigned)iid);
+}
+
+static inline int
+vy_run_snprint_filename(char *buf, int size, int64_t run_id,
+			enum vy_file_type type)
+{
+	return snprintf(buf, size, "%020lld.%s",
+			(long long)run_id, vy_file_suffix[type]);
 }
 
 static inline int
@@ -388,8 +396,8 @@ vy_run_snprint_path(char *buf, int size, const char *dir,
 	int total = 0;
 	SNPRINT(total, vy_index_snprint_path, buf, size,
 		dir, (unsigned)space_id, (unsigned)iid);
-	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
-		(long long)run_id, vy_file_suffix[type]);
+	SNPRINT(total, snprintf, buf, size, "/");
+	SNPRINT(total, vy_run_snprint_filename, buf, size, run_id, type);
 	return total;
 }
 

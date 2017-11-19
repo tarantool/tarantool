@@ -1208,12 +1208,16 @@ vy_log_tx_do_commit(bool no_discard)
 	if (vy_log.recovery != NULL)
 		goto done;
 
-	/*
-	 * Rollback the transaction on failure unless
-	 * we were explicitly told not to.
-	 */
-	if (vy_log_flush() != 0 && !no_discard)
-		goto rollback;
+	if (vy_log_flush() != 0) {
+		if (!no_discard)
+			goto rollback;
+		/*
+		 * We were told not to discard the transaction on
+		 * failure so just warn and leave it in the buffer.
+		 */
+		struct error *e = diag_last_error(diag_get());
+		say_warn("failed to flush vylog: %s", e->errmsg);
+	}
 
 done:
 	say_verbose("commit vylog transaction");
@@ -1238,10 +1242,11 @@ vy_log_tx_commit(void)
 	return vy_log_tx_do_commit(false);
 }
 
-int
+void
 vy_log_tx_try_commit(void)
 {
-	return vy_log_tx_do_commit(true);
+	if (vy_log_tx_do_commit(true) != 0)
+		unreachable();
 }
 
 void

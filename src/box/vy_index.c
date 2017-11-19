@@ -1048,18 +1048,16 @@ fail:
 	}
 	if (split_key != NULL)
 		tuple_unref(split_key);
-	assert(!diag_is_empty(diag_get()));
-	say_error("%s: failed to split range %s: %s",
-		  vy_index_name(index), vy_range_str(range),
-		  diag_last_error(diag_get())->errmsg);
+
+	diag_log();
+	say_error("%s: failed to split range %s",
+		  vy_index_name(index), vy_range_str(range));
 	return false;
 }
 
 bool
 vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 {
-	struct error *e;
-
 	struct vy_range *first, *last;
 	if (!vy_range_needs_coalesce(range, index->tree, &index->opts,
 				     &first, &last))
@@ -1127,9 +1125,8 @@ vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 fail_commit:
 	vy_range_delete(result);
 fail_range:
-	assert(!diag_is_empty(diag_get()));
-	e = diag_last_error(diag_get());
-	say_error("%s: failed to coalesce range %s: %s",
-		  vy_index_name(index), vy_range_str(range), e->errmsg);
+	diag_log();
+	say_error("%s: failed to coalesce range %s",
+		  vy_index_name(index), vy_range_str(range));
 	return false;
 }
