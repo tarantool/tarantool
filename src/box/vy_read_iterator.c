@@ -400,7 +400,7 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr)
 		assert(src->front_id < itr->front_id);
 		return 0;
 	}
-	if (cmp < 0 || vy_stmt_lsn(src->stmt) > vy_stmt_lsn(itr->curr_stmt)) {
+	if (cmp < 0 || itr->curr_src != itr->txw_src) {
 		/*
 		 * The new statement precedes the current
 		 * candidate for the next key or it is a
@@ -413,12 +413,9 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr)
 		itr->curr_src = itr->mem_src;
 	} else {
 		/*
-		 * There must be a statement for the same
-		 * key in the transaction write set.
 		 * Make sure we don't read the old value
 		 * from the cache while applying UPSERTs.
 		 */
-		assert(itr->curr_src == itr->txw_src);
 		itr->src[itr->cache_src].front_id = 0;
 	}
 	if (cmp < 0)
