@@ -320,8 +320,7 @@ lbox_console_add_history(struct lua_State *L)
 		luaL_error(L, "add_history(string)");
 
 	const char *s = lua_tostring(L, 1);
-	if (*s)
-	{
+	if (*s) {
 		HIST_ENTRY *hist_ent = history_get(history_length - 1 + history_base);
 		const char *prev_s = hist_ent ? hist_ent->line : "";
 		if (strcmp(prev_s, s) != 0)
