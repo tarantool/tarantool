@@ -182,6 +182,10 @@ local function isboolean(test, v, message, extra)
     return is(test, type(v), 'boolean', message, extra)
 end
 
+local function isfunction(test, v, message, extra)
+    return is(test, type(v), 'function', message, extra)
+end
+
 local function isudata(test, v, utype, message, extra)
     extra = extra or {}
     extra.expected = 'userdata<'..utype..'>'
@@ -279,6 +283,7 @@ test_mt = {
         isstring  = isstring;
         istable   = istable;
         isboolean = isboolean;
+        isfunction = isfunction;
         isudata   = isudata;
         iscdata   = iscdata;
         is_deeply = is_deeply;
