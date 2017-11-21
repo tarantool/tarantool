@@ -70,6 +70,21 @@ int tarantoolSqlite3Insert(BtCursor * pCur, const BtreePayload * pX);
 int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
 int tarantoolSqlite3ClearTable(int iTable);
 
+/* Rename table pTab with zNewName by inserting new tuple to _space.
+ * SQL statement, which creates table with new name is saved in pzSqlStmt.
+ */
+int tarantoolSqlite3RenameTable(int iTab, const char *zNewName, char *zSqlStmt,
+				uint32_t *pSqlStmtLen);
+
+/* Alter trigger statement after rename table. */
+int tarantoolSqlite3RenameTrigger(const char *zTriggerName,
+				  const char *zOldName, const char *zNewName);
+
+/* Alter create table statement of child foreign key table by
+ * replacing parent table name in create table statement.*/
+int tarantoolSqlite3RenameParentTable(int iTab, const char *zOldParentName,
+				      const char *zNewParentName);
+
 /* Compare against the index key under a cursor -
  * the key may span non-adjacent fields in a random order,
  * ex: [4]-[1]-[2]

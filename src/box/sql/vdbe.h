@@ -216,6 +216,7 @@ VdbeOp *sqlite3VdbeAddOpList(Vdbe *, int nOp, VdbeOpList const *aOp,
 void sqlite3VdbeAddParseSchemaOp(Vdbe *, char *);
 void sqlite3VdbeAddParseSchema2Op(Vdbe * p, int, int);
 void sqlite3VdbeAddParseSchema3Op(Vdbe * p, int);
+void sqlite3VdbeAddRenameTableOp(Vdbe * p, int, char *);
 void sqlite3VdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlite3VdbeChangeP1(Vdbe *, u32 addr, int P1);
 void sqlite3VdbeChangeP2(Vdbe *, u32 addr, int P2);

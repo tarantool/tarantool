@@ -3645,7 +3645,6 @@ extern int sqlite3PendingByte;
 #endif
 #endif
 void sqlite3Reindex(Parse *, Token *, Token *);
-void sqlite3AlterFunctions(void);
 void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
 int sqlite3GetToken(const unsigned char *, int *, bool *);
 void sqlite3NestedParse(Parse *, const char *, ...);

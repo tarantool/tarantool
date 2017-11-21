@@ -5607,6 +5607,104 @@ case OP_ParseSchema3: {
 	break;
 }
 
+/* Opcode: RenameTable P1 * * P4 *
+ * Synopsis: P1 = root, P4 = name
+ *
+ * Rename table P1 with name from P4.
+ * Invoke tarantoolSqlite3RenameTable, which updates tuple with
+ * corresponding space_id in _space: changes string of statement, which creates
+ * table and its name. Removes hash of old table name and updates SQL schema
+ * by calling sqlite3InitCallback.
+ * In presence of triggers or foreign keys, their statements
+ * are also updated in _trigger and in parent table.
+ *
+ */
+case OP_RenameTable: {
+	unsigned space_id;
+	struct space *space;
+	const char *zOldTableName;
+	const char *zNewTableName;
+	Table *pTab;
+	FKey *pFKey;
+	Trigger *pTrig;
+	int iRootPage;
+	InitData initData;
+	char *argv[4] = {NULL, NULL, NULL, NULL};
+	char *zSqlStmt;
+	uint32_t iSqlStmtLen;
+
+	space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
+	space = space_by_id(space_id);
+	assert(space);
+	zOldTableName = space_name(space);
+	assert(zOldTableName);
+	pTab = sqlite3HashFind(&db->mdb.pSchema->tblHash, zOldTableName);
+	assert(pTab);
+	pTrig = pTab->pTrigger;
+	iRootPage = pTab->tnum;
+	zNewTableName = pOp->p4.z;
+	zOldTableName = sqlite3DbStrNDup(db, zOldTableName,
+					 sqlite3Strlen30(zOldTableName));
+
+	rc = tarantoolSqlite3RenameTable(pTab->tnum, zNewTableName,
+					 NULL, &iSqlStmtLen);
+	if (rc) goto abort_due_to_error;
+	zSqlStmt = sqlite3DbMallocZero(db, iSqlStmtLen);
+	if (!zSqlStmt) {
+		goto no_mem;
+	}
+	rc = tarantoolSqlite3RenameTable(pTab->tnum, zNewTableName,
+					 zSqlStmt, &iSqlStmtLen);
+	if (rc) goto abort_due_to_error;
+
+	/* If it is parent table, all children statements should be updated. */
+	for (pFKey = sqlite3FkReferences(pTab); pFKey; pFKey = pFKey->pNextTo) {
+		assert(pFKey->zTo);
+		assert(pFKey->pFrom);
+		rc = tarantoolSqlite3RenameParentTable(pFKey->pFrom->tnum,
+						       pFKey->zTo,
+						       zNewTableName);
+		if (rc) goto abort_due_to_error;
+		pFKey->zTo = sqlite3DbStrNDup(db, zNewTableName,
+					      sqlite3Strlen30(zNewTableName));
+		sqlite3HashInsert(&db->mdb.pSchema->fkeyHash, zOldTableName, 0);
+		sqlite3HashInsert(&db->mdb.pSchema->fkeyHash, zNewTableName, pFKey);
+	}
+
+	sqlite3UnlinkAndDeleteTable(db, pTab->zName);
+
+	initData.db = db;
+	initData.pzErrMsg = &p->zErrMsg;
+	assert(db->init.busy == 0);
+	db->init.busy = 1;
+	initData.rc = SQLITE_OK;
+	argv[0] = (char*) zNewTableName;
+	argv[1] = (char*) &iRootPage;
+	argv[2] = zSqlStmt;
+	sqlite3InitCallback(&initData, 3, argv, NULL);
+	db->init.busy = 0;
+	rc = initData.rc;
+	if (rc) {
+		sqlite3ResetAllSchemasOfConnection(db);
+		goto abort_due_to_error;
+	}
+
+	pTab = sqlite3HashFind(&db->mdb.pSchema->tblHash, zNewTableName);
+	pTab->pTrigger = pTrig;
+
+	/* Rename all trigger created on this table.*/
+	for (; pTrig; pTrig = pTrig->pNext) {
+		pTrig->table = sqlite3DbStrNDup(db, zNewTableName,
+						sqlite3Strlen30(zNewTableName));
+		pTrig->pTabSchema = pTab->pSchema;
+		rc = tarantoolSqlite3RenameTrigger(pTrig->zName,
+						   zOldTableName, zNewTableName);
+		if (rc) goto abort_due_to_error;
+	}
+	sqlite3DbFree(db, (void*)zOldTableName);
+	sqlite3DbFree(db, (void*)zSqlStmt);
+	break;
+}
 #if !defined(SQLITE_OMIT_ANALYZE)
 /* Opcode: LoadAnalysis P1 * * * *
  *

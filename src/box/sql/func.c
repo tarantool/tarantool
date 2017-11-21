@@ -1929,9 +1929,6 @@ sqlite3RegisterBuiltinFunctions(void)
 		FUNCTION(coalesce, 0, 0, 0, 0),
 		FUNCTION2(coalesce, -1, 0, 0, noopFunc, SQLITE_FUNC_COALESCE),
 	};
-#ifndef SQLITE_OMIT_ALTERTABLE
-	sqlite3AlterFunctions();
-#endif
 	sqlite3AnalyzeFunctions();
 	sqlite3RegisterDateTimeFunctions();
 	sqlite3InsertBuiltinFuncs(aBuiltinFunc, ArraySize(aBuiltinFunc));

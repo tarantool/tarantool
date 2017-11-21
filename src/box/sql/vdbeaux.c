@@ -401,6 +401,13 @@ sqlite3VdbeAddParseSchema3Op(Vdbe * p, int iRec)
 	sqlite3VdbeUsesBtree(p);
 }
 
+void
+sqlite3VdbeAddRenameTableOp(Vdbe * p, int iTab, char* zNewName)
+{
+	sqlite3VdbeAddOp4(p, OP_RenameTable, iTab, 0, 0, zNewName, P4_DYNAMIC);
+	sqlite3VdbeUsesBtree(p);
+}
+
 /*
  * Add an opcode that includes the p4 value as an integer.
  */
