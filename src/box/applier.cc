@@ -467,6 +467,8 @@ applier_disconnect(struct applier *applier, enum applier_state state)
 	}
 
 	coio_close(loop(), &applier->io);
+	/* Clear all unparsed input. */
+	ibuf_reset(&applier->iobuf->in);
 	iobuf_reset(applier->iobuf);
 	fiber_gc();
 }
