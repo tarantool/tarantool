@@ -1798,25 +1798,6 @@ vy_check_update(struct space *space, const struct vy_index *pk,
 }
 
 /**
- * Check if an UPDATE operation with the specified column mask
- * changes all indexes. In that case we don't need to store
- * column mask in a tuple.
- * @param space Space to update.
- * @param column_mask Bitmask of update operations.
- */
-static inline bool
-vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
-{
-	for (uint32_t i = 1; i < space->index_count; ++i) {
-		struct vy_index *index = vy_index(space->index[i]);
-		if (key_update_can_be_skipped(index->cmp_def->column_mask,
-					      column_mask))
-			return false;
-	}
-	return true;
-}
-
-/**
  * Execute UPDATE in a vinyl space.
  * @param env     Vinyl environment.
  * @param tx      Current transaction.
@@ -1876,10 +1857,8 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, new_tuple))
 		return -1;
 
-	bool update_changes_all =
-		vy_update_changes_all_indexes(space, column_mask);
 	struct tuple_format *mask_format = pk->mem_format_with_colmask;
-	if (space->index_count == 1 || update_changes_all) {
+	if (space->index_count == 1) {
 		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
 						      new_tuple_end);
 		if (stmt->new_tuple == NULL)
@@ -1904,20 +1883,12 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (space->index_count == 1)
 		return 0;
 
-	struct tuple *delete = NULL;
-	if (! update_changes_all) {
-		delete = vy_stmt_new_surrogate_delete(mask_format,
-						      stmt->old_tuple);
-		if (delete == NULL)
-			return -1;
-		vy_stmt_set_column_mask(delete, column_mask);
-	} else {
-		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
-						      stmt->old_tuple);
-		if (delete == NULL)
-			return -1;
-	}
-	assert(delete != NULL);
+	struct tuple *delete = vy_stmt_new_surrogate_delete(mask_format,
+							    stmt->old_tuple);
+	if (delete == NULL)
+		return -1;
+	vy_stmt_set_column_mask(delete, column_mask);
+
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
 		if (vy_is_committed_one(env, space, index))
@@ -2162,10 +2133,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, new_tuple))
 		return -1;
 	new_tuple_end = new_tuple + new_size;
-	bool update_changes_all =
-		vy_update_changes_all_indexes(space, column_mask);
 	struct tuple_format *mask_format = pk->mem_format_with_colmask;
-	if (space->index_count == 1 || update_changes_all) {
+	if (space->index_count == 1) {
 		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
 						      new_tuple_end);
 		if (stmt->new_tuple == NULL)
@@ -2193,20 +2162,12 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	/* Replace in secondary indexes works as delete insert. */
 	struct vy_index *index;
-	struct tuple *delete = NULL;
-	if (! update_changes_all) {
-		delete = vy_stmt_new_surrogate_delete(mask_format,
-						      stmt->old_tuple);
-		if (delete == NULL)
-			return -1;
-		vy_stmt_set_column_mask(delete, column_mask);
-	} else {
-		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
-						      stmt->old_tuple);
-		if (delete == NULL)
-			return -1;
-	}
-	assert(delete != NULL);
+	struct tuple *delete = vy_stmt_new_surrogate_delete(mask_format,
+							    stmt->old_tuple);
+	if (delete == NULL)
+		return -1;
+	vy_stmt_set_column_mask(delete, column_mask);
+
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
 		if (vy_is_committed_one(env, space, index))
