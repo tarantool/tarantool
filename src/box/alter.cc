@@ -2188,7 +2188,7 @@ coll_cache_rollback(struct trigger *trigger, void *event)
 	if (new_tuple != NULL) {
 		uint32_t new_id = tuple_field_u32_xc(new_tuple,
 						     BOX_COLLATION_FIELD_ID);
-		struct coll *new_coll = coll_cache_find(new_id);
+		struct coll *new_coll = coll_by_id(new_id);
 		coll_cache_delete(new_coll);
 		coll_delete(new_coll);
 	}
@@ -2226,7 +2226,7 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		/* TODO: Check that no index uses the collation */
 		uint32_t old_id = tuple_field_u32_xc(old_tuple,
 						     BOX_COLLATION_FIELD_ID);
-		old_coll = coll_cache_find(old_id);
+		old_coll = coll_by_id(old_id);
 		assert(old_coll != NULL);
 		access_check_ddl(old_coll->owner_id, SC_COLLATION);
 

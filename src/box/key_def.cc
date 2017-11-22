@@ -140,7 +140,7 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 		struct key_part_def *part = &parts[i];
 		struct coll *coll = NULL;
 		if (part->coll_id != COLL_NONE) {
-			coll = coll_cache_find(part->coll_id);
+			coll = coll_by_id(part->coll_id);
 			if (coll == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 					 i + 1, "collation was not found by ID");

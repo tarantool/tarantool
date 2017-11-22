@@ -68,7 +68,7 @@ coll_cache_delete(const struct coll *coll);
  * Find a collation object by its id.
  */
 struct coll *
-coll_cache_find(uint32_t id);
+coll_by_id(uint32_t id);
 
 #if defined(__cplusplus)
 } /* extern "C" */
