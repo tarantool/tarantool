@@ -1918,6 +1918,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			sqlite3ErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
 					p->zName);
+			return;
 		} else {
 			p->tabFlags |= TF_WithoutRowid | TF_NoVisibleRowid;
 			convertToWithoutRowidTable(pParse, p);
