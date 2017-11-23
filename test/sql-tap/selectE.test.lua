@@ -58,7 +58,7 @@ test:do_test(
             INSERT INTO t3 VALUES('def'),('jkl');
 
             SELECT a FROM t1 EXCEPT SELECT a FROM t2
-             ORDER BY a COLLATE nocase;
+             ORDER BY a COLLATE "unicode_ci";
         ]]
     end, {
         -- <selectE-1.0>
@@ -71,7 +71,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a FROM t2 EXCEPT SELECT a FROM t3
-             ORDER BY a COLLATE nocase;
+             ORDER BY a COLLATE "unicode_ci";
         ]]
     end, {
         -- <selectE-1.1>
@@ -113,7 +113,7 @@ test:do_test(
             DELETE FROM t3;
             INSERT INTO t2 VALUES('ABC'),('def'),('GHI'),('jkl');
             INSERT INTO t3 SELECT lower(a) FROM t2;
-            SELECT a COLLATE nocase FROM t2 EXCEPT SELECT a FROM t3
+            SELECT a COLLATE "unicode_ci" FROM t2 EXCEPT SELECT a FROM t3
              ORDER BY 1
         ]]
     end, {
@@ -126,7 +126,7 @@ test:do_test(
     "selectE-2.2",
     function()
         return test:execsql [[
-            SELECT a COLLATE nocase FROM t2 EXCEPT SELECT a FROM t3
+            SELECT a COLLATE "unicode_ci" FROM t2 EXCEPT SELECT a FROM t3
              ORDER BY 1 COLLATE binary
         ]]
     end, {
@@ -138,7 +138,7 @@ test:do_test(
 test:do_catchsql_test(
     "selectE-3.1",
     [[
-        SELECT 1 EXCEPT SELECT 2 ORDER BY 1 COLLATE nocase EXCEPT SELECT 3;
+        SELECT 1 EXCEPT SELECT 2 ORDER BY 1 COLLATE "unicode_ci" EXCEPT SELECT 3;
     ]], {
         -- <selectE-3.1>
         1, "ORDER BY clause should come after EXCEPT not before"

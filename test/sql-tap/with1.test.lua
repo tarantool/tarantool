@@ -868,7 +868,7 @@ test:do_execsql_test("10.8.4.1", [[
   INSERT INTO tst VALUES('a', 'A');
   INSERT INTO tst VALUES('b', 'B');
   INSERT INTO tst VALUES('c', 'C');
-  SELECT a COLLATE nocase FROM tst UNION ALL SELECT b FROM tst ORDER BY 1;
+  SELECT a COLLATE "unicode_ci" FROM tst UNION ALL SELECT b FROM tst ORDER BY 1;
 ]], {
   -- <10.8.4.1>
   "a", "A", "b", "B", "c", "C"
@@ -877,7 +877,7 @@ test:do_execsql_test("10.8.4.1", [[
 
 -- MUST_WORK_TEST
 test:do_execsql_test("10.8.4.2", [[
-  SELECT a FROM tst UNION ALL SELECT b COLLATE nocase FROM tst ORDER BY 1;
+  SELECT a FROM tst UNION ALL SELECT b COLLATE "unicode_ci" FROM tst ORDER BY 1;
 ]], {
   -- <10.8.4.2>
   "A", "B", "C", "a", "b", "c"
@@ -885,7 +885,7 @@ test:do_execsql_test("10.8.4.2", [[
 })
 
 test:do_execsql_test("10.8.4.3", [[
-  SELECT a||'' FROM tst UNION ALL SELECT b COLLATE nocase FROM tst ORDER BY 1;
+  SELECT a||'' FROM tst UNION ALL SELECT b COLLATE "unicode_ci" FROM tst ORDER BY 1;
 ]], {
   -- <10.8.4.3>
   "a", "A", "b", "B", "c", "C"

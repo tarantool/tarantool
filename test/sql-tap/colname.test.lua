@@ -642,7 +642,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "colname-11.2",
     [[CREATE TABLE t1(a, b, c, d, e, 
-      PRIMARY KEY(a), UNIQUE('b' COLLATE nocase DESC));]],
+      PRIMARY KEY(a), UNIQUE('b' COLLATE "unicode_ci" DESC));]],
     {1, "/expressions prohibited in PRIMARY KEY/"})
 
 test:execsql("create table table1(a primary key, b, c)")

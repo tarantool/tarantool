@@ -377,7 +377,7 @@ test:do_execsql_test("select3-8.1", [[
   DROP TABLE IF EXISTS A;
   CREATE TABLE A (
     A1 DOUBLE,
-    A2 VARCHAR COLLATE NOCASE,
+    A2 VARCHAR COLLATE "unicode_ci",
     A3 DOUBLE,
     id int primary key
   );

@@ -463,7 +463,7 @@ test:do_execsql_test(
           WHERE aaa.fk = 'constant'
             AND LENGTH(bbb.title) > 0
             AND bbb.parent = 4
-          ORDER BY bbb.title COLLATE NOCASE ASC;
+          ORDER BY bbb.title COLLATE "unicode_ci" ASC;
     ]], {
         -- <where3-5.0>
         

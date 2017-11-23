@@ -524,7 +524,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-4.1",
     [[
-        CREATE TABLE t4a(a TEXT, b TEXT COLLATE nocase, c PRIMARY KEY);
+        CREATE TABLE t4a(a TEXT, b TEXT COLLATE "unicode_ci", c PRIMARY KEY);
         INSERT INTO t4a VALUES('ABC','abc',1);
         INSERT INTO t4a VALUES('def','xyz',2);
         INSERT INTO t4a VALUES('ghi','ghi',3);

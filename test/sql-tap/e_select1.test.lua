@@ -248,7 +248,7 @@ test:do_select_tests(
     "e_select-0.6",
     {
         {"1", "SELECT b||a FROM t1 ORDER BY b||a", {"onea", "threec", "twob"}},
-        {"2", "SELECT b||a FROM t1 ORDER BY (b||a) COLLATE nocase", {"onea", "threec", "twob"}},
+        {"2", "SELECT b||a FROM t1 ORDER BY (b||a) COLLATE \"unicode_ci\"", {"onea", "threec", "twob"}},
         {"3", "SELECT b||a FROM t1 ORDER BY (b||a) ASC", {"onea", "threec", "twob"}},
         {"4", "SELECT b||a FROM t1 ORDER BY (b||a) DESC", {"twob", "threec", "onea"}},
     })
@@ -562,11 +562,11 @@ if (0 > 0)
     test:do_execsql_test(
         "e_select-1.6.0",
         [[
-            CREATE TABLE t5(a COLLATE nocase, b COLLATE binary);
+            CREATE TABLE t5(a COLLATE "unicode_ci", b COLLATE binary);
             INSERT INTO t5 VALUES('AA', 'cc');
             INSERT INTO t5 VALUES('BB', 'dd');
             INSERT INTO t5 VALUES(NULL, NULL);
-            CREATE TABLE t6(a COLLATE binary, b COLLATE nocase);
+            CREATE TABLE t6(a COLLATE binary, b COLLATE "unicode_ci");
             INSERT INTO t6 VALUES('aa', 'cc');
             INSERT INTO t6 VALUES('bb', 'DD');
             INSERT INTO t6 VALUES(NULL, NULL);
@@ -576,7 +576,7 @@ if (0 > 0)
             -- </e_select-1.6.0>
         })
 
-    for _ in X(0, "X!foreach", [=[["tn select res","\n     1 { SELECT * FROM t5 JOIN_PATTERN t6 USING (a) } {AA cc cc BB dd DD}\n     2 { SELECT * FROM t6 JOIN_PATTERN t5 USING (a) } {}\n     3 { SELECT * FROM (SELECT a COLLATE nocase, b FROM t6) JOIN_PATTERN t5 USING (a) } \n       {aa cc cc bb DD dd}\n     4 { SELECT * FROM t5 JOIN_PATTERN t6 USING (a,b) } {AA cc}\n     5 { SELECT * FROM t6 JOIN_PATTERN t5 USING (a,b) } {}\n   "]]=]) do
+    for _ in X(0, "X!foreach", [=[["tn select res","\n     1 { SELECT * FROM t5 JOIN_PATTERN t6 USING (a) } {AA cc cc BB dd DD}\n     2 { SELECT * FROM t6 JOIN_PATTERN t5 USING (a) } {}\n     3 { SELECT * FROM (SELECT a COLLATE "unicode_ci", b FROM t6) JOIN_PATTERN t5 USING (a) } \n       {aa cc cc bb DD dd}\n     4 { SELECT * FROM t5 JOIN_PATTERN t6 USING (a,b) } {AA cc}\n     5 { SELECT * FROM t6 JOIN_PATTERN t5 USING (a,b) } {}\n   "]]=]) do
         do_join_test("e_select-1.6."..tn, select, res)
     end
     -- EVIDENCE-OF: R-57047-10461 For each pair of columns identified by a
@@ -586,7 +586,7 @@ if (0 > 0)
     -- EVIDENCE-OF: R-56132-15700 This is the only difference between a USING
     -- clause and its equivalent ON constraint.
     --
-    for _ in X(0, "X!foreach", [=[["tn select res","\n     1a { SELECT * FROM t1 JOIN_PATTERN t2 USING (a)      } \n        {a one I b two II c three III}\n     1b { SELECT * FROM t1 JOIN_PATTERN t2 ON (t1.a=t2.a) }\n        {a one a I b two b II c three c III}\n\n     2a { SELECT * FROM t3 JOIN_PATTERN t4 USING (a)      }  \n        {a 1 {} b 2 2}\n     2b { SELECT * FROM t3 JOIN_PATTERN t4 ON (t3.a=t4.a) } \n        {a 1 a {} b 2 b 2}\n\n     3a { SELECT * FROM t3 JOIN_PATTERN t4 USING (a,c)                  } {b 2}\n     3b { SELECT * FROM t3 JOIN_PATTERN t4 ON (t3.a=t4.a AND t3.c=t4.c) } {b 2 b 2}\n\n     4a { SELECT * FROM (SELECT a COLLATE nocase, b FROM t6) AS x \n          JOIN_PATTERN t5 USING (a) } \n        {aa cc cc bb DD dd}\n     4b { SELECT * FROM (SELECT a COLLATE nocase, b FROM t6) AS x\n          JOIN_PATTERN t5 ON (x.a=t5.a) } \n        {aa cc AA cc bb DD BB dd}\n   "]]=]) do
+    for _ in X(0, "X!foreach", [=[["tn select res","\n     1a { SELECT * FROM t1 JOIN_PATTERN t2 USING (a)      } \n        {a one I b two II c three III}\n     1b { SELECT * FROM t1 JOIN_PATTERN t2 ON (t1.a=t2.a) }\n        {a one a I b two b II c three c III}\n\n     2a { SELECT * FROM t3 JOIN_PATTERN t4 USING (a)      }  \n        {a 1 {} b 2 2}\n     2b { SELECT * FROM t3 JOIN_PATTERN t4 ON (t3.a=t4.a) } \n        {a 1 a {} b 2 b 2}\n\n     3a { SELECT * FROM t3 JOIN_PATTERN t4 USING (a,c)                  } {b 2}\n     3b { SELECT * FROM t3 JOIN_PATTERN t4 ON (t3.a=t4.a AND t3.c=t4.c) } {b 2 b 2}\n\n     4a { SELECT * FROM (SELECT a COLLATE "unicode_ci", b FROM t6) AS x \n          JOIN_PATTERN t5 USING (a) } \n        {aa cc cc bb DD dd}\n     4b { SELECT * FROM (SELECT a COLLATE "unicode_ci", b FROM t6) AS x\n          JOIN_PATTERN t5 ON (x.a=t5.a) } \n        {aa cc AA cc bb DD BB dd}\n   "]]=]) do
         do_join_test("e_select-1.7."..tn, select, res)
     end
     X(630, "X!cmd", [=[["EVIDENCE-OF:","R-42531-52874","If","the","join-operator","is","a","LEFT JOIN","or"]]=])
@@ -1100,7 +1100,7 @@ test:do_execsql_test(
         INSERT INTO b2 VALUES('abc', 3);
         INSERT INTO b2 VALUES('xyz', 4);
 
-        CREATE TABLE b3(id PRIMARY KEY, a COLLATE nocase, b COLLATE binary);
+        CREATE TABLE b3(id PRIMARY KEY, a COLLATE "unicode_ci", b COLLATE binary);
         INSERT INTO b3 VALUES(1, 'abc', 'abc');
         INSERT INTO b3 VALUES(2, 'aBC', 'aBC');
         INSERT INTO b3 VALUES(3, 'Def', 'Def');
@@ -1312,7 +1312,7 @@ test:do_execsql_test(
         INSERT INTO h1 VALUES(5, 4, 'IV');
         INSERT INTO h1 VALUES(6, 4, 'iv');
 
-        CREATE TABLE h2(id primary key, x COLLATE nocase);
+        CREATE TABLE h2(id primary key, x COLLATE "unicode_ci");
         INSERT INTO h2 VALUES(1, 'One');
         INSERT INTO h2 VALUES(2, 'Two');
         INSERT INTO h2 VALUES(3, 'Three');
@@ -1390,7 +1390,7 @@ test:do_select_tests(
     "e_select-5.6",
     {
         {"1", "SELECT DISTINCT b FROM h1", {"one", "I", "i", "four", "IV", "iv"}},
-        {"2", "SELECT DISTINCT b COLLATE nocase FROM h1", {"one", "I", "four", "IV"}},
+        {"2", "SELECT DISTINCT b COLLATE \"unicode_ci\" FROM h1", {"one", "I", "four", "IV"}},
         {"3", "SELECT DISTINCT x FROM h2", {"One", "Two", "Three", "Four"}},
         {"4", "SELECT DISTINCT x COLLATE binary FROM h2", {
             "One", "Two", "Three", "Four", "one", "two", "three", "four"
@@ -1677,7 +1677,7 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.10.0",
     [[
-        CREATE TABLE y1(a COLLATE nocase PRIMARY KEY, b COLLATE binary, c);
+        CREATE TABLE y1(a COLLATE "unicode_ci" PRIMARY KEY, b COLLATE binary, c);
         INSERT INTO y1 VALUES('Abc', 'abc', 'aBC');
     ]], {
         -- <e_select-7.10.0>
@@ -1689,10 +1689,10 @@ test:do_select_tests(
     "e_select-7.10",
     {
         {"1", "SELECT 'abc'                UNION SELECT 'ABC'", {"ABC",  "abc"}},
-        {"2", "SELECT 'abc' COLLATE nocase UNION SELECT 'ABC'", {"ABC" }},
-        {"3", "SELECT 'abc'                UNION SELECT 'ABC' COLLATE nocase", {"ABC" }},
-        {"4", "SELECT 'abc' COLLATE binary UNION SELECT 'ABC' COLLATE nocase", {"ABC",  "abc"}},
-        {"5", "SELECT 'abc' COLLATE nocase UNION SELECT 'ABC' COLLATE binary", {"ABC" }},
+        {"2", "SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC'", {"ABC" }},
+        {"3", "SELECT 'abc'                UNION SELECT 'ABC' COLLATE \"unicode_ci\"", {"ABC" }},
+        {"4", "SELECT 'abc' COLLATE binary UNION SELECT 'ABC' COLLATE \"unicode_ci\"", {"ABC",  "abc"}},
+        {"5", "SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE binary", {"ABC" }},
         {"6", "SELECT a FROM y1 UNION SELECT b FROM y1", {"abc" }},
         {"7", "SELECT b FROM y1 UNION SELECT a FROM y1", {"Abc",  "abc"}},
         {"8", "SELECT a FROM y1 UNION SELECT c FROM y1", {"aBC" }},
@@ -1991,7 +1991,7 @@ test:do_execsql_test(
         INSERT INTO d3 VALUES(6, 12.9);
         INSERT INTO d3 VALUES(7, null);
 
-        CREATE TABLE d4(id primary key, x COLLATE nocase);
+        CREATE TABLE d4(id primary key, x COLLATE "unicode_ci");
         INSERT INTO d4 VALUES(1, 'abc');
         INSERT INTO d4 VALUES(2, 'ghi');
         INSERT INTO d4 VALUES(3, 'DEF');
@@ -2045,7 +2045,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-8.9.2",
     [[
-        SELECT x COLLATE binary FROM d4 ORDER BY 1 COLLATE nocase
+        SELECT x COLLATE binary FROM d4 ORDER BY 1 COLLATE "unicode_ci"
     ]], {
         -- <e_select-8.9.2>
         "abc", "DEF", "ghi", "JKL"
@@ -2151,8 +2151,8 @@ test:do_execsql_test(
         INSERT INTO d6 VALUES(5, 'b');
         INSERT INTO d7 VALUES(6, 'a');
 
-        CREATE TABLE d8(x COLLATE nocase PRIMARY KEY);
-        CREATE TABLE d9(y COLLATE nocase PRIMARY KEY);
+        CREATE TABLE d8(x COLLATE "unicode_ci" PRIMARY KEY);
+        CREATE TABLE d9(y COLLATE "unicode_ci" PRIMARY KEY);
 
         INSERT INTO d8 VALUES('a');
         INSERT INTO d9 VALUES('B');

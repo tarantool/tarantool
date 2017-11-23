@@ -31,7 +31,7 @@ testprefix = "selectA"
 test:do_execsql_test(
     "selectA-1.0",
     [[
-        CREATE TABLE t1(id primary key, a,b,c COLLATE NOCASE);
+        CREATE TABLE t1(id primary key, a,b,c COLLATE "unicode_ci");
         INSERT INTO t1 VALUES(1, 1,'a','a');
         INSERT INTO t1 VALUES(2, 9.9, 'b', 'B');
         INSERT INTO t1 VALUES(3, NULL, 'C', 'c');
@@ -47,7 +47,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-1.1",
     [[
-        CREATE TABLE t2(id primary key, x,y,z COLLATE NOCASE);
+        CREATE TABLE t2(id primary key, x,y,z COLLATE "unicode_ci");
         INSERT INTO t2 VALUES(1, NULL,'U','u');
         INSERT INTO t2 VALUES(2, 'mad', 'Z', 'z');
         INSERT INTO t2 VALUES(3, x'68617265', 'm', 'M');
@@ -63,7 +63,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-1.2",
     [[
-        CREATE TABLE t3(id primary key, a,b,c COLLATE NOCASE);
+        CREATE TABLE t3(id primary key, a,b,c COLLATE "unicode_ci");
         INSERT INTO t3 SELECT id, a, b, c FROM t1;
         INSERT INTO t3 SELECT id+10, x, y, z FROM t2;
         INSERT INTO t3 SELECT id+20, a, b, c FROM t1;
@@ -157,7 +157,7 @@ test:do_execsql_test(
     "selectA-2.5",
     [[
         SELECT a,b,c FROM t1 UNION ALL SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-2.5>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -168,7 +168,7 @@ test:do_execsql_test(
     "selectA-2.6",
     [[
         SELECT a,b,c FROM t1 UNION ALL SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-2.6>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -267,7 +267,7 @@ test:do_execsql_test(
     "selectA-2.15",
     [[
         SELECT x,y,z FROM t2 UNION ALL SELECT a,b,c FROM t1
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-2.15>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -278,7 +278,7 @@ test:do_execsql_test(
     "selectA-2.16",
     [[
         SELECT x,y,z FROM t2 UNION ALL SELECT a,b,c FROM t1
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-2.16>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -377,7 +377,7 @@ test:do_execsql_test(
     "selectA-2.25",
     [[
         SELECT a,b,c FROM t1 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-2.25>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -388,7 +388,7 @@ test:do_execsql_test(
     "selectA-2.26",
     [[
         SELECT a,b,c FROM t1 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-2.26>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -487,7 +487,7 @@ test:do_execsql_test(
     "selectA-2.35",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t1
-        ORDER BY y COLLATE NOCASE,x,z
+        ORDER BY y COLLATE "unicode_ci",x,z
     ]], {
         -- <selectA-2.35>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -498,7 +498,7 @@ test:do_execsql_test(
     "selectA-2.36",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t1
-        ORDER BY y COLLATE NOCASE DESC,x,z
+        ORDER BY y COLLATE "unicode_ci" DESC,x,z
     ]], {
         -- <selectA-2.36>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -729,7 +729,7 @@ test:do_execsql_test(
     "selectA-2.57",
     [[
         SELECT a,b,c FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
-        ORDER BY b COLLATE NOCASE
+        ORDER BY b COLLATE "unicode_ci"
     ]], {
         -- <selectA-2.57>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -795,7 +795,7 @@ test:do_execsql_test(
     "selectA-2.63",
     [[
         SELECT a,b,c FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
-        ORDER BY c COLLATE NOCASE
+        ORDER BY c COLLATE "unicode_ci"
     ]], {
         -- <selectA-2.63>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -817,7 +817,7 @@ test:do_execsql_test(
     "selectA-2.65",
     [[
         SELECT a,b,c FROM t3 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
-        ORDER BY c COLLATE NOCASE
+        ORDER BY c COLLATE "unicode_ci"
     ]], {
         -- <selectA-2.65>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -865,7 +865,7 @@ test:do_execsql_test(
         SELECT a,b,c FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
         INTERSECT SELECT a,b,c FROM t3
         EXCEPT SELECT b,c,a FROM t3
-        ORDER BY c COLLATE NOCASE
+        ORDER BY c COLLATE "unicode_ci"
     ]], {
         -- <selectA-2.69>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -953,7 +953,7 @@ test:do_execsql_test(
     "selectA-2.76",
     [[
         SELECT a,b,c FROM t3 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-2.76>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -964,7 +964,7 @@ test:do_execsql_test(
     "selectA-2.77",
     [[
         SELECT a,b,c FROM t3 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-2.77>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1063,7 +1063,7 @@ test:do_execsql_test(
     "selectA-2.86",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t3
-        ORDER BY y COLLATE NOCASE,x,z
+        ORDER BY y COLLATE "unicode_ci",x,z
     ]], {
         -- <selectA-2.86>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -1074,7 +1074,7 @@ test:do_execsql_test(
     "selectA-2.87",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t3
-        ORDER BY y COLLATE NOCASE DESC,x,z
+        ORDER BY y COLLATE "unicode_ci" DESC,x,z
     ]], {
         -- <selectA-2.87>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1135,7 +1135,7 @@ test:do_execsql_test(
         INTERSECT SELECT a,b,c FROM t3
         EXCEPT SELECT c,b,a FROM t1
         UNION SELECT a,b,c FROM t3
-        ORDER BY y COLLATE NOCASE DESC,x,z
+        ORDER BY y COLLATE "unicode_ci" DESC,x,z
     ]], {
         -- <selectA-2.92>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1260,7 +1260,7 @@ test:do_execsql_test(
     "selectA-3.5",
     [[
         SELECT a,b,c FROM t1 UNION ALL SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-3.5>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -1271,7 +1271,7 @@ test:do_execsql_test(
     "selectA-3.6",
     [[
         SELECT a,b,c FROM t1 UNION ALL SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-3.6>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1372,7 +1372,7 @@ test:do_execsql_test(
     "selectA-3.15",
     [[
         SELECT x,y,z FROM t2 UNION ALL SELECT a,b,c FROM t1
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-3.15>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -1383,7 +1383,7 @@ test:do_execsql_test(
     "selectA-3.16",
     [[
         SELECT x,y,z FROM t2 UNION ALL SELECT a,b,c FROM t1
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-3.16>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1484,7 +1484,7 @@ test:do_execsql_test(
     "selectA-3.25",
     [[
         SELECT a,b,c FROM t1 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-3.25>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -1495,7 +1495,7 @@ test:do_execsql_test(
     "selectA-3.26",
     [[
         SELECT a,b,c FROM t1 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-3.26>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1597,7 +1597,7 @@ test:do_execsql_test(
     "selectA-3.35",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t1
-        ORDER BY y COLLATE NOCASE,x,z
+        ORDER BY y COLLATE "unicode_ci",x,z
     ]], {
         -- <selectA-3.35>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -1608,7 +1608,7 @@ test:do_execsql_test(
     "selectA-3.36",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t1
-        ORDER BY y COLLATE NOCASE DESC,x,z
+        ORDER BY y COLLATE "unicode_ci" DESC,x,z
     ]], {
         -- <selectA-3.36>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -1842,7 +1842,7 @@ test:do_execsql_test(
     "selectA-3.57",
     [[
         SELECT a,b,c FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
-        ORDER BY b COLLATE NOCASE
+        ORDER BY b COLLATE "unicode_ci"
     ]], {
         -- <selectA-3.57>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -1912,7 +1912,7 @@ test:do_execsql_test(
     "selectA-3.63",
     [[
         SELECT a,b,c FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
-        ORDER BY c COLLATE NOCASE
+        ORDER BY c COLLATE "unicode_ci"
     ]], {
         -- <selectA-3.63>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -1936,7 +1936,7 @@ test:do_execsql_test(
     "selectA-3.65",
     [[
         SELECT a,b,c FROM t3 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
-        ORDER BY c COLLATE NOCASE
+        ORDER BY c COLLATE "unicode_ci"
     ]], {
         -- <selectA-3.65>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -1986,7 +1986,7 @@ test:do_execsql_test(
         SELECT a,b,c FROM t1 INTERSECT SELECT a,b,c FROM t1 WHERE b<'d'
         INTERSECT SELECT a,b,c FROM t3
         EXCEPT SELECT b,c,a FROM t3
-        ORDER BY c COLLATE NOCASE
+        ORDER BY c COLLATE "unicode_ci"
     ]], {
         -- <selectA-3.69>
         1, "a", "a", 9.9, "b", "B", "", "C", "c"
@@ -2077,7 +2077,7 @@ test:do_execsql_test(
     "selectA-3.76",
     [[
         SELECT a,b,c FROM t3 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE,a,c
+        ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-3.76>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -2088,7 +2088,7 @@ test:do_execsql_test(
     "selectA-3.77",
     [[
         SELECT a,b,c FROM t3 UNION SELECT x,y,z FROM t2
-        ORDER BY b COLLATE NOCASE DESC,a,c
+        ORDER BY b COLLATE "unicode_ci" DESC,a,c
     ]], {
         -- <selectA-3.77>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -2187,7 +2187,7 @@ test:do_execsql_test(
     "selectA-3.86",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t3
-        ORDER BY y COLLATE NOCASE,x,z
+        ORDER BY y COLLATE "unicode_ci",x,z
     ]], {
         -- <selectA-3.86>
         1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
@@ -2198,7 +2198,7 @@ test:do_execsql_test(
     "selectA-3.87",
     [[
         SELECT x,y,z FROM t2 UNION SELECT a,b,c FROM t3
-        ORDER BY y COLLATE NOCASE DESC,x,z
+        ORDER BY y COLLATE "unicode_ci" DESC,x,z
     ]], {
         -- <selectA-3.87>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -2259,7 +2259,7 @@ test:do_execsql_test(
         INTERSECT SELECT a,b,c FROM t3
         EXCEPT SELECT c,b,a FROM t1
         UNION SELECT a,b,c FROM t3
-        ORDER BY y COLLATE NOCASE DESC,x,z
+        ORDER BY y COLLATE "unicode_ci" DESC,x,z
     ]], {
         -- <selectA-3.92>
         "mad", "Z", "z", -23, "Y", "y", 5200000.0, "X", "x", "", "U", "u", "hare", "m", "M", "abc", "e", "e", "hello", "d", "D", "", "C", "c", 9.9, "b", "B", 1, "a", "a"
@@ -2320,7 +2320,7 @@ test:do_execsql_test(
           INTERSECT SELECT a,b,c FROM t3
           EXCEPT SELECT c,b,a FROM t1
           UNION SELECT a,b,c FROM t3
-          ORDER BY y COLLATE NOCASE DESC,x,z)))
+          ORDER BY y COLLATE "unicode_ci" DESC,x,z)))
     ]], {
         -- <selectA-3.97>
         "MAD"
@@ -2340,7 +2340,7 @@ test:do_execsql_test(
               INTERSECT SELECT a,b,c FROM t3
               EXCEPT SELECT c,b,a FROM t1
               UNION SELECT a,b,c FROM t3
-              ORDER BY y COLLATE NOCASE DESC,x,z)))
+              ORDER BY y COLLATE "unicode_ci" DESC,x,z)))
             UNION ALL
             SELECT n || '+' FROM xyz WHERE length(n)<5
           )
@@ -2498,35 +2498,35 @@ do_same_test(
 do_same_test(
     5.2,
     [[
-      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY a COLLATE NOCASE
+      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY a COLLATE "unicode_ci"
     ]],
     {[[
-      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY t8.a COLLATE NOCASE
+      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY t8.a COLLATE "unicode_ci"
     ]], [[
-      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY 1 COLLATE NOCASE
+      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY 1 COLLATE "unicode_ci"
     ]], [[
-      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY c COLLATE NOCASE
+      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY c COLLATE "unicode_ci"
     ]], [[
-      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY t9.c COLLATE NOCASE
+      SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY t9.c COLLATE "unicode_ci"
     ]]})
     do_same_test(5.3,
         [[
-      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY b, c COLLATE NOCASE
+      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY b, c COLLATE "unicode_ci"
     ]],
         {[[
-      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY 2, 1 COLLATE NOCASE
+      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY 2, 1 COLLATE "unicode_ci"
     ]], [[
-      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY d, a COLLATE NOCASE
+      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY d, a COLLATE "unicode_ci"
     ]], [[
-      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY t9.d, c COLLATE NOCASE
+      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY t9.d, c COLLATE "unicode_ci"
     ]], [[
-      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY d, t8.a COLLATE NOCASE
+      SELECT a, b FROM t8 EXCEPT SELECT c, d FROM t9 ORDER BY d, t8.a COLLATE "unicode_ci"
     ]]})
 
 test:do_catchsql_test(
     5.4,
     [[
-        SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY a+b COLLATE NOCASE
+        SELECT a, b FROM t8 UNION SELECT c, d FROM t9 ORDER BY a+b COLLATE "unicode_ci"
     ]], {
         -- <5.4>
         1, "1st ORDER BY term does not match any column in the result set"

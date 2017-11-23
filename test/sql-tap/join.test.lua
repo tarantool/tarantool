@@ -980,7 +980,7 @@ test:do_test(
             DROP TABLE IF EXISTS t2;
         ]]
         return test:execsql [[
-            CREATE TABLE t1(id primary key, a COLLATE nocase, b);
+            CREATE TABLE t1(id primary key, a COLLATE "unicode_ci", b);
             CREATE TABLE t2(id primary key, a, b);
             INSERT INTO t1 VALUES(1, 'ONE', 1);
             INSERT INTO t1 VALUES(2, 'two', 2);

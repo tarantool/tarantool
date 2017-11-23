@@ -792,7 +792,7 @@ end
 test:do_execsql_test(
     "e_expr-9.10",
     [[
-        SELECT  'abcd' =  'ABCD'  COLLATE nocase
+        SELECT  'abcd' =  'ABCD'  COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.10>
         1
@@ -802,7 +802,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.11",
     [[
-        SELECT ('abcd' =  'ABCD') COLLATE nocase
+        SELECT ('abcd' =  'ABCD') COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.11>
         0
@@ -812,7 +812,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.12",
     [[
-        SELECT  'abcd' == 'ABCD'  COLLATE nocase
+        SELECT  'abcd' == 'ABCD'  COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.12>
         1
@@ -822,7 +822,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.13",
     [[
-        SELECT ('abcd' == 'ABCD') COLLATE nocase
+        SELECT ('abcd' == 'ABCD') COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.13>
         0
@@ -832,7 +832,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.14",
     [[
-        SELECT  'abcd' IS 'ABCD'  COLLATE nocase
+        SELECT  'abcd' IS 'ABCD'  COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.14>
         1
@@ -842,7 +842,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.15",
     [[
-        SELECT ('abcd' IS 'ABCD') COLLATE nocase
+        SELECT ('abcd' IS 'ABCD') COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.15>
         0
@@ -852,7 +852,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.16",
     [[
-        SELECT  'abcd' != 'ABCD'      COLLATE nocase
+        SELECT  'abcd' != 'ABCD'      COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.16>
         0
@@ -862,7 +862,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.17",
     [[
-        SELECT ('abcd' != 'ABCD')     COLLATE nocase
+        SELECT ('abcd' != 'ABCD')     COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.17>
         1
@@ -872,7 +872,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.18",
     [[
-        SELECT  'abcd' <> 'ABCD'      COLLATE nocase
+        SELECT  'abcd' <> 'ABCD'      COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.18>
         0
@@ -882,7 +882,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.19",
     [[
-        SELECT ('abcd' <> 'ABCD')     COLLATE nocase
+        SELECT ('abcd' <> 'ABCD')     COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.19>
         1
@@ -892,7 +892,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.20",
     [[
-        SELECT  'abcd' IS NOT 'ABCD'  COLLATE nocase
+        SELECT  'abcd' IS NOT 'ABCD'  COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.20>
         0
@@ -902,7 +902,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.21",
     [[
-        SELECT ('abcd' IS NOT 'ABCD') COLLATE nocase
+        SELECT ('abcd' IS NOT 'ABCD') COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.21>
         1
@@ -912,7 +912,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.22",
     [[
-        SELECT 'bbb' BETWEEN 'AAA' AND 'CCC' COLLATE nocase
+        SELECT 'bbb' BETWEEN 'AAA' AND 'CCC' COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.22>
         1
@@ -922,7 +922,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.23",
     [[
-        SELECT ('bbb' BETWEEN 'AAA' AND 'CCC') COLLATE nocase
+        SELECT ('bbb' BETWEEN 'AAA' AND 'CCC') COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.23>
         0
@@ -1552,7 +1552,7 @@ local test_cases12 ={
     {50, "CAST ( EXPR AS 'abcd' )"},
     {51, "CAST ( EXPR AS 'ab$ $cd' )"},
 
-    {52, "EXPR COLLATE nocase"},
+    {52, "EXPR COLLATE \"unicode_ci\""},
     {53, "EXPR COLLATE binary"},
 
     {54, "EXPR1 LIKE EXPR2"},

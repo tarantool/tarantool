@@ -93,7 +93,7 @@ test:do_execsql_test(
     1.0,
     [[
         CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b, c, d);
-        CREATE UNIQUE INDEX i2 ON t1(d COLLATE nocase);
+        CREATE UNIQUE INDEX i2 ON t1(d COLLATE "unicode_ci");
 
         CREATE TABLE t2(x INTEGER PRIMARY KEY, y);
 
@@ -102,7 +102,7 @@ test:do_execsql_test(
 
         CREATE TABLE t4(id INTEGER PRIMARY KEY, a, b NOT NULL, c NOT NULL, d NOT NULL);
         CREATE UNIQUE INDEX t4i1 ON t4(b, c);
-        CREATE UNIQUE INDEX t4i2 ON t4(d COLLATE nocase);
+        CREATE UNIQUE INDEX t4i2 ON t4(d COLLATE "unicode_ci");
     ]])
 local data = {
     {"1.1", 0, "SELECT DISTINCT b, c FROM t1"},
@@ -120,10 +120,10 @@ local data = {
     {"11 ", 0, "SELECT DISTINCT b FROM t1"},
     {"12.1", 0, "SELECT DISTINCT a, d FROM t1"},
     {"12.2", 0, "SELECT DISTINCT a, d FROM t4"},
-    {"13.1", 0, "SELECT DISTINCT a, b, c COLLATE nocase FROM t1"},
-    {"13.2", 0, "SELECT DISTINCT a, b, c COLLATE nocase FROM t4"},
-    {"14.1", 0, "SELECT DISTINCT a, d COLLATE nocase FROM t1"},
-    {"14.2", 1, "SELECT DISTINCT a, d COLLATE nocase FROM t4"},
+    {"13.1", 0, "SELECT DISTINCT a, b, c COLLATE \"unicode_ci\" FROM t1"},
+    {"13.2", 0, "SELECT DISTINCT a, b, c COLLATE \"unicode_ci\" FROM t4"},
+    {"14.1", 0, "SELECT DISTINCT a, d COLLATE \"unicode_ci\" FROM t1"},
+    {"14.2", 1, "SELECT DISTINCT a, d COLLATE \"unicode_ci\" FROM t4"},
     {"15 ", 0, "SELECT DISTINCT a, d COLLATE binary FROM t1"},
     {"16.1", 0, "SELECT DISTINCT a, b, c COLLATE binary FROM t1"},
     {"16.2", 1, "SELECT DISTINCT a, b, c COLLATE binary FROM t4"},
@@ -161,7 +161,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b, c);
         CREATE INDEX i1 ON t1(a, b);
-        CREATE INDEX i2 ON t1(b COLLATE nocase, c COLLATE nocase);
+        CREATE INDEX i2 ON t1(b COLLATE "unicode_ci", c COLLATE "unicode_ci");
 
         INSERT INTO t1 VALUES(1, 'a', 'b', 'c');
         INSERT INTO t1 VALUES(2, 'A', 'B', 'C');
@@ -177,8 +177,8 @@ data = {
     {"b FROM t1 WHERE a = 'a'", {}, {"b"}},
     {"b FROM t1 ORDER BY +b COLLATE binary", {"btree", "hash"}, {"B", "b"}},
     {"a FROM t1", {}, {"A", "a"}},
-    {"b COLLATE nocase FROM t1", {}, {"B"}},
-    {"b COLLATE nocase FROM t1 ORDER BY b COLLATE nocase", {}, {"B"}},
+    {"b COLLATE \"unicode_ci\" FROM t1", {}, {"b"}},
+    {"b COLLATE \"unicode_ci\" FROM t1 ORDER BY b COLLATE \"unicode_ci\"", {}, {"b"}},
 }
 for tn, val in ipairs(data) do
     local sql = val[1]

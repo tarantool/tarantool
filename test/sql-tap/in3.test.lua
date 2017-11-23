@@ -196,7 +196,7 @@ test:do_test(
 test:do_test(
     "in3-1.14",
     function()
-        return exec_neph(" SELECT a FROM t1 WHERE a COLLATE nocase IN (SELECT a FROM t1) ")
+        return exec_neph(" SELECT a FROM t1 WHERE a COLLATE \"unicode_ci\" IN (SELECT a FROM t1) ")
     end, {
         -- <in3-1.14>
         1, 1, 3, 5
@@ -398,7 +398,7 @@ test:do_test(
 test:do_test(
     "in3-4.3",
     function()
-        return exec_neph(" SELECT 'TEXT' COLLATE nocase IN (SELECT b FROM t3) ")
+        return exec_neph(" SELECT 'TEXT' COLLATE \"unicode_ci\" IN (SELECT b FROM t3) ")
     end, {
         -- <in3-4.3>
         1, 1

@@ -482,7 +482,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.2",
     [[
-        SELECT max(x COLLATE nocase) FROM t4;
+        SELECT max(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.2>
         "BCD"
@@ -492,7 +492,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.3",
     [[
-        SELECT max(x), max(x COLLATE nocase) FROM t4;
+        SELECT max(x), max(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.3>
         "abc", "BCD"
@@ -502,7 +502,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.4",
     [[
-        SELECT max(x COLLATE binary), max(x COLLATE nocase) FROM t4;
+        SELECT max(x COLLATE binary), max(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.4>
         "abc", "BCD"
@@ -512,17 +512,19 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.5",
     [[
-        SELECT max(x COLLATE nocase), max(x COLLATE rtrim) FROM t4;
+        --SELECT max(x COLLATE nocase), max(x COLLATE rtrim) FROM t4;
+        SELECT max(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.5>
-        "BCD", "abc"
+        --"BCD", "abc"
+        "BCD"
         -- </minmax3-4.5>
     })
 
 test:do_execsql_test(
     "minmax3-4.6",
     [[
-        SELECT max(x COLLATE nocase), max(x) FROM t4;
+        SELECT max(x COLLATE "unicode_ci"), max(x) FROM t4;
     ]], {
         -- <minmax3-4.6>
         "BCD", "abc"
@@ -542,7 +544,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.11",
     [[
-        SELECT min(x COLLATE nocase) FROM t4;
+        SELECT min(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.11>
         "abc"
@@ -552,7 +554,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.12",
     [[
-        SELECT min(x), min(x COLLATE nocase) FROM t4;
+        SELECT min(x), min(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.12>
         "BCD", "abc"
@@ -562,7 +564,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.13",
     [[
-        SELECT min(x COLLATE binary), min(x COLLATE nocase) FROM t4;
+        SELECT min(x COLLATE binary), min(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.13>
         "BCD", "abc"
@@ -572,17 +574,19 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.14",
     [[
-        SELECT min(x COLLATE nocase), min(x COLLATE rtrim) FROM t4;
+        --SELECT min(x COLLATE nocase), min(x COLLATE rtrim) FROM t4;
+        SELECT min(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.14>
-        "abc", "BCD"
+        --"abc", "BCD"
+        "abc"
         -- </minmax3-4.14>
     })
 
 test:do_execsql_test(
     "minmax3-4.15",
     [[
-        SELECT min(x COLLATE nocase), min(x) FROM t4;
+        SELECT min(x COLLATE "unicode_ci"), min(x) FROM t4;
     ]], {
         -- <minmax3-4.15>
         "abc", "BCD"

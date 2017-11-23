@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(42)
+test:plan(162)
 
 local prefix = "collation-"
 
@@ -64,8 +64,12 @@ local data_eng = {
     {2, "a"},
     {3, "aa"},
     {4, "ab"},
-    {5, "aba"},
-    {6, "abc"},
+    {5, "Ac"},
+    {6, "Ad"},
+    {7, "AD"},
+    {8, "aE"},
+    {9, "ae"},
+    {10, "aba"},
 }
 local data_num = {
     {21, "1"},
@@ -96,9 +100,13 @@ local data_ru = {
     {64, "б"},
     {65, "е"},
     {66, "её"},
-    {67, "ё"},
-    {68, "Ё"},
-    {69, "ж"},
+    {67, "Её"},
+    {68, "ЕЁ"},
+    {69, "еЁ"},
+    {70, "ёёё"},
+    {71, "ё"},
+    {72, "Ё"},
+    {73, "ж"},
 }
 
 local data_combined = merge_tables(data_eng, data_num, data_symbols, data_ru)
@@ -109,19 +117,47 @@ local data_combined = merge_tables(data_eng, data_num, data_symbols, data_ru)
 
 local data_test_binary_1 = {
     --   test_name , data to fill with, result output in col
-    {"en", data_eng, {1,2,3,4,5,6}},
-    {"num", data_num, {27,21,22,23,24,25,26}},
-    {"symbols", data_symbols, {41,42,43,44,45,46,47,48,49,50}},
-    {"ru", data_ru, {68,61,63,62,64,65,66,69,67}},
+    {"en", data_eng, {"AD","Aa","Ac","Ad","a","aE","aa","ab","aba","ae"}},
+    {"num", data_num, {"0","1","2","21","23","3","9"}},
+    {"symbols", data_symbols, {" ","!",")","/",":","<","@","[","`","}"}},
+    {"ru", data_ru, {"Ё","А","Б","ЕЁ","Её","а","б","е","еЁ","её","ж","ё","ёёё"}},
     {"combined", data_combined,
-        {41,42,43,44,27,21,22,23,24,25,26,45,46,47,1,
-            48,49,2,3,4,5,6,50,68,61,63,62,64,65,66,69,67}}
+        {" ","!",")","/","0","1","2","21","23","3","9",":","<","@",
+            "AD","Aa","Ac","Ad","[","`","a","aE","aa","ab","aba","ae",
+            "}","Ё","А","Б","ЕЁ","Её","а","б","е","еЁ","её","ж","ё","ёёё"}}
+}
+
+local data_test_unicode = {
+    --   test_name , data to fill with, result output in col
+    {"en", data_eng, {"a","aa","Aa","ab","aba","Ac","Ad","AD","ae","aE"}},
+    {"num", data_num, {"0","1","2","21","23","3","9"}},
+    {"symbols", data_symbols, {" ",":","!",")","[","}","@","/","`","<"}},
+    {"ru", data_ru, {"а","А","б","Б","е","ё","Ё","её","еЁ","Её","ЕЁ","ёёё","ж"}},
+    {"combined", data_combined,
+        {" ",":","!",")","[","}","@","/","`","<","0","1","2","21","23",
+            "3","9","a","aa","Aa","ab","aba","Ac","Ad","AD","ae","aE","а",
+            "А","б","Б","е","ё","Ё","её","еЁ","Её","ЕЁ","ёёё","ж"}}
+}
+
+
+local data_test_unicode_ci = {
+    --   test_name , data to fill with, result output in col
+    {"en", data_eng, {"a","Aa","aa","ab","aba","Ac","Ad","AD","aE","ae"}},
+    {"num", data_num, {"0","1","2","21","23","3","9"}},
+    {"symbols", data_symbols, {" ",":","!",")","[","}","@","/","`","<"}},
+    {"ru", data_ru, {"А","а","Б","б","е","ё","Ё","её","Её","ЕЁ","еЁ","ёёё","ж"}},
+    {"combined", data_combined,
+        {" ",":","!",")","[","}","@","/","`","<","0","1","2","21","23",
+            "3","9","a","aa","Aa","ab","aba","Ac","Ad","AD","ae","aE","а",
+            "А","б","Б","е","ё","Ё","её","еЁ","Её","ЕЁ","ёёё","ж"}}
 }
 
 local data_collations = {
     -- default collation = binary
     {"/*COLLATE DEFAULT*/", data_test_binary_1},
     {"COLLATE BINARY", data_test_binary_1},
+    {"COLLATE \"unicode\"", data_test_unicode},
+    {"COLLATE \"unicode_ci\"", data_test_unicode_ci},
 }
 
 for _, data_collation in ipairs(data_collations) do
@@ -130,20 +166,37 @@ for _, data_collation in ipairs(data_collations) do
         local data = test_case[2]
         local result = test_case[3]
         test:do_execsql_test(
-            extendex_prefix.."0",
+            extendex_prefix.."create_table",
             string.format("create table t1(a primary key, b %s);", data_collation[1]),
             {})
         test:do_test(
-            extendex_prefix.."1",
+            extendex_prefix.."insert_values",
             function()
                 return insert_into_table("t1", data)
             end, {})
         test:do_execsql_test(
-            extendex_prefix.."2",
-            "select a from t1 order by b;",
+            extendex_prefix.."select_plan_contains_b-tree",
+            string.format("explain query plan select b from t1 order by b %s;",data_collation[1]),
+            {0,0,0,"SCAN TABLE T1",
+                0,0,0,"USE TEMP B-TREE FOR ORDER BY"})
+        test:do_execsql_test(
+            extendex_prefix.."select",
+            string.format("select b from t1 order by b %s;",data_collation[1]),
             result)
         test:do_execsql_test(
-            extendex_prefix.."3",
+            extendex_prefix.."create index",
+            string.format("create index i on t1(b %s)",data_collation[1]),
+            {})
+        test:do_execsql_test(
+            extendex_prefix.."select_from_index_plan_does_not_contain_b-tree",
+            string.format("explain query plan select b from t1 order by b %s;",data_collation[1]),
+            {0,0,0,"SCAN TABLE T1 USING COVERING INDEX I"})
+        test:do_execsql_test(
+            extendex_prefix.."select_from_index",
+            string.format("select b from t1 order by b %s;",data_collation[1]),
+            result)
+        test:do_execsql_test(
+            extendex_prefix.."drop_table",
             "drop table t1",
             {})
     end

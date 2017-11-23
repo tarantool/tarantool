@@ -676,7 +676,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "11.0",
     [[
-        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a COLLATE nocase, b);
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a COLLATE "unicode_ci", b);
         CREATE INDEX t4a ON t4(a);
         CREATE INDEX t4b ON t4(b);
     ]], {
@@ -728,7 +728,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b);
-        CREATE INDEX t4a ON t4(a COLLATE nocase);
+        CREATE INDEX t4a ON t4(a COLLATE "unicode_ci");
         CREATE INDEX t4b ON t4(b);
     ]], {
         -- <11.4>
@@ -767,7 +767,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "11.7", 
     [[
-        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' COLLATE nocase AND b = 3;
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a = 'abc' COLLATE "unicode_ci" AND b = 3;
     ]], {
         -- <11.7>
         0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
@@ -777,7 +777,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "11.8", 
     [[
-        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a COLLATE nocase = 'abc' AND b = 3;
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE a COLLATE "unicode_ci" = 'abc' AND b = 3;
     ]], {
         -- <11.8>
         0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (B=?)"
@@ -788,7 +788,7 @@ test:do_execsql_test(
     "12.0",
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a COLLATE nocase, b);
+        CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a COLLATE "unicode_ci", b);
         CREATE INDEX t4a ON t4(x, a);
         CREATE INDEX t4b ON t4(x, b);
     ]], {
@@ -840,7 +840,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a, b);
-        CREATE INDEX t4a ON t4(x, a COLLATE nocase);
+        CREATE INDEX t4a ON t4(x, a COLLATE "unicode_ci");
         CREATE INDEX t4b ON t4(x, b);
     ]], {
         -- <12.4>
@@ -879,7 +879,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "12.7", 
     [[
-        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x= 'abcdef' AND a = 'abc' COLLATE nocase AND b = 3;
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x= 'abcdef' AND a = 'abc' COLLATE "unicode_ci" AND b = 3;
     ]], {
         -- <12.7>
         0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
@@ -889,7 +889,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "12.8", 
     [[
-        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a COLLATE nocase = 'abc' AND b = 3;
+        EXPLAIN QUERY PLAN SELECT * FROM t4 WHERE x = 'abcdef' AND a COLLATE "unicode_ci" = 'abc' AND b = 3;
     ]], {
         -- <12.8>
         0, 0, 0, "SEARCH TABLE T4 USING COVERING INDEX T4B (X=? AND B=?)"
@@ -1365,7 +1365,7 @@ test:do_execsql_test(
     23.0,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(a COLLATE nocase, b, c, d, e, f, PRIMARY KEY(c, b, a));
+        CREATE TABLE t4(a COLLATE "unicode_ci", b, c, d, e, f, PRIMARY KEY(c, b, a));
         CREATE INDEX i41 ON t4(e);
         CREATE INDEX i42 ON t4(f);
 

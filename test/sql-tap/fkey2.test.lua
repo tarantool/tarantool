@@ -745,7 +745,7 @@ test:do_catchsql_test(
     [[
         DROP TABLE IF EXISTS c;
         CREATE TABLE p(a COLLATE binary, b PRIMARY KEY);
-        CREATE UNIQUE INDEX idx ON p(a COLLATE nocase);
+        CREATE UNIQUE INDEX idx ON p(a COLLATE "unicode_ci");
         CREATE TABLE c(x PRIMARY KEY REFERENCES p(a));
         INSERT INTO c DEFAULT VALUES;
     ]], {
@@ -845,7 +845,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(x COLLATE NOCASE PRIMARY KEY);
+        CREATE TABLE t1(x COLLATE "unicode_ci" PRIMARY KEY);
         CREATE TRIGGER tt1 AFTER DELETE ON t1
             WHEN EXISTS ( SELECT 1 FROM t2 WHERE old.x = y )
         BEGIN

@@ -21,12 +21,12 @@ test:plan(30)
 test:do_execsql_test(
     "transitive1-100",
     [[
-        CREATE TABLE t1(id primary key, a TEXT, b TEXT, c TEXT COLLATE NOCASE);
+        CREATE TABLE t1(id primary key, a TEXT, b TEXT, c TEXT COLLATE "unicode_ci");
         INSERT INTO t1 VALUES(1, 'abc','abc','Abc');
         INSERT INTO t1 VALUES(2, 'def','def','def');
         INSERT INTO t1 VALUES(3, 'ghi','ghi','GHI');
         CREATE INDEX t1a1 ON t1(a);
-        CREATE INDEX t1a2 ON t1(a COLLATE nocase);
+        CREATE INDEX t1a2 ON t1(a COLLATE "unicode_ci");
 
         SELECT a,b,c FROM t1 WHERE a=b AND c=b AND c='DEF';
     ]], {
@@ -461,7 +461,7 @@ test:do_execsql_test(
         CREATE TABLE t2(y TEXT primary key);
         INSERT INTO t1 VALUES('abc');
         INSERT INTO t2 VALUES('ABC');
-        SELECT * FROM t1 CROSS JOIN t2 WHERE (x=y COLLATE nocase) AND y='ABC';
+        SELECT * FROM t1 CROSS JOIN t2 WHERE (x=y COLLATE "unicode_ci") AND y='ABC';
     ]], {
         -- <transitive1-510>
         "abc", "ABC"
@@ -499,7 +499,7 @@ test:do_execsql_test(
         CREATE TABLE b1(x PRIMARY KEY, y);
         INSERT INTO b1 VALUES('abc', 'ABC');
         CREATE INDEX b1x ON b1(x);
-        SELECT * FROM b1 WHERE (x=y COLLATE nocase) AND y='ABC';
+        SELECT * FROM b1 WHERE (x=y COLLATE "unicode_ci") AND y='ABC';
     ]], {
         -- <transitive1-540>
         "abc", "ABC"
@@ -509,7 +509,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-550",
     [[
-        CREATE TABLE c1(id PRIMARY KEY, x, y COLLATE nocase, z);
+        CREATE TABLE c1(id PRIMARY KEY, x, y COLLATE "unicode_ci", z);
         INSERT INTO c1 VALUES(1, 'ABC', 'ABC', 'abc');
         SELECT x, y, z FROM c1 WHERE x=y AND y=z AND z='abc';
     ]], {

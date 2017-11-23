@@ -52,7 +52,7 @@ test:do_execsql_test(
     "1.2.2",
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT a, c, b FROM t1 WHERE a='xyz' COLLATE nocase;
+        SELECT DISTINCT a, c, b FROM t1 WHERE a='xyz' COLLATE "unicode_ci";
     ]], {
         -- <1.2.2>
         "/B-TREE/"
@@ -63,7 +63,7 @@ test:do_execsql_test(
     "1.2.3",
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT a COLLATE nocase, c, b FROM t1 WHERE a='xyz';
+        SELECT DISTINCT a COLLATE "unicode_ci", c, b FROM t1 WHERE a='xyz';
     ]], {
         -- <1.2.3>
         "/B-TREE/"
@@ -74,7 +74,7 @@ test:do_execsql_test(
     "1.2.4",
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT a COLLATE nocase, c, b FROM t1 WHERE a='xyz' COLLATE nocase;
+        SELECT DISTINCT a COLLATE "unicode_ci", c, b FROM t1 WHERE a='xyz' COLLATE "unicode_ci";
     ]], {
         -- <1.2.4>
         "~/B-TREE/"

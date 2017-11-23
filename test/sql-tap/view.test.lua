@@ -806,7 +806,7 @@ if (0 > 0)
     test:do_execsql_test(
         "view-11.1",
         [[
-            CREATE TABLE t4(a COLLATE NOCASE primary key);
+            CREATE TABLE t4(a COLLATE "unicode_ci" primary key);
             INSERT INTO t4 VALUES('This');
             INSERT INTO t4 VALUES('this');
             INSERT INTO t4 VALUES('THIS');
@@ -821,7 +821,7 @@ if (0 > 0)
     test:do_execsql_test(
         "view-11.1",
         [[
-            CREATE TABLE t4(a COLLATE NOCASE primary key);
+            CREATE TABLE t4(a COLLATE "unicode_ci" primary key);
             INSERT INTO t4 VALUES('This');
             INSERT INTO t4 VALUES('this');
             INSERT INTO t4 VALUES('THIS');

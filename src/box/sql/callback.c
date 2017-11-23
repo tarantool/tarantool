@@ -164,9 +164,6 @@ sqlite3FindCollSeq(sqlite3 * db, const char *zName, int create)
 	if (zName == NULL || sqlite3StrICmp(zName, "binary")==0){
 		return binary_coll;
 	}
-	if (sqlite3StrICmp(zName, "nocase")==0){
-		return coll_by_name("unicode", strlen("unicode"));
-	}
 	return coll_by_name(zName, strlen(zName));
 }
 

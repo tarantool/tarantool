@@ -269,7 +269,7 @@ test:do_test(
 test:do_execsql_test(
     "6.1.1",
     [[
-        CREATE TABLE t1(id primary key, a COLLATE nocase);
+        CREATE TABLE t1(id primary key, a COLLATE "unicode_ci");
         INSERT INTO t1 VALUES(1, 'one');
         INSERT INTO t1 VALUES(2, 'ONE');
     ]])
