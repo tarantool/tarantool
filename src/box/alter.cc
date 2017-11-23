@@ -3030,6 +3030,18 @@ unlock_after_dd(struct trigger *trigger, void *event)
 	(void) trigger;
 	(void) event;
 	latch_unlock(&schema_lock);
+	/*
+	 * There can be a some count of other latch awaiting fibers. All of
+	 * these fibers should continue their job before current fiber fires
+	 * next request. It is important especially for replication - if some
+	 * rows are applied out of order then lsn order will be broken. This
+	 * can be done with locking latch one more time - it guarantees that
+	 * all "queued" fibers did their job before current fiber wakes next
+	 * time. If there is no waiting fibers then locking will be done without
+	 * any yields.
+	 */
+	latch_lock(&schema_lock);
+	latch_unlock(&schema_lock);
 }
 
 static void
