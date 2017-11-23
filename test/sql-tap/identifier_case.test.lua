@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(51)
+test:plan(67)
 
 local test_prefix = "identifier_case-"
 
@@ -164,7 +164,7 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     test_prefix.."4.1",
-    string.format([[select * from table1 order by a collate NOCASE]]),
+    string.format([[select * from table1 order by a collate "unicode_ci"]]),
     {}
 )
 
@@ -197,5 +197,60 @@ for _, row in ipairs(data) do
                 ]], row[2]),
         row[3])
 end
+
+
+-- Check that collaiton names work as identifiers
+data = {
+    { 1,  [[ binary ]], {0}},
+    { 2,  [[ BINARY ]], {0}},
+    { 3,  [["binary"]], {0}},
+    { 4,  [["bInaRy"]], {0}},
+    { 5,  [["unicode"]], {0}},
+    { 6,  [[ unicode ]], {1,"no such collation sequence: UNICODE"}},
+    { 7,  [["UNICODE"]], {1,"no such collation sequence: UNICODE"}}
+}
+
+test:do_catchsql_test(
+    test_prefix.."6.0.",
+    [[
+        CREATE TABLE T1 (a primary key, b);
+    ]],
+    {0})
+
+for _, row in ipairs(data) do
+    test:do_catchsql_test(
+        test_prefix.."6.1."..row[1],
+        string.format( [[
+                CREATE INDEX I%s ON T1 (b COLLATE %s);
+                ]], row[1], row[2]),
+        row[3])
+end
+
+test:do_catchsql_test(
+    test_prefix.."6.2",
+    [[
+        DROP TABLE T1;
+    ]],
+    {0})
+
+data = {
+    { 1,  [[ 'a' < 'b' collate binary ]], {0, {1}}},
+    { 2,  [[ 'a' < 'b' collate "binary" ]], {0, {1}}},
+    { 3,  [[ 'a' < 'b' collate 'binary' ]], {1, [[near "'binary'": syntax error]]}},
+    { 4,  [[ 'a' < 'b' collate "unicode" ]], {0, {1}}},
+    { 5,  [[ 5 < 'b' collate "unicode" ]], {0, {1}}},
+    { 6,  [[ 5 < 'b' collate unicode ]], {1,"no such collation sequence: UNICODE"}},
+    { 7,  [[ 5 < 'b' collate "unicode_ci" ]], {0, {1}}},
+}
+
+for _, row in ipairs(data) do
+    test:do_catchsql_test(
+        test_prefix.."6.3."..row[1],
+        string.format( [[
+                SELECT %s;
+                ]], row[2]),
+        row[3])
+end
+
 
 test:finish_test()
