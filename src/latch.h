@@ -122,8 +122,8 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 	int result = 0;
 	while (true) {
 		fiber_yield_timeout(timeout);
-		if (l->owner == NULL) {
-			l->owner = fiber();
+		if (l->owner == fiber()) {
+			/* Current fiber was woken by previous latch owner. */
 			break;
 		}
 		timeout -= ev_monotonic_now(loop()) - start;
@@ -166,6 +166,12 @@ latch_unlock(struct latch *l)
 	if (!rlist_empty(&l->queue)) {
 		struct fiber *f = rlist_first_entry(&l->queue,
 						    struct fiber, state);
+		/*
+		 * Set this fiber as latch owner because fiber_wakeup remove
+		 * its from waiting queue and any other already scheduled
+		 * fiber can intercept this latch.
+		 */
+		l->owner = f;
 		fiber_wakeup(f);
 	}
 }
