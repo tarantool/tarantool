@@ -83,8 +83,9 @@ lbox_fio_pwrite(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	const char *buf = lua_tostring(L, 2);
+	uint32_t ctypeid = 0;
 	if (buf == NULL)
-		luaL_error(L, "fio.pwrite(): buffer is not a string");
+		buf = *(const char **)luaL_checkcdata(L, 2, &ctypeid);
 	size_t len = lua_tonumber(L, 3);
 	size_t offset = lua_tonumber(L, 4);
 
@@ -102,33 +103,24 @@ static int
 lbox_fio_pread(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
-	size_t len = lua_tonumber(L, 2);
-	size_t offset = lua_tonumber(L, 3);
+	uint32_t ctypeid;
+	char *buf = *(char **)luaL_checkcdata(L, 2, &ctypeid);
+	size_t len = lua_tonumber(L, 3);
+	size_t offset = lua_tonumber(L, 4);
 
 	if (!len) {
-		lua_pushliteral(L, "");
+		lua_pushinteger(L, 0);
 		return 1;
-	}
-
-	/* allocate buffer at lua stack */
-	void *buf = lua_newuserdata(L, len);
-	if (!buf) {
-		errno = ENOMEM;
-		lua_pushnil(L);
-		lbox_fio_pushsyserror(L);
-		return 2;
 	}
 
 	int res = coio_pread(fh, buf, len, offset);
 
 	if (res < 0) {
-		lua_pop(L, 1);
 		lua_pushnil(L);
 		lbox_fio_pushsyserror(L);
 		return 2;
 	}
-	lua_pushlstring(L, (char *)buf, res);
-	lua_remove(L, -2);
+	lua_pushinteger(L, res);
 	return 1;
 }
 
@@ -213,10 +205,11 @@ lbox_fio_write(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	const char *buf = lua_tostring(L, 2);
+	uint32_t ctypeid = 0;
 	if (buf == NULL)
-		luaL_error(L, "fio.write(): buffer is not a string");
-
+		buf = *(const char **)luaL_checkcdata(L, 2, &ctypeid);
 	size_t len = lua_tonumber(L, 3);
+
 	int res = coio_write(fh, buf, len);
 	if (res < 0) {
 		lua_pushnil(L);
@@ -294,32 +287,23 @@ static int
 lbox_fio_read(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
-	size_t len = lua_tonumber(L, 2);
+	uint32_t ctypeid;
+	char *buf = *(char **)luaL_checkcdata(L, 2, &ctypeid);
+	size_t len = lua_tonumber(L, 3);
 
 	if (!len) {
-		lua_pushliteral(L, "");
+		lua_pushinteger(L, 0);
 		return 1;
 	}
-
-	/* allocate buffer at lua stack */
-	void *buf = lua_newuserdata(L, len);
-	if (!buf) {
-		errno = ENOMEM;
-		lua_pushnil(L);
-		return 1;
-	}
-
 
 	int res = coio_read(fh, buf, len);
 
 	if (res < 0) {
-		lua_pop(L, 1);
 		lua_pushnil(L);
 		lbox_fio_pushsyserror(L);
 		return 2;
 	}
-	lua_pushlstring(L, (char *)buf, res);
-	lua_remove(L, -2);
+	lua_pushinteger(L, res);
 	return 1;
 }
 

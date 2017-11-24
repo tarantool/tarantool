@@ -2,12 +2,15 @@
 
 local fio = require('fio')
 local ffi = require('ffi')
+local buffer = require('buffer')
 
 ffi.cdef[[
     int umask(int mask);
     char *dirname(char *path);
     int chdir(const char *path);
 ]]
+
+local const_char_ptr_t = ffi.typeof('const char *')
 
 local internal = fio.internal
 fio.internal = nil
@@ -21,36 +24,53 @@ end
 
 local fio_methods = {}
 
-fio_methods.read = function(self, size)
-    if size == nil then
-        return ''
+-- read(size) -> str
+-- read(buf, size) -> len
+fio_methods.read = function(self, buf, size)
+    local tmpbuf
+    if not ffi.istype(const_char_ptr_t, buf) then
+        size = buf
+        tmpbuf = buffer.IBUF_SHARED
+        tmpbuf:reset()
+        buf = tmpbuf:reserve(size)
     end
-
-    return internal.read(self.fh, tonumber(size))
+    local res, err = internal.read(self.fh, buf, size)
+    if res == nil then
+        if tmpbuf ~= nil then
+            tmpbuf:recycle()
+        end
+        return nil, err
+    end
+    if tmpbuf ~= nil then
+        tmpbuf:alloc(res)
+        res = ffi.string(tmpbuf.rpos, tmpbuf:size())
+        tmpbuf:recycle()
+    end
+    return res
 end
 
-fio_methods.write = function(self, data)
-    data = tostring(data)
-    local res, err = internal.write(self.fh, data, #data)
+-- write(str)
+-- write(buf, len)
+fio_methods.write = function(self, data, len)
+    if not ffi.istype(const_char_ptr_t, data) then
+        data = tostring(data)
+        len = #data
+    end
+    local res, err = internal.write(self.fh, data, len)
     if err ~= nil then
         return false, err
     end
     return res >= 0
 end
 
-fio_methods.pwrite = function(self, data, offset)
-    data = tostring(data)
-    local len = #data
-    if len == 0 then
-        return true
+-- pwrite(str, offset)
+-- pwrite(buf, len, offset)
+fio_methods.pwrite = function(self, data, len, offset)
+    if not ffi.istype(const_char_ptr_t, data) then
+        data = tostring(data)
+        offset = len
+        len = #data
     end
-
-    if offset == nil then
-        offset = 0
-    else
-        offset = tonumber(offset)
-    end
-
     local res, err = internal.pwrite(self.fh, data, len, offset)
     if err ~= nil then
         return false, err
@@ -58,15 +78,30 @@ fio_methods.pwrite = function(self, data, offset)
     return res >= 0
 end
 
-fio_methods.pread = function(self, len, offset)
-    if len == nil then
-        return ''
+-- pread(size, offset) -> str
+-- pread(buf, size, offset) -> len
+fio_methods.pread = function(self, buf, size, offset)
+    local tmpbuf
+    if not ffi.istype(const_char_ptr_t, buf) then
+        offset = size
+        size = buf
+        tmpbuf = buffer.IBUF_SHARED
+        tmpbuf:reset()
+        buf = tmpbuf:reserve(size)
     end
-    if offset == nil then
-        offset = 0
+    local res, err = internal.pread(self.fh, buf, size, offset)
+    if res == nil then
+        if tmpbuf ~= nil then
+            tmpbuf:recycle()
+        end
+        return nil, err
     end
-
-    return internal.pread(self.fh, tonumber(len), tonumber(offset))
+    if tmpbuf ~= nil then
+        tmpbuf:alloc(res)
+        res = ffi.string(tmpbuf.rpos, tmpbuf:size())
+        tmpbuf:recycle()
+    end
+    return res
 end
 
 fio_methods.truncate = function(self, length)

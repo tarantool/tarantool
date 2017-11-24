@@ -1,7 +1,10 @@
 fio = require 'fio'
 ---
 ...
-errno = require 'errno'
+ffi = require 'ffi'
+---
+...
+buffer = require 'buffer'
 ---
 ...
 -- umask
@@ -755,4 +758,110 @@ fio.copytree("/no/such/dir", "/some/where")
 ---
 - false
 - Directory /no/such/dir does not exist
+...
+-- ibuf read/write
+buf = buffer.ibuf()
+---
+...
+tmpdir = fio.tempdir()
+---
+...
+tmpfile = fio.pathjoin(tmpdir, "test")
+---
+...
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+---
+...
+fh:write('helloworld!')
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- hello
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- world
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- '!'
+...
+buf:reset()
+---
+...
+len = fh:pread(buf:reserve(5), 5, 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- world
+...
+len = fh:pread(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- hello
+...
+fh:seek(0)
+---
+- 0
+...
+fh:write(buf.rpos, buf:size())
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read(64)
+---
+- worldhello!
+...
+fh:pwrite(buf:read(5), 5, 5)
+---
+- true
+...
+fh:pwrite(buf:read(5), 5)
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read(64)
+---
+- helloworld!
+...
+buf:recycle()
+---
+...
+fh:close()
+---
+- true
+...
+fio.unlink(tmpfile)
+---
+- true
+...
+fio.rmdir(tmpdir)
+---
+- true
 ...

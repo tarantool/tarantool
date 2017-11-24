@@ -1,5 +1,6 @@
 fio = require 'fio'
-errno = require 'errno'
+ffi = require 'ffi'
+buffer = require 'buffer'
 
 -- umask
 
@@ -241,3 +242,44 @@ fio.stat(fio.pathjoin(newdir, "2", "file.2")) ~= nil
 fio.stat(fio.pathjoin(newdir, "2", "3", "file.3")) ~= nil
 fio.readlink(fio.pathjoin(newdir, "2", "3", "file.3")) == file1
 fio.copytree("/no/such/dir", "/some/where")
+
+-- ibuf read/write
+buf = buffer.ibuf()
+
+tmpdir = fio.tempdir()
+tmpfile = fio.pathjoin(tmpdir, "test")
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+
+fh:write('helloworld!')
+fh:seek(0)
+
+len = fh:read(buf:reserve(5), 5)
+ffi.string(buf:alloc(len), len)
+len = fh:read(buf:reserve(5), 5)
+ffi.string(buf:alloc(len), len)
+len = fh:read(buf:reserve(5), 5)
+ffi.string(buf:alloc(len), len)
+
+buf:reset()
+len = fh:pread(buf:reserve(5), 5, 5)
+ffi.string(buf:alloc(len), len)
+len = fh:pread(buf:reserve(5), 5)
+ffi.string(buf:alloc(len), len)
+
+fh:seek(0)
+fh:write(buf.rpos, buf:size())
+
+fh:seek(0)
+fh:read(64)
+
+fh:pwrite(buf:read(5), 5, 5)
+fh:pwrite(buf:read(5), 5)
+
+fh:seek(0)
+fh:read(64)
+
+buf:recycle()
+
+fh:close()
+fio.unlink(tmpfile)
+fio.rmdir(tmpdir)
