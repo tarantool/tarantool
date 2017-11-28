@@ -16,6 +16,8 @@ errinj.info()
     state: 0
   ERRINJ_WAL_WRITE:
     state: false
+  ERRINJ_HTTPC_EXECUTE:
+    state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false
   ERRINJ_VY_SCHED_TIMEOUT:

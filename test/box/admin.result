@@ -26,6 +26,12 @@ cfg_filter(box.cfg)
     - 3600
   - - coredump
     - false
+  - - feedback_enabled
+    - true
+  - - feedback_host
+    - https://feedback.tarantool.io
+  - - feedback_interval
+    - 3600
   - - force_recovery
     - false
   - - hot_standby

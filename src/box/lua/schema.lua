@@ -5,6 +5,8 @@ local msgpack = require('msgpack')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local log = require('log')
+local fio = require('fio')
+local json = require('json')
 local session = box.session
 local internal = require('box.internal')
 local function setmap(table)
@@ -2232,6 +2234,18 @@ setmetatable(box.space, { __serialize = box_space_mt })
 box.internal.schema = {}
 box.internal.schema.init = function()
     box_sequence_init()
+end
+
+box.feedback = {}
+box.feedback.save = function(file_name)
+    local feedback = json.encode(box.internal.feedback_daemon.generate_feedback())
+    local fh, err = fio.open(file_name, {'O_CREAT', 'O_RDWR', 'O_TRUNC'},
+        tonumber('0777', 8))
+    if not fh then
+        error(err)
+    end
+    fh:write(feedback)
+    fh:close()
 end
 
 box.NULL = msgpack.NULL

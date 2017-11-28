@@ -4211,7 +4211,7 @@ s:replace{35}
 ...
 state, value = gen(param,state)
 ---
-- error: 'builtin/box/schema.lua:983: usage: next(param, state)'
+- error: 'builtin/box/schema.lua:985: usage: next(param, state)'
 ...
 value
 ---

@@ -35,6 +35,7 @@
 #include <curl/curl.h>
 
 #include "fiber.h"
+#include "errinj.h"
 
 /**
  * libcurl callback for CURLOPT_WRITEFUNCTION
@@ -318,7 +319,7 @@ httpc_execute(struct httpc_request *req, double timeout)
 
 	if (curl_execute(&req->curl_request, &env->curl_env, timeout) != CURLM_OK)
 		return -1;
-
+	ERROR_INJECT_RETURN(ERRINJ_HTTPC_EXECUTE);
 	long longval = 0;
 	switch (req->curl_request.code) {
 	case CURLE_OK:
