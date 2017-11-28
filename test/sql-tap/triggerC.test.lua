@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(52)
+test:plan(59)
 
 --!./tcltestrunner.lua
 -- 2009 August 24
@@ -170,17 +170,15 @@ test:do_test(
         -- </triggerC-1.9>
     })
 
--- Tarantool: Issue submitted #2506
--- Should be uncommented as far as bug is fixed
--- test:do_execsql_test(
---     "triggerC-1.10",
---     [[
---         SELECT * FROM t4
---     ]], {
---         -- <triggerC-1.10>
---         1, 2
---         -- </triggerC-1.10>
---     })
+test:do_execsql_test(
+    "triggerC-1.10",
+    [[
+        SELECT * FROM t4
+    ]], {
+        -- <triggerC-1.10>
+        1, 2
+        -- </triggerC-1.10>
+    })
 
 test:do_execsql_test(
     "triggerC-1.11",
@@ -221,23 +219,33 @@ test:do_execsql_test(
         -- </triggerC-1.13>
     })
 
--- MUST_WORK_TEST
--- do_test triggerC-1.14 {
---   execsql {
---     DROP TABLE t1;
---     CREATE TABLE cnt(n PRIMARY KEY);
---     INSERT INTO cnt VALUES(0);
---     CREATE TABLE t1(a INTEGER PRIMARY KEY, b UNIQUE, c, d, e);
---     CREATE INDEX t1cd ON t1(c,d);
---     CREATE TRIGGER t1r1 AFTER UPDATE ON t1 BEGIN UPDATE cnt SET n=n+1; END;
---     INSERT INTO t1 VALUES(1,2,3,4,5);
---     INSERT INTO t1 VALUES(6,7,8,9,10);
---     INSERT INTO t1 VALUES(11,12,13,14,15);
---   }
--- } {}
--- do_test triggerC-1.15 {
---   catchsql { UPDATE OR ROLLBACK t1 SET a=100 }
--- } {1 {UNIQUE constraint failed: t1.a}}
+test:do_execsql_test(
+    "triggerC-1.14",
+    [[
+        DROP TABLE IF EXISTS t1;
+        CREATE TABLE cnt(n PRIMARY KEY);
+        INSERT INTO cnt VALUES(0);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b UNIQUE, c, d, e);
+        CREATE INDEX t1cd ON t1(c,d);
+        CREATE TRIGGER t1r1 AFTER UPDATE ON t1 BEGIN UPDATE cnt SET n=n+1; END;
+        INSERT INTO t1 VALUES(1,2,3,4,5);
+        INSERT INTO t1 VALUES(6,7,8,9,10);
+        INSERT INTO t1 VALUES(11,12,13,14,15);
+    ]], {
+        -- <triggerC-1.14>
+        -- </triggerC-1.14>
+    })
+
+test:do_catchsql_test(
+    "triggerC-1.15",
+    [[
+        UPDATE OR ROLLBACK t1 SET a=100;
+    ]], {
+        -- <triggerC-1.15>
+        1, "UNIQUE constraint failed: T1.A"
+        -- </triggerC-1.15>
+    })
+
 ---------------------------------------------------------------------------
 -- This block of tests, triggerC-2.*, tests that recursive trigger
 -- programs (triggers that fire themselves) work. More specifically,
@@ -378,86 +386,44 @@ test:do_catchsql_test(
         -- </triggerC-3.1.2>
     })
 
--- Tarantool: Issue submitted #2506
--- Should be uncommented as far as bug is fixed
--- test:do_execsql_test(
---     "triggerC-3.1.3",
---     [[
---         SELECT * FROM t3
---     ]], {
---         -- <triggerC-3.1.3>
+test:do_execsql_test(
+    "triggerC-3.1.3",
+    [[
+        SELECT * FROM t3
+    ]], {
+        -- <triggerC-3.1.3>
+        -- </triggerC-3.1.3>
+    })
 
---         -- </triggerC-3.1.3>
---     })
+test:do_execsql_test(
+    "triggerC-3.2.1",
+    [[
+        CREATE TABLE t3b(x PRIMARY KEY);
+        CREATE TRIGGER t3bi AFTER INSERT ON t3b BEGIN INSERT INTO t3b VALUES(new.x+1); END;
+    ]], {
+        -- <triggerC-3.2.1>
+        -- </triggerC-3.2.1>
+    })
 
--- do_test triggerC-3.2.1 {
---   execsql "
---     CREATE TABLE t3b(x);
---     CREATE TRIGGER t3bi AFTER INSERT ON t3b WHEN new.x<[expr $SQLITE_MAX_TRIGGER_DEPTH * 2] BEGIN
---       INSERT INTO t3b VALUES(new.x+1);
---     END;
---   "
---   catchsql {
---     INSERT INTO t3b VALUES(1);
---   }
--- } {1 {too many levels of trigger recursion}}
--- do_test triggerC-3.2.2 {
---   db eval {SELECT * FROM t3b}
--- } {}
--- do_test triggerC-3.3.1 {
---   catchsql "
---     INSERT INTO t3b VALUES([expr $SQLITE_MAX_TRIGGER_DEPTH + 1]);
---   "
--- } {0 {}}
--- do_test triggerC-3.3.2 {
---   db eval {SELECT count(*), max(x), min(x) FROM t3b}
--- } [list $SQLITE_MAX_TRIGGER_DEPTH [expr $SQLITE_MAX_TRIGGER_DEPTH * 2] [expr $SQLITE_MAX_TRIGGER_DEPTH + 1]]
--- do_test triggerC-3.4.1 {
---   catchsql "
---     DELETE FROM t3b;
---     INSERT INTO t3b VALUES([expr $SQLITE_MAX_TRIGGER_DEPTH - 1]);
---   "
--- } {1 {too many levels of trigger recursion}}
--- do_test triggerC-3.4.2 {
---   db eval {SELECT count(*), max(x), min(x) FROM t3b}
--- } {0 {} {}}
--- do_test triggerC-3.5.1 {
---   sqlite3_limit db SQLITE_LIMIT_TRIGGER_DEPTH  [expr $SQLITE_MAX_TRIGGER_DEPTH / 10]
---   catchsql "
---     INSERT INTO t3b VALUES([expr ($SQLITE_MAX_TRIGGER_DEPTH * 2) - ($SQLITE_MAX_TRIGGER_DEPTH / 10) + 1]);
---   "
--- } {0 {}}
--- do_test triggerC-3.5.2 {
---   db eval {SELECT count(*), max(x), min(x) FROM t3b}
--- } [list [expr $SQLITE_MAX_TRIGGER_DEPTH / 10] [expr $SQLITE_MAX_TRIGGER_DEPTH * 2] [expr ($SQLITE_MAX_TRIGGER_DEPTH * 2) - ($SQLITE_MAX_TRIGGER_DEPTH / 10) + 1]]
--- do_test triggerC-3.5.3 {
---   catchsql "
---     DELETE FROM t3b;
---     INSERT INTO t3b VALUES([expr ($SQLITE_MAX_TRIGGER_DEPTH * 2) - ($SQLITE_MAX_TRIGGER_DEPTH / 10)]);
---   "
--- } {1 {too many levels of trigger recursion}}
--- do_test triggerC-3.5.4 {
---   db eval {SELECT count(*), max(x), min(x) FROM t3b}
--- } {0 {} {}}
--- do_test triggerC-3.6.1 {
---   sqlite3_limit db SQLITE_LIMIT_TRIGGER_DEPTH 1
---   catchsql "
---     INSERT INTO t3b VALUES([expr $SQLITE_MAX_TRIGGER_DEPTH * 2]);
---   "
--- } {0 {}}
--- do_test triggerC-3.6.2 {
---   db eval {SELECT count(*), max(x), min(x) FROM t3b}
--- } [list 1 [expr $SQLITE_MAX_TRIGGER_DEPTH * 2] [expr $SQLITE_MAX_TRIGGER_DEPTH * 2]]
--- do_test triggerC-3.6.3 {
---   catchsql "
---     DELETE FROM t3b;
---     INSERT INTO t3b VALUES([expr ($SQLITE_MAX_TRIGGER_DEPTH * 2) - 1]);
---   "
--- } {1 {too many levels of trigger recursion}}
--- do_test triggerC-3.6.4 {
---   db eval {SELECT count(*), max(x), min(x) FROM t3b}
--- } {0 {} {}}
--- sqlite3_limit db SQLITE_LIMIT_TRIGGER_DEPTH $SQLITE_MAX_TRIGGER_DEPTH
+test:do_catchsql_test(
+    "triggerC-3.2.2",
+    [[
+        INSERT INTO t3b VALUES(1);
+    ]], {
+        -- <triggerC-3.1.3>
+        1, "too many levels of trigger recursion"
+        -- </triggerC-3.1.3>
+    })
+
+test:do_execsql_test(
+    "triggerC-3.2.3",
+    [[
+        SELECT * FROM t3b;
+    ]], {
+        -- <triggerC-3.2.3>
+        -- </triggerC-3.2.3>
+    })
+
 -------------------------------------------------------------------------
 -- This next block of tests, triggerC-4.*, checks that affinity
 -- transformations and constraint processing is performed at the correct
