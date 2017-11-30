@@ -83,16 +83,6 @@ iobuf_new_mt(struct slab_cache *slabc_out);
 void
 iobuf_reset(struct iobuf *iobuf);
 
-/** Return true if there is no input and no output and
- * no one has pinned the buffer - i.e. it's safe to
- * destroy it.
- */
-static inline bool
-iobuf_is_idle(struct iobuf *iobuf)
-{
-	return ibuf_used(&iobuf->in) == 0 && obuf_used(&iobuf->out) == 0;
-}
-
 /**
  * Got to be called in each thread iobuf subsystem is
  * used in.

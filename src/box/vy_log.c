@@ -273,6 +273,15 @@ struct vy_slice_recovery_info {
 };
 
 /**
+ * Return the name of the vylog file that has the given signature.
+ */
+static inline const char *
+vy_log_filename(int64_t signature)
+{
+	return xdir_format_filename(&vy_log.dir, signature, NONE);
+}
+
+/**
  * Return the lsn of the checkpoint that was taken
  * before the given lsn.
  */
@@ -663,7 +672,7 @@ vy_log_record_decode(struct vy_log_record *record,
 fail:
 	buf = tt_static_buf();
 	mp_snprint(buf, TT_STATIC_BUF_LEN, req.tuple);
-	say_error("invalid record in metadata log: %s", buf);
+	say_error("failed to decode vylog record: %s", buf);
 	return -1;
 }
 
@@ -813,8 +822,7 @@ vy_log_open(struct xlog *xlog)
 	 * Open the current log file or create a new one
 	 * if it doesn't exist.
 	 */
-	char *path = xdir_format_filename(&vy_log.dir,
-			vclock_sum(&vy_log.last_checkpoint), NONE);
+	const char *path = vy_log_filename(vclock_sum(&vy_log.last_checkpoint));
 	if (access(path, F_OK) == 0)
 		return xlog_open(xlog, path);
 
@@ -925,8 +933,11 @@ vy_log_end_recovery(void)
 	assert(vy_log.recovery != NULL);
 
 	/* Flush all pending records. */
-	if (vy_log_flush() < 0)
+	if (vy_log_flush() < 0) {
+		diag_log();
+		say_error("failed to flush vylog after recovery");
 		return -1;
+	}
 
 	/*
 	 * On backup we copy files corresponding to the most recent
@@ -949,8 +960,12 @@ vy_log_end_recovery(void)
 		}
 		vclock_copy(vclock, &vy_log.last_checkpoint);
 		xdir_add_vclock(&vy_log.dir, vclock);
-		if (vy_log_create(vclock, vy_log.recovery) < 0)
+		if (vy_log_create(vclock, vy_log.recovery) < 0) {
+			diag_log();
+			say_error("failed to write `%s'",
+				  vy_log_filename(vclock_sum(vclock)));
 			return -1;
+		}
 	}
 
 	vy_log.recovery = NULL;
@@ -971,6 +986,8 @@ vy_log_rotate_cb_func(const struct vy_log_record *record, void *cb_arg)
 	struct vy_log_rotate_cb_arg *arg = cb_arg;
 	struct xlog *xlog = arg->xlog;
 	struct xrow_header row;
+
+	say_verbose("save vylog record: %s", vy_log_record_str(record));
 
 	/* Create the log file on the first write. */
 	if (!xlog_is_open(xlog) &&
@@ -996,6 +1013,8 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 	struct xlog xlog;
 	xlog_clear(&xlog);
 
+	say_verbose("saving vylog %lld", (long long)vclock_sum(vclock));
+
 	struct vy_log_rotate_cb_arg arg = {
 		.xlog = &xlog,
 		.dir = &vy_log.dir,
@@ -1005,7 +1024,7 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 		goto err_write_xlog;
 
 	if (!xlog_is_open(&xlog))
-		return 0; /* nothing written */
+		goto done; /* nothing written */
 
 	/* Mark the end of the snapshot. */
 	struct xrow_header row;
@@ -1023,6 +1042,8 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 		goto err_write_xlog;
 
 	xlog_close(&xlog, false);
+done:
+	say_verbose("done saving vylog");
 	return 0;
 
 err_write_xlog:
@@ -1066,8 +1087,9 @@ vy_log_rotate(const struct vclock *vclock)
 	}
 	vclock_copy(new_vclock, vclock);
 
-	say_debug("%s: signature %lld", __func__,
-		  (long long)vclock_sum(vclock));
+	say_verbose("rotating vylog %lld => %lld",
+		    (long long)vclock_sum(&vy_log.last_checkpoint),
+		    (long long)vclock_sum(vclock));
 
 	struct vy_recovery *recovery;
 	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint), false);
@@ -1089,6 +1111,9 @@ vy_log_rotate(const struct vclock *vclock)
 	int rc = coio_call(vy_log_rotate_f, recovery, vclock);
 	vy_recovery_delete(recovery);
 	if (rc < 0) {
+		diag_log();
+		say_error("failed to write `%s'",
+			  vy_log_filename(vclock_sum(vclock)));
 		latch_unlock(&vy_log.latch);
 		goto fail;
 	}
@@ -1104,13 +1129,9 @@ vy_log_rotate(const struct vclock *vclock)
 	xdir_add_vclock(&vy_log.dir, new_vclock);
 
 	latch_unlock(&vy_log.latch);
-	say_debug("%s: complete", __func__);
+	say_verbose("done rotating vylog");
 	return 0;
-
 fail:
-	say_debug("%s: failed", __func__);
-	say_error("failed to rotate metadata log: %s",
-		  diag_last_error(diag_get())->errmsg);
 	free(new_vclock);
 	return -1;
 }
@@ -1136,7 +1157,7 @@ vy_log_backup_path(struct vclock *vclock)
 	int64_t lsn = vy_log_prev_checkpoint(vclock_sum(vclock));
 	if (lsn < 0)
 		return NULL;
-	const char *path = xdir_format_filename(&vy_log.dir, lsn, NONE);
+	const char *path = vy_log_filename(lsn);
 	if (access(path, F_OK) == -1 && errno == ENOENT)
 		return NULL; /* vinyl not used */
 	return path;
@@ -1148,7 +1169,7 @@ vy_log_tx_begin(void)
 	latch_lock(&vy_log.latch);
 	vy_log.tx_begin = NULL;
 	vy_log.tx_failed = false;
-	say_debug("%s", __func__);
+	say_verbose("begin vylog transaction");
 }
 
 /**
@@ -1162,7 +1183,6 @@ static int
 vy_log_tx_do_commit(bool no_discard)
 {
 	struct stailq rollback;
-	int rc = 0;
 
 	assert(latch_owner(&vy_log.latch) == fiber());
 
@@ -1171,12 +1191,11 @@ vy_log_tx_do_commit(bool no_discard)
 		 * vy_log_write() failed to append a record to tx.
 		 * @no_discard transactions can't handle this.
 		 */
-		if (no_discard) {
-			error_log(diag_last_error(&vy_log.tx_diag));
-			panic("vinyl log write failed");
-		}
 		diag_move(&vy_log.tx_diag, diag_get());
-		rc = -1;
+		if (no_discard) {
+			diag_log();
+			panic("non-discardable vylog transaction failed");
+		}
 		goto rollback;
 	}
 
@@ -1187,22 +1206,19 @@ vy_log_tx_do_commit(bool no_discard)
 	 * recovery completion.
 	 */
 	if (vy_log.recovery != NULL)
-		goto out;
-
-	rc = vy_log_flush();
+		goto done;
 
 	/*
 	 * Rollback the transaction on failure unless
 	 * we were explicitly told not to.
 	 */
-	if (rc != 0 && !no_discard)
+	if (vy_log_flush() != 0 && !no_discard)
 		goto rollback;
 
-out:
-	say_debug("%s(no_discard=%d): %s", __func__, no_discard,
-		  rc == 0 ? "success" : "fail");
+done:
+	say_verbose("commit vylog transaction");
 	latch_unlock(&vy_log.latch);
-	return rc;
+	return 0;
 
 rollback:
 	stailq_create(&rollback);
@@ -1211,7 +1227,9 @@ rollback:
 	vy_log.tx_size = 0;
 	vy_log.tx_svp = 0;
 	vy_log.tx_begin = NULL;
-	goto out;
+	say_verbose("rollback vylog transaction");
+	latch_unlock(&vy_log.latch);
+	return -1;
 }
 
 int
@@ -1241,7 +1259,7 @@ vy_log_write(const struct vy_log_record *record)
 		return;
 	}
 
-	say_debug("%s: %s", __func__, vy_log_record_str(tx_record));
+	say_verbose("write vylog record: %s", vy_log_record_str(tx_record));
 
 	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
 	vy_log.tx_size++;
@@ -1928,8 +1946,6 @@ static int
 vy_recovery_process_record(struct vy_recovery *recovery,
 			   const struct vy_log_record *record)
 {
-	say_debug("%s: %s", __func__, vy_log_record_str(record));
-
 	int rc;
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
@@ -1981,6 +1997,9 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	default:
 		unreachable();
 	}
+	if (rc != 0)
+		say_error("failed to process vylog record: %s",
+			  vy_log_record_str(record));
 	return rc;
 }
 
@@ -1990,6 +2009,8 @@ vy_recovery_new_f(va_list ap)
 	int64_t signature = va_arg(ap, int64_t);
 	bool only_checkpoint = va_arg(ap, int);
 	struct vy_recovery **p_recovery = va_arg(ap, struct vy_recovery **);
+
+	say_verbose("loading vylog %lld", (long long)signature);
 
 	struct vy_recovery *recovery = malloc(sizeof(*recovery));
 	if (recovery == NULL) {
@@ -2024,8 +2045,7 @@ vy_recovery_new_f(va_list ap)
 	 * be stored in it, so if the log doesn't exist, assume
 	 * the recovery context is empty.
 	 */
-	const char *path = xdir_format_filename(&vy_log.dir,
-						signature, NONE);
+	const char *path = vy_log_filename(signature);
 	if (access(path, F_OK) < 0 && errno == ENOENT)
 		goto out;
 
@@ -2040,6 +2060,8 @@ vy_recovery_new_f(va_list ap)
 		rc = vy_log_record_decode(&record, &row);
 		if (rc < 0)
 			break;
+		say_verbose("load vylog record: %s",
+			    vy_log_record_str(&record));
 		if (record.type == VY_LOG_SNAPSHOT) {
 			if (only_checkpoint)
 				break;
@@ -2056,6 +2078,7 @@ vy_recovery_new_f(va_list ap)
 
 	xlog_cursor_close(&cursor, false);
 out:
+	say_verbose("done loading vylog");
 	*p_recovery = recovery;
 	return 0;
 
@@ -2080,12 +2103,19 @@ vy_recovery_new(int64_t signature, bool only_checkpoint)
 	 * pending records have been flushed out.
 	 */
 	rc = vy_log_flush();
-	if (rc != 0)
+	if (rc != 0) {
+		diag_log();
+		say_error("failed to flush vylog for recovery");
 		goto out;
+	}
 
 	/* Load the log from coio so as not to stall tx thread. */
 	rc = coio_call(vy_recovery_new_f, signature,
 		       (int)only_checkpoint, &recovery);
+	if (rc != 0) {
+		diag_log();
+		say_error("failed to load `%s'", vy_log_filename(signature));
+	}
 out:
 	latch_unlock(&vy_log.latch);
 	return rc == 0 ? recovery : NULL;
@@ -2128,15 +2158,6 @@ vy_recovery_delete(struct vy_recovery *recovery)
 	free(recovery);
 }
 
-/** Helper to call a recovery callback and log the event if debugging. */
-static int
-vy_recovery_cb_call(vy_recovery_cb cb, void *cb_arg,
-		    const struct vy_log_record *record)
-{
-	say_debug("%s: %s", __func__, vy_log_record_str(record));
-	return cb(record, cb_arg);
-}
-
 static int
 vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 			  vy_recovery_cb cb, void *cb_arg)
@@ -2153,7 +2174,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 	record.space_id = index->space_id;
 	record.key_parts = index->key_parts;
 	record.key_part_count = index->key_part_count;
-	if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+	if (cb(&record, cb_arg) != 0)
 		return -1;
 
 	if (index->truncate_count > 0) {
@@ -2161,7 +2182,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		record.type = VY_LOG_TRUNCATE_INDEX;
 		record.index_lsn = index->index_lsn;
 		record.truncate_count = index->truncate_count;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 	}
 
@@ -2170,7 +2191,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		record.type = VY_LOG_DUMP_INDEX;
 		record.index_lsn = index->index_lsn;
 		record.dump_lsn = index->dump_lsn;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 	}
 
@@ -2185,7 +2206,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		record.index_lsn = index->index_lsn;
 		record.run_id = run->id;
 		record.is_dropped = run->is_dropped;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 
 		if (!run->is_dropped)
@@ -2195,7 +2216,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		record.type = VY_LOG_DROP_RUN;
 		record.run_id = run->id;
 		record.gc_lsn = run->gc_lsn;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 	}
 
@@ -2206,7 +2227,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		record.range_id = range->id;
 		record.begin = range->begin;
 		record.end = range->end;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 		/*
 		 * Newer slices are stored closer to the head of the list,
@@ -2221,7 +2242,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 			record.run_id = slice->run->id;
 			record.begin = slice->begin;
 			record.end = slice->end;
-			if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+			if (cb(&record, cb_arg) != 0)
 				return -1;
 		}
 	}
@@ -2230,7 +2251,7 @@ vy_recovery_iterate_index(struct vy_index_recovery_info *index,
 		vy_log_record_init(&record);
 		record.type = VY_LOG_DROP_INDEX;
 		record.index_lsn = index->index_lsn;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 	}
 	return 0;
@@ -2281,12 +2302,12 @@ vy_recovery_load_index(struct vy_recovery *recovery,
 		record.index_id = index->index_id;
 		record.space_id = index->space_id;
 		record.index_lsn = index_lsn;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 		vy_log_record_init(&record);
 		record.type = VY_LOG_DROP_INDEX;
 		record.index_lsn = index_lsn;
-		if (vy_recovery_cb_call(cb, cb_arg, &record) != 0)
+		if (cb(&record, cb_arg) != 0)
 			return -1;
 		return 0;
 	} else if (is_checkpoint_recovery || index_lsn == index->index_lsn) {

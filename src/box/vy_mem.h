@@ -39,7 +39,8 @@
 #include "fiber_cond.h"
 #include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
-#include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_stmt_stream.h"
+#include "vy_read_view.h"
 #include "vy_stat.h"
 
 #if defined(__cplusplus)
@@ -299,9 +300,6 @@ vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt);
  * key.
  */
 struct vy_mem_iterator {
-	/** Parent class, must be the first member */
-	struct vy_stmt_iterator base;
-
 	/** Usage statistics */
 	struct vy_mem_iterator_stat *stat;
 
@@ -316,7 +314,7 @@ struct vy_mem_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	struct tuple *key;
+	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	const struct vy_read_view **read_view;
 
@@ -344,12 +342,53 @@ struct vy_mem_iterator {
 };
 
 /**
- * Open the iterator.
+ * Open an iterator over in-memory tree.
  */
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     struct tuple *key, const struct vy_read_view **rv);
+		     const struct tuple *key, const struct vy_read_view **rv);
+
+/**
+ * Advance a mem iterator to the newest statement for the next key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+NODISCARD int
+vy_mem_iterator_next_key(struct vy_mem_iterator *itr, struct tuple **ret);
+
+/**
+ * Advance a mem iterator to the older statement for the same key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+NODISCARD int
+vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr, struct tuple **ret);
+
+/**
+ * Advance a mem iterator to the newest statement for the first key
+ * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+NODISCARD int
+vy_mem_iterator_skip(struct vy_mem_iterator *itr,
+		     const struct tuple *last_stmt, struct tuple **ret);
+
+/**
+ * Check if a mem iterator was invalidated and needs to be restored.
+ * If it does, set the iterator position to the newest statement for
+ * the key following @last_stmt and return 1, otherwise return 0.
+ * Returns -1 on memory allocation error.
+ */
+NODISCARD int
+vy_mem_iterator_restore(struct vy_mem_iterator *itr,
+			const struct tuple *last_stmt, struct tuple **ret);
+
+/**
+ * Close a mem iterator.
+ */
+void
+vy_mem_iterator_close(struct vy_mem_iterator *itr);
 
 /**
  * Simple stream over a mem. @see vy_stmt_stream.

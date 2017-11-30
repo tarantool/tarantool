@@ -60,6 +60,11 @@ struct vy_read_iterator {
 	/** Read view the iterator lives in. */
 	const struct vy_read_view **read_view;
 	/**
+	 * If a read iteration takes longer than the given value,
+	 * warn about it in the log.
+	 */
+	double too_long_threshold;
+	/**
 	 * Set if the resulting statement needs to be
 	 * checked to match the search key.
 	 */
@@ -100,17 +105,25 @@ struct vy_read_iterator {
 	uint32_t curr_src;
 	/** Statement returned by the current merge source. */
 	struct tuple *curr_stmt;
-	/** Offset of the first mutable source. */
-	uint32_t mutable_start;
-	/** Offset of the source following the last mutable source. */
-	uint32_t mutable_end;
+	/** Offset of the transaction write set source. */
+	uint32_t txw_src;
+	/** Offset of the cache source. */
+	uint32_t cache_src;
+	/** Offset of the first memory source. */
+	uint32_t mem_src;
+	/** Offset of the first disk source. */
+	uint32_t disk_src;
 	/** Offset of the first skipped source. */
-	uint32_t skipped_start;
+	uint32_t skipped_src;
 	/**
 	 * front_id of the current source and all sources
 	 * that are on the same key.
 	 */
 	uint32_t front_id;
+	/**
+	 * front_id from the previous iteration.
+	 */
+	uint32_t prev_front_id;
 };
 
 /**
@@ -128,7 +141,7 @@ void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
 		      struct vy_index *index, struct vy_tx *tx,
 		      enum iterator_type iterator_type, struct tuple *key,
-		      const struct vy_read_view **rv);
+		      const struct vy_read_view **rv, double too_long_threshold);
 
 /**
  * Get the next statement with another key, or start the iterator,

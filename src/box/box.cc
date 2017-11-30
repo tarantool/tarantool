@@ -50,7 +50,7 @@
 #include "engine.h"
 #include "memtx_engine.h"
 #include "sysview_engine.h"
-#include "vinyl_engine.h"
+#include "vinyl.h"
 #include "space.h"
 #include "index.h"
 #include "port.h"
@@ -258,30 +258,6 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 {
 	journal_create(&journal->base, recovery_journal_write, NULL);
 	journal->vclock = v;
-}
-
-/**
- * Dummy journal used to generate unique LSNs for rows received
- * during initial join.
- */
-struct join_journal {
-	struct journal base;
-	int64_t lsn;
-};
-
-static int64_t
-join_journal_write(struct journal *base,
-		   struct journal_entry * /* entry */)
-{
-	struct join_journal *journal = (struct join_journal *) base;
-	return ++journal->lsn;
-}
-
-static inline void
-join_journal_create(struct join_journal *journal)
-{
-	journal_create(&journal->base, join_journal_write, NULL);
-	journal->lsn = 0;
 }
 
 static inline void
@@ -615,6 +591,11 @@ void
 box_set_too_long_threshold(void)
 {
 	too_long_threshold = cfg_getd("too_long_threshold");
+
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_too_long_threshold(vinyl, too_long_threshold);
 }
 
 void
@@ -1130,7 +1111,7 @@ box_on_join(const tt_uuid *instance_uuid)
 }
 
 void
-box_process_auth(struct auth_request *request, struct obuf *out)
+box_process_auth(struct auth_request *request)
 {
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 
@@ -1141,7 +1122,6 @@ box_process_auth(struct auth_request *request, struct obuf *out)
 	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
 	authenticate(user, len, request->scramble);
-	iproto_reply_ok_xc(out, request->header->sync, ::schema_version);
 }
 
 void
@@ -1435,9 +1415,10 @@ engine_init()
 				    cfg_geti64("vinyl_cache"),
 				    cfg_geti("vinyl_read_threads"),
 				    cfg_geti("vinyl_write_threads"),
-				    cfg_getd("vinyl_timeout"));
+				    cfg_geti("force_recovery"));
 	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
+	box_set_vinyl_timeout();
 }
 
 /**
@@ -1502,11 +1483,8 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	struct join_journal join_journal;
-	join_journal_create(&join_journal);
-	journal_set(&join_journal.base);
-
 	applier_resume_to_state(applier, APPLIER_FINAL_JOIN, TIMEOUT_INFINITY);
+
 	/*
 	 * Process final data (WALs).
 	 */

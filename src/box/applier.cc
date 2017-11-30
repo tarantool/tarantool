@@ -421,8 +421,6 @@ applier_subscribe(struct applier *applier)
 		}
 
 		coio_read_xrow(coio, &iobuf->in, &row);
-		applier->lag = ev_now(loop()) - row.tm;
-		applier->last_row_time = ev_monotonic_now(loop());
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error_xc(&row);  /* error */
@@ -437,6 +435,10 @@ applier_subscribe(struct applier *applier)
 				  int2str(row.replica_id),
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
+
+		applier->lag = ev_now(loop()) - row.tm;
+		applier->last_row_time = ev_monotonic_now(loop());
+
 		if (vclock_get(&replicaset_vclock, row.replica_id) < row.lsn) {
 			/**
 			 * Promote the replica set vclock before
@@ -467,6 +469,8 @@ applier_disconnect(struct applier *applier, enum applier_state state)
 	}
 
 	coio_close(loop(), &applier->io);
+	/* Clear all unparsed input. */
+	ibuf_reset(&applier->iobuf->in);
 	iobuf_reset(applier->iobuf);
 	fiber_gc();
 }

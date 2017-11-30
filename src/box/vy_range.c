@@ -224,14 +224,12 @@ vy_range_snprint(char *buf, int size, const struct vy_range *range)
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size, "(");
 	if (range->begin != NULL)
-		SNPRINT(total, vy_key_snprint, buf, size,
-			tuple_data(range->begin));
+		SNPRINT(total, tuple_snprint, buf, size, range->begin);
 	else
 		SNPRINT(total, snprintf, buf, size, "-inf");
 	SNPRINT(total, snprintf, buf, size, "..");
 	if (range->end != NULL)
-		SNPRINT(total, vy_key_snprint, buf, size,
-			tuple_data(range->end));
+		SNPRINT(total, tuple_snprint, buf, size, range->end);
 	else
 		SNPRINT(total, snprintf, buf, size, "inf");
 	SNPRINT(total, snprintf, buf, size, ")");

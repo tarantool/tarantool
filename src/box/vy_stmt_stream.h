@@ -1,7 +1,7 @@
-#ifndef TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED
-#define TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_BOX_VY_STMT_STREAM_H
+#define INCLUDES_TARANTOOL_BOX_VY_STMT_STREAM_H
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -16,11 +16,11 @@
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
  * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
@@ -30,51 +30,58 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
-#include <small/mempool.h>
 
-#include "engine.h"
+#include <trivia/util.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct vy_env;
+struct tuple;
 
-struct vinyl_engine {
-	struct engine base;
-	struct vy_env *env;
-	/** Memory pool for index iterator. */
-	struct mempool iterator_pool;
+/**
+ * The stream is a very simple iterator (generally over a mem or a run)
+ * that output all the tuples on increasing order.
+ */
+struct vy_stmt_stream;
+
+/**
+ * Start streaming
+ */
+typedef NODISCARD int
+(*vy_stream_start_f)(struct vy_stmt_stream *virt_stream);
+
+/**
+ * Get next tuple from a stream.
+ */
+typedef NODISCARD int
+(*vy_stream_next_f)(struct vy_stmt_stream *virt_stream, struct tuple **ret);
+
+/**
+ * Close the stream.
+ */
+typedef void
+(*vy_stream_close_f)(struct vy_stmt_stream *virt_stream);
+
+/**
+ * The interface description for streams over run and mem.
+ */
+struct vy_stmt_stream_iface {
+	vy_stream_start_f start;
+	vy_stream_next_f next;
+	vy_stream_close_f stop;
+	vy_stream_close_f close;
 };
 
-struct vinyl_engine *
-vinyl_engine_new(const char *dir, size_t memory, size_t cache,
-		 int read_threads, int write_threads, double timeout);
-
-void
-vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size);
-
-void
-vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout);
+/**
+ * Common interface for streams over run and mem.
+ */
+struct vy_stmt_stream {
+	const struct vy_stmt_stream_iface *iface;
+};
 
 #if defined(__cplusplus)
 } /* extern "C" */
+#endif /* defined(__cplusplus) */
 
-#include "diag.h"
-
-static inline struct vinyl_engine *
-vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
-		    int read_threads, int write_threads, double timeout)
-{
-	struct vinyl_engine *vinyl;
-	vinyl = vinyl_engine_new(dir, memory, cache, read_threads,
-				 write_threads, timeout);
-	if (vinyl == NULL)
-		diag_raise();
-	return vinyl;
-}
-
-#endif /* defined(__plusplus) */
-
-#endif /* TARANTOOL_BOX_VINYL_ENGINE_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_BOX_VY_STMT_STREAM_H */

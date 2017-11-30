@@ -42,7 +42,7 @@ coll_cache_init()
 	coll_cache_id = mh_i32ptr_new();
 	if (coll_cache_id == NULL) {
 		diag_set(OutOfMemory, sizeof(*coll_cache_id), "malloc",
-			 "coll_cache");
+			 "coll_cache_id");
 		return -1;
 	}
 	return 0;
@@ -63,15 +63,16 @@ coll_cache_destroy()
 int
 coll_cache_replace(struct coll *coll, struct coll **replaced)
 {
-	const struct mh_i32ptr_node_t node = {coll->id, coll};
-	struct mh_i32ptr_node_t repl_node = {0, NULL};
-	struct mh_i32ptr_node_t *prepl_node = &repl_node;
-	if (mh_i32ptr_put(coll_cache_id, &node, &prepl_node, NULL) ==
+	const struct mh_i32ptr_node_t id_node = {coll->id, coll};
+	struct mh_i32ptr_node_t repl_id_node = {0, NULL};
+	struct mh_i32ptr_node_t *prepl_id_node = &repl_id_node;
+	if (mh_i32ptr_put(coll_cache_id, &id_node, &prepl_id_node, NULL) ==
 	    mh_end(coll_cache_id)) {
-		diag_set(OutOfMemory, sizeof(node), "malloc", "coll_cache");
+		diag_set(OutOfMemory, sizeof(id_node), "malloc", "coll_cache_id");
 		return -1;
 	}
-	*replaced = repl_node.val;
+	assert(repl_id_node.val == NULL);
+	*replaced = repl_id_node.val;
 	return 0;
 }
 
@@ -92,7 +93,7 @@ coll_cache_delete(const struct coll *coll)
  * Find a collation object by its id.
  */
 struct coll *
-coll_cache_find(uint32_t id)
+coll_by_id(uint32_t id)
 {
 	mh_int_t pos = mh_i32ptr_find(coll_cache_id, id, NULL);
 	if (pos == mh_end(coll_cache_id))

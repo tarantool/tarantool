@@ -32,9 +32,10 @@
 #include "coio_task.h"
 #include "fiber.h"
 #include "say.h"
+#include "fio.h"
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <dirent.h>
 
 /**
  * A context of libeio request for any
@@ -91,6 +92,16 @@ struct coio_file_task {
 		struct {
 			char *tpl;
 		} tempdir;
+
+		struct {
+			char **bufp;
+			const char *pathname;
+		} readdir;
+
+		struct {
+			const char *source;
+			const char *dest;
+		} copyfile;
 	};
 };
 
@@ -488,5 +499,132 @@ coio_fdatasync(int fd)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_fdatasync(fd, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
+}
+
+static void
+coio_do_readdir(eio_req *req)
+{
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
+	DIR *dirp = opendir(eio->readdir.pathname);
+	if (dirp == NULL)
+		goto error;
+	size_t capacity = 128;
+	size_t len = 0;
+	struct dirent *entry;
+	char *buf = (char *) malloc(capacity);
+	if (buf == NULL)
+		goto mem_error;
+	req->result = 0;
+	do {
+		entry = readdir(dirp);
+		if (entry == NULL ||
+		    strcmp(entry->d_name, ".") == 0 ||
+		    strcmp(entry->d_name, "..") == 0)
+			continue;
+		size_t namlen = strlen(entry->d_name);
+		size_t needed = len + namlen + 1;
+		if (needed > capacity) {
+			if (needed <= capacity * 2)
+				capacity *= 2;
+			else
+				capacity = needed * 2;
+			char *new_buf = (char *) realloc(buf, capacity);
+			if (new_buf == NULL)
+				goto mem_error;
+			buf = new_buf;
+		}
+		memcpy(&buf[len], entry->d_name, namlen);
+		len += namlen;
+		buf[len++] = '\n';
+		req->result++;
+	} while(entry != NULL);
+
+	if (len > 0)
+		buf[len - 1] = 0;
+	else
+		buf[0] = 0;
+
+	*eio->readdir.bufp = buf;
+	closedir(dirp);
+	return;
+
+mem_error:
+	free(buf);
+	closedir(dirp);
+error:
+	req->result = -1;
+	req->errorno = errno;
+}
+
+int
+coio_readdir(const char *dir_path, char **buf)
+{
+	INIT_COEIO_FILE(eio)
+	eio.readdir.bufp = buf;
+	eio.readdir.pathname = dir_path;
+	eio_req *req = eio_custom(coio_do_readdir, 0, coio_complete, &eio);
+	return coio_wait_done(req, &eio);
+}
+
+static void
+coio_do_copyfile(eio_req *req)
+{
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
+
+	struct stat st;
+	if (stat(eio->copyfile.source, &st) < 0) {
+		goto error;
+	}
+
+	int source_fd = open(eio->copyfile.source, O_RDONLY);
+	if (source_fd < 0) {
+		goto error;
+	}
+
+	int dest_fd = open(eio->copyfile.dest, O_WRONLY | O_CREAT,
+			   st.st_mode & 0777);
+	if (dest_fd < 0) {
+		goto error_dest;
+	}
+
+	enum { COPY_FILE_BUF_SIZE = 4096 };
+
+	char buf[COPY_FILE_BUF_SIZE];
+
+	while (true) {
+		ssize_t nread = fio_read(source_fd, buf, sizeof(buf));
+		if (nread < 0)
+			goto error_copy;
+
+		if (nread == 0)
+			break; /* eof */
+
+		ssize_t nwritten = fio_writen(dest_fd, buf, nread);
+		if (nwritten < 0)
+			goto error_copy;
+	}
+	req->result = 0;
+	close(source_fd);
+	close(dest_fd);
+	return;
+
+error_copy:
+	close(dest_fd);
+error_dest:
+	close(source_fd);
+error:
+	req->errorno = errno;
+	req->result = -1;
+	return;
+}
+
+int
+coio_copyfile(const char *source, const char *dest)
+{
+	INIT_COEIO_FILE(eio)
+	eio.copyfile.source = source;
+	eio.copyfile.dest = dest;
+	eio_req *req = eio_custom(coio_do_copyfile, 0, coio_complete, &eio);
 	return coio_wait_done(req, &eio);
 }

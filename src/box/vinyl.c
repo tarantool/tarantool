@@ -45,18 +45,26 @@
 #include "vy_stat.h"
 
 #include <math.h>
-#include <small/lsregion.h>
-#include <coio_file.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
+#include <small/lsregion.h>
+#include <small/region.h>
+#include <small/mempool.h>
+
+#include "coio_file.h"
 #include "coio_task.h"
 #include "cbus.h"
 #include "histogram.h"
-
 #include "tuple_update.h"
 #include "txn.h"
 #include "xrow.h"
 #include "xlog.h"
+#include "engine.h"
 #include "space.h"
+#include "index.h"
 #include "xstream.h"
 #include "info.h"
 #include "column_mask.h"
@@ -92,8 +100,8 @@ struct vy_env {
 	struct tx_manager   *xm;
 	/** Upsert squash queue */
 	struct vy_squash_queue *squash_queue;
-	/** Mempool for struct vy_cursor */
-	struct mempool      cursor_pool;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
 	/** Memory quota */
 	struct vy_quota     quota;
 	/** Timer for updating quota watermark. */
@@ -135,16 +143,34 @@ struct vy_env {
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
 	const struct vclock *recovery_vclock;
+	/**
+	 * LSN to assign to the next statement received during
+	 * initial join.
+	 *
+	 * We can't use original statements' LSNs, because we
+	 * send statements not in the chronological order while
+	 * the receiving end expects LSNs to grow monotonically
+	 * due to the design of the lsregion allocator, which is
+	 * used for storing statements in memory.
+	 */
+	int64_t join_lsn;
 	/** Path to the data directory. */
 	char *path;
 	/** Max size of the memory level. */
 	size_t memory;
 	/** Max time a transaction may wait for memory. */
 	double timeout;
+	/**
+	 * If read of a single statement takes longer than
+	 * the given value, warn about it in the log.
+	 */
+	double too_long_threshold;
 	/** Max number of threads used for reading. */
 	int read_threads;
 	/** Max number of threads used for writing. */
 	int write_threads;
+	/** Try to recover corrupted data if set. */
+	bool force_recovery;
 };
 
 enum {
@@ -167,6 +193,32 @@ vy_dump_bandwidth(struct vy_env *env)
 	return histogram_percentile(env->dump_bw, 10);
 }
 
+struct vinyl_engine {
+	struct engine base;
+	/** Vinyl environment. */
+	struct vy_env *env;
+};
+
+/** Extract vy_env from an engine object. */
+static inline struct vy_env *
+vy_env(struct engine *engine)
+{
+	return ((struct vinyl_engine *)engine)->env;
+}
+
+struct vinyl_index {
+	struct index base;
+	/** Vinyl index implementation. */
+	struct vy_index *db;
+};
+
+/** Extract vy_index from an index object. */
+struct vy_index *
+vy_index(struct index *index)
+{
+	return ((struct vinyl_index *)index)->db;
+}
+
 /** Mask passed to vy_gc(). */
 enum {
 	/** Delete incomplete runs. */
@@ -179,30 +231,34 @@ static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn);
 
-/** Cursor. */
-struct vy_cursor {
+struct vinyl_iterator {
+	struct iterator base;
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** Vinyl index this iterator is for. */
+	struct vy_index *index;
 	/**
-	 * A built-in transaction created when a cursor is open
+	 * Points either to tx_autocommit for autocommit mode
+	 * or to a multi-statement transaction active when the
+	 * iterator was created.
+	 */
+	struct vy_tx *tx;
+	/** Search key. */
+	struct tuple *key;
+	/** Vinyl read iterator. */
+	struct vy_read_iterator iterator;
+	/**
+	 * Built-in transaction created when iterator is opened
 	 * in autocommit mode.
 	 */
 	struct vy_tx tx_autocommit;
-	struct vy_index *index;
-	struct tuple *key;
-	/**
-	 * Points either to tx_autocommit for autocommit mode or
-	 * to a multi-statement transaction active when the cursor
-	 * was created.
-	 */
-	struct vy_tx *tx;
-	/** The number of vy_cursor_next() invocations. */
-	int n_reads;
-	/** Cursor creation time, used for statistics. */
-	ev_tstamp start;
-	/** Trigger invoked when tx ends to close the cursor. */
+	/** Trigger invoked when tx ends to close the iterator. */
 	struct trigger on_tx_destroy;
-	/** Iterator over index */
-	struct vy_read_iterator iterator;
 };
+
+static const struct engine_vtab vinyl_engine_vtab;
+static const struct space_vtab vinyl_space_vtab;
+static const struct index_vtab vinyl_index_vtab;
 
 /**
  * A quick intro into Vinyl cosmology and file format
@@ -295,8 +351,10 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 }
 
 void
-vy_info(struct vy_env *env, struct info_handler *h)
+vinyl_engine_info(struct vinyl_engine *vinyl, struct info_handler *h)
 {
+	struct vy_env *env = vinyl->env;
+
 	info_begin(h);
 	vy_info_append_quota(env, h);
 	vy_info_append_cache(env, h);
@@ -341,10 +399,11 @@ vy_info_append_compact_stat(struct info_handler *h, const char *name,
 	info_table_end(h);
 }
 
-void
-vy_index_info(struct vy_index *index, struct info_handler *h)
+static void
+vinyl_index_info(struct index *base, struct info_handler *h)
 {
 	char buf[1024];
+	struct vy_index *index = vy_index(base);
 	struct vy_index_stat *stat = &index->stat;
 	struct vy_cache_stat *cache_stat = &index->cache.stat;
 
@@ -463,24 +522,141 @@ vy_index_find_unique(struct space *space, uint32_t index_id)
 	return index;
 }
 
-struct vy_index *
-vy_new_index(struct vy_env *env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_index *pk)
+static int
+vinyl_engine_check_space_def(struct space_def *def)
 {
-	return vy_index_new(&env->index_env, &env->cache_env,
-			    index_def, format, pk);
+	if (def->opts.temporary) {
+		diag_set(ClientError, ER_ALTER_SPACE,
+			 def->name, "engine does not support temporary flag");
+		return -1;
+	}
+	return 0;
 }
 
-void
-vy_delete_index(struct vy_env *env, struct vy_index *index)
+static struct space *
+vinyl_engine_create_space(struct engine *engine, struct space_def *def,
+			  struct rlist *key_list)
 {
-	(void)env;
+	struct space *space = malloc(sizeof(*space));
+	if (space == NULL) {
+		diag_set(OutOfMemory, sizeof(*space),
+			 "malloc", "struct space");
+		return NULL;
+	}
+
+	/* Create a format from key and field definitions. */
+	int key_count = 0;
+	struct index_def *index_def;
+	rlist_foreach_entry(index_def, key_list, link)
+		key_count++;
+	struct key_def **keys = region_alloc(&fiber()->gc,
+					     sizeof(*keys) * key_count);
+	if (keys == NULL) {
+		free(space);
+		return NULL;
+	}
+	key_count = 0;
+	rlist_foreach_entry(index_def, key_list, link)
+		keys[key_count++] = index_def->key_def;
+
+	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
+			keys, key_count, 0, def->fields, def->field_count);
+	if (format == NULL) {
+		free(space);
+		return NULL;
+	}
+	format->exact_field_count = def->exact_field_count;
+	tuple_format_ref(format);
+
+	if (space_create(space, engine, &vinyl_space_vtab,
+			 def, key_list, format) != 0) {
+		tuple_format_unref(format);
+		free(space);
+		return NULL;
+	}
+
+	/* Format is now referenced by the space. */
+	tuple_format_unref(format);
+	return space;
+}
+
+static void
+vinyl_space_destroy(struct space *space)
+{
+	free(space);
+}
+
+static int
+vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
+{
+	if (index_def->type != TREE) {
+		diag_set(ClientError, ER_INDEX_TYPE,
+			 index_def->name, space_name(space));
+		return -1;
+	}
+	if (index_def->key_def->is_nullable && index_def->iid == 0) {
+		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name(space));
+		return -1;
+	}
+	/* Check that there are no ANY, ARRAY, MAP parts */
+	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
+		struct key_part *part = &index_def->key_def->parts[i];
+		if (part->type <= FIELD_TYPE_ANY ||
+		    part->type >= FIELD_TYPE_ARRAY) {
+			diag_set(ClientError, ER_MODIFY_INDEX,
+				 index_def->name, space_name(space),
+				 tt_sprintf("field type '%s' is not supported",
+					    field_type_strs[part->type]));
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static struct index *
+vinyl_space_create_index(struct space *space, struct index_def *index_def)
+{
+	assert(index_def->type == TREE);
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)space->engine;
+	struct vinyl_index *index = calloc(1, sizeof(*index));
+	if (index == NULL) {
+		diag_set(OutOfMemory, sizeof(*index),
+			 "malloc", "struct vinyl_index");
+		return NULL;
+	}
+	struct vy_env *env = vinyl->env;
+	struct vy_index *pk = NULL;
+	if (index_def->iid > 0) {
+		pk = vy_index(space_index(space, 0));
+		assert(pk != NULL);
+	}
+	struct vy_index *db = vy_index_new(&env->index_env, &env->cache_env,
+					   index_def, space->format, pk);
+	if (db == NULL) {
+		free(index);
+		return NULL;
+	}
+	if (index_create(&index->base, (struct engine *)vinyl,
+			 &vinyl_index_vtab, index_def) != 0) {
+		vy_index_delete(db);
+		free(index);
+		return NULL;
+	}
+	index->db = db;
+	return &index->base;
+}
+
+static void
+vinyl_index_destroy(struct index *base)
+{
+	struct vy_index *index = vy_index(base);
 	/*
 	 * There still may be a task scheduled for this index
 	 * so postpone actual deletion until the last reference
 	 * is gone.
 	 */
 	vy_index_unref(index);
+	free(base);
 }
 
 /**
@@ -489,8 +665,8 @@ vy_delete_index(struct vy_env *env, struct vy_index *index)
  * create a new index. Take the current recovery status into
  * account.
  */
-int
-vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
+static int
+vy_index_open(struct vy_env *env, struct vy_index *index)
 {
 	/* Ensure vinyl data directory exists. */
 	if (access(env->path, F_OK) != 0) {
@@ -531,7 +707,7 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 		rc = vy_index_recover(index, env->recovery,
 				vclock_sum(env->recovery_vclock),
 				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
-				force_recovery);
+				env->force_recovery);
 		break;
 	default:
 		unreachable();
@@ -539,9 +715,12 @@ vy_index_open(struct vy_env *env, struct vy_index *index, bool force_recovery)
 	return rc;
 }
 
-void
-vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
+static void
+vinyl_index_commit_create(struct index *base, int64_t lsn)
 {
+	struct vy_env *env = vy_env(base->engine);
+	struct vy_index *index = vy_index(base);
+
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
 		/*
@@ -556,6 +735,15 @@ vy_index_commit_create(struct vy_env *env, struct vy_index *index, int64_t lsn)
 			vy_scheduler_add_index(&env->scheduler, index);
 			return;
 		}
+	}
+
+	if (env->status == VINYL_INITIAL_RECOVERY_REMOTE) {
+		/*
+		 * Records received during initial join do not
+		 * have LSNs so we use a fake one to identify
+		 * the index in vylog.
+		 */
+		lsn = ++env->join_lsn;
 	}
 
 	/*
@@ -620,9 +808,12 @@ vy_log_index_prune(struct vy_index *index, int64_t gc_lsn)
 	}
 }
 
-void
-vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
+static void
+vinyl_index_commit_drop(struct index *base)
 {
+	struct vy_env *env = vy_env(base->engine);
+	struct vy_index *index = vy_index(base);
+
 	vy_scheduler_remove_index(&env->scheduler, index);
 
 	/*
@@ -646,10 +837,18 @@ vy_index_commit_drop(struct vy_env *env, struct vy_index *index)
 			 diag_last_error(diag_get())->errmsg);
 }
 
-int
-vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
-			  struct space *new_space)
+static void
+vinyl_init_system_space(struct space *space)
 {
+	(void)space;
+	unreachable();
+}
+
+static int
+vinyl_space_prepare_truncate(struct space *old_space, struct space *new_space)
+{
+	struct vy_env *env = vy_env(old_space->engine);
+
 	if (vinyl_check_wal(env, "DDL") != 0)
 		return -1;
 
@@ -710,10 +909,11 @@ vy_prepare_truncate_space(struct vy_env *env, struct space *old_space,
 	return 0;
 }
 
-void
-vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
-			 struct space *new_space)
+static void
+vinyl_space_commit_truncate(struct space *old_space, struct space *new_space)
 {
+	struct vy_env *env = vy_env(old_space->engine);
+
 	assert(old_space->index_count == new_space->index_count);
 	uint32_t index_count = new_space->index_count;
 	if (index_count == 0)
@@ -778,10 +978,11 @@ vy_commit_truncate_space(struct vy_env *env, struct space *old_space,
 	}
 }
 
-int
-vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
-		       struct space *new_space)
+static int
+vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
+	struct vy_env *env = vy_env(old_space->engine);
+
 	if (vinyl_check_wal(env, "DDL") != 0)
 		return -1;
 	/*
@@ -838,9 +1039,11 @@ vy_prepare_alter_space(struct vy_env *env, struct space *old_space,
 	return 0;
 }
 
-int
-vy_check_format(struct vy_env *env, struct space *old_space)
+static int
+vinyl_space_check_format(struct space *new_space, struct space *old_space)
 {
+	(void)new_space;
+	struct vy_env *env = vy_env(old_space->engine);
 	/* @sa vy_prepare_alter_space for checks below. */
 	if (old_space->index_count == 0)
 		return 0;
@@ -854,11 +1057,14 @@ vy_check_format(struct vy_env *env, struct space *old_space)
 	return -1;
 }
 
-int
-vy_commit_alter_space(struct vy_env *env, struct space *new_space,
-		      struct tuple_format *new_format)
+static void
+vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 {
-	(void) env;
+	(void)old_space;
+	if (new_space == NULL || new_space->index_count == 0)
+		return; /* space drop */
+
+	struct tuple_format *new_format = new_space->format;
 	struct vy_index *pk = vy_index(new_space->index[0]);
 	struct index_def *new_index_def = space_index_def(new_space, 0);
 
@@ -868,14 +1074,14 @@ vy_commit_alter_space(struct vy_env *env, struct space *new_space,
 	struct tuple_format *format =
 		vy_tuple_format_new_with_colmask(new_format);
 	if (format == NULL)
-		return -1;
+		goto fail;
 
 	/* Update the upsert format. */
 	struct tuple_format *upsert_format =
 		vy_tuple_format_new_upsert(new_format);
 	if (upsert_format == NULL) {
 		tuple_format_delete(format);
-		return -1;
+		goto fail;
 	}
 
 	/* Set possibly changed opts. */
@@ -915,12 +1121,69 @@ vy_commit_alter_space(struct vy_env *env, struct space *new_space,
 		tuple_format_ref(index->upsert_format);
 		vy_index_validate_formats(index);
 	}
+	return;
+fail:
+	/* FIXME: space_vtab::commit_alter() must not fail. */
+	diag_log();
+	unreachable();
+	panic("failed to alter space");
+}
+
+static int
+vinyl_space_add_primary_key(struct space *space)
+{
+	return vy_index_open(vy_env(space->engine),
+			     vy_index(space->index[0]));
+}
+
+static void
+vinyl_space_drop_primary_key(struct space *space)
+{
+	(void)space;
+}
+
+static int
+vinyl_space_build_secondary_key(struct space *old_space,
+				struct space *new_space,
+				struct index *new_index)
+{
+	(void)old_space;
+	(void)new_space;
+	/*
+	 * Unlike Memtx, Vinyl does not need building of a secondary index.
+	 * This is true because of two things:
+	 * 1) Vinyl does not support alter of non-empty spaces
+	 * 2) During recovery a Vinyl index already has all needed data on disk.
+	 * And there are 3 cases:
+	 * I. The secondary index is added in snapshot. Then Vinyl was
+	 * snapshotted too and all necessary for that moment data is on disk.
+	 * II. The secondary index is added in WAL. That means that vinyl
+	 * space had no data at that point and had nothing to build. The
+	 * index actually could contain recovered data, but it will handle it
+	 * by itself during WAL recovery.
+	 * III. Vinyl is online. The space is definitely empty and there's
+	 * nothing to build.
+	 *
+	 * When we start to implement alter of non-empty vinyl spaces, it
+	 *  seems that we should call here:
+	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
+	 *  but aware of three cases mentioned above.
+	 */
+	return vy_index_open(vy_env(new_index->engine),
+			     vy_index(new_index));
+}
+
+static size_t
+vinyl_space_bsize(struct space *space)
+{
+	(void)space;
 	return 0;
 }
 
-size_t
-vy_index_bsize(struct vy_index *index)
+static ssize_t
+vinyl_index_bsize(struct index *base)
 {
+	struct vy_index *index = vy_index(base);
 	return index->stat.memory.count.bytes;
 }
 
@@ -1008,8 +1271,8 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, &env->run_env, index, tx,
-			      ITER_EQ, vykey, p_read_view);
+	vy_read_iterator_open(&itr, &env->run_env, index, tx, ITER_EQ, vykey,
+			      p_read_view, env->too_long_threshold);
 	int rc = vy_read_iterator_next(&itr, result);
 	tuple_unref(vykey);
 	if (*result != NULL)
@@ -1038,6 +1301,12 @@ vy_check_dup_key(struct vy_env *env, struct vy_tx *tx, struct space *space,
 {
 	struct tuple *found;
 	(void) part_count;
+	/*
+	 * During recovery we apply rows that were successfully
+	 * applied before restart so no conflict is possible.
+	 */
+	if (env->status != VINYL_ONLINE)
+		return 0;
 	/*
 	 * Expect a full tuple as input (secondary key || primary key)
 	 * but use only  the secondary key fields (partial key look
@@ -1159,8 +1428,7 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		return -1;
 	/**
 	 * If the space has triggers, then we need to fetch the
-	 * old tuple to pass it to the trigger. Use vy_get to
-	 * fetch it.
+	 * old tuple to pass it to the trigger.
 	 */
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
 		const char *key;
@@ -1168,7 +1436,8 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		if (key == NULL)
 			goto error_unref;
 		uint32_t part_count = mp_decode_array(&key);
-		if (vy_get(env, tx, pk, key, part_count, &stmt->old_tuple) != 0)
+		if (vy_index_get(env, tx, pk, key, part_count,
+				 &stmt->old_tuple) != 0)
 			goto error_unref;
 	}
 	if (vy_tx_set(tx, pk, new_tuple))
@@ -1429,7 +1698,20 @@ error:
 	return -1;
 }
 
-int
+/**
+ * Execute DELETE in a vinyl space.
+ * @param env     Vinyl environment.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with deleted
+ *                statement.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR the index is not found OR a tuple
+ *            reference increment error.
+ */
+static int
 vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
@@ -1531,7 +1813,20 @@ vy_update_changes_all_indexes(const struct space *space, uint64_t column_mask)
 	return true;
 }
 
-int
+/**
+ * Execute UPDATE in a vinyl space.
+ * @param env     Vinyl environment.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with old and new
+ *                statements.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR the index is not found OR a tuple
+ *            reference increment error.
+ */
+static int
 vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
@@ -1766,7 +2061,21 @@ request_normalize_ops(struct request *request)
 	return 0;
 }
 
-int
+/**
+ * Execute UPSERT in a vinyl space.
+ * @param env     Vinyl environment.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with old and new
+ *                statements.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data and update
+ *                operations.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR the index is not found OR a tuple
+ *            reference increment error.
+ */
+static int
 vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	  struct space *space, struct request *request)
 {
@@ -1936,6 +2245,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		/* The space hasn't the primary index. */
 		return -1;
 	assert(pk->id == 0);
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(env, space, pk));
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	/* First insert into the primary index. */
@@ -1949,6 +2260,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index = vy_index(space->index[iid]);
+		if (vy_is_committed_one(env, space, index))
+			continue;
 		if (vy_insert_secondary(env, tx, space, index,
 					stmt->new_tuple) != 0)
 			return -1;
@@ -1956,13 +2269,27 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	return 0;
 }
 
-int
+/**
+ * Execute REPLACE in a vinyl space.
+ * @param env     Vinyl environment.
+ * @param tx      Current transaction.
+ * @param stmt    Statement for triggers filled with old
+ *                statement.
+ * @param space   Vinyl space.
+ * @param request Request with the tuple data.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory error OR duplicate key error OR the primary
+ *            index is not found OR a tuple reference increment
+ *            error.
+ */
+static int
 vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	   struct space *space, struct request *request)
 {
 	if (vy_is_committed(env, space))
 		return 0;
-	if (request->type == IPROTO_INSERT && env->status == VINYL_ONLINE)
+	if (request->type == IPROTO_INSERT)
 		return vy_insert(env, tx, stmt, space, request);
 
 	if (space->index_count == 1) {
@@ -1974,15 +2301,89 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	}
 }
 
-struct vy_tx *
-vy_begin(struct vy_env *env)
+static int
+vinyl_space_execute_replace(struct space *space, struct txn *txn,
+			    struct request *request, struct tuple **result)
 {
-	return vy_tx_begin(env->xm);
+	assert(request->index_id == 0);
+	struct vy_env *env = vy_env(space->engine);
+	struct vy_tx *tx = txn->engine_tx;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (vy_replace(env, tx, stmt, space, request))
+		return -1;
+	*result = stmt->new_tuple;
+	return 0;
 }
 
-int
-vy_prepare(struct vy_env *env, struct vy_tx *tx)
+static int
+vinyl_space_execute_delete(struct space *space, struct txn *txn,
+			   struct request *request, struct tuple **result)
 {
+	struct vy_env *env = vy_env(space->engine);
+	struct vy_tx *tx = txn->engine_tx;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (vy_delete(env, tx, stmt, space, request))
+		return -1;
+	/*
+	 * Delete may or may not set stmt->old_tuple,
+	 * but we always return NULL.
+	 */
+	*result = NULL;
+	return 0;
+}
+
+static int
+vinyl_space_execute_update(struct space *space, struct txn *txn,
+			   struct request *request, struct tuple **result)
+{
+	struct vy_env *env = vy_env(space->engine);
+	struct vy_tx *tx = txn->engine_tx;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (vy_update(env, tx, stmt, space, request) != 0)
+		return -1;
+	*result = stmt->new_tuple;
+	return 0;
+}
+
+static int
+vinyl_space_execute_upsert(struct space *space, struct txn *txn,
+                           struct request *request)
+{
+	struct vy_env *env = vy_env(space->engine);
+	struct vy_tx *tx = txn->engine_tx;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	return vy_upsert(env, tx, stmt, space, request);
+}
+
+static inline void
+txn_stmt_unref_tuples(struct txn_stmt *stmt)
+{
+	if (stmt->old_tuple)
+		tuple_unref(stmt->old_tuple);
+	if (stmt->new_tuple)
+		tuple_unref(stmt->new_tuple);
+	stmt->old_tuple = NULL;
+	stmt->new_tuple = NULL;
+}
+
+static int
+vinyl_engine_begin(struct engine *engine, struct txn *txn)
+{
+	struct vy_env *env = vy_env(engine);
+	assert(txn->engine_tx == NULL);
+	txn->engine_tx = vy_tx_begin(env->xm);
+	if (txn->engine_tx == NULL)
+		return -1;
+	return 0;
+}
+
+static int
+vinyl_engine_prepare(struct engine *engine, struct txn *txn)
+{
+	struct vy_env *env = vy_env(engine);
+	struct vy_tx *tx = txn->engine_tx;
+	assert(tx != NULL);
+
 	if (tx->write_size > 0 &&
 	    vinyl_check_wal(env, "DML") != 0)
 		return -1;
@@ -2036,9 +2437,13 @@ vy_prepare(struct vy_env *env, struct vy_tx *tx)
 	return 0;
 }
 
-void
-vy_commit(struct vy_env *env, struct vy_tx *tx, int64_t lsn)
+static void
+vinyl_engine_commit(struct engine *engine, struct txn *txn)
 {
+	struct vy_env *env = vy_env(engine);
+	struct vy_tx *tx = txn->engine_tx;
+	assert(tx != NULL);
+
 	/*
 	 * vy_tx_commit() may trigger an upsert squash.
 	 * If there is no memory for a created statement,
@@ -2047,53 +2452,58 @@ vy_commit(struct vy_env *env, struct vy_tx *tx, int64_t lsn)
 	 */
 	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
 
-	vy_tx_commit(tx, lsn);
+	vy_tx_commit(tx, txn->signature);
 
 	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		txn_stmt_unref_tuples(stmt);
+	txn->engine_tx = NULL;
 }
 
-void
-vy_rollback(struct vy_env *env, struct vy_tx *tx)
+static void
+vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 {
-	(void)env;
+	(void)engine;
+	struct vy_tx *tx = txn->engine_tx;
+	if (tx == NULL)
+		return;
+
 	vy_tx_rollback(tx);
+
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		txn_stmt_unref_tuples(stmt);
+	txn->engine_tx = NULL;
 }
 
-void *
-vy_savepoint(struct vy_env *env, struct vy_tx *tx)
+static int
+vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
-	(void)env;
-	return vy_tx_savepoint(tx);
-}
-
-void
-vy_rollback_to_savepoint(struct vy_env *env, struct vy_tx *tx, void *svp)
-{
-	(void)env;
-	vy_tx_rollback_to_savepoint(tx, svp);
-}
-
-/* }}} Public API of transaction control */
-
-int
-vy_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
-       const char *key, uint32_t part_count, struct tuple **result)
-{
-	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	assert(result != NULL);
-	struct tuple *vyresult = NULL;
-	assert(part_count <= index->cmp_def->part_count);
-	if (vy_index_full_by_key(env, tx, index, key, part_count, &vyresult))
-		return -1;
-	if (vyresult == NULL)
-		return 0;
-	*result = vyresult;
+	(void)engine;
+	struct vy_tx *tx = txn->engine_tx;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(tx != NULL);
+	stmt->engine_savepoint = vy_tx_savepoint(tx);
 	return 0;
 }
 
+static void
+vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
+				struct txn_stmt *stmt)
+{
+	(void)engine;
+	struct vy_tx *tx = txn->engine_tx;
+	assert(tx != NULL);
+	vy_tx_rollback_to_savepoint(tx, stmt->engine_savepoint);
+	txn_stmt_unref_tuples(stmt);
+}
+
+/* }}} Public API of transaction control */
 
 /** {{{ Environment */
 
@@ -2194,9 +2604,9 @@ static void
 vy_squash_schedule(struct vy_index *index, struct tuple *stmt,
 		   void /* struct vy_env */ *arg);
 
-struct vy_env *
-vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
-	   int write_threads, double timeout)
+static struct vy_env *
+vy_env_new(const char *path, size_t memory, size_t cache,
+	   int read_threads, int write_threads, bool force_recovery)
 {
 	enum { KB = 1000, MB = 1000 * 1000 };
 	static int64_t dump_bandwidth_buckets[] = {
@@ -2221,9 +2631,11 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 	memset(e, 0, sizeof(*e));
 	e->status = VINYL_OFFLINE;
 	e->memory = memory;
-	e->timeout = timeout;
+	e->timeout = TIMEOUT_INFINITY;
+	e->too_long_threshold = TIMEOUT_INFINITY;
 	e->read_threads = read_threads;
 	e->write_threads = write_threads;
+	e->force_recovery = force_recovery;
 	e->path = strdup(path);
 	if (e->path == NULL) {
 		diag_set(OutOfMemory, strlen(path),
@@ -2263,8 +2675,8 @@ vy_env_new(const char *path, size_t memory, size_t cache, int read_threads,
 		goto error_index_env;
 
 	struct slab_cache *slab_cache = cord_slab_cache();
-	mempool_create(&e->cursor_pool, slab_cache,
-	               sizeof(struct vy_cursor));
+	mempool_create(&e->iterator_pool, slab_cache,
+	               sizeof(struct vinyl_iterator));
 	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
 	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0,
 		      VY_QUOTA_UPDATE_INTERVAL);
@@ -2289,7 +2701,7 @@ error_path:
 	return NULL;
 }
 
-void
+static void
 vy_env_delete(struct vy_env *e)
 {
 	ev_timer_stop(loop(), &e->quota_timer);
@@ -2298,7 +2710,7 @@ vy_env_delete(struct vy_env *e)
 	tx_manager_delete(e->xm);
 	free(e->path);
 	histogram_delete(e->dump_bw);
-	mempool_destroy(&e->cursor_pool);
+	mempool_destroy(&e->iterator_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_index_env_destroy(&e->index_env);
 	vy_stmt_env_destroy(&e->stmt_env);
@@ -2311,26 +2723,65 @@ vy_env_delete(struct vy_env *e)
 	free(e);
 }
 
-void
-vy_set_max_tuple_size(struct vy_env *env, size_t max_size)
+struct vinyl_engine *
+vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+		 int read_threads, int write_threads, bool force_recovery)
 {
-	(void) env;
+	struct vinyl_engine *vinyl = calloc(1, sizeof(*vinyl));
+	if (vinyl == NULL) {
+		diag_set(OutOfMemory, sizeof(*vinyl),
+			 "malloc", "struct vinyl_engine");
+		return NULL;
+	}
+
+	vinyl->env = vy_env_new(dir, memory, cache, read_threads,
+				write_threads, force_recovery);
+	if (vinyl->env == NULL) {
+		free(vinyl);
+		return NULL;
+	}
+
+	vinyl->base.vtab = &vinyl_engine_vtab;
+	vinyl->base.name = "vinyl";
+	return vinyl;
+}
+
+static void
+vinyl_engine_shutdown(struct engine *engine)
+{
+	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
+	vy_env_delete(vinyl->env);
+	free(vinyl);
+}
+
+void
+vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
+{
+	(void)vinyl;
 	vy_max_tuple_size = max_size;
 }
 
 void
-vy_set_timeout(struct vy_env *env, double timeout)
+vinyl_engine_set_timeout(struct vinyl_engine *vinyl, double timeout)
 {
-	env->timeout = timeout;
+	vinyl->env->timeout = timeout;
+}
+
+void
+vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
+				    double too_long_threshold)
+{
+	vinyl->env->too_long_threshold = too_long_threshold;
 }
 
 /** }}} Environment */
 
 /* {{{ Checkpoint */
 
-int
-vy_begin_checkpoint(struct vy_env *env)
+static int
+vinyl_engine_begin_checkpoint(struct engine *engine)
 {
+	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
 	/*
 	 * The scheduler starts worker threads upon the first wakeup.
@@ -2344,9 +2795,10 @@ vy_begin_checkpoint(struct vy_env *env)
 	return 0;
 }
 
-int
-vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
+static int
+vinyl_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
 {
+	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
 	if (vy_scheduler_wait_checkpoint(&env->scheduler) != 0)
 		return -1;
@@ -2355,17 +2807,19 @@ vy_wait_checkpoint(struct vy_env *env, struct vclock *vclock)
 	return 0;
 }
 
-void
-vy_commit_checkpoint(struct vy_env *env, struct vclock *vclock)
+static void
+vinyl_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
 {
 	(void)vclock;
+	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
 	vy_scheduler_end_checkpoint(&env->scheduler);
 }
 
-void
-vy_abort_checkpoint(struct vy_env *env)
+static void
+vinyl_engine_abort_checkpoint(struct engine *engine)
 {
+	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
 	vy_scheduler_end_checkpoint(&env->scheduler);
 }
@@ -2374,9 +2828,10 @@ vy_abort_checkpoint(struct vy_env *env)
 
 /** {{{ Recovery */
 
-int
-vy_bootstrap(struct vy_env *e)
+static int
+vinyl_engine_bootstrap(struct engine *engine)
 {
+	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (vy_log_bootstrap() != 0)
 		return -1;
@@ -2385,10 +2840,11 @@ vy_bootstrap(struct vy_env *e)
 	return 0;
 }
 
-int
-vy_begin_initial_recovery(struct vy_env *e,
-			  const struct vclock *recovery_vclock)
+static int
+vinyl_engine_begin_initial_recovery(struct engine *engine,
+				    const struct vclock *recovery_vclock)
 {
+	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (recovery_vclock != NULL) {
 		e->xm->lsn = vclock_sum(recovery_vclock);
@@ -2406,9 +2862,10 @@ vy_begin_initial_recovery(struct vy_env *e,
 	return 0;
 }
 
-int
-vy_begin_final_recovery(struct vy_env *e)
+static int
+vinyl_engine_begin_final_recovery(struct engine *engine)
 {
+	struct vy_env *e = vy_env(engine);
 	switch (e->status) {
 	case VINYL_INITIAL_RECOVERY_LOCAL:
 		e->status = VINYL_FINAL_RECOVERY_LOCAL;
@@ -2422,9 +2879,10 @@ vy_begin_final_recovery(struct vy_env *e)
 	return 0;
 }
 
-int
-vy_end_recovery(struct vy_env *e)
+static int
+vinyl_engine_end_recovery(struct engine *engine)
 {
+	struct vy_env *e = vy_env(engine);
 	switch (e->status) {
 	case VINYL_FINAL_RECOVERY_LOCAL:
 		if (vy_log_end_recovery() != 0)
@@ -2504,16 +2962,6 @@ struct vy_join_ctx {
 	 * is to the head of the list.
 	 */
 	struct rlist slices;
-	/**
-	 * LSN to assign to the next statement.
-	 *
-	 * We can't use original statements' LSNs, because we
-	 * send statements not in the chronological order while
-	 * the receiving end expects LSNs to grow monotonically
-	 * due to the design of the lsregion allocator, which is
-	 * used for storing statements in memory.
-	 */
-	int64_t lsn;
 };
 
 static int
@@ -2532,8 +2980,11 @@ vy_send_range_f(struct cbus_call_msg *cmsg)
 					    ctx->space_id, &xrow);
 		if (rc != 0)
 			break;
-		/* See comment to vy_join_ctx::lsn. */
-		xrow.lsn = ++ctx->lsn;
+		/*
+		 * Reset the LSN as the replica will ignore it
+		 * anyway - see comment to vy_env::join_lsn.
+		 */
+		xrow.lsn = 0;
 		rc = xstream_write(ctx->stream, &xrow);
 		if (rc != 0)
 			break;
@@ -2700,9 +3151,11 @@ vy_join_f(va_list ap)
 	return 0;
 }
 
-int
-vy_join(struct vy_env *env, struct vclock *vclock, struct xstream *stream)
+static int
+vinyl_engine_join(struct engine *engine, struct vclock *vclock,
+		  struct xstream *stream)
 {
+	struct vy_env *env = vy_env(engine);
 	int rc = -1;
 
 	/* Allocate the relay context. */
@@ -2756,6 +3209,69 @@ out_join_cord:
 out_free_ctx:
 	free(ctx);
 out:
+	return rc;
+}
+
+static int
+vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
+{
+	assert(request->header != NULL);
+	struct vy_env *env = vy_env(space->engine);
+
+	struct vy_tx *tx = vy_tx_begin(env->xm);
+	if (tx == NULL)
+		return -1;
+
+	struct txn_stmt stmt;
+	memset(&stmt, 0, sizeof(stmt));
+
+	int rc = -1;
+	switch (request->type) {
+	case IPROTO_REPLACE:
+		rc = vy_replace(env, tx, &stmt, space, request);
+		break;
+	case IPROTO_UPSERT:
+		rc = vy_upsert(env, tx, &stmt, space, request);
+		break;
+	case IPROTO_DELETE:
+		rc = vy_delete(env, tx, &stmt, space, request);
+		break;
+	default:
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, request->type);
+		break;
+	}
+	if (rc != 0) {
+		vy_tx_rollback(tx);
+		return -1;
+	}
+
+	/*
+	 * Account memory quota, see vinyl_engine_prepare()
+	 * and vinyl_engine_commit() for more details about
+	 * quota accounting.
+	 */
+	size_t reserved = tx->write_size;
+	if (vy_quota_use(&env->quota, reserved, TIMEOUT_INFINITY) != 0)
+		unreachable();
+
+	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
+
+	rc = vy_tx_prepare(tx);
+	if (rc == 0)
+		vy_tx_commit(tx, ++env->join_lsn);
+	else
+		vy_tx_rollback(tx);
+
+	txn_stmt_unref_tuples(&stmt);
+
+	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
+	assert(mem_used_after >= mem_used_before);
+	size_t used = mem_used_after - mem_used_before;
+	if (used >= reserved)
+		vy_quota_force_use(&env->quota, used - reserved);
+	else
+		vy_quota_release(&env->quota, reserved - used);
+
 	return rc;
 }
 
@@ -2862,9 +3378,11 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 	vy_recovery_iterate(recovery, vy_gc_cb, &arg);
 }
 
-void
-vy_collect_garbage(struct vy_env *env, int64_t lsn)
+static int
+vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 {
+	struct vy_env *env = vy_env(engine);
+
 	/* Cleanup old metadata log files. */
 	vy_log_collect_garbage(lsn);
 
@@ -2874,10 +3392,11 @@ vy_collect_garbage(struct vy_env *env, int64_t lsn)
 	if (recovery == NULL) {
 		say_warn("vinyl garbage collection failed: %s",
 			 diag_last_error(diag_get())->errmsg);
-		return;
+		return 0;
 	}
 	vy_gc(env, recovery, VY_GC_DROPPED, lsn);
 	vy_recovery_delete(recovery);
+	return 0;
 }
 
 /* }}} Garbage collection */
@@ -2930,10 +3449,12 @@ out:
 	return 0;
 }
 
-int
-vy_backup(struct vy_env *env, struct vclock *vclock,
-	  int (*cb)(const char *, void *), void *cb_arg)
+static int
+vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
+		    engine_backup_cb cb, void *cb_arg)
 {
+	struct vy_env *env = vy_env(engine);
+
 	/* Backup the metadata log. */
 	const char *path = vy_log_backup_path(vclock);
 	if (path == NULL)
@@ -3033,7 +3554,8 @@ vy_squash_process(struct vy_squash *squash)
 	 * prepared, but not committed statements.
 	 */
 	vy_read_iterator_open(&itr, &env->run_env, index, NULL, ITER_EQ,
-			      squash->stmt, &env->xm->p_committed_read_view);
+			      squash->stmt, &env->xm->p_committed_read_view,
+			      env->too_long_threshold);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
 	if (rc == 0 && result != NULL)
@@ -3276,110 +3798,245 @@ fail:
 /* {{{ Cursor */
 
 static void
-vy_cursor_on_tx_destroy(struct trigger *trigger, void *event)
+vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct vy_cursor *c = container_of(trigger, struct vy_cursor,
-					   on_tx_destroy);
-	c->tx = NULL;
+	struct vinyl_iterator *it = container_of(trigger,
+			struct vinyl_iterator, on_tx_destroy);
+	it->tx = NULL;
 }
 
-struct vy_cursor *
-vy_cursor_new(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
-	      const char *key, uint32_t part_count, enum iterator_type type)
+static int
+vinyl_iterator_last(struct iterator *base, struct tuple **ret)
 {
-	struct vy_cursor *c = mempool_alloc(&env->cursor_pool);
-	if (c == NULL) {
-		diag_set(OutOfMemory, sizeof(*c), "cursor", "cursor pool");
-		return NULL;
-	}
-	assert(part_count <= index->cmp_def->part_count);
-	c->key = vy_stmt_new_select(index->env->key_format, key, part_count);
-	if (c->key == NULL) {
-		mempool_free(&env->cursor_pool, c);
-		return NULL;
-	}
-	c->index = index;
-	c->n_reads = 0;
-	trigger_create(&c->on_tx_destroy, vy_cursor_on_tx_destroy, NULL, NULL);
-	if (tx == NULL) {
-		tx = &c->tx_autocommit;
-		vy_tx_create(env->xm, tx);
-	} else {
+	(void)base;
+	*ret = NULL;
+	return 0;
+}
+
+static void
+vinyl_iterator_close(struct vinyl_iterator *it)
+{
+	vy_read_iterator_close(&it->iterator);
+	vy_index_unref(it->index);
+	it->index = NULL;
+	tuple_unref(it->key);
+	it->key = NULL;
+	if (it->tx == &it->tx_autocommit) {
 		/*
-		 * Register a trigger that will abort this cursor
+		 * Rollback the automatic transaction.
+		 * Use vy_tx_destroy() so as not to spoil
+		 * the statistics of rollbacks issued by
+		 * user transactions.
+		 */
+		vy_tx_destroy(it->tx);
+	} else {
+		trigger_clear(&it->on_tx_destroy);
+	}
+	it->tx = NULL;
+	it->base.next = vinyl_iterator_last;
+}
+
+static int
+vinyl_iterator_next(struct iterator *base, struct tuple **ret)
+{
+	assert(base->next = vinyl_iterator_next);
+	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	struct tuple *tuple;
+
+	if (it->tx == NULL) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		goto fail;
+	}
+	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
+		diag_set(ClientError, ER_READ_VIEW_ABORTED);
+		goto fail;
+	}
+
+	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
+		goto fail;
+
+	if (tuple == NULL) {
+		/* EOF. Close the iterator immediately. */
+		vinyl_iterator_close(it);
+		*ret = NULL;
+		return 0;
+	}
+
+	if (it->index->id > 0) {
+		/* Get the full tuple from the primary index. */
+		if (vy_index_full_by_stmt(it->env, it->tx, it->index,
+					  tuple, &tuple) != 0)
+			goto fail;
+	} else {
+		tuple_ref(tuple);
+	}
+	*ret = tuple_bless(tuple);
+	tuple_unref(*ret);
+	if (*ret == NULL)
+		goto fail;
+	return 0;
+fail:
+	vinyl_iterator_close(it);
+	return -1;
+}
+
+static void
+vinyl_iterator_free(struct iterator *base)
+{
+	assert(base->free == vinyl_iterator_free);
+	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	if (base->next != vinyl_iterator_last)
+		vinyl_iterator_close(it);
+	mempool_free(&it->env->iterator_pool, it);
+}
+
+static struct iterator *
+vinyl_index_create_iterator(struct index *base, enum iterator_type type,
+			    const char *key, uint32_t part_count)
+{
+	struct vy_index *index = vy_index(base);
+	struct vy_env *env = vy_env(base->engine);
+
+	if (type > ITER_GT) {
+		diag_set(UnsupportedIndexFeature, base->def,
+			 "requested iterator type");
+		return NULL;
+	}
+
+	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
+	if (it == NULL) {
+	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
+			 "mempool", "struct vinyl_iterator");
+		return NULL;
+	}
+	it->key = vy_stmt_new_select(index->env->key_format, key, part_count);
+	if (it->key == NULL) {
+		mempool_free(&env->iterator_pool, it);
+		return NULL;
+	}
+
+	iterator_create(&it->base, base);
+	it->base.next = vinyl_iterator_next;
+	it->base.free = vinyl_iterator_free;
+
+	it->env = env;
+	it->index = index;
+	vy_index_ref(index);
+
+	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
+	if (tx != NULL) {
+		/*
+		 * Register a trigger that will abort this iterator
 		 * when the transaction ends.
 		 */
-		trigger_add(&tx->on_destroy, &c->on_tx_destroy);
+		trigger_create(&it->on_tx_destroy,
+			       vinyl_iterator_on_tx_destroy, NULL, NULL);
+		trigger_add(&tx->on_destroy, &it->on_tx_destroy);
+	} else {
+		tx = &it->tx_autocommit;
+		vy_tx_create(env->xm, tx);
 	}
-	c->tx = tx;
-	vy_read_iterator_open(&c->iterator, &env->run_env, index, tx,
-			      type, c->key,
-			      (const struct vy_read_view **)&tx->read_view);
-	vy_index_ref(c->index);
-	return c;
+	it->tx = tx;
+
+	vy_read_iterator_open(&it->iterator, &env->run_env,
+			      index, tx, type, it->key,
+			      (const struct vy_read_view **)&tx->read_view,
+			      env->too_long_threshold);
+	return (struct iterator *)it;
 }
 
-int
-vy_cursor_next(struct vy_env *env, struct vy_cursor *c, struct tuple **result)
+static int
+vinyl_index_get(struct index *base, const char *key,
+		uint32_t part_count, struct tuple **ret)
 {
-	struct tuple *vyresult = NULL;
-	struct vy_index *index = c->index;
-	*result = NULL;
+	assert(base->def->opts.is_unique);
+	assert(base->def->key_def->part_count == part_count);
 
-	if (c->tx == NULL) {
-		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
-		return -1;
-	}
-	if (c->tx->state == VINYL_TX_ABORT || c->tx->read_view->is_aborted) {
-		diag_set(ClientError, ER_READ_VIEW_ABORTED);
-		return -1;
-	}
+	struct vy_index *index = vy_index(base);
+	struct vy_env *env = vy_env(base->engine);
+	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
-	assert(c->key != NULL);
-	int rc = vy_read_iterator_next(&c->iterator, &vyresult);
-	if (rc)
+	struct tuple *tuple;
+	if (vy_index_full_by_key(env, tx, index,
+				 key, part_count, &tuple) != 0)
 		return -1;
-	c->n_reads++;
-	if (vyresult == NULL)
-		return 0;
-	if (index->id > 0 && vy_index_full_by_stmt(env, c->tx, index, vyresult,
-						   &vyresult))
-		return -1;
-	*result = vyresult;
-	/**
-	 * If the index is not primary (def->iid != 0) then no
-	 * need to reference the tuple, because it is returned
-	 * from vy_index_full_by_stmt() as new statement with 1
-	 * reference.
-	 */
-	if (index->id == 0)
-		tuple_ref(vyresult);
-	return *result != NULL ? 0 : -1;
-}
 
-void
-vy_cursor_delete(struct vy_env *env, struct vy_cursor *c)
-{
-	vy_read_iterator_close(&c->iterator);
-	if (c->tx != NULL) {
-		if (c->tx == &c->tx_autocommit) {
-			/*
-			 * Rollback the automatic transaction,
-			 * use vy_tx_destroy() to not spoil
-			 * the statistics of rollbacks issued
-			 * by user transactions.
-			 */
-			vy_tx_destroy(c->tx);
-		} else {
-			trigger_clear(&c->on_tx_destroy);
-		}
+	if (tuple != NULL) {
+		*ret = tuple_bless(tuple);
+		tuple_unref(tuple);
+		return *ret == NULL ? -1 : 0;
 	}
-	if (c->key)
-		tuple_unref(c->key);
-	vy_index_unref(c->index);
-	TRASH(c);
-	mempool_free(&env->cursor_pool, c);
+	*ret = NULL;
+	return 0;
 }
 
 /*** }}} Cursor */
+
+static const struct engine_vtab vinyl_engine_vtab = {
+	/* .shutdown = */ vinyl_engine_shutdown,
+	/* .create_space = */ vinyl_engine_create_space,
+	/* .join = */ vinyl_engine_join,
+	/* .begin = */ vinyl_engine_begin,
+	/* .begin_statement = */ vinyl_engine_begin_statement,
+	/* .prepare = */ vinyl_engine_prepare,
+	/* .commit = */ vinyl_engine_commit,
+	/* .rollback_statement = */ vinyl_engine_rollback_statement,
+	/* .rollback = */ vinyl_engine_rollback,
+	/* .bootstrap = */ vinyl_engine_bootstrap,
+	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
+	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
+	/* .end_recovery = */ vinyl_engine_end_recovery,
+	/* .begin_checkpoint = */ vinyl_engine_begin_checkpoint,
+	/* .wait_checkpoint = */ vinyl_engine_wait_checkpoint,
+	/* .commit_checkpoint = */ vinyl_engine_commit_checkpoint,
+	/* .abort_checkpoint = */ vinyl_engine_abort_checkpoint,
+	/* .collect_garbage = */ vinyl_engine_collect_garbage,
+	/* .backup = */ vinyl_engine_backup,
+	/* .check_space_def = */ vinyl_engine_check_space_def,
+};
+
+static const struct space_vtab vinyl_space_vtab = {
+	/* .destroy = */ vinyl_space_destroy,
+	/* .bsize = */ vinyl_space_bsize,
+	/* .apply_initial_join_row = */ vinyl_space_apply_initial_join_row,
+	/* .execute_replace = */ vinyl_space_execute_replace,
+	/* .execute_delete = */ vinyl_space_execute_delete,
+	/* .execute_update = */ vinyl_space_execute_update,
+	/* .execute_upsert = */ vinyl_space_execute_upsert,
+	/* .init_system_space = */ vinyl_init_system_space,
+	/* .check_index_def = */ vinyl_space_check_index_def,
+	/* .create_index = */ vinyl_space_create_index,
+	/* .add_primary_key = */ vinyl_space_add_primary_key,
+	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
+	/* .check_format = */ vinyl_space_check_format,
+	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
+	/* .prepare_truncate = */ vinyl_space_prepare_truncate,
+	/* .commit_truncate = */ vinyl_space_commit_truncate,
+	/* .prepare_alter = */ vinyl_space_prepare_alter,
+	/* .commit_alter = */ vinyl_space_commit_alter,
+};
+
+static const struct index_vtab vinyl_index_vtab = {
+	/* .destroy = */ vinyl_index_destroy,
+	/* .commit_create = */ vinyl_index_commit_create,
+	/* .commit_drop = */ vinyl_index_commit_drop,
+	/* .size = */ generic_index_size,
+	/* .bsize = */ vinyl_index_bsize,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ generic_index_count,
+	/* .get = */ vinyl_index_get,
+	/* .replace = */ generic_index_replace,
+	/* .create_iterator = */ vinyl_index_create_iterator,
+	/* .create_snapshot_iterator = */
+		generic_index_create_snapshot_iterator,
+	/* .info = */ vinyl_index_info,
+	/* .begin_build = */ generic_index_begin_build,
+	/* .reserve = */ generic_index_reserve,
+	/* .build_next = */ generic_index_build_next,
+	/* .end_build = */ generic_index_end_build,
+};

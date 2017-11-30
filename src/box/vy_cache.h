@@ -38,7 +38,7 @@
 
 #include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
-#include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_read_view.h"
 #include "vy_stat.h"
 #include "small/mempool.h"
 
@@ -214,8 +214,6 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
  * Cache iterator
  */
 struct vy_cache_iterator {
-	/** Parent class, must be the first member */
-	struct vy_stmt_iterator base;
 	/* The cache */
 	struct vy_cache *cache;
 
@@ -226,7 +224,7 @@ struct vy_cache_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
-	struct tuple *key;
+	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const struct vy_read_view **read_view;
 
@@ -253,7 +251,43 @@ struct vy_cache_iterator {
 void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 		       enum iterator_type iterator_type,
-		       struct tuple *key, const struct vy_read_view **rv);
+		       const struct tuple *key, const struct vy_read_view **rv);
+
+/**
+ * Advance a cache iterator to the next statement.
+ * The next statement is returned in @ret (NULL if EOF).
+ * @stop flag is set if a chain was found in the cache
+ * and so there shouldn't be statements preceding the
+ * returned statement in memory or on disk.
+ */
+void
+vy_cache_iterator_next(struct vy_cache_iterator *itr,
+		       struct tuple **ret, bool *stop);
+
+/**
+ * Advance a cache iterator to the statement following @last_stmt.
+ * The statement is returned in @ret (NULL if EOF).
+ */
+void
+vy_cache_iterator_skip(struct vy_cache_iterator *itr,
+		       const struct tuple *last_stmt,
+		       struct tuple **ret, bool *stop);
+
+/**
+ * Check if a cache iterator was invalidated and needs to be restored.
+ * If it does, set the iterator position to the statement following
+ * @last_stmt and return 1, otherwise return 0.
+ */
+int
+vy_cache_iterator_restore(struct vy_cache_iterator *itr,
+			  const struct tuple *last_stmt,
+			  struct tuple **ret, bool *stop);
+
+/**
+ * Close a cache iterator.
+ */
+void
+vy_cache_iterator_close(struct vy_cache_iterator *itr);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

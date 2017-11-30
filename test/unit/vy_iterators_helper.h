@@ -37,8 +37,8 @@
 #include "small/rlist.h"
 #include "small/lsregion.h"
 #include "vy_mem.h"
-#include "vy_stmt_iterator.h"
 #include "vy_cache.h"
+#include "vy_read_view.h"
 
 #define vyend 99999999
 #define MAX_FIELDS_COUNT 100

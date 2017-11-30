@@ -1,7 +1,10 @@
 fio = require 'fio'
 ---
 ...
-errno = require 'errno'
+ffi = require 'ffi'
+---
+...
+buffer = require 'buffer'
 ---
 ...
 -- umask
@@ -14,9 +17,16 @@ fio.umask()
 - 0
 ...
 -- pathjoin
-fio.basename(nil, nil)
+st, err = pcall(fio.basename, nil, nil)
 ---
-- null
+...
+st
+---
+- false
+...
+err:match("basename") ~= nil
+---
+- true
 ...
 fio.pathjoin('abc', 'cde')
 ---
@@ -35,9 +45,16 @@ fio.pathjoin('/', '/cde')
 - /cde
 ...
 -- basename
-fio.basename(nil)
+st, err = pcall(fio.basename, nil)
 ---
-- null
+...
+st
+---
+- false
+...
+err:match("basename") ~= nil
+---
+- true
 ...
 fio.basename('/')
 ---
@@ -75,9 +92,16 @@ file3 = fio.pathjoin(tmpdir, 'file.3')
 file4 = fio.pathjoin(tmpdir, 'file.4')
 ---
 ...
-fio.open(nil)
+st, err = pcall(fio.open, nil)
 ---
-- null
+...
+st
+---
+- false
+...
+err:match("open") ~= nil
+---
+- true
 ...
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 ---
@@ -341,12 +365,15 @@ string.format('%04o', bit.band(fio.stat(dir2).mode, 0x1FF))
 - - true
   - true
 ...
-{ fh1:close(), errno.strerror(), fh3:close(), errno.strerror() }
+fh1:close()
 ---
-- - false
-  - Bad file descriptor
-  - false
-  - Bad file descriptor
+- false
+- 'fio: Bad file descriptor'
+...
+fh3:close()
+---
+- false
+- 'fio: Bad file descriptor'
 ...
 fio.rmdir(nil)
 ---
@@ -373,15 +400,16 @@ fio.rmdir(dir2)
   - false
   - false
   - false
+  - 'fio: No such file or directory'
 ...
 fio.rmdir(tmpdir)
 ---
 - true
 ...
-{ fio.rmdir(tmpdir), errno.strerror() }
+fio.rmdir(tmpdir)
 ---
-- - false
-  - No such file or directory
+- false
+- 'fio: No such file or directory'
 ...
 fio.unlink()
 ---
@@ -395,9 +423,9 @@ fio.unlink(nil)
 fh4 = fio.open('newfile', {'O_RDWR','O_CREAT','O_EXCL'})
 ---
 ...
-string.format('%o', bit.band(fh4:stat().mode, 0x1FF))
+bit.band(fh4:stat().mode, 0x1FF) == bit.band(fio.umask(), 0x1ff)
 ---
-- '777'
+- true
 ...
 fh4:close()
 ---
@@ -408,9 +436,16 @@ fio.unlink('newfile')
 - true
 ...
 -- dirname
-fio.dirname(nil)
+st, err = pcall(fio.dirname, nil)
 ---
-- null
+...
+st
+---
+- false
+...
+err:match("dirname") ~= nil
+---
+- true
 ...
 fio.dirname('abc')
 ---
@@ -433,9 +468,16 @@ fio.dirname('/')
 - /
 ...
 -- abspath
-fio.abspath(nil)
+st, err = pcall(fio.abspath, nil)
 ---
-- null
+...
+st
+---
+- false
+...
+err:match("abspath") ~= nil
+---
+- true
 ...
 fio.abspath("/")
 ---
@@ -477,13 +519,27 @@ type(string.find(fio.abspath("tmp"), "tmp"))
 old_cwd = fio.cwd()
 ---
 ...
-fio.chdir(nil)
+st, err = pcall(fio.chdir, nil)
+---
+...
+st
 ---
 - false
 ...
-fio.chdir(42)
+err:match("chdir") ~= nil
+---
+- true
+...
+st, err = pcall(fio.chdir, 42)
+---
+...
+st
 ---
 - false
+...
+err:match("chdir") ~= nil
+---
+- true
 ...
 fio.chdir('/no/such/file/or/directory')
 ---
@@ -502,6 +558,310 @@ fio.chdir(old_cwd)
 - true
 ...
 fio.cwd() == old_cwd
+---
+- true
+...
+-- listdir
+tmpdir = fio.tempdir()
+---
+...
+dir3 = fio.pathjoin(tmpdir, "dir3")
+---
+...
+st, err = pcall(fio.mkdir, nil)
+---
+...
+st
+---
+- false
+...
+err:match("mkdir") ~= nil
+---
+- true
+...
+fio.mkdir(dir3)
+---
+- true
+...
+fio.mkdir(fio.pathjoin(dir3, "1"))
+---
+- true
+...
+fio.mkdir(fio.pathjoin(dir3, "2"))
+---
+- true
+...
+fio.mkdir(fio.pathjoin(dir3, "3"))
+---
+- true
+...
+fio.listdir("/no/such/directory/")
+---
+- null
+- 'can''t listdir /no/such/directory/: fio: No such file or directory'
+...
+ls = fio.listdir(dir3)
+---
+...
+table.sort(ls, function(a, b) return tonumber(a) < tonumber(b) end)
+---
+...
+ls
+---
+- - '1'
+  - '2'
+  - '3'
+...
+-- rmtree
+fio.stat(dir3) ~= nil
+---
+- true
+...
+fio.rmtree(dir3)
+---
+- true
+...
+fio.stat(dir3) == nil
+---
+- true
+...
+st, err = fio.rmtree(dir3)
+---
+...
+st
+---
+- null
+...
+err:match("No such") ~= nil
+---
+- true
+...
+-- mktree
+tmp1 = fio.pathjoin(tmpdir, "1")
+---
+...
+tmp2 = fio.pathjoin(tmp1, "2")
+---
+...
+tree = fio.pathjoin(tmp2, "3")
+---
+...
+tree2 = fio.pathjoin(tmpdir, "4")
+---
+...
+st, err = pcall(fio.mktree, nil)
+---
+...
+st
+---
+- false
+...
+err:match("mktree") ~= nil
+---
+- true
+...
+fio.mktree(tree)
+---
+- true
+...
+fio.stat(tree) ~= nil
+---
+- true
+...
+fio.stat(tmp2) ~= nil
+---
+- true
+...
+fio.mktree(tree2, 1)
+---
+- true
+...
+-- copy and copytree
+file1 = fio.pathjoin(tmp1, 'file.1')
+---
+...
+file2 = fio.pathjoin(tmp2, 'file.2')
+---
+...
+file3 = fio.pathjoin(tree, 'file.3')
+---
+...
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+---
+...
+fh1:write("gogo")
+---
+- true
+...
+fh1:close()
+---
+- true
+...
+fh1 = fio.open(file2, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+---
+...
+fh1:write("lolo")
+---
+- true
+...
+fh1:close()
+---
+- true
+...
+fio.symlink(file1, file3)
+---
+- true
+...
+fio.copyfile(file1, tmp2)
+---
+- true
+...
+fio.stat(fio.pathjoin(tmp2, "file.1")) ~= nil
+---
+- true
+...
+res, err = fio.copyfile(fio.pathjoin(tmp1, 'not_exists.txt'), tmp1)
+---
+...
+res
+---
+- false
+...
+err:match("failed to copy") ~= nil
+---
+- true
+...
+newdir = fio.pathjoin(tmpdir, "newdir")
+---
+...
+fio.copytree(fio.pathjoin(tmpdir, "1"), newdir)
+---
+- true
+...
+fio.stat(fio.pathjoin(newdir, "file.1")) ~= nil
+---
+- true
+...
+fio.stat(fio.pathjoin(newdir, "2", "file.2")) ~= nil
+---
+- true
+...
+fio.stat(fio.pathjoin(newdir, "2", "3", "file.3")) ~= nil
+---
+- true
+...
+fio.readlink(fio.pathjoin(newdir, "2", "3", "file.3")) == file1
+---
+- true
+...
+fio.copytree("/no/such/dir", "/some/where")
+---
+- false
+- Directory /no/such/dir does not exist
+...
+-- ibuf read/write
+buf = buffer.ibuf()
+---
+...
+tmpdir = fio.tempdir()
+---
+...
+tmpfile = fio.pathjoin(tmpdir, "test")
+---
+...
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+---
+...
+fh:write('helloworld!')
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- hello
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- world
+...
+len = fh:read(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- '!'
+...
+buf:reset()
+---
+...
+len = fh:pread(buf:reserve(5), 5, 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- world
+...
+len = fh:pread(buf:reserve(5), 5)
+---
+...
+ffi.string(buf:alloc(len), len)
+---
+- hello
+...
+fh:seek(0)
+---
+- 0
+...
+fh:write(buf.rpos, buf:size())
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read(64)
+---
+- worldhello!
+...
+fh:pwrite(buf:read(5), 5, 5)
+---
+- true
+...
+fh:pwrite(buf:read(5), 5)
+---
+- true
+...
+fh:seek(0)
+---
+- 0
+...
+fh:read(64)
+---
+- helloworld!
+...
+buf:recycle()
+---
+...
+fh:close()
+---
+- true
+...
+fio.unlink(tmpfile)
+---
+- true
+...
+fio.rmdir(tmpdir)
 ---
 - true
 ...

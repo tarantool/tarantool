@@ -1,0 +1,921 @@
+test_run = require('test_run').new()
+---
+...
+-- Since we store LSNs in data files, the data size may differ
+-- from run to run. Deploy a new server to make sure it will be
+-- the same so that we can check it.
+test_run:cmd('create server test with script = "vinyl/info.lua"')
+---
+- true
+...
+test_run:cmd('start server test')
+---
+- true
+...
+test_run:cmd('switch test')
+---
+- true
+...
+fiber = require('fiber')
+---
+...
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk', {page_size = 4096, range_size = 16384, run_count_per_level = 1, run_size_ratio = 1000})
+---
+...
+--
+-- Helper functions.
+--
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+-- Generate random 1K padding.
+function pad()
+    local t = {}
+    for i = 1, 1024 do
+        t[i] = string.char(math.random(65, 90))
+    end
+    return table.concat(t)
+end;
+---
+...
+-- Insert a tuple into the test space.
+function put(val)
+    box.space.test:replace{val, pad()}
+end;
+---
+...
+-- Compute the difference between two tables containing stats.
+-- If a field value is the same, it will be set to nil in the
+-- resulting table. If 'path' is not 'nil', compare statistics
+-- starting from 'path'.
+function stat_diff(stat1, stat2, path)
+    while path ~= nil and path ~= '' do
+        local i = path:find('%.') or path:len() + 1
+        local node = path:sub(1, i - 1)
+        path = path:sub(i + 1, path:len())
+        stat1 = stat1[node]
+        stat2 = stat2[node]
+    end
+    if type(stat1) == 'string' then
+        return nil
+    end
+    if type(stat1) == 'number' then
+        return stat1 ~= stat2 and stat1 - stat2 or nil
+    end
+    assert(type(stat1) == 'table')
+    local diff
+    for k, v1 in pairs(stat1) do
+        local v2 = stat2[k]
+        local d = stat_diff(v1, v2)
+        if d ~= nil then
+            if diff == nil then
+                diff = {}
+            end
+            diff[k] = d
+        end
+    end
+    return diff
+end;
+---
+...
+-- Return index statistics.
+--
+-- Note, latency measurement is beyond the scope of this test
+-- so we just filter it out.
+function istat()
+    local st = box.space.test.index.pk:info()
+    st.latency = nil
+    return st
+end;
+---
+...
+-- Return global statistics.
+--
+-- Note, quota watermark checking is beyond the scope of this
+-- test so we just filter out related statistics.
+function gstat()
+    local st = box.info.vinyl()
+    st.quota.use_rate = nil
+    st.quota.dump_bandwidth = nil
+    st.quota.watermark = nil
+    return st
+end;
+---
+...
+-- Wait until a stat counter changes.
+function wait(stat_func, stat, path, diff)
+    while (stat_diff(stat_func(), stat, path) or 0) < diff do
+        fiber.sleep(0.01)
+    end
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+-- initially stats are empty
+istat()
+---
+- rows: 0
+  run_avg: 0
+  bytes: 0
+  upsert:
+    squashed: 0
+    applied: 0
+  lookup: 0
+  run_count: 0
+  cache:
+    invalidate:
+      rows: 0
+      bytes: 0
+    rows: 0
+    evict:
+      rows: 0
+      bytes: 0
+    put:
+      rows: 0
+      bytes: 0
+    lookup: 0
+    bytes: 0
+    get:
+      rows: 0
+      bytes: 0
+  range_count: 1
+  put:
+    rows: 0
+    bytes: 0
+  disk:
+    dump:
+      in:
+        rows: 0
+        bytes: 0
+      count: 0
+      out:
+        rows: 0
+        bytes: 0
+    compact:
+      in:
+        rows: 0
+        bytes: 0
+      count: 0
+      out:
+        rows: 0
+        bytes: 0
+    rows: 0
+    iterator:
+      read:
+        bytes_compressed: 0
+        pages: 0
+        rows: 0
+        bytes: 0
+      bloom:
+        hit: 0
+        miss: 0
+      lookup: 0
+      get:
+        rows: 0
+        bytes: 0
+    pages: 0
+    bytes_compressed: 0
+    bytes: 0
+  txw:
+    bytes: 0
+    rows: 0
+    iterator:
+      lookup: 0
+      get:
+        rows: 0
+        bytes: 0
+  run_histogram: '[0]:1'
+  memory:
+    bytes: 0
+    rows: 0
+    iterator:
+      lookup: 0
+      get:
+        rows: 0
+        bytes: 0
+  get:
+    rows: 0
+    bytes: 0
+...
+gstat()
+---
+- cache:
+    limit: 15360
+    tuples: 0
+    used: 0
+  tx:
+    conflict: 0
+    commit: 0
+    rollback: 0
+    statements: 0
+    transactions: 0
+    gap_locks: 0
+    read_views: 0
+  quota:
+    limit: 134217728
+    used: 0
+...
+--
+-- Index statistics.
+--
+-- Compressed data size may differ as padding is random.
+-- Besides, it may depend on the zstd version so let's
+-- filter it out.
+test_run:cmd("push filter 'bytes_compressed: .*' to 'bytes_compressed: <bytes_compressed>'")
+---
+- true
+...
+-- put + dump
+st = istat()
+---
+...
+for i = 1, 100, 4 do put(i) end
+---
+...
+box.snapshot()
+---
+- ok
+...
+wait(istat, st, 'disk.dump.count', 1)
+---
+...
+stat_diff(istat(), st)
+---
+- rows: 25
+  run_avg: 1
+  run_count: 1
+  disk:
+    dump:
+      in:
+        rows: 25
+        bytes: 26525
+      count: 1
+      out:
+        rows: 25
+        bytes: 26049
+    rows: 25
+    pages: 7
+    bytes_compressed: <bytes_compressed>
+    bytes: 26049
+  bytes: 26049
+  put:
+    rows: 25
+    bytes: 26525
+...
+-- put + dump + compaction
+st = istat()
+---
+...
+for i = 1, 100, 2 do put(i) end
+---
+...
+box.snapshot()
+---
+- ok
+...
+wait(istat, st, 'disk.compact.count', 1)
+---
+...
+stat_diff(istat(), st)
+---
+- disk:
+    dump:
+      in:
+        rows: 50
+        bytes: 53050
+      count: 1
+      out:
+        rows: 50
+        bytes: 52091
+    compact:
+      in:
+        rows: 75
+        bytes: 78140
+      count: 1
+      out:
+        rows: 50
+        bytes: 52091
+    rows: 25
+    pages: 6
+    bytes_compressed: <bytes_compressed>
+    bytes: 26042
+  put:
+    rows: 50
+    bytes: 53050
+  rows: 25
+  bytes: 26042
+...
+-- point lookup from disk + cache put
+st = istat()
+---
+...
+s:get(1) ~= nil
+---
+- true
+...
+stat_diff(istat(), st)
+---
+- cache:
+    bytes: 1061
+    lookup: 1
+    rows: 1
+    put:
+      rows: 1
+      bytes: 1061
+  lookup: 1
+  disk:
+    iterator:
+      read:
+        bytes: 4167
+        pages: 1
+        bytes_compressed: <bytes_compressed>
+        rows: 4
+      lookup: 1
+      get:
+        rows: 1
+        bytes: 1061
+  memory:
+    iterator:
+      lookup: 1
+  get:
+    rows: 1
+    bytes: 1061
+...
+-- point lookup from cache
+st = istat()
+---
+...
+s:get(1) ~= nil
+---
+- true
+...
+stat_diff(istat(), st)
+---
+- cache:
+    lookup: 1
+    put:
+      rows: 1
+      bytes: 1061
+    get:
+      rows: 1
+      bytes: 1061
+  lookup: 1
+  get:
+    rows: 1
+    bytes: 1061
+...
+-- put in memory + cache invalidate
+st = istat()
+---
+...
+put(1)
+---
+...
+stat_diff(istat(), st)
+---
+- cache:
+    invalidate:
+      rows: 1
+      bytes: 1061
+    rows: -1
+    bytes: -1061
+  rows: 1
+  memory:
+    bytes: 1061
+    rows: 1
+  put:
+    rows: 1
+    bytes: 1061
+  bytes: 1061
+...
+-- point lookup from memory
+st = istat()
+---
+...
+s:get(1) ~= nil
+---
+- true
+...
+stat_diff(istat(), st)
+---
+- cache:
+    bytes: 1061
+    lookup: 1
+    rows: 1
+    put:
+      rows: 1
+      bytes: 1061
+  memory:
+    iterator:
+      lookup: 1
+      get:
+        rows: 1
+        bytes: 1061
+  lookup: 1
+  get:
+    rows: 1
+    bytes: 1061
+...
+-- put in txw + point lookup from txw
+st = istat()
+---
+...
+box.begin()
+---
+...
+put(1)
+---
+...
+s:get(1) ~= nil
+---
+- true
+...
+stat_diff(istat(), st)
+---
+- txw:
+    rows: 1
+    bytes: 1061
+    iterator:
+      lookup: 1
+      get:
+        rows: 1
+        bytes: 1061
+  lookup: 1
+  get:
+    rows: 1
+    bytes: 1061
+...
+box.rollback()
+---
+...
+-- apply upsert in txw
+st = istat()
+---
+...
+box.begin()
+---
+...
+_ = s:replace{1}
+---
+...
+_ = s:upsert({1}, {{'=', 2, pad()}})
+---
+...
+stat_diff(istat(), st, 'upsert')
+---
+- squashed: 1
+  applied: 1
+...
+box.rollback()
+---
+...
+-- apply upsert on get
+st = istat()
+---
+...
+_ = s:upsert({5}, {{'=', 2, pad()}})
+---
+...
+s:get(5) ~= nil
+---
+- true
+...
+stat_diff(istat(), st, 'upsert')
+---
+- applied: 1
+...
+-- cache eviction
+assert(box.cfg.vinyl_cache < 100 * 1024)
+---
+- true
+...
+for i = 1, 100 do put(i) end
+---
+...
+st = istat()
+---
+...
+for i = 1, 100 do s:get(i) end
+---
+...
+stat_diff(istat(), st, 'cache')
+---
+- rows: 14
+  bytes: 14854
+  evict:
+    rows: 86
+    bytes: 91246
+  lookup: 100
+  put:
+    rows: 100
+    bytes: 106100
+...
+-- range split
+for i = 1, 100 do put(i) end
+---
+...
+st = istat()
+---
+...
+box.snapshot()
+---
+- ok
+...
+wait(istat, st, 'disk.compact.count', 2)
+---
+...
+st = istat()
+---
+...
+st.range_count -- 2
+---
+- 2
+...
+st.run_count -- 2
+---
+- 2
+...
+st.run_avg -- 1
+---
+- 1
+...
+st.run_histogram -- [1]:2
+---
+- '[1]:2'
+...
+-- range lookup
+for i = 1, 100 do put(i) end
+---
+...
+box.begin()
+---
+...
+for i = 1, 100, 2 do put(i) end
+---
+...
+st = istat()
+---
+...
+#s:select()
+---
+- 100
+...
+stat_diff(istat(), st)
+---
+- cache:
+    rows: 13
+    bytes: 13793
+    evict:
+      rows: 37
+      bytes: 39257
+    lookup: 1
+    put:
+      rows: 51
+      bytes: 54111
+  disk:
+    iterator:
+      read:
+        bytes: 104300
+        pages: 25
+        bytes_compressed: <bytes_compressed>
+        rows: 100
+      lookup: 2
+      get:
+        rows: 100
+        bytes: 106100
+  txw:
+    iterator:
+      lookup: 1
+      get:
+        rows: 50
+        bytes: 53050
+  memory:
+    iterator:
+      lookup: 1
+      get:
+        rows: 100
+        bytes: 106100
+  lookup: 1
+  get:
+    rows: 100
+    bytes: 106100
+...
+box.rollback()
+---
+...
+-- range lookup from cache
+assert(box.cfg.vinyl_cache > 10 * 1024)
+---
+- true
+...
+for i = 1, 100 do put(i) end
+---
+...
+box.begin()
+---
+...
+#s:select({}, {limit = 5})
+---
+- 5
+...
+st = istat()
+---
+...
+#s:select({}, {limit = 5})
+---
+- 5
+...
+stat_diff(istat(), st)
+---
+- cache:
+    lookup: 1
+    put:
+      rows: 5
+      bytes: 5305
+    get:
+      rows: 9
+      bytes: 9549
+  txw:
+    iterator:
+      lookup: 1
+  lookup: 1
+  get:
+    rows: 5
+    bytes: 5305
+...
+box.rollback()
+---
+...
+--
+-- Global statistics.
+--
+-- use quota
+st = gstat()
+---
+...
+put(1)
+---
+...
+stat_diff(gstat(), st, 'quota')
+---
+- used: 1061
+...
+-- use cache
+st = gstat()
+---
+...
+_ = s:get(1)
+---
+...
+stat_diff(gstat(), st, 'cache')
+---
+- used: 1101
+  tuples: 1
+...
+s:delete(1)
+---
+...
+-- rollback
+st = gstat()
+---
+...
+box.begin()
+---
+...
+_ = s:insert{1}
+---
+...
+box.rollback()
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- rollback: 1
+...
+-- conflict
+st = gstat()
+---
+...
+ch1 = fiber.channel(1)
+---
+...
+ch2 = fiber.channel(1)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+_ = fiber.create(function()
+    box.begin()
+    s:insert{1}
+    ch1:put(true)
+    ch2:get()
+    pcall(box.commit)
+    ch1:put(true)
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+ch1:get()
+---
+- true
+...
+_ = s:insert{1}
+---
+...
+ch2:put(true)
+---
+- true
+...
+ch1:get()
+---
+- true
+...
+stat_diff(gstat(), st, 'tx')
+---
+- conflict: 1
+  commit: 1
+  rollback: 1
+...
+s:delete(1)
+---
+...
+-- tx statements
+st = gstat()
+---
+...
+box.begin()
+---
+...
+for i = 1, 10 do s:replace{i} end
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- statements: 10
+  transactions: 1
+...
+box.rollback()
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- rollback: 1
+...
+-- transactions
+st = gstat()
+---
+...
+ch1 = fiber.channel(5)
+---
+...
+ch2 = fiber.channel(5)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for i = 1, 5 do
+    fiber.create(function()
+        box.begin()
+        s:replace{i}
+        ch1:put(true)
+        ch2:get()
+        box.rollback()
+        ch1:put(true)
+    end)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+for i = 1, 5 do ch1:get() end
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- statements: 5
+  transactions: 5
+...
+for i = 1, 5 do ch2:put(true) end
+---
+...
+for i = 1, 5 do ch1:get() end
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- rollback: 5
+...
+-- read view
+st = gstat()
+---
+...
+ch1 = fiber.channel(1)
+---
+...
+ch2 = fiber.channel(1)
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+_ = fiber.create(function()
+    box.begin()
+    s:select()
+    ch1:put(true)
+    ch2:get()
+    pcall(box.commit)
+    ch1:put(true)
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+ch1:get()
+---
+- true
+...
+_ = s:insert{1}
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- transactions: 1
+  gap_locks: 1
+  commit: 1
+  read_views: 1
+...
+ch2:put(true)
+---
+- true
+...
+ch1:get()
+---
+- true
+...
+stat_diff(gstat(), st, 'tx')
+---
+- commit: 2
+...
+s:delete(1)
+---
+...
+-- gap locks
+st = gstat()
+---
+...
+box.begin()
+---
+...
+_ = s:select({10}, {iterator = 'LT'})
+---
+...
+_ = s:select({20}, {iterator = 'GT'})
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- transactions: 1
+  gap_locks: 2
+...
+box.commit()
+---
+...
+stat_diff(gstat(), st, 'tx')
+---
+- commit: 1
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd('stop server test')
+---
+- true
+...
+test_run:cmd('cleanup server test')
+---
+- true
+...
+test_run:cmd("clear filter")
+---
+- true
+...

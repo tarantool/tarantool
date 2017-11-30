@@ -44,7 +44,6 @@ local json = require("json")
 local special_fields = {
     "file",
     "level",
-    "message",
     "pid",
     "line",
     "cord_name",

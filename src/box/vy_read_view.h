@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_COLL_H_INCLUDED
-#define TARANTOOL_BOX_COLL_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_BOX_VY_READ_VIEW_H
+#define INCLUDES_TARANTOOL_BOX_VY_READ_VIEW_H
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -31,70 +31,48 @@
  * SUCH DAMAGE.
  */
 
-#include "coll_def.h"
-#include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
+
+#include <small/rlist.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct coll;
-
-typedef int (*coll_cmp_f)(const char *s, size_t s_len,
-			  const char *t, size_t t_len,
-			  const struct coll *coll);
-
-typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len,
-				uint32_t *ph, uint32_t *pcarry,
-				struct coll *coll);
-
-/**
- * ICU collation specific data.
- */
-struct UCollator;
-
-struct coll_icu {
-	struct UCollator *collator;
+/** The state of the database the cursor should be looking at. */
+struct vy_read_view {
+	/**
+	 * Consistent read view LSN. Originally read-only transactions
+	 * receive a read view lsn upon creation and do not see further
+	 * changes.
+	 * Other transactions are expected to be read-write and
+	 * have vlsn == INT64_MAX to read newest data. Once a value read
+	 * by such a transaction (T) is overwritten by another
+	 * commiting transaction, T permanently goes to read view that does
+	 * not see this change.
+	 * If T does not have any write statements by the commit time it will
+	 * be committed successfully, or aborted as conflicted otherwise.
+	 */
+	int64_t vlsn;
+	/** The link in read_views of the TX manager */
+	struct rlist in_read_views;
+	/**
+	 * The number of references to this read view. The global
+	 * read view has zero refs, we don't do reference
+	 * count it as it is missing from read_views list.
+	 */
+	int refs;
+	/**
+	 * Is set to true when the read view which includes
+	 * a prepared but not committed transaction, is
+	 * compromised by a cascading rollback.
+	 */
+	bool is_aborted;
 };
-
-/**
- * A collation.
- */
-struct coll {
-	/** Personal ID */
-	uint32_t id;
-	/** Owner ID */
-	uint32_t owner_id;
-	/** Collation type. */
-	enum coll_type type;
-	/** Type specific data. */
-	struct coll_icu icu;
-	/** String comparator. */
-	coll_cmp_f cmp;
-	coll_hash_f hash;
-	/** Collation name. */
-	size_t name_len;
-	char name[0];
-};
-
-/**
- * Create a collation by definition.
- * @param def - collation definition.
- * @return - the collation OR NULL on memory error (diag is set).
- */
-struct coll *
-coll_new(const struct coll_def *def);
-
-/**
- * Delete a collation.
- * @param cool - collation to delete.
- */
-void
-coll_delete(struct coll *coll);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BOX_COLL_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_BOX_VY_READ_VIEW_H */

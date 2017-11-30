@@ -235,6 +235,10 @@ box.info.replication[1].upstream.status
 ---
 - follow
 ...
+box.info.replication[1].upstream.lag
+---
+- 0
+...
 -- wait for ack timeout
 while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
 ---

@@ -600,25 +600,6 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 }
 
 int
-vy_key_snprint(char *buf, int size, const char *key)
-{
-	if (key == NULL)
-		return snprintf(buf, size, "[]");
-
-	int total = 0;
-	SNPRINT(total, snprintf, buf, size, "[");
-	uint32_t count = mp_decode_array(&key);
-	for (uint32_t i = 0; i < count; i++) {
-		if (i > 0)
-			SNPRINT(total, snprintf, buf, size, ", ");
-		SNPRINT(total, mp_snprint, buf, size, key);
-		mp_next(&key);
-	}
-	SNPRINT(total, snprintf, buf, size, "]");
-	return total;
-}
-
-int
 vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
 {
 	int total = 0;
@@ -638,15 +619,6 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
 	SNPRINT(total, snprintf, buf, size, ", lsn=%lld)",
 		(long long) vy_stmt_lsn(stmt));
 	return total;
-}
-
-const char *
-vy_key_str(const char *key)
-{
-	char *buf = tt_static_buf();
-	if (vy_key_snprint(buf, TT_STATIC_BUF_LEN, key) < 0)
-		return "<failed to format key>";
-	return buf;
 }
 
 const char *

@@ -194,8 +194,7 @@ test_iterator_restore_after_insertion()
 				     direct ? ITER_GE : ITER_LE, select_key,
 				     &prv);
 		struct tuple *t;
-		bool stop = false;
-		int rc = itr.base.iface->next_key(&itr.base, &t, &stop);
+		int rc = vy_mem_iterator_next_key(&itr, &t);
 		assert(rc == 0);
 		size_t j = 0;
 		while (t != NULL) {
@@ -215,7 +214,7 @@ test_iterator_restore_after_insertion()
 				break;
 			else if(!direct && val <= middle_value)
 				break;
-			int rc = itr.base.iface->next_key(&itr.base, &t, &stop);
+			int rc = vy_mem_iterator_next_key(&itr, &t);
 			assert(rc == 0);
 		}
 		if (t == NULL && j != expected_count)
@@ -267,9 +266,9 @@ test_iterator_restore_after_insertion()
 		}
 
 		if (direct)
-			rc = itr.base.iface->restore(&itr.base, restore_on_key, &t, &stop);
+			rc = vy_mem_iterator_restore(&itr, restore_on_key, &t);
 		else
-			rc = itr.base.iface->restore(&itr.base, restore_on_key_reverse, &t, &stop);
+			rc = vy_mem_iterator_restore(&itr, restore_on_key_reverse, &t);
 
 		j = 0;
 		while (t != NULL) {
@@ -285,7 +284,7 @@ test_iterator_restore_after_insertion()
 				break;
 			}
 			j++;
-			int rc = itr.base.iface->next_key(&itr.base, &t, &stop);
+			int rc = vy_mem_iterator_next_key(&itr, &t);
 			assert(rc == 0);
 		}
 		if (j != expected_count)

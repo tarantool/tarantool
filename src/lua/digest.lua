@@ -44,6 +44,7 @@ local digest_shortcuts = {
     md5     = 'MD5',
     md4     = 'MD4',
 }
+local internal = require("digest")
 
 local PMurHash
 local PMurHash_methods = {
@@ -141,6 +142,24 @@ setmetatable(CRC32, {
     end
 })
 
+local pbkdf2 = function(pass, salt, iters, digest_len)
+    if type(pass) ~= 'string' or type(salt) ~= 'string' then
+        error("Usage: digest.pbkdf2(pass, salt[,iters][,digest_len])")
+    end
+    if iters and type(iters) ~= 'number' then
+        error("iters must be a number")
+    end
+    if digest_len and type(digest_len) ~= 'number' then
+        error("digest_len must be a number")
+    end
+    iters = iters or 100000
+    digest_len = digest_len or 128
+    if digest_len > 128 then
+        error("too big digest size")
+    end
+    return internal.pbkdf2(pass, salt, iters, digest_len)
+end
+
 local m = {
     base64_encode = function(bin, options)
         if type(bin) ~= 'string' or
@@ -215,7 +234,16 @@ local m = {
         return ffi.string(buf, n)
     end,
 
-    murmur = PMurHash
+    murmur = PMurHash,
+
+    pbkdf2 = pbkdf2,
+
+    pbkdf2_hex = function(pass, salt, iters, digest_len)
+        if type(pass) ~= 'string' or type(salt) ~= 'string' then
+            error("Usage: digest.pbkdf2_hex(pass, salt)")
+        end
+        return string.hex(pbkdf2(pass, salt, iters, digest_len))
+    end
 }
 
 for digest, name in pairs(digest_shortcuts) do

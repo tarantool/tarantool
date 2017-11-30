@@ -44,10 +44,6 @@ local function process(self)
 
     local checkpoints = box.internal.gc.info().checkpoints
     local last_checkpoint = checkpoints[#checkpoints]
-    if last_checkpoint.signature == box.info.signature then
-        log.debug('snapshot %d already exists', last_checkpoint.signature)
-        return false
-    end
 
     local last_snap = fio.pathjoin(box.cfg.memtx_dir,
             string.format('%020d.snap', last_checkpoint.signature))
@@ -56,7 +52,7 @@ local function process(self)
         log.error("can't stat %s: %s", last_snap, errno.strerror())
         return false
     end
-    if snstat.mtime <= fiber.time() + daemon.checkpoint_interval then
+    if snstat.mtime + daemon.checkpoint_interval <= fiber.time() then
         return snapshot()
     end
 end

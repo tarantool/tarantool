@@ -18,8 +18,6 @@ git:
     depth: 100500
 
 env:
-    global:
-      - PACKAGECLOUD_REPO=1_8
     matrix:
       - TARGET=source
       - TARGET=test
@@ -92,21 +90,23 @@ before_deploy:
 deploy:
   # Deploy packages to PackageCloud
   - provider: packagecloud
-    username: "${PACKAGECLOUD_USER}"
-    repository: "${PACKAGECLOUD_REPO}"
+    username: "tarantool"
+    repository: "1_8"
     token: "${PACKAGECLOUD_TOKEN}"
     dist: "${OS}/${DIST}"
     package_glob: build/*.{rpm,deb,dsc}
     skip_cleanup: true
     on:
-      branch: "1.8"
+      repo: tarantool/tarantool
+      branch: "1.8" # releases
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
-  # Deploy sources to S3
+  # Deploy source tarballs to S3
   - provider: script
     script: make -f .travis.mk source_deploy
     skip_cleanup: true
     on:
-      branch: "1.8"
+      repo: tarantool/tarantool
+      branch: "1.8" # releases
       condition: "x${TARGET} = xsource"
 
 notifications:

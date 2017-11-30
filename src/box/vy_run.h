@@ -37,7 +37,8 @@
 #include "fiber_cond.h"
 #include "iterator_type.h"
 #include "vy_stmt.h" /* for comparators */
-#include "vy_stmt_iterator.h" /* struct vy_stmt_iterator */
+#include "vy_stmt_stream.h"
+#include "vy_read_view.h"
 #include "vy_stat.h"
 #include "index_def.h"
 
@@ -204,8 +205,6 @@ struct vy_run_iterator_pos {
  * key.
  */
 struct vy_run_iterator {
-	/** Parent class, must be the first member */
-	struct vy_stmt_iterator base;
 	/** Usage statistics */
 	struct vy_run_iterator_stat *stat;
 	/** Vinyl run environment. */
@@ -236,7 +235,7 @@ struct vy_run_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	struct tuple *key;
+	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const struct vy_read_view **read_view;
 
@@ -464,16 +463,53 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
 	     const struct key_def *cmp_def,
 	     struct vy_slice **result);
 
+/**
+ * Open an iterator over on-disk run.
+ *
+ * Note, it is the caller's responsibility to make sure the slice
+ * is not compacted while the iterator is reading it.
+ */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
-		     struct tuple *key, const struct vy_read_view **rv,
+		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
 		     struct tuple_format *format,
 		     struct tuple_format *upsert_format,
 		     bool is_primary);
+
+/**
+ * Advance a run iterator to the newest statement for the next key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+NODISCARD int
+vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret);
+
+/**
+ * Advance a run iterator to the older statement for the same key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+NODISCARD int
+vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret);
+
+/**
+ * Advance a run iterator to the newest statement for the first key
+ * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+NODISCARD int
+vy_run_iterator_skip(struct vy_run_iterator *itr,
+		     const struct tuple *last_stmt, struct tuple **ret);
+
+/**
+ * Close a run iterator.
+ */
+void
+vy_run_iterator_close(struct vy_run_iterator *itr);
 
 /**
  * Simple stream over a slice. @see vy_stmt_stream.
