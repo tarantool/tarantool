@@ -102,6 +102,7 @@ test_run:cmd("switch replica")
 -- wait for reconnect
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 box.info.replication[1].upstream.status
+box.info.replication[1].upstream.lag
 -- wait for ack timeout
 while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
 
