@@ -370,6 +370,24 @@ box_check_replication_timeout(void)
 	return timeout;
 }
 
+static void
+box_check_instance_uuid(struct tt_uuid *uuid)
+{
+	*uuid = uuid_nil;
+	const char *uuid_str = cfg_gets("instance_uuid");
+	if (uuid_str != NULL && tt_uuid_from_string(uuid_str, uuid) != 0)
+		tnt_raise(ClientError, ER_CFG, "instance_uuid", uuid_str);
+}
+
+static void
+box_check_replicaset_uuid(struct tt_uuid *uuid)
+{
+	*uuid = uuid_nil;
+	const char *uuid_str = cfg_gets("replicaset_uuid");
+	if (uuid_str != NULL && tt_uuid_from_string(uuid_str, uuid) != 0)
+		tnt_raise(ClientError, ER_CFG, "replicaset_uuid", uuid_str);
+}
+
 static enum wal_mode
 box_check_wal_mode(const char *mode_name)
 {
@@ -425,9 +443,12 @@ box_check_wal_max_size(int64_t wal_max_size)
 void
 box_check_config()
 {
+	struct tt_uuid uuid;
 	box_check_log(cfg_gets("log"));
 	box_check_log_format(cfg_gets("log_format"));
 	box_check_uri(cfg_gets("listen"), "listen");
+	box_check_instance_uuid(&uuid);
+	box_check_replicaset_uuid(&uuid);
 	box_check_replication();
 	box_check_replication_timeout();
 	box_check_readahead(cfg_geti("readahead"));
@@ -1295,8 +1316,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 */
 	if (!tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
 		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-			  tt_uuid_str(&replicaset_uuid),
-			  tt_uuid_str(&REPLICASET_UUID));
+			  tt_uuid_str(&REPLICASET_UUID),
+			  tt_uuid_str(&replicaset_uuid));
 	}
 
 	/* Check replica uuid */
@@ -1351,11 +1372,14 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 
 /** Insert a new cluster into _schema */
 static void
-box_set_replicaset_uuid()
+box_set_replicaset_uuid(const struct tt_uuid *replicaset_uuid)
 {
 	tt_uuid uu;
-	/* Generate a new replica set UUID */
-	tt_uuid_create(&uu);
+	/* Use UUID from the config or generate a new one */
+	if (!tt_uuid_is_nil(replicaset_uuid))
+		uu = *replicaset_uuid;
+	else
+		tt_uuid_create(&uu);
 	/* Save replica set UUID in _schema */
 	if (boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "[%s%s]", "cluster",
 		 tt_uuid_str(&uu)))
@@ -1423,7 +1447,7 @@ engine_init()
  * Initialize the first replica of a new replica set.
  */
 static void
-bootstrap_master(void)
+bootstrap_master(const struct tt_uuid *replicaset_uuid)
 {
 	engine_bootstrap_xc();
 
@@ -1446,8 +1470,8 @@ bootstrap_master(void)
 		assert(replica->id == replica_id);
 	}
 
-	/* Generate UUID of a new replica set */
-	box_set_replicaset_uuid();
+	/* Set UUID of a new replica set */
+	box_set_replicaset_uuid(replicaset_uuid);
 }
 
 /**
@@ -1512,7 +1536,7 @@ bootstrap_from_master(struct replica *master)
  * instance
  */
 static void
-bootstrap()
+bootstrap(const struct tt_uuid *replicaset_uuid)
 {
 	/* Use the first replica by URI as a bootstrap leader */
 	struct replica *master = replicaset_first();
@@ -1520,8 +1544,15 @@ bootstrap()
 
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
 		bootstrap_from_master(master);
+		/* Check replica set UUID */
+		if (!tt_uuid_is_nil(replicaset_uuid) &&
+		    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
+			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+				  tt_uuid_str(replicaset_uuid),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
 	} else {
-		bootstrap_master();
+		bootstrap_master(replicaset_uuid);
 	}
 	if (engine_begin_checkpoint() ||
 	    engine_commit_checkpoint(&replicaset_vclock))
@@ -1583,6 +1614,10 @@ box_cfg_xc(void)
 	wal_thread_start();
 
 	title("loading");
+
+	struct tt_uuid instance_uuid, replicaset_uuid;
+	box_check_instance_uuid(&instance_uuid);
+	box_check_replicaset_uuid(&replicaset_uuid);
 
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
@@ -1680,6 +1715,20 @@ box_cfg_xc(void)
 		recovery_finalize(recovery, &wal_stream.base);
 		engine_end_recovery_xc();
 
+		/* Check replica set and instance UUID. */
+		if (!tt_uuid_is_nil(&instance_uuid) &&
+		    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
+			tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
+				  tt_uuid_str(&instance_uuid),
+				  tt_uuid_str(&INSTANCE_UUID));
+		}
+		if (!tt_uuid_is_nil(&replicaset_uuid) &&
+		    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
+			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+				  tt_uuid_str(&replicaset_uuid),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
+
 		/* Clear the pointer to journal before it goes out of scope */
 		journal_set(NULL);
 		/*
@@ -1695,7 +1744,10 @@ box_cfg_xc(void)
 		/* Wait for the cluster to start up */
 		box_sync_replication(TIMEOUT_INFINITY);
 	} else {
-		tt_uuid_create(&INSTANCE_UUID);
+		if (!tt_uuid_is_nil(&instance_uuid))
+			INSTANCE_UUID = instance_uuid;
+		else
+			tt_uuid_create(&INSTANCE_UUID);
 		/*
 		 * Begin listening on the socket to enable
 		 * master-master replication leader election.
@@ -1706,7 +1758,7 @@ box_cfg_xc(void)
 		box_sync_replication(TIMEOUT_INFINITY);
 
 		/* Bootstrap a new master */
-		bootstrap();
+		bootstrap(&replicaset_uuid);
 	}
 	fiber_gc();
 

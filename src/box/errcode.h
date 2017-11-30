@@ -115,10 +115,10 @@ struct errcode_record {
 	/* 60 */_(ER_SAVEPOINT_EMPTY_TX,	"Can not set a savepoint in an empty transaction") \
 	/* 61 */_(ER_NO_SUCH_SAVEPOINT,		"Can not rollback to savepoint: the savepoint does not exist") \
 	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %s") \
-	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
+	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID mismatch: expected %s, got %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
 	/* 65 */_(ER_REPLICASET_UUID_IS_RO,	"Can't reset replica set UUID: it is already assigned") \
-	/* 66 */_(ER_INSTANCE_UUID_MISMATCH,	"Remote ID mismatch for %s: expected %u, got %u") \
+	/* 66 */_(ER_INSTANCE_UUID_MISMATCH,	"Instance UUID mismatch: expected %s, got %s") \
 	/* 67 */_(ER_REPLICA_ID_IS_RESERVED,	"Can't initialize replica id with a reserved value %u") \
 	/* 68 */_(ER_INVALID_ORDER,		"Invalid LSN order for instance %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	"Missing mandatory field '%s' in request") \

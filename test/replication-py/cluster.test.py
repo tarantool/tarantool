@@ -263,6 +263,24 @@ except Exception as e:
 
 master.admin('box.cfg { read_only = false }')
 
+print '-------------------------------------------------------------'
+print 'JOIN replica with different replica set UUID'
+print '-------------------------------------------------------------'
+
+failed = TarantoolServer(server.ini)
+failed.script = 'replication-py/uuid_mismatch.lua'
+failed.vardir = server.vardir
+failed.rpl_master = master
+failed.name = "uuid_mismatch"
+failed.crash_expected = True
+try:
+    failed.deploy()
+except Exception as e:
+    line = "ER_REPLICASET_UUID_MISMATCH"
+    if failed.logfile_pos.seek_once(line) >= 0:
+        print "'%s' exists in server log" % line
+
+failed.cleanup()
 
 print '-------------------------------------------------------------'
 print 'Cleanup'

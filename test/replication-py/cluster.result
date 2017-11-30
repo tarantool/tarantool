@@ -207,6 +207,10 @@ box.cfg { read_only = false }
 ---
 ...
 -------------------------------------------------------------
+JOIN replica with different replica set UUID
+-------------------------------------------------------------
+'ER_REPLICASET_UUID_MISMATCH' exists in server log
+-------------------------------------------------------------
 Cleanup
 -------------------------------------------------------------
 box.schema.user.revoke('guest', 'replication')

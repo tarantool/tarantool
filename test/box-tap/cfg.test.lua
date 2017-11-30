@@ -4,7 +4,8 @@ local tap = require('tap')
 local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
-test:plan(72)
+local uuid = require('uuid')
+test:plan(78)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -410,6 +411,48 @@ ok = ok and pcall(s.select, s)
 os.exit(ok and 0 or 1)
 ]], cfg)
 test:is(run_script(code), 0, "wal_mode none -> vinyl DDL/DML is not supported")
+fio.rmdir(dir)
+
+--
+-- Invalid values of instance_uuid or replicaset_uuid.
+--
+code = [[ box.cfg{instance_uuid = 'uuid'} ]]
+test:is(run_script(code), PANIC, 'invalid instance_uuid')
+code = [[ box.cfg{replicaset_uuid = 'uuid'} ]]
+test:is(run_script(code), PANIC, 'invalid replicaset_uuid')
+
+--
+-- Instance and replica set UUID are set to the configured values.
+--
+code = [[
+instance_uuid = tostring(require('uuid').new())
+box.cfg{instance_uuid = instance_uuid}
+os.exit(instance_uuid == box.info.uuid and 0 or 1)
+]]
+test:is(run_script(code), 0, "check instance_uuid")
+code = [[
+replicaset_uuid = tostring(require('uuid').new())
+box.cfg{replicaset_uuid = replicaset_uuid}
+os.exit(replicaset_uuid == box.info.cluster.uuid and 0 or 1)
+]]
+test:is(run_script(code), 0, "check replicaset_uuid")
+
+--
+-- Configuration fails on instance or replica set UUID mismatch.
+--
+dir = fio.tempdir()
+instance_uuid = uuid.new()
+replicaset_uuid = uuid.new()
+code_fmt = [[
+box.cfg{memtx_dir = '%s', instance_uuid = '%s', replicaset_uuid = '%s'}
+os.exit(0)
+]]
+code = string.format(code_fmt, dir, instance_uuid, replicaset_uuid)
+run_script(code)
+code = string.format(code_fmt, dir, uuid.new(), replicaset_uuid)
+test:is(run_script(code), PANIC, "instance_uuid mismatch")
+code = string.format(code_fmt, dir, instance_uuid, uuid.new())
+test:is(run_script(code), PANIC, "replicaset_uuid mismatch")
 fio.rmdir(dir)
 
 test:check()
