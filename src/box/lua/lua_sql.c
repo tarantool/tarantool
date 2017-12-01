@@ -33,9 +33,6 @@
 #include "lua/utils.h"
 
 #include "box/lua/call.h"
-#undef likely
-#undef SWAP
-#undef unlikely
 #include <box/sql/sqliteInt.h>
 #include <box/sql/vdbeInt.h>
 #include <box/sql.h>

@@ -45,9 +45,6 @@
  */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
-#undef SWAP
-#undef likely
-#undef unlikely
 #include "tarantoolInt.h"
 #include "box/session.h"
 

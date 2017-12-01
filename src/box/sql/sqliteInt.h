@@ -514,12 +514,6 @@ void sqlite3Coverage(int);
 #endif
 
 /*
- * Swap two objects of type TYPE.
- */
-#undef SWAP			/* temporary crutch against redefite warning */
-#define SWAP(TYPE,A,B) {TYPE t=A; A=B; B=t;}
-
-/*
  * Check to see if this machine uses EBCDIC.  (Yes, believe it or
  * not, there are still machines out there that use EBCDIC.)
  */

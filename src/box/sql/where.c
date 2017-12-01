@@ -1360,8 +1360,8 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 			assert(p->aSortOrder != 0);
 			if (p->aSortOrder[nEq]) {
 				/* The roles of pLower and pUpper are swapped for a DESC index */
-				SWAP(WhereTerm *, pLower, pUpper);
-				SWAP(int, nBtm, nTop);
+				SWAP(pLower, pUpper);
+				SWAP(nBtm, nTop);
 			}
 
 			/* If possible, improve on the iLower estimate using ($P:$L). */

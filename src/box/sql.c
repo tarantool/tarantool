@@ -42,7 +42,6 @@
 #include "sql/tarantoolInt.h"
 #include "sql/vdbeInt.h"
 #undef Index
-#undef SWAP
 
 #include "index.h"
 #include "info.h"

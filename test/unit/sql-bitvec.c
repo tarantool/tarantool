@@ -3,17 +3,6 @@
 
 #include "box/sql.h"
 #include "box/sql/sqliteInt.h"
-
-#ifdef SWAP
-    #undef SWAP
-#endif
-#ifdef likely
-    #undef likely
-#endif
-#ifdef unlikely
-    #undef unlikely
-#endif
-
 #include "trivia/util.h"
 #include "unit.h"
 

@@ -57,12 +57,8 @@ extern "C" {
 # define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-#ifdef SWAP
-# undef SWAP
-#endif
-
 #define SWAP(a, b) do {							\
-	typeof(a) tmp = (a);						\
+	__typeof__(a) tmp = (a);					\
 	(a) = (b);							\
 	(b) = tmp;							\
 } while (0)

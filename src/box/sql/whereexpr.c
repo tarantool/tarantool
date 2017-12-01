@@ -172,7 +172,7 @@ exprCommute(Parse * pParse, Expr * pExpr)
 			pExpr->pLeft->flags |= EP_Collate;
 		}
 	}
-	SWAP(Expr *, pExpr->pRight, pExpr->pLeft);
+	SWAP(pExpr->pRight, pExpr->pLeft);
 	if (pExpr->op >= TK_GT) {
 		assert(TK_LT == TK_GT + 2);
 		assert(TK_GE == TK_LE + 2);
