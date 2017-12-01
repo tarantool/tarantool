@@ -1397,7 +1397,7 @@ c.space.test:replace({2}, {buffer = ibuf})
 ---
 - 9
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1409,7 +1409,7 @@ c.space.test:insert({3}, {buffer = ibuf})
 ---
 - 9
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1421,7 +1421,7 @@ c.space.test:update({3}, {}, {buffer = ibuf})
 ---
 - 9
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1432,7 +1432,7 @@ c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
 ---
 - 9
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1443,7 +1443,7 @@ result
 c.space.test:upsert({4}, {}, {buffer = ibuf})
 ---
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1454,7 +1454,7 @@ result
 c.space.test:upsert({4}, {}, {buffer = ibuf})
 ---
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1466,7 +1466,7 @@ c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
 ---
 - 19
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1481,7 +1481,7 @@ ibuf.rpos + len == ibuf.wpos
 ---
 - true
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 ibuf.rpos == ibuf.wpos
@@ -1501,7 +1501,7 @@ c:call("echo", {1, 2, 3}, {buffer = ibuf})
 ---
 - 10
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1512,7 +1512,7 @@ c:call("echo", {}, {buffer = ibuf})
 ---
 - 7
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1523,7 +1523,7 @@ c:call("echo", nil, {buffer = ibuf})
 ---
 - 7
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1535,7 +1535,7 @@ c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
 ---
 - 7
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1546,7 +1546,7 @@ c:eval("echo(...)", {}, {buffer = ibuf})
 ---
 - 7
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result
@@ -1557,7 +1557,7 @@ c:eval("echo(...)", nil, {buffer = ibuf})
 ---
 - 7
 ...
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
 ...
 result

@@ -538,65 +538,65 @@ c.space.test:replace({1, 'hello'})
 
 -- replace
 c.space.test:replace({2}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- insert
 c.space.test:insert({3}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- update
 c.space.test:update({3}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- upsert
 c.space.test:upsert({4}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- delete
 c.space.test:upsert({4}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- select
 c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- select
 len = c.space.test:select({}, {buffer = ibuf})
 ibuf.rpos + len == ibuf.wpos
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ibuf.rpos == ibuf.wpos
 len
 result
 
 -- call
 c:call("echo", {1, 2, 3}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:call("echo", {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:call("echo", nil, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- eval
 c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:eval("echo(...)", {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:eval("echo(...)", nil, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- unsupported methods
