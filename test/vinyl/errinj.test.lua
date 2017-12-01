@@ -326,8 +326,8 @@ space:drop()
 --
 -- Space drop in the middle of dump.
 --
-test_run:cmd("create server test with script='vinyl/low_quota_1.lua'")
-test_run:cmd("start server test")
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+test_run:cmd("start server test with args='1048576'")
 test_run:cmd('switch test')
 fiber = require 'fiber'
 box.cfg{vinyl_timeout = 0.001}

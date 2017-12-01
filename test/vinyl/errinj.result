@@ -814,11 +814,11 @@ space:drop()
 --
 -- Space drop in the middle of dump.
 --
-test_run:cmd("create server test with script='vinyl/low_quota_1.lua'")
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
 ---
 - true
 ...
-test_run:cmd("start server test")
+test_run:cmd("start server test with args='1048576'")
 ---
 - true
 ...
