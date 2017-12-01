@@ -387,13 +387,15 @@ for k=1, box.schema.INDEX_MAX, 1 do
 end;
 ---
 ...
+-- cleanup
+for k=2, box.schema.INDEX_MAX, 1 do
+    s.index['i'..k]:drop()
+end;
+---
+...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
-...
--- cleanup
-for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
----
 ...
 -- test limits enforced in key_def_check:
 -- unknown index type

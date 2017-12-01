@@ -241,8 +241,8 @@ s:replace({4, 5, 6})
 s:replace({7, 8, 9})
 s:upsert({10, 11, 12}, {})
 _ = fiber.create(function () s:drop() ch:put(true) end)
-box.commit()
 ch:get()
+box.commit()
 
 s = box.schema.space.create('test', { engine = 'vinyl' })
 pk = s:create_index('primary', { parts = { 1, 'uint' } })
@@ -252,8 +252,8 @@ s:replace{1, 2, 3}
 s:replace{4, 5, 6}
 s:replace{7, 8, 9}
 _ = fiber.create(function () s:drop() ch:put(true) end)
-box.commit()
 ch:get()
+box.commit()
 
 -- check invalid field types
 space = box.schema.space.create('test', { engine = 'vinyl' })
