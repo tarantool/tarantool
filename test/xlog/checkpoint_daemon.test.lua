@@ -53,6 +53,12 @@ test_run:cmd("setopt delimiter ''");
 
 fio.basename(snaps[1], '.snap') >= fio.basename(xlogs[1], '.xlog')
 
+-- gh-2780 check that scheduled snapshots are performed
+fiber.sleep(3 * PERIOD)
+-- check that it's not first snapshot
+test_run:grep_log("default", "saving snapshot", 400) == nil
+test_run:grep_log("default", "making snapshot", 400) ~= nil
+
 -- restore default options
 box.cfg{checkpoint_interval = 3600 * 4, checkpoint_count = 4 }
 space:drop()
@@ -112,12 +118,3 @@ box.cfg{ checkpoint_count = 2, checkpoint_interval = 0}
 daemon.next_snapshot_time
 daemon.fiber == nil
 daemon.control == nil
-
--- gh-2780 check that scheduled snapshots are performed
-PERIOD = 0.03
-if jit.os ~= 'Linux' then PERIOD = 1.5 end
-box.cfg{ checkpoint_interval = PERIOD}
-fiber.sleep(3 * PERIOD)
--- check that it's not first snapshot
-test_run:grep_log("default", "saving snapshot", 400)
-test_run:grep_log("default", "making snapshot", 400)
