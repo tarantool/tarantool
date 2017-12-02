@@ -275,6 +275,15 @@ int
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 
 /**
+ * Encode a heartbeat message.
+ * @param row[out] Row to encode into.
+ * @param replica_id Instance id.
+ * @param tm Time stamp.
+ */
+void
+xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm);
+
+/**
  * Fast encode xrow header using the specified header fields.
  * It is faster than the xrow_header_encode, because uses
  * the predefined values for all fields of the header, defined

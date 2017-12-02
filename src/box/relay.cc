@@ -143,6 +143,8 @@ relay_vclock(const struct relay *relay)
 }
 
 static void
+relay_send(struct relay *relay, struct xrow_header *packet);
+static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
 static void
 relay_send_row(struct xstream *stream, struct xrow_header *row);
@@ -428,7 +430,23 @@ relay_subscribe_f(va_list ap)
 		if (inj != NULL && inj->dparam != 0)
 			timeout = inj->dparam;
 
-		fiber_cond_wait_timeout(&relay->reader_cond, timeout);
+		if (fiber_cond_wait_timeout(&relay->reader_cond, timeout) != 0) {
+			/*
+			 * Timed out waiting for WAL events.
+			 * Send a heartbeat message to update
+			 * the replication lag on the slave.
+			 */
+			struct xrow_header row;
+			xrow_encode_timestamp(&row, instance_id,
+					      ev_now(loop()));
+			try {
+				relay_send(relay, &row);
+			} catch (Exception *e) {
+				e->log();
+				break;
+			}
+		}
+
 		/*
 		 * The fiber can be woken by IO cancel, by a timeout of
 		 * status messaging or by an acknowledge to status message.

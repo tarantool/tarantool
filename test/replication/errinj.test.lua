@@ -89,7 +89,9 @@ box.snapshot()
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 
-box.cfg{replication_timeout = 0.01}
+-- Set minuscule timeout to make replication stop
+-- immediately after join.
+box.cfg{replication_timeout = 0.0001}
 
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
@@ -97,16 +99,21 @@ fiber = require'fiber'
 while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
 
 test_run:cmd("switch default")
+-- Disable heartbeat messages on the master so as not
+-- to trigger acks on the replica.
+errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 5)
 box.cfg{replication_timeout = 0.05}
 test_run:cmd("switch replica")
 -- wait for reconnect
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 box.info.replication[1].upstream.status
-box.info.replication[1].upstream.lag
+box.info.replication[1].upstream.lag > 0
+box.info.replication[1].upstream.lag < 1
 -- wait for ack timeout
 while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
 
 test_run:cmd("switch default")
+errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
 box.cfg{replication_timeout = 5}
 
 test_run:cmd("switch replica")

@@ -941,6 +941,15 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 }
 
 void
+xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm)
+{
+	memset(row, 0, sizeof(*row));
+	row->type = IPROTO_OK;
+	row->replica_id = replica_id;
+	row->tm = tm;
+}
+
+void
 greeting_encode(char *greetingbuf, uint32_t version_id,
 		const struct tt_uuid *uuid, const char *salt, uint32_t salt_len)
 {
