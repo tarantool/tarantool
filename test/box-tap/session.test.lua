@@ -15,7 +15,7 @@ session = box.session
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
-test:plan(49)
+test:plan(53)
 
 ---
 --- Check that Tarantool creates ADMIN session for #! script
@@ -141,6 +141,16 @@ test:is(on_disconnect_user, 'admin', "check triggers permissions, on_disconnect"
 
 box.session.on_connect(nil, on_connect)
 box.session.on_disconnect(nil, on_disconnect)
+
+-- check Session privilege
+ok, err = pcall(function() net.box.connect("tester:tester@" ..HOST..':'..PORT) end)
+test:ok(ok, "session privilege")
+box.schema.user.revoke('tester', 'session', 'universe')
+conn = net.box.connect("tester:tester@" ..HOST..':'..PORT)
+test:is(conn.state, "error", "session privilege state")
+test:ok(conn.error:match("Session"), "sesssion privilege errmsg")
+ok, err = pcall(box.session.su, "user1")
+test:ok(not ok, "session.su on revoked")
 box.schema.user.drop('tester')
 
 local test_run = require('test_run')

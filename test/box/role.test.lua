@@ -314,7 +314,7 @@ box.space.test:drop()
 box.schema.user.drop('john')
 
 -- test ER_GRANT
-box.space._priv:insert{1, 0, 'universe', 0, 0}
+box.space._priv:replace{1, 0, 'universe', 0, 0}
 -- role.exists()
 --
 -- true if the role is present

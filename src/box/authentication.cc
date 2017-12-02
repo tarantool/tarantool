@@ -56,6 +56,8 @@ authenticate(const char *user_name, uint32_t len,
 		goto ok;
 	}
 
+	access_check_session_xc(user);
+
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,

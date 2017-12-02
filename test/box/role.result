@@ -46,6 +46,9 @@ box.schema.user.info('tester')
 - - - execute
     - role
     - public
+  - - session,usage
+    - universe
+    - 
 ...
 box.schema.user.grant('tester', 'execute', 'role', 'iddqd')
 ---
@@ -58,6 +61,9 @@ box.schema.user.info('tester')
   - - execute
     - role
     - iddqd
+  - - session,usage
+    - universe
+    - 
 ...
 -- test granting user to a user
 box.schema.user.grant('tester', 'execute', 'role', 'tester')
@@ -789,7 +795,7 @@ box.schema.user.drop('john')
 ---
 ...
 -- test ER_GRANT
-box.space._priv:insert{1, 0, 'universe', 0, 0}
+box.space._priv:replace{1, 0, 'universe', 0, 0}
 ---
 - error: 'Incorrect grant arguments: the grant tuple has no privileges'
 ...
@@ -926,6 +932,9 @@ box.schema.user.info('test_user')
 - - - execute
     - role
     - public
+  - - session,usage
+    - universe
+    - 
 ...
 box.schema.role.info('test_user')
 ---

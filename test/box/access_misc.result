@@ -209,7 +209,8 @@ uid = session.uid()
 --
 box.schema.user.drop('uniuser')
 ---
-- error: Create, drop or alter access on role is denied for user 'uniuser'
+- error: 'Failed to drop user or role ''uniuser'': the user is active in the current
+    session'
 ...
 --
 --Check create, call and drop function
@@ -414,9 +415,15 @@ box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'unsigned'}
 session.su('admin')
 ---
 ...
+box.schema.user.revoke('testuser', 'usage,session', 'universe')
+---
+...
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
 - error: User 'testuser' does not have read, write, execute access on universe 'nil'
+...
+box.schema.user.grant('testuser', 'usage,session', 'universe')
+---
 ...
 --
 -- Check that itertors check privileges

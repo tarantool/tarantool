@@ -241,25 +241,24 @@ session_run_on_disconnect_triggers(struct session *session);
 int
 session_run_on_auth_triggers(const char *user_name);
 
+/**
+ * Check whether or not the current user is authorized to connect
+ */
+int
+access_check_session(struct user *user);
+
+void
+access_check_session_xc(struct user *user);
+
+/**
+ * Check whether or not the current user can be granted
+ * the requested access to the universe.
+ */
+void
+access_check_universe(user_access_t access);
+
 #if defined(__cplusplus)
 } /* extern "C" */
-
-static inline void
-access_check_universe(uint8_t access)
-{
-	struct credentials *credentials = effective_user();
-	if (!(credentials->universal_access & access)) {
-		/*
-		 * Access violation, report error.
-		 * The user may not exist already, if deleted
-		 * from a different connection.
-		 */
-		struct user *user = user_find_xc(credentials->uid);
-		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  priv_name(access), schema_object_name(SC_UNIVERSE),
-			  user->def->name);
-	}
-}
 
 #endif /* defined(__cplusplus) */
 

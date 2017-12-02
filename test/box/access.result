@@ -132,6 +132,13 @@ box.schema.user.revoke('rich', 'read,write', 'universe')
 box.schema.user.revoke('rich', 'public')
 ---
 ...
+box.schema.user.disable("rich")
+---
+...
+-- test double disable is a no op
+box.schema.user.disable("rich")
+---
+...
 box.space['_user']:delete{uid}
 ---
 - [5, 1, 'rich', 'user', {}]
@@ -196,12 +203,17 @@ session.user()
 -- drop current user
 session.su('admin', function() return box.schema.user.drop('tester') end)
 ---
+- error: 'Failed to drop user or role ''tester'': the user is active in the current
+    session'
 ...
 session.user()
 ---
-- null
+- tester
 ...
 session.su('admin')
+---
+...
+box.schema.user.drop('tester')
 ---
 ...
 session.user()
@@ -361,7 +373,8 @@ box.schema.user.drop('grantee')
 -- fails, can't kill oneself
 box.schema.user.drop('grantor')
 ---
-- error: Create, drop or alter access on role is denied for user 'grantor'
+- error: 'Failed to drop user or role ''grantor'': the user is active in the current
+    session'
 ...
 session.su('admin')
 ---
@@ -462,7 +475,7 @@ box.schema.user.grant('user', 'read,write', 'universe')
 box.space._priv:select{id}
 ---
 - - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 3]
+  - [1, 4, 'universe', 0, 27]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
@@ -471,7 +484,7 @@ box.schema.user.grant('user', 'read', 'universe')
 box.space._priv:select{id}
 ---
 - - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 3]
+  - [1, 4, 'universe', 0, 27]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
@@ -479,7 +492,7 @@ box.schema.user.revoke('user', 'write', 'universe')
 box.space._priv:select{id}
 ---
 - - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 1]
+  - [1, 4, 'universe', 0, 25]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
@@ -487,6 +500,7 @@ box.schema.user.revoke('user', 'read', 'universe')
 box.space._priv:select{id}
 ---
 - - [1, 4, 'role', 2, 4]
+  - [1, 4, 'universe', 0, 24]
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
@@ -494,7 +508,7 @@ box.schema.user.grant('user', 'write', 'universe')
 box.space._priv:select{id}
 ---
 - - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 2]
+  - [1, 4, 'universe', 0, 26]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
@@ -502,7 +516,7 @@ box.schema.user.grant('user', 'read', 'universe')
 box.space._priv:select{id}
 ---
 - - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 3]
+  - [1, 4, 'universe', 0, 27]
 ...
 box.schema.user.drop('user')
 ---
@@ -659,11 +673,17 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_ex
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...
+box.schema.user.revoke('guest', 'usage,session', 'universe')
+---
+...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 - error: User 'guest' does not have read,write,execute access on universe 'nil'
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })
+---
+...
+box.schema.user.grant('guest', 'usage,session', 'universe')
 ---
 ...
 box.schema.func.create('dummy', { if_not_exists = true })
@@ -870,6 +890,9 @@ box.schema.user.info('test_user')
   - - read
     - space
     - test_space
+  - - session,usage
+    - universe
+    - 
 ...
 box.schema.role.info('test_role')
 ---
@@ -897,6 +920,9 @@ box.schema.user.info('test_user')
 - - - execute
     - role
     - public
+  - - session,usage
+    - universe
+    - 
 ...
 box.schema.role.info('test_role')
 ---
@@ -929,4 +955,104 @@ box.session.su('guest', uids)
 ---
 - uid: 1
   euid: 0
+...
+--
+-- gh-2898 System privileges
+--
+s = box.schema.create_space("tweed")
+---
+...
+_ = s:create_index('primary', {type = 'hash', parts = {1, 'unsigned'}})
+---
+...
+box.schema.user.create('test', {password="pass"})
+---
+...
+box.schema.user.grant('test', 'read,write', 'universe')
+---
+...
+-- other users can't disable
+box.schema.user.create('test1')
+---
+...
+session.su("test1")
+---
+...
+box.schema.user.disable("test")
+---
+- error: Read access is denied for user 'test1' to space '_user'
+...
+session.su("admin")
+---
+...
+box.schema.user.disable("test")
+---
+...
+-- test double disable is a no op
+box.schema.user.disable("test")
+---
+...
+session.su("test")
+---
+- error: Session access on universe is denied for user 'test'
+...
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test", password="pass"})
+---
+...
+c.state
+---
+- error
+...
+c.error
+---
+- Session access on universe is denied for user 'test'
+...
+session.su("test1")
+---
+...
+box.schema.user.grant("test", "usage", "universe")
+---
+- error: Read access is denied for user 'test1' to space '_user'
+...
+session.su('admin')
+---
+...
+box.schema.user.grant("test", "session", "universe")
+---
+...
+session.su("test")
+---
+...
+s:select{}
+---
+- error: Usage access on universe is denied for user 'test'
+...
+session.su('admin')
+---
+...
+box.schema.user.enable("test")
+---
+...
+-- check enable not fails on double enabling
+box.schema.user.enable("test")
+---
+...
+session.su("test")
+---
+...
+s:select{}
+---
+- []
+...
+session.su("admin")
+---
+...
+box.schema.user.drop('test')
+---
+...
+box.schema.user.drop('test1')
+---
+...
+s:drop()
+---
 ...

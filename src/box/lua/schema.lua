@@ -1900,6 +1900,11 @@ box.schema.user.create = function(name, opts)
     uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}[1]
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
+    -- we have to grant global privileges from setuid function, since
+    -- only admin has the ownership over universe and we don't have
+    -- grant option
+    box.session.su('admin', box.schema.user.grant, uid, 'session,usage', 'universe',
+                   nil, {if_not_exists=true})
 end
 
 box.schema.user.exists = function(name)
@@ -1964,11 +1969,11 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
         privilege = 'execute'
     end
     local privilege_hex = checked_privilege(privilege, object_type)
-
     options = options or {}
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local tuple = _priv:get{uid, object_type, oid}
+    -- system privileges of admin and guest can't be revoked
     if tuple == nil then
         if options.if_exists then
             return
@@ -1997,10 +2002,6 @@ end
 local function drop(uid, opts)
     -- recursive delete of user data
     local _priv = box.space[box.schema.PRIV_ID]
-    local privs = _priv.index.primary:select{uid}
-    for k, tuple in pairs(privs) do
-        revoke(uid, uid, tuple[5], tuple[3], tuple[4])
-    end
     local spaces = box.space[box.schema.SPACE_ID].index.owner:select{uid}
     for k, tuple in pairs(spaces) do
         box.space[tuple[1]]:drop()
@@ -2017,6 +2018,17 @@ local function drop(uid, opts)
     local sequences = box.space[box.schema.SEQUENCE_ID].index.owner:select{uid}
     for k, tuple in pairs(sequences) do
         box.schema.sequence.drop(tuple[1])
+    end
+    -- xxx: hack, we have to revoke session and usage privileges
+    -- of a user using a setuid function in absence of create/drop
+    -- privileges and grant option
+    if box.space._user:get{uid}[4] == 'user' then
+        box.session.su('admin', box.schema.user.revoke, uid,
+                       'session,usage', 'universe', nil, {if_exists = true})
+    end
+    local privs = _priv.index.primary:select{uid}
+    for k, tuple in pairs(privs) do
+        revoke(uid, uid, tuple[5], tuple[3], tuple[4])
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
@@ -2037,6 +2049,16 @@ box.schema.user.revoke = function(user_name, ...)
     return revoke(uid, user_name, ...)
 end
 
+box.schema.user.enable = function(user)
+    box.schema.user.grant(user, "session,usage", "universe", nil,
+                            {if_not_exists = true})
+end
+
+box.schema.user.disable = function(user)
+    box.schema.user.revoke(user, "session,usage", "universe", nil,
+                            {if_exists = true})
+end
+
 box.schema.user.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
@@ -2047,6 +2069,10 @@ box.schema.user.drop = function(name, opts)
             -- gh-1205: box.schema.user.info fails
             box.error(box.error.DROP_USER, name,
                       "the user or the role is a system")
+        end
+        if uid == box.session.uid() or uid == box.session.euid() then
+            box.error(box.error.DROP_USER, name,
+                      "the user is active in the current session")
         end
         return drop(uid, opts)
     end
@@ -2123,11 +2149,21 @@ box.schema.role.drop = function(name, opts)
     end
     return drop(uid)
 end
+
+function role_check_grant_revoke_of_sys_priv(priv)
+    priv = string.lower(priv)
+    if (type(priv) == 'string' and (priv:match("session") or priv:match("usage"))) or
+        (type(priv) == "number" and (bit.band(priv, 8) ~= 0 or bit.band(priv, 16) ~= 0)) then
+        box.error(box.error.GRANT, "system privilege can not be granted to role")
+    end
+end
+
 box.schema.role.grant = function(user_name, ...)
     local uid = role_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, user_name)
     end
+    role_check_grant_revoke_of_sys_priv(...)
     return grant(uid, user_name, ...)
 end
 box.schema.role.revoke = function(user_name, ...)
@@ -2135,6 +2171,7 @@ box.schema.role.revoke = function(user_name, ...)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, user_name)
     end
+    role_check_grant_revoke_of_sys_priv(...)
     return revoke(uid, user_name, ...)
 end
 box.schema.role.info = function(role_name)

@@ -305,7 +305,7 @@ space_def_check_compatibility(const struct space_def *old_def,
  * the requested access to the space.
  */
 int
-access_check_space(struct space *space, uint8_t access);
+access_check_space(struct space *space, user_access_t access);
 
 static inline int
 space_apply_initial_join_row(struct space *space, struct request *request)
@@ -469,7 +469,7 @@ space_new_xc(struct space_def *space_def, struct rlist *key_list)
 }
 
 static inline void
-access_check_space_xc(struct space *space, uint8_t access)
+access_check_space_xc(struct space *space, user_access_t access)
 {
 	if (access_check_space(space, access) != 0)
 		diag_raise();

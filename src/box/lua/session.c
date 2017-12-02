@@ -165,6 +165,9 @@ lbox_session_su(struct lua_State *L)
 	}
 	if (user == NULL)
 		luaT_error(L);
+	if (access_check_session(user) < 0)
+		luaT_error(L);
+
 	if (top == 1) {
 		credentials_init(&session->credentials, user->auth_token,
 				 user->def->uid);

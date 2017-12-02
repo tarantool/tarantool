@@ -11,7 +11,6 @@ local PUBLIC = 2
 -- role 'REPLICATION'
 local REPLICATION = 3
 
-
 --------------------------------------------------------------------------------
 -- Utils
 --------------------------------------------------------------------------------
@@ -911,6 +910,26 @@ local function upgrade_to_1_7_6()
 end
 
 --------------------------------------------------------------------------------
+--- Tarantool 1.7.7
+--------------------------------------------------------------------------------
+local function upgrade_to_1_7_7()
+    local _priv = box.space[box.schema.PRIV_ID]
+    local _user = box.space[box.schema.USER_ID]
+    --
+    -- grant 'session' and 'usage' to all existing users
+    --
+    for _, v in _user:pairs() do
+        if v[4] ~= "role" then
+            _priv:upsert({ADMIN, v[1], "universe", 0, 24}, {{"|", 5, 24}})
+        end
+    end
+    --
+    -- grant admin all new privileges (session, usage, grant option,
+    -- create, alter, drop and anything that might come up in the future
+    --
+    _priv:upsert({ADMIN, ADMIN, 'universe', 0, 4294967295},
+                 {{ "|", 5, 4294967295}})
+end
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -936,6 +955,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 2), func = upgrade_to_1_7_2, auto = false},
         {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto = true},
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = false},
+        {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

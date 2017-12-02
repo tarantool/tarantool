@@ -1355,6 +1355,9 @@ box.schema.user.info()
   - - read
     - space
     - _priv
+  - - session,usage
+    - universe
+    - 
 ...
 sq:set(100) -- ok
 ---

@@ -172,7 +172,9 @@ box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'unsigned'}
 
 
 session.su('admin')
+box.schema.user.revoke('testuser', 'usage,session', 'universe')
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
+box.schema.user.grant('testuser', 'usage,session', 'universe')
 --
 -- Check that itertors check privileges
 --

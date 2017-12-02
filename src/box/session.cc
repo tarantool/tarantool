@@ -131,7 +131,7 @@ session_create_on_demand(int fd)
 	 * At bootstrap, admin user access is not loaded yet (is
 	 * 0), force global access. @sa comment in session_init()
 	 */
-	s->credentials.universal_access = PRIV_ALL;
+	s->credentials.universal_access = ~(user_access_t) 0;
 	fiber_set_session(fiber(), s);
 	fiber_set_user(fiber(), &s->credentials);
 	return s;
@@ -223,7 +223,7 @@ session_init()
 	 * When session_init() is called, admin user access is not
 	 * loaded yet (is 0), force global access.
 	 */
-	admin_credentials.universal_access = PRIV_ALL;
+	admin_credentials.universal_access = ~((user_access_t) 0);
 }
 
 void
@@ -231,4 +231,48 @@ session_free()
 {
 	if (session_registry)
 		mh_i64ptr_delete(session_registry);
+}
+
+int
+access_check_session(struct user *user)
+{
+	/*
+	 * Can't use here access_check_universe
+	 * as current_user is not assigned yet
+	 */
+	if (!(universe.access[user->auth_token].effective & PRIV_S)) {
+		diag_set(ClientError, ER_ACCESS_DENIED, priv_name(PRIV_S),
+			 schema_object_name(SC_UNIVERSE),
+			 user->def->name);
+		return -1;
+	}
+	return 0;
+}
+
+void
+access_check_session_xc(struct user *user)
+{
+	if (access_check_session(user) < 0) {
+		diag_raise();
+	}
+}
+
+void
+access_check_universe(user_access_t access)
+{
+	struct credentials *credentials = effective_user();
+	access |= PRIV_U;
+	if ((credentials->universal_access & access) ^ access) {
+		/*
+		 * Access violation, report error.
+		 * The user may not exist already, if deleted
+		 * from a different connection.
+		 */
+		struct user *user = user_find_xc(credentials->uid);
+		int denied_access = access & ((credentials->universal_access
+					       & access) ^ access);
+		tnt_raise(ClientError, ER_ACCESS_DENIED,
+			 priv_name(denied_access),
+			 schema_object_name(SC_UNIVERSE), user->def->name);
+	}
 }
