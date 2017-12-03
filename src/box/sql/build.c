@@ -2667,8 +2667,17 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	}
 #endif
 
-	/* Generate code to remove the table from the master table
-	 * on disk.
+	/* Generate code to remove the table from Tarantool and internal SQL
+	 * tables. Basically, it consists from 3 stages:
+	 * 1. Delete statistics from _stat1 and _stat4 tables (if any exist)
+	 * 2. In case of presence of FK constraints, i.e. current table is child
+	 *    or parent, then start new transaction and erase from table
+	 *    all data row by row. On each deletion check whether any FK
+	 *    violations have occurred. If ones take place, then rollback
+	 *    transaction and halt VDBE. Otherwise, commit transaction.
+	 * 3. Drop table by truncating (if step 2 was skipped), removing
+	 *    indexes from _index table and eventually tuple with corresponding
+	 *    space_id from _space.
 	 */
 
 	sqlite3BeginWriteOperation(pParse, 1);

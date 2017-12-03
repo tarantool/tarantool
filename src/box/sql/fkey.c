@@ -782,8 +782,9 @@ fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
  *       determined at runtime that there are outstanding deferred FK
  *       constraint violations in the database,
  *
- * then the equivalent of "DELETE FROM <tbl>" is executed before dropping
- * the table from the database. Triggers are disabled while running this
+ * then the equivalent of "DELETE FROM <tbl>" is executed in a single transaction
+ * before dropping the table from the database. If any FK violations occur,
+ * rollback transaction and halt VDBE. Triggers are disabled while running this
  * DELETE, but foreign key actions are not.
  */
 void
@@ -819,27 +820,19 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
 		}
 
 		pParse->disableTriggers = 1;
+		/* Staring new transaction before DELETE FROM <tbl> */
+		sqlite3VdbeAddOp0(v, OP_TTransaction);
 		sqlite3DeleteFrom(pParse, sqlite3SrcListDup(db, pName, 0), 0);
 		pParse->disableTriggers = 0;
 
 		/* If the DELETE has generated immediate foreign key constraint
-		 * violations, halt the VDBE and return an error at this point, before
-		 * any modifications to the schema are made. This is because statement
-		 * transactions are not able to rollback schema changes.
-		 *
-		 * If the SQLITE_DeferFKs flag is set, then this is not required, as
-		 * the statement transaction will not be rolled back even if FK
-		 * constraints are violated.
+		 * violations, rollback, halt the VDBE and return
+		 * an error at this point, before any modifications of
+		 * the _space and _index spaces. This is because these spaces
+		 * don't support multistatement transactions. Otherwise, just
+		 * commit changes.
 		 */
-		if ((user_session->sql_flags & SQLITE_DeferFKs) == 0) {
-			sqlite3VdbeAddOp2(v, OP_FkIfZero, 0,
-					  sqlite3VdbeCurrentAddr(v) + 2);
-			VdbeCoverage(v);
-			sqlite3HaltConstraint(pParse,
-					      SQLITE_CONSTRAINT_FOREIGNKEY,
-					      OE_Abort, 0, P4_STATIC,
-					      P5_ConstraintFK);
-		}
+		sqlite3VdbeAddOp0(v, OP_FkCheckCommit);
 
 		if (iSkip) {
 			sqlite3VdbeResolveLabel(v, iSkip);

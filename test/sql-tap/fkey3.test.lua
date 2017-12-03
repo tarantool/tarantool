@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(23)
+test:plan(25)
 
 -- This file implements regression tests for foreign keys.
 
@@ -31,25 +31,34 @@ test:do_execsql_test(
     })
 
 test:do_catchsql_test(
-    "fkey3-1.3",
+    "fkey3-1.3.1",
     [[
         DROP TABLE t1;
     ]], {
-        -- <fkey3-1.3>
+        -- <fkey3-1.3.1>
         1, "FOREIGN KEY constraint failed"
-        -- </fkey3-1.3>
+        -- </fkey3-1.3.1>
     })
 
--- Commented due to #2953
--- test:do_execsql_test(
---     "fkey3-1.4",
---     [[
---         SELECT * FROM t1;
---     ]], {
---         -- <fkey3-1.4>
---         100, 101
---         -- </fkey3-1.4>
---     })
+test:do_catchsql_test(
+    "fkey3-1.3.2",
+    [[
+        DROP TABLE t1;
+    ]], {
+        -- <fkey3-1.3.2>
+        1, "FOREIGN KEY constraint failed"
+        -- </fkey3-1.3.2>
+    })
+
+test:do_execsql_test(
+    "fkey3-1.4",
+    [[
+        SELECT * FROM t1;
+    ]], {
+        -- <fkey3-1.4>
+        100, 101
+        -- </fkey3-1.4>
+    })
 
 test:do_execsql_test(
     "fkey3-1.5",

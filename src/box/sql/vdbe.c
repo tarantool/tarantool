@@ -3007,6 +3007,36 @@ case OP_Savepoint: {
 	break;
 }
 
+/* Opcode: FkCheckCommit * * * * *
+ *
+ * This opcode is used and required by DROP TABLE statement,
+ * since deleted rows should be rollbacked in case of foreign keys
+ * constraint violations. In case of rollback, instruction
+ * also causes the VM to halt, because it makes no sense to continue
+ * execution with FK violations. If there is no FK violations, then
+ * just commit changes - deleted rows.
+ *
+ * Do not use this instruction in any statement implementation
+ * except for DROP TABLE!
+ */
+case OP_FkCheckCommit: {
+	if (!box_txn()) {
+		sqlite3VdbeError(p, "cannot commit or rollback - " \
+			"no transaction is active");
+		rc = SQLITE_ERROR;
+		goto abort_due_to_error;
+	}
+	if ((rc = sqlite3VdbeCheckFk(p, 0) != SQLITE_OK)) {
+		box_txn_rollback();
+		sqlite3VdbeHalt(p);
+		goto vdbe_return;
+	} else {
+		rc = box_txn_commit() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+		if (rc) goto abort_due_to_error;
+	}
+	break;
+}
+
 /* Opcode: AutoCommit P1 P2 * * *
  *
  * Set the database auto-commit flag to P1 (1 or 0). If P2 is true, roll
