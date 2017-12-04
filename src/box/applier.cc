@@ -668,7 +668,6 @@ struct applier_on_state {
 	struct fiber_cond wakeup;
 };
 
-/** Used by applier_connect_all() */
 static void
 applier_on_state_f(struct trigger *trigger, void *event)
 {
@@ -730,6 +729,46 @@ applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 	return 0;
 }
 
+/**
+ * Replica set configuration state, shared among appliers.
+ */
+struct applier_connect_state {
+	/** Number of successfully connected appliers. */
+	int connected;
+	/** Number of appliers that failed to connect. */
+	int failed;
+	/** Signaled when an applier connects or stops. */
+	struct fiber_cond wakeup;
+};
+
+struct applier_on_connect {
+	struct trigger base;
+	struct applier_connect_state *state;
+};
+
+static void
+applier_on_connect_f(struct trigger *trigger, void *event)
+{
+	struct applier_on_connect *on_connect = container_of(trigger,
+					struct applier_on_connect, base);
+	struct applier_connect_state *state = on_connect->state;
+	struct applier *applier = (struct applier *)event;
+
+	switch (applier->state) {
+	case APPLIER_OFF:
+	case APPLIER_STOPPED:
+		state->failed++;
+		break;
+	case APPLIER_CONNECTED:
+		state->connected++;
+		break;
+	default:
+		return;
+	}
+	fiber_cond_signal(&state->wakeup);
+	applier_pause(applier);
+}
+
 void
 applier_connect_all(struct applier **appliers, int count,
 		    double timeout)
@@ -753,33 +792,39 @@ applier_connect_all(struct applier **appliers, int count,
 	 */
 
 	/* Memory for on_state triggers registered in appliers */
-	struct applier_on_state triggers[VCLOCK_MAX];
-	/* Wait results until this time */
-	double deadline = ev_monotonic_now(loop()) + timeout;
+	struct applier_on_connect triggers[VCLOCK_MAX];
+
+	struct applier_connect_state state;
+	state.connected = state.failed = 0;
+	fiber_cond_create(&state.wakeup);
 
 	/* Add triggers and start simulations connection to remote peers */
 	for (int i = 0; i < count; i++) {
+		struct applier *applier = appliers[i];
+		struct applier_on_connect *trigger = &triggers[i];
 		/* Register a trigger to wake us up when peer is connected */
-		applier_add_on_state(appliers[i], &triggers[i],
-				     APPLIER_CONNECTED);
+		trigger_create(&trigger->base, applier_on_connect_f, NULL, NULL);
+		trigger->state = &state;
+		trigger_add(&applier->on_state, &trigger->base);
 		/* Start background connection */
-		applier_start(appliers[i]);
+		applier_start(applier);
 	}
 
-	/* Wait for all appliers */
-	for (int i = 0; i < count; i++) {
-		double wait = deadline - ev_monotonic_now(loop());
-		if (wait < 0.0 ||
-		    applier_wait_for_state(&triggers[i], wait) != 0) {
-			goto error;
-		}
+	while (state.connected < count && state.failed == 0) {
+		double wait_start = ev_monotonic_now(loop());
+		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
+			break;
+		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
-
+	if (state.connected < count) {
+		/* Timeout or connection failure. */
+		goto error;
+	}
 
 	for (int i = 0; i < count; i++) {
 		assert(appliers[i]->state == APPLIER_CONNECTED);
 		/* Unregister the temporary trigger used to wake us up */
-		applier_clear_on_state(&triggers[i]);
+		trigger_clear(&triggers[i].base);
 	}
 
 	/* Now all the appliers are connected, finish. */
@@ -787,7 +832,7 @@ applier_connect_all(struct applier **appliers, int count,
 error:
 	/* Destroy appliers */
 	for (int i = 0; i < count; i++) {
-		applier_clear_on_state(&triggers[i]);
+		trigger_clear(&triggers[i].base);
 		applier_stop(appliers[i]);
 	}
 
