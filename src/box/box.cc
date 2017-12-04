@@ -525,7 +525,6 @@ box_sync_replication(double timeout)
 	});
 
 	replicaset_connect(appliers, count, timeout);
-	replicaset_update(appliers, count);
 
 	guard.is_active = false;
 }
@@ -545,10 +544,8 @@ box_set_replication(void)
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
 	box_sync_replication(replication_cfg_timeout);
-	replicaset_foreach(replica) {
-		if (replica->applier != NULL)
-			applier_resume(replica->applier);
-	}
+	/* Follow replica */
+	replicaset_follow();
 }
 
 void
@@ -1778,10 +1775,7 @@ box_cfg_xc(void)
 	rmean_cleanup(rmean_box);
 
 	/* Follow replica */
-	replicaset_foreach(replica) {
-		if (replica->applier != NULL)
-			applier_resume(replica->applier);
-	}
+	replicaset_follow();
 
 	title("running");
 	say_info("ready to accept requests");

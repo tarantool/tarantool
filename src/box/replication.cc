@@ -180,7 +180,11 @@ replica_clear_id(struct replica *replica)
 	}
 }
 
-void
+/**
+ * Update the replica set with new "applier" objects
+ * upon reconfiguration of box.cfg.replication.
+ */
+static void
 replicaset_update(struct applier **appliers, int count)
 {
 	replicaset_t uniq;
@@ -292,8 +296,11 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 void
 replicaset_connect(struct applier **appliers, int count, double timeout)
 {
-	if (count == 0)
-		return; /* nothing to do */
+	if (count == 0) {
+		/* Cleanup the replica set. */
+		replicaset_update(appliers, count);
+		return;
+	}
 
 	/*
 	 * Simultaneously connect to remote peers to receive their UUIDs
@@ -346,7 +353,8 @@ replicaset_connect(struct applier **appliers, int count, double timeout)
 		trigger_clear(&triggers[i].base);
 	}
 
-	/* Now all the appliers are connected, finish. */
+	/* Now all the appliers are connected, update the replica set. */
+	replicaset_update(appliers, count);
 	return;
 error:
 	/* Destroy appliers */
@@ -358,6 +366,15 @@ error:
 	/* ignore original error */
 	tnt_raise(ClientError, ER_CFG, "replication",
 		  "failed to connect to one or more replicas");
+}
+
+void
+replicaset_follow(void)
+{
+	replicaset_foreach(replica) {
+		if (replica->applier != NULL)
+			applier_resume(replica->applier);
+	}
 }
 
 void
