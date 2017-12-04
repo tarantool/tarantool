@@ -106,6 +106,13 @@ sysview_init_system_space(struct space *space)
 	unreachable();
 }
 
+static void
+sysview_init_ephemeral_space(struct space *space)
+{
+	(void)space;
+	unreachable();
+}
+
 static int
 sysview_space_check_index_def(struct space *space, struct index_def *index_def)
 {
@@ -194,6 +201,7 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .execute_update = */ sysview_space_execute_update,
 	/* .execute_upsert = */ sysview_space_execute_upsert,
 	/* .init_system_space = */ sysview_init_system_space,
+	/* .init_ephemeral_space = */ sysview_init_ephemeral_space,
 	/* .check_index_def = */ sysview_space_check_index_def,
 	/* .create_index = */ sysview_space_create_index,
 	/* .add_primary_key = */ sysview_space_add_primary_key,

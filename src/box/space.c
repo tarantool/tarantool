@@ -163,6 +163,17 @@ space_new(struct space_def *def, struct rlist *key_list)
 	return engine_create_space(engine, def, key_list);
 }
 
+struct space *
+space_new_ephemeral(struct space_def *def, struct rlist *key_list)
+{
+	struct space *space = space_new(def, key_list);
+	if (space == NULL)
+		return NULL;
+	space->def->opts.temporary = true;
+	space->vtab->init_ephemeral_space(space);
+	return space;
+}
+
 void
 space_delete(struct space *space)
 {

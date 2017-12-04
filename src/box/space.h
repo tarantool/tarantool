@@ -68,6 +68,10 @@ struct space_vtab {
 
 	void (*init_system_space)(struct space *);
 	/**
+	 * Initialize an ephemeral space instance.
+	 */
+	void (*init_ephemeral_space)(struct space *);
+	/**
 	 * Check an index definition for violation of
 	 * various limits.
 	 */
@@ -422,6 +426,19 @@ struct field_def;
  */
 struct space *
 space_new(struct space_def *space_def, struct rlist *key_list);
+
+/**
+ * Create an ephemeral space.
+ * @param space_def Space definition.
+ * @param key_list List of index_defs.
+ * @retval Space object.
+ *
+ * Ephemeral spaces are invisible via public API and they
+ * are not persistent. They are needed solely to do some
+ * transient calculations.
+ */
+struct space *
+space_new_ephemeral(struct space_def *space_def, struct rlist *key_list);
 
 /** Destroy and free a space. */
 void

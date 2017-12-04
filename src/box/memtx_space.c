@@ -748,6 +748,12 @@ memtx_init_system_space(struct space *space)
 	memtx_space_do_add_primary_key(space, MEMTX_OK);
 }
 
+static void
+memtx_init_ephemeral_space(struct space *space)
+{
+	memtx_space_do_add_primary_key(space, MEMTX_OK);
+}
+
 static int
 memtx_space_build_secondary_key(struct space *old_space,
 				struct space *new_space,
@@ -895,6 +901,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_update = */ memtx_space_execute_update,
 	/* .execute_upsert = */ memtx_space_execute_upsert,
 	/* .init_system_space = */ memtx_init_system_space,
+	/* .init_ephemeral_space = */ memtx_init_ephemeral_space,
 	/* .check_index_def = */ memtx_space_check_index_def,
 	/* .create_index = */ memtx_space_create_index,
 	/* .add_primary_key = */ memtx_space_add_primary_key,

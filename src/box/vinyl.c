@@ -844,6 +844,13 @@ vinyl_init_system_space(struct space *space)
 	unreachable();
 }
 
+static void
+vinyl_init_ephemeral_space(struct space *space)
+{
+	(void)space;
+	unreachable();
+}
+
 static int
 vinyl_space_prepare_truncate(struct space *old_space, struct space *new_space)
 {
@@ -4007,6 +4014,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_update = */ vinyl_space_execute_update,
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
 	/* .init_system_space = */ vinyl_init_system_space,
+	/* .init_ephemeral_space = */ vinyl_init_ephemeral_space,
 	/* .check_index_def = */ vinyl_space_check_index_def,
 	/* .create_index = */ vinyl_space_create_index,
 	/* .add_primary_key = */ vinyl_space_add_primary_key,
