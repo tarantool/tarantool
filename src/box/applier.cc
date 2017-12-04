@@ -736,8 +736,6 @@ applier_connect_all(struct applier **appliers, int count,
 	 *   for duplicates, fill the result set, return.
 	 */
 
-	/* A channel from applier's on_state trigger is used to wake us up */
-	IpcChannelGuard wakeup(count);
 	/* Memory for on_state triggers registered in appliers */
 	struct applier_on_state triggers[VCLOCK_MAX];
 	/* Wait results until this time */
