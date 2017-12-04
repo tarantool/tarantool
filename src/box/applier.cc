@@ -650,7 +650,7 @@ applier_resume(struct applier *applier)
 	fiber_cond_signal(&applier->resume_cond);
 }
 
-static inline void
+void
 applier_pause(struct applier *applier)
 {
 	/* Sleep until applier_resume() wake us up */
@@ -727,118 +727,6 @@ applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 		return -1;
 	}
 	return 0;
-}
-
-/**
- * Replica set configuration state, shared among appliers.
- */
-struct applier_connect_state {
-	/** Number of successfully connected appliers. */
-	int connected;
-	/** Number of appliers that failed to connect. */
-	int failed;
-	/** Signaled when an applier connects or stops. */
-	struct fiber_cond wakeup;
-};
-
-struct applier_on_connect {
-	struct trigger base;
-	struct applier_connect_state *state;
-};
-
-static void
-applier_on_connect_f(struct trigger *trigger, void *event)
-{
-	struct applier_on_connect *on_connect = container_of(trigger,
-					struct applier_on_connect, base);
-	struct applier_connect_state *state = on_connect->state;
-	struct applier *applier = (struct applier *)event;
-
-	switch (applier->state) {
-	case APPLIER_OFF:
-	case APPLIER_STOPPED:
-		state->failed++;
-		break;
-	case APPLIER_CONNECTED:
-		state->connected++;
-		break;
-	default:
-		return;
-	}
-	fiber_cond_signal(&state->wakeup);
-	applier_pause(applier);
-}
-
-void
-applier_connect_all(struct applier **appliers, int count,
-		    double timeout)
-{
-	if (count == 0)
-		return; /* nothing to do */
-
-	/*
-	 * Simultaneously connect to remote peers to receive their UUIDs
-	 * and fill the resulting set:
-	 *
-	 * - create a single control channel;
-	 * - register a trigger in each applier to wake up our
-	 *   fiber via this channel when the remote peer becomes
-	 *   connected and a UUID is received;
-	 * - wait up to CONNECT_TIMEOUT seconds for `count` messages;
-	 * - on timeout, raise a CFG error, cancel and destroy
-	 *   the freshly created appliers (done in a guard);
-	 * - an success, unregister the trigger, check the UUID set
-	 *   for duplicates, fill the result set, return.
-	 */
-
-	/* Memory for on_state triggers registered in appliers */
-	struct applier_on_connect triggers[VCLOCK_MAX];
-
-	struct applier_connect_state state;
-	state.connected = state.failed = 0;
-	fiber_cond_create(&state.wakeup);
-
-	/* Add triggers and start simulations connection to remote peers */
-	for (int i = 0; i < count; i++) {
-		struct applier *applier = appliers[i];
-		struct applier_on_connect *trigger = &triggers[i];
-		/* Register a trigger to wake us up when peer is connected */
-		trigger_create(&trigger->base, applier_on_connect_f, NULL, NULL);
-		trigger->state = &state;
-		trigger_add(&applier->on_state, &trigger->base);
-		/* Start background connection */
-		applier_start(applier);
-	}
-
-	while (state.connected < count && state.failed == 0) {
-		double wait_start = ev_monotonic_now(loop());
-		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
-			break;
-		timeout -= ev_monotonic_now(loop()) - wait_start;
-	}
-	if (state.connected < count) {
-		/* Timeout or connection failure. */
-		goto error;
-	}
-
-	for (int i = 0; i < count; i++) {
-		assert(appliers[i]->state == APPLIER_CONNECTED);
-		/* Unregister the temporary trigger used to wake us up */
-		trigger_clear(&triggers[i].base);
-	}
-
-	/* Now all the appliers are connected, finish. */
-	return;
-error:
-	/* Destroy appliers */
-	for (int i = 0; i < count; i++) {
-		trigger_clear(&triggers[i].base);
-		applier_stop(appliers[i]);
-	}
-
-	/* ignore original error */
-	tnt_raise(ClientError, ER_CFG, "replication",
-		  "failed to connect to one or more replicas");
 }
 
 void

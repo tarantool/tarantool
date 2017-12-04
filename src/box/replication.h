@@ -188,6 +188,18 @@ struct replica *
 replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 
 /**
+ * Connect all appliers to remote peers and receive UUID.
+ * \post appliers are connected to remote hosts and paused.
+ * Use applier_resume(applier) to resume applier.
+ *
+ * \param appliers the array of appliers
+ * \param count size of appliers array
+ * \param timeout connection timeout
+ */
+void
+replicaset_connect(struct applier **appliers, int count, double timeout);
+
+/**
  * Update a replica set with new "applier" objects
  * upon reconfiguration of box.cfg.replication.
  */

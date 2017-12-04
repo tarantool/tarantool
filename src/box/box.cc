@@ -524,7 +524,7 @@ box_sync_replication(double timeout)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	applier_connect_all(appliers, count, timeout);
+	replicaset_connect(appliers, count, timeout);
 	replicaset_update(appliers, count);
 
 	guard.is_active = false;
