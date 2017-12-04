@@ -36,7 +36,6 @@
 #include <tarantool_ev.h>
 
 #include "fiber_cond.h"
-#include "fiber_channel.h"
 #include "trigger.h"
 #include "trivia/util.h"
 #include "tt_uuid.h"
@@ -107,8 +106,13 @@ struct applier {
 	struct iobuf *iobuf;
 	/** Triggers invoked on state change */
 	struct rlist on_state;
-	/** Channel used by applier_connect_all() and applier_resume() */
-	struct fiber_channel pause;
+	/**
+	 * Set if the applier was paused (see applier_pause()) and is now
+	 * waiting on resume_cond to be resumed (see applier_resume()).
+	 */
+	bool is_paused;
+	/** Condition variable signaled to resume the applier. */
+	struct fiber_cond resume_cond;
 	/** xstream to process rows during initial JOIN */
 	struct xstream *join_stream;
 	/** xstream to process rows during final JOIN and SUBSCRIBE */

@@ -34,7 +34,7 @@
 
 #include "xlog.h"
 #include "fiber.h"
-#include "scoped_guard.h"
+#include "fiber_cond.h"
 #include "coio.h"
 #include "coio_buf.h"
 #include "xstream.h"
@@ -614,7 +614,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 	applier->subscribe_stream = subscribe_stream;
 	applier->last_row_time = ev_monotonic_now(loop());
 	rlist_create(&applier->on_state);
-	fiber_channel_create(&applier->pause, 0);
+	fiber_cond_create(&applier->resume_cond);
 	fiber_cond_create(&applier->writer_cond);
 
 	return applier;
@@ -626,8 +626,8 @@ applier_delete(struct applier *applier)
 	assert(applier->reader == NULL && applier->writer == NULL);
 	iobuf_delete(applier->iobuf);
 	assert(applier->io.fd == -1);
-	fiber_channel_destroy(&applier->pause);
 	trigger_destroy(&applier->on_state);
+	fiber_cond_destroy(&applier->resume_cond);
 	fiber_cond_destroy(&applier->writer_cond);
 	free(applier);
 }
@@ -636,23 +636,26 @@ void
 applier_resume(struct applier *applier)
 {
 	assert(!fiber_is_dead(applier->reader));
-	void *data = NULL;
-	fiber_channel_put_xc(&applier->pause, data);
+	applier->is_paused = false;
+	fiber_cond_signal(&applier->resume_cond);
 }
 
 static inline void
 applier_pause(struct applier *applier)
 {
 	/* Sleep until applier_resume() wake us up */
-	void *data;
-	fiber_channel_get_xc(&applier->pause, &data);
+	assert(fiber() == applier->reader);
+	assert(!applier->is_paused);
+	applier->is_paused = true;
+	while (applier->is_paused)
+		fiber_cond_wait(&applier->resume_cond);
 }
 
 struct applier_on_state {
 	struct trigger base;
 	struct applier *applier;
 	enum applier_state desired_state;
-	struct fiber_channel wakeup;
+	struct fiber_cond wakeup;
 };
 
 /** Used by applier_connect_all() */
@@ -671,7 +674,7 @@ applier_on_state_f(struct trigger *trigger, void *event)
 		return;
 
 	/* Wake up waiter */
-	fiber_channel_put_xc(&on_state->wakeup, applier);
+	fiber_cond_signal(&on_state->wakeup);
 
 	applier_pause(applier);
 }
@@ -683,7 +686,7 @@ applier_add_on_state(struct applier *applier,
 {
 	trigger_create(&trigger->base, applier_on_state_f, NULL, NULL);
 	trigger->applier = applier;
-	fiber_channel_create(&trigger->wakeup, 0);
+	fiber_cond_create(&trigger->wakeup);
 	trigger->desired_state = desired_state;
 	trigger_add(&applier->on_state, &trigger->base);
 }
@@ -691,18 +694,22 @@ applier_add_on_state(struct applier *applier,
 static inline void
 applier_clear_on_state(struct applier_on_state *trigger)
 {
-	fiber_channel_destroy(&trigger->wakeup);
+	fiber_cond_destroy(&trigger->wakeup);
 	trigger_clear(&trigger->base);
 }
 
 static inline int
 applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 {
-	void *data = NULL;
-	if (fiber_channel_get_timeout(&trigger->wakeup, &data, timeout) != 0)
-		return -1; /* ER_TIMEOUT */
-
 	struct applier *applier = trigger->applier;
+	while (applier->state != APPLIER_OFF &&
+	       applier->state != APPLIER_STOPPED &&
+	       applier->state != trigger->desired_state) {
+		double wait_start = ev_monotonic_now(loop());
+		if (fiber_cond_wait_timeout(&trigger->wakeup, timeout) != 0)
+			return -1; /* ER_TIMEOUT */
+		timeout -= ev_monotonic_now(loop()) - wait_start;
+	}
 	if (applier->state != trigger->desired_state) {
 		assert(applier->state == APPLIER_OFF ||
 		       applier->state == APPLIER_STOPPED);
