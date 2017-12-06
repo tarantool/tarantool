@@ -81,16 +81,6 @@ iproto_reset_input(struct ibuf *ibuf)
 
 /* {{{ iproto_msg - declaration */
 
-/*
- * When there is an error in iproto thread, we can't
- * simply append the error to out buffer, since it's
- * controlled by tx thread, so send a message to tx thread
- * to append the error.
- */
-struct iproto_error_request {
-	struct diag diag;
-};
-
 /**
  * A single msg from io thread. All requests
  * from all connections are queued into a single queue
@@ -345,27 +335,6 @@ iproto_connection_stop(struct iproto_connection *con)
 	assert(rlist_empty(&con->in_stop_list));
 	ev_io_stop(con->loop, &con->input);
 	rlist_add_tail(&stopped_connections, &con->in_stop_list);
-}
-
-/**
- * Try to write an iproto error to a socket in the blocking mode.
- * It is useful, when a connection is going to be closed and it is
- * neccessary to response any error information to the user before
- * closing.
- * @param sock Socket to write to.
- * @param error Error to write.
- * @param sync Request sync.
- */
-static inline void
-iproto_write_error_blocking(int sock, const struct error *e, uint64_t sync)
-{
-	/* Set to blocking to write the error. */
-	int flags = fcntl(sock, F_GETFL, 0);
-	if (flags < 0)
-		return;
-	(void) fcntl(sock, F_SETFL, flags & (~O_NONBLOCK));
-	iproto_write_error(sock, e, ::schema_version, sync);
-	(void) fcntl(sock, F_SETFL, flags);
 }
 
 /**
@@ -663,7 +632,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		iproto_enqueue_batch(con, in);
 	} catch (Exception *e) {
 		/* Best effort at sending the error message to the client. */
-		iproto_write_error_blocking(fd, e, 0);
+		iproto_write_error(fd, e, ::schema_version, 0);
 		e->log();
 		iproto_connection_close(con);
 	}
@@ -1181,7 +1150,8 @@ tx_process_join_subscribe(struct cmsg *m)
 	} catch (SocketError *e) {
 		throw; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
-		iproto_write_error_blocking(con->input.fd, e, msg->header.sync);
+		iproto_write_error(con->input.fd, e, ::schema_version,
+				   msg->header.sync);
 	}
 }
 
