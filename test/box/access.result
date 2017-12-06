@@ -820,3 +820,91 @@ box.internal.collation.drop('test') -- success
 box.schema.user.drop('test')
 ---
 ...
+--
+-- gh-2710 object drop revokes all associated privileges
+--
+_ = box.schema.space.create('test_space')
+---
+...
+_ = box.schema.sequence.create('test_sequence')
+---
+...
+box.schema.func.create('test_function')
+---
+...
+box.schema.user.create('test_user')
+---
+...
+box.schema.user.grant('test_user', 'read', 'space', 'test_space')
+---
+...
+box.schema.user.grant('test_user', 'write', 'sequence', 'test_sequence')
+---
+...
+box.schema.user.grant('test_user', 'execute', 'function', 'test_function')
+---
+...
+box.schema.role.create('test_role')
+---
+...
+box.schema.role.grant('test_role', 'read', 'space', 'test_space')
+---
+...
+box.schema.role.grant('test_role', 'write', 'sequence', 'test_sequence')
+---
+...
+box.schema.role.grant('test_role', 'execute', 'function', 'test_function')
+---
+...
+box.schema.user.info('test_user')
+---
+- - - execute
+    - function
+    - test_function
+  - - execute
+    - role
+    - public
+  - - write
+    - sequence
+    - test_sequence
+  - - read
+    - space
+    - test_space
+...
+box.schema.role.info('test_role')
+---
+- - - execute
+    - function
+    - test_function
+  - - write
+    - sequence
+    - test_sequence
+  - - read
+    - space
+    - test_space
+...
+box.space.test_space:drop()
+---
+...
+box.sequence.test_sequence:drop()
+---
+...
+box.schema.func.drop('test_function')
+---
+...
+box.schema.user.info('test_user')
+---
+- - - execute
+    - role
+    - public
+...
+box.schema.role.info('test_role')
+---
+- []
+...
+box.schema.user.drop('test_user')
+---
+...
+box.schema.role.drop('test_role')
+---
+...

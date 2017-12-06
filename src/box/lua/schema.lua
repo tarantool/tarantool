@@ -160,6 +160,16 @@ local function sequence_resolve(name_or_id)
     end
 end
 
+-- Revoke all privileges associated with the given object.
+local function revoke_object_privs(object_type, object_id)
+    local _priv = box.space[box.schema.PRIV_ID]
+    local privs = _priv.index.object:select{object_type, object_id}
+    for k, tuple in pairs(privs) do
+        local uid = tuple[2]
+        _priv:delete{uid, object_type, object_id}
+    end
+end
+
 -- Same as type(), but returns 'number' if 'param' is
 -- of type 'cdata' and represents a 64-bit integer.
 local function param_type(param)
@@ -430,7 +440,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
     check_param_table(opts, { if_exists = 'boolean' })
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
-    local _priv = box.space[box.schema.PRIV_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_tuple = _space_sequence:delete{space_id}
@@ -443,10 +452,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
         local v = keys[i]
         _index:delete{v[1], v[2]}
     end
-    local privs = _priv.index.object:select{'space', space_id}
-    for k, tuple in pairs(privs) do
-        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-    end
+    revoke_object_privs('space', space_id)
     _truncate:delete{space_id}
     if _space:delete{space_id} == nil then
         if space_name == nil then
@@ -1537,11 +1543,7 @@ box.schema.sequence.drop = function(name, opts)
         end
         return
     end
-    local _priv = box.space[box.schema.PRIV_ID]
-    local privs = _priv.index.object:select{'sequence', id}
-    for k, tuple in pairs(privs) do
-        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-    end
+    revoke_object_privs('sequence', id)
     local _sequence = box.space[box.schema.SEQUENCE_ID]
     local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
     _sequence_data:delete{id}
@@ -1682,7 +1684,6 @@ box.schema.func.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local _func = box.space[box.schema.FUNC_ID]
-    local _priv = box.space[box.schema.PRIV_ID]
     local fid
     local tuple
     if type(name) == 'string' then
@@ -1699,10 +1700,7 @@ box.schema.func.drop = function(name, opts)
         end
         return
     end
-    local privs = _priv.index.object:select{'function', fid}
-    for k, tuple in pairs(privs) do
-        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-    end
+    revoke_object_privs('function', fid)
     _func:delete{fid}
 end
 
