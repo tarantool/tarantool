@@ -227,6 +227,24 @@ local function flattern_with_column_names(result)
     return ret
 end
 
+function test.do_catchsql_set_test(self, testcases, prefix)
+    -- testcases structure:
+    -- {
+    --      {
+    --          TEST_CASE_NAME,
+    --          SQL_STATEMENTS,
+    --          RESULT (AS IN CATCHSQL TEST)
+    --      }
+    -- }
+    if prefix == nil then prefix = "" end
+    for _, testcase in ipairs(testcases) do
+        test:do_catchsql_test(
+                              prefix..testcase[1],
+                              testcase[2],
+                              testcase[3])
+    end
+end
+
 local function execsql2(self, sql)
     local result = execsql_one_by_one(sql)
     if type(result) ~= 'table' then return end
