@@ -135,8 +135,8 @@ struct vy_env {
 	struct vy_cache_env cache_env;
 	/** Environment for run subsystem */
 	struct vy_run_env run_env;
-	/** Environment for statements subsystem. */
-	struct vy_stmt_env stmt_env;
+	/** Environment for memory subsystem. */
+	struct vy_mem_env mem_env;
 	/** Scheduler */
 	struct vy_scheduler scheduler;
 	/** Local recovery context. */
@@ -631,7 +631,8 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		assert(pk != NULL);
 	}
 	struct vy_index *db = vy_index_new(&env->index_env, &env->cache_env,
-					   index_def, space->format, pk);
+					   &env->mem_env, index_def,
+					   space->format, pk);
 	if (db == NULL) {
 		free(index);
 		return NULL;
@@ -2382,11 +2383,11 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 		return -1;
 	}
 
-	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 
 	int rc = vy_tx_prepare(tx);
 
-	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t write_size = mem_used_after - mem_used_before;
 	/*
@@ -2425,11 +2426,11 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 	 * it silently fails. But if it succeeds, we
 	 * need to account the memory in the quota.
 	 */
-	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 
 	vy_tx_commit(tx, txn->signature);
 
-	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
@@ -2543,7 +2544,7 @@ vy_env_quota_exceeded_cb(struct vy_quota *quota)
 	assert(env->status != VINYL_INITIAL_RECOVERY_LOCAL &&
 	       env->status != VINYL_FINAL_RECOVERY_LOCAL);
 
-	if (lsregion_used(&env->stmt_env.allocator) == 0) {
+	if (lsregion_used(&env->mem_env.allocator) == 0) {
 		/*
 		 * The memory limit has been exceeded, but there's
 		 * nothing to dump. This may happen if all available
@@ -2562,7 +2563,7 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	struct vy_env *env = container_of(scheduler, struct vy_env, scheduler);
 
 	/* Free memory and release quota. */
-	struct lsregion *allocator = &env->stmt_env.allocator;
+	struct lsregion *allocator = &env->mem_env.allocator;
 	struct vy_quota *quota = &env->quota;
 	size_t mem_used_before = lsregion_used(allocator);
 	lsregion_gc(allocator, dump_generation);
@@ -2646,13 +2647,12 @@ vy_env_new(const char *path, size_t memory, size_t cache,
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
-	vy_stmt_env_create(&e->stmt_env, e->memory);
+	vy_mem_env_create(&e->mem_env, e->memory);
 	vy_scheduler_create(&e->scheduler, e->write_threads,
 			    vy_env_dump_complete_cb,
 			    &e->run_env, &e->xm->read_views);
 
 	if (vy_index_env_create(&e->index_env, e->path,
-				&e->stmt_env.allocator,
 				&e->scheduler.generation,
 				vy_squash_schedule, e) != 0)
 		goto error_index_env;
@@ -2670,7 +2670,7 @@ vy_env_new(const char *path, size_t memory, size_t cache,
 	vy_log_init(e->path);
 	return e;
 error_index_env:
-	vy_stmt_env_destroy(&e->stmt_env);
+	vy_mem_env_destroy(&e->mem_env);
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
@@ -2696,7 +2696,7 @@ vy_env_delete(struct vy_env *e)
 	mempool_destroy(&e->iterator_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_index_env_destroy(&e->index_env);
-	vy_stmt_env_destroy(&e->stmt_env);
+	vy_mem_env_destroy(&e->mem_env);
 	vy_cache_env_destroy(&e->cache_env);
 	vy_quota_destroy(&e->quota);
 	if (e->recovery != NULL)
@@ -2771,7 +2771,7 @@ vinyl_engine_begin_checkpoint(struct engine *engine)
 	 * To avoid starting the threads for nothing, do not wake it
 	 * up if Vinyl is not used.
 	 */
-	if (lsregion_used(&env->stmt_env.allocator) == 0)
+	if (lsregion_used(&env->mem_env.allocator) == 0)
 		return 0;
 	if (vy_scheduler_begin_checkpoint(&env->scheduler) != 0)
 		return -1;
@@ -3240,7 +3240,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	if (vy_quota_use(&env->quota, reserved, TIMEOUT_INFINITY) != 0)
 		unreachable();
 
-	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 
 	rc = vy_tx_prepare(tx);
 	if (rc == 0)
@@ -3250,7 +3250,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 	txn_stmt_unref_tuples(&stmt);
 
-	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t used = mem_used_after - mem_used_before;
 	if (used >= reserved)
@@ -3686,11 +3686,11 @@ vy_squash_process(struct vy_squash *squash)
 	 * Insert the resulting REPLACE statement to the mem
 	 * and adjust the quota.
 	 */
-	size_t mem_used_before = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 	const struct tuple *region_stmt = NULL;
 	rc = vy_index_set(index, mem, result, &region_stmt);
 	tuple_unref(result);
-	size_t mem_used_after = lsregion_used(&env->stmt_env.allocator);
+	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	if (rc == 0) {
 		/*

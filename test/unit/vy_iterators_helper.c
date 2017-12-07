@@ -1,13 +1,18 @@
 #include "vy_iterators_helper.h"
 #include "memory.h"
 #include "fiber.h"
+#include "say.h"
 
 struct tuple_format *vy_key_format = NULL;
+struct vy_mem_env mem_env;
 struct vy_cache_env cache_env;
 
 void
 vy_iterator_C_test_init(size_t cache_size)
 {
+	/* Suppress info messages. */
+	say_set_log_level(S_WARN);
+
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	tuple_init(NULL);
@@ -15,11 +20,15 @@ vy_iterator_C_test_init(size_t cache_size)
 	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, 0, 0,
 					 NULL, 0);
 	tuple_format_ref(vy_key_format);
+
+	size_t mem_size = 64 * 1024 * 1024;
+	vy_mem_env_create(&mem_env, mem_size);
 }
 
 void
 vy_iterator_C_test_finish()
 {
+	vy_mem_env_destroy(&mem_env);
 	tuple_format_unref(vy_key_format);
 	vy_cache_env_destroy(&cache_env);
 	tuple_free();
@@ -136,8 +145,8 @@ vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 	struct tuple *stmt =
 		vy_new_simple_stmt(mem->format, mem->upsert_format,
 				   mem->format_with_colmask, templ);
-	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt, mem->allocator,
-							 mem->generation);
+	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
+			&mem->env->allocator, mem->generation);
 	assert(region_stmt != NULL);
 	tuple_unref(stmt);
 	if (templ->type == IPROTO_UPSERT)
@@ -194,7 +203,7 @@ init_read_views_list(struct rlist *rlist, struct vy_read_view *rvs,
 }
 
 struct vy_mem *
-create_test_mem(struct lsregion *region, struct key_def *def)
+create_test_mem(struct key_def *def)
 {
 	/* Create format */
 	struct key_def * const defs[] = { def };
@@ -214,7 +223,7 @@ create_test_mem(struct lsregion *region, struct key_def *def)
 	assert(format_upsert != NULL);
 
 	/* Create mem */
-	struct vy_mem *mem = vy_mem_new(region, 1, def, format,
+	struct vy_mem *mem = vy_mem_new(&mem_env, 1, def, format,
 					format_with_colmask, format_upsert, 0);
 	fail_if(mem == NULL);
 	return mem;

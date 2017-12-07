@@ -50,11 +50,11 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
-struct lsregion;
 struct tuple;
 struct tuple_format;
 struct vy_index;
 struct vy_mem;
+struct vy_mem_env;
 struct vy_recovery;
 struct vy_run;
 
@@ -65,8 +65,6 @@ typedef void
 struct vy_index_env {
 	/** Path to the data directory. */
 	const char *path;
-	/** Memory allocator. */
-	struct lsregion *allocator;
 	/** Memory generation counter. */
 	int64_t *p_generation;
 	/** Tuple format for keys (SELECT). */
@@ -87,7 +85,7 @@ struct vy_index_env {
 /** Create a common index environment. */
 int
 vy_index_env_create(struct vy_index_env *env, const char *path,
-		    struct lsregion *allocator, int64_t *p_generation,
+		    int64_t *p_generation,
 		    vy_upsert_thresh_cb upsert_thresh_cb,
 		    void *upsert_thresh_arg);
 
@@ -288,8 +286,8 @@ vy_index_name(struct vy_index *index);
 /** Allocate a new index object. */
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk);
+	     struct vy_mem_env *mem_env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk);
 
 /** Free an index object. */
 void

@@ -1,7 +1,6 @@
 #include "memory.h"
 #include "fiber.h"
 #include "vy_write_iterator.h"
-#include <small/slab_cache.h>
 #include "vy_iterators_helper.h"
 
 /**
@@ -29,11 +28,7 @@ compare_write_iterator_results(struct key_def *key_def,
 			       const int *vlsns, int vlsns_count,
 			       bool is_primary, bool is_last_level)
 {
-	/* Create lsregion */
-	struct lsregion lsregion;
-	struct slab_cache *slab_cache = cord_slab_cache();
-	lsregion_create(&lsregion, slab_cache->arena);
-	struct vy_mem *mem = create_test_mem(&lsregion, key_def);
+	struct vy_mem *mem = create_test_mem(key_def);
 	for (int i = 0; i < content_count; ++i)
 		vy_mem_insert_template(mem, &content[i]);
 	struct rlist rv_list;
@@ -66,7 +61,6 @@ compare_write_iterator_results(struct key_def *key_def,
 	/* Clean up */
 	wi->iface->close(wi);
 	vy_mem_delete(mem);
-	lsregion_destroy(&lsregion);
 
 	free(rv_array);
 }

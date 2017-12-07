@@ -38,41 +38,18 @@
 
 #include "diag.h"
 #include <small/region.h>
+#include <small/lsregion.h>
 
 #include "error.h"
 #include "tuple_format.h"
 #include "xrow.h"
 #include "fiber.h"
 
-enum {
-	/** Lowest allowed vinyl_max_tuple_size. */
-	TUPLE_MAX_SIZE_MIN = 16 * 1024,
-	/** Slab size for tuple arena. */
-	SLAB_SIZE = 16 * 1024 * 1024
-};
-
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_delete,
 };
 
 size_t vy_max_tuple_size = 1024 * 1024;
-
-void
-vy_stmt_env_create(struct vy_stmt_env *env, size_t memory)
-{
-	/* Vinyl memory is limited by vy_quota. */
-	quota_init(&env->quota, QUOTA_MAX);
-	tuple_arena_create(&env->arena, &env->quota, memory,
-			   SLAB_SIZE, "vinyl");
-	lsregion_create(&env->allocator, &env->arena);
-}
-
-void
-vy_stmt_env_destroy(struct vy_stmt_env *env)
-{
-	lsregion_destroy(&env->allocator);
-	tuple_arena_destroy(&env->arena);
-}
 
 void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)

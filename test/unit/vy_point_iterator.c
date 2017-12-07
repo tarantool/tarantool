@@ -1,12 +1,9 @@
 #include "trivia/util.h"
 #include "unit.h"
-#include "say.h"
 #include "vy_index.h"
 #include "vy_cache.h"
 #include "vy_run.h"
 #include "fiber.h"
-#include <small/lsregion.h>
-#include <small/slab_cache.h>
 #include <bit/bit.h>
 #include <crc32.h>
 #include <box/vy_point_iterator.h>
@@ -27,12 +24,10 @@ test_basic()
 	const size_t QUOTA = 100 * 1024 * 1024;
 	int64_t generation = 0;
 	struct slab_cache *slab_cache = cord_slab_cache();
-	struct lsregion lsregion;
-	lsregion_create(&lsregion, slab_cache->arena);
 
 	int rc;
 	struct vy_index_env index_env;
-	rc = vy_index_env_create(&index_env, ".", &lsregion, &generation,
+	rc = vy_index_env_create(&index_env, ".", &generation,
 				 NULL, NULL);
 	is(rc, 0, "vy_index_env_create");
 
@@ -60,8 +55,8 @@ test_basic()
 		index_def_new(512, 0, "primary", sizeof("primary"), TREE,
 			      &index_opts, key_def, NULL);
 
-	struct vy_index *pk = vy_index_new(&index_env, &cache_env, index_def,
-					   format, NULL);
+	struct vy_index *pk = vy_index_new(&index_env, &cache_env, &mem_env,
+					   index_def, format, NULL);
 	isnt(pk, NULL, "index is not NULL")
 
 	struct vy_range *range = vy_range_new(1, NULL, NULL, pk->cmp_def);
@@ -145,7 +140,7 @@ test_basic()
 
 	/* create second run */
 	struct vy_mem *run_mem =
-		vy_mem_new(pk->env->allocator, *pk->env->p_generation,
+		vy_mem_new(pk->mem->env, *pk->env->p_generation,
 			   pk->cmp_def, pk->mem_format,
 			   pk->mem_format_with_colmask,
 			   pk->upsert_format, 0);
@@ -182,7 +177,7 @@ test_basic()
 
 	/* create first run */
 	run_mem =
-		vy_mem_new(pk->env->allocator, *pk->env->p_generation,
+		vy_mem_new(pk->mem->env, *pk->env->p_generation,
 			   pk->cmp_def, pk->mem_format,
 			   pk->mem_format_with_colmask,
 			   pk->upsert_format, 0);
@@ -290,8 +285,6 @@ test_basic()
 	vy_cache_env_destroy(&cache_env);
 	vy_run_env_destroy(&run_env);
 	vy_index_env_destroy(&index_env);
-
-	lsregion_destroy(&lsregion);
 
 	strcpy(path, "rm -rf ");
 	strcat(path, dir_name);

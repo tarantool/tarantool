@@ -81,7 +81,7 @@ vy_index_validate_formats(const struct vy_index *index)
 
 int
 vy_index_env_create(struct vy_index_env *env, const char *path,
-		    struct lsregion *allocator, int64_t *p_generation,
+		    int64_t *p_generation,
 		    vy_upsert_thresh_cb upsert_thresh_cb,
 		    void *upsert_thresh_arg)
 {
@@ -96,7 +96,6 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 		return -1;
 	}
 	env->path = path;
-	env->allocator = allocator;
 	env->p_generation = p_generation;
 	env->upsert_thresh_cb = upsert_thresh_cb;
 	env->upsert_thresh_arg = upsert_thresh_arg;
@@ -121,8 +120,8 @@ vy_index_name(struct vy_index *index)
 
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk)
+	     struct vy_mem_env *mem_env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -203,10 +202,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
 
-	index->mem = vy_mem_new(index->env->allocator,
-				*index->env->p_generation,
-				cmp_def, format,
-				index->mem_format_with_colmask,
+	index->mem = vy_mem_new(mem_env, *index->env->p_generation,
+				cmp_def, format, index->mem_format_with_colmask,
 				index->upsert_format, schema_version);
 	if (index->mem == NULL)
 		goto fail_mem;
@@ -730,7 +727,7 @@ vy_index_rotate_mem(struct vy_index *index)
 	struct vy_mem *mem;
 
 	assert(index->mem != NULL);
-	mem = vy_mem_new(index->env->allocator, *index->env->p_generation,
+	mem = vy_mem_new(index->mem->env, *index->env->p_generation,
 			 index->cmp_def, index->mem_format,
 			 index->mem_format_with_colmask,
 			 index->upsert_format, schema_version);
@@ -762,7 +759,7 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 
 	/* Allocate region_stmt on demand. */
 	if (*region_stmt == NULL) {
-		*region_stmt = vy_stmt_dup_lsregion(stmt, mem->allocator,
+		*region_stmt = vy_stmt_dup_lsregion(stmt, &mem->env->allocator,
 						    mem->generation);
 		if (*region_stmt == NULL)
 			return -1;
@@ -898,7 +895,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
 
 		const struct tuple *region_stmt =
-			vy_stmt_dup_lsregion(upserted, mem->allocator,
+			vy_stmt_dup_lsregion(upserted, &mem->env->allocator,
 					     mem->generation);
 		if (region_stmt == NULL) {
 			/* OOM */

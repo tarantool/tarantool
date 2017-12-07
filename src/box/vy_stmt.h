@@ -42,9 +42,6 @@
 #include "tuple.h"
 #include "tuple_compare.h"
 #include "iproto_constants.h"
-#include "small/lsregion.h"
-#include "small/slab_arena.h"
-#include "small/quota.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -73,25 +70,6 @@ extern struct tuple_format_vtab vy_tuple_format_vtab;
  * @see box.cfg.vinyl_max_tuple_size
  */
 extern size_t vy_max_tuple_size;
-
-/** Vinyl statement environment. */
-struct vy_stmt_env {
-	struct lsregion allocator;
-	struct slab_arena arena;
-	struct quota quota;
-};
-
-/**
- * Initialize vinyl statement environment.
- * @param env[out] Vinyl statement environment.
- * @param memory The maximum number of in-memory bytes that vinyl uses.
- * @param max_tuple_size Memory limit for a single vinyl statement.
- */
-void
-vy_stmt_env_create(struct vy_stmt_env *env, size_t memory);
-
-void
-vy_stmt_env_destroy(struct vy_stmt_env *env);
 
 /**
  * There are two groups of statements:

@@ -34,7 +34,37 @@
 
 #include <trivia/util.h>
 #include <small/lsregion.h>
+#include <small/slab_arena.h>
+#include <small/quota.h>
+
 #include "diag.h"
+#include "tuple.h"
+
+/** {{{ vy_mem_env */
+
+enum {
+	/** Slab size for tuple arena. */
+	SLAB_SIZE = 16 * 1024 * 1024
+};
+
+void
+vy_mem_env_create(struct vy_mem_env *env, size_t memory)
+{
+	/* Vinyl memory is limited by vy_quota. */
+	quota_init(&env->quota, QUOTA_MAX);
+	tuple_arena_create(&env->arena, &env->quota, memory,
+			   SLAB_SIZE, "vinyl");
+	lsregion_create(&env->allocator, &env->arena);
+}
+
+void
+vy_mem_env_destroy(struct vy_mem_env *env)
+{
+	lsregion_destroy(&env->allocator);
+	tuple_arena_destroy(&env->arena);
+}
+
+/* }}} vy_mem_env */
 
 /** {{{ vy_mem */
 
@@ -42,7 +72,8 @@ static void *
 vy_mem_tree_extent_alloc(void *ctx)
 {
 	struct vy_mem *mem = (struct vy_mem *) ctx;
-	void *ret = lsregion_alloc(mem->allocator, VY_MEM_TREE_EXTENT_SIZE,
+	struct vy_mem_env *env = mem->env;
+	void *ret = lsregion_alloc(&env->allocator, VY_MEM_TREE_EXTENT_SIZE,
 				   mem->generation);
 	if (ret == NULL)
 		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "lsregion_alloc",
@@ -59,7 +90,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 struct vy_mem *
-vy_mem_new(struct lsregion *allocator, int64_t generation,
+vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version)
@@ -70,12 +101,12 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 			 "malloc", "struct vy_mem");
 		return NULL;
 	}
+	index->env = env;
 	index->min_lsn = INT64_MAX;
 	index->max_lsn = -1;
 	index->cmp_def = cmp_def;
 	index->generation = generation;
 	index->schema_version = schema_version;
-	index->allocator = allocator;
 	index->format = format;
 	tuple_format_ref(format);
 	index->format_with_colmask = format_with_colmask;
