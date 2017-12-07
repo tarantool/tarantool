@@ -245,6 +245,21 @@ tuple_format_meta_size(const struct tuple_format *format)
 	return format->extra_size + format->field_map_size;
 }
 
+/**
+ * Calculate minimal field count of tuples with specified keys and
+ * space format.
+ * @param keys Array of key definitions of indexes.
+ * @param key_count Length of @a keys.
+ * @param space_fields Array of fields from a space format.
+ * @param space_field_count Length of @a space_fields.
+ *
+ * @retval Minimal field count.
+ */
+uint32_t
+tuple_format_min_field_count(struct key_def * const *keys, uint16_t key_count,
+			     const struct field_def *space_fields,
+			     uint32_t space_field_count);
+
 typedef struct tuple_format box_tuple_format_t;
 
 /** \cond public */
@@ -313,7 +328,7 @@ static inline const char *
 tuple_field_raw(const struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {
-	if (likely(field_no < format->field_count)) {
+	if (likely(field_no < format->index_field_count)) {
 		/* Indexed field */
 
 		if (field_no == 0) {
@@ -322,8 +337,12 @@ tuple_field_raw(const struct tuple_format *format, const char *tuple,
 		}
 
 		int32_t offset_slot = format->fields[field_no].offset_slot;
-		if (offset_slot != TUPLE_OFFSET_SLOT_NIL)
-			return tuple + field_map[offset_slot];
+		if (offset_slot != TUPLE_OFFSET_SLOT_NIL) {
+			if (field_map[offset_slot] != 0)
+				return tuple + field_map[offset_slot];
+			else
+				return NULL;
+		}
 	}
 	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
 	uint32_t field_count = mp_decode_array(&tuple);

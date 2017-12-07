@@ -687,7 +687,7 @@ vy_tuple_key_contains_null(const struct tuple *tuple, const struct key_def *def)
 {
 	for (uint32_t i = 0; i < def->part_count; ++i) {
 		const char *field = tuple_field(tuple, def->parts[i].fieldno);
-		if (mp_typeof(*field) == MP_NIL)
+		if (field == NULL || mp_typeof(*field) == MP_NIL)
 			return true;
 	}
 	return false;

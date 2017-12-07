@@ -276,6 +276,24 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		key_def_set_cmp(def);
 }
 
+void
+key_def_update_optionality(struct key_def *def, uint32_t min_field_count)
+{
+	def->has_optional_parts = false;
+	for (uint32_t i = 0; i < def->part_count; ++i) {
+		struct key_part *part = &def->parts[i];
+		def->has_optional_parts |= part->is_nullable &&
+					   min_field_count < part->fieldno + 1;
+		/*
+		 * One optional part is enough to switch to new
+		 * comparators.
+		 */
+		if (def->has_optional_parts)
+			break;
+	}
+	key_def_set_cmp(def);
+}
+
 int
 key_def_snprint_parts(char *buf, int size, const struct key_part_def *parts,
 		      uint32_t part_count)
@@ -531,6 +549,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	new_def->part_count = new_part_count;
 	new_def->unique_part_count = new_part_count;
 	new_def->is_nullable = first->is_nullable || second->is_nullable;
+	new_def->has_optional_parts = first->has_optional_parts ||
+				      second->has_optional_parts;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
 	/* Append first key def's parts to the new index_def. */

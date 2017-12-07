@@ -661,6 +661,12 @@ struct alter_space {
 	 * substantially.
 	 */
 	struct key_def *pk_def;
+	/**
+	 * Min field count of a new space. It is calculated before
+	 * the new space is created and used to update optionality
+	 * of key_defs and key_parts.
+	 */
+	uint32_t new_min_field_count;
 };
 
 static struct alter_space *
@@ -671,6 +677,10 @@ alter_space_new(struct space *old_space)
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup_xc(alter->old_space->def);
+	if (old_space->format != NULL)
+		alter->new_min_field_count = old_space->format->min_field_count;
+	else
+		alter->new_min_field_count = 0;
 	return alter;
 }
 
@@ -1359,15 +1369,32 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 			 uint32_t end)
 {
 	struct space *old_space = alter->old_space;
+	bool is_min_field_count_changed;
+	if (old_space->format != NULL) {
+		is_min_field_count_changed =
+			old_space->format->min_field_count !=
+			alter->new_min_field_count;
+	} else {
+		is_min_field_count_changed = false;
+	}
 	for (uint32_t index_id = begin; index_id < end; ++index_id) {
 		struct index *old_index = space_index(old_space, index_id);
 		if (old_index == NULL)
 			continue;
 		struct index_def *old_def = old_index->def;
+		struct index_def *new_def;
+		uint32_t min_field_count = alter->new_min_field_count;
 		if ((old_def->opts.is_unique &&
 		     !old_def->key_def->is_nullable) ||
 		    old_def->type != TREE || alter->pk_def == NULL) {
-			(void) new MoveIndex(alter, old_def->iid);
+			if (is_min_field_count_changed) {
+				new_def = index_def_dup(old_def);
+				index_def_update_optionality(new_def,
+							     min_field_count);
+				(void) new ModifyIndex(alter, new_def, old_def);
+			} else {
+				(void) new MoveIndex(alter, old_def->iid);
+			}
 			continue;
 		}
 		/*
@@ -1375,11 +1402,11 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		 * the primary, since primary key parts have
 		 * changed.
 		 */
-		struct index_def *new_def =
-			index_def_new(old_def->space_id, old_def->iid,
-				      old_def->name, strlen(old_def->name),
-				      old_def->type, &old_def->opts,
-				      old_def->key_def, alter->pk_def);
+		new_def = index_def_new(old_def->space_id, old_def->iid,
+					old_def->name, strlen(old_def->name),
+					old_def->type, &old_def->opts,
+					old_def->key_def, alter->pk_def);
+		index_def_update_optionality(new_def, min_field_count);
 		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
 		(void) new RebuildIndex(alter, new_def, old_def);
 		guard.is_active = false;
@@ -1670,16 +1697,19 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	 * First, move all unchanged indexes from the old space
 	 * to the new one.
 	 */
-	alter_space_move_indexes(alter, 0, iid);
 	/* Case 1: drop the index, if it is dropped. */
 	if (old_index != NULL && new_tuple == NULL) {
+		alter_space_move_indexes(alter, 0, iid);
 		(void) new DropIndex(alter, old_index->def);
 	}
 	/* Case 2: create an index, if it is simply created. */
 	if (old_index == NULL && new_tuple != NULL) {
+		alter_space_move_indexes(alter, 0, iid);
 		CreateIndex *create_index = new CreateIndex(alter);
 		create_index->new_index_def =
 			index_def_new_from_tuple(new_tuple, old_space);
+		index_def_update_optionality(create_index->new_index_def,
+					     alter->new_min_field_count);
 	}
 	/* Case 3 and 4: check if we need to rebuild index data. */
 	if (old_index != NULL && new_tuple != NULL) {
@@ -1687,6 +1717,43 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		index_def = index_def_new_from_tuple(new_tuple, old_space);
 		auto index_def_guard =
 			make_scoped_guard([=] { index_def_delete(index_def); });
+		/*
+		 * To detect which key parts are optional,
+		 * min_field_count is required. But
+		 * min_field_count from the old space format can
+		 * not be used. For example, consider the case,
+		 * when a space has no format, has a primary index
+		 * on the first field and has a single secondary
+		 * index on a non-nullable second field. Min field
+		 * count here is 2. Now alter the secondary index
+		 * to make its part be nullable. In the
+		 * 'old_space' min_field_count is still 2, but
+		 * actually it is already 1. Actual
+		 * min_field_count must be calculated using old
+		 * unchanged indexes, NEW definition of an updated
+		 * index and a space format, defined by a user.
+		 */
+		struct key_def **keys;
+		size_t bsize = old_space->index_count * sizeof(keys[0]);
+		keys = (struct key_def **) region_alloc_xc(&fiber()->gc,
+							   bsize);
+		for (uint32_t i = 0, j = 0; i < old_space->index_count;
+		     ++i) {
+			struct index_def *d = old_space->index[i]->def;
+			if (d->iid != index_def->iid)
+				keys[j++] = d->key_def;
+			else
+				keys[j++] = index_def->key_def;
+		}
+		struct space_def *def = old_space->def;
+		alter->new_min_field_count =
+			tuple_format_min_field_count(keys,
+						     old_space->index_count,
+						     def->fields,
+						     def->field_count);
+		index_def_update_optionality(index_def,
+					     alter->new_min_field_count);
+		alter_space_move_indexes(alter, 0, iid);
 		if (index_def_cmp(index_def, old_index->def) == 0) {
 			/* Index is not changed so just move it. */
 			(void) new MoveIndex(alter, old_index->def->iid);

@@ -126,6 +126,11 @@ struct key_def {
 	uint32_t unique_part_count;
 	/** True, if at least one part can store NULL. */
 	bool is_nullable;
+	/**
+	 * True, if some key parts can be absent in a tuple. These
+	 * fields assumed to be MP_NIL.
+	 */
+	bool has_optional_parts;
 	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
 	/** The size of the 'parts' array. */
@@ -231,6 +236,16 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, bool is_nullable, struct coll *coll);
+
+/**
+ * Update 'has_optional_parts' of @a key_def with correspondence
+ * to @a min_field_count.
+ * @param def Key definition to update.
+ * @param min_field_count Minimal field count. All parts out of
+ *        this value are optional.
+ */
+void
+key_def_update_optionality(struct key_def *def, uint32_t min_field_count);
 
 /**
  * An snprint-style function to print a key definition.
