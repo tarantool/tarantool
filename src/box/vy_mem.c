@@ -55,6 +55,7 @@ vy_mem_env_create(struct vy_mem_env *env, size_t memory)
 	tuple_arena_create(&env->arena, &env->quota, memory,
 			   SLAB_SIZE, "vinyl");
 	lsregion_create(&env->allocator, &env->arena);
+	env->tree_extent_size = 0;
 }
 
 void
@@ -75,9 +76,13 @@ vy_mem_tree_extent_alloc(void *ctx)
 	struct vy_mem_env *env = mem->env;
 	void *ret = lsregion_alloc(&env->allocator, VY_MEM_TREE_EXTENT_SIZE,
 				   mem->generation);
-	if (ret == NULL)
+	if (ret == NULL) {
 		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "lsregion_alloc",
 			 "ret");
+		return NULL;
+	}
+	mem->tree_extent_size += VY_MEM_TREE_EXTENT_SIZE;
+	env->tree_extent_size += VY_MEM_TREE_EXTENT_SIZE;
 	return ret;
 }
 
@@ -141,6 +146,7 @@ vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
 void
 vy_mem_delete(struct vy_mem *index)
 {
+	index->env->tree_extent_size -= index->tree_extent_size;
 	tuple_format_unref(index->format);
 	tuple_format_unref(index->format_with_colmask);
 	tuple_format_unref(index->upsert_format);

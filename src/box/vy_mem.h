@@ -55,6 +55,8 @@ struct vy_mem_env {
 	struct lsregion allocator;
 	struct slab_arena arena;
 	struct quota quota;
+	/** Size of memory used for storing tree extents. */
+	size_t tree_extent_size;
 };
 
 /**
@@ -158,6 +160,8 @@ struct vy_mem {
 	struct rlist in_sealed;
 	/** BPS tree */
 	struct vy_mem_tree tree;
+	/** Size of memory used for storing tree extents. */
+	size_t tree_extent_size;
 	/** Number of statements. */
 	struct vy_stmt_counter count;
 	/** The min and max values of stmt->lsn in this tree. */
