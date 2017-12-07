@@ -122,6 +122,8 @@ struct vy_run {
 	int64_t id;
 	/** Number of statements in this run. */
 	struct vy_disk_stmt_counter count;
+	/** Size of memory used for storing page index. */
+	size_t page_index_size;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**

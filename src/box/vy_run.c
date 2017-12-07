@@ -1746,6 +1746,10 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 static void
 vy_run_acct_page(struct vy_run *run, struct vy_page_info *page)
 {
+	const char *min_key_end = page->min_key;
+	mp_next(&min_key_end);
+	run->page_index_size += sizeof(struct vy_page_info);
+	run->page_index_size += min_key_end - page->min_key;
 	run->count.rows += page->row_count;
 	run->count.bytes += page->unpacked_size;
 	run->count.bytes_compressed += page->size;

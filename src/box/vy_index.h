@@ -86,6 +86,10 @@ struct vy_index_env {
 	void *upsert_thresh_arg;
 	/** Number of indexes in this environment. */
 	int index_count;
+	/** Size of memory used for bloom filters. */
+	size_t bloom_size;
+	/** Size of memory used for page index. */
+	size_t page_index_size;
 };
 
 /** Create a common index environment. */
