@@ -43,6 +43,7 @@
 
 #include <fiber.h>
 #include "version.h"
+#include "backtrace.h"
 #include "coio.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -317,10 +318,17 @@ tarantool_lua_setpaths(struct lua_State *L)
 static int
 tarantool_panic_handler(lua_State *L) {
 	const char *problem = lua_tostring(L, -1);
+	print_backtrace();
+	say_crit("%s", problem);
+	int level = 1;
 	lua_Debug ar;
-	lua_getstack(L, 1, &ar);
-	lua_getinfo(L, "nSl", &ar);
-	say_crit("%s at %s:%d \n", problem, ar.short_src, ar.currentline);
+	while (lua_getstack(L, level++, &ar) == 1) {
+		if (lua_getinfo(L, "nSl", &ar) == 0)
+			break;
+		say_crit("#%d %s (%s), %s:%d", level,
+			 ar.name, ar.namewhat,
+			 ar.short_src, ar.currentline);
+	}
 	return 1;
 }
 
