@@ -185,6 +185,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/box/tuple.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple_format.h
     ${CMAKE_SOURCE_DIR}/src/box/tuple_compare.h
+    ${CMAKE_SOURCE_DIR}/src/box/tuple_extract_key.h
     ${CMAKE_SOURCE_DIR}/src/box/schema_def.h
     ${CMAKE_SOURCE_DIR}/src/box/box.h
     ${CMAKE_SOURCE_DIR}/src/box/index.h

@@ -30,6 +30,7 @@
  */
 #include "key_def.h"
 #include "tuple_compare.h"
+#include "tuple_extract_key.h"
 #include "tuple_hash.h"
 #include "column_mask.h"
 #include "schema_def.h"

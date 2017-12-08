@@ -383,6 +383,45 @@ key_part_check_compatibility(const struct key_part *old_parts,
 			     const struct key_part *new_parts,
 			     uint32_t new_part_count);
 
+/**
+ * Extract key from tuple by given key definition and return
+ * buffer allocated on box_txn_alloc with this key. This function
+ * has O(n) complexity, where n is the number of key parts.
+ * @param tuple - tuple from which need to extract key
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+static inline char *
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
+		  uint32_t *key_size)
+{
+	return key_def->tuple_extract_key(tuple, key_def, key_size);
+}
+
+/**
+ * Extract key from raw msgpuck by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * This function has O(n*m) complexity, where n is the number of key parts
+ * and m is the tuple size.
+ * @param data - msgpuck data from which need to extract key
+ * @param data_end - pointer at the end of data
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+static inline char *
+tuple_extract_key_raw(const char *data, const char *data_end,
+		      const struct key_def *key_def, uint32_t *key_size)
+{
+	return key_def->tuple_extract_key_raw(data, data_end, key_def,
+					      key_size);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
