@@ -148,13 +148,11 @@ vy_quota_release(struct vy_quota *q, size_t size)
 static inline int
 vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 {
+	double deadline = ev_monotonic_now(loop()) + timeout;
 	while (q->used + size > q->limit && timeout > 0) {
 		q->quota_exceeded_cb(q);
-		double wait_start = ev_monotonic_now(loop());
-		if (fiber_cond_wait_timeout(&q->cond, timeout) != 0)
+		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0)
 			break; /* timed out */
-		double wait_end = ev_monotonic_now(loop());
-		timeout -= (wait_end - wait_start);
 	}
 	if (q->used + size > q->limit)
 		return -1;

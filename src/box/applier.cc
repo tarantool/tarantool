@@ -702,13 +702,12 @@ static inline int
 applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 {
 	struct applier *applier = trigger->applier;
+	double deadline = ev_monotonic_now(loop()) + timeout;
 	while (applier->state != APPLIER_OFF &&
 	       applier->state != APPLIER_STOPPED &&
 	       applier->state != trigger->desired_state) {
-		double wait_start = ev_monotonic_now(loop());
-		if (fiber_cond_wait_timeout(&trigger->wakeup, timeout) != 0)
+		if (fiber_cond_wait_deadline(&trigger->wakeup, deadline) != 0)
 			return -1; /* ER_TIMEOUT */
-		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
 	if (applier->state != trigger->desired_state) {
 		assert(applier->state == APPLIER_OFF ||

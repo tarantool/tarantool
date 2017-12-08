@@ -128,6 +128,15 @@ fiber_cond_wait(struct fiber_cond *cond);
 
 /** \endcond public */
 
+/**
+ * Wait until the given condition variable is signaled or the
+ * deadline passed. The deadline is specified as absolute time
+ * in seconds since system start (i.e. monotonic clock).
+ * @see fiber_cond_wait_timeout()
+ */
+int
+fiber_cond_wait_deadline(struct fiber_cond *cond, double deadline);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
