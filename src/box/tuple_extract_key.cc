@@ -57,6 +57,7 @@ tuple_extract_key_sequential(const struct tuple *tuple,
  * General-purpose implementation of tuple_extract_key()
  * @copydoc tuple_extract_key()
  */
+template <bool contains_sequential_parts>
 static char *
 tuple_extract_key_slowpath(const struct tuple *tuple,
 			   const struct key_def *key_def, uint32_t *key_size)
@@ -73,17 +74,21 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 			tuple_field_raw(format, data, field_map,
 					key_def->parts[i].fieldno);
 		const char *end = field;
-		/*
-		 * Skip sequential part in order to minimize
-		 * tuple_field_raw() calls.
-		 */
-		for (; i < key_def->part_count - 1; i++) {
-			if (key_def->parts[i].fieldno + 1 !=
-				key_def->parts[i + 1].fieldno) {
-				/* End of sequential part */
-				break;
+		if (contains_sequential_parts) {
+			/*
+			 * Skip sequential part in order to
+			 * minimize tuple_field_raw() calls.
+			 */
+			for (; i < key_def->part_count - 1; i++) {
+				if (key_def->parts[i].fieldno + 1 !=
+					key_def->parts[i + 1].fieldno) {
+					/*
+					 * End of sequential part.
+					 */
+					break;
+				}
+				mp_next(&end);
 			}
-			mp_next(&end);
 		}
 		mp_next(&end);
 		bsize += end - field;
@@ -100,17 +105,21 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 			tuple_field_raw(format, data, field_map,
 					key_def->parts[i].fieldno);
 		const char *end = field;
-		/*
-		 * Skip sequential part in order to minimize
-		 * tuple_field_raw() calls
-		 */
-		for (; i < key_def->part_count - 1; i++) {
-			if (key_def->parts[i].fieldno + 1 !=
-				key_def->parts[i + 1].fieldno) {
-				/* End of sequential part */
-				break;
+		if (contains_sequential_parts) {
+			/*
+			 * Skip sequential part in order to
+			 * minimize tuple_field_raw() calls.
+			 */
+			for (; i < key_def->part_count - 1; i++) {
+				if (key_def->parts[i].fieldno + 1 !=
+					key_def->parts[i + 1].fieldno) {
+					/*
+					 * End of sequential part.
+					 */
+					break;
+				}
+				mp_next(&end);
 			}
-			mp_next(&end);
 		}
 		mp_next(&end);
 		bsize = end - field;
@@ -181,6 +190,17 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 	return key;
 }
 
+/** True, if a key con contain two or more parts in sequence. */
+static bool
+key_def_contains_sequential_parts(struct key_def *def)
+{
+	for (uint32_t i = 0; i < def->part_count - 1; ++i) {
+		if (def->parts[i].fieldno + 1 == def->parts[i + 1].fieldno)
+			return true;
+	}
+	return false;
+}
+
 /**
  * Initialize tuple_extract_key() and tuple_extract_key_raw()
  */
@@ -191,7 +211,13 @@ tuple_extract_key_set(struct key_def *key_def)
 		key_def->tuple_extract_key = tuple_extract_key_sequential;
 		key_def->tuple_extract_key_raw = tuple_extract_key_sequential_raw;
 	} else {
-		key_def->tuple_extract_key = tuple_extract_key_slowpath;
+		if (key_def_contains_sequential_parts(key_def)) {
+			key_def->tuple_extract_key =
+				tuple_extract_key_slowpath<true>;
+		} else {
+			key_def->tuple_extract_key =
+				tuple_extract_key_slowpath<false>;
+		}
 		key_def->tuple_extract_key_raw = tuple_extract_key_slowpath_raw;
 	}
 }
