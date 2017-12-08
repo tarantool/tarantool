@@ -3451,6 +3451,55 @@ case OP_OpenEphemeral: {
 	break;
 }
 
+/* Opcode: OpenTEphemeral P1 P2 * * *
+ * Synopsis: nColumn = P2
+ *
+ * This opcode creates Tarantool's ephemeral table and sets cursor P1 to it.
+ */
+case OP_OpenTEphemeral: {
+	VdbeCursor *pCx;
+	KeyInfo *pKeyInfo;
+	static const int vfsFlags =
+		SQLITE_OPEN_READWRITE |
+		SQLITE_OPEN_CREATE |
+		SQLITE_OPEN_EXCLUSIVE |
+		SQLITE_OPEN_DELETEONCLOSE |
+		SQLITE_OPEN_TRANSIENT_DB |
+		SQLITE_OPEN_MEMORY;
+	assert(pOp->p1 >= 0);
+	assert(pOp->p2 > 0);
+
+	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_BTREE);
+	if (pCx == 0) goto no_mem;
+	pCx->isEphemeral = 1;
+	pCx->nullRow = 1;
+	rc = sqlite3BtreeOpen(db->pVfs, 0, db, &pCx->pBtx,
+			      BTREE_OMIT_JOURNAL | BTREE_SINGLE, vfsFlags);
+	if (rc) goto abort_due_to_error;
+	rc = sqlite3BtreeBeginTrans(pCx->pBtx, 0, 1);
+	if (rc) goto abort_due_to_error;
+	if ((pCx->pKeyInfo = pKeyInfo = pOp->p4.pKeyInfo) !=0) {
+		int pgno;
+		assert(pOp->p4type == P4_KEYINFO);
+		rc = sqlite3BtreeCreateTable(pCx->pBtx, &pgno, BTREE_BLOBKEY | pOp->p5);
+		if (rc == SQLITE_OK) {
+			assert(pgno == 2);
+			assert(pKeyInfo->db==db);
+			sqlite3BtreeCursorEphemeral(pCx->pBtx, pgno, BTREE_WRCSR, pKeyInfo,
+						    pCx->uc.pCursor);
+		}
+		pCx->isTable = 0;
+	} else {
+		sqlite3BtreeCursorEphemeral(pCx->pBtx, 1, BTREE_WRCSR, 0,
+					    pCx->uc.pCursor);
+		pCx->isTable = 1;
+	}
+
+	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2);
+	if (rc) goto abort_due_to_error;
+	break;
+}
+
 /* Opcode: SorterOpen P1 P2 P3 P4 *
  *
  * This opcode works like OP_OpenEphemeral except that it opens

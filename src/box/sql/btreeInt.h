@@ -539,6 +539,7 @@ struct BtCursor {
 #define BTCF_Incrblob     0x10	/* True if an incremental I/O handle */
 #define BTCF_Multiple     0x20	/* Maybe another cursor on the same btree */
 #define BTCF_TaCursor     0x80	/* Tarantool cursor, pTaCursor valid */
+#define BTCF_TEphemCursor 0x40	/* Tarantool cursor to ephemeral table  */
 
 /*
  * Potential values for BtCursor.eState.

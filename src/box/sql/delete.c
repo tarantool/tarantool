@@ -421,7 +421,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			pParse->nMem += nPk;
 			iEphCur = pParse->nTab++;
 			addrEphOpen =
-			    sqlite3VdbeAddOp2(v, OP_OpenEphemeral, iEphCur,
+			    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEphCur,
 					      nPk);
 			sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 		}

@@ -221,6 +221,7 @@ int sqlite3BtreeCursor(Btree *,	/* BTree containing table to open */
 		       struct KeyInfo *,	/* First argument to compare function */
 		       BtCursor * pCursor	/* Space to write cursor structure */
     );
+int sqlite3BtreeCursorEphemeral(Btree *, int, int, struct KeyInfo *, BtCursor *);
 int sqlite3BtreeCursorSize(void);
 void sqlite3BtreeCursorZero(BtCursor *);
 void sqlite3BtreeCursorHintFlags(BtCursor *, unsigned);

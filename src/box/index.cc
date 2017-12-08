@@ -449,6 +449,9 @@ int
 iterator_next(struct iterator *it, struct tuple **ret)
 {
 	assert(it->next != NULL);
+	/* In case of ephemeral space there is no need to check schema version */
+	if (it->space_id == 0)
+		return it->next(it, ret);
 	if (unlikely(it->schema_version != schema_version)) {
 		struct space *space = space_by_id(it->space_id);
 		if (space == NULL)
