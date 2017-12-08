@@ -218,8 +218,17 @@ iproto_msg_delete(struct cmsg *msg)
  */
 static struct cpipe tx_pipe;
 static struct cpipe net_pipe;
-/* A pointer to the transaction processor cord. */
-struct cord *tx_cord;
+
+/**
+ * Network thread.
+ */
+static struct cord net_cord;
+
+/**
+ * Slab cache used for allocating memory for output network buffers
+ * in the tx thread.
+ */
+static struct slab_cache net_slabc;
 
 struct rmean *rmean_net;
 
@@ -783,8 +792,8 @@ iproto_connection_new(int fd)
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
 	ibuf_create(&con->ibuf[0], cord_slab_cache(), iproto_readahead);
 	ibuf_create(&con->ibuf[1], cord_slab_cache(), iproto_readahead);
-	obuf_create(&con->obuf[0], &tx_cord->slabc, iproto_readahead);
-	obuf_create(&con->obuf[1], &tx_cord->slabc, iproto_readahead);
+	obuf_create(&con->obuf[0], &net_slabc, iproto_readahead);
+	obuf_create(&con->obuf[1], &net_slabc, iproto_readahead);
 	con->p_ibuf = &con->ibuf[0];
 	con->tx.p_obuf = &con->obuf[0];
 	iproto_wpos_create(&con->wpos, con->tx.p_obuf);
@@ -1462,9 +1471,8 @@ net_cord_f(va_list /* ap */)
 void
 iproto_init()
 {
-	tx_cord = cord();
+	slab_cache_create(&net_slabc, &runtime);
 
-	static struct cord net_cord;
 	if (cord_costart(&net_cord, "iproto", net_cord_f, NULL))
 		panic("failed to initialize iproto thread");
 
@@ -1532,4 +1540,8 @@ iproto_listen()
 		diag_raise();
 }
 
-/* vim: set foldmethod=marker */
+size_t
+iproto_mem_used(void)
+{
+	return slab_cache_used(&net_cord.slabc) + slab_cache_used(&net_slabc);
+}
