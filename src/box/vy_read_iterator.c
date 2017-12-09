@@ -905,8 +905,9 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 				vy_tuple_compare_with_key(itr->last_stmt,
 						range->end, cmp_def) < 0))
 			break;
-		if (dir < 0 && vy_tuple_compare_with_key(itr->last_stmt,
-						range->begin, cmp_def) > 0)
+		if (dir < 0 && (range->begin == NULL ||
+				vy_tuple_compare_with_key(itr->last_stmt,
+						range->begin, cmp_def) > 0))
 			break;
 	}
 	itr->curr_range = range;
