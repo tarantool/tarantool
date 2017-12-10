@@ -538,6 +538,9 @@ applier_f(va_list ap)
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
 			goto reconnect;
+		} catch (ChannelIsClosed *e) {
+			applier_disconnect(applier, APPLIER_OFF);
+			break;
 		}
 		/* Put fiber_sleep() out of catch block.
 		 *
@@ -647,7 +650,7 @@ applier_pause(struct applier *applier)
 	assert(fiber() == applier->reader);
 	assert(!applier->is_paused);
 	applier->is_paused = true;
-	while (applier->is_paused)
+	while (applier->is_paused && !fiber_is_cancelled())
 		fiber_cond_wait(&applier->resume_cond);
 }
 
