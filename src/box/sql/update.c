@@ -394,7 +394,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		regKey = ++pParse->nMem;
 		iEph = pParse->nTab++;
 		sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
-		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenEphemeral, iEph, nPk);
+		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph, nPk);
 		sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 		pWInfo = sqlite3WhereBegin(pParse, pTabList, pWhere, 0, 0,
 					   WHERE_ONEPASS_DESIRED, iIdxCur);

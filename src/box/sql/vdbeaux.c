@@ -4431,7 +4431,8 @@ sqlite3VdbeIdxKeyCompare(sqlite3 * db,			/* Database connection */
 	assert(pC->eCurType == CURTYPE_BTREE);
 	pCur = pC->uc.pCursor;
 	assert(sqlite3BtreeCursorIsValid(pCur));
-	if (pCur->curFlags & BTCF_TaCursor) {
+	if (pCur->curFlags & BTCF_TaCursor ||
+	    pCur->curFlags & BTCF_TEphemCursor) {
 		return tarantoolSqlite3IdxKeyCompare(pCur, pUnpacked, res);
 	}
 	nCellKey = sqlite3BtreePayloadSize(pCur);

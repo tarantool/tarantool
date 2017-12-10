@@ -2656,7 +2656,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 					assert(p->pOrderBy == 0);
 					addr =
 					    sqlite3VdbeAddOp2(v,
-							      OP_OpenEphemeral,
+							      OP_OpenTEphemeral,
 							      unionTab, 0);
 					assert(p->addrOpenEphm[0] == -1);
 					p->addrOpenEphm[0] = addr;

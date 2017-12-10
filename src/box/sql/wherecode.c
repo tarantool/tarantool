@@ -1872,7 +1872,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			} else {
 				Index *pPk = sqlite3PrimaryKeyIndex(pTab);
 				regRowset = pParse->nTab++;
-				sqlite3VdbeAddOp2(v, OP_OpenEphemeral,
+				sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 						  regRowset, pPk->nKeyCol);
 				sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 			}

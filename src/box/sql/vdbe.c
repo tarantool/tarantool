@@ -2577,7 +2577,8 @@ case OP_Column: {
 	if (pC->nHdrParsed <= p2) {
 		u32 size;
 		if (pC->eCurType == CURTYPE_BTREE &&
-		    pCrsr != NULL && (pCrsr->curFlags & BTCF_TaCursor) != 0 &&
+		    pCrsr != NULL && ((pCrsr->curFlags & BTCF_TaCursor) != 0 ||
+		    (pCrsr->curFlags & BTCF_TEphemCursor)) &&
 		    (zParse = tarantoolSqlite3TupleColumnFast(pCrsr, p2,
 							      &size)) != NULL) {
 			/*
@@ -3494,7 +3495,6 @@ case OP_OpenTEphemeral: {
 					    pCx->uc.pCursor);
 		pCx->isTable = 1;
 	}
-
 	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2);
 	if (rc) goto abort_due_to_error;
 	break;

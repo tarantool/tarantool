@@ -2899,7 +2899,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			 */
 			pExpr->iTable = pParse->nTab++;
 			pExpr->is_ephemeral = 1;
-			addr = sqlite3VdbeAddOp2(v, OP_OpenEphemeral,
+			addr = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 						 pExpr->iTable,
 						 (isRowid ? 0 : nVal));
 			pKeyInfo =

@@ -29,7 +29,7 @@ test:plan(27)
 local function nEphemeral(sql)
     nEph = 0
     for _, op in ipairs(test:execsql("EXPLAIN "..sql.."")) do
-        if (op == "OpenEphemeral")
+        if (op == "OpenTEphemeral")
  then
             nEph = nEph + 1
         end
@@ -45,7 +45,7 @@ local function exec_neph(sql)
     local res = test:execsql('EXPLAIN '..sql)
     local cnt = 0
     for _, v in ipairs(res) do
-        if string.find(v, 'OpenEphemeral') then
+        if string.find(v, 'OpenTEphemeral') then
             cnt = cnt + 1
         end
     end

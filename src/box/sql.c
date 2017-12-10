@@ -224,7 +224,9 @@ const void *tarantoolSqlite3PayloadFetch(BtCursor *pCur, u32 *pAmt)
 const void *
 tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
 {
-	assert((pCur->curFlags & BTCF_TaCursor) != 0);
+	assert(pCur->curFlags & BTCF_TaCursor ||
+	       pCur->curFlags & BTCF_TEphemCursor);
+
 	struct ta_cursor *c = pCur->pTaCursor;
 	assert(c != NULL);
 	assert(c->tuple_last != NULL);
@@ -254,6 +256,13 @@ int tarantoolSqlite3First(BtCursor *pCur, int *pRes)
 {
 	return cursor_seek(pCur, pRes, ITER_GE,
 			   nil_key, nil_key + sizeof(nil_key));
+}
+
+/* Set cursor to the first tuple in ephemeral space. */
+int tarantoolSqlite3EphemeralLast(BtCursor *pCur, int *pRes)
+{
+	return cursor_ephemeral_seek(pCur, pRes, ITER_LE,
+				     nil_key, nil_key + sizeof(nil_key));
 }
 
 int tarantoolSqlite3Last(BtCursor *pCur, int *pRes)
@@ -292,6 +301,24 @@ int tarantoolSqlite3Next(BtCursor *pCur, int *pRes)
 		((struct ta_cursor *)pCur->pTaCursor)->type
 	) > 0);
 	return cursor_advance(pCur, pRes);
+}
+
+/*
+ * Set cursor to the previous entry in ephemeral space.
+ * If state of cursor is invalid (e.g. it is still under construction,
+ * or already destroyed), it immediately returns.
+ */
+int tarantoolSqlite3EphemeralPrevious(BtCursor *pCur, int *pRes)
+{
+	assert(pCur->curFlags & BTCF_TEphemCursor);
+	if (pCur->eState == CURSOR_INVALID) {
+		*pRes = 1;
+		return SQLITE_OK;
+	}
+	assert(pCur->pTaCursor);
+	assert(iterator_direction(
+		((struct ta_cursor *)pCur->pTaCursor)->type) < 0);
+	return cursor_ephemeral_advance(pCur, pRes);
 }
 
 int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes)
@@ -359,7 +386,9 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 		res_success = 0;
 		break;
 	}
-	rc = cursor_seek(pCur, pRes, iter_type, k, ke);
+	rc = (pCur->curFlags & BTCF_TaCursor) ?
+	     cursor_seek(pCur, pRes, iter_type, k, ke) :
+	     cursor_ephemeral_seek(pCur, pRes, iter_type, k, ke);
 	if (*pRes == 0) {
 		*pRes = res_success;
 		/*
@@ -500,6 +529,41 @@ int tarantoolSqlite3Insert(BtCursor *pCur, const BtreePayload *pX)
 			buf, (const char *)buf + pX->nKey,
 			NULL)
 	    != 0) {
+		return SQLITE_TARANTOOL_ERROR;
+	}
+	return SQLITE_OK;
+}
+
+/*
+ * Delete tuple from ephemeral space. It is contained in cursor
+ * as a result of previous call to cursor_advance().
+ *
+ * @param pCur Cursor pointing to ephemeral space.
+ *
+ * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
+ */
+int tarantoolSqlite3EphemeralDelete(BtCursor *pCur)
+{
+	assert(pCur->curFlags & BTCF_TEphemCursor);
+	assert(pCur->pTaCursor);
+	struct ta_cursor *c = pCur->pTaCursor;
+	struct space *ephem_space = c->ephem_space;
+	assert(ephem_space);
+
+	char *key;
+	uint32_t key_size;
+	assert(c->iter);
+	assert(c->tuple_last);
+
+	key = tuple_extract_key(c->tuple_last,
+				box_iterator_key_def(c->iter),
+				&key_size);
+	if (key == NULL)
+		return SQLITE_TARANTOOL_ERROR;
+
+	int rc = space_ephemeral_delete(ephem_space, key);
+	if (rc != 0) {
+		diag_log();
 		return SQLITE_TARANTOOL_ERROR;
 	}
 	return SQLITE_OK;

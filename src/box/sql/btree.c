@@ -3594,7 +3594,8 @@ fetchPayload(BtCursor * pCur,	/* Cursor pointing to entry to read from */
 const void *
 sqlite3BtreePayloadFetch(BtCursor * pCur, u32 * pAmt)
 {
-	if (pCur->curFlags & BTCF_TaCursor) {
+	if (pCur->curFlags & BTCF_TaCursor ||
+	    pCur->curFlags & BTCF_TEphemCursor) {
 		return tarantoolSqlite3PayloadFetch(pCur, pAmt);
 	}
 	return fetchPayload(pCur, pAmt);
@@ -3886,6 +3887,10 @@ sqlite3BtreeLast(BtCursor * pCur, int *pRes)
 		return tarantoolSqlite3Last(pCur, pRes);
 	}
 
+	if (pCur->curFlags & BTCF_TEphemCursor) {
+		return tarantoolSqlite3EphemeralLast(pCur, pRes);
+	}
+
 	/* If the cursor already points to the last entry, this is a no-op. */
 	if (CURSOR_VALID == pCur->eState && (pCur->curFlags & BTCF_AtLast) != 0) {
 #ifdef SQLITE_DEBUG
@@ -3972,7 +3977,8 @@ sqlite3BtreeMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
 	assert(pCur->eState != CURSOR_VALID
 	       || (pIdxKey == 0) == (pCur->curIntKey != 0));
 
-	if (pCur->curFlags & BTCF_TaCursor) {
+	if (pCur->curFlags & BTCF_TaCursor ||
+	    pCur->curFlags & BTCF_TEphemCursor) {
 		assert(pIdxKey);
 		/*
 		 * Note: pIdxKey/intKey are mutually-exclusive and all Tarantool
@@ -4465,6 +4471,9 @@ sqlite3BtreePrevious(BtCursor * pCur, int *pRes)
 	pCur->info.nSize = 0;
 	if (pCur->curFlags & BTCF_TaCursor) {
 		return tarantoolSqlite3Previous(pCur, pRes);
+	}
+	if (pCur->curFlags & BTCF_TEphemCursor) {
+		return tarantoolSqlite3EphemeralPrevious(pCur, pRes);
 	}
 	if (pCur->eState != CURSOR_VALID
 	    || pCur->aiIdx[pCur->iPage] == 0
@@ -7025,6 +7034,9 @@ sqlite3BtreeDelete(BtCursor * pCur, u8 flags)
 		return tarantoolSqlite3Delete(pCur, flags);
 	}
 
+	if (pCur->curFlags & BTCF_TEphemCursor) {
+		return tarantoolSqlite3EphemeralDelete(pCur);
+	}
 	assert(pCur->aiIdx[pCur->iPage] < pCur->apPage[pCur->iPage]->nCell);
 
 	iCellDepth = pCur->iPage;

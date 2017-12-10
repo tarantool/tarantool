@@ -88,8 +88,11 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *zOldParentName,
 /* Interface for ephemeral tables. */
 int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count);
 int tarantoolSqlite3EphemeralInsert(BtCursor * pCur, const BtreePayload * pX);
+int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
 int tarantoolSqlite3EphemeralFirst(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralNext(BtCursor * pCur, int * pRes);
+int tarantoolSqlite3EphemeralLast(BtCursor * pCur, int * pRes);
+int tarantoolSqlite3EphemeralPrevious(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);
 
 /* Compare against the index key under a cursor -
