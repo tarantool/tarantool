@@ -464,6 +464,36 @@ local function upgrade_to_1_8_2()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 1.8.4
+--------------------------------------------------------------------------------
+
+local function upgrade_to_1_8_4()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local stat1_ft = {{name='tbl', type='string'},
+                      {name='idx', type='string'},
+	              {name='stat', type='scalar'}}
+    local stat4_ft = {{name='tbl', type='string'},
+                      {name='idx', type='string'},
+                      {name='neq', type='string', is_nullable=true},
+                      {name='nlt', type='string', is_nullable=true},
+                      {name='ndlt', type='string', is_nullable=true},
+                      {name='sample', type='scalar'}}
+
+    log.info("create space _sql_stat1")
+    _space:insert{box.schema.SQL_STAT1_ID, ADMIN, '_sql_stat1', 'memtx', 0, setmap({}), stat1_ft}
+    log.info("create index primary on _stat1")
+    _index:insert{box.schema.SQL_STAT1_ID, 0, 'primary', 'tree', { unique = true },
+        {{0, 'string'}, {1, 'string'}}}
+    log.info("create space _sql_stat4")
+    _space:insert{box.schema.SQL_STAT4_ID, ADMIN, '_sql_stat4', 'memtx', 0, setmap({}), stat4_ft}
+    log.info("create index primary on _stat4")
+    _index:insert{box.schema.SQL_STAT4_ID, 0, 'primary', 'tree', { unique = true },
+        {{0, 'string'}, {1, 'string'}, {5, 'scalar'}}}
+end
+
+--------------------------------------------------------------------------------
+
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -491,6 +521,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
         {version = mkversion(1, 8, 2), func = upgrade_to_1_8_2, auto = true},
+        {version = mkversion(1, 8, 4), func = upgrade_to_1_8_4, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

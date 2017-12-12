@@ -683,14 +683,20 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor *pCur)
 }
 
 /*
- * Removes all instances from table. If there is no active transaction,
- * then truncate is used. Otherwise, manually deletes one-by-one all tuples.
+ * Removes all instances from table.
  */
 int tarantoolSqlite3ClearTable(int iTable)
 {
 	int space_id = SQLITE_PAGENO_TO_SPACEID(iTable);
 
-	if (box_txn()) {
+	/*
+	 *  There are two cases when we have to delete tuples one by one:
+	 *  1. When we are inside of another transaction, we can not use
+	 *  truncate, because it is a ddl. (prohibited in transactions)
+	 *  2. Truncate on system spaces is disallowed. (because of triggers)
+	 *   (main usecase is _sql_stat4 table editing)
+	 */
+	if (box_txn() || space_id < BOX_SYSTEM_ID_MAX) {
 		int primary_index_id = 0;
 		char *key;
 		uint32_t key_size;
@@ -1466,6 +1472,23 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 	sql_schema_put(init, TARANTOOL_SYS_SPACE_SEQUENCE_NAME, BOX_SPACE_SEQUENCE_ID, 0,
 		       "CREATE TABLE \""TARANTOOL_SYS_SPACE_SEQUENCE_NAME
 		       "\" (\"space_id\" INT PRIMARY KEY, \"sequence_id\" INT, \"flag\" INT)");
+
+	sql_schema_put(init, TARANTOOL_SYS_SQL_STAT1_NAME, BOX_SQL_STAT1_ID, 0,
+		       "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT1_NAME
+			       "\"(\"tbl\" text,"
+			       "\"idx\" text,"
+			       "\"stat\" not null,"
+			       "PRIMARY KEY(\"tbl\", \"idx\"))");
+
+	sql_schema_put(init, TARANTOOL_SYS_SQL_STAT4_NAME, BOX_SQL_STAT4_ID, 0,
+		       "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT4_NAME
+			       "\"(\"tbl\" text,"
+			       "\"idx\" text,"
+			       "\"neq\" text,"
+			       "\"nlt\" text,"
+			       "\"ndlt\" text,"
+			       "\"sample\","
+			       "PRIMARY KEY(\"tbl\", \"idx\", \"sample\"))");
 
 	/* Read _space */
 	if (space_foreach(space_foreach_put_cb, init) != 0) {

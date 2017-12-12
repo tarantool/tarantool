@@ -135,15 +135,10 @@ openStatTable(Parse * pParse,	/* Parsing context */
 	      const char *zWhereType	/* Either "tbl" or "idx" */
     )
 {
-	static const struct {
-		const char *zName;
-		const char *zCols;
-	} aTable[] = {
-		{
-		"_sql_stat1", "\"tbl\",\"idx\",\"stat\", PRIMARY KEY(\"tbl\", \"idx\")"},
-		{
-		"_sql_stat4", "\"tbl\",\"idx\",\"neq\",\"nlt\",\"ndlt\",\"sample\", PRIMARY KEY(\"tbl\", \"idx\", \"sample\")"}
-	};
+	const char *aTable[] = {
+		"_sql_stat1",
+		"_sql_stat4",
+		NULL};
 	int i;
 	sqlite3 *db = pParse->db;
 	Vdbe *v = sqlite3GetVdbe(pParse);
@@ -157,42 +152,28 @@ openStatTable(Parse * pParse,	/* Parsing context */
 	/* Create new statistic tables if they do not exist, or clear them
 	 * if they do already exist.
 	 */
-	for (i = 0; i < ArraySize(aTable); i++) {
-		const char *zTab = aTable[i].zName;
+	for (i = 0; aTable[i]; i++) {
+		const char *zTab = aTable[i];
 		Table *pStat;
-		if ((pStat = sqlite3FindTable(db, zTab)) == 0) {
-			if (aTable[i].zCols) {
-				/* The sql_statN table does not exist. Create it. Note that a
-				 * side-effect of the CREATE TABLE statement is to leave the rootpage
-				 * of the new table in register pParse->regRoot. This is important
-				 * because the OpenWrite opcode below will be needing it.
-				 */
-				sqlite3NestedParse(pParse,
-						   "CREATE TABLE \"%s\"(%s)", zTab,
-						   aTable[i].zCols);
-				aRoot[i] = pParse->regRoot;
-				aCreateTbl[i] = OPFLAG_P2ISREG;
-			}
+		/* The table already exists, because it is a system space */
+		pStat = sqlite3FindTable(db, zTab);
+		aRoot[i] = pStat->tnum;
+		aCreateTbl[i] = 0;
+		if (zWhere) {
+			sqlite3NestedParse(pParse,
+					   "DELETE FROM \"%s\" WHERE \"%s\"=%Q",
+					   zTab, zWhereType, zWhere);
 		} else {
-			/* The table already exists. If zWhere is not NULL, delete all entries
-			 * associated with the table zWhere. If zWhere is NULL, delete the
-			 * entire contents of the table.
+			/*
+			 * The sql_stat[134] table already exists.
+			 * Delete all rows.
 			 */
-			aRoot[i] = pStat->tnum;
-			aCreateTbl[i] = 0;
-			if (zWhere) {
-				sqlite3NestedParse(pParse,
-						   "DELETE FROM \"%s\" WHERE \"%s\"=%Q",
-						   zTab, zWhereType, zWhere);
-			} else {
-				/* The sql_stat[14] table already exists.  Delete all rows. */
-				sqlite3VdbeAddOp2(v, OP_Clear, aRoot[i], 0);
-			}
+			sqlite3VdbeAddOp2(v, OP_Clear, aRoot[i], 0);
 		}
 	}
 
-	/* Open the sql_stat[14] tables for writing. */
-	for (i = 0; i < ArraySize(aTable); i++) {
+	/* Open the sql_stat[134] tables for writing. */
+	for (i = 0; aTable[i]; i++) {
 		int addr;
 		addr =
 		    sqlite3VdbeAddOp3(v, OP_OpenWrite, iStatCur + i, aRoot[i],
@@ -200,7 +181,7 @@ openStatTable(Parse * pParse,	/* Parsing context */
 		v->aOp[addr].p4.pKeyInfo = 0;
 		v->aOp[addr].p4type = P4_KEYINFO;
 		sqlite3VdbeChangeP5(v, aCreateTbl[i]);
-		VdbeComment((v, aTable[i].zName));
+		VdbeComment((v, aTable[i]));
 	}
 }
 

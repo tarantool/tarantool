@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(36)
+test:plan(34)
 
 --!./tcltestrunner.lua
 -- 2005 July 22
@@ -28,26 +28,6 @@ test:do_catchsql_test(
         -- <analyze-1.1>
         1, "no such table: NO_SUCH_TABLE"
         -- </analyze-1.1>
-    })
-
-test:do_execsql_test(
-    "analyze-1.2",
-    [[
-        SELECT count(*) FROM "_space" WHERE "name"='_sql_stat1'
-    ]], {
-        -- <analyze-1.2>
-        0
-        -- </analyze-1.2>
-    })
-
-test:do_catchsql_test(
-    "analyze-1.5.1",
-    [[
-        ANALYZE
-    ]], {
-        -- <analyze-1.5.1>
-        0
-        -- </analyze-1.5.1>
     })
 
 test:do_execsql_test(

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(127)
+test:plan(125)
 
 testprefix = "analyze9"
 
@@ -1036,7 +1036,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     15.3,
     [[
-        INSERT INTO "_sql_stat4" VALUES(42, 42, 42, 42, 42, 42);
+        INSERT INTO "_sql_stat4" VALUES('42', '42', '42', '42', '42', 42);
     ]])
 
 test:do_execsql_test(
@@ -1047,22 +1047,6 @@ test:do_execsql_test(
         -- <15.4>
         1, 2, 3, 4, 5, 6
         -- </15.4>
-    })
-
-test:do_execsql_test(
-    15.5,
-    [[
-        UPDATE "_sql_stat1" SET "stat" = NULL;
-    ]])
-
-test:do_execsql_test(
-    15.6,
-    [[
-        SELECT * FROM x1;
-    ]], {
-        -- <15.6>
-        1, 2, 3, 4, 5, 6
-        -- </15.6>
     })
 
 test:do_execsql_test(
