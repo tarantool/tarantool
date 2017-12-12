@@ -2335,7 +2335,7 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	sqlite3VdbeAddOp3(v, OP_OpenPseudo, iCurrent, regCurrent, nCol);
 	if (pOrderBy) {
 		KeyInfo *pKeyInfo = multiSelectOrderByKeyInfo(pParse, p, 1);
-		sqlite3VdbeAddOp4(v, OP_OpenEphemeral, iQueue,
+		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iQueue,
 				  pOrderBy->nExpr + 2, 0, (char *)pKeyInfo,
 				  P4_KEYINFO);
 		destQueue.pOrderBy = pOrderBy;
@@ -2345,7 +2345,7 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	VdbeComment((v, "Queue table"));
 	if (iDistinct) {
 		p->addrOpenEphm[0] =
-		    sqlite3VdbeAddOp2(v, OP_OpenEphemeral, iDistinct, 0);
+		    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iDistinct, 0);
 		p->selFlags |= SF_UsesEphemeral;
 	}
 
@@ -2767,7 +2767,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				assert(p->pOrderBy == 0);
 
 				addr =
-				    sqlite3VdbeAddOp2(v, OP_OpenEphemeral, tab1,
+				    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, tab1,
 						      0);
 				assert(p->addrOpenEphm[0] == -1);
 				p->addrOpenEphm[0] = addr;
@@ -2788,7 +2788,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				/* Code the current SELECT into temporary table "tab2"
 				 */
 				addr =
-				    sqlite3VdbeAddOp2(v, OP_OpenEphemeral, tab2,
+				    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, tab2,
 						      0);
 				assert(p->addrOpenEphm[1] == -1);
 				p->addrOpenEphm[1] = addr;

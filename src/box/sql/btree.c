@@ -7469,6 +7469,10 @@ sqlite3BtreeCount(BtCursor * pCur, i64 * pnEntry)
 		return tarantoolSqlite3Count(pCur, pnEntry);
 	}
 
+	if (pCur->curFlags & BTCF_TEphemCursor) {
+		return tarantoolSqlite3EphemeralCount(pCur, pnEntry);
+	}
+
 	if (pCur->pgnoRoot == 0) {
 		*pnEntry = 0;
 		return SQLITE_OK;

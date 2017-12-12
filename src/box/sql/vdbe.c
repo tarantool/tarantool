@@ -4161,6 +4161,31 @@ case OP_NextId: {     /* out3 */
 	break;
 }
 
+/* Opcode: NextIdEphemeral P1 P2 P3 * *
+ * Synopsis: r[P3]=get_max(space_index[P1]{Column[P2]})
+ *
+ * This opcode works in the same way as OP_NextId does, except it is
+ * only applied for ephemeral tables. The difference is in the fact that
+ * all ephemeral tables don't have space_id (to be more precise it equals to zero).
+ */
+case OP_NextIdEphemeral: {
+	VdbeCursor *pC;
+	int p2;
+	pC = p->apCsr[pOp->p1];
+	p2 = pOp->p2;
+	pOut = &aMem[pOp->p3];
+
+	assert(pC->uc.pCursor->curFlags & BTCF_TEphemCursor);
+
+	rc = tarantoolSqlite3EphemeralGetMaxId(pC->uc.pCursor, p2,
+					       (uint64_t *) &pOut->u.i);
+	if (rc) goto abort_due_to_error;
+
+	pOut->u.i += 1;
+	pOut->flags = MEM_Int;
+	break;
+}
+
 /* Opcode: FCopy P1 P2 P3 * *
  * Synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)]
  *

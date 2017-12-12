@@ -563,24 +563,30 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			 *      M: ...
 			 */
 			int regRec;	/* Register to hold packed record */
-			int regTempRowid;	/* Register to hold temp table ROWID */
+			int regTempId;	/* Register to hold temp table ID */
+			int regCopy;    /* Register to keep copy of registers from select */
 			int addrL;	/* Label "L" */
 
 			srcTab = pParse->nTab++;
 			regRec = sqlite3GetTempReg(pParse);
-			regTempRowid = sqlite3GetTempReg(pParse);
-			sqlite3VdbeAddOp2(v, OP_OpenEphemeral, srcTab, nColumn);
+			regCopy = sqlite3GetTempRange(pParse, nColumn);
+			regTempId = sqlite3GetTempReg(pParse);
+			KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, 1+nColumn, 0);
+			sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, srcTab, nColumn+1,
+					  0, (char*)pKeyInfo, P4_KEYINFO);
 			addrL = sqlite3VdbeAddOp1(v, OP_Yield, dest.iSDParm);
 			VdbeCoverage(v);
-			sqlite3VdbeAddOp3(v, OP_MakeRecord, regFromSelect,
-					  nColumn, regRec);
-			sqlite3VdbeAddOp2(v, OP_NewRowid, srcTab, regTempRowid);
-			sqlite3VdbeAddOp3(v, OP_Insert, srcTab, regRec,
-					  regTempRowid);
+			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, srcTab, 2, regTempId);
+			sqlite3VdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn-1);
+			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy,
+					  nColumn + 1, regRec);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, srcTab, regRec);
+
 			sqlite3VdbeGoto(v, addrL);
 			sqlite3VdbeJumpHere(v, addrL);
 			sqlite3ReleaseTempReg(pParse, regRec);
-			sqlite3ReleaseTempReg(pParse, regTempRowid);
+			sqlite3ReleaseTempReg(pParse, regTempId);
+			sqlite3ReleaseTempRange(pParse, regCopy, nColumn);
 		}
 	} else {
 		/* This is the case if the data for the INSERT is coming from a

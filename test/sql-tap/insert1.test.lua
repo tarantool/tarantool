@@ -315,7 +315,7 @@ test:do_execsql_test("insert-4.7", [[
       x = test:execsql [[
         EXPLAIN INSERT INTO t4 SELECT x+2 FROM t4;
       ]]
-      return {test:lsearch(x, 'OpenEphemeral') > 0} -- X(264, "X!cmd", [=[["expr","[lsearch $x OpenEphemeral]>0"]]=])
+      return {test:lsearch(x, 'OpenTEphemeral') > 0} -- X(264, "X!cmd", [=[["expr","[lsearch $x OpenEphemeral]>0"]]=])
     end, {
       -- <insert-5.3>
       1

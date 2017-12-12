@@ -92,8 +92,11 @@ int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
 int tarantoolSqlite3EphemeralFirst(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralNext(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralLast(BtCursor * pCur, int * pRes);
+int tarantoolSqlite3EphemeralCount(BtCursor * pCur, i64 * pnEntry);
 int tarantoolSqlite3EphemeralPrevious(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);
+int tarantoolSqlite3EphemeralGetMaxId(BtCursor * pCur, uint32_t fieldno,
+				       uint64_t * max_id);
 
 /* Compare against the index key under a cursor -
  * the key may span non-adjacent fields in a random order,
