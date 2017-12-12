@@ -67,7 +67,6 @@
 #include "scoped_guard.h"
 #include "random.h"
 #include "tt_uuid.h"
-#include "iobuf.h"
 #include "cfg.h"
 #include "version.h"
 #include <readline/readline.h>
@@ -664,8 +663,6 @@ main(int argc, char **argv)
 	exception_init();
 
 	fiber_init(fiber_cxx_invoke);
-	/* Init iobuf library with default readahead */
-	iobuf_init();
 	coio_init();
 	coio_enable();
 	signal_init();

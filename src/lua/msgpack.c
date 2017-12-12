@@ -41,7 +41,6 @@
 #include <small/region.h>
 #include <small/ibuf.h>
 
-#include <iobuf.h>
 #include <fiber.h>
 
 void

@@ -35,6 +35,8 @@
 #include <stdio.h>
 
 #include <msgpuck.h>
+#include <small/ibuf.h>
+#include <small/obuf.h>
 #include "third_party/base64.h"
 
 #include "version.h"
@@ -48,7 +50,6 @@
 #include "memory.h"
 
 #include "port.h"
-#include "iobuf.h"
 #include "box.h"
 #include "call.h"
 #include "tuple_convert.h"
@@ -62,6 +63,33 @@
 /* The number of iproto messages in flight */
 enum { IPROTO_MSG_MAX = 768 };
 
+/**
+ * Network readahead. A signed integer to avoid
+ * automatic type coercion to an unsigned type.
+ * We assign it without locks in txn thread and
+ * use in iproto thread -- it's OK that
+ * readahead has a stale value while until the thread
+ * caches have synchronized, after all, it's used
+ * in new connections only.
+ *
+ * Notice that the default is not a strict power of two.
+ * slab metadata takes some space, and we want
+ * allocation steps to be correlated to slab buddy
+ * sizes, so when we ask slab cache for 16320 bytes,
+ * we get a slab of size 16384, not 32768.
+ */
+unsigned iproto_readahead = 16320;
+
+/**
+ * How big is a buffer which needs to be shrunk before
+ * it is put back into buffer cache.
+ */
+static inline unsigned
+iproto_max_input_size(void)
+{
+	return 18 * iproto_readahead;
+}
+
 void
 iproto_reset_input(struct ibuf *ibuf)
 {
@@ -70,12 +98,12 @@ iproto_reset_input(struct ibuf *ibuf)
 	 * move the pos to the start of the input buffer.
 	 */
 	assert(ibuf_used(ibuf) == 0);
-	if (ibuf_capacity(ibuf) < iobuf_max_size()) {
+	if (ibuf_capacity(ibuf) < iproto_max_input_size()) {
 		ibuf_reset(ibuf);
 	} else {
 		struct slab_cache *slabc = ibuf->slabc;
 		ibuf_destroy(ibuf);
-		ibuf_create(ibuf, slabc, iobuf_readahead);
+		ibuf_create(ibuf, slabc, iproto_readahead);
 	}
 }
 
@@ -753,10 +781,10 @@ iproto_connection_new(int fd)
 	con->loop = loop();
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
-	ibuf_create(&con->ibuf[0], cord_slab_cache(), iobuf_readahead);
-	ibuf_create(&con->ibuf[1], cord_slab_cache(), iobuf_readahead);
-	obuf_create(&con->obuf[0], &tx_cord->slabc, iobuf_readahead);
-	obuf_create(&con->obuf[1], &tx_cord->slabc, iobuf_readahead);
+	ibuf_create(&con->ibuf[0], cord_slab_cache(), iproto_readahead);
+	ibuf_create(&con->ibuf[1], cord_slab_cache(), iproto_readahead);
+	obuf_create(&con->obuf[0], &tx_cord->slabc, iproto_readahead);
+	obuf_create(&con->obuf[1], &tx_cord->slabc, iproto_readahead);
 	con->p_ibuf = &con->ibuf[0];
 	con->tx.p_obuf = &con->obuf[0];
 	iproto_wpos_create(&con->wpos, con->tx.p_obuf);
@@ -1391,8 +1419,6 @@ static struct evio_service binary; /* iproto binary listener */
 static int
 net_cord_f(va_list /* ap */)
 {
-	/* Got to be called in every thread using iobuf */
-	iobuf_init();
 	mempool_create(&iproto_msg_pool, &cord()->slabc,
 		       sizeof(struct iproto_msg));
 	mempool_create(&iproto_connection_pool, &cord()->slabc,

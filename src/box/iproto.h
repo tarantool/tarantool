@@ -30,6 +30,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+extern unsigned iproto_readahead;
+
 void
 iproto_init();
 

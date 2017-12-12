@@ -36,7 +36,6 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 
-#include "iobuf.h"
 #include "sio.h"
 #include "scoped_guard.h"
 #include "coio_task.h" /* coio_resolve() */
@@ -595,25 +594,17 @@ coio_service_on_accept(struct evio_service *evio_service,
 
 	/* Set connection name. */
 	char fiber_name[SERVICE_NAME_MAXLEN];
-	char iobuf_name[SERVICE_NAME_MAXLEN];
 	snprintf(fiber_name, sizeof(fiber_name),
 		 "%s/%s", evio_service->name, sio_strfaddr(addr, addrlen));
-	snprintf(iobuf_name, sizeof(iobuf_name), "%s/%s", "iobuf",
-		sio_strfaddr(addr, addrlen));
 
 	/* Create the worker fiber. */
-	struct iobuf *iobuf = NULL;
 	struct fiber *f;
-
 	try {
-		iobuf = iobuf_new();
 		f = fiber_new_xc(fiber_name, service->handler);
 	} catch (struct error *e) {
 		error_log(e);
 		say_error("can't create a handler fiber, dropping client connection");
 		evio_close(loop(), &coio);
-		if (iobuf)
-			iobuf_delete(iobuf);
 		throw;
 	}
 	/*
@@ -625,7 +616,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * Start the created fiber. It becomes the coio object owner
 	 * and will have to close it and free before termination.
 	 */
-	fiber_start(f, coio, addr, addrlen, iobuf, service->handler_param);
+	fiber_start(f, coio, addr, addrlen, service->handler_param);
 }
 
 void
