@@ -144,7 +144,7 @@ void
 applier_connect(struct applier *applier)
 {
 	struct ev_io *coio = &applier->io;
-	struct iobuf *iobuf = applier->iobuf;
+	struct ibuf *ibuf = &applier->ibuf;
 	if (coio->fd >= 0)
 		return;
 	char greetingbuf[IPROTO_GREETING_SIZE];
@@ -219,7 +219,7 @@ applier_connect(struct applier *applier)
 	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
 			    uri->login_len, uri->password, uri->password_len);
 	coio_write_xrow(coio, &row);
-	coio_read_xrow(coio, &iobuf->in, &row);
+	coio_read_xrow(coio, ibuf, &row);
 	applier->last_row_time = ev_monotonic_now(loop());
 	if (row.type != IPROTO_OK)
 		xrow_decode_error_xc(&row); /* auth failed */
@@ -239,7 +239,7 @@ applier_join(struct applier *applier)
 {
 	/* Send JOIN request */
 	struct ev_io *coio = &applier->io;
-	struct iobuf *iobuf = applier->iobuf;
+	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 	xrow_encode_join_xc(&row, &INSTANCE_UUID);
 	coio_write_xrow(coio, &row);
@@ -250,7 +250,7 @@ applier_join(struct applier *applier)
 	 */
 	if (applier->version_id >= version_id(1, 7, 0)) {
 		/* Decode JOIN response */
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row); /* re-throw error */
 		} else if (row.type != IPROTO_OK) {
@@ -273,7 +273,7 @@ applier_join(struct applier *applier)
 	 */
 	assert(applier->join_stream != NULL);
 	while (true) {
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write_xc(applier->join_stream, &row);
@@ -312,7 +312,7 @@ applier_join(struct applier *applier)
 	 * Receive final data.
 	 */
 	while (true) {
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			vclock_follow(&replicaset_vclock, row.replica_id,
@@ -347,7 +347,7 @@ applier_subscribe(struct applier *applier)
 
 	/* Send SUBSCRIBE request */
 	struct ev_io *coio = &applier->io;
-	struct iobuf *iobuf = applier->iobuf;
+	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
@@ -370,7 +370,7 @@ applier_subscribe(struct applier *applier)
 	 * Read SUBSCRIBE response
 	 */
 	if (applier->version_id >= version_id(1, 6, 7)) {
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row);  /* error */
 		} else if (row.type != IPROTO_OK) {
@@ -420,7 +420,7 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error_xc(&row);  /* error */
@@ -453,7 +453,8 @@ applier_subscribe(struct applier *applier)
 		}
 		if (applier->state == APPLIER_FOLLOW)
 			fiber_cond_signal(&applier->writer_cond);
-		iobuf_reset(iobuf);
+		if (ibuf_used(ibuf) == 0)
+			ibuf_reset(ibuf);
 		fiber_gc();
 	}
 }
@@ -470,8 +471,7 @@ applier_disconnect(struct applier *applier, enum applier_state state)
 
 	coio_close(loop(), &applier->io);
 	/* Clear all unparsed input. */
-	ibuf_reset(&applier->iobuf->in);
-	iobuf_reset(applier->iobuf);
+	ibuf_reinit(&applier->ibuf);
 	fiber_gc();
 }
 
@@ -604,7 +604,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 		return NULL;
 	}
 	coio_create(&applier->io, -1);
-	applier->iobuf = iobuf_new();
+	ibuf_create(&applier->ibuf, &cord()->slabc, 1024);
 
 	/* uri_parse() sets pointers to applier->source buffer */
 	snprintf(applier->source, sizeof(applier->source), "%s", uri);
@@ -627,7 +627,7 @@ void
 applier_delete(struct applier *applier)
 {
 	assert(applier->reader == NULL && applier->writer == NULL);
-	iobuf_delete(applier->iobuf);
+	ibuf_destroy(&applier->ibuf);
 	assert(applier->io.fd == -1);
 	trigger_destroy(&applier->on_state);
 	fiber_cond_destroy(&applier->resume_cond);

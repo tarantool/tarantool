@@ -35,6 +35,8 @@
 #include <sys/socket.h>
 #include <tarantool_ev.h>
 
+#include <small/ibuf.h>
+
 #include "fiber_cond.h"
 #include "trigger.h"
 #include "trivia/util.h"
@@ -102,8 +104,8 @@ struct applier {
 	socklen_t addr_len;
 	/** EV watcher for I/O */
 	struct ev_io io;
-	/** Input/output buffer for buffered IO */
-	struct iobuf *iobuf;
+	/** Input buffer */
+	struct ibuf ibuf;
 	/** Triggers invoked on state change */
 	struct rlist on_state;
 	/**
