@@ -55,14 +55,14 @@ c = remote.connect(box.cfg.listen)
 ...
 c:call("setuid_func")
 ---
-- error: Read access is denied for user 'guest' to space 'setuid_space'
+- error: Read access to space 'setuid_space' is denied for user 'guest'
 ...
 session.su('guest')
 ---
 ...
 setuid_func()
 ---
-- error: Read access is denied for user 'guest' to space 'setuid_space'
+- error: Read access to space 'setuid_space' is denied for user 'guest'
 ...
 session.su('admin')
 ---
@@ -85,7 +85,7 @@ session.su('guest')
 ...
 setuid_func()
 ---
-- error: Read access is denied for user 'guest' to space 'setuid_space'
+- error: Read access to space 'setuid_space' is denied for user 'guest'
 ...
 session.su('admin')
 ---
@@ -122,7 +122,7 @@ session.su('guest')
 ...
 setuid_func()
 ---
-- error: Read access is denied for user 'guest' to space 'setuid_space'
+- error: Read access to space 'setuid_space' is denied for user 'guest'
 ...
 session.su('admin')
 ---
@@ -244,14 +244,14 @@ c = net.connect('test:test@'..box.cfg.listen)
 ...
 c.space.test:select{}
 ---
-- error: Read access is denied for user 'test' to space 'test'
+- error: Read access to space 'test' is denied for user 'test'
 ...
 box.schema.role.grant('public', 'read', 'universe')
 ---
 ...
 c.space.test:select{}
 ---
-- error: Read access is denied for user 'test' to space 'test'
+- error: Read access to space 'test' is denied for user 'test'
 ...
 c:close()
 ---
@@ -275,7 +275,7 @@ box.session.su('test')
 ...
 test:select{}
 ---
-- error: Read access is denied for user 'test' to space 'test'
+- error: Read access to space 'test' is denied for user 'test'
 ...
 box.session.su('admin')
 ---
@@ -314,7 +314,7 @@ c = net.connect(box.cfg.listen)
 -- should return access denied
 c:call('f1')
 ---
-- error: Read access is denied for user 'guest' to space '_func'
+- error: Read access to space '_func' is denied for user 'guest'
 ...
 -- should work (used to return access denied, because was not setuid
 c:call('f2')

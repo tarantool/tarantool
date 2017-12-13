@@ -228,10 +228,10 @@ basic_test()
 		((uint64_t) 1) << 63 | ((uint64_t) 1) << 31,
 	};
 
-	assert(ARRAY_LENGTH(statements) == ARRAY_LENGTH(update_ops));
-	assert(ARRAY_LENGTH(statements) == ARRAY_LENGTH(results));
-	assert(ARRAY_LENGTH(statements) == ARRAY_LENGTH(column_masks));
-	for (size_t i = 0; i < ARRAY_LENGTH(statements); ++i)
+	assert(lengthof(statements) == lengthof(update_ops));
+	assert(lengthof(statements) == lengthof(results));
+	assert(lengthof(statements) == lengthof(column_masks));
+	for (size_t i = 0; i < lengthof(statements); ++i)
 		check_update_result(&statements[i], &update_ops[i], &results[i],
 				    column_masks[i]);
 }

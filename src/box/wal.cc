@@ -954,7 +954,7 @@ wal_set_watcher(struct wal_watcher *watcher, const char *name,
 	watcher->msg.cmsg.route = NULL;
 	watcher->events = 0;
 
-	assert(ARRAY_LENGTH(watcher->route) == 2);
+	assert(lengthof(watcher->route) == 2);
 	watcher->route[0] = {wal_watcher_notify_perform, &watcher->wal_pipe};
 	watcher->route[1] = {wal_watcher_notify_complete, NULL};
 

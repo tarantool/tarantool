@@ -65,8 +65,6 @@ extern "C" {
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
-#define ARRAY_LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
-
 /* Macros to define enum and corresponding strings. */
 #define ENUM0_MEMBER(s, ...) s,
 #define ENUM_MEMBER(s, v, ...) s = v,

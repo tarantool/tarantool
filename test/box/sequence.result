@@ -1316,15 +1316,15 @@ box.session.su('user')
 ...
 sq:set(100) -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq'
+- error: Write access to sequence 'seq' is denied for user 'user'
 ...
 sq:next() -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq'
+- error: Write access to sequence 'seq' is denied for user 'user'
 ...
 sq:reset() -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq'
+- error: Write access to sequence 'seq' is denied for user 'user'
 ...
 box.session.su('admin')
 ---
@@ -1433,15 +1433,15 @@ box.session.su('user')
 ...
 sq:set(100) -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq'
+- error: Write access to sequence 'seq' is denied for user 'user'
 ...
 sq:next() -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq'
+- error: Write access to sequence 'seq' is denied for user 'user'
 ...
 sq:reset() -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq'
+- error: Write access to sequence 'seq' is denied for user 'user'
 ...
 box.session.su('admin')
 ---
@@ -1455,11 +1455,11 @@ box.session.su('user')
 ...
 sq:alter{step = 2} -- error
 ---
-- error: Create, drop or alter access on sequence is denied for user 'user'
+- error: Alter access to sequence 'seq' is denied for user 'user'
 ...
 sq:drop() -- error
 ---
-- error: Create, drop or alter access on sequence is denied for user 'user'
+- error: Drop access to sequence 'seq' is denied for user 'user'
 ...
 box.session.su('admin')
 ---
@@ -1532,23 +1532,23 @@ s2 = box.schema.space.create('space2')
 ...
 _ = s2:create_index('pk', {sequence = 'seq1'}) -- error
 ---
-- error: Create, drop or alter access on sequence is denied for user 'user'
+- error: Create access to sequence 'seq1' is denied for user 'user'
 ...
 s1.index.pk:alter({sequence = 'seq1'}) -- error
 ---
-- error: Create, drop or alter access on space is denied for user 'user'
+- error: Alter access to space 'space1' is denied for user 'user'
 ...
 box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
 ---
-- error: Create, drop or alter access on space is denied for user 'user'
+- error: Alter access to space 'space1' is denied for user 'user'
 ...
 box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
 ---
-- error: Create, drop or alter access on space is denied for user 'user'
+- error: Alter access to space 'space1' is denied for user 'user'
 ...
 box.space._space_sequence:replace{s2.id, sq1.id, false} -- error
 ---
-- error: Create, drop or alter access on sequence is denied for user 'user'
+- error: Create access to sequence 'seq1' is denied for user 'user'
 ...
 s2.index.pk:alter({sequence = 'seq2'}) -- ok
 ---
@@ -1580,11 +1580,11 @@ box.session.su('user')
 ...
 s2:insert{2, 2} -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq1'
+- error: Write access to sequence 'seq1' is denied for user 'user'
 ...
 s2:insert{nil, 2} -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'seq1'
+- error: Write access to sequence 'seq1' is denied for user 'user'
 ...
 s2:update(1, {{'+', 2, 1}}) -- ok
 ---
@@ -1650,15 +1650,15 @@ s:insert{nil, 11} -- ok: {11, 11}
 ...
 box.sequence.test_seq:set(100) -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'test_seq'
+- error: Write access to sequence 'test_seq' is denied for user 'user'
 ...
 box.sequence.test_seq:next() -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'test_seq'
+- error: Write access to sequence 'test_seq' is denied for user 'user'
 ...
 box.sequence.test_seq:reset() -- error
 ---
-- error: Write access is denied for user 'user' to sequence 'test_seq'
+- error: Write access to sequence 'test_seq' is denied for user 'user'
 ...
 box.session.su('admin')
 ---
@@ -1714,7 +1714,7 @@ box.session.su('user2')
 ...
 box.schema.user.grant('user2', 'write', 'sequence', 'test') -- error
 ---
-- error: Grant access on sequence is denied for user 'user2'
+- error: Grant access to sequence 'test' is denied for user 'user2'
 ...
 box.session.su('user1')
 ---

@@ -81,13 +81,14 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 			if (!(access & credentials->universal_access)) {
 				diag_set(ClientError, ER_ACCESS_DENIED,
 					 priv_name(PRIV_U),
-					 schema_object_name(SC_UNIVERSE),
+					 schema_object_name(SC_UNIVERSE), "",
 					 user->def->name);
 			} else {
-				diag_set(ClientError,
-					 ER_FUNCTION_ACCESS_DENIED,
-					 priv_name(PRIV_X), user->def->name,
-					 tt_cstr(name, name_len));
+				diag_set(ClientError, ER_ACCESS_DENIED,
+					 priv_name(PRIV_X),
+					 schema_object_name(SC_FUNCTION),
+					 tt_cstr(name, name_len),
+					 user->def->name);
 			}
 		}
 		return -1;

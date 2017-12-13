@@ -53,7 +53,7 @@ background = fiber.create(function() connection:call("setuid") end)
 ...
 connection:call("escalation")
 ---
-- error: Read access is denied for user 'guest' to space '_space'
+- error: Read access to space '_space' is denied for user 'guest'
 ...
 fiber.cancel(background)
 ---

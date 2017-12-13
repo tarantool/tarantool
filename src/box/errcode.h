@@ -94,7 +94,7 @@ struct errcode_record {
 	/* 39 */_(ER_MIN_FIELD_COUNT,		"Tuple field count %u is less than required by space format or defined indexes (expected at least %u)") \
 	/* 40 */_(ER_WAL_IO,			"Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	"Get() doesn't support partial keys and non-unique indexes") \
-	/* 42 */_(ER_ACCESS_DENIED,		"%s access on %s is denied for user '%s'") \
+	/* 42 */_(ER_ACCESS_DENIED,		"%s access to %s '%s' is denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		"Failed to create user '%s': %s") \
 	/* 44 */_(ER_DROP_USER,			"Failed to drop user or role '%s': %s") \
 	/* 45 */_(ER_NO_SUCH_USER,		"User '%s' is not found") \
@@ -105,9 +105,9 @@ struct errcode_record {
 	/* 50 */_(ER_CREATE_FUNCTION,		"Failed to create function '%s': %s") \
 	/* 51 */_(ER_NO_SUCH_FUNCTION,		"Function '%s' does not exist") \
 	/* 52 */_(ER_FUNCTION_EXISTS,		"Function '%s' already exists") \
-	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	"%s access is denied for user '%s' to function '%s'") \
+	/* 53 */_(ER_UNUSED3,			"") \
 	/* 54 */_(ER_FUNCTION_MAX,		"A limit on the total number of functions has been reached: %u") \
-	/* 55 */_(ER_SPACE_ACCESS_DENIED,	"%s access is denied for user '%s' to space '%s'") \
+	/* 55 */_(ER_UNUSED4,			"") \
 	/* 56 */_(ER_USER_MAX,			"A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		"Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		"Can't set option '%s' dynamically") \
@@ -200,7 +200,7 @@ struct errcode_record {
 	/*145 */_(ER_NO_SUCH_SEQUENCE,		"Sequence '%s' does not exist") \
 	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
 	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
-	/*148 */_(ER_SEQUENCE_ACCESS_DENIED,	"%s access is denied for user '%s' to sequence '%s'") \
+	/*148 */_(ER_UNUSED5,			"") \
 	/*149 */_(ER_SPACE_FIELD_IS_DUPLICATE,	"Space field '%s' is duplicate") \
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \

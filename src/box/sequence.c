@@ -258,13 +258,14 @@ access_check_sequence(struct sequence *seq)
 			if (!(cr->universal_access & PRIV_U)) {
 				diag_set(ClientError, ER_ACCESS_DENIED,
 					 priv_name(PRIV_U),
-					 schema_object_name(SC_UNIVERSE),
+					 schema_object_name(SC_UNIVERSE), "",
 					 user->def->name);
 			} else {
 				diag_set(ClientError,
-					 ER_SEQUENCE_ACCESS_DENIED,
-					 priv_name(access), user->def->name,
-					 seq->def->name);
+					 ER_ACCESS_DENIED,
+					 priv_name(access),
+					 schema_object_name(SC_SEQUENCE),
+					 seq->def->name, user->def->name);
 			}
 		}
 		return -1;

@@ -56,7 +56,7 @@ session.su('test')
 -- in future we may  introduce a separate privilege
 box.schema.space.create('test')
 ---
-- error: Write access is denied for user 'test' to space '_schema'
+- error: Write access to space '_schema' is denied for user 'test'
 ...
 -- su() goes through because called from admin
 -- console, and it has no access checks
@@ -274,21 +274,21 @@ c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access to function 'nosuchfunction' is denied for user 'guest'
 ...
 function nosuchfunction() end
 ---
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access to function 'nosuchfunction' is denied for user 'guest'
 ...
 nosuchfunction = nil
 ---
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access to function 'nosuchfunction' is denied for user 'guest'
 ...
 c:close()
 ---
@@ -364,7 +364,7 @@ box.schema.user.create('grantee')
 ...
 box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
 ---
-- error: Grant access on universe is denied for user 'grantor'
+- error: Grant access to universe '' is denied for user 'grantor'
 ...
 session.su('grantee')
 ---
@@ -372,7 +372,7 @@ session.su('grantee')
 -- fails - can't suicide - ask the creator to kill you
 box.schema.user.drop('grantee')
 ---
-- error: Read access is denied for user 'grantee' to space '_user'
+- error: Read access to space '_user' is denied for user 'grantee'
 ...
 session.su('grantor')
 ---
@@ -403,11 +403,11 @@ session.su('guest')
 ...
 box.space._user:select{0}
 ---
-- error: Read access is denied for user 'guest' to space '_user'
+- error: Read access to space '_user' is denied for user 'guest'
 ...
 box.space._user:select{1}
 ---
-- error: Read access is denied for user 'guest' to space '_user'
+- error: Read access to space '_user' is denied for user 'guest'
 ...
 session.su('admin')
 ---
@@ -457,7 +457,7 @@ session.su('user1')
 -- permission denied
 box.schema.user.passwd('admin', 'xxx')
 ---
-- error: Read access is denied for user 'user1' to space '_user'
+- error: Read access to space '_user' is denied for user 'user1'
 ...
 session.su('admin')
 ---
@@ -839,7 +839,7 @@ session.su('test')
 ...
 box.internal.collation.drop('test') -- fail
 ---
-- error: Create, drop or alter access on collation is denied for user 'test'
+- error: Drop access to collation 'test' is denied for user 'test'
 ...
 session.su('admin')
 ---
@@ -990,7 +990,7 @@ session.su("test1")
 ...
 box.schema.user.disable("test")
 ---
-- error: Read access is denied for user 'test1' to space '_user'
+- error: Read access to space '_user' is denied for user 'test1'
 ...
 session.su("admin")
 ---
@@ -1004,7 +1004,7 @@ box.schema.user.disable("test")
 ...
 session.su("test")
 ---
-- error: Session access on universe is denied for user 'test'
+- error: Session access to universe '' is denied for user 'test'
 ...
 c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test", password="pass"})
 ---
@@ -1015,14 +1015,14 @@ c.state
 ...
 c.error
 ---
-- Session access on universe is denied for user 'test'
+- Session access to universe '' is denied for user 'test'
 ...
 session.su("test1")
 ---
 ...
 box.schema.user.grant("test", "usage", "universe")
 ---
-- error: Read access is denied for user 'test1' to space '_user'
+- error: Read access to space '_user' is denied for user 'test1'
 ...
 session.su('admin')
 ---
@@ -1035,7 +1035,7 @@ session.su("test")
 ...
 s:select{}
 ---
-- error: Usage access on universe is denied for user 'test'
+- error: Usage access to universe '' is denied for user 'test'
 ...
 session.su('admin')
 ---
@@ -1104,15 +1104,15 @@ box.session.su('guest')
 ...
 box.schema.space.create('test')
 ---
-- error: Write access is denied for user 'guest' to space '_schema'
+- error: Write access to space '_schema' is denied for user 'guest'
 ...
 box.schema.user.create('test')
 ---
-- error: Read access is denied for user 'guest' to space '_user'
+- error: Read access to space '_user' is denied for user 'guest'
 ...
 box.schema.func.create('test')
 ---
-- error: Read access is denied for user 'guest' to space '_func'
+- error: Read access to space '_func' is denied for user 'guest'
 ...
 box.session.su('admin')
 ---

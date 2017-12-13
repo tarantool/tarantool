@@ -32,32 +32,26 @@
 const char *
 priv_name(user_access_t access)
 {
-	if (access & PRIV_R)
-		return "Read";
-	if (access & PRIV_W)
-		return "Write";
-	if (access & PRIV_X)
-		return "Execute";
-	if (access & PRIV_S)
-		return "Session";
-	if (access & PRIV_U)
-		return "Usage";
-	if (access & PRIV_C)
-		return "Create";
-	if (access & PRIV_D)
-		return "Drop";
-	if (access & PRIV_A)
-		return "Alter";
-	if (access & PRIV_REFERENCE)
-		return "Reference";
-	if (access & PRIV_TRIGGER)
-		return "Trigger";
-	if (access & PRIV_INSERT)
-		return "Insert";
-	if (access & PRIV_UPDATE)
-		return "Update";
-	if (access & PRIV_DELETE)
-		return "Delete";
+	static const char *priv_name_strs[] = {
+		"Read",
+		"Write",
+		"Execute",
+		"Session",
+		"Usage",
+		"Create",
+		"Drop",
+		"Alter",
+		"Reference",
+		"Trigger",
+		"Insert",
+		"Update",
+		"Delete",
+		"Grant",
+		"Revoke",
+	};
+	int bit_no = __builtin_ffs((int) access);
+	if (bit_no > 0 && bit_no <= (int) lengthof(priv_name_strs))
+		return priv_name_strs[bit_no - 1];
 	return "Any";
 }
 

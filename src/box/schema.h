@@ -89,6 +89,14 @@ func_by_name(const char *name, uint32_t name_len);
 int
 space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
 
+/**
+ * Try to look up object name by id and type of object.
+ *
+ * @return NULL if object of type not found, otherwise name of object.
+ */
+const char *
+schema_find_name(enum schema_object_type type, uint32_t object_id);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

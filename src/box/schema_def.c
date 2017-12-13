@@ -59,6 +59,7 @@ schema_object_type(const char *name)
 const char *
 schema_object_name(enum schema_object_type type)
 {
+	assert((int) type < (int) schema_object_type_MAX);
 	return object_type_strs[type];
 }
 

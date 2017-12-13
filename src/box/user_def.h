@@ -58,7 +58,7 @@ struct credentials {
 	uint32_t uid;
 };
 
-enum {
+enum priv_type {
 	/* SELECT */
 	PRIV_R = 1,
 	/* INSERT, UPDATE, UPSERT, DELETE, REPLACE */
@@ -85,6 +85,10 @@ enum {
 	PRIV_UPDATE = 2048,
 	/* DELETE - required by ANSI - not implemented */
 	PRIV_DELETE = 4096,
+	/* This is never granted, but used internally. */
+	PRIV_GRANT = 8192,
+	/* Never granted, but used internally. */
+	PRIV_REVOKE = 16384,
 	/* all bits */
 	PRIV_ALL  = ~((user_access_t) 0),
 };

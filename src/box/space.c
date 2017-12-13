@@ -68,13 +68,14 @@ access_check_space(struct space *space, user_access_t access)
 			if (!(cr->universal_access & PRIV_U)) {
 				diag_set(ClientError, ER_ACCESS_DENIED,
 					 priv_name(PRIV_U),
-					 schema_object_name(SC_UNIVERSE),
+					 schema_object_name(SC_UNIVERSE), "",
 					 user->def->name);
 			} else {
 				diag_set(ClientError,
-					 ER_SPACE_ACCESS_DENIED,
-					 priv_name(access), user->def->name,
-					 space->def->name);
+					 ER_ACCESS_DENIED,
+					 priv_name(access),
+					 schema_object_name(SC_SPACE),
+					 space->def->name, user->def->name);
 			}
 		}
 		return -1;
