@@ -399,7 +399,7 @@ box.schema.space.create = function(name, options)
         end
         id = max_id[2]
     end
-    local uid = session.uid()
+    local uid = session.euid()
     if options.user then
         uid = user_or_role_resolve(options.user)
         if uid == nil then
@@ -1522,7 +1522,7 @@ box.schema.sequence.create = function(name, opts)
         return box.sequence[name], 'not created'
     end
     local _sequence = box.space[box.schema.SEQUENCE_ID]
-    _sequence:auto_increment{session.uid(), name, opts.step, opts.min,
+    _sequence:auto_increment{session.euid(), name, opts.step, opts.min,
                              opts.max, opts.start, opts.cache, opts.cycle}
     return box.sequence[name]
 end
@@ -1748,7 +1748,7 @@ box.schema.func.create = function(name, opts)
     opts = update_param_table(opts, { setuid = false, language = 'lua'})
     opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
-    _func:auto_increment{session.uid(), name, opts.setuid, opts.language}
+    _func:auto_increment{session.euid(), name, opts.setuid, opts.language}
 end
 
 box.schema.func.drop = function(name, opts)
@@ -1819,7 +1819,7 @@ box.internal.collation.create = function(name, coll_type, locale, opts)
             return
         end
     end
-    _coll:auto_increment{name, session.uid(), coll_type, locale, opts}
+    _coll:auto_increment{name, session.euid(), coll_type, locale, opts}
 end
 
 box.internal.collation.drop = function(name, opts)
@@ -1897,7 +1897,7 @@ box.schema.user.create = function(name, opts)
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
     local _user = box.space[box.schema.USER_ID]
-    uid = _user:auto_increment{session.uid(), name, 'user', auth_mech_list}[1]
+    uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}[1]
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
 end
@@ -1926,7 +1926,7 @@ local function grant(uid, name, privilege, object_type,
     local oid = object_resolve(object_type, object_name)
     options = options or {}
     if options.grantor == nil then
-        options.grantor = session.uid()
+        options.grantor = session.euid()
     else
         options.grantor = user_or_role_resolve(options.grantor)
     end
@@ -2072,7 +2072,7 @@ end
 box.schema.user.info = function(user_name)
     local uid
     if user_name == nil then
-        uid = box.session.uid()
+        uid = box.session.euid()
     else
         uid = user_resolve(user_name)
         if uid == nil then
@@ -2103,7 +2103,7 @@ box.schema.role.create = function(name, opts)
         return
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.uid(), name, 'role', setmap({})}
+    _user:auto_increment{session.euid(), name, 'role', setmap({})}
 end
 
 box.schema.role.drop = function(name, opts)

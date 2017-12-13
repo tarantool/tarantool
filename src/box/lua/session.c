@@ -100,18 +100,30 @@ lbox_session_sync(struct lua_State *L)
 }
 
 /**
+ * Session effective user id.
+ * Note: user id (current_user()->uid)
+ * may be different in a setuid function.
+ */
+static int
+lbox_session_euid(struct lua_State *L)
+{
+	/*
+	 * Sic: push effective session user, not the current user,
+	 * which may differ inside a setuid function.
+	 */
+	lua_pushnumber(L, current_session()->credentials.uid);
+	return 1;
+}
+
+/**
  * Session user id.
- * Note: effective user id (current_user()->uid)
+ * Note: effective user id
  * may be different in a setuid function.
  */
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	/*
-	 * Sic: push session user, not the current user,
-	 * which may differ inside a setuid function.
-	 */
-	lua_pushnumber(L, current_session()->credentials.uid);
+	lua_pushnumber(L, current_user()->uid);
 	return 1;
 }
 
@@ -353,6 +365,7 @@ box_lua_session_init(struct lua_State *L)
 		{"type", lbox_session_type},
 		{"sync", lbox_session_sync},
 		{"uid", lbox_session_uid},
+		{"euid", lbox_session_euid},
 		{"user", lbox_session_user},
 		{"su", lbox_session_su},
 		{"fd", lbox_session_fd},

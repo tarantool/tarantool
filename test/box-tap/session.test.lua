@@ -15,7 +15,7 @@ session = box.session
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
-test:plan(43)
+test:plan(49)
 
 ---
 --- Check that Tarantool creates ADMIN session for #! script
@@ -159,7 +159,20 @@ test:ok(conn:eval("return box.session.exists(box.session.id())"), "remote sessio
 test:isnt(conn:eval("return box.session.peer(box.session.id())"), nil, "remote session peer check")
 test:ok(conn:eval("return box.session.peer() == box.session.peer(box.session.id())"), "remote session peer check")
 
+-- gh-2994 session uid vs session effective uid
+test:is(session.euid(), 1, "session.uid")
+test:is(session.su("guest", session.uid), 0, "session.uid from su")
+test:is(session.su("guest", session.euid), 1, "session.euid from su")
+local id = conn:eval("return box.session.uid()")
+test:is(id, 0, "session.uid from netbox")
+id = conn:eval("return box.session.euid()")
+test:is(id, 0, "session.euid from netbox")
+--box.session.su("admin")
+conn:eval("box.session.su(\"admin\", box.schema.create_space, \"sp1\")")
+local sp = conn:eval("return box.space._space.index.name:get{\"sp1\"}[2]")
+test:is(sp, 0, "effective ddl owner")
 conn:close()
+
 inspector:cmd('stop server session with cleanup=1')
 session = nil
 os.exit(test:check() == true and 0 or -1)
