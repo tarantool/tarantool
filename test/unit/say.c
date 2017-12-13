@@ -106,9 +106,9 @@ int main()
 	struct log test_log;
 	log_create(&test_log, tmp_filename, false);
 	log_set_format(&test_log, say_format_plain);
-	log_say(&test_log, 0, "dumb name", 0, NULL, "hello %s\n", "user");
+	log_say(&test_log, 0, NULL, 0, NULL, "hello %s\n", "user");
 	log_set_format(&test_log, say_format_json);
-	log_say(&test_log, 0, "dumb name", 0, NULL, "hello %s", "user");
+	log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user");
 	log_set_format(&test_log, format_func_custom);
 	log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user");
 

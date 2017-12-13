@@ -590,7 +590,10 @@ say_format_plain_tail(char *buf, int len, int level, const char *filename,
 		for (const char *f = filename; *f; f++)
 			if (*f == '/' && *(f + 1) != '\0')
 				filename = f + 1;
-		SNPRINT(total, snprintf, buf, len, " %s:%i", filename, line);
+		if (filename) {
+			SNPRINT(total, snprintf, buf, len, " %s:%i", filename,
+				line);
+		}
 	}
 
 	SNPRINT(total, snprintf, buf, len, " %c> ", level_to_char(level));
@@ -694,11 +697,11 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
 		SNPRINT(total, snprintf, buf, len, "\", ");
 	}
 
-	SNPRINT(total, snprintf, buf, len, "\"pid\": %i, ", getpid());
+	SNPRINT(total, snprintf, buf, len, "\"pid\": %i ", getpid());
 
 	struct cord *cord = cord();
 	if (cord) {
-		SNPRINT(total, snprintf, buf, len, "\"cord_name\": \"");
+		SNPRINT(total, snprintf, buf, len, ", \"cord_name\": \"");
 		SNPRINT(total, json_escape, buf, len, cord->name);
 		SNPRINT(total, snprintf, buf, len, "\", ");
 		if (fiber() && fiber()->fid != 1) {
@@ -708,15 +711,16 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
 				"\"fiber_name\": \"");
 			SNPRINT(total, json_escape, buf, len,
 				fiber()->name);
-			SNPRINT(total, snprintf, buf, len, "\", ");
+			SNPRINT(total, snprintf, buf, len, "\"");
 		}
 	}
 
-	SNPRINT(total, snprintf, buf, len, "\"file\": \"");
-	SNPRINT(total, json_escape, buf, len, filename);
-	SNPRINT(total, snprintf, buf, len, "\", ");
-	SNPRINT(total, snprintf, buf, len, "\"line\": %i}", line);
-	SNPRINT(total, snprintf, buf, len, "\n");
+	if (filename) {
+		SNPRINT(total, snprintf, buf, len, ", \"file\": \"");
+		SNPRINT(total, json_escape, buf, len, filename);
+		SNPRINT(total, snprintf, buf, len, "\", \"line\": %i", line);
+	}
+	SNPRINT(total, snprintf, buf, len, "}\n");
 	return total;
 }
 
