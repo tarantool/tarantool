@@ -577,6 +577,25 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
 }
 
 /**
+ * Extract the key from a tuple by the given key definition
+ * and store the result in a SELECT statement allocated with
+ * malloc().
+ */
+struct tuple *
+vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+		    struct tuple_format *format);
+
+/**
+ * Extract the key from msgpack by the given key definition
+ * and store the result in a SELECT statement allocated with
+ * malloc().
+ */
+struct tuple *
+vy_stmt_extract_key_raw(const char *data, const char *data_end,
+			const struct key_def *key_def,
+			struct tuple_format *format);
+
+/**
  * Encode vy_stmt for a primary key as xrow_header
  *
  * @param value statement to encode

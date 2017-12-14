@@ -1235,9 +1235,7 @@ vy_is_committed(struct vy_env *env, struct space *space)
  * @param env         Vinyl environment.
  * @param tx          Current transaction.
  * @param index       Index in which search.
- * @param key         MessagePack'ed data, the array without a
- *                    header.
- * @param part_count  Part count of the key.
+ * @param key         Key statement.
  * @param[out] result The found tuple is stored here. Must be
  *                    unreferenced after usage.
  *
@@ -1246,18 +1244,14 @@ vy_is_committed(struct vy_env *env, struct space *space)
  */
 static inline int
 vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
-	     const char *key, uint32_t part_count, struct tuple **result)
+	     struct tuple *key, struct tuple **result)
 {
 	/*
 	 * tx can be NULL, for example, if an user calls
 	 * space.index.get({key}).
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
-	struct tuple *vykey;
-	assert(part_count <= index->cmp_def->part_count);
-	vykey = vy_stmt_new_select(index->env->key_format, key, part_count);
-	if (vykey == NULL)
-		return -1;
+
 	const struct vy_read_view **p_read_view;
 	if (tx != NULL) {
 		p_read_view = (const struct vy_read_view **) &tx->read_view;
@@ -1266,10 +1260,9 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, ITER_EQ, vykey,
+	vy_read_iterator_open(&itr, index, tx, ITER_EQ, key,
 			      p_read_view, env->too_long_threshold);
 	int rc = vy_read_iterator_next(&itr, result);
-	tuple_unref(vykey);
 	if (*result != NULL)
 		tuple_ref(*result);
 	vy_read_iterator_close(&itr);
@@ -1283,33 +1276,23 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
  * @param tx         Current transaction.
  * @param space      Target space.
  * @param index      Index in which to search.
- * @param key        MessagePack'ed data, the array without a
- *                   header.
- * @param part_count Part count of the key.
+ * @param key        Key statement.
  *
  * @retval  0 Success, the key isn't found.
  * @retval -1 Memory error or the key is found.
  */
 static inline int
 vy_check_dup_key(struct vy_env *env, struct vy_tx *tx, struct space *space,
-		 struct vy_index *index, const char *key, uint32_t part_count)
+		 struct vy_index *index, struct tuple *key)
 {
 	struct tuple *found;
-	(void) part_count;
 	/*
 	 * During recovery we apply rows that were successfully
 	 * applied before restart so no conflict is possible.
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	/*
-	 * Expect a full tuple as input (secondary key || primary key)
-	 * but use only  the secondary key fields (partial key look
-	 * up) to check for duplicates.
-         */
-	assert(part_count == index->cmp_def->part_count);
-	if (vy_index_get(env, tx, index, key, index->key_def->part_count,
-			 &found))
+	if (vy_index_get(env, tx, index, key, &found))
 		return -1;
 
 	if (found) {
@@ -1338,17 +1321,18 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 {
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	const char *key;
 	assert(pk->id == 0);
-	key = tuple_extract_key(stmt, pk->key_def, NULL);
+	struct tuple *key = vy_stmt_extract_key(stmt, pk->key_def,
+						pk->env->key_format);
 	if (key == NULL)
 		return -1;
 	/*
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	uint32_t part_count = mp_decode_array(&key);
-	if (vy_check_dup_key(env, tx, space, pk, key, part_count))
+	int rc = vy_check_dup_key(env, tx, space, pk, key);
+	tuple_unref(key);
+	if (rc != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -1380,13 +1364,13 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	if (index->opts.is_unique &&
 	    (!index->key_def->is_nullable ||
 	     !vy_tuple_key_contains_null(stmt, index->key_def))) {
-		uint32_t key_len;
-		const char *key = tuple_extract_key(stmt, index->cmp_def,
-						    &key_len);
+		struct tuple *key = vy_stmt_extract_key(stmt, index->key_def,
+							index->env->key_format);
 		if (key == NULL)
 			return -1;
-		uint32_t part_count = mp_decode_array(&key);
-		if (vy_check_dup_key(env, tx, space, index, key, part_count))
+		int rc = vy_check_dup_key(env, tx, space, index, key);
+		tuple_unref(key);
+		if (rc != 0)
 			return -1;
 	}
 	return vy_tx_set(tx, index, stmt);
@@ -1427,13 +1411,13 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * old tuple to pass it to the trigger.
 	 */
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
-		const char *key;
-		key = tuple_extract_key(new_tuple, pk->key_def, NULL);
+		struct tuple *key = vy_stmt_extract_key(new_tuple, pk->key_def,
+							pk->env->key_format);
 		if (key == NULL)
 			goto error_unref;
-		uint32_t part_count = mp_decode_array(&key);
-		if (vy_index_get(env, tx, pk, key, part_count,
-				 &stmt->old_tuple) != 0)
+		int rc = vy_index_get(env, tx, pk, key, &stmt->old_tuple);
+		tuple_unref(key);
+		if (rc != 0)
 			goto error_unref;
 	}
 	if (vy_tx_set(tx, pk, new_tuple))
@@ -1486,13 +1470,15 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 				       request->tuple_end);
 	if (new_stmt == NULL)
 		return -1;
-	const char *key = tuple_extract_key(new_stmt, pk->key_def, NULL);
+	struct tuple *key = vy_stmt_extract_key(new_stmt, pk->key_def,
+						pk->env->key_format);
 	if (key == NULL) /* out of memory */
 		goto error;
-	uint32_t part_count = mp_decode_array(&key);
 
 	/* Get full tuple from the primary index. */
-	if (vy_index_get(env, tx, pk, key, part_count, &old_stmt) != 0)
+	int rc = vy_index_get(env, tx, pk, key, &old_stmt);
+	tuple_unref(key);
+	if (rc != 0)
 		goto error;
 
 	if (old_stmt == NULL) {
@@ -1614,17 +1600,14 @@ vy_index_full_by_stmt(struct vy_env *env, struct vy_tx *tx,
 	 */
 	struct vy_index *pk = index->pk;
 	assert(pk != NULL);
-	uint32_t size;
-	const char *tuple = tuple_data_range(partial, &size);
-	const char *tuple_end = tuple + size;
-	const char *pkey = tuple_extract_key_raw(tuple, tuple_end, pk->key_def,
-						 NULL);
-	if (pkey == NULL)
+	struct tuple *key = vy_stmt_extract_key(partial, pk->key_def,
+						pk->env->key_format);
+	if (key == NULL)
 		return -1;
 	/* Fetch the tuple from the primary index. */
-	uint32_t part_count = mp_decode_array(&pkey);
-	assert(part_count == pk->key_def->part_count);
-	return vy_index_get(env, tx, pk, pkey, part_count, full);
+	int rc = vy_index_get(env, tx, pk, key, full);
+	tuple_unref(key);
+	return rc;
 }
 
 /**
@@ -1634,7 +1617,7 @@ vy_index_full_by_stmt(struct vy_env *env, struct vy_tx *tx,
  * @param tx          Current transaction.
  * @param index       Index for which the key is specified. Can be
  *                    both primary and secondary.
- * @param key         MessagePack'ed data, the array without a
+ * @param key_raw     MessagePack'ed data, the array without a
  *                    header.
  * @param part_count  Count of parts in the key.
  * @param[out] result The found statement is stored here. Must be
@@ -1645,17 +1628,24 @@ vy_index_full_by_stmt(struct vy_env *env, struct vy_tx *tx,
  */
 static inline int
 vy_index_full_by_key(struct vy_env *env, struct vy_tx *tx,
-		     struct vy_index *index, const char *key,
+		     struct vy_index *index, const char *key_raw,
 		     uint32_t part_count, struct tuple **result)
 {
+	int rc;
+	struct tuple *key = vy_stmt_new_select(index->env->key_format,
+					       key_raw, part_count);
+	if (key == NULL)
+		return -1;
 	struct tuple *found;
-	if (vy_index_get(env, tx, index, key, part_count, &found))
+	rc = vy_index_get(env, tx, index, key, &found);
+	tuple_unref(key);
+	if (rc != 0)
 		return -1;
 	if (index->id == 0 || found == NULL) {
 		*result = found;
 		return 0;
 	}
-	int rc = vy_index_full_by_stmt(env, tx, index, found, result);
+	rc = vy_index_full_by_stmt(env, tx, index, found, result);
 	tuple_unref(found);
 	return rc;
 }
@@ -2086,8 +2076,6 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	const char *old_tuple, *old_tuple_end;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size;
-	const char *key;
-	uint32_t part_count;
 	uint64_t column_mask;
 	/*
 	 * There are two cases when need to get the old tuple
@@ -2099,11 +2087,13 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 *   to delete old tuples from secondary indexes.
 	 */
 	/* Find the old tuple using the primary key. */
-	key = tuple_extract_key_raw(tuple, tuple_end, pk->key_def, NULL);
+	struct tuple *key = vy_stmt_extract_key_raw(tuple, tuple_end,
+					pk->key_def, pk->env->key_format);
 	if (key == NULL)
 		return -1;
-	part_count = mp_decode_array(&key);
-	if (vy_index_get(env, tx, pk, key, part_count, &stmt->old_tuple))
+	int rc = vy_index_get(env, tx, pk, key, &stmt->old_tuple);
+	tuple_unref(key);
+	if (rc != 0)
 		return -1;
 	/*
 	 * If the old tuple was not found then UPSERT

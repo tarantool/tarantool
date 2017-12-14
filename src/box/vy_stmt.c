@@ -455,6 +455,42 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 	return stmt;
 }
 
+struct tuple *
+vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+		    struct tuple_format *format)
+{
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *key_raw = tuple_extract_key(stmt, key_def, NULL);
+	if (key_raw == NULL)
+		return NULL;
+	uint32_t part_count = mp_decode_array(&key_raw);
+	assert(part_count == key_def->part_count);
+	struct tuple *key = vy_stmt_new_select(format, key_raw, part_count);
+	/* Cleanup memory allocated by tuple_extract_key(). */
+	region_truncate(region, region_svp);
+	return key;
+}
+
+struct tuple *
+vy_stmt_extract_key_raw(const char *data, const char *data_end,
+			const struct key_def *key_def,
+			struct tuple_format *format)
+{
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *key_raw = tuple_extract_key_raw(data, data_end,
+						    key_def, NULL);
+	if (key_raw == NULL)
+		return NULL;
+	uint32_t part_count = mp_decode_array(&key_raw);
+	assert(part_count == key_def->part_count);
+	struct tuple *key = vy_stmt_new_select(format, key_raw, part_count);
+	/* Cleanup memory allocated by tuple_extract_key_raw(). */
+	region_truncate(region, region_svp);
+	return key;
+}
+
 int
 vy_stmt_encode_primary(const struct tuple *value,
 		       const struct key_def *key_def, uint32_t space_id,
