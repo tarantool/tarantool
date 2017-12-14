@@ -1322,17 +1322,11 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(pk->id == 0);
-	struct tuple *key = vy_stmt_extract_key(stmt, pk->key_def,
-						pk->env->key_format);
-	if (key == NULL)
-		return -1;
 	/*
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	int rc = vy_check_dup_key(env, tx, space, pk, key);
-	tuple_unref(key);
-	if (rc != 0)
+	if (vy_check_dup_key(env, tx, space, pk, stmt) != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -1411,13 +1405,7 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * old tuple to pass it to the trigger.
 	 */
 	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
-		struct tuple *key = vy_stmt_extract_key(new_tuple, pk->key_def,
-							pk->env->key_format);
-		if (key == NULL)
-			goto error_unref;
-		int rc = vy_index_get(env, tx, pk, key, &stmt->old_tuple);
-		tuple_unref(key);
-		if (rc != 0)
+		if (vy_index_get(env, tx, pk, new_tuple, &stmt->old_tuple) != 0)
 			goto error_unref;
 	}
 	if (vy_tx_set(tx, pk, new_tuple))
@@ -1470,15 +1458,9 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 				       request->tuple_end);
 	if (new_stmt == NULL)
 		return -1;
-	struct tuple *key = vy_stmt_extract_key(new_stmt, pk->key_def,
-						pk->env->key_format);
-	if (key == NULL) /* out of memory */
-		goto error;
 
 	/* Get full tuple from the primary index. */
-	int rc = vy_index_get(env, tx, pk, key, &old_stmt);
-	tuple_unref(key);
-	if (rc != 0)
+	if (vy_index_get(env, tx, pk, new_stmt, &old_stmt) != 0)
 		goto error;
 
 	if (old_stmt == NULL) {
@@ -1592,7 +1574,7 @@ vy_unique_key_validate(struct vy_index *index, const char *key,
 static inline int
 vy_index_full_by_stmt(struct vy_env *env, struct vy_tx *tx,
 		      struct vy_index *index,
-		      const struct tuple *partial, struct tuple **full)
+		      struct tuple *partial, struct tuple **full)
 {
 	assert(index->id > 0);
 	/*
@@ -1600,14 +1582,8 @@ vy_index_full_by_stmt(struct vy_env *env, struct vy_tx *tx,
 	 */
 	struct vy_index *pk = index->pk;
 	assert(pk != NULL);
-	struct tuple *key = vy_stmt_extract_key(partial, pk->key_def,
-						pk->env->key_format);
-	if (key == NULL)
-		return -1;
 	/* Fetch the tuple from the primary index. */
-	int rc = vy_index_get(env, tx, pk, key, full);
-	tuple_unref(key);
-	return rc;
+	return vy_index_get(env, tx, pk, partial, full);
 }
 
 /**
