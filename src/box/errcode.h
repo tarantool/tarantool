@@ -79,10 +79,10 @@ struct errcode_record {
 	/* 24 */_(ER_FIELD_TYPE_MISMATCH,	"Ambiguous field type, field %u. Requested type is %s but the field has previously been defined as %s") \
 	/* 25 */_(ER_SPLICE,			"SPLICE error on field %u: %s") \
 	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %u does not match field type: expected %s") \
-	/* 27 */_(ER_TUPLE_IS_TOO_LONG,		"Tuple is too long %u") \
+	/* 27 */_(ER_UNUSED1,			"") \
 	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation") \
 	/* 29 */_(ER_UPDATE_FIELD,		"Field %u UPDATE error: %s") \
-	/* 30 */_(ER_FIBER_STACK,		"Can not create a new fiber: recursion limit reached") \
+	/* 30 */_(ER_UNUSED2,			"") \
 	/* 31 */_(ER_KEY_PART_COUNT,		"Invalid key part count (expected [0..%u], got %u)") \
 	/* 32 */_(ER_PROC_LUA,			"%s") \
 	/* 33 */_(ER_NO_SUCH_PROC,		"Procedure '%.*s' is not defined") \
