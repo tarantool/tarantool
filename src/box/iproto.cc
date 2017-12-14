@@ -951,6 +951,10 @@ tx_process_disconnect(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	if (con->session) {
 		tx_fiber_init(con->session, 0);
+		/*
+		 * The socket is already closed in iproto thread,
+		 * prevent box.session.peer() from using it.
+		 */
 		con->session->fd = -1;
 		if (! rlist_empty(&session_on_disconnect))
 			session_run_on_disconnect_triggers(con->session);
