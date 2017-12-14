@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_VY_POINT_ITERATOR_H
-#define INCLUDES_TARANTOOL_BOX_VY_POINT_ITERATOR_H
+#ifndef INCLUDES_TARANTOOL_BOX_VY_POINT_LOOKUP_H
+#define INCLUDES_TARANTOOL_BOX_VY_POINT_LOOKUP_H
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -31,49 +31,8 @@
  * SUCH DAMAGE.
  */
 
-#include <small/rlist.h>
-
 /**
- * @file
- * Point-lookup iterator
- */
-
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-struct vy_index;
-struct vy_tx;
-struct vy_read_view;
-struct tuple;
-
-
-/**
- * ID of an iterator source type. Can be used in bitmaps.
- */
-enum iterator_src_type {
-	ITER_SRC_TXW = 1,
-	ITER_SRC_CACHE = 2,
-	ITER_SRC_MEM = 4,
-	ITER_SRC_RUN = 8,
-};
-
-/**
- * History of a key in vinyl is a continuous sequence of statements of the
- * same key in order of decreasing lsn. The history can be represented as a
- * list, the structure below describes one node of the list.
- */
-struct vy_stmt_history_node {
-	/* Type of source that the history statement came from */
-	enum iterator_src_type src_type;
-	/* The history statement. Referenced for runs. */
-	struct tuple *stmt;
-	/* Link in the history list */
-	struct rlist link;
-};
-
-/**
- * Point iterator is a special read iterator that is designed for
+ * Point lookup is a special case of read iterator that is designed for
  * retrieving one value from index by a full key (all parts are present).
  *
  * Iterator collects necessary history of the given key from different sources
@@ -85,45 +44,29 @@ struct vy_stmt_history_node {
  * After the history is collected the iterator calculates resultant statement
  * and, if the result is the latest version of the key, adds it to cache.
  */
-struct vy_point_iterator {
-	/* Search location and options */
-	struct vy_index *index;
-	struct vy_tx *tx;
-	const struct vy_read_view **p_read_view;
-	struct tuple *key;
 
-	/**
-	 *  For compatibility reasons, the iterator references the
-	 * resultant statement until own destruction.
-	 */
-	struct tuple *curr_stmt;
-};
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct vy_index;
+struct vy_tx;
+struct vy_read_view;
+struct tuple;
 
 /**
- * Create an iterator by full key.
- */
-void
-vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_index *index,
-		       struct vy_tx *tx, const struct vy_read_view **rv,
-		       struct tuple *key);
-
-
-/**
- * Free resources and close the iterator.
- */
-void
-vy_point_iterator_close(struct vy_point_iterator *itr);
-
-/*
- * Get a resultant tuple from the iterator. Actually do not change
- * iterator state thus second call will return the same statement
- * (unlike all other iterators that would return NULL on the second call)
+ * Given a key that has all index parts (including primary index
+ * parts in case of a secondary index), lookup the corresponding
+ * tuple in the index. The tuple is returned in @ret with its
+ * reference counter elevated.
  */
 int
-vy_point_iterator_get(struct vy_point_iterator *itr, struct tuple **result);
+vy_point_lookup(struct vy_index *index, struct vy_tx *tx,
+		const struct vy_read_view **rv,
+		struct tuple *key, struct tuple **ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_BOX_VY_POINT_ITERATOR_H */
+#endif /* INCLUDES_TARANTOOL_BOX_VY_POINT_LOOKUP_H */

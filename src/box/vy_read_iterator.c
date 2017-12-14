@@ -37,7 +37,7 @@
 #include "vy_upsert.h"
 #include "vy_index.h"
 #include "vy_stat.h"
-#include "vy_point_iterator.h"
+#include "vy_point_lookup.h"
 
 /**
  * Merge source, support structure for vy_read_iterator.
@@ -950,15 +950,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	/* Run a special iterator for a special case */
 	if ((itr->iterator_type == ITER_EQ || itr->iterator_type == ITER_REQ) &&
 	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
-		struct vy_point_iterator one;
-		vy_point_iterator_open(&one, itr->index, itr->tx,
-				       itr->read_view, itr->key);
-		int rc = vy_point_iterator_get(&one, result);
-		if (*result) {
-			tuple_ref(*result);
-			itr->last_stmt = *result;
-		}
-		vy_point_iterator_close(&one);
+		int rc = vy_point_lookup(itr->index, itr->tx, itr->read_view,
+					 itr->key, &itr->last_stmt);
+		*result = itr->last_stmt;
 		itr->key = NULL;
 		return rc;
 	}

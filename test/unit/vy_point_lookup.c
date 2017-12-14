@@ -6,7 +6,7 @@
 #include "fiber.h"
 #include <bit/bit.h>
 #include <crc32.h>
-#include <box/vy_point_iterator.h>
+#include <box/vy_point_lookup.h>
 #include "vy_iterators_helper.h"
 #include "vy_write_iterator.h"
 
@@ -246,10 +246,8 @@ test_basic()
 				vy_new_simple_stmt(format, pk->upsert_format,
 						   pk->mem_format_with_colmask,
 						   &tmpl_key);
-			struct vy_point_iterator itr;
-			vy_point_iterator_open(&itr, pk, NULL, &prv, key);
 			struct tuple *res;
-			rc = vy_point_iterator_get(&itr, &res);
+			rc = vy_point_lookup(pk, NULL, &prv, key, &res);
 			tuple_unref(key);
 			if (rc != 0) {
 				has_errors = true;
@@ -270,6 +268,7 @@ test_basic()
 			tuple_field_u32(res, 1, &got);
 			if (got != expect && expect_lsn != vy_stmt_lsn(res))
 				results_ok = false;
+			tuple_unref(res);
 		}
 	}
 

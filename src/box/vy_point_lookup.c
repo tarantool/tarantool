@@ -28,7 +28,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "vy_point_iterator.h"
+#include "vy_point_lookup.h"
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include <small/region.h>
+#include <small/rlist.h>
 
 #include "fiber.h"
 
@@ -40,26 +47,36 @@
 #include "vy_cache.h"
 #include "vy_upsert.h"
 
-void
-vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_index *index,
-		       struct vy_tx *tx, const struct vy_read_view **rv,
-		       struct tuple *key)
-{
-	vy_index_ref(index);
-	itr->index = index;
-	itr->tx = tx;
-	itr->p_read_view = rv;
-	itr->key = key;
+/**
+ * ID of an iterator source type. Can be used in bitmaps.
+ */
+enum iterator_src_type {
+	ITER_SRC_TXW = 1,
+	ITER_SRC_CACHE = 2,
+	ITER_SRC_MEM = 4,
+	ITER_SRC_RUN = 8,
+};
 
-	itr->curr_stmt = NULL;
-}
+/**
+ * History of a key in vinyl is a continuous sequence of statements of the
+ * same key in order of decreasing lsn. The history can be represented as a
+ * list, the structure below describes one node of the list.
+ */
+struct vy_stmt_history_node {
+	/* Type of source that the history statement came from */
+	enum iterator_src_type src_type;
+	/* The history statement. Referenced for runs. */
+	struct tuple *stmt;
+	/* Link in the history list */
+	struct rlist link;
+};
 
 /**
  * Allocate (region) new history node.
  * @return new node or NULL on memory error (diag is set).
  */
 static struct vy_stmt_history_node *
-vy_point_iterator_new_node()
+vy_stmt_history_node_new(void)
 {
 	struct region *region = &fiber()->gc;
 	struct vy_stmt_history_node *node = region_alloc(region, sizeof(*node));
@@ -73,7 +90,7 @@ vy_point_iterator_new_node()
  * Unref statement if necessary, remove node from history if it's there.
  */
 static void
-vy_point_iterator_cleanup(struct rlist *history, size_t region_svp)
+vy_stmt_history_cleanup(struct rlist *history, size_t region_svp)
 {
 	struct vy_stmt_history_node *node;
 	rlist_foreach_entry(node, history, link)
@@ -83,21 +100,12 @@ vy_point_iterator_cleanup(struct rlist *history, size_t region_svp)
 	region_truncate(&fiber()->gc, region_svp);
 }
 
-void
-vy_point_iterator_close(struct vy_point_iterator *itr)
-{
-	if (itr->curr_stmt != NULL)
-		tuple_unref(itr->curr_stmt);
-	vy_index_unref(itr->index);
-	TRASH(itr);
-}
-
 /**
  * Return true if the history of a key contains terminal node in the end,
  * i.e. REPLACE of DELETE statement.
  */
 static bool
-vy_point_iterator_history_is_terminal(struct rlist *history)
+vy_stmt_history_is_terminal(struct rlist *history)
 {
 	if (rlist_empty(history))
 		return false;
@@ -115,20 +123,20 @@ vy_point_iterator_history_is_terminal(struct rlist *history)
  * Add one or no statement to the history list.
  */
 static int
-vy_point_iterator_scan_txw(struct vy_point_iterator *itr, struct rlist *history)
+vy_point_lookup_scan_txw(struct vy_index *index, struct vy_tx *tx,
+			 struct tuple *key, struct rlist *history)
 {
-	struct vy_tx *tx = itr->tx;
 	if (tx == NULL)
 		return 0;
-	itr->index->stat.txw.iterator.lookup++;
+	index->stat.txw.iterator.lookup++;
 	struct txv *txv =
-		write_set_search_key(&tx->write_set, itr->index, itr->key);
-	assert(txv == NULL || txv->index == itr->index);
+		write_set_search_key(&tx->write_set, index, key);
+	assert(txv == NULL || txv->index == index);
 	if (txv == NULL)
 		return 0;
-	vy_stmt_counter_acct_tuple(&itr->index->stat.txw.iterator.get,
+	vy_stmt_counter_acct_tuple(&index->stat.txw.iterator.get,
 				   txv->stmt);
-	struct vy_stmt_history_node *node = vy_point_iterator_new_node();
+	struct vy_stmt_history_node *node = vy_stmt_history_node_new();
 	if (node == NULL)
 		return -1;
 	node->src_type = ITER_SRC_TXW;
@@ -142,17 +150,18 @@ vy_point_iterator_scan_txw(struct vy_point_iterator *itr, struct rlist *history)
  * Add one or no statement to the history list.
  */
 static int
-vy_point_iterator_scan_cache(struct vy_point_iterator *itr,
-			     struct rlist *history)
+vy_point_lookup_scan_cache(struct vy_index *index,
+			   const struct vy_read_view **rv,
+			   struct tuple *key, struct rlist *history)
 {
-	itr->index->cache.stat.lookup++;
-	struct tuple *stmt = vy_cache_get(&itr->index->cache, itr->key);
+	index->cache.stat.lookup++;
+	struct tuple *stmt = vy_cache_get(&index->cache, key);
 
-	if (stmt == NULL || vy_stmt_lsn(stmt) > (*itr->p_read_view)->vlsn)
+	if (stmt == NULL || vy_stmt_lsn(stmt) > (*rv)->vlsn)
 		return 0;
 
-	vy_stmt_counter_acct_tuple(&itr->index->cache.stat.get, stmt);
-	struct vy_stmt_history_node *node = vy_point_iterator_new_node();
+	vy_stmt_counter_acct_tuple(&index->cache.stat.get, stmt);
+	struct vy_stmt_history_node *node = vy_stmt_history_node_new();
 	if (node == NULL)
 		return -1;
 
@@ -167,20 +176,21 @@ vy_point_iterator_scan_cache(struct vy_point_iterator *itr,
  * Add found statements to the history list up to terminal statement.
  */
 static int
-vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
-			   struct rlist *history)
+vy_point_lookup_scan_mem(struct vy_index *index, struct vy_mem *mem,
+			 const struct vy_read_view **rv,
+			 struct tuple *key, struct rlist *history)
 {
 	struct tree_mem_key tree_key;
-	tree_key.stmt = itr->key;
-	tree_key.lsn = (*itr->p_read_view)->vlsn;
+	tree_key.stmt = key;
+	tree_key.lsn = (*rv)->vlsn;
 	bool exact;
 	struct vy_mem_tree_iterator mem_itr =
 		vy_mem_tree_lower_bound(&mem->tree, &tree_key, &exact);
-	itr->index->stat.memory.iterator.lookup++;
+	index->stat.memory.iterator.lookup++;
 	const struct tuple *stmt = NULL;
 	if (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
 		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_stmt_compare(stmt, itr->key, mem->cmp_def) != 0)
+		if (vy_stmt_compare(stmt, key, mem->cmp_def) != 0)
 			stmt = NULL;
 	}
 
@@ -188,17 +198,17 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
 		return 0;
 
 	while (true) {
-		struct vy_stmt_history_node *node = vy_point_iterator_new_node();
+		struct vy_stmt_history_node *node = vy_stmt_history_node_new();
 		if (node == NULL)
 			return -1;
 
-		vy_stmt_counter_acct_tuple(&itr->index->stat.memory.iterator.get,
+		vy_stmt_counter_acct_tuple(&index->stat.memory.iterator.get,
 					   stmt);
 
 		node->src_type = ITER_SRC_MEM;
 		node->stmt = (struct tuple *)stmt;
 		rlist_add_tail(history, &node->link);
-		if (vy_point_iterator_history_is_terminal(history))
+		if (vy_stmt_history_is_terminal(history))
 			break;
 
 		if (!vy_mem_tree_iterator_next(&mem->tree, &mem_itr))
@@ -208,7 +218,7 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
 		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
 		if (vy_stmt_lsn(stmt) >= vy_stmt_lsn(prev_stmt))
 			break;
-		if (vy_stmt_compare(stmt, itr->key, mem->cmp_def) != 0)
+		if (vy_stmt_compare(stmt, key, mem->cmp_def) != 0)
 			break;
 	}
 	return 0;
@@ -220,17 +230,18 @@ vy_point_iterator_scan_mem(struct vy_point_iterator *itr, struct vy_mem *mem,
  * Add found statements to the history list up to terminal statement.
  */
 static int
-vy_point_iterator_scan_mems(struct vy_point_iterator *itr,
-			    struct rlist *history)
+vy_point_lookup_scan_mems(struct vy_index *index,
+			  const struct vy_read_view **rv,
+			  struct tuple *key, struct rlist *history)
 {
-	assert(itr->index->mem != NULL);
-	int rc = vy_point_iterator_scan_mem(itr, itr->index->mem, history);
+	assert(index->mem != NULL);
+	int rc = vy_point_lookup_scan_mem(index, index->mem, rv, key, history);
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &itr->index->sealed, in_sealed) {
-		if (rc != 0 || vy_point_iterator_history_is_terminal(history))
+	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
+		if (rc != 0 || vy_stmt_history_is_terminal(history))
 			return rc;
 
-		rc = vy_point_iterator_scan_mem(itr, mem, history);
+		rc = vy_point_lookup_scan_mem(index, mem, rv, key, history);
 	}
 	return 0;
 }
@@ -240,16 +251,11 @@ vy_point_iterator_scan_mems(struct vy_point_iterator *itr,
  * Add found statements to the history list up to terminal statement.
  * Set *terminal_found to true if the terminal statement (DELETE or REPLACE)
  * was found.
- * @param itr - the iterator.
- * @param slice - a slice to scan.
- * @param history - history for adding statements.
- * @param terminal_found - is set to true if terminal stmt was found.
- * @return 0 on success, -1 otherwise.
  */
 static int
-vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
-			     struct vy_slice *slice, struct rlist *history,
-			     bool *terminal_found)
+vy_point_lookup_scan_slice(struct vy_index *index, struct vy_slice *slice,
+			   const struct vy_read_view **rv, struct tuple *key,
+			   struct rlist *history, bool *terminal_found)
 {
 	int rc = 0;
 	/*
@@ -257,17 +263,15 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	 * format with the same identifier to fully match the
 	 * format in vy_mem.
 	 */
-	struct vy_index *index = itr->index;
 	struct vy_run_iterator run_itr;
 	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator, slice,
-			     ITER_EQ, itr->key, itr->p_read_view,
-			     index->cmp_def, index->key_def,
+			     ITER_EQ, key, rv, index->cmp_def, index->key_def,
 			     index->disk_format, index->upsert_format,
 			     index->id == 0);
 	struct tuple *stmt;
 	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {
-		struct vy_stmt_history_node *node = vy_point_iterator_new_node();
+		struct vy_stmt_history_node *node = vy_stmt_history_node_new();
 		if (node == NULL) {
 			rc = -1;
 			break;
@@ -293,11 +297,12 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
  * that complete history from runs will be extracted.
  */
 static int
-vy_point_iterator_scan_slices(struct vy_point_iterator *itr,
-			      struct rlist *history)
+vy_point_lookup_scan_slices(struct vy_index *index,
+			    const struct vy_read_view **rv,
+			    struct tuple *key, struct rlist *history)
 {
-	struct vy_range *range = vy_range_tree_find_by_key(itr->index->tree,
-							   ITER_EQ, itr->key);
+	struct vy_range *range = vy_range_tree_find_by_key(index->tree,
+							   ITER_EQ, key);
 	assert(range != NULL);
 	int slice_count = range->slice_count;
 	struct vy_slice **slices = (struct vy_slice **)
@@ -318,9 +323,8 @@ vy_point_iterator_scan_slices(struct vy_point_iterator *itr,
 	bool terminal_found = false;
 	for (i = 0; i < slice_count; i++) {
 		if (rc == 0 && !terminal_found)
-			rc = vy_point_iterator_scan_slice(itr, slices[i],
-							  history,
-							  &terminal_found);
+			rc = vy_point_lookup_scan_slice(index, slices[i],
+					rv, key, history, &terminal_found);
 		vy_slice_unpin(slices[i]);
 	}
 	return rc;
@@ -330,24 +334,27 @@ vy_point_iterator_scan_slices(struct vy_point_iterator *itr,
  * Get a resultant statement from collected history. Add to cache if possible.
  */
 static int
-vy_point_iterator_apply_history(struct vy_point_iterator *itr,
-				struct rlist *history)
+vy_point_lookup_apply_history(struct vy_index *index,
+			      const struct vy_read_view **rv,
+			      struct tuple *key, struct rlist *history,
+			      struct tuple **ret)
 {
-	assert(itr->curr_stmt == NULL);
+	*ret = NULL;
 	if (rlist_empty(history))
 		return 0;
 
+	struct tuple *curr_stmt = NULL;
 	struct vy_stmt_history_node *node =
 		rlist_last_entry(history, struct vy_stmt_history_node, link);
-	if (vy_point_iterator_history_is_terminal(history)) {
+	if (vy_stmt_history_is_terminal(history)) {
 		if (vy_stmt_type(node->stmt) == IPROTO_DELETE) {
 			/* Ignore terminal delete */
 		} else if (node->src_type == ITER_SRC_MEM) {
-			itr->curr_stmt = vy_stmt_dup(node->stmt,
-						     tuple_format(node->stmt));
+			curr_stmt = vy_stmt_dup(node->stmt,
+						tuple_format(node->stmt));
 		} else {
-			itr->curr_stmt = node->stmt;
-			tuple_ref(itr->curr_stmt);
+			curr_stmt = node->stmt;
+			tuple_ref(curr_stmt);
 		}
 		node = rlist_prev_entry_safe(node, history, link);
 	}
@@ -355,47 +362,43 @@ vy_point_iterator_apply_history(struct vy_point_iterator *itr,
 		assert(vy_stmt_type(node->stmt) == IPROTO_UPSERT);
 		/* We could not read the data that is invisible now */
 		assert(node->src_type == ITER_SRC_TXW ||
-		       vy_stmt_lsn(node->stmt) <= (*itr->p_read_view)->vlsn);
+		       vy_stmt_lsn(node->stmt) <= (*rv)->vlsn);
 
-		struct tuple *stmt =
-			vy_apply_upsert(node->stmt, itr->curr_stmt,
-					itr->index->cmp_def,
-					itr->index->mem_format,
-					itr->index->upsert_format, true);
-		itr->index->stat.upsert.applied++;
+		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
+					index->cmp_def, index->mem_format,
+					index->upsert_format, true);
+		index->stat.upsert.applied++;
 		if (stmt == NULL)
 			return -1;
-		if (itr->curr_stmt)
-			tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = stmt;
+		if (curr_stmt != NULL)
+			tuple_unref(curr_stmt);
+		curr_stmt = stmt;
 		node = rlist_prev_entry_safe(node, history, link);
 	}
-	if (itr->curr_stmt) {
-		vy_stmt_counter_acct_tuple(&itr->index->stat.get,
-					   itr->curr_stmt);
+	if (curr_stmt != NULL) {
+		vy_stmt_counter_acct_tuple(&index->stat.get, curr_stmt);
+		*ret = curr_stmt;
 	}
 	/**
 	 * Add a statement to the cache
 	 */
-	if ((**itr->p_read_view).vlsn == INT64_MAX) /* Do not store non-latest data */
-		vy_cache_add(&itr->index->cache, itr->curr_stmt, NULL,
-			     itr->key, ITER_EQ);
+	if ((*rv)->vlsn == INT64_MAX) /* Do not store non-latest data */
+		vy_cache_add(&index->cache, curr_stmt, NULL, key, ITER_EQ);
 	return 0;
 }
 
-/*
- * Get a resultant tuple from the iterator. Actually do not change
- * iterator state thus second call will return the same statement
- * (unlike all other iterators that would return NULL on the second call)
- */
 int
-vy_point_iterator_get(struct vy_point_iterator *itr, struct tuple **result)
+vy_point_lookup(struct vy_index *index, struct vy_tx *tx,
+		const struct vy_read_view **rv,
+		struct tuple *key, struct tuple **ret)
 {
-	*result = NULL;
+	assert(tuple_field_count(key) >= index->cmp_def->part_count);
+
+	*ret = NULL;
 	size_t region_svp = region_used(&fiber()->gc);
 	int rc = 0;
 
-	itr->index->stat.lookup++;
+	index->stat.lookup++;
 	/* History list */
 	struct rlist history;
 	/*
@@ -405,41 +408,41 @@ vy_point_iterator_get(struct vy_point_iterator *itr, struct tuple **result)
 	 * read view and hence will not try to add a stale value
 	 * to the cache.
 	 */
-	if (itr->tx != NULL) {
-		rc = vy_tx_track_point(itr->tx, itr->index, itr->key);
+	if (tx != NULL) {
+		rc = vy_tx_track_point(tx, index, key);
 		if (rc != 0)
 			goto done;
 	}
 restart:
 	rlist_create(&history);
 
-	rc = vy_point_iterator_scan_txw(itr, &history);
-	if (rc != 0 || vy_point_iterator_history_is_terminal(&history))
+	rc = vy_point_lookup_scan_txw(index, tx, key, &history);
+	if (rc != 0 || vy_stmt_history_is_terminal(&history))
 		goto done;
 
-	vy_point_iterator_scan_cache(itr, &history);
-	if (rc != 0 || vy_point_iterator_history_is_terminal(&history))
+	rc = vy_point_lookup_scan_cache(index, rv, key, &history);
+	if (rc != 0 || vy_stmt_history_is_terminal(&history))
 		goto done;
 
-	rc = vy_point_iterator_scan_mems(itr, &history);
-	if (rc != 0 || vy_point_iterator_history_is_terminal(&history))
+	rc = vy_point_lookup_scan_mems(index, rv, key, &history);
+	if (rc != 0 || vy_stmt_history_is_terminal(&history))
 		goto done;
 
 	/* Save version before yield */
-	uint32_t mem_list_version = itr->index->mem_list_version;
+	uint32_t mem_list_version = index->mem_list_version;
 
-	rc = vy_point_iterator_scan_slices(itr, &history);
+	rc = vy_point_lookup_scan_slices(index, rv, key, &history);
 	if (rc != 0)
 		goto done;
 
 	ERROR_INJECT(ERRINJ_VY_POINT_ITER_WAIT, {
-		while (mem_list_version == itr->index->mem_list_version)
+		while (mem_list_version == index->mem_list_version)
 			fiber_sleep(0.01);
 		/* Turn of the injection to avoid infinite loop */
 		errinj(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL)->bparam = false;
 	});
 
-	if (mem_list_version != itr->index->mem_list_version) {
+	if (mem_list_version != index->mem_list_version) {
 		/*
 		 * Mem list was changed during yield. This could be rotation
 		 * or a dump. In case of dump the memory referenced by
@@ -447,14 +450,15 @@ restart:
 		 * This in unnecessary in case of rotation but since we
 		 * cannot distinguish these two cases we always restart.
 		 */
-		vy_point_iterator_cleanup(&history, region_svp);
+		vy_stmt_history_cleanup(&history, region_svp);
 		goto restart;
 	}
 
 done:
-	if (rc == 0)
-		rc = vy_point_iterator_apply_history(itr, &history);
-	*result = itr->curr_stmt;
-	vy_point_iterator_cleanup(&history, region_svp);
+	if (rc == 0) {
+		rc = vy_point_lookup_apply_history(index, rv, key,
+						   &history, ret);
+	}
+	vy_stmt_history_cleanup(&history, region_svp);
 	return rc;
 }
