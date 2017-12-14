@@ -755,8 +755,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		assert(slice->run->info.max_lsn <= index->dump_lsn);
 		struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 		vy_run_iterator_open(&sub_src->run_iterator,
-				     &index->stat.disk.iterator,
-				     itr->run_env, slice,
+				     &index->stat.disk.iterator, slice,
 				     iterator_type, itr->key,
 				     itr->read_view, index->cmp_def,
 				     index->key_def, index->disk_format,
@@ -803,14 +802,13 @@ vy_read_iterator_cleanup(struct vy_read_iterator *itr)
 }
 
 void
-vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
-		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type, struct tuple *key,
-		      const struct vy_read_view **rv, double too_long_threshold)
+vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
+		      struct vy_tx *tx, enum iterator_type iterator_type,
+		      struct tuple *key, const struct vy_read_view **rv,
+		      double too_long_threshold)
 {
 	memset(itr, 0, sizeof(*itr));
 
-	itr->run_env = run_env;
 	itr->index = index;
 	itr->tx = tx;
 	itr->iterator_type = iterator_type;
@@ -965,8 +963,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	if ((itr->iterator_type == ITER_EQ || itr->iterator_type == ITER_REQ) &&
 	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
 		struct vy_point_iterator one;
-		vy_point_iterator_open(&one, itr->run_env, itr->index,
-				       itr->tx, itr->read_view, itr->key);
+		vy_point_iterator_open(&one, itr->index, itr->tx,
+				       itr->read_view, itr->key);
 		int rc = vy_point_iterator_get(&one, result);
 		if (*result) {
 			tuple_ref(*result);

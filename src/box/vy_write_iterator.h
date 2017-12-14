@@ -218,7 +218,6 @@ struct tuple_format;
 struct tuple;
 struct vy_mem;
 struct vy_slice;
-struct vy_run_env;
 
 /**
  * Open an empty write iterator. To add sources to the iterator
@@ -249,7 +248,7 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
  */
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *stream,
-			    struct vy_slice *slice, struct vy_run_env *run_env);
+			    struct vy_slice *slice);
 
 #endif /* INCLUDES_TARANTOOL_BOX_VY_WRITE_STREAM_H */
 

@@ -440,14 +440,14 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *vstream, struct vy_mem *mem)
  */
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *vstream,
-			    struct vy_slice *slice, struct vy_run_env *run_env)
+			    struct vy_slice *slice)
 {
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src = vy_write_iterator_new_src(stream);
 	if (src == NULL)
 		return -1;
 	vy_slice_stream_open(&src->slice_stream, slice, stream->cmp_def,
-			     stream->format, stream->upsert_format, run_env,
+			     stream->format, stream->upsert_format,
 			     stream->is_primary);
 	return 0;
 }

@@ -159,7 +159,7 @@ test_basic()
 					pk->upsert_format, pk->id == 0,
 					true, &read_views);
 	vy_write_iterator_new_mem(write_stream, run_mem);
-	struct vy_run *run = vy_run_new(1);
+	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
 
 	rc = vy_run_write(run, dir_name, 0, pk->id,
@@ -196,7 +196,7 @@ test_basic()
 					pk->upsert_format, pk->id == 0,
 					true, &read_views);
 	vy_write_iterator_new_mem(write_stream, run_mem);
-	run = vy_run_new(2);
+	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");
 
 	rc = vy_run_write(run, dir_name, 0, pk->id,
@@ -247,8 +247,7 @@ test_basic()
 						   pk->mem_format_with_colmask,
 						   &tmpl_key);
 			struct vy_point_iterator itr;
-			vy_point_iterator_open(&itr, &run_env, pk,
-					       NULL, &prv, key);
+			vy_point_iterator_open(&itr, pk, NULL, &prv, key);
 			struct tuple *res;
 			rc = vy_point_iterator_get(&itr, &res);
 			tuple_unref(key);

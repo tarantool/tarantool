@@ -375,6 +375,8 @@ struct vy_index_recovery_cb_arg {
 	struct vy_index *index;
 	/** Last recovered range. */
 	struct vy_range *range;
+	/** Vinyl run environment. */
+	struct vy_run_env *run_env;
 	/**
 	 * All recovered runs hashed by ID.
 	 * It is needed in order not to load the same
@@ -394,6 +396,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_index_recovery_cb_arg *arg = cb_arg;
 	struct vy_index *index = arg->index;
 	struct vy_range *range = arg->range;
+	struct vy_run_env *run_env = arg->run_env;
 	struct mh_i64ptr_t *run_hash = arg->run_hash;
 	bool force_recovery = arg->force_recovery;
 	struct tuple_format *key_format = index->env->key_format;
@@ -449,7 +452,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (record->is_dropped)
 			break;
 		assert(record->index_lsn == index->commit_lsn);
-		run = vy_run_new(record->run_id);
+		run = vy_run_new(run_env, record->run_id);
 		if (run == NULL)
 			goto out;
 		run->dump_lsn = record->dump_lsn;
@@ -520,13 +523,15 @@ out:
 
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool is_checkpoint_recovery, bool force_recovery)
+		 struct vy_run_env *run_env, int64_t lsn,
+		 bool is_checkpoint_recovery, bool force_recovery)
 {
 	assert(index->range_count == 0);
 
 	struct vy_index_recovery_cb_arg arg = {
 		.index = index,
 		.range = NULL,
+		.run_env = run_env,
 		.run_hash = NULL,
 		.force_recovery = force_recovery,
 	};

@@ -41,11 +41,10 @@
 #include "vy_upsert.h"
 
 void
-vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_run_env *run_env,
-		       struct vy_index *index, struct vy_tx *tx,
-		       const struct vy_read_view **rv, struct tuple *key)
+vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_index *index,
+		       struct vy_tx *tx, const struct vy_read_view **rv,
+		       struct tuple *key)
 {
-	itr->run_env = run_env;
 	vy_index_ref(index);
 	itr->index = index;
 	itr->tx = tx;
@@ -260,11 +259,11 @@ vy_point_iterator_scan_slice(struct vy_point_iterator *itr,
 	 */
 	struct vy_index *index = itr->index;
 	struct vy_run_iterator run_itr;
-	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator,
-			     itr->run_env, slice, ITER_EQ, itr->key,
-			     itr->p_read_view, index->cmp_def,
-			     index->key_def, index->disk_format,
-			     index->upsert_format, index->id == 0);
+	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator, slice,
+			     ITER_EQ, itr->key, itr->p_read_view,
+			     index->cmp_def, index->key_def,
+			     index->disk_format, index->upsert_format,
+			     index->id == 0);
 	struct tuple *stmt;
 	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {

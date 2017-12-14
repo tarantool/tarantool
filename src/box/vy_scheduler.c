@@ -577,9 +577,9 @@ vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
  * is called from dump/compaction task constructor.
  */
 static struct vy_run *
-vy_run_prepare(struct vy_index *index)
+vy_run_prepare(struct vy_run_env *run_env, struct vy_index *index)
 {
-	struct vy_run *run = vy_run_new(vy_log_next_id());
+	struct vy_run *run = vy_run_new(run_env, vy_log_next_id());
 	if (run == NULL)
 		return NULL;
 	vy_log_tx_begin();
@@ -930,7 +930,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	if (task == NULL)
 		goto err;
 
-	struct vy_run *new_run = vy_run_prepare(index);
+	struct vy_run *new_run = vy_run_prepare(scheduler->run_env, index);
 	if (new_run == NULL)
 		goto err_run;
 
@@ -1197,7 +1197,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	if (task == NULL)
 		goto err_task;
 
-	struct vy_run *new_run = vy_run_prepare(index);
+	struct vy_run *new_run = vy_run_prepare(scheduler->run_env, index);
 	if (new_run == NULL)
 		goto err_run;
 
@@ -1212,8 +1212,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct vy_slice *slice;
 	int n = range->compact_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_new_slice(wi, slice,
-				scheduler->run_env) != 0)
+		if (vy_write_iterator_new_slice(wi, slice) != 0)
 			goto err_wi_sub;
 
 		task->max_output_count += slice->count.rows;

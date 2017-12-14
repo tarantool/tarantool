@@ -57,6 +57,7 @@ struct vy_mem;
 struct vy_mem_env;
 struct vy_recovery;
 struct vy_run;
+struct vy_run_env;
 
 typedef void
 (*vy_upsert_thresh_cb)(struct vy_index *index, struct tuple *stmt, void *arg);
@@ -363,7 +364,8 @@ vy_index_create(struct vy_index *index);
  */
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool is_checkpoint_recovery, bool force_recovery);
+		 struct vy_run_env *run_env, int64_t lsn,
+		 bool is_checkpoint_recovery, bool force_recovery);
 
 /**
  * Return generation of in-memory data stored in an index

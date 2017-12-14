@@ -42,7 +42,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct vy_run_env;
 struct vy_index;
 struct vy_tx;
 struct vy_read_view;
@@ -87,8 +86,6 @@ struct vy_stmt_history_node {
  * and, if the result is the latest version of the key, adds it to cache.
  */
 struct vy_point_iterator {
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
 	/* Search location and options */
 	struct vy_index *index;
 	struct vy_tx *tx;
@@ -106,8 +103,7 @@ struct vy_point_iterator {
  * Create an iterator by full key.
  */
 void
-vy_point_iterator_open(struct vy_point_iterator *itr,
-		       struct vy_run_env *run_env, struct vy_index *index,
+vy_point_iterator_open(struct vy_point_iterator *itr, struct vy_index *index,
 		       struct vy_tx *tx, const struct vy_read_view **rv,
 		       struct tuple *key);
 

@@ -705,7 +705,7 @@ vy_index_open(struct vy_env *env, struct vy_index *index)
 		 * have already been created, so try to load
 		 * the index files from it.
 		 */
-		rc = vy_index_recover(index, env->recovery,
+		rc = vy_index_recover(index, env->recovery, &env->run_env,
 				vclock_sum(env->recovery_vclock),
 				env->status == VINYL_INITIAL_RECOVERY_LOCAL,
 				env->force_recovery);
@@ -1266,7 +1266,7 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, &env->run_env, index, tx, ITER_EQ, vykey,
+	vy_read_iterator_open(&itr, index, tx, ITER_EQ, vykey,
 			      p_read_view, env->too_long_threshold);
 	int rc = vy_read_iterator_next(&itr, result);
 	tuple_unref(vykey);
@@ -3000,8 +3000,7 @@ vy_send_range(struct vy_join_ctx *ctx)
 
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &ctx->slices, in_join) {
-		if (vy_write_iterator_new_slice(ctx->wi, slice,
-						&ctx->env->run_env) != 0)
+		if (vy_write_iterator_new_slice(ctx->wi, slice) != 0)
 			goto out_delete_wi;
 	}
 
@@ -3075,7 +3074,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		struct tuple *begin = NULL, *end = NULL;
 		bool success = false;
 
-		struct vy_run *run = vy_run_new(record->run_id);
+		struct vy_run *run = vy_run_new(&ctx->env->run_env,
+						record->run_id);
 		if (run == NULL)
 			goto done_slice;
 		if (vy_run_recover(run, ctx->env->path,
@@ -3543,8 +3543,8 @@ vy_squash_process(struct vy_squash *squash)
 	 * Use the committed read view to avoid squashing
 	 * prepared, but not committed statements.
 	 */
-	vy_read_iterator_open(&itr, &env->run_env, index, NULL, ITER_EQ,
-			      squash->stmt, &env->xm->p_committed_read_view,
+	vy_read_iterator_open(&itr, index, NULL, ITER_EQ, squash->stmt,
+			      &env->xm->p_committed_read_view,
 			      env->too_long_threshold);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
@@ -3930,8 +3930,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 	it->tx = tx;
 
-	vy_read_iterator_open(&it->iterator, &env->run_env,
-			      index, tx, type, it->key,
+	vy_read_iterator_open(&it->iterator, index, tx, type, it->key,
 			      (const struct vy_read_view **)&tx->read_view,
 			      env->too_long_threshold);
 	return (struct iterator *)it;

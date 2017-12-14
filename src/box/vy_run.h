@@ -110,6 +110,8 @@ struct vy_page_info {
  * Logical unit of vinyl index - a sorted file with data.
  */
 struct vy_run {
+	/** Vinyl run environment. */
+	struct vy_run_env *env;
 	/** Info about the run stored in the index file. */
 	struct vy_run_info info;
 	/** Info about the run pages stored in the index file. */
@@ -207,8 +209,6 @@ struct vy_run_iterator_pos {
 struct vy_run_iterator {
 	/** Usage statistics */
 	struct vy_run_iterator_stat *stat;
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
 
 	/* Members needed for memory allocation and disk access */
 	/** Index key definition used for storing statements on disk. */
@@ -313,7 +313,7 @@ vy_run_is_empty(struct vy_run *run)
 }
 
 struct vy_run *
-vy_run_new(int64_t id);
+vy_run_new(struct vy_run_env *env, int64_t id);
 
 void
 vy_run_delete(struct vy_run *run);
@@ -479,7 +479,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
  */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
-		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
@@ -546,8 +546,6 @@ struct vy_slice_stream {
 	struct tuple_format *format;
 	/** Same as format, but for UPSERT tuples. */
 	struct tuple_format *upsert_format;
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
 	/** Set if this iterator is for a primary index. */
 	bool is_primary;
 };
@@ -558,8 +556,7 @@ struct vy_slice_stream {
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 		     const struct key_def *cmp_def, struct tuple_format *format,
-		     struct tuple_format *upsert_format,
-		     struct vy_run_env *run_env, bool is_primary);
+		     struct tuple_format *upsert_format, bool is_primary);
 
 #if defined(__cplusplus)
 } /* extern "C" */

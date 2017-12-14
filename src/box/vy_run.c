@@ -88,10 +88,8 @@ struct vy_page_read_task {
 	struct cbus_call_msg base;
 	/** vinyl page metadata */
 	struct vy_page_info page_info;
-	/** vy_slice with fd - ref. counted */
-	struct vy_slice *slice;
-	/** vy_run_env - contains environment with task mempool */
-	struct vy_run_env *run_env;
+	/** vy_run with fd - ref. counted */
+	struct vy_run *run;
 	/** [out] resulting vinyl page */
 	struct vy_page *page;
 };
@@ -224,7 +222,7 @@ vy_page_info_destroy(struct vy_page_info *page_info)
 }
 
 struct vy_run *
-vy_run_new(int64_t id)
+vy_run_new(struct vy_run_env *env, int64_t id)
 {
 	struct vy_run *run = calloc(1, sizeof(struct vy_run));
 	if (unlikely(run == NULL)) {
@@ -232,6 +230,7 @@ vy_run_new(int64_t id)
 			 "struct vy_run");
 		return NULL;
 	}
+	run->env = env;
 	run->id = id;
 	run->dump_lsn = -1;
 	run->fd = -1;
@@ -943,11 +942,10 @@ static int
 vy_page_read_cb(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
-	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run_env);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run->env);
 	if (zdctx == NULL)
 		return -1;
-	return vy_page_read(task->page, &task->page_info,
-			    task->slice->run, zdctx);
+	return vy_page_read(task->page, &task->page_info, task->run, zdctx);
 }
 
 /**
@@ -958,7 +956,7 @@ vy_page_read_cb_free(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	vy_page_delete(task->page);
-	mempool_free(&task->run_env->read_task_pool, task);
+	mempool_free(&task->run->env->read_task_pool, task);
 	return 0;
 }
 
@@ -972,8 +970,8 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
-	struct vy_run_env *env = itr->run_env;
 	struct vy_slice *slice = itr->slice;
+	struct vy_run_env *env = slice->run->env;
 
 	/* Check cache */
 	*result = vy_run_iterator_cache_get(itr, page_no);
@@ -1004,9 +1002,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		reader = &env->reader_pool[env->next_reader++];
 		env->next_reader %= env->reader_pool_size;
 
-		task->slice = slice;
+		task->run = slice->run;
 		task->page_info = *page_info;
-		task->run_env = env;
 		task->page = page;
 
 		/* Post task to the reader thread. */
@@ -1482,7 +1479,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
-		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
@@ -1497,7 +1494,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 	itr->format = format;
 	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
-	itr->run_env = run_env;
 	itr->slice = slice;
 
 	itr->iterator_type = iterator_type;
@@ -2608,19 +2604,19 @@ close_err:
 static NODISCARD int
 vy_slice_stream_read_page(struct vy_slice_stream *stream)
 {
+	struct vy_run *run = stream->slice->run;
+
 	assert(stream->page == NULL);
-	ZSTD_DStream *zdctx = vy_env_get_zdctx(stream->run_env);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(run->env);
 	if (zdctx == NULL)
 		return -1;
 
-	struct vy_page_info *page_info = vy_run_page_info(stream->slice->run,
-							  stream->page_no);
+	struct vy_page_info *page_info = vy_run_page_info(run, stream->page_no);
 	stream->page = vy_page_new(page_info);
 	if (stream->page == NULL)
 		return -1;
 
-	if (vy_page_read(stream->page, page_info,
-			 stream->slice->run, zdctx) != 0) {
+	if (vy_page_read(stream->page, page_info, run, zdctx) != 0) {
 		vy_page_delete(stream->page);
 		stream->page = NULL;
 		return -1;
@@ -2775,8 +2771,7 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 		   const struct key_def *cmp_def, struct tuple_format *format,
-		   struct tuple_format *upsert_format,
-		   struct vy_run_env *run_env, bool is_primary)
+		   struct tuple_format *upsert_format, bool is_primary)
 {
 	stream->base.iface = &vy_slice_stream_iface;
 
@@ -2789,6 +2784,5 @@ vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 	stream->cmp_def = cmp_def;
 	stream->format = format;
 	stream->upsert_format = upsert_format;
-	stream->run_env = run_env;
 	stream->is_primary = is_primary;
 }
