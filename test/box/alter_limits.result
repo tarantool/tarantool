@@ -567,8 +567,7 @@ index = s:create_index('t1', { type = 'hash' })
 -- field type contradicts field type of another index
 index = s:create_index('t2', { type = 'hash', parts = { 1, 'string' }})
 ---
-- error: Ambiguous field type, field 1. Requested type is string but the field has
-    previously been defined as unsigned
+- error: Field 1 has type 'unsigned' in one index, but type 'string' in another
 ...
 -- ok
 index = s:create_index('t2', { type = 'hash', parts = { 2, 'string' }})
@@ -841,8 +840,7 @@ s.index.primary:select{}
 -- ambiguous field type
 index = s:create_index('string', { type = 'tree', unique =  false, parts = { 2, 'string'}})
 ---
-- error: Ambiguous field type, field 2. Requested type is string but the field has
-    previously been defined as unsigned
+- error: Field 2 has type 'unsigned' in one index, but type 'string' in another
 ...
 -- create index on a non-existing field
 index = s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 3, 'string'}})

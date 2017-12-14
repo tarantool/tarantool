@@ -168,21 +168,31 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 				return -1;
 			}
 
-			field->is_key_part = true;
+			/*
+			 * Check that there are no conflicts
+			 * between index part types and space
+			 * fields.
+			 */
 			if (field->type == FIELD_TYPE_ANY) {
 				field->type = part->type;
 			} else if (field->type != part->type) {
-				/**
-				 * Check that there are no
-				 * conflicts between index part
-				 * types and space fields.
-				 */
-				diag_set(ClientError, ER_FIELD_TYPE_MISMATCH,
-					 part->fieldno + TUPLE_INDEX_BASE,
-					 field_type_strs[part->type],
-					 field_type_strs[field->type]);
+				const char *name;
+				int fieldno = part->fieldno + TUPLE_INDEX_BASE;
+				if (field->name == NULL)
+					name = tt_sprintf("%d", fieldno);
+				else
+					name = tt_sprintf("'%s'", field->name);
+				int errcode;
+				if (! field->is_key_part)
+					errcode = ER_FORMAT_MISMATCH_INDEX_PART;
+				else
+					errcode = ER_INDEX_PART_TYPE_MISMATCH;
+				diag_set(ClientError, errcode, name,
+					 field_type_strs[field->type],
+					 field_type_strs[part->type]);
 				return -1;
 			}
+			field->is_key_part = true;
 			/*
 			 * In the tuple, store only offsets necessary
 			 * to access fields of non-sequential keys.
