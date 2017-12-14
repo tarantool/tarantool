@@ -73,6 +73,11 @@ struct vy_index_env {
 	/** Key (SELECT) with no parts. */
 	struct tuple *empty_key;
 	/**
+	 * If read of a single statement takes longer than
+	 * the given value, warn about it in the log.
+	 */
+	double too_long_threshold;
+	/**
 	 * Callback invoked when the number of upserts for
 	 * the same key exceeds VY_UPSERT_THRESHOLD.
 	 */

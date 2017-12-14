@@ -792,8 +792,7 @@ vy_read_iterator_cleanup(struct vy_read_iterator *itr)
 void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
 		      struct vy_tx *tx, enum iterator_type iterator_type,
-		      struct tuple *key, const struct vy_read_view **rv,
-		      double too_long_threshold)
+		      struct tuple *key, const struct vy_read_view **rv)
 {
 	memset(itr, 0, sizeof(*itr));
 
@@ -802,7 +801,6 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	itr->too_long_threshold = too_long_threshold;
 
 	if (tuple_field_count(key) == 0) {
 		/*
@@ -1054,7 +1052,7 @@ clear:
 	ev_tstamp latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&index->stat.latency, latency);
 
-	if (latency > itr->too_long_threshold) {
+	if (latency > index->env->too_long_threshold) {
 		say_warn("%s: select(%s, %s) => %s took too long: %.3f sec",
 			 vy_index_name(index), tuple_str(itr->key),
 			 iterator_type_strs[itr->iterator_type],

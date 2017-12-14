@@ -160,11 +160,6 @@ struct vy_env {
 	size_t memory;
 	/** Max time a transaction may wait for memory. */
 	double timeout;
-	/**
-	 * If read of a single statement takes longer than
-	 * the given value, warn about it in the log.
-	 */
-	double too_long_threshold;
 	/** Max number of threads used for reading. */
 	int read_threads;
 	/** Max number of threads used for writing. */
@@ -1260,8 +1255,7 @@ vy_index_get(struct vy_env *env, struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, index, tx, ITER_EQ, key,
-			      p_read_view, env->too_long_threshold);
+	vy_read_iterator_open(&itr, index, tx, ITER_EQ, key, p_read_view);
 	int rc = vy_read_iterator_next(&itr, result);
 	if (*result != NULL)
 		tuple_ref(*result);
@@ -2582,7 +2576,6 @@ vy_env_new(const char *path, size_t memory, size_t cache,
 	e->status = VINYL_OFFLINE;
 	e->memory = memory;
 	e->timeout = TIMEOUT_INFINITY;
-	e->too_long_threshold = TIMEOUT_INFINITY;
 	e->read_threads = read_threads;
 	e->write_threads = write_threads;
 	e->force_recovery = force_recovery;
@@ -2720,7 +2713,7 @@ void
 vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 				    double too_long_threshold)
 {
-	vinyl->env->too_long_threshold = too_long_threshold;
+	vinyl->env->index_env.too_long_threshold = too_long_threshold;
 }
 
 /** }}} Environment */
@@ -3510,8 +3503,7 @@ vy_squash_process(struct vy_squash *squash)
 	 * prepared, but not committed statements.
 	 */
 	vy_read_iterator_open(&itr, index, NULL, ITER_EQ, squash->stmt,
-			      &env->xm->p_committed_read_view,
-			      env->too_long_threshold);
+			      &env->xm->p_committed_read_view);
 	struct tuple *result;
 	int rc = vy_read_iterator_next(&itr, &result);
 	if (rc == 0 && result != NULL)
@@ -3897,8 +3889,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	it->tx = tx;
 
 	vy_read_iterator_open(&it->iterator, index, tx, type, it->key,
-			      (const struct vy_read_view **)&tx->read_view,
-			      env->too_long_threshold);
+			      (const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
 }
 

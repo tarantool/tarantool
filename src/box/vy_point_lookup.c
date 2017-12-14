@@ -396,6 +396,7 @@ vy_point_lookup(struct vy_index *index, struct vy_tx *tx,
 
 	*ret = NULL;
 	size_t region_svp = region_used(&fiber()->gc);
+	double start_time = ev_monotonic_now(loop());
 	int rc = 0;
 
 	index->stat.lookup++;
@@ -460,5 +461,17 @@ done:
 						   &history, ret);
 	}
 	vy_stmt_history_cleanup(&history, region_svp);
-	return rc;
+
+	if (rc != 0)
+		return -1;
+
+	double latency = ev_monotonic_now(loop()) - start_time;
+	latency_collect(&index->stat.latency, latency);
+
+	if (latency > index->env->too_long_threshold) {
+		say_warn("%s: get(%s) => %s took too long: %.3f sec",
+			 vy_index_name(index), tuple_str(key),
+			 vy_stmt_str(*ret), latency);
+	}
+	return 0;
 }
