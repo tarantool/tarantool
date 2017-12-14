@@ -47,6 +47,7 @@ extern const struct type_info type_FiberIsCancelled;
 extern const struct type_info type_TimedOut;
 extern const struct type_info type_ChannelIsClosed;
 extern const struct type_info type_LuajitError;
+extern const struct type_info type_IllegalParams;
 extern const struct type_info type_SystemError;
 
 const char *
@@ -133,6 +134,11 @@ public:
 	virtual void raise() { throw this; }
 };
 
+class IllegalParams: public Exception {
+public:
+	IllegalParams(const char *file, unsigned line, const char *format, ...);
+	virtual void raise() { throw this; }
+};
 /**
  * Initialize the exception subsystem.
  */

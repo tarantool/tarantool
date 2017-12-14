@@ -44,9 +44,6 @@ ok 16 - identity=xtarantoolx,facility=local1
 # identity: bar
 # facility: foo
 ok 17 - facility=foo,identity=bar
-# error: bad option 'invalid='
 ok 18 - invalid=
-# error: duplicate option 'facility'
 ok 19 - facility=local1,facility=local2
-# error: duplicate option 'identity'
 ok 20 - identity=foo,identity=bar

@@ -317,12 +317,15 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 static void
 box_check_log(const char *log)
 {
-	char *error_msg;
 	if (log == NULL)
 		return;
-	if (say_check_init_str(log, &error_msg) == -1) {
-		auto guard = make_scoped_guard([=]{ free(error_msg); });
-		tnt_raise(ClientError, ER_CFG, "log", error_msg);
+	if (say_check_init_str(log) == -1) {
+		if (diag_last_error(diag_get())->type ==
+		    &type_IllegalParams) {
+			tnt_raise(ClientError, ER_CFG, "log",
+				 diag_last_error(diag_get())->errmsg);
+		}
+		diag_raise();
 	}
 }
 

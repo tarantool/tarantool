@@ -180,12 +180,11 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 
 /**
  * validates logger init string;
- * @param[out] error - a malloc-ed error message
  * @returns 0 if validation passed or -1
- *           with an error message
+ *           with an error message written to diag
  */
 int
-say_check_init_str(const char *str, char **error);
+say_check_init_str(const char *str);
 
 /* internals, for unit testing */
 
@@ -215,13 +214,12 @@ struct say_syslog_opts {
 
 /**
  * Parse syslog logger init string (without the prefix)
- * @retval -1  error, message is malloc-ed
+ * @retval -1  error, message is in diag
  * @retval  0  success
  */
 int
 say_parse_syslog_opts(const char *init_str,
-		      struct say_syslog_opts *opts,
-		      char **error);
+		      struct say_syslog_opts *opts);
 
 /** Release memory allocated by the option parser. */
 void

@@ -161,7 +161,7 @@ say_format_by_name(const char *format)
  * Initialize the logger pipe: a standalone
  * process which is fed all log messages.
  */
-static void
+static int
 say_pipe_init(const char *init_str)
 {
 	int pipefd[2];
@@ -177,8 +177,8 @@ say_pipe_init(const char *init_str)
 		say_syserror("sigprocmask");
 
 	if (pipe(pipefd) == -1) {
-		say_syserror("pipe");
-		goto error;
+		diag_set(SystemError, "failed to create pipe");
+		return -1;
 	}
 
 	/* flush buffers to avoid multiple output */
@@ -187,8 +187,8 @@ say_pipe_init(const char *init_str)
 	fflush(stderr);
 	log_pid = fork();
 	if (log_pid == -1) {
-		say_syserror("pipe");
-		goto error;
+		diag_set(SystemError, "failed to create process");
+		return -1;
 	}
 
 	if (log_pid == 0) {
@@ -205,7 +205,8 @@ say_pipe_init(const char *init_str)
 		 */
 		setpgid(0, 0);
 		execve(argv[0], argv, envp); /* does not return */
-		goto error;
+		diag_set(SystemError, "can't start logger: %s", init_str);
+		return -1;
 	}
 #ifndef TARGET_OS_DARWIN
 	/*
@@ -218,8 +219,10 @@ say_pipe_init(const char *init_str)
 	struct timespec timeout;
 	timeout.tv_sec = 0;
 	timeout.tv_nsec = 1; /* Mostly to trigger preemption. */
-	if (sigtimedwait(&mask, NULL, &timeout) == SIGCHLD)
-		goto error;
+	if (sigtimedwait(&mask, NULL, &timeout) == SIGCHLD) {
+		diag_set(IllegalParams, "logger process died");
+		return -1;
+	}
 #endif
 	/* OK, let's hope for the best. */
 	sigprocmask(SIG_UNBLOCK, &mask, NULL);
@@ -228,10 +231,7 @@ say_pipe_init(const char *init_str)
 	say_info("started logging into a pipe, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_PIPE;
 	_say = say_logger_file;
-	return;
-error:
-	say_syserror("can't start logger: %s", init_str);
-	exit(EXIT_FAILURE);
+	return 0;
 }
 
 /**
@@ -275,23 +275,26 @@ done:
  * Initialize logging to a file and set up a log
  * rotation signal.
  */
-static void
+static int
 say_file_init(const char *init_str)
 {
 	int fd;
 	log_path = abspath(init_str);
-	if (log_path == NULL)
-		panic("out of memory");
+	if (log_path == NULL) {
+		diag_set(OutOfMemory, strlen(init_str), "malloc", "abspath");
+		return -1;
+	}
 	fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
-	          S_IRUSR | S_IWUSR | S_IRGRP);
+		  S_IRUSR | S_IWUSR | S_IRGRP);
 	if (fd < 0) {
-		say_syserror("can't open log file: %s", log_path);
-		exit(EXIT_FAILURE);
+		diag_set(SystemError, "can't open log file: %s", log_path);
+		return -1;
 	}
 	log_fd = fd;
 	signal(SIGHUP, say_logrotate); /* will access log_fd */
 	logger_type = SAY_LOGGER_FILE;
 	_say = say_logger_file;
+	return 0;
 }
 
 /**
@@ -331,17 +334,13 @@ say_syslog_connect()
 }
 
 /** Initialize logging to syslog */
-static void
+static int
 say_syslog_init(const char *init_str)
 {
-	char *error;
 	struct say_syslog_opts opts;
 
-	if (say_parse_syslog_opts(init_str, &opts, &error)) {
-		say_syserror("syslog logger: %s",
-			     error ? error : "out of memory");
-		free(error);
-		exit(EXIT_FAILURE);
+	if (say_parse_syslog_opts(init_str, &opts) < 0) {
+		return -1;
 	}
 
 	if (opts.identity == NULL)
@@ -352,20 +351,20 @@ say_syslog_init(const char *init_str)
 	log_fd = say_syslog_connect();
 	if (log_fd < 0) {
 		/* syslog indent is freed in atexit(). */
-		say_syserror("syslog logger: %s", strerror(errno));
-		exit(EXIT_FAILURE);
+		diag_set(SystemError, "syslog logger: %s", strerror(errno));
+		return -1;
 	}
 	say_info("started logging to syslog, SIGHUP log rotation disabled");
 	logger_type = SAY_LOGGER_SYSLOG;
 	_say = say_logger_syslog;
-	return;
+	return 0;
 }
 
 /**
  * Initialize logging subsystem to use in daemon mode.
  */
-void
-say_logger_init(const char *init_str, int level, int nonblock, const char *format, int background)
+static int
+say_logger_do_init(const char *init_str, int level, int nonblock, const char *format, int background)
 {
 	log_level = level;
 	say_set_log_format(say_format_by_name(format));
@@ -376,26 +375,29 @@ say_logger_init(const char *init_str, int level, int nonblock, const char *forma
 	if (init_str != NULL) {
 		enum say_logger_type type;
 		if (say_parse_logger_type(&init_str, &type)) {
-			say_syserror("logger: bad initialization string: %s, %s",
-				     init_str, logger_syntax_reminder);
-			exit(EXIT_FAILURE);
+			diag_set(IllegalParams, logger_syntax_reminder);
+			return -1;
 		}
+		int rc;
 		switch (type) {
 		case SAY_LOGGER_PIPE:
-			say_pipe_init(init_str);
+			rc = say_pipe_init(init_str);
 			break;
 		case SAY_LOGGER_SYSLOG:
 			if (log_format != SF_PLAIN) {
-				fprintf(stderr, "logger: syslog does not "
+				diag_set(IllegalParams, "logger: syslog does not "
 						"support non-plain formats\n");
-				exit(EXIT_FAILURE);
+				return -1;
 			}
-			say_syslog_init(init_str);
+			rc = say_syslog_init(init_str);
 			break;
 		case SAY_LOGGER_FILE:
 		default:
-			say_file_init(init_str);
+			rc = say_file_init(init_str);
 			break;
+		}
+		if (rc < 0) {
+			return -1;
 		}
 		/*
 		 * Set non-blocking mode if a non-default log
@@ -419,8 +421,10 @@ say_logger_init(const char *init_str, int level, int nonblock, const char *forma
 		fflush(stdout);
 		if (log_fd == STDERR_FILENO) {
 			int fd = open("/dev/null", O_WRONLY);
-			if (fd < 0)
-				exit(EXIT_FAILURE);
+			if (fd < 0) {
+				diag_set(SystemError, "open /dev/null");
+				return -1;
+			}
 			dup2(fd, STDERR_FILENO);
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
@@ -428,6 +432,18 @@ say_logger_init(const char *init_str, int level, int nonblock, const char *forma
 			dup2(log_fd, STDERR_FILENO);
 			dup2(log_fd, STDOUT_FILENO);
 		}
+	}
+	return 0;
+}
+
+void
+say_logger_init(const char *init_str, int level, int nonblock,
+		     const char *format, int background)
+{
+	if (say_logger_do_init(init_str, level, nonblock,
+			       format, background) < 0) {
+		diag_log();
+		panic("failed to initialize logging subsystem");
 	}
 }
 
@@ -786,17 +802,17 @@ say_logger_syslog(int level, const char *filename, int line, const char *error,
  */
 
 int
-say_check_init_str(const char *str, char **error)
+say_check_init_str(const char *str)
 {
 	enum say_logger_type type;
 	if (say_parse_logger_type(&str, &type)) {
-		*error = strdup(logger_syntax_reminder);
+		diag_set(IllegalParams, logger_syntax_reminder);
 		return -1;
 	}
 	if (type == SAY_LOGGER_SYSLOG) {
 		struct say_syslog_opts opts;
 
-		if (say_parse_syslog_opts(str, &opts, error))
+		if (say_parse_syslog_opts(str, &opts) < 0)
 			return -1;
 		say_free_syslog_opts(&opts);
 	}
@@ -838,18 +854,15 @@ say_parse_logger_type(const char **str, enum say_logger_type *type)
 }
 
 int
-say_parse_syslog_opts(const char *init_str,
-		      struct say_syslog_opts *opts,
-		      char **err)
+say_parse_syslog_opts(const char *init_str, struct say_syslog_opts *opts)
 {
 	opts->identity = NULL;
 	opts->facility = NULL;
 	opts->copy = strdup(init_str);
 	if (opts->copy == NULL) {
-		*err = NULL;
+		diag_set(OutOfMemory, strlen(init_str), "malloc", "opts->copy");
 		return -1;
 	}
-
 	char *ptr = opts->copy;
 	const char *option, *value;
 
@@ -868,8 +881,7 @@ say_parse_syslog_opts(const char *init_str,
 				goto duplicate;
 			opts->facility = value;
 		} else {
-			if (asprintf(err, "bad option '%s'", option) == -1)
-				*err = NULL;
+			diag_set(IllegalParams, "bad option '%s'", option);
 			goto error;
 		}
 	}
@@ -877,8 +889,7 @@ say_parse_syslog_opts(const char *init_str,
 duplicate:
 	/* Terminate the "bad" option, by overwriting '=' sign */
 	((char *)value)[-1] = '\0';
-	if (asprintf(err, "duplicate option '%s'", option) == -1)
-		*err = NULL;
+	diag_set(IllegalParams, "duplicate option '%s'", option);
 error:
 	free(opts->copy); opts->copy = NULL;
 	return -1;

@@ -1,4 +1,6 @@
 #include <string.h>
+#include <fiber.h>
+#include <memory.h>
 #include "unit.h"
 #include "say.h"
 
@@ -30,10 +32,7 @@ int
 parse_syslog_opts(const char *input)
 {
 	struct say_syslog_opts opts;
-	char *error;
-	if (say_parse_syslog_opts(input, &opts, &error) == -1) {
-		note("error: %s", error);
-		free(error);
+	if (say_parse_syslog_opts(input, &opts) == -1) {
 		return -1;
 	}
 	if (opts.identity)
@@ -46,6 +45,8 @@ parse_syslog_opts(const char *input)
 
 int main()
 {
+	memory_init();
+	fiber_init(fiber_c_invoke);
 	say_logger_init("/dev/null", S_INFO, 0, "plain", 0);
 
 	plan(20);

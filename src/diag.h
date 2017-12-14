@@ -244,6 +244,8 @@ BuildChannelIsClosed(const char *file, unsigned line);
 struct error *
 BuildLuajitError(const char *file, unsigned line, const char *msg);
 struct error *
+BuildIllegalParams(const char *file, unsigned line, const char *format, ...);
+struct error *
 BuildSystemError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildXlogError(const char *file, unsigned line, const char *format, ...);
