@@ -2515,9 +2515,12 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 				continue;
 			}
 			++page_row_count;
-			key = vy_stmt_extract_key(&xrow, cmp_def,
-						  mem_format, upsert_format,
-						  iid == 0);
+			struct tuple *tuple = vy_stmt_decode(&xrow, cmp_def,
+					mem_format, upsert_format, iid == 0);
+			if (tuple == NULL)
+				goto close_err;
+			key = tuple_extract_key(tuple, cmp_def, NULL);
+			tuple_unref(tuple);
 			if (key == NULL)
 				goto close_err;
 			if (run->info.min_key == NULL) {

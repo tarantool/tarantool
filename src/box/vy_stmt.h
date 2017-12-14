@@ -658,22 +658,6 @@ vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
 struct tuple_format *
 vy_tuple_format_new_upsert(struct tuple_format *mem_format);
 
-
-/**
- * Extract a key from a xrow-stored vy_stmt.
- * @param xrow xrow with encoded vy_stmt
- * @param key_def definition of a key to extract
- *
- * @retval not NULL Success.
- * @retval     NULL Error.
- */
-char *
-vy_stmt_extract_key(struct xrow_header *xrow,
-		    const struct key_def *key_def,
-		    struct tuple_format *mem_format,
-		    struct tuple_format *upsert_format,
-		    bool is_primary);
-
 /**
  * Check if a key of @a tuple contains NULL.
  * @param tuple Tuple to check.
