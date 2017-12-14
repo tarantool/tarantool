@@ -65,6 +65,7 @@ mp_decode_float
 
 say_set_log_level
 say_logrotate
+say_set_log_format
 tarantool_uptime
 log_pid
 space_by_id

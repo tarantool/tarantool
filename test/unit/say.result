@@ -1,4 +1,4 @@
-1..20
+1..23
 # type: file
 # next: 
 ok 1 - 
@@ -47,3 +47,6 @@ ok 17 - facility=foo,identity=bar
 ok 18 - invalid=
 ok 19 - facility=local1,facility=local2
 ok 20 - identity=foo,identity=bar
+ok 21 - plain
+ok 22 - json
+ok 23 - custom

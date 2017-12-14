@@ -8,7 +8,8 @@ ffi.cdef[[
     say_set_log_level(int new_level);
 
     void
-    say_set_log_format(const char *format_name);
+    say_set_log_format(enum say_format format);
+
 
     extern sayfunc_t _say;
     extern void say_logrotate(int);
@@ -111,7 +112,13 @@ local function log_level(level)
 end
 
 local function log_format(format_name)
-    return ffi.C.say_set_log_format(format_name)
+    if format_name == "json" then
+        ffi.C.say_set_log_format(ffi.C.SF_JSON)
+    elseif format_name == "plain" then
+        ffi.C.say_set_log_format(ffi.C.SF_PLAIN)
+    else
+        error("log_format: expected 'json' or 'plain'")
+    end
 end
 
 local function log_pid()

@@ -36,6 +36,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <sys/types.h> /* pid_t */
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -65,7 +66,6 @@ enum say_format {
 };
 
 extern int log_level;
-extern int log_format;
 
 static inline bool
 say_log_level_is_enabled(int level)
@@ -75,17 +75,89 @@ say_log_level_is_enabled(int level)
 
 /** \endcond public */
 
+extern enum say_format log_format;
+
+enum say_logger_type {
+	SAY_LOGGER_BOOT,
+	SAY_LOGGER_STDERR,
+	SAY_LOGGER_FILE,
+	SAY_LOGGER_PIPE,
+	SAY_LOGGER_SYSLOG
+};
+
+struct log;
+
+typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
+				 const char *filename, int line, const char *error,
+				 const char *format, va_list ap);
+
+struct log {
+	int fd;
+	int level;
+	enum say_logger_type type;
+	char *path;
+	bool nonblock;
+	log_format_func_t format_func;
+	pid_t pid;
+	/* Application identifier used to group syslog messages. */
+	char *syslog_ident;
+	struct rlist in_log_list;
+};
+
+/**
+ * Creates new logger configuration
+ * @param log - logger struct to initialize
+ * @param init_str - box.cfg log option
+ * @param nonblock - box.cfg non-block option
+ * @return 0 on success, -1 on system error, error is written in diag
+ */
+int
+log_create(struct log *log, const char *init_str, bool nonblock);
+
+void
+log_destroy(struct log *log);
+
+/*
+ * Performs log write
+ */
+int
+log_say(struct log *log, int level, const char *filename,
+	int line, const char *error, const char *format, ...);
+
 /**
  * Set log level
+ * Can be used dynamically
+ * @param cfg config of logger
+ * @param format constant level
+ */
+void
+log_set_level(struct log *log, int level);
+
+/**
+ * Set log format
+ * Can be used dynamically
+ * @param log config of logger
+ * @param format_func function formatting log
+ */
+void
+log_set_format(struct log *log, log_format_func_t format_func);
+
+/**
+ * Set log level for default logger
+ * Can be used dynamically
+ * @param format constant level
  */
 void
 say_set_log_level(int new_level);
 
 /**
- * Set log format
+ * Set log format for default logger
+ * Can be used dynamically
+ * Can't be applied in case syslog or boot (will be ignored)
+ * @param say format
  */
 void
-say_set_log_format(enum say_format new_format);
+say_set_log_format(enum say_format format);
 
 /**
  * Return say format by name.
@@ -99,12 +171,14 @@ say_format_by_name(const char *format);
 void
 say_logrotate(int /* signo */);
 
-/* Init logger. */
-void say_logger_init(const char *init_str,
-                     int log_level, int nonblock,
-					 const char *log_format,
-					 int background);
+/* Init default logger. */
+void
+say_logger_init(const char *init_str,
+		int log_level, int nonblock,
+		const char *log_format,
+		int background);
 
+/* Free default logger */
 void
 say_logger_free();
 
@@ -179,6 +253,62 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 #define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
 
 /**
+ * Format and print a message to Tarantool log file.
+ *
+ * \param log (struct log *) - logger object
+ * \param level (int) - log level (see enum \link say_level \endlink)
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \sa printf()
+ * \sa enum say_level
+ */
+#define log_say_level(log, _level, format, ...) ({ 	\
+	if (_level <= log->level) 			\
+		log_say(log, _level, __FILE__, __LINE__,\
+		format, ##__VA_ARGS__); })
+
+
+/**
+ * Format and print a message to specified logger.
+ *
+ * \param log (struct log *) - logger object
+ * \param format (const char * ) - printf()-like format string
+ * \param ... - format arguments
+ * \sa printf()
+ * \sa enum say_level
+ * Example:
+ * \code
+ * log_say_info("Some useful information: %s", status);
+ * \endcode
+ */
+#define log_say_error(log, format, ...) \
+	log_say_level(log, S_ERROR, NULL, format, ##__VA_ARGS__)
+
+/** \copydoc log_say_error() */
+#define log_say_crit(log, format, ...) \
+	log_say_level(log, S_CRIT, NULL, format, ##__VA_ARGS__)
+
+/** \copydoc log_say_error() */
+#define log_say_warn(log, format, ...) \
+	log_say_level(log, S_WARN, NULL, format, ##__VA_ARGS__)
+
+/** \copydoc log_say_error() */
+#define log_say_info(log, format, ...) \
+	log_say_level(log, S_INFO, NULL, format, ##__VA_ARGS__)
+
+/** \copydoc log_say_error() */
+#define log_say_verbose(log, format, ...) \
+	log_say_level(log, S_VERBOSE, NULL, format, ##__VA_ARGS__)
+
+/** \copydoc log_say_error() */
+#define log_say_debug(log, format, ...) \
+	log_say_level(log, S_DEBUG, NULL, format, ##__VA_ARGS__)
+
+/** \copydoc log_say_error(). */
+#define log_say_syserror(log, format, ...) \
+	log_say_level(log, S_SYSERROR, strerror(errno), format, ##__VA_ARGS__)
+
+/**
  * validates logger init string;
  * @returns 0 if validation passed or -1
  *           with an error message written to diag
@@ -187,14 +317,6 @@ int
 say_check_init_str(const char *str);
 
 /* internals, for unit testing */
-
-enum say_logger_type {
-	SAY_LOGGER_BOOT,
-	SAY_LOGGER_STDERR,
-	SAY_LOGGER_FILE,
-	SAY_LOGGER_PIPE,
-	SAY_LOGGER_SYSLOG
-};
 
 /**
  * Determine logger type and strip type prefix from init_str.
@@ -224,6 +346,28 @@ say_parse_syslog_opts(const char *init_str,
 /** Release memory allocated by the option parser. */
 void
 say_free_syslog_opts(struct say_syslog_opts *opts);
+
+/**
+ * Format functions
+ * @param log logger structure
+ * @param buf buffer where the formatted message should be written to
+ * @param len size of buffer
+ * @param level log level of message
+ * @param filename name of file where log was called
+ * @param line name of file where log was called
+ * @param error error in case of system errors
+ * @param format format of message
+ * @param ap message parameters
+ * @return number of bytes written to buf
+ */
+int
+say_format_json(struct log *log, char *buf, int len, int level,
+		const char *filename, int line, const char *error,
+		const char *format, va_list ap);
+int
+say_format_plain(struct log *log, char *buf, int len, int level,
+		 const char *filename, int line, const char *error,
+		 const char *format, va_list ap);
 
 #if defined(__cplusplus)
 } /* extern "C" */

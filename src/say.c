@@ -45,31 +45,48 @@
 
 pid_t log_pid = 0;
 int log_level = S_INFO;
-int log_format = SF_PLAIN;
+enum say_format log_format = SF_PLAIN;
+
+static RLIST_HEAD(log_list);
 
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
-
 static bool logger_background = true;
-static int logger_nonblock;
-
-static int log_fd = STDERR_FILENO;
-static char *log_path; /* iff logger_type == SAY_LOGGER_FILE */
-/* Application identifier used to group syslog messages. */
-static char *syslog_ident = NULL;
 
 static void
-say_logger_boot(int level, const char *filename, int line, const char *error,
-		const char *format, ...);
-static void
-say_logger_file(int level, const char *filename, int line, const char *error,
-		const char *format, ...);
-static void
-say_logger_syslog(int level, const char *filename, int line, const char *error,
-		  const char *format, ...);
+say_default(int level, const char *filename, int line, const char *error,
+	    const char *format, ...);
 
-static enum say_logger_type logger_type = SAY_LOGGER_BOOT;
-sayfunc_t _say = say_logger_boot;
+static int
+say_format_boot(struct log *log, char *buf, int len, int level,
+		const char *filename, int line, const char *error,
+		const char *format, va_list ap);
+static int
+say_format_syslog(struct log *log, char *buf, int len, int level,
+		  const char *filename, int line, const char *error,
+		  const char *format, va_list ap);
+
+
+/*
+ * This function is utility to handle va_list from different varargs functions
+ */
+static inline int
+log_vsay(struct log *log, int level, const char *filename, int line,
+	 const char *error, const char *format, va_list ap);
+
+
+struct log log_default = {
+	.fd = STDERR_FILENO,
+	.level = S_INFO,
+	.type = SAY_LOGGER_BOOT,
+	.path = NULL, /* iff type == SAY_LOGGER_FILE */
+	.nonblock = false,
+	.format_func = say_format_boot,
+	.pid = 0,
+	.syslog_ident = NULL,
+};
+
+sayfunc_t _say = say_default;
 
 static const char level_chars[] = {
 	[S_FATAL] = 'F',
@@ -133,16 +150,44 @@ level_to_syslog_priority(int level)
 }
 
 void
+log_set_level(struct log *log, int level)
+{
+	log->level = level;
+}
+
+void
+log_set_format(struct log *log, log_format_func_t format_func)
+{
+	/*
+	 * In case of syslog or default format can not be changed
+	 */
+	if (SAY_LOGGER_STDERR == log->type ||
+	    log->type == SAY_LOGGER_PIPE || log->type == SAY_LOGGER_FILE) {
+		log->format_func = format_func;
+	}
+}
+
+void
 say_set_log_level(int new_level)
 {
 	log_level = new_level;
+	log_set_level(&log_default, new_level);
 }
 
 void
 say_set_log_format(enum say_format format)
 {
-	assert(format >= SF_PLAIN && format <= SF_JSON);
 	log_format = format;
+	switch (format) {
+	case SF_JSON:
+		log_set_format(&log_default, say_format_json);
+		break;
+	case SF_PLAIN:
+		log_set_format(&log_default, say_format_plain);
+		break;
+	default:
+		unreachable();
+	}
 }
 
 static const char *say_format_strs[] = {
@@ -157,12 +202,74 @@ say_format_by_name(const char *format)
 	return STR2ENUM(say_format, format);
 }
 
+static void
+write_to_file(struct log *log, int total);
+static void
+write_to_syslog(struct log *log, int total);
+
+/**
+ * Rotate logs on SIGHUP
+ */
+static int
+log_rotate(const struct log *log)
+{
+	if (log->type != SAY_LOGGER_FILE) {
+		return 0;
+	}
+	int fd = open(log->path, O_WRONLY | O_APPEND | O_CREAT,
+		      S_IRUSR | S_IWUSR | S_IRGRP);
+	if (fd < 0) {
+		diag_set(SystemError, "logrotate can't open %s", log->path);
+		return -1;
+	}
+	/*
+	 * The whole charade's purpose is to avoid log->fd changing.
+	 * Remember, we are a signal handler.
+	 */
+	dup2(fd, log->fd);
+	close(fd);
+
+	if (log->nonblock) {
+		int flags;
+		if ( (flags = fcntl(log->fd, F_GETFL, 0)) < 0 ||
+		     fcntl(log->fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+			say_syserror("fcntl, fd=%i", log->fd);
+		}
+	}
+	char logrotate_message[] = "log file has been reopened\n";
+	ssize_t r = write(log->fd,
+			   logrotate_message, (sizeof logrotate_message) - 1);
+	(void)r;
+	return 0;
+}
+
+void
+say_logrotate(int signo)
+{
+	(void) signo;
+	int saved_errno = errno;
+	struct log *log;
+	rlist_foreach_entry(log, &log_list, in_log_list) {
+		if (log_rotate(log) < 0) {
+			diag_log();
+		}
+	}
+	/*
+	 * logger_background applies only to log_default logger
+	 */
+	if (logger_background && log_default.type == SAY_LOGGER_FILE) {
+		dup2(log_default.fd, STDOUT_FILENO);
+		dup2(log_default.fd, STDERR_FILENO);
+	}
+	errno = saved_errno;
+}
+
 /**
  * Initialize the logger pipe: a standalone
  * process which is fed all log messages.
  */
 static int
-say_pipe_init(const char *init_str)
+log_pipe_init(struct log *log, const char *init_str)
 {
 	int pipefd[2];
 	char cmd[] = { "/bin/sh" };
@@ -185,13 +292,14 @@ say_pipe_init(const char *init_str)
 	/* https://github.com/tarantool/tarantool/issues/366 */
 	fflush(stdout);
 	fflush(stderr);
-	log_pid = fork();
-	if (log_pid == -1) {
+
+	log->pid = fork();
+	if (log->pid == -1) {
 		diag_set(SystemError, "failed to create process");
 		return -1;
 	}
 
-	if (log_pid == 0) {
+	if (log->pid == 0) {
 		sigprocmask(SIG_UNBLOCK, &mask, NULL);
 
 		close(pipefd[1]);
@@ -227,48 +335,10 @@ say_pipe_init(const char *init_str)
 	/* OK, let's hope for the best. */
 	sigprocmask(SIG_UNBLOCK, &mask, NULL);
 	close(pipefd[0]);
-	log_fd = pipefd[1];
-	say_info("started logging into a pipe, SIGHUP log rotation disabled");
-	logger_type = SAY_LOGGER_PIPE;
-	_say = say_logger_file;
+	log->fd = pipefd[1];
+	log->type = SAY_LOGGER_PIPE;
+	log->format_func = say_format_plain;
 	return 0;
-}
-
-/**
- * Rotate logs on SIGHUP
- */
-void
-say_logrotate(int signo)
-{
-	(void) signo;
-	if (logger_type != SAY_LOGGER_FILE)
-		return;
-	int saved_errno = errno;
-	int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
-	              S_IRUSR | S_IWUSR | S_IRGRP);
-	if (fd < 0)
-		goto done;
-	/* The whole charade's purpose is to avoid log_fd changing.
-	 * Remember, we are a signal handler.*/
-	dup2(fd, log_fd);
-	close(fd);
-
-	if (logger_background) {
-		dup2(log_fd, STDOUT_FILENO);
-		dup2(log_fd, STDERR_FILENO);
-	}
-	if (logger_nonblock) {
-		int flags;
-		if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
-		    fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
-			say_syserror("fcntl, fd=%i", log_fd);
-	}
-	char logrotate_message[] = "log file has been reopened\n";
-	int r = write(log_fd,
-	              logrotate_message, (sizeof logrotate_message) - 1);
-	(void)r;
-done:
-	errno = saved_errno;
 }
 
 /**
@@ -276,24 +346,24 @@ done:
  * rotation signal.
  */
 static int
-say_file_init(const char *init_str)
+
+log_file_init(struct log *log, const char *init_str)
 {
 	int fd;
-	log_path = abspath(init_str);
-	if (log_path == NULL) {
+	log->path = abspath(init_str);
+	if (log->path == NULL) {
 		diag_set(OutOfMemory, strlen(init_str), "malloc", "abspath");
 		return -1;
 	}
-	fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
-		  S_IRUSR | S_IWUSR | S_IRGRP);
+	fd = open(log->path, O_WRONLY | O_APPEND | O_CREAT,
+	          S_IRUSR | S_IWUSR | S_IRGRP);
 	if (fd < 0) {
-		diag_set(SystemError, "can't open log file: %s", log_path);
+		diag_set(SystemError, "can't open log file: %s", log->path);
 		return -1;
 	}
-	log_fd = fd;
-	signal(SIGHUP, say_logrotate); /* will access log_fd */
-	logger_type = SAY_LOGGER_FILE;
-	_say = say_logger_file;
+	log->fd = fd;
+	log->type = SAY_LOGGER_FILE;
+	log->format_func = say_format_plain;
 	return 0;
 }
 
@@ -321,21 +391,21 @@ syslog_connect_unix(const char *path)
 }
 
 static inline int
-say_syslog_connect()
+log_syslog_connect(struct log *log)
 {
 	/*
 	 * Try two locations: '/dev/log' for Linux and
 	 * '/var/run/syslog' for Mac.
 	 */
-	log_fd = syslog_connect_unix("/dev/log");
-	if (log_fd < 0)
+	log->fd = syslog_connect_unix("/dev/log");
+	if (log->fd < 0)
 		return syslog_connect_unix("/var/run/syslog");
-	return log_fd;
+	return log->fd;
 }
 
 /** Initialize logging to syslog */
 static int
-say_syslog_init(const char *init_str)
+log_syslog_init(struct log *log, const char *init_str)
 {
 	struct say_syslog_opts opts;
 
@@ -344,32 +414,34 @@ say_syslog_init(const char *init_str)
 	}
 
 	if (opts.identity == NULL)
-		syslog_ident = strdup("tarantool");
+		log->syslog_ident = strdup("tarantool");
 	else
-		syslog_ident = strdup(opts.identity);
+		log->syslog_ident = strdup(opts.identity);
 	say_free_syslog_opts(&opts);
-	log_fd = say_syslog_connect();
-	if (log_fd < 0) {
+	log->fd = log_syslog_connect(log);
+	if (log->fd < 0) {
 		/* syslog indent is freed in atexit(). */
 		diag_set(SystemError, "syslog logger: %s", strerror(errno));
 		return -1;
 	}
-	say_info("started logging to syslog, SIGHUP log rotation disabled");
-	logger_type = SAY_LOGGER_SYSLOG;
-	_say = say_logger_syslog;
+	log->type = SAY_LOGGER_SYSLOG;
+	/* syslog supports only one formatting function */
+	log->format_func = say_format_syslog;
 	return 0;
 }
 
 /**
  * Initialize logging subsystem to use in daemon mode.
  */
-static int
-say_logger_do_init(const char *init_str, int level, int nonblock, const char *format, int background)
+int
+log_create(struct log *log, const char *init_str, bool nonblock)
 {
-	log_level = level;
-	say_set_log_format(say_format_by_name(format));
-	logger_nonblock = nonblock;
-	logger_background = background;
+	log->pid = 0;
+	log->syslog_ident = NULL;
+	log->path = NULL;
+	log->format_func = NULL;
+	log->level = S_INFO;
+	log->nonblock = nonblock;
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	if (init_str != NULL) {
@@ -381,19 +453,14 @@ say_logger_do_init(const char *init_str, int level, int nonblock, const char *fo
 		int rc;
 		switch (type) {
 		case SAY_LOGGER_PIPE:
-			rc = say_pipe_init(init_str);
+			rc = log_pipe_init(log, init_str);
 			break;
 		case SAY_LOGGER_SYSLOG:
-			if (log_format != SF_PLAIN) {
-				diag_set(IllegalParams, "logger: syslog does not "
-						"support non-plain formats\n");
-				return -1;
-			}
-			rc = say_syslog_init(init_str);
+			rc = log_syslog_init(log, init_str);
 			break;
 		case SAY_LOGGER_FILE:
 		default:
-			rc = say_file_init(init_str);
+			rc = log_file_init(log, init_str);
 			break;
 		}
 		if (rc < 0) {
@@ -405,54 +472,74 @@ say_logger_do_init(const char *init_str, int level, int nonblock, const char *fo
 		 * non-blocking: this will garble interactive
 		 * console output.
 		 */
-		if (logger_nonblock) {
+		if (log->nonblock) {
 			int flags;
-			if ( (flags = fcntl(log_fd, F_GETFL, 0)) < 0 ||
-				fcntl(log_fd, F_SETFL, flags | O_NONBLOCK) < 0)
-				say_syserror("fcntl, fd=%i", log_fd);
+			if ( (flags = fcntl(log->fd, F_GETFL, 0)) < 0 ||
+			     fcntl(log->fd, F_SETFL, flags | O_NONBLOCK) < 0)
+				say_syserror("fcntl, fd=%i", log->fd);
 		}
 	} else {
-		logger_type = SAY_LOGGER_STDERR;
-		_say = say_logger_file;
+		log->type = SAY_LOGGER_STDERR;
+		log->fd = STDERR_FILENO;
 	}
-
-	if (background) {
-		fflush(stderr);
-		fflush(stdout);
-		if (log_fd == STDERR_FILENO) {
-			int fd = open("/dev/null", O_WRONLY);
-			if (fd < 0) {
-				diag_set(SystemError, "open /dev/null");
-				return -1;
-			}
-			dup2(fd, STDERR_FILENO);
-			dup2(fd, STDOUT_FILENO);
-			close(fd);
-		} else {
-			dup2(log_fd, STDERR_FILENO);
-			dup2(log_fd, STDOUT_FILENO);
-		}
-	}
+	rlist_add_entry(&log_list, log, in_log_list);
 	return 0;
 }
 
 void
 say_logger_init(const char *init_str, int level, int nonblock,
-		     const char *format, int background)
+		const char *format, int background)
 {
-	if (say_logger_do_init(init_str, level, nonblock,
-			       format, background) < 0) {
-		diag_log();
-		panic("failed to initialize logging subsystem");
+	if (log_create(&log_default, init_str, nonblock) < 0) {
+		goto fail;
 	}
+	switch(log_default.type) {
+	case SAY_LOGGER_PIPE:
+		fprintf(stderr, "started logging into a pipe,"
+			" SIGHUP log rotation disabled\n");
+		break;
+	case SAY_LOGGER_SYSLOG:
+		fprintf(stderr, "started logging into a syslog,"
+			" SIGHUP log rotation disabled\n");
+	default:
+		break;
+	}
+	_say = say_default;
+	say_set_log_level(level);
+	logger_background = background;
+	log_pid = log_default.pid;
+	signal(SIGHUP, say_logrotate);
+	say_set_log_format(say_format_by_name(format));
+
+	if (background) {
+		fflush(stderr);
+		fflush(stdout);
+		if (log_default.fd == STDERR_FILENO) {
+			int fd = open("/dev/null", O_WRONLY);
+			if (fd < 0) {
+				diag_set(SystemError, "open /dev/null");
+				goto fail;
+			}
+			dup2(fd, STDERR_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			close(fd);
+		} else {
+			dup2(log_default.fd, STDERR_FILENO);
+			dup2(log_default.fd, STDOUT_FILENO);
+		}
+	}
+	return;
+fail:
+	diag_log();
+	panic("failed to initialize logging subsystem");
 }
 
 void
 say_logger_free()
 {
-	if (logger_type == SAY_LOGGER_SYSLOG && log_fd != -1)
-		close(log_fd);
-	free(syslog_ident);
+	if (log_default.type != SAY_LOGGER_BOOT) {
+		log_destroy(&log_default);
+	}
 }
 
 /** {{{ Formatters */
@@ -464,9 +551,13 @@ say_logger_free()
  * Used during boot time, e.g. without box.cfg().
  */
 static int
-say_format_boot(char *buf, int len, const char *error,
-		 const char *format, va_list ap)
+say_format_boot(struct log *log, char *buf, int len, int level, const char *filename, int line,
+		const char *error, const char *format, va_list ap)
 {
+	(void) log;
+	(void) filename;
+	(void) line;
+	(void) level;
 	int total = 0;
 	SNPRINT(total, vsnprintf, buf, len, format, ap);
 	if (error != NULL)
@@ -516,10 +607,11 @@ say_format_plain_tail(char *buf, int len, int level, const char *filename,
  * Format the log message in Tarantool format:
  * YYYY-MM-DD hh:mm:ss.ms [PID]: CORD/FID/FIBERNAME LEVEL> MSG
  */
-static int
-say_format_plain(char *buf, int len, int level, const char *filename, int line,
+int
+say_format_plain(struct log *log, char *buf, int len, int level, const char *filename, int line,
 		 const char *error, const char *format, va_list ap)
 {
+	(void) log;
 	/* Don't use ev_now() since it requires a working event loop. */
 	ev_tstamp now = ev_time();
 	time_t now_seconds = (time_t) now;
@@ -544,13 +636,15 @@ say_format_plain(char *buf, int len, int level, const char *filename, int line,
 
 /**
  * Format log message in json format:
- * {"time": 1507026445.23232, "level": "WARN", "message": <message>, "pid": <pid>,
- * "cord_name": <name>, "fiber_id": <id>, "fiber_name": <fiber_name>, filename": <filename>, "line": <fds>}
+ * {"time": 1507026445.23232, "level": "WARN", "message": <message>,
+ * "pid": <pid>, "cord_name": <name>, "fiber_id": <id>,
+ * "fiber_name": <fiber_name>, filename": <filename>, "line": <fds>}
  */
-static int
-say_format_json(char *buf, int len, int level, const char *filename, int line,
+int
+say_format_json(struct log *log, char *buf, int len, int level, const char *filename, int line,
 		 const char *error, const char *format, va_list ap)
 {
+	(void) log;
 	int total = 0;
 
 	SNPRINT(total, snprintf, buf, len, "{\"time\": \"");
@@ -640,7 +734,7 @@ say_format_json(char *buf, int len, int level, const char *filename, int line,
  * - Identation is application name. By default it is "tarantool";
  */
 static int
-say_format_syslog(char *buf, int len, int level, const char *filename,
+say_format_syslog(struct log *log, char *buf, int len, int level, const char *filename,
 		  int line, const char *error, const char *format, va_list ap)
 {
 	/* Don't use ev_now() since it requires a working event loop. */
@@ -655,7 +749,7 @@ say_format_syslog(char *buf, int len, int level, const char *filename,
 	int prio = level_to_syslog_priority(level);
 	SNPRINT(total, snprintf, buf, len, "<%d>", LOG_MAKEPRI(1, prio));
 	SNPRINT(total, strftime, buf, len, "%h %e %T ", &tm);
-	SNPRINT(total, snprintf, buf, len, "%s[%d]:", syslog_ident, getpid());
+	SNPRINT(total, snprintf, buf, len, "%s[%d]:", log->syslog_ident, getpid());
 
 	/* Format message */
 	SNPRINT(total, say_format_plain_tail, buf, len, level, filename, line,
@@ -681,27 +775,18 @@ say_format_syslog(char *buf, int len, int level, const char *filename,
 enum { SAY_BUF_LEN_MAX = 16 * 1024 };
 static __thread char buf[SAY_BUF_LEN_MAX];
 
-/**
- * Boot-time logger.
- *
- * Used without box.cfg()
- */
 static void
-say_logger_boot(int level, const char *filename, int line, const char *error,
-		const char *format, ...)
+say_default(int level, const char *filename, int line, const char *error,
+	    const char *format, ...)
 {
-	assert(logger_type == SAY_LOGGER_BOOT);
-	(void) filename;
-	(void) line;
-	if (!say_log_level_is_enabled(level))
-		return;
-
-	int errsv = errno; /* Preserve the errno. */
+	int errsv = errno;
 	va_list ap;
 	va_start(ap, format);
-	int total = say_format_boot(buf, sizeof(buf), error, format, ap);
-	assert(total >= 0);
-	(void) write(STDERR_FILENO, buf, total);
+	int total = log_vsay(&log_default, level, filename,
+			     line, error, format, ap);
+	if (level == S_FATAL && log_default.fd != STDERR_FILENO)
+		(void) write(STDERR_FILENO, buf, total);
+
 	va_end(ap);
 	errno = errsv; /* Preserve the errno. */
 }
@@ -710,89 +795,43 @@ say_logger_boot(int level, const char *filename, int line, const char *error,
  * File and pipe logger
  */
 static void
-say_logger_file(int level, const char *filename, int line, const char *error,
-		const char *format, ...)
+write_to_file(struct log *log, int total)
 {
-	assert(logger_type == SAY_LOGGER_FILE ||
-	       logger_type == SAY_LOGGER_PIPE ||
-	       logger_type == SAY_LOGGER_STDERR);
-	if (!say_log_level_is_enabled(level))
-		return;
-
-	int errsv = errno; /* Preserve the errno. */
-	va_list ap;
-	va_start(ap, format);
-	int total = 0;
-	switch (log_format) {
-		case SF_PLAIN:
-			total = say_format_plain(buf, sizeof(buf), level,
-						 filename, line, error,
-						 format, ap);
-			break;
-		case SF_JSON:
-			total = say_format_json(buf, sizeof(buf), level,
-						filename, line, error,
-						format, ap);
-			break;
-		default:
-			unreachable();
-	}
+	assert(log->type == SAY_LOGGER_FILE ||
+	       log->type == SAY_LOGGER_PIPE ||
+	       log->type == SAY_LOGGER_STDERR);
 	assert(total >= 0);
-	(void) write(log_fd, buf, total);
-	/* Log fatal errors to STDERR */
-	if (level == S_FATAL && log_fd != STDERR_FILENO)
-		(void) write(STDERR_FILENO, buf, total);
-
-	va_end(ap);
-	errno = errsv; /* Preserve the errno. */
+	(void) write(log->fd, buf, total);
 }
 
 /**
  * Syslog logger
  */
 static void
-say_logger_syslog(int level, const char *filename, int line, const char *error,
-		  const char *format, ...)
+write_to_syslog(struct log *log, int total)
 {
-	assert(logger_type == SAY_LOGGER_SYSLOG);
-
-	if (!say_log_level_is_enabled(level))
-		return;
-
-	int errsv = errno; /* Preserve the errno. */
-	va_list ap;
-	va_start(ap, format);
-
-	int total = say_format_syslog(buf, sizeof(buf), level, filename, line,
-				       error, format, ap);
+	assert(log->type == SAY_LOGGER_SYSLOG);
 	assert(total >= 0);
-
-	if (level == S_FATAL && log_fd != STDERR_FILENO)
-		(void) write(STDERR_FILENO, buf, total);
-
-	if (log_fd < 0 || write(log_fd, buf, total) <= 0) {
+	if (log->fd < 0 || write(log->fd, buf, total) <= 0) {
 		/*
 		 * Try to reconnect, if write to syslog has
 		 * failed. Syslog write can fail, if, for example,
 		 * syslogd is restarted. In such a case write to
 		 * UNIX socket starts return -1 even for UDP.
 		 */
-		if (log_fd >= 0)
-			close(log_fd);
-		log_fd = say_syslog_connect();
-		if (log_fd >= 0) {
+		if (log->fd >= 0)
+			close(log->fd);
+		log->fd = log_syslog_connect(log);
+		if (log->fd >= 0) {
 			/*
 			 * In a case or error the log message is
 			 * lost. We can not wait for connection -
 			 * it would block thread. Try to reconnect
 			 * on next vsay().
 			 */
-			(void) write(log_fd, buf, total);
+			(void) write(log->fd, buf, total);
 		}
 	}
-
-	va_end(ap);
-	errno = errsv; /* Preserve the errno. */
 }
 
 /** Loggers }}} */
@@ -900,4 +939,53 @@ say_free_syslog_opts(struct say_syslog_opts *opts)
 {
 	free(opts->copy);
 	opts->copy = NULL;
+}
+
+void
+log_destroy(struct log *log)
+{
+	assert(log != NULL);
+	if (log->fd != -1)
+		close(log->fd);
+	free(log->syslog_ident);
+	rlist_del_entry(log, in_log_list);
+}
+
+static inline int
+log_vsay(struct log *log, int level, const char *filename, int line,
+	 const char *error, const char *format, va_list ap)
+{
+	int errsv = errno;
+	if (level > log->level) {
+		return 0;
+	}
+	int total = log->format_func(log, buf, sizeof(buf), level,
+				     filename, line, error, format, ap);
+	switch (log->type) {
+	case SAY_LOGGER_FILE:
+	case SAY_LOGGER_PIPE:
+	case SAY_LOGGER_STDERR:
+		write_to_file(log, total);
+		break;
+	case SAY_LOGGER_SYSLOG:
+		write_to_syslog(log, total);
+	case SAY_LOGGER_BOOT:
+		(void) write(STDERR_FILENO, buf, total);
+		break;
+	default:
+		unreachable();
+	}
+	errno = errsv; /* Preserve the errno. */
+	return total;
+}
+
+int
+log_say(struct log *log, int level, const char *filename, int line,
+	const char *error, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	int total = log_vsay(log, level, filename, line, error, format, ap);
+	va_end(ap);
+	return total;
 }

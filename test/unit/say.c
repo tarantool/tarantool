@@ -43,13 +43,30 @@ parse_syslog_opts(const char *input)
 	return 0;
 }
 
+static int
+format_func_custom(struct log *log, char *buf, int len, int level,
+		   const char *filename, int line, const char *error,
+		   const char *format, va_list ap)
+{
+	int total = 0;
+	(void) log;
+	(void) level;
+	(void) filename;
+	(void) line;
+	(void) error;
+	SNPRINT(total, snprintf, buf, len, "\"msg\" = \"");
+	SNPRINT(total, vsnprintf, buf, len, format, ap);
+	SNPRINT(total, snprintf, buf, len, "\"\n");
+	return total;
+}
+
 int main()
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	say_logger_init("/dev/null", S_INFO, 0, "plain", 0);
 
-	plan(20);
+	plan(23);
 
 #define PARSE_LOGGER_TYPE(input, rc) \
 	ok(parse_logger_type(input) == rc, "%s", input)
@@ -78,6 +95,38 @@ int main()
 	PARSE_SYSLOG_OPTS("invalid=", -1);
 	PARSE_SYSLOG_OPTS("facility=local1,facility=local2", -1);
 	PARSE_SYSLOG_OPTS("identity=foo,identity=bar", -1);
+	char template[] = "/tmp/tmpdir.XXXXXX";
+	const char *tmp_dir = mkdtemp(template);
+	if (tmp_dir == NULL) {
+		diag("unit/say: failed to create temp dir: %s", strerror(errno));
+		return check_plan();
+	}
+	char tmp_filename[30];
+	sprintf(tmp_filename, "%s/1.log", tmp_dir);
+	struct log test_log;
+	log_create(&test_log, tmp_filename, false);
+	log_set_format(&test_log, say_format_plain);
+	log_say(&test_log, 0, "dumb name", 0, NULL, "hello %s\n", "user");
+	log_set_format(&test_log, say_format_json);
+	log_say(&test_log, 0, "dumb name", 0, NULL, "hello %s", "user");
+	log_set_format(&test_log, format_func_custom);
+	log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user");
 
+	FILE* fd = fopen(tmp_filename, "r");
+	char *line = NULL;
+	size_t len = 0;
+
+	if (getline(&line, &len, fd) != -1) {
+		ok(strstr(line, "hello user") != NULL, "plain");
+		getline(&line, &len, fd);
+	}
+	if (getline(&line, &len, fd) != -1) {
+		ok(strstr(line, "\"message\": \"hello user\"") != NULL, "json");
+	}
+
+	if (getline(&line, &len, fd) != -1) {
+		ok(strstr(line, "\"msg\" = \"hello user\"") != NULL, "custom");
+	}
+	log_destroy(&test_log);
 	return check_plan();
 }
