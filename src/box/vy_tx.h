@@ -182,6 +182,12 @@ struct vy_tx {
 	struct rlist on_destroy;
 };
 
+static inline const struct vy_read_view **
+vy_tx_read_view(struct vy_tx *tx)
+{
+	return (const struct vy_read_view **)&tx->read_view;
+}
+
 /** Transaction manager object. */
 struct tx_manager {
 	/**
