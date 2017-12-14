@@ -498,7 +498,8 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 s:replace{1, 2} -- error
 ---
-- error: Tuple field count 2 is less than required (expected at least 3)
+- error: Tuple field count 2 is less than required by space format or defined indexes
+    (expected at least 3)
 ...
 t1 = s:replace{2, 3, 4}
 ---
@@ -569,15 +570,18 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 s:replace{1, 2} -- error
 ---
-- error: Tuple field count 2 is less than required (expected at least 5)
+- error: Tuple field count 2 is less than required by space format or defined indexes
+    (expected at least 5)
 ...
 s:replace{2, 3, 4} -- error
 ---
-- error: Tuple field count 3 is less than required (expected at least 5)
+- error: Tuple field count 3 is less than required by space format or defined indexes
+    (expected at least 5)
 ...
 s:replace{3, 4, 5, 6} -- error
 ---
-- error: Tuple field count 4 is less than required (expected at least 5)
+- error: Tuple field count 4 is less than required by space format or defined indexes
+    (expected at least 5)
 ...
 t1 = s:replace{4, 5, 6, 7, 8}
 ---

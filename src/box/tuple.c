@@ -131,7 +131,7 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 		return -1;
 	}
 	if (unlikely(field_count < format->min_field_count)) {
-		diag_set(ClientError, ER_INDEX_FIELD_COUNT,
+		diag_set(ClientError, ER_MIN_FIELD_COUNT,
 			 (unsigned) field_count,
 			 (unsigned) format->min_field_count);
 		return -1;
