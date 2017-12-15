@@ -91,7 +91,7 @@ applier_log_error(struct applier *applier, struct error *e)
 		break;
 	}
 	error_log(e);
-	if (type_cast(SocketError, e))
+	if (type_cast(SocketError, e) || type_cast(SystemError, e))
 		say_info("will retry every %.2lf second",
 			 applier_timeout);
 	applier->last_logged_errcode = errcode;
@@ -538,9 +538,16 @@ applier_f(va_list ap)
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
 			goto reconnect;
+		} catch (SystemError *e) {
+			applier_log_error(applier, e);
+			goto reconnect;
 		} catch (ChannelIsClosed *e) {
 			applier_disconnect(applier, APPLIER_OFF);
 			break;
+		} catch (Exception *e) {
+			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_STOPPED);
+			return -1;
 		}
 		/* Put fiber_sleep() out of catch block.
 		 *

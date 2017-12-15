@@ -199,7 +199,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
 	    if (rc != 0) {
 		    diag_raise();
-		    tnt_raise(SocketError, -1, "getaddrinfo");
+		    panic("unspecified getaddrinfo error");
 	    }
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
