@@ -646,3 +646,18 @@ s = box.schema.create_space('test')
 idx = s:create_index('idx')
 box.space.test == s
 s:drop()
+
+--
+-- gh-3000: index modifying must change key_def parts and
+-- comparators. They can be changed, if there was compatible index
+-- parts change. For example, a part type was changed from
+-- unsigned to number. In such a case comparators must be reset
+-- and part types updated.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+s:replace{1}
+pk:alter{parts = {{1, 'integer'}}}
+s:replace{-2}
+s:select{}
+s:drop()

@@ -146,10 +146,8 @@ index_def_swap(struct index_def *def1, struct index_def *def2)
 	struct index_def tmp_def = *def1;
 	memcpy(def1, def2, offsetof(struct index_def, key_def));
 	memcpy(def2, &tmp_def, offsetof(struct index_def, key_def));
-	/*
-	 * index_def_swap() is used only during alter to modify
-	 * index metadata.
-	 */
+	key_def_swap(def1->key_def, def2->key_def);
+	key_def_swap(def1->cmp_def, def2->cmp_def);
 }
 
 /** Free a key definition. */
