@@ -6200,8 +6200,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				int iRoot = pTab->tnum;	/* Root page of scanned b-tree */
 
 				sqlite3CodeVerifySchema(pParse);
-				sqlite3TableLock(pParse, pTab->tnum, 0,
-						 pTab->zName);
 
 				/* Search for the index that has the lowest scan cost.
 				 *

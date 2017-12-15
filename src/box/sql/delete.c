@@ -382,7 +382,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 #endif
 	    ) {
 		assert(!isView);
-		sqlite3TableLock(pParse, pTab->tnum, 1, pTab->zName);
 		if (HasRowid(pTab)) {
 			sqlite3VdbeAddOp4(v, OP_Clear, pTab->tnum, 0, memCnt,
 					  pTab->zName, P4_STATIC);

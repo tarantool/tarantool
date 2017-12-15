@@ -181,7 +181,6 @@ openStatTable(Parse * pParse,	/* Parsing context */
 			 */
 			aRoot[i] = pStat->tnum;
 			aCreateTbl[i] = 0;
-			sqlite3TableLock(pParse, aRoot[i], 1, zTab);
 			if (zWhere) {
 				sqlite3NestedParse(pParse,
 						   "DELETE FROM %s WHERE %s=%Q",
@@ -902,7 +901,6 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	 * to use for scanning indexes (iIdxCur). No index cursor is opened at
 	 * this time though.
 	 */
-	sqlite3TableLock(pParse, pTab->tnum, 0, pTab->zName);
 	iTabCur = iTab++;
 	iIdxCur = iTab++;
 	pParse->nTab = MAX(pParse->nTab, iTab);

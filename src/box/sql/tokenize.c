@@ -635,13 +635,6 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		sqlite3VdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-#ifndef SQLITE_OMIT_SHARED_CACHE
-	if (pParse->nested == 0) {
-		sqlite3DbFree(db, pParse->aTableLock);
-		pParse->aTableLock = 0;
-		pParse->nTableLock = 0;
-	}
-#endif
 	sqlite3DeleteTable(db, pParse->pNewTable);
 
 	if (pParse->pWithToFree)

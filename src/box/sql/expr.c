@@ -2494,9 +2494,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		assert(p->pSrc != 0);	/* Because of isCandidateForInOpt(p) */
 		pTab = p->pSrc->a[0].pTab;
 
-		/* Code an OP_Transaction and OP_TableLock for <table>. */
 		sqlite3CodeVerifySchema(pParse);
-		sqlite3TableLock(pParse, pTab->tnum, 0, pTab->zName);
 
 		assert(v);	/* sqlite3GetVdbe() has always been previously called */
 		if (nExpr == 1 && pEList->a[0].pExpr->iColumn < 0) {

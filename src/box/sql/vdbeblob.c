@@ -333,18 +333,7 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 			if (db->mallocFailed == 0) {
 				assert(aOp != 0);
 				/* Configure the OP_TableLock instruction */
-#ifdef SQLITE_OMIT_SHARED_CACHE
 				aOp[0].opcode = OP_Noop;
-#else
-				aOp[0].p1 = 0;
-				aOp[0].p2 = pTab->tnum;
-				aOp[0].p3 = flags;
-				sqlite3VdbeChangeP4(v, 1, pTab->zName,
-						    P4_TRANSIENT);
-			}
-			if (db->mallocFailed == 0) {
-#endif
-
 				/* Remove either the OP_OpenWrite or OpenRead. Set the P2
 				 * parameter of the other to pTab->tnum.
 				 */
@@ -355,7 +344,7 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 
 				/* Configure the number of columns. Configure the cursor to
 				 * think that the table has one more column than it really
-				 * does. An OP_Column to retrieve this imaginary column will
+				 * does. An OP_Column to retrieve this imagin/ary column will
 				 * always return an SQL NULL. This is useful because it means
 				 * we can invoke OP_Column to fill in the vdbe cursors type
 				 * and offset cache without causing any IO.

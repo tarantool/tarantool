@@ -1059,11 +1059,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 #endif
 		}
 
-		/* Take a shared-cache advisory read-lock on the parent table. Allocate
-		 * a cursor to use to search the unique index on the parent key columns
-		 * in the parent table.
-		 */
-		sqlite3TableLock(pParse, pTo->tnum, 0, pTo->zName);
 		pParse->nTab++;
 
 		if (regOld != 0) {

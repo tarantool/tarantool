@@ -726,8 +726,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				}
 				if (pTab == 0 || pTab->pFKey == 0)
 					continue;
-				sqlite3TableLock(pParse, pTab->tnum, 0,
-						 pTab->zName);
 				if (pTab->nCol + regRow > pParse->nMem)
 					pParse->nMem = pTab->nCol + regRow;
 				sqlite3OpenTable(pParse, 0, pTab, OP_OpenRead);
@@ -740,8 +738,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					if (pParent == 0)
 						continue;
 					pIdx = 0;
-					sqlite3TableLock(pParse, pParent->tnum,
-							 0, pParent->zName);
 					x = sqlite3FkLocateIndex(pParse,
 								 pParent, pFK,
 								 &pIdx, 0);
@@ -1014,7 +1010,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				}
 			}
 			pParse->nMem = 3;
-			sqlite3VdbeAddOp3(v, OP_Checkpoint, 0, eMode, 1);
+			sqlite3VdbeAddOp2(v, OP_Checkpoint, eMode, 1);
 			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 3);
 		}
 		break;

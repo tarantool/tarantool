@@ -5451,7 +5451,7 @@ case OP_CreateTable: {          /* out2 */
 
 	pOut = out2Prerelease(p, pOp);
 	pgno = 0;
-	assert(pOp->p1==0);
+
 	assert(DbMaskTest(p->btreeMask, pOp->p1));
 	assert(p->readOnly==0);
 	pDb = &db->mdb;
@@ -5467,21 +5467,6 @@ case OP_CreateTable: {          /* out2 */
 	pOut->u.i = pgno;
 	break;
 }
-
-/* Opcode: ParseSchema P1 * * P4 *
- *
- * Read and parse all entries from the SQLITE_MASTER table of database P1
- * that match the WHERE clause P4.
- *
- * This opcode invokes the parser to create a new virtual machine,
- * then runs the new virtual machine.  It is thus a re-entrant opcode.
- *
- * Tarantool: this opcode is deprecated and superceeded by OP_ParseSchema2
- * which is in charge for updated Tarantool's schema
- */
-case OP_ParseSchema: {
-			break;
-		}
 
 /* Opcode: ParseSchema2 P1 P2 * * *
  * Synopsis: rows=r[P1@P2]
@@ -6363,16 +6348,16 @@ case OP_AggFinal: {
 }
 
 #ifndef SQLITE_OMIT_WAL
-/* Opcode: Checkpoint P1 P2 P3 * *
+/* Opcode: Checkpoint P1 P2 * * *
  *
- * Checkpoint database P1. This is a no-op if P1 is not currently in
- * WAL mode. Parameter P2 is one of SQLITE_CHECKPOINT_PASSIVE, FULL,
- * RESTART, or TRUNCATE.  Write 1 or 0 into mem[P3] if the checkpoint returns
+ * Checkpoint the database. This is a no-op if it is not currently in
+ * WAL mode. Parameter P1 is one of SQLITE_CHECKPOINT_PASSIVE, FULL,
+ * RESTART, or TRUNCATE.  Write 1 or 0 into mem[P2] if the checkpoint returns
  * SQLITE_BUSY or not, respectively.  Write the number of pages in the
- * WAL after the checkpoint into mem[P3+1] and the number of pages
+ * WAL after the checkpoint into mem[P2+1] and the number of pages
  * in the WAL that have been checkpointed after the checkpoint
- * completes into mem[P3+2].  However on an error, mem[P3+1] and
- * mem[P3+2] are initialized to -1.
+ * completes into mem[P3+2].  However on an error, mem[P2+1] and
+ * mem[P2+2] are initialized to -1.
  */
 case OP_Checkpoint: {
 	int i;                          /* Loop counter */
@@ -6382,10 +6367,10 @@ case OP_Checkpoint: {
 	assert(p->readOnly==0);
 	aRes[0] = 0;
 	aRes[1] = aRes[2] = -1;
-	assert(pOp->p2==SQLITE_CHECKPOINT_PASSIVE
-	       || pOp->p2==SQLITE_CHECKPOINT_FULL
-	       || pOp->p2==SQLITE_CHECKPOINT_RESTART
-	       || pOp->p2==SQLITE_CHECKPOINT_TRUNCATE
+	assert(pOp->p1==SQLITE_CHECKPOINT_PASSIVE
+	       || pOp->p1==SQLITE_CHECKPOINT_FULL
+	       || pOp->p1==SQLITE_CHECKPOINT_RESTART
+	       || pOp->p1==SQLITE_CHECKPOINT_TRUNCATE
 		);
 	/* Tarantool: SQLite native WAL is removed. Probably whole opcode
 	   needs to be removed. Or adopt Tarantool's WAL for this op.  */
@@ -6399,7 +6384,7 @@ case OP_Checkpoint: {
 		rc = SQLITE_OK;
 		aRes[0] = 1;
 	}
-	for(i=0, pMem = &aMem[pOp->p3]; i<3; i++, pMem++) {
+	for(i=0, pMem = &aMem[pOp->p2]; i<3; i++, pMem++) {
 		sqlite3VdbeMemSetInt64(pMem, (i64)aRes[i]);
 	}
 	break;
@@ -6471,42 +6456,6 @@ case OP_Expire: {
 	}
 	break;
 }
-
-#ifndef SQLITE_OMIT_SHARED_CACHE
-/* Opcode: TableLock P1 P2 P3 P4 *
- * Synopsis: iDb=P1 root=P2 write=P3
- *
- * Obtain a lock on a particular table. This instruction is only used when
- * the shared-cache feature is enabled.
- *
- * P1 is the index of the database in sqlite3.aDb[] of the database
- * on which the lock is acquired.  A readlock is obtained if P3==0 or
- * a write lock if P3==1.
- *
- * P2 contains the root-page of the table to lock.
- *
- * P4 contains a pointer to the name of the table being locked. This is only
- * used to generate an error message if the lock cannot be obtained.
- */
-case OP_TableLock: {
-	u8 isWriteLock = (u8)pOp->p3;
-	if (isWriteLock || 0==(user_session->sql_flags&SQLITE_ReadUncommitted)) {
-		int p1 = pOp->p1;
-		assert(p1==0);
-		assert(DbMaskTest(p->btreeMask, p1));
-		assert(isWriteLock==0 || isWriteLock==1);
-		rc = sqlite3BtreeLockTable(db->mdb.pBt, pOp->p2, isWriteLock);
-		if (rc) {
-			if ((rc&0xFF)==SQLITE_LOCKED) {
-				const char *z = pOp->p4.z;
-				sqlite3VdbeError(p, "database table is locked: %s", z);
-			}
-			goto abort_due_to_error;
-		}
-	}
-	break;
-}
-#endif /* SQLITE_OMIT_SHARED_CACHE */
 
 #ifndef  SQLITE_OMIT_PAGER_PRAGMAS
 /* Opcode: Pagecount P1 P2 * * *

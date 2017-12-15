@@ -54,8 +54,6 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	Vdbe *v;
 	v = sqlite3GetVdbe(pParse);
 	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
-	sqlite3TableLock(pParse, pTab->tnum,
-			 (opcode == OP_OpenWrite) ? 1 : 0, pTab->zName);
 	if (HasRowid(pTab)) {
 		sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, 0,
 				     pTab->nCol);
@@ -1792,9 +1790,6 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		*piDataCur = iDataCur;
 	if (HasRowid(pTab) && (aToOpen == 0 || aToOpen[0])) {
 		sqlite3OpenTable(pParse, iDataCur, pTab, op);
-	} else {
-		sqlite3TableLock(pParse, pTab->tnum, op == OP_OpenWrite,
-				 pTab->zName);
 	}
 	if (piIdxCur)
 		*piIdxCur = iBase;
@@ -2138,9 +2133,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		VdbeCoverage(v);
 		sqlite3VdbeAddOp2(v, OP_Close, iSrc, 0);
 		sqlite3VdbeAddOp2(v, OP_Close, iDest, 0);
-	} else {
-		sqlite3TableLock(pParse, pDest->tnum, 1, pDest->zName);
-		sqlite3TableLock(pParse, pSrc->tnum, 0, pSrc->zName);
 	}
 	for (pDestIdx = pDest->pIndex; pDestIdx; pDestIdx = pDestIdx->pNext) {
 		u8 idxInsFlags = 0;

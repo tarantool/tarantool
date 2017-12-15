@@ -4633,8 +4633,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 					      (const u8 *)&pTabItem->colUsed,
 					      P4_INT64);
 #endif
-		} else {
-			sqlite3TableLock(pParse, pTab->tnum, 0, pTab->zName);
 		}
 		if (pLoop->wsFlags & WHERE_INDEXED) {
 			Index *pIx = pLoop->pIndex;

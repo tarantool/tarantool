@@ -888,7 +888,6 @@ typedef struct SelectDest SelectDest;
 typedef struct SrcList SrcList;
 typedef struct StrAccum StrAccum;
 typedef struct Table Table;
-typedef struct TableLock TableLock;
 typedef struct Token Token;
 typedef struct TreeView TreeView;
 typedef struct Trigger Trigger;
@@ -2560,12 +2559,6 @@ typedef unsigned int yDbMask;
  * generate call themselves recursively, the first part of the structure
  * is constant but the second part is reset at the beginning and end of
  * each recursion.
- *
- * The nTableLock and aTableLock variables are only used if the shared-cache
- * feature is enabled (if sqlite3Tsd()->useSharedData is true). They are
- * used to store the set of table-locks required by the statement being
- * compiled. Function sqlite3TableLock() is used to add entries to the
- * list.
  */
 struct Parse {
 	sqlite3 *db;		/* The main database structure */
@@ -2605,10 +2598,6 @@ struct Parse {
 #if SELECTTRACE_ENABLED
 	int nSelect;		/* Number of SELECT statements seen */
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
-#endif
-#ifndef SQLITE_OMIT_SHARED_CACHE
-	int nTableLock;		/* Number of locks in aTableLock */
-	TableLock *aTableLock;	/* Required table locks for shared-cache mode */
 #endif
 	AutoincInfo *pAinc;	/* Information about AUTOINCREMENT counters */
 	Parse *pToplevel;	/* Parse structure for main program (or NULL) */
@@ -3684,12 +3673,6 @@ void sqlite3ParserFree(void *, void (*)(void *));
 void sqlite3Parser(void *, int, Token, Parse *);
 #ifdef YYTRACKMAXSTACKDEPTH
 int sqlite3ParserStackPeak(void *);
-#endif
-
-#ifndef SQLITE_OMIT_SHARED_CACHE
-void sqlite3TableLock(Parse *, int, u8, const char *);
-#else
-#define sqlite3TableLock(v,w,x,y,z)
 #endif
 
 #ifdef SQLITE_TEST
