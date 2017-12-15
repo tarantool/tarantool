@@ -2631,11 +2631,10 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 								   pIdx->zName),
 								  P4_DYNAMIC);
 #endif
-						sqlite3VdbeAddOp3(v,
+						sqlite3VdbeAddOp2(v,
 								  OP_OpenRead,
 								  iTab,
-								  pIdx->tnum,
-								  0);
+								  pIdx->tnum);
 						sqlite3VdbeSetP4KeyInfo(pParse,
 									pIdx);
 						VdbeComment((v, "%s",

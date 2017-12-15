@@ -173,18 +173,10 @@ sqlite3AuthRead(Parse * pParse,	/* The parser context */
 	Table *pTab = 0;	/* The table being read */
 	const char *zCol;	/* Name of the column of the table */
 	int iSrc;		/* Index in pTabList->a[] of table being read */
-	int iDb;		/* The index of the database the expression refers to */
 	int iCol;		/* Index of column in table */
 
 	if (db->xAuth == 0)
 		return;
-	iDb = sqlite3SchemaToIndex(pParse->db, pSchema);
-	if (iDb < 0) {
-		/* An attempt to read a column out of a subquery or other
-		 * temporary table.
-		 */
-		return;
-	}
 
 	assert(pExpr->op == TK_COLUMN || pExpr->op == TK_TRIGGER);
 	if (pExpr->op == TK_TRIGGER) {
@@ -211,7 +203,6 @@ sqlite3AuthRead(Parse * pParse,	/* The parser context */
 	} else {
 		zCol = "ROWID";
 	}
-	assert(iDb == 0);
 	if (SQLITE_IGNORE == sqlite3AuthReadCol(pParse, pTab->zName, zCol)) {
 		pExpr->op = TK_NULL;
 	}

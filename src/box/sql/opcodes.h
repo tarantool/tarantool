@@ -101,9 +101,9 @@
 #define OP_TTransaction   98
 #define OP_ReadCookie     99
 #define OP_SetCookie     100
-#define OP_ReopenIdx     101 /* synopsis: root=P2 iDb=P3                   */
-#define OP_OpenRead      102 /* synopsis: root=P2 iDb=P3                   */
-#define OP_OpenWrite     103 /* synopsis: root=P2 iDb=P3                   */
+#define OP_ReopenIdx     101 /* synopsis: root=P2                          */
+#define OP_OpenRead      102 /* synopsis: root=P2                          */
+#define OP_OpenWrite     103 /* synopsis: root=P2                          */
 #define OP_OpenAutoindex 104 /* synopsis: nColumn=P2                       */
 #define OP_OpenEphemeral 105 /* synopsis: nColumn=P2                       */
 #define OP_SorterOpen    106
@@ -133,11 +133,11 @@
 #define OP_Destroy       130
 #define OP_Clear         131
 #define OP_ResetSorter   132
-#define OP_CreateIndex   133 /* synopsis: r[P2]=root iDb=P1                */
-#define OP_CreateTable   134 /* synopsis: r[P2]=root iDb=P1                */
+#define OP_CreateIndex   133 /* synopsis: r[P2]=root                       */
+#define OP_CreateTable   134 /* synopsis: r[P2]=root                       */
 #define OP_ParseSchema   135
-#define OP_ParseSchema2  136 /* synopsis: rows=r[P1@P2] iDb=P3             */
-#define OP_ParseSchema3  137 /* synopsis: name=r[P1] sql=r[P1+1] iDb=P2    */
+#define OP_ParseSchema2  136 /* synopsis: rows=r[P1@P2]                    */
+#define OP_ParseSchema3  137 /* synopsis: name=r[P1] sql=r[P1+1]           */
 #define OP_RenameTable   138 /* synopsis: P1 = root, P4 = name             */
 #define OP_LoadAnalysis  139
 #define OP_DropTable     140
@@ -153,7 +153,7 @@
 #define OP_AggStep       150 /* synopsis: accum=r[P3] step(r[P2@P5])       */
 #define OP_AggFinal      151 /* synopsis: accum=r[P1] N=P2                 */
 #define OP_Expire        152
-#define OP_TableLock     153 /* synopsis: iDb=P1 root=P2 write=P3          */
+#define OP_TableLock     153 /* synopsis:        root=P2 write=P3          */
 #define OP_Pagecount     154
 #define OP_MaxPgcnt      155
 #define OP_CursorHint    156

@@ -1001,7 +1001,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		 * Checkpoint the database.
 		 */
 	case PragTyp_WAL_CHECKPOINT:{
-			int iBt = (pId2->z ? iDb : SQLITE_MAX_ATTACHED);
 			int eMode = SQLITE_CHECKPOINT_PASSIVE;
 			if (zRight) {
 				if (sqlite3StrICmp(zRight, "full") == 0) {
@@ -1015,7 +1014,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				}
 			}
 			pParse->nMem = 3;
-			sqlite3VdbeAddOp3(v, OP_Checkpoint, iBt, eMode, 1);
+			sqlite3VdbeAddOp3(v, OP_Checkpoint, 0, eMode, 1);
 			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 3);
 		}
 		break;

@@ -2116,8 +2116,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			regRowid = ++pParse->nMem;
 			assert(pParse->nTab == 1);
 			sqlite3MayAbort(pParse);
-			sqlite3VdbeAddOp3(v, OP_OpenWrite, 1, pParse->regRoot,
-					  0);
+			sqlite3VdbeAddOp2(v, OP_OpenWrite, 1, pParse->regRoot);
 			sqlite3VdbeChangeP5(v, OPFLAG_P2ISREG);
 			pParse->nTab = 2;
 			addrTop = sqlite3VdbeCurrentAddr(v) + 1;

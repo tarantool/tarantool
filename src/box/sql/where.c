@@ -4672,8 +4672,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			assert(pIx->pSchema == pTab->pSchema);
 			assert(iIndexCur >= 0);
 			if (op) {
-				sqlite3VdbeAddOp3(v, op, iIndexCur, pIx->tnum,
-						  0);
+				sqlite3VdbeAddOp2(v, op, iIndexCur, pIx->tnum);
 				sqlite3VdbeSetP4KeyInfo(pParse, pIx);
 				if ((pLoop->wsFlags & WHERE_CONSTRAINT) != 0
 				    && (pLoop->

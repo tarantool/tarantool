@@ -3260,14 +3260,12 @@ case OP_SetCookie: {
 	break;
 }
 
-/* Opcode: OpenRead P1 P2 P3 P4 P5
- * Synopsis: root=P2 iDb=P3
+/* Opcode: OpenRead P1 P2 * P4 P5
+ * Synopsis: root=P2
  *
  * Open a read-only cursor for the database table whose root page is
- * P2 in a database file.  The database file is determined by P3.
- * P3==0 means the main database, P3==1 means the database used for
- * temporary tables, and P3>1 means used the corresponding attached
- * database.  Give the new cursor an identifier of P1.  The P1
+ * P2 in a database file. 
+ * Give the new cursor an identifier of P1.  The P1
  * values need not be contiguous but all P1 values should be small integers.
  * It is an error for P1 to be negative.
  *
@@ -3291,8 +3289,8 @@ case OP_SetCookie: {
  *
  * See also: OpenWrite, ReopenIdx
  */
-/* Opcode: ReopenIdx P1 P2 P3 P4 P5
- * Synopsis: root=P2 iDb=P3
+/* Opcode: ReopenIdx P1 P2 * P4 P5
+ * Synopsis: root=P2
  *
  * The ReopenIdx opcode works exactly like ReadOpen except that it first
  * checks to see if the cursor on P1 is already open with a root page
@@ -3300,16 +3298,15 @@ case OP_SetCookie: {
  * if the cursor is already open, do not reopen it.
  *
  * The ReopenIdx opcode may only be used with P5==0 and with P4 being
- * a P4_KEYINFO object.  Furthermore, the P3 value must be the same as
- * every other ReopenIdx or OpenRead for the same cursor number.
+ * a P4_KEYINFO object.
  *
  * See the OpenRead opcode documentation for additional information.
  */
-/* Opcode: OpenWrite P1 P2 P3 P4 P5
- * Synopsis: root=P2 iDb=P3
+/* Opcode: OpenWrite P1 P2 * P4 P5
+ * Synopsis: root=P2
  *
  * Open a read/write cursor named P1 on the table or index whose root
- * page is P2.  Or if P5!=0 use the content of register P2 to find the
+ * page is P2. Or if P5!=0 use the content of register P2 to find the
  * root page.
  *
  * The P4 value may be either an integer (P4_INT32) or a pointer to
@@ -5425,27 +5422,24 @@ case OP_ResetSorter: {
 	break;
 }
 
-/* Opcode: CreateTable P1 P2 * * *
- * Synopsis: r[P2]=root iDb=P1
+/* Opcode: CreateTable * P2 * * *
+ * Synopsis: r[P2]=root
  *
- * Allocate a new table in the main database file if P1==0 or in the
- * auxiliary database file if P1==1 or in an attached database if
- * P1>1.  Write the root page number of the new table into
- * register P2
+ * Allocate a new table the database. Write the root page number of the new
+ * table into register P2
  *
  * The difference between a table and an index is this:  A table must
  * have a 4-byte integer key and can have arbitrary data.  An index
  * has an arbitrary key but no data.
  *
  * See also: CreateIndex
+ * Tarantool: this opcode is deprecated
  */
-/* Opcode: CreateIndex P1 P2 * * *
- * Synopsis: r[P2]=root iDb=P1
+/* Opcode: CreateIndex * P2 * * *
+ * Synopsis: r[P2]=root
  *
- * Allocate a new index in the main database file if P1==0 or in the
- * auxiliary database file if P1==1 or in an attached database if
- * P1>1.  Write the root page number of the new table into
- * register P2.
+ * Allocate a new index in the database. Write the root page number of the
+ * new table into register P2.
  *
  * See documentation on OP_CreateTable for additional information.
  */
@@ -5489,8 +5483,8 @@ case OP_ParseSchema: {
 			break;
 		}
 
-/* Opcode: ParseSchema2 P1 P2 P3 * *
- * Synopsis: rows=r[P1@P2] iDb=P3
+/* Opcode: ParseSchema2 P1 P2 * * *
+ * Synopsis: rows=r[P1@P2]
  *
  * For each 4-tuple from r[P1@P2] range convert to following
  * format and update the schema with the resulting entry:
@@ -5552,8 +5546,8 @@ case OP_ParseSchema2: {
 	break;
 }
 
-/* Opcode: ParseSchema3 P1 P2 * * *
- * Synopsis: name=r[P1] sql=r[P1+1] iDb=P2
+/* Opcode: ParseSchema3 P1 * * * *
+ * Synopsis: name=r[P1] sql=r[P1+1]
  *
  * Create trigger named r[P1] w/ DDL SQL stored in r[P1+1]
  * in database P2

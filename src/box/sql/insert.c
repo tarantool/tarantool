@@ -1807,7 +1807,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			p5 = 0;
 		}
 		if (aToOpen == 0 || aToOpen[i + 1]) {
-			sqlite3VdbeAddOp3(v, op, iIdxCur, pIdx->tnum, 0);
+			sqlite3VdbeAddOp2(v, op, iIdxCur, pIdx->tnum);
 			sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
 			sqlite3VdbeChangeP5(v, p5);
 			VdbeComment((v, "%s", pIdx->zName));
@@ -2150,10 +2150,10 @@ xferOptimization(Parse * pParse,	/* Parser context */
 				break;
 		}
 		assert(pSrcIdx);
-		sqlite3VdbeAddOp3(v, OP_OpenRead, iSrc, pSrcIdx->tnum, 0);
+		sqlite3VdbeAddOp2(v, OP_OpenRead, iSrc, pSrcIdx->tnum);
 		sqlite3VdbeSetP4KeyInfo(pParse, pSrcIdx);
 		VdbeComment((v, "%s", pSrcIdx->zName));
-		sqlite3VdbeAddOp3(v, OP_OpenWrite, iDest, pDestIdx->tnum, 0);
+		sqlite3VdbeAddOp2(v, OP_OpenWrite, iDest, pDestIdx->tnum);
 		sqlite3VdbeSetP4KeyInfo(pParse, pDestIdx);
 		sqlite3VdbeChangeP5(v, OPFLAG_BULKCSR);
 		VdbeComment((v, "%s", pDestIdx->zName));

@@ -975,7 +975,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 
 		/* Open a read-only cursor on the index being analyzed. */
 		assert(sqlite3SchemaToIndex(db, pIdx->pSchema) == 0);
-		sqlite3VdbeAddOp3(v, OP_OpenRead, iIdxCur, pIdx->tnum, 0);
+		sqlite3VdbeAddOp2(v, OP_OpenRead, iIdxCur, pIdx->tnum);
 		sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
 		VdbeComment((v, "%s", pIdx->zName));
 
