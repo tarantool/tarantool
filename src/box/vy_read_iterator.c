@@ -212,25 +212,8 @@ static void
 vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 			      struct vy_read_src *src, bool *stop)
 {
-	int cmp;
 	uint32_t src_id = src - itr->src;
-
-	if (vy_read_iterator_is_exact_match(itr, src->stmt)) {
-		/*
-		 * If we got an exact match, we can skip a tuple
-		 * comparison, because this source must be on top
-		 * of the heap, otherwise 'curr_stmt' would be an
-		 * exact match as well and so we would not have
-		 * scanned this source at all.
-		 */
-		assert(vy_read_iterator_cmp_stmt(itr, src->stmt,
-						 itr->curr_stmt) < 0);
-		cmp = -1;
-		*stop = true;
-	} else {
-		cmp = vy_read_iterator_cmp_stmt(itr, src->stmt,
-						itr->curr_stmt);
-	}
+	int cmp = vy_read_iterator_cmp_stmt(itr, src->stmt, itr->curr_stmt);
 	if (cmp < 0) {
 		assert(src->stmt != NULL);
 		tuple_ref(src->stmt);
@@ -242,8 +225,13 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 	}
 	if (cmp <= 0)
 		src->front_id = itr->front_id;
-	if (*stop || src_id >= itr->skipped_src)
+
+	itr->skipped_src = MAX(itr->skipped_src, src_id + 1);
+
+	if (cmp < 0 && vy_read_iterator_is_exact_match(itr, src->stmt)) {
 		itr->skipped_src = src_id + 1;
+		*stop = true;
+	}
 }
 
 /*
