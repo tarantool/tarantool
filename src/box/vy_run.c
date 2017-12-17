@@ -1290,7 +1290,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	/* Check if the result is within the slice boundaries. */
 	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		if (slice->begin != NULL &&
-		    vy_stmt_compare_with_key(*ret, slice->begin, cmp_def) < 0) {
+		    vy_tuple_compare_with_key(*ret, slice->begin, cmp_def) < 0) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			*ret = NULL;
@@ -1300,7 +1300,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
 		       iterator_type == ITER_EQ);
 		if (slice->end != NULL &&
-		    vy_stmt_compare_with_key(*ret, slice->end, cmp_def) >= 0) {
+		    vy_tuple_compare_with_key(*ret, slice->end, cmp_def) >= 0) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			*ret = NULL;
@@ -1670,7 +1670,7 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	/**
 	 * One can think that we had to lock page of itr->curr_pos,
 	 *  to prevent freeing cur_key with entire page and avoid
-	 *  segmentation fault in vy_stmt_compare_raw.
+	 *  segmentation fault in vy_tuple_compare.
 	 * But in fact the only case when curr_pos and next_pos
 	 *  point to different pages is the case when next_pos points
 	 *  to the beginning of the next page, and in this case
@@ -1705,8 +1705,8 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_stmt, last_stmt,
-			     itr->cmp_def) > 0)) {
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->cmp_def) > 0)) {
 		*ret = itr->curr_stmt;
 		return 0;
 	}
@@ -2663,8 +2663,8 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 				     stream->is_primary);
 		if (fnd_key == NULL)
 			return -1;
-		int cmp = vy_stmt_compare(fnd_key, stream->slice->begin,
-					  stream->cmp_def);
+		int cmp = vy_tuple_compare_with_key(fnd_key,
+				stream->slice->begin, stream->cmp_def);
 		if (cmp < 0)
 			beg = mid + 1;
 		else
@@ -2716,8 +2716,8 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 	/* Check that the tuple is not out of slice bounds = */
 	if (stream->slice->end != NULL &&
 	    stream->page_no >= stream->slice->last_page_no &&
-	    vy_stmt_compare_with_key(tuple, stream->slice->end,
-				     stream->cmp_def) >= 0)
+	    vy_tuple_compare_with_key(tuple, stream->slice->end,
+				      stream->cmp_def) >= 0)
 		return 0;
 
 	/* We definitely has the next non-null tuple. Save it in stream */

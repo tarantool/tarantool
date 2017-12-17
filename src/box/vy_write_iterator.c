@@ -221,7 +221,7 @@ heap_less(heap_t *heap, struct heap_node *node1, struct heap_node *node2)
 	struct vy_write_src *src2 =
 		container_of(node2, struct vy_write_src, heap_node);
 
-	int cmp = tuple_compare(src1->tuple, src2->tuple, stream->cmp_def);
+	int cmp = vy_tuple_compare(src1->tuple, src2->tuple, stream->cmp_def);
 	if (cmp != 0)
 		return cmp < 0;
 

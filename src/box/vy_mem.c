@@ -164,7 +164,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 
 	const struct tuple *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-	if (vy_stmt_compare(result, stmt, mem->cmp_def) != 0)
+	if (vy_tuple_compare(result, stmt, mem->cmp_def) != 0)
 		return NULL;
 	return result;
 }
@@ -363,8 +363,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr,
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
 			if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
-			    vy_stmt_compare(itr->curr_stmt, prev_stmt,
-					    cmp_def) != 0)
+			    vy_tuple_compare(itr->curr_stmt, prev_stmt,
+					     cmp_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
 			itr->curr_stmt = prev_stmt;
@@ -492,7 +492,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 			itr->curr_stmt = NULL;
 			return 1;
 		}
-	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0);
+	} while (vy_tuple_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0);
 
 	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt, cmp_def) != 0) {
@@ -534,7 +534,7 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 
 	const struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_stmt_compare(itr->curr_stmt, next_stmt, cmp_def) == 0) {
+	if (vy_tuple_compare(itr->curr_stmt, next_stmt, cmp_def) == 0) {
 		itr->curr_pos = next_pos;
 		itr->curr_stmt = next_stmt;
 		return 0;
@@ -565,8 +565,8 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_stmt, last_stmt,
-			     itr->mem->cmp_def) > 0)) {
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->mem->cmp_def) > 0)) {
 		if (itr->curr_stmt != NULL)
 			*ret = itr->last_stmt;
 		return 0;

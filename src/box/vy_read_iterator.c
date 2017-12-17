@@ -519,8 +519,8 @@ done:
 						itr->last_stmt) > 0);
 
 	if (itr->need_check_eq && itr->curr_stmt != NULL &&
-	    vy_tuple_compare_with_key(itr->curr_stmt, itr->key,
-				      itr->index->cmp_def) != 0)
+	    vy_stmt_compare(itr->curr_stmt, itr->key,
+			    itr->index->cmp_def) != 0)
 		itr->curr_stmt = NULL;
 
 	if (vy_read_iterator_track_read(itr, itr->curr_stmt) != 0)
