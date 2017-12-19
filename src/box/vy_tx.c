@@ -133,8 +133,7 @@ tx_manager_delete(struct tx_manager *xm)
 	free(xm);
 }
 
-/** Create or reuse an instance of a read view. */
-static struct vy_read_view *
+struct vy_read_view *
 tx_manager_read_view(struct tx_manager *xm)
 {
 	struct vy_read_view *rv;
@@ -177,8 +176,7 @@ tx_manager_read_view(struct tx_manager *xm)
 	return rv;
 }
 
-/** Dereference and possibly destroy a read view. */
-static void
+void
 tx_manager_destroy_read_view(struct tx_manager *xm,
 			     const struct vy_read_view *read_view)
 {
@@ -277,7 +275,8 @@ vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
 	return NULL;
 }
 
-void
+/** Initialize a tx object. */
+static void
 vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 {
 	stailq_create(&tx->log);
@@ -292,7 +291,8 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	rlist_create(&tx->on_destroy);
 }
 
-void
+/** Destroy a tx object. */
+static void
 vy_tx_destroy(struct vy_tx *tx)
 {
 	trigger_run(&tx->on_destroy, NULL);

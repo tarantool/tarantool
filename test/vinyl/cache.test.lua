@@ -166,6 +166,8 @@ pk:max()
 s:drop()
 
 -- Same test w/o begin/end
+--
+-- Note, select() does not update cache in autcommit mode, see gh-2534.
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('pk')
@@ -216,13 +218,13 @@ s:select{1}
 stat_changed()  -- cache miss, true
 
 s:select{1}
-stat_changed() -- cache hit, false
+stat_changed() -- cache miss, true
 
 s:select{}
 stat_changed()  -- cache miss, true
 
 s:select{}
-stat_changed() -- cache hit, false
+stat_changed() -- cache miss, true
 
 s:drop()
 
@@ -249,13 +251,13 @@ s:select{}
 stat_changed()  -- cache miss, true
 
 s:get{1, 2}
-stat_changed() -- cache hit, false
+stat_changed() -- cache miss, true
 
 s:select{1}
-stat_changed() -- cache hit, false
+stat_changed() -- cache miss, true
 
 s:select{}
-stat_changed() -- cache hit, false
+stat_changed() -- cache miss, true
 
 s:drop()
 

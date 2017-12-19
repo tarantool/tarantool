@@ -232,21 +232,25 @@ struct vinyl_iterator {
 	struct vy_env *env;
 	/** Vinyl index this iterator is for. */
 	struct vy_index *index;
-	/**
-	 * Points either to tx_autocommit for autocommit mode
-	 * or to a multi-statement transaction active when the
-	 * iterator was created.
-	 */
+	/** Active transaction or NULL if autocommit. */
 	struct vy_tx *tx;
+	/**
+	 * Read view to use for the iteration. Points either to
+	 * tx->read_view or to rv_autocommit if autocommit.
+	 */
+	const struct vy_read_view **rv;
 	/** Search key. */
 	struct tuple *key;
 	/** Vinyl read iterator. */
 	struct vy_read_iterator iterator;
 	/**
-	 * Built-in transaction created when iterator is opened
-	 * in autocommit mode.
+	 * If an iterator is open in autocommit mode, we create
+	 * a read view for it immediately so as not to waste
+	 * memory on tracking reads for conflict resolution.
+	 * The following member points to the read view used by
+	 * the iterator.
 	 */
-	struct vy_tx tx_autocommit;
+	struct vy_read_view *rv_autocommit;
 	/** Trigger invoked when tx ends to close the iterator. */
 	struct trigger on_tx_destroy;
 };
@@ -2811,6 +2815,16 @@ vinyl_engine_end_recovery(struct engine *engine)
 		vy_gc(e, e->recovery, VY_GC_INCOMPLETE, INT64_MAX);
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
+		/*
+		 * During WAL recovery we skip WAL rows that have
+		 * already been dumped to disk so the LSN last seen
+		 * by the transaction manager after WAL recovery is
+		 * complete may be less than the newest LSN actually
+		 * stored on disk. Update the LSN to make sure that
+		 * the iterator sees all data when open in a read
+		 * view.
+		 */
+		e->xm->lsn = vclock_sum(e->recovery_vclock);
 		e->recovery_vclock = NULL;
 		e->status = VINYL_ONLINE;
 		vy_quota_set_limit(&e->quota, e->memory);
@@ -3716,15 +3730,6 @@ fail:
 
 /* {{{ Cursor */
 
-static void
-vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
-{
-	(void)event;
-	struct vinyl_iterator *it = container_of(trigger,
-			struct vinyl_iterator, on_tx_destroy);
-	it->tx = NULL;
-}
-
 static int
 vinyl_iterator_last(struct iterator *base, struct tuple **ret)
 {
@@ -3741,18 +3746,11 @@ vinyl_iterator_close(struct vinyl_iterator *it)
 	it->index = NULL;
 	tuple_unref(it->key);
 	it->key = NULL;
-	if (it->tx == &it->tx_autocommit) {
-		/*
-		 * Rollback the automatic transaction.
-		 * Use vy_tx_destroy() so as not to spoil
-		 * the statistics of rollbacks issued by
-		 * user transactions.
-		 */
-		vy_tx_destroy(it->tx);
-	} else {
-		trigger_clear(&it->on_tx_destroy);
-	}
 	it->tx = NULL;
+	it->rv = NULL;
+	trigger_clear(&it->on_tx_destroy);
+	if (it->rv_autocommit != NULL)
+		tx_manager_destroy_read_view(it->env->xm, it->rv_autocommit);
 	it->base.next = vinyl_iterator_last;
 }
 
@@ -3763,12 +3761,8 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	struct tuple *tuple;
 
-	if (it->tx == NULL) {
-		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
-		goto fail;
-	}
-	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
-		diag_set(ClientError, ER_READ_VIEW_ABORTED);
+	if ((*it->rv)->is_aborted ||
+	    (it->tx != NULL && it->tx->state == VINYL_TX_ABORT)) {
 		goto fail;
 	}
 
@@ -3784,17 +3778,17 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 
 	if (it->index->id > 0) {
 		/* Get the full tuple from the primary index. */
-		if (vy_index_get(it->index->pk, it->tx,
-				 vy_tx_read_view(it->tx),
+		if (vy_index_get(it->index->pk, it->tx, it->rv,
 				 tuple, &tuple) != 0)
 			goto fail;
 	} else {
 		tuple_ref(tuple);
 	}
 	*ret = tuple_bless(tuple);
-	tuple_unref(*ret);
+	tuple_unref(tuple);
 	if (*ret == NULL)
 		goto fail;
+
 	return 0;
 fail:
 	vinyl_iterator_close(it);
@@ -3806,9 +3800,28 @@ vinyl_iterator_free(struct iterator *base)
 {
 	assert(base->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	if (base->next != vinyl_iterator_last)
+	if (it->index != NULL)
 		vinyl_iterator_close(it);
 	mempool_free(&it->env->iterator_pool, it);
+}
+
+static int
+vinyl_iterator_no_tx(struct iterator *base, struct tuple **ret)
+{
+	(void)base;
+	(void)ret;
+	diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+	return -1;
+}
+
+static void
+vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct vinyl_iterator *it = container_of(trigger,
+			struct vinyl_iterator, on_tx_destroy);
+	vinyl_iterator_close(it);
+	it->base.next = vinyl_iterator_no_tx;
 }
 
 static struct iterator *
@@ -3821,20 +3834,18 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
-		return NULL;
+		goto err;
 	}
 
 	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
 			 "mempool", "struct vinyl_iterator");
-		return NULL;
+		goto err;
 	}
 	it->key = vy_stmt_new_select(index->env->key_format, key, part_count);
-	if (it->key == NULL) {
-		mempool_free(&env->iterator_pool, it);
-		return NULL;
-	}
+	if (it->key == NULL)
+		goto err_key;
 
 	iterator_create(&it->base, base);
 	it->base.next = vinyl_iterator_next;
@@ -3844,6 +3855,11 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	it->index = index;
 	vy_index_ref(index);
 
+	it->rv_autocommit = NULL;
+	trigger_create(&it->on_tx_destroy,
+		       vinyl_iterator_on_tx_destroy, NULL, NULL);
+
+	const struct vy_read_view **rv;
 	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	if (tx != NULL) {
@@ -3851,18 +3867,27 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		 * Register a trigger that will abort this iterator
 		 * when the transaction ends.
 		 */
-		trigger_create(&it->on_tx_destroy,
-			       vinyl_iterator_on_tx_destroy, NULL, NULL);
 		trigger_add(&tx->on_destroy, &it->on_tx_destroy);
+		rv = (const struct vy_read_view **)&tx->read_view;
 	} else {
-		tx = &it->tx_autocommit;
-		vy_tx_create(env->xm, tx);
+		it->rv_autocommit = tx_manager_read_view(env->xm);
+		if (it->rv_autocommit == NULL)
+			goto err_rv;
+		rv = (const struct vy_read_view **)&it->rv_autocommit;
 	}
 	it->tx = tx;
+	it->rv = rv;
 
-	vy_read_iterator_open(&it->iterator, index, tx, type, it->key,
-			      (const struct vy_read_view **)&tx->read_view);
+	vy_read_iterator_open(&it->iterator, index, tx, type, it->key, rv);
 	return (struct iterator *)it;
+
+err_rv:
+	vy_index_unref(index);
+	tuple_unref(it->key);
+err_key:
+	mempool_free(&env->iterator_pool, it);
+err:
+	return NULL;
 }
 
 static int

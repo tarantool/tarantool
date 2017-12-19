@@ -309,10 +309,12 @@ function fill_space()
 end;
 
 function iterate_in_read_view()
+    box.begin()
     local i = create_iterator(space)
     last_read = i.next()
     fiber.sleep(100000)
     last_read = i.next()
+    box.commit()
 end;
 
 test_run:cmd("setopt delimiter ''");
@@ -450,6 +452,7 @@ box.snapshot()
 s:replace{0, 0}
 s:select{0}
 
+box.begin()
 errinj.set("ERRINJ_WAL_DELAY", true)
 wait_replace = true
 _ = fiber.create(function() s:replace{1, 1} wait_replace = false end)
@@ -460,4 +463,6 @@ errinj.set("ERRINJ_WAL_DELAY", false)
 while wait_replace do fiber.sleep(0.01) end
 state, value = gen(param, state)
 value
+box.commit()
+
 s:drop()

@@ -126,7 +126,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- []
+- 0: [1]
+  1: [2]
+  2: [3]
 ...
 --   3) create iterator within test case
 space:insert({1})
@@ -174,7 +176,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- []
+- 0: [1, 1]
+  1: [2, 2]
+  2: [3, 3]
 ...
 --
 -- UPSERT followed by DELETE
@@ -237,7 +241,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- []
+- 0: [1]
+  1: [2]
+  2: [3]
 ...
 --   3) create iterator within test case
 space:upsert({1}, {{'!', 2, 1}})
@@ -267,7 +273,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- []
+- 0: [3]
 ...
 --
 -- UPSERT followed by UPSERT
@@ -302,9 +308,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 1]
-  1: [2, 2]
-  2: [3, 3]
+- []
 ...
 space:truncate()
 ---
@@ -339,9 +343,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 1]
-  1: [2, 2]
-  2: [3, 3]
+- 0: [1]
+  1: [2]
+  2: [3]
 ...
 space:truncate()
 ---
@@ -377,8 +381,8 @@ space:select{}
 iterate_over(iter_obj)
 ---
 - 0: [1, 1]
-  1: [2, 2]
-  2: [3, 3]
+  1: [2]
+  2: [3]
 ...
 space:truncate()
 ---
@@ -419,9 +423,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 10]
-  1: [2, 20]
-  2: [3, 30]
+- []
 ...
 space:truncate()
 ---
@@ -459,9 +461,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 10]
-  1: [2, 20]
-  2: [3, 30]
+- 0: [1]
+  1: [2]
+  2: [3]
 ...
 space:truncate()
 ---
@@ -501,7 +503,7 @@ iterate_over(iter_obj)
 ---
 - 0: [1, 10]
   1: [2, 20]
-  2: [3, 30]
+  2: [3]
 ...
 space:truncate()
 ---
@@ -542,9 +544,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 1, 10]
-  1: [2, 2, 20]
-  2: [3, 3, 30]
+- []
 ...
 space:truncate()
 ---
@@ -582,9 +582,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 1, 10]
-  1: [2, 2, 20]
-  2: [3, 3, 30]
+- 0: [1, 10]
+  1: [2, 20]
+  2: [3, 30]
 ...
 space:truncate()
 ---
@@ -623,8 +623,8 @@ space:select{}
 iterate_over(iter_obj)
 ---
 - 0: [1, 1, 10]
-  1: [2, 2, 20]
-  2: [3, 3, 30]
+  1: [2, 20]
+  2: [3, 30]
 ...
 space:truncate()
 ---
@@ -696,7 +696,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- []
+- 0: [1, 10]
+  1: [2, 20]
+  2: [3, 30]
 ...
 --   3) create iterator within test case
 space:replace({1, 10})
@@ -729,7 +731,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- []
+- 0: [3, 30]
 ...
 --
 -- DELETE followed by REPLACE
@@ -779,9 +781,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1]
-  1: [2]
-  2: [3]
+- 0: [1, 10]
+  1: [2, 20]
+  2: [3, 30]
 ...
 space:truncate()
 ---
@@ -831,9 +833,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1]
-  1: [2]
-  2: [3]
+- []
 ...
 space:truncate()
 ---
@@ -885,7 +885,6 @@ iterate_over(iter_obj)
 ---
 - 0: [1]
   1: [2]
-  2: [3]
 ...
 space:truncate()
 ---
@@ -929,9 +928,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 10]
-  1: [2, 20]
-  2: [3, 30]
+- []
 ...
 space:truncate()
 ---
@@ -972,9 +969,9 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 10]
-  1: [2, 20]
-  2: [3, 30]
+- 0: [1]
+  1: [2]
+  2: [3]
 ...
 space:truncate()
 ---
@@ -1017,7 +1014,7 @@ iterate_over(iter_obj)
 ---
 - 0: [1, 10]
   1: [2, 20]
-  2: [3, 30]
+  2: [3]
 ...
 space:truncate()
 ---
@@ -1046,9 +1043,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1]
-  1: [2]
-  2: [3]
+- []
 ...
 space:truncate()
 ---
@@ -1075,8 +1070,6 @@ space:select{}
 iterate_over(iter_obj)
 ---
 - 0: [1]
-  1: [2]
-  2: [3]
 ...
 space:truncate()
 ---
@@ -1136,9 +1129,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1]
-  1: [2]
-  2: [3]
+- []
 ...
 space:truncate()
 ---
@@ -1169,7 +1160,6 @@ iterate_over(iter_obj)
 ---
 - 0: [1]
   1: [2]
-  2: [3]
 ...
 space:truncate()
 ---
@@ -1447,8 +1437,6 @@ box.snapshot()
 iterate_over(iter_obj_sp2)
 ---
 - 0: [5]
-  1: [6]
-  2: [8]
 ...
 space2:truncate()
 ---
@@ -1461,8 +1449,6 @@ iterate_over(iter_obj_sp3)
 ---
 - 0: [4]
   1: [5]
-  2: [6]
-  3: [8]
 ...
 space3:truncate()
 ---
@@ -1529,7 +1515,7 @@ space:select{}
 ...
 iterate_over(iter_obj)
 ---
-- 0: [1, 2, 3]
+- []
 ...
 iter_obj2 = create_iterator(idx2, 2, {iterator = 'EQ'})
 ---
@@ -1539,7 +1525,7 @@ space:delete({1})
 ...
 iterate_over(iter_obj2)
 ---
-- []
+- 0: [1, 2, 3]
 ...
 space:truncate()
 ---
@@ -1604,15 +1590,11 @@ space:select{}
 iterate_over(iter_obj)
 ---
 - 0: [3, 8, 1]
-  1: [4, 16, -1]
-  2: [5, 32, -10]
-  3: [6, 64, -10]
 ...
 iterate_over(iter_obj2)
 ---
 - 0: [4, 16, -1]
-  1: [6, 64, -10]
-  2: [5, 32, -10]
+  1: [5, 32, -10]
 ...
 iterate_over(iter_obj3)
 ---
@@ -1726,12 +1708,10 @@ iterate_over(iter_obj)
 ---
 - 0: [1, 1, 1]
   1: [2, 2, 2]
-  2: [3, 3, 3]
 ...
 iterate_over(iter_obj2)
 ---
 - 0: [2, 2, 2]
-  1: [3, 3, 3]
 ...
 box.commit()
 ---

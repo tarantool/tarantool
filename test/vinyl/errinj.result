@@ -791,10 +791,12 @@ end;
 ---
 ...
 function iterate_in_read_view()
+    box.begin()
     local i = create_iterator(space)
     last_read = i.next()
     fiber.sleep(100000)
     last_read = i.next()
+    box.commit()
 end;
 ---
 ...
@@ -1149,6 +1151,9 @@ s:select{0}
 ---
 - - [0, 0]
 ...
+box.begin()
+---
+...
 errinj.set("ERRINJ_WAL_DELAY", true)
 ---
 - ok
@@ -1182,6 +1187,9 @@ state, value = gen(param, state)
 value
 ---
 - [2, 0]
+...
+box.commit()
+---
 ...
 s:drop()
 ---
