@@ -99,6 +99,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 	env->p_generation = p_generation;
 	env->upsert_thresh_cb = upsert_thresh_cb;
 	env->upsert_thresh_arg = upsert_thresh_arg;
+	env->index_count = 0;
 	return 0;
 }
 
