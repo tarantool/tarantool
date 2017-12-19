@@ -29,9 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "schema.h"
-#include "user_def.h"
-#include "engine.h"
-#include "index.h"
 #include "func.h"
 #include "sequence.h"
 #include "tuple.h"
