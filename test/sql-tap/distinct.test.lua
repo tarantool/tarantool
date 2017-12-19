@@ -67,7 +67,7 @@ local function do_temptables_test(tn, sql, temptables)
             for _, val in ipairs(r) do
                 local opcode = val[2]
                 local p5 = val[7]
-                if opcode == "OpenEphemeral" or opcode == "SorterOpen" then
+                if opcode == "OpenTEphemeral" or opcode == "SorterOpen" then
                     if p5 ~= "08" and p5 ~= "00" then
                         error()--p5 = $p5)
                     end

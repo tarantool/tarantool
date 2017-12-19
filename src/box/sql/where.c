@@ -2785,10 +2785,8 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 	int iSortIdx = 1;	/* Index number */
 	int b;			/* A boolean value */
 	LogEst rSize;		/* number of rows in the table */
-	LogEst rLogSize;	/* Logarithm of the number of rows in the table */
 	WhereClause *pWC;	/* The parsed WHERE clause */
 	Table *pTab;		/* Table being queried */
-	struct session *user_session = current_session();
 
 	pNew = pBuilder->pNew;
 	pWInfo = pBuilder->pWInfo;
@@ -2828,11 +2826,12 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		}
 		pProbe = &sPk;
 	}
-	rSize = pTab->nRowLogEst;
-	rLogSize = estLog(rSize);
 
 #ifndef SQLITE_OMIT_AUTOMATIC_INDEX
 	/* Automatic indexes */
+	LogEst rSize = pTab->nRowLogEst;
+	LogEst rLogSize = estLog(rSize);
+	struct session *user_session = current_session();
 	if (!pBuilder->pOrSet	/* Not part of an OR optimization */
 	    && (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) == 0 && (user_session->sql_flags & SQLITE_AutoIndex) != 0 && pSrc->pIBIndex == 0	/* Has no INDEXED BY clause */
 	    && !pSrc->fg.notIndexed	/* Has no NOT INDEXED clause */

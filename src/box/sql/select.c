@@ -848,7 +848,15 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			 * saving space and CPU cycles.
 			 */
 			ecelFlags |= (SQLITE_ECEL_OMITREF | SQLITE_ECEL_REF);
-			for (i = pSort->nOBSat; i < pSort->pOrderBy->nExpr; i++) {
+			/* This optimization is temporary disabled. It seems
+			 * that it was possible to create table with n columns and
+			 * insert tuple with m columns, where m < n. Contrary, Tarantool
+			 * doesn't allow to alter the number of fields in tuple
+			 * to be inserted. This may be uncommented by delaying the
+			 * creation of table until insertion of first tuple,
+			 * so that the number of fields in tuple can be precisely calculated.
+			 */
+			/*for (i = pSort->nOBSat; i < pSort->pOrderBy->nExpr; i++) {
 				int j;
 				if ((j =
 				     pSort->pOrderBy->a[i].u.x.iOrderByCol) >
@@ -856,7 +864,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 					pEList->a[j - 1].u.x.iOrderByCol =
 					    (u16) (i + 1 - pSort->nOBSat);
 				}
-			}
+			}*/
 			regOrig = 0;
 			assert(eDest == SRT_Set || eDest == SRT_Mem
 			       || eDest == SRT_Coroutine
@@ -991,7 +999,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				 * current row to the index and proceed with writing it to the
 				 * output table as well.
 				 */
-				int addr = sqlite3VdbeCurrentAddr(v) + 4;
+				int addr = sqlite3VdbeCurrentAddr(v) + 6;
 				sqlite3VdbeAddOp4Int(v, OP_Found, iParm + 1,
 						     addr, r1, 0);
 				VdbeCoverage(v);
@@ -1005,11 +1013,22 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 					       r1 + nPrefixReg, regResult, 1,
 					       nPrefixReg);
 			} else {
-				int r2 = sqlite3GetTempReg(pParse);
-				sqlite3VdbeAddOp2(v, OP_NewRowid, iParm, r2);
-				sqlite3VdbeAddOp3(v, OP_Insert, iParm, r1, r2);
-				sqlite3VdbeChangeP5(v, OPFLAG_APPEND);
-				sqlite3ReleaseTempReg(pParse, r2);
+				int regRec = sqlite3GetTempReg(pParse);
+				/* Last column is required for ID. */
+				int regCopy = sqlite3GetTempRange(pParse, nResultCol + 1);
+				sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, iParm,
+						  0, regCopy + nResultCol);
+				/* Positioning ID column to be last in inserted tuple.
+				 * NextId -> regCopy + n + 1
+				 * Copy [regResult, regResult + n] -> [regCopy, regCopy + n]
+				 * MakeRecord -> [regCopy, regCopy + n + 1] -> regRec
+				 * IdxInsert -> regRec
+				 */
+				sqlite3VdbeAddOp3(v, OP_Copy, regResult, regCopy, nResultCol - 1);
+				sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy, nResultCol + 1, regRec);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regRec);
+				sqlite3ReleaseTempReg(pParse, regRec);
+				sqlite3ReleaseTempRange(pParse, regCopy, nResultCol + 1);
 			}
 			sqlite3ReleaseTempRange(pParse, r1, nPrefixReg + 1);
 			break;
@@ -1184,6 +1203,7 @@ sqlite3KeyInfoAlloc(sqlite3 * db, int N, int X)
 		p->nXField = (u16) X;
 		p->db = db;
 		p->nRef = 1;
+		p->aColl[0] = NULL;
 		memset(&p[1], 0, nExtra);
 	} else {
 		sqlite3OomFault(db);
@@ -1469,10 +1489,12 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	switch (eDest) {
 	case SRT_Table:
 	case SRT_EphemTab: {
-			sqlite3VdbeAddOp2(v, OP_NewRowid, iParm, regRowid);
-			sqlite3VdbeAddOp3(v, OP_Insert, iParm, regRow,
-					  regRowid);
-			sqlite3VdbeChangeP5(v, OPFLAG_APPEND);
+			int regCopy = sqlite3GetTempRange(pParse,  nColumn);
+			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, iParm, 0, regRowid);
+			sqlite3VdbeAddOp3(v, OP_Copy, regRow, regCopy, nSortData - 1);
+			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy, nColumn + 1, regRow);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regRow);
+			sqlite3ReleaseTempReg(pParse, regCopy);
 			break;
 		}
 #ifndef SQLITE_OMIT_SUBQUERY
@@ -2338,15 +2360,19 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iQueue,
 				  pOrderBy->nExpr + 2, 0, (char *)pKeyInfo,
 				  P4_KEYINFO);
+		VdbeComment((v, "Orderby table"));
 		destQueue.pOrderBy = pOrderBy;
 	} else {
-		sqlite3VdbeAddOp2(v, OP_OpenEphemeral, iQueue, nCol);
+		KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nCol + 1, 0);
+		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iQueue, nCol + 1, 0,
+				  (char*)pKeyInfo, P4_KEYINFO);
+		VdbeComment((v, "Queue table"));
 	}
-	VdbeComment((v, "Queue table"));
 	if (iDistinct) {
 		p->addrOpenEphm[0] =
-		    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iDistinct, 0);
+		    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iDistinct, 1);
 		p->selFlags |= SF_UsesEphemeral;
+		VdbeComment((v, "Distinct table"));
 	}
 
 	/* Detach the ORDER BY clause from the compound SELECT */
@@ -2541,8 +2567,11 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	 */
 	if (dest.eDest == SRT_EphemTab) {
 		assert(p->pEList);
-		sqlite3VdbeAddOp2(v, OP_OpenEphemeral, dest.iSDParm,
-				  p->pEList->nExpr);
+		int nCols = p->pEList->nExpr;
+		KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nCols + 1, 0);
+		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, dest.iSDParm, nCols + 1,
+				  0, (char*)pKeyInfo, P4_KEYINFO);
+		VdbeComment((v, "Destination temp"));
 		dest.eDest = SRT_Table;
 	}
 
@@ -5238,8 +5267,8 @@ resetAccumulator(Parse * pParse, AggInfo * pAggInfo)
 				KeyInfo *pKeyInfo =
 				    keyInfoFromExprList(pParse, pE->x.pList, 0,
 							0);
-				sqlite3VdbeAddOp4(v, OP_OpenEphemeral,
-						  pFunc->iDistinct, 0, 0,
+				sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
+						  pFunc->iDistinct, 1, 0,
 						  (char *)pKeyInfo, P4_KEYINFO);
 			}
 		}
@@ -5731,14 +5760,19 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if (sSort.pOrderBy) {
 		KeyInfo *pKeyInfo;
 		pKeyInfo =
-		    keyInfoFromExprList(pParse, sSort.pOrderBy, 0,
-					pEList->nExpr);
+		    keyInfoFromExprList(pParse, sSort.pOrderBy, 0, pEList->nExpr);
 		sSort.iECursor = pParse->nTab++;
+		/* Number of columns in transient table equals to number of columns in
+		 * SELECT statement plus number of columns in ORDER BY statement
+		 * and plus one column for ID.
+		 */
+		int nCols = pEList->nExpr + sSort.pOrderBy->nExpr + 1;
 		sSort.addrSortIndex =
-		    sqlite3VdbeAddOp4(v, OP_OpenEphemeral,
+		    sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
 				      sSort.iECursor,
-				      sSort.pOrderBy->nExpr + 1 + pEList->nExpr,
+				      nCols,
 				      0, (char *)pKeyInfo, P4_KEYINFO);
+		VdbeComment((v, "Sort table"));
 	} else {
 		sSort.addrSortIndex = -1;
 	}
@@ -5746,8 +5780,12 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	/* If the output is destined for a temporary table, open that table.
 	 */
 	if (pDest->eDest == SRT_EphemTab) {
-		sqlite3VdbeAddOp2(v, OP_OpenEphemeral, pDest->iSDParm,
-				  pEList->nExpr);
+		KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db,
+							pEList->nExpr + 1, 0);
+		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, pDest->iSDParm,
+				  pEList->nExpr + 1, 0, (char*)pKeyInfo, P4_KEYINFO);
+
+		VdbeComment((v, "Output table"));
 	}
 
 	/* Set the limiter.
@@ -5766,13 +5804,14 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	 */
 	if (p->selFlags & SF_Distinct) {
 		sDistinct.tabTnct = pParse->nTab++;
-		sDistinct.addrTnct = sqlite3VdbeAddOp4(v, OP_OpenEphemeral,
-						       sDistinct.tabTnct, 0, 0,
-						       (char *)
-						       keyInfoFromExprList
-						       (pParse, p->pEList, 0,
-							0), P4_KEYINFO);
+		KeyInfo *pKeyInfo = keyInfoFromExprList(pParse, p->pEList, 0, 0);
+		sDistinct.addrTnct = sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
+						       sDistinct.tabTnct,
+						       pKeyInfo->nField,
+						       0, (char *)pKeyInfo,
+						       P4_KEYINFO);
 		sqlite3VdbeChangeP5(v, BTREE_UNORDERED);
+		VdbeComment((v, "Distinct table"));
 		sDistinct.eTnctType = WHERE_DISTINCT_UNORDERED;
 	} else {
 		sDistinct.eTnctType = WHERE_DISTINCT_NOOP;

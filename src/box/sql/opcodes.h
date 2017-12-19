@@ -115,8 +115,8 @@
 #define OP_Sequence      112 /* synopsis: r[P2]=cursor[P1].ctr++           */
 #define OP_NextId        113 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
 #define OP_NextIdEphemeral 114 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
-#define OP_FCopy         115 /* synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)] */
-#define OP_Real          116 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_Real          115 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_FCopy         116 /* synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)] */
 #define OP_NewRowid      117 /* synopsis: r[P2]=rowid                      */
 #define OP_Insert        118 /* synopsis: intkey=r[P3] data=r[P2]          */
 #define OP_InsertInt     119 /* synopsis: intkey=P3 data=r[P2]             */
