@@ -148,7 +148,6 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	int regNewRowid = 0;	/* The new rowid */
 	int regNew = 0;		/* Content of the NEW.* table in triggers */
 	int regOld = 0;		/* Content of OLD.* table in triggers */
-	int regRowSet = 0;	/* Rowset of rows to be updated */
 	int regKey = 0;		/* composite PRIMARY KEY value */
 
 	memset(&sContext, 0, sizeof(sContext));
@@ -328,7 +327,6 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	sqlite3BeginWriteOperation(pParse, 1);
 
 	/* Allocate required registers. */
-	regRowSet = ++pParse->nMem;
 	regOldRowid = regNewRowid = ++pParse->nMem;
 	if (chngPk || pTrigger || hasFK) {
 		regOld = pParse->nMem + 1;
@@ -351,6 +349,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 #if !defined(SQLITE_OMIT_VIEW) && !defined(SQLITE_OMIT_TRIGGER)
 	if (isView) {
 		sqlite3MaterializeView(pParse, pTab, pWhere, iDataCur);
+		/* Number of columns from SELECT plus ID.*/
+		nKey = pTab->nCol + 1;
 	}
 #endif
 
@@ -361,65 +361,69 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		goto update_cleanup;
 	}
 	/* Begin the database scan
+	 * The only difference between VIEW and ordinary table is the fact that
+	 * VIEW is held in ephemeral table and doesn't have explicit PK.
+	 * In this case we have to manually load columns in order to make tuple.
 	 */
-	if (HasRowid(pTab)) {
-		sqlite3VdbeAddOp3(v, OP_Null, 0, regRowSet, regOldRowid);
-		pWInfo = sqlite3WhereBegin(pParse, pTabList, pWhere, 0, 0,
-					   WHERE_ONEPASS_DESIRED |
-					   WHERE_SEEK_TABLE, iIdxCur);
-		if (pWInfo == 0)
-			goto update_cleanup;
-		okOnePass = sqlite3WhereOkOnePass(pWInfo, aiCurOnePass);
+	int iPk;	/* First of nPk memory cells holding PRIMARY KEY value */
+	i16 nPk;	/* Number of components of the PRIMARY KEY */
+	int addrOpen;	/* Address of the OpenEphemeral instruction */
 
-		/* Remember the rowid of every item to be updated.
-		 */
-		sqlite3VdbeAddOp2(v, OP_Rowid, iDataCur, regOldRowid);
-		if (!okOnePass) {
-			sqlite3VdbeAddOp2(v, OP_RowSetAdd, regRowSet,
-					  regOldRowid);
-		}
-
-		/* End the database scan loop.
-		 */
-		sqlite3WhereEnd(pWInfo);
+	if (isView) {
+		nPk = nKey;
 	} else {
-		int iPk;	/* First of nPk memory cells holding PRIMARY KEY value */
-		i16 nPk;	/* Number of components of the PRIMARY KEY */
-		int addrOpen;	/* Address of the OpenEphemeral instruction */
-
 		assert(pPk != 0);
 		nPk = pPk->nKeyCol;
-		iPk = pParse->nMem + 1;
-		pParse->nMem += nPk;
-		regKey = ++pParse->nMem;
-		iEph = pParse->nTab++;
-		sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
+	}
+	iPk = pParse->nMem + 1;
+	pParse->nMem += nPk;
+	regKey = ++pParse->nMem;
+	iEph = pParse->nTab++;
+	sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
+
+	if (isView) {
+		KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nKey, 0);
+		addrOpen = sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iEph,
+					     nKey, 0, (char*)pKeyInfo, P4_KEYINFO);
+	} else {
 		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph, nPk);
 		sqlite3VdbeSetP4KeyInfo(pParse, pPk);
-		pWInfo = sqlite3WhereBegin(pParse, pTabList, pWhere, 0, 0,
-					   WHERE_ONEPASS_DESIRED, iIdxCur);
-		if (pWInfo == 0)
-			goto update_cleanup;
-		okOnePass = sqlite3WhereOkOnePass(pWInfo, aiCurOnePass);
+	}
+
+	pWInfo = sqlite3WhereBegin(pParse, pTabList, pWhere, 0, 0,
+				   WHERE_ONEPASS_DESIRED, iIdxCur);
+	if (pWInfo == 0)
+		goto update_cleanup;
+	okOnePass = sqlite3WhereOkOnePass(pWInfo, aiCurOnePass);
+	if (isView){
+		for (i = 0; i < nPk; i++) {
+			sqlite3VdbeAddOp3(v, OP_Column, iDataCur, i, iPk + i);
+		}
+	} else {
 		for (i = 0; i < nPk; i++) {
 			assert(pPk->aiColumn[i] >= 0);
 			sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur,
 							pPk->aiColumn[i],
 							iPk + i);
 		}
-		if (okOnePass) {
-			sqlite3VdbeChangeToNoop(v, addrOpen);
-			nKey = nPk;
-			regKey = iPk;
-		} else {
-			sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, nPk, regKey,
-					  sqlite3IndexAffinityStr(db, pPk),
-					  nPk);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iEph, regKey, iPk,
-					     nPk);
-		}
-		sqlite3WhereEnd(pWInfo);
 	}
+
+	if (okOnePass) {
+		sqlite3VdbeChangeToNoop(v, addrOpen);
+		nKey = nPk;
+		regKey = iPk;
+	} else {
+		const char *zAff = isView ? 0 :
+				   sqlite3IndexAffinityStr(pParse->db, pPk);
+		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, nPk, regKey,
+					  zAff, nPk);
+		sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iEph, regKey, iPk,
+				     nPk);
+	}
+	/* End the database scan loop.
+	 */
+	sqlite3WhereEnd(pWInfo);
+
 
 	/* Initialize the count of updated rows
 	 */
@@ -460,7 +464,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Top of the update loop */
 	if (okOnePass) {
 		labelContinue = labelBreak;
-		sqlite3VdbeAddOp2(v, OP_IsNull, pPk ? regKey : regOldRowid,
+		sqlite3VdbeAddOp2(v, OP_IsNull, regKey,
 				  labelBreak);
 		if (aToOpen[iDataCur - iBaseCur] && !isView) {
 			assert(pPk);
@@ -470,21 +474,13 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 		VdbeCoverageIf(v, pPk == 0);
 		VdbeCoverageIf(v, pPk != 0);
-	} else if (pPk) {
+	} else {
 		labelContinue = sqlite3VdbeMakeLabel(v);
 		sqlite3VdbeAddOp2(v, OP_Rewind, iEph, labelBreak);
 		VdbeCoverage(v);
 		addrTop = sqlite3VdbeAddOp2(v, OP_RowData, iEph, regKey);
 		sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur, labelContinue,
 				     regKey, 0);
-		VdbeCoverage(v);
-	} else {
-		labelContinue =
-		    sqlite3VdbeAddOp3(v, OP_RowSetRead, regRowSet, labelBreak,
-				      regOldRowid);
-		VdbeCoverage(v);
-		sqlite3VdbeAddOp3(v, OP_NotExists, iDataCur, labelContinue,
-				  regOldRowid);
 		VdbeCoverage(v);
 	}
 
@@ -583,13 +579,13 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * is deleted or renamed by a BEFORE trigger - is left undefined in the
 		 * documentation.
 		 */
-		if (pPk) {
+		if (!isView) {
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur,
 					     labelContinue, regKey, nKey);
 			VdbeCoverage(v);
 		} else {
-			sqlite3VdbeAddOp3(v, OP_NotExists, iDataCur,
-					  labelContinue, regOldRowid);
+			sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur,
+					     labelContinue, regKey - nKey, nKey);
 			VdbeCoverage(v);
 		}
 
@@ -627,16 +623,10 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 		/* Delete the index entries associated with the current record.  */
 		if (bReplace || chngKey) {
-			if (pPk) {
-				addr1 =
-				    sqlite3VdbeAddOp4Int(v, OP_NotFound,
-							 iDataCur, 0, regKey,
-							 nKey);
-			} else {
-				addr1 =
-				    sqlite3VdbeAddOp3(v, OP_NotExists, iDataCur,
-						      0, regOldRowid);
-			}
+			addr1 =
+				sqlite3VdbeAddOp4Int(v, OP_NotFound,
+						     iDataCur, 0, regKey,
+						     nKey);
 			VdbeCoverageNeverTaken(v);
 		}
 		sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur);
@@ -703,12 +693,10 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	if (okOnePass) {
 		/* Nothing to do at end-of-loop for a single-pass */
-	} else if (pPk) {
+	} else {
 		sqlite3VdbeResolveLabel(v, labelContinue);
 		sqlite3VdbeAddOp2(v, OP_Next, iEph, addrTop);
 		VdbeCoverage(v);
-	} else {
-		sqlite3VdbeGoto(v, labelContinue);
 	}
 	sqlite3VdbeResolveLabel(v, labelBreak);
 
