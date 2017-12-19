@@ -239,6 +239,10 @@ struct tx_manager {
 	const struct vy_read_view *p_committed_read_view;
 	/** Transaction statistics. */
 	struct vy_tx_stat stat;
+	/** Sum size of statements pinned by the write set. */
+	size_t write_set_size;
+	/** Sum size of statements pinned by the read set. */
+	size_t read_set_size;
 	/** Memory pool for struct vy_tx allocations. */
 	struct mempool tx_mempool;
 	/** Memory pool for struct txv allocations. */

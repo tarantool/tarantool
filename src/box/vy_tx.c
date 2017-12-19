@@ -204,7 +204,8 @@ tx_manager_vlsn(struct tx_manager *xm)
 static struct txv *
 txv_new(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 {
-	struct txv *v = mempool_alloc(&tx->xm->txv_mempool);
+	struct tx_manager *xm = tx->xm;
+	struct txv *v = mempool_alloc(&xm->txv_mempool);
 	if (v == NULL) {
 		diag_set(OutOfMemory, sizeof(*v), "mempool", "struct txv");
 		return NULL;
@@ -219,15 +220,18 @@ txv_new(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	v->is_first_insert = false;
 	v->is_overwritten = false;
 	v->overwritten = NULL;
+	xm->write_set_size += tuple_size(stmt);
 	return v;
 }
 
 static void
 txv_delete(struct txv *v)
 {
+	struct tx_manager *xm = v->tx->xm;
+	xm->write_set_size -= tuple_size(v->stmt);
 	tuple_unref(v->stmt);
 	vy_index_unref(v->index);
-	mempool_free(&v->tx->xm->txv_mempool, v);
+	mempool_free(&xm->txv_mempool, v);
 }
 
 static struct vy_read_interval *
@@ -235,8 +239,9 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_index *index,
 		     struct tuple *left, bool left_belongs,
 		     struct tuple *right, bool right_belongs)
 {
+	struct tx_manager *xm = tx->xm;
 	struct vy_read_interval *interval;
-	interval = mempool_alloc(&tx->xm->read_interval_mempool);
+	interval = mempool_alloc(&xm->read_interval_mempool);
 	if (interval == NULL) {
 		diag_set(OutOfMemory, sizeof(*interval),
 			 "mempool", "struct vy_read_interval");
@@ -252,16 +257,23 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_index *index,
 	interval->right = right;
 	interval->right_belongs = right_belongs;
 	interval->subtree_last = NULL;
+	xm->read_set_size += tuple_size(left);
+	if (left != right)
+		xm->read_set_size += tuple_size(right);
 	return interval;
 }
 
 static void
 vy_read_interval_delete(struct vy_read_interval *interval)
 {
+	struct tx_manager *xm = interval->tx->xm;
+	xm->read_set_size -= tuple_size(interval->left);
+	if (interval->left != interval->right)
+		xm->read_set_size -= tuple_size(interval->right);
 	vy_index_unref(interval->index);
 	tuple_unref(interval->left);
 	tuple_unref(interval->right);
-	mempool_free(&interval->tx->xm->read_interval_mempool, interval);
+	mempool_free(&xm->read_interval_mempool, interval);
 }
 
 static struct vy_read_interval *
