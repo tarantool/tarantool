@@ -98,14 +98,29 @@ box.schema.user.drop('tester')
 session.user()
 
 --------------------------------------------------------------------------------
--- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+-- Check if identifiers obey the common constraints
 --------------------------------------------------------------------------------
--- invalid identifiers
-box.schema.user.create('invalid.identifier')
-box.schema.user.create('invalid identifier')
-box.schema.user.create('user ')
-box.schema.user.create('5')
-box.schema.user.create(' ')
+identifier = require("identifier")
+test_run:cmd("setopt delimiter ';'")
+identifier.run_test(
+	function (identifier)
+		box.schema.user.create(identifier)
+		box.schema.user.grant(identifier, 'super')
+		box.session.su(identifier)
+		box.session.su("admin")
+		box.schema.user.revoke(identifier, 'super')
+	end,
+	box.schema.user.drop
+);
+identifier.run_test(
+	function (identifier)
+		box.schema.role.create(identifier)
+		box.schema.role.grant(identifier, 'execute,read,write',
+			'universe', nil, {if_not_exists = false})
+	end,
+	box.schema.role.drop
+);
+test_run:cmd("setopt delimiter ''");
 
 -- valid identifiers
 box.schema.user.create('Петя_Иванов')

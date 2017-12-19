@@ -9,8 +9,9 @@
 #include <box/vy_point_lookup.h>
 #include "vy_iterators_helper.h"
 #include "vy_write_iterator.h"
+#include "identifier.h"
 
-uint64_t schema_version;
+uint32_t schema_version;
 
 static void
 test_basic()
@@ -52,7 +53,7 @@ test_basic()
 
 	struct index_opts index_opts = index_opts_default;
 	struct index_def *index_def =
-		index_def_new(512, 0, "primary", sizeof("primary"), TREE,
+		index_def_new(512, 0, "primary", sizeof("primary") - 1, TREE,
 			      &index_opts, key_def, NULL);
 
 	struct vy_index *pk = vy_index_new(&index_env, &cache_env, &mem_env,
@@ -295,6 +296,7 @@ test_basic()
 int
 main()
 {
+	identifier_init();
 	plan(1);
 
 	vy_iterator_C_test_init(128 * 1024);
@@ -304,5 +306,6 @@ main()
 
 	vy_iterator_C_test_finish();
 
+	identifier_destroy();
 	return check_plan();
 }

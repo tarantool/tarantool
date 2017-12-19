@@ -105,14 +105,28 @@ space:drop()
 
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--
+-- The result of this test is superseded by the change made
+-- in scope of gh-2914, which allows all printable characters for
+-- identifiers.
+--
 --------------------------------------------------------------------------------
 
 -- invalid identifiers
-box.schema.space.create('invalid.identifier')
-box.schema.space.create('invalid identifier')
-box.schema.space.create('primary ')
-box.schema.space.create('5')
+s = box.schema.space.create('invalid.identifier')
+s.name
+s:drop()
+s = box.schema.space.create('invalid identifier')
+s.name
+s:drop()
+s = box.schema.space.create('primary ')
+'|'..s.name..'|'
+s:drop()
+s = box.schema.space.create('5')
+s.name
+s:drop()
 box.schema.space.create('')
+
 
 -- valid identifiers
 box.schema.space.create('_Abcde'):drop()
@@ -127,13 +141,22 @@ box.schema.space.create('utf8_наше_Фсё'):drop() -- unicode
 space = box.schema.space.create('test')
 
 -- invalid identifiers
-space:create_index('invalid.identifier')
-space:create_index('invalid identifier')
-space:create_index('primary ')
-space:create_index('5')
+i = space:create_index('invalid.identifier')
+i.name
+i:drop()
+i = space:create_index('invalid identifier')
+i.name
+i:drop()
+i = space:create_index('primary ')
+'|'..i.name..'|'
+i:drop()
+i = space:create_index('5')
+i.name
+i:drop()
 space:create_index('')
 
 space:drop()
+
 -- gh-57 Confusing error message when trying to create space with a
 -- duplicate id
 auto = box.schema.space.create('auto_original')
@@ -661,3 +684,51 @@ pk:alter{parts = {{1, 'integer'}}}
 s:replace{-2}
 s:select{}
 s:drop()
+
+--
+-- gh-2914: Allow any space name which consists of printable characters
+--
+identifier = require("identifier")
+test_run:cmd("setopt delimiter ';'")
+identifier.run_test(
+	function (identifier)
+		box.schema.space.create(identifier)
+		if box.space[identifier] == nil then
+			error("Cannot query space")
+		end
+	end,
+	function (identifier) box.space[identifier]:drop() end
+);
+
+s = box.schema.create_space("test");
+identifier.run_test(
+    function (identifier) s:create_index(identifier, {parts={1}}) end,
+    function (identifier) s.index[identifier]:drop() end
+);
+s:drop();
+
+--
+-- gh-2914: check column name validation.
+-- Ensure that col names are validated as identifiers.
+--
+s = box.schema.create_space('test');
+i = s:create_index("primary", {parts={1, "integer"}});
+identifier.run_test(
+	function (identifier)
+		s:format({{name=identifier,type="integer"}})
+		local t = s:replace({1})
+		if t[identifier] ~= 1 then
+			error("format identifier error")
+		end
+	end,
+	function (identifier) end
+);
+s:drop();
+
+-- gh-2914: check coll name validation.
+identifier.run_test(
+    function (identifier) box.internal.collation.create(identifier, 'ICU', 'ru-RU', {}) end,
+    function (identifier) box.internal.collation.drop(identifier) end
+);
+
+test_run:cmd("setopt delimiter ''");

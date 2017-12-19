@@ -1,5 +1,7 @@
+#ifndef TARANTOOL_BOX_IDENTIFIER_H_INCLUDED
+#define TARANTOOL_BOX_IDENTIFIER_H_INCLUDED
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,35 +30,51 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "schema_def.h"
+#include "trivia/util.h"
+#include <stdbool.h>
+#include "error.h"
 
-static const char *object_type_strs[] = {
-	/* [SC_UKNNOWN]         = */ "unknown",
-	/* [SC_UNIVERSE]        = */ "universe",
-	/* [SC_SPACE]           = */ "space",
-	/* [SC_FUNCTION]        = */ "function",
-	/* [SC_USER]            = */ "user",
-	/* [SC_ROLE]            = */ "role",
-	/* [SC_SEQUENCE]        = */ "sequence",
-	/* [SC_COLLATION]       = */ "collation",
-};
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-enum schema_object_type
-schema_object_type(const char *name)
+/**
+ * Check object identifier for invalid symbols.
+ * The function checks the str for containing
+ * printable characters only.
+ *
+ * @retval 0 success
+ * @retval -1 error, diagnostics area is set
+ */
+int
+identifier_check(const char *str, size_t str_len);
+
+/**
+ * Init identifier check mechanism.
+ * This function allocates necessary for icu structures.
+ */
+void
+identifier_init();
+
+/**
+ * Clean icu structures.
+ */
+void
+identifier_destroy();
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+/**
+ * Throw an error if identifier is not valid.
+ */
+static inline void
+identifier_check_xc(const char *str, size_t str_len)
 {
-	/**
-	 * There may be other places in which we look object type by
-	 * name, and they are case-sensitive, so be case-sensitive
-	 * here too.
-	 */
-	int n_strs = sizeof(object_type_strs)/sizeof(*object_type_strs);
-	int index = strindex(object_type_strs, name, n_strs);
-	return (enum schema_object_type) (index == n_strs ? 0 : index);
+	if (identifier_check(str, str_len))
+		diag_raise();
 }
 
-const char *
-schema_object_name(enum schema_object_type type)
-{
-	assert((int) type < (int) schema_object_type_MAX);
-	return object_type_strs[type];
-}
+#endif /* defined(__cplusplus) */
+
+#endif /* TARANTOOL_BOX_IDENTIFIER_H_INCLUDED */

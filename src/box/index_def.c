@@ -30,6 +30,7 @@
  */
 #include "index_def.h"
 #include "schema_def.h"
+#include "identifier.h"
 
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
@@ -80,8 +81,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		diag_set(OutOfMemory, name_len + 1, "malloc", "index_def name");
 		return NULL;
 	}
-	if (!identifier_is_valid(def->name, name_len)) {
-		diag_set(ClientError, ER_IDENTIFIER, def->name);
+	if (identifier_check(def->name, name_len)) {
 		index_def_delete(def);
 		return NULL;
 	}

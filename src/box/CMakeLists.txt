@@ -53,6 +53,7 @@ add_library(box STATIC
     error.cc
     xrow_io.cc
     tuple_convert.c
+    identifier.c
     index.cc
     index_def.c
     iterator_type.c

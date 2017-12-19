@@ -231,28 +231,42 @@ session.user()
 - admin
 ...
 --------------------------------------------------------------------------------
--- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+-- Check if identifiers obey the common constraints
 --------------------------------------------------------------------------------
--- invalid identifiers
-box.schema.user.create('invalid.identifier')
+identifier = require("identifier")
 ---
-- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-box.schema.user.create('invalid identifier')
+test_run:cmd("setopt delimiter ';'")
 ---
-- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
+- true
 ...
-box.schema.user.create('user ')
+identifier.run_test(
+	function (identifier)
+		box.schema.user.create(identifier)
+		box.schema.user.grant(identifier, 'super')
+		box.session.su(identifier)
+		box.session.su("admin")
+		box.schema.user.revoke(identifier, 'super')
+	end,
+	box.schema.user.drop
+);
 ---
-- error: Invalid identifier 'user ' (expected letters, digits or an underscore)
+- All tests passed
 ...
-box.schema.user.create('5')
+identifier.run_test(
+	function (identifier)
+		box.schema.role.create(identifier)
+		box.schema.role.grant(identifier, 'execute,read,write',
+			'universe', nil, {if_not_exists = false})
+	end,
+	box.schema.role.drop
+);
 ---
-- error: Invalid identifier '5' (expected letters, digits or an underscore)
+- All tests passed
 ...
-box.schema.user.create(' ')
+test_run:cmd("setopt delimiter ''");
 ---
-- error: Invalid identifier ' ' (expected letters, digits or an underscore)
+- true
 ...
 -- valid identifiers
 box.schema.user.create('Петя_Иванов')

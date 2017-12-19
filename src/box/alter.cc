@@ -48,6 +48,7 @@
 #include "vclock.h" /* VCLOCK_MAX */
 #include "xrow.h"
 #include "iproto_constants.h"
+#include "identifier.h"
 #include "memtx_tuple.h"
 #include "version.h"
 #include "sequence.h"
@@ -281,6 +282,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  space_name(space), "index name is too long");
 	}
+	identifier_check_xc(name, name_len);
 	struct key_def *key_def = NULL;
 	struct key_part_def *part_def = (struct key_part_def *)
 			malloc(sizeof(*part_def) * part_count);
@@ -406,11 +408,13 @@ field_def_decode(struct field_def *field, const char **data,
 			  tt_sprintf("field %d name is not specified",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
-	if (strlen(field->name) > BOX_NAME_MAX) {
+	size_t field_name_len = strlen(field->name);
+	if (field_name_len > BOX_NAME_MAX) {
 		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d name is too long",
 				     fieldno + TUPLE_INDEX_BASE));
 	}
+	identifier_check_xc(field->name, field_name_len);
 	if (field->type == field_type_MAX) {
 		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d has unknown field type",
@@ -480,6 +484,10 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	const char *engine_name =
 		tuple_field_str_xc(tuple, BOX_SPACE_FIELD_ENGINE,
 				   &engine_name_len);
+	/*
+	 * Engines are compiled-in so their names are known in
+	 * advance to be shorter than names of other identifiers.
+	 */
 	if (engine_name_len > ENGINE_NAME_MAX) {
 		tnt_raise(ClientError, errcode, tt_cstr(name, name_len),
 			  "space engine name is too long");
@@ -2018,6 +2026,7 @@ func_def_new_from_tuple(const struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_FUNCTION,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "function name is too long");
+	identifier_check_xc(name, len);
 	struct func_def *def = (struct func_def *) malloc(func_def_sizeof(len));
 	if (def == NULL)
 		tnt_raise(OutOfMemory, func_def_sizeof(len), "malloc", "def");
@@ -2148,6 +2157,10 @@ coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
 	if (locale_len > BOX_NAME_MAX)
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "collation locale is too long");
+	/* Locale is an optional argument and can be NULL. */
+	if (locale_len > 0)
+		identifier_check_xc(def->locale, locale_len);
+	identifier_check_xc(def->name, name_len);
 
 	assert(def->type == COLL_TYPE_ICU); /* no more defined now */
 	if (opts_decode(&def->icu, coll_icu_opts_reg, &options,
@@ -2696,6 +2709,7 @@ sequence_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
 			  "sequence name is too long");
 	}
+	identifier_check_xc(name, name_len);
 	size_t sz = sequence_def_sizeof(name_len);
 	struct sequence_def *def = (struct sequence_def *) malloc(sz);
 	if (def == NULL)

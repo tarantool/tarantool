@@ -36,6 +36,7 @@
 #include "fiber_pool.h"
 #include <say.h>
 #include <scoped_guard.h>
+#include "identifier.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -1424,6 +1425,7 @@ box_free(void)
 		gc_free();
 		engine_shutdown();
 		wal_thread_stop();
+		identifier_destroy();
 	}
 }
 
@@ -1624,6 +1626,7 @@ box_cfg_xc(void)
 	engine_init();
 	if (module_init() != 0)
 		diag_raise();
+	identifier_init();
 	schema_init();
 	replication_init();
 	port_init();

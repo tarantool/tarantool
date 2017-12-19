@@ -308,27 +308,56 @@ space:drop()
 ...
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--
+-- The result of this test is superseded by the change made
+-- in scope of gh-2914, which allows all printable characters for
+-- identifiers.
+--
 --------------------------------------------------------------------------------
 -- invalid identifiers
-box.schema.space.create('invalid.identifier')
+s = box.schema.space.create('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-box.schema.space.create('invalid identifier')
+s.name
 ---
-- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
+- invalid.identifier
 ...
-box.schema.space.create('primary ')
+s:drop()
 ---
-- error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
-box.schema.space.create('5')
+s = box.schema.space.create('invalid identifier')
 ---
-- error: Invalid identifier '5' (expected letters, digits or an underscore)
+...
+s.name
+---
+- invalid identifier
+...
+s:drop()
+---
+...
+s = box.schema.space.create('primary ')
+---
+...
+'|'..s.name..'|'
+---
+- '|primary |'
+...
+s:drop()
+---
+...
+s = box.schema.space.create('5')
+---
+...
+s.name
+---
+- '5'
+...
+s:drop()
+---
 ...
 box.schema.space.create('')
 ---
-- error: Invalid identifier '' (expected letters, digits or an underscore)
+- error: Invalid identifier '' (expected printable symbols only)
 ...
 -- valid identifiers
 box.schema.space.create('_Abcde'):drop()
@@ -357,25 +386,49 @@ space = box.schema.space.create('test')
 ---
 ...
 -- invalid identifiers
-space:create_index('invalid.identifier')
+i = space:create_index('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-space:create_index('invalid identifier')
+i.name
 ---
-- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
+- invalid.identifier
 ...
-space:create_index('primary ')
+i:drop()
 ---
-- error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
-space:create_index('5')
+i = space:create_index('invalid identifier')
 ---
-- error: Invalid identifier '5' (expected letters, digits or an underscore)
+...
+i.name
+---
+- invalid identifier
+...
+i:drop()
+---
+...
+i = space:create_index('primary ')
+---
+...
+'|'..i.name..'|'
+---
+- '|primary |'
+...
+i:drop()
+---
+...
+i = space:create_index('5')
+---
+...
+i.name
+---
+- '5'
+...
+i:drop()
+---
 ...
 space:create_index('')
 ---
-- error: Invalid identifier '' (expected letters, digits or an underscore)
+- error: Invalid identifier '' (expected printable symbols only)
 ...
 space:drop()
 ---
@@ -1734,4 +1787,77 @@ s:select{}
 ...
 s:drop()
 ---
+...
+--
+-- gh-2914: Allow any space name which consists of printable characters
+--
+identifier = require("identifier")
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+identifier.run_test(
+	function (identifier)
+		box.schema.space.create(identifier)
+		if box.space[identifier] == nil then
+			error("Cannot query space")
+		end
+	end,
+	function (identifier) box.space[identifier]:drop() end
+);
+---
+- All tests passed
+...
+s = box.schema.create_space("test");
+---
+...
+identifier.run_test(
+    function (identifier) s:create_index(identifier, {parts={1}}) end,
+    function (identifier) s.index[identifier]:drop() end
+);
+---
+- All tests passed
+...
+s:drop();
+---
+...
+--
+-- gh-2914: check column name validation.
+-- Ensure that col names are validated as identifiers.
+--
+s = box.schema.create_space('test');
+---
+...
+i = s:create_index("primary", {parts={1, "integer"}});
+---
+...
+identifier.run_test(
+	function (identifier)
+		s:format({{name=identifier,type="integer"}})
+		local t = s:replace({1})
+		if t[identifier] ~= 1 then
+			error("format identifier error")
+		end
+	end,
+	function (identifier) end
+);
+---
+- All tests passed
+...
+s:drop();
+---
+...
+-- gh-2914: check coll name validation.
+identifier.run_test(
+    function (identifier) box.internal.collation.create(identifier, 'ICU', 'ru-RU', {}) end,
+    function (identifier) box.internal.collation.drop(identifier) end
+);
+---
+- All tests passed
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
 ...

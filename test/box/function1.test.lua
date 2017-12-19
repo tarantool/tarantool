@@ -83,4 +83,31 @@ box.schema.func.drop('function1.test_yield')
 ch:get()
 s:drop()
 
+-- gh-2914: check identifier constraints.
+test_run = require('test_run').new()
+identifier = require("identifier")
+test_run:cmd("setopt delimiter ';'")
+--
+-- '.' in func name is used to point out path therefore '.' in name
+-- itself is prohibited
+--
+--
+identifier.run_test(
+	function (identifier)
+		if identifier == "." then return end
+		box.schema.func.create(identifier, {language = "lua"})
+		box.schema.user.grant('guest', 'execute', 'function', identifier)
+		rawset(_G, identifier, function () return 1 end)
+		local res = pcall(c.call, c, identifier)
+		if c:call(identifier) ~= 1 then
+			error("Should not fire")
+		end
+		rawset(_G, identifier, nil)
+	end,
+	function (identifier)
+		if identifier == "." then return end
+		box.schema.func.drop(identifier)
+	end
+);
+test_run:cmd("setopt delimiter ''");
 c:close()

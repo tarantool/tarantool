@@ -235,29 +235,8 @@ schema_object_type(const char *name);
 const char *
 schema_object_name(enum schema_object_type type);
 
-/**
- * Check object identifier for invalid symbols.
- * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
- * Result is locale-dependent.
- */
-bool
-identifier_is_valid(const char *str, uint32_t len);
-
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "error.h"
-
-/**
- * Throw an error if identifier is not valid.
- */
-static inline void
-identifier_check_xc(const char *str, uint32_t len)
-{
-	if (! identifier_is_valid(str, len))
-		tnt_raise(ClientError, ER_IDENTIFIER, tt_cstr(str, len));
-}
-
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_SCHEMA_DEF_H_INCLUDED */
