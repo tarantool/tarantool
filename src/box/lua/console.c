@@ -32,7 +32,6 @@
 #include "box/lua/console.h"
 #include "lua/utils.h"
 #include "lua/fiber.h"
-#include "box/session.h"
 #include "fiber.h"
 #include "coio.h"
 #include <lua.h>
@@ -341,7 +340,7 @@ tarantool_lua_console_init(struct lua_State *L)
 	};
 	luaL_register_module(L, "console", consolelib);
 
-	/* readline() func neads a ref to completion_handler (in upvalue) */
+	/* readline() func needs a ref to completion_handler (in upvalue) */
 	lua_getfield(L, -1, "completion_handler");
 	lua_pushcclosure(L, lbox_console_readline, 1);
 	lua_setfield(L, -2, "readline");
