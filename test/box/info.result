@@ -74,6 +74,7 @@ t
 - - cluster
   - id
   - lsn
+  - memory
   - pid
   - replication
   - ro

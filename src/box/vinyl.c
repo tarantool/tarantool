@@ -471,6 +471,29 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	info_end(h);
 }
 
+static void
+vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
+{
+	struct vy_env *env = vy_env(engine);
+	struct mempool_stats mstats;
+
+	stat->data += lsregion_used(&env->mem_env.allocator) -
+				env->mem_env.tree_extent_size;
+	stat->index += env->mem_env.tree_extent_size;
+	stat->index += env->index_env.bloom_size;
+	stat->index += env->index_env.page_index_size;
+	stat->cache += env->cache_env.mem_used;
+	stat->tx += env->xm->write_set_size + env->xm->read_set_size;
+	mempool_stats(&env->xm->tx_mempool, &mstats);
+	stat->tx += mstats.totals.used;
+	mempool_stats(&env->xm->txv_mempool, &mstats);
+	stat->tx += mstats.totals.used;
+	mempool_stats(&env->xm->read_interval_mempool, &mstats);
+	stat->tx += mstats.totals.used;
+	mempool_stats(&env->xm->read_view_mempool, &mstats);
+	stat->tx += mstats.totals.used;
+}
+
 /** }}} Introspection */
 
 /**
@@ -3938,6 +3961,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .abort_checkpoint = */ vinyl_engine_abort_checkpoint,
 	/* .collect_garbage = */ vinyl_engine_collect_garbage,
 	/* .backup = */ vinyl_engine_backup,
+	/* .memory_stat = */ vinyl_engine_memory_stat,
 	/* .check_space_def = */ vinyl_engine_check_space_def,
 };
 

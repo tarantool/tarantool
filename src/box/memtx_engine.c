@@ -32,6 +32,7 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
+#include <small/small.h>
 #include <small/mempool.h>
 
 #include "coio_file.h"
@@ -870,6 +871,26 @@ memtx_engine_join(struct engine *engine, struct vclock *vclock,
 }
 
 static int
+small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
+{
+	(void)stats;
+	(void)cb_ctx;
+	return 0;
+}
+
+static void
+memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
+{
+	(void)engine;
+	struct small_stats data_stats;
+	struct mempool_stats index_stats;
+	mempool_stats(&memtx_index_extent_pool, &index_stats);
+	small_stats(&memtx_alloc, &data_stats, small_stats_noop_cb, NULL);
+	stat->data += data_stats.used;
+	stat->index += index_stats.totals.used;
+}
+
+static int
 memtx_engine_check_space_def(struct space_def *def)
 {
 	(void)def;
@@ -896,6 +917,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .abort_checkpoint = */ memtx_engine_abort_checkpoint,
 	/* .collect_garbage = */ memtx_engine_collect_garbage,
 	/* .backup = */ memtx_engine_backup,
+	/* .memory_stat = */ memtx_engine_memory_stat,
 	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 

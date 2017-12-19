@@ -42,6 +42,7 @@
 
 #include "box/applier.h"
 #include "box/relay.h"
+#include "box/iproto.h"
 #include "box/wal.h"
 #include "box/replication.h"
 #include "box/info.h"
@@ -287,6 +288,54 @@ lbox_info_cluster(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_memory_call(struct lua_State *L)
+{
+	struct engine_memory_stat stat;
+	engine_memory_stat(&stat);
+
+	lua_pushstring(L, "data");
+	luaL_pushuint64(L, stat.data);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "index");
+	luaL_pushuint64(L, stat.index);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "cache");
+	luaL_pushuint64(L, stat.cache);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "tx");
+	luaL_pushuint64(L, stat.tx);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "net");
+	luaL_pushuint64(L, iproto_mem_used());
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "lua");
+	lua_pushinteger(L, G(L)->gc.total);
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static int
+lbox_info_memory(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	lua_newtable(L); /* metatable */
+
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_info_memory_call);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
 static void
 luaT_info_begin(struct info_handler *info)
 {
@@ -361,10 +410,6 @@ luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 	h->ctx = L;
 }
 
-/* Declared in vinyl_engine.cc */
-extern struct vy_env *
-vinyl_engine_get_env();
-
 static int
 lbox_info_vinyl_call(struct lua_State *L)
 {
@@ -405,6 +450,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},
 	{"cluster", lbox_info_cluster},
+	{"memory", lbox_info_memory},
 	{"vinyl", lbox_info_vinyl},
 	{NULL, NULL}
 };
