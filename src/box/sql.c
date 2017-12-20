@@ -1342,8 +1342,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	for (i = 0; i < n; i++) {
 		const char *t;
-
-		p = enc->encode_map(p, 2);
+		p = enc->encode_map(p, 3);
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
@@ -1354,6 +1353,8 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 				convertSqliteAffinity(aCol[i].affinity, aCol[i].notNull == 0);
 		}
 		p = enc->encode_str(p, t, strlen(t));
+		p = enc->encode_str(p, "is_nullable", 11);
+		p = enc->encode_bool(p, aCol[i].notNull == OE_None);
 	}
 	return (int)(p - base);
 }
@@ -1428,7 +1429,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 			 */
 			assert(collation);
 		}
-		p = enc->encode_map(p, collation == NULL ? 2 : 3);
+		p = enc->encode_map(p, collation == NULL ? 3 : 4);
 		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "field", sizeof("field")-1);
@@ -1437,6 +1438,8 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 			p = enc->encode_str(p, "collation", sizeof("collation")-1);
 			p = enc->encode_uint(p, collation->id);
 		}
+		p = enc->encode_str(p, "is_nullable", 11);
+		p = enc->encode_bool(p, aCol[col].notNull == OE_None);
 	}
 	return (int)(p - base);
 }
