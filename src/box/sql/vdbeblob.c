@@ -307,14 +307,13 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 			 */
 			static const int iLn = VDBE_OFFSET_LINENO(2);
 			static const VdbeOpList openBlob[] = {
-				{OP_TableLock, 0, 0, 0},	/* 0: Acquire a read or write lock */
-				{OP_OpenRead, 0, 0, 0},	/* 1: Open a cursor */
-				{OP_Variable, 1, 1, 0},	/* 2: Move ?1 into reg[1] */
-				{OP_NotExists, 0, 7, 1},	/* 3: Seek the cursor */
-				{OP_Column, 0, 0, 1},	/* 4  */
-				{OP_ResultRow, 1, 0, 0},	/* 5  */
-				{OP_Goto, 0, 2, 0},	/* 6  */
-				{OP_Halt, 0, 0, 0},	/* 7  */
+				{OP_OpenRead, 0, 0, 0},  /* 1: Open a cursor */
+				{OP_Variable, 1, 1, 0},  /* 2: Move ?1 into reg[1] */
+				{OP_NotExists, 0, 7, 1}, /* 3: Seek the cursor */
+				{OP_Column, 0, 0, 1},    /* 4  */
+				{OP_ResultRow, 1, 0, 0}, /* 5  */
+				{OP_Goto, 0, 2, 0},      /* 6  */
+				{OP_Halt, 0, 0, 0},      /* 7  */
 			};
 			Vdbe *v = (Vdbe *) pBlob->pStmt;
 			VdbeOp *aOp;
