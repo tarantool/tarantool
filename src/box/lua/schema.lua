@@ -498,7 +498,7 @@ local function update_index_parts_1_6_0(parts)
     return result
 end
 
-local function update_index_parts(space_id, parts)
+local function update_index_parts(format, parts)
     if type(parts) ~= "table" then
         box.error(box.error.ILLEGAL_PARAMS,
         "options.parts parameter should be a table")
@@ -549,7 +549,7 @@ local function update_index_parts(space_id, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: field (name or number) is expected")
         elseif type(part.field) == 'string' then
-            for k,v in pairs(box.space[space_id]:format()) do
+            for k,v in pairs(format) do
                 if v.name == part.field then
                     part.field = k
                     break
@@ -563,7 +563,7 @@ local function update_index_parts(space_id, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: field (number) must be one-based")
         end
-        local fmt = box.space[space_id]:format()[part.field]
+        local fmt = format[part.field]
         if part.type == nil then
             if fmt and fmt.type then
                 part.type = fmt.type
@@ -644,6 +644,11 @@ box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
     check_param(name, 'name', 'string')
     check_param_table(options, create_index_template)
+    local space = box.space[space_id]
+    if not space then
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+    end
+    local format = space:format()
 
     local options_defaults = {
         type = 'tree',
@@ -655,10 +660,18 @@ box.schema.index.create = function(space_id, name, options)
         other = {parts = { 1, 'unsigned' }, unique = true},
     }
     options_defaults = type_dependent_defaults[options.type]
-            and type_dependent_defaults[options.type]
             or type_dependent_defaults.other
+    if not options.parts then
+        local fieldno = options_defaults.parts[1]
+        if #format >= fieldno then
+            local t = format[fieldno].type
+            if t ~= 'any' then
+                options.parts = {{fieldno, format[fieldno].type}}
+            end
+        end
+    end
     options = update_param_table(options, options_defaults)
-    if box.space[space_id] ~= nil and box.space[space_id].engine == 'vinyl' then
+    if space.engine == 'vinyl' then
         options_defaults = {
             page_size = box.cfg.vinyl_page_size,
             range_size = box.cfg.vinyl_range_size,
@@ -674,7 +687,7 @@ box.schema.index.create = function(space_id, name, options)
     local _index = box.space[box.schema.INDEX_ID]
     if _index.index.name:get{space_id, name} then
         if options.if_not_exists then
-            return box.space[space_id].index[name], "not created"
+            return space.index[name], "not created"
         else
             box.error(box.error.INDEX_EXISTS, name)
         end
@@ -695,7 +708,7 @@ box.schema.index.create = function(space_id, name, options)
         end
     end
     local parts, parts_can_be_simplified =
-        update_index_parts(space_id, options.parts)
+        update_index_parts(format, options.parts)
     -- create_index() options contains type, parts, etc,
     -- stored separately. Remove these members from index_opts
     local index_opts = {
@@ -728,17 +741,16 @@ box.schema.index.create = function(space_id, name, options)
     local sequence = options.sequence or nil -- ignore sequence = false
     if sequence ~= nil then
         if iid ~= 0 then
-            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, name, space.name,
                       "sequence cannot be used with a secondary key")
         end
         if #parts >= 1 and parts[1].type ~= 'integer' and
                            parts[1].type ~= 'unsigned' then
-            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, name, space.name,
                       "sequence cannot be used with a non-integer key")
         end
         if sequence == true then
-            sequence = box.schema.sequence.create(
-                box.space[space_id].name .. '_seq')
+            sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
             sequence_is_generated = true
         else
@@ -756,7 +768,7 @@ box.schema.index.create = function(space_id, name, options)
     if sequence ~= nil then
         _space_sequence:insert{space_id, sequence, sequence_is_generated}
     end
-    return box.space[space_id].index[name]
+    return space.index[name]
 end
 
 box.schema.index.drop = function(space_id, index_id)
@@ -784,11 +796,12 @@ box.schema.index.rename = function(space_id, index_id, name)
 end
 
 box.schema.index.alter = function(space_id, index_id, options)
-    if box.space[space_id] == nil then
+    local space = box.space[space_id]
+    if space == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
-    if box.space[space_id].index[index_id] == nil then
-        box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
+    if space.index[index_id] == nil then
+        box.error(box.error.NO_SUCH_INDEX, index_id, space.name)
     end
     if options == nil then
         return
@@ -797,11 +810,12 @@ box.schema.index.alter = function(space_id, index_id, options)
     check_param_table(options, alter_index_template)
 
     if type(space_id) ~= "number" then
-        space_id = box.space[space_id].id
+        space_id = space.id
     end
     if type(index_id) ~= "number" then
-        index_id = box.space[space_id].index[index_id].id
+        index_id = space.index[index_id].id
     end
+    local format = space:format()
     local _index = box.space[box.schema.INDEX_ID]
     if options.id ~= nil then
         local can_update_field = {id = true, name = true, type = true }
@@ -861,7 +875,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options.parts then
         local parts_can_be_simplified
         parts, parts_can_be_simplified =
-            update_index_parts(space_id, options.parts)
+            update_index_parts(format, options.parts)
         -- save parts in old format if possible
         if parts_can_be_simplified then
             parts = simplify_index_parts(parts)
@@ -873,8 +887,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     local sequence_tuple
     if index_id ~= 0 then
         if sequence then
-            box.error(box.error.MODIFY_INDEX,
-                      options.name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, options.name, space.name,
                       "sequence cannot be used with a secondary key")
         end
         -- ignore 'sequence = false' for secondary indexes
@@ -884,15 +897,13 @@ box.schema.index.alter = function(space_id, index_id, options)
         if (sequence or (sequence ~= false and sequence_tuple ~= nil)) and
            #parts >= 1 and (parts[1].type or parts[1][2]) ~= 'integer' and
                            (parts[1].type or parts[1][2]) ~= 'unsigned' then
-            box.error(box.error.MODIFY_INDEX,
-                      options.name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, options.name, space.name,
                       "sequence cannot be used with a non-integer key")
         end
     end
     if sequence == true then
         if sequence_tuple == nil or sequence_tuple[3] == false then
-            sequence = box.schema.sequence.create(
-                box.space[space_id].name .. '_seq')
+            sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
             sequence_is_generated = true
         else

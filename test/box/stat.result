@@ -59,7 +59,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 3
+- 4
 ...
 -- check exceptions
 space:get('Impossible value')

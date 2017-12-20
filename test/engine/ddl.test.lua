@@ -119,3 +119,20 @@ pk.parts
 space:insert{1, 2, 3}
 pk:drop()
 space:drop()
+
+--
+-- gh-2893: inherit index part type from a format, if a parts array
+-- is omited.
+--
+format = {{'field1', 'scalar'}}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+pk.parts[1].type
+s:drop()
+
+-- Ensure type 'any' to be not inherited.
+format = {{'field1'}}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+pk.parts[1].type
+s:drop()
