@@ -3495,7 +3495,8 @@ case OP_OpenTEphemeral: {
 					    pCx->uc.pCursor);
 		pCx->isTable = 1;
 	}
-	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2);
+	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2,
+					     pOp->p4.pKeyInfo->aColl[0]);
 	if (rc) goto abort_due_to_error;
 	break;
 }

@@ -81,6 +81,7 @@ struct SortCtx {
 	u8 bOrderedInnerLoop;	/* ORDER BY correctly sorts the inner loop */
 };
 #define SORTFLAG_UseSorter  0x01	/* Use SorterOpen instead of OpenEphemeral */
+#define SORTFLAG_DESC 0xF0
 
 /*
  * Delete all the content of a Select structure.  Deallocate the structure
@@ -683,7 +684,12 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		 */
 		addr = sqlite3VdbeAddOp1(v, OP_IfNotZero, iLimit);
 		VdbeCoverage(v);
-		sqlite3VdbeAddOp1(v, OP_Last, pSort->iECursor);
+		if (pSort->sortFlags & SORTFLAG_DESC) {
+			int iNextInstr = sqlite3VdbeCurrentAddr(v) + 1;
+			sqlite3VdbeAddOp2(v, OP_Rewind, pSort->iECursor, iNextInstr);
+		} else {
+			sqlite3VdbeAddOp1(v, OP_Last, pSort->iECursor);
+		}
 		if (pSort->bOrderedInnerLoop) {
 			r1 = ++pParse->nMem;
 			sqlite3VdbeAddOp3(v, OP_Column, pSort->iECursor, nExpr,
@@ -1468,7 +1474,11 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 		sqlite3VdbeAddOp3(v, OP_SorterData, iTab, regSortOut, iSortTab);
 		bSeq = 0;
 	} else {
-		addr = 1 + sqlite3VdbeAddOp2(v, OP_Sort, iTab, addrBreak);
+		/* In case of DESC sorting order data should be taken from
+		 * the end of table. */
+		int opPositioning = (pSort->sortFlags & SORTFLAG_DESC) ?
+				    OP_Last : OP_Sort;
+		addr = 1 + sqlite3VdbeAddOp2(v, opPositioning, iTab, addrBreak);
 		VdbeCoverage(v);
 		codeOffset(v, p->iOffset, addrContinue);
 		iSortTab = iTab;
@@ -1544,7 +1554,10 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 		sqlite3VdbeAddOp2(v, OP_SorterNext, iTab, addr);
 		VdbeCoverage(v);
 	} else {
-		sqlite3VdbeAddOp2(v, OP_Next, iTab, addr);
+		/* In case of DESC sorting cursor should move backward. */
+		int opPositioning = (pSort->sortFlags & SORTFLAG_DESC) ?
+				    OP_Prev : OP_Next;
+		sqlite3VdbeAddOp2(v, opPositioning, iTab, addr);
 		VdbeCoverage(v);
 	}
 	if (pSort->regReturn)
@@ -3020,15 +3033,17 @@ generateOutputSubroutine(Parse * pParse,	/* Parsing context */
 		/* Store the result as data using a unique key.
 		 */
 	case SRT_EphemTab:{
-			int r1 = sqlite3GetTempReg(pParse);
-			int r2 = sqlite3GetTempReg(pParse);
-			sqlite3VdbeAddOp3(v, OP_MakeRecord, pIn->iSdst,
-					  pIn->nSdst, r1);
-			sqlite3VdbeAddOp2(v, OP_NewRowid, pDest->iSDParm, r2);
-			sqlite3VdbeAddOp3(v, OP_Insert, pDest->iSDParm, r1, r2);
-			sqlite3VdbeChangeP5(v, OPFLAG_APPEND);
-			sqlite3ReleaseTempReg(pParse, r2);
-			sqlite3ReleaseTempReg(pParse, r1);
+			int regRec = sqlite3GetTempReg(pParse);
+			int regCopy = sqlite3GetTempRange(pParse, pIn->nSdst + 1);
+			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, pDest->iSDParm,
+					  0, regCopy + pIn->nSdst);
+			sqlite3VdbeAddOp3(v, OP_Copy, pIn->iSdst, regCopy,
+					  pIn->nSdst - 1);
+			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy,
+					  pIn->nSdst + 1, regRec);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, pDest->iSDParm, regRec);
+			sqlite3ReleaseTempRange(pParse, regCopy, pIn->nSdst + 1);
+			sqlite3ReleaseTempReg(pParse, regRec);
 			break;
 		}
 
@@ -5767,6 +5782,9 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		 * and plus one column for ID.
 		 */
 		int nCols = pEList->nExpr + sSort.pOrderBy->nExpr + 1;
+		if (pKeyInfo->aSortOrder[0] == SQLITE_SO_DESC) {
+			sSort.sortFlags |= SORTFLAG_DESC;
+		}
 		sSort.addrSortIndex =
 		    sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
 				      sSort.iECursor,

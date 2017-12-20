@@ -50,7 +50,6 @@ test:do_execsql_test(
 local t1_cross_t2 = { "a", "one", "a", "I", "a", "one", "b", "II", "a", "one", "c", "III", "b", "two", "a", "I", "b", "two", "b", "II", "b", "two", "c", "III", "c", "three", "a", "I", "c", "three", "b", "II", "c", "three", "c", "III" }
 local t1_cross_t1 = { "a", "one", "a", "one", "a", "one", "b", "two", "a", "one", "c", "three", "b", "two", "a", "one", "b", "two", "b", "two", "b", "two", "c", "three", "c", "three", "a", "one", "c", "three", "b", "two", "c", "three", "c", "three" }
 -- This proc is a specialized version of [do_execsql_test].
---
 -- The second argument to this proc must be a SELECT statement that
 -- features a cross join of some time. Instead of the usual ",",
 -- "CROSS JOIN" or "INNER JOIN" join-op, the string JOIN_PATTERN must be

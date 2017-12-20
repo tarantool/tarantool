@@ -442,15 +442,17 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
  * Create ephemeral space and set cursor to the first entry. Features of
  * ephemeral spaces: id == 0, name == "ephemeral", memtx engine (in future it
  * can be changed, but now only memtx engine is supported), primary index
- * which covers all fields and no secondary indexes. All fields are scalar
- * and nullable.
+ * which covers all fields and no secondary indexes, given field number and
+ * collation sequence. All fields are scalar and nullable.
  *
  * @param pCur Cursor which will point to the new ephemeral space.
  * @param field_count Number of fields in ephemeral space.
+ * @param aColl Collation sequence of ephemeral space.
  *
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
-int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count)
+int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
+				    struct coll *aColl)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
@@ -468,7 +470,7 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count)
 		key_def_set_part(ephemer_key_def, part /* part no */,
 				 part /* filed no */,
 				 FIELD_TYPE_SCALAR, true /* is_nullable */,
-				 NULL /* coll */);
+				 aColl /* coll */);
 	}
 
 	struct index_def *ephemer_index_def =
@@ -617,6 +619,47 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	rc = box_delete(space_id, index_id, key, key + key_size, NULL);
 
 	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+}
+
+/*
+ * Delete all tuples from space. It is worth noting, that truncate can't
+ * be applied to ephemeral space, so this routine manually deletes
+ * tuples one by one.
+ *
+ * @param pCur Cursor pointing to ephemeral space.
+ *
+ * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
+ */
+int tarantoolSqlite3EphemeralClearTable(BtCursor *pCur)
+{
+	assert(pCur);
+	assert(pCur->curFlags & BTCF_TEphemCursor);
+	struct ta_cursor *c = pCur->pTaCursor;
+	assert(c->ephem_space);
+
+	struct space *ephem_space = c->ephem_space;
+	struct iterator *it = index_create_iterator(*ephem_space->index,
+						    ITER_ALL, nil_key,
+						    0 /* part_count */);
+	if (it == NULL) {
+		pCur->eState = CURSOR_INVALID;
+		return SQLITE_TARANTOOL_ERROR;
+	}
+
+	struct tuple *tuple;
+	char *key;
+	uint32_t  key_size;
+
+	while (iterator_next(it, &tuple) == 0 && tuple != NULL) {
+		key = tuple_extract_key(tuple, box_iterator_key_def(it),
+					&key_size);
+		if (space_ephemeral_delete(ephem_space, key) != 0) {
+			return SQLITE_TARANTOOL_ERROR;
+		}
+	}
+	iterator_delete(it);
+
+	return SQLITE_OK;
 }
 
 /*

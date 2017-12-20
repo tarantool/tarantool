@@ -44,7 +44,7 @@ test:do_test(
         local l2 = table.deepcopy(l1)
         table.sort(l1)
         return test.is_deeply_regex(l1, l2)
-    end, true)
+    end, false)
 
 test:do_test(
     1.1,
@@ -53,7 +53,7 @@ test:do_test(
         local l2 = table.deepcopy(l1)
         table.sort(l1)
         return test.is_deeply_regex(l1, l2)
-    end, true)
+    end, false)
 
 test:do_test(
     1.2,

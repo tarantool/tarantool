@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(58)
+test:plan(52)
 
 --!./tcltestrunner.lua
 -- 2014-03-21
@@ -95,54 +95,57 @@ testprefix = "orderby6"
         ]], {
             840, 880, 920, 960, 1000, 1, 41, 81, 121, 161
         })
+   -- Tests below are disabled due to incapability of sorting two or more
+   -- key columns with different orders (DESC/ASC). As soon as Tarantool
+   -- supports this feature, these tests will be uncommented.
+   -- #3016
+   -- test:do_execsql_test(
+   --     "1.12",
+   --     [[
+   --         SELECT a FROM t1 ORDER BY b DESC, a LIMIT 10 OFFSET 20;
+   --     ]], {
+   --         839, 879, 919, 959, 999, 38, 78, 118, 158, 198
+   --     })
 
-    test:do_execsql_test(
-        "1.12",
-        [[
-            SELECT a FROM t1 ORDER BY b DESC, a LIMIT 10 OFFSET 20;
-        ]], {
-            839, 879, 919, 959, 999, 38, 78, 118, 158, 198
-        })
+   -- test:do_execsql_test(
+   --     "1.12",
+   --     [[
+   --         SELECT a FROM t1 ORDER BY +b DESC, a LIMIT 10 OFFSET 20;
+   --     ]], {
+   --         839, 879, 919, 959, 999, 38, 78, 118, 158, 198
+   --     })
 
-    test:do_execsql_test(
-        "1.12",
-        [[
-            SELECT a FROM t1 ORDER BY +b DESC, a LIMIT 10 OFFSET 20;
-        ]], {
-            839, 879, 919, 959, 999, 38, 78, 118, 158, 198
-        })
+   -- test:do_execsql_test(
+   --     "1.13",
+   --     [[
+   --         SELECT a FROM t1 ORDER BY b, a DESC LIMIT 10 OFFSET 45;
+   --     ]], {
+   --         161, 121, 81, 41, 1, 962, 922, 882, 842, 802
+   --     })
 
-    test:do_execsql_test(
-        "1.13",
-        [[
-            SELECT a FROM t1 ORDER BY b, a DESC LIMIT 10 OFFSET 45;
-        ]], {
-            161, 121, 81, 41, 1, 962, 922, 882, 842, 802
-        })
+   -- test:do_execsql_test(
+   --     "1.13x",
+   --     [[
+   --         SELECT a FROM t1 ORDER BY +b, a DESC LIMIT 10 OFFSET 45;
+   --     ]], {
+   --         161, 121, 81, 41, 1, 962, 922, 882, 842, 802
+   --     })
 
-    test:do_execsql_test(
-        "1.13x",
-        [[
-            SELECT a FROM t1 ORDER BY +b, a DESC LIMIT 10 OFFSET 45;
-        ]], {
-            161, 121, 81, 41, 1, 962, 922, 882, 842, 802
-        })
+   -- test:do_execsql_test(
+   --     "1.14",
+   --     [[
+   --         SELECT a FROM t1 ORDER BY b DESC, a LIMIT 10 OFFSET 45;
+   --     ]], {
+   --         838, 878, 918, 958, 998, 37, 77, 117, 157, 197
+   --     })
 
-    test:do_execsql_test(
-        "1.14",
-        [[
-            SELECT a FROM t1 ORDER BY b DESC, a LIMIT 10 OFFSET 45;
-        ]], {
-            838, 878, 918, 958, 998, 37, 77, 117, 157, 197
-        })
-
-    test:do_execsql_test(
-        "1.14x",
-        [[
-            SELECT a FROM t1 ORDER BY +b DESC, a LIMIT 10 OFFSET 45;
-        ]], {
-            838, 878, 918, 958, 998, 37, 77, 117, 157, 197
-        })
+   -- test:do_execsql_test(
+   --     "1.14x",
+   --     [[
+   --         SELECT a FROM t1 ORDER BY +b DESC, a LIMIT 10 OFFSET 45;
+   --     ]], {
+   --         838, 878, 918, 958, 998, 37, 77, 117, 157, 197
+   --     })
 
     -- Many test cases where the LIMIT+OFFSET window is in various
     -- alignments with block-sort boundaries.
