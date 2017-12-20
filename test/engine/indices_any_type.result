@@ -698,7 +698,7 @@ i4_1 = s4:create_index('my_space5_idx1', {type='TREE', parts={1, 'scalar', 2, 'i
 ...
 s4:insert({mp.NULL, 1, 1, 1})
 ---
-- [null, 1, 1, 1]
+- error: 'Tuple field 1 type does not match one required by operation: expected scalar'
 ...
 s4:insert({2, mp.NULL, 2, 2}) -- all nulls must fail
 ---
@@ -782,7 +782,7 @@ s5:insert({7, true})
 ...
 s5:insert({8, mp.NULL}) -- must fail
 ---
-- [8, null]
+- error: 'Tuple field 2 type does not match one required by operation: expected scalar'
 ...
 s5:insert({9, -40.5})
 ---
@@ -809,7 +809,6 @@ s5:select{}
   - [5, 123]
   - [6, true]
   - [7, true]
-  - [8, null]
   - [9, -40.5]
   - [10, -39.5]
   - [11, -38.5]

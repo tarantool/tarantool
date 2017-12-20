@@ -87,7 +87,7 @@ const uint32_t key_mp_type[] = {
 	/* [FIELD_TYPE_BOOLEAN]  =  */ 1U << MP_BOOL,
 	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
 		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
-		(1U << MP_BIN) | (1U << MP_BOOL) | (1U << MP_NIL),
+		(1U << MP_BIN) | (1U << MP_BOOL),
 	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
