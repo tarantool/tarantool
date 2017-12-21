@@ -146,7 +146,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
  * quietly _exit() when called for a second time.
  */
 static void
-sig_fatal_cb(int signo, siginfo_t *siginfo, void *)
+sig_fatal_cb(int signo, siginfo_t *siginfo, void *context)
 {
 	static volatile sig_atomic_t in_cb = 0;
 	int fd = STDERR_FILENO;
@@ -178,6 +178,8 @@ sig_fatal_cb(int signo, siginfo_t *siginfo, void *)
 		fprintf(stderr, "  addr: %p\n", siginfo->si_addr); 
 	} else
 		fdprintf(fd, "Got a fatal signal %d\n", signo);
+	fprintf(stderr, "  context: %p\n", context); 
+	fprintf(stderr, "  siginfo: %p\n", siginfo); 
 
 	fdprintf(fd, "Current time: %u\n", (unsigned) time(0));
 	fdprintf(fd,
