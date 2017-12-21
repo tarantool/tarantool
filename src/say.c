@@ -51,7 +51,11 @@ static RLIST_HEAD(log_list);
 
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
-static bool logger_background = true;
+/**
+ * True if Tarantool process runs in background mode, i.e. has no
+ * controlling terminal.
+ */
+static bool log_background = true;
 
 static void
 say_default(int level, const char *filename, int line, const char *error,
@@ -66,14 +70,10 @@ say_format_syslog(struct log *log, char *buf, int len, int level,
 		  const char *filename, int line, const char *error,
 		  const char *format, va_list ap);
 
-
-/*
- * This function is utility to handle va_list from different varargs functions
- */
+/** A utility function to handle va_list from different varargs functions. */
 static inline int
 log_vsay(struct log *log, int level, const char *filename, int line,
 	 const char *error, const char *format, va_list ap);
-
 
 struct log log_default = {
 	.fd = STDERR_FILENO,
@@ -150,7 +150,7 @@ level_to_syslog_priority(int level)
 }
 
 void
-log_set_level(struct log *log, int level)
+log_set_level(struct log *log, enum say_level level)
 {
 	log->level = level;
 }
@@ -159,10 +159,13 @@ void
 log_set_format(struct log *log, log_format_func_t format_func)
 {
 	/*
-	 * In case of syslog or default format can not be changed
+	 * For syslog, default or boot log type the log format can
+	 * not be changed.
 	 */
-	if (SAY_LOGGER_STDERR == log->type ||
-	    log->type == SAY_LOGGER_PIPE || log->type == SAY_LOGGER_FILE) {
+	if (log->type == SAY_LOGGER_STDERR ||
+	    log->type == SAY_LOGGER_PIPE ||
+	    log->type == SAY_LOGGER_FILE) {
+
 		log->format_func = format_func;
 	}
 }
@@ -171,7 +174,7 @@ void
 say_set_log_level(int new_level)
 {
 	log_level = new_level;
-	log_set_level(&log_default, new_level);
+	log_set_level(&log_default, (enum say_level) new_level);
 }
 
 void
@@ -238,8 +241,8 @@ log_rotate(const struct log *log)
 	}
 	char logrotate_message[] = "log file has been reopened\n";
 	ssize_t r = write(log->fd,
-			   logrotate_message, (sizeof logrotate_message) - 1);
-	(void)r;
+			  logrotate_message, (sizeof logrotate_message) - 1);
+	(void) r;
 	return 0;
 }
 
@@ -255,9 +258,9 @@ say_logrotate(int signo)
 		}
 	}
 	/*
-	 * logger_background applies only to log_default logger
+	 * log_background applies only to log_default logger
 	 */
-	if (logger_background && log_default.type == SAY_LOGGER_FILE) {
+	if (log_background && log_default.type == SAY_LOGGER_FILE) {
 		dup2(log_default.fd, STDOUT_FILENO);
 		dup2(log_default.fd, STDERR_FILENO);
 	}
@@ -346,7 +349,6 @@ log_pipe_init(struct log *log, const char *init_str)
  * rotation signal.
  */
 static int
-
 log_file_init(struct log *log, const char *init_str)
 {
 	int fd;
@@ -399,7 +401,7 @@ log_syslog_connect(struct log *log)
 	 */
 	log->fd = syslog_connect_unix("/dev/log");
 	if (log->fd < 0)
-		return syslog_connect_unix("/var/run/syslog");
+		log->fd = syslog_connect_unix("/var/run/syslog");
 	return log->fd;
 }
 
@@ -409,9 +411,8 @@ log_syslog_init(struct log *log, const char *init_str)
 {
 	struct say_syslog_opts opts;
 
-	if (say_parse_syslog_opts(init_str, &opts) < 0) {
+	if (say_parse_syslog_opts(init_str, &opts) < 0)
 		return -1;
-	}
 
 	if (opts.identity == NULL)
 		log->syslog_ident = strdup("tarantool");
@@ -506,7 +507,7 @@ say_logger_init(const char *init_str, int level, int nonblock,
 	}
 	_say = say_default;
 	say_set_log_level(level);
-	logger_background = background;
+	log_background = background;
 	log_pid = log_default.pid;
 	signal(SIGHUP, say_logrotate);
 	say_set_log_format(say_format_by_name(format));

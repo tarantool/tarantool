@@ -78,10 +78,22 @@ say_log_level_is_enabled(int level)
 extern enum say_format log_format;
 
 enum say_logger_type {
+	/**
+	 * Before the app server core is initialized, we do not
+	 * decorate output and simply print every message to
+	 * stdout intact.
+	 */
 	SAY_LOGGER_BOOT,
+	/**
+	 * The core has initialized and we can decorate output
+	 * with pid, thread/fiber id, time, etc.
+	 */
 	SAY_LOGGER_STDERR,
+	/** box.cfg option to log to file. */
 	SAY_LOGGER_FILE,
+	/** box.cfg option to log to another process via a pipe */
 	SAY_LOGGER_PIPE,
+	/** box.cfg option to log to syslog. */
 	SAY_LOGGER_SYSLOG
 };
 
@@ -91,13 +103,19 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
 				 const char *filename, int line, const char *error,
 				 const char *format, va_list ap);
 
+/**
+ * A log object. There is a singleton for the default log.
+ */
 struct log {
 	int fd;
+	/** The current log level. */
 	int level;
 	enum say_logger_type type;
+	/** path to file if logging to file. */
 	char *path;
 	bool nonblock;
 	log_format_func_t format_func;
+	/** pid of the process if logging to pipe. */
 	pid_t pid;
 	/* Application identifier used to group syslog messages. */
 	char *syslog_ident;
@@ -105,11 +123,12 @@ struct log {
 };
 
 /**
- * Creates new logger configuration
- * @param log - logger struct to initialize
- * @param init_str - box.cfg log option
- * @param nonblock - box.cfg non-block option
- * @return 0 on success, -1 on system error, error is written in diag
+ * Create a new log object.
+ * @param log		log to initialize
+ * @param init_str	box.cfg log option
+ * @param nonblock	box.cfg non-block option
+ * @return 0 on success, -1 on system error, the error is saved in
+ * the diagnostics area
  */
 int
 log_create(struct log *log, const char *init_str, bool nonblock);
@@ -117,42 +136,39 @@ log_create(struct log *log, const char *init_str, bool nonblock);
 void
 log_destroy(struct log *log);
 
-/*
- * Performs log write
- */
+/** Perform log write. */
 int
 log_say(struct log *log, int level, const char *filename,
 	int line, const char *error, const char *format, ...);
 
 /**
- * Set log level
- * Can be used dynamically
- * @param cfg config of logger
- * @param format constant level
+ * Set log level. Can be used dynamically.
+ *
+ * @param log   log object
+ * @param level level to set
  */
 void
-log_set_level(struct log *log, int level);
+log_set_level(struct log *log, enum say_level level);
 
 /**
- * Set log format
- * Can be used dynamically
- * @param log config of logger
- * @param format_func function formatting log
+ * Set log format. Can be used dynamically.
+ *
+ * @param log		log object
+ * @param format_func	function to format log messages
  */
 void
 log_set_format(struct log *log, log_format_func_t format_func);
 
 /**
- * Set log level for default logger
- * Can be used dynamically
- * @param format constant level
+ * Set log level for the default logger. Can be used dynamically.
+ * @param format	constant level
  */
 void
 say_set_log_level(int new_level);
 
 /**
- * Set log format for default logger
- * Can be used dynamically
+ * Set log format for default logger. Can be used dynamically.
+ *
  * Can't be applied in case syslog or boot (will be ignored)
  * @param say format
  */
@@ -161,6 +177,7 @@ say_set_log_format(enum say_format format);
 
 /**
  * Return say format by name.
+ *
  * @param format_name format name.
  * @retval say_format_MAX on error
  * @retval say_format otherwise
@@ -171,14 +188,14 @@ say_format_by_name(const char *format);
 void
 say_logrotate(int /* signo */);
 
-/* Init default logger. */
+/** Init default logger. */
 void
 say_logger_init(const char *init_str,
 		int log_level, int nonblock,
 		const char *log_format,
 		int background);
 
-/* Free default logger */
+/** Free default logger */
 void
 say_logger_free();
 
