@@ -146,7 +146,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
  * quietly _exit() when called for a second time.
  */
 static void
-sig_fatal_cb(int signo)
+sig_fatal_cb(int signo, siginfo_t *siginfo, void *)
 {
 	static volatile sig_atomic_t in_cb = 0;
 	int fd = STDERR_FILENO;
@@ -160,9 +160,23 @@ sig_fatal_cb(int signo)
 
 	in_cb = 1;
 
-	if (signo == SIGSEGV)
+	if (signo == SIGSEGV) {
 		fdprintf(fd, "Segmentation fault\n");
-	else
+		const char* signal_code_repr = 0;
+		switch(siginfo->si_code) {
+		case SEGV_MAPERR:
+			signal_code_repr = "SEGV_MAPERR"; break;
+		case SEGV_ACCERR:
+			signal_code_repr = "SEGV_ACCERR"; break;
+		}
+		if (signal_code_repr)
+			fdprintf(fd, "  code: %s\n", signal_code_repr);
+		else
+			fdprintf(fd, "  code: %d\n", siginfo->si_code);
+
+		// fprintf used insted of fdprintf, because fdprintf does not understand %p
+		fprintf(stderr, "  addr: %p\n", siginfo->si_addr); 
+	} else
 		fdprintf(fd, "Got a fatal signal %d\n", signo);
 
 	fdprintf(fd, "Current time: %u\n", (unsigned) time(0));
@@ -248,8 +262,8 @@ signal_init(void)
 	 * one when entering handler.
 	 * SA_NODEFER allows receiving the same signal during handler.
 	 */
-	sa.sa_flags = SA_RESETHAND | SA_NODEFER;
-	sa.sa_handler = sig_fatal_cb;
+	sa.sa_flags = SA_RESETHAND | SA_NODEFER | SA_SIGINFO;
+	sa.sa_sigaction = sig_fatal_cb;
 
 	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
 	    sigaction(SIGFPE, &sa, 0) == -1) {
