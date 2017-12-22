@@ -93,9 +93,6 @@ int sqlite3BtreeCreateTable(Btree *, int *, int flags);
 int sqlite3BtreeIsInTrans(Btree *);
 int sqlite3BtreeIsInReadTrans(Btree *);
 void *sqlite3BtreeSchema(Btree *, int, void (*)(void *));
-#ifndef SQLITE_OMIT_SHARED_CACHE
-int sqlite3BtreeLockTable(Btree * pBtree, int iTab, u8 isWriteLock);
-#endif
 int sqlite3BtreeSavepoint(Btree *, int, int);
 
 const char *sqlite3BtreeGetFilename(Btree *);
@@ -309,46 +306,6 @@ int sqlite3BtreeCount(BtCursor *, i64 *);
 #ifdef SQLITE_TEST
 int sqlite3BtreeCursorInfo(BtCursor *, int *, int);
 void sqlite3BtreeCursorList(Btree *);
-#endif
-
-/*
- * If we are not using shared cache, then there is no need to
- * use mutexes to access the BtShared structures.  So make the
- * Enter and Leave procedures no-ops.
- */
-#ifndef SQLITE_OMIT_SHARED_CACHE
-void sqlite3BtreeEnter(Btree *);
-void sqlite3BtreeEnterAll(sqlite3 *);
-int sqlite3BtreeSharable(Btree *);
-void sqlite3BtreeEnterCursor(BtCursor *);
-int sqlite3BtreeConnectionCount(Btree *);
-#else
-#define sqlite3BtreeEnter(X)
-#define sqlite3BtreeEnterAll(X)
-#define sqlite3BtreeSharable(X) 0
-#define sqlite3BtreeEnterCursor(X)
-#define sqlite3BtreeConnectionCount(X) 1
-#endif
-
-#if !defined(SQLITE_OMIT_SHARED_CACHE) && SQLITE_THREADSAFE
-void sqlite3BtreeLeave(Btree *);
-void sqlite3BtreeLeaveCursor(BtCursor *);
-void sqlite3BtreeLeaveAll(sqlite3 *);
-#ifndef NDEBUG
-  /* These routines are used inside assert() statements only. */
-int sqlite3BtreeHoldsMutex(Btree *);
-int sqlite3BtreeHoldsAllMutexes(sqlite3 *);
-int sqlite3SchemaMutexHeld(sqlite3 *, Schema *);
-#endif
-#else
-
-#define sqlite3BtreeLeave(X)
-#define sqlite3BtreeLeaveCursor(X)
-#define sqlite3BtreeLeaveAll(X)
-
-#define sqlite3BtreeHoldsMutex(X) 1
-#define sqlite3BtreeHoldsAllMutexes(X) 1
-#define sqlite3SchemaMutexHeld(X,Y) 1
 #endif
 
 #endif				/* SQLITE_BTREE_H */

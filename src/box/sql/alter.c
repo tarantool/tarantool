@@ -57,7 +57,6 @@ reloadTableSchema(Parse * pParse, Table * pTab, const char *zName)
 	v = sqlite3GetVdbe(pParse);
 	if (NEVER(v == 0))
 		return;
-	assert(sqlite3BtreeHoldsAllMutexes(pParse->db));
 
 	char *zNewName = sqlite3MPrintf(pParse->db, "%s", zName);
 	sqlite3VdbeAddRenameTableOp(v, pTab->tnum, zNewName);
@@ -102,7 +101,6 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	if (NEVER(db->mallocFailed))
 		goto exit_rename_table;
 	assert(pSrc->nSrc == 1);
-	assert(sqlite3BtreeHoldsAllMutexes(pParse->db));
 
 	pTab = sqlite3LocateTableItem(pParse, 0, &pSrc->a[0]);
 	if (!pTab)
@@ -208,7 +206,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	pNew = pParse->pNewTable;
 	assert(pNew);
 
-	assert(sqlite3BtreeHoldsAllMutexes(db));
 	zTab = &pNew->zName[16];	/* Skip the "sqlite_altertab_" prefix on the name */
 	pCol = &pNew->aCol[pNew->nCol - 1];
 	pDflt = pCol->pDflt;
@@ -324,7 +321,6 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 
 	/* Look up the table being altered. */
 	assert(pParse->pNewTable == 0);
-	assert(sqlite3BtreeHoldsAllMutexes(db));
 	if (db->mallocFailed)
 		goto exit_begin_add_column;
 	pTab = sqlite3LocateTableItem(pParse, 0, &pSrc->a[0]);

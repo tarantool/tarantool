@@ -368,13 +368,9 @@ struct Btree {
 	u8 sharable;		/* True if we can share pBt with another db */
 	u8 locked;		/* True if db currently has pBt locked */
 	u8 hasIncrblobCur;	/* True if there are one or more Incrblob cursors */
-	int wantToLock;		/* Number of nested calls to sqlite3BtreeEnter() */
 	u32 iDataVersion;	/* Combines with pBt->pPager->iDataVersion */
 	Btree *pNext;		/* List of other sharable Btrees from the same db */
 	Btree *pPrev;		/* Back pointer of the same list */
-#ifndef SQLITE_OMIT_SHARED_CACHE
-	BtLock lock;		/* Object used to lock page 1 */
-#endif
 };
 
 /*
@@ -447,12 +443,6 @@ struct BtShared {
 	void (*xFreeSchema) (void *);	/* Destructor for BtShared.pSchema */
 	sqlite3_mutex *mutex;	/* Non-recursive mutex required to access this object */
 	Bitvec *pHasContent;	/* Set of pages moved to free-list this transaction */
-#ifndef SQLITE_OMIT_SHARED_CACHE
-	int nRef;		/* Number of references to this structure */
-	BtShared *pNext;	/* Next on a list of sharable BtShared structs */
-	BtLock *pLock;		/* List of locks held on this shared-btree struct */
-	Btree *pWriter;		/* Btree with currently open write transaction */
-#endif
 	u8 *pTmpSpace;		/* Temp space sufficient to hold a single cell */
 };
 

@@ -1195,23 +1195,6 @@ struct sqlite3 {
 	BusyHandler busyHandler;	/* Busy callback */
 	int busyTimeout;	/* Busy handler timeout, in msec */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
-#ifdef SQLITE_ENABLE_UNLOCK_NOTIFY
-	/* The following variables are all protected by the STATIC_MASTER
-	 * mutex, not by sqlite3.mutex. They are used by code in notify.c.
-	 *
-	 * When X.pUnlockConnection==Y, that means that X is waiting for Y to
-	 * unlock so that it can proceed.
-	 *
-	 * When X.pBlockingConnection==Y, that means that something that X tried
-	 * tried to do recently failed with an SQLITE_LOCKED error due to locks
-	 * held by Y.
-	 */
-	sqlite3 *pBlockingConnection;	/* Connection that caused SQLITE_LOCKED */
-	sqlite3 *pUnlockConnection;	/* Connection to watch for unlock */
-	void *pUnlockArg;	/* Argument to xUnlockNotify */
-	void (*xUnlockNotify) (void **, int);	/* Unlock notify callback */
-	sqlite3 *pNextBlocked;	/* Next in list of all blocked connections */
-#endif
 #ifdef SQLITE_USER_AUTHENTICATION
 	sqlite3_userauth auth;	/* User authentication information */
 #endif
@@ -3784,16 +3767,6 @@ int sqlite3ExprCheckHeight(Parse *, int);
 
 u32 sqlite3Get4byte(const u8 *);
 void sqlite3Put4byte(u8 *, u32);
-
-#ifdef SQLITE_ENABLE_UNLOCK_NOTIFY
-void sqlite3ConnectionBlocked(sqlite3 *, sqlite3 *);
-void sqlite3ConnectionUnlocked(sqlite3 * db);
-void sqlite3ConnectionClosed(sqlite3 * db);
-#else
-#define sqlite3ConnectionBlocked(x,y)
-#define sqlite3ConnectionUnlocked(x)
-#define sqlite3ConnectionClosed(x)
-#endif
 
 #ifdef SQLITE_DEBUG
 void sqlite3ParserTrace(FILE *, char *);

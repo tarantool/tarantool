@@ -273,7 +273,6 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 	case SQLITE_DBSTATUS_SCHEMA_USED:{
 			int nByte = 0;	/* Used to accumulate return value */
 
-			sqlite3BtreeEnterAll(db);
 			db->pnBytesFreed = &nByte;
 			Schema *pSchema = db->mdb.pSchema;
 			if (ALWAYS(pSchema != 0)) {
@@ -303,7 +302,6 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 				}
 			}
 			db->pnBytesFreed = 0;
-			sqlite3BtreeLeaveAll(db);
 
 			*pHighwater = 0;
 			*pCurrent = nByte;

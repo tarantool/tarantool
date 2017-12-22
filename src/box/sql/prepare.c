@@ -174,7 +174,6 @@ sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg)
 
 	assert(db->mdb.pSchema);
 	assert(sqlite3_mutex_held(db->mutex));
-	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
 
 	memset(&initData, 0, sizeof(InitData));
 	initData.db = db;
@@ -198,7 +197,6 @@ sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg)
 	 * on the b-tree database, open one now. If a transaction is opened, it
 	 * will be closed before this function returns.
 	 */
-	sqlite3BtreeEnter(pDb->pBt);
 	if (!sqlite3BtreeIsInReadTrans(pDb->pBt)) {
 		rc = sqlite3BtreeBeginTrans(pDb->pBt, 0, 0);
 		if (rc != SQLITE_OK) {
@@ -295,14 +293,12 @@ sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg)
 	}
 
 	/* Jump here for an error that occurs after successfully allocating
-	 * curMain and calling sqlite3BtreeEnter(). For an error that occurs
-	 * before that point, jump to error_out.
+	 * curMain. For an error that occurs before that point, jump to error_out.
 	 */
  initone_error_out:
 	if (openedTransaction) {
 		sqlite3BtreeCommit(pDb->pBt);
 	}
-	sqlite3BtreeLeave(pDb->pBt);
 
  error_out:
 	if (rc == SQLITE_NOMEM || rc == SQLITE_IOERR_NOMEM) {
@@ -327,7 +323,6 @@ sqlite3Init(sqlite3 * db, char **pzErrMsg)
 	int commit_internal = !(user_session->sql_flags & SQLITE_InternChanges);
 
 	assert(sqlite3_mutex_held(db->mutex));
-	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
 	assert(db->init.busy == 0);
 	rc = SQLITE_OK;
 	db->init.busy = 1;
@@ -402,7 +397,6 @@ schemaIsValid(Parse * pParse)
 	 * set Parse.rc to SQLITE_SCHEMA.
 	 */
 	sqlite3BtreeGetMeta(pBt, BTREE_SCHEMA_VERSION, (u32 *) & cookie);
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	if (cookie != db->mdb.pSchema->schema_cookie) {
 		sqlite3ResetOneSchema(db);
 		pParse->rc = SQLITE_SCHEMA;
@@ -501,20 +495,12 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	 * prepared statement goes to run the schema cookie would fail to detect
 	 * the schema change.  Disaster would follow.
 	 *
-	 * This thread is currently holding mutexes on all Btrees (because
-	 * of the sqlite3BtreeEnterAll() in sqlite3LockAndPrepare()) so it
-	 * is not possible for another thread to start a new schema change
-	 * while this routine is running.  Hence, we do not need to hold
-	 * locks on the schema, we just need to make sure nobody else is
-	 * holding them.
-	 *
 	 * Note that setting READ_UNCOMMITTED overrides most lock detection,
 	 * but it does *not* override schema lock detection, so this all still
 	 * works even if READ_UNCOMMITTED is set.
 	 */
 	Btree *pBt = db->mdb.pBt;
 	assert(pBt);
-	assert(sqlite3BtreeHoldsMutex(pBt));
 	sParse.db = db;
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
 		char *zSqlCopy;
@@ -632,7 +618,6 @@ sqlite3LockAndPrepare(sqlite3 * db,		/* Database handle. */
 		return SQLITE_MISUSE_BKPT;
 	}
 	sqlite3_mutex_enter(db->mutex);
-	sqlite3BtreeEnterAll(db);
 	rc = sqlite3Prepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 			    pzTail);
 	if (rc == SQLITE_SCHEMA) {
@@ -640,7 +625,6 @@ sqlite3LockAndPrepare(sqlite3 * db,		/* Database handle. */
 		rc = sqlite3Prepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 				    pzTail);
 	}
-	sqlite3BtreeLeaveAll(db);
 	sqlite3_mutex_leave(db->mutex);
 	assert(rc == SQLITE_OK || *ppStmt == 0);
 	return rc;

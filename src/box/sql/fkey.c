@@ -1563,7 +1563,6 @@ sqlite3FkDelete(sqlite3 * db, Table * pTab)
 	FKey *pFKey;		/* Iterator variable */
 	FKey *pNext;		/* Copy of pFKey->pNextFrom */
 
-	assert(db == 0 || sqlite3SchemaMutexHeld(db, pTab->pSchema));
 	for (pFKey = pTab->pFKey; pFKey; pFKey = pNext) {
 
 		/* Remove the FK from the fkeyHash hash table. */

@@ -1673,74 +1673,7 @@ void
 sqlite3VdbeUsesBtree(Vdbe * p)
 {
 	DbMaskSet(p->btreeMask, 0);
-	if (sqlite3BtreeSharable(p->db->mdb.pBt)) {
-		DbMaskSet(p->lockMask, 0);
-	}
 }
-
-#if !defined(SQLITE_OMIT_SHARED_CACHE)
-/*
- * If SQLite is compiled to support shared-cache mode and to be threadsafe,
- * this routine obtains the mutex associated with each BtShared structure
- * that may be accessed by the VM passed as an argument. In doing so it also
- * sets the BtShared.db member of each of the BtShared structures, ensuring
- * that the correct busy-handler callback is invoked if required.
- *
- * If SQLite is not threadsafe but does support shared-cache mode, then
- * sqlite3BtreeEnter() is invoked to set the BtShared.db variables
- * of all of BtShared structures accessible via the database handle
- * associated with the VM.
- *
- * If SQLite is not threadsafe and does not support shared-cache mode, this
- * function is a no-op.
- *
- * The p->btreeMask field is a bitmask of all btrees that the prepared
- * statement p will ever use.  Let N be the number of bits in p->btreeMask
- * corresponding to btrees that use shared cache.  Then the runtime of
- * this routine is N*N.  But as N is rarely more than 1, this should not
- * be a problem.
- */
-void
-sqlite3VdbeEnter(Vdbe * p)
-{
-	int i = 0;
-	sqlite3 *db;
-	Db *aDb;
-	if (DbMaskAllZero(p->lockMask))
-		return;		/* The common case */
-	db = p->db;
-	aDb = &db->mdb;
-	if (DbMaskTest(p->lockMask, 0) && ALWAYS(aDb->pBt != 0)) {
-		sqlite3BtreeEnter(aDb[i].pBt);
-	}
-}
-#endif
-
-#if !defined(SQLITE_OMIT_SHARED_CACHE) && SQLITE_THREADSAFE>0
-/*
- * Unlock all of the btrees previously locked by a call to sqlite3VdbeEnter().
- */
-static SQLITE_NOINLINE void
-vdbeLeave(Vdbe * p)
-{
-	int i = 0;
-	sqlite3 *db;
-	Db *aDb;
-	db = p->db;
-	aDb = &db->mdb;
-	if (DbMaskTest(p->lockMask, 0) && ALWAYS(aDb->pBt != 0)) {
-		sqlite3BtreeLeave(aDb[i].pBt);
-	}
-}
-
-void
-sqlite3VdbeLeave(Vdbe * p)
-{
-	if (DbMaskAllZero(p->lockMask))
-		return;		/* The common case */
-	vdbeLeave(p);
-}
-#endif
 
 #if defined(VDBE_PROFILE) || defined(SQLITE_DEBUG)
 /*
@@ -2560,7 +2493,6 @@ vdbeCommit(sqlite3 * db)
 		};
 		Pager *pPager;	/* Pager associated with pBt */
 		needXcommit = 1;
-		sqlite3BtreeEnter(pBt);
 		pPager = sqlite3BtreePager(pBt);
 		if (db->mdb.safety_level != PAGER_SYNCHRONOUS_OFF
 		    && aMJNeeded[sqlite3PagerGetJournalMode(pPager)]
@@ -2568,7 +2500,6 @@ vdbeCommit(sqlite3 * db)
 			nTrans++;
 		}
 		rc = sqlite3PagerExclusiveLock(pPager);
-		sqlite3BtreeLeave(pBt);
 	}
 	if (rc != SQLITE_OK) {
 		return rc;
@@ -2801,9 +2732,6 @@ sqlite3VdbeHalt(Vdbe * p)
 		int eStatementOp = 0;
 		int isSpecialError;	/* Set to true if a 'special' error */
 
-		/* Lock all btrees used by the statement */
-		sqlite3VdbeEnter(p);
-
 		/* Check for one of the special errors */
 		mrc = p->rc & 0xff;
 		isSpecialError = mrc == SQLITE_NOMEM || mrc == SQLITE_IOERR
@@ -2858,7 +2786,6 @@ sqlite3VdbeHalt(Vdbe * p)
 				if (rc != SQLITE_OK) {
 					if (NEVER(p->readOnly)) {
 						closeCursorsAndFree(p);
-						sqlite3VdbeLeave(p);
 						return SQLITE_ERROR;
 					}
 					rc = SQLITE_CONSTRAINT_FOREIGNKEY;
@@ -2877,7 +2804,6 @@ sqlite3VdbeHalt(Vdbe * p)
 				}
 				if (rc == SQLITE_BUSY && p->readOnly) {
 					closeCursorsAndFree(p);
-					sqlite3VdbeLeave(p);
 					return SQLITE_BUSY;
 				} else if (rc != SQLITE_OK) {
 					p->rc = rc;
@@ -2949,9 +2875,6 @@ sqlite3VdbeHalt(Vdbe * p)
 			}
 			p->nChange = 0;
 		}
-
-		/* Release the locks */
-		sqlite3VdbeLeave(p);
 	}
 
 	closeCursorsAndFree(p);
@@ -2971,14 +2894,6 @@ sqlite3VdbeHalt(Vdbe * p)
 	checkActiveVdbeCnt(db);
 	if (db->mallocFailed) {
 		p->rc = SQLITE_NOMEM_BKPT;
-	}
-
-	/* If the auto-commit flag is set to true, then any locks that were held
-	 * by connection db have now been released. Call sqlite3ConnectionUnlocked()
-	 * to invoke any required unlock-notify callbacks.
-	 */
-	if (p->autoCommit) {
-		sqlite3ConnectionUnlocked(db);
 	}
 
 	assert(db->nVdbeActive > 0 || p->autoCommit == 0 ||

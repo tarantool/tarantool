@@ -803,10 +803,8 @@ sqlite3_db_release_memory(sqlite3 * db)
 		return SQLITE_MISUSE_BKPT;
 #endif
 	sqlite3_mutex_enter(db->mutex);
-	sqlite3BtreeEnterAll(db);
 	Btree *pBt = db->mdb.pBt;
 	assert(pBt);
-	sqlite3BtreeLeaveAll(db);
 	sqlite3_mutex_leave(db->mutex);
 	return SQLITE_OK;
 }
@@ -826,10 +824,8 @@ sqlite3_db_cacheflush(sqlite3 * db)
 		return SQLITE_MISUSE_BKPT;
 #endif
 	sqlite3_mutex_enter(db->mutex);
-	sqlite3BtreeEnterAll(db);
 	Btree *pBt = db->mdb.pBt;
 	assert(pBt);
-	sqlite3BtreeLeaveAll(db);
 	sqlite3_mutex_leave(db->mutex);
 	return ((rc == SQLITE_OK && bSeenBusy) ? SQLITE_BUSY : rc);
 }
@@ -1080,7 +1076,6 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 	 * the database rollback and schema reset, which can cause false
 	 * corruption reports in some cases.
 	 */
-	sqlite3BtreeEnterAll(db);
 	schemaChange = (user_session->sql_flags & SQLITE_InternChanges) != 0 &&
 	    db->init.busy == 0;
 
@@ -1099,7 +1094,6 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 		sqlite3ExpirePreparedStatements(db);
 		sqlite3ResetAllSchemasOfConnection(db);
 	}
-	sqlite3BtreeLeaveAll(db);
 
 	/* Any deferred constraint violations have now been resolved. */
 	pVdbe->nDeferredCons = 0;
@@ -2562,9 +2556,7 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 		sqlite3Error(db, rc);
 		goto opendb_out;
 	}
-	sqlite3BtreeEnter(db->mdb.pBt);
 	db->mdb.pSchema = sqlite3SchemaGet(db, db->mdb.pBt);
-	sqlite3BtreeLeave(db->mdb.pBt);
 	db->mdb.pSchema = sqlite3SchemaGet(db, 0);
 
 	/* The default safety_level for the main database is FULL; for the temp
@@ -2831,7 +2823,6 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 
 	/* Ensure the database schema has been loaded */
 	sqlite3_mutex_enter(db->mutex);
-	sqlite3BtreeEnterAll(db);
 	rc = sqlite3Init(db, &zErrMsg);
 	if (SQLITE_OK != rc) {
 		goto error_out;
@@ -2891,8 +2882,6 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 	}
 
  error_out:
-	sqlite3BtreeLeaveAll(db);
-
 	/* Whether the function call succeeded or failed, set the output parameters
 	 * to whatever their local counterparts contain. If an error did occur,
 	 * this has the effect of zeroing all output parameters.
@@ -2975,7 +2964,6 @@ sqlite3_file_control(sqlite3 * db, int op, void *pArg)
 	if (pBtree) {
 		Pager *pPager;
 		sqlite3_file *fd;
-		sqlite3BtreeEnter(pBtree);
 		pPager = sqlite3BtreePager(pBtree);
 		assert(pPager != 0);
 		fd = sqlite3PagerFile(pPager);
@@ -2991,7 +2979,6 @@ sqlite3_file_control(sqlite3 * db, int op, void *pArg)
 		} else {
 			rc = SQLITE_NOTFOUND;
 		}
-		sqlite3BtreeLeave(pBtree);
 	}
 	sqlite3_mutex_leave(db->mutex);
 	return rc;

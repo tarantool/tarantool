@@ -193,7 +193,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 		sqlite3DbFree(db, zErr);
 		zErr = 0;
 
-		sqlite3BtreeEnterAll(db);
 		pTab = sqlite3LocateTable(pParse, 0, zTable);
 		if (pTab && !HasRowid(pTab)) {
 			pTab = 0;
@@ -214,7 +213,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 				pParse->zErrMsg = 0;
 			}
 			rc = SQLITE_ERROR;
-			sqlite3BtreeLeaveAll(db);
 			goto blob_open_out;
 		}
 		pBlob->pTab = pTab;
@@ -232,7 +230,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 			    sqlite3MPrintf(db, "no such column: \"%s\"",
 					   zColumn);
 			rc = SQLITE_ERROR;
-			sqlite3BtreeLeaveAll(db);
 			goto blob_open_out;
 		}
 
@@ -281,7 +278,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 						   "cannot open %s column for writing",
 						   zFault);
 				rc = SQLITE_ERROR;
-				sqlite3BtreeLeaveAll(db);
 				goto blob_open_out;
 			}
 		}
@@ -362,7 +358,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 		pBlob->flags = flags;
 		pBlob->iCol = iCol;
 		pBlob->db = db;
-		sqlite3BtreeLeaveAll(db);
 		if (db->mallocFailed) {
 			goto blob_open_out;
 		}
@@ -443,7 +438,6 @@ blobReadWrite(sqlite3_blob * pBlob,
 		 * returned, clean-up the statement handle.
 		 */
 		assert(db == v->db);
-		sqlite3BtreeEnterCursor(p->pCsr);
 
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
 		if (xCall == sqlite3BtreePutData && db->xPreUpdateCallback) {
@@ -468,7 +462,6 @@ blobReadWrite(sqlite3_blob * pBlob,
 #endif
 
 		rc = xCall(p->pCsr, iOffset + p->iOffset, n, z);
-		sqlite3BtreeLeaveCursor(p->pCsr);
 		if (rc == SQLITE_ABORT) {
 			sqlite3VdbeFinalize(v);
 			p->pStmt = 0;

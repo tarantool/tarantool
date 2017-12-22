@@ -227,9 +227,6 @@ sqlite3UserAuthTable(const char *zTable)
 Table *
 sqlite3FindTable(sqlite3 * db, const char *zName)
 {
-
-	/* All mutexes are required for schema access.  Make sure we hold them. */
-	assert(sqlite3BtreeHoldsAllMutexes(db));
 #if SQLITE_USER_AUTHENTICATION
 	/* Only the admin user is allowed to know that the sqlite_user table
 	 * exists
@@ -239,7 +236,6 @@ sqlite3FindTable(sqlite3 * db, const char *zName)
 		return 0;
 	}
 #endif
-	assert(sqlite3SchemaMutexHeld(db, 0));
 
 	return sqlite3HashFind(&db->mdb.pSchema->tblHash, zName);
 }
@@ -305,10 +301,7 @@ sqlite3LocateTableItem(Parse * pParse, u32 flags, struct SrcList_item * p)
 Index *
 sqlite3FindIndex(MAYBE_UNUSED sqlite3 * db, const char *zName, Table * pTab)
 {
-	/* All mutexes are required for schema access.  Make sure we hold them. */
-	assert(sqlite3BtreeHoldsAllMutexes(db));
 	assert(pTab);
-	assert(sqlite3SchemaMutexHeld(db, 0));
 
 	return sqlite3HashFind(&pTab->idxHash, zName);
 }
@@ -318,9 +311,6 @@ sqlite3LocateIndex(sqlite3 * db, const char *zName, const char *zTable)
 {
 	assert(zName);
 	assert(zTable);
-
-	assert(sqlite3BtreeHoldsAllMutexes(db));
-	assert(sqlite3SchemaMutexHeld(db, 0));
 
 	Table *pTab = sqlite3FindTable(db, zTable);
 
@@ -358,7 +348,6 @@ freeIndex(sqlite3 * db, Index * p)
 void
 sqlite3UnlinkAndDeleteIndex(sqlite3 * db, Index * pIndex)
 {
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	assert(pIndex != 0);
 	assert(&pIndex->pTable->idxHash);
 
@@ -397,7 +386,6 @@ sqlite3ResetOneSchema(sqlite3 * db)
 
 	/* Case 1:  Reset the single schema of the database  */
 	pDb = &db->mdb;
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	assert(pDb->pSchema != 0);
 	sqlite3SchemaClear(pDb->pSchema);
 }
@@ -409,14 +397,12 @@ sqlite3ResetOneSchema(sqlite3 * db)
 void
 sqlite3ResetAllSchemasOfConnection(sqlite3 * db)
 {
-	sqlite3BtreeEnterAll(db);
 	struct session *user_session = current_session();
 	Db *pDb = &db->mdb;
 	if (pDb->pSchema) {
 		sqlite3SchemaClear(pDb->pSchema);
 	}
 	user_session->sql_flags &= ~SQLITE_InternChanges;
-	sqlite3BtreeLeaveAll(db);
 }
 
 /*
@@ -489,8 +475,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 			TESTONLY(Index *
 				 pOld =) sqlite3HashInsert(&pTable->idxHash,
 							   zName, 0);
-			assert(db == 0
-			       || sqlite3SchemaMutexHeld(db, pIndex->pSchema));
 			assert(pOld == pIndex || pOld == 0);
 		}
 		freeIndex(db, pIndex);
@@ -536,7 +520,6 @@ sqlite3UnlinkAndDeleteTable(sqlite3 * db, const char *zTabName)
 
 	assert(db != 0);
 	assert(zTabName);
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	testcase(zTabName[0] == 0);	/* Zero-length table names are allowed */
 	pDb = &db->mdb;
 	p = sqlite3HashInsert(&pDb->pSchema->tblHash, zTabName, 0);
@@ -765,7 +748,6 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	 */
 #ifndef SQLITE_OMIT_AUTOINCREMENT
 	if (!pParse->nested && strcmp(zName, "_SEQUENCE") == 0) {
-		assert(sqlite3SchemaMutexHeld(db, 0));
 		pTable->pSchema->pSeqTab = pTable;
 	}
 #endif
@@ -1257,7 +1239,6 @@ sqlite3ChangeCookie(Parse * pParse)
 {
 	sqlite3 *db = pParse->db;
 	Vdbe *v = pParse->pVdbe;
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	sqlite3VdbeAddOp3(v, OP_SetCookie, 0, BTREE_SCHEMA_VERSION,
 			  db->mdb.pSchema->schema_cookie + 1);
 }
@@ -2133,7 +2114,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	if (db->init.busy) {
 		Table *pOld;
 		Schema *pSchema = p->pSchema;
-		assert(sqlite3SchemaMutexHeld(db, 0));
 		pOld = sqlite3HashInsert(&pSchema->tblHash, p->zName, p);
 		if (pOld) {
 			assert(p == pOld);	/* Malloc must have failed inside HashInsert() */
@@ -2326,7 +2306,6 @@ sqlite3ViewGetColumnNames(Parse * pParse, Table * pTable)
 			pTable->aCol = pSelTab->aCol;
 			pSelTab->nCol = 0;
 			pSelTab->aCol = 0;
-			assert(sqlite3SchemaMutexHeld(db, pTable->pSchema));
 		} else {
 			pTable->nCol = 0;
 			nErr++;
@@ -2351,7 +2330,6 @@ static void
 sqliteViewResetAll(sqlite3 * db)
 {
 	HashElem *i;
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	if (!DbHasProperty(db, DB_UnresetViews))
 		return;
 	for (i = sqliteHashFirst(&db->mdb.pSchema->tblHash); i;
@@ -2692,7 +2670,6 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 	pFKey->aAction[0] = (u8) (flags & 0xff);	/* ON DELETE action */
 	pFKey->aAction[1] = (u8) ((flags >> 8) & 0xff);	/* ON UPDATE action */
 
-	assert(sqlite3SchemaMutexHeld(db, p->pSchema));
 	pNextTo = (FKey *) sqlite3HashInsert(&p->pSchema->fkeyHash,
 					     pFKey->zTo, (void *)pFKey);
 	if (pNextTo == pFKey) {
@@ -3193,7 +3170,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		pIndex->pPartIdxWhere = pPIWhere;
 		pPIWhere = 0;
 	}
-	assert(sqlite3SchemaMutexHeld(db, 0));
 
 	/* Check to see if we should honor DESC requests on index columns
 	 */
@@ -3343,7 +3319,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	assert(pParse->nErr == 0);
 	if (db->init.busy) {
 		Index *p;
-		assert(sqlite3SchemaMutexHeld(db, pIndex->pSchema));
 		p = sqlite3HashInsert(&pTab->idxHash, pIndex->zName, pIndex);
 		if (p) {
 			assert(p == pIndex);	/* Malloc must have failed */
@@ -4098,7 +4073,6 @@ sqlite3CodeVerifySchema(Parse * pParse)
 	Parse *pToplevel = sqlite3ParseToplevel(pParse);
 
 	assert(pParse->db->mdb.pBt != 0);
-	assert(sqlite3SchemaMutexHeld(pParse->db, 0));
 	if (DbMaskTest(pToplevel->cookieMask, 0) == 0) {
 		DbMaskSet(pToplevel->cookieMask, 0);
 	}
@@ -4299,7 +4273,6 @@ reindexDatabases(Parse * pParse, char const *zColl)
 	Table *pTab;		/* A table in the database */
 
 	pDb = &db->mdb;
-	assert(sqlite3BtreeHoldsAllMutexes(db));	/* Needed for schema access */
 	assert(pDb != 0);
 	for (k = sqliteHashFirst(&pDb->pSchema->tblHash); k;
 	     k = sqliteHashNext(k)) {

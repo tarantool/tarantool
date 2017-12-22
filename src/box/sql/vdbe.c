@@ -618,7 +618,6 @@ int sqlite3VdbeExec(Vdbe *p)
 	/*** INSERT STACK UNION HERE ***/
 
 	assert(p->magic==VDBE_MAGIC_RUN);  /* sqlite3_step() verifies this */
-	sqlite3VdbeEnter(p);
 	if (p->rc==SQLITE_NOMEM) {
 		/* This happens if a malloc() inside a call to sqlite3_column_text() or
 		 * sqlite3_column_text16() failed.
@@ -3165,7 +3164,6 @@ case OP_SetCookie: {
 	assert(p->readOnly==0);
 	pDb = &db->mdb;
 	assert(pDb->pBt!=0);
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	/* See note about index shifting on OP_ReadCookie */
 	rc = sqlite3BtreeUpdateMeta(pDb->pBt, pOp->p2, pOp->p3);
 	if (pOp->p2==BTREE_SCHEMA_VERSION) {
@@ -3290,7 +3288,6 @@ case OP_OpenWrite:
 	if (pOp->opcode==OP_OpenWrite) {
 		assert(OPFLAG_FORDELETE==BTREE_FORDELETE);
 		wrFlag = BTREE_WRCSR | (pOp->p5 & OPFLAG_FORDELETE);
-		assert(sqlite3SchemaMutexHeld(db, 0));
 		if (pDb->pSchema->file_format < p->minWriteFileFormat) {
 			p->minWriteFileFormat = pDb->pSchema->file_format;
 		}
@@ -5407,14 +5404,6 @@ case OP_ParseSchema2: {
 	Mem *pRec, *pRecEnd;
 	char *argv[4] = {NULL, NULL, NULL, NULL};
 
-	/* Any prepared statement that invokes this opcode will hold mutexes
-	 * on every btree.  This is a prerequisite for invoking
-	 * sqlite3InitCallback().
-	 */
-#ifdef SQLITE_DEBUG
-	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
-#endif
-
 	assert(DbHasProperty(db, DB_SchemaLoaded));
 
 	initData.db = db;
@@ -5469,14 +5458,6 @@ case OP_ParseSchema3: {
 	Mem *pRec;
 	char zPgnoBuf[16];
 	char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
-
-	/* Any prepared statement that invokes this opcode will hold mutexes
-	 * on every btree.  This is a prerequisite for invoking
-	 * sqlite3InitCallback().
-	 */
-#ifdef SQLITE_DEBUG
-	assert(sqlite3BtreeHoldsMutex(db->mdb.pBt));
-#endif
 
 	assert(DbHasProperty(db, DB_SchemaLoaded));
 
@@ -6619,7 +6600,6 @@ vdbe_return:
 	db->lastRowid = lastRowid;
 	testcase( nVmStep>0);
 	p->aCounter[SQLITE_STMTSTATUS_VM_STEP] += (int)nVmStep;
-	sqlite3VdbeLeave(p);
 	assert(rc!=SQLITE_OK || nExtraDelete==0
 		|| sqlite3_strlike("DELETE%",p->zSql,0)!=0
 		);

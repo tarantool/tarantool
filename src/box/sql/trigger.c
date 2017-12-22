@@ -123,7 +123,6 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	if (!zName || SQLITE_OK != sqlite3CheckObjectName(pParse, zName)) {
 		goto trigger_cleanup;
 	}
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	if (sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName)) {
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse, "trigger %s already exists",
@@ -326,7 +325,6 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 	if (db->init.busy) {
 		Trigger *pLink = pTrig;
 		Hash *pHash = &db->mdb.pSchema->trigHash;
-		assert(sqlite3SchemaMutexHeld(db, 0));
 		pTrig = sqlite3HashInsert(pHash, zName, pTrig);
 		if (pTrig) {
 			sqlite3OomFault(db);
@@ -535,8 +533,6 @@ sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 
 	assert(pName->nSrc == 1);
 	zName = pName->a[0].zName;
-	assert(sqlite3BtreeHoldsAllMutexes(db));
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	pTrigger = sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName);
 	if (!pTrigger) {
 		if (!noErr) {
@@ -618,7 +614,6 @@ sqlite3UnlinkAndDeleteTrigger(sqlite3 * db, const char *zName)
 	Hash *pHash;
 	struct session *user_session = current_session();
 
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	pHash = &(db->mdb.pSchema->trigHash);
 	pTrigger = sqlite3HashInsert(pHash, zName, 0);
 	if (ALWAYS(pTrigger)) {

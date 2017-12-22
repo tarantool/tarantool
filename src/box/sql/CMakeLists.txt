@@ -38,7 +38,6 @@ add_library(sql STATIC
     analyze.c
     attach.c
     bitvec.c
-    btmutex.c
     btree.c
     build.c
     callback.c
@@ -64,7 +63,6 @@ add_library(sql STATIC
     mutex.c
     mutex_noop.c
     mutex_unix.c
-    notify.c
     os.c
     os_unix.c
     pager.c

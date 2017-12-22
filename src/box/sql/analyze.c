@@ -152,7 +152,6 @@ openStatTable(Parse * pParse,	/* Parsing context */
 
 	if (v == 0)
 		return;
-	assert(sqlite3BtreeHoldsAllMutexes(db));
 	assert(sqlite3VdbeDb(v) == db);
 
 	/* Create new statistic tables if they do not exist, or clear them
@@ -892,9 +891,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		/* Do not gather statistics on system tables */
 		return;
 	}
-	assert(sqlite3BtreeHoldsAllMutexes(db));
 	assert(sqlite3SchemaToIndex(db, pTab->pSchema) == 0);
-	assert(sqlite3SchemaMutexHeld(db, 0));
 
 	/* Establish a read-lock on the table at the shared-cache level.
 	 * Open a read-only cursor on the table. Also allocate a cursor number
@@ -1216,7 +1213,6 @@ analyzeDatabase(Parse * pParse)
 	openStatTable(pParse, iStatCur, 0, 0);
 	iMem = pParse->nMem + 1;
 	iTab = pParse->nTab;
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	for (k = sqliteHashFirst(&pSchema->tblHash); k; k = sqliteHashNext(k)) {
 		Table *pTab = (Table *) sqliteHashData(k);
 		analyzeOneTable(pParse, pTab, 0, iStatCur, iMem, iTab);
@@ -1235,7 +1231,6 @@ analyzeTable(Parse * pParse, Table * pTab, Index * pOnlyIdx)
 	int iStatCur;
 
 	assert(pTab != 0);
-	assert(sqlite3BtreeHoldsAllMutexes(pParse->db));
 	assert(sqlite3SchemaToIndex(pParse->db, pTab->pSchema) == 0);
 	sqlite3BeginWriteOperation(pParse, 0);
 	iStatCur = pParse->nTab;
@@ -1271,7 +1266,6 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 	/* Read the database schema. If an error occurs, leave an error message
 	 * and code in pParse and return NULL.
 	 */
-	assert(sqlite3BtreeHoldsAllMutexes(pParse->db));
 	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
 		return;
 	}
@@ -1792,7 +1786,6 @@ sqlite3AnalysisLoad(sqlite3 * db)
 	assert(db->mdb.pBt != 0);
 
 	/* Clear any prior statistics */
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {
 		Table *pTab = sqliteHashData(j);
@@ -1813,7 +1806,6 @@ sqlite3AnalysisLoad(sqlite3 * db)
 	}
 
 	/* Set appropriate defaults on all indexes not in the _sql_stat1 table */
-	assert(sqlite3SchemaMutexHeld(db, 0));
 	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {
 		Table *pTab = sqliteHashData(j);

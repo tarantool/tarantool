@@ -562,18 +562,6 @@ int sqlite3VdbeSorterRewind(const VdbeCursor *, int *);
 int sqlite3VdbeSorterWrite(const VdbeCursor *, Mem *);
 int sqlite3VdbeSorterCompare(const VdbeCursor *, Mem *, int, int *);
 
-#if !defined(SQLITE_OMIT_SHARED_CACHE)
-void sqlite3VdbeEnter(Vdbe *);
-#else
-#define sqlite3VdbeEnter(X)
-#endif
-
-#if !defined(SQLITE_OMIT_SHARED_CACHE) && SQLITE_THREADSAFE>0
-void sqlite3VdbeLeave(Vdbe *);
-#else
-#define sqlite3VdbeLeave(X)
-#endif
-
 #ifdef SQLITE_DEBUG
 void sqlite3VdbeMemAboutToChange(Vdbe *, Mem *);
 int sqlite3VdbeCheckMemInvariants(Mem *);
