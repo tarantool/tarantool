@@ -47,7 +47,8 @@ pid_t log_pid = 0;
 int log_level = S_INFO;
 enum say_format log_format = SF_PLAIN;
 
-static RLIST_HEAD(log_list);
+/** List of logs to rotate */
+static RLIST_HEAD(log_rotate_list);
 
 static const char logger_syntax_reminder[] =
 	"expecting a file name or a prefix, such as '|', 'pipe:', 'syslog:'";
@@ -117,6 +118,14 @@ static const char *level_strs[] = {
 	[S_DEBUG] = "DEBUG",
 };
 
+static const char *say_logger_type_strs[] = {
+	[SAY_LOGGER_BOOT] = "stdout",
+	[SAY_LOGGER_STDERR] = "stderr",
+	[SAY_LOGGER_FILE] = "file",
+	[SAY_LOGGER_PIPE] = "pipe",
+	[SAY_LOGGER_SYSLOG] = "syslog",
+};
+
 static const char*
 level_to_string(int level)
 {
@@ -158,16 +167,11 @@ log_set_level(struct log *log, enum say_level level)
 void
 log_set_format(struct log *log, log_format_func_t format_func)
 {
-	/*
-	 * For syslog, default or boot log type the log format can
-	 * not be changed.
-	 */
-	if (log->type == SAY_LOGGER_STDERR ||
-	    log->type == SAY_LOGGER_PIPE ||
-	    log->type == SAY_LOGGER_FILE) {
+	assert(format_func == say_format_plain ||
+	       log->type == SAY_LOGGER_STDERR ||
+	       log->type == SAY_LOGGER_PIPE || log->type == SAY_LOGGER_FILE);
 
-		log->format_func = format_func;
-	}
+	log->format_func = format_func;
 }
 
 void
@@ -180,9 +184,20 @@ say_set_log_level(int new_level)
 void
 say_set_log_format(enum say_format format)
 {
-	log_format = format;
+
 	switch (format) {
 	case SF_JSON:
+		/*
+		 * For syslog, default or boot log type the log format can
+		 * not be changed.
+		 */
+		if (log_default.type != SAY_LOGGER_STDERR &&
+		    log_default.type != SAY_LOGGER_PIPE &&
+		    log_default.type != SAY_LOGGER_FILE) {
+			say_error("json log format is not supported when output is '%s'",
+				  say_logger_type_strs[log_default.type]);
+			return;
+		}
 		log_set_format(&log_default, say_format_json);
 		break;
 	case SF_PLAIN:
@@ -191,6 +206,7 @@ say_set_log_format(enum say_format format)
 	default:
 		unreachable();
 	}
+	log_format = format;
 }
 
 static const char *say_format_strs[] = {
@@ -252,7 +268,7 @@ say_logrotate(int signo)
 	(void) signo;
 	int saved_errno = errno;
 	struct log *log;
-	rlist_foreach_entry(log, &log_list, in_log_list) {
+	rlist_foreach_entry(log, &log_rotate_list, in_log_list) {
 		if (log_rotate(log) < 0) {
 			diag_log();
 		}
@@ -483,7 +499,10 @@ log_create(struct log *log, const char *init_str, bool nonblock)
 		log->type = SAY_LOGGER_STDERR;
 		log->fd = STDERR_FILENO;
 	}
-	rlist_add_entry(&log_list, log, in_log_list);
+	if (log->type == SAY_LOGGER_FILE)
+		rlist_add_entry(&log_rotate_list, log, in_log_list);
+	else
+		rlist_create(&log->in_log_list);
 	return 0;
 }
 
@@ -494,7 +513,7 @@ say_logger_init(const char *init_str, int level, int nonblock,
 	if (log_create(&log_default, init_str, nonblock) < 0) {
 		goto fail;
 	}
-	switch(log_default.type) {
+	switch (log_default.type) {
 	case SAY_LOGGER_PIPE:
 		fprintf(stderr, "started logging into a pipe,"
 			" SIGHUP log rotation disabled\n");
@@ -538,9 +557,8 @@ fail:
 void
 say_logger_free()
 {
-	if (log_default.type != SAY_LOGGER_BOOT) {
+	if (log_default.type != SAY_LOGGER_BOOT)
 		log_destroy(&log_default);
-	}
 }
 
 /** {{{ Formatters */
