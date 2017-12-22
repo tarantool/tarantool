@@ -130,7 +130,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	ev_break(loop, EVBREAK_ALL);
 }
 
-#ifdef __amd64
+#if defined(__linux__) && defined(__amd64)
 
 inline void dump_x86_64_register(const char *reg_name, unsigned long long val)
 {
@@ -139,36 +139,34 @@ inline void dump_x86_64_register(const char *reg_name, unsigned long long val)
 
 void dump_x86_64_registers(ucontext_t *uc)
 {
-  dump_x86_64_register("rax", uc->uc_mcontext.gregs[REG_RAX]);
-  dump_x86_64_register("rbx", uc->uc_mcontext.gregs[REG_RBX]);
-  dump_x86_64_register("rcx", uc->uc_mcontext.gregs[REG_RCX]);
-  dump_x86_64_register("rdx", uc->uc_mcontext.gregs[REG_RDX]);
-  dump_x86_64_register("rsi", uc->uc_mcontext.gregs[REG_RSI]);
-  dump_x86_64_register("rdi", uc->uc_mcontext.gregs[REG_RDI]);
-  dump_x86_64_register("rsp", uc->uc_mcontext.gregs[REG_RSP]);
-  dump_x86_64_register("rbp", uc->uc_mcontext.gregs[REG_RBP]);
-  dump_x86_64_register("r8", uc->uc_mcontext.gregs[REG_R8]);
-  dump_x86_64_register("r9", uc->uc_mcontext.gregs[REG_R9]);
-  dump_x86_64_register("r10", uc->uc_mcontext.gregs[REG_R10]);
-  dump_x86_64_register("r11", uc->uc_mcontext.gregs[REG_R11]);
-  dump_x86_64_register("r12", uc->uc_mcontext.gregs[REG_R12]);
-  dump_x86_64_register("r13", uc->uc_mcontext.gregs[REG_R13]);
-  dump_x86_64_register("r14", uc->uc_mcontext.gregs[REG_R14]);
-  dump_x86_64_register("r15", uc->uc_mcontext.gregs[REG_R15]);
-  dump_x86_64_register("rip", uc->uc_mcontext.gregs[REG_RIP]);
-  dump_x86_64_register("eflags", uc->uc_mcontext.gregs[REG_EFL]);
-
-  dump_x86_64_register("cs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 0) & 0xffff);
-  dump_x86_64_register("gs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 16) & 0xffff);
-  dump_x86_64_register("fs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 32) & 0xffff);
-
-  dump_x86_64_register("cr2", uc->uc_mcontext.gregs[REG_CR2]);
-  dump_x86_64_register("err", uc->uc_mcontext.gregs[REG_ERR]);
-  dump_x86_64_register("oldmask", uc->uc_mcontext.gregs[REG_OLDMASK]);
-  dump_x86_64_register("trapno", uc->uc_mcontext.gregs[REG_TRAPNO]);
+	dump_x86_64_register("rax", uc->uc_mcontext.gregs[REG_RAX]);
+	dump_x86_64_register("rbx", uc->uc_mcontext.gregs[REG_RBX]);
+	dump_x86_64_register("rcx", uc->uc_mcontext.gregs[REG_RCX]);
+	dump_x86_64_register("rdx", uc->uc_mcontext.gregs[REG_RDX]);
+	dump_x86_64_register("rsi", uc->uc_mcontext.gregs[REG_RSI]);
+	dump_x86_64_register("rdi", uc->uc_mcontext.gregs[REG_RDI]);
+	dump_x86_64_register("rsp", uc->uc_mcontext.gregs[REG_RSP]);
+	dump_x86_64_register("rbp", uc->uc_mcontext.gregs[REG_RBP]);
+	dump_x86_64_register("r8", uc->uc_mcontext.gregs[REG_R8]);
+	dump_x86_64_register("r9", uc->uc_mcontext.gregs[REG_R9]);
+	dump_x86_64_register("r10", uc->uc_mcontext.gregs[REG_R10]);
+	dump_x86_64_register("r11", uc->uc_mcontext.gregs[REG_R11]);
+	dump_x86_64_register("r12", uc->uc_mcontext.gregs[REG_R12]);
+	dump_x86_64_register("r13", uc->uc_mcontext.gregs[REG_R13]);
+	dump_x86_64_register("r14", uc->uc_mcontext.gregs[REG_R14]);
+	dump_x86_64_register("r15", uc->uc_mcontext.gregs[REG_R15]);
+	dump_x86_64_register("rip", uc->uc_mcontext.gregs[REG_RIP]);
+	dump_x86_64_register("eflags", uc->uc_mcontext.gregs[REG_EFL]);
+	dump_x86_64_register("cs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 0) & 0xffff);
+	dump_x86_64_register("gs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 16) & 0xffff);
+	dump_x86_64_register("fs", (uc->uc_mcontext.gregs[REG_CSGSFS] >> 32) & 0xffff);
+	dump_x86_64_register("cr2", uc->uc_mcontext.gregs[REG_CR2]);
+	dump_x86_64_register("err", uc->uc_mcontext.gregs[REG_ERR]);
+	dump_x86_64_register("oldmask", uc->uc_mcontext.gregs[REG_OLDMASK]);
+	dump_x86_64_register("trapno", uc->uc_mcontext.gregs[REG_TRAPNO]);
 }
 
-#endif //__amd64
+#endif //#if defined(__linux__) && defined(__amd64)
 
 /** Try to log as much as possible before dumping a core.
  *
@@ -221,7 +219,7 @@ sig_fatal_cb(int signo, siginfo_t *siginfo, void *context)
 	fprintf(stderr, "  context: %p\n", context); 
 	fprintf(stderr, "  siginfo: %p\n", siginfo); 
 
-#ifdef __amd64
+#if defined(__linux__) && defined(__amd64)
 	dump_x86_64_registers((ucontext_t *)context);
 #endif
 
