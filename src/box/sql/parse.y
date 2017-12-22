@@ -182,22 +182,12 @@ createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
 
-create_table_args ::= LP columnlist conslist_opt(X) RP(E) table_options(F). {
-  sqlite3EndTable(pParse,&X,&E,F,0);
+create_table_args ::= LP columnlist conslist_opt(X) RP(E). {
+  sqlite3EndTable(pParse,&X,&E,0,0);
 }
 create_table_args ::= AS select(S). {
   sqlite3EndTable(pParse,0,0,0,S);
   sqlite3SelectDelete(pParse->db, S);
-}
-%type table_options {int}
-table_options(A) ::= .    {A = 0;}
-table_options(A) ::= WITHOUT nm(X). {
-  if( X.n==5 && sqlite3_strnicmp(X.z,"rowid",5)==0 ){
-    A = TF_WithoutRowid | TF_NoVisibleRowid;
-  }else{
-    A = 0;
-    sqlite3ErrorMsg(pParse, "unknown table option: %.*s", X.n, X.z);
-  }
 }
 columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.

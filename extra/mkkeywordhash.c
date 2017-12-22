@@ -241,7 +241,6 @@ static Keyword aKeywordTable[] = {
   { "VALUES",                 "TK_VALUES",      ALWAYS,           true  },
   { "VIEW",                   "TK_VIEW",        VIEW,             true  },
   { "WITH",                   "TK_WITH",        CTE,              true  },
-  { "WITHOUT",                "TK_WITHOUT",     ALWAYS,           false },
   { "WHEN",                   "TK_WHEN",        ALWAYS,           true  },
   { "WHERE",                  "TK_WHERE",       ALWAYS,           true  },
   { "ANY",                    "TK_STANDARD",    RESERVED,         true  },
