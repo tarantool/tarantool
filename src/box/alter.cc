@@ -470,7 +470,6 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 			  "space id 0 is reserved");
 	}
 	uint32_t uid = tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_UID);
-	access_check_ddl(uid, SC_SPACE);
 	uint32_t exact_field_count =
 		tuple_field_u32_xc(tuple, BOX_SPACE_FIELD_FIELD_COUNT);
 	uint32_t engine_name_len;
@@ -1367,6 +1366,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_CREATE_SPACE,
 						 region);
+		access_check_ddl(def->uid, SC_SPACE);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		RLIST_HEAD(empty_list);
@@ -1431,6 +1431,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE,
 						 region);
+		access_check_ddl(def->uid, SC_SPACE);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		/*
@@ -1866,7 +1867,6 @@ user_def_new_from_tuple(struct tuple *tuple)
 			  user->name, "unknown user type");
 	}
 	identifier_check_xc(user->name, name_len);
-	access_check_ddl(user->owner, SC_USER);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password), 0).
@@ -1937,6 +1937,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
+		access_check_ddl(user->owner, SC_USER);
 		auto def_guard = make_scoped_guard([=] { free(user); });
 		(void) user_cache_replace(user);
 		def_guard.is_active = false;
@@ -1970,6 +1971,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * correct.
 		 */
 		struct user_def *user = user_def_new_from_tuple(new_tuple);
+		access_check_ddl(user->uid, SC_USER);
 		auto def_guard = make_scoped_guard([=] { free(user); });
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_alter_user, NULL);
@@ -2112,7 +2114,7 @@ coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
 	def->id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_ID);
 	def->name = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_NAME, &name_len);
 	def->name_len = name_len;
-	uint32_t owner_id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_UID);
+	def->owner_id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_UID);
 	const char *type = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_TYPE,
 					      &type_len);
 	def->type = STRN2ENUM(coll_type, type, type_len);
@@ -2181,9 +2183,6 @@ coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
 			  "ICU wrong numeric_collation option setting, "
 				  "expected ON | OFF");
 	}
-
-	access_check_ddl(owner_id, SC_COLLATION);
-
 }
 
 /** Rollback change in collation space. */
@@ -2257,6 +2256,7 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 
 	struct coll_def new_def;
 	coll_def_new_from_tuple(new_tuple, &new_def);
+	access_check_ddl(new_def.owner_id, SC_COLLATION);
 	struct coll *new_coll = coll_new(&new_def);
 	if (new_coll == NULL)
 		diag_raise();
