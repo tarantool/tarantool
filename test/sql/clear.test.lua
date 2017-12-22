@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 -- box.cfg()
 
 -- create space
-box.sql.execute("CREATE TABLE zoobar (c1, c2 PRIMARY KEY, c3, c4) WITHOUT ROWID")
+box.sql.execute("CREATE TABLE zoobar (c1, c2 PRIMARY KEY, c3, c4)")
 box.sql.execute("CREATE UNIQUE INDEX zoobar2 ON zoobar(c1, c4)")
 
 -- Debug

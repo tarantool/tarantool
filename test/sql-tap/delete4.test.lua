@@ -90,7 +90,7 @@ test:do_execsql_test(
     3.1,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a, b, PRIMARY KEY(a, b)) WITHOUT ROWID;
+        CREATE TABLE t1(a, b, PRIMARY KEY(a, b));
         INSERT INTO t1 VALUES(1, 2);
         INSERT INTO t1 VALUES(2, 4);
         INSERT INTO t1 VALUES(1, 5);
@@ -182,7 +182,7 @@ test:do_execsql_test(
     4.11,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(col0, col1, pk PRIMARY KEY) WITHOUT ROWID;
+        CREATE TABLE t4(col0, col1, pk PRIMARY KEY);
         INSERT INTO t4 VALUES(14, 'abcde','xyzzy');
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);
         CREATE INDEX idx_t4_3 ON t4 (col0);
@@ -197,7 +197,7 @@ test:do_execsql_test(
     4.12,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(col0, col1, pk PRIMARY KEY) WITHOUT ROWID;
+        CREATE TABLE t4(col0, col1, pk PRIMARY KEY);
         INSERT INTO t4 VALUES(14, 'abcde','xyzzy');
         CREATE INDEX idx_t4_3 ON t4 (col0);
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);

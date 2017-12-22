@@ -241,7 +241,7 @@ test:do_catchsql_test(5.2, [[
 })
 
 test:do_execsql_test("5.2.1", [[
-  CREATE TABLE edge(xfrom, xto, seq, PRIMARY KEY(xfrom, xto)) WITHOUT ROWID;
+  CREATE TABLE edge(xfrom, xto, seq, PRIMARY KEY(xfrom, xto));
   INSERT INTO edge VALUES(0, 1, 10);
   INSERT INTO edge VALUES(1, 2, 20);
   INSERT INTO edge VALUES(0, 3, 30);
@@ -900,7 +900,7 @@ test:do_execsql_test("10.8.4.3", [[
 --   CREATE TABLE org(
 --     name TEXT PRIMARY KEY,
 --     boss TEXT REFERENCES org
---   ) WITHOUT ROWID;
+--   );
 --   INSERT INTO org VALUES('Alice',NULL);
 --   INSERT INTO org VALUES('Bob','Alice');
 --   INSERT INTO org VALUES('Cindy','Alice');

@@ -274,7 +274,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "count-5.1",
     [[
-        CREATE TABLE t5(a TEXT PRIMARY KEY, b VARCHAR(50)) WITHOUT ROWID;
+        CREATE TABLE t5(a TEXT PRIMARY KEY, b VARCHAR(50));
         INSERT INTO t5 VALUES('bison','jazz');
         SELECT count(*) FROM t5;
     ]], {

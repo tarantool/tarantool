@@ -604,8 +604,8 @@ test:execsql [[
 test:do_execsql_test(
     "trigger2-7.1",
     [[
-        CREATE TABLE ab(a PRIMARY KEY, b) WITHOUT ROWID;
-        CREATE TABLE cd(c PRIMARY KEY, d) WITHOUT ROWID;
+        CREATE TABLE ab(a PRIMARY KEY, b);
+        CREATE TABLE cd(c PRIMARY KEY, d);
         INSERT INTO ab VALUES (1, 2);
         INSERT INTO ab VALUES (0, 0);
         INSERT INTO cd VALUES (3, 4);

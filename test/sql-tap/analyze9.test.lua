@@ -1401,7 +1401,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     24.0,
     [[
-        CREATE TABLE t5(c, d, b, e, a, PRIMARY KEY(a, b, c)) WITHOUT ROWID;
+        CREATE TABLE t5(c, d, b, e, a, PRIMARY KEY(a, b, c));
         WITH data(a, b, c, d, e) AS (SELECT 'z', 'y', 0, 0, 0 UNION ALL 
             SELECT a, CASE WHEN b='y' THEN 'n' ELSE 'y' END, c+1, e/250, e+1 FROM data WHERE e<1000) 
                 INSERT INTO t5(a, b, c, d, e) SELECT * FROM data;
@@ -1612,7 +1612,7 @@ test:do_execsql_test(
     "26.2.1",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, x, y, z) WITHOUT ROWID;
+        CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, x, y, z);
         CREATE INDEX i1 ON t1(x, y);
         CREATE INDEX i2 ON t1(z);
 

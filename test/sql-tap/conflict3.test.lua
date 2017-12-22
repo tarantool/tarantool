@@ -133,7 +133,7 @@ test:do_execsql_test(
         -- </conflict-2.4>
     })
 
--- Replete again on a WITHOUT ROWID table.
+-- Replete again
 --
 test:do_execsql_test(
     "conflict-3.1",
@@ -143,7 +143,7 @@ test:do_execsql_test(
           a INT PRIMARY KEY ON CONFLICT REPLACE, 
           b UNIQUE ON CONFLICT IGNORE,
           c UNIQUE ON CONFLICT FAIL
-        ) WITHOUT ROWID;
+        );
         INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
         SELECT a,b,c FROM t1 ORDER BY a;
     ]], {
@@ -198,7 +198,7 @@ test:do_execsql_test(
           b UNIQUE ON CONFLICT IGNORE,
           c UNIQUE ON CONFLICT FAIL,
           a INT PRIMARY KEY ON CONFLICT REPLACE
-        ) WITHOUT ROWID;
+        );
         INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
         SELECT a,b,c FROM t1 ORDER BY a;
     ]], {
@@ -473,7 +473,7 @@ test:do_execsql_test(
           a UNIQUE ON CONFLICT REPLACE, 
           b INT PRIMARY KEY ON CONFLICT IGNORE,
           c UNIQUE ON CONFLICT FAIL
-        ) WITHOUT ROWID;
+        );
         INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
         SELECT a,b,c FROM t1 ORDER BY a;
     ]], {
@@ -583,7 +583,7 @@ test:do_execsql_test(
           a UNIQUE ON CONFLICT REPLACE, 
           b UNIQUE ON CONFLICT IGNORE,
           c PRIMARY KEY ON CONFLICT FAIL
-        ) WITHOUT ROWID;
+        );
         INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
         SELECT a,b,c FROM t1 ORDER BY a;
     ]], {

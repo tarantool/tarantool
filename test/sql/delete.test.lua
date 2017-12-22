@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 -- box.cfg()
 
 -- create space
-box.sql.execute("CREATE TABLE t1(a, b, PRIMARY KEY(a, b)) WITHOUT ROWID;");
+box.sql.execute("CREATE TABLE t1(a, b, PRIMARY KEY(a, b));");
 
 -- Debug
 -- box.sql.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
