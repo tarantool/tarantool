@@ -75,8 +75,8 @@
 #define OP_Bool           72 /* synopsis: r[P2]=P1                         */
 #define OP_Int64          73 /* synopsis: r[P2]=P4                         */
 #define OP_String         74 /* synopsis: r[P2]='P4' (len=P1)              */
-#define OP_Null           75 /* synopsis: r[P2..P3]=NULL                   */
-#define OP_String8        76 /* same as TK_STRING, synopsis: r[P2]='P4'    */
+#define OP_String8        75 /* same as TK_STRING, synopsis: r[P2]='P4'    */
+#define OP_Null           76 /* synopsis: r[P2..P3]=NULL                   */
 #define OP_SoftNull       77 /* synopsis: r[P1]=NULL                       */
 #define OP_Blob           78 /* synopsis: r[P2]=P4 (len=P1, subtype=P3)    */
 #define OP_Variable       79 /* synopsis: r[P2]=parameter(P1,P4)           */
@@ -115,8 +115,8 @@
 #define OP_NextId        112 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
 #define OP_FCopy         113 /* synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)] */
 #define OP_NewRowid      114 /* synopsis: r[P2]=rowid                      */
-#define OP_Insert        115 /* synopsis: intkey=r[P3] data=r[P2]          */
-#define OP_Real          116 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_Real          115 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
+#define OP_Insert        116 /* synopsis: intkey=r[P3] data=r[P2]          */
 #define OP_InsertInt     117 /* synopsis: intkey=P3 data=r[P2]             */
 #define OP_Delete        118
 #define OP_ResetCount    119
@@ -184,7 +184,7 @@
 /*  88 */ 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,\
 /*  96 */ 0x10, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,\
 /* 104 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,\
-/* 112 */ 0x20, 0x10, 0x10, 0x00, 0x10, 0x00, 0x00, 0x00,\
+/* 112 */ 0x20, 0x10, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00,\
 /* 120 */ 0x00, 0x00, 0x00, 0x10, 0x00, 0x04, 0x04, 0x00,\
 /* 128 */ 0x00, 0x10, 0x10, 0x00, 0x00, 0x10, 0x10, 0x00,\
 /* 136 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,\
