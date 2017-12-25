@@ -313,21 +313,12 @@ space_apply_initial_join_row(struct space *space, struct request *request)
 	return space->vtab->apply_initial_join_row(space, request);
 }
 
+/**
+ * Execute a DML request on the given space.
+ */
 int
-space_execute_replace(struct space *space, struct txn *txn,
-		      struct request *request, struct tuple **result);
-
-int
-space_execute_delete(struct space *space, struct txn *txn,
-		     struct request *request, struct tuple **result);
-
-int
-space_execute_update(struct space *space, struct txn *txn,
-		     struct request *request, struct tuple **result);
-
-int
-space_execute_upsert(struct space *space, struct txn *txn,
-		     struct request *request);
+space_execute_dml(struct space *space, struct txn *txn,
+		  struct request *request, struct tuple **result);
 
 static inline void
 init_system_space(struct space *space)
@@ -515,44 +506,6 @@ static inline void
 space_apply_initial_join_row_xc(struct space *space, struct request *request)
 {
 	if (space_apply_initial_join_row(space, request) != 0)
-		diag_raise();
-}
-
-static inline struct tuple *
-space_execute_replace_xc(struct space *space, struct txn *txn,
-			 struct request *request)
-{
-	struct tuple *result;
-	if (space_execute_replace(space, txn, request, &result) != 0)
-		diag_raise();
-	return result;
-}
-
-static inline struct tuple *
-space_execute_delete_xc(struct space *space, struct txn *txn,
-			struct request *request)
-{
-	struct tuple *result;
-	if (space_execute_delete(space, txn, request, &result) != 0)
-		diag_raise();
-	return result;
-}
-
-static inline struct tuple *
-space_execute_update_xc(struct space *space, struct txn *txn,
-			struct request *request)
-{
-	struct tuple *result;
-	if (space_execute_update(space, txn, request, &result) != 0)
-		diag_raise();
-	return result;
-}
-
-static inline void
-space_execute_upsert_xc(struct space *space, struct txn *txn,
-			struct request *request)
-{
-	if (space_execute_upsert(space, txn, request) != 0)
 		diag_raise();
 }
 

@@ -429,51 +429,46 @@ request_handle_sequence(struct request *request, struct space *space)
 }
 
 int
-space_execute_replace(struct space *space, struct txn *txn,
-		      struct request *request, struct tuple **result)
+space_execute_dml(struct space *space, struct txn *txn,
+		  struct request *request, struct tuple **result)
 {
-	assert(request->type == IPROTO_INSERT ||
-	       request->type == IPROTO_REPLACE);
-	if (space->sequence != NULL &&
-	    request_handle_sequence(request, space) != 0)
-		return -1;
-	return space->vtab->execute_replace(space, txn, request, result);
-}
-
-int
-space_execute_delete(struct space *space, struct txn *txn,
-		     struct request *request, struct tuple **result)
-{
-	assert(request->type == IPROTO_DELETE);
-	if (space->vtab->execute_delete(space, txn, request, result) != 0)
-		return -1;
-	if (*result != NULL && request->index_id != 0)
-		request_rebind_to_primary_key(request, space, *result);
-	return 0;
-}
-
-int
-space_execute_update(struct space *space, struct txn *txn,
-		     struct request *request, struct tuple **result)
-{
-	assert(request->type == IPROTO_UPDATE);
-	if (space->vtab->execute_update(space, txn, request, result) != 0)
-		return -1;
-	if (*result != NULL && request->index_id != 0) {
-		/*
-		 * XXX: this is going to break with sync replication
-		 * for cases when tuple is NULL, since the leader
-		 * will be unable to certify such updates correctly.
-		 */
-		request_rebind_to_primary_key(request, space, *result);
+	switch (request->type) {
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+		if (space->sequence != NULL &&
+		    request_handle_sequence(request, space) != 0)
+			return -1;
+		if (space->vtab->execute_replace(space, txn,
+						 request, result) != 0)
+			return -1;
+		break;
+	case IPROTO_UPDATE:
+		if (space->vtab->execute_update(space, txn,
+						request, result) != 0)
+			return -1;
+		if (*result != NULL && request->index_id != 0) {
+			/*
+			 * XXX: this is going to break with sync replication
+			 * for cases when tuple is NULL, since the leader
+			 * will be unable to certify such updates correctly.
+			 */
+			request_rebind_to_primary_key(request, space, *result);
+		}
+		break;
+	case IPROTO_DELETE:
+		if (space->vtab->execute_delete(space, txn,
+						request, result) != 0)
+			return -1;
+		if (*result != NULL && request->index_id != 0)
+			request_rebind_to_primary_key(request, space, *result);
+		break;
+	case IPROTO_UPSERT:
+		*result = NULL;
+		if (space->vtab->execute_upsert(space, txn, request) != 0)
+			return -1;
+		break;
+	default:
+		*result = NULL;
 	}
 	return 0;
-}
-
-int
-space_execute_upsert(struct space *space, struct txn *txn,
-		     struct request *request)
-{
-	assert(request->type == IPROTO_UPSERT);
-	return space->vtab->execute_upsert(space, txn, request);
 }

@@ -293,6 +293,7 @@ dup_replace_mode(uint32_t op)
 static int
 memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 {
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	if (request->type != IPROTO_INSERT) {
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, request->type);
 		return -1;
@@ -301,13 +302,20 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 	struct txn *txn = txn_begin_stmt(space);
 	if (txn == NULL)
 		return -1;
-	struct tuple *unused;
-	if (space_execute_replace(space, txn, request, &unused) != 0) {
-		say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
-		txn_rollback_stmt();
-		return -1;
-	}
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	stmt->new_tuple = memtx_tuple_new(space->format, request->tuple,
+					  request->tuple_end);
+	if (stmt->new_tuple == NULL)
+		goto rollback;
+	tuple_ref(stmt->new_tuple);
+	if (memtx_space->replace(space, stmt, DUP_INSERT) != 0)
+		goto rollback;
 	return txn_commit_stmt(txn, request);
+
+rollback:
+	say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
+	txn_rollback_stmt();
+	return -1;
 }
 
 static int
