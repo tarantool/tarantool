@@ -65,7 +65,7 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	if ((credentials->universal_access & PRIV_ALL) == PRIV_ALL) {
+	if ((credentials->universal_access & PRIV_X) == PRIV_X) {
 		*funcp = func;
 		return 0;
 	}
