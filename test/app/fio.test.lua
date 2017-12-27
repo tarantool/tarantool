@@ -15,6 +15,8 @@ fio.pathjoin('abc', 'cde')
 fio.pathjoin('/', 'abc')
 fio.pathjoin('abc/', '/cde')
 fio.pathjoin('/', '/cde')
+fio.pathjoin('/a', '/')
+fio.pathjoin('abc', 'awdeq///qweqwqwe///', "//asda//")
 
 -- basename
 st, err = pcall(fio.basename, nil)

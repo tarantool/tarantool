@@ -212,16 +212,15 @@ fio.pathjoin = function(path, ...)
         if sp == nil then
             error("Undefined path part")
         end
-        if sp == '' or sp == '/' then
+        if sp == '' then
             error("Empty path part")
         end
-        if string.match(sp, '^/') ~= nil then
-            sp = string.gsub(sp, '^/', '')
-        end
+
         if sp ~= '' then
             path = path .. '/' .. sp
         end
     end
+    path = string.gsub(path, "/+",'/')
     if string.match(path, '/$') ~= nil and #path > 1 then
         path = string.gsub(path, '/$', '')
     end
