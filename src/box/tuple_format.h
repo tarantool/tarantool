@@ -34,6 +34,7 @@
 #include "key_def.h"
 #include "field_def.h"
 #include "errinj.h"
+#include "tuple_dictionary.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -95,15 +96,9 @@ struct tuple_field {
 	int32_t offset_slot;
 	/** True if this field is used by an index. */
 	bool is_key_part;
-	/** Tuple field name, specified by a user. Can be NULL. */
-	char *name;
 	/** True, if a field can store NULL. */
 	bool is_nullable;
 };
-
-struct mh_strnu32_t;
-typedef uint32_t (*field_name_hash_f)(const char *str, uint32_t len);
-extern field_name_hash_f field_name_hash;
 
 /**
  * @brief Tuple format
@@ -144,16 +139,15 @@ struct tuple_format {
 	uint32_t min_field_count;
 	/* Length of 'fields' array. */
 	uint32_t field_count;
-	/** Field names hash. Key - name, value - field number. */
-	struct mh_strnu32_t *names;
+	/**
+	 * Shared names storage used by all formats of a space.
+	 */
+	struct tuple_dictionary *dict;
 	/* Formats of the fields */
 	struct tuple_field fields[0];
 };
 
 extern struct tuple_format **tuple_formats;
-
-int
-tuple_format_named_fields(const struct tuple_format *format);
 
 static inline uint32_t
 tuple_format_id(const struct tuple_format *format)
@@ -203,7 +197,7 @@ struct tuple_format *
 tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		 uint16_t key_count, uint16_t extra_size,
 		 const struct field_def *space_fields,
-		 uint32_t space_field_count);
+		 uint32_t space_field_count, struct tuple_dictionary *dict);
 
 /**
  * Check that two tuple formats are identical.
@@ -221,7 +215,7 @@ tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b);
  * @retval     NULL Memory or format register error.
  */
 struct tuple_format *
-tuple_format_dup(const struct tuple_format *src);
+tuple_format_dup(struct tuple_format *src);
 
 /**
  * Returns the total size of tuple metadata of this format.
@@ -337,10 +331,17 @@ tuple_field_raw(const struct tuple_format *format, const char *tuple,
  * @retval not NULL MessagePack field.
  * @retval     NULL No field with @a name.
  */
-const char *
+static inline const char *
 tuple_field_raw_by_name(struct tuple_format *format, const char *tuple,
 			const uint32_t *field_map, const char *name,
-			uint32_t name_len, uint32_t name_hash);
+			uint32_t name_len, uint32_t name_hash)
+{
+	uint32_t fieldno;
+	if (tuple_fieldno_by_name(format->dict, name, name_len, name_hash,
+				  &fieldno) != 0)
+		return NULL;
+	return tuple_field_raw(format, tuple, field_map, fieldno);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

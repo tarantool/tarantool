@@ -36,6 +36,7 @@ add_library(tuple STATIC
     tuple_update.c
     tuple_compare.cc
     tuple_hash.cc
+    tuple_dictionary.c
     key_def.cc
     coll_def.c
     coll.c

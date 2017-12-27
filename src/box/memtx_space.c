@@ -933,8 +933,9 @@ memtx_space_new(struct memtx_engine *memtx,
 	rlist_foreach_entry(index_def, key_list, link)
 		keys[key_count++] = index_def->key_def;
 
-	struct tuple_format *format = tuple_format_new(&memtx_tuple_format_vtab,
-			keys, key_count, 0, def->fields, def->field_count);
+	struct tuple_format *format =
+		tuple_format_new(&memtx_tuple_format_vtab, keys, key_count, 0,
+				 def->fields, def->field_count, def->dict);
 	if (format == NULL) {
 		free(memtx_space);
 		return NULL;

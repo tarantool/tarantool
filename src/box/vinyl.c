@@ -581,8 +581,9 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 	rlist_foreach_entry(index_def, key_list, link)
 		keys[key_count++] = index_def->key_def;
 
-	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-			keys, key_count, 0, def->fields, def->field_count);
+	struct tuple_format *format =
+		tuple_format_new(&vy_tuple_format_vtab, keys, key_count, 0,
+				 def->fields, def->field_count, def->dict);
 	if (format == NULL) {
 		free(space);
 		return NULL;
@@ -3017,7 +3018,8 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		if (ctx->format != NULL)
 			tuple_format_unref(ctx->format);
 		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
-					       &ctx->key_def, 1, 0, NULL, 0);
+					       &ctx->key_def, 1, 0, NULL, 0,
+					       NULL);
 		if (ctx->format == NULL)
 			return -1;
 		tuple_format_ref(ctx->format);

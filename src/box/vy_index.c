@@ -86,7 +86,7 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 		    void *upsert_thresh_arg)
 {
 	env->key_format = tuple_format_new(&vy_tuple_format_vtab,
-					   NULL, 0, 0, NULL, 0);
+					   NULL, 0, 0, NULL, 0, NULL);
 	if (env->key_format == NULL)
 		return -1;
 	tuple_format_ref(env->key_format);
@@ -167,7 +167,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		tuple_format_ref(format);
 	} else {
 		index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
-						      &cmp_def, 1, 0, NULL, 0);
+						      &cmp_def, 1, 0, NULL, 0,
+						      NULL);
 		if (index->disk_format == NULL)
 			goto fail_format;
 		for (uint32_t i = 0; i < cmp_def->part_count; ++i) {

@@ -42,10 +42,10 @@ const struct opt_def space_opts_reg[] = {
 };
 
 /**
- * Size of the space_def, calculated using its name.
+ * Size of the space_def.
  * @param name_len Length of the space name.
- * @param field_defs_size Binary size of a field definitions
- *        array.
+ * @param field_names_size Size of all names.
+ * @param field_count Space field count.
  * @param[out] names_offset Offset from the beginning of a def to
  *             a field names memory.
  * @param[out] fields_offset Offset from the beginning of a def to
@@ -86,6 +86,7 @@ space_def_dup(const struct space_def *src)
 			name_pos += strlen(name_pos) + 1;
 		}
 	}
+	tuple_dictionary_ref(ret->dict);
 	return ret;
 }
 
@@ -109,6 +110,11 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	}
 	assert(name_len <= BOX_NAME_MAX);
 	assert(engine_len <= ENGINE_NAME_MAX);
+	def->dict = tuple_dictionary_new(fields, field_count);
+	if (def->dict == NULL) {
+		free(def);
+		return NULL;
+	}
 	def->id = id;
 	def->uid = uid;
 	def->exact_field_count = exact_field_count;
