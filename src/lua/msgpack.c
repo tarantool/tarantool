@@ -548,6 +548,9 @@ lua_ibuf_msgpack_decode(lua_State *L)
 {
 	uint32_t ctypeid = 0;
 	const char *rpos = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
+	if (rpos == NULL) {
+		luaL_error(L, "msgpack.ibuf_decode: rpos is null");
+	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	luamp_decode(L, cfg, &rpos);
 	*(const char **)luaL_pushcdata(L, ctypeid) = rpos;

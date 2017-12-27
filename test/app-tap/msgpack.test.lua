@@ -36,14 +36,17 @@ local function test_offsets(test, s)
 end
 
 local function test_misc(test, s)
-    test:plan(3)
+    test:plan(4)
     local ffi = require('ffi')
+    local buffer = require('buffer')
     local buf = ffi.cast("const char *", "\x91\x01")
     local bufcopy = ffi.cast('const char *', buf)
     local bufend, result = s.ibuf_decode(buf)
+    local st,e = pcall(s.ibuf_decode, buffer.ibuf().rpos)
     test:is(buf, bufcopy, "ibuf_decode argument is constant")
     test:is(buf + 2, bufend, 'ibuf_decode position')
     test:is_deeply(result, {1}, "ibuf_decode result")
+    test:ok(not st and e:match("null"), "null ibuf")
 end
 
 tap.test("msgpack", function(test)
