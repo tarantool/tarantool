@@ -263,3 +263,9 @@ index = space:create_index('test', { type = 'tree', parts = { 2, 'any' }})
 index = space:create_index('test', { type = 'tree', parts = { 2, 'array' }})
 index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
 space:drop()
+
+-- gh-3019 default index options
+box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serialize = 'map'}), {}}
+box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
+box.space.test.index.pk
+box.space.test:drop()

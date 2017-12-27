@@ -686,3 +686,33 @@ index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
 space:drop()
 ---
 ...
+-- gh-3019 default index options
+box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serialize = 'map'}), {}}
+---
+- [512, 1, 'test', 'vinyl', 0, {}, []]
+...
+box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
+---
+- [512, 0, 'pk', 'tree', {'unique': true}, [[0, 'unsigned']]]
+...
+box.space.test.index.pk
+---
+- unique: true
+  parts:
+  - type: unsigned
+    is_nullable: false
+    fieldno: 1
+  id: 0
+  space_id: 512
+  options:
+    page_size: 8192
+    run_count_per_level: 2
+    run_size_ratio: 3.5
+    bloom_fpr: 0.05
+    range_size: 1073741824
+  name: pk
+  type: TREE
+...
+box.space.test:drop()
+---
+...
