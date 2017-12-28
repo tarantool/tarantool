@@ -30,12 +30,34 @@
  */
 #include "user_def.h"
 const char *
-priv_name(uint8_t access)
+priv_name(user_access_t access)
 {
 	if (access & PRIV_R)
 		return "Read";
 	if (access & PRIV_W)
 		return "Write";
-	return "Execute";
+	if (access & PRIV_X)
+		return "Execute";
+	if (access & PRIV_S)
+		return "Session";
+	if (access & PRIV_U)
+		return "Usage";
+	if (access & PRIV_C)
+		return "Create";
+	if (access & PRIV_D)
+		return "Drop";
+	if (access & PRIV_A)
+		return "Alter";
+	if (access & PRIV_REFERENCE)
+		return "Reference";
+	if (access & PRIV_TRIGGER)
+		return "Trigger";
+	if (access & PRIV_INSERT)
+		return "Insert";
+	if (access & PRIV_UPDATE)
+		return "Update";
+	if (access & PRIV_DELETE)
+		return "Delete";
+	return "Any";
 }
 

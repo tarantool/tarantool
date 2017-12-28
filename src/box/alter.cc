@@ -60,7 +60,7 @@
 
 /* {{{ Auxiliary functions and methods. */
 
-void
+static void
 access_check_ddl(uint32_t owner_uid, enum schema_object_type type)
 {
 	struct credentials *cr = current_user();

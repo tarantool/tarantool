@@ -70,7 +70,7 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 		return 0;
 	}
 
-	uint8_t access = PRIV_X & ~credentials->universal_access;
+	user_access_t access = PRIV_X & ~credentials->universal_access;
 	if (func == NULL || (func->def->uid != credentials->uid &&
 	     access & ~func->access[credentials->auth_token].effective)) {
 		/* Access violation, report error. */

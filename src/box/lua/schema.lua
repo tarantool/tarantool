@@ -1574,6 +1574,36 @@ local function privilege_resolve(privilege)
         if string.find(privilege, 'execute') then
             numeric = numeric + 4
         end
+        if string.find(privilege, 'session') then
+            numeric = numeric + 8
+        end
+        if string.find(privilege, 'usage') then
+            numeric = numeric + 16
+        end
+        if string.find(privilege, 'create') then
+            numeric = numeric + 32
+        end
+        if string.find(privilege, 'drop') then
+            numeric = numeric + 64
+        end
+        if string.find(privilege, 'alter') then
+            numeric = numeric + 128
+        end
+        if string.find(privilege, 'reference') then
+            numeric = numeric + 256
+        end
+        if string.find(privilege, 'trigger') then
+            numeric = numeric + 512
+        end
+        if string.find(privilege, 'insert') then
+            numeric = numeric + 1024
+        end
+        if string.find(privilege, 'update') then
+            numeric = numeric + 2048
+        end
+        if string.find(privilege, 'delete') then
+            numeric = numeric + 4096
+        end
     else
         numeric = privilege
     end
@@ -1598,6 +1628,36 @@ local function privilege_name(privilege)
     end
     if bit.band(privilege, 4) ~= 0 then
         table.insert(names, "execute")
+    end
+    if bit.band(privilege, 8) ~= 0 then
+        table.insert(names, "session")
+    end
+    if bit.band(privilege, 16) ~= 0 then
+        table.insert(names, "usage")
+    end
+    if bit.band(privilege, 32) ~= 0 then
+        table.insert(names, "create")
+    end
+    if bit.band(privilege, 64) ~= 0 then
+        table.insert(names, "drop")
+    end
+    if bit.band(privilege, 128) ~= 0 then
+        table.insert(names, "alter")
+    end
+    if bit.band(privilege, 256) ~= 0 then
+        table.insert(names, "reference")
+    end
+    if bit.band(privilege, 512) ~= 0 then
+        table.insert(names, "trigger")
+    end
+    if bit.band(privilege, 1024) ~= 0 then
+        table.insert(names, "insert")
+    end
+    if bit.band(privilege, 2048) ~= 0 then
+        table.insert(names, "update")
+    end
+    if bit.band(privilege, 4096) ~= 0 then
+        table.insert(names, "delete")
     end
     return table.concat(names, ",")
 end
