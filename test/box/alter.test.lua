@@ -732,3 +732,27 @@ identifier.run_test(
 );
 
 test_run:cmd("setopt delimiter ''");
+
+--
+-- gh-3011: add new names to old tuple formats.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+t1 = s:replace{1}
+t1.field1
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+s:format(format)
+t2 = s:replace{2}
+t2.field1
+t1.field1
+format[1].name = 'field_1'
+s:format(format)
+t3 = s:replace{3}
+t1.field1
+t1.field_1
+t2.field1
+t2.field_1
+t3.field1
+t3.field_1
+s:drop()
