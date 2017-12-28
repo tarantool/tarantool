@@ -298,6 +298,11 @@ not not s:create_index('test3', {parts = {{3, 'integer', collation = 'unicode_ci
 not not s:create_index('test4', {parts = {{4, 'boolean', collation = 'unicode_ci'}}})
 s:drop()
 
+--
+-- gh-2068 no error for invalid user during space creation
+--
+s = box.schema.space.create('test', {user="no_such_user"})
+
 -- Too long WAL write warning (gh-2743).
 s = box.schema.space.create('test')
 _ = s:create_index('pk')

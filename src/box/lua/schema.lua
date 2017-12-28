@@ -399,12 +399,12 @@ box.schema.space.create = function(name, options)
         end
         id = max_id[2]
     end
-    local uid = nil
+    local uid = session.uid()
     if options.user then
         uid = user_or_role_resolve(options.user)
-    end
-    if uid == nil then
-        uid = session.uid()
+        if uid == nil then
+            box.error(box.error.NO_SUCH_USER, options.user)
+        end
     end
     local format = options.format and options.format or {}
     check_param(format, 'format', 'table')
