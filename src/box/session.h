@@ -87,7 +87,7 @@ struct session {
 	enum session_type type;
 	/** Authentication salt. */
 	char salt[SESSION_SEED_SIZE];
-	/** Cached user id and global grants */
+	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
@@ -184,7 +184,7 @@ current_session()
  * user on demand as in current_session() applies.
  */
 static inline struct credentials *
-current_user()
+effective_user()
 {
 	struct credentials *u =
 		(struct credentials *) fiber_get_key(fiber(),
@@ -247,7 +247,7 @@ session_run_on_auth_triggers(const char *user_name);
 static inline void
 access_check_universe(uint8_t access)
 {
-	struct credentials *credentials = current_user();
+	struct credentials *credentials = effective_user();
 	if (!(credentials->universal_access & access)) {
 		/*
 		 * Access violation, report error.

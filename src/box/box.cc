@@ -1008,7 +1008,7 @@ sequence_data_update(uint32_t seq_id, int64_t value)
 			 mp_encode_uint(tuple_buf_end, value));
 	assert(tuple_buf_end < tuple_buf + tuple_buf_size);
 
-	struct credentials *orig_credentials = current_user();
+	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
 
 	int rc = box_replace(BOX_SEQUENCE_DATA_ID,
@@ -1033,7 +1033,7 @@ sequence_data_delete(uint32_t seq_id)
 	key_buf_end = mp_encode_uint(key_buf_end, seq_id);
 	assert(key_buf_end < key_buf + key_buf_size);
 
-	struct credentials *orig_credentials = current_user();
+	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
 
 	int rc = box_delete(BOX_SEQUENCE_DATA_ID, 0,

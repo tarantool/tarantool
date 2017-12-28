@@ -43,7 +43,7 @@
 int
 access_check_space(struct space *space, uint8_t access)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required

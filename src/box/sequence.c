@@ -241,7 +241,7 @@ overflow:
 int
 access_check_sequence(struct sequence *seq)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	/*
 	 * If the user has universal access, don't bother with checks.
 	 * No special check for ADMIN user is necessary since ADMIN has

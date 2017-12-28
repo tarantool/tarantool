@@ -347,3 +347,12 @@ box.schema.role.info('test_role')
 
 box.schema.user.drop('test_user')
 box.schema.role.drop('test_role')
+
+-- gh-3023: box.session.su() changes both authenticated and effective
+-- user, while should only change the effective user
+--
+function uids() return { uid = box.session.uid(), euid = box.session.euid() } end
+box.session.su('guest')
+uids()
+box.session.su('admin')
+box.session.su('guest', uids)

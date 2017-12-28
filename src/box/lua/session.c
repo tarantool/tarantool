@@ -101,7 +101,7 @@ lbox_session_sync(struct lua_State *L)
 
 /**
  * Session effective user id.
- * Note: user id (current_user()->uid)
+ * Note: user id (effective_user()->uid)
  * may be different in a setuid function.
  */
 static int
@@ -123,7 +123,7 @@ lbox_session_euid(struct lua_State *L)
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, current_user()->uid);
+	lua_pushnumber(L, effective_user()->uid);
 	return 1;
 }
 
@@ -135,7 +135,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = user_by_id(current_user()->uid);
+	struct user *user = user_by_id(effective_user()->uid);
 	if (user)
 		lua_pushstring(L, user->def->name);
 	else
@@ -179,6 +179,7 @@ lbox_session_su(struct lua_State *L)
 	/* sudo */
 	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
+	/* Restore the original credentials. */
 	fiber_set_user(fiber(), &session->credentials);
 
 	if (error)
