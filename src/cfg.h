@@ -40,6 +40,9 @@ extern "C" {
 int
 cfg_geti(const char *param);
 
+int
+cfg_geti_default(const char *param, int default_val);
+
 int64_t
 cfg_geti64(const char *param);
 

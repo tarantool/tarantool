@@ -109,6 +109,14 @@ static bool is_ro = true;
  */
 static double replication_cfg_timeout = 1.0; /* seconds */
 
+static const int REPLICATION_QUORUM_ALL = INT_MAX;
+
+/**
+ * Min number of masters to connect for configuration to succeed.
+ * If set to REPLICATION_QUORUM_ALL, wait for all masters.
+ */
+static int replication_cfg_quorum = REPLICATION_QUORUM_ALL;
+
 /* Use the shared instance of xstream for all appliers */
 static struct xstream join_stream;
 static struct xstream subscribe_stream;
@@ -374,6 +382,18 @@ box_check_replication_timeout(void)
 	return timeout;
 }
 
+static int
+box_check_replication_quorum(void)
+{
+	int quorum = cfg_geti_default("replication_quorum",
+				      REPLICATION_QUORUM_ALL);
+	if (quorum < 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_quorum",
+			  "the value must be greater or equal to 0");
+	}
+	return quorum;
+}
+
 static void
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -455,6 +475,7 @@ box_check_config()
 	box_check_replicaset_uuid(&uuid);
 	box_check_replication();
 	box_check_replication_timeout();
+	box_check_replication_quorum();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
@@ -512,7 +533,7 @@ cfg_get_replication(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication(double timeout)
+box_sync_replication(double timeout, int quorum)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication(&count);
@@ -524,7 +545,7 @@ box_sync_replication(double timeout)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	replicaset_connect(appliers, count, timeout);
+	replicaset_connect(appliers, count, quorum, timeout);
 
 	guard.is_active = false;
 }
@@ -543,7 +564,7 @@ box_set_replication(void)
 
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_cfg_timeout);
+	box_sync_replication(replication_cfg_timeout, replication_cfg_quorum);
 	/* Follow replica */
 	replicaset_follow();
 }
@@ -553,6 +574,12 @@ box_set_replication_timeout(void)
 {
 	double timeout = box_check_replication_timeout();
 	replication_cfg_timeout = relay_timeout = applier_timeout = timeout;
+}
+
+void
+box_set_replication_quorum(void)
+{
+	replication_cfg_quorum = box_check_replication_quorum();
 }
 
 void
@@ -1615,6 +1642,7 @@ box_cfg_xc(void)
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	box_set_replication_quorum();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
@@ -1735,7 +1763,7 @@ box_cfg_xc(void)
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
 		/* Wait for the cluster to start up */
-		box_sync_replication(TIMEOUT_INFINITY);
+		box_sync_replication(TIMEOUT_INFINITY, replication_cfg_quorum);
 	} else {
 		if (!tt_uuid_is_nil(&instance_uuid))
 			INSTANCE_UUID = instance_uuid;
@@ -1747,8 +1775,15 @@ box_cfg_xc(void)
 		 */
 		box_listen();
 
-		/* Wait for the  cluster to start up */
-		box_sync_replication(TIMEOUT_INFINITY);
+		/*
+		 * Wait for the cluster to start up.
+		 *
+		 * Note, when bootstrapping a new instance, we have to
+		 * connect to all masters to make sure all replicas
+		 * receive the same replica set UUID when a new cluster
+		 * is deployed.
+		 */
+		box_sync_replication(TIMEOUT_INFINITY, REPLICATION_QUORUM_ALL);
 
 		/* Bootstrap a new master */
 		bootstrap(&replicaset_uuid);

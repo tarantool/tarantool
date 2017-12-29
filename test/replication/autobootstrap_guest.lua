@@ -1,12 +1,12 @@
 #!/usr/bin/env tarantool
 
--- get instance name from filename (autobootstrap1.lua => autobootstrap1)
+-- get instance name from filename (autobootstrap_guest1.lua => autobootstrap_guest1)
 local INSTANCE_ID = string.match(arg[0], "%d")
 
 local SOCKET_DIR = require('fio').cwd()
 local function instance_uri(instance_id)
     --return 'localhost:'..(3310 + instance_id)
-    return SOCKET_DIR..'/autobootstrap'..instance_id..'.sock';
+    return SOCKET_DIR..'/autobootstrap_guest'..instance_id..'.sock';
 end
 
 -- start console first
@@ -22,12 +22,9 @@ box.cfg({
     };
 })
 
-env = require('test_run')
-test_run = env.new()
-engine = test_run:get_cfg('engine')
-
 box.once("bootstrap", function()
+    local test_run = require('test_run').new()
     box.schema.user.grant("guest", 'replication')
-    box.schema.space.create('test', {engine = engine})
+    box.schema.space.create('test', {engine = test_run:get_cfg('engine')})
     box.space.test:create_index('primary')
 end)
