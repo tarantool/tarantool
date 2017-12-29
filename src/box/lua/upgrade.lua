@@ -10,6 +10,10 @@ local ADMIN = 1
 local PUBLIC = 2
 -- role 'REPLICATION'
 local REPLICATION = 3
+-- role 'SUPER'
+-- choose a fancy id to not clash with any existing role or
+-- user during upgrade
+local SUPER = 31
 
 --------------------------------------------------------------------------------
 -- Utils
@@ -929,6 +933,11 @@ local function upgrade_to_1_7_7()
     --
     _priv:upsert({ADMIN, ADMIN, 'universe', 0, 4294967295},
                  {{ "|", 5, 4294967295}})
+    --
+    -- create role 'super' and grant it all privileges on universe
+    --
+    _user:replace{SUPER, ADMIN, 'super', 'role', setmap({})}
+    _priv:replace({ADMIN, SUPER, 'universe', 0, 4294967295})
 end
 
 local function get_version()

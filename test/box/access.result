@@ -95,7 +95,7 @@ end;
 ...
 usermax();
 ---
-- error: User 'user28' is not found
+- error: User 'user27' is not found
 ...
 test_run:cmd("setopt delimiter ''");
 ---
@@ -145,7 +145,7 @@ box.schema.user.disable("rich")
 ...
 box.space['_user']:delete{uid}
 ---
-- [5, 1, 'rich', 'user', {}]
+- [33, 1, 'rich', 'user', {}]
 ...
 box.schema.user.drop('test')
 ---
@@ -421,7 +421,7 @@ box.schema.user.create('user1')
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', {}]
+- - [32, 1, 'user1', 'user', {}]
 ...
 session.su('user1')
 ---
@@ -434,14 +434,14 @@ session.su('admin')
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}]
+- - [32, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}]
 ...
 box.schema.user.passwd('user1', 'extra_new_password')
 ---
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', {'chap-sha1': 'nMc3F1oaUtz37IYbgGYYPZawmfE='}]
+- - [32, 1, 'user1', 'user', {'chap-sha1': 'nMc3F1oaUtz37IYbgGYYPZawmfE='}]
 ...
 box.schema.user.passwd('invalid_user', 'some_password')
 ---
@@ -484,8 +484,8 @@ box.schema.user.grant('user', 'read,write', 'universe')
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 27]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 27]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
@@ -493,40 +493,40 @@ box.schema.user.grant('user', 'read', 'universe')
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 27]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 27]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 25]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 25]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 24]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 24]
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 26]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 26]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 27]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 27]
 ...
 box.schema.user.drop('user')
 ---
@@ -1064,5 +1064,56 @@ box.schema.user.drop('test1')
 ---
 ...
 s:drop()
+---
+...
+--
+-- gh-3022 role 'super'
+--
+box.schema.user.grant('guest', 'super')
+---
+...
+box.session.su('guest')
+---
+...
+_ = box.schema.space.create('test')
+---
+...
+box.space.test:drop()
+---
+...
+_ = box.schema.user.create('test')
+---
+...
+box.schema.user.drop('test')
+---
+...
+_ = box.schema.func.create('test')
+---
+...
+box.schema.func.drop('test')
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'super')
+---
+...
+box.session.su('guest')
+---
+...
+box.schema.space.create('test')
+---
+- error: Write access is denied for user 'guest' to space '_schema'
+...
+box.schema.user.create('test')
+---
+- error: Read access is denied for user 'guest' to space '_user'
+...
+box.schema.func.create('test')
+---
+- error: Read access is denied for user 'guest' to space '_func'
+...
+box.session.su('admin')
 ---
 ...

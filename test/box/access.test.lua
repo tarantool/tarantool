@@ -406,3 +406,23 @@ session.su("admin")
 box.schema.user.drop('test')
 box.schema.user.drop('test1')
 s:drop()
+
+--
+-- gh-3022 role 'super'
+--
+
+box.schema.user.grant('guest', 'super')
+box.session.su('guest')
+_ = box.schema.space.create('test')
+box.space.test:drop()
+_ = box.schema.user.create('test')
+box.schema.user.drop('test')
+_ = box.schema.func.create('test')
+box.schema.func.drop('test')
+box.session.su('admin')
+box.schema.user.revoke('guest', 'super')
+box.session.su('guest')
+box.schema.space.create('test')
+box.schema.user.create('test')
+box.schema.func.create('test')
+box.session.su('admin')

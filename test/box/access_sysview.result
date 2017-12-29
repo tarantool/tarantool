@@ -234,11 +234,11 @@ box.session.su('guest')
 ...
 #box.space._vuser:select{}
 ---
-- 4
+- 5
 ...
 #box.space._vpriv:select{}
 ---
-- 13
+- 14
 ...
 #box.space._vfunc:select{}
 ---

@@ -355,7 +355,7 @@ uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_M
 ...
 box.space._user:delete(uid)
 ---
-- [5, 4, 'someone', 'user', {}]
+- [33, 32, 'someone', 'user', {}]
 ...
 session.su('admin')
 ---
@@ -626,6 +626,7 @@ box.space._user:select()
   - [1, 1, 'admin', 'user', {}]
   - [2, 1, 'public', 'role', {}]
   - [3, 1, 'replication', 'role', {}]
+  - [31, 1, 'super', 'role', {}]
 ...
 box.space._space:select()
 ---

@@ -151,6 +151,7 @@ box.space._user:select()
   - [3, 1, 'replication', 'role', {}]
   - [4, 1, 'someuser', 'user', {'chap-sha1': '2qvbQIHM4zMWhAmm2xGeGNjqoHM='}]
   - [5, 1, 'somerole', 'role', {}]
+  - [31, 1, 'super', 'role', {}]
 ...
 box.space._func:select()
 ---
@@ -185,6 +186,7 @@ box.space._priv:select()
   - [1, 4, 'space', 513, 3]
   - [1, 4, 'universe', 0, 24]
   - [1, 5, 'space', 512, 3]
+  - [1, 31, 'universe', 0, 4294967295]
 ...
 box.space._vspace ~= nil
 ---

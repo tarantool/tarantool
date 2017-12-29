@@ -1293,7 +1293,7 @@ box.schema.user.grant('user', 'write', 'sequence', 'seq') -- ok
 ...
 box.space._priv.index.object:select{'sequence'}
 ---
-- - [1, 4, 'sequence', 1, 2]
+- - [1, 32, 'sequence', 1, 2]
 ...
 box.space._sequence:delete(sq.id) -- error: sequence has grants
 ---
