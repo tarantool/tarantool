@@ -124,8 +124,8 @@ box.schema.user.create('tester', { password = 'tester' })
 
 on_connect_user = nil
 on_disconnect_user = nil
-function on_connect() on_connect_user = box.session.user() end
-function on_disconnect() on_disconnect_user = box.session.user() end
+function on_connect() on_connect_user = box.session.effective_user() end
+function on_disconnect() on_disconnect_user = box.session.effective_user() end
 _ = box.session.on_connect(on_connect)
 _ = box.session.on_disconnect(on_disconnect)
 local conn = require('net.box').connect("tester:tester@" ..HOST..':'..PORT)
@@ -136,8 +136,8 @@ conn:close()
 conn = nil
 while not on_disconnect_user do fiber.sleep(0.001) end
 -- Triggers are executed with admin permissions
-test:is(on_connect_user, 'admin', "check triggers permissions, on_connect")
-test:is(on_disconnect_user, 'admin', "check triggers permissions, on_disconnect")
+test:is(on_connect_user, 'admin', "check trigger permissions, on_connect")
+test:is(on_disconnect_user, 'admin', "check trigger permissions, on_disconnect")
 
 box.session.on_connect(nil, on_connect)
 box.session.on_disconnect(nil, on_disconnect)

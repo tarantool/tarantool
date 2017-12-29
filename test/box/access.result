@@ -22,6 +22,10 @@ session.user()
 ---
 - admin
 ...
+session.effective_user()
+---
+- admin
+...
 -- extra argumentes are ignored
 session.user(nil)
 ---
@@ -176,8 +180,9 @@ session.user()
 ---
 - admin
 ...
-session.su('tester', function() return session.user() end)
+session.su('tester', function() return session.user(), session.effective_user() end)
 ---
+- admin
 - tester
 ...
 session.user()
@@ -188,15 +193,20 @@ session.user()
 session.su('tester')
 ---
 ...
+session.effective_user()
+---
+- tester
+...
+session.su('admin', function() return session.user(), session.effective_user() end)
+---
+- tester
+- admin
+...
 session.user()
 ---
 - tester
 ...
-session.su('admin', function() return session.user() end)
----
-- admin
-...
-session.user()
+session.effective_user()
 ---
 - tester
 ...

@@ -127,13 +127,26 @@ lbox_session_uid(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Session user name.
- * Note: effective user name may be different in
- * a setuid function.
- */
+/** Session authenticated user name. */
 static int
 lbox_session_user(struct lua_State *L)
+{
+	struct user *user = user_by_id(current_session()->credentials.uid);
+	if (user)
+		lua_pushstring(L, user->def->name);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+/**
+ * Session effective name.
+ * Note: effective user name may be different in
+ * a setuid function or in box.session.su() used in sudo
+ * mode.
+ */
+static int
+lbox_session_effective_user(struct lua_State *L)
 {
 	struct user *user = user_by_id(effective_user()->uid);
 	if (user)
@@ -371,6 +384,7 @@ box_lua_session_init(struct lua_State *L)
 		{"uid", lbox_session_uid},
 		{"euid", lbox_session_euid},
 		{"user", lbox_session_user},
+		{"effective_user", lbox_session_effective_user},
 		{"su", lbox_session_su},
 		{"fd", lbox_session_fd},
 		{"exists", lbox_session_exists},

@@ -8,6 +8,7 @@ session.uid()
 session.uid(nil)
 -- admin
 session.user()
+session.effective_user()
 -- extra argumentes are ignored
 session.user(nil)
 -- password() is a function which returns base64(sha1(sha1(password))
@@ -79,14 +80,15 @@ box.schema.user.drop(name)
 box.schema.user.create('tester')
 -- admin -> user
 session.user()
-session.su('tester', function() return session.user() end)
+session.su('tester', function() return session.user(), session.effective_user() end)
 session.user()
 
 -- user -> admin
 session.su('tester')
+session.effective_user()
+session.su('admin', function() return session.user(), session.effective_user() end)
 session.user()
-session.su('admin', function() return session.user() end)
-session.user()
+session.effective_user()
 
 -- drop current user
 session.su('admin', function() return box.schema.user.drop('tester') end)
