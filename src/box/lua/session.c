@@ -111,7 +111,7 @@ lbox_session_euid(struct lua_State *L)
 	 * Sic: push effective session user, not the current user,
 	 * which may differ inside a setuid function.
 	 */
-	lua_pushnumber(L, current_session()->credentials.uid);
+	lua_pushnumber(L, effective_user()->uid);
 	return 1;
 }
 
@@ -123,7 +123,7 @@ lbox_session_euid(struct lua_State *L)
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, effective_user()->uid);
+	lua_pushnumber(L, current_session()->credentials.uid);
 	return 1;
 }
 

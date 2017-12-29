@@ -927,6 +927,6 @@ box.session.su('admin')
 ...
 box.session.su('guest', uids)
 ---
-- uid: 0
-  euid: 1
+- uid: 1
+  euid: 0
 ...
