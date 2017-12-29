@@ -43,6 +43,7 @@ extern "C" {
 
 /** box statistics */
 extern struct rmean *rmean_box;
+struct sql_txn;
 
 struct engine;
 struct space;
@@ -125,6 +126,7 @@ struct txn {
 	struct trigger fiber_on_yield, fiber_on_stop;
 	 /** Commit and rollback triggers */
 	struct rlist on_commit, on_rollback;
+	struct sql_txn *psql_txn;
 };
 
 /* Pointer to the current transaction (if any) */

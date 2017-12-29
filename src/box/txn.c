@@ -123,6 +123,7 @@ txn_begin(bool is_autocommit)
 	txn->signature = -1;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
+	txn->psql_txn = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
 	fiber_set_txn(fiber(), txn);
 	return txn;

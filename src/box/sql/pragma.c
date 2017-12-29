@@ -422,11 +422,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				} else {
 					user_session->sql_flags &= ~mask;
 					if (mask == SQLITE_DeferFKs) {
-						Vdbe *v = db->pVdbe;
-						while (v->pNext) {
-							v->nDeferredImmCons = 0;
-							v = v->pNext;
-						}
+						v->nDeferredImmCons = 0;
 					}
 				}
 

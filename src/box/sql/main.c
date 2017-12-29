@@ -948,21 +948,14 @@ sqlite3_total_changes(sqlite3 * db)
 }
 
 /*
- * Close all open savepoints. This function only manipulates fields of the
- * database handle object, it does not close any savepoints that may be open
- * at the b-tree/pager level.
+ * Close all open savepoints.
+ * This procedure is trivial as savepoints are allocated on the "region" and
+ * would be destroyed automatically.
  */
 void
 sqlite3CloseSavepoints(Vdbe * pVdbe)
 {
-	while (pVdbe->pSavepoint && pVdbe->pSavepoint->pNext) {
-		Savepoint *pTmp = pVdbe->pSavepoint;
-		pVdbe->pSavepoint = pTmp->pNext;
-		sqlite3DbFree(pVdbe->db, pTmp);
-	}
-	pVdbe->nSavepoint = 0;
-	pVdbe->nStatement = 0;
-	pVdbe->isTransactionSavepoint = 0;
+	pVdbe->anonymous_savepoint = NULL;
 }
 
 /*

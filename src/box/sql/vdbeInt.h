@@ -356,6 +356,19 @@ struct ScanStatus {
 	char *zName;		/* Name of table or index */
 };
 
+
+struct sql_txn {
+	Savepoint *pSavepoint;	/* List of active savepoints */
+	/*
+	 * This variables transfer deferred constraints from one
+	 * VDBE to the next in the same transaction.
+	 * We have to do it this way because some VDBE execute ddl and do not
+	 * have a transaction which disallows to always store this vars here.
+	 */
+	i64 nDeferredConsSave;
+	i64 nDeferredImmConsSave;
+};
+
 /*
  * An instance of the virtual machine.  This structure contains the complete
  * state of the virtual machine.
@@ -381,13 +394,15 @@ struct Vdbe {
 	i64 nStmtDefCons;	/* Number of def. constraints when stmt started */
 	i64 nStmtDefImmCons;	/* Number of def. imm constraints when stmt started */
 
+	struct sql_txn *psql_txn; /* Data related to current transaction */
 	u8 autoCommit;		/* The auto-commit flag. */
-	u8 isTransactionSavepoint;	/* True if the outermost savepoint is a TS */
-	Savepoint *pSavepoint;	/* List of active savepoints */
-	int nSavepoint;		/* Number of non-transaction savepoints */
-	int nStatement;		/* Number of nested statement-transactions  */
-	i64 nDeferredCons;	/* Net deferred constraints this transaction. */
-	i64 nDeferredImmCons;	/* Net deferred immediate constraints */
+	/*
+	 * `nDeferredCons` and `nDeferredImmCons` are stored in vdbe during
+	 * vdbe execution and moved to sql_txn when it needs to be saved until
+	 * execution of the next vdbe in the same transaction.
+	 */
+	i64 nDeferredCons;	/* Number of deferred fk violations */
+	i64 nDeferredImmCons;	/* Number of deferred imm fk. */
 
 	/* When allocating a new Vdbe object, all of the fields below should be
 	 * initialized to zero or NULL
@@ -432,6 +447,8 @@ struct Vdbe {
 	u32 expmask;		/* Binding to these vars invalidates VM */
 	SubProgram *pProgram;	/* Linked list of all sub-programs used by VM */
 	AuxData *pAuxData;	/* Linked list of auxdata allocations */
+	/* Anonymous savepoint for aborts only */
+	Savepoint *anonymous_savepoint;
 #ifdef SQLITE_ENABLE_STMT_SCANSTATUS
 	i64 *anExec;		/* Number of times each op has been executed */
 	int nScan;		/* Entries in aScan[] */
@@ -490,6 +507,11 @@ int sqlite3VdbeIdxKeyCompare(sqlite3 *, VdbeCursor *, UnpackedRecord *, int *);
 int sqlite3VdbeIdxRowid(sqlite3 *, BtCursor *, i64 *);
 int sqlite3VdbeExec(Vdbe *);
 int sqlite3VdbeList(Vdbe *);
+int
+sql_txn_begin(Vdbe *p);
+Savepoint *
+sql_savepoint(Vdbe *p,
+	      const char *zName);
 int sqlite3VdbeHalt(Vdbe *);
 int sqlite3VdbeMemTooBig(Mem *);
 int sqlite3VdbeMemCopy(Mem *, const Mem *);

@@ -45,6 +45,7 @@
 #include "btreeInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/sql.h"
 
 #include "msgpuck/msgpuck.h"
 
@@ -550,28 +551,6 @@ registerTrace(int iReg, Mem *p) {
  */
 #include "hwtime.h"
 
-#endif
-
-#ifndef NDEBUG
-/*
- * This function is only called from within an assert() expression. It
- * checks that the sqlite3.nTransaction variable is correctly set to
- * the number of non-transaction savepoints currently in the
- * linked list starting at sqlite3.pSavepoint.
- *
- * Usage:
- *
- *     assert(checkSavepointCount(db));
- */
-static int
-checkSavepointCount(Vdbe *v)
-{
-	int n = 0;
-	Savepoint *p;
-	for(p=v->pSavepoint; p; p=p->pNext) n++;
-	assert(n==(v->nSavepoint + v->isTransactionSavepoint));
-	return 1;
-}
 #endif
 
 /*
@@ -2825,22 +2804,20 @@ case OP_Count: {         /* out2 */
 case OP_Savepoint: {
 	int p1;                         /* Value of P1 operand */
 	char *zName;                    /* Name of savepoint */
-	int nName;
 	Savepoint *pNew;
 	Savepoint *pSavepoint;
 	Savepoint *pTmp;
-	int iSavepoint;
+	struct sql_txn *psql_txn = p->psql_txn;
 
+	assert(psql_txn);
 	p1 = pOp->p1;
 	zName = pOp->p4.z;
 
 	/* Assert that the p1 parameter is valid. Also that if there is no open
 	 * transaction, then there cannot be any savepoints.
 	 */
-	assert(p->pSavepoint==0 || p->autoCommit==0);
+	assert(psql_txn->pSavepoint == 0 || p->autoCommit == 0);
 	assert(p1==SAVEPOINT_BEGIN||p1==SAVEPOINT_RELEASE||p1==SAVEPOINT_ROLLBACK);
-	assert(p->pSavepoint || p->isTransactionSavepoint==0);
-	assert(checkSavepointCount(p));
 	assert(p->bIsReader);
 
 	if (p1==SAVEPOINT_BEGIN) {
@@ -2851,44 +2828,21 @@ case OP_Savepoint: {
 			sqlite3VdbeError(p, "cannot open savepoint - SQL statements in progress");
 			rc = SQLITE_BUSY;
 		} else {
-			nName = sqlite3Strlen30(zName);
-
 			/* Create a new savepoint structure. */
-			pNew = sqlite3DbMallocRawNN(db, sizeof(Savepoint)+nName+1);
-			if (pNew) {
-				pNew->zName = (char *)&pNew[1];
-				memcpy(pNew->zName, zName, nName+1);
-
-				/* If there is no open transaction, then mark this as a special
-				 * "transaction savepoint".
-				 */
-				if (p->autoCommit) {
-					p->autoCommit = 0;
-					p->isTransactionSavepoint = 1;
-				} else {
-					p->nSavepoint++;
-				}
-
-				/* Link the new savepoint into the database handle's list. */
-				pNew->pNext = p->pSavepoint;
-				p->pSavepoint = pNew;
-				pNew->nDeferredCons = p->nDeferredCons;
-				pNew->nDeferredImmCons = p->nDeferredImmCons;
-			}
+			pNew = sql_savepoint(p, zName);
+			/* Link the new savepoint into the database handle's list. */
+			pNew->pNext = psql_txn->pSavepoint;
+			psql_txn->pSavepoint = pNew;
 		}
 	} else {
-		iSavepoint = 0;
-
 		/* Find the named savepoint. If there is no such savepoint, then an
 		 * an error is returned to the user.
 		 */
 		for(
-			pSavepoint = p->pSavepoint;
+			pSavepoint = psql_txn->pSavepoint;
 			pSavepoint && sqlite3StrICmp(pSavepoint->zName, zName);
 			pSavepoint = pSavepoint->pNext
-			) {
-			iSavepoint++;
-		}
+			);
 		if (!pSavepoint) {
 			sqlite3VdbeError(p, "no such savepoint: %s", zName);
 			rc = SQLITE_ERROR;
@@ -2905,7 +2859,7 @@ case OP_Savepoint: {
 			 * and this is a RELEASE command, then the current transaction
 			 * is committed.
 			 */
-			int isTransaction = pSavepoint->pNext==0 && p->isTransactionSavepoint;
+			int isTransaction = pSavepoint->pNext == 0;
 			if (isTransaction && p1==SAVEPOINT_RELEASE) {
 				if ((rc = sqlite3VdbeCheckFk(p, 1))!=SQLITE_OK) {
 					goto vdbe_return;
@@ -2917,13 +2871,12 @@ case OP_Savepoint: {
 					p->rc = rc = SQLITE_BUSY;
 					goto vdbe_return;
 				}
-				p->isTransactionSavepoint = 0;
 				rc = p->rc;
 			} else {
 				int isSchemaChange;
-				iSavepoint = p->nSavepoint - iSavepoint - 1;
 				if (p1==SAVEPOINT_ROLLBACK) {
 					isSchemaChange = (user_session->sql_flags & SQLITE_InternChanges)!=0;
+					box_txn_rollback_to_savepoint(pSavepoint->tnt_savepoint);
 					rc = sqlite3BtreeTripAllCursors(db->mdb.pBt,
 									SQLITE_ABORT_ROLLBACK,
 									isSchemaChange==0);
@@ -2931,7 +2884,6 @@ case OP_Savepoint: {
 				} else {
 					isSchemaChange = 0;
 				}
-				rc = sqlite3BtreeSavepoint(db->mdb.pBt, p1, iSavepoint);
 				if (rc!=SQLITE_OK) {
 					goto abort_due_to_error;
 				}
@@ -2945,11 +2897,13 @@ case OP_Savepoint: {
 			/* Regardless of whether this is a RELEASE or ROLLBACK, destroy all
 			 * savepoints nested inside of the savepoint being operated on.
 			 */
-			while( p->pSavepoint!=pSavepoint) {
-				pTmp = p->pSavepoint;
-				p->pSavepoint = pTmp->pNext;
-				sqlite3DbFree(db, pTmp);
-				p->nSavepoint--;
+			while (psql_txn->pSavepoint != pSavepoint) {
+				pTmp = psql_txn->pSavepoint;
+				psql_txn->pSavepoint = pTmp->pNext;
+				/*
+				 * Since savepoints are stored in region, we do not
+				 * have to destroy them
+				 */
 			}
 
 			/* If it is a RELEASE, then destroy the savepoint being operated on
@@ -2958,12 +2912,8 @@ case OP_Savepoint: {
 			 * when the savepoint was created.
 			 */
 			if (p1==SAVEPOINT_RELEASE) {
-				assert(pSavepoint==p->pSavepoint);
-				p->pSavepoint = pSavepoint->pNext;
-				sqlite3DbFree(db, pSavepoint);
-				if (!isTransaction) {
-					p->nSavepoint--;
-				}
+				assert(pSavepoint == psql_txn->pSavepoint);
+				psql_txn->pSavepoint = pSavepoint->pNext;
 			} else {
 				p->nDeferredCons = pSavepoint->nDeferredCons;
 				p->nDeferredImmCons = pSavepoint->nDeferredImmCons;
@@ -3043,6 +2993,9 @@ case OP_AutoCommit: {
 			goto vdbe_return;
 		} else {
 			p->autoCommit = (u8)desiredAutoCommit;
+			if (p->autoCommit == 0) {
+				sql_txn_begin(p);
+			}
 		}
 		if (sqlite3VdbeHalt(p)==SQLITE_BUSY) {
 			p->pc = (int)(pOp - aOp);
@@ -3050,13 +3003,7 @@ case OP_AutoCommit: {
 			p->rc = rc = SQLITE_BUSY;
 			goto vdbe_return;
 		}
-		assert(p->nStatement==0);
-		sqlite3CloseSavepoints(p);
-		if (p->rc==SQLITE_OK) {
-			rc = SQLITE_DONE;
-		} else {
-			rc = SQLITE_ERROR;
-		}
+		rc = SQLITE_DONE;
 		goto vdbe_return;
 	} else {
 		sqlite3VdbeError(p,
@@ -3105,7 +3052,7 @@ case OP_AutoCommit: {
  * statement and rerun it from the beginning.
  */
 case OP_Transaction: {
-	Btree *pBt;
+	Btree *pBt = db->mdb.pBt;
 	int iMeta;
 	int iGen;
 
@@ -3117,50 +3064,26 @@ case OP_Transaction: {
 		rc = SQLITE_READONLY;
 		goto abort_due_to_error;
 	}
-	pBt = db->mdb.pBt;
 
-	if (pBt) {
-		rc = sqlite3BtreeBeginTrans(pBt, p->nSavepoint, pOp->p2);
-		testcase( rc==SQLITE_BUSY_SNAPSHOT);
-		testcase( rc==SQLITE_BUSY_RECOVERY);
-		if (rc!=SQLITE_OK) {
-			if ((rc&0xff)==SQLITE_BUSY) {
-				p->pc = (int)(pOp - aOp);
-				p->rc = rc;
-				goto vdbe_return;
-			}
-			goto abort_due_to_error;
+	rc = sqlite3BtreeBeginTrans(pBt, 0, pOp->p2);
+	testcase(rc == SQLITE_BUSY_SNAPSHOT);
+	testcase(rc == SQLITE_BUSY_RECOVERY);
+	if (rc != SQLITE_OK) {
+		if ((rc&0xff) == SQLITE_BUSY) {
+			p->pc = (int)(pOp - aOp);
+			p->rc = rc;
+			goto vdbe_return;
 		}
-
-		if (pOp->p2 && p->usesStmtJournal
-		    && (p->autoCommit==0 || db->nVdbeRead>1)
-			) {
-			assert(sqlite3BtreeIsInTrans(pBt));
-			if (p->iStatement==0) {
-				assert(p->nStatement>=0 && p->nSavepoint>=0);
-				p->nStatement++;
-				p->iStatement = p->nSavepoint + p->nStatement;
-			}
-			rc = sqlite3BtreeBeginStmt(pBt, p->iStatement, p->nSavepoint);
-
-			/* Store the current value of the database handles deferred constraint
-			 * counter. If the statement transaction needs to be rolled back,
-			 * the value of this counter needs to be restored too.
-			 */
-			p->nStmtDefCons = p->nDeferredCons;
-			p->nStmtDefImmCons = p->nDeferredImmCons;
-		}
-
-		/* Gather the schema version number for checking:
-		 * IMPLEMENTATION-OF: R-03189-51135 As each SQL statement runs, the schema
-		 * version is checked to ensure that the schema has not changed since the
-		 * SQL statement was prepared.
-		 */
-		sqlite3BtreeGetMeta(pBt, BTREE_SCHEMA_VERSION, (u32 *)&iMeta);
-		iGen = db->mdb.pSchema->iGeneration;
-	} else {
-		iGen = iMeta = 0;
+		goto abort_due_to_error;
 	}
+	/* Gather the schema version number for checking:
+	 * IMPLEMENTATION-OF: R-03189-51135 As each SQL statement runs, the schema
+	 * version is checked to ensure that the schema has not changed since the
+	 * SQL statement was prepared.
+	 */
+	sqlite3BtreeGetMeta(pBt, BTREE_SCHEMA_VERSION, (u32 *)&iMeta);
+	iGen = db->mdb.pSchema->iGeneration;
+
 	assert(pOp->p5==0 || pOp->p4type==P4_INT32);
 	if (pOp->p5 && (iMeta!=pOp->p3 || iGen!=pOp->p4.i)) {
 		sqlite3DbFree(db, p->zErrMsg);
@@ -3189,6 +3112,10 @@ case OP_Transaction: {
 case OP_TTransaction: {
 	if (p->autoCommit) {
 		rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;}
+	if (box_txn()
+	    && p->autoCommit == 0){
+		p->anonymous_savepoint = sql_savepoint(p, NULL);
+	}
 	break;
 }
 
@@ -3496,7 +3423,7 @@ case OP_OpenEphemeral: {
 	rc = sqlite3BtreeOpen(db->pVfs, 0, db, &pCx->pBtx,
 			      BTREE_OMIT_JOURNAL | BTREE_SINGLE | pOp->p5, vfsFlags);
 	if (rc==SQLITE_OK) {
-		rc = sqlite3BtreeBeginTrans(pCx->pBtx, p->nSavepoint, 1);
+		rc = sqlite3BtreeBeginTrans(pCx->pBtx, 0, 1);
 	}
 	if (rc==SQLITE_OK) {
 		/* If a transient index is required, create it by calling
@@ -6075,10 +6002,10 @@ case OP_FkCounter: {
  */
 case OP_FkIfZero: {         /* jump */
 	if (pOp->p1) {
-		VdbeBranchTaken(db->nDeferredCons==0 && p->nDeferredImmCons==0, 2);
+		VdbeBranchTaken(db->nDeferredCons == 0 && db->nDeferredImmCons == 0, 2);
 		if (p->nDeferredCons==0 && p->nDeferredImmCons==0) goto jump_to_p2;
 	} else {
-		VdbeBranchTaken(p->nFkConstraint==0 && p->nDeferredImmCons==0, 2);
+		VdbeBranchTaken(p->nFkConstraint == 0 && db->nDeferredImmCons == 0, 2);
 		if (p->nFkConstraint==0 && p->nDeferredImmCons==0) goto jump_to_p2;
 	}
 	break;

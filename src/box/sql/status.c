@@ -362,12 +362,15 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 	case SQLITE_DBSTATUS_DEFERRED_FKS:{
 			*pHighwater = 0;	/* IMP: R-11967-56545
 			*/
-			Vdbe *v = db->pVdbe;
-			while (v->pNext) {
-				*pCurrent = v->nDeferredImmCons > 0
-				    || v->nDeferredCons > 0;
-				v = v->pNext;
+			const struct txn *ptxn = in_txn();
+
+			if (!ptxn || !ptxn->psql_txn) {
+				*pCurrent = 0;
+				break;
 			}
+			const struct sql_txn *psql_txn = ptxn->psql_txn;
+			*pCurrent = psql_txn->nDeferredImmConsSave > 0 ||
+				    psql_txn->nDeferredConsSave > 0;
 			break;
 		}
 
