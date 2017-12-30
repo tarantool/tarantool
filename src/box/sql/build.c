@@ -621,20 +621,9 @@ sqlite3PrimaryKeyIndex(Table * pTab)
 i16
 sqlite3ColumnOfIndex(Index * pIdx, i16 iCol)
 {
-	/* TODO: gh-2376. We need to improve discrimination of the table
-	   by introducing spacial flag for Table which will signal if table
-	   originated form  Tarantool or not.  */
-	if (HasRowid(pIdx->pTable)) {
-		int i;
-		for (i = 0; i < pIdx->nColumn; i++) {
-			if (iCol == pIdx->aiColumn[i])
-				return i;
-		}
-		return -1;
-	} else {
-		/* TARANTOOL: Data layout is the same in every index.  */
-		return iCol;
-	}
+	/* TARANTOOL: Data layout is the same in every index.  */
+	(void) pIdx;
+	return iCol;
 }
 
 /*
@@ -3017,8 +3006,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		assert(db->mallocFailed == 0 || pTab == 0);
 		if (pTab == 0)
 			goto exit_create_index;
-		if (!HasRowid(pTab))
-			sqlite3PrimaryKeyIndex(pTab);
+		sqlite3PrimaryKeyIndex(pTab);
 	} else {
 		assert(pName == 0);
 		assert(pStart == 0);
@@ -3242,8 +3230,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	if (pParse->pNewTable == 0)
 		estimateIndexWidth(pIndex);
 
-	assert(HasRowid(pTab)
-	       || pTab->iPKey < 0
+	assert(pTab->iPKey < 0
 	       || sqlite3ColumnOfIndex(pIndex, pTab->iPKey) >= 0);
 
 	if (pTab == pParse->pNewTable) {

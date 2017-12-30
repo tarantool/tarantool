@@ -629,8 +629,7 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 
 	assert(pIdx == 0 || pIdx->pTable == pTab);
 	assert(pIdx == 0 || pIdx->nKeyCol == pFKey->nCol);
-	assert(pIdx != 0 || pFKey->nCol == 1);
-	assert(pIdx != 0 || HasRowid(pTab));
+	assert(pIdx != 0);
 
 	if (nIncr < 0) {
 		iFkIfZero =
@@ -678,30 +677,20 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 		Expr *pNe;	/* Expression (pLeft != pRight) */
 		Expr *pLeft;	/* Value from parent table row */
 		Expr *pRight;	/* Column ref to child table */
-		if (HasRowid(pTab)) {
-			pLeft = exprTableRegister(pParse, pTab, regData, -1);
-			pRight =
-			    exprTableColumn(db, pTab, pSrc->a[0].iCursor, -1);
-			pNe = sqlite3PExpr(pParse, TK_NE, pLeft, pRight);
-		} else {
-			Expr *pEq, *pAll = 0;
-			Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-			assert(pIdx != 0);
-			for (i = 0; i < pPk->nKeyCol; i++) {
-				i16 iCol = pIdx->aiColumn[i];
-				assert(iCol >= 0);
-				pLeft =
-				    exprTableRegister(pParse, pTab, regData,
-						      iCol);
-				pRight =
-				    exprTableColumn(db, pTab,
-						    pSrc->a[0].iCursor, iCol);
-				pEq =
-				    sqlite3PExpr(pParse, TK_EQ, pLeft, pRight);
-				pAll = sqlite3ExprAnd(db, pAll, pEq);
-			}
-			pNe = sqlite3PExpr(pParse, TK_NOT, pAll, 0);
+
+		Expr *pEq, *pAll = 0;
+		Index *pPk = sqlite3PrimaryKeyIndex(pTab);
+		assert(pIdx != 0);
+		for (i = 0; i < pPk->nKeyCol; i++) {
+			i16 iCol = pIdx->aiColumn[i];
+			assert(iCol >= 0);
+			pLeft = exprTableRegister(pParse, pTab, regData, iCol);
+			pRight = exprTableColumn(db, pTab, pSrc->a[0].iCursor,
+						 iCol);
+			pEq = sqlite3PExpr(pParse, TK_EQ, pLeft, pRight);
+			pAll = sqlite3ExprAnd(db, pAll, pEq);
 		}
+		pNe = sqlite3PExpr(pParse, TK_NOT, pAll, 0);
 		pWhere = sqlite3ExprAnd(db, pWhere, pNe);
 	}
 

@@ -211,7 +211,7 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 			pIdx = pLoop->pIndex;
 			assert(!(flags & WHERE_AUTO_INDEX)
 			       || (flags & WHERE_IDX_ONLY));
-			if (!HasRowid(pItem->pTab) && IsPrimaryKeyIndex(pIdx)) {
+			if (IsPrimaryKeyIndex(pIdx)) {
 				if (isSearch) {
 					zFmt = "PRIMARY KEY";
 				}
@@ -1075,57 +1075,6 @@ codeCursorHint(struct SrcList_item *pTabItem,	/* FROM clause item */
 #endif				/* SQLITE_ENABLE_CURSOR_HINTS */
 
 /*
- * Cursor iCur is open on an intkey b-tree (a table). Register iRowid contains
- * a rowid value just read from cursor iIdxCur, open on index pIdx. This
- * function generates code to do a deferred seek of cursor iCur to the
- * rowid stored in register iRowid.
- *
- * Normally, this is just:
- *
- *   OP_Seek $iCur $iRowid
- *
- * However, if the scan currently being coded is a branch of an OR-loop and
- * the statement currently being coded is a SELECT, then P3 of the OP_Seek
- * is set to iIdxCur and P4 is set to point to an array of integers
- * containing one entry for each column of the table cursor iCur is open
- * on. For each table column, if the column is the i'th column of the
- * index, then the corresponding array entry is set to (i+1). If the column
- * does not appear in the index at all, the array entry is set to 0.
- */
-static void
-codeDeferredSeek(WhereInfo * pWInfo,	/* Where clause context */
-		 Index * pIdx,	/* Index scan is using */
-		 int iCur,	/* Cursor for IPK b-tree */
-		 int iIdxCur)	/* Index cursor */
-{
-	Parse *pParse = pWInfo->pParse;	/* Parse context */
-	Vdbe *v = pParse->pVdbe;	/* Vdbe to generate code within */
-
-	assert(iIdxCur > 0);
-	assert(pIdx->aiColumn[pIdx->nColumn - 1] == -1);
-
-	sqlite3VdbeAddOp3(v, OP_Seek, iIdxCur, 0, iCur);
-	if ((pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE)
-	    && DbMaskAllZero(sqlite3ParseToplevel(pParse)->writeMask)
-	    ) {
-		int i;
-		Table *pTab = pIdx->pTable;
-		int *ai =
-		    (int *)sqlite3DbMallocZero(pParse->db,
-					       sizeof(int) * (pTab->nCol + 1));
-		if (ai) {
-			ai[0] = pTab->nCol;
-			for (i = 0; i < pIdx->nColumn - 1; i++) {
-				assert(pIdx->aiColumn[i] < pTab->nCol);
-				if (pIdx->aiColumn[i] >= 0)
-					ai[pIdx->aiColumn[i] + 1] = i + 1;
-			}
-			sqlite3VdbeChangeP4(v, -1, (char *)ai, P4_INTARRAY);
-		}
-	}
-}
-
-/*
  * If the expression passed as the second argument is a vector, generate
  * code to write the first nReg elements of the vector into an array
  * of registers starting with iReg.
@@ -1595,28 +1544,26 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			startEq = 0;
 			start_constraints = 1;
 		}
-		if (!HasRowid(pIdx->pTable)) {
-			struct Index *pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
-			assert(pk);
-			if (pk->nKeyCol == 1
-			    && pIdx->pTable->aCol[pk->aiColumn[0]].affinity == 'D') {
-				/* Right now INTEGER PRIMARY KEY is the only option to
-				 * get Tarantool's INTEGER column type. Need special handling
-				 * here: try to loosely convert FLOAT to INT. If RHS type
-				 * is not INT or FLOAT - skip this ites, i.e. goto addrNxt.
-				 */
-				int limit = pRangeStart == NULL ? nEq : nEq + 1;
-				for (int i = 0; i < limit; i++) {
-					if (pIdx->aiColumn[i] == pk->aiColumn[0]) {
-						/* Here: we know for sure that table has INTEGER
-						   PRIMARY KEY, single column, and Index we're
-						   trying to use for scan contains this column. */
-						if (i < nEq)
-							sqlite3VdbeAddOp2(v, OP_MustBeInt, regBase + i, addrNxt);
-						else
-							force_integer_reg = regBase + i;
-						break;
-					}
+		struct Index *pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
+		assert(pk);
+		if (pk->nKeyCol == 1
+		    && pIdx->pTable->aCol[pk->aiColumn[0]].affinity == 'D') {
+			/* Right now INTEGER PRIMARY KEY is the only option to
+			 * get Tarantool's INTEGER column type. Need special handling
+			 * here: try to loosely convert FLOAT to INT. If RHS type
+			 * is not INT or FLOAT - skip this ites, i.e. goto addrNxt.
+			 */
+			int limit = pRangeStart == NULL ? nEq : nEq + 1;
+			for (int i = 0; i < limit; i++) {
+				if (pIdx->aiColumn[i] == pk->aiColumn[0]) {
+					/* Here: we know for sure that table has INTEGER
+					   PRIMARY KEY, single column, and Index we're
+					   trying to use for scan contains this column. */
+					if (i < nEq)
+						sqlite3VdbeAddOp2(v, OP_MustBeInt, regBase + i, addrNxt);
+					else
+						force_integer_reg = regBase + i;
+					break;
 				}
 			}
 		}
@@ -1715,20 +1662,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		/* Seek the table cursor, if required */
 		if (omitTable) {
 			/* pIdx is a covering index.  No need to access the main table. */
-		} else if (HasRowid(pIdx->pTable)) {
-			if ((pWInfo->wctrlFlags & WHERE_SEEK_TABLE) != 0) {
-				iRowidReg = ++pParse->nMem;
-				sqlite3VdbeAddOp2(v, OP_IdxRowid, iIdxCur,
-						  iRowidReg);
-				sqlite3ExprCacheStore(pParse, iCur, -1,
-						      iRowidReg);
-				sqlite3VdbeAddOp3(v, OP_NotExists, iCur, 0,
-						  iRowidReg);
-				VdbeCoverage(v);
-			} else {
-				codeDeferredSeek(pWInfo, pIdx, iCur, iIdxCur);
-			}
-		} else if (iCur != iIdxCur) {
+		}  else if (iCur != iIdxCur) {
 			Index *pPk = sqlite3PrimaryKeyIndex(pIdx->pTable);
 			iRowidReg = sqlite3GetTempRange(pParse, pPk->nKeyCol);
 			for (j = 0; j < pPk->nKeyCol; j++) {
@@ -1853,9 +1787,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			pOrTab = pWInfo->pTabList;
 		}
 
-		/* Initialize the rowset register to contain NULL. An SQL NULL is
-		 * equivalent to an empty rowset.  Or, create an ephemeral index
-		 * capable of holding primary keys in the case of a WITHOUT ROWID.
+		/* Create an ephemeral index capable of holding primary keys.
 		 *
 		 * Also initialize regReturn to contain the address of the instruction
 		 * immediately following the OP_Return at the bottom of the loop. This
@@ -1866,16 +1798,11 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 * called on an uninitialized cursor.
 		 */
 		if ((pWInfo->wctrlFlags & WHERE_DUPLICATES_OK) == 0) {
-			if (HasRowid(pTab)) {
-				regRowset = ++pParse->nMem;
-				sqlite3VdbeAddOp2(v, OP_Null, 0, regRowset);
-			} else {
-				Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-				regRowset = pParse->nTab++;
-				sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-						  regRowset, pPk->nKeyCol);
-				sqlite3VdbeSetP4KeyInfo(pParse, pPk);
-			}
+			Index *pPk = sqlite3PrimaryKeyIndex(pTab);
+			regRowset = pParse->nTab++;
+			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
+					  regRowset, pPk->nKeyCol);
+			sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 			regRowid = ++pParse->nMem;
 		}
 		iRetInit = sqlite3VdbeAddOp2(v, OP_Integer, 0, regReturn);
@@ -1974,78 +1901,55 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						int r;
 						int iSet =
 						    ((ii == pOrWc->nTerm - 1) ? -1 : ii);
-						if (HasRowid(pTab)) {
-							r = sqlite3ExprCodeGetColumn(pParse, pTab, -1, iCur, regRowid, 0);
-							jmp1 =
-							    sqlite3VdbeAddOp4Int
-							    (v, OP_RowSetTest,
-							     regRowset, 0, r,
-							     iSet);
-							VdbeCoverage(v);
-						} else {
-							Index *pPk =
-							    sqlite3PrimaryKeyIndex
-							    (pTab);
-							int nPk = pPk->nKeyCol;
-							int iPk;
+						Index *pPk = sqlite3PrimaryKeyIndex (pTab);
+						int nPk = pPk->nKeyCol;
+						int iPk;
 
-							/* Read the PK into an array of temp registers. */
-							r = sqlite3GetTempRange
-							    (pParse, nPk);
-							for (iPk = 0; iPk < nPk;
-							     iPk++) {
-								int iCol =
-								    pPk->aiColumn[iPk];
-								sqlite3ExprCodeGetColumnToReg
-								    (pParse,
-								     pTab, iCol,
-								     iCur,
-								     r + iPk);
-							}
-
-							/* Check if the temp table already contains this key. If so,
-							 * the row has already been included in the result set and
-							 * can be ignored (by jumping past the Gosub below). Otherwise,
-							 * insert the key into the temp table and proceed with processing
-							 * the row.
-							 *
-							 * Use some of the same optimizations as OP_RowSetTest: If iSet
-							 * is zero, assume that the key cannot already be present in
-							 * the temp table. And if iSet is -1, assume that there is no
-							 * need to insert the key into the temp table, as it will never
-							 * be tested for.
-							 */
-							if (iSet) {
-								jmp1 =
-								    sqlite3VdbeAddOp4Int
-								    (v,
-								     OP_Found,
-								     regRowset,
-								     0, r, nPk);
-								VdbeCoverage(v);
-							}
-							if (iSet >= 0) {
-								sqlite3VdbeAddOp3
-								    (v,
-								     OP_MakeRecord,
-								     r, nPk,
-								     regRowid);
-								sqlite3VdbeAddOp4Int
-								    (v,
-								     OP_IdxInsert,
-								     regRowset,
-								     regRowid,
-								     r, nPk);
-								if (iSet)
-									sqlite3VdbeChangeP5
-									    (v,
-									     OPFLAG_USESEEKRESULT);
-							}
-
-							/* Release the array of temp registers */
-							sqlite3ReleaseTempRange
-							    (pParse, r, nPk);
+						/* Read the PK into an array of temp registers. */
+						r = sqlite3GetTempRange(pParse, nPk);
+						for (iPk = 0; iPk < nPk; iPk++) {
+							int iCol = pPk->aiColumn[iPk];
+							sqlite3ExprCodeGetColumnToReg
+								(pParse, pTab,
+								 iCol, iCur,
+								 r + iPk);
 						}
+
+						/* Check if the temp table already contains this key. If so,
+						 * the row has already been included in the result set and
+						 * can be ignored (by jumping past the Gosub below). Otherwise,
+						 * insert the key into the temp table and proceed with processing
+						 * the row.
+						 *
+						 * Use some of the same optimizations as OP_RowSetTest: If iSet
+						 * is zero, assume that the key cannot already be present in
+						 * the temp table. And if iSet is -1, assume that there is no
+						 * need to insert the key into the temp table, as it will never
+						 * be tested for.
+						 */
+						if (iSet) {
+							jmp1 = sqlite3VdbeAddOp4Int
+								(v, OP_Found,
+								 regRowset, 0,
+								 r, nPk);
+							VdbeCoverage(v);
+						}
+						if (iSet >= 0) {
+							sqlite3VdbeAddOp3
+								(v, OP_MakeRecord,
+								 r, nPk, regRowid);
+							sqlite3VdbeAddOp4Int
+								(v, OP_IdxInsert,
+								 regRowset, regRowid,
+								 r, nPk);
+							if (iSet)
+								sqlite3VdbeChangeP5
+									(v,
+									 OPFLAG_USESEEKRESULT);
+						}
+
+						/* Release the array of temp registers */
+						sqlite3ReleaseTempRange(pParse, r, nPk);
 					}
 
 					/* Invoke the main loop body as a subroutine */
@@ -2082,8 +1986,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 					assert((pSubLoop->wsFlags & WHERE_AUTO_INDEX) == 0);
 					if ((pSubLoop->wsFlags & WHERE_INDEXED) != 0
 					    && (ii == 0 || pSubLoop->pIndex == pCov)
-					    && (HasRowid(pTab)
-						|| !IsPrimaryKeyIndex(pSubLoop->pIndex))
+					    && (!IsPrimaryKeyIndex(pSubLoop->pIndex))
 					    ) {
 						assert(pSubWInfo->a[0].
 						       iIdxCur == iCovCur);

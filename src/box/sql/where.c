@@ -2798,7 +2798,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 	if (pSrc->pIBIndex) {
 		/* An INDEXED BY clause specifies a particular index to use */
 		pProbe = pSrc->pIBIndex;
-	} else if (!HasRowid(pTab)) {
+	} else if (pTab->pIndex) {
 		pProbe = pTab->pIndex;
 	} else {
 		/* There is no INDEXED BY clause.  Create a fake Index object in local
@@ -2938,40 +2938,25 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 			}
 
 			/* Full scan via index */
-			if (b || !HasRowid(pTab)
-			    || pProbe->pPartIdxWhere != 0
-			    || (m == 0
-				&& pProbe->bUnordered == 0
-				&& (pProbe->szIdxRow < pTab->szTabRow)
-				&& (pWInfo->
-				    wctrlFlags & WHERE_ONEPASS_DESIRED) == 0
-				&& sqlite3GlobalConfig.bUseCis
-				&& OptimizationEnabled(pWInfo->pParse->db,
-						       SQLITE_CoverIdxScan)
-			    )
-			    ) {
-				pNew->iSortIdx = b ? iSortIdx : 0;
+			pNew->iSortIdx = b ? iSortIdx : 0;
 
-				/* The cost of visiting the index rows is N*K, where K is
-				 * between 1.1 and 3.0 (3.0 and 4.0 for tarantool),
-				 * depending on the relative sizes of the
-				 * index and table rows.
-				 */
-				assert(!HasRowid(pTab));
-				/* In Tarantool we prefer perform full scan over pk instead
-				 * of secondary indexes, because secondary indexes
-				 * are not really store any data (only pointers to tuples).
-				 */
-				int notPkPenalty =
-				    IsPrimaryKeyIndex(pProbe) ? 0 : 4;
-				pNew->rRun = rSize + 16 + notPkPenalty;
-				ApplyCostMultiplier(pNew->rRun, pTab->costMult);
-				whereLoopOutputAdjust(pWC, pNew, rSize);
-				rc = whereLoopInsert(pBuilder, pNew);
-				pNew->nOut = rSize;
-				if (rc)
-					break;
-			}
+			/* The cost of visiting the index rows is N*K, where K is
+			 * between 1.1 and 3.0 (3.0 and 4.0 for tarantool),
+			 * depending on the relative sizes of the
+			 * index and table rows.
+			 *
+			 * In Tarantool we prefer perform full scan over pk instead
+			 * of secondary indexes, because secondary indexes
+			 * are not really store any data (only pointers to tuples).
+			 */
+			int notPkPenalty = IsPrimaryKeyIndex(pProbe) ? 0 : 4;
+			pNew->rRun = rSize + 16 + notPkPenalty;
+			ApplyCostMultiplier(pNew->rRun, pTab->costMult);
+			whereLoopOutputAdjust(pWC, pNew, rSize);
+			rc = whereLoopInsert(pBuilder, pNew);
+			pNew->nOut = rSize;
+			if (rc)
+				break;
 		}
 
 		rc = whereLoopAddBtreeIndex(pBuilder, pSrc, pProbe, 0);
@@ -3333,10 +3318,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 			} else {
 				nKeyCol = pIndex->nKeyCol;
 				nColumn = pIndex->nColumn;
-				assert(nColumn == nKeyCol + 1
-				       || !HasRowid(pIndex->pTable));
-				assert(pIndex->aiColumn[nColumn - 1] == XN_ROWID
-				       || !HasRowid(pIndex->pTable));
 				isOrderDistinct = IsUniqueIndex(pIndex);
 			}
 
@@ -4573,14 +4554,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 		if (bOnerow || (wctrlFlags & WHERE_ONEPASS_MULTIROW) != 0) {
 			pWInfo->eOnePass =
 			    bOnerow ? ONEPASS_SINGLE : ONEPASS_MULTI;
-			if (HasRowid(pTabList->a[0].pTab)
-			    && (wsFlags & WHERE_IDX_ONLY)) {
-				if (wctrlFlags & WHERE_ONEPASS_MULTIROW) {
-					bFordelete = OPFLAG_FORDELETE;
-				}
-				pWInfo->a[0].pWLoop->wsFlags =
-				    (wsFlags & ~WHERE_IDX_ONLY);
-			}
 		}
 	}
 
@@ -4609,16 +4582,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 				 && pTab->nCol == BMS - 1);
 			testcase(pWInfo->eOnePass == ONEPASS_OFF
 				 && pTab->nCol == BMS);
-			if (pWInfo->eOnePass == ONEPASS_OFF && pTab->nCol < BMS
-			    && HasRowid(pTab)) {
-				Bitmask b = pTabItem->colUsed;
-				int n = 0;
-				for (; b; b = b >> 1, n++) {
-				}
-				sqlite3VdbeChangeP4(v, -1, SQLITE_INT_TO_PTR(n),
-						    P4_INT32);
-				assert(n <= pTab->nCol);
-			}
 #ifdef SQLITE_ENABLE_CURSOR_HINTS
 			if (pLoop->pIndex != 0) {
 				sqlite3VdbeChangeP5(v,
@@ -4643,7 +4606,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			assert(iAuxArg != 0
 			       || (pWInfo->
 				   wctrlFlags & WHERE_ONEPASS_DESIRED) == 0);
-			if (!HasRowid(pTab) && IsPrimaryKeyIndex(pIx)
+			if (IsPrimaryKeyIndex(pIx)
 			    && (wctrlFlags & WHERE_OR_SUBCLAUSE) != 0) {
 				/* This is one term of an OR-optimization using the PRIMARY KEY of a
 				 * WITHOUT ROWID table.  No need for a separate index
@@ -4897,10 +4860,7 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 		} else if (pLoop->wsFlags & WHERE_MULTI_OR) {
 			pIdx = pLevel->u.pCovidx;
 		}
-		if (pIdx
-		    && (pWInfo->eOnePass == ONEPASS_OFF
-			|| !HasRowid(pIdx->pTable))
-		    && !db->mallocFailed) {
+		if (pIdx && !db->mallocFailed) {
 			last = sqlite3VdbeCurrentAddr(v);
 			k = pLevel->addrBody;
 			pOp = sqlite3VdbeGetOp(v, k);
@@ -4910,16 +4870,6 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 				if (pOp->opcode == OP_Column) {
 					int x = pOp->p2;
 					assert(pIdx->pTable == pTab);
-#if 0
-					/* TARANTOOL: data layout is the same in every index. */
-					if (!HasRowid(pTab)) {
-						Index *pPk =
-						    sqlite3PrimaryKeyIndex
-						    (pTab);
-						x = pPk->aiColumn[x];
-						assert(x >= 0);
-					}
-#endif
 					x = sqlite3ColumnOfIndex(pIdx, x);
 					if (x >= 0) {
 						pOp->p2 = x;

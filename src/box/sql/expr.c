@@ -3735,11 +3735,7 @@ sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
 	if (iCol < 0 || iCol == pTab->iPKey) {
 		sqlite3VdbeAddOp2(v, OP_Rowid, iTabCur, regOut);
 	} else {
-		int x = iCol;
-		if (!HasRowid(pTab)) {
-			x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab),
-						 iCol);
-		}
+		int x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab), iCol);
 		sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
 	}
 	if (iCol >= 0) {

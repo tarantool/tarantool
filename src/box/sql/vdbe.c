@@ -4410,7 +4410,6 @@ case OP_InsertInt: {
 	Mem *pKey;        /* MEM cell holding key  for the record */
 	VdbeCursor *pC;   /* Cursor to table into which insert is written */
 	int seekResult;   /* Result of prior seek or 0 if no USESEEKRESULT flag */
-	Table *pTab;      /* Table structure - used by update and pre-update hooks */
 	int op;           /* Opcode for update hook: SQLITE_UPDATE or SQLITE_INSERT */
 	BtreePayload x;   /* Payload to be inserted */
 
@@ -4437,25 +4436,6 @@ case OP_InsertInt: {
 		x.nKey = pOp->p3;
 	}
 
-	if (pOp->p4type==P4_TABLE && HAS_UPDATE_HOOK(db)) {
-		assert(pC->isTable);
-		pTab = pOp->p4.pTab;
-		assert(HasRowid(pTab));
-		op = ((pOp->p5 & OPFLAG_ISUPDATE) ? SQLITE_UPDATE : SQLITE_INSERT);
-	} else {
-		pTab = 0; /* Not needed.  Silence a comiler warning. */
-	}
-
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-	/* Invoke the pre-update hook, if any */
-	if (db->xPreUpdateCallback
-	    && pOp->p4type==P4_TABLE
-	    && !(pOp->p5 & OPFLAG_ISUPDATE)
-		) {
-		sqlite3VdbePreUpdateHook(p, pC, SQLITE_INSERT, 0, pTab, x.nKey, pOp->p2);
-	}
-#endif
-
 	if (pOp->p5 & OPFLAG_NCHANGE) p->nChange++;
 	if (pOp->p5 & OPFLAG_LASTROWID) db->lastRowid = lastRowid = x.nKey;
 	if (pData->flags & MEM_Null) {
@@ -4479,11 +4459,7 @@ case OP_InsertInt: {
 	pC->deferredMoveto = 0;
 	pC->cacheStatus = CACHE_STALE;
 
-	/* Invoke the update-hook if required. */
 	if (rc) goto abort_due_to_error;
-	if (db->xUpdateCallback && op) {
-		db->xUpdateCallback(db->pUpdateArg, op, 0, pTab->zName, x.nKey);
-	}
 	break;
 }
 
@@ -4524,7 +4500,6 @@ case OP_InsertInt: {
  */
 case OP_Delete: {
 	VdbeCursor *pC;
-	Table *pTab;
 	int opflags;
 
 	opflags = pOp->p2;
@@ -4534,46 +4509,6 @@ case OP_Delete: {
 	assert(pC->eCurType==CURTYPE_BTREE);
 	assert(pC->uc.pCursor!=0);
 	assert(pC->deferredMoveto==0);
-
-#ifdef SQLITE_DEBUG
-	if (pOp->p4type==P4_TABLE && HasRowid(pOp->p4.pTab) && pOp->p5==0) {
-		/* If p5 is zero, the seek operation that positioned the cursor prior to
-		 * OP_Delete will have also set the pC->movetoTarget field to the rowid of
-		 * the row that is being deleted
-		 */
-		i64 iKey = sqlite3BtreeIntegerKey(pC->uc.pCursor);
-		assert(pC->movetoTarget==iKey);
-	}
-#endif
-
-	/* If the update-hook or pre-update-hook will be invoked, set
-	 * local pTab to a copy
-	 * of p4.pTab. Finally, if p5 is true, indicating that this cursor was
-	 * last moved with OP_Next or OP_Prev, not Seek or NotFound, set
-	 * VdbeCursor.movetoTarget to the current rowid.
-	 */
-	if (pOp->p4type==P4_TABLE && HAS_UPDATE_HOOK(db)) {
-		assert(pOp->p4.pTab!=0);
-		pTab = pOp->p4.pTab;
-		if ((pOp->p5 & OPFLAG_SAVEPOSITION)!=0 && pC->isTable) {
-			pC->movetoTarget = sqlite3BtreeIntegerKey(pC->uc.pCursor);
-		}
-	} else {
-		pTab = 0;  /* Not needed.  Silence a compiler warning. */
-	}
-
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-	/* Invoke the pre-update-hook if required. */
-	if (db->xPreUpdateCallback && pOp->p4.pTab && HasRowid(pTab)) {
-		assert(!(opflags & OPFLAG_ISUPDATE) || (aMem[pOp->p3].flags & MEM_Int));
-		sqlite3VdbePreUpdateHook(p, pC,
-					 (opflags & OPFLAG_ISUPDATE) ? SQLITE_UPDATE : SQLITE_DELETE,
-					 0, pTab, pC->movetoTarget,
-					 pOp->p3
-			);
-	}
-	if (opflags & OPFLAG_ISNOOP) break;
-#endif
 
 	/* Only flags that can be set are SAVEPOISTION and AUXDELETE */
 	assert((pOp->p5 & ~(OPFLAG_SAVEPOSITION|OPFLAG_AUXDELETE))==0);
@@ -4599,14 +4534,8 @@ case OP_Delete: {
 	pC->seekResult = 0;
 	if (rc) goto abort_due_to_error;
 
-	/* Invoke the update-hook if required. */
-	if (opflags & OPFLAG_NCHANGE) {
+	if (opflags & OPFLAG_NCHANGE)
 		p->nChange++;
-		if (db->xUpdateCallback && HasRowid(pTab)) {
-			db->xUpdateCallback(db->pUpdateArg, SQLITE_DELETE, 0, pTab->zName,
-					    pC->movetoTarget);
-		}
-	}
 
 	break;
 }

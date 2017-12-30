@@ -874,7 +874,6 @@ sqlite3GenerateRowIndexDelete(Parse * pParse,	/* Parsing and code generating con
 	Index *pPk;		/* PRIMARY KEY index, or NULL for rowid tables */
 
 	v = pParse->pVdbe;
-	assert(!HasRowid(pTab));
 	pPk = sqlite3PrimaryKeyIndex(pTab);
 	/* In Tarantool it is enough to delete row just from pk */
 	VdbeModuleComment((v, "GenRowIdxDel for %s", pPk->zName));

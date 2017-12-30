@@ -2846,13 +2846,8 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 			}
 		}
 		if (iCol == pTab->nCol) {
-			if (HasRowid(pTab) && sqlite3IsRowid(zColumnName)) {
-				iCol = pTab->iPKey;
-				pCol = iCol >= 0 ? &pTab->aCol[iCol] : 0;
-			} else {
 				pTab = 0;
 				goto error_out;
-			}
 		}
 	}
 

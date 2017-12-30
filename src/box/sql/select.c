@@ -5411,8 +5411,7 @@ explainSimpleCount(Parse * pParse,	/* Parse context */
 		   Index * pIdx)	/* Index used to optimize scan, or NULL */
 {
 	if (pParse->explain == 2) {
-		int bCover = (pIdx != 0
-			      && (HasRowid(pTab) || !IsPrimaryKeyIndex(pIdx)));
+		int bCover = (pIdx != 0 && !IsPrimaryKeyIndex(pIdx));
 		char *zEqp = sqlite3MPrintf(pParse->db, "SCAN TABLE %s%s%s",
 					    pTab->zName,
 					    bCover ? " USING COVERING INDEX " :
@@ -6254,7 +6253,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				const int iCsr = pParse->nTab++;	/* Cursor to scan b-tree */
 				Index *pIdx;	/* Iterator variable */
 				KeyInfo *pKeyInfo = 0;	/* Keyinfo for scanned index */
-				Index *pBest = 0;	/* Best index found so far */
+				Index *pBest;	/* Best index found so far */
 				int iRoot = pTab->tnum;	/* Root page of scanned b-tree */
 
 				sqlite3CodeVerifySchema(pParse);
@@ -6268,8 +6267,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				 * In practice the KeyInfo structure will not be used. It is only
 				 * passed to keep OP_OpenRead happy.
 				 */
-				if (!HasRowid(pTab))
-					pBest = sqlite3PrimaryKeyIndex(pTab);
+				pBest = sqlite3PrimaryKeyIndex(pTab);
 				for (pIdx = pTab->pIndex; pIdx;
 				     pIdx = pIdx->pNext) {
 					if (pIdx->bUnordered == 0

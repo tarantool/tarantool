@@ -37,13 +37,7 @@
 #include "box/session.h"
 
 /*
- * Generate code that will
- *
- *   (1) acquire a lock for table pTab then
- *   (2) open pTab as cursor iCur.
- *
- * If pTab is a WITHOUT ROWID table, then it is the PRIMARY KEY index
- * for that table that is actually opened.
+ * Generate code that will open pTab as cursor iCur.
  */
 void
 sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
@@ -54,18 +48,12 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	Vdbe *v;
 	v = sqlite3GetVdbe(pParse);
 	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
-	if (HasRowid(pTab)) {
-		sqlite3VdbeAddOp4Int(v, opcode, iCur, pTab->tnum, 0,
-				     pTab->nCol);
-		VdbeComment((v, "%s", pTab->zName));
-	} else {
-		Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-		assert(pPk != 0);
-		assert(pPk->tnum == pTab->tnum);
-		sqlite3VdbeAddOp3(v, opcode, iCur, pPk->tnum, 0);
-		sqlite3VdbeSetP4KeyInfo(pParse, pPk);
-		VdbeComment((v, "%s", pTab->zName));
-	}
+	Index *pPk = sqlite3PrimaryKeyIndex(pTab);
+	assert(pPk != 0);
+	assert(pPk->tnum == pTab->tnum);
+	sqlite3VdbeAddOp3(v, opcode, iCur, pPk->tnum, 0);
+	sqlite3VdbeSetP4KeyInfo(pParse, pPk);
+	VdbeComment((v, "%s", pTab->zName));
 }
 
 /*
@@ -347,7 +335,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	SelectDest dest;	/* Destination for SELECT on rhs of INSERT */
 	u8 useTempTable = 0;	/* Store SELECT results in intermediate table */
 	u8 appendFlag = 0;	/* True if the insert is likely to be an append */
-	u8 withoutRowid;	/* 0 for normal table.  1 for WITHOUT ROWID table */
 	u8 bIdListInOrder;	/* True if IDLIST is in table order */
 	ExprList *pList = 0;	/* List of VALUES() to be inserted  */
 	struct session *user_session = current_session();
@@ -397,7 +384,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (sqlite3AuthCheck(pParse, SQLITE_INSERT, pTab->zName, 0, "")) {
 		goto insert_cleanup;
 	}
-	withoutRowid = !HasRowid(pTab);
 
 	/* Figure out if we have any triggers and if the table being
 	 * inserted into is a view
@@ -488,14 +474,14 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						bIdListInOrder = 0;
 					if (j == pTab->iPKey) {
 						ipkColumn = i;
-						assert(!withoutRowid);
+						assert(isView);
 					}
 					break;
 				}
 			}
 			if (j >= pTab->nCol) {
 				if (sqlite3IsRowid(pColumn->a[i].zName)
-				    && !withoutRowid) {
+				    && isView) {
 					ipkColumn = i;
 					bIdListInOrder = 0;
 				} else {
@@ -785,7 +771,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				sqlite3VdbeAddOp1(v, OP_MustBeInt, regRowid);
 				VdbeCoverage(v);
 			}
-		} else if (withoutRowid) {
+		} else if (!isView) {
 			sqlite3VdbeAddOp2(v, OP_Null, 0, regRowid);
 		} else {
 			sqlite3VdbeAddOp3(v, OP_NewRowid, iDataCur, regRowid,
@@ -1164,18 +1150,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	assert(pTab->pSelect == 0);	/* This table is not a VIEW */
 	nCol = pTab->nCol;
 
-	/* pPk is the PRIMARY KEY index for WITHOUT ROWID tables and NULL for
-	 * normal rowid tables.  nPkField is the number of key fields in the
-	 * pPk index or 1 for a rowid table.  In other words, nPkField is the
-	 * number of fields in the true primary key of the table.
-	 */
-	if (HasRowid(pTab)) {
-		pPk = 0;
-		nPkField = 1;
-	} else {
-		pPk = sqlite3PrimaryKeyIndex(pTab);
-		nPkField = pPk->nKeyCol;
-	}
+	pPk = sqlite3PrimaryKeyIndex(pTab);
+	nPkField = pPk->nKeyCol;
 
 	/* Record that this module has started */
 	VdbeModuleComment((v, "BEGIN: GenCnstCks(%d,%d,%d,%d,%d)",
@@ -1381,20 +1357,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 								 0, OE_Replace,
 								 1, -1);
 				} else {
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-					if (HasRowid(pTab)) {
-						/* This OP_Delete opcode fires the pre-update-hook only. It does
-						 * not modify the b-tree. It is more efficient to let the coming
-						 * OP_Insert replace the existing entry than it is to delete the
-						 * existing entry and then insert a new one.
-						 */
-						sqlite3VdbeAddOp2(v, OP_Delete,
-								  iDataCur,
-								  OPFLAG_ISNOOP);
-						sqlite3VdbeAppendP4(v, pTab,
-								    P4_TABLE);
-					}
-#endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
 					if (pTab->pIndex) {
 						sqlite3MultiWrite(pParse);
 						sqlite3GenerateRowIndexDelete
@@ -1422,8 +1384,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	 * index and making sure that duplicate entries do not already exist.
 	 * Compute the revised record entries for indices as we go.
 	 *
-	 * This loop also handles the case of the PRIMARY KEY index for a
-	 * WITHOUT ROWID table.
+	 * This loop also handles the case of the PRIMARY KEY index.
 	 */
 	for (ix = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, ix++) {
 		int regIdx;	/* Range of registers hold conent for pIdx */
@@ -1483,7 +1444,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 
 		bool table_ipk_autoinc = false;
 		int reg_pk = -1;
-		if (!HasRowid(pTab) && IsPrimaryKeyIndex(pIdx)) {
+		if (IsPrimaryKeyIndex(pIdx)) {
 			/* If PK is marked as INTEGER, use it as strict type,
 			 * not as affinity. Emit code for type checking */
 			if (pIdx->nKeyCol == 1) {
@@ -1567,84 +1528,51 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		    (pIdx == pPk) ? regIdx : sqlite3GetTempRange(pParse,
 								 nPkField);
 		if (isUpdate || onError == OE_Replace) {
-			if (HasRowid(pTab)) {
-				sqlite3VdbeAddOp2(v, OP_IdxRowid, iThisCur,
-						  regR);
-				/* Conflict only if the rowid of the existing index entry
-				 * is different from old-rowid
+			int x;
+			/* Extract the PRIMARY KEY from the end of the index entry and
+			 * store it in registers regR..regR+nPk-1
+			 */
+			if (pIdx != pPk) {
+				for (i = 0; i < pPk->nKeyCol; i++) {
+					assert(pPk->aiColumn[i] >= 0);
+					x = sqlite3ColumnOfIndex(pIdx,
+								 pPk->aiColumn[i]);
+					sqlite3VdbeAddOp3(v, OP_Column,
+							  iThisCur, x, regR + i);
+					VdbeComment((v, "%s.%s", pTab->zName,
+						pTab->aCol[pPk->aiColumn[i]].zName));
+				}
+			}
+			if (isUpdate) {
+				/* If currently processing the PRIMARY KEY of a WITHOUT ROWID
+				 * table, only conflict if the new PRIMARY KEY values are actually
+				 * different from the old.
+				 *
+				 * For a UNIQUE index, only conflict if the PRIMARY KEY values
+				 * of the matched index row are different from the original PRIMARY
+				 * KEY values of this row before the update.
 				 */
-				if (isUpdate) {
-					sqlite3VdbeAddOp3(v, OP_Eq, regR,
-							  addrUniqueOk,
-							  regOldData);
+				int addrJump =
+					sqlite3VdbeCurrentAddr(v) + pPk->nKeyCol;
+				int op = OP_Ne;
+				int regCmp = (IsPrimaryKeyIndex(pIdx) ?
+					      regIdx : regR);
+				for (i = 0; i < pPk->nKeyCol; i++) {
+					char *p4 = (char *)
+						sqlite3LocateCollSeq(pParse, db,
+								     pPk->azColl[i]);
+					x = pPk->aiColumn[i];
+					assert(x >= 0);
+					if (i == (pPk->nKeyCol - 1)) {
+						addrJump = addrUniqueOk;
+						op = OP_Eq;
+					}
+					sqlite3VdbeAddOp4(v, op, regOldData + 1 + x,
+							  addrJump, regCmp + i,
+							  p4, P4_COLLSEQ);
 					sqlite3VdbeChangeP5(v, SQLITE_NOTNULL);
-					VdbeCoverage(v);
-				}
-			} else {
-				int x;
-				/* Extract the PRIMARY KEY from the end of the index entry and
-				 * store it in registers regR..regR+nPk-1
-				 */
-				if (pIdx != pPk) {
-					for (i = 0; i < pPk->nKeyCol; i++) {
-						assert(pPk->aiColumn[i] >= 0);
-						x = sqlite3ColumnOfIndex(pIdx,
-									 pPk->
-									 aiColumn
-									 [i]);
-						sqlite3VdbeAddOp3(v, OP_Column,
-								  iThisCur, x,
-								  regR + i);
-						VdbeComment((v, "%s.%s",
-							     pTab->zName,
-							     pTab->aCol[pPk->
-									aiColumn
-									[i]].
-							     zName));
-					}
-				}
-				if (isUpdate) {
-					/* If currently processing the PRIMARY KEY of a WITHOUT ROWID
-					 * table, only conflict if the new PRIMARY KEY values are actually
-					 * different from the old.
-					 *
-					 * For a UNIQUE index, only conflict if the PRIMARY KEY values
-					 * of the matched index row are different from the original PRIMARY
-					 * KEY values of this row before the update.
-					 */
-					int addrJump =
-					    sqlite3VdbeCurrentAddr(v) +
-					    pPk->nKeyCol;
-					int op = OP_Ne;
-					int regCmp =
-					    (IsPrimaryKeyIndex(pIdx) ? regIdx :
-					     regR);
-
-					for (i = 0; i < pPk->nKeyCol; i++) {
-						char *p4 = (char *)
-						    sqlite3LocateCollSeq(pParse,
-									 db,
-									 pPk->
-									 azColl
-									 [i]);
-						x = pPk->aiColumn[i];
-						assert(x >= 0);
-						if (i == (pPk->nKeyCol - 1)) {
-							addrJump = addrUniqueOk;
-							op = OP_Eq;
-						}
-						sqlite3VdbeAddOp4(v, op,
-								  regOldData +
-								  1 + x,
-								  addrJump,
-								  regCmp + i,
-								  p4,
-								  P4_COLLSEQ);
-						sqlite3VdbeChangeP5(v,
-								    SQLITE_NOTNULL);
-						VdbeCoverageIf(v, op == OP_Eq);
-						VdbeCoverageIf(v, op == OP_Ne);
-					}
+					VdbeCoverageIf(v, op == OP_Eq);
+					VdbeCoverageIf(v, op == OP_Ne);
 				}
 			}
 		}
@@ -1743,7 +1671,6 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
 	if (useSeekResult) {
 		pik_flags |= OPFLAG_USESEEKRESULT;
 	}
-	assert(!HasRowid(pTab));
 	assert(pParse->nested == 0);
 	sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iIdxCur, aRegIdx[0],
 			     aRegIdx[0] + 1,
@@ -1793,15 +1720,12 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 	iDataCur = iBase++;
 	if (piDataCur)
 		*piDataCur = iDataCur;
-	if (HasRowid(pTab) && (aToOpen == 0 || aToOpen[0])) {
-		sqlite3OpenTable(pParse, iDataCur, pTab, op);
-	}
 	if (piIdxCur)
 		*piIdxCur = iBase;
 	for (i = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, i++) {
 		int iIdxCur = iBase++;
 		assert(pIdx->pSchema == pTab->pSchema);
-		if (IsPrimaryKeyIndex(pIdx) && !HasRowid(pTab)) {
+		if (IsPrimaryKeyIndex(pIdx)) {
 			if (piDataCur)
 				*piDataCur = iIdxCur;
 			p5 = 0;
@@ -1914,7 +1838,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	struct SrcList_item *pItem;	/* An element of pSelect->pSrc */
 	int i;			/* Loop counter */
 	int iSrc, iDest;	/* Cursors from source and destination */
-	int addr1, addr2;	/* Loop addresses */
+	int addr1;		/* Loop addresses */
 	int emptyDestTest = 0;	/* Address of test for empty pDest */
 	int emptySrcTest = 0;	/* Address of test for empty pSrc */
 	Vdbe *v;		/* The VDBE we are building */
@@ -1991,9 +1915,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	}
 	if (pSrc == pDest) {
 		return 0;	/* tab1 and tab2 may not be the same table */
-	}
-	if (HasRowid(pDest) != HasRowid(pSrc)) {
-		return 0;	/* source and destination must both be WITHOUT ROWID or not */
 	}
 	if (pSrc->pSelect) {
 		return 0;	/* tab2 may not be a view */
@@ -2083,7 +2004,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	regData = sqlite3GetTempReg(pParse);
 	regRowid = sqlite3GetTempReg(pParse);
 	sqlite3OpenTable(pParse, iDest, pDest, OP_OpenWrite);
-	assert(HasRowid(pDest) || destHasUniqueIdx);
+	assert(destHasUniqueIdx);
 	if ((pDest->iPKey < 0 && pDest->pIndex != 0)	/* (1) */
 	    ||destHasUniqueIdx	/* (2) */
 	    || (onError != OE_Abort && onError != OE_Rollback)	/* (3) */
@@ -2109,36 +2030,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		emptyDestTest = sqlite3VdbeAddOp0(v, OP_Goto);
 		sqlite3VdbeJumpHere(v, addr1);
 	}
-	if (HasRowid(pSrc)) {
-		u8 insFlags;
-		sqlite3OpenTable(pParse, iSrc, pSrc, OP_OpenRead);
-		emptySrcTest = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
-		VdbeCoverage(v);
-		if (pDest->iPKey >= 0) {
-			addr1 = sqlite3VdbeAddOp2(v, OP_Rowid, iSrc, regRowid);
-			addr2 =
-			    sqlite3VdbeAddOp3(v, OP_NotExists, iDest, 0,
-					      regRowid);
-			VdbeCoverage(v);
-			sqlite3RowidConstraint(pParse, onError, pDest);
-			sqlite3VdbeJumpHere(v, addr2);
-		} else if (pDest->pIndex == 0) {
-			addr1 =
-			    sqlite3VdbeAddOp2(v, OP_NewRowid, iDest, regRowid);
-		} else {
-			addr1 = sqlite3VdbeAddOp2(v, OP_Rowid, iSrc, regRowid);
-			assert((pDest->tabFlags & TF_Autoincrement) == 0);
-		}
-		sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);
-		insFlags = OPFLAG_NCHANGE | OPFLAG_LASTROWID | OPFLAG_APPEND;
-		sqlite3VdbeAddOp4(v, OP_Insert, iDest, regData, regRowid,
-				  (char *)pDest, P4_TABLE);
-		sqlite3VdbeChangeP5(v, insFlags);
-		sqlite3VdbeAddOp2(v, OP_Next, iSrc, addr1);
-		VdbeCoverage(v);
-		sqlite3VdbeAddOp2(v, OP_Close, iSrc, 0);
-		sqlite3VdbeAddOp2(v, OP_Close, iDest, 0);
-	}
+
 	for (pDestIdx = pDest->pIndex; pDestIdx; pDestIdx = pDestIdx->pNext) {
 		u8 idxInsFlags = 0;
 		for (pSrcIdx = pSrc->pIndex; ALWAYS(pSrcIdx);
@@ -2157,7 +2049,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);
 		sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);
-		if (!HasRowid(pSrc) && pDestIdx->idxType == 2) {
+		if (pDestIdx->idxType == 2) {
 			idxInsFlags |= OPFLAG_NCHANGE;
 		}
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iDest, regData);
