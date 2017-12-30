@@ -928,6 +928,16 @@ local function upgrade_to_1_7_7()
         end
     end
     --
+    -- grant 'create' to all users with 'read' and 'write'
+    -- on the universe, since going forward we will require
+    -- 'create' rather than 'read,write' to be able to create
+    -- objects
+    --
+    for _, v in _priv.index.object:pairs{'universe'} do
+        if bit.band(v[5], 1) ~= 0 and bit.band(v[5], 2) ~= 0 then
+            _priv:update({v[2], v[3], v[4]}, {{ "|", 5, 32}})
+        end
+    end
     -- grant admin all new privileges (session, usage, grant option,
     -- create, alter, drop and anything that might come up in the future
     --
