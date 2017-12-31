@@ -2980,8 +2980,6 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				for (i = pList->nExpr, pItem = pList->a; i > 0;
 				     i--, pItem++) {
 					Expr *pE2 = pItem->pExpr;
-					int iValToIns;
-
 					/* If the expression is not constant then we will need to
 					 * disable the test that was generated above that makes sure
 					 * this code only executes once.  Because for a non-constant
@@ -2989,56 +2987,16 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					 */
 					if (jmpIfDynamic >= 0
 					    && !sqlite3ExprIsConstant(pE2)) {
-						sqlite3VdbeChangeToNoop(v,
-									jmpIfDynamic);
+						sqlite3VdbeChangeToNoop(v, jmpIfDynamic);
 						jmpIfDynamic = -1;
 					}
-
-					/* Evaluate the expression and insert it into the temp table */
-					if (isRowid
-					    && sqlite3ExprIsInteger(pE2,
-								    &iValToIns))
-					{
-						sqlite3VdbeAddOp3(v,
-								  OP_InsertInt,
-								  pExpr->iTable,
-								  r2,
-								  iValToIns);
-					} else {
-						r3 = sqlite3ExprCodeTarget
-						    (pParse, pE2, r1);
-						if (isRowid) {
-							sqlite3VdbeAddOp2(v,
-									  OP_MustBeInt,
-									  r3,
-									  sqlite3VdbeCurrentAddr
-									  (v) +
-									  2);
-							VdbeCoverage(v);
-							sqlite3VdbeAddOp3(v,
-									  OP_Insert,
-									  pExpr->
-									  iTable,
-									  r2,
-									  r3);
-						} else {
-							sqlite3VdbeAddOp4(v,
-									  OP_MakeRecord,
-									  r3, 1,
-									  r2,
-									  &affinity,
-									  1);
-							sqlite3ExprCacheAffinityChange
-							    (pParse, r3, 1);
-							sqlite3VdbeAddOp4Int(v,
-									     OP_IdxInsert,
-									     pExpr->
-									     iTable,
-									     r2,
-									     r3,
-									     1);
-						}
-					}
+					r3 = sqlite3ExprCodeTarget(pParse, pE2, r1);
+					sqlite3VdbeAddOp4(v, OP_MakeRecord, r3,
+							  1, r2, &affinity, 1);
+					sqlite3ExprCacheAffinityChange(pParse, r3, 1);
+					sqlite3VdbeAddOp4Int(v, OP_IdxInsert,
+							     pExpr->iTable, r2,
+							     r3, 1);
 				}
 				sqlite3ReleaseTempReg(pParse, r1);
 				sqlite3ReleaseTempReg(pParse, r2);

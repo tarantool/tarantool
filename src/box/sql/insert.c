@@ -1261,12 +1261,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				}
 			}
 		}
-
-		/* Check to see if the new rowid already exists in the table.  Skip
-		 * the following conflict logic if it does not.
-		 */
-		sqlite3VdbeAddOp3(v, OP_NotExists, iDataCur, addrRowidOk,
-				  regNewData);
 		VdbeCoverage(v);
 
 		/* Generate code that deals with a rowid collision */

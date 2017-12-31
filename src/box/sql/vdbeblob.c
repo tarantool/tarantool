@@ -305,7 +305,6 @@ sqlite3_blob_open(sqlite3 * db,	/* The database connection */
 			static const VdbeOpList openBlob[] = {
 				{OP_OpenRead, 0, 0, 0},  /* 1: Open a cursor */
 				{OP_Variable, 1, 1, 0},  /* 2: Move ?1 into reg[1] */
-				{OP_NotExists, 0, 7, 1}, /* 3: Seek the cursor */
 				{OP_Column, 0, 0, 1},    /* 4  */
 				{OP_ResultRow, 1, 0, 0}, /* 5  */
 				{OP_Goto, 0, 2, 0},      /* 6  */

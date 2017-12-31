@@ -405,7 +405,6 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			/* If pIdx is NULL, then the parent key is the INTEGER PRIMARY KEY
 			 * column of the parent table (table pTab).
 			 */
-			int iMustBeInt;	/* Address of MustBeInt instruction */
 			int regTemp = sqlite3GetTempReg(pParse);
 
 			/* Invoke MustBeInt to coerce the child key value to an integer (i.e.
@@ -416,8 +415,6 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			 */
 			sqlite3VdbeAddOp2(v, OP_SCopy, aiCol[0] + 1 + regData,
 					  regTemp);
-			iMustBeInt =
-			    sqlite3VdbeAddOp2(v, OP_MustBeInt, regTemp, 0);
 			VdbeCoverage(v);
 
 			/* If the parent table is the same as the child table, and we are about
@@ -432,13 +429,6 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 				sqlite3VdbeChangeP5(v, SQLITE_NOTNULL);
 			}
 
-			sqlite3OpenTable(pParse, iCur, pTab, OP_OpenRead);
-			sqlite3VdbeAddOp3(v, OP_NotExists, iCur, 0, regTemp);
-			VdbeCoverage(v);
-			sqlite3VdbeGoto(v, iOk);
-			sqlite3VdbeJumpHere(v, sqlite3VdbeCurrentAddr(v) - 2);
-			sqlite3VdbeJumpHere(v, iMustBeInt);
-			sqlite3ReleaseTempReg(pParse, regTemp);
 		} else {
 			int nCol = pFKey->nCol;
 			int regTemp = sqlite3GetTempRange(pParse, nCol);

@@ -734,7 +734,6 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 	iLabel = sqlite3VdbeMakeLabel(v);
 	if (eMode == ONEPASS_OFF) {
 		sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur, iLabel, iPk, nPk);
-		VdbeCoverageIf(v, opSeek == OP_NotExists);
 		VdbeCoverageIf(v, opSeek == OP_NotFound);
 	}
 
@@ -787,7 +786,6 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 		if (addrStart < sqlite3VdbeCurrentAddr(v)) {
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur, iLabel, iPk,
 					     nPk);
-			VdbeCoverageIf(v, opSeek == OP_NotExists);
 			VdbeCoverageIf(v, opSeek == OP_NotFound);
 		}
 
