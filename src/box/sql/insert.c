@@ -100,8 +100,6 @@ sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
 			i16 x = pIdx->aiColumn[n];
 			if (x >= 0) {
 				pIdx->zColAff[n] = pTab->aCol[x].affinity;
-			} else if (x == XN_ROWID) {
-				pIdx->zColAff[n] = SQLITE_AFF_INTEGER;
 			} else {
 				char aff;
 				assert(x == XN_EXPR);
@@ -334,7 +332,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	int addrCont = 0;	/* Top of insert loop. Label "C" in templates 3 and 4 */
 	SelectDest dest;	/* Destination for SELECT on rhs of INSERT */
 	u8 useTempTable = 0;	/* Store SELECT results in intermediate table */
-	u8 appendFlag = 0;	/* True if the insert is likely to be an append */
 	u8 bIdListInOrder;	/* True if IDLIST is in table order */
 	ExprList *pList = 0;	/* List of VALUES() to be inserted  */
 	struct session *user_session = current_session();
@@ -742,40 +739,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				sqlite3VdbeAddOp2(v, OP_Copy,
 						  regFromSelect + ipkColumn,
 						  regRowid);
-			} else {
-				VdbeOp *pOp;
-				sqlite3ExprCode(pParse,
-						pList->a[ipkColumn].pExpr,
-						regRowid);
-				pOp = sqlite3VdbeGetOp(v, -1);
-				if (ALWAYS(pOp) && pOp->opcode == OP_Null) {
-					appendFlag = 1;
-					pOp->opcode = OP_NewRowid;
-					pOp->p1 = iDataCur;
-					pOp->p2 = regRowid;
-					pOp->p3 = 0;
-				}
 			}
-			/* If the PRIMARY KEY expression is NULL, then use OP_NewRowid
-			 * to generate a unique primary key value.
-			 */
-			if (!appendFlag) {
-				int addr1 =
-				    sqlite3VdbeAddOp1(v, OP_NotNull,
-						      regRowid);
-				VdbeCoverage(v);
-				sqlite3VdbeAddOp3(v, OP_NewRowid,
-						  iDataCur, regRowid,
-						  0);
-				sqlite3VdbeJumpHere(v, addr1);
-				sqlite3VdbeAddOp1(v, OP_MustBeInt, regRowid);
-				VdbeCoverage(v);
-			}
-		} else if (!isView) {
-			sqlite3VdbeAddOp2(v, OP_Null, 0, regRowid);
 		} else {
-			sqlite3VdbeAddOp3(v, OP_NewRowid, iDataCur, regRowid,
-					  0);
+			sqlite3VdbeAddOp2(v, OP_Null, 0, regRowid);
 		}
 
 		/* Compute data for all columns of the new entry, beginning
@@ -1313,7 +1279,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		case OE_Rollback:
 		case OE_Abort:
 		case OE_Fail:{
-				sqlite3RowidConstraint(pParse, onError, pTab);
 				break;
 			}
 		case OE_Replace:{
@@ -1426,7 +1391,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				VdbeComment((v, "%s column %d", pIdx->zName,
 					     i));
 			} else {
-				if (iField == XN_ROWID || iField == pTab->iPKey) {
+				if (iField == pTab->iPKey) {
 					x = regNewData;
 				} else {
 					x = iField + regNewData + 1;

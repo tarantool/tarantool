@@ -382,8 +382,6 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 		iColumn = pIdx->aiColumn[j];
 		if (iColumn == XN_EXPR) {
 			pScan->pIdxExpr = pIdx->aColExpr->a[j].pExpr;
-		} else if (iColumn == pIdx->pTable->iPKey) {
-			iColumn = XN_ROWID;
 		} else if (iColumn >= 0) {
 			pScan->idxaff = pIdx->pTable->aCol[iColumn].affinity;
 			pScan->zCollName = pIdx->azColl[j];
@@ -594,18 +592,12 @@ estLog(LogEst N)
  * This routine runs over generated VDBE code and translates OP_Column
  * opcodes into OP_Copy when the table is being accessed via co-routine
  * instead of via table lookup.
- *
- * If the bIncrRowid parameter is 0, then any OP_Rowid instructions on
- * cursor iTabCur are transformed into OP_Null. Or, if bIncrRowid is non-zero,
- * then each OP_Rowid is transformed into an instruction to increment the
- * value stored in its output register.
  */
 static void
 translateColumnToCopy(Vdbe * v,		/* The VDBE containing code to translate */
 		      int iStart,	/* Translate from this opcode to the end */
-		      int iTabCur,	/* OP_Column/OP_Rowid references to this table */
-		      int iRegister,	/* The first column is in this register */
-		      int bIncrRowid)	/* If non-zero, transform OP_rowid to OP_AddImm(1) */
+		      int iTabCur,	/* OP_Column references to this table */
+		      int iRegister)	/* The first column is in this register */
 {
 	VdbeOp *pOp = sqlite3VdbeGetOp(v, iStart);
 	int iEnd = sqlite3VdbeCurrentAddr(v);
@@ -617,17 +609,6 @@ translateColumnToCopy(Vdbe * v,		/* The VDBE containing code to translate */
 			pOp->p1 = pOp->p2 + iRegister;
 			pOp->p2 = pOp->p3;
 			pOp->p3 = 0;
-		} else if (pOp->opcode == OP_Rowid) {
-			if (bIncrRowid) {
-				/* Increment the value stored in the P2 operand of the OP_Rowid. */
-				pOp->opcode = OP_AddImm;
-				pOp->p1 = pOp->p2;
-				pOp->p2 = 1;
-			} else {
-				pOp->opcode = OP_Null;
-				pOp->p1 = 0;
-				pOp->p3 = 0;
-			}
 		}
 	}
 }
@@ -2256,7 +2237,6 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 			break;
 		}
 
-		testcase(pLhs->iColumn == XN_ROWID);
 		aff = sqlite3CompareAffinity(pRhs, sqlite3ExprAffinity(pLhs));
 		idxaff =
 		    sqlite3TableColumnAffinity(pIdx->pTable, pLhs->iColumn);
@@ -2434,8 +2414,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			int iCol = pProbe->aiColumn[saved_nEq];
 			pNew->wsFlags |= WHERE_COLUMN_EQ;
 			assert(saved_nEq == pNew->nEq);
-			if (iCol == XN_ROWID
-			    || (iCol > 0 && nInMul == 0
+			if ((iCol > 0 && nInMul == 0
 				&& saved_nEq == pProbe->nKeyCol - 1)
 			    ) {
 				if (iCol >= 0 && pProbe->uniqNotNull == 0) {
@@ -3384,7 +3363,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 					if (iColumn == pIndex->pTable->iPKey)
 						iColumn = -1;
 				} else {
-					iColumn = XN_ROWID;
+					iColumn = -1;
 					revIdx = 0;
 				}
 
@@ -3457,10 +3436,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 					}
 				}
 				if (isMatch) {
-					if (iColumn == XN_ROWID) {
-						testcase(distinctColumns == 0);
-						distinctColumns = 1;
-					}
 					obSat |= MASKBIT(i);
 				} else {
 					/* No match found */
@@ -4186,7 +4161,7 @@ whereShortCut(WhereLoopBuilder * pBuilder)
  *
  * The code that sqlite3WhereBegin() generates leaves the cursors named
  * in pTabList pointing at their appropriate entries.  The [...] code
- * can use OP_Column and OP_Rowid opcodes on these cursors to extract
+ * can use OP_Column opcode on these cursors to extract
  * data from the various tables of the loop.
  *
  * If the WHERE clause is empty, the foreach loops must each scan their
@@ -4835,12 +4810,11 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 
 		/* For a co-routine, change all OP_Column references to the table of
 		 * the co-routine into OP_Copy of result contained in a register.
-		 * OP_Rowid becomes OP_Null.
 		 */
 		if (pTabItem->fg.viaCoroutine && !db->mallocFailed) {
 			translateColumnToCopy(v, pLevel->addrBody,
 					      pLevel->iTabCur,
-					      pTabItem->regResult, 0);
+					      pTabItem->regResult);
 			continue;
 		}
 
@@ -4878,9 +4852,6 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 					assert((pLoop->
 						wsFlags & WHERE_IDX_ONLY) == 0
 					       || x >= 0);
-				} else if (pOp->opcode == OP_Rowid) {
-					pOp->p1 = pLevel->iIdxCur;
-					pOp->opcode = OP_IdxRowid;
 				}
 			}
 		}

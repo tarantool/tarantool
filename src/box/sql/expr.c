@@ -1720,11 +1720,9 @@ sqlite3ExprListAppend(Parse * pParse,	/* Parsing context */
 		pList->a = a;
 	}
 	assert(pList->a != 0);
-	if (1) {
-		struct ExprList_item *pItem = &pList->a[pList->nExpr++];
-		memset(pItem, 0, sizeof(*pItem));
-		pItem->pExpr = pExpr;
-	}
+	struct ExprList_item *pItem = &pList->a[pList->nExpr++];
+	memset(pItem, 0, sizeof(*pItem));
+	pItem->pExpr = pExpr;
 	return pList;
 
  no_mem:
@@ -2371,7 +2369,6 @@ sqlite3InRhsIsConstant(Expr * pIn)
  *
  * The returned value of this function indicates the b-tree type, as follows:
  *
- *   IN_INDEX_ROWID      - The cursor was opened on a database table.
  *   IN_INDEX_INDEX_ASC  - The cursor was opened on an ascending index.
  *   IN_INDEX_INDEX_DESC - The cursor was opened on a descending index.
  *   IN_INDEX_EPH        - The cursor was opened on a specially created and
@@ -2503,7 +2500,6 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 			VdbeCoverage(v);
 
 			sqlite3OpenTable(pParse, iTab, pTab, OP_OpenRead);
-			eType = IN_INDEX_ROWID;
 
 			sqlite3VdbeJumpHere(v, iAddr);
 		} else {
@@ -2578,8 +2574,6 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 						int j;
 
 						assert(pReq != 0
-						       || pRhs->iColumn ==
-						       XN_ROWID
 						       || pParse->nErr);
 						for (j = 0; j < nExpr; j++) {
 							if (pIdx->aiColumn[j] !=
@@ -2701,15 +2695,11 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		eType = IN_INDEX_EPH;
 		if (inFlags & IN_INDEX_LOOP) {
 			pParse->nQueryLoop = 0;
-			if (pX->pLeft->iColumn < 0
-			    && !ExprHasProperty(pX, EP_xIsSelect)) {
-				eType = IN_INDEX_ROWID;
-			}
+
 		} else if (prRhsHasNull) {
 			*prRhsHasNull = rMayHaveNull = ++pParse->nMem;
 		}
-		sqlite3CodeSubselect(pParse, pX, rMayHaveNull,
-				     eType == IN_INDEX_ROWID);
+		sqlite3CodeSubselect(pParse, pX, rMayHaveNull, 0);
 		pParse->nQueryLoop = savedNQueryLoop;
 	} else {
 		pX->iTable = iTab;
@@ -3347,50 +3337,38 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 * of the RHS using the LHS as a probe.  If found, the result is
 	 * true.
 	 */
-	if (eType == IN_INDEX_ROWID) {
-		/* In this case, the RHS is the ROWID of table b-tree and so we also
-		 * know that the RHS is non-NULL.  Hence, we combine steps 3 and 4
-		 * into a single opcode.
-		 */
-		sqlite3VdbeAddOp3(v, OP_SeekRowid, pExpr->iTable, destIfFalse,
-				  rLhs);
-		VdbeCoverage(v);
-		addrTruthOp = sqlite3VdbeAddOp0(v, OP_Goto);	/* Return True */
-	} else {
-		sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff,
-				  nVector);
-		if ((pExpr->flags & EP_xIsSelect)
-		    && !pExpr->is_ephemeral) {
-			struct SrcList *src_list = pExpr->x.pSelect->pSrc;
-			assert(src_list->nSrc == 1);
+	sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff,
+			  nVector);
+	if ((pExpr->flags & EP_xIsSelect)
+	    && !pExpr->is_ephemeral) {
+		struct SrcList *src_list = pExpr->x.pSelect->pSrc;
+		assert(src_list->nSrc == 1);
 
-			struct Table *tab = src_list->a[0].pTab;
-			assert(tab != NULL);
+		struct Table *tab = src_list->a[0].pTab;
+		assert(tab != NULL);
 
-			struct Index *pk = sqlite3PrimaryKeyIndex(tab);
-			assert(pk);
+		struct Index *pk = sqlite3PrimaryKeyIndex(tab);
+		assert(pk);
 
-			if (pk->nKeyCol == 1
-			    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
-			    && pk->aiColumn[0] < nVector) {
-				int reg_pk = rLhs + pk->aiColumn[0];
-				sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
-			}
-
+		if (pk->nKeyCol == 1
+		    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
+		    && pk->aiColumn[0] < nVector) {
+			int reg_pk = rLhs + pk->aiColumn[0];
+			sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
 		}
-		if (destIfFalse == destIfNull) {
-			/* Combine Step 3 and Step 5 into a single opcode */
-			sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
-					     destIfFalse, rLhs, nVector);
-			VdbeCoverage(v);
-			goto sqlite3ExprCodeIN_finished;
-		}
-		/* Ordinary Step 3, for the case where FALSE and NULL are distinct */
-		addrTruthOp =
-		    sqlite3VdbeAddOp4Int(v, OP_Found, pExpr->iTable, 0, rLhs,
-					 nVector);
-		VdbeCoverage(v);
 	}
+	if (destIfFalse == destIfNull) {
+		/* Combine Step 3 and Step 5 into a single opcode */
+		sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
+				     destIfFalse, rLhs, nVector);
+		VdbeCoverage(v);
+		goto sqlite3ExprCodeIN_finished;
+	}
+	/* Ordinary Step 3, for the case where FALSE and NULL are distinct */
+	addrTruthOp =
+		sqlite3VdbeAddOp4Int(v, OP_Found, pExpr->iTable, 0, rLhs,
+				     nVector);
+	VdbeCoverage(v);
 
 	/* Step 4.  If the RHS is known to be non-NULL and we did not find
 	 * an match on the search above, then the result must be FALSE.
@@ -3732,12 +3710,8 @@ sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
 				int regOut	/* Extract the value into this register */
     )
 {
-	if (iCol < 0 || iCol == pTab->iPKey) {
-		sqlite3VdbeAddOp2(v, OP_Rowid, iTabCur, regOut);
-	} else {
-		int x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab), iCol);
-		sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
-	}
+	int x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab), iCol);
+	sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
 	if (iCol >= 0) {
 		sqlite3ColumnDefault(v, pTab, iCol, regOut);
 	}

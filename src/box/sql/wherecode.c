@@ -52,8 +52,6 @@ explainIndexColumnName(Index * pIdx, int i)
 	i = pIdx->aiColumn[i];
 	if (i == XN_EXPR)
 		return "<expr>";
-	if (i == XN_ROWID)
-		return "rowid";
 	return pIdx->pTable->aCol[i].zName;
 }
 
@@ -599,24 +597,13 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 			for (i = iEq; i < pLoop->nLTerm; i++) {
 				if (pLoop->aLTerm[i]->pExpr == pX) {
 					int iOut = iReg + i - iEq;
-					if (eType == IN_INDEX_ROWID) {
-						testcase(nEq > 1);	/* Happens with a UNIQUE index on ROWID */
-						pIn->addrInTop =
-						    sqlite3VdbeAddOp2(v,
-								      OP_Rowid,
-								      iTab,
-								      iOut);
-					} else {
-						int iCol =
-						    aiMap ? aiMap[iMap++] :
-						    iSingleIdxCol;
-						pIn->addrInTop =
-						    sqlite3VdbeAddOp3(v,
-								      OP_Column,
-								      iTab,
-								      iCol,
-								      iOut);
-					}
+					int iCol =
+						aiMap ? aiMap[iMap++] :
+						iSingleIdxCol;
+					pIn->addrInTop =
+						sqlite3VdbeAddOp3(v, OP_Column,
+								  iTab, iCol,
+								  iOut);
 					sqlite3VdbeAddOp1(v, OP_IsNull, iOut);
 					VdbeCoverage(v);
 					if (i == iEq) {
@@ -1135,7 +1122,6 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 	int addrBrk;		/* Jump here to break out of the loop */
 	int addrCont;		/* Jump here to continue with next cycle */
 	int iRowidReg = 0;	/* Rowid is stored in this register, if not zero */
-	int iReleaseReg = 0;	/* Temp register to free before returning */
 
 	pParse = pWInfo->pParse;
 	v = pParse->pVdbe;
@@ -1185,38 +1171,10 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		VdbeCoverage(v);
 		VdbeComment((v, "next row of \"%s\"", pTabItem->pTab->zName));
 		pLevel->op = OP_Goto;
-	} else if ((pLoop->wsFlags & WHERE_IPK) != 0 &&
-		   (pLoop->wsFlags &
-		    (WHERE_COLUMN_IN | WHERE_COLUMN_EQ)) != 0) {
-		/* Case 2:  We can directly reference a single row using an
-		 *          equality comparison against the ROWID field.  Or
-		 *          we reference multiple rows using a "rowid IN (...)"
-		 *          construct.
-		 */
-		assert(pLoop->nEq == 1);
-		pTerm = pLoop->aLTerm[0];
-		assert(pTerm != 0);
-		assert(pTerm->pExpr != 0);
-		assert(omitTable == 0);
-		testcase(pTerm->wtFlags & TERM_VIRTUAL);
-		iReleaseReg = ++pParse->nMem;
-		iRowidReg =
-		    codeEqualityTerm(pParse, pTerm, pLevel, 0, bRev,
-				     iReleaseReg);
-		if (iRowidReg != iReleaseReg)
-			sqlite3ReleaseTempReg(pParse, iReleaseReg);
-		addrNxt = pLevel->addrNxt;
-		sqlite3VdbeAddOp3(v, OP_SeekRowid, iCur, addrNxt, iRowidReg);
-		VdbeCoverage(v);
-		sqlite3ExprCacheAffinityChange(pParse, iRowidReg, 1);
-		sqlite3ExprCacheStore(pParse, iCur, -1, iRowidReg);
-		VdbeComment((v, "pk"));
-		pLevel->op = OP_Noop;
 	} else if ((pLoop->wsFlags & WHERE_IPK) != 0
 		   && (pLoop->wsFlags & WHERE_COLUMN_RANGE) != 0) {
 		/* Case 3:  We have an inequality comparison against the ROWID field.
 		 */
-		int testOp = OP_Noop;
 		int start;
 		int memEndValue = 0;
 		WhereTerm *pStart, *pEnd;
@@ -1235,53 +1193,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			pEnd = pTerm;
 		}
 		codeCursorHint(pTabItem, pWInfo, pLevel, pEnd);
-		if (pStart) {
-			Expr *pX;	/* The expression that defines the start bound */
-			int r1, rTemp;	/* Registers for holding the start boundary */
-			int op;	/* Cursor seek operation */
-
-			/* The following constant maps TK_xx codes into corresponding
-			 * seek opcodes.  It depends on a particular ordering of TK_xx
-			 */
-			const u8 aMoveOp[] = {
-				/* TK_GT */ OP_SeekGT,
-				/* TK_LE */ OP_SeekLE,
-				/* TK_LT */ OP_SeekLT,
-				/* TK_GE */ OP_SeekGE
-			};
-			assert(TK_LE == TK_GT + 1);	/* Make sure the ordering.. */
-			assert(TK_LT == TK_GT + 2);	/*  ... of the TK_xx values... */
-			assert(TK_GE == TK_GT + 3);	/*  ... is correcct. */
-
-			assert((pStart->wtFlags & TERM_VNULL) == 0);
-			testcase(pStart->wtFlags & TERM_VIRTUAL);
-			pX = pStart->pExpr;
-			assert(pX != 0);
-			testcase(pStart->leftCursor != iCur);	/* transitive constraints */
-			if (sqlite3ExprIsVector(pX->pRight)) {
-				r1 = rTemp = sqlite3GetTempReg(pParse);
-				codeExprOrVector(pParse, pX->pRight, r1, 1);
-				op = aMoveOp[(pX->op - TK_GT) | 0x0001];
-			} else {
-				r1 = sqlite3ExprCodeTemp(pParse, pX->pRight,
-							 &rTemp);
-				disableTerm(pLevel, pStart);
-				op = aMoveOp[(pX->op - TK_GT)];
-			}
-			sqlite3VdbeAddOp3(v, op, iCur, addrBrk, r1);
-			VdbeComment((v, "pk"));
-			VdbeCoverageIf(v, pX->op == TK_GT);
-			VdbeCoverageIf(v, pX->op == TK_LE);
-			VdbeCoverageIf(v, pX->op == TK_LT);
-			VdbeCoverageIf(v, pX->op == TK_GE);
-			sqlite3ExprCacheAffinityChange(pParse, r1, 1);
-			sqlite3ReleaseTempReg(pParse, rTemp);
-		} else {
-			sqlite3VdbeAddOp2(v, bRev ? OP_Last : OP_Rewind, iCur,
-					  addrBrk);
-			VdbeCoverageIf(v, bRev == 0);
-			VdbeCoverageIf(v, bRev != 0);
-		}
+		sqlite3VdbeAddOp2(v, bRev ? OP_Last : OP_Rewind, iCur, addrBrk);
+		VdbeCoverageIf(v, bRev == 0);
+		VdbeCoverageIf(v, bRev != 0);
 		if (pEnd) {
 			Expr *pX;
 			pX = pEnd->pExpr;
@@ -1291,13 +1205,6 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			testcase(pEnd->wtFlags & TERM_VIRTUAL);
 			memEndValue = ++pParse->nMem;
 			codeExprOrVector(pParse, pX->pRight, memEndValue, 1);
-			if (0 == sqlite3ExprIsVector(pX->pRight)
-			    && (pX->op == TK_LT || pX->op == TK_GT)
-			    ) {
-				testOp = bRev ? OP_Le : OP_Ge;
-			} else {
-				testOp = bRev ? OP_Lt : OP_Gt;
-			}
 			if (0 == sqlite3ExprIsVector(pX->pRight)) {
 				disableTerm(pLevel, pEnd);
 			}
@@ -1307,20 +1214,6 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		pLevel->p1 = iCur;
 		pLevel->p2 = start;
 		assert(pLevel->p5 == 0);
-		if (testOp != OP_Noop) {
-			iRowidReg = ++pParse->nMem;
-			sqlite3VdbeAddOp2(v, OP_Rowid, iCur, iRowidReg);
-			sqlite3ExprCacheStore(pParse, iCur, -1, iRowidReg);
-			sqlite3VdbeAddOp3(v, testOp, memEndValue, addrBrk,
-					  iRowidReg);
-			VdbeCoverageIf(v, testOp == OP_Le);
-			VdbeCoverageIf(v, testOp == OP_Lt);
-			VdbeCoverageIf(v, testOp == OP_Ge);
-			VdbeCoverageIf(v, testOp == OP_Gt);
-			sqlite3VdbeChangeP5(v,
-					    SQLITE_AFF_NUMERIC |
-					    SQLITE_JUMPIFNULL);
-		}
 	} else if (pLoop->wsFlags & WHERE_INDEXED) {
 		/* Case 4: A scan using an index.
 		 *
@@ -1921,7 +1814,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						 * insert the key into the temp table and proceed with processing
 						 * the row.
 						 *
-						 * Use some of the same optimizations as OP_RowSetTest: If iSet
+						 * Use optimizations: If iSet
 						 * is zero, assume that the key cannot already be present in
 						 * the temp table. And if iSet is -1, assume that there is no
 						 * need to insert the key into the temp table, as it will never

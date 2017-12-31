@@ -1778,7 +1778,6 @@ struct Index {
 /* The Index.aiColumn[] values are normally positive integer.  But
  * there are some negative values that have special meaning:
  */
-#define XN_ROWID     (-1)	/* Indexed column is the rowid */
 #define XN_EXPR      (-2)	/* Indexed column is an expression */
 
 /*
@@ -3383,7 +3382,6 @@ void sqlite3MultiWrite(Parse *);
 void sqlite3MayAbort(Parse *);
 void sqlite3HaltConstraint(Parse *, int, int, char *, i8, u8);
 void sqlite3UniqueConstraint(Parse *, int, Index *);
-void sqlite3RowidConstraint(Parse *, int, Table *);
 Expr *sqlite3ExprDup(sqlite3 *, Expr *, int);
 ExprList *sqlite3ExprListDup(sqlite3 *, ExprList *, int);
 SrcList *sqlite3SrcListDup(sqlite3 *, SrcList *, int);
@@ -3720,7 +3718,6 @@ void sqlite3EndBenignMalloc(void);
 /*
  * Allowed return values from sqlite3FindInIndex()
  */
-#define IN_INDEX_ROWID        1	/* Search the rowid of the table */
 #define IN_INDEX_EPH          2	/* Search an ephemeral b-tree */
 #define IN_INDEX_INDEX_ASC    3	/* Existing index ASCENDING */
 #define IN_INDEX_INDEX_DESC   4	/* Existing index DESCENDING */

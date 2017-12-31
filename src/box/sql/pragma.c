@@ -799,15 +799,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 									  regRow,
 									  addrOk);
 							VdbeCoverage(v);
-						} else {
-							sqlite3VdbeAddOp2(v,
-									  OP_Rowid,
-									  0,
-									  regRow);
 						}
-						sqlite3VdbeAddOp3(v,
-								  OP_SeekRowid,
-								  i, 0, regRow);
 						VdbeCoverage(v);
 						sqlite3VdbeGoto(v, addrOk);
 						sqlite3VdbeJumpHere(v,
@@ -848,8 +840,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 							VdbeCoverage(v);
 						}
 					}
-					sqlite3VdbeAddOp2(v, OP_Rowid, 0,
-							  regResult + 1);
 					sqlite3VdbeMultiLoad(v, regResult + 2,
 							     "si", pFK->zTo,
 							     i - 1);
