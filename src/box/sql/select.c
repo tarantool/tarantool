@@ -1844,12 +1844,8 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 			pTab = pTabList->a[j].pTab;
 			if (iCol < 0)
 				iCol = pTab->iPKey;
-			assert(iCol == -1 || (iCol >= 0 && iCol < pTab->nCol));
-			if (iCol < 0) {
-				zCol = "rowid";
-			} else {
-				zCol = pTab->aCol[iCol].zName;
-			}
+			assert(iCol >= 0 && iCol < pTab->nCol);
+			zCol = pTab->aCol[iCol].zName;
 			if (!shortNames && !fullNames) {
 				sqlite3VdbeSetColName(v, i, COLNAME_NAME,
 						      sqlite3DbStrDup(db,
@@ -1940,9 +1936,7 @@ sqlite3ColumnsFromExprList(Parse * pParse,	/* Parsing context */
 				pTab = pColExpr->pTab;
 				if (iCol < 0)
 					iCol = pTab->iPKey;
-				zName =
-				    iCol >=
-				    0 ? pTab->aCol[iCol].zName : "rowid";
+				zName = pTab->aCol[iCol].zName;
 			} else if (pColExpr->op == TK_ID) {
 				assert(!ExprHasProperty(pColExpr, EP_IntValue));
 				zName = pColExpr->u.zToken;
@@ -4630,7 +4624,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		pTab->iPKey = -1;
 		pTab->nRowLogEst = 200;
 		assert(200 == sqlite3LogEst(1048576));
-		pTab->tabFlags |= TF_Ephemeral | TF_NoVisibleRowid;
+		pTab->tabFlags |= TF_Ephemeral;
 		pFrom->pSelect = sqlite3SelectDup(db, pCte->pSelect, 0);
 		if (db->mallocFailed)
 			return SQLITE_NOMEM_BKPT;

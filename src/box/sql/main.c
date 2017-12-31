@@ -897,22 +897,6 @@ sqlite3_db_config(sqlite3 * db, int op, ...)
 	return rc;
 }
 
-
-/*
- * Return the ROWID of the most recent insert
- */
-sqlite_int64
-sqlite3_last_insert_rowid(sqlite3 * db)
-{
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	return db->lastRowid;
-}
-
 /*
  * Return the number of changes in the most recent call to sqlite3_exec().
  */
@@ -1312,9 +1296,6 @@ sqlite3ErrName(int rc)
 			break;
 		case SQLITE_CONSTRAINT_FUNCTION:
 			zName = "SQLITE_CONSTRAINT_FUNCTION";
-			break;
-		case SQLITE_CONSTRAINT_ROWID:
-			zName = "SQLITE_CONSTRAINT_ROWID";
 			break;
 		case SQLITE_MISMATCH:
 			zName = "SQLITE_MISMATCH";

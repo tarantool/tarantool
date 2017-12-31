@@ -1878,19 +1878,15 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	if (db->init.busy)
 		p->tnum = db->init.newTnum;
 
-	/* Enforce WITHOUT ROWID, skip VIEWs. */
-	if (!p->pSelect)
-		tabOpts |= TF_WithoutRowid;
-
-	/* Special processing for WITHOUT ROWID Tables */
-	if (tabOpts & TF_WithoutRowid) {
+	if (p->pSelect) {
+		tabOpts |= TF_View;
+	} else {
 		if ((p->tabFlags & TF_HasPrimaryKey) == 0) {
 			sqlite3ErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
 					p->zName);
 			return;
 		} else {
-			p->tabFlags |= TF_WithoutRowid | TF_NoVisibleRowid;
 			convertToWithoutRowidTable(pParse, p);
 		}
 	}

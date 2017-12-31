@@ -95,13 +95,11 @@ struct VdbeCursor {
 	u8 eCurType;		/* One of the CURTYPE_* values above */
 	u8 nullRow;		/* True if pointing to a row with no data */
 	u8 deferredMoveto;	/* A call to sqlite3BtreeMoveto() is needed */
-	u8 isTable;		/* True for rowid tables.  False for indexes */
 #ifdef SQLITE_DEBUG
 	u8 seekOp;		/* Most recent seek operation on this cursor */
 	u8 wrFlag;		/* The wrFlag argument to sqlite3BtreeCursor() */
 #endif
 	Bool isEphemeral:1;	/* True for an ephemeral table */
-	Bool useRandomRowid:1;	/* Generate new record numbers semi-randomly */
 	Bool isOrdered:1;	/* True if the table is not BTREE_UNORDERED */
 	Btree *pBtx;		/* Separate file holding temporary table */
 	i64 seqCount;		/* Sequence counter */
@@ -184,7 +182,6 @@ struct VdbeFrame {
 	Mem *aMem;		/* Array of memory cells for parent frame */
 	VdbeCursor **apCsr;	/* Array of Vdbe cursors for parent frame */
 	void *token;		/* Copy of SubProgram.token */
-	i64 lastRowid;		/* Last insert rowid (sqlite3.lastRowid) */
 	AuxData *pAuxData;	/* Linked list of auxdata allocations */
 	int nCursor;		/* Number of entries in apCsr */
 	int pc;			/* Program Counter in parent (calling) frame */
@@ -210,7 +207,6 @@ struct Mem {
 		bool b;         /* Boolean value used when MEM_Bool is set in flags */
 		int nZero;	/* Used when bit MEM_Zero is set in flags */
 		FuncDef *pDef;	/* Used only when flags==MEM_Agg */
-		RowSet *pRowSet;	/* Used only when flags==MEM_RowSet */
 		VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 	} u;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
@@ -254,7 +250,6 @@ struct Mem {
 #define MEM_Blob      0x0010	/* Value is a BLOB */
 #define MEM_Bool      0x0020    /* Value is a bool */
 #define MEM_AffMask   0x003f	/* Mask of affinity bits */
-#define MEM_RowSet    0x0040	/* Value is a RowSet object */
 #define MEM_Frame     0x0080	/* Value is a VdbeFrame object */
 #define MEM_Undefined 0x0100	/* Value is undefined */
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
@@ -284,7 +279,7 @@ struct Mem {
  * that needs to be deallocated to avoid a leak.
  */
 #define VdbeMemDynamic(X)  \
-  (((X)->flags&(MEM_Agg|MEM_Dyn|MEM_RowSet|MEM_Frame))!=0)
+  (((X)->flags&(MEM_Agg|MEM_Dyn|MEM_Frame))!=0)
 
 /*
  * Clear any existing type flags from a Mem and replace them with f
@@ -504,7 +499,6 @@ void sqlite3VdbeDeleteAuxData(sqlite3 *, AuxData **, int, int);
 
 int sqlite2BtreeKeyCompare(BtCursor *, const void *, int, int, int *);
 int sqlite3VdbeIdxKeyCompare(sqlite3 *, VdbeCursor *, UnpackedRecord *, int *);
-int sqlite3VdbeIdxRowid(sqlite3 *, BtCursor *, i64 *);
 int sqlite3VdbeExec(Vdbe *);
 int sqlite3VdbeList(Vdbe *);
 int
@@ -528,7 +522,6 @@ void sqlite3VdbeMemSetDouble(Mem *, double);
 void sqlite3VdbeMemInit(Mem *, sqlite3 *, u32);
 void sqlite3VdbeMemSetNull(Mem *);
 void sqlite3VdbeMemSetZeroBlob(Mem *, int);
-void sqlite3VdbeMemSetRowSet(Mem *);
 int sqlite3VdbeMemMakeWriteable(Mem *);
 int sqlite3VdbeMemStringify(Mem *, u8);
 i64 sqlite3VdbeIntValue(Mem *);

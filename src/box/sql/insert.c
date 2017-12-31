@@ -477,18 +477,11 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				}
 			}
 			if (j >= pTab->nCol) {
-				if (sqlite3IsRowid(pColumn->a[i].zName)
-				    && isView) {
-					ipkColumn = i;
-					bIdListInOrder = 0;
-				} else {
-					sqlite3ErrorMsg(pParse,
-							"table %S has no column named %s",
-							pTabList, 0,
-							pColumn->a[i].zName);
-					pParse->checkSchema = 1;
-					goto insert_cleanup;
-				}
+				sqlite3ErrorMsg(pParse,
+						"table %S has no column named %s",
+						pTabList, 0, pColumn->a[i].zName);
+				pParse->checkSchema = 1;
+				goto insert_cleanup;
 			}
 		}
 	}

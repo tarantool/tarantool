@@ -251,16 +251,10 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			}
 		}
 		if (j >= pTab->nCol) {
-			if (pPk == 0 && sqlite3IsRowid(pChanges->a[i].zName)) {
-				j = -1;
-				chngRowid = 1;
-				pRowidExpr = pChanges->a[i].pExpr;
-			} else {
-				sqlite3ErrorMsg(pParse, "no such column: %s",
-						pChanges->a[i].zName);
-				pParse->checkSchema = 1;
-				goto update_cleanup;
-			}
+			sqlite3ErrorMsg(pParse, "no such column: %s",
+					pChanges->a[i].zName);
+			pParse->checkSchema = 1;
+			goto update_cleanup;
 		}
 #ifndef SQLITE_OMIT_AUTHORIZATION
 		{
