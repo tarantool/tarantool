@@ -5800,7 +5800,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 						       pKeyInfo->nField,
 						       0, (char *)pKeyInfo,
 						       P4_KEYINFO);
-		sqlite3VdbeChangeP5(v, BTREE_UNORDERED);
 		VdbeComment((v, "Distinct table"));
 		sDistinct.eTnctType = WHERE_DISTINCT_UNORDERED;
 	} else {

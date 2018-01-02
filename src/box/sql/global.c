@@ -238,7 +238,6 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 	0,			/* inProgress */
 	0,			/* isMutexInit */
 	0,			/* isMallocInit */
-	0,			/* isPCacheInit */
 	0,			/* nRefInitMutex */
 	0,			/* pInitMutex */
 	0,			/* xLog */

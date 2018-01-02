@@ -879,7 +879,7 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 	}
 #endif
 
-	assert(pCsr->pKeyInfo && pCsr->pBtx == 0);
+	assert(pCsr->pKeyInfo);
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	szKeyInfo =
 	    sizeof(KeyInfo) + (pCsr->pKeyInfo->nField - 1) * sizeof(struct coll *);
@@ -898,7 +898,7 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 			pKeyInfo->nXField += (pKeyInfo->nField - nField);
 			pKeyInfo->nField = nField;
 		}
-		pSorter->pgsz = pgsz = sqlite3BtreeGetPageSize(db->mdb.pBt);
+		pSorter->pgsz = pgsz = 1024;
 		pSorter->nTask = nWorker + 1;
 		pSorter->iPrev = (u8) (nWorker - 1);
 		pSorter->bUseThreads = (pSorter->nTask > 1);

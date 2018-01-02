@@ -38,7 +38,6 @@
  */
 #define Index SqliteIndex
 #include "sql/sqliteInt.h"
-#include "sql/btreeInt.h"
 #include "sql/tarantoolInt.h"
 #include "sql/vdbeInt.h"
 #undef Index
@@ -72,8 +71,6 @@ void
 sql_init()
 {
 	int rc;
-	char *zErrMsg = 0;
-
 	default_flags |= default_sql_flags;
 
 	rc = sqlite3_open("", &db);
@@ -85,9 +82,9 @@ sql_init()
 
 	current_session()->sql_flags |= default_sql_flags;
 
-	rc = sqlite3Init(db, &zErrMsg);
+	rc = sqlite3Init(db);
 	if (rc != SQLITE_OK) {
-		panic(zErrMsg);
+		panic("database initialization failed");
 	} else {
 		/* XXX */
 	}
@@ -506,7 +503,7 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
  *
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
-int tarantoolSqlite3EphemeralInsert(BtCursor *pCur, const BtreePayload *pX)
+int tarantoolSqlite3EphemeralInsert(BtCursor *pCur, const CursorPayload *pX)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
@@ -537,7 +534,7 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 	return SQLITE_OK;
 }
 
-int tarantoolSqlite3Insert(BtCursor *pCur, const BtreePayload *pX)
+int tarantoolSqlite3Insert(BtCursor *pCur, const CursorPayload *pX)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 
@@ -1222,7 +1219,6 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 	box_tuple_ref(res);
 	c->tuple_last = res;
 	pCur->eState = CURSOR_VALID;
-	pCur->curIntKey = 0;
 	return SQLITE_OK;
 }
 
@@ -1319,7 +1315,6 @@ cursor_ephemeral_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	c->iter = it;
 	c->type = type;
 	pCur->eState = CURSOR_VALID;
-	pCur->curIntKey = 0;
 
 	return cursor_ephemeral_advance(pCur, pRes);
 }
@@ -1367,7 +1362,6 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	}
 	c->type = type;
 	pCur->eState = CURSOR_VALID;
-	pCur->curIntKey = 0;
 	return cursor_advance(pCur, pRes);
 }
 

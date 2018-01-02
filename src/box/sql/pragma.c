@@ -151,20 +151,6 @@ returnSingleInt(Vdbe * v, i64 value)
 }
 
 /*
- * Generate code to return a single text value.
- */
-static void
-returnSingleText(Vdbe * v,	/* Prepared statement under construction */
-		 const char *zValue	/* Value to be returned */
-    )
-{
-	if (zValue) {
-		sqlite3VdbeLoadString(v, 1, (const char *)zValue);
-		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 1);
-	}
-}
-
-/*
  * Return a human-readable name for a constraint resolution action.
  */
 #ifndef SQLITE_OMIT_FOREIGN_KEY
@@ -205,12 +191,6 @@ sqlite3JournalModename(int eMode)
 	static char *const azModeName[] = {
 		"delete", "persist", "off", "truncate", "memory"
 	};
-	assert(PAGER_JOURNALMODE_DELETE == 0);
-	assert(PAGER_JOURNALMODE_PERSIST == 1);
-	assert(PAGER_JOURNALMODE_OFF == 2);
-	assert(PAGER_JOURNALMODE_TRUNCATE == 3);
-	assert(PAGER_JOURNALMODE_MEMORY == 4);
-	assert(PAGER_JOURNALMODE_WAL == 5);
 	assert(eMode >= 0 && eMode <= ArraySize(azModeName));
 
 	if (eMode == ArraySize(azModeName))
@@ -267,13 +247,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	char *zLeft = 0;	/* Nul-terminated UTF-8 string <id> */
 	char *zRight = 0;	/* Nul-terminated UTF-8 string <value>, or NULL */
 	char *zTable = 0;	/* Nul-terminated UTF-8 string <value2> or NULL */
-	char *aFcntl[4];	/* Argument to SQLITE_FCNTL_PRAGMA */
 	int rc;			/* return value form SQLITE_FCNTL_PRAGMA */
 	sqlite3 *db = pParse->db;	/* The database connection */
 	Db *pDb;		/* The specific database being pragmaed */
 	Vdbe *v = sqlite3GetVdbe(pParse);	/* Prepared statement */
 	const PragmaName *pPragma;	/* The pragma */
 	struct session *user_session = current_session();
+	(void)pId2;
 
 	if (v == 0)
 		return;
@@ -290,46 +270,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		zRight = sqlite3NameFromToken(db, pValue);
 	}
 	zTable = sqlite3NameFromToken(db, pValue2);
-
-	/* Send an SQLITE_FCNTL_PRAGMA file-control to the underlying VFS *
-	 * connection.  If it returns SQLITE_OK, then assume that the VFS *
-	 * handled the pragma and generate a no-op prepared statement. *
-	 *
-	 * IMPLEMENTATION-OF: R-12238-55120 Whenever a PRAGMA
-	 * statement is parsed, an SQLITE_FCNTL_PRAGMA file control
-	 * is sent to the open sqlite3_file
-	 * object corresponding to the database file to which the pragma *
-	 * statement refers. *
-	 *
-	 * IMPLEMENTATION-OF: R-29875-31678 The argument to the
-	 * SQLITE_FCNTL_PRAGMA * file control is an array of pointers to
-	 * strings (char**) in which the * second element of the array is the
-	 * name of the pragma and the third * element is the argument to the
-	 * pragma or NULL if the pragma has no * argument.
-	 */
-	aFcntl[0] = 0;
-	aFcntl[1] = zLeft;
-	aFcntl[2] = zRight;
-	aFcntl[3] = 0;
 	db->busyHandler.nBusy = 0;
-	rc = sqlite3_file_control(db, SQLITE_FCNTL_PRAGMA, (void *)aFcntl);
-	if (rc == SQLITE_OK) {
-		sqlite3VdbeSetNumCols(v, 1);
-		sqlite3VdbeSetColName(v, 0, COLNAME_NAME,
-				      aFcntl[0], SQLITE_TRANSIENT);
-		returnSingleText(v, aFcntl[0]);
-		sqlite3_free(aFcntl[0]);
-		goto pragma_out;
-	}
-	if (rc != SQLITE_NOTFOUND) {
-		if (aFcntl[0]) {
-			sqlite3ErrorMsg(pParse, "%s", aFcntl[0]);
-			sqlite3_free(aFcntl[0]);
-		}
-		pParse->nErr++;
-		pParse->rc = rc;
-		goto pragma_out;
-	}
+
 	/* Locate the pragma in the lookup table */
 	pPragma = pragmaLocate(zLeft);
 	if (pPragma == 0) {
@@ -350,59 +292,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	}
 	/* Jump to the appropriate pragma handler */
 	switch (pPragma->ePragTyp) {
-
-#if !defined(SQLITE_OMIT_PAGER_PRAGMAS)
-		/* *  PRAGMA [schema.]secure_delete *  PRAGMA
-		 * [schema.]secure_delete=ON/OFF *
-		 *
-		 * The first form reports the current setting for the *
-		 * secure_delete flag.  The second form changes the
-		 * secure_delete * flag setting and reports thenew value.
-		 */
-	case PragTyp_SECURE_DELETE:{
-			Btree *pBt = pDb->pBt;
-			int b = -1;
-			assert(pBt != 0);
-			if (zRight) {
-				b = sqlite3GetBoolean(zRight, 0);
-			}
-			if (pId2->n == 0 && b >= 0) {
-				sqlite3BtreeSecureDelete(db->mdb.pBt, b);
-			}
-			b = sqlite3BtreeSecureDelete(pBt, b);
-			returnSingleInt(v, b);
-			break;
-		}
-#endif				/* SQLITE_OMIT_PAGER_PRAGMAS */
-
-#ifndef SQLITE_OMIT_PAGER_PRAGMAS
-		/* *   PRAGMA [schema.]synchronous *   PRAGMA
-		 * [schema.]synchronous=OFF|ON|NORMAL|FULL|EXTRA *
-		 *
-		 * Return or set the local value of the synchronous flag. Changing *
-		 * the local value does not make changes to the disk file and
-		 * the * default value will be restored the next time the
-		 * database is * opened.
-		 */
-	case PragTyp_SYNCHRONOUS:{
-			if (!zRight) {
-				returnSingleInt(v, pDb->safety_level - 1);
-			} else {
-				/* * Autocommit is default VDBE state. Only
-				 * OP_Savepoint may change it to 0 * Thats why
-				 * we shouldn't check it
-				 */
-				int iLevel =
-				    (getSafetyLevel(zRight, 0, 1) +
-				     1) & PAGER_SYNCHRONOUS_MASK;
-				if (iLevel == 0)
-					iLevel = 1;
-				pDb->safety_level = iLevel;
-				pDb->bSyncSet = 1;
-			}
-			break;
-		}
-#endif				/* SQLITE_OMIT_PAGER_PRAGMAS */
 
 #ifndef SQLITE_OMIT_FLAG_PRAGMAS
 	case PragTyp_FLAG:{
@@ -927,7 +816,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			int iCookie = pPragma->iArg;	/* Which cookie to read
 							 * or write
 							 */
-			sqlite3VdbeUsesBtree(v);
 			if (zRight
 			    && (pPragma->mPragFlg & PragFlg_ReadOnly) == 0) {
 				/* Write the specified cookie value */
@@ -973,53 +861,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			}
 			break;
 		}
-
-/* Tarantool: TODO: comment this so far, since native SQLite WAL was remoced.
-   This might be used with native Tarantool's WAL.  */
-#if 0
-		/* *   PRAGMA [schema.]wal_checkpoint =
-		 * passive|full|restart|truncate *
-		 *
-		 * Checkpoint the database.
-		 */
-	case PragTyp_WAL_CHECKPOINT:{
-			int eMode = SQLITE_CHECKPOINT_PASSIVE;
-			if (zRight) {
-				if (sqlite3StrICmp(zRight, "full") == 0) {
-					eMode = SQLITE_CHECKPOINT_FULL;
-				} else if (sqlite3StrICmp(zRight, "restart") ==
-					   0) {
-					eMode = SQLITE_CHECKPOINT_RESTART;
-				} else if (sqlite3StrICmp(zRight, "truncate") ==
-					   0) {
-					eMode = SQLITE_CHECKPOINT_TRUNCATE;
-				}
-			}
-			pParse->nMem = 3;
-			sqlite3VdbeAddOp2(v, OP_Checkpoint, eMode, 1);
-			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 3);
-		}
-		break;
-
-		/* *   PRAGMA wal_autocheckpoint *   PRAGMA
-		 * wal_autocheckpoint = N *
-		 *
-		 * Configure a database connection to automatically
-		 * checkpoint a database * after accumulating N frames
-		 * in the log. Or query for the current value * of N.
-		 */
-	case PragTyp_WAL_AUTOCHECKPOINT:{
-			if (zRight) {
-				sqlite3_wal_autocheckpoint(db,
-							   sqlite3Atoi(zRight));
-			}
-			returnSingleInt(v,
-					db->xWalCallback ==
-					sqlite3WalDefaultHook ?
-					SQLITE_PTR_TO_INT(db->pWalArg) : 0);
-		}
-		break;
-#endif
 
 		/* *  PRAGMA shrink_memory *
 		 *
@@ -1092,60 +933,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						      -1));
 			break;
 		}
-
-#ifdef SQLITE_HAS_CODEC
-	case PragTyp_KEY:{
-			if (zRight)
-			sqlite3_key_v2(db, 0, zRight,
-					       sqlite3Strlen30(zRight));
-			break;
-		}
-	case PragTyp_REKEY:{
-			if (zRight)
-				sqlite3_rekey_v2(db, 0, zRight,
-						 sqlite3Strlen30(zRight));
-			break;
-		}
-	case PragTyp_HEXKEY:{
-			if (zRight) {
-				u8 iByte;
-				int i;
-				char zKey[40];
-				for (i = 0, iByte = 0;
-				     i < sizeof(zKey) * 2
-				     && sqlite3Isxdigit(zRight[i]); i++) {
-					iByte =
-					    (iByte << 4) +
-					    sqlite3HexToInt(zRight[i]);
-					if ((i & 1) != 0)
-						zKey[i / 2] = iByte;
-				}
-				if ((zLeft[3] & 0xf) == 0xb) {
-					sqlite3_key_v2(db, zKey, i / 2);
-				} else {
-					sqlite3_rekey_v2(db, zKey, i / 2);
-				}
-			}
-			break;
-		}
-#endif
-#if defined(SQLITE_HAS_CODEC) || defined(SQLITE_ENABLE_CEROD)
-	case PragTyp_ACTIVATE_EXTENSIONS:
-		if (zRight) {
-#ifdef SQLITE_HAS_CODEC
-			if (sqlite3StrNICmp(zRight, "see-", 4) == 0) {
-				sqlite3_activate_see(&zRight[4]);
-			}
-#endif
-#ifdef SQLITE_ENABLE_CEROD
-			if (sqlite3StrNICmp(zRight, "cerod-", 6) == 0) {
-				sqlite3_activate_cerod(&zRight[6]);
-			}
-#endif
-		}
-		break;
-#endif
-
 	}			/* End of the PRAGMA switch */
 
 	/* The following block is a no-op unless SQLITE_DEBUG is

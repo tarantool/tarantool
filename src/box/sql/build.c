@@ -109,7 +109,6 @@ sqlite3FinishCoding(Parse * pParse)
 			sqlite3VdbeJumpHere(v, 0);
 			Schema *pSchema;
 			if (DbMaskTest(pParse->cookieMask, 0) != 0) {
-				sqlite3VdbeUsesBtree(v);
 				pSchema = db->mdb.pSchema;
 				sqlite3VdbeAddOp4Int(v, OP_Transaction,	/* Opcode */
 						     0,	/* P1 */
@@ -1111,9 +1110,7 @@ sqlite3AddCheckConstraint(Parse * pParse,	/* Parsing context */
 {
 #ifndef SQLITE_OMIT_CHECK
 	Table *pTab = pParse->pNewTable;
-	sqlite3 *db = pParse->db;
-	if (pTab && !sqlite3BtreeIsReadonly(db->mdb.pBt)
-	    ) {
+	if (pTab) {
 		pTab->pCheck =
 		    sqlite3ExprListAppend(pParse, pTab->pCheck, pCheckExpr);
 		if (pParse->constraintName.n) {
@@ -1226,7 +1223,7 @@ sqlite3ChangeCookie(Parse * pParse)
 {
 	sqlite3 *db = pParse->db;
 	Vdbe *v = pParse->pVdbe;
-	sqlite3VdbeAddOp3(v, OP_SetCookie, 0, BTREE_SCHEMA_VERSION,
+	sqlite3VdbeAddOp3(v, OP_SetCookie, 0, 0,
 			  db->mdb.pSchema->schema_cookie + 1);
 }
 
@@ -2902,9 +2899,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	int nName;		/* Number of characters in zName */
 	int i, j;
 	DbFixer sFix;		/* For assigning database names to pTable */
-	int sortOrderMask;	/* 1 to honor DESC in index.  0 to ignore. */
 	sqlite3 *db = pParse->db;
-	Db *pDb;		/* The specific table containing the indexed database */
 	struct ExprList_item *pListItem;	/* For looping over pList */
 	int nExtra = 0;		/* Space allocated for zExtra[] */
 	char *zExtra = 0;	/* Extra space after the Index object */
@@ -2959,7 +2954,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		if (!pTab)
 			goto exit_create_index;
 	}
-	pDb = &db->mdb;
 
 	assert(pTab != 0);
 	assert(pParse->nErr == 0);
@@ -3107,14 +3101,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		pPIWhere = 0;
 	}
 
-	/* Check to see if we should honor DESC requests on index columns
-	 */
-	if (pDb->pSchema->file_format >= 4) {
-		sortOrderMask = -1;	/* Honor DESC */
-	} else {
-		sortOrderMask = 0;	/* Ignore DESC */
-	}
-
 	/* Analyze the list of expressions that form the terms of the index and
 	 * report any errors.  In the common case where the expression is exactly
 	 * a table column, store that column in aiColumn[].  For general expressions,
@@ -3167,7 +3153,10 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		}
 		pIndex->azColl[i] = zColl;
-		requestedSortOrder = pListItem->sortOrder & sortOrderMask;
+		/* Tarantool: DESC indexes are not supported so far.
+		 * See gh-3016.
+		 */
+		requestedSortOrder = pListItem->sortOrder & 0;
 		pIndex->aSortOrder[i] = (u8) requestedSortOrder;
 	}
 
@@ -4007,7 +3996,6 @@ sqlite3CodeVerifySchema(Parse * pParse)
 {
 	Parse *pToplevel = sqlite3ParseToplevel(pParse);
 
-	assert(pParse->db->mdb.pBt != 0);
 	if (DbMaskTest(pToplevel->cookieMask, 0) == 0) {
 		DbMaskSet(pToplevel->cookieMask, 0);
 	}

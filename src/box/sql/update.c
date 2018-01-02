@@ -313,6 +313,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	/* Allocate required registers. */
 	regOldPk = regNewPk = ++pParse->nMem;
+
 	if (chngPk || pTrigger || hasFK) {
 		regOld = pParse->nMem + 1;
 		pParse->nMem += pTab->nCol;

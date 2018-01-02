@@ -52,22 +52,6 @@ static SQLITE_WSD struct sqlite3StatType {
 0,}, {
 0,}};
 
-/*
- * Elements of sqlite3Stat[] are protected by either the memory allocator
- * mutex, or by the pcache1 mutex.  The following array determines which.
- */
-static const char statMutex[] = {
-	0,			/* SQLITE_STATUS_MEMORY_USED */
-	1,			/* SQLITE_STATUS_PAGECACHE_USED */
-	1,			/* SQLITE_STATUS_PAGECACHE_OVERFLOW */
-	0,			/* SQLITE_STATUS_SCRATCH_USED */
-	0,			/* SQLITE_STATUS_SCRATCH_OVERFLOW */
-	0,			/* SQLITE_STATUS_MALLOC_SIZE */
-	0,			/* SQLITE_STATUS_PARSER_STACK */
-	1,			/* SQLITE_STATUS_PAGECACHE_SIZE */
-	0,			/* SQLITE_STATUS_SCRATCH_SIZE */
-	0,			/* SQLITE_STATUS_MALLOC_COUNT */
-};
 
 /* The "wsdStat" macro will resolve to the status information
  * state vector.  If writable static data is unsupported on the target,
@@ -92,9 +76,7 @@ sqlite3StatusValue(int op)
 {
 	wsdStatInit;
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
-	assert(op >= 0 && op < ArraySize(statMutex));
-	assert(sqlite3_mutex_held(statMutex[op] ? sqlite3Pcache1Mutex()
-				  : sqlite3MallocMutex()));
+
 	return wsdStat.nowValue[op];
 }
 
@@ -114,9 +96,7 @@ sqlite3StatusUp(int op, int N)
 {
 	wsdStatInit;
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
-	assert(op >= 0 && op < ArraySize(statMutex));
-	assert(sqlite3_mutex_held(statMutex[op] ? sqlite3Pcache1Mutex()
-				  : sqlite3MallocMutex()));
+
 	wsdStat.nowValue[op] += N;
 	if (wsdStat.nowValue[op] > wsdStat.mxValue[op]) {
 		wsdStat.mxValue[op] = wsdStat.nowValue[op];
@@ -128,9 +108,7 @@ sqlite3StatusDown(int op, int N)
 {
 	wsdStatInit;
 	assert(N >= 0);
-	assert(op >= 0 && op < ArraySize(statMutex));
-	assert(sqlite3_mutex_held(statMutex[op] ? sqlite3Pcache1Mutex()
-				  : sqlite3MallocMutex()));
+
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
 	wsdStat.nowValue[op] -= N;
 }
@@ -147,9 +125,7 @@ sqlite3StatusHighwater(int op, int X)
 	assert(X >= 0);
 	newValue = (sqlite3StatValueType) X;
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
-	assert(op >= 0 && op < ArraySize(statMutex));
-	assert(sqlite3_mutex_held(statMutex[op] ? sqlite3Pcache1Mutex()
-				  : sqlite3MallocMutex()));
+
 	assert(op == SQLITE_STATUS_MALLOC_SIZE
 	       || op == SQLITE_STATUS_PAGECACHE_SIZE
 	       || op == SQLITE_STATUS_SCRATCH_SIZE
@@ -167,7 +143,6 @@ sqlite3_status64(int op,
 		 sqlite3_int64 * pCurrent,
 		 sqlite3_int64 * pHighwater, int resetFlag)
 {
-	sqlite3_mutex *pMutex;
 	wsdStatInit;
 	if (op < 0 || op >= ArraySize(wsdStat.nowValue)) {
 		return SQLITE_MISUSE_BKPT;
@@ -176,15 +151,11 @@ sqlite3_status64(int op,
 	if (pCurrent == 0 || pHighwater == 0)
 		return SQLITE_MISUSE_BKPT;
 #endif
-	pMutex = statMutex[op] ? sqlite3Pcache1Mutex() : sqlite3MallocMutex();
-	sqlite3_mutex_enter(pMutex);
 	*pCurrent = wsdStat.nowValue[op];
 	*pHighwater = wsdStat.mxValue[op];
 	if (resetFlag) {
 		wsdStat.mxValue[op] = wsdStat.nowValue[op];
 	}
-	sqlite3_mutex_leave(pMutex);
-	(void)pMutex;		/* Prevent warning when SQLITE_THREADSAFE=0 */
 	return SQLITE_OK;
 }
 

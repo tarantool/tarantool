@@ -77,16 +77,15 @@ typedef struct VdbeSorter VdbeSorter;
 typedef struct AuxData AuxData;
 
 /* Types of VDBE cursors */
-#define CURTYPE_BTREE       0
+#define CURTYPE_TARANTOOL   0
 #define CURTYPE_SORTER      1
-#define CURTYPE_PSEUDO      3
+#define CURTYPE_PSEUDO      2
 
 /*
  * A VdbeCursor is an superclass (a wrapper) for various cursor objects:
  *
- *      * A b-tree cursor
- *          -  In the main database or in an ephemeral database
- *          -  On either an index or a table
+ *      * A Tarantool cursor
+ *          -  On either an ephemeral or ordinary space
  *      * A sorter
  *      * A one-row "pseudotable" stored in a single register
  */
@@ -94,16 +93,11 @@ typedef struct VdbeCursor VdbeCursor;
 struct VdbeCursor {
 	u8 eCurType;		/* One of the CURTYPE_* values above */
 	u8 nullRow;		/* True if pointing to a row with no data */
-	u8 deferredMoveto;	/* A call to sqlite3BtreeMoveto() is needed */
+	u8 deferredMoveto;	/* A call to sqlite3CursorMoveto() is needed */
 #ifdef SQLITE_DEBUG
 	u8 seekOp;		/* Most recent seek operation on this cursor */
-	u8 wrFlag;		/* The wrFlag argument to sqlite3BtreeCursor() */
 #endif
-	Bool isEphemeral:1;	/* True for an ephemeral table */
-	Bool isOrdered:1;	/* True if the table is not BTREE_UNORDERED */
-	Btree *pBtx;		/* Separate file holding temporary table */
 	i64 seqCount;		/* Sequence counter */
-	int *aAltMap;		/* Mapping from table to index column numbers */
 
 	/* Cached OP_Column parse information is only valid if cacheStatus matches
 	 * Vdbe.cacheCtr.  Vdbe.cacheCtr will never take on the value of
@@ -111,7 +105,7 @@ struct VdbeCursor {
 	 * the cache is out of date.
 	 */
 	u32 cacheStatus;	/* Cache is valid if this matches Vdbe.cacheCtr */
-	int seekResult;		/* Result of previous sqlite3BtreeMoveto() or 0
+	int seekResult;		/* Result of previous sqlite3CursorMoveto() or 0
 				 * if there have been no prior seeks on the cursor.
 				 */
 	/* NB: seekResult does not distinguish between "no seeks have ever occurred
@@ -122,18 +116,15 @@ struct VdbeCursor {
 	 * The fields that follow are uninitialized, and must be individually
 	 * initialized prior to first use.
 	 */
-	VdbeCursor *pAltCursor;	/* Associated index cursor from which to read */
 	union {
-		BtCursor *pCursor;	/* CURTYPE_BTREE.  Btree cursor */
+		BtCursor *pCursor;	/* CURTYPE_TARANTOOL */
 		int pseudoTableReg;	/* CURTYPE_PSEUDO. Reg holding content. */
 		VdbeSorter *pSorter;	/* CURTYPE_SORTER. Sorter object */
 	} uc;
 	KeyInfo *pKeyInfo;	/* Info about index keys needed by index cursors */
-	u32 iHdrOffset;		/* Offset to next unparsed byte of the header */
-	Pgno pgnoRoot;		/* Root page of the open btree cursor */
+	Pgno pgnoRoot;		/* Root page of the open cursor */
 	i16 nField;		/* Number of fields in the header */
 	u16 nHdrParsed;		/* Number of header fields parsed so far */
-	i64 movetoTarget;	/* Argument to the deferred sqlite3BtreeMoveto() */
 	const u8 *aRow;		/* Data for the current row, if all on one page */
 	u32 payloadSize;	/* Total number of bytes in the record */
 	u32 szRow;		/* Byte available in aRow */
@@ -421,7 +412,6 @@ struct Vdbe {
 #endif
 	u16 nResColumn;		/* Number of columns in one row of the result set */
 	u8 errorAction;		/* Recovery action to do in case of an error */
-	u8 minWriteFileFormat;	/* Minimum file format for writable database files */
 	bft expired:1;		/* True if the VM needs to be recompiled */
 	bft doingRerun:1;	/* True if rerunning after an auto-reprepare */
 	bft explain:2;		/* True if EXPLAIN present on SQL command */
@@ -431,8 +421,6 @@ struct Vdbe {
 	bft readOnly:1;		/* True for statements that do not write */
 	bft bIsReader:1;	/* True for statements that read */
 	bft isPrepareV2:1;	/* True if prepared with prepare_v2() */
-	yDbMask btreeMask;	/* Bitmask of db->aDb[] entries referenced */
-	yDbMask lockMask;	/* Subset of btreeMask that requires a lock */
 	u32 aCounter[5];	/* Counters used by sqlite3_stmt_status() */
 	char *zSql;		/* Text of the SQL statement that generated this */
 	void *pFree;		/* Free this when deleting the vdbe */
@@ -497,7 +485,6 @@ u32 sqlite3VdbeSerialPut(unsigned char *, Mem *, u32);
 u32 sqlite3VdbeSerialGet(const unsigned char *, u32, Mem *);
 void sqlite3VdbeDeleteAuxData(sqlite3 *, AuxData **, int, int);
 
-int sqlite2BtreeKeyCompare(BtCursor *, const void *, int, int, int *);
 int sqlite3VdbeIdxKeyCompare(sqlite3 *, VdbeCursor *, UnpackedRecord *, int *);
 int sqlite3VdbeExec(Vdbe *);
 int sqlite3VdbeList(Vdbe *);

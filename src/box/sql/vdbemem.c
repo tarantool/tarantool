@@ -38,6 +38,7 @@
  */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "tarantoolInt.h"
 
 #ifdef SQLITE_DEBUG
 /*
@@ -965,7 +966,7 @@ vdbeMemFromBtreeResize(BtCursor * pCur,	/* Cursor pointing at record to retrieve
 	int rc;
 	pMem->flags = MEM_Null;
 	if (SQLITE_OK == (rc = sqlite3VdbeMemClearAndResize(pMem, amt + 2))) {
-		rc = sqlite3BtreePayload(pCur, offset, amt, pMem->z);
+		rc = sqlite3CursorPayload(pCur, offset, amt, pMem->z);
 		if (rc == SQLITE_OK) {
 			pMem->z[amt] = 0;
 			pMem->z[amt + 1] = 0;
@@ -989,13 +990,13 @@ sqlite3VdbeMemFromBtree(BtCursor * pCur,	/* Cursor pointing at record to retriev
 	u32 available = 0;	/* Number of bytes available on the local btree page */
 	int rc = SQLITE_OK;	/* Return code */
 
-	assert(sqlite3BtreeCursorIsValid(pCur));
+	assert(sqlite3CursorIsValid(pCur));
 	assert(!VdbeMemDynamic(pMem));
+	assert(pCur->curFlags & BTCF_TaCursor ||
+	       pCur->curFlags & BTCF_TEphemCursor);
 
-	/* Note: the calls to BtreeKeyFetch() and DataFetch() below assert()
-	 * that both the BtShared and database handle mutexes are held.
-	 */
-	zData = (char *)sqlite3BtreePayloadFetch(pCur, &available);
+
+	zData = (char *)tarantoolSqlite3PayloadFetch(pCur, &available);
 	assert(zData != 0);
 
 	if (offset + amt <= available) {

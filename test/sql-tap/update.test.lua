@@ -443,7 +443,7 @@ test:do_execsql_test("update-5.6.5", [[
 
 -- Repeat the previous sequence of tests with a different index.
 --
-test:execsql "PRAGMA synchronous='FULL'"
+--test:execsql "PRAGMA synchronous='FULL'"
 test:do_test("update-6.0", function()
   test:execsql "DROP INDEX idx1 ON test1"
   test:execsql "CREATE INDEX idx1 ON test1(f2)"

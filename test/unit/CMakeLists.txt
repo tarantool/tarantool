@@ -48,13 +48,6 @@ target_link_libraries(base64.test misc unit)
 add_executable(uuid.test uuid.c)
 target_link_libraries(uuid.test uuid unit)
 
-# Needed by SQL, which doesn't use mutexes
-add_definitions(-DTHREADSAFE=0)
-add_executable(sql-bitvec.test sql-bitvec.c ${CMAKE_SOURCE_DIR}/src/box/sql/bitvec.c
-        ${CMAKE_SOURCE_DIR}/src/box/sql/malloc.c
-        unit.c)
-target_link_libraries(sql-bitvec.test sql box)
-
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)
 add_executable(bps_tree_iterator.test bps_tree_iterator.cc)

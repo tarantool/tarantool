@@ -170,10 +170,10 @@ test:do_execsql_test(
 data = {
     {"a, b FROM t1", {}, {"A", "B", "a", "b"}},
     {"b, a FROM t1", {}, {"B", "A", "b", "a"}},
-    {"a, b, c FROM t1", {"hash"}, {"A", "B", "C", "a", "b", "c"}},
+    {"a, b, c FROM t1", {"btree"}, {"A", "B", "C", "a", "b", "c"}},
     {"a, b, c FROM t1 ORDER BY a, b, c", {"btree"}, {"A", "B", "C", "a", "b", "c"}},
     {"b FROM t1 WHERE a = 'a'", {}, {"b"}},
-    {"b FROM t1 ORDER BY +b COLLATE binary", {"btree", "hash"}, {"B", "b"}},
+    {"b FROM t1 ORDER BY +b COLLATE binary", {"btree", "btree"}, {"B", "b"}},
     {"a FROM t1", {}, {"A", "a"}},
     {"b COLLATE \"unicode_ci\" FROM t1", {}, {"b"}},
     {"b COLLATE \"unicode_ci\" FROM t1 ORDER BY b COLLATE \"unicode_ci\"", {}, {"b"}},

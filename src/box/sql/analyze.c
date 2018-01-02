@@ -1694,8 +1694,6 @@ sqlite3AnalysisLoad(sqlite3 * db)
 	char *zSql;
 	int rc = SQLITE_OK;
 
-	assert(db->mdb.pBt != 0);
-
 	/* Clear any prior statistics */
 	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {

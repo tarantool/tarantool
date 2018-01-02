@@ -265,17 +265,10 @@ sqlite3_initialize(void)
 		memset(&sqlite3BuiltinFunctions, 0,
 		       sizeof(sqlite3BuiltinFunctions));
 		sqlite3RegisterBuiltinFunctions();
-		if (sqlite3GlobalConfig.isPCacheInit == 0) {
-			rc = sqlite3PcacheInitialize();
-		}
 		if (rc == SQLITE_OK) {
-			sqlite3GlobalConfig.isPCacheInit = 1;
 			rc = sqlite3OsInit();
 		}
 		if (rc == SQLITE_OK) {
-			sqlite3PCacheBufferSetup(sqlite3GlobalConfig.pPage,
-						 sqlite3GlobalConfig.szPage,
-						 sqlite3GlobalConfig.nPage);
 			sqlite3GlobalConfig.isInit = 1;
 #ifdef SQLITE_EXTRA_INIT
 			bRunExtraInit = 1;
@@ -354,10 +347,6 @@ sqlite3_shutdown(void)
 #endif
 		sqlite3_os_end();
 		sqlite3GlobalConfig.isInit = 0;
-	}
-	if (sqlite3GlobalConfig.isPCacheInit) {
-		sqlite3PcacheShutdown();
-		sqlite3GlobalConfig.isPCacheInit = 0;
 	}
 	if (sqlite3GlobalConfig.isMallocInit) {
 		sqlite3MallocEnd();
@@ -497,63 +486,6 @@ sqlite3_config(int op, ...)
 			sqlite3GlobalConfig.pScratch = va_arg(ap, void *);
 			sqlite3GlobalConfig.szScratch = va_arg(ap, int);
 			sqlite3GlobalConfig.nScratch = va_arg(ap, int);
-			break;
-		}
-	case SQLITE_CONFIG_PAGECACHE:{
-			/* EVIDENCE-OF: R-18761-36601 There are three arguments to
-			 * SQLITE_CONFIG_PAGECACHE: A pointer to 8-byte aligned memory (pMem),
-			 * the size of each page cache line (sz), and the number of cache lines
-			 * (N).
-			 */
-			sqlite3GlobalConfig.pPage = va_arg(ap, void *);
-			sqlite3GlobalConfig.szPage = va_arg(ap, int);
-			sqlite3GlobalConfig.nPage = va_arg(ap, int);
-			break;
-		}
-	case SQLITE_CONFIG_PCACHE_HDRSZ:{
-			/* EVIDENCE-OF: R-39100-27317 The SQLITE_CONFIG_PCACHE_HDRSZ option takes
-			 * a single parameter which is a pointer to an integer and writes into
-			 * that integer the number of extra bytes per page required for each page
-			 * in SQLITE_CONFIG_PAGECACHE.
-			 */
-			*va_arg(ap, int *) =
-			    sqlite3HeaderSizeBtree() +
-			    sqlite3HeaderSizePcache() +
-			    sqlite3HeaderSizePcache1();
-			break;
-		}
-
-	case SQLITE_CONFIG_PCACHE:{
-			/* no-op */
-			break;
-		}
-	case SQLITE_CONFIG_GETPCACHE:{
-			/* now an error */
-			rc = SQLITE_ERROR;
-			break;
-		}
-
-	case SQLITE_CONFIG_PCACHE2:{
-			/* EVIDENCE-OF: R-63325-48378 The SQLITE_CONFIG_PCACHE2 option takes a
-			 * single argument which is a pointer to an sqlite3_pcache_methods2
-			 * object. This object specifies the interface to a custom page cache
-			 * implementation.
-			 */
-			sqlite3GlobalConfig.pcache2 =
-			    *va_arg(ap, sqlite3_pcache_methods2 *);
-			break;
-		}
-	case SQLITE_CONFIG_GETPCACHE2:{
-			/* EVIDENCE-OF: R-22035-46182 The SQLITE_CONFIG_GETPCACHE2 option takes a
-			 * single argument which is a pointer to an sqlite3_pcache_methods2
-			 * object. SQLite copies of the current page cache implementation into
-			 * that object.
-			 */
-			if (sqlite3GlobalConfig.pcache2.xInit == 0) {
-				sqlite3PCacheSetDefault();
-			}
-			*va_arg(ap, sqlite3_pcache_methods2 *) =
-			    sqlite3GlobalConfig.pcache2;
 			break;
 		}
 
@@ -798,14 +730,11 @@ sqlite3_db_mutex(sqlite3 * db)
 int
 sqlite3_db_release_memory(sqlite3 * db)
 {
+	(void)db;
 #ifdef SQLITE_ENABLE_API_ARMOR
 	if (!sqlite3SafetyCheckOk(db))
 		return SQLITE_MISUSE_BKPT;
 #endif
-	sqlite3_mutex_enter(db->mutex);
-	Btree *pBt MAYBE_UNUSED = db->mdb.pBt;
-	assert(pBt);
-	sqlite3_mutex_leave(db->mutex);
 	return SQLITE_OK;
 }
 
@@ -818,15 +747,11 @@ sqlite3_db_cacheflush(sqlite3 * db)
 {
 	int rc = SQLITE_OK;
 	int bSeenBusy = 0;
-
+	(void)db;
 #ifdef SQLITE_ENABLE_API_ARMOR
 	if (!sqlite3SafetyCheckOk(db))
 		return SQLITE_MISUSE_BKPT;
 #endif
-	sqlite3_mutex_enter(db->mutex);
-	Btree *pBt MAYBE_UNUSED = db->mdb.pBt;
-	assert(pBt);
-	sqlite3_mutex_leave(db->mutex);
 	return ((rc == SQLITE_OK && bSeenBusy) ? SQLITE_BUSY : rc);
 }
 
@@ -1048,30 +973,9 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 {
 	sqlite3 *db = pVdbe->db;
 	int inTrans = 0;
-	int schemaChange;
+	(void)tripCode;
 	struct session *user_session = current_session();
 	assert(sqlite3_mutex_held(db->mutex));
-	sqlite3BeginBenignMalloc();
-
-	/* Obtain all b-tree mutexes before making any calls to BtreeRollback().
-	 * This is important in case the transaction being rolled back has
-	 * modified the database schema. If the b-tree mutexes are not taken
-	 * here, then another shared-cache connection might sneak in between
-	 * the database rollback and schema reset, which can cause false
-	 * corruption reports in some cases.
-	 */
-	schemaChange = (user_session->sql_flags & SQLITE_InternChanges) != 0 &&
-	    db->init.busy == 0;
-
-	Btree *p = db->mdb.pBt;
-	assert(p);
-	if (p) {
-		if (sqlite3BtreeIsInTrans(p)) {
-			inTrans = 1;
-		}
-		sqlite3BtreeRollback(p, tripCode, !schemaChange);
-	}
-	sqlite3EndBenignMalloc();
 
 	if ((user_session->sql_flags & SQLITE_InternChanges) != 0
 	    && db->init.busy == 0) {
@@ -2419,7 +2323,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	int isThreadsafe;	/* True for threadsafe connections */
 	char *zOpen = 0;	/* Filename argument to pass to BtreeOpen() */
 	char *zErrMsg = 0;	/* Error message from sqlite3ParseUri() */
-	struct session *user_session = current_session();
 
 #ifdef SQLITE_ENABLE_API_ARMOR
 	if (ppDb == 0)
@@ -2527,24 +2430,7 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 		goto opendb_out;
 	}
 
-	/* Open the backend database driver */
-	rc = sqlite3BtreeOpen(db->pVfs, zOpen, db, &db->mdb.pBt, 0,
-			      user_session->sql_flags | SQLITE_OPEN_MAIN_DB);
-	if (rc != SQLITE_OK) {
-		if (rc == SQLITE_IOERR_NOMEM) {
-			rc = SQLITE_NOMEM_BKPT;
-		}
-		sqlite3Error(db, rc);
-		goto opendb_out;
-	}
-	db->mdb.pSchema = sqlite3SchemaGet(db, db->mdb.pBt);
-	db->mdb.pSchema = sqlite3SchemaGet(db, 0);
-
-	/* The default safety_level for the main database is FULL; for the temp
-	 * database it is OFF. This matches the pager layer defaults.
-	 */
-	db->mdb.safety_level = SQLITE_DEFAULT_SYNCHRONOUS + 1;
-
+	db->mdb.pSchema = sqlite3SchemaCreate(db);
 	db->magic = SQLITE_MAGIC_OPEN;
 	if (db->mallocFailed) {
 		goto opendb_out;
@@ -2604,16 +2490,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	if (!db->mallocFailed && rc == SQLITE_OK) {
 		rc = sqlite3Json1Init(db);
 	}
-#endif
-
-	/* -DSQLITE_DEFAULT_LOCKING_MODE=1 makes EXCLUSIVE the default locking
-	 * mode.  -DSQLITE_DEFAULT_LOCKING_MODE=0 make NORMAL the default locking
-	 * mode.  Doing nothing at all also makes NORMAL the default.
-	 */
-#ifdef SQLITE_DEFAULT_LOCKING_MODE
-	db->dfltLockMode = SQLITE_DEFAULT_LOCKING_MODE;
-	sqlite3PagerLockingMode(sqlite3BtreePager(db->aDb[0].pBt),
-				SQLITE_DEFAULT_LOCKING_MODE);
 #endif
 
 	if (rc)
@@ -2804,7 +2680,7 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 
 	/* Ensure the database schema has been loaded */
 	sqlite3_mutex_enter(db->mutex);
-	rc = sqlite3Init(db, &zErrMsg);
+	rc = sqlite3Init(db);
 	if (SQLITE_OK != rc) {
 		goto error_out;
 	}
@@ -2919,44 +2795,6 @@ sqlite3_extended_result_codes(sqlite3 * db, int onoff)
 }
 
 /*
- * Invoke the xFileControl method on a particular database.
- */
-int
-sqlite3_file_control(sqlite3 * db, int op, void *pArg)
-{
-	int rc = SQLITE_ERROR;
-	Btree *pBtree;
-
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db))
-		return SQLITE_MISUSE_BKPT;
-#endif
-	sqlite3_mutex_enter(db->mutex);
-	pBtree = db->mdb.pBt;
-	if (pBtree) {
-		Pager *pPager;
-		sqlite3_file *fd;
-		pPager = sqlite3BtreePager(pBtree);
-		assert(pPager != 0);
-		fd = sqlite3PagerFile(pPager);
-		assert(fd != 0);
-		if (op == SQLITE_FCNTL_FILE_POINTER) {
-			*(sqlite3_file **) pArg = fd;
-			rc = SQLITE_OK;
-		} else if (op == SQLITE_FCNTL_JOURNAL_POINTER) {
-			*(sqlite3_file **) pArg = sqlite3PagerJrnlFile(pPager);
-			rc = SQLITE_OK;
-		} else if (fd->pMethods) {
-			rc = sqlite3OsFileControl(fd, op, pArg);
-		} else {
-			rc = SQLITE_NOTFOUND;
-		}
-	}
-	sqlite3_mutex_leave(db->mutex);
-	return rc;
-}
-
-/*
  * Interface to the testing logic.
  */
 int
@@ -2995,21 +2833,6 @@ sqlite3_test_control(int op, ...)
 		 */
 	case SQLITE_TESTCTRL_PRNG_RESET:{
 			sqlite3_randomness(0, 0);
-			break;
-		}
-
-		/*
-		 *  sqlite3_test_control(BITVEC_TEST, size, program)
-		 *
-		 * Run a test against a Bitvec object of size.  The program argument
-		 * is an array of integers that defines the test.  Return -1 on a
-		 * memory allocation error, 0 on success, or non-zero for an error.
-		 * See the sqlite3BitvecBuiltinTest() for additional information.
-		 */
-	case SQLITE_TESTCTRL_BITVEC_TEST:{
-			int sz = va_arg(ap, int);
-			int *aProg = va_arg(ap, int *);
-			rc = sqlite3BitvecBuiltinTest(sz, aProg);
 			break;
 		}
 
@@ -3138,20 +2961,6 @@ sqlite3_test_control(int op, ...)
 	case SQLITE_TESTCTRL_BYTEORDER:{
 			rc = SQLITE_BYTEORDER * 100 + SQLITE_LITTLEENDIAN * 10 +
 			    SQLITE_BIGENDIAN;
-			break;
-		}
-
-		/*   sqlite3_test_control(SQLITE_TESTCTRL_RESERVE, sqlite3 *db, int N)
-		 *
-		 * Set the nReserve size to N for the main database on the database
-		 * connection db.
-		 */
-	case SQLITE_TESTCTRL_RESERVE:{
-			sqlite3 *db = va_arg(ap, sqlite3 *);
-			int x = va_arg(ap, int);
-			sqlite3_mutex_enter(db->mutex);
-			sqlite3BtreeSetPageSize(db->mdb.pBt, 0, x);
-			sqlite3_mutex_leave(db->mutex);
 			break;
 		}
 
@@ -3362,41 +3171,6 @@ sqlite3_uri_int64(const char *zFilename,	/* Filename as passed to xOpen */
 	return bDflt;
 }
 
-/*
- * Return the filename of the database associated with a database
- * connection.
- */
-const char *
-sqlite3_db_filename(sqlite3 * db)
-{
-	Btree *pBt;
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	pBt = db->mdb.pBt;
-	return pBt ? sqlite3BtreeGetFilename(pBt) : 0;
-}
-
-/*
- * Return 1 if database is read-only or 0 if read/write.  Return -1 if
- * no such database exists.
- */
-int
-sqlite3_db_readonly(sqlite3 * db)
-{
-	Btree *pBt;
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return -1;
-	}
-#endif
-	pBt = db->mdb.pBt;
-	return pBt ? sqlite3BtreeIsReadonly(pBt) : -1;
-}
 
 #ifdef SQLITE_ENABLE_SNAPSHOT
 /*

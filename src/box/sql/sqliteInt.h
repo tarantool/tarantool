@@ -421,17 +421,6 @@ void sqlite3Coverage(int);
 #endif
 
 /*
- * The "file format" number is an integer that is incremented whenever
- * the VDBE-level file format changes.  The following macros define the
- * the default file format for new databases and the maximum file format
- * that the library can read.
- */
-#define SQLITE_MAX_FILE_FORMAT 4
-#ifndef SQLITE_DEFAULT_FILE_FORMAT
-#define SQLITE_DEFAULT_FILE_FORMAT 4
-#endif
-
-/*
  * Determine whether triggers are recursive by default.  This can be
  * changed at run-time using a pragma.
  */
@@ -890,78 +879,25 @@ typedef struct With With;
 typedef int VList;
 
 /*
- * Defer sourcing vdbe.h and btree.h until after the "u8" and
+ * Defer sourcing vdbe.h and cursor.h until after the "u8" and
  * "BusyHandler" typedefs. vdbe.h also requires a few of the opaque
  * pointer types (i.e. FuncDef) defined above.
  */
-#include "btree.h"
+#include "cursor.h"
 #include "vdbe.h"
-#include "pager.h"
-#include "pcache.h"
 #include "os.h"
 #include "mutex.h"
 
-/* The SQLITE_EXTRA_DURABLE compile-time option used to set the default
- * synchronous setting to EXTRA.  It is no longer supported.
- */
-#ifdef SQLITE_EXTRA_DURABLE
-#warning Use SQLITE_DEFAULT_SYNCHRONOUS=3 instead of SQLITE_EXTRA_DURABLE
-#define SQLITE_DEFAULT_SYNCHRONOUS 3
-#endif
-
-/*
- * Default synchronous levels.
- *
- * Note that (for historcal reasons) the PAGER_SYNCHRONOUS_* macros differ
- * from the SQLITE_DEFAULT_SYNCHRONOUS value by 1.
- *
- *           PAGER_SYNCHRONOUS       DEFAULT_SYNCHRONOUS
- *   OFF           1                         0
- *   NORMAL        2                         1
- *   FULL          3                         2
- *   EXTRA         4                         3
- *
- * The "PRAGMA synchronous" statement also uses the zero-based numbers.
- * In other words, the zero-based numbers are used for all external interfaces
- * and the one-based values are used internally.
- */
-#ifndef SQLITE_DEFAULT_SYNCHRONOUS
-#define SQLITE_DEFAULT_SYNCHRONOUS (PAGER_SYNCHRONOUS_FULL-1)
-#endif
-#ifndef SQLITE_DEFAULT_WAL_SYNCHRONOUS
-#define SQLITE_DEFAULT_WAL_SYNCHRONOUS SQLITE_DEFAULT_SYNCHRONOUS
-#endif
-
 /*
  * Each database file to be accessed by the system is an instance
- * of the following structure.  There are normally two of these structures
- * in the sqlite.aDb[] array.  aDb[0] is the main database file and
- * aDb[1] is the database file used to hold temporary tables.  Additional
- * databases may be attached.
+ * of the following structure.
  */
 struct Db {
-	Btree *pBt;		/* The B*Tree structure for this database file */
-	u8 safety_level;	/* How aggressive at syncing data to disk */
-	u8 bSyncSet;		/* True if "PRAGMA synchronous=N" has been run */
 	Schema *pSchema;	/* Pointer to database schema (possibly shared) */
 };
 
 /*
  * An instance of the following structure stores a database schema.
- *
- * Most Schema objects are associated with a Btree.  The exception is
- * the Schema for the TEMP databaes (sqlite3.aDb[1]) which is free-standing.
- * In shared cache mode, a single Schema object can be shared by multiple
- * Btrees that refer to the same underlying BtShared object.
- *
- * Schema objects are automatically deallocated when the last Btree that
- * references them is destroyed.   The TEMP Schema is manually freed by
- * sqlite3_close().
-*
- * A thread must be holding a mutex on the corresponding Btree in order
- * to access Schema content.  This implies that the thread must also be
- * holding a mutex on the sqlite3 connection pointer that owns the Btree.
- * For a TEMP Schema, only the connection mutex is required.
  */
 struct Schema {
 	int schema_cookie;	/* Database schema version number for this file */
@@ -970,7 +906,6 @@ struct Schema {
 	Hash trigHash;		/* All triggers indexed by name */
 	Hash fkeyHash;		/* All foreign keys by referenced table name */
 	Table *pSeqTab;		/* The sqlite_sequence table used by AUTOINCREMENT */
-	u8 file_format;		/* Schema format version for this file */
 	u8 enc;			/* Text encoding used by this database */
 	u16 schemaFlags;	/* Flags associated with this schema */
 	int cache_size;		/* Number of pages to use in the cache */
@@ -2845,7 +2780,6 @@ struct Sqlite3Config {
 	int inProgress;		/* True while initialization in progress */
 	int isMutexInit;	/* True after mutexes are initialized */
 	int isMallocInit;	/* True after malloc is initialized */
-	int isPCacheInit;	/* True after malloc is initialized */
 	int nRefInitMutex;	/* Number of users of pInitMutex */
 	sqlite3_mutex *pInitMutex;	/* Mutex used by sqlite3_initialize() */
 	void (*xLog) (void *, int, const char *);	/* Function for logging */
@@ -3178,7 +3112,7 @@ void sqlite3ExprListSetName(Parse *, ExprList *, Token *, int);
 void sqlite3ExprListSetSpan(Parse *, ExprList *, ExprSpan *);
 void sqlite3ExprListDelete(sqlite3 *, ExprList *);
 u32 sqlite3ExprListFlags(const ExprList *);
-int sqlite3Init(sqlite3 *, char **);
+int sqlite3Init(sqlite3 *);
 int sqlite3InitCallback(void *, int, char **, char **);
 void sqlite3Pragma(Parse *, Token *, Token *, Token *, Token *, int);
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
@@ -3210,17 +3144,6 @@ int sqlite3ParseUri(const char *, const char *, unsigned int *,
 #define sqlite3FaultSim(X) SQLITE_OK
 #else
 int sqlite3FaultSim(int);
-#endif
-
-Bitvec *sqlite3BitvecCreate(u32);
-int sqlite3BitvecTest(Bitvec *, u32);
-int sqlite3BitvecTestNotNull(Bitvec *, u32);
-int sqlite3BitvecSet(Bitvec *, u32);
-void sqlite3BitvecClear(Bitvec *, u32, void *);
-void sqlite3BitvecDestroy(Bitvec *);
-u32 sqlite3BitvecSize(Bitvec *);
-#ifndef SQLITE_UNTESTABLE
-int sqlite3BitvecBuiltinTest(int, int *);
 #endif
 
 void sqlite3CreateView(Parse *, Token *, Token *, ExprList *, Select *, int);
@@ -3576,7 +3499,7 @@ void sqlite3DefaultRowEst(Index *);
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
 void sqlite3SchemaClear(void *);
-Schema *sqlite3SchemaGet(sqlite3 *, Btree *);
+Schema *sqlite3SchemaCreate(sqlite3 *);
 int sqlite3SchemaToIndex(sqlite3 * db, Schema *);
 KeyInfo *sqlite3KeyInfoAlloc(sqlite3 *, int, int);
 void sqlite3KeyInfoUnref(KeyInfo *);
@@ -3815,5 +3738,5 @@ void sqlite3VectorErrorMsg(Parse *, Expr *);
  */
 extern int sqlSubProgramsRemaining;
 
-extern int sqlite3InitDatabase(sqlite3 * db, char **pzErrMsg);
+extern int sqlite3InitDatabase(sqlite3 * db);
 #endif				/* SQLITEINT_H */

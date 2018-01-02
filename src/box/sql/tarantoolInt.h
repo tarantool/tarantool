@@ -66,7 +66,7 @@ int tarantoolSqlite3Previous(BtCursor * pCur, int *pRes);
 int tarantoolSqlite3MovetoUnpacked(BtCursor * pCur, UnpackedRecord * pIdxKey,
 				   int *pRes);
 int tarantoolSqlite3Count(BtCursor * pCur, i64 * pnEntry);
-int tarantoolSqlite3Insert(BtCursor * pCur, const BtreePayload * pX);
+int tarantoolSqlite3Insert(BtCursor * pCur, const CursorPayload * pX);
 int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
 int tarantoolSqlite3ClearTable(int iTable);
 
@@ -88,7 +88,7 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *zOldParentName,
 /* Interface for ephemeral tables. */
 int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count,
 				    struct coll *aColl);
-int tarantoolSqlite3EphemeralInsert(BtCursor * pCur, const BtreePayload * pX);
+int tarantoolSqlite3EphemeralInsert(BtCursor * pCur, const CursorPayload * pX);
 int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
 int tarantoolSqlite3EphemeralFirst(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralNext(BtCursor * pCur, int * pRes);

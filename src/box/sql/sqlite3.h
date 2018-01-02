@@ -1851,16 +1851,11 @@ struct sqlite3_mem_methods {
 #define SQLITE_CONFIG_GETMUTEX     11	/* sqlite3_mutex_methods* */
 /* previously SQLITE_CONFIG_CHUNKALLOC 12 which is now unused. */
 #define SQLITE_CONFIG_LOOKASIDE    13	/* int int */
-#define SQLITE_CONFIG_PCACHE       14	/* no-op */
-#define SQLITE_CONFIG_GETPCACHE    15	/* no-op */
 #define SQLITE_CONFIG_LOG          16	/* xFunc, void* */
 #define SQLITE_CONFIG_URI          17	/* int */
-#define SQLITE_CONFIG_PCACHE2      18	/* sqlite3_pcache_methods2* */
-#define SQLITE_CONFIG_GETPCACHE2   19	/* sqlite3_pcache_methods2* */
 #define SQLITE_CONFIG_COVERING_INDEX_SCAN 20	/* int */
 #define SQLITE_CONFIG_SQLLOG       21	/* xSqllog, void* */
 #define SQLITE_CONFIG_MMAP_SIZE    22	/* sqlite3_int64, sqlite3_int64 */
-#define SQLITE_CONFIG_PCACHE_HDRSZ        23	/* int *psz */
 #define SQLITE_CONFIG_PMASZ               24	/* unsigned int szPma */
 #define SQLITE_CONFIG_STMTJRNL_SPILL      25	/* int nByte */
 

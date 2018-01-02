@@ -213,7 +213,6 @@ void sqlite3VdbeVerifyNoResultRow(Vdbe * p);
 #endif
 VdbeOp *sqlite3VdbeAddOpList(Vdbe *, int nOp, VdbeOpList const *aOp,
 			     int iLineno);
-void sqlite3VdbeAddParseSchemaOp(Vdbe *, char *);
 void sqlite3VdbeAddParseSchema2Op(Vdbe * p, int, int);
 void sqlite3VdbeAddParseSchema3Op(Vdbe * p, int);
 void sqlite3VdbeAddRenameTableOp(Vdbe * p, int, char *);
@@ -228,7 +227,6 @@ int sqlite3VdbeDeletePriorOpcode(Vdbe *, u8 op);
 void sqlite3VdbeChangeP4(Vdbe *, int addr, const char *zP4, int N);
 void sqlite3VdbeAppendP4(Vdbe *, void *pP4, int p4type);
 void sqlite3VdbeSetP4KeyInfo(Parse *, Index *);
-void sqlite3VdbeUsesBtree(Vdbe *);
 VdbeOp *sqlite3VdbeGetOp(Vdbe *, int);
 int sqlite3VdbeMakeLabel(Vdbe *);
 void sqlite3VdbeRunOnlyOnce(Vdbe *);

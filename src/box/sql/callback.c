@@ -417,23 +417,15 @@ sqlite3SchemaClear(void *p)
 	}
 }
 
-/*
- * Find and return the schema associated with a BTree.  Create
- * a new one if necessary.
- */
+/* Create a brand new schema. */
 Schema *
-sqlite3SchemaGet(sqlite3 * db, Btree * pBt)
+sqlite3SchemaCreate(sqlite3 * db)
 {
 	Schema *p;
-	if (pBt) {
-		p = (Schema *) sqlite3BtreeSchema(pBt, sizeof(Schema),
-						  sqlite3SchemaClear);
-	} else {
-		p = (Schema *) sqlite3DbMallocZero(0, sizeof(Schema));
-	}
+	p = (Schema *) sqlite3DbMallocZero(0, sizeof(Schema));
 	if (!p) {
 		sqlite3OomFault(db);
-	} else if (0 == p->file_format) {
+	} else {
 		sqlite3HashInit(&p->tblHash);
 		sqlite3HashInit(&p->trigHash);
 		sqlite3HashInit(&p->fkeyHash);

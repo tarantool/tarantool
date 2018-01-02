@@ -38,7 +38,6 @@
 #include "fiber.h"
 #include "box/session.h"
 #include "sqliteInt.h"
-#include "btreeInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 
@@ -377,7 +376,6 @@ void
 sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iRec, int n)
 {
 	sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, 0);
-	sqlite3VdbeUsesBtree(p);
 }
 
 /*
@@ -387,14 +385,12 @@ void
 sqlite3VdbeAddParseSchema3Op(Vdbe * p, int iRec)
 {
 	sqlite3VdbeAddOp2(p, OP_ParseSchema3, iRec, 0);
-	sqlite3VdbeUsesBtree(p);
 }
 
 void
 sqlite3VdbeAddRenameTableOp(Vdbe * p, int iTab, char* zNewName)
 {
 	sqlite3VdbeAddOp4(p, OP_RenameTable, iTab, 0, 0, zNewName, P4_DYNAMIC);
-	sqlite3VdbeUsesBtree(p);
 }
 
 /*
@@ -699,13 +695,13 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 			case OP_Next:
 			case OP_NextIfOpen:
 			case OP_SorterNext:{
-					pOp->p4.xAdvance = sqlite3BtreeNext;
+					pOp->p4.xAdvance = sqlite3CursorNext;
 					pOp->p4type = P4_ADVANCE;
 					break;
 				}
 			case OP_Prev:
 			case OP_PrevIfOpen:{
-					pOp->p4.xAdvance = sqlite3BtreePrevious;
+					pOp->p4.xAdvance = sqlite3CursorPrevious;
 					pOp->p4type = P4_ADVANCE;
 					break;
 				}
@@ -724,7 +720,6 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 	pParse->aLabel = 0;
 	pParse->nLabel = 0;
 	*pMaxFuncArgs = nMaxArgs;
-	assert(p->bIsReader != 0 || DbMaskAllZero(p->btreeMask));
 }
 
 /*
@@ -787,9 +782,6 @@ sqlite3VdbeTakeOpArray(Vdbe * p, int *pnOp, int *pnMaxArg)
 {
 	VdbeOp *aOp = p->aOp;
 	assert(aOp && !p->db->mallocFailed);
-
-	/* Check that sqlite3VdbeUsesBtree() was not called on this VM */
-	assert(DbMaskAllZero(p->btreeMask));
 
 	resolveP2Values(p, pnMaxArg);
 	*pnOp = p->nOp;
@@ -1655,19 +1647,6 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 }
 #endif				/* VDBE_DISPLAY_P4 */
 
-/*
- * Declare to the Vdbe that the BTree object at db->mdb is used.
- *
- * The prepared statements need to know in advance the database
- * that will be use.  A mask of this database is maintained in p->btreeMask.
- * The p->lockMask value is the subset of p->btreeMask of databases that
- * will require a lock.
- */
-void
-sqlite3VdbeUsesBtree(Vdbe * p)
-{
-	DbMaskSet(p->btreeMask, 0);
-}
 
 #if defined(VDBE_PROFILE) || defined(SQLITE_DEBUG)
 /*
@@ -2114,7 +2093,6 @@ sqlite3VdbeRewind(Vdbe * p)
 	p->errorAction = OE_Abort;
 	p->nChange = 0;
 	p->cacheCtr = 1;
-	p->minWriteFileFormat = 255;
 	p->iStatement = 0;
 	p->nFkConstraint = 0;
 #ifdef VDBE_PROFILE
@@ -2252,22 +2230,14 @@ sqlite3VdbeFreeCursor(Vdbe * p, VdbeCursor * pCx)
 	if (pCx == 0) {
 		return;
 	}
-	assert(pCx->pBtx == 0 || pCx->eCurType == CURTYPE_BTREE);
 	switch (pCx->eCurType) {
 	case CURTYPE_SORTER:{
 			sqlite3VdbeSorterClose(p->db, pCx);
 			break;
 		}
-	case CURTYPE_BTREE:{
-			if (pCx->pBtx) {
-				sqlite3BtreeClose(pCx->pBtx);
-				/* The pCx->pCursor will be close automatically, if it exists, by
-				 * the call above.
-				 */
-			} else {
-				assert(pCx->uc.pCursor != 0);
-				sqlite3BtreeCloseCursor(pCx->uc.pCursor);
-			}
+	case CURTYPE_TARANTOOL:{
+		assert(pCx->uc.pCursor != 0);
+		sqlite3CloseCursor(pCx->uc.pCursor);
 			break;
 		}
 	}
@@ -2443,92 +2413,6 @@ sqlite3VdbeSetColName(Vdbe * p,			/* Vdbe being configured */
 	pColName = &(p->aColName[idx + var * p->nResColumn]);
 	rc = sqlite3VdbeMemSetStr(pColName, zName, -1, 1, xDel);
 	assert(rc != 0 || !zName || (pColName->flags & MEM_Term) != 0);
-	return rc;
-}
-
-/*
- * A read or write transaction may or may not be active on database handle
- * db. If a transaction is active, commit it. If there is a
- * write-transaction spanning more than one database file, this routine
- * takes care of the master journal trickery.
- */
-static int
-vdbeCommit(sqlite3 * db)
-{
-	int nTrans = 0;		/* Number of databases with an active write-transaction
-				 * that are candidates for a two-phase commit using a
-				 * master-journal
-				 */
-	int rc = SQLITE_OK;
-	int needXcommit = 0;
-
-	/* This loop determines (a) if the commit hook should be invoked and
-	 * (b) how many database files have open write transactions, not
-	 * including the temp database. (b) is important because if more than
-	 * one database file has an open write transaction, a master journal
-	 * file is required for an atomic commit.
-	 */
-	Btree *pBt = db->mdb.pBt;
-	if (sqlite3BtreeIsInTrans(pBt)) {
-		/* Whether or not a database might need a master journal depends upon
-		 * its journal mode (among other things).  This matrix determines which
-		 * journal modes use a master journal and which do not
-		 */
-		static const u8 aMJNeeded[] = {
-			/* DELETE   */ 1,
-			/* PERSIST   */ 1,
-			/* OFF       */ 0,
-			/* TRUNCATE  */ 1,
-			/* MEMORY    */ 0,
-			/* WAL       */ 0
-		};
-		Pager *pPager;	/* Pager associated with pBt */
-		needXcommit = 1;
-		pPager = sqlite3BtreePager(pBt);
-		if (db->mdb.safety_level != PAGER_SYNCHRONOUS_OFF
-		    && aMJNeeded[sqlite3PagerGetJournalMode(pPager)]
-		    ) {
-			nTrans++;
-		}
-		rc = sqlite3PagerExclusiveLock(pPager);
-	}
-	if (rc != SQLITE_OK) {
-		return rc;
-	}
-
-	/* If there are any write-transactions at all, invoke the commit hook */
-	if (needXcommit && db->xCommitCallback) {
-		rc = db->xCommitCallback(db->pCommitArg);
-		if (rc) {
-			return SQLITE_CONSTRAINT_COMMITHOOK;
-		}
-	}
-
-	/* The simple case - no more than one database file (not counting the
-	 * TEMP database) has a transaction active.   There is no need for the
-	 * master-journal.
-	 *
-	 * If the return value of sqlite3BtreeGetFilename() is a zero length
-	 * string, it means the main database is :memory: or a temp file.  In
-	 * that case we do not support atomic multi-file commits, so use the
-	 * simple case then too.
-	 */
-	if (0 == sqlite3Strlen30(sqlite3BtreeGetFilename(db->mdb.pBt))
-	    || nTrans <= 1) {
-		Btree *pBt = db->mdb.pBt;
-		if (pBt) {
-			rc = sqlite3BtreeCommitPhaseOne(pBt);
-		}
-
-		/* Do the commit only if database successfully complete phase 1.
-		 * If one of the BtreeCommitPhaseOne() calls fails, this indicates an
-		 * IO error while deleting or truncating a journal file. It is unlikely,
-		 * but could happen. In this case abandon processing and return the error.
-		 */
-		if (pBt) {
-			rc = sqlite3BtreeCommitPhaseTwo(pBt, 0);
-		}
-	}
 	return rc;
 }
 
@@ -2786,9 +2670,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					 * key constraints to hold up the transaction. This means a commit
 					 * is required.
 					 */
-					rc = vdbeCommit(db);
-					if (rc == SQLITE_OK)
-						rc = box_txn_commit() ==
+					rc = box_txn_commit() ==
 						    0 ? SQLITE_OK :
 						    SQLITE_TARANTOOL_ERROR;
 					closeCursorsAndFree(p);
@@ -3180,9 +3062,8 @@ handleDeferredMoveto(VdbeCursor * p)
 	extern int sql_search_count;
 #endif
 	assert(p->deferredMoveto);
-	assert(p->eCurType == CURTYPE_BTREE);
-	rc = sqlite3BtreeMovetoUnpacked(p->uc.pCursor, 0, p->movetoTarget, 0,
-					&res);
+	assert(p->eCurType == CURTYPE_TARANTOOL);
+	rc = sqlite3CursorMovetoUnpacked(p->uc.pCursor, 0, &res);
 	if (rc)
 		return rc;
 	if (res != 0)
@@ -3192,41 +3073,6 @@ handleDeferredMoveto(VdbeCursor * p)
 #endif
 	p->deferredMoveto = 0;
 	p->cacheStatus = CACHE_STALE;
-	return SQLITE_OK;
-}
-
-/*
- * Something has moved cursor "p" out of place.  Maybe the row it was
- * pointed to was deleted out from under it.  Or maybe the btree was
- * rebalanced.  Whatever the cause, try to restore "p" to the place it
- * is supposed to be pointing.  If the row was deleted out from under the
- * cursor, set the cursor to point to a NULL row.
- */
-static int SQLITE_NOINLINE
-handleMovedCursor(VdbeCursor * p)
-{
-	int isDifferentRow, rc;
-	assert(p->eCurType == CURTYPE_BTREE);
-	assert(p->uc.pCursor != 0);
-	assert(sqlite3BtreeCursorHasMoved(p->uc.pCursor));
-	rc = sqlite3BtreeCursorRestore(p->uc.pCursor, &isDifferentRow);
-	p->cacheStatus = CACHE_STALE;
-	if (isDifferentRow)
-		p->nullRow = 1;
-	return rc;
-}
-
-/*
- * Check to ensure that the cursor is valid.  Restore the cursor
- * if need be.  Return any I/O error from the restore operation.
- */
-int
-sqlite3VdbeCursorRestore(VdbeCursor * p)
-{
-	assert(p->eCurType == CURTYPE_BTREE);
-	if (sqlite3BtreeCursorHasMoved(p->uc.pCursor)) {
-		return handleMovedCursor(p);
-	}
 	return SQLITE_OK;
 }
 
@@ -3246,19 +3092,11 @@ sqlite3VdbeCursorRestore(VdbeCursor * p)
 int
 sqlite3VdbeCursorMoveto(VdbeCursor ** pp, int *piCol)
 {
+	(void)piCol;
 	VdbeCursor *p = *pp;
-	if (p->eCurType == CURTYPE_BTREE) {
+	if (p->eCurType == CURTYPE_TARANTOOL) {
 		if (p->deferredMoveto) {
-			int iMap;
-			if (p->aAltMap && (iMap = p->aAltMap[1 + *piCol]) > 0) {
-				*pp = p->pAltCursor;
-				*piCol = iMap - 1;
-				return SQLITE_OK;
-			}
 			return handleDeferredMoveto(p);
-		}
-		if (sqlite3BtreeCursorHasMoved(p->uc.pCursor)) {
-			return handleMovedCursor(p);
 		}
 	}
 	return SQLITE_OK;
@@ -4327,33 +4165,17 @@ sqlite3VdbeIdxKeyCompare(sqlite3 * db,			/* Database connection */
 			 UnpackedRecord * pUnpacked,	/* Unpacked version of key */
 			 int *res)			/* Write the comparison result here */
 {
-	i64 nCellKey = 0;
-	int rc;
+	(void)db;
 	BtCursor *pCur;
-	Mem m;
 
-	assert(pC->eCurType == CURTYPE_BTREE);
+	assert(pC->eCurType == CURTYPE_TARANTOOL);
 	pCur = pC->uc.pCursor;
-	assert(sqlite3BtreeCursorIsValid(pCur));
+	assert(sqlite3CursorIsValid(pCur));
 	if (pCur->curFlags & BTCF_TaCursor ||
 	    pCur->curFlags & BTCF_TEphemCursor) {
 		return tarantoolSqlite3IdxKeyCompare(pCur, pUnpacked, res);
 	}
-	nCellKey = sqlite3BtreePayloadSize(pCur);
-	/* nCellKey will always be between 0 and 0xffffffff because of the way
-	 * that btreeParseCellPtr() and sqlite3GetVarint32() are implemented
-	 */
-	if (nCellKey <= 0 || nCellKey > 0x7fffffff) {
-		*res = 0;
-		return SQLITE_CORRUPT_BKPT;
-	}
-	sqlite3VdbeMemInit(&m, db, 0);
-	rc = sqlite3VdbeMemFromBtree(pCur, 0, (u32) nCellKey, &m);
-	if (rc) {
-		return rc;
-	}
-	*res = sqlite3VdbeRecordCompareMsgpack(m.n, m.z, pUnpacked);
-	sqlite3VdbeMemRelease(&m);
+	unreachable();
 	return SQLITE_OK;
 }
 

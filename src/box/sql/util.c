@@ -67,7 +67,7 @@ sqlite3Coverage(int x)
  */
 #ifndef SQLITE_UNTESTABLE
 int
-sqlite3FaultSim(int iTest)
+   sqlite3FaultSim(int iTest)
 {
 	int (*xCallback) (int) = sqlite3GlobalConfig.xTestCallback;
 	return xCallback ? xCallback(iTest) : SQLITE_OK;
@@ -88,9 +88,7 @@ sqlite3IsNaN(double x)
 #if !SQLITE_HAVE_ISNAN && !HAVE_ISNAN
 	/*
 	 * Systems that support the isnan() library function should probably
-	 * make use of it by compiling with -DSQLITE_HAVE_ISNAN.  But we have
-	 * found that many systems do not have a working isnan() function so
-	 * this implementation is provided as an alternative.
+	 * make use
 	 *
 	 * This NaN test sometimes fails if compiled on GCC with -ffast-math.
 	 * On the other hand, the use of -ffast-math comes with the following
@@ -1149,7 +1147,6 @@ sqlite3GetVarint32(const unsigned char *p, u32 * v)
 	 * rare larger cases can be handled by the slower 64-bit varint
 	 * routine.
 	 */
-#if 1
 	{
 		u64 v64;
 		u8 n;
@@ -1164,54 +1161,6 @@ sqlite3GetVarint32(const unsigned char *p, u32 * v)
 		}
 		return n;
 	}
-
-#else
-	/* For following code (kept for historical record only) shows an
-	 * unrolling for the 3- and 4-byte varint cases.  This code is
-	 * slightly faster, but it is also larger and much harder to test.
-	 */
-	p++;
-	b = b << 14;
-	b |= *p;
-	/* b: p1<<14 | p3 (unmasked) */
-	if (!(b & 0x80)) {
-		/* Values between 2097152 and 268435455 */
-		b &= (0x7f << 14) | (0x7f);
-		a &= (0x7f << 14) | (0x7f);
-		a = a << 7;
-		*v = a | b;
-		return 4;
-	}
-
-	p++;
-	a = a << 14;
-	a |= *p;
-	/* a: p0<<28 | p2<<14 | p4 (unmasked) */
-	if (!(a & 0x80)) {
-		/* Values  between 268435456 and 34359738367 */
-		a &= SLOT_4_2_0;
-		b &= SLOT_4_2_0;
-		b = b << 7;
-		*v = a | b;
-		return 5;
-	}
-
-	/* We can only reach this point when reading a corrupt database
-	 * file.  In that case we are not in any hurry.  Use the (relatively
-	 * slow) general-purpose sqlite3GetVarint() routine to extract the
-	 * value.
-	 */
-	{
-		u64 v64;
-		u8 n;
-
-		p -= 4;
-		n = sqlite3GetVarint(p, &v64);
-		assert(n > 5 && n <= 9);
-		*v = (u32) v64;
-		return n;
-	}
-#endif
 }
 
 /*

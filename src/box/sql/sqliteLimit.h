@@ -160,59 +160,6 @@ enum {
 #define SQLITE_MAX_ATTACHED 10
 #endif
 
-/* Maximum page size.  The upper bound on this value is 65536.  This a limit
- * imposed by the use of 16-bit offsets within each page.
- *
- * Earlier versions of SQLite allowed the user to change this value at
- * compile time. This is no longer permitted, on the grounds that it creates
- * a library that is technically incompatible with an SQLite library
- * compiled with a different limit. If a process operating on a database
- * with a page-size of 65536 bytes crashes, then an instance of SQLite
- * compiled with the default page-size limit will not be able to rollback
- * the aborted transaction. This could lead to database corruption.
- */
-#ifdef SQLITE_MAX_PAGE_SIZE
-#undef SQLITE_MAX_PAGE_SIZE
-#endif
-#define SQLITE_MAX_PAGE_SIZE 65536
-
-/*
- * The default size of a database page.
- */
-#ifndef SQLITE_DEFAULT_PAGE_SIZE
-#define SQLITE_DEFAULT_PAGE_SIZE 4096
-#endif
-#if SQLITE_DEFAULT_PAGE_SIZE>SQLITE_MAX_PAGE_SIZE
-#undef SQLITE_DEFAULT_PAGE_SIZE
-#define SQLITE_DEFAULT_PAGE_SIZE SQLITE_MAX_PAGE_SIZE
-#endif
-
-/*
- * Ordinarily, if no value is explicitly provided, SQLite creates databases
- * with page size SQLITE_DEFAULT_PAGE_SIZE. However, based on certain
- * device characteristics (sector-size and atomic write() support),
- * SQLite may choose a larger value. This constant is the maximum value
- * SQLite will choose on its own.
- */
-#ifndef SQLITE_MAX_DEFAULT_PAGE_SIZE
-#define SQLITE_MAX_DEFAULT_PAGE_SIZE 8192
-#endif
-#if SQLITE_MAX_DEFAULT_PAGE_SIZE>SQLITE_MAX_PAGE_SIZE
-#undef SQLITE_MAX_DEFAULT_PAGE_SIZE
-#define SQLITE_MAX_DEFAULT_PAGE_SIZE SQLITE_MAX_PAGE_SIZE
-#endif
-
-/*
- * Maximum number of pages in one database file.
- *
- * This is really just the default value for the max_page_count pragma.
- * This value can be lowered (or raised) at run-time using that the
- * max_page_count macro.
- */
-#ifndef SQLITE_MAX_PAGE_COUNT
-#define SQLITE_MAX_PAGE_COUNT 1073741823
-#endif
-
 /*
  * Maximum length (in bytes) of the pattern in a LIKE or GLOB
  * operator.
