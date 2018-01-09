@@ -291,35 +291,39 @@ lbox_fiber_info(struct lua_State *L)
 }
 
 static int
-lua_fiber_run_f(va_list ap)
+lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 {
 	int result;
-	int coro_ref = va_arg(ap, int);
-	struct lua_State *L = va_arg(ap, struct lua_State *);
-
-	result = luaT_call(L, lua_gettop(L) - 1, 0);
+	struct lua_State *L = (struct lua_State *)
+		fiber_get_key(fiber(), FIBER_KEY_LUA_STACK);
+	int coro_ref = lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	result = luaT_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 
 	/* Destroy local storage */
 	int storage_ref = (int)(intptr_t)
 		fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
 	if (storage_ref > 0)
 		luaL_unref(L, LUA_REGISTRYINDEX, storage_ref);
-	luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	/*
+	 * If fiber is not joinable
+	 * We can unref child stack here,
+	 * otherwise we have to unref child stack in join
+	 */
+	if (fiber()->flags & FIBER_IS_JOINABLE)
+		lua_pushinteger(L, coro_ref);
+	else
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+
 	return result;
 }
 
 /**
- * Create, resume and detach a fiber
- * given the function and its arguments.
+ * Utility function for fiber.create and fiber.new
  */
-static int
-lbox_fiber_create(struct lua_State *L)
+static struct fiber *
+fiber_create(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1 || !lua_isfunction(L, 1))
-		luaL_error(L, "fiber.create(function, ...): bad arguments");
-	if (fiber_checkstack())
-		luaL_error(L, "fiber.create(): out of fiber stack");
-
 	struct lua_State *child_L = lua_newthread(L);
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -333,7 +337,45 @@ lbox_fiber_create(struct lua_State *L)
 	lua_xmove(L, child_L, lua_gettop(L));
 	/* XXX: 'fiber' is leaked if this throws a Lua error. */
 	lbox_pushfiber(L, f->fid);
-	fiber_start(f, coro_ref, child_L);
+	/* Pass coro_ref via lua stack so that we don't have to pass it
+	 * as an argument of fiber_run function.
+	 * No function will work with child_L until the function is called.
+	 * At that time we can pop coro_ref from stack
+	 */
+	lua_pushinteger(child_L, coro_ref);
+	fiber_set_key(f, FIBER_KEY_LUA_STACK, child_L);
+	return f;
+}
+
+/**
+ * Create, resume and detach a fiber
+ * given the function and its arguments.
+ */
+static int
+lbox_fiber_create(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1 || !lua_isfunction(L, 1))
+		luaL_error(L, "fiber.create(function, ...): bad arguments");
+	if (fiber_checkstack())
+		luaL_error(L, "fiber.create(): out of fiber stack");
+	struct fiber *f = fiber_create(L);
+	fiber_start(f);
+	return 1;
+}
+
+/**
+ * Create a fiber, schedule it for execution, but not invoke yet
+ */
+static int
+lbox_fiber_new(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1 || !lua_isfunction(L, 1))
+		luaL_error(L, "fiber.new(function, ...): bad arguments");
+	if (fiber_checkstack())
+		luaL_error(L, "fiber.new(): out of fiber stack");
+
+	struct fiber *f = fiber_create(L);
+	fiber_wakeup(f);
 	return 1;
 }
 
@@ -567,6 +609,55 @@ lbox_fiber_wakeup(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_fiber_join(struct lua_State *L)
+{
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	struct lua_State *child_L = fiber_get_key(fiber, FIBER_KEY_LUA_STACK);
+	fiber_join(fiber);
+	struct error *e = NULL;
+	int num_ret = 0;
+	int coro_ref = 0;
+	if (child_L != NULL) {
+		coro_ref = lua_tointeger(child_L, -1);
+		lua_pop(child_L, 1);
+	}
+	if (fiber->f_ret != 0) {
+		/*
+		 * After fiber_join the error of fiber being joined was moved to
+		 * current fiber diag so we have to get it from there.
+		 */
+		assert(!diag_is_empty(&fiber()->diag));
+		e = diag_last_error(&fiber()->diag);
+		lua_pushboolean(L, false);
+		luaT_pusherror(L, e);
+		diag_clear(&fiber()->diag);
+		num_ret = 1;
+	} else {
+		lua_pushboolean(L, true);
+		if (child_L != NULL) {
+			num_ret = lua_gettop(child_L);
+			lua_xmove(child_L, L, num_ret);
+		}
+	}
+	if (child_L != NULL)
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	return num_ret + 1;
+}
+
+static int
+lbox_fiber_set_joinable(struct lua_State *L)
+{
+
+	if (lua_gettop(L) != 2) {
+		luaL_error(L, "fiber.set_joinable(id, yesno): bad arguments");
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	bool yesno = lua_toboolean(L, 2);
+	fiber_set_joinable(fiber, yesno);
+	return 0;
+}
+
 static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
@@ -575,6 +666,8 @@ static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"testcancel", lbox_fiber_testcancel},
 	{"__serialize", lbox_fiber_serialize},
 	{"__tostring", lbox_fiber_tostring},
+	{"join", lbox_fiber_join},
+	{"set_joinable", lbox_fiber_set_joinable},
 	{"wakeup", lbox_fiber_wakeup},
 	{"__index", lbox_fiber_index},
 	{NULL, NULL}
@@ -589,9 +682,12 @@ static const struct luaL_Reg fiberlib[] = {
 	{"find", lbox_fiber_find},
 	{"kill", lbox_fiber_cancel},
 	{"wakeup", lbox_fiber_wakeup},
+	{"join", lbox_fiber_join},
+	{"set_joinable", lbox_fiber_set_joinable},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
 	{"create", lbox_fiber_create},
+	{"new", lbox_fiber_new},
 	{"status", lbox_fiber_status},
 	{"name", lbox_fiber_name},
 	{NULL, NULL}
