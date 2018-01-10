@@ -42,9 +42,6 @@ struct replica;
 struct tt_uuid;
 struct vclock;
 
-/** Network timeout */
-extern double relay_timeout;
-
 /**
  * Returns relay's vclock
  * @param relay relay

@@ -51,6 +51,8 @@ uint32_t instance_id = REPLICA_ID_NIL;
  */
 struct tt_uuid REPLICASET_UUID;
 
+double replication_timeout = 1.0; /* seconds */
+
 typedef rb_tree(struct replica) replicaset_t;
 rb_proto(, replicaset_, replicaset_t, struct replica)
 

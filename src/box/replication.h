@@ -90,6 +90,42 @@ extern "C" {
 
 struct gc_consumer;
 
+/**
+ * Network timeout. Determines how often master and slave exchange
+ * heartbeat messages. Set by box.cfg.replication_timeout.
+ */
+extern double replication_timeout;
+
+/**
+ * Wait for the given period of time before trying to reconnect
+ * to a master.
+ */
+static inline double
+replication_reconnect_timeout(void)
+{
+	return replication_timeout;
+}
+
+/**
+ * Disconnect a replica if no heartbeat message has been
+ * received from it within the given period.
+ */
+static inline double
+replication_disconnect_timeout(void)
+{
+	return replication_timeout * 4;
+}
+
+/**
+ * Fail box.cfg() if the quorum hasn't been assembled within
+ * the given period.
+ */
+static inline double
+replication_connect_quorum_timeout(void)
+{
+	return replication_reconnect_timeout() * 4;
+}
+
 void
 replication_init(void);
 

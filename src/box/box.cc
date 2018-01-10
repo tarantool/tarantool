@@ -103,12 +103,6 @@ static struct gc_consumer *backup_gc;
 static bool is_box_configured = false;
 static bool is_ro = true;
 
-/**
- * box.cfg{} will fail if one or more replicas can't be reached
- * within the given period.
- */
-static double replication_cfg_timeout = 1.0; /* seconds */
-
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
 
 /**
@@ -564,7 +558,7 @@ box_set_replication(void)
 
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_cfg_timeout,
+	box_sync_replication(replication_connect_quorum_timeout(),
 			     replication_connect_quorum);
 	/* Follow replica */
 	replicaset_follow();
@@ -573,8 +567,7 @@ box_set_replication(void)
 void
 box_set_replication_timeout(void)
 {
-	double timeout = box_check_replication_timeout();
-	replication_cfg_timeout = relay_timeout = applier_timeout = timeout;
+	replication_timeout = box_check_replication_timeout();
 }
 
 void

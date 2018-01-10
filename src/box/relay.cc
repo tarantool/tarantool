@@ -53,9 +53,6 @@
 #include "xstream.h"
 #include "wal.h"
 
-/** Network timeout */
-double relay_timeout;
-
 /**
  * Cbus message to send status updates from relay to tx thread.
  */
@@ -347,9 +344,6 @@ relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 	}
 }
 
-/* Count of replication_timeout periods to disconnect the client. */
-#define TIMEOUT_PERIODS 4
-
 /*
  * Relay reader fiber function.
  * Read xrow encoded vclocks sent by the replica.
@@ -368,7 +362,7 @@ relay_reader_f(va_list ap)
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
-						  TIMEOUT_PERIODS * relay_timeout);
+					replication_disconnect_timeout());
 			/* vclock is followed while decoding, zeroing it. */
 			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
@@ -424,7 +418,7 @@ relay_subscribe_f(va_list ap)
 	fiber_start(reader, relay, fiber());
 
 	while (!fiber_is_cancelled()) {
-		double timeout = relay_timeout;
+		double timeout = replication_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam != 0)
