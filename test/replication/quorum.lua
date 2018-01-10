@@ -11,7 +11,7 @@ end
 require('console').listen(os.getenv('ADMIN'))
 
 box.cfg({
-    replication_quorum = 2;
+    replication_connect_quorum = 2;
     replication_timeout = 0.05;
     replication = {
         instance_uri(1);

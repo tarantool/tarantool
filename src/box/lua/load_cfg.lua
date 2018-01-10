@@ -56,7 +56,7 @@ local default_cfg = {
     checkpoint_count    = 2,
     worker_pool_threads = 4,
     replication_timeout = 1,
-    replication_quorum  = nil
+    replication_connect_quorum = nil
 }
 
 -- types of available options
@@ -110,7 +110,7 @@ local template_cfg = {
     hot_standby         = 'boolean',
     worker_pool_threads = 'number',
     replication_timeout = 'number',
-    replication_quorum  = 'number',
+    replication_connect_quorum = 'number',
 }
 
 local function normalize_uri(port)
@@ -177,7 +177,7 @@ local dynamic_cfg = {
     end,
     force_recovery          = function() end,
     replication_timeout     = private.cfg_set_replication_timeout,
-    replication_quorum      = private.cfg_set_replication_quorum,
+    replication_connect_quorum = private.cfg_set_replication_connect_quorum,
 }
 
 local dynamic_cfg_skip_at_load = {
@@ -185,7 +185,7 @@ local dynamic_cfg_skip_at_load = {
     listen                  = true,
     replication             = true,
     replication_timeout     = true,
-    replication_quorum      = true,
+    replication_connect_quorum = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,

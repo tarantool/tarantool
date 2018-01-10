@@ -230,10 +230,10 @@ lbox_cfg_set_replication_timeout(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_replication_quorum(struct lua_State *L)
+lbox_cfg_set_replication_connect_quorum(struct lua_State *L)
 {
 	try {
-		box_set_replication_quorum();
+		box_set_replication_connect_quorum();
 	} catch (Exception *) {
 		luaT_error(L);
 	}
@@ -261,7 +261,8 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_vinyl_max_tuple_size", lbox_cfg_set_vinyl_max_tuple_size},
 		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
-		{"cfg_set_replication_quorum", lbox_cfg_set_replication_quorum},
+		{"cfg_set_replication_connect_quorum",
+			lbox_cfg_set_replication_connect_quorum},
 		{NULL, NULL}
 	};
 

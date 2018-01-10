@@ -14,7 +14,7 @@ test_run:cmd('switch test')
 
 -- Stop one master and try to restart the replica.
 -- It should successfully restart because it has
--- replication_quorum set to 2 (see quorum.lua)
+-- replication_connect_quorum set to 2 (see quorum.lua)
 -- and two other masters are still running.
 test_run:cmd('stop server autobootstrap_guest1')
 test_run:cmd('restart server test')
@@ -37,16 +37,16 @@ function cfg_replication(servers)
 end;
 test_run:cmd("setopt delimiter ''");
 
--- Set a stricter value for replication_quorum and
+-- Set a stricter value for replication_connect_quorum and
 -- check that replication configuration fails.
-box.cfg{replication_quorum = 3}
+box.cfg{replication_connect_quorum = 3}
 cfg_replication(SERVERS) -- fail
-box.cfg{replication_quorum = nil} -- default wait for all
+box.cfg{replication_connect_quorum = nil} -- default: wait for all
 cfg_replication(SERVERS) -- fail
 
 -- Lower replication quorum and check that replication
 -- configuration succeeds.
-box.cfg{replication_quorum = 2}
+box.cfg{replication_connect_quorum = 2}
 cfg_replication(SERVERS) -- success
 
 -- Start the master that was down and check that
