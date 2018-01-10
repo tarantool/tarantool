@@ -78,8 +78,7 @@ int tarantoolSqlite3ClearTable(int iTable);
 /* Rename table pTab with zNewName by inserting new tuple to _space.
  * SQL statement, which creates table with new name is saved in pzSqlStmt.
  */
-int tarantoolSqlite3RenameTable(int iTab, const char *zNewName, char *zSqlStmt,
-				uint32_t *pSqlStmtLen);
+int tarantoolSqlite3RenameTable(int iTab, const char *zNewName, char **zSqlStmt);
 
 /* Alter trigger statement after rename table. */
 int tarantoolSqlite3RenameTrigger(const char *zTriggerName,

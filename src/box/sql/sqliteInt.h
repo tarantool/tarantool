@@ -3489,6 +3489,10 @@ int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
 void sqlite3ColumnDefault(Vdbe *, Table *, int, int);
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
+char* rename_table(sqlite3 *, const char *, const char *, bool *);
+char* rename_parent_table(sqlite3 *, const char *, const char *, const char *,
+			  uint32_t *, uint32_t *);
+char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
 struct coll *sqlite3GetCollSeq(Parse *, sqlite3 *, struct coll *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);

@@ -4856,7 +4856,6 @@ case OP_RenameTable: {
 	InitData initData;
 	char *argv[4] = {NULL, NULL, NULL, NULL};
 	char *zSqlStmt;
-	uint32_t iSqlStmtLen;
 
 	space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
 	space = space_by_id(space_id);
@@ -4870,16 +4869,8 @@ case OP_RenameTable: {
 	zNewTableName = pOp->p4.z;
 	zOldTableName = sqlite3DbStrNDup(db, zOldTableName,
 					 sqlite3Strlen30(zOldTableName));
-
 	rc = tarantoolSqlite3RenameTable(pTab->tnum, zNewTableName,
-					 NULL, &iSqlStmtLen);
-	if (rc) goto abort_due_to_error;
-	zSqlStmt = sqlite3DbMallocZero(db, iSqlStmtLen);
-	if (!zSqlStmt) {
-		goto no_mem;
-	}
-	rc = tarantoolSqlite3RenameTable(pTab->tnum, zNewTableName,
-					 zSqlStmt, &iSqlStmtLen);
+					 &zSqlStmt);
 	if (rc) goto abort_due_to_error;
 
 	/* If it is parent table, all children statements should be updated. */

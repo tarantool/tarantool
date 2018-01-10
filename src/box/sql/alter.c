@@ -370,4 +370,222 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	sqlite3SrcListDelete(db, pSrc);
 	return;
 }
+
+/*
+ * This function implements part of the ALTER TABLE command.
+ * The first argument is the text of a CREATE TABLE or CREATE INDEX command.
+ * The second is a table name. The table name in the CREATE TABLE or
+ * CREATE INDEX statement is replaced with the second argument and
+ * the result returned. There is no need to deallocate returned memory, since
+ * it will be doe automatically by VDBE. Note that new statement always
+ * contains quoted new table name.
+ *
+ * Examples:
+ *
+ * sqlite_rename_table('CREATE TABLE abc(a, b, c)', 'def')
+ *     -> 'CREATE TABLE "def"(a, b, c)'
+ *
+ * sqlite_rename_table('CREATE INDEX i ON abc(a)', 'def')
+ *     -> 'CREATE INDEX i ON "def"(a, b, c)'
+ *
+ * @param sql_stmt text of a CREATE TABLE or CREATE INDEX statement
+ * @param table_name new table name
+ * @param[out] is_quoted true if statement to be modified contains quoted name
+ *
+ * @retval new SQL statement on success, NULL otherwise.
+ */
+char*
+rename_table(sqlite3 *db, const char *sql_stmt, const char *table_name,
+	     bool *is_quoted)
+{
+	assert(sql_stmt);
+	assert(table_name);
+	assert(is_quoted);
+
+	int token;
+	Token old_name;
+	unsigned char const *csr = (unsigned const char *)sql_stmt;
+	int len = 0;
+	char *new_sql_stmt;
+	bool unused;
+
+	/* The principle used to locate the table name in the CREATE TABLE
+	 * statement is that the table name is the first non-space token that
+	 * is immediately followed by a TK_LP or TK_USING token.
+	 */
+	do {
+		if (!*csr) {
+			/* Ran out of input before finding a bracket. */
+			return NULL;
+		}
+		/* Store the token that zCsr points to in tname. */
+		old_name.z = (char *)csr;
+		old_name.n = len;
+		/* Advance zCsr to the next token.
+		 * Store that token type in 'token', and its length
+		 * in 'len' (to be used next iteration of this loop).
+		 */
+		do {
+			csr += len;
+			len = sqlite3GetToken(csr, &token, &unused);
+		} while (token == TK_SPACE);
+		assert(len > 0);
+	} while (token != TK_LP && token != TK_USING);
+
+	if (*old_name.z == '"')
+		*is_quoted = true;
+	/* No need to care about deallocating zRet, since its memory
+	 * will be automatically freed by VDBE.
+	 */
+	new_sql_stmt = sqlite3MPrintf(db, "%.*s\"%w\"%s",
+				      (int)((old_name.z) - sql_stmt), sql_stmt,
+				      table_name, old_name.z + old_name.n);
+	return new_sql_stmt;
+}
+
+/*
+ * This function is used by the ALTER TABLE ... RENAME command to modify the
+ * definition of any foreign key constraints that used the table being renamed
+ * as the parent table. All substituted occurrences will be quoted.
+ * It returns the new CREATE TABLE statement. Memory for the new statement
+ * will be automatically freed by VDBE.
+ *
+ * Usage example:
+ *
+ *   sqlite_rename_parent('CREATE TABLE t1(a REFERENCES t2)', 't2', 't3')
+ *       -> 'CREATE TABLE t1(a REFERENCES "t3")'
+ *
+ * @param sql_stmt text of a child CREATE TABLE statement being modified
+ * @param old_name old name of the table being renamed
+ * @param new_name new name of the table being renamed
+ * @param[out] numb_of_occurrences number of occurrences of old_name in sql_stmt
+ * @param[out] numb_of_unquoted number of unquoted occurrences of old_name
+ *
+ * @retval new SQL statement on success, empty string otherwise.
+ */
+char*
+rename_parent_table(sqlite3 *db, const char *sql_stmt, const char *old_name,
+		    const char *new_name, uint32_t *numb_of_occurrences,
+		    uint32_t *numb_of_unquoted)
+{
+	assert(sql_stmt);
+	assert(old_name);
+	assert(new_name);
+	assert(numb_of_occurrences);
+	assert(numb_of_unquoted);
+
+	char *output = NULL;
+	char *new_sql_stmt;
+	const char *csr;	/* Pointer to token */
+	int n;		/* Length of token z */
+	int token;	/* Type of token */
+	bool unused;
+	bool is_quoted;
+
+	for (csr = sql_stmt; *csr; csr = csr + n) {
+		n = sqlite3GetToken((const unsigned char *)csr, &token, &unused);
+		if (token == TK_REFERENCES) {
+			char *zParent;
+			do {
+				csr += n;
+				n = sqlite3GetToken((const unsigned char *)csr,
+						    &token, &unused);
+			} while (token == TK_SPACE);
+			if (token == TK_ILLEGAL)
+				break;
+			zParent = sqlite3DbStrNDup(db, csr, n);
+			if (zParent == 0)
+				break;
+			is_quoted = *zParent == '"' ? true : false;
+			sqlite3NormalizeName(zParent);
+			if (0 == strcmp(old_name, zParent)) {
+				(*numb_of_occurrences)++;
+				if (!is_quoted)
+					(*numb_of_unquoted)++;
+				char *zOut = sqlite3MPrintf(db, "%s%.*s\"%w\"",
+							    (output ? output : ""),
+							    (int)((char*)csr - sql_stmt),
+							    sql_stmt, new_name);
+				sqlite3DbFree(db, output);
+				output = zOut;
+				sql_stmt = &csr[n];
+			}
+			sqlite3DbFree(db, zParent);
+		}
+	}
+
+	new_sql_stmt = sqlite3MPrintf(db, "%s%s", (output ? output : ""), sql_stmt);
+	sqlite3DbFree(db, output);
+	return new_sql_stmt;
+}
+
+/* This function is used to implement the ALTER TABLE command.
+ * The table name in the CREATE TRIGGER statement is replaced with the third
+ * argument and the result returned. This is analagous to rename_table()
+ * above, except for CREATE TRIGGER, not CREATE INDEX and CREATE TABLE.
+ */
+char*
+rename_trigger(sqlite3 *db, char const *sql_stmt, char const *table_name,
+	       bool *is_quoted)
+{
+	assert(sql_stmt);
+	assert(table_name);
+	assert(is_quoted);
+
+	int token;
+	Token tname;
+	int dist = 3;
+	unsigned char const *csr = (unsigned char const*)sql_stmt;
+	int len = 0;
+	char *new_sql_stmt;
+	bool unused;
+
+	/* The principle used to locate the table name in the CREATE TRIGGER
+	 * statement is that the table name is the first token that is immediately
+	 * preceded by either TK_ON or TK_DOT and immediately followed by one
+	 * of TK_WHEN, TK_BEGIN or TK_FOR.
+	 */
+	do {
+		if (!*csr) {
+			/* Ran out of input before finding the table name. */
+			return NULL;
+		}
+		/* Store the token that csr points to in tname. */
+		tname.z = (char *) csr;
+		tname.n = len;
+		/* Advance zCsr to the next token. Store that token type in 'token',
+		 * and its length in 'len' (to be used next iteration of this loop).
+		 */
+		do {
+			csr += len;
+			len = sqlite3GetToken(csr, &token, &unused);
+		} while (token == TK_SPACE);
+		assert(len > 0);
+		/* Variable 'dist' stores the number of tokens read since the most
+		 * recent TK_ON. This means that when a WHEN, FOR or BEGIN
+		 * token is read and 'dist' equals 2, the condition stated above
+		 * to be met.
+		 *
+		 * Note that ON cannot be a table or column name, so
+		 * there is no need to worry about syntax like
+		 * "CREATE TRIGGER ... ON ON BEGIN ..." etc.
+		 */
+		dist++;
+		if (token == TK_ON) {
+			dist = 0;
+		}
+	} while (dist != 2 ||
+		 (token != TK_WHEN && token != TK_FOR && token != TK_BEGIN));
+
+	if (*tname.z  == '"')
+		*is_quoted = true;
+	/* Variable tname now contains the token that is the old table-name
+	 * in the CREATE TRIGGER statement.
+	 */
+	new_sql_stmt = sqlite3MPrintf(db, "%.*s\"%w\"%s",
+				      (int)((tname.z) - sql_stmt), sql_stmt,
+				      table_name, tname.z + tname.n);
+	return new_sql_stmt;
+}
+
 #endif				/* SQLITE_ALTER_TABLE */
