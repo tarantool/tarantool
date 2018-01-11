@@ -345,7 +345,7 @@ end
 local function client_handler(client, peer)
     session_internal.create(client:fd(), "console")
     session_internal.run_on_connect()
-    session_internal.run_on_auth(box.session.user())
+    session_internal.run_on_auth(box.session.user(), true)
     local state = setmetatable({
         running = true;
         read = client_read;

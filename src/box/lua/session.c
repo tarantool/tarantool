@@ -281,8 +281,10 @@ lbox_push_on_connect_event(struct lua_State *L, void *event)
 static int
 lbox_push_on_auth_event(struct lua_State *L, void *event)
 {
-	lua_pushstring(L, (const char *)event);
-	return 1;
+	struct on_auth_trigger_ctx *ctx = (struct on_auth_trigger_ctx *) event;
+	lua_pushstring(L, ctx->username);
+	lua_pushboolean(L, ctx->is_authenticated);
+	return 2;
 }
 
 static int
@@ -327,8 +329,17 @@ lbox_session_on_auth(struct lua_State *L)
 static int
 lbox_session_run_on_auth(struct lua_State *L)
 {
-	const char *username = luaL_optstring(L, 1, "");
-	if (session_run_on_auth_triggers(username) != 0)
+	struct on_auth_trigger_ctx ctx;
+	ctx.username = luaL_optstring(L, 1, "");
+	/*
+	 * In earlier versions of tarantool on_auth trigger
+	 * was not invoked on authentication failure and the
+	 * second argument was missing.
+	 */
+	assert(lua_isboolean(L, 2));
+	ctx.is_authenticated = lua_toboolean(L, 2);
+
+	if (session_run_on_auth_triggers(&ctx) != 0)
 		return luaT_error(L);
 	return 0;
 }
