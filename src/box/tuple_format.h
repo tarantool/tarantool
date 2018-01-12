@@ -101,6 +101,18 @@ struct tuple_field {
 };
 
 /**
+ * Get is_nullable property of tuple_field.
+ * @param tuple_field for which attribute is being fetched
+ *
+ * @retval boolean nullability attribute
+ */
+static inline bool
+tuple_field_is_nullable(const struct tuple_field *tuple_field)
+{
+	return tuple_field->is_nullable;
+}
+
+/**
  * @brief Tuple format
  * Tuple format describes how tuple is stored and information about its fields
  */

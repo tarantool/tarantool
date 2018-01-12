@@ -140,7 +140,7 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 	for (; i < defined_field_count; ++i, ++field) {
 		if (key_mp_type_validate(field->type, mp_typeof(*tuple),
 					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE,
-					 field->is_nullable))
+					 tuple_field_is_nullable(field)))
 			return -1;
 		mp_next(&tuple);
 	}

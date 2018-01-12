@@ -162,7 +162,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts)
 		struct key_part_def *part_def = &parts[i];
 		part_def->fieldno = part->fieldno;
 		part_def->type = part->type;
-		part_def->is_nullable = part->is_nullable;
+		part_def->is_nullable = key_part_is_nullable(part);
 		part_def->coll_id = (part->coll != NULL ?
 				     part->coll->id : COLL_NONE);
 	}
@@ -205,9 +205,9 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 		if (part1->coll != part2->coll)
 			return (uintptr_t) part1->coll <
 			       (uintptr_t) part2->coll ? -1 : 1;
-		if (part1->is_nullable != part2->is_nullable)
-			return part1->is_nullable <
-			       part2->is_nullable ? -1 : 1;
+		if (key_part_is_nullable(part1) != key_part_is_nullable(part2))
+			return key_part_is_nullable(part1) <
+			       key_part_is_nullable(part2) ? -1 : 1;
 	}
 	return part_count1 < part_count2 ? -1 : part_count1 > part_count2;
 }
@@ -229,7 +229,7 @@ key_part_check_compatibility(const struct key_part *old_parts,
 			return false;
 		if (old_part->coll != new_part->coll)
 			return false;
-		if (old_part->is_nullable != new_part->is_nullable)
+		if (key_part_is_nullable(old_part) != key_part_is_nullable(new_part))
 			return false;
 	}
 	return true;
@@ -489,7 +489,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	end = part + first->part_count;
 	for (; part != end; part++) {
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->is_nullable, part->coll);
+				 key_part_is_nullable(part), part->coll);
 	}
 
 	/* Set-append second key def's part to the new key def. */
@@ -499,7 +499,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		if (key_def_find(first, part->fieldno))
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->is_nullable, part->coll);
+				 key_part_is_nullable(part), part->coll);
 	}
 	return new_def;
 }
@@ -514,7 +514,8 @@ key_validate_parts(const struct key_def *key_def, const char *key,
 		mp_next(&key);
 
 		if (key_mp_type_validate(part->type, mp_type, ER_KEY_PART_TYPE,
-					 i, part->is_nullable && allow_nullable))
+					 i, key_part_is_nullable(part)
+					 && allow_nullable))
 			return -1;
 	}
 	return 0;

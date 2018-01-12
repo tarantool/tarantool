@@ -77,6 +77,17 @@ struct key_part {
 struct key_def;
 struct tuple;
 
+/**
+ * Get is_nullable property of key_part.
+ * @param key_part for which attribute is being fetched
+ *
+ * @retval boolean nullability attribute
+ */
+static inline bool
+key_part_is_nullable(const struct key_part *part) {
+	return part->is_nullable;
+}
+
 /** @copydoc tuple_compare_with_key() */
 typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
 					const char *key,

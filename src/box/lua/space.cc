@@ -256,7 +256,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_pushnumber(L, part->fieldno + TUPLE_INDEX_BASE);
 			lua_setfield(L, -2, "fieldno");
 
-			lua_pushboolean(L, part->is_nullable);
+			lua_pushboolean(L, key_part_is_nullable(part));
 			lua_setfield(L, -2, "is_nullable");
 
 			if (part->coll != NULL) {
