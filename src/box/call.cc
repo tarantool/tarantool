@@ -79,12 +79,12 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 		struct user *user = user_find(credentials->uid);
 		if (user != NULL) {
 			if (!(access & credentials->universal_access)) {
-				diag_set(ClientError, ER_ACCESS_DENIED,
+				diag_set(AccessDeniedError,
 					 priv_name(PRIV_U),
 					 schema_object_name(SC_UNIVERSE), "",
 					 user->def->name);
 			} else {
-				diag_set(ClientError, ER_ACCESS_DENIED,
+				diag_set(AccessDeniedError,
 					 priv_name(PRIV_X),
 					 schema_object_name(SC_FUNCTION),
 					 tt_cstr(name, name_len),

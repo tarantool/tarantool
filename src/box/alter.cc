@@ -78,13 +78,13 @@ access_check_ddl(const char *name, uint32_t owner_uid,
 	if (access || (owner_uid != cr->uid && cr->uid != ADMIN)) {
 		struct user *user = user_find_xc(cr->uid);
 		if (access) {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(PRIV_U),
 				  schema_object_name(SC_UNIVERSE),
 				  "",
 				  user->def->name);
 		} else {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(type),
 				  name,
@@ -907,7 +907,8 @@ ModifySpace::~ModifySpace() {
 
 /** DropIndex - remove an index from space. */
 
-class DropIndex: public AlterSpaceOp {
+class DropIndex: public AlterSpaceOp
+{
 public:
 	DropIndex(struct alter_space *alter, struct index_def *def_arg)
 		:AlterSpaceOp(alter), old_index_def(def_arg) {}
@@ -1059,7 +1060,8 @@ ModifyIndex::~ModifyIndex()
 }
 
 /** CreateIndex - add a new index to the space. */
-class CreateIndex: public AlterSpaceOp {
+class CreateIndex: public AlterSpaceOp
+{
 public:
 	CreateIndex(struct alter_space *alter)
 		:AlterSpaceOp(alter),
@@ -1135,7 +1137,8 @@ CreateIndex::~CreateIndex()
  * from by reading the primary key. Used when key_def of
  * an index is changed.
  */
-class RebuildIndex: public AlterSpaceOp {
+class RebuildIndex: public AlterSpaceOp
+{
 public:
 	RebuildIndex(struct alter_space *alter,
 		     struct index_def *new_index_def_arg,
@@ -2338,7 +2341,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
 		if (grantor->def->uid != ADMIN) {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_UNIVERSE),
 				  name,
@@ -2350,7 +2353,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		struct space *space = space_cache_find_xc(priv->object_id);
 		if (space->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_SPACE), name,
 				  grantor->def->name);
@@ -2362,7 +2365,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		struct func *func = func_cache_find(priv->object_id);
 		if (func->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_FUNCTION), name,
 				  grantor->def->name);
@@ -2374,7 +2377,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		struct sequence *seq = sequence_cache_find(priv->object_id);
 		if (seq->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_SEQUENCE), name,
 				  grantor->def->name);
@@ -2396,7 +2399,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		if (role->def->owner != grantor->def->uid &&
 		    grantor->def->uid != ADMIN &&
 		    (role->def->uid != PUBLIC || priv->access < PRIV_X)) {
-			tnt_raise(ClientError, ER_ACCESS_DENIED,
+			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_ROLE), name,
 				  grantor->def->name);;

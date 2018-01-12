@@ -256,13 +256,12 @@ access_check_sequence(struct sequence *seq)
 		struct user *user = user_find(cr->uid);
 		if (user != NULL) {
 			if (!(cr->universal_access & PRIV_U)) {
-				diag_set(ClientError, ER_ACCESS_DENIED,
+				diag_set(AccessDeniedError,
 					 priv_name(PRIV_U),
 					 schema_object_name(SC_UNIVERSE), "",
 					 user->def->name);
 			} else {
-				diag_set(ClientError,
-					 ER_ACCESS_DENIED,
+				diag_set(AccessDeniedError,
 					 priv_name(access),
 					 schema_object_name(SC_SEQUENCE),
 					 seq->def->name, user->def->name);

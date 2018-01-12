@@ -219,4 +219,21 @@ extern struct rlist on_alter_space;
  */
 extern struct rlist on_alter_sequence;
 
+/**
+ * Triggers fired after access denied error is created.
+ */
+extern struct rlist on_access_denied;
+
+/**
+ * Context passed to on_access_denied trigger.
+ */
+struct on_access_denied_ctx {
+	/** Type of declined access */
+	const char *access_type;
+	/** Type of object the required access was denied to */
+	const char *object_type;
+	/** Name of object the required access was denied to */
+	const char *object_name;
+};
+
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

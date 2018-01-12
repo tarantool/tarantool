@@ -40,6 +40,7 @@
 #include "box/box.h"
 #include "box/session.h"
 #include "box/user.h"
+#include "box/schema.h"
 
 static const char *sessionlib_name = "box.session";
 
@@ -344,6 +345,27 @@ lbox_session_run_on_auth(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_push_on_access_denied_event(struct lua_State *L, void *event)
+{
+	struct on_access_denied_ctx *ctx = (struct on_access_denied_ctx *) event;
+	lua_pushstring(L, ctx->access_type);
+	lua_pushstring(L, ctx->object_type);
+	lua_pushstring(L, ctx->object_name);
+	return 3;
+}
+
+/**
+ * Sets trigger on_access_denied.
+ * For test purposes only.
+ */
+static int
+lbox_session_on_access_denied(struct lua_State *L)
+{
+	return lbox_trigger_reset(L, 2, &on_access_denied,
+				  lbox_push_on_access_denied_event);
+}
+
 void
 session_storage_cleanup(int sid)
 {
@@ -403,6 +425,7 @@ box_lua_session_init(struct lua_State *L)
 		{"on_connect", lbox_session_on_connect},
 		{"on_disconnect", lbox_session_on_disconnect},
 		{"on_auth", lbox_session_on_auth},
+		{"on_access_denied", lbox_session_on_access_denied},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, sessionlib_name, sessionlib);

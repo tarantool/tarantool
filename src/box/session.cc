@@ -241,7 +241,7 @@ access_check_session(struct user *user)
 	 * as current_user is not assigned yet
 	 */
 	if (!(universe.access[user->auth_token].effective & PRIV_S)) {
-		diag_set(ClientError, ER_ACCESS_DENIED, priv_name(PRIV_S),
+		diag_set(AccessDeniedError, priv_name(PRIV_S),
 			 schema_object_name(SC_UNIVERSE), "",
 			 user->def->name);
 		return -1;
@@ -271,7 +271,7 @@ access_check_universe(user_access_t access)
 		struct user *user = user_find_xc(credentials->uid);
 		int denied_access = access & ((credentials->universal_access
 					       & access) ^ access);
-		tnt_raise(ClientError, ER_ACCESS_DENIED,
+		tnt_raise(AccessDeniedError,
 			 priv_name(denied_access),
 			 schema_object_name(SC_UNIVERSE), "",
 			 user->def->name);

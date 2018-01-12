@@ -99,17 +99,23 @@ static struct method_info clienterror_methods[] = {
 const struct type_info type_ClientError =
 	make_type("ClientError", &type_Exception, clienterror_methods);
 
-ClientError::ClientError(const char *file, unsigned line,
-			 uint32_t errcode, ...)
-	: Exception(&type_ClientError, file, line)
+ClientError::ClientError(const type_info *type, const char *file, unsigned line,
+			 uint32_t errcode)
+	:Exception(type, file, line)
 {
 	m_errcode = errcode;
+	if (rmean_error)
+		rmean_collect(rmean_error, RMEAN_ERROR, 1);
+}
+
+ClientError::ClientError(const char *file, unsigned line,
+			 uint32_t errcode, ...)
+	:ClientError(&type_ClientError, file, line, errcode)
+{
 	va_list ap;
 	va_start(ap, errcode);
 	error_vformat_msg(this, tnt_errcode_desc(m_errcode), ap);
 	va_end(ap);
-	if (rmean_error)
-		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
 
 struct error *
@@ -165,3 +171,57 @@ BuildXlogError(const char *file, unsigned line, const char *format, ...)
 	}
 }
 
+#include "schema.h"
+#include "trigger.h"
+
+struct rlist on_access_denied = RLIST_HEAD_INITIALIZER(on_access_denied);
+
+static struct method_info accessdeniederror_methods[] = {
+	make_method(&type_AccessDeniedError, "access_type", &AccessDeniedError::access_type),
+	make_method(&type_AccessDeniedError, "object_type", &AccessDeniedError::object_type),
+	make_method(&type_AccessDeniedError, "object_name", &AccessDeniedError::object_name),
+	METHODS_SENTINEL
+};
+
+const struct type_info type_AccessDeniedError =
+	make_type("AccessDeniedError", &type_ClientError,
+		  accessdeniederror_methods);
+
+AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
+				     const char *access_type,
+				     const char *object_type,
+				     const char *object_name,
+				     const char *user_name)
+	:ClientError(&type_AccessDeniedError, file, line, ER_ACCESS_DENIED)
+{
+	error_format_msg(this, tnt_errcode_desc(m_errcode),
+			 access_type, object_type, object_name, user_name);
+
+	struct on_access_denied_ctx ctx = {access_type, object_type, object_name};
+	trigger_run(&on_access_denied, (void *) &ctx);
+	/*
+	 * We want to use ctx parameters as error parameters
+	 * later, so we have to alloc space for it.
+	 * As m_access_type and m_object_type are constant
+	 * literals they are statically  allocated. We must copy
+	 * only m_object_name.
+	 */
+	m_object_type = object_type;
+	m_access_type = access_type;
+	m_object_name = strdup(object_name);
+}
+
+struct error *
+BuildAccessDeniedError(const char *file, unsigned int line,
+		       const char *access_type, const char *object_type,
+		       const char *object_name,
+		       const char *user_name)
+{
+	try {
+		return new AccessDeniedError(file, line, access_type,
+					     object_type, object_name,
+					     user_name);
+	} catch (OutOfMemory *e) {
+		return e;
+	}
+}

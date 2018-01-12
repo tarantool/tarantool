@@ -39,6 +39,12 @@ extern "C" {
 struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
 
+struct error *
+BuildAccessDeniedError(const char *file, unsigned int line,
+		       const char *access_type, const char *object_type,
+		       const char *object_name, const char *user_name);
+
+
 /** \cond public */
 
 struct error;
@@ -125,6 +131,7 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 
 extern const struct type_info type_ClientError;
 extern const struct type_info type_XlogError;
+extern const struct type_info type_AccessDeniedError;
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -139,7 +146,8 @@ enum rmean_error_name {
 };
 extern const char *rmean_error_strings[RMEAN_ERROR_LAST];
 
-class ClientError: public Exception {
+class ClientError: public Exception
+{
 public:
 	virtual void raise()
 	{
@@ -159,9 +167,13 @@ public:
 	static uint32_t get_errcode(const struct error *e);
 	/* client errno code */
 	int m_errcode;
+protected:
+	ClientError(const type_info *type, const char *file, unsigned line,
+		    uint32_t errcode);
 };
 
-class LoggedError: public ClientError {
+class LoggedError: public ClientError
+{
 public:
 	template <typename ... Args>
 	LoggedError(const char *file, unsigned line, uint32_t errcode, Args ... args)
@@ -170,6 +182,49 @@ public:
 		/* TODO: actually calls ClientError::log */
 		log();
 	}
+};
+
+/**
+ * A special type of exception which must be used
+ * for all access denied errors, since it invokes audit triggers.
+ */
+class AccessDeniedError: public ClientError
+{
+public:
+	AccessDeniedError(const char *file, unsigned int line,
+			  const char *access_type, const char *object_type,
+			  const char *object_name, const char *user_name);
+
+	~AccessDeniedError()
+	{
+		free(m_object_name);
+	}
+
+	const char *
+	object_type()
+	{
+		return m_object_type;
+	}
+
+	const char *
+	object_name()
+	{
+		return m_object_name?:"(nil)";
+	}
+
+	const char *
+	access_type()
+	{
+		return m_access_type;
+	}
+
+private:
+	/** Type of object the required access was denied to */
+	const char *m_object_type;
+	/** Name of object the required access was denied to */
+	char *m_object_name;
+	/** Type of declined access */
+	const char *m_access_type;
 };
 
 /**

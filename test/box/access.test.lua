@@ -426,3 +426,50 @@ box.schema.space.create('test')
 box.schema.user.create('test')
 box.schema.func.create('test')
 box.session.su('admin')
+
+--
+-- gh-2911 on_access_denied trigger
+--
+obj_type = nil
+obj_name = nil
+op_type = nil
+euid = nil
+auid = nil
+function access_denied_trigger(op, type, name) obj_type = type; obj_name = name; op_type = op end
+function uid() euid = box.session.euid(); auid = box.session.uid() end
+_ = box.session.on_access_denied(access_denied_trigger)
+_ = box.session.on_access_denied(uid)
+s = box.schema.space.create('admin_space', {engine="vinyl"})
+seq = box.schema.sequence.create('test_sequence')
+index = s:create_index('primary', {type = 'tree', parts = {1, 'unsigned'}})
+box.schema.user.create('test_user', {password="pass"})
+box.session.su("test_user")
+s:select{}
+obj_type, obj_name, op_type
+euid, auid
+seq:set(1)
+obj_type, obj_name, op_type
+euid, auid
+box.session.su("admin")
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+function func() end
+st, e = pcall(c.call, c, func)
+obj_type, op_type
+euid, auid
+obj_name:match("function")
+box.schema.user.revoke("test_user", "usage", "universe")
+box.session.su("test_user")
+st, e = pcall(s.select, s, {})
+e = e:unpack()
+e.type, e.access_type, e.object_type, e.message
+obj_type, obj_name, op_type
+euid, auid
+box.session.su("admin")
+box.schema.user.revoke("test_user", "session", "universe")
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+obj_type, obj_name, op_type
+euid, auid
+box.session.on_access_denied(nil, access_denied_trigger)
+box.session.on_access_denied(nil, uid)
+box.schema.user.drop("test_user")
+s:drop()
