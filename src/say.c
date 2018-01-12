@@ -294,7 +294,6 @@ log_pipe_init(struct log *log, const char *init_str)
 	char cmd[] = { "/bin/sh" };
 	char args[] = { "-c" };
 	char *argv[] = { cmd, args, (char *) init_str, NULL };
-	char *envp[] = { NULL };
 	sigset_t mask;
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -331,7 +330,7 @@ log_pipe_init(struct log *log, const char *init_str)
 		 * dies, we get SIGPIPE and terminate.
 		 */
 		setpgid(0, 0);
-		execve(argv[0], argv, envp); /* does not return */
+		execv(argv[0], argv); /* does not return */
 		diag_set(SystemError, "can't start logger: %s", init_str);
 		return -1;
 	}
