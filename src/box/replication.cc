@@ -132,7 +132,6 @@ replica_new(void)
 	replica->gc = NULL;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_connect, NULL, NULL, NULL);
-	replica->pause_on_connect = false;
 	return replica;
 }
 
@@ -227,7 +226,6 @@ replica_on_receive_uuid(struct trigger *trigger, void *event)
 
 	rlist_del_entry(replica, in_anon);
 
-	bool pause_on_connect = replica->pause_on_connect;
 	if (orig != NULL) {
 		/* Use existing struct replica */
 		orig->applier = applier;
@@ -237,8 +235,6 @@ replica_on_receive_uuid(struct trigger *trigger, void *event)
 		/* Add a new struct replica */
 		replicaset_insert(&replicaset, replica);
 	}
-	if (pause_on_connect)
-		applier_pause(applier);
 }
 
 /**
@@ -280,7 +276,6 @@ replicaset_update(struct applier **appliers, int count)
 			trigger_create(&replica->on_connect,
 				       replica_on_receive_uuid, NULL, NULL);
 			trigger_add(&applier->on_state, &replica->on_connect);
-			replica->pause_on_connect = true;
 			continue;
 		}
 
@@ -445,6 +440,14 @@ replicaset_connect(struct applier **appliers, int count, int quorum,
 	for (int i = 0; i < count; i++) {
 		/* Unregister the temporary trigger used to wake us up */
 		trigger_clear(&triggers[i].base);
+		/*
+		 * Stop appliers that failed to connect.
+		 * They will be restarted once we proceed
+		 * to 'subscribe', see replicaset_follow().
+		 */
+		struct applier *applier = appliers[i];
+		if (applier->state != APPLIER_CONNECTED)
+			applier_stop(applier);
 	}
 
 	/* Now all the appliers are connected, update the replica set. */
@@ -467,11 +470,14 @@ replicaset_follow(void)
 {
 	struct replica *replica;
 	replicaset_foreach(replica) {
+		/* Resume connected appliers. */
 		if (replica->applier != NULL)
 			applier_resume(replica->applier);
 	}
-	rlist_foreach_entry(replica, &anon_replicas, in_anon)
-		replica->pause_on_connect = false;
+	rlist_foreach_entry(replica, &anon_replicas, in_anon) {
+		/* Restart appliers that failed to connect. */
+		applier_start(replica->applier);
+	}
 }
 
 void

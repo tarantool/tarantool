@@ -175,11 +175,6 @@ struct replica {
 	 * the replica into the replica set.
 	 */
 	struct trigger on_connect;
-	/**
-	 * Set if the applier should be paused upon conecting
-	 * to the master.
-	 */
-	bool pause_on_connect;
 };
 
 enum {
