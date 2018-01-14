@@ -52,6 +52,9 @@ cfg_gets(const char *param);
 double
 cfg_getd(const char *param);
 
+double
+cfg_getd_default(const char *param, double default_val);
+
 int
 cfg_getarr_size(const char *name);
 

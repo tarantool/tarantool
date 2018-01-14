@@ -80,6 +80,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case APPLIER_AUTH:
 		say_info("failed to authenticate");
 		break;
+	case APPLIER_SYNC:
 	case APPLIER_FOLLOW:
 	case APPLIER_INITIAL_JOIN:
 	case APPLIER_FINAL_JOIN:
@@ -110,7 +111,8 @@ applier_writer_f(va_list ap)
 		fiber_cond_wait_timeout(&applier->writer_cond,
 					replication_timeout);
 		/* Send ACKs only when in FOLLOW mode ,*/
-		if (applier->state != APPLIER_FOLLOW)
+		if (applier->state != APPLIER_SYNC &&
+		    applier->state != APPLIER_FOLLOW)
 			continue;
 		try {
 			struct xrow_header xrow;
@@ -353,7 +355,16 @@ applier_subscribe(struct applier *applier)
 	coio_write_xrow(coio, &row);
 
 	if (applier->state == APPLIER_READY) {
-		applier_set_state(applier, APPLIER_FOLLOW);
+		/*
+		 * Tarantool < 1.7.7 does not send periodic heartbeat
+		 * messages so we cannot enable applier synchronization
+		 * for it without risking getting stuck in the 'orphan'
+		 * mode until a DML operation happens on the master.
+		 */
+		if (applier->version_id >= version_id(1, 7, 7))
+			applier_set_state(applier, APPLIER_SYNC);
+		else
+			applier_set_state(applier, APPLIER_FOLLOW);
 	} else {
 		/*
 		 * Tarantool < 1.7.0 sends replica id during
@@ -406,6 +417,8 @@ applier_subscribe(struct applier *applier)
 		fiber_start(applier->writer, applier);
 	}
 
+	applier->lag = TIMEOUT_INFINITY;
+
 	/*
 	 * Process a stream of rows from the binary log.
 	 */
@@ -415,6 +428,12 @@ applier_subscribe(struct applier *applier)
 			say_info("final data received");
 			applier_set_state(applier, APPLIER_JOINED);
 			applier_set_state(applier, APPLIER_READY);
+			applier_set_state(applier, APPLIER_FOLLOW);
+		}
+
+		if (applier->state == APPLIER_SYNC &&
+		    applier->lag <= replication_sync_lag) {
+			/* Applier is synced, switch to "follow". */
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
@@ -449,7 +468,8 @@ applier_subscribe(struct applier *applier)
 				      row.lsn);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		}
-		if (applier->state == APPLIER_FOLLOW)
+		if (applier->state == APPLIER_SYNC ||
+		    applier->state == APPLIER_FOLLOW)
 			fiber_cond_signal(&applier->writer_cond);
 		if (ibuf_used(ibuf) == 0)
 			ibuf_reset(ibuf);

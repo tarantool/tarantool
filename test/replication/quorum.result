@@ -1,10 +1,7 @@
 test_run = require('test_run').new()
 ---
 ...
-engine = test_run:get_cfg('engine')
----
-...
-SERVERS = {'autobootstrap_guest1', 'autobootstrap_guest2', 'autobootstrap_guest3'}
+SERVERS = {'quorum1', 'quorum2', 'quorum3'}
 ---
 ...
 -- Deploy a cluster.
@@ -14,139 +11,141 @@ test_run:create_cluster(SERVERS)
 test_run:wait_fullmesh(SERVERS)
 ---
 ...
--- Create a new replica and switch to it.
-test_run:cmd('create server test with script "replication/quorum.lua"')
+-- Stop one replica and try to restart another one.
+-- It should successfully restart, but stay in the
+-- 'orphan' mode, which disables write accesses.
+-- There are three ways for the replica to leave the
+-- 'orphan' mode:
+-- * reconfigure replication
+-- * reset box.cfg.replication_connect_quorum
+-- * wait until a quorum is formed asynchronously
+test_run:cmd('stop server quorum1')
 ---
 - true
 ...
-test_run:cmd('start server test')
+test_run:cmd('switch quorum2')
 ---
 - true
 ...
-test_run:cmd('switch test')
+test_run:cmd('restart server quorum2')
+box.info.status -- orphan
 ---
-- true
+- orphan
 ...
--- Stop one master and try to restart the replica.
--- It should successfully restart because it has
--- replication_connect_quorum set to 2 (see quorum.lua)
--- and two other masters are still running.
-test_run:cmd('stop server autobootstrap_guest1')
+box.space.test:replace{100} -- error
 ---
-- true
+- error: Can't modify data because this instance is in read-only mode.
 ...
-test_run:cmd('restart server test')
-fio = require('fio')
+box.cfg{replication={}}
+---
+...
+box.info.status -- running
+---
+- running
+...
+test_run:cmd('restart server quorum2')
+box.info.status -- orphan
+---
+- orphan
+...
+box.space.test:replace{100} -- error
+---
+- error: Can't modify data because this instance is in read-only mode.
+...
+box.cfg{replication_connect_quorum = 2}
 ---
 ...
 fiber = require('fiber')
 ---
 ...
-SERVERS = {'autobootstrap_guest1', 'autobootstrap_guest2', 'autobootstrap_guest3'}
+while box.info.status == 'orphan' do fiber.sleep(0.001) end
 ---
 ...
-SOCKET_DIR = fio.cwd()
+box.info.status -- running
 ---
+- running
 ...
-test_run:cmd("setopt delimiter ';'")
+test_run:cmd('restart server quorum2')
+box.info.status -- orphan
+---
+- orphan
+...
+box.space.test:replace{100} -- error
+---
+- error: Can't modify data because this instance is in read-only mode.
+...
+test_run:cmd('start server quorum1')
 ---
 - true
 ...
-function instance_uri(name)
-    return SOCKET_DIR .. '/' .. name .. '.sock'
-end;
+fiber = require('fiber')
 ---
 ...
-function cfg_replication(servers)
-    local replication = {}
-    for _, srv in ipairs(servers) do
-        table.insert(replication, instance_uri(srv))
-    end
-    box.cfg{replication = replication}
-end;
+while box.info.status == 'orphan' do fiber.sleep(0.001) end
 ---
 ...
-test_run:cmd("setopt delimiter ''");
+box.info.status -- running
+---
+- running
+...
+-- Check that the replica follows all masters.
+box.info.id == 1 or box.info.replication[1].upstream.status == 'follow'
 ---
 - true
 ...
--- Set a stricter value for replication_connect_quorum and
--- check that replication configuration fails.
-box.cfg{replication_connect_quorum = 3}
----
-...
-cfg_replication(SERVERS) -- fail
----
-- error: 'Incorrect value for option ''replication'': failed to connect to one or
-    more replicas'
-...
-box.cfg{replication_connect_quorum = nil} -- default: wait for all
----
-...
-cfg_replication(SERVERS) -- fail
----
-- error: 'Incorrect value for option ''replication'': failed to connect to one or
-    more replicas'
-...
--- Lower replication quorum and check that replication
--- configuration succeeds.
-box.cfg{replication_connect_quorum = 2}
----
-...
-cfg_replication(SERVERS) -- success
----
-...
--- Start the master that was down and check that
--- the replica follows it. To do that, we need to
--- stop other masters.
-test_run:cmd('start server autobootstrap_guest1')
+box.info.id == 2 or box.info.replication[2].upstream.status == 'follow'
 ---
 - true
 ...
-test_run:cmd('stop server autobootstrap_guest2')
+box.info.id == 3 or box.info.replication[3].upstream.status == 'follow'
 ---
 - true
 ...
-test_run:cmd('stop server autobootstrap_guest3')
+-- Check that box.cfg() doesn't return until the instance
+-- catches up with all configured replicas.
+test_run:cmd('switch quorum3')
 ---
 - true
 ...
-test_run:cmd('switch autobootstrap_guest1')
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
+---
+- ok
+...
+test_run:cmd('switch quorum2')
 ---
 - true
 ...
-box.space.test:auto_increment{'test'}
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
 ---
-- [1, 'test']
+- ok
 ...
-test_run:cmd('switch test')
+test_run:cmd('stop server quorum1')
 ---
 - true
 ...
-while box.space.test:count() < 1 do fiber.sleep(0.001) end
+for i = 1, 10 do box.space.test:insert{i} end
 ---
 ...
-box.space.test:select()
+fiber.sleep(0.1)
 ---
-- - [1, 'test']
+...
+test_run:cmd('start server quorum1')
+---
+- true
+...
+test_run:cmd('switch quorum1')
+---
+- true
+...
+box.space.test:count() -- 10
+---
+- 10
 ...
 -- Cleanup.
 test_run:cmd('switch default')
 ---
 - true
 ...
-test_run:cmd('stop server test')
----
-- true
-...
-test_run:cmd('cleanup server test')
----
-- true
-...
-test_run:cmd('stop server autobootstrap_guest1')
----
-- true
-...
-for _, srv in ipairs(SERVERS) do test_run:cmd(string.format('cleanup server %s', srv)) end
+test_run:drop_cluster(SERVERS)
 ---
 ...

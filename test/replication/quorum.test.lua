@@ -1,69 +1,65 @@
 test_run = require('test_run').new()
-engine = test_run:get_cfg('engine')
 
-SERVERS = {'autobootstrap_guest1', 'autobootstrap_guest2', 'autobootstrap_guest3'}
+SERVERS = {'quorum1', 'quorum2', 'quorum3'}
 
 -- Deploy a cluster.
 test_run:create_cluster(SERVERS)
 test_run:wait_fullmesh(SERVERS)
 
--- Create a new replica and switch to it.
-test_run:cmd('create server test with script "replication/quorum.lua"')
-test_run:cmd('start server test')
-test_run:cmd('switch test')
+-- Stop one replica and try to restart another one.
+-- It should successfully restart, but stay in the
+-- 'orphan' mode, which disables write accesses.
+-- There are three ways for the replica to leave the
+-- 'orphan' mode:
+-- * reconfigure replication
+-- * reset box.cfg.replication_connect_quorum
+-- * wait until a quorum is formed asynchronously
+test_run:cmd('stop server quorum1')
 
--- Stop one master and try to restart the replica.
--- It should successfully restart because it has
--- replication_connect_quorum set to 2 (see quorum.lua)
--- and two other masters are still running.
-test_run:cmd('stop server autobootstrap_guest1')
-test_run:cmd('restart server test')
+test_run:cmd('switch quorum2')
 
-fio = require('fio')
-fiber = require('fiber')
+test_run:cmd('restart server quorum2')
+box.info.status -- orphan
+box.space.test:replace{100} -- error
+box.cfg{replication={}}
+box.info.status -- running
 
-SERVERS = {'autobootstrap_guest1', 'autobootstrap_guest2', 'autobootstrap_guest3'}
-SOCKET_DIR = fio.cwd()
-test_run:cmd("setopt delimiter ';'")
-function instance_uri(name)
-    return SOCKET_DIR .. '/' .. name .. '.sock'
-end;
-function cfg_replication(servers)
-    local replication = {}
-    for _, srv in ipairs(servers) do
-        table.insert(replication, instance_uri(srv))
-    end
-    box.cfg{replication = replication}
-end;
-test_run:cmd("setopt delimiter ''");
-
--- Set a stricter value for replication_connect_quorum and
--- check that replication configuration fails.
-box.cfg{replication_connect_quorum = 3}
-cfg_replication(SERVERS) -- fail
-box.cfg{replication_connect_quorum = nil} -- default: wait for all
-cfg_replication(SERVERS) -- fail
-
--- Lower replication quorum and check that replication
--- configuration succeeds.
+test_run:cmd('restart server quorum2')
+box.info.status -- orphan
+box.space.test:replace{100} -- error
 box.cfg{replication_connect_quorum = 2}
-cfg_replication(SERVERS) -- success
+fiber = require('fiber')
+while box.info.status == 'orphan' do fiber.sleep(0.001) end
+box.info.status -- running
 
--- Start the master that was down and check that
--- the replica follows it. To do that, we need to
--- stop other masters.
-test_run:cmd('start server autobootstrap_guest1')
-test_run:cmd('stop server autobootstrap_guest2')
-test_run:cmd('stop server autobootstrap_guest3')
-test_run:cmd('switch autobootstrap_guest1')
-box.space.test:auto_increment{'test'}
-test_run:cmd('switch test')
-while box.space.test:count() < 1 do fiber.sleep(0.001) end
-box.space.test:select()
+test_run:cmd('restart server quorum2')
+box.info.status -- orphan
+box.space.test:replace{100} -- error
+test_run:cmd('start server quorum1')
+fiber = require('fiber')
+while box.info.status == 'orphan' do fiber.sleep(0.001) end
+box.info.status -- running
+
+-- Check that the replica follows all masters.
+box.info.id == 1 or box.info.replication[1].upstream.status == 'follow'
+box.info.id == 2 or box.info.replication[2].upstream.status == 'follow'
+box.info.id == 3 or box.info.replication[3].upstream.status == 'follow'
+
+-- Check that box.cfg() doesn't return until the instance
+-- catches up with all configured replicas.
+test_run:cmd('switch quorum3')
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
+test_run:cmd('switch quorum2')
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
+test_run:cmd('stop server quorum1')
+
+for i = 1, 10 do box.space.test:insert{i} end
+fiber.sleep(0.1)
+
+test_run:cmd('start server quorum1')
+test_run:cmd('switch quorum1')
+box.space.test:count() -- 10
 
 -- Cleanup.
 test_run:cmd('switch default')
-test_run:cmd('stop server test')
-test_run:cmd('cleanup server test')
-test_run:cmd('stop server autobootstrap_guest1')
-for _, srv in ipairs(SERVERS) do test_run:cmd(string.format('cleanup server %s', srv)) end
+test_run:drop_cluster(SERVERS)

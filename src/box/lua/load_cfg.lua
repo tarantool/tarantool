@@ -56,7 +56,8 @@ local default_cfg = {
     checkpoint_count    = 2,
     worker_pool_threads = 4,
     replication_timeout = 1,
-    replication_connect_quorum = nil
+    replication_sync_lag = 10,
+    replication_connect_quorum = nil, -- connect all
 }
 
 -- types of available options
@@ -110,6 +111,7 @@ local template_cfg = {
     hot_standby         = 'boolean',
     worker_pool_threads = 'number',
     replication_timeout = 'number',
+    replication_sync_lag = 'number',
     replication_connect_quorum = 'number',
 }
 
