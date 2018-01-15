@@ -31,28 +31,29 @@
  * SUCH DAMAGE.
  */
 
-#include <stdint.h>
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-int
-box_func_reload(const char *name);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
 
 struct obuf;
+struct port;
+struct call_request;
 
 struct box_function_ctx {
 	struct port *port;
 };
 
-void
+int
+box_func_reload(const char *name);
+
+int
 box_process_call(struct call_request *request, struct obuf *out);
 
-void
+int
 box_process_eval(struct call_request *request, struct obuf *out);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_CALL_H */

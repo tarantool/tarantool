@@ -35,7 +35,6 @@
 #include "session.h"
 #include "func.h"
 #include "port.h"
-#include "scoped_guard.h"
 #include "box.h"
 #include "txn.h"
 #include "xrow.h"
@@ -106,7 +105,6 @@ box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 	/* Create a call context */
 	struct port port;
 	port_create(&port);
-	auto port_guard = make_scoped_guard([&](){ port_destroy(&port); });
 	box_function_ctx_t ctx = { &port };
 
 	/* Clear all previous errors */
@@ -136,7 +134,7 @@ box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 			goto error;
 		}
 		iproto_reply_select(out, &svp, request->header->sync,
-				    ::schema_version, port.size);
+				    schema_version, port.size);
 	} else {
 		assert(request->header->type == IPROTO_CALL);
 		char *size_buf = (char *)
@@ -149,13 +147,15 @@ box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 			goto error;
 		}
 		iproto_reply_select(out, &svp, request->header->sync,
-				    ::schema_version, 1);
+				    schema_version, 1);
 	}
 
+	port_destroy(&port);
 	return 0;
 
 error:
 	txn_rollback();
+	port_destroy(&port);
 	return -1;
 }
 
@@ -177,7 +177,7 @@ box_func_reload(const char *name)
 	return -1;
 }
 
-void
+int
 box_process_call(struct call_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_CALL, 1);
@@ -193,8 +193,8 @@ box_process_call(struct call_request *request, struct obuf *out)
 	 * Sic: func == NULL means that perhaps the user has a global
 	 * "EXECUTE" privilege, so no specific grant to a function.
 	 */
-	if ((access_check_func(name, name_len, &func)) < 0)
-		diag_raise(); /* permission denied */
+	if (access_check_func(name, name_len, &func) != 0)
+		return -1; /* permission denied */
 
 	/**
 	 * Change the current user id if the function is
@@ -212,7 +212,9 @@ box_process_call(struct call_request *request, struct obuf *out)
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user *owner = user_find_xc(func->def->uid);
+			struct user *owner = user_find(func->def->uid);
+			if (owner == NULL)
+				return -1;
 			credentials_init(&func->owner_credentials,
 					 owner->auth_token,
 					 owner->def->uid);
@@ -232,7 +234,7 @@ box_process_call(struct call_request *request, struct obuf *out)
 
 	if (rc != 0) {
 		txn_rollback();
-		diag_raise();
+		return -1;
 	}
 
 	if (in_txn()) {
@@ -241,17 +243,20 @@ box_process_call(struct call_request *request, struct obuf *out)
 			name_len, name);
 		txn_rollback();
 	}
+
+	return 0;
 }
 
-void
+int
 box_process_eval(struct call_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
-	access_check_universe_xc(PRIV_X);
+	if (access_check_universe(PRIV_X) != 0)
+		return -1;
 	if (box_lua_eval(request, out) != 0) {
 		txn_rollback();
-		diag_raise();
+		return -1;
 	}
 
 	if (in_txn()) {
@@ -263,4 +268,6 @@ box_process_eval(struct call_request *request, struct obuf *out)
 			expr_len, expr);
 		txn_rollback();
 	}
+
+	return 0;
 }

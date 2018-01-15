@@ -1191,10 +1191,12 @@ tx_process_misc(struct cmsg *m)
 		switch (msg->header.type) {
 		case IPROTO_CALL:
 		case IPROTO_CALL_16:
-			box_process_call(&msg->call, out);
+			if (box_process_call(&msg->call, out) != 0)
+				diag_raise();
 			break;
 		case IPROTO_EVAL:
-			box_process_eval(&msg->call, out);
+			if (box_process_eval(&msg->call, out) != 0)
+				diag_raise();
 			break;
 		case IPROTO_AUTH:
 			box_process_auth(&msg->auth);
