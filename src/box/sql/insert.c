@@ -37,6 +37,7 @@
 #include "tarantoolInt.h"
 #include "box/session.h"
 #include "box/schema.h"
+#include "bit/bit.h"
 
 /*
  * Generate code that will open pTab as cursor iCur.
@@ -459,6 +460,12 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 * is appears in the original table.  (The index of the INTEGER
 	 * PRIMARY KEY in the original table is pTab->iPKey.)
 	 */
+	/* Create bitmask to mark used columns of the table. */
+	void *used_columns = tt_static_buf();
+	/* The size of used_columns buffer is checked during compilation time
+	 * using SQLITE_MAX_COLUMN constant.
+	 */
+	memset(used_columns, 0, (pTab->nCol + 7) / 8);
 	bIdListInOrder = 1;
 	if (pColumn) {
 		for (i = 0; i < pColumn->nId; i++) {
@@ -486,6 +493,14 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				pParse->checkSchema = 1;
 				goto insert_cleanup;
 			}
+			if (bit_test(used_columns, j)) {
+				const char *err;
+				err = "table id list: duplicate column name %s";
+				sqlite3ErrorMsg(pParse,
+						err, pColumn->a[i].zName);
+				goto insert_cleanup;
+			}
+			bit_set(used_columns, j);
 		}
 	}
 

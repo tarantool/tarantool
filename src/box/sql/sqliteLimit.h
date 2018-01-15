@@ -35,6 +35,7 @@
  *
  * This file defines various limits of what SQLite can process.
  */
+#include "trivia/util.h"
 
 enum {
 	/*
@@ -73,6 +74,14 @@ enum {
  */
 #ifndef SQLITE_MAX_COLUMN
 #define SQLITE_MAX_COLUMN 2000
+#endif
+/*
+ * tt_static_buf() is used to store bitmask for used columns in a table during
+ * SQL parsing stage. The following statement checks if static buffer is big
+ * enough to store the bitmask.
+ */
+#if SQLITE_MAX_COLUMN > TT_STATIC_BUF_LEN * 8
+#error "Bitmask for used table columns cannot fit into static buffer"
 #endif
 
 /*

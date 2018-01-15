@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 yaml = require('yaml')
-test:plan(24)
+test:plan(28)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -516,5 +516,33 @@ test:do_execsql_test("insert-4.7", [[
 --   SELECT * FROM t12c;
 -- } {one xyzzy two}
 -- integrity_check insert-99.0
+
+
+test:do_execsql_test(
+    "insert-13.0",
+    [[
+        create table test(a primary key, b)
+    ]])
+
+test:do_catchsql_test(
+    "insert-13.1",
+    [[
+        insert into test(a, a, b) values(1, 1, 1)
+    ]],
+    {1, "table id list: duplicate column name A"})
+
+test:do_catchsql_test(
+    "insert-13.2",
+    [[
+        insert into test(a, b, b) values(1, 1, 1)
+    ]],
+    {1, "table id list: duplicate column name B"})
+
+test:do_execsql_test(
+    "insert-13.3",
+    [[
+        drop table test;
+    ]])
+
 test:finish_test()
 

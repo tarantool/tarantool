@@ -233,6 +233,13 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				if (pPk && table_column_is_in_pk(pTab, j)) {
 					chngPk = 1;
 				}
+				if (aXRef[j] != -1) {
+					sqlite3ErrorMsg(pParse,
+							"set id list: duplicate"
+							" column name %s",
+							pChanges->a[i].zName);
+					goto update_cleanup;
+				}
 				aXRef[j] = i;
 				break;
 			}

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(108)
+test:plan(111)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1109,5 +1109,26 @@ test:do_catchsql_test("update-10.10", [[
 --   UPDATE t15 SET c=printf("y%d",a) WHERE c IS NULL;
 --   SELECT a,b,c,'|' FROM t15 ORDER BY a;
 -- } {5 zyx y5 | 10 abc y10 | 15 wvu y15 | 20 def y20 | 25 tsr y25 | 30 ghi y30 | 35 qpo y35 |}
+
+test:do_execsql_test(
+    "insert-15.0",
+    [[
+        create table test(a primary key);
+        insert into test(a) values(1);
+    ]])
+
+test:do_catchsql_test(
+    "insert-15.1",
+    [[
+        update test set a = 2, a = 3;
+    ]],
+    {1, "set id list: duplicate column name A"})
+
+test:do_execsql_test(
+  "insert-15.2",
+  [[
+      drop table test;
+  ]])
+
 test:finish_test()
 
