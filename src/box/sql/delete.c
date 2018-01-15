@@ -382,10 +382,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	    ) {
 		assert(!isView);
 
-		for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
-			assert(pIdx->pSchema == pTab->pSchema);
-			sqlite3VdbeAddOp2(v, OP_Clear, pIdx->tnum, 0);
-		}
+		sqlite3VdbeAddOp1(v, OP_Clear, pTab->tnum);
 
 		/* Do not start Tarantool's transaction in case of truncate optimization.
 		   This is workaround until system tables cannot be changes inside a
