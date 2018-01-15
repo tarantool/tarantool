@@ -249,15 +249,7 @@ access_check_session(struct user *user)
 	return 0;
 }
 
-void
-access_check_session_xc(struct user *user)
-{
-	if (access_check_session(user) < 0) {
-		diag_raise();
-	}
-}
-
-void
+int
 access_check_universe(user_access_t access)
 {
 	struct credentials *credentials = effective_user();
@@ -268,12 +260,23 @@ access_check_universe(user_access_t access)
 		 * The user may not exist already, if deleted
 		 * from a different connection.
 		 */
-		struct user *user = user_find_xc(credentials->uid);
 		int denied_access = access & ((credentials->universal_access
 					       & access) ^ access);
-		tnt_raise(AccessDeniedError,
-			 priv_name(denied_access),
-			 schema_object_name(SC_UNIVERSE), "",
-			 user->def->name);
+		struct user *user = user_find(credentials->uid);
+		if (user != NULL) {
+			diag_set(AccessDeniedError,
+				 priv_name(denied_access),
+				 schema_object_name(SC_UNIVERSE), "",
+				 user->def->name);
+		} else {
+			/*
+			 * The user may have been dropped, in
+			 * which case user_find() will set the
+			 * error.
+			 */
+			assert(!diag_is_empty(&fiber()->diag));
+		}
+		return -1;
 	}
+	return 0;
 }

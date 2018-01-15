@@ -248,7 +248,7 @@ box_process_eval(struct call_request *request, struct obuf *out)
 {
 	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
-	access_check_universe(PRIV_X);
+	access_check_universe_xc(PRIV_X);
 	if (box_lua_eval(request, out) != 0) {
 		txn_rollback();
 		diag_raise();

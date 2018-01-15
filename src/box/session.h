@@ -248,18 +248,31 @@ session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result);
 int
 access_check_session(struct user *user);
 
-void
-access_check_session_xc(struct user *user);
-
 /**
  * Check whether or not the current user can be granted
  * the requested access to the universe.
  */
-void
+int
 access_check_universe(user_access_t access);
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+#include "diag.h"
+
+static inline void
+access_check_session_xc(struct user *user)
+{
+	if (access_check_session(user) != 0)
+		diag_raise();
+}
+
+static inline void
+access_check_universe_xc(user_access_t access)
+{
+	if (access_check_universe(access) != 0)
+		diag_raise();
+}
 
 #endif /* defined(__cplusplus) */
 

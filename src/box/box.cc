@@ -1217,7 +1217,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
-	access_check_universe(PRIV_R);
+	access_check_universe_xc(PRIV_R);
 	access_check_space_xc(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
@@ -1320,7 +1320,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
-	access_check_universe(PRIV_R);
+	access_check_universe_xc(PRIV_R);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
