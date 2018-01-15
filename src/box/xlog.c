@@ -1797,7 +1797,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 	if (rc == -1)
 		goto error;
 	if (rc > 0) {
-		diag_set(XlogError, "Unexpected end of file");
+		diag_set(XlogError, "Unexpected end of file, run with 'force_recovery = true'");
 		goto error;
 	}
 	snprintf(i->name, PATH_MAX, "%s", name);
