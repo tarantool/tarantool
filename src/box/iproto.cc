@@ -838,6 +838,9 @@ static void
 tx_process_misc(struct cmsg *msg);
 
 static void
+tx_process_call(struct cmsg *msg);
+
+static void
 tx_process1(struct cmsg *msg);
 
 static void
@@ -869,6 +872,11 @@ static const struct cmsg_hop misc_route[] = {
 	{ net_send_msg, NULL },
 };
 
+static const struct cmsg_hop call_route[] = {
+	{ tx_process_call, &net_pipe },
+	{ net_send_msg, NULL },
+};
+
 static const struct cmsg_hop select_route[] = {
 	{ tx_process_select, &net_pipe },
 	{ net_send_msg, NULL },
@@ -886,11 +894,11 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	process1_route,                         /* IPROTO_REPLACE */
 	process1_route,                         /* IPROTO_UPDATE */
 	process1_route,                         /* IPROTO_DELETE */
-	misc_route,                             /* IPROTO_CALL_16 */
+	call_route,                             /* IPROTO_CALL_16 */
 	misc_route,                             /* IPROTO_AUTH */
-	misc_route,                             /* IPROTO_EVAL */
+	call_route,                             /* IPROTO_EVAL */
 	process1_route,                         /* IPROTO_UPSERT */
-	misc_route                              /* IPROTO_CALL */
+	call_route                              /* IPROTO_CALL */
 };
 
 static const struct cmsg_hop join_route[] = {
@@ -943,7 +951,7 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_EVAL:
 		if (xrow_decode_call(&msg->header, &msg->call))
 			goto error;
-		cmsg_init(msg, misc_route);
+		cmsg_init(msg, call_route);
 		break;
 	case IPROTO_PING:
 		cmsg_init(msg, misc_route);
@@ -1177,6 +1185,39 @@ error:
 }
 
 static void
+tx_process_call(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	struct obuf *out = msg->connection->tx.p_obuf;
+
+	tx_fiber_init(msg->connection->session, msg->header.sync);
+
+	if (tx_check_schema(msg->header.schema_version))
+		goto error;
+
+	int rc;
+	switch (msg->header.type) {
+	case IPROTO_CALL:
+	case IPROTO_CALL_16:
+		rc = box_process_call(&msg->call, out);
+		break;
+	case IPROTO_EVAL:
+		rc = box_process_eval(&msg->call, out);
+		break;
+	default:
+		unreachable();
+	}
+
+	if (rc != 0)
+		goto error;
+
+	iproto_wpos_create(&msg->wpos, out);
+	return;
+error:
+	tx_reply_error(msg);
+}
+
+static void
 tx_process_misc(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
@@ -1189,15 +1230,6 @@ tx_process_misc(struct cmsg *m)
 
 	try {
 		switch (msg->header.type) {
-		case IPROTO_CALL:
-		case IPROTO_CALL_16:
-			if (box_process_call(&msg->call, out) != 0)
-				diag_raise();
-			break;
-		case IPROTO_EVAL:
-			if (box_process_eval(&msg->call, out) != 0)
-				diag_raise();
-			break;
 		case IPROTO_AUTH:
 			box_process_auth(&msg->auth);
 			iproto_reply_ok_xc(out, msg->header.sync,
