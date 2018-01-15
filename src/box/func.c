@@ -420,10 +420,10 @@ func_load(struct func *func)
 		/* Try to find loaded module in the cache */
 		module = module_load(name.package, name.package_end);
 		if (module == NULL)
-			diag_raise();
+			return -1;
 		if (module_cache_put(name.package, name.package_end, module)) {
 			module_delete(module);
-			diag_raise();
+			return -1;
 		}
 	}
 
