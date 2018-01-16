@@ -171,6 +171,12 @@ struct iproto_msg: public cmsg
 	 */
 	struct iproto_wpos wpos;
 	/**
+	 * Message sent by the tx thread to notify iproto that input has
+	 * been processed and can be discarded before request completion.
+	 * Used by long (yielding) CALL/EVAL requests.
+	 */
+	struct cmsg discard_input;
+	/**
 	 * Used in "connect" msgs, true if connect trigger failed
 	 * and the connection must be closed.
 	 */
@@ -333,6 +339,12 @@ struct iproto_connection
 	 * meaningless.
 	 */
 	size_t parse_size;
+	/**
+	 * Nubmer of active long polling requests that have already
+	 * discarded their arguments in order not to stall other
+	 * connections.
+	 */
+	int long_poll_requests;
 	struct ev_io input;
 	struct ev_io output;
 	/** Logical session. */
@@ -410,7 +422,8 @@ iproto_resume()
 static inline bool
 iproto_connection_is_idle(struct iproto_connection *con)
 {
-	return ibuf_used(&con->ibuf[0]) == 0 &&
+	return con->long_poll_requests == 0 &&
+	       ibuf_used(&con->ibuf[0]) == 0 &&
 	       ibuf_used(&con->ibuf[1]) == 0;
 }
 
@@ -799,6 +812,7 @@ iproto_connection_new(int fd)
 	iproto_wpos_create(&con->wpos, con->tx.p_obuf);
 	iproto_wpos_create(&con->wend, con->tx.p_obuf);
 	con->parse_size = 0;
+	con->long_poll_requests = 0;
 	con->session = NULL;
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
@@ -1056,6 +1070,27 @@ tx_check_schema(uint32_t new_schema_version)
 	return 0;
 }
 
+static void
+net_discard_input(struct cmsg *m)
+{
+	struct iproto_msg *msg = container_of(m, struct iproto_msg,
+					      discard_input);
+	msg->p_ibuf->rpos += msg->len;
+	msg->len = 0;
+	msg->connection->long_poll_requests++;
+	iproto_resume();
+}
+
+static void
+tx_discard_input(struct iproto_msg *msg)
+{
+	static const struct cmsg_hop discard_input_route[] = {
+		{ net_discard_input, NULL },
+	};
+	cmsg_init(&msg->discard_input, discard_input_route);
+	cpipe_push(&net_pipe, &msg->discard_input);
+}
+
 /**
  * The goal of this function is to maintain the state of
  * two rotating connection output buffers in tx thread.
@@ -1191,6 +1226,15 @@ error:
 }
 
 static void
+tx_process_call_on_yield(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct iproto_msg *msg = (struct iproto_msg *)trigger->data;
+	tx_discard_input(msg);
+	trigger_clear(trigger);
+}
+
+static void
 tx_process_call(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
@@ -1199,6 +1243,15 @@ tx_process_call(struct cmsg *m)
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
+
+	/*
+	 * CALL/EVAL should copy its arguments so we can discard
+	 * input on yield to avoid stalling other connections by
+	 * a long polling request.
+	 */
+	struct trigger fiber_on_yield;
+	trigger_create(&fiber_on_yield, tx_process_call_on_yield, msg, NULL);
+	trigger_add(&fiber()->on_yield, &fiber_on_yield);
 
 	int rc;
 	struct port port;
@@ -1214,6 +1267,8 @@ tx_process_call(struct cmsg *m)
 	default:
 		unreachable();
 	}
+
+	trigger_clear(&fiber_on_yield);
 
 	if (rc != 0)
 		goto error;
@@ -1338,8 +1393,15 @@ net_send_msg(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *) m;
 	struct iproto_connection *con = msg->connection;
-	/* Discard request (see iproto_enqueue_batch()) */
-	msg->p_ibuf->rpos += msg->len;
+
+	if (msg->len != 0) {
+		/* Discard request (see iproto_enqueue_batch()). */
+		msg->p_ibuf->rpos += msg->len;
+	} else {
+		/* Already discarded by net_discard_input(). */
+		assert(con->long_poll_requests > 0);
+		con->long_poll_requests--;
+	}
 	con->wend = msg->wpos;
 
 	if (evio_has_fd(&con->output)) {

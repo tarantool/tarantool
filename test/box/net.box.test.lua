@@ -798,3 +798,46 @@ c.space.test.index.test_index ~= nil
 box.schema.user.revoke('guest','read,write,execute','universe')
 
 space:drop()
+
+--
+-- gh-946: long polling CALL blocks input
+--
+box.schema.user.grant('guest', 'execute', 'universe')
+
+c = net.connect(box.cfg.listen)
+
+N = 100
+
+pad = string.rep('x', 1024)
+
+long_call_cond = fiber.cond()
+long_call_channel = fiber.channel()
+fast_call_channel = fiber.channel()
+
+function fast_call(x) return x end
+function long_call(x) long_call_cond:wait() return x * 2 end
+
+test_run:cmd("setopt delimiter ';'")
+for i = 1, N do
+    fiber.create(function()
+        fast_call_channel:put(c:call('fast_call', {i, pad}))
+    end)
+    fiber.create(function()
+        long_call_channel:put(c:call('long_call', {i, pad}))
+    end)
+end
+test_run:cmd("setopt delimiter ''");
+
+x = 0
+for i = 1, N do x = x + fast_call_channel:get() end
+x
+
+long_call_cond:broadcast()
+
+x = 0
+for i = 1, N do x = x + long_call_channel:get() end
+x
+
+c:close()
+
+box.schema.user.revoke('guest', 'execute', 'universe')
