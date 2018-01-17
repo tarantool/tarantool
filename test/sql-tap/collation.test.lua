@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(162)
+test:plan(173)
 
 local prefix = "collation-"
 
@@ -201,5 +201,52 @@ for _, data_collation in ipairs(data_collations) do
             {})
     end
 end
+
+-- Like uses collation (only for unicode_ci and binary)
+local like_testcases =
+{
+    {"2.0",
+    [[
+        CREATE TABLE tx1 (s1 CHAR(5) PRIMARY KEY);
+        CREATE INDEX I1 on tx1(s1 collate "unicode_ci");
+        INSERT INTO tx1 VALUES('aaa');
+        INSERT INTO tx1 VALUES('Aab');
+        INSERT INTO tx1 VALUES('İac');
+        INSERT INTO tx1 VALUES('iad');
+    ]], {0}},
+    {"2.1.1",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'A%' order by s1;",
+        {0, {"Aab", "aaa"}} },
+    {"2.1.2",
+        "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
+        {0, {0, 0, 0, "/USING COVERING INDEX I1/"}} },
+    {"2.2.0",
+        "PRAGMA case_sensitive_like = true;",
+        {0}},
+    {"2.2.1",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'A%' order by s1;",
+        {0, {"Aab"}} },
+    {"2.2.2",
+        "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
+        {0, {0, 0, 0, "/USING PRIMARY KEY/"}} },
+    {"2.3.0",
+        "PRAGMA case_sensitive_like = false;",
+        {0}},
+    {"2.3.1",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'i%' order by s1;",
+        {0, {"iad", "İac"}}},
+    {"2.3.2",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'İ%'order by s1;",
+        {0, {"iad", "İac"}} },
+    {"2.4.0",
+    [[
+        INSERT INTO tx1 VALUES('ЯЁЮ');
+    ]], {0} },
+    {"2.4.1",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'яёю';",
+        {0, {"ЯЁЮ"}} },
+}
+
+test:do_catchsql_set_test(like_testcases, prefix)
 
 test:finish_test()

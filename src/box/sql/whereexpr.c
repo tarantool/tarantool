@@ -1206,7 +1206,8 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			}
 			*pC = c + 1;
 		}
-		zCollSeqName = noCase ? "NOCASE" : "BINARY";
+		/* Support only for unicode_ci indexes by now */
+		zCollSeqName = noCase ? "unicode_ci" : "BINARY";
 		pNewExpr1 = sqlite3ExprDup(db, pLeft, 0);
 		pNewExpr1 = sqlite3PExpr(pParse, TK_GE,
 					 sqlite3ExprAddCollateString(pParse,
