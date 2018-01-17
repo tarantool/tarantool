@@ -33,15 +33,14 @@
  * This file contains code used for creating, destroying, and populating
  * a VDBE (or an "sqlite3_stmt" as it is known to the outside world.)
  */
-#include <box/coll_cache.h>
-#include "box/txn.h"
 #include "fiber.h"
 #include "box/session.h"
+#include "box/tuple_format.h"
+#include "box/txn.h"
+#include "msgpuck/msgpuck.h"
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
-
-#include "msgpuck/msgpuck.h"
 
 /*
  * Create a new virtual database engine.
@@ -579,8 +578,8 @@ opIterNext(VdbeOpIter * p)
  * to be rolled back). This condition is true if the main program or any
  * sub-programs contains any of the following:
  *
- *   *  OP_Halt with P1=SQLITE_CONSTRAINT and P2=OE_Abort.
- *   *  OP_HaltIfNull with P1=SQLITE_CONSTRAINT and P2=OE_Abort.
+ *   *  OP_Halt with P1=SQLITE_CONSTRAINT and P2=ON_CONFLICT_ACTION_ABORT.
+ *   *  OP_HaltIfNull with P1=SQLITE_CONSTRAINT and P2=ON_CONFLICT_ACTION_ABORT.
  *   *  OP_Destroy
  *   *  OP_FkCounter with P2==0 (immediate foreign key constraint)
  *
@@ -606,7 +605,7 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
 		if (opcode == OP_Destroy ||
 		    ((opcode == OP_Halt || opcode == OP_HaltIfNull)
 			&& ((pOp->p1 & 0xff) == SQLITE_CONSTRAINT
-			    && pOp->p2 == OE_Abort))
+			    && pOp->p2 == ON_CONFLICT_ACTION_ABORT))
 		    ) {
 			hasAbort = 1;
 			break;
@@ -2091,7 +2090,7 @@ sqlite3VdbeRewind(Vdbe * p)
 	p->pc = -1;
 	p->rc = SQLITE_OK;
 	p->ignoreRaised = 0;
-	p->errorAction = OE_Abort;
+	p->errorAction = ON_CONFLICT_ACTION_ABORT;
 	p->nChange = 0;
 	p->cacheCtr = 1;
 	p->iStatement = 0;
@@ -2498,7 +2497,7 @@ sqlite3VdbeCheckFk(Vdbe * p, int deferred)
 	    || (!deferred && p->nFkConstraint > 0)
 	    ) {
 		p->rc = SQLITE_CONSTRAINT_FOREIGNKEY;
-		p->errorAction = OE_Abort;
+		p->errorAction = ON_CONFLICT_ACTION_ABORT;
 		sqlite3VdbeError(p, "FOREIGN KEY constraint failed");
 		return SQLITE_ERROR;
 	}
@@ -2657,7 +2656,8 @@ sqlite3VdbeHalt(Vdbe * p)
 		 */
 		if (p->autoCommit) {
 			if (p->rc == SQLITE_OK
-			    || (p->errorAction == OE_Fail && !isSpecialError)) {
+			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL
+				&& !isSpecialError)) {
 				rc = sqlite3VdbeCheckFk(p, 1);
 				if (rc != SQLITE_OK) {
 					if (NEVER(p->readOnly)) {
@@ -2700,9 +2700,9 @@ sqlite3VdbeHalt(Vdbe * p)
 			}
 			p->anonymous_savepoint = NULL;
 		} else if (eStatementOp == 0) {
-			if (p->rc == SQLITE_OK || p->errorAction == OE_Fail) {
+			if (p->rc == SQLITE_OK || p->errorAction == ON_CONFLICT_ACTION_FAIL) {
 				eStatementOp = SAVEPOINT_RELEASE;
-			} else if (p->errorAction == OE_Abort) {
+			} else if (p->errorAction == ON_CONFLICT_ACTION_ABORT) {
 				eStatementOp = SAVEPOINT_ROLLBACK;
 			} else {
 				box_txn_rollback();

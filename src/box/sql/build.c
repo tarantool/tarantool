@@ -1431,7 +1431,7 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 	if (!db->init.imposterTable) {
 		for (i = 0; i < pTab->nCol; i++) {
 			if ((pTab->aCol[i].colFlags & COLFLAG_PRIMKEY) != 0) {
-				pTab->aCol[i].notNull = OE_Abort;
+				pTab->aCol[i].notNull = ON_CONFLICT_ACTION_ABORT;
 			}
 		}
 	}
@@ -2721,7 +2721,8 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 		sqlite3VdbeAddOp4Int(v, OP_SorterCompare, iSorter, j2,
 				     regRecord, pIndex->nKeyCol);
 		VdbeCoverage(v);
-		sqlite3UniqueConstraint(pParse, OE_Abort, pIndex);
+		sqlite3UniqueConstraint(pParse, ON_CONFLICT_ACTION_ABORT,
+					pIndex);
 	} else {
 		addr2 = sqlite3VdbeCurrentAddr(v);
 	}
@@ -2808,7 +2809,7 @@ getNewIid(Parse * pParse, int iSpaceId, int iCursor)
 	sqlite3VdbeJumpHere(v, iSeekInst);
 	sqlite3VdbeJumpHere(v, iSeekInst + 1);
 	sqlite3VdbeAddOp4(v,
-			  OP_Halt, SQLITE_ERROR, OE_Fail, 0,
+			  OP_Halt, SQLITE_ERROR, ON_CONFLICT_ACTION_FAIL, 0,
 			  sqlite3MPrintf(pParse->db, "Invalid space id: %d",
 					 iSpaceId), P4_DYNAMIC);
 
@@ -2825,8 +2826,8 @@ getNewIid(Parse * pParse, int iSpaceId, int iCursor)
  * When adding an index to the list of indexes for a table, we
  * maintain special order of the indexes in the list:
  * 1. PK (go first just for simplicity)
- * 2. OE_Replace indexes
- * 3. OE_Ignore indexes
+ * 2. ON_CONFLICT_ACTION_REPLACE indexes
+ * 3. ON_CONFLICT_ACTION_IGNORE indexes
  * This is necessary for the correct constraint check
  * processing (in sqlite3GenerateConstraintChecks()) as part of
  * UPDATE and INSERT statements.
@@ -2840,8 +2841,8 @@ addIndexToTable(Index * pIndex, Table * pTab)
 		pTab->pIndex = pIndex;
 		return;
 	}
-	if (pIndex->onError != OE_Replace || pTab->pIndex == 0
-	    || pTab->pIndex->onError == OE_Replace) {
+	if (pIndex->onError != ON_CONFLICT_ACTION_REPLACE || pTab->pIndex == 0
+	    || pTab->pIndex->onError == ON_CONFLICT_ACTION_REPLACE) {
 		Index *pk = sqlite3PrimaryKeyIndex(pTab);
 		if (pk) {
 			pIndex->pNext = pk->pNext;
@@ -2852,7 +2853,8 @@ addIndexToTable(Index * pIndex, Table * pTab)
 		}
 	} else {
 		Index *pOther = pTab->pIndex;
-		while (pOther->pNext && pOther->pNext->onError != OE_Replace) {
+		while (pOther->pNext && pOther->pNext->onError
+		       != ON_CONFLICT_ACTION_REPLACE) {
 			pOther = pOther->pNext;
 		}
 		pIndex->pNext = pOther->pNext;
@@ -2877,10 +2879,11 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		   Token * pName,	/* Index name. May be NULL */
 		   SrcList * pTblName,	/* Table to index. Use pParse->pNewTable if 0 */
 		   ExprList * pList,	/* A list of columns to be indexed */
-		   int onError,	/* OE_Abort, OE_Ignore, OE_Replace, or OE_None */
-		   Token MAYBE_UNUSED * pStart, /* The CREATE token
-						 * that begins this
-						 * statement.
+		   int onError,	        /* ON_CONFLICT_ACTION_ABORT, _IGNORE,
+					 * _REPLACE, or _NONE.
+					 */
+		   Token MAYBE_UNUSED * pStart,	/* The CREATE token that begins
+						 * this statement
 						 */
 		   Expr * pPIWhere,	/* WHERE clause for partial indices */
 		   int sortOrder,	/* Sort order of primary key when pList==NULL */
@@ -3070,7 +3073,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	memcpy(pIndex->zName, zName, nName + 1);
 	pIndex->pTable = pTab;
 	pIndex->onError = (u8) onError;
-	pIndex->uniqNotNull = onError != OE_None;
+	pIndex->uniqNotNull = onError != ON_CONFLICT_ACTION_NONE;
 	pIndex->idxType = idxType;
 	pIndex->pSchema = db->mdb.pSchema;
 	pIndex->nKeyCol = pList->nExpr;
@@ -3201,14 +3204,14 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 					 * explicitly specified behavior for the index.
 					 */
 					if (!
-					    (pIdx->onError == OE_Default
+					    (pIdx->onError == ON_CONFLICT_ACTION_DEFAULT
 					     || pIndex->onError ==
-					     OE_Default)) {
+					     ON_CONFLICT_ACTION_DEFAULT)) {
 						sqlite3ErrorMsg(pParse,
 								"conflicting ON CONFLICT clauses specified",
 								0);
 					}
-					if (pIdx->onError == OE_Default) {
+					if (pIdx->onError == ON_CONFLICT_ACTION_DEFAULT) {
 						pIdx->onError = pIndex->onError;
 					}
 				}
@@ -3280,7 +3283,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			/* A named index with an explicit CREATE INDEX statement */
 			zStmt = sqlite3MPrintf(db, "CREATE%s INDEX %.*s",
 					       onError ==
-					       OE_None ? "" : " UNIQUE", n,
+					       ON_CONFLICT_ACTION_NONE
+					       ? "" : " UNIQUE", n,
 					       pName->z);
 		}
 
@@ -3306,8 +3310,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	/* When adding an index to the list of indexes for a table, we
 	 * maintain special order of the indexes in the list:
 	 * 1. PK (go first just for simplicity)
-	 * 2. OE_Replace indexes
-	 * 3. OE_Ignore indexes
+	 * 2. ON_CONFLICT_ACTION_REPLACE indexes
+	 * 3. ON_CONFLICT_ACTION_IGNORE indexes
 	 * This is necessary for the correct constraint check
 	 * processing (in sqlite3GenerateConstraintChecks()) as part of
 	 * UPDATE and INSERT statements.
@@ -4072,7 +4076,7 @@ sqlite3HaltConstraint(Parse * pParse,	/* Parsing context */
 {
 	Vdbe *v = sqlite3GetVdbe(pParse);
 	assert((errCode & 0xff) == SQLITE_CONSTRAINT);
-	if (onError == OE_Abort) {
+	if (onError == ON_CONFLICT_ACTION_ABORT) {
 		sqlite3MayAbort(pParse);
 	}
 	sqlite3VdbeAddOp4(v, OP_Halt, errCode, onError, 0, p4, p4type);

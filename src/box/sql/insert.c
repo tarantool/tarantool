@@ -1050,8 +1050,8 @@ checkConstraintUnchanged(Expr * pExpr, int *aiChng)
  *  CHECK            REPLACE      Illegal.  The results in an exception.
  *
  * Which action to take is determined by the overrideError parameter.
- * Or if overrideError==OE_Default, then the pParse->onError parameter
- * is used.  Or if pParse->onError==OE_Default then the onError value
+ * Or if overrideError==ON_CONFLICT_ACTION_DEFAULT, then the pParse->onError parameter
+ * is used.  Or if pParse->onError==ON_CONFLICT_ACTION_DEFAULT then the onError value
  * for the constraint is used.
  */
 void
@@ -1063,8 +1063,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				int regNewData,		/* First register in a range holding values to insert */
 				int regOldData,		/* Previous content.  0 for INSERTs */
 				u8 pkChng,		/* Non-zero if the PRIMARY KEY changed */
-				u8 overrideError,	/* Override onError to this if not OE_Default */
-				int ignoreDest,		/* Jump to this label on an OE_Ignore resolution */
+				u8 overrideError,	/* Override onError to this if not ON_CONFLICT_ACTION_DEFAULT */
+				int ignoreDest,		/* Jump to this label on an ON_CONFLICT_ACTION_IGNORE resolution */
 				int *pbMayReplace,	/* OUT: Set to true if constraint may cause a replace */
 				int *aiChng)		/* column i is unchanged if aiChng[i]<0 */
 {
@@ -1108,25 +1108,30 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			continue;
 		}
 		onError = pTab->aCol[i].notNull;
-		if (onError == OE_None || (pTab->tabFlags & TF_Autoincrement && pTab->iAutoIncPKey == i))
+		if (onError == ON_CONFLICT_ACTION_NONE
+		    || (pTab->tabFlags & TF_Autoincrement && pTab->iAutoIncPKey == i))
 			continue;	/* This column is allowed to be NULL */
-		if (overrideError != OE_Default) {
+
+		if (overrideError != ON_CONFLICT_ACTION_DEFAULT) {
 			onError = overrideError;
-		} else if (onError == OE_Default) {
-			onError = OE_Abort;
+		} else if (onError == ON_CONFLICT_ACTION_DEFAULT) {
+			onError = ON_CONFLICT_ACTION_ABORT;
 		}
-		if (onError == OE_Replace && pTab->aCol[i].pDflt == 0) {
-			onError = OE_Abort;
+		if (onError == ON_CONFLICT_ACTION_REPLACE
+		    && pTab->aCol[i].pDflt == 0) {
+			onError = ON_CONFLICT_ACTION_ABORT;
 		}
-		assert(onError == OE_Rollback || onError == OE_Abort
-		       || onError == OE_Fail || onError == OE_Ignore
-		       || onError == OE_Replace);
+		assert(onError == ON_CONFLICT_ACTION_ROLLBACK
+		       || onError == ON_CONFLICT_ACTION_ABORT
+		       || onError == ON_CONFLICT_ACTION_FAIL
+		       || onError == ON_CONFLICT_ACTION_IGNORE
+		       || onError == ON_CONFLICT_ACTION_REPLACE);
 		switch (onError) {
-		case OE_Abort:
+		case ON_CONFLICT_ACTION_ABORT:
 			sqlite3MayAbort(pParse);
 			/* Fall through */
-		case OE_Rollback:
-		case OE_Fail:{
+		case ON_CONFLICT_ACTION_ROLLBACK:
+		case ON_CONFLICT_ACTION_FAIL: {
 				char *zMsg =
 				    sqlite3MPrintf(db, "%s.%s", pTab->zName,
 						   pTab->aCol[i].zName);
@@ -1138,7 +1143,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				VdbeCoverage(v);
 				break;
 			}
-		case OE_Ignore:{
+		case ON_CONFLICT_ACTION_IGNORE: {
 				sqlite3VdbeAddOp2(v, OP_IsNull,
 						  regNewData + 1 + i,
 						  ignoreDest);
@@ -1146,7 +1151,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				break;
 			}
 		default:{
-				assert(onError == OE_Replace);
+				assert(onError == ON_CONFLICT_ACTION_REPLACE);
 				addr1 =
 				    sqlite3VdbeAddOp1(v, OP_NotNull,
 						      regNewData + 1 + i);
@@ -1167,7 +1172,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		ExprList *pCheck = pTab->pCheck;
 		pParse->ckBase = regNewData + 1;
 		onError =
-		    overrideError != OE_Default ? overrideError : OE_Abort;
+		    overrideError != ON_CONFLICT_ACTION_DEFAULT ? overrideError
+			: ON_CONFLICT_ACTION_ABORT;
 		for (i = 0; i < pCheck->nExpr; i++) {
 			int allOk;
 			Expr *pExpr = pCheck->a[i].pExpr;
@@ -1177,14 +1183,14 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			allOk = sqlite3VdbeMakeLabel(v);
 			sqlite3ExprIfTrue(pParse, pExpr, allOk,
 					  SQLITE_JUMPIFNULL);
-			if (onError == OE_Ignore) {
+			if (onError == ON_CONFLICT_ACTION_IGNORE) {
 				sqlite3VdbeGoto(v, ignoreDest);
 			} else {
 				char *zName = pCheck->a[i].zName;
 				if (zName == 0)
 					zName = pTab->zName;
-				if (onError == OE_Replace)
-					onError = OE_Abort;	/* IMP: R-15569-63625 */
+				if (onError == ON_CONFLICT_ACTION_REPLACE)
+					onError = ON_CONFLICT_ACTION_ABORT;
 				sqlite3HaltConstraint(pParse,
 						      SQLITE_CONSTRAINT_CHECK,
 						      onError, zName,
@@ -1209,8 +1215,10 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		int addrUniqueOk;	/* Jump here if the UNIQUE constraint is satisfied */
 		bool uniqueByteCodeNeeded = false;
 
-		if ((pIdx->onError != OE_Abort && pIdx->onError != OE_Default) ||
-		   (overrideError != OE_Abort && overrideError != OE_Default)) {
+		if ((pIdx->onError != ON_CONFLICT_ACTION_ABORT &&
+		     pIdx->onError != ON_CONFLICT_ACTION_DEFAULT) ||
+		    (overrideError != ON_CONFLICT_ACTION_ABORT &&
+		     overrideError != ON_CONFLICT_ACTION_DEFAULT)) {
 			uniqueByteCodeNeeded = true;
 		}
 
@@ -1306,7 +1314,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 
 		/* Find out what action to take in case there is a uniqueness conflict */
 		onError = pIdx->onError;
-		if (onError == OE_None) {
+		if (onError == ON_CONFLICT_ACTION_NONE) {
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
 			continue;	/* pIdx is not a UNIQUE index */
 		}
@@ -1314,15 +1322,16 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		 * INSERT OR FAIL then skip uniqueness checks and let it to be
 		 * done by Tarantool.
 		 */
-		if (overrideError == OE_Fail ||
-		    overrideError == OE_Ignore || overrideError == OE_Abort) {
+		if (overrideError == ON_CONFLICT_ACTION_FAIL ||
+		    overrideError == ON_CONFLICT_ACTION_IGNORE ||
+		    overrideError == ON_CONFLICT_ACTION_ABORT) {
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
 			continue;	/* pIdx is not a UNIQUE index */
 		}
-		if (overrideError != OE_Default) {
+		if (overrideError != ON_CONFLICT_ACTION_DEFAULT) {
 			onError = overrideError;
-		} else if (onError == OE_Default) {
-			onError = OE_Abort;
+		} else if (onError == ON_CONFLICT_ACTION_DEFAULT) {
+			onError = ON_CONFLICT_ACTION_ABORT;
 		}
 
 		/* Collision detection may be omitted if all of the following are true:
@@ -1332,7 +1341,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		 *   (4) No FK constraint counters need to be updated if a conflict occurs.
 		 */
 		if ((ix == 0 && pIdx->pNext == 0)	/* Condition 2 */
-		    && onError == OE_Replace	/* Condition 1 */
+		    && onError == ON_CONFLICT_ACTION_REPLACE	/* Condition 1 */
 		    && (0 == (user_session->sql_flags & SQLITE_RecTriggers)	/* Condition 3 */
 			||0 == sqlite3TriggersExist(pTab, TK_DELETE, 0, 0))
 		    && (0 == (user_session->sql_flags & SQLITE_ForeignKeys) ||	/* Condition 4 */
@@ -1358,7 +1367,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		regR =
 		    (pIdx == pPk) ? regIdx : sqlite3GetTempRange(pParse,
 								 nPkField);
-		if (isUpdate || onError == OE_Replace) {
+		if (isUpdate || onError == ON_CONFLICT_ACTION_REPLACE) {
 			int x;
 			/* Extract the PRIMARY KEY from the end of the index entry and
 			 * store it in registers regR..regR+nPk-1
@@ -1409,25 +1418,27 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		}
 
 		/* Generate code that executes if the new index entry is not unique */
-		assert(onError == OE_Rollback || onError == OE_Abort
-		       || onError == OE_Fail || onError == OE_Ignore
-		       || onError == OE_Replace);
+		assert(onError == ON_CONFLICT_ACTION_ROLLBACK
+		       || onError == ON_CONFLICT_ACTION_ABORT
+		       || onError == ON_CONFLICT_ACTION_FAIL
+		       || onError == ON_CONFLICT_ACTION_IGNORE
+		       || onError == ON_CONFLICT_ACTION_REPLACE);
 		switch (onError) {
-		case OE_Fail:
-		case OE_Rollback:{
+		case ON_CONFLICT_ACTION_FAIL:
+		case ON_CONFLICT_ACTION_ROLLBACK: {
 				sqlite3UniqueConstraint(pParse, onError, pIdx);
 				break;
 			}
-		case OE_Abort:{
+		case ON_CONFLICT_ACTION_ABORT: {
 				break;
 			}
-		case OE_Ignore:{
+		case ON_CONFLICT_ACTION_IGNORE: {
 				sqlite3VdbeGoto(v, ignoreDest);
 				break;
 			}
-		default:{
+		default: {
 				Trigger *pTrigger = 0;
-				assert(onError == OE_Replace);
+				assert(onError == ON_CONFLICT_ACTION_REPLACE);
 				sqlite3MultiWrite(pParse);
 				if (user_session->
 				    sql_flags & SQLITE_RecTriggers) {
@@ -1439,7 +1450,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				sqlite3GenerateRowDelete(pParse, pTab, pTrigger,
 							 iDataCur, iIdxCur,
 							 regR, nPkField, 0,
-							 OE_Replace,
+							 ON_CONFLICT_ACTION_REPLACE,
 							 (pIdx ==
 							  pPk ? ONEPASS_SINGLE :
 							  ONEPASS_OFF), -1);
@@ -1504,15 +1515,15 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
 	}
 	assert(pParse->nested == 0);
 
-	if (onError == OE_Replace) {
+	if (onError == ON_CONFLICT_ACTION_REPLACE) {
 		opcode = OP_IdxReplace;
 	} else {
 		opcode = OP_IdxInsert;
 	}
 
-	if (onError == OE_Ignore) {
+	if (onError == ON_CONFLICT_ACTION_IGNORE) {
 		pik_flags |= OPFLAG_OE_IGNORE;
-	} else if (onError == OE_Fail) {
+	} else if (onError == ON_CONFLICT_ACTION_FAIL) {
 		pik_flags |= OPFLAG_OE_FAIL;
 	}
 
@@ -1580,8 +1591,8 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		 * 3) For table mentioned in FOREIGN KEY constraint
 		 * 4) For an index which has ON CONFLICT action which require
 		 *    VDBE bytecode - ROLLBACK, IGNORE, FAIL, REPLACE:
-		 *    1. If user specified non-default ON CONFLICT (not OE_None
-		 *       or OE_Abort) clause
+		 *    1. If user specified non-default ON CONFLICT (not
+		 *       ON_CONFLICT_ACTION_NONE or _Abort) clause
 		 *       for an non-primary unique index, then bytecode is needed
 		 *    	 for proper error action.
 		 *    2. INSERT/UPDATE OR IGNORE/ABORT/FAIL/REPLACE -
@@ -1597,9 +1608,12 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		    IsPrimaryKeyIndex(pIdx) ||		/* Condition 2 */
 		    sqlite3FkReferences(pTab) ||	/* Condition 3 */
 		    /* Condition 4 */
-		    (IsUniqueIndex(pIdx) && pIdx->onError != OE_Default &&
-		    pIdx->onError != OE_Abort) || 	/* Condition 4.1 */
-		    overrideError == OE_Rollback) {	/* Condition 4.2 */
+		    (IsUniqueIndex(pIdx) && pIdx->onError !=
+		     ON_CONFLICT_ACTION_DEFAULT &&
+		     /* Condition 4.1 */
+		     pIdx->onError != ON_CONFLICT_ACTION_ABORT) ||
+		     /* Condition 4.2 */
+		     overrideError == ON_CONFLICT_ACTION_ROLLBACK) {
 
 			int iIdxCur = iBase++;
 			assert(pIdx->pSchema == pTab->pSchema);
@@ -1639,7 +1653,7 @@ int sqlite3_xferopt_count;
  *
  *    *   The index is over the same set of columns
  *    *   The same DESC and ASC markings occurs on all columns
- *    *   The same onError processing (OE_Abort, OE_Ignore, etc)
+ *    *   The same onError processing (ON_CONFLICT_ACTION_ABORT, _IGNORE, etc)
  *    *   The same collating sequence on each column
  *    *   The index has the exact same WHERE clause
  */
@@ -1738,11 +1752,11 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (pDest->pTrigger) {
 		return 0;	/* tab1 must not have triggers */
 	}
-	if (onError == OE_Default) {
+	if (onError == ON_CONFLICT_ACTION_DEFAULT) {
 		if (pDest->iPKey >= 0)
 			onError = pDest->keyConf;
-		if (onError == OE_Default)
-			onError = OE_Abort;
+		if (onError == ON_CONFLICT_ACTION_DEFAULT)
+			onError = ON_CONFLICT_ACTION_ABORT;
 	}
 	assert(pSelect->pSrc);	/* allocated even if there is no FROM clause */
 	if (pSelect->pSrc->nSrc != 1) {
@@ -1886,7 +1900,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	assert(destHasUniqueIdx);
 	if ((pDest->iPKey < 0 && pDest->pIndex != 0)	/* (1) */
 	    ||destHasUniqueIdx	/* (2) */
-	    || (onError != OE_Abort && onError != OE_Rollback)	/* (3) */
+	    || (onError != ON_CONFLICT_ACTION_ABORT
+		&& onError != ON_CONFLICT_ACTION_ROLLBACK)	/* (3) */
 	    ) {
 		/* In some circumstances, we are able to run the xfer optimization
 		 * only if the destination table is initially empty.
@@ -1900,7 +1915,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		 * (2) The destination has a unique index.  (The xfer optimization
 		 *     is unable to test uniqueness.)
 		 *
-		 * (3) onError is something other than OE_Abort and OE_Rollback.
+		 * (3) onError is something other than ON_CONFLICT_ACTION_ABORT and _ROLLBACK.
 		 */
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iDest, 0);
 		VdbeCoverage(v);

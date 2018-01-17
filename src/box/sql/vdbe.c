@@ -954,7 +954,8 @@ case OP_HaltIfNull: {      /* in3 */
  * or sqlite3_finalize().  For a normal halt, this should be SQLITE_OK (0).
  * For errors, it can be some other value.  If P1!=0 then P2 will determine
  * whether or not to rollback the current transaction.  Do not rollback
- * if P2==OE_Fail. Do the rollback if P2==OE_Rollback.  If P2==OE_Abort,
+ * if P2==ON_CONFLICT_ACTION_FAIL. Do the rollback if
+ * P2==ON_CONFLICT_ACTION_ROLLBACK.  If P2==ON_CONFLICT_ACTION_ABORT,
  * then back out all changes that have occurred during this execution of the
  * VDBE, but do not rollback the transaction.
  *
@@ -987,10 +988,11 @@ case OP_Halt: {
 		p->nFrame--;
 		sqlite3VdbeSetChanges(db, p->nChange);
 		pcx = sqlite3VdbeFrameRestore(pFrame);
-		if (pOp->p2==OE_Ignore) {
+		if (pOp->p2 == ON_CONFLICT_ACTION_IGNORE) {
 			/* Instruction pcx is the OP_Program that invoked the sub-program
 			 * currently being halted. If the p2 instruction of this OP_Halt
-			 * instruction is set to OE_Ignore, then the sub-program is throwing
+			 * instruction is set to ON_CONFLICT_ACTION_IGNORE, then
+			 * the sub-program is throwing
 			 * an IGNORE exception. In this case jump to the address specified
 			 * as the p2 of the calling OP_Program.
 			 */
@@ -4510,10 +4512,11 @@ case OP_IdxInsert: {        /* in2 */
 			p->ignoreRaised++;
 		}
 	} else if (pOp->p5 & OPFLAG_OE_FAIL) {
-		p->errorAction = OE_Fail;
+		p->errorAction = ON_CONFLICT_ACTION_FAIL;
 	}
 
-	assert(p->errorAction == OE_Abort || p->errorAction == OE_Fail);
+	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT ||
+	       p->errorAction == ON_CONFLICT_ACTION_FAIL);
 	if (rc) goto abort_due_to_error;
 	break;
 }
@@ -4675,7 +4678,7 @@ case OP_Destroy: {     /* out2 */
 	pOut->flags = MEM_Null;
 	if (db->nVdbeRead > 1) {
 		rc = SQLITE_LOCKED;
-		p->errorAction = OE_Abort;
+		p->errorAction = ON_CONFLICT_ACTION_ABORT;
 		goto abort_due_to_error;
 	} else {
 		iMoved = 0;  /* Not needed.  Only to silence a warning. */

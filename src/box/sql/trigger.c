@@ -369,7 +369,7 @@ sqlite3TriggerSelectStep(sqlite3 * db, Select * pSelect)
 	}
 	pTriggerStep->op = TK_SELECT;
 	pTriggerStep->pSelect = pSelect;
-	pTriggerStep->orconf = OE_Default;
+	pTriggerStep->orconf = ON_CONFLICT_ACTION_DEFAULT;
 	return pTriggerStep;
 }
 
@@ -411,7 +411,10 @@ sqlite3TriggerInsertStep(sqlite3 * db,	/* The database connection */
 			 Token * pTableName,	/* Name of the table into which we insert */
 			 IdList * pColumn,	/* List of columns in pTableName to insert into */
 			 Select * pSelect,	/* A SELECT statement that supplies values */
-			 u8 orconf	/* The conflict algorithm (OE_Abort, OE_Replace, etc.) */
+			 u8 orconf	/* The conflict algorithm
+					 * (ON_CONFLICT_ACTION_ABORT, _REPLACE,
+					 * etc.)
+					 */
     )
 {
 	TriggerStep *pTriggerStep;
@@ -442,7 +445,10 @@ sqlite3TriggerUpdateStep(sqlite3 * db,	/* The database connection */
 			 Token * pTableName,	/* Name of the table to be updated */
 			 ExprList * pEList,	/* The SET clause: list of column and new values */
 			 Expr * pWhere,	/* The WHERE clause */
-			 u8 orconf	/* The conflict algorithm. (OE_Abort, OE_Ignore, etc) */
+			 u8 orconf	/* The conflict algorithm.
+					 * (ON_CONFLICT_ACTION_ABORT, _IGNORE,
+					 * etc)
+					 */
     )
 {
 	TriggerStep *pTriggerStep;
@@ -477,7 +483,7 @@ sqlite3TriggerDeleteStep(sqlite3 * db,	/* Database connection */
 	if (pTriggerStep) {
 		pTriggerStep->pWhere =
 		    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
-		pTriggerStep->orconf = OE_Default;
+		pTriggerStep->orconf = ON_CONFLICT_ACTION_DEFAULT;
 	}
 	sqlite3ExprDelete(db, pWhere);
 	return pTriggerStep;
@@ -709,7 +715,10 @@ targetSrcList(Parse * pParse,	/* The parsing context */
 static int
 codeTriggerProgram(Parse * pParse,	/* The parser context */
 		   TriggerStep * pStepList,	/* List of statements inside the trigger body */
-		   int orconf	/* Conflict algorithm. (OE_Abort, etc) */
+		   int orconf	/* Conflict algorithm.
+				 * (ON_CONFLICT_ACTION_ABORT,
+				 * etc)
+				 */
     )
 {
 	TriggerStep *pStep;
@@ -743,7 +752,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 		 *   INSERT OR IGNORE INTO t1 ... ;  -- insert into t2 uses IGNORE policy
 		 */
 		pParse->eOrconf =
-		    (orconf == OE_Default) ? pStep->orconf : (u8) orconf;
+		    (orconf == ON_CONFLICT_ACTION_DEFAULT) ? pStep->orconf : (u8) orconf;
 		assert(pParse->okConstFactor == 0);
 
 		switch (pStep->op) {
@@ -808,17 +817,17 @@ static const char *
 onErrorText(int onError)
 {
 	switch (onError) {
-	case OE_Abort:
+	case ON_CONFLICT_ACTION_ABORT:
 		return "abort";
-	case OE_Rollback:
+	case ON_CONFLICT_ACTION_ROLLBACK:
 		return "rollback";
-	case OE_Fail:
+	case ON_CONFLICT_ACTION_FAIL:
 		return "fail";
-	case OE_Replace:
+	case ON_CONFLICT_ACTION_REPLACE:
 		return "replace";
-	case OE_Ignore:
+	case ON_CONFLICT_ACTION_IGNORE:
 		return "ignore";
-	case OE_Default:
+	case ON_CONFLICT_ACTION_DEFAULT:
 		return "default";
 	}
 	return "n/a";

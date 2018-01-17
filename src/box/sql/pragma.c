@@ -173,7 +173,7 @@ actionName(u8 action)
 		break;
 	default:
 		zName = "NO ACTION";
-		assert(action == OE_None);
+		assert(action == ON_CONFLICT_ACTION_NONE);
 		break;
 	}
 	return zName;

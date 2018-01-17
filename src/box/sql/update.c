@@ -427,11 +427,11 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * action, then we need to open all indices because we might need
 		 * to be deleting some records.
 		 */
-		if (onError == OE_Replace) {
+		if (onError == ON_CONFLICT_ACTION_REPLACE) {
 			memset(aToOpen, 1, nIdx + 1);
 		} else {
 			for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
-				if (pIdx->onError == OE_Replace) {
+				if (pIdx->onError == ON_CONFLICT_ACTION_REPLACE) {
 					memset(aToOpen, 1, nIdx + 1);
 					break;
 				}

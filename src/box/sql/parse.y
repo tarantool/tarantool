@@ -295,7 +295,7 @@ autoinc(X) ::= AUTOINCR.  {X = 1;}
 // check fails.
 //
 %type refargs {int}
-refargs(A) ::= .                  { A = OE_None*0x0101; /* EV: R-19803-45884 */}
+refargs(A) ::= .                  { A = ON_CONFLICT_ACTION_NONE*0x0101; /* EV: R-19803-45884 */}
 refargs(A) ::= refargs(A) refarg(Y). { A = (A & ~Y.mask) | Y.value; }
 %type refarg {struct {int value; int mask;}}
 refarg(A) ::= MATCH nm.              { A.value = 0;     A.mask = 0x000000; }
@@ -307,7 +307,7 @@ refact(A) ::= SET NULL.              { A = OE_SetNull;  /* EV: R-33326-45252 */}
 refact(A) ::= SET DEFAULT.           { A = OE_SetDflt;  /* EV: R-33326-45252 */}
 refact(A) ::= CASCADE.               { A = OE_Cascade;  /* EV: R-33326-45252 */}
 refact(A) ::= RESTRICT.              { A = OE_Restrict; /* EV: R-33326-45252 */}
-refact(A) ::= NO ACTION.             { A = OE_None;     /* EV: R-33326-45252 */}
+refact(A) ::= NO ACTION.             { A = ON_CONFLICT_ACTION_NONE;     /* EV: R-33326-45252 */}
 %type defer_subclause {int}
 defer_subclause(A) ::= NOT DEFERRABLE init_deferred_pred_opt.     {A = 0;}
 defer_subclause(A) ::= DEFERRABLE init_deferred_pred_opt(X).      {A = X;}
@@ -345,13 +345,13 @@ defer_subclause_opt(A) ::= defer_subclause(A).
 %type onconf {int}
 %type orconf {int}
 %type resolvetype {int}
-onconf(A) ::= .                              {A = OE_Default;}
+onconf(A) ::= .                              {A = ON_CONFLICT_ACTION_DEFAULT;}
 onconf(A) ::= ON CONFLICT resolvetype(X).    {A = X;}
-orconf(A) ::= .                              {A = OE_Default;}
+orconf(A) ::= .                              {A = ON_CONFLICT_ACTION_DEFAULT;}
 orconf(A) ::= OR resolvetype(X).             {A = X;}
 resolvetype(A) ::= raisetype(A).
-resolvetype(A) ::= IGNORE.                   {A = OE_Ignore;}
-resolvetype(A) ::= REPLACE.                  {A = OE_Replace;}
+resolvetype(A) ::= IGNORE.                   {A = ON_CONFLICT_ACTION_IGNORE;}
+resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
@@ -806,7 +806,7 @@ cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
 
 %type insert_cmd {int}
 insert_cmd(A) ::= INSERT orconf(R).   {A = R;}
-insert_cmd(A) ::= REPLACE.            {A = OE_Replace;}
+insert_cmd(A) ::= REPLACE.            {A = ON_CONFLICT_ACTION_REPLACE;}
 
 %type idlist_opt {IdList*}
 %destructor idlist_opt {sqlite3IdListDelete(pParse->db, $$);}
@@ -1243,8 +1243,8 @@ cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
 }
 
 %type uniqueflag {int}
-uniqueflag(A) ::= UNIQUE.  {A = OE_Abort;}
-uniqueflag(A) ::= .        {A = OE_None;}
+uniqueflag(A) ::= UNIQUE.  {A = ON_CONFLICT_ACTION_ABORT;}
+uniqueflag(A) ::= .        {A = ON_CONFLICT_ACTION_NONE;}
 
 
 // The eidlist non-terminal (Expression Id List) generates an ExprList
@@ -1444,7 +1444,7 @@ expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
   A.pExpr = sqlite3PExpr(pParse, TK_RAISE, 0, 0); 
   if( A.pExpr ){
-    A.pExpr->affinity = OE_Ignore;
+    A.pExpr->affinity = ON_CONFLICT_ACTION_IGNORE;
   }
 }
 expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
@@ -1457,9 +1457,9 @@ expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
 %endif  !SQLITE_OMIT_TRIGGER
 
 %type raisetype {int}
-raisetype(A) ::= ROLLBACK.  {A = OE_Rollback;}
-raisetype(A) ::= ABORT.     {A = OE_Abort;}
-raisetype(A) ::= FAIL.      {A = OE_Fail;}
+raisetype(A) ::= ROLLBACK.  {A = ON_CONFLICT_ACTION_ROLLBACK;}
+raisetype(A) ::= ABORT.     {A = ON_CONFLICT_ACTION_ABORT;}
+raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////

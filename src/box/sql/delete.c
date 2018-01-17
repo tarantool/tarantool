@@ -516,7 +516,8 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite,
 						   OPFLAG_FORDELETE, iTabCur,
 						   aToOpen, &iDataCur,
-						   &iIdxCur, OE_None, 0);
+						   &iIdxCur,
+						   ON_CONFLICT_ACTION_NONE, 0);
 			assert(pPk || iDataCur == iTabCur);
 			assert(pPk || iIdxCur == iDataCur + 1);
 			if (eOnePass == ONEPASS_MULTI)
@@ -553,7 +554,9 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			}
 			sqlite3GenerateRowDelete(pParse, pTab, pTrigger,
 						 iDataCur, iIdxCur, iKey, nKey,
-						 count, OE_Default, eOnePass,
+						 count,
+						 ON_CONFLICT_ACTION_DEFAULT,
+						 eOnePass,
 						 iIdxNoSeek);
 		}
 
@@ -710,7 +713,7 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 			 int iPk,		/* First memory cell containing the PRIMARY KEY */
 			 i16 nPk,		/* Number of PRIMARY KEY memory cells */
 			 u8 count,		/* If non-zero, increment the row change counter */
-			 u8 onconf,		/* Default ON CONFLICT policy for triggers */
+			 enum on_conflict_action onconf,		/* Default ON CONFLICT policy for triggers */
 			 u8 eMode,		/* ONEPASS_OFF, _SINGLE, or _MULTI.  See above */
 			 int iIdxNoSeek)	/* Cursor number of cursor that does not need seeking */
 {

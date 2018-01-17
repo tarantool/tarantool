@@ -495,7 +495,8 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 		 */
 		assert(nIncr == 1);
 		sqlite3HaltConstraint(pParse, SQLITE_CONSTRAINT_FOREIGNKEY,
-				      OE_Abort, 0, P4_STATIC, P5_ConstraintFK);
+				      ON_CONFLICT_ACTION_ABORT, 0, P4_STATIC,
+				      P5_ConstraintFK);
 	} else {
 		if (nIncr > 0 && pFKey->isDeferred == 0) {
 			sqlite3MayAbort(pParse);
@@ -1263,7 +1264,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 	}
 	pTrigger = pFKey->apTrigger[iAction];
 
-	if (action != OE_None && !pTrigger) {
+	if (action != ON_CONFLICT_ACTION_NONE && !pTrigger) {
 		char const *zFrom;	/* Name of child table */
 		int nFrom;	/* Length in bytes of zFrom */
 		Index *pIdx = 0;	/* Parent key index for this FK */
@@ -1396,7 +1397,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 			    sqlite3Expr(db, TK_RAISE,
 					"FOREIGN KEY constraint failed");
 			if (pRaise) {
-				pRaise->affinity = OE_Abort;
+				pRaise->affinity = ON_CONFLICT_ACTION_ABORT;
 			}
 			pSelect = sqlite3SelectNew(pParse,
 						   sqlite3ExprListAppend(pParse,
@@ -1501,7 +1502,7 @@ sqlite3FkActions(Parse * pParse,	/* Parse context */
 					sqlite3CodeRowTriggerDirect(pParse,
 								    pAct, pTab,
 								    regOld,
-								    OE_Abort,
+								    ON_CONFLICT_ACTION_ABORT,
 								    0);
 				}
 			}

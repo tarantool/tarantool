@@ -84,7 +84,8 @@ struct tuple;
  * @retval boolean nullability attribute
  */
 static inline bool
-key_part_is_nullable(const struct key_part *part) {
+key_part_is_nullable(const struct key_part *part)
+{
 	return part->is_nullable;
 }
 

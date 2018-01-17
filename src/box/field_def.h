@@ -59,6 +59,17 @@ enum field_type {
 	field_type_MAX
 };
 
+enum on_conflict_action {
+	ON_CONFLICT_ACTION_NONE = 0,
+	ON_CONFLICT_ACTION_ROLLBACK,
+	ON_CONFLICT_ACTION_ABORT,
+	ON_CONFLICT_ACTION_FAIL,
+	ON_CONFLICT_ACTION_IGNORE,
+	ON_CONFLICT_ACTION_REPLACE,
+	ON_CONFLICT_ACTION_DEFAULT,
+	on_conflict_action_MAX
+};
+
 /** \endcond public */
 
 extern const char *field_type_strs[];

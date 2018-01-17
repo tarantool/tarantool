@@ -578,16 +578,16 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 	case TK_RAISE:{
 			const char *zType = "unk";
 			switch (pExpr->affinity) {
-			case OE_Rollback:
+			case ON_CONFLICT_ACTION_ROLLBACK:
 				zType = "rollback";
 				break;
-			case OE_Abort:
+			case ON_CONFLICT_ACTION_ABORT:
 				zType = "abort";
 				break;
-			case OE_Fail:
+			case ON_CONFLICT_ACTION_FAIL:
 				zType = "fail";
 				break;
-			case OE_Ignore:
+			case ON_CONFLICT_ACTION_IGNORE:
 				zType = "ignore";
 				break;
 			}
