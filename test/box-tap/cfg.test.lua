@@ -5,7 +5,7 @@ local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
-test:plan(78)
+test:plan(79)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -180,6 +180,10 @@ box.cfg{log_nonblock = false }
 os.exit(box.cfg.log_nonblock == false and 0 or 1)
 ]]
 test:is(run_script(code), 0, "log_nonblock new value")
+
+-- gh-3048: box.cfg must not crash on invalid log configuration
+code = [[ box.cfg{ log = '/' } ]]
+test:is(run_script(code), PANIC, 'log is invalid')
 
 -- box.cfg { listen = xx }
 local path = './tarantool.sock'

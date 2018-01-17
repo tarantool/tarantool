@@ -76,7 +76,8 @@ static inline int
 log_vsay(struct log *log, int level, const char *filename, int line,
 	 const char *error, const char *format, va_list ap);
 
-struct log log_default = {
+/** Default logger used before logging subsystem is initialized. */
+static struct log log_boot = {
 	.fd = STDERR_FILENO,
 	.level = S_INFO,
 	.type = SAY_LOGGER_BOOT,
@@ -86,6 +87,11 @@ struct log log_default = {
 	.pid = 0,
 	.syslog_ident = NULL,
 };
+
+/** Default logger used after bootstrap. */
+static struct log log_std;
+
+static struct log *log_default = &log_boot;
 
 sayfunc_t _say = say_default;
 
@@ -178,7 +184,7 @@ void
 say_set_log_level(int new_level)
 {
 	log_level = new_level;
-	log_set_level(&log_default, (enum say_level) new_level);
+	log_set_level(log_default, (enum say_level) new_level);
 }
 
 void
@@ -191,17 +197,17 @@ say_set_log_format(enum say_format format)
 		 * For syslog, default or boot log type the log format can
 		 * not be changed.
 		 */
-		if (log_default.type != SAY_LOGGER_STDERR &&
-		    log_default.type != SAY_LOGGER_PIPE &&
-		    log_default.type != SAY_LOGGER_FILE) {
+		if (log_default->type != SAY_LOGGER_STDERR &&
+		    log_default->type != SAY_LOGGER_PIPE &&
+		    log_default->type != SAY_LOGGER_FILE) {
 			say_error("json log format is not supported when output is '%s'",
-				  say_logger_type_strs[log_default.type]);
+				  say_logger_type_strs[log_default->type]);
 			return;
 		}
-		log_set_format(&log_default, say_format_json);
+		log_set_format(log_default, say_format_json);
 		break;
 	case SF_PLAIN:
-		log_set_format(&log_default, say_format_plain);
+		log_set_format(log_default, say_format_plain);
 		break;
 	default:
 		unreachable();
@@ -276,9 +282,9 @@ say_logrotate(int signo)
 	/*
 	 * log_background applies only to log_default logger
 	 */
-	if (log_background && log_default.type == SAY_LOGGER_FILE) {
-		dup2(log_default.fd, STDOUT_FILENO);
-		dup2(log_default.fd, STDERR_FILENO);
+	if (log_background && log_default->type == SAY_LOGGER_FILE) {
+		dup2(log_default->fd, STDOUT_FILENO);
+		dup2(log_default->fd, STDERR_FILENO);
 	}
 	errno = saved_errno;
 }
@@ -509,10 +515,12 @@ void
 say_logger_init(const char *init_str, int level, int nonblock,
 		const char *format, int background)
 {
-	if (log_create(&log_default, init_str, nonblock) < 0) {
+	if (log_create(&log_std, init_str, nonblock) < 0)
 		goto fail;
-	}
-	switch (log_default.type) {
+
+	log_default = &log_std;
+
+	switch (log_default->type) {
 	case SAY_LOGGER_PIPE:
 		fprintf(stderr, "started logging into a pipe,"
 			" SIGHUP log rotation disabled\n");
@@ -526,14 +534,14 @@ say_logger_init(const char *init_str, int level, int nonblock,
 	_say = say_default;
 	say_set_log_level(level);
 	log_background = background;
-	log_pid = log_default.pid;
+	log_pid = log_default->pid;
 	signal(SIGHUP, say_logrotate);
 	say_set_log_format(say_format_by_name(format));
 
 	if (background) {
 		fflush(stderr);
 		fflush(stdout);
-		if (log_default.fd == STDERR_FILENO) {
+		if (log_default->fd == STDERR_FILENO) {
 			int fd = open("/dev/null", O_WRONLY);
 			if (fd < 0) {
 				diag_set(SystemError, "open /dev/null");
@@ -543,8 +551,8 @@ say_logger_init(const char *init_str, int level, int nonblock,
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
 		} else {
-			dup2(log_default.fd, STDERR_FILENO);
-			dup2(log_default.fd, STDOUT_FILENO);
+			dup2(log_default->fd, STDERR_FILENO);
+			dup2(log_default->fd, STDOUT_FILENO);
 		}
 	}
 	return;
@@ -556,8 +564,8 @@ fail:
 void
 say_logger_free()
 {
-	if (log_default.type != SAY_LOGGER_BOOT)
-		log_destroy(&log_default);
+	if (log_default == &log_std)
+		log_destroy(&log_std);
 }
 
 /** {{{ Formatters */
@@ -804,9 +812,9 @@ say_default(int level, const char *filename, int line, const char *error,
 	int errsv = errno;
 	va_list ap;
 	va_start(ap, format);
-	int total = log_vsay(&log_default, level, filename,
+	int total = log_vsay(log_default, level, filename,
 			     line, error, format, ap);
-	if (level == S_FATAL && log_default.fd != STDERR_FILENO)
+	if (level == S_FATAL && log_default->fd != STDERR_FILENO)
 		(void) write(STDERR_FILENO, buf, total);
 
 	va_end(ap);
