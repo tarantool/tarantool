@@ -1107,11 +1107,12 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			/* Don't bother checking for NOT NULL on columns that do not change */
 			continue;
 		}
-		onError = pTab->aCol[i].notNull;
-		if (onError == ON_CONFLICT_ACTION_NONE
-		    || (pTab->tabFlags & TF_Autoincrement && pTab->iAutoIncPKey == i))
+		if (table_column_is_nullable(pTab, i)
+		    || (pTab->tabFlags & TF_Autoincrement
+			&& pTab->iAutoIncPKey == i))
 			continue;	/* This column is allowed to be NULL */
 
+		onError = table_column_nullable_action(pTab, i);
 		if (overrideError != ON_CONFLICT_ACTION_DEFAULT) {
 			onError = overrideError;
 		} else if (onError == ON_CONFLICT_ACTION_DEFAULT) {
@@ -1832,7 +1833,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		if (sqlite3_stricmp(pDestCol->zColl, pSrcCol->zColl) != 0) {
 			return 0;	/* Collating sequence must be the same on all columns */
 		}
-		if (pDestCol->notNull && !pSrcCol->notNull) {
+		if (!table_column_is_nullable(pDest, i)
+		    && table_column_is_nullable(pSrc, i)) {
 			return 0;	/* tab2 must be NOT NULL if tab1 is */
 		}
 		/* Default values for second and subsequent columns need to match. */

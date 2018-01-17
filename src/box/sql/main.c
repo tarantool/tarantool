@@ -2720,7 +2720,7 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 	if (pCol) {
 		zDataType = sqlite3ColumnType(pCol, 0);
 		zCollSeq = pCol->zColl;
-		notnull = pCol->notNull != 0;
+		notnull = table_column_is_nullable(pTab, iCol) == 0;
 		primarykey = (pCol->colFlags & COLFLAG_PRIMKEY) != 0;
 		autoinc = pTab->iPKey == iCol
 		    && (pTab->tabFlags & TF_Autoincrement) != 0;

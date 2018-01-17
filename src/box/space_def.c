@@ -150,13 +150,12 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 		char *name_pos = (char *)def + names_offset;
 		def->fields = (struct field_def *)((char *)def + fields_offset);
 		for (uint32_t i = 0; i < field_count; ++i) {
+			def->fields[i] = fields[i];
 			def->fields[i].name = name_pos;
 			uint32_t len = strlen(fields[i].name);
 			memcpy(def->fields[i].name, fields[i].name, len);
 			def->fields[i].name[len] = 0;
-			def->fields[i].type = fields[i].type;
 			name_pos += len + 1;
-			def->fields[i].is_nullable = fields[i].is_nullable;
 		}
 	}
 	return def;

@@ -74,6 +74,8 @@ enum on_conflict_action {
 
 extern const char *field_type_strs[];
 
+extern const char *on_conflict_action_strs[];
+
 /** Check if @a new_type can store values of @an old_type. */
 bool
 field_type_is_compatible(enum field_type old_type, enum field_type new_type);
@@ -104,6 +106,8 @@ struct field_def {
 	char *name;
 	/** True, if a field can store NULL. */
 	bool is_nullable;
+	/** Action to perform if NULL constraint failed. */
+	enum on_conflict_action nullable_action;
 };
 
 #if defined(__cplusplus)

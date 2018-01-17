@@ -40,6 +40,7 @@ static const struct key_part_def key_part_def_default = {
 	field_type_MAX,
 	COLL_NONE,
 	false,
+	ON_CONFLICT_ACTION_ABORT
 };
 
 static int64_t
@@ -48,10 +49,11 @@ part_type_by_name_wrapper(const char *str, uint32_t len)
 	return field_type_by_name(str, len);
 }
 
-#define PART_OPT_TYPE		"type"
-#define PART_OPT_FIELD		"field"
-#define PART_OPT_COLLATION	"collation"
-#define PART_OPT_NULLABILITY	"is_nullable"
+#define PART_OPT_TYPE		 "type"
+#define PART_OPT_FIELD		 "field"
+#define PART_OPT_COLLATION	 "collation"
+#define PART_OPT_NULLABILITY	 "is_nullable"
+#define PART_OPT_NULLABLE_ACTION "nullable_action"
 
 const struct opt_def part_def_reg[] = {
 	OPT_DEF_ENUM(PART_OPT_TYPE, field_type, struct key_part_def, type,
@@ -60,6 +62,8 @@ const struct opt_def part_def_reg[] = {
 	OPT_DEF(PART_OPT_COLLATION, OPT_UINT32, struct key_part_def, coll_id),
 	OPT_DEF(PART_OPT_NULLABILITY, OPT_BOOL, struct key_part_def,
 		is_nullable),
+	OPT_DEF_ENUM(PART_OPT_NULLABLE_ACTION, on_conflict_action,
+		     struct key_part_def, nullable_action, NULL),
 	OPT_END,
 };
 
@@ -149,7 +153,7 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 			}
 		}
 		key_def_set_part(def, i, part->fieldno, part->type,
-				 part->is_nullable, coll);
+				 part->nullable_action, coll);
 	}
 	return def;
 }
@@ -163,6 +167,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts)
 		part_def->fieldno = part->fieldno;
 		part_def->type = part->type;
 		part_def->is_nullable = key_part_is_nullable(part);
+		part_def->nullable_action = part->nullable_action;
 		part_def->coll_id = (part->coll != NULL ?
 				     part->coll->id : COLL_NONE);
 	}
@@ -178,7 +183,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 	for (uint32_t item = 0; item < part_count; ++item) {
 		key_def_set_part(key_def, item, fields[item],
 				 (enum field_type)types[item],
-				 key_part_def_default.is_nullable, NULL);
+				 key_part_def_default.nullable_action, NULL);
 	}
 	return key_def;
 }
@@ -237,12 +242,13 @@ key_part_check_compatibility(const struct key_part *old_parts,
 
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, bool is_nullable, struct coll *coll)
+		 enum field_type type, enum on_conflict_action nullable_action,
+		 struct coll *coll)
 {
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
-	def->is_nullable |= is_nullable;
-	def->parts[part_no].is_nullable = is_nullable;
+	def->is_nullable |= (nullable_action == ON_CONFLICT_ACTION_NONE);
+	def->parts[part_no].nullable_action = nullable_action;
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	def->parts[part_no].coll = coll;
@@ -380,6 +386,7 @@ key_def_decode_parts_166(struct key_part_def *parts, uint32_t part_count,
 				 "field id must be an integer");
 			return -1;
 		}
+		*part = key_part_def_default;
 		part->fieldno = (uint32_t) mp_decode_uint(data);
 		if (mp_typeof(**data) != MP_STR) {
 			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
@@ -421,11 +428,35 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 				 "index part is expected to be a map");
 			return -1;
 		}
+		int opts_count = mp_decode_map(data);
 		*part = key_part_def_default;
-		if (opts_decode(part, part_def_reg, data,
-				ER_WRONG_INDEX_OPTIONS, i + TUPLE_INDEX_BASE,
-				NULL) != 0)
-			return -1;
+		bool is_action_missing = true;
+		uint32_t  action_literal_len = strlen("nullable_action");
+		for (int j = 0; j < opts_count; ++j) {
+			if (mp_typeof(**data) != MP_STR) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 i + TUPLE_INDEX_BASE,
+					 "key must be a string");
+				return -1;
+			}
+			uint32_t key_len;
+			const char *key = mp_decode_str(data, &key_len);
+			if (opts_parse_key(part, part_def_reg, key, key_len, data,
+					   ER_WRONG_INDEX_OPTIONS,
+					   i + TUPLE_INDEX_BASE, NULL,
+					   false) != 0)
+				return -1;
+			if (is_action_missing &&
+			    key_len == action_literal_len &&
+			    memcmp(key, "nullable_action",
+				   action_literal_len) == 0)
+				is_action_missing = false;
+		}
+		if (is_action_missing) {
+			part->nullable_action = part->is_nullable ?
+				ON_CONFLICT_ACTION_NONE
+				: ON_CONFLICT_ACTION_ABORT;
+		}
 		if (part->type == field_type_MAX) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 				 i + TUPLE_INDEX_BASE,
@@ -439,6 +470,17 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 				 i + 1,
 				 "collation is reasonable only for "
 				 "string and scalar parts");
+			return -1;
+		}
+		if (!((part->is_nullable && part->nullable_action ==
+		       ON_CONFLICT_ACTION_NONE)
+		      || (!part->is_nullable
+			  && part->nullable_action !=
+			  ON_CONFLICT_ACTION_NONE))) {
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+				 i + TUPLE_INDEX_BASE,
+				 "index part: conflicting nullability and "
+				 "nullable action properties");
 			return -1;
 		}
 	}
@@ -489,7 +531,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	end = part + first->part_count;
 	for (; part != end; part++) {
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 key_part_is_nullable(part), part->coll);
+				 part->nullable_action, part->coll);
 	}
 
 	/* Set-append second key def's part to the new key def. */
@@ -499,7 +541,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		if (key_def_find(first, part->fieldno))
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 key_part_is_nullable(part), part->coll);
+				 part->nullable_action, part->coll);
 	}
 	return new_def;
 }

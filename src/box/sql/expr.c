@@ -2186,7 +2186,8 @@ sqlite3ExprCanBeNull(const Expr * p)
 	case TK_COLUMN:
 		assert(p->pTab != 0);
 		return ExprHasProperty(p, EP_CanBeNull) ||
-		    (p->iColumn >= 0 && p->pTab->aCol[p->iColumn].notNull == 0);
+		       (p->iColumn >= 0
+		        && table_column_is_nullable(p->pTab, p->iColumn));
 	default:
 		return 1;
 	}

@@ -96,8 +96,8 @@ struct tuple_field {
 	int32_t offset_slot;
 	/** True if this field is used by an index. */
 	bool is_key_part;
-	/** True, if a field can store NULL. */
-	bool is_nullable;
+	/** Action to perform if NULL constraint failed. */
+	enum on_conflict_action nullable_action;
 };
 
 /**
@@ -109,7 +109,7 @@ struct tuple_field {
 static inline bool
 tuple_field_is_nullable(const struct tuple_field *tuple_field)
 {
-	return tuple_field->is_nullable;
+	return tuple_field->nullable_action == ON_CONFLICT_ACTION_NONE;
 }
 
 /**

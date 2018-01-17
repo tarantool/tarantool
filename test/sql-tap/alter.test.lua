@@ -93,7 +93,7 @@ test:do_catchsql_test(
         ALTER TABLE "_space" RENAME TO space;
     ]], {
         -- <alter-2.3>
-        1, "Failed to execute SQL statement: can't modify name of space created not via SQL facilities."
+        1, "Failed to execute SQL statement: can't modify name of space created not via SQL facilities"
         -- </alter-2.3>
     })
 

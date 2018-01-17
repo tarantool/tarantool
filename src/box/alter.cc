@@ -315,6 +315,8 @@ field_def_decode(struct field_def *field, const char **data,
 	}
 	int count = mp_decode_map(data);
 	*field = field_def_default;
+	bool is_action_missing = true;
+	uint32_t action_literal_len = strlen("nullable_action");
 	for (int i = 0; i < count; ++i) {
 		if (mp_typeof(**data) != MP_STR) {
 			tnt_raise(ClientError, errcode,
@@ -330,6 +332,15 @@ field_def_decode(struct field_def *field, const char **data,
 				   fieldno + TUPLE_INDEX_BASE, region,
 				   true) != 0)
 			diag_raise();
+		if (is_action_missing &&
+		    key_len == action_literal_len &&
+		    memcmp(key, "nullable_action", action_literal_len) == 0)
+			is_action_missing = false;
+	}
+	if (is_action_missing) {
+		field->nullable_action = field->is_nullable ?
+			ON_CONFLICT_ACTION_NONE
+			: ON_CONFLICT_ACTION_DEFAULT;
 	}
 	if (field->name == NULL) {
 		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
@@ -347,6 +358,21 @@ field_def_decode(struct field_def *field, const char **data,
 		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
 			  tt_sprintf("field %d has unknown field type",
 				     fieldno + TUPLE_INDEX_BASE));
+	}
+	if (field->nullable_action == on_conflict_action_MAX) {
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
+			  tt_sprintf("field %d has unknown field on conflict "
+				     "nullable action",
+				     fieldno + TUPLE_INDEX_BASE));
+	}
+	if (!((field->is_nullable && field->nullable_action ==
+	       ON_CONFLICT_ACTION_NONE)
+	      || (!field->is_nullable
+		  && field->nullable_action != ON_CONFLICT_ACTION_NONE))) {
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
+			  tt_sprintf("field %d has conflicting nullability and "
+				     "nullable action properties", fieldno +
+				     TUPLE_INDEX_BASE));
 	}
 }
 

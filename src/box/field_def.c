@@ -44,6 +44,16 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_MAP]      = */ "map",
 };
 
+const char *on_conflict_action_strs[] = {
+	/* [ON_CONFLICT_ACTION_NONE]     = */ "none",
+	/* [ON_CONFLICT_ACTION_ROLLBACK] = */ "rollback",
+	/* [ON_CONFLICT_ACTION_ABORT]    = */ "abort",
+	/* [ON_CONFLICT_ACTION_FAIL]     = */ "fail",
+	/* [ON_CONFLICT_ACTION_IGNORE]   = */ "ignore",
+	/* [ON_CONFLICT_ACTION_REPLACE]  = */ "replace",
+	/* [ON_CONFLICT_ACTION_DEFAULT]  = */ "default"
+};
+
 static int64_t
 field_type_by_name_wrapper(const char *str, uint32_t len)
 {
@@ -80,6 +90,8 @@ const struct opt_def field_def_reg[] = {
 		     field_type_by_name_wrapper),
 	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
 	OPT_DEF("is_nullable", OPT_BOOL, struct field_def, is_nullable),
+	OPT_DEF_ENUM("nullable_action", on_conflict_action, struct field_def,
+		     nullable_action, NULL),
 	OPT_END,
 };
 
@@ -87,6 +99,7 @@ const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
 	.name = NULL,
 	.is_nullable = false,
+	.nullable_action = ON_CONFLICT_ACTION_DEFAULT
 };
 
 enum field_type

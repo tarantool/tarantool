@@ -1269,7 +1269,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			 * FYI: entries in an index are ordered as follows:
 			 *      NULL, ... NULL, min_value, ...
 			 */
-			if ((j >= 0 && pIdx->pTable->aCol[j].notNull == 0)
+			if ((j >= 0 && table_column_is_nullable(pIdx->pTable, j))
 			    || j == XN_EXPR) {
 				assert(pLoop->nSkip == 0);
 				bSeekPastNull = 1;
@@ -1316,7 +1316,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			if (pRangeStart == 0) {
 				j = pIdx->aiColumn[nEq];
 				if ((j >= 0
-				     && pIdx->pTable->aCol[j].notNull == 0) || j == XN_EXPR) {
+				     && table_column_is_nullable(pIdx->pTable, j)) || j == XN_EXPR) {
 					bSeekPastNull = 1;
 				}
 			}

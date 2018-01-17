@@ -242,3 +242,100 @@ s.index.i4:select()
 s.index.i5:select()
 
 s:drop()
+
+-- Check that action property is consistent if nullable
+format = {}
+format[1] = { name = 'field1', type = 'unsigned' }
+format[2] = { name = 'field2', type = 'unsigned', is_nullable = false}
+s = box.schema.space.create('test', { engine = engine, format = format })
+pk = s:create_index('pk')
+
+format[2].nullable_action = 'abort'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'rollback'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'fail'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'ignore'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'replace'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'default'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'none'
+s:format(format) -- Fail.
+
+format[2].is_nullable = false
+format[2].nullable_action = 'abort'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'rollback'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'fail'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'ignore'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'replace'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'default'
+s:format(format) -- Ok.
+
+format[2].nullable_action = 'none'
+s:format(format) -- Fail.
+
+parts = {}
+parts[1] = {field = 2, type = 'unsigned', is_nullable = true, nullable_action = 'abort'}
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'rollback'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'fail'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'ignore'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'replace'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'default'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'none'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].is_nullable = false
+parts[1].nullable_action = 'none'
+sk = s:create_index('sk', { parts = parts }) -- Fail.
+
+parts[1].nullable_action = 'abort'
+sk = s:create_index('sk', { parts = parts }) -- Ok.
+
+sk:drop()
+parts[1].nullable_action = 'rollback'
+sk = s:create_index('sk', { parts = parts }) -- Ok.
+
+sk:drop()
+parts[1].nullable_action = 'replace'
+sk = s:create_index('sk', { parts = parts }) -- Ok.
+
+sk:drop()
+parts[1].nullable_action = 'fail'
+sk = s:create_index('sk', { parts = parts }) -- Ok.
+
+sk:drop()
+parts[1].nullable_action = 'ignore'
+sk = s:create_index('sk', { parts = parts }) -- Ok.
+
+s:drop()

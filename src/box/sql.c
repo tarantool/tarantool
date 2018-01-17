@@ -478,7 +478,8 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 	for (uint32_t part = 0; part < field_count; ++part) {
 		key_def_set_part(ephemer_key_def, part /* part no */,
 				 part /* filed no */,
-				 FIELD_TYPE_SCALAR, true /* is_nullable */,
+				 FIELD_TYPE_SCALAR,
+				 ON_CONFLICT_ACTION_NONE /* nullable_action */,
 				 aColl /* coll */);
 	}
 
@@ -1684,7 +1685,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	for (i = 0; i < n; i++) {
 		const char *t;
-		p = enc->encode_map(p, 3);
+		p = enc->encode_map(p, 4);
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
@@ -1696,7 +1697,12 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		}
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "is_nullable", 11);
-		p = enc->encode_bool(p, aCol[i].notNull == ON_CONFLICT_ACTION_NONE);
+		p = enc->encode_bool(p, aCol[i].notNull ==
+				     ON_CONFLICT_ACTION_NONE);
+		p = enc->encode_str(p, "nullable_action", 15);
+		assert(aCol[i].notNull < on_conflict_action_MAX);
+		const char *action = on_conflict_action_strs[aCol[i].notNull];
+		p = enc->encode_str(p, action, strlen(action));
 	}
 	return (int)(p - base);
 }
@@ -1771,7 +1777,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 			 */
 			assert(collation);
 		}
-		p = enc->encode_map(p, collation == NULL ? 3 : 4);
+		p = enc->encode_map(p, collation == NULL ? 4 : 5);
 		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "field", sizeof("field")-1);
@@ -1782,6 +1788,9 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 		}
 		p = enc->encode_str(p, "is_nullable", 11);
 		p = enc->encode_bool(p, aCol[col].notNull == ON_CONFLICT_ACTION_NONE);
+		p = enc->encode_str(p, "nullable_action", 15);
+		const char *action_str = on_conflict_action_strs[aCol[col].notNull];
+		p = enc->encode_str(p, action_str, strlen(action_str));
 	}
 	return (int)(p - base);
 }

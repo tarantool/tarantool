@@ -54,6 +54,8 @@ struct key_part_def {
 	uint32_t coll_id;
 	/** True if a key part can store NULLs. */
 	bool is_nullable;
+	/** Action to perform if NULL constraint failed. */
+	enum on_conflict_action nullable_action;
 };
 
 /**
@@ -70,8 +72,8 @@ struct key_part {
 	enum field_type type;
 	/** Collation definition for string comparison */
 	struct coll *coll;
-	/** True if a part can store NULLs. */
-	bool is_nullable;
+	/** Action to perform if NULL constraint failed. */
+	enum on_conflict_action nullable_action;
 };
 
 struct key_def;
@@ -86,7 +88,7 @@ struct tuple;
 static inline bool
 key_part_is_nullable(const struct key_part *part)
 {
-	return part->is_nullable;
+	return part->nullable_action == ON_CONFLICT_ACTION_NONE;
 }
 
 /** @copydoc tuple_compare_with_key() */
@@ -213,7 +215,8 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
  */
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, bool is_nullable, struct coll *coll);
+		 enum field_type type, enum on_conflict_action nullable_action,
+		 struct coll *coll);
 
 /**
  * An snprint-style function to print a key definition.
