@@ -55,6 +55,11 @@ cn:eval('error("exception")')
 cn:eval('box.error(0)')
 cn:eval('!invalid expression')
 
+-- box.commit() missing at return of CALL/EVAL
+function no_commit() box.begin() fiber.sleep(0.001) end
+cn:call('no_commit')
+cn:eval('no_commit()')
+
 remote.self:eval('return 1+1, 2+2')
 remote.self:eval('return')
 remote.self:eval('error("exception")')

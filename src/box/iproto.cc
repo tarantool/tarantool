@@ -1230,6 +1230,7 @@ tx_process_call_on_yield(struct trigger *trigger, void *event)
 {
 	(void)event;
 	struct iproto_msg *msg = (struct iproto_msg *)trigger->data;
+	TRASH(&msg->call);
 	tx_discard_input(msg);
 	trigger_clear(trigger);
 }

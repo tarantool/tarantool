@@ -82,7 +82,7 @@ struct errcode_record {
 	/* 27 */_(ER_FORMAT_MISMATCH_INDEX_PART, "Field %s has type '%s' in space format, but type '%s' in index definition") \
 	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation") \
 	/* 29 */_(ER_UPDATE_FIELD,		"Field %u UPDATE error: %s") \
-	/* 30 */_(ER_UNUSED2,			"") \
+	/* 30 */_(ER_FUNCTION_TX_ACTIVE,	"Transaction is active at return from function") \
 	/* 31 */_(ER_KEY_PART_COUNT,		"Invalid key part count (expected [0..%u], got %u)") \
 	/* 32 */_(ER_PROC_LUA,			"%s") \
 	/* 33 */_(ER_NO_SUCH_PROC,		"Procedure '%.*s' is not defined") \

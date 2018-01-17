@@ -203,10 +203,9 @@ box_process_call(struct call_request *request, struct port *port)
 	}
 
 	if (in_txn()) {
-		/* The procedure forgot to call box.commit() */
-		say_warn("a transaction is active at return from '%.*s'",
-			name_len, name);
+		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
 		txn_rollback();
+		return -1;
 	}
 
 	return 0;
@@ -225,13 +224,9 @@ box_process_eval(struct call_request *request, struct port *port)
 	}
 
 	if (in_txn()) {
-		/* The procedure forgot to call box.commit() */
-		const char *expr = request->expr;
-		assert(expr != NULL);
-		uint32_t expr_len = mp_decode_strl(&expr);
-		say_warn("a transaction is active at return from EVAL '%.*s'",
-			expr_len, expr);
+		diag_set(ClientError, ER_FUNCTION_TX_ACTIVE);
 		txn_rollback();
+		return -1;
 	}
 
 	return 0;

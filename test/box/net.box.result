@@ -148,6 +148,18 @@ cn:eval('!invalid expression')
 ---
 - error: 'eval:1: unexpected symbol near ''!'''
 ...
+-- box.commit() missing at return of CALL/EVAL
+function no_commit() box.begin() fiber.sleep(0.001) end
+---
+...
+cn:call('no_commit')
+---
+- error: Transaction is active at return from function
+...
+cn:eval('no_commit()')
+---
+- error: Transaction is active at return from function
+...
 remote.self:eval('return 1+1, 2+2')
 ---
 - 2
