@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(43)
+test:plan(46)
 
 --!./tcltestrunner.lua
 -- 2004 November 12
@@ -561,7 +561,7 @@ test:do_catchsql_test(
         CREATE TABLE t8(x TEXT PRIMARY KEY AUTOINCREMENT);
     ]], {
         -- <autoinc-7.2>
-        1, "AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY"
+        1, "AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY or INT PRIMARY KEY"
         -- </autoinc-7.2>
     })
 
@@ -585,6 +585,59 @@ test:do_test(
         -- <autoinc-9.1>
         ""
         -- </autoinc-9.1>
+    })
+
+-- Issue #2999.
+-- Make sure that INT is synonim for INTEGER. In this respect this:
+-- "INT PRIMARY KEY AUTOINCREMET" should not faild and be equal to
+-- "INTEGER PRIMARY KEY AUTOINCREMENT".
+--
+test:do_test(
+    "autoinc-10.1",
+    function()
+        return test:execsql([[
+            DROP TABLE IF EXISTS t2;
+            CREATE TABLE t2(x INT PRIMARY KEY AUTOINCREMENT, y INT);
+            INSERT INTO t2 VALUES(NULL, 1);
+            INSERT INTO t2 VALUES(NULL, 2);
+            INSERT INTO t2 VALUES(NULL, 3);
+            INSERT INTO t2 VALUES(NULL, 4);
+            SELECT * FROM t2;
+        ]])
+    end, {
+        -- <autoinc-10.1>
+        1, 1, 2, 2, 3, 3, 4, 4
+        -- </autoinc-10.1>
+    })
+
+test:do_catchsql_test(
+    "autoinc-10.2",
+    [[
+            DROP TABLE IF EXISTS t2;
+            CREATE TABLE t2(x INT PRIMARY KEY AUTOINCREMENT);
+            INSERT INTO t2 VALUES('asd'); 
+    ]], {
+        -- <autoinc-10.2>
+        1, "datatype mismatch"
+        -- </autoinc-10.2>
+    })
+
+test:do_test(
+    "autoinc-10.3",
+    function()
+        return test:execsql([[
+            DROP TABLE IF EXISTS t7;
+            CREATE TABLE t7(x INT, y REAL, PRIMARY KEY(x AUTOINCREMENT));
+            INSERT INTO t7(y) VALUES(123);
+            INSERT INTO t7(y) VALUES(234);
+            DELETE FROM t7;
+            INSERT INTO t7(y) VALUES(345);
+            SELECT * FROM t7;
+        ]])
+    end, {
+        -- <autoinc-10.3>
+        3, 345.0
+        -- </autoinc-10.3>
     })
 
 test:catchsql(" pragma recursive_triggers = off ")

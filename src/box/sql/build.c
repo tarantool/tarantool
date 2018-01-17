@@ -1073,7 +1073,8 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	}
 	if (nTerm == 1
 	    && pCol
-	    && sqlite3StrICmp(sqlite3ColumnType(pCol, ""), "INTEGER") == 0
+	    && (sqlite3StrICmp(sqlite3ColumnType(pCol, ""), "INTEGER") == 0
+		|| sqlite3StrICmp(sqlite3ColumnType(pCol, ""), "INT") == 0)
 	    && sortOrder != SQLITE_SO_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
 		pTab->iPKey = iCol;
@@ -1087,7 +1088,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	} else if (autoInc) {
 #ifndef SQLITE_OMIT_AUTOINCREMENT
 		sqlite3ErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
-				"INTEGER PRIMARY KEY");
+				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
 #endif
 	} else {
 		sqlite3CreateIndex(pParse, 0, 0, pList, onError, 0,

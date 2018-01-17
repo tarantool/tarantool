@@ -70,7 +70,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(1,3,4)
     ]], {
         -- <unique-1.3>
-        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_2' in space 'T1'"
         -- </unique-1.3>
     })
 
@@ -91,7 +91,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(3,2,4)
     ]], {
         -- <unique-1.5>
-        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_2' in space 'T1'"
+        1, "Duplicate key exists in unique index 'sqlite_autoindex_T1_1' in space 'T1'"
         -- </unique-1.5>
     })
 
