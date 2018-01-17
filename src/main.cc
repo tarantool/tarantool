@@ -132,12 +132,14 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 
 #if defined(__linux__) && defined(__amd64)
 
-inline void dump_x86_64_register(const char *reg_name, unsigned long long val)
+inline void
+dump_x86_64_register(const char *reg_name, unsigned long long val)
 {
 	fprintf(stderr, "  %-9s0x%-17llx%lld\n", reg_name, val, val);
 }
 
-void dump_x86_64_registers(ucontext_t *uc)
+void
+dump_x86_64_registers(ucontext_t *uc)
 {
 	dump_x86_64_register("rax", uc->uc_mcontext.gregs[REG_RAX]);
 	dump_x86_64_register("rbx", uc->uc_mcontext.gregs[REG_RBX]);
@@ -166,7 +168,7 @@ void dump_x86_64_registers(ucontext_t *uc)
 	dump_x86_64_register("trapno", uc->uc_mcontext.gregs[REG_TRAPNO]);
 }
 
-#endif //#if defined(__linux__) && defined(__amd64)
+#endif /* defined(__linux__) && defined(__amd64) */
 
 /** Try to log as much as possible before dumping a core.
  *
@@ -200,24 +202,28 @@ sig_fatal_cb(int signo, siginfo_t *siginfo, void *context)
 
 	if (signo == SIGSEGV) {
 		fdprintf(fd, "Segmentation fault\n");
-		const char* signal_code_repr = 0;
-		switch(siginfo->si_code) {
+		const char *signal_code_repr = 0;
+		switch (siginfo->si_code) {
 		case SEGV_MAPERR:
-			signal_code_repr = "SEGV_MAPERR"; break;
+			signal_code_repr = "SEGV_MAPERR";
+			break;
 		case SEGV_ACCERR:
-			signal_code_repr = "SEGV_ACCERR"; break;
+			signal_code_repr = "SEGV_ACCERR";
+			break;
 		}
 		if (signal_code_repr)
 			fdprintf(fd, "  code: %s\n", signal_code_repr);
 		else
 			fdprintf(fd, "  code: %d\n", siginfo->si_code);
-
-		// fprintf used insted of fdprintf, because fdprintf does not understand %p
-		fprintf(stderr, "  addr: %p\n", siginfo->si_addr); 
+		/*
+		 * fprintf is used insted of fdprintf, because
+		 * fdprintf does not understand %p
+		 */
+		fprintf(stderr, "  addr: %p\n", siginfo->si_addr);
 	} else
 		fdprintf(fd, "Got a fatal signal %d\n", signo);
-	fprintf(stderr, "  context: %p\n", context); 
-	fprintf(stderr, "  siginfo: %p\n", siginfo); 
+	fprintf(stderr, "  context: %p\n", context);
+	fprintf(stderr, "  siginfo: %p\n", siginfo);
 
 #if defined(__linux__) && defined(__amd64)
 	dump_x86_64_registers((ucontext_t *)context);
