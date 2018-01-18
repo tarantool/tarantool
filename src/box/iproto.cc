@@ -132,8 +132,9 @@ iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
  * from all connections are queued into a single queue
  * and processed in FIFO order.
  */
-struct iproto_msg: public cmsg
+struct iproto_msg
 {
+	struct cmsg base;
 	struct iproto_connection *connection;
 
 	/* --- Box msgs - actual requests for the transaction processor --- */
@@ -205,7 +206,7 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		  bool *stop_input);
 
 static inline void
-iproto_msg_delete(struct cmsg *msg)
+iproto_msg_delete(struct iproto_msg *msg)
 {
 	mempool_free(&iproto_msg_pool, msg);
 	iproto_resume();
@@ -478,7 +479,7 @@ iproto_connection_close(struct iproto_connection *con)
 		assert(con->disconnect != NULL);
 		struct iproto_msg *msg = con->disconnect;
 		con->disconnect = NULL;
-		cpipe_push(&tx_pipe, msg);
+		cpipe_push(&tx_pipe, &msg->base);
 	}
 	rlist_del(&con->in_stop_list);
 }
@@ -604,7 +605,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		 * This can't throw, but should not be
 		 * done in case of exception.
 		 */
-		cpipe_push_input(&tx_pipe, msg);
+		cpipe_push_input(&tx_pipe, &msg->base);
 		n_requests++;
 		/* Request is parsed */
 		assert(reqend > reqstart);
@@ -817,7 +818,7 @@ iproto_connection_new(int fd)
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	con->disconnect = iproto_msg_new(con);
-	cmsg_init(con->disconnect, disconnect_route);
+	cmsg_init(&con->disconnect->base, disconnect_route);
 	return con;
 }
 
@@ -958,30 +959,30 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 				    dml_request_key_map(type)))
 			goto error;
 		assert(type < sizeof(dml_route)/sizeof(*dml_route));
-		cmsg_init(msg, dml_route[type]);
+		cmsg_init(&msg->base, dml_route[type]);
 		break;
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
 	case IPROTO_EVAL:
 		if (xrow_decode_call(&msg->header, &msg->call))
 			goto error;
-		cmsg_init(msg, call_route);
+		cmsg_init(&msg->base, call_route);
 		break;
 	case IPROTO_PING:
-		cmsg_init(msg, misc_route);
+		cmsg_init(&msg->base, misc_route);
 		break;
 	case IPROTO_JOIN:
-		cmsg_init(msg, join_route);
+		cmsg_init(&msg->base, join_route);
 		*stop_input = true;
 		break;
 	case IPROTO_SUBSCRIBE:
-		cmsg_init(msg, subscribe_route);
+		cmsg_init(&msg->base, subscribe_route);
 		*stop_input = true;
 		break;
 	case IPROTO_AUTH:
 		if (xrow_decode_auth(&msg->header, &msg->auth))
 			goto error;
-		cmsg_init(msg, misc_route);
+		cmsg_init(&msg->base, misc_route);
 		break;
 	default:
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
@@ -994,7 +995,7 @@ error:
 	diag_log();
 	diag_create(&msg->diag);
 	diag_move(&fiber()->diag, &msg->diag);
-	cmsg_init(msg, error_route);
+	cmsg_init(&msg->base, error_route);
 }
 
 static void
@@ -1553,11 +1554,11 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
 	struct iproto_msg *msg = iproto_msg_new(con);
-	cmsg_init(msg, connect_route);
+	cmsg_init(&msg->base, connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
 	msg->close_connection = false;
-	cpipe_push(&tx_pipe, msg);
+	cpipe_push(&tx_pipe, &msg->base);
 }
 
 static struct evio_service binary; /* iproto binary listener */
