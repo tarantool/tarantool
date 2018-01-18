@@ -164,9 +164,10 @@ typedef struct tuple box_tuple_t;
 
 /* box_select is private and used only by FFI */
 API_EXPORT int
-box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
-	   const char *key, const char *key_end);
+	   const char *key, const char *key_end,
+	   struct port *port);
 
 /** \cond public */
 

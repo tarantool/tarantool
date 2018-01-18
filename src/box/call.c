@@ -104,7 +104,7 @@ box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 
 	/* Create a call context */
 	struct port port;
-	port_create(&port);
+	port_tuple_create(&port);
 	box_function_ctx_t ctx = { &port };
 
 	/* Clear all previous errors */
@@ -127,28 +127,20 @@ box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 	if (iproto_prepare_select(out, &svp) != 0)
 		goto error;
 
+	int count;
 	if (request->header->type == IPROTO_CALL_16) {
 		/* Tarantool < 1.7.1 compatibility */
-		if (port_dump(&port, out) != 0) {
-			obuf_rollback_to_svp(out, &svp);
-			goto error;
-		}
-		iproto_reply_select(out, &svp, request->header->sync,
-				    schema_version, port.size);
+		count = port_dump_16(&port, out);
 	} else {
 		assert(request->header->type == IPROTO_CALL);
-		char *size_buf = (char *)
-			obuf_alloc(out, mp_sizeof_array(port.size));
-		if (size_buf == NULL)
-			goto error;
-		mp_encode_array(size_buf, port.size);
-		if (port_dump(&port, out) != 0) {
-			obuf_rollback_to_svp(out, &svp);
-			goto error;
-		}
-		iproto_reply_select(out, &svp, request->header->sync,
-				    schema_version, 1);
+		count = port_dump(&port, out);
 	}
+	if (count < 0) {
+		obuf_rollback_to_svp(out, &svp);
+		goto error;
+	}
+	iproto_reply_select(out, &svp, request->header->sync,
+			    schema_version, count);
 
 	port_destroy(&port);
 	return 0;

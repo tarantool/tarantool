@@ -742,7 +742,7 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 {
-	return port_add_tuple(ctx->port, tuple);
+	return port_tuple_add(ctx->port, tuple);
 }
 
 /* schema_find_id()-like method using only public API */
@@ -812,9 +812,10 @@ box_process1(struct request *request, box_tuple_t **result)
 }
 
 int
-box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
-	   const char *key, const char *key_end)
+	   const char *key, const char *key_end,
+	   struct port *port)
 {
 	(void)key_end;
 
@@ -860,6 +861,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	int rc = 0;
 	uint32_t found = 0;
 	struct tuple *tuple;
+	port_tuple_create(port);
 	while (found < limit) {
 		rc = iterator_next(it, &tuple);
 		if (rc != 0 || tuple == NULL)
@@ -868,7 +870,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 			offset--;
 			continue;
 		}
-		rc = port_add_tuple(port, tuple);
+		rc = port_tuple_add(port, tuple);
 		if (rc != 0)
 			break;
 		found++;
@@ -876,6 +878,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	iterator_delete(it);
 
 	if (rc != 0) {
+		port_destroy(port);
 		txn_rollback_stmt();
 		return -1;
 	}

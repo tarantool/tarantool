@@ -37,26 +37,26 @@
 #include <fiber.h>
 #include "errinj.h"
 
-static struct mempool port_entry_pool;
+static struct mempool port_tuple_entry_pool;
 
 int
-port_add_tuple(struct port *port, struct tuple *tuple)
+port_tuple_add(struct port *base, struct tuple *tuple)
 {
-	struct port_entry *e;
+	struct port_tuple *port = port_tuple(base);
+	struct port_tuple_entry *e;
 	if (port->size == 0) {
 		if (tuple_ref(tuple) != 0)
 			return -1;
 		e = &port->first_entry;
 		port->first = port->last = e;
 	} else {
-		e = (struct port_entry *)
-			mempool_alloc(&port_entry_pool);
+		e = mempool_alloc(&port_tuple_entry_pool);
 		if (e == NULL) {
 			diag_set(OutOfMemory, sizeof(*e), "mempool_alloc", "e");
 			return -1;
 		}
 		if (tuple_ref(tuple) != 0) {
-			mempool_free(&port_entry_pool, e);
+			mempool_free(&port_tuple_entry_pool, e);
 			return -1;
 		}
 		port->last->next = e;
@@ -69,54 +69,95 @@ port_add_tuple(struct port *port, struct tuple *tuple)
 }
 
 void
-port_create(struct port *port)
+port_tuple_create(struct port *base)
 {
+	struct port_tuple *port = (struct port_tuple *)base;
+	port->vtab = &port_tuple_vtab;
 	port->size = 0;
 	port->first = NULL;
 	port->last = NULL;
 }
 
-void
-port_destroy(struct port *port)
+static void
+port_tuple_destroy(struct port *base)
 {
-	struct port_entry *e = port->first;
+	struct port_tuple *port = port_tuple(base);
+	struct port_tuple_entry *e = port->first;
 	if (e == NULL)
 		return;
 	tuple_unref(e->tuple);
 	e = e->next;
 	while (e != NULL) {
-		struct port_entry *cur = e;
+		struct port_tuple_entry *cur = e;
 		e = e->next;
 		tuple_unref(cur->tuple);
-		mempool_free(&port_entry_pool, cur);
+		mempool_free(&port_tuple_entry_pool, cur);
 	}
 }
 
-int
-port_dump(struct port *port, struct obuf *out)
+static int
+port_tuple_dump_16(struct port *base, struct obuf *out)
 {
-	for (struct port_entry *pe = port->first; pe != NULL; pe = pe->next) {
+	struct port_tuple *port = port_tuple(base);
+	struct port_tuple_entry *pe;
+	for (pe = port->first; pe != NULL; pe = pe->next) {
 		if (tuple_to_obuf(pe->tuple, out) != 0)
 			return -1;
-
 		ERROR_INJECT(ERRINJ_PORT_DUMP, {
 			diag_set(OutOfMemory, tuple_size(pe->tuple), "obuf_dup",
 				 "data");
 			return -1;
 		});
 	}
-	return 0;
+	return port->size;
+}
+
+static int
+port_tuple_dump(struct port *base, struct obuf *out)
+{
+	struct port_tuple *port = port_tuple(base);
+	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
+	if (size_buf == NULL)
+		return -1;
+	mp_encode_array(size_buf, port->size);
+	if (port_tuple_dump_16(base, out) < 0)
+		return -1;
+	return 1;
+}
+
+void
+port_destroy(struct port *port)
+{
+	return port->vtab->destroy(port);
+}
+
+int
+port_dump(struct port *port, struct obuf *out)
+{
+	return port->vtab->dump(port, out);
+}
+
+int
+port_dump_16(struct port *port, struct obuf *out)
+{
+	return port->vtab->dump_16(port, out);
 }
 
 void
 port_init(void)
 {
-	mempool_create(&port_entry_pool, &cord()->slabc,
-		       sizeof(struct port_entry));
+	mempool_create(&port_tuple_entry_pool, &cord()->slabc,
+		       sizeof(struct port_tuple_entry));
 }
 
 void
 port_free(void)
 {
-	mempool_destroy(&port_entry_pool);
+	mempool_destroy(&port_tuple_entry_pool);
 }
+
+const struct port_vtab port_tuple_vtab = {
+	.dump = port_tuple_dump,
+	.dump_16 = port_tuple_dump_16,
+	.destroy = port_tuple_destroy,
+};

@@ -75,28 +75,28 @@ ffi.cdef[[
     int
     box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
-    struct port_entry {
-        struct port_entry *next;
+    struct port_tuple_entry {
+        struct port_tuple_entry *next;
         struct tuple *tuple;
     };
 
-    struct port {
+    struct port_tuple {
+        const struct port_vtab *vtab;
         size_t size;
-        struct port_entry *first;
-        struct port_entry *last;
-        struct port_entry first_entry;
+        struct port_tuple_entry *first;
+        struct port_tuple_entry *last;
+        struct port_tuple_entry first_entry;
     };
-
-    void
-    port_create(struct port *port);
 
     void
     port_destroy(struct port *port);
 
     int
-    box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+    box_select(uint32_t space_id, uint32_t index_id,
                int iterator, uint32_t offset, uint32_t limit,
-               const char *key, const char *key_end);
+               const char *key, const char *key_end,
+               struct port *port);
+
     void password_prepare(const char *password, int len,
                           char *out, int out_len);
 ]]
@@ -994,8 +994,8 @@ local iterator_gen_luac = function(param, state)
 end
 
 -- global struct port instance to use by select()/get()
-local port = ffi.new('struct port')
-local port_entry_t = ffi.typeof('struct port_entry')
+local port_tuple = ffi.new('struct port_tuple')
+local port_tuple_entry_t = ffi.typeof('struct port_tuple_entry')
 
 -- Helper function to check space:method() usage
 local function check_space_arg(space, method)
@@ -1224,16 +1224,16 @@ function box.schema.space.bless(space)
         local key, key_end = tuple_encode(key)
         local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
-        builtin.port_create(port)
-        if builtin.box_select(port, index.space_id,
-            index.id, iterator, offset, limit, key, key_end) ~=0 then
-            builtin.port_destroy(port);
+        local port = ffi.cast('struct port *', port_tuple)
+
+        if builtin.box_select(index.space_id, index.id,
+            iterator, offset, limit, key, key_end, port) ~= 0 then
             return box.error()
         end
 
         local ret = {}
-        local entry = port.first
-        for i=1,tonumber(port.size),1 do
+        local entry = port_tuple.first
+        for i=1,tonumber(port_tuple.size),1 do
             ret[i] = tuple_bless(entry.tuple)
             entry = entry.next
         end
