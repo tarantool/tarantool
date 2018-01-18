@@ -54,6 +54,9 @@ local default_cfg = {
     checkpoint_count    = 2,
     worker_pool_threads = 4,
     replication_timeout = 1,
+    reports_enabled     = true,
+    reports_host        = "https://report.tarantool.io",
+    reports_interval    = 3600,
 }
 
 -- types of available options
@@ -105,6 +108,9 @@ local template_cfg = {
     hot_standby         = 'boolean',
     worker_pool_threads = 'number',
     replication_timeout = 'number',
+    reports_enabled     = 'boolean',
+    reports_host        = 'string',
+    reports_interval    = 'number',
 }
 
 local function normalize_uri(port)
@@ -164,6 +170,9 @@ local dynamic_cfg = {
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
+    reports_enabled         = private.report_daemon.set_report_params,
+    reports_host            = private.report_daemon.set_report_params,
+    reports_interval        = private.report_daemon.set_report_params,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()
