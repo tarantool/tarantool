@@ -1322,25 +1322,25 @@ cmd ::= DROP INDEX ifexists(E) fullname(X) ON nm(Y).   {
 //
 %ifndef SQLITE_OMIT_PRAGMA
 cmd ::= PRAGMA nm(X).                        {
-    sqlite3Pragma(pParse,&X,0,0,0,0);
+    sqlite3Pragma(pParse,&X,0,0,0);
 }
 cmd ::= PRAGMA nm(X) EQ nmnum(Y).  {
-    sqlite3Pragma(pParse,&X,0,&Y,0,0);
+    sqlite3Pragma(pParse,&X,&Y,0,0);
 }
 cmd ::= PRAGMA nm(X) LP nmnum(Y) RP.         {
-    sqlite3Pragma(pParse,&X,0,&Y,0,0);
+    sqlite3Pragma(pParse,&X,&Y,0,0);
 }
 cmd ::= PRAGMA nm(X) EQ minus_num(Y).        {
-    sqlite3Pragma(pParse,&X,0,&Y,0,1);
+    sqlite3Pragma(pParse,&X,&Y,0,1);
 }
 cmd ::= PRAGMA nm(X) LP minus_num(Y) RP.     {
-    sqlite3Pragma(pParse,&X,0,&Y,0,1);
+    sqlite3Pragma(pParse,&X,&Y,0,1);
 }
 cmd ::= PRAGMA nm(X) EQ nm(Z) DOT nm(Y).    {
-    sqlite3Pragma(pParse,&X,0,&Y,&Z,0);
+    sqlite3Pragma(pParse,&X,&Y,&Z,0);
 }
 cmd ::= PRAGMA .                            {
-    sqlite3Pragma(pParse, 0,0,0,0,0);
+    sqlite3Pragma(pParse, 0,0,0,0);
 }
 
 nmnum(A) ::= plus_num(A).

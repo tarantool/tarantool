@@ -1567,7 +1567,6 @@ test:do_execsql_test(
 test:do_test(
     "select1-9.2",
     function()
-        test:execsql "PRAGMA empty_result_callbacks=on"
         local r = box.sql.execute "SELECT * FROM test1 WHERE f1<0"
         return r[0]
     end, {

@@ -3444,49 +3444,49 @@ static void yy_reduce(
       case 211: /* cmd ::= PRAGMA nm */
 #line 1324 "parse.y"
 {
-    sqlite3Pragma(pParse,&yymsp[0].minor.yy0,0,0,0,0);
+    sqlite3Pragma(pParse,&yymsp[0].minor.yy0,0,0,0);
 }
 #line 3450 "parse.c"
         break;
       case 212: /* cmd ::= PRAGMA nm EQ nmnum */
 #line 1327 "parse.y"
 {
-    sqlite3Pragma(pParse,&yymsp[-2].minor.yy0,0,&yymsp[0].minor.yy0,0,0);
+    sqlite3Pragma(pParse,&yymsp[-2].minor.yy0,&yymsp[0].minor.yy0,0,0);
 }
 #line 3457 "parse.c"
         break;
       case 213: /* cmd ::= PRAGMA nm LP nmnum RP */
 #line 1330 "parse.y"
 {
-    sqlite3Pragma(pParse,&yymsp[-3].minor.yy0,0,&yymsp[-1].minor.yy0,0,0);
+    sqlite3Pragma(pParse,&yymsp[-3].minor.yy0,&yymsp[-1].minor.yy0,0,0);
 }
 #line 3464 "parse.c"
         break;
       case 214: /* cmd ::= PRAGMA nm EQ minus_num */
 #line 1333 "parse.y"
 {
-    sqlite3Pragma(pParse,&yymsp[-2].minor.yy0,0,&yymsp[0].minor.yy0,0,1);
+    sqlite3Pragma(pParse,&yymsp[-2].minor.yy0,&yymsp[0].minor.yy0,0,1);
 }
 #line 3471 "parse.c"
         break;
       case 215: /* cmd ::= PRAGMA nm LP minus_num RP */
 #line 1336 "parse.y"
 {
-    sqlite3Pragma(pParse,&yymsp[-3].minor.yy0,0,&yymsp[-1].minor.yy0,0,1);
+    sqlite3Pragma(pParse,&yymsp[-3].minor.yy0,&yymsp[-1].minor.yy0,0,1);
 }
 #line 3478 "parse.c"
         break;
       case 216: /* cmd ::= PRAGMA nm EQ nm DOT nm */
 #line 1339 "parse.y"
 {
-    sqlite3Pragma(pParse,&yymsp[-4].minor.yy0,0,&yymsp[0].minor.yy0,&yymsp[-2].minor.yy0,0);
+    sqlite3Pragma(pParse,&yymsp[-4].minor.yy0,&yymsp[0].minor.yy0,&yymsp[-2].minor.yy0,0);
 }
 #line 3485 "parse.c"
         break;
       case 217: /* cmd ::= PRAGMA */
 #line 1342 "parse.y"
 {
-    sqlite3Pragma(pParse, 0,0,0,0,0);
+    sqlite3Pragma(pParse, 0,0,0,0);
 }
 #line 3492 "parse.c"
         break;

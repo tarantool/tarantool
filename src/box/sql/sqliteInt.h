@@ -3553,7 +3553,7 @@ void sqlite3ExprListDelete(sqlite3 *, ExprList *);
 u32 sqlite3ExprListFlags(const ExprList *);
 int sqlite3Init(sqlite3 *);
 int sqlite3InitCallback(void *, int, char **, char **);
-void sqlite3Pragma(Parse *, Token *, Token *, Token *, Token *, int);
+void sqlite3Pragma(Parse *, Token *, Token *, Token *, int);
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
 void sqlite3CommitInternalChanges();
 void sqlite3DeleteColumnNames(sqlite3 *, Table *);

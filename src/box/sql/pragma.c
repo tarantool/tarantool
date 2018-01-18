@@ -248,7 +248,6 @@ printActivePragmas(struct session *user_session)
  */
 void
 sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
-	      Token * pId2,	/* Second part of [schema.]id field, or NULL */
 	      Token * pValue,	/* Token for <value>, or NULL */
 	      Token * pValue2,	/* Token for <value2>, or NULL */
 	      int minusFlag	/* True if a '-' sign preceded <value> */
@@ -262,7 +261,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	Vdbe *v = sqlite3GetVdbe(pParse);	/* Prepared statement */
 	const PragmaName *pPragma;	/* The pragma */
 	struct session *user_session = current_session();
-	(void)pId2;
 
 	if (v == 0)
 		return;
@@ -859,17 +857,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			break;
 		}
 
-		/* *  PRAGMA shrink_memory *
-		 *
-		 * IMPLEMENTATION-OF: R-23445-46109 This pragma causes the
-		 * database * connection on which it is invoked to free
-		 * up as much memory as it * can, by calling
-		 * sqlite3_db_release_memory().
-		 */
-	case PragTyp_SHRINK_MEMORY:
-		sqlite3_db_release_memory(db);
-		break;
-
 		/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
 		 *
 		 * Call sqlite3_busy_timeout(db, N).  Return the current
@@ -885,49 +872,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				sqlite3_busy_timeout(db, sqlite3Atoi(zRight));
 			}
 			returnSingleInt(v, db->busyTimeout);
-			break;
-		}
-
-		/* *   PRAGMA soft_heap_limit *   PRAGMA
-		 * soft_heap_limit = N *
-		 *
-		 * IMPLEMENTATION-OF: R-26343-45930 This pragma invokes
-		 * the * sqlite3_soft_heap_limit64() interface with the
-		 * argument N, if N is * specified and is a
-		 * non-negative integer. * IMPLEMENTATION-OF:
-		 * R-64451-07163 The soft_heap_limit pragma always *
-		 * returns the same integer that would be returned by
-		 * the * sqlite3_soft_heap_limit64(-1) C-language
-		 * function.
-		 */
-	case PragTyp_SOFT_HEAP_LIMIT:{
-			sqlite3_int64 N;
-			if (zRight
-			    && sqlite3DecOrHexToI64(zRight, &N) == SQLITE_OK) {
-				sqlite3_soft_heap_limit64(N);
-			}
-			returnSingleInt(v, sqlite3_soft_heap_limit64(-1));
-			break;
-		}
-
-		/* *   PRAGMA threads *   PRAGMA threads = N *
-		 *
-		 * Configure the maximum number of worker threads. Return
-		 * the new * maximum, which might be less than
-		 * requested.
-		 */
-	case PragTyp_THREADS:{
-			sqlite3_int64 N;
-			if (zRight
-			    && sqlite3DecOrHexToI64(zRight, &N) == SQLITE_OK
-			    && N >= 0) {
-				sqlite3_limit(db, SQLITE_LIMIT_WORKER_THREADS,
-					      (int)(N & 0x7fffffff));
-			}
-			returnSingleInt(v,
-					sqlite3_limit(db,
-						      SQLITE_LIMIT_WORKER_THREADS,
-						      -1));
 			break;
 		}
 	}			/* End of the PRAGMA switch */
