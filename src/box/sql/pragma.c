@@ -221,6 +221,34 @@ pragmaLocate(const char *zName)
 	return lwr > upr ? 0 : &aPragmaName[mid];
 }
 
+#ifdef PRINT_PRAGMA
+#undef PRINT_PRAGMA
+#endif
+#define PRINT_PRAGMA(pragma_name, pragma_flag) do {			       \
+	int nCoolSpaces = 30 - strlen(pragma_name);			       \
+	if (user_session->sql_flags & (pragma_flag)) {			       \
+		printf("%s %*c --  [true] \n", pragma_name, nCoolSpaces, ' '); \
+	} else {							       \
+		printf("%s %*c --  [false] \n", pragma_name, nCoolSpaces, ' ');\
+	}								       \
+} while (0)
+
+static void
+printActivePragmas(struct session *user_session)
+{
+	int i;
+	for (i = 0; i < ArraySize(aPragmaName); ++i) {
+		if (aPragmaName[i].ePragTyp == PragTyp_FLAG)
+			PRINT_PRAGMA(aPragmaName[i].zName, aPragmaName[i].iArg);
+	}
+
+	printf("Other available pragmas: \n");
+	for (i = 0; i < ArraySize(aPragmaName); ++i) {
+		if (aPragmaName[i].ePragTyp != PragTyp_FLAG)
+			printf("-- %s \n", aPragmaName[i].zName);
+	}
+}
+
 /*
  * Process a pragma statement.
  *
@@ -262,8 +290,11 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	pDb = &db->mdb;
 
 	zLeft = sqlite3NameFromToken(db, pId);
-	if (!zLeft)
+	if (!zLeft) {
+		printActivePragmas(user_session);
 		return;
+	}
+
 	if (minusFlag) {
 		zRight = sqlite3MPrintf(db, "-%T", pValue);
 	} else {

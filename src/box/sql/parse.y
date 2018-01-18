@@ -1326,6 +1326,9 @@ cmd ::= PRAGMA nm(X) LP minus_num(Y) RP.     {
 cmd ::= PRAGMA nm(X) EQ nm(Z) DOT nm(Y).    {
     sqlite3Pragma(pParse,&X,0,&Y,&Z,0);
 }
+cmd ::= PRAGMA .                            {
+    sqlite3Pragma(pParse, 0,0,0,0,0);
+}
 
 nmnum(A) ::= plus_num(A).
 nmnum(A) ::= STRING(A).
