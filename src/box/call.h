@@ -35,7 +35,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct obuf;
 struct port;
 struct call_request;
 
@@ -47,10 +46,10 @@ int
 box_func_reload(const char *name);
 
 int
-box_process_call(struct call_request *request, struct obuf *out);
+box_process_call(struct call_request *request, struct port *port);
 
 int
-box_process_eval(struct call_request *request, struct obuf *out);
+box_process_eval(struct call_request *request, struct port *port);
 
 #if defined(__cplusplus)
 } /* extern "C" */

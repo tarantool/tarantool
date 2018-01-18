@@ -98,14 +98,13 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 }
 
 static int
-box_c_call(struct func *func, struct call_request *request, struct obuf *out)
+box_c_call(struct func *func, struct call_request *request, struct port *port)
 {
 	assert(func != NULL && func->def->language == FUNC_LANGUAGE_C);
 
 	/* Create a call context */
-	struct port port;
-	port_tuple_create(&port);
-	box_function_ctx_t ctx = { &port };
+	port_tuple_create(port);
+	box_function_ctx_t ctx = { port };
 
 	/* Clear all previous errors */
 	diag_clear(&fiber()->diag);
@@ -119,36 +118,10 @@ box_c_call(struct func *func, struct call_request *request, struct obuf *out)
 			/* Stored procedure forget to set diag  */
 			diag_set(ClientError, ER_PROC_C, "unknown error");
 		}
-		goto error;
+		port_destroy(port);
+		return -1;
 	}
-
-	/* Push results to obuf */
-	struct obuf_svp svp;
-	if (iproto_prepare_select(out, &svp) != 0)
-		goto error;
-
-	int count;
-	if (request->header->type == IPROTO_CALL_16) {
-		/* Tarantool < 1.7.1 compatibility */
-		count = port_dump_16(&port, out);
-	} else {
-		assert(request->header->type == IPROTO_CALL);
-		count = port_dump(&port, out);
-	}
-	if (count < 0) {
-		obuf_rollback_to_svp(out, &svp);
-		goto error;
-	}
-	iproto_reply_select(out, &svp, request->header->sync,
-			    schema_version, count);
-
-	port_destroy(&port);
 	return 0;
-
-error:
-	txn_rollback();
-	port_destroy(&port);
-	return -1;
 }
 
 int
@@ -170,7 +143,7 @@ box_func_reload(const char *name)
 }
 
 int
-box_process_call(struct call_request *request, struct obuf *out)
+box_process_call(struct call_request *request, struct port *port)
 {
 	rmean_collect(rmean_box, IPROTO_CALL, 1);
 	/**
@@ -216,9 +189,9 @@ box_process_call(struct call_request *request, struct obuf *out)
 
 	int rc;
 	if (func && func->def->language == FUNC_LANGUAGE_C) {
-		rc = box_c_call(func, request, out);
+		rc = box_c_call(func, request, port);
 	} else {
-		rc = box_lua_call(request, out);
+		rc = box_lua_call(request, port);
 	}
 	/* Restore the original user */
 	if (orig_credentials)
@@ -240,13 +213,13 @@ box_process_call(struct call_request *request, struct obuf *out)
 }
 
 int
-box_process_eval(struct call_request *request, struct obuf *out)
+box_process_eval(struct call_request *request, struct port *port)
 {
 	rmean_collect(rmean_box, IPROTO_EVAL, 1);
 	/* Check permissions */
 	if (access_check_universe(PRIV_X) != 0)
 		return -1;
-	if (box_lua_eval(request, out) != 0) {
+	if (box_lua_eval(request, port) != 0) {
 		txn_rollback();
 		return -1;
 	}

@@ -36,12 +36,11 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
-#include "box/txn.h"
 #include "box/xrow.h"
-#include "box/iproto_constants.h"
+#include "box/port.h"
 #include "box/lua/tuple.h"
-#include "box/schema.h"
 #include "small/obuf.h"
+#include "trivia/util.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -345,6 +344,12 @@ encode_lua_call(lua_State *L)
 		lua_topointer(L, -1);
 	lua_pop(L, 1);
 
+	/*
+	 * Add all elements from Lua stack to the buffer.
+	 *
+	 * TODO: forbid explicit yield from __serialize or __index here
+	 */
+
 	struct mpstream stream;
 	mpstream_init(&stream, ctx->out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
@@ -359,68 +364,101 @@ encode_lua_call(lua_State *L)
 	return 0;
 }
 
+/**
+ * Port for storing the result of a Lua CALL/EVAL.
+ */
+struct port_lua {
+	const struct port_vtab *vtab;
+	/** Lua state that stores the result. */
+	struct lua_State *L;
+	/** Reference to L in tarantool_L. */
+	int ref;
+};
+static_assert(sizeof(struct port_lua) <= sizeof(struct port),
+	      "sizeof(struct port_lua) must be <= sizeof(struct port)");
+
+static const struct port_vtab port_lua_vtab;
+
 static inline int
-box_process_lua(struct call_request *request, struct obuf *out, lua_CFunction handler)
+port_lua_do_dump(struct port *base, bool call_16, struct obuf *out)
+{
+	struct port_lua *port = (struct port_lua *)base;
+	assert(port->vtab == &port_lua_vtab);
+
+	struct lua_State *L = port->L;
+	struct encode_lua_call_ctx ctx = { out, call_16, 0 };
+	lua_pushlightuserdata(L, &ctx);
+	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0)
+		return -1;
+
+	return ctx.count;
+}
+
+static int
+port_lua_dump(struct port *base, struct obuf *out)
+{
+	return port_lua_do_dump(base, false, out);
+}
+
+static int
+port_lua_dump_16(struct port *base, struct obuf *out)
+{
+	return port_lua_do_dump(base, true, out);
+}
+
+static void
+port_lua_destroy(struct port *base)
+{
+	struct port_lua *port = (struct port_lua *)base;
+	assert(port->vtab == &port_lua_vtab);
+
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, port->ref);
+}
+
+static const struct port_vtab port_lua_vtab = {
+	.dump = port_lua_dump,
+	.dump_16 = port_lua_dump_16,
+	.destroy = port_lua_destroy,
+};
+
+static inline int
+box_process_lua(struct call_request *request, struct port *base,
+		lua_CFunction handler)
 {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 
 	/*
 	 * Push the encoder function first - values returned by
-	 * the handler will be passed to it as arguments.
+	 * the handler will be passed to it as arguments, see
+	 * port_lua_dump().
 	 */
 	lua_pushcfunction(L, encode_lua_call);
 
 	lua_pushcfunction(L, handler);
 	lua_pushlightuserdata(L, request);
-	if (luaT_call(L, 1, LUA_MULTRET) != 0)
-		goto error;
-
-	/*
-	 * Add all elements from Lua stack to iproto.
-	 *
-	 * (!) Please note that a save point for output buffer
-	 * must be taken only after finishing executing of Lua
-	 * function because Lua can yield and leave the
-	 * buffer in inconsistent state (a parallel request
-	 * from the same connection will break the protocol).
-	 *
-	 * TODO: forbid explicit yield from __serialize or __index here
-	 */
-	struct obuf_svp svp;
-	if (iproto_prepare_select(out, &svp) != 0)
-		goto error;
-
-	struct encode_lua_call_ctx ctx = { out, false, 0 };
-	if (request->header->type == IPROTO_CALL_16)
-		ctx.call_16 = true;
-
-	lua_pushlightuserdata(L, &ctx);
-	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0) {
-		obuf_rollback_to_svp(out, &svp);
-		goto error;
+	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		return -1;
 	}
 
-	iproto_reply_select(out, &svp, request->header->sync,
-			    schema_version, ctx.count);
-
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+	struct port_lua *port = (struct port_lua *)base;
+	port->vtab = &port_lua_vtab;
+	port->L = L;
+	port->ref = coro_ref;
 	return 0;
-error:
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	return -1;
 }
 
 int
-box_lua_call(struct call_request *request, struct obuf *out)
+box_lua_call(struct call_request *request, struct port *port)
 {
-	return box_process_lua(request, out, execute_lua_call);
+	return box_process_lua(request, port, execute_lua_call);
 }
 
 int
-box_lua_eval(struct call_request *request, struct obuf *out)
+box_lua_eval(struct call_request *request, struct port *port)
 {
-	return box_process_lua(request, out, execute_lua_eval);
+	return box_process_lua(request, port, execute_lua_eval);
 }
 
 static int

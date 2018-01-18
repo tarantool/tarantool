@@ -1194,7 +1194,6 @@ static void
 tx_process_call(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	struct obuf *out = msg->connection->tx.p_obuf;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
@@ -1202,13 +1201,15 @@ tx_process_call(struct cmsg *m)
 		goto error;
 
 	int rc;
+	struct port port;
+
 	switch (msg->header.type) {
 	case IPROTO_CALL:
 	case IPROTO_CALL_16:
-		rc = box_process_call(&msg->call, out);
+		rc = box_process_call(&msg->call, &port);
 		break;
 	case IPROTO_EVAL:
-		rc = box_process_eval(&msg->call, out);
+		rc = box_process_eval(&msg->call, &port);
 		break;
 	default:
 		unreachable();
@@ -1217,6 +1218,43 @@ tx_process_call(struct cmsg *m)
 	if (rc != 0)
 		goto error;
 
+	/*
+	 * Add all elements returned by the function to iproto.
+	 *
+	 * To allow clients to understand a complex return from
+	 * a procedure, we are compatible with SELECT protocol,
+	 * and return the number of return values first, and
+	 * then each return value as a tuple.
+	 *
+	 * (!) Please note that a save point for output buffer
+	 * must be taken only after finishing executing of Lua
+	 * function because Lua can yield and leave the
+	 * buffer in inconsistent state (a parallel request
+	 * from the same connection will break the protocol).
+	 */
+
+	int count;
+	struct obuf *out;
+	struct obuf_svp svp;
+
+	out = msg->connection->tx.p_obuf;
+	if (iproto_prepare_select(out, &svp) != 0) {
+		port_destroy(&port);
+		goto error;
+	}
+
+	if (msg->header.type == IPROTO_CALL_16)
+		count = port_dump_16(&port, out);
+	else
+		count = port_dump(&port, out);
+	port_destroy(&port);
+	if (count < 0) {
+		obuf_rollback_to_svp(out, &svp);
+		goto error;
+	}
+
+	iproto_reply_select(out, &svp, msg->header.sync,
+			    ::schema_version, count);
 	iproto_wpos_create(&msg->wpos, out);
 	return;
 error:
