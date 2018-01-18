@@ -257,14 +257,18 @@ sqlite3OsUnfetch(sqlite3_file * id, i64 iOff, void *p)
 #else
 /* No-op stubs to use when memory-mapped I/O is disabled */
 int
-sqlite3OsFetch(sqlite3_file * id, i64 iOff, int iAmt, void **pp)
+sqlite3OsFetch(sqlite3_file * id __attribute__((__unused__)),
+	       i64 iOff __attribute__((__unused__)),
+	       int iAmt __attribute__((__unused__)), void **pp)
 {
 	*pp = 0;
 	return SQLITE_OK;
 }
 
 int
-sqlite3OsUnfetch(sqlite3_file * id, i64 iOff, void *p)
+sqlite3OsUnfetch(sqlite3_file * id __attribute__((__unused__)),
+		 i64 iOff __attribute__((__unused__)),
+		 void *p __attribute__((__unused__)))
 {
 	return SQLITE_OK;
 }

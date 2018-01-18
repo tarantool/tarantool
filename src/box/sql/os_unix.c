@@ -326,7 +326,9 @@ posixOpen(const char *zFile, int flags, int mode)
 
 /* Forward reference */
 static int openDirectory(const char *, int *);
+#if SQLITE_MAX_MMAP_SIZE > 0
 static int unixGetpagesize(void);
+#endif
 
 /*
  * Many system calls are accessed through pointer-to-functions so that
@@ -3753,7 +3755,9 @@ unixMapfile(unixFile * pFd, i64 nMap)
  * release the reference by calling unixUnfetch().
  */
 static int
-unixFetch(sqlite3_file * fd, i64 iOff, int nAmt, void **pp)
+unixFetch(sqlite3_file * fd __attribute__((__unused__)),
+	  i64 iOff __attribute__((__unused__)),
+	  int nAmt __attribute__((__unused__)), void **pp)
 {
 #if SQLITE_MAX_MMAP_SIZE>0
 	unixFile *pFd = (unixFile *) fd;	/* The underlying database file */
