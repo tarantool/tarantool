@@ -472,4 +472,5 @@ euid, auid
 box.session.on_access_denied(nil, access_denied_trigger)
 box.session.on_access_denied(nil, uid)
 box.schema.user.drop("test_user")
+seq:drop()
 s:drop()

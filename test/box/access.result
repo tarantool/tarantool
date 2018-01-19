@@ -1277,6 +1277,9 @@ box.session.on_access_denied(nil, uid)
 box.schema.user.drop("test_user")
 ---
 ...
+seq:drop()
+---
+...
 s:drop()
 ---
 ...
