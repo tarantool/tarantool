@@ -46,8 +46,8 @@ struct memtx_space {
 	 * A pointer to replace function, set to different values
 	 * at different stages of recovery.
 	 */
-	int (*replace)(struct space *, struct txn_stmt *,
-		       enum dup_replace_mode);
+	int (*replace)(struct space *, struct tuple *, struct tuple *,
+		       enum dup_replace_mode, struct tuple **);
 };
 
 /**
@@ -65,17 +65,17 @@ memtx_space_update_bsize(struct space *space,
 			 const struct tuple *new_tuple);
 
 int
-memtx_space_replace_no_keys(struct space *, struct txn_stmt *,
-			    enum dup_replace_mode);
+memtx_space_replace_no_keys(struct space *, struct tuple *, struct tuple *,
+			    enum dup_replace_mode, struct tuple **);
 int
-memtx_space_replace_build_next(struct space *, struct txn_stmt *,
-			       enum dup_replace_mode);
+memtx_space_replace_build_next(struct space *, struct tuple *, struct tuple *,
+			       enum dup_replace_mode, struct tuple **);
 int
-memtx_space_replace_primary_key(struct space *, struct txn_stmt *,
-				enum dup_replace_mode);
+memtx_space_replace_primary_key(struct space *, struct tuple *, struct tuple *,
+				enum dup_replace_mode, struct tuple **);
 int
-memtx_space_replace_all_keys(struct space *, struct txn_stmt *,
-			     enum dup_replace_mode);
+memtx_space_replace_all_keys(struct space *, struct tuple *, struct tuple *,
+			     enum dup_replace_mode, struct tuple **);
 
 struct space *
 memtx_space_new(struct memtx_engine *memtx,
