@@ -75,11 +75,14 @@ memtx_space_update_bsize(struct space *space,
  * no indexes (is not yet fully built).
  */
 int
-memtx_space_replace_no_keys(struct space *space, struct txn_stmt *stmt,
-			    enum dup_replace_mode mode)
+memtx_space_replace_no_keys(struct space *space, struct tuple *old_tuple,
+			    struct tuple *new_tuple,
+			    enum dup_replace_mode mode, struct tuple **result)
 {
-	(void)stmt;
+	(void)old_tuple;
+	(void)new_tuple;
 	(void)mode;
+	(void)result;
 	struct index *index = index_find(space, 0);
 	assert(index == NULL); /* not reached. */
 	(void) index;
@@ -103,12 +106,15 @@ enum {
  * from snapshot.
  */
 int
-memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
-			       enum dup_replace_mode mode)
+memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
+			       struct tuple *new_tuple,
+			       enum dup_replace_mode mode,
+			       struct tuple **result)
 {
-	assert(stmt->old_tuple == NULL && mode == DUP_INSERT);
-	(void) mode;
-	if (stmt->old_tuple) {
+	assert(old_tuple == NULL && mode == DUP_INSERT);
+	(void)mode;
+	*result = NULL;
+	if (old_tuple) {
 		/*
 		 * Called from txn_rollback() In practice
 		 * is impossible: all possible checks for tuple
@@ -118,10 +124,9 @@ memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-	if (index_build_next(space->index[0], stmt->new_tuple) != 0)
+	if (index_build_next(space->index[0], new_tuple) != 0)
 		return -1;
-	stmt->engine_savepoint = stmt;
-	memtx_space_update_bsize(space, NULL, stmt->new_tuple);
+	memtx_space_update_bsize(space, NULL, new_tuple);
 	return 0;
 }
 
@@ -130,14 +135,16 @@ memtx_space_replace_build_next(struct space *space, struct txn_stmt *stmt,
  * data from XLOG files.
  */
 int
-memtx_space_replace_primary_key(struct space *space, struct txn_stmt *stmt,
-				enum dup_replace_mode mode)
+memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
+				struct tuple *new_tuple,
+				enum dup_replace_mode mode,
+				struct tuple **result)
 {
-	if (index_replace(space->index[0], stmt->old_tuple,
-			  stmt->new_tuple, mode, &stmt->old_tuple) != 0)
+	if (index_replace(space->index[0], old_tuple,
+			  new_tuple, mode, &old_tuple) != 0)
 		return -1;
-	stmt->engine_savepoint = stmt;
-	memtx_space_update_bsize(space, stmt->old_tuple, stmt->new_tuple);
+	memtx_space_update_bsize(space, old_tuple, new_tuple);
+	*result = old_tuple;
 	return 0;
 }
 
@@ -226,12 +233,12 @@ memtx_space_replace_primary_key(struct space *space, struct txn_stmt *stmt,
  * primary key.
  */
 int
-memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
-			     enum dup_replace_mode mode)
+memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
+			     struct tuple *new_tuple,
+			     enum dup_replace_mode mode,
+			     struct tuple **result)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
-	struct tuple *old_tuple = stmt->old_tuple;
-	struct tuple *new_tuple = stmt->new_tuple;
 	/*
 	 * Ensure we have enough slack memory to guarantee
 	 * successful statement-level rollback.
@@ -265,9 +272,8 @@ memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 			goto rollback;
 	}
 
-	stmt->old_tuple = old_tuple;
-	stmt->engine_savepoint = stmt;
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
+	*result = old_tuple;
 	return 0;
 
 rollback:
@@ -309,7 +315,8 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 	if (stmt->new_tuple == NULL)
 		goto rollback;
 	tuple_ref(stmt->new_tuple);
-	if (memtx_space->replace(space, stmt, DUP_INSERT) != 0)
+	if (memtx_space->replace(space, NULL, stmt->new_tuple,
+				 DUP_INSERT, &stmt->old_tuple) != 0)
 		goto rollback;
 	return txn_commit_stmt(txn, request);
 
@@ -331,8 +338,12 @@ memtx_space_execute_replace(struct space *space, struct txn *txn,
 	if (stmt->new_tuple == NULL)
 		return -1;
 	tuple_ref(stmt->new_tuple);
-	if (memtx_space->replace(space, stmt, mode) != 0)
+	struct tuple *old_tuple;
+	if (memtx_space->replace(space, stmt->old_tuple, stmt->new_tuple,
+				 mode, &old_tuple) != 0)
 		return -1;
+	stmt->old_tuple = old_tuple;
+	stmt->engine_savepoint = stmt;
 	/** The new tuple is referenced by the primary key. */
 	*result = stmt->new_tuple;
 	return 0;
@@ -354,9 +365,13 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 		return -1;
 	if (index_get(pk, key, part_count, &stmt->old_tuple) != 0)
 		return -1;
+	struct tuple *old_tuple = NULL;
 	if (stmt->old_tuple != NULL &&
-	    memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT) != 0)
+	    memtx_space->replace(space, stmt->old_tuple, stmt->new_tuple,
+				 DUP_REPLACE_OR_INSERT, &old_tuple) != 0)
 		return -1;
+	stmt->old_tuple = old_tuple;
+	stmt->engine_savepoint = stmt;
 	*result = stmt->old_tuple;
 	return 0;
 }
@@ -399,9 +414,13 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	if (stmt->new_tuple == NULL)
 		return -1;
 	tuple_ref(stmt->new_tuple);
+	struct tuple *old_tuple = NULL;
 	if (stmt->old_tuple != NULL &&
-	    memtx_space->replace(space, stmt, DUP_REPLACE) != 0)
+	    memtx_space->replace(space, stmt->old_tuple, stmt->new_tuple,
+				 DUP_REPLACE, &old_tuple) != 0)
 		return -1;
+	stmt->old_tuple = old_tuple;
+	stmt->engine_savepoint = stmt;
 	*result = stmt->new_tuple;
 	return 0;
 }
@@ -512,9 +531,13 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	 * we checked this case explicitly and skipped the upsert
 	 * above.
 	 */
+	struct tuple *old_tuple = NULL;
 	if (stmt->new_tuple != NULL &&
-	    memtx_space->replace(space, stmt, DUP_REPLACE_OR_INSERT) != 0)
+	    memtx_space->replace(space, stmt->old_tuple, stmt->new_tuple,
+				 DUP_REPLACE_OR_INSERT, &old_tuple) != 0)
 		return -1;
+	stmt->old_tuple = old_tuple;
+	stmt->engine_savepoint = stmt;
 	/* Return nothing: UPSERT does not return data. */
 	return 0;
 }
