@@ -2269,7 +2269,7 @@ isCandidateForInOpt(Expr * pX)
 	Select *p;
 	SrcList *pSrc;
 	ExprList *pEList;
-	Table *pTab;
+	Table MAYBE_UNUSED *pTab;
 	int i;
 	if (!ExprHasProperty(pX, EP_xIsSelect))
 		return 0;	/* Not a subquery */
@@ -3642,9 +3642,10 @@ sqlite3ExprCacheRemove(Parse * pParse, int iReg, int nReg)
 void
 sqlite3ExprCachePush(Parse * pParse)
 {
-	struct session *user_session = current_session();
+	struct session MAYBE_UNUSED *user_session;
 	pParse->iCacheLevel++;
 #ifdef SQLITE_DEBUG
+	user_session = current_session();
 	if (user_session->sql_flags & SQLITE_VdbeAddopTrace) {
 		printf("PUSH to %d\n", pParse->iCacheLevel);
 	}
@@ -3660,7 +3661,8 @@ void
 sqlite3ExprCachePop(Parse * pParse)
 {
 	int i = 0;
-	struct session *user_session = current_session();
+	struct session *user_session MAYBE_UNUSED;
+	user_session = current_session();
 	assert(pParse->iCacheLevel >= 1);
 	pParse->iCacheLevel--;
 #ifdef SQLITE_DEBUG
@@ -3808,7 +3810,8 @@ void
 sqlite3ExprCacheClear(Parse * pParse)
 {
 	int i;
-	struct session *user_session = current_session();
+	struct session MAYBE_UNUSED *user_session;
+	user_session = current_session();
 
 #if SQLITE_DEBUG
 	if (user_session->sql_flags & SQLITE_VdbeAddopTrace) {

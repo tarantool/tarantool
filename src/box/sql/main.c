@@ -803,7 +803,7 @@ sqlite3_db_release_memory(sqlite3 * db)
 		return SQLITE_MISUSE_BKPT;
 #endif
 	sqlite3_mutex_enter(db->mutex);
-	Btree *pBt = db->mdb.pBt;
+	Btree *pBt MAYBE_UNUSED = db->mdb.pBt;
 	assert(pBt);
 	sqlite3_mutex_leave(db->mutex);
 	return SQLITE_OK;
@@ -824,7 +824,7 @@ sqlite3_db_cacheflush(sqlite3 * db)
 		return SQLITE_MISUSE_BKPT;
 #endif
 	sqlite3_mutex_enter(db->mutex);
-	Btree *pBt = db->mdb.pBt;
+	Btree *pBt MAYBE_UNUSED = db->mdb.pBt;
 	assert(pBt);
 	sqlite3_mutex_leave(db->mutex);
 	return ((rc == SQLITE_OK && bSeenBusy) ? SQLITE_BUSY : rc);

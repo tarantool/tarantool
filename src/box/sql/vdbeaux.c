@@ -224,7 +224,8 @@ sqlite3VdbeAddOp3(Vdbe * p, int op, int p1, int p2, int p3)
 {
 	int i;
 	VdbeOp *pOp;
-	struct session *user_session = current_session();
+	struct session MAYBE_UNUSED *user_session;
+	user_session = current_session();
 
 	i = p->nOp;
 	assert(p->magic == VDBE_MAGIC_INIT);
@@ -818,7 +819,8 @@ sqlite3VdbeAddOpList(Vdbe * p,	/* Add opcodes to the prepared statement */
 		     int iLineno)	/* Source-file line number of first opcode */
 {
 	int i;
-	struct session *user_session = current_session();
+	struct session MAYBE_UNUSED *user_session;
+	user_session = current_session();
 	VdbeOp *pOut, *pFirst;
 	assert(nOp > 0);
 	assert(p->magic == VDBE_MAGIC_INIT);

@@ -40,7 +40,7 @@
 /*
  * Trace output macros
  */
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 /***/ int sqlite3SelectTrace = 0;
 #define SELECTTRACE(K,P,S,X)  \
   if(sqlite3SelectTrace&(K))   \
@@ -150,13 +150,14 @@ sqlite3SelectNew(Parse * pParse,	/* Parsing context */
 		    sqlite3ExprListAppend(pParse, 0,
 					  sqlite3Expr(db, TK_ASTERISK, 0));
 	}
-	struct session *user_session = current_session();
+	struct session MAYBE_UNUSED *user_session;
+	user_session = current_session();
 	pNew->pEList = pEList;
 	pNew->op = TK_SELECT;
 	pNew->selFlags = selFlags;
 	pNew->iLimit = 0;
 	pNew->iOffset = 0;
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	pNew->zSelName[0] = 0;
 	if (user_session->sql_flags & SQLITE_SelectTrace)
 		sqlite3SelectTrace = 0xfff;
@@ -190,7 +191,7 @@ sqlite3SelectNew(Parse * pParse,	/* Parsing context */
 	return pNew;
 }
 
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 /*
  * Set the name of a Select object
  */
@@ -4177,7 +4178,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 	 */
 	sqlite3SelectDelete(db, pSub1);
 
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	if (sqlite3SelectTrace & 0x100) {
 		SELECTTRACE(0x100, pParse, p, ("After flattening:\n"));
 		sqlite3TreeViewSelect(0, p, 0);
@@ -5427,7 +5428,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if (sqlite3AuthCheck(pParse, SQLITE_SELECT, 0, 0, 0))
 		return 1;
 	memset(&sAggInfo, 0, sizeof(sAggInfo));
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	pParse->nSelectIndent++;
 	SELECTTRACE(1, pParse, p, ("begin processing:\n"));
 	if (sqlite3SelectTrace & 0x100) {
@@ -5463,7 +5464,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	}
 	assert(p->pEList != 0);
 	isAgg = (p->selFlags & SF_Aggregate) != 0;
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	if (sqlite3SelectTrace & 0x100) {
 		SELECTTRACE(0x100, pParse, p, ("after name resolution:\n"));
 		sqlite3TreeViewSelect(0, p, 0);
@@ -5524,7 +5525,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if (p->pPrior) {
 		rc = multiSelect(pParse, p, pDest);
 		explainSetInteger(pParse->iSelectId, iRestoreSelectId);
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 		SELECTTRACE(1, pParse, p, ("end compound-select processing\n"));
 		pParse->nSelectIndent--;
 #endif
@@ -5573,7 +5574,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		    && pushDownWhereTerms(pParse, pSub, p->pWhere,
 					  pItem->iCursor)
 		    ) {
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 			if (sqlite3SelectTrace & 0x100) {
 				SELECTTRACE(0x100, pParse, p,
 					    ("After WHERE-clause push-down:\n"));
@@ -5677,7 +5678,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	pHaving = p->pHaving;
 	sDistinct.isTnct = (p->selFlags & SF_Distinct) != 0;
 
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	if (sqlite3SelectTrace & 0x400) {
 		SELECTTRACE(0x400, pParse, p,
 			    ("After all FROM-clause analysis:\n"));
@@ -5710,7 +5711,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		 */
 		assert(sDistinct.isTnct);
 
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 		if (sqlite3SelectTrace & 0x400) {
 			SELECTTRACE(0x400, pParse, p,
 				    ("Transform DISTINCT into GROUP BY:\n"));
@@ -6373,7 +6374,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 
 	sqlite3DbFree(db, sAggInfo.aCol);
 	sqlite3DbFree(db, sAggInfo.aFunc);
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	SELECTTRACE(1, pParse, p, ("end processing\n"));
 	pParse->nSelectIndent--;
 #endif

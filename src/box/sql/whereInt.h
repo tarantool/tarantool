@@ -39,7 +39,7 @@
 /*
  * Trace output macros
  */
-#if WHERETRACE_ENABLED
+#ifdef WHERETRACE_ENABLED
 /***/ extern int sqlite3WhereTrace;
 #define WHERETRACE(K,X)  if(sqlite3WhereTrace&(K)) sqlite3DebugPrintf X
 #else

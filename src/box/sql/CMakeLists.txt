@@ -1,13 +1,13 @@
 option(SQL_MAINTAINER_MODE "Regenerate parser and opcodes for SQL compiler" OFF)
 
-# SQLITE_DEBUG == 1 is needed by all tracing capabilities
-# which are heavily used in tests.
-# if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-# set(SQLITE_DEBUG 1)
-# endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_definitions(-DSQLITE_DEBUG=1)
+  add_definitions(-DSQLITE_ENABLE_SELECTTRACE)
+  add_definitions(-DSQLITE_ENABLE_WHERETRACE)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+endif()
 
 set(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -17,11 +17,8 @@ add_definitions(-DSQLITE_OMIT_AUTHORIZATION=1)
 add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
 add_definitions(-DTHREADSAFE=0)
 add_definitions(-DSQLITE_DEFAULT_FOREIGN_KEYS=1)
-add_definitions(-DSQLITE_ENABLE_SELECTTRACE=1)
-add_definitions(-DSQLITE_ENABLE_WHERETRACE=1)
 
 set(TEST_DEFINITIONS
-    SQLITE_DEBUG=1
     SQLITE_NO_SYNC=1
     TCLSH=1
     SQLITE_TEST=1

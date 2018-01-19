@@ -394,8 +394,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (pTab == 0) {
 		goto insert_cleanup;
 	}
-	if (sqlite3AuthCheck(pParse, SQLITE_INSERT, pTab->zName, 0,
-			     db->mdb.zDbSName)) {
+	if (sqlite3AuthCheck(pParse, SQLITE_INSERT, pTab->zName, 0, "")) {
 		goto insert_cleanup;
 	}
 	withoutRowid = !HasRowid(pTab);

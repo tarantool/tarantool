@@ -47,7 +47,7 @@
 static int whereLoopResize(sqlite3 *, WhereLoop *, int);
 
 /* Test variable that can be set to enable WHERE tracing */
-#if WHERETRACE_ENABLED
+#ifdef WHERETRACE_ENABLED
 /***/ int sqlite3WhereTrace = 0; /* -1; */
 #endif
 
@@ -1657,10 +1657,12 @@ whereLoopPrint(WhereLoop * p, WhereClause * pWC)
 	struct SrcList_item *pItem = pWInfo->pTabList->a + p->iTab;
 	Table *pTab = pItem->pTab;
 	Bitmask mAll = (((Bitmask) 1) << (nb * 4)) - 1;
+#ifdef SQLITE_DEBUG
 	sqlite3DebugPrintf("%c%2d.%0*llx.%0*llx", p->cId,
 			   p->iTab, nb, p->maskSelf, nb, p->prereq & mAll);
 	sqlite3DebugPrintf(" %12s",
 			   pItem->zAlias ? pItem->zAlias : pTab->zName);
+#endif
 	const char *zName;
 	if (p->pIndex && (zName = p->pIndex->zName) != 0) {
 		if (strncmp(zName, "sqlite_autoindex_", 17) == 0) {
@@ -2022,14 +2024,14 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 	 */
 	if (pBuilder->pOrSet != 0) {
 		if (pTemplate->nLTerm) {
-#if WHERETRACE_ENABLED
+#ifdef WHERETRACE_ENABLED
 			u16 n = pBuilder->pOrSet->n;
 			int x =
 #endif
 			    whereOrInsert(pBuilder->pOrSet, pTemplate->prereq,
 					  pTemplate->rRun,
 					  pTemplate->nOut);
-#if WHERETRACE_ENABLED		/* 0x8 */
+#ifdef WHERETRACE_ENABLED		/* 0x8 */
 			if (sqlite3WhereTrace & 0x8) {
 				sqlite3DebugPrintf(x ? "   or-%d:  " :
 						   "   or-X:  ", n);
@@ -2049,7 +2051,7 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 		/* There already exists a WhereLoop on the list that is better
 		 * than pTemplate, so just ignore pTemplate
 		 */
-#if WHERETRACE_ENABLED		/* 0x8 */
+#ifdef WHERETRACE_ENABLED		/* 0x8 */
 		if (sqlite3WhereTrace & 0x8) {
 			sqlite3DebugPrintf("   skip: ");
 			whereLoopPrint(pTemplate, pBuilder->pWC);
@@ -2064,7 +2066,7 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 	 * with pTemplate[] if p[] exists, or if p==NULL then allocate a new
 	 * WhereLoop and insert it.
 	 */
-#if WHERETRACE_ENABLED		/* 0x8 */
+#ifdef WHERETRACE_ENABLED		/* 0x8 */
 	if (sqlite3WhereTrace & 0x8) {
 		if (p != 0) {
 			sqlite3DebugPrintf("replace: ");
@@ -2096,7 +2098,7 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 			if (pToDel == 0)
 				break;
 			*ppTail = pToDel->pNextLoop;
-#if WHERETRACE_ENABLED		/* 0x8 */
+#ifdef WHERETRACE_ENABLED		/* 0x8 */
 			if (sqlite3WhereTrace & 0x8) {
 				sqlite3DebugPrintf(" delete: ");
 				whereLoopPrint(pToDel, pBuilder->pWC);
@@ -4865,7 +4867,7 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 		VdbeOp *pOp;
 		Index *pIdx = 0;
 		struct SrcList_item *pTabItem = &pTabList->a[pLevel->iFrom];
-		Table *pTab = pTabItem->pTab;
+		Table *pTab MAYBE_UNUSED = pTabItem->pTab;
 		assert(pTab != 0);
 		pLoop = pLevel->pWLoop;
 

@@ -1112,6 +1112,7 @@ case OP_String8: {         /* same as TK_STRING, out2 */
 	}
 	assert(rc==SQLITE_OK);
 	/* Fall through to the next case, OP_String */
+	FALLTHROUGH;
 }
 
 /* Opcode: String P1 P2 P3 P4 P5
@@ -2478,7 +2479,7 @@ case OP_Column: {
 	Mem *pDest;        /* Where to write the extracted value */
 	Mem sMem;          /* For storing the record being decoded */
 	const u8 *zData;   /* Part of the record being decoded */
-	const u8 *zEnd;    /* Data end */
+	const u8 MAYBE_UNUSED *zEnd;    /* Data end */
 	const u8 *zParse;  /* Next unparsed byte of the row */
 	u32 avail;         /* Number of bytes of available data */
 	Mem *pReg;         /* PseudoTable input register */
@@ -2702,7 +2703,7 @@ case OP_MakeRecord: {
 	Mem *pRec;             /* The new record */
 	i64 nByte;             /* Data space required for this record */
 	Mem *pData0;           /* First field to be combined into the record */
-	Mem *pLast;            /* Last field of the record */
+	Mem MAYBE_UNUSED *pLast;  /* Last field of the record */
 	int nField;            /* Number of fields in the record */
 	char *zAffinity;       /* The affinity string for the record */
 
@@ -5663,14 +5664,12 @@ case OP_DropTrigger: {
  */
 case OP_IntegrityCk: {
 	/* Number of tables to check.  (Number of root pages.) */
-	int nRoot;
 	int nErr;       /* Number of errors reported */
 	char *z;        /* Text of the error report */
 	Mem *pnErr;     /* Register keeping track of errors remaining */
 
 	assert(p->bIsReader);
-	nRoot = pOp->p2;
-	assert(nRoot>0);
+	assert(pOp->p2 > 0);
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
 	pnErr = &aMem[pOp->p3];
 	assert((pnErr->flags & MEM_Int)!=0);
@@ -6170,9 +6169,7 @@ case OP_AggStep0: {
 	pOp->p4.pCtx = pCtx;
 	pOp->opcode = OP_AggStep;
 	/* Fall through into OP_AggStep */
-#if __GNUC__ >= 7
-	__attribute__ ((fallthrough));
-#endif
+	FALLTHROUGH;
 }
 case OP_AggStep: {
 	int i;

@@ -499,7 +499,7 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	 * but it does *not* override schema lock detection, so this all still
 	 * works even if READ_UNCOMMITTED is set.
 	 */
-	Btree *pBt = db->mdb.pBt;
+	Btree MAYBE_UNUSED *pBt = db->mdb.pBt;
 	assert(pBt);
 	sParse.db = db;
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {

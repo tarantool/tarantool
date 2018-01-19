@@ -3755,9 +3755,9 @@ unixMapfile(unixFile * pFd, i64 nMap)
  * release the reference by calling unixUnfetch().
  */
 static int
-unixFetch(sqlite3_file * fd __attribute__((__unused__)),
-	  i64 iOff __attribute__((__unused__)),
-	  int nAmt __attribute__((__unused__)), void **pp)
+unixFetch(sqlite3_file * fd MAYBE_UNUSED,
+	  i64 iOff MAYBE_UNUSED,
+	  int nAmt MAYBE_UNUSED, void **pp)
 {
 #if SQLITE_MAX_MMAP_SIZE>0
 	unixFile *pFd = (unixFile *) fd;	/* The underlying database file */

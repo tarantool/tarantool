@@ -37,6 +37,7 @@
 #include "btreeInt.h"
 #include "tarantoolInt.h"
 #include "box/session.h"
+#include "trivia/util.h"
 
 /*
  * The header string that appears at the beginning of every
@@ -2780,10 +2781,11 @@ sqlite3BtreeRollback(Btree * p, int tripCode, int writeOnly)
  * using the sqlite3BtreeSavepoint() function.
  */
 int
-sqlite3BtreeBeginStmt(Btree * p, int iStatement, int nSavepoint)
+sqlite3BtreeBeginStmt(Btree * p, int MAYBE_UNUSED iStatement,
+		      int MAYBE_UNUSED nSavepoint)
 {
 	int rc = SQLITE_OK;
-	BtShared *pBt = p->pBt;
+	BtShared *pBt MAYBE_UNUSED = p->pBt;
 	assert(p->inTrans == TRANS_WRITE);
 	assert((pBt->btsFlags & BTS_READ_ONLY) == 0);
 	assert(iStatement > 0);

@@ -566,7 +566,7 @@ tableOfTrigger(Trigger * pTrigger)
 void
 sqlite3DropTriggerPtr(Parse * pParse, Trigger * pTrigger)
 {
-	Table *pTable;
+	Table *pTable MAYBE_UNUSED;
 	Vdbe *v;
 	sqlite3 *db = pParse->db;
 

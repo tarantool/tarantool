@@ -1202,7 +1202,7 @@ sqlite3_log(int iErrCode, const char *zFormat, ...)
 	}
 }
 
-#if defined(SQLITE_DEBUG)
+#if (defined(SQLITE_DEBUG) || defined(SQLITE_ENABLE_SELECTTRACE))
 /*
  * A version of printf() that understands %lld.  Used for debugging.
  */

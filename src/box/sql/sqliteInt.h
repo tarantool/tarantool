@@ -742,15 +742,15 @@ extern const int sqlite3one;
  * the Select query generator tracing logic is turned on.
  */
 #if defined(SQLITE_DEBUG) || defined(SQLITE_ENABLE_SELECTTRACE)
-#define SELECTTRACE_ENABLED 1
+#define SELECTTRACE_ENABLED
 #else
-#define SELECTTRACE_ENABLED 0
+#undef SELECTTRACE_ENABLED
 #endif
 
 #if defined(SQLITE_DEBUG) || defined(SQLITE_ENABLE_WHERETRACE)
-#define WHERETRACE_ENABLED 1
+#define WHERETRACE_ENABLED
 #else
-#define WHERETRACE_ENABLED 0
+#undef WHERETRACE_ENABLED
 #endif
 
 /*
@@ -2310,7 +2310,7 @@ struct Select {
 	LogEst nSelectRow;	/* Estimated number of result rows */
 	u32 selFlags;		/* Various SF_* values */
 	int iLimit, iOffset;	/* Memory registers holding LIMIT & OFFSET counters */
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	char zSelName[12];	/* Symbolic name of this SELECT use for debugging */
 #endif
 	int addrOpenEphm[2];	/* OP_OpenEphem opcodes related to this select */
@@ -2562,7 +2562,7 @@ struct Parse {
 	int regRowid;		/* Register holding rowid of CREATE TABLE entry */
 	int regRoot;		/* Register holding root page number for new objects */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 	int nSelect;		/* Number of SELECT statements seen */
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
 #endif
@@ -3390,7 +3390,7 @@ ExprList *sqlite3ExprListDup(sqlite3 *, ExprList *, int);
 SrcList *sqlite3SrcListDup(sqlite3 *, SrcList *, int);
 IdList *sqlite3IdListDup(sqlite3 *, IdList *);
 Select *sqlite3SelectDup(sqlite3 *, Select *, int);
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
 void sqlite3SelectSetName(Select *, const char *);
 #else
 #define sqlite3SelectSetName(A,B)
@@ -3455,7 +3455,12 @@ void sqlite3AuthContextPop(AuthContext *);
 int sqlite3AuthReadCol(Parse *, const char *, const char *);
 #else
 #define sqlite3AuthRead(a,b,c,d)
-#define sqlite3AuthCheck(a,b,c,d,e)    SQLITE_OK
+static inline
+int sqlite3AuthCheck(MAYBE_UNUSED Parse *a,
+		     MAYBE_UNUSED int b,
+		     MAYBE_UNUSED const char *c,
+		     MAYBE_UNUSED const char *d,
+		     MAYBE_UNUSED const char *e)    { return SQLITE_OK; }
 #define sqlite3AuthContextPush(a,b,c)
 #define sqlite3AuthContextPop(a)  ((void)(a))
 #endif

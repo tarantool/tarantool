@@ -559,7 +559,7 @@ sqlite3NameFromToken(sqlite3 * db, Token * pName)
  * -1 if the named db cannot be found.
  */
 int
-sqlite3FindDbName(const char *zName)
+sqlite3FindDbName(const char *zName MAYBE_UNUSED)
 {
 	assert(0 == sqlite3_stricmp("main", zName));
 	return 0;
@@ -2952,7 +2952,10 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		   SrcList * pTblName,	/* Table to index. Use pParse->pNewTable if 0 */
 		   ExprList * pList,	/* A list of columns to be indexed */
 		   int onError,	/* OE_Abort, OE_Ignore, OE_Replace, or OE_None */
-		   Token * pStart,	/* The CREATE token that begins this statement */
+		   Token MAYBE_UNUSED * pStart, /* The CREATE token
+						 * that begins this
+						 * statement.
+						 */
 		   Expr * pPIWhere,	/* WHERE clause for partial indices */
 		   int sortOrder,	/* Sort order of primary key when pList==NULL */
 		   int ifNotExist,	/* Omit error if index already exists */
@@ -3980,9 +3983,9 @@ sqlite3SrcListShiftJoinType(SrcList * p)
  * Generate VDBE code for a BEGIN statement.
  */
 void
-sqlite3BeginTransaction(Parse * pParse, MAYBE_UNUSED int type)
+sqlite3BeginTransaction(Parse * pParse, int MAYBE_UNUSED type)
 {
-	sqlite3 *db;
+	sqlite3 MAYBE_UNUSED *db;
 	Vdbe *v;
 
 	assert(pParse != 0);
@@ -4045,9 +4048,9 @@ sqlite3Savepoint(Parse * pParse, int op, Token * pName)
 	char *zName = sqlite3NameFromToken(pParse->db, pName);
 	if (zName) {
 		Vdbe *v = sqlite3GetVdbe(pParse);
-#ifndef SQLITE_OMIT_AUTHORIZATION
 		static const char *const az[] =
 		    { "BEGIN", "RELEASE", "ROLLBACK" };
+#ifndef SQLITE_OMIT_AUTHORIZATION
 		assert(!SAVEPOINT_BEGIN && SAVEPOINT_RELEASE == 1
 		       && SAVEPOINT_ROLLBACK == 2);
 #endif

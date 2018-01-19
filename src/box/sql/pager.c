@@ -1215,7 +1215,8 @@ enable_simulated_io_errors(void)
  * output buffer undefined.
  */
 int
-sqlite3PagerReadFileheader(Pager * pPager, int N, unsigned char *pDest)
+sqlite3PagerReadFileheader(Pager * pPager MAYBE_UNUSED,
+			   int N, unsigned char *pDest)
 {
 	int rc = SQLITE_OK;
 	memset(pDest, 0, N);
@@ -1259,7 +1260,7 @@ sqlite3PagerPagecount(Pager * pPager, int *pnPage)
  * to the caller.
  */
 int
-sqlite3PagerClose(Pager * pPager, sqlite3 * db)
+sqlite3PagerClose(Pager * pPager, sqlite3 MAYBE_UNUSED * db)
 {
 	u8 *pTmp = (u8 *) pPager->pTmpSpace;
 

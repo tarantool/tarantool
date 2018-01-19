@@ -432,6 +432,7 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 41, 3,
 	 /* iArg:      */ 0},
 #endif
+
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS) && defined(SQLITE_ENABLE_WHERETRACE)
 
 	{ /* zName:     */ "where_trace",
@@ -439,6 +440,6 @@ static const PragmaName aPragmaName[] = {
 	/* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	/* ColNames:  */ 0, 0,
 	/* iArg:      */ SQLITE_WhereTrace},
-};
 #endif
+};
 /* Number of pragmas: 36 on by default, 47 total. */
