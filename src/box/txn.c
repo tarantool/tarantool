@@ -456,12 +456,7 @@ box_txn_savepoint()
 			 "region", "struct txn_savepoint");
 		return NULL;
 	}
-	if (stailq_empty(&txn->stmts)) {
-		svp->is_first = true;
-		return svp;
-	}
-	svp->is_first = false;
-	svp->stmt = txn_last_stmt(txn);
+	svp->stmt = stailq_last(&txn->stmts);
 	svp->in_sub_stmt = txn->in_sub_stmt;
 	return svp;
 }
@@ -474,14 +469,22 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
 		return -1;
 	}
-	struct txn_stmt *stmt = svp->stmt;
-	if (!svp->is_first && (stmt == NULL || stmt->space == NULL ||
-			       svp->in_sub_stmt != txn->in_sub_stmt)) {
+	struct txn_stmt *stmt = svp->stmt == NULL ? NULL :
+			stailq_entry(svp->stmt, struct txn_stmt, next);
+	if (stmt != NULL && stmt->space == NULL) {
+		/*
+		 * The statement at which this savepoint was
+		 * created has been rolled back.
+		 */
+		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
+		return -1;
+	}
+	if (svp->in_sub_stmt != txn->in_sub_stmt) {
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
 	struct stailq rollback_stmts;
-	if (svp->is_first) {
+	if (stmt == NULL) {
 		rollback_stmts = txn->stmts;
 		stailq_create(&txn->stmts);
 	} else {

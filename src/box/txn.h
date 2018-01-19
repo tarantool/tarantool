@@ -82,13 +82,10 @@ struct txn_savepoint {
 	/**
 	 * Statement, on which a savepoint is created. On rollback
 	 * to this savepoint all newer statements are rolled back.
+	 * Initialized to NULL in case a savepoint is created in
+	 * an empty transaction.
 	 */
-	struct txn_stmt *stmt;
-	/**
-	 * True, if a savepoint is created when a transaction is
-	 * empty. In such a case stmt can not be used.
-	 */
-	bool is_first;
+	struct stailq_entry *stmt;
 };
 
 extern double too_long_threshold;
