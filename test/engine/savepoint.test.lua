@@ -247,22 +247,6 @@ test_run:cmd("setopt delimiter ''");
 s:select{}
 s:truncate()
 
--- Savepoints on different statements, but on a same state.
-test_run:cmd("setopt delimiter ';'")
-box.begin()
-s:replace{1}
-s1 = box.savepoint()
-pcall(s.replace, s, {'2'})
-s2 = box.savepoint()
-s:replace{3}
-box.rollback_to_savepoint(s1)
-ok1, errmsg1 = pcall(box.rollback_to_savepoint, s2)
-box.commit()
-test_run:cmd("setopt delimiter ''");
-s:select{}
-ok1, errmsg1
-s:truncate()
-
 -- Several savepoints on a same statement.
 test_run:cmd("setopt delimiter ';'")
 box.begin()

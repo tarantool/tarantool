@@ -199,3 +199,54 @@ t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 s:replace({9, 10})
 s:select()
 s:drop()
+
+--
+-- gh-3020: sub-statement rollback
+--
+s1 = box.schema.space.create('test1')
+_ = s1:create_index('pk')
+s2 = box.schema.space.create('test2')
+_ = s2:create_index('pk')
+s3 = box.schema.space.create('test3')
+_ = s3:create_index('pk')
+
+test_run:cmd("setopt delimiter ';'");
+
+x1 = 1;
+x2 = 1;
+
+_ = s1:on_replace(function(old, new)
+    for i = 1, 3 do
+        s2:insert{x1}
+        x1 = x1 + 1
+    end
+    if new[2] == 'fail' then
+        error('fail')
+    end
+    pcall(s2.insert, s2, {123, 'fail'})
+end);
+
+_ = s2:on_replace(function(old, new)
+    for i = 1, 3 do
+        s3:insert{x2}
+        x2 = x2 + 1
+    end
+    if new[2] == 'fail' then
+        error('fail')
+    end
+end);
+
+box.begin()
+s1:insert{1}
+pcall(s1.insert, s1, {123, 'fail'})
+box.commit();
+
+test_run:cmd("setopt delimiter ''");
+
+s1:select()
+s2:select()
+s3:select()
+
+s1:drop()
+s2:drop()
+s3:drop()

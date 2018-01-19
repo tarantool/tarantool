@@ -35,14 +35,6 @@
 #include <fiber.h>
 #include "xrow.h"
 
-enum {
-	/**
-	 * Maximum recursion depth for on_replace triggers.
-	 * Large numbers may corrupt C stack.
-	 */
-	TXN_SUB_STMT_MAX = 3
-};
-
 double too_long_threshold;
 
 static inline void
@@ -98,9 +90,30 @@ txn_stmt_new(struct txn *txn)
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 
+	/* Set the savepoint for statement rollback. */
+	txn->sub_stmt_begin[txn->in_sub_stmt] = stailq_last(&txn->stmts);
+	txn->in_sub_stmt++;
+
 	stailq_add_tail_entry(&txn->stmts, stmt, next);
-	++txn->in_sub_stmt;
 	return stmt;
+}
+
+static void
+txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
+{
+	struct txn_stmt *stmt;
+	struct stailq rollback;
+	stailq_cut_tail(&txn->stmts, svp, &rollback);
+	stailq_reverse(&rollback);
+	stailq_foreach_entry(stmt, &rollback, next) {
+		engine_rollback_statement(txn->engine, txn, stmt);
+		if (stmt->row != NULL) {
+			assert(txn->n_rows > 0);
+			txn->n_rows--;
+			stmt->row = NULL;
+		}
+		stmt->space = NULL;
+	}
 }
 
 struct txn *
@@ -309,12 +322,6 @@ fail:
 	return -1;
 }
 
-/**
- * Void all effects of the statement, but
- * keep it in the list - to maintain
- * limit on the number of statements in a
- * transaction.
- */
 void
 txn_rollback_stmt()
 {
@@ -325,15 +332,8 @@ txn_rollback_stmt()
 		return txn_rollback();
 	if (txn->in_sub_stmt == 0)
 		return;
-	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
-						  next);
-	engine_rollback_statement(txn->engine, txn, stmt);
-	if (stmt->row != NULL) {
-		stmt->row = NULL;
-		--txn->n_rows;
-		assert(txn->n_rows >= 0);
-	}
-	--txn->in_sub_stmt;
+	txn->in_sub_stmt--;
+	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt]);
 }
 
 void
@@ -483,17 +483,6 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
-	struct stailq rollback_stmts;
-	stailq_cut_tail(&txn->stmts, svp->stmt, &rollback_stmts);
-	stailq_reverse(&rollback_stmts);
-	stailq_foreach_entry(stmt, &rollback_stmts, next) {
-		engine_rollback_statement(txn->engine, txn, stmt);
-		if (stmt->row != NULL) {
-			stmt->row = NULL;
-			--txn->n_rows;
-			assert(txn->n_rows >= 0);
-		}
-		stmt->space = NULL;
-	}
+	txn_rollback_to_svp(txn, svp->stmt);
 	return 0;
 }

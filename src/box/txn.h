@@ -49,6 +49,14 @@ struct space;
 struct tuple;
 struct xrow_header;
 
+enum {
+	/**
+	 * Maximum recursion depth for on_replace triggers.
+	 * Large numbers may corrupt C stack.
+	 */
+	TXN_SUB_STMT_MAX = 3
+};
+
 /**
  * A single statement of a multi-statement
  * transaction: undo and redo info.
@@ -110,6 +118,12 @@ struct txn {
 	bool has_triggers;
 	/** The number of active nested statement-level transactions. */
 	int in_sub_stmt;
+	/**
+	 * First statement at each statement-level.
+	 * Needed to rollback sub statements.
+	 */
+	struct stailq_entry *sub_stmt_begin[TXN_SUB_STMT_MAX];
+	/** LSN of this transaction when written to WAL. */
 	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
 	struct engine *engine;
