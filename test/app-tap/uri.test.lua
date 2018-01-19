@@ -6,7 +6,7 @@ local uri = require('uri')
 local function test_parse(test)
     -- Tests for uri.parse() Lua bindings.
     -- Parser itself is tested by test/unit/uri unit test.
-    test:plan(28)
+    test:plan(38)
 
     local u
 
@@ -31,6 +31,21 @@ local function test_parse(test)
     test:is(u.path, "/path1/path2/path3", "path")
     test:is(u.query, "q1=v1&q2=v2&q3=v3:1|v3:2", "query")
     test:is(u.fragment, "fragment", "fragment")
+
+    u = uri.parse("http+unix://%2Fvar%2Frun%2Fdocker.sock"..
+        "/v1.24/images/json?x=1")
+    test:is(u.scheme, "http+unix", "scheme")
+    test:is(u.host, "%2Fvar%2Frun%2Fdocker.sock", "host")
+    test:is(u.service, nil, "service")
+    test:is(u.path, "/v1.24/images/json", "path")
+    test:is(u.query, "x=1", "query")
+
+    u = uri.parse("http://unix/:/var/run/docker.sock:/v1.24/images/json?x=1")
+    test:is(u.scheme, "http", "scheme")
+    test:is(u.host, "unix/", "host")
+    test:is(u.service, "/var/run/docker.sock", "service")
+    test:is(u.path, "/v1.24/images/json", "path")
+    test:is(u.query, "x=1", "query")
 
     u = uri.parse('login@host')
     test:is(u.login, "login", "login")

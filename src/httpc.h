@@ -38,6 +38,7 @@
 #include "diag.h"
 
 #include "curl.h"
+#include "uri.h"
 
 /** {{{ Environment */
 
