@@ -215,7 +215,8 @@ tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
 	assert(c != NULL);
 	assert(c->tuple_last != NULL);
 	struct tuple_format *format = tuple_format(c->tuple_last);
-	assert(fieldno < format->field_count);
+	assert(format->exact_field_count == 0
+	       || fieldno < format->exact_field_count);
 	if (format->fields[fieldno].offset_slot == TUPLE_OFFSET_SLOT_NIL)
 		return NULL;
 	const char *field = tuple_field(c->tuple_last, fieldno);
@@ -562,7 +563,7 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	mp_decode_map(&field);
 	uint32_t key_len;
 	const char *sql_str = mp_decode_str(&field, &key_len);
-	assert(sqlite3StrNICmp(sql_str, "sql", 3));
+	assert(sqlite3StrNICmp(sql_str, "sql", 3) == 0);
 	(void)sql_str;
 	uint32_t trigger_stmt_len;
 	const char *trigger_stmt_old = mp_decode_str(&field, &trigger_stmt_len);
@@ -653,7 +654,7 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name,
 	(void)map_size;
 	uint32_t key_len;
 	const char *sql_str = mp_decode_str(&sql_stmt_map, &key_len);
-	assert(sqlite3StrNICmp(sql_str, "sql", 3));
+	assert(sqlite3StrNICmp(sql_str, "sql", 3) == 0);
 	(void)sql_str;
 	uint32_t sql_stmt_decoded_len;
 	const char *sql_stmt_old = mp_decode_str(&sql_stmt_map,
@@ -762,7 +763,7 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 	(void)map_size;
 	uint32_t key_len;
 	const char *sql_str = mp_decode_str(&sql_stmt_map, &key_len);
-	assert(sqlite3StrNICmp(sql_str, "sql", 3));
+	assert(sqlite3StrNICmp(sql_str, "sql", 3) == 0);
 	(void)sql_str;
 	uint32_t create_stmt_decoded_len;
 	const char *create_stmt_old = mp_decode_str(&sql_stmt_map,

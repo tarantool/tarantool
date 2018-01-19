@@ -263,24 +263,6 @@
 #endif
 
 /*
- * NDEBUG and SQLITE_DEBUG are opposites.  It should always be true that
- * defined(NDEBUG)==!defined(SQLITE_DEBUG).  If this is not currently true,
- * make it true by defining or undefining NDEBUG.
- *
- * Setting NDEBUG makes the code smaller and faster by disabling the
- * assert() statements in the code.  So we want the default action
- * to be for NDEBUG to be set and NDEBUG to be undefined only if SQLITE_DEBUG
- * is set.  Thus NDEBUG becomes an opt-in rather than an opt-out
- * feature.
- */
-#if !defined(NDEBUG) && !defined(SQLITE_DEBUG)
-#define NDEBUG 1
-#endif
-#if defined(NDEBUG) && defined(SQLITE_DEBUG)
-#undef NDEBUG
-#endif
-
-/*
  * Enable SQLITE_ENABLE_EXPLAIN_COMMENTS if SQLITE_DEBUG is turned on.
  */
 #if !defined(SQLITE_ENABLE_EXPLAIN_COMMENTS) && defined(SQLITE_DEBUG)
