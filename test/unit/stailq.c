@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include "unit.h"
 
-#define PLAN		37
+#define PLAN		68
 
 #define ITEMS		7
 
@@ -15,7 +15,7 @@ struct test {
 
 static struct test items[ITEMS];
 
-static struct stailq head;
+static struct stailq head, tail;
 
 int
 main(void)
@@ -72,6 +72,44 @@ main(void)
 		is(it, items + i, "element (foreach_entry) %d", i);
 		i++;
 	}
+
+	stailq_create(&head);
+	for (i = 0; i < ITEMS; i++) {
+		items[i].no = ITEMS - i;
+		stailq_add_tail_entry(&head, &items[i], next);
+	}
+	stailq_cut_tail(&head, NULL, &tail);
+	ok(stailq_empty(&head), "head is empty after cut at first");
+	i = 0;
+	stailq_foreach_entry(it, &tail, next) {
+		is(it, items + i, "tail element after cut at first %d", i);
+		i++;
+	}
+	stailq_concat(&head, &tail);
+	stailq_cut_tail(&head, stailq_last(&head), &tail);
+	ok(stailq_empty(&tail), "tail is empty after cut at last");
+	i = 0;
+	stailq_foreach_entry(it, &head, next) {
+		is(it, items + i, "head element after cut at last %d", i);
+		i++;
+	}
+	stailq_concat(&head, &tail);
+	stailq_cut_tail(&head, &items[3].next, &tail);
+	i = 0;
+	stailq_foreach_entry(it, &head, next) {
+		is(it, items + i, "head element after cut at middle %d", i);
+		i++;
+	}
+	stailq_foreach_entry(it, &tail, next) {
+		is(it, items + i, "tail element after cut at middle %d", i);
+		i++;
+	}
+	stailq_concat(&head, &tail);
+	ok(stailq_empty(&tail), "tail is empty after concat");
+	i = 0;
+	stailq_foreach_entry(it, &head, next) {
+		is(it, items + i, "head element after concat %d", i);
+		i++;
+	}
 	return check_plan();
 }
-

@@ -681,15 +681,8 @@ vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 {
 	assert(tx->state == VINYL_TX_READY);
 	struct stailq_entry *last = svp;
-	/* Start from the first statement after the savepoint. */
-	last = last == NULL ? stailq_first(&tx->log) : stailq_next(last);
-	if (last == NULL) {
-		/* Empty transaction or no changes after the savepoint. */
-		return;
-	}
 	struct stailq tail;
-	stailq_create(&tail);
-	stailq_splice(&tx->log, last, &tail);
+	stailq_cut_tail(&tx->log, last, &tail);
 	/* Rollback statements in LIFO order. */
 	stailq_reverse(&tail);
 	struct txv *v, *tmp;

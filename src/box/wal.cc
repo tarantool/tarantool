@@ -629,7 +629,8 @@ wal_write_to_disk(struct cmsg *msg)
 	/*
 	 * Iterate over requests (transactions)
 	 */
-	struct journal_entry *entry, *last_commit_entry = NULL;
+	struct journal_entry *entry;
+	struct stailq_entry *last_committed = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
 		wal_assign_lsn(writer, entry->rows, entry->rows + entry->n_rows);
 		entry->res = vclock_sum(&writer->vclock);
@@ -637,14 +638,13 @@ wal_write_to_disk(struct cmsg *msg)
 		if (rc < 0)
 			goto done;
 		if (rc > 0)
-			last_commit_entry = entry;
+			last_committed = &entry->fifo;
 		/* rc == 0: the write is buffered in xlog_tx */
 	}
 	if (xlog_flush(l) < 0)
 		goto done;
 
-	last_commit_entry = stailq_last_entry(&wal_msg->commit,
-					      struct journal_entry, fifo);
+	last_committed = stailq_last(&wal_msg->commit);
 
 done:
 	struct error *error = diag_last_error(diag_get());
@@ -660,20 +660,15 @@ done:
 	 * nothing, and need to start rollback from the first
 	 * request. Otherwise we rollback from the first request.
 	 */
-	struct journal_entry *rollback_entry = last_commit_entry ?
-		stailq_next_entry(last_commit_entry, fifo) :
-		stailq_first_entry(&wal_msg->commit, struct journal_entry,
-				   fifo);
-	if (rollback_entry) {
-		/* Update status of the successfully committed requests. */
-		for (entry = rollback_entry; entry != NULL;
-		     entry = stailq_next_entry(entry, fifo)) {
+	struct stailq rollback;
+	stailq_cut_tail(&wal_msg->commit, last_committed, &rollback);
 
+	if (!stailq_empty(&rollback)) {
+		/* Update status of the successfully committed requests. */
+		stailq_foreach_entry(entry, &rollback, fifo)
 			entry->res = -1;
-		}
 		/* Rollback unprocessed requests */
-		stailq_splice(&wal_msg->commit, &rollback_entry->fifo,
-			      &wal_msg->rollback);
+		stailq_concat(&wal_msg->rollback, &rollback);
 		wal_writer_begin_rollback(writer);
 	}
 	fiber_gc();

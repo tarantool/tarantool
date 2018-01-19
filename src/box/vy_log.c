@@ -147,7 +147,10 @@ struct vy_log {
 	int tx_size;
 	/** Start of the current transaction in the pool, for rollback */
 	size_t tx_svp;
-	/** First record of the current transaction. */
+	/**
+	 * Last record in the queue at the time when the current
+	 * transaction was started. Used for rollback.
+	 */
 	struct stailq_entry *tx_begin;
 	/**
 	 * Flag set if vy_log_write() failed.
@@ -802,7 +805,6 @@ vy_log_flush(void)
 	region_reset(&vy_log.pool);
 	stailq_create(&vy_log.tx);
 	vy_log.tx_size = 0;
-	vy_log.tx_svp = 0;
 	return 0;
 }
 
@@ -1167,7 +1169,8 @@ void
 vy_log_tx_begin(void)
 {
 	latch_lock(&vy_log.latch);
-	vy_log.tx_begin = NULL;
+	vy_log.tx_begin = stailq_last(&vy_log.tx);
+	vy_log.tx_svp = region_used(&vy_log.pool);
 	vy_log.tx_failed = false;
 	say_verbose("begin vylog transaction");
 }
@@ -1225,12 +1228,10 @@ done:
 	return 0;
 
 rollback:
-	stailq_create(&rollback);
-	stailq_splice(&vy_log.tx, vy_log.tx_begin, &rollback);
+	stailq_cut_tail(&vy_log.tx, vy_log.tx_begin, &rollback);
 	region_truncate(&vy_log.pool, vy_log.tx_svp);
 	vy_log.tx_size = 0;
 	vy_log.tx_svp = 0;
-	vy_log.tx_begin = NULL;
 	say_verbose("rollback vylog transaction");
 	latch_unlock(&vy_log.latch);
 	return -1;
@@ -1254,8 +1255,6 @@ vy_log_write(const struct vy_log_record *record)
 {
 	assert(latch_owner(&vy_log.latch) == fiber());
 
-	size_t svp = region_used(&vy_log.pool);
-
 	struct vy_log_record *tx_record = vy_log_record_dup(&vy_log.pool,
 							    record);
 	if (tx_record == NULL) {
@@ -1268,10 +1267,6 @@ vy_log_write(const struct vy_log_record *record)
 
 	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
 	vy_log.tx_size++;
-	if (vy_log.tx_begin == NULL) {
-		vy_log.tx_begin = &tx_record->in_tx;
-		vy_log.tx_svp = svp;
-	}
 }
 
 /**

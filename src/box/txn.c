@@ -484,14 +484,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		return -1;
 	}
 	struct stailq rollback_stmts;
-	if (stmt == NULL) {
-		rollback_stmts = txn->stmts;
-		stailq_create(&txn->stmts);
-	} else {
-		stailq_create(&rollback_stmts);
-		stmt = stailq_next_entry(stmt, next);
-		stailq_splice(&txn->stmts, &stmt->next, &rollback_stmts);
-	}
+	stailq_cut_tail(&txn->stmts, svp->stmt, &rollback_stmts);
 	stailq_reverse(&rollback_stmts);
 	stailq_foreach_entry(stmt, &rollback_stmts, next) {
 		engine_rollback_statement(txn->engine, txn, stmt);
