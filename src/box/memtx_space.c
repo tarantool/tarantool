@@ -532,6 +532,69 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	return 0;
 }
 
+/**
+ * This function simply creates new memtx tuple, refs it and calls space's
+ * replace function. In constrast to original memtx_space_execute_replace(), it
+ * doesn't handle any transaction routine.
+ * Ephemeral spaces shouldn't be involved in transaction routine, since
+ * they are used only for internal purposes. Moreover, ephemeral spaces
+ * can be created and destroyed within one transaction and rollback of already
+ * destroyed space may lead to undefined behaviour. For this reason it
+ * doesn't take txn as an argument.
+ */
+static int
+memtx_space_ephemeral_replace(struct space *space, const char *tuple,
+				      const char *tuple_end)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct tuple *new_tuple = memtx_tuple_new(space->format, tuple,
+						  tuple_end);
+	if (new_tuple == NULL)
+		return -1;
+	tuple_ref(new_tuple);
+	struct tuple *old_tuple = NULL;
+	if (memtx_space->replace(space, old_tuple, new_tuple,
+				 DUP_REPLACE_OR_INSERT, &old_tuple) != 0) {
+		tuple_unref(new_tuple);
+		return -1;
+	}
+	if (old_tuple != NULL)
+		tuple_unref(old_tuple);
+	return 0;
+}
+
+/**
+ * Delete tuple with given key from primary index. Tuple checking is omitted
+ * due to the ability of ephemeral spaces to hold nulls in primary key.
+ * Generally speaking, it is not correct behaviour owing to ambiguity when
+ * fetching/deleting tuple from space with several tuples containing
+ * nulls in PK. On the other hand, ephemeral spaces are used only for internal
+ * needs, so if it is guaranteed that no such situation occur
+ * (when several tuples with nulls in PK exist), it is OK to allow
+ * insertion nulls in PK.
+ *
+ * Similarly to ephemeral replace function,
+ * it isn't involved in any transaction routine.
+ */
+static int
+memtx_space_ephemeral_delete(struct space *space, const char *key)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct index *primary_index = space_index(space, 0 /* primary index*/);
+	if (primary_index == NULL)
+		return -1;
+	uint32_t part_count = mp_decode_array(&key);
+	struct tuple *old_tuple;
+	if (index_get(primary_index, key, part_count, &old_tuple) != 0)
+		return -1;
+	if (old_tuple != NULL &&
+	    memtx_space->replace(space, old_tuple, NULL,
+				 DUP_REPLACE, &old_tuple) != 0)
+		return -1;
+	tuple_unref(old_tuple);
+	return 0;
+}
+
 /* }}} DML */
 
 /* {{{ DDL */
@@ -922,6 +985,8 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_delete = */ memtx_space_execute_delete,
 	/* .execute_update = */ memtx_space_execute_update,
 	/* .execute_upsert = */ memtx_space_execute_upsert,
+	/* .ephemeral_replace = */ memtx_space_ephemeral_replace,
+	/* .ephemeral_delete = */ memtx_space_ephemeral_delete,
 	/* .init_system_space = */ memtx_init_system_space,
 	/* .init_ephemeral_space = */ memtx_init_ephemeral_space,
 	/* .check_index_def = */ memtx_space_check_index_def,

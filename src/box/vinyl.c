@@ -2362,6 +2362,26 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 	return vy_upsert(env, tx, stmt, space, request);
 }
 
+static int
+vinyl_space_ephemeral_replace(struct space *space, const char *tuple,
+			      const char *tuple_end)
+{
+	(void)space;
+	(void)tuple;
+	(void)tuple_end;
+	unreachable();
+	return -1;
+}
+
+static int
+vinyl_space_ephemeral_delete(struct space *space, const char *key)
+{
+	(void)space;
+	(void)key;
+	unreachable();
+	return -1;
+}
+
 static inline void
 txn_stmt_unref_tuples(struct txn_stmt *stmt)
 {
@@ -4013,6 +4033,8 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_delete = */ vinyl_space_execute_delete,
 	/* .execute_update = */ vinyl_space_execute_update,
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
+	/* .ephemeral_replace = */ vinyl_space_ephemeral_replace,
+	/* .ephemeral_delete = */ vinyl_space_ephemeral_delete,
 	/* .init_system_space = */ vinyl_init_system_space,
 	/* .init_ephemeral_space = */ vinyl_init_ephemeral_space,
 	/* .check_index_def = */ vinyl_space_check_index_def,

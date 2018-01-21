@@ -99,6 +99,26 @@ sysview_space_execute_upsert(struct space *space, struct txn *txn,
 	return -1;
 }
 
+static int
+sysview_space_ephemeral_replace(struct space *space, const char *tuple,
+				const char *tuple_end)
+{
+	(void)space;
+	(void)tuple;
+	(void)tuple_end;
+	unreachable();
+	return -1;
+}
+
+static int
+sysview_space_ephemeral_delete(struct space *space, const char *key)
+{
+	(void)key;
+	(void)space;
+	unreachable();
+	return -1;
+}
+
 static void
 sysview_init_system_space(struct space *space)
 {
@@ -200,6 +220,8 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .execute_delete = */ sysview_space_execute_delete,
 	/* .execute_update = */ sysview_space_execute_update,
 	/* .execute_upsert = */ sysview_space_execute_upsert,
+	/* .ephemeral_replace = */ sysview_space_ephemeral_replace,
+	/* .ephemeral_delete = */ sysview_space_ephemeral_delete,
 	/* .init_system_space = */ sysview_init_system_space,
 	/* .init_ephemeral_space = */ sysview_init_ephemeral_space,
 	/* .check_index_def = */ sysview_space_check_index_def,
