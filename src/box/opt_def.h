@@ -57,7 +57,7 @@ typedef int64_t (*opt_def_to_enum_cb)(const char *str, uint32_t len);
 struct opt_def {
 	const char *name;
 	enum opt_type type;
-	ptrdiff_t offset;
+	size_t offset;
 	uint32_t len;
 
 	const char *enum_name;
