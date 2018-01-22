@@ -8,7 +8,12 @@ macro(zstd_build)
         third_party/zstd/lib/common/fse_decompress.c
         third_party/zstd/lib/decompress/zstd_decompress.c
         third_party/zstd/lib/decompress/huf_decompress.c
+        third_party/zstd/lib/compress/zstd_double_fast.c
+        third_party/zstd/lib/compress/zstd_fast.c
+        third_party/zstd/lib/compress/zstd_lazy.c
+        third_party/zstd/lib/compress/zstd_opt.c
         third_party/zstd/lib/compress/zstd_compress.c
+        third_party/zstd/lib/compress/zstd_ldm.c
         third_party/zstd/lib/compress/zstdmt_compress.c
         third_party/zstd/lib/compress/huf_compress.c
         third_party/zstd/lib/compress/fse_compress.c
