@@ -264,9 +264,11 @@ txn_check_singlestatement(struct txn *txn, const char *where);
 static inline struct txn_stmt *
 txn_current_stmt(struct txn *txn)
 {
-	return (txn->in_sub_stmt > 0 ?
-		stailq_last_entry(&txn->stmts, struct txn_stmt, next) :
-		NULL);
+	if (txn->in_sub_stmt == 0)
+		return NULL;
+	struct stailq_entry *stmt = txn->sub_stmt_begin[txn->in_sub_stmt - 1];
+	stmt = stmt != NULL ? stailq_next(stmt) : stailq_first(&txn->stmts);
+	return stailq_entry(stmt, struct txn_stmt, next);
 }
 
 /** The last statement of the transaction. */

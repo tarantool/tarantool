@@ -205,8 +205,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
 	 */
-	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts,
-						  struct txn_stmt, next);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	/* Create WAL record for the write requests in non-temporary spaces */
 	if (!space_is_temporary(stmt->space)) {

@@ -624,3 +624,63 @@ s2:drop()
 s3:drop()
 ---
 ...
+--
+-- gh-3020: trigger chaining
+--
+s1 = box.schema.space.create('test1')
+---
+...
+_ = s1:create_index('pk')
+---
+...
+s2 = box.schema.space.create('test2')
+---
+...
+_ = s2:create_index('pk')
+---
+...
+s3 = box.schema.space.create('test3')
+---
+...
+_ = s3:create_index('pk')
+---
+...
+x = 1
+---
+...
+_ = s1:on_replace(function(old, new) s2:insert(new:update{{'!', 2, x}}) x = x + 1 end)
+---
+...
+_ = s1:on_replace(function(old, new) s3:insert(new:update{{'!', 2, x}}) x = x + 1 end)
+---
+...
+box.begin() s1:insert{1} s1:insert{2} s1:insert{3} box.commit()
+---
+...
+s1:select()
+---
+- - [1]
+  - [2]
+  - [3]
+...
+s2:select()
+---
+- - [1, 2]
+  - [2, 4]
+  - [3, 6]
+...
+s3:select()
+---
+- - [1, 1]
+  - [2, 3]
+  - [3, 5]
+...
+s1:drop()
+---
+...
+s2:drop()
+---
+...
+s3:drop()
+---
+...
