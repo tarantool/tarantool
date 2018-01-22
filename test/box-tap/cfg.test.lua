@@ -5,7 +5,8 @@ local test = tap.test('cfg')
 local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
-test:plan(79)
+local msgpack = require('msgpack')
+test:plan(80)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -55,6 +56,8 @@ status, result = pcall(function() return box.runtime.info() end)
 test:ok(status and type(result) == 'table', "box.runtime without box.cfg")
 status, result = pcall(function() return box.index.EQ end)
 test:ok(status and type(result) == 'number', "box.index without box.cfg")
+status, result = pcall(function() return box.NULL end)
+test:ok(status and result == msgpack.NULL, "box.NULL without box.cfg")
 status, result = pcall(box.session.id)
 test:ok(status, "box.session without box.cfg")
 status, result = pcall(box.tuple.new, {1, 2, 3})

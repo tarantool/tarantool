@@ -338,6 +338,7 @@ local box_cfg_guard_whitelist = {
     session = true;
     tuple = true;
     runtime = true;
+    NULL = true;
 };
 
 local box = require('box')
