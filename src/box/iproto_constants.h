@@ -141,6 +141,8 @@ enum iproto_type {
 	IPROTO_UPSERT = 9,
 	/** CALL request - returns arbitrary MessagePack */
 	IPROTO_CALL = 10,
+	/** No operation. Treated as DML, used to bump LSN. */
+	IPROTO_NOP = 11,
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 
@@ -174,6 +176,13 @@ extern const char *iproto_type_strs[];
 static inline const char *
 iproto_type_name(uint32_t type)
 {
+	/*
+	 * Sic: iptoto_type_strs[IPROTO_NOP] is NULL
+	 * to suppress box.stat() output.
+	 */
+	if (type == IPROTO_NOP)
+		return "NOP";
+
 	if (type < IPROTO_TYPE_STAT_MAX)
 		return iproto_type_strs[type];
 
@@ -207,7 +216,7 @@ static inline bool
 iproto_type_is_dml(uint32_t type)
 {
 	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
-		type == IPROTO_UPSERT;
+		type == IPROTO_UPSERT || type == IPROTO_NOP;
 }
 
 /**
