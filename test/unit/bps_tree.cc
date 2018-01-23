@@ -789,6 +789,8 @@ insert_get_iterator()
 	for (i = -9999; i < 10000; i += 2)
 		bps_insert_and_check(test, &tree, i, NULL)
 
+	test_destroy(&tree);
+
 	footer();
 }
 
