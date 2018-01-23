@@ -12,7 +12,11 @@ ffi.cdef[[
 
 
     extern sayfunc_t _say;
-    extern void say_logrotate(int);
+    extern struct ev_loop;
+    extern struct ev_signal;
+
+    extern void
+    say_logrotate(struct ev_loop *, struct ev_signal *, int);
 
     enum say_level {
         S_FATAL,
@@ -104,7 +108,7 @@ local function say_closure(lvl)
 end
 
 local function log_rotate()
-    ffi.C.say_logrotate(0)
+    ffi.C.say_logrotate(nil, nil, 0)
 end
 
 local function log_level(level)

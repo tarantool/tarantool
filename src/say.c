@@ -42,6 +42,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
+#include <coio_task.h>
 
 pid_t log_pid = 0;
 int log_level = S_INFO;
@@ -265,26 +266,62 @@ log_rotate(const struct log *log)
 	ssize_t r = write(log->fd,
 			  logrotate_message, (sizeof logrotate_message) - 1);
 	(void) r;
+	/*
+	 * log_background applies only to log_default logger
+	 */
+	if (log == log_default && log_background &&
+		log->type == SAY_LOGGER_FILE) {
+		dup2(log_default->fd, STDOUT_FILENO);
+		dup2(log_default->fd, STDERR_FILENO);
+	}
+
+	return 0;
+}
+
+struct rotate_task {
+	struct coio_task base;
+	struct log *log;
+};
+
+static int
+logrotate_cb(struct coio_task *ptr)
+{
+	struct rotate_task *task = (struct rotate_task *) ptr;
+	if (log_rotate(task->log) < 0) {
+		diag_log();
+	}
+	return 0;
+}
+
+static int
+logrotate_cleanup_cb(struct coio_task *ptr)
+{
+	struct rotate_task *task = (struct rotate_task *) ptr;
+	coio_task_destroy(&task->base);
+	free(task);
 	return 0;
 }
 
 void
-say_logrotate(int signo)
+say_logrotate(struct ev_loop *loop, struct ev_signal *w, int revents)
 {
-	(void) signo;
+	(void) loop;
+	(void) w;
+	(void) revents;
 	int saved_errno = errno;
 	struct log *log;
 	rlist_foreach_entry(log, &log_rotate_list, in_log_list) {
-		if (log_rotate(log) < 0) {
+		struct rotate_task *task =
+			(struct rotate_task *) calloc(1, sizeof(*task));
+		if (task == NULL) {
+			diag_set(OutOfMemory, sizeof(*task), "malloc",
+				 "say_logrotate");
 			diag_log();
+			continue;
 		}
-	}
-	/*
-	 * log_background applies only to log_default logger
-	 */
-	if (log_background && log_default->type == SAY_LOGGER_FILE) {
-		dup2(log_default->fd, STDOUT_FILENO);
-		dup2(log_default->fd, STDERR_FILENO);
+		coio_task_create(&task->base, logrotate_cb, logrotate_cleanup_cb);
+		task->log = log;
+		coio_task_post(&task->base, 0);
 	}
 	errno = saved_errno;
 }
@@ -535,7 +572,6 @@ say_logger_init(const char *init_str, int level, int nonblock,
 	say_set_log_level(level);
 	log_background = background;
 	log_pid = log_default->pid;
-	signal(SIGHUP, say_logrotate);
 	say_set_log_format(say_format_by_name(format));
 
 	if (background) {
