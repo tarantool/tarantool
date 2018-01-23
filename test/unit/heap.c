@@ -475,6 +475,7 @@ test_random_delete_workload()
 		}
 		else {
 			test_heap_delete(&heap, &(nodes[nodes_it]->node));
+			free(nodes[nodes_it]);
 			current_size--;
 			nodes_it++;
 		}
@@ -511,9 +512,11 @@ test_delete_last_node()
 	}
 
 	test_heap_delete(&heap, &value->node);
+	free(value);
 	if (test_heap_check(&heap)) {
 		fail("check heap invariants failed", "test_heap_check(&heap)");
 	}
+	free_all_nodes(&heap);
 	test_heap_destroy(&heap);
 	footer();
 }
