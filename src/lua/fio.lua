@@ -24,12 +24,22 @@ end
 
 local fio_methods = {}
 
+-- read() -> str
+-- read(buf) -> len
 -- read(size) -> str
 -- read(buf, size) -> len
 fio_methods.read = function(self, buf, size)
     local tmpbuf
+    if (not ffi.istype(const_char_ptr_t, buf) and buf == nil) or
+        (ffi.istype(const_char_ptr_t, buf) and size == nil) then
+        local st, err = self:stat()
+        if st == nil then
+            return nil, err
+        end
+        size = st.size
+    end
     if not ffi.istype(const_char_ptr_t, buf) then
-        size = buf
+        size = buf or size
         tmpbuf = buffer.IBUF_SHARED
         tmpbuf:reset()
         buf = tmpbuf:reserve(size)
@@ -148,7 +158,6 @@ end
 fio_methods.stat = function(self)
     return internal.fstat(self.fh)
 end
-
 
 local fio_mt = { __index = fio_methods }
 

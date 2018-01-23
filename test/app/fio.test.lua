@@ -249,10 +249,21 @@ fio.copytree("/no/such/dir", "/some/where")
 buf = buffer.ibuf()
 
 tmpdir = fio.tempdir()
+tmpfile = fio.pathjoin(tmpdir, "test1")
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh:write('helloworld!')
+fh:seek(0)
+fh:read()
+fh:close()
+fh:read()
+fio.unlink(tmpfile)
+
 tmpfile = fio.pathjoin(tmpdir, "test")
 fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
-
 fh:write('helloworld!')
+fh:seek(0)
+len = fh:read(buf:reserve(12))
+ffi.string(buf:alloc(len), len)
 fh:seek(0)
 
 len = fh:read(buf:reserve(5), 5)
