@@ -40,6 +40,23 @@ struct space;
 struct tuple;
 
 /**
+ * Given old and new tuples, initialize the corresponding
+ * request to be written to WAL.
+ *
+ * @param request - request to fix
+ * @param space - space corresponding to request
+ * @param old_tuple - the old tuple
+ * @param new_tuple - the new tuple
+ *
+ * If old_tuple and new_tuple are the same, the request is turned into NOP.
+ * If new_tuple is NULL, the request is turned into DELETE(old_tuple).
+ * If new_tuple is not NULL, the request is turned into REPLACE(new_tuple).
+ */
+int
+request_create_from_tuple(struct request *request, struct space *space,
+			  struct tuple *old_tuple, struct tuple *new_tuple);
+
+/**
  * Convert a request accessing a secondary key to a primary
  * key undo record, given it found a tuple.
  * Flush iproto header of the request to be reconstructed in

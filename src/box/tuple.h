@@ -44,6 +44,12 @@ extern "C" {
 struct slab_arena;
 struct quota;
 
+/**
+ * A format for standalone tuples allocated on runtime arena.
+ * \sa tuple_new().
+ */
+extern struct tuple_format *tuple_format_runtime;
+
 /** Initialize tuple library */
 int
 tuple_init(field_name_hash_f hash);

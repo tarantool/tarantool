@@ -143,6 +143,8 @@ struct space {
 	struct access access[BOX_USER_MAX];
 	/** Engine used by this space. */
 	struct engine *engine;
+	/** Triggers fired before executing a request. */
+	struct rlist before_replace;
 	/** Triggers fired after space_replace() -- see txn_commit_stmt(). */
 	struct rlist on_replace;
 	/** Triggers fired before space statement */

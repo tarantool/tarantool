@@ -539,6 +539,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 static void
 space_swap_triggers(struct space *new_space, struct space *old_space)
 {
+	rlist_swap(&new_space->before_replace, &old_space->before_replace);
 	rlist_swap(&new_space->on_replace, &old_space->on_replace);
 	rlist_swap(&new_space->on_stmt_begin, &old_space->on_stmt_begin);
 }

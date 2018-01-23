@@ -45,6 +45,52 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 
+int
+request_create_from_tuple(struct request *request, struct space *space,
+			  struct tuple *old_tuple, struct tuple *new_tuple)
+{
+	memset(request, 0, sizeof(*request));
+	request->space_id = space->def->id;
+
+	if (old_tuple == new_tuple) {
+		/*
+		 * Old and new tuples are the same,
+		 * turn this request into no-op.
+		 */
+		request->type = IPROTO_NOP;
+		return 0;
+	}
+
+	if (new_tuple == NULL) {
+		uint32_t size, key_size;
+		const char *data = tuple_data_range(old_tuple, &size);
+		request->key = tuple_extract_key_raw(data, data + size,
+				space->index[0]->def->key_def, &key_size);
+		if (request->key == NULL)
+			return -1;
+		request->key_end = request->key + key_size;
+		request->type = IPROTO_DELETE;
+	} else {
+		uint32_t size;
+		const char *data = tuple_data_range(new_tuple, &size);
+		/*
+		 * We have to copy the tuple data to region, because
+		 * the tuple is allocated on runtime arena and not
+		 * referenced and hence may be freed before the
+		 * current transaction ends while we need to write
+		 * the tuple data to WAL on commit.
+		 */
+		char *buf = region_alloc(&fiber()->gc, size);
+		if (buf == NULL)
+			return -1;
+		memcpy(buf, data, size);
+		request->tuple = buf;
+		request->tuple_end = buf + size;
+		request->type = IPROTO_REPLACE;
+	}
+	return 0;
+}
+
 void
 request_rebind_to_primary_key(struct request *request, struct space *space,
 			      struct tuple *found_tuple)
