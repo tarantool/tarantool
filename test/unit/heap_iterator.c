@@ -63,7 +63,7 @@ test_iterator_create()
 		fail("incorrect position after create", "it.curr_pos != 0");
 
 	free_all_nodes(&heap);
-
+	test_heap_destroy(&heap);
 	footer();
 }
 
@@ -84,7 +84,7 @@ test_iterator_empty()
 		fail("incorrect node", "nd != NULL");
 
 	free_all_nodes(&heap);
-
+	test_heap_destroy(&heap);
 	footer();
 }
 
@@ -141,6 +141,7 @@ test_iterator_small()
 		     "test_node != NULL");
 
 	free_all_nodes(&heap);
+	test_heap_destroy(&heap);
 	footer();
 }
 
@@ -198,6 +199,7 @@ test_iterator_large()
 		     "test_node != NULL");
 
 	free_all_nodes(&heap);
+	test_heap_destroy(&heap);
 	footer();
 }
 
