@@ -157,7 +157,7 @@ static int keywordCode(const char *z, int n, int *pType, bool *pFlag){
     TK_REPLACE,    TK_VALUES,     TK_STANDARD,   TK_IF,         TK_STANDARD,   
     TK_STANDARD,   TK_STANDARD,   TK_STANDARD,   TK_WHERE,      TK_RESTRICT,   
     TK_STANDARD,   TK_WITH,       TK_AFTER,      TK_STANDARD,   TK_AND,        
-    TK_DEFAULT,    TK_AUTOINCR,   TK_TO,         TK_COLLATE,    TK_COLUMNKW,   
+    TK_DEFAULT,    TK_AUTOINCR,   TK_TO,         TK_COLLATE,    TK_STANDARD,   
     TK_STANDARD,   TK_CONFLICT,   TK_STANDARD,   TK_CREATE,     TK_JOIN_KW,    
     TK_STANDARD,   TK_STANDARD,   TK_STANDARD,   TK_CTIME_KW,   TK_ID,         
     TK_STANDARD,   TK_CTIME_KW,   TK_CTIME_KW,   TK_PRIMARY,    TK_STANDARD,   

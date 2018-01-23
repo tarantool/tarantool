@@ -149,7 +149,11 @@ static Keyword aKeywordTable[] = {
   { "CAST",                   "TK_CAST",        CAST,             false },
   { "CHECK",                  "TK_CHECK",       ALWAYS,           true  },
   { "COLLATE",                "TK_COLLATE",     ALWAYS,           true  },
-  { "COLUMN",                 "TK_COLUMNKW",    ALTER,            true  },
+  /* gh-3075: Reserved until ALTER ADD COLUMN is implemeneted.
+   * Move it back to ALTER when done.
+   */
+  /* { "COLUMN",                 "TK_COLUMNKW",    ALTER,            true  }, */
+  { "COLUMN",                 "TK_STANDARD",    RESERVED,         true  },
   { "COMMIT",                 "TK_COMMIT",      ALWAYS,           true  },
   { "CONFLICT",               "TK_CONFLICT",    CONFLICT,         false },
   { "CONSTRAINT",             "TK_CONSTRAINT",  ALWAYS,           true  },
