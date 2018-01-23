@@ -170,8 +170,7 @@ static struct ta_cursor *
 cursor_create(struct ta_cursor *c, size_t key_size);
 
 static int
-cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
-	    const char *k, const char *ke);
+cursor_seek(BtCursor *pCur, int *pRes);
 
 static int
 cursor_advance(BtCursor *pCur, int *pRes);
@@ -252,15 +251,31 @@ tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
  */
 int tarantoolSqlite3First(BtCursor *pCur, int *pRes)
 {
-	return cursor_seek(pCur, pRes, ITER_GE,
-			   nil_key, nil_key + sizeof(nil_key));
+	struct ta_cursor *c = pCur->pTaCursor;
+	c = cursor_create(c, sizeof(nil_key));
+	if (!c) {
+		*pRes = 1;
+		return SQLITE_NOMEM;
+	}
+	c->key[0] = nil_key[0];
+	c->type = ITER_GE;
+	pCur->pTaCursor = c;
+	return cursor_seek(pCur, pRes);
 }
 
 /* Set cursor to the last tuple in given space. */
 int tarantoolSqlite3Last(BtCursor *pCur, int *pRes)
 {
-	return cursor_seek(pCur, pRes, ITER_LE,
-			   nil_key, nil_key + sizeof(nil_key));
+	struct ta_cursor *c = pCur->pTaCursor;
+	c = cursor_create(c, sizeof(nil_key));
+	if (!c) {
+		*pRes = 1;
+		return SQLITE_NOMEM;
+	}
+	c->key[0] = nil_key[0];
+	c->type = ITER_LE;
+	pCur->pTaCursor = c;
+	return cursor_seek(pCur, pRes);
 }
 
 /*
@@ -304,15 +319,13 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 {
 	int rc, res_success;
 	size_t ks;
-	const char *k, *ke;
-	enum iterator_type iter_type;
+	struct ta_cursor *taCur = pCur->pTaCursor;
 
 	ks = sqlite3VdbeMsgpackRecordLen(pIdxKey->aMem,
 					 pIdxKey->nField);
-	k = region_reserve(&fiber()->gc, ks);
-	if (k == NULL) return SQLITE_NOMEM;
-	ke = k + sqlite3VdbeMsgpackRecordPut((u8 *)k, pIdxKey->aMem,
-					     pIdxKey->nField);
+	taCur = cursor_create(taCur, ks);
+	sqlite3VdbeMsgpackRecordPut((u8 *)taCur->key, pIdxKey->aMem,
+				    pIdxKey->nField);
 
 	switch (pIdxKey->opcode) {
 	default:
@@ -321,36 +334,37 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 	case 255:
 	/* Restore saved state. Just re-seek cursor.
 	   TODO: replace w/ named constant.  */
-		iter_type = ((struct ta_cursor *)pCur->pTaCursor)->type;
+		taCur->type = ((struct ta_cursor *)pCur->pTaCursor)->type;
 		res_success = 0;
 		break;
 	case OP_SeekLT:
-		iter_type = ITER_LT;
+		taCur->type = ITER_LT;
 		res_success = -1; /* item<key */
 		break;
 	case OP_SeekLE:
-		iter_type = (pCur->hints & BTREE_SEEK_EQ) ?
-			    ITER_REQ : ITER_LE;
+		taCur->type = (pCur->hints & BTREE_SEEK_EQ) ?
+			      ITER_REQ : ITER_LE;
 		res_success = 0; /* item==key */
 		break;
 	case OP_SeekGE:
-		iter_type = (pCur->hints & BTREE_SEEK_EQ) ?
-			    ITER_EQ : ITER_GE;
+		taCur->type = (pCur->hints & BTREE_SEEK_EQ) ?
+			      ITER_EQ : ITER_GE;
 		res_success = 0; /* item==key */
 		break;
 	case OP_SeekGT:
-		iter_type = ITER_GT;
+		taCur->type = ITER_GT;
 		res_success = 1; /* item>key */
 		break;
 	case OP_NoConflict:
 	case OP_NotFound:
 	case OP_Found:
 	case OP_IdxDelete:
-		iter_type = ITER_EQ;
+		taCur->type = ITER_EQ;
 		res_success = 0;
 		break;
 	}
-	rc = cursor_seek(pCur, pRes, iter_type, k, ke);
+	pCur->pTaCursor = taCur;
+	rc = cursor_seek(pCur, pRes);
 	if (*pRes == 0) {
 		*pRes = res_success;
 		/*
@@ -1186,34 +1200,15 @@ cursor_create(struct ta_cursor *c, size_t key_size)
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
 static int
-cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
-	    const char *key, const char *key_end)
+cursor_seek(BtCursor *pCur, int *pRes)
 {
 	struct ta_cursor *c = pCur->pTaCursor;
-	size_t key_size = 0;
+	assert(c != NULL);
 
 	/* Close existing iterator, if any */
-	if (c && c->iter) {
+	if (c->iter) {
 		box_iterator_free(c->iter);
 		c->iter = NULL;
-	}
-
-	/* Allocate or grow cursor if needed. */
-	if (type == ITER_EQ || type == ITER_REQ) {
-		key_size = (size_t)(key_end - key);
-	}
-	c = cursor_create(c, key_size);
-	if (!c) {
-		*pRes = 1;
-		return SQLITE_NOMEM;
-	}
-	pCur->pTaCursor = c;
-
-	/* Copy key if necessary. */
-	if (key_size != 0) {
-		memcpy(c->key, key, key_end - key);
-		key_end = c->key + (key_end - key);
-		key = c->key;
 	}
 
 	struct space *space;
@@ -1228,20 +1223,20 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 		index = *space->index;
 	}
 
+	const char *key = (const char *)c->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, type, key, part_count)) {
+	if (key_validate(index->def, c->type, key, part_count)) {
 		diag_log();
 		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 
-	struct iterator *it = index_create_iterator(index, type, key,
+	struct iterator *it = index_create_iterator(index, c->type, key,
 						    part_count);
 	if (it == NULL) {
 		pCur->eState = CURSOR_INVALID;
 		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 	c->iter = it;
-	c->type = type;
 	pCur->eState = CURSOR_VALID;
 
 	return cursor_advance(pCur, pRes);
