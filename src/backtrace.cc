@@ -76,7 +76,7 @@ backtrace_proc_cache_clear()
 }
 
 const char *
-get_proc_name(unw_cursor *unw_cur, unw_word_t *offset, bool skip_cache)
+get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
 {
 	static __thread char proc_name[BACKTRACE_NAME_MAX];
 	unw_word_t ip;
