@@ -2606,11 +2606,11 @@ static void yy_reduce(
       case 81: /* oneselect ::= SELECT distinct selcollist from where_opt groupby_opt having_opt orderby_opt limit_opt */
 #line 457 "parse.y"
 {
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
   Token s = yymsp[-8].minor.yy0; /*A-overwrites-S*/
 #endif
   yymsp[-8].minor.yy279 = sqlite3SelectNew(pParse,yymsp[-6].minor.yy382,yymsp[-5].minor.yy387,yymsp[-4].minor.yy362,yymsp[-3].minor.yy382,yymsp[-2].minor.yy362,yymsp[-1].minor.yy382,yymsp[-7].minor.yy52,yymsp[0].minor.yy384.pLimit,yymsp[0].minor.yy384.pOffset);
-#if SELECTTRACE_ENABLED
+#ifdef SELECTTRACE_ENABLED
   /* Populate the Select.zSelName[] string that is used to help with
   ** query planner debugging, to differentiate between multiple Select
   ** objects in a complex query.
