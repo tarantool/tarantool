@@ -43,11 +43,6 @@
 #include "scramble.h"
 #include "iproto_constants.h"
 
-/**
- * Globally unique identifier of this instance.
- */
-struct tt_uuid INSTANCE_UUID;
-
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end)

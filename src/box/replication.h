@@ -36,6 +36,8 @@
 #define RB_COMPACT 1
 #include <small/rb.h> /* replicaset_t */
 #include <small/rlist.h>
+#include <small/mempool.h>
+#include "vclock.h"
 
 /**
  * @module replication - global state of multi-master
@@ -132,25 +134,47 @@ replication_init(void);
 void
 replication_free(void);
 
-/** Instance id vclock identifier */
+/** Instance id vclock identifier. */
 extern uint32_t instance_id;
-/**
- * tx-thread local vclock reflecting the
- * state of the cluster, as maintained by the appliers.
- */
-extern struct vclock replicaset_vclock;
-
 /** UUID of the instance. */
 extern struct tt_uuid INSTANCE_UUID;
 /** UUID of the replica set. */
 extern struct tt_uuid REPLICASET_UUID;
 
+typedef rb_tree(struct replica) replica_hash_t;
+
+/**
+ * Replica set state.
+ *
+ * A replica set is a set of appliers and their matching
+ * relays, usually connected in full mesh.
+ */
+struct replicaset {
+	/** Memory pool for struct replica allocations. */
+	struct mempool pool;
+	/** Hash of replicas indexed by UUID. */
+	replica_hash_t hash;
+	/**
+	 * List of replicas that haven't received a UUID.
+	 * It contains both replicas that are still trying
+	 * to connect and those that failed to connect.
+	 */
+	struct rlist anon;
+	/**
+	 * TX thread local vclock reflecting the state
+	 * of the cluster as maintained by appliers.
+	 */
+	struct vclock vclock;
+
+};
+extern struct replicaset replicaset;
+
 /**
  * Summary information about a replica in the replica set.
  */
 struct replica {
-	/** Link in a replica set. */
-	rb_node(struct replica) link;
+	/** Link in replicaset::hash. */
+	rb_node(struct replica) in_hash;
 	/**
 	 * Replica UUID or nil if the replica or nil if the
 	 * applier has not received from the master yet.

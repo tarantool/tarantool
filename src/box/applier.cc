@@ -114,7 +114,7 @@ applier_writer_f(va_list ap)
 			continue;
 		try {
 			struct xrow_header xrow;
-			xrow_encode_vclock(&xrow, &replicaset_vclock);
+			xrow_encode_vclock(&xrow, &replicaset.vclock);
 			coio_write_xrow(&io, &xrow);
 		} catch (SocketError *e) {
 			/*
@@ -261,7 +261,7 @@ applier_join(struct applier *applier)
 		 * Used to initialize the replica's initial
 		 * vclock in bootstrap_from_master()
 		 */
-		xrow_decode_vclock_xc(&row, &replicaset_vclock);
+		xrow_decode_vclock_xc(&row, &replicaset.vclock);
 	}
 
 	applier_set_state(applier, APPLIER_INITIAL_JOIN);
@@ -284,7 +284,7 @@ applier_join(struct applier *applier)
 				 * vclock yet, do it now. In 1.7+
 				 * this vlcock is not used.
 				 */
-				xrow_decode_vclock_xc(&row, &replicaset_vclock);
+				xrow_decode_vclock_xc(&row, &replicaset.vclock);
 			}
 			break; /* end of stream */
 		} else if (iproto_type_is_error(row.type)) {
@@ -313,7 +313,7 @@ applier_join(struct applier *applier)
 		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
-			vclock_follow(&replicaset_vclock, row.replica_id,
+			vclock_follow(&replicaset.vclock, row.replica_id,
 				      row.lsn);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		} else if (row.type == IPROTO_OK) {
@@ -349,7 +349,7 @@ applier_subscribe(struct applier *applier)
 	struct xrow_header row;
 
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-				 &replicaset_vclock);
+				 &replicaset.vclock);
 	coio_write_xrow(coio, &row);
 
 	if (applier->state == APPLIER_READY) {
@@ -437,7 +437,7 @@ applier_subscribe(struct applier *applier)
 		applier->lag = ev_now(loop()) - row.tm;
 		applier->last_row_time = ev_monotonic_now(loop());
 
-		if (vclock_get(&replicaset_vclock, row.replica_id) < row.lsn) {
+		if (vclock_get(&replicaset.vclock, row.replica_id) < row.lsn) {
 			/**
 			 * Promote the replica set vclock before
 			 * applying the row. If there is an
@@ -445,7 +445,7 @@ applier_subscribe(struct applier *applier)
 			 * the row is skipped when the replication
 			 * is resumed.
 			 */
-			vclock_follow(&replicaset_vclock, row.replica_id,
+			vclock_follow(&replicaset.vclock, row.replica_id,
 				      row.lsn);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		}

@@ -236,7 +236,7 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 		diag_raise();
 
 	ERROR_INJECT(ERRINJ_RELAY_FINAL_SLEEP, {
-		while (vclock_compare(stop_vclock, &replicaset_vclock) == 0)
+		while (vclock_compare(stop_vclock, &replicaset.vclock) == 0)
 			fiber_sleep(0.001);
 	});
 }

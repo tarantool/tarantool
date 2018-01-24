@@ -136,7 +136,7 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "lsn");
-	luaL_pushuint64(L, vclock_get(&replicaset_vclock, replica->id));
+	luaL_pushuint64(L, vclock_get(&replicaset.vclock, replica->id));
 	lua_settable(L, -3);
 
 	if (applier != NULL && applier->state != APPLIER_OFF) {
@@ -207,7 +207,7 @@ lbox_info_lsn(struct lua_State *L)
 	/* See comments in lbox_info_id */
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
 	if (self != NULL && self->id != REPLICA_ID_NIL) {
-		luaL_pushint64(L, vclock_get(&replicaset_vclock, self->id));
+		luaL_pushint64(L, vclock_get(&replicaset.vclock, self->id));
 	} else {
 		luaL_pushint64(L, -1);
 	}
@@ -217,7 +217,7 @@ lbox_info_lsn(struct lua_State *L)
 static int
 lbox_info_signature(struct lua_State *L)
 {
-	luaL_pushint64(L, vclock_sum(&replicaset_vclock));
+	luaL_pushint64(L, vclock_sum(&replicaset.vclock));
 	return 1;
 }
 
@@ -253,7 +253,7 @@ lbox_info_server(struct lua_State *L)
 static int
 lbox_info_vclock(struct lua_State *L)
 {
-	lbox_pushvclock(L, &replicaset_vclock);
+	lbox_pushvclock(L, &replicaset.vclock);
 	return 1;
 }
 
