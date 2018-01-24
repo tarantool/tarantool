@@ -386,6 +386,21 @@ relay_reader_f(va_list ap)
 }
 
 /**
+ * Send a heartbeat message over a connected relay.
+ */
+static void
+relay_send_heartbeat(struct relay *relay)
+{
+	struct xrow_header row;
+	xrow_encode_timestamp(&row, instance_id, ev_now(loop()));
+	try {
+		relay_send(relay, &row);
+	} catch (Exception *e) {
+		e->log();
+	}
+}
+
+/**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
  * its socket, and we get an EOF.
@@ -417,6 +432,15 @@ relay_subscribe_f(va_list ap)
 	fiber_set_joinable(reader, true);
 	fiber_start(reader, relay, fiber());
 
+	/*
+	 * If the replica happens to be uptodate on subscribe,
+	 * don't wait for timeout to happen - send a heartbeat
+	 * message right away to update the replication lag as
+	 * soon as possible.
+	 */
+	if (vclock_compare(&r->vclock, &replicaset.vclock) == 0)
+		relay_send_heartbeat(relay);
+
 	while (!fiber_is_cancelled()) {
 		double timeout = replication_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
@@ -430,15 +454,7 @@ relay_subscribe_f(va_list ap)
 			 * Send a heartbeat message to update
 			 * the replication lag on the slave.
 			 */
-			struct xrow_header row;
-			xrow_encode_timestamp(&row, instance_id,
-					      ev_now(loop()));
-			try {
-				relay_send(relay, &row);
-			} catch (Exception *e) {
-				e->log();
-				break;
-			}
+			relay_send_heartbeat(relay);
 		}
 
 		/*
