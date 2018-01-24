@@ -179,6 +179,21 @@ replica_clear_id(struct replica *replica)
 }
 
 static void
+replica_set_applier(struct replica *replica, struct applier *applier)
+{
+	assert(replica->applier == NULL);
+	replica->applier = applier;
+}
+
+static void
+replica_clear_applier(struct replica *replica)
+{
+	assert(replica->applier != NULL);
+	replica->applier = NULL;
+	trigger_clear(&replica->on_connect);
+}
+
+static void
 replica_on_receive_uuid(struct trigger *trigger, void *event)
 {
 	struct replica *replica = container_of(trigger,
@@ -214,8 +229,8 @@ replica_on_receive_uuid(struct trigger *trigger, void *event)
 
 	if (orig != NULL) {
 		/* Use existing struct replica */
-		orig->applier = applier;
-		replica->applier = NULL;
+		replica_set_applier(orig, applier);
+		replica_clear_applier(replica);
 		replica_delete(replica);
 	} else {
 		/* Add a new struct replica */
@@ -235,6 +250,7 @@ replicaset_update(struct applier **appliers, int count)
 	replica_hash_new(&uniq);
 	RLIST_HEAD(anon_replicas);
 	struct replica *replica, *next;
+	struct applier *applier;
 
 	auto uniq_guard = make_scoped_guard([&]{
 		replica_hash_foreach_safe(&uniq, replica, next) {
@@ -245,9 +261,9 @@ replicaset_update(struct applier **appliers, int count)
 
 	/* Check for duplicate UUID */
 	for (int i = 0; i < count; i++) {
-		struct applier *applier = appliers[i];
+		applier = appliers[i];
 		replica = replica_new();
-		replica->applier = applier;
+		replica_set_applier(replica, applier);
 
 		if (applier->state != APPLIER_CONNECTED) {
 			/*
@@ -284,16 +300,17 @@ replicaset_update(struct applier **appliers, int count)
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
-		applier_stop(replica->applier); /* cancels a background fiber */
-		applier_delete(replica->applier);
-		replica->applier = NULL;
+		applier = replica->applier;
+		replica_clear_applier(replica);
+		applier_stop(applier);
+		applier_delete(applier);
 	}
 	rlist_foreach_entry_safe(replica, &replicaset.anon, in_anon, next) {
-		assert(replica->applier != NULL);
-		applier_stop(replica->applier);
-		applier_delete(replica->applier);
-		replica->applier = NULL;
+		applier = replica->applier;
+		replica_clear_applier(replica);
 		replica_delete(replica);
+		applier_stop(applier);
+		applier_delete(applier);
 	}
 	rlist_create(&replicaset.anon);
 
@@ -305,12 +322,9 @@ replicaset_update(struct applier **appliers, int count)
 							   replica);
 		if (orig != NULL) {
 			/* Use existing struct replica */
-			orig->applier = replica->applier;
-			assert(tt_uuid_is_equal(&orig->uuid,
-						&orig->applier->uuid));
-			replica->applier = NULL;
-			replica_delete(replica); /* remove temporary object */
-			replica = orig;
+			replica_set_applier(orig, replica->applier);
+			replica_clear_applier(replica);
+			replica_delete(replica);
 		} else {
 			/* Add a new struct replica */
 			replica_hash_insert(&replicaset.hash, replica);
