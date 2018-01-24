@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(89)
+test:plan(91)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -47,6 +47,14 @@ invalid('vinyl_run_size_ratio', 1)
 invalid('vinyl_bloom_fpr', 0)
 invalid('vinyl_bloom_fpr', 1.1)
 
+local function invalid_combinations(name, val)
+    local status, result = pcall(box.cfg, val)
+    test:ok(not status and result:match('Illegal'), 'invalid '..name)
+end
+
+invalid_combinations("log, log_nonblock", {log = "1.log", log_nonblock = true})
+invalid_combinations("log, log_format", {log = "syslog:identity=tarantool", log_format = 'json'})
+
 test:is(type(box.cfg), 'function', 'box is not started')
 
 --------------------------------------------------------------------------------
@@ -79,6 +87,7 @@ test:ok(status and result[1] == 1, "box.tuple without box.cfg")
 os.execute("rm -rf vinyl")
 box.cfg{
     log="tarantool.log",
+    log_nonblock=false,
     memtx_memory=104857600,
     wal_mode = "", -- "" means default value
 }
@@ -163,7 +172,7 @@ function run_script(code)
 end
 
 -- gh-715: Cannot switch to/from 'fsync'
-code = [[ box.cfg{ log="tarantool.log", wal_mode = 'fsync' }; ]]
+code = [[ box.cfg{ log="tarantool.log", log_nonblock = false, wal_mode = 'fsync' }; ]]
 test:is(run_script(code), 0, 'wal_mode fsync')
 
 code = [[ box.cfg{ wal_mode = 'fsync' }; box.cfg { wal_mode = 'fsync' }; ]]
@@ -190,7 +199,7 @@ test:is(run_script(code), PANIC, 'snap_dir is invalid')
 code = [[ box.cfg{ wal_dir='invalid' } ]]
 test:is(run_script(code), PANIC, 'wal_dir is invalid')
 
-test:is(box.cfg.log_nonblock, true, "log_nonblock default value")
+test:isnil(box.cfg.log_nonblock, "log_nonblock default value")
 code = [[
 box.cfg{log_nonblock = false }
 os.exit(box.cfg.log_nonblock == false and 0 or 1)

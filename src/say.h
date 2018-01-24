@@ -144,7 +144,7 @@ struct log {
  * the diagnostics area
  */
 int
-log_create(struct log *log, const char *init_str, bool nonblock);
+log_create(struct log *log, const char *init_str, int nonblock);
 
 void
 log_destroy(struct log *log);

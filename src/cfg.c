@@ -57,6 +57,18 @@ cfg_geti(const char *param)
 }
 
 int
+cfg_getb(const char *param)
+{
+	cfg_get(param);
+	int val;
+	if (lua_isnil(tarantool_L, -1))
+		return -1;
+	val = lua_toboolean(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return val;
+}
+
+int
 cfg_geti_default(const char *param, int default_val)
 {
 	cfg_get(param);

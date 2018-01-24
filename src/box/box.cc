@@ -329,17 +329,46 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 /* {{{ configuration bindings */
 
 static void
-box_check_log(const char *log)
+box_check_say()
 {
+	const char *log = cfg_gets("log");
 	if (log == NULL)
 		return;
+	enum say_logger_type type;
+	if (say_parse_logger_type(&log, &type) < 0) {
+		tnt_raise(ClientError, ER_CFG, "log",
+			  diag_last_error(diag_get())->errmsg);
+	}
+
 	if (say_check_init_str(log) == -1) {
-		if (diag_last_error(diag_get())->type ==
-		    &type_IllegalParams) {
-			tnt_raise(ClientError, ER_CFG, "log",
-				 diag_last_error(diag_get())->errmsg);
-		}
+
 		diag_raise();
+	}
+
+	if (type == SAY_LOGGER_SYSLOG) {
+		struct say_syslog_opts opts;
+		if (say_parse_syslog_opts(log, &opts) < 0) {
+			if (diag_last_error(diag_get())->type ==
+			    &type_IllegalParams) {
+				tnt_raise(ClientError, ER_CFG, "log",
+					  diag_last_error(diag_get())->errmsg);
+			}
+		}
+		say_free_syslog_opts(&opts);
+		diag_raise();
+	}
+
+	const char *log_format = cfg_gets("log_format");
+	enum say_format format = say_format_by_name(log_format);
+	if (format == say_format_MAX)
+		diag_set(ClientError, ER_CFG, "log_format",
+			 "expected 'plain' or 'json'");
+	if (type == SAY_LOGGER_SYSLOG && format == SF_JSON) {
+		tnt_raise(ClientError, ER_ILLEGAL_PARAMS, "log, log_format");
+	}
+	int log_nonblock = cfg_getb("log_nonblock");
+	if (log_nonblock == 1 && type == SAY_LOGGER_FILE) {
+		tnt_raise(ClientError, ER_ILLEGAL_PARAMS, "log, log_nonblock");
 	}
 }
 
@@ -538,8 +567,7 @@ void
 box_check_config()
 {
 	struct tt_uuid uuid;
-	box_check_log(cfg_gets("log"));
-	box_check_log_format(cfg_gets("log_format"));
+	box_check_say();
 	box_check_uri(cfg_gets("listen"), "listen");
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);

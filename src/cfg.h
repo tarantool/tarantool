@@ -40,6 +40,13 @@ extern "C" {
 int
 cfg_geti(const char *param);
 
+/**
+ * Gets boolean parameter of cfg.
+ * Returns -1 in case of nil
+ */
+int
+cfg_getb(const char *param);
+
 int
 cfg_geti_default(const char *param, int default_val);
 

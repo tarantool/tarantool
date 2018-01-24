@@ -512,14 +512,13 @@ log_syslog_init(struct log *log, const char *init_str)
  * Initialize logging subsystem to use in daemon mode.
  */
 int
-log_create(struct log *log, const char *init_str, bool nonblock)
+log_create(struct log *log, const char *init_str, int nonblock)
 {
 	log->pid = 0;
 	log->syslog_ident = NULL;
 	log->path = NULL;
 	log->format_func = NULL;
 	log->level = S_INFO;
-	log->nonblock = nonblock;
 	log->rotating_threads = 0;
 	fiber_cond_create(&log->rotate_cond);
 	ev_async_init(&log->log_async, log_rotate_async_cb);
@@ -534,13 +533,16 @@ log_create(struct log *log, const char *init_str, bool nonblock)
 		int rc;
 		switch (type) {
 		case SAY_LOGGER_PIPE:
+			log->nonblock = (nonblock >= 0)? nonblock: true;
 			rc = log_pipe_init(log, init_str);
 			break;
 		case SAY_LOGGER_SYSLOG:
+			log->nonblock = (nonblock >= 0)? nonblock: true;
 			rc = log_syslog_init(log, init_str);
 			break;
 		case SAY_LOGGER_FILE:
 		default:
+			log->nonblock = (nonblock >= 0)? nonblock: false;
 			rc = log_file_init(log, init_str);
 			break;
 		}

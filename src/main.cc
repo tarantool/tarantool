@@ -499,7 +499,7 @@ load_cfg()
 	 */
 	say_logger_init(log,
 			cfg_geti("log_level"),
-			cfg_geti("log_nonblock"),
+			cfg_getb("log_nonblock"),
 			log_format,
 			background);
 	systemd_init();
