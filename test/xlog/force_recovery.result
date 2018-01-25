@@ -1,0 +1,98 @@
+#!/usr/bin/env tarantool
+---
+...
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+box.cfg{}
+---
+...
+test_run:cmd('create server test with script = "xlog/force_recovery.lua"')
+---
+- true
+...
+test_run:cmd("start server test")
+---
+- true
+...
+test_run:cmd("switch test")
+---
+- true
+...
+box.space._schema:replace({'test'})
+---
+- ['test']
+...
+test_run:cmd("restart server test")
+box.space._schema:replace({'lost'})
+---
+- ['lost']
+...
+test_run:cmd("restart server test")
+box.space._schema:replace({'tost'})
+---
+- ['tost']
+...
+-- corrupted (empty) in the middle (old behavior: goto error on recovery)
+fio = require('fio')
+---
+...
+path = fio.pathjoin(box.cfg.wal_dir, string.format('%020d.xlog', box.info.lsn - 2))
+---
+...
+fio.truncate(path)
+---
+- true
+...
+test_run:cmd("restart server test")
+box.space._schema:replace({'last'})
+---
+- ['last']
+...
+-- corrupted (empty), last
+fio = require('fio')
+---
+...
+path = fio.pathjoin(box.cfg.wal_dir, string.format('%020d.xlog', box.info.lsn - 1))
+---
+...
+fio.truncate(path)
+---
+- true
+...
+test_run:cmd("restart server test")
+box.space._schema:replace({'test'})
+---
+- ['test']
+...
+test_run:cmd("restart server test")
+box.space._schema:replace({'tost'})
+---
+- ['tost']
+...
+-- corrupted header, last
+fio = require('fio')
+---
+...
+path = fio.pathjoin(box.cfg.wal_dir, string.format('%020d.xlog', box.info.lsn - 1))
+---
+...
+f = fio.open(path, {'O_WRONLY'})
+---
+...
+f:write('DEAD')
+---
+- true
+...
+f:close()
+---
+- true
+...
+test_run:cmd("restart server test")
+box.space._schema:replace({'post'})
+---
+- ['post']
+...

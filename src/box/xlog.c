@@ -552,8 +552,6 @@ xdir_scan(struct xdir *dir)
 					goto exit;
 				/** Skip a corrupted file */
 				error_log(e);
-				rc = 0;
-				goto exit;
 			}
 			i++;
 		} else {
