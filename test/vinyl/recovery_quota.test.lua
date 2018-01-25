@@ -1,5 +1,4 @@
 test_run = require('test_run').new()
-fio = require 'fio'
 
 -- Upon start the test server creates a space and populates it with
 -- more tuples than can be stored in memory, which results in dumping
@@ -7,8 +6,8 @@ fio = require 'fio'
 -- it replayed the dumped statements, it would exceed memory quota.
 -- Check that it does not.
 
-test_run:cmd('create server test with script = "vinyl/low_quota_2.lua"')
-test_run:cmd('start server test')
+test_run:cmd('create server test with script = "vinyl/low_quota.lua"')
+test_run:cmd('start server test with args="2097152"')
 
 test_run:cmd('switch test')
 -- Create a vinyl space and trigger dump by exceeding memory quota.
@@ -25,11 +24,7 @@ _ = var:create_index('pk', {parts = {1, 'string'}})
 stat = box.space.test.index.pk:info()
 _ = var:insert{'put', stat.put.rows}
 _ = var:insert{'dump', stat.disk.dump.out.rows}
-test_run:cmd('switch default')
-
-test_run:cmd('restart server test')
-
-test_run:cmd('switch test')
+test_run:cmd('restart server test with args="2097152"')
 -- Check that we do not exceed quota.
 stat = box.info.vinyl()
 stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}
@@ -43,27 +38,20 @@ put_after = stat.put.rows
 dump_after == 0 or dump_after
 put_before - dump_before == put_after or {dump_before, dump_after, put_before, put_after}
 -- Disable dump and use all memory up to the limit.
-box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
+box.error.injection.set('ERRINJ_VY_RUN_WRITE', true)
 box.cfg{vinyl_timeout=0.001}
 pad_size = 1000
 pad = string.rep('x', pad_size)
 for i = 1, box.cfg.vinyl_memory / pad_size do box.space.test:replace{i, pad} end
 box.info.vinyl().quota.used > 1024 * 1024
-test_run:cmd('switch default')
-
-test_run:cmd('stop server test')
-
 -- Check that tarantool can recover with a smaller memory limit.
-_ = test_run:cmd(string.format('create server test2 with script = "vinyl/low_quota_1.lua", workdir = "%s"', fio.pathjoin(fio.cwd(), 'low_quota_2')))
-_ = test_run:cmd('start server test2')
-_ = test_run:cmd('switch test2')
+test_run:cmd('restart server test with args="1048576"')
 fiber = require 'fiber'
 -- All memory above the limit must be dumped after recovery.
 while box.space.test.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.001) end
 stat = box.info.vinyl()
 stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}
 _ = test_run:cmd('switch default')
-test_run:cmd('stop server test2')
 
+test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')
-test_run:cmd('cleanup server test2')

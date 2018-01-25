@@ -31,9 +31,11 @@
  * SUCH DAMAGE.
  */
 #include "tt_uuid.h"
+#include "trigger.h"
 #include <stdint.h>
 #define RB_COMPACT 1
 #include <small/rb.h> /* replicaset_t */
+#include <small/rlist.h>
 
 /**
  * @module replication - global state of multi-master
@@ -88,6 +90,42 @@ extern "C" {
 
 struct gc_consumer;
 
+/**
+ * Network timeout. Determines how often master and slave exchange
+ * heartbeat messages. Set by box.cfg.replication_timeout.
+ */
+extern double replication_timeout;
+
+/**
+ * Wait for the given period of time before trying to reconnect
+ * to a master.
+ */
+static inline double
+replication_reconnect_timeout(void)
+{
+	return replication_timeout;
+}
+
+/**
+ * Disconnect a replica if no heartbeat message has been
+ * received from it within the given period.
+ */
+static inline double
+replication_disconnect_timeout(void)
+{
+	return replication_timeout * 4;
+}
+
+/**
+ * Fail box.cfg() if the quorum hasn't been assembled within
+ * the given period.
+ */
+static inline double
+replication_connect_quorum_timeout(void)
+{
+	return replication_reconnect_timeout() * 4;
+}
+
 void
 replication_init(void);
 
@@ -111,12 +149,37 @@ extern struct tt_uuid REPLICASET_UUID;
  * Summary information about a replica in the replica set.
  */
 struct replica {
+	/** Link in a replica set. */
 	rb_node(struct replica) link;
+	/**
+	 * Replica UUID or nil if the replica or nil if the
+	 * applier has not received from the master yet.
+	 */
 	struct tt_uuid uuid;
-	struct applier *applier;
-	struct relay *relay;
-	struct gc_consumer *gc;
+	/**
+	 * Replica ID or nil if the replica has not been
+	 * registered in the _cluster space yet.
+	 */
 	uint32_t id;
+	/** Applier fiber. */
+	struct applier *applier;
+	/** Relay thread. */
+	struct relay *relay;
+	/** Garbage collection state associated with the replica. */
+	struct gc_consumer *gc;
+	/** Link in the anon_replicas list. */
+	struct rlist in_anon;
+	/**
+	 * Trigger invoked when the applier connects to the
+	 * remote master for the first time. Used to insert
+	 * the replica into the replica set.
+	 */
+	struct trigger on_connect;
+	/**
+	 * Set if the applier should be paused upon conecting
+	 * to the master.
+	 */
+	bool pause_on_connect;
 };
 
 enum {
@@ -188,11 +251,25 @@ struct replica *
 replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 
 /**
- * Update a replica set with new "applier" objects
- * upon reconfiguration of box.cfg.replication.
+ * Connect \a quorum appliers to remote peers and receive UUID.
+ * Appliers that did not connect will connect asynchronously.
+ * On success, update the replica set with new appliers.
+ * \post appliers are connected to remote hosts and paused.
+ * Use replicaset_follow() to resume appliers.
+ *
+ * \param appliers the array of appliers
+ * \param count size of appliers array
+ * \param timeout connection timeout
  */
 void
-replicaset_update(struct applier **appliers, int count);
+replicaset_connect(struct applier **appliers, int count, int quorum,
+		   double timeout);
+
+/**
+ * Resume all appliers registered with the replica set.
+ */
+void
+replicaset_follow(void);
 
 #endif /* defined(__cplusplus) */
 

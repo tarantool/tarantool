@@ -183,7 +183,7 @@ static const struct index_vtab sysview_index_vtab = {
 static bool
 vspace_filter(struct space *source, struct tuple *tuple)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
 		return true; /* read access to unverse */
 	if (PRIV_R & source->access[cr->auth_token].effective)
@@ -203,7 +203,7 @@ vspace_filter(struct space *source, struct tuple *tuple)
 static bool
 vuser_filter(struct space *source, struct tuple *tuple)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
 		return true; /* read access to unverse */
 	if (PRIV_R & source->access[cr->auth_token].effective)
@@ -221,7 +221,7 @@ vuser_filter(struct space *source, struct tuple *tuple)
 static bool
 vpriv_filter(struct space *source, struct tuple *tuple)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
 		return true; /* read access to unverse */
 	if (PRIV_R & source->access[cr->auth_token].effective)
@@ -239,7 +239,7 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 static bool
 vfunc_filter(struct space *source, struct tuple *tuple)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	if ((PRIV_R | PRIV_X) & cr->universal_access)
 		return true; /* read or execute access to unverse */
 	if (PRIV_R & source->access[cr->auth_token].effective)

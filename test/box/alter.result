@@ -309,27 +309,56 @@ space:drop()
 ...
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--
+-- The result of this test is superseded by the change made
+-- in scope of gh-2914, which allows all printable characters for
+-- identifiers.
+--
 --------------------------------------------------------------------------------
 -- invalid identifiers
-box.schema.space.create('invalid.identifier')
+s = box.schema.space.create('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-box.schema.space.create('invalid identifier')
+s.name
 ---
-- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
+- invalid.identifier
 ...
-box.schema.space.create('primary ')
+s:drop()
 ---
-- error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
-box.schema.space.create('5')
+s = box.schema.space.create('invalid identifier')
 ---
-- error: Invalid identifier '5' (expected letters, digits or an underscore)
+...
+s.name
+---
+- invalid identifier
+...
+s:drop()
+---
+...
+s = box.schema.space.create('primary ')
+---
+...
+'|'..s.name..'|'
+---
+- '|primary |'
+...
+s:drop()
+---
+...
+s = box.schema.space.create('5')
+---
+...
+s.name
+---
+- '5'
+...
+s:drop()
+---
 ...
 box.schema.space.create('')
 ---
-- error: Invalid identifier '' (expected letters, digits or an underscore)
+- error: Invalid identifier '' (expected printable symbols only)
 ...
 -- valid identifiers
 box.schema.space.create('_Abcde'):drop()
@@ -358,25 +387,49 @@ space = box.schema.space.create('test')
 ---
 ...
 -- invalid identifiers
-space:create_index('invalid.identifier')
+i = space:create_index('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-space:create_index('invalid identifier')
+i.name
 ---
-- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
+- invalid.identifier
 ...
-space:create_index('primary ')
+i:drop()
 ---
-- error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
-space:create_index('5')
+i = space:create_index('invalid identifier')
 ---
-- error: Invalid identifier '5' (expected letters, digits or an underscore)
+...
+i.name
+---
+- invalid identifier
+...
+i:drop()
+---
+...
+i = space:create_index('primary ')
+---
+...
+'|'..i.name..'|'
+---
+- '|primary |'
+...
+i:drop()
+---
+...
+i = space:create_index('5')
+---
+...
+i.name
+---
+- '5'
+...
+i:drop()
+---
 ...
 space:create_index('')
 ---
-- error: Invalid identifier '' (expected letters, digits or an underscore)
+- error: Invalid identifier '' (expected printable symbols only)
 ...
 space:drop()
 ---
@@ -848,13 +901,13 @@ pk = s:create_index('pk')
 ...
 sk1 = s:create_index('sk1', { parts = { 2, 'unsigned' } })
 ---
-- error: Ambiguous field type, field 2. Requested type is unsigned but the field has
-    previously been defined as string
+- error: Field 'field2' has type 'string' in space format, but type 'unsigned' in
+    index definition
 ...
 sk2 = s:create_index('sk2', { parts = { 3, 'number' } })
 ---
-- error: Ambiguous field type, field 3. Requested type is number but the field has
-    previously been defined as scalar
+- error: Field 'field3' has type 'scalar' in space format, but type 'number' in index
+    definition
 ...
 -- Check space format conflicting with index parts.
 sk3 = s:create_index('sk3', { parts = { 2, 'string' } })
@@ -865,8 +918,8 @@ format[2].type = 'unsigned'
 ...
 s:format(format)
 ---
-- error: Ambiguous field type, field 2. Requested type is string but the field has
-    previously been defined as unsigned
+- error: Field 'field2' has type 'unsigned' in space format, but type 'string' in
+    index definition
 ...
 s:format()
 ---
@@ -992,11 +1045,13 @@ s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
 ---
-- error: Tuple field count 7 is less than required (expected at least 9)
+- error: Tuple field count 7 is less than required by space format or defined indexes
+    (expected at least 9)
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
 ---
-- error: Tuple field count 8 is less than required (expected at least 9)
+- error: Tuple field count 8 is less than required by space format or defined indexes
+    (expected at least 9)
 ...
 s:truncate()
 ---
@@ -1486,7 +1541,8 @@ s:format(format)
 -- Fail, not enough fields.
 s:replace{2, 2, 2, 2, 2}
 ---
-- error: Tuple field count 5 is less than required (expected at least 6)
+- error: Tuple field count 5 is less than required by space format or defined indexes
+    (expected at least 6)
 ...
 s:replace{2, 2, 2, 2, 2, 2, 2}
 ---
@@ -1498,7 +1554,8 @@ format[7] = {name = 'field7', type = 'unsigned'}
 -- Fail, the tuple {1, ... 1} is invalid for a new format.
 s:format(format)
 ---
-- error: Tuple field count 6 is less than required (expected at least 7)
+- error: Tuple field count 6 is less than required by space format or defined indexes
+    (expected at least 7)
 ...
 s:drop()
 ---
@@ -1703,6 +1760,183 @@ idx = s:create_index('idx')
 box.space.test == s
 ---
 - true
+...
+s:drop()
+---
+...
+--
+-- gh-3000: index modifying must change key_def parts and
+-- comparators. They can be changed, if there was compatible index
+-- parts change. For example, a part type was changed from
+-- unsigned to number. In such a case comparators must be reset
+-- and part types updated.
+--
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1}
+---
+- [1]
+...
+pk:alter{parts = {{1, 'integer'}}}
+---
+...
+s:replace{-2}
+---
+- [-2]
+...
+s:select{}
+---
+- - [-2]
+  - [1]
+...
+s:drop()
+---
+...
+--
+-- gh-2914: Allow any space name which consists of printable characters
+--
+identifier = require("identifier")
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+identifier.run_test(
+	function (identifier)
+		box.schema.space.create(identifier)
+		if box.space[identifier] == nil then
+			error("Cannot query space")
+		end
+	end,
+	function (identifier) box.space[identifier]:drop() end
+);
+---
+- All tests passed
+...
+s = box.schema.create_space("test");
+---
+...
+identifier.run_test(
+    function (identifier) s:create_index(identifier, {parts={1}}) end,
+    function (identifier) s.index[identifier]:drop() end
+);
+---
+- All tests passed
+...
+s:drop();
+---
+...
+--
+-- gh-2914: check column name validation.
+-- Ensure that col names are validated as identifiers.
+--
+s = box.schema.create_space('test');
+---
+...
+i = s:create_index("primary", {parts={1, "integer"}});
+---
+...
+identifier.run_test(
+	function (identifier)
+		s:format({{name=identifier,type="integer"}})
+		local t = s:replace({1})
+		if t[identifier] ~= 1 then
+			error("format identifier error")
+		end
+	end,
+	function (identifier) end
+);
+---
+- All tests passed
+...
+s:drop();
+---
+...
+-- gh-2914: check coll name validation.
+identifier.run_test(
+    function (identifier) box.internal.collation.create(identifier, 'ICU', 'ru-RU', {}) end,
+    function (identifier) box.internal.collation.drop(identifier) end
+);
+---
+- All tests passed
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+--
+-- gh-3011: add new names to old tuple formats.
+--
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+t1 = s:replace{1}
+---
+...
+t1.field1
+---
+- null
+...
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+s:format(format)
+---
+...
+t2 = s:replace{2}
+---
+...
+t2.field1
+---
+- 2
+...
+t1.field1
+---
+- 1
+...
+format[1].name = 'field_1'
+---
+...
+s:format(format)
+---
+...
+t3 = s:replace{3}
+---
+...
+t1.field1
+---
+- null
+...
+t1.field_1
+---
+- 1
+...
+t2.field1
+---
+- null
+...
+t2.field_1
+---
+- 2
+...
+t3.field1
+---
+- null
+...
+t3.field_1
+---
+- 3
 ...
 s:drop()
 ---

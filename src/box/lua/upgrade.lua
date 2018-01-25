@@ -10,7 +10,10 @@ local ADMIN = 1
 local PUBLIC = 2
 -- role 'REPLICATION'
 local REPLICATION = 3
-
+-- role 'SUPER'
+-- choose a fancy id to not clash with any existing role or
+-- user during upgrade
+local SUPER = 31
 
 --------------------------------------------------------------------------------
 -- Utils
@@ -328,6 +331,8 @@ end
 
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
+--------------------------------------------------------------------------------
+
 local function create_sequence_space()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
@@ -400,6 +405,44 @@ local function upgrade_to_1_7_6()
 end
 
 --------------------------------------------------------------------------------
+--- Tarantool 1.7.7
+--------------------------------------------------------------------------------
+
+local function upgrade_to_1_7_7()
+    local _priv = box.space[box.schema.PRIV_ID]
+    local _user = box.space[box.schema.USER_ID]
+    --
+    -- grant 'session' and 'usage' to all existing users
+    --
+    for _, v in _user:pairs() do
+        if v[4] ~= "role" then
+            _priv:upsert({ADMIN, v[1], "universe", 0, 24}, {{"|", 5, 24}})
+        end
+    end
+    --
+    -- grant 'create' to all users with 'read' and 'write'
+    -- on the universe, since going forward we will require
+    -- 'create' rather than 'read,write' to be able to create
+    -- objects
+    --
+    for _, v in _priv.index.object:pairs{'universe'} do
+        if bit.band(v[5], 1) ~= 0 and bit.band(v[5], 2) ~= 0 then
+            _priv:update({v[2], v[3], v[4]}, {{ "|", 5, 32}})
+        end
+    end
+    -- grant admin all new privileges (session, usage, grant option,
+    -- create, alter, drop and anything that might come up in the future
+    --
+    _priv:upsert({ADMIN, ADMIN, 'universe', 0, 4294967295},
+                 {{ "|", 5, 4294967295}})
+    --
+    -- create role 'super' and grant it all privileges on universe
+    --
+    _user:replace{SUPER, ADMIN, 'super', 'role', setmap({})}
+    _priv:replace({ADMIN, SUPER, 'universe', 0, 4294967295})
+end
+
+--------------------------------------------------------------------------------
 -- Tarantool 1.8.2
 --------------------------------------------------------------------------------
 
@@ -446,6 +489,7 @@ local function upgrade(options)
 
     local handlers = {
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
+        {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
         {version = mkversion(1, 8, 2), func = upgrade_to_1_8_2, auto = true},
     }
 

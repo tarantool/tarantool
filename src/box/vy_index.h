@@ -50,13 +50,14 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
-struct lsregion;
 struct tuple;
 struct tuple_format;
 struct vy_index;
 struct vy_mem;
+struct vy_mem_env;
 struct vy_recovery;
 struct vy_run;
+struct vy_run_env;
 
 typedef void
 (*vy_upsert_thresh_cb)(struct vy_index *index, struct tuple *stmt, void *arg);
@@ -65,14 +66,17 @@ typedef void
 struct vy_index_env {
 	/** Path to the data directory. */
 	const char *path;
-	/** Memory allocator. */
-	struct lsregion *allocator;
 	/** Memory generation counter. */
 	int64_t *p_generation;
 	/** Tuple format for keys (SELECT). */
 	struct tuple_format *key_format;
 	/** Key (SELECT) with no parts. */
 	struct tuple *empty_key;
+	/**
+	 * If read of a single statement takes longer than
+	 * the given value, warn about it in the log.
+	 */
+	double too_long_threshold;
 	/**
 	 * Callback invoked when the number of upserts for
 	 * the same key exceeds VY_UPSERT_THRESHOLD.
@@ -82,12 +86,16 @@ struct vy_index_env {
 	void *upsert_thresh_arg;
 	/** Number of indexes in this environment. */
 	int index_count;
+	/** Size of memory used for bloom filters. */
+	size_t bloom_size;
+	/** Size of memory used for page index. */
+	size_t page_index_size;
 };
 
 /** Create a common index environment. */
 int
 vy_index_env_create(struct vy_index_env *env, const char *path,
-		    struct lsregion *allocator, int64_t *p_generation,
+		    int64_t *p_generation,
 		    vy_upsert_thresh_cb upsert_thresh_cb,
 		    void *upsert_thresh_arg);
 
@@ -288,8 +296,8 @@ vy_index_name(struct vy_index *index);
 /** Allocate a new index object. */
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk);
+	     struct vy_mem_env *mem_env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk);
 
 /** Free an index object. */
 void
@@ -365,7 +373,8 @@ vy_index_create(struct vy_index *index);
  */
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool is_checkpoint_recovery, bool force_recovery);
+		 struct vy_run_env *run_env, int64_t lsn,
+		 bool is_checkpoint_recovery, bool force_recovery);
 
 /**
  * Return generation of in-memory data stored in an index

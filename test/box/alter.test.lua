@@ -105,14 +105,28 @@ space:drop()
 
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--
+-- The result of this test is superseded by the change made
+-- in scope of gh-2914, which allows all printable characters for
+-- identifiers.
+--
 --------------------------------------------------------------------------------
 
 -- invalid identifiers
-box.schema.space.create('invalid.identifier')
-box.schema.space.create('invalid identifier')
-box.schema.space.create('primary ')
-box.schema.space.create('5')
+s = box.schema.space.create('invalid.identifier')
+s.name
+s:drop()
+s = box.schema.space.create('invalid identifier')
+s.name
+s:drop()
+s = box.schema.space.create('primary ')
+'|'..s.name..'|'
+s:drop()
+s = box.schema.space.create('5')
+s.name
+s:drop()
 box.schema.space.create('')
+
 
 -- valid identifiers
 box.schema.space.create('_Abcde'):drop()
@@ -127,13 +141,22 @@ box.schema.space.create('utf8_наше_Фсё'):drop() -- unicode
 space = box.schema.space.create('test')
 
 -- invalid identifiers
-space:create_index('invalid.identifier')
-space:create_index('invalid identifier')
-space:create_index('primary ')
-space:create_index('5')
+i = space:create_index('invalid.identifier')
+i.name
+i:drop()
+i = space:create_index('invalid identifier')
+i.name
+i:drop()
+i = space:create_index('primary ')
+'|'..i.name..'|'
+i:drop()
+i = space:create_index('5')
+i.name
+i:drop()
 space:create_index('')
 
 space:drop()
+
 -- gh-57 Confusing error message when trying to create space with a
 -- duplicate id
 auto = box.schema.space.create('auto_original')
@@ -650,4 +673,91 @@ s:drop()
 s = box.schema.create_space('test')
 idx = s:create_index('idx')
 box.space.test == s
+s:drop()
+
+--
+-- gh-3000: index modifying must change key_def parts and
+-- comparators. They can be changed, if there was compatible index
+-- parts change. For example, a part type was changed from
+-- unsigned to number. In such a case comparators must be reset
+-- and part types updated.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+s:replace{1}
+pk:alter{parts = {{1, 'integer'}}}
+s:replace{-2}
+s:select{}
+s:drop()
+
+--
+-- gh-2914: Allow any space name which consists of printable characters
+--
+identifier = require("identifier")
+test_run:cmd("setopt delimiter ';'")
+identifier.run_test(
+	function (identifier)
+		box.schema.space.create(identifier)
+		if box.space[identifier] == nil then
+			error("Cannot query space")
+		end
+	end,
+	function (identifier) box.space[identifier]:drop() end
+);
+
+s = box.schema.create_space("test");
+identifier.run_test(
+    function (identifier) s:create_index(identifier, {parts={1}}) end,
+    function (identifier) s.index[identifier]:drop() end
+);
+s:drop();
+
+--
+-- gh-2914: check column name validation.
+-- Ensure that col names are validated as identifiers.
+--
+s = box.schema.create_space('test');
+i = s:create_index("primary", {parts={1, "integer"}});
+identifier.run_test(
+	function (identifier)
+		s:format({{name=identifier,type="integer"}})
+		local t = s:replace({1})
+		if t[identifier] ~= 1 then
+			error("format identifier error")
+		end
+	end,
+	function (identifier) end
+);
+s:drop();
+
+-- gh-2914: check coll name validation.
+identifier.run_test(
+    function (identifier) box.internal.collation.create(identifier, 'ICU', 'ru-RU', {}) end,
+    function (identifier) box.internal.collation.drop(identifier) end
+);
+
+test_run:cmd("setopt delimiter ''");
+
+--
+-- gh-3011: add new names to old tuple formats.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+t1 = s:replace{1}
+t1.field1
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+s:format(format)
+t2 = s:replace{2}
+t2.field1
+t1.field1
+format[1].name = 'field_1'
+s:format(format)
+t3 = s:replace{3}
+t1.field1
+t1.field_1
+t2.field1
+t2.field_1
+t3.field1
+t3.field_1
 s:drop()

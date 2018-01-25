@@ -191,6 +191,69 @@ box.snapshot()
 ---
 - ok
 ...
+-- Check that replication doesn't freeze if slave bumps LSN
+-- while master is down (gh-3038). To do this,
+-- 1. Stop replication by injecting an error on the slave.
+-- 2. Bump LSN on the slave while replication is inactive.
+-- 3. Restore replication.
+-- 4. Generate some records on the master.
+-- 5. Make sure they'll make it to the slave.
+test_run:cmd("switch replica")
+---
+- true
+...
+box.error.injection.set("ERRINJ_WAL_WRITE", true)
+---
+- ok
+...
+test_run:cmd("switch default")
+---
+- true
+...
+s:replace{9000, "won't make it"}
+---
+- [9000, 'won''t make it']
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+while box.info.replication[1].upstream.status == 'follow' do fiber.sleep(0.0001) end
+---
+...
+box.error.injection.set("ERRINJ_WAL_WRITE", false)
+---
+- ok
+...
+s:replace{9001, "bump lsn"}
+---
+- [9001, 'bump lsn']
+...
+box.cfg{replication={}}
+---
+...
+box.cfg{replication = os.getenv('MASTER')}
+---
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_f(61, true)
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+wait_repl(70)
+---
+- true
+...
+test_run:cmd("switch default")
+---
+- true
+...
 test_run:cmd("stop server replica")
 ---
 - true
@@ -199,7 +262,9 @@ test_run:cmd("cleanup server replica")
 ---
 - true
 ...
-box.cfg{replication_timeout = 0.01}
+-- Set minuscule timeout to make replication stop
+-- immediately after join.
+box.cfg{replication_timeout = 0.0001}
 ---
 ...
 test_run:cmd("start server replica")
@@ -220,6 +285,12 @@ test_run:cmd("switch default")
 ---
 - true
 ...
+-- Disable heartbeat messages on the master so as not
+-- to trigger acks on the replica.
+errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 5)
+---
+- ok
+...
 box.cfg{replication_timeout = 0.05}
 ---
 ...
@@ -235,9 +306,13 @@ box.info.replication[1].upstream.status
 ---
 - follow
 ...
-box.info.replication[1].upstream.lag
+box.info.replication[1].upstream.lag > 0
 ---
-- 0
+- true
+...
+box.info.replication[1].upstream.lag < 1
+---
+- true
 ...
 -- wait for ack timeout
 while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
@@ -246,6 +321,10 @@ while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0
 test_run:cmd("switch default")
 ---
 - true
+...
+errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
+---
+- ok
 ...
 box.cfg{replication_timeout = 5}
 ---

@@ -37,7 +37,7 @@
 #include "vy_upsert.h"
 #include "vy_index.h"
 #include "vy_stat.h"
-#include "vy_point_iterator.h"
+#include "vy_point_lookup.h"
 
 /**
  * Merge source, support structure for vy_read_iterator.
@@ -212,25 +212,8 @@ static void
 vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 			      struct vy_read_src *src, bool *stop)
 {
-	int cmp;
 	uint32_t src_id = src - itr->src;
-
-	if (vy_read_iterator_is_exact_match(itr, src->stmt)) {
-		/*
-		 * If we got an exact match, we can skip a tuple
-		 * comparison, because this source must be on top
-		 * of the heap, otherwise 'curr_stmt' would be an
-		 * exact match as well and so we would not have
-		 * scanned this source at all.
-		 */
-		assert(vy_read_iterator_cmp_stmt(itr, src->stmt,
-						 itr->curr_stmt) < 0);
-		cmp = -1;
-		*stop = true;
-	} else {
-		cmp = vy_read_iterator_cmp_stmt(itr, src->stmt,
-						itr->curr_stmt);
-	}
+	int cmp = vy_read_iterator_cmp_stmt(itr, src->stmt, itr->curr_stmt);
 	if (cmp < 0) {
 		assert(src->stmt != NULL);
 		tuple_ref(src->stmt);
@@ -242,8 +225,13 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 	}
 	if (cmp <= 0)
 		src->front_id = itr->front_id;
-	if (*stop || src_id >= itr->skipped_src)
+
+	itr->skipped_src = MAX(itr->skipped_src, src_id + 1);
+
+	if (cmp < 0 && vy_read_iterator_is_exact_match(itr, src->stmt)) {
 		itr->skipped_src = src_id + 1;
+		*stop = true;
+	}
 }
 
 /*
@@ -531,8 +519,8 @@ done:
 						itr->last_stmt) > 0);
 
 	if (itr->need_check_eq && itr->curr_stmt != NULL &&
-	    vy_tuple_compare_with_key(itr->curr_stmt, itr->key,
-				      itr->index->cmp_def) != 0)
+	    vy_stmt_compare(itr->curr_stmt, itr->key,
+			    itr->index->cmp_def) != 0)
 		itr->curr_stmt = NULL;
 
 	if (vy_read_iterator_track_read(itr, itr->curr_stmt) != 0)
@@ -755,8 +743,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		assert(slice->run->info.max_lsn <= index->dump_lsn);
 		struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 		vy_run_iterator_open(&sub_src->run_iterator,
-				     &index->stat.disk.iterator,
-				     itr->run_env, slice,
+				     &index->stat.disk.iterator, slice,
 				     iterator_type, itr->key,
 				     itr->read_view, index->cmp_def,
 				     index->key_def, index->disk_format,
@@ -803,20 +790,17 @@ vy_read_iterator_cleanup(struct vy_read_iterator *itr)
 }
 
 void
-vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
-		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type, struct tuple *key,
-		      const struct vy_read_view **rv, double too_long_threshold)
+vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
+		      struct vy_tx *tx, enum iterator_type iterator_type,
+		      struct tuple *key, const struct vy_read_view **rv)
 {
 	memset(itr, 0, sizeof(*itr));
 
-	itr->run_env = run_env;
 	itr->index = index;
 	itr->tx = tx;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	itr->too_long_threshold = too_long_threshold;
 
 	if (tuple_field_count(key) == 0) {
 		/*
@@ -905,8 +889,9 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 				vy_tuple_compare_with_key(itr->last_stmt,
 						range->end, cmp_def) < 0))
 			break;
-		if (dir < 0 && vy_tuple_compare_with_key(itr->last_stmt,
-						range->begin, cmp_def) > 0)
+		if (dir < 0 && (range->begin == NULL ||
+				vy_tuple_compare_with_key(itr->last_stmt,
+						range->begin, cmp_def) > 0))
 			break;
 	}
 	itr->curr_range = range;
@@ -963,15 +948,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	/* Run a special iterator for a special case */
 	if ((itr->iterator_type == ITER_EQ || itr->iterator_type == ITER_REQ) &&
 	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
-		struct vy_point_iterator one;
-		vy_point_iterator_open(&one, itr->run_env, itr->index,
-				       itr->tx, itr->read_view, itr->key);
-		int rc = vy_point_iterator_get(&one, result);
-		if (*result) {
-			tuple_ref(*result);
-			itr->last_stmt = *result;
-		}
-		vy_point_iterator_close(&one);
+		int rc = vy_point_lookup(itr->index, itr->tx, itr->read_view,
+					 itr->key, &itr->last_stmt);
+		*result = itr->last_stmt;
 		itr->key = NULL;
 		return rc;
 	}
@@ -1009,7 +988,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 		if (itr->last_stmt != NULL)
 			tuple_unref(itr->last_stmt);
 		itr->last_stmt = t;
-		if (vy_stmt_type(t) == IPROTO_REPLACE)
+		if (vy_stmt_type(t) == IPROTO_INSERT ||
+		    vy_stmt_type(t) == IPROTO_REPLACE)
 			break;
 		assert(vy_stmt_type(t) == IPROTO_DELETE);
 		if (vy_stmt_lsn(t) == INT64_MAX) /* t is from write set */
@@ -1017,7 +997,9 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	}
 
 	*result = itr->last_stmt;
-	assert(*result == NULL || vy_stmt_type(*result) == IPROTO_REPLACE);
+	assert(*result == NULL ||
+	       vy_stmt_type(*result) == IPROTO_INSERT ||
+	       vy_stmt_type(*result) == IPROTO_REPLACE);
 	if (*result != NULL)
 		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
 
@@ -1070,7 +1052,7 @@ clear:
 	ev_tstamp latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&index->stat.latency, latency);
 
-	if (latency > itr->too_long_threshold) {
+	if (latency > index->env->too_long_threshold) {
 		say_warn("%s: select(%s, %s) => %s took too long: %.3f sec",
 			 vy_index_name(index), tuple_str(itr->key),
 			 iterator_type_strs[itr->iterator_type],

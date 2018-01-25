@@ -8,6 +8,7 @@ session.uid()
 session.uid(nil)
 -- admin
 session.user()
+session.effective_user()
 -- extra argumentes are ignored
 session.user(nil)
 -- password() is a function which returns base64(sha1(sha1(password))
@@ -59,6 +60,9 @@ box.schema.func.drop('dummy')
 box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
 box.schema.user.revoke('rich', 'public')
+box.schema.user.disable("rich")
+-- test double disable is a no op
+box.schema.user.disable("rich")
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 
@@ -76,30 +80,47 @@ box.schema.user.drop(name)
 box.schema.user.create('tester')
 -- admin -> user
 session.user()
-session.su('tester', function() return session.user() end)
+session.su('tester', function() return session.user(), session.effective_user() end)
 session.user()
 
 -- user -> admin
 session.su('tester')
+session.effective_user()
+session.su('admin', function() return session.user(), session.effective_user() end)
 session.user()
-session.su('admin', function() return session.user() end)
-session.user()
+session.effective_user()
 
 -- drop current user
 session.su('admin', function() return box.schema.user.drop('tester') end)
 session.user()
 session.su('admin')
+box.schema.user.drop('tester')
 session.user()
 
 --------------------------------------------------------------------------------
--- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+-- Check if identifiers obey the common constraints
 --------------------------------------------------------------------------------
--- invalid identifiers
-box.schema.user.create('invalid.identifier')
-box.schema.user.create('invalid identifier')
-box.schema.user.create('user ')
-box.schema.user.create('5')
-box.schema.user.create(' ')
+identifier = require("identifier")
+test_run:cmd("setopt delimiter ';'")
+identifier.run_test(
+	function (identifier)
+		box.schema.user.create(identifier)
+		box.schema.user.grant(identifier, 'super')
+		box.session.su(identifier)
+		box.session.su("admin")
+		box.schema.user.revoke(identifier, 'super')
+	end,
+	box.schema.user.drop
+);
+identifier.run_test(
+	function (identifier)
+		box.schema.role.create(identifier)
+		box.schema.role.grant(identifier, 'execute,read,write',
+			'universe', nil, {if_not_exists = false})
+	end,
+	box.schema.role.drop
+);
+test_run:cmd("setopt delimiter ''");
 
 -- valid identifiers
 box.schema.user.create('Петя_Иванов')
@@ -258,8 +279,10 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_exists = true })
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'usage,session', 'universe')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })
+box.schema.user.grant('guest', 'usage,session', 'universe')
 box.schema.func.create('dummy', { if_not_exists = true })
 box.schema.func.create('dummy', { if_not_exists = true })
 box.schema.func.drop('dummy')
@@ -317,3 +340,152 @@ box.internal.collation.drop('test') -- fail
 session.su('admin')
 box.internal.collation.drop('test') -- success
 box.schema.user.drop('test')
+
+--
+-- gh-2710 object drop revokes all associated privileges
+--
+_ = box.schema.space.create('test_space')
+_ = box.schema.sequence.create('test_sequence')
+box.schema.func.create('test_function')
+
+box.schema.user.create('test_user')
+box.schema.user.grant('test_user', 'read', 'space', 'test_space')
+box.schema.user.grant('test_user', 'write', 'sequence', 'test_sequence')
+box.schema.user.grant('test_user', 'execute', 'function', 'test_function')
+
+box.schema.role.create('test_role')
+box.schema.role.grant('test_role', 'read', 'space', 'test_space')
+box.schema.role.grant('test_role', 'write', 'sequence', 'test_sequence')
+box.schema.role.grant('test_role', 'execute', 'function', 'test_function')
+
+box.schema.user.info('test_user')
+box.schema.role.info('test_role')
+
+box.space.test_space:drop()
+box.sequence.test_sequence:drop()
+box.schema.func.drop('test_function')
+
+box.schema.user.info('test_user')
+box.schema.role.info('test_role')
+
+box.schema.user.drop('test_user')
+box.schema.role.drop('test_role')
+
+-- gh-3023: box.session.su() changes both authenticated and effective
+-- user, while should only change the effective user
+--
+function uids() return { uid = box.session.uid(), euid = box.session.euid() } end
+box.session.su('guest')
+uids()
+box.session.su('admin')
+box.session.su('guest', uids)
+
+--
+-- gh-2898 System privileges
+--
+s = box.schema.create_space("tweed")
+_ = s:create_index('primary', {type = 'hash', parts = {1, 'unsigned'}})
+
+box.schema.user.create('test', {password="pass"})
+box.schema.user.grant('test', 'read,write', 'universe')
+
+-- other users can't disable
+box.schema.user.create('test1')
+session.su("test1")
+box.schema.user.disable("test")
+
+session.su("admin")
+box.schema.user.disable("test")
+-- test double disable is a no op
+box.schema.user.disable("test")
+session.su("test")
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test", password="pass"})
+c.state
+c.error
+
+session.su("test1")
+box.schema.user.grant("test", "usage", "universe")
+session.su('admin')
+box.schema.user.grant("test", "session", "universe")
+session.su("test")
+s:select{}
+
+session.su('admin')
+box.schema.user.enable("test")
+-- check enable not fails on double enabling
+box.schema.user.enable("test")
+session.su("test")
+s:select{}
+
+session.su("admin")
+box.schema.user.drop('test')
+box.schema.user.drop('test1')
+s:drop()
+
+--
+-- gh-3022 role 'super'
+--
+
+box.schema.user.grant('guest', 'super')
+box.session.su('guest')
+_ = box.schema.space.create('test')
+box.space.test:drop()
+_ = box.schema.user.create('test')
+box.schema.user.drop('test')
+_ = box.schema.func.create('test')
+box.schema.func.drop('test')
+box.session.su('admin')
+box.schema.user.revoke('guest', 'super')
+box.session.su('guest')
+box.schema.space.create('test')
+box.schema.user.create('test')
+box.schema.func.create('test')
+box.session.su('admin')
+
+--
+-- gh-2911 on_access_denied trigger
+--
+obj_type = nil
+obj_name = nil
+op_type = nil
+euid = nil
+auid = nil
+function access_denied_trigger(op, type, name) obj_type = type; obj_name = name; op_type = op end
+function uid() euid = box.session.euid(); auid = box.session.uid() end
+_ = box.session.on_access_denied(access_denied_trigger)
+_ = box.session.on_access_denied(uid)
+s = box.schema.space.create('admin_space', {engine="vinyl"})
+seq = box.schema.sequence.create('test_sequence')
+index = s:create_index('primary', {type = 'tree', parts = {1, 'unsigned'}})
+box.schema.user.create('test_user', {password="pass"})
+box.session.su("test_user")
+s:select{}
+obj_type, obj_name, op_type
+euid, auid
+seq:set(1)
+obj_type, obj_name, op_type
+euid, auid
+box.session.su("admin")
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+function func() end
+st, e = pcall(c.call, c, func)
+obj_type, op_type
+euid, auid
+obj_name:match("function")
+box.schema.user.revoke("test_user", "usage", "universe")
+box.session.su("test_user")
+st, e = pcall(s.select, s, {})
+e = e:unpack()
+e.type, e.access_type, e.object_type, e.message
+obj_type, obj_name, op_type
+euid, auid
+box.session.su("admin")
+box.schema.user.revoke("test_user", "session", "universe")
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+obj_type, obj_name, op_type
+euid, auid
+box.session.on_access_denied(nil, access_denied_trigger)
+box.session.on_access_denied(nil, uid)
+box.schema.user.drop("test_user")
+seq:drop()
+s:drop()

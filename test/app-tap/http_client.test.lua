@@ -182,7 +182,7 @@ test:test("errors", function(test)
     test:ok(not status and string.find(json.encode(err),
                         "Unsupported protocol"),
                         "POST: exception on bad protocol")
-    local r = http:get("http://mailru")
+    local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
     test:is(r.status, 595, "GET: response on bad url")
 end)
 

@@ -34,7 +34,7 @@
 
 #include "xlog.h"
 #include "fiber.h"
-#include "scoped_guard.h"
+#include "fiber_cond.h"
 #include "coio.h"
 #include "coio_buf.h"
 #include "xstream.h"
@@ -47,8 +47,6 @@
 #include "xrow_io.h"
 #include "error.h"
 #include "session.h"
-
-double applier_timeout = 1;
 
 STRS(applier_state, applier_STATE);
 
@@ -91,9 +89,9 @@ applier_log_error(struct applier *applier, struct error *e)
 		break;
 	}
 	error_log(e);
-	if (type_cast(SocketError, e))
+	if (type_cast(SocketError, e) || type_cast(SystemError, e))
 		say_info("will retry every %.2lf second",
-			 applier_timeout);
+			 replication_reconnect_timeout());
 	applier->last_logged_errcode = errcode;
 }
 
@@ -110,7 +108,7 @@ applier_writer_f(va_list ap)
 	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
 		fiber_cond_wait_timeout(&applier->writer_cond,
-					applier_timeout);
+					replication_timeout);
 		/* Send ACKs only when in FOLLOW mode ,*/
 		if (applier->state != APPLIER_FOLLOW)
 			continue;
@@ -144,7 +142,7 @@ void
 applier_connect(struct applier *applier)
 {
 	struct ev_io *coio = &applier->io;
-	struct iobuf *iobuf = applier->iobuf;
+	struct ibuf *ibuf = &applier->ibuf;
 	if (coio->fd >= 0)
 		return;
 	char greetingbuf[IPROTO_GREETING_SIZE];
@@ -219,7 +217,7 @@ applier_connect(struct applier *applier)
 	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
 			    uri->login_len, uri->password, uri->password_len);
 	coio_write_xrow(coio, &row);
-	coio_read_xrow(coio, &iobuf->in, &row);
+	coio_read_xrow(coio, ibuf, &row);
 	applier->last_row_time = ev_monotonic_now(loop());
 	if (row.type != IPROTO_OK)
 		xrow_decode_error_xc(&row); /* auth failed */
@@ -239,7 +237,7 @@ applier_join(struct applier *applier)
 {
 	/* Send JOIN request */
 	struct ev_io *coio = &applier->io;
-	struct iobuf *iobuf = applier->iobuf;
+	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 	xrow_encode_join_xc(&row, &INSTANCE_UUID);
 	coio_write_xrow(coio, &row);
@@ -250,7 +248,7 @@ applier_join(struct applier *applier)
 	 */
 	if (applier->version_id >= version_id(1, 7, 0)) {
 		/* Decode JOIN response */
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row); /* re-throw error */
 		} else if (row.type != IPROTO_OK) {
@@ -273,7 +271,7 @@ applier_join(struct applier *applier)
 	 */
 	assert(applier->join_stream != NULL);
 	while (true) {
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write_xc(applier->join_stream, &row);
@@ -312,7 +310,7 @@ applier_join(struct applier *applier)
 	 * Receive final data.
 	 */
 	while (true) {
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			vclock_follow(&replicaset_vclock, row.replica_id,
@@ -347,7 +345,7 @@ applier_subscribe(struct applier *applier)
 
 	/* Send SUBSCRIBE request */
 	struct ev_io *coio = &applier->io;
-	struct iobuf *iobuf = applier->iobuf;
+	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
@@ -370,7 +368,7 @@ applier_subscribe(struct applier *applier)
 	 * Read SUBSCRIBE response
 	 */
 	if (applier->version_id >= version_id(1, 6, 7)) {
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 		if (iproto_type_is_error(row.type)) {
 			xrow_decode_error_xc(&row);  /* error */
 		} else if (row.type != IPROTO_OK) {
@@ -420,7 +418,7 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
-		coio_read_xrow(coio, &iobuf->in, &row);
+		coio_read_xrow(coio, ibuf, &row);
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error_xc(&row);  /* error */
@@ -453,7 +451,8 @@ applier_subscribe(struct applier *applier)
 		}
 		if (applier->state == APPLIER_FOLLOW)
 			fiber_cond_signal(&applier->writer_cond);
-		iobuf_reset(iobuf);
+		if (ibuf_used(ibuf) == 0)
+			ibuf_reset(ibuf);
 		fiber_gc();
 	}
 }
@@ -470,8 +469,7 @@ applier_disconnect(struct applier *applier, enum applier_state state)
 
 	coio_close(loop(), &applier->io);
 	/* Clear all unparsed input. */
-	ibuf_reset(&applier->iobuf->in);
-	iobuf_reset(applier->iobuf);
+	ibuf_reinit(&applier->ibuf);
 	fiber_gc();
 }
 
@@ -538,6 +536,16 @@ applier_f(va_list ap)
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
 			goto reconnect;
+		} catch (SystemError *e) {
+			applier_log_error(applier, e);
+			goto reconnect;
+		} catch (ChannelIsClosed *e) {
+			applier_disconnect(applier, APPLIER_OFF);
+			break;
+		} catch (Exception *e) {
+			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_STOPPED);
+			return -1;
 		}
 		/* Put fiber_sleep() out of catch block.
 		 *
@@ -553,7 +561,7 @@ applier_f(va_list ap)
 		*/
 reconnect:
 		applier_disconnect(applier, APPLIER_DISCONNECTED);
-		fiber_sleep(applier_timeout);
+		fiber_sleep(replication_reconnect_timeout());
 	}
 	return 0;
 }
@@ -601,7 +609,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 		return NULL;
 	}
 	coio_create(&applier->io, -1);
-	applier->iobuf = iobuf_new();
+	ibuf_create(&applier->ibuf, &cord()->slabc, 1024);
 
 	/* uri_parse() sets pointers to applier->source buffer */
 	snprintf(applier->source, sizeof(applier->source), "%s", uri);
@@ -614,7 +622,7 @@ applier_new(const char *uri, struct xstream *join_stream,
 	applier->subscribe_stream = subscribe_stream;
 	applier->last_row_time = ev_monotonic_now(loop());
 	rlist_create(&applier->on_state);
-	fiber_channel_create(&applier->pause, 0);
+	fiber_cond_create(&applier->resume_cond);
 	fiber_cond_create(&applier->writer_cond);
 
 	return applier;
@@ -624,10 +632,10 @@ void
 applier_delete(struct applier *applier)
 {
 	assert(applier->reader == NULL && applier->writer == NULL);
-	iobuf_delete(applier->iobuf);
+	ibuf_destroy(&applier->ibuf);
 	assert(applier->io.fd == -1);
-	fiber_channel_destroy(&applier->pause);
 	trigger_destroy(&applier->on_state);
+	fiber_cond_destroy(&applier->resume_cond);
 	fiber_cond_destroy(&applier->writer_cond);
 	free(applier);
 }
@@ -636,26 +644,28 @@ void
 applier_resume(struct applier *applier)
 {
 	assert(!fiber_is_dead(applier->reader));
-	void *data = NULL;
-	fiber_channel_put_xc(&applier->pause, data);
+	applier->is_paused = false;
+	fiber_cond_signal(&applier->resume_cond);
 }
 
-static inline void
+void
 applier_pause(struct applier *applier)
 {
 	/* Sleep until applier_resume() wake us up */
-	void *data;
-	fiber_channel_get_xc(&applier->pause, &data);
+	assert(fiber() == applier->reader);
+	assert(!applier->is_paused);
+	applier->is_paused = true;
+	while (applier->is_paused && !fiber_is_cancelled())
+		fiber_cond_wait(&applier->resume_cond);
 }
 
 struct applier_on_state {
 	struct trigger base;
 	struct applier *applier;
 	enum applier_state desired_state;
-	struct fiber_channel wakeup;
+	struct fiber_cond wakeup;
 };
 
-/** Used by applier_connect_all() */
 static void
 applier_on_state_f(struct trigger *trigger, void *event)
 {
@@ -671,7 +681,7 @@ applier_on_state_f(struct trigger *trigger, void *event)
 		return;
 
 	/* Wake up waiter */
-	fiber_channel_put_xc(&on_state->wakeup, applier);
+	fiber_cond_signal(&on_state->wakeup);
 
 	applier_pause(applier);
 }
@@ -683,7 +693,7 @@ applier_add_on_state(struct applier *applier,
 {
 	trigger_create(&trigger->base, applier_on_state_f, NULL, NULL);
 	trigger->applier = applier;
-	fiber_channel_create(&trigger->wakeup, 0);
+	fiber_cond_create(&trigger->wakeup);
 	trigger->desired_state = desired_state;
 	trigger_add(&applier->on_state, &trigger->base);
 }
@@ -691,18 +701,21 @@ applier_add_on_state(struct applier *applier,
 static inline void
 applier_clear_on_state(struct applier_on_state *trigger)
 {
-	fiber_channel_destroy(&trigger->wakeup);
+	fiber_cond_destroy(&trigger->wakeup);
 	trigger_clear(&trigger->base);
 }
 
 static inline int
 applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 {
-	void *data = NULL;
-	if (fiber_channel_get_timeout(&trigger->wakeup, &data, timeout) != 0)
-		return -1; /* ER_TIMEOUT */
-
 	struct applier *applier = trigger->applier;
+	double deadline = ev_monotonic_now(loop()) + timeout;
+	while (applier->state != APPLIER_OFF &&
+	       applier->state != APPLIER_STOPPED &&
+	       applier->state != trigger->desired_state) {
+		if (fiber_cond_wait_deadline(&trigger->wakeup, deadline) != 0)
+			return -1; /* ER_TIMEOUT */
+	}
 	if (applier->state != trigger->desired_state) {
 		assert(applier->state == APPLIER_OFF ||
 		       applier->state == APPLIER_STOPPED);
@@ -712,74 +725,6 @@ applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 		return -1;
 	}
 	return 0;
-}
-
-void
-applier_connect_all(struct applier **appliers, int count,
-		    double timeout)
-{
-	if (count == 0)
-		return; /* nothing to do */
-
-	/*
-	 * Simultaneously connect to remote peers to receive their UUIDs
-	 * and fill the resulting set:
-	 *
-	 * - create a single control channel;
-	 * - register a trigger in each applier to wake up our
-	 *   fiber via this channel when the remote peer becomes
-	 *   connected and a UUID is received;
-	 * - wait up to CONNECT_TIMEOUT seconds for `count` messages;
-	 * - on timeout, raise a CFG error, cancel and destroy
-	 *   the freshly created appliers (done in a guard);
-	 * - an success, unregister the trigger, check the UUID set
-	 *   for duplicates, fill the result set, return.
-	 */
-
-	/* A channel from applier's on_state trigger is used to wake us up */
-	IpcChannelGuard wakeup(count);
-	/* Memory for on_state triggers registered in appliers */
-	struct applier_on_state triggers[VCLOCK_MAX];
-	/* Wait results until this time */
-	double deadline = ev_monotonic_now(loop()) + timeout;
-
-	/* Add triggers and start simulations connection to remote peers */
-	for (int i = 0; i < count; i++) {
-		/* Register a trigger to wake us up when peer is connected */
-		applier_add_on_state(appliers[i], &triggers[i],
-				     APPLIER_CONNECTED);
-		/* Start background connection */
-		applier_start(appliers[i]);
-	}
-
-	/* Wait for all appliers */
-	for (int i = 0; i < count; i++) {
-		double wait = deadline - ev_monotonic_now(loop());
-		if (wait < 0.0 ||
-		    applier_wait_for_state(&triggers[i], wait) != 0) {
-			goto error;
-		}
-	}
-
-
-	for (int i = 0; i < count; i++) {
-		assert(appliers[i]->state == APPLIER_CONNECTED);
-		/* Unregister the temporary trigger used to wake us up */
-		applier_clear_on_state(&triggers[i]);
-	}
-
-	/* Now all the appliers are connected, finish. */
-	return;
-error:
-	/* Destroy appliers */
-	for (int i = 0; i < count; i++) {
-		applier_clear_on_state(&triggers[i]);
-		applier_stop(appliers[i]);
-	}
-
-	/* ignore original error */
-	tnt_raise(ClientError, ER_CFG, "replication",
-		  "failed to connect to one or more replicas");
 }
 
 void

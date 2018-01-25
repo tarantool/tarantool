@@ -158,18 +158,26 @@ stailq_reverse(struct stailq *head)
 	}
 }
 
-/** Concat all members of head1 starting from elem to the end of head2. */
+/**
+ * Move elements of list @head starting from @last->next to
+ * list @tail. If @last is NULL, then this function moves all
+ * elements from @head to @tail. Note, all elements of list
+ * @tail are discarded.
+ */
 static inline void
-stailq_splice(struct stailq *head1, struct stailq_entry *elem,
-	      struct stailq *head2)
+stailq_cut_tail(struct stailq *head, struct stailq_entry *last,
+		struct stailq *tail)
 {
-	if (elem) {
-		*head2->last = elem;
-		head2->last = head1->last;
-		head1->last = &head1->first;
-		while (*head1->last != elem)
-			head1->last = &(*head1->last)->next;
-		*head1->last = NULL;
+	if (last != NULL) {
+		tail->first = last->next;
+		tail->last = head->last;
+		head->last = &last->next;
+		last->next = NULL;
+	} else {
+		tail->first = head->first;
+		tail->last = head->first != NULL ? head->last : &tail->first;
+		head->first = NULL;
+		head->last = &head->first;
 	}
 }
 

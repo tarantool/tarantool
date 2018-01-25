@@ -116,3 +116,10 @@ fiber_cond_wait(struct fiber_cond *c)
 {
 	return fiber_cond_wait_timeout(c, TIMEOUT_INFINITY);
 }
+
+int
+fiber_cond_wait_deadline(struct fiber_cond *c, double deadline)
+{
+	double timeout = deadline - ev_monotonic_now(loop());
+	return fiber_cond_wait_timeout(c, timeout);
+}

@@ -35,17 +35,15 @@
 #include <sys/socket.h>
 #include <tarantool_ev.h>
 
+#include <small/ibuf.h>
+
 #include "fiber_cond.h"
-#include "fiber_channel.h"
 #include "trigger.h"
 #include "trivia/util.h"
 #include "tt_uuid.h"
 #include "uri.h"
 
 #include "vclock.h"
-
-/** Network timeout */
-extern double applier_timeout;
 
 struct xstream;
 
@@ -103,12 +101,17 @@ struct applier {
 	socklen_t addr_len;
 	/** EV watcher for I/O */
 	struct ev_io io;
-	/** Input/output buffer for buffered IO */
-	struct iobuf *iobuf;
+	/** Input buffer */
+	struct ibuf ibuf;
 	/** Triggers invoked on state change */
 	struct rlist on_state;
-	/** Channel used by applier_connect_all() and applier_resume() */
-	struct fiber_channel pause;
+	/**
+	 * Set if the applier was paused (see applier_pause()) and is now
+	 * waiting on resume_cond to be resumed (see applier_resume()).
+	 */
+	bool is_paused;
+	/** Condition variable signaled to resume the applier. */
+	struct fiber_cond resume_cond;
 	/** xstream to process rows during initial JOIN */
 	struct xstream *join_stream;
 	/** xstream to process rows during final JOIN and SUBSCRIBE */
@@ -155,20 +158,6 @@ void
 applier_delete(struct applier *applier);
 
 /*
- * Connect all appliers to remote peer and receive UUID
- * \post appliers are connected to remote hosts and paused.
- * Use applier_resume(applier) to resume applier.
- *
- * \param appliers the array of appliers
- * \param count size of appliers array
- * \param timeout connection timeout
- *
- */
-void
-applier_connect_all(struct applier **appliers, int count,
-		    double timeout);
-
-/*
  * Resume execution of applier until \a state.
  */
 void
@@ -180,5 +169,15 @@ applier_resume_to_state(struct applier *applier, enum applier_state state,
  */
 void
 applier_resume(struct applier *applier);
+
+/*
+ * Pause execution of applier.
+ *
+ * Note, in contrast to applier_resume() this function may
+ * only be called by the applier fiber (e.g. from on_state
+ * trigger).
+ */
+void
+applier_pause(struct applier *applier);
 
 #endif /* TARANTOOL_APPLIER_H_INCLUDED */

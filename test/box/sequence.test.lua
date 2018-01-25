@@ -581,3 +581,18 @@ box.schema.user.grant('user2', 'write', 'sequence', 'test') -- ok
 box.session.su('admin')
 box.schema.user.drop('user1')
 box.schema.user.drop('user2')
+
+-- gh-2914: check identifier constraints.
+test_run = require('test_run').new()
+identifier = require("identifier")
+test_run:cmd("setopt delimiter ';'")
+identifier.run_test(
+	function (identifier)
+		box.schema.sequence.create(identifier)
+		if box.sequence[identifier]:next() ~= 1 then
+			error("Cannot access sequence by identifier")
+		end
+	end,
+	function (identifier) box.schema.sequence.drop(identifier) end
+);
+test_run:cmd("setopt delimiter ''");

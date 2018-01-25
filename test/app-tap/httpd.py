@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import sys
 from gevent.pywsgi import WSGIServer
@@ -97,7 +97,8 @@ def heartbeat():
     try:
         while True:
             sys.stdout.write("heartbeat\n")
-            sleep(1e-3)
+            sys.stdout.flush()
+            sleep(1e-1)
     except IOError:
         sys.exit(1)
 

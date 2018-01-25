@@ -1,7 +1,6 @@
 #include "memory.h"
 #include "fiber.h"
 #include "vy_write_iterator.h"
-#include <small/slab_cache.h>
 #include "vy_iterators_helper.h"
 
 /**
@@ -29,11 +28,7 @@ compare_write_iterator_results(struct key_def *key_def,
 			       const int *vlsns, int vlsns_count,
 			       bool is_primary, bool is_last_level)
 {
-	/* Create lsregion */
-	struct lsregion lsregion;
-	struct slab_cache *slab_cache = cord_slab_cache();
-	lsregion_create(&lsregion, slab_cache->arena);
-	struct vy_mem *mem = create_test_mem(&lsregion, key_def);
+	struct vy_mem *mem = create_test_mem(key_def);
 	for (int i = 0; i < content_count; ++i)
 		vy_mem_insert_template(mem, &content[i]);
 	struct rlist rv_list;
@@ -66,7 +61,6 @@ compare_write_iterator_results(struct key_def *key_def,
 	/* Clean up */
 	wi->iface->close(wi);
 	vy_mem_delete(mem);
-	lsregion_destroy(&lsregion);
 
 	free(rv_array);
 }
@@ -75,7 +69,7 @@ void
 test_basic(void)
 {
 	header();
-	plan(38);
+	plan(46);
 
 	/* Create key_def */
 	uint32_t fields[] = { 0 };
@@ -419,6 +413,87 @@ test_basic(void)
 	};
 	const struct vy_stmt_template expected[] = { content[1] };
 	const int vlsns[] = {5, 7, 9};
+	int content_count = sizeof(content) / sizeof(content[0]);
+	int expected_count = sizeof(expected) / sizeof(expected[0]);
+	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
+	compare_write_iterator_results(key_def, content, content_count,
+				       expected, expected_count,
+				       vlsns, vlsns_count, true, false);
+}
+{
+/*
+ * STATEMENT: INS DEL REPL DEL REPL REPL INS REPL
+ * LSN:        2   3   4    5   6    7    8   9
+ * READ VIEW:      *        *        *    *   *
+ *            \______/\_______/\_______/
+ *              merge   merge    merge
+ *
+ *                DEL      DEL      REPL INS REPL
+ *                \__________/      \__/
+ *                  discard     convert to INS
+ *
+ * is_last_level = false
+ *
+ * If the oldest statement for a given key is an INSERT, all
+ * leading DELETE statements should be discarded and the first
+ * non-DELETE statement should be turned into an INSERT.
+ */
+	const struct vy_stmt_template content[] = {
+		STMT_TEMPLATE(2, INSERT, 1, 1),
+		STMT_TEMPLATE(3, DELETE, 1),
+		STMT_TEMPLATE(4, REPLACE, 1, 2),
+		STMT_TEMPLATE(5, DELETE, 1),
+		STMT_TEMPLATE(6, REPLACE, 1, 3),
+		STMT_TEMPLATE(7, REPLACE, 1, 4),
+		STMT_TEMPLATE(8, INSERT, 1, 5),
+		STMT_TEMPLATE(9, REPLACE, 1, 6),
+	};
+	const struct vy_stmt_template expected[] = {
+		content[7],
+		content[6],
+		STMT_TEMPLATE(7, INSERT, 1, 4),
+	};
+	const int vlsns[] = {3, 5, 7, 8, 9};
+	int content_count = sizeof(content) / sizeof(content[0]);
+	int expected_count = sizeof(expected) / sizeof(expected[0]);
+	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
+	compare_write_iterator_results(key_def, content, content_count,
+				       expected, expected_count,
+				       vlsns, vlsns_count, true, false);
+}
+{
+/*
+ * STATEMENT: DEL INS DEL INS REPL DEL INS
+ * LSN:        3   4   5   6   7    8   9
+ * READ VIEW:              *   *
+ *            \______________/     \_____/
+ *                  merge           merge
+ *
+ *                        INS REPL     INS
+ *                        \__/
+ *                   convert to REPL
+ *
+ * is_last_level = false
+ *
+ * If the oldest statement for a given key is NOT an INSERT
+ * and the first key in the resulting history turns out to be
+ * an INSERT, it should be converted to a REPLACE.
+ */
+	const struct vy_stmt_template content[] = {
+		STMT_TEMPLATE(3, DELETE, 1),
+		STMT_TEMPLATE(4, INSERT, 1, 1),
+		STMT_TEMPLATE(5, DELETE, 1),
+		STMT_TEMPLATE(6, INSERT, 1, 2),
+		STMT_TEMPLATE(7, REPLACE, 1, 3),
+		STMT_TEMPLATE(8, DELETE, 1),
+		STMT_TEMPLATE(9, INSERT, 1, 4),
+	};
+	const struct vy_stmt_template expected[] = {
+		content[6],
+		content[4],
+		STMT_TEMPLATE(6, REPLACE, 1, 2),
+	};
+	const int vlsns[] = {6, 7};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);

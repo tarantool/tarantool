@@ -56,6 +56,15 @@ cfg_geti(const char *param)
 	return val;
 }
 
+int
+cfg_geti_default(const char *param, int default_val)
+{
+	cfg_get(param);
+	int ok;
+	int val = lua_tointegerx(tarantool_L, -1, &ok);
+	return ok ? val : default_val;
+}
+
 int64_t
 cfg_geti64(const char *param)
 {

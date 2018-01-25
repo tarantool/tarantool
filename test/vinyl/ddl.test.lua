@@ -74,7 +74,7 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 -- the space is now empty and can be altered.
 space:delete({1})
 -- Make sure the run is big enough to trigger compaction.
-space:insert({2, 3})
+space:replace({2, 3})
 space:delete({2})
 box.snapshot()
 -- Wait until the dump is finished.
@@ -241,8 +241,8 @@ s:replace({4, 5, 6})
 s:replace({7, 8, 9})
 s:upsert({10, 11, 12}, {})
 _ = fiber.create(function () s:drop() ch:put(true) end)
-box.commit()
 ch:get()
+box.commit()
 
 s = box.schema.space.create('test', { engine = 'vinyl' })
 pk = s:create_index('primary', { parts = { 1, 'uint' } })
@@ -252,8 +252,8 @@ s:replace{1, 2, 3}
 s:replace{4, 5, 6}
 s:replace{7, 8, 9}
 _ = fiber.create(function () s:drop() ch:put(true) end)
-box.commit()
 ch:get()
+box.commit()
 
 -- check invalid field types
 space = box.schema.space.create('test', { engine = 'vinyl' })
@@ -263,3 +263,9 @@ index = space:create_index('test', { type = 'tree', parts = { 2, 'any' }})
 index = space:create_index('test', { type = 'tree', parts = { 2, 'array' }})
 index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
 space:drop()
+
+-- gh-3019 default index options
+box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serialize = 'map'}), {}}
+box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
+box.space.test.index.pk
+box.space.test:drop()

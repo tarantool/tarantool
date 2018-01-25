@@ -15,7 +15,7 @@ session = box.session
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
-test:plan(41)
+test:plan(53)
 
 ---
 --- Check that Tarantool creates ADMIN session for #! script
@@ -70,11 +70,14 @@ session.on_connect(nil, fail)
 session.on_disconnect(nil, fail)
 
 -- check how connect/disconnect triggers work
+local peer_name = "peer_name"
 function inc() active_connections = active_connections + 1 end
 function dec() active_connections = active_connections - 1 end
+function peer() peer_name = box.session.peer() end
 net = { box = require('net.box') }
 test:is(type(session.on_connect(inc)), "function", "type of trigger inc on_connect")
 test:is(type(session.on_disconnect(dec)), "function", "type of trigger dec on_disconnect")
+test:is(type(session.on_disconnect(peer)), "function", "type of trigger peer on_disconnect")
 active_connections = 0
 c = net.box.connect(HOST, PORT)
 while active_connections < 1 do fiber.sleep(0.001) end
@@ -86,9 +89,11 @@ c:close()
 c1:close()
 while active_connections > 0 do fiber.sleep(0.001) end
 test:is(active_connections, 0, "active_connections after closing")
+test:isnil(peer_name, "peer_name after closing")
 
 session.on_connect(nil, inc)
 session.on_disconnect(nil, dec)
+session.on_disconnect(nil, peer)
 
 -- write audit trail of connect/disconnect into a space
 function audit_connect() box.space['tweedledum']:insert{session.id()} end
@@ -119,8 +124,8 @@ box.schema.user.create('tester', { password = 'tester' })
 
 on_connect_user = nil
 on_disconnect_user = nil
-function on_connect() on_connect_user = box.session.user() end
-function on_disconnect() on_disconnect_user = box.session.user() end
+function on_connect() on_connect_user = box.session.effective_user() end
+function on_disconnect() on_disconnect_user = box.session.effective_user() end
 _ = box.session.on_connect(on_connect)
 _ = box.session.on_disconnect(on_disconnect)
 local conn = require('net.box').connect("tester:tester@" ..HOST..':'..PORT)
@@ -131,11 +136,21 @@ conn:close()
 conn = nil
 while not on_disconnect_user do fiber.sleep(0.001) end
 -- Triggers are executed with admin permissions
-test:is(on_connect_user, 'admin', "check triggers permissions, on_connect")
-test:is(on_disconnect_user, 'admin', "check triggers permissions, on_disconnect")
+test:is(on_connect_user, 'admin', "check trigger permissions, on_connect")
+test:is(on_disconnect_user, 'admin', "check trigger permissions, on_disconnect")
 
 box.session.on_connect(nil, on_connect)
 box.session.on_disconnect(nil, on_disconnect)
+
+-- check Session privilege
+ok, err = pcall(function() net.box.connect("tester:tester@" ..HOST..':'..PORT) end)
+test:ok(ok, "session privilege")
+box.schema.user.revoke('tester', 'session', 'universe')
+conn = net.box.connect("tester:tester@" ..HOST..':'..PORT)
+test:is(conn.state, "error", "session privilege state")
+test:ok(conn.error:match("Session"), "sesssion privilege errmsg")
+ok, err = pcall(box.session.su, "user1")
+test:ok(not ok, "session.su on revoked")
 box.schema.user.drop('tester')
 
 local test_run = require('test_run')
@@ -154,7 +169,20 @@ test:ok(conn:eval("return box.session.exists(box.session.id())"), "remote sessio
 test:isnt(conn:eval("return box.session.peer(box.session.id())"), nil, "remote session peer check")
 test:ok(conn:eval("return box.session.peer() == box.session.peer(box.session.id())"), "remote session peer check")
 
+-- gh-2994 session uid vs session effective uid
+test:is(session.euid(), 1, "session.uid")
+test:is(session.su("guest", session.uid), 1, "session.uid from su is admin")
+test:is(session.su("guest", session.euid), 0, "session.euid from su is guest")
+local id = conn:eval("return box.session.uid()")
+test:is(id, 0, "session.uid from netbox")
+id = conn:eval("return box.session.euid()")
+test:is(id, 0, "session.euid from netbox")
+--box.session.su("admin")
+conn:eval("box.session.su(\"admin\", box.schema.create_space, \"sp1\")")
+local sp = conn:eval("return box.space._space.index.name:get{\"sp1\"}[2]")
+test:is(sp, 1, "effective ddl owner")
 conn:close()
+
 inspector:cmd('stop server session with cleanup=1')
 session = nil
 os.exit(test:check() == true and 0 or -1)

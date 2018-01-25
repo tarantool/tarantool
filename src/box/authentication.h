@@ -33,6 +33,17 @@
 
 #include <stdint.h>
 
+/**
+ * State passed to authentication trigger.
+ */
+struct on_auth_trigger_ctx {
+	/** Authenticated user name. */
+	const char *username;
+	/* true if authentication was successful */
+	bool is_authenticated;
+};
+
+
 void
 authenticate(const char *user_name, uint32_t len, const char *tuple);
 

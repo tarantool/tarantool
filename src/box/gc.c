@@ -204,12 +204,9 @@ gc_run(void)
 	 * collection for memtx snapshots first and abort if it
 	 * fails - see comment to memtx_engine_collect_garbage().
 	 */
-	if (engine_collect_garbage(gc_signature) != 0) {
-		say_error("box garbage collection failed: %s",
-			  diag_last_error(diag_get())->errmsg);
-	} else {
+	if (engine_collect_garbage(gc_signature) == 0)
 		wal_collect_garbage(gc_signature);
-	}
+
 	latch_unlock(&gc.latch);
 }
 

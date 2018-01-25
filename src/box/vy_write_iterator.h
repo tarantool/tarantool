@@ -180,6 +180,36 @@
  *   | LSN1  LSN2  ...  DELETE  | LSNi  LSNi+1  ...  DELETE |
  *   \________________/\_______/ \_________________/\______/
  *          skip         keep           skip         discard
+ *
+ * ---------------------------------------------------------------
+ * Optimization #6: discard the first DELETE if the oldest
+ * statement for the current key among all sources is an INSERT.
+ * Rationale: if a key's history starts from an INSERT, there is
+ * either no statements for this key in older runs or the latest
+ * statement is a DELETE; in either case, the first DELETE does
+ * not affect the resulting tuple, no matter which read view it
+ * is looked from, and hence can be skipped.
+ *
+ *                         --------
+ *                         SAME KEY
+ *                         --------
+ *
+ * 0                               VLSN1              INT64_MAX
+ * |                                 |                    |
+ * | INSERT  LSN2  ...  LSNi  DELETE | LSNi+2  ...  LSN_N |
+ * \________________________/\______/ \__________________/
+ *           skip             discard         merge
+ *
+ * If this optimization is performed, the resulting key's history
+ * will either be empty or start with a REPLACE or INSERT. In the
+ * latter case we convert the first REPLACE to INSERT so that if
+ * the key gets deleted later, we will perform this optimization
+ * again on the next compaction to drop the DELETE.
+ *
+ * In order not to trigger this optimization by mistake, we must
+ * also turn the first INSERT in the resulting key's history to a
+ * REPLACE in case the oldest statement among all sources is not
+ * an INSERT.
  */
 
 struct vy_write_iterator;
@@ -188,7 +218,6 @@ struct tuple_format;
 struct tuple;
 struct vy_mem;
 struct vy_slice;
-struct vy_run_env;
 
 /**
  * Open an empty write iterator. To add sources to the iterator
@@ -219,7 +248,7 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
  */
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *stream,
-			    struct vy_slice *slice, struct vy_run_env *run_env);
+			    struct vy_slice *slice);
 
 #endif /* INCLUDES_TARANTOOL_BOX_VY_WRITE_STREAM_H */
 

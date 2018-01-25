@@ -264,8 +264,11 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	}
 	TRASH(&order);
 
-	assert(vy_stmt_type(stmt) == IPROTO_REPLACE);
-	assert(prev_stmt == NULL || vy_stmt_type(prev_stmt) == IPROTO_REPLACE);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(stmt) == IPROTO_REPLACE);
+	assert(prev_stmt == NULL ||
+	       vy_stmt_type(prev_stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(prev_stmt) == IPROTO_REPLACE);
 	cache->version++;
 
 	/* Insert/replace new entry to the tree */
@@ -336,8 +339,8 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 							&inserted);
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
-		int cmp = vy_stmt_compare(prev_stmt, prev_check_stmt,
-					  cache->cmp_def);
+		int cmp = vy_tuple_compare(prev_stmt, prev_check_stmt,
+					   cache->cmp_def);
 
 		if (entry->flags & flag) {
 			/* The found entry must be exactly prev_stmt. (2) */
@@ -459,7 +462,8 @@ vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
 		assert(entry != NULL);
 		cache->version++;
 		struct vy_cache_entry *to_delete = *entry;
-		assert(vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
+		assert(vy_stmt_type(to_delete->stmt) == IPROTO_INSERT ||
+		       vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
 		if (deleted != NULL) {
 			*deleted = to_delete->stmt;
 			tuple_ref(to_delete->stmt);
@@ -699,8 +703,8 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_stmt, last_stmt,
-			     itr->cache->cmp_def) > 0)) {
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->cache->cmp_def) > 0)) {
 		if (itr->curr_stmt == NULL)
 			return;
 		struct vy_cache_tree *tree = &itr->cache->cache_tree;

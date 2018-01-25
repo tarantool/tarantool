@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(57)
+test:plan(59)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -190,11 +190,12 @@ local function console_on_disconnect()
     triggers_ran = triggers_ran + 1
 end
 
-local function console_on_auth(username)
+local function console_on_auth(username, success)
     test:is(box.session.user(), "admin", "on_auth session.user()")
     test:like(box.session.peer(), "unix", "on_auth session.peer()")
     test:isnt(box.session.id(), session_id, "on_auth session.id()")
     test:is(username, "admin", "on_auth argument")
+    test:is(success, true, "on_auth argument 2")
     triggers_ran = triggers_ran + 1
 end
 

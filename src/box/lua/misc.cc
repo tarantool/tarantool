@@ -60,11 +60,12 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 /** {{{ Lua/C implementation of index:select(): used only by Vinyl **/
 
 static inline void
-lbox_port_to_table(lua_State *L, struct port *port)
+lbox_port_to_table(lua_State *L, struct port *port_base)
 {
+	struct port_tuple *port = port_tuple(port_base);
 	lua_createtable(L, port->size, 0);
-	struct port_entry *entry = port->first;
-	for (size_t i = 0 ; i < port->size; i++) {
+	struct port_tuple_entry *entry = port->first;
+	for (int i = 0 ; i < port->size; i++) {
 		luaT_pushtuple(L, entry->tuple);
 		lua_rawseti(L, -2, i + 1);
 		entry = entry->next;
@@ -90,10 +91,8 @@ lbox_select(lua_State *L)
 	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
 
 	struct port port;
-	port_create(&port);
-	if (box_select((struct port *) &port, space_id, index_id, iterator,
-			offset, limit, key, key + key_len) != 0) {
-		port_destroy(&port);
+	if (box_select(space_id, index_id, iterator, offset, limit,
+		       key, key + key_len, &port) != 0) {
 		return luaT_error(L);
 	}
 

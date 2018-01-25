@@ -179,3 +179,12 @@ engine_join(struct vclock *vclock, struct xstream *stream)
 	}
 	return 0;
 }
+
+void
+engine_memory_stat(struct engine_memory_stat *stat)
+{
+	memset(stat, 0, sizeof(*stat));
+	struct engine *engine;
+	engine_foreach(engine)
+		engine->vtab->memory_stat(engine, stat);
+}

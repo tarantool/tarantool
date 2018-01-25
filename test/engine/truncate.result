@@ -506,7 +506,7 @@ con = require('net.box').connect(box.cfg.listen)
 ...
 con:eval([[box.space.access_truncate:truncate()]])
 ---
-- error: Write access is denied for user 'guest' to space 'access_truncate'
+- error: Write access to space 'access_truncate' is denied for user 'guest'
 ...
 con.space.access_truncate:select()
 ---

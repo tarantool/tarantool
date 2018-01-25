@@ -1656,6 +1656,7 @@ xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor)
 int
 xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 {
+	assert(xlog_cursor_is_open(i));
 	log_magic_t magic;
 	do {
 		/*
@@ -1680,7 +1681,7 @@ int
 xlog_cursor_next_tx(struct xlog_cursor *i)
 {
 	int rc;
-	assert(i->state != XLOG_CURSOR_EOF);
+	assert(xlog_cursor_is_open(i));
 
 	/* load at least magic to check eof */
 	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
@@ -1731,6 +1732,7 @@ eof_found:
 int
 xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow)
 {
+	assert(xlog_cursor_is_open(cursor));
 	if (cursor->state != XLOG_CURSOR_TX)
 		return 1;
 	int rc = xlog_tx_cursor_next_row(&cursor->tx_cursor, xrow);
@@ -1745,6 +1747,7 @@ int
 xlog_cursor_next(struct xlog_cursor *cursor,
 		 struct xrow_header *xrow, bool force_recovery)
 {
+	assert(xlog_cursor_is_open(cursor));
 	while (true) {
 		int rc;
 		rc = xlog_cursor_next_row(cursor, xrow);
@@ -1873,6 +1876,7 @@ error:
 int
 xlog_cursor_reset(struct xlog_cursor *cursor)
 {
+	assert(xlog_cursor_is_open(cursor));
 	cursor->rbuf.rpos = cursor->rbuf.buf;
 	if (ibuf_used(&cursor->rbuf) != (size_t)cursor->read_offset) {
 		cursor->rbuf.wpos = cursor->rbuf.buf;
@@ -1899,15 +1903,19 @@ xlog_cursor_reset(struct xlog_cursor *cursor)
 void
 xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 {
-	bool eof = (i->state == XLOG_CURSOR_EOF);
+	assert(xlog_cursor_is_open(i));
 	if (i->fd >= 0 && !reuse_fd)
 		close(i->fd);
 	ibuf_destroy(&i->rbuf);
 	if (i->state == XLOG_CURSOR_TX)
 		xlog_tx_cursor_destroy(&i->tx_cursor);
 	ZSTD_freeDStream(i->zdctx);
-	TRASH(i);
-	i->state = eof ? XLOG_CURSOR_EOF_CLOSED : XLOG_CURSOR_CLOSED;
+	i->state = (i->state == XLOG_CURSOR_EOF ?
+		    XLOG_CURSOR_EOF_CLOSED : XLOG_CURSOR_CLOSED);
+	/*
+	 * Do not trash the cursor object since the caller might
+	 * still want to access its state and/or meta information.
+	 */
 }
 
 /* }}} */

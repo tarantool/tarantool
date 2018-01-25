@@ -50,6 +50,7 @@
 
 extern struct tuple_format_vtab vy_tuple_format_vtab;
 extern struct tuple_format *vy_key_format;
+extern struct vy_mem_env mem_env;
 extern struct vy_cache_env cache_env;
 
 #if defined(__cplusplus)
@@ -164,13 +165,12 @@ init_read_views_list(struct rlist *rlist, struct vy_read_view *rvs,
  * Create vy_mem with the specified key_def, using the @region as
  * allocator.
  *
- * @param region Allocator for statements and bps.
  * @param def Key definition.
  *
  * @return New vy_mem.
  */
 struct vy_mem *
-create_test_mem(struct lsregion *region, struct key_def *def);
+create_test_mem(struct key_def *def);
 
 /**
  * Create vy_cache, key_def and tuple_format, using a specified

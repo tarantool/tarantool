@@ -35,14 +35,6 @@
 #include <fiber.h>
 #include "xrow.h"
 
-enum {
-	/**
-	 * Maximum recursion depth for on_replace triggers.
-	 * Large numbers may corrupt C stack.
-	 */
-	TXN_SUB_STMT_MAX = 3
-};
-
 double too_long_threshold;
 
 static inline void
@@ -98,9 +90,30 @@ txn_stmt_new(struct txn *txn)
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 
+	/* Set the savepoint for statement rollback. */
+	txn->sub_stmt_begin[txn->in_sub_stmt] = stailq_last(&txn->stmts);
+	txn->in_sub_stmt++;
+
 	stailq_add_tail_entry(&txn->stmts, stmt, next);
-	++txn->in_sub_stmt;
 	return stmt;
+}
+
+static void
+txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
+{
+	struct txn_stmt *stmt;
+	struct stailq rollback;
+	stailq_cut_tail(&txn->stmts, svp, &rollback);
+	stailq_reverse(&rollback);
+	stailq_foreach_entry(stmt, &rollback, next) {
+		engine_rollback_statement(txn->engine, txn, stmt);
+		if (stmt->row != NULL) {
+			assert(txn->n_rows > 0);
+			txn->n_rows--;
+			stmt->row = NULL;
+		}
+		stmt->space = NULL;
+	}
 }
 
 struct txn *
@@ -193,8 +206,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
 	 */
-	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts,
-						  struct txn_stmt, next);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
 
 	/* Create WAL record for the write requests in non-temporary spaces */
 	if (!space_is_temporary(stmt->space)) {
@@ -246,10 +258,8 @@ txn_write_to_wal(struct txn *txn)
 
 	ev_tstamp start = ev_monotonic_now(loop());
 	int64_t res = journal_write(req);
-
 	ev_tstamp stop = ev_monotonic_now(loop());
-	if (stop - start > too_long_threshold)
-		say_warn("too long WAL write: %.3f sec", stop - start);
+
 	if (res < 0) {
 		/* Cascading rollback. */
 		txn_rollback(); /* Perform our part of cascading rollback. */
@@ -261,6 +271,9 @@ txn_write_to_wal(struct txn *txn)
 		fiber_reschedule();
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
+	} else if (stop - start > too_long_threshold) {
+		say_warn("too long WAL write: %d rows at LSN %lld: %.3f sec",
+			 txn->n_rows, res - txn->n_rows + 1, stop - start);
 	}
 	/*
 	 * Use vclock_sum() from WAL writer as transaction signature.
@@ -309,12 +322,6 @@ fail:
 	return -1;
 }
 
-/**
- * Void all effects of the statement, but
- * keep it in the list - to maintain
- * limit on the number of statements in a
- * transaction.
- */
 void
 txn_rollback_stmt()
 {
@@ -325,15 +332,8 @@ txn_rollback_stmt()
 		return txn_rollback();
 	if (txn->in_sub_stmt == 0)
 		return;
-	struct txn_stmt *stmt = stailq_last_entry(&txn->stmts, struct txn_stmt,
-						  next);
-	engine_rollback_statement(txn->engine, txn, stmt);
-	if (stmt->row != NULL) {
-		stmt->row = NULL;
-		--txn->n_rows;
-		assert(txn->n_rows >= 0);
-	}
-	--txn->in_sub_stmt;
+	txn->in_sub_stmt--;
+	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt]);
 }
 
 void
@@ -456,12 +456,7 @@ box_txn_savepoint()
 			 "region", "struct txn_savepoint");
 		return NULL;
 	}
-	if (stailq_empty(&txn->stmts)) {
-		svp->is_first = true;
-		return svp;
-	}
-	svp->is_first = false;
-	svp->stmt = txn_last_stmt(txn);
+	svp->stmt = stailq_last(&txn->stmts);
 	svp->in_sub_stmt = txn->in_sub_stmt;
 	return svp;
 }
@@ -474,30 +469,20 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
 		return -1;
 	}
-	struct txn_stmt *stmt = svp->stmt;
-	if (!svp->is_first && (stmt == NULL || stmt->space == NULL ||
-			       svp->in_sub_stmt != txn->in_sub_stmt)) {
+	struct txn_stmt *stmt = svp->stmt == NULL ? NULL :
+			stailq_entry(svp->stmt, struct txn_stmt, next);
+	if (stmt != NULL && stmt->space == NULL) {
+		/*
+		 * The statement at which this savepoint was
+		 * created has been rolled back.
+		 */
 		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
 		return -1;
 	}
-	struct stailq rollback_stmts;
-	if (svp->is_first) {
-		rollback_stmts = txn->stmts;
-		stailq_create(&txn->stmts);
-	} else {
-		stailq_create(&rollback_stmts);
-		stmt = stailq_next_entry(stmt, next);
-		stailq_splice(&txn->stmts, &stmt->next, &rollback_stmts);
+	if (svp->in_sub_stmt != txn->in_sub_stmt) {
+		diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
+		return -1;
 	}
-	stailq_reverse(&rollback_stmts);
-	stailq_foreach_entry(stmt, &rollback_stmts, next) {
-		engine_rollback_statement(txn->engine, txn, stmt);
-		if (stmt->row != NULL) {
-			stmt->row = NULL;
-			--txn->n_rows;
-			assert(txn->n_rows >= 0);
-		}
-		stmt->space = NULL;
-	}
+	txn_rollback_to_svp(txn, svp->stmt);
 	return 0;
 }

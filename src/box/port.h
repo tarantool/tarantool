@@ -47,43 +47,116 @@ struct obuf;
  * for every server request. State of the instance is represented
  * by the tuples added to it. E.g.:
  *
- * struct port_iproto *port = port_iproto_new(...)
+ * struct port port;
+ * port_tuple_create(&port);
  * for (tuple in tuples)
- *	port_add_tuple(tuple);
+ *	port_tuple_add(tuple);
+ *
+ * port_dump(&port, obuf);
+ * port_destroy(&port);
  *
  * Beginning with Tarantool 1.5, tuple can have different internal
- * structure and port_add_tuple() requires a double
+ * structure and port_tuple_add() requires a double
  * dispatch: first, by the type of the port the tuple is being
  * added to, second, by the type of the tuple format, since the
  * format defines the internal structure of the tuple.
  */
 
-struct port_entry {
-	struct port_entry *next;
+struct port;
+
+struct port_vtab {
+	/**
+	 * Dump the content of a port to an output buffer.
+	 * On success returns number of entries dumped.
+	 * On failure sets diag and returns -1.
+	 */
+	int (*dump)(struct port *port, struct obuf *out);
+	/**
+	 * Same as dump(), but use the legacy Tarantool 1.6
+	 * format.
+	 */
+	int (*dump_16)(struct port *port, struct obuf *out);
+	/**
+	 * Destroy a port and release associated resources.
+	 */
+	void (*destroy)(struct port *port);
+};
+
+/**
+ * Abstract port instance. It is supposed to be converted to
+ * a concrete port realization, e.g. port_tuple.
+ */
+struct port {
+	/** Virtual method table. */
+	const struct port_vtab *vtab;
+	/**
+	 * Implementation dependent content. Needed to declare
+	 * an abstract port instance on stack.
+	 */
+	char pad[48];
+};
+
+struct port_tuple_entry {
+	struct port_tuple_entry *next;
 	struct tuple *tuple;
 };
 
-struct port {
-	size_t size;
-	struct port_entry *first;
-	struct port_entry *last;
-	struct port_entry first_entry;
+/**
+ * Port implementation used for storing tuples.
+ */
+struct port_tuple {
+	const struct port_vtab *vtab;
+	int size;
+	struct port_tuple_entry *first;
+	struct port_tuple_entry *last;
+	struct port_tuple_entry first_entry;
 };
+static_assert(sizeof(struct port_tuple) <= sizeof(struct port),
+	      "sizeof(struct port_tuple) must be <= sizeof(struct port)");
 
-void
-port_create(struct port *port);
+extern const struct port_vtab port_tuple_vtab;
 
 /**
- * Unref all tuples and free allocated memory
+ * Convert an abstract port instance to a tuple port.
+ */
+static inline struct port_tuple *
+port_tuple(struct port *port)
+{
+	assert(port->vtab == &port_tuple_vtab);
+	return (struct port_tuple *)port;
+}
+
+/**
+ * Create a port for storing tuples.
+ */
+void
+port_tuple_create(struct port *port);
+
+/**
+ * Append a tuple to a port.
+ */
+int
+port_tuple_add(struct port *port, struct tuple *tuple);
+
+/**
+ * Destroy an abstract port instance.
  */
 void
 port_destroy(struct port *port);
 
+/**
+ * Dump an abstract port instance to an output buffer.
+ * Return number of entries dumped on success, -1 on error.
+ */
 int
 port_dump(struct port *port, struct obuf *out);
 
+/**
+ * Same as port_dump(), but use the legacy Tarantool 1.6
+ * format.
+ */
 int
-port_add_tuple(struct port *port, struct tuple *tuple);
+port_dump_16(struct port *port, struct obuf *out);
 
 void
 port_init(void);
@@ -93,16 +166,6 @@ port_free(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "diag.h"
-
-static inline void
-port_add_tuple_xc(struct port *port, struct tuple *tuple)
-{
-	if (port_add_tuple(port, tuple) != 0)
-		diag_raise();
-}
-
 #endif /* defined __cplusplus */
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

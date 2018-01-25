@@ -106,6 +106,58 @@ box.space.test:select()
 _ = test_run:cmd("switch default")
 ---
 ...
+_ = test_run:cmd("switch autobootstrap1")
+---
+...
+u1 = box.schema.user.create('test_u')
+---
+...
+box.schema.user.grant('test_u', 'read,write', 'universe')
+---
+...
+box.session.su('test_u')
+---
+...
+_ = box.schema.space.create('test_u'):create_index('pk')
+---
+...
+box.session.su('admin')
+---
+...
+_ = box.space.test_u:replace({1, 2, 3, 4})
+---
+...
+box.space.test_u:select()
+---
+- - [1, 2, 3, 4]
+...
+-- Synchronize
+vclock = test_run:get_vclock('autobootstrap1')
+---
+...
+_ = test_run:wait_vclock("autobootstrap2", vclock)
+---
+...
+_ = test_run:wait_vclock("autobootstrap3", vclock)
+---
+...
+_ = test_run:cmd("switch autobootstrap2")
+---
+...
+box.space.test_u:select()
+---
+- - [1, 2, 3, 4]
+...
+_ = test_run:cmd("switch autobootstrap3")
+---
+...
+box.space.test_u:select()
+---
+- - [1, 2, 3, 4]
+...
+_ = test_run:cmd("switch default")
+---
+...
 --
 -- Stop servers
 --

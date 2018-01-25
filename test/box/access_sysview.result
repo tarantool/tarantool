@@ -105,23 +105,23 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- error: Read access is denied for user 'guest' to space '_vspace'
+- error: Read access to space '_vspace' is denied for user 'guest'
 ...
 #box.space._vindex:select{}
 ---
-- error: Read access is denied for user 'guest' to space '_vindex'
+- error: Read access to space '_vindex' is denied for user 'guest'
 ...
 #box.space._vuser:select{}
 ---
-- error: Read access is denied for user 'guest' to space '_vuser'
+- error: Read access to space '_vuser' is denied for user 'guest'
 ...
 #box.space._vpriv:select{}
 ---
-- error: Read access is denied for user 'guest' to space '_vpriv'
+- error: Read access to space '_vpriv' is denied for user 'guest'
 ...
 #box.space._vfunc:select{}
 ---
-- error: Read access is denied for user 'guest' to space '_vfunc'
+- error: Read access to space '_vfunc' is denied for user 'guest'
 ...
 box.session.su('admin')
 ---
@@ -234,11 +234,11 @@ box.session.su('guest')
 ...
 #box.space._vuser:select{}
 ---
-- 4
+- 5
 ...
 #box.space._vpriv:select{}
 ---
-- 13
+- 14
 ...
 #box.space._vfunc:select{}
 ---

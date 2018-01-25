@@ -81,12 +81,12 @@ vy_index_validate_formats(const struct vy_index *index)
 
 int
 vy_index_env_create(struct vy_index_env *env, const char *path,
-		    struct lsregion *allocator, int64_t *p_generation,
+		    int64_t *p_generation,
 		    vy_upsert_thresh_cb upsert_thresh_cb,
 		    void *upsert_thresh_arg)
 {
 	env->key_format = tuple_format_new(&vy_tuple_format_vtab,
-					   NULL, 0, 0, NULL, 0);
+					   NULL, 0, 0, NULL, 0, NULL);
 	if (env->key_format == NULL)
 		return -1;
 	tuple_format_ref(env->key_format);
@@ -96,10 +96,11 @@ vy_index_env_create(struct vy_index_env *env, const char *path,
 		return -1;
 	}
 	env->path = path;
-	env->allocator = allocator;
 	env->p_generation = p_generation;
 	env->upsert_thresh_cb = upsert_thresh_cb;
 	env->upsert_thresh_arg = upsert_thresh_arg;
+	env->too_long_threshold = TIMEOUT_INFINITY;
+	env->index_count = 0;
 	return 0;
 }
 
@@ -121,8 +122,8 @@ vy_index_name(struct vy_index *index)
 
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
-	     struct index_def *index_def, struct tuple_format *format,
-	     struct vy_index *pk)
+	     struct vy_mem_env *mem_env, struct index_def *index_def,
+	     struct tuple_format *format, struct vy_index *pk)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -166,7 +167,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 		tuple_format_ref(format);
 	} else {
 		index->disk_format = tuple_format_new(&vy_tuple_format_vtab,
-						      &cmp_def, 1, 0, NULL, 0);
+						      &cmp_def, 1, 0, NULL, 0,
+						      NULL);
 		if (index->disk_format == NULL)
 			goto fail_format;
 		for (uint32_t i = 0; i < cmp_def->part_count; ++i) {
@@ -203,10 +205,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	if (index->run_hist == NULL)
 		goto fail_run_hist;
 
-	index->mem = vy_mem_new(index->env->allocator,
-				*index->env->p_generation,
-				cmp_def, format,
-				index->mem_format_with_colmask,
+	index->mem = vy_mem_new(mem_env, *index->env->p_generation,
+				cmp_def, format, index->mem_format_with_colmask,
 				index->upsert_format, schema_version);
 	if (index->mem == NULL)
 		goto fail_mem;
@@ -287,6 +287,10 @@ vy_index_delete(struct vy_index *index)
 	rlist_foreach_entry_safe(mem, &index->sealed, in_sealed, next_mem)
 		vy_mem_delete(mem);
 	vy_mem_delete(index->mem);
+
+	struct vy_run *run, *next_run;
+	rlist_foreach_entry_safe(run, &index->runs, in_index, next_run)
+		vy_index_remove_run(index, run);
 
 	vy_range_tree_iter(index->tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&index->range_heap);
@@ -378,6 +382,8 @@ struct vy_index_recovery_cb_arg {
 	struct vy_index *index;
 	/** Last recovered range. */
 	struct vy_range *range;
+	/** Vinyl run environment. */
+	struct vy_run_env *run_env;
 	/**
 	 * All recovered runs hashed by ID.
 	 * It is needed in order not to load the same
@@ -397,6 +403,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 	struct vy_index_recovery_cb_arg *arg = cb_arg;
 	struct vy_index *index = arg->index;
 	struct vy_range *range = arg->range;
+	struct vy_run_env *run_env = arg->run_env;
 	struct mh_i64ptr_t *run_hash = arg->run_hash;
 	bool force_recovery = arg->force_recovery;
 	struct tuple_format *key_format = index->env->key_format;
@@ -452,7 +459,7 @@ vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
 		if (record->is_dropped)
 			break;
 		assert(record->index_lsn == index->commit_lsn);
-		run = vy_run_new(record->run_id);
+		run = vy_run_new(run_env, record->run_id);
 		if (run == NULL)
 			goto out;
 		run->dump_lsn = record->dump_lsn;
@@ -523,13 +530,15 @@ out:
 
 int
 vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
-		 int64_t lsn, bool is_checkpoint_recovery, bool force_recovery)
+		 struct vy_run_env *run_env, int64_t lsn,
+		 bool is_checkpoint_recovery, bool force_recovery)
 {
 	assert(index->range_count == 0);
 
 	struct vy_index_recovery_cb_arg arg = {
 		.index = index,
 		.range = NULL,
+		.run_env = run_env,
 		.run_hash = NULL,
 		.force_recovery = force_recovery,
 	};
@@ -682,6 +691,9 @@ vy_index_add_run(struct vy_index *index, struct vy_run *run)
 	rlist_add_entry(&index->runs, run, in_index);
 	index->run_count++;
 	vy_disk_stmt_counter_add(&index->stat.disk.count, &run->count);
+
+	index->env->bloom_size += bloom_store_size(&run->info.bloom);
+	index->env->page_index_size += run->page_index_size;
 }
 
 void
@@ -692,6 +704,9 @@ vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 	rlist_del_entry(run, in_index);
 	index->run_count--;
 	vy_disk_stmt_counter_sub(&index->stat.disk.count, &run->count);
+
+	index->env->bloom_size -= bloom_store_size(&run->info.bloom);
+	index->env->page_index_size -= run->page_index_size;
 }
 
 void
@@ -730,7 +745,7 @@ vy_index_rotate_mem(struct vy_index *index)
 	struct vy_mem *mem;
 
 	assert(index->mem != NULL);
-	mem = vy_mem_new(index->env->allocator, *index->env->p_generation,
+	mem = vy_mem_new(index->mem->env, *index->env->p_generation,
 			 index->cmp_def, index->mem_format,
 			 index->mem_format_with_colmask,
 			 index->upsert_format, schema_version);
@@ -762,7 +777,7 @@ vy_index_set(struct vy_index *index, struct vy_mem *mem,
 
 	/* Allocate region_stmt on demand. */
 	if (*region_stmt == NULL) {
-		*region_stmt = vy_stmt_dup_lsregion(stmt, mem->allocator,
+		*region_stmt = vy_stmt_dup_lsregion(stmt, &mem->env->allocator,
 						    mem->generation);
 		if (*region_stmt == NULL)
 			return -1;
@@ -898,7 +913,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
 
 		const struct tuple *region_stmt =
-			vy_stmt_dup_lsregion(upserted, mem->allocator,
+			vy_stmt_dup_lsregion(upserted, &mem->env->allocator,
 					     mem->generation);
 		if (region_stmt == NULL) {
 			/* OOM */
@@ -1048,18 +1063,16 @@ fail:
 	}
 	if (split_key != NULL)
 		tuple_unref(split_key);
-	assert(!diag_is_empty(diag_get()));
-	say_error("%s: failed to split range %s: %s",
-		  vy_index_name(index), vy_range_str(range),
-		  diag_last_error(diag_get())->errmsg);
+
+	diag_log();
+	say_error("%s: failed to split range %s",
+		  vy_index_name(index), vy_range_str(range));
 	return false;
 }
 
 bool
 vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 {
-	struct error *e;
-
 	struct vy_range *first, *last;
 	if (!vy_range_needs_coalesce(range, index->tree, &index->opts,
 				     &first, &last))
@@ -1127,9 +1140,8 @@ vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 fail_commit:
 	vy_range_delete(result);
 fail_range:
-	assert(!diag_is_empty(diag_get()));
-	e = diag_last_error(diag_get());
-	say_error("%s: failed to coalesce range %s: %s",
-		  vy_index_name(index), vy_range_str(range), e->errmsg);
+	diag_log();
+	say_error("%s: failed to coalesce range %s",
+		  vy_index_name(index), vy_range_str(range));
 	return false;
 }

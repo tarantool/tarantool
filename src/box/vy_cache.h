@@ -72,7 +72,7 @@ static inline int
 vy_cache_tree_cmp(struct vy_cache_entry *a,
 		  struct vy_cache_entry *b, struct key_def *cmp_def)
 {
-	return vy_stmt_compare(a->stmt, b->stmt, cmp_def);
+	return vy_tuple_compare(a->stmt, b->stmt, cmp_def);
 }
 
 /**
@@ -223,7 +223,7 @@ struct vy_cache_iterator {
 	 * GE, LT to LE for beauty.
 	 */
 	enum iterator_type iterator_type;
-	/* Search key data in terms of vinyl, vy_stmt_compare_raw argument */
+	/* Search key data in terms of vinyl, vy_stmt_compare argument */
 	const struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const struct vy_read_view **read_view;

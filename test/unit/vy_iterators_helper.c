@@ -1,25 +1,34 @@
 #include "vy_iterators_helper.h"
 #include "memory.h"
 #include "fiber.h"
+#include "say.h"
 
 struct tuple_format *vy_key_format = NULL;
+struct vy_mem_env mem_env;
 struct vy_cache_env cache_env;
 
 void
 vy_iterator_C_test_init(size_t cache_size)
 {
+	/* Suppress info messages. */
+	say_set_log_level(S_WARN);
+
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	tuple_init(NULL);
 	vy_cache_env_create(&cache_env, cord_slab_cache(), cache_size);
 	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, 0, 0,
-					 NULL, 0);
+					 NULL, 0, NULL);
 	tuple_format_ref(vy_key_format);
+
+	size_t mem_size = 64 * 1024 * 1024;
+	vy_mem_env_create(&mem_env, mem_size);
 }
 
 void
 vy_iterator_C_test_finish()
 {
+	vy_mem_env_destroy(&mem_env);
 	tuple_format_unref(vy_key_format);
 	vy_cache_env_destroy(&cache_env);
 	tuple_free();
@@ -68,19 +77,26 @@ vy_new_simple_stmt(struct tuple_format *format,
 	/*
 	 * Create the result statement, using one of the formats.
 	 */
-	if (templ->type == IPROTO_REPLACE || templ->type == IPROTO_DELETE) {
+	switch (templ->type) {
+	case IPROTO_INSERT: {
+		ret = vy_stmt_new_insert(format, buf, pos);
+		fail_if(ret == NULL);
+		break;
+	}
+	case IPROTO_REPLACE: {
 		ret = vy_stmt_new_replace(format, buf, pos);
 		fail_if(ret == NULL);
-		if (templ->type == IPROTO_REPLACE)
-			goto end;
-
-		struct tuple *tmp = vy_stmt_new_surrogate_delete(format, ret);
-		fail_if(tmp == NULL);
-		tuple_unref(ret);
-		ret = tmp;
-		goto end;
+		break;
 	}
-	if (templ->type == IPROTO_UPSERT) {
+	case IPROTO_DELETE: {
+		struct tuple *tmp = vy_stmt_new_replace(format, buf, pos);
+		fail_if(tmp == NULL);
+		ret = vy_stmt_new_surrogate_delete(format, tmp);
+		fail_if(ret == NULL);
+		tuple_unref(tmp);
+		break;
+	}
+	case IPROTO_UPSERT: {
 		/*
 		 * Create the upsert statement without operations.
 		 * Validation of result of UPSERT operations
@@ -104,17 +120,18 @@ vy_new_simple_stmt(struct tuple_format *format,
 		ret = vy_stmt_new_upsert(upsert_format, buf, pos,
 					 operations, 1);
 		fail_if(ret == NULL);
-		goto end;
+		break;
 	}
-	if (templ->type == IPROTO_SELECT) {
+	case IPROTO_SELECT: {
 		const char *key = buf;
 		uint part_count = mp_decode_array(&key);
 		ret = vy_stmt_new_select(vy_key_format, key, part_count);
 		fail_if(ret == NULL);
-		goto end;
+		break;
 	}
-	fail_if(true);
-end:
+	default:
+		fail_if(true);
+	}
 	free(buf);
 	vy_stmt_set_lsn(ret, templ->lsn);
 	if (templ->optimize_update)
@@ -128,8 +145,8 @@ vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 	struct tuple *stmt =
 		vy_new_simple_stmt(mem->format, mem->upsert_format,
 				   mem->format_with_colmask, templ);
-	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt, mem->allocator,
-							 mem->generation);
+	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
+			&mem->env->allocator, mem->generation);
 	assert(region_stmt != NULL);
 	tuple_unref(stmt);
 	if (templ->type == IPROTO_UPSERT)
@@ -186,13 +203,13 @@ init_read_views_list(struct rlist *rlist, struct vy_read_view *rvs,
 }
 
 struct vy_mem *
-create_test_mem(struct lsregion *region, struct key_def *def)
+create_test_mem(struct key_def *def)
 {
 	/* Create format */
 	struct key_def * const defs[] = { def };
 	struct tuple_format *format =
 		tuple_format_new(&vy_tuple_format_vtab, defs, def->part_count,
-				 0, NULL, 0);
+				 0, NULL, 0, NULL);
 	fail_if(format == NULL);
 
 	/* Create format with column mask */
@@ -206,7 +223,7 @@ create_test_mem(struct lsregion *region, struct key_def *def)
 	assert(format_upsert != NULL);
 
 	/* Create mem */
-	struct vy_mem *mem = vy_mem_new(region, 1, def, format,
+	struct vy_mem *mem = vy_mem_new(&mem_env, 1, def, format,
 					format_with_colmask, format_upsert, 0);
 	fail_if(mem == NULL);
 	return mem;
@@ -220,7 +237,8 @@ create_test_cache(uint32_t *fields, uint32_t *types,
 	*def = box_key_def_new(fields, types, key_cnt);
 	assert(*def != NULL);
 	vy_cache_create(cache, &cache_env, *def);
-	*format = tuple_format_new(&vy_tuple_format_vtab, def, 1, 0, NULL, 0);
+	*format = tuple_format_new(&vy_tuple_format_vtab, def, 1, 0, NULL, 0,
+				   NULL);
 	tuple_format_ref(*format);
 }
 

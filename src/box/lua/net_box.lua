@@ -14,7 +14,7 @@ local band          = bit.band
 local max           = math.max
 local fiber_clock   = fiber.clock
 local fiber_self    = fiber.self
-local ibuf_decode   = msgpack.ibuf_decode
+local decode        = msgpack.decode_unchecked
 
 local table_new           = require('table.new')
 local check_iterator_type = box.internal.check_iterator_type
@@ -274,7 +274,7 @@ local function create_transport(host, port, user, password, callback)
 
         if status ~= 0 then
             -- Handle errors
-            body_end_check, body = ibuf_decode(body_rpos)
+            body, body_end_check = decode(body_rpos)
             assert(body_end == body_end_check, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
             request.response = body[IPROTO_ERROR_KEY]
@@ -294,7 +294,7 @@ local function create_transport(host, port, user, password, callback)
         end
 
         -- Decode xrow.body[DATA] to Lua objects
-        body_end_check, body = ibuf_decode(body_rpos)
+        body, body_end_check = decode(body_rpos)
         assert(body_end == body_end_check, "invalid xrow length")
         request.response = body[IPROTO_DATA_KEY]
         request.metadata = body[IPROTO_METADATA_KEY]
@@ -322,11 +322,11 @@ local function create_transport(host, port, user, password, callback)
         else
             -- PWN! insufficient input validation
             local bufpos = recv_buf.rpos
-            local rpos, len = ibuf_decode(bufpos)
+            local len, rpos = decode(bufpos)
             required = (rpos - bufpos) + len
             if data_len >= required then
                 local body_end = rpos + len
-                local body_rpos, hdr = ibuf_decode(rpos)
+                local hdr, body_rpos = decode(rpos)
                 recv_buf.rpos = body_end
                 return nil, hdr, body_rpos, body_end
             end
@@ -428,7 +428,7 @@ local function create_transport(host, port, user, password, callback)
         end
         if hdr[IPROTO_STATUS_KEY] ~= 0 then
             local body
-            body_end, body = ibuf_decode(body_rpos)
+            body, body_end = decode(body_rpos)
             return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
         end
         set_state('fetch_schema')
@@ -470,7 +470,7 @@ local function create_transport(host, port, user, password, callback)
                     return iproto_schema_sm()
                 end
                 local body
-                body_end, body = ibuf_decode(body_rpos)
+                body, body_end = decode(body_rpos)
                 response[id] = body[IPROTO_DATA_KEY]
             end
         until response[select1_id] and response[select2_id]
@@ -491,7 +491,7 @@ local function create_transport(host, port, user, password, callback)
             -- schema_version has been changed - start to load a new version.
             -- Sic: self.schema_version will be updated only after reload.
             local body
-            body_end, body = ibuf_decode(body_rpos)
+            body, body_end = decode(body_rpos)
             set_state('fetch_schema',
                       E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY],
                       response_schema_version)

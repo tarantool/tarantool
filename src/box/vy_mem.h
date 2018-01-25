@@ -35,6 +35,9 @@
 #include <stdbool.h>
 
 #include <small/rlist.h>
+#include <small/lsregion.h>
+#include <small/slab_arena.h>
+#include <small/quota.h>
 
 #include "fiber_cond.h"
 #include "iterator_type.h"
@@ -47,9 +50,29 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct vy_mem;
-struct vy_stmt;
-struct lsregion;
+/** Vinyl memory environment. */
+struct vy_mem_env {
+	struct lsregion allocator;
+	struct slab_arena arena;
+	struct quota quota;
+	/** Size of memory used for storing tree extents. */
+	size_t tree_extent_size;
+};
+
+/**
+ * Initialize a vinyl memory environment.
+ * @param env[out] The environment to initialize.
+ * @param memory The maximum number of in-memory bytes that vinyl uses.
+ */
+void
+vy_mem_env_create(struct vy_mem_env *env, size_t memory);
+
+/**
+ * Destroy a vinyl memory environment.
+ * @param env The environment to destroy.
+ */
+void
+vy_mem_env_destroy(struct vy_mem_env *env);
 
 /** @cond false */
 
@@ -65,7 +88,7 @@ static int
 vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
 		const struct key_def *cmp_def)
 {
-	int res = vy_stmt_compare(a, b, cmp_def);
+	int res = vy_tuple_compare(a, b, cmp_def);
 	if (res)
 		return res;
 	int64_t a_lsn = vy_stmt_lsn(a), b_lsn = vy_stmt_lsn(b);
@@ -131,10 +154,14 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
  * and other keys in that chain.
  */
 struct vy_mem {
+	/** Vinyl memory environment. */
+	struct vy_mem_env *env;
 	/** Link in range->sealed list. */
 	struct rlist in_sealed;
 	/** BPS tree */
 	struct vy_mem_tree tree;
+	/** Size of memory used for storing tree extents. */
+	size_t tree_extent_size;
 	/** Number of statements. */
 	struct vy_stmt_counter count;
 	/** The min and max values of stmt->lsn in this tree. */
@@ -154,8 +181,6 @@ struct vy_mem {
 	 * Used as lsregion allocator identifier.
 	 */
 	int64_t generation;
-	/** Allocator for extents */
-	struct lsregion *allocator;
 	/**
 	 * Format of vy_mem REPLACE and DELETE tuples without
 	 * column mask.
@@ -218,7 +243,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
 /**
  * Instantiate a new in-memory level.
  *
- * @param allocator lsregion allocator to use for BPS tree extents
+ * @param env Vinyl memory environment.
  * @param generation Generation of statements stored in the tree.
  * @param key_def key definition.
  * @param format Format for REPLACE and DELETE tuples.
@@ -230,7 +255,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  * @retval NULL on error, check diag.
  */
 struct vy_mem *
-vy_mem_new(struct lsregion *allocator, int64_t generation,
+vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version);

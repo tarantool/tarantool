@@ -292,10 +292,8 @@ vy_log_tx_commit(void);
  * buffered records to disk, but in case of failure pending records
  * are not expunged from the buffer, so that the next transaction
  * will retry to flush them.
- *
- * Returns 0 on success, -1 on failure.
  */
-int
+void
 vy_log_tx_try_commit(void);
 
 /**

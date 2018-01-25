@@ -128,17 +128,6 @@ box.begin() test:insert{1} box.rollback()
 test:select{1}
 box.begin() test:insert{1} box.commit()
 test:select{1}
---
--- gh-793 box.rollback() is not invoked after CALL
---
-function test() box.begin() end
-box.schema.func.create('test')
-box.schema.user.grant('guest', 'execute', 'function', 'test')
-cn = require('net.box').connect(box.cfg.listen)
-cn:call('test') -- first CALL starts transaction
-cn:call('test') -- iproto reuses fiber on the second call
-cn = nil
-box.schema.func.drop('test')
 
 --
 -- Test statement-level rollback

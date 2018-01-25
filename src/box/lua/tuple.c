@@ -287,11 +287,12 @@ lbox_tuple_to_map(struct lua_State *L)
 	const struct tuple_field *field = &format->fields[0];
 	const char *pos = tuple_data(tuple);
 	int field_count = (int)mp_decode_array(&pos);
-	int n_named = tuple_format_named_fields(format);
+	int n_named = format->dict->name_count;
 	lua_createtable(L, field_count, n_named);
 	for (int i = 0; i < n_named; ++i, ++field) {
 		/* Access by name. */
-		lua_pushstring(L, field->name);
+		const char *name = format->dict->names[i];
+		lua_pushstring(L, name);
 		luamp_decode(L, luaL_msgpack_default, &pos);
 		lua_rawset(L, -3);
 		/*
@@ -299,7 +300,7 @@ lbox_tuple_to_map(struct lua_State *L)
 		 * copy for tables - lua optimizes it and uses
 		 * references.
 		 */
-		lua_pushstring(L, field->name);
+		lua_pushstring(L, name);
 		lua_rawget(L, -2);
 		lua_rawseti(L, -2, i + TUPLE_INDEX_BASE);
 	}

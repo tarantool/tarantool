@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(20)
+test:plan(22)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
@@ -95,7 +95,12 @@ log.info("json")
 local line = file:read()
 message = json.decode(line)
 test:is(message.message, "json", "check message with internal key word")
+log.log_format("plain")
+log.info("hello")
+line = file:read()
+test:ok(not line:match("{"), "log change format")
+s, e = pcall(log.log_format, "non_format")
+test:ok(not s)
 file:close()
-
 test:check()
 os.exit()

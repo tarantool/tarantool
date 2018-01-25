@@ -41,9 +41,11 @@
 #include "sequence.h"
 
 int
-access_check_space(struct space *space, uint8_t access)
+access_check_space(struct space *space, user_access_t access)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
+	/* Any space access also requires global USAGE privilege. */
+	access |= PRIV_U;
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required
@@ -51,9 +53,10 @@ access_check_space(struct space *space, uint8_t access)
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	access &= ~cr->universal_access;
-	if (access && space->def->uid != cr->uid &&
-	    access & ~space->access[cr->auth_token].effective) {
+	user_access_t space_access = access & ~cr->universal_access;
+
+	if (space_access && space->def->uid != cr->uid &&
+	    space_access & ~space->access[cr->auth_token].effective) {
 		/*
 		 * Report access violation. Throw "no such user"
 		 * error if there is  no user with this id.
@@ -61,10 +64,19 @@ access_check_space(struct space *space, uint8_t access)
 		 * from a different connection.
 		 */
 		struct user *user = user_find(cr->uid);
-		if (user != NULL)
-			diag_set(ClientError, ER_SPACE_ACCESS_DENIED,
-				 priv_name(access), user->def->name,
-				 space->def->name);
+		if (user != NULL) {
+			if (!(cr->universal_access & PRIV_U)) {
+				diag_set(AccessDeniedError,
+					 priv_name(PRIV_U),
+					 schema_object_name(SC_UNIVERSE), "",
+					 user->def->name);
+			} else {
+				diag_set(AccessDeniedError,
+					 priv_name(access),
+					 schema_object_name(SC_SPACE),
+					 space->def->name, user->def->name);
+			}
+		}
 		return -1;
 	}
 	return 0;

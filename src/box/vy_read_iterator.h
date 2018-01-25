@@ -47,8 +47,6 @@ extern "C" {
  * Used for executing a SELECT request over a Vinyl index.
  */
 struct vy_read_iterator {
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
 	/** Index to iterate over. */
 	struct vy_index *index;
 	/** Active transaction or NULL. */
@@ -59,11 +57,6 @@ struct vy_read_iterator {
 	struct tuple *key;
 	/** Read view the iterator lives in. */
 	const struct vy_read_view **read_view;
-	/**
-	 * If a read iteration takes longer than the given value,
-	 * warn about it in the log.
-	 */
-	double too_long_threshold;
 	/**
 	 * Set if the resulting statement needs to be
 	 * checked to match the search key.
@@ -129,7 +122,6 @@ struct vy_read_iterator {
 /**
  * Open the read iterator.
  * @param itr           Read iterator.
- * @param run_env       Vinyl run environment.
  * @param index         Vinyl index to iterate.
  * @param tx            Current transaction, if exists.
  * @param iterator_type Type of the iterator that determines order
@@ -138,10 +130,9 @@ struct vy_read_iterator {
  * @param rv            Read view.
  */
 void
-vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_run_env *run_env,
-		      struct vy_index *index, struct vy_tx *tx,
-		      enum iterator_type iterator_type, struct tuple *key,
-		      const struct vy_read_view **rv, double too_long_threshold);
+vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
+		      struct vy_tx *tx, enum iterator_type iterator_type,
+		      struct tuple *key, const struct vy_read_view **rv);
 
 /**
  * Get the next statement with another key, or start the iterator,

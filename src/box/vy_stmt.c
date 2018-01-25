@@ -38,41 +38,18 @@
 
 #include "diag.h"
 #include <small/region.h>
+#include <small/lsregion.h>
 
 #include "error.h"
 #include "tuple_format.h"
 #include "xrow.h"
 #include "fiber.h"
 
-enum {
-	/** Lowest allowed vinyl_max_tuple_size. */
-	TUPLE_MAX_SIZE_MIN = 16 * 1024,
-	/** Slab size for tuple arena. */
-	SLAB_SIZE = 16 * 1024 * 1024
-};
-
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_delete,
 };
 
 size_t vy_max_tuple_size = 1024 * 1024;
-
-void
-vy_stmt_env_create(struct vy_stmt_env *env, size_t memory)
-{
-	/* Vinyl memory is limited by vy_quota. */
-	quota_init(&env->quota, QUOTA_MAX);
-	tuple_arena_create(&env->arena, &env->quota, memory,
-			   SLAB_SIZE, "vinyl");
-	lsregion_create(&env->allocator, &env->arena);
-}
-
-void
-vy_stmt_env_destroy(struct vy_stmt_env *env)
-{
-	lsregion_destroy(&env->allocator);
-	tuple_arena_destroy(&env->arena);
-}
 
 void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
@@ -312,6 +289,16 @@ vy_stmt_new_replace(struct tuple_format *format, const char *tuple_begin,
 }
 
 struct tuple *
+vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end)
+{
+	/* INSERT mustn't have n_upserts field. */
+	assert(format->extra_size != sizeof(uint8_t));
+	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				    NULL, 0, IPROTO_INSERT);
+}
+
+struct tuple *
 vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 			    const struct tuple *upsert)
 {
@@ -468,6 +455,42 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 	return stmt;
 }
 
+struct tuple *
+vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+		    struct tuple_format *format)
+{
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *key_raw = tuple_extract_key(stmt, key_def, NULL);
+	if (key_raw == NULL)
+		return NULL;
+	uint32_t part_count = mp_decode_array(&key_raw);
+	assert(part_count == key_def->part_count);
+	struct tuple *key = vy_stmt_new_select(format, key_raw, part_count);
+	/* Cleanup memory allocated by tuple_extract_key(). */
+	region_truncate(region, region_svp);
+	return key;
+}
+
+struct tuple *
+vy_stmt_extract_key_raw(const char *data, const char *data_end,
+			const struct key_def *key_def,
+			struct tuple_format *format)
+{
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *key_raw = tuple_extract_key_raw(data, data_end,
+						    key_def, NULL);
+	if (key_raw == NULL)
+		return NULL;
+	uint32_t part_count = mp_decode_array(&key_raw);
+	assert(part_count == key_def->part_count);
+	struct tuple *key = vy_stmt_new_select(format, key_raw, part_count);
+	/* Cleanup memory allocated by tuple_extract_key_raw(). */
+	region_truncate(region, region_svp);
+	return key;
+}
+
 int
 vy_stmt_encode_primary(const struct tuple *value,
 		       const struct key_def *key_def, uint32_t space_id,
@@ -493,6 +516,7 @@ vy_stmt_encode_primary(const struct tuple *value,
 		request.key = extracted;
 		request.key_end = request.key + size;
 		break;
+	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 		request.tuple = tuple_data_range(value, &size);
 		request.tuple_end = request.tuple + size;
@@ -530,7 +554,7 @@ vy_stmt_encode_secondary(const struct tuple *value,
 	const char *extracted = tuple_extract_key(value, cmp_def, &size);
 	if (extracted == NULL)
 		return -1;
-	if (type == IPROTO_REPLACE) {
+	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
 		request.tuple = extracted;
 		request.tuple_end = extracted + size;
 	} else {
@@ -567,13 +591,15 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 						      IPROTO_DELETE,
 						      key_def, format);
 		break;
+	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 		if (is_primary) {
-			stmt = vy_stmt_new_replace(format, request.tuple,
-					    request.tuple_end);
+			stmt = vy_stmt_new_with_ops(format, request.tuple,
+						    request.tuple_end,
+						    NULL, 0, request.type);
 		} else {
 			stmt = vy_stmt_new_surrogate_from_key(request.tuple,
-							      IPROTO_REPLACE,
+							      request.type,
 							      key_def, format);
 		}
 		break;
@@ -652,21 +678,4 @@ vy_tuple_format_new_upsert(struct tuple_format *mem_format)
 	assert(format->extra_size == 0);
 	format->extra_size = sizeof(uint8_t);
 	return format;
-}
-
-char *
-vy_stmt_extract_key(struct xrow_header *xrow,
-		    const struct key_def *key_def,
-		    struct tuple_format *mem_format,
-		    struct tuple_format *upsert_format,
-		    bool is_primary)
-{
-	struct tuple *tuple;
-	tuple = vy_stmt_decode(xrow, key_def, mem_format, upsert_format,
-			       is_primary);
-	if (tuple == NULL)
-		return NULL;
-	char *key = tuple_extract_key(tuple, key_def, NULL);
-	tuple_unref(tuple);
-	return key;
 }

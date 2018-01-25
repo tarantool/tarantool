@@ -110,6 +110,8 @@ struct vy_page_info {
  * Logical unit of vinyl index - a sorted file with data.
  */
 struct vy_run {
+	/** Vinyl run environment. */
+	struct vy_run_env *env;
 	/** Info about the run stored in the index file. */
 	struct vy_run_info info;
 	/** Info about the run pages stored in the index file. */
@@ -120,6 +122,8 @@ struct vy_run {
 	int64_t id;
 	/** Number of statements in this run. */
 	struct vy_disk_stmt_counter count;
+	/** Size of memory used for storing page index. */
+	size_t page_index_size;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -207,8 +211,6 @@ struct vy_run_iterator_pos {
 struct vy_run_iterator {
 	/** Usage statistics */
 	struct vy_run_iterator_stat *stat;
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
 
 	/* Members needed for memory allocation and disk access */
 	/** Index key definition used for storing statements on disk. */
@@ -313,7 +315,7 @@ vy_run_is_empty(struct vy_run *run)
 }
 
 struct vy_run *
-vy_run_new(int64_t id);
+vy_run_new(struct vy_run_env *env, int64_t id);
 
 void
 vy_run_delete(struct vy_run *run);
@@ -372,12 +374,20 @@ enum vy_file_type {
 
 extern const char *vy_file_suffix[];
 
-static int
+static inline int
 vy_index_snprint_path(char *buf, int size, const char *dir,
 		      uint32_t space_id, uint32_t iid)
 {
 	return snprintf(buf, size, "%s/%u/%u",
 			dir, (unsigned)space_id, (unsigned)iid);
+}
+
+static inline int
+vy_run_snprint_filename(char *buf, int size, int64_t run_id,
+			enum vy_file_type type)
+{
+	return snprintf(buf, size, "%020lld.%s",
+			(long long)run_id, vy_file_suffix[type]);
 }
 
 static inline int
@@ -388,8 +398,8 @@ vy_run_snprint_path(char *buf, int size, const char *dir,
 	int total = 0;
 	SNPRINT(total, vy_index_snprint_path, buf, size,
 		dir, (unsigned)space_id, (unsigned)iid);
-	SNPRINT(total, snprintf, buf, size, "/%020lld.%s",
-		(long long)run_id, vy_file_suffix[type]);
+	SNPRINT(total, snprintf, buf, size, "/");
+	SNPRINT(total, vy_run_snprint_filename, buf, size, run_id, type);
 	return total;
 }
 
@@ -471,7 +481,7 @@ vy_slice_cut(struct vy_slice *slice, int64_t id,
  */
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
-		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
@@ -538,8 +548,6 @@ struct vy_slice_stream {
 	struct tuple_format *format;
 	/** Same as format, but for UPSERT tuples. */
 	struct tuple_format *upsert_format;
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
 	/** Set if this iterator is for a primary index. */
 	bool is_primary;
 };
@@ -550,8 +558,7 @@ struct vy_slice_stream {
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 		     const struct key_def *cmp_def, struct tuple_format *format,
-		     struct tuple_format *upsert_format,
-		     struct vy_run_env *run_env, bool is_primary);
+		     struct tuple_format *upsert_format, bool is_primary);
 
 #if defined(__cplusplus)
 } /* extern "C" */

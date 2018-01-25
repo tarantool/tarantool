@@ -138,9 +138,11 @@ test_run:cmd("setopt delimiter ';'")
 for k=1, box.schema.INDEX_MAX, 1 do
     index = s:create_index('i'..k, { type = 'hash' })
 end;
-test_run:cmd("setopt delimiter ''");
 -- cleanup
-for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
+for k=2, box.schema.INDEX_MAX, 1 do
+    s.index['i'..k]:drop()
+end;
+test_run:cmd("setopt delimiter ''");
 -- test limits enforced in key_def_check:
 -- unknown index type
 index = s:create_index('test', { type = 'nosuchtype' })

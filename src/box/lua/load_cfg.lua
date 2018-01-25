@@ -43,6 +43,8 @@ local default_cfg = {
     wal_dir_rescan_delay= 2,
     force_recovery      = false,
     replication         = nil,
+    instance_uuid       = nil,
+    replicaset_uuid     = nil,
     custom_proc_title   = nil,
     pid_file            = nil,
     background          = false,
@@ -54,6 +56,7 @@ local default_cfg = {
     checkpoint_count    = 2,
     worker_pool_threads = 4,
     replication_timeout = 1,
+    replication_connect_quorum = nil
 }
 
 -- types of available options
@@ -94,6 +97,8 @@ local template_cfg = {
     wal_dir_rescan_delay= 'number',
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
+    instance_uuid       = 'string',
+    replicaset_uuid     = 'string',
     custom_proc_title   = 'string',
     pid_file            = 'string',
     background          = 'boolean',
@@ -105,6 +110,7 @@ local template_cfg = {
     hot_standby         = 'boolean',
     worker_pool_threads = 'number',
     replication_timeout = 'number',
+    replication_connect_quorum = 'number',
 }
 
 local function normalize_uri(port)
@@ -171,6 +177,7 @@ local dynamic_cfg = {
     end,
     force_recovery          = function() end,
     replication_timeout     = private.cfg_set_replication_timeout,
+    replication_connect_quorum = private.cfg_set_replication_connect_quorum,
 }
 
 local dynamic_cfg_skip_at_load = {
@@ -178,6 +185,7 @@ local dynamic_cfg_skip_at_load = {
     listen                  = true,
     replication             = true,
     replication_timeout     = true,
+    replication_connect_quorum = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
@@ -330,6 +338,7 @@ local box_cfg_guard_whitelist = {
     session = true;
     tuple = true;
     runtime = true;
+    NULL = true;
 };
 
 local box = require('box')

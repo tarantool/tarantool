@@ -32,7 +32,6 @@
 #include "box/lua/console.h"
 #include "lua/utils.h"
 #include "lua/fiber.h"
-#include "box/session.h"
 #include "fiber.h"
 #include "coio.h"
 #include <lua.h>
@@ -319,7 +318,13 @@ lbox_console_add_history(struct lua_State *L)
 	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
 		luaL_error(L, "add_history(string)");
 
-	add_history(lua_tostring(L, 1));
+	const char *s = lua_tostring(L, 1);
+	if (*s) {
+		HIST_ENTRY *hist_ent = history_get(history_length - 1 + history_base);
+		const char *prev_s = hist_ent ? hist_ent->line : "";
+		if (strcmp(prev_s, s) != 0)
+			add_history(s);
+	}
 	return 0;
 }
 
@@ -335,7 +340,7 @@ tarantool_lua_console_init(struct lua_State *L)
 	};
 	luaL_register_module(L, "console", consolelib);
 
-	/* readline() func neads a ref to completion_handler (in upvalue) */
+	/* readline() func needs a ref to completion_handler (in upvalue) */
 	lua_getfield(L, -1, "completion_handler");
 	lua_pushcclosure(L, lbox_console_readline, 1);
 	lua_setfield(L, -2, "readline");

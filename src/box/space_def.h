@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "field_def.h"
+#include "tuple_dictionary.h"
 #include "schema_def.h"
 #include <stdlib.h>
 #include <stdbool.h>
@@ -92,6 +92,11 @@ struct space_def {
 	 */
 	uint32_t exact_field_count;
 	char engine_name[ENGINE_NAME_MAX + 1];
+	/**
+	 * Tuple field names dictionary, shared with a space's
+	 * tuple format.
+	 */
+	struct tuple_dictionary *dict;
 	/** Space fields, specified by a user. */
 	struct field_def *fields;
 	/** Length of @a fields. */
@@ -108,6 +113,7 @@ static inline void
 space_def_delete(struct space_def *def)
 {
 	space_opts_destroy(&def->opts);
+	tuple_dictionary_unref(def->dict);
 	TRASH(def);
 	free(def);
 }

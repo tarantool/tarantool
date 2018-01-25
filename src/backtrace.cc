@@ -39,17 +39,97 @@
 #include "say.h"
 #include "fiber.h"
 
+#include "assoc.h"
+
 #define CRLF "\n"
 
 #ifdef ENABLE_BACKTRACE
 #include <libunwind.h>
+
+#include "small/region.h"
 /*
  * We use a global static buffer because it is too late to do any
  * allocation when we are printing backtrace and fiber stack is
  * small.
  */
 
+#define BACKTRACE_NAME_MAX 200
+
 static char backtrace_buf[4096 * 4];
+
+static __thread struct region cache_region;
+static __thread struct mh_i64ptr_t *proc_cache = NULL;
+
+struct proc_cache_entry {
+	char name[BACKTRACE_NAME_MAX];
+	unw_word_t offset;
+};
+
+void
+backtrace_proc_cache_clear()
+{
+	if (proc_cache == NULL)
+		return;
+	region_destroy(&cache_region);
+	mh_i64ptr_delete(proc_cache);
+	proc_cache = NULL;
+}
+
+const char *
+get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
+{
+	static __thread char proc_name[BACKTRACE_NAME_MAX];
+	unw_word_t ip;
+	unw_get_reg(unw_cur, UNW_REG_IP, &ip);
+
+	if (skip_cache) {
+		unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
+				  offset);
+		return proc_name;
+	}
+
+	struct proc_cache_entry *entry;
+	struct mh_i64ptr_node_t node;
+	mh_int_t k;
+
+	if (proc_cache == NULL) {
+		region_create(&cache_region, &cord()->slabc);
+		proc_cache = mh_i64ptr_new();
+		if (proc_cache == NULL) {
+			unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
+					  offset);
+			goto error;
+		}
+	}
+
+	k  = mh_i64ptr_find(proc_cache, ip, NULL);
+	if (k != mh_end(proc_cache)) {
+		entry = (struct proc_cache_entry *)
+			mh_i64ptr_node(proc_cache, k)->val;
+		snprintf(proc_name, BACKTRACE_NAME_MAX, "%s", entry->name);
+		*offset = entry->offset;
+	}  else {
+		unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
+				  offset);
+
+		entry = (struct proc_cache_entry *)
+			region_alloc(&cache_region, sizeof(struct proc_cache_entry));
+		if (entry == NULL)
+			goto error;
+		node.key = ip;
+		node.val = entry;
+		snprintf(entry->name, BACKTRACE_NAME_MAX, "%s", proc_name);
+		entry->offset = *offset;
+
+		k = mh_i64ptr_put(proc_cache, &node, NULL, NULL);
+		if (k == mh_end(proc_cache)) {
+			free(entry);
+			goto error;
+		}
+	}
+error:
+	return proc_name;
+}
 
 char *
 backtrace()
@@ -64,7 +144,7 @@ backtrace()
 	char *end = p + sizeof(backtrace_buf) - 1;
 	int unw_status;
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
-		char proc[200];
+		const char *proc;
 		old_sp = sp;
 		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
 		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
@@ -73,7 +153,7 @@ backtrace()
 				  "identical to this frame (corrupt stack?)");
 			goto out;
 		}
-		unw_get_proc_name(&unw_cur, proc, sizeof(proc), &offset);
+		proc = get_proc_name(&unw_cur, &offset, true);
 		p += snprintf(p, end - p, "#%-2d %p in ", frame_no, (void *)ip);
 		if (p >= end)
 			goto out;
@@ -297,7 +377,7 @@ backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 	size_t demangle_buf_len = 0;
 
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
-		char proc[200];
+		const char *proc;
 		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
 		if (sp == old_sp) {
 			say_debug("unwinding error: previous frame "
@@ -306,7 +386,7 @@ backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 		}
 		old_sp = sp;
 		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
-		unw_get_proc_name(&unw_cur, proc, sizeof(proc), &offset);
+		proc = get_proc_name(&unw_cur, &offset, false);
 
 		char *cxxname = abi::__cxa_demangle(proc, demangle_buf,
 						    &demangle_buf_len,

@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "schema_def.h"
-#include <wchar.h>
-#include <wctype.h>
 
 static const char *object_type_strs[] = {
 	/* [SC_UKNNOWN]         = */ "unknown",
@@ -59,30 +57,6 @@ schema_object_type(const char *name)
 const char *
 schema_object_name(enum schema_object_type type)
 {
+	assert((int) type < (int) schema_object_type_MAX);
 	return object_type_strs[type];
-}
-
-bool
-identifier_is_valid(const char *str, uint32_t str_len)
-{
-	mbstate_t state;
-	memset(&state, 0, sizeof(state));
-	wchar_t w;
-	ssize_t len = mbrtowc(&w, str, str_len, &state);
-	if (len <= 0)
-		return false; /* invalid character or zero-length string */
-	if (!iswalpha(w) && w != L'_')
-		return false; /* fail to match [a-zA-Z_] */
-
-	while (str_len > 0 && (len = mbrtowc(&w, str, str_len, &state)) > 0) {
-		if (!iswalnum(w) && w != L'_')
-			return false; /* fail to match [a-zA-Z0-9_]* */
-		str_len -= len;
-		str += len;
-	}
-
-	if (len < 0)
-		return false; /* invalid character  */
-
-	return true;
 }

@@ -89,6 +89,13 @@ struct txv {
 	/** Member the transaction write set. */
 	rb_node(struct txv) in_set;
 	/**
+	 * True if there is no tuple committed to the database
+	 * matching the key this operation is for, i.e. either
+	 * there is no statements for this key at all or the
+	 * last committed statement is DELETE.
+	 */
+	bool is_first_insert;
+	/**
 	 * True if the txv was overwritten by another txv of
 	 * the same transaction.
 	 */
@@ -175,6 +182,12 @@ struct vy_tx {
 	struct rlist on_destroy;
 };
 
+static inline const struct vy_read_view **
+vy_tx_read_view(struct vy_tx *tx)
+{
+	return (const struct vy_read_view **)&tx->read_view;
+}
+
 /** Transaction manager object. */
 struct tx_manager {
 	/**
@@ -226,6 +239,10 @@ struct tx_manager {
 	const struct vy_read_view *p_committed_read_view;
 	/** Transaction statistics. */
 	struct vy_tx_stat stat;
+	/** Sum size of statements pinned by the write set. */
+	size_t write_set_size;
+	/** Sum size of statements pinned by the read set. */
+	size_t read_set_size;
 	/** Memory pool for struct vy_tx allocations. */
 	struct mempool tx_mempool;
 	/** Memory pool for struct txv allocations. */
@@ -244,6 +261,15 @@ tx_manager_new(void);
 void
 tx_manager_delete(struct tx_manager *xm);
 
+/** Create or reuse an instance of a read view. */
+struct vy_read_view *
+tx_manager_read_view(struct tx_manager *xm);
+
+/** Dereference and possibly destroy a read view. */
+void
+tx_manager_destroy_read_view(struct tx_manager *xm,
+			     const struct vy_read_view *read_view);
+
 /*
  * Determine the lowest possible vlsn, i.e. the level below
  * which the history could be compacted.
@@ -255,14 +281,6 @@ tx_manager_delete(struct tx_manager *xm);
  */
 int64_t
 tx_manager_vlsn(struct tx_manager *xm);
-
-/** Initialize a tx object. */
-void
-vy_tx_create(struct tx_manager *xm, struct vy_tx *tx);
-
-/** Destroy a tx object. */
-void
-vy_tx_destroy(struct vy_tx *tx);
 
 /** Begin a new transaction. */
 struct vy_tx *

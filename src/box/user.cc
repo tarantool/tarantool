@@ -242,7 +242,7 @@ access_find(struct priv_def *priv)
 static void
 user_set_effective_access(struct user *user)
 {
-	struct credentials *cr = current_user();
+	struct credentials *cr = effective_user();
 	struct privset_iterator it;
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
@@ -408,20 +408,22 @@ user_cache_replace(struct user_def *def)
 void
 user_cache_delete(uint32_t uid)
 {
-	struct user *user = user_by_id(uid);
-	if (user) {
+	mh_int_t k = mh_i32ptr_find(user_registry, uid, NULL);
+	if (k != mh_end(user_registry)) {
+		struct user *user = (struct user *)
+			mh_i32ptr_node(user_registry, k)->val;
 		assert(user->auth_token > ADMIN);
 		auth_token_put(user->auth_token);
 		assert(user_map_is_empty(&user->roles));
 		assert(user_map_is_empty(&user->users));
+		user_destroy(user);
 		/*
 		 * Sic: we don't have to remove a deleted
 		 * user from users hash of roles, since
 		 * to drop a user, one has to revoke
 		 * all privileges from them first.
 		 */
-		user_destroy(user);
-		mh_i32ptr_del(user_registry, uid, NULL);
+		mh_i32ptr_del(user_registry, k, NULL);
 	}
 }
 

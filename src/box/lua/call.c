@@ -36,13 +36,12 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
-#include "box/txn.h"
 #include "box/xrow.h"
-#include "box/iproto_constants.h"
+#include "box/port.h"
 #include "box/lua/tuple.h"
-#include "box/schema.h"
 #include "small/obuf.h"
 #include "lua_sql.h"
+#include "trivia/util.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -128,12 +127,44 @@ lbox_call_loadproc(struct lua_State *L)
 }
 
 /*
- * Encode CALL result.
- * Please read gh-291 carefully before "fixing" this code.
+ * Encode CALL/EVAL result.
  */
 static inline uint32_t
 luamp_encode_call(lua_State *L, struct luaL_serializer *cfg,
 		  struct mpstream *stream)
+{
+	int count = lua_gettop(L);
+	for (int i = 1; i <= count; ++i)
+		luamp_encode(L, cfg, stream, i);
+	return count;
+}
+
+/*
+ * Encode CALL_16 result.
+ *
+ * To allow clients to understand a complex return from
+ * a procedure, we are compatible with SELECT protocol,
+ * and return the number of return values first, and
+ * then each return value as a tuple.
+ *
+ * The following conversion rules apply:
+ *
+ * If a Lua stack contains at least one scalar, each
+ * value on the stack is converted to a tuple. A stack
+ * containing a single Lua table with scalars is converted to
+ * a tuple with multiple fields.
+ *
+ * If the stack is a Lua table, each member of which is
+ * not scalar, each member of the table is converted to
+ * a tuple. This way very large lists of return values can
+ * be used, since Lua stack size is limited by 8000 elements,
+ * while Lua table size is pretty much unlimited.
+ *
+ * Please read gh-291 carefully before "fixing" this code.
+ */
+static inline uint32_t
+luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
+		     struct mpstream *stream)
 {
 	int nrets = lua_gettop(L);
 	if (nrets == 0) {
@@ -244,26 +275,11 @@ luamp_encode_call(lua_State *L, struct luaL_serializer *cfg,
 	return root.size;
 }
 
-struct lua_function_ctx {
-	struct call_request *request;
-	struct obuf *out;
-	struct obuf_svp svp;
-	/* true if `out' was changed and `svp' can be used for rollback  */
-	bool out_is_dirty;
-};
-
-/**
- * Invoke a Lua stored procedure from the binary protocol
- * (implementation of 'CALL' command code).
- */
-static inline int
+static int
 execute_lua_call(lua_State *L)
 {
-	struct lua_function_ctx *ctx = (struct lua_function_ctx *)
+	struct call_request *request = (struct call_request *)
 		lua_topointer(L, 1);
-	struct call_request *request = ctx->request;
-	struct obuf *out = ctx->out;
-	struct obuf_svp *svp = &ctx->svp;
 	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
 	const char *name = request->name;
@@ -282,61 +298,14 @@ execute_lua_call(lua_State *L)
 	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
 	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
-
-	/**
-	 * Add all elements from Lua stack to iproto.
-	 *
-	 * To allow clients to understand a complex return from
-	 * a procedure, we are compatible with SELECT protocol,
-	 * and return the number of return values first, and
-	 * then each return value as a tuple.
-	 *
-	 * If a Lua stack contains at least one scalar, each
-	 * value on the stack is converted to a tuple. A single
-	 * Lua with scalars is converted to a tuple with multiple
-	 * fields.
-	 *
-	 * If the stack is a Lua table, each member of which is
-	 * not scalar, each member of the table is converted to
-	 * a tuple. This way very large lists of return values can
-	 * be used, since Lua stack size is limited by 8000 elements,
-	 * while Lua table size is pretty much unlimited.
-	 */
-	/* TODO: forbid explicit yield from __serialize or __index here */
-	if (iproto_prepare_select(out, svp) != 0)
-		luaT_error(L);
-	ctx->out_is_dirty = true;
-	struct luaL_serializer *cfg = luaL_msgpack_default;
-	struct mpstream stream;
-	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_error, L);
-
-	int count;
-	if (request->header->type == IPROTO_CALL_16) {
-		/* Tarantool < 1.7.1 compatibility */
-		count = luamp_encode_call(L, cfg, &stream);
-	} else {
-		assert(request->header->type == IPROTO_CALL);
-		count = lua_gettop(L);
-		for (int k = 1; k <= count; ++k) {
-			luamp_encode(L, cfg, &stream, k);
-		}
-	}
-
-	mpstream_flush(&stream);
-	iproto_reply_select(out, svp, request->header->sync, schema_version,
-			    count);
-	return 0; /* truncate Lua stack */
+	return lua_gettop(L);
 }
 
 static int
 execute_lua_eval(lua_State *L)
 {
-	struct lua_function_ctx *ctx = (struct lua_function_ctx *)
+	struct call_request *request = (struct call_request *)
 		lua_topointer(L, 1);
-	struct call_request *request = ctx->request;
-	struct obuf *out = ctx->out;
-	struct obuf_svp *svp = &ctx->svp;
 	lua_settop(L, 0); /* clear the stack to simplify the logic below */
 
 	/* Compile expression */
@@ -357,62 +326,140 @@ execute_lua_eval(lua_State *L)
 
 	/* Call compiled code */
 	lua_call(L, arg_count, LUA_MULTRET);
+	return lua_gettop(L);
+}
 
-	/* Send results of the called procedure to the client. */
-	if (iproto_prepare_select(out, svp) != 0)
-		diag_raise();
-	ctx->out_is_dirty = true;
+struct encode_lua_call_ctx {
+	/** Buffer to append the call result to. */
+	struct obuf *out;
+	/** If set, use Tarantool 1.6 output format. */
+	bool call_16;
+	/** Number of values in the output. */
+	int count;
+};
+
+static int
+encode_lua_call(lua_State *L)
+{
+	struct encode_lua_call_ctx *ctx = (struct encode_lua_call_ctx *)
+		lua_topointer(L, -1);
+	lua_pop(L, 1);
+
+	/*
+	 * Add all elements from Lua stack to the buffer.
+	 *
+	 * TODO: forbid explicit yield from __serialize or __index here
+	 */
+
 	struct mpstream stream;
-	mpstream_init(&stream, out, obuf_reserve_cb, obuf_alloc_cb,
+	mpstream_init(&stream, ctx->out, obuf_reserve_cb, obuf_alloc_cb,
 		      luamp_error, L);
-	int nrets = lua_gettop(L);
-	for (int k = 1; k <= nrets; ++k) {
-		luamp_encode(L, luaL_msgpack_default, &stream, k);
-	}
-	mpstream_flush(&stream);
-	iproto_reply_select(out, svp, request->header->sync, schema_version,
-			    nrets);
 
+	struct luaL_serializer *cfg = luaL_msgpack_default;
+	if (ctx->call_16)
+		ctx->count = luamp_encode_call_16(L, cfg, &stream);
+	else
+		ctx->count = luamp_encode_call(L, cfg, &stream);
+
+	mpstream_flush(&stream);
 	return 0;
 }
+
+/**
+ * Port for storing the result of a Lua CALL/EVAL.
+ */
+struct port_lua {
+	const struct port_vtab *vtab;
+	/** Lua state that stores the result. */
+	struct lua_State *L;
+	/** Reference to L in tarantool_L. */
+	int ref;
+};
+static_assert(sizeof(struct port_lua) <= sizeof(struct port),
+	      "sizeof(struct port_lua) must be <= sizeof(struct port)");
+
+static const struct port_vtab port_lua_vtab;
 
 static inline int
-box_process_lua(struct call_request *request, struct obuf *out, lua_CFunction handler)
+port_lua_do_dump(struct port *base, bool call_16, struct obuf *out)
 {
-	struct lua_function_ctx ctx = { request, out, {0, 0, 0}, false };
+	struct port_lua *port = (struct port_lua *)base;
+	assert(port->vtab == &port_lua_vtab);
 
+	struct lua_State *L = port->L;
+	struct encode_lua_call_ctx ctx = { out, call_16, 0 };
+	lua_pushlightuserdata(L, &ctx);
+	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0)
+		return -1;
+
+	return ctx.count;
+}
+
+static int
+port_lua_dump(struct port *base, struct obuf *out)
+{
+	return port_lua_do_dump(base, false, out);
+}
+
+static int
+port_lua_dump_16(struct port *base, struct obuf *out)
+{
+	return port_lua_do_dump(base, true, out);
+}
+
+static void
+port_lua_destroy(struct port *base)
+{
+	struct port_lua *port = (struct port_lua *)base;
+	assert(port->vtab == &port_lua_vtab);
+
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, port->ref);
+}
+
+static const struct port_vtab port_lua_vtab = {
+	.dump = port_lua_dump,
+	.dump_16 = port_lua_dump_16,
+	.destroy = port_lua_destroy,
+};
+
+static inline int
+box_process_lua(struct call_request *request, struct port *base,
+		lua_CFunction handler)
+{
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	int rc = luaT_cpcall(L, handler, &ctx);
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	if (rc != 0) {
-		if (ctx.out_is_dirty) {
-			/*
-			 * Output buffer has been altered, rollback to svp.
-			 * (!) Please note that a save point for output buffer
-			 * must be taken only after finishing executing of Lua
-			 * function because Lua can yield and leave the
-			 * buffer in inconsistent state (a parallel request
-			 * from the same connection will break the protocol).
-			 */
-			obuf_rollback_to_svp(out, &ctx.svp);
-		}
 
+	/*
+	 * Push the encoder function first - values returned by
+	 * the handler will be passed to it as arguments, see
+	 * port_lua_dump().
+	 */
+	lua_pushcfunction(L, encode_lua_call);
+
+	lua_pushcfunction(L, handler);
+	lua_pushlightuserdata(L, request);
+	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		return -1;
 	}
+
+	struct port_lua *port = (struct port_lua *)base;
+	port->vtab = &port_lua_vtab;
+	port->L = L;
+	port->ref = coro_ref;
 	return 0;
 }
 
 int
-box_lua_call(struct call_request *request, struct obuf *out)
+box_lua_call(struct call_request *request, struct port *port)
 {
-	return box_process_lua(request, out, execute_lua_call);
+	return box_process_lua(request, port, execute_lua_call);
 }
 
 int
-box_lua_eval(struct call_request *request, struct obuf *out)
+box_lua_eval(struct call_request *request, struct port *port)
 {
-	return box_process_lua(request, out, execute_lua_eval);
+	return box_process_lua(request, port, execute_lua_eval);
 }
 
 static int

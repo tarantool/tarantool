@@ -265,7 +265,9 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 
 	ev_async_start(scheduler->scheduler_loop, &scheduler->scheduler_async);
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
-		if (cord_costart(&scheduler->worker_pool[i], "vinyl.worker",
+		char name[FIBER_NAME_MAX];
+		snprintf(name, sizeof(name), "vinyl.writer.%d", i);
+		if (cord_costart(&scheduler->worker_pool[i], name,
 				 vy_worker_f, scheduler) != 0)
 			panic("failed to start vinyl worker thread");
 	}
@@ -503,10 +505,10 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 	 * the scheduler.
 	 */
 	if (scheduler->is_throttled) {
-		assert(!diag_is_empty(&scheduler->diag));
-		diag_add_error(diag_get(), diag_last_error(&scheduler->diag));
-		say_error("Can't checkpoint, scheduler is throttled with: %s",
-			  diag_last_error(diag_get())->errmsg);
+		struct error *e = diag_last_error(&scheduler->diag);
+		diag_add_error(diag_get(), e);
+		say_error("cannot checkpoint vinyl, "
+			  "scheduler is throttled with: %s", e->errmsg);
 		return -1;
 	}
 
@@ -523,6 +525,7 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 	scheduler->generation++;
 	scheduler->checkpoint_in_progress = true;
 	fiber_cond_signal(&scheduler->scheduler_cond);
+	say_info("vinyl checkpoint started");
 	return 0;
 }
 
@@ -539,16 +542,14 @@ vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 	while (scheduler->dump_generation < scheduler->generation) {
 		if (scheduler->is_throttled) {
 			/* A dump error occurred, abort checkpoint. */
-			assert(!diag_is_empty(&scheduler->diag));
-			diag_add_error(diag_get(),
-				       diag_last_error(&scheduler->diag));
-			say_error("vinyl checkpoint error: %s",
-				  diag_last_error(diag_get())->errmsg);
+			struct error *e = diag_last_error(&scheduler->diag);
+			diag_add_error(diag_get(), e);
+			say_error("vinyl checkpoint failed: %s", e->errmsg);
 			return -1;
 		}
 		fiber_cond_wait(&scheduler->dump_cond);
 	}
-	say_info("vinyl checkpoint done");
+	say_info("vinyl checkpoint completed");
 	return 0;
 }
 
@@ -576,9 +577,9 @@ vy_scheduler_end_checkpoint(struct vy_scheduler *scheduler)
  * is called from dump/compaction task constructor.
  */
 static struct vy_run *
-vy_run_prepare(struct vy_index *index)
+vy_run_prepare(struct vy_run_env *run_env, struct vy_index *index)
 {
-	struct vy_run *run = vy_run_new(vy_log_next_id());
+	struct vy_run *run = vy_run_new(run_env, vy_log_next_id());
 	if (run == NULL)
 		return NULL;
 	vy_log_tx_begin();
@@ -612,18 +613,12 @@ vy_run_discard(struct vy_run *run)
 	 * so set gc_lsn to minimal possible (0).
 	 */
 	vy_log_drop_run(run_id, 0);
-	if (vy_log_tx_commit() < 0) {
-		/*
-		 * Failure to log deletion of an incomplete
-		 * run means that we won't retry to delete
-		 * its files on log rotation. We will do that
-		 * after restart though, so just warn and
-		 * carry on.
-		 */
-		struct error *e = diag_last_error(diag_get());
-		say_warn("failed to log run %lld deletion: %s",
-			 (long long)run_id, e->errmsg);
-	}
+	/*
+	 * Leave the record in the vylog buffer on disk error.
+	 * If we fail to flush it before restart, we will delete
+	 * the run file upon recovery completion.
+	 */
+	vy_log_tx_try_commit();
 }
 
 static int
@@ -800,9 +795,9 @@ delete_mems:
 	assert(scheduler->dump_task_count > 0);
 	scheduler->dump_task_count--;
 
-	vy_scheduler_complete_dump(scheduler);
-
 	say_info("%s: dump completed", vy_index_name(index));
+
+	vy_scheduler_complete_dump(scheduler);
 	return 0;
 
 fail_free_slices:
@@ -834,8 +829,9 @@ vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	 * shutting down or the index was dropped.
 	 */
 	if (!in_shutdown && !index->is_dropped) {
-		say_error("%s: dump failed: %s", vy_index_name(index),
-			  diag_last_error(&task->diag)->errmsg);
+		struct error *e = diag_last_error(&task->diag);
+		error_log(e);
+		say_error("%s: dump failed", vy_index_name(index));
 	}
 
 	/* The metadata log is unavailable on shutdown. */
@@ -934,7 +930,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	if (task == NULL)
 		goto err;
 
-	struct vy_run *new_run = vy_run_prepare(index);
+	struct vy_run *new_run = vy_run_prepare(scheduler->run_env, index);
 	if (new_run == NULL)
 		goto err_run;
 
@@ -989,8 +985,8 @@ err_wi:
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
 err:
-	say_error("%s: could not start dump: %s", vy_index_name(index),
-		  diag_last_error(diag_get())->errmsg);
+	diag_log();
+	say_error("%s: could not start dump", vy_index_name(index));
 	return -1;
 }
 
@@ -1153,9 +1149,10 @@ vy_task_compact_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	 * shutting down or the index was dropped.
 	 */
 	if (!in_shutdown && !index->is_dropped) {
-		say_error("%s: failed to compact range %s: %s",
-			  vy_index_name(index), vy_range_str(range),
-			  diag_last_error(&task->diag)->errmsg);
+		struct error *e = diag_last_error(&task->diag);
+		error_log(e);
+		say_error("%s: failed to compact range %s",
+			  vy_index_name(index), vy_range_str(range));
 	}
 
 	/* The metadata log is unavailable on shutdown. */
@@ -1200,7 +1197,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	if (task == NULL)
 		goto err_task;
 
-	struct vy_run *new_run = vy_run_prepare(index);
+	struct vy_run *new_run = vy_run_prepare(scheduler->run_env, index);
 	if (new_run == NULL)
 		goto err_run;
 
@@ -1215,8 +1212,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct vy_slice *slice;
 	int n = range->compact_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_new_slice(wi, slice,
-				scheduler->run_env) != 0)
+		if (vy_write_iterator_new_slice(wi, slice) != 0)
 			goto err_wi_sub;
 
 		task->max_output_count += slice->count.rows;
@@ -1261,9 +1257,9 @@ err_wi:
 err_run:
 	vy_task_delete(&scheduler->task_pool, task);
 err_task:
+	diag_log();
 	say_error("%s: could not start compacting range %s: %s",
-		  vy_index_name(index), vy_range_str(range),
-		  diag_last_error(diag_get())->errmsg);
+		  vy_index_name(index), vy_range_str(range));
 	return -1;
 }
 

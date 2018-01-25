@@ -30,6 +30,24 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stddef.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+extern unsigned iproto_readahead;
+
+/**
+ * Return size of memory used for storing network buffers.
+ */
+size_t
+iproto_mem_used(void);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
 void
 iproto_init();
 
@@ -38,5 +56,7 @@ iproto_bind(const char *uri);
 
 void
 iproto_listen();
+
+#endif /* defined(__cplusplus) */
 
 #endif

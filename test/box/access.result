@@ -22,6 +22,10 @@ session.user()
 ---
 - admin
 ...
+session.effective_user()
+---
+- admin
+...
 -- extra argumentes are ignored
 session.user(nil)
 ---
@@ -52,7 +56,7 @@ session.su('test')
 -- in future we may  introduce a separate privilege
 box.schema.space.create('test')
 ---
-- error: Write access is denied for user 'test' to space '_schema'
+- error: Write access to space '_schema' is denied for user 'test'
 ...
 -- su() goes through because called from admin
 -- console, and it has no access checks
@@ -91,7 +95,7 @@ end;
 ...
 usermax();
 ---
-- error: User 'user28' is not found
+- error: User 'user27' is not found
 ...
 test_run:cmd("setopt delimiter ''");
 ---
@@ -132,9 +136,16 @@ box.schema.user.revoke('rich', 'read,write', 'universe')
 box.schema.user.revoke('rich', 'public')
 ---
 ...
+box.schema.user.disable("rich")
+---
+...
+-- test double disable is a no op
+box.schema.user.disable("rich")
+---
+...
 box.space['_user']:delete{uid}
 ---
-- [5, 1, 'rich', 'user', {}]
+- [33, 1, 'rich', 'user', {}]
 ...
 box.schema.user.drop('test')
 ---
@@ -169,8 +180,9 @@ session.user()
 ---
 - admin
 ...
-session.su('tester', function() return session.user() end)
+session.su('tester', function() return session.user(), session.effective_user() end)
 ---
+- admin
 - tester
 ...
 session.user()
@@ -181,27 +193,37 @@ session.user()
 session.su('tester')
 ---
 ...
+session.effective_user()
+---
+- tester
+...
+session.su('admin', function() return session.user(), session.effective_user() end)
+---
+- tester
+- admin
+...
 session.user()
 ---
 - tester
 ...
-session.su('admin', function() return session.user() end)
----
-- admin
-...
-session.user()
+session.effective_user()
 ---
 - tester
 ...
 -- drop current user
 session.su('admin', function() return box.schema.user.drop('tester') end)
 ---
+- error: 'Failed to drop user or role ''tester'': the user is active in the current
+    session'
 ...
 session.user()
 ---
-- null
+- tester
 ...
 session.su('admin')
+---
+...
+box.schema.user.drop('tester')
 ---
 ...
 session.user()
@@ -209,28 +231,42 @@ session.user()
 - admin
 ...
 --------------------------------------------------------------------------------
--- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+-- Check if identifiers obey the common constraints
 --------------------------------------------------------------------------------
--- invalid identifiers
-box.schema.user.create('invalid.identifier')
+identifier = require("identifier")
 ---
-- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
-box.schema.user.create('invalid identifier')
+test_run:cmd("setopt delimiter ';'")
 ---
-- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
+- true
 ...
-box.schema.user.create('user ')
+identifier.run_test(
+	function (identifier)
+		box.schema.user.create(identifier)
+		box.schema.user.grant(identifier, 'super')
+		box.session.su(identifier)
+		box.session.su("admin")
+		box.schema.user.revoke(identifier, 'super')
+	end,
+	box.schema.user.drop
+);
 ---
-- error: Invalid identifier 'user ' (expected letters, digits or an underscore)
+- All tests passed
 ...
-box.schema.user.create('5')
+identifier.run_test(
+	function (identifier)
+		box.schema.role.create(identifier)
+		box.schema.role.grant(identifier, 'execute,read,write',
+			'universe', nil, {if_not_exists = false})
+	end,
+	box.schema.role.drop
+);
 ---
-- error: Invalid identifier '5' (expected letters, digits or an underscore)
+- All tests passed
 ...
-box.schema.user.create(' ')
+test_run:cmd("setopt delimiter ''");
 ---
-- error: Invalid identifier ' ' (expected letters, digits or an underscore)
+- true
 ...
 -- valid identifiers
 box.schema.user.create('Петя_Иванов')
@@ -252,21 +288,21 @@ c = (require 'net.box').connect(LISTEN.host, LISTEN.service)
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access to function 'nosuchfunction' is denied for user 'guest'
 ...
 function nosuchfunction() end
 ---
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access to function 'nosuchfunction' is denied for user 'guest'
 ...
 nosuchfunction = nil
 ---
 ...
 c:call('nosuchfunction')
 ---
-- error: Execute access is denied for user 'guest' to function 'nosuchfunction'
+- error: Execute access to function 'nosuchfunction' is denied for user 'guest'
 ...
 c:close()
 ---
@@ -342,7 +378,7 @@ box.schema.user.create('grantee')
 ...
 box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
 ---
-- error: Grant access on universe is denied for user 'grantor'
+- error: Grant access to universe '' is denied for user 'grantor'
 ...
 session.su('grantee')
 ---
@@ -350,7 +386,7 @@ session.su('grantee')
 -- fails - can't suicide - ask the creator to kill you
 box.schema.user.drop('grantee')
 ---
-- error: Read access is denied for user 'grantee' to space '_user'
+- error: Read access to space '_user' is denied for user 'grantee'
 ...
 session.su('grantor')
 ---
@@ -361,7 +397,8 @@ box.schema.user.drop('grantee')
 -- fails, can't kill oneself
 box.schema.user.drop('grantor')
 ---
-- error: Create, drop or alter access on role is denied for user 'grantor'
+- error: 'Failed to drop user or role ''grantor'': the user is active in the current
+    session'
 ...
 session.su('admin')
 ---
@@ -380,11 +417,11 @@ session.su('guest')
 ...
 box.space._user:select{0}
 ---
-- error: Read access is denied for user 'guest' to space '_user'
+- error: Read access to space '_user' is denied for user 'guest'
 ...
 box.space._user:select{1}
 ---
-- error: Read access is denied for user 'guest' to space '_user'
+- error: Read access to space '_user' is denied for user 'guest'
 ...
 session.su('admin')
 ---
@@ -398,7 +435,7 @@ box.schema.user.create('user1')
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', {}]
+- - [32, 1, 'user1', 'user', {}]
 ...
 session.su('user1')
 ---
@@ -411,14 +448,14 @@ session.su('admin')
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}]
+- - [32, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}]
 ...
 box.schema.user.passwd('user1', 'extra_new_password')
 ---
 ...
 box.space._user.index.name:select{'user1'}
 ---
-- - [4, 1, 'user1', 'user', {'chap-sha1': 'nMc3F1oaUtz37IYbgGYYPZawmfE='}]
+- - [32, 1, 'user1', 'user', {'chap-sha1': 'nMc3F1oaUtz37IYbgGYYPZawmfE='}]
 ...
 box.schema.user.passwd('invalid_user', 'some_password')
 ---
@@ -434,7 +471,7 @@ session.su('user1')
 -- permission denied
 box.schema.user.passwd('admin', 'xxx')
 ---
-- error: Read access is denied for user 'user1' to space '_user'
+- error: Read access to space '_user' is denied for user 'user1'
 ...
 session.su('admin')
 ---
@@ -461,8 +498,8 @@ box.schema.user.grant('user', 'read,write', 'universe')
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 3]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 27]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
@@ -470,39 +507,40 @@ box.schema.user.grant('user', 'read', 'universe')
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 3]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 27]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 1]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 25]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 24]
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 2]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 26]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 4, 'role', 2, 4]
-  - [1, 4, 'universe', 0, 3]
+- - [1, 32, 'role', 2, 4]
+  - [1, 32, 'universe', 0, 27]
 ...
 box.schema.user.drop('user')
 ---
@@ -659,11 +697,17 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_ex
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...
+box.schema.user.revoke('guest', 'usage,session', 'universe')
+---
+...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 - error: User 'guest' does not have read,write,execute access on universe 'nil'
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })
+---
+...
+box.schema.user.grant('guest', 'usage,session', 'universe')
 ---
 ...
 box.schema.func.create('dummy', { if_not_exists = true })
@@ -809,7 +853,7 @@ session.su('test')
 ...
 box.internal.collation.drop('test') -- fail
 ---
-- error: Create, drop or alter access on collation is denied for user 'test'
+- error: Drop access to collation 'test' is denied for user 'test'
 ...
 session.su('admin')
 ---
@@ -818,5 +862,438 @@ box.internal.collation.drop('test') -- success
 ---
 ...
 box.schema.user.drop('test')
+---
+...
+--
+-- gh-2710 object drop revokes all associated privileges
+--
+_ = box.schema.space.create('test_space')
+---
+...
+_ = box.schema.sequence.create('test_sequence')
+---
+...
+box.schema.func.create('test_function')
+---
+...
+box.schema.user.create('test_user')
+---
+...
+box.schema.user.grant('test_user', 'read', 'space', 'test_space')
+---
+...
+box.schema.user.grant('test_user', 'write', 'sequence', 'test_sequence')
+---
+...
+box.schema.user.grant('test_user', 'execute', 'function', 'test_function')
+---
+...
+box.schema.role.create('test_role')
+---
+...
+box.schema.role.grant('test_role', 'read', 'space', 'test_space')
+---
+...
+box.schema.role.grant('test_role', 'write', 'sequence', 'test_sequence')
+---
+...
+box.schema.role.grant('test_role', 'execute', 'function', 'test_function')
+---
+...
+box.schema.user.info('test_user')
+---
+- - - execute
+    - function
+    - test_function
+  - - execute
+    - role
+    - public
+  - - write
+    - sequence
+    - test_sequence
+  - - read
+    - space
+    - test_space
+  - - session,usage
+    - universe
+    - 
+...
+box.schema.role.info('test_role')
+---
+- - - execute
+    - function
+    - test_function
+  - - write
+    - sequence
+    - test_sequence
+  - - read
+    - space
+    - test_space
+...
+box.space.test_space:drop()
+---
+...
+box.sequence.test_sequence:drop()
+---
+...
+box.schema.func.drop('test_function')
+---
+...
+box.schema.user.info('test_user')
+---
+- - - execute
+    - role
+    - public
+  - - session,usage
+    - universe
+    - 
+...
+box.schema.role.info('test_role')
+---
+- []
+...
+box.schema.user.drop('test_user')
+---
+...
+box.schema.role.drop('test_role')
+---
+...
+-- gh-3023: box.session.su() changes both authenticated and effective
+-- user, while should only change the effective user
+--
+function uids() return { uid = box.session.uid(), euid = box.session.euid() } end
+---
+...
+box.session.su('guest')
+---
+...
+uids()
+---
+- uid: 0
+  euid: 0
+...
+box.session.su('admin')
+---
+...
+box.session.su('guest', uids)
+---
+- uid: 1
+  euid: 0
+...
+--
+-- gh-2898 System privileges
+--
+s = box.schema.create_space("tweed")
+---
+...
+_ = s:create_index('primary', {type = 'hash', parts = {1, 'unsigned'}})
+---
+...
+box.schema.user.create('test', {password="pass"})
+---
+...
+box.schema.user.grant('test', 'read,write', 'universe')
+---
+...
+-- other users can't disable
+box.schema.user.create('test1')
+---
+...
+session.su("test1")
+---
+...
+box.schema.user.disable("test")
+---
+- error: Read access to space '_user' is denied for user 'test1'
+...
+session.su("admin")
+---
+...
+box.schema.user.disable("test")
+---
+...
+-- test double disable is a no op
+box.schema.user.disable("test")
+---
+...
+session.su("test")
+---
+- error: Session access to universe '' is denied for user 'test'
+...
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test", password="pass"})
+---
+...
+c.state
+---
+- error
+...
+c.error
+---
+- Session access to universe '' is denied for user 'test'
+...
+session.su("test1")
+---
+...
+box.schema.user.grant("test", "usage", "universe")
+---
+- error: Read access to space '_user' is denied for user 'test1'
+...
+session.su('admin')
+---
+...
+box.schema.user.grant("test", "session", "universe")
+---
+...
+session.su("test")
+---
+...
+s:select{}
+---
+- error: Usage access to universe '' is denied for user 'test'
+...
+session.su('admin')
+---
+...
+box.schema.user.enable("test")
+---
+...
+-- check enable not fails on double enabling
+box.schema.user.enable("test")
+---
+...
+session.su("test")
+---
+...
+s:select{}
+---
+- []
+...
+session.su("admin")
+---
+...
+box.schema.user.drop('test')
+---
+...
+box.schema.user.drop('test1')
+---
+...
+s:drop()
+---
+...
+--
+-- gh-3022 role 'super'
+--
+box.schema.user.grant('guest', 'super')
+---
+...
+box.session.su('guest')
+---
+...
+_ = box.schema.space.create('test')
+---
+...
+box.space.test:drop()
+---
+...
+_ = box.schema.user.create('test')
+---
+...
+box.schema.user.drop('test')
+---
+...
+_ = box.schema.func.create('test')
+---
+...
+box.schema.func.drop('test')
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'super')
+---
+...
+box.session.su('guest')
+---
+...
+box.schema.space.create('test')
+---
+- error: Write access to space '_schema' is denied for user 'guest'
+...
+box.schema.user.create('test')
+---
+- error: Read access to space '_user' is denied for user 'guest'
+...
+box.schema.func.create('test')
+---
+- error: Read access to space '_func' is denied for user 'guest'
+...
+box.session.su('admin')
+---
+...
+--
+-- gh-2911 on_access_denied trigger
+--
+obj_type = nil
+---
+...
+obj_name = nil
+---
+...
+op_type = nil
+---
+...
+euid = nil
+---
+...
+auid = nil
+---
+...
+function access_denied_trigger(op, type, name) obj_type = type; obj_name = name; op_type = op end
+---
+...
+function uid() euid = box.session.euid(); auid = box.session.uid() end
+---
+...
+_ = box.session.on_access_denied(access_denied_trigger)
+---
+...
+_ = box.session.on_access_denied(uid)
+---
+...
+s = box.schema.space.create('admin_space', {engine="vinyl"})
+---
+...
+seq = box.schema.sequence.create('test_sequence')
+---
+...
+index = s:create_index('primary', {type = 'tree', parts = {1, 'unsigned'}})
+---
+...
+box.schema.user.create('test_user', {password="pass"})
+---
+...
+box.session.su("test_user")
+---
+...
+s:select{}
+---
+- error: Read access to space 'admin_space' is denied for user 'test_user'
+...
+obj_type, obj_name, op_type
+---
+- space
+- admin_space
+- Read
+...
+euid, auid
+---
+- 32
+- 32
+...
+seq:set(1)
+---
+- error: Write access to sequence 'test_sequence' is denied for user 'test_user'
+...
+obj_type, obj_name, op_type
+---
+- sequence
+- test_sequence
+- Write
+...
+euid, auid
+---
+- 32
+- 32
+...
+box.session.su("admin")
+---
+...
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+---
+...
+function func() end
+---
+...
+st, e = pcall(c.call, c, func)
+---
+...
+obj_type, op_type
+---
+- function
+- Execute
+...
+euid, auid
+---
+- 32
+- 32
+...
+obj_name:match("function")
+---
+- function
+...
+box.schema.user.revoke("test_user", "usage", "universe")
+---
+...
+box.session.su("test_user")
+---
+...
+st, e = pcall(s.select, s, {})
+---
+...
+e = e:unpack()
+---
+...
+e.type, e.access_type, e.object_type, e.message
+---
+- AccessDeniedError
+- Usage
+- universe
+- Usage access to universe '' is denied for user 'test_user'
+...
+obj_type, obj_name, op_type
+---
+- universe
+- 
+- Usage
+...
+euid, auid
+---
+- 32
+- 32
+...
+box.session.su("admin")
+---
+...
+box.schema.user.revoke("test_user", "session", "universe")
+---
+...
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user="test_user", password="pass"})
+---
+...
+obj_type, obj_name, op_type
+---
+- universe
+- 
+- Session
+...
+euid, auid
+---
+- 0
+- 0
+...
+box.session.on_access_denied(nil, access_denied_trigger)
+---
+...
+box.session.on_access_denied(nil, uid)
+---
+...
+box.schema.user.drop("test_user")
+---
+...
+seq:drop()
+---
+...
+s:drop()
 ---
 ...

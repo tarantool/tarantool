@@ -39,6 +39,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** Memtx tuple allocator, available to statistics.  */
+extern struct small_alloc memtx_alloc;
+
 /**
  * Initialize memtx_tuple library
  */

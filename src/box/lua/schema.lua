@@ -75,28 +75,28 @@ ffi.cdef[[
     int
     box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
-    struct port_entry {
-        struct port_entry *next;
+    struct port_tuple_entry {
+        struct port_tuple_entry *next;
         struct tuple *tuple;
     };
 
-    struct port {
+    struct port_tuple {
+        const struct port_vtab *vtab;
         size_t size;
-        struct port_entry *first;
-        struct port_entry *last;
-        struct port_entry first_entry;
+        struct port_tuple_entry *first;
+        struct port_tuple_entry *last;
+        struct port_tuple_entry first_entry;
     };
-
-    void
-    port_create(struct port *port);
 
     void
     port_destroy(struct port *port);
 
     int
-    box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+    box_select(uint32_t space_id, uint32_t index_id,
                int iterator, uint32_t offset, uint32_t limit,
-               const char *key, const char *key_end);
+               const char *key, const char *key_end,
+               struct port *port);
+
     void password_prepare(const char *password, int len,
                           char *out, int out_len);
 ]]
@@ -157,6 +157,16 @@ local function sequence_resolve(name_or_id)
         return tuple[1], tuple
     else
         return nil
+    end
+end
+
+-- Revoke all privileges associated with the given object.
+local function revoke_object_privs(object_type, object_id)
+    local _priv = box.space[box.schema.PRIV_ID]
+    local privs = _priv.index.object:select{object_type, object_id}
+    for k, tuple in pairs(privs) do
+        local uid = tuple[2]
+        _priv:delete{uid, object_type, object_id}
     end
 end
 
@@ -389,12 +399,12 @@ box.schema.space.create = function(name, options)
         end
         id = max_id[2]
     end
-    local uid = nil
+    local uid = session.euid()
     if options.user then
         uid = user_or_role_resolve(options.user)
-    end
-    if uid == nil then
-        uid = session.uid()
+        if uid == nil then
+            box.error(box.error.NO_SUCH_USER, options.user)
+        end
     end
     local format = options.format and options.format or {}
     check_param(format, 'format', 'table')
@@ -430,7 +440,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
     check_param_table(opts, { if_exists = 'boolean' })
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
-    local _priv = box.space[box.schema.PRIV_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local sequence_tuple = _space_sequence:delete{space_id}
@@ -443,10 +452,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
         local v = keys[i]
         _index:delete{v[1], v[2]}
     end
-    local privs = _priv.index.object:select{'space', space_id}
-    for k, tuple in pairs(privs) do
-        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-    end
+    revoke_object_privs('space', space_id)
     _truncate:delete{space_id}
     if _space:delete{space_id} == nil then
         if space_name == nil then
@@ -492,7 +498,7 @@ local function update_index_parts_1_6_0(parts)
     return result
 end
 
-local function update_index_parts(space_id, parts)
+local function update_index_parts(format, parts)
     if type(parts) ~= "table" then
         box.error(box.error.ILLEGAL_PARAMS,
         "options.parts parameter should be a table")
@@ -543,7 +549,7 @@ local function update_index_parts(space_id, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: field (name or number) is expected")
         elseif type(part.field) == 'string' then
-            for k,v in pairs(box.space[space_id]:format()) do
+            for k,v in pairs(format) do
                 if v.name == part.field then
                     part.field = k
                     break
@@ -557,7 +563,7 @@ local function update_index_parts(space_id, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: field (number) must be one-based")
         end
-        local fmt = box.space[space_id]:format()[part.field]
+        local fmt = format[part.field]
         if part.type == nil then
             if fmt and fmt.type then
                 part.type = fmt.type
@@ -638,6 +644,11 @@ box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
     check_param(name, 'name', 'string')
     check_param_table(options, create_index_template)
+    local space = box.space[space_id]
+    if not space then
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
+    end
+    local format = space:format()
 
     local options_defaults = {
         type = 'tree',
@@ -649,10 +660,18 @@ box.schema.index.create = function(space_id, name, options)
         other = {parts = { 1, 'unsigned' }, unique = true},
     }
     options_defaults = type_dependent_defaults[options.type]
-            and type_dependent_defaults[options.type]
             or type_dependent_defaults.other
+    if not options.parts then
+        local fieldno = options_defaults.parts[1]
+        if #format >= fieldno then
+            local t = format[fieldno].type
+            if t ~= 'any' then
+                options.parts = {{fieldno, format[fieldno].type}}
+            end
+        end
+    end
     options = update_param_table(options, options_defaults)
-    if box.space[space_id] ~= nil and box.space[space_id].engine == 'vinyl' then
+    if space.engine == 'vinyl' then
         options_defaults = {
             page_size = box.cfg.vinyl_page_size,
             range_size = box.cfg.vinyl_range_size,
@@ -668,7 +687,7 @@ box.schema.index.create = function(space_id, name, options)
     local _index = box.space[box.schema.INDEX_ID]
     if _index.index.name:get{space_id, name} then
         if options.if_not_exists then
-            return box.space[space_id].index[name], "not created"
+            return space.index[name], "not created"
         else
             box.error(box.error.INDEX_EXISTS, name)
         end
@@ -689,7 +708,7 @@ box.schema.index.create = function(space_id, name, options)
         end
     end
     local parts, parts_can_be_simplified =
-        update_index_parts(space_id, options.parts)
+        update_index_parts(format, options.parts)
     -- create_index() options contains type, parts, etc,
     -- stored separately. Remove these members from index_opts
     local index_opts = {
@@ -722,17 +741,16 @@ box.schema.index.create = function(space_id, name, options)
     local sequence = options.sequence or nil -- ignore sequence = false
     if sequence ~= nil then
         if iid ~= 0 then
-            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, name, space.name,
                       "sequence cannot be used with a secondary key")
         end
         if #parts >= 1 and parts[1].type ~= 'integer' and
                            parts[1].type ~= 'unsigned' then
-            box.error(box.error.MODIFY_INDEX, name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, name, space.name,
                       "sequence cannot be used with a non-integer key")
         end
         if sequence == true then
-            sequence = box.schema.sequence.create(
-                box.space[space_id].name .. '_seq')
+            sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
             sequence_is_generated = true
         else
@@ -750,7 +768,7 @@ box.schema.index.create = function(space_id, name, options)
     if sequence ~= nil then
         _space_sequence:insert{space_id, sequence, sequence_is_generated}
     end
-    return box.space[space_id].index[name]
+    return space.index[name]
 end
 
 box.schema.index.drop = function(space_id, index_id)
@@ -778,11 +796,12 @@ box.schema.index.rename = function(space_id, index_id, name)
 end
 
 box.schema.index.alter = function(space_id, index_id, options)
-    if box.space[space_id] == nil then
+    local space = box.space[space_id]
+    if space == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
-    if box.space[space_id].index[index_id] == nil then
-        box.error(box.error.NO_SUCH_INDEX, index_id, box.space[space_id].name)
+    if space.index[index_id] == nil then
+        box.error(box.error.NO_SUCH_INDEX, index_id, space.name)
     end
     if options == nil then
         return
@@ -791,11 +810,12 @@ box.schema.index.alter = function(space_id, index_id, options)
     check_param_table(options, alter_index_template)
 
     if type(space_id) ~= "number" then
-        space_id = box.space[space_id].id
+        space_id = space.id
     end
     if type(index_id) ~= "number" then
-        index_id = box.space[space_id].index[index_id].id
+        index_id = space.index[index_id].id
     end
+    local format = space:format()
     local _index = box.space[box.schema.INDEX_ID]
     if options.id ~= nil then
         local can_update_field = {id = true, name = true, type = true }
@@ -855,7 +875,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options.parts then
         local parts_can_be_simplified
         parts, parts_can_be_simplified =
-            update_index_parts(space_id, options.parts)
+            update_index_parts(format, options.parts)
         -- save parts in old format if possible
         if parts_can_be_simplified then
             parts = simplify_index_parts(parts)
@@ -867,8 +887,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     local sequence_tuple
     if index_id ~= 0 then
         if sequence then
-            box.error(box.error.MODIFY_INDEX,
-                      options.name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, options.name, space.name,
                       "sequence cannot be used with a secondary key")
         end
         -- ignore 'sequence = false' for secondary indexes
@@ -878,15 +897,13 @@ box.schema.index.alter = function(space_id, index_id, options)
         if (sequence or (sequence ~= false and sequence_tuple ~= nil)) and
            #parts >= 1 and (parts[1].type or parts[1][2]) ~= 'integer' and
                            (parts[1].type or parts[1][2]) ~= 'unsigned' then
-            box.error(box.error.MODIFY_INDEX,
-                      options.name, box.space[space_id].name,
+            box.error(box.error.MODIFY_INDEX, options.name, space.name,
                       "sequence cannot be used with a non-integer key")
         end
     end
     if sequence == true then
         if sequence_tuple == nil or sequence_tuple[3] == false then
-            sequence = box.schema.sequence.create(
-                box.space[space_id].name .. '_seq')
+            sequence = box.schema.sequence.create(space.name .. '_seq')
             sequence = sequence.id
             sequence_is_generated = true
         else
@@ -977,8 +994,8 @@ local iterator_gen_luac = function(param, state)
 end
 
 -- global struct port instance to use by select()/get()
-local port = ffi.new('struct port')
-local port_entry_t = ffi.typeof('struct port_entry')
+local port_tuple = ffi.new('struct port_tuple')
+local port_tuple_entry_t = ffi.typeof('struct port_tuple_entry')
 
 -- Helper function to check space:method() usage
 local function check_space_arg(space, method)
@@ -1207,16 +1224,16 @@ function box.schema.space.bless(space)
         local key, key_end = tuple_encode(key)
         local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
-        builtin.port_create(port)
-        if builtin.box_select(port, index.space_id,
-            index.id, iterator, offset, limit, key, key_end) ~=0 then
-            builtin.port_destroy(port);
+        local port = ffi.cast('struct port *', port_tuple)
+
+        if builtin.box_select(index.space_id, index.id,
+            iterator, offset, limit, key, key_end, port) ~= 0 then
             return box.error()
         end
 
         local ret = {}
-        local entry = port.first
-        for i=1,tonumber(port.size),1 do
+        local entry = port_tuple.first
+        for i=1,tonumber(port_tuple.size),1 do
             ret[i] = tuple_bless(entry.tuple)
             entry = entry.next
         end
@@ -1505,7 +1522,7 @@ box.schema.sequence.create = function(name, opts)
         return box.sequence[name], 'not created'
     end
     local _sequence = box.space[box.schema.SEQUENCE_ID]
-    _sequence:auto_increment{session.uid(), name, opts.step, opts.min,
+    _sequence:auto_increment{session.euid(), name, opts.step, opts.min,
                              opts.max, opts.start, opts.cache, opts.cycle}
     return box.sequence[name]
 end
@@ -1537,11 +1554,7 @@ box.schema.sequence.drop = function(name, opts)
         end
         return
     end
-    local _priv = box.space[box.schema.PRIV_ID]
-    local privs = _priv.index.object:select{'sequence', id}
-    for k, tuple in pairs(privs) do
-        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-    end
+    revoke_object_privs('sequence', id)
     local _sequence = box.space[box.schema.SEQUENCE_ID]
     local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
     _sequence_data:delete{id}
@@ -1560,6 +1573,36 @@ local function privilege_resolve(privilege)
         end
         if string.find(privilege, 'execute') then
             numeric = numeric + 4
+        end
+        if string.find(privilege, 'session') then
+            numeric = numeric + 8
+        end
+        if string.find(privilege, 'usage') then
+            numeric = numeric + 16
+        end
+        if string.find(privilege, 'create') then
+            numeric = numeric + 32
+        end
+        if string.find(privilege, 'drop') then
+            numeric = numeric + 64
+        end
+        if string.find(privilege, 'alter') then
+            numeric = numeric + 128
+        end
+        if string.find(privilege, 'reference') then
+            numeric = numeric + 256
+        end
+        if string.find(privilege, 'trigger') then
+            numeric = numeric + 512
+        end
+        if string.find(privilege, 'insert') then
+            numeric = numeric + 1024
+        end
+        if string.find(privilege, 'update') then
+            numeric = numeric + 2048
+        end
+        if string.find(privilege, 'delete') then
+            numeric = numeric + 4096
         end
     else
         numeric = privilege
@@ -1585,6 +1628,36 @@ local function privilege_name(privilege)
     end
     if bit.band(privilege, 4) ~= 0 then
         table.insert(names, "execute")
+    end
+    if bit.band(privilege, 8) ~= 0 then
+        table.insert(names, "session")
+    end
+    if bit.band(privilege, 16) ~= 0 then
+        table.insert(names, "usage")
+    end
+    if bit.band(privilege, 32) ~= 0 then
+        table.insert(names, "create")
+    end
+    if bit.band(privilege, 64) ~= 0 then
+        table.insert(names, "drop")
+    end
+    if bit.band(privilege, 128) ~= 0 then
+        table.insert(names, "alter")
+    end
+    if bit.band(privilege, 256) ~= 0 then
+        table.insert(names, "reference")
+    end
+    if bit.band(privilege, 512) ~= 0 then
+        table.insert(names, "trigger")
+    end
+    if bit.band(privilege, 1024) ~= 0 then
+        table.insert(names, "insert")
+    end
+    if bit.band(privilege, 2048) ~= 0 then
+        table.insert(names, "update")
+    end
+    if bit.band(privilege, 4096) ~= 0 then
+        table.insert(names, "delete")
     end
     return table.concat(names, ",")
 end
@@ -1675,14 +1748,13 @@ box.schema.func.create = function(name, opts)
     opts = update_param_table(opts, { setuid = false, language = 'lua'})
     opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
-    _func:auto_increment{session.uid(), name, opts.setuid, opts.language}
+    _func:auto_increment{session.euid(), name, opts.setuid, opts.language}
 end
 
 box.schema.func.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
     local _func = box.space[box.schema.FUNC_ID]
-    local _priv = box.space[box.schema.PRIV_ID]
     local fid
     local tuple
     if type(name) == 'string' then
@@ -1699,10 +1771,7 @@ box.schema.func.drop = function(name, opts)
         end
         return
     end
-    local privs = _priv.index.object:select{'function', fid}
-    for k, tuple in pairs(privs) do
-        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-    end
+    revoke_object_privs('function', fid)
     _func:delete{fid}
 end
 
@@ -1750,7 +1819,7 @@ box.internal.collation.create = function(name, coll_type, locale, opts)
             return
         end
     end
-    _coll:auto_increment{name, session.uid(), coll_type, locale, opts}
+    _coll:auto_increment{name, session.euid(), coll_type, locale, opts}
 end
 
 box.internal.collation.drop = function(name, opts)
@@ -1828,9 +1897,14 @@ box.schema.user.create = function(name, opts)
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
     local _user = box.space[box.schema.USER_ID]
-    uid = _user:auto_increment{session.uid(), name, 'user', auth_mech_list}[1]
+    uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}[1]
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
+    -- we have to grant global privileges from setuid function, since
+    -- only admin has the ownership over universe and we don't have
+    -- grant option
+    box.session.su('admin', box.schema.user.grant, uid, 'session,usage', 'universe',
+                   nil, {if_not_exists=true})
 end
 
 box.schema.user.exists = function(name)
@@ -1857,7 +1931,7 @@ local function grant(uid, name, privilege, object_type,
     local oid = object_resolve(object_type, object_name)
     options = options or {}
     if options.grantor == nil then
-        options.grantor = session.uid()
+        options.grantor = session.euid()
     else
         options.grantor = user_or_role_resolve(options.grantor)
     end
@@ -1895,11 +1969,11 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
         privilege = 'execute'
     end
     local privilege_hex = checked_privilege(privilege, object_type)
-
     options = options or {}
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]
     local tuple = _priv:get{uid, object_type, oid}
+    -- system privileges of admin and guest can't be revoked
     if tuple == nil then
         if options.if_exists then
             return
@@ -1928,10 +2002,6 @@ end
 local function drop(uid, opts)
     -- recursive delete of user data
     local _priv = box.space[box.schema.PRIV_ID]
-    local privs = _priv.index.primary:select{uid}
-    for k, tuple in pairs(privs) do
-        revoke(uid, uid, tuple[5], tuple[3], tuple[4])
-    end
     local spaces = box.space[box.schema.SPACE_ID].index.owner:select{uid}
     for k, tuple in pairs(spaces) do
         box.space[tuple[1]]:drop()
@@ -1948,6 +2018,17 @@ local function drop(uid, opts)
     local sequences = box.space[box.schema.SEQUENCE_ID].index.owner:select{uid}
     for k, tuple in pairs(sequences) do
         box.schema.sequence.drop(tuple[1])
+    end
+    -- xxx: hack, we have to revoke session and usage privileges
+    -- of a user using a setuid function in absence of create/drop
+    -- privileges and grant option
+    if box.space._user:get{uid}[4] == 'user' then
+        box.session.su('admin', box.schema.user.revoke, uid,
+                       'session,usage', 'universe', nil, {if_exists = true})
+    end
+    local privs = _priv.index.primary:select{uid}
+    for k, tuple in pairs(privs) do
+        revoke(uid, uid, tuple[5], tuple[3], tuple[4])
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
@@ -1968,6 +2049,16 @@ box.schema.user.revoke = function(user_name, ...)
     return revoke(uid, user_name, ...)
 end
 
+box.schema.user.enable = function(user)
+    box.schema.user.grant(user, "session,usage", "universe", nil,
+                            {if_not_exists = true})
+end
+
+box.schema.user.disable = function(user)
+    box.schema.user.revoke(user, "session,usage", "universe", nil,
+                            {if_exists = true})
+end
+
 box.schema.user.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
@@ -1978,6 +2069,10 @@ box.schema.user.drop = function(name, opts)
             -- gh-1205: box.schema.user.info fails
             box.error(box.error.DROP_USER, name,
                       "the user or the role is a system")
+        end
+        if uid == box.session.uid() or uid == box.session.euid() then
+            box.error(box.error.DROP_USER, name,
+                      "the user is active in the current session")
         end
         return drop(uid, opts)
     end
@@ -2003,7 +2098,7 @@ end
 box.schema.user.info = function(user_name)
     local uid
     if user_name == nil then
-        uid = box.session.uid()
+        uid = box.session.euid()
     else
         uid = user_resolve(user_name)
         if uid == nil then
@@ -2034,7 +2129,7 @@ box.schema.role.create = function(name, opts)
         return
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.uid(), name, 'role', setmap({})}
+    _user:auto_increment{session.euid(), name, 'role', setmap({})}
 end
 
 box.schema.role.drop = function(name, opts)
@@ -2054,11 +2149,21 @@ box.schema.role.drop = function(name, opts)
     end
     return drop(uid)
 end
+
+function role_check_grant_revoke_of_sys_priv(priv)
+    priv = string.lower(priv)
+    if (type(priv) == 'string' and (priv:match("session") or priv:match("usage"))) or
+        (type(priv) == "number" and (bit.band(priv, 8) ~= 0 or bit.band(priv, 16) ~= 0)) then
+        box.error(box.error.GRANT, "system privilege can not be granted to role")
+    end
+end
+
 box.schema.role.grant = function(user_name, ...)
     local uid = role_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, user_name)
     end
+    role_check_grant_revoke_of_sys_priv(...)
     return grant(uid, user_name, ...)
 end
 box.schema.role.revoke = function(user_name, ...)
@@ -2066,6 +2171,7 @@ box.schema.role.revoke = function(user_name, ...)
     if uid == nil then
         box.error(box.error.NO_SUCH_ROLE, user_name)
     end
+    role_check_grant_revoke_of_sys_priv(...)
     return revoke(uid, user_name, ...)
 end
 box.schema.role.info = function(role_name)

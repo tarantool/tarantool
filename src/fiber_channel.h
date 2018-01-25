@@ -371,21 +371,7 @@ fiber_channel_is_closed(struct fiber_channel *ch)
 #if defined(__cplusplus)
 } /* extern "C" */
 
-#include "fiber.h"
-
-struct IpcChannelGuard {
-	struct fiber_channel *ch;
-
-	IpcChannelGuard(uint32_t size) {
-		ch = fiber_channel_new(size);
-		if (ch == NULL)
-			diag_raise();
-	}
-
-	~IpcChannelGuard() {
-		fiber_channel_delete(ch);
-	}
-};
+#include "diag.h"
 
 static inline void
 fiber_channel_get_xc(struct fiber_channel *ch, void **data)

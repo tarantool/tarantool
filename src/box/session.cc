@@ -35,6 +35,7 @@
 #include "trigger.h"
 #include "random.h"
 #include "user.h"
+#include "error.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -132,6 +133,11 @@ session_create_on_demand(int fd)
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
 	credentials_init(&s->credentials, admin_user->auth_token,
 			 admin_user->def->uid);
+	/*
+	 * At bootstrap, admin user access is not loaded yet (is
+	 * 0), force global access. @sa comment in session_init()
+	 */
+	s->credentials.universal_access = ~(user_access_t) 0;
 	fiber_set_session(fiber(), s);
 	fiber_set_user(fiber(), &s->credentials);
 	return s;
@@ -175,9 +181,9 @@ session_run_on_connect_triggers(struct session *session)
 }
 
 int
-session_run_on_auth_triggers(const char *user_name)
+session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 {
-	return trigger_run(&session_on_auth, (void *)user_name);
+	return trigger_run(&session_on_auth, (void *)result);
 }
 
 void
@@ -206,11 +212,24 @@ session_init()
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_init(&admin_credentials, ADMIN, ADMIN);
-	/**
+	/*
+	 * For performance reasons, we do not always explicitly
+	 * look at user id in access checks, while still need to
+	 * ensure 'admin' user has full access to all objects in
+	 * the universe.
+	 *
+	 * This is why  _priv table contains a record with grants
+	 * of full access to universe to 'admin' user.
+	 *
+	 * Making a record in _priv table is, however,
+	 * insufficient, since some checks are done at bootstrap,
+	 * before _priv table is read (e.g. when we're
+	 * bootstrapping a replica in applier fiber).
+	 *
 	 * When session_init() is called, admin user access is not
 	 * loaded yet (is 0), force global access.
 	 */
-	admin_credentials.universal_access = PRIV_ALL;
+	admin_credentials.universal_access = ~((user_access_t) 0);
 }
 
 void
@@ -218,4 +237,52 @@ session_free()
 {
 	if (session_registry)
 		mh_i64ptr_delete(session_registry);
+}
+
+int
+access_check_session(struct user *user)
+{
+	/*
+	 * Can't use here access_check_universe
+	 * as current_user is not assigned yet
+	 */
+	if (!(universe.access[user->auth_token].effective & PRIV_S)) {
+		diag_set(AccessDeniedError, priv_name(PRIV_S),
+			 schema_object_name(SC_UNIVERSE), "",
+			 user->def->name);
+		return -1;
+	}
+	return 0;
+}
+
+int
+access_check_universe(user_access_t access)
+{
+	struct credentials *credentials = effective_user();
+	access |= PRIV_U;
+	if ((credentials->universal_access & access) ^ access) {
+		/*
+		 * Access violation, report error.
+		 * The user may not exist already, if deleted
+		 * from a different connection.
+		 */
+		int denied_access = access & ((credentials->universal_access
+					       & access) ^ access);
+		struct user *user = user_find(credentials->uid);
+		if (user != NULL) {
+			diag_set(AccessDeniedError,
+				 priv_name(denied_access),
+				 schema_object_name(SC_UNIVERSE), "",
+				 user->def->name);
+		} else {
+			/*
+			 * The user may have been dropped, in
+			 * which case user_find() will set the
+			 * error.
+			 */
+			assert(!diag_is_empty(&fiber()->diag));
+		}
+		return -1;
+	}
+	return 0;
 }

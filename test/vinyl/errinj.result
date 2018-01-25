@@ -282,7 +282,23 @@ s:select()
   - [9, 'test str9']
   - [10, 'test str10']
 ...
+s:drop()
+---
+...
 -- gh-2871: check that long reads are logged
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+for i = 1, 10 do s:insert{i, i * 2} end
+---
+...
+box.snapshot()
+---
+- ok
+...
 too_long_threshold = box.cfg.too_long_threshold
 ---
 ...
@@ -292,6 +308,10 @@ box.cfg{too_long_threshold = 0.01}
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
 ---
 - ok
+...
+s:get(10) ~= nil
+---
+- true
 ...
 #s:select(5, {iterator = 'LE'}) == 5
 ---
@@ -305,9 +325,13 @@ test_run:cmd("push filter 'lsn=[0-9]+' to 'lsn=<lsn>'")
 ---
 - true
 ...
+test_run:grep_log('default', 'get.* took too long')
+---
+- get([10]) => INSERT([10, 20], lsn=<lsn>) took too long
+...
 test_run:grep_log('default', 'select.* took too long')
 ---
-- select([5], LE) => REPLACE([5, "test str5"], lsn=<lsn>) took too long
+- select([5], LE) => INSERT([5, 10], lsn=<lsn>) took too long
 ...
 test_run:cmd("clear filter")
 ---
@@ -767,10 +791,12 @@ end;
 ---
 ...
 function iterate_in_read_view()
+    box.begin()
     local i = create_iterator(space)
     last_read = i.next()
     fiber.sleep(100000)
     last_read = i.next()
+    box.commit()
 end;
 ---
 ...
@@ -814,11 +840,11 @@ space:drop()
 --
 -- Space drop in the middle of dump.
 --
-test_run:cmd("create server test with script='vinyl/low_quota_1.lua'")
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
 ---
 - true
 ...
-test_run:cmd("start server test")
+test_run:cmd("start server test with args='1048576'")
 ---
 - true
 ...
@@ -1125,6 +1151,9 @@ s:select{0}
 ---
 - - [0, 0]
 ...
+box.begin()
+---
+...
 errinj.set("ERRINJ_WAL_DELAY", true)
 ---
 - ok
@@ -1158,6 +1187,9 @@ state, value = gen(param, state)
 value
 ---
 - [2, 0]
+...
+box.commit()
+---
 ...
 s:drop()
 ---

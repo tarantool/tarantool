@@ -42,9 +42,6 @@
 #include "tuple.h"
 #include "tuple_compare.h"
 #include "iproto_constants.h"
-#include "small/lsregion.h"
-#include "small/slab_arena.h"
-#include "small/quota.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -73,25 +70,6 @@ extern struct tuple_format_vtab vy_tuple_format_vtab;
  * @see box.cfg.vinyl_max_tuple_size
  */
 extern size_t vy_max_tuple_size;
-
-/** Vinyl statement environment. */
-struct vy_stmt_env {
-	struct lsregion allocator;
-	struct slab_arena arena;
-	struct quota quota;
-};
-
-/**
- * Initialize vinyl statement environment.
- * @param env[out] Vinyl statement environment.
- * @param memory The maximum number of in-memory bytes that vinyl uses.
- * @param max_tuple_size Memory limit for a single vinyl statement.
- */
-void
-vy_stmt_env_create(struct vy_stmt_env *env, size_t memory);
-
-void
-vy_stmt_env_destroy(struct vy_stmt_env *env);
 
 /**
  * There are two groups of statements:
@@ -193,7 +171,8 @@ static inline uint64_t
 vy_stmt_column_mask(const struct tuple *tuple)
 {
 	enum iproto_type type = vy_stmt_type(tuple);
-	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_DELETE);
 	(void) type;
 	if (tuple_format(tuple)->extra_size == sizeof(uint64_t)) {
 		/* Tuple has column mask */
@@ -212,7 +191,8 @@ static inline void
 vy_stmt_set_column_mask(struct tuple *tuple, uint64_t column_mask)
 {
 	enum iproto_type type = vy_stmt_type(tuple);
-	assert(type == IPROTO_REPLACE || type == IPROTO_DELETE);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_DELETE);
 	assert(tuple_format(tuple)->extra_size == sizeof(uint64_t));
 	(void) type;
 	char *extra = (char *) tuple_extra(tuple);
@@ -334,12 +314,14 @@ static inline int
 vy_tuple_compare(const struct tuple *a, const struct tuple *b,
 		 const struct key_def *cmp_def)
 {
-	assert(vy_stmt_type(a) == IPROTO_REPLACE ||
-	       vy_stmt_type(a) == IPROTO_UPSERT ||
-	       vy_stmt_type(a) == IPROTO_DELETE);
-	assert(vy_stmt_type(b) == IPROTO_REPLACE ||
-	       vy_stmt_type(b) == IPROTO_UPSERT ||
-	       vy_stmt_type(b) == IPROTO_DELETE);
+	enum iproto_type type;
+	type = vy_stmt_type(a);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_UPSERT || type == IPROTO_DELETE);
+	type = vy_stmt_type(b);
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
+	       type == IPROTO_UPSERT || type == IPROTO_DELETE);
+	(void)type;
 	return tuple_compare(a, b, cmp_def);
 }
 
@@ -380,12 +362,8 @@ static inline int
 vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 		const struct key_def *key_def)
 {
-	bool a_is_tuple = vy_stmt_type(a) == IPROTO_REPLACE ||
-			  vy_stmt_type(a) == IPROTO_UPSERT ||
-			  vy_stmt_type(a) == IPROTO_DELETE;
-	bool b_is_tuple = vy_stmt_type(b) == IPROTO_REPLACE ||
-			  vy_stmt_type(b) == IPROTO_UPSERT ||
-			  vy_stmt_type(b) == IPROTO_DELETE;
+	bool a_is_tuple = vy_stmt_type(a) != IPROTO_SELECT;
+	bool b_is_tuple = vy_stmt_type(b) != IPROTO_SELECT;
 	if (a_is_tuple && b_is_tuple) {
 		return vy_tuple_compare(a, b, key_def);
 	} else if (a_is_tuple && !b_is_tuple) {
@@ -403,9 +381,7 @@ static inline int
 vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 			     const struct key_def *key_def)
 {
-	if (vy_stmt_type(stmt) == IPROTO_REPLACE ||
-	    vy_stmt_type(stmt) == IPROTO_UPSERT ||
-	    vy_stmt_type(stmt) == IPROTO_DELETE)
+	if (vy_stmt_type(stmt) != IPROTO_SELECT)
 		return vy_tuple_compare_with_raw_key(stmt, key, key_def);
 	return key_compare(tuple_data(stmt), key, key_def);
 }
@@ -497,6 +473,20 @@ struct tuple *
 vy_stmt_new_replace(struct tuple_format *format, const char *tuple,
                     const char *tuple_end);
 
+/**
+ * Create the INSERT statement from raw MessagePack data.
+ * @param format Format of a tuple for offsets generating.
+ * @param tuple_begin MessagePack data that contain an array of fields WITH the
+ *                    array header.
+ * @param tuple_end End of the array that begins from @param tuple_begin.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+struct tuple *
+vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end);
+
  /**
  * Create the UPSERT statement from raw MessagePack data.
  * @param tuple_begin MessagePack data that contain an array of fields WITH the
@@ -587,6 +577,25 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
 }
 
 /**
+ * Extract the key from a tuple by the given key definition
+ * and store the result in a SELECT statement allocated with
+ * malloc().
+ */
+struct tuple *
+vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+		    struct tuple_format *format);
+
+/**
+ * Extract the key from msgpack by the given key definition
+ * and store the result in a SELECT statement allocated with
+ * malloc().
+ */
+struct tuple *
+vy_stmt_extract_key_raw(const char *data, const char *data_end,
+			const struct key_def *key_def,
+			struct tuple_format *format);
+
+/**
  * Encode vy_stmt for a primary key as xrow_header
  *
  * @param value statement to encode
@@ -667,22 +676,6 @@ vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
  */
 struct tuple_format *
 vy_tuple_format_new_upsert(struct tuple_format *mem_format);
-
-
-/**
- * Extract a key from a xrow-stored vy_stmt.
- * @param xrow xrow with encoded vy_stmt
- * @param key_def definition of a key to extract
- *
- * @retval not NULL Success.
- * @retval     NULL Error.
- */
-char *
-vy_stmt_extract_key(struct xrow_header *xrow,
-		    const struct key_def *key_def,
-		    struct tuple_format *mem_format,
-		    struct tuple_format *upsert_format,
-		    bool is_primary);
 
 /**
  * Check if a key of @a tuple contains NULL.

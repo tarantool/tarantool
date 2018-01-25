@@ -30,6 +30,7 @@
  */
 #include "index_def.h"
 #include "schema_def.h"
+#include "identifier.h"
 
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
@@ -39,8 +40,8 @@ const struct index_opts index_opts_default = {
 	/* .unique              = */ true,
 	/* .dimension           = */ 2,
 	/* .distance            = */ RTREE_INDEX_DISTANCE_TYPE_EUCLID,
-	/* .range_size          = */ 0,
-	/* .page_size           = */ 0,
+	/* .range_size          = */ 1073741824,
+	/* .page_size           = */ 8192,
 	/* .run_count_per_level = */ 2,
 	/* .run_size_ratio      = */ 3.5,
 	/* .bloom_fpr           = */ 0.05,
@@ -82,8 +83,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		diag_set(OutOfMemory, name_len + 1, "malloc", "index_def name");
 		return NULL;
 	}
-	if (!identifier_is_valid(def->name, name_len)) {
-		diag_set(ClientError, ER_IDENTIFIER, def->name);
+	if (identifier_check(def->name, name_len)) {
 		index_def_delete(def);
 		return NULL;
 	}
@@ -167,10 +167,8 @@ index_def_swap(struct index_def *def1, struct index_def *def2)
 	struct index_def tmp_def = *def1;
 	memcpy(def1, def2, offsetof(struct index_def, key_def));
 	memcpy(def2, &tmp_def, offsetof(struct index_def, key_def));
-	/*
-	 * index_def_swap() is used only during alter to modify
-	 * index metadata.
-	 */
+	key_def_swap(def1->key_def, def2->key_def);
+	key_def_swap(def1->cmp_def, def2->cmp_def);
 }
 
 /** Free a key definition. */

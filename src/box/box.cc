@@ -36,6 +36,7 @@
 #include "fiber_pool.h"
 #include <say.h>
 #include <scoped_guard.h>
+#include "identifier.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -57,7 +58,6 @@
 #include "txn.h"
 #include "user.h"
 #include "cfg.h"
-#include "iobuf.h"
 #include "coio.h"
 #include "replication.h" /* replica */
 #include "title.h"
@@ -105,11 +105,13 @@ static struct gc_consumer *backup_gc;
 static bool is_box_configured = false;
 static bool is_ro = true;
 
+static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
+
 /**
- * box.cfg{} will fail if one or more replicas can't be reached
- * within the given period.
+ * Min number of masters to connect for configuration to succeed.
+ * If set to REPLICATION_CONNECT_QUORUM_ALL, wait for all masters.
  */
-static double replication_cfg_timeout = 1.0; /* seconds */
+static int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 
 /* Use the shared instance of xstream for all appliers */
 static struct xstream join_stream;
@@ -265,10 +267,11 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
-	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find_xc(request->space_id);
-	if (process_rw(request, space, NULL) != 0) {
-		say_error("error applying row: %s", request_str(request));
+	struct request request;
+	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
+	struct space *space = space_cache_find_xc(request.space_id);
+	if (process_rw(&request, space, NULL) != 0) {
+		say_error("error applying row: %s", request_str(&request));
 		diag_raise();
 	}
 }
@@ -306,10 +309,11 @@ static void
 apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	(void) stream;
-	struct request *request = xrow_decode_dml_gc_xc(row);
-	struct space *space = space_cache_find_xc(request->space_id);
+	struct request request;
+	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
+	struct space *space = space_cache_find_xc(request.space_id);
 	/* no access checks here - applier always works with admin privs */
-	space_apply_initial_join_row_xc(space, request);
+	space_apply_initial_join_row_xc(space, &request);
 }
 
 /* {{{ configuration bindings */
@@ -317,12 +321,15 @@ apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
 static void
 box_check_log(const char *log)
 {
-	char *error_msg;
 	if (log == NULL)
 		return;
-	if (say_check_init_str(log, &error_msg) == -1) {
-		auto guard = make_scoped_guard([=]{ free(error_msg); });
-		tnt_raise(ClientError, ER_CFG, "log", error_msg);
+	if (say_check_init_str(log) == -1) {
+		if (diag_last_error(diag_get())->type ==
+		    &type_IllegalParams) {
+			tnt_raise(ClientError, ER_CFG, "log",
+				 diag_last_error(diag_get())->errmsg);
+		}
+		diag_raise();
 	}
 }
 
@@ -369,6 +376,36 @@ box_check_replication_timeout(void)
 			  "the value must be greather than 0");
 	}
 	return timeout;
+}
+
+static int
+box_check_replication_connect_quorum(void)
+{
+	int quorum = cfg_geti_default("replication_connect_quorum",
+				      REPLICATION_CONNECT_QUORUM_ALL);
+	if (quorum < 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_connect_quorum",
+			  "the value must be greater or equal to 0");
+	}
+	return quorum;
+}
+
+static void
+box_check_instance_uuid(struct tt_uuid *uuid)
+{
+	*uuid = uuid_nil;
+	const char *uuid_str = cfg_gets("instance_uuid");
+	if (uuid_str != NULL && tt_uuid_from_string(uuid_str, uuid) != 0)
+		tnt_raise(ClientError, ER_CFG, "instance_uuid", uuid_str);
+}
+
+static void
+box_check_replicaset_uuid(struct tt_uuid *uuid)
+{
+	*uuid = uuid_nil;
+	const char *uuid_str = cfg_gets("replicaset_uuid");
+	if (uuid_str != NULL && tt_uuid_from_string(uuid_str, uuid) != 0)
+		tnt_raise(ClientError, ER_CFG, "replicaset_uuid", uuid_str);
 }
 
 static enum wal_mode
@@ -426,11 +463,15 @@ box_check_wal_max_size(int64_t wal_max_size)
 void
 box_check_config()
 {
+	struct tt_uuid uuid;
 	box_check_log(cfg_gets("log"));
 	box_check_log_format(cfg_gets("log_format"));
 	box_check_uri(cfg_gets("listen"), "listen");
+	box_check_instance_uuid(&uuid);
+	box_check_replicaset_uuid(&uuid);
 	box_check_replication();
 	box_check_replication_timeout();
+	box_check_replication_connect_quorum();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
@@ -488,7 +529,7 @@ cfg_get_replication(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication(double timeout)
+box_sync_replication(double timeout, int quorum)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication(&count);
@@ -500,8 +541,7 @@ box_sync_replication(double timeout)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	applier_connect_all(appliers, count, timeout);
-	replicaset_update(appliers, count);
+	replicaset_connect(appliers, count, quorum, timeout);
 
 	guard.is_active = false;
 }
@@ -520,18 +560,22 @@ box_set_replication(void)
 
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_cfg_timeout);
-	replicaset_foreach(replica) {
-		if (replica->applier != NULL)
-			applier_resume(replica->applier);
-	}
+	box_sync_replication(replication_connect_quorum_timeout(),
+			     replication_connect_quorum);
+	/* Follow replica */
+	replicaset_follow();
 }
 
 void
 box_set_replication_timeout(void)
 {
-	double timeout = box_check_replication_timeout();
-	replication_cfg_timeout = relay_timeout = applier_timeout = timeout;
+	replication_timeout = box_check_replication_timeout();
+}
+
+void
+box_set_replication_connect_quorum(void)
+{
+	replication_connect_quorum = box_check_replication_connect_quorum();
 }
 
 void
@@ -603,7 +647,7 @@ box_set_readahead(void)
 {
 	int readahead = cfg_geti("readahead");
 	box_check_readahead(readahead);
-	iobuf_readahead = readahead;
+	iproto_readahead = readahead;
 }
 
 void
@@ -653,13 +697,10 @@ int
 boxk(int type, uint32_t space_id, const char *format, ...)
 {
 	va_list ap;
-	struct request *request;
-	request = region_alloc_object(&fiber()->gc, struct request);
-	if (request == NULL)
-		return -1;
-	memset(request, 0, sizeof(*request));
-	request->type = type;
-	request->space_id = space_id;
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = type;
+	request.space_id = space_id;
 	va_start(ap, format);
 	size_t buf_size = mp_vformat(NULL, 0, format, ap);
 	char *buf = (char *)region_alloc(&fiber()->gc, buf_size);
@@ -675,21 +716,21 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	switch (type) {
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
-		request->tuple = data;
-		request->tuple_end = data_end;
+		request.tuple = data;
+		request.tuple_end = data_end;
 		break;
 	case IPROTO_DELETE:
-		request->key = data;
-		request->key_end = data_end;
+		request.key = data;
+		request.key_end = data_end;
 		break;
 	case IPROTO_UPDATE:
-		request->key = data;
+		request.key = data;
 		mp_next(&data);
-		request->key_end = data;
-		request->tuple = data;
+		request.key_end = data;
+		request.tuple = data;
 		mp_next(&data);
-		request->tuple_end = data;
-		request->index_base = 0;
+		request.tuple_end = data;
+		request.index_base = 0;
 		break;
 	default:
 		unreachable();
@@ -697,13 +738,13 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)
 		return -1;
-	return process_rw(request, space, NULL);
+	return process_rw(&request, space, NULL);
 }
 
 int
 box_return_tuple(box_function_ctx_t *ctx, box_tuple_t *tuple)
 {
-	return port_add_tuple(ctx->port, tuple);
+	return port_tuple_add(ctx->port, tuple);
 }
 
 /* schema_find_id()-like method using only public API */
@@ -773,9 +814,10 @@ box_process1(struct request *request, box_tuple_t **result)
 }
 
 int
-box_select(struct port *port, uint32_t space_id, uint32_t index_id,
+box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
-	   const char *key, const char *key_end)
+	   const char *key, const char *key_end,
+	   struct port *port)
 {
 	(void)key_end;
 
@@ -821,6 +863,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	int rc = 0;
 	uint32_t found = 0;
 	struct tuple *tuple;
+	port_tuple_create(port);
 	while (found < limit) {
 		rc = iterator_next(it, &tuple);
 		if (rc != 0 || tuple == NULL)
@@ -829,7 +872,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 			offset--;
 			continue;
 		}
-		rc = port_add_tuple(port, tuple);
+		rc = port_tuple_add(port, tuple);
 		if (rc != 0)
 			break;
 		found++;
@@ -837,6 +880,7 @@ box_select(struct port *port, uint32_t space_id, uint32_t index_id,
 	iterator_delete(it);
 
 	if (rc != 0) {
+		port_destroy(port);
 		txn_rollback_stmt();
 		return -1;
 	}
@@ -849,14 +893,13 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	   box_tuple_t **result)
 {
 	mp_tuple_assert(tuple, tuple_end);
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	memset(request, 0, sizeof(*request));
-	request->type = IPROTO_INSERT;
-	request->space_id = space_id;
-	request->tuple = tuple;
-	request->tuple_end = tuple_end;
-	return box_process1(request, result);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_INSERT;
+	request.space_id = space_id;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	return box_process1(&request, result);
 }
 
 int
@@ -864,14 +907,13 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
 	    box_tuple_t **result)
 {
 	mp_tuple_assert(tuple, tuple_end);
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	memset(request, 0, sizeof(*request));
-	request->type = IPROTO_REPLACE;
-	request->space_id = space_id;
-	request->tuple = tuple;
-	request->tuple_end = tuple_end;
-	return box_process1(request, result);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_REPLACE;
+	request.space_id = space_id;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	return box_process1(&request, result);
 }
 
 int
@@ -879,15 +921,14 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
 	   const char *key_end, box_tuple_t **result)
 {
 	mp_tuple_assert(key, key_end);
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	memset(request, 0, sizeof(*request));
-	request->type = IPROTO_DELETE;
-	request->space_id = space_id;
-	request->index_id = index_id;
-	request->key = key;
-	request->key_end = key_end;
-	return box_process1(request, result);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_DELETE;
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.key = key;
+	request.key_end = key_end;
+	return box_process1(&request, result);
 }
 
 int
@@ -897,19 +938,18 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
 {
 	mp_tuple_assert(key, key_end);
 	mp_tuple_assert(ops, ops_end);
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	memset(request, 0, sizeof(*request));
-	request->type = IPROTO_UPDATE;
-	request->space_id = space_id;
-	request->index_id = index_id;
-	request->key = key;
-	request->key_end = key_end;
-	request->index_base = index_base;
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_UPDATE;
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.key = key;
+	request.key_end = key_end;
+	request.index_base = index_base;
 	/** Legacy: in case of update, ops are passed in in request tuple */
-	request->tuple = ops;
-	request->tuple_end = ops_end;
-	return box_process1(request, result);
+	request.tuple = ops;
+	request.tuple_end = ops_end;
+	return box_process1(&request, result);
 }
 
 int
@@ -919,18 +959,17 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 {
 	mp_tuple_assert(ops, ops_end);
 	mp_tuple_assert(tuple, tuple_end);
-	struct request *request;
-	request = region_alloc_object_xc(&fiber()->gc, struct request);
-	memset(request, 0, sizeof(*request));
-	request->type = IPROTO_UPSERT;
-	request->space_id = space_id;
-	request->index_id = index_id;
-	request->ops = ops;
-	request->ops_end = ops_end;
-	request->tuple = tuple;
-	request->tuple_end = tuple_end;
-	request->index_base = index_base;
-	return box_process1(request, result);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_UPSERT;
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.ops = ops;
+	request.ops_end = ops_end;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	request.index_base = index_base;
+	return box_process1(&request, result);
 }
 
 /**
@@ -992,7 +1031,7 @@ sequence_data_update(uint32_t seq_id, int64_t value)
 			 mp_encode_uint(tuple_buf_end, value));
 	assert(tuple_buf_end < tuple_buf + tuple_buf_size);
 
-	struct credentials *orig_credentials = current_user();
+	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
 
 	int rc = box_replace(BOX_SEQUENCE_DATA_ID,
@@ -1017,7 +1056,7 @@ sequence_data_delete(uint32_t seq_id)
 	key_buf_end = mp_encode_uint(key_buf_end, seq_id);
 	assert(key_buf_end < key_buf + key_buf_size);
 
-	struct credentials *orig_credentials = current_user();
+	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
 
 	int rc = box_delete(BOX_SEQUENCE_DATA_ID, 0,
@@ -1183,7 +1222,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
-	access_check_universe(PRIV_R);
+	access_check_universe_xc(PRIV_R);
 	access_check_space_xc(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
 	/* Check that we actually can register a new replica */
@@ -1286,7 +1325,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
-	access_check_universe(PRIV_R);
+	access_check_universe_xc(PRIV_R);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
@@ -1296,8 +1335,8 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 */
 	if (!tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
 		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-			  tt_uuid_str(&replicaset_uuid),
-			  tt_uuid_str(&REPLICASET_UUID));
+			  tt_uuid_str(&REPLICASET_UUID),
+			  tt_uuid_str(&replicaset_uuid));
 	}
 
 	/* Check replica uuid */
@@ -1352,11 +1391,14 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 
 /** Insert a new cluster into _schema */
 static void
-box_set_replicaset_uuid()
+box_set_replicaset_uuid(const struct tt_uuid *replicaset_uuid)
 {
 	tt_uuid uu;
-	/* Generate a new replica set UUID */
-	tt_uuid_create(&uu);
+	/* Use UUID from the config or generate a new one */
+	if (!tt_uuid_is_nil(replicaset_uuid))
+		uu = *replicaset_uuid;
+	else
+		tt_uuid_create(&uu);
 	/* Save replica set UUID in _schema */
 	if (boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "[%s%s]", "cluster",
 		 tt_uuid_str(&uu)))
@@ -1385,6 +1427,7 @@ box_free(void)
 		gc_free();
 		engine_shutdown();
 		wal_thread_stop();
+		identifier_destroy();
 	}
 }
 
@@ -1425,7 +1468,7 @@ engine_init()
  * Initialize the first replica of a new replica set.
  */
 static void
-bootstrap_master(void)
+bootstrap_master(const struct tt_uuid *replicaset_uuid)
 {
 	engine_bootstrap_xc();
 
@@ -1448,8 +1491,8 @@ bootstrap_master(void)
 		assert(replica->id == replica_id);
 	}
 
-	/* Generate UUID of a new replica set */
-	box_set_replicaset_uuid();
+	/* Set UUID of a new replica set */
+	box_set_replicaset_uuid(replicaset_uuid);
 }
 
 /**
@@ -1514,7 +1557,7 @@ bootstrap_from_master(struct replica *master)
  * instance
  */
 static void
-bootstrap()
+bootstrap(const struct tt_uuid *replicaset_uuid)
 {
 	/* Use the first replica by URI as a bootstrap leader */
 	struct replica *master = replicaset_first();
@@ -1522,8 +1565,15 @@ bootstrap()
 
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
 		bootstrap_from_master(master);
+		/* Check replica set UUID */
+		if (!tt_uuid_is_nil(replicaset_uuid) &&
+		    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
+			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+				  tt_uuid_str(replicaset_uuid),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
 	} else {
-		bootstrap_master();
+		bootstrap_master(replicaset_uuid);
 	}
 	if (engine_begin_checkpoint() ||
 	    engine_commit_checkpoint(&replicaset_vclock))
@@ -1578,6 +1628,7 @@ box_cfg_xc(void)
 	engine_init();
 	if (module_init() != 0)
 		diag_raise();
+	identifier_init();
 	schema_init();
 	replication_init();
 	port_init();
@@ -1586,9 +1637,14 @@ box_cfg_xc(void)
 
 	title("loading");
 
+	struct tt_uuid instance_uuid, replicaset_uuid;
+	box_check_instance_uuid(&instance_uuid);
+	box_check_replicaset_uuid(&replicaset_uuid);
+
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	box_set_replication_connect_quorum();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
@@ -1682,6 +1738,20 @@ box_cfg_xc(void)
 		recovery_finalize(recovery, &wal_stream.base);
 		engine_end_recovery_xc();
 
+		/* Check replica set and instance UUID. */
+		if (!tt_uuid_is_nil(&instance_uuid) &&
+		    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
+			tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
+				  tt_uuid_str(&instance_uuid),
+				  tt_uuid_str(&INSTANCE_UUID));
+		}
+		if (!tt_uuid_is_nil(&replicaset_uuid) &&
+		    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
+			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+				  tt_uuid_str(&replicaset_uuid),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
+
 		/* Clear the pointer to journal before it goes out of scope */
 		journal_set(NULL);
 		/*
@@ -1695,20 +1765,32 @@ box_cfg_xc(void)
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
 		/* Wait for the cluster to start up */
-		box_sync_replication(TIMEOUT_INFINITY);
+		box_sync_replication(TIMEOUT_INFINITY,
+				     replication_connect_quorum);
 	} else {
-		tt_uuid_create(&INSTANCE_UUID);
+		if (!tt_uuid_is_nil(&instance_uuid))
+			INSTANCE_UUID = instance_uuid;
+		else
+			tt_uuid_create(&INSTANCE_UUID);
 		/*
 		 * Begin listening on the socket to enable
 		 * master-master replication leader election.
 		 */
 		box_listen();
 
-		/* Wait for the  cluster to start up */
-		box_sync_replication(TIMEOUT_INFINITY);
+		/*
+		 * Wait for the cluster to start up.
+		 *
+		 * Note, when bootstrapping a new instance, we have to
+		 * connect to all masters to make sure all replicas
+		 * receive the same replica set UUID when a new cluster
+		 * is deployed.
+		 */
+		box_sync_replication(TIMEOUT_INFINITY,
+				     REPLICATION_CONNECT_QUORUM_ALL);
 
 		/* Bootstrap a new master */
-		bootstrap();
+		bootstrap(&replicaset_uuid);
 	}
 	fiber_gc();
 
@@ -1732,10 +1814,7 @@ box_cfg_xc(void)
 	rmean_cleanup(rmean_box);
 
 	/* Follow replica */
-	replicaset_foreach(replica) {
-		if (replica->applier != NULL)
-			applier_resume(replica->applier);
-	}
+	replicaset_follow();
 
 	sql_init();
 

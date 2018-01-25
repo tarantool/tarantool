@@ -65,8 +65,6 @@ extern "C" {
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
-#define ARRAY_LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
-
 /* Macros to define enum and corresponding strings. */
 #define ENUM0_MEMBER(s, ...) s,
 #define ENUM_MEMBER(s, v, ...) s = v,
@@ -502,7 +500,7 @@ tt_static_buf(void)
  * Return a null-terminated string for \a str of length \a len
  */
 static inline const char *
-tt_cstr(const char *str, uint32_t len)
+tt_cstr(const char *str, size_t len)
 {
 	char *buf = tt_static_buf();
 	len = MIN(len, TT_STATIC_BUF_LEN - 1);

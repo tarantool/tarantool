@@ -9,6 +9,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
+include_directories(${ICU_INCLUDE_DIRS})
 
 add_library(unit STATIC unit.c)
 
@@ -101,7 +102,7 @@ target_link_libraries(cbus_stress.test core stat)
 add_executable(cbus.test cbus.c)
 target_link_libraries(cbus.test core unit stat)
 
-add_executable(coio.test coio.cc ${CMAKE_SOURCE_DIR}/src/iobuf.cc)
+add_executable(coio.test coio.cc)
 target_link_libraries(coio.test core eio bit uri unit)
 
 if (ENABLE_BUNDLED_MSGPUCK)
@@ -153,11 +154,11 @@ set(ITERATOR_TEST_LIBS core tuple xrow unit)
 add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES})
 target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS})
 
-add_executable(vy_point_iterator.test
-    vy_point_iterator.c
+add_executable(vy_point_lookup.test
+    vy_point_lookup.c
     vy_iterators_helper.c
     vy_log_stub.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_point_iterator.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_point_lookup.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
@@ -170,8 +171,9 @@ add_executable(vy_point_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c
     ${PROJECT_SOURCE_DIR}/src/box/index_def.c
     ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
+    ${PROJECT_SOURCE_DIR}/src/box/identifier.c
 )
-target_link_libraries(vy_point_iterator.test core tuple xrow xlog unit)
+target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit)
 
 add_executable(column_mask.test
     column_mask.c)

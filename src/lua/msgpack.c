@@ -41,7 +41,6 @@
 #include <small/region.h>
 #include <small/ibuf.h>
 
-#include <iobuf.h>
 #include <fiber.h>
 
 void
@@ -90,6 +89,9 @@ mpstream_reset(struct mpstream *stream)
 	stream->end = stream->pos + size;
 }
 
+
+static uint32_t CTID_CHAR_PTR;
+static uint32_t CTID_STRUCT_IBUF;
 
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
@@ -430,13 +432,23 @@ static int
 lua_msgpack_encode(lua_State *L)
 {
 	int index = lua_gettop(L);
-	if (index != 1)
-		luaL_error(L, "msgpack.encode: a Lua object expected");
+	if (index < 1)
+		return luaL_error(L, "msgpack.encode: a Lua object expected");
+
+	struct ibuf *buf;
+	if (index > 1) {
+		uint32_t ctypeid;
+		buf = luaL_checkcdata(L, 2, &ctypeid);
+		if (ctypeid != CTID_STRUCT_IBUF)
+			return luaL_error(L, "msgpack.encode: argument 2 "
+					  "must be of type 'struct ibuf'");
+	} else {
+		buf = tarantool_lua_ibuf;
+		ibuf_reset(buf);
+	}
+	size_t used = ibuf_used(buf);
 
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
-
-	struct ibuf *buf = tarantool_lua_ibuf;
-	ibuf_reset(buf);
 
 	struct mpstream stream;
 	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
@@ -445,35 +457,90 @@ lua_msgpack_encode(lua_State *L)
 	luamp_encode(L, cfg, &stream, 1);
 	mpstream_flush(&stream);
 
-	lua_pushlstring(L, buf->buf, ibuf_used(buf));
-	ibuf_reinit(buf);
+	if (index > 1) {
+		lua_pushinteger(L, ibuf_used(buf) - used);
+	} else {
+		lua_pushlstring(L, buf->buf, ibuf_used(buf));
+		ibuf_reinit(buf);
+	}
 	return 1;
+}
+
+static int
+lua_msgpack_decode_cdata(lua_State *L, bool check)
+{
+	uint32_t ctypeid;
+	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
+	if (ctypeid != CTID_CHAR_PTR) {
+		return luaL_error(L, "msgpack.decode: "
+				  "a Lua string or 'char *' expected");
+	}
+	if (check) {
+		size_t data_len = luaL_checkinteger(L, 2);
+		const char *p = data;
+		if (mp_check(&p, data + data_len) != 0)
+			return luaL_error(L, "msgpack.decode: invalid MsgPack");
+	}
+	struct luaL_serializer *cfg = luaL_checkserializer(L);
+	luamp_decode(L, cfg, &data);
+	*(const char **)luaL_pushcdata(L, ctypeid) = data;
+	return 2;
+}
+
+static int
+lua_msgpack_decode_string(lua_State *L, bool check)
+{
+	ptrdiff_t offset = 0;
+	size_t data_len;
+	const char *data = lua_tolstring(L, 1, &data_len);
+	if (lua_gettop(L) > 1) {
+		offset = luaL_checkinteger(L, 2) - 1;
+		if (offset < 0 || (size_t)offset >= data_len)
+			return luaL_error(L, "msgpack.decode: "
+					  "offset is out of bounds");
+	}
+	if (check) {
+		const char *p = data + offset;
+		if (mp_check(&p, data + data_len) != 0)
+			return luaL_error(L, "msgpack.decode: invalid MsgPack");
+	}
+	struct luaL_serializer *cfg = luaL_checkserializer(L);
+	const char *p = data + offset;
+	luamp_decode(L, cfg, &p);
+	lua_pushinteger(L, p - data + 1);
+	return 2;
 }
 
 static int
 lua_msgpack_decode(lua_State *L)
 {
 	int index = lua_gettop(L);
-	if (index != 2 && index != 1 && lua_type(L, 1) != LUA_TSTRING)
-		return luaL_error(L, "msgpack.decode: a Lua string expected");
+	int type = index >= 1 ? lua_type(L, 1) : LUA_TNONE;
+	switch (type) {
+	case LUA_TCDATA:
+		return lua_msgpack_decode_cdata(L, true);
+	case LUA_TSTRING:
+		return lua_msgpack_decode_string(L, true);
+	default:
+		return luaL_error(L, "msgpack.decode: "
+				  "a Lua string or 'char *' expected");
+	}
+}
 
-	size_t data_len;
-	uint32_t offset = index > 1 ? lua_tointeger(L, 2) - 1 : 0;
-	const char *data = lua_tolstring(L, 1, &data_len);
-	if (offset >= data_len)
-		luaL_error(L, "msgpack.decode: offset is out of bounds");
-	const char *end = data + data_len;
-
-	const char *b = data + offset;
-	if (mp_check(&b, end))
-		return luaL_error(L, "msgpack.decode: invalid MsgPack");
-
-	struct luaL_serializer *cfg = luaL_checkserializer(L);
-
-	b = data + offset;
-	luamp_decode(L, cfg, &b);
-	lua_pushinteger(L, b - data + 1);
-	return 2;
+static int
+lua_msgpack_decode_unchecked(lua_State *L)
+{
+	int index = lua_gettop(L);
+	int type = index >= 1 ? lua_type(L, 1) : LUA_TNONE;
+	switch (type) {
+	case LUA_TCDATA:
+		return lua_msgpack_decode_cdata(L, false);
+	case LUA_TSTRING:
+		return lua_msgpack_decode_string(L, false);
+	default:
+		return luaL_error(L, "msgpack.decode: "
+				  "a Lua string or 'char *' expected");
+	}
 }
 
 static int
@@ -481,6 +548,9 @@ lua_ibuf_msgpack_decode(lua_State *L)
 {
 	uint32_t ctypeid = 0;
 	const char *rpos = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
+	if (rpos == NULL) {
+		luaL_error(L, "msgpack.ibuf_decode: rpos is null");
+	}
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 	luamp_decode(L, cfg, &rpos);
 	*(const char **)luaL_pushcdata(L, ctypeid) = rpos;
@@ -494,9 +564,10 @@ lua_msgpack_new(lua_State *L);
 static const luaL_Reg msgpacklib[] = {
 	{ "encode", lua_msgpack_encode },
 	{ "decode", lua_msgpack_decode },
+	{ "decode_unchecked", lua_msgpack_decode_unchecked },
 	{ "ibuf_decode", lua_ibuf_msgpack_decode },
 	{ "new", lua_msgpack_new },
-	{ NULL, NULL}
+	{ NULL, NULL }
 };
 
 static int
@@ -509,6 +580,13 @@ lua_msgpack_new(lua_State *L)
 LUALIB_API int
 luaopen_msgpack(lua_State *L)
 {
+	int rc = luaL_cdef(L, "struct ibuf;");
+	assert(rc == 0);
+	(void) rc;
+	CTID_STRUCT_IBUF = luaL_ctypeid(L, "struct ibuf");
+	assert(CTID_STRUCT_IBUF != 0);
+	CTID_CHAR_PTR = luaL_ctypeid(L, "char *");
+	assert(CTID_CHAR_PTR != 0);
 	luaL_msgpack_default = luaL_newserializer(L, "msgpack", msgpacklib);
 	return 1;
 }

@@ -29,15 +29,13 @@
  * SUCH DAMAGE.
  */
 #include "schema.h"
-#include "user_def.h"
-#include "engine.h"
-#include "index.h"
 #include "func.h"
 #include "sequence.h"
 #include "tuple.h"
 #include "assoc.h"
 #include "alter.h"
 #include "scoped_guard.h"
+#include "user.h"
 #include <stdio.h>
 /**
  * @module Data Dictionary
@@ -524,3 +522,46 @@ sequence_cache_delete(uint32_t id)
 		free(seq);
 	}
 }
+
+const char *
+schema_find_name(enum schema_object_type type, uint32_t object_id)
+{
+	switch (type) {
+	case SC_UNIVERSE:
+		return "";
+	case SC_SPACE:
+		{
+			struct space *space = space_by_id(object_id);
+			if (space == NULL)
+				break;
+			return space->def->name;
+		}
+	case SC_FUNCTION:
+		{
+			struct func *func = func_by_id(object_id);
+			if (func == NULL)
+				break;
+			return func->def->name;
+		}
+	case SC_SEQUENCE:
+		{
+			struct sequence *seq = sequence_by_id(object_id);
+			if (seq == NULL)
+				break;
+			return seq->def->name;
+		}
+	case SC_ROLE:
+	case SC_USER:
+		{
+			struct user *role = user_by_id(object_id);
+			if (role == NULL)
+				break;
+			return role->def->name;
+		}
+	default:
+		break;
+	}
+	assert(false);
+	return "(nil)";
+}
+

@@ -76,13 +76,13 @@ struct errcode_record {
 	/* 21 */_(ER_PROC_RET,			"msgpack.encode: can not encode Lua type '%s'") \
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		"Tuple/Key must be MsgPack array") \
 	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %u type does not match one required by operation: expected %s") \
-	/* 24 */_(ER_FIELD_TYPE_MISMATCH,	"Ambiguous field type, field %u. Requested type is %s but the field has previously been defined as %s") \
+	/* 24 */_(ER_INDEX_PART_TYPE_MISMATCH,	"Field %s has type '%s' in one index, but type '%s' in another") \
 	/* 25 */_(ER_SPLICE,			"SPLICE error on field %u: %s") \
 	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %u does not match field type: expected %s") \
-	/* 27 */_(ER_TUPLE_IS_TOO_LONG,		"Tuple is too long %u") \
+	/* 27 */_(ER_FORMAT_MISMATCH_INDEX_PART, "Field %s has type '%s' in space format, but type '%s' in index definition") \
 	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		"Unknown UPDATE operation") \
 	/* 29 */_(ER_UPDATE_FIELD,		"Field %u UPDATE error: %s") \
-	/* 30 */_(ER_FIBER_STACK,		"Can not create a new fiber: recursion limit reached") \
+	/* 30 */_(ER_FUNCTION_TX_ACTIVE,	"Transaction is active at return from function") \
 	/* 31 */_(ER_KEY_PART_COUNT,		"Invalid key part count (expected [0..%u], got %u)") \
 	/* 32 */_(ER_PROC_LUA,			"%s") \
 	/* 33 */_(ER_NO_SUCH_PROC,		"Procedure '%.*s' is not defined") \
@@ -91,10 +91,10 @@ struct errcode_record {
 	/* 36 */_(ER_NO_SUCH_SPACE,		"Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		"Field %d was not found in the tuple") \
 	/* 38 */_(ER_EXACT_FIELD_COUNT,		"Tuple field count %u does not match space field count %u") \
-	/* 39 */_(ER_INDEX_FIELD_COUNT,		"Tuple field count %u is less than required (expected at least %u)") \
+	/* 39 */_(ER_MIN_FIELD_COUNT,		"Tuple field count %u is less than required by space format or defined indexes (expected at least %u)") \
 	/* 40 */_(ER_WAL_IO,			"Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	"Get() doesn't support partial keys and non-unique indexes") \
-	/* 42 */_(ER_ACCESS_DENIED,		"%s access on %s is denied for user '%s'") \
+	/* 42 */_(ER_ACCESS_DENIED,		"%s access to %s '%s' is denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		"Failed to create user '%s': %s") \
 	/* 44 */_(ER_DROP_USER,			"Failed to drop user or role '%s': %s") \
 	/* 45 */_(ER_NO_SUCH_USER,		"User '%s' is not found") \
@@ -105,9 +105,9 @@ struct errcode_record {
 	/* 50 */_(ER_CREATE_FUNCTION,		"Failed to create function '%s': %s") \
 	/* 51 */_(ER_NO_SUCH_FUNCTION,		"Function '%s' does not exist") \
 	/* 52 */_(ER_FUNCTION_EXISTS,		"Function '%s' already exists") \
-	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	"%s access is denied for user '%s' to function '%s'") \
+	/* 53 */_(ER_UNUSED3,			"") \
 	/* 54 */_(ER_FUNCTION_MAX,		"A limit on the total number of functions has been reached: %u") \
-	/* 55 */_(ER_SPACE_ACCESS_DENIED,	"%s access is denied for user '%s' to space '%s'") \
+	/* 55 */_(ER_UNUSED4,			"") \
 	/* 56 */_(ER_USER_MAX,			"A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		"Space engine '%s' does not exist") \
 	/* 58 */_(ER_RELOAD_CFG,		"Can't set option '%s' dynamically") \
@@ -115,14 +115,14 @@ struct errcode_record {
 	/* 60 */_(ER_SAVEPOINT_EMPTY_TX,	"Can not set a savepoint in an empty transaction") \
 	/* 61 */_(ER_NO_SUCH_SAVEPOINT,		"Can not rollback to savepoint: the savepoint does not exist") \
 	/* 62 */_(ER_UNKNOWN_REPLICA,		"Replica %s is not registered with replica set %s") \
-	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID of the replica %s doesn't match replica set UUID of the master %s") \
+	/* 63 */_(ER_REPLICASET_UUID_MISMATCH,	"Replica set UUID mismatch: expected %s, got %s") \
 	/* 64 */_(ER_INVALID_UUID,		"Invalid UUID: %s") \
 	/* 65 */_(ER_REPLICASET_UUID_IS_RO,	"Can't reset replica set UUID: it is already assigned") \
-	/* 66 */_(ER_INSTANCE_UUID_MISMATCH,	"Remote ID mismatch for %s: expected %u, got %u") \
+	/* 66 */_(ER_INSTANCE_UUID_MISMATCH,	"Instance UUID mismatch: expected %s, got %s") \
 	/* 67 */_(ER_REPLICA_ID_IS_RESERVED,	"Can't initialize replica id with a reserved value %u") \
 	/* 68 */_(ER_INVALID_ORDER,		"Invalid LSN order for instance %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	"Missing mandatory field '%s' in request") \
-	/* 70 */_(ER_IDENTIFIER,		"Invalid identifier '%s' (expected letters, digits or an underscore)") \
+	/* 70 */_(ER_IDENTIFIER,		"Invalid identifier '%s' (expected printable symbols only)") \
 	/* 71 */_(ER_DROP_FUNCTION,		"Can't drop function %u: %s") \
 	/* 72 */_(ER_ITERATOR_TYPE,		"Unknown iterator type '%s'") \
 	/* 73 */_(ER_REPLICA_MAX,		"Replica count limit reached: %u") \
@@ -200,7 +200,7 @@ struct errcode_record {
 	/*145 */_(ER_NO_SUCH_SEQUENCE,		"Sequence '%s' does not exist") \
 	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
 	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
-	/*148 */_(ER_SEQUENCE_ACCESS_DENIED,	"%s access is denied for user '%s' to sequence '%s'") \
+	/*148 */_(ER_UNUSED5,			"") \
 	/*149 */_(ER_SPACE_FIELD_IS_DUPLICATE,	"Space field '%s' is duplicate") \
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \

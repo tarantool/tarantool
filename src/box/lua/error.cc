@@ -156,7 +156,7 @@ lbox_errinj_set(struct lua_State *L)
 		errinj->dparam = lua_tonumber(L, 2);
 		break;
 	default:
-		lua_pushfstring(L, "error: unknow injection type '%s'", name);
+		lua_pushfstring(L, "error: unknown injection type '%s'", name);
 		return 1;
 	}
 

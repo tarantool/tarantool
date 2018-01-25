@@ -53,9 +53,6 @@
 #include "xstream.h"
 #include "wal.h"
 
-/** Network timeout */
-double relay_timeout;
-
 /**
  * Cbus message to send status updates from relay to tx thread.
  */
@@ -142,6 +139,8 @@ relay_vclock(const struct relay *relay)
 	return &relay->tx.vclock;
 }
 
+static void
+relay_send(struct relay *relay, struct xrow_header *packet);
 static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row);
 static void
@@ -345,9 +344,6 @@ relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 	}
 }
 
-/* Count of replication_timeout periods to disconnect the client. */
-#define TIMEOUT_PERIODS 4
-
 /*
  * Relay reader fiber function.
  * Read xrow encoded vclocks sent by the replica.
@@ -366,7 +362,7 @@ relay_reader_f(va_list ap)
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
-						  TIMEOUT_PERIODS * relay_timeout);
+					replication_disconnect_timeout());
 			/* vclock is followed while decoding, zeroing it. */
 			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
@@ -422,13 +418,29 @@ relay_subscribe_f(va_list ap)
 	fiber_start(reader, relay, fiber());
 
 	while (!fiber_is_cancelled()) {
-		double timeout = relay_timeout;
+		double timeout = replication_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam != 0)
 			timeout = inj->dparam;
 
-		fiber_cond_wait_timeout(&relay->reader_cond, timeout);
+		if (fiber_cond_wait_timeout(&relay->reader_cond, timeout) != 0) {
+			/*
+			 * Timed out waiting for WAL events.
+			 * Send a heartbeat message to update
+			 * the replication lag on the slave.
+			 */
+			struct xrow_header row;
+			xrow_encode_timestamp(&row, instance_id,
+					      ev_now(loop()));
+			try {
+				relay_send(relay, &row);
+			} catch (Exception *e) {
+				e->log();
+				break;
+			}
+		}
+
 		/*
 		 * The fiber can be woken by IO cancel, by a timeout of
 		 * status messaging or by an acknowledge to status message.

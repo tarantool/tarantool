@@ -50,6 +50,14 @@ struct space;
 struct tuple;
 struct xrow_header;
 
+enum {
+	/**
+	 * Maximum recursion depth for on_replace triggers.
+	 * Large numbers may corrupt C stack.
+	 */
+	TXN_SUB_STMT_MAX = 3
+};
+
 /**
  * A single statement of a multi-statement
  * transaction: undo and redo info.
@@ -83,13 +91,10 @@ struct txn_savepoint {
 	/**
 	 * Statement, on which a savepoint is created. On rollback
 	 * to this savepoint all newer statements are rolled back.
+	 * Initialized to NULL in case a savepoint is created in
+	 * an empty transaction.
 	 */
-	struct txn_stmt *stmt;
-	/**
-	 * True, if a savepoint is created when a transaction is
-	 * empty. In such a case stmt can not be used.
-	 */
-	bool is_first;
+	struct stailq_entry *stmt;
 };
 
 extern double too_long_threshold;
@@ -114,6 +119,12 @@ struct txn {
 	bool has_triggers;
 	/** The number of active nested statement-level transactions. */
 	int in_sub_stmt;
+	/**
+	 * First statement at each statement-level.
+	 * Needed to rollback sub statements.
+	 */
+	struct stailq_entry *sub_stmt_begin[TXN_SUB_STMT_MAX];
+	/** LSN of this transaction when written to WAL. */
 	int64_t signature;
 	/** Engine involved in multi-statement transaction. */
 	struct engine *engine;
@@ -255,9 +266,11 @@ txn_check_singlestatement(struct txn *txn, const char *where);
 static inline struct txn_stmt *
 txn_current_stmt(struct txn *txn)
 {
-	return (txn->in_sub_stmt > 0 ?
-		stailq_last_entry(&txn->stmts, struct txn_stmt, next) :
-		NULL);
+	if (txn->in_sub_stmt == 0)
+		return NULL;
+	struct stailq_entry *stmt = txn->sub_stmt_begin[txn->in_sub_stmt - 1];
+	stmt = stmt != NULL ? stailq_next(stmt) : stailq_first(&txn->stmts);
+	return stailq_entry(stmt, struct txn_stmt, next);
 }
 
 /** The last statement of the transaction. */

@@ -204,7 +204,7 @@ space:delete({1})
 ---
 ...
 -- Make sure the run is big enough to trigger compaction.
-space:insert({2, 3})
+space:replace({2, 3})
 ---
 - [2, 3]
 ...
@@ -613,13 +613,13 @@ s:upsert({10, 11, 12}, {})
 _ = fiber.create(function () s:drop() ch:put(true) end)
 ---
 ...
-box.commit()
----
-- error: Transaction has been aborted by conflict
-...
 ch:get()
 ---
 - true
+...
+box.commit()
+---
+- error: Transaction has been aborted by conflict
 ...
 s = box.schema.space.create('test', { engine = 'vinyl' })
 ---
@@ -648,13 +648,13 @@ s:replace{7, 8, 9}
 _ = fiber.create(function () s:drop() ch:put(true) end)
 ---
 ...
-box.commit()
----
-- error: Transaction has been aborted by conflict
-...
 ch:get()
 ---
 - true
+...
+box.commit()
+---
+- error: Transaction has been aborted by conflict
 ...
 -- check invalid field types
 space = box.schema.space.create('test', { engine = 'vinyl' })
@@ -684,5 +684,35 @@ index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
     is not supported'
 ...
 space:drop()
+---
+...
+-- gh-3019 default index options
+box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serialize = 'map'}), {}}
+---
+- [512, 1, 'test', 'vinyl', 0, {}, []]
+...
+box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
+---
+- [512, 0, 'pk', 'tree', {'unique': true}, [[0, 'unsigned']]]
+...
+box.space.test.index.pk
+---
+- unique: true
+  parts:
+  - type: unsigned
+    is_nullable: false
+    fieldno: 1
+  id: 0
+  space_id: 512
+  options:
+    page_size: 8192
+    run_count_per_level: 2
+    run_size_ratio: 3.5
+    bloom_fpr: 0.05
+    range_size: 1073741824
+  name: pk
+  type: TREE
+...
+box.space.test:drop()
 ---
 ...

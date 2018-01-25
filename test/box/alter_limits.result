@@ -387,13 +387,15 @@ for k=1, box.schema.INDEX_MAX, 1 do
 end;
 ---
 ...
+-- cleanup
+for k=2, box.schema.INDEX_MAX, 1 do
+    s.index['i'..k]:drop()
+end;
+---
+...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
-...
--- cleanup
-for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
----
 ...
 -- test limits enforced in key_def_check:
 -- unknown index type
@@ -565,8 +567,7 @@ index = s:create_index('t1', { type = 'hash' })
 -- field type contradicts field type of another index
 index = s:create_index('t2', { type = 'hash', parts = { 1, 'string' }})
 ---
-- error: Ambiguous field type, field 1. Requested type is string but the field has
-    previously been defined as unsigned
+- error: Field 1 has type 'unsigned' in one index, but type 'string' in another
 ...
 -- ok
 index = s:create_index('t2', { type = 'hash', parts = { 2, 'string' }})
@@ -839,13 +840,13 @@ s.index.primary:select{}
 -- ambiguous field type
 index = s:create_index('string', { type = 'tree', unique =  false, parts = { 2, 'string'}})
 ---
-- error: Ambiguous field type, field 2. Requested type is string but the field has
-    previously been defined as unsigned
+- error: Field 2 has type 'unsigned' in one index, but type 'string' in another
 ...
 -- create index on a non-existing field
 index = s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 3, 'string'}})
 ---
-- error: Tuple field count 2 is less than required (expected at least 3)
+- error: Tuple field count 2 is less than required by space format or defined indexes
+    (expected at least 3)
 ...
 s.index.year:drop()
 ---
@@ -866,7 +867,8 @@ s:replace{'Der Baader Meinhof Komplex'}
 ...
 index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'unsigned'}})
 ---
-- error: Tuple field count 1 is less than required (expected at least 2)
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
 ...
 s:drop()
 ---

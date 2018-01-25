@@ -1,3 +1,5 @@
+fiber = require('fiber')
+
 --
 -- gh-2784: do not validate space formatted but not indexed fields
 -- in surrogate statements.
@@ -30,4 +32,19 @@ box.snapshot()
 s:delete(1)
 box.snapshot()
 s:select()
+s:drop()
+
+--
+-- gh-2983: ensure the transaction associated with a fiber
+-- is automatically rolled back if the fiber stops.
+--
+s = box.schema.create_space('test', { engine = 'vinyl' })
+_ = s:create_index('pk')
+tx1 = box.info.vinyl().tx
+ch = fiber.channel(1)
+_ = fiber.create(function() box.begin() s:insert{1} ch:put(true) end)
+ch:get()
+tx2 = box.info.vinyl().tx
+tx2.commit - tx1.commit -- 0
+tx2.rollback - tx1.rollback -- 1
 s:drop()

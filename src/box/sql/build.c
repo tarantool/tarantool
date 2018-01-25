@@ -1679,7 +1679,7 @@ createSpace(Parse * pParse,
 	}
 
 	sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */ );
-	sqlite3VdbeAddOp2(v, OP_Integer, current_user()->uid,
+	sqlite3VdbeAddOp2(v, OP_Integer, effective_user()->uid,
 			  iFirstCol + 1 /* owner */ );
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
 			  sqlite3DbStrDup(pParse->db, p->zName), P4_DYNAMIC);
@@ -1785,7 +1785,7 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 	/* 1. New sequence id  */
 	sqlite3VdbeAddOp2(v, OP_SCopy, reg_seq_id, first_col + 1);
 	/* 2. user is  */
-	sqlite3VdbeAddOp2(v, OP_Integer, current_user()->uid, first_col + 2);
+	sqlite3VdbeAddOp2(v, OP_Integer, effective_user()->uid, first_col + 2);
 	/* 3. New sequence name  */
         sqlite3VdbeAddOp4(v, OP_String8, 0, first_col + 3, 0,
 			  sqlite3DbStrDup(pParse->db, seq_name), P4_DYNAMIC);

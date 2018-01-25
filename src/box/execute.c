@@ -412,7 +412,7 @@ sql_row_to_port(struct sqlite3_stmt *stmt, int column_count,
 	if (tuple == NULL)
 		goto error;
 	region_truncate(region, svp);
-	return port_add_tuple(port, tuple);
+	return port_tuple_add(port, tuple);
 
 error:
 	region_truncate(region, svp);
@@ -589,7 +589,8 @@ sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 		       uint64_t sync, struct region *region)
 {
 	struct port port;
-	port_create(&port);
+	struct port_tuple *port_tuple = (struct port_tuple *)&port;
+	port_tuple_create(&port);
 	int column_count = sqlite3_column_count(stmt);
 	if (sql_execute(db, stmt, column_count, &port, region) != 0)
 		goto err_execute;
@@ -606,15 +607,20 @@ sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
 		if (sql_get_description(stmt, out, column_count) != 0)
 			goto err_body;
 		keys = 2;
-		if (iproto_reply_array_key(out, port.size, IPROTO_DATA) != 0)
+		if (iproto_reply_array_key(out, port_tuple->size,
+					   IPROTO_DATA) != 0)
 			goto err_body;
-		if (port_dump(&port, out) != 0) {
+		/*
+		 * Just like SELECT, SQL uses output format compatible
+		 * with Tarantool 1.6
+		 */
+		if (port_dump_16(&port, out) < 0) {
 			/* Failed port dump destroyes the port. */
 			goto err_body;
 		}
 	} else {
 		keys = 1;
-		assert(port.size == 0);
+		assert(port_tuple->size == 0);
 		if (iproto_reply_map_key(out, 1, IPROTO_SQL_INFO) != 0)
 			goto err_body;
 		int changes = sqlite3_changes(db);

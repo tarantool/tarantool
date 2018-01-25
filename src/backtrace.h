@@ -49,6 +49,9 @@ typedef int (backtrace_cb)(int frameno, void *frameret,
 void
 backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx);
 
+void
+backtrace_proc_cache_clear();
+
 #endif /* ENABLE_BACKTRACE */
 
 #if defined(__cplusplus)

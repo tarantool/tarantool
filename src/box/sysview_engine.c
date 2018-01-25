@@ -397,6 +397,14 @@ sysview_engine_backup(struct engine *engine, struct vclock *vclock,
 	return 0;
 }
 
+static void
+sysview_engine_memory_stat(struct engine *engine,
+			   struct engine_memory_stat *stat)
+{
+	(void)engine;
+	(void)stat;
+}
+
 static int
 sysview_engine_check_space_def(struct space_def *def)
 {
@@ -424,6 +432,7 @@ static const struct engine_vtab sysview_engine_vtab = {
 	/* .abort_checkpoint = */ sysview_engine_abort_checkpoint,
 	/* .collect_garbage = */ sysview_engine_collect_garbage,
 	/* .backup = */ sysview_engine_backup,
+	/* .memory_stat = */ sysview_engine_memory_stat,
 	/* .check_space_def = */ sysview_engine_check_space_def,
 };
 

@@ -131,7 +131,7 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 		return -1;
 	}
 	if (unlikely(field_count < format->min_field_count)) {
-		diag_set(ClientError, ER_INDEX_FIELD_COUNT,
+		diag_set(ClientError, ER_MIN_FIELD_COUNT,
 			 (unsigned) field_count,
 			 (unsigned) format->min_field_count);
 		return -1;
@@ -389,9 +389,8 @@ tuple_init(field_name_hash_f hash)
 	/*
 	 * Create a format for runtime tuples
 	 */
-	RLIST_HEAD(empty_list);
 	tuple_format_runtime = tuple_format_new(&tuple_format_runtime_vtab,
-						NULL, 0, 0, NULL, 0);
+						NULL, 0, 0, NULL, 0, NULL);
 	if (tuple_format_runtime == NULL)
 		return -1;
 
@@ -473,7 +472,7 @@ box_tuple_format_new(struct key_def **keys, uint16_t key_count)
 {
 	box_tuple_format_t *format =
 		tuple_format_new(&tuple_format_runtime_vtab,
-				 keys, key_count, 0, NULL, 0);
+				 keys, key_count, 0, NULL, 0, NULL);
 	if (format != NULL)
 		tuple_format_ref(format);
 	return format;

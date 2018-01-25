@@ -160,16 +160,6 @@ xrow_decode_dml(struct xrow_header *xrow, struct request *request,
 		uint64_t key_map);
 
 /**
- * Decode a request from the @row using fiber->gc.
- * @param row Xrow.
- * @retval not NULL Decoded request.
- *
- * @retval     NULL Memory or binary format error.
- */
-struct request *
-xrow_decode_dml_gc(struct xrow_header *row);
-
-/**
  * Encode the request fields to iovec using region_alloc().
  * @param request request to encode
  * @param iov[out] iovec to fill
@@ -296,6 +286,15 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
  */
 int
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+
+/**
+ * Encode a heartbeat message.
+ * @param row[out] Row to encode into.
+ * @param replica_id Instance id.
+ * @param tm Time stamp.
+ */
+void
+xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm);
 
 /**
  * Fast encode xrow header using the specified header fields.
@@ -507,16 +506,6 @@ xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 {
 	if (xrow_decode_dml(row, request, key_map) != 0)
 		diag_raise();
-}
-
-/** @copydoc xrow_decode_request. */
-static inline struct request *
-xrow_decode_dml_gc_xc(struct xrow_header *row)
-{
-	struct request *ret = xrow_decode_dml_gc(row);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
 }
 
 static inline int

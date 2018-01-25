@@ -30,12 +30,28 @@
  */
 #include "user_def.h"
 const char *
-priv_name(uint8_t access)
+priv_name(user_access_t access)
 {
-	if (access & PRIV_R)
-		return "Read";
-	if (access & PRIV_W)
-		return "Write";
-	return "Execute";
+	static const char *priv_name_strs[] = {
+		"Read",
+		"Write",
+		"Execute",
+		"Session",
+		"Usage",
+		"Create",
+		"Drop",
+		"Alter",
+		"Reference",
+		"Trigger",
+		"Insert",
+		"Update",
+		"Delete",
+		"Grant",
+		"Revoke",
+	};
+	int bit_no = __builtin_ffs((int) access);
+	if (bit_no > 0 && bit_no <= (int) lengthof(priv_name_strs))
+		return priv_name_strs[bit_no - 1];
+	return "Any";
 }
 

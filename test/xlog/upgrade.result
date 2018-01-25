@@ -152,13 +152,14 @@ box.space._user:select()
   - [1, 1, 'admin', 'user', {}]
   - [2, 1, 'public', 'role', {}]
   - [3, 1, 'replication', 'role', {}]
-  - [4, 1, 'someuser', 'user', {'chap-sha1': '2qvbQIHM4zMWhAmm2xGeGNjqoHM='}]
-  - [5, 1, 'somerole', 'role', {}]
+  - [31, 1, 'super', 'role', {}]
+  - [32, 1, 'someuser', 'user', {'chap-sha1': '2qvbQIHM4zMWhAmm2xGeGNjqoHM='}]
+  - [33, 1, 'somerole', 'role', {}]
 ...
 box.space._func:select()
 ---
 - - [1, 1, 'box.schema.user.info', 1, 'LUA']
-  - [2, 4, 'somefunc', 1, 'LUA']
+  - [2, 32, 'somefunc', 1, 'LUA']
   - [3, 1, 'someotherfunc', 0, 'LUA']
 ...
 box.space._collation:select()
@@ -169,7 +170,8 @@ box.space._collation:select()
 box.space._priv:select()
 ---
 - - [1, 0, 'role', 2, 4]
-  - [1, 1, 'universe', 0, 7]
+  - [1, 0, 'universe', 0, 24]
+  - [1, 1, 'universe', 0, 4294967295]
   - [1, 2, 'function', 1, 4]
   - [1, 2, 'function', 2, 4]
   - [1, 2, 'space', 276, 2]
@@ -181,11 +183,13 @@ box.space._priv:select()
   - [1, 2, 'space', 330, 2]
   - [1, 3, 'space', 320, 2]
   - [1, 3, 'universe', 0, 1]
-  - [1, 4, 'function', 3, 4]
-  - [1, 4, 'role', 2, 4]
-  - [1, 4, 'role', 5, 4]
-  - [1, 4, 'space', 513, 3]
-  - [1, 5, 'space', 512, 3]
+  - [1, 31, 'universe', 0, 4294967295]
+  - [1, 32, 'function', 3, 4]
+  - [1, 32, 'role', 2, 4]
+  - [1, 32, 'role', 33, 4]
+  - [1, 32, 'space', 513, 3]
+  - [1, 32, 'universe', 0, 24]
+  - [1, 33, 'space', 512, 3]
 ...
 box.space._vspace ~= nil
 ---

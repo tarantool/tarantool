@@ -38,6 +38,7 @@ add_library(tuple STATIC
     tuple_update.c
     tuple_compare.cc
     tuple_hash.cc
+    tuple_dictionary.c
     key_def.cc
     coll_def.c
     coll.c
@@ -55,6 +56,7 @@ add_library(box STATIC
     error.cc
     xrow_io.cc
     tuple_convert.c
+    identifier.c
     index.cc
     index_def.c
     iterator_type.c
@@ -76,8 +78,8 @@ add_library(box STATIC
     vy_index.c
     vy_tx.c
     vy_write_iterator.c
-    vy_point_iterator.c
     vy_read_iterator.c
+    vy_point_lookup.c
     vy_cache.c
     vy_log.c
     vy_upsert.c
@@ -109,7 +111,7 @@ add_library(box STATIC
     wal.cc
     sql.c
     execute.c
-    call.cc
+    call.c
     ${lua_sources}
     lua/init.c
     lua/call.c

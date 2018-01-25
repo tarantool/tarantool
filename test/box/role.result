@@ -46,6 +46,9 @@ box.schema.user.info('tester')
 - - - execute
     - role
     - public
+  - - session,usage
+    - universe
+    - 
 ...
 box.schema.user.grant('tester', 'execute', 'role', 'iddqd')
 ---
@@ -58,6 +61,9 @@ box.schema.user.info('tester')
   - - execute
     - role
     - iddqd
+  - - session,usage
+    - universe
+    - 
 ...
 -- test granting user to a user
 box.schema.user.grant('tester', 'execute', 'role', 'tester')
@@ -245,11 +251,11 @@ box.session.su('grantee')
 ...
 box.space.test:insert{1}
 ---
-- error: Write access is denied for user 'grantee' to space 'test'
+- error: Write access to space 'test' is denied for user 'grantee'
 ...
 box.space.test:select{1}
 ---
-- error: Read access is denied for user 'grantee' to space 'test'
+- error: Read access to space 'test' is denied for user 'grantee'
 ...
 box.session.su('admin')
 ---
@@ -374,7 +380,7 @@ box.session.su("user")
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user' to space '_space'
+- error: Read access to space '_space' is denied for user 'user'
 ...
 box.session.su("admin")
 ---
@@ -390,7 +396,7 @@ box.session.su("user")
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user' to space '_space'
+- error: Read access to space '_space' is denied for user 'user'
 ...
 box.space._index:get{288, 0}[3]
 ---
@@ -407,11 +413,11 @@ box.session.su("user")
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user' to space '_space'
+- error: Read access to space '_space' is denied for user 'user'
 ...
 box.space._index:get{288, 0}[3]
 ---
-- error: Read access is denied for user 'user' to space '_index'
+- error: Read access to space '_index' is denied for user 'user'
 ...
 box.session.su("admin")
 ---
@@ -427,7 +433,7 @@ box.session.su("user")
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user' to space '_space'
+- error: Read access to space '_space' is denied for user 'user'
 ...
 box.space._index:get{288, 0}[3]
 ---
@@ -444,11 +450,11 @@ box.session.su("user")
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user' to space '_space'
+- error: Read access to space '_space' is denied for user 'user'
 ...
 box.space._index:get{288, 0}[3]
 ---
-- error: Read access is denied for user 'user' to space '_index'
+- error: Read access to space '_index' is denied for user 'user'
 ...
 box.session.su("admin")
 ---
@@ -517,7 +523,7 @@ box.session.su("user1")
 ...
 box.space._index:get{288, 0}[3]
 ---
-- error: Read access is denied for user 'user1' to space '_index'
+- error: Read access to space '_index' is denied for user 'user1'
 ...
 box.session.su("admin")
 ---
@@ -530,14 +536,14 @@ box.session.su("user")
 ...
 box.space._index:get{288, 0}[3]
 ---
-- error: Read access is denied for user 'user' to space '_index'
+- error: Read access to space '_index' is denied for user 'user'
 ...
 box.session.su("user1")
 ---
 ...
 box.space._index:get{288, 0}[3]
 ---
-- error: Read access is denied for user 'user1' to space '_index'
+- error: Read access to space '_index' is denied for user 'user1'
 ...
 box.session.su("admin")
 ---
@@ -573,14 +579,14 @@ box.session.su("user")
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user' to space '_space'
+- error: Read access to space '_space' is denied for user 'user'
 ...
 box.session.su("user1")
 ---
 ...
 box.space._space.index.name:get{"_space"}[3]
 ---
-- error: Read access is denied for user 'user1' to space '_space'
+- error: Read access to space '_space' is denied for user 'user1'
 ...
 box.session.su("admin")
 ---
@@ -656,7 +662,7 @@ box.session.su('john')
 -- error
 box.schema.user.grant('grantee', 'role')
 ---
-- error: Read access is denied for user 'john' to space '_user'
+- error: Read access to space '_user' is denied for user 'john'
 ...
 --
 box.session.su('admin')
@@ -673,11 +679,11 @@ box.session.su('john')
 ...
 box.schema.user.grant('grantee', 'role')
 ---
-- error: Grant access on role is denied for user 'john'
+- error: Grant access to role 'role' is denied for user 'john'
 ...
 box.schema.user.grant('grantee', 'read', 'space', 'test')
 ---
-- error: Grant access on space is denied for user 'john'
+- error: Grant access to space 'test' is denied for user 'john'
 ...
 --
 -- granting 'public' is however an exception - everyone
@@ -695,7 +701,7 @@ box.schema.user.grant('grantee', 'public')
 --
 box.schema.user.revoke('grantee', 'public')
 ---
-- error: Create, drop or alter access on role is denied for user 'john'
+- error: Revoke access to role 'public' is denied for user 'john'
 ...
 box.session.su('admin')
 ---
@@ -743,7 +749,7 @@ box.space.test:select{}
 ...
 box.space.test:insert{1}
 ---
-- error: Write access is denied for user 'john' to space 'test'
+- error: Write access to space 'test' is denied for user 'john'
 ...
 box.session.su('admin')
 ---
@@ -777,7 +783,7 @@ box.space.test:select{}
 ...
 box.space.test:insert{1}
 ---
-- error: Write access is denied for user 'john' to space 'test'
+- error: Write access to space 'test' is denied for user 'john'
 ...
 box.session.su('admin')
 ---
@@ -789,7 +795,7 @@ box.schema.user.drop('john')
 ---
 ...
 -- test ER_GRANT
-box.space._priv:insert{1, 0, 'universe', 0, 0}
+box.space._priv:replace{1, 0, 'universe', 0, 0}
 ---
 - error: 'Incorrect grant arguments: the grant tuple has no privileges'
 ...
@@ -926,6 +932,9 @@ box.schema.user.info('test_user')
 - - - execute
     - role
     - public
+  - - session,usage
+    - universe
+    - 
 ...
 box.schema.role.info('test_user')
 ---

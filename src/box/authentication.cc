@@ -32,6 +32,7 @@
 #include "user.h"
 #include "session.h"
 #include "msgpuck.h"
+#include "error.h"
 
 static char zero_hash[SCRAMBLE_SIZE];
 
@@ -44,6 +45,7 @@ authenticate(const char *user_name, uint32_t len,
 	uint32_t part_count;
 	uint32_t scramble_len;
 	const char *scramble;
+	struct on_auth_trigger_ctx auth_res = { user->def->name, true };
 	/*
 	 * Allow authenticating back to GUEST user without
 	 * checking a password. This is useful for connection
@@ -55,6 +57,8 @@ authenticate(const char *user_name, uint32_t len,
 		/* No password is set for GUEST, OK. */
 		goto ok;
 	}
+
+	access_check_session_xc(user);
 
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */
@@ -80,12 +84,15 @@ authenticate(const char *user_name, uint32_t len,
 			   "invalid scramble size");
 	}
 
-	if (scramble_check(scramble, session->salt, user->def->hash2))
+	if (scramble_check(scramble, session->salt, user->def->hash2)) {
+		auth_res.is_authenticated = false;
+		if (session_run_on_auth_triggers(&auth_res) != 0)
+			diag_raise();
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def->name);
-
+	}
 	/* check and run auth triggers on success */
 	if (! rlist_empty(&session_on_auth) &&
-	    session_run_on_auth_triggers(user->def->name) != 0)
+	    session_run_on_auth_triggers(&auth_res) != 0)
 		diag_raise();
 ok:
 	credentials_init(&session->credentials, user->auth_token,

@@ -1,7 +1,6 @@
 #include <trivia/config.h>
 #include "memory.h"
 #include "fiber.h"
-#include <small/slab_cache.h>
 #include "vy_iterators_helper.h"
 
 static void
@@ -16,11 +15,7 @@ test_basic(void)
 	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
 	struct key_def *key_def = box_key_def_new(fields, types, 1);
 	assert(key_def != NULL);
-	/* Create lsregion */
-	struct lsregion lsregion;
-	struct slab_cache *slab_cache = cord_slab_cache();
-	lsregion_create(&lsregion, slab_cache->arena);
-	struct vy_mem *mem = create_test_mem(&lsregion, key_def);
+	struct vy_mem *mem = create_test_mem(key_def);
 
 	is(mem->min_lsn, INT64_MAX, "mem->min_lsn on empty mem");
 	is(mem->max_lsn, -1, "mem->max_lsn on empty mem");
@@ -61,7 +56,6 @@ test_basic(void)
 
 	/* Clean up */
 	vy_mem_delete(mem);
-	lsregion_destroy(&lsregion);
 	box_key_def_delete(key_def);
 
 	fiber_gc();
@@ -85,7 +79,8 @@ test_iterator_restore_after_insertion()
 
 	/* Create format */
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       &key_def, 1, 0, NULL, 0);
+						       &key_def, 1, 0, NULL, 0,
+						       NULL);
 	assert(format != NULL);
 	tuple_format_ref(format);
 
@@ -166,7 +161,7 @@ test_iterator_restore_after_insertion()
 		}
 
 		/* Create mem */
-		struct vy_mem *mem = create_test_mem(&lsregion, key_def);
+		struct vy_mem *mem = create_test_mem(key_def);
 		if (has40_50) {
 			const struct vy_stmt_template temp =
 				STMT_TEMPLATE(50, REPLACE, 40);

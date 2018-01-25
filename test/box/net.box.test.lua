@@ -55,6 +55,11 @@ cn:eval('error("exception")')
 cn:eval('box.error(0)')
 cn:eval('!invalid expression')
 
+-- box.commit() missing at return of CALL/EVAL
+function no_commit() box.begin() fiber.sleep(0.001) end
+cn:call('no_commit')
+cn:eval('no_commit()')
+
 remote.self:eval('return 1+1, 2+2')
 remote.self:eval('return')
 remote.self:eval('error("exception")')
@@ -538,65 +543,65 @@ c.space.test:replace({1, 'hello'})
 
 -- replace
 c.space.test:replace({2}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- insert
 c.space.test:insert({3}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- update
 c.space.test:update({3}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- upsert
 c.space.test:upsert({4}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- delete
 c.space.test:upsert({4}, {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- select
 c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- select
 len = c.space.test:select({}, {buffer = ibuf})
 ibuf.rpos + len == ibuf.wpos
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ibuf.rpos == ibuf.wpos
 len
 result
 
 -- call
 c:call("echo", {1, 2, 3}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:call("echo", {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:call("echo", nil, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- eval
 c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:eval("echo(...)", {}, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:eval("echo(...)", nil, {buffer = ibuf})
-ibuf.rpos, result = msgpack.ibuf_decode(ibuf.rpos)
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
 -- unsupported methods
@@ -798,3 +803,46 @@ c.space.test.index.test_index ~= nil
 box.schema.user.revoke('guest','read,write,execute','universe')
 
 space:drop()
+
+--
+-- gh-946: long polling CALL blocks input
+--
+box.schema.user.grant('guest', 'execute', 'universe')
+
+c = net.connect(box.cfg.listen)
+
+N = 100
+
+pad = string.rep('x', 1024)
+
+long_call_cond = fiber.cond()
+long_call_channel = fiber.channel()
+fast_call_channel = fiber.channel()
+
+function fast_call(x) return x end
+function long_call(x) long_call_cond:wait() return x * 2 end
+
+test_run:cmd("setopt delimiter ';'")
+for i = 1, N do
+    fiber.create(function()
+        fast_call_channel:put(c:call('fast_call', {i, pad}))
+    end)
+    fiber.create(function()
+        long_call_channel:put(c:call('long_call', {i, pad}))
+    end)
+end
+test_run:cmd("setopt delimiter ''");
+
+x = 0
+for i = 1, N do x = x + fast_call_channel:get() end
+x
+
+long_call_cond:broadcast()
+
+x = 0
+for i = 1, N do x = x + long_call_channel:get() end
+x
+
+c:close()
+
+box.schema.user.revoke('guest', 'execute', 'universe')

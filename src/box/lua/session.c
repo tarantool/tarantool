@@ -40,6 +40,7 @@
 #include "box/box.h"
 #include "box/session.h"
 #include "box/user.h"
+#include "box/schema.h"
 
 static const char *sessionlib_name = "box.session";
 
@@ -100,30 +101,55 @@ lbox_session_sync(struct lua_State *L)
 }
 
 /**
+ * Session effective user id.
+ * Note: user id (effective_user()->uid)
+ * may be different in a setuid function.
+ */
+static int
+lbox_session_euid(struct lua_State *L)
+{
+	/*
+	 * Sic: push effective session user, not the current user,
+	 * which may differ inside a setuid function.
+	 */
+	lua_pushnumber(L, effective_user()->uid);
+	return 1;
+}
+
+/**
  * Session user id.
- * Note: effective user id (current_user()->uid)
+ * Note: effective user id
  * may be different in a setuid function.
  */
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	/*
-	 * Sic: push session user, not the current user,
-	 * which may differ inside a setuid function.
-	 */
 	lua_pushnumber(L, current_session()->credentials.uid);
 	return 1;
 }
 
-/**
- * Session user name.
- * Note: effective user name may be different in
- * a setuid function.
- */
+/** Session authenticated user name. */
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = user_by_id(current_user()->uid);
+	struct user *user = user_by_id(current_session()->credentials.uid);
+	if (user)
+		lua_pushstring(L, user->def->name);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+/**
+ * Session effective name.
+ * Note: effective user name may be different in
+ * a setuid function or in box.session.su() used in sudo
+ * mode.
+ */
+static int
+lbox_session_effective_user(struct lua_State *L)
+{
+	struct user *user = user_by_id(effective_user()->uid);
 	if (user)
 		lua_pushstring(L, user->def->name);
 	else
@@ -153,6 +179,9 @@ lbox_session_su(struct lua_State *L)
 	}
 	if (user == NULL)
 		luaT_error(L);
+	if (access_check_session(user) < 0)
+		luaT_error(L);
+
 	if (top == 1) {
 		credentials_init(&session->credentials, user->auth_token,
 				 user->def->uid);
@@ -167,6 +196,7 @@ lbox_session_su(struct lua_State *L)
 	/* sudo */
 	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
+	/* Restore the original credentials. */
 	fiber_set_user(fiber(), &session->credentials);
 
 	if (error)
@@ -252,8 +282,10 @@ lbox_push_on_connect_event(struct lua_State *L, void *event)
 static int
 lbox_push_on_auth_event(struct lua_State *L, void *event)
 {
-	lua_pushstring(L, (const char *)event);
-	return 1;
+	struct on_auth_trigger_ctx *ctx = (struct on_auth_trigger_ctx *) event;
+	lua_pushstring(L, ctx->username);
+	lua_pushboolean(L, ctx->is_authenticated);
+	return 2;
 }
 
 static int
@@ -298,10 +330,40 @@ lbox_session_on_auth(struct lua_State *L)
 static int
 lbox_session_run_on_auth(struct lua_State *L)
 {
-	const char *username = luaL_optstring(L, 1, "");
-	if (session_run_on_auth_triggers(username) != 0)
+	struct on_auth_trigger_ctx ctx;
+	ctx.username = luaL_optstring(L, 1, "");
+	/*
+	 * In earlier versions of tarantool on_auth trigger
+	 * was not invoked on authentication failure and the
+	 * second argument was missing.
+	 */
+	assert(lua_isboolean(L, 2));
+	ctx.is_authenticated = lua_toboolean(L, 2);
+
+	if (session_run_on_auth_triggers(&ctx) != 0)
 		return luaT_error(L);
 	return 0;
+}
+
+static int
+lbox_push_on_access_denied_event(struct lua_State *L, void *event)
+{
+	struct on_access_denied_ctx *ctx = (struct on_access_denied_ctx *) event;
+	lua_pushstring(L, ctx->access_type);
+	lua_pushstring(L, ctx->object_type);
+	lua_pushstring(L, ctx->object_name);
+	return 3;
+}
+
+/**
+ * Sets trigger on_access_denied.
+ * For test purposes only.
+ */
+static int
+lbox_session_on_access_denied(struct lua_State *L)
+{
+	return lbox_trigger_reset(L, 2, &on_access_denied,
+				  lbox_push_on_access_denied_event);
 }
 
 void
@@ -353,7 +415,9 @@ box_lua_session_init(struct lua_State *L)
 		{"type", lbox_session_type},
 		{"sync", lbox_session_sync},
 		{"uid", lbox_session_uid},
+		{"euid", lbox_session_euid},
 		{"user", lbox_session_user},
+		{"effective_user", lbox_session_effective_user},
 		{"su", lbox_session_su},
 		{"fd", lbox_session_fd},
 		{"exists", lbox_session_exists},
@@ -361,6 +425,7 @@ box_lua_session_init(struct lua_State *L)
 		{"on_connect", lbox_session_on_connect},
 		{"on_disconnect", lbox_session_on_disconnect},
 		{"on_auth", lbox_session_on_auth},
+		{"on_access_denied", lbox_session_on_access_denied},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, sessionlib_name, sessionlib);

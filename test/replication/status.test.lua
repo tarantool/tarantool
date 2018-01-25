@@ -85,6 +85,7 @@ master.uuid == box.space._cluster:get(master_id)[2]
 master.upstream.status == "follow"
 master.upstream.lag < 1
 master.upstream.idle < 1
+master.upstream.peer:match("localhost")
 master.downstream == nil
 
 -- replica's status
@@ -99,8 +100,6 @@ replica.uuid == box.space._cluster:get(replica_id)[2]
 replica.lsn == 0
 replica.upstream == nil
 replica.downstream == nil
-
-test_run:cmd('switch default')
 
 --
 -- ClientError during replication
@@ -118,6 +117,25 @@ box.space._schema:delete({'dup'})
 test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")
 test_run:grep_log('replica', 'error applying row: .*')
 test_run:cmd("clear filter")
+
+--
+-- Check box.info.replication login
+--
+test_run:cmd('switch replica')
+test_run:cmd("set variable master_port to 'replica.master'")
+replica_uri = os.getenv("LISTEN")
+box.cfg{replication = {"guest@localhost:" .. master_port, replica_uri}}
+
+master_id = test_run:get_server_id('default')
+master = box.info.replication[master_id]
+master.id == master_id
+master.upstream.status == "follow"
+master.upstream.peer:match("guest")
+master.upstream.peer:match("localhost")
+master.downstream == nil
+
+test_run:cmd('switch default')
+
 --
 -- Cleanup
 --

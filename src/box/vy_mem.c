@@ -34,7 +34,38 @@
 
 #include <trivia/util.h>
 #include <small/lsregion.h>
+#include <small/slab_arena.h>
+#include <small/quota.h>
+
 #include "diag.h"
+#include "tuple.h"
+
+/** {{{ vy_mem_env */
+
+enum {
+	/** Slab size for tuple arena. */
+	SLAB_SIZE = 16 * 1024 * 1024
+};
+
+void
+vy_mem_env_create(struct vy_mem_env *env, size_t memory)
+{
+	/* Vinyl memory is limited by vy_quota. */
+	quota_init(&env->quota, QUOTA_MAX);
+	tuple_arena_create(&env->arena, &env->quota, memory,
+			   SLAB_SIZE, "vinyl");
+	lsregion_create(&env->allocator, &env->arena);
+	env->tree_extent_size = 0;
+}
+
+void
+vy_mem_env_destroy(struct vy_mem_env *env)
+{
+	lsregion_destroy(&env->allocator);
+	tuple_arena_destroy(&env->arena);
+}
+
+/* }}} vy_mem_env */
 
 /** {{{ vy_mem */
 
@@ -42,11 +73,16 @@ static void *
 vy_mem_tree_extent_alloc(void *ctx)
 {
 	struct vy_mem *mem = (struct vy_mem *) ctx;
-	void *ret = lsregion_alloc(mem->allocator, VY_MEM_TREE_EXTENT_SIZE,
+	struct vy_mem_env *env = mem->env;
+	void *ret = lsregion_alloc(&env->allocator, VY_MEM_TREE_EXTENT_SIZE,
 				   mem->generation);
-	if (ret == NULL)
+	if (ret == NULL) {
 		diag_set(OutOfMemory, VY_MEM_TREE_EXTENT_SIZE, "lsregion_alloc",
 			 "ret");
+		return NULL;
+	}
+	mem->tree_extent_size += VY_MEM_TREE_EXTENT_SIZE;
+	env->tree_extent_size += VY_MEM_TREE_EXTENT_SIZE;
 	return ret;
 }
 
@@ -59,7 +95,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 struct vy_mem *
-vy_mem_new(struct lsregion *allocator, int64_t generation,
+vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   struct tuple_format *upsert_format, uint32_t schema_version)
@@ -70,12 +106,12 @@ vy_mem_new(struct lsregion *allocator, int64_t generation,
 			 "malloc", "struct vy_mem");
 		return NULL;
 	}
+	index->env = env;
 	index->min_lsn = INT64_MAX;
 	index->max_lsn = -1;
 	index->cmp_def = cmp_def;
 	index->generation = generation;
 	index->schema_version = schema_version;
-	index->allocator = allocator;
 	index->format = format;
 	tuple_format_ref(format);
 	index->format_with_colmask = format_with_colmask;
@@ -110,6 +146,7 @@ vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
 void
 vy_mem_delete(struct vy_mem *index)
 {
+	index->env->tree_extent_size -= index->tree_extent_size;
 	tuple_format_unref(index->format);
 	tuple_format_unref(index->format_with_colmask);
 	tuple_format_unref(index->upsert_format);
@@ -133,7 +170,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 
 	const struct tuple *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-	if (vy_stmt_compare(result, stmt, mem->cmp_def) != 0)
+	if (vy_tuple_compare(result, stmt, mem->cmp_def) != 0)
 		return NULL;
 	return result;
 }
@@ -332,8 +369,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr,
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
 			if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
-			    vy_stmt_compare(itr->curr_stmt, prev_stmt,
-					    cmp_def) != 0)
+			    vy_tuple_compare(itr->curr_stmt, prev_stmt,
+					     cmp_def) != 0)
 				break;
 			itr->curr_pos = prev_pos;
 			itr->curr_stmt = prev_stmt;
@@ -461,7 +498,7 @@ vy_mem_iterator_next_key_impl(struct vy_mem_iterator *itr)
 			itr->curr_stmt = NULL;
 			return 1;
 		}
-	} while (vy_stmt_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0);
+	} while (vy_tuple_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0);
 
 	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt, cmp_def) != 0) {
@@ -503,7 +540,7 @@ vy_mem_iterator_next_lsn_impl(struct vy_mem_iterator *itr)
 
 	const struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_stmt_compare(itr->curr_stmt, next_stmt, cmp_def) == 0) {
+	if (vy_tuple_compare(itr->curr_stmt, next_stmt, cmp_def) == 0) {
 		itr->curr_pos = next_pos;
 		itr->curr_stmt = next_stmt;
 		return 0;
@@ -534,8 +571,8 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_stmt, last_stmt,
-			     itr->mem->cmp_def) > 0)) {
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->mem->cmp_def) > 0)) {
 		if (itr->curr_stmt != NULL)
 			*ret = itr->last_stmt;
 		return 0;

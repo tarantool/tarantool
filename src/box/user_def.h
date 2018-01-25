@@ -39,6 +39,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+typedef uint16_t user_access_t;
 /**
  * Effective session user. A cache of user data
  * and access stored in session and fiber local storage.
@@ -52,20 +53,44 @@ struct credentials {
 	 * Cached global grants, to avoid an extra look up
 	 * when checking global grants.
 	 */
-	uint8_t universal_access;
+	user_access_t universal_access;
 	/** User id of the authenticated user. */
 	uint32_t uid;
 };
 
-enum {
+enum priv_type {
 	/* SELECT */
 	PRIV_R = 1,
-	/* INSERT, UPDATE, DELETE, REPLACE */
+	/* INSERT, UPDATE, UPSERT, DELETE, REPLACE */
 	PRIV_W = 2,
 	/* CALL */
 	PRIV_X = 4,
-	/** Everything. */
-	PRIV_ALL = PRIV_R + PRIV_W + PRIV_X
+	/* SESSION */
+	PRIV_S = 8,
+	/* USAGE */
+	PRIV_U = 16,
+	/* CREATE */
+	PRIV_C = 32,
+	/* DROP */
+	PRIV_D = 64,
+	/* ALTER */
+	PRIV_A = 128,
+	/* REFERENCE - required by ANSI - not implemented */
+	PRIV_REFERENCE = 256,
+	/* TRIGGER - required by ANSI - not implemented */
+	PRIV_TRIGGER = 512,
+	/* INSERT - required by ANSI - not implemented */
+	PRIV_INSERT = 1024,
+	/* UPDATE - required by ANSI - not implemented */
+	PRIV_UPDATE = 2048,
+	/* DELETE - required by ANSI - not implemented */
+	PRIV_DELETE = 4096,
+	/* This is never granted, but used internally. */
+	PRIV_GRANT = 8192,
+	/* Never granted, but used internally. */
+	PRIV_REVOKE = 16384,
+	/* all bits */
+	PRIV_ALL  = ~((user_access_t) 0),
 };
 
 /**
@@ -84,14 +109,14 @@ struct priv_def {
 	 * What is being granted, has been granted, or is being
 	 * revoked.
 	 */
-	uint8_t access;
+	user_access_t access;
 	/** To maintain a set of effective privileges. */
 	rb_node(struct priv_def) link;
 };
 
 /* Privilege name for error messages */
 const char *
-priv_name(uint8_t access);
+priv_name(user_access_t access);
 
 /**
  * Encapsulates privileges of a user on an object.
@@ -103,14 +128,14 @@ struct access {
 	 * Granted access has been given to a user explicitly
 	 * via some form of a grant.
 	 */
-	uint8_t granted;
+	user_access_t granted;
 	/**
 	 * Effective access is a sum of granted access and
 	 * all privileges inherited by a user on this object
 	 * via some role. Since roles may be granted to other
 	 * roles, this may include indirect grants.
 	 */
-	uint8_t effective;
+	user_access_t effective;
 };
 
 /**

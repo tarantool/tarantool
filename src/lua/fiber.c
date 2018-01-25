@@ -258,6 +258,7 @@ lbox_fiber_statof_nobt(struct fiber *f, void *cb_ctx)
 static int
 lbox_fiber_info(struct lua_State *L)
 {
+#ifdef ENABLE_BACKTRACE
 	bool do_backtrace = true;
 	if (lua_istable(L, 1)) {
 		lua_pushstring(L, "backtrace");
@@ -271,8 +272,15 @@ lbox_fiber_info(struct lua_State *L)
 			do_backtrace = lua_toboolean(L, -1);
 		lua_pop(L, 1);
 	}
-	lua_newtable(L);
-	fiber_stat(do_backtrace ? lbox_fiber_statof_bt : lbox_fiber_statof_nobt, L);
+	if (do_backtrace) {
+		lua_newtable(L);
+		fiber_stat(lbox_fiber_statof_bt, L);
+	} else
+#endif /* ENABLE_BACKTRACE */
+	{
+		lua_newtable(L);
+		fiber_stat(lbox_fiber_statof_nobt, L);
+	}
 	lua_createtable(L, 0, 1);
 	lua_pushliteral(L, "mapping"); /* YAML will use block mode */
 	lua_setfield(L, -2, LUAL_SERIALIZE);

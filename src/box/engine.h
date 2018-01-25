@@ -50,6 +50,20 @@ struct xstream;
 
 extern struct rlist engines;
 
+/**
+ * Aggregated memory statistics. Used by box.info.memory().
+ */
+struct engine_memory_stat {
+	/** Size of memory used for storing user data. */
+	size_t data;
+	/** Size of memory used for indexing user data. */
+	size_t index;
+	/** Size of memory used for caching user data. */
+	size_t cache;
+	/** Size of memory used by active transactions. */
+	size_t tx;
+};
+
 typedef int
 engine_backup_cb(const char *path, void *arg);
 
@@ -160,6 +174,10 @@ struct engine_vtab {
 	 */
 	int (*backup)(struct engine *engine, struct vclock *vclock,
 		      engine_backup_cb cb, void *cb_arg);
+	/**
+	 * Accumulate engine memory statistics.
+	 */
+	void (*memory_stat)(struct engine *, struct engine_memory_stat *);
 	/**
 	 * Check definition of a new space for engine-specific
 	 * limitations. E.g. not all engines support temporary
@@ -307,6 +325,9 @@ engine_collect_garbage(int64_t lsn);
 
 int
 engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
+
+void
+engine_memory_stat(struct engine_memory_stat *stat);
 
 #if defined(__cplusplus)
 } /* extern "C" */

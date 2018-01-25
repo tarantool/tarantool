@@ -311,4 +311,14 @@ new_stat = s.index.test:info()
 upsert_stat_diff(new_stat, old_stat)
 new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
 
+--
+-- gh-3003: crash in read iterator if upsert exactly matches
+-- the search key.
+--
+s:truncate()
+s:insert{100, 100}
+box.snapshot()
+s:upsert({100}, {{'+', 2, 100}})
+s:select({100}, 'GE')
+
 s:drop()

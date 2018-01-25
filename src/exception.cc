@@ -126,7 +126,7 @@ Exception::Exception(const struct type_info *type_arg, const char *file,
 void
 Exception::log() const
 {
-	_say(S_ERROR, file, line, errmsg, "%s", type->name);
+	say_file_line(S_ERROR, file, line, errmsg, "%s", type->name);
 }
 
 static const struct method_info systemerror_methods[] = {
@@ -159,8 +159,8 @@ SystemError::SystemError(const char *file, unsigned line,
 void
 SystemError::log() const
 {
-	_say(S_SYSERROR, file, line, strerror(m_errno), "SystemError %s",
-	     errmsg);
+	say_file_line(S_SYSERROR, file, line, strerror(m_errno),
+		      "SystemError %s", errmsg);
 }
 
 const struct type_info type_OutOfMemory =
@@ -222,6 +222,20 @@ LuajitError::LuajitError(const char *file, unsigned line,
 	snprintf(errmsg, sizeof(errmsg), "%s", msg ? msg : "");
 }
 
+const struct type_info type_IllegalParams =
+	make_type("IllegalParams", &type_Exception);
+
+IllegalParams::IllegalParams(const char *file, unsigned line,
+				     const char *format, ...)
+	: Exception(&type_IllegalParams, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -263,6 +277,18 @@ BuildLuajitError(const char *file, unsigned line, const char *msg)
 {
 	BuildAlloc(LuajitError);
 	return new (p) LuajitError(file, line, msg);
+}
+
+struct error *
+BuildIllegalParams(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(IllegalParams);
+	IllegalParams *e =  new (p) IllegalParams(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
 }
 
 struct error *

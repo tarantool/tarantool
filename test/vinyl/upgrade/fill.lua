@@ -4,7 +4,12 @@
 --
 fiber = require 'fiber'
 
-box.cfg{vinyl_memory = 1024 * 1024, vinyl_timeout = 0.1, checkpoint_count = 1}
+box.cfg{
+    vinyl_memory = 1024 * 1024,
+    vinyl_max_tuple_size = 1024 * 1024 * 2,
+    vinyl_timeout = 0.1,
+    checkpoint_count = 1,
+}
 
 dump_trigger = box.schema.space.create('dump_trigger', {engine = 'vinyl'})
 dump_trigger:create_index('pk')

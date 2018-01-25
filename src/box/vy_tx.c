@@ -63,7 +63,7 @@ write_set_cmp(struct txv *a, struct txv *b)
 {
 	int rc = a->index < b->index ? -1 : a->index > b->index;
 	if (rc == 0)
-		return vy_stmt_compare(a->stmt, b->stmt, a->index->cmp_def);
+		return vy_tuple_compare(a->stmt, b->stmt, a->index->cmp_def);
 	return rc;
 }
 
@@ -133,8 +133,7 @@ tx_manager_delete(struct tx_manager *xm)
 	free(xm);
 }
 
-/** Create or reuse an instance of a read view. */
-static struct vy_read_view *
+struct vy_read_view *
 tx_manager_read_view(struct tx_manager *xm)
 {
 	struct vy_read_view *rv;
@@ -177,8 +176,7 @@ tx_manager_read_view(struct tx_manager *xm)
 	return rv;
 }
 
-/** Dereference and possibly destroy a read view. */
-static void
+void
 tx_manager_destroy_read_view(struct tx_manager *xm,
 			     const struct vy_read_view *read_view)
 {
@@ -206,7 +204,8 @@ tx_manager_vlsn(struct tx_manager *xm)
 static struct txv *
 txv_new(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 {
-	struct txv *v = mempool_alloc(&tx->xm->txv_mempool);
+	struct tx_manager *xm = tx->xm;
+	struct txv *v = mempool_alloc(&xm->txv_mempool);
 	if (v == NULL) {
 		diag_set(OutOfMemory, sizeof(*v), "mempool", "struct txv");
 		return NULL;
@@ -218,17 +217,21 @@ txv_new(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	tuple_ref(stmt);
 	v->region_stmt = NULL;
 	v->tx = tx;
+	v->is_first_insert = false;
 	v->is_overwritten = false;
 	v->overwritten = NULL;
+	xm->write_set_size += tuple_size(stmt);
 	return v;
 }
 
 static void
 txv_delete(struct txv *v)
 {
+	struct tx_manager *xm = v->tx->xm;
+	xm->write_set_size -= tuple_size(v->stmt);
 	tuple_unref(v->stmt);
 	vy_index_unref(v->index);
-	mempool_free(&v->tx->xm->txv_mempool, v);
+	mempool_free(&xm->txv_mempool, v);
 }
 
 static struct vy_read_interval *
@@ -236,8 +239,9 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_index *index,
 		     struct tuple *left, bool left_belongs,
 		     struct tuple *right, bool right_belongs)
 {
+	struct tx_manager *xm = tx->xm;
 	struct vy_read_interval *interval;
-	interval = mempool_alloc(&tx->xm->read_interval_mempool);
+	interval = mempool_alloc(&xm->read_interval_mempool);
 	if (interval == NULL) {
 		diag_set(OutOfMemory, sizeof(*interval),
 			 "mempool", "struct vy_read_interval");
@@ -253,16 +257,23 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_index *index,
 	interval->right = right;
 	interval->right_belongs = right_belongs;
 	interval->subtree_last = NULL;
+	xm->read_set_size += tuple_size(left);
+	if (left != right)
+		xm->read_set_size += tuple_size(right);
 	return interval;
 }
 
 static void
 vy_read_interval_delete(struct vy_read_interval *interval)
 {
+	struct tx_manager *xm = interval->tx->xm;
+	xm->read_set_size -= tuple_size(interval->left);
+	if (interval->left != interval->right)
+		xm->read_set_size -= tuple_size(interval->right);
 	vy_index_unref(interval->index);
 	tuple_unref(interval->left);
 	tuple_unref(interval->right);
-	mempool_free(&interval->tx->xm->read_interval_mempool, interval);
+	mempool_free(&xm->read_interval_mempool, interval);
 }
 
 static struct vy_read_interval *
@@ -276,7 +287,8 @@ vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
 	return NULL;
 }
 
-void
+/** Initialize a tx object. */
+static void
 vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 {
 	stailq_create(&tx->log);
@@ -291,7 +303,8 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	rlist_create(&tx->on_destroy);
 }
 
-void
+/** Destroy a tx object. */
+static void
 vy_tx_destroy(struct vy_tx *tx)
 {
 	trigger_run(&tx->on_destroy, NULL);
@@ -524,13 +537,37 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (v->is_overwritten)
 			continue;
 
+		enum iproto_type type = vy_stmt_type(v->stmt);
+
+		/* Optimize out INSERT + DELETE for the same key. */
+		if (v->is_first_insert && type == IPROTO_DELETE)
+			continue;
+
+		if (v->is_first_insert && type == IPROTO_REPLACE) {
+			/*
+			 * There is no committed statement for the
+			 * given key or the last statement is DELETE
+			 * so we can turn REPLACE into INSERT.
+			 */
+			type = IPROTO_INSERT;
+			vy_stmt_set_type(v->stmt, type);
+		}
+
+		if (!v->is_first_insert && type == IPROTO_INSERT) {
+			/*
+			 * INSERT following REPLACE means nothing,
+			 * turn it into REPLACE.
+			 */
+			type = IPROTO_REPLACE;
+			vy_stmt_set_type(v->stmt, type);
+		}
+
 		if (vy_tx_write_prepare(v) != 0)
 			return -1;
 		assert(v->mem != NULL);
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
-		enum iproto_type type = vy_stmt_type(v->stmt);
 		const struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
 		if (vy_tx_write(index, v->mem, v->stmt, region_stmt) != 0)
@@ -644,15 +681,8 @@ vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp)
 {
 	assert(tx->state == VINYL_TX_READY);
 	struct stailq_entry *last = svp;
-	/* Start from the first statement after the savepoint. */
-	last = last == NULL ? stailq_first(&tx->log) : stailq_next(last);
-	if (last == NULL) {
-		/* Empty transaction or no changes after the savepoint. */
-		return;
-	}
 	struct stailq tail;
-	stailq_create(&tail);
-	stailq_splice(&tx->log, last, &tail);
+	stailq_cut_tail(&tx->log, last, &tail);
 	/* Rollback statements in LIFO order. */
 	stailq_reverse(&tail);
 	struct txv *v, *tmp;
@@ -763,8 +793,7 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_index *index,
 	}
 
 	struct txv *v = write_set_search_key(&tx->write_set, index, stmt);
-	if (v != NULL && (vy_stmt_type(v->stmt) == IPROTO_REPLACE ||
-			  vy_stmt_type(v->stmt) == IPROTO_DELETE)) {
+	if (v != NULL && vy_stmt_type(v->stmt) != IPROTO_UPSERT) {
 		/* Reading from own write set is serializable. */
 		return 0;
 	}
@@ -790,6 +819,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		assert(index->id == 0);
 		uint8_t old_type = vy_stmt_type(old->stmt);
 		assert(old_type == IPROTO_UPSERT ||
+		       old_type == IPROTO_INSERT ||
 		       old_type == IPROTO_REPLACE ||
 		       old_type == IPROTO_DELETE);
 		(void) old_type;
@@ -818,7 +848,11 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 		tx->write_size -= tuple_size(old->stmt);
 		write_set_remove(&tx->write_set, old);
 		old->is_overwritten = true;
+		v->is_first_insert = old->is_first_insert;
 	}
+
+	if (old == NULL && vy_stmt_type(stmt) == IPROTO_INSERT)
+		v->is_first_insert = true;
 
 	if (old != NULL && vy_stmt_type(stmt) != IPROTO_UPSERT) {
 		/*
@@ -957,8 +991,8 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_txv == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_txv->stmt, last_stmt,
-			     itr->index->cmp_def) > 0)) {
+	     vy_tuple_compare(itr->curr_txv->stmt, last_stmt,
+			      itr->index->cmp_def) > 0)) {
 		if (itr->curr_txv != NULL)
 			*ret = itr->curr_txv->stmt;
 		return;

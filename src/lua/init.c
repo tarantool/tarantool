@@ -43,6 +43,7 @@
 
 #include <fiber.h>
 #include "version.h"
+#include "backtrace.h"
 #include "coio.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -315,6 +316,23 @@ tarantool_lua_setpaths(struct lua_State *L)
 }
 
 static int
+tarantool_panic_handler(lua_State *L) {
+	const char *problem = lua_tostring(L, -1);
+	print_backtrace();
+	say_crit("%s", problem);
+	int level = 1;
+	lua_Debug ar;
+	while (lua_getstack(L, level++, &ar) == 1) {
+		if (lua_getinfo(L, "nSl", &ar) == 0)
+			break;
+		say_crit("#%d %s (%s), %s:%d", level,
+			 ar.name, ar.namewhat,
+			 ar.short_src, ar.currentline);
+	}
+	return 1;
+}
+
+static int
 luaopen_tarantool(lua_State *L)
 {
 	/* Set _G._TARANTOOL (like _VERSION) */
@@ -377,7 +395,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
 	luaL_loadstring(L, "return require('ffi')");
 	lua_call(L, 0, 0);
-
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_utils_init(L);
@@ -446,6 +463,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 		panic("Failed to unload 'strict' Lua module");
 #endif /* NDEBUG */
 
+	lua_atpanic(L, tarantool_panic_handler);
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
 	tarantool_L = L;
@@ -590,6 +608,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
+
 	script_fiber = fiber_new(title, run_script_f);
 	if (script_fiber == NULL)
 		panic("%s", diag_last_error(diag_get())->errmsg);

@@ -290,7 +290,6 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 	/* Malformed packet appears to be a lesser evil than abort. */
 	return obuf_dup(out, &body, sizeof(body)) != sizeof(body) ||
 	       obuf_dup(out, e->errmsg, msg_len) != msg_len ? -1 : 0;
-
 }
 
 void
@@ -578,25 +577,6 @@ xrow_encode_dml(const struct request *request, struct iovec *iov)
 	iov[0].iov_len = pos - begin;
 
 	return iovcnt;
-}
-
-struct request *
-xrow_decode_dml_gc(struct xrow_header *row)
-{
-	struct region *region = &fiber()->gc;
-	size_t used = region_used(region);
-	struct request *request = region_alloc_object(region, struct request);
-	if (request == NULL) {
-		diag_set(OutOfMemory, sizeof(*request), "region_alloc_object",
-			 "request");
-		return NULL;
-	}
-	uint64_t key_map = dml_request_key_map(row->type);
-	if (xrow_decode_dml(row, request, key_map) != 0) {
-		region_truncate(region, used);
-		return NULL;
-	}
-	return request;
 }
 
 int
@@ -1023,6 +1003,15 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	row->bodycnt = 1;
 	row->type = IPROTO_OK;
 	return 0;
+}
+
+void
+xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm)
+{
+	memset(row, 0, sizeof(*row));
+	row->type = IPROTO_OK;
+	row->replica_id = replica_id;
+	row->tm = tm;
 }
 
 void

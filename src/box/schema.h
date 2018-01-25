@@ -84,6 +84,14 @@ func_by_name(const char *name, uint32_t name_len);
 int
 space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
 
+/**
+ * Try to look up object name by id and type of object.
+ *
+ * @return NULL if object of type not found, otherwise name of object.
+ */
+const char *
+schema_find_name(enum schema_object_type type, uint32_t object_id);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -205,5 +213,22 @@ extern struct rlist on_alter_space;
  * It is passed the txn statement that altered the sequence.
  */
 extern struct rlist on_alter_sequence;
+
+/**
+ * Triggers fired after access denied error is created.
+ */
+extern struct rlist on_access_denied;
+
+/**
+ * Context passed to on_access_denied trigger.
+ */
+struct on_access_denied_ctx {
+	/** Type of declined access */
+	const char *access_type;
+	/** Type of object the required access was denied to */
+	const char *object_type;
+	/** Name of object the required access was denied to */
+	const char *object_name;
+};
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

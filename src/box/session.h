@@ -35,6 +35,7 @@
 #include "trigger.h"
 #include "fiber.h"
 #include "user.h"
+#include "authentication.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -97,7 +98,7 @@ struct session {
 	enum session_type type;
 	/** Authentication salt. */
 	char salt[SESSION_SEED_SIZE];
-	/** Cached user id and global grants */
+	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
@@ -194,7 +195,7 @@ current_session()
  * user on demand as in current_session() applies.
  */
 static inline struct credentials *
-current_user()
+effective_user()
 {
 	struct credentials *u =
 		(struct credentials *) fiber_get_key(fiber(),
@@ -249,26 +250,38 @@ session_run_on_disconnect_triggers(struct session *session);
 
 /** Run auth triggers */
 int
-session_run_on_auth_triggers(const char *user_name);
+session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result);
+
+/**
+ * Check whether or not the current user is authorized to connect
+ */
+int
+access_check_session(struct user *user);
+
+/**
+ * Check whether or not the current user can be granted
+ * the requested access to the universe.
+ */
+int
+access_check_universe(user_access_t access);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 
+#include "diag.h"
+
 static inline void
-access_check_universe(uint8_t access)
+access_check_session_xc(struct user *user)
 {
-	struct credentials *credentials = current_user();
-	if (!(credentials->universal_access & access)) {
-		/*
-		 * Access violation, report error.
-		 * The user may not exist already, if deleted
-		 * from a different connection.
-		 */
-		struct user *user = user_find_xc(credentials->uid);
-		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  priv_name(access), schema_object_name(SC_UNIVERSE),
-			  user->def->name);
-	}
+	if (access_check_session(user) != 0)
+		diag_raise();
+}
+
+static inline void
+access_check_universe_xc(user_access_t access)
+{
+	if (access_check_universe(access) != 0)
+		diag_raise();
 }
 
 #endif /* defined(__cplusplus) */

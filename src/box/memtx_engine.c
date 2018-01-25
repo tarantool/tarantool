@@ -32,6 +32,7 @@
 #include "memtx_space.h"
 #include "memtx_tuple.h"
 
+#include <small/small.h>
 #include <small/mempool.h>
 
 #include "coio_file.h"
@@ -208,10 +209,10 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		return -1;
 	}
 
-	struct request *request = xrow_decode_dml_gc(row);
-	if (request == NULL)
+	struct request request;
+	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
-	struct space *space = space_cache_find(request->space_id);
+	struct space *space = space_cache_find(request.space_id);
 	if (space == NULL)
 		return -1;
 	/* memtx snapshot must contain only memtx spaces */
@@ -220,7 +221,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		return -1;
 	}
 	/* no access checks here - applier always works with admin privs */
-	if (space_apply_initial_join_row(space, request) != 0)
+	if (space_apply_initial_join_row(space, &request) != 0)
 		return -1;
 	/*
 	 * Don't let gc pool grow too much. Yet to
@@ -870,6 +871,26 @@ memtx_engine_join(struct engine *engine, struct vclock *vclock,
 }
 
 static int
+small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
+{
+	(void)stats;
+	(void)cb_ctx;
+	return 0;
+}
+
+static void
+memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
+{
+	(void)engine;
+	struct small_stats data_stats;
+	struct mempool_stats index_stats;
+	mempool_stats(&memtx_index_extent_pool, &index_stats);
+	small_stats(&memtx_alloc, &data_stats, small_stats_noop_cb, NULL);
+	stat->data += data_stats.used;
+	stat->index += index_stats.totals.used;
+}
+
+static int
 memtx_engine_check_space_def(struct space_def *def)
 {
 	(void)def;
@@ -896,6 +917,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .abort_checkpoint = */ memtx_engine_abort_checkpoint,
 	/* .collect_garbage = */ memtx_engine_collect_garbage,
 	/* .backup = */ memtx_engine_backup,
+	/* .memory_stat = */ memtx_engine_memory_stat,
 	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 

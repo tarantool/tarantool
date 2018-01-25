@@ -88,10 +88,8 @@ struct vy_page_read_task {
 	struct cbus_call_msg base;
 	/** vinyl page metadata */
 	struct vy_page_info page_info;
-	/** vy_slice with fd - ref. counted */
-	struct vy_slice *slice;
-	/** vy_run_env - contains environment with task mempool */
-	struct vy_run_env *run_env;
+	/** vy_run with fd - ref. counted */
+	struct vy_run *run;
 	/** [out] resulting vinyl page */
 	struct vy_page *page;
 };
@@ -224,7 +222,7 @@ vy_page_info_destroy(struct vy_page_info *page_info)
 }
 
 struct vy_run *
-vy_run_new(int64_t id)
+vy_run_new(struct vy_run_env *env, int64_t id)
 {
 	struct vy_run *run = calloc(1, sizeof(struct vy_run));
 	if (unlikely(run == NULL)) {
@@ -232,6 +230,7 @@ vy_run_new(int64_t id)
 			 "struct vy_run");
 		return NULL;
 	}
+	run->env = env;
 	run->id = id;
 	run->dump_lsn = -1;
 	run->fd = -1;
@@ -825,7 +824,6 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 		}
 	}
 	if (size != sizeof(uint32_t) * row_count) {
-		/* TODO: report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
 			 tt_sprintf("Wrong row index size "
 				    "(expected %zu, got %u",
@@ -840,6 +838,15 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 	return 0;
 }
 
+/** Return the name of a run data file. */
+static inline const char *
+vy_run_filename(struct vy_run *run)
+{
+	char *buf = tt_static_buf();
+	vy_run_snprint_filename(buf, TT_STATIC_BUF_LEN, run->id, VY_FILE_RUN);
+	return buf;
+}
+
 /**
  * Read a page requests from vinyl xlog data file.
  *
@@ -847,8 +854,8 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
  * @retval -1 on error, check diag
  */
 static int
-vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
-	     ZSTD_DStream *zdctx)
+vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
+	     struct vy_run *run, ZSTD_DStream *zdctx)
 {
 	/* read xlog tx from xlog file */
 	size_t region_svp = region_used(&fiber()->gc);
@@ -857,18 +864,16 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 		diag_set(OutOfMemory, page_info->size, "region gc", "page");
 		return -1;
 	}
-	ssize_t readen = fio_pread(fd, data, page_info->size,
+	ssize_t readen = fio_pread(run->fd, data, page_info->size,
 				   page_info->offset);
 	ERROR_INJECT(ERRINJ_VYRUN_DATA_READ, {
 		readen = -1;
 		errno = EIO;});
 	if (readen < 0) {
-		/* TODO: report filename */
 		diag_set(SystemError, "failed to read from file");
 		goto error;
 	}
 	if (readen != (ssize_t)page_info->size) {
-		/* TODO: replace with XlogError, report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
 			 "Unexpected end of file");
 		goto error;
@@ -889,7 +894,6 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 	if (xrow_header_decode(&xrow, &data_pos, data_end) == -1)
 		goto error;
 	if (xrow.type != VY_RUN_ROW_INDEX) {
-		/* TODO: report filename */
 		diag_set(ClientError, ER_INVALID_RUN_FILE,
 			 tt_sprintf("Wrong row index type "
 				    "(expected %d, got %u)",
@@ -903,8 +907,12 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info, int fd,
 		diag_set(ClientError, ER_INJECTION, "vinyl page read");
 		return -1;});
 	return 0;
-	error:
+error:
 	region_truncate(&fiber()->gc, region_svp);
+	diag_log();
+	say_error("error reading %s@%llu:%u", vy_run_filename(run),
+		  (unsigned long long)page_info->offset,
+		  (unsigned)page_info->size);
 	return -1;
 }
 
@@ -934,11 +942,10 @@ static int
 vy_page_read_cb(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
-	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run_env);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(task->run->env);
 	if (zdctx == NULL)
 		return -1;
-	return vy_page_read(task->page, &task->page_info,
-			    task->slice->run->fd, zdctx);
+	return vy_page_read(task->page, &task->page_info, task->run, zdctx);
 }
 
 /**
@@ -949,7 +956,7 @@ vy_page_read_cb_free(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
 	vy_page_delete(task->page);
-	mempool_free(&task->run_env->read_task_pool, task);
+	mempool_free(&task->run->env->read_task_pool, task);
 	return 0;
 }
 
@@ -963,8 +970,8 @@ static NODISCARD int
 vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			  struct vy_page **result)
 {
-	struct vy_run_env *env = itr->run_env;
 	struct vy_slice *slice = itr->slice;
+	struct vy_run_env *env = slice->run->env;
 
 	/* Check cache */
 	*result = vy_run_iterator_cache_get(itr, page_no);
@@ -995,9 +1002,8 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		reader = &env->reader_pool[env->next_reader++];
 		env->next_reader %= env->reader_pool_size;
 
-		task->slice = slice;
+		task->run = slice->run;
 		task->page_info = *page_info;
-		task->run_env = env;
 		task->page = page;
 
 		/* Post task to the reader thread. */
@@ -1024,7 +1030,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 			vy_page_delete(page);
 			return -1;
 		}
-		if (vy_page_read(page, page_info, slice->run->fd, zdctx) != 0) {
+		if (vy_page_read(page, page_info, slice->run, zdctx) != 0) {
 			vy_page_delete(page);
 			return -1;
 		}
@@ -1284,7 +1290,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	/* Check if the result is within the slice boundaries. */
 	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		if (slice->begin != NULL &&
-		    vy_stmt_compare_with_key(*ret, slice->begin, cmp_def) < 0) {
+		    vy_tuple_compare_with_key(*ret, slice->begin, cmp_def) < 0) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			*ret = NULL;
@@ -1294,7 +1300,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
 		       iterator_type == ITER_EQ);
 		if (slice->end != NULL &&
-		    vy_stmt_compare_with_key(*ret, slice->end, cmp_def) >= 0) {
+		    vy_tuple_compare_with_key(*ret, slice->end, cmp_def) >= 0) {
 			vy_run_iterator_cache_clean(itr);
 			itr->search_ended = true;
 			*ret = NULL;
@@ -1473,7 +1479,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 
 void
 vy_run_iterator_open(struct vy_run_iterator *itr,
-		     struct vy_run_iterator_stat *stat, struct vy_run_env *run_env,
+		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
@@ -1488,7 +1494,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 	itr->format = format;
 	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
-	itr->run_env = run_env;
 	itr->slice = slice;
 
 	itr->iterator_type = iterator_type;
@@ -1665,7 +1670,7 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	/**
 	 * One can think that we had to lock page of itr->curr_pos,
 	 *  to prevent freeing cur_key with entire page and avoid
-	 *  segmentation fault in vy_stmt_compare_raw.
+	 *  segmentation fault in vy_tuple_compare.
 	 * But in fact the only case when curr_pos and next_pos
 	 *  point to different pages is the case when next_pos points
 	 *  to the beginning of the next page, and in this case
@@ -1700,8 +1705,8 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_stmt, last_stmt,
-			     itr->cmp_def) > 0)) {
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->cmp_def) > 0)) {
 		*ret = itr->curr_stmt;
 		return 0;
 	}
@@ -1741,6 +1746,10 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 static void
 vy_run_acct_page(struct vy_run *run, struct vy_page_info *page)
 {
+	const char *min_key_end = page->min_key;
+	mp_next(&min_key_end);
+	run->page_index_size += sizeof(struct vy_page_info);
+	run->page_index_size += min_key_end - page->min_key;
 	run->count.rows += page->row_count;
 	run->count.bytes += page->unpacked_size;
 	run->count.bytes_compressed += page->size;
@@ -1868,6 +1877,8 @@ fail_close:
 	xlog_cursor_close(&cursor, false);
 fail:
 	vy_run_clear(run);
+	diag_log();
+	say_error("failed to load `%s'", path);
 	return -1;
 }
 
@@ -2138,6 +2149,9 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
 			    space_id, iid, run->id, VY_FILE_RUN);
+
+	say_info("writing `%s'", path);
+
 	struct xlog data_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_RUN,
@@ -2173,16 +2187,16 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	bloom_spectrum_choose(&bs, &run->info.bloom);
 	run->info.has_bloom = true;
 	bloom_spectrum_destroy(&bs, runtime.quota);
-	done:
+done:
 	wi->iface->stop(wi);
 	return 0;
 
-	err_close_xlog:
+err_close_xlog:
 	xlog_close(&data_xlog, false);
 	fiber_gc();
-	err_free_bloom:
+err_free_bloom:
 	bloom_spectrum_destroy(&bs, runtime.quota);
-	err:
+err:
 	wi->iface->stop(wi);
 	return -1;
 }
@@ -2378,6 +2392,8 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	vy_run_snprint_path(path, sizeof(path), dirpath,
 			    space_id, iid, run->id, VY_FILE_INDEX);
 
+	say_info("writing `%s'", path);
+
 	struct xlog index_xlog;
 	struct xlog_meta meta = {
 		.filetype = XLOG_META_TYPE_INDEX,
@@ -2470,7 +2486,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	vy_run_snprint_path(path, sizeof(path), dir,
 			    space_id, iid, run->id, VY_FILE_RUN);
 
-	say_warn("rebuilding run index from %s data file", path);
+	say_info("rebuilding index for `%s'", path);
 	if (xlog_cursor_open(&cursor, path))
 		return -1;
 
@@ -2503,9 +2519,12 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 				continue;
 			}
 			++page_row_count;
-			key = vy_stmt_extract_key(&xrow, cmp_def,
-						  mem_format, upsert_format,
-						  iid == 0);
+			struct tuple *tuple = vy_stmt_decode(&xrow, cmp_def,
+					mem_format, upsert_format, iid == 0);
+			if (tuple == NULL)
+				goto close_err;
+			key = tuple_extract_key(tuple, cmp_def, NULL);
+			tuple_unref(tuple);
 			if (key == NULL)
 				goto close_err;
 			if (run->info.min_key == NULL) {
@@ -2592,19 +2611,19 @@ close_err:
 static NODISCARD int
 vy_slice_stream_read_page(struct vy_slice_stream *stream)
 {
+	struct vy_run *run = stream->slice->run;
+
 	assert(stream->page == NULL);
-	ZSTD_DStream *zdctx = vy_env_get_zdctx(stream->run_env);
+	ZSTD_DStream *zdctx = vy_env_get_zdctx(run->env);
 	if (zdctx == NULL)
 		return -1;
 
-	struct vy_page_info *page_info = vy_run_page_info(stream->slice->run,
-							  stream->page_no);
+	struct vy_page_info *page_info = vy_run_page_info(run, stream->page_no);
 	stream->page = vy_page_new(page_info);
 	if (stream->page == NULL)
 		return -1;
 
-	if (vy_page_read(stream->page, page_info,
-			 stream->slice->run->fd, zdctx) != 0) {
+	if (vy_page_read(stream->page, page_info, run, zdctx) != 0) {
 		vy_page_delete(stream->page);
 		stream->page = NULL;
 		return -1;
@@ -2648,8 +2667,8 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 				     stream->is_primary);
 		if (fnd_key == NULL)
 			return -1;
-		int cmp = vy_stmt_compare(fnd_key, stream->slice->begin,
-					  stream->cmp_def);
+		int cmp = vy_tuple_compare_with_key(fnd_key,
+				stream->slice->begin, stream->cmp_def);
 		if (cmp < 0)
 			beg = mid + 1;
 		else
@@ -2701,8 +2720,8 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 	/* Check that the tuple is not out of slice bounds = */
 	if (stream->slice->end != NULL &&
 	    stream->page_no >= stream->slice->last_page_no &&
-	    vy_stmt_compare_with_key(tuple, stream->slice->end,
-				     stream->cmp_def) >= 0)
+	    vy_tuple_compare_with_key(tuple, stream->slice->end,
+				      stream->cmp_def) >= 0)
 		return 0;
 
 	/* We definitely has the next non-null tuple. Save it in stream */
@@ -2759,8 +2778,7 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 		   const struct key_def *cmp_def, struct tuple_format *format,
-		   struct tuple_format *upsert_format,
-		   struct vy_run_env *run_env, bool is_primary)
+		   struct tuple_format *upsert_format, bool is_primary)
 {
 	stream->base.iface = &vy_slice_stream_iface;
 
@@ -2773,6 +2791,5 @@ vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 	stream->cmp_def = cmp_def;
 	stream->format = format;
 	stream->upsert_format = upsert_format;
-	stream->run_env = run_env;
 	stream->is_primary = is_primary;
 }
