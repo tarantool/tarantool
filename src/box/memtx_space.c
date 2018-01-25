@@ -952,6 +952,12 @@ fail:
 }
 
 static void
+memtx_space_ephemeral_cleanup(struct space *space)
+{
+	memtx_space_prune(space);
+}
+
+static void
 memtx_space_commit_truncate(struct space *old_space,
 			    struct space *new_space)
 {
@@ -996,6 +1002,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_upsert = */ memtx_space_execute_upsert,
 	/* .ephemeral_replace = */ memtx_space_ephemeral_replace,
 	/* .ephemeral_delete = */ memtx_space_ephemeral_delete,
+	/* .ephemeral_cleanup = */ memtx_space_ephemeral_cleanup,
 	/* .init_system_space = */ memtx_init_system_space,
 	/* .init_ephemeral_space = */ memtx_init_ephemeral_space,
 	/* .check_index_def = */ memtx_space_check_index_def,

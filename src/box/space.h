@@ -70,6 +70,8 @@ struct space_vtab {
 
 	int (*ephemeral_delete)(struct space *, const char *);
 
+	void (*ephemeral_cleanup)(struct space *);
+
 	void (*init_system_space)(struct space *);
 	/**
 	 * Initialize an ephemeral space instance.
@@ -447,6 +449,9 @@ space_new(struct space_def *space_def, struct rlist *key_list);
  * Ephemeral spaces are invisible via public API and they
  * are not persistent. They are needed solely to do some
  * transient calculations.
+ *
+ * Ephemeral spaces created with this function must be
+ * deleted with space_delete_ephemeral().
  */
 struct space *
 space_new_ephemeral(struct space_def *space_def, struct rlist *key_list);
@@ -454,6 +459,17 @@ space_new_ephemeral(struct space_def *space_def, struct rlist *key_list);
 /** Destroy and free a space. */
 void
 space_delete(struct space *space);
+
+/**
+ * Ephemeral spaces must be destroyed with
+ * space_delete_ephemeral(). It calls ephemeral_cleanup() in
+ * addition to space_delete(). Otherwise, it can lead to
+ * memory leaks. For instance, calling space_delete() instead
+ * of space_delete_ephemeral() for memtx engine doesn't unref
+ * tuples, so they are appear to be incompletely destroyed.
+ */
+void
+space_delete_ephemeral(struct space *space);
 
 /**
  * Dump space definition (key definitions, key count)

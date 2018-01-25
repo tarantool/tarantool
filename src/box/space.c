@@ -213,6 +213,13 @@ space_delete(struct space *space)
 	space->vtab->destroy(space);
 }
 
+void
+space_delete_ephemeral(struct space *space)
+{
+	space->vtab->ephemeral_cleanup(space);
+	space_delete(space);
+}
+
 /** Do nothing if the space is already recovered. */
 void
 space_noop(struct space *space)
