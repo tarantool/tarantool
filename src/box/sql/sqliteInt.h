@@ -1630,8 +1630,7 @@ struct FKey {
  * comparison of the two index keys.
  *
  * Note that aSortOrder[] and aColl[] have nField+1 slots.  There
- * are nField slots for the columns of an index then one extra slot
- * for the rowid at the end.
+ * are nField slots for the columns of an index.
  */
 struct KeyInfo {
 	u32 nRef;		/* Number of references to this KeyInfo object */
@@ -1952,7 +1951,7 @@ struct Expr {
 	bool is_ephemeral;      /* If iTable was set, this flags if this table i
 				 * ephemeral or not.
 				 */
-	ynVar iColumn;		/* TK_COLUMN: column index.  -1 for rowid.
+	ynVar iColumn;		/* TK_COLUMN: column index.
 				 * TK_VARIABLE: variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
 				 */
@@ -2455,7 +2454,6 @@ struct SelectDest {
 struct AutoincInfo {
 	AutoincInfo *pNext;	/* Next info block in a list of them all */
 	Table *pTab;		/* Table this info block refers to */
-	int regCtr;		/* Memory register holding the rowid counter */
 };
 
 /*
@@ -2552,7 +2550,6 @@ struct Parse {
 	Token constraintName;	/* Name of the constraint currently being parsed */
 	yDbMask writeMask;	/* Start a write transaction on these databases */
 	yDbMask cookieMask;	/* Bitmask of schema verified databases */
-	int regRowid;		/* Register holding rowid of CREATE TABLE entry */
 	int regRoot;		/* Register holding root page number for new objects */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
 #ifdef SELECTTRACE_ENABLED
@@ -3661,18 +3658,18 @@ void sqlite3WithPush(Parse *, With *, u8);
  * provided (enforcement of FK constraints requires the triggers sub-system).
  */
 #if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
-void sqlite3FkCheck(Parse *, Table *, int, int, int *, int);
+void sqlite3FkCheck(Parse *, Table *, int, int, int *);
 void sqlite3FkDropTable(Parse *, SrcList *, Table *);
-void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *, int);
-int sqlite3FkRequired(Table *, int *, int);
+void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *);
+int sqlite3FkRequired(Table *, int *);
 u32 sqlite3FkOldmask(Parse *, Table *);
 FKey *sqlite3FkReferences(Table *);
 #else
-#define sqlite3FkActions(a,b,c,d,e,f)
+#define sqlite3FkActions(a,b,c,d,e)
 #define sqlite3FkCheck(a,b,c,d,e,f)
 #define sqlite3FkDropTable(a,b,c)
 #define sqlite3FkOldmask(a,b)         0
-#define sqlite3FkRequired(a,b,c,d)    0
+#define sqlite3FkRequired(b,c)    0
 #endif
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 void sqlite3FkDelete(sqlite3 *, Table *);

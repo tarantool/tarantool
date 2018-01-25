@@ -2834,13 +2834,9 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 
 	/* The following block stores the meta information that will be returned
 	 * to the caller in local variables zDataType, zCollSeq, notnull, primarykey
-	 * and autoinc. At this point there are two possibilities:
-	 *
-	 *     1. The specified column name was rowid", "oid" or "_rowid_"
-	 *        and there is no explicitly declared IPK column.
-	 *
-	 *     2. The table is not a view and the column name identified an
-	 *        explicitly declared column. Copy meta information from *pCol.
+	 * and autoinc. At this the table is not a view and the column name
+	 * identified an explicitly declared column.
+	 * Copy meta information from *pCol.
 	 */
 	if (pCol) {
 		zDataType = sqlite3ColumnType(pCol, 0);

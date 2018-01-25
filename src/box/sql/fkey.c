@@ -512,8 +512,8 @@ fkLookupParent(Parse * pParse,	/* Parse context */
  * to column iCol of table pTab.
  *
  * regBase is the first of an array of register that contains the data
- * for pTab.  regBase itself holds the rowid.  regBase+1 holds the first
- * column.  regBase+2 holds the second column, and so forth.
+ * for pTab.  regBase+1 holds the first column.
+ * regBase+2 holds the second column, and so forth.
  */
 static Expr *
 exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
@@ -656,12 +656,8 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 	 * to the WHERE clause that prevent this entry from being scanned.
 	 * The added WHERE clause terms are like this:
 	 *
-	 *     $current_rowid!=rowid
 	 *     NOT( $current_a==a AND $current_b==b AND ... )
-	 *
-	 * The first form is used for rowid tables.  The second form is used
-	 * for WITHOUT ROWID tables.  In the second form, the primary key is
-	 * (a,b,...)
+	 *     The primary key is (a,b,...)
 	 */
 	if (pTab == pFKey->pFrom && nIncr > 0) {
 		Expr *pNe;	/* Expression (pLeft != pRight) */
@@ -825,25 +821,20 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
  * is currently being processed. For each column of the table that is
  * actually updated, the corresponding element in the aChange[] array
  * is zero or greater (if a column is unmodified the corresponding element
- * is set to -1). If the rowid column is modified by the UPDATE statement
- * the bChngRowid argument is non-zero.
+ * is set to -1).
  *
  * This function returns true if any of the columns that are part of the
  * child key for FK constraint *p are modified.
  */
 static int
-fkChildIsModified(Table * pTab,	/* Table being updated */
-		  FKey * p,	/* Foreign key for which pTab is the child */
-		  int *aChange,	/* Array indicating modified columns */
-		  int bChngRowid	/* True if rowid is modified by this update */
+fkChildIsModified(FKey * p,	/* Foreign key for which pTab is the child */
+		  int *aChange	/* Array indicating modified columns */
     )
 {
 	int i;
 	for (i = 0; i < p->nCol; i++) {
 		int iChildKey = p->aCol[i].iFrom;
 		if (aChange[iChildKey] >= 0)
-			return 1;
-		if (iChildKey == pTab->iPKey && bChngRowid)
 			return 1;
 	}
 	return 0;
@@ -855,22 +846,20 @@ fkChildIsModified(Table * pTab,	/* Table being updated */
  * is currently being processed. For each column of the table that is
  * actually updated, the corresponding element in the aChange[] array
  * is zero or greater (if a column is unmodified the corresponding element
- * is set to -1). If the rowid column is modified by the UPDATE statement
- * the bChngRowid argument is non-zero.
+ * is set to -1).
  *
  * This function returns true if any of the columns that are part of the
  * parent key for FK constraint *p are modified.
  */
 static int
-fkParentIsModified(Table * pTab, FKey * p, int *aChange, int bChngRowid)
+fkParentIsModified(Table * pTab, FKey * p, int *aChange)
 {
 	int i;
 	for (i = 0; i < p->nCol; i++) {
 		char *zKey = p->aCol[i].zCol;
 		int iKey;
 		for (iKey = 0; iKey < pTab->nCol; iKey++) {
-			if (aChange[iKey] >= 0
-			    || (iKey == pTab->iPKey && bChngRowid)) {
+			if (aChange[iKey] >= 0) {
 				Column *pCol = &pTab->aCol[iKey];
 				if (zKey) {
 					if (0 ==
@@ -914,7 +903,7 @@ isSetNullAction(Parse * pParse, FKey * pFKey)
  *
  * For a DELETE operation, parameter regOld is passed the index of the
  * first register in an array of (pTab->nCol+1) registers containing the
- * rowid of the row being deleted, followed by each of the column values
+ * PK of the row being deleted, followed by each of the column values
  * of the row being deleted, from left to right. Parameter regNew is passed
  * zero in this case.
  *
@@ -932,8 +921,7 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 	       Table * pTab,	/* Row is being deleted from this table */
 	       int regOld,	/* Previous row data is stored here */
 	       int regNew,	/* New row data is stored here */
-	       int *aChange,	/* Array indicating UPDATEd columns (or 0) */
-	       int bChngRowid	/* True if rowid is UPDATEd */
+	       int *aChange	/* Array indicating UPDATEd columns (or 0) */
     )
 {
 	sqlite3 *db = pParse->db;	/* Database handle */
@@ -962,8 +950,7 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 
 		if (aChange
 		    && sqlite3_stricmp(pTab->zName, pFKey->zTo) != 0
-		    && fkChildIsModified(pTab, pFKey, aChange,
-					 bChngRowid) == 0) {
+		    && fkChildIsModified(pFKey, aChange) == 0) {
 			continue;
 		}
 
@@ -1074,8 +1061,7 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 		int *aiCol = 0;
 
 		if (aChange
-		    && fkParentIsModified(pTab, pFKey, aChange,
-					  bChngRowid) == 0) {
+		    && fkParentIsModified(pTab, pFKey, aChange) == 0) {
 			continue;
 		}
 
@@ -1187,8 +1173,7 @@ sqlite3FkOldmask(Parse * pParse,	/* Parse context */
  * to an array of size N, where N is the number of columns in table pTab.
  * If the i'th column is not modified by the UPDATE, then the corresponding
  * entry in the aChange[] array is set to -1. If the column is modified,
- * the value is 0 or greater. Parameter chngRowid is set to true if the
- * UPDATE statement modifies the rowid fields of the table.
+ * the value is 0 or greater.
  *
  * If any foreign key processing will be required, this function returns
  * true. If there is no foreign key related processing, this function
@@ -1196,8 +1181,7 @@ sqlite3FkOldmask(Parse * pParse,	/* Parse context */
  */
 int
 sqlite3FkRequired(Table * pTab,	/* Table being modified */
-		  int *aChange,	/* Non-NULL for UPDATE operations */
-		  int chngRowid	/* True for UPDATE that affects rowid */
+		  int *aChange	/* Non-NULL for UPDATE operations */
     )
 {
 	struct session *user_session = current_session();
@@ -1216,15 +1200,13 @@ sqlite3FkRequired(Table * pTab,	/* Table being modified */
 
 			/* Check if any child key columns are being modified. */
 			for (p = pTab->pFKey; p; p = p->pNextFrom) {
-				if (fkChildIsModified
-				    (pTab, p, aChange, chngRowid))
+				if (fkChildIsModified(p, aChange))
 					return 1;
 			}
 
 			/* Check if any parent key columns are being modified. */
 			for (p = sqlite3FkReferences(pTab); p; p = p->pNextTo) {
-				if (fkParentIsModified
-				    (pTab, p, aChange, chngRowid))
+				if (fkParentIsModified(pTab, p, aChange))
 					return 1;
 			}
 		}
@@ -1497,8 +1479,7 @@ sqlite3FkActions(Parse * pParse,	/* Parse context */
 		 Table * pTab,	/* Table being updated or deleted from */
 		 ExprList * pChanges,	/* Change-list for UPDATE, NULL for DELETE */
 		 int regOld,	/* Address of array containing old row */
-		 int *aChange,	/* Array indicating UPDATEd columns (or 0) */
-		 int bChngRowid	/* True if rowid is UPDATEd */
+		 int *aChange	/* Array indicating UPDATEd columns (or 0) */
     )
 {
 	struct session *user_session = current_session();
@@ -1512,8 +1493,7 @@ sqlite3FkActions(Parse * pParse,	/* Parse context */
 		for (pFKey = sqlite3FkReferences(pTab); pFKey;
 		     pFKey = pFKey->pNextTo) {
 			if (aChange == 0
-			    || fkParentIsModified(pTab, pFKey, aChange,
-						  bChngRowid)) {
+			    || fkParentIsModified(pTab, pFKey, aChange)) {
 				Trigger *pAct =
 				    fkActionTrigger(pParse, pTab, pFKey,
 						    pChanges);

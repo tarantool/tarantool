@@ -4320,11 +4320,6 @@ sqlite3VdbeFindCompare(UnpackedRecord * p)
  * the key string in pUnpacked.  Write into *pRes a number
  * that is negative, zero, or positive if pC is less than, equal to,
  * or greater than pUnpacked.  Return SQLITE_OK on success.
- *
- * pUnpacked is either created without a rowid or is truncated so that it
- * omits the rowid at the end.  The rowid at the end of the index entry
- * is ignored as well.  Hence, this routine only compares the prefixes
- * of the keys prior to the final rowid, not the entire key.
  */
 int
 sqlite3VdbeIdxKeyCompare(sqlite3 * db,			/* Database connection */

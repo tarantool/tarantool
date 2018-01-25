@@ -576,23 +576,6 @@ randomBlob(sqlite3_context * context, int argc, sqlite3_value ** argv)
 }
 
 /*
- * Implementation of the last_insert_rowid() SQL function.  The return
- * value is the same as the sqlite3_last_insert_rowid() API function.
- */
-/* static void last_insert_rowid( */
-/*   sqlite3_context *context,  */
-/*   int NotUsed,  */
-/*   sqlite3_value **NotUsed2 */
-/* ){ */
-/*   sqlite3 *db = sqlite3_context_db_handle(context); */
-/*   UNUSED_PARAMETER2(NotUsed, NotUsed2); */
-/*   /\* IMP: R-51513-12026 The last_insert_rowid() SQL function is a */
-/*   * wrapper around the sqlite3_last_insert_rowid() C/C++ interface */
-/*   * function. *\/ */
-/*   sqlite3_result_int64(context, sqlite3_last_insert_rowid(db)); */
-/* } */
-
-/*
  * Implementation of the changes() SQL function.
  *
  * IMP: R-62073-11209 The changes() SQL function is a wrapper
@@ -1887,10 +1870,6 @@ sqlite3RegisterBuiltinFunctions(void)
 		DFUNCTION(sqlite_source_id, 0, 0, 0, sourceidFunc),
 		FUNCTION(sqlite_log, 2, 0, 0, errlogFunc),
 		FUNCTION(quote, 1, 0, 0, quoteFunc),
-#if 0
-		/* Tarantool: #2181. ROWID is not supported by Tarantool.  */
-		VFUNCTION(last_insert_rowid, 0, 0, 0, last_insert_rowid),
-#endif
 		VFUNCTION(changes, 0, 0, 0, changes),
 		VFUNCTION(total_changes, 0, 0, 0, total_changes),
 		FUNCTION(replace, 3, 0, 0, replaceFunc),

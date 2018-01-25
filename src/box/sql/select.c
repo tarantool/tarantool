@@ -1430,7 +1430,7 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	int eDest = pDest->eDest;
 	int iParm = pDest->iSDParm;
 	int regRow;
-	int regRowid;
+	int regTupleid;
 	int iCol;
 	int nKey;
 	int iSortTab;		/* Sorter cursor to read from */
@@ -1448,11 +1448,11 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	}
 	iTab = pSort->iECursor;
 	if (eDest == SRT_Output || eDest == SRT_Coroutine || eDest == SRT_Mem) {
-		regRowid = 0;
+		regTupleid = 0;
 		regRow = pDest->iSdst;
 		nSortData = nColumn;
 	} else {
-		regRowid = sqlite3GetTempReg(pParse);
+		regTupleid = sqlite3GetTempReg(pParse);
 		regRow = sqlite3GetTempRange(pParse, nColumn);
 		nSortData = nColumn;
 	}
@@ -1500,7 +1500,7 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	case SRT_Table:
 	case SRT_EphemTab: {
 			int regCopy = sqlite3GetTempRange(pParse,  nColumn);
-			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, iParm, 0, regRowid);
+			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, iParm, 0, regTupleid);
 			sqlite3VdbeAddOp3(v, OP_Copy, regRow, regCopy, nSortData - 1);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy, nColumn + 1, regRow);
 			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regRow);
@@ -1512,9 +1512,9 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			assert((unsigned int)nColumn ==
 			       sqlite3Strlen30(pDest->zAffSdst));
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, regRow, nColumn,
-					  regRowid, pDest->zAffSdst, nColumn);
+					  regTupleid, pDest->zAffSdst, nColumn);
 			sqlite3ExprCacheAffinityChange(pParse, regRow, nColumn);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm, regRowid,
+			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm, regTupleid,
 					     regRow, nColumn);
 			break;
 		}
@@ -1539,13 +1539,13 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			break;
 		}
 	}
-	if (regRowid) {
+	if (regTupleid) {
 		if (eDest == SRT_Set) {
 			sqlite3ReleaseTempRange(pParse, regRow, nColumn);
 		} else {
 			sqlite3ReleaseTempReg(pParse, regRow);
 		}
-		sqlite3ReleaseTempReg(pParse, regRowid);
+		sqlite3ReleaseTempReg(pParse, regTupleid);
 	}
 	/* The bottom of the loop
 	 */
@@ -1573,11 +1573,10 @@ generateSortTail(Parse * pParse,	/* Parsing context */
  * result in *pEstWidth.
  *
  * The declaration type is the exact datatype definition extracted from the
- * original CREATE TABLE statement if the expression is a column. The
- * declaration type for a ROWID field is INTEGER. Exactly when an expression
- * is considered a column can be complex in the presence of subqueries. The
- * result-set expression in all of the following SELECT statements is
- * considered a column by this function.
+ * original CREATE TABLE statement if the expression is a column.
+ * Exactly when an expression is considered a column can be complex
+ * in the presence of subqueries. The result-set expression in all
+ * of the following SELECT statements is considered a column by this function.
  *
  *   SELECT col FROM tbl;
  *   SELECT (SELECT col FROM tbl;
@@ -1665,13 +1664,10 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 				 * of the SELECT statement. Return the declaration type and origin
 				 * data for the result-set column of the sub-select.
 				 */
-				if (iCol >= 0
-				    && ALWAYS(iCol < pS->pEList->nExpr)) {
-					/* If iCol is less than zero, then the expression requests the
-					 * rowid of the sub-select or view. This expression is legal (see
-					 * test case misc2.2.2) - it always evaluates to NULL.
-					 *
-					 * The ALWAYS() is because iCol>=pS->pEList->nExpr will have been
+				assert(iCol >= 0);
+				if (ALWAYS(iCol < pS->pEList->nExpr)) {
+					/* The ALWAYS() is because
+					 * iCol>=pS->pEList->nExpr will have been
 					 * caught already by name resolution.
 					 */
 					NameContext sNC;
@@ -1687,31 +1683,15 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 			} else if (pTab->pSchema) {
 				/* A real table */
 				assert(!pS);
-				if (iCol < 0)
-					iCol = pTab->iPKey;
-				assert(iCol == -1
-				       || (iCol >= 0 && iCol < pTab->nCol));
+				assert(iCol >= 0 && iCol < pTab->nCol);
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
-				if (iCol < 0) {
-					zType = "INTEGER";
-					zOrigCol = "rowid";
-				} else {
-					zOrigCol = pTab->aCol[iCol].zName;
-					zType =
-					    sqlite3ColumnType(&pTab->aCol[iCol],
-							      0);
-					estWidth = pTab->aCol[iCol].szEst;
-				}
+				zOrigCol = pTab->aCol[iCol].zName;
+				zType = sqlite3ColumnType(&pTab->aCol[iCol], 0);
+				estWidth = pTab->aCol[iCol].szEst;
 				zOrigTab = pTab->zName;
 #else
-				if (iCol < 0) {
-					zType = "INTEGER";
-				} else {
-					zType =
-					    sqlite3ColumnType(&pTab->aCol[iCol],
-							      0);
-					estWidth = pTab->aCol[iCol].szEst;
-				}
+				zType = sqlite3ColumnType(&pTab->aCol[iCol], 0);
+				estWidth = pTab->aCol[iCol].szEst;
 #endif
 			}
 			break;
@@ -3550,8 +3530,7 @@ static void substSelect(Parse *, Select *, int, ExprList *, int);
 /*
  * Scan through the expression pExpr.  Replace every reference to
  * a column in table number iTable with a copy of the iColumn-th
- * entry in pEList.  (But leave references to the ROWID column
- * unchanged.)
+ * entry in pEList.
  *
  * This routine is part of the flattening procedure.  A subquery
  * whose result set is defined by pEList appears as entry in the

@@ -1993,58 +1993,6 @@ SQLITE_API int
 sqlite3_extended_result_codes(sqlite3 *, int onoff);
 
 /*
- * CAPI3REF: Last Insert Rowid
- * METHOD: sqlite3
- *
- * ^Each entry in most SQLite tables (except for [WITHOUT ROWID] tables)
- * has a unique 64-bit signed
- * integer key called the [ROWID | "rowid"]. ^The rowid is always available
- * as an undeclared column named ROWID, OID, or _ROWID_ as long as those
- * names are not also used by explicitly declared columns. ^If
- * the table has a column of type [INTEGER PRIMARY KEY] then that column
- * is another alias for the rowid.
- *
- * ^The sqlite3_last_insert_rowid(D) interface returns the [rowid] of the
- * most recent successful [INSERT] into a rowid table.
- * ^Inserts into [WITHOUT ROWID] tables are not recorded.
- * ^If no successful [INSERT]s into rowid tables
- * have ever occurred on the database connection D,
- * then sqlite3_last_insert_rowid(D) returns zero.
- *
- * ^(If an [INSERT] occurs within a trigger method, then this
- * routine will return the [rowid] of the inserted row as long as
- * the trigger or virtual table method is running. But once the
- * trigger or virtual table method ends, the value returned by
- * this routine reverts to what it was before the trigger or
- * virtual table method began.)^
- *
- * ^An [INSERT] that fails due to a constraint violation is not a
- * successful [INSERT] and does not change the value returned by this
- * routine.  ^Thus INSERT OR FAIL, INSERT OR IGNORE, INSERT OR ROLLBACK,
- * and INSERT OR ABORT make no changes to the return value of this
- * routine when their insertion fails.  ^(When INSERT OR REPLACE
- * encounters a constraint violation, it does not fail.  The
- * INSERT continues to completion after deleting rows that caused
- * the constraint problem so INSERT OR REPLACE will always change
- * the return value of this interface.)^
- *
- * ^For the purposes of this routine, an [INSERT] is considered to
- * be successful even if it is subsequently rolled back.
- *
- * This function is accessible to SQL statements via the
- * [last_insert_rowid() SQL function].
- *
- * If a separate thread performs a new [INSERT] on the same
- * database connection while the [sqlite3_last_insert_rowid()]
- * function is running and thus changes the last insert [rowid],
- * then the value returned by [sqlite3_last_insert_rowid()] is
- * unpredictable and might not equal either the old or the new
- * last insert [rowid].
-*/
-SQLITE_API sqlite3_int64
-sqlite3_last_insert_rowid(sqlite3 *);
-
-/*
  * CAPI3REF: Count The Number Of Rows Modified
  * METHOD: sqlite3
  *
@@ -2615,11 +2563,9 @@ sqlite3_memory_highwater(int resetFlag);
 /*
  * CAPI3REF: Pseudo-Random Number Generator
  *
- * SQLite contains a high-quality pseudo-random number generator (PRNG) used to
- * select random [ROWID | ROWIDs] when inserting new records into a table that
- * already uses the largest possible [ROWID].  The PRNG is also used for
- * the build-in random() and randomblob() SQL functions.  This interface allows
- * applications to access the same PRNG for other purposes.
+ * SQLite contains a high-quality pseudo-random number generator (PRNG).
+ * The PRNG is used for the build-in random() and randomblob() SQL functions.
+ * This interface allows applications to access the same PRNG for other purposes.
  *
  * ^A call to this routine stores N bytes of randomness into buffer P.
  * ^The P parameter can be a NULL pointer.
@@ -5326,61 +5272,6 @@ sqlite3_rollback_hook(sqlite3 *, void (*)(void *),
 		      void *);
 
 /*
- * CAPI3REF: Data Change Notification Callbacks
- * METHOD: sqlite3
- *
- * ^The sqlite3_update_hook() interface registers a callback function
- * with the [database connection] identified by the first argument
- * to be invoked whenever a row is updated, inserted or deleted in
- * a [rowid table].
- * ^Any callback set by a previous call to this function
- * for the same database connection is overridden.
- *
- * ^The second argument is a pointer to the function to invoke when a
- * row is updated, inserted or deleted in a rowid table.
- * ^The first argument to the callback is a copy of the third argument
- * to sqlite3_update_hook().
- * ^The second callback argument is one of [SQLITE_INSERT], [SQLITE_DELETE],
- * or [SQLITE_UPDATE], depending on the operation that caused the callback
- * to be invoked.
- * ^The third and fourth arguments to the callback contain pointers to the
- * database and table name containing the affected row.
- * ^The final callback parameter is the [rowid] of the row.
- * ^In the case of an update, this is the [rowid] after the update takes place.
- *
- * ^(The update hook is not invoked when internal system tables are
- * modified (i.e. _sql_stat1).)^
- * ^The update hook is not invoked when [WITHOUT ROWID] tables are modified.
- *
- * ^In the current implementation, the update hook
- * is not invoked when duplication rows are deleted because of an
- * [ON CONFLICT | ON CONFLICT REPLACE] clause.  ^Nor is the update hook
- * invoked when rows are deleted using the [truncate optimization].
- * The exceptions defined in this paragraph might change in a future
- * release of SQLite.
- *
- * The update hook implementation must not do anything that will modify
- * the database connection that invoked the update hook.  Any actions
- * to modify the database connection must be deferred until after the
- * completion of the [sqlite3_step()] call that triggered the update hook.
- * Note that [sqlite3_prepare_v2()] and [sqlite3_step()] both modify their
- * database connections for the meaning of "modify" in this paragraph.
- *
- * ^The sqlite3_update_hook(D,C,P) function
- * returns the P argument from the previous call
- * on the same [database connection] D, or NULL for
- * the first call on D.
- *
- * See also the [sqlite3_commit_hook()], [sqlite3_rollback_hook()],
- * and [sqlite3_preupdate_hook()] interfaces.
-*/
-SQLITE_API void *
-sqlite3_update_hook(sqlite3 *,
-		    void (*)(void *, int, char const *,
-			     char const *,
-			     sqlite3_int64), void *);
-
-/*
  * CAPI3REF: Enable Or Disable Shared Pager Cache
  *
  * ^(This routine enables or disables the sharing of the database cache
@@ -5564,21 +5455,6 @@ void sqlite3_soft_heap_limit(int N);
  *
  * ^If the specified table is actually a view, an [error code] is returned.
  *
- * ^If the specified column is "rowid", "oid" or "_rowid_" and the table
- * is not a [WITHOUT ROWID] table and an
- * [INTEGER PRIMARY KEY] column has been explicitly declared, then the output
- * parameters are set for the explicitly declared column. ^(If there is no
- * [INTEGER PRIMARY KEY] column, then the outputs
- * for the [rowid] are set as follows:
- *
- * <pre>
- *     data type: "INTEGER"
- *     collation sequence: "BINARY"
- *     not null: 0
- *     primary key: 1
- *     auto increment: 0
- * </pre>)^
- *
  * ^This function causes all database schemas to be read from disk and
  * parsed, if that has not already been done, and returns an error if
  * any errors are encountered while loading the schema.
@@ -5617,112 +5493,6 @@ sqlite3_table_column_metadata(sqlite3 * db,
  * ^The [sqlite3_blob_bytes()] interface returns the size of the BLOB in bytes.
 */
 typedef struct sqlite3_blob sqlite3_blob;
-
-/*
- * CAPI3REF: Open A BLOB For Incremental I/O
- * METHOD: sqlite3
- * CONSTRUCTOR: sqlite3_blob
- *
- * ^(This interfaces opens a [BLOB handle | handle] to the BLOB located
- * in row iRow, column zColumn, table zTable in database zDb;
- * in other words, the same BLOB that would be selected by:
- *
- * <pre>
- *     SELECT zColumn FROM zDb.zTable WHERE [rowid] = iRow;
- * </pre>)^
- *
- * ^(Parameter zDb is not the filename that contains the database, but
- * rather the symbolic name of the database. For attached databases, this is
- * the name that appears after the AS keyword in the [ATTACH] statement.
- * For the main database file, the database name is "main". For TEMP
- * tables, the database name is "temp".)^
- *
- * ^If the flags parameter is non-zero, then the BLOB is opened for read
- * and write access. ^If the flags parameter is zero, the BLOB is opened for
- * read-only access.
- *
- * ^(On success, [SQLITE_OK] is returned and the new [BLOB handle] is stored
- * in *ppBlob. Otherwise an [error code] is returned and, unless the error
- * code is SQLITE_MISUSE, *ppBlob is set to NULL.)^ ^This means that, provided
- * the API is not misused, it is always safe to call [sqlite3_blob_close()]
- * on *ppBlob after this function it returns.
- *
- * This function fails with SQLITE_ERROR if any of the following are true:
- * <ul>
- *   <li> ^(Database zDb does not exist)^,
- *   <li> ^(Table zTable does not exist within database zDb)^,
- *   <li> ^(Table zTable is a WITHOUT ROWID table)^,
- *   <li> ^(Column zColumn does not exist)^,
- *   <li> ^(Row iRow is not present in the table)^,
- *   <li> ^(The specified column of row iRow contains a value that is not
- *         a TEXT or BLOB value)^,
- *   <li> ^(Column zColumn is part of an index, PRIMARY KEY or UNIQUE
- *         constraint and the blob is being opened for read/write access)^,
- *   <li> ^([foreign key constraints | Foreign key constraints] are enabled,
- *         column zColumn is part of a [child key] definition and the blob is
- *         being opened for read/write access)^.
- * </ul>
- *
- * ^Unless it returns SQLITE_MISUSE, this function sets the
- * [database connection] error code and message accessible via
- * [sqlite3_errcode()] and [sqlite3_errmsg()] and related functions.
- *
- *
- * ^(If the row that a BLOB handle points to is modified by an
- * [UPDATE], [DELETE], or by [ON CONFLICT] side-effects
- * then the BLOB handle is marked as "expired".
- * This is true if any column of the row is changed, even a column
- * other than the one the BLOB handle is open on.)^
- * ^Calls to [sqlite3_blob_read()] and [sqlite3_blob_write()] for
- * an expired BLOB handle fail with a return code of [SQLITE_ABORT].
- * ^(Changes written into a BLOB prior to the BLOB expiring are not
- * rolled back by the expiration of the BLOB.  Such changes will eventually
- * commit if the transaction continues to completion.)^
- *
- * ^Use the [sqlite3_blob_bytes()] interface to determine the size of
- * the opened blob.  ^The size of a blob may not be changed by this
- * interface.  Use the [UPDATE] SQL command to change the size of a
- * blob.
- *
- * ^The [sqlite3_bind_zeroblob()] and [sqlite3_result_zeroblob()] interfaces
- * and the built-in [zeroblob] SQL function may be used to create a
- * zero-filled blob to read or write using the incremental-blob interface.
- *
- * To avoid a resource leak, every open [BLOB handle] should eventually
- * be released by a call to [sqlite3_blob_close()].
-*/
-SQLITE_API int
-sqlite3_blob_open(sqlite3 *,
-		  const char *zTable,
-		  const char *zColumn,
-		  sqlite3_int64 iRow,
-		  int flags, sqlite3_blob ** ppBlob);
-
-/*
- * CAPI3REF: Move a BLOB Handle to a New Row
- * METHOD: sqlite3_blob
- *
- * ^This function is used to move an existing blob handle so that it points
- * to a different row of the same database table. ^The new row is identified
- * by the rowid value passed as the second argument. Only the row can be
- * changed. ^The database, table and column on which the blob handle is open
- * remain the same. Moving an existing blob handle to a new row can be
- * faster than closing the existing handle and opening a new one.
- *
- * ^(The new row must meet the same criteria as for [sqlite3_blob_open()] -
- * it must exist and there must be either a blob or text value stored in
- * the nominated column.)^ ^If the new row is not present in the table, or if
- * it does not contain a blob or text value, or if another error occurs, an
- * SQLite error code is returned and the blob handle is considered aborted.
- * ^All subsequent calls to [sqlite3_blob_read()], [sqlite3_blob_write()] or
- * [sqlite3_blob_reopen()] on an aborted blob handle immediately return
- * SQLITE_ABORT. ^Calling [sqlite3_blob_bytes()] on an aborted blob handle
- * always returns zero.
- *
- * ^This function sets the database handle error code and message.
-*/
-SQLITE_API int
-sqlite3_blob_reopen(sqlite3_blob *, sqlite3_int64);
 
 /*
  * CAPI3REF: Close A BLOB Handle
@@ -7144,106 +6914,6 @@ sqlite3_stmt_scanstatus_reset(sqlite3_stmt *);
 */
 SQLITE_API int
 sqlite3_db_cacheflush(sqlite3 *);
-
-/*
- * CAPI3REF: The pre-update hook.
- *
- * ^These interfaces are only available if SQLite is compiled using the
- * [SQLITE_ENABLE_PREUPDATE_HOOK] compile-time option.
- *
- * ^The [sqlite3_preupdate_hook()] interface registers a callback function
- * that is invoked prior to each [INSERT], [UPDATE], and [DELETE] operation
- * on a [rowid table].
- * ^At most one preupdate hook may be registered at a time on a single
- * [database connection]; each call to [sqlite3_preupdate_hook()] overrides
- * the previous setting.
- * ^The preupdate hook is disabled by invoking [sqlite3_preupdate_hook()]
- * with a NULL pointer as the second parameter.
- * ^The third parameter to [sqlite3_preupdate_hook()] is passed through as
- * the first parameter to callbacks.
- *
- * ^The preupdate hook only fires for changes to [rowid tables]; the preupdate
- * hook is not invoked for changes to [WITHOUT ROWID] tables.
- *
- * ^The second parameter to the preupdate callback is a pointer to
- * the [database connection] that registered the preupdate hook.
- * ^The third parameter to the preupdate callback is one of the constants
- * [SQLITE_INSERT], [SQLITE_DELETE], or [SQLITE_UPDATE] to identify the
- * kind of update operation that is about to occur.
- * ^(The fourth parameter to the preupdate callback is the name of the
- * database within the database connection that is being modified.  This
- * will be "main" for the main database or "temp" for TEMP tables or
- * the name given after the AS keyword in the [ATTACH] statement for attached
- * databases.)^
- * ^The fifth parameter to the preupdate callback is the name of the
- * table that is being modified.
- * ^The sixth parameter to the preupdate callback is the initial [rowid] of the
- * row being changes for SQLITE_UPDATE and SQLITE_DELETE changes and is
- * undefined for SQLITE_INSERT changes.
- * ^The seventh parameter to the preupdate callback is the final [rowid] of
- * the row being changed for SQLITE_UPDATE and SQLITE_INSERT changes and is
- * undefined for SQLITE_DELETE changes.
- *
- * The [sqlite3_preupdate_old()], [sqlite3_preupdate_new()],
- * [sqlite3_preupdate_count()], and [sqlite3_preupdate_depth()] interfaces
- * provide additional information about a preupdate event. These routines
- * may only be called from within a preupdate callback.  Invoking any of
- * these routines from outside of a preupdate callback or with a
- * [database connection] pointer that is different from the one supplied
- * to the preupdate callback results in undefined and probably undesirable
- * behavior.
- *
- * ^The [sqlite3_preupdate_count(D)] interface returns the number of columns
- * in the row that is being inserted, updated, or deleted.
- *
- * ^The [sqlite3_preupdate_old(D,N,P)] interface writes into P a pointer to
- * a [protected sqlite3_value] that contains the value of the Nth column of
- * the table row before it is updated.  The N parameter must be between 0
- * and one less than the number of columns or the behavior will be
- * undefined. This must only be used within SQLITE_UPDATE and SQLITE_DELETE
- * preupdate callbacks; if it is used by an SQLITE_INSERT callback then the
- * behavior is undefined.  The [sqlite3_value] that P points to
- * will be destroyed when the preupdate callback returns.
- *
- * ^The [sqlite3_preupdate_new(D,N,P)] interface writes into P a pointer to
- * a [protected sqlite3_value] that contains the value of the Nth column of
- * the table row after it is updated.  The N parameter must be between 0
- * and one less than the number of columns or the behavior will be
- * undefined. This must only be used within SQLITE_INSERT and SQLITE_UPDATE
- * preupdate callbacks; if it is used by an SQLITE_DELETE callback then the
- * behavior is undefined.  The [sqlite3_value] that P points to
- * will be destroyed when the preupdate callback returns.
- *
- * ^The [sqlite3_preupdate_depth(D)] interface returns 0 if the preupdate
- * callback was invoked as a result of a direct insert, update, or delete
- * operation; or 1 for inserts, updates, or deletes invoked by top-level
- * triggers; or 2 for changes resulting from triggers called by top-level
- * triggers; and so forth.
- *
- * See also:  [sqlite3_update_hook()]
-*/
-#if defined(SQLITE_ENABLE_PREUPDATE_HOOK)
-SQLITE_API void
-*sqlite3_preupdate_hook(sqlite3 * db, void (*xPreUpdate) (void *pCtx,	/* Copy of third arg to preupdate_hook()
-*/
-							  sqlite3 * db,	/* Database handle */
-							  int op,	/* SQLITE_UPDATE, DELETE or INSERT */
-							  char const *zName,	/* Table name */
-							  sqlite3_int64 iKey1,	/* Rowid of row about to be deleted/updated */
-							  sqlite3_int64 iKey2	/* New rowid value (for a rowid UPDATE) */
-				), void *);
-SQLITE_API int
-sqlite3_preupdate_old(sqlite3 *, int, sqlite3_value **);
-
-SQLITE_API int
-sqlite3_preupdate_count(sqlite3 *);
-
-SQLITE_API int
-sqlite3_preupdate_depth(sqlite3 *);
-
-SQLITE_API int
-sqlite3_preupdate_new(sqlite3 *, int, sqlite3_value **);
-#endif
 
 /*
  * CAPI3REF: Low-level system error code

@@ -69,9 +69,6 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
  *  'D'            INTEGER
  *  'F'            REAL
  *
- * An extra 'D' is appended to the end of the string to cover the
- * rowid that appears as the last column in every index.
- *
  * Memory for the buffer containing the column index affinity string
  * is managed along with the rest of the Index structure. It will be
  * released when sqlite3DeleteIndex() is called.
@@ -339,8 +336,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* Register allocations */
 	int regFromSelect = 0;	/* Base register for data coming from SELECT */
 	int regRowCount = 0;	/* Memory cell used for the row counter */
-	int regIns;		/* Block of regs holding rowid+data being inserted */
-	int regRowid;		/* registers holding insert rowid */
+	int regIns;		/* Block of regs holding data being inserted */
+	int regTupleid;		/* registers holding insert tupleid */
 	int regData;		/* register holding first column to insert */
 	int *aRegIdx = 0;	/* One register allocated to each index */
 
@@ -438,12 +435,12 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	}
 #endif				/* SQLITE_OMIT_XFER_OPT */
 
-	/* Allocate registers for holding the rowid of the new row,
+	/* Allocate registers for holding the tupleid of the new row,
 	 * the content of the new row, and the assembled row record.
 	 */
-	regRowid = regIns = pParse->nMem + 1;
+	regTupleid = regIns = pParse->nMem + 1;
 	pParse->nMem += pTab->nCol + 1;
-	regData = regRowid + 1;
+	regData = regTupleid + 1;
 
 	/* If the INSERT statement included an IDLIST term, then make sure
 	 * all elements of the IDLIST really are columns of the table and
@@ -727,14 +724,14 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		if (ipkColumn >= 0) {
 			if (useTempTable) {
 				sqlite3VdbeAddOp3(v, OP_Column, srcTab,
-						  ipkColumn, regRowid);
+						  ipkColumn, regTupleid);
 			} else if (pSelect) {
 				sqlite3VdbeAddOp2(v, OP_Copy,
 						  regFromSelect + ipkColumn,
-						  regRowid);
+						  regTupleid);
 			}
 		} else {
-			sqlite3VdbeAddOp2(v, OP_Null, 0, regRowid);
+			sqlite3VdbeAddOp2(v, OP_Null, 0, regTupleid);
 		}
 
 		/* Compute data for all columns of the new entry, beginning
@@ -742,7 +739,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 */
 		nHidden = 0;
 		for (i = 0; i < pTab->nCol; i++) {
-			int iRegStore = regRowid + 1 + i;
+			int iRegStore = regTupleid + 1 + i;
 			if (pColumn == 0) {
 				if (IsHiddenColumn(&pTab->aCol[i])) {
 					j = -1;
@@ -847,7 +844,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						iIdxCur, regIns, 0,
 						ipkColumn >= 0, onError,
 						endOfLoop, &isReplace, 0);
-		sqlite3FkCheck(pParse, pTab, 0, regIns, 0, 0);
+		sqlite3FkCheck(pParse, pTab, 0, regIns, 0);
 
 		/* Set the OPFLAG_USESEEKRESULT flag if either (a) there are no REPLACE
 		 * constraints or (b) there are no triggers and this table is not a
@@ -935,7 +932,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
  * Meanings of bits in of pWalker->eCode for checkConstraintUnchanged()
  */
 #define CKCNSTRNT_COLUMN   0x01	/* CHECK constraint uses a changing column */
-#define CKCNSTRNT_ROWID    0x02	/* CHECK constraint references the ROWID */
 
 /* This is the Walker callback from checkConstraintUnchanged().  Set
  * bit 0x01 of pWalker->eCode if
@@ -951,8 +947,6 @@ checkConstraintExprNode(Walker * pWalker, Expr * pExpr)
 			if (pWalker->u.aiCol[pExpr->iColumn] >= 0) {
 				pWalker->eCode |= CKCNSTRNT_COLUMN;
 			}
-		} else {
-			pWalker->eCode |= CKCNSTRNT_ROWID;
 		}
 	}
 	return WRC_Continue;
@@ -961,15 +955,14 @@ checkConstraintExprNode(Walker * pWalker, Expr * pExpr)
 /*
  * pExpr is a CHECK constraint on a row that is being UPDATE-ed.  The
  * only columns that are modified by the UPDATE are those for which
- * aiChng[i]>=0, and also the ROWID is modified if chngRowid is true.
+ * aiChng[i]>=0.
  *
  * Return true if CHECK constraint pExpr does not use any of the
- * changing columns (or the rowid if it is changing).  In other words,
- * return true if this CHECK constraint can be skipped when validating
- * the new row in the UPDATE statement.
+ * changing columns.  In other words, return true if this CHECK constraint
+ * can be skipped when validating the new row in the UPDATE statement.
  */
 static int
-checkConstraintUnchanged(Expr * pExpr, int *aiChng, int chngRowid)
+checkConstraintUnchanged(Expr * pExpr, int *aiChng)
 {
 	Walker w;
 	memset(&w, 0, sizeof(w));
@@ -977,14 +970,8 @@ checkConstraintUnchanged(Expr * pExpr, int *aiChng, int chngRowid)
 	w.xExprCallback = checkConstraintExprNode;
 	w.u.aiCol = aiChng;
 	sqlite3WalkExpr(&w, pExpr);
-	if (!chngRowid) {
-		testcase((w.eCode & CKCNSTRNT_ROWID) != 0);
-		w.eCode &= ~CKCNSTRNT_ROWID;
-	}
 	testcase(w.eCode == 0);
 	testcase(w.eCode == CKCNSTRNT_COLUMN);
-	testcase(w.eCode == CKCNSTRNT_ROWID);
-	testcase(w.eCode == (CKCNSTRNT_ROWID | CKCNSTRNT_COLUMN));
 	return !w.eCode;
 }
 
@@ -995,27 +982,22 @@ checkConstraintUnchanged(Expr * pExpr, int *aiChng, int chngRowid)
  * The regNewData parameter is the first register in a range that contains
  * the data to be inserted or the data after the update.  There will be
  * pTab->nCol+1 registers in this range.  The first register (the one
- * that regNewData points to) will contain the new rowid, or NULL in the
- * case of a WITHOUT ROWID table.  The second register in the range will
- * contain the content of the first table column.  The third register will
- * contain the content of the second table column.  And so forth.
+ * that regNewData points to) will contain NULL.  The second register
+ * in the range will contain the content of the first table column.
+ * The third register will contain the content of the second table column.
+ * And so forth.
  *
  * The regOldData parameter is similar to regNewData except that it contains
  * the data prior to an UPDATE rather than afterwards.  regOldData is zero
  * for an INSERT.  This routine can distinguish between UPDATE and INSERT by
  * checking regOldData for zero.
  *
- * For an UPDATE, the pkChng boolean is true if the true primary key (the
- * rowid for a normal table or the PRIMARY KEY for a WITHOUT ROWID table)
+ * For an UPDATE, the pkChng boolean is true if the primary key
  * might be modified by the UPDATE.  If pkChng is false, then the key of
  * the iDataCur content table is guaranteed to be unchanged by the UPDATE.
  *
- * For an INSERT, the pkChng boolean indicates whether or not the rowid
- * was explicitly specified as part of the INSERT statement.  If pkChng
- * is zero, it means that the either rowid is computed automatically or
- * that the table is a WITHOUT ROWID table and has no rowid.  On an INSERT,
- * pkChng will only be true if the INSERT statement provides an integer
- * value for either the rowid column or its INTEGER PRIMARY KEY alias.
+ * On an INSERT, pkChng will only be true if the INSERT statement provides
+ * an integer value for INTEGER PRIMARY KEY alias.
  *
  * The code generated by this routine will store new index entries into
  * registers identified by aRegIdx[].  No index entry is created for
@@ -1025,11 +1007,10 @@ checkConstraintUnchanged(Expr * pExpr, int *aiChng, int chngRowid)
  *
  * The caller must have already opened writeable cursors on the main
  * table and all applicable indices (that is to say, all indices for which
- * aRegIdx[] is not zero).  iDataCur is the cursor for the main table when
- * inserting or updating a rowid table, or the cursor for the PRIMARY KEY
- * index when operating on a WITHOUT ROWID table.  iIdxCur is the cursor
- * for the first index in the pTab->pIndex list.  Cursors for other indices
- * are at iIdxCur+N for the N-th element of the pTab->pIndex list.
+ * aRegIdx[] is not zero).  iDataCur is the cursor for the PRIMARY KEY index.
+ * iIdxCur is the cursor for the first index in the pTab->pIndex list.
+ * Cursors for other indices are at iIdxCur+N for the N-th element
+ * of the pTab->pIndex list.
  *
  * This routine also generates code to check constraints.  NOT NULL,
  * CHECK, and UNIQUE constraints are all checked.  If a constraint fails,
@@ -1079,7 +1060,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				int iIdxCur,		/* First index cursor */
 				int regNewData,		/* First register in a range holding values to insert */
 				int regOldData,		/* Previous content.  0 for INSERTs */
-				u8 pkChng,		/* Non-zero if the rowid or PRIMARY KEY changed */
+				u8 pkChng,		/* Non-zero if the PRIMARY KEY changed */
 				u8 overrideError,	/* Override onError to this if not OE_Default */
 				int ignoreDest,		/* Jump to this label on an OE_Ignore resolution */
 				int *pbMayReplace,	/* OUT: Set to true if constraint may cause a replace */
@@ -1095,9 +1076,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	int onError;		/* Conflict resolution strategy */
 	int addr1;		/* Address of jump instruction */
 	int seenReplace = 0;	/* True if REPLACE is used to resolve INT PK conflict */
-	int nPkField;		/* Number of fields in PRIMARY KEY. 1 for ROWID tables */
-	int ipkTop = 0;		/* Top of the rowid change constraint check */
-	int ipkBottom = 0;	/* Bottom of the rowid change constraint check */
+	int nPkField;		/* Number of fields in PRIMARY KEY. */
 	u8 isUpdate;		/* True if this is an UPDATE operation */
 	u8 bAffinityDone = 0;	/* True if the OP_Affinity operation has been run */
 	struct session *user_session = current_session();
@@ -1120,7 +1099,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	 */
 	for (i = 0; i < nCol; i++) {
 		if (i == pTab->iPKey) {
-			continue;	/* ROWID is never NULL */
+			continue;
 		}
 		if (aiChng && aiChng[i] < 0) {
 			/* Don't bother checking for NOT NULL on columns that do not change */
@@ -1191,7 +1170,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			int allOk;
 			Expr *pExpr = pCheck->a[i].pExpr;
 			if (aiChng
-			    && checkConstraintUnchanged(pExpr, aiChng, pkChng))
+			    && checkConstraintUnchanged(pExpr, aiChng))
 				continue;
 			allOk = sqlite3VdbeMakeLabel(v);
 			sqlite3ExprIfTrue(pParse, pExpr, allOk,
@@ -1214,123 +1193,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		}
 	}
 #endif				/* !defined(SQLITE_OMIT_CHECK) */
-
-	/* If rowid is changing, make sure the new rowid does not previously
-	 * exist in the table.
-	 */
-	if (pkChng && pPk == 0) {
-		int addrRowidOk = sqlite3VdbeMakeLabel(v);
-
-		/* Figure out what action to take in case of a rowid collision */
-		onError = pTab->keyConf;
-		if (overrideError != OE_Default) {
-			onError = overrideError;
-		} else if (onError == OE_Default) {
-			onError = OE_Abort;
-		}
-
-		if (isUpdate) {
-			/* pkChng!=0 does not mean that the rowid has changed, only that
-			 * it might have changed.  Skip the conflict logic below if the rowid
-			 * is unchanged.
-			 */
-			sqlite3VdbeAddOp3(v, OP_Eq, regNewData, addrRowidOk,
-					  regOldData);
-			sqlite3VdbeChangeP5(v, SQLITE_NOTNULL);
-			VdbeCoverage(v);
-		}
-
-		/* If the response to a rowid conflict is REPLACE but the response
-		 * to some other UNIQUE constraint is FAIL or IGNORE, then we need
-		 * to defer the running of the rowid conflict checking until after
-		 * the UNIQUE constraints have run.
-		 */
-		if (onError == OE_Replace && overrideError != OE_Replace) {
-			for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
-				if (pIdx->onError == OE_Ignore
-				    || pIdx->onError == OE_Fail) {
-					ipkTop = sqlite3VdbeAddOp0(v, OP_Goto);
-					break;
-				}
-			}
-		}
-		VdbeCoverage(v);
-
-		/* Generate code that deals with a rowid collision */
-		switch (onError) {
-		default:{
-				onError = OE_Abort;
-				/* Fall thru into the next case */
-				FALLTHROUGH;
-			}
-		case OE_Rollback:
-		case OE_Abort:
-		case OE_Fail:{
-				break;
-			}
-		case OE_Replace:{
-				/* If there are DELETE triggers on this table and the
-				 * recursive-triggers flag is set, call GenerateRowDelete() to
-				 * remove the conflicting row from the table. This will fire
-				 * the triggers and remove both the table and index b-tree entries.
-				 *
-				 * Otherwise, if there are no triggers or the recursive-triggers
-				 * flag is not set, but the table has one or more indexes, call
-				 * GenerateRowIndexDelete(). This removes the index b-tree entries
-				 * only. The table b-tree entry will be replaced by the new entry
-				 * when it is inserted.
-				 *
-				 * If either GenerateRowDelete() or GenerateRowIndexDelete() is called,
-				 * also invoke MultiWrite() to indicate that this VDBE may require
-				 * statement rollback (if the statement is aborted after the delete
-				 * takes place). Earlier versions called sqlite3MultiWrite() regardless,
-				 * but being more selective here allows statements like:
-				 *
-				 *   REPLACE INTO t(rowid) VALUES($newrowid)
-				 *
-				 * to run without a statement journal if there are no indexes on the
-				 * table.
-				 */
-				Trigger *pTrigger = 0;
-				if (user_session->
-				    sql_flags & SQLITE_RecTriggers) {
-					pTrigger =
-					    sqlite3TriggersExist(pTab,
-								 TK_DELETE, 0,
-								 0);
-				}
-				if (pTrigger || sqlite3FkRequired(pTab, 0, 0)) {
-					sqlite3MultiWrite(pParse);
-					sqlite3GenerateRowDelete(pParse, pTab,
-								 pTrigger,
-								 iDataCur,
-								 iIdxCur,
-								 regNewData, 1,
-								 0, OE_Replace,
-								 1, -1);
-				} else {
-					if (pTab->pIndex) {
-						sqlite3MultiWrite(pParse);
-						sqlite3GenerateRowIndexDelete
-						    (pParse, pTab, iDataCur,
-						     iIdxCur);
-					}
-				}
-				seenReplace = 1;
-				break;
-			}
-		case OE_Ignore:{
-				/*assert( seenReplace==0 ); */
-				sqlite3VdbeGoto(v, ignoreDest);
-				break;
-			}
-		}
-		sqlite3VdbeResolveLabel(v, addrRowidOk);
-		if (ipkTop) {
-			ipkBottom = sqlite3VdbeAddOp0(v, OP_Goto);
-			sqlite3VdbeJumpHere(v, ipkTop);
-		}
-	}
 
 	/* Test all UNIQUE constraints by creating entries for each UNIQUE
 	 * index and making sure that duplicate entries do not already exist.
@@ -1383,14 +1245,9 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				} else {
 					x = iField + regNewData + 1;
 				}
-				sqlite3VdbeAddOp2(v,
-						  iField <
-						  0 ? OP_IntCopy : OP_SCopy, x,
-						  regIdx + i);
-				VdbeComment((v, "%s",
-					     iField <
-					     0 ? "rowid" : pTab->aCol[iField].
-					     zName));
+				assert(iField >= 0);
+				sqlite3VdbeAddOp2(v, OP_SCopy, x, regIdx + i);
+				VdbeComment((v, "%s", pTab->aCol[iField].zName));
 			}
 		}
 
@@ -1425,9 +1282,9 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 
 		VdbeComment((v, "for %s", pIdx->zName));
 
-		/* In an UPDATE operation, if this index is the PRIMARY KEY index
-		 * of a WITHOUT ROWID table and there has been no change the
-		 * primary key, then no collision is possible.  The collision detection
+		/* In an UPDATE operation, if this index is the PRIMARY KEY
+		 * index and there has been no change the primary key, then no
+		 * collision is possible.  The collision detection
 		 * logic below can all be skipped.
 		 */
 		if (isUpdate && pPk == pIdx && pkChng == 0) {
@@ -1449,17 +1306,15 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 
 		/* Collision detection may be omitted if all of the following are true:
 		 *   (1) The conflict resolution algorithm is REPLACE
-		 *   (2) The table is a WITHOUT ROWID table
-		 *   (3) There are no secondary indexes on the table
-		 *   (4) No delete triggers need to be fired if there is a conflict
-		 *   (5) No FK constraint counters need to be updated if a conflict occurs.
+		 *   (2) There are no secondary indexes on the table
+		 *   (3) No delete triggers need to be fired if there is a conflict
+		 *   (4) No FK constraint counters need to be updated if a conflict occurs.
 		 */
-		if ((ix == 0 && pIdx->pNext == 0)	/* Condition 3 */
-		    &&pPk == pIdx	/* Condition 2 */
+		if ((ix == 0 && pIdx->pNext == 0)	/* Condition 2 */
 		    && onError == OE_Replace	/* Condition 1 */
-		    && (0 == (user_session->sql_flags & SQLITE_RecTriggers)	/* Condition 4 */
+		    && (0 == (user_session->sql_flags & SQLITE_RecTriggers)	/* Condition 3 */
 			||0 == sqlite3TriggersExist(pTab, TK_DELETE, 0, 0))
-		    && (0 == (user_session->sql_flags & SQLITE_ForeignKeys) ||	/* Condition 5 */
+		    && (0 == (user_session->sql_flags & SQLITE_ForeignKeys) ||	/* Condition 4 */
 			(0 == pTab->pFKey && 0 == sqlite3FkReferences(pTab)))
 		    ) {
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
@@ -1496,9 +1351,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				}
 			}
 			if (isUpdate) {
-				/* If currently processing the PRIMARY KEY of a WITHOUT ROWID
-				 * table, only conflict if the new PRIMARY KEY values are actually
-				 * different from the old.
+				/* Only conflict if the new PRIMARY KEY
+				 * values are actually different from the old.
 				 *
 				 * For a UNIQUE index, only conflict if the PRIMARY KEY values
 				 * of the matched index row are different from the original PRIMARY
@@ -1570,10 +1424,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		if (regR != regIdx)
 			sqlite3ReleaseTempRange(pParse, regR, nPkField);
 	}
-	if (ipkTop) {
-		sqlite3VdbeGoto(v, ipkTop + 1);
-		sqlite3VdbeJumpHere(v, ipkBottom);
-	}
 
 	*pbMayReplace = seenReplace;
 	VdbeModuleComment((v, "END: GenCnstCks(%d)", seenReplace));
@@ -1583,7 +1433,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
  * This routine generates code to finish the INSERT or UPDATE operation
  * that was started by a prior call to sqlite3GenerateConstraintChecks.
  * A consecutive range of registers starting at regNewData contains the
- * rowid and the content to be inserted.
+ * tupleid and the content to be inserted.
  *
  * The arguments to this routine should be the same as corresponding
  * arguments to sqlite3GenerateConstraintChecks.
@@ -1634,17 +1484,14 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
  * Allocate cursors for the pTab table and all its indices and generate
  * code to open and initialized those cursors.
  *
- * The cursor for the object that contains the complete data (normally
- * the table itself, but the PRIMARY KEY index in the case of a WITHOUT
- * ROWID table) is returned in *piDataCur.  The first index cursor is
+ * The cursor for the object that contains the complete data (index)
+ * is returned in *piDataCur.  The first index cursor is
  * returned in *piIdxCur.  The number of indices is returned.
  *
- * Use iBase as the first cursor (either the *piDataCur for rowid tables
- * or the first index for WITHOUT ROWID tables) if it is non-negative.
+ * Use iBase as the first cursor (the first index) if it is non-negative.
  * If iBase is negative, then allocate the next available cursor.
  *
- * For a rowid table, *piDataCur will be exactly one less than *piIdxCur.
- * For a WITHOUT ROWID table, *piDataCur will be somewhere in the range
+ * *piDataCur will be somewhere in the range
  * of *piIdxCurs, depending on where the PRIMARY KEY index appears on the
  * pTab->pIndex list.
  */
@@ -1652,7 +1499,7 @@ int
 sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			   Table * pTab,	/* Table to be opened */
 			   int op,		/* OP_OpenRead or OP_OpenWrite */
-			   u8 p5,		/* P5 value for OP_Open* opcodes (except on WITHOUT ROWID) */
+			   u8 p5,		/* P5 value for OP_Open* opcodes */
 			   int iBase,		/* Use this for the table cursor, if there is one */
 			   u8 * aToOpen,	/* If not NULL: boolean for each table and index */
 			   int *piDataCur,	/* Write the database source cursor number here */
@@ -1795,7 +1642,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	int emptySrcTest = 0;	/* Address of test for empty pSrc */
 	Vdbe *v;		/* The VDBE we are building */
 	int destHasUniqueIdx = 0;	/* True if pDest has a UNIQUE index */
-	int regData, regRowid;	/* Registers holding data and rowid */
+	int regData, regTupleid;	/* Registers holding data and tupleid */
 	struct session *user_session = current_session();
 
 	if (pSelect == 0) {
@@ -1954,7 +1801,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	iSrc = pParse->nTab++;
 	iDest = pParse->nTab++;
 	regData = sqlite3GetTempReg(pParse);
-	regRowid = sqlite3GetTempReg(pParse);
+	regTupleid = sqlite3GetTempReg(pParse);
 	sqlite3OpenTable(pParse, iDest, pDest, OP_OpenWrite);
 	assert(destHasUniqueIdx);
 	if ((pDest->iPKey < 0 && pDest->pIndex != 0)	/* (1) */
@@ -1969,8 +1816,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		 * Conditions under which the destination must be empty:
 		 *
 		 * (1) There is no INTEGER PRIMARY KEY but there are indices.
-		 *     (If the destination is not initially empty, the rowid fields
-		 *     of index entries might need to change.)
 		 *
 		 * (2) The destination has a unique index.  (The xfer optimization
 		 *     is unable to test uniqueness.)
@@ -2014,7 +1859,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	}
 	if (emptySrcTest)
 		sqlite3VdbeJumpHere(v, emptySrcTest);
-	sqlite3ReleaseTempReg(pParse, regRowid);
+	sqlite3ReleaseTempReg(pParse, regTupleid);
 	sqlite3ReleaseTempReg(pParse, regData);
 	if (emptyDestTest) {
 		sqlite3VdbeAddOp2(v, OP_Halt, SQLITE_OK, 0);

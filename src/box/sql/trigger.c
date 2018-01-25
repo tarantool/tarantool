@@ -1069,11 +1069,11 @@ sqlite3CodeRowTriggerDirect(Parse * pParse,	/* Parse context */
  *
  *   Register       Contains
  *   ------------------------------------------------------
- *   reg+0          OLD.rowid
+ *   reg+0          OLD.PK
  *   reg+1          OLD.* value of left-most column of pTab
  *   ...            ...
  *   reg+N          OLD.* value of right-most column of pTab
- *   reg+N+1        NEW.rowid
+ *   reg+N+1        NEW.PK
  *   reg+N+2        OLD.* value of left-most column of pTab
  *   ...            ...
  *   reg+N+N+1      NEW.* value of right-most column of pTab
@@ -1144,7 +1144,7 @@ sqlite3CodeRowTrigger(Parse * pParse,	/* Parse context */
  * are more than 32 columns in the table, and at least one of the columns
  * with an index greater than 32 may be accessed, 0xffffffff is returned.
  *
- * It is not possible to determine if the old.rowid or new.rowid column is
+ * It is not possible to determine if the old.PK or new.PK column is
  * accessed by triggers. The caller must always assume that it is.
  *
  * Parameter isNew must be either 1 or 0. If it is 0, then the mask returned

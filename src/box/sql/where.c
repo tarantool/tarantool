@@ -2781,7 +2781,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		pProbe = pTab->pIndex;
 	} else {
 		/* There is no INDEXED BY clause.  Create a fake Index object in local
-		 * variable sPk to represent the rowid primary key index.  Make this
+		 * variable sPk to represent the primary key index.  Make this
 		 * fake index the first in a chain of Index objects with all of the real
 		 * indices to follow
 		 */
@@ -3187,7 +3187,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	 * row of output.  A WhereLoop is one-row if all of the following are true:
 	 *  (a) All index columns match with WHERE_COLUMN_EQ.
 	 *  (b) The index is unique
-	 * Any WhereLoop with an WHERE_COLUMN_EQ constraint on the rowid is one-row.
+	 * Any WhereLoop with an WHERE_COLUMN_EQ constraint on the PK is one-row.
 	 * Every one-row WhereLoop will have the WHERE_ONEROW bit set in wsFlags.
 	 *
 	 * We say the WhereLoop is "order-distinct" if the set of columns from
@@ -3198,10 +3198,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	 * UNIQUE since a UNIQUE column or index can have multiple rows that
 	 * are NULL and NULL values are equivalent for the purpose of order-distinct.
 	 * To be order-distinct, the columns must be UNIQUE and NOT NULL.
-	 *
-	 * The rowid for a table is always UNIQUE and NOT NULL so whenever the
-	 * rowid appears in the ORDER BY clause, the corresponding WhereLoop is
-	 * automatically order-distinct.
 	 */
 
 	assert(pOrderBy != 0);
@@ -4066,7 +4062,7 @@ whereShortCut(WhereLoopBuilder * pBuilder)
 		pLoop->aLTerm[0] = pTerm;
 		pLoop->nLTerm = 1;
 		pLoop->nEq = 1;
-		/* TUNING: Cost of a rowid lookup is 10 */
+		/* TUNING: Cost of a PK lookup is 10 */
 		pLoop->rRun = 33;	/* 33==sqlite3LogEst(10) */
 	} else {
 		for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
@@ -4583,8 +4579,8 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 				   wctrlFlags & WHERE_ONEPASS_DESIRED) == 0);
 			if (IsPrimaryKeyIndex(pIx)
 			    && (wctrlFlags & WHERE_OR_SUBCLAUSE) != 0) {
-				/* This is one term of an OR-optimization using the PRIMARY KEY of a
-				 * WITHOUT ROWID table.  No need for a separate index
+				/* This is one term of an OR-optimization using
+				 * the PRIMARY KEY.  No need for a separate index
 				 */
 				iIndexCur = pLevel->iTabCur;
 				op = 0;

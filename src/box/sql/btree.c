@@ -243,7 +243,7 @@ btreeReleaseAllCursorPages(BtCursor * pCur)
  * code otherwise.
  *
  * If the cursor is open on an intkey table, then the integer key
- * (the rowid) is stored in pCur->nKey and pCur->pKey is left set to
+ * is stored in pCur->nKey and pCur->pKey is left set to
  * NULL. If the cursor is open on a non-intkey table, then pCur->pKey is
  * set to point to a malloced buffer pCur->nKey bytes in size containing
  * the key.

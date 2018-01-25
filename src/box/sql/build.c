@@ -1016,11 +1016,9 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
  * a primary key (and this is the second primary key) then create an
  * error.
  *
- * If the PRIMARY KEY is on a single column whose datatype is INTEGER,
- * then we will try to use that column as the rowid.  Set the Table.iPKey
- * field of the table under construction to be the index of the
- * INTEGER PRIMARY KEY column.  Table.iPKey is set to -1 if there is
- * no INTEGER PRIMARY KEY.
+ * Set the Table.iPKey field of the table under construction to be the
+ * index of the INTEGER PRIMARY KEY column.
+ * Table.iPKey is set to -1 if there is no INTEGER PRIMARY KEY.
  *
  * If the key is not an INTEGER PRIMARY KEY, then create a unique
  * index for the key.  No index is created for INTEGER PRIMARY KEYs.
@@ -1410,21 +1408,18 @@ hasColumn(const i16 * aiCol, int nCol, int x)
 }
 
 /*
- * This routine runs at the end of parsing a CREATE TABLE statement that
- * has a WITHOUT ROWID clause.  The job of this routine is to convert both
- * internal schema data structures and the generated VDBE code so that they
- * are appropriate for a WITHOUT ROWID table instead of a rowid table.
+ * This routine runs at the end of parsing a CREATE TABLE statement.
+ * The job of this routine is to convert both
+ * internal schema data structures and the generated VDBE code.
  * Changes include:
  *
  *     (1)  Set all columns of the PRIMARY KEY schema object to be NOT NULL.
- *     (4)  Set the Index.tnum of the PRIMARY KEY Index object in the
+ *     (2)  Set the Index.tnum of the PRIMARY KEY Index object in the
  *          schema to the rootpage from the main table.
- *     (5)  Add all table columns to the PRIMARY KEY Index object
+ *     (3)  Add all table columns to the PRIMARY KEY Index object
  *          so that the PRIMARY KEY is a covering index.  The surplus
  *          columns are part of KeyInfo.nXField and are not used for
  *          sorting or lookup or uniqueness checks.
- *     (6)  Replace the rowid tail on all automatically generated UNIQUE
- *          indices with the PRIMARY KEY columns.
  */
 static void
 convertToWithoutRowidTable(Parse * pParse, Table * pTab)
@@ -1711,7 +1706,7 @@ createImplicitIndices(Parse * pParse,
 			    iCursor);
 	} else {
 		/*
-		 * Until ROWID support is back, this branch should not be taken.
+		 * This branch should not be taken.
 		 * If it is, then the current CREATE TABLE statement fails to
 		 * specify the PRIMARY KEY. The error is reported elsewhere.
 		 */
@@ -3273,7 +3268,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * index is an implied index for a UNIQUE or PRIMARY KEY constraint) then
 	 * emit code to to insert new index into Tarantool.
 	 * But, do not do this if we are simply parsing the schema, or if this
-	 * index is the PRIMARY KEY index of a WITHOUT ROWID table.
+	 * index is the PRIMARY KEY index.
 	 *
 	 * If pTblName==0 it means this index is generated as an implied PRIMARY KEY
 	 * or UNIQUE index in a CREATE TABLE statement.  Since the table

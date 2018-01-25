@@ -291,7 +291,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 #ifndef SQLITE_OMIT_TRIGGER
 	pTrigger = sqlite3TriggersExist(pTab, TK_DELETE, 0, 0);
 	isView = pTab->pSelect != 0;
-	bComplex = pTrigger || sqlite3FkRequired(pTab, 0, 0);
+	bComplex = pTrigger || sqlite3FkRequired(pTab, 0);
 #else
 #define pTrigger 0
 #define isView 0
@@ -426,11 +426,11 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 		}
 
-		/* Construct a query to find the rowid or primary key for every row
+		/* Construct a query to find the primary key for every row
 		 * to be deleted, based on the WHERE clause. Set variable eOnePass
 		 * to indicate the strategy used to implement this delete:
 		 *
-		 *  ONEPASS_OFF:    Two-pass approach - use a FIFO for rowids/PK values.
+		 *  ONEPASS_OFF:    Two-pass approach - use a FIFO for PK values.
 		 *  ONEPASS_SINGLE: One-pass approach - at most one row deleted.
 		 *  ONEPASS_MULTI:  One-pass approach - any number of rows may be deleted.
 		 */
@@ -468,7 +468,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		iKey = iPk;
 
 		if (eOnePass != ONEPASS_OFF) {
-			/* For ONEPASS, no need to store the rowid/primary-key. There is only
+			/* For ONEPASS, no need to store the primary-key. There is only
 			 * one, so just keep it in its register(s) and fall through to the
 			 * delete code.
 			 */
@@ -560,7 +560,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 						 iIdxNoSeek);
 		}
 
-		/* End of the loop over all rowids/primary-keys. */
+		/* End of the loop over all primary-keys. */
 		if (eOnePass != ONEPASS_OFF) {
 			sqlite3VdbeResolveLabel(v, addrBypass);
 			sqlite3WhereEnd(pWInfo);
@@ -673,9 +673,7 @@ sqlite3DeleteByKey(Parse * pParse, Token * pTab, const char **columns,
  * Preconditions:
  *
  *   1.  iDataCur is an open cursor on the btree that is the canonical data
- *       store for the table.  (This will be either the table itself,
- *       in the case of a rowid table, or the PRIMARY KEY index in the case
- *       of a WITHOUT ROWID table.)
+ *       store for the table.  (This will be the PRIMARY KEY index)
  *
  *   2.  Read/write cursors for all indices of pTab must be open as
  *       cursor number iIdxCur+i for the i-th index.
@@ -740,13 +738,12 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 	/* If there are any triggers to fire, allocate a range of registers to
 	 * use for the old.* references in the triggers.
 	 */
-	if (sqlite3FkRequired(pTab, 0, 0) || pTrigger) {
+	if (sqlite3FkRequired(pTab, 0) || pTrigger) {
 		u32 mask;	/* Mask of OLD.* columns in use */
 		int iCol;	/* Iterator used while populating OLD.* */
 		int addrStart;	/* Start of BEFORE trigger programs */
 
-		/* TODO: Could use temporary registers here. Also could attempt to
-		 * avoid copying the contents of the rowid register.
+		/* TODO: Could use temporary registers here.
 		 */
 		mask =
 		    sqlite3TriggerColmask(pParse, pTrigger, 0, 0,
@@ -793,7 +790,7 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 		 * refer to this table (i.e. constraints attached to other tables)
 		 * are not violated by deleting this row.
 		 */
-		sqlite3FkCheck(pParse, pTab, iOld, 0, 0, 0);
+		sqlite3FkCheck(pParse, pTab, iOld, 0, 0);
 	}
 
 	/* Delete the index and table entries. Skip this step if pTab is really
@@ -828,7 +825,7 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 	 * handle rows (possibly in other tables) that refer via a foreign key
 	 * to the row just deleted.
 	 */
-	sqlite3FkActions(pParse, pTab, 0, iOld, 0, 0);
+	sqlite3FkActions(pParse, pTab, 0, iOld, 0);
 
 	/* Invoke AFTER DELETE trigger programs. */
 	sqlite3CodeRowTrigger(pParse, pTrigger,
@@ -850,9 +847,7 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
  * Preconditions:
  *
  *   1.  A read/write cursor "iDataCur" must be open on the canonical storage
- *       btree for the table pTab.  (This will be either the table itself
- *       for rowid tables or to the primary key index for WITHOUT ROWID
- *       tables.)
+ *       btree for the table pTab.  (This will be primary key index)
  *
  *   2.  Read/write cursor for primary index of pTab must be open as
  *       cursor number iIdxCur.  (The pTab->pIndex index is the 0-th index.)
@@ -869,7 +864,7 @@ sqlite3GenerateRowIndexDelete(Parse * pParse,	/* Parsing and code generating con
 	int r1 = -1;		/* Register holding an index key */
 	int iPartIdxLabel;	/* Jump destination for skipping partial index entries */
 	Vdbe *v;		/* The prepared statement under construction */
-	Index *pPk;		/* PRIMARY KEY index, or NULL for rowid tables */
+	Index *pPk;		/* PRIMARY KEY index */
 
 	v = pParse->pVdbe;
 	pPk = sqlite3PrimaryKeyIndex(pTab);
@@ -886,7 +881,7 @@ sqlite3GenerateRowIndexDelete(Parse * pParse,	/* Parsing and code generating con
  * Generate code that will assemble an index key and stores it in register
  * regOut.  The key with be for index pIdx which is an index on pTab.
  * iCur is the index of a cursor open on the pTab table and pointing to
- * the entry that needs indexing.  If pTab is a WITHOUT ROWID table, then
+ * the entry that needs indexing.
  * iCur must be the cursor of the PRIMARY KEY index.
  *
  * Return a register number which is the first in a block of
@@ -910,8 +905,8 @@ sqlite3GenerateRowIndexDelete(Parse * pParse,	/* Parsing and code generating con
  * a column in common, then the register corresponding to that column already
  * holds the correct value and the loading of that register is skipped.
  * This optimization is helpful when doing a DELETE or an INTEGRITY_CHECK
- * on a table with multiple indices, and especially with the ROWID or
- * PRIMARY KEY columns of the index.
+ * on a table with multiple indices, and especially with
+ * the PRIMARY KEY columns of the index.
  */
 int
 sqlite3GenerateIndexKey(Parse * pParse,	/* Parsing context */
