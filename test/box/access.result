@@ -104,7 +104,7 @@ test_run:cmd("setopt delimiter ''");
 box.schema.user.create('rich')
 ---
 ...
-box.schema.user.grant('rich', 'read,write', 'universe')
+box.schema.user.grant('rich', 'read,write,create', 'universe')
 ---
 ...
 session.su('rich')
@@ -141,6 +141,9 @@ box.schema.user.disable("rich")
 ...
 -- test double disable is a no op
 box.schema.user.disable("rich")
+---
+...
+box.schema.user.revoke('rich', 'create', 'universe')
 ---
 ...
 box.space['_user']:delete{uid}
@@ -342,7 +345,7 @@ session = box.session
 box.schema.user.create('uniuser')
 ---
 ...
-box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+box.schema.user.grant('uniuser', 'read, write, execute, create, drop', 'universe')
 ---
 ...
 session.su('uniuser')
@@ -367,7 +370,7 @@ box.schema.user.drop('uniuser')
 box.schema.user.create('grantor')
 ---
 ...
-box.schema.user.grant('grantor', 'read, write, execute', 'universe')  
+box.schema.user.grant('grantor', 'read, write, execute, create, drop', 'universe')
 ---
 ...
 session.su('grantor')
@@ -573,7 +576,7 @@ session = nil
 box.schema.user.create('twostep')
 ---
 ...
-box.schema.user.grant('twostep', 'read,write,execute', 'universe')
+box.schema.user.grant('twostep', 'read,write,execute,create,drop', 'universe')
 ---
 ...
 box.session.su('twostep')
@@ -607,7 +610,7 @@ box.schema.user.drop('twostep_client')
 ---
 ...
 -- the space is dropped when the user is dropped
--- 
+--
 -- box.schema.user.exists()
 box.schema.user.exists('guest')
 ---
@@ -830,7 +833,7 @@ session = box.session
 box.schema.user.create('test')
 ---
 ...
-box.schema.user.grant('test', 'read,write', 'universe')
+box.schema.user.grant('test', 'read,write,create,alter', 'universe')
 ---
 ...
 session.su('test')
@@ -1083,6 +1086,9 @@ s:drop()
 --
 -- gh-3022 role 'super'
 --
+s = box.schema.space.create("admin_space")
+---
+...
 box.schema.user.grant('guest', 'super')
 ---
 ...
@@ -1105,6 +1111,10 @@ _ = box.schema.func.create('test')
 ---
 ...
 box.schema.func.drop('test')
+---
+...
+-- gh-3088 bug: super role lacks drop privileges on other users' spaces
+s:drop()
 ---
 ...
 box.session.su('admin')
@@ -1295,5 +1305,115 @@ seq:drop()
 ---
 ...
 s:drop()
+---
+...
+--
+-- gh-945 create, drop, alter privileges
+--
+box.schema.user.create("tester")
+---
+...
+s = box.schema.space.create("test")
+---
+...
+u = box.schema.user.create("test")
+---
+...
+f = box.schema.func.create("test")
+---
+...
+box.schema.user.grant("tester", "read,write,execute", "universe")
+---
+...
+-- failed create
+box.session.su("tester", box.schema.space.create, "testy")
+---
+- error: Create access to universe '' is denied for user 'tester'
+...
+box.session.su("tester", box.schema.user.create, 'test1')
+---
+- error: Create access to universe '' is denied for user 'tester'
+...
+box.session.su("tester", box.schema.func.create, 'test1')
+---
+- error: Create access to universe '' is denied for user 'tester'
+...
+box.schema.user.grant("tester", "create", "universe")
+---
+...
+-- successful create
+s1 = box.session.su("tester", box.schema.space.create, "testy")
+---
+...
+_ = box.session.su("tester", box.schema.user.create, 'test1')
+---
+...
+_ = box.session.su("tester", box.schema.func.create, 'test1')
+---
+...
+-- successful drop of owned objects
+_ = box.session.su("tester", s1.drop, s1)
+---
+...
+_ = box.session.su("tester", box.schema.user.drop, 'test1')
+---
+...
+_ = box.session.su("tester", box.schema.func.drop, 'test1')
+---
+...
+-- failed alter
+box.session.su("tester", s.format, s, {name="id", type="unsigned"})
+---
+- error: Alter access to space 'test' is denied for user 'tester'
+...
+box.schema.user.grant("tester", "alter", "universe")
+---
+...
+-- successful alter
+box.session.su("tester", s.format, s, {name="id", type="unsigned"})
+---
+...
+-- failed drop
+box.session.su("tester", s.drop, s)
+---
+- error: Drop access to space 'test' is denied for user 'tester'
+...
+-- can't use here sudo
+-- because drop use sudo inside
+-- and currently sudo can't be performed nested
+box.session.su("tester")
+---
+...
+box.schema.user.drop("test")
+---
+- error: Revoke access to role 'public' is denied for user 'tester'
+...
+box.session.su("admin")
+---
+...
+box.session.su("tester", box.schema.func.drop, "test")
+---
+- error: Drop access to function 'test' is denied for user 'tester'
+...
+box.schema.user.grant("tester", "drop", "universe")
+---
+...
+-- successful drop
+box.session.su("tester", s.drop, s)
+---
+...
+box.session.su("tester", box.schema.user.drop, "test")
+---
+...
+box.session.su("tester", box.schema.func.drop, "test")
+---
+...
+box.session.su("admin")
+---
+...
+box.schema.user.revoke("tester", "read,write,execute,create,drop,alter", "universe")
+---
+...
+box.schema.user.drop("tester")
 ---
 ...

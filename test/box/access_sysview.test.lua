@@ -146,13 +146,13 @@ box.session.su('guest')
 #box.space._vuser:select{} < user_cnt
 
 box.session.su('admin')
-box.schema.user.grant('guest', 'read,write', 'universe')
+box.schema.user.grant('guest', 'read,write,create', 'universe')
 box.session.su('guest')
 
 box.schema.user.create('tester')
 
 box.session.su('admin')
-box.schema.user.revoke('guest', 'read,write', 'universe')
+box.schema.user.revoke('guest', 'read,write,create', 'universe')
 box.session.su('guest')
 
 #box.space._vuser.index[2]:select('tester') > 0

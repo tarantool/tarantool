@@ -50,7 +50,7 @@ end;
 usermax();
 test_run:cmd("setopt delimiter ''");
 box.schema.user.create('rich')
-box.schema.user.grant('rich', 'read,write', 'universe')
+box.schema.user.grant('rich', 'read,write,create', 'universe')
 session.su('rich')
 uid = session.uid()
 box.schema.func.create('dummy')
@@ -63,6 +63,7 @@ box.schema.user.revoke('rich', 'public')
 box.schema.user.disable("rich")
 -- test double disable is a no op
 box.schema.user.disable("rich")
+box.schema.user.revoke('rich', 'create', 'universe')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 
@@ -153,7 +154,7 @@ box.schema.user.drop('testus')
 -- ------------------------------------------------------------
 session = box.session
 box.schema.user.create('uniuser')
-box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+box.schema.user.grant('uniuser', 'read, write, execute, create, drop', 'universe')
 session.su('uniuser')
 us = box.schema.space.create('uniuser_space')
 session.su('admin')
@@ -166,7 +167,7 @@ box.schema.user.drop('uniuser')
 -- only by its creator at the moment
 -- ------------------------------------------------------------
 box.schema.user.create('grantor')
-box.schema.user.grant('grantor', 'read, write, execute', 'universe')  
+box.schema.user.grant('grantor', 'read, write, execute, create, drop', 'universe')
 session.su('grantor')
 box.schema.user.create('grantee')
 box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
@@ -240,7 +241,7 @@ session = nil
 -- admin can't manage grants on not owned objects
 -- -----------------------------------------------------------
 box.schema.user.create('twostep')
-box.schema.user.grant('twostep', 'read,write,execute', 'universe')
+box.schema.user.grant('twostep', 'read,write,execute,create,drop', 'universe')
 box.session.su('twostep')
 twostep = box.schema.space.create('twostep')
 index2 = twostep:create_index('primary')
@@ -252,7 +253,7 @@ box.schema.user.grant('twostep_client', 'execute', 'function', 'test')
 box.schema.user.drop('twostep')
 box.schema.user.drop('twostep_client')
 -- the space is dropped when the user is dropped
--- 
+--
 -- box.schema.user.exists()
 box.schema.user.exists('guest')
 box.schema.user.exists(nil)
@@ -329,7 +330,7 @@ c:close()
 
 session = box.session
 box.schema.user.create('test')
-box.schema.user.grant('test', 'read,write', 'universe')
+box.schema.user.grant('test', 'read,write,create,alter', 'universe')
 session.su('test')
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 session.su('admin')
@@ -425,7 +426,7 @@ s:drop()
 --
 -- gh-3022 role 'super'
 --
-
+s = box.schema.space.create("admin_space")
 box.schema.user.grant('guest', 'super')
 box.session.su('guest')
 _ = box.schema.space.create('test')
@@ -434,6 +435,9 @@ _ = box.schema.user.create('test')
 box.schema.user.drop('test')
 _ = box.schema.func.create('test')
 box.schema.func.drop('test')
+-- gh-3088 bug: super role lacks drop privileges on other users' spaces
+s:drop()
+
 box.session.su('admin')
 box.schema.user.revoke('guest', 'super')
 box.session.su('guest')
@@ -489,3 +493,57 @@ box.session.on_access_denied(nil, uid)
 box.schema.user.drop("test_user")
 seq:drop()
 s:drop()
+
+--
+-- gh-945 create, drop, alter privileges
+--
+box.schema.user.create("tester")
+s = box.schema.space.create("test")
+u = box.schema.user.create("test")
+f = box.schema.func.create("test")
+box.schema.user.grant("tester", "read,write,execute", "universe")
+
+-- failed create
+box.session.su("tester", box.schema.space.create, "testy")
+box.session.su("tester", box.schema.user.create, 'test1')
+box.session.su("tester", box.schema.func.create, 'test1')
+
+box.schema.user.grant("tester", "create", "universe")
+-- successful create
+s1 = box.session.su("tester", box.schema.space.create, "testy")
+_ = box.session.su("tester", box.schema.user.create, 'test1')
+_ = box.session.su("tester", box.schema.func.create, 'test1')
+
+-- successful drop of owned objects
+_ = box.session.su("tester", s1.drop, s1)
+_ = box.session.su("tester", box.schema.user.drop, 'test1')
+_ = box.session.su("tester", box.schema.func.drop, 'test1')
+
+-- failed alter
+box.session.su("tester", s.format, s, {name="id", type="unsigned"})
+
+box.schema.user.grant("tester", "alter", "universe")
+-- successful alter
+box.session.su("tester", s.format, s, {name="id", type="unsigned"})
+
+-- failed drop
+box.session.su("tester", s.drop, s)
+
+-- can't use here sudo
+-- because drop use sudo inside
+-- and currently sudo can't be performed nested
+box.session.su("tester")
+box.schema.user.drop("test")
+box.session.su("admin")
+
+box.session.su("tester", box.schema.func.drop, "test")
+
+box.schema.user.grant("tester", "drop", "universe")
+-- successful drop
+box.session.su("tester", s.drop, s)
+box.session.su("tester", box.schema.user.drop, "test")
+box.session.su("tester", box.schema.func.drop, "test")
+
+box.session.su("admin")
+box.schema.user.revoke("tester", "read,write,execute,create,drop,alter", "universe")
+box.schema.user.drop("tester")

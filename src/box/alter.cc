@@ -67,30 +67,35 @@ access_check_ddl(const char *name, uint32_t owner_uid,
 		 enum priv_type priv_type)
 {
 	struct credentials *cr = effective_user();
+	user_access_t universal_access = (PRIV_U | (priv_type))
+					 & ~cr->universal_access;
+	bool not_owner = owner_uid != cr->uid && cr->uid != ADMIN;
 	/*
-	 * Only the owner of the object can be the grantor
-	 * of the privilege on the object. This means that
-	 * for universe/space/func/other persistent object,
-	 * only the creator of the object can be the grantor,
-	 * since Tarantool lacks separate CREATE/DROP/GRANT OPTION
-	 * privileges.
+	 * Only the owner of the object or someone who has specific privilege
+	 * on universe can be the grantor of the privilege on the object.
+	 *
+	 * Handling "create" case differs from other ddl operations
+	 * because being owner of objects and possessing usage right
+	 * don't guarantee the right to create object
 	 */
-	user_access_t access = PRIV_U & ~cr->universal_access;
-	if (access || (owner_uid != cr->uid && cr->uid != ADMIN)) {
+	bool access_denied = (priv_type == PRIV_C) ?
+			     (universal_access || not_owner) :
+			     ((universal_access & PRIV_U) == PRIV_U ||
+				     (universal_access && not_owner));
+	if (access_denied) {
 		struct user *user = user_find_xc(cr->uid);
-		if (access) {
-			tnt_raise(AccessDeniedError,
-				  priv_name(PRIV_U),
-				  schema_object_name(SC_UNIVERSE),
-				  "",
-				  user->def->name);
-		} else {
+		if (not_owner)
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(type),
 				  name,
 				  user->def->name);
-		}
+		else
+			tnt_raise(AccessDeniedError,
+				  priv_name(universal_access),
+				  schema_object_name(SC_UNIVERSE),
+				  "",
+				  user->def->name);
 	}
 }
 
@@ -2151,6 +2156,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	struct func *old_func = func_by_id(fid);
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
 		struct func_def *def = func_def_new_from_tuple(new_tuple);
+		access_check_ddl(def->name, def->uid, SC_FUNCTION, PRIV_C);
 		auto def_guard = make_scoped_guard([=] { free(def); });
 		func_cache_replace(def);
 		def_guard.is_active = false;
@@ -2468,11 +2474,11 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		 */
 		if (role->def->owner != grantor->def->uid &&
 		    grantor->def->uid != ADMIN &&
-		    (role->def->uid != PUBLIC || priv->access < PRIV_X)) {
+		    (role->def->uid != PUBLIC || priv->access != PRIV_X)) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_ROLE), name,
-				  grantor->def->name);;
+				  grantor->def->name);
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
@@ -2565,6 +2571,14 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 			priv.access |= PRIV_S;
 			priv.access |= PRIV_U;
+			/*
+			 * For admin we have to set his privileges
+			 * explicitly because he needs them in upgrade and
+			 * bootstrap script
+			 */
+			if (priv.grantor_id == ADMIN) {
+				priv.access = admin_credentials.universal_access;
+			}
 		}
 		priv_def_check(&priv, PRIV_GRANT);
 		grant_or_revoke(&priv);
@@ -2574,10 +2588,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		priv_def_create_from_tuple(&priv, old_tuple);
-		const char *name = schema_find_name(priv.object_type,
-						    priv.object_id);
-		access_check_ddl(name, priv.grantor_id, priv.object_type,
-				 PRIV_REVOKE);
+		priv_def_check(&priv, PRIV_REVOKE);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(revoke_priv, NULL);
 		txn_on_commit(txn, on_commit);

@@ -24,7 +24,7 @@ end;
 func_limit();
 drop_limit_func();
 box.schema.user.create('testuser');
-box.schema.user.grant('testuser', 'read, write, execute', 'universe');
+box.schema.user.grant('testuser', 'read, write, execute,create', 'universe');
 session.su('testuser');
 func_limit();
 drop_limit_func();

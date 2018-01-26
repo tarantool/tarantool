@@ -214,7 +214,7 @@ box.schema.role.drop('test')
 box.schema.user.grant('grantee', 'liaison')
 ---
 ...
-box.schema.user.grant('test', 'read,write', 'universe')
+box.schema.user.grant('test', 'read,write,create', 'universe')
 ---
 ...
 box.session.su('test')
@@ -635,7 +635,7 @@ box.schema.user.create('user')
 box.schema.user.create('grantee')
 ---
 ...
-box.schema.user.grant('user', 'read,write,execute', 'universe')
+box.schema.user.grant('user', 'read,write,execute,create', 'universe')
 ---
 ...
 box.session.su('user')
