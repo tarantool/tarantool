@@ -2,7 +2,7 @@
 # Travis CI rules
 #
 
-DOCKER_IMAGE:=packpack/packpack:ubuntu-zesty
+DOCKER_IMAGE:=packpack/packpack:ubuntu-artful
 
 all: package
 
