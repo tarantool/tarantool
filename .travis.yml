@@ -30,6 +30,7 @@ env:
       - OS=ubuntu DIST=precise
       - OS=ubuntu DIST=trusty
       - OS=ubuntu DIST=xenial
+      - OS=ubuntu DIST=artful
       - OS=debian DIST=wheezy
       - OS=debian DIST=jessie
       - OS=debian DIST=stretch
@@ -64,6 +65,8 @@ matrix:
       - env: OS=ubuntu DIST=trusty
         os: osx
       - env: OS=ubuntu DIST=xenial
+        os: osx
+      - env: OS=ubuntu DIST=artful
         os: osx
       - env: OS=debian DIST=wheezy
         os: osx
