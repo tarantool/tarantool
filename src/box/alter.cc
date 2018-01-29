@@ -2043,7 +2043,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		access_check_ddl(old_user->def->name, old_user->def->owner,
 				 SC_USER, PRIV_D, true);
 		/* Can't drop guest or super user */
-		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX) {
+		if (uid <= (uint32_t) BOX_SYSTEM_USER_ID_MAX || uid == SUPER) {
 			tnt_raise(ClientError, ER_DROP_USER,
 				  old_user->def->name,
 				  "the user or the role is a system");

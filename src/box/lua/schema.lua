@@ -2143,7 +2143,7 @@ box.schema.role.drop = function(name, opts)
         return
     end
     if uid >= box.schema.SYSTEM_USER_ID_MIN and
-       uid <= box.schema.SYSTEM_USER_ID_MAX then
+       uid <= box.schema.SYSTEM_USER_ID_MAX or uid == box.schema.SUPER_ROLE_ID then
         -- gh-1205: box.schema.user.info fails
         box.error(box.error.DROP_USER, name, "the user or the role is a system")
     end
