@@ -110,8 +110,11 @@ ClientError::ClientError(const type_info *type, const char *file, unsigned line,
 
 ClientError::ClientError(const char *file, unsigned line,
 			 uint32_t errcode, ...)
-	:ClientError(&type_ClientError, file, line, errcode)
+	:Exception(&type_ClientError, file, line)
 {
+	m_errcode = errcode;
+	if (rmean_error)
+		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 	va_list ap;
 	va_start(ap, errcode);
 	error_vformat_msg(this, tnt_errcode_desc(m_errcode), ap);
