@@ -12,7 +12,6 @@ depends="libstdc++ readline libressl yaml lz4 binutils ncurses libgomp lua curl 
 makedepends="perl gcc cmake readline-dev libressl-dev yaml-dev lz4-dev binutils-dev ncurses-dev lua-dev musl-dev make git libunwind-dev autoconf automake libtool linux-headers go curl-dev icu-dev"
 subpackages=""
 
-# builddir="$startdir"/..
 builddir="$srcdir"/"$pkgname-$pkgver"
 
 prepare() {
