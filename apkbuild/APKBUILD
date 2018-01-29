@@ -19,7 +19,7 @@ prepare() {
     default_prepare
 
     git clone "$giturl" "$builddir"
-    # git -C "$builddir" checkout "$pkgver"
+    git -C "$builddir" checkout "$pkgver"
     git -C "$builddir" submodule update --init --recursive
 }
 
