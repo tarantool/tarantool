@@ -24,6 +24,13 @@ for i = 1001,2000 do s:insert{i, pad} end
 _ = test_run:cmd("create server replica with rpl_master=default, script='vinyl/join_quota.lua'")
 _ = test_run:cmd("start server replica")
 _ = test_run:wait_lsn('replica', 'default')
+
+-- Check vinyl_timeout is ignored on 'subscribe' (gh-3087).
+_ = test_run:cmd("stop server replica")
+for i = 2001,3000 do s:insert{i, pad} end
+_ = test_run:cmd("start server replica")
+_ = test_run:wait_lsn('replica', 'default')
+
 _ = test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
 
