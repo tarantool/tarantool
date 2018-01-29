@@ -36,7 +36,6 @@ invalid_testcases = {
 
 function run_test(create_func, cleanup_func)
     local json = require("json")
-    print("loosadlalsd")
     local bad_tests = {}
     for i, identifier in ipairs(valid_testcases) do
         local ok, res = pcall(create_func,identifier)
