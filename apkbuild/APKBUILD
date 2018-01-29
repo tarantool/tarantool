@@ -1,0 +1,70 @@
+pkgname="tarantool"
+pkgver="1.7.6"
+pkgrel="0"
+pkgdesc="Tarantool is an in-memory database and application server"
+maintainer="Ilya Konyukhov <i.konyukhov@tarantool.org>"
+license="BSD-2-Clause"
+arch="all"
+source=""
+giturl="https://github.com/tarantool/tarantool.git"
+url="https://github.com/tarantool/tarantool"
+depends="libstdc++ readline libressl yaml lz4 binutils ncurses libgomp lua curl tar zip libunwind libcurl icu"
+makedepends="perl gcc cmake readline-dev libressl-dev yaml-dev lz4-dev binutils-dev ncurses-dev lua-dev musl-dev make git libunwind-dev autoconf automake libtool linux-headers go curl-dev icu-dev"
+subpackages=""
+
+# builddir="$startdir"/..
+builddir="$srcdir"/"$pkgname-$pkgver"
+
+prepare() {
+    default_prepare
+
+    git clone "$giturl" "$builddir"
+    # git -C "$builddir" checkout "$pkgver"
+    git -C "$builddir" submodule update --init --recursive
+}
+
+build() {
+    cd "$builddir"
+
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DENABLE_BUNDLED_LIBYAML:BOOL=OFF \
+          -DENABLE_BACKTRACE:BOOL=ON \
+          -DENABLE_DIST:BOOL=ON \
+          .
+    make -C "$builddir" -j || return 1
+
+    # "---------- small ----------"
+    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_INSTALL_LIBDIR=lib \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          . || return 1
+    make -C "$builddir"/src/lib/small || return 1
+
+    # "---------- msgpuck ----------"
+    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_INSTALL_LIBDIR=lib \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          . || return 1
+    make -C "$builddir"/src/lib/msgpuck || return 1
+
+    return 0
+}
+
+package() {
+    mkdir -p "$pkgdir"
+
+    make -C "$builddir" DESTDIR="$pkgdir" install
+    make -C "$builddir"/src/lib/small DESTDIR="$pkgdir" install
+    make -C "$builddir"/src/lib/msgpuck DESTDIR="$pkgdir" install
+
+    make -C /usr/src/tarantool/src/lib/msgpuck clean
+    make -C /usr/src/tarantool/src/lib/small clean
+    make -C /usr/src/tarantool clean
+
+    return 0
+}
+
+# Even if subpackages var is explicitly set to "", this function failed while trying to setup default subpackages
+prepare_subpackages() {
+    return 0
+}

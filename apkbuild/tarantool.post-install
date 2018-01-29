@@ -1,0 +1,13 @@
+#!/bin/sh
+
+mkdir -p /var/lib/tarantool
+chown tarantool:tarantool /var/lib/tarantool
+
+mkdir -p /opt/tarantool
+chown tarantool:tarantool /opt/tarantool
+
+mkdir -p /var/run/tarantool
+chown tarantool:tarantool /var/run/tarantool
+
+mkdir /etc/tarantool
+chown tarantool:tarantool /etc/tarantool

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+addgroup -S tarantool
+adduser -S -G tarantool tarantool
+
+apk add --no-cache 'su-exec>=0.2'
