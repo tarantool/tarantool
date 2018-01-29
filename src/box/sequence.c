@@ -250,8 +250,13 @@ access_check_sequence(struct sequence *seq)
 
 	user_access_t access = PRIV_U | PRIV_W;
 	user_access_t sequence_access = access & ~cr->universal_access;
-	if (seq->def->uid != cr->uid &&
-	    sequence_access & ~seq->access[cr->auth_token].effective) {
+	if (sequence_access &&
+	    /* Check for missing Usage access, ignore owner rights. */
+	    (sequence_access & PRIV_U ||
+	     /* Check for missing specific access, respect owner rights. */
+	     (seq->def->uid != cr->uid &&
+	      sequence_access & ~seq->access[cr->auth_token].effective))) {
+
 		/* Access violation, report error. */
 		struct user *user = user_find(cr->uid);
 		if (user != NULL) {

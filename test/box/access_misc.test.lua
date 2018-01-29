@@ -243,6 +243,46 @@ box.schema.user.drop('testuser')
 
 s:drop()
 
+--
+-- gh-3089 usage access is not applied to owner
+--
+box.schema.user.grant("guest","read, write, execute, create", "universe")
+box.session.su("guest")
+s = box.schema.space.create("test")
+_ = s:create_index("prim")
+test_func = function() end
+box.schema.func.create('test_func')
+sq = box.schema.sequence.create("test")
+box.session.su("admin")
+box.schema.user.revoke("guest", "usage", "universe")
+box.session.su("guest")
+
+s:select{}
+s:drop()
+sq:set(100)
+sq:drop()
+c = require("net.box").connect(os.getenv("LISTEN"))
+c:call("test_func")
+
+box.session.su("admin")
+box.schema.user.revoke("guest","read, write, execute, create", "universe")
+box.session.su("guest")
+
+s:select{}
+s:drop()
+sq:set(100)
+sq:drop()
+c = require("net.box").connect(os.getenv("LISTEN"))
+c:call("test_func")
+
+box.session.su("admin")
+
+box.schema.user.grant("guest","usage", "universe")
+
+box.schema.func.drop("test_func")
+s:drop()
+sq:drop()
+
 box.space._user:select()
 box.space._space:select()
 box.space._func:select()
