@@ -770,7 +770,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 			 * and promote vclock.
 			 */
 			if ((*last)->replica_id == instance_id) {
-				vclock_follow(&replicaset_vclock, instance_id,
+				vclock_follow(&replicaset.vclock, instance_id,
 					      (*last)->lsn);
 				break;
 			}
@@ -786,11 +786,11 @@ wal_write_in_wal_mode_none(struct journal *journal,
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
 	wal_assign_lsn(writer, entry->rows, entry->rows + entry->n_rows);
-	int64_t old_lsn = vclock_get(&replicaset_vclock, instance_id);
+	int64_t old_lsn = vclock_get(&replicaset.vclock, instance_id);
 	int64_t new_lsn = vclock_get(&writer->vclock, instance_id);
 	if (new_lsn > old_lsn) {
 		/* There were local writes, promote vclock. */
-		vclock_follow(&replicaset_vclock, instance_id, new_lsn);
+		vclock_follow(&replicaset.vclock, instance_id, new_lsn);
 	}
 	return vclock_sum(&writer->vclock);
 }

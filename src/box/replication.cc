@@ -42,19 +42,13 @@
 #include "error.h"
 #include "vclock.h" /* VCLOCK_MAX */
 
-struct vclock replicaset_vclock;
 uint32_t instance_id = REPLICA_ID_NIL;
-/**
- * Globally unique identifier of this replica set.
- * A replica set is a set of appliers and their matching
- * relays, usually connected in full mesh.
- */
+struct tt_uuid INSTANCE_UUID;
 struct tt_uuid REPLICASET_UUID;
 
 double replication_timeout = 1.0; /* seconds */
 
-typedef rb_tree(struct replica) replicaset_t;
-rb_proto(, replicaset_, replicaset_t, struct replica)
+struct replicaset replicaset;
 
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
@@ -62,38 +56,29 @@ replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 	return tt_uuid_compare(&a->uuid, &b->uuid);
 }
 
-rb_gen(, replicaset_, replicaset_t, struct replica, link,
-       replica_compare_by_uuid);
+rb_gen(static MAYBE_UNUSED, replica_hash_, replica_hash_t,
+       struct replica, in_hash, replica_compare_by_uuid);
 
-#define replicaset_foreach_safe(set, item, next) \
-	for (item = replicaset_first(set); \
-	     item != NULL && ((next = replicaset_next(set, item)) || 1); \
+#define replica_hash_foreach_safe(hash, item, next) \
+	for (item = replica_hash_first(hash); \
+	     item != NULL && ((next = replica_hash_next(hash, item)) || 1); \
 	     item = next)
-
-static struct mempool replica_pool;
-static replicaset_t replicaset;
-
-/**
- * List of replicas that haven't received a UUID.
- * It contains both replicas that are still trying
- * to connect and those that failed to connect.
- */
-static RLIST_HEAD(anon_replicas);
 
 void
 replication_init(void)
 {
-	mempool_create(&replica_pool, &cord()->slabc,
-		       sizeof(struct replica));
 	memset(&replicaset, 0, sizeof(replicaset));
-	replicaset_new(&replicaset);
-	vclock_create(&replicaset_vclock);
+	mempool_create(&replicaset.pool, &cord()->slabc,
+		       sizeof(struct replica));
+	replica_hash_new(&replicaset.hash);
+	rlist_create(&replicaset.anon);
+	vclock_create(&replicaset.vclock);
 }
 
 void
 replication_free(void)
 {
-	mempool_destroy(&replica_pool);
+	mempool_destroy(&replicaset.pool);
 }
 
 void
@@ -121,7 +106,8 @@ replica_is_orphan(struct replica *replica)
 static struct replica *
 replica_new(void)
 {
-	struct replica *replica = (struct replica *) mempool_alloc(&replica_pool);
+	struct replica *replica = (struct replica *)
+			mempool_alloc(&replicaset.pool);
 	if (replica == NULL)
 		tnt_raise(OutOfMemory, sizeof(*replica), "malloc",
 			  "struct replica");
@@ -132,7 +118,6 @@ replica_new(void)
 	replica->gc = NULL;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_connect, NULL, NULL, NULL);
-	replica->pause_on_connect = false;
 	return replica;
 }
 
@@ -142,7 +127,7 @@ replica_delete(struct replica *replica)
 	assert(replica_is_orphan(replica));
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
-	mempool_free(&replica_pool, replica);
+	mempool_free(&replicaset.pool, replica);
 }
 
 struct replica *
@@ -154,7 +139,7 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *replica_uuid)
 	assert(replica_by_uuid(replica_uuid) == NULL);
 	struct replica *replica = replica_new();
 	replica->uuid = *replica_uuid;
-	replicaset_insert(&replicaset, replica);
+	replica_hash_insert(&replicaset.hash, replica);
 	replica_set_id(replica, replica_id);
 	return replica;
 }
@@ -188,9 +173,24 @@ replica_clear_id(struct replica *replica)
 	 */
 	replica->id = REPLICA_ID_NIL;
 	if (replica_is_orphan(replica)) {
-		replicaset_remove(&replicaset, replica);
+		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);
 	}
+}
+
+static void
+replica_set_applier(struct replica *replica, struct applier *applier)
+{
+	assert(replica->applier == NULL);
+	replica->applier = applier;
+}
+
+static void
+replica_clear_applier(struct replica *replica)
+{
+	assert(replica->applier != NULL);
+	replica->applier = NULL;
+	trigger_clear(&replica->on_connect);
 }
 
 static void
@@ -211,7 +211,7 @@ replica_on_receive_uuid(struct trigger *trigger, void *event)
 	assert(!tt_uuid_is_nil(&applier->uuid));
 	replica->uuid = applier->uuid;
 
-	struct replica *orig = replicaset_search(&replicaset, replica);
+	struct replica *orig = replica_hash_search(&replicaset.hash, replica);
 	if (orig != NULL && orig->applier != NULL) {
 		say_error("duplicate connection to the same replica: "
 			  "instance uuid %s, addr1 %s, addr2 %s",
@@ -227,18 +227,15 @@ replica_on_receive_uuid(struct trigger *trigger, void *event)
 
 	rlist_del_entry(replica, in_anon);
 
-	bool pause_on_connect = replica->pause_on_connect;
 	if (orig != NULL) {
 		/* Use existing struct replica */
-		orig->applier = applier;
-		replica->applier = NULL;
+		replica_set_applier(orig, applier);
+		replica_clear_applier(replica);
 		replica_delete(replica);
 	} else {
 		/* Add a new struct replica */
-		replicaset_insert(&replicaset, replica);
+		replica_hash_insert(&replicaset.hash, replica);
 	}
-	if (pause_on_connect)
-		applier_pause(applier);
 }
 
 /**
@@ -248,24 +245,25 @@ replica_on_receive_uuid(struct trigger *trigger, void *event)
 static void
 replicaset_update(struct applier **appliers, int count)
 {
-	replicaset_t uniq;
+	replica_hash_t uniq;
 	memset(&uniq, 0, sizeof(uniq));
-	replicaset_new(&uniq);
-	RLIST_HEAD(anon_replicas_new);
+	replica_hash_new(&uniq);
+	RLIST_HEAD(anon_replicas);
 	struct replica *replica, *next;
+	struct applier *applier;
 
 	auto uniq_guard = make_scoped_guard([&]{
-		replicaset_foreach_safe(&uniq, replica, next) {
-			replicaset_remove(&uniq, replica);
+		replica_hash_foreach_safe(&uniq, replica, next) {
+			replica_hash_remove(&uniq, replica);
 			replica_delete(replica);
 		}
 	});
 
 	/* Check for duplicate UUID */
 	for (int i = 0; i < count; i++) {
-		struct applier *applier = appliers[i];
+		applier = appliers[i];
 		replica = replica_new();
-		replica->applier = applier;
+		replica_set_applier(replica, applier);
 
 		if (applier->state != APPLIER_CONNECTED) {
 			/*
@@ -276,22 +274,21 @@ replicaset_update(struct applier **appliers, int count)
 			 * that will insert it into the replica set
 			 * when it is finally connected.
 			 */
-			rlist_add_entry(&anon_replicas_new, replica, in_anon);
+			rlist_add_entry(&anon_replicas, replica, in_anon);
 			trigger_create(&replica->on_connect,
 				       replica_on_receive_uuid, NULL, NULL);
 			trigger_add(&applier->on_state, &replica->on_connect);
-			replica->pause_on_connect = true;
 			continue;
 		}
 
 		assert(!tt_uuid_is_nil(&applier->uuid));
 		replica->uuid = applier->uuid;
 
-		if (replicaset_search(&uniq, replica) != NULL) {
+		if (replica_hash_search(&uniq, replica) != NULL) {
 			tnt_raise(ClientError, ER_CFG, "replication",
 				  "duplicate connection to the same replica");
 		}
-		replicaset_insert(&uniq, replica);
+		replica_hash_insert(&uniq, replica);
 	}
 
 	/*
@@ -303,43 +300,42 @@ replicaset_update(struct applier **appliers, int count)
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
-		applier_stop(replica->applier); /* cancels a background fiber */
-		applier_delete(replica->applier);
-		replica->applier = NULL;
+		applier = replica->applier;
+		replica_clear_applier(replica);
+		applier_stop(applier);
+		applier_delete(applier);
 	}
-	rlist_foreach_entry_safe(replica, &anon_replicas, in_anon, next) {
-		assert(replica->applier != NULL);
-		applier_stop(replica->applier);
-		applier_delete(replica->applier);
-		replica->applier = NULL;
+	rlist_foreach_entry_safe(replica, &replicaset.anon, in_anon, next) {
+		applier = replica->applier;
+		replica_clear_applier(replica);
 		replica_delete(replica);
+		applier_stop(applier);
+		applier_delete(applier);
 	}
-	rlist_create(&anon_replicas);
+	rlist_create(&replicaset.anon);
 
 	/* Save new appliers */
-	replicaset_foreach_safe(&uniq, replica, next) {
-		replicaset_remove(&uniq, replica);
+	replica_hash_foreach_safe(&uniq, replica, next) {
+		replica_hash_remove(&uniq, replica);
 
-		struct replica *orig = replicaset_search(&replicaset, replica);
+		struct replica *orig = replica_hash_search(&replicaset.hash,
+							   replica);
 		if (orig != NULL) {
 			/* Use existing struct replica */
-			orig->applier = replica->applier;
-			assert(tt_uuid_is_equal(&orig->uuid,
-						&orig->applier->uuid));
-			replica->applier = NULL;
-			replica_delete(replica); /* remove temporary object */
-			replica = orig;
+			replica_set_applier(orig, replica->applier);
+			replica_clear_applier(replica);
+			replica_delete(replica);
 		} else {
 			/* Add a new struct replica */
-			replicaset_insert(&replicaset, replica);
+			replica_hash_insert(&replicaset.hash, replica);
 		}
 	}
-	rlist_swap(&anon_replicas, &anon_replicas_new);
+	rlist_swap(&replicaset.anon, &anon_replicas);
 
-	assert(replicaset_first(&uniq) == NULL);
-	replicaset_foreach_safe(&replicaset, replica, next) {
+	assert(replica_hash_first(&uniq) == NULL);
+	replica_hash_foreach_safe(&replicaset.hash, replica, next) {
 		if (replica_is_orphan(replica)) {
-			replicaset_remove(&replicaset, replica);
+			replica_hash_remove(&replicaset.hash, replica);
 			replica_delete(replica);
 		}
 	}
@@ -445,6 +441,14 @@ replicaset_connect(struct applier **appliers, int count, int quorum,
 	for (int i = 0; i < count; i++) {
 		/* Unregister the temporary trigger used to wake us up */
 		trigger_clear(&triggers[i].base);
+		/*
+		 * Stop appliers that failed to connect.
+		 * They will be restarted once we proceed
+		 * to 'subscribe', see replicaset_follow().
+		 */
+		struct applier *applier = appliers[i];
+		if (applier->state != APPLIER_CONNECTED)
+			applier_stop(applier);
 	}
 
 	/* Now all the appliers are connected, update the replica set. */
@@ -467,11 +471,14 @@ replicaset_follow(void)
 {
 	struct replica *replica;
 	replicaset_foreach(replica) {
+		/* Resume connected appliers. */
 		if (replica->applier != NULL)
 			applier_resume(replica->applier);
 	}
-	rlist_foreach_entry(replica, &anon_replicas, in_anon)
-		replica->pause_on_connect = false;
+	rlist_foreach_entry(replica, &replicaset.anon, in_anon) {
+		/* Restart appliers that failed to connect. */
+		applier_start(replica->applier);
+	}
 }
 
 void
@@ -488,7 +495,7 @@ replica_clear_relay(struct replica *replica)
 	assert(replica->relay != NULL);
 	replica->relay = NULL;
 	if (replica_is_orphan(replica)) {
-		replicaset_remove(&replicaset, replica);
+		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);
 	}
 }
@@ -496,13 +503,13 @@ replica_clear_relay(struct replica *replica)
 struct replica *
 replicaset_first(void)
 {
-	return replicaset_first(&replicaset);
+	return replica_hash_first(&replicaset.hash);
 }
 
 struct replica *
 replicaset_next(struct replica *replica)
 {
-	return replicaset_next(&replicaset, replica);
+	return replica_hash_next(&replicaset.hash, replica);
 }
 
 struct replica *
@@ -510,5 +517,5 @@ replica_by_uuid(const struct tt_uuid *uuid)
 {
 	struct replica key;
 	key.uuid = *uuid;
-	return replicaset_search(&replicaset, &key);
+	return replica_hash_search(&replicaset.hash, &key);
 }

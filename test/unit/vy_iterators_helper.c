@@ -1,7 +1,10 @@
 #include "vy_iterators_helper.h"
 #include "memory.h"
 #include "fiber.h"
+#include "tt_uuid.h"
 #include "say.h"
+
+struct tt_uuid INSTANCE_UUID;
 
 struct tuple_format *vy_key_format = NULL;
 struct vy_mem_env mem_env;

@@ -1513,7 +1513,7 @@ bootstrap_from_master(struct replica *master)
 	 */
 	engine_begin_final_recovery_xc();
 	struct recovery_journal journal;
-	recovery_journal_create(&journal, &replicaset_vclock);
+	recovery_journal_create(&journal, &replicaset.vclock);
 	journal_set(&journal.base);
 
 	applier_resume_to_state(applier, APPLIER_JOINED, TIMEOUT_INFINITY);
@@ -1556,7 +1556,7 @@ bootstrap(const struct tt_uuid *replicaset_uuid)
 		bootstrap_master(replicaset_uuid);
 	}
 	if (engine_begin_checkpoint() ||
-	    engine_commit_checkpoint(&replicaset_vclock))
+	    engine_commit_checkpoint(&replicaset.vclock))
 		panic("failed to create a checkpoint");
 }
 
@@ -1737,10 +1737,10 @@ box_cfg_xc(void)
 		/*
 		 * Initialize the replica set vclock from recovery.
 		 * The local WAL may contain rows from remote masters,
-		 * so we must reflect this in replicaset_vclock to
+		 * so we must reflect this in replicaset vclock to
 		 * not attempt to apply these rows twice.
 		 */
-		vclock_copy(&replicaset_vclock, &recovery->vclock);
+		vclock_copy(&replicaset.vclock, &recovery->vclock);
 
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
@@ -1789,7 +1789,7 @@ box_cfg_xc(void)
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
-		 &replicaset_vclock, wal_max_rows, wal_max_size);
+		 &replicaset.vclock, wal_max_rows, wal_max_size);
 
 	rmean_cleanup(rmean_box);
 
