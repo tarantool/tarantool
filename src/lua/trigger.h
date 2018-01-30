@@ -41,9 +41,18 @@ struct lua_State;
  * The job of lbox_push_event_f is to push trigger arguments
  * to Lua stack.
  */
-
 typedef int
 (*lbox_push_event_f)(struct lua_State *L, void *event);
+
+/**
+ * If not NULL, lbox_pop_event_f will be called after successful
+ * execution of the trigger callback. It can be used to parse the
+ * return value of the trigger callback and update the 'event'
+ * accordingly. If this function returns a non-zero value, an
+ * error will be raised for the caller.
+ */
+typedef int
+(*lbox_pop_event_f)(struct lua_State *L, void *event);
 
 /**
  * Create a Lua trigger, replace an existing one,
@@ -76,8 +85,8 @@ typedef int
  *        optional).
  */
 int
-lbox_trigger_reset(struct lua_State *L, int top,
-		   struct rlist *list, lbox_push_event_f push_f);
+lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
+		   lbox_push_event_f push_f, lbox_pop_event_f pop_f);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -481,6 +481,23 @@ luaL_pushnull(struct lua_State *L)
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
 }
 
+/**
+ * Return true if the value at Lua stack is ffi's NULL
+ * (cdata<void *>: NULL).
+ * @param L stack
+ * @param idx stack index
+ */
+static inline bool
+luaL_isnull(struct lua_State *L, int idx)
+{
+	if (lua_type(L, idx) == LUA_TCDATA) {
+		GCcdata *cd = cdataV(L->base + idx - 1);
+		return cd->ctypeid == CTID_P_VOID &&
+			*(void **)cdataptr(cd) == NULL;
+	}
+	return false;
+}
+
 static inline void
 luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 		 lua_Number number)

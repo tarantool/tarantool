@@ -52,7 +52,7 @@ extern "C" {
  * Trigger function for all spaces
  */
 static int
-lbox_push_on_replace_event(struct lua_State *L, void *event)
+lbox_push_txn_stmt(struct lua_State *L, void *event)
 {
 	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
 
@@ -69,6 +69,33 @@ lbox_push_on_replace_event(struct lua_State *L, void *event)
 	/* @todo: maybe the space object has to be here */
 	lua_pushstring(L, stmt->space->def->name);
 	return 3;
+}
+
+static int
+lbox_pop_txn_stmt(struct lua_State *L, void *event)
+{
+	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
+
+	if (lua_gettop(L) < 1) {
+		/* No return value - nothing to do. */
+		return 0;
+	}
+
+	struct tuple *result = luaT_istuple(L, 1);
+	if (result == NULL && !lua_isnil(L, 1) && !luaL_isnull(L, 1)) {
+		/* Invalid return value - raise error. */
+		diag_set(ClientError, ER_BEFORE_REPLACE_RET,
+			 lua_typename(L, lua_type(L, 1)));
+		return -1;
+	}
+
+	/* Update the new tuple. */
+	if (result != NULL)
+		tuple_ref(result);
+	if (stmt->new_tuple != NULL)
+		tuple_unref(stmt->new_tuple);
+	stmt->new_tuple = result;
+	return 0;
 }
 
 /**
@@ -89,7 +116,28 @@ lbox_space_on_replace(struct lua_State *L)
 	lua_pop(L, 1);
 
 	return lbox_trigger_reset(L, 3, &space->on_replace,
-				  lbox_push_on_replace_event);
+				  lbox_push_txn_stmt, NULL);
+}
+
+/**
+ * Set/Reset/Get space.before_replace trigger
+ */
+static int
+lbox_space_before_replace(struct lua_State *L)
+{
+	int top = lua_gettop(L);
+
+	if (top < 1 || !lua_istable(L, 1)) {
+		luaL_error(L,
+	   "usage: space:before_replace(function | nil, [function | nil])");
+	}
+	lua_getfield(L, 1, "id"); /* Get space id. */
+	uint32_t id = lua_tonumber(L, lua_gettop(L));
+	struct space *space = space_cache_find_xc(id);
+	lua_pop(L, 1);
+
+	return lbox_trigger_reset(L, 3, &space->before_replace,
+				  lbox_push_txn_stmt, lbox_pop_txn_stmt);
 }
 
 /**
@@ -135,6 +183,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
         /* space:on_replace */
         lua_pushstring(L, "on_replace");
         lua_pushcfunction(L, lbox_space_on_replace);
+        lua_settable(L, i);
+
+        /* space:before_replace */
+        lua_pushstring(L, "before_replace");
+        lua_pushcfunction(L, lbox_space_before_replace);
         lua_settable(L, i);
 
 	lua_getfield(L, i, "index");

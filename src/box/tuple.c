@@ -56,11 +56,7 @@ static const double ALLOC_FACTOR = 1.05;
  */
 struct tuple *box_tuple_last;
 
-/**
- * A format for standalone tuples allocated on runtime arena.
- * \sa tuple_new().
- */
-static struct tuple_format *tuple_format_runtime;
+struct tuple_format *tuple_format_runtime;
 
 static void
 runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple);

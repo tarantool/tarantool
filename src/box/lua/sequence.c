@@ -89,7 +89,7 @@ static int
 lbox_sequence_on_alter(struct lua_State *L)
 {
 	return lbox_trigger_reset(L, 2, &on_alter_sequence,
-				  lbox_sequence_push_on_alter_event);
+				  lbox_sequence_push_on_alter_event, NULL);
 }
 
 void

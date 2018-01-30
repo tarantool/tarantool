@@ -170,28 +170,8 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 	struct txn *txn = txn_begin_stmt(space);
 	if (txn == NULL)
 		return -1;
-	int rc;
 	struct tuple *tuple;
-	switch (request->type) {
-	case IPROTO_INSERT:
-	case IPROTO_REPLACE:
-		rc = space_execute_replace(space, txn, request, &tuple);
-		break;
-	case IPROTO_UPDATE:
-		rc = space_execute_update(space, txn, request, &tuple);
-		break;
-	case IPROTO_DELETE:
-		rc = space_execute_delete(space, txn, request, &tuple);
-		break;
-	case IPROTO_UPSERT:
-		rc = space_execute_upsert(space, txn, request);
-		tuple = NULL;
-		break;
-	default:
-		rc = 0;
-		tuple = NULL;
-	}
-	if (rc != 0) {
+	if (space_execute_dml(space, txn, request, &tuple) != 0) {
 		txn_rollback_stmt();
 		return -1;
 	}

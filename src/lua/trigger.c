@@ -44,6 +44,12 @@ struct lbox_trigger
 	 * Lua trigger.
 	 */
 	lbox_push_event_f push_event;
+	/**
+	 * A pointer to a C function which is called
+	 * upon successful execution of the trigger
+	 * callback.
+	 */
+	lbox_pop_event_f pop_event;
 };
 
 static void
@@ -78,7 +84,12 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 	int top = trigger->push_event(L, event);
-	if (luaT_call(L, top, 0)) {
+	if (luaT_call(L, top, LUA_MULTRET)) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		diag_raise();
+	}
+	if (trigger->pop_event != NULL &&
+	    trigger->pop_event(L, event) != 0) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}
@@ -142,8 +153,8 @@ lbox_trigger_check_input(struct lua_State *L, int top)
 }
 
 int
-lbox_trigger_reset(struct lua_State *L, int top,
-		   struct rlist *list, lbox_push_event_f push_event)
+lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
+		   lbox_push_event_f push_event, lbox_pop_event_f pop_event)
 {
 	/**
 	 * If the stack is empty, pushes nils for optional
@@ -176,6 +187,7 @@ lbox_trigger_reset(struct lua_State *L, int top,
 			trg->base.destroy = lbox_trigger_destroy;
 			trg->ref = LUA_NOREF;
 			trg->push_event = push_event;
+			trg->pop_event = pop_event;
 			trigger_add(list, &trg->base);
 		}
 		/*

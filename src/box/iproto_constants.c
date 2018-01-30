@@ -103,6 +103,7 @@ const char *iproto_type_strs[] =
 	"EVAL",
 	"UPSERT",
 	"CALL",
+	NULL, /* NOP */
 	"EXECUTE",
 };
 
@@ -118,6 +119,8 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 	0,                                                     /* AUTH */
 	0,                                                     /* EVAL */
 	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                 /* UPSERT */
+	0,                                                     /* CALL */
+	bit(SPACE_ID),                                         /* NOP */
 };
 #undef bit
 
