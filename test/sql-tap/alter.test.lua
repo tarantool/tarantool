@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(42)
+test:plan(41)
 
 test:do_execsql_test(
     "alter-1.1",
@@ -93,17 +93,7 @@ test:do_catchsql_test(
         ALTER TABLE "_space" RENAME TO space;
     ]], {
         -- <alter-2.3>
-        1, "table _space may not be altered"
-        -- </alter-2.3>
-    })
-
-test:do_catchsql_test(
-    "alter-2.4",
-    [[
-        ALTER TABLE t3 RENAME TO _test;
-    ]], {
-        -- <alter-2.3>
-        1, "object name reserved for internal use: _TEST"
+        1, "/logic error/"
         -- </alter-2.3>
     })
 

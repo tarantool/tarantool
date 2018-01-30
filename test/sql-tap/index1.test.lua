@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(83)
+test:plan(79)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1051,58 +1051,11 @@ test:do_catchsql_test(
         -- </index-17.4>
     })
 
--- The following tests ensure that it is not possible to explicitly name
--- a schema object with a name beginning with "sqlite_". Granted that is a
--- little outside the focus of this test scripts, but this has got to be
--- tested somewhere.
-test:do_catchsql_test(
-    "index-18.1",
-    [[
-        CREATE TABLE _sqlite_t1(a, b, c);
-    ]], {
-        -- <index-18.1>
-        1, "object name reserved for internal use: _SQLITE_T1"
-        -- </index-18.1>
-    })
-
-test:do_catchsql_test(
-    "index-18.2",
-    [[
-        CREATE INDEX _sqlite_i1 ON t7(c);
-    ]], {
-        -- <index-18.2>
-        1, "object name reserved for internal use: _SQLITE_I1"
-        -- </index-18.2>
-    })
-
-test:do_catchsql_test(
-    "index-18.3",
-    [[
-        CREATE VIEW _sqlite_v1 AS SELECT * FROM t7;
-    ]], {
-        -- <index-18.3>
-        1, "object name reserved for internal use: _SQLITE_V1"
-        -- </index-18.3>
-    })
-
-test:do_catchsql_test(
-    "index-18.4",
-    [[
-        CREATE TRIGGER _sqlite_tr1 BEFORE INSERT ON t7 BEGIN SELECT 1; END;
-    ]], {
-        -- <index-18.4>
-        1, "object name reserved for internal use: _SQLITE_TR1"
-        -- </index-18.4>
-    })
-
 test:do_execsql_test(
-    "index-18.5",
+    "index-17.5",
     [[
         DROP TABLE t7;
     ]], {
-        -- <index-18.5>
-        
-        -- </index-18.5>
     })
 
 

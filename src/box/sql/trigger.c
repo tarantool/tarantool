@@ -120,7 +120,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	 * specified name exists
 	 */
 	zName = sqlite3NameFromToken(db, pName);
-	if (!zName || SQLITE_OK != sqlite3CheckObjectName(pParse, zName)) {
+	if (!zName || SQLITE_OK != sqlite3CheckIdentifierName(pParse, zName)) {
 		goto trigger_cleanup;
 	}
 	if (sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName)) {

@@ -1850,6 +1850,9 @@ sqlite3ExprListSetName(Parse * pParse,	/* Parsing context */
 		pItem->zName = sqlite3DbStrNDup(pParse->db, pName->z, pName->n);
 		if (dequote)
 			sqlite3NormalizeName(pItem->zName);
+		/* n = 0 in case of select * */
+		if (pName->n != 0)
+			sqlite3CheckIdentifierName(pParse, pItem->zName);
 	}
 }
 

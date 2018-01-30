@@ -71,7 +71,7 @@ test:do_catchsql_test(
         DROP TABLE "_sequence"
     ]], {
         -- <autoinc-1.5>
-        1, "table _sequence may not be dropped"
+        1, "/system space/"
         -- </autoinc-1.5>
     })
 

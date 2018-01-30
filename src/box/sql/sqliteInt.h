@@ -3440,7 +3440,7 @@ Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlite3ExprAddCollateString(Parse *, Expr *, const char *);
 Expr *sqlite3ExprSkipCollate(Expr *);
 int sqlite3CheckCollSeq(Parse *, struct coll *);
-int sqlite3CheckObjectName(Parse *, char *);
+int sqlite3CheckIdentifierName(Parse *, char *);
 void sqlite3VdbeSetChanges(sqlite3 *, int);
 int sqlite3AddInt64(i64 *, i64);
 int sqlite3SubInt64(i64 *, i64);

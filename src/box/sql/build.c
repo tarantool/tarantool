@@ -47,6 +47,7 @@
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 #include "box/session.h"
+#include "box/identifier.h"
 
 /*
  * This routine is called after a single SQL statement has been
@@ -583,18 +584,20 @@ sqlite3FindDb(sqlite3 * db, Token * pName)
 
 /*
  * This routine is used to check if the UTF-8 string zName is a legal
- * unqualified name for a new schema object (table, index, view or
- * trigger). All names are legal except those that begin with the string
- * "sqlite_" (in upper, lower or mixed case). This portion of the namespace
- * is reserved for internal use.
+ * unqualified name for an identifier.
+ * Some objects may not be checked, because they are validated in Tarantool.
+ * (e.g. table, index, column name of a real table)
+ * All names are legal except those that cantain non-printable
+ * characters or have length greater than BOX_NAME_MAX.
  */
 int
-sqlite3CheckObjectName(Parse * pParse, char *zName)
+sqlite3CheckIdentifierName(Parse *pParse, char *zName)
 {
-	if (!pParse->db->init.busy && pParse->nested == 0
-	    && 0 == sqlite3StrNICmp(zName, "_", 1)) {
+	ssize_t len = strlen(zName);
+
+	if (len > BOX_NAME_MAX || identifier_check(zName, len) != 0) {
 		sqlite3ErrorMsg(pParse,
-				"object name reserved for internal use: %s",
+				"identifier name is invalid: %s",
 				zName);
 		return SQLITE_ERROR;
 	}
@@ -668,9 +671,6 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	pParse->sNameToken = *pName;
 	if (zName == 0)
 		return;
-	if (SQLITE_OK != sqlite3CheckObjectName(pParse, zName)) {
-		goto begin_table_error;
-	}
 #ifndef SQLITE_OMIT_AUTHORIZATION
 	assert(isTemp == 0 || isTemp == 1);
 	assert(isView == 0 || (isView == 1 && isTemp == 0));
@@ -2448,11 +2448,6 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 		}
 	}
 #endif
-	if (sqlite3StrNICmp(pTab->zName, "_", 1) == 0) {
-		sqlite3ErrorMsg(pParse, "table %s may not be dropped",
-				pTab->zName);
-		goto exit_drop_table;
-	}
 #ifndef SQLITE_OMIT_VIEW
 	/* Ensure DROP TABLE is not used on a view, and DROP VIEW is not used
 	 * on a table.
@@ -2957,16 +2952,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 
 	assert(pTab != 0);
 	assert(pParse->nErr == 0);
-	if (sqlite3CheckObjectName(pParse, pTab->zName) != 0
-	    && db->init.busy == 0
-#if SQLITE_USER_AUTHENTICATION
-	    && sqlite3UserAuthTable(pTab->zName) == 0
-#endif
-	    && sqlite3StrNICmp(&pTab->zName[7], "altertab_", 9) != 0) {
-		sqlite3ErrorMsg(pParse, "table %s may not be indexed",
-				pTab->zName);
-		goto exit_create_index;
-	}
 #ifndef SQLITE_OMIT_VIEW
 	if (pTab->pSelect) {
 		sqlite3ErrorMsg(pParse, "views may not be indexed");
@@ -2991,9 +2976,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		if (zName == 0)
 			goto exit_create_index;
 		assert(pName->z != 0);
-		if (SQLITE_OK != sqlite3CheckObjectName(pParse, zName)) {
-			goto exit_create_index;
-		}
 		if (!db->init.busy) {
 			if (sqlite3FindTable(db, zName) != 0) {
 				sqlite3ErrorMsg(pParse,
@@ -3987,6 +3969,12 @@ sqlite3Savepoint(Parse * pParse, int op, Token * pName)
 		    || sqlite3AuthCheck(pParse, SQLITE_SAVEPOINT, az[op], zName,
 					0)) {
 			sqlite3DbFree(pParse->db, zName);
+			return;
+		}
+		if (op == SAVEPOINT_BEGIN &&
+			sqlite3CheckIdentifierName(pParse, zName)
+				!= SQLITE_OK) {
+			sqlite3ErrorMsg(pParse, "bad savepoint name");
 			return;
 		}
 		sqlite3VdbeAddOp4(v, OP_Savepoint, op, 0, 0, zName, P4_DYNAMIC);
