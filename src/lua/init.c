@@ -318,7 +318,9 @@ tarantool_lua_setpaths(struct lua_State *L)
 static int
 tarantool_panic_handler(lua_State *L) {
 	const char *problem = lua_tostring(L, -1);
+#ifdef ENABLE_BACKTRACE
 	print_backtrace();
+#endif /* ENABLE_BACKTRACE */
 	say_crit("%s", problem);
 	int level = 1;
 	lua_Debug ar;
