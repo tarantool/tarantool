@@ -814,8 +814,10 @@ say_default(int level, const char *filename, int line, const char *error,
 	va_start(ap, format);
 	int total = log_vsay(log_default, level, filename,
 			     line, error, format, ap);
-	if (level == S_FATAL && log_default->fd != STDERR_FILENO)
-		(void) write(STDERR_FILENO, buf, total);
+	if (level == S_FATAL && log_default->fd != STDERR_FILENO) {
+		ssize_t r = write(STDERR_FILENO, buf, total);
+		(void) r;                       /* silence gcc warning */
+	}
 
 	va_end(ap);
 	errno = errsv; /* Preserve the errno. */
@@ -831,7 +833,8 @@ write_to_file(struct log *log, int total)
 	       log->type == SAY_LOGGER_PIPE ||
 	       log->type == SAY_LOGGER_STDERR);
 	assert(total >= 0);
-	(void) write(log->fd, buf, total);
+	ssize_t r = write(log->fd, buf, total);
+	(void) r;                               /* silence gcc warning */
 }
 
 /**
@@ -859,7 +862,8 @@ write_to_syslog(struct log *log, int total)
 			 * it would block thread. Try to reconnect
 			 * on next vsay().
 			 */
-			(void) write(log->fd, buf, total);
+			ssize_t r = write(log->fd, buf, total);
+			(void) r;               /* silence gcc warning */
 		}
 	}
 }
@@ -1003,8 +1007,11 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 			(void) write(STDERR_FILENO, buf, total);
 		break;
 	case SAY_LOGGER_BOOT:
-		(void) write(STDERR_FILENO, buf, total);
+	{
+		ssize_t r = write(STDERR_FILENO, buf, total);
+		(void) r;                       /* silence gcc warning */
 		break;
+	}
 	default:
 		unreachable();
 	}

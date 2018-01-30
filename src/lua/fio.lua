@@ -439,4 +439,47 @@ fio.copytree = function(from, to)
     return true
 end
 
+fio.path = {}
+fio.path.is_file = function(filename)
+    local fs = fio.stat(filename)
+    return fs ~= nil and fs:is_reg() or false
+end
+
+fio.path.is_link = function(filename)
+    local fs = fio.lstat(filename)
+    return fs ~= nil and fs:is_link() or false
+end
+
+fio.path.is_dir = function(filename)
+    local fs = fio.stat(filename)
+    return fs ~= nil and fs:is_dir() or false
+end
+
+-- From Python os.path docs (docs.python.org/2/library/os.path.html)
+-- "The function checks whether path’s parent, path/.., is on a different device
+-- than path, or whether path/.. and path
+-- point to the same i-node on the same device"
+fio.path.is_mount = function(filename)
+    local st = fio.lstat(filename)
+    if st == nil then
+        return false
+    end
+    if st:is_link() then
+        return false
+    end
+    local parent_st = fio.lstat(fio.abspath(fio.pathjoin(filename, "..")))
+    if parent_st == nil then
+        return true
+    end
+    return st.dev ~= parent_st.dev or st.inode == parent_st.inode
+end
+
+fio.path.exists = function(filename)
+    return fio.stat(filename) ~= nil
+end
+
+fio.path.lexists = function(filename)
+    return fio.lstat(filename) ~= nil
+end
+
 return fio

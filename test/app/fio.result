@@ -7,6 +7,9 @@ ffi = require 'ffi'
 buffer = require 'buffer'
 ---
 ...
+test_run = require('test_run').new()
+---
+...
 -- umask
 type(fio.umask(0))
 ---
@@ -862,6 +865,220 @@ buf:recycle()
 ---
 ...
 fh:close()
+---
+- true
+...
+-- gh-2924
+-- fio.path.exists lexists is_file, etc
+--
+fio.path.is_file(tmpfile)
+---
+- true
+...
+fio.path.is_dir(tmpfile)
+---
+- false
+...
+fio.path.is_link(tmpfile)
+---
+- false
+...
+fio.path.is_mount(tmpfile)
+---
+- false
+...
+fio.path.exists(tmpfile)
+---
+- true
+...
+fio.path.lexists(tmpfile)
+---
+- true
+...
+non_existing_file = "/no/such/file"
+---
+...
+fio.path.is_file(non_existing_file)
+---
+- false
+...
+fio.path.is_dir(non_existing_file)
+---
+- false
+...
+fio.path.is_link(non_existing_file)
+---
+- false
+...
+fio.path.is_mount(non_existing_file)
+---
+- false
+...
+fio.path.exists(non_existing_file)
+---
+- false
+...
+fio.path.lexists(non_existing_file)
+---
+- false
+...
+fio.path.is_file(tmpdir)
+---
+- false
+...
+fio.path.is_dir(tmpdir)
+---
+- true
+...
+fio.path.is_link(tmpdir)
+---
+- false
+...
+fio.path.is_mount(tmpdir)
+---
+- false
+...
+fio.path.exists(tmpdir)
+---
+- true
+...
+fio.path.lexists(tmpdir)
+---
+- true
+...
+link = fio.pathjoin(tmpdir, "link")
+---
+...
+fio.symlink(tmpfile, link)
+---
+- true
+...
+fio.path.is_file(link)
+---
+- true
+...
+fio.path.is_dir(link)
+---
+- false
+...
+fio.path.is_link(link)
+---
+- true
+...
+fio.path.is_mount(link)
+---
+- false
+...
+fio.path.exists(link)
+---
+- true
+...
+fio.path.lexists(link)
+---
+- true
+...
+fio.unlink(link)
+---
+- true
+...
+fio.symlink(non_existing_file, link)
+---
+- true
+...
+fio.path.is_file(link)
+---
+- false
+...
+fio.path.is_dir(link)
+---
+- false
+...
+fio.path.is_link(link)
+---
+- true
+...
+fio.path.is_mount(link)
+---
+- false
+...
+fio.path.exists(link)
+---
+- false
+...
+fio.path.lexists(link)
+---
+- true
+...
+fio.unlink(link)
+---
+- true
+...
+fio.symlink(tmpdir, link)
+---
+- true
+...
+fio.path.is_file(link)
+---
+- false
+...
+fio.path.is_dir(link)
+---
+- true
+...
+fio.path.is_link(link)
+---
+- true
+...
+fio.path.is_mount(link)
+---
+- false
+...
+fio.path.exists(link)
+---
+- true
+...
+fio.path.lexists(link)
+---
+- true
+...
+fio.path.is_mount("/")
+---
+- true
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+-- create fake function lstat to test is_mount
+function fake_lstat(filename)
+    local inode = 0
+    local dev = 0
+    if filename == tmpfile then
+        inode = 1
+        dev = 1
+    end
+    return {dev = dev, inode = inode, is_link = function() return false end}
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+lstat= fio.lstat
+---
+...
+fio.lstat = fake_lstat
+---
+...
+fio.path.is_mount(tmpfile)
+---
+- true
+...
+fio.lstat = lstat
+---
+...
+fio.unlink(link)
 ---
 - true
 ...
