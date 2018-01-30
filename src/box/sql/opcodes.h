@@ -49,117 +49,102 @@
 #define OP_NoConflict     46 /* synopsis: key=r[P3@P4]                     */
 #define OP_NotFound       47 /* synopsis: key=r[P3@P4]                     */
 #define OP_Found          48 /* synopsis: key=r[P3@P4]                     */
-#define OP_SeekRowid      49 /* synopsis: intkey=r[P3]                     */
-#define OP_NotExists      50 /* synopsis: intkey=r[P3]                     */
-#define OP_Last           51
-#define OP_SorterSort     52
-#define OP_Sort           53
-#define OP_Rewind         54
-#define OP_IdxLE          55 /* synopsis: key=r[P3@P4]                     */
-#define OP_IdxGT          56 /* synopsis: key=r[P3@P4]                     */
-#define OP_IdxLT          57 /* synopsis: key=r[P3@P4]                     */
-#define OP_IdxGE          58 /* synopsis: key=r[P3@P4]                     */
-#define OP_RowSetRead     59 /* synopsis: r[P3]=rowset(P1)                 */
-#define OP_RowSetTest     60 /* synopsis: if r[P3] in rowset(P1) goto P2   */
-#define OP_Program        61
-#define OP_FkIfZero       62 /* synopsis: if fkctr[P1]==0 goto P2          */
-#define OP_IfPos          63 /* synopsis: if r[P1]>0 then r[P1]-=P3, goto P2 */
-#define OP_IfNotZero      64 /* synopsis: if r[P1]!=0 then r[P1]--, goto P2 */
-#define OP_DecrJumpZero   65 /* synopsis: if (--r[P1])==0 goto P2          */
-#define OP_Init           66 /* synopsis: Start at P2                      */
-#define OP_Return         67
-#define OP_EndCoroutine   68
-#define OP_HaltIfNull     69 /* synopsis: if r[P3]=null halt               */
-#define OP_Halt           70
-#define OP_Integer        71 /* synopsis: r[P2]=P1                         */
-#define OP_Bool           72 /* synopsis: r[P2]=P1                         */
-#define OP_Int64          73 /* synopsis: r[P2]=P4                         */
-#define OP_String         74 /* synopsis: r[P2]='P4' (len=P1)              */
+#define OP_Last           49
+#define OP_SorterSort     50
+#define OP_Sort           51
+#define OP_Rewind         52
+#define OP_IdxLE          53 /* synopsis: key=r[P3@P4]                     */
+#define OP_IdxGT          54 /* synopsis: key=r[P3@P4]                     */
+#define OP_IdxLT          55 /* synopsis: key=r[P3@P4]                     */
+#define OP_IdxGE          56 /* synopsis: key=r[P3@P4]                     */
+#define OP_Program        57
+#define OP_FkIfZero       58 /* synopsis: if fkctr[P1]==0 goto P2          */
+#define OP_IfPos          59 /* synopsis: if r[P1]>0 then r[P1]-=P3, goto P2 */
+#define OP_IfNotZero      60 /* synopsis: if r[P1]!=0 then r[P1]--, goto P2 */
+#define OP_DecrJumpZero   61 /* synopsis: if (--r[P1])==0 goto P2          */
+#define OP_Init           62 /* synopsis: Start at P2                      */
+#define OP_Return         63
+#define OP_EndCoroutine   64
+#define OP_HaltIfNull     65 /* synopsis: if r[P3]=null halt               */
+#define OP_Halt           66
+#define OP_Integer        67 /* synopsis: r[P2]=P1                         */
+#define OP_Bool           68 /* synopsis: r[P2]=P1                         */
+#define OP_Int64          69 /* synopsis: r[P2]=P4                         */
+#define OP_String         70 /* synopsis: r[P2]='P4' (len=P1)              */
+#define OP_Null           71 /* synopsis: r[P2..P3]=NULL                   */
+#define OP_SoftNull       72 /* synopsis: r[P1]=NULL                       */
+#define OP_Blob           73 /* synopsis: r[P2]=P4 (len=P1, subtype=P3)    */
+#define OP_Variable       74 /* synopsis: r[P2]=parameter(P1,P4)           */
 #define OP_String8        75 /* same as TK_STRING, synopsis: r[P2]='P4'    */
-#define OP_Null           76 /* synopsis: r[P2..P3]=NULL                   */
-#define OP_SoftNull       77 /* synopsis: r[P1]=NULL                       */
-#define OP_Blob           78 /* synopsis: r[P2]=P4 (len=P1, subtype=P3)    */
-#define OP_Variable       79 /* synopsis: r[P2]=parameter(P1,P4)           */
-#define OP_Move           80 /* synopsis: r[P2@P3]=r[P1@P3]                */
-#define OP_Copy           81 /* synopsis: r[P2@P3+1]=r[P1@P3+1]            */
-#define OP_SCopy          82 /* synopsis: r[P2]=r[P1]                      */
-#define OP_IntCopy        83 /* synopsis: r[P2]=r[P1]                      */
-#define OP_ResultRow      84 /* synopsis: output=r[P1@P2]                  */
-#define OP_CollSeq        85
-#define OP_Function0      86 /* synopsis: r[P3]=func(r[P2@P5])             */
-#define OP_Function       87 /* synopsis: r[P3]=func(r[P2@P5])             */
-#define OP_AddImm         88 /* synopsis: r[P1]=r[P1]+P2                   */
-#define OP_RealAffinity   89
-#define OP_Cast           90 /* synopsis: affinity(r[P1])                  */
-#define OP_Permutation    91
-#define OP_Compare        92 /* synopsis: r[P1@P3] <-> r[P2@P3]            */
-#define OP_Column         93 /* synopsis: r[P3]=PX                         */
-#define OP_Affinity       94 /* synopsis: affinity(r[P1@P2])               */
-#define OP_MakeRecord     95 /* synopsis: r[P3]=mkrec(r[P1@P2])            */
-#define OP_Count          96 /* synopsis: r[P2]=count()                    */
-#define OP_FkCheckCommit  97
-#define OP_TTransaction   98
-#define OP_ReadCookie     99
-#define OP_SetCookie     100
-#define OP_ReopenIdx     101 /* synopsis: root=P2                          */
-#define OP_OpenRead      102 /* synopsis: root=P2                          */
-#define OP_OpenWrite     103 /* synopsis: root=P2                          */
-#define OP_OpenAutoindex 104 /* synopsis: nColumn=P2                       */
-#define OP_OpenEphemeral 105 /* synopsis: nColumn=P2                       */
-#define OP_OpenTEphemeral 106 /* synopsis: nColumn = P2                     */
-#define OP_SorterOpen    107
-#define OP_SequenceTest  108 /* synopsis: if (cursor[P1].ctr++) pc = P2    */
-#define OP_OpenPseudo    109 /* synopsis: P3 columns in r[P2]              */
-#define OP_Close         110
-#define OP_ColumnsUsed   111
-#define OP_Sequence      112 /* synopsis: r[P2]=cursor[P1].ctr++           */
-#define OP_NextId        113 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
-#define OP_NextIdEphemeral 114 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
+#define OP_Move           76 /* synopsis: r[P2@P3]=r[P1@P3]                */
+#define OP_Copy           77 /* synopsis: r[P2@P3+1]=r[P1@P3+1]            */
+#define OP_SCopy          78 /* synopsis: r[P2]=r[P1]                      */
+#define OP_IntCopy        79 /* synopsis: r[P2]=r[P1]                      */
+#define OP_ResultRow      80 /* synopsis: output=r[P1@P2]                  */
+#define OP_CollSeq        81
+#define OP_Function0      82 /* synopsis: r[P3]=func(r[P2@P5])             */
+#define OP_Function       83 /* synopsis: r[P3]=func(r[P2@P5])             */
+#define OP_AddImm         84 /* synopsis: r[P1]=r[P1]+P2                   */
+#define OP_RealAffinity   85
+#define OP_Cast           86 /* synopsis: affinity(r[P1])                  */
+#define OP_Permutation    87
+#define OP_Compare        88 /* synopsis: r[P1@P3] <-> r[P2@P3]            */
+#define OP_Column         89 /* synopsis: r[P3]=PX                         */
+#define OP_Affinity       90 /* synopsis: affinity(r[P1@P2])               */
+#define OP_MakeRecord     91 /* synopsis: r[P3]=mkrec(r[P1@P2])            */
+#define OP_Count          92 /* synopsis: r[P2]=count()                    */
+#define OP_FkCheckCommit  93
+#define OP_TTransaction   94
+#define OP_ReadCookie     95
+#define OP_SetCookie      96
+#define OP_ReopenIdx      97 /* synopsis: root=P2                          */
+#define OP_OpenRead       98 /* synopsis: root=P2                          */
+#define OP_OpenWrite      99 /* synopsis: root=P2                          */
+#define OP_OpenTEphemeral 100 /* synopsis: nColumn = P2                     */
+#define OP_SorterOpen    101
+#define OP_SequenceTest  102 /* synopsis: if (cursor[P1].ctr++) pc = P2    */
+#define OP_OpenPseudo    103 /* synopsis: P3 columns in r[P2]              */
+#define OP_Close         104
+#define OP_ColumnsUsed   105
+#define OP_Sequence      106 /* synopsis: r[P2]=cursor[P1].ctr++           */
+#define OP_NextId        107 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
+#define OP_NextIdEphemeral 108 /* synopsis: r[P3]=get_max(space_index[P1]{Column[P2]}) */
+#define OP_FCopy         109 /* synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)] */
+#define OP_Delete        110
+#define OP_ResetCount    111
+#define OP_SorterCompare 112 /* synopsis: if key(P1)!=trim(r[P3],P4) goto P2 */
+#define OP_SorterData    113 /* synopsis: r[P2]=data                       */
+#define OP_RowData       114 /* synopsis: r[P2]=data                       */
 #define OP_Real          115 /* same as TK_FLOAT, synopsis: r[P2]=P4       */
-#define OP_FCopy         116 /* synopsis: reg[P2@cur_frame]= reg[P1@root_frame(OPFLAG_SAME_FRAME)] */
-#define OP_NewRowid      117 /* synopsis: r[P2]=rowid                      */
-#define OP_Insert        118 /* synopsis: intkey=r[P3] data=r[P2]          */
-#define OP_InsertInt     119 /* synopsis: intkey=P3 data=r[P2]             */
-#define OP_Delete        120
-#define OP_ResetCount    121
-#define OP_SorterCompare 122 /* synopsis: if key(P1)!=trim(r[P3],P4) goto P2 */
-#define OP_SorterData    123 /* synopsis: r[P2]=data                       */
-#define OP_RowData       124 /* synopsis: r[P2]=data                       */
-#define OP_Rowid         125 /* synopsis: r[P2]=rowid                      */
-#define OP_NullRow       126
-#define OP_SorterInsert  127 /* synopsis: key=r[P2]                        */
-#define OP_IdxInsert     128 /* synopsis: key=r[P2]                        */
-#define OP_IdxDelete     129 /* synopsis: key=r[P2@P3]                     */
-#define OP_Seek          130 /* synopsis: Move P3 to P1.rowid              */
-#define OP_IdxRowid      131 /* synopsis: r[P2]=rowid                      */
-#define OP_Destroy       132
-#define OP_Clear         133
-#define OP_ResetSorter   134
-#define OP_CreateIndex   135 /* synopsis: r[P2]=root                       */
-#define OP_CreateTable   136 /* synopsis: r[P2]=root                       */
-#define OP_ParseSchema2  137 /* synopsis: rows=r[P1@P2]                    */
-#define OP_ParseSchema3  138 /* synopsis: name=r[P1] sql=r[P1+1]           */
-#define OP_RenameTable   139 /* synopsis: P1 = root, P4 = name             */
-#define OP_LoadAnalysis  140
-#define OP_DropTable     141
-#define OP_DropIndex     142
-#define OP_DropTrigger   143
-#define OP_IntegrityCk   144
-#define OP_RowSetAdd     145 /* synopsis: rowset(P1)=r[P2]                 */
-#define OP_Param         146
-#define OP_FkCounter     147 /* synopsis: fkctr[P1]+=P2                    */
-#define OP_MemMax        148 /* synopsis: r[P1]=max(r[P1],r[P2])           */
-#define OP_OffsetLimit   149 /* synopsis: if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1) */
-#define OP_AggStep0      150 /* synopsis: accum=r[P3] step(r[P2@P5])       */
-#define OP_AggStep       151 /* synopsis: accum=r[P3] step(r[P2@P5])       */
-#define OP_AggFinal      152 /* synopsis: accum=r[P1] N=P2                 */
-#define OP_Expire        153
-#define OP_Pagecount     154
-#define OP_MaxPgcnt      155
-#define OP_CursorHint    156
-#define OP_IncMaxid      157
-#define OP_Noop          158
-#define OP_Explain       159
+#define OP_NullRow       116
+#define OP_SorterInsert  117 /* synopsis: key=r[P2]                        */
+#define OP_IdxInsert     118 /* synopsis: key=r[P2]                        */
+#define OP_IdxDelete     119 /* synopsis: key=r[P2@P3]                     */
+#define OP_Destroy       120
+#define OP_Clear         121
+#define OP_ResetSorter   122
+#define OP_ParseSchema2  123 /* synopsis: rows=r[P1@P2]                    */
+#define OP_ParseSchema3  124 /* synopsis: name=r[P1] sql=r[P1+1]           */
+#define OP_RenameTable   125 /* synopsis: P1 = root, P4 = name             */
+#define OP_LoadAnalysis  126
+#define OP_DropTable     127
+#define OP_DropIndex     128
+#define OP_DropTrigger   129
+#define OP_IntegrityCk   130
+#define OP_Param         131
+#define OP_FkCounter     132 /* synopsis: fkctr[P1]+=P2                    */
+#define OP_MemMax        133 /* synopsis: r[P1]=max(r[P1],r[P2])           */
+#define OP_OffsetLimit   134 /* synopsis: if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1) */
+#define OP_AggStep0      135 /* synopsis: accum=r[P3] step(r[P2@P5])       */
+#define OP_AggStep       136 /* synopsis: accum=r[P3] step(r[P2@P5])       */
+#define OP_AggFinal      137 /* synopsis: accum=r[P1] N=P2                 */
+#define OP_Expire        138
+#define OP_Pagecount     139
+#define OP_MaxPgcnt      140
+#define OP_CursorHint    141
+#define OP_IncMaxid      142
+#define OP_Noop          143
+#define OP_Explain       144
 
 /* Properties such as "out2" or "jump" that are specified in
 ** comments following the "case" for each opcode in the vdbe.c
@@ -178,21 +163,19 @@
 /*  24 */ 0x26, 0x26, 0x26, 0x26, 0x26, 0x26, 0x26, 0x26,\
 /*  32 */ 0x01, 0x12, 0x01, 0x01, 0x03, 0x03, 0x01, 0x01,\
 /*  40 */ 0x03, 0x03, 0x09, 0x09, 0x09, 0x09, 0x09, 0x09,\
-/*  48 */ 0x09, 0x09, 0x09, 0x01, 0x01, 0x01, 0x01, 0x01,\
-/*  56 */ 0x01, 0x01, 0x01, 0x23, 0x0b, 0x01, 0x01, 0x03,\
-/*  64 */ 0x03, 0x03, 0x01, 0x02, 0x02, 0x08, 0x00, 0x10,\
-/*  72 */ 0x10, 0x10, 0x10, 0x10, 0x10, 0x00, 0x10, 0x10,\
-/*  80 */ 0x00, 0x00, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00,\
-/*  88 */ 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,\
-/*  96 */ 0x10, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,\
-/* 104 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
-/* 112 */ 0x10, 0x20, 0x00, 0x10, 0x10, 0x10, 0x00, 0x00,\
-/* 120 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x04,\
-/* 128 */ 0x04, 0x00, 0x00, 0x10, 0x10, 0x00, 0x00, 0x10,\
-/* 136 */ 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
-/* 144 */ 0x00, 0x06, 0x10, 0x00, 0x04, 0x1a, 0x00, 0x00,\
-/* 152 */ 0x00, 0x00, 0x10, 0x10, 0x00, 0x00, 0x00, 0x00,\
-}
+/*  48 */ 0x09, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,\
+/*  56 */ 0x01, 0x01, 0x01, 0x03, 0x03, 0x03, 0x01, 0x02,\
+/*  64 */ 0x02, 0x08, 0x00, 0x10, 0x10, 0x10, 0x10, 0x10,\
+/*  72 */ 0x00, 0x10, 0x10, 0x10, 0x00, 0x00, 0x10, 0x10,\
+/*  80 */ 0x00, 0x00, 0x00, 0x00, 0x02, 0x02, 0x02, 0x00,\
+/*  88 */ 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x10,\
+/*  96 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
+/* 104 */ 0x00, 0x00, 0x10, 0x20, 0x00, 0x10, 0x00, 0x00,\
+/* 112 */ 0x00, 0x00, 0x00, 0x10, 0x00, 0x04, 0x04, 0x00,\
+/* 120 */ 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
+/* 128 */ 0x00, 0x00, 0x00, 0x10, 0x00, 0x04, 0x1a, 0x00,\
+/* 136 */ 0x00, 0x00, 0x00, 0x10, 0x10, 0x00, 0x00, 0x00,\
+/* 144 */ 0x00,}
 
 /* The sqlite3P2Values() routine is able to run faster if it knows
 ** the value of the largest JUMP opcode.  The smaller the maximum
@@ -200,4 +183,4 @@
 ** generated this include file strives to group all JUMP opcodes
 ** together near the beginning of the list.
 */
-#define SQLITE_MX_JUMP_OPCODE  66  /* Maximum JUMP opcode */
+#define SQLITE_MX_JUMP_OPCODE  62  /* Maximum JUMP opcode */

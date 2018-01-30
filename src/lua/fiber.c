@@ -240,11 +240,13 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx, bool backtrace)
 	return 0;
 }
 
+#ifdef ENABLE_BACKTRACE
 static int
 lbox_fiber_statof_bt(struct fiber *f, void *cb_ctx)
 {
 	return lbox_fiber_statof(f, cb_ctx, true);
 }
+#endif /* ENABLE_BACKTRACE */
 
 static int
 lbox_fiber_statof_nobt(struct fiber *f, void *cb_ctx)

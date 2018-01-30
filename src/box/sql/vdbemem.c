@@ -99,7 +99,6 @@ SQLITE_NOINLINE int
 sqlite3VdbeMemGrow(Mem * pMem, int n, int bPreserve)
 {
 	assert(sqlite3VdbeCheckMemInvariants(pMem));
-	assert((pMem->flags & MEM_RowSet) == 0);
 	testcase(pMem->db == 0);
 
 	/* If the bPreserve flag is set to true, then the memory cell must already
@@ -184,7 +183,6 @@ int
 sqlite3VdbeMemMakeWriteable(Mem * pMem)
 {
 	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
-	assert((pMem->flags & MEM_RowSet) == 0);
 	if ((pMem->flags & (MEM_Str | MEM_Blob)) != 0) {
 		if (ExpandBlob(pMem))
 			return SQLITE_NOMEM;
@@ -216,7 +214,6 @@ sqlite3VdbeMemExpandBlob(Mem * pMem)
 	int nByte;
 	assert(pMem->flags & MEM_Zero);
 	assert(pMem->flags & MEM_Blob);
-	assert((pMem->flags & MEM_RowSet) == 0);
 	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 
 	/* Set nByte to the number of bytes required to store the expanded blob. */
@@ -291,7 +288,6 @@ sqlite3VdbeMemStringify(Mem * pMem, u8 bForce)
 	assert(!(fg & MEM_Zero));
 	assert(!(fg & (MEM_Str | MEM_Blob)));
 	assert(fg & (MEM_Int | MEM_Real));
-	assert((pMem->flags & MEM_RowSet) == 0);
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	if (sqlite3VdbeMemClearAndResize(pMem, nByte)) {
@@ -364,11 +360,8 @@ vdbeMemClearExternAndSetNull(Mem * p)
 		testcase(p->flags & MEM_Dyn);
 	}
 	if (p->flags & MEM_Dyn) {
-		assert((p->flags & MEM_RowSet) == 0);
 		assert(p->xDel != SQLITE_DYNAMIC && p->xDel != 0);
 		p->xDel((void *)p->z);
-	} else if (p->flags & MEM_RowSet) {
-		sqlite3RowSetClear(p->u.pRowSet);
 	} else if (p->flags & MEM_Frame) {
 		VdbeFrame *pFrame = p->u.pFrame;
 		pFrame->pParent = pFrame->v->pDelFrame;
@@ -516,7 +509,6 @@ sqlite3VdbeIntegerAffinity(Mem * pMem)
 {
 	i64 ix;
 	assert(pMem->flags & MEM_Real);
-	assert((pMem->flags & MEM_RowSet) == 0);
 	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
@@ -545,7 +537,6 @@ int
 sqlite3VdbeMemIntegerify(Mem * pMem)
 {
 	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
-	assert((pMem->flags & MEM_RowSet) == 0);
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	pMem->u.i = sqlite3VdbeIntValue(pMem);
@@ -748,31 +739,6 @@ sqlite3VdbeMemSetDouble(Mem * pMem, double val)
 #endif
 
 /*
- * Delete any previous value and set the value of pMem to be an
- * empty boolean index.
- */
-void
-sqlite3VdbeMemSetRowSet(Mem * pMem)
-{
-	sqlite3 *db = pMem->db;
-	assert(db != 0);
-	assert((pMem->flags & MEM_RowSet) == 0);
-	sqlite3VdbeMemRelease(pMem);
-	pMem->zMalloc = sqlite3DbMallocRawNN(db, 64);
-	if (db->mallocFailed) {
-		pMem->flags = MEM_Null;
-		pMem->szMalloc = 0;
-	} else {
-		assert(pMem->zMalloc);
-		pMem->szMalloc = sqlite3DbMallocSize(db, pMem->zMalloc);
-		pMem->u.pRowSet =
-		    sqlite3RowSetInit(db, pMem->zMalloc, pMem->szMalloc);
-		assert(pMem->u.pRowSet != 0);
-		pMem->flags = MEM_RowSet;
-	}
-}
-
-/*
  * Return true if the Mem object contains a TEXT or BLOB that is
  * too large - whose size exceeds SQLITE_MAX_LENGTH.
  */
@@ -831,7 +797,6 @@ vdbeClrCopy(Mem * pTo, const Mem * pFrom, int eType)
 void
 sqlite3VdbeMemShallowCopy(Mem * pTo, const Mem * pFrom, int srcType)
 {
-	assert((pFrom->flags & MEM_RowSet) == 0);
 	assert(pTo->db == pFrom->db);
 	if (VdbeMemDynamic(pTo)) {
 		vdbeClrCopy(pTo, pFrom, srcType);
@@ -854,7 +819,6 @@ sqlite3VdbeMemCopy(Mem * pTo, const Mem * pFrom)
 {
 	int rc = SQLITE_OK;
 
-	assert((pFrom->flags & MEM_RowSet) == 0);
 	if (VdbeMemDynamic(pTo))
 		vdbeMemClearExternAndSetNull(pTo);
 	memcpy(pTo, pFrom, MEMCELLSIZE);
@@ -915,7 +879,6 @@ sqlite3VdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 	int iLimit;		/* Maximum allowed string or blob size */
 	u16 flags = 0;		/* New value for pMem->flags */
 	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
-	assert((pMem->flags & MEM_RowSet) == 0);
 
 	/* If z is a NULL pointer, set pMem to contain an SQL NULL. */
 	if (!z) {
@@ -1032,7 +995,6 @@ sqlite3VdbeMemFromBtree(BtCursor * pCur,	/* Cursor pointing at record to retriev
 	/* Note: the calls to BtreeKeyFetch() and DataFetch() below assert()
 	 * that both the BtShared and database handle mutexes are held.
 	 */
-	assert((pMem->flags & MEM_RowSet) == 0);
 	zData = (char *)sqlite3BtreePayloadFetch(pCur, &available);
 	assert(zData != 0);
 
@@ -1057,7 +1019,6 @@ valueToText(sqlite3_value * pVal)
 {
 	assert(pVal != 0);
 	assert(pVal->db == 0 || sqlite3_mutex_held(pVal->db->mutex));
-	assert((pVal->flags & MEM_RowSet) == 0);
 	assert((pVal->flags & (MEM_Null)) == 0);
 	if (pVal->flags & (MEM_Blob | MEM_Str)) {
 		if (ExpandBlob(pVal))
@@ -1087,7 +1048,6 @@ sqlite3ValueText(sqlite3_value * pVal)
 	if (!pVal)
 		return 0;
 	assert(pVal->db == 0 || sqlite3_mutex_held(pVal->db->mutex));
-	assert((pVal->flags & MEM_RowSet) == 0);
 	if ((pVal->flags & (MEM_Str | MEM_Term)) == (MEM_Str | MEM_Term)) {
 		return pVal->z;
 	}

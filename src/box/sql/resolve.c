@@ -292,10 +292,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 						}
 						cnt++;
 						pMatch = pItem;
-						/* Substitute the rowid (column -1) for the INTEGER PRIMARY KEY */
-						pExpr->iColumn =
-						    j ==
-						    pTab->iPKey ? -1 : (i16) j;
+						pExpr->iColumn = (i16) j;
 						break;
 					}
 				}
@@ -344,11 +341,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 						break;
 					}
 				}
-				if (iCol >= pTab->nCol && sqlite3IsRowid(zCol)
-				    && VisibleRowid(pTab)) {
-					/* IMP: R-51414-32910 */
-					iCol = -1;
-				}
 				if (iCol < pTab->nCol) {
 					cnt++;
 					if (iCol < 0) {
@@ -376,20 +368,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 			}
 		}
 #endif				/* !defined(SQLITE_OMIT_TRIGGER) */
-
-		/*
-		 * Perhaps the name is a reference to the ROWID
-		 */
-		if (cnt == 0
-		    && cntTab == 1
-		    && pMatch
-		    && (pNC->ncFlags & NC_IdxExpr) == 0 && sqlite3IsRowid(zCol)
-		    && VisibleRowid(pMatch->pTab)
-		    ) {
-			cnt = 1;
-			pExpr->iColumn = -1;
-			pExpr->affinity = SQLITE_AFF_INTEGER;
-		}
 
 		/*
 		 * If the input is of the form Z (not Y.Z or X.Y.Z) then the name Z

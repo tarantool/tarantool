@@ -1108,7 +1108,6 @@ struct sqlite3 {
 	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
 	sqlite3_mutex *mutex;	/* Connection mutex */
 	Db mdb;			/* All backends */
-	i64 lastRowid;		/* ROWID of most recent insert (see above) */
 	i64 szMmap;		/* Default mmap_size setting */
 	unsigned int openFlags;	/* Flags passed to sqlite3_vfs.xOpen() */
 	int errCode;		/* Most recent error code (SQLITE_*) */
@@ -1524,8 +1523,7 @@ struct Table {
 #define TF_Ephemeral       0x02	/* An ephemeral table */
 #define TF_HasPrimaryKey   0x04	/* Table has a primary key */
 #define TF_Autoincrement   0x08	/* Integer primary key is autoincrement */
-#define TF_WithoutRowid    0x20	/* No rowid.  PRIMARY KEY is the key */
-#define TF_NoVisibleRowid  0x40	/* No user-visible "rowid" column */
+#define TF_View   	   0x20	/* A view */
 #define TF_OOOHidden       0x80	/* Out-of-Order hidden columns */
 
 /*
@@ -1541,10 +1539,6 @@ struct Table {
 #define IsHiddenColumn(X)         0
 #define IsOrdinaryHiddenColumn(X) 0
 #endif
-
-/* Does the table have a rowid */
-#define HasRowid(X)     (((X)->tabFlags & TF_WithoutRowid)==0)
-#define VisibleRowid(X) (((X)->tabFlags & TF_NoVisibleRowid)==0)
 
 /*
  * Each foreign key constraint is an instance of the following structure.
@@ -1636,8 +1630,7 @@ struct FKey {
  * comparison of the two index keys.
  *
  * Note that aSortOrder[] and aColl[] have nField+1 slots.  There
- * are nField slots for the columns of an index then one extra slot
- * for the rowid at the end.
+ * are nField slots for the columns of an index.
  */
 struct KeyInfo {
 	u32 nRef;		/* Number of references to this KeyInfo object */
@@ -1779,7 +1772,6 @@ struct Index {
 /* The Index.aiColumn[] values are normally positive integer.  But
  * there are some negative values that have special meaning:
  */
-#define XN_ROWID     (-1)	/* Indexed column is the rowid */
 #define XN_EXPR      (-2)	/* Indexed column is an expression */
 
 /*
@@ -1959,7 +1951,7 @@ struct Expr {
 	bool is_ephemeral;      /* If iTable was set, this flags if this table i
 				 * ephemeral or not.
 				 */
-	ynVar iColumn;		/* TK_COLUMN: column index.  -1 for rowid.
+	ynVar iColumn;		/* TK_COLUMN: column index.
 				 * TK_VARIABLE: variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
 				 */
@@ -2462,7 +2454,6 @@ struct SelectDest {
 struct AutoincInfo {
 	AutoincInfo *pNext;	/* Next info block in a list of them all */
 	Table *pTab;		/* Table this info block refers to */
-	int regCtr;		/* Memory register holding the rowid counter */
 };
 
 /*
@@ -2559,7 +2550,6 @@ struct Parse {
 	Token constraintName;	/* Name of the constraint currently being parsed */
 	yDbMask writeMask;	/* Start a write transaction on these databases */
 	yDbMask cookieMask;	/* Bitmask of schema verified databases */
-	int regRowid;		/* Register holding rowid of CREATE TABLE entry */
 	int regRoot;		/* Register holding root page number for new objects */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
 #ifdef SELECTTRACE_ENABLED
@@ -2569,7 +2559,6 @@ struct Parse {
 	AutoincInfo *pAinc;	/* Information about AUTOINCREMENT counters */
 	Parse *pToplevel;	/* Parse structure for main program (or NULL) */
 	Table *pTriggerTab;	/* Table triggers are being coded for */
-	int addrCrTab;		/* Address of OP_CreateTable opcode on CREATE TABLE */
 	u32 nQueryLoop;		/* Est number of iterations of a query (10*log2(N)) */
 	u32 oldmask;		/* Mask of old.* columns referenced */
 	u32 newmask;		/* Mask of new.* columns referenced */
@@ -2657,7 +2646,6 @@ struct AuthContext {
 #define OPFLAG_NCHANGE       0x01	/* OP_Insert: Set to update db->nChange */
 				     /* Also used in P2 (not P5) of OP_Delete */
 #define OPFLAG_EPHEM         0x01	/* OP_Column: Ephemeral output is ok */
-#define OPFLAG_LASTROWID     0x02	/* Set to update db->lastRowid */
 #define OPFLAG_ISUPDATE      0x04	/* This OP_Insert is an sql UPDATE */
 #define OPFLAG_APPEND        0x08	/* This is likely to be an append */
 #define OPFLAG_USESEEKRESULT 0x10	/* Try to avoid a seek in BtreeInsert() */
@@ -3235,12 +3223,6 @@ u32 sqlite3BitvecSize(Bitvec *);
 int sqlite3BitvecBuiltinTest(int, int *);
 #endif
 
-RowSet *sqlite3RowSetInit(sqlite3 *, void *, unsigned int);
-void sqlite3RowSetClear(RowSet *);
-void sqlite3RowSetInsert(RowSet *, i64);
-int sqlite3RowSetTest(RowSet *, int iBatch, i64);
-int sqlite3RowSetNext(RowSet *, i64 *);
-
 void sqlite3CreateView(Parse *, Token *, Token *, ExprList *, Select *, int);
 
 #if !defined(SQLITE_OMIT_VIEW)
@@ -3367,7 +3349,6 @@ int sqlite3ExprContainsSubquery(Expr *);
 int sqlite3ExprIsInteger(Expr *, int *);
 int sqlite3ExprCanBeNull(const Expr *);
 int sqlite3ExprNeedsNoAffinityChange(const Expr *, char);
-int sqlite3IsRowid(const char *);
 void sqlite3GenerateRowDelete(Parse *, Table *, Trigger *, int, int, int, i16,
 			      u8, u8, u8, int);
 void sqlite3GenerateRowIndexDelete(Parse *, Table *, int, int);
@@ -3384,7 +3365,6 @@ void sqlite3MultiWrite(Parse *);
 void sqlite3MayAbort(Parse *);
 void sqlite3HaltConstraint(Parse *, int, int, char *, i8, u8);
 void sqlite3UniqueConstraint(Parse *, int, Index *);
-void sqlite3RowidConstraint(Parse *, int, Table *);
 Expr *sqlite3ExprDup(sqlite3 *, Expr *, int);
 ExprList *sqlite3ExprListDup(sqlite3 *, ExprList *, int);
 SrcList *sqlite3SrcListDup(sqlite3 *, SrcList *, int);
@@ -3572,7 +3552,7 @@ void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
 int sqlite3GetToken(const unsigned char *, int *, bool *);
 void sqlite3NestedParse(Parse *, const char *, ...);
 void sqlite3ExpirePreparedStatements(sqlite3 *);
-int sqlite3CodeSubselect(Parse *, Expr *, int, int);
+int sqlite3CodeSubselect(Parse *, Expr *, int);
 void sqlite3SelectPrep(Parse *, Select *, NameContext *);
 void sqlite3SelectWrongNumTermsError(Parse * pParse, Select * p);
 int sqlite3MatchSpanName(const char *, const char *, const char *);
@@ -3678,18 +3658,18 @@ void sqlite3WithPush(Parse *, With *, u8);
  * provided (enforcement of FK constraints requires the triggers sub-system).
  */
 #if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
-void sqlite3FkCheck(Parse *, Table *, int, int, int *, int);
+void sqlite3FkCheck(Parse *, Table *, int, int, int *);
 void sqlite3FkDropTable(Parse *, SrcList *, Table *);
-void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *, int);
-int sqlite3FkRequired(Table *, int *, int);
+void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *);
+int sqlite3FkRequired(Table *, int *);
 u32 sqlite3FkOldmask(Parse *, Table *);
 FKey *sqlite3FkReferences(Table *);
 #else
-#define sqlite3FkActions(a,b,c,d,e,f)
+#define sqlite3FkActions(a,b,c,d,e)
 #define sqlite3FkCheck(a,b,c,d,e,f)
 #define sqlite3FkDropTable(a,b,c)
 #define sqlite3FkOldmask(a,b)         0
-#define sqlite3FkRequired(a,b,c,d)    0
+#define sqlite3FkRequired(b,c)    0
 #endif
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 void sqlite3FkDelete(sqlite3 *, Table *);
@@ -3721,7 +3701,6 @@ void sqlite3EndBenignMalloc(void);
 /*
  * Allowed return values from sqlite3FindInIndex()
  */
-#define IN_INDEX_ROWID        1	/* Search the rowid of the table */
 #define IN_INDEX_EPH          2	/* Search an ephemeral b-tree */
 #define IN_INDEX_INDEX_ASC    3	/* Existing index ASCENDING */
 #define IN_INDEX_INDEX_DESC   4	/* Existing index DESCENDING */

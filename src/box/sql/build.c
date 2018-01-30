@@ -621,20 +621,9 @@ sqlite3PrimaryKeyIndex(Table * pTab)
 i16
 sqlite3ColumnOfIndex(Index * pIdx, i16 iCol)
 {
-	/* TODO: gh-2376. We need to improve discrimination of the table
-	   by introducing spacial flag for Table which will signal if table
-	   originated form  Tarantool or not.  */
-	if (HasRowid(pIdx->pTable)) {
-		int i;
-		for (i = 0; i < pIdx->nColumn; i++) {
-			if (iCol == pIdx->aiColumn[i])
-				return i;
-		}
-		return -1;
-	} else {
-		/* TARANTOOL: Data layout is the same in every index.  */
-		return iCol;
-	}
+	/* TARANTOOL: Data layout is the same in every index.  */
+	(void) pIdx;
+	return iCol;
 }
 
 /*
@@ -1027,11 +1016,9 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
  * a primary key (and this is the second primary key) then create an
  * error.
  *
- * If the PRIMARY KEY is on a single column whose datatype is INTEGER,
- * then we will try to use that column as the rowid.  Set the Table.iPKey
- * field of the table under construction to be the index of the
- * INTEGER PRIMARY KEY column.  Table.iPKey is set to -1 if there is
- * no INTEGER PRIMARY KEY.
+ * Set the Table.iPKey field of the table under construction to be the
+ * index of the INTEGER PRIMARY KEY column.
+ * Table.iPKey is set to -1 if there is no INTEGER PRIMARY KEY.
  *
  * If the key is not an INTEGER PRIMARY KEY, then create a unique
  * index for the key.  No index is created for INTEGER PRIMARY KEYs.
@@ -1421,21 +1408,18 @@ hasColumn(const i16 * aiCol, int nCol, int x)
 }
 
 /*
- * This routine runs at the end of parsing a CREATE TABLE statement that
- * has a WITHOUT ROWID clause.  The job of this routine is to convert both
- * internal schema data structures and the generated VDBE code so that they
- * are appropriate for a WITHOUT ROWID table instead of a rowid table.
+ * This routine runs at the end of parsing a CREATE TABLE statement.
+ * The job of this routine is to convert both
+ * internal schema data structures and the generated VDBE code.
  * Changes include:
  *
  *     (1)  Set all columns of the PRIMARY KEY schema object to be NOT NULL.
- *     (4)  Set the Index.tnum of the PRIMARY KEY Index object in the
+ *     (2)  Set the Index.tnum of the PRIMARY KEY Index object in the
  *          schema to the rootpage from the main table.
- *     (5)  Add all table columns to the PRIMARY KEY Index object
+ *     (3)  Add all table columns to the PRIMARY KEY Index object
  *          so that the PRIMARY KEY is a covering index.  The surplus
  *          columns are part of KeyInfo.nXField and are not used for
  *          sorting or lookup or uniqueness checks.
- *     (6)  Replace the rowid tail on all automatically generated UNIQUE
- *          indices with the PRIMARY KEY columns.
  */
 static void
 convertToWithoutRowidTable(Parse * pParse, Table * pTab)
@@ -1722,7 +1706,7 @@ createImplicitIndices(Parse * pParse,
 			    iCursor);
 	} else {
 		/*
-		 * Until ROWID support is back, this branch should not be taken.
+		 * This branch should not be taken.
 		 * If it is, then the current CREATE TABLE statement fails to
 		 * specify the PRIMARY KEY. The error is reported elsewhere.
 		 */
@@ -1889,19 +1873,15 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	if (db->init.busy)
 		p->tnum = db->init.newTnum;
 
-	/* Enforce WITHOUT ROWID, skip VIEWs. */
-	if (!p->pSelect)
-		tabOpts |= TF_WithoutRowid;
-
-	/* Special processing for WITHOUT ROWID Tables */
-	if (tabOpts & TF_WithoutRowid) {
+	if (p->pSelect) {
+		tabOpts |= TF_View;
+	} else {
 		if ((p->tabFlags & TF_HasPrimaryKey) == 0) {
 			sqlite3ErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
 					p->zName);
 			return;
 		} else {
-			p->tabFlags |= TF_WithoutRowid | TF_NoVisibleRowid;
 			convertToWithoutRowidTable(pParse, p);
 		}
 	}
@@ -1980,53 +1960,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		 * a schema-lock excludes all other database users, the write-lock would
 		 * be redundant.
 		 */
-		if (pSelect) {
-			SelectDest dest;	/* Where the SELECT should store results */
-			int regYield;	/* Register holding co-routine entry-point */
-			int addrTop;	/* Top of the co-routine */
-			int regRec;	/* A record to be insert into the new table */
-			int regRowid;	/* Rowid of the next row to insert */
-			int addrInsLoop;	/* Top of the loop for inserting rows */
-			Table *pSelTab;	/* A table that describes the SELECT results */
 
-			regYield = ++pParse->nMem;
-			regRec = ++pParse->nMem;
-			regRowid = ++pParse->nMem;
-			assert(pParse->nTab == 1);
-			sqlite3MayAbort(pParse);
-			sqlite3VdbeAddOp2(v, OP_OpenWrite, 1, pParse->regRoot);
-			sqlite3VdbeChangeP5(v, OPFLAG_P2ISREG);
-			pParse->nTab = 2;
-			addrTop = sqlite3VdbeCurrentAddr(v) + 1;
-			sqlite3VdbeAddOp3(v, OP_InitCoroutine, regYield, 0,
-					  addrTop);
-			sqlite3SelectDestInit(&dest, SRT_Coroutine, regYield);
-			sqlite3Select(pParse, pSelect, &dest);
-			sqlite3VdbeEndCoroutine(v, regYield);
-			sqlite3VdbeJumpHere(v, addrTop - 1);
-			if (pParse->nErr)
-				return;
-			pSelTab = sqlite3ResultSetOfSelect(pParse, pSelect);
-			if (pSelTab == 0)
-				return;
-			assert(p->aCol == 0);
-			p->nCol = pSelTab->nCol;
-			p->aCol = pSelTab->aCol;
-			pSelTab->nCol = 0;
-			pSelTab->aCol = 0;
-			sqlite3DeleteTable(db, pSelTab);
-			addrInsLoop =
-			    sqlite3VdbeAddOp1(v, OP_Yield, dest.iSDParm);
-			VdbeCoverage(v);
-			sqlite3VdbeAddOp3(v, OP_MakeRecord, dest.iSdst,
-					  dest.nSdst, regRec);
-			sqlite3TableAffinity(v, p, 0);
-			sqlite3VdbeAddOp2(v, OP_NewRowid, 1, regRowid);
-			sqlite3VdbeAddOp3(v, OP_Insert, 1, regRec, regRowid);
-			sqlite3VdbeGoto(v, addrInsLoop);
-			sqlite3VdbeJumpHere(v, addrInsLoop);
-			sqlite3VdbeAddOp1(v, OP_Close, 1);
-		}
 
 		/* Compute the complete text of the CREATE statement */
 		if (pSelect) {
@@ -3017,8 +2951,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		assert(db->mallocFailed == 0 || pTab == 0);
 		if (pTab == 0)
 			goto exit_create_index;
-		if (!HasRowid(pTab))
-			sqlite3PrimaryKeyIndex(pTab);
+		sqlite3PrimaryKeyIndex(pTab);
 	} else {
 		assert(pName == 0);
 		assert(pStart == 0);
@@ -3242,8 +3175,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	if (pParse->pNewTable == 0)
 		estimateIndexWidth(pIndex);
 
-	assert(HasRowid(pTab)
-	       || pTab->iPKey < 0
+	assert(pTab->iPKey < 0
 	       || sqlite3ColumnOfIndex(pIndex, pTab->iPKey) >= 0);
 
 	if (pTab == pParse->pNewTable) {
@@ -3336,7 +3268,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * index is an implied index for a UNIQUE or PRIMARY KEY constraint) then
 	 * emit code to to insert new index into Tarantool.
 	 * But, do not do this if we are simply parsing the schema, or if this
-	 * index is the PRIMARY KEY index of a WITHOUT ROWID table.
+	 * index is the PRIMARY KEY index.
 	 *
 	 * If pTblName==0 it means this index is generated as an implied PRIMARY KEY
 	 * or UNIQUE index in a CREATE TABLE statement.  Since the table
@@ -4196,29 +4128,6 @@ sqlite3UniqueConstraint(Parse * pParse,	/* Parsing context */
 			      SQLITE_CONSTRAINT_PRIMARYKEY :
 			      SQLITE_CONSTRAINT_UNIQUE, onError, zErr,
 			      P4_DYNAMIC, P5_ConstraintUnique);
-}
-
-/*
- * Code an OP_Halt due to non-unique rowid.
- */
-void
-sqlite3RowidConstraint(Parse * pParse,	/* Parsing context */
-		       int onError,	/* Conflict resolution algorithm */
-		       Table * pTab	/* The table with the non-unique rowid */
-    )
-{
-	char *zMsg;
-	int rc;
-	if (pTab->iPKey >= 0) {
-		zMsg = sqlite3MPrintf(pParse->db, "%s.%s", pTab->zName,
-				      pTab->aCol[pTab->iPKey].zName);
-		rc = SQLITE_CONSTRAINT_PRIMARYKEY;
-	} else {
-		zMsg = sqlite3MPrintf(pParse->db, "%s.rowid", pTab->zName);
-		rc = SQLITE_CONSTRAINT_ROWID;
-	}
-	sqlite3HaltConstraint(pParse, rc, onError, zMsg, P4_DYNAMIC,
-			      P5_ConstraintUnique);
 }
 
 /*

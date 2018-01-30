@@ -506,11 +506,6 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
  * It might be the case that multiple tables are indexable.  For example,
  * (E) above is indexable on tables P, Q, and R.
  *
- * Terms that satisfy case 3 are candidates for lookup by using
- * separate indices to find rowids for each subterm and composing
- * the union of all rowids using a RowSet object.  This is similar
- * to "bitmap indices" in other database engines.
- *
  * OTHERWISE:
  *
  * If none of cases 1, 2, or 3 apply, then leave the eOperator set to

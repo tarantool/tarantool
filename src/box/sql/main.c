@@ -897,22 +897,6 @@ sqlite3_db_config(sqlite3 * db, int op, ...)
 	return rc;
 }
 
-
-/*
- * Return the ROWID of the most recent insert
- */
-sqlite_int64
-sqlite3_last_insert_rowid(sqlite3 * db)
-{
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	return db->lastRowid;
-}
-
 /*
  * Return the number of changes in the most recent call to sqlite3_exec().
  */
@@ -1312,9 +1296,6 @@ sqlite3ErrName(int rc)
 			break;
 		case SQLITE_CONSTRAINT_FUNCTION:
 			zName = "SQLITE_CONSTRAINT_FUNCTION";
-			break;
-		case SQLITE_CONSTRAINT_ROWID:
-			zName = "SQLITE_CONSTRAINT_ROWID";
 			break;
 		case SQLITE_MISMATCH:
 			zName = "SQLITE_MISMATCH";
@@ -2846,25 +2827,16 @@ sqlite3_table_column_metadata(sqlite3 * db,		/* Connection handle */
 			}
 		}
 		if (iCol == pTab->nCol) {
-			if (HasRowid(pTab) && sqlite3IsRowid(zColumnName)) {
-				iCol = pTab->iPKey;
-				pCol = iCol >= 0 ? &pTab->aCol[iCol] : 0;
-			} else {
 				pTab = 0;
 				goto error_out;
-			}
 		}
 	}
 
 	/* The following block stores the meta information that will be returned
 	 * to the caller in local variables zDataType, zCollSeq, notnull, primarykey
-	 * and autoinc. At this point there are two possibilities:
-	 *
-	 *     1. The specified column name was rowid", "oid" or "_rowid_"
-	 *        and there is no explicitly declared IPK column.
-	 *
-	 *     2. The table is not a view and the column name identified an
-	 *        explicitly declared column. Copy meta information from *pCol.
+	 * and autoinc. At this the table is not a view and the column name
+	 * identified an explicitly declared column.
+	 * Copy meta information from *pCol.
 	 */
 	if (pCol) {
 		zDataType = sqlite3ColumnType(pCol, 0);

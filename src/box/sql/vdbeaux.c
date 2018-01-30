@@ -587,7 +587,6 @@ opIterNext(VdbeOpIter * p)
  *   *  OP_HaltIfNull with P1=SQLITE_CONSTRAINT and P2=OE_Abort.
  *   *  OP_Destroy
  *   *  OP_FkCounter with P2==0 (immediate foreign key constraint)
- *   *  OP_CreateTable and OP_InitCoroutine (for CREATE TABLE AS SELECT ...)
  *
  * Then check that the value of Parse.mayAbort is true if an
  * ABORT may be thrown, or false otherwise. Return true if it does
@@ -601,8 +600,6 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
 {
 	int hasAbort = 0;
 	int hasFkCounter = 0;
-	int hasCreateTable = 0;
-	int hasInitCoroutine = 0;
 	Op *pOp;
 	VdbeOpIter sIter;
 	memset(&sIter, 0, sizeof(sIter));
@@ -618,10 +615,6 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
 			hasAbort = 1;
 			break;
 		}
-		if (opcode == OP_CreateTable)
-			hasCreateTable = 1;
-		if (opcode == OP_InitCoroutine)
-			hasInitCoroutine = 1;
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 		if (opcode == OP_FkCounter && pOp->p1 == 0 && pOp->p2 == 1) {
 			hasFkCounter = 1;
@@ -636,8 +629,7 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
 	 * true for this case to prevent the assert() in the callers frame
 	 * from failing.
 	 */
-	return (v->db->mallocFailed || hasAbort == mayAbort || hasFkCounter
-		|| (hasCreateTable && hasInitCoroutine));
+	return (v->db->mallocFailed || hasAbort == mayAbort || hasFkCounter);
 }
 #endif				/* SQLITE_DEBUG - the sqlite3AssertMayAbort() function */
 
@@ -1760,10 +1752,8 @@ releaseMemArray(Mem * p, int N)
 			testcase(p->flags & MEM_Agg);
 			testcase(p->flags & MEM_Dyn);
 			testcase(p->flags & MEM_Frame);
-			testcase(p->flags & MEM_RowSet);
 			if (p->
-			    flags & (MEM_Agg | MEM_Dyn | MEM_Frame |
-				     MEM_RowSet)) {
+			    flags & (MEM_Agg | MEM_Dyn | MEM_Frame)) {
 				sqlite3VdbeMemRelease(p);
 			} else if (p->szMalloc) {
 				sqlite3DbFree(db, p->zMalloc);
@@ -2320,7 +2310,6 @@ sqlite3VdbeFrameRestore(VdbeFrame * pFrame)
 	v->nMem = pFrame->nMem;
 	v->apCsr = pFrame->apCsr;
 	v->nCursor = pFrame->nCursor;
-	v->db->lastRowid = pFrame->lastRowid;
 	v->nChange = pFrame->nChange;
 	v->db->nChange = pFrame->nDbChange;
 	sqlite3VdbeDeleteAuxData(v->db, &v->pAuxData, -1, 0);
@@ -3191,7 +3180,6 @@ handleDeferredMoveto(VdbeCursor * p)
 	extern int sql_search_count;
 #endif
 	assert(p->deferredMoveto);
-	assert(p->isTable);
 	assert(p->eCurType == CURTYPE_BTREE);
 	rc = sqlite3BtreeMovetoUnpacked(p->uc.pCursor, 0, p->movetoTarget, 0,
 					&res);
@@ -3966,7 +3954,6 @@ sqlite3MemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pCol
 	f1 = pMem1->flags;
 	f2 = pMem2->flags;
 	combined_flags = f1 | f2;
-	assert((combined_flags & MEM_RowSet) == 0);
 
 	/* If one value is NULL, it is less than the other. If both values
 	 * are NULL, return 0.
@@ -4329,93 +4316,10 @@ sqlite3VdbeFindCompare(UnpackedRecord * p)
 }
 
 /*
- * pCur points at an index entry created using the OP_MakeRecord opcode.
- * Read the rowid (the last field in the record) and store it in *rowid.
- * Return SQLITE_OK if everything works, or an error code otherwise.
- *
- * pCur might be pointing to text obtained from a corrupt database file.
- * So the content cannot be trusted.  Do appropriate checks on the content.
- */
-int
-sqlite3VdbeIdxRowid(sqlite3 * db, BtCursor * pCur, i64 * rowid)
-{
-	i64 nCellKey = 0;
-	int rc;
-	u32 szHdr;		/* Size of the header */
-	u32 typeRowid;		/* Serial type of the rowid */
-	u32 lenRowid;		/* Size of the rowid */
-	Mem m, v;
-
-	/* Get the size of the index entry.  Only indices entries of less
-	 * than 2GiB are support - anything large must be database corruption.
-	 * Any corruption is detected in sqlite3BtreeParseCellPtr(), though, so
-	 * this code can safely assume that nCellKey is 32-bits
-	 */
-	assert(sqlite3BtreeCursorIsValid(pCur));
-	nCellKey = sqlite3BtreePayloadSize(pCur);
-	assert((nCellKey & SQLITE_MAX_U32) == (u64) nCellKey);
-
-	/* Read in the complete content of the index entry */
-	sqlite3VdbeMemInit(&m, db, 0);
-	rc = sqlite3VdbeMemFromBtree(pCur, 0, (u32) nCellKey, &m);
-	if (rc) {
-		return rc;
-	}
-
-	/* The index entry must begin with a header size */
-	(void)getVarint32((u8 *) m.z, szHdr);
-	testcase(szHdr == 3);
-	testcase(szHdr == m.n);
-	if (unlikely(szHdr < 3 || (int)szHdr > m.n)) {
-		goto idx_rowid_corruption;
-	}
-
-	/* The last field of the index should be an integer - the ROWID.
-	 * Verify that the last entry really is an integer.
-	 */
-	(void)getVarint32((u8 *) & m.z[szHdr - 1], typeRowid);
-	testcase(typeRowid == 1);
-	testcase(typeRowid == 2);
-	testcase(typeRowid == 3);
-	testcase(typeRowid == 4);
-	testcase(typeRowid == 5);
-	testcase(typeRowid == 6);
-	testcase(typeRowid == 8);
-	testcase(typeRowid == 9);
-	if (unlikely(typeRowid < 1 || typeRowid > 9 || typeRowid == 7)) {
-		goto idx_rowid_corruption;
-	}
-	lenRowid = sqlite3SmallTypeSizes[typeRowid];
-	testcase((u32) m.n == szHdr + lenRowid);
-	if (unlikely((u32) m.n < szHdr + lenRowid)) {
-		goto idx_rowid_corruption;
-	}
-
-	/* Fetch the integer off the end of the index record */
-	sqlite3VdbeSerialGet((u8 *) & m.z[m.n - lenRowid], typeRowid, &v);
-	*rowid = v.u.i;
-	sqlite3VdbeMemRelease(&m);
-	return SQLITE_OK;
-
-	/* Jump here if database corruption is detected after m has been
-	 * allocated.  Free the m object and return SQLITE_CORRUPT.
-	 */
- idx_rowid_corruption:
-	testcase(m.szMalloc != 0);
-	sqlite3VdbeMemRelease(&m);
-	return SQLITE_CORRUPT_BKPT;
-}
-
-/*
  * Compare the key of the index entry that cursor pC is pointing to against
  * the key string in pUnpacked.  Write into *pRes a number
  * that is negative, zero, or positive if pC is less than, equal to,
  * or greater than pUnpacked.  Return SQLITE_OK on success.
- *
- * pUnpacked is either created without a rowid or is truncated so that it
- * omits the rowid at the end.  The rowid at the end of the index entry
- * is ignored as well.  Hence, this routine only compares the prefixes
- * of the keys prior to the final rowid, not the entire key.
  */
 int
 sqlite3VdbeIdxKeyCompare(sqlite3 * db,			/* Database connection */

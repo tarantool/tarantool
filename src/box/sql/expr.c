@@ -529,7 +529,7 @@ exprCodeSubselect(Parse * pParse, Expr * pExpr)
 	int reg = 0;
 #ifndef SQLITE_OMIT_SUBQUERY
 	if (pExpr->op == TK_SELECT) {
-		reg = sqlite3CodeSubselect(pParse, pExpr, 0, 0);
+		reg = sqlite3CodeSubselect(pParse, pExpr, 0);
 	}
 #endif
 	return reg;
@@ -1720,11 +1720,9 @@ sqlite3ExprListAppend(Parse * pParse,	/* Parsing context */
 		pList->a = a;
 	}
 	assert(pList->a != 0);
-	if (1) {
-		struct ExprList_item *pItem = &pList->a[pList->nExpr++];
-		memset(pItem, 0, sizeof(*pItem));
-		pItem->pExpr = pExpr;
-	}
+	struct ExprList_item *pItem = &pList->a[pList->nExpr++];
+	memset(pItem, 0, sizeof(*pItem));
+	pItem->pExpr = pExpr;
 	return pList;
 
  no_mem:
@@ -2241,21 +2239,6 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 }
 
 /*
- * Return TRUE if the given string is a row-id column name.
- */
-int
-sqlite3IsRowid(const char *z)
-{
-	if (sqlite3StrICmp(z, "_ROWID_") == 0)
-		return 1;
-	if (sqlite3StrICmp(z, "ROWID") == 0)
-		return 1;
-	if (sqlite3StrICmp(z, "OID") == 0)
-		return 1;
-	return 0;
-}
-
-/*
  * pX is the RHS of an IN operator.  If pX is a SELECT statement
  * that can be simplified to a direct table access, then return
  * a pointer to the SELECT statement.  If pX is not a SELECT statement,
@@ -2371,7 +2354,6 @@ sqlite3InRhsIsConstant(Expr * pIn)
  *
  * The returned value of this function indicates the b-tree type, as follows:
  *
- *   IN_INDEX_ROWID      - The cursor was opened on a database table.
  *   IN_INDEX_INDEX_ASC  - The cursor was opened on an ascending index.
  *   IN_INDEX_INDEX_DESC - The cursor was opened on a descending index.
  *   IN_INDEX_EPH        - The cursor was opened on a specially created and
@@ -2497,153 +2479,119 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		sqlite3CodeVerifySchema(pParse);
 
 		assert(v);	/* sqlite3GetVdbe() has always been previously called */
-		if (nExpr == 1 && pEList->a[0].pExpr->iColumn < 0) {
-			/* The "x IN (SELECT rowid FROM table)" case */
-			int iAddr = sqlite3VdbeAddOp0(v, OP_Once);
-			VdbeCoverage(v);
 
-			sqlite3OpenTable(pParse, iTab, pTab, OP_OpenRead);
-			eType = IN_INDEX_ROWID;
+		Index *pIdx;	/* Iterator variable */
+		int affinity_ok = 1;
+		int i;
 
-			sqlite3VdbeJumpHere(v, iAddr);
-		} else {
-			Index *pIdx;	/* Iterator variable */
-			int affinity_ok = 1;
-			int i;
-
-			/* Check that the affinity that will be used to perform each
-			 * comparison is the same as the affinity of each column in table
-			 * on the RHS of the IN operator.  If it not, it is not possible to
-			 * use any index of the RHS table.
-			 */
-			for (i = 0; i < nExpr && affinity_ok; i++) {
-				Expr *pLhs =
-				    sqlite3VectorFieldSubexpr(pX->pLeft, i);
-				int iCol = pEList->a[i].pExpr->iColumn;
-				char idxaff = sqlite3TableColumnAffinity(pTab, iCol);	/* RHS table */
-				char cmpaff =
-				    sqlite3CompareAffinity(pLhs, idxaff);
-				testcase(cmpaff == SQLITE_AFF_BLOB);
-				testcase(cmpaff == SQLITE_AFF_TEXT);
-				switch (cmpaff) {
-				case SQLITE_AFF_BLOB:
-					break;
-				case SQLITE_AFF_TEXT:
-					/* sqlite3CompareAffinity() only returns TEXT if one side or the
-					 * other has no affinity and the other side is TEXT.  Hence,
-					 * the only way for cmpaff to be TEXT is for idxaff to be TEXT
-					 * and for the term on the LHS of the IN to have no affinity.
-					 */
-					assert(idxaff == SQLITE_AFF_TEXT);
-					break;
-				default:
-					affinity_ok =
-					    sqlite3IsNumericAffinity(idxaff);
-				}
+		/* Check that the affinity that will be used to perform each
+		 * comparison is the same as the affinity of each column in table
+		 * on the RHS of the IN operator.  If it not, it is not possible to
+		 * use any index of the RHS table.
+		 */
+		for (i = 0; i < nExpr && affinity_ok; i++) {
+			Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
+			int iCol = pEList->a[i].pExpr->iColumn;
+			char idxaff = sqlite3TableColumnAffinity(pTab, iCol);	/* RHS table */
+			char cmpaff = sqlite3CompareAffinity(pLhs, idxaff);
+			testcase(cmpaff == SQLITE_AFF_BLOB);
+			testcase(cmpaff == SQLITE_AFF_TEXT);
+			switch (cmpaff) {
+			case SQLITE_AFF_BLOB:
+				break;
+			case SQLITE_AFF_TEXT:
+				/* sqlite3CompareAffinity() only returns TEXT if one side or the
+				 * other has no affinity and the other side is TEXT.  Hence,
+				 * the only way for cmpaff to be TEXT is for idxaff to be TEXT
+				 * and for the term on the LHS of the IN to have no affinity.
+				 */
+				assert(idxaff == SQLITE_AFF_TEXT);
+				break;
+			default:
+				affinity_ok = sqlite3IsNumericAffinity(idxaff);
 			}
+		}
 
-			if (affinity_ok) {
-				/* Search for an existing index that will work for this IN operator */
-				for (pIdx = pTab->pIndex; pIdx && eType == 0;
-				     pIdx = pIdx->pNext) {
-					Bitmask colUsed;	/* Columns of the index used */
-					Bitmask mCol;	/* Mask for the current column */
-					if (pIdx->nColumn < nExpr)
-						continue;
-					/* Maximum nColumn is BMS-2, not BMS-1, so that we can compute
-					 * BITMASK(nExpr) without overflowing
-					 */
-					testcase(pIdx->nColumn == BMS - 2);
-					testcase(pIdx->nColumn == BMS - 1);
-					if (pIdx->nColumn >= BMS - 1)
-						continue;
-					if (mustBeUnique) {
-						if (pIdx->nKeyCol > nExpr
-						    || (pIdx->nColumn > nExpr
-							&& !IsUniqueIndex(pIdx))
-						    ) {
+		if (affinity_ok) {
+			/* Search for an existing index that will work for this IN operator */
+			for (pIdx = pTab->pIndex; pIdx && eType == 0;
+			     pIdx = pIdx->pNext) {
+				Bitmask colUsed; /* Columns of the index used */
+				Bitmask mCol;	/* Mask for the current column */
+				if (pIdx->nColumn < nExpr)
+					continue;
+				/* Maximum nColumn is BMS-2, not BMS-1, so that we can compute
+				 * BITMASK(nExpr) without overflowing
+				 */
+				testcase(pIdx->nColumn == BMS - 2);
+				testcase(pIdx->nColumn == BMS - 1);
+				if (pIdx->nColumn >= BMS - 1)
+					continue;
+				if (mustBeUnique) {
+					if (pIdx->nKeyCol > nExpr
+					    || (pIdx->nColumn > nExpr
+					    && !IsUniqueIndex(pIdx))) {
 							continue;	/* This index is not unique over the IN RHS columns */
-						}
 					}
+				}
 
-					colUsed = 0;	/* Columns of index used so far */
-					for (i = 0; i < nExpr; i++) {
-						Expr *pLhs =
-						    sqlite3VectorFieldSubexpr
-						    (pX->pLeft, i);
-						Expr *pRhs = pEList->a[i].pExpr;
-						struct coll *pReq =
-						    sqlite3BinaryCompareCollSeq
+				colUsed = 0;	/* Columns of index used so far */
+				for (i = 0; i < nExpr; i++) {
+					Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
+					Expr *pRhs = pEList->a[i].pExpr;
+					struct coll *pReq = sqlite3BinaryCompareCollSeq
 						    (pParse, pLhs, pRhs);
-						int j;
+					int j;
 
-						assert(pReq != 0
-						       || pRhs->iColumn ==
-						       XN_ROWID
-						       || pParse->nErr);
-						for (j = 0; j < nExpr; j++) {
-							if (pIdx->aiColumn[j] !=
-							    pRhs->iColumn)
-								continue;
-							assert(pIdx->azColl[j]);
-							if (pReq != 0
-							    &&
-							    strcmp
-							    (pReq->name,
-							     pIdx->azColl[j]) !=
-							    0) {
-								continue;
-							}
-							break;
+					assert(pReq != 0 || pParse->nErr);
+					for (j = 0; j < nExpr; j++) {
+						if (pIdx->aiColumn[j]
+						    != pRhs->iColumn)
+							continue;
+						assert(pIdx->azColl[j]);
+						if (pReq != 0 && strcmp
+						    (pReq->name,
+						     pIdx->azColl[j]) != 0) {
+							continue;
 						}
-						if (j == nExpr)
-							break;
-						mCol = MASKBIT(j);
-						if (mCol & colUsed)
-							break;	/* Each column used only once */
-						colUsed |= mCol;
-						if (aiMap)
-							aiMap[i] =
-							    pRhs->iColumn;
-						else if (pSingleIdxCol
-							 && nExpr == 1)
-							*pSingleIdxCol =
-							    pRhs->iColumn;
+						break;
+					}
+					if (j == nExpr)
+						break;
+					mCol = MASKBIT(j);
+					if (mCol & colUsed)
+						break;	/* Each column used only once */
+					colUsed |= mCol;
+					if (aiMap)
+						aiMap[i] = pRhs->iColumn;
+					else if (pSingleIdxCol && nExpr == 1)
+						*pSingleIdxCol = pRhs->iColumn;
 					}
 
-					assert(i == nExpr
-					       || colUsed !=
-					       (MASKBIT(nExpr) - 1));
-					if (colUsed == (MASKBIT(nExpr) - 1)) {
-						/* If we reach this point, that means the index pIdx is usable */
-						int iAddr =
-						    sqlite3VdbeAddOp0(v,
-								      OP_Once);
-						VdbeCoverage(v);
+				assert(i == nExpr
+				       || colUsed != (MASKBIT(nExpr) - 1));
+				if (colUsed == (MASKBIT(nExpr) - 1)) {
+					/* If we reach this point, that means the index pIdx is usable */
+					int iAddr = sqlite3VdbeAddOp0(v, OP_Once);
+					VdbeCoverage(v);
 #ifndef SQLITE_OMIT_EXPLAIN
-						sqlite3VdbeAddOp4(v, OP_Explain,
-								  0, 0, 0,
-								  sqlite3MPrintf
-								  (db,
-								   "USING INDEX %s FOR IN-OPERATOR",
-								   pIdx->zName),
-								  P4_DYNAMIC);
+					sqlite3VdbeAddOp4(v, OP_Explain,
+							  0, 0, 0,
+							  sqlite3MPrintf(db,
+							  "USING INDEX %s FOR IN-OPERATOR",
+							  pIdx->zName),
+							  P4_DYNAMIC);
 #endif
-						sqlite3VdbeAddOp2(v,
-								  OP_OpenRead,
-								  iTab,
-								  pIdx->tnum);
-						sqlite3VdbeSetP4KeyInfo(pParse,
-									pIdx);
-						VdbeComment((v, "%s",
-							     pIdx->zName));
-						assert(IN_INDEX_INDEX_DESC ==
-						       IN_INDEX_INDEX_ASC + 1);
-						eType =
-						    IN_INDEX_INDEX_ASC +
-						    pIdx->aSortOrder[0];
+					sqlite3VdbeAddOp2(v, OP_OpenRead, iTab,
+							  pIdx->tnum);
+					sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+					VdbeComment((v, "%s", pIdx->zName));
+					assert(IN_INDEX_INDEX_DESC ==
+					       IN_INDEX_INDEX_ASC + 1);
+					eType = IN_INDEX_INDEX_ASC +
+						pIdx->aSortOrder[0];
 
-						if (prRhsHasNull) {
+					if (prRhsHasNull) {
 #ifdef SQLITE_ENABLE_COLUMN_USED_MASK
 							i64 mask =
 							    (1 << nExpr) - 1;
@@ -2658,23 +2606,19 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 									      mask,
 									      P4_INT64);
 #endif
-							*prRhsHasNull =
-							    ++pParse->nMem;
-							if (nExpr == 1) {
-								/* Tarantool: Check for null is performed on first key of the index.  */
-								sqlite3SetHasNullFlag
-								    (v, iTab,
-								     pIdx->
-								     aiColumn
-								     [0],
-								     *prRhsHasNull);
-							}
+						*prRhsHasNull = ++pParse->nMem;
+						if (nExpr == 1) {
+							/* Tarantool: Check for null is performed on first key of the index.  */
+							sqlite3SetHasNullFlag(v,
+									      iTab,
+									      pIdx->aiColumn[0],
+									      *prRhsHasNull);
 						}
-						sqlite3VdbeJumpHere(v, iAddr);
 					}
-				}	/* End loop over indexes */
-			}	/* End if( affinity_ok ) */
-		}		/* End if not an rowid index */
+					sqlite3VdbeJumpHere(v, iAddr);
+				}
+			}	/* End loop over indexes */
+		}	/* End if( affinity_ok ) */
 	}
 
 	/* End attempt to optimize using an index */
@@ -2701,15 +2645,11 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		eType = IN_INDEX_EPH;
 		if (inFlags & IN_INDEX_LOOP) {
 			pParse->nQueryLoop = 0;
-			if (pX->pLeft->iColumn < 0
-			    && !ExprHasProperty(pX, EP_xIsSelect)) {
-				eType = IN_INDEX_ROWID;
-			}
+
 		} else if (prRhsHasNull) {
 			*prRhsHasNull = rMayHaveNull = ++pParse->nMem;
 		}
-		sqlite3CodeSubselect(pParse, pX, rMayHaveNull,
-				     eType == IN_INDEX_ROWID);
+		sqlite3CodeSubselect(pParse, pX, rMayHaveNull);
 		pParse->nQueryLoop = savedNQueryLoop;
 	} else {
 		pX->iTable = iTab;
@@ -2816,12 +2756,6 @@ sqlite3VectorErrorMsg(Parse * pParse, Expr * pExpr)
  * The pExpr parameter describes the expression that contains the IN
  * operator or subquery.
  *
- * If parameter isRowid is non-zero, then expression pExpr is guaranteed
- * to be of the form "<rowid> IN (?, ?, ?)", where <rowid> is a reference
- * to some integer key column of a table B-Tree. In this case, use an
- * intkey B-Tree to store the set of IN(...) values instead of the usual
- * (slower) variable length keys B-Tree.
- *
  * If rMayHaveNull is non-zero, that means that the operation is an IN
  * (not a SELECT or EXISTS) and that the RHS might contains NULLs.
  * All this routine does is initialize the register given by rMayHaveNull
@@ -2837,8 +2771,7 @@ sqlite3VectorErrorMsg(Parse * pParse, Expr * pExpr)
 int
 sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 		     Expr * pExpr,	/* The IN, SELECT, or EXISTS operator */
-		     int rHasNullFlag,	/* Register that records whether NULLs exist in RHS */
-		     int isRowid	/* If true, LHS of IN operator is a rowid */
+		     int rHasNullFlag	/* Register that records whether NULLs exist in RHS */
     )
 {
 	int jmpIfDynamic = -1;	/* One-time test address */
@@ -2882,7 +2815,6 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			int nVal;	/* Size of vector pLeft */
 
 			nVal = sqlite3ExprVectorSize(pLeft);
-			assert(!isRowid || nVal == 1);
 
 			/* Whether this is an 'x IN(SELECT...)' or an 'x IN(<exprlist>)'
 			 * expression it is handled the same way.  An ephemeral table is
@@ -2900,11 +2832,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			pExpr->iTable = pParse->nTab++;
 			pExpr->is_ephemeral = 1;
 			addr = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-						 pExpr->iTable,
-						 (isRowid ? 0 : nVal));
-			pKeyInfo =
-			    isRowid ? 0 : sqlite3KeyInfoAlloc(pParse->db, nVal,
-							      1);
+						 pExpr->iTable, nVal);
+			pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nVal, 1);
 
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				/* Case 1:     expr IN (SELECT ...)
@@ -2915,7 +2844,6 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				Select *pSelect = pExpr->x.pSelect;
 				ExprList *pEList = pSelect->pEList;
 
-				assert(!isRowid);
 				/* If the LHS and RHS of the IN operator do not match, that
 				 * error will have been caught long before we reach this point.
 				 */
@@ -2985,13 +2913,10 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				/* Loop through each expression in <exprlist>. */
 				r1 = sqlite3GetTempReg(pParse);
 				r2 = sqlite3GetTempReg(pParse);
-				if (isRowid)
-					sqlite3VdbeAddOp2(v, OP_Null, 0, r2);
+
 				for (i = pList->nExpr, pItem = pList->a; i > 0;
 				     i--, pItem++) {
 					Expr *pE2 = pItem->pExpr;
-					int iValToIns;
-
 					/* If the expression is not constant then we will need to
 					 * disable the test that was generated above that makes sure
 					 * this code only executes once.  Because for a non-constant
@@ -2999,56 +2924,17 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					 */
 					if (jmpIfDynamic >= 0
 					    && !sqlite3ExprIsConstant(pE2)) {
-						sqlite3VdbeChangeToNoop(v,
-									jmpIfDynamic);
+						sqlite3VdbeChangeToNoop(v, jmpIfDynamic);
 						jmpIfDynamic = -1;
 					}
-
-					/* Evaluate the expression and insert it into the temp table */
-					if (isRowid
-					    && sqlite3ExprIsInteger(pE2,
-								    &iValToIns))
-					{
-						sqlite3VdbeAddOp3(v,
-								  OP_InsertInt,
-								  pExpr->iTable,
-								  r2,
-								  iValToIns);
-					} else {
-						r3 = sqlite3ExprCodeTarget
-						    (pParse, pE2, r1);
-						if (isRowid) {
-							sqlite3VdbeAddOp2(v,
-									  OP_MustBeInt,
-									  r3,
-									  sqlite3VdbeCurrentAddr
-									  (v) +
-									  2);
-							VdbeCoverage(v);
-							sqlite3VdbeAddOp3(v,
-									  OP_Insert,
-									  pExpr->
-									  iTable,
-									  r2,
-									  r3);
-						} else {
-							sqlite3VdbeAddOp4(v,
-									  OP_MakeRecord,
-									  r3, 1,
-									  r2,
-									  &affinity,
-									  1);
-							sqlite3ExprCacheAffinityChange
-							    (pParse, r3, 1);
-							sqlite3VdbeAddOp4Int(v,
-									     OP_IdxInsert,
-									     pExpr->
-									     iTable,
-									     r2,
-									     r3,
-									     1);
-						}
-					}
+					r3 = sqlite3ExprCodeTarget(pParse, pE2, r1);
+	 				sqlite3VdbeAddOp4(v, OP_MakeRecord, r3,
+							  1, r2, &affinity, 1);
+					sqlite3ExprCacheAffinityChange(pParse,
+								       r3, 1);
+					sqlite3VdbeAddOp4Int(v, OP_IdxInsert,
+							     pExpr->iTable, r2,
+							     r3, 1);
 				}
 				sqlite3ReleaseTempReg(pParse, r1);
 				sqlite3ReleaseTempReg(pParse, r2);
@@ -3347,50 +3233,38 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 * of the RHS using the LHS as a probe.  If found, the result is
 	 * true.
 	 */
-	if (eType == IN_INDEX_ROWID) {
-		/* In this case, the RHS is the ROWID of table b-tree and so we also
-		 * know that the RHS is non-NULL.  Hence, we combine steps 3 and 4
-		 * into a single opcode.
-		 */
-		sqlite3VdbeAddOp3(v, OP_SeekRowid, pExpr->iTable, destIfFalse,
-				  rLhs);
-		VdbeCoverage(v);
-		addrTruthOp = sqlite3VdbeAddOp0(v, OP_Goto);	/* Return True */
-	} else {
-		sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff,
-				  nVector);
-		if ((pExpr->flags & EP_xIsSelect)
-		    && !pExpr->is_ephemeral) {
-			struct SrcList *src_list = pExpr->x.pSelect->pSrc;
-			assert(src_list->nSrc == 1);
+	sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff,
+			  nVector);
+	if ((pExpr->flags & EP_xIsSelect)
+	    && !pExpr->is_ephemeral) {
+		struct SrcList *src_list = pExpr->x.pSelect->pSrc;
+		assert(src_list->nSrc == 1);
 
-			struct Table *tab = src_list->a[0].pTab;
-			assert(tab != NULL);
+		struct Table *tab = src_list->a[0].pTab;
+		assert(tab != NULL);
 
-			struct Index *pk = sqlite3PrimaryKeyIndex(tab);
-			assert(pk);
+		struct Index *pk = sqlite3PrimaryKeyIndex(tab);
+		assert(pk);
 
-			if (pk->nKeyCol == 1
-			    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
-			    && pk->aiColumn[0] < nVector) {
-				int reg_pk = rLhs + pk->aiColumn[0];
-				sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
-			}
-
+		if (pk->nKeyCol == 1
+		    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
+		    && pk->aiColumn[0] < nVector) {
+			int reg_pk = rLhs + pk->aiColumn[0];
+			sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
 		}
-		if (destIfFalse == destIfNull) {
-			/* Combine Step 3 and Step 5 into a single opcode */
-			sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
-					     destIfFalse, rLhs, nVector);
-			VdbeCoverage(v);
-			goto sqlite3ExprCodeIN_finished;
-		}
-		/* Ordinary Step 3, for the case where FALSE and NULL are distinct */
-		addrTruthOp =
-		    sqlite3VdbeAddOp4Int(v, OP_Found, pExpr->iTable, 0, rLhs,
-					 nVector);
-		VdbeCoverage(v);
 	}
+	if (destIfFalse == destIfNull) {
+		/* Combine Step 3 and Step 5 into a single opcode */
+		sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
+				     destIfFalse, rLhs, nVector);
+		VdbeCoverage(v);
+		goto sqlite3ExprCodeIN_finished;
+	}
+	/* Ordinary Step 3, for the case where FALSE and NULL are distinct */
+	addrTruthOp =
+		sqlite3VdbeAddOp4Int(v, OP_Found, pExpr->iTable, 0, rLhs,
+				     nVector);
+	VdbeCoverage(v);
 
 	/* Step 4.  If the RHS is known to be non-NULL and we did not find
 	 * an match on the search above, then the result must be FALSE.
@@ -3727,21 +3601,13 @@ sqlite3ExprCodeLoadIndexColumn(Parse * pParse,	/* The parsing context */
 void
 sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
 				Table * pTab,	/* The table containing the value */
-				int iTabCur,	/* The table cursor.  Or the PK cursor for WITHOUT ROWID */
+				int iTabCur,	/* The PK cursor */
 				int iCol,	/* Index of the column to extract */
 				int regOut	/* Extract the value into this register */
     )
 {
-	if (iCol < 0 || iCol == pTab->iPKey) {
-		sqlite3VdbeAddOp2(v, OP_Rowid, iTabCur, regOut);
-	} else {
-		int x = iCol;
-		if (!HasRowid(pTab)) {
-			x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab),
-						 iCol);
-		}
-		sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
-	}
+	int x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab), iCol);
+	sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
 	if (iCol >= 0) {
 		sqlite3ColumnDefault(v, pTab, iCol, regOut);
 	}
@@ -3755,9 +3621,6 @@ sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
  * is not garanteeed for GetColumn() - the result can be stored in
  * any register.  But the result is guaranteed to land in register iReg
  * for GetColumnToReg().
- *
- * There must be an open cursor to pTab in iTable when this routine
- * is called.  If iColumn<0 then code is generated that extracts the rowid.
  */
 int
 sqlite3ExprCodeGetColumn(Parse * pParse,	/* Parsing and code generating context */
@@ -3771,6 +3634,7 @@ sqlite3ExprCodeGetColumn(Parse * pParse,	/* Parsing and code generating context 
 	Vdbe *v = pParse->pVdbe;
 	int i;
 	struct yColCache *p;
+	assert(iColumn >= 0);
 
 	for (i = 0, p = pParse->aColCache; i < pParse->nColCache; i++, p++) {
 		if (p->iTable == iTable && p->iColumn == iColumn) {
@@ -3907,7 +3771,7 @@ exprCodeVector(Parse * pParse, Expr * p, int *piFreeable)
 	} else {
 		*piFreeable = 0;
 		if (p->op == TK_SELECT) {
-			iResult = sqlite3CodeSubselect(pParse, p, 0, 0);
+			iResult = sqlite3CodeSubselect(pParse, p, 0);
 		} else {
 			int i;
 			iResult = pParse->nMem + 1;
@@ -4371,8 +4235,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			    && (nCol = pExpr->x.pSelect->pEList->nExpr) != 1) {
 				sqlite3SubselectError(pParse, nCol, 1);
 			} else {
-				return sqlite3CodeSubselect(pParse, pExpr, 0,
-							    0);
+				return sqlite3CodeSubselect(pParse, pExpr, 0);
 			}
 			break;
 		}
@@ -4380,8 +4243,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			int n;
 			if (pExpr->pLeft->iTable == 0) {
 				pExpr->pLeft->iTable =
-				    sqlite3CodeSubselect(pParse, pExpr->pLeft,
-							 0, 0);
+				    sqlite3CodeSubselect(pParse, pExpr->pLeft, 0);
 			}
 			assert(pExpr->iTable == 0
 			       || pExpr->pLeft->op == TK_SELECT);
@@ -4437,14 +4299,12 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 * to a column in the new.* or old.* pseudo-tables available to
 			 * trigger programs. In this case Expr.iTable is set to 1 for the
 			 * new.* pseudo-table, or 0 for the old.* pseudo-table. Expr.iColumn
-			 * is set to the column of the pseudo-table to read, or to -1 to
-			 * read the rowid field.
+			 * is set to the column of the pseudo-table to read.
 			 *
 			 * The expression is implemented using an OP_Param opcode. The p1
-			 * parameter is set to 0 for an old.rowid reference, or to (i+1)
+			 * parameter is set to (i+1)
 			 * to reference another column of the old.* pseudo-table, where
-			 * i is the index of the column. For a new.rowid reference, p1 is
-			 * set to (n+1), where n is the number of columns in each pseudo-table.
+			 * i is the index of the column.
 			 * For a reference to any other column in the new.* pseudo-table, p1
 			 * is set to (n+2+i), where n and i are as defined previously. For
 			 * example, if the table on which triggers are being fired is
@@ -4454,7 +4314,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 *
 			 * Then p1 is interpreted as follows:
 			 *
-			 *   p1==0   ->    old.rowid     p1==3   ->    new.rowid
 			 *   p1==1   ->    old.a         p1==4   ->    new.a
 			 *   p1==2   ->    old.b         p1==5   ->    new.b
 			 */
@@ -4464,7 +4323,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			    pExpr->iColumn;
 
 			assert(pExpr->iTable == 0 || pExpr->iTable == 1);
-			assert(pExpr->iColumn >= -1
+			assert(pExpr->iColumn >= 0
 			       && pExpr->iColumn < pTab->nCol);
 			assert(pTab->iPKey < 0
 			       || pExpr->iColumn != pTab->iPKey);
@@ -4472,11 +4331,9 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 
 			sqlite3VdbeAddOp2(v, OP_Param, p1, target);
 			VdbeComment((v, "%s.%s -> $%d",
-				     (pExpr->iTable ? "new" : "old"),
-				     (pExpr->iColumn <
-				      0 ? "rowid" : pExpr->pTab->aCol[pExpr->
-								      iColumn].
-				      zName), target));
+				    (pExpr->iTable ? "new" : "old"),
+				    pExpr->pTab->aCol[pExpr->iColumn].zName,
+				    target));
 
 #ifndef SQLITE_OMIT_FLOATING_POINT
 			/* If the column has REAL affinity, it may currently be stored as an

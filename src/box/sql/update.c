@@ -108,7 +108,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	WhereInfo *pWInfo;	/* Information about the WHERE clause */
 	Vdbe *v;		/* The virtual database engine */
 	Index *pIdx;		/* For looping over indices */
-	Index *pPk;		/* The PRIMARY KEY index for WITHOUT ROWID tables */
+	Index *pPk;		/* The PRIMARY KEY index */
 	int nIdx;		/* Number of indices that need updating */
 	int iBaseCur;		/* Base cursor number */
 	int iDataCur;		/* Cursor for the canonical data btree */
@@ -120,10 +120,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				 * aXRef[i]==-1 if the i-th column is not changed.
 				 */
 	u8 *aToOpen;		/* 1 for tables and indices to be opened */
-	u8 chngPk;		/* PRIMARY KEY changed in a WITHOUT ROWID table */
-	u8 chngRowid;		/* Rowid changed in a normal table */
-	u8 chngKey;		/* Either chngPk or chngRowid */
-	Expr *pRowidExpr = 0;	/* Expression defining the new record number */
+	u8 chngPk;		/* PRIMARY KEY changed */
 	AuthContext sContext;	/* The authorization context */
 	NameContext sNC;	/* The name-context to resolve expressions in */
 	int okOnePass;		/* True for one-pass algorithm without the FIFO */
@@ -139,13 +136,13 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 #endif
 	int newmask;		/* Mask of NEW.* columns accessed by BEFORE triggers */
 	int iEph = 0;		/* Ephemeral table holding all primary key values */
-	int nKey = 0;		/* Number of elements in regKey for WITHOUT ROWID */
+	int nKey = 0;		/* Number of elements in regKey */
 	int aiCurOnePass[2];	/* The write cursors opened by WHERE_ONEPASS */
 
 	/* Register Allocations */
 	int regRowCount = 0;	/* A count of rows changed */
-	int regOldRowid = 0;	/* The old rowid */
-	int regNewRowid = 0;	/* The new rowid */
+	int regOldPk = 0;
+	int regNewPk = 0;
 	int regNew = 0;		/* Content of the NEW.* table in triggers */
 	int regOld = 0;		/* Content of OLD.* table in triggers */
 	int regKey = 0;		/* composite PRIMARY KEY value */
@@ -194,7 +191,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].iCursor = iBaseCur = iDataCur = pParse->nTab++;
 	iIdxCur = iDataCur + 1;
-	pPk = HasRowid(pTab) ? 0 : sqlite3PrimaryKeyIndex(pTab);
+	pPk = isView ? 0 : sqlite3PrimaryKeyIndex(pTab);
 	for (nIdx = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, nIdx++) {
 		if (IsPrimaryKeyIndex(pIdx) && pPk != 0) {
 			iDataCur = pParse->nTab;
@@ -229,7 +226,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * column to be updated, make sure we have authorization to change
 	 * that column.
 	 */
-	chngRowid = chngPk = 0;
+	chngPk = 0;
 	for (i = 0; i < pChanges->nExpr; i++) {
 		if (sqlite3ResolveExprNames(&sNC, pChanges->a[i].pExpr)) {
 			goto update_cleanup;
@@ -237,10 +234,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		for (j = 0; j < pTab->nCol; j++) {
 			if (strcmp
 			    (pTab->aCol[j].zName, pChanges->a[i].zName) == 0) {
-				if (j == pTab->iPKey) {
-					chngRowid = 1;
-					pRowidExpr = pChanges->a[i].pExpr;
-				} else if (pPk
+				if (pPk
 					   && (pTab->aCol[j].
 					       colFlags & COLFLAG_PRIMKEY) !=
 					   0) {
@@ -251,16 +245,10 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			}
 		}
 		if (j >= pTab->nCol) {
-			if (pPk == 0 && sqlite3IsRowid(pChanges->a[i].zName)) {
-				j = -1;
-				chngRowid = 1;
-				pRowidExpr = pChanges->a[i].pExpr;
-			} else {
-				sqlite3ErrorMsg(pParse, "no such column: %s",
-						pChanges->a[i].zName);
-				pParse->checkSchema = 1;
-				goto update_cleanup;
-			}
+			sqlite3ErrorMsg(pParse, "no such column: %s",
+					pChanges->a[i].zName);
+			pParse->checkSchema = 1;
+			goto update_cleanup;
 		}
 #ifndef SQLITE_OMIT_AUTHORIZATION
 		{
@@ -278,10 +266,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 #endif
 	}
-	assert((chngRowid & chngPk) == 0);
-	assert(chngRowid == 0 || chngRowid == 1);
 	assert(chngPk == 0 || chngPk == 1);
-	chngKey = chngRowid + chngPk;
 
 	/*
 	 * The SET expressions are not actually used inside the
@@ -289,7 +274,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].colUsed = 0;
 
-	hasFK = sqlite3FkRequired(pTab, aXRef, chngKey);
+	hasFK = sqlite3FkRequired(pTab, aXRef);
 
 	/* There is one entry in the aRegIdx[] array for each index on the table
 	 * being updated.  Fill in aRegIdx[] with a register number that will hold
@@ -299,7 +284,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	for (j = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, j++) {
 		int reg;
-		if (chngKey || hasFK || pIdx->pPartIdxWhere || pIdx == pPk) {
+		if (chngPk || hasFK || pIdx->pPartIdxWhere || pIdx == pPk) {
 			reg = ++pParse->nMem;
 			pParse->nMem += pIdx->nColumn;
 		} else {
@@ -327,13 +312,13 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	sqlite3BeginWriteOperation(pParse, 1);
 
 	/* Allocate required registers. */
-	regOldRowid = regNewRowid = ++pParse->nMem;
+	regOldPk = regNewPk = ++pParse->nMem;
 	if (chngPk || pTrigger || hasFK) {
 		regOld = pParse->nMem + 1;
 		pParse->nMem += pTab->nCol;
 	}
-	if (chngKey || pTrigger || hasFK) {
-		regNewRowid = ++pParse->nMem;
+	if (chngPk || pTrigger || hasFK) {
+		regNewPk = ++pParse->nMem;
 	}
 	regNew = pParse->nMem + 1;
 	pParse->nMem += pTab->nCol;
@@ -484,17 +469,13 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		VdbeCoverage(v);
 	}
 
-	/* If the record number will change, set register regNewRowid to
+	/* If the record number will change, set register regNewPk to
 	 * contain the new value. If the record number is not being modified,
-	 * then regNewRowid is the same register as regOldRowid, which is
+	 * then regNewPk is the same register as regOldPk, which is
 	 * already populated.
 	 */
-	assert(chngKey || pTrigger || hasFK || regOldRowid == regNewRowid);
-	if (chngRowid) {
-		sqlite3ExprCode(pParse, pRowidExpr, regNewRowid);
-		sqlite3VdbeAddOp1(v, OP_MustBeInt, regNewRowid);
-		VdbeCoverage(v);
-	}
+	assert(chngPk || pTrigger || hasFK || regOldPk == regNewPk);
+
 
 	/* Compute the old pre-UPDATE content of the row being changed, if that
 	 * information is needed
@@ -517,9 +498,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				sqlite3VdbeAddOp2(v, OP_Null, 0, regOld + i);
 			}
 		}
-		if (chngRowid == 0 && pPk == 0) {
-			sqlite3VdbeAddOp2(v, OP_Copy, regOldRowid, regNewRowid);
-		}
+
 	}
 
 	/* Populate the array of registers beginning at regNew with the new
@@ -570,7 +549,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	if (tmask & TRIGGER_BEFORE) {
 		sqlite3TableAffinity(v, pTab, regNew);
 		sqlite3CodeRowTrigger(pParse, pTrigger, TK_UPDATE, pChanges,
-				      TRIGGER_BEFORE, pTab, regOldRowid,
+				      TRIGGER_BEFORE, pTab, regOldPk,
 				      onError, labelContinue);
 
 		/* The row-trigger may have deleted the row being updated. In this
@@ -608,21 +587,20 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		int bReplace = 0;	/* True if REPLACE conflict resolution might happen */
 
 		/* Do constraint checks. */
-		assert(regOldRowid > 0);
+		assert(regOldPk > 0);
 		sqlite3GenerateConstraintChecks(pParse, pTab, aRegIdx, iDataCur,
-						iIdxCur, regNewRowid,
-						regOldRowid, chngKey, onError,
+						iIdxCur, regNewPk,
+						regOldPk, chngPk, onError,
 						labelContinue, &bReplace,
 						aXRef);
 
 		/* Do FK constraint checks. */
 		if (hasFK) {
-			sqlite3FkCheck(pParse, pTab, regOldRowid, 0, aXRef,
-				       chngKey);
+			sqlite3FkCheck(pParse, pTab, regOldPk, 0, aXRef);
 		}
 
 		/* Delete the index entries associated with the current record.  */
-		if (bReplace || chngKey) {
+		if (bReplace || chngPk) {
 			addr1 =
 				sqlite3VdbeAddOp4Int(v, OP_NotFound,
 						     iDataCur, 0, regKey,
@@ -631,16 +609,16 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 		sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur);
 
-		/* If changing the rowid value, or if there are foreign key constraints
+		/* If changing the PK value, or if there are foreign key constraints
 		 * to process, delete the old record. Otherwise, add a noop OP_Delete
 		 * to invoke the pre-update hook.
 		 *
-		 * That (regNew==regnewRowid+1) is true is also important for the
+		 * That (regNew==regnewPk+1) is true is also important for the
 		 * pre-update hook. If the caller invokes preupdate_new(), the returned
-		 * value is copied from memory cell (regNewRowid+1+iCol), where iCol
+		 * value is copied from memory cell (regNewPk+1+iCol), where iCol
 		 * is the column index supplied by the user.
 		 */
-		assert(regNew == regNewRowid + 1);
+		assert(regNew == regNewPk + 1);
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
 		sqlite3VdbeAddOp3(v, OP_Delete, iDataCur,
 				  OPFLAG_ISUPDATE |
@@ -651,17 +629,16 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			sqlite3VdbeAppendP4(v, pTab, P4_TABLE);
 		}
 #else
-		if (hasFK || chngKey || pPk != 0) {
+		if (hasFK || chngPk || pPk != 0) {
 			sqlite3VdbeAddOp2(v, OP_Delete, iDataCur, 0);
 		}
 #endif
-		if (bReplace || chngKey) {
+		if (bReplace || chngPk) {
 			sqlite3VdbeJumpHere(v, addr1);
 		}
 
 		if (hasFK) {
-			sqlite3FkCheck(pParse, pTab, 0, regNewRowid, aXRef,
-				       chngKey);
+			sqlite3FkCheck(pParse, pTab, 0, regNewPk, aXRef);
 		}
 
 		/* Insert the new index entries and the new record. */
@@ -672,8 +649,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * to the row just updated.
 		 */
 		if (hasFK) {
-			sqlite3FkActions(pParse, pTab, pChanges, regOldRowid,
-					 aXRef, chngKey);
+			sqlite3FkActions(pParse, pTab, pChanges, regOldPk, aXRef);
 		}
 	}
 
@@ -685,7 +661,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	}
 
 	sqlite3CodeRowTrigger(pParse, pTrigger, TK_UPDATE, pChanges,
-			      TRIGGER_AFTER, pTab, regOldRowid, onError,
+			      TRIGGER_AFTER, pTab, regOldPk, onError,
 			      labelContinue);
 
 	/* Repeat the above with the next record to be updated, until
