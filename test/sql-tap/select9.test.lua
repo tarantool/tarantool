@@ -275,8 +275,8 @@ test:do_execsql_test(
 
 local t1_space_id = ""
 local t2_space_id = ""
-t1_space_id = test:execsql("SELECT * from _space where name='T1'")["ID"]
-t2_space_id = test:execsql("SELECT * from _space where name='T2'")["ID"]
+t1_space_id = test:execsql([[SELECT * from "_space" where "name"='T1']])["id"]
+t2_space_id = test:execsql([[SELECT * from "_space" where "name"='T2']])["id"]
 --X(276, "X!cmd", [=[["db","eval","SELECT * from _space where name='t2'","data","\n  set t2_space_id $data(id)\n"]]=])
 --local function reverse(lhs, rhs)
 --    return X(283, "X!cmd", [=[["string","compare",["rhs"],["lhs"]]]=])

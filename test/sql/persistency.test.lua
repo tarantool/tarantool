@@ -49,7 +49,7 @@ box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 
 -- create a trigger
 box.sql.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
-box.sql.execute("SELECT * FROM _trigger");
+box.sql.execute("SELECT * FROM \"_trigger\"");
 
 -- Many entries
 box.sql.execute("CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));")
@@ -59,21 +59,21 @@ box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 test_run:cmd('restart server default');
 
 -- prove that trigger survived
-box.sql.execute("SELECT * FROM _trigger");
+box.sql.execute("SELECT * FROM \"_trigger\"");
 
 -- ... functional
 box.sql.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
 box.sql.execute("SELECT * FROM barfoo WHERE foo = 9999");
 
 -- and still persistent
-box.sql.execute("SELECT * FROM _trigger")
+box.sql.execute("SELECT * FROM \"_trigger\"")
 
 -- and can be dropped just once
 box.sql.execute("DROP TRIGGER tfoobar")
 -- Should error
 box.sql.execute("DROP TRIGGER tfoobar")
 -- Should be empty
-box.sql.execute("SELECT * FROM _trigger")
+box.sql.execute("SELECT * FROM \"_trigger\"")
 
 -- prove barfoo2 still exists
 box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")

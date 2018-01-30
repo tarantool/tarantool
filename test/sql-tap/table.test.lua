@@ -325,7 +325,7 @@ test:do_test(
             test:execsql(sql)
         end
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
-        return test:execsql "SELECT name FROM _space WHERE id>500"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
     end, r)
 
 -- do_test table-4.1b {
@@ -348,7 +348,7 @@ test:do_test(
             test:execsql(sql)
         end
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
-        return test:execsql("SELECT name FROM _space WHERE id>500")
+        return test:execsql([[SELECT "name" FROM "_space" WHERE "id">500]])
     end, r)
 
 --exit
@@ -362,7 +362,7 @@ test:do_test(
             test:execsql(sql)
         end
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
-        return test:execsql "SELECT name FROM _space WHERE id>500"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
     end, {
         -- <table-4.3>
         
@@ -451,7 +451,7 @@ test:do_test(
         test:execsql "EXPLAIN CREATE TABLE test1(f1 int primary key)"
 
 
-        return test:execsql "SELECT name FROM _space WHERE id>500"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
     end, {
         -- <table-5.3>
@@ -468,7 +468,7 @@ test:do_test(
         test:execsql "EXPLAIN DROP TABLE test1"
 
 
-        return test:execsql "SELECT name FROM _space WHERE id>500"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
     end, {
         -- <table-5.4>

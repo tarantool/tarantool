@@ -18,7 +18,7 @@ testprefix = "analyzeC"
 -------------------------------------------------------------------------
 --
 -- This file contains automated tests used to verify that the text terms
--- at the end of _sql_stat1.stat are processed correctly.
+-- at the end of "_sql_stat1".stat are processed correctly.
 --
 --  (1) "unordered" means that the index cannot be used for ORDER BY
 --      or for range queries
@@ -39,8 +39,8 @@ test:do_execsql_test(
         CREATE INDEX t1b ON t1(b);
         CREATE INDEX t1c ON t1(c);
         ANALYZE;
-        DELETE FROM _sql_stat1;
-        INSERT INTO _sql_stat1(tbl,idx,stat) VALUES('t1','t1b','12345 2'),('t1','t1c','12345 4');
+        DELETE FROM "_sql_stat1";
+        INSERT INTO "_sql_stat1"("tbl","idx","stat") VALUES('t1','t1b','12345 2'),('t1','t1c','12345 4');
         ANALYZE;
         SELECT b,c,d, '#' FROM t1 WHERE b BETWEEN 3 AND 8 ORDER BY d;
     ]], {
@@ -86,7 +86,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.0,
     [[
-        UPDATE _sql_stat1 SET stat='12345 2 unordered' WHERE idx='t1b';
+        UPDATE "_sql_stat1" SET "stat"='12345 2 unordered' WHERE "idx"='t1b';
         ANALYZE;
         SELECT b, c, d, '#' FROM t1 WHERE b BETWEEN 3 AND 8 ORDER BY d;
     ]], {
@@ -126,12 +126,12 @@ test:do_execsql_test(
         -- </2.3>
     })
 
--- Ignore extraneous text parameters in the _sql_stat1.stat field.
+-- Ignore extraneous text parameters in the "_sql_stat1".stat field.
 --
 test:do_execsql_test(
     3.0,
     [[
-        UPDATE _sql_stat1 SET stat='12345 2 whatever=5 unordered xyzzy=11' WHERE idx='t1b';
+        UPDATE "_sql_stat1" SET "stat"='12345 2 whatever=5 unordered xyzzy=11' WHERE "idx"='t1b';
         ANALYZE;
         SELECT b, c, d, '#' FROM t1 WHERE b BETWEEN 3 AND 8 ORDER BY d;
     ]], {
@@ -179,8 +179,8 @@ test:do_execsql_test(
         DROP INDEX t1b ON t1;
         CREATE INDEX t1bc ON t1(b,c);
         CREATE INDEX t1db ON t1(d,b);
-        DELETE FROM _sql_stat1;
-        INSERT INTO _sql_stat1(tbl,idx,stat) VALUES('t1','t1bc','12345 3 2 sz=10'),('t1','t1db','12345 3 2 sz=20');
+        DELETE FROM "_sql_stat1";
+        INSERT INTO "_sql_stat1"("tbl","idx","stat") VALUES('t1','t1bc','12345 3 2 sz=10'),('t1','t1db','12345 3 2 sz=20');
         ANALYZE;
         SELECT count(b) FROM t1;
     ]], {
@@ -202,8 +202,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.2,
     [[
-        DELETE FROM _sql_stat1;
-        INSERT INTO _sql_stat1(tbl,idx,stat) VALUES('t1','t1bc','12345 3 2 sz=20'),('t1','t1db','12345 3 2 sz=10');
+        DELETE FROM "_sql_stat1";
+        INSERT INTO "_sql_stat1"("tbl","idx","stat") VALUES('t1','t1bc','12345 3 2 sz=20'),('t1','t1db','12345 3 2 sz=10');
         ANALYZE;
         SELECT count(b) FROM t1;
     ]], {
@@ -228,8 +228,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     5.0,
     [[
-        DELETE FROM _sql_stat1;
-        INSERT INTO _sql_stat1(tbl,idx,stat)
+        DELETE FROM "_sql_stat1";
+        INSERT INTO "_sql_stat1"("tbl","idx","stat")
           VALUES('t1','t1bc','12345 3 2 x=5 sz=10 y=10'),
                 ('t1','t1db','12345 3 2 whatever sz=20 junk');
         ANALYZE;
@@ -254,8 +254,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     5.2,
     [[
-        DELETE FROM _sql_stat1;
-        INSERT INTO _sql_stat1(tbl,idx,stat) VALUES('t1','t1db','12345 3 2 x=5 sz=10 y=10'), ('t1','t1bc','12345 3 2 whatever sz=20 junk');
+        DELETE FROM "_sql_stat1";
+        INSERT INTO "_sql_stat1"("tbl","idx","stat") VALUES('t1','t1db','12345 3 2 x=5 sz=10 y=10'), ('t1','t1bc','12345 3 2 whatever sz=20 junk');
         ANALYZE;
         SELECT count(b) FROM t1;
     ]], {

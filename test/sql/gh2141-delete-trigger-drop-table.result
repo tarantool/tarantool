@@ -24,7 +24,7 @@ box.sql.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END")
 ---
 ...
 -- check that these triggers exist
-box.sql.execute("SELECT * FROM _trigger")
+box.sql.execute("SELECT * FROM \"_trigger\"")
 ---
 - - ['TT_AD', !!binary gaNzcWzZOkNSRUFURSBUUklHR0VSIHR0X2FkIEFGVEVSIERFTEVURSBPTiB0IEJFR0lOIFNFTEVDVCAxOyBFTkQ=]
   - ['TT_AI', !!binary gaNzcWzZOkNSRUFURSBUUklHR0VSIHR0X2FpIEFGVEVSIElOU0VSVCBPTiB0IEJFR0lOIFNFTEVDVCAxOyBFTkQ=]
@@ -38,7 +38,7 @@ box.sql.execute("DROP TABLE t")
 ---
 ...
 -- check that triggers were dropped with deleted table
-box.sql.execute("SELECT * FROM _trigger")
+box.sql.execute("SELECT * FROM \"_trigger\"")
 ---
 - []
 ...

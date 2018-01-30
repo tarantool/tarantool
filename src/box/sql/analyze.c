@@ -140,9 +140,9 @@ openStatTable(Parse * pParse,	/* Parsing context */
 		const char *zCols;
 	} aTable[] = {
 		{
-		"_SQL_STAT1", "tbl,idx,stat, PRIMARY KEY(tbl, idx)"},
+		"_sql_stat1", "\"tbl\",\"idx\",\"stat\", PRIMARY KEY(\"tbl\", \"idx\")"},
 		{
-		"_SQL_STAT4", "tbl,idx,neq,nlt,ndlt,sample, PRIMARY KEY(tbl, idx, sample)"}
+		"_sql_stat4", "\"tbl\",\"idx\",\"neq\",\"nlt\",\"ndlt\",\"sample\", PRIMARY KEY(\"tbl\", \"idx\", \"sample\")"}
 	};
 	int i;
 	sqlite3 *db = pParse->db;
@@ -168,7 +168,7 @@ openStatTable(Parse * pParse,	/* Parsing context */
 				 * because the OpenWrite opcode below will be needing it.
 				 */
 				sqlite3NestedParse(pParse,
-						   "CREATE TABLE %s(%s)", zTab,
+						   "CREATE TABLE \"%s\"(%s)", zTab,
 						   aTable[i].zCols);
 				aRoot[i] = pParse->regRoot;
 				aCreateTbl[i] = OPFLAG_P2ISREG;
@@ -182,7 +182,7 @@ openStatTable(Parse * pParse,	/* Parsing context */
 			aCreateTbl[i] = 0;
 			if (zWhere) {
 				sqlite3NestedParse(pParse,
-						   "DELETE FROM %s WHERE %s=%Q",
+						   "DELETE FROM \"%s\" WHERE \"%s\"=%Q",
 						   zTab, zWhereType, zWhere);
 			} else {
 				/* The sql_stat[14] table already exists.  Delete all rows. */
@@ -1658,11 +1658,12 @@ loadStat4(sqlite3 * db)
 	Table *pTab = 0;	/* Pointer to stat table */
 
 	assert(db->lookaside.bDisable);
-	if ((pTab = sqlite3FindTable(db, "_SQL_STAT4"))) {
+	pTab = sqlite3FindTable(db, "_sql_stat4");
+	if (pTab) {
 		rc = loadStatTbl(db,
 				 pTab,
-				 "SELECT tbl,idx,count(*) FROM _sql_stat4 GROUP BY tbl,idx",
-				 "SELECT tbl,idx,neq,nlt,ndlt,sample FROM _SQL_STAT4");
+				 "SELECT \"tbl\",\"idx\",count(*) FROM \"_sql_stat4\" GROUP BY \"tbl\",\"idx\"",
+				 "SELECT \"tbl\",\"idx\",\"neq\",\"nlt\",\"ndlt\",\"sample\" FROM \"_sql_stat4\"");
 	}
 	
 	return rc;
@@ -1709,8 +1710,8 @@ sqlite3AnalysisLoad(sqlite3 * db)
 
 	/* Load new statistics out of the _sql_stat1 table */
 	sInfo.db = db;
-	if (sqlite3FindTable(db, "_SQL_STAT1") != 0) {
-		zSql = "SELECT tbl,idx,stat FROM _sql_stat1";
+	if (sqlite3FindTable(db, "_sql_stat1") != 0) {
+		zSql = "SELECT \"tbl\",\"idx\",\"stat\" FROM \"_sql_stat1\"";
 		rc = sqlite3_exec(db, zSql, analysisLoader, &sInfo, 0);
 	}
 

@@ -93,7 +93,7 @@ test:do_test(
             COMMIT;
             ANALYZE;
         ]])
-        return test:execsql(" SELECT count(*)>0 FROM _sql_stat4; ")
+        return test:execsql([[ SELECT count(*)>0 FROM "_sql_stat4"; ]])
 
 
     end, {

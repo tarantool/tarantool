@@ -2292,10 +2292,10 @@ sqlite3ClearStatTables(Parse * pParse,	/* The parsing context */
 	int i;
 	for (i = 1; i <= 4; i++) {
 		char zTab[24];
-		sqlite3_snprintf(sizeof(zTab), zTab, "_SQL_STAT%d", i);
+		sqlite3_snprintf(sizeof(zTab), zTab, "_sql_stat%d", i);
 		if (sqlite3FindTable(pParse->db, zTab)) {
 			sqlite3NestedParse(pParse,
-					   "DELETE FROM \"%s\" WHERE %s=%Q",
+					   "DELETE FROM \"%s\" WHERE \"%s\"=%Q",
 					   zTab, zType, zName);
 		}
 	}
@@ -2338,11 +2338,11 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	 */
 	if (pTab->tabFlags & TF_Autoincrement) {
 		sqlite3NestedParse(pParse,
-				   "DELETE FROM %s WHERE space_id=%d",
+				   "DELETE FROM \"%s\" WHERE \"space_id\"=%d",
 				   TARANTOOL_SYS_SPACE_SEQUENCE_NAME,
 				   SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
 		sqlite3NestedParse(pParse,
-				   "DELETE FROM %s WHERE name=%Q",
+				   "DELETE FROM \"%s\" WHERE \"name\"=%Q",
 				   TARANTOOL_SYS_SEQUENCE_NAME,
 				   pTab->zName);
 	}
@@ -2360,28 +2360,27 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 			/*  Remove all indexes, except for primary.
 			   Tarantool won't allow remove primary when secondary exist. */
 			sqlite3NestedParse(pParse,
-					   "DELETE FROM %s WHERE id=%d AND iid>0",
+					   "DELETE FROM \"%s\" WHERE \"id\"=%d AND \"iid\">0",
 					   TARANTOOL_SYS_INDEX_NAME, space_id);
 		}
 
 		/*  Remove primary index. */
 		sqlite3NestedParse(pParse,
-				   "DELETE FROM %s WHERE id=%d AND iid=0",
+				   "DELETE FROM \"%s\" WHERE \"id\"=%d AND \"iid\"=0",
 				   TARANTOOL_SYS_INDEX_NAME, space_id);
 	}
 	/* Delete records about the space from the _truncate. */
-	sqlite3NestedParse(pParse, "DELETE FROM "
-			   TARANTOOL_SYS_TRUNCATE_NAME " WHERE id = %d",
+	sqlite3NestedParse(pParse, "DELETE FROM \""
+			   TARANTOOL_SYS_TRUNCATE_NAME "\" WHERE \"id\" = %d",
 			   space_id);
 
-	Token _space =
-	    { TARANTOOL_SYS_SPACE_NAME, strlen(TARANTOOL_SYS_SPACE_NAME), false };
 	Expr *id_value = sqlite3ExprInteger(db, space_id);
-	const char *column = "ID";
+	const char *column = "id";
 	/* Execute not nested DELETE of a space to account DROP TABLE
 	 * changes.
 	 */
-	sqlite3DeleteByKey(pParse, &_space, &column, &id_value, 1);
+	sqlite3DeleteByKey(pParse, TARANTOOL_SYS_SPACE_NAME,
+			   &column, &id_value, 1);
 
 	/* Remove the table entry from SQLite's internal schema and modify
 	 * the schema cookie.
@@ -2484,7 +2483,7 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	 */
 
 	sqlite3BeginWriteOperation(pParse, 1);
-	sqlite3ClearStatTables(pParse, "TBL", pTab->zName);
+	sqlite3ClearStatTables(pParse, "tbl", pTab->zName);
 	sqlite3FkDropTable(pParse, pName, pTab);
 	sqlite3CodeDropTable(pParse, pTab, isView);
 
@@ -3280,7 +3279,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 
 		pSysIndex =
 		    sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
-				    "_INDEX");
+				    TARANTOOL_SYS_INDEX_NAME);
 		if (NEVER(!pSysIndex))
 			return;
 
@@ -3467,18 +3466,15 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 
 	/* Generate code to remove the index and from the master table */
 	sqlite3BeginWriteOperation(pParse, 1);
-
-	Token _index =
-	    { TARANTOOL_SYS_INDEX_NAME, strlen(TARANTOOL_SYS_INDEX_NAME), false };
-	const char *columns[2] = { "ID", "IID" };
+	const char *columns[2] = { "id", "iid" };
 	Expr *values[2];
 	values[0] =
 	    sqlite3ExprInteger(db, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum));
 	values[1] =
 	    sqlite3ExprInteger(db, SQLITE_PAGENO_TO_INDEXID(pIndex->tnum));
-	sqlite3DeleteByKey(pParse, &_index, columns, values, 2);
-
-	sqlite3ClearStatTables(pParse, "IDX", pIndex->zName);
+	sqlite3DeleteByKey(pParse, TARANTOOL_SYS_INDEX_NAME,
+			   columns, values, 2);
+	sqlite3ClearStatTables(pParse, "idx", pIndex->zName);
 	sqlite3ChangeCookie(pParse);
 
 	sqlite3VdbeAddOp3(v, OP_DropIndex, 0, 0, 0);
@@ -3663,6 +3659,21 @@ sqlite3SrcListEnlarge(sqlite3 * db,	/* Database connection to notify of OOM erro
 	return pSrc;
 }
 
+SrcList *
+sql_alloc_src_list(sqlite3 *db)
+{
+	SrcList *pList;
+
+	pList = sqlite3DbMallocRawNN(db, sizeof(SrcList));
+	if (pList == 0)
+		return NULL;
+	pList->nAlloc = 1;
+	pList->nSrc = 1;
+	memset(&pList->a[0], 0, sizeof(pList->a[0]));
+	pList->a[0].iCursor = -1;
+	return pList;
+}
+
 /*
  * Append a new table name to the given SrcList.  Create a new SrcList if
  * need be.  A new entry is created in the SrcList even if pTable is NULL.
@@ -3706,13 +3717,9 @@ sqlite3SrcListAppend(sqlite3 * db,	/* Connection to notify of malloc failures */
 	struct SrcList_item *pItem;
 	assert(db != 0);
 	if (pList == 0) {
-		pList = sqlite3DbMallocRawNN(db, sizeof(SrcList));
+		pList = sql_alloc_src_list(db);
 		if (pList == 0)
 			return 0;
-		pList->nAlloc = 1;
-		pList->nSrc = 1;
-		memset(&pList->a[0], 0, sizeof(pList->a[0]));
-		pList->a[0].iCursor = -1;
 	} else {
 		pList = sqlite3SrcListEnlarge(db, pList, 1, pList->nSrc);
 	}

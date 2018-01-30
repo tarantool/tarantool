@@ -54,7 +54,7 @@ test:do_test(
 --
 test:do_execsql_test(
     "analyze4-1.1",
-    [[ SELECT idx, stat FROM _sql_stat1 WHERE tbl='T1' ORDER BY idx; ]],
+    [[ SELECT "idx", "stat" FROM "_sql_stat1" WHERE "tbl"='T1' ORDER BY "idx"; ]],
     {
         -- <analyze4-1.1>
         "T1","128 1", "T1A", "128 1", "T1B", "128 128"
@@ -73,7 +73,7 @@ test:do_test(
 -- pragma vdbe_debug=1;
             ANALYZE;
 -- pragma vdbe_debug=0;
-            SELECT idx, stat FROM _sql_stat1 WHERE tbl='T1' ORDER BY idx;
+            SELECT "idx", "stat" FROM "_sql_stat1" WHERE "tbl"='T1' ORDER BY "idx";
         ]])
     end, {
         -- <analyze4-1.2>
@@ -111,7 +111,7 @@ test:do_execsql_test(
             CREATE INDEX t1cdb ON t1(c,d,b);
             CREATE INDEX t1cbd ON t1(c,b,d);
             ANALYZE;
-            SELECT idx, stat FROM _sql_stat1 WHERE tbl='T1' ORDER BY idx;
+            SELECT "idx", "stat" FROM "_sql_stat1" WHERE "tbl"='T1' ORDER BY "idx";
     ]]
     , {
         -- <analyze4-1.3>

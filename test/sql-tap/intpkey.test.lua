@@ -39,7 +39,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "intpkey-1.1",
     [[
-        SELECT _index.name FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T1'
+        SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T1'
     ]], {
         -- <intpkey-1.1>
         "sqlite_autoindex_T1_1"

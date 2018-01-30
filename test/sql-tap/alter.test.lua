@@ -26,7 +26,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-1.2",
     [[
-        SELECT count(*) FROM _space WHERE name IN ('T1', 't1x1', 'Space_Table')
+        SELECT count(*) FROM "_space" WHERE "name" IN ('T1', 't1x1', 'Space_Table')
     ]], {
         -- <alter-1.2>
         3
@@ -59,7 +59,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-1.5",
     [[
-        SELECT count(*) FROM _space WHERE name IN ('T1', 't1x1', 'Space_Table', 'SPACE_TABLE', 't1', 'T2');
+        SELECT count(*) FROM "_space" WHERE "name" IN ('T1', 't1x1', 'Space_Table', 'SPACE_TABLE', 't1', 'T2');
     ]], {
         -- <alter-1.5>
         3
@@ -90,10 +90,10 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "alter-2.3",
     [[
-        ALTER TABLE _space RENAME TO space;
+        ALTER TABLE "_space" RENAME TO space;
     ]], {
         -- <alter-2.3>
-        1, "table _SPACE may not be altered"
+        1, "table _space may not be altered"
         -- </alter-2.3>
     })
 
@@ -139,7 +139,7 @@ test:do_execsql_test(
     "alter-3.3",
     [[
             DROP TRIGGER trig1;
-            SELECT * FROM _TRIGGER;
+            SELECT * FROM "_trigger";
     ]], {
         -- <alter-3.3>
         -- </alter-3.3>
@@ -242,7 +242,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE xyz(x PRIMARY KEY);
         ALTER TABLE xyz RENAME TO "xyz1234abc";
-        SELECT name FROM _space WHERE name GLOB 'xyz*';
+        SELECT "name" FROM "_space" WHERE "name" GLOB 'xyz*';
     ]], {
         -- <alter-5.1>
         "xyz1234abc"
@@ -253,7 +253,7 @@ test:do_execsql_test(
     "alter-5.2",
     [[
         ALTER TABLE "xyz1234abc" RENAME TO xyzabc;
-        SELECT name FROM _space WHERE name GLOB 'XYZ*';
+        SELECT "name" FROM "_space" WHERE "name" GLOB 'XYZ*';
     ]], {
         -- <alter-5.2>
         "XYZABC"
@@ -285,7 +285,7 @@ test:do_execsql_test(
     "alter-6.2",
     [[
         DROP TRIGGER on_t2;
-        SELECT name FROM _TRIGGER;
+        SELECT "name" FROM "_trigger";
     ]], {
         -- <alter-6.2>
         "ON_T1", "ON_T3"
@@ -308,7 +308,7 @@ test:do_execsql_test(
     "alter-6.4",
     [[
         DROP TABLE "a";
-        SELECT * FROM _TRIGGER;
+        SELECT * FROM "_trigger";
     ]], {
         -- <alter-6.4>
         -- </alter-6.4>

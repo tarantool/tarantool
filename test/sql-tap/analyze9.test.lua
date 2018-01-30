@@ -65,7 +65,7 @@ box.internal.sql_create_function("msgpack_decode_sample", msgpack_decode_sample)
 test:do_execsql_test(
     1.2,
     [[
-        SELECT tbl,idx,nEq,nLt,nDLt,msgpack_decode_sample(sample) FROM _sql_stat4 where idx = 'I1';
+        SELECT "tbl","idx","neq","nlt","ndlt",msgpack_decode_sample("sample") FROM "_sql_stat4" where "idx" = 'I1';
     ]], {
         -- <1.2>
         "T1", "I1", "1 1", "0 0", "0 0", "(0) (0)", "T1", "I1", "1 1", "1 1", "1 1", "(1) (1)", 
@@ -77,7 +77,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.3,
     [[
-        SELECT tbl,idx,nEq,nLt,nDLt,msgpack_decode_sample(sample) FROM _sql_stat4 where idx = 'T1';
+        SELECT "tbl","idx","neq","nlt","ndlt",msgpack_decode_sample("sample") FROM "_sql_stat4" where "idx" = 'T1';
 
     ]], {
         -- <1.3>
@@ -100,7 +100,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(22.0, 'some text');
         CREATE INDEX i1 ON t1(a, b);
         ANALYZE;
-        SELECT msgpack_decode_sample(sample) FROM _sql_stat4;
+        SELECT msgpack_decode_sample("sample") FROM "_sql_stat4";
     ]], {
         -- <2.1>
         "some text 14", "22 some text", "some text", 22
@@ -185,7 +185,7 @@ test:do_execsql_test(
     "3.3.2",
     [[
         ANALYZE;
-        SELECT lrange(nEq, 1, 1) FROM _sql_stat4 WHERE idx = 'I2';
+        SELECT lrange("neq", 1, 1) FROM "_sql_stat4" WHERE "idx" = 'I2';
     ]], generate_tens_str(24))
 
 ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ test:do_test(
             INSERT INTO t1(id, c, b, a) VALUES(null, 201, 4, 'h');
 
             ANALYZE;
-            SELECT count(*) FROM _sql_stat4;
+            SELECT count(*) FROM "_sql_stat4";
 
         ]])
         end, {
@@ -282,8 +282,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.3,
     [[
-        SELECT neq, lrange(nlt, 1, 3), lrange(ndlt, 1, 3), lrange(msgpack_decode_sample(sample), 1, 3) 
-            FROM _sql_stat4 WHERE idx = 'I1' ORDER BY sample LIMIT 16;
+        SELECT "neq", lrange("nlt", 1, 3), lrange("ndlt", 1, 3), lrange(msgpack_decode_sample("sample"), 1, 3) 
+            FROM "_sql_stat4" WHERE "idx" = 'I1' ORDER BY "sample" LIMIT 16;
     ]], {
         -- <4.3>
         "10 10 1","0 0 8","0 0 8","0 0 0","10 10 1","10 10 10","1 1 10","1 1 1","10 10 1","20 20 28",
@@ -299,8 +299,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.4,
     [[
-        SELECT neq, lrange(nlt, 1, 3), lrange(ndlt, 1, 3), lrange(msgpack_decode_sample(sample), 1, 3) 
-        FROM _sql_stat4 WHERE idx = 'I1' ORDER BY sample DESC LIMIT 2;
+        SELECT "neq", lrange("nlt", 1, 3), lrange("ndlt", 1, 3), lrange(msgpack_decode_sample("sample"), 1, 3) 
+        FROM "_sql_stat4" WHERE "idx" = 'I1' ORDER BY "sample" DESC LIMIT 2;
     ]], {
         -- <4.4>
         "2 1 1","295 296 296","120 122 296","201 4 h","5 3 1","290 290 291","119 119 291","200 1 b"
@@ -331,7 +331,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     4.7,
     [[
-        SELECT count(*) FROM _sql_stat4 WHERE msgpack_decode_sample(sample) IN (34, 68, 102, 136, 170, 204, 238, 272);
+        SELECT count(*) FROM "_sql_stat4" WHERE msgpack_decode_sample("sample") IN (34, 68, 102, 136, 170, 204, 238, 272);
     ]], {
         -- <4.7>
         8
@@ -352,7 +352,7 @@ test:do_test(
         end
         return test:execsql([[
             ANALYZE;
-            SELECT count(*) FROM _sql_stat4;
+            SELECT count(*) FROM "_sql_stat4";
         ]])
         end, {
             -- <4.8>
@@ -363,7 +363,7 @@ test:do_test(
 test:do_execsql_test(
     4.9,
     [[
-        SELECT msgpack_decode_sample(sample) FROM _sql_stat4;
+        SELECT msgpack_decode_sample("sample") FROM "_sql_stat4";
     ]], {
         -- <4.9>
         "x", 1110, 2230, 2750, 3350, 4090, 4470, 4980, 5240, 5280, 5290, 5590, 5920, 
@@ -388,9 +388,9 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(null, 5, 5);
         ANALYZE;
         CREATE TABLE x1(tbl, idx, neq, nlt, ndlt, sample, PRIMARY KEY(tbl, idx, sample)); 
-        INSERT INTO x1 SELECT * FROM _sql_stat4;
-        DELETE FROM _sql_stat4;
-        INSERT INTO _sql_stat4 SELECT * FROM x1;
+        INSERT INTO x1 SELECT * FROM "_sql_stat4";
+        DELETE FROM "_sql_stat4";
+        INSERT INTO "_sql_stat4" SELECT * FROM x1;
         ANALYZE;
     ]])
 
@@ -416,8 +416,8 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(null, 4, 4);
         INSERT INTO t1 VALUES(null, 5, 5);
         ANALYZE;
-        UPDATE _sql_stat4 SET sample = '' WHERE sample = 
-            (SELECT sample FROM _sql_stat4 WHERE tbl = 't1' AND idx = 'i1' LIMIT 1);
+        UPDATE "_sql_stat4" SET "sample" = '' WHERE "sample" =
+            (SELECT "sample" FROM "_sql_stat4" WHERE "tbl" = 't1' AND "idx" = 'i1' LIMIT 1);
         ANALYZE;
     ]])
 
@@ -438,7 +438,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     7.3,
     [[
-        UPDATE _sql_stat4 SET neq = '0 0 0';
+        UPDATE "_sql_stat4" SET "neq" = '0 0 0';
         ANALYZE;
         SELECT * FROM t1 WHERE a = 1;
     ]], {
@@ -451,7 +451,7 @@ test:do_execsql_test(
     7.4,
     [[
         ANALYZE;
-        UPDATE _sql_stat4 SET ndlt = '0 0 0';
+        UPDATE "_sql_stat4" SET "ndlt" = '0 0 0';
         ANALYZE;
         SELECT * FROM t1 WHERE a = 3;
     ]], {
@@ -464,7 +464,7 @@ test:do_execsql_test(
     7.5,
     [[
         ANALYZE;
-        UPDATE _sql_stat4 SET nlt = '0 0 0';
+        UPDATE "_sql_stat4" SET "nlt" = '0 0 0';
         ANALYZE;
         SELECT * FROM t1 WHERE a = 5;
     ]], {
@@ -1020,7 +1020,7 @@ test:do_execsql_test(
         INSERT INTO x1 VALUES(3, 4);
         INSERT INTO x1 VALUES(5, 6);
         ANALYZE;
-        INSERT INTO _sql_stat4 VALUES('x1', 'abc', NULL, NULL, NULL, '');
+        INSERT INTO "_sql_stat4" VALUES('x1', 'abc', NULL, NULL, NULL, '');
     ]])
 
 test:do_execsql_test(
@@ -1036,7 +1036,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     15.3,
     [[
-        INSERT INTO _sql_stat4 VALUES(42, 42, 42, 42, 42, 42);
+        INSERT INTO "_sql_stat4" VALUES(42, 42, 42, 42, 42, 42);
     ]])
 
 test:do_execsql_test(
@@ -1052,7 +1052,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     15.5,
     [[
-        UPDATE _sql_stat1 SET stat = NULL;
+        UPDATE "_sql_stat1" SET "stat" = NULL;
     ]])
 
 test:do_execsql_test(
@@ -1069,7 +1069,7 @@ test:do_execsql_test(
     15.7,
     [[
         ANALYZE;
-        UPDATE _sql_stat1 SET tbl = 'no such tbl';
+        UPDATE "_sql_stat1" SET "tbl" = 'no such tbl';
     ]])
 
 test:do_execsql_test(
@@ -1086,7 +1086,7 @@ test:do_execsql_test(
     15.9,
     [[
         ANALYZE;
-        UPDATE _sql_stat4 SET neq = NULL, nlt = NULL, ndlt = NULL;
+        UPDATE "_sql_stat4" SET "neq" = NULL, "nlt" = NULL, "ndlt" = NULL;
     ]])
 
 test:do_execsql_test(
@@ -1104,7 +1104,7 @@ test:do_execsql_test(
     15.11,
     [[
         ANALYZE;
-        UPDATE _sql_stat1 SET stat = stat || ' unordered';
+        UPDATE "_sql_stat1" SET "stat" = "stat" || ' unordered';
     ]])
 
 test:do_execsql_test(
@@ -1210,7 +1210,7 @@ test:do_test(
             test:execsql(string.format("INSERT INTO t1 VALUES(%s, 0);", i))
         end
         test:execsql("ANALYZE")
-        return test:execsql(" SELECT count(*) FROM _sql_stat4 WHERE idx = 'I1'; ")
+        return test:execsql([[ SELECT count(*) FROM "_sql_stat4" WHERE "idx" = 'I1'; ]])
     end, {
         -- <18.1>
         9
@@ -1257,7 +1257,7 @@ for i = 0, 15 do
         "20.3."..i,
         function()
             return test:execsql(string.format(
-                "SELECT count(*) FROM _sql_stat4 WHERE idx = 'I1' AND lrange(msgpack_decode_sample(sample), 1, 1) = '%s'", i))
+                [[SELECT count(*) FROM "_sql_stat4" WHERE "idx" = 'I1' AND lrange(msgpack_decode_sample("sample"), 1, 1) = '%s']], i))
         end, {
             1
         })

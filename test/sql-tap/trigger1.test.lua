@@ -537,7 +537,7 @@ test:do_execsql_test(
     "trigger1-8.1",
     [[
         CREATE TRIGGER "trigger" AFTER INSERT ON t2 BEGIN SELECT 1; END;
-        SELECT name FROM _trigger WHERE name='trigger';
+        SELECT "name" FROM "_trigger" WHERE "name"='trigger';
     ]], {
         -- <trigger1-8.1>
         "trigger"
@@ -548,7 +548,7 @@ test:do_execsql_test(
     "trigger1-8.2",
     [[
         DROP TRIGGER "trigger";
-        SELECT name FROM _trigger WHERE name='trigger';
+        SELECT "name" FROM "_trigger" WHERE "name"='trigger';
     ]], {
         -- <trigger1-8.2>
         
@@ -559,7 +559,7 @@ test:do_execsql_test(
     "trigger1-8.3",
     [[
         CREATE TRIGGER "trigger" AFTER INSERT ON t2 BEGIN SELECT 1; END;
-        SELECT name FROM _trigger WHERE name='trigger';
+        SELECT "name" FROM "_trigger" WHERE "name"='trigger';
     ]], {
         -- <trigger1-8.3>
         "trigger"
@@ -570,7 +570,7 @@ test:do_execsql_test(
     "trigger1-8.4",
     [[
         DROP TRIGGER "trigger";
-        SELECT name FROM _trigger WHERE name='trigger';
+        SELECT "name" FROM "_trigger" WHERE "name"='trigger';
     ]], {
         -- <trigger1-8.4>
         

@@ -76,7 +76,7 @@ test:do_execsql_test(
 test:do_test(
 	1.3,
 	function()
-		test:execsql("DELETE FROM _sql_stat1;")
+		test:execsql("DELETE FROM \"_sql_stat1\";")
 	end, {
         -- <1.3>
         -- </1.3>
@@ -120,7 +120,7 @@ test:do_execsql_test(
 test:do_test(
 	1.7,
 	function()
-		test:execsql(" DELETE FROM _sql_stat1 ")
+		test:execsql(" DELETE FROM \"_sql_stat1\" ")
 	end, {
         -- <1.7> 
         -- </1.7>

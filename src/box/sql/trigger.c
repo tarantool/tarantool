@@ -591,13 +591,10 @@ sqlite3DropTriggerPtr(Parse * pParse, Trigger * pTrigger)
 	 */
 	assert(pTable != 0);
 	if ((v = sqlite3GetVdbe(pParse)) != 0) {
-		Token _trigger = { TARANTOOL_SYS_TRIGGER_NAME,
-			strlen(TARANTOOL_SYS_TRIGGER_NAME),
-			false
-		};
-		const char *column = "NAME";
+		const char *column = "name";
 		Expr *value = sqlite3Expr(db, TK_STRING, pTrigger->zName);
-		sqlite3DeleteByKey(pParse, &_trigger, &column, &value, 1);
+		sqlite3DeleteByKey(pParse, TARANTOOL_SYS_TRIGGER_NAME,
+				   &column, &value, 1);
 		sqlite3ChangeCookie(pParse);
 		sqlite3VdbeAddOp4(v, OP_DropTrigger, 0, 0, 0, pTrigger->zName,
 				  0);

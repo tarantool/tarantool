@@ -3167,6 +3167,8 @@ void *sqlite3ArrayAllocate(sqlite3 *, void *, int, int *, int *);
 IdList *sqlite3IdListAppend(sqlite3 *, IdList *, Token *);
 int sqlite3IdListIndex(IdList *, const char *);
 SrcList *sqlite3SrcListEnlarge(sqlite3 *, SrcList *, int, int);
+SrcList *
+sql_alloc_src_list(sqlite3 *db);
 SrcList *sqlite3SrcListAppend(sqlite3 *, SrcList *, Token *);
 SrcList *sqlite3SrcListAppendFromTerm(Parse *, SrcList *, Token *,
 				      Token *, Select *, Expr *, IdList *);
@@ -3193,7 +3195,7 @@ Expr *sqlite3LimitWhere(Parse *, SrcList *, Expr *, ExprList *, Expr *, Expr *,
 			char *);
 #endif
 void sqlite3DeleteFrom(Parse *, SrcList *, Expr *);
-void sqlite3DeleteByKey(Parse *, Token *, const char **, Expr **, int);
+void sqlite3DeleteByKey(Parse *, char *, const char **, Expr **, int);
 void sqlite3Update(Parse *, SrcList *, ExprList *, Expr *, int);
 WhereInfo *sqlite3WhereBegin(Parse *, SrcList *, Expr *, ExprList *, ExprList *,
 			     u16, int);

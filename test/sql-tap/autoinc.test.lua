@@ -40,7 +40,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-1.3",
     [[
-        SELECT * FROM _sequence;
+        SELECT * FROM "_sequence";
     ]], {
         -- <autoinc-1.3>
         1,1,"T1",1,0,9223372036854775807LL,1,0,4294967041
@@ -68,17 +68,17 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "autoinc-1.5",
     [[
-        DROP TABLE _sequence
+        DROP TABLE "_sequence"
     ]], {
         -- <autoinc-1.5>
-        1, "table _SEQUENCE may not be dropped"
+        1, "table _sequence may not be dropped"
         -- </autoinc-1.5>
     })
 
 test:do_execsql_test(
     "autoinc-1.6",
     [[
-        SELECT name FROM _space WHERE name NOT IN (SELECT name FROM _space WHERE name LIKE '\_%' ESCAPE '\')
+        SELECT "name" FROM "_space" WHERE "name" NOT IN (SELECT "name" FROM "_space" WHERE "name" LIKE '\_%' ESCAPE '\')
     ]], {
         -- <autoinc-1.6>
         "T1"
@@ -331,7 +331,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-3.1",
     [[
-        SELECT name FROM _sequence
+        SELECT "name" FROM "_sequence"
     ]], {
         -- <autoinc-3.1>
         "T1", "T2", "T3"
@@ -342,7 +342,7 @@ test:do_execsql_test(
     "autoinc-3.2",
     [[
         DROP TABLE t1;
-        SELECT name FROM _sequence;
+        SELECT "name" FROM "_sequence";
     ]], {
         -- <autoinc-3.2>
        "T2", "T3"
@@ -353,7 +353,7 @@ test:do_execsql_test(
     "autoinc-3.3",
     [[
         DROP TABLE t3;
-        SELECT name FROM _sequence;
+        SELECT "name" FROM "_sequence";
     ]], {
         -- <autoinc-3.3>
         "T2"
@@ -364,7 +364,7 @@ test:do_execsql_test(
     "autoinc-3.4",
     [[
         DROP TABLE t2;
-        SELECT name FROM _sequence;
+        SELECT "name" FROM "_sequence";
     ]], {
         -- <autoinc-3.4>
 

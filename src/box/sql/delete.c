@@ -605,15 +605,17 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
  * In case of error the @values elements are deleted.
  */
 void
-sqlite3DeleteByKey(Parse * pParse, Token * pTab, const char **columns,
-		   Expr ** values, int nPairs)
+sqlite3DeleteByKey(Parse *pParse, char *zTab, const char **columns,
+		   Expr **values, int nPairs)
 {
 	Expr *where = NULL;
+	SrcList *src;
 
-	assert(nPairs > 0);
+		assert(nPairs > 0);
 	if (pParse->nErr > 0 || pParse->db->mallocFailed)
 		goto error;
-	SrcList *src = sqlite3SrcListAppend(pParse->db, NULL, pTab);
+	src = sql_alloc_src_list(pParse->db);
+	src->a[0].zName = sqlite3DbStrDup(pParse->db, zTab);
 	if (src == NULL)
 		goto error;
 	/* Dummy init of INDEXED BY clause. */

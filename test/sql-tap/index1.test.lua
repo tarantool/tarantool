@@ -26,7 +26,7 @@ test:do_test(
     function()
         test:execsql "CREATE TABLE test1(id primary key, f1 int, f2 int, f3 int)"
         test:execsql "CREATE INDEX index1 ON test1(f1)"
-        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
     end, {
         -- <index-1.1>
         "TEST1"
@@ -36,7 +36,7 @@ test:do_test(
 test:do_execsql_test(
     "index-1.1.1",
     [[
-        SELECT name FROM _index WHERE name='INDEX1'
+        SELECT "name" FROM "_index" WHERE "name"='INDEX1'
     ]], {
         -- <index-1.1.1>
         "INDEX1"
@@ -67,7 +67,7 @@ test:do_test(
     "index-1.2",
     function()
         test:execsql "DROP TABLE test1"
-        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-1.2>
@@ -191,7 +191,7 @@ test:do_test(
         end
         test:execsql "CREATE INDEX index9 ON test1(cnt)"
         test:execsql "CREATE INDEX indext ON test1(power)"
-        return test:execsql "SELECT name FROM _index WHERE name='INDEX9' OR name='INDEXT' union SELECT name FROM _space WHERE name='TEST1';"
+        return test:execsql [[SELECT "name" FROM "_index" WHERE "name"='INDEX9' OR "name"='INDEXT' union SELECT "name" FROM "_space" WHERE "name"='TEST1';]]
     end, {
         -- <index-4.1>
         "INDEX9", "INDEXT", "TEST1"
@@ -316,7 +316,7 @@ test:do_test(
     "index-4.13",
     function()
         test:execsql "DROP TABLE test1"
-        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-4.13>
@@ -357,7 +357,7 @@ test:do_test(
 test:do_execsql_test(
     "index-6.1b",
     [[
-        SELECT name FROM _index WHERE name='INDEX1' union SELECT name FROM _space WHERE name='TEST1' OR name='TEST2'
+        SELECT "name" FROM "_index" WHERE "name"='INDEX1' union SELECT "name" FROM "_space" WHERE "name"='TEST1' OR "name"='TEST2'
     ]], {
         -- <index-6.1b>
         "INDEX1", "TEST1", "TEST2"
@@ -387,7 +387,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "index-6.2b",
     [[
-        SELECT name FROM _index WHERE name='INDEX1' union SELECT name FROM _space WHERE name='TEST1' OR name='TEST2'
+        SELECT "name" FROM "_index" WHERE "name"='INDEX1' union SELECT "name" FROM "_space" WHERE "name"='TEST1' OR "name"='TEST2'
     ]], {
         -- <index-6.2b>
         "INDEX1", "TEST1", "TEST2"
@@ -399,7 +399,7 @@ test:do_test(
     function()
         test:execsql "DROP TABLE test1"
         test:execsql "DROP TABLE test2"
-        return test:execsql "SELECT name FROM _space WHERE name='TEST1' OR name='TEST2'"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1' OR "name"='TEST2']]
         --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-6.3>
@@ -415,7 +415,7 @@ test:do_execsql_test(
         CREATE INDEX index2 ON test1(b);
         CREATE INDEX index3 ON test1(a,b);
         DROP TABLE test1;
-        SELECT name FROM _space WHERE name='TEST1';
+        SELECT "name" FROM "_space" WHERE "name"='TEST1';
     ]], {
         -- <index-6.4>
         
@@ -454,7 +454,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index-7.3",
     [[
-        SELECT name FROM _index WHERE name='sqlite_autoindex_TEST1_1'
+        SELECT "name" FROM "_index" WHERE "name"='sqlite_autoindex_TEST1_1'
     ]], {
         -- <index-7.3>
         "sqlite_autoindex_TEST1_1"
@@ -465,7 +465,7 @@ test:do_test(
     "index-7.4",
     function()
         test:execsql "DROP table test1"
-        return test:execsql "SELECT name FROM _space WHERE name='TEST1'"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
     end, {
         -- <index-7.4>
         
@@ -498,7 +498,7 @@ test:do_test(
         test:execsql "EXPLAIN CREATE INDEX idx1 ON tab1(a)"
 
 
-        return test:execsql "SELECT name FROM _space WHERE name='TAB1'"
+        return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TAB1']]
     end, {
         -- <index-9.1>
         "TAB1"
@@ -509,7 +509,7 @@ test:do_test(
     "index-9.2",
     function()
         test:execsql "CREATE INDEX idx1 ON tab1(a)"
-        return test:execsql "SELECT name FROM _index WHERE name='IDX1' union SELECT name FROM _space WHERE name='TAB1'"
+        return test:execsql [[SELECT "name" FROM "_index" WHERE "name"='IDX1' union SELECT "name" FROM "_space" WHERE "name"='TAB1']]
     end, {
         -- <index-9.2>
         "IDX1", "TAB1"
@@ -959,7 +959,7 @@ test:do_execsql_test(
     "index-16.1",
     [[
         CREATE TABLE t7(c UNIQUE PRIMARY KEY);
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
+        SELECT count(*) FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-16.1>
         1
@@ -971,7 +971,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c UNIQUE PRIMARY KEY);
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
+        SELECT count(*) FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-16.2>
         1
@@ -983,7 +983,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c PRIMARY KEY, UNIQUE(c) );
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
+        SELECT count(*) FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-16.3>
         1
@@ -995,7 +995,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c, d , UNIQUE(c, d), PRIMARY KEY(c, d) );
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
+        SELECT count(*) FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-16.4>
         1
@@ -1007,7 +1007,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c, d , UNIQUE(c), PRIMARY KEY(c, d) );
-        SELECT count(*) FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
+        SELECT count(*) FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-16.5>
         2
@@ -1024,7 +1024,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t7;
         CREATE TABLE t7(c, d UNIQUE, UNIQUE(c), PRIMARY KEY(c, d) );
-        SELECT _index.name FROM _index JOIN _space WHERE _index.id = _space.id AND _space.name='T7';
+        SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-17.1>
         "sqlite_autoindex_T7_3", "sqlite_autoindex_T7_2", "sqlite_autoindex_T7_1"

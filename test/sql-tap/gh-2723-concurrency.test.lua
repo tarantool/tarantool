@@ -27,7 +27,7 @@ end
 test:do_test(
     "concurrency:1",
     function()
-        return test:execsql("select count(*) from _space where name like 'table-2723-%'")[1]
+        return test:execsql([[select count(*) from "_space" where "name" like 'table-2723-%']])[1]
     end,
     0)
 
