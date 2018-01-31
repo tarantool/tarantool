@@ -56,7 +56,7 @@ replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 	return tt_uuid_compare(&a->uuid, &b->uuid);
 }
 
-rb_gen(static MAYBE_UNUSED, replica_hash_, replica_hash_t,
+rb_gen(MAYBE_UNUSED static, replica_hash_, replica_hash_t,
        struct replica, in_hash, replica_compare_by_uuid);
 
 #define replica_hash_foreach_safe(hash, item, next) \

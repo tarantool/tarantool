@@ -37,8 +37,15 @@ cn:call('unexists_procedure')
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 cn:call('test_foo', {'a', 'b', 'c'})
 cn:eval('return 2+2')
-
+cn:close()
+-- connect and call without usage access
 box.schema.user.grant('guest','execute','universe')
+box.schema.user.revoke('guest','usage','universe')
+box.session.su("guest")
+cn = remote.connect(LISTEN.host, LISTEN.service)
+cn:call('test_foo', {'a', 'b', 'c'})
+box.session.su("admin")
+box.schema.user.grant('guest','usage','universe')
 cn:close()
 cn = remote.connect(box.cfg.listen)
 

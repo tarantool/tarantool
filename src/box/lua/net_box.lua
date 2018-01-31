@@ -461,6 +461,8 @@ local function create_transport(host, port, user, password, callback)
                 local status = hdr[IPROTO_STATUS_KEY]
                 local response_schema_version = hdr[IPROTO_SCHEMA_VERSION_KEY]
                 if status ~= 0 then
+                    local body
+                    body, body_end = decode(body_rpos)
                     return error_sm(E_NO_CONNECTION, body[IPROTO_ERROR_KEY])
                 end
                 if schema_version == nil then

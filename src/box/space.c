@@ -59,8 +59,12 @@ access_check_space(struct space *space, user_access_t access)
 	 */
 	user_access_t space_access = access & ~cr->universal_access;
 
-	if (space_access && space->def->uid != cr->uid &&
-	    space_access & ~space->access[cr->auth_token].effective) {
+	if (space_access &&
+	    /* Check for missing Usage access, ignore owner rights. */
+	    (space_access & PRIV_U ||
+	     /* Check for missing specific access, respect owner rights. */
+	    (space->def->uid != cr->uid &&
+	     space_access & ~space->access[cr->auth_token].effective))) {
 		/*
 		 * Report access violation. Throw "no such user"
 		 * error if there is  no user with this id.
