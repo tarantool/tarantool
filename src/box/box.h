@@ -89,6 +89,14 @@ box_set_ro(bool ro);
 bool
 box_is_ro(void);
 
+/**
+ * Switch this instance from 'orphan' to 'running' state.
+ * Called on initial configuration as soon as this instance
+ * synchronizes with enough replicas to form a quorum.
+ */
+void
+box_clear_orphan(void);
+
 /** True if snapshot is in progress. */
 extern bool box_checkpoint_is_in_progress;
 /** Incremented with each next snapshot. */

@@ -107,6 +107,16 @@ cfg_getd(const char *param)
 	return val;
 }
 
+double
+cfg_getd_default(const char *param, double default_val)
+{
+	cfg_get(param);
+	int ok;
+	double val = lua_tonumberx(tarantool_L, -1, &ok);
+	return ok ? val : default_val;
+}
+
+
 int
 cfg_getarr_size(const char *name)
 {
