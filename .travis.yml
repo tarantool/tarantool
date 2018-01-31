@@ -26,13 +26,11 @@ env:
       - TARGET=coverage
       - OS=el DIST=6
       - OS=el DIST=7
-      - OS=fedora DIST=24
-      - OS=fedora DIST=25
       - OS=fedora DIST=26
+      - OS=fedora DIST=27
       - OS=ubuntu DIST=precise
       - OS=ubuntu DIST=trusty
       - OS=ubuntu DIST=xenial
-      - OS=ubuntu DIST=zesty
       - OS=debian DIST=wheezy
       - OS=debian DIST=jessie
       - OS=debian DIST=stretch
@@ -42,13 +40,11 @@ matrix:
       - TARGET=coverage
 #      - env: OS=el DIST=6
 #      - env: OS=el DIST=7
-#      - env: OS=fedora DIST=24
-#      - env: OS=fedora DIST=25
 #      - env: OS=fedora DIST=26
+#      - env: OS=fedora DIST=27
 #      - env: OS=ubuntu DIST=precise
 #      - env: OS=ubuntu DIST=trusty
 #      - env: OS=ubuntu DIST=xenial
-#      - env: OS=ubuntu DIST=zesty
 #      - env: OS=debian DIST=wheezy
 #      - env: OS=debian DIST=jessie
 #      - env: OS=debian DIST=stretch
@@ -57,19 +53,15 @@ matrix:
         os: osx
       - env: OS=el DIST=7
         os: osx
-      - env: OS=fedora DIST=24
-        os: osx
-      - env: OS=fedora DIST=25
-        os: osx
       - env: OS=fedora DIST=26
+        os: osx
+      - env: OS=fedora DIST=27
         os: osx
       - env: OS=ubuntu DIST=precise
         os: osx
       - env: OS=ubuntu DIST=trusty
         os: osx
       - env: OS=ubuntu DIST=xenial
-        os: osx
-      - env: OS=ubuntu DIST=zesty
         os: osx
       - env: OS=debian DIST=wheezy
         os: osx
