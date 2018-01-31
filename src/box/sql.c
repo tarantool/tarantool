@@ -481,11 +481,16 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 
 	struct space *ephemer_new_space = space_new_ephemeral(ephemer_space_def,
 							      &key_list);
+	if (ephemer_new_space == NULL) {
+		diag_log();
+		return SQLITE_TARANTOOL_ERROR;
+	}
 	struct ta_cursor *c = NULL;
 	c = cursor_create(c, field_count /* key size */);
-	if (!c)
+	if (!c) {
+		space_delete(ephemer_new_space);
 		return SQLITE_NOMEM;
-
+	}
 	c->ephem_space = ephemer_new_space;
 	pCur->pTaCursor = c;
 
@@ -521,7 +526,7 @@ int tarantoolSqlite3EphemeralInsert(BtCursor *pCur, const CursorPayload *pX)
 	return SQLITE_OK;
 }
 
-/* Simply delete ephemeral space calling space_delete(). */
+/* Simply delete ephemeral space calling space_delete_ephemeral(). */
 int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 {
 	assert(pCur);
@@ -529,7 +534,7 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 
 	struct ta_cursor *c = pCur->pTaCursor;
 	assert(c->ephem_space);
-	space_delete(c->ephem_space);
+	space_delete_ephemeral(c->ephem_space);
 
 	return SQLITE_OK;
 }
