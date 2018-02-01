@@ -408,11 +408,22 @@ enum {
 	GREETING_SALT_LEN_MAX = 44,
 };
 
+/**
+ * The server sends a greeting into a newly established socket,
+ * regardless of the socket protocol. This allows the connected
+ * client identify the protocol, server version and instance uuid.
+ * The greeting also contains a random salt which can be
+ * used to encode a password.
+ */
 struct greeting {
+	/** Peer version id. */
 	uint32_t version_id;
 	uint32_t salt_len;
+	/** Peer protocol - Binary or Console */
 	char protocol[GREETING_PROTOCOL_LEN_MAX + 1];
+	/** Peer instance uuid */
 	struct tt_uuid uuid;
+	/** Random salt. */
 	char salt[GREETING_SALT_LEN_MAX];
 };
 

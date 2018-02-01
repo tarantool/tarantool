@@ -2,7 +2,7 @@
 # Travis CI rules
 #
 
-DOCKER_IMAGE:=packpack/packpack:ubuntu-artful
+DOCKER_IMAGE:=packpack/packpack:debian-stretch
 
 all: package
 

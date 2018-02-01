@@ -850,6 +850,25 @@ x = 0
 for i = 1, N do x = x + long_call_channel:get() end
 x
 
-c:close()
+-- Check that a connection does not leak if there is
+-- a long CALL in progress when it is closed.
+disconnected = false
+function on_disconnect() disconnected = true end
+box.session.on_disconnect(on_disconnect) == on_disconnect
 
+ch1 = fiber.channel(1)
+ch2 = fiber.channel(1)
+function wait_signal() ch1:put(true) ch2:get() end
+_ = fiber.create(function() c:call('wait_signal') end)
+ch1:get()
+
+c:close()
+fiber.sleep(0)
+disconnected -- false
+
+ch2:put(true)
+fiber.sleep(0)
+disconnected -- true
+
+box.session.on_disconnect(nil, on_disconnect)
 box.schema.user.revoke('guest', 'execute', 'universe')

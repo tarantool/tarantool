@@ -228,7 +228,6 @@ done:
 	/* auth succeeded */
 	say_info("authenticated");
 	applier_set_state(applier, APPLIER_READY);
-
 }
 
 /**

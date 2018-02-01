@@ -289,7 +289,6 @@ fh:close()
 fio.path.is_file(tmpfile)
 fio.path.is_dir(tmpfile)
 fio.path.is_link(tmpfile)
-fio.path.is_mount(tmpfile)
 fio.path.exists(tmpfile)
 fio.path.lexists(tmpfile)
 
@@ -297,14 +296,12 @@ non_existing_file = "/no/such/file"
 fio.path.is_file(non_existing_file)
 fio.path.is_dir(non_existing_file)
 fio.path.is_link(non_existing_file)
-fio.path.is_mount(non_existing_file)
 fio.path.exists(non_existing_file)
 fio.path.lexists(non_existing_file)
 
 fio.path.is_file(tmpdir)
 fio.path.is_dir(tmpdir)
 fio.path.is_link(tmpdir)
-fio.path.is_mount(tmpdir)
 fio.path.exists(tmpdir)
 fio.path.lexists(tmpdir)
 
@@ -313,7 +310,6 @@ fio.symlink(tmpfile, link)
 fio.path.is_file(link)
 fio.path.is_dir(link)
 fio.path.is_link(link)
-fio.path.is_mount(link)
 fio.path.exists(link)
 fio.path.lexists(link)
 fio.unlink(link)
@@ -322,7 +318,6 @@ fio.symlink(non_existing_file, link)
 fio.path.is_file(link)
 fio.path.is_dir(link)
 fio.path.is_link(link)
-fio.path.is_mount(link)
 fio.path.exists(link)
 fio.path.lexists(link)
 fio.unlink(link)
@@ -331,29 +326,8 @@ fio.symlink(tmpdir, link)
 fio.path.is_file(link)
 fio.path.is_dir(link)
 fio.path.is_link(link)
-fio.path.is_mount(link)
 fio.path.exists(link)
 fio.path.lexists(link)
-
-fio.path.is_mount("/")
-
-test_run:cmd("setopt delimiter ';'")
--- create fake function lstat to test is_mount
-function fake_lstat(filename)
-    local inode = 0
-    local dev = 0
-    if filename == tmpfile then
-        inode = 1
-        dev = 1
-    end
-    return {dev = dev, inode = inode, is_link = function() return false end}
-end;
-test_run:cmd("setopt delimiter ''");
-
-lstat= fio.lstat
-fio.lstat = fake_lstat
-fio.path.is_mount(tmpfile)
-fio.lstat = lstat
 
 fio.unlink(link)
 fio.unlink(tmpfile)
