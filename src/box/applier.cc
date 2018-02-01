@@ -445,7 +445,18 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
-		coio_read_xrow(coio, ibuf, &row);
+		/*
+		 * Tarantool < 1.7.7 does not send periodic heartbeat
+		 * messages so we can't assume that if we haven't heard
+		 * from the master for quite a while the connection is
+		 * broken - the master might just be idle.
+		 */
+		if (applier->version_id < version_id(1, 7, 7)) {
+			coio_read_xrow(coio, ibuf, &row);
+		} else {
+			double timeout = replication_disconnect_timeout();
+			coio_read_xrow_timeout_xc(coio, ibuf, &row, timeout);
+		}
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error_xc(&row);  /* error */
