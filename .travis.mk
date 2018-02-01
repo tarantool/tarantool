@@ -2,7 +2,7 @@
 # Travis CI rules
 #
 
-DOCKER_IMAGE:=packpack/packpack:ubuntu-xenial
+DOCKER_IMAGE:=packpack/packpack:debian-stretch
 
 all: package
 
