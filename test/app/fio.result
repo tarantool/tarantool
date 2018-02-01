@@ -883,10 +883,6 @@ fio.path.is_link(tmpfile)
 ---
 - false
 ...
-fio.path.is_mount(tmpfile)
----
-- false
-...
 fio.path.exists(tmpfile)
 ---
 - true
@@ -910,10 +906,6 @@ fio.path.is_link(non_existing_file)
 ---
 - false
 ...
-fio.path.is_mount(non_existing_file)
----
-- false
-...
 fio.path.exists(non_existing_file)
 ---
 - false
@@ -931,10 +923,6 @@ fio.path.is_dir(tmpdir)
 - true
 ...
 fio.path.is_link(tmpdir)
----
-- false
-...
-fio.path.is_mount(tmpdir)
 ---
 - false
 ...
@@ -965,10 +953,6 @@ fio.path.is_link(link)
 ---
 - true
 ...
-fio.path.is_mount(link)
----
-- false
-...
 fio.path.exists(link)
 ---
 - true
@@ -996,10 +980,6 @@ fio.path.is_dir(link)
 fio.path.is_link(link)
 ---
 - true
-...
-fio.path.is_mount(link)
----
-- false
 ...
 fio.path.exists(link)
 ---
@@ -1029,10 +1009,6 @@ fio.path.is_link(link)
 ---
 - true
 ...
-fio.path.is_mount(link)
----
-- false
-...
 fio.path.exists(link)
 ---
 - true
@@ -1040,43 +1016,6 @@ fio.path.exists(link)
 fio.path.lexists(link)
 ---
 - true
-...
-fio.path.is_mount("/")
----
-- true
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
--- create fake function lstat to test is_mount
-function fake_lstat(filename)
-    local inode = 0
-    local dev = 0
-    if filename == tmpfile then
-        inode = 1
-        dev = 1
-    end
-    return {dev = dev, inode = inode, is_link = function() return false end}
-end;
----
-...
-test_run:cmd("setopt delimiter ''");
----
-- true
-...
-lstat= fio.lstat
----
-...
-fio.lstat = fake_lstat
----
-...
-fio.path.is_mount(tmpfile)
----
-- true
-...
-fio.lstat = lstat
----
 ...
 fio.unlink(link)
 ---
