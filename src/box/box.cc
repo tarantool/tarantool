@@ -103,6 +103,7 @@ static struct gc_consumer *backup_gc;
  */
 static bool is_box_configured = false;
 static bool is_ro = true;
+static fiber_cond ro_cond;
 
 /**
  * The following flag is set if the instance failed to
@@ -193,12 +194,28 @@ void
 box_set_ro(bool ro)
 {
 	is_ro = ro;
+	fiber_cond_broadcast(&ro_cond);
 }
 
 bool
 box_is_ro(void)
 {
 	return is_ro || is_orphan;
+}
+
+int
+box_wait_ro(bool ro, double timeout)
+{
+	double deadline = ev_monotonic_now(loop()) + timeout;
+	while (is_ro != ro) {
+		if (fiber_cond_wait_deadline(&ro_cond, deadline) != 0)
+			return -1;
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+	}
+	return 0;
 }
 
 void
@@ -1440,6 +1457,8 @@ box_free(void)
 		wal_thread_stop();
 		identifier_destroy();
 	}
+
+	fiber_cond_destroy(&ro_cond);
 }
 
 static void
@@ -1604,6 +1623,8 @@ tx_prio_cb(struct ev_loop *loop, ev_watcher *watcher, int events)
 void
 box_init(void)
 {
+	fiber_cond_create(&ro_cond);
+
 	user_cache_init();
 	/*
 	 * The order is important: to initialize sessions,

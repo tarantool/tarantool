@@ -1,3 +1,5 @@
+fiber = require('fiber')
+
 -- Test Lua from admin console. Whenever producing output,
 -- make sure it's a valid YAML
 box.info.unknown_variable
@@ -29,3 +31,39 @@ box.info().server.id == box.info.id
 box.info().server.uuid == box.info.uuid
 box.info().server.lsn == box.info.lsn
 box.info().ro == box.info.server.ro
+
+--
+-- box.ctl.wait_ro and box.ctl.wait_rw
+--
+box.ctl.wait_ro("abc") -- invalid argument
+box.ctl.wait_rw("def") -- invalid argument
+box.info.ro -- false
+box.ctl.wait_rw() -- success
+box.ctl.wait_ro(0.001) -- timeout
+box.cfg{read_only = true}
+box.ctl.wait_ro() -- success
+box.ctl.wait_rw(0.001) -- timeout
+
+status, err = nil
+f = fiber.create(function() status, err = pcall(box.ctl.wait_rw) end)
+fiber.sleep(0.001)
+f:cancel()
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+status, err -- fiber is cancelled
+box.cfg{read_only = false}
+status, err = nil
+f = fiber.create(function() status, err = pcall(box.ctl.wait_ro) end)
+fiber.sleep(0.001)
+f:cancel()
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+status, err -- fiber is cancelled
+
+ch = fiber.channel(1)
+_ = fiber.create(function() box.ctl.wait_ro() ch:put(box.info.ro) end)
+fiber.sleep(0.001)
+box.cfg{read_only = true}
+ch:get() -- true
+_ = fiber.create(function() box.ctl.wait_rw() ch:put(box.info.ro) end)
+fiber.sleep(0.001)
+box.cfg{read_only = false}
+ch:get() -- false
