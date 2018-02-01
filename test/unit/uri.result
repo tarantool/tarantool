@@ -1,4 +1,4 @@
-1..61
+1..63
     1..19
     ok 1 - host: parse
     ok 2 - host: scheme
@@ -1155,6 +1155,48 @@ ok 54 - subtests
     ok 19 - unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment: fragment
 ok 55 - subtests
     1..19
+    ok 1 - login:password@unix/:/path1/path2/path3: parse
+    ok 2 - login:password@unix/:/path1/path2/path3: scheme
+    ok 3 - login:password@unix/:/path1/path2/path3: login
+    ok 4 - login:password@unix/:/path1/path2/path3: password
+    ok 5 - login:password@unix/:/path1/path2/path3: host
+    ok 6 - login:password@unix/:/path1/path2/path3: service
+    ok 7 - login:password@unix/:/path1/path2/path3: path
+    ok 8 - login:password@unix/:/path1/path2/path3: query
+    ok 9 - login:password@unix/:/path1/path2/path3: fragment
+    ok 10 - login:password@unix/:/path1/path2/path3: host_hint
+    ok 11 - login:password@unix/:/path1/path2/path3: parse
+    ok 12 - login:password@unix/:/path1/path2/path3: scheme
+    ok 13 - login:password@unix/:/path1/path2/path3: login
+    ok 14 - login:password@unix/:/path1/path2/path3: password
+    ok 15 - login:password@unix/:/path1/path2/path3: host
+    ok 16 - login:password@unix/:/path1/path2/path3: service
+    ok 17 - login:password@unix/:/path1/path2/path3: path
+    ok 18 - login:password@unix/:/path1/path2/path3: query
+    ok 19 - login:password@unix/:/path1/path2/path3: fragment
+ok 56 - subtests
+    1..19
+    ok 1 - login:password@unix/:/path1/path2/path3:: parse
+    ok 2 - login:password@unix/:/path1/path2/path3:: scheme
+    ok 3 - login:password@unix/:/path1/path2/path3:: login
+    ok 4 - login:password@unix/:/path1/path2/path3:: password
+    ok 5 - login:password@unix/:/path1/path2/path3:: host
+    ok 6 - login:password@unix/:/path1/path2/path3:: service
+    ok 7 - login:password@unix/:/path1/path2/path3:: path
+    ok 8 - login:password@unix/:/path1/path2/path3:: query
+    ok 9 - login:password@unix/:/path1/path2/path3:: fragment
+    ok 10 - login:password@unix/:/path1/path2/path3:: host_hint
+    ok 11 - login:password@unix/:/path1/path2/path3:: parse
+    ok 12 - login:password@unix/:/path1/path2/path3:: scheme
+    ok 13 - login:password@unix/:/path1/path2/path3:: login
+    ok 14 - login:password@unix/:/path1/path2/path3:: password
+    ok 15 - login:password@unix/:/path1/path2/path3:: host
+    ok 16 - login:password@unix/:/path1/path2/path3:: service
+    ok 17 - login:password@unix/:/path1/path2/path3:: path
+    ok 18 - login:password@unix/:/path1/path2/path3:: query
+    ok 19 - login:password@unix/:/path1/path2/path3:: fragment
+ok 57 - subtests
+    1..19
     ok 1 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: parse
     ok 2 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: scheme
     ok 3 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: login
@@ -1174,7 +1216,7 @@ ok 55 - subtests
     ok 17 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: path
     ok 18 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: query
     ok 19 - scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3: fragment
-ok 56 - subtests
+ok 58 - subtests
     1..19
     ok 1 - unix/:./relative/path.sock:/test: parse
     ok 2 - unix/:./relative/path.sock:/test: scheme
@@ -1195,7 +1237,7 @@ ok 56 - subtests
     ok 17 - unix/:./relative/path.sock:/test: path
     ok 18 - unix/:./relative/path.sock:/test: query
     ok 19 - unix/:./relative/path.sock:/test: fragment
-ok 57 - subtests
+ok 59 - subtests
     1..19
     ok 1 - scheme://unix/:./relative/path.sock:/test: parse
     ok 2 - scheme://unix/:./relative/path.sock:/test: scheme
@@ -1216,7 +1258,7 @@ ok 57 - subtests
     ok 17 - scheme://unix/:./relative/path.sock:/test: path
     ok 18 - scheme://unix/:./relative/path.sock:/test: query
     ok 19 - scheme://unix/:./relative/path.sock:/test: fragment
-ok 58 - subtests
+ok 60 - subtests
     1..19
     ok 1 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: parse
     ok 2 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: scheme
@@ -1237,7 +1279,7 @@ ok 58 - subtests
     ok 17 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: path
     ok 18 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: query
     ok 19 - http://tarantool.org/dist/master/debian/pool/main/t/tarantool/tarantool_1.6.3+314+g91066ee+20140910+1434.orig.tar.gz: fragment
-ok 59 - subtests
+ok 61 - subtests
     1..19
     ok 1 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: parse
     ok 2 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: scheme
@@ -1258,8 +1300,8 @@ ok 59 - subtests
     ok 17 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: path
     ok 18 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: query
     ok 19 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: fragment
-ok 60 - subtests
+ok 62 - subtests
     1..2
     ok 1 - empty is invalid
     ok 2 - :// is invalid
-ok 61 - subtests
+ok 63 - subtests

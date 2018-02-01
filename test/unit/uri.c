@@ -62,7 +62,7 @@ test_invalid()
 int
 main(void)
 {
-	plan(61);
+	plan(63);
 
 	/* General */
 	test("host", NULL, NULL, NULL, "host", NULL, NULL, NULL, NULL, 0);
@@ -202,11 +202,12 @@ main(void)
 	test("unix/:/path1/path2/path3:/p1/p2?q1=v1&q2=v2#fragment",
 	     NULL, NULL, NULL, "unix/", "/path1/path2/path3", "/p1/p2",
 	     "q1=v1&q2=v2", "fragment", 3);
-#if 0
-	/* Broken due to grammar limitations. */
+	/* fixed grammar #2933 */
 	test("login:password@unix/:/path1/path2/path3", NULL, "login",
 	     "password", "unix/", "/path1/path2/path3", NULL, NULL, NULL, 3);
-#endif
+	test("login:password@unix/:/path1/path2/path3:", NULL, "login",
+	     "password", "unix/", "/path1/path2/path3", NULL, NULL, NULL, 3);
+
 	test("scheme://login:password@unix/:/tmp/unix.sock:/path1/path2/path3",
 	     "scheme", "login", "password", "unix/", "/tmp/unix.sock",
 	     "/path1/path2/path3", NULL, NULL, 3);

@@ -91,6 +91,11 @@ uri_parse(struct uri *uri, const char *p)
 		     | path_rootless   # begins with a segment
 		     | path_empty;     # zero characters
 
+		socket_path_absolute = ("/" segment_nz_nc)+;
+		socket_path_relative = ("." socket_path_absolute);
+		socket_path = socket_path_absolute
+		     | socket_path_relative;
+
 		reg_name = (unreserved | pct_encoded | sub_delims)+
 			>{ s = p; }
 			%{ uri->host = s; uri->host_len = p - s;};
@@ -127,7 +132,7 @@ uri_parse(struct uri *uri, const char *p)
 			};
 		}
 		# Non-standard: "unix/" support
-		unix = ("unix/:" %{ s = p;} path) %unix;
+		unix = ("unix/:" %{ s = p;} socket_path) %unix;
 
 		service = (digit+ | alpha*)
 			>{ s = p; }
@@ -160,7 +165,8 @@ uri_parse(struct uri *uri, const char *p)
 		#	 path_empty;
 
 		# Non-standard: allow URI without scheme
-		hier_part_noscheme = (((authority %{ s = p; } path_abempty?
+		hier_part_noscheme = (((userinfo "@" unix) %{ s = p; }) |
+				((authority %{ s = p; } path_abempty?
 					  | path_absolute?
 					  | path_rootless?
 					  | path_empty?
