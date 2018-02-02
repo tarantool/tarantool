@@ -924,8 +924,8 @@ static const struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX] = {
 	call_route,                             /* IPROTO_EVAL */
 	process1_route,                         /* IPROTO_UPSERT */
 	call_route,                             /* IPROTO_CALL */
-	NULL,                                   /* IPROTO_NOP */
 	sql_route,                              /* IPROTO_EXECUTE */
+	NULL,                                   /* IPROTO_NOP */
 };
 
 static const struct cmsg_hop join_route[] = {

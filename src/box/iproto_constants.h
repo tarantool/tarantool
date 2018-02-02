@@ -174,10 +174,10 @@ enum iproto_type {
 	IPROTO_UPSERT = 9,
 	/** CALL request - returns arbitrary MessagePack */
 	IPROTO_CALL = 10,
-	/** No operation. Treated as DML, used to bump LSN. */
-	IPROTO_NOP = 11,
 	/** Execute an SQL statement. */
-	IPROTO_EXECUTE = 12,
+	IPROTO_EXECUTE = 11,
+	/** No operation. Treated as DML, used to bump LSN. */
+	IPROTO_NOP = 12,
 	/** The maximum typecode used for box.stat() */
 	IPROTO_TYPE_STAT_MAX,
 
