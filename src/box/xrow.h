@@ -41,6 +41,8 @@
 extern "C" {
 #endif
 
+struct vclock;
+
 enum {
 	XROW_HEADER_IOVMAX = 1,
 	XROW_BODY_IOVMAX = 2,
@@ -220,7 +222,6 @@ xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len, const char *password,
 		 size_t password_len);
 
-struct vclock;
 /**
  * Encode SUBSCRIBE command.
  * @param[out] Row.
@@ -264,6 +265,20 @@ int
 xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
 
 /**
+ * Decode JOIN command.
+ * @param row Row to decode.
+ * @param[out] instance_uuid.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or format error.
+ */
+static inline int
+xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
+{
+	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL);
+}
+
+/**
  * Encode end of stream command (a response to JOIN command).
  * @param row[out] Row to encode into.
  * @param vclock.
@@ -273,6 +288,20 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
  */
 int
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+
+/**
+ * Decode end of stream command (a response to JOIN command).
+ * @param row Row to decode.
+ * @param[out] vclock.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or format error.
+ */
+static inline int
+xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
+{
+	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL);
+}
 
 /**
  * Encode a heartbeat message.
@@ -319,7 +348,7 @@ void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		    uint32_t schema_version, uint32_t count);
 
-/*
+/**
  * Encode iproto header with IPROTO_OK response code.
  * @param out Encode to.
  * @param sync Request sync.
@@ -425,9 +454,7 @@ xrow_decode_error(struct xrow_header *row);
 #if defined(__cplusplus)
 } /* extern "C" */
 
-/**
- * @copydoc xrow_header_decode()
- */
+/** @copydoc xrow_header_decode. */
 static inline void
 xrow_header_decode_xc(struct xrow_header *header, const char **pos,
 		      const char *end)
@@ -454,6 +481,7 @@ xrow_decode_error_xc(struct xrow_header *row)
 	diag_raise();
 }
 
+/** @copydoc xrow_decode_dml. */
 static inline void
 xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 		   uint64_t key_map)
@@ -462,6 +490,7 @@ xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 		diag_raise();
 }
 
+/** @copydoc xrow_encode_dml. */
 static inline int
 xrow_encode_dml_xc(const struct request *request, struct iovec *iov)
 {
@@ -533,15 +562,12 @@ xrow_encode_join_xc(struct xrow_header *row,
 		diag_raise();
 }
 
-/**
- * \brief Decode JOIN command
- * \param row
- * \param[out] instance_uuid
-*/
+/** @copydoc xrow_decode_join. */
 static inline void
-xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
+xrow_decode_join_xc(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	xrow_decode_subscribe_xc(row, NULL, instance_uuid, NULL, NULL);
+	if (xrow_decode_join(row, instance_uuid) != 0)
+		diag_raise();
 }
 
 /** @copydoc xrow_encode_vclock. */
@@ -552,26 +578,12 @@ xrow_encode_vclock_xc(struct xrow_header *row, const struct vclock *vclock)
 		diag_raise();
 }
 
-/**
- * \brief Decode end of stream command (a response to JOIN command)
- * \param row
- * \param[out] vclock
-*/
-static inline int
-xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
-{
-	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL);
-}
-
-/**
- * \brief Decode end of stream command (a response to JOIN command)
- * \param row
- * \param[out] vclock
-*/
+/** @copydoc xrow_decode_vclock. */
 static inline void
 xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
 {
-	xrow_decode_subscribe_xc(row, NULL, NULL, vclock, NULL);
+	if (xrow_decode_vclock(row, vclock) != 0)
+		diag_raise();
 }
 
 /** @copydoc iproto_reply_ok. */

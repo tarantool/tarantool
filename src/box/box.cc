@@ -1214,7 +1214,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Decode JOIN request */
 	struct tt_uuid instance_uuid = uuid_nil;
-	xrow_decode_join(header, &instance_uuid);
+	xrow_decode_join_xc(header, &instance_uuid);
 
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
