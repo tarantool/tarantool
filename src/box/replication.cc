@@ -233,12 +233,9 @@ replica_on_applier_connect(struct replica *replica)
 {
 	struct applier *applier = replica->applier;
 
-	if (!tt_uuid_is_nil(&replica->uuid)) {
-		assert(tt_uuid_is_equal(&replica->uuid, &applier->uuid));
-		return;
-	}
-
+	assert(tt_uuid_is_nil(&replica->uuid));
 	assert(!tt_uuid_is_nil(&applier->uuid));
+
 	replica->uuid = applier->uuid;
 
 	replicaset.applier.connected++;
@@ -271,6 +268,33 @@ replica_on_applier_connect(struct replica *replica)
 }
 
 static void
+replica_on_applier_reconnect(struct replica *replica)
+{
+	struct applier *applier = replica->applier;
+
+	assert(!tt_uuid_is_nil(&replica->uuid));
+	assert(!tt_uuid_is_nil(&applier->uuid));
+
+	if (tt_uuid_is_equal(&replica->uuid, &applier->uuid))
+		return;
+
+	/*
+	 * Master's UUID changed, most likely because it was
+	 * rebootstrapped. Try to look up a replica matching
+	 * the new UUID and reassign the applier to it.
+	 */
+	struct replica *new_replica = replica_by_uuid(&applier->uuid);
+	if (new_replica == NULL || new_replica->applier != NULL) {
+		tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
+			  tt_uuid_str(&replica->uuid),
+			  tt_uuid_str(&applier->uuid));
+	}
+
+	replica_set_applier(new_replica, applier);
+	replica_clear_applier(replica);
+}
+
+static void
 replica_on_applier_state_f(struct trigger *trigger, void *event)
 {
 	(void)event;
@@ -278,7 +302,10 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 			struct replica, on_applier_state);
 	switch (replica->applier->state) {
 	case APPLIER_CONNECTED:
-		replica_on_applier_connect(replica);
+		if (tt_uuid_is_nil(&replica->uuid))
+			replica_on_applier_connect(replica);
+		else
+			replica_on_applier_reconnect(replica);
 		break;
 	case APPLIER_FOLLOW:
 		replica_on_applier_sync(replica);

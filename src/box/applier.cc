@@ -182,19 +182,6 @@ applier_connect(struct applier *applier)
 			  "Unsupported protocol for replication");
 	}
 
-	/*
-	 * Forbid changing UUID dynamically on connect because
-	 * applier is registered by UUID in the replica set.
-	 */
-	if (!tt_uuid_is_nil(&applier->uuid) &&
-	    !tt_uuid_is_equal(&applier->uuid, &greeting.uuid)) {
-		Exception *e = tnt_error(ClientError, ER_INSTANCE_UUID_MISMATCH,
-					 tt_uuid_str(&applier->uuid),
-					 tt_uuid_str(&greeting.uuid));
-		applier_log_error(applier, e);
-		e->raise();
-	}
-
 	if (applier->version_id != greeting.version_id) {
 		say_info("remote master is %u.%u.%u at %s\r\n",
 			 version_id_major(greeting.version_id),
