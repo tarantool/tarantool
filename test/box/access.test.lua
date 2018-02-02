@@ -50,7 +50,7 @@ end;
 usermax();
 test_run:cmd("setopt delimiter ''");
 box.schema.user.create('rich')
-box.schema.user.grant('rich', 'read,write,create', 'universe')
+box.schema.user.grant('rich', 'read,write', 'universe')
 session.su('rich')
 uid = session.uid()
 box.schema.func.create('dummy')
@@ -63,7 +63,6 @@ box.schema.user.revoke('rich', 'public')
 box.schema.user.disable("rich")
 -- test double disable is a no op
 box.schema.user.disable("rich")
-box.schema.user.revoke('rich', 'create', 'universe')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 
@@ -154,7 +153,7 @@ box.schema.user.drop('testus')
 -- ------------------------------------------------------------
 session = box.session
 box.schema.user.create('uniuser')
-box.schema.user.grant('uniuser', 'read, write, execute, create, drop', 'universe')
+box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
 session.su('uniuser')
 us = box.schema.space.create('uniuser_space')
 session.su('admin')
@@ -167,10 +166,10 @@ box.schema.user.drop('uniuser')
 -- only by its creator at the moment
 -- ------------------------------------------------------------
 box.schema.user.create('grantor')
-box.schema.user.grant('grantor', 'read, write, execute, create, drop', 'universe')
+box.schema.user.grant('grantor', 'read, write, execute', 'universe')
 session.su('grantor')
 box.schema.user.create('grantee')
-box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
+box.schema.user.grant('grantee', 'read, write, execute', 'universe')
 session.su('grantee')
 -- fails - can't suicide - ask the creator to kill you
 box.schema.user.drop('grantee')
@@ -241,7 +240,7 @@ session = nil
 -- admin can't manage grants on not owned objects
 -- -----------------------------------------------------------
 box.schema.user.create('twostep')
-box.schema.user.grant('twostep', 'read,write,execute,create,drop', 'universe')
+box.schema.user.grant('twostep', 'read,write,execute', 'universe')
 box.session.su('twostep')
 twostep = box.schema.space.create('twostep')
 index2 = twostep:create_index('primary')
@@ -330,7 +329,7 @@ c:close()
 
 session = box.session
 box.schema.user.create('test')
-box.schema.user.grant('test', 'read,write,create,alter', 'universe')
+box.schema.user.grant('test', 'read,write', 'universe')
 session.su('test')
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 session.su('admin')
@@ -501,33 +500,38 @@ box.schema.user.create("tester")
 s = box.schema.space.create("test")
 u = box.schema.user.create("test")
 f = box.schema.func.create("test")
-box.schema.user.grant("tester", "read,write,execute", "universe")
+box.schema.user.grant("tester", "read,execute", "universe")
 
 -- failed create
-box.session.su("tester", box.schema.space.create, "testy")
-box.session.su("tester", box.schema.user.create, 'test1')
-box.session.su("tester", box.schema.func.create, 'test1')
+box.session.su("tester", box.schema.space.create, "test_space")
+box.session.su("tester", box.schema.user.create, 'test_user')
+box.session.su("tester", box.schema.func.create, 'test_func')
 
-box.schema.user.grant("tester", "create", "universe")
+--
+-- FIXME 2.0: we still need to grant 'write' on universe
+-- explicitly since we still use process_rw to write to system
+-- tables from ddl
+--
+box.schema.user.grant("tester", "create,write", "universe")
 -- successful create
-s1 = box.session.su("tester", box.schema.space.create, "testy")
-_ = box.session.su("tester", box.schema.user.create, 'test1')
-_ = box.session.su("tester", box.schema.func.create, 'test1')
+s1 = box.session.su("tester", box.schema.space.create, "test_space")
+_ = box.session.su("tester", box.schema.user.create, 'test_user')
+_ = box.session.su("tester", box.schema.func.create, 'test_func')
 
 -- successful drop of owned objects
 _ = box.session.su("tester", s1.drop, s1)
-_ = box.session.su("tester", box.schema.user.drop, 'test1')
-_ = box.session.su("tester", box.schema.func.drop, 'test1')
+_ = box.session.su("tester", box.schema.user.drop, 'test_user')
+_ = box.session.su("tester", box.schema.func.drop, 'test_func')
 
 -- failed alter
-box.session.su("tester", s.format, s, {name="id", type="unsigned"})
+-- box.session.su("tester", s.format, s, {name="id", type="unsigned"})
 
-box.schema.user.grant("tester", "alter", "universe")
+-- box.schema.user.grant("tester", "alter", "universe")
 -- successful alter
-box.session.su("tester", s.format, s, {name="id", type="unsigned"})
+-- box.session.su("tester", s.format, s, {name="id", type="unsigned"})
 
 -- failed drop
-box.session.su("tester", s.drop, s)
+-- box.session.su("tester", s.drop, s)
 
 -- can't use here sudo
 -- because drop use sudo inside
@@ -545,5 +549,4 @@ box.session.su("tester", box.schema.user.drop, "test")
 box.session.su("tester", box.schema.func.drop, "test")
 
 box.session.su("admin")
-box.schema.user.revoke("tester", "read,write,execute,create,drop,alter", "universe")
 box.schema.user.drop("tester")

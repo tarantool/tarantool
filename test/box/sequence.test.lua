@@ -428,7 +428,6 @@ box.schema.user.grant('user', 'read', 'space', '_priv')
 box.schema.user.grant('user', 'read', 'space', '_user')
 box.schema.user.grant('user', 'read', 'space', '_space')
 box.schema.user.grant('user', 'read', 'space', '_sequence')
-box.schema.user.grant('user', 'create', 'universe')
 sq = box.schema.sequence.create('seq')
 box.schema.user.grant('user', 'write', 'sequence', 'test') -- error: no such sequence
 box.schema.user.grant('user', 'write', 'sequence', 'seq') -- ok

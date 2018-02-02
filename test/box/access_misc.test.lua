@@ -79,7 +79,7 @@ s:select()
 -- and create this user session
 --
 box.schema.user.create('uniuser')
-box.schema.user.grant('uniuser', 'read, write, execute,create', 'universe')
+box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
 session.su('uniuser')
 uid = session.uid()
 --
@@ -131,7 +131,7 @@ box.schema.func.drop('uniuser_func')
 box.schema.user.drop('someuser')
 box.schema.user.drop('uniuser_testus')
 box.schema.user.drop('uniuser')
-box.space._user:delete(uid)
+_ = box.space._user:delete(uid)
 s:drop()
 --
 -- Check write grant on _user
@@ -140,24 +140,23 @@ box.schema.user.create('testuser')
 maxuid = box.space._user.index.primary:max()[1]
 
 box.schema.user.grant('testuser', 'write', 'space', '_user')
-box.schema.user.grant('testuser', 'create', 'universe')
 session.su('testuser')
 testuser_uid = session.uid()
-box.space._user:delete(2)
+_ = box.space._user:delete(2)
 box.space._user:select(1)
 uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP}[1]
-box.space._user:delete(uid)
+_ = box.space._user:delete(uid)
 
 session.su('admin')
 box.space._user:select(1)
-box.space._user:delete(testuser_uid)
+_ = box.space._user:delete(testuser_uid)
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 --
 -- Check read grant on _user
 --
 box.schema.user.grant('testuser', 'read', 'space', '_user')
 session.su('testuser')
-box.space._user:delete(2)
+_  = box.space._user:delete(2)
 box.space._user:select(1)
 box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 
@@ -173,7 +172,7 @@ box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'unsigned'}
 
 
 session.su('admin')
-box.schema.user.revoke('testuser', 'create,usage,session', 'universe')
+box.schema.user.revoke('testuser', 'usage,session', 'universe')
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 box.schema.user.grant('testuser', 'usage,session', 'universe')
 --

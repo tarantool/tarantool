@@ -1281,9 +1281,6 @@ box.schema.user.grant('user', 'read', 'space', '_space')
 box.schema.user.grant('user', 'read', 'space', '_sequence')
 ---
 ...
-box.schema.user.grant('user', 'create', 'universe')
----
-...
 sq = box.schema.sequence.create('seq')
 ---
 ...
@@ -1358,7 +1355,7 @@ box.schema.user.info()
   - - read
     - space
     - _priv
-  - - session,usage,create
+  - - session,usage
     - universe
     - 
 ...
@@ -1539,11 +1536,11 @@ _ = s2:create_index('pk', {sequence = 'seq1'}) -- error
 ...
 s1.index.pk:alter({sequence = 'seq1'}) -- error
 ---
-- error: Alter access to space 'space1' is denied for user 'user'
+- error: Create access to sequence 'seq1' is denied for user 'user'
 ...
 box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
 ---
-- error: Alter access to space 'space1' is denied for user 'user'
+- error: Create access to sequence 'seq1' is denied for user 'user'
 ...
 box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
 ---
