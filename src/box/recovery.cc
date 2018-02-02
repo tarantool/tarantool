@@ -330,19 +330,24 @@ recovery_finalize(struct recovery *r, struct xstream *stream)
 	recovery_close_log(r);
 
 	/*
-	 * Check that the last xlog file has rows.
+	 * Check if next xlog exists. If it's true this xlog is
+	 * corrupted and we should rename it (to avoid getting
+	 * problem on the next xlog write with the same name).
+	 * Possible reasons are:
+	 *  - last xlog has corrupted rows
+	 *  - last xlog has corrupted header
+	 *  - last xlog has zero size
 	 */
-	if (vclockset_last(&r->wal_dir.index) != NULL &&
-	    vclock_sum(&r->vclock) ==
-	    vclock_sum(vclockset_last(&r->wal_dir.index))) {
-		/*
-		 * Delete the last empty xlog file.
-		 */
-		char *name = xdir_format_filename(&r->wal_dir,
-						  vclock_sum(&r->vclock),
-						  NONE);
-		if (unlink(name) != 0) {
-			tnt_raise(SystemError, "%s: failed to unlink file",
+	char *name = xdir_format_filename(&r->wal_dir,
+					  vclock_sum(&r->vclock),
+					  NONE);
+	if (access(name, F_OK) == 0) {
+		say_info("rename corrupted xlog %s", name);
+		char to[PATH_MAX];
+		snprintf(to, sizeof(to), "%s.corrupted", name);
+		if (rename(name, to) != 0) {
+			tnt_raise(SystemError,
+				  "%s: can't rename corrupted xlog",
 				  name);
 		}
 	}
@@ -529,4 +534,3 @@ recovery_stop_local(struct recovery *r)
 }
 
 /* }}} */
-

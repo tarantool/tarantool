@@ -55,7 +55,7 @@ _ = test_run:cmd("switch default")
 
 _ = test_run:cmd("switch autobootstrap1")
 u1 = box.schema.user.create('test_u')
-box.schema.user.grant('test_u', 'read,write', 'universe')
+box.schema.user.grant('test_u', 'read,write,create', 'universe')
 box.session.su('test_u')
 _ = box.schema.space.create('test_u'):create_index('pk')
 box.session.su('admin')

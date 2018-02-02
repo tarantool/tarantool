@@ -131,7 +131,7 @@ box.schema.func.drop('uniuser_func')
 box.schema.user.drop('someuser')
 box.schema.user.drop('uniuser_testus')
 box.schema.user.drop('uniuser')
-box.space._user:delete(uid)
+_ = box.space._user:delete(uid)
 s:drop()
 --
 -- Check write grant on _user
@@ -142,21 +142,21 @@ maxuid = box.space._user.index.primary:max()[1]
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 session.su('testuser')
 testuser_uid = session.uid()
-box.space._user:delete(2)
+_ = box.space._user:delete(2)
 box.space._user:select(1)
 uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP}[1]
-box.space._user:delete(uid)
+_ = box.space._user:delete(uid)
 
 session.su('admin')
 box.space._user:select(1)
-box.space._user:delete(testuser_uid)
+_ = box.space._user:delete(testuser_uid)
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 --
 -- Check read grant on _user
 --
 box.schema.user.grant('testuser', 'read', 'space', '_user')
 session.su('testuser')
-box.space._user:delete(2)
+_  = box.space._user:delete(2)
 box.space._user:select(1)
 box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 

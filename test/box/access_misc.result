@@ -318,7 +318,7 @@ box.schema.user.drop('uniuser_testus')
 box.schema.user.drop('uniuser')
 ---
 ...
-box.space._user:delete(uid)
+_ = box.space._user:delete(uid)
 ---
 ...
 s:drop()
@@ -342,7 +342,7 @@ session.su('testuser')
 testuser_uid = session.uid()
 ---
 ...
-box.space._user:delete(2)
+_ = box.space._user:delete(2)
 ---
 - error: Drop access to user 'public' is denied for user 'testuser'
 ...
@@ -353,9 +353,8 @@ box.space._user:select(1)
 uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP}[1]
 ---
 ...
-box.space._user:delete(uid)
+_ = box.space._user:delete(uid)
 ---
-- [33, 32, 'someone', 'user', {}]
 ...
 session.su('admin')
 ---
@@ -364,7 +363,7 @@ box.space._user:select(1)
 ---
 - - [1, 1, 'admin', 'user', {}]
 ...
-box.space._user:delete(testuser_uid)
+_ = box.space._user:delete(testuser_uid)
 ---
 - error: 'Failed to drop user or role ''testuser'': the user has objects'
 ...
@@ -380,7 +379,7 @@ box.schema.user.grant('testuser', 'read', 'space', '_user')
 session.su('testuser')
 ---
 ...
-box.space._user:delete(2)
+_  = box.space._user:delete(2)
 ---
 - error: Write access to space '_user' is denied for user 'testuser'
 ...

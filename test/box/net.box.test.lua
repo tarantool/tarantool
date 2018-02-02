@@ -867,7 +867,7 @@ fiber.sleep(0)
 disconnected -- false
 
 ch2:put(true)
-fiber.sleep(0)
+while disconnected == false do fiber.sleep(0.01) end
 disconnected -- true
 
 box.session.on_disconnect(nil, on_disconnect)

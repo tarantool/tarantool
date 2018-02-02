@@ -120,6 +120,13 @@ applier_writer_f(va_list ap)
 			coio_write_xrow(&io, &xrow);
 		} catch (SocketError *e) {
 			/*
+			 * There is no point trying to send ACKs if
+			 * the master closed its end - we would only
+			 * spam the log - so exit immediately.
+			 */
+			if (e->get_errno() == EPIPE)
+				break;
+			/*
 			 * Do not exit, if there is a network error,
 			 * the reader fiber will reconnect for us
 			 * and signal our cond afterwards.
