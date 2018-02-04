@@ -227,6 +227,10 @@ struct vy_index {
 	 * have a particular number of runs.
 	 */
 	struct histogram *run_hist;
+	/** Size of memory used for bloom filters. */
+	size_t bloom_size;
+	/** Size of memory used for page index. */
+	size_t page_index_size;
 	/**
 	 * Incremented for each change of the mem list,
 	 * to invalidate iterators.
@@ -292,6 +296,10 @@ vy_index_validate_formats(const struct vy_index *index);
 /** Return index name. Used for logging. */
 const char *
 vy_index_name(struct vy_index *index);
+
+/** Return sum size of memory tree extents. */
+size_t
+vy_index_mem_tree_size(struct vy_index *index);
 
 /** Allocate a new index object. */
 struct vy_index *

@@ -120,6 +120,16 @@ vy_index_name(struct vy_index *index)
 	return buf;
 }
 
+size_t
+vy_index_mem_tree_size(struct vy_index *index)
+{
+	struct vy_mem *mem;
+	size_t size = index->mem->tree_extent_size;
+	rlist_foreach_entry(mem, &index->sealed, in_sealed)
+		size += mem->tree_extent_size;
+	return size;
+}
+
 struct vy_index *
 vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	     struct vy_mem_env *mem_env, struct index_def *index_def,
@@ -692,6 +702,9 @@ vy_index_add_run(struct vy_index *index, struct vy_run *run)
 	index->run_count++;
 	vy_disk_stmt_counter_add(&index->stat.disk.count, &run->count);
 
+	index->bloom_size += bloom_store_size(&run->info.bloom);
+	index->page_index_size += run->page_index_size;
+
 	index->env->bloom_size += bloom_store_size(&run->info.bloom);
 	index->env->page_index_size += run->page_index_size;
 }
@@ -704,6 +717,9 @@ vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 	rlist_del_entry(run, in_index);
 	index->run_count--;
 	vy_disk_stmt_counter_sub(&index->stat.disk.count, &run->count);
+
+	index->bloom_size -= bloom_store_size(&run->info.bloom);
+	index->page_index_size -= run->page_index_size;
 
 	index->env->bloom_size -= bloom_store_size(&run->info.bloom);
 	index->env->page_index_size -= run->page_index_size;

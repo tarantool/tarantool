@@ -429,6 +429,7 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	info_append_int(h, "lookup", stat->memory.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
 	info_table_end(h);
+	info_append_int(h, "index_size", vy_index_mem_tree_size(index));
 	info_table_end(h);
 
 	info_table_begin(h, "disk");
@@ -444,6 +445,8 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	info_table_end(h);
 	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
 	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
+	info_append_int(h, "index_size", index->page_index_size);
+	info_append_int(h, "bloom_size", index->bloom_size);
 	info_table_end(h);
 
 	info_table_begin(h, "cache");
@@ -453,6 +456,8 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	vy_info_append_stmt_counter(h, "put", &cache_stat->put);
 	vy_info_append_stmt_counter(h, "invalidate", &cache_stat->invalidate);
 	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
+	info_append_int(h, "index_size",
+			vy_cache_tree_mem_used(&index->cache.cache_tree));
 	info_table_end(h);
 
 	info_table_begin(h, "txw");

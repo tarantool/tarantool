@@ -133,6 +133,7 @@ istat()
     invalidate:
       rows: 0
       bytes: 0
+    index_size: 0
     rows: 0
     evict:
       rows: 0
@@ -150,6 +151,9 @@ istat()
     rows: 0
     bytes: 0
   disk:
+    index_size: 0
+    rows: 0
+    bytes: 0
     dump:
       in:
         rows: 0
@@ -166,7 +170,6 @@ istat()
       out:
         rows: 0
         bytes: 0
-    rows: 0
     iterator:
       read:
         bytes_compressed: 0
@@ -182,7 +185,7 @@ istat()
         bytes: 0
     pages: 0
     bytes_compressed: 0
-    bytes: 0
+    bloom_size: 0
   txw:
     bytes: 0
     rows: 0
@@ -194,6 +197,7 @@ istat()
   run_histogram: '[0]:1'
   memory:
     bytes: 0
+    index_size: 0
     rows: 0
     iterator:
       lookup: 0
@@ -260,10 +264,12 @@ stat_diff(istat(), st)
       out:
         rows: 25
         bytes: 26049
+    index_size: 294
     rows: 25
+    bloom_size: 4096
     pages: 7
-    bytes_compressed: <bytes_compressed>
     bytes: 26049
+    bytes_compressed: <bytes_compressed>
   bytes: 26049
   put:
     rows: 25
@@ -294,6 +300,11 @@ stat_diff(istat(), st)
       out:
         rows: 50
         bytes: 52091
+    index_size: 252
+    rows: 25
+    bytes_compressed: <bytes_compressed>
+    pages: 6
+    bytes: 26042
     compact:
       in:
         rows: 75
@@ -302,10 +313,6 @@ stat_diff(istat(), st)
       out:
         rows: 50
         bytes: 52091
-    rows: 25
-    pages: 6
-    bytes_compressed: <bytes_compressed>
-    bytes: 26042
   put:
     rows: 50
     bytes: 53050
@@ -323,9 +330,10 @@ s:get(1) ~= nil
 stat_diff(istat(), st)
 ---
 - cache:
+    index_size: 49152
+    rows: 1
     bytes: 1061
     lookup: 1
-    rows: 1
     put:
       rows: 1
       bytes: 1061
@@ -388,6 +396,7 @@ stat_diff(istat(), st)
     bytes: -1061
   rows: 1
   memory:
+    index_size: 49152
     bytes: 1061
     rows: 1
   put:
