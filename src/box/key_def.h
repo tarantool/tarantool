@@ -271,10 +271,6 @@ key_def_find(const struct key_def *key_def, uint32_t fieldno);
 struct key_def *
 key_def_merge(const struct key_def *first, const struct key_def *second);
 
-/** Swap content of key defs. */
-void
-key_def_swap(struct key_def *a, struct key_def *b);
-
 /*
  * Check that parts of the key match with the key definition.
  * @param key_def Key definition.

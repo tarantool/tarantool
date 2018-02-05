@@ -716,3 +716,44 @@ box.space.test.index.pk
 box.space.test:drop()
 ---
 ...
+-- gh-2449 change 'unique' index property from true to false
+s = box.schema.space.create('test', { engine = 'vinyl' })
+---
+...
+_ = s:create_index('primary')
+---
+...
+_ = s:create_index('secondary', {unique = true, parts = {2, 'unsigned'}})
+---
+...
+s:insert{1, 10}
+---
+- [1, 10]
+...
+s.index.secondary:alter{unique = false} -- ok
+---
+...
+s.index.secondary.unique
+---
+- false
+...
+s.index.secondary:alter{unique = true} -- error
+---
+- error: Vinyl does not support changing the definition of a non-empty index
+...
+s.index.secondary.unique
+---
+- false
+...
+s:insert{2, 10}
+---
+- [2, 10]
+...
+s.index.secondary:select(10)
+---
+- - [1, 10]
+  - [2, 10]
+...
+s:drop()
+---
+...

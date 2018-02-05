@@ -341,6 +341,11 @@ struct index_vtab {
 	 * Must not fail.
 	 */
 	void (*commit_drop)(struct index *);
+	/**
+	 * Called after index definition update that did not
+	 * require index rebuild.
+	 */
+	void (*update_def)(struct index *);
 
 	ssize_t (*size)(struct index *);
 	ssize_t (*bsize)(struct index *);
@@ -453,6 +458,12 @@ index_commit_drop(struct index *index)
 	index->vtab->commit_drop(index);
 }
 
+static inline void
+index_update_def(struct index *index)
+{
+	index->vtab->update_def(index);
+}
+
 static inline ssize_t
 index_size(struct index *index)
 {
@@ -555,6 +566,7 @@ index_end_build(struct index *index)
  */
 void generic_index_commit_create(struct index *, int64_t);
 void generic_index_commit_drop(struct index *);
+void generic_index_update_def(struct index *);
 ssize_t generic_index_size(struct index *);
 int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);

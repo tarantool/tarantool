@@ -136,20 +136,6 @@ index_def_dup(const struct index_def *def)
 	return dup;
 }
 
-void
-index_def_swap(struct index_def *def1, struct index_def *def2)
-{
-	/*
-	 * Swap const-size items and name. Keep the original key
-	 * definitions, they are used in the engines.
-	 */
-	struct index_def tmp_def = *def1;
-	memcpy(def1, def2, offsetof(struct index_def, key_def));
-	memcpy(def2, &tmp_def, offsetof(struct index_def, key_def));
-	key_def_swap(def1->key_def, def2->key_def);
-	key_def_swap(def1->cmp_def, def2->cmp_def);
-}
-
 /** Free a key definition. */
 void
 index_def_delete(struct index_def *index_def)
@@ -176,7 +162,7 @@ index_def_change_requires_rebuild(const struct index_def *old_index_def,
 {
 	if (old_index_def->iid != new_index_def->iid ||
 	    old_index_def->type != new_index_def->type ||
-	    old_index_def->opts.is_unique != new_index_def->opts.is_unique ||
+	    (!old_index_def->opts.is_unique && new_index_def->opts.is_unique) ||
 	    !key_part_check_compatibility(old_index_def->key_def->parts,
 					  old_index_def->key_def->part_count,
 					  new_index_def->key_def->parts,

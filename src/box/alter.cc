@@ -1113,7 +1113,8 @@ ModifyIndex::alter(struct alter_space *alter)
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
 	assert(new_index != NULL);
-	index_def_swap(old_index->def, new_index->def);
+	SWAP(old_index->def, new_index->def);
+	index_update_def(new_index);
 }
 
 void
@@ -1131,7 +1132,8 @@ ModifyIndex::rollback(struct alter_space *alter)
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
 	assert(new_index != NULL);
-	index_def_swap(old_index->def, new_index->def);
+	SWAP(old_index->def, new_index->def);
+	index_update_def(old_index);
 }
 
 ModifyIndex::~ModifyIndex()

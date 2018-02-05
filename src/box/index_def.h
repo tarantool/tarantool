@@ -159,9 +159,6 @@ struct index_def {
 struct index_def *
 index_def_dup(const struct index_def *def);
 
-void
-index_def_swap(struct index_def *def1, struct index_def *def2);
-
 /* Destroy and free an index_def. */
 void
 index_def_delete(struct index_def *def);

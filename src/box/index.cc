@@ -545,6 +545,11 @@ generic_index_commit_drop(struct index *)
 {
 }
 
+void
+generic_index_update_def(struct index *)
+{
+}
+
 ssize_t
 generic_index_size(struct index *index)
 {

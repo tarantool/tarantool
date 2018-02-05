@@ -528,23 +528,6 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	return new_def;
 }
 
-void
-key_def_swap(struct key_def *a, struct key_def *b)
-{
-	assert(a->part_count == b->part_count);
-	char buf[sizeof(*a)];
-	/* Swap fixed members. */
-	memcpy(buf, a, sizeof(*a));
-	memcpy(a, b, sizeof(*a));
-	memcpy(b, buf, sizeof(*a));
-	/* Swap parts. */
-	for (uint32_t i = 0; i < a->part_count; ++i) {
-		struct key_part tmp = a->parts[i];
-		a->parts[i] = b->parts[i];
-		b->parts[i] = tmp;
-	}
-}
-
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
 		   uint32_t part_count, bool allow_nullable)
