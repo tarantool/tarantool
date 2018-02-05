@@ -342,7 +342,7 @@ local function connect(uri)
 end
 
 local function client_handler(client, peer)
-    log.info("client %s:%s connected", peer.host, peer.port)
+    log.debug("client %s:%s connected", peer.host, peer.port)
     local state = setmetatable({
         running = true;
         read = client_read;
@@ -354,7 +354,7 @@ local function client_handler(client, peer)
         "Tarantool ".. version.." (Lua console)",
         "type 'help' for interactive help"))
     repl(state)
-    log.info("client %s:%s disconnected", peer.host, peer.port)
+    log.debug("client %s:%s disconnected", peer.host, peer.port)
 end
 
 --
