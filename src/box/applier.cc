@@ -218,9 +218,9 @@ applier_connect(struct applier *applier)
 	if (row.type != IPROTO_OK)
 		xrow_decode_error_xc(&row); /* auth failed */
 
-done:
 	/* auth succeeded */
 	say_info("authenticated");
+done:
 	applier_set_state(applier, APPLIER_READY);
 }
 
