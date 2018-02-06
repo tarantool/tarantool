@@ -1950,7 +1950,6 @@ sqlite3ColumnsFromExprList(Parse * pParse,	/* Parsing context */
 				sqlite3_randomness(sizeof(cnt), &cnt);
 		}
 		pCol->zName = zName;
-		sqlite3ColumnPropertiesFromName(0, pCol);
 		if (zName && sqlite3HashInsert(&ht, zName, pCol) == pCol) {
 			sqlite3OomFault(db);
 		}
@@ -4953,19 +4952,6 @@ selectExpander(Walker * pWalker, Select * p)
 						    && sqlite3MatchSpanName(pSub->pEList->a[j].zSpan,
 									    0,
 									    zTName) == 0) {
-							continue;
-						}
-
-						/* If a column is marked as 'hidden', omit it from the expanded
-						 * result-set list unless the SELECT has the SF_IncludeHidden
-						 * bit set.
-						 */
-						if ((p->
-						     selFlags &
-						     SF_IncludeHidden) == 0
-						    && IsHiddenColumn(&pTab->
-								      aCol[j])
-						    ) {
 							continue;
 						}
 						tableSeen = 1;

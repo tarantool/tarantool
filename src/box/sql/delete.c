@@ -123,7 +123,7 @@ sqlite3MaterializeView(Parse * pParse,	/* Parsing context */
 		assert(pFrom->a[0].pUsing == 0);
 	}
 	pSel = sqlite3SelectNew(pParse, 0, pFrom, pWhere, 0, 0, 0,
-				SF_IncludeHidden, 0, 0);
+				0, 0, 0);
 	sqlite3SelectDestInit(&dest, SRT_EphemTab, iCur);
 	sqlite3Select(pParse, pSel, &dest);
 	sqlite3SelectDelete(db, pSel);

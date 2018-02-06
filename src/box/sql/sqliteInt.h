@@ -1362,7 +1362,6 @@ struct Column {
 /* Allowed values for Column.colFlags:
  */
 #define COLFLAG_PRIMKEY  0x0001	/* Column is part of the primary key */
-#define COLFLAG_HIDDEN   0x0002	/* A hidden column. */
 #define COLFLAG_HASTYPE  0x0004	/* Type name follows column name */
 
 /*
@@ -1452,31 +1451,12 @@ struct Table {
 
 /*
  * Allowed values for Table.tabFlags.
- *
- * TF_OOOHidden applies to tables or view that have hidden columns that are
- * followed by non-hidden columns.Such tables require special
- * handling during INSERT processing.
  */
 #define TF_Readonly        0x01	/* Read-only system table */
 #define TF_Ephemeral       0x02	/* An ephemeral table */
 #define TF_HasPrimaryKey   0x04	/* Table has a primary key */
 #define TF_Autoincrement   0x08	/* Integer primary key is autoincrement */
 #define TF_View   	   0x20	/* A view */
-#define TF_OOOHidden       0x80	/* Out-of-Order hidden columns */
-
-/*
- * Macros to determine if a column is hidden.
- * IsOrdinaryHiddenColumn() is always false unless
- * SQLITE_ENABLE_HIDDEN_COLUMNS is defined. The IsHiddenColumn()
- * macro is general purpose.
- */
-#if defined(SQLITE_ENABLE_HIDDEN_COLUMNS)
-#define IsHiddenColumn(X)         (((X)->colFlags & COLFLAG_HIDDEN)!=0)
-#define IsOrdinaryHiddenColumn(X) (((X)->colFlags & COLFLAG_HIDDEN)!=0)
-#else
-#define IsHiddenColumn(X)         0
-#define IsOrdinaryHiddenColumn(X) 0
-#endif
 
 /*
  * Each foreign key constraint is an instance of the following structure.
@@ -2258,7 +2238,6 @@ struct Select {
 #define SF_FixedLimit     0x04000	/* nSelectRow set by a constant LIMIT */
 #define SF_MaybeConvert   0x08000	/* Need convertCompoundSelectToSubquery() */
 #define SF_Converted      0x10000	/* By convertCompoundSelectToSubquery() */
-#define SF_IncludeHidden  0x20000	/* Include hidden columns in output */
 
 /*
  * The results of a SELECT can be distributed in several ways, as defined
@@ -3106,11 +3085,6 @@ Table *sqlite3ResultSetOfSelect(Parse *, Select *);
 Index *sqlite3PrimaryKeyIndex(Table *);
 i16 sqlite3ColumnOfIndex(Index *, i16);
 void sqlite3StartTable(Parse *, Token *, int);
-#if SQLITE_ENABLE_HIDDEN_COLUMNS
-void sqlite3ColumnPropertiesFromName(Table *, Column *);
-#else
-#define sqlite3ColumnPropertiesFromName(T,C)	/* no-op */
-#endif
 void sqlite3AddColumn(Parse *, Token *, Token *);
 void sqlite3AddNotNull(Parse *, int);
 void sqlite3AddPrimaryKey(Parse *, ExprList *, int, int, int);

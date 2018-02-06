@@ -1474,9 +1474,6 @@ sqlite3WhereExprAnalyze(SrcList * pTabList,	/* the FROM clause */
 /*
  * For table-valued-functions, transform the function arguments into
  * new WHERE clause terms.
- *
- * Each function argument translates into an equality constraint against
- * a HIDDEN column in the table.
  */
 void
 sqlite3WhereTabFuncArgs(Parse * pParse,	/* Parsing context */
@@ -1497,8 +1494,7 @@ sqlite3WhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 	if (pArgs == 0)
 		return;
 	for (j = k = 0; j < pArgs->nExpr; j++) {
-		while (k < pTab->nCol
-		       && (pTab->aCol[k].colFlags & COLFLAG_HIDDEN) == 0) {
+		while (k < pTab->nCol) {
 			k++;
 		}
 		if (k >= pTab->nCol) {

@@ -760,22 +760,6 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	return;
 }
 
-/* Set properties of a table column based on the (magical)
- * name of the column.
- */
-#if SQLITE_ENABLE_HIDDEN_COLUMNS
-void
-sqlite3ColumnPropertiesFromName(Table * pTab, Column * pCol)
-{
-	if (sqlite3_strnicmp(pCol->zName, "__hidden__", 10) == 0) {
-		pCol->colFlags |= COLFLAG_HIDDEN;
-	} else if (pTab && pCol != pTab->aCol
-		   && (pCol[-1].colFlags & COLFLAG_HIDDEN)) {
-		pTab->tabFlags |= TF_OOOHidden;
-	}
-}
-#endif
-
 /*
  * Add a new column to the table currently being constructed.
  *
@@ -828,7 +812,6 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	pCol = &p->aCol[p->nCol];
 	memset(pCol, 0, sizeof(p->aCol[0]));
 	pCol->zName = z;
-	sqlite3ColumnPropertiesFromName(p, pCol);
 
 	if (pType->n == 0) {
 		/* If there is no type specified, columns have the default affinity

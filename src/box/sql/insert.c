@@ -216,7 +216,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
  *    insert into TABLE (IDLIST) default values
  *
  * The IDLIST following the table name is always optional.  If omitted,
- * then a list of all (non-hidden) columns for the table is substituted.
+ * then a list of all columns for the table is substituted.
  * The IDLIST appears in the pColumn parameter.  pColumn is NULL if IDLIST
  * is omitted.
  *
@@ -319,7 +319,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	Vdbe *v;		/* Generate code into this virtual machine */
 	Index *pIdx;		/* For looping over indices of the table */
 	int nColumn;		/* Number of columns in the data */
-	int nHidden = 0;	/* Number of hidden columns. */
 	int iDataCur = 0;	/* VDBE cursor that is the main data repository */
 	int iIdxCur = 0;	/* First index cursor */
 	int ipkColumn = -1;	/* Column that is the INTEGER PRIMARY KEY */
@@ -453,7 +452,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 * is appears in the original table.  (The index of the INTEGER
 	 * PRIMARY KEY in the original table is pTab->iPKey.)
 	 */
-	bIdListInOrder = (pTab->tabFlags & TF_OOOHidden) == 0;
+	bIdListInOrder = 1;
 	if (pColumn) {
 		for (i = 0; i < pColumn->nId; i++) {
 			pColumn->a[i].idx = -1;
@@ -590,16 +589,10 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		ipkColumn = pTab->iPKey;
 	}
 
-	/* Make sure the number of columns in the source data matches the number
-	 * of columns to be inserted into the table.
-	 */
-	for (i = 0; i < pTab->nCol; i++) {
-		nHidden += (IsHiddenColumn(&pTab->aCol[i]) ? 1 : 0);
-	}
-	if (pColumn == 0 && nColumn && nColumn != (pTab->nCol - nHidden)) {
+	if (pColumn == 0 && nColumn && nColumn != (pTab->nCol)) {
 		sqlite3ErrorMsg(pParse,
 				"table %S has %d columns but %d values were supplied",
-				pTabList, 0, pTab->nCol - nHidden, nColumn);
+				pTabList, 0, pTab->nCol, nColumn);
 		goto insert_cleanup;
 	}
 	if (pColumn != 0 && nColumn != pColumn->nId) {
@@ -679,9 +672,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				}
 			}
 			if ((!useTempTable && !pList)
-			    || (pColumn && j >= pColumn->nId)
-			    || (pColumn == 0
-				&& IsOrdinaryHiddenColumn(&pTab->aCol[i]))) {
+			    || (pColumn && j >= pColumn->nId)) {
 				if (i == pTab->iAutoIncPKey)
 					sqlite3VdbeAddOp2(v, OP_Integer, -1,
 							  regCols + i + 1);
@@ -698,8 +689,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 							pList->a[j].pExpr,
 							regCols + i + 1);
 			}
-			if (pColumn == 0
-			    && !IsOrdinaryHiddenColumn(&pTab->aCol[i]))
+			if (pColumn == 0)
 				j++;
 		}
 
@@ -741,16 +731,10 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		/* Compute data for all columns of the new entry, beginning
 		 * with the first column.
 		 */
-		nHidden = 0;
 		for (i = 0; i < pTab->nCol; i++) {
 			int iRegStore = regTupleid + 1 + i;
 			if (pColumn == 0) {
-				if (IsHiddenColumn(&pTab->aCol[i])) {
-					j = -1;
-					nHidden++;
-				} else {
-					j = i - nHidden;
-				}
+				j = i;
 			} else {
 				for (j = 0; j < pColumn->nId; j++) {
 					if (pColumn->a[j].idx == i)
@@ -1824,11 +1808,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	for (i = 0; i < pDest->nCol; i++) {
 		Column *pDestCol = &pDest->aCol[i];
 		Column *pSrcCol = &pSrc->aCol[i];
-#ifdef SQLITE_ENABLE_HIDDEN_COLUMNS
-		if ((pDestCol->colFlags | pSrcCol->colFlags) & COLFLAG_HIDDEN) {
-			return 0;	/* Neither table may have __hidden__ columns */
-		}
-#endif
 		if (pDestCol->affinity != pSrcCol->affinity) {
 			return 0;	/* Affinity must be the same on all columns */
 		}
