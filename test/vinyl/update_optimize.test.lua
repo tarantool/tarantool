@@ -201,4 +201,36 @@ index:select{}
 index2:select{}
 index3:select{}
 
+--
+-- gh-2980: key uniqueness is not checked if indexed fields
+-- are not updated.
+--
+space:truncate()
+space:replace{1, 1, 1, 1, 1}
+
+LOOKUPS_BASE = {0, 0, 0}
+test_run:cmd("setopt delimiter ';'")
+function lookups()
+    local ret = {}
+    for i = 1, #LOOKUPS_BASE do
+        local info = space.index[i - 1]:info()
+        table.insert(ret, info.lookup - LOOKUPS_BASE[i])
+    end
+    return ret
+end;
+test_run:cmd("setopt delimiter ''");
+LOOKUPS_BASE = lookups()
+
+-- update of a field that is not indexed
+space:update(1, {{'+', 1, 1}})
+lookups()
+
+-- update of a field indexed by space.index[1]
+space:update(1, {{'+', 3, 1}})
+lookups()
+
+-- update of a field indexed by space.index[2]
+space:update(1, {{'+', 5, 1}})
+lookups()
+
 space:drop()
