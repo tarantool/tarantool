@@ -1129,10 +1129,11 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 static void
 box_on_join(const tt_uuid *instance_uuid)
 {
-	box_check_writable_xc();
 	struct replica *replica = replica_by_uuid(instance_uuid);
 	if (replica != NULL)
 		return; /* nothing to do - already registered */
+
+	box_check_writable_xc();
 
 	/** Find the largest existing replica id. */
 	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
@@ -1226,10 +1227,18 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
-	access_check_space_xc(space_cache_find_xc(BOX_CLUSTER_ID), PRIV_W);
 
-	/* Check that we actually can register a new replica */
-	box_check_writable_xc();
+	/*
+	 * Unless already registered, the new replica will be
+	 * added to _cluster space once the initial join stage
+	 * is complete. Fail early if the caller does not have
+	 * appropriate access privileges.
+	 */
+	if (replica_by_uuid(&instance_uuid) == NULL) {
+		box_check_writable_xc();
+		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
+		access_check_space_xc(space, PRIV_W);
+	}
 
 	/* Forbid replication with disabled WAL */
 	if (wal_mode() == WAL_NONE) {
