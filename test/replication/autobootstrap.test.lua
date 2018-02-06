@@ -72,6 +72,27 @@ box.space.test_u:select()
 _ = test_run:cmd("switch autobootstrap3")
 box.space.test_u:select()
 
+--
+-- Rebootstrap one node and check that others follow.
+--
+_ = test_run:cmd("switch autobootstrap1")
+_ = test_run:cmd("restart server autobootstrap1 with cleanup=1")
+
+_ = box.space.test_u:replace({5, 6, 7, 8})
+box.space.test_u:select()
+
+_ = test_run:cmd("switch default")
+test_run:wait_fullmesh(SERVERS)
+
+vclock = test_run:get_vclock("autobootstrap1")
+_ = test_run:wait_vclock("autobootstrap2", vclock)
+_ = test_run:wait_vclock("autobootstrap3", vclock)
+
+_ = test_run:cmd("switch autobootstrap2")
+box.space.test_u:select()
+_ = test_run:cmd("switch autobootstrap3")
+box.space.test_u:select()
+
 _ = test_run:cmd("switch default")
 
 --

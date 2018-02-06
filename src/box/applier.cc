@@ -155,6 +155,7 @@ applier_connect(struct applier *applier)
 	if (coio->fd >= 0)
 		return;
 	char greetingbuf[IPROTO_GREETING_SIZE];
+	struct xrow_header row;
 
 	struct uri *uri = &applier->uri;
 	/*
@@ -197,6 +198,21 @@ applier_connect(struct applier *applier)
 	/* Don't display previous error messages in box.info.replication */
 	diag_clear(&fiber()->diag);
 
+	/*
+	 * Tarantool >= 1.7.7: send an IPROTO_REQUEST_VOTE message
+	 * to fetch the master's vclock before proceeding to "join".
+	 * It will be used for leader election on bootstrap.
+	 */
+	if (applier->version_id >= version_id(1, 7, 7)) {
+		xrow_encode_request_vote(&row);
+		coio_write_xrow(coio, &row);
+		coio_read_xrow(coio, ibuf, &row);
+		if (row.type != IPROTO_OK)
+			xrow_decode_error_xc(&row);
+		vclock_create(&applier->vclock);
+		xrow_decode_vclock_xc(&row, &applier->vclock);
+	}
+
 	applier_set_state(applier, APPLIER_CONNECTED);
 
 	/* Detect connection to itself */
@@ -209,7 +225,6 @@ applier_connect(struct applier *applier)
 
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
-	struct xrow_header row;
 	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
 			    uri->login_len, uri->password, uri->password_len);
 	coio_write_xrow(coio, &row);

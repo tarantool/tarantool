@@ -1562,7 +1562,7 @@ static void
 bootstrap(const struct tt_uuid *replicaset_uuid, bool *is_bootstrap_leader)
 {
 	/* Use the first replica by URI as a bootstrap leader */
-	struct replica *master = replicaset_first();
+	struct replica *master = replicaset_leader();
 	assert(master == NULL || master->applier != NULL);
 
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {

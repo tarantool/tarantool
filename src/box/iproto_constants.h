@@ -153,6 +153,8 @@ enum iproto_type {
 	IPROTO_JOIN = 65,
 	/** Replication SUBSCRIBE command */
 	IPROTO_SUBSCRIBE = 66,
+	/** Vote request command for master election */
+	IPROTO_REQUEST_VOTE = 67,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,

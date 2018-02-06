@@ -264,6 +264,12 @@ enum {
 struct replica *
 replica_by_uuid(const struct tt_uuid *uuid);
 
+/**
+ * Return the replica set leader.
+ */
+struct replica *
+replicaset_leader(void);
+
 struct replica *
 replicaset_first(void);
 
