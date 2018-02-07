@@ -226,7 +226,9 @@ test:do_catchsql_test(
         INSERT INTO c1 VALUES(1);
     ]], {
         -- <fkey1-6.2>
-        1, "foreign key mismatch - \"C1\" referencing \"P1\""
+        1, "Foreign key mismatch - \"C1\" referencing \"P1\"" ..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey1-6.2>
     })
 

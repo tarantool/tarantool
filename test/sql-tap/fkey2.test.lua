@@ -314,7 +314,9 @@ test:do_catchsql_test(
         INSERT INTO t10 VALUES(1, 3);
     ]], {
         -- <fkey2-1.30>
-        1, "foreign key mismatch - \"T10\" referencing \"T9\""
+        1, "Foreign key mismatch - \"T10\" referencing \"T9\"" ..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey2-1.30>
     })
 
@@ -722,7 +724,9 @@ test:do_catchsql_test(
         INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.1>
-        1, "foreign key mismatch - \"C\" referencing \"P\""
+        1, "Foreign key mismatch - \"C\" referencing \"P\"" ..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey2-7.1>
     })
 
@@ -736,7 +740,9 @@ test:do_catchsql_test(
         INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.2>
-        1, "foreign key mismatch - \"C\" referencing \"V\""
+        1, "Foreign key mismatch - \"C\" referencing \"V\""..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey2-7.2>
     })
 
@@ -750,7 +756,9 @@ test:do_catchsql_test(
         INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.3>
-        1, "foreign key mismatch - \"C\" referencing \"P\""
+        1, "Foreign key mismatch - \"C\" referencing \"P\""..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey2-7.3>
     })
 
@@ -764,7 +772,9 @@ test:do_catchsql_test(
         INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.4>
-        1, "foreign key mismatch - \"C\" referencing \"P\""
+        1, "Foreign key mismatch - \"C\" referencing \"P\""..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey2-7.4>
     })
 
@@ -1153,7 +1163,9 @@ test:do_catchsql_test(
         INSERT INTO cc VALUES(1, 2);
     ]], {
         -- <fkey2-10.15>
-        1, "foreign key mismatch - \"CC\" referencing \"PP\""
+        1, "Foreign key mismatch - \"CC\" referencing \"PP\""..
+           " Foreign keys can be created only on primary key" ..
+           " or unique indexes with the default collation sequence"
         -- </fkey2-10.15>
     })
 

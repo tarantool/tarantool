@@ -328,7 +328,9 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 	if (!pIdx) {
 		if (!pParse->disableTriggers) {
 			sqlite3ErrorMsg(pParse,
-					"foreign key mismatch - \"%w\" referencing \"%w\"",
+					"Foreign key mismatch - \"%w\" referencing \"%w\""
+					" Foreign keys can be created only on primary"
+					" key or unique indexes with the default collation sequence",
 					pFKey->pFrom->zName, pFKey->zTo);
 		}
 		sqlite3DbFree(pParse->db, aiCol);
