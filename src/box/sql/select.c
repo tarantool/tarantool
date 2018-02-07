@@ -1597,14 +1597,14 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 #else				/* if !defined(SQLITE_ENABLE_COLUMN_METADATA) */
 #define columnType(A,B,C,D,E,F) columnTypeImpl(A,B,F)
 #endif
-static const char *
+static enum field_type
 columnTypeImpl(NameContext * pNC, Expr * pExpr,
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
 	       const char **pzOrigTab, const char **pzOrigCol,
 #endif
 	       u8 * pEstWidth)
 {
-	char const *zType = 0;
+	enum field_type column_type = FIELD_TYPE_SCALAR;
 	int j;
 	u8 estWidth = 1;
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
@@ -1679,7 +1679,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 					sNC.pSrcList = pS->pSrc;
 					sNC.pNext = pNC;
 					sNC.pParse = pNC->pParse;
-					zType =
+					column_type =
 					    columnType(&sNC, p, 0,
 						       &zOrigTab, &zOrigCol,
 						       &estWidth);
@@ -1694,7 +1694,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 				estWidth = pTab->aCol[iCol].szEst;
 				zOrigTab = pTab->zName;
 #else
-				zType = sqlite3ColumnType(&pTab->aCol[iCol], 0);
+				column_type = sqlite3ColumnType(&pTab->aCol[iCol]);
 				estWidth = pTab->aCol[iCol].szEst;
 #endif
 			}
@@ -1713,7 +1713,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 			sNC.pSrcList = pS->pSrc;
 			sNC.pNext = pNC;
 			sNC.pParse = pNC->pParse;
-			zType =
+			column_type =
 			    columnType(&sNC, p, 0, &zOrigTab, &zOrigCol,
 				       &estWidth);
 			break;
@@ -1730,50 +1730,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 #endif
 	if (pEstWidth)
 		*pEstWidth = estWidth;
-	return zType;
-}
-
-/*
- * Generate code that will tell the VDBE the declaration types of columns
- * in the result set.
- */
-static void
-generateColumnTypes(Parse * pParse,	/* Parser context */
-		    SrcList * pTabList,	/* List of tables */
-		    ExprList * pEList)	/* Expressions defining the result set */
-{
-#ifndef SQLITE_OMIT_DECLTYPE
-	Vdbe *v = pParse->pVdbe;
-	int i;
-	NameContext sNC;
-	sNC.pSrcList = pTabList;
-	sNC.pParse = pParse;
-	for (i = 0; i < pEList->nExpr; i++) {
-		Expr *p = pEList->a[i].pExpr;
-		const char *zType;
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-		const char *zOrigDb = 0;
-		const char *zOrigTab = 0;
-		const char *zOrigCol = 0;
-		zType = columnType(&sNC, p, &zOrigDb, &zOrigTab, &zOrigCol, 0);
-
-		/* The vdbe must make its own copy of the column-type and other
-		 * column specific strings, in case the schema is reset before this
-		 * virtual machine is deleted.
-		 */
-		sqlite3VdbeSetColName(v, i, COLNAME_DATABASE, zOrigDb,
-				      SQLITE_TRANSIENT);
-		sqlite3VdbeSetColName(v, i, COLNAME_TABLE, zOrigTab,
-				      SQLITE_TRANSIENT);
-		sqlite3VdbeSetColName(v, i, COLNAME_COLUMN, zOrigCol,
-				      SQLITE_TRANSIENT);
-#else
-		zType = columnType(&sNC, p, 0, 0, 0, 0);
-#endif
-		sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, zType,
-				      SQLITE_TRANSIENT);
-	}
-#endif				/* !defined(SQLITE_OMIT_DECLTYPE) */
+	return column_type;
 }
 
 /*
@@ -1855,7 +1812,6 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 					      SQLITE_DYNAMIC);
 		}
 	}
-	generateColumnTypes(pParse, pTabList, pEList);
 }
 
 /*
@@ -2001,21 +1957,13 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	sNC.pSrcList = pSelect->pSrc;
 	a = pSelect->pEList->a;
 	for (i = 0, pCol = pTab->aCol; i < pTab->nCol; i++, pCol++) {
-		const char *zType;
-		int n, m;
+		enum field_type type;
 		p = a[i].pExpr;
-		zType = columnType(&sNC, p, 0, 0, 0, &pCol->szEst);
+		type = columnType(&sNC, p, 0, 0, 0, &pCol->szEst);
 		szAll += pCol->szEst;
 		pCol->affinity = sqlite3ExprAffinity(p);
-		if (zType && (m = sqlite3Strlen30(zType)) > 0) {
-			n = sqlite3Strlen30(pCol->zName);
-			pCol->zName =
-			    sqlite3DbReallocOrFree(db, pCol->zName, n + m + 2);
-			if (pCol->zName) {
-				memcpy(&pCol->zName[n + 1], zType, m + 1);
-				pCol->colFlags |= COLFLAG_HASTYPE;
-			}
-		}
+		pCol->type = type;
+
 		if (pCol->affinity == 0)
 			pCol->affinity = SQLITE_AFF_BLOB;
 		pColl = sqlite3ExprCollSeq(pParse, p);

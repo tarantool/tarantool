@@ -398,10 +398,11 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					assert(pCol->pDflt == 0
 					       || pCol->pDflt->op == TK_SPAN);
 					bool nullable = table_column_is_nullable(pTab, i);
-					char *type = sqlite3ColumnType(pCol, "");
 					sqlite3VdbeMultiLoad(v, 1, "issisi",
 							     i, pCol->zName,
-							     type,
+							     field_type_strs[
+							     sqlite3ColumnType
+							     (pCol)],
 							     nullable == 0,
 							     pCol->
 							     pDflt ? pCol->

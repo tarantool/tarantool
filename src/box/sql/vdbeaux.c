@@ -2411,6 +2411,7 @@ sqlite3VdbeSetColName(Vdbe * p,			/* Vdbe being configured */
 		return SQLITE_NOMEM_BKPT;
 	}
 	assert(p->aColName != 0);
+	assert(var == COLNAME_NAME);
 	pColName = &(p->aColName[idx + var * p->nResColumn]);
 	rc = sqlite3VdbeMemSetStr(pColName, zName, -1, 1, xDel);
 	assert(rc != 0 || !zName || (pColName->flags & MEM_Term) != 0);

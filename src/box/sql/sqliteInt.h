@@ -1348,7 +1348,8 @@ struct Savepoint {
  * of this structure.
  */
 struct Column {
-	char *zName;		/* Name of this column, \000, then the type */
+	char *zName;		/* Name of this column */
+	enum field_type type;	/* Column type. */
 	Expr *pDflt;		/* Default value of this column */
 	char *zColl;		/* Collating sequence.  If NULL, use the default */
 	enum on_conflict_action notNull;  /* An ON_CONFLICT_ACTION code for
@@ -1362,7 +1363,6 @@ struct Column {
 /* Allowed values for Column.colFlags:
  */
 #define COLFLAG_PRIMKEY  0x0001	/* Column is part of the primary key */
-#define COLFLAG_HASTYPE  0x0004	/* Type name follows column name */
 
 /*
  * A sort order can be either ASC or DESC.
@@ -2925,7 +2925,7 @@ int sqlite3IoerrnomemError(int);
  */
 int sqlite3StrICmp(const char *, const char *);
 unsigned sqlite3Strlen30(const char *);
-char *sqlite3ColumnType(Column *, char *);
+enum field_type sqlite3ColumnType(Column *);
 #define sqlite3StrNICmp sqlite3_strnicmp
 
 int sqlite3MallocInit(void);

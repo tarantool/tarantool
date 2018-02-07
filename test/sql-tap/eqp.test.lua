@@ -551,8 +551,8 @@ test:do_execsql_test(
 test:do_eqp_test("5.3.1", "SELECT a, b FROM t1 WHERE a=1", {
     -- It is equal for tarantol wheather to use i1 or i2
     -- because both of them are covering
-    --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX i2 (a=?)"},
-    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
+    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
+    --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
 })
 -- EVIDENCE-OF: R-09991-48941 sqlite> EXPLAIN QUERY PLAN
 -- SELECT t1.*, t2.* FROM t1, t2 WHERE t1.a=1 AND t1.b>2;
@@ -592,8 +592,8 @@ test:do_execsql_test(
 test:do_eqp_test("5.6.1", "SELECT a, b FROM t1 WHERE a=1 OR b=2", {
     -- It is equal for tarantol wheather to use i1 or i2
     -- because both of them are covering
-    --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX i2 (a=?)"},
-    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
+    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
+    --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I3 (B=?)"},
 })
 -- EVIDENCE-OF: R-24577-38891 sqlite> EXPLAIN QUERY PLAN
@@ -633,8 +633,8 @@ test:do_eqp_test(5.9, [[
     {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
     -- It is equally for tarantol wheather to use i1 or i2
     -- because both of them are covering
-    --{1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX i2 (a=?)"},
-    {1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
+    {1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
+    --{1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     {0, 0, 0, "EXECUTE CORRELATED SCALAR SUBQUERY 2"},
     {2, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I3 (B=?)"},
 })
@@ -736,7 +736,7 @@ test:do_eqp_test(7.1, "SELECT count(*) FROM t1", {
     {0, 0, 0, "SCAN TABLE T1"},
 })
 test:do_eqp_test(7.2, "SELECT count(*) FROM t2", {
-    {0, 0, 0, "SCAN TABLE T2"},
+    {0, 0, 0, "SCAN TABLE T2 USING COVERING INDEX I1"},
 })
 -- MUST_WORK_TEST
 if (0 > 0)

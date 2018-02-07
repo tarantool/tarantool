@@ -785,7 +785,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		return;
 	}
 #endif
-	z = sqlite3DbMallocRaw(db, pName->n + pType->n + 2);
+	z = sqlite3DbMallocRaw(db, pName->n + 1);
 	if (z == 0)
 		return;
 	memcpy(z, pName->z, pName->n);
@@ -815,17 +815,32 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 
 	if (pType->n == 0) {
 		/* If there is no type specified, columns have the default affinity
-		 * 'BLOB'.
+		 * 'BLOB' and type SCALAR.
+		 * TODO: since SQL standard prohibits column creation without
+		 * specified type, the code below should emit an error.
 		 */
 		pCol->affinity = SQLITE_AFF_BLOB;
+		pCol->type = FIELD_TYPE_SCALAR;
 		pCol->szEst = 1;
 	} else {
-		zType = z + sqlite3Strlen30(z) + 1;
-		memcpy(zType, pType->z, pType->n);
-		zType[pType->n] = 0;
-		sqlite3Dequote(zType);
-		pCol->affinity = sqlite3AffinityType(zType, &pCol->szEst);
-		pCol->colFlags |= COLFLAG_HASTYPE;
+		/* TODO: convert string of type into runtime
+		 * FIELD_TYPE value for other types.
+		 */
+		if ((sqlite3StrNICmp(pType->z, "INTEGER", 7) == 0 &&
+		     pType->n == 7) ||
+		    (sqlite3StrNICmp(pType->z, "INT", 3) == 0 &&
+		     pType->n == 3)) {
+			pCol->type = FIELD_TYPE_INTEGER;
+			pCol->affinity = SQLITE_AFF_INTEGER;
+		} else {
+			zType = sqlite3_malloc(pType->n + 1);
+			memcpy(zType, pType->z, pType->n);
+			zType[pType->n] = 0;
+			sqlite3Dequote(zType);
+			pCol->affinity = sqlite3AffinityType(zType, 0);
+			pCol->type = FIELD_TYPE_SCALAR;
+			sqlite3_free(zType);
+		}
 	}
 	p->nCol++;
 	pParse->constraintName.n = 0;
@@ -1056,8 +1071,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	}
 	if (nTerm == 1
 	    && pCol
-	    && (sqlite3StrICmp(sqlite3ColumnType(pCol, ""), "INTEGER") == 0
-		|| sqlite3StrICmp(sqlite3ColumnType(pCol, ""), "INT") == 0)
+	    && (sqlite3ColumnType(pCol) == FIELD_TYPE_INTEGER)
 	    && sortOrder != SQLITE_SO_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
 		pTab->iPKey = iCol;
