@@ -232,12 +232,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			goto update_cleanup;
 		}
 		for (j = 0; j < pTab->nCol; j++) {
-			if (strcmp
-			    (pTab->aCol[j].zName, pChanges->a[i].zName) == 0) {
-				if (pPk
-					   && (pTab->aCol[j].
-					       colFlags & COLFLAG_PRIMKEY) !=
-					   0) {
+			if (strcmp(pTab->aCol[j].zName,
+				   pChanges->a[i].zName) == 0) {
+				if (pPk && table_column_is_in_pk(pTab, j)) {
 					chngPk = 1;
 				}
 				aXRef[j] = i;
@@ -492,7 +489,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		for (i = 0; i < pTab->nCol; i++) {
 			if (oldmask == 0xffffffff
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
-			    || (pTab->aCol[i].colFlags & COLFLAG_PRIMKEY) != 0) {
+			    || table_column_is_in_pk(pTab, i)) {
 				testcase(oldmask != 0xffffffff && i == 31);
 				sqlite3ExprCodeGetColumnOfTable(v, pTab,
 								iDataCur, i,

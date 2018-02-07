@@ -383,8 +383,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				sqlite3ViewGetColumnNames(pParse, pTab);
 				for (i = 0, pCol = pTab->aCol; i < pTab->nCol;
 				     i++, pCol++) {
-					if ((pCol->
-					     colFlags & COLFLAG_PRIMKEY) == 0) {
+					if (!table_column_is_in_pk(pTab, i)) {
 						k = 0;
 					} else if (pPk == 0) {
 						k = 1;

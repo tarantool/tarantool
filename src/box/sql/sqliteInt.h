@@ -1357,12 +1357,8 @@ struct Column {
 					   */
 	char affinity;		/* One of the SQLITE_AFF_... values */
 	u8 szEst;		/* Estimated size of value in this column. sizeof(INT)==1 */
-	u8 colFlags;		/* Boolean properties.  See COLFLAG_ defines below */
+	u8 is_primkey;		/* Boolean propertie for being PK */
 };
-
-/* Allowed values for Column.colFlags:
- */
-#define COLFLAG_PRIMKEY  0x0001	/* Column is part of the primary key */
 
 /*
  * A sort order can be either ASC or DESC.
@@ -3079,6 +3075,7 @@ void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
 void sqlite3ResetOneSchema(sqlite3 *);
 void sqlite3CommitInternalChanges();
 void sqlite3DeleteColumnNames(sqlite3 *, Table *);
+bool table_column_is_in_pk(Table *, uint32_t);
 int sqlite3ColumnsFromExprList(Parse *, ExprList *, i16 *, Column **);
 void sqlite3SelectAddColumnTypeAndCollation(Parse *, Table *, Select *);
 Table *sqlite3ResultSetOfSelect(Parse *, Select *);

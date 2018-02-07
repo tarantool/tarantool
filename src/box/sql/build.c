@@ -48,6 +48,7 @@
 #include "tarantoolInt.h"
 #include "box/session.h"
 #include "box/identifier.h"
+#include "box/schema.h"
 
 /*
  * This routine is called after a single SQL statement has been
@@ -432,6 +433,40 @@ sqlite3DeleteColumnNames(sqlite3 * db, Table * pTable)
 		}
 		sqlite3DbFree(db, pTable->aCol);
 	}
+}
+
+/*
+ * Return true if given column is part of primary key.
+ * If field number is less than 63, corresponding bit
+ * in column mask is tested. Otherwise, check whether 64-th bit
+ * in mask is set or not. If it is set, then iterate through
+ * key parts of primary index and check field number.
+ * In case it isn't set, there are no key columns among
+ * the rest of fields.
+ */
+bool
+table_column_is_in_pk(Table *table, uint32_t column)
+{
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+
+	struct index *primary_idx = index_find(space, 0 /* PK */);
+	/* Views don't have any indexes. */
+	if (primary_idx == NULL)
+		return false;
+	struct index_def *idx_def = primary_idx->def;
+	uint64_t pk_mask = idx_def->key_def->column_mask;
+	if (column < 63) {
+		return pk_mask & (((uint64_t) 1) << column);
+	} else if ((pk_mask & (((uint64_t) 1) << 63)) != 0) {
+		for (uint32_t i = 0; i < idx_def->key_def->part_count; ++i) {
+			struct key_part *part = &idx_def->key_def->parts[i];
+			if (part->fieldno == column)
+				return true;
+		}
+	}
+	return false;
 }
 
 /*
@@ -1044,7 +1079,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	if (pList == 0) {
 		iCol = pTab->nCol - 1;
 		pCol = &pTab->aCol[iCol];
-		pCol->colFlags |= COLFLAG_PRIMKEY;
+		pCol->is_primkey = 1;
 		nTerm = 1;
 	} else {
 		nTerm = pList->nExpr;
@@ -1062,8 +1097,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 				    (zCName,
 				     pTab->aCol[iCol].zName) == 0) {
 					pCol = &pTab->aCol[iCol];
-					pCol->colFlags |=
-					    COLFLAG_PRIMKEY;
+					pCol->is_primkey = 1;
 					break;
 				}
 			}
@@ -1427,7 +1461,7 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 	 */
 	if (!db->init.imposterTable) {
 		for (i = 0; i < pTab->nCol; i++) {
-			if ((pTab->aCol[i].colFlags & COLFLAG_PRIMKEY) != 0) {
+			if (pTab->aCol[i].is_primkey) {
 				pTab->aCol[i].notNull = ON_CONFLICT_ACTION_ABORT;
 			}
 		}
