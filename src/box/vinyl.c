@@ -1380,6 +1380,8 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * unique a conflict is impossible.
 	 */
 	if (index->opts.is_unique &&
+	    !key_update_can_be_skipped(index->key_def->column_mask,
+				       vy_stmt_column_mask(stmt)) &&
 	    (!index->key_def->is_nullable ||
 	     !vy_tuple_key_contains_null(stmt, index->key_def))) {
 		struct tuple *key = vy_stmt_extract_key(stmt, index->key_def,

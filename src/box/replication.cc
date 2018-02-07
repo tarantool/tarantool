@@ -643,6 +643,35 @@ replicaset_next(struct replica *replica)
 }
 
 struct replica *
+replicaset_leader(void)
+{
+	struct replica *leader = NULL;
+	replicaset_foreach(replica) {
+		if (replica->applier == NULL)
+			continue;
+		if (leader == NULL) {
+			leader = replica;
+			continue;
+		}
+		/*
+		 * Choose the replica with the most advanced
+		 * vclock. If there are two or more replicas
+		 * with the same vclock, prefer the one with
+		 * the lowest uuid.
+		 */
+		int cmp = vclock_compare(&replica->applier->vclock,
+					 &leader->applier->vclock);
+		if (cmp < 0)
+			continue;
+		if (cmp == 0 && tt_uuid_compare(&replica->uuid,
+						&leader->uuid) > 0)
+			continue;
+		leader = replica;
+	}
+	return leader;
+}
+
+struct replica *
 replica_by_uuid(const struct tt_uuid *uuid)
 {
 	struct replica key;

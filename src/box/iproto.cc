@@ -980,6 +980,11 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 			goto error;
 		cmsg_init(&msg->base, call_route);
 		break;
+	case IPROTO_EXECUTE:
+		if (xrow_decode_sql(&msg->header, &msg->sql, &fiber()->gc))
+			goto error;
+		cmsg_init(&msg->base, sql_route);
+		break;
 	case IPROTO_PING:
 		cmsg_init(&msg->base, misc_route);
 		break;
@@ -991,10 +996,8 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, subscribe_route);
 		*stop_input = true;
 		break;
-	case IPROTO_EXECUTE:
-		if (xrow_decode_sql(&msg->header, &msg->sql, &fiber()->gc))
-			goto error;
-		cmsg_init(&msg->base, sql_route);
+	case IPROTO_REQUEST_VOTE:
+		cmsg_init(&msg->base, misc_route);
 		break;
 	case IPROTO_AUTH:
 		if (xrow_decode_auth(&msg->header, &msg->auth))
@@ -1356,6 +1359,11 @@ tx_process_misc(struct cmsg *m)
 		case IPROTO_PING:
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
+			break;
+		case IPROTO_REQUEST_VOTE:
+			iproto_reply_vclock_xc(out, msg->header.sync,
+					       ::schema_version,
+					       &replicaset.vclock);
 			break;
 		default:
 			unreachable();

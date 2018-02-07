@@ -268,6 +268,44 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 }
 
 int
+iproto_reply_vclock(struct obuf *out, uint64_t sync, uint32_t schema_version,
+		    const struct vclock *vclock)
+{
+	uint32_t replicaset_size = vclock_size(vclock);
+	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(replicaset_size) +
+		replicaset_size * (mp_sizeof_uint(UINT32_MAX) +
+				   mp_sizeof_uint(UINT64_MAX));
+
+	char *buf = obuf_reserve(out, max_size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, max_size,
+			 "obuf_alloc", "buf");
+		return -1;
+	}
+
+	char *data = buf + IPROTO_HEADER_LEN;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_map(data, replicaset_size);
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, replica) {
+		data = mp_encode_uint(data, replica.id);
+		data = mp_encode_uint(data, replica.lsn);
+	}
+	size_t size = data - buf;
+	assert(size <= max_size);
+
+	iproto_header_encode(buf, IPROTO_OK, sync, schema_version,
+			     size - IPROTO_HEADER_LEN);
+
+	char *ptr = obuf_alloc(out, size);
+	assert(ptr == buf);
+	return 0;
+}
+
+int
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint32_t schema_version)
 {
@@ -813,6 +851,13 @@ xrow_decode_error(struct xrow_header *row)
 
 error:
 	box_error_set(__FILE__, __LINE__, code, error);
+}
+
+void
+xrow_encode_request_vote(struct xrow_header *row)
+{
+	memset(row, 0, sizeof(*row));
+	row->type = IPROTO_REQUEST_VOTE;
 }
 
 int

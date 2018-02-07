@@ -93,6 +93,8 @@ struct applier {
 	struct uri uri;
 	/** Remote version encoded as a number, see version_id() macro */
 	uint32_t version_id;
+	/** Remote vclock at time of connect. */
+	struct vclock vclock;
 	/** Remote address */
 	union {
 		struct sockaddr addr;
