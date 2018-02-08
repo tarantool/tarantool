@@ -2,7 +2,7 @@
 
 import sys
 from gevent.pywsgi import WSGIServer
-from gevent import spawn, sleep
+from gevent import spawn, sleep, socket
 
 def absent():
     code = "500 Server Error"
@@ -89,10 +89,6 @@ def handle(env, response) :
         return other_handle(env, response, method, "200 Ok")
     return other_handle(env, response, method, "400 Bad Request")
 
-if len(sys.argv) < 3:
-    sys.stderr.write("Usage: %s HOST PORT\n" % sys.argv[0])
-    sys.exit(1)
-
 def heartbeat():
     try:
         while True:
@@ -102,6 +98,29 @@ def heartbeat():
     except IOError:
         sys.exit(1)
 
-server = WSGIServer((sys.argv[1], int(sys.argv[2])), handle, log=None)
+def usage():
+    sys.stderr.write("Usage: %s { --inet HOST:PORT | --unix PATH }\n" %
+                     sys.argv[0])
+    sys.exit(1)
+
+if len(sys.argv) != 3:
+    usage()
+
+if sys.argv[1] == "--inet":
+    host, port = sys.argv[2].split(':')
+    sock_family = socket.AF_INET
+    sock_addr = (host, int(port))
+elif sys.argv[1] == "--unix":
+    path = sys.argv[2]
+    sock_family = socket.AF_UNIX
+    sock_addr = path
+else:
+    usage()
+
+sock = socket.socket(sock_family, socket.SOCK_STREAM)
+sock.bind(sock_addr)
+sock.listen(10)
+
+server = WSGIServer(sock, handle, log=None)
 spawn(heartbeat)
 server.serve_forever()
