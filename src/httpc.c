@@ -263,6 +263,22 @@ httpc_set_ca_file(struct httpc_request *req, const char *ca_file)
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_CAINFO, ca_file);
 }
 
+int
+httpc_set_unix_socket(struct httpc_request *req, const char *unix_socket)
+{
+#ifdef CURL_VERSION_UNIX_SOCKETS
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_UNIX_SOCKET_PATH, unix_socket);
+	return 0;
+#else
+#pragma message "UNIX_SOCKETS are not supported, please upgrade curl to 7.40.0"
+	(void) req;
+	(void) unix_socket;
+	diag_set(IllegalParams, "tarantool was build without unix socket support,"
+				" please upgrade libcurl to 7.40 and rebuild it");
+	return -1;
+#endif
+}
+
 void
 httpc_set_verify_host(struct httpc_request *req, long verify)
 {

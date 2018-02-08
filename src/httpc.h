@@ -221,6 +221,18 @@ void
 httpc_set_ca_file(struct httpc_request *req, const char *ca_file);
 
 /**
+ * Specify path to Unix domain socket
+ * @param req request
+ * @param unix_socket - path to Unix domain socket used as connection
+ * endpoint instead of TCP. The application does not have to keep the string
+ * around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_UNIX_SOCKET_PATH.html
+ * @return 0 on success
+ */
+int
+httpc_set_unix_socket(struct httpc_request *req, const char *unix_socket);
+
+/**
  * Enables/disables verification of the certificate's name (CN) against host
  * @param req request
  * @param verify flag
