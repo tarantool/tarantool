@@ -169,9 +169,6 @@ sqlite3CursorMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
 	assert((pCur->curFlags & BTCF_TaCursor) ||
 	       (pCur->curFlags & BTCF_TEphemCursor));
 
-	if (pCur->curFlags & BTCF_TaCursor) {
-		return tarantoolSqlite3MovetoUnpacked(pCur, pIdxKey, pRes);
-	}
 	return tarantoolSqlite3MovetoUnpacked(pCur, pIdxKey, pRes);
 }
 
@@ -184,10 +181,7 @@ sqlite3CursorNext(BtCursor *pCur, int *pRes)
 	       (pCur->curFlags & BTCF_TEphemCursor));
 
 	*pRes = 0;
-	if (pCur->curFlags & BTCF_TaCursor) {
-		return tarantoolSqlite3Next(pCur, pRes);
-	}
-	return tarantoolSqlite3EphemeralNext(pCur, pRes);
+	return tarantoolSqlite3Next(pCur, pRes);
 }
 
 int
@@ -199,10 +193,7 @@ sqlite3CursorPrevious(BtCursor *pCur, int *pRes)
 	       (pCur->curFlags & BTCF_TEphemCursor));
 
 	*pRes = 0;
-	if (pCur->curFlags & BTCF_TaCursor) {
-		return tarantoolSqlite3Previous(pCur, pRes);
-	}
-	return tarantoolSqlite3EphemeralPrevious(pCur, pRes);
+	return tarantoolSqlite3Previous(pCur, pRes);
 }
 
 /*

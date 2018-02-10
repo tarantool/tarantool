@@ -4197,13 +4197,7 @@ case OP_Last: {        /* jump */
 	pC->seekOp = OP_Last;
 #endif
 	if (pOp->p3==0 || !sqlite3CursorIsValidNN(pCrsr)) {
-		if (pCrsr->curFlags & BTCF_TaCursor) {
-			rc = tarantoolSqlite3Last(pCrsr, &res);
-		} else if (pCrsr->curFlags & BTCF_TEphemCursor) {
-			rc = tarantoolSqlite3EphemeralLast(pCrsr, &res);
-		} else {
-			unreachable();
-		}
+		rc = tarantoolSqlite3Last(pCrsr, &res);
 		pC->nullRow = (u8)res;
 		pC->deferredMoveto = 0;
 		pC->cacheStatus = CACHE_STALE;
@@ -4281,13 +4275,7 @@ case OP_Rewind: {        /* jump */
 		assert(pC->eCurType==CURTYPE_TARANTOOL);
 		pCrsr = pC->uc.pCursor;
 		assert(pCrsr);
-		if (pCrsr->curFlags & BTCF_TaCursor) {
-			rc = tarantoolSqlite3First(pCrsr, &res);
-		} else if (pCrsr->curFlags & BTCF_TEphemCursor) {
-			rc = tarantoolSqlite3EphemeralFirst(pCrsr, &res);
-		} else {
-			unreachable();
-		}
+		rc = tarantoolSqlite3First(pCrsr, &res);
 		pC->deferredMoveto = 0;
 		pC->cacheStatus = CACHE_STALE;
 	}

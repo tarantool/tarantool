@@ -98,11 +98,7 @@ int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count,
 				    struct coll *aColl);
 int tarantoolSqlite3EphemeralInsert(BtCursor * pCur, const CursorPayload * pX);
 int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
-int tarantoolSqlite3EphemeralFirst(BtCursor * pCur, int * pRes);
-int tarantoolSqlite3EphemeralNext(BtCursor * pCur, int * pRes);
-int tarantoolSqlite3EphemeralLast(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralCount(BtCursor * pCur, i64 * pnEntry);
-int tarantoolSqlite3EphemeralPrevious(BtCursor * pCur, int * pRes);
 int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);
 int tarantoolSqlite3EphemeralClearTable(BtCursor * pCur);
 int tarantoolSqlite3EphemeralGetMaxId(BtCursor * pCur, uint32_t fieldno,
