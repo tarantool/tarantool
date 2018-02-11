@@ -142,19 +142,3 @@ space = nil
 pk = nil
 ---
 ...
--------------------------------------------------------------------------------
--- space:len() is unsupported
--------------------------------------------------------------------------------
-space = box.schema.space.create('test_len', { engine = 'vinyl' })
----
-...
-_ = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
----
-...
-space:len()
----
-- error: Index 'primary' (TREE) of space 'test_len' (vinyl) does not support size()
-...
-space:drop()
----
-...

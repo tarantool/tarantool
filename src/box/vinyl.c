@@ -1200,15 +1200,49 @@ vinyl_space_build_secondary_key(struct space *old_space,
 static size_t
 vinyl_space_bsize(struct space *space)
 {
-	(void)space;
-	return 0;
+	/*
+	 * Return the sum size of user data this space
+	 * accommodates. Since full tuples are stored in
+	 * primary indexes, it is basically the size of
+	 * binary data stored in this space's primary index.
+	 */
+	struct index *pk_base = space_index(space, 0);
+	if (pk_base == NULL)
+		return 0;
+	struct vy_index *pk = vy_index(pk_base);
+	return pk->stat.memory.count.bytes + pk->stat.disk.count.bytes;
+}
+
+static ssize_t
+vinyl_index_size(struct index *base)
+{
+	/*
+	 * Return the total number of statements in the index.
+	 * Note, it may be greater than the number of tuples
+	 * actually stored in the space, but it should be a
+	 * fairly good estimate.
+	 */
+	struct vy_index *index = vy_index(base);
+	return index->stat.memory.count.rows + index->stat.disk.count.rows;
 }
 
 static ssize_t
 vinyl_index_bsize(struct index *base)
 {
+	/*
+	 * Return the cost of indexing user data. For both
+	 * primary and secondary indexes, this includes the
+	 * size of page index, bloom filter, and memory tree
+	 * extents. For secondary indexes, we also add the
+	 * total size of statements stored on disk, because
+	 * they are only needed for building the index.
+	 */
 	struct vy_index *index = vy_index(base);
-	return index->stat.memory.count.bytes;
+	ssize_t bsize = vy_index_mem_tree_size(index) +
+		index->page_index_size + index->bloom_size;
+	if (index->id > 0)
+		bsize += index->stat.disk.count.bytes;
+	return bsize;
 }
 
 /* {{{ Public API of transaction control: start/end transaction,
@@ -4001,7 +4035,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .commit_create = */ vinyl_index_commit_create,
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
-	/* .size = */ generic_index_size,
+	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,

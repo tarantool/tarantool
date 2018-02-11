@@ -85,21 +85,6 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 space:drop()
 
 --
--- gh-1632: index:bsize()
---
-space = box.schema.space.create('test', { engine = 'vinyl' })
-pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}  })
-for i=1,10 do box.space.test:replace({i}) end
-box.space.test.index.primary:bsize() > 0
-
-box.snapshot()
-while space.index.primary:info().run_count ~= 1 do fiber.sleep(0.01) end
-
-box.space.test.index.primary:bsize() == 0
-
-space:drop()
-
---
 -- gh-1709: need error on altering space
 --
 space = box.schema.space.create('test', {engine='vinyl'})
