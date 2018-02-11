@@ -553,6 +553,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			sqlite3VdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn-1);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy,
 					  nColumn + 1, regRec);
+			/* Set flag to save memory allocating one by malloc. */
+			sqlite3VdbeChangeP5(v, 1);
 			sqlite3VdbeAddOp2(v, OP_IdxInsert, srcTab, regRec);
 
 			sqlite3VdbeGoto(v, addrL);

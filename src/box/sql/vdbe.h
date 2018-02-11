@@ -261,6 +261,7 @@ void sqlite3VdbeRecordUnpackMsgpack(KeyInfo *, int, const void *,
 int sqlite3VdbeRecordCompare(int, const void *, UnpackedRecord *);
 int sqlite3VdbeRecordCompareWithSkip(int, const void *, UnpackedRecord *, int);
 UnpackedRecord *sqlite3VdbeAllocUnpackedRecord(KeyInfo *);
+int sql_vdbe_mem_alloc_region(Mem *, uint32_t);
 
 typedef int (*RecordCompare) (int, const void *, UnpackedRecord *);
 RecordCompare sqlite3VdbeFindCompare(UnpackedRecord *);

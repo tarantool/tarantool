@@ -526,21 +526,15 @@ static int insertOrReplace(BtCursor *pCur, const CursorPayload *pX,
 	assert(operationType == TARANTOOL_INDEX_INSERT ||
 	       operationType == TARANTOOL_INDEX_REPLACE);
 
-	char *buf = (char*)region_alloc(&fiber()->gc, pX->nKey);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, pX->nKey, "region", "buf");
-		return SQLITE_NOMEM;
-	}
-
-	memcpy(buf, pX->pKey, pX->nKey);
 	int space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
-
 	int rc;
 	if (operationType == TARANTOOL_INDEX_INSERT) {
-		rc = box_insert(space_id, buf, (const char *)buf + pX->nKey,
+		rc = box_insert(space_id, pX->pKey,
+				(const char *)pX->pKey + pX->nKey,
 				NULL /* result */);
 	} else {
-		rc = box_replace(space_id, buf, (const char *)buf + pX->nKey,
+		rc = box_replace(space_id, pX->pKey,
+				 (const char *)pX->pKey + pX->nKey,
 				 NULL /* result */);
 	}
 

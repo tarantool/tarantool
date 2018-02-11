@@ -405,6 +405,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 					  zAff, nPk);
 		sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iEph, regKey, iPk,
 				     nPk);
+		/* Set flag to save memory allocating one by malloc. */
+		sqlite3VdbeChangeP5(v, 1);
 	}
 	/* End the database scan loop.
 	 */

@@ -3550,6 +3550,18 @@ sqlite3VdbeAllocUnpackedRecord(KeyInfo * pKeyInfo)
 	return p;
 }
 
+/* Allocate memory for internal VDBE structure on region. */
+int
+sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
+{
+	vdbe_mem->n = size;
+	vdbe_mem->z = region_alloc(&fiber()->gc, size);
+	if (vdbe_mem->z == NULL)
+		return SQLITE_NOMEM;
+	MemSetTypeFlag(vdbe_mem, MEM_Blob | MEM_Ephem);
+	return SQLITE_OK;
+}
+
 #if SQLITE_DEBUG
 /*
  * This function compares two index or table record keys in the same way

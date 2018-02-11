@@ -2668,7 +2668,7 @@ case OP_Affinity: {
 	break;
 }
 
-/* Opcode: MakeRecord P1 P2 P3 P4 *
+/* Opcode: MakeRecord P1 P2 P3 P4 P5
  * Synopsis: r[P3]=mkrec(r[P1@P2])
  *
  * Convert P2 registers beginning with P1 into the [record format]
@@ -2683,6 +2683,9 @@ case OP_Affinity: {
  * macros defined in sqliteInt.h.
  *
  * If P4 is NULL then all index fields have the affinity BLOB.
+ *
+ * If P5 is not NULL then record under construction is intended to be inserted
+ * into ephemeral space. Thus, sort of memory optimization can be performed.
  */
 case OP_MakeRecord: {
 	Mem *pRec;             /* The new record */
@@ -2691,6 +2694,7 @@ case OP_MakeRecord: {
 	Mem MAYBE_UNUSED *pLast;  /* Last field of the record */
 	int nField;            /* Number of fields in the record */
 	char *zAffinity;       /* The affinity string for the record */
+	u8 bIsEphemeral;
 
 	/* Assuming the record contains N fields, the record format looks
 	 * like this:
@@ -2709,6 +2713,7 @@ case OP_MakeRecord: {
 	 */
 	nField = pOp->p1;
 	zAffinity = pOp->p4.z;
+	bIsEphemeral = pOp->p5;
 	assert(nField>0 && pOp->p2>0 && pOp->p2+nField<=(p->nMem+1 - p->nCursor)+1);
 	pData0 = &aMem[nField];
 	nField = pOp->p2;
@@ -2739,19 +2744,29 @@ case OP_MakeRecord: {
 		goto too_big;
 	}
 
-	/* Make sure the output register has a buffer large enough to store
-	 * the new record. The output register (pOp->p3) is not allowed to
-	 * be one of the input registers (because the following call to
-	 * sqlite3VdbeMemClearAndResize() could clobber the value before it is used).
+	/* In case of ephemeral space, it is possible to save some memory
+	 * allocating one by ordinary malloc: instead of cutting pieces
+	 * from region and waiting while they will be freed after
+	 * statement commitment, it is better to reuse the same chunk.
+	 * Such optimization is prohibited for ordinary spaces, since
+	 * memory shouldn't be reused until it is written into WAL.
 	 */
-	if (sqlite3VdbeMemClearAndResize(pOut, (int)nByte)) {
-		goto no_mem;
+	if (bIsEphemeral) {
+		rc = sqlite3VdbeMemClearAndResize(pOut, nByte);
+		pOut->flags = MEM_Blob;
+	} else {
+		/* Allocate memory on the region for the tuple
+		 * to be passed to Tarantool. Before that, make
+		 * sure previously allocated memory has gone.
+		 */
+		sqlite3VdbeMemRelease(pOut);
+		rc = sql_vdbe_mem_alloc_region(pOut, nByte);
 	}
-
+	if (rc)
+		goto no_mem;
 	/* Write the record */
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
 	pOut->n = sqlite3VdbeMsgpackRecordPut((u8 *)pOut->z, pData0, nField);
-	pOut->flags = MEM_Blob;
 	REGISTER_TRACE(pOp->p3, pOut);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
@@ -4128,11 +4143,11 @@ case OP_RowData: {
 		goto too_big;
 	}
 	testcase( n==0);
-	if (sqlite3VdbeMemClearAndResize(pOut, MAX(n,32))) {
+
+	sqlite3VdbeMemRelease(pOut);
+	rc = sql_vdbe_mem_alloc_region(pOut, n);
+	if (rc)
 		goto no_mem;
-	}
-	pOut->n = n;
-	MemSetTypeFlag(pOut, MEM_Blob);
 	rc = sqlite3CursorPayload(pCrsr, 0, n, pOut->z);
 	if (rc) goto abort_due_to_error;
 	UPDATE_MAX_BLOBSIZE(pOut);
@@ -4479,6 +4494,8 @@ case OP_IdxInsert: {        /* in2 */
 		BtCursor *pBtCur = pC->uc.pCursor;
 		assert((x.pKey == 0) == (pBtCur->pKeyInfo == 0));
 		if (pBtCur->curFlags & BTCF_TaCursor) {
+			/* Make sure that memory has been allocated on region. */
+			assert(aMem[pOp->p2].flags & MEM_Ephem);
 			if (pOp->opcode == OP_IdxInsert)
 				rc = tarantoolSqlite3Insert(pBtCur, &x);
 			else
