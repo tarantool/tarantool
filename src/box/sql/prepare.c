@@ -264,7 +264,7 @@ sqlite3Init(sqlite3 * db)
 
 	db->init.busy = 0;
 	if (rc == SQLITE_OK && commit_internal) {
-		sqlite3CommitInternalChanges(db);
+		sqlite3CommitInternalChanges();
 	}
 
 	return rc;

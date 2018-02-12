@@ -2690,7 +2690,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					p->nDeferredImmCons = 0;
 					user_session->sql_flags &=
 					    ~SQLITE_DeferFKs;
-					sqlite3CommitInternalChanges(p->db);
+					sqlite3CommitInternalChanges();
 				}
 			} else {
 				box_txn_rollback();
