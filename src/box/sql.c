@@ -184,7 +184,18 @@ cursor_ephemeral_advance(BtCursor *pCur, int *pRes);
 
 const char *tarantoolErrorMessage()
 {
+	if (diag_is_empty(&fiber()->diag))
+		return NULL;
 	return box_error_message(box_error_last());
+}
+
+int
+is_tarantool_error(int rc)
+{
+	return (rc == SQL_TARANTOOL_ERROR ||
+		rc == SQL_TARANTOOL_ITERATOR_FAIL ||
+		rc == SQL_TARANTOOL_DELETE_FAIL ||
+		rc == SQL_TARANTOOL_INSERT_FAIL);
 }
 
 int tarantoolSqlite3CloseCursor(BtCursor *pCur)
@@ -483,7 +494,7 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 							      &key_list);
 	if (ephemer_new_space == NULL) {
 		diag_log();
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ERROR;
 	}
 	struct ta_cursor *c = NULL;
 	c = cursor_create(c, field_count /* key size */);
@@ -521,7 +532,7 @@ int tarantoolSqlite3EphemeralInsert(BtCursor *pCur, const CursorPayload *pX)
 	if (space_ephemeral_replace(space, pX->pKey,
 				    pX->pKey + pX->nKey) != 0) {
 		diag_log();
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_INSERT_FAIL;
 	}
 	return SQLITE_OK;
 }
@@ -549,7 +560,7 @@ static int insertOrReplace(BtCursor *pCur, const CursorPayload *pX,
 	char *buf = (char*)region_alloc(&fiber()->gc, pX->nKey);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, pX->nKey, "region", "buf");
-		return SQLITE_TARANTOOL_ERROR;
+		return SQLITE_NOMEM;
 	}
 
 	memcpy(buf, pX->pKey, pX->nKey);
@@ -564,7 +575,7 @@ static int insertOrReplace(BtCursor *pCur, const CursorPayload *pX,
 				 NULL /* result */);
 	}
 
-	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;;
+	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;;
 }
 
 int tarantoolSqlite3Insert(BtCursor *pCur, const CursorPayload *pX)
@@ -602,12 +613,12 @@ int tarantoolSqlite3EphemeralDelete(BtCursor *pCur)
 				box_iterator_key_def(c->iter),
 				&key_size);
 	if (key == NULL)
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_DELETE_FAIL;
 
 	int rc = space_ephemeral_delete(ephem_space, key);
 	if (rc != 0) {
 		diag_log();
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_DELETE_FAIL;
 	}
 	return SQLITE_OK;
 }
@@ -634,11 +645,11 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 				box_iterator_key_def(c->iter),
 				&key_size);
 	if (key == NULL)
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_DELETE_FAIL;
 
 	rc = box_delete(space_id, index_id, key, key + key_size, NULL);
 
-	return rc == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_DELETE_FAIL;
 }
 
 /*
@@ -663,7 +674,7 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor *pCur)
 						    0 /* part_count */);
 	if (it == NULL) {
 		pCur->eState = CURSOR_INVALID;
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 
 	struct tuple *tuple;
@@ -674,7 +685,8 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor *pCur)
 		key = tuple_extract_key(tuple, box_iterator_key_def(it),
 					&key_size);
 		if (space_ephemeral_delete(ephem_space, key) != 0) {
-			return SQLITE_TARANTOOL_ERROR;
+			iterator_delete(it);
+			return SQL_TARANTOOL_DELETE_FAIL;
 		}
 	}
 	iterator_delete(it);
@@ -706,19 +718,21 @@ int tarantoolSqlite3ClearTable(int iTable)
 		iter = box_index_iterator(space_id, primary_index_id, ITER_ALL,
 					  nil_key, nil_key + sizeof(nil_key));
 		if (iter == NULL)
-			return SQLITE_TARANTOOL_ERROR;
+			return SQL_TARANTOOL_ITERATOR_FAIL;
 		while (box_iterator_next(iter, &tuple) == 0 && tuple != NULL) {
 			key = tuple_extract_key(tuple,
 						box_iterator_key_def(iter),
 						&key_size);
 			rc = box_delete(space_id, primary_index_id, key,
 					key + key_size, NULL);
-			if (rc != 0)
-				return SQLITE_TARANTOOL_ERROR;
+			if (rc != 0) {
+				box_iterator_free(iter);
+				return SQL_TARANTOOL_DELETE_FAIL;
+			}
 		}
 		box_iterator_free(iter);
 	} else if (box_truncate(space_id) != 0) {
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_DELETE_FAIL;
 	}
 
 	return SQLITE_OK;
@@ -750,9 +764,10 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 
 	box_iterator_t *iter = box_index_iterator(BOX_TRIGGER_ID, 0, ITER_EQ,
 						  key_begin, key);
-	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0)
-		goto rename_fail;
-
+	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0) {
+		box_iterator_free(iter);
+		return SQL_TARANTOOL_ERROR;
+	}
 	assert(tuple_field_count(tuple) == 2);
 	const char *field = box_tuple_field(tuple, 1);
 	assert(mp_typeof(*field) == MP_MAP);
@@ -788,15 +803,17 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 
 	rc = box_replace(BOX_TRIGGER_ID, new_tuple, new_tuple_end, &tuple);
 
-	if (rc != 0 || tuple == NULL)
-		goto rename_fail;
 	box_iterator_free(iter);
+	if (rc != 0 || tuple == NULL)
+		return SQL_TARANTOOL_ERROR;
 
 	return SQLITE_OK;
 
 rename_fail:
+	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
+		"created not via SQL facilities");
 	box_iterator_free(iter);
-	return SQLITE_TARANTOOL_ERROR;
+	return SQL_TARANTOOL_ERROR;
 }
 
 /*
@@ -833,8 +850,10 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 	box_iterator_t *iter = box_index_iterator(BOX_SPACE_ID, 0, ITER_EQ,
 						  key_begin, key);
 
-	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0)
-		goto rename_fail;
+	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0) {
+		box_iterator_free(iter);
+		return SQL_TARANTOOL_ERROR;
+	}
 
 	/* Code below relies on format of _space. If number of fields or their
 	 * order will ever change, this code should be changed too.
@@ -908,16 +927,17 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 
 	rc = box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, &tuple);
 
-	if (rc != 0 || tuple == NULL)
-		goto rename_fail;
 	box_iterator_free(iter);
+	if (rc != 0 || tuple == NULL)
+		return SQL_TARANTOOL_ERROR;
 
 	return SQLITE_OK;
 
 rename_fail:
-	sqlite3Error(db, SQLITE_ERROR);
+	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
+		"created not via SQL facilities");
 	box_iterator_free(iter);
-	return SQLITE_ERROR;
+	return SQL_TARANTOOL_ERROR;
 }
 
 /*
@@ -944,8 +964,10 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 	box_iterator_t *iter = box_index_iterator(BOX_SPACE_ID, 0, ITER_EQ,
 						  key_begin, key);
 
-	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0)
-		goto rename_fail;
+	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0) {
+		box_iterator_free(iter);
+		return SQL_TARANTOOL_ERROR;
+	}
 
 	assert(tuple_field_count(tuple) == 7);
 	const char *sql_stmt_map = box_tuple_field(tuple, 5);
@@ -1000,16 +1022,17 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 
 	rc = box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, &tuple);
 
-	if (rc != 0 || tuple == NULL)
-		goto rename_fail;
 	box_iterator_free(iter);
+	if (rc != 0 || tuple == NULL)
+		return SQL_TARANTOOL_ERROR;
 
 	return SQLITE_OK;
 
 rename_fail:
-	sqlite3Error(db, SQLITE_ERROR);
+	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
+		"created not via SQL facilities");
 	box_iterator_free(iter);
-	return SQLITE_ERROR;
+	return SQL_TARANTOOL_ERROR;
 }
 
 
@@ -1144,7 +1167,7 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 		0,
 		&res);
 	if (rc != 0 || res == NULL) {
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ERROR;
 	}
 	if (!c) {
 		c = cursor_create(NULL, 0);
@@ -1241,14 +1264,14 @@ cursor_ephemeral_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	struct index *index = *ephem_space->index;
 	if (key_validate(index->def, type, key, part_count)) {
 		diag_log();
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 
 	struct iterator *it = index_create_iterator(*ephem_space->index, type,
 						    key, part_count);
 	if (it == NULL) {
 		pCur->eState = CURSOR_INVALID;
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 	c->iter = it;
 	c->type = type;
@@ -1296,7 +1319,7 @@ cursor_seek(BtCursor *pCur, int *pRes, enum iterator_type type,
 	c->iter = box_index_iterator(space_id, index_id, type, k, ke);
 	if (c->iter == NULL) {
 		pCur->eState = CURSOR_INVALID;
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 	c->type = type;
 	pCur->eState = CURSOR_VALID;
@@ -1323,9 +1346,9 @@ cursor_ephemeral_advance(BtCursor *pCur, int *pRes)
 
 	struct tuple *tuple;
 	if (iterator_next(c->iter, &tuple) != 0)
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	if (tuple != NULL && tuple_bless(tuple) == NULL)
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	if (c->tuple_last) box_tuple_unref(c->tuple_last);
 	if (tuple) {
 		box_tuple_ref(tuple);
@@ -1353,7 +1376,7 @@ cursor_advance(BtCursor *pCur, int *pRes)
 
 	rc = box_iterator_next(c->iter, &tuple);
 	if (rc)
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ITERATOR_FAIL;
 	if (c->tuple_last) box_tuple_unref(c->tuple_last);
 	if (tuple) {
 		box_tuple_ref(tuple);
@@ -1492,7 +1515,7 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 
 	/* Read _space */
 	if (space_foreach(space_foreach_put_cb, init) != 0) {
-		init->rc = SQLITE_TARANTOOL_ERROR;
+		init->rc = SQL_TARANTOOL_ERROR;
 		return;
 	}
 
@@ -1501,7 +1524,7 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 				nil_key, nil_key + sizeof(nil_key));
 
 	if (it == NULL) {
-		init->rc = SQLITE_TARANTOOL_ERROR;
+		init->rc = SQL_TARANTOOL_ITERATOR_FAIL;
 		return;
 	}
 
@@ -1833,10 +1856,10 @@ int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
 
 	uint32_t part_count = primary_index->def->key_def->part_count;
 	if (index_max(primary_index, key, part_count, &tuple) != 0) {
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ERROR;
 	}
 	if (tuple != NULL && tuple_bless(tuple) == NULL)
-		return SQLITE_TARANTOOL_ERROR;
+		return SQL_TARANTOOL_ERROR;
 
 	if (tuple == NULL) {
 		*max_id = 0;

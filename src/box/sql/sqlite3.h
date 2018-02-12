@@ -442,9 +442,12 @@ sqlite3_exec(sqlite3 *,	/* An open database */
 #define SQLITE_FORMAT      24	/* Auxiliary database format error */
 #define SQLITE_RANGE       25	/* 2nd parameter to sqlite3_bind out of range */
 #define SQLITE_NOTADB      26	/* File opened that is not a database file */
-#define SQLITE_TARANTOOL_ERROR 27
-#define SQLITE_NOTICE      28	/* Notifications from sqlite3_log() */
-#define SQLITE_WARNING     29	/* Warnings from sqlite3_log() */
+#define SQL_TARANTOOL_ITERATOR_FAIL 27
+#define SQL_TARANTOOL_INSERT_FAIL   28
+#define SQL_TARANTOOL_DELETE_FAIL   29
+#define SQL_TARANTOOL_ERROR         30
+#define SQLITE_NOTICE      31	/* Notifications from sqlite3_log() */
+#define SQLITE_WARNING     32	/* Warnings from sqlite3_log() */
 #define SQLITE_ROW         100	/* sqlite3_step() has another row ready */
 #define SQLITE_DONE        101	/* sqlite3_step() has finished executing */
 /* end-of-error-codes */

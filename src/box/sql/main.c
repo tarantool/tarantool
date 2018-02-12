@@ -1222,7 +1222,7 @@ sqlite3ErrName(int rc)
 		case SQLITE_NOTADB:
 			zName = "SQLITE_NOTADB";
 			break;
-		case SQLITE_TARANTOOL_ERROR:
+		case SQL_TARANTOOL_ERROR:
 			zName = "SQLITE_TARANTOOL_ERROR";
 			break;
 		case SQLITE_ROW:
@@ -1295,7 +1295,10 @@ sqlite3ErrStr(int rc)
 		/* SQLITE_RANGE       */ "bind or column index out of range",
 		/* SQLITE_NOTADB      */
 		    "file is encrypted or is not a database",
-		/* SQLITE_TARANTOOL_ERROR */ "sqlite/tarantool error",
+		/* SQL_TARANTOOL_ITERATOR_FAIL */ "Tarantool's iterator failed",
+		/* SQL_TARANTOOL_INSERT_FAIL */ "Tarantool's insert failed",
+		/* SQL_TARANTOOL_DELETE_FAIL */ "Tarantool's delete failed",
+		/* SQL_TARANTOOL_ERROR */ "SQL-/Tarantool error",
 	};
 	const char *zErr = "unknown error";
 	switch (rc) {

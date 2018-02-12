@@ -2673,7 +2673,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					 */
 					rc = box_txn_commit() ==
 						    0 ? SQLITE_OK :
-						    SQLITE_TARANTOOL_ERROR;
+						    SQL_TARANTOOL_ERROR;
 					closeCursorsAndFree(p);
 				}
 				if (rc == SQLITE_BUSY && p->readOnly) {

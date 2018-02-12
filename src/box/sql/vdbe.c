@@ -2931,7 +2931,7 @@ case OP_FkCheckCommit: {
 		sqlite3VdbeHalt(p);
 		goto vdbe_return;
 	} else {
-		rc = box_txn_commit() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+		rc = box_txn_commit() == 0 ? SQLITE_OK : SQL_TARANTOOL_ERROR;
 		if (rc) goto abort_due_to_error;
 	}
 	break;
@@ -3067,7 +3067,7 @@ case OP_Transaction: {
  */
 case OP_TTransaction: {
 	if (p->autoCommit) {
-		rc = box_txn_begin() == 0 ? SQLITE_OK : SQLITE_TARANTOOL_ERROR;
+		rc = box_txn_begin() == 0 ? SQLITE_OK : SQL_TARANTOOL_ERROR;
 	}
 	if (box_txn()
 	    && p->autoCommit == 0){
@@ -5688,9 +5688,16 @@ abort_due_to_error:
 	if (db->mallocFailed) rc = SQLITE_NOMEM_BKPT;
 	assert(rc);
 	if (p->zErrMsg==0 && rc!=SQLITE_IOERR_NOMEM) {
-		const char *m = (rc!=SQLITE_TARANTOOL_ERROR) ? sqlite3ErrStr(rc) :
-			tarantoolErrorMessage();
-		sqlite3VdbeError(p, "%s", m);
+		const char *msg;
+		/* Avoiding situation when Tarantool error is set,
+		 * but error message isn't.
+		 */
+		if (is_tarantool_error(rc) && tarantoolErrorMessage()) {
+			msg = tarantoolErrorMessage();
+		} else {
+			msg = sqlite3ErrStr(rc);
+		}
+		sqlite3VdbeError(p, "%s", msg);
 	}
 	p->rc = rc;
 	sqlite3SystemError(db, rc);
