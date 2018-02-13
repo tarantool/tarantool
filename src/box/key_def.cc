@@ -225,7 +225,7 @@ key_part_check_compatibility(const struct key_part *old_parts,
 		const struct key_part *old_part = &old_parts[i];
 		if (old_part->fieldno != new_part->fieldno)
 			return false;
-		if (! field_type_is_compatible(old_part->type, new_part->type))
+		if (! field_type1_contains_type2(new_part->type, old_part->type))
 			return false;
 		if (old_part->coll != new_part->coll)
 			return false;
