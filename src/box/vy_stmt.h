@@ -40,7 +40,6 @@
 #include <bit/bit.h>
 
 #include "tuple.h"
-#include "tuple_compare.h"
 #include "iproto_constants.h"
 
 #if defined(__cplusplus)

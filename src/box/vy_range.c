@@ -46,7 +46,6 @@
 #include "key_def.h"
 #include "trivia/util.h"
 #include "tuple.h"
-#include "tuple_compare.h"
 #include "vy_run.h"
 #include "vy_stat.h"
 #include "vy_stmt.h"

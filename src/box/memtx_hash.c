@@ -32,7 +32,6 @@
 #include "say.h"
 #include "fiber.h"
 #include "tuple.h"
-#include "tuple_compare.h"
 #include "tuple_hash.h"
 #include "memtx_engine.h"
 #include "space.h"

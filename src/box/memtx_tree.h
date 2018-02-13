@@ -35,7 +35,6 @@
 
 #include "index.h"
 #include "memtx_engine.h"
-#include "tuple_compare.h"
 
 #if defined(__cplusplus)
 extern "C" {

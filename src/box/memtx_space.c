@@ -32,7 +32,6 @@
 #include "space.h"
 #include "iproto_constants.h"
 #include "txn.h"
-#include "tuple_compare.h"
 #include "tuple_update.h"
 #include "xrow.h"
 #include "memtx_hash.h"

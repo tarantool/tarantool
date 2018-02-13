@@ -38,7 +38,6 @@
 #include "session.h"
 #include "txn.h"
 #include "tuple.h"
-#include "tuple_compare.h"
 #include "tuple_update.h"
 #include "request.h"
 #include "xrow.h"
