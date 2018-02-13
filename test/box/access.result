@@ -747,7 +747,15 @@ box.schema.user.drop('guest')
 ---
 - error: 'Failed to drop user or role ''guest'': the user or the role is a system'
 ...
+box.schema.role.drop('guest')
+---
+- error: Role 'guest' is not found
+...
 box.space._user.index.name:delete{'guest'}
+---
+- error: 'Failed to drop user or role ''guest'': the user or the role is a system'
+...
+box.space._user:delete{box.schema.GUEST_ID}
 ---
 - error: 'Failed to drop user or role ''guest'': the user or the role is a system'
 ...
@@ -759,13 +767,25 @@ box.schema.user.drop('admin')
 ---
 - error: 'Failed to drop user or role ''admin'': the user or the role is a system'
 ...
+box.schema.role.drop('admin')
+---
+- error: Role 'admin' is not found
+...
 box.space._user.index.name:delete{'admin'}
+---
+- error: 'Failed to drop user or role ''admin'': the user or the role is a system'
+...
+box.space._user:delete{box.schema.ADMIN_ID}
 ---
 - error: 'Failed to drop user or role ''admin'': the user or the role is a system'
 ...
 #box.schema.user.info('admin') > 0
 ---
 - true
+...
+box.schema.user.drop('public')
+---
+- error: User 'public' is not found
 ...
 box.schema.role.drop('public')
 ---
@@ -775,7 +795,31 @@ box.space._user.index.name:delete{'public'}
 ---
 - error: 'Failed to drop user or role ''public'': the user or the role is a system'
 ...
+box.space._user:delete{box.schema.PUBLIC_ROLE_ID}
+---
+- error: 'Failed to drop user or role ''public'': the user or the role is a system'
+...
 #box.schema.role.info('public') > 0
+---
+- true
+...
+box.schema.role.drop('super')
+---
+- error: 'Failed to drop user or role ''super'': the user or the role is a system'
+...
+box.schema.user.drop('super')
+---
+- error: User 'super' is not found
+...
+box.space._user.index.name:delete{'super'}
+---
+- error: 'Failed to drop user or role ''super'': the user or the role is a system'
+...
+box.space._user:delete{box.schema.SUPER_ROLE_ID}
+---
+- error: 'Failed to drop user or role ''super'': the user or the role is a system'
+...
+#box.schema.role.info('super') > 0
 ---
 - true
 ...

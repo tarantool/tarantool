@@ -132,10 +132,13 @@ s:delete(1)
 -- Issue DML from trigger.
 s2 = box.schema.space.create('test2')
 _ = s2:create_index('pk')
-cb = function(old, new) s2:auto_increment{old, new} end
+cb = function(old, new) s2:insert{i, old, new} end
 s:before_replace(cb) == cb
+i = 1
 s:insert{1, 1}
+i = 2
 s:replace{1, 2}
+s:replace{1, 3} -- error: conflict in s2
 s:select()
 s2:select()
 
@@ -183,6 +186,22 @@ s:select()
 s:before_replace(nil, ret_update)
 s:on_replace(nil, save)
 s:delete(1)
+
+-- Nesting limit: space.before_replace
+cb = function(old, new) s:insert{1, 1} end
+s:before_replace(cb) == cb
+s:insert{1, 1} -- error
+s:select()
+s:before_replace(nil, cb)
+
+-- Nesting limit: space.before_replace + space.on_replace
+cb = function(old, new) s:delete(1) end
+s:before_replace(cb) == cb
+s:on_replace(cb) == cb
+s:insert{1, 1} -- error
+s:select()
+s:before_replace(nil, cb)
+s:on_replace(nil, cb)
 
 -- Make sure the server can recover from xlogs after
 -- using space:before_replace.

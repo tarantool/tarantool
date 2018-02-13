@@ -85,21 +85,6 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 space:drop()
 
 --
--- gh-1632: index:bsize()
---
-space = box.schema.space.create('test', { engine = 'vinyl' })
-pk = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned'}  })
-for i=1,10 do box.space.test:replace({i}) end
-box.space.test.index.primary:bsize() > 0
-
-box.snapshot()
-while space.index.primary:info().run_count ~= 1 do fiber.sleep(0.01) end
-
-box.space.test.index.primary:bsize() == 0
-
-space:drop()
-
---
 -- gh-1709: need error on altering space
 --
 space = box.schema.space.create('test', {engine='vinyl'})
@@ -269,3 +254,16 @@ box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serializ
 box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
 box.space.test.index.pk
 box.space.test:drop()
+
+-- gh-2449 change 'unique' index property from true to false
+s = box.schema.space.create('test', { engine = 'vinyl' })
+_ = s:create_index('primary')
+_ = s:create_index('secondary', {unique = true, parts = {2, 'unsigned'}})
+s:insert{1, 10}
+s.index.secondary:alter{unique = false} -- ok
+s.index.secondary.unique
+s.index.secondary:alter{unique = true} -- error
+s.index.secondary.unique
+s:insert{2, 10}
+s.index.secondary:select(10)
+s:drop()

@@ -167,10 +167,10 @@ txn_begin_stmt(struct space *space)
 	if (txn == NULL) {
 		txn = txn_begin(true);
 		if (txn == NULL)
-			goto fail;
+			return NULL;
 	} else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
 		diag_set(ClientError, ER_SUB_STMT_MAX);
-		goto fail;
+		return NULL;
 	}
 
 	if (trigger_run(&space->on_stmt_begin, txn) != 0)
@@ -185,12 +185,14 @@ txn_begin_stmt(struct space *space)
 		goto fail;
 	stmt->space = space;
 
-	if (engine_begin_statement(engine, txn) != 0)
-		goto fail;
-
+	if (engine_begin_statement(engine, txn) != 0) {
+		txn_rollback_stmt();
+		return NULL;
+	}
 	return txn;
 fail:
-	txn_rollback_stmt();
+	if (txn->is_autocommit && txn->in_sub_stmt == 0)
+		txn_rollback();
 	return NULL;
 }
 
@@ -326,13 +328,11 @@ void
 txn_rollback_stmt()
 {
 	struct txn *txn = in_txn();
-	if (txn == NULL)
-		return;
-	if (txn->is_autocommit)
-		return txn_rollback();
-	if (txn->in_sub_stmt == 0)
+	if (txn == NULL || txn->in_sub_stmt == 0)
 		return;
 	txn->in_sub_stmt--;
+	if (txn->is_autocommit && txn->in_sub_stmt == 0)
+		return txn_rollback();
 	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt]);
 }
 

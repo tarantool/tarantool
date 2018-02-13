@@ -429,6 +429,7 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	info_append_int(h, "lookup", stat->memory.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
 	info_table_end(h);
+	info_append_int(h, "index_size", vy_index_mem_tree_size(index));
 	info_table_end(h);
 
 	info_table_begin(h, "disk");
@@ -444,6 +445,8 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	info_table_end(h);
 	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
 	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
+	info_append_int(h, "index_size", index->page_index_size);
+	info_append_int(h, "bloom_size", index->bloom_size);
 	info_table_end(h);
 
 	info_table_begin(h, "cache");
@@ -453,6 +456,8 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 	vy_info_append_stmt_counter(h, "put", &cache_stat->put);
 	vy_info_append_stmt_counter(h, "invalidate", &cache_stat->invalidate);
 	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
+	info_append_int(h, "index_size",
+			vy_cache_tree_mem_used(&index->cache.cache_tree));
 	info_table_end(h);
 
 	info_table_begin(h, "txw");
@@ -1202,15 +1207,49 @@ vinyl_space_build_secondary_key(struct space *old_space,
 static size_t
 vinyl_space_bsize(struct space *space)
 {
-	(void)space;
-	return 0;
+	/*
+	 * Return the sum size of user data this space
+	 * accommodates. Since full tuples are stored in
+	 * primary indexes, it is basically the size of
+	 * binary data stored in this space's primary index.
+	 */
+	struct index *pk_base = space_index(space, 0);
+	if (pk_base == NULL)
+		return 0;
+	struct vy_index *pk = vy_index(pk_base);
+	return pk->stat.memory.count.bytes + pk->stat.disk.count.bytes;
+}
+
+static ssize_t
+vinyl_index_size(struct index *base)
+{
+	/*
+	 * Return the total number of statements in the index.
+	 * Note, it may be greater than the number of tuples
+	 * actually stored in the space, but it should be a
+	 * fairly good estimate.
+	 */
+	struct vy_index *index = vy_index(base);
+	return index->stat.memory.count.rows + index->stat.disk.count.rows;
 }
 
 static ssize_t
 vinyl_index_bsize(struct index *base)
 {
+	/*
+	 * Return the cost of indexing user data. For both
+	 * primary and secondary indexes, this includes the
+	 * size of page index, bloom filter, and memory tree
+	 * extents. For secondary indexes, we also add the
+	 * total size of statements stored on disk, because
+	 * they are only needed for building the index.
+	 */
 	struct vy_index *index = vy_index(base);
-	return index->stat.memory.count.bytes;
+	ssize_t bsize = vy_index_mem_tree_size(index) +
+		index->page_index_size + index->bloom_size;
+	if (index->id > 0)
+		bsize += index->stat.disk.count.bytes;
+	return bsize;
 }
 
 /* {{{ Public API of transaction control: start/end transaction,
@@ -4033,7 +4072,8 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .destroy = */ vinyl_index_destroy,
 	/* .commit_create = */ vinyl_index_commit_create,
 	/* .commit_drop = */ vinyl_index_commit_drop,
-	/* .size = */ generic_index_size,
+	/* .update_def = */ generic_index_update_def,
+	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,

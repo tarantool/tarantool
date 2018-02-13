@@ -133,6 +133,7 @@ istat()
     invalidate:
       rows: 0
       bytes: 0
+    index_size: 0
     rows: 0
     evict:
       rows: 0
@@ -150,6 +151,9 @@ istat()
     rows: 0
     bytes: 0
   disk:
+    index_size: 0
+    rows: 0
+    bytes: 0
     dump:
       in:
         rows: 0
@@ -166,7 +170,6 @@ istat()
       out:
         rows: 0
         bytes: 0
-    rows: 0
     iterator:
       read:
         bytes_compressed: 0
@@ -182,7 +185,7 @@ istat()
         bytes: 0
     pages: 0
     bytes_compressed: 0
-    bytes: 0
+    bloom_size: 0
   txw:
     bytes: 0
     rows: 0
@@ -194,6 +197,7 @@ istat()
   run_histogram: '[0]:1'
   memory:
     bytes: 0
+    index_size: 0
     rows: 0
     iterator:
       lookup: 0
@@ -260,10 +264,12 @@ stat_diff(istat(), st)
       out:
         rows: 25
         bytes: 26049
+    index_size: 294
     rows: 25
+    bloom_size: 4096
     pages: 7
-    bytes_compressed: <bytes_compressed>
     bytes: 26049
+    bytes_compressed: <bytes_compressed>
   bytes: 26049
   put:
     rows: 25
@@ -294,6 +300,11 @@ stat_diff(istat(), st)
       out:
         rows: 50
         bytes: 52091
+    index_size: 252
+    rows: 25
+    bytes_compressed: <bytes_compressed>
+    pages: 6
+    bytes: 26042
     compact:
       in:
         rows: 75
@@ -302,10 +313,6 @@ stat_diff(istat(), st)
       out:
         rows: 50
         bytes: 52091
-    rows: 25
-    pages: 6
-    bytes_compressed: <bytes_compressed>
-    bytes: 26042
   put:
     rows: 50
     bytes: 53050
@@ -323,9 +330,10 @@ s:get(1) ~= nil
 stat_diff(istat(), st)
 ---
 - cache:
+    index_size: 49152
+    rows: 1
     bytes: 1061
     lookup: 1
-    rows: 1
     put:
       rows: 1
       bytes: 1061
@@ -388,6 +396,7 @@ stat_diff(istat(), st)
     bytes: -1061
   rows: 1
   memory:
+    index_size: 49152
     bytes: 1061
     rows: 1
   put:
@@ -902,6 +911,225 @@ box.commit()
 stat_diff(gstat(), st, 'tx')
 ---
 - commit: 1
+...
+s:drop()
+---
+...
+--
+-- space.bsize, index.len, index.bsize
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+s:bsize()
+---
+- 0
+...
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}, run_count_per_level = 1})
+---
+...
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}, run_count_per_level = 1})
+---
+...
+s:bsize()
+---
+- 0
+...
+i1:len(), i2:len()
+---
+- 0
+- 0
+...
+i1:bsize(), i2:bsize()
+---
+- 0
+- 0
+...
+for i = 1, 100, 2 do s:replace{i, i, pad()} end
+---
+...
+st1 = i1:info()
+---
+...
+st2 = i2:info()
+---
+...
+s:bsize()
+---
+- 53300
+...
+i1:len(), i2:len()
+---
+- 50
+- 50
+...
+i1:bsize(), i2:bsize()
+---
+- 49152
+- 49152
+...
+s:bsize() == st1.memory.bytes
+---
+- true
+...
+i1:len() == st1.memory.rows
+---
+- true
+...
+i2:len() == st2.memory.rows
+---
+- true
+...
+i1:bsize() == st1.memory.index_size
+---
+- true
+...
+i2:bsize() == st2.memory.index_size
+---
+- true
+...
+box.snapshot()
+---
+- ok
+...
+st1 = i1:info()
+---
+...
+st2 = i2:info()
+---
+...
+s:bsize()
+---
+- 52199
+...
+i1:len(), i2:len()
+---
+- 50
+- 50
+...
+i1:bsize(), i2:bsize()
+---
+- 4390
+- 4946
+...
+s:bsize() == st1.disk.bytes
+---
+- true
+...
+i1:len() == st1.disk.rows
+---
+- true
+...
+i2:len() == st2.disk.rows
+---
+- true
+...
+i1:bsize() == st1.disk.index_size + st1.disk.bloom_size
+---
+- true
+...
+i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+---
+- true
+...
+for i = 1, 100, 2 do s:delete(i) end
+---
+...
+for i = 2, 100, 2 do s:replace{i, i, pad()} end
+---
+...
+st1 = i1:info()
+---
+...
+st2 = i2:info()
+---
+...
+s:bsize()
+---
+- 107449
+...
+i1:len(), i2:len()
+---
+- 150
+- 150
+...
+i1:bsize(), i2:bsize()
+---
+- 53542
+- 54098
+...
+s:bsize() == st1.memory.bytes + st1.disk.bytes
+---
+- true
+...
+i1:len() == st1.memory.rows + st1.disk.rows
+---
+- true
+...
+i2:len() == st2.memory.rows + st2.disk.rows
+---
+- true
+...
+i1:bsize() == st1.memory.index_size + st1.disk.index_size + st1.disk.bloom_size
+---
+- true
+...
+i2:bsize() == st2.memory.index_size + st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+---
+- true
+...
+box.snapshot()
+---
+- ok
+...
+wait(function() return i1:info() end, st1, 'disk.compact.count', 1)
+---
+...
+wait(function() return i2:info() end, st2, 'disk.compact.count', 1)
+---
+...
+st1 = i1:info()
+---
+...
+st2 = i2:info()
+---
+...
+s:bsize()
+---
+- 52199
+...
+i1:len(), i2:len()
+---
+- 50
+- 50
+...
+i1:bsize(), i2:bsize()
+---
+- 4390
+- 4946
+...
+s:bsize() == st1.disk.bytes
+---
+- true
+...
+i1:len() == st1.disk.rows
+---
+- true
+...
+i2:len() == st2.disk.rows
+---
+- true
+...
+i1:bsize() == st1.disk.index_size + st1.disk.bloom_size
+---
+- true
+...
+i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+---
+- true
+...
+s:drop()
+---
 ...
 test_run:cmd('switch default')
 ---

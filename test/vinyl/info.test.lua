@@ -309,6 +309,73 @@ stat_diff(gstat(), st, 'tx')
 box.commit()
 stat_diff(gstat(), st, 'tx')
 
+s:drop()
+
+--
+-- space.bsize, index.len, index.bsize
+--
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+s:bsize()
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}, run_count_per_level = 1})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}, run_count_per_level = 1})
+s:bsize()
+i1:len(), i2:len()
+i1:bsize(), i2:bsize()
+
+for i = 1, 100, 2 do s:replace{i, i, pad()} end
+st1 = i1:info()
+st2 = i2:info()
+s:bsize()
+i1:len(), i2:len()
+i1:bsize(), i2:bsize()
+s:bsize() == st1.memory.bytes
+i1:len() == st1.memory.rows
+i2:len() == st2.memory.rows
+i1:bsize() == st1.memory.index_size
+i2:bsize() == st2.memory.index_size
+
+box.snapshot()
+st1 = i1:info()
+st2 = i2:info()
+s:bsize()
+i1:len(), i2:len()
+i1:bsize(), i2:bsize()
+s:bsize() == st1.disk.bytes
+i1:len() == st1.disk.rows
+i2:len() == st2.disk.rows
+i1:bsize() == st1.disk.index_size + st1.disk.bloom_size
+i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+
+for i = 1, 100, 2 do s:delete(i) end
+for i = 2, 100, 2 do s:replace{i, i, pad()} end
+st1 = i1:info()
+st2 = i2:info()
+s:bsize()
+i1:len(), i2:len()
+i1:bsize(), i2:bsize()
+s:bsize() == st1.memory.bytes + st1.disk.bytes
+i1:len() == st1.memory.rows + st1.disk.rows
+i2:len() == st2.memory.rows + st2.disk.rows
+i1:bsize() == st1.memory.index_size + st1.disk.index_size + st1.disk.bloom_size
+i2:bsize() == st2.memory.index_size + st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+
+box.snapshot()
+wait(function() return i1:info() end, st1, 'disk.compact.count', 1)
+wait(function() return i2:info() end, st2, 'disk.compact.count', 1)
+st1 = i1:info()
+st2 = i2:info()
+s:bsize()
+i1:len(), i2:len()
+i1:bsize(), i2:bsize()
+s:bsize() == st1.disk.bytes
+i1:len() == st1.disk.rows
+i2:len() == st2.disk.rows
+i1:bsize() == st1.disk.index_size + st1.disk.bloom_size
+i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+
+s:drop()
+
 test_run:cmd('switch default')
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')

@@ -7,29 +7,43 @@ local test = tap.test("curl")
 local fiber = require('fiber')
 local socketlib = require('socket')
 local os = require('os')
-local yaml = require('yaml')
 
 local TARANTOOL_SRC_DIR = os.getenv("TARANTOOL_SRC_DIR") or "../.."
+test:diag("TARANTOOL_SRC_DIR=%s", TARANTOOL_SRC_DIR)
 
-test:plan(9)
+local function merge(...)
+    local res = {}
+    for i = 1, select('#', ...) do
+        local t = select(i, ...)
+        for k, v in pairs(t) do
+            res[k] = v
+        end
+    end
+    return res
+end
 
-local function start_server()
-    local s = socketlib('AF_INET', 'SOCK_STREAM', 0)
-    s:bind('127.0.0.1', 0)
-    local host = s:name().host
-    local port = s:name().port
-    s:close()
-    test:diag("TARANTOOL_SRC_DIR="..TARANTOOL_SRC_DIR)
-    test:diag("starting HTTP server on %s:%s...", host, port)
-    local cmd = string.format("%s/test/app-tap/httpd.py %s %s",
-            TARANTOOL_SRC_DIR, host, port)
+local function start_server(test, sock_family, sock_addr)
+    test:diag("starting HTTP server on %s...", sock_addr)
+    local arg, url, opts
+    if sock_family == 'AF_INET' then
+        arg = string.format("--inet %s", sock_addr)
+        url = string.format("http://%s/", sock_addr)
+        opts = {}
+    elseif sock_family == 'AF_UNIX' then
+        arg = string.format("--unix %s", sock_addr)
+        url = "http://localhost/"
+        opts = {unix_socket = sock_addr}
+    else
+        error(string.format('invalid socket family: %s', sock_family))
+    end
+    local cmd = string.format("%s/test/app-tap/httpd.py %s",
+                              TARANTOOL_SRC_DIR, arg)
     local server = io.popen(cmd)
     test:is(server:read("*l"), "heartbeat", "server started")
-    local url = string.format("http://%s:%s/", host, port)
     test:diag("trying to connect to %s", url)
     local r
     for i=1,10 do
-        r = client.get(url, {timeout = 0.01})
+        r = client.get(url, merge(opts, {timeout = 0.01}))
         if r.status == 200 then
             break
         end
@@ -39,22 +53,20 @@ local function start_server()
     if r.status ~= 200 then
         os.exit(1)
     end
-    return server, url
+    return server, url, opts
 end
 
-local function stop_server(server)
+local function stop_server(test, server)
     test:diag("stopping HTTP server")
     server:close()
 end
 
-local server, URL = start_server()
-
-test:test("http.client", function(test)
+local function test_http_client(test, url, opts)
     test:plan(9)
 
     test:isnil(rawget(_G, 'http'), "global namespace is not polluted");
     test:isnil(rawget(_G, 'http.client'), "global namespace is not polluted");
-    local r = client.get(URL)
+    local r = client.get(url, opts)
     test:is(r.status, 200, 'simple 200')
     test:is(r.proto[1], 1, 'proto major http 1.1')
     test:is(r.proto[2], 1, 'proto major http 1.1')
@@ -63,26 +75,26 @@ test:test("http.client", function(test)
         "content-length > 0")
     test:is(client.get("http://localhost:0/").status, 595, 'bad url')
 
-    local r = client.request('GET', URL)
+    local r = client.request('GET', url, nil, opts)
     test:is(r.status, 200, 'request')
-end)
+end
 
-test:test("cancel and timeout", function(test)
+local function test_cancel_and_timeout(test, url, opts)
     test:plan(2)
     local ch = fiber.channel(1)
     local http = client:new()
     local f = fiber.create(function()
-                ch:put(http:get(URL)) end)
+                ch:put(http:get(url, opts)) end)
     f:cancel()
     local r = ch:get()
     test:ok(r.status == 408 and string.find(r.reason, "Timeout"),
                     "After cancel fiber timeout is returned")
-    local r = http:get(URL, {timeout = 0.0001})
+    local r = http:get(url, merge(opts, {timeout = 0.0001}))
     test:ok(r.status == 408 and string.find(r.reason, "Timeout"),
                                                        "Timeout check")
-end)
+end
 
-test:test("basic http post/get", function(test)
+local function test_post_and_get(test, url, opts)
     test:plan(19)
 
     local http = client.new()
@@ -96,35 +108,33 @@ test:test("basic http post/get", function(test)
     headers['Content-Type'] = 'application/json'
     local fibers = 7
     local ch = fiber.channel(fibers)
-    local _
+    opts = merge(opts, {headers = headers})
     fiber.create(function()
-        responses.good_get = http:get(URL, {headers = headers})
+        responses.good_get = http:get(url, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.get2 = http:get(URL.."abc", {headers = headers})
+        responses.get2 = http:get(url .. "abc", opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.good_post = http:post(URL, json_body, {headers = headers})
+        responses.good_post = http:post(url, json_body, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.empty_post = http:post(URL, nil, {headers = headers})
+        responses.empty_post = http:post(url, nil, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.good_put = http:put(URL, json_body, {headers = headers})
+        responses.good_put = http:put(url, json_body, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.bad_get = http:get(URL .. 'this/page/not/exists',
-            {headers = headers})
+        responses.bad_get = http:get(url .. 'this/page/not/exists', opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.absent_get = http:get(URL .. 'absent',
-            {headers = headers})
+        responses.absent_get = http:get(url .. 'absent', opts)
         ch:put(1)
     end)
     for i=1,fibers do
@@ -169,9 +179,9 @@ test:test("basic http post/get", function(test)
     test:ok(st.sockets_added == st.sockets_deleted and
         st.active_requests == 0,
         "stats checking")
-end)
+end
 
-test:test("errors", function(test)
+local function test_errors(test)
     test:plan(3)
     local http = client:new()
     local status, err = pcall(http.get, http, "htp://mail.ru")
@@ -184,19 +194,19 @@ test:test("errors", function(test)
                         "POST: exception on bad protocol")
     local r = http:get("http://do_not_exist_8ffad33e0cb01e6a01a03d00089e71e5b2b7e9930dfcba.ru")
     test:is(r.status, 595, "GET: response on bad url")
-end)
+end
 
-test:test("headers", function(test)
+local function test_headers(test, url, opts)
     test:plan(4)
     local http = client:new()
-    local r = http:get(URL .. 'headers')
+    local r = http:get(url .. 'headers', opts)
     test:is(type(r.headers["set-cookie"]), 'string', "set-cookie check")
     test:is(r.headers["set-cookie"], "likes=cheese,age=17", "set-cookie check")
     test:is(r.headers["content-type"], "application/json", "content-type check")
     test:is(r.headers["my_header"], "value1,value2", "other header check")
-end)
+end
 
-test:test("special methods", function(test)
+local function test_special_methods(test, url, opts)
     test:plan(14)
     local http = client.new()
     local responses = {}
@@ -204,31 +214,31 @@ test:test("special methods", function(test)
     local ch = fiber.channel(fibers)
     local _
     fiber.create(function()
-        responses.patch_data = http:patch(URL, "{\"key\":\"val\"}")
+        responses.patch_data = http:patch(url, "{\"key\":\"val\"}", opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.delete_data = http:delete(URL)
+        responses.delete_data = http:delete(url, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.options_data = http:options(URL)
+        responses.options_data = http:options(url, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.head_data = http:head(URL)
+        responses.head_data = http:head(url, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.trace_data = http:trace(URL)
+        responses.trace_data = http:trace(url, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.connect_data = http:connect(URL)
+        responses.connect_data = http:connect(url, opts)
         ch:put(1)
     end)
     fiber.create(function()
-        responses.custom_data = http:request("CUSTOM", URL)
+        responses.custom_data = http:request("CUSTOM", url, nil, opts)
         ch:put(1)
     end)
     for i = 1, fibers do
@@ -256,9 +266,9 @@ test:test("special methods", function(test)
     test:is(responses.custom_data.status, 400, "HTTP:CUSTOM request")
     test:ok(responses.custom_data.headers.method == "CUSTOM",
         "HTTP:CUSTOM request content")
-end)
+end
 
-test:test("concurrent", function(test)
+local function test_concurrent(test, url, opts)
     test:plan(3)
     local http = client.new()
     local headers = { my_header = "1", my_header2 = "2" }
@@ -276,7 +286,7 @@ test:test("concurrent", function(test)
 
     for i = 1, num_test do
         table.insert(curls, {
-            url = URL,
+            url = url,
             http = client.new(),
             body = json.encode({stat = {"ok"},
             info = {"ok"} }),
@@ -294,23 +304,23 @@ test:test("concurrent", function(test)
         local obj = curls[i]
         for j=1,num_load do
             fiber.create(function()
-                local r = obj.http:post(obj.url, obj.body, {
+                local r = obj.http:post(obj.url, obj.body, merge(opts, {
                     headers = obj.headers,
                     keepalive_idle = 30,
                     keepalive_interval = 60,
                     connect_timeout = obj.connect_timeout,
                     timeout = obj.timeout,
-                })
+                }))
                 ch:put(r.status)
             end)
             fiber.create(function()
-                local r = obj.http:get(obj.url, {
+                local r = obj.http:get(obj.url, merge(opts, {
                     headers = obj.headers,
                     keepalive_idle = 30,
                     keepalive_interval = 60,
                     connect_timeout = obj.connect_timeout,
                     timeout = obj.timeout,
-                })
+                }))
                 ch:put(r.status)
             end)
         end
@@ -357,7 +367,55 @@ test:test("concurrent", function(test)
     test:is(ok_req, true, "All requests are ok")
     test:ok(ok_sockets_added, "free sockets")
     test:ok(ok_active, "no active requests")
+end
+
+function run_tests(test, sock_family, sock_addr)
+    test:plan(9)
+    local server, url, opts = start_server(test, sock_family, sock_addr)
+    test:test("http.client", test_http_client, url, opts)
+    test:test("cancel and timeout", test_cancel_and_timeout, url, opts)
+    test:test("basic http post/get", test_post_and_get, url, opts)
+    test:test("errors", test_errors)
+    test:test("headers", test_headers, url, opts)
+    test:test("special methods", test_special_methods, url, opts)
+    if sock_family == 'AF_UNIX' and jit.os ~= "Linux" then
+        --
+        -- BSD-based operating systems (including OS X) will fail
+        -- connect() to a Unix domain socket with ECONNREFUSED
+        -- if the queue of pending connections is full. Hence the
+        -- "concurrent" test, which opens a lot of connections
+        -- simultaneously, cannot run on those platforms. Linux,
+        -- however, is fine - instead of returning ECONNEREFUSED
+        -- it will suspend connect() until backlog is processed.
+        --
+        test:skip("concurrent")
+    else
+        test:test("concurrent", test_concurrent, url, opts)
+    end
+    stop_server(test, server)
+end
+
+test:plan(2)
+
+test:test("http over AF_INET", function(test)
+    local s = socketlib('AF_INET', 'SOCK_STREAM', 0)
+    s:bind('127.0.0.1', 0)
+    local host = s:name().host
+    local port = s:name().port
+    s:close()
+    run_tests(test, 'AF_INET', string.format("%s:%d", host, port))
 end)
 
-stop_server(server)
+test:test("http over AF_UNIX", function(test)
+    local path = os.tmpname()
+    os.remove(path)
+    local status = pcall(client.get, 'http://localhost/', {unix_socket = path})
+    if not status then
+        -- Unix domain sockets are not supported, skip the test.
+        return
+    end
+    run_tests(test, 'AF_UNIX', path)
+    os.remove(path)
+end)
+
 os.exit(test:check() == true and 0 or -1)

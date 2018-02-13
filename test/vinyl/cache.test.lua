@@ -334,3 +334,27 @@ sk:select('key2')
 s:insert{5, 'key1'}
 sk:select('key1')
 s:drop()
+
+--
+-- gh-2789: vy_cache_iterator must stop iteration, if a sought
+-- statement does not exist and is between chained statements.
+--
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+s:replace{1}
+s:replace{2}
+s:replace{4}
+s:replace{5}
+box.snapshot()
+-- Cache is not updated in autocommit mode.
+box.begin() s:select{} box.commit()
+info = pk:info().cache
+info.lookup
+info.get.rows
+pk:info().disk.iterator.lookup
+s:get{3}
+info = pk:info().cache
+info.lookup
+info.get.rows
+pk:info().disk.iterator.lookup
+s:drop()

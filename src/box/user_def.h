@@ -170,6 +170,7 @@ enum {
 	GUEST = 0,
 	ADMIN =  1,
 	PUBLIC = 2, /* role */
+	SUPER = 31, /* role */
 	BOX_SYSTEM_USER_ID_MAX = PUBLIC
 };
 

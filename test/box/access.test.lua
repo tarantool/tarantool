@@ -298,14 +298,25 @@ box.schema.func.drop('blah', 'blah')
 box.schema.user.passwd('guest', 'sesame')
 -- gh-1205 box.schema.user.info fails
 box.schema.user.drop('guest')
+box.schema.role.drop('guest')
 box.space._user.index.name:delete{'guest'}
+box.space._user:delete{box.schema.GUEST_ID}
 #box.schema.user.info('guest') > 0
 box.schema.user.drop('admin')
+box.schema.role.drop('admin')
 box.space._user.index.name:delete{'admin'}
+box.space._user:delete{box.schema.ADMIN_ID}
 #box.schema.user.info('admin') > 0
+box.schema.user.drop('public')
 box.schema.role.drop('public')
 box.space._user.index.name:delete{'public'}
+box.space._user:delete{box.schema.PUBLIC_ROLE_ID}
 #box.schema.role.info('public') > 0
+box.schema.role.drop('super')
+box.schema.user.drop('super')
+box.space._user.index.name:delete{'super'}
+box.space._user:delete{box.schema.SUPER_ROLE_ID}
+#box.schema.role.info('super') > 0
 
 -- gh-944 name is too long
 name = string.rep('a', box.schema.NAME_MAX - 1)

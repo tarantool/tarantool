@@ -308,6 +308,13 @@ memtx_tree_index_destroy(struct index *base)
 	free(index);
 }
 
+static void
+memtx_tree_index_update_def(struct index *base)
+{
+	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
+	index->tree.arg = memtx_tree_index_cmp_def(index);
+}
+
 static ssize_t
 memtx_tree_index_size(struct index *base)
 {
@@ -575,6 +582,7 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .destroy = */ memtx_tree_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .commit_drop = */ generic_index_commit_drop,
+	/* .update_def = */ memtx_tree_index_update_def,
 	/* .size = */ memtx_tree_index_size,
 	/* .bsize = */ memtx_tree_index_bsize,
 	/* .min = */ generic_index_min,
