@@ -89,7 +89,7 @@ deploy:
     skip_cleanup: true
     on:
       repo: tarantool/tarantool
-      branch: "1.8" # releases
+      branch: "2.0" # releases
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
   # Deploy source tarballs to S3
   - provider: script
@@ -97,7 +97,7 @@ deploy:
     skip_cleanup: true
     on:
       repo: tarantool/tarantool
-      branch: "1.8" # releases
+      branch: "2.0" # releases
       condition: "x${TARGET} = xsource"
 
 notifications:
