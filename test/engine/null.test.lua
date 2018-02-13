@@ -242,3 +242,38 @@ s.index.i4:select()
 s.index.i5:select()
 
 s:drop()
+
+--
+-- gh-2973: allow to enable nullable on a non-empty space.
+--
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'unsigned'}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+s:replace{1, 1}
+s:replace{100, 100}
+s:replace{50, 50}
+s:replace{25, box.NULL}
+
+format[2].is_nullable = true
+s:format(format)
+s:replace{25, box.NULL}
+s:replace{10, box.NULL}
+s:replace{150, box.NULL}
+s:select{}
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = false}}})
+s:replace{1, 1}
+s:replace{100, 100}
+s:replace{50, 50}
+s:replace{25, box.NULL}
+sk:alter({parts = {{2, 'unsigned', is_nullable = true}}})
+s:replace{25, box.NULL}
+s:replace{10, box.NULL}
+s:replace{150, box.NULL}
+sk:select{}
+s:drop()

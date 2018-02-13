@@ -755,3 +755,119 @@ s.index.i5:select()
 s:drop()
 ---
 ...
+--
+-- gh-2973: allow to enable nullable on a non-empty space.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'unsigned'}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+s:replace{100, 100}
+---
+- [100, 100]
+...
+s:replace{50, 50}
+---
+- [50, 50]
+...
+s:replace{25, box.NULL}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+format[2].is_nullable = true
+---
+...
+s:format(format)
+---
+...
+s:replace{25, box.NULL}
+---
+- [25, null]
+...
+s:replace{10, box.NULL}
+---
+- [10, null]
+...
+s:replace{150, box.NULL}
+---
+- [150, null]
+...
+s:select{}
+---
+- - [1, 1]
+  - [10, null]
+  - [25, null]
+  - [50, 50]
+  - [100, 100]
+  - [150, null]
+...
+s:drop()
+---
+...
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = false}}})
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+s:replace{100, 100}
+---
+- [100, 100]
+...
+s:replace{50, 50}
+---
+- [50, 50]
+...
+s:replace{25, box.NULL}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+sk:alter({parts = {{2, 'unsigned', is_nullable = true}}})
+---
+...
+s:replace{25, box.NULL}
+---
+- [25, null]
+...
+s:replace{10, box.NULL}
+---
+- [10, null]
+...
+s:replace{150, box.NULL}
+---
+- [150, null]
+...
+sk:select{}
+---
+- - [10, null]
+  - [25, null]
+  - [150, null]
+  - [1, 1]
+  - [50, 50]
+  - [100, 100]
+...
+s:drop()
+---
+...
