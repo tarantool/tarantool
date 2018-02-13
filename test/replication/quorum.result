@@ -32,6 +32,14 @@ box.info.status -- orphan
 ---
 - orphan
 ...
+box.ctl.wait_rw(0.001) -- timeout
+---
+- error: timed out
+...
+box.info.ro -- true
+---
+- true
+...
 box.space.test:replace{100} -- error
 ---
 - error: Can't modify data because this instance is in read-only mode.
@@ -48,6 +56,14 @@ box.info.status -- orphan
 ---
 - orphan
 ...
+box.ctl.wait_rw(0.001) -- timeout
+---
+- error: timed out
+...
+box.info.ro -- true
+---
+- true
+...
 box.space.test:replace{100} -- error
 ---
 - error: Can't modify data because this instance is in read-only mode.
@@ -55,11 +71,12 @@ box.space.test:replace{100} -- error
 box.cfg{replication_connect_quorum = 2}
 ---
 ...
-fiber = require('fiber')
+box.ctl.wait_rw()
 ---
 ...
-while box.info.status == 'orphan' do fiber.sleep(0.001) end
+box.info.ro -- false
 ---
+- false
 ...
 box.info.status -- running
 ---
@@ -70,6 +87,14 @@ box.info.status -- orphan
 ---
 - orphan
 ...
+box.ctl.wait_rw(0.001) -- timeout
+---
+- error: timed out
+...
+box.info.ro -- true
+---
+- true
+...
 box.space.test:replace{100} -- error
 ---
 - error: Can't modify data because this instance is in read-only mode.
@@ -78,11 +103,12 @@ test_run:cmd('start server quorum1')
 ---
 - true
 ...
-fiber = require('fiber')
+box.ctl.wait_rw()
 ---
 ...
-while box.info.status == 'orphan' do fiber.sleep(0.001) end
+box.info.ro -- false
 ---
+- false
 ...
 box.info.status -- running
 ---
@@ -124,6 +150,9 @@ test_run:cmd('stop server quorum1')
 - true
 ...
 for i = 1, 10 do box.space.test:insert{i} end
+---
+...
+fiber = require('fiber')
 ---
 ...
 fiber.sleep(0.1)

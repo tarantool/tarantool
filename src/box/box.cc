@@ -207,7 +207,7 @@ int
 box_wait_ro(bool ro, double timeout)
 {
 	double deadline = ev_monotonic_now(loop()) + timeout;
-	while (is_ro != ro) {
+	while (box_is_ro() != ro) {
 		if (fiber_cond_wait_deadline(&ro_cond, deadline) != 0)
 			return -1;
 		if (fiber_is_cancelled()) {
@@ -225,6 +225,7 @@ box_clear_orphan(void)
 		return; /* nothing to do */
 
 	is_orphan = false;
+	fiber_cond_broadcast(&ro_cond);
 
 	/* Update the title to reflect the new status. */
 	title("running");

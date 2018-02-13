@@ -20,24 +20,30 @@ test_run:cmd('switch quorum2')
 
 test_run:cmd('restart server quorum2')
 box.info.status -- orphan
+box.ctl.wait_rw(0.001) -- timeout
+box.info.ro -- true
 box.space.test:replace{100} -- error
 box.cfg{replication={}}
 box.info.status -- running
 
 test_run:cmd('restart server quorum2')
 box.info.status -- orphan
+box.ctl.wait_rw(0.001) -- timeout
+box.info.ro -- true
 box.space.test:replace{100} -- error
 box.cfg{replication_connect_quorum = 2}
-fiber = require('fiber')
-while box.info.status == 'orphan' do fiber.sleep(0.001) end
+box.ctl.wait_rw()
+box.info.ro -- false
 box.info.status -- running
 
 test_run:cmd('restart server quorum2')
 box.info.status -- orphan
+box.ctl.wait_rw(0.001) -- timeout
+box.info.ro -- true
 box.space.test:replace{100} -- error
 test_run:cmd('start server quorum1')
-fiber = require('fiber')
-while box.info.status == 'orphan' do fiber.sleep(0.001) end
+box.ctl.wait_rw()
+box.info.ro -- false
 box.info.status -- running
 
 -- Check that the replica follows all masters.
@@ -54,6 +60,7 @@ box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
 test_run:cmd('stop server quorum1')
 
 for i = 1, 10 do box.space.test:insert{i} end
+fiber = require('fiber')
 fiber.sleep(0.1)
 
 test_run:cmd('start server quorum1')
