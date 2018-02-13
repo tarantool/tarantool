@@ -1295,7 +1295,7 @@ s = box.schema.space.create('test', {format = format})
 pk = s:create_index('pk')
 ---
 ...
-t = s:replace{1, 2, 3, '4', 5.5, -6, true, 8, {9, 9}, {val = 10}}
+t = s:replace{1, {2}, 3, '4', 5.5, -6, true, -8, {9, 9}, {val = 10}}
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
@@ -1329,8 +1329,7 @@ test_run:cmd("setopt delimiter ''");
 -- any --X--> unsigned
 fail_format_change(2, 'unsigned')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from any to unsigned
-  on a not empty space'
+- 'Tuple field 2 type does not match one required by operation: expected unsigned'
 ...
 -- unsigned -----> any
 ok_format_change(3, 'any')
@@ -1385,8 +1384,7 @@ ok_format_change(5, 'scalar')
 -- number --X--> integer
 fail_format_change(5, 'integer')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from number to integer
-  on a not empty space'
+- 'Tuple field 5 type does not match one required by operation: expected integer'
 ...
 -- integer -----> any
 ok_format_change(6, 'any')
@@ -1403,8 +1401,7 @@ ok_format_change(6, 'scalar')
 -- integer --X--> unsigned
 fail_format_change(6, 'unsigned')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from integer to unsigned
-  on a not empty space'
+- 'Tuple field 6 type does not match one required by operation: expected unsigned'
 ...
 -- boolean -----> any
 ok_format_change(7, 'any')
@@ -1427,8 +1424,7 @@ ok_format_change(8, 'any')
 -- scalar --X--> unsigned
 fail_format_change(8, 'unsigned')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from scalar to unsigned
-  on a not empty space'
+- 'Tuple field 8 type does not match one required by operation: expected unsigned'
 ...
 -- array -----> any
 ok_format_change(9, 'any')
@@ -1574,7 +1570,7 @@ format[2] = {name = 'field2', type = 'unsigned'}
 ...
 s:format(format)
 ---
-- error: Vinyl does not support adding new fields to a non-empty space
+- error: Vinyl does not support non-empty space format incompatible change
 ...
 s:drop()
 ---
@@ -1647,8 +1643,7 @@ format[2].is_nullable = false
 ...
 s:format(format)
 ---
-- error: 'Can''t modify space ''test'': Can not disable is_nullable on a not empty
-    space'
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
 ...
 s:delete(1)
 ---
@@ -1657,6 +1652,38 @@ s:delete(1)
 -- Disable is_nullable on empty space
 s:format(format)
 ---
+...
+-- Disable is_nullable on a non-empty space.
+format[2].is_nullable = true
+---
+...
+s:format(format)
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+format[2].is_nullable = false
+---
+...
+s:format(format)
+---
+...
+-- Enable is_nullable on a non-empty space.
+format[2].is_nullable = true
+---
+...
+s:format(format)
+---
+...
+s:replace{1, box.NULL}
+---
+- [1, null]
+...
+s:delete{1}
+---
+- [1, null]
 ...
 s:format({})
 ---
@@ -1784,6 +1811,142 @@ s:select{}
 ---
 - - [-2]
   - [1]
+...
+s:drop()
+---
+...
+--
+-- Allow to restrict space format, if corresponding restrictions
+-- already are defined in indexes.
+--
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function check_format_restriction(engine, name)
+    local s = box.schema.create_space(name, {engine = engine})
+    local pk = s:create_index('pk')
+    local format = {}
+    format[1] = {name = 'field1'}
+    s:replace{1}
+    s:replace{100}
+    s:replace{0}
+    s:format(format)
+    s:format()
+    format[1].type = 'unsigned'
+    s:format(format)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+check_format_restriction('memtx', 'test1')
+---
+...
+check_format_restriction('vinyl', 'test2')
+---
+...
+box.space.test1:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}]
+...
+box.space.test1:select{}
+---
+- - [0]
+  - [1]
+  - [100]
+...
+box.space.test2:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}]
+...
+box.space.test2:select{}
+---
+- - [0]
+  - [1]
+  - [100]
+...
+box.space.test1:drop()
+---
+...
+box.space.test2:drop()
+---
+...
+--
+-- Allow to change is_nullable in index definition on non-empty
+-- space.
+--
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk1 = s:create_index('sk1', {parts = {{2, 'unsigned', is_nullable = true}}})
+---
+...
+sk2 = s:create_index('sk2', {parts = {{3, 'unsigned', is_nullable = false}}})
+---
+...
+s:replace{1, box.NULL, 1}
+---
+- [1, null, 1]
+...
+sk1:alter({parts = {{2, 'unsigned', is_nullable = false}}})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:replace{1, 1, 1}
+---
+- [1, 1, 1]
+...
+sk1:alter({parts = {{2, 'unsigned', is_nullable = false}}})
+---
+...
+s:replace{1, 1, box.NULL}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected unsigned'
+...
+sk2:alter({parts = {{3, 'unsigned', is_nullable = true}}})
+---
+...
+s:replace{1, 1, box.NULL}
+---
+- [1, 1, null]
+...
+s:replace{2, 10, 100}
+---
+- [2, 10, 100]
+...
+s:replace{3, 0, 20}
+---
+- [3, 0, 20]
+...
+s:replace{4, 15, 150}
+---
+- [4, 15, 150]
+...
+s:replace{5, 9, box.NULL}
+---
+- [5, 9, null]
+...
+sk1:select{}
+---
+- - [3, 0, 20]
+  - [1, 1, null]
+  - [5, 9, null]
+  - [2, 10, 100]
+  - [4, 15, 150]
+...
+sk2:select{}
+---
+- - [1, 1, null]
+  - [5, 9, null]
+  - [3, 0, 20]
+  - [2, 10, 100]
+  - [4, 15, 150]
 ...
 s:drop()
 ---
@@ -1929,6 +2092,58 @@ t3.field1
 t3.field_1
 ---
 - 3
+...
+s:drop()
+---
+...
+--
+-- gh-3008. Ensure the change of hash index parts updates hash
+-- key_def.
+--
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk', {type = 'hash'})
+---
+...
+pk:alter{parts = {{1, 'string'}}}
+---
+...
+s:replace{'1', '1'}
+---
+- ['1', '1']
+...
+s:replace{'1', '2'}
+---
+- ['1', '2']
+...
+pk:select{}
+---
+- - ['1', '2']
+...
+pk:select{'1'}
+---
+- - ['1', '2']
+...
+s:drop()
+---
+...
+--
+-- Ensure that incompatible key parts change validates format.
+--
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1}
+---
+- [1]
+...
+pk:alter{parts = {{1, 'string'}}} -- Must fail.
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected string'
 ...
 s:drop()
 ---

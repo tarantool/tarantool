@@ -278,6 +278,41 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 }
 
 bool
+tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
+				       const struct tuple_format *format2)
+{
+	if (format1->exact_field_count != format2->exact_field_count)
+		return false;
+	for (uint32_t i = 0; i < format1->field_count; ++i) {
+		const struct tuple_field *field1 = &format1->fields[i];
+		/*
+		 * The field is formatted in format1, but not
+		 * formatted in format2.
+		 */
+		if (i >= format2->field_count) {
+			/*
+			 * The field can be defined with no type,
+			 * but with a name - it is not
+			 * restriction. Nullability is necessary
+			 * if a field is absend in some tuples.
+			 */
+			if (field1->type == FIELD_TYPE_ANY &&
+			    field1->is_nullable)
+				continue;
+			else
+				return false;
+		}
+		const struct tuple_field *field2 = &format2->fields[i];
+		if (! field_type1_contains_type2(field1->type, field2->type))
+			return false;
+		/* Nullability removal - format is restricted. */
+		if (field2->is_nullable && !field1->is_nullable)
+			return false;
+	}
+	return true;
+}
+
+bool
 tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b)
 {
 	if (a->field_map_size != b->field_map_size ||

@@ -892,6 +892,12 @@ class ModifySpaceFormat: public AlterSpaceOp
 	 */
 	struct tuple_dictionary *new_dict;
 	/**
+	 * Old tuple dictionary stored to rollback in destructor,
+	 * if an exception had been raised after alter_def(), but
+	 * before alter().
+	 */
+	struct tuple_dictionary *old_dict;
+	/**
 	 * New space definition. It can not be got from alter,
 	 * because alter_def() is called before
 	 * ModifySpace::alter_def().
@@ -899,14 +905,12 @@ class ModifySpaceFormat: public AlterSpaceOp
 	struct space_def *new_def;
 public:
 	ModifySpaceFormat(struct alter_space *alter, struct space_def *new_def)
-		:AlterSpaceOp(alter), new_dict(NULL), new_def(new_def) {}
+		: AlterSpaceOp(alter), new_dict(NULL), old_dict(NULL),
+		  new_def(new_def) {}
+	virtual void alter(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
-	virtual void rollback(struct alter_space *alter);
-	virtual ~ModifySpaceFormat()
-	{
-		if (new_dict != NULL)
-			tuple_dictionary_unref(new_dict);
-	}
+	virtual void commit(struct alter_space *alter, int64_t lsn);
+	virtual ~ModifySpaceFormat();
 };
 
 void
@@ -918,18 +922,43 @@ ModifySpaceFormat::alter_def(struct alter_space *alter)
 	 * object is deleted later, in destructor.
 	 */
 	new_dict = new_def->dict;
-	struct tuple_dictionary *old_dict = alter->old_space->def->dict;
+	old_dict = alter->old_space->def->dict;
 	tuple_dictionary_swap(new_dict, old_dict);
 	new_def->dict = old_dict;
 	tuple_dictionary_ref(old_dict);
 }
 
 void
-ModifySpaceFormat::rollback(struct alter_space *alter)
+ModifySpaceFormat::alter(struct alter_space *alter)
 {
-	/* Return old names into the old dict. */
-	struct tuple_dictionary *old_dict = alter->old_space->def->dict;
-	tuple_dictionary_swap(new_dict, old_dict);
+	struct space *new_space = alter->new_space;
+	struct space *old_space = alter->old_space;
+	struct tuple_format *new_format = new_space->format;
+	struct tuple_format *old_format = old_space->format;
+	if (old_format != NULL) {
+		assert(new_format != NULL);
+		if (! tuple_format1_can_store_format2_tuples(new_format,
+							     old_format))
+		    space_check_format_xc(new_space, old_space);
+	}
+}
+
+void
+ModifySpaceFormat::commit(struct alter_space *alter, int64_t lsn)
+{
+	(void) alter;
+	(void) lsn;
+	old_dict = NULL;
+}
+
+ModifySpaceFormat::~ModifySpaceFormat()
+{
+	if (new_dict != NULL) {
+		/* Return old names into the old dict. */
+		if (old_dict != NULL)
+			tuple_dictionary_swap(new_dict, old_dict);
+		tuple_dictionary_unref(new_dict);
+	}
 }
 
 /** Change non-essential properties of a space. */
@@ -941,7 +970,6 @@ public:
 	/* New space definition. */
 	struct space_def *def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
 	virtual ~ModifySpace();
 };
 
@@ -953,51 +981,6 @@ ModifySpace::alter_def(struct alter_space *alter)
 	alter->space_def = def;
 	/* Now alter owns the def. */
 	def = NULL;
-}
-
-void
-ModifySpace::alter(struct alter_space *alter)
-{
-	struct space *new_space = alter->new_space;
-	struct space *old_space = alter->old_space;
-	uint32_t old_field_count = old_space->def->field_count;
-	uint32_t new_field_count = new_space->def->field_count;
-	if (old_field_count >= new_field_count) {
-		/* Is checked by space_def_check_compatibility. */
-		return;
-	}
-	struct tuple_format *new_format = new_space->format;
-	struct tuple_format *old_format = old_space->format;
-	/*
-	 * A tuples validation can be skipped if fields between
-	 * old_space->def->field_count and
-	 * new_space->def->field_count are indexed or have type
-	 * ANY. If they are indexed, then their type is already
-	 * checked. Type ANY can store any values.
-	 * Optimization is inapplicable if
-	 * new_def->def->field_count > old_format->field_count.
-	 */
-	if (old_format != NULL && new_field_count <= old_format->field_count) {
-		assert(new_field_count <= new_format->field_count);
-		struct tuple_field *fields = new_format->fields;
-		bool are_new_fields_checked = true;
-		for (uint32_t i = old_field_count; i < new_field_count; ++i) {
-			if (!fields[i].is_key_part &&
-			    fields[i].type != FIELD_TYPE_ANY) {
-				are_new_fields_checked = false;
-				break;
-			}
-		}
-		if (are_new_fields_checked) {
-			/*
-			 * If the new space fields are already
-			 * used by existing indexes, then tuples
-			 * already are validated by them.
-			 */
-			return;
-		}
-	}
-	space_check_format_xc(new_space, old_space);
 }
 
 ModifySpace::~ModifySpace() {
@@ -1098,9 +1081,20 @@ public:
 	ModifyIndex(struct alter_space *alter,
 		    struct index_def *new_index_def_arg,
 		    struct index_def *old_index_def_arg)
-		:AlterSpaceOp(alter),
-		new_index_def(new_index_def_arg),
-		old_index_def(old_index_def_arg) {}
+		: AlterSpaceOp(alter), new_index_def(new_index_def_arg),
+		  old_index_def(old_index_def_arg) {
+	        if (new_index_def->iid == 0 &&
+	            key_part_cmp(new_index_def->key_def->parts,
+	                         new_index_def->key_def->part_count,
+	                         old_index_def->key_def->parts,
+	                         old_index_def->key_def->part_count) != 0) {
+	                /*
+	                 * Primary parts have been changed -
+	                 * update non-unique secondary indexes.
+	                 */
+	                alter->pk_def = new_index_def->key_def;
+	        }
+	}
 	struct index_def *new_index_def;
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
@@ -1696,8 +1690,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (index_def_cmp(index_def, old_index->def) == 0) {
 			/* Index is not changed so just move it. */
 			(void) new MoveIndex(alter, old_index->def->iid);
-		}
-		else if (index_def_change_requires_rebuild(old_index->def, index_def)) {
+		} else if (index_def_change_requires_rebuild(old_index->def,
+							     index_def)) {
 			/*
 			 * Operation demands an index rebuild.
 			 */
@@ -1705,6 +1699,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 						old_index->def);
 			index_def_guard.is_active = false;
 		} else {
+			(void) new ModifySpaceFormat(alter, old_space->def);
 			/*
 			 * Operation can be done without index rebuild.
 			 */

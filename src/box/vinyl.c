@@ -1065,6 +1065,12 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 			 "adding an index to a non-empty space");
 		return -1;
 	}
+	if (! tuple_format1_can_store_format2_tuples(new_space->format,
+						     old_space->format)) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "non-empty space format incompatible change");
+		return -1;
+	}
 	return 0;
 }
 

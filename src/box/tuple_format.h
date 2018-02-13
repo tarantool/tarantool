@@ -200,6 +200,22 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		 uint32_t space_field_count, struct tuple_dictionary *dict);
 
 /**
+ * Check, if @a format1 can store ANY!!! tuples of @a format2. For
+ * example, if a field is not nullable in the format1 and the same
+ * field is nullable in the format2, or the field type is integer
+ * in the format1 and unsigned in the format2, then the format1
+ * can not store the format2 tuples.
+ * @param format1 Tuple format, that possibly can store tuples of
+ *                @a format2.
+ * @param format2 Tuple format 2.
+ *
+ * @retval True, if @a format1 can store any tuples of @a format2.
+ */
+bool
+tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
+				       const struct tuple_format *format2);
+
+/**
  * Check that two tuple formats are identical.
  * @param a format a
  * @param b format b
