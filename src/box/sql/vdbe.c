@@ -44,12 +44,12 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
-#include "box/sql.h"
 
 #include "msgpuck/msgpuck.h"
 
 #include "box/schema.h"
 #include "box/space.h"
+#include "box/sequence.h"
 
 /*
  * Invoke this macro on memory cells just prior to changing the
@@ -1137,6 +1137,40 @@ case OP_String: {          /* out2 */
 		if (pIn3->u.i==pOp->p5) pOut->flags = MEM_Blob|MEM_Static|MEM_Term;
 	}
 #endif
+	break;
+}
+
+/* Opcode: NextAutoincValue P1 P2 * * *
+ * Synopsis: r[P2] = next value from space sequence, which pageno is r[P1]
+ *
+ * Get next value from space sequence, which pageno is written into register
+ * P1, write this value into register P2. If space doesn't exists (invalid
+ * space_id or something else), raise an error. If space with
+ * specified space_id doesn't have attached sequence, also raise an error.
+ */
+case OP_NextAutoincValue: {
+	assert(pOp->p1 > 0);
+	assert(pOp->p2 > 0);
+
+	int64_t value;
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
+
+	struct space *space = space_by_id(space_id);
+	if (space == NULL) {
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+
+	struct sequence *sequence = space->sequence;
+	if (sequence == NULL || sequence_next(sequence, &value) != 0) {
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+
+	pOut = out2Prerelease(p, pOp);
+	pOut->flags = MEM_Int;
+	pOut->u.i = value;
+
 	break;
 }
 

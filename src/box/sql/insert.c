@@ -742,7 +742,10 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			if (j < 0 || nColumn == 0
 			    || (pColumn && j >= pColumn->nId)) {
 				if (i == pTab->iAutoIncPKey) {
-					sqlite3VdbeAddOp2(v, OP_Null, 0, iRegStore);
+					sqlite3VdbeAddOp2(v,
+							  OP_NextAutoincValue,
+							  pTab->tnum,
+							  iRegStore);
 					continue;
 				}
 				sqlite3ExprCodeFactorable(pParse,
