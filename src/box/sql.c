@@ -1209,7 +1209,9 @@ cursor_seek(BtCursor *pCur, int *pRes)
 	struct index *index;
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
 	if (space_id != 0) {
-		space = space_by_id(space_id);
+		space = space_cache_find(space_id);
+		if (space == NULL)
+			return SQL_TARANTOOL_ERROR;
 		uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
 		index = index_find(space, index_id);
 	} else {
