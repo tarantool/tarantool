@@ -275,6 +275,9 @@ struct vy_slice_recovery_info {
 	char *end;
 };
 
+static struct vy_recovery *
+vy_recovery_new_locked(int64_t signature, bool only_checkpoint);
+
 /**
  * Return the name of the vylog file that has the given signature.
  */
@@ -1070,6 +1073,9 @@ vy_log_rotate_f(va_list ap)
 int
 vy_log_rotate(const struct vclock *vclock)
 {
+	int64_t signature = vclock_sum(vclock);
+	int64_t prev_signature = vclock_sum(&vy_log.last_checkpoint);
+
 	assert(vy_log.recovery == NULL);
 
 	/*
@@ -1077,9 +1083,10 @@ vy_log_rotate(const struct vclock *vclock)
 	 * in which case old and new signatures coincide and there's
 	 * nothing we need to do.
 	 */
-	assert(vclock_compare(vclock, &vy_log.last_checkpoint) >= 0);
-	if (vclock_compare(vclock, &vy_log.last_checkpoint) == 0)
+	if (signature == prev_signature)
 		return 0;
+
+	assert(signature > prev_signature);
 
 	struct vclock *new_vclock = malloc(sizeof(*new_vclock));
 	if (new_vclock == NULL) {
@@ -1090,13 +1097,7 @@ vy_log_rotate(const struct vclock *vclock)
 	vclock_copy(new_vclock, vclock);
 
 	say_verbose("rotating vylog %lld => %lld",
-		    (long long)vclock_sum(&vy_log.last_checkpoint),
-		    (long long)vclock_sum(vclock));
-
-	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint), false);
-	if (recovery == NULL)
-		goto fail;
+		    (long long)prev_signature, (long long)signature);
 
 	/*
 	 * Lock out all concurrent log writers while we are rotating it.
@@ -1109,14 +1110,17 @@ vy_log_rotate(const struct vclock *vclock)
 	 */
 	latch_lock(&vy_log.latch);
 
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new_locked(prev_signature, false);
+	if (recovery == NULL)
+		goto fail;
+
 	/* Do actual work from coio so as not to stall tx thread. */
 	int rc = coio_call(vy_log_rotate_f, recovery, vclock);
 	vy_recovery_delete(recovery);
 	if (rc < 0) {
 		diag_log();
-		say_error("failed to write `%s'",
-			  vy_log_filename(vclock_sum(vclock)));
-		latch_unlock(&vy_log.latch);
+		say_error("failed to write `%s'", vy_log_filename(signature));
 		goto fail;
 	}
 
@@ -1134,6 +1138,7 @@ vy_log_rotate(const struct vclock *vclock)
 	say_verbose("done rotating vylog");
 	return 0;
 fail:
+	latch_unlock(&vy_log.latch);
 	free(new_vclock);
 	return -1;
 }
@@ -2090,14 +2095,17 @@ fail:
 	return -1;
 }
 
-struct vy_recovery *
-vy_recovery_new(int64_t signature, bool only_checkpoint)
+/**
+ * Load the metadata log and return a recovery context.
+ * Must be called with the log latch held.
+ */
+static struct vy_recovery *
+vy_recovery_new_locked(int64_t signature, bool only_checkpoint)
 {
 	int rc;
 	struct vy_recovery *recovery;
 
-	/* Lock out concurrent writers while we are loading the log. */
-	latch_lock(&vy_log.latch);
+	assert(latch_owner(&vy_log.latch) == fiber());
 	/*
 	 * Before proceeding to log recovery, make sure that all
 	 * pending records have been flushed out.
@@ -2106,7 +2114,7 @@ vy_recovery_new(int64_t signature, bool only_checkpoint)
 	if (rc != 0) {
 		diag_log();
 		say_error("failed to flush vylog for recovery");
-		goto out;
+		return NULL;
 	}
 
 	/* Load the log from coio so as not to stall tx thread. */
@@ -2115,10 +2123,20 @@ vy_recovery_new(int64_t signature, bool only_checkpoint)
 	if (rc != 0) {
 		diag_log();
 		say_error("failed to load `%s'", vy_log_filename(signature));
+		return NULL;
 	}
-out:
+	return recovery;
+}
+
+struct vy_recovery *
+vy_recovery_new(int64_t signature, bool only_checkpoint)
+{
+	/* Lock out concurrent writers while we are loading the log. */
+	latch_lock(&vy_log.latch);
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new_locked(signature, only_checkpoint);
 	latch_unlock(&vy_log.latch);
-	return rc == 0 ? recovery : NULL;
+	return recovery;
 }
 
 /** Helper to delete mh_i64ptr_t along with all its records. */
