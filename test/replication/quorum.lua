@@ -16,6 +16,7 @@ box.cfg({
     listen = instance_uri(INSTANCE_ID);
     replication_timeout = 0.05;
     replication_sync_lag = 0.01;
+    replication_connect_timeout = 0.1;
     replication_connect_quorum = 3;
     replication = {
         instance_uri(1);

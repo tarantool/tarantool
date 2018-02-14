@@ -57,6 +57,7 @@ local default_cfg = {
     worker_pool_threads = 4,
     replication_timeout = 1,
     replication_sync_lag = 10,
+    replication_connect_timeout = 4,
     replication_connect_quorum = nil, -- connect all
 }
 
@@ -112,6 +113,7 @@ local template_cfg = {
     worker_pool_threads = 'number',
     replication_timeout = 'number',
     replication_sync_lag = 'number',
+    replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
 }
 

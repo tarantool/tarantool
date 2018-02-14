@@ -104,6 +104,14 @@ static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
 extern double replication_timeout;
 
 /**
+ * Maximal time box.cfg() may wait for connections to all configured
+ * replicas to be established. If box.cfg() fails to connect to all
+ * replicas within the timeout, it will either leave the instance in
+ * the orphan mode (recovery) or fail (bootstrap, reconfiguration).
+ */
+extern double replication_connect_timeout;
+
+/**
  * Minimal number of replicas to sync for this instance to switch
  * to the write mode. If set to REPLICATION_CONNECT_QUORUM_ALL,
  * wait for all configured masters.
@@ -134,16 +142,6 @@ static inline double
 replication_disconnect_timeout(void)
 {
 	return replication_timeout * 4;
-}
-
-/**
- * Fail box.cfg() if the quorum hasn't been assembled within
- * the given period.
- */
-static inline double
-replication_connect_quorum_timeout(void)
-{
-	return replication_reconnect_timeout() * 4;
 }
 
 void

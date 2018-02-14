@@ -47,6 +47,7 @@ struct tt_uuid INSTANCE_UUID;
 struct tt_uuid REPLICASET_UUID;
 
 double replication_timeout = 1.0; /* seconds */
+double replication_connect_timeout = 4.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
 

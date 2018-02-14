@@ -386,6 +386,17 @@ box_check_replication_timeout(void)
 	return timeout;
 }
 
+static double
+box_check_replication_connect_timeout(void)
+{
+	double timeout = cfg_getd("replication_connect_timeout");
+	if (timeout <= 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_connect_timeout",
+			  "the value must be greather than 0");
+	}
+	return timeout;
+}
+
 static int
 box_check_replication_connect_quorum(void)
 {
@@ -490,6 +501,7 @@ box_check_config()
 	box_check_replicaset_uuid(&uuid);
 	box_check_replication();
 	box_check_replication_timeout();
+	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
 	box_check_readahead(cfg_geti("readahead"));
@@ -580,7 +592,7 @@ box_set_replication(void)
 
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_connect_quorum_timeout(), true);
+	box_sync_replication(replication_connect_timeout, true);
 	/* Follow replica */
 	replicaset_follow();
 }
@@ -589,6 +601,12 @@ void
 box_set_replication_timeout(void)
 {
 	replication_timeout = box_check_replication_timeout();
+}
+
+void
+box_set_replication_connect_timeout(void)
+{
+	replication_connect_timeout = box_check_replication_connect_timeout();
 }
 
 void
@@ -1678,6 +1696,7 @@ box_cfg_xc(void)
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	box_set_replication_connect_timeout();
 	box_set_replication_connect_quorum();
 	replication_sync_lag = box_check_replication_sync_lag();
 	xstream_create(&join_stream, apply_initial_join_row);
@@ -1803,7 +1822,7 @@ box_cfg_xc(void)
 		title("orphan");
 
 		/* Wait for the cluster to start up */
-		box_sync_replication(replication_connect_quorum_timeout(), false);
+		box_sync_replication(replication_connect_timeout, false);
 	} else {
 		if (!tt_uuid_is_nil(&instance_uuid))
 			INSTANCE_UUID = instance_uuid;
