@@ -387,12 +387,14 @@ sqlite3FindFunction(sqlite3 * db,	/* An open database */
  * The Schema.cache_size variable is not cleared.
  */
 void
-sqlite3SchemaClear(void *p)
+sqlite3SchemaClear(sqlite3 * db)
 {
+	assert(db->pSchema != NULL);
+
 	Hash temp1;
 	Hash temp2;
 	HashElem *pElem;
-	Schema *pSchema = (Schema *) p;
+	Schema *pSchema = db->pSchema;
 
 	temp1 = pSchema->tblHash;
 	temp2 = pSchema->trigHash;
@@ -410,11 +412,8 @@ sqlite3SchemaClear(void *p)
 	}
 	sqlite3HashClear(&temp1);
 	sqlite3HashClear(&pSchema->fkeyHash);
-	pSchema->pSeqTab = 0;
-	if (pSchema->schemaFlags & DB_SchemaLoaded) {
-		pSchema->iGeneration++;
-		pSchema->schemaFlags &= ~DB_SchemaLoaded;
-	}
+
+	db->pSchema = NULL;
 }
 
 /* Create a brand new schema. */

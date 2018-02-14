@@ -87,7 +87,6 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 	assert(argc == 3);
 	UNUSED_PARAMETER2(NotUsed, argc);
 	assert(sqlite3_mutex_held(db->mutex));
-	DbClearProperty(db, DB_Empty);
 	if (db->mallocFailed) {
 		corruptSchema(pData, argv[0], 0);
 		return 1;
@@ -182,11 +181,7 @@ sqlite3InitDatabase(sqlite3 * db)
 	/* Tarantool: schema_cookie is not used so far, but
 	 * might be used in future. Set it to dummy value.
 	 */
-	pDb->pSchema->schema_cookie = 0;
-
-	if (pDb->pSchema->cache_size == 0) {
-		pDb->pSchema->cache_size = SQLITE_DEFAULT_CACHE_SIZE;
-	}
+	db->pSchema->schema_cookie = 0;
 
 	/* Read the schema information out of the schema tables
 	 */
@@ -214,9 +209,6 @@ sqlite3InitDatabase(sqlite3 * db)
 		rc = SQLITE_NOMEM_BKPT;
 		sqlite3ResetAllSchemasOfConnection(db);
 	}
-	if (rc == SQLITE_OK) {
-		DbSetProperty(db, DB_SchemaLoaded);
-	}
 
  error_out:
 	if (rc == SQLITE_NOMEM || rc == SQLITE_IOERR_NOMEM) {
@@ -228,8 +220,8 @@ sqlite3InitDatabase(sqlite3 * db)
 /*
  * Initialize all database files - the main database file
  * Return a success code.
- * After a database is initialized, the DB_SchemaLoaded
- * bit is set in the flags field of the Db structure.
+ * After a database is initialized, the pSchema field in database
+ * structure will be not NULL.
  */
 int
 sqlite3Init(sqlite3 * db)
@@ -242,10 +234,11 @@ sqlite3Init(sqlite3 * db)
 	assert(db->init.busy == 0);
 	rc = SQLITE_OK;
 	db->init.busy = 1;
-	if (!DbHasProperty(db, DB_SchemaLoaded)) {
+	if (!db->pSchema) {
+		db->pSchema = sqlite3SchemaCreate(db);
 		rc = sqlite3InitDatabase(db);
 		if (rc) {
-			sqlite3SchemaClear(db->pSchema);
+			sqlite3SchemaClear(db);
 		}
 	}
 

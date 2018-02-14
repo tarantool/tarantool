@@ -109,9 +109,7 @@ sqlite3FinishCoding(Parse * pParse)
 			int i;
 			assert(sqlite3VdbeGetOp(v, 0)->opcode == OP_Init);
 			sqlite3VdbeJumpHere(v, 0);
-			Schema *pSchema;
 			if (DbMaskTest(pParse->cookieMask, 0) != 0) {
-				pSchema = db->pSchema;
 				sqlite3VdbeAddOp2(v, OP_Transaction,	/* Opcode */
 						  0,	/* P1 */
 						  DbMaskTest(pParse->writeMask, 0)	/* P2 */
@@ -384,7 +382,7 @@ sqlite3ResetAllSchemasOfConnection(sqlite3 * db)
 {
 	struct session *user_session = current_session();
 	if (db->pSchema) {
-		sqlite3SchemaClear(db->pSchema);
+		sqlite3SchemaClear(db);
 	}
 	user_session->sql_flags &= ~SQLITE_InternChanges;
 }
@@ -1225,7 +1223,7 @@ sqlite3ChangeCookie(Parse * pParse)
 	sqlite3 *db = pParse->db;
 	Vdbe *v = pParse->pVdbe;
 	sqlite3VdbeAddOp3(v, OP_SetCookie, 0, 0,
-			  db->mdb.pSchema->schema_cookie + 1);
+			  db->pSchema->schema_cookie + 1);
 }
 
 /*
@@ -2246,7 +2244,6 @@ sqlite3ViewGetColumnNames(Parse * pParse, Table * pTable)
 	} else {
 		nErr++;
 	}
-	pTable->pSchema->schemaFlags |= DB_UnresetViews;
 #endif				/* SQLITE_OMIT_VIEW */
 	return nErr;
 }
@@ -2269,7 +2266,6 @@ sqliteViewResetAll(sqlite3 * db)
 			pTab->nCol = 0;
 		}
 	}
-	DbClearProperty(db, DB_UnresetViews);
 }
 #else
 #define sqliteViewResetAll(A,B)

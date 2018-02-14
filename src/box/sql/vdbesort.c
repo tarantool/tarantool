@@ -913,15 +913,8 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 			u32 szPma = sqlite3GlobalConfig.szPma;
 			pSorter->mnPmaSize = szPma * pgsz;
 
-			mxCache = db->mdb.pSchema->cache_size;
-			if (mxCache < 0) {
-				/* A negative cache-size value C indicates that the cache is abs(C)
-				 * KiB in size.
-				 */
-				mxCache = mxCache * -1024;
-			} else {
-				mxCache = mxCache * pgsz;
-			}
+			mxCache = SQLITE_DEFAULT_CACHE_SIZE;
+			mxCache = mxCache * -1024;
 			mxCache = MIN(mxCache, SQLITE_MAX_PMASZ);
 			pSorter->mxPmaSize =
 			    MAX(pSorter->mnPmaSize, (int)mxCache);

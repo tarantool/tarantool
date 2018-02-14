@@ -892,38 +892,11 @@ typedef int VList;
  * An instance of the following structure stores a database schema.
  */
 struct Schema {
-	int schema_cookie;	/* Database schema version number for this file */
-	int iGeneration;	/* Generation counter.  Incremented with each change */
+	int schema_cookie;      /* Database schema version number for this file */
 	Hash tblHash;		/* All tables indexed by name */
 	Hash trigHash;		/* All triggers indexed by name */
 	Hash fkeyHash;		/* All foreign keys by referenced table name */
-	Table *pSeqTab;		/* The sqlite_sequence table used by AUTOINCREMENT */
-	u8 enc;			/* Text encoding used by this database */
-	u16 schemaFlags;	/* Flags associated with this schema */
-	int cache_size;		/* Number of pages to use in the cache */
 };
-
-/*
- * These macros can be used to test, set, or clear bits in the
- * Db.pSchema->flags field.
- */
-#define DbHasProperty(D,P)     (((D)->pSchema->schemaFlags&(P))==(P))
-#define DbHasAnyProperty(D,P)  (((D)->pSchema->schemaFlags&(P))!=0)
-#define DbSetProperty(D,P)     (D)->pSchema->schemaFlags|=(P)
-
-/*
- * Allowed values for the DB.pSchema->flags field.
- *
- * The DB_SchemaLoaded flag is set after the database schema has been
- * read into internal hash tables.
- *
- * DB_UnresetViews means that one or more views have column names that
- * have been filled out.  If the schema changes, these column names might
- * changes and so the view will need to be reset.
- */
-#define DB_SchemaLoaded    0x0001	/* The schema has been loaded */
-#define DB_UnresetViews    0x0002	/* Some views have defined column names */
-#define DB_Empty           0x0004	/* The file is empty (length 0 bytes) */
 
 /*
  * The number of different kinds of things that can be limited
@@ -3436,7 +3409,7 @@ void sqlite3DeleteIndexSamples(sqlite3 *, Index *);
 void sqlite3DefaultRowEst(Index *);
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
-void sqlite3SchemaClear(void *);
+void sqlite3SchemaClear(sqlite3 *);
 Schema *sqlite3SchemaCreate(sqlite3 *);
 int sqlite3SchemaToIndex(sqlite3 * db, Schema *);
 KeyInfo *sqlite3KeyInfoAlloc(sqlite3 *, int, int);

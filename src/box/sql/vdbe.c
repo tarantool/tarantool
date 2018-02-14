@@ -3024,7 +3024,7 @@ case OP_AutoCommit: {
 	break;
 }
 
-/* Opcode: Transaction P1 P2 P3 P4 P5
+/* Opcode: Transaction P1 P2 * * *
  *
  * Begin a transaction on database P1 if a transaction is not already
  * active.
@@ -3047,16 +3047,6 @@ case OP_AutoCommit: {
  * entire transaction. If no error is encountered, the statement transaction
  * will automatically commit when the VDBE halts.
  *
- * If P5!=0 then this opcode also checks the schema cookie against P3
- * and the schema generation counter against P4.
- * The cookie changes its value whenever the database schema changes.
- * This operation is used to detect when that the cookie has changed
- * and that the current process needs to reread the schema.  If the schema
- * cookie in P3 differs from the schema cookie in the database header or
- * if the schema generation counter in P4 differs from the current
- * generation counter, then an SQLITE_SCHEMA error is raised and execution
- * halts.  The sqlite3_step() wrapper function might then reprepare the
- * statement and rerun it from the beginning.
  */
 case OP_Transaction: {
 	assert(p->bIsReader);
@@ -3077,7 +3067,6 @@ case OP_Transaction: {
 		}
 		goto abort_due_to_error;
 	}
-	assert(pOp->p5==0 || pOp->p4type==P4_INT32);
 
 	if (rc) goto abort_due_to_error;
 	break;
@@ -3136,7 +3125,6 @@ case OP_SetCookie: {
 	assert(p->readOnly==0);
 	/* See note about index shifting on OP_ReadCookie */
 	/* When the schema cookie changes, record the new cookie internally */
-	pDb->pSchema->schema_cookie = pOp->p3;
 	user_session->sql_flags |= SQLITE_InternChanges;
 	if (pOp->p1==1) {
 		/* Invalidate all prepared statements whenever the TEMP database
@@ -4763,7 +4751,7 @@ case OP_ParseSchema2: {
 	char *argv[4] = {NULL, NULL, NULL, NULL};
 
 
-	assert(DbHasProperty(db, DB_SchemaLoaded));
+	assert(db->pSchema != NULL);
 
 	initData.db = db;
 	initData.pzErrMsg = &p->zErrMsg;
@@ -4817,7 +4805,7 @@ case OP_ParseSchema3: {
 	Mem *pRec;
 	char zPgnoBuf[16];
 	char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
-	assert(DbHasProperty(db, DB_SchemaLoaded));
+	assert(db->pSchema != NULL);
 
 	initData.db = db;
 	initData.pzErrMsg = &p->zErrMsg;
@@ -5683,7 +5671,7 @@ abort_due_to_error:
 	if (rc==SQLITE_IOERR_NOMEM) sqlite3OomFault(db);
 	rc = SQLITE_ERROR;
 	if (resetSchemaOnFault>0) {
-		sqlite3SchemaClear(db->pSchema);
+		sqlite3SchemaClear(db);
 	}
 
 	/* This is the only way out of this procedure.  We have to
