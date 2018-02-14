@@ -327,7 +327,7 @@ schema_init()
 	sc_space_new(BOX_CLUSTER_ID, "_cluster", key_def, &on_replace_cluster,
 		     NULL);
 
-	/* _trigger - all existing SQL triggers */
+	/* _trigger - all existing SQL triggers. */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
 	sc_space_new(BOX_TRIGGER_ID, "_trigger", key_def, NULL, NULL);
@@ -344,6 +344,32 @@ schema_init()
 			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL);
 	sc_space_new(BOX_INDEX_ID, "_index", key_def,
 		     &alter_space_on_replace_index, &on_stmt_begin_index);
+
+	/* space name */
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+	/* index name */
+	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+	/* _sql_stat1 - a simpler statistics on space, seen in SQL. */
+	sc_space_new(BOX_SQL_STAT1_ID, "_sql_stat1", key_def, NULL, NULL);
+
+	free(key_def);
+	key_def = key_def_new(3); /* part count */
+	if (key_def == NULL)
+		diag_raise();
+
+	/* space name */
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+	/* index name */
+	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+	/* sample */
+	key_def_set_part(key_def, 2 /* part no */, 5 /* field no */,
+			 FIELD_TYPE_SCALAR, ON_CONFLICT_ACTION_ABORT, NULL);
+	/* _sql_stat4 - extensive statistics on space, seen in SQL. */
+	sc_space_new(BOX_SQL_STAT4_ID, "_sql_stat4", key_def, NULL, NULL);
 }
 
 void

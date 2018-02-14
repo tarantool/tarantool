@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(125)
+test:plan(124)
 
 testprefix = "analyze9"
 
@@ -1020,7 +1020,7 @@ test:do_execsql_test(
         INSERT INTO x1 VALUES(3, 4);
         INSERT INTO x1 VALUES(5, 6);
         ANALYZE;
-        INSERT INTO "_sql_stat4" VALUES('x1', 'abc', NULL, NULL, NULL, '');
+        INSERT INTO "_sql_stat4" VALUES('x1', 'abc', 0, 0, 0, '');
     ]])
 
 test:do_execsql_test(
@@ -1066,12 +1066,14 @@ test:do_execsql_test(
         -- </15.8>
     })
 
-test:do_execsql_test(
-    15.9,
-    [[
-        ANALYZE;
-        UPDATE "_sql_stat4" SET "neq" = NULL, "nlt" = NULL, "ndlt" = NULL;
-    ]])
+-- Tarantool: this test seems to be useless. There's no reason
+-- for these fields to be nullable.
+-- test:do_execsql_test(
+--    15.9,
+--    [[
+--        ANALYZE;
+--        UPDATE "_sql_stat4" SET "neq" = NULL, "nlt" = NULL, "ndlt" = NULL;
+--    ]])
 
 test:do_execsql_test(
     15.10,

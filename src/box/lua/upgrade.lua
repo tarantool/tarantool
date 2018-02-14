@@ -472,24 +472,30 @@ local function upgrade_to_1_8_4()
     local _index = box.space[box.schema.INDEX_ID]
     local stat1_ft = {{name='tbl', type='string'},
                       {name='idx', type='string'},
-	              {name='stat', type='scalar'}}
+	              {name='stat', type='string'}}
     local stat4_ft = {{name='tbl', type='string'},
                       {name='idx', type='string'},
-                      {name='neq', type='string', is_nullable=true},
-                      {name='nlt', type='string', is_nullable=true},
-                      {name='ndlt', type='string', is_nullable=true},
+                      {name='neq', type='string'},
+                      {name='nlt', type='string'},
+                      {name='ndlt', type='string'},
                       {name='sample', type='scalar'}}
 
     log.info("create space _sql_stat1")
-    _space:insert{box.schema.SQL_STAT1_ID, ADMIN, '_sql_stat1', 'memtx', 0, setmap({}), stat1_ft}
-    log.info("create index primary on _stat1")
-    _index:insert{box.schema.SQL_STAT1_ID, 0, 'primary', 'tree', { unique = true },
-        {{0, 'string'}, {1, 'string'}}}
+    _space:insert{box.schema.SQL_STAT1_ID, ADMIN, '_sql_stat1', 'memtx', 0,
+                  setmap({}), stat1_ft}
+
+    log.info("create index primary on _sql_stat1")
+    _index:insert{box.schema.SQL_STAT1_ID, 0, 'primary', 'tree',
+                  {unique = true}, {{0, 'string'}, {1, 'string'}}}
+
     log.info("create space _sql_stat4")
-    _space:insert{box.schema.SQL_STAT4_ID, ADMIN, '_sql_stat4', 'memtx', 0, setmap({}), stat4_ft}
-    log.info("create index primary on _stat4")
-    _index:insert{box.schema.SQL_STAT4_ID, 0, 'primary', 'tree', { unique = true },
-        {{0, 'string'}, {1, 'string'}, {5, 'scalar'}}}
+    _space:insert{box.schema.SQL_STAT4_ID, ADMIN, '_sql_stat4', 'memtx', 0,
+                  setmap({}), stat4_ft}
+
+    log.info("create index primary on _sql_stat4")
+    _index:insert{box.schema.SQL_STAT4_ID, 0, 'primary', 'tree',
+                  {unique = true}, {{0, 'string'}, {1, 'string'},
+                  {5, 'scalar'}}}
 end
 
 --------------------------------------------------------------------------------
