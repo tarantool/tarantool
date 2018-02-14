@@ -1629,10 +1629,6 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			zTemp[0] = 0;
 			break;
 		}
-	case P4_TABLE:{
-			sqlite3XPrintf(&x, "%s", pOp->p4.pTab->zName);
-			break;
-		}
 	default:{
 			zP4 = pOp->p4.z;
 			if (zP4 == 0) {

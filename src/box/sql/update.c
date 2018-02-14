@@ -625,9 +625,6 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				  ((hasFK || chngKey
 				    || pPk != 0) ? 0 : OPFLAG_ISNOOP),
 				  regNewRowid);
-		if (!pParse->nested) {
-			sqlite3VdbeAppendP4(v, pTab, P4_TABLE);
-		}
 #else
 		if (hasFK || chngPk || pPk != 0) {
 			sqlite3VdbeAddOp2(v, OP_Delete, iDataCur, 0);

@@ -813,7 +813,6 @@ sqlite3GenerateRowDelete(Parse * pParse,	/* Parsing context */
 		/* sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur,0,iIdxNoSeek);  */
 		sqlite3VdbeAddOp2(v, OP_Delete, iDataCur,
 				  (count ? OPFLAG_NCHANGE : 0));
-		sqlite3VdbeAppendP4(v, (char *)pTab, P4_TABLE);
 		if (eMode != ONEPASS_OFF) {
 			sqlite3VdbeChangeP5(v, OPFLAG_AUXDELETE);
 		}
