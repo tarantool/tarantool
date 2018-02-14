@@ -561,3 +561,17 @@ box.session.su("tester", box.schema.func.drop, "test")
 
 box.session.su("admin")
 box.schema.user.drop("tester")
+
+-- gh-3146 gotcha for granting universe with options
+box.schema.user.grant("guest", "read", "universe", {if_not_exists = true})
+box.schema.user.grant("guest", "read", "universe", "useless name")
+box.schema.user.grant("guest", "read", "universe", "useless name", {if_not_exists = true})
+box.schema.user.grant("guest", "read", "universe", 0, {if_not_exists = true})
+box.schema.user.grant("guest", "read", "universe", nil, {if_not_exists = true})
+box.schema.user.grant("guest", "read", "universe", {}, {if_not_exists = true})
+box.schema.user.revoke("guest", "read", "universe", {if_exists = true})
+box.schema.user.revoke("guest", "read", "universe", "useless name")
+box.schema.user.revoke("guest", "read", "universe", "useless name", {if_exists = true})
+box.schema.user.revoke("guest", "read", "universe", 0, {if_exists = true})
+box.schema.user.revoke("guest", "read", "universe", nil, {if_exists = true})
+box.schema.user.revoke("guest", "read", "universe", {}, {if_exists = true})
