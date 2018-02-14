@@ -219,9 +219,8 @@ for i = 0, 9999 do box.space.test:replace({i, 4, 5, 'test'}) end
 -- during the join stage, i.e. a replica with a minuscule
 -- timeout successfully bootstraps and breaks connection only
 -- after subscribe.
-test_run:cmd("create server replica_ack with rpl_master=default, script='replication/replica_ack.lua'")
-test_run:cmd("start server replica_ack")
-test_run:cmd("switch replica_ack")
+test_run:cmd("start server replica_timeout with args='0.00001'")
+test_run:cmd("switch replica_timeout")
 fiber = require('fiber')
 while box.info.replication[1].upstream.message ~= 'timed out' do fiber.sleep(0.0001) end
 
@@ -229,5 +228,5 @@ test_run:cmd("stop server default")
 test_run:cmd("deploy server default")
 test_run:cmd("start server default")
 test_run:cmd("switch default")
-test_run:cmd("stop server replica_ack")
-test_run:cmd("cleanup server replica_ack")
+test_run:cmd("stop server replica_timeout")
+test_run:cmd("cleanup server replica_timeout")

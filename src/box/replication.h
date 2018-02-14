@@ -200,11 +200,6 @@ struct replicaset {
 		 */
 		int synced;
 		/**
-		 * Number of appliers that have been stopped
-		 * due to unrecoverable errors.
-		 */
-		int failed;
-		/**
 		 * Signaled whenever an applier changes its
 		 * state.
 		 */
@@ -212,6 +207,24 @@ struct replicaset {
 	} applier;
 };
 extern struct replicaset replicaset;
+
+enum replica_state {
+	/**
+	 * Applier has not connected to the master yet
+	 * or has disconnected.
+	 */
+	REPLICA_DISCONNECTED,
+	/**
+	 * Applier has connected to the master and
+	 * received UUID.
+	 */
+	REPLICA_CONNECTED,
+	/**
+	 * Applier has synchronized with the master
+	 * (left "sync" and entered "follow" state).
+	 */
+	REPLICA_SYNCED,
+};
 
 /**
  * Summary information about a replica in the replica set.
@@ -241,11 +254,8 @@ struct replica {
 	 * Trigger invoked when the applier changes its state.
 	 */
 	struct trigger on_applier_state;
-	/**
-	 * Set if the applier has successfully synchornized to
-	 * the master (left "sync" and entered "follow" state).
-	 */
-	bool is_synced;
+	/** Replica sync state. */
+	enum replica_state state;
 };
 
 enum {
