@@ -1026,15 +1026,6 @@ typedef int (*sqlite3_xauth) (void *, int, const char *, const char *,
 			      const char *, const char *);
 #endif
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/* This is an extra SQLITE_TRACE macro that indicates "legacy" tracing
- * in the style of sqlite3_trace()
- */
-#define SQLITE_TRACE_LEGACY  0x80
-#else
-#define SQLITE_TRACE_LEGACY  0
-#endif				/* SQLITE_OMIT_DEPRECATED */
-
 /*
  * Each database connection is an instance of the following structure.
  */

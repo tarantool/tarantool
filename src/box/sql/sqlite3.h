@@ -100,7 +100,6 @@
  * that we have taken it all out and gone back to using simple
  * noop macros.
 */
-#define SQLITE_DEPRECATED
 #define SQLITE_EXPERIMENTAL
 
 /*
@@ -1012,11 +1011,6 @@ struct sqlite3_io_methods {
 #define SQLITE_FCNTL_VFS_POINTER            24
 #define SQLITE_FCNTL_JOURNAL_POINTER        25
 #define SQLITE_FCNTL_PDB                    26
-
-/* deprecated names */
-#define SQLITE_GET_LOCKPROXYFILE      SQLITE_FCNTL_GET_LOCKPROXYFILE
-#define SQLITE_SET_LOCKPROXYFILE      SQLITE_FCNTL_SET_LOCKPROXYFILE
-#define SQLITE_LAST_ERRNO             SQLITE_FCNTL_LAST_ERRNO
 
 /*
  * CAPI3REF: Mutex Handle
@@ -2734,51 +2728,6 @@ sqlite3_set_authorizer(sqlite3 *,
 #define SQLITE_SAVEPOINT            32	/* Operation       Savepoint Name  */
 #define SQLITE_COPY                  0	/* No longer used */
 #define SQLITE_RECURSIVE            33	/* NULL            NULL            */
-
-/*
- * CAPI3REF: Tracing And Profiling Functions
- * METHOD: sqlite3
- *
- * These routines are deprecated. Use the [sqlite3_trace_v2()] interface
- * instead of the routines described here.
- *
- * These routines register callback functions that can be used for
- * tracing and profiling the execution of SQL statements.
- *
- * ^The callback function registered by sqlite3_trace() is invoked at
- * various times when an SQL statement is being run by [sqlite3_step()].
- * ^The sqlite3_trace() callback is invoked with a UTF-8 rendering of the
- * SQL statement text as the statement first begins executing.
- * ^(Additional sqlite3_trace() callbacks might occur
- * as each triggered subprogram is entered.  The callbacks for triggers
- * contain a UTF-8 SQL comment that identifies the trigger.)^
- *
- * The [SQLITE_TRACE_SIZE_LIMIT] compile-time option can be used to limit
- * the length of [bound parameter] expansion in the output of sqlite3_trace().
- *
- * ^The callback function registered by sqlite3_profile() is invoked
- * as each SQL statement finishes.  ^The profile callback contains
- * the original statement text and an estimate of wall-clock time
- * of how long that statement took to run.  ^The profile callback
- * time is in units of nanoseconds, however the current implementation
- * is only capable of millisecond resolution so the six least significant
- * digits in the time are meaningless.  Future versions of SQLite
- * might provide greater resolution on the profiler callback.  The
- * sqlite3_profile() function is considered experimental and is
- * subject to change in future versions of SQLite.
-*/
-SQLITE_API SQLITE_DEPRECATED void *
-sqlite3_trace(sqlite3 *,
-	      void (*xTrace) (void *,
-			      const char *),
-	      void *);
-SQLITE_API SQLITE_DEPRECATED void *
-sqlite3_profile(sqlite3 *,
-		void (*xProfile)
-		(void *,
-		 const char *,
-		 sqlite3_uint64),
-		void *);
 
 /*
  * CAPI3REF: SQL Trace Event Codes
@@ -4503,39 +4452,6 @@ sqlite3_create_function_v2(sqlite3 * db,
 #define SQLITE_DETERMINISTIC    0x800
 
 /*
- * CAPI3REF: Deprecated Functions
- * DEPRECATED
- *
- * These functions are [deprecated].  In order to maintain
- * backwards compatibility with older code, these functions continue
- * to be supported.  However, new applications should avoid
- * the use of these functions.  To encourage programmers to avoid
- * these functions, we will not explain what they do.
-*/
-#ifndef SQLITE_OMIT_DEPRECATED
-SQLITE_API SQLITE_DEPRECATED int
-sqlite3_aggregate_count(sqlite3_context
-			*);
-
-SQLITE_API SQLITE_DEPRECATED int
-sqlite3_expired(sqlite3_stmt *);
-
-SQLITE_API SQLITE_DEPRECATED int
-sqlite3_transfer_bindings(sqlite3_stmt *,
-			  sqlite3_stmt *);
-
-SQLITE_API SQLITE_DEPRECATED
-int sqlite3_global_recover(void);
-
-SQLITE_API SQLITE_DEPRECATED
-void sqlite3_thread_cleanup(void);
-
-SQLITE_API SQLITE_DEPRECATED int
-sqlite3_memory_alarm(void (*)(void *, sqlite3_int64, int), void *,
-		     sqlite3_int64);
-#endif
-
-/*
  * CAPI3REF: Obtaining SQL Values
  * METHOD: sqlite3_value
  *
@@ -5394,16 +5310,66 @@ SQLITE_API sqlite3_int64
 sqlite3_soft_heap_limit64(sqlite3_int64 N);
 
 /*
- * CAPI3REF: Deprecated Soft Heap Limit Interface
- * DEPRECATED
+ * CAPI3REF: Extract Metadata About A Column Of A Table
+ * METHOD: sqlite3
  *
- * This is a deprecated version of the [sqlite3_soft_heap_limit64()]
- * interface.  This routine is provided for historical compatibility
- * only.  All new applications should use the
- * [sqlite3_soft_heap_limit64()] interface rather than this one.
+ * ^(The sqlite3_table_column_metadata(X,D,T,C,....) routine returns
+ * information about column C of table T in database D
+ * on [database connection] X.)^  ^The sqlite3_table_column_metadata()
+ * interface returns SQLITE_OK and fills in the non-NULL pointers in
+ * the final five arguments with appropriate values if the specified
+ * column exists.  ^The sqlite3_table_column_metadata() interface returns
+ * SQLITE_ERROR and if the specified column does not exist.
+ * ^If the column-name parameter to sqlite3_table_column_metadata() is a
+ * NULL pointer, then this routine simply checks for the existence of the
+ * table and returns SQLITE_OK if the table exists and SQLITE_ERROR if it
+ * does not.
+ *
+ * ^The column is identified by the second, third and fourth parameters to
+ * this function. ^(The second parameter is either the name of the database
+ * (i.e. "main", "temp", or an attached database) containing the specified
+ * table or NULL.)^ ^If it is NULL, then all attached databases are searched
+ * for the table using the same algorithm used by the database engine to
+ * resolve unqualified table references.
+ *
+ * ^The third and fourth parameters to this function are the table and column
+ * name of the desired column, respectively.
+ *
+ * ^Metadata is returned by writing to the memory locations passed as the 5th
+ * and subsequent parameters to this function. ^Any of these arguments may be
+ * NULL, in which case the corresponding element of metadata is omitted.
+ *
+ * ^(<blockquote>
+ * <table border="1">
+ * <tr><th> Parameter <th> Output<br>Type <th>  Description
+ *
+ * <tr><td> 5th <td> const char* <td> Data type
+ * <tr><td> 6th <td> const char* <td> Name of default collation sequence
+ * <tr><td> 7th <td> int         <td> True if column has a NOT NULL constraint
+ * <tr><td> 8th <td> int         <td> True if column is part of the PRIMARY KEY
+ * <tr><td> 9th <td> int         <td> True if column is [AUTOINCREMENT]
+ * </table>
+ * </blockquote>)^
+ *
+ * ^The memory pointed to by the character pointers returned for the
+ * declaration type and collation sequence is valid until the next
+ * call to any SQLite API function.
+ *
+ * ^If the specified table is actually a view, an [error code] is returned.
+ *
+ * ^This function causes all database schemas to be read from disk and
+ * parsed, if that has not already been done, and returns an error if
+ * any errors are encountered while loading the schema.
 */
-SQLITE_API SQLITE_DEPRECATED
-void sqlite3_soft_heap_limit(int N);
+SQLITE_API int
+sqlite3_table_column_metadata(sqlite3 * db,
+			      const char *zTableName,
+			      const char *zColumnName,
+			      char const **pzDataType,
+			      char const **pzCollSeq,
+			      int *pNotNull,
+			      int *pPrimaryKey,
+			      int *pAutoinc);
 
 /*
  * CAPI3REF: A Handle To An Open BLOB

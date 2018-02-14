@@ -37,23 +37,6 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * Return TRUE (non-zero) of the statement supplied as an argument needs
- * to be recompiled.  A statement needs to be recompiled whenever the
- * execution environment changes in a way that would alter the program
- * that sqlite3_prepare() generates.  For example, if new functions or
- * collating sequences are registered or if an authorizer function is
- * added or changed.
- */
-int
-sqlite3_expired(sqlite3_stmt * pStmt)
-{
-	Vdbe *p = (Vdbe *) pStmt;
-	return p == 0 || p->expired;
-}
-#endif
-
 /*
  * Check on a Vdbe to make sure it has not been finalized.  Log
  * an error and return true if it has been finalized (or is otherwise
@@ -915,24 +898,6 @@ sqlite3_set_auxdata(sqlite3_context * pCtx,
 	}
 }
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * Return the number of times the Step function of an aggregate has been
- * called.
- *
- * This function is deprecated.  Do not use it for new code.  It is
- * provide only to avoid breaking legacy code.  New aggregate function
- * implementations should keep their own counts within their aggregate
- * context.
- */
-int
-sqlite3_aggregate_count(sqlite3_context * p)
-{
-	assert(p && p->pMem && p->pFunc && p->pFunc->xFinalize);
-	return p->pMem->n;
-}
-#endif
-
 /*
  * Return the number of columns in the result set for the statement pStmt.
  */
@@ -1580,37 +1545,6 @@ sqlite3TransferBindings(sqlite3_stmt * pFromStmt, sqlite3_stmt * pToStmt)
 	sqlite3_mutex_leave(pTo->db->mutex);
 	return SQLITE_OK;
 }
-
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * Deprecated external interface.  Internal/core SQLite code
- * should call sqlite3TransferBindings.
- *
- * It is misuse to call this routine with statements from different
- * database connections.  But as this is a deprecated interface, we
- * will not bother to check for that condition.
- *
- * If the two statements contain a different number of bindings, then
- * an SQLITE_ERROR is returned.  Nothing else can go wrong, so otherwise
- * SQLITE_OK is returned.
- */
-int
-sqlite3_transfer_bindings(sqlite3_stmt * pFromStmt, sqlite3_stmt * pToStmt)
-{
-	Vdbe *pFrom = (Vdbe *) pFromStmt;
-	Vdbe *pTo = (Vdbe *) pToStmt;
-	if (pFrom->nVar != pTo->nVar) {
-		return SQLITE_ERROR;
-	}
-	if (pTo->isPrepareV2 && pTo->expmask) {
-		pTo->expired = 1;
-	}
-	if (pFrom->isPrepareV2 && pFrom->expmask) {
-		pFrom->expired = 1;
-	}
-	return sqlite3TransferBindings(pFromStmt, pToStmt);
-}
-#endif
 
 /*
  * Return the sqlite3* database handle to which the prepared statement given

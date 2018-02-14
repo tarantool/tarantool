@@ -100,23 +100,6 @@ sqlite3MallocMutex(void)
 	return mem0.mutex;
 }
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * Deprecated external interface.  It used to set an alarm callback
- * that was invoked when memory usage grew too large.  Now it is a
- * no-op.
- */
-int
-sqlite3_memory_alarm(void (*xCallback) (void *pArg, sqlite3_int64 used, int N),
-		     void *pArg, sqlite3_int64 iThreshold)
-{
-	(void)xCallback;
-	(void)pArg;
-	(void)iThreshold;
-	return SQLITE_OK;
-}
-#endif
-
 /*
  * Set the soft heap-size limit for the library. Passing a zero or
  * negative value indicates no limit.

@@ -163,9 +163,6 @@ extern int
 sqlite3InitDatabase(sqlite3 * db)
 {
 	int rc;
-#ifndef SQLITE_OMIT_DEPRECATED
-	int size;
-#endif
 	Db *pDb;
 	InitData initData;
 
@@ -193,12 +190,7 @@ sqlite3InitDatabase(sqlite3 * db)
 	pDb->pSchema->schema_cookie = 0;
 
 	if (pDb->pSchema->cache_size == 0) {
-#ifndef SQLITE_OMIT_DEPRECATED
-		size = SQLITE_DEFAULT_CACHE_SIZE;
-		pDb->pSchema->cache_size = size;
-#else
 		pDb->pSchema->cache_size = SQLITE_DEFAULT_CACHE_SIZE;
-#endif
 	}
 
 	/* Read the schema information out of the schema tables

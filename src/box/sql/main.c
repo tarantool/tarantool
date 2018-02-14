@@ -1588,36 +1588,6 @@ sqlite3_create_function_v2(sqlite3 * db,
 }
 
 #ifndef SQLITE_OMIT_TRACE
-/*
- * Register a trace function.  The pArg from the previously registered trace
- * is returned.
- *
- * A NULL trace function means that no tracing is executes.  A non-NULL
- * trace is a pointer to a function that is invoked at the start of each
- * SQL statement.
- */
-#ifndef SQLITE_OMIT_DEPRECATED
-void *
-sqlite3_trace(sqlite3 * db, void (*xTrace) (void *, const char *), void *pArg)
-{
-	void *pOld;
-
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	sqlite3_mutex_enter(db->mutex);
-	pOld = db->pTraceArg;
-	db->mTrace = xTrace ? SQLITE_TRACE_LEGACY : 0;
-	db->xTrace = (int (*)(u32, void *, void *, void *))xTrace;
-	db->pTraceArg = pArg;
-	sqlite3_mutex_leave(db->mutex);
-	return pOld;
-}
-#endif				/* SQLITE_OMIT_DEPRECATED */
-
 /* Register a trace callback using the version-2 interface.
  */
 int
@@ -1643,36 +1613,6 @@ sqlite3_trace_v2(sqlite3 * db,		/* Trace this connection */
 	return SQLITE_OK;
 }
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * Register a profile function.  The pArg from the previously registered
- * profile function is returned.
- *
- * A NULL profile function means that no profiling is executes.  A non-NULL
- * profile is a pointer to a function that is invoked at the conclusion of
- * each SQL statement that is run.
- */
-void *
-sqlite3_profile(sqlite3 * db,
-		void (*xProfile) (void *, const char *, sqlite_uint64),
-		void *pArg)
-{
-	void *pOld;
-
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	sqlite3_mutex_enter(db->mutex);
-	pOld = db->pProfileArg;
-	db->xProfile = xProfile;
-	db->pProfileArg = pArg;
-	sqlite3_mutex_leave(db->mutex);
-	return pOld;
-}
-#endif				/* SQLITE_OMIT_DEPRECATED */
 #endif				/* SQLITE_OMIT_TRACE */
 
 /*
@@ -2568,18 +2508,6 @@ sqlite3_open_v2(const char *filename,	/* Database filename (UTF-8) */
 	return openDatabase(filename, ppDb, (unsigned int)flags, zVfs);
 }
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * This function is now an anachronism. It used to be used to recover from a
- * malloc() failure, but SQLite now does this automatically.
- */
-int
-sqlite3_global_recover(void)
-{
-	return SQLITE_OK;
-}
-#endif
-
 /*
  * The following routines are substitutes for constants SQLITE_CORRUPT,
  * SQLITE_MISUSE, SQLITE_CANTOPEN, SQLITE_NOMEM and possibly other error
@@ -2633,20 +2561,6 @@ sqlite3IoerrnomemError(int lineno)
 {
 	testcase(sqlite3GlobalConfig.xLog != 0);
 	return reportError(SQLITE_IOERR_NOMEM, lineno, "I/O OOM error");
-}
-#endif
-
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * This is a convenience routine that makes sure that all thread-specific
- * data for this thread has been deallocated.
- *
- * SQLite no longer uses thread-specific data so this routine is now a
- * no-op.  It is retained for historical compatibility.
- */
-void
-sqlite3_thread_cleanup(void)
-{
 }
 #endif
 

@@ -5140,26 +5140,6 @@ unixCurrentTimeInt64(sqlite3_vfs * NotUsed, sqlite3_int64 * piNow)
 	return rc;
 }
 
-#ifndef SQLITE_OMIT_DEPRECATED
-/*
- * Find the current time (in Universal Coordinated Time).  Write the
- * current time and date as a Julian Day number into *prNow and
- * return 0.  Return 1 if the time and date cannot be found.
- */
-static int
-unixCurrentTime(sqlite3_vfs * NotUsed, double *prNow)
-{
-	sqlite3_int64 i = 0;
-	int rc;
-	UNUSED_PARAMETER(NotUsed);
-	rc = unixCurrentTimeInt64(0, &i);
-	*prNow = i / 86400000.0;
-	return rc;
-}
-#else
-#define unixCurrentTime 0
-#endif
-
 /*
  * The xGetLastError() method is designed to return a better
  * low-level error message when operating-system problems come up
@@ -6526,7 +6506,7 @@ sqlite3_os_init(void)
     unixDlClose,          /* xDlClose */                    \
     unixRandomness,       /* xRandomness */                 \
     unixSleep,            /* xSleep */                      \
-    unixCurrentTime,      /* xCurrentTime */                \
+    0,			  /* xCurrentTime */                \
     unixGetLastError,     /* xGetLastError */               \
     unixCurrentTimeInt64, /* xCurrentTimeInt64 */           \
     unixSetSystemCall,    /* xSetSystemCall */              \

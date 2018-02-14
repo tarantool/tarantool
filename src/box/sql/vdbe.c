@@ -5555,18 +5555,10 @@ case OP_Init: {          /* jump */
 	assert(pOp==p->aOp);  /* Always instruction 0 */
 
 #ifndef SQLITE_OMIT_TRACE
-	if ((db->mTrace & (SQLITE_TRACE_STMT|SQLITE_TRACE_LEGACY))!=0
+	if ((db->mTrace & SQLITE_TRACE_STMT)!=0
 	    && !p->doingRerun
 	    && (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql))!=0
 		) {
-#ifndef SQLITE_OMIT_DEPRECATED
-		if (db->mTrace & SQLITE_TRACE_LEGACY) {
-			void (*x)(void*,const char*) = (void(*)(void*,const char*))db->xTrace;
-			char *z = sqlite3VdbeExpandSql(p, zTrace);
-			x(db->pTraceArg, z);
-			sqlite3_free(z);
-		} else
-#endif
 		{
 			(void)db->xTrace(SQLITE_TRACE_STMT, db->pTraceArg, p, zTrace);
 		}
