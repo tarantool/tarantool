@@ -65,9 +65,6 @@ box.info.vinyl().quota.used
 ---
 - 748241
 ...
-s:drop()
----
-...
 box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
 ---
 - ok
@@ -76,8 +73,54 @@ fiber.sleep(0.01) -- wait for scheduler to unthrottle
 ---
 ...
 --
+-- Check that there's a warning in the log if a transaction
+-- waits for quota for more than too_long_threshold seconds.
+--
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.01)
+---
+- ok
+...
+box.cfg{vinyl_timeout=60}
+---
+...
+box.cfg{too_long_threshold=0.01}
+---
+...
+_ = s:auto_increment{pad}
+---
+...
+_ = s:auto_increment{pad}
+---
+...
+test_run:cmd("push filter '[0-9.]+ sec' to '<sec> sec'")
+---
+- true
+...
+test_run:grep_log('test', 'waited for .* quota for too long.*')
+---
+- 'waited for 699089 bytes of vinyl memory quota for too long: <sec> sec'
+...
+test_run:cmd("clear filter")
+---
+- true
+...
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
+---
+- ok
+...
+s:drop()
+---
+...
+box.snapshot()
+---
+- ok
+...
+--
 -- Check that exceeding quota triggers dump of all spaces.
 --
+box.cfg{vinyl_timeout=0.01}
+---
+...
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
 ---
 ...

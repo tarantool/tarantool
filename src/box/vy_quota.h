@@ -37,6 +37,7 @@
 
 #include "fiber.h"
 #include "fiber_cond.h"
+#include "say.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -66,6 +67,11 @@ struct vy_quota {
 	/** Current memory consumption. */
 	size_t used;
 	/**
+	 * If vy_quota_use() takes longer than the given
+	 * value, warn about it in the log.
+	 */
+	double too_long_threshold;
+	/**
 	 * Condition variable used for throttling consumers when
 	 * there is no quota left.
 	 */
@@ -83,6 +89,7 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 	q->limit = SIZE_MAX;
 	q->watermark = SIZE_MAX;
 	q->used = 0;
+	q->too_long_threshold = TIMEOUT_INFINITY;
 	q->quota_exceeded_cb = quota_exceeded_cb;
 	fiber_cond_create(&q->cond);
 }
@@ -148,11 +155,17 @@ vy_quota_release(struct vy_quota *q, size_t size)
 static inline int
 vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 {
-	double deadline = ev_monotonic_now(loop()) + timeout;
+	double start_time = ev_monotonic_now(loop());
+	double deadline = start_time + timeout;
 	while (q->used + size > q->limit && timeout > 0) {
 		q->quota_exceeded_cb(q);
 		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0)
 			break; /* timed out */
+	}
+	double wait_time = ev_monotonic_now(loop()) - start_time;
+	if (wait_time > q->too_long_threshold) {
+		say_warn("waited for %zu bytes of vinyl memory quota "
+			 "for too long: %.3f sec", size, wait_time);
 	}
 	if (q->used + size > q->limit)
 		return -1;

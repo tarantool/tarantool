@@ -2754,6 +2754,7 @@ void
 vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 				    double too_long_threshold)
 {
+	vinyl->env->quota.too_long_threshold = too_long_threshold;
 	vinyl->env->index_env.too_long_threshold = too_long_threshold;
 }
 

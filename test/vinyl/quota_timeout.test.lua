@@ -29,14 +29,35 @@ _ = s:auto_increment{pad}
 s:count()
 box.info.vinyl().quota.used
 
-s:drop()
-
 box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
 fiber.sleep(0.01) -- wait for scheduler to unthrottle
 
 --
+-- Check that there's a warning in the log if a transaction
+-- waits for quota for more than too_long_threshold seconds.
+--
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.01)
+
+box.cfg{vinyl_timeout=60}
+box.cfg{too_long_threshold=0.01}
+
+_ = s:auto_increment{pad}
+_ = s:auto_increment{pad}
+
+test_run:cmd("push filter '[0-9.]+ sec' to '<sec> sec'")
+test_run:grep_log('test', 'waited for .* quota for too long.*')
+test_run:cmd("clear filter")
+
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
+
+s:drop()
+box.snapshot()
+
+--
 -- Check that exceeding quota triggers dump of all spaces.
 --
+box.cfg{vinyl_timeout=0.01}
+
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
 _ = s1:create_index('pk')
 s2 = box.schema.space.create('test2', {engine = 'vinyl'})
