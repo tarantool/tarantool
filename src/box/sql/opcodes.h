@@ -133,15 +133,14 @@
 #define OP_DropTrigger   130
 #define OP_Param         131
 #define OP_FkCounter     132 /* synopsis: fkctr[P1]+=P2                    */
-#define OP_MemMax        133 /* synopsis: r[P1]=max(r[P1],r[P2])           */
-#define OP_OffsetLimit   134 /* synopsis: if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1) */
-#define OP_AggStep0      135 /* synopsis: accum=r[P3] step(r[P2@P5])       */
-#define OP_AggStep       136 /* synopsis: accum=r[P3] step(r[P2@P5])       */
-#define OP_AggFinal      137 /* synopsis: accum=r[P1] N=P2                 */
-#define OP_Expire        138
-#define OP_IncMaxid      139
-#define OP_Noop          140
-#define OP_Explain       141
+#define OP_OffsetLimit   133 /* synopsis: if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1) */
+#define OP_AggStep0      134 /* synopsis: accum=r[P3] step(r[P2@P5])       */
+#define OP_AggStep       135 /* synopsis: accum=r[P3] step(r[P2@P5])       */
+#define OP_AggFinal      136 /* synopsis: accum=r[P1] N=P2                 */
+#define OP_Expire        137
+#define OP_IncMaxid      138
+#define OP_Noop          139
+#define OP_Explain       140
 
 /* Properties such as "out2" or "jump" that are specified in
 ** comments following the "case" for each opcode in the vdbe.c
@@ -170,8 +169,8 @@
 /* 104 */ 0x00, 0x00, 0x10, 0x20, 0x00, 0x10, 0x00, 0x00,\
 /* 112 */ 0x00, 0x00, 0x00, 0x10, 0x00, 0x04, 0x00, 0x04,\
 /* 120 */ 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\
-/* 128 */ 0x00, 0x00, 0x00, 0x10, 0x00, 0x04, 0x1a, 0x00,\
-/* 136 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,}
+/* 128 */ 0x00, 0x00, 0x00, 0x10, 0x00, 0x1a, 0x00, 0x00,\
+/* 136 */ 0x00, 0x00, 0x00, 0x00, 0x00,}
 
 /* The sqlite3P2Values() routine is able to run faster if it knows
 ** the value of the largest JUMP opcode.  The smaller the maximum

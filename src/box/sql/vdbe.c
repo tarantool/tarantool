@@ -5194,37 +5194,6 @@ case OP_FkIfZero: {         /* jump */
 }
 #endif /* #ifndef SQLITE_OMIT_FOREIGN_KEY */
 
-#ifndef SQLITE_OMIT_AUTOINCREMENT
-/* Opcode: MemMax P1 P2 * * *
- * Synopsis: r[P1]=max(r[P1],r[P2])
- *
- * P1 is a register in the root frame of this VM (the root frame is
- * different from the current frame if this instruction is being executed
- * within a sub-program). Set the value of register P1 to the maximum of
- * its current value and the value in register P2.
- *
- * This instruction throws an error if the memory cell is not initially
- * an integer.
- */
-case OP_MemMax: {        /* in2 */
-	VdbeFrame *pFrame;
-	if (p->pFrame) {
-		for(pFrame=p->pFrame; pFrame->pParent; pFrame=pFrame->pParent);
-		pIn1 = &pFrame->aMem[pOp->p1];
-	} else {
-		pIn1 = &aMem[pOp->p1];
-	}
-	assert(memIsValid(pIn1));
-	sqlite3VdbeMemIntegerify(pIn1);
-	pIn2 = &aMem[pOp->p2];
-	sqlite3VdbeMemIntegerify(pIn2);
-	if (pIn1->u.i<pIn2->u.i) {
-		pIn1->u.i = pIn2->u.i;
-	}
-	break;
-}
-#endif /* SQLITE_OMIT_AUTOINCREMENT */
-
 /* Opcode: IfPos P1 P2 P3 * *
  * Synopsis: if r[P1]>0 then r[P1]-=P3, goto P2
  *

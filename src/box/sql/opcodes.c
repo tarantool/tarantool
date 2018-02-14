@@ -144,15 +144,14 @@ const char *sqlite3OpcodeName(int i){
     /* 130 */ "DropTrigger"      OpHelp(""),
     /* 131 */ "Param"            OpHelp(""),
     /* 132 */ "FkCounter"        OpHelp("fkctr[P1]+=P2"),
-    /* 133 */ "MemMax"           OpHelp("r[P1]=max(r[P1],r[P2])"),
-    /* 134 */ "OffsetLimit"      OpHelp("if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1)"),
-    /* 135 */ "AggStep0"         OpHelp("accum=r[P3] step(r[P2@P5])"),
-    /* 136 */ "AggStep"          OpHelp("accum=r[P3] step(r[P2@P5])"),
-    /* 137 */ "AggFinal"         OpHelp("accum=r[P1] N=P2"),
-    /* 138 */ "Expire"           OpHelp(""),
-    /* 139 */ "IncMaxid"         OpHelp(""),
-    /* 140 */ "Noop"             OpHelp(""),
-    /* 141 */ "Explain"          OpHelp(""),
+    /* 133 */ "OffsetLimit"      OpHelp("if r[P1]>0 then r[P2]=r[P1]+max(0,r[P3]) else r[P2]=(-1)"),
+    /* 134 */ "AggStep0"         OpHelp("accum=r[P3] step(r[P2@P5])"),
+    /* 135 */ "AggStep"          OpHelp("accum=r[P3] step(r[P2@P5])"),
+    /* 136 */ "AggFinal"         OpHelp("accum=r[P1] N=P2"),
+    /* 137 */ "Expire"           OpHelp(""),
+    /* 138 */ "IncMaxid"         OpHelp(""),
+    /* 139 */ "Noop"             OpHelp(""),
+    /* 140 */ "Explain"          OpHelp(""),
   };
   return azName[i];
 }

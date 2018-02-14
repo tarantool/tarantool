@@ -131,17 +131,6 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	}
 	sqlite3BeginWriteOperation(pParse, false);
 
-#ifndef SQLITE_OMIT_AUTOINCREMENT
-	/* If the sqlite_sequence table exists in this database, then update
-	 * it with the new table name.
-	 */
-	if (sqlite3FindTable(db, "sqlite_sequence")) {
-		sqlite3NestedParse(pParse,
-				   "UPDATE sqlite_sequence set name = %Q WHERE name = %Q",
-				   zName, pTab->zName);
-	}
-#endif
-
 	/* Drop and reload the internal table schema. */
 	reloadTableSchema(pParse, pTab, zName);
 

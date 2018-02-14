@@ -765,16 +765,6 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	assert(pParse->pNewTable == 0);
 	pParse->pNewTable = pTable;
 
-	/* If this is the magic _sequence table used by autoincrement,
-	 * then record a pointer to this table in the main database structure
-	 * so that INSERT can find the table easily.
-	 */
-#ifndef SQLITE_OMIT_AUTOINCREMENT
-	if (!pParse->nested && strcmp(zName, "_SEQUENCE") == 0) {
-		pTable->pSchema->pSeqTab = pTable;
-	}
-#endif
-
 	/* Begin generating the code that will create a new table.
 	 * Note in particular that we must go ahead and allocate the
 	 * record number for the table entry now.  Before any
@@ -1117,10 +1107,8 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		if (pList)
 			pParse->iPkSortOrder = pList->a[0].sortOrder;
 	} else if (autoInc) {
-#ifndef SQLITE_OMIT_AUTOINCREMENT
 		sqlite3ErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
 				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
-#endif
 	} else {
 		sqlite3CreateIndex(pParse, 0, 0, pList, onError, 0,
 				   0, sortOrder, 0, SQLITE_IDXTYPE_PRIMARYKEY);
@@ -2013,7 +2001,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		createImplicitIndices(pParse, iSpaceId, iCursor, pSysIndex);
 		sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 
-#ifndef SQLITE_OMIT_AUTOINCREMENT
 		/* Check to see if we need to create an _sequence table for
 		 * keeping track of autoincrement keys.
 		 */
@@ -2066,7 +2053,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 
 			sqlite3VdbeAddOp1(v, OP_Close, iCursor);
 		}
-#endif
 
 		/* Reparse everything to update our internal data structures */
 		parseTableSchemaRecord(pParse, iSpaceId, zStmt);	/* consumes zStmt */
