@@ -896,11 +896,6 @@ sk1 = s:create_index('sk1', { parts = { 2, 'unsigned' } })
 - error: Field 'field2' has type 'string' in space format, but type 'unsigned' in
     index definition
 ...
-sk2 = s:create_index('sk2', { parts = { 3, 'number' } })
----
-- error: Field 'field3' has type 'scalar' in space format, but type 'number' in index
-    definition
-...
 -- Check space format conflicting with index parts.
 sk3 = s:create_index('sk3', { parts = { 2, 'string' } })
 ---
@@ -1947,6 +1942,190 @@ sk2:select{}
   - [3, 0, 20]
   - [2, 10, 100]
   - [4, 15, 150]
+...
+s:drop()
+---
+...
+--
+-- gh-3008: allow multiple types on the same field.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'scalar'}
+---
+...
+format[3] = {name = 'field3', type = 'integer'}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk1 = s:create_index('sk1', {parts = {{2, 'number'}}})
+---
+...
+sk2 = s:create_index('sk2', {parts = {{2, 'integer'}}})
+---
+...
+sk3 = s:create_index('sk3', {parts = {{2, 'unsigned'}}})
+---
+...
+sk4 = s:create_index('sk4', {parts = {{3, 'number'}}})
+---
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'scalar'}, {
+    'name': 'field3', 'type': 'integer'}]
+...
+s:replace{1, '100', -20.2}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:replace{1, 100, -20.2}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected integer'
+...
+s:replace{1, 100, -20}
+---
+- [1, 100, -20]
+...
+s:replace{2, 50, 0}
+---
+- [2, 50, 0]
+...
+s:replace{3, 150, -60}
+---
+- [3, 150, -60]
+...
+s:replace{4, 0, 120}
+---
+- [4, 0, 120]
+...
+pk:select{}
+---
+- - [1, 100, -20]
+  - [2, 50, 0]
+  - [3, 150, -60]
+  - [4, 0, 120]
+...
+sk1:select{}
+---
+- - [4, 0, 120]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk2:select{}
+---
+- - [4, 0, 120]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk3:select{}
+---
+- - [4, 0, 120]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk4:select{}
+---
+- - [3, 150, -60]
+  - [1, 100, -20]
+  - [2, 50, 0]
+  - [4, 0, 120]
+...
+sk1:alter{parts = {{2, 'unsigned'}}}
+---
+...
+sk2:alter{parts = {{2, 'unsigned'}}}
+---
+...
+sk4:alter{parts = {{3, 'integer'}}}
+---
+...
+s:replace{1, 50.5, 1.5}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:replace{1, 50, 1.5}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected integer'
+...
+s:replace{5, 5, 5}
+---
+- [5, 5, 5]
+...
+sk1:select{}
+---
+- - [4, 0, 120]
+  - [5, 5, 5]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk2:select{}
+---
+- - [4, 0, 120]
+  - [5, 5, 5]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk3:select{}
+---
+- - [4, 0, 120]
+  - [5, 5, 5]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk4:select{}
+---
+- - [3, 150, -60]
+  - [1, 100, -20]
+  - [2, 50, 0]
+  - [5, 5, 5]
+  - [4, 0, 120]
+...
+sk1:drop()
+---
+...
+sk2:drop()
+---
+...
+sk3:drop()
+---
+...
+-- Remove 'unsigned' constraints from indexes, and 'scalar' now
+-- can be inserted in the second field.
+s:replace{1, true, 100}
+---
+- [1, true, 100]
+...
+s:select{}
+---
+- - [1, true, 100]
+  - [2, 50, 0]
+  - [3, 150, -60]
+  - [4, 0, 120]
+  - [5, 5, 5]
+...
+sk4:select{}
+---
+- - [3, 150, -60]
+  - [2, 50, 0]
+  - [5, 5, 5]
+  - [1, true, 100]
+  - [4, 0, 120]
 ...
 s:drop()
 ---

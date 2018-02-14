@@ -93,11 +93,16 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			/*
 			 * Check that there are no conflicts
 			 * between index part types and space
-			 * fields.
+			 * fields. If a part type is compatible
+			 * with field's one, then the part type is
+			 * more strict and the part type must be
+			 * used in tuple_format.
 			 */
-			if (field->type == FIELD_TYPE_ANY) {
+			if (field_type1_contains_type2(field->type,
+						       part->type)) {
 				field->type = part->type;
-			} else if (field->type != part->type) {
+			} else if (! field_type1_contains_type2(part->type,
+								field->type)) {
 				const char *name;
 				int fieldno = part->fieldno + TUPLE_INDEX_BASE;
 				if (part->fieldno >= field_count) {
