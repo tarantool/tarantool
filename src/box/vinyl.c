@@ -3868,6 +3868,14 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 	}
 
 	if (it->index->id > 0) {
+#ifndef NDEBUG
+		struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
+					      ERRINJ_BOOL);
+		if (delay && delay->bparam) {
+			while (delay->bparam)
+				fiber_sleep(0.01);
+		}
+#endif
 		/* Get the full tuple from the primary index. */
 		if (vy_index_get(it->index->pk, it->tx, it->rv,
 				 tuple, &tuple) != 0)

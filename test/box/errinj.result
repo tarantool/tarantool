@@ -30,6 +30,8 @@ errinj.info()
     state: false
   ERRINJ_VYRUN_INDEX_GARBAGE:
     state: false
+  ERRINJ_VY_DELAY_PK_LOOKUP:
+    state: false
   ERRINJ_VY_TASK_COMPLETE:
     state: false
   ERRINJ_PORT_DUMP:
