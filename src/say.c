@@ -237,7 +237,7 @@ write_to_syslog(struct log *log, int total);
  * Rotate logs on SIGHUP
  */
 static int
-log_rotate(const struct log *log)
+log_rotate(struct log *log)
 {
 	if (log->type != SAY_LOGGER_FILE) {
 		return 0;
@@ -262,10 +262,11 @@ log_rotate(const struct log *log)
 			say_syserror("fcntl, fd=%i", log->fd);
 		}
 	}
-	char logrotate_message[] = "log file has been reopened\n";
-	ssize_t r = write(log->fd,
-			  logrotate_message, (sizeof logrotate_message) - 1);
-	(void) r;
+	/* We are in ev signal handler
+	 * so we don't have to be worry about async signal safety
+	 */
+	log_say(log, S_INFO, __FILE__, __LINE__, NULL,
+		"log file has been reopened");
 	/*
 	 * log_background applies only to log_default logger
 	 */
@@ -765,10 +766,10 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
 	if (cord) {
 		SNPRINT(total, snprintf, buf, len, ", \"cord_name\": \"");
 		SNPRINT(total, json_escape, buf, len, cord->name);
-		SNPRINT(total, snprintf, buf, len, "\", ");
+		SNPRINT(total, snprintf, buf, len, "\"");
 		if (fiber() && fiber()->fid != 1) {
 			SNPRINT(total, snprintf, buf, len,
-				"\"fiber_id\": %i, ", fiber()->fid);
+				", \"fiber_id\": %i, ", fiber()->fid);
 			SNPRINT(total, snprintf, buf, len,
 				"\"fiber_name\": \"");
 			SNPRINT(total, json_escape, buf, len,
