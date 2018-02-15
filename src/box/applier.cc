@@ -98,6 +98,11 @@ applier_log_error(struct applier *applier, struct error *e)
 
 /*
  * Fiber function to write vclock to replication master.
+ * To track connection status, replica answers master
+ * with encoded vclock. In addition to DML requests,
+ * master also sends heartbeat messages every
+ * replication_timeout seconds (introduced in 1.7.7).
+ * On such requests replica also responds with vclock.
  */
 static int
 applier_writer_f(va_list ap)
@@ -106,10 +111,18 @@ applier_writer_f(va_list ap)
 	struct ev_io io;
 	coio_create(&io, applier->io.fd);
 
-	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
-		fiber_cond_wait_timeout(&applier->writer_cond,
-					replication_timeout);
+		/*
+		 * Tarantool >= 1.7.7 sends periodic heartbeat
+		 * messages so we don't need to send ACKs every
+		 * replication_timeout seconds any more.
+		 */
+		if (applier->version_id >= version_id(1, 7, 7))
+			fiber_cond_wait_timeout(&applier->writer_cond,
+						TIMEOUT_INFINITY);
+		else
+			fiber_cond_wait_timeout(&applier->writer_cond,
+						replication_timeout);
 		/* Send ACKs only when in FOLLOW mode ,*/
 		if (applier->state != APPLIER_SYNC &&
 		    applier->state != APPLIER_FOLLOW)
