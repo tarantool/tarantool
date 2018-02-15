@@ -284,10 +284,15 @@ replica_on_applier_reconnect(struct replica *replica)
 		 * the new UUID and reassign the applier to it.
 		 */
 		struct replica *orig = replica_by_uuid(&applier->uuid);
-		if (orig == NULL || orig->applier != NULL) {
-			tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
-				  tt_uuid_str(&replica->uuid),
-				  tt_uuid_str(&applier->uuid));
+		if (orig == NULL) {
+			orig = replica_new();
+			orig->uuid = applier->uuid;
+			replica_hash_insert(&replicaset.hash, orig);
+		}
+
+		if (orig->applier != NULL) {
+			tnt_raise(ClientError, ER_CFG, "replication",
+				  "duplicate connection to the same replica");
 		}
 
 		replica_set_applier(orig, applier);

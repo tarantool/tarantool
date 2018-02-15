@@ -1152,7 +1152,7 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
 		 (unsigned) id, tt_uuid_str(uuid)) != 0)
 		diag_raise();
-	assert(replica_by_uuid(uuid) != NULL);
+	assert(replica_by_uuid(uuid)->id == id);
 }
 
 /**
@@ -1166,7 +1166,7 @@ static void
 box_on_join(const tt_uuid *instance_uuid)
 {
 	struct replica *replica = replica_by_uuid(instance_uuid);
-	if (replica != NULL)
+	if (replica != NULL && replica->id != REPLICA_ID_NIL)
 		return; /* nothing to do - already registered */
 
 	box_check_writable_xc();
@@ -1270,7 +1270,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * is complete. Fail early if the caller does not have
 	 * appropriate access privileges.
 	 */
-	if (replica_by_uuid(&instance_uuid) == NULL) {
+	struct replica *replica = replica_by_uuid(&instance_uuid);
+	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
 		box_check_writable_xc();
 		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 		access_check_space_xc(space, PRIV_W);
@@ -1323,7 +1324,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 */
 	box_on_join(&instance_uuid);
 
-	struct replica *replica = replica_by_uuid(&instance_uuid);
+	replica = replica_by_uuid(&instance_uuid);
 	assert(replica != NULL);
 	replica->gc = gc;
 	gc_guard.is_active = false;
