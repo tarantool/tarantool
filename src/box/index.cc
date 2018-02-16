@@ -570,7 +570,7 @@ int
 generic_index_min(struct index *index, const char *key,
 		  uint32_t part_count, struct tuple **result)
 {
-	struct iterator *it = index_create_iterator(index, ITER_GE,
+	struct iterator *it = index_create_iterator(index, ITER_EQ,
 						    key, part_count);
 	if (it == NULL)
 		return -1;
@@ -583,7 +583,7 @@ int
 generic_index_max(struct index *index, const char *key,
 		  uint32_t part_count, struct tuple **result)
 {
-	struct iterator *it = index_create_iterator(index, ITER_LE,
+	struct iterator *it = index_create_iterator(index, ITER_REQ,
 						    key, part_count);
 	if (it == NULL)
 		return -1;
