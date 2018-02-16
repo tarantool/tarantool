@@ -54,7 +54,6 @@
 #include <small/region.h>
 #include <small/mempool.h>
 
-#include "coio_file.h"
 #include "coio_task.h"
 #include "cbus.h"
 #include "histogram.h"
@@ -3340,20 +3339,8 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 				(long long)record->run_id); goto out;});
 
 	/* Try to delete files. */
-	bool forget = true;
-	char path[PATH_MAX];
-	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_snprint_path(path, sizeof(path), arg->env->path,
-				    arg->space_id, arg->index_id,
-				    record->run_id, type);
-		say_info("removing %s", path);
-		if (coio_unlink(path) < 0 && errno != ENOENT) {
-			say_syserror("error while removing %s", path);
-			forget = false;
-		}
-	}
-
-	if (!forget)
+	if (vy_run_remove_files(arg->env->path, arg->space_id,
+				arg->index_id, record->run_id) != 0)
 		goto out;
 
 	/* Forget the run on success. */

@@ -37,6 +37,7 @@
 #include "fio.h"
 #include "cbus.h"
 #include "memory.h"
+#include "coio_file.h"
 
 #include "replication.h"
 #include "tuple_hash.h" /* for bloom filter */
@@ -2602,6 +2603,24 @@ close_err:
 	region_truncate(region, mem_used);
 	xlog_cursor_close(&cursor, false);
 	return -1;
+}
+
+int
+vy_run_remove_files(const char *dir, uint32_t space_id,
+		    uint32_t iid, int64_t run_id)
+{
+	int ret = 0;
+	char path[PATH_MAX];
+	for (int type = 0; type < vy_file_MAX; type++) {
+		vy_run_snprint_path(path, sizeof(path), dir,
+				    space_id, iid, run_id, type);
+		say_info("removing %s", path);
+		if (coio_unlink(path) < 0 && errno != ENOENT) {
+			say_syserror("error while removing %s", path);
+			ret = -1;
+		}
+	}
+	return ret;
 }
 
 /**

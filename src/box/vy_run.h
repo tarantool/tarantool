@@ -403,6 +403,15 @@ vy_run_snprint_path(char *buf, int size, const char *dir,
 	return total;
 }
 
+/**
+ * Remove all files (data, index) corresponding to a run
+ * with the given id. Return 0 on success, -1 if unlink()
+ * failed.
+ */
+int
+vy_run_remove_files(const char *dir, uint32_t space_id,
+		    uint32_t iid, int64_t run_id);
+
 int
 vy_run_write(struct vy_run *run, const char *dirpath,
 	     uint32_t space_id, uint32_t iid,
