@@ -3858,10 +3858,11 @@ vinyl_iterator_close(struct vinyl_iterator *it)
 }
 
 static int
-vinyl_iterator_next(struct iterator *base, struct tuple **ret)
+vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 {
-	assert(base->next = vinyl_iterator_next);
+	assert(base->next = vinyl_iterator_primary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	assert(it->index->id == 0);
 	struct tuple *tuple;
 
 	if ((*it->rv)->is_aborted ||
@@ -3878,29 +3879,52 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 		*ret = NULL;
 		return 0;
 	}
-
-	if (it->index->id > 0) {
-#ifndef NDEBUG
-		struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
-					      ERRINJ_BOOL);
-		if (delay && delay->bparam) {
-			while (delay->bparam)
-				fiber_sleep(0.01);
-		}
-#endif
-		/* Get the full tuple from the primary index. */
-		if (vy_index_get(it->index->pk, it->tx, it->rv,
-				 tuple, &tuple) != 0)
-			goto fail;
-	} else {
-		tuple_ref(tuple);
-	}
 	*ret = tuple_bless(tuple);
-	tuple_unref(tuple);
-	if (*ret == NULL)
+	if (*ret != NULL)
+		return 0;
+fail:
+	vinyl_iterator_close(it);
+	return -1;
+}
+
+static int
+vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
+{
+	assert(base->next = vinyl_iterator_secondary_next);
+	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	assert(it->index->id > 0);
+	struct tuple *tuple;
+
+	if ((*it->rv)->is_aborted ||
+	    (it->tx != NULL && it->tx->state == VINYL_TX_ABORT)) {
+		goto fail;
+	}
+
+	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
 		goto fail;
 
-	return 0;
+	if (tuple == NULL) {
+		/* EOF. Close the iterator immediately. */
+		vinyl_iterator_close(it);
+		*ret = NULL;
+		return 0;
+	}
+#ifndef NDEBUG
+	struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
+				      ERRINJ_BOOL);
+	if (delay && delay->bparam) {
+		while (delay->bparam)
+			fiber_sleep(0.01);
+	}
+#endif
+	/* Get the full tuple from the primary index. */
+	if (vy_index_get(it->index->pk, it->tx, it->rv,
+			 tuple, &tuple) != 0)
+		goto fail;
+	*ret = tuple_bless(tuple);
+	tuple_unref(tuple);
+	if (*ret != NULL)
+		return 0;
 fail:
 	vinyl_iterator_close(it);
 	return -1;
@@ -3959,7 +3983,10 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		goto err_key;
 
 	iterator_create(&it->base, base);
-	it->base.next = vinyl_iterator_next;
+	if (index->id == 0)
+		it->base.next = vinyl_iterator_primary_next;
+	else
+		it->base.next = vinyl_iterator_secondary_next;
 	it->base.free = vinyl_iterator_free;
 
 	it->env = env;
