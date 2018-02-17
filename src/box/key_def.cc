@@ -481,6 +481,18 @@ key_def_find(const struct key_def *key_def, uint32_t fieldno)
 	return NULL;
 }
 
+bool
+key_def_contains(const struct key_def *first, const struct key_def *second)
+{
+	const struct key_part *part = second->parts;
+	const struct key_part *end = part + second->part_count;
+	for (; part != end; part++) {
+		if (key_def_find(first, part->fieldno) == NULL)
+			return false;
+	}
+	return true;
+}
+
 struct key_def *
 key_def_merge(const struct key_def *first, const struct key_def *second)
 {

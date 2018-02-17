@@ -261,6 +261,15 @@ const struct key_part *
 key_def_find(const struct key_def *key_def, uint32_t fieldno);
 
 /**
+ * Check if key definition @a first contains all parts of
+ * key definition @a second.
+ * @retval true if @a first is a superset of @a second
+ * @retval false otherwise
+ */
+bool
+key_def_contains(const struct key_def *first, const struct key_def *second);
+
+/**
  * Allocate a new key_def with a set union of key parts from
  * first and second key defs. Parts of the new key_def consist
  * of the first key_def's parts and those parts of the second

@@ -1115,6 +1115,7 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 
 	/* Set possibly changed opts. */
 	pk->opts = new_index_def->opts;
+	pk->check_is_unique = true;
 
 	/* Set new formats. */
 	tuple_format_unref(pk->disk_format);
@@ -1138,6 +1139,7 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		index->pk = pk;
 		new_index_def = space_index_def(new_space, i);
 		index->opts = new_index_def->opts;
+		index->check_is_unique = index->opts.is_unique;
 		tuple_format_unref(index->mem_format_with_colmask);
 		tuple_format_unref(index->mem_format);
 		tuple_format_unref(index->upsert_format);
@@ -1149,6 +1151,27 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		tuple_format_ref(index->mem_format);
 		tuple_format_ref(index->upsert_format);
 		vy_index_validate_formats(index);
+	}
+
+	/*
+	 * Check if there are unique indexes that are contained
+	 * by other unique indexes. For them, we can skip check
+	 * for duplicates on INSERT. Prefer indexes with higher
+	 * ids for uniqueness check optimization as they are
+	 * likelier to have a "colder" cache.
+	 */
+	for (int i = new_space->index_count - 1; i >= 0; i--) {
+		struct vy_index *index = vy_index(new_space->index[i]);
+		if (!index->check_is_unique)
+			continue;
+		for (int j = 0; j < (int)new_space->index_count; j++) {
+			struct vy_index *other = vy_index(new_space->index[j]);
+			if (other != index && other->check_is_unique &&
+			    key_def_contains(index->key_def, other->key_def)) {
+				index->check_is_unique = false;
+				break;
+			}
+		}
 	}
 	return;
 fail:
@@ -1343,8 +1366,8 @@ vy_index_get(struct vy_index *index, struct vy_tx *tx,
  * @retval -1 Memory error or the key is found.
  */
 static inline int
-vy_check_dup_key(struct vy_env *env, struct vy_tx *tx, struct space *space,
-		 struct vy_index *index, struct tuple *key)
+vy_check_is_unique(struct vy_env *env, struct vy_tx *tx, struct space *space,
+		   struct vy_index *index, struct tuple *key)
 {
 	struct tuple *found;
 	/*
@@ -1387,7 +1410,8 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	if (vy_check_dup_key(env, tx, space, pk, stmt) != 0)
+	if (pk->check_is_unique &&
+	    vy_check_is_unique(env, tx, space, pk, stmt) != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -1416,7 +1440,7 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * conflict with existing tuples. If the index is not
 	 * unique a conflict is impossible.
 	 */
-	if (index->opts.is_unique &&
+	if (index->check_is_unique &&
 	    !key_update_can_be_skipped(index->key_def->column_mask,
 				       vy_stmt_column_mask(stmt)) &&
 	    (!index->key_def->is_nullable ||
@@ -1425,7 +1449,7 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 							index->env->key_format);
 		if (key == NULL)
 			return -1;
-		int rc = vy_check_dup_key(env, tx, space, index, key);
+		int rc = vy_check_is_unique(env, tx, space, index, key);
 		tuple_unref(key);
 		if (rc != 0)
 			return -1;

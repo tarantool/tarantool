@@ -48,3 +48,28 @@ tx2 = box.info.vinyl().tx
 tx2.commit - tx1.commit -- 0
 tx2.rollback - tx1.rollback -- 1
 s:drop()
+
+--
+-- gh-3158: check of duplicates is skipped if the index
+-- is contained by another unique index which is checked.
+--
+s = box.schema.create_space('test', {engine = 'vinyl'})
+i1 = s:create_index('i1', {unique = true, parts = {1, 'unsigned', 2, 'unsigned'}})
+i2 = s:create_index('i2', {unique = true, parts = {2, 'unsigned', 1, 'unsigned'}})
+i3 = s:create_index('i3', {unique = true, parts = {3, 'unsigned', 4, 'unsigned', 5, 'unsigned'}})
+i4 = s:create_index('i4', {unique = true, parts = {5, 'unsigned', 4, 'unsigned'}})
+i5 = s:create_index('i5', {unique = true, parts = {4, 'unsigned', 5, 'unsigned', 1, 'unsigned'}})
+i6 = s:create_index('i6', {unique = true, parts = {4, 'unsigned', 6, 'unsigned', 5, 'unsigned'}})
+i7 = s:create_index('i7', {unique = true, parts = {6, 'unsigned'}})
+
+s:insert{1, 1, 1, 1, 1, 1}
+
+i1:info().lookup -- 1
+i2:info().lookup -- 0
+i3:info().lookup -- 0
+i4:info().lookup -- 1
+i5:info().lookup -- 0
+i6:info().lookup -- 0
+i7:info().lookup -- 1
+
+s:drop()

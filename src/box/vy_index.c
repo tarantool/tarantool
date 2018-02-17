@@ -239,6 +239,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->space_id = index_def->space_id;
 	index->id = index_def->iid;
 	index->opts = index_def->opts;
+	index->check_is_unique = index->opts.is_unique;
 	vy_index_read_set_new(&index->read_set);
 
 	index_env->index_count++;
