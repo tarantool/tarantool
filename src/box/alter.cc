@@ -236,13 +236,33 @@ index_opts_decode(struct index_opts *opts, const char *map)
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
 			  "'euclid' or 'manhattan'");
 	}
-	if (opts->run_count_per_level <= 0)
+	if (opts->range_size <= 0) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS,
-			  "run_count_per_level must be > 0");
-	if (opts->run_size_ratio <= 1)
-		tnt_raise(ClientError, ER_WRONG_SPACE_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS, "run_size_ratio must be > 1");
+			  "range_size must be greater than 0");
+	}
+	if (opts->page_size <= 0 || opts->page_size > opts->range_size) {
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS,
+			  "page_size must be greater than 0 and "
+			  "less than or equal to range_size");
+	}
+	if (opts->run_count_per_level <= 0) {
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS,
+			  "run_count_per_level must be greater than 0");
+	}
+	if (opts->run_size_ratio <= 1) {
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS,
+			  "run_size_ratio must be greater than 1");
+	}
+	if (opts->bloom_fpr <= 0 || opts->bloom_fpr > 1) {
+		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
+			  BOX_INDEX_FIELD_OPTS,
+			  "bloom_fpr must be greater than 0 and "
+			  "less than or equal to 1");
+	}
 }
 
 /**

@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(85)
+test:plan(89)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -38,6 +38,14 @@ invalid('listen', '//!')
 invalid('log', ':')
 invalid('log', 'syslog:xxx=')
 invalid('log_level', 'unknown')
+invalid('vinyl_read_threads', 0)
+invalid('vinyl_write_threads', 1)
+invalid('vinyl_range_size', 0)
+invalid('vinyl_page_size', 0)
+invalid('vinyl_run_count_per_level', 0)
+invalid('vinyl_run_size_ratio', 1)
+invalid('vinyl_bloom_fpr', 0)
+invalid('vinyl_bloom_fpr', 1.1)
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
@@ -263,36 +271,6 @@ box.cfg{vinyl_page_size = 2 * 1024 * 1024, vinyl_range_size = 2 * 1024 * 1024}
 os.exit(0)
 ]]
 test:is(run_script(code), 0, "page size equal with range")
-
---
--- there is at least one vinyl reader thread.
---
-code = [[
-box.cfg{vinyl_read_threads = 0}
-os.exit(0)
-]]
-test:is(run_script(code), PANIC, "vinyl_read_threads = 0")
-
-code = [[
-box.cfg{vinyl_read_threads = 1}
-os.exit(0)
-]]
-test:is(run_script(code), 0, "vinyl_read_threads = 1")
-
---
--- gh-2150 one vinyl worker thread is reserved for dumps
---
-code = [[
-box.cfg{vinyl_write_threads = 1}
-os.exit(0)
-]]
-test:is(run_script(code), PANIC, "vinyl_write_threads = 1")
-
-code = [[
-box.cfg{vinyl_write_threads = 2}
-os.exit(0)
-]]
-test:is(run_script(code), 0, "vinyl_write_threads = 2")
 
 -- test memtx options upgrade
 code = [[

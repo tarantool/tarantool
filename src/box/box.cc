@@ -490,6 +490,48 @@ box_check_wal_max_size(int64_t wal_max_size)
 	return wal_max_size;
 }
 
+static void
+box_check_vinyl_options(void)
+{
+	int read_threads = cfg_geti("vinyl_read_threads");
+	int write_threads = cfg_geti("vinyl_write_threads");
+	int64_t range_size = cfg_geti64("vinyl_range_size");
+	int64_t page_size = cfg_geti64("vinyl_page_size");
+	int run_count_per_level = cfg_geti("vinyl_run_count_per_level");
+	double run_size_ratio = cfg_getd("vinyl_run_size_ratio");
+	double bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+
+	if (read_threads < 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_read_threads",
+			  "must be greater than or equal to 1");
+	}
+	if (write_threads < 2) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_write_threads",
+			  "must be greater than or equal to 2");
+	}
+	if (range_size <= 0) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_range_size",
+			  "must be greater than 0");
+	}
+	if (page_size <= 0 || page_size > range_size) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
+			  "must be greater than 0 and less than "
+			  "or equal to vinyl_range_size");
+	}
+	if (run_count_per_level <= 0) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_run_count_per_level",
+			  "must be greater than 0");
+	}
+	if (run_size_ratio <= 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_run_size_ratio",
+			  "must be greater than 1");
+	}
+	if (bloom_fpr <= 0 || bloom_fpr > 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_bloom_fpr",
+			  "must be greater than 0 and less than or equal to 1");
+	}
+}
+
 void
 box_check_config()
 {
@@ -510,15 +552,7 @@ box_check_config()
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
-	if (cfg_geti64("vinyl_page_size") > cfg_geti64("vinyl_range_size"))
-		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
-			  "can't be greater than vinyl_range_size");
-	if (cfg_geti("vinyl_read_threads") < 1)
-		tnt_raise(ClientError, ER_CFG,
-			  "vinyl_read_threads", "must be >= 1");
-	if (cfg_geti("vinyl_write_threads") < 2)
-		tnt_raise(ClientError, ER_CFG,
-			  "vinyl_write_threads", "must be >= 2");
+	box_check_vinyl_options();
 }
 
 /*
