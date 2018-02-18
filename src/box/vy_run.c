@@ -2032,7 +2032,8 @@ vy_run_write_page(struct vy_run *run, struct xlog *data_xlog,
 				     cmp_def, is_primary) != 0)
 			goto error_rollback;
 
-		bloom_spectrum_add(bs, tuple_hash(*curr_stmt, key_def));
+		if (bs != NULL)
+			bloom_spectrum_add(bs, tuple_hash(*curr_stmt, key_def));
 
 		int64_t lsn = vy_stmt_lsn(*curr_stmt);
 		run->info.min_lsn = MIN(run->info.min_lsn, lsn);
@@ -2141,8 +2142,9 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 		goto done;
 
 	struct bloom_spectrum bs;
-	if (bloom_spectrum_create(&bs, max_output_count,
-				  bloom_fpr, runtime.quota) != 0) {
+	bool has_bloom = bloom_fpr < 1;
+	if (has_bloom && bloom_spectrum_create(&bs, max_output_count,
+					bloom_fpr, runtime.quota) != 0) {
 		diag_set(OutOfMemory, 0,
 			 "bloom_spectrum_create", "bloom_spectrum");
 		goto err;
@@ -2169,8 +2171,8 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	uint32_t page_info_capacity = 0;
 	int rc;
 	do {
-		rc = vy_run_write_page(run, &data_xlog, wi, &stmt,
-				       page_size, &bs, cmp_def, key_def,
+		rc = vy_run_write_page(run, &data_xlog, wi, &stmt, page_size,
+				       has_bloom ? &bs : NULL, cmp_def, key_def,
 				       iid == 0, &page_info_capacity);
 		if (rc < 0)
 			goto err_close_xlog;
@@ -2186,9 +2188,11 @@ vy_run_write_data(struct vy_run *run, const char *dirpath,
 	xlog_close(&data_xlog, true);
 	fiber_gc();
 
-	bloom_spectrum_choose(&bs, &run->info.bloom);
-	run->info.has_bloom = true;
-	bloom_spectrum_destroy(&bs, runtime.quota);
+	if (has_bloom) {
+		bloom_spectrum_choose(&bs, &run->info.bloom);
+		run->info.has_bloom = true;
+		bloom_spectrum_destroy(&bs, runtime.quota);
+	}
 done:
 	wi->iface->stop(wi);
 	return 0;
@@ -2197,7 +2201,8 @@ err_close_xlog:
 	xlog_close(&data_xlog, false);
 	fiber_gc();
 err_free_bloom:
-	bloom_spectrum_destroy(&bs, runtime.quota);
+	if (has_bloom)
+		bloom_spectrum_destroy(&bs, runtime.quota);
 err:
 	wi->iface->stop(wi);
 	return -1;
@@ -2336,8 +2341,11 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	mp_next(&tmp);
 	size_t max_key_size = tmp - run_info->max_key;
 
-	assert(run_info->has_bloom);
-	size_t size = mp_sizeof_map(6);
+	uint32_t key_count = 5;
+	if (run_info->has_bloom)
+		key_count++;
+
+	size_t size = mp_sizeof_map(key_count);
 	size += mp_sizeof_uint(VY_RUN_INFO_MIN_KEY) + min_key_size;
 	size += mp_sizeof_uint(VY_RUN_INFO_MAX_KEY) + max_key_size;
 	size += mp_sizeof_uint(VY_RUN_INFO_MIN_LSN) +
@@ -2346,8 +2354,9 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 		mp_sizeof_uint(run_info->max_lsn);
 	size += mp_sizeof_uint(VY_RUN_INFO_PAGE_COUNT) +
 		mp_sizeof_uint(run_info->page_count);
-	size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
-		vy_run_bloom_encode_size(&run_info->bloom);
+	if (run_info->has_bloom)
+		size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
+			vy_run_bloom_encode_size(&run_info->bloom);
 
 	char *pos = region_alloc(&fiber()->gc, size);
 	if (pos == NULL) {
@@ -2357,7 +2366,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	memset(xrow, 0, sizeof(*xrow));
 	xrow->body->iov_base = pos;
 	/* encode values */
-	pos = mp_encode_map(pos, 6);
+	pos = mp_encode_map(pos, key_count);
 	pos = mp_encode_uint(pos, VY_RUN_INFO_MIN_KEY);
 	memcpy(pos, run_info->min_key, min_key_size);
 	pos += min_key_size;
@@ -2370,8 +2379,10 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	pos = mp_encode_uint(pos, run_info->max_lsn);
 	pos = mp_encode_uint(pos, VY_RUN_INFO_PAGE_COUNT);
 	pos = mp_encode_uint(pos, run_info->page_count);
-	pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
-	pos = vy_run_bloom_encode(&run_info->bloom, pos);
+	if (run_info->has_bloom) {
+		pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
+		pos = vy_run_bloom_encode(&run_info->bloom, pos);
+	}
 	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
 	xrow->bodycnt = 1;
 	xrow->type = VY_INDEX_RUN_INFO;
@@ -2563,6 +2574,9 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	}
 	run->info.max_lsn = max_lsn;
 	run->info.min_lsn = min_lsn;
+
+	if (opts->bloom_fpr >= 1)
+		goto done;
 	if (xlog_cursor_reset(&cursor) != 0)
 		goto close_err;
 	if (bloom_create(&run->info.bloom, run_row_count,
@@ -2583,7 +2597,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		bloom_add(&run->info.bloom, tuple_hash(tuple, key_def));
 	}
 	run->info.has_bloom = true;
-
+done:
 	region_truncate(region, mem_used);
 	run->fd = cursor.fd;
 	xlog_cursor_close(&cursor, true);

@@ -1,7 +1,41 @@
-#!/usr/bin/env tarantool
+test_run = require('test_run').new()
 ---
 ...
-test_run = require('test_run').new()
+--
+-- Setting bloom_fpr to 1 disables bloom filter.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk', {bloom_fpr = 1})
+---
+...
+for i = 1, 10, 2 do s:insert{i} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+for i = 1, 10 do s:get{i} end
+---
+...
+stat = s.index.pk:info()
+---
+...
+stat.disk.bloom_size -- 0
+---
+- 0
+...
+stat.disk.iterator.bloom.hit -- 0
+---
+- 0
+...
+stat.disk.iterator.bloom.miss -- 0
+---
+- 0
+...
+s:drop()
 ---
 ...
 s = box.schema.space.create('test', {engine = 'vinyl'})

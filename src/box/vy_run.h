@@ -301,6 +301,12 @@ vy_run_env_destroy(struct vy_run_env *env);
 void
 vy_run_env_enable_coio(struct vy_run_env *env, int threads);
 
+static inline size_t
+vy_run_bloom_size(struct vy_run *run)
+{
+	return run->info.has_bloom ? bloom_store_size(&run->info.bloom) : 0;
+}
+
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
 {
