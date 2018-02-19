@@ -488,18 +488,18 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
  *
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
-int tarantoolSqlite3EphemeralInsert(BtCursor *pCur, const CursorPayload *pX)
+int tarantoolSqlite3EphemeralInsert(BtCursor *pCur)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
 	struct ta_cursor *c = pCur->pTaCursor;
 	assert(c);
 	assert(c->ephem_space);
-	mp_tuple_assert(pX->pKey, pX->pKey + pX->nKey);
+	mp_tuple_assert(pCur->pKey, pCur->pKey + pCur->nKey);
 
 	struct space *space = c->ephem_space;
-	if (space_ephemeral_replace(space, pX->pKey,
-				    pX->pKey + pX->nKey) != 0) {
+	if (space_ephemeral_replace(space, pCur->pKey,
+				    pCur->pKey + pCur->nKey) != 0) {
 		diag_log();
 		return SQL_TARANTOOL_INSERT_FAIL;
 	}
@@ -519,8 +519,7 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 	return SQLITE_OK;
 }
 
-static int insertOrReplace(BtCursor *pCur, const CursorPayload *pX,
-		           int operationType)
+static int insertOrReplace(BtCursor *pCur, int operationType)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 	assert(operationType == TARANTOOL_INDEX_INSERT ||
@@ -529,26 +528,26 @@ static int insertOrReplace(BtCursor *pCur, const CursorPayload *pX,
 	int space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
 	int rc;
 	if (operationType == TARANTOOL_INDEX_INSERT) {
-		rc = box_insert(space_id, pX->pKey,
-				(const char *)pX->pKey + pX->nKey,
+		rc = box_insert(space_id, pCur->pKey,
+				(const char *)pCur->pKey + pCur->nKey,
 				NULL /* result */);
 	} else {
-		rc = box_replace(space_id, pX->pKey,
-				 (const char *)pX->pKey + pX->nKey,
+		rc = box_replace(space_id, pCur->pKey,
+				 (const char *)pCur->pKey + pCur->nKey,
 				 NULL /* result */);
 	}
 
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;;
 }
 
-int tarantoolSqlite3Insert(BtCursor *pCur, const CursorPayload *pX)
+int tarantoolSqlite3Insert(BtCursor *pCur)
 {
-	return insertOrReplace(pCur, pX, TARANTOOL_INDEX_INSERT);
+	return insertOrReplace(pCur, TARANTOOL_INDEX_INSERT);
 }
 
-int tarantoolSqlite3Replace(BtCursor *pCur, const CursorPayload *pX)
+int tarantoolSqlite3Replace(BtCursor *pCur)
 {
-	return insertOrReplace(pCur, pX, TARANTOOL_INDEX_REPLACE);
+	return insertOrReplace(pCur, TARANTOOL_INDEX_REPLACE);
 }
 
 /*

@@ -4465,7 +4465,6 @@ case OP_SorterInsert:       /* in2 */
 case OP_IdxReplace:
 case OP_IdxInsert: {        /* in2 */
 	VdbeCursor *pC;
-	CursorPayload x;
 
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
 	pC = p->apCsr[pOp->p1];
@@ -4480,27 +4479,37 @@ case OP_IdxInsert: {        /* in2 */
 	if (pOp->opcode==OP_SorterInsert) {
 		rc = sqlite3VdbeSorterWrite(pC, pIn2);
 	} else {
-		x.nKey = pIn2->n;
-		x.pKey = pIn2->z;
-		x.aMem = aMem + pOp->p3;
-		x.nMem = (u16)pOp->p4.i;
-
 		BtCursor *pBtCur = pC->uc.pCursor;
-		assert((x.pKey == 0) == (pBtCur->pKeyInfo == 0));
+		assert((pIn2->z == 0) == (pBtCur->pKeyInfo == 0));
+
+		pBtCur->nKey = pIn2->n;
+		pBtCur->pKey = pIn2->z;
+
 		if (pBtCur->curFlags & BTCF_TaCursor) {
 			/* Make sure that memory has been allocated on region. */
 			assert(aMem[pOp->p2].flags & MEM_Ephem);
 			if (pOp->opcode == OP_IdxInsert)
-				rc = tarantoolSqlite3Insert(pBtCur, &x);
+				rc = tarantoolSqlite3Insert(pBtCur);
 			else
-				rc = tarantoolSqlite3Replace(pBtCur, &x);
+				rc = tarantoolSqlite3Replace(pBtCur);
 		} else if (pBtCur->curFlags & BTCF_TEphemCursor) {
-			rc = tarantoolSqlite3EphemeralInsert(pBtCur, &x);
+			rc = tarantoolSqlite3EphemeralInsert(pBtCur);
 		} else {
 			unreachable();
 		}
 		assert(pC->deferredMoveto==0);
 		pC->cacheStatus = CACHE_STALE;
+
+		/*
+		 * Memory for tuple passed to Tarantool is
+		 * allocated in region. This memory will be
+		 * automatically released by Tarantool.
+		 * However, VDBE in the end will also try to
+		 * release it, so pointers should be explicitly
+		 * nullified.
+		 */
+		pBtCur->nKey = 0;
+		pBtCur->pKey = NULL;
 	}
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {

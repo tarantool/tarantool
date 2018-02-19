@@ -34,7 +34,6 @@
 
 typedef u32 Pgno;
 typedef struct BtCursor BtCursor;
-typedef struct CursorPayload CursorPayload;
 
 /*
  * Values that may be OR'd together to form the argument to the
@@ -79,24 +78,6 @@ void sqlite3CursorHintFlags(BtCursor *, unsigned);
 
 int sqlite3CloseCursor(BtCursor *);
 int sqlite3CursorMovetoUnpacked(BtCursor *, UnpackedRecord * pUnKey, int *pRes);
-
-/* An instance of the CursorPayload object describes the content of a single
- * entry in index.
- *
- * This object is used to pass information into tarantoolSqlite3Insert().  The
- * same information used to be passed as five separate parameters.  But placing
- * the information into this object helps to keep the interface more
- * organized and understandable, and it also helps the resulting code to
- * run a little faster by using fewer registers for parameter passing.
- */
-struct CursorPayload {
-	const void *pKey;	/* Key content for indexes.  NULL for tables */
-	sqlite3_int64 nKey;	/* Size of pKey for indexes.  PRIMARY KEY for tabs */
-	const void *pData;	/* Data for tables.  NULL for indexes */
-	struct Mem *aMem;	/* First of nMem value in the unpacked pKey */
-	u16 nMem;		/* Number of aMem[] value.  Might be zero */
-	int nData;		/* Size of pData.  0 if none. */
-};
 
 int sqlite3CursorNext(BtCursor *, int *pRes);
 int sqlite3CursorPrevious(BtCursor *, int *pRes);
