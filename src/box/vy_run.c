@@ -251,6 +251,7 @@ vy_run_clear(struct vy_run *run)
 		free(run->page_info);
 	}
 	run->page_info = NULL;
+	run->page_index_size = 0;
 	run->info.page_count = 0;
 	if (run->info.has_bloom)
 		bloom_destroy(&run->info.bloom, runtime.quota);
@@ -2550,6 +2551,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		info->row_index_offset = page_row_index_offset;
 		++run->info.page_count;
 		run_row_count += page_row_count;
+		vy_run_acct_page(run, info);
 		region_truncate(region, mem_used);
 	}
 
