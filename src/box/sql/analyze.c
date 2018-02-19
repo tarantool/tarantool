@@ -1113,7 +1113,7 @@ static void
 analyzeDatabase(Parse * pParse)
 {
 	sqlite3 *db = pParse->db;
-	Schema *pSchema = db->mdb.pSchema;	/* Schema of database */
+	Schema *pSchema = db->pSchema;	/* Schema of database */
 	HashElem *k;
 	int iStatCur;
 	int iMem;
@@ -1677,7 +1677,7 @@ sqlite3AnalysisLoad(sqlite3 * db)
 	int rc = SQLITE_OK;
 
 	/* Clear any prior statistics */
-	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
+	for (j = sqliteHashFirst(&db->pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {
 		Table *pTab = sqliteHashData(j);
 		for (i = sqliteHashFirst(&pTab->idxHash); i;
@@ -1697,7 +1697,7 @@ sqlite3AnalysisLoad(sqlite3 * db)
 	}
 
 	/* Set appropriate defaults on all indexes not in the _sql_stat1 table */
-	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
+	for (j = sqliteHashFirst(&db->pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {
 		Table *pTab = sqliteHashData(j);
 		for (i = sqliteHashFirst(&pTab->idxHash); i;
@@ -1715,7 +1715,7 @@ sqlite3AnalysisLoad(sqlite3 * db)
 		db->lookaside.bDisable--;
 	}
 
-	for (j = sqliteHashFirst(&db->mdb.pSchema->tblHash); j;
+	for (j = sqliteHashFirst(&db->pSchema->tblHash); j;
 	     j = sqliteHashNext(j)) {
 		Table *pTab = sqliteHashData(j);
 		for (i = sqliteHashFirst(&pTab->idxHash); i;

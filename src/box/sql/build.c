@@ -111,12 +111,10 @@ sqlite3FinishCoding(Parse * pParse)
 			sqlite3VdbeJumpHere(v, 0);
 			Schema *pSchema;
 			if (DbMaskTest(pParse->cookieMask, 0) != 0) {
-				pSchema = db->mdb.pSchema;
-				sqlite3VdbeAddOp4Int(v, OP_Transaction,	/* Opcode */
-						     0,	/* P1 */
-						     DbMaskTest(pParse->writeMask, 0),	/* P2 */
-						     pSchema->schema_cookie,	/* P3 */
-						     pSchema->iGeneration	/* P4 */
+				pSchema = db->pSchema;
+				sqlite3VdbeAddOp2(v, OP_Transaction,	/* Opcode */
+						  0,	/* P1 */
+						  DbMaskTest(pParse->writeMask, 0)	/* P2 */
 				    );
 				if (pParse->initiateTTrans)
 					sqlite3VdbeAddOp0(v, OP_TTransaction);
@@ -238,7 +236,7 @@ sqlite3FindTable(sqlite3 * db, const char *zName)
 	}
 #endif
 
-	return sqlite3HashFind(&db->mdb.pSchema->tblHash, zName);
+	return sqlite3HashFind(&db->pSchema->tblHash, zName);
 }
 
 /*
@@ -378,20 +376,6 @@ sqlite3UnlinkAndDeleteIndex(sqlite3 * db, Index * pIndex)
 }
 
 /*
- * Reset the schema for the database.
- */
-void
-sqlite3ResetOneSchema(sqlite3 * db)
-{
-	Db *pDb;
-
-	/* Case 1:  Reset the single schema of the database  */
-	pDb = &db->mdb;
-	assert(pDb->pSchema != 0);
-	sqlite3SchemaClear(pDb->pSchema);
-}
-
-/*
  * Erase all schema information from all attached databases (including
  * "main" and "temp") for a single database connection.
  */
@@ -399,9 +383,8 @@ void
 sqlite3ResetAllSchemasOfConnection(sqlite3 * db)
 {
 	struct session *user_session = current_session();
-	Db *pDb = &db->mdb;
-	if (pDb->pSchema) {
-		sqlite3SchemaClear(pDb->pSchema);
+	if (db->pSchema) {
+		sqlite3SchemaClear(db->pSchema);
 	}
 	user_session->sql_flags &= ~SQLITE_InternChanges;
 }
@@ -551,13 +534,11 @@ void
 sqlite3UnlinkAndDeleteTable(sqlite3 * db, const char *zTabName)
 {
 	Table *p;
-	Db *pDb;
 
 	assert(db != 0);
 	assert(zTabName);
 	testcase(zTabName[0] == 0);	/* Zero-length table names are allowed */
-	pDb = &db->mdb;
-	p = sqlite3HashInsert(&pDb->pSchema->tblHash, zTabName, 0);
+	p = sqlite3HashInsert(&db->pSchema->tblHash, zTabName, 0);
 	sqlite3DeleteTable(db, p);
 }
 
@@ -757,7 +738,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	pTable->zName = zName;
 	pTable->iPKey = -1;
 	pTable->iAutoIncPKey = -1;
-	pTable->pSchema = db->mdb.pSchema;
+	pTable->pSchema = db->pSchema;
 	sqlite3HashInit(&pTable->idxHash);
 	pTable->nTabRef = 1;
 	pTable->nRowLogEst = 200;
@@ -1936,17 +1917,17 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		if (NEVER(v == 0))
 			return;
 
-		pSysSchema = sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
+		pSysSchema = sqlite3HashFind(&pParse->db->pSchema->tblHash,
 					     TARANTOOL_SYS_SCHEMA_NAME);
 		if (NEVER(!pSysSchema))
 			return;
 
-		pSysSpace = sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
+		pSysSpace = sqlite3HashFind(&pParse->db->pSchema->tblHash,
 					    TARANTOOL_SYS_SPACE_NAME);
 		if (NEVER(!pSysSpace))
 			return;
 
-		pSysIndex = sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
+		pSysIndex = sqlite3HashFind(&pParse->db->pSchema->tblHash,
 					    TARANTOOL_SYS_INDEX_NAME);
 		if (NEVER(!pSysIndex))
 			return;
@@ -2012,7 +1993,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 
 			/* Do an insertion into _sequence  */
 			sys_sequence = sqlite3HashFind(
-				&pParse->db->mdb.pSchema->tblHash,
+				&pParse->db->pSchema->tblHash,
 				TARANTOOL_SYS_SEQUENCE_NAME);
 			if (NEVER(!sys_sequence))
 				return;
@@ -2034,7 +2015,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 
 			/* Do an insertion into _space_sequence  */
 			sys_space_sequence = sqlite3HashFind(
-				&pParse->db->mdb.pSchema->tblHash,
+				&pParse->db->pSchema->tblHash,
 				TARANTOOL_SYS_SPACE_SEQUENCE_NAME);
 			if (NEVER(!sys_space_sequence))
 				return;
@@ -2279,9 +2260,7 @@ static void
 sqliteViewResetAll(sqlite3 * db)
 {
 	HashElem *i;
-	if (!DbHasProperty(db, DB_UnresetViews))
-		return;
-	for (i = sqliteHashFirst(&db->mdb.pSchema->tblHash); i;
+	for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
 	     i = sqliteHashNext(i)) {
 		Table *pTab = sqliteHashData(i);
 		if (pTab->pSelect) {
@@ -3092,7 +3071,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	pIndex->onError = (u8) onError;
 	pIndex->uniqNotNull = onError != ON_CONFLICT_ACTION_NONE;
 	pIndex->idxType = idxType;
-	pIndex->pSchema = db->mdb.pSchema;
+	pIndex->pSchema = db->pSchema;
 	pIndex->nKeyCol = pList->nExpr;
 	/* Tarantool have access to each column by any index */
 	pIndex->isCovering = 1;
@@ -3280,7 +3259,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		sqlite3BeginWriteOperation(pParse, 1);
 
 		pSysIndex =
-		    sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
+		    sqlite3HashFind(&pParse->db->pSchema->tblHash,
 				    TARANTOOL_SYS_INDEX_NAME);
 		if (NEVER(!pSysIndex))
 			return;
@@ -4184,14 +4163,12 @@ reindexTable(Parse * pParse, Table * pTab, char const *zColl)
 static void
 reindexDatabases(Parse * pParse, char const *zColl)
 {
-	Db *pDb;		/* A single database */
 	sqlite3 *db = pParse->db;	/* The database connection */
-	HashElem *k;		/* For looping over tables in pDb */
+	HashElem *k;		/* For looping over tables in pSchema */
 	Table *pTab;		/* A table in the database */
 
-	pDb = &db->mdb;
-	assert(pDb != 0);
-	for (k = sqliteHashFirst(&pDb->pSchema->tblHash); k;
+	assert(db->pSchema != NULL);
+	for (k = sqliteHashFirst(&db->pSchema->tblHash); k;
 	     k = sqliteHashNext(k)) {
 		pTab = (Table *) sqliteHashData(k);
 		reindexTable(pParse, pTab, zColl);

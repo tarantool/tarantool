@@ -123,7 +123,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	if (!zName || SQLITE_OK != sqlite3CheckIdentifierName(pParse, zName)) {
 		goto trigger_cleanup;
 	}
-	if (sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName)) {
+	if (sqlite3HashFind(&(db->pSchema->trigHash), zName)) {
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse, "trigger %s already exists",
 					zName);
@@ -187,7 +187,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	pTrigger->zName = zName;
 	zName = 0;
 	pTrigger->table = sqlite3DbStrDup(db, pTableName->a[0].zName);
-	pTrigger->pSchema = db->mdb.pSchema;
+	pTrigger->pSchema = db->pSchema;
 	pTrigger->pTabSchema = pTab->pSchema;
 	pTrigger->op = (u8) op;
 	pTrigger->tr_tm = tr_tm == TK_BEFORE ? TRIGGER_BEFORE : TRIGGER_AFTER;
@@ -260,7 +260,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 		if (v == 0)
 			goto triggerfinish_cleanup;
 
-		pSysTrigger = sqlite3HashFind(&pParse->db->mdb.pSchema->tblHash,
+		pSysTrigger = sqlite3HashFind(&pParse->db->pSchema->tblHash,
 					      TARANTOOL_SYS_TRIGGER_NAME);
 		if (NEVER(!pSysTrigger))
 			goto triggerfinish_cleanup;
@@ -324,7 +324,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 
 	if (db->init.busy) {
 		Trigger *pLink = pTrig;
-		Hash *pHash = &db->mdb.pSchema->trigHash;
+		Hash *pHash = &db->pSchema->trigHash;
 		pTrig = sqlite3HashInsert(pHash, zName, pTrig);
 		if (pTrig) {
 			sqlite3OomFault(db);
@@ -539,7 +539,7 @@ sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 
 	assert(pName->nSrc == 1);
 	zName = pName->a[0].zName;
-	pTrigger = sqlite3HashFind(&(db->mdb.pSchema->trigHash), zName);
+	pTrigger = sqlite3HashFind(&(db->pSchema->trigHash), zName);
 	if (!pTrigger) {
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse, "no such trigger: %S", pName,
@@ -617,7 +617,7 @@ sqlite3UnlinkAndDeleteTrigger(sqlite3 * db, const char *zName)
 	Hash *pHash;
 	struct session *user_session = current_session();
 
-	pHash = &(db->mdb.pSchema->trigHash);
+	pHash = &(db->pSchema->trigHash);
 	pTrigger = sqlite3HashInsert(pHash, zName, 0);
 	if (ALWAYS(pTrigger)) {
 		if (pTrigger->pSchema == pTrigger->pTabSchema) {

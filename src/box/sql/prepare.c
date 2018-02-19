@@ -163,10 +163,9 @@ extern int
 sqlite3InitDatabase(sqlite3 * db)
 {
 	int rc;
-	Db *pDb;
 	InitData initData;
 
-	assert(db->mdb.pSchema);
+	assert(db->pSchema != NULL);
 	assert(sqlite3_mutex_held(db->mutex));
 
 	memset(&initData, 0, sizeof(InitData));
@@ -179,10 +178,6 @@ sqlite3InitDatabase(sqlite3 * db)
 		rc = initData.rc;
 		goto error_out;
 	}
-
-	/* Create a cursor to hold the database open
-	 */
-	pDb = &db->mdb;
 
 	/* Tarantool: schema_cookie is not used so far, but
 	 * might be used in future. Set it to dummy value.
@@ -250,7 +245,7 @@ sqlite3Init(sqlite3 * db)
 	if (!DbHasProperty(db, DB_SchemaLoaded)) {
 		rc = sqlite3InitDatabase(db);
 		if (rc) {
-			sqlite3ResetOneSchema(db);
+			sqlite3SchemaClear(db->pSchema);
 		}
 	}
 
@@ -305,7 +300,7 @@ sqlite3SchemaToIndex(sqlite3 * db, Schema * pSchema)
 	 */
 	assert(sqlite3_mutex_held(db->mutex));
 	if (pSchema) {
-		if (db->mdb.pSchema == pSchema) {
+		if (db->pSchema == pSchema) {
 			i = 0;
 		}
 		assert(i == 0);

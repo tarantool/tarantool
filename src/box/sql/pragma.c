@@ -277,7 +277,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	char *zTable = 0;	/* Nul-terminated UTF-8 string <value2> or NULL */
 	int rc;			/* return value form SQLITE_FCNTL_PRAGMA */
 	sqlite3 *db = pParse->db;	/* The database connection */
-	Db *pDb;		/* The specific database being pragmaed */
 	Vdbe *v = sqlite3GetVdbe(pParse);	/* Prepared statement */
 	const PragmaName *pPragma;	/* The pragma */
 	struct session *user_session = current_session();
@@ -287,7 +286,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		return;
 	sqlite3VdbeRunOnlyOnce(v);
 	pParse->nMem = 2;
-	pDb = &db->mdb;
 
 	zLeft = sqlite3NameFromToken(db, pId);
 	if (!zLeft) {
@@ -419,7 +417,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			HashElem *i;
 			pParse->nMem = 4;
 			sqlite3CodeVerifySchema(pParse);
-			for (i = sqliteHashFirst(&pDb->pSchema->tblHash); i;
+			for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
 			     i = sqliteHashNext(i)) {
 				Table *pTab = sqliteHashData(i);
 				sqlite3VdbeMultiLoad(v, 1, "ssii",
@@ -623,7 +621,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			regKey = ++pParse->nMem;
 			regRow = ++pParse->nMem;
 			sqlite3CodeVerifySchema(pParse);
-			k = sqliteHashFirst(&db->mdb.pSchema->tblHash);
+			k = sqliteHashFirst(&db->pSchema->tblHash);
 			while (k) {
 				if (zRight) {
 					pTab =

@@ -314,7 +314,7 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 		pCol->zColl = 0;
 		pCol->pDflt = 0;
 	}
-	pNew->pSchema = db->mdb.pSchema;
+	pNew->pSchema = db->pSchema;
 	pNew->addColOffset = pTab->addColOffset;
 	pNew->nTabRef = 1;
 

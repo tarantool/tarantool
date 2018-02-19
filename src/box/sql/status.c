@@ -245,7 +245,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 			int nByte = 0;	/* Used to accumulate return value */
 
 			db->pnBytesFreed = &nByte;
-			Schema *pSchema = db->mdb.pSchema;
+			Schema *pSchema = db->pSchema;
 			if (ALWAYS(pSchema != 0)) {
 				HashElem *p;
 

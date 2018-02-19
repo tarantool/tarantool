@@ -833,7 +833,6 @@ typedef struct AuthContext AuthContext;
 typedef struct AutoincInfo AutoincInfo;
 typedef struct Bitvec Bitvec;
 typedef struct Column Column;
-typedef struct Db Db;
 typedef struct Schema Schema;
 typedef struct Expr Expr;
 typedef struct ExprList ExprList;
@@ -890,14 +889,6 @@ typedef int VList;
 #include "mutex.h"
 
 /*
- * Each database file to be accessed by the system is an instance
- * of the following structure.
- */
-struct Db {
-	Schema *pSchema;	/* Pointer to database schema (possibly shared) */
-};
-
-/*
  * An instance of the following structure stores a database schema.
  */
 struct Schema {
@@ -916,10 +907,9 @@ struct Schema {
  * These macros can be used to test, set, or clear bits in the
  * Db.pSchema->flags field.
  */
-#define DbHasProperty(D,P)     (((D)->mdb.pSchema->schemaFlags&(P))==(P))
-#define DbHasAnyProperty(D,P)  (((D)->mdb.pSchema->schemaFlags&(P))!=0)
-#define DbSetProperty(D,P)     (D)->mdb.pSchema->schemaFlags|=(P)
-#define DbClearProperty(D,P)   (D)->mdb.pSchema->schemaFlags&=~(P)
+#define DbHasProperty(D,P)     (((D)->pSchema->schemaFlags&(P))==(P))
+#define DbHasAnyProperty(D,P)  (((D)->pSchema->schemaFlags&(P))!=0)
+#define DbSetProperty(D,P)     (D)->pSchema->schemaFlags|=(P)
 
 /*
  * Allowed values for the DB.pSchema->flags field.
@@ -1034,7 +1024,7 @@ struct sqlite3 {
 	struct Vdbe *pVdbe;	/* List of active virtual machines */
 	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
 	sqlite3_mutex *mutex;	/* Connection mutex */
-	Db mdb;			/* All backends */
+	struct Schema *pSchema; /* Schema of the database */
 	i64 szMmap;		/* Default mmap_size setting */
 	unsigned int openFlags;	/* Flags passed to sqlite3_vfs.xOpen() */
 	int errCode;		/* Most recent error code (SQLITE_*) */
@@ -3063,7 +3053,6 @@ int sqlite3Init(sqlite3 *);
 int sqlite3InitCallback(void *, int, char **, char **);
 void sqlite3Pragma(Parse *, Token *, Token *, Token *, Token *, int);
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
-void sqlite3ResetOneSchema(sqlite3 *);
 void sqlite3CommitInternalChanges();
 void sqlite3DeleteColumnNames(sqlite3 *, Table *);
 bool table_column_is_in_pk(Table *, uint32_t);

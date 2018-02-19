@@ -2373,7 +2373,7 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 		goto opendb_out;
 	}
 
-	db->mdb.pSchema = sqlite3SchemaCreate(db);
+	db->pSchema = sqlite3SchemaCreate(db);
 	db->magic = SQLITE_MAGIC_OPEN;
 	if (db->mallocFailed) {
 		goto opendb_out;

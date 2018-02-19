@@ -49,7 +49,7 @@ sqlite3FixInit(DbFixer * pFix,	/* The fixer to be initialized */
 
 	db = pParse->db;
 	pFix->pParse = pParse;
-	pFix->pSchema = db->mdb.pSchema;
+	pFix->pSchema = db->pSchema;
 	pFix->zType = zType;
 	pFix->pName = pName;
 	pFix->bVarOnly = 0;

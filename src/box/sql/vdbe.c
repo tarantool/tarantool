@@ -3132,10 +3132,8 @@ case OP_ReadCookie: {               /* out2 */
  * A transaction must be started before executing this opcode.
  */
 case OP_SetCookie: {
-	Db *pDb;
 	assert(pOp->p1==0);
 	assert(p->readOnly==0);
-	pDb = &db->mdb;
 	/* See note about index shifting on OP_ReadCookie */
 	/* When the schema cookie changes, record the new cookie internally */
 	pDb->pSchema->schema_cookie = pOp->p3;
@@ -3277,7 +3275,7 @@ case OP_OpenWrite:
 			zName = space_name(space);
 			assert(zName);
 
-			pTab = sqlite3HashFind(&db->mdb.pSchema->tblHash, zName);
+			pTab = sqlite3HashFind(&db->pSchema->tblHash, zName);
 			assert(pTab);
 
 			pIdx = sqlite3PrimaryKeyIndex(pTab);
@@ -4878,7 +4876,7 @@ case OP_RenameTable: {
 	assert(space);
 	zOldTableName = space_name(space);
 	assert(zOldTableName);
-	pTab = sqlite3HashFind(&db->mdb.pSchema->tblHash, zOldTableName);
+	pTab = sqlite3HashFind(&db->pSchema->tblHash, zOldTableName);
 	assert(pTab);
 	pTrig = pTab->pTrigger;
 	iRootPage = pTab->tnum;
@@ -4899,8 +4897,8 @@ case OP_RenameTable: {
 		if (rc) goto abort_due_to_error;
 		pFKey->zTo = sqlite3DbStrNDup(db, zNewTableName,
 					      sqlite3Strlen30(zNewTableName));
-		sqlite3HashInsert(&db->mdb.pSchema->fkeyHash, zOldTableName, 0);
-		sqlite3HashInsert(&db->mdb.pSchema->fkeyHash, zNewTableName, pFKey);
+		sqlite3HashInsert(&db->pSchema->fkeyHash, zOldTableName, 0);
+		sqlite3HashInsert(&db->pSchema->fkeyHash, zNewTableName, pFKey);
 	}
 
 	sqlite3UnlinkAndDeleteTable(db, pTab->zName);
@@ -4921,7 +4919,7 @@ case OP_RenameTable: {
 		goto abort_due_to_error;
 	}
 
-	pTab = sqlite3HashFind(&db->mdb.pSchema->tblHash, zNewTableName);
+	pTab = sqlite3HashFind(&db->pSchema->tblHash, zNewTableName);
 	pTab->pTrigger = pTrig;
 
 	/* Rename all trigger created on this table.*/
@@ -5685,7 +5683,7 @@ abort_due_to_error:
 	if (rc==SQLITE_IOERR_NOMEM) sqlite3OomFault(db);
 	rc = SQLITE_ERROR;
 	if (resetSchemaOnFault>0) {
-		sqlite3ResetOneSchema(db);
+		sqlite3SchemaClear(db->pSchema);
 	}
 
 	/* This is the only way out of this procedure.  We have to
