@@ -181,24 +181,6 @@ actionName(u8 action)
 #endif
 
 /*
- * Parameter eMode must be one of the PAGER_JOURNALMODE_XXX constants
- * defined in pager.h. This function returns the associated lowercase
- * journal-mode name.
- */
-const char *
-sqlite3JournalModename(int eMode)
-{
-	static char *const azModeName[] = {
-		"delete", "persist", "off", "truncate", "memory"
-	};
-	assert(eMode >= 0 && eMode <= ArraySize(azModeName));
-
-	if (eMode == ArraySize(azModeName))
-		return 0;
-	return azModeName[eMode];
-}
-
-/*
  * Locate a pragma in the aPragmaName[] array.
  */
 static const PragmaName *

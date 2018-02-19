@@ -1262,7 +1262,6 @@ vdbeSorterOpenTempFile(sqlite3 * db,	/* Database handle doing sort */
 	if (sqlite3FaultSim(202))
 		return SQLITE_IOERR_ACCESS;
 	rc = sqlite3OsOpenMalloc(db->pVfs, 0, ppFd,
-				 SQLITE_OPEN_TEMP_JOURNAL |
 				 SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
 				 SQLITE_OPEN_EXCLUSIVE |
 				 SQLITE_OPEN_DELETEONCLOSE, &rc);

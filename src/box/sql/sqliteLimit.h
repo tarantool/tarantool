@@ -143,14 +143,6 @@ enum {
 #endif
 
 /*
- * The default number of frames to accumulate in the log file before
- * checkpointing the database in WAL mode.
- */
-#ifndef SQLITE_DEFAULT_WAL_AUTOCHECKPOINT
-#define SQLITE_DEFAULT_WAL_AUTOCHECKPOINT  1000
-#endif
-
-/*
  * The maximum number of attached databases.  This must be between 0
  * and 125.  The upper bound of 125 is because the attached databases are
  * counted using a signed 8-bit integer which has a maximum value of 127

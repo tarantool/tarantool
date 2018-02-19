@@ -540,15 +540,10 @@ sqlite3_exec(sqlite3 *,	/* An open database */
 #define SQLITE_OPEN_MAIN_DB          0x00000100	/* VFS only */
 #define SQLITE_OPEN_TEMP_DB          0x00000200	/* VFS only */
 #define SQLITE_OPEN_TRANSIENT_DB     0x00000400	/* VFS only */
-#define SQLITE_OPEN_MAIN_JOURNAL     0x00000800	/* VFS only */
-#define SQLITE_OPEN_TEMP_JOURNAL     0x00001000	/* VFS only */
-#define SQLITE_OPEN_SUBJOURNAL       0x00002000	/* VFS only */
-#define SQLITE_OPEN_MASTER_JOURNAL   0x00004000	/* VFS only */
 #define SQLITE_OPEN_NOMUTEX          0x00008000	/* Ok for sqlite3_open_v2() */
 #define SQLITE_OPEN_FULLMUTEX        0x00010000	/* Ok for sqlite3_open_v2() */
 #define SQLITE_OPEN_SHAREDCACHE      0x00020000	/* Ok for sqlite3_open_v2() */
 #define SQLITE_OPEN_PRIVATECACHE     0x00040000	/* Ok for sqlite3_open_v2() */
-#define SQLITE_OPEN_WAL              0x00080000	/* VFS only */
 
 /* Reserved:                         0x00F00000 */
 
@@ -813,13 +808,7 @@ struct sqlite3_io_methods {
  * <li>[[SQLITE_FCNTL_FILE_POINTER]]
  * The [SQLITE_FCNTL_FILE_POINTER] opcode is used to obtain a pointer
  * to the [sqlite3_file] object associated with a particular database
- * connection.  See also [SQLITE_FCNTL_JOURNAL_POINTER].
- *
- * <li>[[SQLITE_FCNTL_JOURNAL_POINTER]]
- * The [SQLITE_FCNTL_JOURNAL_POINTER] opcode is used to obtain a pointer
- * to the [sqlite3_file] object associated with the journal file (either
- * the [rollback journal] or the [write-ahead log]) for a particular database
- * connection.  See also [SQLITE_FCNTL_FILE_POINTER].
+ * connection.
  *
  * <li>[[SQLITE_FCNTL_SYNC_OMITTED]]
  * No longer in use.
@@ -845,21 +834,6 @@ struct sqlite3_io_methods {
  * should silently ignore this opcode. Applications should not call
  * [sqlite3_file_control()] with this opcode as doing so may disrupt the
  * operation of the specialized VFSes that do require it.
- *
- * <li>[[SQLITE_FCNTL_PERSIST_WAL]]
- * ^The [SQLITE_FCNTL_PERSIST_WAL] opcode is used to set or query the
- * persistent [WAL | Write Ahead Log] setting.  By default, the auxiliary
- * write ahead log and shared memory files used for transaction control
- * are automatically deleted when the latest connection to the database
- * closes.  Setting persistent WAL mode causes those files to persist after
- * close.  Persisting the files is useful when other processes that do not
- * have write permission on the directory containing the database file want
- * to read the database file, as the WAL and shared memory files must exist
- * in order for the database to be readable.  The fourth parameter to
- * [sqlite3_file_control()] for this opcode should be a pointer to an integer.
- * That integer is 0 to disable persistent WAL mode or 1 to enable persistent
- * WAL mode.  If the integer is -1, then it is overwritten with the current
- * WAL persistence setting.
  *
  * <li>[[SQLITE_FCNTL_POWERSAFE_OVERWRITE]]
  * ^The [SQLITE_FCNTL_POWERSAFE_OVERWRITE] opcode is used to set or query the
@@ -968,13 +942,6 @@ struct sqlite3_io_methods {
  * on whether or not the file has been renamed, moved, or deleted since it
  * was first opened.
  *
- * <li>[[SQLITE_FCNTL_WAL_BLOCK]]
- * The [SQLITE_FCNTL_WAL_BLOCK] is a signal to the VFS layer that it might
- * be advantageous to block on the next WAL lock if the lock is not immediately
- * available.  The WAL subsystem issues this signal during rare
- * circumstances in order to fix a problem with priority inversion.
- * Applications should <em>not</em> use this file-control.
- *
  * <li>[[SQLITE_FCNTL_ZIPVFS]]
  * The [SQLITE_FCNTL_ZIPVFS] opcode is implemented by zipvfs only. All other
  * VFS should return SQLITE_NOTFOUND for this opcode.
@@ -993,7 +960,6 @@ struct sqlite3_io_methods {
 #define SQLITE_FCNTL_CHUNK_SIZE              6
 #define SQLITE_FCNTL_FILE_POINTER            7
 #define SQLITE_FCNTL_SYNC_OMITTED            8
-#define SQLITE_FCNTL_PERSIST_WAL             9
 #define SQLITE_FCNTL_OVERWRITE              10
 #define SQLITE_FCNTL_VFSNAME                11
 #define SQLITE_FCNTL_POWERSAFE_OVERWRITE    12
@@ -1005,11 +971,9 @@ struct sqlite3_io_methods {
 #define SQLITE_FCNTL_HAS_MOVED              18
 #define SQLITE_FCNTL_SYNC                   19
 #define SQLITE_FCNTL_COMMIT_PHASETWO        20
-#define SQLITE_FCNTL_WAL_BLOCK              21
 #define SQLITE_FCNTL_ZIPVFS                 22
 #define SQLITE_FCNTL_RBU                    23
 #define SQLITE_FCNTL_VFS_POINTER            24
-#define SQLITE_FCNTL_JOURNAL_POINTER        25
 #define SQLITE_FCNTL_PDB                    26
 
 /*
@@ -1098,13 +1062,8 @@ typedef struct sqlite3_api_routines sqlite3_api_routines;
  *
  * <ul>
  * <li>  [SQLITE_OPEN_MAIN_DB]
- * <li>  [SQLITE_OPEN_MAIN_JOURNAL]
  * <li>  [SQLITE_OPEN_TEMP_DB]
- * <li>  [SQLITE_OPEN_TEMP_JOURNAL]
  * <li>  [SQLITE_OPEN_TRANSIENT_DB]
- * <li>  [SQLITE_OPEN_SUBJOURNAL]
- * <li>  [SQLITE_OPEN_MASTER_JOURNAL]
- * <li>  [SQLITE_OPEN_WAL]
  * </ul>)^
  *
  * The file I/O implementation can use the object type flags to
@@ -6599,61 +6558,6 @@ SQLITE_API void *
 sqlite3_wal_hook(sqlite3 *,
 		 int (*)(void *, sqlite3 *,
 			 const char *, int), void *);
-
-/*
- * CAPI3REF: Configure an auto-checkpoint
- * METHOD: sqlite3
- *
- * ^The [sqlite3_wal_autocheckpoint(D,N)] is a wrapper around
- * [sqlite3_wal_hook()] that causes any database on [database connection] D
- * to automatically [checkpoint]
- * after committing a transaction if there are N or
- * more frames in the [write-ahead log] file.  ^Passing zero or
- * a negative value as the nFrame parameter disables automatic
- * checkpoints entirely.
- *
- * ^The callback registered by this function replaces any existing callback
- * registered using [sqlite3_wal_hook()].  ^Likewise, registering a callback
- * using [sqlite3_wal_hook()] disables the automatic checkpoint mechanism
- * configured by this function.
- *
- * ^The [wal_autocheckpoint pragma] can be used to invoke this interface
- * from SQL.
- *
- * ^Checkpoints initiated by this mechanism are
- * [sqlite3_wal_checkpoint_v2|PASSIVE].
- *
- * ^Every new [database connection] defaults to having the auto-checkpoint
- * enabled with a threshold of 1000 or [SQLITE_DEFAULT_WAL_AUTOCHECKPOINT]
- * pages.  The use of this interface
- * is only necessary if the default setting is found to be suboptimal
- * for a particular application.
-*/
-SQLITE_API int
-sqlite3_wal_autocheckpoint(sqlite3 * db, int N);
-
-/*
- * CAPI3REF: Checkpoint a database
- * METHOD: sqlite3
- *
- * ^(The sqlite3_wal_checkpoint(D,X) is equivalent to
- * [sqlite3_wal_checkpoint_v2](D,X,[SQLITE_CHECKPOINT_PASSIVE],0,0).)^
- *
- * In brief, sqlite3_wal_checkpoint(D,X) causes the content in the
- * [write-ahead log] for database X on [database connection] D to be
- * transferred into the database file and for the write-ahead log to
- * be reset.  See the [checkpointing] documentation for addition
- * information.
- *
- * This interface used to be the only way to cause a checkpoint to
- * occur.  But then the newer and more powerful [sqlite3_wal_checkpoint_v2()]
- * interface was added.  This interface is retained for backwards
- * compatibility and as a convenience for applications that need to manually
- * start a callback but which do not need the full power (and corresponding
- * complication) of [sqlite3_wal_checkpoint_v2()].
-*/
-SQLITE_API int
-sqlite3_wal_checkpoint(sqlite3 * db);
 
 /*
  * CAPI3REF: Checkpoint Mode Values

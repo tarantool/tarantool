@@ -254,7 +254,6 @@ static pid_t randomnessPid = 0;
  */
 #define UNIXFILE_EXCL        0x01	/* Connections from one process only */
 #define UNIXFILE_RDONLY      0x02	/* Connection is read only */
-#define UNIXFILE_PERSIST_WAL 0x04	/* Persistent WAL mode */
 #ifndef SQLITE_DISABLE_DIRSYNC
 #define UNIXFILE_DIRSYNC    0x08	/* Directory sync needed */
 #else
@@ -599,8 +598,8 @@ unixNextSystemCall(sqlite3_vfs * p, const char *zName)
  * 0644) as modified by the system umask.  If m is not 0, then
  * make the file creation mode be exactly m ignoring the umask.
  *
- * The m parameter will be non-zero only when creating -wal, -journal,
- * and -shm files.  We want those files to have *exactly* the same
+ * The m parameter will be non-zero only when creating
+ * -shm files.  We want those files to have *exactly* the same
  * permissions as their original database, unadulterated by the umask.
  * In that way, if a database file is -rw-rw-rw or -rw-rw-r-, and a
  * transaction crashes and leaves behind hot journals, then any
@@ -1511,7 +1510,7 @@ unixLock(sqlite3_file * id, int eFileLock)
 	/* Set up the transaction-counter change checking flags when
 	 * transitioning from a SHARED to a RESERVED lock.  The change
 	 * from SHARED to RESERVED marks the beginning of a normal
-	 * write operation (not a hot journal rollback).
+	 * write operation.
 	 */
 	if (rc == SQLITE_OK
 	    && pFile->eFileLock <= SHARED_LOCK && eFileLock == RESERVED_LOCK) {
@@ -2865,14 +2864,6 @@ unixRead(sqlite3_file * id, void *pBuf, int amt, sqlite3_int64 offset)
 	assert(offset >= 0);
 	assert(amt > 0);
 
-	/* If this is a database file (not a journal, master-journal or temp
-	 * file), the bytes in the locking range should never be read or written.
-	 */
-#if 0
-	assert(pFile->pUnused == 0
-	       || offset >= PENDING_BYTE + 512 || offset + amt <= PENDING_BYTE);
-#endif
-
 #if SQLITE_MAX_MMAP_SIZE>0
 	/* Deal with as much of this read request as possible by transfering
 	 * data from the memory mapping using memcpy().
@@ -2982,18 +2973,9 @@ unixWrite(sqlite3_file * id, const void *pBuf, int amt, sqlite3_int64 offset)
 	assert(id);
 	assert(amt > 0);
 
-	/* If this is a database file (not a journal, master-journal or temp
-	 * file), the bytes in the locking range should never be read or written.
-	 */
-#if 0
-	assert(pFile->pUnused == 0
-	       || offset >= PENDING_BYTE + 512 || offset + amt <= PENDING_BYTE);
-#endif
-
 #ifdef SQLITE_DEBUG
-	/* If we are doing a normal write to a database file (as opposed to
-	 * doing a hot-journal rollback or a write to some file other than a
-	 * normal database file) then record the fact that the database
+	/* If we are doing a normal write to a database file,
+	 * then record the fact that the database
 	 * has changed.  If the transaction counter is modified, record that
 	 * fact too.
 	 */
@@ -3458,10 +3440,6 @@ unixFileControl(sqlite3_file * id, int op, void *pArg)
 			rc = fcntlSizeHint(pFile, *(i64 *) pArg);
 			SimulateIOErrorBenign(0);
 			return rc;
-		}
-	case SQLITE_FCNTL_PERSIST_WAL:{
-			unixModeBit(pFile, UNIXFILE_PERSIST_WAL, (int *)pArg);
-			return SQLITE_OK;
 		}
 	case SQLITE_FCNTL_POWERSAFE_OVERWRITE:{
 			unixModeBit(pFile, UNIXFILE_PSOW, (int *)pArg);
@@ -4384,10 +4362,10 @@ getFileMode(const char *zFile,	/* File name */
  * In most cases, this routine sets *pMode to 0, which will become
  * an indication to robust_open() to create the file using
  * SQLITE_DEFAULT_FILE_PERMISSIONS adjusted by the umask.
- * But if the file being opened is a WAL or regular journal file, then
+ * But if the file being opened is a regular journal file, then
  * this function queries the file-system for the permissions on the
  * corresponding database file and sets *pMode to this value. Whenever
- * possible, WAL and journal files are created using the same permissions
+ * possible, journal files are created using the same permissions
  * as the associated database file.
  *
  * If the SQLITE_ENABLE_8_3_NAMES option is enabled, then the
@@ -4407,44 +4385,7 @@ findCreateFileMode(const char *zPath,	/* Path of file (possibly) being created *
 	*pMode = 0;
 	*pUid = 0;
 	*pGid = 0;
-	if (flags & (SQLITE_OPEN_WAL | SQLITE_OPEN_MAIN_JOURNAL)) {
-		char zDb[MAX_PATHNAME + 1];	/* Database file path */
-		int nDb;	/* Number of valid bytes in zDb */
-
-		/* zPath is a path to a WAL or journal file. The following block derives
-		 * the path to the associated database file from zPath. This block handles
-		 * the following naming conventions:
-		 *
-		 *   "<path to db>-journal"
-		 *   "<path to db>-wal"
-		 *   "<path to db>-journalNN"
-		 *   "<path to db>-walNN"
-		 *
-		 * where NN is a decimal number. The NN naming schemes are
-		 * used by the test_multiplex.c module.
-		 */
-		nDb = sqlite3Strlen30(zPath) - 1;
-		while (zPath[nDb] != '-') {
-#ifndef SQLITE_ENABLE_8_3_NAMES
-			/* In the normal case (8+3 filenames disabled) the journal filename
-			 * is guaranteed to contain a '-' character.
-			 */
-			assert(nDb > 0);
-			assert(sqlite3Isalnum(zPath[nDb]));
-#else
-			/* If 8+3 names are possible, then the journal file might not contain
-			 * a '-' character.  So check for that case and return early.
-			 */
-			if (nDb == 0 || zPath[nDb] == '.')
-				return SQLITE_OK;
-#endif
-			nDb--;
-		}
-		memcpy(zDb, zPath, nDb);
-		zDb[nDb] = '\0';
-
-		rc = getFileMode(zDb, pMode, pUid, pGid);
-	} else if (flags & SQLITE_OPEN_DELETEONCLOSE) {
+	if (flags & SQLITE_OPEN_DELETEONCLOSE) {
 		*pMode = 0600;
 	} else if (flags & SQLITE_OPEN_URI) {
 		/* If this is a main database file and the file was opened using a URI
@@ -4514,9 +4455,7 @@ unixOpen(sqlite3_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 	 * a file-descriptor on the directory too. The first time unixSync()
 	 * is called the directory file descriptor will be fsync()ed and close()d.
 	 */
-	int syncDir = (isCreate && (eType == SQLITE_OPEN_MASTER_JOURNAL
-				    || eType == SQLITE_OPEN_MAIN_JOURNAL
-				    || eType == SQLITE_OPEN_WAL));
+	int syncDir = isCreate;
 
 	/* If argument zPath is a NULL pointer, this function is required to open
 	 * a temporary file. Use this buffer to store the file name in.
@@ -4536,23 +4475,6 @@ unixOpen(sqlite3_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 	assert(isCreate == 0 || isReadWrite);
 	assert(isExclusive == 0 || isCreate);
 	assert(isDelete == 0 || isCreate);
-
-	/* The main DB, main journal, WAL file and master journal are never
-	 * automatically deleted. Nor are they ever temporary files.
-	 */
-	assert((!isDelete && zName) || eType != SQLITE_OPEN_MAIN_DB);
-	assert((!isDelete && zName) || eType != SQLITE_OPEN_MAIN_JOURNAL);
-	assert((!isDelete && zName) || eType != SQLITE_OPEN_MASTER_JOURNAL);
-	assert((!isDelete && zName) || eType != SQLITE_OPEN_WAL);
-
-	/* Assert that the upper layer has set one of the "file-type" flags. */
-	assert(eType == SQLITE_OPEN_MAIN_DB || eType == SQLITE_OPEN_TEMP_DB
-	       || eType == SQLITE_OPEN_MAIN_JOURNAL
-	       || eType == SQLITE_OPEN_TEMP_JOURNAL
-	       || eType == SQLITE_OPEN_SUBJOURNAL
-	       || eType == SQLITE_OPEN_MASTER_JOURNAL
-	       || eType == SQLITE_OPEN_TRANSIENT_DB
-	       || eType == SQLITE_OPEN_WAL);
 
 	/* Detect a pid change and reset the PRNG.  There is a race condition
 	 * here such that two or more threads all trying to open databases at
@@ -4588,7 +4510,7 @@ unixOpen(sqlite3_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 
 	} else if (!zName) {
 		/* If zName is NULL, the upper layer is requesting a temp file. */
-		assert(isDelete && !syncDir);
+		assert(isDelete);
 		rc = unixGetTempname(pVfs->mxPathname, zTmpname);
 		if (rc != SQLITE_OK) {
 			return rc;
@@ -4623,8 +4545,6 @@ unixOpen(sqlite3_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 		rc = findCreateFileMode(zName, flags, &openMode, &uid, &gid);
 		if (rc != SQLITE_OK) {
 			assert(!p->pUnused);
-			assert(eType == SQLITE_OPEN_WAL
-			       || eType == SQLITE_OPEN_MAIN_JOURNAL);
 			return rc;
 		}
 		fd = robust_open(zName, openFlags, openMode);
@@ -6249,10 +6169,7 @@ proxyFileControl(sqlite3_file * id, int op, void *pArg)
 			int isProxyStyle = (pFile->pMethod == &proxyIoMethods);
 			if (pArg == NULL || (const char *)pArg == 0) {
 				if (isProxyStyle) {
-					/* turn off proxy locking - not supported.  If support is added for
-					 * switching proxy locking mode off then it will need to fail if
-					 * the journal mode is WAL mode.
-					 */
+					/* turn off proxy locking - not supported. */
 					rc = SQLITE_ERROR
 					    /*SQLITE_PROTOCOL? SQLITE_MISUSE? */
 					    ;

@@ -55,7 +55,6 @@ add_library(sql STATIC
     mem2.c
     mem3.c
     mem5.c
-    memjournal.c
     mutex.c
     mutex_noop.c
     mutex_unix.c

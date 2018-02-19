@@ -2326,12 +2326,8 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 		   SQLITE_OPEN_MAIN_DB |
 		   SQLITE_OPEN_TEMP_DB |
 		   SQLITE_OPEN_TRANSIENT_DB |
-		   SQLITE_OPEN_MAIN_JOURNAL |
-		   SQLITE_OPEN_TEMP_JOURNAL |
-		   SQLITE_OPEN_SUBJOURNAL |
-		   SQLITE_OPEN_MASTER_JOURNAL |
 		   SQLITE_OPEN_NOMUTEX |
-		   SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_WAL);
+		   SQLITE_OPEN_FULLMUTEX);
 	flags |= SQLITE_OPEN_MEMORY;
 	/* Allocate the sqlite data structure */
 	db = sqlite3MallocZero(sizeof(sqlite3));
@@ -2441,8 +2437,6 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	/* Enable the lookaside-malloc subsystem */
 	setupLookaside(db, 0, sqlite3GlobalConfig.szLookaside,
 		       sqlite3GlobalConfig.nLookaside);
-
-	sqlite3_wal_autocheckpoint(db, SQLITE_DEFAULT_WAL_AUTOCHECKPOINT);
 
  opendb_out:
 	if (db) {

@@ -684,14 +684,6 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 					p->bIsReader = 1;
 					break;
 				}
-#ifndef SQLITE_OMIT_WAL
-			case OP_Checkpoint:
-#endif
-			case OP_JournalMode:{
-					p->readOnly = 0;
-					p->bIsReader = 1;
-					break;
-				}
 			case OP_Next:
 			case OP_NextIfOpen:
 			case OP_SorterNext:{

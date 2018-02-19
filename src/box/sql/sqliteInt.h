@@ -3474,7 +3474,6 @@ int sqlite3Reprepare(Vdbe *);
 void sqlite3ExprListCheckLength(Parse *, ExprList *, const char *);
 struct coll *sqlite3BinaryCompareCollSeq(Parse *, Expr *, Expr *);
 int sqlite3TempInMemory(const sqlite3 *);
-const char *sqlite3JournalModename(int);
 #ifndef SQLITE_OMIT_CTE
 With *sqlite3WithAdd(Parse *, With *, Token *, ExprList *, Select *);
 void sqlite3WithDelete(sqlite3 *, With *);
@@ -3546,15 +3545,6 @@ void sqlite3EndBenignMalloc(void);
 #define IN_INDEX_MEMBERSHIP  0x0002	/* IN operator used for membership test */
 #define IN_INDEX_LOOP        0x0004	/* IN operator used as a loop */
 int sqlite3FindInIndex(Parse *, Expr *, u32, int *, int *, int *);
-
-int sqlite3JournalOpen(sqlite3_vfs *, const char *, sqlite3_file *, int, int);
-int sqlite3JournalSize(sqlite3_vfs *);
-#ifdef SQLITE_ENABLE_ATOMIC_WRITE
-int sqlite3JournalCreate(sqlite3_file *);
-#endif
-
-int sqlite3JournalIsInMemory(sqlite3_file * p);
-void sqlite3MemJournalOpen(sqlite3_file *);
 
 void sqlite3ExprSetHeightAndFlags(Parse * pParse, Expr * p);
 #if SQLITE_MAX_EXPR_DEPTH>0
