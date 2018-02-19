@@ -31,6 +31,7 @@
 
 #include "field_def.h"
 #include "trivia/util.h"
+#include "key_def.h"
 
 const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",
@@ -92,6 +93,7 @@ const struct opt_def field_def_reg[] = {
 	OPT_DEF("is_nullable", OPT_BOOL, struct field_def, is_nullable),
 	OPT_DEF_ENUM("nullable_action", on_conflict_action, struct field_def,
 		     nullable_action, NULL),
+	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
 	OPT_END,
 };
 
@@ -99,7 +101,8 @@ const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
 	.name = NULL,
 	.is_nullable = false,
-	.nullable_action = ON_CONFLICT_ACTION_DEFAULT
+	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
+	.coll_id = COLL_NONE
 };
 
 enum field_type

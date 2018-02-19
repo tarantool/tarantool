@@ -37,7 +37,8 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 static uint32_t formats_size = 0, formats_capacity = 0;
 
 static const struct tuple_field tuple_field_default = {
-	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false, ON_CONFLICT_ACTION_DEFAULT
+	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false,
+	ON_CONFLICT_ACTION_DEFAULT, NULL
 };
 
 /**
@@ -62,6 +63,17 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		format->fields[i].type = fields[i].type;
 		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
 		format->fields[i].nullable_action = fields[i].nullable_action;
+		struct coll *coll = NULL;
+		uint32_t coll_id = fields[i].coll_id;
+		if (coll_id != COLL_NONE) {
+			coll = coll_by_id(coll_id);
+			if (coll == NULL) {
+				diag_set(ClientError,ER_WRONG_COLLATION_OPTIONS,
+					 i + 1, "collation was not found by ID");
+				return -1;
+			}
+		}
+		format->fields[i].coll = coll;
 	}
 	/* Initialize remaining fields */
 	for (uint32_t i = field_count; i < format->field_count; i++)

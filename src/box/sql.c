@@ -1560,7 +1560,12 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	for (i = 0; i < n; i++) {
 		const char *t;
-		p = enc->encode_map(p, 4);
+		struct coll *coll = NULL;
+		if (aCol[i].zColl != NULL &&
+		    strcasecmp(aCol[i].zColl, "binary") != 0) {
+			coll = sqlite3FindCollSeq(NULL, aCol[i].zColl, 0);
+		}
+		p = enc->encode_map(p, coll ? 5 : 4);
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
@@ -1578,6 +1583,10 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		assert(aCol[i].notNull < on_conflict_action_MAX);
 		const char *action = on_conflict_action_strs[aCol[i].notNull];
 		p = enc->encode_str(p, action, strlen(action));
+		if (coll != NULL) {
+			p = enc->encode_str(p, "collation", strlen("collation"));
+			p = enc->encode_uint(p, coll->id);
+		}
 	}
 	return (int)(p - base);
 }

@@ -394,6 +394,14 @@ field_def_decode(struct field_def *field, const char **data,
 				     "nullable action properties", fieldno +
 				     TUPLE_INDEX_BASE));
 	}
+	if (field->coll_id != COLL_NONE &&
+	    field->type != FIELD_TYPE_STRING &&
+	    field->type != FIELD_TYPE_SCALAR &&
+	    field->type != FIELD_TYPE_ANY) {
+		tnt_raise(ClientError, errcode, tt_cstr(space_name, name_len),
+			  tt_sprintf("collation is reasonable only for "
+				     "string, scalar and any fields"));
+	}
 }
 
 /**

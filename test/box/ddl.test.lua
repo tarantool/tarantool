@@ -198,3 +198,34 @@ format[3] = {'field3', 'unsigned', custom_field = 'custom_value'}
 s = box.schema.create_space('test', {format = format})
 s:format()[3].custom_field
 s:drop()
+
+--
+-- gh-2937: allow to specify collation in field definition.
+--
+format = {}
+format[1] = {name = 'field1', type = 'string', collation = 'unicode'}
+format[2] = {'field2', 'any', collation = 'unicode_ci'}
+format[3] = {type = 'scalar', name = 'field3', collation = 'unicode'}
+s = box.schema.create_space('test', {format = format})
+s:format()
+s:drop()
+
+-- Check that collation is allowed only for stings, scalar and any types.
+format = {}
+format[1] = {'field1', 'unsigned', collation = 'unicode'}
+s = box.schema.create_space('test', {format = format})
+format[1] = {'field2', 'array', collation = 'unicode_ci'}
+s = box.schema.create_space('test', {format = format})
+
+-- Check that error is raised when collation doesn't exists.
+format = {}
+format[1] = {'field1', 'unsigend', collation = 'test_coll'}
+s = box.schema.create_space('test', {format = format})
+
+-- Check that error is raised when collation with wrong id is used.
+_space = box.space[box.schema.SPACE_ID]
+utils = require('utils')
+EMPTY_MAP = utils.setmap({})
+format = {{name = 'field1', type = 'string', collation = 666}}
+surrogate_space = {12345, 1, 'test', 'memtx', 0, EMPTY_MAP, format}
+_space:insert(surrogate_space)

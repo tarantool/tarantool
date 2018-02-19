@@ -35,6 +35,7 @@
 #include "field_def.h"
 #include "errinj.h"
 #include "tuple_dictionary.h"
+#include "coll_cache.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -98,6 +99,8 @@ struct tuple_field {
 	bool is_key_part;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
+	/** Collation definition for string comparison */
+	struct coll *coll;
 };
 
 /**

@@ -108,6 +108,8 @@ struct field_def {
 	bool is_nullable;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
+	/** Collation ID for string comparison. */
+	uint32_t coll_id;
 };
 
 #if defined(__cplusplus)
