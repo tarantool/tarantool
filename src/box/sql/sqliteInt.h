@@ -1004,8 +1004,6 @@ struct sqlite3 {
 					   sqlite3_int64);
 	PreUpdate *pPreUpdate;	/* Context for active pre-update callback */
 #endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
-	void (*xCollNeeded) (void *, sqlite3 *, const char *);
-	void *pCollNeededArg;
 	sqlite3_value *pErr;	/* Most recent error message */
 	union {
 		volatile int isInterrupted;	/* True if sqlite3_interrupt has been called */
@@ -2979,6 +2977,12 @@ void sqlite3AddPrimaryKey(Parse *, ExprList *, int, int, int);
 void sqlite3AddCheckConstraint(Parse *, Expr *);
 void sqlite3AddDefaultValue(Parse *, ExprSpan *);
 void sqlite3AddCollateType(Parse *, Token *);
+const char *
+column_collation_name(Table *, uint32_t);
+const char *
+index_collation_name(Index *, uint32_t);
+struct coll *
+sql_default_coll();
 void sqlite3EndTable(Parse *, Token *, Token *, u8, Select *);
 int sqlite3ParseUri(const char *, const char *, unsigned int *,
 		    sqlite3_vfs **, char **, char **);
@@ -3256,7 +3260,7 @@ const char *sqlite3ErrName(int);
 
 const char *sqlite3ErrStr(int);
 int sqlite3ReadSchema(Parse * pParse);
-struct coll *sqlite3FindCollSeq(sqlite3 *, const char *, int);
+struct coll *sqlite3FindCollSeq(const char *);
 struct coll *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
 struct coll *sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr);
 Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
@@ -3318,7 +3322,7 @@ char* rename_table(sqlite3 *, const char *, const char *, bool *);
 char* rename_parent_table(sqlite3 *, const char *, const char *, const char *,
 			  uint32_t *, uint32_t *);
 char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
-struct coll *sqlite3GetCollSeq(Parse *, sqlite3 *, struct coll *, const char *);
+struct coll *sqlite3GetCollSeq(Parse *, struct coll *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 int sqlite3InvokeBusyHandler(BusyHandler *);

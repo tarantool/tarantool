@@ -170,7 +170,6 @@ sqlite3ExprSkipCollate(Expr * pExpr)
 struct coll *
 sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
 {
-	sqlite3 *db = pParse->db;
 	struct coll *pColl = 0;
 	Expr *p = pExpr;
 	while (p) {
@@ -184,7 +183,7 @@ sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
 		if (op == TK_COLLATE
 		    || (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
 			pColl =
-			    sqlite3GetCollSeq(pParse, db, 0, p->u.zToken);
+			    sqlite3GetCollSeq(pParse, 0, p->u.zToken);
 			break;
 		}
 		if ((op == TK_AGG_COLUMN || op == TK_COLUMN
@@ -195,9 +194,9 @@ sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
 			 */
 			int j = p->iColumn;
 			if (j >= 0) {
-				const char *zColl = p->pTab->aCol[j].zColl;
-				pColl =
-				    sqlite3FindCollSeq(db, zColl, 0);
+				const char *zColl =
+					column_collation_name(p->pTab, j);
+				pColl = sqlite3FindCollSeq(zColl);
 			}
 			break;
 		}
@@ -2552,10 +2551,9 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 						if (pIdx->aiColumn[j]
 						    != pRhs->iColumn)
 							continue;
-						assert(pIdx->azColl[j]);
 						if (pReq != 0 && strcmp
 						    (pReq->name,
-						     pIdx->azColl[j]) != 0) {
+						     index_collation_name(pIdx, j)) != 0) {
 							continue;
 						}
 						break;
@@ -4217,7 +4215,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 			if (pDef->funcFlags & SQLITE_FUNC_NEEDCOLL) {
 				if (!pColl)
-					pColl = db->pDfltColl;
+					pColl = sql_default_coll();
 				sqlite3VdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
 						  (char *)pColl, P4_COLLSEQ);
 			}

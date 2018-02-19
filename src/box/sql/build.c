@@ -49,6 +49,7 @@
 #include "box/session.h"
 #include "box/identifier.h"
 #include "box/schema.h"
+#include "box/tuple_format.h"
 
 /*
  * This routine is called after a single SQL statement has been
@@ -1095,12 +1096,79 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 		for (pIdx = p->pIndex; pIdx; pIdx = pIdx->pNext) {
 			assert(pIdx->nColumn == 1);
 			if (pIdx->aiColumn[0] == i) {
-				pIdx->azColl[0] = p->aCol[i].zColl;
+				pIdx->azColl[0] = column_collation_name(p, i);
 			}
 		}
 	} else {
 		sqlite3DbFree(db, zColl);
 	}
+}
+
+/**
+ * Return name of given column collation from table.
+ *
+ * @param table Table which is used to fetch column.
+ * @param column Number of column.
+ * @retval Pointer to collation's name.
+ */
+const char *
+column_collation_name(Table *table, uint32_t column)
+{
+	assert(table != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+	struct space *space = space_by_id(space_id);
+	/*
+	 * It is not always possible to fetch collation directly
+	 * from struct space. To be more precise when:
+	 * 1. space is ephemeral. Thus, its id is zero and
+	 *    it can't be found in space cache.
+	 * 2. space is a view. Hence, it lacks any functional
+	 *    parts such as indexes or fields.
+	 * 3. space is under construction. So, the same as p.1
+	 *    it can't be found in space cache.
+	 * In cases mentioned above collation is fetched from
+	 * SQL specific structures.
+	 */
+	if (space == NULL || space_index(space, 0) == NULL)
+		return table->aCol[column].zColl;
+
+	/* "BINARY" is a name for default collation in SQL. */
+	char *coll_name = (char *)sqlite3StrBINARY;
+	if (space->format->fields[column].coll != NULL) {
+		coll_name = space->format->fields[column].coll->name;
+	}
+	return coll_name;
+}
+
+/**
+ * Return name of given column collation from index.
+ *
+ * @param idx Index which is used to fetch column.
+ * @param column Number of column.
+ * @retval Pointer to collation's name.
+ */
+const char *
+index_collation_name(Index *idx, uint32_t column)
+{
+	assert(idx != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->pTable->tnum);
+	struct space *space = space_by_id(space_id);
+	/*
+	 * If space is still under construction, or it is
+	 * an ephemeral space, then fetch collation from
+	 * SQL internal structure.
+	 */
+	if (space == NULL)
+		return (char *)idx->azColl[column];
+
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct index *index = space_index(space, index_id);
+	assert(index != NULL && index->def->key_def->part_count >= column);
+	struct coll *coll = index->def->key_def->parts[column].coll;
+	/* "BINARY" is a name for default collation in SQL. */
+	if (coll == NULL)
+		return (char *)sqlite3StrBINARY;
+	return index->def->key_def->parts[column].coll->name;
 }
 
 /*
@@ -1130,9 +1198,9 @@ sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName)
 	struct coll *pColl;
 	initbusy = db->init.busy;
 
-	pColl = sqlite3FindCollSeq(db, zName, initbusy);
+	pColl = sqlite3FindCollSeq(zName);
 	if (!initbusy && (!pColl)) {
-		pColl = sqlite3GetCollSeq(pParse, db, pColl, zName);
+		pColl = sqlite3GetCollSeq(pParse, pColl, zName);
 	}
 
 	return pColl;
@@ -3002,7 +3070,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			zExtra += nColl;
 			nExtra -= nColl;
 		} else if (j >= 0) {
-			zColl = pTab->aCol[j].zColl;
+			zColl = column_collation_name(pTab, j);
 		}
 		if (!zColl)
 			zColl = sqlite3StrBINARY;
@@ -3061,8 +3129,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 				assert(pIdx->aiColumn[k] >= 0);
 				if (pIdx->aiColumn[k] != pIndex->aiColumn[k])
 					break;
-				z1 = pIdx->azColl[k];
-				z2 = pIndex->azColl[k];
+				z1 = index_collation_name(pIdx, k);
+				z2 = index_collation_name(pIndex, k);
 				if (strcmp(z1, z2))
 					break;
 			}
@@ -4008,7 +4076,7 @@ collationMatch(const char *zColl, Index * pIndex)
 	int i;
 	assert(zColl != 0);
 	for (i = 0; i < pIndex->nColumn; i++) {
-		const char *z = pIndex->azColl[i];
+		const char *z = index_collation_name(pIndex, i);
 		assert(z != 0 || pIndex->aiColumn[i] < 0);
 		if (pIndex->aiColumn[i] >= 0 && 0 == sqlite3StrICmp(z, zColl)) {
 			return 1;
@@ -4099,7 +4167,7 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 		zColl = sqlite3NameFromToken(pParse->db, pName1);
 		if (!zColl)
 			return;
-		pColl = sqlite3FindCollSeq(db, zColl, 0);
+		pColl = sqlite3FindCollSeq(zColl);
 		if (pColl) {
 			reindexDatabases(pParse, zColl);
 			sqlite3DbFree(db, zColl);
@@ -4171,7 +4239,7 @@ sqlite3KeyInfoOfIndex(Parse * pParse, sqlite3 * db, Index * pIdx)
 	if (pKey) {
 		assert(sqlite3KeyInfoIsWriteable(pKey));
 		for (i = 0; i < nCol; i++) {
-			const char *zColl = pIdx->azColl[i];
+			const char *zColl = index_collation_name(pIdx, i);
 			pKey->aColl[i] = zColl == sqlite3StrBINARY ? 0 :
 			    sqlite3LocateCollSeq(pParse, db, zColl);
 			pKey->aSortOrder[i] = pIdx->aSortOrder[i];

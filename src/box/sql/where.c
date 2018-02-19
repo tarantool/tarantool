@@ -314,7 +314,7 @@ whereScanNext(WhereScan * pScan)
 							     pX->pRight);
 							if (pColl == 0)
 								pColl =
-								    pParse->db->pDfltColl;
+									sql_default_coll();
 							if (strcmp(pColl->name,
 									   pScan->zCollName)) {
 								continue;
@@ -384,7 +384,7 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 			pScan->pIdxExpr = pIdx->aColExpr->a[j].pExpr;
 		} else if (iColumn >= 0) {
 			pScan->idxaff = pIdx->pTable->aCol[iColumn].affinity;
-			pScan->zCollName = pIdx->azColl[j];
+			pScan->zCollName = index_collation_name(pIdx, j);
 		}
 	} else if (iColumn == XN_EXPR) {
 		return 0;
@@ -466,7 +466,7 @@ findIndexCol(Parse * pParse,	/* Parse context */
 	     int iCol)		/* Column of index to match */
 {
 	int i;
-	const char *zColl = pIdx->azColl[iCol];
+	const char *zColl = index_collation_name(pIdx, iCol);
 
 	for (i = 0; i < pList->nExpr; i++) {
 		Expr *p = sqlite3ExprSkipCollate(pList->a[i].pExpr);
@@ -1175,7 +1175,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	sqlite3_value *p2 = 0;	/* Value extracted from pUpper */
 	sqlite3_value *pVal = 0;	/* Value extracted from record */
 
-	pColl = sqlite3LocateCollSeq(pParse, db, p->azColl[nEq]);
+	pColl = sqlite3LocateCollSeq(pParse, db, index_collation_name(p, nEq));
 	if (pLower) {
 		rc = sqlite3Stat4ValueFromExpr(pParse, pLower->pExpr->pRight,
 					       aff, &p1);
@@ -2247,7 +2247,8 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		pColl = sqlite3BinaryCompareCollSeq(pParse, pLhs, pRhs);
 		if (pColl == 0)
 			break;
-		if (strcmp(pColl->name, pIdx->azColl[i + nEq]))
+		const char *zCollName = index_collation_name(pIdx, i + nEq);
+		if (zCollName && strcmp(pColl->name, zCollName))
 			break;
 	}
 	return i;
@@ -3240,13 +3241,13 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				    sqlite3ExprCollSeq(pWInfo->pParse,
 						       pOrderBy->a[i].pExpr);
 				if (!pColl)
-					pColl = db->pDfltColl;
+					pColl = sql_default_coll();
 				z1 = pColl->name;
 				pColl =
 				    sqlite3ExprCollSeq(pWInfo->pParse,
 						       pTerm->pExpr);
 				if (!pColl)
-					pColl = db->pDfltColl;
+					pColl = sql_default_coll();
 				z2 = pColl->name;
 				if (strcmp(z1, z2) != 0)
 					continue;
@@ -3376,9 +3377,11 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						    sqlite3ExprCollSeq(pWInfo->pParse,
 								       pOrderBy->a[i].pExpr);
 						if (!pColl)
-							pColl = db->pDfltColl;
+							pColl = sql_default_coll();
+						const char *zCollName =
+							index_collation_name(pIndex, j);
 						if (strcmp(pColl->name,
-								   pIndex->azColl[j]) != 0)
+							   zCollName) != 0)
 							continue;
 					}
 					isMatch = 1;

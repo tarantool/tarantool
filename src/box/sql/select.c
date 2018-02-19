@@ -1297,7 +1297,7 @@ keyInfoFromExprList(Parse * pParse,	/* Parsing context */
 			struct coll *pColl;
 			pColl = sqlite3ExprCollSeq(pParse, pItem->pExpr);
 			if (!pColl)
-				pColl = db->pDfltColl;
+				pColl = sql_default_coll();
 			pInfo->aColl[i - iStart] = pColl;
 			pInfo->aSortOrder[i - iStart] = pItem->sortOrder;
 		}
@@ -2179,7 +2179,7 @@ multiSelectOrderByKeyInfo(Parse * pParse, Select * p, int nExtra)
 				    multiSelectCollSeq(pParse, p,
 						       pItem->u.x.iOrderByCol - 1);
 				if (pColl == 0)
-					pColl = db->pDfltColl;
+					pColl = sql_default_coll();
 				pOrderBy->a[i].pExpr =
 				    sqlite3ExprAddCollateString(pParse, pTerm,
 								pColl->name);
@@ -2836,7 +2836,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 		for (i = 0, apColl = pKeyInfo->aColl; i < nCol; i++, apColl++) {
 			*apColl = multiSelectCollSeq(pParse, p, i);
 			if (0 == *apColl) {
-				*apColl = db->pDfltColl;
+				*apColl = sql_default_coll();
 			}
 		}
 
@@ -5259,7 +5259,7 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 				    sqlite3ExprCollSeq(pParse, pItem->pExpr);
 			}
 			if (!pColl) {
-				pColl = pParse->db->pDfltColl;
+				pColl = sql_default_coll();
 			}
 			if (regHit == 0 && pAggInfo->nAccumulator)
 				regHit = ++pParse->nMem;

@@ -935,7 +935,7 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 
 		if ((pKeyInfo->nField + pKeyInfo->nXField) < 13
 		    && (pKeyInfo->aColl[0] == 0
-			|| pKeyInfo->aColl[0] == db->pDfltColl)
+			|| pKeyInfo->aColl[0] == sql_default_coll())
 		    ) {
 			pSorter->typeMask =
 			    SORTER_TYPE_INTEGER | SORTER_TYPE_TEXT;

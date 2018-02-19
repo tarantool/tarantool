@@ -1563,7 +1563,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		struct coll *coll = NULL;
 		if (aCol[i].zColl != NULL &&
 		    strcasecmp(aCol[i].zColl, "binary") != 0) {
-			coll = sqlite3FindCollSeq(NULL, aCol[i].zColl, 0);
+			coll = sqlite3FindCollSeq(aCol[i].zColl);
 		}
 		p = enc->encode_map(p, coll ? 5 : 4);
 		p = enc->encode_str(p, "name", 4);
@@ -1654,7 +1654,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
 		/* do not decode default collation */
 		if (sqlite3StrICmp(pIndex->azColl[i], "binary") != 0){
-			collation = sqlite3FindCollSeq(NULL, pIndex->azColl[i], 0);
+			collation = sqlite3FindCollSeq(pIndex->azColl[i]);
 			/* 
 			 * At this point, the collation has already been found 
 			 * once and the assert should not fire.

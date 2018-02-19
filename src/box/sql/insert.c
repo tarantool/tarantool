@@ -1391,7 +1391,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				for (i = 0; i < nPkCol; i++) {
 					char *p4 = (char *)
 						sqlite3LocateCollSeq(pParse, db,
-								     pPk->azColl[i]);
+								     index_collation_name(pPk, i));
 					x = pPk->aiColumn[i];
 					assert(x >= 0);
 					if (i == (nPkCol - 1)) {
@@ -1676,7 +1676,8 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 		if (pSrc->aSortOrder[i] != pDest->aSortOrder[i]) {
 			return 0;	/* Different sort orders */
 		}
-		if (sqlite3_stricmp(pSrc->azColl[i], pDest->azColl[i]) != 0) {
+		if (strcasecmp(index_collation_name(pSrc, i),
+			       index_collation_name(pDest, i)) != 0) {
 			return 0;	/* Different collating sequences */
 		}
 	}
@@ -1816,7 +1817,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		if (pDestCol->affinity != pSrcCol->affinity) {
 			return 0;	/* Affinity must be the same on all columns */
 		}
-		if (sqlite3_stricmp(pDestCol->zColl, pSrcCol->zColl) != 0) {
+		if (strcasecmp(column_collation_name(pDest, i),
+			       column_collation_name(pSrc, i)) != 0) {
 			return 0;	/* Collating sequence must be the same on all columns */
 		}
 		if (!table_column_is_nullable(pDest, i)

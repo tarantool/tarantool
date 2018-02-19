@@ -464,9 +464,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 									     pIdx->
 									     aSortOrder
 									     [i],
-									     pIdx->
-									     azColl
-									     [i],
+									     index_collation_name(pIdx, i),
 									     i <
 									     mx);
 						}

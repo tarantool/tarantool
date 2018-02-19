@@ -55,7 +55,6 @@
  */
 struct coll *
 sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
-		  sqlite3 * db,	/* if called during runtime - pointer to the DB */
 		  struct coll * pColl,	/* Collating sequence with native encoding, or NULL */
 		  const char *zName	/* Collating sequence name */
     )
@@ -64,7 +63,7 @@ sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
 
 	p = pColl;
 	if (!p) {
-		p = sqlite3FindCollSeq(db, zName, 0);
+		p = sqlite3FindCollSeq(zName);
 	}
 	if (p == 0) {
 		if (pParse)
@@ -94,8 +93,7 @@ sqlite3CheckCollSeq(Parse * pParse, struct coll * pColl)
 	if (pColl) {
 		const char *zName = pColl->name;
 		struct coll *p =
-		    sqlite3GetCollSeq(pParse, pParse->db, pColl,
-				      zName);
+		    sqlite3GetCollSeq(pParse, pColl, zName);
 		if (!p) {
 			return SQLITE_ERROR;
 		}
@@ -141,26 +139,25 @@ static struct coll_plus_name_struct binary_coll_with_name =
 		"BINARY"};
 static struct coll * binary_coll = (struct coll*)&binary_coll_with_name;
 
-/*
- * Parameter zName points to a UTF-8 encoded string nName bytes long.
- * Return the CollSeq* pointer for the collation sequence named zName
- * for the encoding 'enc' from the database 'db'.
- *
- * If the entry specified is not found and 'create' is true, then create a
- * new entry.  Otherwise return NULL.
+struct coll *
+sql_default_coll()
+{
+	return binary_coll;
+}
+
+/**
+ * Return the coll* pointer for the collation sequence named zName.
  *
  * A separate function sqlite3LocateCollSeq() is a wrapper around
- * this routine.  sqlite3LocateCollSeq() invokes the collation factory
- * if necessary and generates an error message if the collating sequence
- * cannot be found.
+ * this routine.  sqlite3LocateCollSeq() generates an error
+ * message if the collating sequence cannot be found.
  *
- * See also: sqlite3LocateCollSeq(), sqlite3GetCollSeq()
+ * @param zName Name of collation to be found.
+ * @retval Pointer for the collation sequence named zName.
  */
 struct coll *
-sqlite3FindCollSeq(sqlite3 * db, const char *zName, int create)
+sqlite3FindCollSeq(const char *zName)
 {
-	(void)db;
-	(void)create;
 	if (zName == NULL || sqlite3StrICmp(zName, "binary")==0){
 		return binary_coll;
 	}

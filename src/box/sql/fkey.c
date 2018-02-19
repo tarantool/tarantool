@@ -297,11 +297,11 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 					 * the default collation sequence for the column, this index is
 					 * unusable. Bail out early in this case.
 					 */
-					zDfltColl = pParent->aCol[iCol].zColl;
-					if (!zDfltColl)
-						zDfltColl = sqlite3StrBINARY;
+					zDfltColl =
+						column_collation_name(pParent,
+								      iCol);
 					if (strcmp
-					    (pIdx->azColl[i], zDfltColl))
+					    (index_collation_name(pIdx, i), zDfltColl))
 						break;
 
 					zIdxCol = pParent->aCol[iCol].zName;
@@ -535,9 +535,7 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 			pCol = &pTab->aCol[iCol];
 			pExpr->iTable = regBase + iCol + 1;
 			pExpr->affinity = pCol->affinity;
-			zColl = pCol->zColl;
-			if (zColl == 0)
-				zColl = db->pDfltColl->name;
+			zColl = column_collation_name(pTab, iCol);
 			pExpr =
 			    sqlite3ExprAddCollateString(pParse, pExpr, zColl);
 		} else {
