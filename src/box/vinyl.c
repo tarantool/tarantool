@@ -1023,19 +1023,11 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	/* The space is empty. Allow alter. */
-	if (pk->stat.disk.count.rows == 0 &&
-	    pk->stat.memory.count.rows == 0)
-		return 0;
-	if (space_def_check_compatibility(old_space->def, new_space->def,
-					  false) != 0)
-		return -1;
-	if (old_space->index_count < new_space->index_count) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-			 "adding an index to a non-empty space");
-		return -1;
-	}
-
+	/*
+	 * Regardless of the space emptyness, key definition of an
+	 * existing index can not be changed, because key
+	 * definition is already in vylog. See #3169.
+	 */
 	if (old_space->index_count == new_space->index_count) {
 		/* Check index_defs to be unchanged. */
 		for (uint32_t i = 0; i < old_space->index_count; ++i) {
@@ -1053,13 +1045,27 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 					 new_def->key_def->parts,
 					 new_def->key_def->part_count) != 0) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-					 "changing the definition of a non-empty "\
-					 "index");
+					 "changing the definition of an index");
 				return -1;
 			}
 		}
 	}
-	/* Drop index or a change in index options. */
+	if (pk->stat.disk.count.rows == 0 &&
+	    pk->stat.memory.count.rows == 0)
+		return 0;
+	/*
+	 * Since space format is not persisted in vylog, it can be
+	 * altered on non-empty space to some state, compatible
+	 * with the old one.
+	 */
+	if (space_def_check_compatibility(old_space->def, new_space->def,
+					  false) != 0)
+		return -1;
+	if (old_space->index_count < new_space->index_count) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "adding an index to a non-empty space");
+		return -1;
+	}
 	return 0;
 }
 

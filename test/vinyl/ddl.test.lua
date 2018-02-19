@@ -48,15 +48,15 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 box.snapshot()
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 
--- after a dump REPLACE + DELETE = nothing, so the space is empty now and
--- can be altered.
+-- After a dump REPLACE + DELETE = nothing, so the space is empty
+-- but an index can not be altered.
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-#box.space._index:select({space.id})
-box.space._index:get{space.id, 0}[6]
-space:insert({1, 2})
-index:select{}
-index2:select{}
+-- Space format still can be altered.
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'unsigned'}
+space:format(format)
 space:drop()
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
@@ -80,6 +80,7 @@ box.snapshot()
 -- Wait until the dump is finished.
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+-- Can not alter an index even if it becames empty after dump.
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 
 space:drop()
@@ -266,4 +267,19 @@ s.index.secondary:alter{unique = true} -- error
 s.index.secondary.unique
 s:insert{2, 10}
 s.index.secondary:select(10)
+s:drop()
+
+--
+-- gh-3169: vinyl index key definition can not be altered even if
+-- the index is empty.
+--
+s = box.schema.space.create('vinyl', {engine = 'vinyl'})
+i = s:create_index('pk')
+i:alter{parts = {1, 'integer'}}
+_ = s:replace{-1}
+_ = s:replace{1}
+_ = s:replace{-2}
+_ = s:replace{3}
+_ = s:replace{-3}
+s:select{}
 s:drop()
