@@ -479,7 +479,8 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 					  part->fieldno);
 		field_b = tuple_field_raw(format_b, tuple_b_raw, field_map_b,
 					  part->fieldno);
-		assert(has_optional_parts || field_a != NULL && field_b != NULL);
+		assert(has_optional_parts ||
+		       (field_a != NULL && field_b != NULL));
 		if (! is_nullable) {
 			rc = tuple_compare_field(field_a, field_b, part->type,
 						 part->coll);
