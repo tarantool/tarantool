@@ -1565,7 +1565,7 @@ format[2] = {name = 'field2', type = 'unsigned'}
 ...
 s:format(format)
 ---
-- error: Vinyl does not support non-empty space format incompatible change
+- error: Vinyl does not support changing space format of a non-empty space
 ...
 s:drop()
 ---

@@ -291,15 +291,18 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 	for (uint32_t i = 0; i < format1->field_count; ++i) {
 		const struct tuple_field *field1 = &format1->fields[i];
 		/*
-		 * The field is formatted in format1, but not
-		 * formatted in format2.
+		 * The field has a data type in format1, but has
+		 * no data type in format2.
 		 */
 		if (i >= format2->field_count) {
 			/*
-			 * The field can be defined with no type,
-			 * but with a name - it is not
-			 * restriction. Nullability is necessary
-			 * if a field is absend in some tuples.
+			 * The field can get a name added
+			 * for it, and this doesn't require a data
+			 * check.
+			 * If the field is defined as not
+			 * nullable, however, we need a data
+			 * check, since old data may contain
+			 * NULLs or miss the subject field.
 			 */
 			if (field1->type == FIELD_TYPE_ANY &&
 			    field1->is_nullable)
@@ -310,7 +313,10 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 		const struct tuple_field *field2 = &format2->fields[i];
 		if (! field_type1_contains_type2(field1->type, field2->type))
 			return false;
-		/* Nullability removal - format is restricted. */
+		/*
+		 * Do not allow transition from nullable to non-nullable:
+		 * it would require a check of all data in the space.
+		 */
 		if (field2->is_nullable && !field1->is_nullable)
 			return false;
 	}

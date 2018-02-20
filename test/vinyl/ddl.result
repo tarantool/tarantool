@@ -770,7 +770,7 @@ format[2].is_nullable = false
 ...
 space:format(format)
 ---
-- error: Vinyl does not support non-empty space format incompatible change
+- error: Vinyl does not support changing space format of a non-empty space
 ...
 space:drop()
 ---
