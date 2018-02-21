@@ -908,10 +908,13 @@ weak.c:ping()
 test_run:cmd('stop server connecter')
 test_run:cmd('cleanup server connecter')
 -- Check the connection tries to reconnect at least two times.
+old_log_level = box.cfg.log_level
+box.cfg{log_level = 6}
 log.info(string.rep('a', 1000))
 while test_run:grep_log('default', 'Connection refused', 1000) == nil do fiber.sleep(0.1) end
 log.info(string.rep('a', 1000))
 while test_run:grep_log('default', 'Connection refused', 1000) == nil do fiber.sleep(0.1) end
+box.cfg{log_level = old_log_level}
 collectgarbage('collect')
 strong.state
 strong == weak.c
