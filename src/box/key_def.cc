@@ -30,6 +30,7 @@
  */
 #include "key_def.h"
 #include "tuple_compare.h"
+#include "tuple_extract_key.h"
 #include "tuple_hash.h"
 #include "column_mask.h"
 #include "schema_def.h"
@@ -195,6 +196,22 @@ box_key_def_delete(box_key_def_t *key_def)
 }
 
 int
+box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
+		  const box_key_def_t *key_def)
+{
+	return tuple_compare(tuple_a, tuple_b, key_def);
+}
+
+int
+box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
+			   const box_key_def_t *key_def)
+{
+	uint32_t part_count = mp_decode_array(&key_b);
+	return tuple_compare_with_key(tuple_a, key_b, part_count, key_def);
+
+}
+
+int
 key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2)
 {
@@ -230,11 +247,7 @@ key_part_check_compatibility(const struct key_part *old_parts,
 		const struct key_part *old_part = &old_parts[i];
 		if (old_part->fieldno != new_part->fieldno)
 			return false;
-		if (! field_type_is_compatible(old_part->type, new_part->type))
-			return false;
 		if (old_part->coll != new_part->coll)
-			return false;
-		if (key_part_is_nullable(old_part) != key_part_is_nullable(new_part))
 			return false;
 	}
 	return true;
@@ -267,6 +280,24 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 	}
 	if (all_parts_set)
 		key_def_set_cmp(def);
+}
+
+void
+key_def_update_optionality(struct key_def *def, uint32_t min_field_count)
+{
+	def->has_optional_parts = false;
+	for (uint32_t i = 0; i < def->part_count; ++i) {
+		struct key_part *part = &def->parts[i];
+		def->has_optional_parts |= key_part_is_nullable(part) &&
+					   min_field_count < part->fieldno + 1;
+		/*
+		 * One optional part is enough to switch to new
+		 * comparators.
+		 */
+		if (def->has_optional_parts)
+			break;
+	}
+	key_def_set_cmp(def);
 }
 
 int
@@ -499,6 +530,18 @@ key_def_find(const struct key_def *key_def, uint32_t fieldno)
 	return NULL;
 }
 
+bool
+key_def_contains(const struct key_def *first, const struct key_def *second)
+{
+	const struct key_part *part = second->parts;
+	const struct key_part *end = part + second->part_count;
+	for (; part != end; part++) {
+		if (key_def_find(first, part->fieldno) == NULL)
+			return false;
+	}
+	return true;
+}
+
 struct key_def *
 key_def_merge(const struct key_def *first, const struct key_def *second)
 {
@@ -524,6 +567,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	new_def->part_count = new_part_count;
 	new_def->unique_part_count = new_part_count;
 	new_def->is_nullable = first->is_nullable || second->is_nullable;
+	new_def->has_optional_parts = first->has_optional_parts ||
+				      second->has_optional_parts;
 	/* Write position in the new key def. */
 	uint32_t pos = 0;
 	/* Append first key def's parts to the new index_def. */

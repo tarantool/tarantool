@@ -360,7 +360,7 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 	assert(part_count <= field_count);
 	uint32_t nulls_count = field_count - cmp_def->part_count;
 	uint32_t bsize = mp_sizeof_array(field_count) +
-		mp_sizeof_nil() * nulls_count;
+			 mp_sizeof_nil() * nulls_count;
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const struct key_part *part = &cmp_def->parts[i];
 		assert(part->fieldno < field_count);
@@ -421,14 +421,25 @@ vy_stmt_new_surrogate_delete(struct tuple_format *format,
 
 	const char *src_pos = src_data;
 	uint32_t src_count = mp_decode_array(&src_pos);
-	uint32_t field_count = format->index_field_count;
-	assert(src_count >= field_count);
-	(void) src_count;
+	assert(src_count >= format->min_field_count);
+	uint32_t field_count;
+	if (src_count < format->index_field_count) {
+		field_count = src_count;
+		/*
+		 * Nullify field map to be able to detect by 0,
+		 * which key fields are absent in tuple_field().
+		 */
+		memset((char *)field_map - format->field_map_size, 0,
+		       format->field_map_size);
+	} else {
+		field_count = format->index_field_count;
+	}
 	char *pos = mp_encode_array(data, field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
 		const struct tuple_field *field = &format->fields[i];
 		if (! field->is_key_part) {
-			/* Unindexed field - write NIL */
+			/* Unindexed field - write NIL. */
+			assert(i < src_count);
 			pos = mp_encode_nil(pos);
 			mp_next(&src_pos);
 			continue;

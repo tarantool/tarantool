@@ -1,6 +1,17 @@
 fiber = require('fiber')
 test_run = require('test_run').new()
 
+-- sanity checks
+space = box.schema.space.create('test', {engine = 'vinyl' })
+space:create_index('pk', {range_size = 0})
+space:create_index('pk', {page_size = 0})
+space:create_index('pk', {page_size = 8192, range_size = 4096})
+space:create_index('pk', {run_count_per_level = 0})
+space:create_index('pk', {run_size_ratio = 1})
+space:create_index('pk', {bloom_fpr = 0})
+space:create_index('pk', {bloom_fpr = 1.1})
+space:drop()
+
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index1 = space:create_index('primary')
@@ -48,15 +59,15 @@ space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 box.snapshot()
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 
--- after a dump REPLACE + DELETE = nothing, so the space is empty now and
--- can be altered.
+-- After a dump REPLACE + DELETE = nothing, so the space is empty
+-- but an index can not be altered.
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-#box.space._index:select({space.id})
-box.space._index:get{space.id, 0}[6]
-space:insert({1, 2})
-index:select{}
-index2:select{}
+-- Space format still can be altered.
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'unsigned'}
+space:format(format)
 space:drop()
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
@@ -80,6 +91,7 @@ box.snapshot()
 -- Wait until the dump is finished.
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
+-- Can not alter an index even if it becames empty after dump.
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 
 space:drop()
@@ -249,6 +261,32 @@ index = space:create_index('test', { type = 'tree', parts = { 2, 'array' }})
 index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
 space:drop()
 
+--
+-- Allow compatible changes of a non-empty vinyl space.
+--
+space = box.schema.create_space('test', { engine = 'vinyl' })
+pk = space:create_index('primary')
+space:replace{1}
+space:replace{2}
+format = {}
+format[1] = {name = 'field1'}
+format[2] = {name = 'field2', is_nullable = true}
+format[3] = {name = 'field3', is_nullable = true}
+space:format(format)
+t1 = space:replace{3,4,5}
+t2 = space:replace{4,5}
+t1.field1, t1.field2, t1.field3
+t2.field1, t2.field2, t2.field3
+t1 = pk:get{1}
+t1.field1, t1.field2, t1.field3
+box.snapshot()
+t1 = pk:get{2}
+t1.field1, t1.field2, t1.field3
+-- Forbid incompatible change.
+format[2].is_nullable = false
+space:format(format)
+space:drop()
+
 -- gh-3019 default index options
 box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serialize = 'map'}), {}}
 box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
@@ -266,4 +304,19 @@ s.index.secondary:alter{unique = true} -- error
 s.index.secondary.unique
 s:insert{2, 10}
 s.index.secondary:select(10)
+s:drop()
+
+--
+-- gh-3169: vinyl index key definition can not be altered even if
+-- the index is empty.
+--
+s = box.schema.space.create('vinyl', {engine = 'vinyl'})
+i = s:create_index('pk')
+i:alter{parts = {1, 'integer'}}
+_ = s:replace{-1}
+_ = s:replace{1}
+_ = s:replace{-2}
+_ = s:replace{3}
+_ = s:replace{-3}
+s:select{}
 s:drop()

@@ -140,6 +140,11 @@ struct key_def {
 	uint32_t unique_part_count;
 	/** True, if at least one part can store NULL. */
 	bool is_nullable;
+	/**
+	 * True, if some key parts can be absent in a tuple. These
+	 * fields assumed to be MP_NIL.
+	 */
+	bool has_optional_parts;
 	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
 	/** The size of the 'parts' array. */
@@ -161,6 +166,7 @@ key_def_dup(const struct key_def *src);
 /** \cond public */
 
 typedef struct key_def box_key_def_t;
+typedef struct tuple box_tuple_t;
 
 /**
  * Create key definition with key fields with passed typed on passed positions.
@@ -181,6 +187,34 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
  */
 void
 box_key_def_delete(box_key_def_t *key_def);
+
+/**
+ * Compare tuples using the key definition.
+ * @param tuple_a first tuple
+ * @param tuple_b second tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
+ * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
+ */
+int
+box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
+		  const box_key_def_t *key_def);
+
+/**
+ * @brief Compare tuple with key using the key definition.
+ * @param tuple tuple
+ * @param key key with MessagePack array header
+ * @param key_def key definition
+ *
+ * @retval 0  if key_fields(tuple) == parts(key)
+ * @retval <0 if key_fields(tuple) < parts(key)
+ * @retval >0 if key_fields(tuple) > parts(key)
+ */
+
+int
+box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
+			   const box_key_def_t *key_def);
 
 /** \endcond public */
 
@@ -217,6 +251,16 @@ void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, enum on_conflict_action nullable_action,
 		 struct coll *coll);
+
+/**
+ * Update 'has_optional_parts' of @a key_def with correspondence
+ * to @a min_field_count.
+ * @param def Key definition to update.
+ * @param min_field_count Minimal field count. All parts out of
+ *        this value are optional.
+ */
+void
+key_def_update_optionality(struct key_def *def, uint32_t min_field_count);
 
 /**
  * An snprint-style function to print a key definition.
@@ -260,6 +304,15 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
  */
 const struct key_part *
 key_def_find(const struct key_def *key_def, uint32_t fieldno);
+
+/**
+ * Check if key definition @a first contains all parts of
+ * key definition @a second.
+ * @retval true if @a first is a superset of @a second
+ * @retval false otherwise
+ */
+bool
+key_def_contains(const struct key_def *first, const struct key_def *second);
 
 /**
  * Allocate a new key_def with a set union of key parts from
@@ -374,6 +427,95 @@ key_part_check_compatibility(const struct key_part *old_parts,
 			     uint32_t old_part_count,
 			     const struct key_part *new_parts,
 			     uint32_t new_part_count);
+
+/**
+ * Extract key from tuple by given key definition and return
+ * buffer allocated on box_txn_alloc with this key. This function
+ * has O(n) complexity, where n is the number of key parts.
+ * @param tuple - tuple from which need to extract key
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+static inline char *
+tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
+		  uint32_t *key_size)
+{
+	return key_def->tuple_extract_key(tuple, key_def, key_size);
+}
+
+/**
+ * Extract key from raw msgpuck by given key definition and return
+ * buffer allocated on box_txn_alloc with this key.
+ * This function has O(n*m) complexity, where n is the number of key parts
+ * and m is the tuple size.
+ * @param data - msgpuck data from which need to extract key
+ * @param data_end - pointer at the end of data
+ * @param key_def - definition of key that need to extract
+ * @param key_size - here will be size of extracted key
+ *
+ * @retval not NULL Success
+ * @retval NULL     Memory allocation error
+ */
+static inline char *
+tuple_extract_key_raw(const char *data, const char *data_end,
+		      const struct key_def *key_def, uint32_t *key_size)
+{
+	return key_def->tuple_extract_key_raw(data, data_end, key_def,
+					      key_size);
+}
+
+/**
+ * Compare keys using the key definition.
+ * @param key_a key parts with MessagePack array header
+ * @param part_count_a the number of parts in the key_a
+ * @param key_b key_parts with MessagePack array header
+ * @param part_count_b the number of parts in the key_b
+ * @param key_def key definition
+ *
+ * @retval 0  if key_a == key_b
+ * @retval <0 if key_a < key_b
+ * @retval >0 if key_a > key_b
+ */
+int
+key_compare(const char *key_a, const char *key_b,
+	    const struct key_def *key_def);
+
+/**
+ * Compare tuples using the key definition.
+ * @param tuple_a first tuple
+ * @param tuple_b second tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
+ * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
+ */
+static inline int
+tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+	      const struct key_def *key_def)
+{
+	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
+}
+
+/**
+ * @brief Compare tuple with key using the key definition.
+ * @param tuple tuple
+ * @param key key parts without MessagePack array header
+ * @param part_count the number of parts in @a key
+ * @param key_def key definition
+ *
+ * @retval 0  if key_fields(tuple) == parts(key)
+ * @retval <0 if key_fields(tuple) < parts(key)
+ * @retval >0 if key_fields(tuple) > parts(key)
+ */
+static inline int
+tuple_compare_with_key(const struct tuple *tuple, const char *key,
+		       uint32_t part_count, const struct key_def *key_def)
+{
+	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

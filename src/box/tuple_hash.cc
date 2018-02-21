@@ -212,6 +212,7 @@ static const hasher_signature hash_arr[] = {
 
 #undef HASHER
 
+template <bool has_optional_parts>
 uint32_t
 tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def);
 
@@ -254,7 +255,10 @@ tuple_hash_func_set(struct key_def *key_def) {
 	}
 
 slowpath:
-	key_def->tuple_hash = tuple_hash_slowpath;
+	if (key_def->has_optional_parts)
+		key_def->tuple_hash = tuple_hash_slowpath<true>;
+	else
+		key_def->tuple_hash = tuple_hash_slowpath<false>;
 	key_def->key_hash = key_hash_slowpath;
 }
 
@@ -295,17 +299,32 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 	return size;
 }
 
+static inline uint32_t
+tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
+{
+	assert(mp_sizeof_nil() == 1);
+	const char null = 0xc0;
+	PMurHash32_Process(ph1, pcarry, &null, 1);
+	return mp_sizeof_nil();
+}
 
+template <bool has_optional_parts>
 uint32_t
 tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def)
 {
+	assert(has_optional_parts == key_def->has_optional_parts);
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
 	uint32_t prev_fieldno = key_def->parts[0].fieldno;
-	const char* field = tuple_field(tuple, key_def->parts[0].fieldno);
-	total_size += tuple_hash_field(&h, &carry, &field,
-				       key_def->parts[0].coll);
+	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *end = (char *)tuple + tuple_size(tuple);
+	if (has_optional_parts && field == NULL) {
+		total_size += tuple_hash_null(&h, &carry);
+	} else {
+		total_size += tuple_hash_field(&h, &carry, &field,
+					       key_def->parts[0].coll);
+	}
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
 		/* If parts of key_def are not sequential we need to call
 		 * tuple_field. Otherwise, tuple is hashed sequentially without
@@ -314,8 +333,13 @@ tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def)
 		if (prev_fieldno + 1 != key_def->parts[part_id].fieldno) {
 			field = tuple_field(tuple, key_def->parts[part_id].fieldno);
 		}
-		total_size += tuple_hash_field(&h, &carry, &field,
-					       key_def->parts[part_id].coll);
+		if (has_optional_parts && (field == NULL || field >= end)) {
+			total_size += tuple_hash_null(&h, &carry);
+		} else {
+			total_size +=
+				tuple_hash_field(&h, &carry, &field,
+						 key_def->parts[part_id].coll);
+		}
 		prev_fieldno = key_def->parts[part_id].fieldno;
 	}
 

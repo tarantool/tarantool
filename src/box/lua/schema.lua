@@ -1670,6 +1670,10 @@ end
 
 local function object_resolve(object_type, object_name)
     if object_type == 'universe' then
+        if object_name ~= nil and type(object_name) ~= 'string'
+                and type(object_name) ~= 'number' then
+            box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
+        end
         return 0
     end
     if object_type == 'space' then

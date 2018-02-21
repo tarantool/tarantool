@@ -301,6 +301,12 @@ vy_run_env_destroy(struct vy_run_env *env);
 void
 vy_run_env_enable_coio(struct vy_run_env *env, int threads);
 
+static inline size_t
+vy_run_bloom_size(struct vy_run *run)
+{
+	return run->info.has_bloom ? bloom_store_size(&run->info.bloom) : 0;
+}
+
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
 {
@@ -402,6 +408,15 @@ vy_run_snprint_path(char *buf, int size, const char *dir,
 	SNPRINT(total, vy_run_snprint_filename, buf, size, run_id, type);
 	return total;
 }
+
+/**
+ * Remove all files (data, index) corresponding to a run
+ * with the given id. Return 0 on success, -1 if unlink()
+ * failed.
+ */
+int
+vy_run_remove_files(const char *dir, uint32_t space_id,
+		    uint32_t iid, int64_t run_id);
 
 int
 vy_run_write(struct vy_run *run, const char *dirpath,

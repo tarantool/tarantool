@@ -97,6 +97,10 @@ for i = 12000, 13999 do test:upsert({i - 10000, i, string.rep('a', 128)}, {{'+',
 box.snapshot()
 for _, f in pairs(fio.glob(box.cfg.vinyl_dir .. '/' .. test.id .. '/0/*.index')) do fio.unlink(f) end
 
+_ = box.schema.space.create('info')
+_ = box.space.info:create_index('pk')
+_ = box.space.info:insert{1, box.space.test.index.pk:info()}
+
 test2 = box.schema.space.create('test2', {engine = 'vinyl'})
 _ = test2:create_index('pk')
 _ = test2:create_index('sec', {parts = {4, 'unsigned', 2, 'string'}})
@@ -117,6 +121,19 @@ sum = 0
 for k, v in pairs(box.space.test:select()) do sum = sum + v[2] end
 -- should be a sum(2005 .. 4004) + sum(4000 .. 9999) = 48006000
 sum
+
+-- Check that disk stats are restored after index rebuild (gh-3173).
+old_info = box.space.info:get(1)[2]
+new_info = box.space.test.index.pk:info()
+new_info.disk.index_size == old_info.disk.index_size
+new_info.disk.bloom_size == old_info.disk.bloom_size
+new_info.disk.rows == old_info.disk.rows
+new_info.disk.bytes == old_info.disk.bytes
+new_info.disk.bytes_compressed == old_info.disk.bytes_compressed
+new_info.disk.pages == old_info.disk.pages
+new_info.run_count == old_info.run_count
+new_info.range_count == old_info.range_count
+
 box.space.test2:select()
 box.space.test2.index.sec:select()
 test_run:cmd('switch default')
@@ -146,3 +163,4 @@ sum
 
 test_run:cmd('switch default')
 test_run:cmd('stop server force_recovery')
+test_run:cmd('cleanup server force_recovery')

@@ -339,3 +339,222 @@ parts[1].nullable_action = 'ignore'
 sk = s:create_index('sk', { parts = parts }) -- Ok.
 
 s:drop()
+
+--
+-- gh-2973: allow to enable nullable on a non-empty space.
+--
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'unsigned'}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+s:replace{1, 1}
+s:replace{100, 100}
+s:replace{50, 50}
+s:replace{25, box.NULL}
+
+format[2].is_nullable = true
+s:format(format)
+s:replace{25, box.NULL}
+s:replace{10, box.NULL}
+s:replace{150, box.NULL}
+s:select{}
+s:drop()
+
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = false}}})
+s:replace{1, 1}
+s:replace{100, 100}
+s:replace{50, 50}
+s:replace{25, box.NULL}
+sk:alter({parts = {{2, 'unsigned', is_nullable = true}}})
+s:replace{25, box.NULL}
+s:replace{10, box.NULL}
+s:replace{150, box.NULL}
+sk:select{}
+s:drop()
+
+--
+-- gh-2988: allow absense of tail nullable indexed fields.
+--
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
+
+-- Test tuple_compare_slowpath, tuple_compare_with_key_slowpath.
+
+s:replace{} -- Fail
+-- Compare full vs not full.
+s:replace{2}
+s:replace{1, 2}
+s:select{}
+sk:select{box.NULL}
+sk:select{2}
+-- Compare not full vs full.
+s:replace{4, 5}
+s:replace{3}
+s:select{}
+sk:select{box.NULL}
+sk:select{5}
+-- Compare extended keys.
+s:replace{7}
+s:replace{6}
+s:select{}
+sk:select{box.NULL}
+sk:select{}
+-- Test tuple extract key during dump for vinyl.
+box.snapshot()
+sk:select{}
+s:select{}
+
+-- Test tuple_compare_sequential_nullable,
+-- tuple_compare_with_key_sequential.
+s:drop()
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk')
+parts = {}
+parts[1] = {1, 'unsigned'}
+parts[2] = {2, 'unsigned', is_nullable = true}
+parts[3] = {3, 'unsigned', is_nullable = true}
+sk = s:create_index('sk', {parts = parts})
+-- Compare full vs not full.
+s:replace{1, 2, 3}
+s:replace{3}
+s:replace{2, 3}
+sk:select{}
+sk:select{3, box.NULL}
+sk:select{3, box.NULL, box.NULL}
+sk:select{2}
+sk:select{2, 3}
+sk:select{3, 100}
+sk:select{3, box.NULL, 100}
+sk:select({3, box.NULL}, {iterator = 'GE'})
+sk:select({3, box.NULL}, {iterator = 'LE'})
+s:select{}
+-- Test tuple extract key for vinyl.
+box.snapshot()
+sk:select{}
+sk:select{3, box.NULL}
+sk:select{3, box.NULL, box.NULL}
+sk:select{2}
+sk:select{2, 3}
+sk:select{3, 100}
+sk:select{3, box.NULL, 100}
+sk:select({3, box.NULL}, {iterator = 'GE'})
+sk:select({3, box.NULL}, {iterator = 'LE'})
+
+-- Test a tuple_compare_sequential() for a case, when there are
+-- two equal tuples, but in one of them field count < unique field
+-- count.
+s:replace{1, box.NULL}
+s:replace{1, box.NULL, box.NULL}
+s:select{1}
+
+--
+-- Partially sequential keys. See tuple_extract_key.cc and
+-- contains_sequential_parts template flag.
+--
+s:drop()
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk')
+parts = {}
+parts[1] = {2, 'unsigned', is_nullable = true}
+parts[2] = {3, 'unsigned', is_nullable = true}
+parts[3] = {5, 'unsigned', is_nullable = true}
+parts[4] = {6, 'unsigned', is_nullable = true}
+parts[5] = {4, 'unsigned', is_nullable = true}
+parts[6] = {7, 'unsigned', is_nullable = true}
+sk = s:create_index('sk', {parts = parts})
+s:insert{1, 1, 1, 1, 1, 1, 1}
+s:insert{8, 1, 1, 1, 1, box.NULL}
+s:insert{9, 1, 1, 1, box.NULL}
+s:insert{6, 6}
+s:insert{10, 6, box.NULL}
+s:insert{2, 2, 2, 2, 2, 2}
+s:insert{7}
+s:insert{5, 5, 5}
+s:insert{3, 5, box.NULL, box.NULL, box.NULL}
+s:insert{4, 5, 5, 5, box.NULL}
+s:insert{11, 4, 4, 4}
+s:insert{12, 4, box.NULL, 4}
+s:insert{13, 3, 3, 3, 3}
+s:insert{14, box.NULL, 3, box.NULL, 3}
+s:select{}
+sk:select{}
+sk:select{5, 5, box.NULL}
+sk:select{5, 5, box.NULL, 100}
+sk:select({7, box.NULL}, {iterator = 'LT'})
+box.snapshot()
+sk:select{}
+sk:select{5, 5, box.NULL}
+sk:select{5, 5, box.NULL, 100}
+sk:select({7, box.NULL}, {iterator = 'LT'})
+
+s:drop()
+
+--
+-- The main case of absent nullable fields - create an index over
+-- them on not empty space (available on memtx only).
+--
+s = box.schema.space.create('test', {engine = 'memtx'})
+pk = s:create_index('pk')
+s:replace{1}
+s:replace{2}
+s:replace{3}
+sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
+s:replace{4}
+s:replace{5, 6}
+s:replace{7, 8}
+s:replace{9, box.NULL}
+s:select{}
+sk:select{}
+sk:select{box.NULL}
+s:drop()
+
+--
+-- The complex case: when an index part is_nullable is set to,
+-- false and it changes min_field_count, this part must become
+-- optional and turn on comparators for optional fields. See the
+-- big comment in alter.cc in index_def_new_from_tuple().
+--
+s = box.schema.create_space('test', {engine = 'memtx'})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {2, 'unsigned'}})
+s:replace{1, 1}
+s:replace{2, box.NULL}
+s:select{}
+sk:alter({parts = {{2, 'unsigned', is_nullable = true}}})
+s:replace{20, box.NULL}
+sk:select{}
+s:replace{10}
+sk:select{}
+s:replace{40}
+sk:select{}
+s:drop()
+
+--
+-- Check that if an index alter makes a field be optional, and
+-- this field is used in another index, then this another index
+-- is updated too. Case of @locker.
+--
+s = box.schema.space.create('test', {engine = 'memtx'})
+_ = s:create_index('pk')
+i1 = s:create_index('i1', {parts = {2, 'unsigned', 3, 'unsigned'}})
+i2 = s:create_index('i2', {parts = {3, 'unsigned', 2, 'unsigned'}})
+
+i1:alter{parts = {{2, 'unsigned'}, {3, 'unsigned', is_nullable = true}}}
+-- i2 alter makes i1 contain optional part. Its key_def and
+-- comparators must be updated.
+i2:alter{parts = {{3, 'unsigned', is_nullable = true}, {2, 'unsigned'}}}
+s:insert{1, 1}
+s:insert{100, 100}
+s:insert{50, 50}
+s:insert{25, 25, 25}
+s:insert{75, 75, 75}
+s:select{}
+i1:select{}
+i2:select{}
+i2:select{box.NULL, 50}
+i2:select{}
+s:drop()

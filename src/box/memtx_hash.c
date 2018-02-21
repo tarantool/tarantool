@@ -32,7 +32,6 @@
 #include "say.h"
 #include "fiber.h"
 #include "tuple.h"
-#include "tuple_compare.h"
 #include "tuple_hash.h"
 #include "memtx_engine.h"
 #include "space.h"
@@ -136,6 +135,13 @@ memtx_hash_index_destroy(struct index *base)
 	light_index_destroy(index->hash_table);
 	free(index->hash_table);
 	free(index);
+}
+
+static void
+memtx_hash_index_update_def(struct index *base)
+{
+	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
+	index->hash_table->arg = index->base.def->key_def;
 }
 
 static ssize_t
@@ -376,7 +382,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .destroy = */ memtx_hash_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ generic_index_update_def,
+	/* .update_def = */ memtx_hash_index_update_def,
 	/* .size = */ memtx_hash_index_size,
 	/* .bsize = */ memtx_hash_index_bsize,
 	/* .min = */ generic_index_min,

@@ -54,7 +54,6 @@
 #include <small/region.h>
 #include <small/mempool.h>
 
-#include "coio_file.h"
 #include "coio_task.h"
 #include "cbus.h"
 #include "histogram.h"
@@ -1030,19 +1029,11 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	/* The space is empty. Allow alter. */
-	if (pk->stat.disk.count.rows == 0 &&
-	    pk->stat.memory.count.rows == 0)
-		return 0;
-	if (space_def_check_compatibility(old_space->def, new_space->def,
-					  false) != 0)
-		return -1;
-	if (old_space->index_count < new_space->index_count) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-			 "adding an index to a non-empty space");
-		return -1;
-	}
-
+	/*
+	 * Regardless of the space emptyness, key definition of an
+	 * existing index can not be changed, because key
+	 * definition is already in vylog. See #3169.
+	 */
 	if (old_space->index_count == new_space->index_count) {
 		/* Check index_defs to be unchanged. */
 		for (uint32_t i = 0; i < old_space->index_count; ++i) {
@@ -1060,13 +1051,33 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 					 new_def->key_def->parts,
 					 new_def->key_def->part_count) != 0) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-					 "changing the definition of a non-empty "\
-					 "index");
+					 "changing the definition of an index");
 				return -1;
 			}
 		}
 	}
-	/* Drop index or a change in index options. */
+	if (pk->stat.disk.count.rows == 0 &&
+	    pk->stat.memory.count.rows == 0)
+		return 0;
+	/*
+	 * Since space format is not persisted in vylog, it can be
+	 * altered on non-empty space to some state, compatible
+	 * with the old one.
+	 */
+	if (space_def_check_compatibility(old_space->def, new_space->def,
+					  false) != 0)
+		return -1;
+	if (old_space->index_count < new_space->index_count) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "adding an index to a non-empty space");
+		return -1;
+	}
+	if (! tuple_format1_can_store_format2_tuples(new_space->format,
+						     old_space->format)) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "changing space format of a non-empty space");
+		return -1;
+	}
 	return 0;
 }
 
@@ -1117,6 +1128,7 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 
 	/* Set possibly changed opts. */
 	pk->opts = new_index_def->opts;
+	pk->check_is_unique = true;
 
 	/* Set new formats. */
 	tuple_format_unref(pk->disk_format);
@@ -1140,6 +1152,7 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		index->pk = pk;
 		new_index_def = space_index_def(new_space, i);
 		index->opts = new_index_def->opts;
+		index->check_is_unique = index->opts.is_unique;
 		tuple_format_unref(index->mem_format_with_colmask);
 		tuple_format_unref(index->mem_format);
 		tuple_format_unref(index->upsert_format);
@@ -1151,6 +1164,27 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		tuple_format_ref(index->mem_format);
 		tuple_format_ref(index->upsert_format);
 		vy_index_validate_formats(index);
+	}
+
+	/*
+	 * Check if there are unique indexes that are contained
+	 * by other unique indexes. For them, we can skip check
+	 * for duplicates on INSERT. Prefer indexes with higher
+	 * ids for uniqueness check optimization as they are
+	 * likelier to have a "colder" cache.
+	 */
+	for (int i = new_space->index_count - 1; i >= 0; i--) {
+		struct vy_index *index = vy_index(new_space->index[i]);
+		if (!index->check_is_unique)
+			continue;
+		for (int j = 0; j < (int)new_space->index_count; j++) {
+			struct vy_index *other = vy_index(new_space->index[j]);
+			if (other != index && other->check_is_unique &&
+			    key_def_contains(index->key_def, other->key_def)) {
+				index->check_is_unique = false;
+				break;
+			}
+		}
 	}
 	return;
 fail:
@@ -1345,8 +1379,8 @@ vy_index_get(struct vy_index *index, struct vy_tx *tx,
  * @retval -1 Memory error or the key is found.
  */
 static inline int
-vy_check_dup_key(struct vy_env *env, struct vy_tx *tx, struct space *space,
-		 struct vy_index *index, struct tuple *key)
+vy_check_is_unique(struct vy_env *env, struct vy_tx *tx, struct space *space,
+		   struct vy_index *index, struct tuple *key)
 {
 	struct tuple *found;
 	/*
@@ -1389,7 +1423,8 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	if (vy_check_dup_key(env, tx, space, pk, stmt) != 0)
+	if (pk->check_is_unique &&
+	    vy_check_is_unique(env, tx, space, pk, stmt) != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -1418,7 +1453,7 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * conflict with existing tuples. If the index is not
 	 * unique a conflict is impossible.
 	 */
-	if (index->opts.is_unique &&
+	if (index->check_is_unique &&
 	    !key_update_can_be_skipped(index->key_def->column_mask,
 				       vy_stmt_column_mask(stmt)) &&
 	    (!index->key_def->is_nullable ||
@@ -1427,7 +1462,7 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 							index->env->key_format);
 		if (key == NULL)
 			return -1;
-		int rc = vy_check_dup_key(env, tx, space, index, key);
+		int rc = vy_check_is_unique(env, tx, space, index, key);
 		tuple_unref(key);
 		if (rc != 0)
 			return -1;
@@ -2788,6 +2823,7 @@ void
 vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 				    double too_long_threshold)
 {
+	vinyl->env->quota.too_long_threshold = too_long_threshold;
 	vinyl->env->index_env.too_long_threshold = too_long_threshold;
 }
 
@@ -3367,20 +3403,8 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 				(long long)record->run_id); goto out;});
 
 	/* Try to delete files. */
-	bool forget = true;
-	char path[PATH_MAX];
-	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_snprint_path(path, sizeof(path), arg->env->path,
-				    arg->space_id, arg->index_id,
-				    record->run_id, type);
-		say_info("removing %s", path);
-		if (coio_unlink(path) < 0 && errno != ENOENT) {
-			say_syserror("error while removing %s", path);
-			forget = false;
-		}
-	}
-
-	if (!forget)
+	if (vy_run_remove_files(arg->env->path, arg->space_id,
+				arg->index_id, record->run_id) != 0)
 		goto out;
 
 	/* Forget the run on success. */
@@ -3878,6 +3902,14 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 	}
 
 	if (it->index->id > 0) {
+#ifndef NDEBUG
+		struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
+					      ERRINJ_BOOL);
+		if (delay && delay->bparam) {
+			while (delay->bparam)
+				fiber_sleep(0.01);
+		}
+#endif
 		/* Get the full tuple from the primary index. */
 		if (vy_index_get(it->index->pk, it->tx, it->rv,
 				 tuple, &tuple) != 0)

@@ -103,46 +103,130 @@ local special_headers = {
     ["user-agent"] = true,
 }
 
-local function parse_list(list)
-    local result = {}
-    for _,str in pairs(list) do
-        local h = str:split(':', 1)
-        if #h > 1 then
-            local key = h[1]:lower()
-            local val = string.gsub(h[2], "^%s*(.-)%s*$", "%1")
-            local prev_val = result[key]
-            -- pack headers
-            if not special_headers[key] then
-                if prev_val == nil then
-                    result[key] = {}
-                    table.insert(result[key], val)
-                else
-                    table.insert(prev_val, val)
-                end
-            else if not prev_val then
-                result[key] = val
-               end
-            end
-        elseif string.match(str, "HTTP/%d%.%d %d%d%d") then
-            result = {}
+local special_characters = {
+    ['('] = true,
+    [')'] = true,
+    ['['] = true,
+    [']'] = true,
+    ['<'] = true,
+    ['>'] = true,
+    ['>'] = true,
+    ['@'] = true,
+    [','] = true,
+    [';'] = true,
+    [':'] = true,
+    ['\\'] = true,
+    ['\"'] = true,
+    ['/'] = true,
+    ['?'] = true,
+    ['='] = true,
+    ['{'] = true,
+    ['}'] = true,
+    [' '] = true,
+    ['\t'] = true
+}
+
+local option_keys = {
+    ["Expires"] = true,
+    ["Max-Age"] = true,
+    ["Domain"] = true,
+    ["Path"] = true,
+    ["Secure"] = true,
+    ["HttpOnly"] = true,
+    ["SameSite"] = true,
+}
+
+--local function process_set_cookies(value, result)
+--    local key_start, value_start
+--    local key, val
+--    local symbols = value:gmatch('.')
+--    local options = {}
+--    local cur = 0
+--    for v in symbols do
+--        cur = cur + 1
+--        if v == ' ' or v == '\t' then
+--            goto continue
+--        end
+--        key_start = cur
+--        -- parse cookie name
+--        while not special_characters[v] do
+--            if v == nil then
+--                return
+--            end
+--            v = symbols()
+--            cur = cur + 1
+--        end
+--        key = value:sub(key_start, cur)
+--        if not v or v ~= '=' then
+--            -- invalid header
+--            return
+--        end
+--        while v == ' ' do
+--            v = symbols()
+--            cur = cur + 1
+--        end
+--
+--        if v == nil then
+--            return
+--        end
+--
+--        while v and v ~= ';' do
+--            if v == nil then
+--                break
+--            end
+--            v = symbols()
+--            cur = cur + 1
+--        end
+--
+--        result[key] = {val, options}
+--        ::continue::
+--    end
+--end
+
+local function process_cookie(cookie, result)
+    local vals = cookie:split(';')
+    local val = vals[1]:split('=')
+    if #val < 2 then
+        return
+    end
+    val[1] = string.strip(val[1])
+    for c in val[1]:gmatch('.') do
+        if special_characters[c] then
+            return
         end
     end
 
-    for key, value in pairs(result) do
-        if not special_headers[key] then
-            result[key] = table.concat(result[key], ",")
+    local options = {}
+    table.remove(vals, 1)
+    for _, opt in pairs(vals) do
+        local splitted = opt:split('=')
+        splitted = string.strip(splitted[1])
+        if option_keys[splitted] then
+            table.insert(options, string.strip(opt))
         end
+    end
+    result[val[1]] = {string.strip(val[2]), options}
+end
+
+local function process_cookies(cookies)
+    local result = {}
+    for _, val in pairs(cookies) do
+        process_cookie(val, result)
     end
     return result
 end
 
-local function parse_headers(resp)
-    local list = resp.headers:split('\r\n')
-    local h1 = table.remove(list, 1):split(' ')
-    local proto = h1[1]:split('/')[2]:split('.')
-    resp.proto = { tonumber(proto[1]), tonumber(proto[2]) }
-    resp.headers = parse_list(list)
-    return resp
+local function process_headers(headers)
+    for header, value in pairs(headers) do
+        if type(value) == 'table' then
+            if special_headers[header] then
+                headers[header] = value[1]
+            else
+                headers[header] = table.concat(value, ',')
+            end
+        end
+    end
+    return headers
 end
 
 --
@@ -214,7 +298,10 @@ curl_mt = {
             end
             local resp = self.curl:request(method, url, body, opts or {})
             if resp and resp.headers then
-                resp = parse_headers(resp)
+                if resp.headers['set-cookie'] ~= nil then
+                    resp.cookies = process_cookies(resp.headers['set-cookie'])
+                end
+                resp.headers = process_headers(resp.headers)
             end
             return resp
         end,

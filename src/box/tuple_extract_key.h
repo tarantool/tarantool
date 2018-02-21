@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED
-#define TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED
+#ifndef TARANTOOL_BOX_TUPLE_EXTRACT_KEY_H_INCLUDED
+#define TARANTOOL_BOX_TUPLE_EXTRACT_KEY_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,34 +30,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-#include "key_def.h"
-#include "tuple.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-/**
- * Create a comparison function for the key_def
- *
- * @param key_def key_definition
- * @returns a comparision function
- */
-tuple_compare_t
-tuple_compare_create(const struct key_def *key_def);
+struct key_def;
 
 /**
- * @copydoc tuple_compare_create()
+ * Initialize key extraction functions in the key_def
+ * @param key_def key definition
  */
-tuple_compare_with_key_t
-tuple_compare_with_key_create(const struct key_def *key_def);
+void
+tuple_extract_key_set(struct key_def *key_def);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED */
+#endif /* TARANTOOL_BOX_TUPLE_EXTRACT_KEY_H_INCLUDED */

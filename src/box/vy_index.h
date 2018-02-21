@@ -159,6 +159,13 @@ struct vy_index {
 	/** Key definition passed by the user. */
 	struct key_def *key_def;
 	/**
+	 * If the following flag is set the index is unique and
+	 * it must be checked for duplicates on INSERT. Otherwise,
+	 * the check can be skipped, either because this index
+	 * is not unique or it is a part of another unique index.
+	 */
+	bool check_is_unique;
+	/**
 	 * Tuple format for tuples of this index created when
 	 * reading pages from disk.
 	 * Is distinct from mem_format only for secondary keys,

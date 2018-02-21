@@ -1071,6 +1071,23 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		return -1;
 	}
 
+	if (gc_lsn < 0) {
+		/*
+		 * If there is no last snapshot, i.e. we are in
+		 * the middle of join, we can delete compacted
+		 * run files right away.
+		 */
+		vy_log_tx_begin();
+		rlist_foreach_entry(run, &unused_runs, in_unused) {
+			if (vy_run_remove_files(index->env->path,
+						index->space_id, index->id,
+						run->id) == 0) {
+				vy_log_forget_run(run->id);
+			}
+		}
+		vy_log_tx_try_commit();
+	}
+
 	/*
 	 * Account the new run if it is not empty,
 	 * otherwise discard it.

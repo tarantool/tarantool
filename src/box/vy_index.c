@@ -239,6 +239,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->space_id = index_def->space_id;
 	index->id = index_def->iid;
 	index->opts = index_def->opts;
+	index->check_is_unique = index->opts.is_unique;
 	vy_index_read_set_new(&index->read_set);
 
 	index_env->index_count++;
@@ -702,10 +703,10 @@ vy_index_add_run(struct vy_index *index, struct vy_run *run)
 	index->run_count++;
 	vy_disk_stmt_counter_add(&index->stat.disk.count, &run->count);
 
-	index->bloom_size += bloom_store_size(&run->info.bloom);
+	index->bloom_size += vy_run_bloom_size(run);
 	index->page_index_size += run->page_index_size;
 
-	index->env->bloom_size += bloom_store_size(&run->info.bloom);
+	index->env->bloom_size += vy_run_bloom_size(run);
 	index->env->page_index_size += run->page_index_size;
 }
 
@@ -718,10 +719,10 @@ vy_index_remove_run(struct vy_index *index, struct vy_run *run)
 	index->run_count--;
 	vy_disk_stmt_counter_sub(&index->stat.disk.count, &run->count);
 
-	index->bloom_size -= bloom_store_size(&run->info.bloom);
+	index->bloom_size -= vy_run_bloom_size(run);
 	index->page_index_size -= run->page_index_size;
 
-	index->env->bloom_size -= bloom_store_size(&run->info.bloom);
+	index->env->bloom_size -= vy_run_bloom_size(run);
 	index->env->page_index_size -= run->page_index_size;
 }
 

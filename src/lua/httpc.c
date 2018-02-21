@@ -34,6 +34,7 @@
  */
 #define DRIVER_LUA_UDATA_NAME	"httpc"
 
+#include <http_parser.h>
 #include "src/httpc.h"
 #include "say.h"
 #include "lua/utils.h"
@@ -56,6 +57,69 @@ lua_add_key_u64(lua_State *L, const char *key, uint64_t value)
 {
 	lua_pushstring(L, key);
 	lua_pushinteger(L, value);
+	lua_settable(L, -3);
+}
+
+static void
+parse_headers(lua_State *L, char *buffer, size_t len)
+{
+	struct http_parser parser;
+	char *end_buf = buffer + len;
+	lua_pushstring(L, "headers");
+	lua_newtable(L);
+	while (true) {
+		int rc = http_parse_header_line(&parser, &buffer, end_buf);
+		if (rc == HTTP_PARSE_INVALID) {
+			continue;
+		}
+		if (rc == HTTP_PARSE_DONE) {
+			break;
+		}
+
+		if (rc == HTTP_PARSE_OK) {
+			lua_pushlstring(L, parser.header_name,
+					parser.header_name_idx);
+
+			/* check value of header, if exists */
+			lua_pushlstring(L, parser.header_name,
+					parser.header_name_idx);
+			lua_gettable(L, -3);
+			int value_len = parser.header_value_end -
+						parser.header_value_start;
+			/* table of values to handle duplicates*/
+			if (lua_isnil(L, -1)) {
+				lua_pop(L, 1);
+				lua_newtable(L);
+				lua_pushinteger(L, 1);
+				lua_pushlstring(L, parser.header_value_start,
+						value_len);
+				lua_settable(L, -3);
+			} else if (lua_istable(L, -1)) {
+				lua_pushinteger(L, lua_objlen(L, -1) + 1);
+				lua_pushlstring(L, parser.header_value_start,
+						value_len);
+				lua_settable(L, -3);
+			}
+			/*headers[parser.header] = {value}*/
+			lua_settable(L, -3);
+		}
+	}
+
+	/* headers */
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "proto");
+
+	lua_newtable(L);
+	lua_pushinteger(L, 1);
+	lua_pushinteger(L, (parser.http_major > 0) ? parser.http_major: 0);
+	lua_settable(L, -3);
+
+	lua_pushinteger(L, 2);
+	lua_pushinteger(L, (parser.http_minor > 0) ? parser.http_minor: 0);
+	lua_settable(L, -3);
+
+	/* proto */
 	lua_settable(L, -3);
 }
 /* }}}
@@ -215,9 +279,7 @@ luaT_httpc_request(lua_State *L)
 			httpc_request_delete(req);
 			return luaT_error(L);
 		}
-		lua_pushstring(L, "headers");
-		lua_pushlstring(L, headers, headers_len);
-		lua_settable(L, -3);
+		parse_headers(L, headers, headers_len);
 	}
 
 	size_t body_len = region_used(&req->resp_body);

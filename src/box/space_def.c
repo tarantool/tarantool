@@ -31,6 +31,7 @@
 
 #include "space_def.h"
 #include "diag.h"
+#include "error.h"
 
 const struct space_opts space_opts_default = {
 	/* .temporary = */ false,
@@ -160,3 +161,52 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	}
 	return def;
 }
+
+int
+space_def_check_compatibility(const struct space_def *old_def,
+			      const struct space_def *new_def,
+			      bool is_space_empty)
+{
+	if (strcmp(new_def->engine_name, old_def->engine_name) != 0) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+			 "can not change space engine");
+		return -1;
+	}
+	if (new_def->id != old_def->id) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+			 "space id is immutable");
+		return -1;
+	}
+	if (is_space_empty)
+		return 0;
+
+	if (new_def->exact_field_count != 0 &&
+	    new_def->exact_field_count != old_def->exact_field_count) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+			 "can not change field count on a non-empty space");
+		return -1;
+	}
+	if (new_def->opts.temporary != old_def->opts.temporary) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+			 "can not switch temporary flag on a non-empty space");
+		return -1;
+	}
+	uint32_t field_count = MIN(new_def->field_count, old_def->field_count);
+	for (uint32_t i = 0; i < field_count; ++i) {
+		enum field_type old_type = old_def->fields[i].type;
+		enum field_type new_type = new_def->fields[i].type;
+		if (!field_type1_contains_type2(new_type, old_type) &&
+		    !field_type1_contains_type2(old_type, new_type)) {
+			const char *msg =
+				tt_sprintf("Can not change a field type from "\
+					   "%s to %s on a not empty space",
+					   field_type_strs[old_type],
+					   field_type_strs[new_type]);
+			diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+				 msg);
+			return -1;
+		}
+	}
+	return 0;
+}
+

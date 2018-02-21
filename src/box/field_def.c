@@ -79,9 +79,9 @@ static const bool field_type_compatibility[] = {
 };
 
 bool
-field_type_is_compatible(enum field_type old_type, enum field_type new_type)
+field_type1_contains_type2(enum field_type type1, enum field_type type2)
 {
-	int idx = old_type * field_type_MAX + new_type;
+	int idx = type2 * field_type_MAX + type1;
 	return field_type_compatibility[idx];
 }
 

@@ -1,7 +1,5 @@
-#ifndef TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED
-#define TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -16,11 +14,11 @@
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
  * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
@@ -30,34 +28,39 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
 
-#include "key_def.h"
-#include "tuple.h"
+#ifndef TARANTOOL_HTTP_PARSER_H
+#define TARANTOOL_HTTP_PARSER_H
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+#define HEADER_LEN 32
 
-/**
- * Create a comparison function for the key_def
- *
- * @param key_def key_definition
- * @returns a comparision function
+enum {
+	HTTP_PARSE_OK,
+	HTTP_PARSE_DONE,
+	HTTP_PARSE_INVALID
+};
+
+struct http_parser {
+	char *header_value_start;
+	char *header_value_end;
+
+	int http_major;
+	int http_minor;
+
+	char header_name[HEADER_LEN];
+	int header_name_idx;
+};
+
+/*
+ * @brief Parse line containing http header info
+ * @param parser object
+ * @param bufp pointer to buffer with data
+ * @param end_buf
+ * @return	HTTP_DONE - line was parsed
+ * 		HTTP_OK - header was read
+ * 		HTTP_PARSE_INVALID - error during parsing
  */
-tuple_compare_t
-tuple_compare_create(const struct key_def *key_def);
+int
+http_parse_header_line(struct http_parser *parser, char **bufp, const char *end_buf);
 
-/**
- * @copydoc tuple_compare_create()
- */
-tuple_compare_with_key_t
-tuple_compare_with_key_create(const struct key_def *key_def);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_BOX_TUPLE_COMPARE_H_INCLUDED */
+#endif //TARANTOOL_HTTP_PARSER_H

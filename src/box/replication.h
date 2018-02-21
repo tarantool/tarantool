@@ -104,6 +104,14 @@ static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
 extern double replication_timeout;
 
 /**
+ * Maximal time box.cfg() may wait for connections to all configured
+ * replicas to be established. If box.cfg() fails to connect to all
+ * replicas within the timeout, it will either leave the instance in
+ * the orphan mode (recovery) or fail (bootstrap, reconfiguration).
+ */
+extern double replication_connect_timeout;
+
+/**
  * Minimal number of replicas to sync for this instance to switch
  * to the write mode. If set to REPLICATION_CONNECT_QUORUM_ALL,
  * wait for all configured masters.
@@ -134,16 +142,6 @@ static inline double
 replication_disconnect_timeout(void)
 {
 	return replication_timeout * 4;
-}
-
-/**
- * Fail box.cfg() if the quorum hasn't been assembled within
- * the given period.
- */
-static inline double
-replication_connect_quorum_timeout(void)
-{
-	return replication_reconnect_timeout() * 4;
 }
 
 void
@@ -202,11 +200,6 @@ struct replicaset {
 		 */
 		int synced;
 		/**
-		 * Number of appliers that have been stopped
-		 * due to unrecoverable errors.
-		 */
-		int failed;
-		/**
 		 * Signaled whenever an applier changes its
 		 * state.
 		 */
@@ -214,6 +207,24 @@ struct replicaset {
 	} applier;
 };
 extern struct replicaset replicaset;
+
+enum replica_state {
+	/**
+	 * Applier has not connected to the master yet
+	 * or has disconnected.
+	 */
+	REPLICA_DISCONNECTED,
+	/**
+	 * Applier has connected to the master and
+	 * received UUID.
+	 */
+	REPLICA_CONNECTED,
+	/**
+	 * Applier has synchronized with the master
+	 * (left "sync" and entered "follow" state).
+	 */
+	REPLICA_SYNCED,
+};
 
 /**
  * Summary information about a replica in the replica set.
@@ -243,11 +254,8 @@ struct replica {
 	 * Trigger invoked when the applier changes its state.
 	 */
 	struct trigger on_applier_state;
-	/**
-	 * Set if the applier has successfully synchornized to
-	 * the master (left "sync" and entered "follow" state).
-	 */
-	bool is_synced;
+	/** Replica sync state. */
+	enum replica_state state;
 };
 
 enum {

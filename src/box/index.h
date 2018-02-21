@@ -201,6 +201,20 @@ ssize_t
 box_index_count(uint32_t space_id, uint32_t index_id, int type,
 		const char *key, const char *key_end);
 
+/**
+ * Extract key from tuple according to key definition of given
+ * index. Returned buffer is allocated on box_txn_alloc() with
+ * this key.
+ * @param tuple Tuple from which need to extract key.
+ * @param space_id Space identifier.
+ * @param index_id Index identifier.
+ * @retval not NULL Success
+ * @retval     NULL Memory Allocation error
+ */
+char *
+box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
+		      uint32_t index_id, uint32_t *key_size);
+
 /** \endcond public */
 
 /**

@@ -98,6 +98,11 @@ applier_log_error(struct applier *applier, struct error *e)
 
 /*
  * Fiber function to write vclock to replication master.
+ * To track connection status, replica answers master
+ * with encoded vclock. In addition to DML requests,
+ * master also sends heartbeat messages every
+ * replication_timeout seconds (introduced in 1.7.7).
+ * On such requests replica also responds with vclock.
  */
 static int
 applier_writer_f(va_list ap)
@@ -106,10 +111,18 @@ applier_writer_f(va_list ap)
 	struct ev_io io;
 	coio_create(&io, applier->io.fd);
 
-	/* Re-connect loop */
 	while (!fiber_is_cancelled()) {
-		fiber_cond_wait_timeout(&applier->writer_cond,
-					replication_timeout);
+		/*
+		 * Tarantool >= 1.7.7 sends periodic heartbeat
+		 * messages so we don't need to send ACKs every
+		 * replication_timeout seconds any more.
+		 */
+		if (applier->version_id >= version_id(1, 7, 7))
+			fiber_cond_wait_timeout(&applier->writer_cond,
+						TIMEOUT_INFINITY);
+		else
+			fiber_cond_wait_timeout(&applier->writer_cond,
+						replication_timeout);
 		/* Send ACKs only when in FOLLOW mode ,*/
 		if (applier->state != APPLIER_SYNC &&
 		    applier->state != APPLIER_FOLLOW)
@@ -445,7 +458,18 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
-		coio_read_xrow(coio, ibuf, &row);
+		/*
+		 * Tarantool < 1.7.7 does not send periodic heartbeat
+		 * messages so we can't assume that if we haven't heard
+		 * from the master for quite a while the connection is
+		 * broken - the master might just be idle.
+		 */
+		if (applier->version_id < version_id(1, 7, 7)) {
+			coio_read_xrow(coio, ibuf, &row);
+		} else {
+			double timeout = replication_disconnect_timeout();
+			coio_read_xrow_timeout_xc(coio, ibuf, &row, timeout);
+		}
 
 		if (iproto_type_is_error(row.type))
 			xrow_decode_error_xc(&row);  /* error */

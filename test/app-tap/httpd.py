@@ -26,8 +26,11 @@ def headers():
     body = [b"cookies"]
     headers = [('Content-Type', 'application/json'),
                ('Content-Type', 'application/yaml'),
-               ('Set-Cookie', 'likes=cheese'),
-               ('Set-Cookie', 'age=17'),
+               ('Set-Cookie', 'likes=cheese; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Secure; HttpOnly'),
+               ('Set-Cookie', 'bad@name=no;'),
+               ('Set-Cookie', 'badcookie'),
+               ('Set-Cookie', 'good_name=yes;'),
+               ('Set-Cookie', 'age = 17; NOSuchOption; EmptyOption=Value;Secure'),
                ('my_header', 'value1'),
                ('my_header', 'value2'),
                ]

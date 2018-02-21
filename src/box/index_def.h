@@ -178,6 +178,19 @@ void
 index_def_delete(struct index_def *def);
 
 /**
+ * Update 'has_optional_parts' property of key definitions.
+ * @param def Index def, containing key definitions to update.
+ * @param min_field_count Minimal field count. All parts out of
+ *        this value are optional.
+ */
+static inline void
+index_def_update_optionality(struct index_def *def, uint32_t min_field_count)
+{
+	key_def_update_optionality(def->key_def, min_field_count);
+	key_def_update_optionality(def->cmp_def, min_field_count);
+}
+
+/**
  * Add an index definition to a list, preserving the
  * first position of the primary key.
  *

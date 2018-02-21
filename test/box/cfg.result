@@ -50,6 +50,8 @@ cfg_filter(box.cfg)
     - false
   - - readahead
     - 16320
+  - - replication_connect_timeout
+    - 4
   - - replication_sync_lag
     - 10
   - - replication_timeout
@@ -137,6 +139,8 @@ cfg_filter(box.cfg)
     - false
   - - readahead
     - 16320
+  - - replication_connect_timeout
+    - 4
   - - replication_sync_lag
     - 10
   - - replication_timeout

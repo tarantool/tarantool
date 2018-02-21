@@ -49,6 +49,9 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		    uint16_t key_count, const struct field_def *fields,
 		    uint32_t field_count)
 {
+	format->min_field_count =
+		tuple_format_min_field_count(keys, key_count, fields,
+					     field_count);
 	if (format->field_count == 0) {
 		format->field_map_size = 0;
 		return 0;
@@ -59,8 +62,6 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		format->fields[i].type = fields[i].type;
 		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
 		format->fields[i].nullable_action = fields[i].nullable_action;
-		if (i + 1 > format->min_field_count && !fields[i].is_nullable)
-			format->min_field_count = i + 1;
 	}
 	/* Initialize remaining fields */
 	for (uint32_t i = field_count; i < format->field_count; i++)
@@ -118,11 +119,16 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			/*
 			 * Check that there are no conflicts
 			 * between index part types and space
-			 * fields.
+			 * fields. If a part type is compatible
+			 * with field's one, then the part type is
+			 * more strict and the part type must be
+			 * used in tuple_format.
 			 */
-			if (field->type == FIELD_TYPE_ANY) {
+			if (field_type1_contains_type2(field->type,
+						       part->type)) {
 				field->type = part->type;
-			} else if (field->type != part->type) {
+			} else if (! field_type1_contains_type2(part->type,
+								field->type)) {
 				const char *name;
 				int fieldno = part->fieldno + TUPLE_INDEX_BASE;
 				if (part->fieldno >= field_count) {
@@ -256,7 +262,7 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	format->field_count = field_count;
 	format->index_field_count = index_field_count;
 	format->exact_field_count = 0;
-	format->min_field_count = index_field_count;
+	format->min_field_count = 0;
 	return format;
 }
 
@@ -300,6 +306,48 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		return NULL;
 	}
 	return format;
+}
+
+bool
+tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
+				       const struct tuple_format *format2)
+{
+	if (format1->exact_field_count != format2->exact_field_count)
+		return false;
+	for (uint32_t i = 0; i < format1->field_count; ++i) {
+		const struct tuple_field *field1 = &format1->fields[i];
+		/*
+		 * The field has a data type in format1, but has
+		 * no data type in format2.
+		 */
+		if (i >= format2->field_count) {
+			/*
+			 * The field can get a name added
+			 * for it, and this doesn't require a data
+			 * check.
+			 * If the field is defined as not
+			 * nullable, however, we need a data
+			 * check, since old data may contain
+			 * NULLs or miss the subject field.
+			 */
+			if (field1->type == FIELD_TYPE_ANY &&
+			    tuple_field_is_nullable(field1))
+				continue;
+			else
+				return false;
+		}
+		const struct tuple_field *field2 = &format2->fields[i];
+		if (! field_type1_contains_type2(field1->type, field2->type))
+			return false;
+		/*
+		 * Do not allow transition from nullable to non-nullable:
+		 * it would require a check of all data in the space.
+		 */
+		if (tuple_field_is_nullable(field2) &&
+		    !tuple_field_is_nullable(field1))
+			return false;
+	}
+	return true;
 }
 
 bool
@@ -380,6 +428,14 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	++field;
 	uint32_t i = 1;
 	uint32_t defined_field_count = MIN(field_count, format->field_count);
+	if (field_count < format->index_field_count) {
+		/*
+		 * Nullify field map to be able to detect by 0,
+		 * which key fields are absent in tuple_field().
+		 */
+		memset((char *)field_map - format->field_map_size, 0,
+		       format->field_map_size);
+	}
 	for (; i < defined_field_count; ++i, ++field) {
 		mp_type = mp_typeof(*pos);
 		if (key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
@@ -393,6 +449,28 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		mp_next(&pos);
 	}
 	return 0;
+}
+
+uint32_t
+tuple_format_min_field_count(struct key_def * const *keys, uint16_t key_count,
+			     const struct field_def *space_fields,
+			     uint32_t space_field_count)
+{
+	uint32_t min_field_count = 0;
+	for (uint32_t i = 0; i < space_field_count; ++i) {
+		if (! space_fields[i].is_nullable)
+			min_field_count = i + 1;
+	}
+	for (uint32_t i = 0; i < key_count; ++i) {
+		const struct key_def *kd = keys[i];
+		for (uint32_t j = 0; j < kd->part_count; ++j) {
+			const struct key_part *kp = &kd->parts[j];
+			if (!key_part_is_nullable(kp) &&
+			    kp->fieldno + 1 > min_field_count)
+				min_field_count = kp->fieldno + 1;
+		}
+	}
+	return min_field_count;
 }
 
 /** Destroy tuple format subsystem and free resourses */

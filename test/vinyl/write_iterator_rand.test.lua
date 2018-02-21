@@ -187,18 +187,18 @@ test_run:cmd("setopt delimiter ''");
 
 -- Tests on write iterator with random combinations of page_size and range_size
 
-range_size = math.random(128, 256)
-page_size = range_size * math.random(10, 20)
+page_size = math.random(128, 256)
+range_size = page_size * math.random(10, 20)
 fill_space_with_sizes(page_size, range_size, 300)
 
-range_size = math.random(256, 512)
-page_size = range_size * math.random(10, 20)
+page_size = math.random(256, 512)
+range_size = page_size * math.random(10, 20)
 fill_space_with_sizes(page_size, range_size, 500)
 
-range_size = math.random(512, 1024)
-page_size = range_size * math.random(10, 20)
+page_size = math.random(512, 1024)
+range_size = page_size * math.random(10, 20)
 fill_space_with_sizes(page_size, range_size, 700)
 
-range_size = math.random(1024, 2048)
-page_size = range_size * math.random(10, 20)
+page_size = math.random(1024, 2048)
+range_size = page_size * math.random(10, 20)
 fill_space_with_sizes(page_size, range_size, 900)

@@ -466,3 +466,26 @@ value
 box.commit()
 
 s:drop()
+
+--
+-- gh-2442: secondary index cursor must skip key update, made
+-- after the secondary index scan, but before a primary index
+-- lookup. It is ok, and the test checks this.
+--
+s = box.schema.create_space('test', {engine = 'vinyl'})
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {{2, 'unsigned'}}})
+s:replace{1, 1}
+s:replace{3, 3}
+box.snapshot()
+ret = nil
+function do_read() ret = sk:select({2}, {iterator = 'GE'}) end
+errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", true)
+f = fiber.create(do_read)
+f:status()
+ret
+s:replace{2, 2}
+errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", false)
+while ret == nil do fiber.sleep(0.01) end
+ret
+s:drop()

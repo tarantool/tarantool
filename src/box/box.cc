@@ -208,7 +208,7 @@ int
 box_wait_ro(bool ro, double timeout)
 {
 	double deadline = ev_monotonic_now(loop()) + timeout;
-	while (is_ro != ro) {
+	while (box_is_ro() != ro) {
 		if (fiber_cond_wait_deadline(&ro_cond, deadline) != 0)
 			return -1;
 		if (fiber_is_cancelled()) {
@@ -226,6 +226,7 @@ box_clear_orphan(void)
 		return; /* nothing to do */
 
 	is_orphan = false;
+	fiber_cond_broadcast(&ro_cond);
 
 	/* Update the title to reflect the new status. */
 	title("running");
@@ -386,6 +387,17 @@ box_check_replication_timeout(void)
 	return timeout;
 }
 
+static double
+box_check_replication_connect_timeout(void)
+{
+	double timeout = cfg_getd("replication_connect_timeout");
+	if (timeout <= 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_connect_timeout",
+			  "the value must be greather than 0");
+	}
+	return timeout;
+}
+
 static int
 box_check_replication_connect_quorum(void)
 {
@@ -479,6 +491,48 @@ box_check_wal_max_size(int64_t wal_max_size)
 	return wal_max_size;
 }
 
+static void
+box_check_vinyl_options(void)
+{
+	int read_threads = cfg_geti("vinyl_read_threads");
+	int write_threads = cfg_geti("vinyl_write_threads");
+	int64_t range_size = cfg_geti64("vinyl_range_size");
+	int64_t page_size = cfg_geti64("vinyl_page_size");
+	int run_count_per_level = cfg_geti("vinyl_run_count_per_level");
+	double run_size_ratio = cfg_getd("vinyl_run_size_ratio");
+	double bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+
+	if (read_threads < 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_read_threads",
+			  "must be greater than or equal to 1");
+	}
+	if (write_threads < 2) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_write_threads",
+			  "must be greater than or equal to 2");
+	}
+	if (range_size <= 0) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_range_size",
+			  "must be greater than 0");
+	}
+	if (page_size <= 0 || page_size > range_size) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
+			  "must be greater than 0 and less than "
+			  "or equal to vinyl_range_size");
+	}
+	if (run_count_per_level <= 0) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_run_count_per_level",
+			  "must be greater than 0");
+	}
+	if (run_size_ratio <= 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_run_size_ratio",
+			  "must be greater than 1");
+	}
+	if (bloom_fpr <= 0 || bloom_fpr > 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_bloom_fpr",
+			  "must be greater than 0 and less than or equal to 1");
+	}
+}
+
 void
 box_check_config()
 {
@@ -490,6 +544,7 @@ box_check_config()
 	box_check_replicaset_uuid(&uuid);
 	box_check_replication();
 	box_check_replication_timeout();
+	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
 	box_check_readahead(cfg_geti("readahead"));
@@ -498,15 +553,7 @@ box_check_config()
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
-	if (cfg_geti64("vinyl_page_size") > cfg_geti64("vinyl_range_size"))
-		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
-			  "can't be greater than vinyl_range_size");
-	if (cfg_geti("vinyl_read_threads") < 1)
-		tnt_raise(ClientError, ER_CFG,
-			  "vinyl_read_threads", "must be >= 1");
-	if (cfg_geti("vinyl_write_threads") < 2)
-		tnt_raise(ClientError, ER_CFG,
-			  "vinyl_write_threads", "must be >= 2");
+	box_check_vinyl_options();
 }
 
 /*
@@ -580,7 +627,7 @@ box_set_replication(void)
 
 	box_check_replication();
 	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_connect_quorum_timeout(), true);
+	box_sync_replication(replication_connect_timeout, true);
 	/* Follow replica */
 	replicaset_follow();
 }
@@ -589,6 +636,12 @@ void
 box_set_replication_timeout(void)
 {
 	replication_timeout = box_check_replication_timeout();
+}
+
+void
+box_set_replication_connect_timeout(void)
+{
+	replication_connect_timeout = box_check_replication_connect_timeout();
 }
 
 void
@@ -1134,7 +1187,7 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
 		 (unsigned) id, tt_uuid_str(uuid)) != 0)
 		diag_raise();
-	assert(replica_by_uuid(uuid) != NULL);
+	assert(replica_by_uuid(uuid)->id == id);
 }
 
 /**
@@ -1148,7 +1201,7 @@ static void
 box_on_join(const tt_uuid *instance_uuid)
 {
 	struct replica *replica = replica_by_uuid(instance_uuid);
-	if (replica != NULL)
+	if (replica != NULL && replica->id != REPLICA_ID_NIL)
 		return; /* nothing to do - already registered */
 
 	box_check_writable_xc();
@@ -1252,7 +1305,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * is complete. Fail early if the caller does not have
 	 * appropriate access privileges.
 	 */
-	if (replica_by_uuid(&instance_uuid) == NULL) {
+	struct replica *replica = replica_by_uuid(&instance_uuid);
+	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
 		box_check_writable_xc();
 		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 		access_check_space_xc(space, PRIV_W);
@@ -1305,7 +1359,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 */
 	box_on_join(&instance_uuid);
 
-	struct replica *replica = replica_by_uuid(&instance_uuid);
+	replica = replica_by_uuid(&instance_uuid);
 	assert(replica != NULL);
 	replica->gc = gc;
 	gc_guard.is_active = false;
@@ -1679,6 +1733,7 @@ box_cfg_xc(void)
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	box_set_replication_connect_timeout();
 	box_set_replication_connect_quorum();
 	replication_sync_lag = box_check_replication_sync_lag();
 	xstream_create(&join_stream, apply_initial_join_row);
@@ -1804,7 +1859,7 @@ box_cfg_xc(void)
 		title("orphan");
 
 		/* Wait for the cluster to start up */
-		box_sync_replication(replication_connect_quorum_timeout(), false);
+		box_sync_replication(replication_connect_timeout, false);
 	} else {
 		if (!tt_uuid_is_nil(&instance_uuid))
 			INSTANCE_UUID = instance_uuid;

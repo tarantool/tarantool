@@ -261,6 +261,15 @@ box.snapshot()
 for _, f in pairs(fio.glob(box.cfg.vinyl_dir .. '/' .. test.id .. '/0/*.index')) do fio.unlink(f) end
 ---
 ...
+_ = box.schema.space.create('info')
+---
+...
+_ = box.space.info:create_index('pk')
+---
+...
+_ = box.space.info:insert{1, box.space.test.index.pk:info()}
+---
+...
 test2 = box.schema.space.create('test2', {engine = 'vinyl'})
 ---
 ...
@@ -325,6 +334,45 @@ for k, v in pairs(box.space.test:select()) do sum = sum + v[2] end
 sum
 ---
 - 48006000
+...
+-- Check that disk stats are restored after index rebuild (gh-3173).
+old_info = box.space.info:get(1)[2]
+---
+...
+new_info = box.space.test.index.pk:info()
+---
+...
+new_info.disk.index_size == old_info.disk.index_size
+---
+- true
+...
+new_info.disk.bloom_size == old_info.disk.bloom_size
+---
+- true
+...
+new_info.disk.rows == old_info.disk.rows
+---
+- true
+...
+new_info.disk.bytes == old_info.disk.bytes
+---
+- true
+...
+new_info.disk.bytes_compressed == old_info.disk.bytes_compressed
+---
+- true
+...
+new_info.disk.pages == old_info.disk.pages
+---
+- true
+...
+new_info.run_count == old_info.run_count
+---
+- true
+...
+new_info.range_count == old_info.range_count
+---
+- true
 ...
 box.space.test2:select()
 ---
@@ -424,6 +472,10 @@ test_run:cmd('switch default')
 - true
 ...
 test_run:cmd('stop server force_recovery')
+---
+- true
+...
+test_run:cmd('cleanup server force_recovery')
 ---
 - true
 ...

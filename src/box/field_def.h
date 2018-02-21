@@ -76,9 +76,9 @@ extern const char *field_type_strs[];
 
 extern const char *on_conflict_action_strs[];
 
-/** Check if @a new_type can store values of @an old_type. */
+/** Check if @a type1 can store values of @a type2. */
 bool
-field_type_is_compatible(enum field_type old_type, enum field_type new_type);
+field_type1_contains_type2(enum field_type type1, enum field_type type2);
 
 /**
  * Get field type by name
