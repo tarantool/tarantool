@@ -292,8 +292,6 @@ freeIndex(sqlite3 * db, Index * p)
 	sqlite3ExprDelete(db, p->pPartIdxWhere);
 	sqlite3ExprListDelete(db, p->aColExpr);
 	sqlite3DbFree(db, p->zColAff);
-	if (p->isResized)
-		sqlite3DbFree(db, (void *)p->azColl);
 	sqlite3_free(p->aiRowEst);
 	sqlite3DbFree(db, p);
 }
@@ -1095,7 +1093,7 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 		 * collation type was added. Correct this if it is the case.
 		 */
 		for (pIdx = p->pIndex; pIdx; pIdx = pIdx->pNext) {
-			assert(pIdx->nKeyCol == 1);
+			assert(pIdx->nColumn == 1);
 			if (pIdx->aiColumn[0] == i) {
 				pIdx->azColl[0] = p->aCol[i].zColl;
 			}
@@ -1404,18 +1402,16 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 		 * "PRIMARY KEY(a,b,a,b,c,b,c,d)" into just "PRIMARY KEY(a,b,c,d)".  Later
 		 * code assumes the PRIMARY KEY contains no repeated columns.
 		 */
-		for (i = j = 1; i < pPk->nKeyCol; i++) {
+		for (i = j = 1; i < pPk->nColumn; i++) {
 			if (hasColumn(pPk->aiColumn, j, pPk->aiColumn[i])) {
 				pPk->nColumn--;
 			} else {
 				pPk->aiColumn[j++] = pPk->aiColumn[i];
 			}
 		}
-		pPk->nKeyCol = j;
+		pPk->nColumn = j;
 	}
 	assert(pPk != 0);
-	if (!db->init.imposterTable)
-		pPk->uniqNotNull = 1;
 }
 
 /*
@@ -2582,7 +2578,7 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 
 	/* Open the sorter cursor if we are to use one. */
 	iSorter = pParse->nTab++;
-	sqlite3VdbeAddOp4(v, OP_SorterOpen, iSorter, 0, pIndex->nKeyCol,
+	sqlite3VdbeAddOp4(v, OP_SorterOpen, iSorter, 0, pIndex->nColumn,
 			  (char *)
 			  sqlite3KeyInfoRef(pKey), P4_KEYINFO);
 
@@ -2594,7 +2590,7 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	VdbeCoverage(v);
 	regRecord = sqlite3GetTempReg(pParse);
 
-	sqlite3GenerateIndexKey(pParse, pIndex, iTab, regRecord, 0,
+	sqlite3GenerateIndexKey(pParse, pIndex, iTab, regRecord,
 				&iPartIdxLabel, 0, 0);
 	sqlite3VdbeAddOp2(v, OP_SorterInsert, iSorter, regRecord);
 	sqlite3ResolvePartIdxLabel(pParse, iPartIdxLabel);
@@ -2616,7 +2612,7 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 		sqlite3VdbeGoto(v, j2);
 		addr2 = sqlite3VdbeCurrentAddr(v);
 		sqlite3VdbeAddOp4Int(v, OP_SorterCompare, iSorter, j2,
-				     regRecord, pIndex->nKeyCol);
+				     regRecord, pIndex->nColumn);
 		VdbeCoverage(v);
 		sqlite3UniqueConstraint(pParse, ON_CONFLICT_ACTION_ABORT,
 					pIndex);
@@ -2670,7 +2666,6 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 		pExtra += sizeof(i16) * nCol;
 		p->aSortOrder = (u8 *) pExtra;
 		p->nColumn = nCol;
-		p->nKeyCol = nCol;
 		*ppExtra = ((char *)p) + nByte;
 	}
 	return p;
@@ -2954,12 +2949,10 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	memcpy(pIndex->zName, zName, nName + 1);
 	pIndex->pTable = pTab;
 	pIndex->onError = (u8) onError;
-	pIndex->uniqNotNull = onError != ON_CONFLICT_ACTION_NONE;
 	pIndex->idxType = idxType;
 	pIndex->pSchema = db->pSchema;
-	pIndex->nKeyCol = pList->nExpr;
+	pIndex->nColumn = pList->nExpr;
 	/* Tarantool have access to each column by any index */
-	pIndex->isCovering = 1;
 	if (pPIWhere) {
 		sqlite3ResolveSelfReference(pParse, pTab, NC_PartIdx, pPIWhere,
 					    0);
@@ -2995,8 +2988,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			assert(j <= 0x7fff);
 			if (j < 0) {
 				j = pTab->iPKey;
-			} else if (pTab->aCol[j].notNull == 0) {
-				pIndex->uniqNotNull = 0;
 			}
 			pIndex->aiColumn[i] = (i16) j;
 		}
@@ -3062,9 +3053,9 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			assert(pIdx->idxType != SQLITE_IDXTYPE_APPDEF);
 			assert(IsUniqueIndex(pIndex));
 
-			if (pIdx->nKeyCol != pIndex->nKeyCol)
+			if (pIdx->nColumn != pIndex->nColumn)
 				continue;
-			for (k = 0; k < pIdx->nKeyCol; k++) {
+			for (k = 0; k < pIdx->nColumn; k++) {
 				const char *z1;
 				const char *z2;
 				assert(pIdx->aiColumn[k] >= 0);
@@ -3075,7 +3066,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 				if (strcmp(z1, z2))
 					break;
 			}
-			if (k == pIdx->nKeyCol) {
+			if (k == pIdx->nColumn) {
 				if (pIdx->onError != pIndex->onError) {
 					/* This constraint creates the same index as a previous
 					 * constraint specified somewhere in the CREATE TABLE statement.
@@ -3237,7 +3228,7 @@ sqlite3DefaultRowEst(Index * pIdx)
 	/*                10,  9,  8,  7,  6 */
 	LogEst aVal[] = { 33, 32, 30, 28, 26 };
 	LogEst *a = pIdx->aiRowLogEst;
-	int nCopy = MIN(ArraySize(aVal), pIdx->nKeyCol);
+	int nCopy = MIN(ArraySize(aVal), pIdx->nColumn);
 	int i;
 
 	/* Set the first entry (number of rows in the index) to the estimated
@@ -3256,14 +3247,52 @@ sqlite3DefaultRowEst(Index * pIdx)
 	 * 6 and each subsequent value (if any) is 5.
 	 */
 	memcpy(&a[1], aVal, nCopy * sizeof(LogEst));
-	for (i = nCopy + 1; i <= pIdx->nKeyCol; i++) {
+	int col_count = index_column_count(pIdx);
+	for (i = nCopy + 1; i <= col_count; i++) {
 		a[i] = 23;
 		assert(23 == sqlite3LogEst(5));
 	}
 
 	assert(0 == sqlite3LogEst(1));
 	if (IsUniqueIndex(pIdx))
-		a[pIdx->nKeyCol] = 0;
+		a[pIdx->nColumn] = 0;
+}
+
+/**
+ * Return number of columns in given index.
+ * If space is ephemeral, use internal
+ * SQL structure to fetch the value.
+ */
+uint32_t
+index_column_count(const Index *idx)
+{
+	assert(idx != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->tnum);
+	struct space *space = space_by_id(space_id);
+	/* It is impossible to find an ephemeral space by id. */
+	if (space == NULL)
+		return idx->nColumn;
+
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct index *index = space_index(space, index_id);
+	assert(index != NULL);
+	return index->def->key_def->part_count;
+}
+
+/** Return true if given index is unique and not nullable. */
+bool
+index_is_unique_not_null(const Index *idx)
+{
+	assert(idx != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct index *index = space_index(space, index_id);
+	assert(index != NULL);
+	return (index->def->opts.is_unique &&
+		!index->def->key_def->is_nullable);
 }
 
 /*
@@ -3951,7 +3980,7 @@ sqlite3UniqueConstraint(Parse * pParse,	/* Parsing context */
 	if (pIdx->aColExpr) {
 		sqlite3XPrintf(&errMsg, "index '%q'", pIdx->zName);
 	} else {
-		for (j = 0; j < pIdx->nKeyCol; j++) {
+		for (j = 0; j < pIdx->nColumn; j++) {
 			char *zCol;
 			assert(pIdx->aiColumn[j] >= 0);
 			zCol = pTab->aCol[pIdx->aiColumn[j]].zName;
@@ -4126,7 +4155,6 @@ sqlite3KeyInfoOfIndex(Parse * pParse, sqlite3 * db, Index * pIdx)
 	int i;
 	int nCol = pIdx->nColumn;
 	int nTableCol = pIdx->pTable->nCol;
-	int nKey = pIdx->nKeyCol;
 	KeyInfo *pKey;
 
 	if (pParse && pParse->nErr)
@@ -4139,11 +4167,7 @@ sqlite3KeyInfoOfIndex(Parse * pParse, sqlite3 * db, Index * pIdx)
 	 * as wide as the table itself.  Otherwize, not enough slots
 	 * for row parser cache are allocated in VdbeCursor object.
 	 */
-	if (pIdx->uniqNotNull) {
-		pKey = sqlite3KeyInfoAlloc(db, nKey, nTableCol - nKey);
-	} else {
-		pKey = sqlite3KeyInfoAlloc(db, nCol, nTableCol - nCol);
-	}
+	pKey = sqlite3KeyInfoAlloc(db, nCol, nTableCol - nCol);
 	if (pKey) {
 		assert(sqlite3KeyInfoIsWriteable(pKey));
 		for (i = 0; i < nCol; i++) {

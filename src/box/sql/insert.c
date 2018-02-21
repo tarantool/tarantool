@@ -86,14 +86,15 @@ sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
 		 * up.
 		 */
 		int n;
+		int nColumn = index_column_count(pIdx);
 		Table *pTab = pIdx->pTable;
 		pIdx->zColAff =
-		    (char *)sqlite3DbMallocRaw(0, pIdx->nColumn + 1);
+		    (char *)sqlite3DbMallocRaw(0, nColumn + 1);
 		if (!pIdx->zColAff) {
 			sqlite3OomFault(db);
 			return 0;
 		}
-		for (n = 0; n < pIdx->nColumn; n++) {
+		for (n = 0; n < nColumn; n++) {
 			i16 x = pIdx->aiColumn[n];
 			if (x >= 0) {
 				pIdx->zColAff[n] = pTab->aCol[x].affinity;
@@ -621,7 +622,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		     pIdx = pIdx->pNext, i++) {
 			assert(pIdx);
 			aRegIdx[i] = ++pParse->nMem;
-			pParse->nMem += pIdx->nColumn;
+			pParse->nMem += index_column_count(pIdx);
 		}
 	}
 
@@ -1074,7 +1075,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	nCol = pTab->nCol;
 
 	pPk = sqlite3PrimaryKeyIndex(pTab);
-	nPkField = pPk->nKeyCol;
+	nPkField = index_column_count(pPk);
 
 	/* Record that this module has started */
 	VdbeModuleComment((v, "BEGIN: GenCnstCks(%d,%d,%d,%d,%d)",
@@ -1228,7 +1229,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		 * the insert or update.  Store that record in the aRegIdx[ix] register
 		 */
 		regIdx = aRegIdx[ix] + 1;
-		for (i = 0; i < pIdx->nColumn; i++) {
+		int nIdxCol = (int)index_column_count(pIdx);
+		for (i = 0; i < nIdxCol; i++) {
 			int iField = pIdx->aiColumn[i];
 			int x;
 			if (iField == XN_EXPR) {
@@ -1256,7 +1258,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		if (IsPrimaryKeyIndex(pIdx)) {
 			/* If PK is marked as INTEGER, use it as strict type,
 			 * not as affinity. Emit code for type checking */
-			if (pIdx->nKeyCol == 1) {
+			if (nIdxCol == 1) {
 				reg_pk = regNewData + 1 + pIdx->aiColumn[0];
 				if (pTab->zColAff[pIdx->aiColumn[0]] == 'D') {
 					int skip_if_null = sqlite3VdbeMakeLabel(v);
@@ -1281,7 +1283,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			/* kyukhin: for Tarantool, this should be evaluated to NOP.  */
 			if (IsPrimaryKeyIndex(pIdx) || uniqueByteCodeNeeded) {
 				sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx,
-						  pIdx->nColumn, aRegIdx[ix]);
+						  nIdxCol, aRegIdx[ix]);
 				VdbeComment((v, "for %s", pIdx->zName));
 			}
 		}
@@ -1342,8 +1344,9 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					  addrUniqueOk);
 
 		if (uniqueByteCodeNeeded) {
-			sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur, addrUniqueOk,
-					     regIdx, pIdx->nKeyCol);
+			sqlite3VdbeAddOp4Int(v, OP_NoConflict, iThisCur,
+					     addrUniqueOk, regIdx,
+					     index_column_count(pIdx));
 		}
 		VdbeCoverage(v);
 
@@ -1353,11 +1356,12 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 								 nPkField);
 		if (isUpdate || onError == ON_CONFLICT_ACTION_REPLACE) {
 			int x;
+			int nPkCol = index_column_count(pPk);
 			/* Extract the PRIMARY KEY from the end of the index entry and
 			 * store it in registers regR..regR+nPk-1
 			 */
 			if (pIdx != pPk) {
-				for (i = 0; i < pPk->nKeyCol; i++) {
+				for (i = 0; i < nPkCol; i++) {
 					assert(pPk->aiColumn[i] >= 0);
 					x = sqlite3ColumnOfIndex(pIdx,
 								 pPk->aiColumn[i]);
@@ -1376,18 +1380,18 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				 * KEY values of this row before the update.
 				 */
 				int addrJump =
-					sqlite3VdbeCurrentAddr(v) + pPk->nKeyCol;
+					sqlite3VdbeCurrentAddr(v) + nPkCol;
 				int op = OP_Ne;
 				int regCmp = (IsPrimaryKeyIndex(pIdx) ?
 					      regIdx : regR);
 
-				for (i = 0; i < pPk->nKeyCol; i++) {
+				for (i = 0; i < nPkCol; i++) {
 					char *p4 = (char *)
 						sqlite3LocateCollSeq(pParse, db,
 								     pPk->azColl[i]);
 					x = pPk->aiColumn[i];
 					assert(x >= 0);
-					if (i == (pPk->nKeyCol - 1)) {
+					if (i == (nPkCol - 1)) {
 						addrJump = addrUniqueOk;
 						op = OP_Eq;
 					}
@@ -1512,8 +1516,7 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
 	}
 
 	sqlite3VdbeAddOp4Int(v, opcode, iIdxCur, aRegIdx[0],
-			     aRegIdx[0] + 1,
-			     pIdx->uniqNotNull ? pIdx->nKeyCol : pIdx->nColumn);
+			     aRegIdx[0] + 1, index_column_count(pIdx));
 	sqlite3VdbeChangeP5(v, pik_flags);
 }
 
@@ -1644,16 +1647,18 @@ int sqlite3_xferopt_count;
 static int
 xferCompatibleIndex(Index * pDest, Index * pSrc)
 {
-	int i;
+	uint32_t i;
 	assert(pDest && pSrc);
 	assert(pDest->pTable != pSrc->pTable);
-	if (pDest->nKeyCol != pSrc->nKeyCol) {
+	uint32_t nDestCol = index_column_count(pDest);
+	uint32_t nSrcCol = index_column_count(pSrc);
+	if (nDestCol != nSrcCol) {
 		return 0;	/* Different number of columns */
 	}
 	if (pDest->onError != pSrc->onError) {
 		return 0;	/* Different conflict resolution strategies */
 	}
-	for (i = 0; i < pSrc->nKeyCol; i++) {
+	for (i = 0; i < nSrcCol; i++) {
 		if (pSrc->aiColumn[i] != pDest->aiColumn[i]) {
 			return 0;	/* Different columns indexed */
 		}

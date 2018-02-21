@@ -2532,7 +2532,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 				if (pIdx->nColumn >= BMS - 1)
 					continue;
 				if (mustBeUnique) {
-					if (pIdx->nKeyCol > nExpr
+					if (pIdx->nColumn > nExpr
 					    || (pIdx->nColumn > nExpr
 					    && !IsUniqueIndex(pIdx))) {
 							continue;	/* This index is not unique over the IN RHS columns */
@@ -3250,7 +3250,7 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		struct Index *pk = sqlite3PrimaryKeyIndex(tab);
 		assert(pk);
 
-		if (pk->nKeyCol == 1
+		if (pk->nColumn == 1
 		    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
 		    && pk->aiColumn[0] < nVector) {
 			int reg_pk = rLhs + pk->aiColumn[0];

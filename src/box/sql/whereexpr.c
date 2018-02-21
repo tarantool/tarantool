@@ -933,7 +933,7 @@ exprMightBeIndexed(SrcList * pFrom,	/* The FROM clause */
 	for (pIdx = pFrom->a[i].pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
 		if (pIdx->aColExpr == 0)
 			continue;
-		for (i = 0; i < pIdx->nKeyCol; i++) {
+		for (i = 0; i < pIdx->nColumn; i++) {
 			if (pIdx->aiColumn[i] != XN_EXPR)
 				continue;
 			if (sqlite3ExprCompare

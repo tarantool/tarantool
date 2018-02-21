@@ -1533,16 +1533,12 @@ struct Index {
 	ExprList *aColExpr;	/* Column expressions */
 	int tnum;		/* DB Page containing root of this index */
 	LogEst szIdxRow;	/* Estimated average row size in bytes */
-	u16 nKeyCol;		/* Number of columns forming the key */
 	u16 nColumn;		/* Number of columns stored in the index */
 	u8 onError;		/* ON_CONFLICT_ACTION_ABORT, _IGNORE, _REPLACE,
 				 * or _NONE
 				 */
 	unsigned idxType:2;	/* 1==UNIQUE, 2==PRIMARY KEY, 0==CREATE INDEX */
 	unsigned bUnordered:1;	/* Use this index for == or IN queries only */
-	unsigned uniqNotNull:1;	/* True if UNIQUE and NOT NULL for all columns */
-	unsigned isResized:1;	/* True if resizeIndexObject() has been called */
-	unsigned isCovering:1;	/* True if this is a covering index */
 	unsigned noSkipScan:1;	/* Do not try to use skip-scan if true */
 	int nSample;		/* Number of elements in aSample[] */
 	int nSampleCol;		/* Size of IndexSample.anEq[] and so on */
@@ -3124,8 +3120,7 @@ int sqlite3ExprNeedsNoAffinityChange(const Expr *, char);
 void sqlite3GenerateRowDelete(Parse *, Table *, Trigger *, int, int, int, i16,
 			      u8, enum on_conflict_action, u8, int);
 void sqlite3GenerateRowIndexDelete(Parse *, Table *, int, int);
-int sqlite3GenerateIndexKey(Parse *, Index *, int, int, int, int *, Index *,
-			    int);
+int sqlite3GenerateIndexKey(Parse *, Index *, int, int, int *, Index *, int);
 void sqlite3ResolvePartIdxLabel(Parse *, int);
 void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
 				     int, u8, u8, int, int *, int *);
@@ -3332,6 +3327,10 @@ int sqlite3FindDbName(const char *);
 int sqlite3AnalysisLoad(sqlite3 *);
 void sqlite3DeleteIndexSamples(sqlite3 *, Index *);
 void sqlite3DefaultRowEst(Index *);
+uint32_t
+index_column_count(const Index *);
+bool
+index_is_unique_not_null(const Index *);
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
 void sqlite3SchemaClear(sqlite3 *);

@@ -847,7 +847,6 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	sqlite3VdbeLoadString(v, regTabname, pTab->zName);
 
 	for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
-		int nCol;	/* Number of columns in pIdx. "N" */
 		int addrRewind;	/* Address of "OP_Rewind iIdxCur" */
 		int addrNextRow;	/* Address of "next_row:" */
 		const char *zIdxName;	/* Name of the index */
@@ -855,15 +854,16 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 
 		if (pOnlyIdx && pOnlyIdx != pIdx)
 			continue;
+		/* Primary indexes feature automatically generated
+		 * names. Thus, for the sake of clarity, use
+		 * instead more familiar table name.
+		 */
 		if (IsPrimaryKeyIndex(pIdx)) {
-			nCol = pIdx->nKeyCol;
 			zIdxName = pTab->zName;
-			nColTest = nCol;
 		} else {
-			nCol = pIdx->nColumn;
 			zIdxName = pIdx->zName;
-			nColTest = pIdx->uniqNotNull ? pIdx->nKeyCol : nCol;
 		}
+		nColTest = index_column_count(pIdx);
 
 		/* Populate the register containing the index name. */
 		sqlite3VdbeLoadString(v, regIdxname, zIdxName);
@@ -925,8 +925,8 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * The third argument is only used for STAT4
 		 */
 		sqlite3VdbeAddOp2(v, OP_Count, iIdxCur, regStat4 + 3);
-		sqlite3VdbeAddOp2(v, OP_Integer, pIdx->nKeyCol, regStat4 + 1);
-		sqlite3VdbeAddOp2(v, OP_Integer, pIdx->nKeyCol, regStat4 + 2);
+		sqlite3VdbeAddOp2(v, OP_Integer, nColTest, regStat4 + 1);
+		sqlite3VdbeAddOp2(v, OP_Integer, nColTest, regStat4 + 2);
 		sqlite3VdbeAddOp4(v, OP_Function0, 0, regStat4 + 1, regStat4,
 				  (char *)&statInitFuncdef, P4_FUNCDEF);
 		sqlite3VdbeChangeP5(v, 3);
@@ -964,8 +964,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 			 */
 			sqlite3VdbeAddOp0(v, OP_Goto);
 			addrNextRow = sqlite3VdbeCurrentAddr(v);
-			if (nColTest == 1 && pIdx->nKeyCol == 1
-			    && IsUniqueIndex(pIdx)) {
+			if (nColTest == 1 && IsUniqueIndex(pIdx)) {
 				/* For a single-column UNIQUE index, once we have found a non-NULL
 				 * row, we know that all the rest will be distinct, so skip
 				 * subsequent distinctness tests.
@@ -1021,16 +1020,17 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		assert(regKey == (regStat4 + 2));
 		Index *pPk = sqlite3PrimaryKeyIndex(pIdx->pTable);
 		int j, k, regKeyStat;
-		regKeyStat = sqlite3GetTempRange(pParse, pPk->nKeyCol);
-		for (j = 0; j < pPk->nKeyCol; j++) {
+		int nPkColumn = (int)index_column_count(pPk);
+		regKeyStat = sqlite3GetTempRange(pParse, nPkColumn);
+		for (j = 0; j < nPkColumn; j++) {
 			k = sqlite3ColumnOfIndex(pIdx, pPk->aiColumn[j]);
 			assert(k >= 0 && k < pTab->nCol);
 			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k, regKeyStat + j);
 			VdbeComment((v, "%s", pTab->aCol[pPk->aiColumn[j]].zName));
 		}
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regKeyStat,
-				  pPk->nKeyCol, regKey);
-		sqlite3ReleaseTempRange(pParse, regKeyStat, pPk->nKeyCol);
+				  nPkColumn, regKey);
+		sqlite3ReleaseTempRange(pParse, regKeyStat, nPkColumn);
 
 		assert(regChng == (regStat4 + 1));
 		sqlite3VdbeAddOp4(v, OP_Function0, 1, regStat4, regTemp,
@@ -1054,11 +1054,11 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		int regDLt = regStat1 + 2;
 		int regSample = regStat1 + 3;
 		int regCol = regStat1 + 4;
-		int regSampleKey = regCol + nCol;
+		int regSampleKey = regCol + nColTest;
 		int addrNext;
 		int addrIsNull;
 
-		pParse->nMem = MAX(pParse->nMem, regCol + nCol);
+		pParse->nMem = MAX(pParse->nMem, regCol + nColTest);
 
 		addrNext = sqlite3VdbeCurrentAddr(v);
 		callStatGet(v, regStat4, STAT_GET_KEY, regSampleKey);
@@ -1074,12 +1074,12 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * be taken
 		 */
 		VdbeCoverageNeverTaken(v);
-		for (i = 0; i < nCol; i++) {
+		for (i = 0; i < nColTest; i++) {
 			sqlite3ExprCodeLoadIndexColumn(pParse, pIdx,
 									 iTabCur, i,
 									 regCol + i);
 		}
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, regCol, nCol,
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, regCol, nColTest,
 					regSample);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regTabname, 6,
 					regTemp);
@@ -1311,7 +1311,7 @@ analysisLoader(void *pData, int argc, char **argv, char **NotUsed)
 
 	if (pIndex) {
 		tRowcnt *aiRowEst = 0;
-		int nCol = pIndex->nKeyCol + 1;
+		int nCol = index_column_count(pIndex) + 1;
 		/* Index.aiRowEst may already be set here if there are duplicate
 		 * _sql_stat1 entries for this index. In that case just clobber
 		 * the old data with the new instead of allocating a new array.
@@ -1392,8 +1392,9 @@ initAvgEq(Index * pIdx)
 			tRowcnt nRow;	/* Number of rows in index */
 			i64 nSum100 = 0;	/* Number of terms contributing to sumEq */
 			i64 nDist100;	/* Number of distinct values in index */
+			int nColumn = index_column_count(pIdx);
 
-			if (!pIdx->aiRowEst || iCol >= pIdx->nKeyCol
+			if (!pIdx->aiRowEst || iCol >= nColumn
 			    || pIdx->aiRowEst[iCol + 1] == 0) {
 				nRow = pFinal->anLt[iCol];
 				nDist100 = (i64) 100 *pFinal->anDLt[iCol];
@@ -1512,9 +1513,7 @@ loadStatTbl(sqlite3 * db,	/* Database handle */
 		if (pIdx == 0 || pIdx->nSample)
 			continue;
 
-		nIdxCol = IsPrimaryKeyIndex(pIdx) ?
-			  pIdx->nKeyCol : pIdx->nColumn;
-
+		nIdxCol = index_column_count(pIdx);
 		pIdx->nSampleCol = nIdxCol;
 		nByte = sizeof(IndexSample) * nSample;
 		nByte += sizeof(tRowcnt) * nIdxCol * 3 * nSample;

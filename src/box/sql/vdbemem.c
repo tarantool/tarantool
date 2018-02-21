@@ -1104,7 +1104,7 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 			Index *pIdx = p->pIdx;	/* Index being probed */
 			int nByte;	/* Bytes of space to allocate */
 			int i;	/* Counter variable */
-			int nCol = pIdx->nColumn;	/* Number of index columns including rowid */
+			int nCol = index_column_count(pIdx);
 
 			nByte =
 			    sizeof(Mem) * nCol + ROUND8(sizeof(UnpackedRecord));

@@ -1256,8 +1256,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		assert(pWInfo->pOrderBy == 0
 		       || pWInfo->pOrderBy->nExpr == 1
 		       || (pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) == 0);
+		int nIdxCol = index_column_count(pIdx);
 		if ((pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) != 0
-		    && pWInfo->nOBSat > 0 && (pIdx->nKeyCol > nEq)) {
+		    && pWInfo->nOBSat > 0 && (nIdxCol > nEq)) {
 			j = pIdx->aiColumn[nEq];
 			/* Allow seek for column with `NOT NULL` == false attribute.
 			 * If a column may contain NULL-s, the comparator installed
@@ -1328,10 +1329,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 * a forward order scan on a descending index, interchange the
 		 * start and end terms (pRangeStart and pRangeEnd).
 		 */
-		if ((nEq < pIdx->nKeyCol
-		     && bRev == (pIdx->aSortOrder[nEq] == SQLITE_SO_ASC))
-		    || (bRev && pIdx->nKeyCol == nEq)
-		    ) {
+		if ((nEq < nIdxCol &&
+		     bRev == (pIdx->aSortOrder[nEq] == SQLITE_SO_ASC)) ||
+		    (bRev && nIdxCol == nEq)) {
 			SWAP(pRangeEnd, pRangeStart);
 			SWAP(bSeekPastNull, bStopAtNull);
 			SWAP(nBtm, nTop);
@@ -1395,7 +1395,8 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		}
 		struct Index *pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
 		assert(pk);
-		if (pk->nKeyCol == 1
+		int nPkCol = index_column_count(pk);
+		if (nPkCol == 1
 		    && pIdx->pTable->aCol[pk->aiColumn[0]].affinity == 'D') {
 			/* Right now INTEGER PRIMARY KEY is the only option to
 			 * get Tarantool's INTEGER column type. Need special handling
@@ -1513,17 +1514,18 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			/* pIdx is a covering index.  No need to access the main table. */
 		}  else if (iCur != iIdxCur) {
 			Index *pPk = sqlite3PrimaryKeyIndex(pIdx->pTable);
-			int iKeyReg = sqlite3GetTempRange(pParse, pPk->nKeyCol);
-			for (j = 0; j < pPk->nKeyCol; j++) {
+			int nPkCol = index_column_count(pPk);
+			int iKeyReg = sqlite3GetTempRange(pParse, nPkCol);
+			for (j = 0; j < nPkCol; j++) {
 				k = sqlite3ColumnOfIndex(pIdx,
 							 pPk->aiColumn[j]);
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k,
 						  iKeyReg + j);
 			}
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iCur, addrCont,
-					     iKeyReg, pPk->nKeyCol);
+					     iKeyReg, nPkCol);
 			VdbeCoverage(v);
-			sqlite3ReleaseTempRange(pParse, iKeyReg, pPk->nKeyCol);
+			sqlite3ReleaseTempRange(pParse, iKeyReg, nPkCol);
 		}
 
 		/* Record the instruction used to terminate the loop. */
@@ -1621,9 +1623,10 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 */
 		if ((pWInfo->wctrlFlags & WHERE_DUPLICATES_OK) == 0) {
 			Index *pPk = sqlite3PrimaryKeyIndex(pTab);
+			int nPkCol = index_column_count(pPk);
 			regRowset = pParse->nTab++;
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-					  regRowset, pPk->nKeyCol);
+					  regRowset, nPkCol);
 			sqlite3VdbeSetP4KeyInfo(pParse, pPk);
 			regPk = ++pParse->nMem;
 		}
@@ -1724,7 +1727,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						int iSet =
 						    ((ii == pOrWc->nTerm - 1) ? -1 : ii);
 						Index *pPk = sqlite3PrimaryKeyIndex (pTab);
-						int nPk = pPk->nKeyCol;
+						int nPk = index_column_count(pPk);
 						int iPk;
 
 						/* Read the PK into an array of temp registers. */

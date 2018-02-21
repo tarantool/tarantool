@@ -262,16 +262,17 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	for (j = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, j++) {
 		int reg;
+		int nIdxCol = index_column_count(pIdx);
 		if (chngPk || hasFK || pIdx->pPartIdxWhere || pIdx == pPk) {
 			reg = ++pParse->nMem;
-			pParse->nMem += pIdx->nColumn;
+			pParse->nMem += nIdxCol;
 		} else {
 			reg = 0;
-			for (i = 0; i < pIdx->nKeyCol; i++) {
+			for (i = 0; i < nIdxCol; i++) {
 				i16 iIdxCol = pIdx->aiColumn[i];
 				if (iIdxCol < 0 || aXRef[iIdxCol] >= 0) {
 					reg = ++pParse->nMem;
-					pParse->nMem += pIdx->nColumn;
+					pParse->nMem += nIdxCol;
 					break;
 				}
 			}
@@ -332,7 +333,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		nPk = nKey;
 	} else {
 		assert(pPk != 0);
-		nPk = pPk->nKeyCol;
+		nPk = index_column_count(pPk);
 	}
 	iPk = pParse->nMem + 1;
 	pParse->nMem += nPk;

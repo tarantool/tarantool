@@ -434,15 +434,14 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						 * version with more rows and
 						 * columns)
 						 */
-						mx = pIdx->nColumn;
 						pParse->nMem = 6;
 					} else {
 						/* PRAGMA index_info (legacy
 						 * version)
 						 */
-						mx = pIdx->nKeyCol;
 						pParse->nMem = 3;
 					}
+					mx = index_column_count(pIdx);
 					sqlite3CodeVerifySchema(pParse);
 					assert(pParse->nMem <=
 					       pPragma->nPragCName);
@@ -469,8 +468,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 									     azColl
 									     [i],
 									     i <
-									     pIdx->
-									     nKeyCol);
+									     mx);
 						}
 						sqlite3VdbeAddOp2(v,
 								  OP_ResultRow,

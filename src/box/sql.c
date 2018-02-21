@@ -1552,7 +1552,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	/* If table's PK is single column which is INTEGER, then
 	 * treat it as strict type, not affinity.  */
-	if (pk_idx && pk_idx->nKeyCol == 1) {
+	if (pk_idx && pk_idx->nColumn == 1) {
 		int pk = pk_idx->aiColumn[0];
 		if (pTable->aCol[pk].type == FIELD_TYPE_INTEGER)
 			pk_forced_int = pk;
@@ -1620,7 +1620,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 
 	/* If table's PK is single column which is INTEGER, then
 	 * treat it as strict type, not affinity.  */
-	if (primary_index->nKeyCol == 1) {
+	if (primary_index->nColumn == 1) {
 		int pk = primary_index->aiColumn[0];
 		if (aCol[pk].type == FIELD_TYPE_INTEGER)
 			pk_forced_int = pk;

@@ -397,7 +397,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 		} else {
 			pPk = sqlite3PrimaryKeyIndex(pTab);
 			assert(pPk != 0);
-			nPk = pPk->nKeyCol;
+			nPk = index_column_count(pPk);
 			iPk = pParse->nMem + 1;
 			pParse->nMem += nPk;
 			iEphCur = pParse->nTab++;
@@ -856,10 +856,9 @@ sqlite3GenerateRowIndexDelete(Parse * pParse,	/* Parsing and code generating con
 	pPk = sqlite3PrimaryKeyIndex(pTab);
 	/* In Tarantool it is enough to delete row just from pk */
 	VdbeModuleComment((v, "GenRowIdxDel for %s", pPk->zName));
-	r1 = sqlite3GenerateIndexKey(pParse, pPk, iDataCur, 0, 1,
-				     &iPartIdxLabel, NULL, r1);
-	sqlite3VdbeAddOp3(v, OP_IdxDelete, iIdxCur, r1,
-			  pPk->uniqNotNull ? pPk->nKeyCol : pPk->nColumn);
+	r1 = sqlite3GenerateIndexKey(pParse, pPk, iDataCur, 0, &iPartIdxLabel,
+				     NULL, r1);
+	sqlite3VdbeAddOp3(v, OP_IdxDelete, iIdxCur, r1, index_column_count(pPk));
 	sqlite3ResolvePartIdxLabel(pParse, iPartIdxLabel);
 }
 
@@ -899,7 +898,6 @@ sqlite3GenerateIndexKey(Parse * pParse,	/* Parsing context */
 			Index * pIdx,	/* The index for which to generate a key */
 			int iDataCur,	/* Cursor number from which to take column data */
 			int regOut,	/* Put the new key into this register if not 0 */
-			int prefixOnly,	/* Compute only a unique prefix of the key */
 			int *piPartIdxLabel,	/* OUT: Jump to this label to skip partial index */
 			Index * pPrior,	/* Previously generated index key */
 			int regPrior)	/* Register holding previous generated key */
@@ -921,8 +919,7 @@ sqlite3GenerateIndexKey(Parse * pParse,	/* Parsing context */
 			*piPartIdxLabel = 0;
 		}
 	}
-	nCol = (prefixOnly
-		&& pIdx->uniqNotNull) ? pIdx->nKeyCol : pIdx->nColumn;
+	nCol = index_column_count(pIdx);
 	regBase = sqlite3GetTempRange(pParse, nCol);
 	if (pPrior && (regBase != regPrior || pPrior->pPartIdxWhere))
 		pPrior = 0;

@@ -255,7 +255,8 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 	}
 
 	for (pIdx = pParent->pIndex; pIdx; pIdx = pIdx->pNext) {
-		if (pIdx->nKeyCol == nCol && IsUniqueIndex(pIdx)
+		int nIdxCol = index_column_count(pIdx);
+		if (nIdxCol == nCol && IsUniqueIndex(pIdx)
 		    && pIdx->pPartIdxWhere == 0) {
 			/* pIdx is a UNIQUE index (or a PRIMARY KEY) and has the right number
 			 * of columns. If each indexed column corresponds to a foreign key
@@ -619,7 +620,7 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 	Vdbe *v = sqlite3GetVdbe(pParse);
 
 	assert(pIdx == 0 || pIdx->pTable == pTab);
-	assert(pIdx == 0 || pIdx->nKeyCol == pFKey->nCol);
+	assert(pIdx == 0 || (int)index_column_count(pIdx) == pFKey->nCol);
 	assert(pIdx != 0);
 
 	if (nIncr < 0) {
@@ -668,7 +669,8 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 		Expr *pEq, *pAll = 0;
 		Index *pPk = sqlite3PrimaryKeyIndex(pTab);
 		assert(pIdx != 0);
-		for (i = 0; i < pPk->nKeyCol; i++) {
+		int col_count = index_column_count(pPk);
+		for (i = 0; i < col_count; i++) {
 			i16 iCol = pIdx->aiColumn[i];
 			assert(iCol >= 0);
 			pLeft = exprTableRegister(pParse, pTab, regData, iCol);
@@ -1141,7 +1143,8 @@ sqlite3FkOldmask(Parse * pParse,	/* Parse context */
 			Index *pIdx = 0;
 			sqlite3FkLocateIndex(pParse, pTab, p, &pIdx, 0);
 			if (pIdx) {
-				for (i = 0; i < pIdx->nKeyCol; i++) {
+				int nIdxCol = index_column_count(pIdx);
+				for (i = 0; i < nIdxCol; i++) {
 					assert(pIdx->aiColumn[i] >= 0);
 					mask |= COLUMN_MASK(pIdx->aiColumn[i]);
 				}
