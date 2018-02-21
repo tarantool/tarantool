@@ -1,5 +1,5 @@
 name: tarantool
-version: "1.7~git"
+version: "2.0~git"
 summary: In-memory database and Lua application server
 description: |
  Tarantool is an in-memory database and Lua application server.
