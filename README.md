@@ -50,10 +50,10 @@ list, tarantool@googlegroups.com.
 
 Thank you for your interest in Tarantool!
 
-[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=1.9
+[travis-badge]: https://api.travis-ci.org/tarantool/tarantool.svg?branch=1.10
 [travis-url]: https://travis-ci.org/tarantool/tarantool
-[coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=1.9
-[coverage-url]: https://coveralls.io/github/tarantool/tarantool?branch=1.9
+[coverage-badge]: https://coveralls.io/repos/github/tarantool/tarantool/badge.svg?branch=1.10
+[coverage-url]: https://coveralls.io/github/tarantool/tarantool?branch=1.10
 [groups-badge]: https://img.shields.io/badge/Google-Groups-orange.svg
 [groups-url]: https://groups.google.com/forum/#!forum/tarantool
 [telegram-badge]: https://img.shields.io/badge/Telegram-join%20chat-blue.svg
