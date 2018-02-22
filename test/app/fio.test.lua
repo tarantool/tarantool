@@ -342,4 +342,33 @@ fio.path.lexists(link)
 
 fio.unlink(link)
 fio.unlink(tmpfile)
+tmp1 = fio.pathjoin(tmpdir, "tmp1")
+tmp2= fio.pathjoin(tmpdir, "tmp2")
+test_run:cmd("setopt delimiter ';'")
+function write_file(name, odd)
+    local fh = fio.open(name, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+    if odd then
+        fh:write(string.rep('1', 100))
+    else
+        fh:write(string.rep('2', 100))
+    end
+    fh:write(name)
+    fh:seek(0)
+    return fh
+end;
+test_run:cmd("setopt delimiter ''");
+fh1 = write_file(tmp1)
+fh2 = write_file(tmp2)
+fiber = require('fiber')
+digest = require('digest')
+str = fh1:read()
+fh1:seek(0)
+hash = digest.crc32(str)
+ch = fiber.channel(1)
+f1 = fiber.create(function() str = fh1:read() ch:put(digest.crc32(str)) end)
+f2 = fiber.create(function() str = fh2:read() end)
+ch:get() == hash
+
+fio.unlink(tmp1)
+fio.unlink(tmp2)
 fio.rmdir(tmpdir)
