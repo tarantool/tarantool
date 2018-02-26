@@ -30,6 +30,7 @@
  */
 #include "vy_cache.h"
 #include "diag.h"
+#include "fiber.h"
 #include "schema_def.h"
 
 #ifndef CT_ASSERT_G
@@ -51,12 +52,11 @@ enum {
 };
 
 void
-vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache,
-		    size_t mem_quota)
+vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache)
 {
 	rlist_create(&e->cache_lru);
 	e->mem_used = 0;
-	e->mem_quota = mem_quota;
+	e->mem_quota = 0;
 	mempool_create(&e->cache_entry_mempool, slab_cache,
 		       sizeof(struct vy_cache_entry));
 }
@@ -199,6 +199,20 @@ vy_cache_gc(struct vy_cache_env *env)
 	     env->mem_used > env->mem_quota && i < VY_CACHE_CLEANUP_MAX_STEPS;
 	     i++) {
 		vy_cache_gc_step(env);
+	}
+}
+
+void
+vy_cache_env_set_quota(struct vy_cache_env *env, size_t quota)
+{
+	env->mem_quota = quota;
+	while (env->mem_used > env->mem_quota) {
+		vy_cache_gc(env);
+		/*
+		 * Make sure we don't block other tx fibers
+		 * for too long.
+		 */
+		fiber_sleep(0);
 	}
 }
 

@@ -171,6 +171,7 @@ void box_set_readahead(void);
 void box_set_checkpoint_count(void);
 void box_set_memtx_max_tuple_size(void);
 void box_set_vinyl_max_tuple_size(void);
+void box_set_vinyl_cache(void);
 void box_set_vinyl_timeout(void);
 void box_set_replication_timeout(void);
 void box_set_replication_connect_quorum(void);

@@ -358,3 +358,20 @@ info.lookup
 info.get.rows
 pk:info().disk.iterator.lookup
 s:drop()
+
+--
+-- Cache resize
+--
+vinyl_cache = box.cfg.vinyl_cache
+box.cfg{vinyl_cache = 1000 * 1000}
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+for i = 1, 100 do s:replace{i, string.rep('x', 1000)} end
+for i = 1, 100 do s:get{i} end
+box.info.vinyl().cache.used
+box.cfg{vinyl_cache = 50 * 1000}
+box.info.vinyl().cache.used
+box.cfg{vinyl_cache = 0}
+box.info.vinyl().cache.used
+s:drop()
+box.cfg{vinyl_cache = vinyl_cache}

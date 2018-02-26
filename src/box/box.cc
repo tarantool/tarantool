@@ -742,6 +742,15 @@ box_set_vinyl_max_tuple_size(void)
 }
 
 void
+box_set_vinyl_cache(void)
+{
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_cache(vinyl, cfg_geti64("vinyl_cache"));
+}
+
+void
 box_set_vinyl_timeout(void)
 {
 	struct vinyl_engine *vinyl;
@@ -1539,12 +1548,12 @@ engine_init()
 	struct vinyl_engine *vinyl;
 	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
 				    cfg_geti64("vinyl_memory"),
-				    cfg_geti64("vinyl_cache"),
 				    cfg_geti("vinyl_read_threads"),
 				    cfg_geti("vinyl_write_threads"),
 				    cfg_geti("force_recovery"));
 	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
+	box_set_vinyl_cache();
 	box_set_vinyl_timeout();
 }
 
