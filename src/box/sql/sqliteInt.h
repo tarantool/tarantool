@@ -3025,6 +3025,8 @@ void sqlite3SrcListAssignCursors(Parse *, SrcList *);
 void sqlite3IdListDelete(sqlite3 *, IdList *);
 void sqlite3SrcListDelete(sqlite3 *, SrcList *);
 Index *sqlite3AllocateIndexObject(sqlite3 *, i16, int, char **);
+bool
+index_is_unique(Index *);
 void sqlite3CreateIndex(Parse *, Token *, SrcList *, ExprList *, int, Token *,
 			Expr *, int, int, u8);
 void sqlite3DropIndex(Parse *, SrcList *, Token *, int);

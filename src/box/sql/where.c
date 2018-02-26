@@ -555,7 +555,7 @@ isDistinctRedundant(Parse * pParse,		/* Parsing context */
 	 *      contain a "col=X" term are subject to a NOT NULL constraint.
 	 */
 	for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
-		if (!IsUniqueIndex(pIdx))
+		if (!index_is_unique(pIdx))
 			continue;
 		int col_count = index_column_count(pIdx);
 		for (i = 0; i < col_count; i++) {
@@ -3265,7 +3265,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				return 0;
 			} else {
 				nColumn = index_column_count(pIndex);
-				isOrderDistinct = IsUniqueIndex(pIndex);
+				isOrderDistinct = index_is_unique(pIndex);
 			}
 
 			/* Loop through all columns of the index and deal with the ones
@@ -4044,7 +4044,7 @@ whereShortCut(WhereLoopBuilder * pBuilder)
 			int opMask;
 			int nIdxCol = index_column_count(pIdx);
 			assert(pLoop->aLTermSpace == pLoop->aLTerm);
-			if (!IsUniqueIndex(pIdx)
+			if (!index_is_unique(pIdx)
 			    || pIdx->pPartIdxWhere != 0
 			    || nIdxCol > ArraySize(pLoop->aLTermSpace)
 			    )

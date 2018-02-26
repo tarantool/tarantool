@@ -2817,6 +2817,20 @@ addIndexToTable(Index * pIndex, Table * pTab)
 	}
 }
 
+bool
+index_is_unique(Index *idx)
+{
+	assert(idx != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->tnum);
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	struct index *tnt_index = space_index(space, index_id);
+	assert(tnt_index != NULL);
+
+	return tnt_index->def->opts.is_unique;
+}
+
 /*
  * Create a new index for an SQL table.  pName1.pName2 is the name of the index
  * and pTblList is the name of the table that is to be indexed.  Both will

@@ -493,7 +493,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								     "isisi", i,
 								     pIdx->
 								     zName,
-								     IsUniqueIndex
+								     index_is_unique
 								     (pIdx),
 								     azOrigin
 								     [pIdx->

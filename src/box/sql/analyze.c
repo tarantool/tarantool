@@ -964,7 +964,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 			 */
 			sqlite3VdbeAddOp0(v, OP_Goto);
 			addrNextRow = sqlite3VdbeCurrentAddr(v);
-			if (nColTest == 1 && IsUniqueIndex(pIdx)) {
+			if (nColTest == 1 && index_is_unique(pIdx)) {
 				/* For a single-column UNIQUE index, once we have found a non-NULL
 				 * row, we know that all the rest will be distinct, so skip
 				 * subsequent distinctness tests.

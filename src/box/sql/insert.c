@@ -1598,7 +1598,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		    IsPrimaryKeyIndex(pIdx) ||		/* Condition 2 */
 		    sqlite3FkReferences(pTab) ||	/* Condition 3 */
 		    /* Condition 4 */
-		    (IsUniqueIndex(pIdx) && pIdx->onError !=
+		    (index_is_unique(pIdx) && pIdx->onError !=
 		     ON_CONFLICT_ACTION_DEFAULT &&
 		     /* Condition 4.1 */
 		     pIdx->onError != ON_CONFLICT_ACTION_ABORT) ||
@@ -1841,7 +1841,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		}
 	}
 	for (pDestIdx = pDest->pIndex; pDestIdx; pDestIdx = pDestIdx->pNext) {
-		if (IsUniqueIndex(pDestIdx)) {
+		if (index_is_unique(pDestIdx)) {
 			destHasUniqueIdx = 1;
 		}
 		for (pSrcIdx = pSrc->pIndex; pSrcIdx; pSrcIdx = pSrcIdx->pNext) {
