@@ -3010,7 +3010,17 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	memcpy(pIndex->zName, zName, nName + 1);
 	pIndex->pTable = pTab;
 	pIndex->onError = (u8) onError;
-	pIndex->idxType = idxType;
+	/*
+	 * Don't make difference between UNIQUE indexes made by user
+	 * using CREATE INDEX statement and those created during
+	 * CREATE TABLE processing.
+	 */
+	if (idxType == SQLITE_IDXTYPE_APPDEF &&
+	    onError != ON_CONFLICT_ACTION_NONE) {
+		pIndex->idxType = SQLITE_IDXTYPE_UNIQUE;
+	} else {
+		pIndex->idxType = idxType;
+	}
 	pIndex->pSchema = db->pSchema;
 	pIndex->nColumn = pList->nExpr;
 	/* Tarantool have access to each column by any index */
@@ -3398,7 +3408,19 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 		pParse->checkSchema = 1;
 		goto exit_drop_index;
 	}
-	if (pIndex->idxType != SQLITE_IDXTYPE_APPDEF) {
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pIndex->tnum);
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pIndex->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	struct index *index = space_index(space, index_id);
+	assert(index != NULL);
+
+	/*
+	 * If index has been created by user, it has its SQL
+	 * statement. Otherwise (i.e. PK and UNIQUE indexes,
+	 * which are created alongside with table) it is NULL.
+	 */
+	if (index->def->opts.sql == NULL) {
 		sqlite3ErrorMsg(pParse, "index associated with UNIQUE "
 				"or PRIMARY KEY constraint cannot be dropped",
 				0);
@@ -3409,10 +3431,8 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 	sqlite3BeginWriteOperation(pParse, 1);
 	const char *columns[2] = { "id", "iid" };
 	Expr *values[2];
-	values[0] =
-	    sqlite3ExprInteger(db, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum));
-	values[1] =
-	    sqlite3ExprInteger(db, SQLITE_PAGENO_TO_INDEXID(pIndex->tnum));
+	values[0] = sqlite3ExprInteger(db, space_id);
+	values[1] = sqlite3ExprInteger(db, index_id);
 	sqlite3DeleteByKey(pParse, TARANTOOL_SYS_INDEX_NAME,
 			   columns, values, 2);
 	sqlite3ClearStatTables(pParse, "idx", pIndex->zName);

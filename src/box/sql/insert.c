@@ -1931,7 +1931,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);
 		sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);
-		if (pDestIdx->idxType == 2) {
+		if (pDestIdx->idxType == SQLITE_IDXTYPE_PRIMARYKEY) {
 			idxInsFlags |= OPFLAG_NCHANGE;
 		}
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iDest, regData);

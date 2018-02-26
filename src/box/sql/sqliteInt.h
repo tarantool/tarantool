@@ -1556,7 +1556,8 @@ struct Index {
 #define IsPrimaryKeyIndex(X)  ((X)->idxType==SQLITE_IDXTYPE_PRIMARYKEY)
 
 /* Return true if index X is a UNIQUE index */
-#define IsUniqueIndex(X)      ((X)->onError != ON_CONFLICT_ACTION_NONE)
+#define IsUniqueIndex(X)      (((X)->idxType == SQLITE_IDXTYPE_UNIQUE) || \
+				((X)->idxType == SQLITE_IDXTYPE_PRIMARYKEY))
 
 /* The Index.aiColumn[] values are normally positive integer.  But
  * there are some negative values that have special meaning:
