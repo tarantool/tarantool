@@ -665,12 +665,6 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
 	*ret = NULL;
 	*stop = false;
 
-	/* disable cache for errinj test - let it try to read from disk */
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
-		     { itr->search_started = true; return; });
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
-		     { itr->search_started = true; return; });
-
 	if (!itr->search_started) {
 		assert(itr->curr_stmt == NULL);
 		itr->search_started = true;
@@ -706,12 +700,6 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 {
 	*ret = NULL;
 	*stop = false;
-
-	/* disable cache for errinj test - let it try to read from disk */
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
-		     { itr->search_started = true; return; });
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
-		     { itr->search_started = true; return; });
 
 	assert(!itr->search_started || itr->version == itr->cache->version);
 
@@ -775,16 +763,6 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 			  const struct tuple *last_stmt,
 			  struct tuple **ret, bool *stop)
 {
-	/* disable cache for errinj test - let it try to read from disk */
-	if ((errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL) != NULL &&
-	     errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL)->bparam) ||
-	    (errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL) != NULL &&
-	     errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL)->bparam)) {
-		*ret = NULL;
-		*stop = false;
-		return 0;
-	}
-
 	struct key_def *def = itr->cache->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 
