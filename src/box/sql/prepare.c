@@ -187,17 +187,6 @@ sqlite3InitDatabase(sqlite3 * db)
 	 */
 	assert(db->init.busy);
 	{
-#ifndef SQLITE_OMIT_AUTHORIZATION
-		{
-			sqlite3_xauth xAuth;
-			xAuth = db->xAuth;
-			db->xAuth = 0;
-#endif
-			rc = SQLITE_OK;
-#ifndef SQLITE_OMIT_AUTHORIZATION
-			db->xAuth = xAuth;
-		}
-#endif
 		rc = initData.rc;
 #ifndef SQLITE_OMIT_ANALYZE
 		if (rc == SQLITE_OK) {

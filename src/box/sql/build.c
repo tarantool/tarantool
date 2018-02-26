@@ -85,18 +85,6 @@ sqlite3FinishCoding(Parse * pParse)
 	if (v) {
 		sqlite3VdbeAddOp0(v, OP_Halt);
 
-#if SQLITE_USER_AUTHENTICATION
-		if (pParse->nTableLock > 0 && db->init.busy == 0) {
-			sqlite3UserAuthInit(db);
-			if (db->auth.authLevel < UAUTH_User) {
-				sqlite3ErrorMsg(pParse,
-						"user not authenticated");
-				pParse->rc = SQLITE_AUTH_USER;
-				return;
-			}
-		}
-#endif
-
 		/* The cookie mask contains one bit for each database file open.
 		 * (Bit 0 is for main, bit 1 is for temp, and so forth.)  Bits are
 		 * set for each database that is used.  Generate code to start a
@@ -197,18 +185,6 @@ sqlite3NestedParse(Parse * pParse, const char *zFormat, ...)
 	pParse->nested--;
 }
 
-#if SQLITE_USER_AUTHENTICATION
-/*
- * Return TRUE if zTable is the name of the system table that stores the
- * list of users and their access credentials.
- */
-int
-sqlite3UserAuthTable(const char *zTable)
-{
-	return sqlite3_stricmp(zTable, "sqlite_user") == 0;
-}
-#endif
-
 /*
  * Locate the in-memory structure that describes a particular database
  * table given the name of that table and (optionally) the name of the
@@ -224,16 +200,6 @@ sqlite3UserAuthTable(const char *zTable)
 Table *
 sqlite3FindTable(sqlite3 * db, const char *zName)
 {
-#if SQLITE_USER_AUTHENTICATION
-	/* Only the admin user is allowed to know that the sqlite_user table
-	 * exists
-	 */
-	if (db->auth.authLevel < UAUTH_Admin
-	    && sqlite3UserAuthTable(zName) != 0) {
-		return 0;
-	}
-#endif
-
 	return sqlite3HashFind(&db->pSchema->tblHash, zName);
 }
 
@@ -685,26 +651,6 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	pParse->sNameToken = *pName;
 	if (zName == 0)
 		return;
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	assert(isTemp == 0 || isTemp == 1);
-	assert(isView == 0 || (isView == 1 && isTemp == 0));
-	{
-		static const u8 aCode[] = {
-			SQLITE_CREATE_TABLE,
-			SQLITE_CREATE_TEMP_TABLE,
-			SQLITE_CREATE_VIEW
-		};
-		char *zDb = db->mdb.zDbSName;
-		if (sqlite3AuthCheck
-		    (pParse, SQLITE_INSERT, MASTER_NAME, 0, zDb)) {
-			goto begin_table_error;
-		}
-		if (sqlite3AuthCheck(pParse, (int)aCode[isTemp + 2 * isView],
-				     zName, 0, zDb)) {
-			goto begin_table_error;
-		}
-	}
-#endif
 
 	/*
 	 * Make sure the new table name does not collide with an
@@ -2151,9 +2097,6 @@ sqlite3ViewGetColumnNames(Parse * pParse, Table * pTable)
 	int nErr = 0;		/* Number of errors encountered */
 	int n;			/* Temporarily holds the number of cursors assigned */
 	sqlite3 *db = pParse->db;	/* Database connection for malloc errors */
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	sqlite3_xauth xAuth;	/* Saved xAuth pointer */
-#endif
 
 	assert(pTable);
 
@@ -2200,14 +2143,7 @@ sqlite3ViewGetColumnNames(Parse * pParse, Table * pTable)
 		sqlite3SrcListAssignCursors(pParse, pSel->pSrc);
 		pTable->nCol = -1;
 		db->lookaside.bDisable++;
-#ifndef SQLITE_OMIT_AUTHORIZATION
-		xAuth = db->xAuth;
-		db->xAuth = 0;
 		pSelTab = sqlite3ResultSetOfSelect(pParse, pSel);
-		db->xAuth = xAuth;
-#else
-		pSelTab = sqlite3ResultSetOfSelect(pParse, pSel);
-#endif
 		pParse->nTab = n;
 		if (pTable->pCheck) {
 			/* CREATE VIEW name(arglist) AS ...
@@ -2419,27 +2355,6 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 			sqlite3CodeVerifySchema(pParse);
 		goto exit_drop_table;
 	}
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	{
-		int code;
-		const char *zTab = MASTER_NAME;
-		char *zDb = db->mdb.zDbSName;
-		if (sqlite3AuthCheck(pParse, SQLITE_DELETE, zTab, 0, zDb)) {
-			goto exit_drop_table;
-		}
-		if (isView)
-			code = SQLITE_DROP_VIEW;
-		else
-			code = SQLITE_DROP_TABLE;
-		if (sqlite3AuthCheck(pParse, code, pTab->zName, NULL, zDb)) {
-			goto exit_drop_table;
-		}
-		if (sqlite3AuthCheck
-		    (pParse, SQLITE_DELETE, pTab->zName, 0, zDb)) {
-			goto exit_drop_table;
-		}
-	}
-#endif
 #ifndef SQLITE_OMIT_VIEW
 	/* Ensure DROP TABLE is not used on a view, and DROP VIEW is not used
 	 * on a table.
@@ -2658,12 +2573,6 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	KeyInfo *pKey;		/* KeyInfo for index */
 	int regRecord;		/* Register holding assembled index record */
 	sqlite3 *db = pParse->db;	/* The database connection */
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	if (sqlite3AuthCheck(pParse, SQLITE_REINDEX, pIndex->zName, 0,
-			     db->mdb.zDbSName)) {
-		return;
-	}
-#endif
 	v = sqlite3GetVdbe(pParse);
 	if (v == 0)
 		return;
@@ -3003,22 +2912,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		}
 	}
-
-	/* Check for authorization to create an index.
-	 */
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	{
-		const char *zDb = pDb->zDbSName;
-		if (sqlite3AuthCheck
-		    (pParse, SQLITE_INSERT, MASTER_NAME, 0, zDb)) {
-			goto exit_create_index;
-		}
-		i = SQLITE_CREATE_INDEX;
-		if (sqlite3AuthCheck(pParse, i, zName, pTab->zName, zDb)) {
-			goto exit_create_index;
-		}
-	}
-#endif
 
 	/* If pList==0, it means this routine was called to make a primary
 	 * key out of the last column added to the table under construction.
@@ -3427,20 +3320,6 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 				0);
 		goto exit_drop_index;
 	}
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	{
-		int code = SQLITE_DROP_INDEX;
-		const char *zDb = db->mdb.zDbSName;
-		const char *zTab = MASTER_NAME;
-		if (sqlite3AuthCheck(pParse, SQLITE_DELETE, zTab, 0, zDb)) {
-			goto exit_drop_index;
-		}
-		if (sqlite3AuthCheck(pParse, code, pIndex->zName,
-				     pIndex->pTable->zName, zDb)) {
-			goto exit_drop_index;
-		}
-	}
-#endif
 
 	/* Generate code to remove the index and from the master table */
 	sqlite3BeginWriteOperation(pParse, 1);
@@ -3898,9 +3777,6 @@ sqlite3BeginTransaction(Parse * pParse, int MAYBE_UNUSED type)
 	assert(pParse != 0);
 	db = pParse->db;
 	assert(db != 0);
-	if (sqlite3AuthCheck(pParse, SQLITE_TRANSACTION, "BEGIN", 0, 0)) {
-		return;
-	}
 	v = sqlite3GetVdbe(pParse);
 	if (!v)
 		return;
@@ -3917,9 +3793,6 @@ sqlite3CommitTransaction(Parse * pParse)
 
 	assert(pParse != 0);
 	assert(pParse->db != 0);
-	if (sqlite3AuthCheck(pParse, SQLITE_TRANSACTION, "COMMIT", 0, 0)) {
-		return;
-	}
 	v = sqlite3GetVdbe(pParse);
 	if (v) {
 		sqlite3VdbeAddOp1(v, OP_AutoCommit, 1);
@@ -3936,9 +3809,6 @@ sqlite3RollbackTransaction(Parse * pParse)
 
 	assert(pParse != 0);
 	assert(pParse->db != 0);
-	if (sqlite3AuthCheck(pParse, SQLITE_TRANSACTION, "ROLLBACK", 0, 0)) {
-		return;
-	}
 	v = sqlite3GetVdbe(pParse);
 	if (v) {
 		sqlite3VdbeAddOp2(v, OP_AutoCommit, 1, 1);
@@ -3955,15 +3825,7 @@ sqlite3Savepoint(Parse * pParse, int op, Token * pName)
 	char *zName = sqlite3NameFromToken(pParse->db, pName);
 	if (zName) {
 		Vdbe *v = sqlite3GetVdbe(pParse);
-		static const char *const az[] =
-		    { "BEGIN", "RELEASE", "ROLLBACK" };
-#ifndef SQLITE_OMIT_AUTHORIZATION
-		assert(!SAVEPOINT_BEGIN && SAVEPOINT_RELEASE == 1
-		       && SAVEPOINT_ROLLBACK == 2);
-#endif
-		if (!v
-		    || sqlite3AuthCheck(pParse, SQLITE_SAVEPOINT, az[op], zName,
-					0)) {
+		if (!v) {
 			sqlite3DbFree(pParse->db, zName);
 			return;
 		}

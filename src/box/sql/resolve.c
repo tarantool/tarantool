@@ -696,25 +696,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 						    'u' ? 8388608 : 125829120;
 					}
 				}
-#ifndef SQLITE_OMIT_AUTHORIZATION
-				{
-					int auth =
-					    sqlite3AuthCheck(pParse,
-							     SQLITE_FUNCTION, 0,
-							     pDef->zName, 0);
-					if (auth != SQLITE_OK) {
-						if (auth == SQLITE_DENY) {
-							sqlite3ErrorMsg(pParse,
-									"not authorized to use function: %s",
-									pDef->
-									zName);
-							pNC->nErr++;
-						}
-						pExpr->op = TK_NULL;
-						return WRC_Prune;
-					}
-				}
-#endif
 				if (pDef->
 				    funcFlags & (SQLITE_FUNC_CONSTANT |
 						 SQLITE_FUNC_SLOCHNG)) {
@@ -1295,8 +1276,6 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			if (pItem->pSelect) {
 				NameContext *pNC;	/* Used to iterate name contexts */
 				int nRef = 0;	/* Refcount for pOuterNC and outer contexts */
-				const char *zSavedContext =
-				    pParse->zAuthContext;
 
 				/* Count the total number of references to pOuterNC and all of its
 				 * parent contexts. After resolving references to expressions in
@@ -1307,12 +1286,9 @@ resolveSelectStep(Walker * pWalker, Select * p)
 				for (pNC = pOuterNC; pNC; pNC = pNC->pNext)
 					nRef += pNC->nRef;
 
-				if (pItem->zName)
-					pParse->zAuthContext = pItem->zName;
 				sqlite3ResolveSelectNames(pParse,
 							  pItem->pSelect,
 							  pOuterNC);
-				pParse->zAuthContext = zSavedContext;
 				if (pParse->nErr || db->mallocFailed)
 					return WRC_Abort;
 

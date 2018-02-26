@@ -155,21 +155,6 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 				" trigger on table: %S", pTableName, 0);
 		goto trigger_cleanup;
 	}
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	{
-		assert(sqlite3SchemaToIndex(db, pTab->pSchema) == 0);
-		int code = SQLITE_CREATE_TRIGGER;
-		const char *zDb = db->mdb.zDbSName;
-		const char *zDbTrig = zDb;
-		if (sqlite3AuthCheck(pParse, code, zName, pTab->zName, zDbTrig)) {
-			goto trigger_cleanup;
-		}
-		if (sqlite3AuthCheck
-		    (pParse, SQLITE_INSERT, MASTER_NAME, 0, zDb)) {
-			goto trigger_cleanup;
-		}
-	}
-#endif
 
 	/* INSTEAD OF triggers can only appear on views and BEFORE triggers
 	 * cannot appear on views.  So we might as well translate every
@@ -580,18 +565,6 @@ sqlite3DropTriggerPtr(Parse * pParse, Trigger * pTrigger)
 	pTable = tableOfTrigger(pTrigger);
 	assert(pTable);
 	assert(pTable->pSchema == pTrigger->pSchema);
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	{
-		int code = SQLITE_DROP_TRIGGER;
-		const char *zDb = db->mdb.zDbSName;
-		const char *zTab = MASTER_NAME;
-		if (sqlite3AuthCheck
-		    (pParse, code, pTrigger->zName, pTable->zName, zDb)
-		    || sqlite3AuthCheck(pParse, SQLITE_DELETE, zTab, 0, zDb)) {
-			return;
-		}
-	}
-#endif
 
 	/* Generate code to destroy the database record of the trigger.
 	 */
@@ -906,7 +879,6 @@ codeRowTrigger(Parse * pParse,	/* Current parse context */
 	pSubParse->db = db;
 	pSubParse->pTriggerTab = pTab;
 	pSubParse->pToplevel = pTop;
-	pSubParse->zAuthContext = pTrigger->zName;
 	pSubParse->eTriggerOp = pTrigger->op;
 	pSubParse->nQueryLoop = pParse->nQueryLoop;
 

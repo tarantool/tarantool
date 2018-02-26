@@ -829,7 +829,6 @@ void *sqlite3_wsd_find(void *K, int L);
  * Forward references to structures
  */
 typedef struct AggInfo AggInfo;
-typedef struct AuthContext AuthContext;
 typedef struct AutoincInfo AutoincInfo;
 typedef struct Bitvec Bitvec;
 typedef struct Column Column;
@@ -951,44 +950,6 @@ struct FuncDefHash {
 	FuncDef *a[SQLITE_FUNC_HASH_SZ];	/* Hash table for functions */
 };
 
-#ifdef SQLITE_USER_AUTHENTICATION
-/*
- * Information held in the "sqlite3" database connection object and used
- * to manage user authentication.
- */
-typedef struct sqlite3_userauth sqlite3_userauth;
-struct sqlite3_userauth {
-	u8 authLevel;		/* Current authentication level */
-	int nAuthPW;		/* Size of the zAuthPW in bytes */
-	char *zAuthPW;		/* Password used to authenticate */
-	char *zAuthUser;	/* User name used to authenticate */
-};
-
-/* Allowed values for sqlite3_userauth.authLevel */
-#define UAUTH_Unknown     0	/* Authentication not yet checked */
-#define UAUTH_Fail        1	/* User authentication failed */
-#define UAUTH_User        2	/* Authenticated as a normal user */
-#define UAUTH_Admin       3	/* Authenticated as an administrator */
-
-/* Functions used only by user authorization logic */
-int sqlite3UserAuthTable(const char *);
-int sqlite3UserAuthCheckLogin(sqlite3 *, const char *, u8 *);
-void sqlite3UserAuthInit(sqlite3 *);
-void sqlite3CryptFunc(sqlite3_context *, int, sqlite3_value **);
-
-#endif				/* SQLITE_USER_AUTHENTICATION */
-
-/*
- * typedef for the authorization callback function.
- */
-#ifdef SQLITE_USER_AUTHENTICATION
-typedef int (*sqlite3_xauth) (void *, int, const char *, const char *,
-			      const char *, const char *, const char *);
-#else
-typedef int (*sqlite3_xauth) (void *, int, const char *, const char *,
-			      const char *, const char *);
-#endif
-
 /*
  * Each database connection is an instance of the following structure.
  */
@@ -1053,10 +1014,6 @@ struct sqlite3 {
 		double notUsed1;	/* Spacer */
 	} u1;
 	Lookaside lookaside;	/* Lookaside malloc configuration */
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	sqlite3_xauth xAuth;	/* Access authorization function */
-	void *pAuthArg;		/* 1st argument to the access auth function */
-#endif
 #ifndef SQLITE_OMIT_PROGRESS_CALLBACK
 	int (*xProgress) (void *);	/* The progress callback */
 	void *pProgressArg;	/* Argument to the progress callback */
@@ -1066,9 +1023,6 @@ struct sqlite3 {
 	BusyHandler busyHandler;	/* Busy callback */
 	int busyTimeout;	/* Busy handler timeout, in msec */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
-#ifdef SQLITE_USER_AUTHENTICATION
-	sqlite3_userauth auth;	/* User authentication information */
-#endif
 };
 
 /*
@@ -2448,7 +2402,6 @@ struct Parse {
 	const char *zTail;	/* All SQL text past the last semicolon parsed */
 	Table *pNewTable;	/* A table being constructed by CREATE TABLE */
 	Trigger *pNewTrigger;	/* Trigger under construct by a CREATE TRIGGER */
-	const char *zAuthContext;	/* The 6th parameter to db->xAuth callbacks */
 	Table *pZombieTab;	/* List of Table objects to delete after code gen */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
@@ -2464,15 +2417,6 @@ struct Parse {
 #define PARSE_RECURSE_SZ offsetof(Parse,sLastToken)	/* Recursive part */
 #define PARSE_TAIL_SZ (sizeof(Parse)-PARSE_RECURSE_SZ)	/* Non-recursive part */
 #define PARSE_TAIL(X) (((char*)(X))+PARSE_RECURSE_SZ)	/* Pointer to tail */
-
-/*
- * An instance of the following structure can be declared on a stack and used
- * to save the Parse.zAuthContext value so that it can be restored later.
- */
-struct AuthContext {
-	const char *zAuthContext;	/* Put saved Parse.zAuthContext here */
-	Parse *pParse;		/* The Parse structure */
-};
 
 /*
  * Bitfield flags for P5 value in various opcodes.
@@ -3257,23 +3201,6 @@ u32 sqlite3TriggerColmask(Parse *, Trigger *, ExprList *, int, int, Table *,
 int sqlite3JoinType(Parse *, Token *, Token *, Token *);
 void sqlite3CreateForeignKey(Parse *, ExprList *, Token *, ExprList *, int);
 void sqlite3DeferForeignKey(Parse *, int);
-#ifndef SQLITE_OMIT_AUTHORIZATION
-void sqlite3AuthRead(Parse *, Expr *, Schema *, SrcList *);
-int sqlite3AuthCheck(Parse *, int, const char *, const char *, const char *);
-void sqlite3AuthContextPush(Parse *, AuthContext *, const char *);
-void sqlite3AuthContextPop(AuthContext *);
-int sqlite3AuthReadCol(Parse *, const char *, const char *);
-#else
-#define sqlite3AuthRead(a,b,c,d)
-static inline
-int sqlite3AuthCheck(MAYBE_UNUSED Parse *a,
-		     MAYBE_UNUSED int b,
-		     MAYBE_UNUSED const char *c,
-		     MAYBE_UNUSED const char *d,
-		     MAYBE_UNUSED const char *e)    { return SQLITE_OK; }
-#define sqlite3AuthContextPush(a,b,c)
-#define sqlite3AuthContextPop(a)  ((void)(a))
-#endif
 void sqlite3Detach(Parse *, Expr *);
 void sqlite3FixInit(DbFixer *, Parse *, const char *, const Token *);
 int sqlite3FixSrcList(DbFixer *, SrcList *);

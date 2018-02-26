@@ -1844,9 +1844,6 @@ sqlite3RegisterBuiltinFunctions(void)
 #ifdef SQLITE_SOUNDEX
 		FUNCTION(soundex, 1, 0, 0, soundexFunc),
 #endif
-#if SQLITE_USER_AUTHENTICATION
-		FUNCTION(sqlite_crypt, 2, 0, 0, sqlite3CryptFunc),
-#endif
 		FUNCTION2(unlikely, 1, 0, 0, noopFunc, SQLITE_FUNC_UNLIKELY),
 		FUNCTION2(likelihood, 2, 0, 0, noopFunc, SQLITE_FUNC_UNLIKELY),
 		FUNCTION2(likely, 1, 0, 0, noopFunc, SQLITE_FUNC_UNLIKELY),

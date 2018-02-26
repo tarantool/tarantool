@@ -243,10 +243,8 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	int iIdxCur = 0;	/* Cursor number of the first index */
 	int nIdx;		/* Number of indices */
 	sqlite3 *db;		/* Main database structure */
-	AuthContext sContext;	/* Authorization context */
 	NameContext sNC;	/* Name context to resolve expressions in */
 	int memCnt = -1;	/* Memory cell used for change counting */
-	int rcauth;		/* Value returned by authorization callback */
 	int eOnePass;		/* ONEPASS_OFF or _SINGLE or _MULTI */
 	int aiCurOnePass[2];	/* The write cursors opened by WHERE_ONEPASS */
 	u8 *aToOpen = 0;	/* Open cursor iTabCur+j if aToOpen[j] is true */
@@ -269,7 +267,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	Trigger *pTrigger;	/* List of table triggers, if required */
 #endif
 
-	memset(&sContext, 0, sizeof(sContext));
 	db = pParse->db;
 	if (pParse->nErr || db->mallocFailed) {
 		goto delete_from_cleanup;
@@ -310,13 +307,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	if (sqlite3IsReadOnly(pParse, pTab, (pTrigger ? 1 : 0))) {
 		goto delete_from_cleanup;
 	}
-	rcauth = sqlite3AuthCheck(pParse, SQLITE_DELETE, pTab->zName, 0,
-			          "main");
-	assert(rcauth == SQLITE_OK || rcauth == SQLITE_DENY
-			|| rcauth == SQLITE_IGNORE);
-	if (rcauth == SQLITE_DENY) {
-		goto delete_from_cleanup;
-	}
 	assert(!isView || pTrigger);
 
 	/* Assign cursor numbers to the table and all its indices.
@@ -325,12 +315,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	iTabCur = pTabList->a[0].iCursor = pParse->nTab++;
 	for (nIdx = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, nIdx++) {
 		pParse->nTab++;
-	}
-
-	/* Start the view context
-	 */
-	if (isView) {
-		sqlite3AuthContextPush(pParse, &sContext, pTab->zName);
 	}
 
 	/* Begin generating code.
@@ -375,7 +359,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	 * this optimization caused the row change count (the value returned by
 	 * API function sqlite3_count_changes) to be set incorrectly.
 	 */
-	if (rcauth == SQLITE_OK && pWhere == 0 && !bComplex
+	if (pWhere == 0 && !bComplex
 #ifdef SQLITE_ENABLE_PREUPDATE_HOOK
 	    && db->xPreUpdateCallback == 0
 #endif
@@ -586,7 +570,6 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	}
 
  delete_from_cleanup:
-	sqlite3AuthContextPop(&sContext);
 	sqlite3SrcListDelete(db, pTabList);
 	sqlite3ExprDelete(db, pWhere);
 	sqlite3DbFree(db, aToOpen);

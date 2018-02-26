@@ -2253,10 +2253,6 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	Expr *pLimit, *pOffset;	/* Saved LIMIT and OFFSET */
 	int regLimit, regOffset;	/* Registers used by LIMIT and OFFSET */
 
-	/* Obtain authorization to do a recursive query */
-	if (sqlite3AuthCheck(pParse, SQLITE_RECURSIVE, 0, 0, 0))
-		return;
-
 	/* Process the LIMIT and OFFSET clauses, if they exist */
 	addrBreak = sqlite3VdbeMakeLabel(v);
 	p->nSelectRow = 320;	/* 4 billion rows */
@@ -3729,7 +3725,6 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		int isAgg,		/* True if outer SELECT uses aggregate functions */
 		int subqueryIsAgg)	/* True if the subquery uses aggregate functions */
 {
-	const char *zSavedAuthContext = pParse->zAuthContext;
 	Select *pParent;	/* Current UNION ALL term of the other query */
 	Select *pSub;		/* The inner query or "subquery" */
 	Select *pSub1;		/* Pointer to the rightmost select in sub-query */
@@ -3889,12 +3884,6 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 	/***** If we reach this point, flattening is permitted. *****/
 	SELECTTRACE(1, pParse, p, ("flatten %s.%p from term %d\n",
 				   pSub->zSelName, pSub, iFrom));
-
-	/* Authorize the subquery */
-	pParse->zAuthContext = pSubitem->zName;
-	TESTONLY(i =) sqlite3AuthCheck(pParse, SQLITE_SELECT, 0, 0, 0);
-	testcase(i == SQLITE_DENY);
-	pParse->zAuthContext = zSavedAuthContext;
 
 	/* If the sub-query is a compound SELECT statement, then (by restrictions
 	 * 17 and 18 above) it must be a UNION ALL and the parent query must
@@ -5381,8 +5370,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if (p == 0 || db->mallocFailed || pParse->nErr) {
 		return 1;
 	}
-	if (sqlite3AuthCheck(pParse, SQLITE_SELECT, 0, 0, 0))
-		return 1;
 	memset(&sAggInfo, 0, sizeof(sAggInfo));
 #ifdef SELECTTRACE_ENABLED
 	pParse->nSelectIndent++;

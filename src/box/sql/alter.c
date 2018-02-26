@@ -114,13 +114,6 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	}
 #endif
 
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	/* Invoke the authorization callback. */
-	if (sqlite3AuthCheck(pParse, SQLITE_ALTER_TABLE, zDb, pTab->zName, 0)) {
-		goto exit_rename_table;
-	}
-#endif
-
 	/* Begin a transaction for database.
 	 * Then modify the schema cookie (since the ALTER TABLE modifies the
 	 * schema).
@@ -172,13 +165,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	pDflt = pCol->pDflt;
 	pTab = sqlite3FindTable(db, zTab);
 	assert(pTab);
-
-#ifndef SQLITE_OMIT_AUTHORIZATION
-	/* Invoke the authorization callback. */
-	if (sqlite3AuthCheck(pParse, SQLITE_ALTER_TABLE, zDb, pTab->zName, 0)) {
-		return;
-	}
-#endif
 
 	/* If the default value for the new column was specified with a
 	 * literal NULL, then set pDflt to 0. This simplifies checking

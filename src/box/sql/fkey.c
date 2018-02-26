@@ -1008,22 +1008,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 				aiCol[i] = -1;
 			}
 			assert(pIdx == 0 || pIdx->aiColumn[i] >= 0);
-#ifndef SQLITE_OMIT_AUTHORIZATION
-			/* Request permission to read the parent key columns. If the
-			 * authorization callback returns SQLITE_IGNORE, behave as if any
-			 * values read from the parent table are NULL.
-			 */
-			if (db->xAuth) {
-				int rcauth;
-				char *zCol =
-				    pTo->aCol[pIdx ? pIdx->aiColumn[i] : pTo->
-					      iPKey].zName;
-				rcauth =
-				    sqlite3AuthReadCol(pParse, pTo->zName,
-						       zCol);
-				bIgnore = (rcauth == SQLITE_IGNORE);
-			}
-#endif
 		}
 
 		pParse->nTab++;

@@ -1210,9 +1210,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_NOLFS:
 			zName = "SQLITE_NOLFS";
 			break;
-		case SQLITE_AUTH:
-			zName = "SQLITE_AUTH";
-			break;
 		case SQLITE_FORMAT:
 			zName = "SQLITE_FORMAT";
 			break;
@@ -1290,7 +1287,6 @@ sqlite3ErrStr(int rc)
 		/* SQLITE_MISUSE      */
 		    "library routine called out of sequence",
 		/* SQLITE_NOLFS       */ "large file support is disabled",
-		/* SQLITE_AUTH        */ "authorization denied",
 		/* SQLITE_FORMAT      */ "auxiliary database format error",
 		/* SQLITE_RANGE       */ "bind or column index out of range",
 		/* SQLITE_NOTADB      */

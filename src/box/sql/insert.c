@@ -374,9 +374,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (pTab == 0) {
 		goto insert_cleanup;
 	}
-	if (sqlite3AuthCheck(pParse, SQLITE_INSERT, pTab->zName, 0, "")) {
-		goto insert_cleanup;
-	}
 
 	/* Figure out if we have any triggers and if the table being
 	 * inserted into is a view
