@@ -221,6 +221,11 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	     struct tuple *prev_stmt, const struct tuple *key,
 	     enum iterator_type order)
 {
+	if (cache->env->mem_quota == 0) {
+		/* Cache is disabled. */
+		return;
+	}
+
 	/* Delete some entries if quota overused */
 	vy_cache_gc(cache->env);
 
