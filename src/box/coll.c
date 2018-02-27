@@ -233,6 +233,13 @@ coll_icu_destroy(struct coll *coll)
 		ucol_close(coll->icu.collator);
 }
 
+bool
+coll_is_case_sensitive(const struct coll *coll)
+{
+	UCollationStrength strength = ucol_getStrength(coll->icu.collator);
+	return strength != UCOL_SECONDARY && strength != UCOL_PRIMARY;
+}
+
 /**
  * Create a collation by definition.
  * @param def - collation definition.

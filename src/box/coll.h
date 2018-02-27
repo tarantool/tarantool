@@ -79,6 +79,14 @@ struct coll {
 };
 
 /**
+ * Return true, if a collation is case sensitive.
+ * @param coll Collation to check.
+ * @retval Case sensitivity.
+ */
+bool
+coll_is_case_sensitive(const struct coll *coll);
+
+/**
  * Create a collation by definition.
  * @param def - collation definition.
  * @return - the collation OR NULL on memory error (diag is set).
