@@ -211,11 +211,11 @@ local function initial()
     log.info("create role public")
     _user:insert{PUBLIC, ADMIN, 'public', 'role'}
     log.info("grant read,write,execute on universe to admin")
-    _priv:insert{ADMIN, ADMIN, 'universe', 0, 7}
+    _priv:insert{ADMIN, ADMIN, 'universe', 0, box.priv.R + box.priv.W + box.priv.X}
 
     -- grant role 'public' to 'guest'
     log.info("grant role public to guest")
-    _priv:insert{ADMIN, GUEST, 'role', PUBLIC, 4}
+    _priv:insert{ADMIN, GUEST, 'role', PUBLIC, box.priv.X}
 
     log.info("set max_id to box.schema.SYSTEM_ID_MAX")
     _schema:insert{'max_id', box.schema.SYSTEM_ID_MAX}
@@ -406,7 +406,7 @@ local function create_sysview(source_id, target_id)
     -- public can read system views
     if box.space._priv.index.primary:count({PUBLIC, 'space', target_id}) == 0 then
         log.info("grant read access to 'public' role for %s view", def[3])
-        box.space._priv:insert({1, PUBLIC, 'space', target_id, 1})
+        box.space._priv:insert({1, PUBLIC, 'space', target_id, box.priv.R})
     end
 end
 
@@ -416,16 +416,17 @@ local function upgrade_users_to_1_6_8()
         local RPL_ID = box.space._user:auto_increment{ADMIN, 'replication', 'role'}[1]
         -- replication can read the entire universe
         log.info("grant read on universe to replication")
-        box.space._priv:replace{1, RPL_ID, 'universe', 0, 1}
+        box.space._priv:replace{1, RPL_ID, 'universe', 0, box.priv.R}
         -- replication can append to '_cluster' system space
         log.info("grant write on space _cluster to replication")
-        box.space._priv:replace{1, RPL_ID, 'space', box.space._cluster.id, 2}
+        box.space._priv:replace{1, RPL_ID, 'space', box.space._cluster.id, box.priv.W}
     end
 
     if box.space._priv.index.primary:count({ADMIN, 'universe', 0}) == 0 then
         -- grant admin access to the universe
         log.info("grant all on universe to admin")
-        box.space._priv:insert{ADMIN, ADMIN, 'universe', 0, 7}
+        box.space._priv:insert{ADMIN, ADMIN, 'universe', 0, box.priv.R +
+                                                        box.priv.W + box.priv.X}
     end
 
     if box.space._func.index.name:count("box.schema.user.info") == 0 then
@@ -435,7 +436,7 @@ local function upgrade_users_to_1_6_8()
 
         -- grant 'public' role access to 'box.schema.user.info' function
         log.info('grant execute on function "box.schema.user.info" to public')
-        box.space._priv:replace{ADMIN, PUBLIC, 'function', 1, 4}
+        box.space._priv:replace{ADMIN, PUBLIC, 'function', 1, box.priv.X}
     end
 end
 
@@ -555,7 +556,7 @@ local function create_truncate_space()
     box.space._index:insert{_truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
 
     local _priv = box.space[box.schema.PRIV_ID]
-    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, 2}
+    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, box.priv.W}
 end
 
 local function update_existing_users_to_1_7_5()
@@ -809,20 +810,20 @@ local function initial_1_7_5()
     -- Create grants
     --
     log.info("grant read,write,execute on universe to admin")
-    _priv:insert{ADMIN, ADMIN, 'universe', 0, 7}
+    _priv:insert{ADMIN, ADMIN, 'universe', 0, box.priv.R + box.priv.W + box.priv.X}
 
     -- grant role 'public' to 'guest'
     log.info("grant role public to guest")
-    _priv:insert{ADMIN, GUEST, 'role', PUBLIC, 4}
+    _priv:insert{ADMIN, GUEST, 'role', PUBLIC, box.priv.X}
 
     -- replication can read the entire universe
     log.info("grant read on universe to replication")
-    _priv:replace{ADMIN, REPLICATION, 'universe', 0, 1}
+    _priv:replace{ADMIN, REPLICATION, 'universe', 0, box.priv.R}
     -- replication can append to '_cluster' system space
     log.info("grant write on space _cluster to replication")
-    _priv:replace{ADMIN, REPLICATION, 'space', _cluster.id, 2}
+    _priv:replace{ADMIN, REPLICATION, 'space', _cluster.id, box.priv.W}
 
-    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, 2}
+    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, box.priv.W}
 
     -- create "box.schema.user.info" function
     log.info('create function "box.schema.user.info" with setuid')
@@ -830,7 +831,7 @@ local function initial_1_7_5()
 
     -- grant 'public' role access to 'box.schema.user.info' function
     log.info('grant execute on function "box.schema.user.info" to public')
-    _priv:replace{ADMIN, PUBLIC, 'function', 1, 4}
+    _priv:replace{ADMIN, PUBLIC, 'function', 1, box.priv.X}
 
     log.info("set max_id to box.schema.SYSTEM_ID_MAX")
     _schema:insert{'max_id', box.schema.SYSTEM_ID_MAX}
@@ -904,7 +905,7 @@ local function create_collation_space()
     box.space._collation:replace{2, "unicode_ci", ADMIN, "ICU", "", {strength='primary'}}
 
     local _priv = box.space[box.schema.PRIV_ID]
-    _priv:insert{ADMIN, PUBLIC, 'space', _collation.id, 2}
+    _priv:insert{ADMIN, PUBLIC, 'space', _collation.id, box.priv.W}
 end
 
 local function upgrade_to_1_7_6()
@@ -924,7 +925,8 @@ local function upgrade_to_1_7_7()
     --
     for _, v in _user:pairs() do
         if v[4] ~= "role" then
-            _priv:upsert({ADMIN, v[1], "universe", 0, 24}, {{"|", 5, 24}})
+            _priv:upsert({ADMIN, v[1], "universe", 0, box.priv.S + box.priv.U},
+                                                {{"|", 5, box.priv.S + box.priv.U}})
         end
     end
     --
@@ -935,14 +937,14 @@ local function upgrade_to_1_7_7()
     --
     for _, v in _priv.index.object:pairs{'universe'} do
         if bit.band(v[5], 1) ~= 0 and bit.band(v[5], 2) ~= 0 then
-            _priv:update({v[2], v[3], v[4]}, {{ "|", 5, 32}})
+            _priv:update({v[2], v[3], v[4]}, {{ "|", 5, box.priv.C}})
         end
     end
     -- grant admin all new privileges (session, usage, grant option,
     -- create, alter, drop and anything that might come up in the future
     --
-    _priv:upsert({ADMIN, ADMIN, 'universe', 0, 4294967295},
-                 {{ "|", 5, 4294967295}})
+    _priv:upsert({ADMIN, ADMIN, 'universe', 0, box.priv.ALL},
+                 {{ "|", 5, box.priv.ALL}})
     --
     -- create role 'super' and grant it all privileges on universe
     --

@@ -101,7 +101,46 @@ ffi.cdef[[
 
     void password_prepare(const char *password, int len,
                           char *out, int out_len);
+
+    enum priv_type {
+        PRIV_R = 1,
+        PRIV_W = 2,
+        PRIV_X = 4,
+        PRIV_S = 8,
+        PRIV_U = 16,
+        PRIV_C = 32,
+        PRIV_D = 64,
+        PRIV_A = 128,
+        PRIV_REFERENCE = 256,
+        PRIV_TRIGGER = 512,
+        PRIV_INSERT = 1024,
+        PRIV_UPDATE = 2048,
+        PRIV_DELETE = 4096,
+        PRIV_GRANT = 8192,
+        PRIV_REVOKE = 16384,
+        PRIV_ALL  = 4294967295
+    };
+
 ]]
+
+box.priv = {
+    ["R"] = builtin.PRIV_R,
+    ["W"] = builtin.PRIV_W,
+    ["X"] = builtin.PRIV_X,
+    ["S"] = builtin.PRIV_S,
+    ["U"] = builtin.PRIV_U,
+    ["C"] = builtin.PRIV_C,
+    ["D"] = builtin.PRIV_D,
+    ["A"] = builtin.PRIV_A,
+    ["REFERENCE"] = builtin.PRIV_REFERENCE,
+    ["TRIGGER"] = builtin.PRIV_TRIGGER,
+    ["INSERT"] = builtin.PRIV_INSERT,
+    ["UPDATE"] = builtin.PRIV_UPDATE,
+    ["DELETE"] = builtin.PRIV_DELETE,
+    ["GRANT"]= builtin.PRIV_GRANT,
+    ["REVOKE"] = builtin.PRIV_REVOKE,
+    ["ALL"] = builtin.PRIV_ALL
+}
 
 local function user_or_role_resolve(user)
     local _vuser = box.space[box.schema.VUSER_ID]
@@ -1687,7 +1726,7 @@ end
 
 local function checked_privilege(privilege, object_type)
     local priv_hex = privilege_resolve(privilege)
-    if object_type == 'role' and priv_hex ~= 4 then
+    if object_type == 'role' and priv_hex ~= box.priv.X then
         box.error(box.error.UNSUPPORTED_ROLE_PRIV, privilege)
     end
     return priv_hex
@@ -1695,43 +1734,43 @@ end
 
 local function privilege_name(privilege)
     local names = {}
-    if bit.band(privilege, 1) ~= 0 then
+    if bit.band(privilege, box.priv.R) ~= 0 then
         table.insert(names, "read")
     end
-    if bit.band(privilege, 2) ~= 0 then
+    if bit.band(privilege, box.priv.W) ~= 0 then
         table.insert(names, "write")
     end
-    if bit.band(privilege, 4) ~= 0 then
+    if bit.band(privilege, box.priv.X) ~= 0 then
         table.insert(names, "execute")
     end
-    if bit.band(privilege, 8) ~= 0 then
+    if bit.band(privilege, box.priv.S) ~= 0 then
         table.insert(names, "session")
     end
-    if bit.band(privilege, 16) ~= 0 then
+    if bit.band(privilege, box.priv.U) ~= 0 then
         table.insert(names, "usage")
     end
-    if bit.band(privilege, 32) ~= 0 then
+    if bit.band(privilege, box.priv.C) ~= 0 then
         table.insert(names, "create")
     end
-    if bit.band(privilege, 64) ~= 0 then
+    if bit.band(privilege, box.priv.D) ~= 0 then
         table.insert(names, "drop")
     end
-    if bit.band(privilege, 128) ~= 0 then
+    if bit.band(privilege, box.priv.A) ~= 0 then
         table.insert(names, "alter")
     end
-    if bit.band(privilege, 256) ~= 0 then
+    if bit.band(privilege, box.priv.REFERENCE) ~= 0 then
         table.insert(names, "reference")
     end
-    if bit.band(privilege, 512) ~= 0 then
+    if bit.band(privilege, box.priv.TRIGGER) ~= 0 then
         table.insert(names, "trigger")
     end
-    if bit.band(privilege, 1024) ~= 0 then
+    if bit.band(privilege, box.priv.INSERT) ~= 0 then
         table.insert(names, "insert")
     end
-    if bit.band(privilege, 2048) ~= 0 then
+    if bit.band(privilege, box.priv.UPDATE) ~= 0 then
         table.insert(names, "update")
     end
-    if bit.band(privilege, 4096) ~= 0 then
+    if bit.band(privilege, box.priv.DELETE) ~= 0 then
         table.insert(names, "delete")
     end
     return table.concat(names, ",")
