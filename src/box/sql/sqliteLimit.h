@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_SQL_SQLITELIMIT_H_INCLUDED
+#define TARANTOOL_SQL_SQLITELIMIT_H_INCLUDED
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -177,3 +179,5 @@ enum {
  * 40 or stack guard will be triggered.
  */
 #define SQL_MAX_COMPILING_TRIGGERS 30
+
+#endif /* TARANTOOL_SQL_SQLITELIMIT_H_INCLUDED */
