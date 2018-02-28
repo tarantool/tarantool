@@ -41,7 +41,6 @@
 #include <tarantool_ev.h>
 
 #include "checkpoint.h"
-#include "coio_task.h"
 #include "diag.h"
 #include "errcode.h"
 #include "errinj.h"
@@ -72,7 +71,7 @@ enum { VY_YIELD_LOOPS = 2 };
 #define VY_SCHEDULER_TIMEOUT_MIN	1
 #define VY_SCHEDULER_TIMEOUT_MAX	60
 
-static int vy_worker_f(va_list);
+static void *vy_worker_f(void *);
 static int vy_scheduler_f(va_list);
 
 struct vy_task;
@@ -267,7 +266,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
 		char name[FIBER_NAME_MAX];
 		snprintf(name, sizeof(name), "vinyl.writer.%d", i);
-		if (cord_costart(&scheduler->worker_pool[i], name,
+		if (cord_start(&scheduler->worker_pool[i], name,
 				 vy_worker_f, scheduler) != 0)
 			panic("failed to start vinyl worker thread");
 	}
@@ -1595,11 +1594,10 @@ wait:
 	return 0;
 }
 
-static int
-vy_worker_f(va_list va)
+static void *
+vy_worker_f(void *arg)
 {
-	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
-	coio_enable();
+	struct vy_scheduler *scheduler = arg;
 	struct vy_task *task = NULL;
 
 	tt_pthread_mutex_lock(&scheduler->mutex);
@@ -1631,5 +1629,5 @@ vy_worker_f(va_list va)
 		stailq_add_tail_entry(&scheduler->output_queue, task, link);
 	}
 	tt_pthread_mutex_unlock(&scheduler->mutex);
-	return 0;
+	return NULL;
 }
