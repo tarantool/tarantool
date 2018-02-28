@@ -87,7 +87,6 @@ enum iproto_key {
 	/* Also request keys. See the comment above. */
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
-	IPROTO_FIELD_NAME = 0x29,
 
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
@@ -113,6 +112,15 @@ enum iproto_key {
 	IPROTO_SQL_INFO = 0x43,
 	IPROTO_SQL_ROW_COUNT = 0x44,
 	IPROTO_KEY_MAX
+};
+
+/**
+ * Keys, stored in IPROTO_METADATA. They can not be received
+ * in a request. Only sent as response, so no necessity in _strs
+ * or _key_type arrays.
+ */
+enum iproto_metadata_key {
+	IPROTO_FIELD_NAME = 0,
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
