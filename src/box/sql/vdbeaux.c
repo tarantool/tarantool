@@ -2772,6 +2772,12 @@ sqlite3VdbeHalt(Vdbe * p)
 		p->rc = SQLITE_NOMEM_BKPT;
 	}
 
+	/* Release all region memory which was allocated
+	 * to hold tuples to be inserted into ephemeral spaces.
+	 */
+	if (!box_txn())
+		fiber_gc();
+
 	assert(db->nVdbeActive > 0 || p->autoCommit == 0 ||
 		       p->anonymous_savepoint == NULL);
 	return (p->rc == SQLITE_BUSY ? SQLITE_BUSY : SQLITE_OK);

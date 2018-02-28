@@ -2750,6 +2750,14 @@ case OP_MakeRecord: {
 	 * statement commitment, it is better to reuse the same chunk.
 	 * Such optimization is prohibited for ordinary spaces, since
 	 * memory shouldn't be reused until it is written into WAL.
+	 *
+	 * However, if memory for ephemeral space is allocated
+	 * on region, it will be freed only in vdbeHalt() routine.
+	 * It is the only way to free this region memory,
+	 * since ephemeral spaces don't have nothing in common
+	 * with txn routine and region memory won't be released
+	 * after txn_commit() or txn_rollback() as it happens
+	 * with ordinary spaces.
 	 */
 	if (bIsEphemeral) {
 		rc = sqlite3VdbeMemClearAndResize(pOut, nByte);
