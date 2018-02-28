@@ -1645,3 +1645,20 @@ box.space._vsequence.index.name:get{"test"} ~= nil
 box.session.su('admin')
 ---
 ...
+-- prerequisite gh-945
+box.schema.user.grant("guest", "alter", "function")
+---
+- error: Unsupported function privilege 'alter'
+...
+box.schema.user.grant("guest", "execute", "sequence")
+---
+- error: Unsupported sequence privilege 'execute'
+...
+box.schema.user.grant("guest", "read,execute", "sequence")
+---
+- error: Unsupported sequence privilege 'read,execute'
+...
+box.schema.user.grant("guest", "read,write,execute", "role")
+---
+- error: Unsupported role privilege 'read,write,execute'
+...

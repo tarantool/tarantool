@@ -1724,10 +1724,19 @@ local function privilege_resolve(privilege)
     return numeric
 end
 
+-- validate privileges
+local forbidden_privileges = {
+    ["universe"] = 0,
+    ["space"] = 0,
+    ["sequence"] = bit.bor(box.priv.X, box.priv.A, box.priv.INSERT, box.priv.UPDATE, box.priv.DELETE),
+    ["function"] = bit.bor(box.priv.A, box.priv.INSERT, box.priv.UPDATE, box.priv.DELETE),
+    ["role"] = bit.bxor(box.priv.ALL, bit.bor(box.priv.C, box.priv.D, box.priv.X)),
+}
+
 local function checked_privilege(privilege, object_type)
     local priv_hex = privilege_resolve(privilege)
-    if object_type == 'role' and priv_hex ~= box.priv.X then
-        box.error(box.error.UNSUPPORTED_ROLE_PRIV, privilege)
+    if bit.band(priv_hex, forbidden_privileges[object_type] or 0) ~= 0 then
+        box.error(box.error.UNSUPPORTED_PRIV, object_type, privilege)
     end
     return priv_hex
 end

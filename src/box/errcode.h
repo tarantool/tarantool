@@ -150,7 +150,7 @@ struct errcode_record {
 	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   "Integer overflow when performing '%c' operation on field %u") \
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      "Transaction has been aborted by conflict") \
-	/* 98 */_(ER_UNSUPPORTED_ROLE_PRIV,     "Unsupported role privilege '%s'") \
+	/* 98 */_(ER_UNSUPPORTED_PRIV,		"Unsupported %s privilege '%s'") \
 	/* 99 */_(ER_LOAD_FUNCTION,		"Failed to dynamically load function '%s': %s") \
 	/*100 */_(ER_FUNCTION_LANGUAGE,		"Unsupported language '%s' specified for function '%s'") \
 	/*101 */_(ER_RTREE_RECT,		"RTree: %s must be an array with %u (point) or %u (rectangle/box) numeric coordinates") \
