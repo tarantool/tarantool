@@ -82,7 +82,7 @@ struct vy_task_ops {
 	 * which is too heavy for the tx thread (like IO or compression).
 	 * Returns 0 on success. On failure returns -1 and sets diag.
 	 */
-	int (*execute)(struct vy_task *task);
+	int (*execute)(struct vy_scheduler *scheduler, struct vy_task *task);
 	/**
 	 * This function is called by the scheduler upon task completion.
 	 * It may be used to finish the task from the tx thread context.
@@ -349,6 +349,7 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 	/* Stop scheduler fiber. */
 	scheduler->scheduler_fiber = NULL;
 	/* Sic: fiber_cancel() can't be used here. */
+	fiber_cond_signal(&scheduler->dump_cond);
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
 	if (scheduler->is_worker_pool_running)
@@ -621,7 +622,7 @@ vy_run_discard(struct vy_run *run)
 }
 
 static int
-vy_task_write_run(struct vy_task *task)
+vy_task_write_run(struct vy_scheduler *scheduler, struct vy_task *task)
 {
 	struct vy_index *index = task->index;
 	struct vy_stmt_stream *wi = task->wi;
@@ -647,9 +648,19 @@ vy_task_write_run(struct vy_task *task)
 	int rc;
 	struct tuple *stmt = NULL;
 	while ((rc = wi->iface->next(wi, &stmt)) == 0 && stmt != NULL) {
+		inj = errinj(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT, ERRINJ_DOUBLE);
+		if (inj != NULL && inj->dparam > 0)
+			usleep(inj->dparam * 1000000);
+
 		rc = vy_run_writer_append_stmt(&writer, stmt);
 		if (rc != 0)
 			break;
+
+		if (!scheduler->is_worker_pool_running) {
+			diag_set(FiberIsCancelled);
+			rc = -1;
+			break;
+		}
 	}
 	wi->iface->stop(wi);
 
@@ -667,9 +678,9 @@ fail:
 }
 
 static int
-vy_task_dump_execute(struct vy_task *task)
+vy_task_dump_execute(struct vy_scheduler *scheduler, struct vy_task *task)
 {
-	return vy_task_write_run(task);
+	return vy_task_write_run(scheduler, task);
 }
 
 static int
@@ -1030,9 +1041,9 @@ err:
 }
 
 static int
-vy_task_compact_execute(struct vy_task *task)
+vy_task_compact_execute(struct vy_scheduler *scheduler, struct vy_task *task)
 {
-	return vy_task_write_run(task);
+	return vy_task_write_run(scheduler, task);
 }
 
 static int
@@ -1617,7 +1628,7 @@ vy_worker_f(void *arg)
 		assert(task != NULL);
 
 		/* Execute task */
-		task->status = task->ops->execute(task);
+		task->status = task->ops->execute(scheduler, task);
 		if (task->status != 0) {
 			struct diag *diag = diag_get();
 			assert(!diag_is_empty(diag));
