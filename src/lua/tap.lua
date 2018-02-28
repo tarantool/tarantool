@@ -106,17 +106,21 @@ local function cmpdeeply(got, expected, extra)
     end
 
     local path = extra.path or '/'
+    local visited_keys = {}
 
     for i, v in pairs(got) do
+        visited_keys[i] = true
         extra.path = path .. '/' .. i
         if not cmpdeeply(v, expected[i], extra) then
             return false
         end
     end
 
-    for i, v in pairs(expected) do
-        extra.path = path .. '/' .. i
-        if not cmpdeeply(got[i], v, extra) then
+    -- check if expected contains more keys then got
+    for i, _ in pairs(expected) do
+        if visited_keys[i] ~= true then
+            extra.expected = 'key ' .. tostring(i)
+            extra.got = 'nil'
             return false
         end
     end
