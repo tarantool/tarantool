@@ -30,6 +30,7 @@
  */
 #include "vy_cache.h"
 #include "diag.h"
+#include "fiber.h"
 #include "schema_def.h"
 
 #ifndef CT_ASSERT_G
@@ -51,12 +52,11 @@ enum {
 };
 
 void
-vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache,
-		    size_t mem_quota)
+vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache)
 {
 	rlist_create(&e->cache_lru);
 	e->mem_used = 0;
-	e->mem_quota = mem_quota;
+	e->mem_quota = 0;
 	mempool_create(&e->cache_entry_mempool, slab_cache,
 		       sizeof(struct vy_cache_entry));
 }
@@ -203,10 +203,29 @@ vy_cache_gc(struct vy_cache_env *env)
 }
 
 void
+vy_cache_env_set_quota(struct vy_cache_env *env, size_t quota)
+{
+	env->mem_quota = quota;
+	while (env->mem_used > env->mem_quota) {
+		vy_cache_gc(env);
+		/*
+		 * Make sure we don't block other tx fibers
+		 * for too long.
+		 */
+		fiber_sleep(0);
+	}
+}
+
+void
 vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	     struct tuple *prev_stmt, const struct tuple *key,
 	     enum iterator_type order)
 {
+	if (cache->env->mem_quota == 0) {
+		/* Cache is disabled. */
+		return;
+	}
+
 	/* Delete some entries if quota overused */
 	vy_cache_gc(cache->env);
 
@@ -646,12 +665,6 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
 	*ret = NULL;
 	*stop = false;
 
-	/* disable cache for errinj test - let it try to read from disk */
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
-		     { itr->search_started = true; return; });
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
-		     { itr->search_started = true; return; });
-
 	if (!itr->search_started) {
 		assert(itr->curr_stmt == NULL);
 		itr->search_started = true;
@@ -687,12 +700,6 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 {
 	*ret = NULL;
 	*stop = false;
-
-	/* disable cache for errinj test - let it try to read from disk */
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE,
-		     { itr->search_started = true; return; });
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT,
-		     { itr->search_started = true; return; });
 
 	assert(!itr->search_started || itr->version == itr->cache->version);
 
@@ -756,16 +763,6 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 			  const struct tuple *last_stmt,
 			  struct tuple **ret, bool *stop)
 {
-	/* disable cache for errinj test - let it try to read from disk */
-	if ((errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL) != NULL &&
-	     errinj(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL)->bparam) ||
-	    (errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL) != NULL &&
-	     errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_BOOL)->bparam)) {
-		*ret = NULL;
-		*stop = false;
-		return 0;
-	}
-
 	struct key_def *def = itr->cache->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 

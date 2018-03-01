@@ -71,7 +71,8 @@ test_basic()
 	vy_run_env_create(&run_env);
 
 	struct vy_cache_env cache_env;
-	vy_cache_env_create(&cache_env, slab_cache, QUOTA);
+	vy_cache_env_create(&cache_env, slab_cache);
+	vy_cache_env_set_quota(&cache_env, QUOTA);
 
 	struct vy_cache cache;
 	uint32_t fields[] = { 0 };

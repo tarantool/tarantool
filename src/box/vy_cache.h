@@ -127,11 +127,9 @@ struct vy_cache_env {
  * Initialize common cache environment.
  * @param e - the environment.
  * @param slab_cache - source of memory.
- * @param mem_quota - memory limit for the cache.
  */
 void
-vy_cache_env_create(struct vy_cache_env *env, struct slab_cache *slab_cache,
-		    size_t mem_quota);
+vy_cache_env_create(struct vy_cache_env *env, struct slab_cache *slab_cache);
 
 /**
  * Destroy and free resources of cache environment.
@@ -139,6 +137,17 @@ vy_cache_env_create(struct vy_cache_env *env, struct slab_cache *slab_cache,
  */
 void
 vy_cache_env_destroy(struct vy_cache_env *e);
+
+/**
+ * Set memory limit for the cache.
+ * @param e - the environment.
+ * @param quota - memory limit for the cache.
+ *
+ * This function blocks until it manages to free enough memory
+ * to fit in the new limit.
+ */
+void
+vy_cache_env_set_quota(struct vy_cache_env *e, size_t quota);
 
 /**
  * Tuple cache (of one particular index)

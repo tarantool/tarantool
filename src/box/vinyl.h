@@ -42,7 +42,7 @@ struct info_handler;
 struct vinyl_engine;
 
 struct vinyl_engine *
-vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery);
 
 /**
@@ -50,6 +50,12 @@ vinyl_engine_new(const char *dir, size_t memory, size_t cache,
  */
 void
 vinyl_engine_info(struct vinyl_engine *vinyl, struct info_handler *handler);
+
+/**
+ * Update vinyl cache size.
+ */
+void
+vinyl_engine_set_cache(struct vinyl_engine *vinyl, size_t quota);
 
 /**
  * Update max tuple size.
@@ -76,11 +82,11 @@ vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 #include "diag.h"
 
 static inline struct vinyl_engine *
-vinyl_engine_new_xc(const char *dir, size_t memory, size_t cache,
+vinyl_engine_new_xc(const char *dir, size_t memory,
 		    int read_threads, int write_threads, bool force_recovery)
 {
 	struct vinyl_engine *vinyl;
-	vinyl = vinyl_engine_new(dir, memory, cache, read_threads,
+	vinyl = vinyl_engine_new(dir, memory, read_threads,
 				 write_threads, force_recovery);
 	if (vinyl == NULL)
 		diag_raise();
