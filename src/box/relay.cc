@@ -124,6 +124,8 @@ struct relay {
 	 * confirmation from the replica.
 	 */
 	struct stailq pending_gc;
+	/** Time when last row was sent to peer. */
+	double last_row_tm;
 
 	struct {
 		/* Align to prevent false-sharing with tx thread */
@@ -433,13 +435,12 @@ relay_subscribe_f(va_list ap)
 	fiber_start(reader, relay, fiber());
 
 	/*
-	 * If the replica happens to be uptodate on subscribe,
+	 * If the replica happens to be up to date on subscribe,
 	 * don't wait for timeout to happen - send a heartbeat
 	 * message right away to update the replication lag as
 	 * soon as possible.
 	 */
-	if (vclock_compare(&r->vclock, &replicaset.vclock) == 0)
-		relay_send_heartbeat(relay);
+	relay_send_heartbeat(relay);
 
 	while (!fiber_is_cancelled()) {
 		double timeout = replication_timeout;
@@ -448,14 +449,8 @@ relay_subscribe_f(va_list ap)
 		if (inj != NULL && inj->dparam != 0)
 			timeout = inj->dparam;
 
-		if (fiber_cond_wait_timeout(&relay->reader_cond, timeout) != 0) {
-			/*
-			 * Timed out waiting for WAL events.
-			 * Send a heartbeat message to update
-			 * the replication lag on the slave.
-			 */
-			relay_send_heartbeat(relay);
-		}
+		fiber_cond_wait_deadline(&relay->reader_cond,
+					 relay->last_row_tm + timeout);
 
 		/*
 		 * The fiber can be woken by IO cancel, by a timeout of
@@ -463,6 +458,9 @@ relay_subscribe_f(va_list ap)
 		 * Handle cbus messages first.
 		 */
 		cbus_process(&relay->endpoint);
+		/* Check for a heartbeat timeout. */
+		if (ev_monotonic_now(loop()) - relay->last_row_tm > timeout)
+			relay_send_heartbeat(relay);
 		/*
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
@@ -560,6 +558,7 @@ static void
 relay_send(struct relay *relay, struct xrow_header *packet)
 {
 	packet->sync = relay->sync;
+	relay->last_row_tm = ev_monotonic_now(loop());
 	coio_write_xrow(&relay->io, packet);
 	fiber_gc();
 

@@ -41,7 +41,6 @@
 #include <tarantool_ev.h>
 
 #include "checkpoint.h"
-#include "coio_task.h"
 #include "diag.h"
 #include "errcode.h"
 #include "errinj.h"
@@ -72,7 +71,7 @@ enum { VY_YIELD_LOOPS = 2 };
 #define VY_SCHEDULER_TIMEOUT_MIN	1
 #define VY_SCHEDULER_TIMEOUT_MAX	60
 
-static int vy_worker_f(va_list);
+static void *vy_worker_f(void *);
 static int vy_scheduler_f(va_list);
 
 struct vy_task;
@@ -83,7 +82,7 @@ struct vy_task_ops {
 	 * which is too heavy for the tx thread (like IO or compression).
 	 * Returns 0 on success. On failure returns -1 and sets diag.
 	 */
-	int (*execute)(struct vy_task *task);
+	int (*execute)(struct vy_scheduler *scheduler, struct vy_task *task);
 	/**
 	 * This function is called by the scheduler upon task completion.
 	 * It may be used to finish the task from the tx thread context.
@@ -267,7 +266,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
 		char name[FIBER_NAME_MAX];
 		snprintf(name, sizeof(name), "vinyl.writer.%d", i);
-		if (cord_costart(&scheduler->worker_pool[i], name,
+		if (cord_start(&scheduler->worker_pool[i], name,
 				 vy_worker_f, scheduler) != 0)
 			panic("failed to start vinyl worker thread");
 	}
@@ -350,6 +349,7 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 	/* Stop scheduler fiber. */
 	scheduler->scheduler_fiber = NULL;
 	/* Sic: fiber_cancel() can't be used here. */
+	fiber_cond_signal(&scheduler->dump_cond);
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
 	if (scheduler->is_worker_pool_running)
@@ -622,15 +622,65 @@ vy_run_discard(struct vy_run *run)
 }
 
 static int
-vy_task_dump_execute(struct vy_task *task)
+vy_task_write_run(struct vy_scheduler *scheduler, struct vy_task *task)
 {
 	struct vy_index *index = task->index;
+	struct vy_stmt_stream *wi = task->wi;
 
-	return vy_run_write(task->new_run, index->env->path,
-			    index->space_id, index->id, task->wi,
-			    task->page_size, index->cmp_def,
-			    index->key_def, task->max_output_count,
-			    task->bloom_fpr);
+	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
+		     {diag_set(ClientError, ER_INJECTION,
+			       "vinyl dump"); return -1;});
+
+	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		usleep(inj->dparam * 1000000);
+
+	struct vy_run_writer writer;
+	if (vy_run_writer_create(&writer, task->new_run, index->env->path,
+				 index->space_id, index->id,
+				 index->cmp_def, index->key_def,
+				 task->page_size, task->bloom_fpr,
+				 task->max_output_count) != 0)
+		goto fail;
+
+	if (wi->iface->start(wi) != 0)
+		goto fail_abort_writer;
+	int rc;
+	struct tuple *stmt = NULL;
+	while ((rc = wi->iface->next(wi, &stmt)) == 0 && stmt != NULL) {
+		inj = errinj(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT, ERRINJ_DOUBLE);
+		if (inj != NULL && inj->dparam > 0)
+			usleep(inj->dparam * 1000000);
+
+		rc = vy_run_writer_append_stmt(&writer, stmt);
+		if (rc != 0)
+			break;
+
+		if (!scheduler->is_worker_pool_running) {
+			diag_set(FiberIsCancelled);
+			rc = -1;
+			break;
+		}
+	}
+	wi->iface->stop(wi);
+
+	if (rc == 0)
+		rc = vy_run_writer_commit(&writer);
+	if (rc != 0)
+		goto fail_abort_writer;
+
+	return 0;
+
+fail_abort_writer:
+	vy_run_writer_abort(&writer);
+fail:
+	return -1;
+}
+
+static int
+vy_task_dump_execute(struct vy_scheduler *scheduler, struct vy_task *task)
+{
+	return vy_task_write_run(scheduler, task);
 }
 
 static int
@@ -991,15 +1041,9 @@ err:
 }
 
 static int
-vy_task_compact_execute(struct vy_task *task)
+vy_task_compact_execute(struct vy_scheduler *scheduler, struct vy_task *task)
 {
-	struct vy_index *index = task->index;
-
-	return vy_run_write(task->new_run, index->env->path,
-			    index->space_id, index->id, task->wi,
-			    task->page_size, index->cmp_def,
-			    index->key_def, task->max_output_count,
-			    task->bloom_fpr);
+	return vy_task_write_run(scheduler, task);
 }
 
 static int
@@ -1561,11 +1605,10 @@ wait:
 	return 0;
 }
 
-static int
-vy_worker_f(va_list va)
+static void *
+vy_worker_f(void *arg)
 {
-	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
-	coio_enable();
+	struct vy_scheduler *scheduler = arg;
 	struct vy_task *task = NULL;
 
 	tt_pthread_mutex_lock(&scheduler->mutex);
@@ -1585,7 +1628,7 @@ vy_worker_f(va_list va)
 		assert(task != NULL);
 
 		/* Execute task */
-		task->status = task->ops->execute(task);
+		task->status = task->ops->execute(scheduler, task);
 		if (task->status != 0) {
 			struct diag *diag = diag_get();
 			assert(!diag_is_empty(diag));
@@ -1597,5 +1640,5 @@ vy_worker_f(va_list va)
 		stailq_add_tail_entry(&scheduler->output_queue, task, link);
 	}
 	tt_pthread_mutex_unlock(&scheduler->mutex);
-	return 0;
+	return NULL;
 }

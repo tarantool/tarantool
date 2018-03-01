@@ -12,7 +12,9 @@ index = space:create_index('primary', { type = 'hash' })
 ...
 errinj.info()
 ---
-- ERRINJ_WAL_WRITE:
+- ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT:
+    state: 0
+  ERRINJ_WAL_WRITE:
     state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false

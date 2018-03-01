@@ -41,6 +41,7 @@
 #include "vy_read_view.h"
 #include "vy_stat.h"
 #include "index_def.h"
+#include "xlog.h"
 
 #include "small/mempool.h"
 #include "salad/bloom.h"
@@ -418,14 +419,6 @@ int
 vy_run_remove_files(const char *dir, uint32_t space_id,
 		    uint32_t iid, int64_t run_id);
 
-int
-vy_run_write(struct vy_run *run, const char *dirpath,
-	     uint32_t space_id, uint32_t iid,
-	     struct vy_stmt_stream *wi, uint64_t page_size,
-	     const struct key_def *cmp_def,
-	     const struct key_def *key_def,
-	     size_t max_output_count, double bloom_fpr);
-
 /**
  * Allocate a new run slice.
  * This function increments @run->refs.
@@ -574,6 +567,88 @@ void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 		     const struct key_def *cmp_def, struct tuple_format *format,
 		     struct tuple_format *upsert_format, bool is_primary);
+
+/**
+ * Run_writer fills a created run with statements one by one,
+ * splitting them into pages.
+ */
+struct vy_run_writer {
+	/** Run to fill. */
+	struct vy_run *run;
+	/** Path to directory with run files. */
+	const char *dirpath;
+	/** Identifier of a space owning the run. */
+	uint32_t space_id;
+	/** Identifier of an index owning the run. */
+	uint32_t iid;
+	/**
+	 * Key definition to extract from tuple and store as page
+	 * min key, run min/max keys, and secondary index
+	 * statements.
+	 */
+	const struct key_def *cmp_def;
+	/** Key definition to calculate bloom. */
+	const struct key_def *key_def;
+	/**
+	 * Minimal page size. When a page becames bigger, it is
+	 * dumped.
+	 */
+	uint64_t page_size;
+	/**
+	 * Current page info capacity. Can grow with page number.
+	 */
+	uint32_t page_info_capacity;
+	/** Xlog to write data. */
+	struct xlog data_xlog;
+	/** Set iff bloom filter is available. */
+	bool has_bloom;
+	/** Bloom filter. */
+	struct bloom_spectrum bloom;
+	/** Buffer of a current page row offsets. */
+	struct ibuf row_index_buf;
+	/**
+	 * Remember a last written statement to use it as a source
+	 * of max key of a finished run.
+	 */
+	struct tuple *last_stmt;
+};
+
+/** Create a run writer to fill a run with statements. */
+int
+vy_run_writer_create(struct vy_run_writer *writer, struct vy_run *run,
+		const char *dirpath, uint32_t space_id, uint32_t iid,
+		const struct key_def *cmp_def, const struct key_def *key_def,
+		uint64_t page_size, double bloom_fpr, size_t max_output_count);
+
+/**
+ * Write a specified statement into a run.
+ * @param writer Writer to write a statement.
+ * @param stmt Statement to write.
+ *
+ * @retval -1 Memory error.
+ * @retval  0 Success.
+ */
+int
+vy_run_writer_append_stmt(struct vy_run_writer *writer, struct tuple *stmt);
+
+/**
+ * Finalize run writing by writing run index into file. The writer
+ * is deleted after call.
+ * @param writer Run writer.
+ * @retval -1 Memory or IO error.
+ * @retval  0 Success.
+ */
+int
+vy_run_writer_commit(struct vy_run_writer *writer);
+
+/**
+ * Abort run writing. Can not delete a run and run's file here,
+ * becase it must be done from tx thread. The writer is deleted
+ * after call.
+ * @param Run writer.
+ */
+void
+vy_run_writer_abort(struct vy_run_writer *writer);
 
 #if defined(__cplusplus)
 } /* extern "C" */
