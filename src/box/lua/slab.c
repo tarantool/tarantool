@@ -167,7 +167,17 @@ lbox_slab_info(struct lua_State *L)
 	/** How much address space has been already touched
 	 * (tuples and indexes) */
 	lua_pushstring(L, "arena_size");
-	luaL_pushuint64(L, totals.total + index_stats.totals.total);
+	/*
+	 * We could use totals.total + index_stats.total here,
+	 * but this would not account for slabs which are sitting
+	 * in slab cache or in the arena, available for reuse.
+	 * Make sure a simple formula:
+	 * items_used_ratio > 0.9 && arena_used_ratio > 0.9 &&
+	 * quota_used_ratio > 0.9 work as an indicator
+	 * for reaching Tarantool memory limit.
+	 */
+	size_t arena_size = tuple_arena->used;
+	luaL_pushuint64(L, arena_size);
 	lua_settable(L, -3);
 	/**
 	 * How much of this formatted address space is used for
@@ -178,7 +188,7 @@ lbox_slab_info(struct lua_State *L)
 	lua_settable(L, -3);
 
 	ratio = 100 * ((double) (totals.used + index_stats.totals.used)
-		       / (double) (totals.total + index_stats.totals.total));
+		       / (double) arena_size);
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.1lf%%", ratio);
 
 	lua_pushstring(L, "arena_used_ratio");

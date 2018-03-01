@@ -357,8 +357,24 @@ fiber.sleep(0)
 s:drop()
 -- Wait for the dump task to complete.
 box.snapshot()
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
+
+--
+-- Check that all dump/compact tasks that are in progress at
+-- the time when the server stops are aborted immediately.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1', {parts = {1, 'unsigned'}})
+_ = s:create_index('i2', {parts = {2, 'unsigned'}})
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 0.01)
+for i = 1, 1000 do s:replace{i, i} end
+_ = fiber.create(function() box.snapshot() end)
+fiber.sleep(0.01)
 test_run:cmd('switch default')
+t1 = fiber.time()
 test_run:cmd("stop server test")
+t2 = fiber.time()
+t2 - t1 < 1
 test_run:cmd("cleanup server test")
 
 --

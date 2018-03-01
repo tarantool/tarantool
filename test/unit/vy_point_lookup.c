@@ -13,13 +13,48 @@
 
 uint32_t schema_version;
 
+static int
+write_run(struct vy_run *run, const char *dir_name,
+	  struct vy_index *index, struct vy_stmt_stream *wi)
+{
+	struct vy_run_writer writer;
+	if (vy_run_writer_create(&writer, run, dir_name,
+				 index->space_id, index->id,
+				 index->cmp_def, index->key_def,
+				 4096, 0.1, 100500) != 0)
+		goto fail;
+
+	if (wi->iface->start(wi) != 0)
+		goto fail_abort_writer;
+	int rc;
+	struct tuple *stmt = NULL;
+	while ((rc = wi->iface->next(wi, &stmt)) == 0 && stmt != NULL) {
+		rc = vy_run_writer_append_stmt(&writer, stmt);
+		if (rc != 0)
+			break;
+	}
+	wi->iface->stop(wi);
+
+	if (rc == 0)
+		rc = vy_run_writer_commit(&writer);
+	if (rc != 0)
+		goto fail_abort_writer;
+
+	return 0;
+
+fail_abort_writer:
+	vy_run_writer_abort(&writer);
+fail:
+	return -1;
+}
+
 static void
 test_basic()
 {
 	header();
 	plan(15);
 
-	/** Suppress info messages from vy_run_write(). */
+	/** Suppress info messages from vy_run_writer. */
 	say_set_log_level(S_WARN);
 
 	const size_t QUOTA = 100 * 1024 * 1024;
@@ -72,7 +107,7 @@ test_basic()
 	isnt(dir_name, NULL, "temp dir name is not NULL")
 	char path[PATH_MAX];
 	strcpy(path, dir_name);
-	strcat(path, "/0");
+	strcat(path, "/512");
 	rc = mkdir(path, 0777);
 	is(rc, 0, "temp dir create (2)");
 	strcat(path, "/0");
@@ -163,9 +198,7 @@ test_basic()
 	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
 
-	rc = vy_run_write(run, dir_name, 0, pk->id,
-			  write_stream, 4096, pk->cmp_def, pk->key_def,
-			  100500, 0.1);
+	rc = write_run(run, dir_name, pk, write_stream);
 	is(rc, 0, "vy_run_write");
 
 	write_stream->iface->close(write_stream);
@@ -200,9 +233,7 @@ test_basic()
 	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");
 
-	rc = vy_run_write(run, dir_name, 0, pk->id,
-			  write_stream, 4096, pk->cmp_def, pk->key_def,
-			  100500, 0.1);
+	rc = write_run(run, dir_name, pk, write_stream);
 	is(rc, 0, "vy_run_write");
 
 	write_stream->iface->close(write_stream);
