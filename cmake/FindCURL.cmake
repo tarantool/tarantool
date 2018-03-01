@@ -68,4 +68,31 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(CURL
 if(CURL_FOUND)
   set(CURL_LIBRARIES ${CURL_LIBRARY})
   set(CURL_INCLUDE_DIRS ${CURL_INCLUDE_DIR})
+  set(CMAKE_REQUIRED_LIBRARIES ${CURL_LIBRARIES})
+  set(CMAKE_REQUIRED_INCLUDES ${CURL_INCLUDE_DIRS})
+  check_c_source_runs("
+    #include <curl/curl.h>
+
+    int main()
+    {
+    #ifdef CURL_VERSION_SSL
+        curl_version_info_data *data = curl_version_info(CURLVERSION_NOW);
+        if (data->features & CURL_VERSION_SSL)
+            return 0;
+    #endif
+        return -1;
+    }
+    " CURL_SUPPORTS_SSL)
+  set(CMAKE_REQUIRED_LIBRARIES "")
+  set(CMAKE_REQUIRED_INCLUDES "")
+    if (NOT DEFINED CURL_SUPPORTS_SSL_EXITCODE OR CURL_SUPPORTS_SSL_EXITCODE)
+        unset(CURL_LIBRARIES)
+        unset(CURL_INCLUDE_DIRS)
+        set(CURL_FOUND false)
+        if (CURL_FIND_REQUIRED)
+            message(FATAL_ERROR "Curl was built without SSL support")
+        else()
+            message(WARNING "Curl was built without SSL support")
+        endif()
+    endif()
 endif()
