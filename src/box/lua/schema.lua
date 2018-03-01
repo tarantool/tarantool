@@ -335,9 +335,17 @@ function update_format(format)
         else
             for k, v in pairs(given) do
                 if k == 1 then
-                    field.name = v;
-                elseif k == 2 then
-                    field.type = v;
+                    if given.name then
+                        if not given.type then
+                            field.type = v
+                        else
+                            field[1] = v
+                        end
+                    else
+                        field.name = v
+                    end
+                elseif k == 2 and not given.type and not given.name then
+                    field.type = v
                 else
                     field[k] = v
                 end

@@ -886,3 +886,19 @@ pk = s:create_index('pk')
 s:replace{1}
 pk:alter{parts = {{1, 'string'}}} -- Must fail.
 s:drop()
+
+--
+-- gh-2895: do not ignore field type in space format, if it is not
+-- specified via 'type = ...'.
+--
+format = {}
+format[1] = {name = 'field1', 'unsigned'}
+format[2] = {name = 'field2', 'unsigned'}
+s = box.schema.create_space('test', {format = format})
+s:format()
+
+format[2] = {name = 'field2', 'unsigned', 'unknown'}
+s:format(format)
+s:format()
+
+s:drop()

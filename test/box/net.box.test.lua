@@ -871,4 +871,28 @@ while disconnected == false do fiber.sleep(0.01) end
 disconnected -- true
 
 box.session.on_disconnect(nil, on_disconnect)
+
+--
+-- gh-2666: check that netbox.call is not repeated on schema
+-- change.
+--
+box.schema.user.grant('guest', 'write', 'space', '_space')
+box.schema.user.grant('guest', 'write', 'space', '_schema')
+count = 0
+function create_space(name) count = count + 1 box.schema.create_space(name) return true end
+c = net.connect(box.cfg.listen)
+c:call('create_space', {'test1'})
+count
+c:call('create_space', {'test2'})
+count
+c:call('create_space', {'test3'})
+count
+box.space.test1:drop()
+box.space.test2:drop()
+box.space.test3:drop()
+box.schema.user.revoke('guest', 'write', 'space', '_space')
+box.schema.user.revoke('guest', 'write', 'space', '_schema')
+
 box.schema.user.revoke('guest', 'execute', 'universe')
+c:close()
+c = nil
