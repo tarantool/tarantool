@@ -92,6 +92,9 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
 const char *
 schema_find_name(enum schema_object_type type, uint32_t object_id);
 
+bool
+space_is_system(struct space *space);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -115,9 +118,6 @@ space_cache_replace(struct space *space);
 /** Delete a space from the space cache. */
 struct space *
 space_cache_delete(uint32_t id);
-
-bool
-space_is_system(struct space *space);
 
 void
 schema_init();
