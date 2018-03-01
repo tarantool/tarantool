@@ -492,7 +492,7 @@ t = s:on_replace(function () s:drop() end, t)
 ...
 s:replace({5, 6})
 ---
-- error: Space _index does not support multi-statement transactions
+- error: DDL does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.func.create('newf') end, t)
 ---

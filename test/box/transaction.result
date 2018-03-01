@@ -107,7 +107,7 @@ s = box.schema.space.create('test');
 ...
 box.begin() index = s:create_index('primary');
 ---
-- error: Space _index does not support multi-statement transactions
+- error: DDL does not support multi-statement transactions
 ...
 box.rollback();
 ---

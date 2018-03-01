@@ -24,7 +24,7 @@ box.begin()
 ...
 s:truncate()
 ---
-- error: Space _truncate does not support multi-statement transactions
+- error: DDL does not support multi-statement transactions
 ...
 box.commit()
 ---
