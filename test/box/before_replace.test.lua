@@ -223,4 +223,44 @@ state, row = fun(param, state)
 row.HEADER.type
 row.BODY.space_id == s.id
 
+-- gh-3128 before_replace with run_triggers
+s2 = box.schema.space.create("test2")
+_ = s2:create_index("prim")
+before_replace1 = function() s2:insert{1} s:run_triggers(false) end
+before_replace2 = function() s2:insert{2} end
+on_replace = function() s2:insert{3} end
+
+type(s:on_replace(on_replace))
+type(s:before_replace(before_replace1))
+type(s:before_replace(before_replace2))
+
+s:insert{1, 1}
+s2:select{}
+s:truncate()
+s2:truncate()
+
+s:on_replace(nil, on_replace)
+s:before_replace(nil, before_replace1)
+s:before_replace(nil, before_replace2)
+
+--
+-- gh-3128
+-- If at least one before trigger returns old
+-- insertion will be aborted, but other before triggers
+-- will be executed
+before_replace1 = function(old, new) s2:insert{1} return old end
+before_replace2 = function(old, new) s2:insert{2} end
+
+type(s:on_replace(on_replace))
+type(s:before_replace(before_replace1))
+type(s:before_replace(before_replace2))
+
+s:insert{1, 1}
+s:select{}
+s2:select{}
+
+s:on_replace(nil, on_replace)
+s:before_replace(nil, before_replace1)
+s:before_replace(nil, before_replace2)
+s2:drop()
 s:drop()
