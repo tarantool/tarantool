@@ -2659,7 +2659,7 @@ vy_squash_schedule(struct vy_index *index, struct tuple *stmt,
 		   void /* struct vy_env */ *arg);
 
 static struct vy_env *
-vy_env_new(const char *path, size_t memory, size_t cache,
+vy_env_new(const char *path, size_t memory,
 	   int read_threads, int write_threads, bool force_recovery)
 {
 	enum { KB = 1000, MB = 1000 * 1000 };
@@ -2734,7 +2734,7 @@ vy_env_new(const char *path, size_t memory, size_t cache,
 		      VY_QUOTA_UPDATE_INTERVAL);
 	e->quota_timer.data = e;
 	ev_timer_start(loop(), &e->quota_timer);
-	vy_cache_env_create(&e->cache_env, slab_cache, cache);
+	vy_cache_env_create(&e->cache_env, slab_cache);
 	vy_run_env_create(&e->run_env);
 	vy_log_init(e->path);
 	return e;
@@ -2776,7 +2776,7 @@ vy_env_delete(struct vy_env *e)
 }
 
 struct vinyl_engine *
-vinyl_engine_new(const char *dir, size_t memory, size_t cache,
+vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery)
 {
 	struct vinyl_engine *vinyl = calloc(1, sizeof(*vinyl));
@@ -2786,7 +2786,7 @@ vinyl_engine_new(const char *dir, size_t memory, size_t cache,
 		return NULL;
 	}
 
-	vinyl->env = vy_env_new(dir, memory, cache, read_threads,
+	vinyl->env = vy_env_new(dir, memory, read_threads,
 				write_threads, force_recovery);
 	if (vinyl->env == NULL) {
 		free(vinyl);
@@ -2804,6 +2804,12 @@ vinyl_engine_shutdown(struct engine *engine)
 	struct vinyl_engine *vinyl = (struct vinyl_engine *)engine;
 	vy_env_delete(vinyl->env);
 	free(vinyl);
+}
+
+void
+vinyl_engine_set_cache(struct vinyl_engine *vinyl, size_t quota)
+{
+	vy_cache_env_set_quota(&vinyl->env->cache_env, quota);
 }
 
 void
