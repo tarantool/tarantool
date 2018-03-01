@@ -2338,3 +2338,37 @@ pk:alter{parts = {{1, 'string'}}} -- Must fail.
 s:drop()
 ---
 ...
+--
+-- gh-2895: do not ignore field type in space format, if it is not
+-- specified via 'type = ...'.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', 'unsigned'}
+---
+...
+format[2] = {name = 'field2', 'unsigned'}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+s:format()
+---
+- [{'type': 'unsigned', 'name': 'field1'}, {'type': 'unsigned', 'name': 'field2'}]
+...
+format[2] = {name = 'field2', 'unsigned', 'unknown'}
+---
+...
+s:format(format)
+---
+- error: 'Can''t modify space ''test'': field 2 format is not map with string keys'
+...
+s:format()
+---
+- [{'type': 'unsigned', 'name': 'field1'}, {'type': 'unsigned', 'name': 'field2'}]
+...
+s:drop()
+---
+...
