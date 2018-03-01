@@ -651,6 +651,12 @@ generic_index_info(struct index *index, struct info_handler *handler)
 }
 
 void
+generic_index_reset_stat(struct index *index)
+{
+	(void)index;
+}
+
+void
 generic_index_begin_build(struct index *)
 {
 }

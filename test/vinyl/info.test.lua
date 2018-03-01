@@ -309,6 +309,11 @@ stat_diff(gstat(), st, 'tx')
 box.commit()
 stat_diff(gstat(), st, 'tx')
 
+-- box.stat.reset
+box.stat.reset()
+istat()
+gstat()
+
 s:drop()
 
 --

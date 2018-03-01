@@ -188,3 +188,11 @@ engine_memory_stat(struct engine_memory_stat *stat)
 	engine_foreach(engine)
 		engine->vtab->memory_stat(engine, stat);
 }
+
+void
+engine_reset_stat(void)
+{
+	struct engine *engine;
+	engine_foreach(engine)
+		engine->vtab->reset_stat(engine);
+}

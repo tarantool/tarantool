@@ -375,6 +375,12 @@ sysview_engine_memory_stat(struct engine *engine,
 	(void)stat;
 }
 
+static void
+sysview_engine_reset_stat(struct engine *engine)
+{
+	(void)engine;
+}
+
 static int
 sysview_engine_check_space_def(struct space_def *def)
 {
@@ -403,6 +409,7 @@ static const struct engine_vtab sysview_engine_vtab = {
 	/* .collect_garbage = */ sysview_engine_collect_garbage,
 	/* .backup = */ sysview_engine_backup,
 	/* .memory_stat = */ sysview_engine_memory_stat,
+	/* .reset_stat = */ sysview_engine_reset_stat,
 	/* .check_space_def = */ sysview_engine_check_space_def,
 };
 

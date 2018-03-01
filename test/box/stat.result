@@ -70,6 +70,34 @@ box.stat.ERROR.total
 ---
 - 1
 ...
+-- reset
+box.stat.reset()
+---
+...
+box.stat.INSERT.total
+---
+- 0
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 0
+...
+box.stat.ERROR.total
+---
+- 0
+...
 test_run:cmd('restart server default')
 -- statistics must be zero
 box.stat.INSERT.total

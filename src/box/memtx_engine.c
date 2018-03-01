@@ -890,6 +890,12 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->index += index_stats.totals.used;
 }
 
+static void
+memtx_engine_reset_stat(struct engine *engine)
+{
+	(void)engine;
+}
+
 static int
 memtx_engine_check_space_def(struct space_def *def)
 {
@@ -918,6 +924,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .collect_garbage = */ memtx_engine_collect_garbage,
 	/* .backup = */ memtx_engine_backup,
 	/* .memory_stat = */ memtx_engine_memory_stat,
+	/* .reset_stat = */ memtx_engine_reset_stat,
 	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 

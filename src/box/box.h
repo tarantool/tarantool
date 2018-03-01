@@ -140,6 +140,12 @@ box_backup_stop(void);
  */
 const char *box_status(void);
 
+/**
+ * Reset box statistics.
+ */
+void
+box_reset_stat(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

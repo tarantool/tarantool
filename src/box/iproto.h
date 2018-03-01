@@ -45,6 +45,12 @@ extern unsigned iproto_readahead;
 size_t
 iproto_mem_used(void);
 
+/**
+ * Reset network statistics.
+ */
+void
+iproto_reset_stat(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

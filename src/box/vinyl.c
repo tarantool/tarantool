@@ -474,6 +474,31 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 }
 
 static void
+vinyl_index_reset_stat(struct index *base)
+{
+	struct vy_index *index = vy_index(base);
+	struct vy_index_stat *stat = &index->stat;
+	struct vy_cache_stat *cache_stat = &index->cache.stat;
+
+	stat->lookup = 0;
+	latency_reset(&stat->latency);
+	memset(&stat->get, 0, sizeof(stat->get));
+	memset(&stat->put, 0, sizeof(stat->put));
+	memset(&stat->upsert, 0, sizeof(stat->upsert));
+	memset(&stat->txw.iterator, 0, sizeof(stat->txw.iterator));
+	memset(&stat->memory.iterator, 0, sizeof(stat->memory.iterator));
+	memset(&stat->disk.iterator, 0, sizeof(stat->disk.iterator));
+	memset(&stat->disk.dump, 0, sizeof(stat->disk.dump));
+	memset(&stat->disk.compact, 0, sizeof(stat->disk.compact));
+
+	cache_stat->lookup = 0;
+	memset(&cache_stat->get, 0, sizeof(cache_stat->get));
+	memset(&cache_stat->put, 0, sizeof(cache_stat->put));
+	memset(&cache_stat->invalidate, 0, sizeof(cache_stat->invalidate));
+	memset(&cache_stat->evict, 0, sizeof(cache_stat->evict));
+}
+
+static void
 vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct vy_env *env = vy_env(engine);
@@ -494,6 +519,15 @@ vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->tx += mstats.totals.used;
 	mempool_stats(&env->xm->read_view_mempool, &mstats);
 	stat->tx += mstats.totals.used;
+}
+
+static void
+vinyl_engine_reset_stat(struct engine *engine)
+{
+	struct vy_env *env = vy_env(engine);
+	struct tx_manager *xm = env->xm;
+
+	memset(&xm->stat, 0, sizeof(xm->stat));
 }
 
 /** }}} Introspection */
@@ -4066,6 +4100,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .collect_garbage = */ vinyl_engine_collect_garbage,
 	/* .backup = */ vinyl_engine_backup,
 	/* .memory_stat = */ vinyl_engine_memory_stat,
+	/* .reset_stat = */ vinyl_engine_reset_stat,
 	/* .check_space_def = */ vinyl_engine_check_space_def,
 };
 
@@ -4107,6 +4142,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ vinyl_index_info,
+	/* .reset_stat = */ vinyl_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,
 	/* .build_next = */ generic_index_build_next,

@@ -58,6 +58,12 @@ void
 latency_destroy(struct latency *latency);
 
 /**
+ * Reset a latency counter.
+ */
+void
+latency_reset(struct latency *latency);
+
+/**
  * Update a latency counter with a new observation.
  * @value is the observed latency value, in seconds.
  */

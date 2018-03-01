@@ -65,6 +65,15 @@ histogram_delete(struct histogram *hist)
 	free(hist);
 }
 
+void
+histogram_reset(struct histogram *hist)
+{
+	hist->total = 0;
+	for (size_t i = 0; i < hist->n_buckets; i++)
+		hist->buckets[i].count = 0;
+	hist->max = hist->buckets[hist->n_buckets - 1].max;
+}
+
 static struct histogram_bucket *
 histogram_lookup_bucket(struct histogram *hist, int64_t val)
 {

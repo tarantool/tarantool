@@ -912,6 +912,117 @@ stat_diff(gstat(), st, 'tx')
 ---
 - commit: 1
 ...
+-- box.stat.reset
+box.stat.reset()
+---
+...
+istat()
+---
+- rows: 306
+  run_avg: 1
+  bytes: 317731
+  upsert:
+    squashed: 0
+    applied: 0
+  lookup: 0
+  run_count: 2
+  cache:
+    invalidate:
+      rows: 0
+      bytes: 0
+    index_size: 49152
+    rows: 13
+    evict:
+      rows: 0
+      bytes: 0
+    put:
+      rows: 0
+      bytes: 0
+    lookup: 0
+    bytes: 13793
+    get:
+      rows: 0
+      bytes: 0
+  range_count: 2
+  put:
+    rows: 0
+    bytes: 0
+  disk:
+    index_size: 1050
+    rows: 100
+    bytes: 104300
+    dump:
+      in:
+        rows: 0
+        bytes: 0
+      count: 0
+      out:
+        rows: 0
+        bytes: 0
+    compact:
+      in:
+        rows: 0
+        bytes: 0
+      count: 0
+      out:
+        rows: 0
+        bytes: 0
+    iterator:
+      read:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
+        rows: 0
+        bytes: 0
+      bloom:
+        hit: 0
+        miss: 0
+      lookup: 0
+      get:
+        rows: 0
+        bytes: 0
+    pages: 25
+    bytes_compressed: <bytes_compressed>
+    bloom_size: 8192
+  txw:
+    bytes: 0
+    rows: 0
+    iterator:
+      lookup: 0
+      get:
+        rows: 0
+        bytes: 0
+  run_histogram: '[1]:2'
+  memory:
+    bytes: 213431
+    index_size: 49152
+    rows: 206
+    iterator:
+      lookup: 0
+      get:
+        rows: 0
+        bytes: 0
+  get:
+    rows: 0
+    bytes: 0
+...
+gstat()
+---
+- cache:
+    limit: 15360
+    tuples: 13
+    used: 14313
+  tx:
+    conflict: 0
+    commit: 0
+    rollback: 0
+    statements: 0
+    transactions: 0
+    gap_locks: 0
+    read_views: 0
+  quota:
+    limit: 134217728
+    used: 262583
+...
 s:drop()
 ---
 ...
