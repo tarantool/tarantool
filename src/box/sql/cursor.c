@@ -38,8 +38,10 @@
 void
 sqlite3ClearCursor(BtCursor * pCur)
 {
-	sqlite3_free(pCur->pKey);
-	pCur->pKey = 0;
+	free(pCur->key);
+	pCur->key = 0;
+	pCur->iter = NULL;
+	pCur->last_tuple = NULL;
 	pCur->eState = CURSOR_INVALID;
 }
 
@@ -55,16 +57,11 @@ sqlite3CursorHintFlags(BtCursor * pCur, unsigned x)
 
 /*
  * Initialize memory that will be converted into a BtCursor object.
- *
- * The simple approach here would be to memset() the entire object
- * to zero.  But it turns out that the apPage[] and aiIdx[] arrays
- * do not need to be zeroed and they are large, so we can save a lot
- * of run-time by skipping the initialization of those elements.
  */
 void
 sqlite3CursorZero(BtCursor * p)
 {
-	memset(p, 0, offsetof(BtCursor, hints));
+	memset(p, 0, sizeof(*p));
 }
 
 /*
@@ -165,7 +162,6 @@ sqlite3CursorMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
 {
 	assert(pRes);
 	assert(pIdxKey);
-	assert(pCur->pKeyInfo);
 	assert((pCur->curFlags & BTCF_TaCursor) ||
 	       (pCur->curFlags & BTCF_TEphemCursor));
 

@@ -58,19 +58,16 @@ typedef struct BtCursor BtCursor;
  * for ordinary space, or to TEphemCursor for ephemeral space.
  */
 struct BtCursor {
-	BtCursor *pNext;	/* Forms a linked list of all cursors */
 	i64 nKey;		/* Size of pKey, or last integer key */
-	void *pKey;		/* Saved key that was cursor last known position */
 	Pgno pgnoRoot;		/* Contains both space_id and index_id */
 	u8 curFlags;		/* zero or more BTCF_* flags defined below */
 	u8 eState;		/* One of the CURSOR_XXX constants (see below) */
 	u8 hints;		/* As configured by CursorSetHints() */
-	/* All fields above are zeroed when the cursor is allocated.  See
-	 * sqlite3CursorZero().  Fields that follow must be manually
-	 * initialized.
-	 */
-	struct KeyInfo *pKeyInfo;	/* Argument passed to comparison function */
-	void *pTaCursor;	/* Tarantool cursor */
+	struct space *space;
+	struct iterator *iter;
+	enum iterator_type iter_type;
+	struct tuple *last_tuple;
+	char *key;		/* Saved key that was cursor last known position */
 };
 
 void sqlite3CursorZero(BtCursor *);

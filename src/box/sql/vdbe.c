@@ -3247,10 +3247,8 @@ case OP_OpenWrite:
 	assert(p2 >= 1);
 	pBtCur = pCur->uc.pCursor;
 	pBtCur->pgnoRoot = p2;
-	pBtCur->pKeyInfo = pKeyInfo;
 	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags |= BTCF_TaCursor;
-	pBtCur->pTaCursor = 0;
 	pCur->pKeyInfo = pKeyInfo;
 
 	open_cursor_set_hints:
@@ -3287,10 +3285,8 @@ case OP_OpenTEphemeral: {
 	pBtCur = pCx->uc.pCursor;
 	/* Ephemeral spaces don't have space_id */
 	pBtCur->pgnoRoot = 0;
-	pBtCur->pKeyInfo = pCx->pKeyInfo;
 	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags = BTCF_TEphemCursor;
-	pBtCur->pTaCursor = 0;
 
 	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2,
 					     pOp->p4.pKeyInfo->aColl[0]);
@@ -4439,11 +4435,8 @@ case OP_IdxInsert: {        /* in2 */
 		rc = sqlite3VdbeSorterWrite(pC, pIn2);
 	} else {
 		BtCursor *pBtCur = pC->uc.pCursor;
-		assert((pIn2->z == 0) == (pBtCur->pKeyInfo == 0));
-
 		pBtCur->nKey = pIn2->n;
-		pBtCur->pKey = pIn2->z;
-
+		pBtCur->key = pIn2->z;
 		if (pBtCur->curFlags & BTCF_TaCursor) {
 			/* Make sure that memory has been allocated on region. */
 			assert(aMem[pOp->p2].flags & MEM_Ephem);
@@ -4468,7 +4461,7 @@ case OP_IdxInsert: {        /* in2 */
 		 * nullified.
 		 */
 		pBtCur->nKey = 0;
-		pBtCur->pKey = NULL;
+		pBtCur->key = NULL;
 	}
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {
