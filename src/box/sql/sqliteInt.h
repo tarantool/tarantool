@@ -984,8 +984,6 @@ struct sqlite3 {
 		u8 imposterTable;	/* Building an imposter table */
 	} init;
 	int nVdbeActive;	/* Number of VDBEs currently running */
-	int nVdbeRead;		/* Number of active VDBEs that read or write */
-	int nVdbeWrite;		/* Number of active VDBEs that read and write */
 	int nVdbeExec;		/* Number of nested calls to VdbeExec() */
 	int (*xTrace) (u32, void *, void *, void *);	/* Trace function */
 	void *pTraceArg;	/* Argument to the trace function */

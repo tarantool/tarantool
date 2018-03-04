@@ -581,7 +581,6 @@ opIterNext(VdbeOpIter * p)
  *
  *   *  OP_Halt with P1=SQLITE_CONSTRAINT and P2=ON_CONFLICT_ACTION_ABORT.
  *   *  OP_HaltIfNull with P1=SQLITE_CONSTRAINT and P2=ON_CONFLICT_ACTION_ABORT.
- *   *  OP_Destroy
  *   *  OP_FkCounter with P2==0 (immediate foreign key constraint)
  *
  * Then check that the value of Parse.mayAbort is true if an
@@ -603,11 +602,9 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
 
 	while ((pOp = opIterNext(&sIter)) != 0) {
 		int opcode = pOp->opcode;
-		if (opcode == OP_Destroy ||
-		    ((opcode == OP_Halt || opcode == OP_HaltIfNull)
-			&& ((pOp->p1 & 0xff) == SQLITE_CONSTRAINT
-			    && pOp->p2 == ON_CONFLICT_ACTION_ABORT))
-		    ) {
+		if ((opcode == OP_Halt || opcode == OP_HaltIfNull) &&
+		    (pOp->p1 & 0xff) == SQLITE_CONSTRAINT &&
+	            pOp->p2 == ON_CONFLICT_ACTION_ABORT){
 			hasAbort = 1;
 			break;
 		}
@@ -639,12 +636,9 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
  * (2) Compute the maximum number of arguments used by any SQL function
  *     and store that value in *pMaxFuncArgs.
  *
- * (3) Update the Vdbe.readOnly and Vdbe.bIsReader flags to accurately
- *     indicate what the prepared statement actually does.
+ * (3) Initialize the p4.xAdvance pointer on opcodes that use it.
  *
- * (4) Initialize the p4.xAdvance pointer on opcodes that use it.
- *
- * (5) Reclaim the memory allocated for storing labels.
+ * (4) Reclaim the memory allocated for storing labels.
  *
  * This routine will only function correctly if the mkopcodeh.tcl generator
  * script numbers the opcodes correctly.  Changes to this routine must be
@@ -657,8 +651,6 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 	Op *pOp;
 	Parse *pParse = p->pParse;
 	int *aLabel = pParse->aLabel;
-	p->readOnly = 1;
-	p->bIsReader = 0;
 	pOp = &p->aOp[p->nOp - 1];
 	while (1) {
 
@@ -673,17 +665,6 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 			 * cases from this switch!
 			 */
 			switch (pOp->opcode) {
-			case OP_Transaction:{
-					if (pOp->p2 != 0)
-						p->readOnly = 0;
-					/* fall thru */
-					FALLTHROUGH;
-				}
-			case OP_AutoCommit:
-			case OP_Savepoint:{
-					p->bIsReader = 1;
-					break;
-				}
 			case OP_Next:
 			case OP_NextIfOpen:
 			case OP_SorterNext:{
@@ -2421,22 +2402,14 @@ checkActiveVdbeCnt(sqlite3 * db)
 {
 	Vdbe *p;
 	int cnt = 0;
-	int nWrite = 0;
-	int nRead = 0;
 	p = db->pVdbe;
 	while (p) {
 		if (sqlite3_stmt_busy((sqlite3_stmt *) p)) {
 			cnt++;
-			if (p->readOnly == 0)
-				nWrite++;
-			if (p->bIsReader)
-				nRead++;
 		}
 		p = p->pNext;
 	}
 	assert(cnt == db->nVdbeActive);
-	assert(nWrite == db->nVdbeWrite);
-	assert(nRead == db->nVdbeRead);
 }
 #else
 #define checkActiveVdbeCnt(x)
@@ -2592,7 +2565,7 @@ sqlite3VdbeHalt(Vdbe * p)
 	/* No commit or rollback needed if the program never started or if the
 	 * SQL statement does not read or write a database file.
 	 */
-	if (p->pc >= 0 && p->bIsReader) {
+	if (p->pc >= 0) {
 		int mrc;	/* Primary error code from p->rc */
 		int eStatementOp = 0;
 		int isSpecialError;	/* Set to true if a 'special' error */
@@ -2614,7 +2587,7 @@ sqlite3VdbeHalt(Vdbe * p)
 			 * pagerStress() in pager.c), the rollback is required to restore
 			 * the pager to a consistent state.
 			 */
-			if (!p->readOnly || mrc != SQLITE_INTERRUPT) {
+			if (mrc != SQLITE_INTERRUPT) {
 				if ((mrc == SQLITE_NOMEM || mrc == SQLITE_FULL)
 				    && p->autoCommit == 0) {
 					eStatementOp = SAVEPOINT_ROLLBACK;
@@ -2650,7 +2623,11 @@ sqlite3VdbeHalt(Vdbe * p)
 				&& !isSpecialError)) {
 				rc = sqlite3VdbeCheckFk(p, 1);
 				if (rc != SQLITE_OK) {
-					if (NEVER(p->readOnly)) {
+					/* Close all opened cursors if
+					 * they exist and free all
+					 * VDBE frames.
+					 */
+					if (NEVER(p->pDelFrame)) {
 						closeCursorsAndFree(p);
 						return SQLITE_ERROR;
 					}
@@ -2666,7 +2643,7 @@ sqlite3VdbeHalt(Vdbe * p)
 						    SQL_TARANTOOL_ERROR;
 					closeCursorsAndFree(p);
 				}
-				if (rc == SQLITE_BUSY && p->readOnly) {
+				if (rc == SQLITE_BUSY && !p->pDelFrame) {
 					closeCursorsAndFree(p);
 					return SQLITE_BUSY;
 				} else if (rc != SQLITE_OK) {
@@ -2746,13 +2723,6 @@ sqlite3VdbeHalt(Vdbe * p)
 	/* We have successfully halted and closed the VM.  Record this fact. */
 	if (p->pc >= 0) {
 		db->nVdbeActive--;
-		if (!p->readOnly)
-			db->nVdbeWrite--;
-		if (p->bIsReader)
-			db->nVdbeRead--;
-		assert(db->nVdbeActive >= db->nVdbeRead);
-		assert(db->nVdbeRead >= db->nVdbeWrite);
-		assert(db->nVdbeWrite >= 0);
 	}
 	p->magic = VDBE_MAGIC_HALT;
 	checkActiveVdbeCnt(db);

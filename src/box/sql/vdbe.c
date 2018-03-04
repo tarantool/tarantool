@@ -620,7 +620,6 @@ int sqlite3VdbeExec(Vdbe *p)
 		goto no_mem;
 	}
 	assert(p->rc==SQLITE_OK || (p->rc&0xff)==SQLITE_BUSY);
-	assert(p->bIsReader || p->readOnly!=0);
 	p->rc = SQLITE_OK;
 	p->iCurrentTime = 0;
 	assert(p->explain==0);
@@ -2832,22 +2831,13 @@ case OP_Savepoint: {
 	 */
 	assert(psql_txn->pSavepoint == 0 || p->autoCommit == 0);
 	assert(p1==SAVEPOINT_BEGIN||p1==SAVEPOINT_RELEASE||p1==SAVEPOINT_ROLLBACK);
-	assert(p->bIsReader);
 
 	if (p1==SAVEPOINT_BEGIN) {
-		if (db->nVdbeWrite>0) {
-			/* A new savepoint cannot be created if there are active write
-			 * statements (i.e. open read/write incremental blob handles).
-			 */
-			sqlite3VdbeError(p, "cannot open savepoint - SQL statements in progress");
-			rc = SQLITE_BUSY;
-		} else {
-			/* Create a new savepoint structure. */
-			pNew = sql_savepoint(p, zName);
-			/* Link the new savepoint into the database handle's list. */
-			pNew->pNext = psql_txn->pSavepoint;
-			psql_txn->pSavepoint = pNew;
-		}
+		/* Create a new savepoint structure. */
+		pNew = sql_savepoint(p, zName);
+		/* Link the new savepoint into the database handle's list. */
+		pNew->pNext = psql_txn->pSavepoint;
+		psql_txn->pSavepoint = pNew;
 	} else {
 		/* Find the named savepoint. If there is no such savepoint, then an
 		 * an error is returned to the user.
@@ -2860,7 +2850,7 @@ case OP_Savepoint: {
 		if (!pSavepoint) {
 			sqlite3VdbeError(p, "no such savepoint: %s", zName);
 			rc = SQLITE_ERROR;
-		} else if (db->nVdbeWrite>0 && p1==SAVEPOINT_RELEASE) {
+		} else if (p1==SAVEPOINT_RELEASE) {
 			/* It is not possible to release (commit) a savepoint if there are
 			 * active write statements.
 			 */
@@ -2980,7 +2970,6 @@ case OP_AutoCommit: {
 	assert(desiredAutoCommit==1 || desiredAutoCommit==0);
 	assert(desiredAutoCommit==1 || iRollback==0);
 	assert(db->nVdbeActive>0);  /* At least this one VM is active */
-	assert(p->bIsReader);
 
 	if (desiredAutoCommit!=p->autoCommit) {
 		if (iRollback) {
@@ -2988,14 +2977,6 @@ case OP_AutoCommit: {
 			box_txn_rollback();
 			sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
 			p->autoCommit = 1;
-		} else if (desiredAutoCommit && db->nVdbeWrite>0) {
-			/* If this instruction implements a COMMIT and other VMs are writing
-			 * return an error indicating that the other VMs must complete first.
-			 */
-			sqlite3VdbeError(p, "cannot commit transaction - "
-					 "SQL statements in progress");
-			rc = SQLITE_BUSY;
-			goto abort_due_to_error;
 		} else if ((rc = sqlite3VdbeCheckFk(p, 1))!=SQLITE_OK) {
 			goto vdbe_return;
 		} else {
@@ -3049,8 +3030,6 @@ case OP_AutoCommit: {
  *
  */
 case OP_Transaction: {
-	assert(p->bIsReader);
-	assert(p->readOnly==0 || pOp->p2==0);
 	assert(pOp->p1==0);
 	if (pOp->p2 && (user_session->sql_flags & SQLITE_QueryOnly)!=0) {
 		rc = SQLITE_READONLY;
@@ -3104,8 +3083,6 @@ case OP_TTransaction: {
  * executing this instruction.
  */
 case OP_ReadCookie: {               /* out2 */
-	assert(p->bIsReader);
-
 	pOut = out2Prerelease(p, pOp);
 	pOut->u.i = 0;
 	break;
@@ -3122,7 +3099,6 @@ case OP_ReadCookie: {               /* out2 */
  */
 case OP_SetCookie: {
 	assert(pOp->p1==0);
-	assert(p->readOnly==0);
 	/* See note about index shifting on OP_ReadCookie */
 	/* When the schema cookie changes, record the new cookie internally */
 	user_session->sql_flags |= SQLITE_InternChanges;
@@ -3219,9 +3195,6 @@ case OP_OpenRead:
 case OP_OpenWrite:
 
 	assert(pOp->opcode==OP_OpenWrite || pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
-	assert(p->bIsReader);
-	assert(pOp->opcode==OP_OpenRead || pOp->opcode==OP_ReopenIdx
-	       || p->readOnly==0);
 
 	if (p->expired) {
 		rc = SQLITE_ABORT_ROLLBACK;
@@ -4664,39 +4637,6 @@ case OP_IdxGE:  {       /* jump */
 	break;
 }
 
-/* Opcode: Destroy P1 P2 P3 * *
- *
- * Delete an entire database table or index whose root page in the database
- * file is given by P1.
- *
- * The table being destroyed is in the main database file if P3==0.  If
- * P3==1 then the table to be clear is in the auxiliary database file
- * that is used to store tables create using CREATE TEMPORARY TABLE.
- *
- * Zero is stored in register P2.
- *
- * See also: Clear
- */
-case OP_Destroy: {     /* out2 */
-	int iMoved;
-
-	assert(p->readOnly==0);
-	assert(pOp->p1>1);
-	pOut = out2Prerelease(p, pOp);
-	pOut->flags = MEM_Null;
-	if (db->nVdbeRead > 1) {
-		rc = SQLITE_LOCKED;
-		p->errorAction = ON_CONFLICT_ACTION_ABORT;
-		goto abort_due_to_error;
-	} else {
-		iMoved = 0;  /* Not needed.  Only to silence a warning. */
-		pOut->flags = MEM_Int;
-		pOut->u.i = iMoved;
-		if (rc) goto abort_due_to_error;
-	}
-	break;
-}
-
 /* Opcode: Clear P1 P2 P3
  *
  * Delete all contents of the database table or index whose root page
@@ -4716,7 +4656,6 @@ case OP_Destroy: {     /* out2 */
  * See also: Destroy
  */
 case OP_Clear: {
-	assert(p->readOnly==0);
 	rc = tarantoolSqlite3ClearTable(pOp->p1);
 	if (rc) goto abort_due_to_error;
 	break;

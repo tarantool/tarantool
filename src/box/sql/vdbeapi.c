@@ -587,7 +587,7 @@ sqlite3Step(Vdbe * p)
 			db->u1.isInterrupted = 0;
 		}
 
-		assert(db->nVdbeWrite > 0 || p->autoCommit == 0
+		assert(p->autoCommit == 0
 		       || (p->nDeferredCons == 0 && p->nDeferredImmCons == 0)
 		    );
 
@@ -601,10 +601,6 @@ sqlite3Step(Vdbe * p)
 #endif
 
 		db->nVdbeActive++;
-		if (p->readOnly == 0)
-			db->nVdbeWrite++;
-		if (p->bIsReader)
-			db->nVdbeRead++;
 		p->pc = 0;
 	}
 #ifdef SQLITE_DEBUG
@@ -1556,16 +1552,6 @@ sqlite3 *
 sqlite3_db_handle(sqlite3_stmt * pStmt)
 {
 	return pStmt ? ((Vdbe *) pStmt)->db : 0;
-}
-
-/*
- * Return true if the prepared statement is guaranteed to not modify the
- * database.
- */
-int
-sqlite3_stmt_readonly(sqlite3_stmt * pStmt)
-{
-	return pStmt ? ((Vdbe *) pStmt)->readOnly : 1;
 }
 
 /*
