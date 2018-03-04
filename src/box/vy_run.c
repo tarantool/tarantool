@@ -1273,23 +1273,6 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 
 	itr->stat->lookup++;
 
-	if (run->info.page_count == 1) {
-		/* there can be a stupid bootstrap run in which it's EOF */
-		struct vy_page_info *page_info = run->page_info;
-
-		if (page_info->row_count == 0) {
-			vy_run_iterator_stop(itr);
-			return 0;
-		}
-		struct vy_page *page;
-		int rc = vy_run_iterator_load_page(itr, 0, &page);
-		if (rc != 0)
-			return rc;
-	} else if (run->info.page_count == 0) {
-		vy_run_iterator_stop(itr);
-		return 0;
-	}
-
 	struct vy_run_iterator_pos end_pos = {run->info.page_count, 0};
 	bool equal_found = false;
 	int rc;
