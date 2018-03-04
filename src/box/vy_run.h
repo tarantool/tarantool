@@ -245,11 +245,7 @@ struct vy_run_iterator {
 	/* State of the iterator */
 	/** Position of the current record */
 	struct vy_run_iterator_pos curr_pos;
-	/**
-	 * Last stmt returned by vy_run_iterator_get.
-	 * The iterator holds this stmt until the next call to
-	 * vy_run_iterator_get, when it's dereferenced.
-	 */
+	/** Statement at curr_pos. */
 	struct tuple *curr_stmt;
 	/**
 	 * Last two pages read by the iterator. We keep two pages
