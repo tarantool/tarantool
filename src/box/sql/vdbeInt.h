@@ -122,7 +122,6 @@ struct VdbeCursor {
 		VdbeSorter *pSorter;	/* CURTYPE_SORTER. Sorter object */
 	} uc;
 	KeyInfo *pKeyInfo;	/* Info about index keys needed by index cursors */
-	Pgno pgnoRoot;		/* Root page of the open cursor */
 	i16 nField;		/* Number of fields in the header */
 	u16 nHdrParsed;		/* Number of header fields parsed so far */
 	const u8 *aRow;		/* Data for the current row, if all on one page */

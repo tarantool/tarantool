@@ -353,9 +353,7 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
-	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
-	*pnEntry = box_index_len(space_id, index_id);
+	*pnEntry = index_size(pCur->index);
 	return SQLITE_OK;
 }
 
@@ -416,6 +414,7 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 		return SQLITE_NOMEM;
 	}
 	pCur->space = ephemer_new_space;
+	pCur->index = *ephemer_new_space->index;
 
 	int unused;
 	return tarantoolSqlite3First(pCur, &unused);
@@ -460,17 +459,20 @@ static int insertOrReplace(BtCursor *pCur, int operationType)
 	assert(operationType == TARANTOOL_INDEX_INSERT ||
 	       operationType == TARANTOOL_INDEX_REPLACE);
 
-	int space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
 	int rc;
+	struct tuple *unused;
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.tuple = pCur->key;
+	request.tuple_end = pCur->key + pCur->nKey;
+	request.space_id = pCur->space->def->id;
+	mp_tuple_assert(request.tuple, request.tuple_end);
 	if (operationType == TARANTOOL_INDEX_INSERT) {
-		rc = box_insert(space_id, pCur->key,
-				(const char *)pCur->key + pCur->nKey,
-				NULL /* result */);
+		request.type = IPROTO_INSERT;
 	} else {
-		rc = box_replace(space_id, pCur->key,
-				 (const char *)pCur->key + pCur->nKey,
-				 NULL /* result */);
+		request.type = IPROTO_REPLACE;
 	}
+	rc = box_process_rw(&request, pCur->space, &unused);
 
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;;
 }
@@ -523,20 +525,24 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	assert(pCur->iter != NULL);
 	assert(pCur->last_tuple != NULL);
 
-	uint32_t space_id, index_id;
 	char *key;
 	uint32_t key_size;
 	int rc;
+	struct tuple *unused;
 
-	space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
-	index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
 	key = tuple_extract_key(pCur->last_tuple,
 				box_iterator_key_def(pCur->iter),
 				&key_size);
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
 
-	rc = box_delete(space_id, index_id, key, key + key_size, NULL);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_DELETE;
+	request.key = key;
+	request.key_end = key + key_size;
+	request.space_id = pCur->space->def->id;
+	rc = box_process_rw(&request, pCur->space, &unused);
 
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_DELETE_FAIL;
 }
@@ -1025,16 +1031,17 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 		1           /* MsgPack int(1) */
 	};
 
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
-	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
-	box_tuple_t *res;
+	struct tuple *res = NULL;
 	int rc;
-
-	rc = box_update(space_id, index_id,
-		key, key + sizeof(key),
-		ops, ops + sizeof(ops),
-		0,
-		&res);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.tuple = ops;
+	request.tuple_end = ops + sizeof(ops);
+	request.key = key;
+	request.key_end = key + sizeof(key);
+	request.type = IPROTO_UPDATE;
+	request.space_id = pCur->space->def->id;
+	rc = box_process_rw(&request, pCur->space, &res);
 	if (rc != 0 || res == NULL) {
 		return SQL_TARANTOOL_ERROR;
 	}
@@ -1084,30 +1091,15 @@ cursor_seek(BtCursor *pCur, int *pRes)
 		box_iterator_free(pCur->iter);
 		pCur->iter = NULL;
 	}
-
-	struct space *space;
-	struct index *index;
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pCur->pgnoRoot);
-	if (space_id != 0) {
-		space = space_cache_find(space_id);
-		if (space == NULL)
-			return SQL_TARANTOOL_ERROR;
-		uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pCur->pgnoRoot);
-		index = index_find(space, index_id);
-	} else {
-		space = pCur->space;
-		index = *space->index;
-	}
-
 	const char *key = (const char *)pCur->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, pCur->iter_type, key, part_count)) {
+	if (key_validate(pCur->index->def, pCur->iter_type, key, part_count)) {
 		diag_log();
 		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 
-	struct iterator *it = index_create_iterator(index, pCur->iter_type, key,
-						    part_count);
+	struct iterator *it = index_create_iterator(pCur->index, pCur->iter_type,
+						    key, part_count);
 	if (it == NULL) {
 		pCur->eState = CURSOR_INVALID;
 		return SQL_TARANTOOL_ITERATOR_FAIL;
@@ -1657,13 +1649,14 @@ int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
  * If index is empty - return 0 in max_id and success status
  */
 int
-tarantoolSqlGetMaxId(uint32_t space_id, uint32_t index_id, uint32_t fieldno,
+tarantoolSqlGetMaxId(BtCursor *cur, uint32_t fieldno,
 		     uint64_t *max_id)
 {
 	char key[16];
 	struct tuple *tuple;
 	char *key_end = mp_encode_array(key, 0);
-	if (box_index_max(space_id, index_id, key, key_end, &tuple) != 0)
+	if (box_index_max(cur->space->def->id, cur->index->def->iid,
+			  key, key_end, &tuple) != 0)
 		return -1;
 
 	/* Index is empty  */

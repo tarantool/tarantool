@@ -3170,10 +3170,15 @@ case OP_ReopenIdx: {
 
 	assert(pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
 	assert(pOp->p4type==P4_KEYINFO);
-	pCur = p->apCsr[pOp->p1];
+	/*
+	 * FIXME: optimization temporary disabled until the whole
+	 * OP_Open* is reworked, i.e. pointer to space is passed
+	 * to this opcode instead of space id.
+	 */
+	/* pCur = p->apCsr[pOp->p1];
 	if (pCur && pCur->pgnoRoot==(u32)pOp->p2) {
 		goto open_cursor_set_hints;
-	}
+	} */
 	/* If the cursor is not currently open or is open on a different
 	 * index, then fall through into OP_OpenRead to force a reopen
 	 */
@@ -3242,16 +3247,18 @@ case OP_OpenWrite:
 	pCur = allocateCursor(p, pOp->p1, nField, CURTYPE_TARANTOOL);
 	if (pCur==0) goto no_mem;
 	pCur->nullRow = 1;
-	pCur->pgnoRoot = p2;
 
 	assert(p2 >= 1);
 	pBtCur = pCur->uc.pCursor;
-	pBtCur->pgnoRoot = p2;
+	pBtCur->space = space_by_id(SQLITE_PAGENO_TO_SPACEID(p2));
+	assert(pBtCur->space != NULL);
+	pBtCur->index = space_index(pBtCur->space, SQLITE_PAGENO_TO_INDEXID(p2));
+	assert(pBtCur->index != NULL);
 	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags |= BTCF_TaCursor;
 	pCur->pKeyInfo = pKeyInfo;
 
-	open_cursor_set_hints:
+	/* open_cursor_set_hints: */
 	assert(OPFLAG_BULKCSR==BTREE_BULKLOAD);
 	assert(OPFLAG_SEEKEQ==BTREE_SEEK_EQ);
 	testcase( pOp->p5 & OPFLAG_BULKCSR);
@@ -3284,7 +3291,6 @@ case OP_OpenTEphemeral: {
 	pCx->pKeyInfo  = pOp->p4.pKeyInfo;
 	pBtCur = pCx->uc.pCursor;
 	/* Ephemeral spaces don't have space_id */
-	pBtCur->pgnoRoot = 0;
 	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags = BTCF_TEphemCursor;
 
@@ -3824,7 +3830,6 @@ case OP_Sequence: {           /* out2 */
 case OP_NextId: {     /* out3 */
 	VdbeCursor *pC;    /* The VDBE cursor */
 	int p2;            /* Column number, which stores the id */
-	int pgno;          /* Page number of the cursor */
 	pC = p->apCsr[pOp->p1];
 	p2 = pOp->p2;
 	pOut = &aMem[pOp->p3];
@@ -3832,11 +3837,7 @@ case OP_NextId: {     /* out3 */
 	/* This opcode is Tarantool specific.  */
 	assert(pC->uc.pCursor->curFlags & BTCF_TaCursor);
 
-	pgno = pC->pgnoRoot;
-
-	tarantoolSqlGetMaxId(SQLITE_PAGENO_TO_SPACEID(pgno),
-			     SQLITE_PAGENO_TO_INDEXID(pgno),
-			     p2,
+	tarantoolSqlGetMaxId(pC->uc.pCursor, p2,
 			     (uint64_t *) &pOut->u.i);
 
 	pOut->u.i += 1;

@@ -32,7 +32,6 @@
 #ifndef SQLITE_CURSOR_H
 #define SQLITE_CURSOR_H
 
-typedef u32 Pgno;
 typedef struct BtCursor BtCursor;
 
 /*
@@ -59,11 +58,11 @@ typedef struct BtCursor BtCursor;
  */
 struct BtCursor {
 	i64 nKey;		/* Size of pKey, or last integer key */
-	Pgno pgnoRoot;		/* Contains both space_id and index_id */
 	u8 curFlags;		/* zero or more BTCF_* flags defined below */
 	u8 eState;		/* One of the CURSOR_XXX constants (see below) */
 	u8 hints;		/* As configured by CursorSetHints() */
 	struct space *space;
+	struct index *index;
 	struct iterator *iter;
 	enum iterator_type iter_type;
 	struct tuple *last_tuple;
