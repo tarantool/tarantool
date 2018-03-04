@@ -128,7 +128,6 @@ foreach name {OP_Noop OP_Explain} {
 # The following are the opcodes that are processed by resolveP2Values()
 #
 set rp2v_ops {
-  OP_Transaction
   OP_AutoCommit
   OP_Savepoint
   OP_Checkpoint

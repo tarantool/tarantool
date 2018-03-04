@@ -98,10 +98,6 @@ sqlite3FinishCoding(Parse * pParse)
 			assert(sqlite3VdbeGetOp(v, 0)->opcode == OP_Init);
 			sqlite3VdbeJumpHere(v, 0);
 			if (DbMaskTest(pParse->cookieMask, 0) != 0) {
-				sqlite3VdbeAddOp2(v, OP_Transaction,	/* Opcode */
-						  0,	/* P1 */
-						  DbMaskTest(pParse->writeMask, 0)	/* P2 */
-				    );
 				if (pParse->initiateTTrans)
 					sqlite3VdbeAddOp0(v, OP_TTransaction);
 
