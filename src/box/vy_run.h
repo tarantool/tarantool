@@ -253,7 +253,13 @@ struct vy_run_iterator {
 	struct tuple *curr_stmt;
 	/** Position of record that spawned curr_stmt */
 	struct vy_run_iterator_pos curr_stmt_pos;
-	/** LRU cache of two active pages (two pages is enough). */
+	/**
+	 * Last two pages read by the iterator. We keep two pages
+	 * rather than just one, because we often probe a page for
+	 * a better match. Keeping the previous page makes sure we
+	 * won't throw out the current page if probing fails to
+	 * find a better match.
+	 */
 	struct vy_page *curr_page;
 	struct vy_page *prev_page;
 	/** Is false until first .._get or .._next_.. method is called */
