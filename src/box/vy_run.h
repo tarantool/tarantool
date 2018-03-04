@@ -251,8 +251,6 @@ struct vy_run_iterator {
 	 * vy_run_iterator_get, when it's dereferenced.
 	 */
 	struct tuple *curr_stmt;
-	/** Position of record that spawned curr_stmt */
-	struct vy_run_iterator_pos curr_stmt_pos;
 	/**
 	 * Last two pages read by the iterator. We keep two pages
 	 * rather than just one, because we often probe a page for

@@ -748,7 +748,6 @@ vy_run_iterator_stop(struct vy_run_iterator *itr)
 	if (itr->curr_stmt != NULL) {
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
-		itr->curr_stmt_pos.page_no = UINT32_MAX;
 	}
 	if (itr->curr_page != NULL) {
 		vy_page_delete(itr->curr_page);
@@ -1450,7 +1449,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 
 	itr->curr_stmt = NULL;
 	itr->curr_pos.page_no = slice->run->info.page_count;
-	itr->curr_stmt_pos.page_no = UINT32_MAX;
 	itr->curr_page = NULL;
 	itr->prev_page = NULL;
 
@@ -1473,18 +1471,11 @@ vy_run_iterator_get(struct vy_run_iterator *itr, struct tuple **result)
 	if (itr->search_ended)
 		return 0;
 	if (itr->curr_stmt != NULL) {
-		if (itr->curr_stmt_pos.page_no == itr->curr_pos.page_no &&
-		    itr->curr_stmt_pos.pos_in_page == itr->curr_pos.pos_in_page) {
-			*result = itr->curr_stmt;
-			return 0;
-		}
 		tuple_unref(itr->curr_stmt);
 		itr->curr_stmt = NULL;
-		itr->curr_stmt_pos.page_no = UINT32_MAX;
 	}
 	int rc = vy_run_iterator_read(itr, itr->curr_pos, result);
 	if (rc == 0) {
-		itr->curr_stmt_pos = itr->curr_pos;
 		itr->curr_stmt = *result;
 		vy_stmt_counter_acct_tuple(&itr->stat->get, *result);
 	}
