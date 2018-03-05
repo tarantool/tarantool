@@ -40,8 +40,7 @@ fio_methods.read = function(self, buf, size)
     end
     if not ffi.istype(const_char_ptr_t, buf) then
         size = buf or size
-        tmpbuf = buffer.IBUF_SHARED
-        tmpbuf:reset()
+        tmpbuf = buffer.ibuf()
         buf = tmpbuf:reserve(size)
     end
     local res, err = internal.read(self.fh, buf, size)
