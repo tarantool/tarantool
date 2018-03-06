@@ -67,6 +67,11 @@ end;
 s:drop();
 test_run:cmd("setopt delimiter ''");
 
+-- Disable the cache so that we can check that disk errors
+-- are handled properly.
+vinyl_cache = box.cfg.vinyl_cache
+box.cfg{vinyl_cache = 0}
+
 s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
 for i = 1, 10 do s:insert({i, 'test str' .. tostring(i)}) end
@@ -97,6 +102,7 @@ errinj.set("ERRINJ_VY_READ_PAGE", false);
 s:select()
 
 s:drop()
+box.cfg{vinyl_cache = vinyl_cache}
 
 -- gh-2871: check that long reads are logged
 s = box.schema.space.create('test', {engine = 'vinyl'})
@@ -309,12 +315,10 @@ function fill_space()
 end;
 
 function iterate_in_read_view()
-    box.begin()
     local i = create_iterator(space)
     last_read = i.next()
     fiber.sleep(100000)
     last_read = i.next()
-    box.commit()
 end;
 
 test_run:cmd("setopt delimiter ''");
@@ -468,7 +472,6 @@ box.snapshot()
 s:replace{0, 0}
 s:select{0}
 
-box.begin()
 errinj.set("ERRINJ_WAL_DELAY", true)
 wait_replace = true
 _ = fiber.create(function() s:replace{1, 1} wait_replace = false end)
@@ -479,8 +482,6 @@ errinj.set("ERRINJ_WAL_DELAY", false)
 while wait_replace do fiber.sleep(0.01) end
 state, value = gen(param, state)
 value
-box.commit()
-
 s:drop()
 
 --

@@ -37,16 +37,6 @@ box.error.injection.set('ERRINJ_VY_INDEX_DUMP', -1)
 
 test_run:cmd('restart server default')
 
-test_run:cmd("setopt delimiter ';'")
-function tuple_equal(t1, t2)
-    if #t1 ~= #t2 then return false end
-    for i = 1, #t1 do
-        if t1[i] ~= t2[i] then return false end
-    end
-    return true
-end
-test_run:cmd("setopt delimiter ''");
-
 INDEX_COUNT = box.cfg.vinyl_write_threads * 3
 assert(INDEX_COUNT < 100)
 
@@ -60,8 +50,7 @@ for i = 1, INDEX_COUNT - 1 do
         bad_index = i
     end
     for _, v in s.index[i]:pairs() do
-        local v2 = s:get(v[1])
-        if not v2 or not tuple_equal(v, v2) then
+        if v ~= s:get(v[1]) then
             bad_index = i
         end
     end

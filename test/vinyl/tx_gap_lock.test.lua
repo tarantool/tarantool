@@ -507,21 +507,6 @@ s:drop();
 
 test_run:cmd("setopt delimiter ''");
 ----------------------------------------------------------------
--- gh-2534: Iterator doesn't track reads in autocommit mode.
-----------------------------------------------------------------
-s = box.schema.space.create('test', {engine = 'vinyl'})
-_ = s:create_index('pk', {parts = {1, 'unsigned'}})
-_ = s:create_index('sk', {parts = {2, 'unsigned'}})
-for i = 1, 100 do s:insert{i, i} end
-gen, param, state = s.index.sk:pairs()
-for i = 1, 100 do state, value = gen(param, state) end
-value
-stat = box.info.vinyl()
-stat.tx.transactions -- 0
-stat.tx.read_views -- 1
-stat.tx.gap_locks -- 0
-s:drop()
-----------------------------------------------------------------
 
 c = nil
 c1 = nil
