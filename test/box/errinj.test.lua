@@ -123,7 +123,6 @@ box.begin()
     s:insert{2}
 box.commit();
 errinj.set("ERRINJ_TUPLE_ALLOC", false);
-s:select{};
 box.rollback();
 s:select{};
 box.begin()
