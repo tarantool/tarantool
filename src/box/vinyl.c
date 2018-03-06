@@ -40,6 +40,7 @@
 #include "vy_upsert.h"
 #include "vy_write_iterator.h"
 #include "vy_read_iterator.h"
+#include "vy_point_lookup.h"
 #include "vy_quota.h"
 #include "vy_scheduler.h"
 #include "vy_stat.h"
@@ -1346,6 +1347,9 @@ vy_index_get(struct vy_index *index, struct vy_tx *tx,
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
+	if (tuple_field_count(key) >= index->cmp_def->part_count)
+		return vy_point_lookup(index, tx, rv, key, result);
+
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, index, tx, ITER_EQ, key, rv);
 	int rc = vy_read_iterator_next(&itr, result);
@@ -1692,7 +1696,7 @@ vy_index_full_by_key(struct vy_index *index, struct vy_tx *tx,
 		*result = found;
 		return 0;
 	}
-	rc = vy_index_get(index->pk, tx, rv, found, result);
+	rc = vy_point_lookup(index->pk, tx, rv, found, result);
 	tuple_unref(found);
 	return rc;
 }
@@ -3571,19 +3575,13 @@ vy_squash_process(struct vy_squash *squash)
 	/* Upserts enabled only in the primary index. */
 	assert(index->id == 0);
 
-	struct vy_read_iterator itr;
 	/*
 	 * Use the committed read view to avoid squashing
 	 * prepared, but not committed statements.
 	 */
-	vy_read_iterator_open(&itr, index, NULL, ITER_EQ, squash->stmt,
-			      &env->xm->p_committed_read_view);
 	struct tuple *result;
-	int rc = vy_read_iterator_next(&itr, &result);
-	if (rc == 0 && result != NULL)
-		tuple_ref(result);
-	vy_read_iterator_close(&itr);
-	if (rc != 0)
+	if (vy_point_lookup(index, NULL, &env->xm->p_committed_read_view,
+			    squash->stmt, &result) != 0)
 		return -1;
 	if (result == NULL)
 		return 0;
@@ -3720,7 +3718,7 @@ vy_squash_process(struct vy_squash *squash)
 	 */
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 	const struct tuple *region_stmt = NULL;
-	rc = vy_index_set(index, mem, result, &region_stmt);
+	int rc = vy_index_set(index, mem, result, &region_stmt);
 	tuple_unref(result);
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
@@ -3929,8 +3927,8 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 	}
 #endif
 	/* Get the full tuple from the primary index. */
-	if (vy_index_get(it->index->pk, it->tx, vy_tx_read_view(it->tx),
-			 tuple, &tuple) != 0)
+	if (vy_point_lookup(it->index->pk, it->tx, vy_tx_read_view(it->tx),
+			    tuple, &tuple) != 0)
 		goto fail;
 	*ret = tuple_bless(tuple);
 	tuple_unref(tuple);
