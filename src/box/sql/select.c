@@ -6187,8 +6187,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				}
 
 				/* Open a read-only cursor, execute the OP_Count, close the cursor. */
-				sqlite3VdbeAddOp4Int(v, OP_OpenRead, iCsr,
-						     iRoot, 0, 1);
+				emit_open_cursor(pParse, iCsr, iRoot);
 				if (pKeyInfo) {
 					sqlite3VdbeChangeP4(v, -1,
 							    (char *)pKeyInfo,

@@ -1169,13 +1169,36 @@ index_collation_name(Index *idx, uint32_t column)
  * into SQL is finished.
  */
 bool
-space_is_view(Table *table)
-{
+space_is_view(Table *table) {
 	assert(table != NULL);
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	return space->def->opts.is_view;
+}
+
+/**
+ * Create cursor which will be positioned to the space/index.
+ * It makes space lookup and loads pointer to it into register,
+ * which is passes to OP_OpenWrite as an argument.
+ *
+ * @param parse_context Parse context.
+ * @param cursor Number of cursor to be created.
+ * @param entity_id Encoded space and index ids.
+ * @retval address of last opcode.
+ */
+int
+emit_open_cursor(Parse *parse_context, int cursor, int entity_id)
+{
+	assert(entity_id > 0);
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(entity_id));
+	assert(space != NULL);
+	Vdbe *vdbe = parse_context->pVdbe;
+	int space_ptr_reg = ++parse_context->nMem;
+	sqlite3VdbeAddOp4Ptr(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0,
+			     (void *) space);
+	return sqlite3VdbeAddOp3(vdbe, OP_OpenWrite, cursor, entity_id,
+				 space_ptr_reg);
 }
 
 /*
@@ -2677,8 +2700,7 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	sqlite3VdbeJumpHere(v, addr1);
 	if (memRootPage < 0)
 		sqlite3VdbeAddOp2(v, OP_Clear, tnum, 0);
-	sqlite3VdbeAddOp4(v, OP_OpenWrite, iIdx, tnum, 0,
-			  (char *)pKey, P4_KEYINFO);
+	emit_open_cursor(pParse, iIdx, tnum);
 	sqlite3VdbeChangeP5(v,
 			    OPFLAG_BULKCSR | ((memRootPage >= 0) ?
 					      OPFLAG_P2ISREG : 0));

@@ -66,6 +66,7 @@ sqlite3VdbeCreate(Parse * pParse)
 	p->magic = VDBE_MAGIC_INIT;
 	p->pParse = pParse;
 	p->autoCommit = (char)box_txn() == 0 ? 1 : 0;
+	p->schema_ver = box_schema_version();
 	if (!p->autoCommit) {
 		p->psql_txn = in_txn()->psql_txn;
 		p->nDeferredCons = p->psql_txn->nDeferredConsSave;
@@ -410,6 +411,16 @@ sqlite3VdbeAddOp4Int(Vdbe * p,	/* Add the opcode to this VM */
 		pOp->p4type = P4_INT32;
 		pOp->p4.i = p4;
 	}
+	return addr;
+}
+
+int
+sqlite3VdbeAddOp4Ptr(Vdbe *p, int op, int p1, int p2, int p3, void *ptr)
+{
+	int addr = sqlite3VdbeAddOp3(p, op, p1, p2, p3);
+	VdbeOp *pOp = &p->aOp[addr];
+	pOp->p4type = P4_PTR;
+	pOp->p4.p = ptr;
 	return addr;
 }
 

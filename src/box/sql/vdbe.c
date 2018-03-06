@@ -1072,6 +1072,19 @@ case OP_Int64: {           /* out2 */
 	break;
 }
 
+/* Opcode: LoadPtr * P2 * P4 *
+ * Synopsis: r[P2] = P4
+ *
+ * P4 is a generic pointer. Copy it into register P2.
+ */
+case OP_LoadPtr: {
+	pOut = out2Prerelease(p, pOp);
+	assert(pOp->p4type == P4_PTR);
+	pOut->u.p = pOp->p4.p;
+	pOut->flags = MEM_Ptr;
+	break;
+}
+
 #ifndef SQLITE_OMIT_FLOATING_POINT
 /* Opcode: Real * P2 * P4 *
  * Synopsis: r[P2]=P4

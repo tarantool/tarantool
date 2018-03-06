@@ -3557,6 +3557,9 @@ sql_default_coll();
 bool
 space_is_view(Table *);
 void sqlite3EndTable(Parse *, Token *, Token *, Select *);
+int
+emit_open_cursor(Parse *, int, int);
+
 int sqlite3ParseUri(const char *, const char *, unsigned int *,
 		    sqlite3_vfs **, char **, char **);
 

@@ -144,6 +144,7 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_INDEX    (-15)	/* P4 is a pointer to a Index structure */
 #define P4_FUNCCTX  (-16)	/* P4 is a pointer to an sqlite3_context object */
 #define P4_BOOL     (-17)	/* P4 is a bool value */
+#define P4_PTR      (-18)	/* P4 is a generic pointer */
 
 
 /* Error message codes for OP_Halt */
@@ -200,6 +201,7 @@ int sqlite3VdbeAddOp3(Vdbe *, int, int, int, int);
 int sqlite3VdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
 int sqlite3VdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
 int sqlite3VdbeAddOp4Int(Vdbe *, int, int, int, int, int);
+int sqlite3VdbeAddOp4Ptr(Vdbe *, int, int, int, int, void *);
 void sqlite3VdbeEndCoroutine(Vdbe *, int);
 #if defined(SQLITE_DEBUG) && !defined(SQLITE_TEST_REALLOC_STRESS)
 void sqlite3VdbeVerifyNoMallocRequired(Vdbe * p, int N);

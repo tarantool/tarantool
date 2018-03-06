@@ -196,6 +196,7 @@ struct Mem {
 		i64 i;		/* Integer value used when MEM_Int is set in flags */
 		bool b;         /* Boolean value used when MEM_Bool is set in flags */
 		int nZero;	/* Used when bit MEM_Zero is set in flags */
+		void *p;	/* Generic pointer */
 		FuncDef *pDef;	/* Used only when flags==MEM_Agg */
 		VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 	} u;
@@ -239,6 +240,7 @@ struct Mem {
 #define MEM_Real      0x0008	/* Value is a real number */
 #define MEM_Blob      0x0010	/* Value is a BLOB */
 #define MEM_Bool      0x0020    /* Value is a bool */
+#define MEM_Ptr       0x0040	/* Value is a generic pointer */
 #define MEM_AffMask   0x003f	/* Mask of affinity bits */
 #define MEM_Frame     0x0080	/* Value is a VdbeFrame object */
 #define MEM_Undefined 0x0100	/* Value is undefined */
@@ -378,6 +380,7 @@ struct Vdbe {
 	i64 nFkConstraint;	/* Number of imm. FK constraints this VM */
 	i64 nStmtDefCons;	/* Number of def. constraints when stmt started */
 	i64 nStmtDefImmCons;	/* Number of def. imm constraints when stmt started */
+	uint32_t schema_ver;	/* Schema version at the moment of VDBE creation. */
 
 	/*
 	 * In recursive triggers we can execute INSERT/UPDATE OR IGNORE

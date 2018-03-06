@@ -2584,8 +2584,8 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  pIdx->zName),
 							  P4_DYNAMIC);
 #endif
-					sqlite3VdbeAddOp2(v, OP_OpenRead, iTab,
-							  pIdx->tnum);
+					emit_open_cursor(pParse, iTab,
+							 pIdx->tnum);
 					sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
 					VdbeComment((v, "%s", pIdx->zName));
 					assert(IN_INDEX_INDEX_DESC ==
