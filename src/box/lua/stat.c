@@ -38,6 +38,8 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+#include "box/box.h"
+#include "box/iproto.h"
 #include "lua/utils.h"
 
 extern struct rmean *rmean_box;
@@ -110,6 +112,15 @@ lbox_stat_call(struct lua_State *L)
 }
 
 static int
+lbox_stat_reset(struct lua_State *L)
+{
+	(void)L;
+	box_reset_stat();
+	iproto_reset_stat();
+	return 0;
+}
+
+static int
 lbox_stat_net_index(struct lua_State *L)
 {
 	luaL_checkstring(L, -1);
@@ -141,6 +152,7 @@ void
 box_lua_stat_init(struct lua_State *L)
 {
 	static const struct luaL_Reg statlib [] = {
+		{"reset", lbox_stat_reset},
 		{NULL, NULL}
 	};
 

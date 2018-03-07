@@ -337,18 +337,10 @@ r = {}
 for k,v in itr1,itr2,itr3 do table.insert(r, v) end
 r
 
--- In memtx an iterator opened in autocommit mode works in
--- the read-committed isolation level while in vinyl it
--- creates a read view. To make sure the result is the same
--- for both engines, start a transaction.
-inspector:cmd("setopt delimiter ';'")
-box.begin()
 itr1,itr2,itr3 = s:pairs({2}, {iterator = 'REQ'})
 s:replace{2, 4}
 r = {}
 for k,v in itr1,itr2,itr3 do table.insert(r, v) end
-box.commit()
-inspector:cmd("setopt delimiter ''");
 r
 
 r = nil

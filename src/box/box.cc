@@ -2029,3 +2029,21 @@ box_status(void)
 {
     return status;
 }
+
+static int
+box_reset_space_stat(struct space *space, void *arg)
+{
+	(void)arg;
+	for (uint32_t i = 0; i < space->index_count; i++)
+		index_reset_stat(space->index[i]);
+	return 0;
+}
+
+void
+box_reset_stat(void)
+{
+	rmean_cleanup(rmean_box);
+	rmean_cleanup(rmean_error);
+	engine_reset_stat();
+	space_foreach(box_reset_space_stat, NULL);
+}

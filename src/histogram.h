@@ -65,6 +65,12 @@ void
 histogram_delete(struct histogram *hist);
 
 /**
+ * Reset a histogram.
+ */
+void
+histogram_reset(struct histogram *hist);
+
+/**
  * Update a histogram with a new observation.
  */
 void

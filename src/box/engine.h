@@ -179,6 +179,10 @@ struct engine_vtab {
 	 */
 	void (*memory_stat)(struct engine *, struct engine_memory_stat *);
 	/**
+	 * Reset all incremental statistic counters.
+	 */
+	void (*reset_stat)(struct engine *);
+	/**
 	 * Check definition of a new space for engine-specific
 	 * limitations. E.g. not all engines support temporary
 	 * tables.
@@ -328,6 +332,9 @@ engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
 
 void
 engine_memory_stat(struct engine_memory_stat *stat);
+
+void
+engine_reset_stat(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

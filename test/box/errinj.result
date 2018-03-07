@@ -456,10 +456,6 @@ errinj.set("ERRINJ_TUPLE_ALLOC", false);
 ---
 - ok
 ...
-s:select{};
----
-- []
-...
 box.rollback();
 ---
 ...

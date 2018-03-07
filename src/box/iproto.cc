@@ -1731,3 +1731,9 @@ iproto_mem_used(void)
 {
 	return slab_cache_used(&net_cord.slabc) + slab_cache_used(&net_slabc);
 }
+
+void
+iproto_reset_stat(void)
+{
+	rmean_cleanup(rmean_net);
+}

@@ -393,6 +393,8 @@ struct index_vtab {
 	struct snapshot_iterator *(*create_snapshot_iterator)(struct index *);
 	/** Introspection (index:info()) */
 	void (*info)(struct index *, struct info_handler *);
+	/** Reset all incremental statistic counters. */
+	void (*reset_stat)(struct index *);
 	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
@@ -558,6 +560,12 @@ index_info(struct index *index, struct info_handler *handler)
 }
 
 static inline void
+index_reset_stat(struct index *index)
+{
+	index->vtab->reset_stat(index);
+}
+
+static inline void
 index_begin_build(struct index *index)
 {
 	index->vtab->begin_build(index);
@@ -598,6 +606,7 @@ int generic_index_replace(struct index *, struct tuple *, struct tuple *,
 			  enum dup_replace_mode, struct tuple **);
 struct snapshot_iterator *generic_index_create_snapshot_iterator(struct index *);
 void generic_index_info(struct index *, struct info_handler *);
+void generic_index_reset_stat(struct index *);
 void generic_index_begin_build(struct index *);
 int generic_index_reserve(struct index *, uint32_t);
 int generic_index_build_next(struct index *, struct tuple *);

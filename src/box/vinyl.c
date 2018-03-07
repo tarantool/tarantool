@@ -40,6 +40,7 @@
 #include "vy_upsert.h"
 #include "vy_write_iterator.h"
 #include "vy_read_iterator.h"
+#include "vy_point_lookup.h"
 #include "vy_quota.h"
 #include "vy_scheduler.h"
 #include "vy_stat.h"
@@ -232,25 +233,21 @@ struct vinyl_iterator {
 	struct vy_env *env;
 	/** Vinyl index this iterator is for. */
 	struct vy_index *index;
-	/** Active transaction or NULL if autocommit. */
-	struct vy_tx *tx;
 	/**
-	 * Read view to use for the iteration. Points either to
-	 * tx->read_view or to rv_autocommit if autocommit.
+	 * Points either to tx_autocommit for autocommit mode
+	 * or to a multi-statement transaction active when the
+	 * iterator was created.
 	 */
-	const struct vy_read_view **rv;
+	struct vy_tx *tx;
 	/** Search key. */
 	struct tuple *key;
 	/** Vinyl read iterator. */
 	struct vy_read_iterator iterator;
 	/**
-	 * If an iterator is open in autocommit mode, we create
-	 * a read view for it immediately so as not to waste
-	 * memory on tracking reads for conflict resolution.
-	 * The following member points to the read view used by
-	 * the iterator.
+	 * Built-in transaction created when iterator is opened
+	 * in autocommit mode.
 	 */
-	struct vy_read_view *rv_autocommit;
+	struct vy_tx tx_autocommit;
 	/** Trigger invoked when tx ends to close the iterator. */
 	struct trigger on_tx_destroy;
 };
@@ -477,6 +474,31 @@ vinyl_index_info(struct index *base, struct info_handler *h)
 }
 
 static void
+vinyl_index_reset_stat(struct index *base)
+{
+	struct vy_index *index = vy_index(base);
+	struct vy_index_stat *stat = &index->stat;
+	struct vy_cache_stat *cache_stat = &index->cache.stat;
+
+	stat->lookup = 0;
+	latency_reset(&stat->latency);
+	memset(&stat->get, 0, sizeof(stat->get));
+	memset(&stat->put, 0, sizeof(stat->put));
+	memset(&stat->upsert, 0, sizeof(stat->upsert));
+	memset(&stat->txw.iterator, 0, sizeof(stat->txw.iterator));
+	memset(&stat->memory.iterator, 0, sizeof(stat->memory.iterator));
+	memset(&stat->disk.iterator, 0, sizeof(stat->disk.iterator));
+	memset(&stat->disk.dump, 0, sizeof(stat->disk.dump));
+	memset(&stat->disk.compact, 0, sizeof(stat->disk.compact));
+
+	cache_stat->lookup = 0;
+	memset(&cache_stat->get, 0, sizeof(cache_stat->get));
+	memset(&cache_stat->put, 0, sizeof(cache_stat->put));
+	memset(&cache_stat->invalidate, 0, sizeof(cache_stat->invalidate));
+	memset(&cache_stat->evict, 0, sizeof(cache_stat->evict));
+}
+
+static void
 vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct vy_env *env = vy_env(engine);
@@ -497,6 +519,15 @@ vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->tx += mstats.totals.used;
 	mempool_stats(&env->xm->read_view_mempool, &mstats);
 	stat->tx += mstats.totals.used;
+}
+
+static void
+vinyl_engine_reset_stat(struct engine *engine)
+{
+	struct vy_env *env = vy_env(engine);
+	struct tx_manager *xm = env->xm;
+
+	memset(&xm->stat, 0, sizeof(xm->stat));
 }
 
 /** }}} Introspection */
@@ -1357,6 +1388,12 @@ vy_index_get(struct vy_index *index, struct vy_tx *tx,
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
+	if (tuple_field_count(key) >= index->cmp_def->part_count) {
+		if (tx != NULL && vy_tx_track_point(tx, index, key) != 0)
+			return -1;
+		return vy_point_lookup(index, tx, rv, key, result);
+	}
+
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, index, tx, ITER_EQ, key, rv);
 	int rc = vy_read_iterator_next(&itr, result);
@@ -1467,6 +1504,12 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		if (rc != 0)
 			return -1;
 	}
+	/*
+	 * We must always append the statement to transaction write set
+	 * of each index, even if operation itself does not update
+	 * the index, e.g. it's an UPDATE, to ensure we read our
+	 * own writes.
+	 */
 	return vy_tx_set(tx, index, stmt);
 }
 
@@ -1697,7 +1740,11 @@ vy_index_full_by_key(struct vy_index *index, struct vy_tx *tx,
 		*result = found;
 		return 0;
 	}
-	rc = vy_index_get(index->pk, tx, rv, found, result);
+	/*
+	 * No need in vy_tx_track() as the tuple is already
+	 * tracked in the secondary index.
+	 */
+	rc = vy_point_lookup(index->pk, tx, rv, found, result);
 	tuple_unref(found);
 	return rc;
 }
@@ -2957,16 +3004,6 @@ vinyl_engine_end_recovery(struct engine *engine)
 		vy_gc(e, e->recovery, VY_GC_INCOMPLETE, INT64_MAX);
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
-		/*
-		 * During WAL recovery we skip WAL rows that have
-		 * already been dumped to disk so the LSN last seen
-		 * by the transaction manager after WAL recovery is
-		 * complete may be less than the newest LSN actually
-		 * stored on disk. Update the LSN to make sure that
-		 * the iterator sees all data when open in a read
-		 * view.
-		 */
-		e->xm->lsn = vclock_sum(e->recovery_vclock);
 		e->recovery_vclock = NULL;
 		e->status = VINYL_ONLINE;
 		vy_quota_set_limit(&e->quota, e->memory);
@@ -3613,19 +3650,13 @@ vy_squash_process(struct vy_squash *squash)
 	/* Upserts enabled only in the primary index. */
 	assert(index->id == 0);
 
-	struct vy_read_iterator itr;
 	/*
 	 * Use the committed read view to avoid squashing
 	 * prepared, but not committed statements.
 	 */
-	vy_read_iterator_open(&itr, index, NULL, ITER_EQ, squash->stmt,
-			      &env->xm->p_committed_read_view);
 	struct tuple *result;
-	int rc = vy_read_iterator_next(&itr, &result);
-	if (rc == 0 && result != NULL)
-		tuple_ref(result);
-	vy_read_iterator_close(&itr);
-	if (rc != 0)
+	if (vy_point_lookup(index, NULL, &env->xm->p_committed_read_view,
+			    squash->stmt, &result) != 0)
 		return -1;
 	if (result == NULL)
 		return 0;
@@ -3762,7 +3793,7 @@ vy_squash_process(struct vy_squash *squash)
 	 */
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 	const struct tuple *region_stmt = NULL;
-	rc = vy_index_set(index, mem, result, &region_stmt);
+	int rc = vy_index_set(index, mem, result, &region_stmt);
 	tuple_unref(result);
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
@@ -3861,6 +3892,15 @@ fail:
 
 /* {{{ Cursor */
 
+static void
+vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct vinyl_iterator *it = container_of(trigger,
+			struct vinyl_iterator, on_tx_destroy);
+	it->tx = NULL;
+}
+
 static int
 vinyl_iterator_last(struct iterator *base, struct tuple **ret)
 {
@@ -3877,23 +3917,35 @@ vinyl_iterator_close(struct vinyl_iterator *it)
 	it->index = NULL;
 	tuple_unref(it->key);
 	it->key = NULL;
+	if (it->tx == &it->tx_autocommit) {
+		/*
+		 * Rollback the automatic transaction.
+		 * Use vy_tx_destroy() so as not to spoil
+		 * the statistics of rollbacks issued by
+		 * user transactions.
+		 */
+		vy_tx_destroy(it->tx);
+	} else {
+		trigger_clear(&it->on_tx_destroy);
+	}
 	it->tx = NULL;
-	it->rv = NULL;
-	trigger_clear(&it->on_tx_destroy);
-	if (it->rv_autocommit != NULL)
-		tx_manager_destroy_read_view(it->env->xm, it->rv_autocommit);
 	it->base.next = vinyl_iterator_last;
 }
 
 static int
-vinyl_iterator_next(struct iterator *base, struct tuple **ret)
+vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 {
-	assert(base->next = vinyl_iterator_next);
+	assert(base->next = vinyl_iterator_primary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	assert(it->index->id == 0);
 	struct tuple *tuple;
 
-	if ((*it->rv)->is_aborted ||
-	    (it->tx != NULL && it->tx->state == VINYL_TX_ABORT)) {
+	if (it->tx == NULL) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		goto fail;
+	}
+	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
+		diag_set(ClientError, ER_READ_VIEW_ABORTED);
 		goto fail;
 	}
 
@@ -3906,29 +3958,61 @@ vinyl_iterator_next(struct iterator *base, struct tuple **ret)
 		*ret = NULL;
 		return 0;
 	}
-
-	if (it->index->id > 0) {
-#ifndef NDEBUG
-		struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
-					      ERRINJ_BOOL);
-		if (delay && delay->bparam) {
-			while (delay->bparam)
-				fiber_sleep(0.01);
-		}
-#endif
-		/* Get the full tuple from the primary index. */
-		if (vy_index_get(it->index->pk, it->tx, it->rv,
-				 tuple, &tuple) != 0)
-			goto fail;
-	} else {
-		tuple_ref(tuple);
-	}
 	*ret = tuple_bless(tuple);
-	tuple_unref(tuple);
-	if (*ret == NULL)
+	if (*ret != NULL)
+		return 0;
+fail:
+	vinyl_iterator_close(it);
+	return -1;
+}
+
+static int
+vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
+{
+	assert(base->next = vinyl_iterator_secondary_next);
+	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	assert(it->index->id > 0);
+	struct tuple *tuple;
+
+	if (it->tx == NULL) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		goto fail;
+	}
+	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
+		diag_set(ClientError, ER_READ_VIEW_ABORTED);
+		goto fail;
+	}
+
+
+	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
 		goto fail;
 
-	return 0;
+	if (tuple == NULL) {
+		/* EOF. Close the iterator immediately. */
+		vinyl_iterator_close(it);
+		*ret = NULL;
+		return 0;
+	}
+#ifndef NDEBUG
+	struct errinj *delay = errinj(ERRINJ_VY_DELAY_PK_LOOKUP,
+				      ERRINJ_BOOL);
+	if (delay && delay->bparam) {
+		while (delay->bparam)
+			fiber_sleep(0.01);
+	}
+#endif
+	/*
+	 * Get the full tuple from the primary index.
+	 * Note, there's no need in vy_tx_track() as the
+	 * tuple is already tracked in the secondary index.
+	 */
+	if (vy_point_lookup(it->index->pk, it->tx, vy_tx_read_view(it->tx),
+			    tuple, &tuple) != 0)
+		goto fail;
+	*ret = tuple_bless(tuple);
+	tuple_unref(tuple);
+	if (*ret != NULL)
+		return 0;
 fail:
 	vinyl_iterator_close(it);
 	return -1;
@@ -3939,28 +4023,9 @@ vinyl_iterator_free(struct iterator *base)
 {
 	assert(base->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	if (it->index != NULL)
+	if (base->next != vinyl_iterator_last)
 		vinyl_iterator_close(it);
 	mempool_free(&it->env->iterator_pool, it);
-}
-
-static int
-vinyl_iterator_no_tx(struct iterator *base, struct tuple **ret)
-{
-	(void)base;
-	(void)ret;
-	diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
-	return -1;
-}
-
-static void
-vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
-{
-	(void)event;
-	struct vinyl_iterator *it = container_of(trigger,
-			struct vinyl_iterator, on_tx_destroy);
-	vinyl_iterator_close(it);
-	it->base.next = vinyl_iterator_no_tx;
 }
 
 static struct iterator *
@@ -3973,32 +4038,32 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
-		goto err;
+		return NULL;
 	}
 
 	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
 			 "mempool", "struct vinyl_iterator");
-		goto err;
+		return NULL;
 	}
 	it->key = vy_stmt_new_select(index->env->key_format, key, part_count);
-	if (it->key == NULL)
-		goto err_key;
+	if (it->key == NULL) {
+		mempool_free(&env->iterator_pool, it);
+		return NULL;
+	}
 
 	iterator_create(&it->base, base);
-	it->base.next = vinyl_iterator_next;
+	if (index->id == 0)
+		it->base.next = vinyl_iterator_primary_next;
+	else
+		it->base.next = vinyl_iterator_secondary_next;
 	it->base.free = vinyl_iterator_free;
 
 	it->env = env;
 	it->index = index;
 	vy_index_ref(index);
 
-	it->rv_autocommit = NULL;
-	trigger_create(&it->on_tx_destroy,
-		       vinyl_iterator_on_tx_destroy, NULL, NULL);
-
-	const struct vy_read_view **rv;
 	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	if (tx != NULL) {
@@ -4006,27 +4071,18 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		 * Register a trigger that will abort this iterator
 		 * when the transaction ends.
 		 */
+		trigger_create(&it->on_tx_destroy,
+			       vinyl_iterator_on_tx_destroy, NULL, NULL);
 		trigger_add(&tx->on_destroy, &it->on_tx_destroy);
-		rv = (const struct vy_read_view **)&tx->read_view;
 	} else {
-		it->rv_autocommit = tx_manager_read_view(env->xm);
-		if (it->rv_autocommit == NULL)
-			goto err_rv;
-		rv = (const struct vy_read_view **)&it->rv_autocommit;
+		tx = &it->tx_autocommit;
+		vy_tx_create(env->xm, tx);
 	}
 	it->tx = tx;
-	it->rv = rv;
 
-	vy_read_iterator_open(&it->iterator, index, tx, type, it->key, rv);
+	vy_read_iterator_open(&it->iterator, index, tx, type, it->key,
+			      (const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
-
-err_rv:
-	vy_index_unref(index);
-	tuple_unref(it->key);
-err_key:
-	mempool_free(&env->iterator_pool, it);
-err:
-	return NULL;
 }
 
 static int
@@ -4078,6 +4134,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .collect_garbage = */ vinyl_engine_collect_garbage,
 	/* .backup = */ vinyl_engine_backup,
 	/* .memory_stat = */ vinyl_engine_memory_stat,
+	/* .reset_stat = */ vinyl_engine_reset_stat,
 	/* .check_space_def = */ vinyl_engine_check_space_def,
 };
 
@@ -4123,6 +4180,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ vinyl_index_info,
+	/* .reset_stat = */ vinyl_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,
 	/* .build_next = */ generic_index_build_next,

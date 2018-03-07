@@ -26,6 +26,15 @@ box.stat.SELECT.total
 space:get('Impossible value')
 box.stat.ERROR.total
 
+-- reset
+box.stat.reset()
+box.stat.INSERT.total
+box.stat.DELETE.total
+box.stat.UPDATE.total
+box.stat.REPLACE.total
+box.stat.SELECT.total
+box.stat.ERROR.total
+
 test_run:cmd('restart server default')
 
 -- statistics must be zero

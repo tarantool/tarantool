@@ -21,6 +21,11 @@ box.stat.net.RECEIVED.total > 0
 -- box.stat.net.EVENTS.total > 0
 -- box.stat.net.LOCKS.total > 0
 
+-- reset
+box.stat.reset()
+box.stat.net.SENT.total
+box.stat.net.RECEIVED.total
+
 space:drop()
 cn:close()
 box.schema.user.revoke('guest','read,write,execute','universe')

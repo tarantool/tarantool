@@ -45,6 +45,8 @@
  * and, if the result is the latest version of the key, adds it to cache.
  */
 
+#include <stdbool.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -59,6 +61,13 @@ struct tuple;
  * parts in case of a secondary index), lookup the corresponding
  * tuple in the index. The tuple is returned in @ret with its
  * reference counter elevated.
+ *
+ * The caller must guarantee that if the tuple looked up by this
+ * function is modified, the transaction will be sent to read view.
+ * This is needed to avoid inserting a stale value into the cache.
+ * In other words, vy_tx_track() must be called for the search key
+ * before calling this function unless this is a primary index and
+ * the tuple is already tracked in a secondary index.
  */
 int
 vy_point_lookup(struct vy_index *index, struct vy_tx *tx,

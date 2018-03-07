@@ -76,6 +76,13 @@ latency_destroy(struct latency *latency)
 }
 
 void
+latency_reset(struct latency *latency)
+{
+	histogram_reset(latency->histogram);
+	histogram_collect(latency->histogram, 0);
+}
+
+void
 latency_collect(struct latency *latency, double value)
 {
 	int64_t value_usec = value * USEC_PER_SEC;

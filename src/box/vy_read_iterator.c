@@ -37,7 +37,6 @@
 #include "vy_upsert.h"
 #include "vy_index.h"
 #include "vy_stat.h"
-#include "vy_point_lookup.h"
 
 /**
  * Merge source, support structure for vy_read_iterator.
@@ -131,6 +130,11 @@ vy_read_iterator_unpin_slices(struct vy_read_iterator *itr)
 /**
  * Return true if the current statement is outside the current
  * range and hence we should move to the next range.
+ *
+ * If we are looking for a match (EQ, REQ) and the search key
+ * doesn't intersect with the current range's boundary, the next
+ * range can't contain statements matching the search criteria
+ * and hence there's no point in iterating to it.
  */
 static bool
 vy_read_iterator_range_is_done(struct vy_read_iterator *itr)
@@ -142,12 +146,16 @@ vy_read_iterator_range_is_done(struct vy_read_iterator *itr)
 
 	if (dir > 0 && range->end != NULL &&
 	    (stmt == NULL || vy_tuple_compare_with_key(stmt,
-				range->end, cmp_def) >= 0))
+				range->end, cmp_def) >= 0) &&
+	    (itr->iterator_type != ITER_EQ ||
+	     vy_stmt_compare_with_key(itr->key, range->end, cmp_def) >= 0))
 		return true;
 
 	if (dir < 0 && range->begin != NULL &&
 	    (stmt == NULL || vy_tuple_compare_with_key(stmt,
-				range->begin, cmp_def) < 0))
+				range->begin, cmp_def) < 0) &&
+	    (itr->iterator_type != ITER_REQ ||
+	     vy_stmt_compare_with_key(itr->key, range->begin, cmp_def) <= 0))
 		return true;
 
 	return false;
@@ -937,23 +945,6 @@ NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
 	ev_tstamp start_time = ev_monotonic_now(loop());
-
-	/* The key might be set to NULL during previous call, that means
-	 * that there's no more data */
-	if (itr->key == NULL) {
-		*result = NULL;
-		return 0;
-	}
-
-	/* Run a special iterator for a special case */
-	if ((itr->iterator_type == ITER_EQ || itr->iterator_type == ITER_REQ) &&
-	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
-		int rc = vy_point_lookup(itr->index, itr->tx, itr->read_view,
-					 itr->key, &itr->last_stmt);
-		*result = itr->last_stmt;
-		itr->key = NULL;
-		return rc;
-	}
 
 	*result = NULL;
 
