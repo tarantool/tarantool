@@ -1460,6 +1460,12 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		if (rc != 0)
 			return -1;
 	}
+	/*
+	 * We must always append the statement to transaction write set
+	 * of each index, even if operation itself does not update
+	 * the index, e.g. it's an UPDATE, to ensure we read our
+	 * own writes.
+	 */
 	return vy_tx_set(tx, index, stmt);
 }
 
