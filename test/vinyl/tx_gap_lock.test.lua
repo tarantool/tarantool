@@ -379,6 +379,25 @@ c3:commit()
 c4:commit()
 
 s:drop()
+----------------------------------------------------------------
+-- gh-2534: Iterator over a secondary index doesn't double track
+-- results in the primary index.
+----------------------------------------------------------------
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {parts = {1, 'unsigned'}})
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+for i = 1, 100 do s:insert{i, i} end
+box.begin()
+gap_lock_count() -- 0
+_ = s.index.sk:select({}, {limit = 50})
+gap_lock_count() -- 1
+for i = 1, 100 do s.index.sk:get(i) end
+gap_lock_count() -- 51
+_ = s.index.sk:select()
+gap_lock_count() -- 1
+box.commit()
+gap_lock_count() -- 0
+s:drop()
 
 gap_lock_count = nil
 ----------------------------------------------------------------
@@ -506,21 +525,6 @@ end;
 s:drop();
 
 test_run:cmd("setopt delimiter ''");
-----------------------------------------------------------------
--- gh-2534: Iterator doesn't track reads in autocommit mode.
-----------------------------------------------------------------
-s = box.schema.space.create('test', {engine = 'vinyl'})
-_ = s:create_index('pk', {parts = {1, 'unsigned'}})
-_ = s:create_index('sk', {parts = {2, 'unsigned'}})
-for i = 1, 100 do s:insert{i, i} end
-gen, param, state = s.index.sk:pairs()
-for i = 1, 100 do state, value = gen(param, state) end
-value
-stat = box.info.vinyl()
-stat.tx.transactions -- 0
-stat.tx.read_views -- 1
-stat.tx.gap_locks -- 0
-s:drop()
 ----------------------------------------------------------------
 
 c = nil

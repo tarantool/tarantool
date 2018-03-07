@@ -402,18 +402,6 @@ vy_point_lookup(struct vy_index *index, struct vy_tx *tx,
 	index->stat.lookup++;
 	/* History list */
 	struct rlist history;
-	/*
-	 * Notify the TX manager that we are about to read the key
-	 * so that if a new statement with the same key arrives
-	 * while we are reading a run file, we will be sent to a
-	 * read view and hence will not try to add a stale value
-	 * to the cache.
-	 */
-	if (tx != NULL) {
-		rc = vy_tx_track_point(tx, index, key);
-		if (rc != 0)
-			goto done;
-	}
 restart:
 	rlist_create(&history);
 

@@ -460,8 +460,6 @@ s:drop()
 ---
 ...
 -- Same test w/o begin/end
---
--- Note, select() does not update cache in autcommit mode, see gh-2534.
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
@@ -587,9 +585,9 @@ s:select{1}
   - [1, 3, 1, '']
   - [1, 4, 1, '']
 ...
-stat_changed() -- cache miss, true
+stat_changed() -- cache hit, false
 ---
-- true
+- false
 ...
 s:select{}
 ---
@@ -621,9 +619,9 @@ s:select{}
   - [2, 4, 2, '']
   - [3, 3, 4]
 ...
-stat_changed() -- cache miss, true
+stat_changed() -- cache hit, false
 ---
-- true
+- false
 ...
 s:drop()
 ---
@@ -705,9 +703,9 @@ s:get{1, 2}
 ---
 - [1, 2, 1, '']
 ...
-stat_changed() -- cache miss, true
+stat_changed() -- cache hit, false
 ---
-- true
+- false
 ...
 s:select{1}
 ---
@@ -716,9 +714,9 @@ s:select{1}
   - [1, 3, 1, '']
   - [1, 4, 1, '']
 ...
-stat_changed() -- cache miss, true
+stat_changed() -- cache hit, false
 ---
-- true
+- false
 ...
 s:select{}
 ---
@@ -733,9 +731,9 @@ s:select{}
   - [2, 4, 2, '']
   - [3, 3, 4]
 ...
-stat_changed() -- cache miss, true
+stat_changed() -- cache hit, false
 ---
-- true
+- false
 ...
 s:drop()
 ---

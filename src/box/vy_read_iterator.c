@@ -37,7 +37,6 @@
 #include "vy_upsert.h"
 #include "vy_index.h"
 #include "vy_stat.h"
-#include "vy_point_lookup.h"
 
 /**
  * Merge source, support structure for vy_read_iterator.
@@ -946,23 +945,6 @@ NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
 	ev_tstamp start_time = ev_monotonic_now(loop());
-
-	/* The key might be set to NULL during previous call, that means
-	 * that there's no more data */
-	if (itr->key == NULL) {
-		*result = NULL;
-		return 0;
-	}
-
-	/* Run a special iterator for a special case */
-	if ((itr->iterator_type == ITER_EQ || itr->iterator_type == ITER_REQ) &&
-	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
-		int rc = vy_point_lookup(itr->index, itr->tx, itr->read_view,
-					 itr->key, &itr->last_stmt);
-		*result = itr->last_stmt;
-		itr->key = NULL;
-		return rc;
-	}
 
 	*result = NULL;
 
