@@ -1735,12 +1735,8 @@ int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
 	assert(ephem_space);
 	struct index *primary_index = *ephem_space->index;
 
-	char key[16];
-	mp_encode_array(key, 0);
 	struct tuple *tuple;
-
-	uint32_t part_count = primary_index->def->key_def->part_count;
-	if (index_max(primary_index, key, part_count, &tuple) != 0) {
+	if (index_max(primary_index, NULL, 0, &tuple) != 0) {
 		return SQL_TARANTOOL_ERROR;
 	}
 	if (tuple != NULL && tuple_bless(tuple) == NULL)
