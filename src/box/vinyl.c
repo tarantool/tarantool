@@ -1347,8 +1347,11 @@ vy_index_get(struct vy_index *index, struct vy_tx *tx,
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
-	if (tuple_field_count(key) >= index->cmp_def->part_count)
+	if (tuple_field_count(key) >= index->cmp_def->part_count) {
+		if (tx != NULL && vy_tx_track_point(tx, index, key) != 0)
+			return -1;
 		return vy_point_lookup(index, tx, rv, key, result);
+	}
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, index, tx, ITER_EQ, key, rv);
@@ -1696,6 +1699,10 @@ vy_index_full_by_key(struct vy_index *index, struct vy_tx *tx,
 		*result = found;
 		return 0;
 	}
+	/*
+	 * No need in vy_tx_track() as the tuple is already
+	 * tracked in the secondary index.
+	 */
 	rc = vy_point_lookup(index->pk, tx, rv, found, result);
 	tuple_unref(found);
 	return rc;
@@ -3926,7 +3933,11 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 			fiber_sleep(0.01);
 	}
 #endif
-	/* Get the full tuple from the primary index. */
+	/*
+	 * Get the full tuple from the primary index.
+	 * Note, there's no need in vy_tx_track() as the
+	 * tuple is already tracked in the secondary index.
+	 */
 	if (vy_point_lookup(it->index->pk, it->tx, vy_tx_read_view(it->tx),
 			    tuple, &tuple) != 0)
 		goto fail;
