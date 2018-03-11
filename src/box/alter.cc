@@ -1578,6 +1578,25 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct alter_space *alter = alter_space_new(old_space);
 		auto alter_guard =
 			make_scoped_guard([=] {alter_space_delete(alter);});
+		/*
+		 * Calculate a new min_field_count. It can be
+		 * changed by resetting space:format(), if an old
+		 * format covers some nullable indexed fields in
+		 * the format tail. And when the format is reset,
+		 * these fields become optional - index
+		 * comparators must be updated.
+		 */
+		struct key_def **keys;
+		size_t bsize = old_space->index_count * sizeof(keys[0]);
+		keys = (struct key_def **) region_alloc_xc(&fiber()->gc,
+							   bsize);
+		for (uint32_t i = 0; i < old_space->index_count; ++i)
+			keys[i] = old_space->index[i]->def->key_def;
+		alter->new_min_field_count =
+			tuple_format_min_field_count(keys,
+						     old_space->index_count,
+						     def->fields,
+						     def->field_count);
 		(void) new ModifySpaceFormat(alter, def);
 		(void) new ModifySpace(alter, def);
 		def_guard.is_active = false;
