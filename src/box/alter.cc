@@ -326,7 +326,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		tnt_raise(OutOfMemory, sizeof(*part_def) * part_count,
 			  "malloc", "key_part_def");
 	}
-	auto key_def_guard = make_scoped_guard([=] {
+	auto key_def_guard = make_scoped_guard([&] {
 		free(part_def);
 		free(key_def);
 	});
