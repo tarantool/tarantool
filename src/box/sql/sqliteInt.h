@@ -3056,6 +3056,11 @@ struct Parse {
 #define OPFLAG_NOOP_IF_NULL  0x02	/* OP_FCopy: if source register is NULL
 					 * then do nothing
 					 */
+#define OPFLAG_FRESH_PTR     0x20	/* OP_Open**: set if space pointer
+					 * comes from OP_SIDtoPtr, i.e. it
+					 * is fresh, even in case schema
+					 * changes previously.
+					 */
 
 /*
  * Each trigger present in the database schema is stored as an instance of
@@ -3581,7 +3586,6 @@ int sqlite3ViewGetColumnNames(Parse *, Table *);
 int sqlite3DbMaskAllZero(yDbMask);
 #endif
 void sqlite3DropTable(Parse *, SrcList *, int, int);
-void sqlite3CodeDropTable(Parse *, Table *, int);
 void sqlite3DeleteTable(sqlite3 *, Table *);
 void sqlite3Insert(Parse *, SrcList *, Select *, IdList *, int);
 void *sqlite3ArrayAllocate(sqlite3 *, void *, int, int *, int *);

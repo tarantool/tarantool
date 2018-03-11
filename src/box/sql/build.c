@@ -46,6 +46,7 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/sequence.h"
 #include "box/session.h"
 #include "box/identifier.h"
 #include "box/schema.h"
@@ -1533,10 +1534,8 @@ getNewSpaceId(Parse * pParse)
  * space id or designates a register storing the id.
  */
 static void
-createIndex(Parse * pParse,
-	    Index * pIndex,
-	    int iSpaceId,
-	    int iIndexId, const char *zSql, Table * pSysIndex, int iCursor)
+createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
+	    const char *zSql)
 {
 	Vdbe *v = sqlite3GetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
@@ -1601,7 +1600,7 @@ createIndex(Parse * pParse,
 	sqlite3VdbeAddOp4(v, OP_Blob, zPartsSz, iFirstCol + 5, MSGPACK_SUBTYPE,
 			  zParts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
-	sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 6);
+	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_INDEX_ID, iRecord);
 	/* Do not account nested operations: the count of such
 	 * operations depends on Tarantool data dictionary internals,
 	 * such as data layout in system spaces. Also do not account
@@ -1610,7 +1609,6 @@ createIndex(Parse * pParse,
 	 */
 	if (!pParse->nested && pIndex->idxType == SQLITE_IDXTYPE_APPDEF)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
-	sqlite3TableAffinity(v, pSysIndex, 0);
 }
 
 /*
@@ -1663,8 +1661,7 @@ makeIndexSchemaRecord(Parse * pParse,
  * iCursor is a cursor to access _space.
  */
 static void
-createSpace(Parse * pParse,
-	    int iSpaceId, char *zStmt, int iCursor, Table * pSysSpace)
+createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 {
 	Table *p = pParse->pNewTable;
 	Vdbe *v = sqlite3GetVdbe(pParse);
@@ -1707,14 +1704,13 @@ createSpace(Parse * pParse,
 	sqlite3VdbeAddOp4(v, OP_Blob, zFormatSz, iFirstCol + 6, MSGPACK_SUBTYPE,
 			  zFormat, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
-	sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord, iFirstCol, 7);
+	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_ID, iRecord);
 	/* Do not account nested operations: the count of such
 	 * operations depends on Tarantool data dictionary internals,
 	 * such as data layout in system spaces.
 	 */
 	if (!pParse->nested)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
-	sqlite3TableAffinity(v, pSysSpace, 0);
 }
 
 /*
@@ -1723,8 +1719,7 @@ createSpace(Parse * pParse,
  * iCursor is a cursor to access _index.
  */
 static void
-createImplicitIndices(Parse * pParse,
-		      int iSpaceId, int iCursor, Table * pSysIndex)
+createImplicitIndices(Parse * pParse, int iSpaceId)
 {
 	Table *p = pParse->pNewTable;
 	Index *pIdx, *pPrimaryIdx = sqlite3PrimaryKeyIndex(p);
@@ -1732,22 +1727,21 @@ createImplicitIndices(Parse * pParse,
 
 	if (pPrimaryIdx) {
 		/* Tarantool quirk: primary index is created first */
-		createIndex(pParse, pPrimaryIdx, iSpaceId, 0, NULL, pSysIndex,
-			    iCursor);
+		createIndex(pParse, pPrimaryIdx, iSpaceId, 0, NULL);
 	} else {
 		/*
 		 * This branch should not be taken.
 		 * If it is, then the current CREATE TABLE statement fails to
 		 * specify the PRIMARY KEY. The error is reported elsewhere.
 		 */
+		unreachable();
 	}
 
 	/* (pIdx->i) mapping must be consistent with parseTableSchemaRecord */
 	for (pIdx = p->pIndex, i = 0; pIdx; pIdx = pIdx->pNext) {
 		if (pIdx == pPrimaryIdx)
 			continue;
-		createIndex(pParse, pIdx, iSpaceId, ++i, NULL, pSysIndex,
-			    iCursor);
+		createIndex(pParse, pIdx, iSpaceId, ++i, NULL);
 	}
 }
 
@@ -1938,22 +1932,10 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		Vdbe *v;
 		char *zType;	/* "VIEW" or "TABLE" */
 		char *zStmt;	/* Text of the CREATE TABLE or CREATE VIEW statement */
-		Table *pSysSpace, *pSysIndex;
-		int iCursor = pParse->nTab++;
 		int iSpaceId;
 
 		v = sqlite3GetVdbe(pParse);
 		if (NEVER(v == 0))
-			return;
-
-		pSysSpace = sqlite3HashFind(&pParse->db->pSchema->tblHash,
-					    TARANTOOL_SYS_SPACE_NAME);
-		if (NEVER(!pSysSpace))
-			return;
-
-		pSysIndex = sqlite3HashFind(&pParse->db->pSchema->tblHash,
-					    TARANTOOL_SYS_INDEX_NAME);
-		if (NEVER(!pSysIndex))
 			return;
 
 		/*
@@ -1998,63 +1980,34 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		}
 
 		iSpaceId = getNewSpaceId(pParse);
-		sqlite3OpenTable(pParse, iCursor, pSysSpace, OP_OpenWrite);
-		createSpace(pParse, iSpaceId, zStmt, iCursor, pSysSpace);
-		sqlite3OpenTable(pParse, iCursor, pSysIndex, OP_OpenWrite);
-		createImplicitIndices(pParse, iSpaceId, iCursor, pSysIndex);
-		sqlite3VdbeAddOp1(v, OP_Close, iCursor);
+		createSpace(pParse, iSpaceId, zStmt);
+		/* Indexes aren't required for VIEW's. */
+		if (p->pSelect == NULL) {
+			createImplicitIndices(pParse, iSpaceId);
+		}
 
 		/* Check to see if we need to create an _sequence table for
 		 * keeping track of autoincrement keys.
 		 */
 		if ((p->tabFlags & TF_Autoincrement) != 0) {
-			Table *sys_sequence, *sys_space_sequence;
 			int reg_seq_id;
 			int reg_seq_record, reg_space_seq_record;
 			assert(iSpaceId);
-
-			/* Do an insertion into _sequence  */
-			sys_sequence = sqlite3HashFind(
-				&pParse->db->pSchema->tblHash,
-				TARANTOOL_SYS_SEQUENCE_NAME);
-			if (NEVER(!sys_sequence))
-				return;
-
-			sqlite3OpenTable(pParse, iCursor, sys_sequence,
-					 OP_OpenWrite);
+			/* Do an insertion into _sequence. */
 			reg_seq_id = ++pParse->nMem;
 			sqlite3VdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
 
 			reg_seq_record = emitNewSysSequenceRecord(pParse,
 								  reg_seq_id,
 								  p->zName);
-			if (reg_seq_record < 0)
-				return;
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor,
-					     reg_seq_record,
-					     reg_seq_record + 1, 9);
-			sqlite3VdbeAddOp1(v, OP_Close, iCursor);
-
-			/* Do an insertion into _space_sequence  */
-			sys_space_sequence = sqlite3HashFind(
-				&pParse->db->pSchema->tblHash,
-				TARANTOOL_SYS_SPACE_SEQUENCE_NAME);
-			if (NEVER(!sys_space_sequence))
-				return;
-
-			sqlite3OpenTable(pParse, iCursor, sys_space_sequence,
-					 OP_OpenWrite);
-			
-			reg_space_seq_record = emitNewSysSpaceSequenceRecord(
-				pParse,
-				iSpaceId,
-				reg_seq_id);
-
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor,
-					     reg_space_seq_record,
-					     reg_space_seq_record + 1, 3);
-
-			sqlite3VdbeAddOp1(v, OP_Close, iCursor);
+			sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SEQUENCE_ID,
+					  reg_seq_record);
+			/* Do an insertion into _space_sequence. */
+			reg_space_seq_record =
+				emitNewSysSpaceSequenceRecord(pParse, iSpaceId,
+							      reg_seq_id);
+			sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID,
+					  reg_space_seq_record);
 		}
 
 		/* Reparse everything to update our internal data structures */
@@ -2310,7 +2263,7 @@ sqlite3ClearStatTables(Parse * pParse,	/* The parsing context */
 /*
  * Generate code to drop a table.
  */
-void
+static void
 sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 {
 	Vdbe *v;
@@ -2320,9 +2273,11 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
 	sqlite3BeginWriteOperation(pParse, 1);
-
-	/* Drop all triggers associated with the table being dropped. Code
-	 * is generated to remove entries from _trigger space.
+	/*
+	 * Drop all triggers associated with the table being
+	 * dropped. Code is generated to remove entries from
+	 * _trigger. OP_DropTrigger will remove it from internal
+	 * SQL structures.
 	 */
 	pTrigger = pTab->pTrigger;
 	/* Do not account triggers deletion - they will be accounted
@@ -2336,58 +2291,81 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 		pTrigger = pTrigger->pNext;
 	}
 	pParse->nested--;
-
-	/* Remove any entries of the _sequence table associated with
-	 * the table being dropped. This is done before the table is dropped
-	 * at the btree level, in case the _sequence table needs to
-	 * move as a result of the drop.
+	/*
+	 * Remove any entries of the _sequence and _space_sequence
+	 * space associated with the table being dropped. This is
+	 * done before the table is dropped from internal schema.
 	 */
-	if (pTab->tabFlags & TF_Autoincrement) {
-		sqlite3NestedParse(pParse,
-				   "DELETE FROM \"%s\" WHERE \"space_id\"=%d",
-				   TARANTOOL_SYS_SPACE_SEQUENCE_NAME,
-				   SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
-		sqlite3NestedParse(pParse,
-				   "DELETE FROM \"%s\" WHERE \"name\"=%Q",
-				   TARANTOOL_SYS_SEQUENCE_NAME,
-				   pTab->zName);
-	}
-
-	/* Drop all _space and _index entries that refer to the
-	 * table. The program loops through the _index & _space tables and deletes
-	 * every row that refers to a table.
-	 * Triggers are handled separately because a trigger can be
-	 * created in the temp database that refers to a table in another
-	 * database.
-	 */
+	int idx_rec_reg = ++pParse->nMem;
+	int space_id_reg = ++pParse->nMem;
 	int space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
+	if (pTab->tabFlags & TF_Autoincrement) {
+		/* Delete entry from _space_sequence. */
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
+				  idx_rec_reg);
+		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SPACE_SEQUENCE_ID,
+				  idx_rec_reg);
+		VdbeComment((v, "Delete entry from _space_sequence"));
+		/* Delete entry by id from _sequence. */
+		assert(space->sequence != NULL);
+		int sequence_id_reg = ++pParse->nMem;
+		sqlite3VdbeAddOp2(v, OP_Integer, space->sequence->def->id,
+				  sequence_id_reg);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
+				  idx_rec_reg);
+		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_ID, idx_rec_reg);
+		VdbeComment((v, "Delete entry from _sequence"));
+	}
+	/*
+	 * Drop all _space and _index entries that refer to the
+	 * table.
+	 */
 	if (!isView) {
-		if (pTab->pIndex && pTab->pIndex->pNext) {
-			/*  Remove all indexes, except for primary.
-			   Tarantool won't allow remove primary when secondary exist. */
-			sqlite3NestedParse(pParse,
-					   "DELETE FROM \"%s\" WHERE \"id\"=%d AND \"iid\">0",
-					   TARANTOOL_SYS_INDEX_NAME, space_id);
+		uint32_t index_count = space->index_count;
+		if (index_count > 1) {
+			/*
+			 * Remove all indexes, except for primary.
+			 * Tarantool won't allow remove primary when
+			 * secondary exist.
+			 */
+			uint32_t *iids =
+				(uint32_t *) region_alloc(&fiber()->gc,
+							  sizeof(uint32_t) *
+							  (index_count - 1));
+			/* Save index ids to be deleted except for PK. */
+			for (uint32_t i = 1; i < index_count; ++i) {
+				iids[i - 1] = space->index[i]->def->iid;
+			}
+			for (uint32_t i = 0; i < index_count - 1; ++i) {
+				sqlite3VdbeAddOp2(v, OP_Integer, iids[i],
+						  space_id_reg + 1);
+				sqlite3VdbeAddOp3(v, OP_MakeRecord,
+						  space_id_reg, 2, idx_rec_reg);
+				sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID,
+						  idx_rec_reg);
+				VdbeComment((v,
+					     "Remove secondary index iid = %u",
+					     iids[i]));
+			}
 		}
-
-		/*  Remove primary index. */
-		sqlite3NestedParse(pParse,
-				   "DELETE FROM \"%s\" WHERE \"id\"=%d AND \"iid\"=0",
-				   TARANTOOL_SYS_INDEX_NAME, space_id);
+		sqlite3VdbeAddOp2(v, OP_Integer, 0, space_id_reg + 1);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2,
+				  idx_rec_reg);
+		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, idx_rec_reg);
+		VdbeComment((v, "Remove primary index"));
 	}
 	/* Delete records about the space from the _truncate. */
-	sqlite3NestedParse(pParse, "DELETE FROM \""
-			   TARANTOOL_SYS_TRUNCATE_NAME "\" WHERE \"id\" = %d",
-			   space_id);
-
-	Expr *id_value = sqlite3ExprInteger(db, space_id);
-	const char *column = "id";
-	/* Execute not nested DELETE of a space to account DROP TABLE
-	 * changes.
-	 */
-	sqlite3DeleteByKey(pParse, TARANTOOL_SYS_SPACE_NAME,
-			   &column, &id_value, 1);
-
+	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1, idx_rec_reg);
+	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_TRUNCATE_ID, idx_rec_reg);
+	VdbeComment((v, "Delete entry from _truncate"));
+	/* Eventually delete entry from _space. */
+	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1, idx_rec_reg);
+	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SPACE_ID, idx_rec_reg);
+	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	VdbeComment((v, "Delete entry from _space"));
 	/* Remove the table entry from SQLite's internal schema and modify
 	 * the schema cookie.
 	 */
@@ -3237,8 +3215,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	else if (pTblName) {
 		Vdbe *v;
 		char *zStmt;
-		Table *pSysIndex;
 		int iCursor = pParse->nTab++;
+		int index_space_ptr_reg = pParse->nTab++;
 		int iSpaceId, iIndexId, iFirstSchemaCol;
 
 		v = sqlite3GetVdbe(pParse);
@@ -3247,13 +3225,11 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 
 		sqlite3BeginWriteOperation(pParse, 1);
 
-		pSysIndex =
-		    sqlite3HashFind(&pParse->db->pSchema->tblHash,
-				    TARANTOOL_SYS_INDEX_NAME);
-		if (NEVER(!pSysIndex))
-			return;
 
-		sqlite3OpenTable(pParse, iCursor, pSysIndex, OP_OpenWrite);
+		sqlite3VdbeAddOp2(v, OP_SIDtoPtr, BOX_INDEX_ID,
+				  index_space_ptr_reg);
+		sqlite3VdbeAddOp4Int(v, OP_OpenWrite, iCursor, 0,
+				     index_space_ptr_reg, 6);
 		sqlite3VdbeChangeP5(v, OPFLAG_SEEKEQ);
 
 		/* Gather the complete text of the CREATE INDEX statement into
@@ -3275,9 +3251,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 
 		iSpaceId = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
 		iIndexId = getNewIid(pParse, iSpaceId, iCursor);
-		createIndex(pParse, pIndex, iSpaceId, iIndexId, zStmt,
-			    pSysIndex, iCursor);
 		sqlite3VdbeAddOp1(v, OP_Close, iCursor);
+		createIndex(pParse, pIndex, iSpaceId, iIndexId, zStmt);
 
 		/* consumes zStmt */
 		iFirstSchemaCol =
@@ -3469,15 +3444,21 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 		goto exit_drop_index;
 	}
 
-	/* Generate code to remove the index and from the master table */
-	sqlite3BeginWriteOperation(pParse, 1);
-	const char *columns[2] = { "id", "iid" };
-	Expr *values[2];
-	values[0] = sqlite3ExprInteger(db, space_id);
-	values[1] = sqlite3ExprInteger(db, index_id);
-	sqlite3DeleteByKey(pParse, TARANTOOL_SYS_INDEX_NAME,
-			   columns, values, 2);
+	/*
+	 * Generate code to remove entry from _index space
+	 * But firstly, delete statistics since schema
+	 * changes after DDL.
+	 */
 	sqlite3ClearStatTables(pParse, "idx", pIndex->zName);
+	int record_reg = ++pParse->nMem;
+	int space_id_reg = ++pParse->nMem;
+	sqlite3VdbeAddOp2(v, OP_Integer, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum),
+			  space_id_reg);
+	sqlite3VdbeAddOp2(v, OP_Integer, SQLITE_PAGENO_TO_INDEXID(pIndex->tnum),
+			  space_id_reg + 1);
+	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
+	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);
+	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 	sqlite3ChangeCookie(pParse);
 
 	sqlite3VdbeAddOp3(v, OP_DropIndex, 0, 0, 0);

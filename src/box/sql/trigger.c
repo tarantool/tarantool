@@ -556,23 +556,22 @@ tableOfTrigger(Trigger * pTrigger)
 void
 sqlite3DropTriggerPtr(Parse * pParse, Trigger * pTrigger)
 {
-	Table *pTable MAYBE_UNUSED;
 	Vdbe *v;
-	sqlite3 *db = pParse->db;
-
-	assert(sqlite3SchemaToIndex(pParse->db, pTrigger->pSchema) == 0);
-	pTable = tableOfTrigger(pTrigger);
-	assert(pTable);
-	assert(pTable->pSchema == pTrigger->pSchema);
-
-	/* Generate code to destroy the database record of the trigger.
+	/* Generate code to delete entry from _trigger and
+	 * internal SQL structures.
 	 */
-	assert(pTable != 0);
 	if ((v = sqlite3GetVdbe(pParse)) != 0) {
-		const char *column = "name";
-		Expr *value = sqlite3Expr(db, TK_STRING, pTrigger->zName);
-		sqlite3DeleteByKey(pParse, TARANTOOL_SYS_TRIGGER_NAME,
-				   &column, &value, 1);
+		int trig_name_reg = ++pParse->nMem;
+		int record_to_delete = ++pParse->nMem;
+		sqlite3VdbeAddOp4(v, OP_String8, 0, trig_name_reg, 0,
+				  pTrigger->zName, P4_STATIC);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, trig_name_reg, 1,
+				  record_to_delete);
+		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_TRIGGER_ID,
+				  record_to_delete);
+		if (!pParse->nested)
+			sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+
 		sqlite3ChangeCookie(pParse);
 		sqlite3VdbeAddOp4(v, OP_DropTrigger, 0, 0, 0, pTrigger->zName,
 				  0);
