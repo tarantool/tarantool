@@ -157,6 +157,22 @@ say_format_by_name(const char *format)
 	return STR2ENUM(say_format, format);
 }
 
+void
+log_error(int level, const char *filename, int line, int format, const char *error)
+{
+	if (say_log_level_is_enabled(level)) {
+		const char* syserror = NULL;
+		if (level == S_SYSERROR) {
+			syserror = strerror(errno);
+		}
+		const char* fmt = "%s";
+		if (log_format == SF_JSON && format == SF_JSON) {
+			fmt = "json";
+		}
+		_say(level, filename, line, syserror, fmt, error);
+	}
+}
+
 /**
  * Initialize the logger pipe: a standalone
  * process which is fed all log messages.

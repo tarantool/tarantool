@@ -120,6 +120,19 @@ typedef void (*sayfunc_t)(int, const char *, int, const char *,
 CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 
 /**
+ * Print a message to Tarantool log file.
+ *
+ * \param level (int) - log level (see enum \link say_level \endlink)
+ * \param filename (const char * ) - error source file name
+ * \param line (int) - error source file line number
+ * \param format (int) - error string format (see enum \link say_format \endlink)
+ * \param error (const char * ) - formatted error string
+ * \sa enum say_level
+ * \sa enum say_format
+ */
+void log_error(int level, const char *filename, int line, int format, const char *error);
+
+/**
  * Format and print a message to Tarantool log file.
  *
  * \param level (int) - log level (see enum \link say_level \endlink)

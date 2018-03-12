@@ -83,6 +83,7 @@ tnt_HMAC_CTX_free
 # Module API
 
 _say
+log_error
 fiber_attr_new
 fiber_attr_delete
 fiber_attr_setstacksize
