@@ -185,8 +185,11 @@ say_set_log_format(enum say_format format);
 enum say_format
 say_format_by_name(const char *format);
 
+struct ev_loop;
+struct ev_signal;
+
 void
-say_logrotate(int /* signo */);
+say_logrotate(struct ev_loop *, struct ev_signal *, int /* revents */);
 
 /** Init default logger. */
 void

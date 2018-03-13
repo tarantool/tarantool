@@ -234,6 +234,15 @@ coio_task_post(struct coio_task *task, double timeout)
 	assert(task->fiber == fiber());
 
 	eio_submit(&task->base);
+	if (timeout == 0) {
+		/*
+		* This is a special case:
+		* we don't wait any response from the task
+		* and just perform just asynchronous post.
+		*/
+		task->fiber = NULL;
+		return 0;
+	}
 	fiber_yield_timeout(timeout);
 	if (!task->complete) {
 		/* timed out or cancelled. */
