@@ -136,3 +136,29 @@ s = box.schema.create_space('test', {format = format})
 pk = s:create_index('pk')
 pk.parts[1].type
 s:drop()
+
+--
+-- gh-3229: update optionality if a space format is changed too,
+-- not only when indexes are updated.
+--
+box.cfg{}
+s = box.schema.create_space('test', {engine = 'memtx'})
+format = {}
+format[1] = {'field1', 'unsigned'}
+format[2] = {'field2', 'unsigned', is_nullable = true}
+format[3] = {'field3', 'unsigned'}
+s:format(format)
+pk = s:create_index('pk')
+sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
+s:replace{2, 3, 4}
+s:format({})
+s:insert({1})
+s:insert({4, 5})
+s:insert({3, 4})
+s:insert({0})
+_ = s:delete({1})
+s:select({})
+pk:get({4})
+sk:select({box.NULL})
+sk:get({5})
+s:drop()
