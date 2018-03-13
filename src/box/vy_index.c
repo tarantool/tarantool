@@ -308,8 +308,7 @@ vy_index_delete(struct vy_index *index)
 	tuple_format_unref(index->disk_format);
 	tuple_format_unref(index->mem_format_with_colmask);
 	tuple_format_unref(index->upsert_format);
-	if (index->id > 0)
-		free(index->cmp_def);
+	free(index->cmp_def);
 	free(index->key_def);
 	histogram_delete(index->run_hist);
 	vy_index_stat_destroy(&index->stat);
