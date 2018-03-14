@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(6)
+test:plan(5)
 
 test:execsql " DROP TABLE IF EXISTS t1 "
 test:execsql " DROP TABLE IF EXISTS t2 "
@@ -69,15 +69,16 @@ test:do_execsql_test(
 	-- <index-1.5>
 	})
 
-test:do_execsql_test(
-	"index-1.6",
-	[[
-		REINDEX t1ix1 ON t1;
-	]],
-	{
-	-- <index-1.6>
-
-	-- <index-1.6>
-	})
+-- This part of test is banned in scope of #2174
+-- test:do_execsql_test(
+--	"index-1.6",
+--	[[
+--		REINDEX t1ix1 ON t1;
+--	]],
+--	{
+--	-- <index-1.6>
+--
+--	-- <index-1.6>
+--	})
 
 test:finish_test()

@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 local json = require("json")
-test:plan(36)
+test:plan(34)
 
 --!./tcltestrunner.lua
 -- 2003 December 17
@@ -444,41 +444,42 @@ test:do_test(
     })
 
 -- Do some additional EXPLAIN operations to exercise the displayP4 logic.
-test:do_test(
-    "misc3-6.10",
-    function()
-        local x = test:execsql([[
-            CREATE TABLE ex1(
-              id PRIMARY KEY,
-              a INTEGER DEFAULT 54321,
-              b TEXT DEFAULT "hello",
-              c REAL DEFAULT 3.1415926
-            );
-            CREATE UNIQUE INDEX ex1i1 ON ex1(a);
-            EXPLAIN REINDEX;
-        ]])
-        x = json.encode(x)
-        return string.find(x, "\"SorterCompare\",%d+,%d+,%d+") > 0
-    end, true)
-
-test:do_test(
-    "misc3-6.11-utf8",
-    function()
-        local x = test:execsql([[
-            EXPLAIN SELECT a+123456789012, b*4.5678, c FROM ex1 ORDER BY +a, b DESC
-        ]])
-        x = json.encode(x)
-        local y = {}
-        table.insert(y, string.find(x, "123456789012")>0)
-        table.insert(y, string.find(x, "4.5678")>0)
-        table.insert(y, string.find(x, "hello")>0)
-        table.insert(y, string.find(x, "-B")>0)
-        return y
-    end, {
-        -- <misc3-6.11-utf8>
-        1, 1, 1, 1
-        -- </misc3-6.11-utf8>
-    })
+-- This part of test is disabled in scope of #2174
+-- test:do_test(
+--    "misc3-6.10",
+--    function()
+--        local x = test:execsql([[
+--            CREATE TABLE ex1(
+--              id PRIMARY KEY,
+--              a INTEGER DEFAULT 54321,
+--              b TEXT DEFAULT "hello",
+--              c REAL DEFAULT 3.1415926
+--            );
+--            CREATE UNIQUE INDEX ex1i1 ON ex1(a);
+--            EXPLAIN REINDEX;
+--        ]])
+--        x = json.encode(x)
+--        return string.find(x, "\"SorterCompare\",%d+,%d+,%d+") > 0
+--    end, true)
+--
+-- test:do_test(
+--     "misc3-6.11-utf8",
+--     function()
+--         local x = test:execsql([[
+--             EXPLAIN SELECT a+123456789012, b*4.5678, c FROM ex1 ORDER BY +a, b DESC
+--         ]])
+--         x = json.encode(x)
+--         local y = {}
+--         table.insert(y, string.find(x, "123456789012")>0)
+--         table.insert(y, string.find(x, "4.5678")>0)
+--         table.insert(y, string.find(x, "hello")>0)
+--         table.insert(y, string.find(x, "-B")>0)
+--         return y
+--     end, {
+--         -- <misc3-6.11-utf8>
+--         1, 1, 1, 1
+--         -- </misc3-6.11-utf8>
+--     })
 
 
 
