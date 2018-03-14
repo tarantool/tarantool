@@ -459,8 +459,6 @@ static int insertOrReplace(BtCursor *pCur, int operationType)
 	assert(operationType == TARANTOOL_INDEX_INSERT ||
 	       operationType == TARANTOOL_INDEX_REPLACE);
 
-	int rc;
-	struct tuple *unused;
 	struct request request;
 	memset(&request, 0, sizeof(request));
 	request.tuple = pCur->key;
@@ -472,8 +470,7 @@ static int insertOrReplace(BtCursor *pCur, int operationType)
 	} else {
 		request.type = IPROTO_REPLACE;
 	}
-	rc = box_process_rw(&request, pCur->space, &unused);
-
+	int rc = box_process_rw(&request, pCur->space, NULL);
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;;
 }
 
@@ -528,7 +525,6 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	char *key;
 	uint32_t key_size;
 	int rc;
-	struct tuple *unused;
 
 	key = tuple_extract_key(pCur->last_tuple,
 				box_iterator_key_def(pCur->iter),
@@ -536,13 +532,31 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
 
+	rc = sql_delete_by_key(pCur->space, key, key_size);
+
+	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_DELETE_FAIL;
+}
+
+/**
+ * Delete entry from space by its key.
+ *
+ * @param space Space which contains record to be deleted.
+ * @param key Key of record to be deleted.
+ * @param key_size Size of key.
+ *
+ * @retval SQLITE_OK on success, SQL_TARANTOOL_DELETE_FAIL otherwise.
+ */
+int
+sql_delete_by_key(struct space *space, char *key, uint32_t key_size)
+{
 	struct request request;
+	struct tuple *unused;
 	memset(&request, 0, sizeof(request));
 	request.type = IPROTO_DELETE;
 	request.key = key;
 	request.key_end = key + key_size;
-	request.space_id = pCur->space->def->id;
-	rc = box_process_rw(&request, pCur->space, &unused);
+	request.space_id = space->def->id;
+	int rc = box_process_rw(&request, space, &unused);
 
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_DELETE_FAIL;
 }
@@ -1007,14 +1021,9 @@ out:
 	return SQLITE_OK;
 }
 
-/*
- * The function assumes the cursor is open on _schema.
- * Increment max_id and store updated tuple in the cursor
- * object.
- */
-int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
+int
+tarantoolSqlite3IncrementMaxid(uint64_t *space_max_id)
 {
-	assert(pCur->curFlags & BTCF_TaCursor);
 	/* ["max_id"] */
 	static const char key[] = {
 		(char)0x91, /* MsgPack array(1) */
@@ -1032,7 +1041,8 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 	};
 
 	struct tuple *res = NULL;
-	int rc;
+	struct space *space_schema = space_by_id(BOX_SCHEMA_ID);
+	assert(space_schema != NULL);
 	struct request request;
 	memset(&request, 0, sizeof(request));
 	request.tuple = ops;
@@ -1040,17 +1050,10 @@ int tarantoolSqlite3IncrementMaxid(BtCursor *pCur)
 	request.key = key;
 	request.key_end = key + sizeof(key);
 	request.type = IPROTO_UPDATE;
-	request.space_id = pCur->space->def->id;
-	rc = box_process_rw(&request, pCur->space, &res);
-	if (rc != 0 || res == NULL) {
+	request.space_id = space_schema->def->id;
+	if (box_process_rw(&request, space_schema, &res) != 0 || res == NULL ||
+	    tuple_field_u64(res, 1, space_max_id) != 0)
 		return SQL_TARANTOOL_ERROR;
-	}
-	if (pCur->last_tuple != NULL) {
-		box_tuple_unref(pCur->last_tuple);
-	}
-	box_tuple_ref(res);
-	pCur->last_tuple = res;
-	pCur->eState = CURSOR_VALID;
 	return SQLITE_OK;
 }
 
@@ -1637,26 +1640,14 @@ int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
 	return SQLITE_OK;
 }
 
-/**
- * Extract maximum integer value from:
- * @param index space_id
- * @param index_id
- * @param field number fieldno
- * @param[out] fetched value in max_id
- *
- * @retval 0 on success, -1 otherwise.
- *
- * If index is empty - return 0 in max_id and success status
- */
 int
-tarantoolSqlGetMaxId(BtCursor *cur, uint32_t fieldno,
-		     uint64_t *max_id)
+tarantoolSqlNextSeqId(uint64_t *max_id)
 {
 	char key[16];
 	struct tuple *tuple;
 	char *key_end = mp_encode_array(key, 0);
-	if (box_index_max(cur->space->def->id, cur->index->def->iid,
-			  key, key_end, &tuple) != 0)
+	if (box_index_max(BOX_SEQUENCE_ID, 0 /* PK */, key,
+			  key_end, &tuple) != 0)
 		return -1;
 
 	/* Index is empty  */
@@ -1665,5 +1656,5 @@ tarantoolSqlGetMaxId(BtCursor *cur, uint32_t fieldno,
 		return 0;
 	}
 
-	return tuple_field_u64(tuple, fieldno, max_id);
+	return tuple_field_u64(tuple, BOX_SEQUENCE_FIELD_ID, max_id);
 }

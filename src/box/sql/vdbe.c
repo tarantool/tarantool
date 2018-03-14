@@ -3830,28 +3830,16 @@ case OP_Sequence: {           /* out2 */
 	break;
 }
 
-/* Opcode: NextId P1 P2 P3 * *
- * Synopsis: r[P3]=get_max(space_index[P1]{Column[P2]})
+/* Opcode: NextSequenceId * P2 * * *
+ * Synopsis: r[P2]=get_max(_sequence)
  *
- * Get next Id of the table. P1 is a table cursor, P2 is column
- * number. Return in P3 maximum id found in provided column,
+ * Get next Id of the _sequence space.
+ * Return in P2 maximum id found in _sequence,
  * incremented by one.
- *
- * This opcode is Tarantool specific and will segfault in case
- * of SQLite cursor.
  */
-case OP_NextId: {     /* out3 */
-	VdbeCursor *pC;    /* The VDBE cursor */
-	int p2;            /* Column number, which stores the id */
-	pC = p->apCsr[pOp->p1];
-	p2 = pOp->p2;
-	pOut = &aMem[pOp->p3];
-
-	/* This opcode is Tarantool specific.  */
-	assert(pC->uc.pCursor->curFlags & BTCF_TaCursor);
-
-	tarantoolSqlGetMaxId(pC->uc.pCursor, p2,
-			     (uint64_t *) &pOut->u.i);
+case OP_NextSequenceId: {
+	pOut = &aMem[pOp->p2];
+	tarantoolSqlNextSeqId((uint64_t *) &pOut->u.i);
 
 	pOut->u.i += 1;
 	pOut->flags = MEM_Int;
@@ -4492,6 +4480,85 @@ case OP_IdxInsert: {        /* in2 */
 	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT ||
 	       p->errorAction == ON_CONFLICT_ACTION_FAIL);
 	if (rc) goto abort_due_to_error;
+	break;
+}
+
+/* Opcode: SInsert P1 P2 * * P5
+ * Synopsis: space id = P1, key = r[P2]
+ *
+ * This opcode is used only during DDL routine.
+ * In contrast to ordinary insertion, insertion to system spaces
+ * such as _space or _index will lead to schema changes.
+ * Thus, usage of space pointers is going to be impossible,
+ * as far as pointers can be expired since compilation time.
+ *
+ * If P5 is set to OPFLAG_NCHANGE, account overall changes
+ * made to database.
+ */
+case OP_SInsert: {
+	assert(pOp->p1 > 0);
+	assert(pOp->p2 >= 0);
+
+	pIn2 = &aMem[pOp->p2];
+	struct space *space = space_by_id(pOp->p1);
+	assert(space != NULL);
+	assert(space_is_system(space));
+	/* Create surrogate cursor to pass to SQL bindings. */
+	BtCursor surrogate_cur;
+	surrogate_cur.space = space;
+	surrogate_cur.key = pIn2->z;
+	surrogate_cur.nKey = pIn2->n;
+	surrogate_cur.curFlags = BTCF_TaCursor;
+	rc = tarantoolSqlite3Insert(&surrogate_cur);
+	if (rc)
+		goto abort_due_to_error;
+	if (pOp->p5 & OPFLAG_NCHANGE)
+		p->nChange++;
+	break;
+}
+
+/* Opcode: SDelete P1 P2 * * P5
+ * Synopsis: space id = P1, key = r[P2]
+ *
+ * This opcode is used only during DDL routine.
+ * Delete entry with given key from system space.
+ *
+ * If P5 is set to OPFLAG_NCHANGE, account overall changes
+ * made to database.
+ */
+case OP_SDelete: {
+	assert(pOp->p1 > 0);
+	assert(pOp->p2 >= 0);
+
+	pIn2 = &aMem[pOp->p2];
+	struct space *space = space_by_id(pOp->p1);
+	assert(space != NULL);
+	assert(space_is_system(space));
+	rc = sql_delete_by_key(space, pIn2->z, pIn2->n);
+	if (rc)
+		goto abort_due_to_error;
+	if (pOp->p5 & OPFLAG_NCHANGE)
+		p->nChange++;
+	break;
+}
+
+/* Opcode: SIDtoPtr P1 P2 * * *
+ * Synopsis: space id = P1, space[out] = r[P2]
+ *
+ * This opcode makes look up by space id and save found space
+ * into register, specified by the content of register P2.
+ * Such trick is needed during DLL routine, since schema may
+ * change and pointers become expired.
+ */
+case OP_SIDtoPtr: {
+	assert(pOp->p1 > 0);
+	assert(pOp->p2 >= 0);
+
+	pIn2 = out2Prerelease(p, pOp);
+	struct space *space = space_by_id(pOp->p1);
+	assert(space != NULL);
+	pIn2->u.p = (void *) space;
+	pIn2->flags = MEM_Ptr;
 	break;
 }
 
@@ -5424,22 +5491,19 @@ case OP_Init: {          /* jump */
 
 /* Opcode: IncMaxid P1 * * * *
  *
- * The cursor (P1) should be open on _schema.
- * Increment the max_id (max space id) and store updated tuple in the
- * cursor.
+ * Increment the max_id from _schema (max space id)
+ * and store updated id in register specified by first operand.
+ * It is system opcode and must be used only during DDL routine.
  */
 case OP_IncMaxid: {
-	VdbeCursor *pC;
+	assert(pOp->p1 > 0);
+	pOut = &aMem[pOp->p1];
 
-	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
-	pC = p->apCsr[pOp->p1];
-	assert(pC != 0);
-
-	rc = tarantoolSqlite3IncrementMaxid(pC->uc.pCursor);
+	rc = tarantoolSqlite3IncrementMaxid((uint64_t*) &pOut->u.i);
 	if (rc!=SQLITE_OK) {
 		goto abort_due_to_error;
 	}
-	pC->nullRow = 0;
+	pOut->flags = MEM_Int;
 	break;
 }
 

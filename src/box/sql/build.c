@@ -1514,18 +1514,16 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 
 /*
  * Generate code to determine the new space Id.
- * Assume _schema was open and accessible via iCursor.
  * Fetch the max space id seen so far from _schema and increment it.
  * Return register storing the result.
  */
 static int
-getNewSpaceId(Parse * pParse, int iCursor)
+getNewSpaceId(Parse * pParse)
 {
 	Vdbe *v = sqlite3GetVdbe(pParse);
 	int iRes = ++pParse->nMem;
 
-	sqlite3VdbeAddOp1(v, OP_IncMaxid, iCursor);
-	sqlite3VdbeAddOp3(v, OP_Column, iCursor, 1, iRes);
+	sqlite3VdbeAddOp1(v, OP_IncMaxid, iRes);
 	return iRes;
 }
 
@@ -1940,17 +1938,12 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		Vdbe *v;
 		char *zType;	/* "VIEW" or "TABLE" */
 		char *zStmt;	/* Text of the CREATE TABLE or CREATE VIEW statement */
-		Table *pSysSchema, *pSysSpace, *pSysIndex;
+		Table *pSysSpace, *pSysIndex;
 		int iCursor = pParse->nTab++;
 		int iSpaceId;
 
 		v = sqlite3GetVdbe(pParse);
 		if (NEVER(v == 0))
-			return;
-
-		pSysSchema = sqlite3HashFind(&pParse->db->pSchema->tblHash,
-					     TARANTOOL_SYS_SCHEMA_NAME);
-		if (NEVER(!pSysSchema))
 			return;
 
 		pSysSpace = sqlite3HashFind(&pParse->db->pSchema->tblHash,
@@ -2004,9 +1997,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 					       pParse->sNameToken.z);
 		}
 
-		sqlite3OpenTable(pParse, iCursor, pSysSchema, OP_OpenRead);
-		sqlite3VdbeChangeP5(v, OPFLAG_SEEKEQ);
-		iSpaceId = getNewSpaceId(pParse, iCursor);
+		iSpaceId = getNewSpaceId(pParse);
 		sqlite3OpenTable(pParse, iCursor, pSysSpace, OP_OpenWrite);
 		createSpace(pParse, iSpaceId, zStmt, iCursor, pSysSpace);
 		sqlite3OpenTable(pParse, iCursor, pSysIndex, OP_OpenWrite);
@@ -2032,7 +2023,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			sqlite3OpenTable(pParse, iCursor, sys_sequence,
 					 OP_OpenWrite);
 			reg_seq_id = ++pParse->nMem;
-			sqlite3VdbeAddOp3(v, OP_NextId, iCursor, 0, reg_seq_id);
+			sqlite3VdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
 
 			reg_seq_record = emitNewSysSequenceRecord(pParse,
 								  reg_seq_id,
