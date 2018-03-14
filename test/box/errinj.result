@@ -60,9 +60,11 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
+  ERRINJ_VY_POINT_ITER_WAIT:
+    state: false
   ERRINJ_RELAY_EXIT_DELAY:
     state: 0
-  ERRINJ_VY_POINT_ITER_WAIT:
+  ERRINJ_IPROTO_TX_DELAY:
     state: false
   ERRINJ_TUPLE_FIELD:
     state: false
@@ -1055,5 +1057,47 @@ box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
 - ok
 ...
 s:drop()
+---
+...
+--
+-- gh-3255: iproto can crash and discard responses, if a network
+-- is saturated, and DML yields too long on commit.
+--
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+c = net_box.connect(box.cfg.listen)
+---
+...
+ch = fiber.channel(200)
+---
+...
+errinj.set("ERRINJ_IPROTO_TX_DELAY", true)
+---
+- ok
+...
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:replace{1} end ch:put(true) end) end
+---
+...
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:select() end ch:put(true) end) end
+---
+...
+for i = 1, 200 do ch:get() end
+---
+...
+errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
+---
+- ok
+...
+s:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute','universe')
 ---
 ...
