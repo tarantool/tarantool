@@ -3097,7 +3097,7 @@ vy_join_cb(const struct vy_log_record *record, void *arg)
 		ctx->space_id = record->space_id;
 		ctx->index_id = record->index_id;
 		if (ctx->key_def != NULL)
-			free(ctx->key_def);
+			key_def_delete(ctx->key_def);
 		ctx->key_def = key_def_new_with_parts(record->key_parts,
 						      record->key_part_count);
 		if (ctx->key_def == NULL)
@@ -3234,7 +3234,7 @@ vinyl_engine_join(struct engine *engine, struct vclock *vclock,
 
 	/* Cleanup. */
 	if (ctx->key_def != NULL)
-		free(ctx->key_def);
+		key_def_delete(ctx->key_def);
 	if (ctx->format != NULL)
 		tuple_format_unref(ctx->format);
 	if (ctx->upsert_format != NULL)

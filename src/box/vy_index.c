@@ -257,9 +257,9 @@ fail_mem_format_with_colmask:
 fail_upsert_format:
 	tuple_format_unref(index->disk_format);
 fail_format:
-	free(cmp_def);
+	key_def_delete(cmp_def);
 fail_cmp_def:
-	free(key_def);
+	key_def_delete(key_def);
 fail_key_def:
 	free(index->tree);
 fail_tree:
@@ -308,8 +308,8 @@ vy_index_delete(struct vy_index *index)
 	tuple_format_unref(index->disk_format);
 	tuple_format_unref(index->mem_format_with_colmask);
 	tuple_format_unref(index->upsert_format);
-	free(index->cmp_def);
-	free(index->key_def);
+	key_def_delete(index->cmp_def);
+	key_def_delete(index->key_def);
 	histogram_delete(index->run_hist);
 	vy_index_stat_destroy(&index->stat);
 	vy_cache_destroy(&index->cache);

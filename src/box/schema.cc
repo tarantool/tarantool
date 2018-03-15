@@ -278,7 +278,7 @@ schema_init()
 	struct key_def *key_def = key_def_new(1); /* part count */
 	if (key_def == NULL)
 		diag_raise();
-	auto key_def_guard = make_scoped_guard([&] { box_key_def_delete(key_def); });
+	auto key_def_guard = make_scoped_guard([&] { key_def_delete(key_def); });
 
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING, false, NULL);
@@ -329,7 +329,7 @@ schema_init()
 	sc_space_new(BOX_CLUSTER_ID, "_cluster", key_def, &on_replace_cluster,
 		     NULL);
 
-	free(key_def);
+	key_def_delete(key_def);
 	key_def = key_def_new(2); /* part count */
 	if (key_def == NULL)
 		diag_raise();

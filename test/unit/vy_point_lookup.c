@@ -312,7 +312,7 @@ test_basic()
 	index_def_delete(index_def);
 	tuple_format_unref(format);
 	vy_cache_destroy(&cache);
-	box_key_def_delete(key_def);
+	key_def_delete(key_def);
 	vy_cache_env_destroy(&cache_env);
 	vy_run_env_destroy(&run_env);
 	vy_index_env_destroy(&index_env);

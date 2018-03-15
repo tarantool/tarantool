@@ -56,7 +56,7 @@ test_basic(void)
 
 	/* Clean up */
 	vy_mem_delete(mem);
-	box_key_def_delete(key_def);
+	key_def_delete(key_def);
 
 	fiber_gc();
 	footer();
@@ -302,7 +302,7 @@ test_iterator_restore_after_insertion()
 
 	tuple_format_unref(format);
 	lsregion_destroy(&lsregion);
-	box_key_def_delete(key_def);
+	key_def_delete(key_def);
 
 	fiber_gc();
 
