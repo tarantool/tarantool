@@ -2920,7 +2920,6 @@ case OP_Savepoint: {
 				}
 				if (isSchemaChange) {
 					sqlite3ExpirePreparedStatements(db);
-					sqlite3ResetAllSchemasOfConnection(db);
 					user_session->sql_flags |= SQLITE_InternChanges;
 				}
 			}

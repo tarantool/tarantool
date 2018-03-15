@@ -330,7 +330,7 @@ schema_init()
 	/* _trigger - all existing SQL triggers. */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
 			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
-	sc_space_new(BOX_TRIGGER_ID, "_trigger", key_def, NULL, NULL);
+	sc_space_new(BOX_TRIGGER_ID, "_trigger", key_def, &on_replace_trigger, NULL);
 
 	free(key_def);
 	key_def = key_def_new(2); /* part count */

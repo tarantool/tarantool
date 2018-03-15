@@ -2364,7 +2364,14 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	 */
 
 	sqlite3VdbeAddOp4(v, OP_DropTable, 0, 0, 0, pTab->zName, 0);
-	sqlite3ChangeCookie(pParse);
+
+	/* FIXME: DDL is impossible inside a transaction so far.
+	 * Replace to _space/_index will fail if active
+	 * transaction. So, don't pretend, that we are able to
+	 * anything back. To be fixed when transactions
+	 * DDL are enabled.
+	 */
+	/* sqlite3ChangeCookie(pParse); */
 	sqliteViewResetAll(db);
 }
 

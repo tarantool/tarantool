@@ -977,20 +977,9 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 	struct session *user_session = current_session();
 	assert(sqlite3_mutex_held(db->mutex));
 
-	if ((user_session->sql_flags & SQLITE_InternChanges) != 0
-	    && db->init.busy == 0) {
-		sqlite3ExpirePreparedStatements(db);
-		sqlite3ResetAllSchemasOfConnection(db);
-
-		db->init.busy = 1;
-		db->pSchema = sqlite3SchemaCreate(db);
-		int rc = sqlite3InitDatabase(db);
-		if (rc != SQLITE_OK)
-			sqlite3SchemaClear(db);
-		db->init.busy = 0;
-		if (rc == SQLITE_OK)
-			sqlite3CommitInternalChanges();
-	}
+	/* DDL is impossible inside a transaction.  */
+	assert((user_session->sql_flags & SQLITE_InternChanges) == 0
+	       || db->init.busy == 1);
 
 	/* Any deferred constraint violations have now been resolved. */
 	pVdbe->nDeferredCons = 0;

@@ -1350,12 +1350,14 @@ cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
   Token all;
   all.z = A.z;
   all.n = (int)(Z.z - A.z) + Z.n;
+  pParse->initiateTTrans = false;
   sqlite3FinishTrigger(pParse, S, &all);
 }
 
 trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
                     trigger_time(C) trigger_event(D)
                     ON fullname(E) foreach_clause when_clause(G). {
+  pParse->initiateTTrans = false;
   sqlite3BeginTrigger(pParse, &B, C, D.a, D.b, E, G, NOERR);
   A = B; /*A-overwrites-T*/
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(31)
+test:plan(33)
 
 --!./tcltestrunner.lua
 -- The author disclaims copyright to this source code.  In place of
@@ -848,6 +848,29 @@ test:do_catchsql_test(
         -- </trigger1-16.7>
     })
 
+test:do_catchsql_test(
+    "trigger1-16.8",
+    [[
+        BEGIN;
+          CREATE TRIGGER tr168 INSERT ON tA BEGIN
+            INSERT INTO t16 values(1);
+          END;
+   ]], {
+        1, [[Space _trigger does not support multi-statement transactions]]
+})
+
+test:execsql [[
+    ROLLBACK;
+]]
+
+test:do_catchsql_test(
+    "trigger1-16.9",
+    [[
+        BEGIN;
+          DROP TRIGGER t16err3;
+   ]], {
+        1, [[Space _trigger does not support multi-statement transactions]]
+})
 -- MUST_WORK_TEST
 -- #-------------------------------------------------------------------------
 -- # Test that bug [34cd55d68e0e6e7c] has been fixed.

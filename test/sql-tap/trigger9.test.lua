@@ -66,10 +66,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.2.1",
     [[
+        CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
+          INSERT INTO t2 VALUES(old.x);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
-            INSERT INTO t2 VALUES(old.x);
-          END;
           DELETE FROM t1;
           SELECT * FROM t2;
     ]], {
@@ -101,10 +101,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.3.1",
     [[
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
+          INSERT INTO t2 VALUES(old.x);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
-            INSERT INTO t2 VALUES(old.x);
-          END;
           DELETE FROM t1;
           SELECT * FROM t2;
     ]], {
@@ -136,10 +137,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.4.1",
     [[
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 BEFORE DELETE ON t1 WHEN old.x='1' BEGIN
+          INSERT INTO t2 VALUES(old.x);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 BEFORE DELETE ON t1 WHEN old.x='1' BEGIN
-            INSERT INTO t2 VALUES(old.x);
-          END;
           DELETE FROM t1;
           SELECT * FROM t2;
     ]], {
@@ -171,10 +173,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.5.1",
     [[
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
+          INSERT INTO t2 VALUES(old.x);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
-            INSERT INTO t2 VALUES(old.x);
-          END;
           UPDATE t1 SET y = '';
           SELECT * FROM t2;
     ]], {
@@ -206,10 +209,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.6.1",
     [[
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
+          INSERT INTO t2 VALUES(old.x);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
-            INSERT INTO t2 VALUES(old.x);
-          END;
           UPDATE t1 SET y = '';
           SELECT * FROM t2;
     ]], {
@@ -241,10 +245,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.7.1",
     [[
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 WHEN old.x>='2' BEGIN
+          INSERT INTO t2 VALUES(old.x);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 BEFORE UPDATE ON t1 WHEN old.x>='2' BEGIN
-            INSERT INTO t2 VALUES(old.x);
-          END;
           UPDATE t1 SET y = '';
           SELECT * FROM t2;
     ]], {
@@ -290,10 +295,11 @@ test:do_execsql_test(
     "trigger9-3.2",
     [[
         CREATE VIEW v1 AS SELECT * FROM t3;
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+          INSERT INTO t2 VALUES(old.a);
+        END;
         BEGIN;
-          CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
-            INSERT INTO t2 VALUES(old.a);
-          END;
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
         ROLLBACK;
@@ -314,10 +320,11 @@ test:do_test(
         --
         return test:execsql([[
             CREATE VIEW v1 AS SELECT a, b AS c FROM t3 WHERE c > 'one';
+            DROP TRIGGER IF EXISTS trig1;
+            CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+              INSERT INTO t2 VALUES(old.a);
+            END;
             BEGIN;
-              CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
-                INSERT INTO t2 VALUES(old.a);
-              END;
               UPDATE v1 SET c = 'hello';
               SELECT * FROM t2;
             ROLLBACK;
@@ -333,11 +340,12 @@ test:do_execsql_test(
     "trigger9-3.4",
     [[
         CREATE VIEW v1 AS SELECT DISTINCT a, b FROM t3;
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+          INSERT INTO t2 VALUES(old.a);
+        END;
         BEGIN;
           INSERT INTO t3 VALUES(4, 3, 'three');
-          CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
-            INSERT INTO t2 VALUES(old.a);
-          END;
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
         ROLLBACK;
@@ -352,11 +360,12 @@ test:do_execsql_test(
     "trigger9-3.5",
     [[
         CREATE VIEW v1 AS SELECT a, b FROM t3 EXCEPT SELECT 1, 'one';
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+          INSERT INTO t2 VALUES(old.a);
+        END;
         BEGIN;
           INSERT INTO t3 VALUES(5, 1, 'uno');
-          CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
-            INSERT INTO t2 VALUES(old.a);
-          END;
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
         ROLLBACK;
@@ -372,11 +381,12 @@ test:do_execsql_test(
     [[
         CREATE VIEW v1 AS
           SELECT sum(a) AS a, max(b) AS b FROM t3 GROUP BY t3.a HAVING b>'two';
+        DROP TRIGGER IF EXISTS trig1;
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+          INSERT INTO t2 VALUES(old.a);
+        END;
         BEGIN;
           INSERT INTO t3 VALUES(6, 1, 'zero');
-          CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
-            INSERT INTO t2 VALUES(old.a);
-          END;
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
         ROLLBACK;
@@ -434,7 +444,6 @@ test:do_execsql_test(
 
         -- </4.3>
     })
-
 
 
 test:finish_test()

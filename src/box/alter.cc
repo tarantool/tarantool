@@ -3057,6 +3057,17 @@ lock_before_dd(struct trigger *trigger, void *event)
 	txn_on_rollback(txn, on_rollback);
 }
 
+/**
+ * A trigger invoked on replace in a space containing
+ * SQL triggers.
+ */
+static void
+on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	txn_check_singlestatement_xc(txn, "Space _trigger");
+}
+
 struct trigger alter_space_on_replace_space = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_space, NULL, NULL
 };
@@ -3115,6 +3126,10 @@ struct trigger on_stmt_begin_index = {
 
 struct trigger on_stmt_begin_truncate = {
 	RLIST_LINK_INITIALIZER, lock_before_dd, NULL, NULL
+};
+
+struct trigger on_replace_trigger = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_trigger, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */
