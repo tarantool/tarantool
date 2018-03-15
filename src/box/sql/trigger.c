@@ -507,9 +507,8 @@ sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 
 	if (db->mallocFailed)
 		goto drop_trigger_cleanup;
-	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-		goto drop_trigger_cleanup;
-	}
+	assert(db->pSchema != NULL);
+
 	/* Do not account nested operations: the count of such
 	 * operations depends on Tarantool data dictionary internals,
 	 * such as data layout in system spaces. Activate the counter

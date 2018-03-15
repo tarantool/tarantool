@@ -217,12 +217,7 @@ sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
 {
 	Table *p;
 
-	/* Read the database schema. If an error occurs, leave an error message
-	 * and code in pParse and return NULL.
-	 */
-	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-		return 0;
-	}
+	assert(pParse->db->pSchema != NULL);
 
 	p = sqlite3FindTable(pParse->db, zName);
 	if (p == 0) {
@@ -647,13 +642,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	if (zName == 0)
 		return;
 
-	/*
-	 * Make sure the new table name does not collide with an
-	 * existing index or table name in the same database.
-	 * Issue an error message if it does.
-	 */
-	if (SQLITE_OK != sqlite3ReadSchema(pParse))
-		goto begin_table_error;
+	assert(db->pSchema != NULL);
 	pTable = sqlite3FindTable(db, zName);
 	if (pTable) {
 		if (!noErr) {
@@ -2401,8 +2390,7 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 		sqlite3VdbeCountChanges(v);
 	assert(pParse->nErr == 0);
 	assert(pName->nSrc == 1);
-	if (sqlite3ReadSchema(pParse))
-		goto exit_drop_table;
+	assert(db->pSchema != NULL);
 	if (noErr)
 		db->suppressErr++;
 	assert(isView == 0 || isView == LOCATE_VIEW);
@@ -2878,9 +2866,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		sqlite3VdbeCountChanges(v);
 	}
-	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-		goto exit_create_index;
-	}
+	assert(db->pSchema != NULL);
 
 	/*
 	 * Find the table that is to be indexed.  Return early if not found.
@@ -3389,9 +3375,7 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 	if (!pParse->nested)
 		sqlite3VdbeCountChanges(v);
 	assert(pName->nSrc == 1);
-	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-		goto exit_drop_index;
-	}
+	assert(db->pSchema != NULL);
 
 	assert(pName2->n > 0);
 	zTableName = sqlite3NameFromToken(db, pName2);
@@ -4151,12 +4135,7 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 	Index *pIndex;		/* An index associated with pTab */
 	sqlite3 *db = pParse->db;	/* The database connection */
 
-	/* Read the database schema. If an error occurs, leave an error message
-	 * and code in pParse and return NULL.
-	 */
-	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-		return;
-	}
+	assert(db->pSchema != NULL);
 
 	if (pName1 == 0) {
 		reindexDatabases(pParse, 0);

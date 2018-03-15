@@ -960,7 +960,6 @@ struct sqlite3 {
 	sqlite3_mutex *mutex;	/* Connection mutex */
 	struct Schema *pSchema; /* Schema of the database */
 	i64 szMmap;		/* Default mmap_size setting */
-	unsigned int openFlags;	/* Flags passed to sqlite3_vfs.xOpen() */
 	int errCode;		/* Most recent error code (SQLITE_*) */
 	int errMask;		/* & result codes with this before returning */
 	int iSysErrno;		/* Errno value from last system error */
@@ -3259,7 +3258,6 @@ const char *sqlite3ErrName(int);
 #endif
 
 const char *sqlite3ErrStr(int);
-int sqlite3ReadSchema(Parse * pParse);
 struct coll *sqlite3FindCollSeq(const char *);
 struct coll *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
 struct coll *sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr);

@@ -207,59 +207,6 @@ sqlite3InitDatabase(sqlite3 * db)
 }
 
 /*
- * Initialize all database files - the main database file
- * Return a success code.
- * After a database is initialized, the pSchema field in database
- * structure will be not NULL.
- */
-int
-sqlite3Init(sqlite3 * db)
-{
-	int rc;
-	struct session *user_session = current_session();
-	int commit_internal = !(user_session->sql_flags & SQLITE_InternChanges);
-
-	assert(sqlite3_mutex_held(db->mutex));
-	assert(db->init.busy == 0);
-	rc = SQLITE_OK;
-	db->init.busy = 1;
-	if (!db->pSchema) {
-		db->pSchema = sqlite3SchemaCreate(db);
-		rc = sqlite3InitDatabase(db);
-		if (rc) {
-			sqlite3SchemaClear(db);
-		}
-	}
-
-	db->init.busy = 0;
-	if (rc == SQLITE_OK && commit_internal) {
-		sqlite3CommitInternalChanges();
-	}
-
-	return rc;
-}
-
-/*
- * This routine is a no-op if the database schema is already initialized.
- * Otherwise, the schema is loaded. An error code is returned.
- */
-int
-sqlite3ReadSchema(Parse * pParse)
-{
-	int rc = SQLITE_OK;
-	sqlite3 *db = pParse->db;
-	assert(sqlite3_mutex_held(db->mutex));
-	if (!db->init.busy) {
-		rc = sqlite3Init(db);
-	}
-	if (rc != SQLITE_OK) {
-		pParse->rc = rc;
-		pParse->nErr++;
-	}
-	return rc;
-}
-
-/*
  * Convert a schema pointer into the 0 index that indicates
  * that schema refers to a single database.
  * This method is inherited from SQLite, which has several dbs.

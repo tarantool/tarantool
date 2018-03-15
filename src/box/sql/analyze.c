@@ -1176,12 +1176,7 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 	Table *pTab;
 	Vdbe *v;
 
-	/* Read the database schema. If an error occurs, leave an error message
-	 * and code in pParse and return NULL.
-	 */
-	if (SQLITE_OK != sqlite3ReadSchema(pParse)) {
-		return;
-	}
+	assert(db->pSchema != NULL);
 
 	if (pName == 0) {
 		/* Form 1:  Analyze everything */

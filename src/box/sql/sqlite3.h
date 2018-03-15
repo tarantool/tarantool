@@ -2869,10 +2869,9 @@ sqlite3_progress_handler(sqlite3 *, int,
  *
  * See also: [sqlite3_temp_directory]
 */
-SQLITE_API int
-sqlite3_open(const char *filename,	/* Database filename (UTF-8) */
-	     sqlite3 ** ppDb	/* OUT: SQLite db handle */
-	);
+
+int
+sql_init_db(sqlite3 **db);
 
 SQLITE_API int
 sqlite3_open16(const void *filename,	/* Database filename (UTF-16) */

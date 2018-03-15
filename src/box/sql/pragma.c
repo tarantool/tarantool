@@ -292,8 +292,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 
 	/* Make sure the database schema is loaded if the pragma requires that */
 	if ((pPragma->mPragFlg & PragFlg_NeedSchema) != 0) {
-		if (sqlite3ReadSchema(pParse))
-			goto pragma_out;
+		assert(db->pSchema != NULL);
 	}
 	/* Register the result column names for pragmas that return results */
 	if ((pPragma->mPragFlg & PragFlg_NoColumns) == 0

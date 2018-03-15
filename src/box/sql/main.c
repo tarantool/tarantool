@@ -981,6 +981,15 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 	    && db->init.busy == 0) {
 		sqlite3ExpirePreparedStatements(db);
 		sqlite3ResetAllSchemasOfConnection(db);
+
+		db->init.busy = 1;
+		db->pSchema = sqlite3SchemaCreate(db);
+		int rc = sqlite3InitDatabase(db);
+		if (rc != SQLITE_OK)
+			sqlite3SchemaClear(db);
+		db->init.busy = 0;
+		if (rc == SQLITE_OK)
+			sqlite3CommitInternalChanges();
 	}
 
 	/* Any deferred constraint violations have now been resolved. */
@@ -2246,85 +2255,35 @@ sqlite3ParseUri(const char *zDefaultVfs,	/* VFS to use if no "vfs=xxx" query opt
 	return rc;
 }
 
-/*
- * This routine does the work of opening a database on behalf of
- * sqlite3_open() and database filename "zFilename"
- * is UTF-8 encoded.
+/**
+ * This routine does the work of initialization of main
+ * SQL connection instance.
+ *
+ * @param[out] out_db returned database handle.
+ * @return error status code.
  */
-static int
-openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
-	     sqlite3 ** ppDb,		/* OUT: Returned database handle */
-	     unsigned int flags,	/* Operational flags */
-	     const char *zVfs)		/* Name of the VFS to use */
+int
+sql_init_db(sqlite3 **out_db)
 {
-	sqlite3 *db;		/* Store allocated handle here */
+	sqlite3 *db;
 	int rc;			/* Return code */
 	int isThreadsafe;	/* True for threadsafe connections */
-	char *zOpen = 0;	/* Filename argument to pass to BtreeOpen() */
-	char *zErrMsg = 0;	/* Error message from sqlite3ParseUri() */
 
 #ifdef SQLITE_ENABLE_API_ARMOR
 	if (ppDb == 0)
 		return SQLITE_MISUSE_BKPT;
 #endif
-	*ppDb = 0;
 #ifndef SQLITE_OMIT_AUTOINIT
 	rc = sqlite3_initialize();
 	if (rc)
 		return rc;
 #endif
 
-	/* Only allow sensible combinations of bits in the flags argument.
-	 * Throw an error if any non-sense combination is used.  If we
-	 * do not block illegal combinations here, it could trigger
-	 * assert() statements in deeper layers.  Sensible combinations
-	 * are:
-	 *
-	 *  1:  SQLITE_OPEN_READONLY
-	 *  2:  SQLITE_OPEN_READWRITE
-	 *  6:  SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
-	 */
-	assert(SQLITE_OPEN_READONLY == 0x01);
-	assert(SQLITE_OPEN_READWRITE == 0x02);
-	assert(SQLITE_OPEN_CREATE == 0x04);
-	testcase((1 << (flags & 7)) == 0x02);	/* READONLY */
-	testcase((1 << (flags & 7)) == 0x04);	/* READWRITE */
-	testcase((1 << (flags & 7)) == 0x40);	/* READWRITE | CREATE */
-	if (((1 << (flags & 7)) & 0x46) == 0) {
-		return SQLITE_MISUSE_BKPT;	/* IMP: R-65497-44594 */
-	}
-
 	if (sqlite3GlobalConfig.bCoreMutex == 0) {
 		isThreadsafe = 0;
-	} else if (flags & SQLITE_OPEN_NOMUTEX) {
-		isThreadsafe = 0;
-	} else if (flags & SQLITE_OPEN_FULLMUTEX) {
-		isThreadsafe = 1;
 	} else {
 		isThreadsafe = sqlite3GlobalConfig.bFullMutex;
 	}
-	if (flags & SQLITE_OPEN_PRIVATECACHE) {
-		flags &= ~SQLITE_OPEN_SHAREDCACHE;
-	} else if (sqlite3GlobalConfig.sharedCacheEnabled) {
-		flags |= SQLITE_OPEN_SHAREDCACHE;
-	}
-	/* Remove harmful bits from the flags parameter
-	 *
-	 * The SQLITE_OPEN_NOMUTEX and SQLITE_OPEN_FULLMUTEX flags were
-	 * dealt with in the previous code block. Besides these, the only
-	 * valid input flags for sqlite3_open_v2() are SQLITE_OPEN_READONLY,
-	 * SQLITE_OPEN_READWRITE, SQLITE_OPEN_CREATE, SQLITE_OPEN_SHAREDCACHE,
-	 * SQLITE_OPEN_PRIVATECACHE, and some reserved bits. Silently mask
-	 * off all other flags.
-	 */
-	flags &= ~(SQLITE_OPEN_DELETEONCLOSE |
-		   SQLITE_OPEN_EXCLUSIVE |
-		   SQLITE_OPEN_MAIN_DB |
-		   SQLITE_OPEN_TEMP_DB |
-		   SQLITE_OPEN_TRANSIENT_DB |
-		   SQLITE_OPEN_NOMUTEX |
-		   SQLITE_OPEN_FULLMUTEX);
-	flags |= SQLITE_OPEN_MEMORY;
 	/* Allocate the sqlite data structure */
 	db = sqlite3MallocZero(sizeof(sqlite3));
 	if (db == 0)
@@ -2341,23 +2300,13 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	db->errMask = 0xff;
 	db->magic = SQLITE_MAGIC_BUSY;
 
+	db->pVfs = sqlite3_vfs_find(0);
+
 	assert(sizeof(db->aLimit) == sizeof(aHardLimit));
 	memcpy(db->aLimit, aHardLimit, sizeof(db->aLimit));
 	db->aLimit[SQLITE_LIMIT_WORKER_THREADS] = SQLITE_DEFAULT_WORKER_THREADS;
 	db->szMmap = sqlite3GlobalConfig.szMmap;
 	db->nMaxSorterMmap = 0x7FFFFFFF;
-
-	db->openFlags = flags;
-	/* Parse the filename/URI argument. */
-	rc = sqlite3ParseUri(zVfs, zFilename,
-			     &flags, &db->pVfs, &zOpen, &zErrMsg);
-	if (rc != SQLITE_OK) {
-		if (rc == SQLITE_NOMEM)
-			sqlite3OomFault(db);
-		sqlite3ErrorWithMsg(db, rc, zErrMsg ? "%s" : 0, zErrMsg);
-		sqlite3_free(zErrMsg);
-		goto opendb_out;
-	}
 
 	db->pSchema = NULL;
 	db->magic = SQLITE_MAGIC_OPEN;
@@ -2428,7 +2377,22 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	setupLookaside(db, 0, sqlite3GlobalConfig.szLookaside,
 		       sqlite3GlobalConfig.nLookaside);
 
- opendb_out:
+	if (rc == SQLITE_OK) {
+		struct session *user_session = current_session();
+		int commit_internal = !(user_session->sql_flags
+					& SQLITE_InternChanges);
+
+		assert(db->init.busy == 0);
+		db->init.busy = 1;
+		db->pSchema = sqlite3SchemaCreate(db);
+		rc = sqlite3InitDatabase(db);
+		if (rc != SQLITE_OK)
+			sqlite3SchemaClear(db);
+		db->init.busy = 0;
+		if (rc == SQLITE_OK && commit_internal)
+			sqlite3CommitInternalChanges();
+	}
+opendb_out:
 	if (db) {
 		assert(db->mutex != 0 || isThreadsafe == 0
 		       || sqlite3GlobalConfig.bFullMutex == 0);
@@ -2439,10 +2403,10 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 	if (rc == SQLITE_NOMEM) {
 		sqlite3_close(db);
 		db = 0;
-	} else if (rc != SQLITE_OK) {
+	} else if (rc != SQLITE_OK)
 		db->magic = SQLITE_MAGIC_SICK;
-	}
-	*ppDb = db;
+
+	*out_db = db;
 #ifdef SQLITE_ENABLE_SQLLOG
 	if (sqlite3GlobalConfig.xSqllog) {
 		/* Opening a db handle. Fourth parameter is passed 0. */
@@ -2450,46 +2414,8 @@ openDatabase(const char *zFilename,	/* Database filename UTF-8 encoded */
 		sqlite3GlobalConfig.xSqllog(pArg, db, zFilename, 0);
 	}
 #endif
-#if defined(SQLITE_HAS_CODEC)
-	if (rc == SQLITE_OK) {
-		const char *zHexKey = sqlite3_uri_parameter(zOpen, "hexkey");
-		if (zHexKey && zHexKey[0]) {
-			u8 iByte;
-			int i;
-			char zKey[40];
-			for (i = 0, iByte = 0;
-			     i < sizeof(zKey) * 2
-			     && sqlite3Isxdigit(zHexKey[i]); i++) {
-				iByte =
-				    (iByte << 4) + sqlite3HexToInt(zHexKey[i]);
-				if ((i & 1) != 0)
-					zKey[i / 2] = iByte;
-			}
-			sqlite3_key_v2(db, 0, zKey, i / 2);
-		}
-	}
-#endif
-	sqlite3_free(zOpen);
-	return rc & 0xff;
-}
 
-/*
- * Open a new database handle.
- */
-int
-sqlite3_open(const char *zFilename, sqlite3 ** ppDb)
-{
-	return openDatabase(zFilename, ppDb,
-			    SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0);
-}
-
-int
-sqlite3_open_v2(const char *filename,	/* Database filename (UTF-8) */
-		sqlite3 ** ppDb,	/* OUT: SQLite db handle */
-		int flags,		/* Flags */
-		const char *zVfs)	/* Name of VFS module to use */
-{
-	return openDatabase(filename, ppDb, (unsigned int)flags, zVfs);
+	return rc;
 }
 
 /*
