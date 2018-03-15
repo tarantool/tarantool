@@ -49,7 +49,6 @@ xpcall(help, function(err)
 end)
 
 file:close()
-log.rotate()
 
 test:ok(log.pid() >= 0, "pid()")
 
