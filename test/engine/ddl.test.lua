@@ -142,7 +142,7 @@ s:drop()
 -- not only when indexes are updated.
 --
 box.cfg{}
-s = box.schema.create_space('test', {engine = 'memtx'})
+s = box.schema.create_space('test', {engine = engine})
 format = {}
 format[1] = {'field1', 'unsigned'}
 format[2] = {'field2', 'unsigned', is_nullable = true}

@@ -394,7 +394,7 @@ s:drop()
 box.cfg{}
 ---
 ...
-s = box.schema.create_space('test', {engine = 'memtx'})
+s = box.schema.create_space('test', {engine = engine})
 ---
 ...
 format = {}

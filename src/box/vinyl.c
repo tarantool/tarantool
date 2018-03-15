@@ -1134,6 +1134,8 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 	pk->mem_format = new_format;
 	tuple_format_ref(new_format);
 	vy_index_validate_formats(pk);
+	key_def_update_optionality(pk->key_def, new_format->min_field_count);
+	key_def_update_optionality(pk->cmp_def, new_format->min_field_count);
 
 	for (uint32_t i = 1; i < new_space->index_count; ++i) {
 		struct vy_index *index = vy_index(new_space->index[i]);
@@ -1153,6 +1155,10 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		tuple_format_ref(index->mem_format_with_colmask);
 		tuple_format_ref(index->mem_format);
 		tuple_format_ref(index->upsert_format);
+		key_def_update_optionality(index->key_def,
+					   new_format->min_field_count);
+		key_def_update_optionality(index->cmp_def,
+					   new_format->min_field_count);
 		vy_index_validate_formats(index);
 	}
 

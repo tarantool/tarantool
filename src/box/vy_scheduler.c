@@ -110,6 +110,12 @@ struct vy_task {
 	struct diag diag;
 	/** Index this task is for. */
 	struct vy_index *index;
+	/**
+	 * Copies of index->key/cmp_def to protect from
+	 * multithread read/write on alter.
+	 */
+	struct key_def *cmp_def;
+	struct key_def *key_def;
 	/** Range to compact. */
 	struct vy_range *range;
 	/** Run written by this task. */
@@ -164,6 +170,17 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 	memset(task, 0, sizeof(*task));
 	task->ops = ops;
 	task->index = index;
+	task->cmp_def = key_def_dup(index->cmp_def);
+	if (task->cmp_def == NULL) {
+		mempool_free(pool, task);
+		return NULL;
+	}
+	task->key_def = key_def_dup(index->key_def);
+	if (task->key_def == NULL) {
+		key_def_delete(task->cmp_def);
+		mempool_free(pool, task);
+		return NULL;
+	}
 	vy_index_ref(index);
 	diag_create(&task->diag);
 	return task;
@@ -173,6 +190,8 @@ vy_task_new(struct mempool *pool, struct vy_index *index,
 static void
 vy_task_delete(struct mempool *pool, struct vy_task *task)
 {
+	key_def_delete(task->cmp_def);
+	key_def_delete(task->key_def);
 	vy_index_unref(task->index);
 	diag_destroy(&task->diag);
 	TRASH(task);
@@ -638,7 +657,7 @@ vy_task_write_run(struct vy_scheduler *scheduler, struct vy_task *task)
 	struct vy_run_writer writer;
 	if (vy_run_writer_create(&writer, task->new_run, index->env->path,
 				 index->space_id, index->id,
-				 index->cmp_def, index->key_def,
+				 task->cmp_def, task->key_def,
 				 task->page_size, task->bloom_fpr,
 				 task->max_output_count) != 0)
 		goto fail;
@@ -989,7 +1008,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 
 	struct vy_stmt_stream *wi;
 	bool is_last_level = (index->run_count == 0);
-	wi = vy_write_iterator_new(index->cmp_def, index->disk_format,
+	wi = vy_write_iterator_new(task->cmp_def, index->disk_format,
 				   index->upsert_format, index->id == 0,
 				   is_last_level, scheduler->read_views);
 	if (wi == NULL)
@@ -1264,7 +1283,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 
 	struct vy_stmt_stream *wi;
 	bool is_last_level = (range->compact_priority == range->slice_count);
-	wi = vy_write_iterator_new(index->cmp_def, index->disk_format,
+	wi = vy_write_iterator_new(task->cmp_def, index->disk_format,
 				   index->upsert_format, index->id == 0,
 				   is_last_level, scheduler->read_views);
 	if (wi == NULL)
