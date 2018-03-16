@@ -3017,8 +3017,6 @@ struct vy_join_ctx {
 	struct cbus_call_msg cmsg;
 	/** ID of the space currently being relayed. */
 	uint32_t space_id;
-	/** Ordinal number of the index. */
-	uint32_t index_id;
 	/**
 	 * Index key definition, as defined by the user.
 	 * We only send the primary key, so the definition
@@ -3041,6 +3039,55 @@ struct vy_join_ctx {
 	 */
 	struct rlist slices;
 };
+
+/**
+ * Recover a slice and add it to the list of slices.
+ * Newer slices are supposed to be recovered first.
+ * Returns 0 on success, -1 on failure.
+ */
+static int
+vy_prepare_send_slice(struct vy_join_ctx *ctx,
+		      struct vy_slice_recovery_info *slice_info)
+{
+	int rc = -1;
+	struct vy_run *run = NULL;
+	struct tuple *begin = NULL, *end = NULL;
+
+	run = vy_run_new(&ctx->env->run_env, slice_info->run->id);
+	if (run == NULL)
+		goto out;
+	if (vy_run_recover(run, ctx->env->path, ctx->space_id, 0) != 0)
+		goto out;
+
+	if (slice_info->begin != NULL) {
+		begin = vy_key_from_msgpack(ctx->env->index_env.key_format,
+					    slice_info->begin);
+		if (begin == NULL)
+			goto out;
+	}
+	if (slice_info->end != NULL) {
+		end = vy_key_from_msgpack(ctx->env->index_env.key_format,
+					  slice_info->end);
+		if (end == NULL)
+			goto out;
+	}
+
+	struct vy_slice *slice = vy_slice_new(slice_info->id, run,
+					      begin, end, ctx->key_def);
+	if (slice == NULL)
+		goto out;
+
+	rlist_add_tail_entry(&ctx->slices, slice, in_join);
+	rc = 0;
+out:
+	if (run != NULL)
+		vy_run_unref(run);
+	if (begin != NULL)
+		tuple_unref(begin);
+	if (end != NULL)
+		tuple_unref(end);
+	return rc;
+}
 
 static int
 vy_send_range_f(struct cbus_call_msg *cmsg)
@@ -3074,28 +3121,38 @@ err:
 	return rc;
 }
 
-/**
- * Merge and send all runs from the given relay context.
- * On success, delete runs.
- */
+/** Merge and send all runs of the given range. */
 static int
-vy_send_range(struct vy_join_ctx *ctx)
+vy_send_range(struct vy_join_ctx *ctx,
+	      struct vy_range_recovery_info *range_info)
 {
-	if (rlist_empty(&ctx->slices))
+	int rc;
+	struct vy_slice *slice, *tmp;
+
+	if (rlist_empty(&range_info->slices))
 		return 0; /* nothing to do */
 
-	int rc = -1;
+	/* Recover slices. */
+	struct vy_slice_recovery_info *slice_info;
+	rlist_foreach_entry(slice_info, &range_info->slices, in_range) {
+		rc = vy_prepare_send_slice(ctx, slice_info);
+		if (rc != 0)
+			goto out_delete_slices;
+	}
+
+	/* Create a write iterator. */
 	struct rlist fake_read_views;
 	rlist_create(&fake_read_views);
 	ctx->wi = vy_write_iterator_new(ctx->key_def,
 					ctx->format, ctx->upsert_format,
 					true, true, &fake_read_views);
-	if (ctx->wi == NULL)
+	if (ctx->wi == NULL) {
+		rc = -1;
 		goto out;
-
-	struct vy_slice *slice;
+	}
 	rlist_foreach_entry(slice, &ctx->slices, in_join) {
-		if (vy_write_iterator_new_slice(ctx->wi, slice) != 0)
+		rc = vy_write_iterator_new_slice(ctx->wi, slice);
+		if (rc != 0)
 			goto out_delete_wi;
 	}
 
@@ -3105,11 +3162,10 @@ vy_send_range(struct vy_join_ctx *ctx)
 		       vy_send_range_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 
-	struct vy_slice *tmp;
+out_delete_slices:
 	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
 		vy_slice_delete(slice);
 	rlist_create(&ctx->slices);
-
 out_delete_wi:
 	ctx->wi->iface->close(ctx->wi);
 	ctx->wi = NULL;
@@ -3117,96 +3173,59 @@ out:
 	return rc;
 }
 
-/** Relay callback, passed to vy_recovery_iterate(). */
+/** Send all tuples stored in the given index. */
 static int
-vy_join_cb(const struct vy_log_record *record, void *arg)
+vy_send_index(struct vy_join_ctx *ctx,
+	      struct vy_index_recovery_info *index_info)
 {
-	struct vy_join_ctx *ctx = arg;
+	int rc = -1;
 
-	if (record->type == VY_LOG_CREATE_INDEX ||
-	    record->type == VY_LOG_INSERT_RANGE) {
-		/*
-		 * All runs of the current range have been recovered,
-		 * so send them to the replica.
-		 */
-		if (vy_send_range(ctx) != 0)
-			return -1;
-	}
-
-	if (record->type == VY_LOG_CREATE_INDEX) {
-		ctx->space_id = record->space_id;
-		ctx->index_id = record->index_id;
-		if (ctx->key_def != NULL)
-			key_def_delete(ctx->key_def);
-		ctx->key_def = key_def_new_with_parts(record->key_parts,
-						      record->key_part_count);
-		if (ctx->key_def == NULL)
-			return -1;
-		if (ctx->format != NULL)
-			tuple_format_unref(ctx->format);
-		ctx->format = tuple_format_new(&vy_tuple_format_vtab,
-					       &ctx->key_def, 1, 0, NULL, 0,
-					       NULL);
-		if (ctx->format == NULL)
-			return -1;
-		tuple_format_ref(ctx->format);
-		if (ctx->upsert_format != NULL)
-			tuple_format_unref(ctx->upsert_format);
-		ctx->upsert_format = vy_tuple_format_new_upsert(ctx->format);
-		if (ctx->upsert_format == NULL)
-			return -1;
-		tuple_format_ref(ctx->upsert_format);
-	}
+	if (index_info->is_dropped)
+		return 0;
 
 	/*
 	 * We are only interested in the primary index.
 	 * Secondary keys will be rebuilt on the destination.
 	 */
-	if (ctx->index_id != 0)
+	if (index_info->index_id != 0)
 		return 0;
 
-	if (record->type == VY_LOG_INSERT_SLICE) {
-		struct tuple_format *key_format = ctx->env->index_env.key_format;
-		struct tuple *begin = NULL, *end = NULL;
-		bool success = false;
+	ctx->space_id = index_info->space_id;
 
-		struct vy_run *run = vy_run_new(&ctx->env->run_env,
-						record->run_id);
-		if (run == NULL)
-			goto done_slice;
-		if (vy_run_recover(run, ctx->env->path,
-				   ctx->space_id, ctx->index_id) != 0)
-			goto done_slice;
+	/* Create key definition and tuple format. */
+	ctx->key_def = key_def_new_with_parts(index_info->key_parts,
+					      index_info->key_part_count);
+	if (ctx->key_def == NULL)
+		goto out;
+	ctx->format = tuple_format_new(&vy_tuple_format_vtab, &ctx->key_def,
+				       1, 0, NULL, 0, NULL);
+	if (ctx->format == NULL)
+		goto out_free_key_def;
+	tuple_format_ref(ctx->format);
+	ctx->upsert_format = vy_tuple_format_new_upsert(ctx->format);
+	if (ctx->upsert_format == NULL)
+		goto out_free_format;
+	tuple_format_ref(ctx->upsert_format);
 
-		if (record->begin != NULL) {
-			begin = vy_key_from_msgpack(key_format, record->begin);
-			if (begin == NULL)
-				goto done_slice;
-		}
-		if (record->end != NULL) {
-			end = vy_key_from_msgpack(key_format, record->end);
-			if (end == NULL)
-				goto done_slice;
-		}
-
-		struct vy_slice *slice = vy_slice_new(record->slice_id,
-						run, begin, end, ctx->key_def);
-		if (slice == NULL)
-			goto done_slice;
-
-		rlist_add_entry(&ctx->slices, slice, in_join);
-		success = true;
-done_slice:
-		if (run != NULL)
-			vy_run_unref(run);
-		if (begin != NULL)
-			tuple_unref(begin);
-		if (end != NULL)
-			tuple_unref(end);
-		if (!success)
-			return -1;
+	/* Send ranges. */
+	struct vy_range_recovery_info *range_info;
+	assert(!rlist_empty(&index_info->ranges));
+	rlist_foreach_entry(range_info, &index_info->ranges, in_index) {
+		rc = vy_send_range(ctx, range_info);
+		if (rc != 0)
+			break;
 	}
-	return 0;
+
+	tuple_format_unref(ctx->upsert_format);
+	ctx->upsert_format = NULL;
+out_free_format:
+	tuple_format_unref(ctx->format);
+	ctx->format = NULL;
+out_free_key_def:
+	key_def_delete(ctx->key_def);
+	ctx->key_def = NULL;
+out:
+	return rc;
 }
 
 /** Relay cord function. */
@@ -3266,22 +3285,15 @@ vinyl_engine_join(struct engine *engine, struct vclock *vclock,
 		say_error("failed to recover vylog to join a replica");
 		goto out_join_cord;
 	}
-	rc = vy_recovery_iterate(recovery, vy_join_cb, ctx);
+	rc = 0;
+	struct vy_index_recovery_info *index_info;
+	rlist_foreach_entry(index_info, &recovery->indexes, in_recovery) {
+		rc = vy_send_index(ctx, index_info);
+		if (rc != 0)
+			break;
+	}
 	vy_recovery_delete(recovery);
-	/* Send the last range. */
-	if (rc == 0)
-		rc = vy_send_range(ctx);
 
-	/* Cleanup. */
-	if (ctx->key_def != NULL)
-		key_def_delete(ctx->key_def);
-	if (ctx->format != NULL)
-		tuple_format_unref(ctx->format);
-	if (ctx->upsert_format != NULL)
-		tuple_format_unref(ctx->upsert_format);
-	struct vy_slice *slice, *tmp;
-	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
-		vy_slice_delete(slice);
 out_join_cord:
 	cbus_stop_loop(&ctx->relay_pipe);
 	cpipe_destroy(&ctx->relay_pipe);
@@ -3361,70 +3373,29 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 
 /* {{{ Garbage collection */
 
-/** Argument passed to vy_gc_cb(). */
-struct vy_gc_arg {
-	/** Vinyl environment. */
-	struct vy_env *env;
-	/**
-	 * Specifies what kinds of runs to delete.
-	 * See VY_GC_*.
-	 */
-	unsigned int gc_mask;
-	/** LSN of the oldest checkpoint to save. */
-	int64_t gc_lsn;
-	/**
-	 * ID of the current space and index.
-	 * Needed for file name formatting.
-	 */
-	uint32_t space_id;
-	uint32_t index_id;
-	/** Number of times the callback has been called. */
-	int loops;
-};
-
 /**
- * Garbage collection callback, passed to vy_recovery_iterate().
- *
  * Given a record encoding information about a vinyl run, try to
  * delete the corresponding files. On success, write a "forget" record
  * to the log so that all information about the run is deleted on the
  * next log rotation.
  */
-static int
-vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
+static void
+vy_gc_run(struct vy_env *env,
+	  struct vy_index_recovery_info *index_info,
+	  struct vy_run_recovery_info *run_info)
 {
-	struct vy_gc_arg *arg = cb_arg;
-
-	switch (record->type) {
-	case VY_LOG_CREATE_INDEX:
-		arg->space_id = record->space_id;
-		arg->index_id = record->index_id;
-		goto out;
-	case VY_LOG_PREPARE_RUN:
-		if ((arg->gc_mask & VY_GC_INCOMPLETE) == 0)
-			goto out;
-		break;
-	case VY_LOG_DROP_RUN:
-		if ((arg->gc_mask & VY_GC_DROPPED) == 0 ||
-		    record->gc_lsn >= arg->gc_lsn)
-			goto out;
-		break;
-	default:
-		goto out;
-	}
-
 	ERROR_INJECT(ERRINJ_VY_GC,
 		     {say_error("error injection: vinyl run %lld not deleted",
-				(long long)record->run_id); goto out;});
+				(long long)run_info->id); return;});
 
 	/* Try to delete files. */
-	if (vy_run_remove_files(arg->env->path, arg->space_id,
-				arg->index_id, record->run_id) != 0)
-		goto out;
+	if (vy_run_remove_files(env->path, index_info->space_id,
+				index_info->index_id, run_info->id) != 0)
+		return;
 
 	/* Forget the run on success. */
 	vy_log_tx_begin();
-	vy_log_forget_run(record->run_id);
+	vy_log_forget_run(run_info->id);
 	/*
 	 * Leave the record in the vylog buffer on disk error.
 	 * If we fail to flush it before restart, we will retry
@@ -3432,23 +3403,35 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 	 * is invoked, which is harmless.
 	 */
 	vy_log_tx_try_commit();
-out:
-	if (++arg->loops % VY_YIELD_LOOPS == 0)
-		fiber_sleep(0);
-	return 0;
 }
 
-/** Delete unused run files, see vy_gc_arg for more details. */
+/**
+ * Delete unused run files stored in the recovery context.
+ * @param env      Vinyl environment.
+ * @param recovery Recovery context.
+ * @param gc_mask  Specifies what kinds of runs to delete (see VY_GC_*).
+ * @param gc_lsn   LSN of the oldest checkpoint to save.
+ */
 static void
 vy_gc(struct vy_env *env, struct vy_recovery *recovery,
       unsigned int gc_mask, int64_t gc_lsn)
 {
-	struct vy_gc_arg arg = {
-		.env = env,
-		.gc_mask = gc_mask,
-		.gc_lsn = gc_lsn,
-	};
-	vy_recovery_iterate(recovery, vy_gc_cb, &arg);
+	int loops = 0;
+	struct vy_index_recovery_info *index_info;
+	rlist_foreach_entry(index_info, &recovery->indexes, in_recovery) {
+		struct vy_run_recovery_info *run_info;
+		rlist_foreach_entry(run_info, &index_info->runs, in_index) {
+			if ((run_info->is_dropped &&
+			     run_info->gc_lsn < gc_lsn &&
+			     (gc_mask & VY_GC_DROPPED) != 0) ||
+			    (run_info->is_incomplete &&
+			     (gc_mask & VY_GC_INCOMPLETE) != 0)) {
+				vy_gc_run(env, index_info, run_info);
+			}
+			if (loops % VY_YIELD_LOOPS == 0)
+				fiber_sleep(0);
+		}
+	}
 }
 
 static int
@@ -3475,52 +3458,6 @@ vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 
 /* {{{ Backup */
 
-/** Argument passed to vy_backup_cb(). */
-struct vy_backup_arg {
-	/** Vinyl environment. */
-	struct vy_env *env;
-	/** Backup callback. */
-	int (*cb)(const char *, void *);
-	/** Argument passed to @cb. */
-	void *cb_arg;
-	/**
-	 * ID of the current space and index.
-	 * Needed for file name formatting.
-	 */
-	uint32_t space_id;
-	uint32_t index_id;
-	/** Number of times the callback has been called. */
-	int loops;
-};
-
-/** Backup callback, passed to vy_recovery_iterate(). */
-static int
-vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
-{
-	struct vy_backup_arg *arg = cb_arg;
-
-	if (record->type == VY_LOG_CREATE_INDEX) {
-		arg->space_id = record->space_id;
-		arg->index_id = record->index_id;
-	}
-
-	if (record->type != VY_LOG_CREATE_RUN || record->is_dropped)
-		goto out;
-
-	char path[PATH_MAX];
-	for (int type = 0; type < vy_file_MAX; type++) {
-		vy_run_snprint_path(path, sizeof(path), arg->env->path,
-				    arg->space_id, arg->index_id,
-				    record->run_id, type);
-		if (arg->cb(path, arg->cb_arg) != 0)
-			return -1;
-	}
-out:
-	if (++arg->loops % VY_YIELD_LOOPS == 0)
-		fiber_sleep(0);
-	return 0;
-}
-
 static int
 vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
 		    engine_backup_cb cb, void *cb_arg)
@@ -3541,12 +3478,32 @@ vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
 		say_error("failed to recover vylog for backup");
 		return -1;
 	}
-	struct vy_backup_arg arg = {
-		.env = env,
-		.cb = cb,
-		.cb_arg = cb_arg,
-	};
-	int rc = vy_recovery_iterate(recovery, vy_backup_cb, &arg);
+	int rc = 0;
+	int loops = 0;
+	struct vy_index_recovery_info *index_info;
+	rlist_foreach_entry(index_info, &recovery->indexes, in_recovery) {
+		if (index_info->is_dropped)
+			continue;
+		struct vy_run_recovery_info *run_info;
+		rlist_foreach_entry(run_info, &index_info->runs, in_index) {
+			if (run_info->is_dropped || run_info->is_incomplete)
+				continue;
+			char path[PATH_MAX];
+			for (int type = 0; type < vy_file_MAX; type++) {
+				vy_run_snprint_path(path, sizeof(path),
+						    env->path,
+						    index_info->space_id,
+						    index_info->index_id,
+						    run_info->id, type);
+				rc = cb(path, cb_arg);
+				if (rc != 0)
+					goto out;
+			}
+			if (loops % VY_YIELD_LOOPS == 0)
+				fiber_sleep(0);
+		}
+	}
+out:
 	vy_recovery_delete(recovery);
 	return rc;
 }

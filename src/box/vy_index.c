@@ -36,7 +36,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "assoc.h"
 #include "diag.h"
 #include "errcode.h"
 #include "histogram.h"
@@ -386,156 +385,150 @@ vy_index_create(struct vy_index *index)
 	return vy_index_init_range_tree(index);
 }
 
-/** vy_index_recovery_cb() argument. */
-struct vy_index_recovery_cb_arg {
-	/** Index being recovered. */
-	struct vy_index *index;
-	/** Last recovered range. */
-	struct vy_range *range;
-	/** Vinyl run environment. */
-	struct vy_run_env *run_env;
-	/**
-	 * All recovered runs hashed by ID.
-	 * It is needed in order not to load the same
-	 * run each time a slice is created for it.
-	 */
-	struct mh_i64ptr_t *run_hash;
-	/**
-	 * True if force_recovery mode is enabled.
-	 */
-	bool force_recovery;
-};
-
-/** Index recovery callback, passed to vy_recovery_load_index(). */
-static int
-vy_index_recovery_cb(const struct vy_log_record *record, void *cb_arg)
+static struct vy_run *
+vy_index_recover_run(struct vy_index *index,
+		     struct vy_run_recovery_info *run_info,
+		     struct vy_run_env *run_env, bool force_recovery)
 {
-	struct vy_index_recovery_cb_arg *arg = cb_arg;
-	struct vy_index *index = arg->index;
-	struct vy_range *range = arg->range;
-	struct vy_run_env *run_env = arg->run_env;
-	struct mh_i64ptr_t *run_hash = arg->run_hash;
-	bool force_recovery = arg->force_recovery;
-	struct tuple_format *key_format = index->env->key_format;
+	assert(!run_info->is_dropped);
+	assert(!run_info->is_incomplete);
+
+	if (run_info->data != NULL) {
+		/* Already recovered. */
+		return run_info->data;
+	}
+
+	struct vy_run *run = vy_run_new(run_env, run_info->id);
+	if (run == NULL)
+		return NULL;
+
+	run->dump_lsn = run_info->dump_lsn;
+	if (vy_run_recover(run, index->env->path,
+			   index->space_id, index->id) != 0 &&
+	    (!force_recovery ||
+	     vy_run_rebuild_index(run, index->env->path,
+				  index->space_id, index->id,
+				  index->cmp_def, index->key_def,
+				  index->mem_format, index->upsert_format,
+				  &index->opts) != 0)) {
+		vy_run_unref(run);
+		return NULL;
+	}
+	vy_index_add_run(index, run);
+
+	/*
+	 * The same run can be referenced by more than one slice
+	 * so we cache recovered runs in run_info to avoid loading
+	 * the same run multiple times.
+	 *
+	 * Runs are stored with their reference counters elevated.
+	 * We drop the extra references as soon as index recovery
+	 * is complete (see vy_index_recover()).
+	 */
+	run_info->data = run;
+	return run;
+}
+
+static struct vy_slice *
+vy_index_recover_slice(struct vy_index *index, struct vy_range *range,
+		       struct vy_slice_recovery_info *slice_info,
+		       struct vy_run_env *run_env, bool force_recovery)
+{
 	struct tuple *begin = NULL, *end = NULL;
+	struct vy_slice *slice = NULL;
 	struct vy_run *run;
-	struct vy_slice *slice;
-	bool success = false;
 
-	assert(record->type == VY_LOG_CREATE_INDEX || index->commit_lsn >= 0);
-
-	if (record->type == VY_LOG_INSERT_RANGE ||
-	    record->type == VY_LOG_INSERT_SLICE) {
-		if (record->begin != NULL) {
-			begin = vy_key_from_msgpack(key_format, record->begin);
-			if (begin == NULL)
-				goto out;
-		}
-		if (record->end != NULL) {
-			end = vy_key_from_msgpack(key_format, record->end);
-			if (end == NULL)
-				goto out;
-		}
+	if (slice_info->begin != NULL) {
+		begin = vy_key_from_msgpack(index->env->key_format,
+					    slice_info->begin);
+		if (begin == NULL)
+			goto out;
+	}
+	if (slice_info->end != NULL) {
+		end = vy_key_from_msgpack(index->env->key_format,
+					  slice_info->end);
+		if (end == NULL)
+			goto out;
+	}
+	if (begin != NULL && end != NULL &&
+	    vy_key_compare(begin, end, index->cmp_def) >= 0) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("begin >= end for slice %lld",
+				    (long long)slice_info->id));
+		goto out;
 	}
 
-	switch (record->type) {
-	case VY_LOG_CREATE_INDEX:
-		assert(record->index_id == index->id);
-		assert(record->space_id == index->space_id);
-		assert(index->commit_lsn < 0);
-		assert(record->index_lsn >= 0);
-		index->commit_lsn = record->index_lsn;
-		break;
-	case VY_LOG_DUMP_INDEX:
-		assert(record->index_lsn == index->commit_lsn);
-		index->dump_lsn = record->dump_lsn;
-		break;
-	case VY_LOG_TRUNCATE_INDEX:
-		assert(record->index_lsn == index->commit_lsn);
-		index->truncate_count = record->truncate_count;
-		break;
-	case VY_LOG_DROP_INDEX:
-		assert(record->index_lsn == index->commit_lsn);
-		index->is_dropped = true;
-		/*
-		 * If the index was dropped, we don't need to replay
-		 * truncate (see vy_prepare_truncate_space()).
-		 */
-		index->truncate_count = UINT64_MAX;
-		break;
-	case VY_LOG_PREPARE_RUN:
-		break;
-	case VY_LOG_CREATE_RUN:
-		if (record->is_dropped)
-			break;
-		assert(record->index_lsn == index->commit_lsn);
-		run = vy_run_new(run_env, record->run_id);
-		if (run == NULL)
-			goto out;
-		run->dump_lsn = record->dump_lsn;
-		if (vy_run_recover(run, index->env->path,
-				   index->space_id, index->id) != 0 &&
-		     (!force_recovery ||
-		     vy_run_rebuild_index(run, index->env->path,
-					  index->space_id, index->id,
-					  index->cmp_def, index->key_def,
-					  index->mem_format,
-					  index->upsert_format,
-					  &index->opts) != 0)) {
-			vy_run_unref(run);
-			goto out;
-		}
-		struct mh_i64ptr_node_t node = { run->id, run };
-		if (mh_i64ptr_put(run_hash, &node,
-				  NULL, NULL) == mh_end(run_hash)) {
-			diag_set(OutOfMemory, 0,
-				 "mh_i64ptr_put", "mh_i64ptr_node_t");
-			vy_run_unref(run);
-			goto out;
-		}
-		break;
-	case VY_LOG_DROP_RUN:
-		break;
-	case VY_LOG_INSERT_RANGE:
-		assert(record->index_lsn == index->commit_lsn);
-		range = vy_range_new(record->range_id, begin, end,
-				     index->cmp_def);
-		if (range == NULL)
-			goto out;
-		if (range->begin != NULL && range->end != NULL &&
-		    vy_key_compare(range->begin, range->end,
-				   index->cmp_def) >= 0) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("begin >= end for range id %lld",
-					    (long long)range->id));
-			vy_range_delete(range);
-			goto out;
-		}
-		vy_index_add_range(index, range);
-		arg->range = range;
-		break;
-	case VY_LOG_INSERT_SLICE:
-		assert(range != NULL);
-		assert(range->id == record->range_id);
-		mh_int_t k = mh_i64ptr_find(run_hash, record->run_id, NULL);
-		assert(k != mh_end(run_hash));
-		run = mh_i64ptr_node(run_hash, k)->val;
-		slice = vy_slice_new(record->slice_id, run, begin, end,
-				     index->cmp_def);
-		if (slice == NULL)
-			goto out;
-		vy_range_add_slice(range, slice);
-		break;
-	default:
-		unreachable();
-	}
-	success = true;
+	run = vy_index_recover_run(index, slice_info->run,
+				   run_env, force_recovery);
+	if (run == NULL)
+		goto out;
+
+	slice = vy_slice_new(slice_info->id, run, begin, end, index->cmp_def);
+	if (slice == NULL)
+		goto out;
+
+	vy_range_add_slice(range, slice);
 out:
 	if (begin != NULL)
 		tuple_unref(begin);
 	if (end != NULL)
 		tuple_unref(end);
-	return success ? 0 : -1;
+	return slice;
+}
+
+static struct vy_range *
+vy_index_recover_range(struct vy_index *index,
+		       struct vy_range_recovery_info *range_info,
+		       struct vy_run_env *run_env, bool force_recovery)
+{
+	struct tuple *begin = NULL, *end = NULL;
+	struct vy_range *range = NULL;
+
+	if (range_info->begin != NULL) {
+		begin = vy_key_from_msgpack(index->env->key_format,
+					    range_info->begin);
+		if (begin == NULL)
+			goto out;
+	}
+	if (range_info->end != NULL) {
+		end = vy_key_from_msgpack(index->env->key_format,
+					  range_info->end);
+		if (end == NULL)
+			goto out;
+	}
+	if (begin != NULL && end != NULL &&
+	    vy_key_compare(begin, end, index->cmp_def) >= 0) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("begin >= end for range %lld",
+				    (long long)range_info->id));
+		goto out;
+	}
+
+	range = vy_range_new(range_info->id, begin, end, index->cmp_def);
+	if (range == NULL)
+		goto out;
+
+	/*
+	 * Newer slices are stored closer to the head of the list,
+	 * while we are supposed to add slices in chronological
+	 * order, so use reverse iterator.
+	 */
+	struct vy_slice_recovery_info *slice_info;
+	rlist_foreach_entry_reverse(slice_info, &range_info->slices, in_range) {
+		if (vy_index_recover_slice(index, range, slice_info,
+					   run_env, force_recovery) == NULL) {
+			vy_range_delete(range);
+			range = NULL;
+			goto out;
+		}
+	}
+	vy_index_add_range(index, range);
+out:
+	if (begin != NULL)
+		tuple_unref(begin);
+	if (end != NULL)
+		tuple_unref(end);
+	return range;
 }
 
 int
@@ -544,19 +537,6 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		 bool is_checkpoint_recovery, bool force_recovery)
 {
 	assert(index->range_count == 0);
-
-	struct vy_index_recovery_cb_arg arg = {
-		.index = index,
-		.range = NULL,
-		.run_env = run_env,
-		.run_hash = NULL,
-		.force_recovery = force_recovery,
-	};
-	arg.run_hash = mh_i64ptr_new();
-	if (arg.run_hash == NULL) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
-		return -1;
-	}
 
 	/*
 	 * Backward compatibility fixup: historically, we used
@@ -568,39 +548,14 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 	if (index->opts.lsn != 0)
 		lsn = index->opts.lsn;
 
-	int rc = vy_recovery_load_index(recovery, index->space_id, index->id,
-					lsn, is_checkpoint_recovery,
-					vy_index_recovery_cb, &arg);
-
-	mh_int_t k;
-	mh_foreach(arg.run_hash, k) {
-		struct vy_run *run = mh_i64ptr_node(arg.run_hash, k)->val;
-		if (run->refs > 1)
-			vy_index_add_run(index, run);
-		if (run->refs == 1 && rc == 0) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Unused run %lld in index %lld",
-					    (long long)run->id,
-					    (long long)index->commit_lsn));
-			rc = -1;
-			/*
-			 * Continue the loop to unreference
-			 * all runs in the hash.
-			 */
-		}
-		/* Drop the reference held by the hash. */
-		vy_run_unref(run);
-	}
-	mh_i64ptr_delete(arg.run_hash);
-
-	if (rc != 0) {
-		/* Recovery callback failed. */
-		return -1;
-	}
-
-	if (index->commit_lsn < 0) {
-		/* Index was not found in the metadata log. */
-		if (is_checkpoint_recovery) {
+	/*
+	 * Look up the last incarnation of the index in vylog.
+	 */
+	struct vy_index_recovery_info *index_info;
+	index_info = vy_recovery_lookup_index(recovery,
+					      index->space_id, index->id);
+	if (is_checkpoint_recovery) {
+		if (index_info == NULL) {
 			/*
 			 * All indexes created from snapshot rows must
 			 * be present in vylog, because snapshot can
@@ -608,10 +563,21 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 			 * flushed.
 			 */
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Index %lld not found",
-					    (long long)index->commit_lsn));
+				 tt_sprintf("Index %u/%u not found",
+					    (unsigned)index->space_id,
+					    (unsigned)index->id));
 			return -1;
 		}
+		if (lsn > index_info->index_lsn) {
+			/*
+			 * The last incarnation of the index was created
+			 * before the last checkpoint, load it now.
+			 */
+			lsn = index_info->index_lsn;
+		}
+	}
+
+	if (index_info == NULL || lsn > index_info->index_lsn) {
 		/*
 		 * If we failed to log index creation before restart,
 		 * we won't find it in the log on recovery. This is
@@ -622,13 +588,56 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		return vy_index_init_range_tree(index);
 	}
 
-	if (index->is_dropped) {
+	index->commit_lsn = lsn;
+
+	if (lsn < index_info->index_lsn || index_info->is_dropped) {
 		/*
-		 * Initial range is not stored in the metadata log
-		 * for dropped indexes, but we need it for recovery.
+		 * Loading a past incarnation of the index, i.e.
+		 * the index is going to dropped during final
+		 * recovery. Mark it as such.
+		 */
+		index->is_dropped = true;
+		/*
+		 * If the index was dropped, we don't need to replay
+		 * truncate (see vinyl_space_prepare_truncate()).
+		 */
+		index->truncate_count = UINT64_MAX;
+		/*
+		 * We need range tree initialized for all indexes,
+		 * even for dropped ones.
 		 */
 		return vy_index_init_range_tree(index);
 	}
+
+	/*
+	 * Loading the last incarnation of the index from vylog.
+	 */
+	index->dump_lsn = index_info->dump_lsn;
+	index->truncate_count = index_info->truncate_count;
+
+	int rc = 0;
+	struct vy_range_recovery_info *range_info;
+	rlist_foreach_entry(range_info, &index_info->ranges, in_index) {
+		if (vy_index_recover_range(index, range_info,
+					   run_env, force_recovery) == NULL) {
+			rc = -1;
+			break;
+		}
+	}
+
+	/*
+	 * vy_index_recover_run() elevates reference counter
+	 * of each recovered run. We need to drop the extra
+	 * references once we are done.
+	 */
+	struct vy_run *run;
+	rlist_foreach_entry(run, &index->runs, in_index) {
+		assert(run->refs > 1);
+		vy_run_unref(run);
+	}
+
+	if (rc != 0)
+		return -1;
 
 	/*
 	 * Account ranges to the index and check that the range tree

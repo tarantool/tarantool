@@ -189,12 +189,12 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [7, {2: 3}]
+          tuple: [7, {2: 2}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [7, {2: 2}]
+          tuple: [7, {2: 3}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT

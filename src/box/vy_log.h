@@ -34,6 +34,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <small/rlist.h>
 
 #include "salad/stailq.h"
 
@@ -58,8 +59,7 @@ struct xlog;
 struct vclock;
 struct key_def;
 struct key_part_def;
-
-struct vy_recovery;
+struct mh_i64ptr_t;
 
 /** Type of a metadata log record. */
 enum vy_log_record_type {
@@ -175,12 +175,6 @@ struct vy_log_record {
 	/** Unique ID of the run slice. */
 	int64_t slice_id;
 	/**
-	 * For VY_LOG_CREATE_RUN record: hint that the run
-	 * is dropped, i.e. there is a VY_LOG_DROP_RUN record
-	 * following this one.
-	 */
-	bool is_dropped;
-	/**
 	 * Msgpack key for start of the range/slice.
 	 * NULL if the range/slice starts from -inf.
 	 */
@@ -211,6 +205,127 @@ struct vy_log_record {
 	int64_t truncate_count;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
+};
+
+/** Recovery context. */
+struct vy_recovery {
+	/**
+	 * List of all indexes stored in the recovery context,
+	 * linked by vy_index_recovery_info::in_recovery.
+	 */
+	struct rlist indexes;
+	/** space_id, index_id -> vy_index_recovery_info. */
+	struct mh_i64ptr_t *index_id_hash;
+	/** index_lsn -> vy_index_recovery_info. */
+	struct mh_i64ptr_t *index_lsn_hash;
+	/** ID -> vy_range_recovery_info. */
+	struct mh_i64ptr_t *range_hash;
+	/** ID -> vy_run_recovery_info. */
+	struct mh_i64ptr_t *run_hash;
+	/** ID -> vy_slice_recovery_info. */
+	struct mh_i64ptr_t *slice_hash;
+	/**
+	 * Maximal vinyl object ID, according to the metadata log,
+	 * or -1 in case no vinyl objects were recovered.
+	 */
+	int64_t max_id;
+};
+
+/** Vinyl index info stored in a recovery context. */
+struct vy_index_recovery_info {
+	/** Link in vy_recovery::indexes. */
+	struct rlist in_recovery;
+	/** LSN of the index creation. */
+	int64_t index_lsn;
+	/** Ordinal index number in the space. */
+	uint32_t index_id;
+	/** Space ID. */
+	uint32_t space_id;
+	/** Array of key part definitions. */
+	struct key_part_def *key_parts;
+	/** Number of key parts. */
+	uint32_t key_part_count;
+	/** True if the index was dropped. */
+	bool is_dropped;
+	/** LSN of the last index dump. */
+	int64_t dump_lsn;
+	/** Truncate count. */
+	int64_t truncate_count;
+	/**
+	 * List of all ranges in the index, linked by
+	 * vy_range_recovery_info::in_index.
+	 */
+	struct rlist ranges;
+	/**
+	 * List of all runs created for the index
+	 * (both committed and not), linked by
+	 * vy_run_recovery_info::in_index.
+	 */
+	struct rlist runs;
+};
+
+/** Vinyl range info stored in a recovery context. */
+struct vy_range_recovery_info {
+	/** Link in vy_index_recovery_info::ranges. */
+	struct rlist in_index;
+	/** ID of the range. */
+	int64_t id;
+	/** Start of the range, stored in MsgPack array. */
+	char *begin;
+	/** End of the range, stored in MsgPack array. */
+	char *end;
+	/**
+	 * List of all slices in the range, linked by
+	 * vy_slice_recovery_info::in_range.
+	 *
+	 * Newer slices are closer to the head.
+	 */
+	struct rlist slices;
+};
+
+/** Run info stored in a recovery context. */
+struct vy_run_recovery_info {
+	/** Link in vy_index_recovery_info::runs. */
+	struct rlist in_index;
+	/** ID of the run. */
+	int64_t id;
+	/** Max LSN stored on disk. */
+	int64_t dump_lsn;
+	/**
+	 * For deleted runs: LSN of the last checkpoint
+	 * that uses this run.
+	 */
+	int64_t gc_lsn;
+	/**
+	 * True if the run was not committed (there's
+	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
+	 */
+	bool is_incomplete;
+	/** True if the run was dropped (VY_LOG_DROP_RUN). */
+	bool is_dropped;
+	/*
+	 * The following field is initialized to NULL and
+	 * ignored by vy_log subsystem. It may be used by
+	 * the caller to store some extra information.
+	 *
+	 * During recovery, we store a pointer to vy_run
+	 * corresponding to this object.
+	 */
+	void *data;
+};
+
+/** Slice info stored in a recovery context. */
+struct vy_slice_recovery_info {
+	/** Link in vy_range_recovery_info::slices. */
+	struct rlist in_range;
+	/** ID of the slice. */
+	int64_t id;
+	/** Run this slice was created for. */
+	struct vy_run_recovery_info *run;
+	/** Start of the slice, stored in MsgPack array. */
+	char *begin;
+	/** End of the slice, stored in MsgPack array. */
+	char *end;
 };
 
 /**
@@ -359,70 +474,14 @@ vy_recovery_new(int64_t signature, bool only_checkpoint);
 void
 vy_recovery_delete(struct vy_recovery *recovery);
 
-typedef int
-(*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
-
 /**
- * Iterate over all objects stored in a recovery context.
+ * Look up the last incarnation of an index stored in a recovery context.
  *
- * This function invokes callback @cb for each object (index, run, etc)
- * stored in the given recovery context. The callback is passed a record
- * used to log the object and optional argument @cb_arg. If the callback
- * returns a value different from 0, iteration stops and -1 is returned,
- * otherwise the function returns 0.
- *
- * To ease the work done by the callback, records corresponding to
- * slices of a range always go right after the range, in the
- * chronological order, while an index's runs go after the index
- * and before its ranges.
+ * Returns NULL if the index was not found.
  */
-int
-vy_recovery_iterate(struct vy_recovery *recovery,
-		    vy_recovery_cb cb, void *cb_arg);
-
-/**
- * Load an index from a recovery context.
- *
- * Call @cb for each object related to the index. Break the loop and
- * return -1 if @cb returned a non-zero value, otherwise return 0.
- * Objects are loaded in the same order as by vy_recovery_iterate().
- *
- * Note, this function returns 0 if there's no index with the requested
- * id in the recovery context. In this case, @cb isn't called at all.
- *
- * The @is_checkpoint_recovery flag indicates that the row that created
- * the index was loaded from a snapshot, in which case @index_lsn is
- * the snapshot signature. Otherwise @index_lsn is the LSN of the WAL
- * row that created the index.
- *
- * The index is looked up by @space_id and @index_id while @index_lsn
- * is used to discern different incarnations of the same index as
- * follows. Let @record denote the vylog record corresponding to the
- * last incarnation of the index. Then
- *
- * - If @is_checkpoint_recovery is set and @index_lsn >= @record->index_lsn,
- *   the last index incarnation was created before the snapshot and we
- *   need to load it right now.
- *
- * - If @is_checkpoint_recovery is set and @index_lsn < @record->index_lsn,
- *   the last index incarnation was created after the snapshot, i.e.
- *   the index loaded now is going to be dropped so load a dummy.
- *
- * - If @is_checkpoint_recovery is unset and @index_lsn < @record->index_lsn,
- *   the last index incarnation is created further in WAL, load a dummy.
- *
- * - If @is_checkpoint_recovery is unset and @index_lsn == @record->index_lsn,
- *   load the last index incarnation.
- *
- * - If @is_checkpoint_recovery is unset and @index_lsn > @record->index_lsn,
- *   it seems we failed to log index creation before restart. In this
- *   case don't do anything. The caller is supposed to retry logging.
- */
-int
-vy_recovery_load_index(struct vy_recovery *recovery,
-		       uint32_t space_id, uint32_t index_id,
-		       int64_t index_lsn, bool is_checkpoint_recovery,
-		       vy_recovery_cb cb, void *cb_arg);
+struct vy_index_recovery_info *
+vy_recovery_lookup_index(struct vy_recovery *recovery,
+			 uint32_t space_id, uint32_t index_id);
 
 /**
  * Initialize a log record with default values.
