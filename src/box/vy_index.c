@@ -318,23 +318,8 @@ vy_index_delete(struct vy_index *index)
 	free(index);
 }
 
-void
-vy_index_swap(struct vy_index *old_index, struct vy_index *new_index)
-{
-	assert(old_index->stat.memory.count.rows == 0);
-	assert(new_index->stat.memory.count.rows == 0);
-
-	SWAP(old_index->dump_lsn, new_index->dump_lsn);
-	SWAP(old_index->range_count, new_index->range_count);
-	SWAP(old_index->run_count, new_index->run_count);
-	SWAP(old_index->stat, new_index->stat);
-	SWAP(old_index->run_hist, new_index->run_hist);
-	SWAP(old_index->tree, new_index->tree);
-	SWAP(old_index->range_heap, new_index->range_heap);
-	rlist_swap(&old_index->runs, &new_index->runs);
-}
-
-int
+/** Initialize the range tree of a new index. */
+static int
 vy_index_init_range_tree(struct vy_index *index)
 {
 	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
@@ -606,11 +591,6 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		 */
 		index->is_dropped = true;
 		/*
-		 * If the index was dropped, we don't need to replay
-		 * truncate (see vinyl_space_prepare_truncate()).
-		 */
-		index->truncate_count = UINT64_MAX;
-		/*
 		 * We need range tree initialized for all indexes,
 		 * even for dropped ones.
 		 */
@@ -621,7 +601,6 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 	 * Loading the last incarnation of the index from vylog.
 	 */
 	index->dump_lsn = index_info->dump_lsn;
-	index->truncate_count = index_info->truncate_count;
 
 	int rc = 0;
 	struct vy_range_recovery_info *range_info;

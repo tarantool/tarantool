@@ -147,21 +147,6 @@ sysview_space_build_secondary_key(struct space *old_space,
 }
 
 static int
-sysview_space_prepare_truncate(struct space *old_space, struct space *new_space)
-{
-	(void)old_space;
-	(void)new_space;
-	return 0;
-}
-
-static void
-sysview_space_commit_truncate(struct space *old_space, struct space *new_space)
-{
-	(void)old_space;
-	(void)new_space;
-}
-
-static int
 sysview_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	(void)old_space;
@@ -200,8 +185,6 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .drop_primary_key = */ sysview_space_drop_primary_key,
 	/* .check_format = */ sysview_space_check_format,
 	/* .build_secondary_key = */ sysview_space_build_secondary_key,
-	/* .prepare_truncate = */ sysview_space_prepare_truncate,
-	/* .commit_truncate = */ sysview_space_commit_truncate,
 	/* .prepare_alter = */ sysview_space_prepare_alter,
 	/* .commit_alter = */ sysview_space_commit_alter,
 };

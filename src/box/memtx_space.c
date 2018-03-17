@@ -818,16 +818,6 @@ memtx_space_build_secondary_key(struct space *old_space,
 	return rc;
 }
 
-static int
-memtx_space_prepare_truncate(struct space *old_space,
-			     struct space *new_space)
-{
-	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
-	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
-	new_memtx_space->replace = old_memtx_space->replace;
-	return 0;
-}
-
 static void
 memtx_space_prune(struct space *space)
 {
@@ -858,14 +848,6 @@ fail:
 	panic("failed to prune space");
 }
 
-static void
-memtx_space_commit_truncate(struct space *old_space,
-			    struct space *new_space)
-{
-	(void)new_space;
-	memtx_space_prune(old_space);
-}
-
 static int
 memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
@@ -883,9 +865,14 @@ memtx_space_commit_alter(struct space *old_space, struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+	bool is_empty = new_space->index_count == 0 ||
+			index_size(new_space->index[0]) == 0;
 
-	/* Delete all tuples when the last index is dropped. */
-	if (new_space->index_count == 0)
+	/*
+	 * Delete all tuples when the last index is dropped
+	 * or the space is truncated.
+	 */
+	if (is_empty)
 		memtx_space_prune(old_space);
 	else
 		new_memtx_space->bsize = old_memtx_space->bsize;
@@ -908,8 +895,6 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .drop_primary_key = */ memtx_space_drop_primary_key,
 	/* .check_format  = */ memtx_space_check_format,
 	/* .build_secondary_key = */ memtx_space_build_secondary_key,
-	/* .prepare_truncate = */ memtx_space_prepare_truncate,
-	/* .commit_truncate = */ memtx_space_commit_truncate,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 	/* .commit_alter = */ memtx_space_commit_alter,
 };

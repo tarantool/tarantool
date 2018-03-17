@@ -104,23 +104,6 @@ struct space_vtab {
 				   struct space *new_space,
 				   struct index *new_index);
 	/**
-	 * Notify the enigne about upcoming space truncation
-	 * so that it can prepare new_space object.
-	 */
-	int (*prepare_truncate)(struct space *old_space,
-				struct space *new_space);
-	/**
-	 * Commit space truncation. Called after space truncate
-	 * record was written to WAL hence must not fail.
-	 *
-	 * The old_space is the space that was replaced with the
-	 * new_space as a result of truncation. The callback is
-	 * supposed to release resources associated with the
-	 * old_space and commit the new_space.
-	 */
-	void (*commit_truncate)(struct space *old_space,
-				struct space *new_space);
-	/**
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space' object.
 	 */
@@ -167,12 +150,6 @@ struct space {
 	struct space_def *def;
 	/** Sequence attached to this space or NULL. */
 	struct sequence *sequence;
-	/**
-	 * Number of times the space has been truncated.
-	 * Updating this counter via _truncate space triggers
-	 * space truncation.
-	 */
-	uint64_t truncate_count;
 	/** Enable/disable triggers. */
 	bool run_triggers;
 	/**
@@ -354,20 +331,6 @@ space_build_secondary_key(struct space *old_space,
 }
 
 static inline int
-space_prepare_truncate(struct space *old_space, struct space *new_space)
-{
-	assert(old_space->vtab == new_space->vtab);
-	return new_space->vtab->prepare_truncate(old_space, new_space);
-}
-
-static inline void
-space_commit_truncate(struct space *old_space, struct space *new_space)
-{
-	assert(old_space->vtab == new_space->vtab);
-	new_space->vtab->commit_truncate(old_space, new_space);
-}
-
-static inline int
 space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	assert(old_space->vtab == new_space->vtab);
@@ -521,13 +484,6 @@ space_build_secondary_key_xc(struct space *old_space,
 			     struct space *new_space, struct index *new_index)
 {
 	if (space_build_secondary_key(old_space, new_space, new_index) != 0)
-		diag_raise();
-}
-
-static inline void
-space_prepare_truncate_xc(struct space *old_space, struct space *new_space)
-{
-	if (space_prepare_truncate(old_space, new_space) != 0)
 		diag_raise();
 }
 

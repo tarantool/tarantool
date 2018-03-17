@@ -267,15 +267,6 @@ struct vy_index {
 	 */
 	bool is_dropped;
 	/**
-	 * Number of times the index was truncated.
-	 *
-	 * After recovery is complete, it equals space->truncate_count.
-	 * On local recovery, it is loaded from the metadata log and may
-	 * be greater than space->truncate_count, which indicates that
-	 * the space is truncated in WAL.
-	 */
-	uint64_t truncate_count;
-	/**
 	 * If pin_count > 0 the index can't be scheduled for dump.
 	 * Used to make sure that the primary index is dumped last.
 	 */
@@ -344,19 +335,6 @@ vy_index_unref(struct vy_index *index)
 	if (--index->refs == 0)
 		vy_index_delete(index);
 }
-
-/**
- * Swap disk contents (ranges, runs, and corresponding stats)
- * between two indexes. Used only on recovery, to skip reloading
- * indexes of a truncated space. The in-memory tree of the index
- * can't be populated - see vy_is_committed_one().
- */
-void
-vy_index_swap(struct vy_index *old_index, struct vy_index *new_index);
-
-/** Initialize the range tree of a new index. */
-int
-vy_index_init_range_tree(struct vy_index *index);
 
 /**
  * Create a new vinyl index.

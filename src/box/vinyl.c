@@ -904,137 +904,6 @@ vinyl_init_system_space(struct space *space)
 }
 
 static int
-vinyl_space_prepare_truncate(struct space *old_space, struct space *new_space)
-{
-	struct vy_env *env = vy_env(old_space->engine);
-
-	if (vinyl_check_wal(env, "DDL") != 0)
-		return -1;
-
-	assert(old_space->index_count == new_space->index_count);
-	uint32_t index_count = new_space->index_count;
-	if (index_count == 0)
-		return 0;
-
-	struct vy_index *pk = vy_index(old_space->index[0]);
-
-	/*
-	 * On local recovery, we need to handle the following
-	 * scenarios:
-	 *
-	 * - Space truncation was successfully logged before restart.
-	 *   In this case indexes of the old space contain data added
-	 *   after truncation (recovered by vy_index_recover()) and
-	 *   hence we just need to swap contents between old and new
-	 *   spaces.
-	 *
-	 * - We failed to log space truncation before restart.
-	 *   In this case we have to replay space truncation the
-	 *   same way we handle it during normal operation.
-	 *
-	 * See also vy_commit_truncate_space().
-	 */
-	bool truncate_done = (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
-			      pk->truncate_count > old_space->truncate_count);
-
-	for (uint32_t i = 0; i < index_count; i++) {
-		struct vy_index *old_index = vy_index(old_space->index[i]);
-		struct vy_index *new_index = vy_index(new_space->index[i]);
-
-		new_index->id = old_index->id;
-		new_index->is_committed = old_index->is_committed;
-
-		if (truncate_done) {
-			/*
-			 * We are replaying truncate from WAL and the
-			 * old space already contains data added after
-			 * truncate (recovered from vylog). Avoid
-			 * reloading the space content from vylog,
-			 * simply swap the contents of old and new
-			 * spaces instead.
-			 */
-			vy_index_swap(old_index, new_index);
-			new_index->is_dropped = old_index->is_dropped;
-			new_index->truncate_count = old_index->truncate_count;
-			vy_scheduler_remove_index(&env->scheduler, old_index);
-			vy_scheduler_add_index(&env->scheduler, new_index);
-			continue;
-		}
-
-		if (vy_index_init_range_tree(new_index) != 0)
-			return -1;
-
-		new_index->truncate_count = new_space->truncate_count;
-	}
-	return 0;
-}
-
-static void
-vinyl_space_commit_truncate(struct space *old_space, struct space *new_space)
-{
-	struct vy_env *env = vy_env(old_space->engine);
-
-	assert(old_space->index_count == new_space->index_count);
-	uint32_t index_count = new_space->index_count;
-	if (index_count == 0)
-		return;
-
-	struct vy_index *pk = vy_index(old_space->index[0]);
-
-	/*
-	 * See the comment in vy_prepare_truncate_space().
-	 */
-	if (env->status == VINYL_FINAL_RECOVERY_LOCAL &&
-	    pk->truncate_count > old_space->truncate_count)
-		return;
-
-	/*
-	 * Mark old indexes as dropped and remove them from the scheduler.
-	 * After this point no task can be scheduled or completed for any
-	 * of them (only aborted).
-	 */
-	for (uint32_t i = 0; i < index_count; i++) {
-		struct vy_index *index = vy_index(old_space->index[i]);
-		index->is_dropped = true;
-		vy_scheduler_remove_index(&env->scheduler, index);
-	}
-
-	/*
-	 * Log change in metadata.
-	 *
-	 * Since we can't fail here, in case of vylog write failure
-	 * we leave records we failed to write in vylog buffer so
-	 * that they get flushed along with the next write. If they
-	 * don't, we will replay them during WAL recovery.
-	 */
-	vy_log_tx_begin();
-	int64_t gc_lsn = checkpoint_last(NULL);
-	for (uint32_t i = 0; i < index_count; i++) {
-		struct vy_index *old_index = vy_index(old_space->index[i]);
-		struct vy_index *new_index = vy_index(new_space->index[i]);
-		struct vy_range *range = vy_range_tree_first(new_index->tree);
-
-		assert(!new_index->is_dropped);
-		assert(new_index->truncate_count == new_space->truncate_count);
-		assert(new_index->range_count == 1);
-
-		vy_log_index_prune(old_index, gc_lsn);
-		vy_log_insert_range(new_index->id, range->id, NULL, NULL);
-		vy_log_truncate_index(new_index->id, new_index->truncate_count);
-	}
-	vy_log_tx_try_commit();
-
-	/*
-	 * After we committed space truncation in the metadata log,
-	 * we can make new indexes eligible for dump and compaction.
-	 */
-	for (uint32_t i = 0; i < index_count; i++) {
-		struct vy_index *index = vy_index(new_space->index[i]);
-		vy_scheduler_add_index(&env->scheduler, index);
-	}
-}
-
-static int
 vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	struct vy_env *env = vy_env(old_space->engine);
@@ -1335,14 +1204,11 @@ vinyl_index_bsize(struct index *base)
  * either.
  */
 static inline bool
-vy_is_committed_one(struct vy_env *env, struct space *space,
-		    struct vy_index *index)
+vy_is_committed_one(struct vy_env *env, struct vy_index *index)
 {
 	if (likely(env->status != VINYL_FINAL_RECOVERY_LOCAL))
 		return false;
 	if (index->is_dropped)
-		return true;
-	if (index->truncate_count > space->truncate_count)
 		return true;
 	if (vclock_sum(env->recovery_vclock) <= index->dump_lsn)
 		return true;
@@ -1360,7 +1226,7 @@ vy_is_committed(struct vy_env *env, struct space *space)
 		return false;
 	for (uint32_t iid = 0; iid < space->index_count; iid++) {
 		struct vy_index *index = vy_index(space->index[iid]);
-		if (!vy_is_committed_one(env, space, index))
+		if (!vy_is_committed_one(env, index))
 			return false;
 	}
 	return true;
@@ -1597,7 +1463,7 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	if (pk == NULL) /* space has no primary key */
 		return -1;
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, space, pk));
+	assert(!vy_is_committed_one(env, pk));
 	assert(pk->index_id == 0);
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
@@ -1636,7 +1502,7 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index;
 		index = vy_index(space->index[iid]);
-		if (vy_is_committed_one(env, space, index))
+		if (vy_is_committed_one(env, index))
 			continue;
 		/*
 		 * Delete goes first, so if old and new keys
@@ -1769,7 +1635,7 @@ vy_delete_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	if (pk == NULL)
 		return -1;
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, space, pk));
+	assert(!vy_is_committed_one(env, pk));
 	struct tuple *delete =
 		vy_stmt_new_surrogate_delete(pk->mem_format, tuple);
 	if (delete == NULL)
@@ -1781,7 +1647,7 @@ vy_delete_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	struct vy_index *index;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_is_committed_one(env, space, index))
+		if (vy_is_committed_one(env, index))
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
@@ -1930,7 +1796,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	assert(pk != NULL);
 	assert(pk->index_id == 0);
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, space, pk));
+	assert(!vy_is_committed_one(env, pk));
 	uint64_t column_mask = 0;
 	const char *new_tuple, *new_tuple_end;
 	uint32_t new_size, old_size;
@@ -1984,7 +1850,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_is_committed_one(env, space, index))
+		if (vy_is_committed_one(env, index))
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
@@ -2168,7 +2034,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (pk == NULL)
 		return -1;
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, space, pk));
+	assert(!vy_is_committed_one(env, pk));
 	if (tuple_validate_raw(pk->mem_format, tuple))
 		return -1;
 
@@ -2264,7 +2130,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		index = vy_index(space->index[i]);
-		if (vy_is_committed_one(env, space, index))
+		if (vy_is_committed_one(env, index))
 			continue;
 		if (vy_tx_set(tx, index, delete) != 0)
 			goto error;
@@ -2304,7 +2170,7 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 	assert(pk->index_id == 0);
 	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, space, pk));
+	assert(!vy_is_committed_one(env, pk));
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	/* First insert into the primary index. */
@@ -2317,7 +2183,7 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_index *index = vy_index(space->index[iid]);
-		if (vy_is_committed_one(env, space, index))
+		if (vy_is_committed_one(env, index))
 			continue;
 		if (vy_insert_secondary(env, tx, space, index,
 					stmt->new_tuple) != 0)
@@ -4086,8 +3952,6 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
 	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
-	/* .prepare_truncate = */ vinyl_space_prepare_truncate,
-	/* .commit_truncate = */ vinyl_space_commit_truncate,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
 	/* .commit_alter = */ vinyl_space_commit_alter,
 };

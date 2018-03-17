@@ -151,8 +151,17 @@ enum vy_log_record_type {
 	 */
 	VY_LOG_SNAPSHOT			= 11,
 	/**
-	 * Update truncate count of a vinyl index.
-	 * Requires vy_log_record::index_id, truncate_count.
+	 * When we used LSN for identifying indexes in vylog, we
+	 * couldn't simply recreate an index on space truncation,
+	 * because in case the space had more than one index, we
+	 * wouldn't be able to distinguish them after truncation.
+	 * So we wrote special 'truncate' record.
+	 *
+	 * Now, we assign a unique id to each index and so we don't
+	 * need a special record type for space truncation. If we
+	 * are recovering from an old vylog, we simply ignore all
+	 * 'truncate' records - this will result in replay of all
+	 * WAL records written after truncation.
 	 */
 	VY_LOG_TRUNCATE_INDEX		= 12,
 
@@ -200,8 +209,6 @@ struct vy_log_record {
 	 * that uses this run.
 	 */
 	int64_t gc_lsn;
-	/** Index truncate count. */
-	int64_t truncate_count;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
 };
@@ -250,8 +257,6 @@ struct vy_index_recovery_info {
 	int64_t commit_lsn;
 	/** LSN of the last index dump. */
 	int64_t dump_lsn;
-	/** Truncate count. */
-	int64_t truncate_count;
 	/**
 	 * List of all ranges in the index, linked by
 	 * vy_range_recovery_info::in_index.
@@ -632,18 +637,6 @@ vy_log_dump_index(int64_t id, int64_t dump_lsn)
 	record.type = VY_LOG_DUMP_INDEX;
 	record.index_id = id;
 	record.dump_lsn = dump_lsn;
-	vy_log_write(&record);
-}
-
-/** Helper to log index truncation. */
-static inline void
-vy_log_truncate_index(int64_t id, int64_t truncate_count)
-{
-	struct vy_log_record record;
-	vy_log_record_init(&record);
-	record.type = VY_LOG_TRUNCATE_INDEX;
-	record.index_id = id;
-	record.truncate_count = truncate_count;
 	vy_log_write(&record);
 }
 
