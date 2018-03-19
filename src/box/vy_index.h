@@ -148,6 +148,8 @@ struct vy_index {
 	 * until all pending operations have completed.
 	 */
 	int refs;
+	/** Unique ID of this index. */
+	int64_t id;
 	/** Ordinal index number in the index array. */
 	uint32_t index_id;
 	/** ID of the space this index belongs to. */
@@ -253,11 +255,11 @@ struct vy_index {
 	 * been dumped yet.
 	 */
 	int64_t dump_lsn;
-	/**
-	 * LSN of the row that committed the index or -1 if
-	 * the index was not committed to the metadata log.
+	/*
+	 * This flag is set if the index creation was
+	 * committed to the metadata log.
 	 */
-	int64_t commit_lsn;
+	bool is_committed;
 	/**
 	 * This flag is set if the index was dropped.
 	 * It is also set on local recovery if the index

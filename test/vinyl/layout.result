@@ -128,59 +128,59 @@ result
     - - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {0: 3, 7: [{'field': 0, 'collation': 1, 'type': 'string'}], 6: 512}]
+          tuple: [0, {7: [{'field': 0, 'collation': 1, 'type': 'string'}], 6: 512}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [10, {0: 3, 9: 9}]
+          tuple: [10, {9: 9}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {0: 3, 2: 6, 9: 9}]
+          tuple: [5, {2: 8, 9: 9}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [4, {0: 3, 2: 3}]
+          tuple: [4, {2: 5}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [6, {2: 3}]
+          tuple: [6, {2: 5}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [2, {0: 3}]
+          tuple: [2, {1: 1}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [8, {2: 6, 8: 7}]
+          tuple: [8, {1: 1, 2: 8, 8: 9}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {0: 4, 5: 1, 6: 512, 7: [{'field': 1, 'is_nullable': true, 'type': 'unsigned'}]}]
+          tuple: [0, {0: 2, 5: 1, 6: 512, 7: [{'field': 1, 'is_nullable': true, 'type': 'unsigned'}]}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [10, {0: 4, 9: 9}]
+          tuple: [10, {0: 2, 9: 9}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {0: 4, 2: 4, 9: 9}]
+          tuple: [5, {0: 2, 2: 6, 9: 9}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [4, {0: 4, 2: 2}]
+          tuple: [4, {0: 2, 2: 4}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [6, {2: 2}]
+          tuple: [6, {2: 4}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [2, {0: 4, 1: 1}]
+          tuple: [2, {0: 2, 1: 3}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [8, {1: 1, 2: 4, 8: 5}]
+          tuple: [8, {1: 3, 2: 6, 8: 7}]
       - HEADER:
           type: INSERT
         BODY:
@@ -189,53 +189,53 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [7, {2: 2}]
+          tuple: [7, {2: 4}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [7, {2: 3}]
+          tuple: [7, {2: 5}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [4, {0: 4, 2: 8}]
+          tuple: [4, {0: 2, 2: 10}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {0: 4, 2: 8, 9: 12}]
+          tuple: [5, {0: 2, 2: 10, 9: 12}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [8, {1: 1, 2: 8, 8: 9}]
+          tuple: [8, {1: 3, 2: 10, 8: 11}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {0: 4, 9: 12}]
+          tuple: [10, {0: 2, 9: 12}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [4, {0: 3, 2: 10}]
+          tuple: [4, {2: 12}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {0: 3, 2: 10, 9: 12}]
+          tuple: [5, {2: 12, 9: 12}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [8, {2: 10, 8: 11}]
+          tuple: [8, {1: 1, 2: 12, 8: 13}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {0: 3, 9: 12}]
-  - - 00000000000000000006.index
+          tuple: [10, {9: 12}]
+  - - 00000000000000000008.index
     - - HEADER:
           type: RUNINFO
         BODY:
@@ -254,7 +254,7 @@ result
           unpacked_size: 67
           row_count: 3
           min_key: ['ёёё']
-  - - 00000000000000000006.run
+  - - 00000000000000000008.run
     - - HEADER:
           lsn: 9
           type: INSERT
@@ -274,7 +274,7 @@ result
           type: ROWINDEX
         BODY:
           row_index: "\0\0\0\0\0\0\0\x10\0\0\0 "
-  - - 00000000000000000010.index
+  - - 00000000000000000012.index
     - - HEADER:
           type: RUNINFO
         BODY:
@@ -293,7 +293,7 @@ result
           unpacked_size: 71
           row_count: 3
           min_key: ['ёёё']
-  - - 00000000000000000010.run
+  - - 00000000000000000012.run
     - - HEADER:
           lsn: 10
           type: REPLACE
@@ -313,7 +313,7 @@ result
           type: ROWINDEX
         BODY:
           row_index: "\0\0\0\0\0\0\0\x10\0\0\0\""
-  - - 00000000000000000004.index
+  - - 00000000000000000006.index
     - - HEADER:
           type: RUNINFO
         BODY:
@@ -332,7 +332,7 @@ result
           unpacked_size: 67
           row_count: 3
           min_key: [null, 'ёёё']
-  - - 00000000000000000004.run
+  - - 00000000000000000006.run
     - - HEADER:
           lsn: 9
           type: INSERT
@@ -352,7 +352,7 @@ result
           type: ROWINDEX
         BODY:
           row_index: "\0\0\0\0\0\0\0\x10\0\0\0 "
-  - - 00000000000000000008.index
+  - - 00000000000000000010.index
     - - HEADER:
           type: RUNINFO
         BODY:
@@ -371,7 +371,7 @@ result
           unpacked_size: 91
           row_count: 4
           min_key: [null, 'ёёё']
-  - - 00000000000000000008.run
+  - - 00000000000000000010.run
     - - HEADER:
           lsn: 10
           type: DELETE

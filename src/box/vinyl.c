@@ -781,6 +781,8 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 	struct vy_env *env = vy_env(base->engine);
 	struct vy_index *index = vy_index(base);
 
+	assert(index->id >= 0);
+
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL) {
 		/*
@@ -791,7 +793,7 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (index->commit_lsn >= 0) {
+		if (index->is_committed) {
 			vy_scheduler_add_index(&env->scheduler, index);
 			return;
 		}
@@ -816,7 +818,8 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 	if (index->opts.lsn != 0)
 		lsn = index->opts.lsn;
 
-	index->commit_lsn = lsn;
+	assert(!index->is_committed);
+	index->is_committed = true;
 
 	assert(index->range_count == 1);
 	struct vy_range *range = vy_range_tree_first(index->tree);
@@ -830,9 +833,9 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 	 * recovery.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_index(index->commit_lsn, index->index_id,
-			    index->space_id, index->key_def);
-	vy_log_insert_range(index->commit_lsn, range->id, NULL, NULL);
+	vy_log_create_index(index->id, index->space_id, index->index_id,
+			    index->key_def, lsn);
+	vy_log_insert_range(index->id, range->id, NULL, NULL);
 	vy_log_tx_try_commit();
 	/*
 	 * After we committed the index in the log, we can schedule
@@ -889,7 +892,7 @@ vinyl_index_commit_drop(struct index *base)
 
 	vy_log_tx_begin();
 	vy_log_index_prune(index, checkpoint_last(NULL));
-	vy_log_drop_index(index->commit_lsn);
+	vy_log_drop_index(index->id);
 	vy_log_tx_try_commit();
 }
 
@@ -938,7 +941,8 @@ vinyl_space_prepare_truncate(struct space *old_space, struct space *new_space)
 		struct vy_index *old_index = vy_index(old_space->index[i]);
 		struct vy_index *new_index = vy_index(new_space->index[i]);
 
-		new_index->commit_lsn = old_index->commit_lsn;
+		new_index->id = old_index->id;
+		new_index->is_committed = old_index->is_committed;
 
 		if (truncate_done) {
 			/*
@@ -1015,10 +1019,8 @@ vinyl_space_commit_truncate(struct space *old_space, struct space *new_space)
 		assert(new_index->range_count == 1);
 
 		vy_log_index_prune(old_index, gc_lsn);
-		vy_log_insert_range(new_index->commit_lsn,
-				    range->id, NULL, NULL);
-		vy_log_truncate_index(new_index->commit_lsn,
-				      new_index->truncate_count);
+		vy_log_insert_range(new_index->id, range->id, NULL, NULL);
+		vy_log_truncate_index(new_index->id, new_index->truncate_count);
 	}
 	vy_log_tx_try_commit();
 

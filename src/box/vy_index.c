@@ -220,8 +220,8 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	if (index->mem == NULL)
 		goto fail_mem;
 
+	index->id = -1;
 	index->refs = 1;
-	index->commit_lsn = -1;
 	index->dump_lsn = -1;
 	vy_cache_create(&index->cache, cache_env, cmp_def);
 	rlist_create(&index->sealed);
@@ -381,6 +381,10 @@ vy_index_create(struct vy_index *index)
 		return -1;
 	}
 
+	/* Assign unique id. */
+	assert(index->id < 0);
+	index->id = vy_log_next_id();
+
 	/* Allocate initial range. */
 	return vy_index_init_range_tree(index);
 }
@@ -536,6 +540,8 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 		 struct vy_run_env *run_env, int64_t lsn,
 		 bool is_checkpoint_recovery, bool force_recovery)
 {
+	assert(index->id < 0);
+	assert(!index->is_committed);
 	assert(index->range_count == 0);
 
 	/*
@@ -552,7 +558,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 	 * Look up the last incarnation of the index in vylog.
 	 */
 	struct vy_index_recovery_info *index_info;
-	index_info = vy_recovery_lookup_index(recovery,
+	index_info = vy_recovery_index_by_id(recovery,
 			index->space_id, index->index_id);
 	if (is_checkpoint_recovery) {
 		if (index_info == NULL) {
@@ -568,29 +574,31 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 					    (unsigned)index->index_id));
 			return -1;
 		}
-		if (lsn > index_info->index_lsn) {
+		if (lsn > index_info->commit_lsn) {
 			/*
 			 * The last incarnation of the index was created
 			 * before the last checkpoint, load it now.
 			 */
-			lsn = index_info->index_lsn;
+			lsn = index_info->commit_lsn;
 		}
 	}
 
-	if (index_info == NULL || lsn > index_info->index_lsn) {
+	if (index_info == NULL || lsn > index_info->commit_lsn) {
 		/*
 		 * If we failed to log index creation before restart,
 		 * we won't find it in the log on recovery. This is
 		 * OK as the index doesn't have any runs in this case.
 		 * We will retry to log index in vy_index_commit_create().
-		 * For now, just create the initial range.
+		 * For now, just create the initial range and assign id.
 		 */
+		index->id = vy_log_next_id();
 		return vy_index_init_range_tree(index);
 	}
 
-	index->commit_lsn = lsn;
+	index->id = index_info->id;
+	index->is_committed = true;
 
-	if (lsn < index_info->index_lsn || index_info->is_dropped) {
+	if (lsn < index_info->commit_lsn || index_info->is_dropped) {
 		/*
 		 * Loading a past incarnation of the index, i.e.
 		 * the index is going to dropped during final
@@ -672,7 +680,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 	if (prev == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Index %lld has empty range tree",
-				    (long long)index->commit_lsn));
+				    (long long)index->id));
 		return -1;
 	}
 	if (prev->end != NULL) {
@@ -1049,7 +1057,7 @@ vy_index_split_range(struct vy_index *index, struct vy_range *range)
 	vy_log_delete_range(range->id);
 	for (int i = 0; i < n_parts; i++) {
 		part = parts[i];
-		vy_log_insert_range(index->commit_lsn, part->id,
+		vy_log_insert_range(index->id, part->id,
 				    tuple_data_or_null(part->begin),
 				    tuple_data_or_null(part->end));
 		rlist_foreach_entry(slice, &part->slices, in_range)
@@ -1115,7 +1123,7 @@ vy_index_coalesce_range(struct vy_index *index, struct vy_range *range)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_insert_range(index->commit_lsn, result->id,
+	vy_log_insert_range(index->id, result->id,
 			    tuple_data_or_null(result->begin),
 			    tuple_data_or_null(result->end));
 	for (it = first; it != end; it = vy_range_tree_next(index->tree, it)) {

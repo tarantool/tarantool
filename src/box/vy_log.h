@@ -65,18 +65,18 @@ struct mh_i64ptr_t;
 enum vy_log_record_type {
 	/**
 	 * Create a new vinyl index.
-	 * Requires vy_log_record::index_lsn, index_def_id, space_def_id,
-	 * key_def (with primary key parts).
+	 * Requires vy_log_record::index_id, index_def_id, space_def_id,
+	 * key_def (with primary key parts), commit_lsn.
 	 */
 	VY_LOG_CREATE_INDEX		= 0,
 	/**
 	 * Drop an index.
-	 * Requires vy_log_record::index_lsn.
+	 * Requires vy_log_record::index_id.
 	 */
 	VY_LOG_DROP_INDEX		= 1,
 	/**
 	 * Insert a new range into a vinyl index.
-	 * Requires vy_log_record::index_lsn, range_id, begin, end.
+	 * Requires vy_log_record::index_id, range_id, begin, end.
 	 */
 	VY_LOG_INSERT_RANGE		= 2,
 	/**
@@ -86,7 +86,7 @@ enum vy_log_record_type {
 	VY_LOG_DELETE_RANGE		= 3,
 	/**
 	 * Prepare a vinyl run file.
-	 * Requires vy_log_record::index_lsn, run_id.
+	 * Requires vy_log_record::index_id, run_id.
 	 *
 	 * Record of this type is written before creating a run file.
 	 * It is needed to keep track of unfinished due to errors run
@@ -95,7 +95,7 @@ enum vy_log_record_type {
 	VY_LOG_PREPARE_RUN		= 4,
 	/**
 	 * Commit a vinyl run file creation.
-	 * Requires vy_log_record::index_lsn, run_id, dump_lsn.
+	 * Requires vy_log_record::index_id, run_id, dump_lsn.
 	 *
 	 * Written after a run file was successfully created.
 	 */
@@ -136,7 +136,7 @@ enum vy_log_record_type {
 	VY_LOG_DELETE_SLICE		= 9,
 	/**
 	 * Update LSN of the last index dump.
-	 * Requires vy_log_record::index_lsn, dump_lsn.
+	 * Requires vy_log_record::index_id, dump_lsn.
 	 */
 	VY_LOG_DUMP_INDEX		= 10,
 	/**
@@ -152,7 +152,7 @@ enum vy_log_record_type {
 	VY_LOG_SNAPSHOT			= 11,
 	/**
 	 * Update truncate count of a vinyl index.
-	 * Requires vy_log_record::index_lsn, truncate_count.
+	 * Requires vy_log_record::index_id, truncate_count.
 	 */
 	VY_LOG_TRUNCATE_INDEX		= 12,
 
@@ -163,11 +163,8 @@ enum vy_log_record_type {
 struct vy_log_record {
 	/** Type of the record. */
 	enum vy_log_record_type type;
-	/**
-	 * LSN from the time of index creation.
-	 * Used to identify indexes in vylog.
-	 */
-	int64_t index_lsn;
+	/** Unique ID of the vinyl index. */
+	int64_t index_id;
 	/** Unique ID of the vinyl range. */
 	int64_t range_id;
 	/** Unique ID of the vinyl run. */
@@ -194,6 +191,8 @@ struct vy_log_record {
 	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
+	/** LSN of the WAL row corresponding to this record. */
+	int64_t commit_lsn;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -216,8 +215,8 @@ struct vy_recovery {
 	struct rlist indexes;
 	/** space_id, index_id -> vy_index_recovery_info. */
 	struct mh_i64ptr_t *index_id_hash;
-	/** index_lsn -> vy_index_recovery_info. */
-	struct mh_i64ptr_t *index_lsn_hash;
+	/** ID -> vy_index_recovery_info. */
+	struct mh_i64ptr_t *index_hash;
 	/** ID -> vy_range_recovery_info. */
 	struct mh_i64ptr_t *range_hash;
 	/** ID -> vy_run_recovery_info. */
@@ -235,8 +234,8 @@ struct vy_recovery {
 struct vy_index_recovery_info {
 	/** Link in vy_recovery::indexes. */
 	struct rlist in_recovery;
-	/** LSN of the index creation. */
-	int64_t index_lsn;
+	/** ID of the index. */
+	int64_t id;
 	/** Ordinal index number in the space. */
 	uint32_t index_id;
 	/** Space ID. */
@@ -247,6 +246,8 @@ struct vy_index_recovery_info {
 	uint32_t key_part_count;
 	/** True if the index was dropped. */
 	bool is_dropped;
+	/** LSN of the WAL row that committed the index. */
+	int64_t commit_lsn;
 	/** LSN of the last index dump. */
 	int64_t dump_lsn;
 	/** Truncate count. */
@@ -480,8 +481,8 @@ vy_recovery_delete(struct vy_recovery *recovery);
  * Returns NULL if the index was not found.
  */
 struct vy_index_recovery_info *
-vy_recovery_lookup_index(struct vy_recovery *recovery,
-			 uint32_t space_id, uint32_t index_id);
+vy_recovery_index_by_id(struct vy_recovery *recovery,
+			uint32_t space_id, uint32_t index_id);
 
 /**
  * Initialize a log record with default values.
@@ -496,39 +497,40 @@ vy_log_record_init(struct vy_log_record *record)
 
 /** Helper to log a vinyl index creation. */
 static inline void
-vy_log_create_index(int64_t index_lsn, uint32_t index_id, uint32_t space_id,
-		    const struct key_def *key_def)
+vy_log_create_index(int64_t id, uint32_t space_id, uint32_t index_id,
+		    const struct key_def *key_def, int64_t commit_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_INDEX;
-	record.index_lsn = index_lsn;
-	record.index_def_id = index_id;
+	record.index_id = id;
 	record.space_def_id = space_id;
+	record.index_def_id = index_id;
 	record.key_def = key_def;
+	record.commit_lsn = commit_lsn;
 	vy_log_write(&record);
 }
 
 /** Helper to log a vinyl index drop. */
 static inline void
-vy_log_drop_index(int64_t index_lsn)
+vy_log_drop_index(int64_t id)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_DROP_INDEX;
-	record.index_lsn = index_lsn;
+	record.index_id = id;
 	vy_log_write(&record);
 }
 
 /** Helper to log a vinyl range insertion. */
 static inline void
-vy_log_insert_range(int64_t index_lsn, int64_t range_id,
+vy_log_insert_range(int64_t index_id, int64_t range_id,
 		    const char *begin, const char *end)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_INSERT_RANGE;
-	record.index_lsn = index_lsn;
+	record.index_id = index_id;
 	record.range_id = range_id;
 	record.begin = begin;
 	record.end = end;
@@ -548,24 +550,24 @@ vy_log_delete_range(int64_t range_id)
 
 /** Helper to log a vinyl run file creation. */
 static inline void
-vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
+vy_log_prepare_run(int64_t index_id, int64_t run_id)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_PREPARE_RUN;
-	record.index_lsn = index_lsn;
+	record.index_id = index_id;
 	record.run_id = run_id;
 	vy_log_write(&record);
 }
 
 /** Helper to log a vinyl run creation. */
 static inline void
-vy_log_create_run(int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
+vy_log_create_run(int64_t index_id, int64_t run_id, int64_t dump_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_RUN;
-	record.index_lsn = index_lsn;
+	record.index_id = index_id;
 	record.run_id = run_id;
 	record.dump_lsn = dump_lsn;
 	vy_log_write(&record);
@@ -623,24 +625,24 @@ vy_log_delete_slice(int64_t slice_id)
 
 /** Helper to log index dump. */
 static inline void
-vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
+vy_log_dump_index(int64_t id, int64_t dump_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_DUMP_INDEX;
-	record.index_lsn = index_lsn;
+	record.index_id = id;
 	record.dump_lsn = dump_lsn;
 	vy_log_write(&record);
 }
 
 /** Helper to log index truncation. */
 static inline void
-vy_log_truncate_index(int64_t index_lsn, int64_t truncate_count)
+vy_log_truncate_index(int64_t id, int64_t truncate_count)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_TRUNCATE_INDEX;
-	record.index_lsn = index_lsn;
+	record.index_id = id;
 	record.truncate_count = truncate_count;
 	vy_log_write(&record);
 }
