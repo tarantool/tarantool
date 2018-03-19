@@ -226,7 +226,7 @@ vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
 	 * ahead of secondary indexes of the same space, i.e. it must
 	 * be dumped last.
 	 */
-	return i1->id > i2->id;
+	return i1->index_id > i2->index_id;
 }
 
 #define HEAP_NAME vy_dump_heap
@@ -656,7 +656,7 @@ vy_task_write_run(struct vy_scheduler *scheduler, struct vy_task *task)
 
 	struct vy_run_writer writer;
 	if (vy_run_writer_create(&writer, task->new_run, index->env->path,
-				 index->space_id, index->id,
+				 index->space_id, index->index_id,
 				 task->cmp_def, task->key_def,
 				 task->page_size, task->bloom_fpr,
 				 task->max_output_count) != 0)
@@ -858,7 +858,7 @@ delete_mems:
 	index->is_dumping = false;
 	vy_scheduler_update_index(scheduler, index);
 
-	if (index->id != 0)
+	if (index->index_id != 0)
 		vy_scheduler_unpin_index(scheduler, index->pk);
 
 	assert(scheduler->dump_task_count > 0);
@@ -912,7 +912,7 @@ vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	index->is_dumping = false;
 	vy_scheduler_update_index(scheduler, index);
 
-	if (index->id != 0)
+	if (index->index_id != 0)
 		vy_scheduler_unpin_index(scheduler, index->pk);
 
 	assert(scheduler->dump_task_count > 0);
@@ -954,7 +954,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	assert(scheduler->dump_generation < scheduler->generation);
 
 	struct errinj *inj = errinj(ERRINJ_VY_INDEX_DUMP, ERRINJ_INT);
-	if (inj != NULL && inj->iparam == (int)index->id) {
+	if (inj != NULL && inj->iparam == (int)index->index_id) {
 		diag_set(ClientError, ER_INJECTION, "vinyl index dump");
 		goto err;
 	}
@@ -1009,7 +1009,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct vy_stmt_stream *wi;
 	bool is_last_level = (index->run_count == 0);
 	wi = vy_write_iterator_new(task->cmp_def, index->disk_format,
-				   index->upsert_format, index->id == 0,
+				   index->upsert_format, index->index_id == 0,
 				   is_last_level, scheduler->read_views);
 	if (wi == NULL)
 		goto err_wi;
@@ -1029,7 +1029,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	index->is_dumping = true;
 	vy_scheduler_update_index(scheduler, index);
 
-	if (index->id != 0) {
+	if (index->index_id != 0) {
 		/*
 		 * The primary index must be dumped after all
 		 * secondary indexes of the same space - see
@@ -1143,7 +1143,8 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		vy_log_tx_begin();
 		rlist_foreach_entry(run, &unused_runs, in_unused) {
 			if (vy_run_remove_files(index->env->path,
-						index->space_id, index->id,
+						index->space_id,
+						index->index_id,
 						run->id) == 0) {
 				vy_log_forget_run(run->id);
 			}
@@ -1284,7 +1285,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_index *index,
 	struct vy_stmt_stream *wi;
 	bool is_last_level = (range->compact_priority == range->slice_count);
 	wi = vy_write_iterator_new(task->cmp_def, index->disk_format,
-				   index->upsert_format, index->id == 0,
+				   index->upsert_format, index->index_id == 0,
 				   is_last_level, scheduler->read_views);
 	if (wi == NULL)
 		goto err_wi;

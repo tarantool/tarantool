@@ -649,7 +649,7 @@ vy_read_iterator_squash_upsert(struct vy_read_iterator *itr,
 	struct tuple *t = itr->curr_stmt;
 
 	/* Upserts enabled only in the primary index. */
-	assert(vy_stmt_type(t) != IPROTO_UPSERT || index->id == 0);
+	assert(vy_stmt_type(t) != IPROTO_UPSERT || index->index_id == 0);
 	tuple_ref(t);
 	while (vy_stmt_type(t) == IPROTO_UPSERT) {
 		struct tuple *next;
@@ -755,7 +755,8 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     iterator_type, itr->key,
 				     itr->read_view, index->cmp_def,
 				     index->key_def, index->disk_format,
-				     index->upsert_format, index->id == 0);
+				     index->upsert_format,
+				     index->index_id == 0);
 	}
 }
 

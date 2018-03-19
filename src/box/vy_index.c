@@ -62,7 +62,7 @@ vy_index_validate_formats(const struct vy_index *index)
 	assert(index->upsert_format != NULL);
 	uint32_t index_field_count = index->mem_format->index_field_count;
 	(void) index_field_count;
-	if (index->id == 0) {
+	if (index->index_id == 0) {
 		assert(index->disk_format == index->mem_format);
 		assert(index->disk_format->index_field_count ==
 		       index_field_count);
@@ -115,7 +115,7 @@ vy_index_name(struct vy_index *index)
 {
 	char *buf = tt_static_buf();
 	snprintf(buf, TT_STATIC_BUF_LEN, "%u/%u",
-		 (unsigned)index->space_id, (unsigned)index->id);
+		 (unsigned)index->space_id, (unsigned)index->index_id);
 	return buf;
 }
 
@@ -236,7 +236,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 	index->in_dump.pos = UINT32_MAX;
 	index->in_compact.pos = UINT32_MAX;
 	index->space_id = index_def->space_id;
-	index->id = index_def->iid;
+	index->index_id = index_def->iid;
 	index->opts = index_def->opts;
 	index->check_is_unique = index->opts.is_unique;
 	vy_index_read_set_new(&index->read_set);
@@ -355,7 +355,7 @@ vy_index_create(struct vy_index *index)
 	int rc;
 	char path[PATH_MAX];
 	vy_index_snprint_path(path, sizeof(path), index->env->path,
-			      index->space_id, index->id);
+			      index->space_id, index->index_id);
 	char *path_sep = path;
 	while (*path_sep == '/') {
 		/* Don't create root */
@@ -404,10 +404,10 @@ vy_index_recover_run(struct vy_index *index,
 
 	run->dump_lsn = run_info->dump_lsn;
 	if (vy_run_recover(run, index->env->path,
-			   index->space_id, index->id) != 0 &&
+			   index->space_id, index->index_id) != 0 &&
 	    (!force_recovery ||
 	     vy_run_rebuild_index(run, index->env->path,
-				  index->space_id, index->id,
+				  index->space_id, index->index_id,
 				  index->cmp_def, index->key_def,
 				  index->mem_format, index->upsert_format,
 				  &index->opts) != 0)) {
@@ -553,7 +553,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 	 */
 	struct vy_index_recovery_info *index_info;
 	index_info = vy_recovery_lookup_index(recovery,
-					      index->space_id, index->id);
+			index->space_id, index->index_id);
 	if (is_checkpoint_recovery) {
 		if (index_info == NULL) {
 			/*
@@ -565,7 +565,7 @@ vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Index %u/%u not found",
 					    (unsigned)index->space_id,
-					    (unsigned)index->id));
+					    (unsigned)index->index_id));
 			return -1;
 		}
 		if (lsn > index_info->index_lsn) {
@@ -850,7 +850,7 @@ vy_index_commit_upsert(struct vy_index *index, struct vy_mem *mem,
 	 * UPSERT is enabled only for the spaces with the single
 	 * index.
 	 */
-	assert(index->id == 0);
+	assert(index->index_id == 0);
 
 	const struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);

@@ -148,8 +148,8 @@ struct vy_index {
 	 * until all pending operations have completed.
 	 */
 	int refs;
-	/** Index ID visible to the user. */
-	uint32_t id;
+	/** Ordinal index number in the index array. */
+	uint32_t index_id;
 	/** ID of the space this index belongs to. */
 	uint32_t space_id;
 	/** Index options. */

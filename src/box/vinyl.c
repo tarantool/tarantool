@@ -830,7 +830,7 @@ vinyl_index_commit_create(struct index *base, int64_t lsn)
 	 * recovery.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_index(index->commit_lsn, index->id,
+	vy_log_create_index(index->commit_lsn, index->index_id,
 			    index->space_id, index->key_def);
 	vy_log_insert_range(index->commit_lsn, range->id, NULL, NULL);
 	vy_log_tx_try_commit();
@@ -1311,7 +1311,7 @@ vinyl_index_bsize(struct index *base)
 	struct vy_index *index = vy_index(base);
 	ssize_t bsize = vy_index_mem_tree_size(index) +
 		index->page_index_size + index->bloom_size;
-	if (index->id > 0)
+	if (index->index_id > 0)
 		bsize += index->stat.disk.count.bytes;
 	return bsize;
 }
@@ -1431,7 +1431,8 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	if (found) {
 		tuple_unref(found);
 		diag_set(ClientError, ER_TUPLE_FOUND,
-			 index_name_by_id(space, index->id), space_name(space));
+			 index_name_by_id(space, index->index_id),
+			 space_name(space));
 		return -1;
 	}
 	return 0;
@@ -1454,7 +1455,7 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 {
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	assert(pk->id == 0);
+	assert(pk->index_id == 0);
 	/*
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
@@ -1483,7 +1484,7 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
 	       vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	assert(index->id > 0);
+	assert(index->index_id > 0);
 	/*
 	 * If the index is unique then the new tuple must not
 	 * conflict with existing tuples. If the index is not
@@ -1535,7 +1536,7 @@ vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	(void)env;
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	struct vy_index *pk = vy_index(space->index[0]);
-	assert(pk->id == 0);
+	assert(pk->index_id == 0);
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	struct tuple *new_tuple =
@@ -1595,7 +1596,7 @@ vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
 		return -1;
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
-	assert(pk->id == 0);
+	assert(pk->index_id == 0);
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
 		return -1;
 	new_stmt = vy_stmt_new_replace(pk->mem_format, request->tuple,
@@ -1735,7 +1736,7 @@ vy_index_full_by_key(struct vy_index *index, struct vy_tx *tx,
 	tuple_unref(key);
 	if (rc != 0)
 		return -1;
-	if (index->id == 0 || found == NULL) {
+	if (index->index_id == 0 || found == NULL) {
 		*result = found;
 		return 0;
 	}
@@ -1841,7 +1842,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		assert(stmt->old_tuple != NULL);
 		return vy_delete_impl(env, tx, space, stmt->old_tuple);
 	} else { /* Primary is the single index in the space. */
-		assert(index->id == 0);
+		assert(index->index_id == 0);
 		struct tuple *delete =
 			vy_stmt_new_surrogate_delete_from_key(request->key,
 							      pk->key_def,
@@ -1880,7 +1881,8 @@ vy_check_update(struct space *space, const struct vy_index *pk,
 	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
 	    vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 index_name_by_id(space, pk->id), space_name(space));
+			 index_name_by_id(space, pk->index_id),
+			 space_name(space));
 		return -1;
 	}
 	return 0;
@@ -1924,7 +1926,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	/* Apply update operations. */
 	struct vy_index *pk = vy_index(space->index[0]);
 	assert(pk != NULL);
-	assert(pk->id == 0);
+	assert(pk->index_id == 0);
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
 	uint64_t column_mask = 0;
@@ -2013,7 +2015,7 @@ vy_insert_first_upsert(struct vy_env *env, struct vy_tx *tx,
 	assert(space->index_count > 0);
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	struct vy_index *pk = vy_index(space->index[0]);
-	assert(pk->id == 0);
+	assert(pk->index_id == 0);
 	if (vy_tx_set(tx, pk, stmt) != 0)
 		return -1;
 	struct vy_index *index;
@@ -2298,7 +2300,7 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (pk == NULL)
 		/* The space hasn't the primary index. */
 		return -1;
-	assert(pk->id == 0);
+	assert(pk->index_id == 0);
 	/* Primary key is dumped last. */
 	assert(!vy_is_committed_one(env, space, pk));
 	if (tuple_validate_raw(pk->mem_format, request->tuple))
@@ -3577,7 +3579,7 @@ vy_squash_process(struct vy_squash *squash)
 	struct key_def *def = index->cmp_def;
 
 	/* Upserts enabled only in the primary index. */
-	assert(index->id == 0);
+	assert(index->index_id == 0);
 
 	/*
 	 * Use the committed read view to avoid squashing
@@ -3672,7 +3674,7 @@ vy_squash_process(struct vy_squash *squash)
 			tuple_unref(result);
 			return 0;
 		}
-		assert(index->id == 0);
+		assert(index->index_id == 0);
 		struct tuple *applied =
 			vy_apply_upsert(mem_stmt, result, def, mem->format,
 					mem->upsert_format, true);
@@ -3866,7 +3868,7 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 {
 	assert(base->next = vinyl_iterator_primary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	assert(it->index->id == 0);
+	assert(it->index->index_id == 0);
 	struct tuple *tuple;
 
 	if (it->tx == NULL) {
@@ -3900,7 +3902,7 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 {
 	assert(base->next = vinyl_iterator_secondary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	assert(it->index->id > 0);
+	assert(it->index->index_id > 0);
 	struct tuple *tuple;
 
 	if (it->tx == NULL) {
@@ -3983,7 +3985,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 
 	iterator_create(&it->base, base);
-	if (index->id == 0)
+	if (index->index_id == 0)
 		it->base.next = vinyl_iterator_primary_next;
 	else
 		it->base.next = vinyl_iterator_secondary_next;

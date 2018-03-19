@@ -267,7 +267,7 @@ vy_point_lookup_scan_slice(struct vy_index *index, struct vy_slice *slice,
 	vy_run_iterator_open(&run_itr, &index->stat.disk.iterator, slice,
 			     ITER_EQ, key, rv, index->cmp_def, index->key_def,
 			     index->disk_format, index->upsert_format,
-			     index->id == 0);
+			     index->index_id == 0);
 	struct tuple *stmt;
 	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {

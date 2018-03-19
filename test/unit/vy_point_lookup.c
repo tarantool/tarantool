@@ -19,7 +19,7 @@ write_run(struct vy_run *run, const char *dir_name,
 {
 	struct vy_run_writer writer;
 	if (vy_run_writer_create(&writer, run, dir_name,
-				 index->space_id, index->id,
+				 index->space_id, index->index_id,
 				 index->cmp_def, index->key_def,
 				 4096, 0.1, 100500) != 0)
 		goto fail;
@@ -193,7 +193,7 @@ test_basic()
 	}
 	struct vy_stmt_stream *write_stream
 		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					pk->upsert_format, pk->id == 0,
+					pk->upsert_format, true,
 					true, &read_views);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	struct vy_run *run = vy_run_new(&run_env, 1);
@@ -228,7 +228,7 @@ test_basic()
 	}
 	write_stream
 		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					pk->upsert_format, pk->id == 0,
+					pk->upsert_format, true,
 					true, &read_views);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	run = vy_run_new(&run_env, 2);

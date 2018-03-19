@@ -525,7 +525,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		struct vy_index *index = v->index;
-		if (index->id == 0) {
+		if (index->index_id == 0) {
 			/* The beginning of the new txn_stmt is met. */
 			current_space_id = index->space_id;
 			repsert = NULL;
@@ -816,7 +816,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_index *index, struct tuple *stmt)
 	struct txv *old = write_set_search_key(&tx->write_set, index, stmt);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL && vy_stmt_type(stmt) == IPROTO_UPSERT) {
-		assert(index->id == 0);
+		assert(index->index_id == 0);
 		uint8_t old_type = vy_stmt_type(old->stmt);
 		assert(old_type == IPROTO_UPSERT ||
 		       old_type == IPROTO_INSERT ||
