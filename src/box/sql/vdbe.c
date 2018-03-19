@@ -3112,86 +3112,58 @@ case OP_SetCookie: {
 	break;
 }
 
-/* Opcode: OpenRead P1 P2 * P4 P5
- * Synopsis: root=P2
+/* Opcode: OpenRead P1 P2 P3 P4 P5
+ * Synopsis: index id = P2, space ptr = P3
  *
- * Open a read-only cursor for the database table whose root page is
- * P2 in a database file. 
- * Give the new cursor an identifier of P1.  The P1
- * values need not be contiguous but all P1 values should be small integers.
- * It is an error for P1 to be negative.
+ * Open a cursor for a space specified by pointer in P3 and index
+ * id in P2. Give the new cursor an identifier of P1. The P1
+ * values need not be contiguous but all P1 values should be
+ * small integers. It is an error for P1 to be negative.
  *
- * If P5!=0 then use the content of register P2 as the root page, not
- * the value of P2 itself.
+ * The P4 value may be a pointer to a KeyInfo structure.
+ * If it is a pointer to a KeyInfo structure, then said structure
+ * defines the content and collatining sequence of the index
+ * being opened. Otherwise, P4 is NULL.
  *
- * There will be a read lock on the database whenever there is an
- * open cursor.  If the database was unlocked prior to this instruction
- * then a read lock is acquired as part of this instruction.  A read
- * lock allows other processes to read the database but prohibits
- * any other process from modifying the database.  The read lock is
- * released when all cursors are closed.  If this instruction attempts
- * to get a read lock but fails, the script terminates with an
- * SQLITE_BUSY error code.
- *
- * The P4 value may be either an integer (P4_INT32) or a pointer to
- * a KeyInfo structure (P4_KEYINFO). If it is a pointer to a KeyInfo
- * structure, then said structure defines the content and collating
- * sequence of the index being opened. Otherwise, if P4 is an integer
- * value, it is set to the number of columns in the table.
- *
- * See also: OpenWrite, ReopenIdx
+ * If schema has changed since compile time, VDBE ends execution
+ * with appropriate error message. The only exception is
+ * when P5 is set to OPFLAG_FRESH_PTR, which means that
+ * space pointer has been fetched in runtime right before
+ * this opcode.
  */
-/* Opcode: ReopenIdx P1 P2 * P4 P5
- * Synopsis: root=P2
+/* Opcode: ReopenIdx P1 P2 P3 P4 P5
+ * Synopsis: index id = P2, space ptr = P3
  *
- * The ReopenIdx opcode works exactly like ReadOpen except that it first
- * checks to see if the cursor on P1 is already open with a root page
- * number of P2 and if it is this opcode becomes a no-op.  In other words,
- * if the cursor is already open, do not reopen it.
+ * The ReopenIdx opcode works exactly like OpenRead except that
+ * it first checks to see if the cursor on P1 is already open
+ * with the same index and if it is this opcode becomes a no-op.
+ * In other words, if the cursor is already open, do not reopen it.
  *
- * The ReopenIdx opcode may only be used with P5==0 and with P4 being
- * a P4_KEYINFO object.
- *
- * See the OpenRead opcode documentation for additional information.
+ * The ReopenIdx opcode may only be used with P5 == 0.
  */
-/* Opcode: OpenWrite P1 P2 * P4 P5
- * Synopsis: root=P2
+/* Opcode: OpenWrite P1 P2 P3 P4 P5
+ * Synopsis: index id = P2, space ptr = P3
  *
- * Open a read/write cursor named P1 on the table or index whose root
- * page is P2. Or if P5!=0 use the content of register P2 to find the
- * root page.
- *
- * The P4 value may be either an integer (P4_INT32) or a pointer to
- * a KeyInfo structure (P4_KEYINFO). If it is a pointer to a KeyInfo
- * structure, then said structure defines the content and collating
- * sequence of the index being opened. Otherwise, if P4 is an integer
- * value, it is set to the number of columns in the table, or to the
- * largest index of any column of the table that is actually used.
- *
- * This instruction works just like OpenRead except that it opens the cursor
- * in read/write mode.  For a given table, there can be one or more read-only
- * cursors or a single read/write cursor but not both.
- *
- * See also OpenRead.
+ * For now, OpenWrite is an alias for OpenRead.
+ * It exists just due legacy reasons and should be removed:
+ * it isn't neccessary to open cursor to make insertion or
+ * deletion.
  */
 case OP_ReopenIdx: {
 	int nField;
-	KeyInfo *pKeyInfo;
 	int p2;
 	VdbeCursor *pCur;
 	BtCursor *pBtCur;
 
 	assert(pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
-	assert(pOp->p4type==P4_KEYINFO);
-	/*
-	 * FIXME: optimization temporary disabled until the whole
-	 * OP_Open* is reworked, i.e. pointer to space is passed
-	 * to this opcode instead of space id.
-	 */
-	/* pCur = p->apCsr[pOp->p1];
-	if (pCur && pCur->pgnoRoot==(u32)pOp->p2) {
+	pCur = p->apCsr[pOp->p1];
+	p2 = pOp->p2;
+	pIn3 = &aMem[pOp->p3];
+	assert(pIn3->flags & MEM_Ptr);
+	if (pCur && pCur->uc.pCursor->space == (struct space *) pIn3->u.p &&
+	    pCur->uc.pCursor->index->def->iid == SQLITE_PAGENO_TO_INDEXID(p2)) {
 		goto open_cursor_set_hints;
-	} */
+	}
 	/* If the cursor is not currently open or is open on a different
 	 * index, then fall through into OP_OpenRead to force a reopen
 	 */
@@ -3199,79 +3171,47 @@ case OP_OpenRead:
 case OP_OpenWrite:
 
 	assert(pOp->opcode==OP_OpenWrite || pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
-
-	if (p->expired) {
-		rc = SQLITE_ABORT_ROLLBACK;
+	/*
+	 * Even if schema has changed, pointer can come from
+	 * OP_SIDtoPtr opcode, which converts space id to pointer
+	 * during runtime.
+	 */
+	if (box_schema_version() != p->schema_ver &&
+	    (pOp->p5 & OPFLAG_FRESH_PTR) == 0) {
+		p->expired = 1;
+		rc = SQLITE_ERROR;
+		sqlite3VdbeError(p, "schema version has changed: " \
+				    "need to re-compile SQL statement");
 		goto abort_due_to_error;
 	}
-
-	nField = 0;
-	pKeyInfo = 0;
 	p2 = pOp->p2;
-	if (pOp->p5 & OPFLAG_P2ISREG) {
-		assert(p2>0);
-		assert(p2<=(p->nMem+1 - p->nCursor));
-		pIn2 = &aMem[p2];
-		assert(memIsValid(pIn2));
-		assert((pIn2->flags & MEM_Int)!=0);
-		sqlite3VdbeMemIntegerify(pIn2);
-		p2 = (int)pIn2->u.i;
-		/* The p2 value always comes from a prior OP_CreateTable opcode and
-		 * that opcode will always set the p2 value to 2 or more or else fail.
-		 * If there were a failure, the prepared statement would have halted
-		 * before reaching this instruction.
-		 */
-		assert(p2>=2);
-	}
-	if (pOp->p4type==P4_KEYINFO) {
-		if (pOp->p4.pKeyInfo) {
-			pKeyInfo = pOp->p4.pKeyInfo;
-		} else {
-			unsigned spaceId;
-			struct space *space;
-			const char *zName;
-			Table *pTab;
-			Index *pIdx;
-			/* Try to extract KeyInfo from PK if it was not passed.  */
-			spaceId = SQLITE_PAGENO_TO_SPACEID(p2);
-			space = space_by_id(spaceId);
-			assert(space);
-
-			zName = space_name(space);
-			assert(zName);
-
-			pTab = sqlite3HashFind(&db->pSchema->tblHash, zName);
-			assert(pTab);
-
-			pIdx = sqlite3PrimaryKeyIndex(pTab);
-			assert(pIdx);
-
-			pKeyInfo = sqlite3KeyInfoOfIndex(0, db, pIdx);
-			assert(pKeyInfo);
-		}
-		assert(pKeyInfo->db==db);
-		nField = pKeyInfo->nField+pKeyInfo->nXField;
-	} else if (pOp->p4type==P4_INT32) {
-		nField = pOp->p4.i;
-	}
+	pIn3 = &aMem[pOp->p3];
+	assert(pIn3->flags & MEM_Ptr);
+	struct space *space = ((struct space *) pIn3->u.p);
+	assert(space != NULL);
+	struct index *index = space_index(space, SQLITE_PAGENO_TO_INDEXID(p2));
+	assert(index != NULL);
+	/*
+	 * Since Tarantool iterator provides the full tuple,
+	 * we need a number of fields as wide as the table itself.
+	 * Otherwise, not enough slots for row parser cache are
+	 * allocated in VdbeCursor object.
+	 */
+	nField = space->def->field_count;
 	assert(pOp->p1>=0);
 	assert(nField>=0);
-	testcase( nField==0);  /* Table with INTEGER PRIMARY KEY and nothing else */
 	pCur = allocateCursor(p, pOp->p1, nField, CURTYPE_TARANTOOL);
 	if (pCur==0) goto no_mem;
 	pCur->nullRow = 1;
-
-	assert(p2 >= 1);
 	pBtCur = pCur->uc.pCursor;
-	pBtCur->space = space_by_id(SQLITE_PAGENO_TO_SPACEID(p2));
-	assert(pBtCur->space != NULL);
-	pBtCur->index = space_index(pBtCur->space, SQLITE_PAGENO_TO_INDEXID(p2));
-	assert(pBtCur->index != NULL);
-	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags |= BTCF_TaCursor;
-	pCur->pKeyInfo = pKeyInfo;
+	pBtCur->space = space;
+	pBtCur->index = index;
+	pBtCur->eState = CURSOR_INVALID;
+	/* Key info still contains sorter order and collation. */
+	pCur->pKeyInfo = pOp->p4.pKeyInfo;
 
-	/* open_cursor_set_hints: */
+open_cursor_set_hints:
 	assert(OPFLAG_BULKCSR==BTREE_BULKLOAD);
 	assert(OPFLAG_SEEKEQ==BTREE_SEEK_EQ);
 	testcase( pOp->p5 & OPFLAG_BULKCSR);
