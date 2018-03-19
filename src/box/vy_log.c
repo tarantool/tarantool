@@ -73,8 +73,8 @@ enum vy_log_key {
 	VY_LOG_KEY_RUN_ID		= 2,
 	VY_LOG_KEY_BEGIN		= 3,
 	VY_LOG_KEY_END			= 4,
-	VY_LOG_KEY_INDEX_ID		= 5,
-	VY_LOG_KEY_SPACE_ID		= 6,
+	VY_LOG_KEY_INDEX_DEF_ID		= 5,
+	VY_LOG_KEY_SPACE_DEF_ID		= 6,
 	VY_LOG_KEY_DEF			= 7,
 	VY_LOG_KEY_SLICE_ID		= 8,
 	VY_LOG_KEY_DUMP_LSN		= 9,
@@ -89,8 +89,8 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_RUN_ID]		= "run_id",
 	[VY_LOG_KEY_BEGIN]		= "begin",
 	[VY_LOG_KEY_END]		= "end",
-	[VY_LOG_KEY_INDEX_ID]		= "index_id",
-	[VY_LOG_KEY_SPACE_ID]		= "space_id",
+	[VY_LOG_KEY_INDEX_DEF_ID]	= "index_def_id",
+	[VY_LOG_KEY_SPACE_DEF_ID]	= "space_def_id",
 	[VY_LOG_KEY_DEF]		= "key_def",
 	[VY_LOG_KEY_SLICE_ID]		= "slice_id",
 	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
@@ -231,13 +231,14 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, mp_snprint, buf, size, record->end);
 		SNPRINT(total, snprintf, buf, size, ", ");
 	}
-	if (record->index_id > 0)
+	if (record->index_def_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
-			vy_log_key_name[VY_LOG_KEY_INDEX_ID], record->index_id);
-	if (record->space_id > 0)
+			vy_log_key_name[VY_LOG_KEY_INDEX_DEF_ID],
+			record->index_def_id);
+	if (record->space_def_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
-			vy_log_key_name[VY_LOG_KEY_SPACE_ID],
-			record->space_id);
+			vy_log_key_name[VY_LOG_KEY_SPACE_DEF_ID],
+			record->space_def_id);
 	if (record->key_parts != NULL) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_DEF]);
@@ -335,14 +336,14 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += p - record->end;
 		n_keys++;
 	}
-	if (record->index_id > 0) {
-		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_ID);
-		size += mp_sizeof_uint(record->index_id);
+	if (record->index_def_id > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_INDEX_DEF_ID);
+		size += mp_sizeof_uint(record->index_def_id);
 		n_keys++;
 	}
-	if (record->space_id > 0) {
-		size += mp_sizeof_uint(VY_LOG_KEY_SPACE_ID);
-		size += mp_sizeof_uint(record->space_id);
+	if (record->space_def_id > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_SPACE_DEF_ID);
+		size += mp_sizeof_uint(record->space_def_id);
 		n_keys++;
 	}
 	if (record->key_parts != NULL) {
@@ -412,13 +413,13 @@ vy_log_record_encode(const struct vy_log_record *record,
 		memcpy(pos, record->end, p - record->end);
 		pos += p - record->end;
 	}
-	if (record->index_id > 0) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_ID);
-		pos = mp_encode_uint(pos, record->index_id);
+	if (record->index_def_id > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_INDEX_DEF_ID);
+		pos = mp_encode_uint(pos, record->index_def_id);
 	}
-	if (record->space_id > 0) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_ID);
-		pos = mp_encode_uint(pos, record->space_id);
+	if (record->space_def_id > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_DEF_ID);
+		pos = mp_encode_uint(pos, record->space_def_id);
 	}
 	if (record->key_parts != NULL) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
@@ -520,11 +521,11 @@ vy_log_record_decode(struct vy_log_record *record,
 			record->end = mp_decode_array(&tmp) > 0 ? pos : NULL;
 			mp_next(&pos);
 			break;
-		case VY_LOG_KEY_INDEX_ID:
-			record->index_id = mp_decode_uint(&pos);
+		case VY_LOG_KEY_INDEX_DEF_ID:
+			record->index_def_id = mp_decode_uint(&pos);
 			break;
-		case VY_LOG_KEY_SPACE_ID:
-			record->space_id = mp_decode_uint(&pos);
+		case VY_LOG_KEY_SPACE_DEF_ID:
+			record->space_def_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_DEF: {
 			uint32_t part_count = mp_decode_array(&pos);
@@ -1765,7 +1766,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	switch (record->type) {
 	case VY_LOG_CREATE_INDEX:
 		rc = vy_recovery_create_index(recovery, record->index_lsn,
-				record->index_id, record->space_id,
+				record->index_def_id, record->space_def_id,
 				record->key_parts, record->key_part_count);
 		break;
 	case VY_LOG_DROP_INDEX:
@@ -2013,8 +2014,8 @@ vy_log_append_index(struct xlog *xlog, struct vy_index_recovery_info *index)
 	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_INDEX;
 	record.index_lsn = index->index_lsn;
-	record.index_id = index->index_id;
-	record.space_id = index->space_id;
+	record.index_def_id = index->index_id;
+	record.space_def_id = index->space_id;
 	record.key_parts = index->key_parts;
 	record.key_part_count = index->key_part_count;
 	if (vy_log_append_record(xlog, &record) != 0)
