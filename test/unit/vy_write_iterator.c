@@ -501,7 +501,7 @@ test_basic(void)
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
-	box_key_def_delete(key_def);
+	key_def_delete(key_def);
 	fiber_gc();
 	footer();
 	check_plan();

@@ -252,7 +252,7 @@ destroy_test_cache(struct vy_cache *cache, struct key_def *def,
 {
 	tuple_format_unref(format);
 	vy_cache_destroy(cache);
-	box_key_def_delete(def);
+	key_def_delete(def);
 }
 
 bool

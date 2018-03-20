@@ -171,18 +171,18 @@ int main()
 	log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user");
 
 	FILE* fd = fopen(tmp_filename, "r");
-	char *line = NULL;
-	size_t len = 0;
+	const size_t len = 4096;
+	char line[len];
 
-	if (getline(&line, &len, fd) != -1) {
+	if (fgets(line, len, fd) != NULL) {
 		ok(strstr(line, "hello user") != NULL, "plain");
-		getline(&line, &len, fd);
+		fgets(line, len, fd);
 	}
-	if (getline(&line, &len, fd) != -1) {
+	if (fgets(line, len, fd) != NULL) {
 		ok(strstr(line, "\"message\": \"hello user\"") != NULL, "json");
 	}
 
-	if (getline(&line, &len, fd) != -1) {
+	if (fgets(line, len, fd) != NULL) {
 		ok(strstr(line, "\"msg\" = \"hello user\"") != NULL, "custom");
 	}
 	log_destroy(&test_log);
