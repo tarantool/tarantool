@@ -328,7 +328,8 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	}
 	auto key_def_guard = make_scoped_guard([&] {
 		free(part_def);
-		free(key_def);
+		if (key_def != NULL)
+			key_def_delete(key_def);
 	});
 	if (is_166plus) {
 		/* 1.6.6+ */

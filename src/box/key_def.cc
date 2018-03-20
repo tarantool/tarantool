@@ -106,6 +106,12 @@ key_def_dup(const struct key_def *src)
 	return res;
 }
 
+void
+key_def_delete(struct key_def *def)
+{
+	free(def);
+}
+
 static void
 key_def_set_cmp(struct key_def *def)
 {
@@ -145,7 +151,7 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 			if (coll == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 					 i + 1, "collation was not found by ID");
-				free(def);
+				key_def_delete(def);
 				return NULL;
 			}
 		}
@@ -187,7 +193,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 void
 box_key_def_delete(box_key_def_t *key_def)
 {
-	free(key_def);
+	key_def_delete(key_def);
 }
 
 int

@@ -149,6 +149,13 @@ struct key_def {
 struct key_def *
 key_def_dup(const struct key_def *src);
 
+/**
+ * Delete @a key_def.
+ * @param def Key_def to delete.
+ */
+void
+key_def_delete(struct key_def *def);
+
 /** \cond public */
 
 typedef struct key_def box_key_def_t;
