@@ -59,6 +59,7 @@
 #include "iproto_constants.h"
 #include "rmean.h"
 #include "execute.h"
+#include "errinj.h"
 
 /* The number of iproto messages in flight */
 enum { IPROTO_MSG_MAX = 768 };
@@ -1178,11 +1179,20 @@ tx_reply_iproto_error(struct cmsg *m)
 	iproto_wpos_create(&msg->wpos, out);
 }
 
+/** Inject a short delay on tx request processing for testing. */
+static inline void
+tx_inject_delay()
+{
+	ERROR_INJECT(ERRINJ_IPROTO_TX_DELAY, {
+		if (rand() % 100 < 10)
+			fiber_sleep(0.001);
+	});
+}
+
 static void
 tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	struct obuf *out = msg->connection->tx.p_obuf;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 	if (tx_check_schema(msg->header.schema_version))
@@ -1190,8 +1200,12 @@ tx_process1(struct cmsg *m)
 
 	struct tuple *tuple;
 	struct obuf_svp svp;
-	if (box_process1(&msg->dml, &tuple) ||
-	    iproto_prepare_select(out, &svp))
+	struct obuf *out;
+	tx_inject_delay();
+	if (box_process1(&msg->dml, &tuple) != 0)
+		goto error;
+	out = msg->connection->tx.p_obuf;
+	if (iproto_prepare_select(out, &svp) != 0)
 		goto error;
 	if (tuple && tuple_to_obuf(tuple, out))
 		goto error;
@@ -1207,7 +1221,7 @@ static void
 tx_process_select(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	struct obuf *out = msg->connection->tx.p_obuf;
+	struct obuf *out;
 	struct obuf_svp svp;
 	struct port port;
 	int count;
@@ -1219,11 +1233,14 @@ tx_process_select(struct cmsg *m)
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
+	tx_inject_delay();
 	rc = box_select(req->space_id, req->index_id,
 			req->iterator, req->offset, req->limit,
 			req->key, req->key_end, &port);
 	if (rc < 0)
 		goto error;
+
+	out = msg->connection->tx.p_obuf;
 	if (iproto_prepare_select(out, &svp) != 0) {
 		port_destroy(&port);
 		goto error;
