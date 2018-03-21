@@ -46,6 +46,7 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/box.h"
 #include "box/sequence.h"
 #include "box/session.h"
 #include "box/identifier.h"
@@ -2142,48 +2143,50 @@ sql_clear_stat_spaces(Parse * pParse, const char *zType, const char *zName)
 			   zType, zName);
 }
 
-/*
+/**
  * Generate code to drop a table.
+ * This routine includes dropping triggers, sequences,
+ * all indexes and entry from _space space.
+ *
+ * @param parse_context Current parsing context.
+ * @param space Space to be dropped.
+ * @param is_view True, if space is
  */
 static void
-sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
+sql_code_drop_table(struct Parse *parse_context, struct space *space,
+		    bool is_view)
 {
-	Vdbe *v;
-	sqlite3 *db = pParse->db;
-	Trigger *pTrigger;
-
-	v = sqlite3GetVdbe(pParse);
-	assert(v != 0);
+	struct sqlite3 *db = parse_context->db;
+	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	assert(v != NULL);
 	/*
 	 * Drop all triggers associated with the table being
 	 * dropped. Code is generated to remove entries from
 	 * _trigger. OP_DropTrigger will remove it from internal
 	 * SQL structures.
+	 *
+	 * Do not account triggers deletion - they will be
+	 * accounted in DELETE from _space below.
 	 */
-	pTrigger = pTab->pTrigger;
-	/* Do not account triggers deletion - they will be accounted
-	 * in DELETE from _space below.
-	 */
-	pParse->nested++;
-
-	while (pTrigger) {
-		assert(pTrigger->pSchema == pTab->pSchema);
-		sqlite3DropTriggerPtr(pParse, pTrigger);
-		pTrigger = pTrigger->pNext;
+	parse_context->nested++;
+	Table *table = sqlite3HashFind(&parse_context->db->pSchema->tblHash,
+				       space->def->name);
+	struct Trigger *trigger = table->pTrigger;
+	while (trigger != NULL) {
+		sqlite3DropTriggerPtr(parse_context, trigger);
+		trigger = trigger->pNext;
 	}
-	pParse->nested--;
+	parse_context->nested--;
 	/*
 	 * Remove any entries of the _sequence and _space_sequence
 	 * space associated with the table being dropped. This is
 	 * done before the table is dropped from internal schema.
 	 */
-	int idx_rec_reg = ++pParse->nMem;
-	int space_id_reg = ++pParse->nMem;
-	int space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
+	int idx_rec_reg = ++parse_context->nMem;
+	int space_id_reg = ++parse_context->nMem;
+	int space_id = space->def->id;
 	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
-	if (pTab->tabFlags & TF_Autoincrement) {
+	if (space->sequence != NULL) {
 		/* Delete entry from _space_sequence. */
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
 				  idx_rec_reg);
@@ -2191,8 +2194,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 				  idx_rec_reg);
 		VdbeComment((v, "Delete entry from _space_sequence"));
 		/* Delete entry by id from _sequence. */
-		assert(space->sequence != NULL);
-		int sequence_id_reg = ++pParse->nMem;
+		int sequence_id_reg = ++parse_context->nMem;
 		sqlite3VdbeAddOp2(v, OP_Integer, space->sequence->def->id,
 				  sequence_id_reg);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
@@ -2204,7 +2206,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	 * Drop all _space and _index entries that refer to the
 	 * table.
 	 */
-	if (!isView) {
+	if (!is_view) {
 		uint32_t index_count = space->index_count;
 		if (index_count > 1) {
 			/*
@@ -2212,16 +2214,9 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 			 * Tarantool won't allow remove primary when
 			 * secondary exist.
 			 */
-			uint32_t *iids =
-				(uint32_t *) region_alloc(&fiber()->gc,
-							  sizeof(uint32_t) *
-							  (index_count - 1));
-			/* Save index ids to be deleted except for PK. */
 			for (uint32_t i = 1; i < index_count; ++i) {
-				iids[i - 1] = space->index[i]->def->iid;
-			}
-			for (uint32_t i = 0; i < index_count - 1; ++i) {
-				sqlite3VdbeAddOp2(v, OP_Integer, iids[i],
+				sqlite3VdbeAddOp2(v, OP_Integer,
+						  space->index[i]->def->iid,
 						  space_id_reg + 1);
 				sqlite3VdbeAddOp3(v, OP_MakeRecord,
 						  space_id_reg, 2, idx_rec_reg);
@@ -2229,7 +2224,7 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 						  idx_rec_reg);
 				VdbeComment((v,
 					     "Remove secondary index iid = %u",
-					     iids[i]));
+					     space->index[i]->def->iid));
 			}
 		}
 		sqlite3VdbeAddOp2(v, OP_Integer, 0, space_id_reg + 1);
@@ -2247,89 +2242,96 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SPACE_ID, idx_rec_reg);
 	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 	VdbeComment((v, "Delete entry from _space"));
-	/* Remove the table entry from SQLite's internal schema and modify
-	 * the schema cookie.
-	 */
+	/* Remove the table entry from SQLite's internal schema. */
+	sqlite3VdbeAddOp4(v, OP_DropTable, 0, 0, 0, space->def->name, 0);
 
-	sqlite3VdbeAddOp4(v, OP_DropTable, 0, 0, 0, pTab->zName, 0);
-
-	/* FIXME: DDL is impossible inside a transaction so far.
+	/*
 	 * Replace to _space/_index will fail if active
 	 * transaction. So, don't pretend, that we are able to
 	 * anything back. To be fixed when transactions
 	 * DDL are enabled.
 	 */
-	/* sqlite3ChangeCookie(pParse); */
 	sqliteViewResetAll(db);
 }
 
-/*
+/**
  * This routine is called to do the work of a DROP TABLE statement.
- * pName is the name of the table to be dropped.
+ *
+ * @param parse_context Current parsing context.
+ * @param table_name_list List containing table name.
+ * @param is_view True, if statement is really 'DROP VIEW'.
+ * @param if_exists True, if statement contains 'IF EXISTS' clause.
  */
 void
-sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
+sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
+	       bool is_view, bool if_exists)
 {
-	Table *pTab;
-	Vdbe *v = sqlite3GetVdbe(pParse);
-	sqlite3 *db = pParse->db;
-
+	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	struct sqlite3 *db = parse_context->db;
 	if (v == NULL || db->mallocFailed) {
 		goto exit_drop_table;
 	}
-	/* Activate changes counting here to account
+	/*
+	 * Activate changes counting here to account
 	 * DROP TABLE IF NOT EXISTS, if the table really does not
 	 * exist.
 	 */
-	if (!pParse->nested)
+	if (!parse_context->nested)
 		sqlite3VdbeCountChanges(v);
-	assert(pParse->nErr == 0);
-	assert(pName->nSrc == 1);
-	assert(db->pSchema != NULL);
-	if (noErr)
-		db->suppressErr++;
-	assert(isView == 0 || isView == LOCATE_VIEW);
-	pTab = sqlite3LocateTable(pParse, isView, pName->a[0].zName);
-	if (noErr)
-		db->suppressErr--;
-
-	if (pTab == NULL)
-		goto exit_drop_table;
-#ifndef SQLITE_OMIT_VIEW
-	/* Ensure DROP TABLE is not used on a view, and DROP VIEW is not used
-	 * on a table.
-	 */
-	if (isView && !space_is_view(pTab)) {
-		sqlite3ErrorMsg(pParse, "use DROP TABLE to delete table %s",
-				pTab->zName);
+	assert(parse_context->nErr == 0);
+	assert(table_name_list->nSrc == 1);
+	assert(is_view == 0 || is_view == LOCATE_VIEW);
+	const char *space_name = table_name_list->a[0].zName;
+	uint32_t space_id = box_space_id_by_name(space_name,
+						 strlen(space_name));
+	if (space_id == BOX_ID_NIL) {
+		if (!is_view && !if_exists)
+			sqlite3ErrorMsg(parse_context, "no such table: %s",
+					space_name);
+		if (is_view && !if_exists)
+			sqlite3ErrorMsg(parse_context, "no such view: %s",
+					space_name);
 		goto exit_drop_table;
 	}
-	if (!isView && space_is_view(pTab)) {
-		sqlite3ErrorMsg(pParse, "use DROP VIEW to delete view %s",
-				pTab->zName);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	/*
+	 * Ensure DROP TABLE is not used on a view,
+	 * and DROP VIEW is not used on a table.
+	 */
+	if (is_view && !space->def->opts.is_view) {
+		sqlite3ErrorMsg(parse_context, "use DROP TABLE to delete table %s",
+				space_name);
 		goto exit_drop_table;
 	}
-#endif
-
-	/* Generate code to remove the table from Tarantool and internal SQL
-	 * tables. Basically, it consists from 3 stages:
-	 * 1. Delete statistics from _stat1 and _stat4 tables (if any exist)
-	 * 2. In case of presence of FK constraints, i.e. current table is child
-	 *    or parent, then start new transaction and erase from table
-	 *    all data row by row. On each deletion check whether any FK
-	 *    violations have occurred. If ones take place, then rollback
-	 *    transaction and halt VDBE. Otherwise, commit transaction.
-	 * 3. Drop table by truncating (if step 2 was skipped), removing
-	 *    indexes from _index table and eventually tuple with corresponding
-	 *    space_id from _space.
+	if (!is_view && space->def->opts.is_view) {
+		sqlite3ErrorMsg(parse_context, "use DROP VIEW to delete view %s",
+				space_name);
+		goto exit_drop_table;
+	}
+	/*
+	 * Generate code to remove the table from Tarantool
+	 * and internal SQL tables. Basically, it consists
+	 * from 3 stages:
+	 * 1. Delete statistics from _stat1 and _stat4 tables.
+	 * 2. In case of presence of FK constraints, i.e. current
+	 *    table is child or parent, then start new transaction
+	 *    and erase from table all data row by row. On each
+	 *    deletion check whether any FK violations have
+	 *    occurred. If ones take place, then rollback
+	 *    transaction and halt VDBE.
+	 * 3. Drop table by truncating (if step 2 was skipped),
+	 *    removing indexes from _index space and eventually
+	 *    tuple with corresponding space_id from _space.
 	 */
 
-	sql_clear_stat_spaces(pParse, "tbl", pTab->zName);
-	sqlite3FkDropTable(pParse, pName, pTab);
-	sqlite3CodeDropTable(pParse, pTab, isView);
+	sql_clear_stat_spaces(parse_context, "tbl", space_name);
+	struct Table *tab = sqlite3HashFind(&db->pSchema->tblHash, space_name);
+	sqlite3FkDropTable(parse_context, table_name_list, tab);
+	sql_code_drop_table(parse_context, space, is_view);
 
  exit_drop_table:
-	sqlite3SrcListDelete(db, pName);
+	sqlite3SrcListDelete(db, table_name_list);
 }
 
 /*
@@ -3256,60 +3258,66 @@ index_is_unique_not_null(const Index *idx)
 		!index->def->key_def->is_nullable);
 }
 
-/*
+/**
  * This routine will drop an existing named index.  This routine
  * implements the DROP INDEX statement.
+ *
+ * @param parse_context Current parsing context.
+ * @param index_name_list List containing index name.
+ * @param table_token Token representing table name.
+ * @param if_exists True, if statement contains 'IF EXISTS' clause.
  */
 void
-sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
+sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
+	       struct Token *table_token, bool if_exists)
 {
-	Index *pIndex;
-	Vdbe *v = sqlite3GetVdbe(pParse);
-	sqlite3 *db = pParse->db;
-	char *zTableName = 0;
-
-	assert(pParse->nErr == 0);	/* Never called with prior errors */
-	assert(pName2 != 0);
-
+	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	assert(v != NULL);
+	struct sqlite3 *db = parse_context->db;
+	/* Never called with prior errors. */
+	assert(parse_context->nErr == 0);
+	assert(table_token != NULL);
+	const char *table_name = sqlite3NameFromToken(db, table_token);
 	if (db->mallocFailed) {
 		goto exit_drop_index;
 	}
-	assert(v != NULL);
-	/* Do not account nested operations: the count of such
+	/*
+	 * Do not account nested operations: the count of such
 	 * operations depends on Tarantool data dictionary internals,
 	 * such as data layout in system spaces.
 	 */
-	if (!pParse->nested)
+	if (!parse_context->nested)
 		sqlite3VdbeCountChanges(v);
-	assert(pName->nSrc == 1);
-	assert(db->pSchema != NULL);
-
-	assert(pName2->n > 0);
-	zTableName = sqlite3NameFromToken(db, pName2);
-
-	pIndex = sqlite3LocateIndex(db, pName->a[0].zName, zTableName);
-	if (pIndex == 0) {
-		if (!ifExists) {
-			sqlite3ErrorMsg(pParse, "no such index: %s.%S",
-					zTableName, pName, 0);
-		}
-		pParse->checkSchema = 1;
+	assert(index_name_list->nSrc == 1);
+	assert(table_token->n > 0);
+	uint32_t space_id = box_space_id_by_name(table_name,
+						 strlen(table_name));
+	if (space_id == BOX_ID_NIL) {
+		if (!if_exists)
+			sqlite3ErrorMsg(parse_context, "no such space: %s",
+					table_name);
 		goto exit_drop_index;
 	}
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pIndex->tnum);
-	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(pIndex->tnum);
+	const char *index_name = index_name_list->a[0].zName;
+	uint32_t index_id = box_index_id_by_name(space_id, index_name,
+						 strlen(index_name));
+	if (index_id == BOX_ID_NIL) {
+		if (!if_exists)
+			sqlite3ErrorMsg(parse_context, "no such index: %s.%s",
+					table_name, index_name);
+		goto exit_drop_index;
+	}
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	struct index *index = space_index(space, index_id);
 	assert(index != NULL);
-
 	/*
 	 * If index has been created by user, it has its SQL
 	 * statement. Otherwise (i.e. PK and UNIQUE indexes,
 	 * which are created alongside with table) it is NULL.
 	 */
 	if (index->def->opts.sql == NULL) {
-		sqlite3ErrorMsg(pParse, "index associated with UNIQUE "
+		sqlite3ErrorMsg(parse_context, "index associated with UNIQUE "
 				"or PRIMARY KEY constraint cannot be dropped",
 				0);
 		goto exit_drop_index;
@@ -3320,24 +3328,27 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 	 * But firstly, delete statistics since schema
 	 * changes after DDL.
 	 */
-	sql_clear_stat_spaces(pParse, "idx", pIndex->zName);
-	int record_reg = ++pParse->nMem;
-	int space_id_reg = ++pParse->nMem;
-	sqlite3VdbeAddOp2(v, OP_Integer, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum),
-			  space_id_reg);
-	sqlite3VdbeAddOp2(v, OP_Integer, SQLITE_PAGENO_TO_INDEXID(pIndex->tnum),
-			  space_id_reg + 1);
+	sql_clear_stat_spaces(parse_context, "idx", index->def->name);
+	int record_reg = ++parse_context->nMem;
+	int space_id_reg = ++parse_context->nMem;
+	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
+	sqlite3VdbeAddOp2(v, OP_Integer, index_id, space_id_reg + 1);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
 	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);
 	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
-	sqlite3ChangeCookie(pParse);
-
+	/*
+	 * Still need to cleanup internal SQL structures.
+	 * Should be removed when SQL and Tarantool
+	 * data-dictionaries will be completely merged.
+	 */
+	Index *pIndex = sqlite3LocateIndex(db, index_name, table_name);
+	assert(pIndex != NULL);
 	sqlite3VdbeAddOp3(v, OP_DropIndex, 0, 0, 0);
 	sqlite3VdbeAppendP4(v, pIndex, P4_INDEX);
 
  exit_drop_index:
-	sqlite3SrcListDelete(db, pName);
-	sqlite3DbFree(db, zTableName);
+	sqlite3SrcListDelete(db, index_name_list);
+	sqlite3DbFree(db, (void *) table_name);
 }
 
 /*

@@ -366,7 +366,7 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
 cmd ::= DROP TABLE ifexists(E) fullname(X). {
-  sqlite3DropTable(pParse, X, 0, E);
+  sql_drop_table(pParse, X, 0, E);
 }
 %type ifexists {int}
 ifexists(A) ::= IF EXISTS.   {A = 1;}
@@ -380,7 +380,7 @@ cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
   sqlite3CreateView(pParse, &X, &Y, C, S, E);
 }
 cmd ::= DROP VIEW ifexists(E) fullname(X). {
-  sqlite3DropTable(pParse, X, 1, E);
+  sql_drop_table(pParse, X, 1, E);
 }
 %endif  SQLITE_OMIT_VIEW
 
@@ -1315,7 +1315,7 @@ collate(C) ::= COLLATE id.   {C = 1;}
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
 cmd ::= DROP INDEX ifexists(E) fullname(X) ON nm(Y).   {
-    sqlite3DropIndex(pParse, X, &Y, E);
+    sql_drop_index(pParse, X, &Y, E);
 }
 
 ///////////////////////////// The PRAGMA command /////////////////////////////

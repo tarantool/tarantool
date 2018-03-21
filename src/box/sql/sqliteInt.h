@@ -3577,7 +3577,8 @@ int sqlite3ViewGetColumnNames(Parse *, Table *);
 #define sqlite3ViewGetColumnNames(A,B) 0
 #endif
 
-void sqlite3DropTable(Parse *, SrcList *, int, int);
+void
+sql_drop_table(struct Parse *, struct SrcList *, bool, bool);
 void sqlite3DeleteTable(sqlite3 *, Table *);
 void sqlite3Insert(Parse *, SrcList *, Select *, IdList *, int);
 void *sqlite3ArrayAllocate(sqlite3 *, void *, int, int *, int *);
@@ -3601,7 +3602,8 @@ bool
 index_is_unique(Index *);
 void sqlite3CreateIndex(Parse *, Token *, SrcList *, ExprList *, int, Token *,
 			Expr *, int, int, u8);
-void sqlite3DropIndex(Parse *, SrcList *, Token *, int);
+void
+sql_drop_index(struct Parse *, struct SrcList *, struct Token *, bool);
 int sqlite3Select(Parse *, Select *, SelectDest *);
 Select *sqlite3SelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
 			 Expr *, ExprList *, u32, Expr *, Expr *);

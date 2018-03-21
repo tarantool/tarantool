@@ -2522,7 +2522,7 @@ static void yy_reduce(
       case 70: /* cmd ::= DROP TABLE ifexists fullname */
 #line 368 "parse.y"
 {
-  sqlite3DropTable(pParse, yymsp[0].minor.yy387, 0, yymsp[-1].minor.yy52);
+  sql_drop_table(pParse, yymsp[0].minor.yy387, 0, yymsp[-1].minor.yy52);
 }
 #line 2528 "parse.c"
         break;
@@ -2536,7 +2536,7 @@ static void yy_reduce(
       case 74: /* cmd ::= DROP VIEW ifexists fullname */
 #line 382 "parse.y"
 {
-  sqlite3DropTable(pParse, yymsp[0].minor.yy387, 1, yymsp[-1].minor.yy52);
+  sql_drop_table(pParse, yymsp[0].minor.yy387, 1, yymsp[-1].minor.yy52);
 }
 #line 2542 "parse.c"
         break;
@@ -3437,7 +3437,7 @@ static void yy_reduce(
       case 210: /* cmd ::= DROP INDEX ifexists fullname ON nm */
 #line 1317 "parse.y"
 {
-    sqlite3DropIndex(pParse, yymsp[-2].minor.yy387, &yymsp[0].minor.yy0, yymsp[-3].minor.yy52);
+    sql_drop_index(pParse, yymsp[-2].minor.yy387, &yymsp[0].minor.yy0, yymsp[-3].minor.yy52);
 }
 #line 3443 "parse.c"
         break;
