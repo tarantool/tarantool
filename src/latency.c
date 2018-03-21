@@ -40,15 +40,15 @@ enum {
 	USEC_PER_SEC		= 1000000,
 };
 
-enum {
-	LATENCY_PERCENTILE	= 99,
-};
-
 int
 latency_create(struct latency *latency)
 {
 	enum { US = 1, MS = USEC_PER_MSEC, S = USEC_PER_SEC };
 	static int64_t buckets[] = {
+		  1 * US,   2 * US,   3 * US,   4 * US,   5 * US,   6 * US,
+		  7 * US,   8 * US,   9 * US,
+		 10 * US,  20 * US,  30 * US,  40 * US,  50 * US,  60 * US,
+		 70 * US,  80 * US,  90 * US,
 		100 * US, 200 * US, 300 * US, 400 * US, 500 * US, 600 * US,
 		700 * US, 800 * US, 900 * US,
 		  1 * MS,   2 * MS,   3 * MS,   4 * MS,   5 * MS,   6 * MS,
@@ -90,9 +90,8 @@ latency_collect(struct latency *latency, double value)
 }
 
 double
-latency_get(struct latency *latency)
+latency_get(struct latency *latency, int pct)
 {
-	int64_t value_usec = histogram_percentile(latency->histogram,
-						  LATENCY_PERCENTILE);
+	int64_t value_usec = histogram_percentile(latency->histogram, pct);
 	return (double)value_usec / USEC_PER_SEC;
 }

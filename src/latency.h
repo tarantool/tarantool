@@ -72,8 +72,9 @@ latency_collect(struct latency *latency, double value);
 
 /**
  * Get accumulated latency value, in seconds.
+ * Returns @pct-th percentile of all observations.
  */
 double
-latency_get(struct latency *latency);
+latency_get(struct latency *latency, int pct);
 
 #endif /* TARANTOOL_LATENCY_H_INCLUDED */
