@@ -231,10 +231,6 @@ fio.pathjoin = function(...)
 
     i = i + 1
     while i <= len do
-        if string.match(path, '/$') ~= nil then
-            path = string.gsub(path, '/$', '')
-        end
-
         local sp = select(i, ...)
         if sp == nil then
             error("Undefined path part")
