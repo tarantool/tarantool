@@ -220,9 +220,6 @@ fio.pathjoin = function(path, ...)
         if sp == nil then
             error("Undefined path part")
         end
-        if sp == '' then
-            error("Empty path part")
-        end
 
         if sp ~= '' then
             path = path .. '/' .. sp
