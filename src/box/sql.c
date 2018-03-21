@@ -1592,9 +1592,16 @@ int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
 	const struct Enc *enc = get_enc(buf);
 	char *base = buf, *p;
 
-	p = enc->encode_map(base, 1);
+	bool is_view = false;
+	if (pTable != NULL)
+		is_view = pTable->pSelect != NULL;
+	p = enc->encode_map(base, is_view ? 2 : 1);
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, strlen(zSql));
+	if (is_view) {
+		p = enc->encode_str(p, "view", 4);
+		p = enc->encode_bool(p, true);
+	}
 	return (int)(p - base);
 }
 

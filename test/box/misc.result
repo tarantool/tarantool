@@ -330,6 +330,7 @@ t;
   - 'box.error.ROLE_LOOP : 87'
   - 'box.error.TUPLE_NOT_FOUND : 4'
   - 'box.error.LOADING : 116'
+  - 'box.error.VIEW_MISSING_SQL : 161'
   - 'box.error.BACKUP_IN_PROGRESS : 129'
   - 'box.error.DROP_USER : 44'
   - 'box.error.MODIFY_INDEX : 14'

@@ -496,6 +496,8 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	}
 	struct space_opts opts;
 	space_opts_decode(&opts, space_opts, region);
+	if (opts.is_view && opts.sql == NULL)
+		tnt_raise(ClientError, ER_VIEW_MISSING_SQL);
 	struct space_def *def =
 		space_def_new_xc(id, uid, exact_field_count, name, name_len,
 				 engine_name, engine_name_len, &opts, fields,
@@ -1590,6 +1592,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	uint32_t iid = tuple_field_u32_xc(old_tuple ? old_tuple : new_tuple,
 					  BOX_INDEX_FIELD_ID);
 	struct space *old_space = space_cache_find_xc(id);
+	if (old_space->def->opts.is_view) {
+		tnt_raise(ClientError, ER_ALTER_SPACE, space_name(old_space),
+			  "can not add index on a view");
+	}
 	enum priv_type priv_type = new_tuple ? PRIV_C : PRIV_D;
 	if (old_tuple && new_tuple)
 		priv_type = PRIV_A;

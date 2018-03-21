@@ -50,6 +50,12 @@ struct space_opts {
 	 */
 	bool temporary;
 	/**
+	 * If the space is a view, then it can't feature any
+	 * indexes, and must have SQL statement. Moreover,
+	 * this flag can't be changed after space creation.
+	 */
+	bool is_view;
+	/**
 	 * SQL statement that produced this space.
 	 */
 	char *sql;

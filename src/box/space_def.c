@@ -35,11 +35,13 @@
 
 const struct space_opts space_opts_default = {
 	/* .temporary = */ false,
+	/* .view = */ false,
 	/* .sql        = */ NULL,
 };
 
 const struct opt_def space_opts_reg[] = {
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, temporary),
+	OPT_DEF("view", OPT_BOOL, struct space_opts, is_view),
 	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
 	OPT_END,
 };
@@ -175,6 +177,11 @@ space_def_check_compatibility(const struct space_def *old_def,
 	if (new_def->id != old_def->id) {
 		diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
 			 "space id is immutable");
+		return -1;
+	}
+	if (new_def->opts.is_view != old_def->opts.is_view) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_def->name,
+			 "can not convert a space to a view and vice versa");
 		return -1;
 	}
 	if (is_space_empty)
