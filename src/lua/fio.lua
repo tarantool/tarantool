@@ -240,6 +240,7 @@ fio.pathjoin = function(...)
             error("Undefined path part")
         end
 
+        sp = tostring(sp)
         if sp ~= '' then
             path = path .. '/' .. sp
         end
