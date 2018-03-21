@@ -348,3 +348,24 @@ box.error.injection.set('ERRINJ_BUILD_SECONDARY', sk.id)
 sk:alter({parts = {2, 'number'}})
 box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
 s:drop()
+
+--
+-- gh-3255: iproto can crash and discard responses, if a network
+-- is saturated, and DML yields too long on commit.
+--
+
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+
+c = net_box.connect(box.cfg.listen)
+
+ch = fiber.channel(200)
+errinj.set("ERRINJ_IPROTO_TX_DELAY", true)
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:replace{1} end ch:put(true) end) end
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:select() end ch:put(true) end) end
+for i = 1, 200 do ch:get() end
+errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
+
+s:drop()
+box.schema.user.revoke('guest', 'read,write,execute','universe')
