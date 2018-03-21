@@ -1135,9 +1135,12 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:count() doesn't support `buffer` argument")
         end
+        local key_is_nil = (key == nil or
+                            (type(key) == 'table' and #key == 0))
+        local iterator = check_iterator_type(opts, key_is_nil)
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('call_16', opts, code, { key })[1][1]
+        return remote:_request('call_16', opts, code, { key, {iterator = iterator} })[1][1]
     end
 
     function methods:delete(key, opts)
