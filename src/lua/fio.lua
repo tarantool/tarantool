@@ -243,9 +243,10 @@ fio.pathjoin = function(...)
 
         i = i + 1
     end
-    path = string.gsub(path, "/+",'/')
-    if string.match(path, '/$') ~= nil and #path > 1 then
-        path = string.gsub(path, '/$', '')
+
+    path = path:gsub('/+', '/')
+    if path ~= '/' then
+        path = path:gsub('/$', '')
     end
 
     return path
