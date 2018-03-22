@@ -123,6 +123,10 @@ box.session.su('guest')
 ---
 - error: Read access to space '_vfunc' is denied for user 'guest'
 ...
+#box.space._vsequence:select{}
+---
+- error: Read access to space '_vsequence' is denied for user 'guest'
+...
 box.session.su('admin')
 ---
 ...
@@ -134,11 +138,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 7
+- 8
 ...
 #box.space._vindex:select{}
 ---
-- 17
+- 20
 ...
 box.session.su('admin')
 ---
@@ -226,11 +230,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 18
+- 19
 ...
 #box.space._vindex:select{}
 ---
-- 41
+- 44
 ...
 #box.space._vuser:select{}
 ---
@@ -238,7 +242,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 14
+- 15
 ...
 #box.space._vfunc:select{}
 ---
@@ -258,7 +262,7 @@ box.session.su('guest')
 ...
 #box.space._vindex:select{}
 ---
-- 41
+- 44
 ...
 #box.space._vuser:select{}
 ---
@@ -271,6 +275,10 @@ box.session.su('guest')
 #box.space._vfunc:select{}
 ---
 - 1
+...
+#box.space._vsequence:select{}
+---
+- 0
 ...
 box.session.su('admin')
 ---
@@ -564,11 +572,66 @@ box.session.su('guest')
 - true
 ...
 --
--- view:alter() tests
+-- _vsequence
 --
+box.session.su('admin')
+---
+...
+seq = box.schema.sequence.create('test')
+---
+...
+-- read access to original sequence also allow to read a view
+seq_cnt = #box.space._sequence:select{}
+---
+...
+box.schema.user.grant("guest", "read", "sequence", "test")
+---
+...
+box.session.su("guest")
+---
+...
+#box.space._vsequence:select{} == seq_cnt
+---
+- true
+...
+box.session.su('admin')
+---
+...
+box.schema.user.revoke("guest", "read", "sequence", "test")
+---
+...
+box.session.su("guest")
+---
+...
+cnt = #box.space._vsequence:select{}
+---
+...
+cnt < seq_cnt
+---
+- true
+...
 session.su('admin')
 ---
 ...
+box.schema.user.grant("guest", "write", "sequence", "test")
+---
+...
+box.session.su("guest")
+---
+...
+#box.space._vsequence:select{} == cnt + 1
+---
+- true
+...
+session.su('admin')
+---
+...
+seq:drop()
+---
+...
+--
+-- view:alter() tests
+--
 box.space._vspace.index[1]:alter({parts = { 2, 'string' }})
 ---
 ...

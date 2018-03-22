@@ -5,7 +5,7 @@ box.space._schema:select{}
 ---
 - - ['cluster', '<cluster uuid>']
   - ['max_id', 511]
-  - ['version', 1, 7, 7]
+  - ['version', 1, 10, 0]
 ...
 box.space._cluster:select{}
 ---
@@ -33,6 +33,11 @@ box.space._space:select{}
       {'name': 'cycle', 'type': 'boolean'}]]
   - [285, 1, '_sequence_data', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
       {'name': 'value', 'type': 'integer'}]]
+  - [286, 1, '_vsequence', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'},
+      {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {
+        'name': 'step', 'type': 'integer'}, {'name': 'min', 'type': 'integer'}, {
+        'name': 'max', 'type': 'integer'}, {'name': 'start', 'type': 'integer'}, {
+        'name': 'cache', 'type': 'integer'}, {'name': 'cycle', 'type': 'boolean'}]]
   - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
         'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
@@ -79,6 +84,9 @@ box.space._index:select{}
   - [284, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [284, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [285, 0, 'primary', 'hash', {'unique': true}, [[0, 'unsigned']]]
+  - [286, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [286, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [286, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [288, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [288, 2, 'name', 'tree', {'unique': true}, [[0, 'unsigned'], [2, 'string']]]
   - [289, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
@@ -129,6 +137,7 @@ box.space._priv:select{}
   - [1, 2, 'function', 1, 4]
   - [1, 2, 'space', 276, 2]
   - [1, 2, 'space', 281, 1]
+  - [1, 2, 'space', 286, 1]
   - [1, 2, 'space', 289, 1]
   - [1, 2, 'space', 297, 1]
   - [1, 2, 'space', 305, 1]

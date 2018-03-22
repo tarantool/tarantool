@@ -33,6 +33,7 @@
 #include <small/mempool.h>
 #include "fiber.h"
 #include "schema.h"
+#include "sequence.h"
 #include "space.h"
 #include "func.h"
 #include "tuple.h"
@@ -273,6 +274,28 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	return false;
 }
 
+static bool
+vsequence_filter(struct space *source, struct tuple *tuple)
+{
+	struct credentials *cr = effective_user();
+	if ((PRIV_R | PRIV_X) & cr->universal_access)
+		return true; /* read or execute access to unverse */
+	if (PRIV_R & source->access[cr->auth_token].effective)
+		return true; /* read access to original space */
+
+	uint32_t id;
+	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_ID, &id) != 0)
+		return false;
+	struct sequence *sequence = sequence_by_id(id);
+	if (sequence == NULL)
+		return false;
+	uint8_t effective = sequence->access[cr->auth_token].effective;
+	if (sequence->def->uid == cr->uid || ((PRIV_W | PRIV_R) & effective))
+		return true;
+	return false;
+}
+
+
 struct sysview_index *
 sysview_index_new(struct sysview_engine *sysview,
 		  struct index_def *def, const char *space_name)
@@ -313,6 +336,11 @@ sysview_index_new(struct sysview_engine *sysview,
 		source_space_id = BOX_PRIV_ID;
 		source_index_id = def->iid;
 		filter = vpriv_filter;
+		break;
+	case BOX_VSEQUENCE_ID:
+		source_space_id = BOX_SEQUENCE_ID;
+		source_index_id = def->iid;
+		filter = vsequence_filter;
 		break;
 	default:
 		diag_set(ClientError, ER_MODIFY_INDEX,

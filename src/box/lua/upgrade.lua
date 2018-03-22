@@ -839,6 +839,15 @@ local function initial_1_7_5()
     _schema:insert({'version', 1, 7, 5})
 end
 
+local sequence_format = {{name = 'id', type = 'unsigned'},
+                         {name = 'owner', type = 'unsigned'},
+                         {name = 'name', type = 'string'},
+                         {name = 'step', type = 'integer'},
+                         {name = 'min', type = 'integer'},
+                         {name = 'max', type = 'integer'},
+                         {name = 'start', type = 'integer'},
+                         {name = 'cache', type = 'integer'},
+                         {name = 'cycle', type = 'boolean'}}
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
 local function create_sequence_space()
@@ -850,16 +859,7 @@ local function create_sequence_space()
     local MAP = setmap({})
 
     log.info("create space _sequence")
-    _space:insert{_sequence.id, ADMIN, '_sequence', 'memtx', 0, MAP,
-                  {{name = 'id', type = 'unsigned'},
-                   {name = 'owner', type = 'unsigned'},
-                   {name = 'name', type = 'string'},
-                   {name = 'step', type = 'integer'},
-                   {name = 'min', type = 'integer'},
-                   {name = 'max', type = 'integer'},
-                   {name = 'start', type = 'integer'},
-                   {name = 'cache', type = 'integer'},
-                   {name = 'cycle', type = 'boolean'}}}
+    _space:insert{_sequence.id, ADMIN, '_sequence', 'memtx', 0, MAP, sequence_format}
     log.info("create index _sequence:primary")
     _index:insert{_sequence.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
     log.info("create index _sequence:owner")
@@ -950,6 +950,19 @@ local function upgrade_to_1_7_7()
     _priv:replace({ADMIN, SUPER, 'universe', 0, 4294967295})
 end
 
+--------------------------------------------------------------------------------
+--- Tarantool 1.10.0
+--------------------------------------------------------------------------------
+local function create_vsequence_space()
+    create_sysview(box.schema.SEQUENCE_ID, box.schema.VSEQUENCE_ID)
+    box.space._vsequence:format(sequence_format)
+end
+
+local function upgrade_to_1_10_0()
+    create_vsequence_space()
+end
+
+
 local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
@@ -975,6 +988,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto = true},
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = false},
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
+        {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

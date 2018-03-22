@@ -540,6 +540,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "SEQUENCE_ID");
 	lua_pushnumber(L, BOX_SEQUENCE_DATA_ID);
 	lua_setfield(L, -2, "SEQUENCE_DATA_ID");
+	lua_pushnumber(L, BOX_VSEQUENCE_ID);
+	lua_setfield(L, -2, "VSEQUENCE_ID");
 	lua_pushnumber(L, BOX_SPACE_SEQUENCE_ID);
 	lua_setfield(L, -2, "SPACE_SEQUENCE_ID");
 	lua_pushnumber(L, BOX_SYSTEM_ID_MIN);

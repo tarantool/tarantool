@@ -752,6 +752,11 @@ box.space._space:select()
       {'name': 'cycle', 'type': 'boolean'}]]
   - [285, 1, '_sequence_data', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
       {'name': 'value', 'type': 'integer'}]]
+  - [286, 1, '_vsequence', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'},
+      {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {
+        'name': 'step', 'type': 'integer'}, {'name': 'min', 'type': 'integer'}, {
+        'name': 'max', 'type': 'integer'}, {'name': 'start', 'type': 'integer'}, {
+        'name': 'cache', 'type': 'integer'}, {'name': 'cycle', 'type': 'boolean'}]]
   - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
         'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
