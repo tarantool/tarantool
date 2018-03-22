@@ -1087,349 +1087,343 @@ end
 
 internal.check_iterator_type = check_iterator_type -- export for net.box
 
-box.space_mt = (function()
-    local space_mt = {}
-    space_mt.__index = space_mt
+local space_mt = {}
+space_mt.__index = space_mt
+box.space_mt = space_mt
 
-    space_mt.len = function(space)
-        check_space_arg(space, 'len')
-        local pk = space.index[0]
-        if pk == nil then
-            return 0 -- empty space without indexes, return 0
+space_mt.len = function(space)
+    check_space_arg(space, 'len')
+    local pk = space.index[0]
+    if pk == nil then
+        return 0 -- empty space without indexes, return 0
+    end
+    return space.index[0]:len()
+end
+space_mt.count = function(space, key, opts)
+    check_space_arg(space, 'count')
+    local pk = space.index[0]
+    if pk == nil then
+        return 0 -- empty space without indexes, return 0
+    end
+    return pk:count(key, opts)
+end
+space_mt.bsize = function(space)
+    check_space_arg(space, 'bsize')
+    local s = builtin.space_by_id(space.id)
+    if s == nil then
+        box.error(box.error.NO_SUCH_SPACE, space.name)
+    end
+    return builtin.space_bsize(s)
+end
+
+space_mt.get = function(space, key)
+    check_space_arg(space, 'get')
+    return check_primary_index(space):get(key)
+end
+space_mt.select = function(space, key, opts)
+    check_space_arg(space, 'select')
+    return check_primary_index(space):select(key, opts)
+end
+space_mt.insert = function(space, tuple)
+    check_space_arg(space, 'insert')
+    return internal.insert(space.id, tuple);
+end
+space_mt.replace = function(space, tuple)
+    check_space_arg(space, 'replace')
+    return internal.replace(space.id, tuple);
+end
+space_mt.put = space_mt.replace; -- put is an alias for replace
+space_mt.update = function(space, key, ops)
+    check_space_arg(space, 'update')
+    return check_primary_index(space):update(key, ops)
+end
+space_mt.upsert = function(space, tuple_key, ops, deprecated)
+    check_space_arg(space, 'upsert')
+    if deprecated ~= nil then
+        local msg = "Error: extra argument in upsert call: "
+        msg = msg .. tostring(deprecated)
+        msg = msg .. ". Usage :upsert(tuple, operations)"
+        box.error(box.error.PROC_LUA, msg)
+    end
+    return internal.upsert(space.id, tuple_key, ops);
+end
+space_mt.delete = function(space, key)
+    check_space_arg(space, 'delete')
+    return check_primary_index(space):delete(key)
+end
+-- Assumes that spaceno has a TREE (NUM) primary key
+-- inserts a tuple after getting the next value of the
+-- primary key and returns it back to the user
+space_mt.auto_increment = function(space, tuple)
+    check_space_arg(space, 'auto_increment')
+    local max_tuple = check_primary_index(space):max()
+    local max = 0
+    if max_tuple ~= nil then
+        max = max_tuple[1]
+    end
+    table.insert(tuple, 1, max + 1)
+    return space:insert(tuple)
+end
+
+space_mt.pairs = function(space, key, opts)
+    check_space_arg(space, 'pairs')
+    local pk = space.index[0]
+    if pk == nil then
+        -- empty space without indexes, return empty iterator
+        return fun.iter({})
+    end
+    return pk:pairs(key, opts)
+end
+space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
+space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
+space_mt.truncate = function(space)
+    check_space_arg(space, 'truncate')
+    return internal.truncate(space.id)
+end
+space_mt.format = function(space, format)
+    check_space_arg(space, 'format')
+    return box.schema.space.format(space.id, format)
+end
+space_mt.drop = function(space)
+    check_space_arg(space, 'drop')
+    check_space_exists(space)
+    return box.schema.space.drop(space.id, space.name)
+end
+space_mt.rename = function(space, name)
+    check_space_arg(space, 'rename')
+    check_space_exists(space)
+    return box.schema.space.rename(space.id, name)
+end
+space_mt.create_index = function(space, name, options)
+    check_space_arg(space, 'create_index')
+    check_space_exists(space)
+    return box.schema.index.create(space.id, name, options)
+end
+space_mt.run_triggers = function(space, yesno)
+    check_space_arg(space, 'run_triggers')
+    local s = builtin.space_by_id(space.id)
+    if s == nil then
+        box.error(box.error.NO_SUCH_SPACE, space.name)
+    end
+    builtin.space_run_triggers(s, yesno)
+end
+
+local index_mt = {}
+index_mt.__index = index_mt
+box.index_mt = index_mt
+
+-- __len and __index
+index_mt.len = function(index)
+    check_index_arg(index, 'len')
+    local ret = builtin.box_index_len(index.space_id, index.id)
+    if ret == -1 then
+        box.error()
+    end
+    return tonumber(ret)
+end
+-- index.bsize
+index_mt.bsize = function(index)
+    check_index_arg(index, 'bsize')
+    local ret = builtin.box_index_bsize(index.space_id, index.id)
+    if ret == -1 then
+        box.error()
+    end
+    return tonumber(ret)
+end
+index_mt.__len = index_mt.len -- Lua 5.2 compatibility
+index_mt.__index = index_mt
+-- min and max
+index_mt.min_ffi = function(index, key)
+    check_index_arg(index, 'min')
+    local pkey, pkey_end = tuple_encode(key)
+    if builtin.box_index_min(index.space_id, index.id,
+                             pkey, pkey_end, ptuple) ~= 0 then
+        box.error() -- error
+    elseif ptuple[0] ~= nil then
+        return tuple_bless(ptuple[0])
+    else
+        return
+    end
+end
+index_mt.min_luac = function(index, key)
+    check_index_arg(index, 'min')
+    key = keify(key)
+    return internal.min(index.space_id, index.id, key);
+end
+index_mt.max_ffi = function(index, key)
+    check_index_arg(index, 'max')
+    local pkey, pkey_end = tuple_encode(key)
+    if builtin.box_index_max(index.space_id, index.id,
+                             pkey, pkey_end, ptuple) ~= 0 then
+        box.error() -- error
+    elseif ptuple[0] ~= nil then
+        return tuple_bless(ptuple[0])
+    else
+        return
+    end
+end
+index_mt.max_luac = function(index, key)
+    check_index_arg(index, 'max')
+    key = keify(key)
+    return internal.max(index.space_id, index.id, key);
+end
+index_mt.random_ffi = function(index, rnd)
+    check_index_arg(index, 'random')
+    rnd = rnd or math.random()
+    if builtin.box_index_random(index.space_id, index.id, rnd,
+                                ptuple) ~= 0 then
+        box.error() -- error
+    elseif ptuple[0] ~= nil then
+        return tuple_bless(ptuple[0])
+    else
+        return
+    end
+end
+index_mt.random_luac = function(index, rnd)
+    check_index_arg(index, 'random')
+    rnd = rnd or math.random()
+    return internal.random(index.space_id, index.id, rnd);
+end
+-- iteration
+index_mt.pairs_ffi = function(index, key, opts)
+    check_index_arg(index, 'pairs')
+    local pkey, pkey_end = tuple_encode(key)
+    local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
+
+    local keybuf = ffi.string(pkey, pkey_end - pkey)
+    local pkeybuf = ffi.cast('const char *', keybuf)
+    local cdata = builtin.box_index_iterator(index.space_id, index.id,
+        itype, pkeybuf, pkeybuf + #keybuf);
+    if cdata == nil then
+        box.error()
+    end
+    return fun.wrap(iterator_gen, keybuf,
+        ffi.gc(cdata, builtin.box_iterator_free))
+end
+index_mt.pairs_luac = function(index, key, opts)
+    check_index_arg(index, 'pairs')
+    key = keify(key)
+    local itype = check_iterator_type(opts, #key == 0);
+    local keymp = msgpack.encode(key)
+    local keybuf = ffi.string(keymp, #keymp)
+    local cdata = internal.iterator(index.space_id, index.id, itype, keymp);
+    return fun.wrap(iterator_gen_luac, keybuf,
+        ffi.gc(cdata, builtin.box_iterator_free))
+end
+
+-- index subtree size
+index_mt.count_ffi = function(index, key, opts)
+    check_index_arg(index, 'count')
+    local pkey, pkey_end = tuple_encode(key)
+    local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
+    local count = builtin.box_index_count(index.space_id, index.id,
+        itype, pkey, pkey_end);
+    if count == -1 then
+        box.error()
+    end
+    return tonumber(count)
+end
+index_mt.count_luac = function(index, key, opts)
+    check_index_arg(index, 'count')
+    key = keify(key)
+    local itype = check_iterator_type(opts, #key == 0);
+    return internal.count(index.space_id, index.id, itype, key);
+end
+
+index_mt.get_ffi = function(index, key)
+    check_index_arg(index, 'get')
+    local key, key_end = tuple_encode(key)
+    if builtin.box_index_get(index.space_id, index.id,
+                             key, key_end, ptuple) ~= 0 then
+        return box.error() -- error
+    elseif ptuple[0] ~= nil then
+        return tuple_bless(ptuple[0])
+    else
+        return
+    end
+end
+index_mt.get_luac = function(index, key)
+    check_index_arg(index, 'get')
+    key = keify(key)
+    return internal.get(index.space_id, index.id, key)
+end
+
+local function check_select_opts(opts, key_is_nil)
+    local offset = 0
+    local limit = 4294967295
+    local iterator = check_iterator_type(opts, key_is_nil)
+    if opts ~= nil then
+        if opts.offset ~= nil then
+            offset = opts.offset
         end
-        return space.index[0]:len()
-    end
-    space_mt.count = function(space, key, opts)
-        check_space_arg(space, 'count')
-        local pk = space.index[0]
-        if pk == nil then
-            return 0 -- empty space without indexes, return 0
-        end
-        return pk:count(key, opts)
-    end
-    space_mt.bsize = function(space)
-        check_space_arg(space, 'bsize')
-        local s = builtin.space_by_id(space.id)
-        if s == nil then
-            box.error(box.error.NO_SUCH_SPACE, space.name)
-        end
-        return builtin.space_bsize(s)
-    end
-
-    space_mt.get = function(space, key)
-        check_space_arg(space, 'get')
-        return check_primary_index(space):get(key)
-    end
-    space_mt.select = function(space, key, opts)
-        check_space_arg(space, 'select')
-        return check_primary_index(space):select(key, opts)
-    end
-    space_mt.insert = function(space, tuple)
-        check_space_arg(space, 'insert')
-        return internal.insert(space.id, tuple);
-    end
-    space_mt.replace = function(space, tuple)
-        check_space_arg(space, 'replace')
-        return internal.replace(space.id, tuple);
-    end
-    space_mt.put = space_mt.replace; -- put is an alias for replace
-    space_mt.update = function(space, key, ops)
-        check_space_arg(space, 'update')
-        return check_primary_index(space):update(key, ops)
-    end
-    space_mt.upsert = function(space, tuple_key, ops, deprecated)
-        check_space_arg(space, 'upsert')
-        if deprecated ~= nil then
-            local msg = "Error: extra argument in upsert call: "
-            msg = msg .. tostring(deprecated)
-            msg = msg .. ". Usage :upsert(tuple, operations)"
-            box.error(box.error.PROC_LUA, msg)
-        end
-        return internal.upsert(space.id, tuple_key, ops);
-    end
-    space_mt.delete = function(space, key)
-        check_space_arg(space, 'delete')
-        return check_primary_index(space):delete(key)
-    end
-    -- Assumes that spaceno has a TREE (NUM) primary key
-    -- inserts a tuple after getting the next value of the
-    -- primary key and returns it back to the user
-    space_mt.auto_increment = function(space, tuple)
-        check_space_arg(space, 'auto_increment')
-        local max_tuple = check_primary_index(space):max()
-        local max = 0
-        if max_tuple ~= nil then
-            max = max_tuple[1]
-        end
-        table.insert(tuple, 1, max + 1)
-        return space:insert(tuple)
-    end
-
-    space_mt.pairs = function(space, key, opts)
-        check_space_arg(space, 'pairs')
-        local pk = space.index[0]
-        if pk == nil then
-            -- empty space without indexes, return empty iterator
-            return fun.iter({})
-        end
-        return pk:pairs(key, opts)
-    end
-    space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
-    space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
-    space_mt.truncate = function(space)
-        check_space_arg(space, 'truncate')
-        return internal.truncate(space.id)
-    end
-    space_mt.format = function(space, format)
-        check_space_arg(space, 'format')
-        return box.schema.space.format(space.id, format)
-    end
-    space_mt.drop = function(space)
-        check_space_arg(space, 'drop')
-        check_space_exists(space)
-        return box.schema.space.drop(space.id, space.name)
-    end
-    space_mt.rename = function(space, name)
-        check_space_arg(space, 'rename')
-        check_space_exists(space)
-        return box.schema.space.rename(space.id, name)
-    end
-    space_mt.create_index = function(space, name, options)
-        check_space_arg(space, 'create_index')
-        check_space_exists(space)
-        return box.schema.index.create(space.id, name, options)
-    end
-    space_mt.run_triggers = function(space, yesno)
-        check_space_arg(space, 'run_triggers')
-        local s = builtin.space_by_id(space.id)
-        if s == nil then
-            box.error(box.error.NO_SUCH_SPACE, space.name)
-        end
-        builtin.space_run_triggers(s, yesno)
-    end
-
-    return space_mt
-end)()
-
-box.index_mt = (function()
-    local index_mt = {}
-    index_mt.__index = index_mt
-
-    -- __len and __index
-    index_mt.len = function(index)
-        check_index_arg(index, 'len')
-        local ret = builtin.box_index_len(index.space_id, index.id)
-        if ret == -1 then
-            box.error()
-        end
-        return tonumber(ret)
-    end
-    -- index.bsize
-    index_mt.bsize = function(index)
-        check_index_arg(index, 'bsize')
-        local ret = builtin.box_index_bsize(index.space_id, index.id)
-        if ret == -1 then
-            box.error()
-        end
-        return tonumber(ret)
-    end
-    index_mt.__len = index_mt.len -- Lua 5.2 compatibility
-    index_mt.__index = index_mt
-    -- min and max
-    index_mt.min_ffi = function(index, key)
-        check_index_arg(index, 'min')
-        local pkey, pkey_end = tuple_encode(key)
-        if builtin.box_index_min(index.space_id, index.id,
-                                 pkey, pkey_end, ptuple) ~= 0 then
-            box.error() -- error
-        elseif ptuple[0] ~= nil then
-            return tuple_bless(ptuple[0])
-        else
-            return
+        if opts.limit ~= nil then
+            limit = opts.limit
         end
     end
-    index_mt.min_luac = function(index, key)
-        check_index_arg(index, 'min')
-        key = keify(key)
-        return internal.min(index.space_id, index.id, key);
-    end
-    index_mt.max_ffi = function(index, key)
-        check_index_arg(index, 'max')
-        local pkey, pkey_end = tuple_encode(key)
-        if builtin.box_index_max(index.space_id, index.id,
-                                 pkey, pkey_end, ptuple) ~= 0 then
-            box.error() -- error
-        elseif ptuple[0] ~= nil then
-            return tuple_bless(ptuple[0])
-        else
-            return
-        end
-    end
-    index_mt.max_luac = function(index, key)
-        check_index_arg(index, 'max')
-        key = keify(key)
-        return internal.max(index.space_id, index.id, key);
-    end
-    index_mt.random_ffi = function(index, rnd)
-        check_index_arg(index, 'random')
-        rnd = rnd or math.random()
-        if builtin.box_index_random(index.space_id, index.id, rnd,
-                                    ptuple) ~= 0 then
-            box.error() -- error
-        elseif ptuple[0] ~= nil then
-            return tuple_bless(ptuple[0])
-        else
-            return
-        end
-    end
-    index_mt.random_luac = function(index, rnd)
-        check_index_arg(index, 'random')
-        rnd = rnd or math.random()
-        return internal.random(index.space_id, index.id, rnd);
-    end
-    -- iteration
-    index_mt.pairs_ffi = function(index, key, opts)
-        check_index_arg(index, 'pairs')
-        local pkey, pkey_end = tuple_encode(key)
-        local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
+    return iterator, offset, limit
+end
 
-        local keybuf = ffi.string(pkey, pkey_end - pkey)
-        local pkeybuf = ffi.cast('const char *', keybuf)
-        local cdata = builtin.box_index_iterator(index.space_id, index.id,
-            itype, pkeybuf, pkeybuf + #keybuf);
-        if cdata == nil then
-            box.error()
-        end
-        return fun.wrap(iterator_gen, keybuf,
-            ffi.gc(cdata, builtin.box_iterator_free))
-    end
-    index_mt.pairs_luac = function(index, key, opts)
-        check_index_arg(index, 'pairs')
-        key = keify(key)
-        local itype = check_iterator_type(opts, #key == 0);
-        local keymp = msgpack.encode(key)
-        local keybuf = ffi.string(keymp, #keymp)
-        local cdata = internal.iterator(index.space_id, index.id, itype, keymp);
-        return fun.wrap(iterator_gen_luac, keybuf,
-            ffi.gc(cdata, builtin.box_iterator_free))
+index_mt.select_ffi = function(index, key, opts)
+    check_index_arg(index, 'select')
+    local key, key_end = tuple_encode(key)
+    local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
+
+    local port = ffi.cast('struct port *', port_tuple)
+
+    if builtin.box_select(index.space_id, index.id,
+        iterator, offset, limit, key, key_end, port) ~= 0 then
+        return box.error()
     end
 
-    -- index subtree size
-    index_mt.count_ffi = function(index, key, opts)
-        check_index_arg(index, 'count')
-        local pkey, pkey_end = tuple_encode(key)
-        local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
-        local count = builtin.box_index_count(index.space_id, index.id,
-            itype, pkey, pkey_end);
-        if count == -1 then
-            box.error()
-        end
-        return tonumber(count)
+    local ret = {}
+    local entry = port_tuple.first
+    for i=1,tonumber(port_tuple.size),1 do
+        ret[i] = tuple_bless(entry.tuple)
+        entry = entry.next
     end
-    index_mt.count_luac = function(index, key, opts)
-        check_index_arg(index, 'count')
-        key = keify(key)
-        local itype = check_iterator_type(opts, #key == 0);
-        return internal.count(index.space_id, index.id, itype, key);
-    end
+    builtin.port_destroy(port);
+    return ret
+end
 
-    index_mt.get_ffi = function(index, key)
-        check_index_arg(index, 'get')
-        local key, key_end = tuple_encode(key)
-        if builtin.box_index_get(index.space_id, index.id,
-                                 key, key_end, ptuple) ~= 0 then
-            return box.error() -- error
-        elseif ptuple[0] ~= nil then
-            return tuple_bless(ptuple[0])
-        else
-            return
-        end
-    end
-    index_mt.get_luac = function(index, key)
-        check_index_arg(index, 'get')
-        key = keify(key)
-        return internal.get(index.space_id, index.id, key)
-    end
+index_mt.select_luac = function(index, key, opts)
+    check_index_arg(index, 'select')
+    local key = keify(key)
+    local iterator, offset, limit = check_select_opts(opts, #key == 0)
+    return internal.select(index.space_id, index.id, iterator,
+        offset, limit, key)
+end
 
-    local function check_select_opts(opts, key_is_nil)
-        local offset = 0
-        local limit = 4294967295
-        local iterator = check_iterator_type(opts, key_is_nil)
-        if opts ~= nil then
-            if opts.offset ~= nil then
-                offset = opts.offset
-            end
-            if opts.limit ~= nil then
-                limit = opts.limit
-            end
-        end
-        return iterator, offset, limit
+index_mt.update = function(index, key, ops)
+    check_index_arg(index, 'update')
+    return internal.update(index.space_id, index.id, keify(key), ops);
+end
+index_mt.delete = function(index, key)
+    check_index_arg(index, 'delete')
+    return internal.delete(index.space_id, index.id, keify(key));
+end
+
+index_mt.info = function(index)
+    return internal.info(index.space_id, index.id);
+end
+
+index_mt.drop = function(index)
+    check_index_arg(index, 'drop')
+    return box.schema.index.drop(index.space_id, index.id)
+end
+index_mt.rename = function(index, name)
+    check_index_arg(index, 'rename')
+    return box.schema.index.rename(index.space_id, index.id, name)
+end
+index_mt.alter = function(index, options)
+    check_index_arg(index, 'alter')
+    if index.id == nil or index.space_id == nil then
+        box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
     end
+    return box.schema.index.alter(index.space_id, index.id, options)
+end
 
-    index_mt.select_ffi = function(index, key, opts)
-        check_index_arg(index, 'select')
-        local key, key_end = tuple_encode(key)
-        local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
-
-        local port = ffi.cast('struct port *', port_tuple)
-
-        if builtin.box_select(index.space_id, index.id,
-            iterator, offset, limit, key, key_end, port) ~= 0 then
-            return box.error()
-        end
-
-        local ret = {}
-        local entry = port_tuple.first
-        for i=1,tonumber(port_tuple.size),1 do
-            ret[i] = tuple_bless(entry.tuple)
-            entry = entry.next
-        end
-        builtin.port_destroy(port);
-        return ret
-    end
-
-    index_mt.select_luac = function(index, key, opts)
-        check_index_arg(index, 'select')
-        local key = keify(key)
-        local iterator, offset, limit = check_select_opts(opts, #key == 0)
-        return internal.select(index.space_id, index.id, iterator,
-            offset, limit, key)
-    end
-
-    index_mt.update = function(index, key, ops)
-        check_index_arg(index, 'update')
-        return internal.update(index.space_id, index.id, keify(key), ops);
-    end
-    index_mt.delete = function(index, key)
-        check_index_arg(index, 'delete')
-        return internal.delete(index.space_id, index.id, keify(key));
-    end
-
-    index_mt.info = function(index)
-        return internal.info(index.space_id, index.id);
-    end
-
-    index_mt.drop = function(index)
-        check_index_arg(index, 'drop')
-        return box.schema.index.drop(index.space_id, index.id)
-    end
-    index_mt.rename = function(index, name)
-        check_index_arg(index, 'rename')
-        return box.schema.index.rename(index.space_id, index.id, name)
-    end
-    index_mt.alter = function(index, options)
-        check_index_arg(index, 'alter')
-        if index.id == nil or index.space_id == nil then
-            box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
-        end
-        return box.schema.index.alter(index.space_id, index.id, options)
-    end
-
-    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
-    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
-
-    return index_mt
-end)()
+index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
+index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
 
 function box.schema.space.bless(space)
     local index_mt = {}
