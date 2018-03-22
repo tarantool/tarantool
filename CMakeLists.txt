@@ -63,6 +63,9 @@ include(cmake/pod2man.cmake)
 include(cmake/arch.cmake)
 include(cmake/os.cmake)
 include(cmake/compiler.cmake)
+# NO_POLICY_SCOPE is to suppress CMP0069 warnings on the unset
+# policy.
+include(cmake/lto.cmake NO_POLICY_SCOPE)
 include(cmake/simd.cmake)
 include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
