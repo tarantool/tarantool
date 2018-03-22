@@ -402,6 +402,88 @@ _ = fiber.create(fn1)
 session_type
 session_type = nil
 
+-- gh-1397 fiber.new, fiber.join
+test_run:cmd("setopt delimiter ';'")
+function err() box.error(box.error.ILLEGAL_PARAMS, 'oh my') end;
+function test1()
+    f = fiber.new(err)
+    f:set_joinable(true)
+    local st, e = f:join()
+    return st, e
+end;
+st, e = test1();
+st;
+e:unpack();
+
+flag = false;
+function test2()
+    f = fiber.new(function() flag = true  end)
+    fiber.set_joinable(f, true)
+    fiber.join(f)
+end;
+test2();
+flag;
+
+function test3()
+    f = fiber.new(function() return "hello" end)
+    fiber.set_joinable(f, true)
+    return fiber.join(f)
+end;
+test3();
+
+function test4()
+    f = fiber.new(function (i) return i + 1  end, 1)
+    fiber.set_joinable(f, true)
+    return f:join()
+end;
+test4();
+
+function test_double_join()
+    f = fiber.new(function (i) return i + 1  end, 1)
+    fiber.set_joinable(f, true)
+    f:join()
+    return f:join()
+end;
+test_double_join();
+
+
+function test5()
+    f = fiber.new(function() end)
+    f:set_joinable(true)
+    return f, f:status()
+end;
+local status;
+f, status = test5();
+status;
+f:status();
+f:join();
+f:status();
+
+function test6()
+    f = fiber.new(function() end)
+    f:set_joinable(true)
+    f:set_joinable(false)
+    return f, f:status()
+end;
+f, status = test6();
+status;
+f:status();
+
+-- test side fiber in transaction
+s = box.schema.space.create("test");
+_ = s:create_index("prim", {parts={1, 'number'}});
+flag = false;
+function test7(i)
+    box.begin()
+    s:put{i}
+    fiber.new(function(inc) s:put{inc + 1} flag = true end, i)
+    box.rollback()
+end;
+f = fiber.create(test7, 1);
+while flag ~= true do fiber.sleep(0.001) end;
+s:select{};
+s:drop();
+test_run:cmd("setopt delimiter ''");
 fiber = nil
 
 --

@@ -105,7 +105,9 @@ enum fiber_key {
 	/** User global privilege and authentication token */
 	FIBER_KEY_USER = 3,
 	FIBER_KEY_MSG = 4,
-	FIBER_KEY_MAX = 5
+	/** Storage for lua stack */
+	FIBER_KEY_LUA_STACK = 5,
+	FIBER_KEY_MAX = 6
 };
 
 /** \cond public */

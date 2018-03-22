@@ -59,6 +59,9 @@ local default_cfg = {
     replication_sync_lag = 10,
     replication_connect_timeout = 4,
     replication_connect_quorum = nil, -- connect all
+    feedback_enabled      = true,
+    feedback_host         = "https://feedback.tarantool.io",
+    feedback_interval     = 3600,
 }
 
 -- types of available options
@@ -115,6 +118,9 @@ local template_cfg = {
     replication_sync_lag = 'number',
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
+    feedback_enabled      = 'boolean',
+    feedback_host         = 'string',
+    feedback_interval     = 'number',
 }
 
 local function normalize_uri(port)
@@ -175,6 +181,9 @@ local dynamic_cfg = {
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.checkpoint_daemon.set_checkpoint_interval,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
+    feedback_enabled        = private.feedback_daemon.set_feedback_params,
+    feedback_host           = private.feedback_daemon.set_feedback_params,
+    feedback_interval       = private.feedback_daemon.set_feedback_params,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     custom_proc_title       = function()

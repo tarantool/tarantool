@@ -63,6 +63,7 @@ t
   - commit
   - ctl
   - error
+  - feedback
   - index
   - info
   - internal
