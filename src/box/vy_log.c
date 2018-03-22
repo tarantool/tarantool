@@ -1942,39 +1942,37 @@ vy_recovery_new(int64_t signature, bool only_checkpoint)
 	return recovery;
 }
 
-/** Helper to delete mh_i64ptr_t along with all its records. */
-static void
-vy_recovery_delete_hash(struct mh_i64ptr_t *h)
-{
-	mh_int_t i;
-	mh_foreach(h, i)
-		free(mh_i64ptr_node(h, i)->val);
-	mh_i64ptr_delete(h);
-}
-
 void
 vy_recovery_delete(struct vy_recovery *recovery)
 {
-	if (recovery->index_id_hash != NULL) {
-		mh_int_t i;
-		mh_foreach(recovery->index_id_hash, i) {
-			struct vy_lsm_recovery_info *lsm;
-			lsm = mh_i64ptr_node(recovery->index_id_hash, i)->val;
-			free(lsm->key_parts);
-			free(lsm);
+	struct vy_lsm_recovery_info *lsm, *next_lsm;
+	struct vy_range_recovery_info *range, *next_range;
+	struct vy_slice_recovery_info *slice, *next_slice;
+	struct vy_run_recovery_info *run, *next_run;
+
+	rlist_foreach_entry_safe(lsm, &recovery->lsms, in_recovery, next_lsm) {
+		rlist_foreach_entry_safe(range, &lsm->ranges,
+					 in_lsm, next_range) {
+			rlist_foreach_entry_safe(slice, &range->slices,
+						 in_range, next_slice)
+				free(slice);
+			free(range);
 		}
+		rlist_foreach_entry_safe(run, &lsm->runs, in_lsm, next_run)
+			free(run);
+		free(lsm->key_parts);
+		free(lsm);
+	}
+	if (recovery->index_id_hash != NULL)
 		mh_i64ptr_delete(recovery->index_id_hash);
-	}
-	if (recovery->lsm_hash != NULL) {
-		/* Hash entries were deleted along with index_id_hash. */
+	if (recovery->lsm_hash != NULL)
 		mh_i64ptr_delete(recovery->lsm_hash);
-	}
 	if (recovery->range_hash != NULL)
-		vy_recovery_delete_hash(recovery->range_hash);
+		mh_i64ptr_delete(recovery->range_hash);
 	if (recovery->run_hash != NULL)
-		vy_recovery_delete_hash(recovery->run_hash);
+		mh_i64ptr_delete(recovery->run_hash);
 	if (recovery->slice_hash != NULL)
-		vy_recovery_delete_hash(recovery->slice_hash);
+		mh_i64ptr_delete(recovery->slice_hash);
 	TRASH(recovery);
 	free(recovery);
 }
@@ -2096,10 +2094,8 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 	struct xlog xlog;
 	xlog_clear(&xlog);
 
-	mh_int_t i;
-	mh_foreach(recovery->index_id_hash, i) {
-		struct vy_lsm_recovery_info *lsm;
-		lsm = mh_i64ptr_node(recovery->index_id_hash, i)->val;
+	struct vy_lsm_recovery_info *lsm;
+	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
 		/*
 		 * Purge dropped LSM trees that are not referenced by runs
 		 * (and thus not needed for garbage collection) from the
