@@ -413,7 +413,10 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return error_sm(err, msg)
         end
+        -- @deprecated since 1.10
         if greeting.protocol == 'Lua console' then
+            log.warn("Netbox text protocol support is deprecated since 1.10, "..
+                     "please use require('console').connect() instead")
             local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
             method_codec.inject(send_buf, nil, nil, setup_delimiter)
             local err, response = send_and_recv_console()
@@ -689,7 +692,10 @@ local function new_sm(host, port, opts, connection, greeting)
             end
         end
     end
+    -- @deprecated since 1.10
     if opts.console then
+        log.warn("Netbox console API is deprecated since 1.10, please use "..
+                 "require('console').connect() instead")
         setmetatable(remote, console_mt)
     else
         setmetatable(remote, remote_mt)
