@@ -2238,6 +2238,9 @@ end
 
 box.feedback = {}
 box.feedback.save = function(file_name)
+    if type(file_name) ~= "string" then
+        error("Usage: box.feedback.save(path)")
+    end
     local feedback = json.encode(box.internal.feedback_daemon.generate_feedback())
     local fh, err = fio.open(file_name, {'O_CREAT', 'O_RDWR', 'O_TRUNC'},
         tonumber('0777', 8))
