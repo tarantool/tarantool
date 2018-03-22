@@ -891,11 +891,11 @@ remote_pk:count({2})
 ...
 remote_pk:count({2}, { timeout = 1.00, iterator = 'LE' })
 ---
-- 1
+- 3
 ...
 remote_pk:count({2}, { iterator = 'LE'})
 ---
-- 1
+- 3
 ...
 remote_pk:count({2}, { timeout = 1e-9, iterator = 'LE' })
 ---
