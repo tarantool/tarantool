@@ -213,7 +213,7 @@ fio.pathjoin = function(...)
     while i <= len do
         local sp = select(i, ...)
         if sp == nil then
-            error("Undefined path part")
+            error("Undefined path part "..i)
         end
 
         sp = tostring(sp)
