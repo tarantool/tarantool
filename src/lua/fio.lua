@@ -206,31 +206,47 @@ fio.open = function(path, flags, mode)
     return fh
 end
 
-fio.pathjoin = function(path, ...)
-    path = tostring(path)
-    if path == nil or path == '' then
-        error("Empty path part")
-    end
-    for i = 1, select('#', ...) do
-        if string.match(path, '/$') ~= nil then
-            path = string.gsub(path, '/$', '')
+fio.pathjoin = function(...)
+    local i, path = 1, nil
+
+    local len = select('#', ...)
+    while i <= len do
+        local sp = select(i, ...)
+        if sp == nil then
+            error("Undefined path part "..i)
         end
 
+        sp = tostring(sp)
+        if sp ~= '' then
+            path = sp
+            break
+        else
+            i = i + 1
+        end
+    end
+
+    if path == nil then
+        return '.'
+    end
+
+    i = i + 1
+    while i <= len do
         local sp = select(i, ...)
         if sp == nil then
             error("Undefined path part")
         end
-        if sp == '' then
-            error("Empty path part")
-        end
 
+        sp = tostring(sp)
         if sp ~= '' then
             path = path .. '/' .. sp
         end
+
+        i = i + 1
     end
-    path = string.gsub(path, "/+",'/')
-    if string.match(path, '/$') ~= nil and #path > 1 then
-        path = string.gsub(path, '/$', '')
+
+    path = path:gsub('/+', '/')
+    if path ~= '/' then
+        path = path:gsub('/$', '')
     end
 
     return path
