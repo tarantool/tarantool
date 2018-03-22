@@ -4623,26 +4623,20 @@ case OP_IdxGE:  {       /* jump */
 	break;
 }
 
-/* Opcode: Clear P1 P2 P3
+/* Opcode: Clear P1 * * * *
+ * Synopsis: space id = P1
  *
- * Delete all contents of the database table or index whose root page
- * in the database file is given by P1.  But, unlike Destroy, do not
- * remove the table or index from the database file.
- *
- * The table being clear is in the main database file if P2==0.  If
- * P2==1 then the table to be clear is in the auxiliary database file
- * that is used to store tables create using CREATE TEMPORARY TABLE.
- *
- * If the P3 value is non-zero, then the table referred to must be an
- * intkey table (an SQL table, not an index). In this case the row change
- * count is incremented by the number of rows in the table being cleared.
- * If P3 is greater than zero, then the value stored in register P3 is
- * also incremented by the number of rows in the table being cleared.
- *
- * See also: Destroy
+ * Delete all contents of the space, which space id is given
+ * in P1 argument. It is worth mentioning, that clearing routine
+ * doesn't involve truncating, since it features completely
+ * different mechanism under hood.
  */
 case OP_Clear: {
-	rc = tarantoolSqlite3ClearTable(pOp->p1);
+	assert(pOp->p1 > 0);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	rc = tarantoolSqlite3ClearTable(space);
 	if (rc) goto abort_due_to_error;
 	break;
 }

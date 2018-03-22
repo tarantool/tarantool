@@ -77,7 +77,7 @@ int tarantoolSqlite3Count(BtCursor * pCur, i64 * pnEntry);
 int tarantoolSqlite3Insert(BtCursor * pCur);
 int tarantoolSqlite3Replace(BtCursor * pCur);
 int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
-int tarantoolSqlite3ClearTable(int iTable);
+int tarantoolSqlite3ClearTable(struct space *space);
 
 /* Rename table pTab with zNewName by inserting new tuple to _space.
  * SQL statement, which creates table with new name is saved in pzSqlStmt.

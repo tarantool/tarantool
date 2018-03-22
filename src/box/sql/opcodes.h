@@ -119,7 +119,7 @@
 #define OP_IdxReplace    116 /* synopsis: key=r[P2]                        */
 #define OP_IdxInsert     117 /* synopsis: key=r[P2]                        */
 #define OP_IdxDelete     118 /* synopsis: key=r[P2@P3]                     */
-#define OP_Clear         119
+#define OP_Clear         119 /* synopsis: space id = P1                    */
 #define OP_ResetSorter   120
 #define OP_ParseSchema2  121 /* synopsis: rows=r[P1@P2]                    */
 #define OP_ParseSchema3  122 /* synopsis: name=r[P1] sql=r[P1+1]           */
