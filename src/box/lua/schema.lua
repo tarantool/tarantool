@@ -1089,7 +1089,7 @@ internal.check_iterator_type = check_iterator_type -- export for net.box
 
 local space_mt = {}
 space_mt.__index = space_mt
-box.space_mt = space_mt
+box.schema.space_mt = space_mt
 
 space_mt.len = function(space)
     check_space_arg(space, 'len')
@@ -1210,7 +1210,7 @@ end
 
 local index_mt = {}
 index_mt.__index = index_mt
-box.index_mt = index_mt
+box.schema.index_mt = index_mt
 
 -- __len and __index
 index_mt.len = function(index)
@@ -1428,7 +1428,7 @@ index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
 function box.schema.space.bless(space)
     local index_mt = {}
     index_mt.__index = function(index, key)
-      return index_mt[key] or box.index_mt[key]
+      return index_mt[key] or box.schema.index_mt[key]
     end
 
     -- true if reading operations may yield
@@ -1437,15 +1437,15 @@ function box.schema.space.bless(space)
     for _, op in ipairs(read_ops) do
         if read_yields then
             -- use Lua/C implmenetation
-            index_mt[op] = box.index_mt[op .. "_luac"]
+            index_mt[op] = box.schema.index_mt[op .. "_luac"]
         else
             -- use FFI implementation
-            index_mt[op] = box.index_mt[op .. "_ffi"]
+            index_mt[op] = box.schema.index_mt[op .. "_ffi"]
         end
     end
     --
 
-    setmetatable(space, box.space_mt)
+    setmetatable(space, box.schema.space_mt)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
