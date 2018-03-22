@@ -50,6 +50,7 @@ struct xrow_header;
 struct obuf;
 struct ev_io;
 struct auth_request;
+struct space;
 
 /*
  * Initialize box library
@@ -379,14 +380,28 @@ box_sequence_reset(uint32_t seq_id);
 /** \endcond public */
 
 /**
- * The main entry point to the
+ * Used to be entry point to the
  * Box: callbacks into the request processor.
  * These are function pointers since they can
  * change when entering/leaving read-only mode
  * (master->slave propagation).
+ * However, it makes space lookup. If space is already obtained,
+ * one can simply use internal box_process_rw().
  */
 int
 box_process1(struct request *request, box_tuple_t **result);
+
+/**
+ * Execute request on given space.
+ *
+ * \param request Request to be executed
+ * \param space Space to be updated
+ * \param result Result of executed request
+ * \retval 0 in success, -1 otherwise
+ */
+int
+box_process_rw(struct request *request, struct space *space,
+	       struct tuple **result);
 
 int
 boxk(int type, uint32_t space_id, const char *format, ...);

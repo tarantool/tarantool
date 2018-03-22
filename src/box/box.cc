@@ -160,8 +160,9 @@ box_check_memtx_min_tuple_size(ssize_t memtx_min_tuple_size)
 		  "specified value is out of bounds");
 }
 
-static int
-process_rw(struct request *request, struct space *space, struct tuple **result)
+int
+box_process_rw(struct request *request, struct space *space,
+	       struct tuple **result)
 {
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
@@ -279,7 +280,7 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	struct request request;
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
 	struct space *space = space_cache_find_xc(request.space_id);
-	if (process_rw(&request, space, NULL) != 0) {
+	if (box_process_rw(&request, space, NULL) != 0) {
 		say_error("error applying row: %s", request_str(&request));
 		diag_raise();
 	}
@@ -821,7 +822,7 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)
 		return -1;
-	return process_rw(&request, space, NULL);
+	return box_process_rw(&request, space, NULL);
 }
 
 int
@@ -893,7 +894,7 @@ box_process1(struct request *request, box_tuple_t **result)
 		return -1;
 	if (!space->def->opts.temporary && box_check_writable() != 0)
 		return -1;
-	return process_rw(request, space, result);
+	return box_process_rw(request, space, result);
 }
 
 int
