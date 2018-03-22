@@ -344,7 +344,7 @@ box.session.su('admin', box.session.user())
 ---
 - error: 'bad argument #2 to ''?'' (function expected, got string)'
 ...
--- clenaup
+-- cleanup
 box.session.su('admin')
 ---
 ...

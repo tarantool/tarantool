@@ -175,11 +175,25 @@ gs = box.schema.space.create('guest_space')
 ---
 - error: Write access to space '_schema' is denied for user 'guest'
 ...
+--
+-- FIXME: object create calls system space auto_increment, which requires
+-- read and write privileges. Create privilege must solve this.
+--
+box.schema.func.create('guest_func')
+---
+- error: Read access to space '_func' is denied for user 'guest'
+...
+session.su('admin', box.schema.user.grant, "guest", "read", "universe")
+---
+...
 box.schema.func.create('guest_func')
 ---
 - error: Read access to space '_func' is denied for user 'guest'
 ...
 session.su('admin')
+---
+...
+box.schema.user.revoke("guest", "read", "universe")
 ---
 ...
 s:select()

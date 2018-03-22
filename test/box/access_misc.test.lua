@@ -70,9 +70,16 @@ s:insert({4})
 s:delete({3})
 s:drop()
 gs = box.schema.space.create('guest_space')
+--
+-- FIXME: object create calls system space auto_increment, which requires
+-- read and write privileges. Create privilege must solve this.
+--
 box.schema.func.create('guest_func')
-
+session.su('admin', box.schema.user.grant, "guest", "read", "universe")
+box.schema.func.create('guest_func')
 session.su('admin')
+box.schema.user.revoke("guest", "read", "universe")
+
 s:select()
 --
 -- Create user with universe read&write grants

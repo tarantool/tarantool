@@ -580,6 +580,10 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
+-- finish transaction
+box.rollback()
+---
+...
 _ = c:get()
 ---
 ...
