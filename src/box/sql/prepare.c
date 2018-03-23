@@ -86,7 +86,6 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 	sqlite3 *db = pData->db;
 	assert(argc == 3);
 	UNUSED_PARAMETER2(NotUsed, argc);
-	assert(sqlite3_mutex_held(db->mutex));
 	if (db->mallocFailed) {
 		corruptSchema(pData, argv[0], 0);
 		return 1;
@@ -165,7 +164,6 @@ sqlite3InitDatabase(sqlite3 * db)
 	InitData initData;
 
 	assert(db->pSchema != NULL);
-	assert(sqlite3_mutex_held(db->mutex));
 
 	memset(&initData, 0, sizeof(InitData));
 	initData.db = db;
@@ -227,7 +225,6 @@ sqlite3SchemaToIndex(sqlite3 * db, Schema * pSchema)
 	 * more likely to cause a segfault than -1 (of course there are assert()
 	 * statements too, but it never hurts to play the odds).
 	 */
-	assert(sqlite3_mutex_held(db->mutex));
 	if (pSchema) {
 		if (db->pSchema == pSchema) {
 			i = 0;
@@ -279,7 +276,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	sParse.pReprepare = pReprepare;
 	assert(ppStmt && *ppStmt == 0);
 	/* assert( !db->mallocFailed ); // not true with SQLITE_USE_ALLOCA */
-	assert(sqlite3_mutex_held(db->mutex));
 
 	/* Check to verify that it is possible to get a read lock on all
 	 * database schemas.  The inability to get a read lock indicates that
@@ -410,7 +406,6 @@ sqlite3LockAndPrepare(sqlite3 * db,		/* Database handle. */
 	if (!sqlite3SafetyCheckOk(db) || zSql == 0) {
 		return SQLITE_MISUSE_BKPT;
 	}
-	sqlite3_mutex_enter(db->mutex);
 	rc = sqlite3Prepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 			    pzTail);
 	if (rc == SQLITE_SCHEMA) {
@@ -418,7 +413,6 @@ sqlite3LockAndPrepare(sqlite3 * db,		/* Database handle. */
 		rc = sqlite3Prepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 				    pzTail);
 	}
-	sqlite3_mutex_leave(db->mutex);
 	assert(rc == SQLITE_OK || *ppStmt == 0);
 	return rc;
 }
@@ -439,11 +433,9 @@ sqlite3Reprepare(Vdbe * p)
 	const char *zSql;
 	sqlite3 *db;
 
-	assert(sqlite3_mutex_held(sqlite3VdbeDb(p)->mutex));
 	zSql = sqlite3_sql((sqlite3_stmt *) p);
 	assert(zSql != 0);	/* Reprepare only called for prepare_v2() statements */
 	db = sqlite3VdbeDb(p);
-	assert(sqlite3_mutex_held(db->mutex));
 	rc = sqlite3LockAndPrepare(db, zSql, -1, 0, p, &pNew, 0);
 	if (rc) {
 		if (rc == SQLITE_NOMEM) {

@@ -183,7 +183,6 @@ sqlite3VdbeMemClearAndResize(Mem * pMem, int szNew)
 int
 sqlite3VdbeMemMakeWriteable(Mem * pMem)
 {
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	if ((pMem->flags & (MEM_Str | MEM_Blob)) != 0) {
 		if (ExpandBlob(pMem))
 			return SQLITE_NOMEM;
@@ -215,7 +214,6 @@ sqlite3VdbeMemExpandBlob(Mem * pMem)
 	int nByte;
 	assert(pMem->flags & MEM_Zero);
 	assert(pMem->flags & MEM_Blob);
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 
 	/* Set nByte to the number of bytes required to store the expanded blob. */
 	nByte = pMem->n + pMem->u.nZero;
@@ -255,7 +253,6 @@ vdbeMemAddTerminator(Mem * pMem)
 int
 sqlite3VdbeMemNulTerminate(Mem * pMem)
 {
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	testcase((pMem->flags & (MEM_Term | MEM_Str)) == (MEM_Term | MEM_Str));
 	testcase((pMem->flags & (MEM_Term | MEM_Str)) == 0);
 	if ((pMem->flags & (MEM_Term | MEM_Str)) != MEM_Str) {
@@ -285,7 +282,6 @@ sqlite3VdbeMemStringify(Mem * pMem, u8 bForce)
 	int fg = pMem->flags;
 	const int nByte = 32;
 
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(!(fg & MEM_Zero));
 	assert(!(fg & (MEM_Str | MEM_Blob)));
 	assert(fg & (MEM_Int | MEM_Real));
@@ -323,7 +319,6 @@ sqlite3VdbeMemFinalize(Mem * pMem, FuncDef * pFunc)
 		sqlite3_context ctx;
 		Mem t;
 		assert((pMem->flags & MEM_Null) != 0 || pFunc == pMem->u.pDef);
-		assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 		memset(&ctx, 0, sizeof(ctx));
 		memset(&t, 0, sizeof(t));
 		t.flags = MEM_Null;
@@ -353,7 +348,6 @@ sqlite3VdbeMemFinalize(Mem * pMem, FuncDef * pFunc)
 static SQLITE_NOINLINE void
 vdbeMemClearExternAndSetNull(Mem * p)
 {
-	assert(p->db == 0 || sqlite3_mutex_held(p->db->mutex));
 	assert(VdbeMemDynamic(p));
 	if (p->flags & MEM_Agg) {
 		sqlite3VdbeMemFinalize(p, p->u.pDef);
@@ -458,7 +452,6 @@ i64
 sqlite3VdbeIntValue(Mem * pMem)
 {
 	int flags;
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 	flags = pMem->flags;
 	if (flags & MEM_Int) {
@@ -484,7 +477,6 @@ sqlite3VdbeIntValue(Mem * pMem)
 double
 sqlite3VdbeRealValue(Mem * pMem)
 {
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 	if (pMem->flags & MEM_Real) {
 		return pMem->u.r;
@@ -510,7 +502,6 @@ sqlite3VdbeIntegerAffinity(Mem * pMem)
 {
 	i64 ix;
 	assert(pMem->flags & MEM_Real);
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	ix = doubleToInt64(pMem->u.r);
@@ -537,7 +528,6 @@ sqlite3VdbeIntegerAffinity(Mem * pMem)
 int
 sqlite3VdbeMemIntegerify(Mem * pMem)
 {
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	pMem->u.i = sqlite3VdbeIntValue(pMem);
@@ -552,7 +542,6 @@ sqlite3VdbeMemIntegerify(Mem * pMem)
 int
 sqlite3VdbeMemRealify(Mem * pMem)
 {
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	pMem->u.r = sqlite3VdbeRealValue(pMem);
@@ -573,7 +562,6 @@ sqlite3VdbeMemNumerify(Mem * pMem)
 {
 	if ((pMem->flags & (MEM_Int | MEM_Real | MEM_Null)) == 0) {
 		assert((pMem->flags & (MEM_Blob | MEM_Str)) != 0);
-		assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 		if (0 == sqlite3Atoi64(pMem->z, &pMem->u.i, pMem->n)) {
 			MemSetTypeFlag(pMem, MEM_Int);
 		} else {
@@ -843,8 +831,6 @@ sqlite3VdbeMemCopy(Mem * pTo, const Mem * pFrom)
 void
 sqlite3VdbeMemMove(Mem * pTo, Mem * pFrom)
 {
-	assert(pFrom->db == 0 || sqlite3_mutex_held(pFrom->db->mutex));
-	assert(pTo->db == 0 || sqlite3_mutex_held(pTo->db->mutex));
 	assert(pFrom->db == 0 || pTo->db == 0 || pFrom->db == pTo->db);
 
 	sqlite3VdbeMemRelease(pTo);
@@ -879,7 +865,6 @@ sqlite3VdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 	int nByte = n;		/* New value for pMem->n */
 	int iLimit;		/* Maximum allowed string or blob size */
 	u16 flags = 0;		/* New value for pMem->flags */
-	assert(pMem->db == 0 || sqlite3_mutex_held(pMem->db->mutex));
 
 	/* If z is a NULL pointer, set pMem to contain an SQL NULL. */
 	if (!z) {
@@ -1019,7 +1004,6 @@ static SQLITE_NOINLINE const void *
 valueToText(sqlite3_value * pVal)
 {
 	assert(pVal != 0);
-	assert(pVal->db == 0 || sqlite3_mutex_held(pVal->db->mutex));
 	assert((pVal->flags & (MEM_Null)) == 0);
 	if (pVal->flags & (MEM_Blob | MEM_Str)) {
 		if (ExpandBlob(pVal))
@@ -1048,7 +1032,6 @@ sqlite3ValueText(sqlite3_value * pVal)
 {
 	if (!pVal)
 		return 0;
-	assert(pVal->db == 0 || sqlite3_mutex_held(pVal->db->mutex));
 	if ((pVal->flags & (MEM_Str | MEM_Term)) == (MEM_Str | MEM_Term)) {
 		return pVal->z;
 	}

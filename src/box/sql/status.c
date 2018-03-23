@@ -68,8 +68,7 @@ static SQLITE_WSD struct sqlite3StatType {
 #endif
 
 /*
- * Return the current value of a status parameter.  The caller must
- * be holding the appropriate mutex.
+ * Return the current value of a status parameter.
  */
 sqlite3_int64
 sqlite3StatusValue(int op)
@@ -81,8 +80,7 @@ sqlite3StatusValue(int op)
 }
 
 /*
- * Add N to the value of a status record.  The caller must hold the
- * appropriate mutex.  (Locking is checked by assert()).
+ * Add N to the value of a status record.
  *
  * The StatusUp() routine can accept positive or negative values for N.
  * The value of N is added to the current status value and the high-water
@@ -115,7 +113,6 @@ sqlite3StatusDown(int op, int N)
 
 /*
  * Adjust the highwater mark if necessary.
- * The caller must hold the appropriate mutex.
  */
 void
 sqlite3StatusHighwater(int op, int X)
@@ -193,7 +190,6 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		return SQLITE_MISUSE_BKPT;
 	}
 #endif
-	sqlite3_mutex_enter(db->mutex);
 	switch (op) {
 	case SQLITE_DBSTATUS_LOOKASIDE_USED:{
 			*pCurrent = db->lookaside.nOut;
@@ -347,6 +343,5 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 			rc = SQLITE_ERROR;
 		}
 	}
-	sqlite3_mutex_leave(db->mutex);
 	return rc;
 }

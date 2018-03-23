@@ -609,11 +609,9 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 	assert(nErr == 0);
 	pParse->zTail = &zSql[i];
 #ifdef YYTRACKMAXSTACKDEPTH
-	sqlite3_mutex_enter(sqlite3MallocMutex());
 	sqlite3StatusHighwater(SQLITE_STATUS_PARSER_STACK,
 			       sqlite3ParserStackPeak(pEngine)
 	    );
-	sqlite3_mutex_leave(sqlite3MallocMutex());
 #endif				/* YYDEBUG */
 	sqlite3ParserFree(pEngine, sqlite3_free);
 	if (db->mallocFailed) {

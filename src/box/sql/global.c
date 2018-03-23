@@ -195,8 +195,6 @@ const unsigned char sqlite3CtypeMap[256] = {
  */
 SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 	SQLITE_DEFAULT_MEMSTATUS,	/* bMemstat */
-	1,			/* bCoreMutex */
-	SQLITE_THREADSAFE == 1,	/* bFullMutex */
 	SQLITE_USE_URI,		/* bOpenUri */
 	SQLITE_ALLOW_COVERING_INDEX_SCAN,	/* bUseCis */
 	0x7ffffffe,		/* mxStrlen */
@@ -205,7 +203,6 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 	125,			/* nLookaside */
 	0,			/* nStmtSpill */
 	{0, 0, 0, 0, 0, 0, 0, 0},	/* m */
-	{0, 0, 0, 0, 0, 0, 0, 0, 0},	/* mutex */
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},	/* pcache2 */
 	(void *)0,		/* pHeap */
 	0,			/* nHeap */
@@ -224,10 +221,7 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 	/* All the rest should always be initialized to zero */
 	0,			/* isInit */
 	0,			/* inProgress */
-	0,			/* isMutexInit */
 	0,			/* isMallocInit */
-	0,			/* nRefInitMutex */
-	0,			/* pInitMutex */
 	0,			/* xLog */
 	0,			/* pLogArg */
 #ifdef SQLITE_ENABLE_SQLLOG

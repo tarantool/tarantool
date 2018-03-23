@@ -69,7 +69,6 @@ sqlite3_exec(sqlite3 * db,	/* The database on which the SQL executes */
 	if (zSql == 0)
 		zSql = "";
 
-	sqlite3_mutex_enter(db->mutex);
 	sqlite3Error(db, SQLITE_OK);
 	while (rc == SQLITE_OK && zSql[0]) {
 		int nCol;
@@ -184,6 +183,5 @@ sqlite3_exec(sqlite3 * db,	/* The database on which the SQL executes */
 	}
 
 	assert((rc & db->errMask) == rc);
-	sqlite3_mutex_leave(db->mutex);
 	return rc;
 }

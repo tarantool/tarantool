@@ -5527,10 +5527,7 @@ abort_due_to_error:
 		sqlite3SchemaClear(db);
 	}
 
-	/* This is the only way out of this procedure.  We have to
-	 * release the mutexes on btrees that were acquired at the
-	 * top.
-	 */
+	/* This is the only way out of this procedure. */
 vdbe_return:
 	testcase( nVmStep>0);
 	p->aCounter[SQLITE_STMTSTATUS_VM_STEP] += (int)nVmStep;

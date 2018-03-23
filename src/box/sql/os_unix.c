@@ -134,15 +134,6 @@
 #define SQLITE_FSFLAGS_IS_MSDOS     0x1
 
 /*
- * If we are to be thread-safe, include the pthreads header and define
- * the SQLITE_UNIX_THREADS macro.
- */
-#if SQLITE_THREADSAFE
-#include <pthread.h>
-#define SQLITE_UNIX_THREADS 1
-#endif
-
-/*
  * Default permissions when creating a new file
  */
 #ifndef SQLITE_DEFAULT_FILE_PERMISSIONS
@@ -284,16 +275,6 @@ static pid_t randomnessPid = 0;
 #endif
 #ifndef O_BINARY
 #define O_BINARY 0
-#endif
-
-/*
- * The threadid macro resolves to the thread-id or to 0.  Used for
- * testing and debugging only.
- */
-#if SQLITE_THREADSAFE
-#define threadid pthread_self()
-#else
-#define threadid 0
 #endif
 
 /*
@@ -648,39 +629,6 @@ robust_open(const char *z, int f, mode_t m)
 	return fd;
 }
 
-/*
- * Helper functions to obtain and relinquish the global mutex. The
- * global mutex is used to protect the unixInodeInfo object
- * used by this file, all of which may be shared by multiple threads.
- *
- * Function unixMutexHeld() is used to assert() that the global mutex
- * is held when required. This function is only used as part of assert()
- * statements. e.g.
- *
- *   unixEnterMutex()
- *     assert( unixMutexHeld() );
- *   unixEnterLeave()
- */
-static void
-unixEnterMutex(void)
-{
-	sqlite3_mutex_enter(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_VFS1));
-}
-
-static void
-unixLeaveMutex(void)
-{
-	sqlite3_mutex_leave(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_VFS1));
-}
-
-#ifdef SQLITE_DEBUG
-static int
-unixMutexHeld(void)
-{
-	return sqlite3_mutex_held(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_VFS1));
-}
-#endif
-
 #ifdef SQLITE_LOCK_TRACE
 /*
  * Print out information about all locking operations.
@@ -717,8 +665,8 @@ lockTrace(int fd, int op, struct flock *p)
 	assert(p->l_whence == SEEK_SET);
 	s = osFcntl(fd, op, p);
 	savedErrno = errno;
-	sqlite3DebugPrintf("fcntl %d %d %s %s %d %d %d %d\n",
-			   threadid, fd, zOpName, zType, (int)p->l_start,
+	sqlite3DebugPrintf("fcntl %d %s %s %d %d %d %d\n",
+			   fd, zOpName, zType, (int)p->l_start,
 			   (int)p->l_len, (int)p->l_pid, s);
 	if (s == (-1) && op == F_SETLK
 	    && (p->l_type == F_RDLCK || p->l_type == F_WRLCK)) {
@@ -951,39 +899,7 @@ unixLogErrorAtLine(int errcode,	/* SQLite error code */
 	char *zErr;		/* Message from strerror() or equivalent */
 	int iErrno = errno;	/* Saved syscall error number */
 
-	/* If this is not a threadsafe build (SQLITE_THREADSAFE==0), then use
-	 * the strerror() function to obtain the human-readable error message
-	 * equivalent to errno. Otherwise, use strerror_r().
-	 */
-#if SQLITE_THREADSAFE && defined(HAVE_STRERROR_R)
-	char aErr[80];
-	memset(aErr, 0, sizeof(aErr));
-	zErr = aErr;
-
-	/* If STRERROR_R_CHAR_P (set by autoconf scripts) or __USE_GNU is defined,
-	 * assume that the system provides the GNU version of strerror_r() that
-	 * returns a pointer to a buffer containing the error message. That pointer
-	 * may point to aErr[], or it may point to some static storage somewhere.
-	 * Otherwise, assume that the system provides the POSIX version of
-	 * strerror_r(), which always writes an error message into aErr[].
-	 *
-	 * If the code incorrectly assumes that it is the POSIX version that is
-	 * available, the error message will often be an empty string. Not a
-	 * huge problem. Incorrectly concluding that the GNU version is available
-	 * could lead to a segfault though.
-	 */
-#if defined(STRERROR_R_CHAR_P) || defined(__USE_GNU)
-	zErr =
-#endif
-	    strerror_r(iErrno, aErr, sizeof(aErr) - 1);
-
-#elif SQLITE_THREADSAFE
-	/* This is a threadsafe build, but strerror_r() is not available. */
-	zErr = "";
-#else
-	/* Non-threadsafe build, use strerror(). */
 	zErr = strerror(iErrno);
-#endif
 
 	if (zPath == 0)
 		zPath = "";
@@ -1045,15 +961,11 @@ closePendingFds(unixFile * pFile)
 
 /*
  * Release a unixInodeInfo structure previously allocated by findInodeInfo().
- *
- * The mutex entered using the unixEnterMutex() function must be held
- * when this function is called.
  */
 static void
 releaseInodeInfo(unixFile * pFile)
 {
 	unixInodeInfo *pInode = pFile->pInode;
-	assert(unixMutexHeld());
 	if (ALWAYS(pInode)) {
 		pInode->nRef--;
 		if (pInode->nRef == 0) {
@@ -1080,9 +992,6 @@ releaseInodeInfo(unixFile * pFile)
  * describes that file descriptor.  Create a new one if necessary.  The
  * return value might be uninitialized if an error occurs.
  *
- * The mutex entered using the unixEnterMutex() function must be held
- * when this function is called.
- *
  * Return an appropriate error code.
  */
 static int
@@ -1095,8 +1004,6 @@ findInodeInfo(unixFile * pFile,	/* Unix file with file desc used in the key */
 	struct unixFileId fileId;	/* Lookup key for the unixInodeInfo */
 	struct stat statbuf;	/* Low-level file information */
 	unixInodeInfo *pInode = 0;	/* Candidate unixInodeInfo object */
-
-	assert(unixMutexHeld());
 
 	/* Get low-level information about the file that we can used to
 	 * create a unique name for the file.
@@ -1238,14 +1145,11 @@ unixCheckReservedLock(sqlite3_file * id, int *pResOut)
 
 	assert(pFile);
 	assert(pFile->eFileLock <= SHARED_LOCK);
-	unixEnterMutex();	/* Because pFile->pInode is shared across threads */
 
 	/* Check if a thread in this process holds such a lock */
 	if (pFile->pInode->eFileLock > SHARED_LOCK) {
 		reserved = 1;
 	}
-
-	unixLeaveMutex();
 
 	*pResOut = reserved;
 	return rc;
@@ -1275,7 +1179,6 @@ unixFileLock(unixFile * pFile, struct flock *pLock)
 {
 	int rc;
 	unixInodeInfo *pInode = pFile->pInode;
-	assert(unixMutexHeld());
 	assert(pInode != 0);
 	if ((pFile->ctrlFlags & (UNIXFILE_EXCL | UNIXFILE_RDONLY)) ==
 	    UNIXFILE_EXCL) {
@@ -1367,12 +1270,10 @@ unixLock(sqlite3_file * id, int eFileLock)
 	assert(pFile);
 
 	/* If there is already a lock of this type or more restrictive on the
-	 * unixFile, do nothing. Don't use the end_lock: exit path, as
-	 * unixEnterMutex() hasn't been called yet.
+	 * unixFile, do nothing.
 	 */
-	if (pFile->eFileLock >= eFileLock) {
+	if (pFile->eFileLock >= eFileLock)
 		return SQLITE_OK;
-	}
 
 	/* Make sure the locking sequence is correct.
 	 *  (1) We never move from unlocked to anything higher than shared lock.
@@ -1383,9 +1284,6 @@ unixLock(sqlite3_file * id, int eFileLock)
 	assert(eFileLock != PENDING_LOCK);
 	assert(eFileLock != RESERVED_LOCK || pFile->eFileLock == SHARED_LOCK);
 
-	/* This mutex is needed because pFile->pInode is shared across threads
-	 */
-	unixEnterMutex();
 	pInode = pFile->pInode;
 
 	/* If some thread using this PID has a lock via a different unixFile*
@@ -1529,7 +1427,6 @@ unixLock(sqlite3_file * id, int eFileLock)
 	}
 
  end_lock:
-	unixLeaveMutex();
 	return rc;
 }
 
@@ -1575,7 +1472,6 @@ posixUnlock(sqlite3_file * id, int eFileLock, int handleNFSUnlock)
 	if (pFile->eFileLock <= eFileLock) {
 		return SQLITE_OK;
 	}
-	unixEnterMutex();
 	pInode = pFile->pInode;
 	assert(pInode->nShared != 0);
 	if (pFile->eFileLock > SHARED_LOCK) {
@@ -1711,7 +1607,6 @@ posixUnlock(sqlite3_file * id, int eFileLock, int handleNFSUnlock)
 	}
 
  end_unlock:
-	unixLeaveMutex();
 	if (rc == SQLITE_OK)
 		pFile->eFileLock = eFileLock;
 	return rc;
@@ -1778,7 +1673,6 @@ unixClose(sqlite3_file * id)
 	unixFile *pFile = (unixFile *) id;
 	verifyDbFile(pFile);
 	unixUnlock(id, NO_LOCK);
-	unixEnterMutex();
 
 	/* unixFile.pInode is always valid here. Otherwise, a different close
 	 * routine (e.g. nolockClose()) would be called instead.
@@ -1794,7 +1688,6 @@ unixClose(sqlite3_file * id)
 	}
 	releaseInodeInfo(pFile);
 	rc = closeUnixFile(id);
-	unixLeaveMutex();
 	return rc;
 }
 
@@ -2355,7 +2248,6 @@ afpCheckReservedLock(sqlite3_file * id, int *pResOut)
 		*pResOut = 1;
 		return SQLITE_OK;
 	}
-	unixEnterMutex();	/* Because pFile->pInode is shared across threads */
 
 	/* Check if a thread in this process holds such a lock */
 	if (pFile->pInode->eFileLock > SHARED_LOCK) {
@@ -2383,8 +2275,6 @@ afpCheckReservedLock(sqlite3_file * id, int *pResOut)
 			rc = lrc;
 		}
 	}
-
-	unixLeaveMutex();
 
 	*pResOut = reserved;
 	return rc;
@@ -2426,8 +2316,7 @@ afpLock(sqlite3_file * id, int eFileLock)
 	assert(pFile);
 
 	/* If there is already a lock of this type or more restrictive on the
-	 * unixFile, do nothing. Don't use the afp_end_lock: exit path, as
-	 * unixEnterMutex() hasn't been called yet.
+	 * unixFile, do nothing.
 	 */
 	if (pFile->eFileLock >= eFileLock) {
 		return SQLITE_OK;
@@ -2442,9 +2331,6 @@ afpLock(sqlite3_file * id, int eFileLock)
 	assert(eFileLock != PENDING_LOCK);
 	assert(eFileLock != RESERVED_LOCK || pFile->eFileLock == SHARED_LOCK);
 
-	/* This mutex is needed because pFile->pInode is shared across threads
-	 */
-	unixEnterMutex();
 	pInode = pFile->pInode;
 
 	/* If some thread using this PID has a lock via a different unixFile*
@@ -2594,7 +2480,6 @@ afpLock(sqlite3_file * id, int eFileLock)
 	}
 
  afp_end_lock:
-	unixLeaveMutex();
 	return rc;
 }
 
@@ -2624,7 +2509,6 @@ afpUnlock(sqlite3_file * id, int eFileLock)
 	if (pFile->eFileLock <= eFileLock) {
 		return SQLITE_OK;
 	}
-	unixEnterMutex();
 	pInode = pFile->pInode;
 	assert(pInode->nShared != 0);
 	if (pFile->eFileLock > SHARED_LOCK) {
@@ -2710,7 +2594,6 @@ afpUnlock(sqlite3_file * id, int eFileLock)
 		}
 	}
 
-	unixLeaveMutex();
 	if (rc == SQLITE_OK)
 		pFile->eFileLock = eFileLock;
 	return rc;
@@ -2726,7 +2609,6 @@ afpClose(sqlite3_file * id)
 	unixFile *pFile = (unixFile *) id;
 	assert(id != 0);
 	afpUnlock(id, NO_LOCK);
-	unixEnterMutex();
 	if (pFile->pInode && pFile->pInode->nLock) {
 		/* If there are outstanding locks, do not actually close the file just
 		 * yet because that would clear those locks.  Instead, add the file
@@ -2738,7 +2620,6 @@ afpClose(sqlite3_file * id)
 	releaseInodeInfo(pFile);
 	sqlite3_free(pFile->lockingContext);
 	rc = closeUnixFile(id);
-	unixLeaveMutex();
 	return rc;
 }
 
@@ -4110,11 +3991,10 @@ fillInUnixFile(sqlite3_vfs * pVfs,	/* Pointer to vfs object */
 	    || pLockingStyle == &nfsIoMethods
 #endif
 	    ) {
-		unixEnterMutex();
 		rc = findInodeInfo(pNew, &pNew->pInode);
 		if (rc != SQLITE_OK) {
 			/* If an error occurred in findInodeInfo(), close the file descriptor
-			 * immediately, before releasing the mutex. findInodeInfo() may fail
+			 * immediately. findInodeInfo() may fail
 			 * in two scenarios:
 			 *
 			 *   (a) A call to fstat() failed.
@@ -4134,7 +4014,6 @@ fillInUnixFile(sqlite3_vfs * pVfs,	/* Pointer to vfs object */
 			robust_close(pNew, h, __LINE__);
 			h = -1;
 		}
-		unixLeaveMutex();
 	}
 #if SQLITE_ENABLE_LOCKING_STYLE && defined(__APPLE__)
 	else if (pLockingStyle == &afpIoMethods) {
@@ -4153,14 +4032,12 @@ fillInUnixFile(sqlite3_vfs * pVfs,	/* Pointer to vfs object */
 			pCtx->dbPath = zFilename;
 			pCtx->reserved = 0;
 			srandomdev();
-			unixEnterMutex();
 			rc = findInodeInfo(pNew, &pNew->pInode);
 			if (rc != SQLITE_OK) {
 				sqlite3_free(pNew->lockingContext);
 				robust_close(pNew, h, __LINE__);
 				h = -1;
 			}
-			unixLeaveMutex();
 		}
 	}
 #endif
@@ -4308,7 +4185,6 @@ findReusableFd(const char *zPath, int flags)
 	if (0 == osStat(zPath, &sStat)) {
 		unixInodeInfo *pInode;
 
-		unixEnterMutex();
 		pInode = inodeList;
 		while (pInode && (pInode->fileId.dev != sStat.st_dev
 				  || pInode->fileId.ino !=
@@ -4325,7 +4201,6 @@ findReusableFd(const char *zPath, int flags)
 				*pp = pUnused->pNext;
 			}
 		}
-		unixLeaveMutex();
 	}
 	return pUnused;
 }
@@ -4897,12 +4772,10 @@ unixDlError(sqlite3_vfs * NotUsed, int nBuf, char *zBufOut)
 {
 	const char *zErr;
 	UNUSED_PARAMETER(NotUsed);
-	unixEnterMutex();
 	zErr = dlerror();
 	if (zErr) {
 		sqlite3_snprintf(nBuf, zBufOut, "%s", zErr);
 	}
-	unixLeaveMutex();
 }
 
 static
@@ -6379,8 +6252,8 @@ proxyClose(sqlite3_file * id)
  * files.
  *
  * This routine is called once during SQLite initialization and by a
- * single thread.  The memory allocation and mutex subsystems have not
- * necessarily been initialized when this routine is called, and so they
+ * single thread.  The memory allocation subsystem have not
+ * necessarily been initialized when this routine \is called, and so they
  * should not be used.
  */
 int

@@ -180,26 +180,6 @@
 #define SQLITE_NOINLINE
 #endif
 
-
-/*
- * The SQLITE_THREADSAFE macro must be defined as 0, 1, or 2.
- * 0 means mutexes are permanently disable and the library is never
- * threadsafe.  1 means the library is serialized which is the highest
- * level of threadsafety.  2 means the library is multithreaded - multiple
- * threads can use SQLite as long as no two threads try to use the same
- * database connection at the same time.
- *
- * Older versions of SQLite used an optional THREADSAFE macro.
- * We support that for legacy.
- */
-#if !defined(SQLITE_THREADSAFE)
-#if defined(THREADSAFE)
-#define SQLITE_THREADSAFE THREADSAFE
-#else
-#define SQLITE_THREADSAFE 1	/* IMP: R-07272-22309 */
-#endif
-#endif
-
 /*
  * Powersafe overwrite is on by default.  But can be turned off using
  * the -DSQLITE_POWERSAFE_OVERWRITE=0 command-line option.
@@ -248,16 +228,6 @@
  */
 #if !defined(SQLITE_MALLOC_SOFT_LIMIT)
 #define SQLITE_MALLOC_SOFT_LIMIT 1024
-#endif
-
-/*
- * We need to define _XOPEN_SOURCE as follows in order to enable
- * recursive mutexes on most Unix systems and fchmod() on OpenBSD.
- * But _XOPEN_SOURCE define causes problems for Mac OS X, so omit
- * it.
- */
-#if !defined(_XOPEN_SOURCE) && !defined(__DARWIN__) && !defined(__APPLE__)
-#define _XOPEN_SOURCE 600
 #endif
 
 /*
@@ -448,20 +418,6 @@ struct sqlite3_vfs {
 	** New fields may be appended in future versions.  The iVersion
 	** value will increment whenever this happens.
 	*/
-};
-
-typedef struct sqlite3_mutex sqlite3_mutex;
-typedef struct sqlite3_mutex_methods sqlite3_mutex_methods;
-struct sqlite3_mutex_methods {
-	int (*xMutexInit) (void);
-	int (*xMutexEnd) (void);
-	sqlite3_mutex *(*xMutexAlloc) (int);
-	void (*xMutexFree) (sqlite3_mutex *);
-	void (*xMutexEnter) (sqlite3_mutex *);
-	int (*xMutexTry) (sqlite3_mutex *);
-	void (*xMutexLeave) (sqlite3_mutex *);
-	int (*xMutexHeld) (sqlite3_mutex *);
-	int (*xMutexNotheld) (sqlite3_mutex *);
 };
 
 #define SQLITE_LIMIT_LENGTH                    0
@@ -1215,7 +1171,7 @@ sqlite3_bind_parameter_lindex(sqlite3_stmt * pStmt, const char *zName,
  * SQLITE_TEMP_STORE is set to 3 (never use temporary files), set it
  * to zero.
  */
-#if SQLITE_TEMP_STORE==3 || SQLITE_THREADSAFE==0
+#if SQLITE_TEMP_STORE==3
 #undef SQLITE_MAX_WORKER_THREADS
 #define SQLITE_MAX_WORKER_THREADS 0
 #endif
@@ -1657,7 +1613,6 @@ typedef int VList;
 #include "cursor.h"
 #include "vdbe.h"
 #include "os.h"
-#include "mutex.h"
 
 /*
  * An instance of the following structure stores a database schema.
@@ -1729,7 +1684,6 @@ struct sqlite3 {
 	sqlite3_vfs *pVfs;	/* OS Interface */
 	struct Vdbe *pVdbe;	/* List of active virtual machines */
 	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
-	sqlite3_mutex *mutex;	/* Connection mutex */
 	struct Schema *pSchema; /* Schema of the database */
 	i64 szMmap;		/* Default mmap_size setting */
 	int errCode;		/* Most recent error code (SQLITE_*) */
@@ -3364,8 +3318,6 @@ typedef struct {
  */
 struct Sqlite3Config {
 	int bMemstat;		/* True to enable memory status */
-	int bCoreMutex;		/* True to enable core mutexing */
-	int bFullMutex;		/* True to enable full mutexing */
 	int bOpenUri;		/* True to interpret filenames as URIs */
 	int bUseCis;		/* Use covering indices for full-scans */
 	int mxStrlen;		/* Maximum string length */
@@ -3374,7 +3326,6 @@ struct Sqlite3Config {
 	int nLookaside;		/* Default lookaside buffer count */
 	int nStmtSpill;		/* Stmt-journal spill-to-disk threshold */
 	sqlite3_mem_methods m;	/* Low-level memory allocation interface */
-	sqlite3_mutex_methods mutex;	/* Low-level mutex interface */
 	sqlite3_pcache_methods2 pcache2;	/* Low-level page-cache interface */
 	void *pHeap;		/* Heap storage space */
 	int nHeap;		/* Size of pHeap[] */
@@ -3395,10 +3346,7 @@ struct Sqlite3Config {
 	 */
 	int isInit;		/* True after initialization has finished */
 	int inProgress;		/* True while initialization in progress */
-	int isMutexInit;	/* True after mutexes are initialized */
 	int isMallocInit;	/* True after malloc is initialized */
-	int nRefInitMutex;	/* Number of users of pInitMutex */
-	sqlite3_mutex *pInitMutex;	/* Mutex used by sqlite3_initialize() */
 	void (*xLog) (void *, int, const char *);	/* Function for logging */
 	void *pLogArg;		/* First argument to xLog() */
 #ifdef SQLITE_ENABLE_SQLLOG
@@ -3639,27 +3587,10 @@ const sqlite3_mem_methods *sqlite3MemGetMemsys5(void);
 const sqlite3_mem_methods *sqlite3MemGetMemsys3(void);
 #endif
 
-#ifndef SQLITE_MUTEX_OMIT
-sqlite3_mutex_methods const *sqlite3DefaultMutex(void);
-sqlite3_mutex_methods const *sqlite3NoopMutex(void);
-sqlite3_mutex *sqlite3MutexAlloc(int);
-int sqlite3MutexInit(void);
-int sqlite3MutexEnd(void);
-#endif
-#if !defined(SQLITE_MUTEX_OMIT) && !defined(SQLITE_MUTEX_NOOP)
-void sqlite3MemoryBarrier(void);
-#else
-#define sqlite3MemoryBarrier()
-#endif
-
 sqlite3_int64 sqlite3StatusValue(int);
 void sqlite3StatusUp(int, int);
 void sqlite3StatusDown(int, int);
 void sqlite3StatusHighwater(int, int);
-
-/* Access to mutexes used by sqlite3_status() */
-sqlite3_mutex *sqlite3Pcache1Mutex(void);
-sqlite3_mutex *sqlite3MallocMutex(void);
 
 #ifndef SQLITE_OMIT_FLOATING_POINT
 int sqlite3IsNaN(double);

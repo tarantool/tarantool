@@ -1712,12 +1712,10 @@ sqlite3_overload_function(sqlite3 * db, const char *zName, int nArg)
 		return SQLITE_MISUSE_BKPT;
 	}
 #endif
-	sqlite3_mutex_enter(db->mutex);
 	if (sqlite3FindFunction(db, zName, nArg, 0) == 0) {
 		rc = sqlite3CreateFunc(db, zName, nArg, 0, 0, sqlite3InvalidFunction, 0, 0, 0);
 	}
 	rc = sqlite3ApiExit(db, rc);
-	sqlite3_mutex_leave(db->mutex);
 	return rc;
 }
 

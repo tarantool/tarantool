@@ -1167,14 +1167,8 @@ sqlite3_snprintf(int n, char *zBuf, const char *zFormat, ...)
  * We house it in a separate routine from sqlite3_log() to avoid using
  * stack space on small-stack systems when logging is disabled.
  *
- * sqlite3_log() must render into a static buffer.  It cannot dynamically
- * allocate memory because it might be called while the memory allocator
- * mutex is held.
- *
  * sqlite3VXPrintf() might ask for *temporary* memory allocations for
  * certain format characters (%q) or for very large precisions or widths.
- * Care must be taken that any sqlite3_log() calls that occur while the
- * memory mutex is held do not use these mechanisms.
  */
 static void
 renderLogMsg(int iErrCode, const char *zFormat, va_list ap)

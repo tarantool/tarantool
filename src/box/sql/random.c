@@ -70,23 +70,13 @@ sqlite3_randomness(int N, void *pBuf)
 #define wsdPrng sqlite3Prng
 #endif
 
-#if SQLITE_THREADSAFE
-	sqlite3_mutex *mutex;
-#endif
-
 #ifndef SQLITE_OMIT_AUTOINIT
 	if (sqlite3_initialize())
 		return;
 #endif
 
-#if SQLITE_THREADSAFE
-	mutex = sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_PRNG);
-#endif
-
-	sqlite3_mutex_enter(mutex);
 	if (N <= 0 || pBuf == 0) {
 		wsdPrng.isInit = 0;
-		sqlite3_mutex_leave(mutex);
 		return;
 	}
 
@@ -127,7 +117,6 @@ sqlite3_randomness(int N, void *pBuf)
 		t += wsdPrng.s[wsdPrng.i];
 		*(zBuf++) = wsdPrng.s[t];
 	} while (--N);
-	sqlite3_mutex_leave(mutex);
 }
 
 #ifndef SQLITE_UNTESTABLE

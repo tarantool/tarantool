@@ -3000,7 +3000,6 @@ sqlite3VdbeDelete(Vdbe * p)
 	if (NEVER(p == 0))
 		return;
 	db = p->db;
-	assert(sqlite3_mutex_held(db->mutex));
 	sqlite3VdbeClearObject(db, p);
 	if (p->pPrev) {
 		p->pPrev->pNext = p->pNext;
@@ -4165,7 +4164,6 @@ sqlite3VdbeIdxKeyCompare(sqlite3 * db,			/* Database connection */
 void
 sqlite3VdbeSetChanges(sqlite3 * db, int nChange)
 {
-	assert(sqlite3_mutex_held(db->mutex));
 	db->nChange = nChange;
 	db->nTotalChange += nChange;
 }

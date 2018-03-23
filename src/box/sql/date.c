@@ -545,10 +545,6 @@ osLocaltime(time_t * t, struct tm *pTm)
 	int rc;
 #if !HAVE_LOCALTIME_R && !HAVE_LOCALTIME_S
 	struct tm *pX;
-#if SQLITE_THREADSAFE>0
-	sqlite3_mutex *mutex = sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_MASTER);
-#endif
-	sqlite3_mutex_enter(mutex);
 	pX = localtime(t);
 #ifndef SQLITE_UNTESTABLE
 	if (sqlite3GlobalConfig.bLocaltimeFault)
@@ -556,7 +552,6 @@ osLocaltime(time_t * t, struct tm *pTm)
 #endif
 	if (pX)
 		*pTm = *pX;
-	sqlite3_mutex_leave(mutex);
 	rc = pX == 0;
 #else
 #ifndef SQLITE_UNTESTABLE
@@ -1290,11 +1285,9 @@ currentTimeFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 #if HAVE_GMTIME_R
 	pTm = gmtime_r(&t, &sNow);
 #else
-	sqlite3_mutex_enter(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_MASTER));
 	pTm = gmtime(&t);
 	if (pTm)
 		memcpy(&sNow, pTm, sizeof(sNow));
-	sqlite3_mutex_leave(sqlite3MutexAlloc(SQLITE_MUTEX_STATIC_MASTER));
 #endif
 	if (pTm) {
 		strftime(zBuf, 20, zFormat, &sNow);

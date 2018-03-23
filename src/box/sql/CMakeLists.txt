@@ -14,7 +14,6 @@ set(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${SRCDIR})
 
 add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
-add_definitions(-DTHREADSAFE=0)
 add_definitions(-DSQLITE_DEFAULT_FOREIGN_KEYS=1)
 add_definitions(-DSQLITE_OMIT_AUTOMATIC_INDEX)
 
@@ -54,9 +53,6 @@ add_library(sql STATIC
     mem2.c
     mem3.c
     mem5.c
-    mutex.c
-    mutex_noop.c
-    mutex_unix.c
     os.c
     os_unix.c
     pragma.c

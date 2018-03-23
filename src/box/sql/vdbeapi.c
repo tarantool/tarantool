@@ -125,7 +125,6 @@ sqlite3_finalize(sqlite3_stmt * pStmt)
 		sqlite3 *db = v->db;
 		if (vdbeSafety(v))
 			return SQLITE_MISUSE_BKPT;
-		sqlite3_mutex_enter(db->mutex);
 		checkProfileCallback(db, v);
 		rc = sqlite3VdbeFinalize(v);
 		rc = sqlite3ApiExit(db, rc);
@@ -150,13 +149,11 @@ sqlite3_reset(sqlite3_stmt * pStmt)
 	} else {
 		Vdbe *v = (Vdbe *) pStmt;
 		sqlite3 *db = v->db;
-		sqlite3_mutex_enter(db->mutex);
 		checkProfileCallback(db, v);
 		rc = sqlite3VdbeReset(v);
 		sqlite3VdbeRewind(v);
 		assert((rc & (db->errMask)) == rc);
 		rc = sqlite3ApiExit(db, rc);
-		sqlite3_mutex_leave(db->mutex);
 	}
 	return rc;
 }
@@ -170,10 +167,6 @@ sqlite3_clear_bindings(sqlite3_stmt * pStmt)
 	int i;
 	int rc = SQLITE_OK;
 	Vdbe *p = (Vdbe *) pStmt;
-#if SQLITE_THREADSAFE
-	sqlite3_mutex *mutex = ((Vdbe *) pStmt)->db->mutex;
-#endif
-	sqlite3_mutex_enter(mutex);
 	for (i = 0; i < p->nVar; i++) {
 		sqlite3VdbeMemRelease(&p->aVar[i]);
 		p->aVar[i].flags = MEM_Null;
@@ -181,7 +174,6 @@ sqlite3_clear_bindings(sqlite3_stmt * pStmt)
 	if (p->isPrepareV2 && p->expmask) {
 		p->expired = 1;
 	}
-	sqlite3_mutex_leave(mutex);
 	return rc;
 }
 
@@ -369,7 +361,6 @@ sqlite3_result_blob(sqlite3_context * pCtx,
     )
 {
 	assert(n >= 0);
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	if (sqlite3VdbeMemSetStr(pCtx->pOut, z, n,0, xDel) == SQLITE_TOOBIG) {
 		sqlite3_result_error_toobig(pCtx);
 	}
@@ -380,7 +371,6 @@ sqlite3_result_blob64(sqlite3_context * pCtx,
 		      const void *z, sqlite3_uint64 n, void (*xDel) (void *)
     )
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	assert(xDel != SQLITE_DYNAMIC);
 	if (n > 0x7fffffff) {
 		(void)invokeValueDestructor(z, xDel, pCtx);
@@ -392,14 +382,12 @@ sqlite3_result_blob64(sqlite3_context * pCtx,
 void
 sqlite3_result_double(sqlite3_context * pCtx, double rVal)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemSetDouble(pCtx->pOut, rVal);
 }
 
 void
 sqlite3_result_error(sqlite3_context * pCtx, const char *z, int n)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	pCtx->isError = SQLITE_ERROR;
 	pCtx->fErrorOrAux = 1;
 	sqlite3VdbeMemSetStr(pCtx->pOut, z, n, 1, SQLITE_TRANSIENT);
@@ -408,21 +396,18 @@ sqlite3_result_error(sqlite3_context * pCtx, const char *z, int n)
 void
 sqlite3_result_int(sqlite3_context * pCtx, int iVal)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemSetInt64(pCtx->pOut, (i64) iVal);
 }
 
 void
 sqlite3_result_int64(sqlite3_context * pCtx, i64 iVal)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemSetInt64(pCtx->pOut, iVal);
 }
 
 void
 sqlite3_result_null(sqlite3_context * pCtx)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemSetNull(pCtx->pOut);
 }
 
@@ -430,7 +415,6 @@ void
 sqlite3_result_subtype(sqlite3_context * pCtx, unsigned int eSubtype)
 {
 	Mem *pOut = pCtx->pOut;
-	assert(sqlite3_mutex_held(pOut->db->mutex));
 	pOut->eSubtype = eSubtype & 0xff;
 	pOut->flags |= MEM_Subtype;
 }
@@ -440,7 +424,6 @@ sqlite3_result_text(sqlite3_context * pCtx,
 		    const char *z, int n, void (*xDel) (void *)
     )
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	setResultStrOrError(pCtx, z, n, xDel);
 }
 
@@ -450,7 +433,6 @@ sqlite3_result_text64(sqlite3_context * pCtx,
 		      sqlite3_uint64 n,
 		      void (*xDel) (void *))
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	assert(xDel != SQLITE_DYNAMIC);
 	if (n > 0x7fffffff) {
 		(void)invokeValueDestructor(z, xDel, pCtx);
@@ -462,14 +444,12 @@ sqlite3_result_text64(sqlite3_context * pCtx,
 void
 sqlite3_result_value(sqlite3_context * pCtx, sqlite3_value * pValue)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemCopy(pCtx->pOut, pValue);
 }
 
 void
 sqlite3_result_zeroblob(sqlite3_context * pCtx, int n)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemSetZeroBlob(pCtx->pOut, n);
 }
 
@@ -477,7 +457,6 @@ int
 sqlite3_result_zeroblob64(sqlite3_context * pCtx, u64 n)
 {
 	Mem *pOut = pCtx->pOut;
-	assert(sqlite3_mutex_held(pOut->db->mutex));
 	if (n > (u64) pOut->db->aLimit[SQLITE_LIMIT_LENGTH]) {
 		return SQLITE_TOOBIG;
 	}
@@ -504,7 +483,6 @@ sqlite3_result_error_code(sqlite3_context * pCtx, int errCode)
 void
 sqlite3_result_error_toobig(sqlite3_context * pCtx)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	pCtx->isError = SQLITE_TOOBIG;
 	pCtx->fErrorOrAux = 1;
 	sqlite3VdbeMemSetStr(pCtx->pOut, "string or blob too big", -1, 1,
@@ -515,7 +493,6 @@ sqlite3_result_error_toobig(sqlite3_context * pCtx)
 void
 sqlite3_result_error_nomem(sqlite3_context * pCtx)
 {
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	sqlite3VdbeMemSetNull(pCtx->pOut);
 	pCtx->isError = SQLITE_NOMEM_BKPT;
 	pCtx->fErrorOrAux = 1;
@@ -667,7 +644,6 @@ sqlite3_step(sqlite3_stmt * pStmt)
 		return SQLITE_MISUSE_BKPT;
 	}
 	db = v->db;
-	sqlite3_mutex_enter(db->mutex);
 	v->doingRerun = 0;
 	while ((rc = sqlite3Step(v)) == SQLITE_SCHEMA
 	       && cnt++ < SQLITE_MAX_SCHEMA_RETRY) {
@@ -700,7 +676,6 @@ sqlite3_step(sqlite3_stmt * pStmt)
 		}
 	}
 	rc = sqlite3ApiExit(db, rc);
-	sqlite3_mutex_leave(db->mutex);
 	return rc;
 }
 
@@ -814,7 +789,6 @@ void *
 sqlite3_aggregate_context(sqlite3_context * p, int nByte)
 {
 	assert(p && p->pFunc && p->pFunc->xFinalize);
-	assert(sqlite3_mutex_held(p->pOut->db->mutex));
 	testcase(nByte < 0);
 	if ((p->pMem->flags & MEM_Agg) == 0) {
 		return createAggContext(p, nByte);
@@ -832,7 +806,6 @@ sqlite3_get_auxdata(sqlite3_context * pCtx, int iArg)
 {
 	AuxData *pAuxData;
 
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	if (pCtx->pVdbe == 0)
 		return 0;
 
@@ -858,7 +831,6 @@ sqlite3_set_auxdata(sqlite3_context * pCtx,
 	AuxData *pAuxData;
 	Vdbe *pVdbe = pCtx->pVdbe;
 
-	assert(sqlite3_mutex_held(pCtx->pOut->db->mutex));
 	if (iArg < 0)
 		goto failed;
 	if (pVdbe == 0)
@@ -973,7 +945,6 @@ columnMem(sqlite3_stmt * pStmt, int i)
 	if (pVm == 0)
 		return (Mem *) columnNullValue();
 	assert(pVm->db);
-	sqlite3_mutex_enter(pVm->db->mutex);
 	if (pVm->pResultSet != 0 && i < pVm->nResColumn && i >= 0) {
 		pOut = &pVm->pResultSet[i];
 	} else {
@@ -1011,9 +982,7 @@ columnMallocFailure(sqlite3_stmt * pStmt)
 	Vdbe *p = (Vdbe *) pStmt;
 	if (p) {
 		assert(p->db != 0);
-		assert(sqlite3_mutex_held(p->db->mutex));
 		p->rc = sqlite3ApiExit(p->db, p->rc);
-		sqlite3_mutex_leave(p->db->mutex);
 	}
 }
 
@@ -1131,7 +1100,6 @@ columnName(sqlite3_stmt * pStmt,
 	n = sqlite3_column_count(pStmt);
 	if (N < n && N >= 0) {
 		N += useType * n;
-		sqlite3_mutex_enter(db->mutex);
 		assert(db->mallocFailed == 0);
 		ret = xFunc(&p->aColName[N]);
 		/* A malloc may have failed inside of the xFunc() call. If this
@@ -1141,7 +1109,6 @@ columnName(sqlite3_stmt * pStmt,
 			sqlite3OomClear(db);
 			ret = 0;
 		}
-		sqlite3_mutex_leave(db->mutex);
 	}
 	return ret;
 }
@@ -1226,9 +1193,6 @@ sqlite3_column_origin_name(sqlite3_stmt * pStmt, int N)
  * the same as binding a NULL value to the column. If the "i" parameter is
  * out of range, then SQLITE_RANGE is returned. Othewise SQLITE_OK.
  *
- * A successful evaluation of this routine acquires the mutex on p.
- * the mutex is released if any kind of error occurs.
- *
  * The error code stored in database p->db is overwritten with the return
  * value in any case.
  */
@@ -1239,17 +1203,14 @@ vdbeUnbind(Vdbe * p, int i)
 	if (vdbeSafetyNotNull(p)) {
 		return SQLITE_MISUSE_BKPT;
 	}
-	sqlite3_mutex_enter(p->db->mutex);
 	if (p->magic != VDBE_MAGIC_RUN || p->pc >= 0) {
 		sqlite3Error(p->db, SQLITE_MISUSE);
-		sqlite3_mutex_leave(p->db->mutex);
 		sqlite3_log(SQLITE_MISUSE,
 			    "bind on a busy prepared statement: [%s]", p->zSql);
 		return SQLITE_MISUSE_BKPT;
 	}
 	if (i < 1 || i > p->nVar) {
 		sqlite3Error(p->db, SQLITE_RANGE);
-		sqlite3_mutex_leave(p->db->mutex);
 		return SQLITE_RANGE;
 	}
 	i--;
@@ -1299,7 +1260,6 @@ bindText(sqlite3_stmt * pStmt,	/* The statement to bind against */
 			sqlite3Error(p->db, rc);
 			rc = sqlite3ApiExit(p->db, rc);
 		}
-		sqlite3_mutex_leave(p->db->mutex);
 	} else if (xDel != SQLITE_STATIC && xDel != SQLITE_TRANSIENT) {
 		xDel((void *)zData);
 	}
@@ -1344,7 +1304,6 @@ sqlite3_bind_double(sqlite3_stmt * pStmt, int i, double rValue)
 	rc = vdbeUnbind(p, i);
 	if (rc == SQLITE_OK) {
 		sqlite3VdbeMemSetDouble(&p->aVar[i - 1], rValue);
-		sqlite3_mutex_leave(p->db->mutex);
 	}
 	return rc;
 }
@@ -1363,7 +1322,6 @@ sqlite3_bind_int64(sqlite3_stmt * pStmt, int i, sqlite_int64 iValue)
 	rc = vdbeUnbind(p, i);
 	if (rc == SQLITE_OK) {
 		sqlite3VdbeMemSetInt64(&p->aVar[i - 1], iValue);
-		sqlite3_mutex_leave(p->db->mutex);
 	}
 	return rc;
 }
@@ -1374,9 +1332,6 @@ sqlite3_bind_null(sqlite3_stmt * pStmt, int i)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
-	if (rc == SQLITE_OK) {
-		sqlite3_mutex_leave(p->db->mutex);
-	}
 	return rc;
 }
 
@@ -1448,7 +1403,6 @@ sqlite3_bind_zeroblob(sqlite3_stmt * pStmt, int i, int n)
 	rc = vdbeUnbind(p, i);
 	if (rc == SQLITE_OK) {
 		sqlite3VdbeMemSetZeroBlob(&p->aVar[i - 1], n);
-		sqlite3_mutex_leave(p->db->mutex);
 	}
 	return rc;
 }
@@ -1458,7 +1412,6 @@ sqlite3_bind_zeroblob64(sqlite3_stmt * pStmt, int i, sqlite3_uint64 n)
 {
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
-	sqlite3_mutex_enter(p->db->mutex);
 	if (n > (u64) p->db->aLimit[SQLITE_LIMIT_LENGTH]) {
 		rc = SQLITE_TOOBIG;
 	} else {
@@ -1466,7 +1419,6 @@ sqlite3_bind_zeroblob64(sqlite3_stmt * pStmt, int i, sqlite3_uint64 n)
 		rc = sqlite3_bind_zeroblob(pStmt, i, n);
 	}
 	rc = sqlite3ApiExit(p->db, rc);
-	sqlite3_mutex_leave(p->db->mutex);
 	return rc;
 }
 
@@ -1534,11 +1486,9 @@ sqlite3TransferBindings(sqlite3_stmt * pFromStmt, sqlite3_stmt * pToStmt)
 	int i;
 	assert(pTo->db == pFrom->db);
 	assert(pTo->nVar == pFrom->nVar);
-	sqlite3_mutex_enter(pTo->db->mutex);
 	for (i = 0; i < pFrom->nVar; i++) {
 		sqlite3VdbeMemMove(&pTo->aVar[i], &pFrom->aVar[i]);
 	}
-	sqlite3_mutex_leave(pTo->db->mutex);
 	return SQLITE_OK;
 }
 
@@ -1580,13 +1530,11 @@ sqlite3_next_stmt(sqlite3 * pDb, sqlite3_stmt * pStmt)
 		return 0;
 	}
 #endif
-	sqlite3_mutex_enter(pDb->mutex);
 	if (pStmt == 0) {
 		pNext = (sqlite3_stmt *) pDb->pVdbe;
 	} else {
 		pNext = (sqlite3_stmt *) ((Vdbe *) pStmt)->pNext;
 	}
-	sqlite3_mutex_leave(pDb->mutex);
 	return pNext;
 }
 
@@ -1639,9 +1587,7 @@ sqlite3_expanded_sql(sqlite3_stmt * pStmt)
 	const char *zSql = sqlite3_sql(pStmt);
 	if (zSql) {
 		Vdbe *p = (Vdbe *) pStmt;
-		sqlite3_mutex_enter(p->db->mutex);
 		z = sqlite3VdbeExpandSql(p, zSql);
-		sqlite3_mutex_leave(p->db->mutex);
 	}
 	return z;
 #endif
