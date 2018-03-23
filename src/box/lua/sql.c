@@ -1,7 +1,7 @@
 #include "sql.h"
 #include "box/sql.h"
 
-#include "box/sql/sqlite3.h"
+#include "box/sql/sqliteInt.h"
 #include "box/info.h"
 #include "lua/utils.h"
 #include "info.h"

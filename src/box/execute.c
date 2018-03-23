@@ -31,7 +31,7 @@
 #include "execute.h"
 
 #include "iproto_constants.h"
-#include "sql/sqlite3.h"
+#include "sql/sqliteInt.h"
 #include "sql/sqliteLimit.h"
 #include "errcode.h"
 #include "small/region.h"

@@ -31,8 +31,6 @@
 #include <assert.h>
 #include "field_def.h"
 #include "sql.h"
-#include "sql/sqlite3.h"
-
 /*
  * Both Tarantool and SQLite codebases declare Index, hence the
  * workaround below.
