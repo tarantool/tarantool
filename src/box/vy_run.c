@@ -236,7 +236,7 @@ vy_run_new(struct vy_run_env *env, int64_t id)
 	run->dump_lsn = -1;
 	run->fd = -1;
 	run->refs = 1;
-	rlist_create(&run->in_index);
+	rlist_create(&run->in_lsm);
 	rlist_create(&run->in_unused);
 	TRASH(&run->info.bloom);
 	return run;
@@ -719,8 +719,7 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
  * Read raw stmt data from the page
  * @param page          Page.
  * @param stmt_no       Statement position in the page.
- * @param cmp_def       Key definition of an index, including
- *                      primary key parts.
+ * @param cmp_def       Key definition, including primary key parts.
  * @param format        Format for REPLACE/DELETE tuples.
  * @param upsert_format Format for UPSERT tuples.
  * @param is_primary    True if the index is primary.

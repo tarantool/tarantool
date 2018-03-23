@@ -35,7 +35,7 @@
 #include "vy_tx.h"
 #include "fiber.h"
 #include "vy_upsert.h"
-#include "vy_index.h"
+#include "vy_lsm.h"
 #include "vy_stat.h"
 
 /**
@@ -141,7 +141,7 @@ vy_read_iterator_range_is_done(struct vy_read_iterator *itr)
 {
 	struct tuple *stmt = itr->curr_stmt;
 	struct vy_range *range = itr->curr_range;
-	struct key_def *cmp_def = itr->index->cmp_def;
+	struct key_def *cmp_def = itr->lsm->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 
 	if (dir > 0 && range->end != NULL &&
@@ -182,7 +182,7 @@ vy_read_iterator_cmp_stmt(struct vy_read_iterator *itr,
 	if (a == NULL && b == NULL)
 		return 0;
 	return iterator_direction(itr->iterator_type) *
-		vy_tuple_compare(a, b, itr->index->cmp_def);
+		vy_tuple_compare(a, b, itr->lsm->cmp_def);
 }
 
 /**
@@ -195,7 +195,7 @@ vy_read_iterator_is_exact_match(struct vy_read_iterator *itr,
 {
 	struct tuple *key = itr->key;
 	enum iterator_type type = itr->iterator_type;
-	struct key_def *cmp_def = itr->index->cmp_def;
+	struct key_def *cmp_def = itr->lsm->cmp_def;
 
 	/*
 	 * If the index is unique and the search key is full,
@@ -442,7 +442,7 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 
 	if (itr->last_stmt != NULL && (itr->iterator_type == ITER_EQ ||
 				       itr->iterator_type == ITER_REQ) &&
-	    tuple_field_count(itr->key) >= itr->index->cmp_def->part_count) {
+	    tuple_field_count(itr->key) >= itr->lsm->cmp_def->part_count) {
 		/*
 		 * There may be one statement at max satisfying
 		 * EQ with a full key.
@@ -451,11 +451,11 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 		return 0;
 	}
 	/*
-	 * Restore the iterator position if the index has changed
+	 * Restore the iterator position if the LSM tree has changed
 	 * since the last iteration.
 	 */
-	if (itr->mem_list_version != itr->index->mem_list_version ||
-	    itr->range_tree_version != itr->index->range_tree_version ||
+	if (itr->mem_list_version != itr->lsm->mem_list_version ||
+	    itr->range_tree_version != itr->lsm->range_tree_version ||
 	    itr->range_version != itr->curr_range->version) {
 		vy_read_iterator_restore(itr);
 	}
@@ -501,8 +501,8 @@ rescan_disk:
 	 * because all slices were pinned and hence could not be
 	 * removed.
 	 */
-	if (itr->mem_list_version != itr->index->mem_list_version ||
-	    itr->range_tree_version != itr->index->range_tree_version) {
+	if (itr->mem_list_version != itr->lsm->mem_list_version ||
+	    itr->range_tree_version != itr->lsm->range_tree_version) {
 		vy_read_iterator_restore(itr);
 		goto restart;
 	}
@@ -528,7 +528,7 @@ done:
 
 	if (itr->need_check_eq && itr->curr_stmt != NULL &&
 	    vy_stmt_compare(itr->curr_stmt, itr->key,
-			    itr->index->cmp_def) != 0)
+			    itr->lsm->cmp_def) != 0)
 		itr->curr_stmt = NULL;
 
 	if (vy_read_iterator_track_read(itr, itr->curr_stmt) != 0)
@@ -592,7 +592,7 @@ vy_read_iterator_next_lsn(struct vy_read_iterator *itr, struct tuple **ret)
 	/*
 	 * Look up the older statement in on-disk runs.
 	 *
-	 * Note, we don't need to check the index version after the yield
+	 * Note, we don't need to check the LSM tree version after the yield
 	 * caused by the disk read, because once we've come to this point,
 	 * we won't read any source except run slices, which are pinned
 	 * and hence cannot be removed during the yield.
@@ -645,11 +645,11 @@ vy_read_iterator_squash_upsert(struct vy_read_iterator *itr,
 			       struct tuple **ret)
 {
 	*ret = NULL;
-	struct vy_index *index = itr->index;
+	struct vy_lsm *lsm = itr->lsm;
 	struct tuple *t = itr->curr_stmt;
 
-	/* Upserts enabled only in the primary index. */
-	assert(vy_stmt_type(t) != IPROTO_UPSERT || index->index_id == 0);
+	/* Upserts enabled only in the primary index LSM tree. */
+	assert(vy_stmt_type(t) != IPROTO_UPSERT || lsm->index_id == 0);
 	tuple_ref(t);
 	while (vy_stmt_type(t) == IPROTO_UPSERT) {
 		struct tuple *next;
@@ -659,9 +659,9 @@ vy_read_iterator_squash_upsert(struct vy_read_iterator *itr,
 			return rc;
 		}
 		struct tuple *applied = vy_apply_upsert(t, next,
-				index->cmp_def, index->mem_format,
-				index->upsert_format, true);
-		index->stat.upsert.applied++;
+				lsm->cmp_def, lsm->mem_format,
+				lsm->upsert_format, true);
+		lsm->stat.upsert.applied++;
 		tuple_unref(t);
 		if (applied == NULL)
 			return -1;
@@ -679,9 +679,9 @@ vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 	assert(itr->tx != NULL);
 	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
 					    itr->iterator_type : ITER_LE);
-	struct vy_txw_iterator_stat *stat = &itr->index->stat.txw.iterator;
+	struct vy_txw_iterator_stat *stat = &itr->lsm->stat.txw.iterator;
 	struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
-	vy_txw_iterator_open(&sub_src->txw_iterator, stat, itr->tx, itr->index,
+	vy_txw_iterator_open(&sub_src->txw_iterator, stat, itr->tx, itr->lsm,
 			     iterator_type, itr->key);
 }
 
@@ -692,7 +692,7 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 					    itr->iterator_type : ITER_LE);
 	struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 	vy_cache_iterator_open(&sub_src->cache_iterator,
-			       &itr->index->cache, iterator_type,
+			       &itr->lsm->cache, iterator_type,
 			       itr->key, itr->read_view);
 }
 
@@ -701,22 +701,20 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 {
 	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
 					    itr->iterator_type : ITER_LE);
-	struct vy_index *index = itr->index;
+	struct vy_lsm *lsm = itr->lsm;
 	struct vy_read_src *sub_src;
 
 	/* Add the active in-memory index. */
-	assert(index->mem != NULL);
+	assert(lsm->mem != NULL);
 	sub_src = vy_read_iterator_add_src(itr);
-	vy_mem_iterator_open(&sub_src->mem_iterator,
-			     &index->stat.memory.iterator,
-			     index->mem, iterator_type, itr->key,
-			     itr->read_view);
+	vy_mem_iterator_open(&sub_src->mem_iterator, &lsm->stat.memory.iterator,
+			     lsm->mem, iterator_type, itr->key, itr->read_view);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
-	rlist_foreach_entry(mem, &index->sealed, in_sealed) {
+	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
 		sub_src = vy_read_iterator_add_src(itr);
 		vy_mem_iterator_open(&sub_src->mem_iterator,
-				     &index->stat.memory.iterator,
+				     &lsm->stat.memory.iterator,
 				     mem, iterator_type, itr->key,
 				     itr->read_view);
 	}
@@ -728,7 +726,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	assert(itr->curr_range != NULL);
 	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
 					    itr->iterator_type : ITER_LE);
-	struct vy_index *index = itr->index;
+	struct vy_lsm *lsm = itr->lsm;
 	struct vy_slice *slice;
 	/*
 	 * The format of the statement must be exactly the space
@@ -742,21 +740,20 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 		 * dumped in-memory trees. We must not add both
 		 * the slice and the trees in this case, because
 		 * the read iterator can't deal with duplicates.
-		 * Since index->dump_lsn is bumped after deletion
+		 * Since lsm->dump_lsn is bumped after deletion
 		 * of dumped in-memory trees, we can filter out
 		 * the run slice containing duplicates by LSN.
 		 */
-		if (slice->run->info.min_lsn > index->dump_lsn)
+		if (slice->run->info.min_lsn > lsm->dump_lsn)
 			continue;
-		assert(slice->run->info.max_lsn <= index->dump_lsn);
+		assert(slice->run->info.max_lsn <= lsm->dump_lsn);
 		struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 		vy_run_iterator_open(&sub_src->run_iterator,
-				     &index->stat.disk.iterator, slice,
+				     &lsm->stat.disk.iterator, slice,
 				     iterator_type, itr->key,
-				     itr->read_view, index->cmp_def,
-				     index->key_def, index->disk_format,
-				     index->upsert_format,
-				     index->index_id == 0);
+				     itr->read_view, lsm->cmp_def,
+				     lsm->key_def, lsm->disk_format,
+				     lsm->upsert_format, lsm->index_id == 0);
 	}
 }
 
@@ -799,13 +796,13 @@ vy_read_iterator_cleanup(struct vy_read_iterator *itr)
 }
 
 void
-vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
+vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 		      struct vy_tx *tx, enum iterator_type iterator_type,
 		      struct tuple *key, const struct vy_read_view **rv)
 {
 	memset(itr, 0, sizeof(*itr));
 
-	itr->index = index;
+	itr->lsm = lsm;
 	itr->tx = tx;
 	itr->iterator_type = iterator_type;
 	itr->key = key;
@@ -851,9 +848,9 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 {
 	vy_read_iterator_cleanup(itr);
 
-	itr->mem_list_version = itr->index->mem_list_version;
-	itr->range_tree_version = itr->index->range_tree_version;
-	itr->curr_range = vy_range_tree_find_by_key(itr->index->tree,
+	itr->mem_list_version = itr->lsm->mem_list_version;
+	itr->range_tree_version = itr->lsm->range_tree_version;
+	itr->curr_range = vy_range_tree_find_by_key(itr->lsm->tree,
 			itr->iterator_type, itr->last_stmt ?: itr->key);
 	itr->range_version = itr->curr_range->version;
 
@@ -879,13 +876,13 @@ static void
 vy_read_iterator_next_range(struct vy_read_iterator *itr)
 {
 	struct vy_range *range = itr->curr_range;
-	struct key_def *cmp_def = itr->index->cmp_def;
+	struct key_def *cmp_def = itr->lsm->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
 
 	assert(range != NULL);
 	while (true) {
-		range = dir > 0 ? vy_range_tree_next(itr->index->tree, range) :
-				  vy_range_tree_prev(itr->index->tree, range);
+		range = dir > 0 ? vy_range_tree_next(itr->lsm->tree, range) :
+				  vy_range_tree_prev(itr->lsm->tree, range);
 		assert(range != NULL);
 
 		if (itr->last_stmt == NULL)
@@ -927,16 +924,16 @@ vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt)
 	if (stmt == NULL) {
 		stmt = (itr->iterator_type == ITER_EQ ||
 			itr->iterator_type == ITER_REQ ?
-			itr->key : itr->index->env->empty_key);
+			itr->key : itr->lsm->env->empty_key);
 	}
 
 	int rc;
 	if (iterator_direction(itr->iterator_type) >= 0) {
-		rc = vy_tx_track(itr->tx, itr->index, itr->key,
+		rc = vy_tx_track(itr->tx, itr->lsm, itr->key,
 				 itr->iterator_type != ITER_GT,
 				 stmt, true);
 	} else {
-		rc = vy_tx_track(itr->tx, itr->index, stmt, true,
+		rc = vy_tx_track(itr->tx, itr->lsm, stmt, true,
 				 itr->key, itr->iterator_type != ITER_LT);
 	}
 	return rc;
@@ -951,7 +948,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 
 	if (!itr->search_started) {
 		itr->search_started = true;
-		itr->index->stat.lookup++;
+		itr->lsm->stat.lookup++;
 		vy_read_iterator_restore(itr);
 	}
 
@@ -961,7 +958,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	bool skipped_txw_delete = false;
 
 	struct tuple *t = NULL;
-	struct vy_index *index = itr->index;
+	struct vy_lsm *lsm = itr->lsm;
 	int rc = 0;
 	while (true) {
 		rc = vy_read_iterator_next_key(itr, &t);
@@ -993,7 +990,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	       vy_stmt_type(*result) == IPROTO_INSERT ||
 	       vy_stmt_type(*result) == IPROTO_REPLACE);
 	if (*result != NULL)
-		vy_stmt_counter_acct_tuple(&index->stat.get, *result);
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, *result);
 
 #ifndef NDEBUG
 	/* Check constraints. */
@@ -1005,18 +1002,18 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	 */
 	if (itr->last_stmt != NULL && tuple_field_count(itr->key) > 0) {
 		int cmp = dir * vy_stmt_compare(*result, itr->key,
-						itr->index->cmp_def);
+						itr->lsm->cmp_def);
 		assert(cmp >= 0);
 	}
 	/*
 	 * Ensure the read iterator does not return duplicates
-	 * and respects statements order (index->cmp_def includes
+	 * and respects statements order (lsm->cmp_def includes
 	 * primary parts, so prev_key != itr->last_stmt for any
-	 * index).
+	 * LSM tree).
 	 */
 	if (prev_key != NULL && itr->last_stmt != NULL) {
 		assert(dir * vy_tuple_compare(prev_key, itr->last_stmt,
-					      index->cmp_def) < 0);
+					      lsm->cmp_def) < 0);
 	}
 #endif
 
@@ -1034,7 +1031,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 			 */
 			cache_prev = NULL;
 		}
-		vy_cache_add(&itr->index->cache, *result, cache_prev,
+		vy_cache_add(&itr->lsm->cache, *result, cache_prev,
 			     itr->key, itr->iterator_type);
 	}
 clear:
@@ -1042,11 +1039,11 @@ clear:
 		tuple_unref(prev_key);
 
 	ev_tstamp latency = ev_monotonic_now(loop()) - start_time;
-	latency_collect(&index->stat.latency, latency);
+	latency_collect(&lsm->stat.latency, latency);
 
-	if (latency > index->env->too_long_threshold) {
+	if (latency > lsm->env->too_long_threshold) {
 		say_warn("%s: select(%s, %s) => %s took too long: %.3f sec",
-			 vy_index_name(index), tuple_str(itr->key),
+			 vy_lsm_name(lsm), tuple_str(itr->key),
 			 iterator_type_strs[itr->iterator_type],
 			 vy_stmt_str(itr->last_stmt), latency);
 	}

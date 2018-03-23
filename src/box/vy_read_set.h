@@ -48,7 +48,7 @@ extern "C" {
 
 struct tuple;
 struct vy_tx;
-struct vy_index;
+struct vy_lsm;
 
 /**
  * A tuple interval read by a transaction.
@@ -56,8 +56,8 @@ struct vy_index;
 struct vy_read_interval {
 	/** Transaction. */
 	struct vy_tx *tx;
-	/** Index that the transaction read from. */
-	struct vy_index *index;
+	/** LSM tree that the transaction read from. */
+	struct vy_lsm *lsm;
 	/** Left boundary of the interval. */
 	struct tuple *left;
 	/** Right boundary of the interval. */
@@ -73,8 +73,8 @@ struct vy_read_interval {
 	const struct vy_read_interval *subtree_last;
 	/** Link in vy_tx->read_set. */
 	rb_node(struct vy_read_interval) in_tx;
-	/** Link in vy_index->read_set. */
-	rb_node(struct vy_read_interval) in_index;
+	/** Link in vy_lsm->read_set. */
+	rb_node(struct vy_read_interval) in_lsm;
 	/**
 	 * Auxiliary list node. Used by vy_tx_track() to
 	 * link intervals to be merged.
@@ -125,7 +125,7 @@ vy_read_interval_should_merge(const struct vy_read_interval *l,
 
 /**
  * Tree that contains tuple intervals read by a transactions.
- * Linked by vy_read_interval->in_tx. Sorted by vy_index, then
+ * Linked by vy_read_interval->in_tx. Sorted by vy_lsm, then
  * by vy_read_interval->left. Intervals stored in this tree
  * must not intersect.
  */
@@ -136,7 +136,7 @@ vy_tx_read_set_cmp(const struct vy_read_interval *a,
 		   const struct vy_read_interval *b)
 {
 	assert(a->tx == b->tx);
-	int rc = a->index < b->index ? -1 : a->index > b->index;
+	int rc = a->lsm < b->lsm ? -1 : a->lsm > b->lsm;
 	if (rc == 0)
 		rc = vy_read_interval_cmpl(a, b);
 	return rc;
@@ -146,18 +146,18 @@ rb_gen(MAYBE_UNUSED static inline, vy_tx_read_set_, vy_tx_read_set_t,
        struct vy_read_interval, in_tx, vy_tx_read_set_cmp);
 
 /**
- * Interval tree used for tracking reads done from an index by
- * all active transactions. Linked by vy_read_interval->in_index.
+ * Interval tree used for tracking reads done from an LSM tree by
+ * all active transactions. Linked by vy_read_interval->in_lsm.
  * Sorted by vy_read_interval->left, then by vy_tx. Intervals that
  * belong to different transactions may intersect.
  */
-typedef rb_tree(struct vy_read_interval) vy_index_read_set_t;
+typedef rb_tree(struct vy_read_interval) vy_lsm_read_set_t;
 
 static inline int
-vy_index_read_set_cmp(const struct vy_read_interval *a,
-		      const struct vy_read_interval *b)
+vy_lsm_read_set_cmp(const struct vy_read_interval *a,
+		    const struct vy_read_interval *b)
 {
-	assert(a->index == b->index);
+	assert(a->lsm == b->lsm);
 	int rc = vy_read_interval_cmpl(a, b);
 	if (rc == 0)
 		rc = a->tx < b->tx ? -1 : a->tx > b->tx;
@@ -165,9 +165,9 @@ vy_index_read_set_cmp(const struct vy_read_interval *a,
 }
 
 static inline void
-vy_index_read_set_aug(struct vy_read_interval *node,
-		      const struct vy_read_interval *left,
-		      const struct vy_read_interval *right)
+vy_lsm_read_set_aug(struct vy_read_interval *node,
+		    const struct vy_read_interval *left,
+		    const struct vy_read_interval *right)
 {
 	node->subtree_last = node;
 	if (left != NULL &&
@@ -178,9 +178,9 @@ vy_index_read_set_aug(struct vy_read_interval *node,
 		node->subtree_last = right->subtree_last;
 }
 
-rb_gen_aug(MAYBE_UNUSED static inline, vy_index_read_set_, vy_index_read_set_t,
-	   struct vy_read_interval, in_index, vy_index_read_set_cmp,
-	   vy_index_read_set_aug);
+rb_gen_aug(MAYBE_UNUSED static inline, vy_lsm_read_set_, vy_lsm_read_set_t,
+	   struct vy_read_interval, in_lsm, vy_lsm_read_set_cmp,
+	   vy_lsm_read_set_aug);
 
 /**
  * Iterator over transactions that conflict with a statement.
@@ -189,10 +189,10 @@ struct vy_tx_conflict_iterator {
 	/** The statement. */
 	const struct tuple *stmt;
 	/**
-	 * Iterator over the index interval tree checked
+	 * Iterator over the interval tree checked
 	 * for intersections with the statement.
 	 */
-	struct vy_index_read_set_walk tree_walk;
+	struct vy_lsm_read_set_walk tree_walk;
 	/**
 	 * Direction of tree traversal to be used on the
 	 * next iteration.
@@ -202,10 +202,10 @@ struct vy_tx_conflict_iterator {
 
 static inline void
 vy_tx_conflict_iterator_init(struct vy_tx_conflict_iterator *it,
-			     vy_index_read_set_t *read_set,
+			     vy_lsm_read_set_t *read_set,
 			     const struct tuple *stmt)
 {
-	vy_index_read_set_walk_init(&it->tree_walk, read_set);
+	vy_lsm_read_set_walk_init(&it->tree_walk, read_set);
 	it->tree_dir = 0;
 	it->stmt = stmt;
 }

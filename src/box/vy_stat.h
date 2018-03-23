@@ -110,13 +110,13 @@ struct vy_compact_stat {
 	struct vy_stmt_counter out;
 };
 
-/** Vinyl index statistics. */
-struct vy_index_stat {
-	/** Number of lookups in the index. */
+/** LSM tree statistics. */
+struct vy_lsm_stat {
+	/** Number of lookups in the LSM tree. */
 	int64_t lookup;
-	/** Number of statements read from this index. */
+	/** Number of statements read from this LSM tree. */
 	struct vy_stmt_counter get;
-	/** Number of statements written to this index. */
+	/** Number of statements written to this LSM tree. */
 	struct vy_stmt_counter put;
 	/** Read latency. */
 	struct latency latency;
@@ -187,13 +187,13 @@ struct vy_tx_stat {
 };
 
 static inline int
-vy_index_stat_create(struct vy_index_stat *stat)
+vy_lsm_stat_create(struct vy_lsm_stat *stat)
 {
 	return latency_create(&stat->latency);
 }
 
 static inline void
-vy_index_stat_destroy(struct vy_index_stat *stat)
+vy_lsm_stat_destroy(struct vy_lsm_stat *stat)
 {
 	latency_destroy(&stat->latency);
 }

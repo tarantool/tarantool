@@ -150,7 +150,7 @@ void
 vy_cache_env_set_quota(struct vy_cache_env *e, size_t quota);
 
 /**
- * Tuple cache (of one particular index)
+ * Tuple cache (of one particular LSM tree)
  */
 struct vy_cache {
 	/**

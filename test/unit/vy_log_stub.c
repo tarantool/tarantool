@@ -51,9 +51,9 @@ vy_log_tx_commit(void)
 void
 vy_log_write(const struct vy_log_record *record) {}
 
-struct vy_index_recovery_info *
-vy_recovery_index_by_id(struct vy_recovery *recovery,
-			uint32_t space_id, uint32_t index_id)
+struct vy_lsm_recovery_info *
+vy_recovery_lsm_by_index_id(struct vy_recovery *recovery,
+			    uint32_t space_id, uint32_t index_id)
 {
 	unreachable();
 }

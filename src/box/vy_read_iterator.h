@@ -44,11 +44,11 @@ extern "C" {
 /**
  * Vinyl read iterator.
  *
- * Used for executing a SELECT request over a Vinyl index.
+ * Used for executing a SELECT request over an LSM tree.
  */
 struct vy_read_iterator {
-	/** Index to iterate over. */
-	struct vy_index *index;
+	/** LSM tree to iterate over. */
+	struct vy_lsm *lsm;
 	/** Active transaction or NULL. */
 	struct vy_tx *tx;
 	/** Iterator type. */
@@ -67,12 +67,12 @@ struct vy_read_iterator {
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct tuple *last_stmt;
 	/**
-	 * Copy of index->range_tree_version.
+	 * Copy of lsm->range_tree_version.
 	 * Used for detecting range tree changes.
 	 */
 	uint32_t range_tree_version;
 	/**
-	 * Copy of index->mem_list_version.
+	 * Copy of lsm->mem_list_version.
 	 * Used for detecting memory level changes.
 	 */
 	uint32_t mem_list_version;
@@ -94,7 +94,7 @@ struct vy_read_iterator {
 	uint32_t src_count;
 	/** Maximal capacity of the src array. */
 	uint32_t src_capacity;
-	/** Index of the current merge source. */
+	/** Offset of the current merge source. */
 	uint32_t curr_src;
 	/** Statement returned by the current merge source. */
 	struct tuple *curr_stmt;
@@ -122,7 +122,7 @@ struct vy_read_iterator {
 /**
  * Open the read iterator.
  * @param itr           Read iterator.
- * @param index         Vinyl index to iterate.
+ * @param lsm           LSM tree to iterate.
  * @param tx            Current transaction, if exists.
  * @param iterator_type Type of the iterator that determines order
  *                      of the iteration.
@@ -130,7 +130,7 @@ struct vy_read_iterator {
  * @param rv            Read view.
  */
 void
-vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_index *index,
+vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 		      struct vy_tx *tx, enum iterator_type iterator_type,
 		      struct tuple *key, const struct vy_read_view **rv);
 

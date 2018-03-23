@@ -1,6 +1,6 @@
 #include "trivia/util.h"
 #include "unit.h"
-#include "vy_index.h"
+#include "vy_lsm.h"
 #include "vy_cache.h"
 #include "vy_run.h"
 #include "fiber.h"
@@ -15,12 +15,12 @@ uint32_t schema_version;
 
 static int
 write_run(struct vy_run *run, const char *dir_name,
-	  struct vy_index *index, struct vy_stmt_stream *wi)
+	  struct vy_lsm *lsm, struct vy_stmt_stream *wi)
 {
 	struct vy_run_writer writer;
 	if (vy_run_writer_create(&writer, run, dir_name,
-				 index->space_id, index->index_id,
-				 index->cmp_def, index->key_def,
+				 lsm->space_id, lsm->index_id,
+				 lsm->cmp_def, lsm->key_def,
 				 4096, 0.1, 100500) != 0)
 		goto fail;
 
@@ -62,10 +62,9 @@ test_basic()
 	struct slab_cache *slab_cache = cord_slab_cache();
 
 	int rc;
-	struct vy_index_env index_env;
-	rc = vy_index_env_create(&index_env, ".", &generation,
-				 NULL, NULL);
-	is(rc, 0, "vy_index_env_create");
+	struct vy_lsm_env lsm_env;
+	rc = vy_lsm_env_create(&lsm_env, ".", &generation, NULL, NULL);
+	is(rc, 0, "vy_lsm_env_create");
 
 	struct vy_run_env run_env;
 	vy_run_env_create(&run_env);
@@ -92,14 +91,14 @@ test_basic()
 		index_def_new(512, 0, "primary", sizeof("primary") - 1, TREE,
 			      &index_opts, key_def, NULL);
 
-	struct vy_index *pk = vy_index_new(&index_env, &cache_env, &mem_env,
-					   index_def, format, NULL);
-	isnt(pk, NULL, "index is not NULL")
+	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,
+				       index_def, format, NULL);
+	isnt(pk, NULL, "lsm is not NULL")
 
 	struct vy_range *range = vy_range_new(1, NULL, NULL, pk->cmp_def);
 
 	isnt(pk, NULL, "range is not NULL")
-	vy_index_add_range(pk, range);
+	vy_lsm_add_range(pk, range);
 
 	struct rlist read_views = RLIST_HEAD_INITIALIZER(read_views);
 
@@ -115,7 +114,7 @@ test_basic()
 	rc = mkdir(path, 0777);
 	is(rc, 0, "temp dir create (3)");
 
-	/* Filling the index with test data */
+	/* Filling the LSM tree with test data */
 	/* Prepare variants */
 	const size_t num_of_keys = 100;
 	bool in_mem1[num_of_keys]; /* UPSERT value += 1, lsn 4 */
@@ -161,8 +160,8 @@ test_basic()
 		vy_mem_insert_template(pk->mem, &tmpl_val);
 	}
 
-	rc = vy_index_rotate_mem(pk);
-	is(rc, 0, "vy_index_rotate_mem");
+	rc = vy_lsm_rotate_mem(pk);
+	is(rc, 0, "vy_lsm_rotate_mem");
 
 	/* create first mem */
 	for (size_t i = 0; i < num_of_keys; i++) {
@@ -205,7 +204,7 @@ test_basic()
 	write_stream->iface->close(write_stream);
 	vy_mem_delete(run_mem);
 
-	vy_index_add_run(pk, run);
+	vy_lsm_add_run(pk, run);
 	struct vy_slice *slice = vy_slice_new(1, run, NULL, NULL, pk->cmp_def);
 	vy_range_add_slice(range, slice);
 	vy_run_unref(run);
@@ -240,7 +239,7 @@ test_basic()
 	write_stream->iface->close(write_stream);
 	vy_mem_delete(run_mem);
 
-	vy_index_add_run(pk, run);
+	vy_lsm_add_run(pk, run);
 	slice = vy_slice_new(1, run, NULL, NULL, pk->cmp_def);
 	vy_range_add_slice(range, slice);
 	vy_run_unref(run);
@@ -308,14 +307,14 @@ test_basic()
 	is(results_ok, true, "select results");
 	is(has_errors, false, "no errors happened");
 
-	vy_index_unref(pk);
+	vy_lsm_unref(pk);
 	index_def_delete(index_def);
 	tuple_format_unref(format);
 	vy_cache_destroy(&cache);
 	key_def_delete(key_def);
 	vy_cache_env_destroy(&cache_env);
 	vy_run_env_destroy(&run_env);
-	vy_index_env_destroy(&index_env);
+	vy_lsm_env_destroy(&lsm_env);
 
 	strcpy(path, "rm -rf ");
 	strcat(path, dir_name);

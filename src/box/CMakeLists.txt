@@ -75,7 +75,7 @@ add_library(box STATIC
     vy_mem.c
     vy_run.c
     vy_range.c
-    vy_index.c
+    vy_lsm.c
     vy_tx.c
     vy_write_iterator.c
     vy_read_iterator.c

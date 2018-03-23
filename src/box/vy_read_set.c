@@ -37,15 +37,15 @@
 
 #include "trivia/util.h"
 #include "tuple.h"
-#include "vy_index.h"
+#include "vy_lsm.h"
 #include "vy_stmt.h"
 
 int
 vy_read_interval_cmpl(const struct vy_read_interval *a,
 		      const struct vy_read_interval *b)
 {
-	assert(a->index == b->index);
-	struct key_def *cmp_def = a->index->cmp_def;
+	assert(a->lsm == b->lsm);
+	struct key_def *cmp_def = a->lsm->cmp_def;
 	int cmp = vy_stmt_compare(a->left, b->left, cmp_def);
 	if (cmp != 0)
 		return cmp;
@@ -67,8 +67,8 @@ int
 vy_read_interval_cmpr(const struct vy_read_interval *a,
 		      const struct vy_read_interval *b)
 {
-	assert(a->index == b->index);
-	struct key_def *cmp_def = a->index->cmp_def;
+	assert(a->lsm == b->lsm);
+	struct key_def *cmp_def = a->lsm->cmp_def;
 	int cmp = vy_stmt_compare(a->right, b->right, cmp_def);
 	if (cmp != 0)
 		return cmp;
@@ -90,9 +90,9 @@ bool
 vy_read_interval_should_merge(const struct vy_read_interval *l,
 			      const struct vy_read_interval *r)
 {
-	assert(l->index == r->index);
+	assert(l->lsm == r->lsm);
 	assert(vy_read_interval_cmpl(l, r) <= 0);
-	struct key_def *cmp_def = l->index->cmp_def;
+	struct key_def *cmp_def = l->lsm->cmp_def;
 	int cmp = vy_stmt_compare(l->right, r->left, cmp_def);
 	if (cmp > 0)
 		return true;
@@ -116,13 +116,13 @@ struct vy_tx *
 vy_tx_conflict_iterator_next(struct vy_tx_conflict_iterator *it)
 {
 	struct vy_read_interval *curr, *left, *right;
-	while ((curr = vy_index_read_set_walk_next(&it->tree_walk, it->tree_dir,
-						   &left, &right)) != NULL) {
-		struct key_def *cmp_def = curr->index->cmp_def;
+	while ((curr = vy_lsm_read_set_walk_next(&it->tree_walk, it->tree_dir,
+						 &left, &right)) != NULL) {
+		struct key_def *cmp_def = curr->lsm->cmp_def;
 		const struct vy_read_interval *last = curr->subtree_last;
 
-		assert(left == NULL || left->index == curr->index);
-		assert(right == NULL || right->index == curr->index);
+		assert(left == NULL || left->lsm == curr->lsm);
+		assert(right == NULL || right->lsm == curr->lsm);
 
 		int cmp_right = vy_stmt_compare(it->stmt, last->right, cmp_def);
 		if (cmp_right == 0 && !last->right_belongs)
