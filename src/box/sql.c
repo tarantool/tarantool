@@ -1131,8 +1131,6 @@ cursor_advance(BtCursor *pCur, int *pRes)
 	struct tuple *tuple;
 	if (iterator_next(pCur->iter, &tuple) != 0)
 		return SQL_TARANTOOL_ITERATOR_FAIL;
-	if (tuple != NULL && tuple_bless(tuple) == NULL)
-		return SQL_TARANTOOL_ITERATOR_FAIL;
 	if (pCur->last_tuple)
 		box_tuple_unref(pCur->last_tuple);
 	if (tuple) {
@@ -1628,9 +1626,6 @@ int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
 	if (index_max(primary_index, NULL, 0, &tuple) != 0) {
 		return SQL_TARANTOOL_ERROR;
 	}
-	if (tuple != NULL && tuple_bless(tuple) == NULL)
-		return SQL_TARANTOOL_ERROR;
-
 	if (tuple == NULL) {
 		*max_id = 0;
 		return SQLITE_OK;
