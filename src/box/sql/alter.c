@@ -107,7 +107,7 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	}
 
 #ifndef SQLITE_OMIT_VIEW
-	if (pTab->pSelect) {
+	if (space_is_view(pTab)) {
 		sqlite3ErrorMsg(pParse, "view %s may not be altered",
 				pTab->zName);
 		goto exit_rename_table;
@@ -262,7 +262,7 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 		goto exit_begin_add_column;
 
 	/* Make sure this is not an attempt to ALTER a view. */
-	if (pTab->pSelect) {
+	if (space_is_view(pTab)) {
 		sqlite3ErrorMsg(pParse, "Cannot add a column to a view");
 		goto exit_begin_add_column;
 	}

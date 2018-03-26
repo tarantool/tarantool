@@ -769,7 +769,8 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
 	sqlite3 *db = pParse->db;
 	struct session *user_session = current_session();
 
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) && !pTab->pSelect) {
+	if ((user_session->sql_flags & SQLITE_ForeignKeys) &&
+	    !space_is_view(pTab)) {
 		int iSkip = 0;
 		Vdbe *v = sqlite3GetVdbe(pParse);
 

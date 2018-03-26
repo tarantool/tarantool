@@ -1160,6 +1160,24 @@ index_collation_name(Index *idx, uint32_t column)
 	return index->def->key_def->parts[column].coll->name;
 }
 
+/**
+ * Return true if space which corresponds to
+ * given table has view option.
+ *
+ * FIXME: this is temporary wrapper around SQL specific struct.
+ * It will be removed after data dictionary integration
+ * into SQL is finished.
+ */
+bool
+space_is_view(Table *table)
+{
+	assert(table != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	return space->def->opts.is_view;
+}
+
 /*
  * This function returns the collation sequence for database native text
  * encoding identified by the string zName, length nName.
@@ -1839,7 +1857,6 @@ void
 sqlite3EndTable(Parse * pParse,	/* Parse context */
 		Token * pCons,	/* The ',' token after the last column defn. */
 		Token * pEnd,	/* The ')' before options in the CREATE TABLE */
-		u8 tabOpts,	/* Extra table options. Usually 0. */
 		Select * pSelect	/* Select from a "CREATE ... AS SELECT" */
     )
 {
@@ -1864,9 +1881,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	if (db->init.busy)
 		p->tnum = db->init.newTnum;
 
-	if (p->pSelect) {
-		tabOpts |= TF_View;
-	} else {
+	if (!p->pSelect) {
 		if ((p->tabFlags & TF_HasPrimaryKey) == 0) {
 			sqlite3ErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
@@ -1957,7 +1972,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		if (pSelect) {
 			zStmt = createTableStmt(db, p);
 		} else {
-			Token *pEnd2 = tabOpts ? &pParse->sLastToken : pEnd;
+			Token *pEnd2 = p->pSelect ? &pParse->sLastToken : pEnd;
 			n = (int)(pEnd2->z - pParse->sNameToken.z);
 			if (pEnd2->z[0] != ';')
 				n += pEnd2->n;
@@ -2123,7 +2138,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 	sEnd.n = 1;
 
 	/* Use sqlite3EndTable() to add the view to the Tarantool.  */
-	sqlite3EndTable(pParse, 0, &sEnd, 0, 0);
+	sqlite3EndTable(pParse, 0, &sEnd, 0);
 
  create_view_fail:
 	sqlite3SelectDelete(db, pSelect);
@@ -2414,12 +2429,12 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	/* Ensure DROP TABLE is not used on a view, and DROP VIEW is not used
 	 * on a table.
 	 */
-	if (isView && pTab->pSelect == 0) {
+	if (isView && !space_is_view(pTab)) {
 		sqlite3ErrorMsg(pParse, "use DROP TABLE to delete table %s",
 				pTab->zName);
 		goto exit_drop_table;
 	}
-	if (!isView && pTab->pSelect) {
+	if (!isView && space_is_view(pTab)) {
 		sqlite3ErrorMsg(pParse, "use DROP VIEW to delete view %s",
 				pTab->zName);
 		goto exit_drop_table;

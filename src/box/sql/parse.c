@@ -2262,14 +2262,14 @@ static void yy_reduce(
       case 17: /* create_table_args ::= LP columnlist conslist_opt RP */
 #line 185 "parse.y"
 {
-  sqlite3EndTable(pParse,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0,0,0);
+  sqlite3EndTable(pParse,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0,0);
 }
 #line 2268 "parse.c"
         break;
       case 18: /* create_table_args ::= AS select */
 #line 188 "parse.y"
 {
-  sqlite3EndTable(pParse,0,0,0,yymsp[0].minor.yy279);
+  sqlite3EndTable(pParse,0,0,yymsp[0].minor.yy279);
   sqlite3SelectDelete(pParse->db, yymsp[0].minor.yy279);
 }
 #line 2276 "parse.c"

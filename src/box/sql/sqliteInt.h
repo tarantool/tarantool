@@ -1355,7 +1355,6 @@ struct Table {
 #define TF_Ephemeral       0x02	/* An ephemeral table */
 #define TF_HasPrimaryKey   0x04	/* Table has a primary key */
 #define TF_Autoincrement   0x08	/* Integer primary key is autoincrement */
-#define TF_View   	   0x20	/* A view */
 
 /*
  * Each foreign key constraint is an instance of the following structure.
@@ -2983,7 +2982,9 @@ const char *
 index_collation_name(Index *, uint32_t);
 struct coll *
 sql_default_coll();
-void sqlite3EndTable(Parse *, Token *, Token *, u8, Select *);
+bool
+space_is_view(Table *);
+void sqlite3EndTable(Parse *, Token *, Token *, Select *);
 int sqlite3ParseUri(const char *, const char *, unsigned int *,
 		    sqlite3_vfs **, char **, char **);
 

@@ -4511,7 +4511,8 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 		pTabItem = &pTabList->a[pLevel->iFrom];
 		pTab = pTabItem->pTab;
 		pLoop = pLevel->pWLoop;
-		if ((pTab->tabFlags & TF_Ephemeral) != 0 || pTab->pSelect) {
+		if ((pTab->tabFlags & TF_Ephemeral) != 0 ||
+		    space_is_view(pTab)) {
 			/* Do nothing */
 		} else if ((pLoop->wsFlags & WHERE_IDX_ONLY) == 0 &&
 			   (wctrlFlags & WHERE_OR_SUBCLAUSE) == 0) {

@@ -4717,7 +4717,7 @@ table_column_is_nullable(struct Table *tab, uint32_t column)
 {
 	/* Temporary hack: until Tarantoool's ephemeral spaces are on-boarded,
 	*  views are not handled properly in Tarantool as well. */
-	if (!(tab->tabFlags | TF_Ephemeral || tab->pSelect != NULL)) {
+	if (!(tab->tabFlags | TF_Ephemeral || space_is_view(tab))) {
 		uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(tab->tnum);
 		struct space *space = space_cache_find(space_id);
 

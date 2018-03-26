@@ -144,13 +144,13 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	/* INSTEAD of triggers are only for views and views only support INSTEAD
 	 * of triggers.
 	 */
-	if (pTab->pSelect && tr_tm != TK_INSTEAD) {
+	if (space_is_view(pTab) && tr_tm != TK_INSTEAD) {
 		sqlite3ErrorMsg(pParse, "cannot create %s trigger on view: %S",
 				(tr_tm == TK_BEFORE) ? "BEFORE" : "AFTER",
 				pTableName, 0);
 		goto trigger_cleanup;
 	}
-	if (!pTab->pSelect && tr_tm == TK_INSTEAD) {
+	if (!space_is_view(pTab) && tr_tm == TK_INSTEAD) {
 		sqlite3ErrorMsg(pParse, "cannot create INSTEAD OF"
 				" trigger on table: %S", pTableName, 0);
 		goto trigger_cleanup;

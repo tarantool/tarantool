@@ -183,10 +183,10 @@ ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
 
 create_table_args ::= LP columnlist conslist_opt(X) RP(E). {
-  sqlite3EndTable(pParse,&X,&E,0,0);
+  sqlite3EndTable(pParse,&X,&E,0);
 }
 create_table_args ::= AS select(S). {
-  sqlite3EndTable(pParse,0,0,0,S);
+  sqlite3EndTable(pParse,0,0,S);
   sqlite3SelectDelete(pParse->db, S);
 }
 columnlist ::= columnlist COMMA columnname carglist.
@@ -1357,7 +1357,6 @@ cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
 trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
                     trigger_time(C) trigger_event(D)
                     ON fullname(E) foreach_clause when_clause(G). {
-  pParse->initiateTTrans = false;
   sqlite3BeginTrigger(pParse, &B, C, D.a, D.b, E, G, NOERR);
   A = B; /*A-overwrites-T*/
 }

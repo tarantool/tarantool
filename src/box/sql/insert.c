@@ -381,7 +381,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 */
 #ifndef SQLITE_OMIT_TRIGGER
 	pTrigger = sqlite3TriggersExist(pTab, TK_INSERT, 0, &tmask);
-	isView = pTab->pSelect != 0;
+	isView = space_is_view(pTab);
 #else
 #define pTrigger 0
 #define tmask 0
@@ -1074,7 +1074,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	db = pParse->db;
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
-	assert(pTab->pSelect == 0);	/* This table is not a VIEW */
+	/* This table is not a VIEW */
+	assert(!space_is_view(pTab));
 	nCol = pTab->nCol;
 
 	pPk = sqlite3PrimaryKeyIndex(pTab);
@@ -1482,7 +1483,8 @@ sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
 
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
-	assert(pTab->pSelect == 0);	/* This table is not a VIEW */
+	/* This table is not a VIEW */
+	assert(!space_is_view(pTab));
 	/*
 	 * The for loop which purpose in sqlite was to insert new
 	 * values to all indexes is replaced to inserting new
@@ -1802,7 +1804,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (pSrc == pDest) {
 		return 0;	/* tab1 and tab2 may not be the same table */
 	}
-	if (pSrc->pSelect) {
+	if (space_is_view(pSrc)) {
 		return 0;	/* tab2 may not be a view */
 	}
 	if (pDest->nCol != pSrc->nCol) {

@@ -163,7 +163,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 #ifndef SQLITE_OMIT_TRIGGER
 	pTrigger = sqlite3TriggersExist(pTab, TK_UPDATE, pChanges, &tmask);
-	isView = pTab->pSelect != 0;
+	isView = space_is_view(pTab);
 	assert(pTrigger || tmask == 0);
 #else
 #define pTrigger 0

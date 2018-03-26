@@ -4295,7 +4295,7 @@ isSimpleCount(Select * p, AggInfo * pAggInfo)
 	}
 	pTab = p->pSrc->a[0].pTab;
 	pExpr = p->pEList->a[0].pExpr;
-	assert(pTab && !pTab->pSelect && pExpr);
+	assert(pTab && !space_is_view(pTab) && pExpr);
 	if (pExpr->op != TK_AGG_FUNCTION)
 		return 0;
 	if (NEVER(pAggInfo->nFunc == 0))
@@ -4760,7 +4760,7 @@ selectExpander(Walker * pWalker, Select * p)
 				return WRC_Abort;
 			}
 #if !defined(SQLITE_OMIT_VIEW)
-			if (pTab->pSelect) {
+			if (space_is_view(pTab)) {
 				i16 nCol;
 				if (sqlite3ViewGetColumnNames(pParse, pTab))
 					return WRC_Abort;
