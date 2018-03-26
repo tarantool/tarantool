@@ -2012,6 +2012,7 @@ vy_log_append_index(struct xlog *xlog, struct vy_index_recovery_info *index)
 	record.space_def_id = index->space_id;
 	record.key_parts = index->key_parts;
 	record.key_part_count = index->key_part_count;
+	record.commit_lsn = index->commit_lsn;
 	if (vy_log_append_record(xlog, &record) != 0)
 		return -1;
 
