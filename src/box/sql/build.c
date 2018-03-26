@@ -3071,8 +3071,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		pCExpr = sqlite3ExprSkipCollate(pListItem->pExpr);
 		if (pCExpr->op != TK_COLUMN) {
 			sqlite3ErrorMsg(pParse,
-					"expressions prohibited in PRIMARY KEY and "
-					"UNIQUE constraints");
+					"functional indexes aren't supported "
+					"in the current version");
 			goto exit_create_index;
 		} else {
 			j = pCExpr->iColumn;
