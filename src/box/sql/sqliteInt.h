@@ -123,15 +123,6 @@
 
 #include "sqliteLimit.h"
 
-/* Disable nuisance warnings on Borland compilers */
-#if defined(__BORLANDC__)
-#pragma warn -rch		/* unreachable code */
-#pragma warn -ccc		/* Condition is always true or false */
-#pragma warn -aus		/* Assigned value is never used */
-#pragma warn -csu		/* Comparing signed and unsigned */
-#pragma warn -spa		/* Suspicious pointer arithmetic */
-#endif
-
 /*
  * Include standard header files as necessary
  */
@@ -197,17 +188,6 @@
 #define SQLITE_DEFAULT_MEMSTATUS 1
 #endif
 
-/*
- * Exactly one of the following macros must be defined in order to
- * specify which memory allocation subsystem to use.
- *
- *     SQLITE_SYSTEM_MALLOC          // Use normal system malloc()
- *     SQLITE_ZERO_MALLOC            // Use a stub allocator that always fails
- *     SQLITE_MEMDEBUG               // Debugging version of system malloc()
- *
- * If none of the above are defined, then set SQLITE_SYSTEM_MALLOC as
- * the default.
- */
 #if defined(SQLITE_SYSTEM_MALLOC) \
   + defined(SQLITE_ZERO_MALLOC) \
   + defined(SQLITE_MEMDEBUG)>1
@@ -431,18 +411,6 @@ struct sqlite3_vfs {
 #define SQLITE_LIMIT_LIKE_PATTERN_LENGTH       8
 #define SQLITE_LIMIT_TRIGGER_DEPTH             9
 #define SQLITE_LIMIT_WORKER_THREADS           10
-
-typedef struct sqlite3_mem_methods sqlite3_mem_methods;
-struct sqlite3_mem_methods {
-	void *(*xMalloc) (int);	/* Memory allocation function */
-	void (*xFree) (void *);	/* Free a prior allocation */
-	void *(*xRealloc) (void *, int);	/* Resize an allocation */
-	int (*xSize) (void *);	/* Return the size of an allocation */
-	int (*xRoundup) (int);	/* Round up request size to allocation size */
-	int (*xInit) (void *);	/* Initialize the memory allocator */
-	void (*xShutdown) (void *);	/* Deinitialize the memory allocator */
-	void *pAppData;	/* Argument to xInit() and xShutdown() */
-};
 
 typedef struct sqlite3_pcache sqlite3_pcache;
 
@@ -804,8 +772,6 @@ sqlite3_os_end(void);
 #define SQLITE_CONFIG_SINGLETHREAD  1	/* nil */
 #define SQLITE_CONFIG_MULTITHREAD   2	/* nil */
 #define SQLITE_CONFIG_SERIALIZED    3	/* nil */
-#define SQLITE_CONFIG_MALLOC        4	/* sqlite3_mem_methods* */
-#define SQLITE_CONFIG_GETMALLOC     5	/* sqlite3_mem_methods* */
 #define SQLITE_CONFIG_SCRATCH       6	/* void*, int sz, int N */
 #define SQLITE_CONFIG_PAGECACHE     7	/* void*, int sz, int N */
 #define SQLITE_CONFIG_HEAP          8	/* void*, int nByte, int min */
@@ -3325,7 +3291,6 @@ struct Sqlite3Config {
 	int szLookaside;	/* Default lookaside buffer size */
 	int nLookaside;		/* Default lookaside buffer count */
 	int nStmtSpill;		/* Stmt-journal spill-to-disk threshold */
-	sqlite3_mem_methods m;	/* Low-level memory allocation interface */
 	sqlite3_pcache_methods2 pcache2;	/* Low-level page-cache interface */
 	void *pHeap;		/* Heap storage space */
 	int nHeap;		/* Size of pHeap[] */
@@ -3533,7 +3498,7 @@ unsigned sqlite3Strlen30(const char *);
 enum field_type sqlite3ColumnType(Column *);
 #define sqlite3StrNICmp sqlite3_strnicmp
 
-int sqlite3MallocInit(void);
+void sqlite3MallocInit(void);
 void sqlite3MallocEnd(void);
 void *sqlite3Malloc(u64);
 void *sqlite3MallocZero(u64);
@@ -3574,17 +3539,6 @@ int sqlite3HeapNearlyFull(void);
 #define sqlite3StackAllocRaw(D,N)   sqlite3DbMallocRaw(D,N)
 #define sqlite3StackAllocZero(D,N)  sqlite3DbMallocZero(D,N)
 #define sqlite3StackFree(D,P)       sqlite3DbFree(D,P)
-#endif
-
-/* Do not allow both MEMSYS5 and MEMSYS3 to be defined together.  If they
- * are, disable MEMSYS3
- */
-#ifdef SQLITE_ENABLE_MEMSYS5
-const sqlite3_mem_methods *sqlite3MemGetMemsys5(void);
-#undef SQLITE_ENABLE_MEMSYS3
-#endif
-#ifdef SQLITE_ENABLE_MEMSYS3
-const sqlite3_mem_methods *sqlite3MemGetMemsys3(void);
 #endif
 
 sqlite3_int64 sqlite3StatusValue(int);

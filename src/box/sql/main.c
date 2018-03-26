@@ -179,7 +179,7 @@ sqlite3_initialize(void)
 		return SQLITE_OK;
 
 	if (!sqlite3GlobalConfig.isMallocInit)
-		rc = sqlite3MallocInit();
+		sqlite3MallocInit();
 	if (rc == SQLITE_OK)
 		sqlite3GlobalConfig.isMallocInit = 1;
 
@@ -326,29 +326,6 @@ sqlite3_config(int op, ...)
 
 	va_start(ap, op);
 	switch (op) {
-	case SQLITE_CONFIG_MALLOC:{
-			/* EVIDENCE-OF: R-55594-21030 The SQLITE_CONFIG_MALLOC option takes a
-			 * single argument which is a pointer to an instance of the
-			 * sqlite3_mem_methods structure. The argument specifies alternative
-			 * low-level memory allocation routines to be used in place of the memory
-			 * allocation routines built into SQLite.
-			 */
-			sqlite3GlobalConfig.m =
-			    *va_arg(ap, sqlite3_mem_methods *);
-			break;
-		}
-	case SQLITE_CONFIG_GETMALLOC:{
-			/* EVIDENCE-OF: R-51213-46414 The SQLITE_CONFIG_GETMALLOC option takes a
-			 * single argument which is a pointer to an instance of the
-			 * sqlite3_mem_methods structure. The sqlite3_mem_methods structure is
-			 * filled with the currently defined memory allocation routines.
-			 */
-			if (sqlite3GlobalConfig.m.xMalloc == 0)
-				sqlite3MemSetDefault();
-			*va_arg(ap, sqlite3_mem_methods *) =
-			    sqlite3GlobalConfig.m;
-			break;
-		}
 	case SQLITE_CONFIG_MEMSTATUS:{
 			/* EVIDENCE-OF: R-61275-35157 The SQLITE_CONFIG_MEMSTATUS option takes
 			 * single argument of type int, interpreted as a boolean, which enables
@@ -368,54 +345,6 @@ sqlite3_config(int op, ...)
 			sqlite3GlobalConfig.nScratch = va_arg(ap, int);
 			break;
 		}
-
-/* EVIDENCE-OF: R-06626-12911 The SQLITE_CONFIG_HEAP option is only
- * available if SQLite is compiled with either SQLITE_ENABLE_MEMSYS3 or
- * SQLITE_ENABLE_MEMSYS5 and returns SQLITE_ERROR if invoked otherwise.
- */
-#if defined(SQLITE_ENABLE_MEMSYS3) || defined(SQLITE_ENABLE_MEMSYS5)
-	case SQLITE_CONFIG_HEAP:{
-			/* EVIDENCE-OF: R-19854-42126 There are three arguments to
-			 * SQLITE_CONFIG_HEAP: An 8-byte aligned pointer to the memory, the
-			 * number of bytes in the memory buffer, and the minimum allocation size.
-			 */
-			sqlite3GlobalConfig.pHeap = va_arg(ap, void *);
-			sqlite3GlobalConfig.nHeap = va_arg(ap, int);
-			sqlite3GlobalConfig.mnReq = va_arg(ap, int);
-
-			if (sqlite3GlobalConfig.mnReq < 1) {
-				sqlite3GlobalConfig.mnReq = 1;
-			} else if (sqlite3GlobalConfig.mnReq > (1 << 12)) {
-				/* cap min request size at 2^12 */
-				sqlite3GlobalConfig.mnReq = (1 << 12);
-			}
-
-			if (sqlite3GlobalConfig.pHeap == 0) {
-				/* EVIDENCE-OF: R-49920-60189 If the first pointer (the memory pointer)
-				 * is NULL, then SQLite reverts to using its default memory allocator
-				 * (the system malloc() implementation), undoing any prior invocation of
-				 * SQLITE_CONFIG_MALLOC.
-				 *
-				 * Setting sqlite3GlobalConfig.m to all zeros will cause malloc to
-				 * revert to its default implementation when sqlite3_initialize() is run
-				 */
-				memset(&sqlite3GlobalConfig.m, 0,
-				       sizeof(sqlite3GlobalConfig.m));
-			} else {
-				/* EVIDENCE-OF: R-61006-08918 If the memory pointer is not NULL then the
-				 * alternative memory allocator is engaged to handle all of SQLites
-				 * memory allocation needs.
-				 */
-#ifdef SQLITE_ENABLE_MEMSYS3
-				sqlite3GlobalConfig.m = *sqlite3MemGetMemsys3();
-#endif
-#ifdef SQLITE_ENABLE_MEMSYS5
-				sqlite3GlobalConfig.m = *sqlite3MemGetMemsys5();
-#endif
-			}
-			break;
-		}
-#endif
 
 	case SQLITE_CONFIG_LOOKASIDE:{
 			sqlite3GlobalConfig.szLookaside = va_arg(ap, int);

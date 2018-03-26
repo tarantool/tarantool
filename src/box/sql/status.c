@@ -246,8 +246,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 				HashElem *p;
 
 				nByte +=
-				    sqlite3GlobalConfig.m.
-				    xRoundup(sizeof(HashElem)) *
+				    ROUND8(sizeof(HashElem)) *
 				    (pSchema->tblHash.count +
 				     pSchema->trigHash.count +
 				     pSchema->fkeyHash.count);

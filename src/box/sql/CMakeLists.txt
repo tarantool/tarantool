@@ -48,11 +48,6 @@ add_library(sql STATIC
     legacy.c
     main.c
     malloc.c
-    mem0.c
-    mem1.c
-    mem2.c
-    mem3.c
-    mem5.c
     os.c
     os_unix.c
     pragma.c
