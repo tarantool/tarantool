@@ -287,7 +287,7 @@ sqlite3OsOpen(sqlite3_vfs * pVfs,
 	DO_OS_MALLOC_TEST(0);
 	/* 0x87f7f is a mask of SQLITE_OPEN_ flags that are valid to be passed
 	 * down into the VFS layer.  Some SQLITE_OPEN_ flags (for example,
-	 * SQLITE_OPEN_FULLMUTEX or SQLITE_OPEN_SHAREDCACHE) are blocked before
+	 * SQLITE_OPEN_SHAREDCACHE) are blocked before
 	 * reaching the VFS.
 	 */
 	rc = pVfs->xOpen(pVfs, zPath, pFile, flags & 0x87f7f, pFlagsOut);

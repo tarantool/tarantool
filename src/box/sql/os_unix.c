@@ -250,7 +250,6 @@ static pid_t randomnessPid = 0;
 #else
 #define UNIXFILE_DIRSYNC    0x00
 #endif
-#define UNIXFILE_PSOW        0x10	/* SQLITE_IOCAP_POWERSAFE_OVERWRITE */
 #define UNIXFILE_DELETE      0x20	/* Delete on close */
 #define UNIXFILE_URI         0x40	/* Filename might have query parameters */
 #define UNIXFILE_NOLOCK      0x80	/* Do no file locking */
@@ -3274,24 +3273,6 @@ fcntlSizeHint(unixFile * pFile, i64 nByte)
 	return SQLITE_OK;
 }
 
-/*
- * If *pArg is initially negative then this is a query.  Set *pArg to
- * 1 or 0 depending on whether or not bit mask of pFile->ctrlFlags is set.
- *
- * If *pArg is 0 or 1, then clear or set the mask bit of pFile->ctrlFlags.
- */
-static void
-unixModeBit(unixFile * pFile, unsigned char mask, int *pArg)
-{
-	if (*pArg < 0) {
-		*pArg = (pFile->ctrlFlags & mask) != 0;
-	} else if ((*pArg) == 0) {
-		pFile->ctrlFlags &= ~mask;
-	} else {
-		pFile->ctrlFlags |= mask;
-	}
-}
-
 /* Forward declaration */
 static int unixGetTempname(int nBuf, char *zBuf);
 
@@ -3321,10 +3302,6 @@ unixFileControl(sqlite3_file * id, int op, void *pArg)
 			rc = fcntlSizeHint(pFile, *(i64 *) pArg);
 			SimulateIOErrorBenign(0);
 			return rc;
-		}
-	case SQLITE_FCNTL_POWERSAFE_OVERWRITE:{
-			unixModeBit(pFile, UNIXFILE_PSOW, (int *)pArg);
-			return SQLITE_OK;
 		}
 	case SQLITE_FCNTL_VFSNAME:{
 			*(char **)pArg =
@@ -3416,14 +3393,10 @@ unixSectorSize(sqlite3_file * NotUsed)
  * available to turn it off and URI query parameter available to turn it off.
  */
 static int
-unixDeviceCharacteristics(sqlite3_file * id)
+unixDeviceCharacteristics(sqlite3_file * pNotUsed)
 {
-	unixFile *p = (unixFile *) id;
-	int rc = 0;
-	if (p->ctrlFlags & UNIXFILE_PSOW) {
-		rc |= SQLITE_IOCAP_POWERSAFE_OVERWRITE;
-	}
-	return rc;
+	UNUSED_PARAMETER(pNotUsed);
+	return SQLITE_OK;
 }
 
 #if SQLITE_MAX_MMAP_SIZE>0
@@ -3965,10 +3938,6 @@ fillInUnixFile(sqlite3_vfs * pVfs,	/* Pointer to vfs object */
 #if SQLITE_MAX_MMAP_SIZE>0
 	pNew->mmapSizeMax = sqlite3GlobalConfig.szMmap;
 #endif
-	if (sqlite3_uri_boolean(((ctrlFlags & UNIXFILE_URI) ? zFilename : 0),
-				"psow", SQLITE_POWERSAFE_OVERWRITE)) {
-		pNew->ctrlFlags |= UNIXFILE_PSOW;
-	}
 	if (strcmp(pVfs->zName, "unix-excl") == 0) {
 		pNew->ctrlFlags |= UNIXFILE_EXCL;
 	}

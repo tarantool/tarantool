@@ -815,35 +815,14 @@ sqlite3ErrName(int rc)
 		case SQLITE_BUSY:
 			zName = "SQLITE_BUSY";
 			break;
-		case SQLITE_BUSY_RECOVERY:
-			zName = "SQLITE_BUSY_RECOVERY";
-			break;
-		case SQLITE_BUSY_SNAPSHOT:
-			zName = "SQLITE_BUSY_SNAPSHOT";
-			break;
 		case SQLITE_LOCKED:
 			zName = "SQLITE_LOCKED";
-			break;
-		case SQLITE_LOCKED_SHAREDCACHE:
-			zName = "SQLITE_LOCKED_SHAREDCACHE";
 			break;
 		case SQLITE_NOMEM:
 			zName = "SQLITE_NOMEM";
 			break;
 		case SQLITE_READONLY:
 			zName = "SQLITE_READONLY";
-			break;
-		case SQLITE_READONLY_RECOVERY:
-			zName = "SQLITE_READONLY_RECOVERY";
-			break;
-		case SQLITE_READONLY_CANTLOCK:
-			zName = "SQLITE_READONLY_CANTLOCK";
-			break;
-		case SQLITE_READONLY_ROLLBACK:
-			zName = "SQLITE_READONLY_ROLLBACK";
-			break;
-		case SQLITE_READONLY_DBMOVED:
-			zName = "SQLITE_READONLY_DBMOVED";
 			break;
 		case SQLITE_INTERRUPT:
 			zName = "SQLITE_INTERRUPT";
@@ -938,18 +917,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_CANTOPEN:
 			zName = "SQLITE_CANTOPEN";
 			break;
-		case SQLITE_CANTOPEN_NOTEMPDIR:
-			zName = "SQLITE_CANTOPEN_NOTEMPDIR";
-			break;
-		case SQLITE_CANTOPEN_ISDIR:
-			zName = "SQLITE_CANTOPEN_ISDIR";
-			break;
-		case SQLITE_CANTOPEN_FULLPATH:
-			zName = "SQLITE_CANTOPEN_FULLPATH";
-			break;
-		case SQLITE_CANTOPEN_CONVPATH:
-			zName = "SQLITE_CANTOPEN_CONVPATH";
-			break;
 		case SQLITE_PROTOCOL:
 			zName = "SQLITE_PROTOCOL";
 			break;
@@ -983,9 +950,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_CONSTRAINT_NOTNULL:
 			zName = "SQLITE_CONSTRAINT_NOTNULL";
 			break;
-		case SQLITE_CONSTRAINT_COMMITHOOK:
-			zName = "SQLITE_CONSTRAINT_COMMITHOOK";
-			break;
 		case SQLITE_CONSTRAINT_FUNCTION:
 			zName = "SQLITE_CONSTRAINT_FUNCTION";
 			break;
@@ -1016,17 +980,8 @@ sqlite3ErrName(int rc)
 		case SQLITE_NOTICE:
 			zName = "SQLITE_NOTICE";
 			break;
-		case SQLITE_NOTICE_RECOVER_WAL:
-			zName = "SQLITE_NOTICE_RECOVER_WAL";
-			break;
-		case SQLITE_NOTICE_RECOVER_ROLLBACK:
-			zName = "SQLITE_NOTICE_RECOVER_ROLLBACK";
-			break;
 		case SQLITE_WARNING:
 			zName = "SQLITE_WARNING";
-			break;
-		case SQLITE_WARNING_AUTOINDEX:
-			zName = "SQLITE_WARNING_AUTOINDEX";
 			break;
 		case SQLITE_DONE:
 			zName = "SQLITE_DONE";
@@ -1297,25 +1252,6 @@ sqlite3CreateFunc(sqlite3 * db,
 	p->pUserData = pUserData;
 	p->nArg = (u16) nArg;
 	return SQLITE_OK;
-}
-
-/*
- * Create new user functions.
- */
-int
-sqlite3_create_function(sqlite3 * db,
-			const char *zFunc,
-			int nArg,
-			int flags,
-			void *p,
-			void (*xSFunc) (sqlite3_context *, int,
-					sqlite3_value **),
-			void (*xStep) (sqlite3_context *, int,
-				       sqlite3_value **),
-			void (*xFinal) (sqlite3_context *))
-{
-	return sqlite3_create_function_v2(db, zFunc, nArg, flags, p, xSFunc,
-					  xStep, xFinal, 0);
 }
 
 int

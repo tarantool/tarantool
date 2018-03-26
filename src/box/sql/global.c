@@ -202,7 +202,6 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 	512,			/* szLookaside */
 	125,			/* nLookaside */
 	0,			/* nStmtSpill */
-	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},	/* pcache2 */
 	(void *)0,		/* pHeap */
 	0,			/* nHeap */
 	0, 0,			/* mnHeap, mxHeap */

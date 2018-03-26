@@ -69,15 +69,6 @@
 #include "box/txn.h"
 
 /*
- * Make sure the Tcl calling convention macro is defined.  This macro is
- * only used by test code and Tcl integration code.
- */
-#ifndef SQLITE_TCLAPI
-#define SQLITE_TCLAPI
-#endif
-
-
-/*
  * These #defines should enable >2GB file support on POSIX if the
  * underlying operating system supports it.  If the OS lacks
  * large file support, these should be no-ops.
@@ -412,36 +403,6 @@ struct sqlite3_vfs {
 #define SQLITE_LIMIT_TRIGGER_DEPTH             9
 #define SQLITE_LIMIT_WORKER_THREADS           10
 
-typedef struct sqlite3_pcache sqlite3_pcache;
-
-typedef struct sqlite3_pcache_page sqlite3_pcache_page;
-struct sqlite3_pcache_page {
-	void *pBuf;	/* The content of the page */
-	void *pExtra;	/* Extra information associated with the page */
-};
-
-typedef struct sqlite3_pcache_methods2 sqlite3_pcache_methods2;
-struct sqlite3_pcache_methods2 {
-	int iVersion;
-	void *pArg;
-	int (*xInit) (void *);
-	void (*xShutdown) (void *);
-	sqlite3_pcache *(*xCreate) (int szPage, int szExtra,
-				    int bPurgeable);
-	void (*xCachesize) (sqlite3_pcache *, int nCachesize);
-	int (*xPagecount) (sqlite3_pcache *);
-	sqlite3_pcache_page *(*xFetch) (sqlite3_pcache *, unsigned key,
-					int createFlag);
-	void (*xUnpin) (sqlite3_pcache *, sqlite3_pcache_page *,
-			int discard);
-	void (*xRekey) (sqlite3_pcache *, sqlite3_pcache_page *,
-			unsigned oldKey, unsigned newKey);
-	void (*xTruncate) (sqlite3_pcache *, unsigned iLimit);
-	void (*xDestroy) (sqlite3_pcache *);
-	void (*xShrink) (sqlite3_pcache *);
-};
-
-
 #define SQLITE_OK           0	/* Successful result */
 /* beginning-of-error-codes */
 #define SQLITE_ERROR        1	/* SQL error or missing database */
@@ -506,90 +467,90 @@ sqlite3_strnicmp(const char *, const char *, int);
  const void *
 sqlite3_value_blob(sqlite3_value *);
 
- int
+int
 sqlite3_value_bytes(sqlite3_value *);
 
- double
+double
 sqlite3_value_double(sqlite3_value *);
 
- int
+int
 sqlite3_value_int(sqlite3_value *);
 
- sqlite3_int64
+sqlite3_int64
 sqlite3_value_int64(sqlite3_value *);
 
- const unsigned char *
+const unsigned char *
 sqlite3_value_text(sqlite3_value *);
 
- int
+int
 sqlite3_value_type(sqlite3_value *);
 
- int
+int
 sqlite3_value_numeric_type(sqlite3_value *);
 
 sqlite3 *
 sqlite3_context_db_handle(sqlite3_context *);
 
 
- void
+void
 sqlite3_result_blob(sqlite3_context *, const void *,
 		    int, void (*)(void *));
 
- void
+void
 sqlite3_result_blob64(sqlite3_context *, const void *,
 		      sqlite3_uint64, void (*)(void *));
 
- void
+void
 sqlite3_result_double(sqlite3_context *, double);
 
- void
+void
 sqlite3_result_error(sqlite3_context *, const char *,
 		     int);
 
- void
+void
 sqlite3_result_error_toobig(sqlite3_context *);
 
- void
+void
 sqlite3_result_error_nomem(sqlite3_context *);
 
- void
+void
 sqlite3_result_error_code(sqlite3_context *, int);
 
- void
+void
 sqlite3_result_int(sqlite3_context *, int);
 
- void
+void
 sqlite3_result_int64(sqlite3_context *, sqlite3_int64);
 
- void
+void
 sqlite3_result_null(sqlite3_context *);
 
- void
+void
 sqlite3_result_text(sqlite3_context *, const char *,
 		    int, void (*)(void *));
 
- void
+void
 sqlite3_result_text64(sqlite3_context *, const char *,
 		      sqlite3_uint64, void (*)(void *));
 
- void
+void
 sqlite3_result_value(sqlite3_context *,
 		     sqlite3_value *);
 
- void
+void
 sqlite3_result_zeroblob(sqlite3_context *, int n);
 
- int
+int
 sqlite3_result_zeroblob64(sqlite3_context *,
 			  sqlite3_uint64 n);
 
- char *
+char *
 sqlite3_mprintf(const char *, ...);
- char *
+char *
 sqlite3_vmprintf(const char *, va_list);
- char *
+char *
 sqlite3_snprintf(int, char *, const char *, ...);
- char *
+char *
 sqlite3_vsnprintf(int, char *, const char *, va_list);
 
 int
@@ -688,30 +649,14 @@ sqlite3_exec(sqlite3 *,	/* An open database */
 #define SQLITE_IOERR_GETTEMPPATH       (SQLITE_IOERR | (25<<8))
 #define SQLITE_IOERR_CONVPATH          (SQLITE_IOERR | (26<<8))
 #define SQLITE_IOERR_VNODE             (SQLITE_IOERR | (27<<8))
-#define SQLITE_LOCKED_SHAREDCACHE      (SQLITE_LOCKED |  (1<<8))
-#define SQLITE_BUSY_RECOVERY           (SQLITE_BUSY   |  (1<<8))
-#define SQLITE_BUSY_SNAPSHOT           (SQLITE_BUSY   |  (2<<8))
-#define SQLITE_CANTOPEN_NOTEMPDIR      (SQLITE_CANTOPEN | (1<<8))
-#define SQLITE_CANTOPEN_ISDIR          (SQLITE_CANTOPEN | (2<<8))
-#define SQLITE_CANTOPEN_FULLPATH       (SQLITE_CANTOPEN | (3<<8))
-#define SQLITE_CANTOPEN_CONVPATH       (SQLITE_CANTOPEN | (4<<8))
-#define SQLITE_READONLY_RECOVERY       (SQLITE_READONLY | (1<<8))
-#define SQLITE_READONLY_CANTLOCK       (SQLITE_READONLY | (2<<8))
-#define SQLITE_READONLY_ROLLBACK       (SQLITE_READONLY | (3<<8))
-#define SQLITE_READONLY_DBMOVED        (SQLITE_READONLY | (4<<8))
 #define SQLITE_ABORT_ROLLBACK          (SQLITE_ABORT | (2<<8))
 #define SQLITE_CONSTRAINT_CHECK        (SQLITE_CONSTRAINT | (1<<8))
-#define SQLITE_CONSTRAINT_COMMITHOOK   (SQLITE_CONSTRAINT | (2<<8))
 #define SQLITE_CONSTRAINT_FOREIGNKEY   (SQLITE_CONSTRAINT | (3<<8))
 #define SQLITE_CONSTRAINT_FUNCTION     (SQLITE_CONSTRAINT | (4<<8))
 #define SQLITE_CONSTRAINT_NOTNULL      (SQLITE_CONSTRAINT | (5<<8))
 #define SQLITE_CONSTRAINT_PRIMARYKEY   (SQLITE_CONSTRAINT | (6<<8))
 #define SQLITE_CONSTRAINT_TRIGGER      (SQLITE_CONSTRAINT | (7<<8))
 #define SQLITE_CONSTRAINT_UNIQUE       (SQLITE_CONSTRAINT | (8<<8))
-#define SQLITE_NOTICE_RECOVER_WAL      (SQLITE_NOTICE | (1<<8))
-#define SQLITE_NOTICE_RECOVER_ROLLBACK (SQLITE_NOTICE | (2<<8))
-#define SQLITE_WARNING_AUTOINDEX       (SQLITE_WARNING | (1<<8))
-#define SQLITE_OK_LOAD_PERMANENTLY     (SQLITE_OK | (1<<8))
 
 enum sql_type {
 	SQLITE_INTEGER = 1,
@@ -769,16 +714,8 @@ sqlite3_initialize(void);
 int
 sqlite3_os_end(void);
 
-#define SQLITE_CONFIG_SINGLETHREAD  1	/* nil */
-#define SQLITE_CONFIG_MULTITHREAD   2	/* nil */
-#define SQLITE_CONFIG_SERIALIZED    3	/* nil */
 #define SQLITE_CONFIG_SCRATCH       6	/* void*, int sz, int N */
-#define SQLITE_CONFIG_PAGECACHE     7	/* void*, int sz, int N */
-#define SQLITE_CONFIG_HEAP          8	/* void*, int nByte, int min */
 #define SQLITE_CONFIG_MEMSTATUS     9	/* boolean */
-#define SQLITE_CONFIG_MUTEX        10	/* sqlite3_mutex_methods* */
-#define SQLITE_CONFIG_GETMUTEX     11	/* sqlite3_mutex_methods* */
-/* previously SQLITE_CONFIG_CHUNKALLOC 12 which is now unused. */
 #define SQLITE_CONFIG_LOOKASIDE    13	/* int int */
 #define SQLITE_CONFIG_LOG          16	/* xFunc, void* */
 #define SQLITE_CONFIG_URI          17	/* int */
@@ -788,12 +725,9 @@ sqlite3_os_end(void);
 #define SQLITE_CONFIG_PMASZ               24	/* unsigned int szPma */
 #define SQLITE_CONFIG_STMTJRNL_SPILL      25	/* int nByte */
 
-#define SQLITE_DBCONFIG_MAINDBNAME            1000	/* const char* */
 #define SQLITE_DBCONFIG_LOOKASIDE             1001	/* void* int int */
 #define SQLITE_DBCONFIG_ENABLE_FKEY           1002	/* int int* */
 #define SQLITE_DBCONFIG_ENABLE_TRIGGER        1003	/* int int* */
-#define SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER 1004	/* int int* */
-#define SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION 1005	/* int int* */
 #define SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE      1006	/* int int* */
 
 #define SQLITE_TRACE_STMT       0x01
@@ -844,9 +778,6 @@ sqlite3_create_function_v2(sqlite3 * db,
 #define SQLITE_OPEN_MEMORY           0x00000080	/* Ok for sqlite3_open_v2() */
 #define SQLITE_OPEN_MAIN_DB          0x00000100	/* VFS only */
 #define SQLITE_OPEN_TEMP_DB          0x00000200	/* VFS only */
-#define SQLITE_OPEN_TRANSIENT_DB     0x00000400	/* VFS only */
-#define SQLITE_OPEN_NOMUTEX          0x00008000	/* Ok for sqlite3_open_v2() */
-#define SQLITE_OPEN_FULLMUTEX        0x00010000	/* Ok for sqlite3_open_v2() */
 #define SQLITE_OPEN_SHAREDCACHE      0x00020000	/* Ok for sqlite3_open_v2() */
 #define SQLITE_OPEN_PRIVATECACHE     0x00040000	/* Ok for sqlite3_open_v2() */
 
@@ -960,21 +891,6 @@ sqlite3_limit(sqlite3 *, int id, int newVal);
 #define SQLITE_SYNC_NORMAL        0x00002
 #define SQLITE_SYNC_FULL          0x00003
 #define SQLITE_SYNC_DATAONLY      0x00010
-
-#define SQLITE_IOCAP_ATOMIC                 0x00000001
-#define SQLITE_IOCAP_ATOMIC512              0x00000002
-#define SQLITE_IOCAP_ATOMIC1K               0x00000004
-#define SQLITE_IOCAP_ATOMIC2K               0x00000008
-#define SQLITE_IOCAP_ATOMIC4K               0x00000010
-#define SQLITE_IOCAP_ATOMIC8K               0x00000020
-#define SQLITE_IOCAP_ATOMIC16K              0x00000040
-#define SQLITE_IOCAP_ATOMIC32K              0x00000080
-#define SQLITE_IOCAP_ATOMIC64K              0x00000100
-#define SQLITE_IOCAP_SAFE_APPEND            0x00000200
-#define SQLITE_IOCAP_SEQUENTIAL             0x00000400
-#define SQLITE_IOCAP_UNDELETABLE_WHEN_OPEN  0x00000800
-#define SQLITE_IOCAP_POWERSAFE_OVERWRITE    0x00001000
-#define SQLITE_IOCAP_IMMUTABLE              0x00002000
 
 int
 sqlite3_uri_boolean(const char *zFile,
@@ -3291,7 +3207,6 @@ struct Sqlite3Config {
 	int szLookaside;	/* Default lookaside buffer size */
 	int nLookaside;		/* Default lookaside buffer count */
 	int nStmtSpill;		/* Stmt-journal spill-to-disk threshold */
-	sqlite3_pcache_methods2 pcache2;	/* Low-level page-cache interface */
 	void *pHeap;		/* Heap storage space */
 	int nHeap;		/* Size of pHeap[] */
 	int mnReq, mxReq;	/* Min and max heap requests sizes */
