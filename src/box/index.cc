@@ -541,6 +541,11 @@ generic_index_commit_create(struct index *, int64_t)
 }
 
 void
+generic_index_abort_create(struct index *)
+{
+}
+
+void
 generic_index_commit_drop(struct index *)
 {
 }

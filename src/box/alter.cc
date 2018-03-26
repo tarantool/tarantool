@@ -1178,6 +1178,7 @@ public:
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
+	virtual void rollback(struct alter_space *alter);
 	virtual ~CreateIndex();
 };
 
@@ -1232,6 +1233,14 @@ CreateIndex::commit(struct alter_space *alter, int64_t signature)
 	index_commit_create(new_index, signature);
 }
 
+void
+CreateIndex::rollback(struct alter_space *alter)
+{
+	struct index *new_index = index_find_xc(alter->new_space,
+						new_index_def->iid);
+	index_abort_create(new_index);
+}
+
 CreateIndex::~CreateIndex()
 {
 	if (new_index_def)
@@ -1264,6 +1273,7 @@ public:
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t signature);
+	virtual void rollback(struct alter_space *alter);
 	virtual ~RebuildIndex();
 };
 
@@ -1296,6 +1306,14 @@ RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 					      new_index_def->iid);
 	index_commit_drop(old_index);
 	index_commit_create(new_index, signature);
+}
+
+void
+RebuildIndex::rollback(struct alter_space *alter)
+{
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
+	index_abort_create(new_index);
 }
 
 RebuildIndex::~RebuildIndex()

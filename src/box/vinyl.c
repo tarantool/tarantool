@@ -3959,6 +3959,7 @@ static const struct space_vtab vinyl_space_vtab = {
 static const struct index_vtab vinyl_index_vtab = {
 	/* .destroy = */ vinyl_index_destroy,
 	/* .commit_create = */ vinyl_index_commit_create,
+	/* .abort_create = */ generic_index_abort_create,
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .size = */ vinyl_index_size,
