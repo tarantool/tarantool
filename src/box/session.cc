@@ -166,7 +166,6 @@ session_run_on_disconnect_triggers(struct session *session)
 {
 	if (session_run_triggers(session, &session_on_disconnect) != 0)
 		diag_log();
-	session_storage_cleanup(session->id);
 }
 
 int
@@ -184,6 +183,7 @@ session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 void
 session_destroy(struct session *session)
 {
+	session_storage_cleanup(session->id);
 	struct mh_i64ptr_node_t node = { session->id, NULL };
 	mh_i64ptr_remove(session_registry, &node, NULL);
 	mempool_free(&session_pool, session);
