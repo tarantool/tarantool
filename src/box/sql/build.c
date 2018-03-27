@@ -524,36 +524,6 @@ sqlite3NameFromToken(sqlite3 * db, Token * pName)
 }
 
 /*
- * Parameter zName points to a nul-terminated buffer containing the name
- * of a database ("main", "temp" or the name of an attached db). This
- * function returns the index of the named database in db->aDb[], or
- * -1 if the named db cannot be found.
- */
-int
-sqlite3FindDbName(const char *zName MAYBE_UNUSED)
-{
-	assert(0 == sqlite3_stricmp("main", zName));
-	return 0;
-}
-
-/*
- * The token *pName contains the name of a database (either "main" or
- * "temp" or the name of an attached db). This routine returns the
- * index of the named database in db->aDb[], or -1 if the named db
- * does not exist.
- */
-int
-sqlite3FindDb(sqlite3 * db, Token * pName)
-{
-	int i;			/* Database number */
-	char *zName;		/* Name we are searching for */
-	zName = sqlite3NameFromToken(db, pName);
-	i = sqlite3FindDbName(zName);
-	sqlite3DbFree(db, zName);
-	return i;
-}
-
-/*
  * This routine is used to check if the UTF-8 string zName is a legal
  * unqualified name for an identifier.
  * Some objects may not be checked, because they are validated in Tarantool.
