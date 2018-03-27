@@ -1760,6 +1760,7 @@ box_cfg_xc(void)
 	replication_init();
 	port_init();
 	iproto_init();
+	sql_init();
 	wal_thread_start();
 
 	title("loading");
@@ -1956,7 +1957,7 @@ box_cfg_xc(void)
 	/* Follow replica */
 	replicaset_follow();
 
-	sql_init();
+	sql_load_schema();
 
 	say_info("ready to accept requests");
 

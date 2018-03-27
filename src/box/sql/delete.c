@@ -212,10 +212,10 @@ sqlite3LimitWhere(Parse * pParse,	/* The parser context */
 	return pInClause;
 
  limit_where_cleanup:
-	sqlite3ExprDelete(pParse->db, pWhere);
+	sql_expr_free(pParse->db, pWhere);
 	sqlite3ExprListDelete(pParse->db, pOrderBy);
-	sqlite3ExprDelete(pParse->db, pLimit);
-	sqlite3ExprDelete(pParse->db, pOffset);
+	sql_expr_free(pParse->db, pLimit);
+	sql_expr_free(pParse->db, pOffset);
 	return 0;
 }
 #endif				/* defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) */
@@ -571,7 +571,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 
  delete_from_cleanup:
 	sqlite3SrcListDelete(db, pTabList);
-	sqlite3ExprDelete(db, pWhere);
+	sql_expr_free(db, pWhere, false);
 	sqlite3DbFree(db, aToOpen);
 	return;
 }
@@ -636,9 +636,9 @@ sqlite3DeleteByKey(Parse *pParse, char *zTab, const char **columns,
 	return;
 
  error:
-	sqlite3ExprDelete(pParse->db, where);
+	sql_expr_free(pParse->db, where, false);
 	for (int i = 0; i < nPairs; ++i)
-		sqlite3ExprDelete(pParse->db, values[i]);
+		sql_expr_free(pParse->db, values[i], false);
 }
 
 /* Make sure "isView" and other macros defined above are undefined. Otherwise

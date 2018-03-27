@@ -108,7 +108,10 @@ static void disableLookaside(Parse *pParse){
 
 // Input is a single SQL command
 input ::= ecmd.
-ecmd ::= explain cmdx SEMI.       { sqlite3FinishCoding(pParse); }
+ecmd ::= explain cmdx SEMI. {
+	if (!pParse->parse_only)
+		sqlite3FinishCoding(pParse);
+}
 ecmd ::= SEMI. {
   sqlite3ErrorMsg(pParse, "syntax error: empty request");
 }
@@ -378,7 +381,10 @@ cmd ::= DROP VIEW ifexists(E) fullname(X). {
 //
 cmd ::= select(X).  {
   SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0};
-  sqlite3Select(pParse, X, &dest);
+  if(!pParse->parse_only)
+	  sqlite3Select(pParse, X, &dest);
+  else
+	  sql_expr_extract_select(pParse, X);
   sqlite3SelectDelete(pParse->db, X);
 }
 
@@ -627,7 +633,7 @@ joinop(X) ::= JOIN_KW(A) join_nm(B) join_nm(C) JOIN.
                   {X = sqlite3JoinType(pParse,&A,&B,&C);/*X-overwrites-A*/}
 
 %type on_opt {Expr*}
-%destructor on_opt {sqlite3ExprDelete(pParse->db, $$);}
+%destructor on_opt {sql_expr_free(pParse->db, $$, false);}
 on_opt(N) ::= ON expr(E).   {N = E.pExpr;}
 on_opt(N) ::= .             {N = 0;}
 
@@ -685,7 +691,7 @@ groupby_opt(A) ::= .                      {A = 0;}
 groupby_opt(A) ::= GROUP BY nexprlist(X). {A = X;}
 
 %type having_opt {Expr*}
-%destructor having_opt {sqlite3ExprDelete(pParse->db, $$);}
+%destructor having_opt {sql_expr_free(pParse->db, $$, false);}
 having_opt(A) ::= .                {A = 0;}
 having_opt(A) ::= HAVING expr(X).  {A = X.pExpr;}
 
@@ -735,7 +741,7 @@ cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
 %endif
 
 %type where_opt {Expr*}
-%destructor where_opt {sqlite3ExprDelete(pParse->db, $$);}
+%destructor where_opt {sql_expr_free(pParse->db, $$, false);}
 
 where_opt(A) ::= .                    {A = 0;}
 where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
@@ -824,9 +830,9 @@ idlist(A) ::= nm(Y).
 //
 
 %type expr {ExprSpan}
-%destructor expr {sqlite3ExprDelete(pParse->db, $$.pExpr);}
+%destructor expr {sql_expr_free(pParse->db, $$.pExpr, false);}
 %type term {ExprSpan}
-%destructor term {sqlite3ExprDelete(pParse->db, $$.pExpr);}
+%destructor term {sql_expr_free(pParse->db, $$.pExpr, false);}
 
 %include {
   /* This is a utility routine used to set the ExprSpan.zStart and
@@ -1034,7 +1040,7 @@ expr(A) ::= expr(A) NOT NULL(E). {spanUnaryPostfix(pParse,TK_NOTNULL,&A,&E);}
     sqlite3 *db = pParse->db;
     if( pA && pY && pY->op==TK_NULL ){
       pA->op = (u8)op;
-      sqlite3ExprDelete(db, pA->pRight);
+      sql_expr_free(db, pA->pRight, false);
       pA->pRight = 0;
     }
   }
@@ -1111,7 +1117,7 @@ expr(A) ::= expr(A) between_op(N) expr(X) AND expr(Y). [BETWEEN] {
       ** simplify to constants 0 (false) and 1 (true), respectively,
       ** regardless of the value of expr1.
       */
-      sqlite3ExprDelete(pParse->db, A.pExpr);
+	    sql_expr_free(pParse->db, A.pExpr, false);
       A.pExpr = sqlite3ExprAlloc(pParse->db, TK_INTEGER,&sqlite3IntTokens[N],1);
     }else if( Y->nExpr==1 ){
       /* Expressions of the form:
@@ -1189,7 +1195,7 @@ expr(A) ::= CASE(C) case_operand(X) case_exprlist(Y) case_else(Z) END(E). {
     sqlite3ExprSetHeightAndFlags(pParse, A.pExpr);
   }else{
     sqlite3ExprListDelete(pParse->db, Y);
-    sqlite3ExprDelete(pParse->db, Z);
+    sql_expr_free(pParse->db, Z, false);
   }
 }
 %type case_exprlist {ExprList*}
@@ -1203,11 +1209,11 @@ case_exprlist(A) ::= WHEN expr(Y) THEN expr(Z). {
   A = sqlite3ExprListAppend(pParse,A, Z.pExpr);
 }
 %type case_else {Expr*}
-%destructor case_else {sqlite3ExprDelete(pParse->db, $$);}
+%destructor case_else {sql_expr_free(pParse->db, $$, false);}
 case_else(A) ::=  ELSE expr(X).         {A = X.pExpr;}
 case_else(A) ::=  .                     {A = 0;} 
 %type case_operand {Expr*}
-%destructor case_operand {sqlite3ExprDelete(pParse->db, $$);}
+%destructor case_operand {sql_expr_free(pParse->db, $$, false);}
 case_operand(A) ::= expr(X).            {A = X.pExpr; /*A-overwrites-X*/} 
 case_operand(A) ::= .                   {A = 0;} 
 
@@ -1377,7 +1383,7 @@ foreach_clause ::= .
 foreach_clause ::= FOR EACH ROW.
 
 %type when_clause {Expr*}
-%destructor when_clause {sqlite3ExprDelete(pParse->db, $$);}
+%destructor when_clause {sql_expr_free(pParse->db, $$, false);}
 when_clause(A) ::= .             { A = 0; }
 when_clause(A) ::= WHEN expr(X). { A = X.pExpr; }
 

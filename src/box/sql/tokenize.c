@@ -652,3 +652,29 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 	assert(nErr == 0 || pParse->rc != SQLITE_OK);
 	return nErr;
 }
+
+int
+sql_expr_compile(sqlite3 *db, const char *expr, struct Expr **result)
+{
+	const char *outer = "SELECT ";
+	int len = strlen(outer) + strlen(expr);
+	char *stmt = (char *) region_alloc(&fiber()->gc, len + 1);
+	if (stmt == NULL) {
+		diag_set(OutOfMemory, len + 1, "region_alloc", "stmt");
+		return -1;
+	}
+	sprintf(stmt, "%s%s", outer, expr);
+
+	struct Parse parser;
+	memset(&parser, 0, sizeof(parser));
+	parser.db = db;
+	parser.parse_only = true;
+	char *unused;
+	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK) {
+		diag_set(ClientError, ER_SQL_EXECUTE, expr);
+		return -1;
+	}
+	*result = parser.parsed_expr;
+	sqlite3ParserReset(&parser);
+	return 0;
+}

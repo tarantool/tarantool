@@ -286,7 +286,7 @@ freeIndex(sqlite3 * db, Index * p)
 #ifndef SQLITE_OMIT_ANALYZE
 	sqlite3DeleteIndexSamples(db, p);
 #endif
-	sqlite3ExprDelete(db, p->pPartIdxWhere);
+	sql_expr_free(db, p->pPartIdxWhere, false);
 	sqlite3ExprListDelete(db, p->aColExpr);
 	sqlite3DbFree(db, p->zColAff);
 	sqlite3_free(p->aiRowEst);
@@ -366,7 +366,7 @@ sqlite3DeleteColumnNames(sqlite3 * db, Table * pTable)
 	if ((pCol = pTable->aCol) != 0) {
 		for (i = 0; i < pTable->nCol; i++, pCol++) {
 			sqlite3DbFree(db, pCol->zName);
-			sqlite3ExprDelete(db, pCol->pDflt);
+			sql_expr_free(db, pCol->pDflt, false);
 			sqlite3DbFree(db, pCol->zColl);
 		}
 		sqlite3DbFree(db, pTable->aCol);
@@ -893,7 +893,7 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			 * is required by pragma table_info.
 			 */
 			Expr x;
-			sqlite3ExprDelete(db, pCol->pDflt);
+			sql_expr_free(db, pCol->pDflt, false);
 			memset(&x, 0, sizeof(x));
 			x.op = TK_SPAN;
 			x.u.zToken = sqlite3DbStrNDup(db, (char *)pSpan->zStart,
@@ -905,7 +905,7 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			sqlite3DbFree(db, x.u.zToken);
 		}
 	}
-	sqlite3ExprDelete(db, pSpan->pExpr);
+	sql_expr_free(db, pSpan->pExpr, false);
 }
 
 
@@ -1019,9 +1019,7 @@ sqlite3AddCheckConstraint(Parse * pParse,	/* Parsing context */
 		}
 	} else
 #endif
-	{
-		sqlite3ExprDelete(pParse->db, pCheckExpr);
-	}
+		sql_expr_free(pParse->db, pCheckExpr, false);
 }
 
 /*
@@ -3256,7 +3254,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
  exit_create_index:
 	if (pIndex)
 		freeIndex(db, pIndex);
-	sqlite3ExprDelete(db, pPIWhere);
+	sql_expr_free(db, pPIWhere, false);
 	sqlite3ExprListDelete(db, pList);
 	sqlite3SrcListDelete(db, pTblName);
 	sqlite3DbFree(db, zName);
@@ -3728,7 +3726,7 @@ sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
 			sqlite3ExprListDelete(db, pItem->u1.pFuncArg);
 		sqlite3DeleteTable(db, pItem->pTab);
 		sqlite3SelectDelete(db, pItem->pSelect);
-		sqlite3ExprDelete(db, pItem->pOn);
+		sql_expr_free(db, pItem->pOn, false);
 		sqlite3IdListDelete(db, pItem->pUsing);
 	}
 	sqlite3DbFree(db, pList);
@@ -3784,7 +3782,7 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 
  append_from_error:
 	assert(p == 0);
-	sqlite3ExprDelete(db, pOn);
+	sql_expr_free(db, pOn, false);
 	sqlite3IdListDelete(db, pUsing);
 	sqlite3SelectDelete(db, pSubquery);
 	return 0;

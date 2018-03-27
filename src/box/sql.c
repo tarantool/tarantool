@@ -56,7 +56,7 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 
-static sqlite3 *db;
+static sqlite3 *db = NULL;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
@@ -77,6 +77,27 @@ sql_init()
 		panic("failed to initialize SQL subsystem");
 
 	assert(db != NULL);
+}
+
+void
+sql_load_schema()
+{
+	int rc;
+	struct session *user_session = current_session();
+	int commit_internal = !(user_session->sql_flags
+				& SQLITE_InternChanges);
+
+	assert(db->init.busy == 0);
+	db->init.busy = 1;
+	db->pSchema = sqlite3SchemaCreate(db);
+	rc = sqlite3InitDatabase(db);
+	if (rc != SQLITE_OK) {
+		sqlite3SchemaClear(db);
+		panic("failed to initialize SQL subsystem");
+	}
+	db->init.busy = 0;
+	if (rc == SQLITE_OK && commit_internal)
+		sqlite3CommitInternalChanges();
 }
 
 void
@@ -1451,11 +1472,17 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 	for (i = 0; i < n; i++) {
 		const char *t;
 		struct coll *coll = NULL;
+		struct Expr *def = aCol[i].pDflt;
 		if (aCol[i].zColl != NULL &&
 		    strcasecmp(aCol[i].zColl, "binary") != 0) {
 			coll = sqlite3FindCollSeq(aCol[i].zColl);
 		}
-		p = enc->encode_map(p, coll ? 5 : 4);
+		int base_len = 4;
+		if (coll != NULL)
+			base_len += 1;
+		if (def != NULL)
+			base_len += 1;
+		p = enc->encode_map(p, base_len);
 		p = enc->encode_str(p, "name", 4);
 		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
 		p = enc->encode_str(p, "type", 4);
@@ -1476,6 +1503,12 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		if (coll != NULL) {
 			p = enc->encode_str(p, "collation", strlen("collation"));
 			p = enc->encode_uint(p, coll->id);
+		}
+		if (def != NULL) {
+		        assert((def->flags & EP_IntValue) == 0);
+			assert(def->u.zToken != NULL);
+			p = enc->encode_str(p, "default", strlen("default"));
+			p = enc->encode_str(p, def->u.zToken, strlen(def->u.zToken));
 		}
 	}
 	return (int)(p - base);
@@ -1669,4 +1702,18 @@ tarantoolSqlNextSeqId(uint64_t *max_id)
 	}
 
 	return tuple_field_u64(tuple, BOX_SEQUENCE_FIELD_ID, max_id);
+}
+
+struct Expr*
+space_column_default_expr(uint32_t space_id, uint32_t fieldno)
+{
+	struct space *space;
+	space = space_cache_find(space_id);
+	assert(space != NULL);
+	assert(space->def != NULL);
+	if (space->def->opts.is_view)
+		return NULL;
+	assert(space->def->field_count > fieldno);
+
+	return space->def->fields[fieldno].default_value_expr;
 }

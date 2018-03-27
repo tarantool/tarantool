@@ -111,18 +111,20 @@ struct space_def {
 	char name[0];
 };
 
+/*
+ * Free a default value syntax trees of @a defs.
+ * @param fields Fields array to destroy.
+ * @param field_count Length of @a fields.
+ */
+void
+space_def_destroy_fields(struct field_def *fields, uint32_t field_count);
+
 /**
  * Delete the space_def object.
  * @param def Def to delete.
  */
-static inline void
-space_def_delete(struct space_def *def)
-{
-	space_opts_destroy(&def->opts);
-	tuple_dictionary_unref(def->dict);
-	TRASH(def);
-	free(def);
-}
+void
+space_def_delete(struct space_def *def);
 
 /**
  * Duplicate space_def object.

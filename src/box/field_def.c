@@ -94,6 +94,7 @@ const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("nullable_action", on_conflict_action, struct field_def,
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
+	OPT_DEF("default", OPT_STRPTR, struct field_def, default_value),
 	OPT_END,
 };
 
@@ -102,7 +103,9 @@ const struct field_def field_def_default = {
 	.name = NULL,
 	.is_nullable = false,
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
-	.coll_id = COLL_NONE
+	.coll_id = COLL_NONE,
+	.default_value = NULL,
+	.default_value_expr = NULL
 };
 
 enum field_type

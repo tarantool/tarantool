@@ -63,10 +63,12 @@
  * asterisks and the comment text.
  */
 
-#include <box/field_def.h>
 #include <stdbool.h>
-#include <trivia/util.h>
+
+#include "box/field_def.h"
+#include "box/sql.h"
 #include "box/txn.h"
+#include "trivia/util.h"
 
 /*
  * These #defines should enable >2GB file support on POSIX if the
@@ -3007,6 +3009,10 @@ struct Parse {
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
 
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
+	/** If set - do not emit byte code at all, just parse.  */
+	bool parse_only;
+	/** If parse_only is set to true, store parsed expression. */
+	struct Expr *parsed_expr;
 };
 
 /*
@@ -3526,7 +3532,6 @@ void sqlite3PExprAddSelect(Parse *, Expr *, Select *);
 Expr *sqlite3ExprAnd(sqlite3 *, Expr *, Expr *);
 Expr *sqlite3ExprFunction(Parse *, ExprList *, Token *);
 void sqlite3ExprAssignVarNumber(Parse *, Expr *, u32);
-void sqlite3ExprDelete(sqlite3 *, Expr *);
 ExprList *sqlite3ExprListAppend(Parse *, ExprList *, Expr *);
 ExprList *sqlite3ExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 void sqlite3ExprListSetSortOrder(ExprList *, int);

@@ -94,12 +94,12 @@ clearSelect(sqlite3 * db, Select * p, int bFree)
 		Select *pPrior = p->pPrior;
 		sqlite3ExprListDelete(db, p->pEList);
 		sqlite3SrcListDelete(db, p->pSrc);
-		sqlite3ExprDelete(db, p->pWhere);
+		sql_expr_free(db, p->pWhere, false);
 		sqlite3ExprListDelete(db, p->pGroupBy);
-		sqlite3ExprDelete(db, p->pHaving);
+		sql_expr_free(db, p->pHaving, false);
 		sqlite3ExprListDelete(db, p->pOrderBy);
-		sqlite3ExprDelete(db, p->pLimit);
-		sqlite3ExprDelete(db, p->pOffset);
+		sql_expr_free(db, p->pLimit, false);
+		sql_expr_free(db, p->pOffset, false);
 		if (p->pWith)
 			sqlite3WithDelete(db, p->pWith);
 		if (bFree)
@@ -2669,7 +2669,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 							     pPrior->
 							     nSelectRow);
 				}
-				sqlite3ExprDelete(db, p->pLimit);
+				sql_expr_free(db, p->pLimit, false);
 				p->pLimit = pLimit;
 				p->pOffset = pOffset;
 				p->iLimit = 0;
@@ -2768,7 +2768,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				p->pPrior = pPrior;
 				if (p->nSelectRow > pPrior->nSelectRow)
 					p->nSelectRow = pPrior->nSelectRow;
-				sqlite3ExprDelete(db, p->pLimit);
+				sql_expr_free(db, p->pLimit, false);
 				p->pLimit = pLimit;
 				p->pOffset = pOffset;
 
@@ -3297,9 +3297,9 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	} else {
 		regLimitA = regLimitB = 0;
 	}
-	sqlite3ExprDelete(db, p->pLimit);
+	sql_expr_free(db, p->pLimit, false);
 	p->pLimit = 0;
-	sqlite3ExprDelete(db, p->pOffset);
+	sql_expr_free(db, p->pOffset, false);
 	p->pOffset = 0;
 
 	regAddrA = ++pParse->nMem;
@@ -3514,7 +3514,7 @@ substExpr(Parse * pParse,	/* Report errors here */
 					    pExpr->iRightJoinTable;
 					pNew->flags |= EP_FromJoin;
 				}
-				sqlite3ExprDelete(db, pExpr);
+				sql_expr_free(db, pExpr, false);
 				pExpr = pNew;
 			}
 		}
@@ -6332,4 +6332,14 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	pParse->nSelectIndent--;
 #endif
 	return rc;
+}
+
+void
+sql_expr_extract_select(struct Parse *parser, struct Select *select)
+{
+	struct ExprList *expr_list = select->pEList;
+	assert(expr_list->nExpr == 1);
+	parser->parsed_expr = sqlite3ExprDup(parser->db,
+					     expr_list->a->pExpr,
+					     EXPRDUP_REDUCE);
 }

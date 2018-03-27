@@ -110,6 +110,10 @@ struct field_def {
 	enum on_conflict_action nullable_action;
 	/** Collation ID for string comparison. */
 	uint32_t coll_id;
+	/** 0-terminated SQL expression for DEFAULT value. */
+	char *default_value;
+	/** AST for parsed default value. */
+	struct Expr *default_value_expr;
 };
 
 #if defined(__cplusplus)

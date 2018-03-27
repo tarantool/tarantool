@@ -52,7 +52,7 @@ sqlite3DeleteTriggerStep(sqlite3 * db, TriggerStep * pTriggerStep)
 		TriggerStep *pTmp = pTriggerStep;
 		pTriggerStep = pTriggerStep->pNext;
 
-		sqlite3ExprDelete(db, pTmp->pWhere);
+		sql_expr_free(db, pTmp->pWhere, false);
 		sqlite3ExprListDelete(db, pTmp->pExprList);
 		sqlite3SelectDelete(db, pTmp->pSelect);
 		sqlite3IdListDelete(db, pTmp->pIdList);
@@ -185,7 +185,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	sqlite3DbFree(db, zName);
 	sqlite3SrcListDelete(db, pTableName);
 	sqlite3IdListDelete(db, pColumns);
-	sqlite3ExprDelete(db, pWhen);
+	sql_expr_free(db, pWhen, false);
 	if (!pParse->pNewTrigger) {
 		sqlite3DeleteTrigger(db, pTrigger);
 	} else {
@@ -447,7 +447,7 @@ sqlite3TriggerUpdateStep(sqlite3 * db,	/* The database connection */
 		pTriggerStep->orconf = orconf;
 	}
 	sqlite3ExprListDelete(db, pEList);
-	sqlite3ExprDelete(db, pWhere);
+	sql_expr_free(db, pWhere, false);
 	return pTriggerStep;
 }
 
@@ -470,7 +470,7 @@ sqlite3TriggerDeleteStep(sqlite3 * db,	/* Database connection */
 		    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
 		pTriggerStep->orconf = ON_CONFLICT_ACTION_DEFAULT;
 	}
-	sqlite3ExprDelete(db, pWhere);
+	sql_expr_free(db, pWhere, false);
 	return pTriggerStep;
 }
 
@@ -485,7 +485,7 @@ sqlite3DeleteTrigger(sqlite3 * db, Trigger * pTrigger)
 	sqlite3DeleteTriggerStep(db, pTrigger->step_list);
 	sqlite3DbFree(db, pTrigger->zName);
 	sqlite3DbFree(db, pTrigger->table);
-	sqlite3ExprDelete(db, pTrigger->pWhen);
+	sql_expr_free(db, pTrigger->pWhen, false);
 	sqlite3IdListDelete(db, pTrigger->pColumns);
 	sqlite3DbFree(db, pTrigger);
 }
@@ -910,7 +910,7 @@ codeRowTrigger(Parse * pParse,	/* Current parse context */
 						   iEndTrigger,
 						   SQLITE_JUMPIFNULL);
 			}
-			sqlite3ExprDelete(db, pWhen);
+			sql_expr_free(db, pWhen, false);
 		}
 
 		/* Code the trigger program into the sub-vdbe. */

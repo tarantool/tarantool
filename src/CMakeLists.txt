@@ -268,7 +268,7 @@ add_executable(
 	${LIBUTIL_FREEBSD_SRC}/flopen.c
 	${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 
-add_dependencies(tarantool build_bundled_libs preprocess_exports)
+add_dependencies(tarantool build_bundled_libs preprocess_exports sql)
 
 # Re-link if exports changed
 set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})

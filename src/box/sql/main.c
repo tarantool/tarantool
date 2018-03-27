@@ -2058,21 +2058,6 @@ sql_init_db(sqlite3 **out_db)
 	setupLookaside(db, 0, sqlite3GlobalConfig.szLookaside,
 		       sqlite3GlobalConfig.nLookaside);
 
-	if (rc == SQLITE_OK) {
-		struct session *user_session = current_session();
-		int commit_internal = !(user_session->sql_flags
-					& SQLITE_InternChanges);
-
-		assert(db->init.busy == 0);
-		db->init.busy = 1;
-		db->pSchema = sqlite3SchemaCreate(db);
-		rc = sqlite3InitDatabase(db);
-		if (rc != SQLITE_OK)
-			sqlite3SchemaClear(db);
-		db->init.busy = 0;
-		if (rc == SQLITE_OK && commit_internal)
-			sqlite3CommitInternalChanges();
-	}
 opendb_out:
 	rc = sqlite3_errcode(db);
 	assert(db != 0 || rc == SQLITE_NOMEM);

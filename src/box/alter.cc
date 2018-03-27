@@ -52,6 +52,7 @@
 #include "memtx_tuple.h"
 #include "version.h"
 #include "sequence.h"
+#include "sql.h"
 
 /**
  * chap-sha1 of empty string, i.e.
@@ -403,6 +404,11 @@ field_def_decode(struct field_def *field, const char **data,
 			  tt_sprintf("collation is reasonable only for "
 				     "string, scalar and any fields"));
 	}
+
+	if (field->default_value != NULL &&
+	    sql_expr_compile(sql_get(), field->default_value,
+			     &field->default_value_expr) != 0)
+		diag_raise();
 }
 
 /**
@@ -429,10 +435,20 @@ space_format_decode(const char *data, uint32_t *out_count,
 	size_t size = count * sizeof(struct field_def);
 	struct field_def *region_defs =
 		(struct field_def *) region_alloc_xc(region, size);
+	/*
+	 * Nullify to prevent a case when decoding will fail in
+	 * the middle and space_def_destroy_fields() below will
+	 * work with garbage pointers.
+	 */
+	memset(region_defs, 0, size);
+	auto fields_guard = make_scoped_guard([=] {
+		space_def_destroy_fields(region_defs, count);
+	});
 	for (uint32_t i = 0; i < count; ++i) {
 		field_def_decode(&region_defs[i], &data, space_name, name_len,
 				 errcode, i, region);
 	}
+	fields_guard.is_active = false;
 	return region_defs;
 }
 
@@ -488,6 +504,9 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 					 MP_ARRAY);
 	fields = space_format_decode(format, &field_count, name,
 				     name_len, errcode, region);
+	auto fields_guard = make_scoped_guard([=] {
+		space_def_destroy_fields(fields, field_count);
+	});
 	if (exact_field_count != 0 &&
 	    exact_field_count < field_count) {
 		tnt_raise(ClientError, errcode, tt_cstr(name, name_len),
@@ -1455,9 +1474,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_CREATE_SPACE,
 						 region);
-		access_check_ddl(def->name, def->uid, SC_SPACE, PRIV_C, true);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
+		access_check_ddl(def->name, def->uid, SC_SPACE, PRIV_C, true);
 		RLIST_HEAD(empty_list);
 		struct space *space = space_new_xc(def, &empty_list);
 		/**
@@ -1515,9 +1534,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct space_def *def =
 			space_def_new_from_tuple(new_tuple, ER_ALTER_SPACE,
 						 region);
-		access_check_ddl(def->name, def->uid, SC_SPACE, PRIV_A, true);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
+		access_check_ddl(def->name, def->uid, SC_SPACE, PRIV_A, true);
 		/*
 		 * Check basic options. Assume the space to be
 		 * empty, because we can not calculate here

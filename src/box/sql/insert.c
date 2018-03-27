@@ -346,6 +346,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	int regTupleid;		/* registers holding insert tupleid */
 	int regData;		/* register holding first column to insert */
 	int *aRegIdx = 0;	/* One register allocated to each index */
+	uint32_t space_id = 0;
 
 #ifndef SQLITE_OMIT_TRIGGER
 	int isView;		/* True if attempting to insert into a view */
@@ -381,6 +382,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (pTab == 0) {
 		goto insert_cleanup;
 	}
+
+	space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
 
 	/* Figure out if we have any triggers and if the table being
 	 * inserted into is a view
@@ -677,13 +680,18 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			}
 			if ((!useTempTable && !pList)
 			    || (pColumn && j >= pColumn->nId)) {
-				if (i == pTab->iAutoIncPKey)
+				if (i == pTab->iAutoIncPKey) {
 					sqlite3VdbeAddOp2(v, OP_Integer, -1,
 							  regCols + i + 1);
-				else
+				} else {
+					struct Expr *dflt = NULL;
+					dflt = space_column_default_expr(
+						space_id,
+						i);
 					sqlite3ExprCode(pParse,
-							pTab->aCol[i].pDflt,
+							dflt,
 							regCols + i + 1);
+				}
 			} else if (useTempTable) {
 				sqlite3VdbeAddOp3(v, OP_Column, srcTab, j,
 						  regCols + i + 1);
@@ -754,8 +762,12 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 							  iRegStore);
 					continue;
 				}
+				struct Expr *dflt = NULL;
+				dflt = space_column_default_expr(
+					space_id,
+					i);
 				sqlite3ExprCodeFactorable(pParse,
-							  pTab->aCol[i].pDflt,
+							  dflt,
 							  iRegStore);
 			} else if (useTempTable) {
 				if ((pTab->tabFlags & TF_Autoincrement)
@@ -1112,10 +1124,13 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		} else if (onError == ON_CONFLICT_ACTION_DEFAULT) {
 			onError = ON_CONFLICT_ACTION_ABORT;
 		}
-		if (onError == ON_CONFLICT_ACTION_REPLACE
-		    && pTab->aCol[i].pDflt == 0) {
+		struct Expr *dflt = NULL;
+		dflt = space_column_default_expr(
+			SQLITE_PAGENO_TO_SPACEID(pTab->tnum),
+			i);
+		if (onError == ON_CONFLICT_ACTION_REPLACE && dflt == 0)
 			onError = ON_CONFLICT_ACTION_ABORT;
-		}
+
 		assert(onError == ON_CONFLICT_ACTION_ROLLBACK
 		       || onError == ON_CONFLICT_ACTION_ABORT
 		       || onError == ON_CONFLICT_ACTION_FAIL
@@ -1151,7 +1166,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				    sqlite3VdbeAddOp1(v, OP_NotNull,
 						      regNewData + 1 + i);
 				VdbeCoverage(v);
-				sqlite3ExprCode(pParse, pTab->aCol[i].pDflt,
+				sqlite3ExprCode(pParse, dflt,
 						regNewData + 1 + i);
 				sqlite3VdbeJumpHere(v, addr1);
 				break;

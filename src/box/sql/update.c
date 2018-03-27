@@ -667,7 +667,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	sqlite3DbFree(db, aXRef);	/* Also frees aRegIdx[] and aToOpen[] */
 	sqlite3SrcListDelete(db, pTabList);
 	sqlite3ExprListDelete(db, pChanges);
-	sqlite3ExprDelete(db, pWhere);
+	sql_expr_free(db, pWhere, false);
 	return;
 }
 

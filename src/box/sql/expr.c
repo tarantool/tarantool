@@ -492,7 +492,7 @@ sqlite3ExprForVectorField(Parse * pParse,	/* Parsing context */
 		 * pLeft->iTable:   First in an array of register holding result, or 0
 		 *                  if the result is not yet computed.
 		 *
-		 * sqlite3ExprDelete() specifically skips the recursive delete of
+		 * sql_expr_free() specifically skips the recursive delete of
 		 * pLeft on TK_SELECT_COLUMN nodes.  But pRight is followed, so pVector
 		 * can be attached to pRight to cause this node to take ownership of
 		 * pVector.  Typically there will be multiple TK_SELECT_COLUMN nodes
@@ -935,8 +935,8 @@ sqlite3ExprAttachSubtrees(sqlite3 * db,
 {
 	if (pRoot == 0) {
 		assert(db->mallocFailed);
-		sqlite3ExprDelete(db, pLeft);
-		sqlite3ExprDelete(db, pRight);
+		sql_expr_free(db, pLeft, false);
+		sql_expr_free(db, pRight, false);
 	} else {
 		if (pRight) {
 			pRoot->pRight = pRight;
@@ -1052,8 +1052,8 @@ sqlite3ExprAnd(sqlite3 * db, Expr * pLeft, Expr * pRight)
 	} else if (pRight == 0) {
 		return pLeft;
 	} else if (exprAlwaysFalse(pLeft) || exprAlwaysFalse(pRight)) {
-		sqlite3ExprDelete(db, pLeft);
-		sqlite3ExprDelete(db, pRight);
+		sql_expr_free(db, pLeft, false);
+		sql_expr_free(db, pRight, false);
 		return sqlite3ExprAlloc(db, TK_INTEGER, &sqlite3IntTokens[0],
 					0);
 	} else {
@@ -1172,7 +1172,7 @@ sqlite3ExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
  * Recursively delete an expression tree.
  */
 static SQLITE_NOINLINE void
-sqlite3ExprDeleteNN(sqlite3 * db, Expr * p)
+sqlite3ExprDeleteNN(sqlite3 * db, Expr * p, bool extern_alloc)
 {
 	assert(p != 0);
 	/* Sanity check: Assert that the IntValue is non-negative if it exists */
@@ -1187,9 +1187,10 @@ sqlite3ExprDeleteNN(sqlite3 * db, Expr * p)
 	if (!ExprHasProperty(p, (EP_TokenOnly | EP_Leaf))) {
 		/* The Expr.x union is never used at the same time as Expr.pRight */
 		assert(p->x.pList == 0 || p->pRight == 0);
-		if (p->pLeft && p->op != TK_SELECT_COLUMN)
-			sqlite3ExprDeleteNN(db, p->pLeft);
-		sqlite3ExprDelete(db, p->pRight);
+		if (p->pLeft && p->op != TK_SELECT_COLUMN && !extern_alloc)
+			sqlite3ExprDeleteNN(db, p->pLeft, extern_alloc);
+		if (!extern_alloc)
+			sql_expr_free(db, p->pRight, extern_alloc);
 		if (ExprHasProperty(p, EP_xIsSelect)) {
 			sqlite3SelectDelete(db, p->x.pSelect);
 		} else {
@@ -1204,10 +1205,10 @@ sqlite3ExprDeleteNN(sqlite3 * db, Expr * p)
 }
 
 void
-sqlite3ExprDelete(sqlite3 * db, Expr * p)
+sql_expr_free(sqlite3 *db, Expr *expr, bool extern_alloc)
 {
-	if (p)
-		sqlite3ExprDeleteNN(db, p);
+	if (expr != NULL)
+		sqlite3ExprDeleteNN(db, expr, extern_alloc);
 }
 
 /*
@@ -1298,61 +1299,39 @@ dupedExprNodeSize(Expr * p, int flags)
 	return ROUND8(nByte);
 }
 
-/*
- * Return the number of bytes required to create a duplicate of the
- * expression passed as the first argument. The second argument is a
- * mask containing EXPRDUP_XXX flags.
- *
- * The value returned includes space to create a copy of the Expr struct
- * itself and the buffer referred to by Expr.u.zToken, if any.
- *
- * If the EXPRDUP_REDUCE flag is set, then the return value includes
- * space to duplicate all Expr nodes in the tree formed by Expr.pLeft
- * and Expr.pRight variables (but not for any structures pointed to or
- * descended from the Expr.x.pList or Expr.x.pSelect variables).
- */
-static int
-dupedExprSize(Expr * p, int flags)
+int
+sql_expr_sizeof(struct Expr *p, int flags)
 {
-	int nByte = 0;
-	if (p) {
-		nByte = dupedExprNodeSize(p, flags);
+	int size = 0;
+	if (p != NULL) {
+		size = dupedExprNodeSize(p, flags);
 		if (flags & EXPRDUP_REDUCE) {
-			nByte +=
-			    dupedExprSize(p->pLeft,
-					  flags) + dupedExprSize(p->pRight,
-								 flags);
+			size +=
+			    sql_expr_sizeof(p->pLeft, flags) +
+			    sql_expr_sizeof(p->pRight, flags);
 		}
 	}
-	return nByte;
+	return size;
 }
 
-/*
- * This function is similar to sqlite3ExprDup(), except that if pzBuffer
- * is not NULL then *pzBuffer is assumed to point to a buffer large enough
- * to store the copy of expression p, the copies of p->u.zToken
- * (if applicable), and the copies of the p->pLeft and p->pRight expressions,
- * if any. Before returning, *pzBuffer is set to the first byte past the
- * portion of the buffer copied into by this function.
- */
-static Expr *
-exprDup(sqlite3 * db, Expr * p, int dupFlags, u8 ** pzBuffer)
+struct Expr *
+sql_expr_dup(struct sqlite3 *db, struct Expr *p, int flags, char **buffer)
 {
 	Expr *pNew;		/* Value to return */
-	u8 *zAlloc;		/* Memory space from which to build Expr object */
-	u32 staticFlag;		/* EP_Static if space not obtained from malloc */
+	u32 staticFlag;         /* EP_Static if space not obtained from malloc */
+	char *zAlloc;		/* Memory space from which to build Expr object */
 
 	assert(db != 0);
 	assert(p);
-	assert(dupFlags == 0 || dupFlags == EXPRDUP_REDUCE);
-	assert(pzBuffer == 0 || dupFlags == EXPRDUP_REDUCE);
+	assert(flags == 0 || flags == EXPRDUP_REDUCE);
 
 	/* Figure out where to write the new Expr structure. */
-	if (pzBuffer) {
-		zAlloc = *pzBuffer;
+	if (buffer) {
+		zAlloc = *buffer;
 		staticFlag = EP_Static;
 	} else {
-		zAlloc = sqlite3DbMallocRawNN(db, dupedExprSize(p, dupFlags));
+		zAlloc = sqlite3DbMallocRawNN(db,
+					      sql_expr_sizeof(p, flags));
 		staticFlag = 0;
 	}
 	pNew = (Expr *) zAlloc;
@@ -1363,15 +1342,14 @@ exprDup(sqlite3 * db, Expr * p, int dupFlags, u8 ** pzBuffer)
 		 * EXPR_TOKENONLYSIZE. nToken is set to the number of bytes consumed
 		 * by the copy of the p->u.zToken string (if any).
 		 */
-		const unsigned nStructSize = dupedExprStructSize(p, dupFlags);
+		const unsigned nStructSize = dupedExprStructSize(p, flags);
 		const int nNewSize = nStructSize & 0xfff;
 		int nToken;
-		if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken) {
+		if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken)
 			nToken = sqlite3Strlen30(p->u.zToken) + 1;
-		} else {
+		else
 			nToken = 0;
-		}
-		if (dupFlags) {
+		if (flags) {
 			assert(ExprHasProperty(p, EP_Reduced) == 0);
 			memcpy(zAlloc, p, nNewSize);
 		} else {
@@ -1401,29 +1379,28 @@ exprDup(sqlite3 * db, Expr * p, int dupFlags, u8 ** pzBuffer)
 			if (ExprHasProperty(p, EP_xIsSelect)) {
 				pNew->x.pSelect =
 				    sqlite3SelectDup(db, p->x.pSelect,
-						     dupFlags);
+						     flags);
 			} else {
 				pNew->x.pList =
 				    sqlite3ExprListDup(db, p->x.pList,
-						       dupFlags);
+						       flags);
 			}
 		}
 
 		/* Fill in pNew->pLeft and pNew->pRight. */
 		if (ExprHasProperty(pNew, EP_Reduced | EP_TokenOnly)) {
-			zAlloc += dupedExprNodeSize(p, dupFlags);
+			zAlloc += dupedExprNodeSize(p, flags);
 			if (!ExprHasProperty(pNew, EP_TokenOnly | EP_Leaf)) {
 				pNew->pLeft = p->pLeft ?
-				    exprDup(db, p->pLeft, EXPRDUP_REDUCE,
-					    &zAlloc) : 0;
+				    sql_expr_dup(db, p->pLeft, EXPRDUP_REDUCE,
+						 &zAlloc) : 0;
 				pNew->pRight =
-				    p->pRight ? exprDup(db, p->pRight,
-							EXPRDUP_REDUCE,
-							&zAlloc) : 0;
+				    p->pRight ? sql_expr_dup(db, p->pRight,
+							     EXPRDUP_REDUCE,
+							     &zAlloc) : 0;
 			}
-			if (pzBuffer) {
-				*pzBuffer = zAlloc;
-			}
+			if (buffer)
+				*buffer = zAlloc;
 		} else {
 			if (!ExprHasProperty(p, EP_TokenOnly | EP_Leaf)) {
 				if (pNew->op == TK_SELECT_COLUMN) {
@@ -1496,7 +1473,7 @@ Expr *
 sqlite3ExprDup(sqlite3 * db, Expr * p, int flags)
 {
 	assert(flags == 0 || flags == EXPRDUP_REDUCE);
-	return p ? exprDup(db, p, flags, 0) : 0;
+	return p ? sql_expr_dup(db, p, flags, 0) : 0;
 }
 
 ExprList *
@@ -1726,7 +1703,7 @@ sqlite3ExprListAppend(Parse * pParse,	/* Parsing context */
 
  no_mem:
 	/* Avoid leaking memory if malloc has failed. */
-	sqlite3ExprDelete(db, pExpr);
+	sql_expr_free(db, pExpr, false);
 	sqlite3ExprListDelete(db, pList);
 	return 0;
 }
@@ -1802,7 +1779,7 @@ sqlite3ExprListAppendVector(Parse * pParse,	/* Parsing context */
 	}
 
  vector_append_error:
-	sqlite3ExprDelete(db, pExpr);
+	sql_expr_free(db, pExpr, false);
 	sqlite3IdListDelete(db, pColumns);
 	return pList;
 }
@@ -1908,7 +1885,7 @@ exprListDeleteNN(sqlite3 * db, ExprList * pList)
 	struct ExprList_item *pItem;
 	assert(pList->a != 0 || pList->nExpr == 0);
 	for (pItem = pList->a, i = 0; i < pList->nExpr; i++, pItem++) {
-		sqlite3ExprDelete(db, pItem->pExpr);
+		sql_expr_free(db, pItem->pExpr, false);
 		sqlite3DbFree(db, pItem->zName);
 		sqlite3DbFree(db, pItem->zSpan);
 	}
@@ -2991,7 +2968,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						  dest.iSDParm);
 				VdbeComment((v, "Init EXISTS result"));
 			}
-			sqlite3ExprDelete(pParse->db, pSel->pLimit);
+			sql_expr_free(pParse->db, pSel->pLimit, false);
 			pSel->pLimit = sqlite3ExprAlloc(pParse->db, TK_INTEGER,
 							&sqlite3IntTokens[1],
 							0);
@@ -4597,7 +4574,7 @@ sqlite3ExprCodeCopy(Parse * pParse, Expr * pExpr, int target)
 	pExpr = sqlite3ExprDup(db, pExpr, 0);
 	if (!db->mallocFailed)
 		sqlite3ExprCode(pParse, pExpr, target);
-	sqlite3ExprDelete(db, pExpr);
+	sql_expr_free(db, pExpr, false);
 }
 
 /*
@@ -5157,7 +5134,7 @@ sqlite3ExprIfFalseDup(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	if (db->mallocFailed == 0) {
 		sqlite3ExprIfFalse(pParse, pCopy, dest, jumpIfNull);
 	}
-	sqlite3ExprDelete(db, pCopy);
+	sql_expr_free(db, pCopy, false);
 }
 
 /*
