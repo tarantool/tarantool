@@ -102,14 +102,14 @@ sqlite3ColumnDefault(Vdbe * v, Table * pTab, int i, int iReg)
  *
  *   UPDATE OR IGNORE table_wxyz SET a=b, c=d WHERE e<5 AND f NOT NULL;
  *          \_______/ \________/     \______/       \________________/
-*            onError   pTabList      pChanges             pWhere
+*            on_error   pTabList      pChanges             pWhere
  */
 void
 sqlite3Update(Parse * pParse,		/* The parser context */
 	      SrcList * pTabList,	/* The table in which we should change things */
 	      ExprList * pChanges,	/* Things to be changed */
 	      Expr * pWhere,		/* The WHERE clause.  May be null */
-	      int onError)		/* How to handle constraint errors */
+	      enum on_conflict_action on_error)
 {
 	int i, j;		/* Loop counters */
 	Table *pTab;		/* The table to be updated */
@@ -422,7 +422,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * action, then we need to open all indices because we might need
 		 * to be deleting some records.
 		 */
-		if (onError == ON_CONFLICT_ACTION_REPLACE) {
+		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			memset(aToOpen, 1, nIdx + 1);
 		} else {
 			for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
@@ -439,7 +439,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				aToOpen[aiCurOnePass[1] - iBaseCur] = 0;
 		}
 		sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite, 0,
-					   iBaseCur, aToOpen, 0, 0, onError, 1);
+					   iBaseCur, aToOpen, 0, 0,
+					   on_error, 1);
 	}
 
 	/* Top of the update loop */
@@ -481,7 +482,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		oldmask |= sqlite3TriggerColmask(pParse,
 						 pTrigger, pChanges, 0,
 						 TRIGGER_BEFORE | TRIGGER_AFTER,
-						 pTab, onError);
+						 pTab, on_error);
 		for (i = 0; i < pTab->nCol; i++) {
 			if (oldmask == 0xffffffff
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
@@ -512,7 +513,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	newmask =
 	    sqlite3TriggerColmask(pParse, pTrigger, pChanges, 1, TRIGGER_BEFORE,
-				  pTab, onError);
+				  pTab, on_error);
 	for (i = 0; i < pTab->nCol; i++) {
 		if (i == pTab->iPKey) {
 			sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
@@ -546,7 +547,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		sqlite3TableAffinity(v, pTab, regNew);
 		sqlite3CodeRowTrigger(pParse, pTrigger, TK_UPDATE, pChanges,
 				      TRIGGER_BEFORE, pTab, regOldPk,
-				      onError, labelContinue);
+				      on_error, labelContinue);
 
 		/* The row-trigger may have deleted the row being updated. In this
 		 * case, jump to the next row. No updates or AFTER triggers are
@@ -582,11 +583,15 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		int addr1 = 0;	/* Address of jump instruction */
 		int bReplace = 0;	/* True if REPLACE conflict resolution might happen */
 
+		struct on_conflict on_conflict;
+		on_conflict.override_error = on_error;
+		on_conflict.optimized_action = ON_CONFLICT_ACTION_NONE;
+
 		/* Do constraint checks. */
 		assert(regOldPk > 0);
 		sqlite3GenerateConstraintChecks(pParse, pTab, aRegIdx, iDataCur,
 						iIdxCur, regNewPk,
-						regOldPk, chngPk, onError,
+						regOldPk, chngPk, &on_conflict,
 						labelContinue, &bReplace,
 						aXRef);
 
@@ -635,7 +640,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 
 		/* Insert the new index entries and the new record. */
-		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0], onError);
+		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0],
+					       &on_conflict);
 
 		/* Do any ON CASCADE, SET NULL or SET DEFAULT operations required to
 		 * handle rows (possibly in other tables) that refer via a foreign key
@@ -654,7 +660,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	}
 
 	sqlite3CodeRowTrigger(pParse, pTrigger, TK_UPDATE, pChanges,
-			      TRIGGER_AFTER, pTab, regOldPk, onError,
+			      TRIGGER_AFTER, pTab, regOldPk, on_error,
 			      labelContinue);
 
 	/* Repeat the above with the next record to be updated, until

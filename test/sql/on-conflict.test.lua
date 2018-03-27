@@ -19,7 +19,20 @@ box.sql.execute("SELECT * FROM p")
 box.sql.execute("INSERT INTO e values (1, 1), (2, 2), (3, 1)")
 box.sql.execute("SELECT * FROM e")
 
+box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY ON CONFLICT REPLACE)")
+box.sql.execute("INSERT INTO t1 VALUES (9)")
+box.sql.execute("INSERT INTO t1 VALUES (9)")
+box.sql.execute("SELECT * FROM t1")
+
+box.sql.execute("CREATE TABLE t2(a INT PRIMARY KEY ON CONFLICT IGNORE)")
+box.sql.execute("INSERT INTO t2 VALUES (9)")
+box.sql.execute("INSERT INTO t2 VALUES (9)")
+
+box.sql.execute("SELECT * FROM t2")
+
 box.sql.execute('DROP TABLE t')
 box.sql.execute('DROP TABLE q')
 box.sql.execute('DROP TABLE p')
 box.sql.execute('DROP TABLE e')
+box.sql.execute('DROP TABLE t1')
+box.sql.execute('DROP TABLE t2')

@@ -675,6 +675,30 @@ enum sql_type {
 	SQLITE_NULL = 5,
 };
 
+/**
+ * Structure for internal usage during INSERT/UPDATE
+ * statements compilation.
+ */
+struct on_conflict {
+	/**
+	 * Represents an error action in queries like
+	 * INSERT/UPDATE OR <override_error>, which
+	 * overrides all space constraints error actions.
+	 * That kind of error action is strictly specified by
+	 * user and therefore have highest priority.
+	 */
+	enum on_conflict_action override_error;
+	/**
+	 * Represents an ON CONFLICT action which can be
+	 * optimized and executed without VDBE bytecode, by
+	 * Tarantool facilities. If optimization is not available,
+	 * then the value is ON_CONFLICT_ACTION_NONE, otherwise
+	 * it is ON_CONFLICT_ACTON_IGNORE or
+	 * ON_CONFLICT_ACTION_REPLACE.
+	 */
+	enum on_conflict_action optimized_action;
+};
+
 void *
 sqlite3_user_data(sqlite3_context *);
 
@@ -3578,7 +3602,8 @@ int sqlite3ViewGetColumnNames(Parse *, Table *);
 void
 sql_drop_table(struct Parse *, struct SrcList *, bool, bool);
 void sqlite3DeleteTable(sqlite3 *, Table *);
-void sqlite3Insert(Parse *, SrcList *, Select *, IdList *, int);
+void sqlite3Insert(Parse *, SrcList *, Select *, IdList *,
+		   enum on_conflict_action);
 void *sqlite3ArrayAllocate(sqlite3 *, void *, int, int *, int *);
 IdList *sqlite3IdListAppend(sqlite3 *, IdList *, Token *);
 int sqlite3IdListIndex(IdList *, const char *);
@@ -3655,7 +3680,8 @@ Expr *sqlite3LimitWhere(Parse *, SrcList *, Expr *, ExprList *, Expr *, Expr *,
 #endif
 void sqlite3DeleteFrom(Parse *, SrcList *, Expr *);
 void sqlite3DeleteByKey(Parse *, char *, const char **, Expr **, int);
-void sqlite3Update(Parse *, SrcList *, ExprList *, Expr *, int);
+void sqlite3Update(Parse *, SrcList *, ExprList *, Expr *,
+		   enum on_conflict_action);
 WhereInfo *sqlite3WhereBegin(Parse *, SrcList *, Expr *, ExprList *, ExprList *,
 			     u16, int);
 void sqlite3WhereEnd(WhereInfo *);
@@ -3762,7 +3788,8 @@ void sqlite3GenerateRowIndexDelete(Parse *, Table *, int, int);
 int sqlite3GenerateIndexKey(Parse *, Index *, int, int, int *, Index *, int);
 void sqlite3ResolvePartIdxLabel(Parse *, int);
 void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
-				     int, u8, u8, int, int *, int *);
+				     int, u8, struct on_conflict *, int, int *,
+				     int *);
 /**
  * This routine generates code to finish the INSERT or UPDATE
  * operation that was started by a prior call to
@@ -3770,11 +3797,13 @@ void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
  * @param v Virtual database engine.
  * @param cursor_id Primary index cursor.
  * @param tuple_id Register with data to insert.
- * @param on_error Error action on failed insert/replace.
+ * @param on_conflict Structure, which contains override error
+ * 	  action on failed insert/replaceand and optimized error
+ * 	  action after generating bytecode for constraints checks.
  */
 void
 vdbe_emit_insertion_completion(Vdbe *v, int cursor_id, int tuple_id,
-			       u8 on_error);
+			       struct on_conflict *on_conflict);
 
 int sqlite3OpenTableAndIndices(Parse *, Table *, int, u8, int, u8 *, int *,
 			       int *, u8, u8);
