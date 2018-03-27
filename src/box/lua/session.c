@@ -378,6 +378,9 @@ session_storage_cleanup(int sid)
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 		if (!lua_istable(L, -1))
 			goto exit;
+		lua_getfield(L, -1, "box");
+		if (!lua_istable(L, -1))
+			goto exit;
 		lua_getfield(L, -1, "session");
 		if (!lua_istable(L, -1))
 			goto exit;
