@@ -35,6 +35,8 @@ s:drop()
 -- Check that an index drop/truncate/create record we failed to
 -- write to vylog is flushed along with the next record.
 --
+fiber = require 'fiber'
+
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
 _ = s1:create_index('pk')
 _ = s1:insert{1, 'a'}
@@ -48,6 +50,8 @@ box.snapshot()
 _ = s1:insert{3, 'c'}
 _ = s2:insert{4, 'd'}
 
+SCHED_TIMEOUT = 0.01
+box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
 
 s1:drop()
@@ -58,7 +62,12 @@ s3 = box.schema.space.create('test3', {engine = 'vinyl'})
 _ = s3:create_index('pk')
 _ = s3:insert{6, 'f'}
 
+-- pending records must not be rolled back on error
+box.snapshot()
+
 box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
+fiber.sleep(2 * SCHED_TIMEOUT) -- wait for scheduler to unthrottle
+box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 
 box.snapshot()
 

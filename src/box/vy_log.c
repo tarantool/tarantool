@@ -143,8 +143,6 @@ struct vy_log {
 	 * Linked by vy_log_record::in_tx;
 	 */
 	struct stailq tx;
-	/** Number of entries in the @tx list. */
-	int tx_size;
 	/** Start of the current transaction in the pool, for rollback */
 	size_t tx_svp;
 	/**
@@ -670,7 +668,7 @@ vy_log_init(const char *dir)
 static int
 vy_log_flush(void)
 {
-	if (vy_log.tx_size == 0)
+	if (stailq_empty(&vy_log.tx))
 		return 0; /* nothing to do */
 
 	ERROR_INJECT(ERRINJ_VY_LOG_FLUSH, {
@@ -678,13 +676,18 @@ vy_log_flush(void)
 		return -1;
 	});
 
-	struct journal_entry *entry = journal_entry_new(vy_log.tx_size);
+	int tx_size = 0;
+	struct vy_log_record *record;
+	stailq_foreach_entry(record, &vy_log.tx, in_tx)
+		tx_size++;
+
+	struct journal_entry *entry = journal_entry_new(tx_size);
 	if (entry == NULL)
 		return -1;
 
 	struct xrow_header *rows;
 	rows = region_aligned_alloc(&fiber()->gc,
-				    vy_log.tx_size * sizeof(struct xrow_header),
+				    tx_size * sizeof(struct xrow_header),
 				    alignof(struct xrow_header));
 	if (rows == NULL)
 		return -1;
@@ -693,16 +696,15 @@ vy_log_flush(void)
 	 * Encode buffered records.
 	 */
 	int i = 0;
-	struct vy_log_record *record;
 	stailq_foreach_entry(record, &vy_log.tx, in_tx) {
-		assert(i < vy_log.tx_size);
+		assert(i < tx_size);
 		struct xrow_header *row = &rows[i];
 		if (vy_log_record_encode(record, row) < 0)
 			return -1;
 		entry->rows[i] = row;
 		i++;
 	}
-	assert(i == vy_log.tx_size);
+	assert(i == tx_size);
 
 	/*
 	 * Do actual disk writes on behalf of the WAL
@@ -714,7 +716,6 @@ vy_log_flush(void)
 	/* Success. Free flushed records. */
 	region_reset(&vy_log.pool);
 	stailq_create(&vy_log.tx);
-	vy_log.tx_size = 0;
 	return 0;
 }
 
@@ -1057,7 +1058,6 @@ done:
 rollback:
 	stailq_cut_tail(&vy_log.tx, vy_log.tx_begin, &rollback);
 	region_truncate(&vy_log.pool, vy_log.tx_svp);
-	vy_log.tx_size = 0;
 	vy_log.tx_svp = 0;
 	say_verbose("rollback vylog transaction");
 	latch_unlock(&vy_log.latch);
@@ -1091,9 +1091,7 @@ vy_log_write(const struct vy_log_record *record)
 	}
 
 	say_verbose("write vylog record: %s", vy_log_record_str(tx_record));
-
 	stailq_add_tail_entry(&vy_log.tx, tx_record, in_tx);
-	vy_log.tx_size++;
 }
 
 /**
