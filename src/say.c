@@ -192,16 +192,17 @@ say_set_log_level(int new_level)
 void
 say_set_log_format(enum say_format format)
 {
-
+	/*
+	 * For syslog, default or boot log type the log format can
+	 * not be changed.
+	 */
+	bool allowed_to_change = log_default->type == SAY_LOGGER_STDERR ||
+				 log_default->type == SAY_LOGGER_PIPE ||
+				 log_default->type == SAY_LOGGER_FILE;
 	switch (format) {
 	case SF_JSON:
-		/*
-		 * For syslog, default or boot log type the log format can
-		 * not be changed.
-		 */
-		if (log_default->type != SAY_LOGGER_STDERR &&
-		    log_default->type != SAY_LOGGER_PIPE &&
-		    log_default->type != SAY_LOGGER_FILE) {
+
+		if (!allowed_to_change) {
 			say_error("json log format is not supported when output is '%s'",
 				  say_logger_type_strs[log_default->type]);
 			return;
@@ -209,6 +210,9 @@ say_set_log_format(enum say_format format)
 		log_set_format(log_default, say_format_json);
 		break;
 	case SF_PLAIN:
+		if (!allowed_to_change) {
+			return;
+		}
 		log_set_format(log_default, say_format_plain);
 		break;
 	default:
@@ -356,6 +360,8 @@ log_pipe_init(struct log *log, const char *init_str)
 	char cmd[] = { "/bin/sh" };
 	char args[] = { "-c" };
 	char *argv[] = { cmd, args, (char *) init_str, NULL };
+	log->type = SAY_LOGGER_PIPE;
+	log->format_func = say_format_plain;
 	sigset_t mask;
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -416,8 +422,6 @@ log_pipe_init(struct log *log, const char *init_str)
 	sigprocmask(SIG_UNBLOCK, &mask, NULL);
 	close(pipefd[0]);
 	log->fd = pipefd[1];
-	log->type = SAY_LOGGER_PIPE;
-	log->format_func = say_format_plain;
 	return 0;
 }
 
@@ -430,6 +434,8 @@ log_file_init(struct log *log, const char *init_str)
 {
 	int fd;
 	log->path = abspath(init_str);
+	log->type = SAY_LOGGER_FILE;
+	log->format_func = say_format_plain;
 	if (log->path == NULL) {
 		diag_set(OutOfMemory, strlen(init_str), "malloc", "abspath");
 		return -1;
@@ -441,8 +447,6 @@ log_file_init(struct log *log, const char *init_str)
 		return -1;
 	}
 	log->fd = fd;
-	log->type = SAY_LOGGER_FILE;
-	log->format_func = say_format_plain;
 	return 0;
 }
 
@@ -487,6 +491,9 @@ static int
 log_syslog_init(struct log *log, const char *init_str)
 {
 	struct say_syslog_opts opts;
+	log->type = SAY_LOGGER_SYSLOG;
+	/* syslog supports only one formatting function */
+	log->format_func = say_format_syslog;
 
 	if (say_parse_syslog_opts(init_str, &opts) < 0)
 		return -1;
@@ -495,6 +502,11 @@ log_syslog_init(struct log *log, const char *init_str)
 		log->syslog_ident = strdup("tarantool");
 	else
 		log->syslog_ident = strdup(opts.identity);
+
+	if (opts.facility == syslog_facility_MAX)
+		log->syslog_facility = SYSLOG_LOCAL7;
+	else
+		log->syslog_facility = opts.facility;
 	say_free_syslog_opts(&opts);
 	log->fd = log_syslog_connect(log);
 	if (log->fd < 0) {
@@ -502,9 +514,6 @@ log_syslog_init(struct log *log, const char *init_str)
 		diag_set(SystemError, "syslog logger: %s", strerror(errno));
 		return -1;
 	}
-	log->type = SAY_LOGGER_SYSLOG;
-	/* syslog supports only one formatting function */
-	log->format_func = say_format_syslog;
 	return 0;
 }
 
@@ -835,14 +844,14 @@ say_format_syslog(struct log *log, char *buf, int len, int level, const char *fi
 
 	/* Format syslog header according to RFC */
 	int prio = level_to_syslog_priority(level);
-	SNPRINT(total, snprintf, buf, len, "<%d>", LOG_MAKEPRI(1, prio));
+	SNPRINT(total, snprintf, buf, len, "<%d>",
+		LOG_MAKEPRI(8 * log->syslog_facility, prio));
 	SNPRINT(total, strftime, buf, len, "%h %e %T ", &tm);
 	SNPRINT(total, snprintf, buf, len, "%s[%d]:", log->syslog_ident, getpid());
 
 	/* Format message */
 	SNPRINT(total, say_format_plain_tail, buf, len, level, filename, line,
 		error, format, ap);
-
 	return total;
 }
 
@@ -996,11 +1005,45 @@ say_parse_logger_type(const char **str, enum say_logger_type *type)
 	return 0;
 }
 
+static const char *syslog_facility_strs[] = {
+	[SYSLOG_KERN] = "kern",
+	[SYSLOG_USER] = "user",
+	[SYSLOG_MAIL] = "mail",
+	[SYSLOG_DAEMON] = "daemon",
+	[SYSLOG_AUTH] = "auth",
+	[SYSLOG_INTERN] = "intern",
+	[SYSLOG_LPR] = "lpr",
+	[SYSLOG_NEWS] = "news",
+	[SYSLOG_UUCP] = "uucp",
+	[SYSLOG_CLOCK] = "clock",
+	[SYSLOG_AUTHPRIV] = "authpriv",
+	[SYSLOG_FTP] = "ftp",
+	[SYSLOG_NTP] = "ntp",
+	[SYSLOG_AUDIT] = "audit",
+	[SYSLOG_ALERT] = "alert",
+	[SYSLOG_CRON] = "cron",
+	[SYSLOG_LOCAL0] = "local0",
+	[SYSLOG_LOCAL1] = "local1",
+	[SYSLOG_LOCAL2] = "local2",
+	[SYSLOG_LOCAL3] = "local3",
+	[SYSLOG_LOCAL4] = "local4",
+	[SYSLOG_LOCAL5] = "local5",
+	[SYSLOG_LOCAL6] = "local6",
+	[SYSLOG_LOCAL7] = "local7",
+	[syslog_facility_MAX] = "unknown",
+};
+
+enum syslog_facility
+say_syslog_facility_by_name(const char *facility)
+{
+	return STR2ENUM(syslog_facility, facility);
+}
+
 int
 say_parse_syslog_opts(const char *init_str, struct say_syslog_opts *opts)
 {
 	opts->identity = NULL;
-	opts->facility = NULL;
+	opts->facility = syslog_facility_MAX;
 	opts->copy = strdup(init_str);
 	if (opts->copy == NULL) {
 		diag_set(OutOfMemory, strlen(init_str), "malloc", "opts->copy");
@@ -1020,9 +1063,14 @@ say_parse_syslog_opts(const char *init_str, struct say_syslog_opts *opts)
 				goto duplicate;
 			opts->identity = value;
 		} else if (say_parse_prefix(&value, "facility=")) {
-			if (opts->facility != NULL)
+			if (opts->facility != syslog_facility_MAX)
 				goto duplicate;
-			opts->facility = value;
+			opts->facility = say_syslog_facility_by_name(value);
+			if (opts->facility == syslog_facility_MAX) {
+				diag_set(IllegalParams, "bad syslog facility option '%s'",
+					 value);
+				goto error;
+			}
 		} else {
 			diag_set(IllegalParams, "bad option '%s'", option);
 			goto error;
@@ -1056,6 +1104,7 @@ log_destroy(struct log *log)
 	if (log->fd != -1)
 		close(log->fd);
 	free(log->syslog_ident);
+	free(log->path);
 	rlist_del_entry(log, in_log_list);
 	ev_async_stop(loop(), &log->log_async);
 	fiber_cond_destroy(&log->rotate_cond);
