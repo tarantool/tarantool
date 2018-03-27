@@ -212,7 +212,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 	 * UPSERT, n = threshold + 1,
 	 * UPSERT, n = threshold + 1, all following ones have
 	 *         ...                threshold + 1.
-	 * These values are used by vy_index_commit to squash
+	 * These values are used by vy_lsm_commit_upsert to squash
 	 * UPSERTs subsequence.
 	 */
 	vy_mem_tree_iterator_next(&mem->tree, &inserted);

@@ -39,9 +39,6 @@ errinj.set("ERRINJ_WAL_ROTATE", false)
 space:update(1, {{'=', 2, 2}})
 space:get{1}
 space:get{2}
-errinj.set("ERRINJ_WAL_ROTATE", true)
-space:truncate()
-errinj.set("ERRINJ_WAL_ROTATE", false)
 space:truncate()
 
 space:drop()

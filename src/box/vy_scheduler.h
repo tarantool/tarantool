@@ -50,7 +50,7 @@ extern "C" {
 
 struct cord;
 struct fiber;
-struct vy_index;
+struct vy_lsm;
 struct vy_run_env;
 struct vy_scheduler;
 
@@ -97,13 +97,13 @@ struct vy_scheduler {
 	 */
 	pthread_mutex_t mutex;
 	/**
-	 * Heap of indexes, ordered by dump priority,
-	 * linked by vy_index::in_dump.
+	 * Heap of LSM trees, ordered by dump priority,
+	 * linked by vy_lsm::in_dump.
 	 */
 	heap_t dump_heap;
 	/**
-	 * Heap of indexes, ordered by compaction priority,
-	 * linked by vy_index::in_compact.
+	 * Heap of LSM trees, ordered by compaction priority,
+	 * linked by vy_lsm::in_compact.
 	 */
 	heap_t compact_heap;
 	/** Last error seen by the scheduler. */
@@ -184,16 +184,16 @@ void
 vy_scheduler_destroy(struct vy_scheduler *scheduler);
 
 /**
- * Add an index to scheduler dump/compaction queues.
+ * Add an LSM tree to scheduler dump/compaction queues.
  */
 void
-vy_scheduler_add_index(struct vy_scheduler *, struct vy_index *);
+vy_scheduler_add_lsm(struct vy_scheduler *, struct vy_lsm *);
 
 /**
- * Remove an index from scheduler dump/compaction queues.
+ * Remove an LSM tree from scheduler dump/compaction queues.
  */
 void
-vy_scheduler_remove_index(struct vy_scheduler *, struct vy_index *);
+vy_scheduler_remove_lsm(struct vy_scheduler *, struct vy_lsm *);
 
 /**
  * Trigger dump of all currently existing in-memory trees.

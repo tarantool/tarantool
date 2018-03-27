@@ -1,15 +1,15 @@
 1..1
 	*** test_basic ***
     1..15
-    ok 1 - vy_index_env_create
+    ok 1 - vy_lsm_env_create
     ok 2 - key_def is not NULL
     ok 3 - tuple_format_new is not NULL
-    ok 4 - index is not NULL
+    ok 4 - lsm is not NULL
     ok 5 - range is not NULL
     ok 6 - temp dir name is not NULL
     ok 7 - temp dir create (2)
     ok 8 - temp dir create (3)
-    ok 9 - vy_index_rotate_mem
+    ok 9 - vy_lsm_rotate_mem
     ok 10 - vy_run_new
     ok 11 - vy_run_write
     ok 12 - vy_run_new

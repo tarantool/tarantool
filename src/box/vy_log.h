@@ -34,6 +34,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <small/rlist.h>
 
 #include "salad/stailq.h"
 
@@ -58,25 +59,24 @@ struct xlog;
 struct vclock;
 struct key_def;
 struct key_part_def;
-
-struct vy_recovery;
+struct mh_i64ptr_t;
 
 /** Type of a metadata log record. */
 enum vy_log_record_type {
 	/**
-	 * Create a new vinyl index.
-	 * Requires vy_log_record::index_lsn, index_id, space_id,
-	 * key_def (with primary key parts).
+	 * Create a new LSM tree.
+	 * Requires vy_log_record::lsm_id, index_id, space_id,
+	 * key_def (with primary key parts), commit_lsn.
 	 */
-	VY_LOG_CREATE_INDEX		= 0,
+	VY_LOG_CREATE_LSM		= 0,
 	/**
-	 * Drop an index.
-	 * Requires vy_log_record::index_lsn.
+	 * Drop an LSM tree.
+	 * Requires vy_log_record::lsm_id.
 	 */
-	VY_LOG_DROP_INDEX		= 1,
+	VY_LOG_DROP_LSM			= 1,
 	/**
-	 * Insert a new range into a vinyl index.
-	 * Requires vy_log_record::index_lsn, range_id, begin, end.
+	 * Insert a new range into an LSM tree.
+	 * Requires vy_log_record::lsm_id, range_id, begin, end.
 	 */
 	VY_LOG_INSERT_RANGE		= 2,
 	/**
@@ -86,7 +86,7 @@ enum vy_log_record_type {
 	VY_LOG_DELETE_RANGE		= 3,
 	/**
 	 * Prepare a vinyl run file.
-	 * Requires vy_log_record::index_lsn, run_id.
+	 * Requires vy_log_record::lsm_id, run_id.
 	 *
 	 * Record of this type is written before creating a run file.
 	 * It is needed to keep track of unfinished due to errors run
@@ -95,7 +95,7 @@ enum vy_log_record_type {
 	VY_LOG_PREPARE_RUN		= 4,
 	/**
 	 * Commit a vinyl run file creation.
-	 * Requires vy_log_record::index_lsn, run_id, dump_lsn.
+	 * Requires vy_log_record::lsm_id, run_id, dump_lsn.
 	 *
 	 * Written after a run file was successfully created.
 	 */
@@ -135,10 +135,10 @@ enum vy_log_record_type {
 	 */
 	VY_LOG_DELETE_SLICE		= 9,
 	/**
-	 * Update LSN of the last index dump.
-	 * Requires vy_log_record::index_lsn, dump_lsn.
+	 * Update LSN of the last LSM tree dump.
+	 * Requires vy_log_record::lsm_id, dump_lsn.
 	 */
-	VY_LOG_DUMP_INDEX		= 10,
+	VY_LOG_DUMP_LSM			= 10,
 	/**
 	 * We don't split vylog into snapshot and log - all records
 	 * are written to the same file. Since we need to load a
@@ -151,10 +151,19 @@ enum vy_log_record_type {
 	 */
 	VY_LOG_SNAPSHOT			= 11,
 	/**
-	 * Update truncate count of a vinyl index.
-	 * Requires vy_log_record::index_lsn, truncate_count.
+	 * When we used LSN for identifying LSM trees in vylog, we
+	 * couldn't simply recreate an LSM tree on space truncation,
+	 * because in case the space had more than one LSM tree, we
+	 * wouldn't be able to distinguish them after truncation.
+	 * So we wrote special 'truncate' record.
+	 *
+	 * Now, we assign a unique id to each LSM tree and so we don't
+	 * need a special record type for space truncation. If we
+	 * are recovering from an old vylog, we simply ignore all
+	 * 'truncate' records - this will result in replay of all
+	 * WAL records written after truncation.
 	 */
-	VY_LOG_TRUNCATE_INDEX		= 12,
+	VY_LOG_TRUNCATE_LSM		= 12,
 
 	vy_log_record_type_MAX
 };
@@ -163,23 +172,14 @@ enum vy_log_record_type {
 struct vy_log_record {
 	/** Type of the record. */
 	enum vy_log_record_type type;
-	/**
-	 * LSN from the time of index creation.
-	 * Used to identify indexes in vylog.
-	 */
-	int64_t index_lsn;
+	/** Unique ID of the vinyl LSM tree. */
+	int64_t lsm_id;
 	/** Unique ID of the vinyl range. */
 	int64_t range_id;
 	/** Unique ID of the vinyl run. */
 	int64_t run_id;
 	/** Unique ID of the run slice. */
 	int64_t slice_id;
-	/**
-	 * For VY_LOG_CREATE_RUN record: hint that the run
-	 * is dropped, i.e. there is a VY_LOG_DROP_RUN record
-	 * following this one.
-	 */
-	bool is_dropped;
 	/**
 	 * Msgpack key for start of the range/slice.
 	 * NULL if the range/slice starts from -inf.
@@ -200,6 +200,8 @@ struct vy_log_record {
 	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
+	/** LSN of the WAL row corresponding to this record. */
+	int64_t commit_lsn;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -207,10 +209,129 @@ struct vy_log_record {
 	 * that uses this run.
 	 */
 	int64_t gc_lsn;
-	/** Index truncate count. */
-	int64_t truncate_count;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
+};
+
+/** Recovery context. */
+struct vy_recovery {
+	/**
+	 * List of all LSM trees stored in the recovery context,
+	 * linked by vy_lsm_recovery_info::in_recovery.
+	 */
+	struct rlist lsms;
+	/** space_id, index_id -> vy_lsm_recovery_info. */
+	struct mh_i64ptr_t *index_id_hash;
+	/** ID -> vy_lsm_recovery_info. */
+	struct mh_i64ptr_t *lsm_hash;
+	/** ID -> vy_range_recovery_info. */
+	struct mh_i64ptr_t *range_hash;
+	/** ID -> vy_run_recovery_info. */
+	struct mh_i64ptr_t *run_hash;
+	/** ID -> vy_slice_recovery_info. */
+	struct mh_i64ptr_t *slice_hash;
+	/**
+	 * Maximal vinyl object ID, according to the metadata log,
+	 * or -1 in case no vinyl objects were recovered.
+	 */
+	int64_t max_id;
+};
+
+/** LSM tree info stored in a recovery context. */
+struct vy_lsm_recovery_info {
+	/** Link in vy_recovery::lsms. */
+	struct rlist in_recovery;
+	/** ID of the LSM tree. */
+	int64_t id;
+	/** Ordinal index number in the space. */
+	uint32_t index_id;
+	/** Space ID. */
+	uint32_t space_id;
+	/** Array of key part definitions. */
+	struct key_part_def *key_parts;
+	/** Number of key parts. */
+	uint32_t key_part_count;
+	/** True if the LSM tree was dropped. */
+	bool is_dropped;
+	/** LSN of the WAL row that committed the LSM tree. */
+	int64_t commit_lsn;
+	/** LSN of the last LSM tree dump. */
+	int64_t dump_lsn;
+	/**
+	 * List of all ranges in the LSM tree, linked by
+	 * vy_range_recovery_info::in_lsm.
+	 */
+	struct rlist ranges;
+	/**
+	 * List of all runs created for the LSM tree
+	 * (both committed and not), linked by
+	 * vy_run_recovery_info::in_lsm.
+	 */
+	struct rlist runs;
+};
+
+/** Vinyl range info stored in a recovery context. */
+struct vy_range_recovery_info {
+	/** Link in vy_lsm_recovery_info::ranges. */
+	struct rlist in_lsm;
+	/** ID of the range. */
+	int64_t id;
+	/** Start of the range, stored in MsgPack array. */
+	char *begin;
+	/** End of the range, stored in MsgPack array. */
+	char *end;
+	/**
+	 * List of all slices in the range, linked by
+	 * vy_slice_recovery_info::in_range.
+	 *
+	 * Newer slices are closer to the head.
+	 */
+	struct rlist slices;
+};
+
+/** Run info stored in a recovery context. */
+struct vy_run_recovery_info {
+	/** Link in vy_lsm_recovery_info::runs. */
+	struct rlist in_lsm;
+	/** ID of the run. */
+	int64_t id;
+	/** Max LSN stored on disk. */
+	int64_t dump_lsn;
+	/**
+	 * For deleted runs: LSN of the last checkpoint
+	 * that uses this run.
+	 */
+	int64_t gc_lsn;
+	/**
+	 * True if the run was not committed (there's
+	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
+	 */
+	bool is_incomplete;
+	/** True if the run was dropped (VY_LOG_DROP_RUN). */
+	bool is_dropped;
+	/*
+	 * The following field is initialized to NULL and
+	 * ignored by vy_log subsystem. It may be used by
+	 * the caller to store some extra information.
+	 *
+	 * During recovery, we store a pointer to vy_run
+	 * corresponding to this object.
+	 */
+	void *data;
+};
+
+/** Slice info stored in a recovery context. */
+struct vy_slice_recovery_info {
+	/** Link in vy_range_recovery_info::slices. */
+	struct rlist in_range;
+	/** ID of the slice. */
+	int64_t id;
+	/** Run this slice was created for. */
+	struct vy_run_recovery_info *run;
+	/** Start of the slice, stored in MsgPack array. */
+	char *begin;
+	/** End of the slice, stored in MsgPack array. */
+	char *end;
 };
 
 /**
@@ -235,10 +356,10 @@ vy_log_open(struct xlog *xlog);
 /**
  * Rotate the metadata log. This function creates a new
  * xlog file in the log directory having vclock @vclock
- * and writes records required to recover active indexes.
+ * and writes records required to recover active LSM trees.
  * The goal of log rotation is to compact the log file by
  * discarding records cancelling each other and records left
- * from dropped indexes.
+ * from dropped LSM trees.
  *
  * Returns 0 on success, -1 on failure.
  */
@@ -318,7 +439,7 @@ vy_log_bootstrap(void);
  * Prepare the metadata log for recovery from the file having
  * vclock @vclock and return the recovery context.
  *
- * After this function is called, vinyl indexes may be recovered from
+ * After this function is called, LSM trees may be recovered from
  * the log using vy_recovery methods. When recovery is complete,
  * one must call vy_log_end_recovery(). After that the recovery context
  * may be deleted with vy_recovery_delete().
@@ -359,70 +480,14 @@ vy_recovery_new(int64_t signature, bool only_checkpoint);
 void
 vy_recovery_delete(struct vy_recovery *recovery);
 
-typedef int
-(*vy_recovery_cb)(const struct vy_log_record *record, void *arg);
-
 /**
- * Iterate over all objects stored in a recovery context.
+ * Look up the last incarnation of an LSM tree stored in a recovery context.
  *
- * This function invokes callback @cb for each object (index, run, etc)
- * stored in the given recovery context. The callback is passed a record
- * used to log the object and optional argument @cb_arg. If the callback
- * returns a value different from 0, iteration stops and -1 is returned,
- * otherwise the function returns 0.
- *
- * To ease the work done by the callback, records corresponding to
- * slices of a range always go right after the range, in the
- * chronological order, while an index's runs go after the index
- * and before its ranges.
+ * Returns NULL if the LSM tree was not found.
  */
-int
-vy_recovery_iterate(struct vy_recovery *recovery,
-		    vy_recovery_cb cb, void *cb_arg);
-
-/**
- * Load an index from a recovery context.
- *
- * Call @cb for each object related to the index. Break the loop and
- * return -1 if @cb returned a non-zero value, otherwise return 0.
- * Objects are loaded in the same order as by vy_recovery_iterate().
- *
- * Note, this function returns 0 if there's no index with the requested
- * id in the recovery context. In this case, @cb isn't called at all.
- *
- * The @is_checkpoint_recovery flag indicates that the row that created
- * the index was loaded from a snapshot, in which case @index_lsn is
- * the snapshot signature. Otherwise @index_lsn is the LSN of the WAL
- * row that created the index.
- *
- * The index is looked up by @space_id and @index_id while @index_lsn
- * is used to discern different incarnations of the same index as
- * follows. Let @record denote the vylog record corresponding to the
- * last incarnation of the index. Then
- *
- * - If @is_checkpoint_recovery is set and @index_lsn >= @record->index_lsn,
- *   the last index incarnation was created before the snapshot and we
- *   need to load it right now.
- *
- * - If @is_checkpoint_recovery is set and @index_lsn < @record->index_lsn,
- *   the last index incarnation was created after the snapshot, i.e.
- *   the index loaded now is going to be dropped so load a dummy.
- *
- * - If @is_checkpoint_recovery is unset and @index_lsn < @record->index_lsn,
- *   the last index incarnation is created further in WAL, load a dummy.
- *
- * - If @is_checkpoint_recovery is unset and @index_lsn == @record->index_lsn,
- *   load the last index incarnation.
- *
- * - If @is_checkpoint_recovery is unset and @index_lsn > @record->index_lsn,
- *   it seems we failed to log index creation before restart. In this
- *   case don't do anything. The caller is supposed to retry logging.
- */
-int
-vy_recovery_load_index(struct vy_recovery *recovery,
-		       uint32_t space_id, uint32_t index_id,
-		       int64_t index_lsn, bool is_checkpoint_recovery,
-		       vy_recovery_cb cb, void *cb_arg);
+struct vy_lsm_recovery_info *
+vy_recovery_lsm_by_index_id(struct vy_recovery *recovery,
+			    uint32_t space_id, uint32_t index_id);
 
 /**
  * Initialize a log record with default values.
@@ -435,41 +500,42 @@ vy_log_record_init(struct vy_log_record *record)
 	memset(record, 0, sizeof(*record));
 }
 
-/** Helper to log a vinyl index creation. */
+/** Helper to log a vinyl LSM tree creation. */
 static inline void
-vy_log_create_index(int64_t index_lsn, uint32_t index_id, uint32_t space_id,
-		    const struct key_def *key_def)
+vy_log_create_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
+		  const struct key_def *key_def, int64_t commit_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
-	record.type = VY_LOG_CREATE_INDEX;
-	record.index_lsn = index_lsn;
-	record.index_id = index_id;
+	record.type = VY_LOG_CREATE_LSM;
+	record.lsm_id = id;
 	record.space_id = space_id;
+	record.index_id = index_id;
 	record.key_def = key_def;
+	record.commit_lsn = commit_lsn;
 	vy_log_write(&record);
 }
 
-/** Helper to log a vinyl index drop. */
+/** Helper to log a vinyl LSM tree drop. */
 static inline void
-vy_log_drop_index(int64_t index_lsn)
+vy_log_drop_lsm(int64_t id)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
-	record.type = VY_LOG_DROP_INDEX;
-	record.index_lsn = index_lsn;
+	record.type = VY_LOG_DROP_LSM;
+	record.lsm_id = id;
 	vy_log_write(&record);
 }
 
 /** Helper to log a vinyl range insertion. */
 static inline void
-vy_log_insert_range(int64_t index_lsn, int64_t range_id,
+vy_log_insert_range(int64_t lsm_id, int64_t range_id,
 		    const char *begin, const char *end)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_INSERT_RANGE;
-	record.index_lsn = index_lsn;
+	record.lsm_id = lsm_id;
 	record.range_id = range_id;
 	record.begin = begin;
 	record.end = end;
@@ -489,24 +555,24 @@ vy_log_delete_range(int64_t range_id)
 
 /** Helper to log a vinyl run file creation. */
 static inline void
-vy_log_prepare_run(int64_t index_lsn, int64_t run_id)
+vy_log_prepare_run(int64_t lsm_id, int64_t run_id)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_PREPARE_RUN;
-	record.index_lsn = index_lsn;
+	record.lsm_id = lsm_id;
 	record.run_id = run_id;
 	vy_log_write(&record);
 }
 
 /** Helper to log a vinyl run creation. */
 static inline void
-vy_log_create_run(int64_t index_lsn, int64_t run_id, int64_t dump_lsn)
+vy_log_create_run(int64_t lsm_id, int64_t run_id, int64_t dump_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_RUN;
-	record.index_lsn = index_lsn;
+	record.lsm_id = lsm_id;
 	record.run_id = run_id;
 	record.dump_lsn = dump_lsn;
 	vy_log_write(&record);
@@ -562,27 +628,15 @@ vy_log_delete_slice(int64_t slice_id)
 	vy_log_write(&record);
 }
 
-/** Helper to log index dump. */
+/** Helper to log LSM tree dump. */
 static inline void
-vy_log_dump_index(int64_t index_lsn, int64_t dump_lsn)
+vy_log_dump_lsm(int64_t id, int64_t dump_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
-	record.type = VY_LOG_DUMP_INDEX;
-	record.index_lsn = index_lsn;
+	record.type = VY_LOG_DUMP_LSM;
+	record.lsm_id = id;
 	record.dump_lsn = dump_lsn;
-	vy_log_write(&record);
-}
-
-/** Helper to log index truncation. */
-static inline void
-vy_log_truncate_index(int64_t index_lsn, int64_t truncate_count)
-{
-	struct vy_log_record record;
-	vy_log_record_init(&record);
-	record.type = VY_LOG_TRUNCATE_INDEX;
-	record.index_lsn = index_lsn;
-	record.truncate_count = truncate_count;
 	vy_log_write(&record);
 }
 

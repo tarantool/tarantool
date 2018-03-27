@@ -144,8 +144,8 @@ struct vy_run {
 	 * after compaction.
 	 */
 	struct rlist in_unused;
-	/** Link in vy_index::runs list. */
-	struct rlist in_index;
+	/** Link in vy_lsm::runs list. */
+	struct rlist in_lsm;
 };
 
 /**
@@ -214,9 +214,9 @@ struct vy_run_iterator {
 	struct vy_run_iterator_stat *stat;
 
 	/* Members needed for memory allocation and disk access */
-	/** Index key definition used for storing statements on disk. */
+	/** Key definition used for comparing statements on disk. */
 	const struct key_def *cmp_def;
-	/** Index key definition defined by the user. */
+	/** Key definition provided by the user. */
 	const struct key_def *key_def;
 	/**
 	 * Format ot allocate REPLACE and DELETE tuples read from
@@ -382,8 +382,8 @@ enum vy_file_type {
 extern const char *vy_file_suffix[];
 
 static inline int
-vy_index_snprint_path(char *buf, int size, const char *dir,
-		      uint32_t space_id, uint32_t iid)
+vy_lsm_snprint_path(char *buf, int size, const char *dir,
+		    uint32_t space_id, uint32_t iid)
 {
 	return snprintf(buf, size, "%s/%u/%u",
 			dir, (unsigned)space_id, (unsigned)iid);
@@ -403,7 +403,7 @@ vy_run_snprint_path(char *buf, int size, const char *dir,
 		    int64_t run_id, enum vy_file_type type)
 {
 	int total = 0;
-	SNPRINT(total, vy_index_snprint_path, buf, size,
+	SNPRINT(total, vy_lsm_snprint_path, buf, size,
 		dir, (unsigned)space_id, (unsigned)iid);
 	SNPRINT(total, snprintf, buf, size, "/");
 	SNPRINT(total, vy_run_snprint_filename, buf, size, run_id, type);

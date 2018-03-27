@@ -768,7 +768,6 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	space_prepare_alter_xc(alter->old_space, alter->new_space);
 
 	alter->new_space->sequence = alter->old_space->sequence;
-	alter->new_space->truncate_count = alter->old_space->truncate_count;
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
 
@@ -1743,48 +1742,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	scoped_guard.is_active = false;
 }
 
-/* {{{ space truncate */
-
-struct truncate_space {
-	/** Space being truncated. */
-	struct space *old_space;
-	/** Space created as a result of truncation. */
-	struct space *new_space;
-	/** Trigger executed to commit truncation. */
-	struct trigger on_commit;
-	/** Trigger executed to rollback truncation. */
-	struct trigger on_rollback;
-};
-
-/**
- * Call the engine specific method to commit truncation
- * and delete the old space.
- */
-static void
-truncate_space_commit(struct trigger *trigger, void * /* event */)
-{
-	struct truncate_space *truncate =
-		(struct truncate_space *) trigger->data;
-	space_commit_truncate(truncate->old_space, truncate->new_space);
-	space_delete(truncate->old_space);
-}
-
-/**
- * Move the old space back to the cache and delete
- * the new space.
- */
-static void
-truncate_space_rollback(struct trigger *trigger, void * /* event */)
-{
-	struct truncate_space *truncate =
-		(struct truncate_space *) trigger->data;
-	if (space_cache_replace(truncate->old_space) != truncate->new_space)
-		unreachable();
-
-	space_swap_triggers(truncate->new_space, truncate->old_space);
-	space_delete(truncate->new_space);
-}
-
 /**
  * A trigger invoked on replace in space _truncate.
  *
@@ -1811,16 +1768,13 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 
 	uint32_t space_id =
 		tuple_field_u32_xc(new_tuple, BOX_TRUNCATE_FIELD_SPACE_ID);
-	uint64_t truncate_count =
-		tuple_field_u64_xc(new_tuple, BOX_TRUNCATE_FIELD_COUNT);
 	struct space *old_space = space_cache_find_xc(space_id);
 
 	if (stmt->row->type == IPROTO_INSERT) {
 		/*
 		 * Space creation during initial recovery -
-		 * initialize truncate_count.
+		 * nothing to do.
 		 */
-		old_space->truncate_count = truncate_count;
 		return;
 	}
 
@@ -1838,58 +1792,23 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 */
 	access_check_space_xc(old_space, PRIV_W);
 
-	/*
-	 * Truncate counter is updated - truncate the space.
-	 */
-	struct truncate_space *truncate =
-		region_calloc_object_xc(&fiber()->gc, struct truncate_space);
-
-	/* Create an empty copy of the old space. */
-	struct rlist key_list;
-	space_dump_def(old_space, &key_list);
-	struct space *new_space = space_new_xc(old_space->def, &key_list);
-	new_space->truncate_count = truncate_count;
-	auto space_guard = make_scoped_guard([=] { space_delete(new_space); });
-
-	/* Notify the engine about upcoming space truncation. */
-	space_prepare_truncate_xc(old_space, new_space);
-
-	space_guard.is_active = false;
-
-	/* Preserve the access control lists during truncate. */
-	memcpy(new_space->access, old_space->access, sizeof(old_space->access));
-
-	/* Truncate does not affect space sequence. */
-	new_space->sequence = old_space->sequence;
+	struct alter_space *alter = alter_space_new(old_space);
+	auto scoped_guard =
+		make_scoped_guard([=] { alter_space_delete(alter); });
 
 	/*
-	 * Replace the old space with the new one in the space
-	 * cache. Requests processed after this point will see
-	 * the space as truncated.
+	 * Recreate all indexes of the truncated space.
 	 */
-	if (space_cache_replace(new_space) != old_space)
-		unreachable();
+	for (uint32_t i = 0; i < old_space->index_count; i++) {
+		struct index *old_index = old_space->index[i];
+		(void) new DropIndex(alter, old_index->def);
+		auto create_index = new CreateIndex(alter);
+		create_index->new_index_def = index_def_dup_xc(old_index->def);
+	}
 
-	/*
-	 * Register the trigger that will commit or rollback
-	 * truncation depending on whether WAL write succeeds
-	 * or fails.
-	 */
-	truncate->old_space = old_space;
-	truncate->new_space = new_space;
-
-	trigger_create(&truncate->on_commit,
-		       truncate_space_commit, truncate, NULL);
-	txn_on_commit(txn, &truncate->on_commit);
-
-	trigger_create(&truncate->on_rollback,
-		       truncate_space_rollback, truncate, NULL);
-	txn_on_rollback(txn, &truncate->on_rollback);
-
-	space_swap_triggers(truncate->new_space, truncate->old_space);
+	alter_space_do(txn, alter);
+	scoped_guard.is_active = false;
 }
-
-/* }}} */
 
 /* {{{ access control */
 

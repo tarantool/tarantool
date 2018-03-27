@@ -54,7 +54,7 @@ tres2 = conn3:eval("t2 = {} for k, v in pairs(all) do table.insert(t2, v.abc) en
 table.sort(tres1)
 table.sort(tres2)
 test:is(tres1[1], "cde", "check after closing")
-test:is(tres2[1], "cde", "check after closing")
+test:is(#tres2, 0, "check after closing")
 conn3:close()
 inspector:cmd('stop server session_storage with cleanup=1')
 os.exit(0)

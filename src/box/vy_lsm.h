@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_VY_INDEX_H
-#define INCLUDES_TARANTOOL_BOX_VY_INDEX_H
+#ifndef INCLUDES_TARANTOOL_BOX_VY_LSM_H
+#define INCLUDES_TARANTOOL_BOX_VY_LSM_H
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -52,7 +52,7 @@ extern "C" {
 struct histogram;
 struct tuple;
 struct tuple_format;
-struct vy_index;
+struct vy_lsm;
 struct vy_mem;
 struct vy_mem_env;
 struct vy_recovery;
@@ -60,10 +60,10 @@ struct vy_run;
 struct vy_run_env;
 
 typedef void
-(*vy_upsert_thresh_cb)(struct vy_index *index, struct tuple *stmt, void *arg);
+(*vy_upsert_thresh_cb)(struct vy_lsm *lsm, struct tuple *stmt, void *arg);
 
-/** Common index environment. */
-struct vy_index_env {
+/** Common LSM tree environment. */
+struct vy_lsm_env {
 	/** Path to the data directory. */
 	const char *path;
 	/** Memory generation counter. */
@@ -84,27 +84,29 @@ struct vy_index_env {
 	vy_upsert_thresh_cb upsert_thresh_cb;
 	/** Argument passed to upsert_thresh_cb. */
 	void *upsert_thresh_arg;
-	/** Number of indexes in this environment. */
-	int index_count;
+	/** Number of LSM trees in this environment. */
+	int lsm_count;
 	/** Size of memory used for bloom filters. */
 	size_t bloom_size;
 	/** Size of memory used for page index. */
 	size_t page_index_size;
 };
 
-/** Create a common index environment. */
+/** Create a common LSM tree environment. */
 int
-vy_index_env_create(struct vy_index_env *env, const char *path,
-		    int64_t *p_generation,
-		    vy_upsert_thresh_cb upsert_thresh_cb,
-		    void *upsert_thresh_arg);
+vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
+		  int64_t *p_generation,
+		  vy_upsert_thresh_cb upsert_thresh_cb,
+		  void *upsert_thresh_arg);
 
-/** Destroy a common index environment. */
+/** Destroy a common LSM tree environment. */
 void
-vy_index_env_destroy(struct vy_index_env *env);
+vy_lsm_env_destroy(struct vy_lsm_env *env);
 
 /**
  * A struct for primary and secondary Vinyl indexes.
+ * Named after the data structure used for organizing
+ * data on disk - log-structured merge-tree (LSM tree).
  *
  * Vinyl primary and secondary indexes work differently:
  *
@@ -125,7 +127,7 @@ vy_index_env_destroy(struct vy_index_env *env);
  * When a search in a secondary index is made, we first look up
  * the secondary index tuple, containing the primary key, and then
  * use this key to find the original tuple in the primary index.
-
+ *
  * While the primary index has only one key_def that is
  * used for validating and comparing tuples, secondary index needs
  * two:
@@ -140,17 +142,19 @@ vy_index_env_destroy(struct vy_index_env *env);
  *   parts concatenated together construe the tuple of the
  *   secondary key, i.e. the tuple stored. This is key_def.
  */
-struct vy_index {
-	/** Common index environment. */
-	struct vy_index_env *env;
+struct vy_lsm {
+	/** Common LSM tree environment. */
+	struct vy_lsm_env *env;
 	/**
-	 * Reference counter. Used to postpone index deletion
+	 * Reference counter. Used to postpone LSM tree deletion
 	 * until all pending operations have completed.
 	 */
 	int refs;
-	/** Index ID visible to the user. */
-	uint32_t id;
-	/** ID of the space this index belongs to. */
+	/** Unique ID of this LSM tree. */
+	int64_t id;
+	/** ID of the index this LSM tree is for. */
+	uint32_t index_id;
+	/** ID of the space this LSM tree is for. */
 	uint32_t space_id;
 	/** Index options. */
 	struct index_opts opts;
@@ -159,14 +163,15 @@ struct vy_index {
 	/** Key definition passed by the user. */
 	struct key_def *key_def;
 	/**
-	 * If the following flag is set the index is unique and
-	 * it must be checked for duplicates on INSERT. Otherwise,
-	 * the check can be skipped, either because this index
-	 * is not unique or it is a part of another unique index.
+	 * If the following flag is set, the index this LSM tree
+	 * is created for is unique and it must be checked for
+	 * duplicates on INSERT. Otherwise, the check can be skipped,
+	 * either because the index is not unique or it is a part
+	 * of another unique index.
 	 */
 	bool check_is_unique;
 	/**
-	 * Tuple format for tuples of this index created when
+	 * Tuple format for tuples of this LSM tree created when
 	 * reading pages from disk.
 	 * Is distinct from mem_format only for secondary keys,
 	 * whose tuples have MP_NIL in all "gap" positions between
@@ -178,7 +183,7 @@ struct vy_index {
 	 * tuples.
 	 */
 	struct tuple_format *disk_format;
-	/** Tuple format of the space this index belongs to. */
+	/** Tuple format of the space this LSM tree belongs to. */
 	struct tuple_format *mem_format;
 	/**
 	 * Format for tuples of type REPLACE or DELETE which
@@ -194,14 +199,16 @@ struct vy_index {
 	 */
 	struct tuple_format *upsert_format;
 	/**
-	 * Primary index of the same space or NULL if this index
-	 * is primary. Referenced by each secondary index.
+	 * If this LSM tree is for a secondary index, the following
+	 * variable points to the LSM tree of the primary index of
+	 * the same space, otherwise it is set to NULL. Referenced
+	 * by each secondary index.
 	 */
-	struct vy_index *pk;
-	/** Index statistics. */
-	struct vy_index_stat stat;
+	struct vy_lsm *pk;
+	/** LSM tree statistics. */
+	struct vy_lsm_stat stat;
 	/**
-	 * Merge cache of this index. Contains hottest tuples
+	 * Merge cache of this LSM tree. Contains hottest tuples
 	 * with continuation markers.
 	 */
 	struct vy_cache cache;
@@ -214,23 +221,23 @@ struct vy_index {
 	 */
 	struct rlist sealed;
 	/**
-	 * Tree of all ranges of this index, linked by
+	 * Tree of all ranges of this LSM tree, linked by
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
 	vy_range_tree_t *tree;
-	/** Number of ranges in this index. */
+	/** Number of ranges in this LSM tree. */
 	int range_count;
 	/** Heap of ranges, prioritized by compact_priority. */
 	heap_t range_heap;
 	/**
-	 * List of all runs created for this index,
-	 * linked by vy_run->in_index.
+	 * List of all runs created for this LSM tree,
+	 * linked by vy_run->in_lsm.
 	 */
 	struct rlist runs;
 	/** Number of entries in all ranges. */
 	int run_count;
 	/**
-	 * Histogram accounting how many ranges of the index
+	 * Histogram accounting how many ranges of the LSM tree
 	 * have a particular number of runs.
 	 */
 	struct histogram *run_hist;
@@ -249,204 +256,182 @@ struct vy_index {
 	 */
 	uint32_t range_tree_version;
 	/**
-	 * LSN of the last dump or -1 if the index has not
+	 * LSN of the last dump or -1 if the LSM tree has not
 	 * been dumped yet.
 	 */
 	int64_t dump_lsn;
-	/**
-	 * LSN of the row that committed the index or -1 if
-	 * the index was not committed to the metadata log.
+	/*
+	 * This flag is set if the LSM tree creation was
+	 * committed to the metadata log.
 	 */
-	int64_t commit_lsn;
+	bool is_committed;
 	/**
-	 * This flag is set if the index was dropped.
-	 * It is also set on local recovery if the index
+	 * This flag is set if the LSM tree was dropped.
+	 * It is also set on local recovery if the LSM tree
 	 * will be dropped when WAL is replayed.
 	 */
 	bool is_dropped;
 	/**
-	 * Number of times the index was truncated.
-	 *
-	 * After recovery is complete, it equals space->truncate_count.
-	 * On local recovery, it is loaded from the metadata log and may
-	 * be greater than space->truncate_count, which indicates that
-	 * the space is truncated in WAL.
-	 */
-	uint64_t truncate_count;
-	/**
-	 * If pin_count > 0 the index can't be scheduled for dump.
+	 * If pin_count > 0 the LSM tree can't be scheduled for dump.
 	 * Used to make sure that the primary index is dumped last.
 	 */
 	int pin_count;
-	/** Set if the index is currently being dumped. */
+	/** Set if the LSM tree is currently being dumped. */
 	bool is_dumping;
 	/** Link in vy_scheduler->dump_heap. */
 	struct heap_node in_dump;
 	/** Link in vy_scheduler->compact_heap. */
 	struct heap_node in_compact;
 	/**
-	 * Interval tree containing reads from this index done by all
-	 * active transactions. Linked by vy_tx_interval->in_index.
+	 * Interval tree containing reads from this LSM tree done by
+	 * all active transactions. Linked by vy_tx_interval->in_lsm.
 	 * Used to abort transactions that conflict with a write to
-	 * the index.
+	 * this LSM tree.
 	 */
-	vy_index_read_set_t read_set;
+	vy_lsm_read_set_t read_set;
 };
 
 /**
- * Assert if an index formats are inconsistent.
- * @param index Index to validate.
+ * Assert if an LSM tree formats are inconsistent.
+ * @param lsm LSM tree to validate.
  */
 void
-vy_index_validate_formats(const struct vy_index *index);
+vy_lsm_validate_formats(const struct vy_lsm *lsm);
 
-/** Return index name. Used for logging. */
+/** Return LSM tree name. Used for logging. */
 const char *
-vy_index_name(struct vy_index *index);
+vy_lsm_name(struct vy_lsm *lsm);
 
 /** Return sum size of memory tree extents. */
 size_t
-vy_index_mem_tree_size(struct vy_index *index);
+vy_lsm_mem_tree_size(struct vy_lsm *lsm);
 
-/** Allocate a new index object. */
-struct vy_index *
-vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
+/** Allocate a new LSM tree object. */
+struct vy_lsm *
+vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	     struct vy_mem_env *mem_env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_index *pk);
+	     struct tuple_format *format, struct vy_lsm *pk);
 
-/** Free an index object. */
+/** Free an LSM tree object. */
 void
-vy_index_delete(struct vy_index *index);
+vy_lsm_delete(struct vy_lsm *lsm);
 
 /**
- * Increment the reference counter of a vinyl index.
- * An index cannot be deleted if its reference counter
- * is elevated.
+ * Increment the reference counter of an LSM tree.
+ * An LSM tree cannot be deleted if its reference
+ * counter is elevated.
  */
 static inline void
-vy_index_ref(struct vy_index *index)
+vy_lsm_ref(struct vy_lsm *lsm)
 {
-	assert(index->refs >= 0);
-	index->refs++;
+	assert(lsm->refs >= 0);
+	lsm->refs++;
 }
 
 /**
- * Decrement the reference counter of a vinyl index.
- * If the reference counter reaches 0, the index is
- * deleted with vy_index_delete().
+ * Decrement the reference counter of an LSM tree.
+ * If the reference counter reaches 0, the LSM tree
+ * is deleted with vy_lsm_delete().
  */
 static inline void
-vy_index_unref(struct vy_index *index)
+vy_lsm_unref(struct vy_lsm *lsm)
 {
-	assert(index->refs > 0);
-	if (--index->refs == 0)
-		vy_index_delete(index);
+	assert(lsm->refs > 0);
+	if (--lsm->refs == 0)
+		vy_lsm_delete(lsm);
 }
 
 /**
- * Swap disk contents (ranges, runs, and corresponding stats)
- * between two indexes. Used only on recovery, to skip reloading
- * indexes of a truncated space. The in-memory tree of the index
- * can't be populated - see vy_is_committed_one().
- */
-void
-vy_index_swap(struct vy_index *old_index, struct vy_index *new_index);
-
-/** Initialize the range tree of a new index. */
-int
-vy_index_init_range_tree(struct vy_index *index);
-
-/**
- * Create a new vinyl index.
+ * Create a new LSM tree.
  *
- * This function is called when an index is created after recovery
- * is complete or during remote recovery. It initializes the range
- * tree and makes the index directory.
+ * This function is called when an LSM tree is created
+ * after recovery is complete or during remote recovery.
+ * It initializes the range tree and makes the LSM tree
+ * directory.
  */
 int
-vy_index_create(struct vy_index *index);
+vy_lsm_create(struct vy_lsm *lsm);
 
 /**
- * Load a vinyl index from disk. Called on local recovery.
+ * Load an LSM tree from disk. Called on local recovery.
  *
- * This function retrieves the index structure from the
- * metadata log, rebuilds the range tree, and opens run
- * files.
+ * This function retrieves the LSM tree structure from the
+ * metadata log, rebuilds the range tree, and opens run files.
  *
- * If @is_checkpoint_recovery is set, the index is recovered from
- * the last snapshot. In particular, this means that the index
- * must have been logged in the metadata log and so if the
+ * If @is_checkpoint_recovery is set, the LSM tree is recovered
+ * from the last snapshot. In particular, this means that the LSM
+ * tree must have been logged in the metadata log and so if the
  * function does not find it in the recovery context, it will
- * fail. If the flag is unset, the index is recovered from a
- * WAL, in which case a missing index is OK - it just means we
+ * fail. If the flag is unset, the LSM tree is recovered from a
+ * WAL, in which case a missing LSM tree is OK - it just means we
  * failed to log it before restart and have to retry during
  * WAL replay.
  *
- * @lsn is the LSN of the row that created the index.
- * If the index is recovered from a snapshot, it is set
+ * @lsn is the LSN of the WAL row that created the LSM tree.
+ * If the LSM tree is recovered from a snapshot, it is set
  * to the snapshot signature.
  */
 int
-vy_index_recover(struct vy_index *index, struct vy_recovery *recovery,
+vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 		 struct vy_run_env *run_env, int64_t lsn,
 		 bool is_checkpoint_recovery, bool force_recovery);
 
 /**
- * Return generation of in-memory data stored in an index
+ * Return generation of in-memory data stored in an LSM tree
  * (min over vy_mem->generation).
  */
 int64_t
-vy_index_generation(struct vy_index *index);
+vy_lsm_generation(struct vy_lsm *lsm);
 
-/** Return max compact_priority among ranges of an index. */
+/** Return max compact_priority among ranges of an LSM tree. */
 int
-vy_index_compact_priority(struct vy_index *index);
+vy_lsm_compact_priority(struct vy_lsm *lsm);
 
-/** Add a run to the list of runs of an index. */
+/** Add a run to the list of runs of an LSM tree. */
 void
-vy_index_add_run(struct vy_index *index, struct vy_run *run);
+vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run);
 
-/** Remove a run from the list of runs of an index. */
+/** Remove a run from the list of runs of an LSM tree. */
 void
-vy_index_remove_run(struct vy_index *index, struct vy_run *run);
+vy_lsm_remove_run(struct vy_lsm *lsm, struct vy_run *run);
 
 /**
  * Add a range to both the range tree and the range heap
- * of an index.
+ * of an LSM tree.
  */
 void
-vy_index_add_range(struct vy_index *index, struct vy_range *range);
+vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range);
 
 /**
  * Remove a range from both the range tree and the range
- * heap of an index.
+ * heap of an LSM tree.
  */
 void
-vy_index_remove_range(struct vy_index *index, struct vy_range *range);
+vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range);
 
-/** Account a range to the run histogram of an index. */
+/** Account a range to the run histogram of an LSM tree. */
 void
-vy_index_acct_range(struct vy_index *index, struct vy_range *range);
+vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range);
 
-/** Unaccount a range from the run histogram of an index. */
+/** Unaccount a range from the run histogram of an LSM tree. */
 void
-vy_index_unacct_range(struct vy_index *index, struct vy_range *range);
+vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range);
 
 /**
- * Allocate a new active in-memory index for an index while moving
- * the old one to the sealed list. Used by the dump task in order
- * not to bother about synchronization with concurrent insertions
- * while an index is being dumped.
+ * Allocate a new active in-memory index for an LSM tree while
+ * moving the old one to the sealed list. Used by the dump task
+ * in order not to bother about synchronization with concurrent
+ * insertions while an LSM tree is being dumped.
  */
 int
-vy_index_rotate_mem(struct vy_index *index);
+vy_lsm_rotate_mem(struct vy_lsm *lsm);
 
 /**
- * Remove an in-memory tree from the sealed list of a vinyl index,
+ * Remove an in-memory tree from the sealed list of an LSM tree,
  * unaccount and delete it.
  */
 void
-vy_index_delete_mem(struct vy_index *index, struct vy_mem *mem);
+vy_lsm_delete_mem(struct vy_lsm *lsm, struct vy_mem *mem);
 
 /**
  * Split a range if it has grown too big, return true if the range
@@ -456,7 +441,7 @@ vy_index_delete_mem(struct vy_index *index, struct vy_mem *mem);
  * operations, like writing a run file, and is done immediately.
  */
 bool
-vy_index_split_range(struct vy_index *index, struct vy_range *range);
+vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range);
 
 /**
  * Coalesce a range with one or more its neighbors if it is too small,
@@ -469,16 +454,16 @@ vy_index_split_range(struct vy_index *index, struct vy_range *range);
  * case of merging key ranges.
  */
 bool
-vy_index_coalesce_range(struct vy_index *index, struct vy_range *range);
+vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range);
 
 /**
- * Insert a statement into the index's in-memory tree. If the
- * region_stmt is NULL and the statement is successfully inserted
+ * Insert a statement into the in-memory index of an LSM tree. If
+ * the region_stmt is NULL and the statement is successfully inserted
  * then the new lsregion statement is returned via @a region_stmt.
- * Either vy_index_commit_stmt() or vy_index_rollback_stmt() must
+ * Either vy_lsm_commit_stmt() or vy_lsm_rollback_stmt() must
  * be called on success.
  *
- * @param index       Index the statement is for.
+ * @param lsm         LSM tree the statement is for.
  * @param mem         In-memory tree to insert the statement into.
  * @param stmt        Statement, allocated on malloc().
  * @param region_stmt NULL or the same statement, allocated on
@@ -488,33 +473,34 @@ vy_index_coalesce_range(struct vy_index *index, struct vy_range *range);
  * @retval -1 Memory error.
  */
 int
-vy_index_set(struct vy_index *index, struct vy_mem *mem,
-	     const struct tuple *stmt, const struct tuple **region_stmt);
+vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
+	   const struct tuple *stmt, const struct tuple **region_stmt);
 
 /**
- * Confirm that the statement stays in the index's in-memory tree.
+ * Confirm that the statement stays in the in-memory index of
+ * an LSM tree.
  *
- * @param index Index the statement is for.
+ * @param lsm   LSM tree the statement is for.
  * @param mem   In-memory tree where the statement was saved.
  * @param stmt  Statement allocated from lsregion.
  */
 void
-vy_index_commit_stmt(struct vy_index *index, struct vy_mem *mem,
+vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
+		   const struct tuple *stmt);
+
+/**
+ * Erase a statement from the in-memory index of an LSM tree.
+ *
+ * @param lsm   LSM tree to erase from.
+ * @param mem   In-memory tree where the statement was saved.
+ * @param stmt  Statement allocated from lsregion.
+ */
+void
+vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		     const struct tuple *stmt);
-
-/**
- * Erase a statement from the index's in-memory tree.
- *
- * @param index Index to erase from.
- * @param mem   In-memory tree where the statement was saved.
- * @param stmt  Statement allocated from lsregion.
- */
-void
-vy_index_rollback_stmt(struct vy_index *index, struct vy_mem *mem,
-		       const struct tuple *stmt);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_BOX_VY_INDEX_H */
+#endif /* INCLUDES_TARANTOOL_BOX_VY_LSM_H */

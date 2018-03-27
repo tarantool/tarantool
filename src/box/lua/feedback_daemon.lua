@@ -35,13 +35,14 @@ local function fill_in_feedback(feedback)
     return feedback
 end
 
-local function send(self)
+local function feedback_loop(self)
     fiber.name(PREFIX, { truncate = true })
     local header = { feedback_type = "version", feedback_version = 1 }
 
     while true do
         local feedback = fill_in_feedback(header)
         local msg = self.control:get(self.interval)
+        -- if msg == "send" then we simply send feedback
         if msg == "stop" then
             break
         elseif feedback ~= nil then
@@ -57,7 +58,7 @@ local function guard_loop(self)
     while true do
 
         if get_fiber_id(self.fiber) == 0 then
-            self.fiber = fiber.create(send, self)
+            self.fiber = fiber.create(feedback_loop, self)
             log.verbose("%s restarted", PREFIX)
         end
         local st, err = pcall(fiber.sleep, self.interval)
@@ -66,8 +67,6 @@ local function guard_loop(self)
             break
         end
     end
-    self.control:put("stop")
-    self.shutdown:get()
     self.shutdown:put("stopped")
 end
 
@@ -85,17 +84,13 @@ end
 local function stop(self)
     if (get_fiber_id(self.guard) ~= 0) then
         self.guard:cancel()
-        --
-        -- this workaround with channels may be replaced with fiber_join
-        -- so guard fiber may be set joinable
-        --
         self.shutdown:get()
-        self.guard = nil
     end
     if (get_fiber_id(self.fiber) ~= 0) then
         self.control:put("stop")
         self.shutdown:get()
     end
+    self.guard = nil
     self.fiber = nil
     self.control = nil
     self.shutdown = nil

@@ -8,9 +8,18 @@ local fiber = require('fiber')
 local test = tap.test('feedback_daemon')
 local socket = require('socket')
 
-test:plan(10)
+test:plan(11)
 
 box.cfg{log = 'report.log', log_level = 6}
+
+local feedback_save = nil
+local feedback = nil
+local feedback_count = 0
+
+local function feedback_reset()
+    feedback = nil
+    feedback_count = 0
+end
 
 local function http_handle(s)
     s:write("HTTP/1.1 200 OK\r\n")
@@ -31,7 +40,8 @@ local function http_handle(s)
     buf = s:read(length)
     local ok, data = pcall(json.decode, buf)
     if ok then
-        box.space._schema:put({'feedback', buf })
+        feedback = buf
+        feedback_count = feedback_count + 1
     end
 end
 
@@ -45,10 +55,12 @@ box.cfg{
 }
 
 local function check(message)
-    while box.space._schema:get('feedback') == nil do fiber.sleep(0.001) end
-    local data = box.space._schema:get('feedback')
-    test:ok(data ~= nil, message)
-    box.space._schema:delete('feedback')
+    while feedback_count < 1 do
+        fiber.sleep(0.001)
+    end
+    test:ok(feedback ~= nil, message)
+    feedback_save = feedback
+    feedback_reset()
 end
 
 check("initial check")
@@ -59,39 +71,41 @@ check("feedback received after reload")
 
 local errinj = box.error.injection
 errinj.set("ERRINJ_HTTPC", true)
-check('feedback received after errinj')
+feedback_reset()
 errinj.set("ERRINJ_HTTPC", false)
+check('feedback received after errinj')
 
 daemon.send_test()
 check("feedback received after explicit sending")
 
 box.cfg{feedback_enabled = false}
+feedback_reset()
 daemon.send_test()
-while box.space._schema:get('feedback') ~= nil do fiber.sleep(0.001) end
-test:ok(box.space._schema:get('feedback') == nil, "no feedback after disabling")
+test:ok(feedback_count == 0, "no feedback after disabling")
 
 box.cfg{feedback_enabled = true}
 daemon.send_test()
 check("feedback after start")
 
 daemon.stop()
+feedback_reset()
 daemon.send_test()
-while box.space._schema:get('feedback') ~= nil do fiber.sleep(0.001) end
-test:ok(box.space._schema:get('feedback') == nil, "no feedback after stop")
+test:ok(feedback_count == 0, "no feedback after stop")
 
 daemon.start()
 daemon.send_test()
 check("feedback after start")
+daemon.send_test()
+check("feedback after feedback send_test")
+
+daemon.stop()
 
 box.feedback.save("feedback.json")
-daemon.send_test()
-while box.space._schema:get('feedback') == nil do fiber.sleep(0.001) end
-local data = box.space._schema:get('feedback')
 local fio = require("fio")
 local fh = fio.open("feedback.json")
 test:ok(fh, "file is created")
 local file_data = fh:read()
-test:is(file_data, data[2], "data is equal")
+test:is(file_data, feedback_save, "data is equal")
 fh:close()
 fio.unlink("feedback.json")
 
@@ -100,6 +114,7 @@ server:close()
 local daemon = box.internal.feedback_daemon
 daemon.start()
 daemon.send_test()
+daemon.stop()
 
 test:check()
 os.exit(0)

@@ -54,7 +54,7 @@ struct tuple;
 struct vy_slice;
 
 /**
- * Range of keys in an index stored on disk.
+ * Range of keys in an LSM tree stored on disk.
  */
 struct vy_range {
 	/** Unique ID of this range. */
@@ -108,20 +108,19 @@ struct vy_range {
 	int compact_priority;
 	/** Number of times the range was compacted. */
 	int n_compactions;
-	/** Link in vy_index->tree. */
+	/** Link in vy_lsm->tree. */
 	rb_node(struct vy_range) tree_node;
-	/** Link in vy_index->range_heap. */
+	/** Link in vy_lsm->range_heap. */
 	struct heap_node heap_node;
 	/**
-	 * Incremented whenever an in-memory index or on disk
-	 * run is added to or deleted from this range. Used to
-	 * invalidate iterators.
+	 * Incremented whenever a run is added to or deleted
+	 * from this range. Used invalidate read iterators.
 	 */
 	uint32_t version;
 };
 
 /**
- * Heap of all ranges of the same index, prioritized by
+ * Heap of all ranges of the same LSM tree, prioritized by
  * vy_range->compact_priority.
  */
 #define HEAP_NAME vy_range_heap
@@ -145,7 +144,7 @@ vy_range_is_scheduled(struct vy_range *range)
 }
 
 /**
- * Search tree of all ranges of the same index, sorted by
+ * Search tree of all ranges of the same LSM tree, sorted by
  * vy_range->begin. Ranges in a tree are supposed to span
  * all possible keys without overlaps.
  */
