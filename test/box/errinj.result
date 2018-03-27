@@ -205,18 +205,6 @@ space:get{1}
 space:get{2}
 ---
 ...
-errinj.set("ERRINJ_WAL_ROTATE", true)
----
-- ok
-...
-space:truncate()
----
-- error: Failed to write to disk
-...
-errinj.set("ERRINJ_WAL_ROTATE", false)
----
-- ok
-...
 space:truncate()
 ---
 ...
