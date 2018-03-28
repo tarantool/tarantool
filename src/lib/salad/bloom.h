@@ -123,7 +123,7 @@ bloom_add(struct bloom *bloom, bloom_hash_t hash);
  *
  */
 static bool
-bloom_possible_has(const struct bloom *bloom, bloom_hash_t hash);
+bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash);
 
 /**
  * Calculate size of a buffer that is needed for storing bloom table
@@ -233,7 +233,7 @@ bloom_add(struct bloom *bloom, bloom_hash_t hash)
 }
 
 static inline bool
-bloom_possible_has(const struct bloom *bloom, bloom_hash_t hash)
+bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash)
 {
 	/* Using lower part of the has for finding a block */
 	bloom_hash_t pos = hash % bloom->table_size;

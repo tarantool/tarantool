@@ -1263,7 +1263,7 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 		} else {
 			hash = tuple_hash(key, key_def);
 		}
-		if (!bloom_possible_has(&run->info.bloom, hash)) {
+		if (!bloom_maybe_has(&run->info.bloom, hash)) {
 			itr->search_ended = true;
 			itr->stat->bloom_hit++;
 			return 0;

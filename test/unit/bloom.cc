@@ -34,7 +34,7 @@ simple_test()
 			for (uint32_t i = 0; i < count * 10; i++) {
 				bool has = check.find(i) != check.end();
 				bool bloom_possible =
-					bloom_possible_has(&bloom, h(i));
+					bloom_maybe_has(&bloom, h(i));
 				tests++;
 				if (has && !bloom_possible)
 					error_count++;
@@ -83,7 +83,7 @@ store_load_test()
 			for (uint32_t i = 0; i < count * 10; i++) {
 				bool has = check.find(i) != check.end();
 				bool bloom_possible =
-					bloom_possible_has(&test, h(i));
+					bloom_maybe_has(&test, h(i));
 				tests++;
 				if (has && !bloom_possible)
 					error_count++;
@@ -124,11 +124,11 @@ spectrum_test()
 	uint64_t false_positive = 0;
 	uint64_t error_count = 0;
 	for (uint32_t i = 0; i < count; i++) {
-		if (!bloom_possible_has(&bloom, h(i)))
+		if (!bloom_maybe_has(&bloom, h(i)))
 			error_count++;
 	}
 	for (uint32_t i = count; i < 2 * count; i++) {
-		if (bloom_possible_has(&bloom, h(i)))
+		if (bloom_maybe_has(&bloom, h(i)))
 			false_positive++;
 	}
 	bool fpr_rate_is_good = false_positive < 1.5 * p * count;
@@ -148,11 +148,11 @@ spectrum_test()
 	false_positive = 0;
 	error_count = 0;
 	for (uint32_t i = 0; i < count; i++) {
-		if (!bloom_possible_has(&bloom, h(i)))
+		if (!bloom_maybe_has(&bloom, h(i)))
 			error_count++;
 	}
 	for (uint32_t i = count; i < 2 * count; i++) {
-		if (bloom_possible_has(&bloom, h(i)))
+		if (bloom_maybe_has(&bloom, h(i)))
 			false_positive++;
 	}
 	fpr_rate_is_good = false_positive < 1.5 * p * count;
