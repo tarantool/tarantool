@@ -40,7 +40,8 @@ box.space._schema:select()
 ...
 box.space._space:select()
 ---
-- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}]]
+- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}, {'type': 'any',
+        'name': 'value', 'is_nullable': true}]]
   - [276, 1, '_collation', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {
         'name': 'name', 'type': 'string'}, {'name': 'owner', 'type': 'unsigned'},
       {'name': 'type', 'type': 'string'}, {'name': 'locale', 'type': 'string'}, {

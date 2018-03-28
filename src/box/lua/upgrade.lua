@@ -479,10 +479,11 @@ local function upgrade_to_1_8_4()
                       {name='nlt', type='string'},
                       {name='ndlt', type='string'},
                       {name='sample', type='scalar'}}
+    local MAP = setmap({})
 
     log.info("create space _sql_stat1")
     _space:insert{box.schema.SQL_STAT1_ID, ADMIN, '_sql_stat1', 'memtx', 0,
-                  setmap({}), stat1_ft}
+                  MAP, stat1_ft}
 
     log.info("create index primary on _sql_stat1")
     _index:insert{box.schema.SQL_STAT1_ID, 0, 'primary', 'tree',
@@ -490,12 +491,21 @@ local function upgrade_to_1_8_4()
 
     log.info("create space _sql_stat4")
     _space:insert{box.schema.SQL_STAT4_ID, ADMIN, '_sql_stat4', 'memtx', 0,
-                  setmap({}), stat4_ft}
+                  MAP, stat4_ft}
 
     log.info("create index primary on _sql_stat4")
     _index:insert{box.schema.SQL_STAT4_ID, 0, 'primary', 'tree',
                   {unique = true}, {{0, 'string'}, {1, 'string'},
                   {5, 'scalar'}}}
+
+    -- Nullability wasn't skipable. This was fixed in 1-7.
+    -- Now, abscent field means NULL, so we can safely set second
+    -- field in format, marking it nullable.
+    log.info("Add nullable value field to space _schema")
+    local format = {}
+    format[1] = {type='string', name='key'}
+    format[2] = {type='any', name='value', is_nullable=true}
+    box.space._schema:format(format)
 end
 
 --------------------------------------------------------------------------------
