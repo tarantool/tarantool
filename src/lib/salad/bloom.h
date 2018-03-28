@@ -126,6 +126,15 @@ static bool
 bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash);
 
 /**
+ * Return the expected false positive rate of a bloom filter.
+ * @param bloom - the bloom filter
+ * @param number_of_values - number of values stored in the filter
+ * @return - expected false positive rate
+ */
+double
+bloom_fpr(const struct bloom *bloom, uint32_t number_of_values);
+
+/**
  * Calculate size of a buffer that is needed for storing bloom table
  * @param bloom - the bloom filter to store
  * @return - Exact size

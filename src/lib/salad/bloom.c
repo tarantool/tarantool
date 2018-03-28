@@ -70,6 +70,19 @@ bloom_destroy(struct bloom *bloom, struct quota *quota)
 	free(bloom->table);
 }
 
+double
+bloom_fpr(const struct bloom *bloom, uint32_t number_of_values)
+{
+	/* Number of hash functions. */
+	uint16_t k = bloom->hash_count;
+	/* Number of bits. */
+	uint64_t m = bloom->table_size * sizeof(struct bloom_block) * CHAR_BIT;
+	/* Number of elements. */
+	uint32_t n = number_of_values;
+	/* False positive rate. */
+	return pow(1 - exp((double) -k * n / m), k);
+}
+
 size_t
 bloom_store_size(const struct bloom *bloom)
 {

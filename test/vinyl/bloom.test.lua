@@ -29,6 +29,23 @@ function new_seeks() local o = seeks seeks = cur_seeks() return seeks - o end
 
 for i = 1, 1000 do s:replace{math.ceil(i / 10), math.ceil(i / 2), i, i * 2} end
 box.snapshot()
+
+--
+-- There are 1000 unique tuples in the index. The cardinality of the
+-- first key part is 100, of the first two key parts is 500, of the
+-- first three key parts is 1000. With the default bloom fpr of 0.05,
+-- we use 5 hash functions or 5 / ln(2) ~= 7.3 bits per tuple.If we
+-- allocated a full sized bloom filter per each sub key, we would need
+-- to allocate at least (100 + 500 + 1000 + 1000) * 7 bits or 2275
+-- bytes. However, since we adjust the fpr of bloom filters of higher
+-- ranks (because a full key lookup checks all its sub keys as well),
+-- we use 5, 4, 3, and 1 hash functions for each sub key respectively.
+-- This leaves us only (100*5 + 500*4 + 1000*3 + 1000*1) / ln(2) bits
+-- or 1172 bytes, and after rounding up to the block size (128 byte)
+-- we have 1280 bytes plus the header overhead.
+--
+s.index.pk:info().disk.bloom_size
+
 _ = new_reflects()
 _ = new_seeks()
 

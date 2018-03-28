@@ -132,8 +132,20 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 	for (uint32_t i = 0; i < part_count; i++) {
 		struct tuple_hash_array *hash_arr = &builder->parts[i];
 		uint32_t count = hash_arr->count;
+		/*
+		 * When we check if a key is stored in a bloom
+		 * filter, we check all its sub keys as well,
+		 * which reduces the resulting false positive
+		 * rate. Take this into account and adjust fpr
+		 * accordingly when constructing a bloom filter
+		 * for keys of a higher rank.
+		 */
+		double part_fpr = fpr;
+		for (uint32_t j = 0; j < i; j++)
+			part_fpr /= bloom_fpr(&bloom->parts[j], count);
+		part_fpr = MIN(part_fpr, 0.5);
 		if (bloom_create(&bloom->parts[i], count,
-				 fpr, runtime.quota) != 0) {
+				 part_fpr, runtime.quota) != 0) {
 			diag_set(OutOfMemory, 0, "bloom_create",
 				 "tuple bloom part");
 			tuple_bloom_delete(bloom);
