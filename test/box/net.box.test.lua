@@ -940,3 +940,25 @@ weak.c
 box.schema.user.revoke('guest', 'execute', 'universe')
 c:close()
 c = nil
+
+--
+-- gh-3256 net.box is_nullable and collation options output
+--
+space = box.schema.create_space('test')
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+_ = space:create_index('pk')
+_ = space:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
+c = net:connect(box.cfg.listen)
+c.space.test.index.sk.parts
+space:drop()
+
+space = box.schema.create_space('test')
+box.internal.collation.create('test', 'ICU', 'ru-RU')
+_ = space:create_index('sk', { type = 'tree', parts = {{1, 'str', collation = 'test'}}, unique = true })
+c:reload_schema()
+c.space.test.index.sk.parts
+c:close()
+box.internal.collation.drop('test')
+space:drop()
+
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
