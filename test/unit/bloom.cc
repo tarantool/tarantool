@@ -102,72 +102,9 @@ store_load_test()
 	cout << "memory after destruction = " << quota_used(&q) << endl << endl;
 }
 
-void
-spectrum_test()
-{
-	cout << "*** " << __func__ << " ***" << endl;
-	struct quota q;
-	quota_init(&q, 1005000);
-	double p = 0.01;
-	uint32_t count = 4000;
-	struct bloom_spectrum spectrum;
-	struct bloom bloom;
-
-	/* using (count) */
-	bloom_spectrum_create(&spectrum, count, p, &q);
-	for (uint32_t i = 0; i < count; i++) {
-		bloom_spectrum_add(&spectrum, h(i));
-	}
-	bloom_spectrum_choose(&spectrum, &bloom);
-	bloom_spectrum_destroy(&spectrum, &q);
-
-	uint64_t false_positive = 0;
-	uint64_t error_count = 0;
-	for (uint32_t i = 0; i < count; i++) {
-		if (!bloom_maybe_has(&bloom, h(i)))
-			error_count++;
-	}
-	for (uint32_t i = count; i < 2 * count; i++) {
-		if (bloom_maybe_has(&bloom, h(i)))
-			false_positive++;
-	}
-	bool fpr_rate_is_good = false_positive < 1.5 * p * count;
-	cout << "bloom table size = " << bloom.table_size << endl;
-	cout << "error_count = " << error_count << endl;
-	cout << "fpr_rate_is_good = " << fpr_rate_is_good << endl;
-	bloom_destroy(&bloom, &q);
-
-	/* same test using (count * 10) */
-	bloom_spectrum_create(&spectrum, count * 10, p, &q);
-	for (uint32_t i = 0; i < count; i++) {
-		bloom_spectrum_add(&spectrum, h(i));
-	}
-	bloom_spectrum_choose(&spectrum, &bloom);
-	bloom_spectrum_destroy(&spectrum, &q);
-
-	false_positive = 0;
-	error_count = 0;
-	for (uint32_t i = 0; i < count; i++) {
-		if (!bloom_maybe_has(&bloom, h(i)))
-			error_count++;
-	}
-	for (uint32_t i = count; i < 2 * count; i++) {
-		if (bloom_maybe_has(&bloom, h(i)))
-			false_positive++;
-	}
-	fpr_rate_is_good = false_positive < 1.5 * p * count;
-	cout << "bloom table size = " << bloom.table_size << endl;
-	cout << "error_count = " << error_count << endl;
-	cout << "fpr_rate_is_good = " << fpr_rate_is_good << endl;
-	bloom_destroy(&bloom, &q);
-
-	cout << "memory after destruction = " << quota_used(&q) << endl << endl;
-}
-
 int
 main(void)
 {
 	simple_test();
 	store_load_test();
-	spectrum_test();
 }
