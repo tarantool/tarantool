@@ -560,6 +560,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			int regTempId;	/* Register to hold temp table ID */
 			int regCopy;    /* Register to keep copy of registers from select */
 			int addrL;	/* Label "L" */
+			int64_t initial_pk = 0;
 
 			srcTab = pParse->nTab++;
 			regRec = sqlite3GetTempReg(pParse);
@@ -568,9 +569,16 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, 1+nColumn, 0);
 			sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, srcTab, nColumn+1,
 					  0, (char*)pKeyInfo, P4_KEYINFO);
+			/* Create counter for rowid */
+			sqlite3VdbeAddOp4Dup8(v, OP_Int64,
+					      0 /* unused */,
+					      regTempId,
+					      0 /* unused */,
+					      (const unsigned char*) &initial_pk,
+					      P4_INT64);
 			addrL = sqlite3VdbeAddOp1(v, OP_Yield, dest.iSDParm);
 			VdbeCoverage(v);
-			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, srcTab, 2, regTempId);
+			sqlite3VdbeAddOp2(v, OP_AddImm, regTempId, 1);
 			sqlite3VdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn-1);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy,
 					  nColumn + 1, regRec);

@@ -1644,7 +1644,8 @@ int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
 		*max_id = 0;
 		return SQLITE_OK;
 	}
-	tuple_field_u64(tuple, fieldno, max_id);
+	if (tuple_field_u64(tuple, fieldno, max_id) == -1)
+		return SQL_TARANTOOL_ERROR;
 
 	return SQLITE_OK;
 }
