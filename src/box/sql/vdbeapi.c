@@ -469,10 +469,6 @@ sqlite3_result_error_code(sqlite3_context * pCtx, int errCode)
 {
 	pCtx->isError = errCode;
 	pCtx->fErrorOrAux = 1;
-#ifdef SQLITE_DEBUG
-	if (pCtx->pVdbe)
-		pCtx->pVdbe->rcApp = errCode;
-#endif
 	if (pCtx->pOut->flags & MEM_Null) {
 		sqlite3VdbeMemSetStr(pCtx->pOut, sqlite3ErrStr(errCode), -1, 1,
 				     SQLITE_STATIC);
@@ -580,9 +576,6 @@ sqlite3Step(Vdbe * p)
 		db->nVdbeActive++;
 		p->pc = 0;
 	}
-#ifdef SQLITE_DEBUG
-	p->rcApp = SQLITE_OK;
-#endif
 #ifndef SQLITE_OMIT_EXPLAIN
 	if (p->explain) {
 		rc = sqlite3VdbeList(p);
@@ -614,8 +607,6 @@ sqlite3Step(Vdbe * p)
 	 */
 	assert(rc == SQLITE_ROW || rc == SQLITE_DONE || rc == SQLITE_ERROR
 	       || (rc & 0xff) == SQLITE_BUSY || rc == SQLITE_MISUSE);
-	assert((p->rc != SQLITE_ROW && p->rc != SQLITE_DONE)
-	       || p->rc == p->rcApp);
 	if (p->isPrepareV2 && rc != SQLITE_ROW && rc != SQLITE_DONE) {
 		/* If this statement was prepared using sqlite3_prepare_v2(), and an
 		 * error has occurred, then return the error code in p->rc to the

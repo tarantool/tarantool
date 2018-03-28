@@ -800,9 +800,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_ERROR:
 			zName = "SQLITE_ERROR";
 			break;
-		case SQLITE_INTERNAL:
-			zName = "SQLITE_INTERNAL";
-			break;
 		case SQLITE_PERM:
 			zName = "SQLITE_PERM";
 			break;
@@ -820,9 +817,6 @@ sqlite3ErrName(int rc)
 			break;
 		case SQLITE_NOMEM:
 			zName = "SQLITE_NOMEM";
-			break;
-		case SQLITE_READONLY:
-			zName = "SQLITE_READONLY";
 			break;
 		case SQLITE_INTERRUPT:
 			zName = "SQLITE_INTERRUPT";
@@ -917,12 +911,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_CANTOPEN:
 			zName = "SQLITE_CANTOPEN";
 			break;
-		case SQLITE_PROTOCOL:
-			zName = "SQLITE_PROTOCOL";
-			break;
-		case SQLITE_EMPTY:
-			zName = "SQLITE_EMPTY";
-			break;
 		case SQLITE_SCHEMA:
 			zName = "SQLITE_SCHEMA";
 			break;
@@ -959,26 +947,14 @@ sqlite3ErrName(int rc)
 		case SQLITE_MISUSE:
 			zName = "SQLITE_MISUSE";
 			break;
-		case SQLITE_NOLFS:
-			zName = "SQLITE_NOLFS";
-			break;
-		case SQLITE_FORMAT:
-			zName = "SQLITE_FORMAT";
-			break;
 		case SQLITE_RANGE:
 			zName = "SQLITE_RANGE";
-			break;
-		case SQLITE_NOTADB:
-			zName = "SQLITE_NOTADB";
 			break;
 		case SQL_TARANTOOL_ERROR:
 			zName = "SQLITE_TARANTOOL_ERROR";
 			break;
 		case SQLITE_ROW:
 			zName = "SQLITE_ROW";
-			break;
-		case SQLITE_NOTICE:
-			zName = "SQLITE_NOTICE";
 			break;
 		case SQLITE_WARNING:
 			zName = "SQLITE_WARNING";
@@ -1008,32 +984,24 @@ sqlite3ErrStr(int rc)
 	static const char *const aMsg[] = {
 		/* SQLITE_OK          */ "not an error",
 		/* SQLITE_ERROR       */ "SQL logic error or missing database",
-		/* SQLITE_INTERNAL    */ 0,
 		/* SQLITE_PERM        */ "access permission denied",
 		/* SQLITE_ABORT       */ "callback requested query abort",
 		/* SQLITE_BUSY        */ "database is locked",
 		/* SQLITE_LOCKED      */ "database table is locked",
 		/* SQLITE_NOMEM       */ "out of memory",
-		/* SQLITE_READONLY    */ "attempt to write a readonly database",
 		/* SQLITE_INTERRUPT   */ "interrupted",
 		/* SQLITE_IOERR       */ "disk I/O error",
 		/* SQLITE_CORRUPT     */ "database disk image is malformed",
 		/* SQLITE_NOTFOUND    */ "unknown operation",
 		/* SQLITE_FULL        */ "database or disk is full",
 		/* SQLITE_CANTOPEN    */ "unable to open database file",
-		/* SQLITE_PROTOCOL    */ "locking protocol",
-		/* SQLITE_EMPTY       */ "table contains no data",
 		/* SQLITE_SCHEMA      */ "database schema has changed",
 		/* SQLITE_TOOBIG      */ "string or blob too big",
 		/* SQLITE_CONSTRAINT  */ "constraint failed",
 		/* SQLITE_MISMATCH    */ "datatype mismatch",
 		/* SQLITE_MISUSE      */
 		    "library routine called out of sequence",
-		/* SQLITE_NOLFS       */ "large file support is disabled",
-		/* SQLITE_FORMAT      */ "auxiliary database format error",
 		/* SQLITE_RANGE       */ "bind or column index out of range",
-		/* SQLITE_NOTADB      */
-		    "file is encrypted or is not a database",
 		/* SQL_TARANTOOL_ITERATOR_FAIL */ "Tarantool's iterator failed",
 		/* SQL_TARANTOOL_INSERT_FAIL */ "Tarantool's insert failed",
 		/* SQL_TARANTOOL_DELETE_FAIL */ "Tarantool's delete failed",

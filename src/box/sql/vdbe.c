@@ -1419,7 +1419,6 @@ case OP_ResultRow: {
 	 */
 	if (SQLITE_OK!=(rc = sqlite3VdbeCheckFk(p, 0))) {
 		assert(user_session->sql_flags&SQLITE_CountRows);
-		assert(p->usesStmtJournal);
 		goto abort_due_to_error;
 	}
 

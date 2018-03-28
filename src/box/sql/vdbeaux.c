@@ -2148,7 +2148,6 @@ sqlite3VdbeMakeReady(Vdbe * p,	/* The VDBE */
 	assert(EIGHT_BYTE_ALIGNMENT(&x.pSpace[x.nFree]));
 
 	resolveP2Values(p, &nArg);
-	p->usesStmtJournal = (u8) (pParse->isMultiWrite && pParse->mayAbort);
 	if (pParse->explain && nMem < 10) {
 		nMem = 10;
 	}

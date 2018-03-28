@@ -418,9 +418,6 @@ struct Vdbe {
 	i64 startTime;		/* Time when query started - used for profiling */
 #endif
 	int nOp;		/* Number of instructions in the program */
-#ifdef SQLITE_DEBUG
-	int rcApp;		/* errcode set by sqlite3_result_error_code() */
-#endif
 	u16 nResColumn;		/* Number of columns in one row of the result set */
 	u8 errorAction;		/* Recovery action to do in case of an error */
 	bft expired:1;		/* True if the VM needs to be recompiled */
@@ -428,7 +425,6 @@ struct Vdbe {
 	bft explain:2;		/* True if EXPLAIN present on SQL command */
 	bft changeCntOn:1;	/* True to update the change-counter */
 	bft runOnlyOnce:1;	/* Automatically expire on reset */
-	bft usesStmtJournal:1;	/* True if uses a statement journal */
 	bft isPrepareV2:1;	/* True if prepared with prepare_v2() */
 	u32 aCounter[5];	/* Counters used by sqlite3_stmt_status() */
 	char *zSql;		/* Text of the SQL statement that generated this */

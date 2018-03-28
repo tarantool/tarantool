@@ -105,10 +105,6 @@ sqlite3FinishCoding(Parse * pParse)
 
 				if (db->init.busy == 0)
 					sqlite3VdbeChangeP5(v, 1);
-
-				VdbeComment((v, "usesStmtJournal=%d",
-					     pParse->mayAbort
-					     && pParse->isMultiWrite));
 			}
 
 			/* Code constant expressions that where factored out of inner loops */

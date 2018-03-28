@@ -405,42 +405,56 @@ struct sqlite3_vfs {
 #define SQLITE_LIMIT_TRIGGER_DEPTH             9
 #define SQLITE_LIMIT_WORKER_THREADS           10
 
-#define SQLITE_OK           0	/* Successful result */
-/* beginning-of-error-codes */
-#define SQLITE_ERROR        1	/* SQL error or missing database */
-#define SQLITE_INTERNAL     2	/* Internal logic error in SQLite */
-#define SQLITE_PERM         3	/* Access permission denied */
-#define SQLITE_ABORT        4	/* Callback routine requested an abort */
-#define SQLITE_BUSY         5	/* The database file is locked */
-#define SQLITE_LOCKED       6	/* A table in the database is locked */
-#define SQLITE_NOMEM        7	/* A malloc() failed */
-#define SQLITE_READONLY     8	/* Attempt to write a readonly database */
-#define SQLITE_INTERRUPT    9	/* Operation terminated by sqlite3_interrupt() */
-#define SQLITE_IOERR       10	/* Some kind of disk I/O error occurred */
-#define SQLITE_CORRUPT     11	/* The database disk image is malformed */
-#define SQLITE_NOTFOUND    12	/* Unknown opcode in sqlite3_file_control() */
-#define SQLITE_FULL        13	/* Insertion failed because database is full */
-#define SQLITE_CANTOPEN    14	/* Unable to open the database file */
-#define SQLITE_PROTOCOL    15	/* Database lock protocol error */
-#define SQLITE_EMPTY       16	/* Database is empty */
-#define SQLITE_SCHEMA      17	/* The database schema changed */
-#define SQLITE_TOOBIG      18	/* String or BLOB exceeds size limit */
-#define SQLITE_CONSTRAINT  19	/* Abort due to constraint violation */
-#define SQLITE_MISMATCH    20	/* Data type mismatch */
-#define SQLITE_MISUSE      21	/* Library used incorrectly */
-#define SQLITE_NOLFS       22	/* Uses OS features not supported on host */
-#define SQLITE_FORMAT      23	/* Auxiliary database format error */
-#define SQLITE_RANGE       24	/* 2nd parameter to sqlite3_bind out of range */
-#define SQLITE_NOTADB      25	/* File opened that is not a database file */
-#define SQL_TARANTOOL_ITERATOR_FAIL 26
-#define SQL_TARANTOOL_INSERT_FAIL   27
-#define SQL_TARANTOOL_DELETE_FAIL   28
-#define SQL_TARANTOOL_ERROR         29
-#define SQLITE_NOTICE      31	/* Notifications from sqlite3_log() */
-#define SQLITE_WARNING     32	/* Warnings from sqlite3_log() */
-#define SQLITE_ROW         100	/* sqlite3_step() has another row ready */
-#define SQLITE_DONE        101	/* sqlite3_step() has finished executing */
-/* end-of-error-codes */
+enum sql_ret_code {
+	/** Result of a routine is ok. */
+	SQLITE_OK = 0,
+	/** Common error code. */
+	SQLITE_ERROR,
+	/** Access permission denied. */
+	SQLITE_PERM,
+	/** Callback routine requested an abort. */
+	SQLITE_ABORT,
+	/** The database file is locked. */
+	SQLITE_BUSY,
+	/** A table in the database is locked. */
+	SQLITE_LOCKED,
+	/** A malloc() failed. */
+	SQLITE_NOMEM,
+	/** Operation terminated by sqlite3_interrupt(). */
+	SQLITE_INTERRUPT,
+	/** Some kind of disk I/O error occurred. */
+	SQLITE_IOERR,
+	/** The database disk image is malformed. */
+	SQLITE_CORRUPT,
+	/** Unknown opcode in sqlite3_file_control(). */
+	SQLITE_NOTFOUND,
+	/** Insertion failed because database is full. */
+	SQLITE_FULL,
+	/** Unable to open the database file. */
+	SQLITE_CANTOPEN,
+	/** The database schema changed. */
+	SQLITE_SCHEMA,
+	/** String or BLOB exceeds size limit. */
+	SQLITE_TOOBIG,
+	/** Abort due to constraint violation. */
+	SQLITE_CONSTRAINT,
+	/** Data type mismatch. */
+	SQLITE_MISMATCH,
+	/** Library used incorrectly. */
+	SQLITE_MISUSE,
+	/** 2nd parameter to sqlite3_bind out of range. */
+	SQLITE_RANGE,
+	SQL_TARANTOOL_ITERATOR_FAIL,
+	SQL_TARANTOOL_INSERT_FAIL,
+	SQL_TARANTOOL_DELETE_FAIL,
+	SQL_TARANTOOL_ERROR,
+	/** Warnings from sqlite3_log(). */
+	SQLITE_WARNING,
+	/** sqlite3_step() has another row ready. */
+	SQLITE_ROW,
+	/** sqlite3_step() has finished executing. */
+	SQLITE_DONE,
+};
 
 void *
 sqlite3_malloc(int);

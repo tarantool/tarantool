@@ -1011,10 +1011,6 @@ findInodeInfo(unixFile * pFile,	/* Unix file with file desc used in the key */
 	rc = osFstat(fd, &statbuf);
 	if (rc != 0) {
 		storeLastErrno(pFile, errno);
-#if defined(EOVERFLOW) && defined(SQLITE_DISABLE_LFS)
-		if (pFile->lastErrno == EOVERFLOW)
-			return SQLITE_NOLFS;
-#endif
 		return SQLITE_IOERR;
 	}
 #ifdef __APPLE__
@@ -6011,10 +6007,7 @@ proxyFileControl(sqlite3_file * id, int op, void *pArg)
 			int isProxyStyle = (pFile->pMethod == &proxyIoMethods);
 			if (pArg == NULL || (const char *)pArg == 0) {
 				if (isProxyStyle) {
-					/* turn off proxy locking - not supported. */
-					rc = SQLITE_ERROR
-					    /*SQLITE_PROTOCOL? SQLITE_MISUSE? */
-					    ;
+					rc = SQLITE_ERROR;
 				} else {
 					/* turn off proxy locking - already off - NOOP */
 					rc = SQLITE_OK;
