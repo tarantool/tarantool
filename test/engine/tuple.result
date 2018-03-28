@@ -590,6 +590,75 @@ maplen(t1map), t1map[1], t1map[2], t1map[3]
 s:drop()
 ---
 ...
+--
+-- gh-2821: tuple:tomap() names_only feature.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned' }
+---
+...
+format[2] = {name = 'field2', type = 'unsigned' }
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = s:replace{100, 200, 300 }
+---
+...
+t:tomap({names_only = false})
+---
+- 1: 100
+  2: 200
+  3: 300
+  field1: 100
+  field2: 200
+...
+t:tomap({names_only = true})
+---
+- field1: 100
+  field2: 200
+...
+t:tomap({names_only = 'text'})
+---
+- error: 'Usage: tuple:tomap(opts)'
+...
+t:tomap({names_only = true}, {dummy = true})
+---
+- error: 'Usage: tuple:tomap(opts)'
+...
+t:tomap({})
+---
+- 1: 100
+  2: 200
+  3: 300
+  field1: 100
+  field2: 200
+...
+s:drop()
+---
+...
+s = box.schema.create_space('test')
+---
+...
+pk = s:create_index('pk')
+---
+...
+t = s:replace{1,2,3,4,5,6,7}
+---
+...
+t:tomap({names_only = true})
+---
+- []
+...
+s:drop()
+---
+...
 engine = nil
 ---
 ...

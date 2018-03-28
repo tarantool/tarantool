@@ -280,8 +280,19 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
 static int
 lbox_tuple_to_map(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
-		luaL_error(L, "Usage: tuple:tomap()");
+	int argc = lua_gettop(L);
+	if (argc < 1 || argc > 2)
+		goto error;
+	bool names_only = false;
+	if (argc == 2) {
+		if (!lua_istable(L, 2))
+			goto error;
+		lua_getfield(L, 2, "names_only");
+		if (!lua_isboolean(L, -1) && !lua_isnil(L, -1))
+			goto error;
+		names_only = lua_toboolean(L, -1);
+	}
+
 	const struct tuple *tuple = lua_checktuple(L, 1);
 	const struct tuple_format *format = tuple_format(tuple);
 	const struct tuple_field *field = &format->fields[0];
@@ -295,6 +306,8 @@ lbox_tuple_to_map(struct lua_State *L)
 		lua_pushstring(L, name);
 		luamp_decode(L, luaL_msgpack_default, &pos);
 		lua_rawset(L, -3);
+		if (names_only)
+			continue;
 		/*
 		 * Access the same field by an index. There is no
 		 * copy for tables - lua optimizes it and uses
@@ -304,11 +317,16 @@ lbox_tuple_to_map(struct lua_State *L)
 		lua_rawget(L, -2);
 		lua_rawseti(L, -2, i + TUPLE_INDEX_BASE);
 	}
+	if (names_only)
+		return 1;
 	/* Access for not named fields by index. */
 	for (int i = n_named; i < field_count; ++i) {
 		luamp_decode(L, luaL_msgpack_default, &pos);
 		lua_rawseti(L, -2, i + TUPLE_INDEX_BASE);
 	}
+	return 1;
+error:
+	luaL_error(L, "Usage: tuple:tomap(opts)");
 	return 1;
 }
 
