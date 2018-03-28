@@ -377,8 +377,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				   sqlite3IndexAffinityStr(pParse->db, pPk);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, nPk, regKey,
 					  zAff, nPk);
-		sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iEph, regKey, iPk,
-				     nPk);
+		sqlite3VdbeAddOp2(v, OP_IdxInsert, iEph, regKey);
 		/* Set flag to save memory allocating one by malloc. */
 		sqlite3VdbeChangeP5(v, 1);
 	}
@@ -616,7 +615,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 
 		/* Insert the new index entries and the new record. */
-		sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx, 0, onError);
+		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0], onError);
 
 		/* Do any ON CASCADE, SET NULL or SET DEFAULT operations required to
 		 * handle rows (possibly in other tables) that refer via a foreign key

@@ -744,7 +744,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 * with the first column.
 		 */
 		for (i = 0; i < pTab->nCol; i++) {
-			int iRegStore = regTupleid + 1 + i;
+			int iRegStore = regData + i;
 			if (pColumn == 0) {
 				j = i;
 			} else {
@@ -846,28 +846,12 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		   and do the insertion.
 		 */
 		int isReplace;	/* Set to true if constraints may cause a replace */
-		int bUseSeek;	/* True to use OPFLAG_SEEKRESULT */
 		sqlite3GenerateConstraintChecks(pParse, pTab, aRegIdx, iDataCur,
 						iIdxCur, regIns, 0,
 						ipkColumn >= 0, onError,
 						endOfLoop, &isReplace, 0);
 		sqlite3FkCheck(pParse, pTab, 0, regIns, 0);
-
-		/* Set the OPFLAG_USESEEKRESULT flag if either (a) there are no REPLACE
-		 * constraints or (b) there are no triggers and this table is not a
-		 * parent table in a foreign key constraint. It is safe to set the
-		 * flag in the second case as if any REPLACE constraint is hit, an
-		 * OP_Delete or OP_IdxDelete instruction will be executed on each
-		 * cursor that is disturbed. And these instructions both clear the
-		 * VdbeCursor.seekResult variable, disabling the OPFLAG_USESEEKRESULT
-		 * functionality.
-		 */
-		bUseSeek = isReplace == 0 || (pTrigger == 0 &&
-					      ((user_session->sql_flags &
-						SQLITE_ForeignKeys) == 0 ||
-					       sqlite3FkReferences(pTab) == 0));
-		sqlite3CompleteInsertion(pParse, pTab, iIdxCur, aRegIdx,
-					 bUseSeek, onError);
+		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0], onError);
 	}
 
 	/* Update the count of rows that are inserted
@@ -1490,69 +1474,23 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	VdbeModuleComment((v, "END: GenCnstCks(%d)", seenReplace));
 }
 
-/*
- * This routine generates code to finish the INSERT or UPDATE operation
- * that was started by a prior call to sqlite3GenerateConstraintChecks.
- * A consecutive range of registers starting at regNewData contains the
- * tupleid and the content to be inserted.
- *
- * The arguments to this routine should be the same as corresponding
- * arguments to sqlite3GenerateConstraintChecks.
- */
 void
-sqlite3CompleteInsertion(Parse * pParse,	/* The parser context */
-			 Table * pTab,		/* the table into which we are inserting */
-			 int iIdxCur,		/* Primary index cursor */
-			 int *aRegIdx,		/* Register used by each index.  0 for unused indices */
-			 int useSeekResult,	/* True to set the USESEEKRESULT flag on OP_[Idx]Insert */
-			 u8 onError)
+vdbe_emit_insertion_completion(Vdbe *v, int cursor_id, int tuple_id, u8 on_error)
 {
-	Vdbe *v;		/* Prepared statements under construction */
-	Index *pIdx;		/* An index being inserted or updated */
-	u16 pik_flags;		/* flag values passed to the btree insert */
+	assert(v != NULL);
 	int opcode;
-
-	v = sqlite3GetVdbe(pParse);
-	assert(v != 0);
-	/* This table is not a VIEW */
-	assert(!space_is_view(pTab));
-	/*
-	 * The for loop which purpose in sqlite was to insert new
-	 * values to all indexes is replaced to inserting new
-	 * values only to pk in tarantool.
-	 */
-	pIdx = pTab->pIndex;
-	/* Each table have pk on top of the indexes list */
-	assert(IsPrimaryKeyIndex(pIdx));
-	/* Partial indexes should be implemented somewhere in tarantool
-	 * codebase to check it during inserting values to the pk #2626
-	 *
-	 */
-	/*if( pIdx->pPartIdxWhere ){
-	 *  sqlite3VdbeAddOp2(v, OP_IsNull, aRegIdx[i], sqlite3VdbeCurrentAddr(v)+2);
-	 *  VdbeCoverage(v);
-	 *}
-	 */
-	pik_flags = OPFLAG_NCHANGE;
-	if (useSeekResult) {
-		pik_flags |= OPFLAG_USESEEKRESULT;
-	}
-	assert(pParse->nested == 0);
-
-	if (onError == ON_CONFLICT_ACTION_REPLACE) {
+	if (on_error == ON_CONFLICT_ACTION_REPLACE)
 		opcode = OP_IdxReplace;
-	} else {
+	else
 		opcode = OP_IdxInsert;
-	}
 
-	if (onError == ON_CONFLICT_ACTION_IGNORE) {
+	u16 pik_flags = OPFLAG_NCHANGE;
+	if (on_error == ON_CONFLICT_ACTION_IGNORE)
 		pik_flags |= OPFLAG_OE_IGNORE;
-	} else if (onError == ON_CONFLICT_ACTION_FAIL) {
+	else if (on_error == ON_CONFLICT_ACTION_FAIL)
 		pik_flags |= OPFLAG_OE_FAIL;
-	}
 
-	sqlite3VdbeAddOp4Int(v, opcode, iIdxCur, aRegIdx[0],
-			     aRegIdx[0] + 1, index_column_count(pIdx));
+	sqlite3VdbeAddOp2(v, opcode, cursor_id, tuple_id);
 	sqlite3VdbeChangeP5(v, pik_flags);
 }
 
@@ -1952,7 +1890,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	}
 
 	for (pDestIdx = pDest->pIndex; pDestIdx; pDestIdx = pDestIdx->pNext) {
-		u8 idxInsFlags = 0;
 		for (pSrcIdx = pSrc->pIndex; ALWAYS(pSrcIdx);
 		     pSrcIdx = pSrcIdx->pNext) {
 			if (xferCompatibleIndex(pDestIdx, pSrcIdx))
@@ -1969,11 +1906,9 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);
 		sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);
-		if (pDestIdx->idxType == SQLITE_IDXTYPE_PRIMARYKEY) {
-			idxInsFlags |= OPFLAG_NCHANGE;
-		}
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iDest, regData);
-		sqlite3VdbeChangeP5(v, idxInsFlags | OPFLAG_APPEND);
+		if (pDestIdx->idxType == SQLITE_IDXTYPE_PRIMARYKEY)
+			sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 		sqlite3VdbeAddOp2(v, OP_Next, iSrc, addr1 + 1);
 		VdbeCoverage(v);
 		sqlite3VdbeJumpHere(v, addr1);

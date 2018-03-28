@@ -476,7 +476,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, nPk, iKey, zAff, nPk);
 			/* Set flag to save memory allocating one by malloc. */
 			sqlite3VdbeChangeP5(v, 1);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iEphCur, iKey, iPk, nPk);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, iEphCur, iKey);
 		}
 
 		/* If this DELETE cannot use the ONEPASS strategy, this is the

@@ -4318,34 +4318,16 @@ case OP_Next:          /* jump */
 	goto check_for_interrupt;
 }
 
-/* Opcode: IdxInsert P1 P2 P3 P4 P5
+/* Opcode: IdxInsert P1 P2 * * P5
  * Synopsis: key=r[P2]
  *
- * Register P2 holds an SQL index key made using the
- * MakeRecord instructions.  This opcode writes that key
- * into the index P1.  Data for the entry is nil.
- *
- * If P4 is not zero, then it is the number of values in the unpacked
- * key of reg(P2).  In that case, P3 is the index of the first register
- * for the unpacked key.  The availability of the unpacked key can sometimes
- * be an optimization.
- *
- * If P5 has the OPFLAG_APPEND bit set, that is a hint to the b-tree layer
- * that this insert is likely to be an append.
- *
- * If P5 has the OPFLAG_NCHANGE bit set, then the change counter is
- * incremented by this instruction.  If the OPFLAG_NCHANGE bit is clear,
- * then the change counter is unchanged.
- *
- * If the OPFLAG_USESEEKRESULT flag of P5 is set, the implementation might
- * run faster by avoiding an unnecessary seek on cursor P1.  However,
- * the OPFLAG_USESEEKRESULT flag must only be set if there have been no prior
- * seeks on the cursor or if the most recent seek used a key equivalent
- * to P2.
- *
- * This instruction only works for indices.
+ * @param P1 Index of a space cursor.
+ * @param P2 Index of a register with MessagePack data to insert.
+ * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
+ *        accounts the change in a case of successful insertion in
+ *        nChange counter.
  */
-/* Opcode: IdxReplace P1 P2 P3 P4 P5
+/* Opcode: IdxReplace P1 P2 * * P5
  * Synopsis: key=r[P2]
  *
  * This opcode works exactly as IdxInsert does, but in Tarantool

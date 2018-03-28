@@ -281,8 +281,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 		sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 1,
 				  MSGPACK_SUBTYPE, zOpts, P4_DYNAMIC);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 2, iRecord);
-		sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iCursor, iRecord,
-				     iFirstCol, 7);
+		sqlite3VdbeAddOp2(v, OP_IdxInsert, iCursor, iRecord);
 		/* Do not account nested operations: the count of such
 		 * operations depends on Tarantool data dictionary internals,
 		 * such as data layout in system spaces.

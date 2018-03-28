@@ -1763,14 +1763,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 							sqlite3VdbeAddOp3
 								(v, OP_MakeRecord,
 								 r, nPk, regPk);
-							sqlite3VdbeAddOp4Int
+							sqlite3VdbeAddOp2
 								(v, OP_IdxInsert,
-								 regRowset, regPk,
-								 r, nPk);
-							if (iSet)
-								sqlite3VdbeChangeP5
-									(v,
-									 OPFLAG_USESEEKRESULT);
+								 regRowset, regPk);
 						}
 
 						/* Release the array of temp registers */

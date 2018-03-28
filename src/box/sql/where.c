@@ -844,7 +844,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	    sqlite3GenerateIndexKey(pParse, pIdx, pLevel->iTabCur, regRecord, 0,
 				    0, 0);
 	sqlite3VdbeAddOp2(v, OP_IdxInsert, pLevel->iIdxCur, regRecord);
-	sqlite3VdbeChangeP5(v, OPFLAG_USESEEKRESULT);
 	if (pPartial)
 		sqlite3VdbeResolveLabel(v, iContinue);
 	if (pTabItem->fg.viaCoroutine) {

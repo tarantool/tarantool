@@ -667,13 +667,11 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		sqlite3ExprCodeMove(pParse, regBase, regPrevKey, pSort->nOBSat);
 		sqlite3VdbeJumpHere(v, addrJmp);
 	}
-	if (pSort->sortFlags & SORTFLAG_UseSorter) {
+	if (pSort->sortFlags & SORTFLAG_UseSorter)
 		op = OP_SorterInsert;
-	} else {
+	else
 		op = OP_IdxInsert;
-	}
-	sqlite3VdbeAddOp4Int(v, op, pSort->iECursor, regRecord,
-			     regBase + nOBSat, nBase - nOBSat);
+	sqlite3VdbeAddOp2(v, op, pSort->iECursor, regRecord);
 	if (iLimit) {
 		int addr;
 		int r1 = 0;
@@ -752,7 +750,7 @@ codeDistinct(Parse * pParse,	/* Parsing and code generating context */
 	sqlite3VdbeAddOp4Int(v, OP_Found, iTab, addrRepeat, iMem, N);
 	VdbeCoverage(v);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iMem, N, r1);
-	sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iTab, r1, iMem, N);
+	sqlite3VdbeAddOp2(v, OP_IdxInsert, iTab, r1);
 	sqlite3ReleaseTempReg(pParse, r1);
 }
 
@@ -967,8 +965,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			r1 = sqlite3GetTempReg(pParse);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regResult,
 					  nResultCol, r1);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm, r1,
-					     regResult, nResultCol);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);
 			sqlite3ReleaseTempReg(pParse, r1);
 			break;
 		}
@@ -1011,8 +1008,8 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				sqlite3VdbeAddOp4Int(v, OP_Found, iParm + 1,
 						     addr, r1, 0);
 				VdbeCoverage(v);
-				sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm + 1,
-						     r1, regResult, nResultCol);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm + 1,
+						  r1);
 				assert(pSort == 0);
 			}
 #endif
@@ -1068,8 +1065,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				sqlite3ExprCacheAffinityChange(pParse,
 							       regResult,
 							       nResultCol);
-				sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm, r1,
-						     regResult, nResultCol);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);
 				sqlite3ReleaseTempReg(pParse, r1);
 			}
 			break;
@@ -1155,7 +1151,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			if (eDest == SRT_DistQueue) {
 				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm + 1,
 						  r3);
-				sqlite3VdbeChangeP5(v, OPFLAG_USESEEKRESULT);
 			}
 			for (i = 0; i < nKey; i++) {
 				sqlite3VdbeAddOp2(v, OP_SCopy,
@@ -1165,8 +1160,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			}
 			sqlite3VdbeAddOp2(v, OP_Sequence, iParm, r2 + nKey);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, r2, nKey + 2, r1);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm, r1, r2,
-					     nKey + 2);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);
 			if (addrTest)
 				sqlite3VdbeJumpHere(v, addrTest);
 			sqlite3ReleaseTempReg(pParse, r1);
@@ -1518,8 +1512,7 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, regRow, nColumn,
 					  regTupleid, pDest->zAffSdst, nColumn);
 			sqlite3ExprCacheAffinityChange(pParse, regRow, nColumn);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, iParm, regTupleid,
-					     regRow, nColumn);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regTupleid);
 			break;
 		}
 	case SRT_Mem:{
@@ -2982,8 +2975,7 @@ generateOutputSubroutine(Parse * pParse,	/* Parsing context */
 					  pIn->nSdst);
 			sqlite3ExprCacheAffinityChange(pParse, pIn->iSdst,
 						       pIn->nSdst);
-			sqlite3VdbeAddOp4Int(v, OP_IdxInsert, pDest->iSDParm,
-					     r1, pIn->iSdst, pIn->nSdst);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, pDest->iSDParm, r1);
 			sqlite3ReleaseTempReg(pParse, r1);
 			break;
 		}
