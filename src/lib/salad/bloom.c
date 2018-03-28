@@ -30,8 +30,10 @@
  */
 
 #include "bloom.h"
-#include <unistd.h>
-#include <sys/mman.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <math.h>
 #include <assert.h>
@@ -42,41 +44,30 @@ bloom_create(struct bloom *bloom, uint32_t number_of_values,
 	     double false_positive_rate, struct quota *quota)
 {
 	/* Optimal hash_count and bit count calculation */
-	bloom->hash_count = (uint32_t)
-		(log(false_positive_rate) / log(0.5) + 0.99);
-	/* Number of bits */
-	uint64_t m = (uint64_t)
-		(number_of_values * bloom->hash_count / log(2) + 0.5);
-	/* mmap page size */
-	uint64_t page_size = sysconf(_SC_PAGE_SIZE);
-	/* Number of bits in one page */
-	uint64_t b = page_size * CHAR_BIT;
-	/* number of pages, round up */
-	uint64_t p = (uint32_t)((m + b - 1) / b);
-	/* bit array size in bytes */
-	size_t mmap_size = p * page_size;
-	bloom->table_size = p * page_size / sizeof(struct bloom_block);
-	if (quota_use(quota, mmap_size) < 0) {
-		bloom->table = NULL;
+	uint16_t hash_count = ceil(log(false_positive_rate) / log(0.5));
+	uint64_t bit_count = ceil(number_of_values * hash_count / log(2));
+	uint32_t block_bits = CHAR_BIT * sizeof(struct bloom_block);
+	uint32_t block_count = (bit_count + block_bits - 1) / block_bits;
+
+	if (quota_use(quota, block_count * sizeof(*bloom->table)) < 0)
+		return -1;
+
+	bloom->table = calloc(block_count, sizeof(*bloom->table));
+	if (bloom->table == NULL) {
+		quota_release(quota, block_count * sizeof(*bloom->table));
 		return -1;
 	}
-	bloom->table = (struct bloom_block *)
-		mmap(NULL, mmap_size, PROT_READ | PROT_WRITE,
-		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (bloom->table == MAP_FAILED) {
-		bloom->table = NULL;
-		quota_release(quota, mmap_size);
-		return -1;
-	}
+
+	bloom->table_size = block_count;
+	bloom->hash_count = hash_count;
 	return 0;
 }
 
 void
 bloom_destroy(struct bloom *bloom, struct quota *quota)
 {
-	size_t mmap_size = bloom->table_size * sizeof(struct bloom_block);
-	munmap(bloom->table, mmap_size);
-	quota_release(quota, mmap_size);
+	quota_release(quota, bloom->table_size * sizeof(*bloom->table));
+	free(bloom->table);
 }
 
 size_t
@@ -96,20 +87,17 @@ bloom_store(const struct bloom *bloom, char *table)
 int
 bloom_load_table(struct bloom *bloom, const char *table, struct quota *quota)
 {
-	size_t mmap_size = bloom->table_size * sizeof(struct bloom_block);
-	if (quota_use(quota, mmap_size) < 0) {
+	size_t size = bloom->table_size * sizeof(struct bloom_block);
+	if (quota_use(quota, size) < 0) {
 		bloom->table = NULL;
 		return -1;
 	}
-	bloom->table = (struct bloom_block *)
-		mmap(NULL, mmap_size, PROT_READ | PROT_WRITE,
-		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (bloom->table == MAP_FAILED) {
-		bloom->table = NULL;
-		quota_release(quota, mmap_size);
+	bloom->table = malloc(size);
+	if (bloom->table == NULL) {
+		quota_release(quota, size);
 		return -1;
 	}
-	memcpy(bloom->table, table, mmap_size);
+	memcpy(bloom->table, table, size);
 	return 0;
 }
 

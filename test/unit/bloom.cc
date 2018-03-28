@@ -7,7 +7,7 @@ using namespace std;
 
 uint32_t h(uint32_t i)
 {
-	return i;
+	return i * 2654435761;
 }
 
 void
@@ -44,8 +44,7 @@ simple_test()
 			bloom_destroy(&bloom, &q);
 		}
 		double fp_rate = (double)false_positive / tests;
-		double excess = fp_rate / p;
-		if (fp_rate > p)
+		if (fp_rate > p + 0.001)
 			fp_rate_too_big++;
 	}
 	cout << "error_count = " << error_count << endl;
@@ -95,7 +94,7 @@ store_load_test()
 		}
 		double fp_rate = (double)false_positive / tests;
 		double excess = fp_rate / p;
-		if (fp_rate > p)
+		if (fp_rate > p + 0.001)
 			fp_rate_too_big++;
 	}
 	cout << "error_count = " << error_count << endl;

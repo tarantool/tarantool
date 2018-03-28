@@ -9,10 +9,10 @@ fp_rate_too_big = 0
 memory after destruction = 0
 
 *** spectrum_test ***
-bloom table size = 128
+bloom table size = 79
 error_count = 0
 fpr_rate_is_good = 1
-bloom table size = 128
+bloom table size = 106
 error_count = 0
 fpr_rate_is_good = 1
 memory after destruction = 0
