@@ -295,8 +295,10 @@ enum vy_run_info_key {
 	VY_RUN_INFO_MAX_LSN = 4,
 	/** Number of pages in the run. */
 	VY_RUN_INFO_PAGE_COUNT = 5,
+	/** Legacy bloom filter implementation. */
+	VY_RUN_INFO_BLOOM_LEGACY = 6,
 	/** Bloom filter for keys. */
-	VY_RUN_INFO_BLOOM = 6,
+	VY_RUN_INFO_BLOOM = 7,
 	/** The last key in this enum + 1 */
 	VY_RUN_INFO_KEY_MAX
 };

@@ -44,7 +44,6 @@
 #include "xlog.h"
 
 #include "small/mempool.h"
-#include "salad/bloom.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -83,10 +82,8 @@ struct vy_run_info {
 	int64_t max_lsn;
 	/** Number of pages in the run. */
 	uint32_t page_count;
-	/** Set iff bloom filter is available. */
-	bool has_bloom;
 	/** Bloom filter of all tuples in run */
-	struct bloom bloom;
+	struct tuple_bloom *bloom;
 };
 
 /**
@@ -302,11 +299,11 @@ vy_run_env_destroy(struct vy_run_env *env);
 void
 vy_run_env_enable_coio(struct vy_run_env *env, int threads);
 
-static inline size_t
-vy_run_bloom_size(struct vy_run *run)
-{
-	return run->info.has_bloom ? bloom_store_size(&run->info.bloom) : 0;
-}
+/**
+ * Return the size of a run bloom filter.
+ */
+size_t
+vy_run_bloom_size(struct vy_run *run);
 
 static inline struct vy_page_info *
 vy_run_page_info(struct vy_run *run, uint32_t pos)
@@ -600,10 +597,10 @@ struct vy_run_writer {
 	uint32_t page_info_capacity;
 	/** Xlog to write data. */
 	struct xlog data_xlog;
-	/** Set iff bloom filter is available. */
-	bool has_bloom;
+	/** Bloom filter false positive rate. */
+	double bloom_fpr;
 	/** Bloom filter. */
-	struct bloom_spectrum bloom;
+	struct tuple_bloom_builder *bloom;
 	/** Buffer of a current page row offsets. */
 	struct ibuf row_index_buf;
 	/**
@@ -618,7 +615,7 @@ int
 vy_run_writer_create(struct vy_run_writer *writer, struct vy_run *run,
 		const char *dirpath, uint32_t space_id, uint32_t iid,
 		const struct key_def *cmp_def, const struct key_def *key_def,
-		uint64_t page_size, double bloom_fpr, size_t max_output_count);
+		uint64_t page_size, double bloom_fpr);
 
 /**
  * Write a specified statement into a run.

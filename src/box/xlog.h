@@ -628,15 +628,6 @@ xlog_cursor_openmem(struct xlog_cursor *cursor, const char *data, size_t size,
 		    const char *name);
 
 /**
- * Reset cursor position
- * @param cursor cursor
- * @retval 0 succes
- * @retval -1 error, check diag
- */
-int
-xlog_cursor_reset(struct xlog_cursor *cursor);
-
-/**
  * Close cursor
  * @param cursor cursor
  */

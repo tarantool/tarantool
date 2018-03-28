@@ -194,7 +194,8 @@ const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
 	"min lsn",
 	"max lsn",
 	"page count",
-	"bloom filter"
+	"bloom filter legacy",
+	"bloom filter",
 };
 
 const char *vy_row_index_key_strs[VY_ROW_INDEX_KEY_MAX] = {

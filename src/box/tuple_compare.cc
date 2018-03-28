@@ -426,6 +426,30 @@ tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
 	}
 }
 
+uint32_t
+tuple_common_key_parts(const struct tuple *tuple_a,
+		       const struct tuple *tuple_b,
+		       const struct key_def *key_def)
+{
+	uint32_t i;
+	for (i = 0; i < key_def->part_count; i++) {
+		const struct key_part *part = &key_def->parts[i];
+		const char *field_a = tuple_field(tuple_a, part->fieldno);
+		const char *field_b = tuple_field(tuple_b, part->fieldno);
+		enum mp_type a_type = field_a != NULL ?
+				      mp_typeof(*field_a) : MP_NIL;
+		enum mp_type b_type = field_b != NULL ?
+				      mp_typeof(*field_b) : MP_NIL;
+		if (a_type == MP_NIL && b_type == MP_NIL)
+			continue;
+		if (a_type == MP_NIL || b_type == MP_NIL ||
+		    tuple_compare_field_with_hint(field_a, a_type,
+				field_b, b_type, part->type, part->coll) != 0)
+			break;
+	}
+	return i;
+}
+
 template<bool is_nullable, bool has_optional_parts>
 static inline int
 tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
