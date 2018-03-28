@@ -84,10 +84,9 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 		goto exit_rename_table;
 	assert(pSrc->nSrc == 1);
 
-	pTab = sqlite3LocateTableItem(pParse, 0, &pSrc->a[0]);
-	if (!pTab)
+	pTab = sqlite3LocateTable(pParse, 0, pSrc->a[0].zName);
+	if (pTab == NULL)
 		goto exit_rename_table;
-	assert(sqlite3SchemaToIndex(pParse->db, pTab->pSchema) == 0);
 
 	user_session->sql_flags |= SQLITE_PreferBuiltin;
 
@@ -99,7 +98,7 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	/* Check that a table named 'zName' does not already exist
 	 * in database. If so, this is an error.
 	 */
-	if (sqlite3FindTable(db, zName)) {
+	if (sqlite3HashFind(&db->pSchema->tblHash, zName) != NULL) {
 		sqlite3ErrorMsg(pParse,
 				"there is already another table or index with this name: %s",
 				zName);
@@ -122,7 +121,7 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 	if (v == 0) {
 		goto exit_rename_table;
 	}
-	sqlite3BeginWriteOperation(pParse, false);
+	sql_set_multi_write(pParse, false);
 
 	/* Drop and reload the internal table schema. */
 	reloadTableSchema(pParse, pTab, zName);
@@ -163,7 +162,7 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	zTab = &pNew->zName[16];	/* Skip the "sqlite_altertab_" prefix on the name */
 	pCol = &pNew->aCol[pNew->nCol - 1];
 	pDflt = pCol->pDflt;
-	pTab = sqlite3FindTable(db, zTab);
+	pTab = sqlite3HashFind(&db->pSchema->tblHash, zTab);;
 	assert(pTab);
 
 	/* If the default value for the new column was specified with a
@@ -257,8 +256,8 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	assert(pParse->pNewTable == 0);
 	if (db->mallocFailed)
 		goto exit_begin_add_column;
-	pTab = sqlite3LocateTableItem(pParse, 0, &pSrc->a[0]);
-	if (!pTab)
+	pTab = sqlite3LocateTable(pParse, 0, pSrc->a[0].zName);
+	if (pTab == NULL)
 		goto exit_begin_add_column;
 
 	/* Make sure this is not an attempt to ALTER a view. */
@@ -305,7 +304,7 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	pNew->nTabRef = 1;
 
 	/* Begin a transaction and increment the schema cookie.  */
-	sqlite3BeginWriteOperation(pParse, 0);
+	sql_set_multi_write(pParse, false);
 	v = sqlite3GetVdbe(pParse);
 	if (!v)
 		goto exit_begin_add_column;

@@ -86,26 +86,14 @@ sqlite3FinishCoding(Parse * pParse)
 	       || sqlite3VdbeAssertMayAbort(v, pParse->mayAbort));
 	if (v) {
 		sqlite3VdbeAddOp0(v, OP_Halt);
-
-		/* The cookie mask contains one bit for each database file open.
-		 * (Bit 0 is for main, bit 1 is for temp, and so forth.)  Bits are
-		 * set for each database that is used.  Generate code to start a
-		 * transaction on each used database and to verify the schema cookie
-		 * on each used database.
-		 */
-		if (db->mallocFailed == 0
-		    && (DbMaskNonZero(pParse->cookieMask) || pParse->pConstExpr)
-		    ) {
+		if (db->mallocFailed == 0 || pParse->pConstExpr) {
 			int i;
 			assert(sqlite3VdbeGetOp(v, 0)->opcode == OP_Init);
 			sqlite3VdbeJumpHere(v, 0);
-			if (DbMaskTest(pParse->cookieMask, 0) != 0) {
-				if (pParse->initiateTTrans)
-					sqlite3VdbeAddOp0(v, OP_TTransaction);
-
-				if (db->init.busy == 0)
-					sqlite3VdbeChangeP5(v, 1);
-			}
+			if (pParse->initiateTTrans)
+				sqlite3VdbeAddOp0(v, OP_TTransaction);
+			if (db->init.busy == 0)
+				sqlite3VdbeChangeP5(v, 1);
 
 			/* Code constant expressions that where factored out of inner loops */
 			if (pParse->pConstExpr) {
@@ -181,30 +169,8 @@ sqlite3NestedParse(Parse * pParse, const char *zFormat, ...)
 
 /*
  * Locate the in-memory structure that describes a particular database
- * table given the name of that table and (optionally) the name of the
- * database containing the table.  Return NULL if not found.
- *
- * If zDatabase is 0, all databases are searched for the table and the
- * first matching table is returned.  (No checking for duplicate table
- * names is done.)  The search order is TEMP first, then MAIN, then any
- * auxiliary databases added using the ATTACH command.
- *
- * See also sqlite3LocateTable().
- */
-Table *
-sqlite3FindTable(sqlite3 * db, const char *zName)
-{
-	return sqlite3HashFind(&db->pSchema->tblHash, zName);
-}
-
-/*
- * Locate the in-memory structure that describes a particular database
  * table given the name of that table. Return NULL if not found.
  * Also leave an error message in pParse->zErrMsg.
- *
- * The difference between this routine and sqlite3FindTable() is that this
- * routine leaves an error message in pParse->zErrMsg where
- * sqlite3FindTable() does not.
  */
 Table *
 sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
@@ -216,8 +182,8 @@ sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
 
 	assert(pParse->db->pSchema != NULL);
 
-	p = sqlite3FindTable(pParse->db, zName);
-	if (p == 0) {
+	p = sqlite3HashFind(&pParse->db->pSchema->tblHash, zName);
+	if (p == NULL) {
 		const char *zMsg =
 		    flags & LOCATE_VIEW ? "no such view" : "no such table";
 		if ((flags & LOCATE_NOERR) == 0) {
@@ -229,48 +195,18 @@ sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
 	return p;
 }
 
-/*
- * Locate the table identified by *p.
- *
- * This is a wrapper around sqlite3LocateTable(). The difference between
- * sqlite3LocateTable() and this function is that this function restricts
- * the search to schema (p->pSchema) if it is not NULL. p->pSchema may be
- * non-NULL if it is part of a view or trigger program definition. See
- * sqlite3FixSrcList() for details.
- */
-Table *
-sqlite3LocateTableItem(Parse * pParse, u32 flags, struct SrcList_item * p)
-{
-	return sqlite3LocateTable(pParse, flags, p->zName);
-}
-
-/*
- * Locate the in-memory structure that describes
- * a particular index given the name of that index
- * and the name of the database that contains the index.
- * Return NULL if not found.
- */
-Index *
-sqlite3FindIndex(MAYBE_UNUSED sqlite3 * db, const char *zName, Table * pTab)
-{
-	assert(pTab);
-
-	return sqlite3HashFind(&pTab->idxHash, zName);
-}
-
 Index *
 sqlite3LocateIndex(sqlite3 * db, const char *zName, const char *zTable)
 {
 	assert(zName);
 	assert(zTable);
 
-	Table *pTab = sqlite3FindTable(db, zTable);
+	Table *pTab = sqlite3HashFind(&db->pSchema->tblHash, zTable);
 
-	if (pTab == 0) {
-		return 0;
-	}
+	if (pTab == NULL)
+		return NULL;
 
-	return sqlite3FindIndex(db, zName, pTab);
+	return sqlite3HashFind(&pTab->idxHash, zName);
 }
 
 /*
@@ -554,18 +490,6 @@ sqlite3PrimaryKeyIndex(Table * pTab)
 }
 
 /*
- * Return the column of index pIdx that corresponds to table
- * column iCol.  Return -1 if not found.
- */
-i16
-sqlite3ColumnOfIndex(Index * pIdx, i16 iCol)
-{
-	/* TARANTOOL: Data layout is the same in every index.  */
-	(void) pIdx;
-	return iCol;
-}
-
-/*
  * Begin constructing a new table representation in memory.  This is
  * the first of several action routines that get called in response
  * to a CREATE TABLE statement.  In particular, this routine is called
@@ -610,15 +534,14 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 		return;
 
 	assert(db->pSchema != NULL);
-	pTable = sqlite3FindTable(db, zName);
-	if (pTable) {
+	pTable = sqlite3HashFind(&db->pSchema->tblHash, zName);
+	if (pTable != NULL) {
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse,
 					"table %s already exists",
 					zName);
 		} else {
 			assert(!db->init.busy || CORRUPT_DB);
-			sqlite3CodeVerifySchema(pParse);
 		}
 		goto begin_table_error;
 	}
@@ -650,7 +573,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	 * now.
 	 */
 	if (!db->init.busy && (v = sqlite3GetVdbe(pParse)) != 0)
-		sqlite3BeginWriteOperation(pParse, 1);
+		sql_set_multi_write(pParse, true);
 
 	/* Normal (non-error) return. */
 	return;
@@ -2035,7 +1958,6 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 	p = pParse->pNewTable;
 	if (p == 0 || pParse->nErr)
 		goto create_view_fail;
-	sqlite3SchemaToIndex(db, p->pSchema);
 	sqlite3FixInit(&sFix, pParse, "view", pName);
 	if (sqlite3FixSelect(&sFix, pSelect))
 		goto create_view_fail;
@@ -2202,26 +2124,22 @@ sqliteViewResetAll(sqlite3 * db)
 #define sqliteViewResetAll(A,B)
 #endif				/* SQLITE_OMIT_VIEW */
 
-/*
- * Remove entries from the sqlite_statN tables (for N in (1,2,3))
- * after a DROP INDEX or DROP TABLE command.
+/**
+ * Remove entries from the _sql_stat1 and _sql_stat4
+ * system spaces after a DROP INDEX or DROP TABLE command.
+ *
+ * @param pParse Parsing context.
+ * @param zType Type of entry to be deleted:
+ * 		'idx' or 'tbl' string literal.
+ * @param zName Name of index or table.
  */
 static void
-sqlite3ClearStatTables(Parse * pParse,	/* The parsing context */
-		       const char *zType,	/* "idx" or "tbl" */
-		       const char *zName	/* Name of index or table */
-    )
+sql_clear_stat_spaces(Parse * pParse, const char *zType, const char *zName)
 {
-	int i;
-	for (i = 1; i <= 4; i++) {
-		char zTab[24];
-		sqlite3_snprintf(sizeof(zTab), zTab, "_sql_stat%d", i);
-		if (sqlite3FindTable(pParse->db, zTab)) {
-			sqlite3NestedParse(pParse,
-					   "DELETE FROM \"%s\" WHERE \"%s\"=%Q",
-					   zTab, zType, zName);
-		}
-	}
+	sqlite3NestedParse(pParse, "DELETE FROM \"_sql_stat1\" WHERE \"%s\"=%Q",
+			   zType, zName);
+	sqlite3NestedParse(pParse, "DELETE FROM \"_sql_stat4\" WHERE \"%s\"=%Q",
+			   zType, zName);
 }
 
 /*
@@ -2236,7 +2154,6 @@ sqlite3CodeDropTable(Parse * pParse, Table * pTab, int isView)
 
 	v = sqlite3GetVdbe(pParse);
 	assert(v != 0);
-	sqlite3BeginWriteOperation(pParse, 1);
 	/*
 	 * Drop all triggers associated with the table being
 	 * dropped. Code is generated to remove entries from
@@ -2372,15 +2289,12 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	if (noErr)
 		db->suppressErr++;
 	assert(isView == 0 || isView == LOCATE_VIEW);
-	pTab = sqlite3LocateTableItem(pParse, isView, &pName->a[0]);
+	pTab = sqlite3LocateTable(pParse, isView, pName->a[0].zName);
 	if (noErr)
 		db->suppressErr--;
 
-	if (pTab == 0) {
-		if (noErr)
-			sqlite3CodeVerifySchema(pParse);
+	if (pTab == NULL)
 		goto exit_drop_table;
-	}
 #ifndef SQLITE_OMIT_VIEW
 	/* Ensure DROP TABLE is not used on a view, and DROP VIEW is not used
 	 * on a table.
@@ -2410,8 +2324,7 @@ sqlite3DropTable(Parse * pParse, SrcList * pName, int isView, int noErr)
 	 *    space_id from _space.
 	 */
 
-	sqlite3BeginWriteOperation(pParse, 1);
-	sqlite3ClearStatTables(pParse, "tbl", pTab->zName);
+	sql_clear_stat_spaces(pParse, "tbl", pTab->zName);
 	sqlite3FkDropTable(pParse, pName, pTab);
 	sqlite3CodeDropTable(pParse, pTab, isView);
 
@@ -2876,7 +2789,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			 */
 			assert(0);
 		}
-		pTab = sqlite3LocateTableItem(pParse, 0, &pTblName->a[0]);
+		pTab = sqlite3LocateTable(pParse, 0, pTblName->a[0].zName);
 		assert(db->mallocFailed == 0 || pTab == 0);
 		if (pTab == 0)
 			goto exit_create_index;
@@ -2916,21 +2829,21 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			goto exit_create_index;
 		assert(pName->z != 0);
 		if (!db->init.busy) {
-			if (sqlite3FindTable(db, zName) != 0) {
+			if (sqlite3HashFind(&db->pSchema->tblHash, zName) !=
+			    NULL) {
 				sqlite3ErrorMsg(pParse,
 						"there is already a table named %s",
 						zName);
 				goto exit_create_index;
 			}
 		}
-		if (sqlite3FindIndex(db, zName, pTab) != 0) {
+		if (sqlite3HashFind(&pTab->idxHash, zName) != NULL) {
 			if (!ifNotExist) {
 				sqlite3ErrorMsg(pParse,
 						"index %s.%s already exists",
 						pTab->zName, zName);
 			} else {
 				assert(!db->init.busy);
-				sqlite3CodeVerifySchema(pParse);
 			}
 			goto exit_create_index;
 		}
@@ -3075,9 +2988,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	if (pParse->pNewTable == 0)
 		estimateIndexWidth(pIndex);
 
-	assert(pTab->iPKey < 0
-	       || sqlite3ColumnOfIndex(pIndex, pTab->iPKey) >= 0);
-
 	if (pTab == pParse->pNewTable) {
 		/* This routine has been called to create an automatic index as a
 		 * result of a PRIMARY KEY or UNIQUE clause on a column definition, or
@@ -3186,7 +3096,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		if (v == 0)
 			goto exit_create_index;
 
-		sqlite3BeginWriteOperation(pParse, 1);
+		sql_set_multi_write(pParse, true);
 
 
 		sqlite3VdbeAddOp2(v, OP_SIDtoPtr, BOX_INDEX_ID,
@@ -3382,8 +3292,6 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 		if (!ifExists) {
 			sqlite3ErrorMsg(pParse, "no such index: %s.%S",
 					zTableName, pName, 0);
-		} else {
-			sqlite3CodeVerifySchema(pParse);
 		}
 		pParse->checkSchema = 1;
 		goto exit_drop_index;
@@ -3412,7 +3320,7 @@ sqlite3DropIndex(Parse * pParse, SrcList * pName, Token * pName2, int ifExists)
 	 * But firstly, delete statistics since schema
 	 * changes after DDL.
 	 */
-	sqlite3ClearStatTables(pParse, "idx", pIndex->zName);
+	sql_clear_stat_spaces(pParse, "idx", pIndex->zName);
 	int record_reg = ++pParse->nMem;
 	int space_id_reg = ++pParse->nMem;
 	sqlite3VdbeAddOp2(v, OP_Integer, SQLITE_PAGENO_TO_SPACEID(pIndex->tnum),
@@ -3929,56 +3837,15 @@ sqlite3Savepoint(Parse * pParse, int op, Token * pName)
 	}
 }
 
-/*
- * Record the fact that the schema cookie will need to be verified
- * for database.  The code to actually verify the schema cookie
- * will occur at the end of the top-level VDBE and will be generated
- * later, by sqlite3FinishCoding().
+/**
+ * Set flag in parse context, which indicates that during query
+ * execution multiple insertion/updates may occur.
  */
 void
-sqlite3CodeVerifySchema(Parse * pParse)
+sql_set_multi_write(struct Parse *parse_context, bool is_set)
 {
-	Parse *pToplevel = sqlite3ParseToplevel(pParse);
-
-	if (DbMaskTest(pToplevel->cookieMask, 0) == 0) {
-		DbMaskSet(pToplevel->cookieMask, 0);
-	}
-}
-
-/*
- * Generate VDBE code that prepares for doing an operation that
- * might change the database.
- *
- * This routine starts a new transaction if we are not already within
- * a transaction.  If we are already within a transaction, then a checkpoint
- * is set if the setStatement parameter is true.  A checkpoint should
- * be set for operations that might fail (due to a constraint) part of
- * the way through and which will need to undo some writes without having to
- * rollback the whole transaction.  For operations where all constraints
- * can be checked before any changes are made to the database, it is never
- * necessary to undo a write and the checkpoint should not be set.
- */
-void
-sqlite3BeginWriteOperation(Parse * pParse, int setStatement)
-{
-	Parse *pToplevel = sqlite3ParseToplevel(pParse);
-	sqlite3CodeVerifySchema(pParse);
-	DbMaskSet(pToplevel->writeMask, 0);
-	pToplevel->isMultiWrite |= setStatement;
-}
-
-/*
- * Indicate that the statement currently under construction might write
- * more than one entry (example: deleting one row then inserting another,
- * inserting multiple rows in a table, or inserting a row and index entries.)
- * If an abort occurs after some of these writes have completed, then it will
- * be necessary to undo the completed writes.
- */
-void
-sqlite3MultiWrite(Parse * pParse)
-{
-	Parse *pToplevel = sqlite3ParseToplevel(pParse);
-	pToplevel->isMultiWrite = 1;
+	Parse *pToplevel = sqlite3ParseToplevel(parse_context);
+	pToplevel->isMultiWrite |= is_set;
 }
 
 /*
@@ -4095,7 +3962,7 @@ reindexTable(Parse * pParse, Table * pTab, char const *zColl)
 
 	for (pIndex = pTab->pIndex; pIndex; pIndex = pIndex->pNext) {
 		if (zColl == 0 || collationMatch(zColl, pIndex)) {
-			sqlite3BeginWriteOperation(pParse, 0);
+			sql_set_multi_write(pParse, false);
 			sqlite3RefillIndex(pParse, pIndex, -1);
 		}
 	}
@@ -4170,8 +4037,8 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 	z = sqlite3NameFromToken(db, pName1);
 	if (z == 0)
 		return;
-	pTab = sqlite3FindTable(db, z);
-	if (pTab) {
+	pTab = sqlite3HashFind(&db->pSchema->tblHash, z);
+	if (pTab != NULL) {
 		reindexTable(pParse, pTab, 0);
 		sqlite3DbFree(db, z);
 		return;
@@ -4180,16 +4047,15 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 		zTable = sqlite3NameFromToken(db, pName2);
 	}
 
-	pTab = sqlite3FindTable(db, zTable);
+	pTab = sqlite3HashFind(&db->pSchema->tblHash, zTable);
 	if (pTab == 0) {
 		sqlite3ErrorMsg(pParse, "no such table: %s", zTable);
 		goto exit_reindex;
 	}
 
-	pIndex = sqlite3FindIndex(db, z, pTab);
-
-	if (pIndex) {
-		sqlite3BeginWriteOperation(pParse, 0);
+	pIndex = sqlite3HashFind(&pTab->idxHash, z);
+	if (pIndex != NULL) {
+		sql_set_multi_write(pParse, false);
 		sqlite3RefillIndex(pParse, pIndex, -1);
 		return;
 	}

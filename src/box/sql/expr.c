@@ -2455,9 +2455,6 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		assert(p->pEList->a[0].pExpr != 0);	/* Because of isCandidateForInOpt(p) */
 		assert(p->pSrc != 0);	/* Because of isCandidateForInOpt(p) */
 		pTab = p->pSrc->a[0].pTab;
-
-		sqlite3CodeVerifySchema(pParse);
-
 		assert(v);	/* sqlite3GetVdbe() has always been previously called */
 
 		Index *pIdx;	/* Iterator variable */
@@ -3584,8 +3581,7 @@ sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
 				int regOut	/* Extract the value into this register */
     )
 {
-	int x = sqlite3ColumnOfIndex(sqlite3PrimaryKeyIndex(pTab), iCol);
-	sqlite3VdbeAddOp3(v, OP_Column, iTabCur, x, regOut);
+	sqlite3VdbeAddOp3(v, OP_Column, iTabCur, iCol, regOut);
 	if (iCol >= 0) {
 		sqlite3ColumnDefault(v, pTab, iCol, regOut);
 	}
@@ -5314,8 +5310,7 @@ exprIdxCover(Walker * pWalker, Expr * pExpr)
 {
 	if (pExpr->op == TK_COLUMN
 	    && pExpr->iTable == pWalker->u.pIdxCover->iCur
-	    && sqlite3ColumnOfIndex(pWalker->u.pIdxCover->pIdx,
-				    pExpr->iColumn) < 0) {
+	    && pExpr->iColumn < 0) {
 		pWalker->eCode = 1;
 		return WRC_Abort;
 	}

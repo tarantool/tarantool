@@ -847,7 +847,7 @@ codeCursorHintCheckExpr(Walker * pWalker, Expr * pExpr)
 	assert(pHint->pIdx != 0);
 	if (pExpr->op == TK_COLUMN
 	    && pExpr->iTable == pHint->iTabCur
-	    && sqlite3ColumnOfIndex(pHint->pIdx, pExpr->iColumn) < 0) {
+	    && (pExpr->iColumn < 0)) {
 		pWalker->eCode = 1;
 	}
 	return WRC_Continue;
@@ -921,8 +921,6 @@ codeCursorHintFixExpr(Walker * pWalker, Expr * pExpr)
 			pExpr->iTable = reg;
 		} else if (pHint->pIdx != 0) {
 			pExpr->iTable = pHint->iIdxCur;
-			pExpr->iColumn =
-			    sqlite3ColumnOfIndex(pHint->pIdx, pExpr->iColumn);
 			assert(pExpr->iColumn >= 0);
 		}
 	} else if (pExpr->op == TK_AGG_FUNCTION) {
@@ -1517,8 +1515,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			int nPkCol = index_column_count(pPk);
 			int iKeyReg = sqlite3GetTempRange(pParse, nPkCol);
 			for (j = 0; j < nPkCol; j++) {
-				k = sqlite3ColumnOfIndex(pIdx,
-							 pPk->aiColumn[j]);
+				k = pPk->aiColumn[j];
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k,
 						  iKeyReg + j);
 			}

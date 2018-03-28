@@ -4615,7 +4615,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 #endif				/* SQLITE_ENABLE_COLUMN_USED_MASK */
 			}
 		}
-		sqlite3CodeVerifySchema(pParse);
 	}
 	pWInfo->iTop = sqlite3VdbeCurrentAddr(v);
 	if (db->mallocFailed)
@@ -4813,7 +4812,6 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 				if (pOp->opcode == OP_Column) {
 					int x = pOp->p2;
 					assert(pIdx->pTable == pTab);
-					x = sqlite3ColumnOfIndex(pIdx, x);
 					if (x >= 0) {
 						pOp->p2 = x;
 						pOp->p1 = pLevel->iIdxCur;

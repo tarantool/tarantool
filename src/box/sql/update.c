@@ -288,7 +288,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		goto update_cleanup;
 	if (pParse->nested == 0)
 		sqlite3VdbeCountChanges(v);
-	sqlite3BeginWriteOperation(pParse, 1);
+	sql_set_multi_write(pParse, true);
 
 	/* Allocate required registers. */
 	regOldPk = regNewPk = ++pParse->nMem;

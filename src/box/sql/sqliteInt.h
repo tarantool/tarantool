@@ -2902,25 +2902,6 @@ struct TriggerPrg {
 };
 
 /*
- * The yDbMask datatype for the bitmask of all attached databases.
- */
-#if SQLITE_MAX_ATTACHED>30
-typedef unsigned char yDbMask[(SQLITE_MAX_ATTACHED + 9) / 8];
-#define DbMaskTest(M,I)    (((M)[(I)/8]&(1<<((I)&7)))!=0)
-#define DbMaskZero(M)      memset((M),0,sizeof(M))
-#define DbMaskSet(M,I)     (M)[(I)/8]|=(1<<((I)&7))
-#define DbMaskAllZero(M)   sqlite3DbMaskAllZero(M)
-#define DbMaskNonZero(M)   (sqlite3DbMaskAllZero(M)==0)
-#else
-typedef unsigned int yDbMask;
-#define DbMaskTest(M,I)    (((M)&(((yDbMask)1)<<(I)))!=0)
-#define DbMaskZero(M)      (M)=0
-#define DbMaskSet(M,I)     (M)|=(((yDbMask)1)<<(I))
-#define DbMaskAllZero(M)   (M)==0
-#define DbMaskNonZero(M)   (M)!=0
-#endif
-
-/*
  * An SQL parser context.  A copy of this structure is passed through
  * the parser and down into all the parser action routine in order to
  * carry around information that is global to the entire parse.
@@ -2960,8 +2941,6 @@ struct Parse {
 	int *aLabel;		/* Space to hold the labels */
 	ExprList *pConstExpr;	/* Constant expressions */
 	Token constraintName;	/* Name of the constraint currently being parsed */
-	yDbMask writeMask;	/* Start a write transaction on these databases */
-	yDbMask cookieMask;	/* Bitmask of schema verified databases */
 	int regRoot;		/* Register holding root page number for new objects */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
 #ifdef SELECTTRACE_ENABLED
@@ -3562,7 +3541,6 @@ int sqlite3ColumnsFromExprList(Parse *, ExprList *, i16 *, Column **);
 void sqlite3SelectAddColumnTypeAndCollation(Parse *, Table *, Select *);
 Table *sqlite3ResultSetOfSelect(Parse *, Select *);
 Index *sqlite3PrimaryKeyIndex(Table *);
-i16 sqlite3ColumnOfIndex(Index *, i16);
 void sqlite3StartTable(Parse *, Token *, int);
 void sqlite3AddColumn(Parse *, Token *, Token *);
 void sqlite3AddNotNull(Parse *, int);
@@ -3599,9 +3577,6 @@ int sqlite3ViewGetColumnNames(Parse *, Table *);
 #define sqlite3ViewGetColumnNames(A,B) 0
 #endif
 
-#if SQLITE_MAX_ATTACHED>30
-int sqlite3DbMaskAllZero(yDbMask);
-#endif
 void sqlite3DropTable(Parse *, SrcList *, int, int);
 void sqlite3DeleteTable(sqlite3 *, Table *);
 void sqlite3Insert(Parse *, SrcList *, Select *, IdList *, int);
@@ -3681,12 +3656,9 @@ int sqlite3ExprCodeExprList(Parse *, ExprList *, int, int, u8);
 void sqlite3ExprIfTrue(Parse *, Expr *, int, int);
 void sqlite3ExprIfFalse(Parse *, Expr *, int, int);
 void sqlite3ExprIfFalseDup(Parse *, Expr *, int, int);
-Table *sqlite3FindTable(sqlite3 *, const char *);
 #define LOCATE_VIEW    0x01
 #define LOCATE_NOERR   0x02
 Table *sqlite3LocateTable(Parse *, u32 flags, const char *);
-Table *sqlite3LocateTableItem(Parse *, u32 flags, struct SrcList_item *);
-Index *sqlite3FindIndex(sqlite3 *, const char *, Table *);
 Index *sqlite3LocateIndex(sqlite3 *, const char *, const char *);
 void sqlite3UnlinkAndDeleteTable(sqlite3 *, const char *);
 void sqlite3UnlinkAndDeleteIndex(sqlite3 *, Index *);
@@ -3704,7 +3676,6 @@ void sqlite3PrngSaveState(void);
 void sqlite3PrngRestoreState(void);
 #endif
 void sqlite3RollbackAll(Vdbe *, int);
-void sqlite3CodeVerifySchema(Parse *);
 void sqlite3BeginTransaction(Parse *, int);
 void sqlite3CommitTransaction(Parse *);
 void sqlite3RollbackTransaction(Parse *);
@@ -3742,8 +3713,8 @@ vdbe_emit_insertion_completion(Vdbe *v, int cursor_id, int tuple_id,
 
 int sqlite3OpenTableAndIndices(Parse *, Table *, int, u8, int, u8 *, int *,
 			       int *, u8, u8);
-void sqlite3BeginWriteOperation(Parse *, int);
-void sqlite3MultiWrite(Parse *);
+void
+sql_set_multi_write(Parse *, bool);
 void sqlite3MayAbort(Parse *);
 void sqlite3HaltConstraint(Parse *, int, int, char *, i8, u8);
 void sqlite3UniqueConstraint(Parse *, int, Index *);
@@ -3936,8 +3907,6 @@ struct coll *sqlite3GetCollSeq(Parse *, struct coll *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 int sqlite3InvokeBusyHandler(BusyHandler *);
-int sqlite3FindDb(sqlite3 *, Token *);
-int sqlite3FindDbName(const char *);
 int sqlite3AnalysisLoad(sqlite3 *);
 void sqlite3DeleteIndexSamples(sqlite3 *, Index *);
 void sqlite3DefaultRowEst(Index *);
@@ -3949,7 +3918,6 @@ void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
 void sqlite3SchemaClear(sqlite3 *);
 Schema *sqlite3SchemaCreate(sqlite3 *);
-int sqlite3SchemaToIndex(sqlite3 * db, Schema *);
 KeyInfo *sqlite3KeyInfoAlloc(sqlite3 *, int, int);
 void sqlite3KeyInfoUnref(KeyInfo *);
 KeyInfo *sqlite3KeyInfoRef(KeyInfo *);

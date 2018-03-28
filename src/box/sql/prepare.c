@@ -204,35 +204,6 @@ sqlite3InitDatabase(sqlite3 * db)
 	return rc;
 }
 
-/*
- * Convert a schema pointer into the 0 index that indicates
- * that schema refers to a single database.
- * This method is inherited from SQLite, which has several dbs.
- * But we have only one, so it is used only in assertions.
- */
-int
-sqlite3SchemaToIndex(sqlite3 * db, Schema * pSchema)
-{
-	int i = -1000000;
-
-	/* If pSchema is NULL, then return -1000000. This happens when code in
-	 * expr.c is trying to resolve a reference to a transient table (i.e. one
-	 * created by a sub-select). In this case the return value of this
-	 * function should never be used.
-	 *
-	 * We return -1000000 instead of the more usual -1 simply because using
-	 * -1000000 as the incorrect index into db->aDb[] is much
-	 * more likely to cause a segfault than -1 (of course there are assert()
-	 * statements too, but it never hurts to play the odds).
-	 */
-	if (pSchema) {
-		if (db->pSchema == pSchema) {
-			i = 0;
-		}
-		assert(i == 0);
-	}
-	return i;
-}
 
 /*
  * Free all memory allocations in the pParse object

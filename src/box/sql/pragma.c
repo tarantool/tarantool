@@ -356,7 +356,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				Column *pCol;
 				Index *pPk = sqlite3PrimaryKeyIndex(pTab);
 				pParse->nMem = 6;
-				sqlite3CodeVerifySchema(pParse);
 				sqlite3ViewGetColumnNames(pParse, pTab);
 				for (i = 0, pCol = pTab->aCol; i < pTab->nCol;
 				     i++, pCol++) {
@@ -395,7 +394,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			Index *pIdx;
 			HashElem *i;
 			pParse->nMem = 4;
-			sqlite3CodeVerifySchema(pParse);
 			for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
 			     i = sqliteHashNext(i)) {
 				Table *pTab = sqliteHashData(i);
@@ -439,7 +437,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						pParse->nMem = 3;
 					}
 					mx = index_column_count(pIdx);
-					sqlite3CodeVerifySchema(pParse);
 					assert(pParse->nMem <=
 					       pPragma->nPragCName);
 					for (i = 0; i < mx; i++) {
@@ -479,10 +476,10 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				Index *pIdx;
 				Table *pTab;
 				int i;
-				pTab = sqlite3FindTable(db, zRight);
-				if (pTab) {
+				pTab = sqlite3HashFind(&db->pSchema->tblHash,
+						       zRight);
+				if (pTab != NULL) {
 					pParse->nMem = 5;
-					sqlite3CodeVerifySchema(pParse);
 					for (pIdx = pTab->pIndex, i = 0; pIdx;
 					     pIdx = pIdx->pNext, i++) {
 						const char *azOrigin[] =
@@ -539,13 +536,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			if (zRight) {
 				FKey *pFK;
 				Table *pTab;
-				pTab = sqlite3FindTable(db, zRight);
-				if (pTab) {
+				pTab = sqlite3HashFind(&db->pSchema->tblHash,
+						       zRight);
+				if (pTab != NULL) {
 					pFK = pTab->pFKey;
 					if (pFK) {
 						int i = 0;
 						pParse->nMem = 8;
-						sqlite3CodeVerifySchema(pParse);
 						while (pFK) {
 							int j;
 							for (j = 0;
@@ -595,7 +592,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			pParse->nMem += 4;
 			regKey = ++pParse->nMem;
 			regRow = ++pParse->nMem;
-			sqlite3CodeVerifySchema(pParse);
 			k = sqliteHashFirst(&db->pSchema->tblHash);
 			while (k) {
 				if (zRight) {
@@ -617,8 +613,9 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				for (i = 1, pFK = pTab->pFKey; pFK;
 				     i++, pFK = pFK->pNextFrom) {
 					pParent =
-					    sqlite3FindTable(db, pFK->zTo);
-					if (pParent == 0)
+						sqlite3HashFind(&db->pSchema->tblHash,
+								pFK->zTo);
+					if (pParent == NULL)
 						continue;
 					pIdx = 0;
 					x = sqlite3FkLocateIndex(pParse,
@@ -655,7 +652,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				for (i = 1, pFK = pTab->pFKey; pFK;
 				     i++, pFK = pFK->pNextFrom) {
 					pParent =
-					    sqlite3FindTable(db, pFK->zTo);
+						sqlite3HashFind(&db->pSchema->tblHash,
+								pFK->zTo);
 					pIdx = 0;
 					aiCols = 0;
 					if (pParent) {

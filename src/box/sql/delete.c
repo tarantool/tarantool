@@ -56,15 +56,13 @@ sqlite3SrcListLookup(Parse * pParse, SrcList * pSrc)
 	struct SrcList_item *pItem = pSrc->a;
 	Table *pTab;
 	assert(pItem && pSrc->nSrc == 1);
-	pTab = sqlite3LocateTableItem(pParse, 0, pItem);
+	pTab = sqlite3LocateTable(pParse, 0, pItem->zName);
 	sqlite3DeleteTable(pParse->db, pItem->pTab);
 	pItem->pTab = pTab;
-	if (pTab) {
+	if (pTab != NULL)
 		pTab->nTabRef++;
-	}
-	if (sqlite3IndexedByLookup(pParse, pItem)) {
-		pTab = 0;
-	}
+	if (sqlite3IndexedByLookup(pParse, pItem))
+		pTab = NULL;
 	return pTab;
 }
 
@@ -113,7 +111,6 @@ sqlite3MaterializeView(Parse * pParse,	/* Parsing context */
 	Select *pSel;
 	SrcList *pFrom;
 	sqlite3 *db = pParse->db;
-	assert(sqlite3SchemaToIndex(db, pView->pSchema) == 0);
 	pWhere = sqlite3ExprDup(db, pWhere, 0);
 	pFrom = sqlite3SrcListAppend(db, 0, 0);
 	if (pFrom) {
@@ -325,7 +322,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 	}
 	if (pParse->nested == 0)
 		sqlite3VdbeCountChanges(v);
-	sqlite3BeginWriteOperation(pParse, 1);
+	sql_set_multi_write(pParse, true);
 
 	/* If we are trying to delete from a view, realize that view into
 	 * an ephemeral table.

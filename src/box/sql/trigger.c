@@ -129,7 +129,6 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 					zName);
 		} else {
 			assert(!db->init.busy);
-			sqlite3CodeVerifySchema(pParse);
 		}
 		goto trigger_cleanup;
 	}
@@ -215,7 +214,6 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 	if (NEVER(pParse->nErr) || !pTrig)
 		goto triggerfinish_cleanup;
 	zName = pTrig->zName;
-	assert(sqlite3SchemaToIndex(pParse->db, pTrig->pSchema) == 0);
 	pTrig->step_list = pStepList;
 	while (pStepList) {
 		pStepList->pTrig = pTrig;
@@ -294,7 +292,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 		iFirstCol = pParse->nMem + 1;
 		pParse->nMem += 2;
 
-		sqlite3BeginWriteOperation(pParse, 0);
+		sql_set_multi_write(pParse, false);
 		sqlite3VdbeAddOp4(v,
 				  OP_String8, 0, iFirstCol, 0,
 				  zName, P4_STATIC);
@@ -527,8 +525,6 @@ sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse, "no such trigger: %S", pName,
 					0);
-		} else {
-			sqlite3CodeVerifySchema(pParse);
 		}
 		pParse->checkSchema = 1;
 		goto drop_trigger_cleanup;
@@ -673,7 +669,6 @@ targetSrcList(Parse * pParse,	/* The parsing context */
 		assert(pSrc->nSrc > 0);
 		pSrc->a[pSrc->nSrc - 1].zName =
 		    sqlite3DbStrDup(db, pStep->zTarget);
-		assert(sqlite3SchemaToIndex(db, pStep->pTrig->pSchema) == 0);
 	}
 	return pSrc;
 }

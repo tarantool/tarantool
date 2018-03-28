@@ -961,7 +961,8 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 		 * early.
 		 */
 		if (pParse->disableTriggers) {
-			pTo = sqlite3FindTable(db, pFKey->zTo);
+			pTo = sqlite3HashFind(&db->pSchema->tblHash,
+					      pFKey->zTo);
 		} else {
 			pTo = sqlite3LocateTable(pParse, 0, pFKey->zTo);
 		}
