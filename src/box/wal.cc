@@ -770,8 +770,19 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 			 * and promote vclock.
 			 */
 			if ((*last)->replica_id == instance_id) {
-				vclock_follow(&replicaset.vclock, instance_id,
-					      (*last)->lsn);
+				/*
+				 * In master-master configuration, during sudden
+				 * power-loss, if the data have not been written
+				 * to WAL but have already been sent to others,
+				 * they will send the data back. In this case
+				 * vclock has already been promoted by applier.
+				 */
+				if (vclock_get(&replicaset.vclock,
+					       instance_id) < (*last)->lsn) {
+					vclock_follow(&replicaset.vclock,
+						      instance_id,
+						      (*last)->lsn);
+				}
 				break;
 			}
 			--last;
