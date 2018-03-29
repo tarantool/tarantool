@@ -1760,7 +1760,7 @@ nb = net.new('localhost:3392', {
 ...
 nb.error;
 ---
-- Connection timed out
+- Operation timed out
 ...
 nb:close();
 ---
