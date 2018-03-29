@@ -8,6 +8,9 @@ local log = require('log')
 local errno = require('errno')
 local urilib = require('uri')
 local yaml = require('yaml')
+local net_box = require('net.box')
+
+local YAML_TERM = '\n...\n'
 
 -- admin formatter must be able to encode any Lua variable
 local formatter = yaml.new()
@@ -173,26 +176,118 @@ local function eval(line)
     return local_eval(box.session, line)
 end
 
+local text_connection_mt = {
+    __index = {
+        --
+        -- Close underlying socket.
+        --
+        close = function(self)
+            self._socket:close()
+        end,
+        --
+        -- Write a text into a socket.
+        -- @param test Text to send.
+        -- @retval not nil Bytes sent.
+        -- @retval     nil Error.
+        --
+        write = function(self, text)
+            -- It is the hack to protect from SIGPIPE, which is
+            -- not ignored under debugger (gdb, lldb) on send in
+            -- a socket, that is actually closed. If a socket is
+            -- readable and read() returns nothing then the socket
+            -- is closed, and writing into it will raise SIGPIPE.
+            if self._socket:readable(0) then
+                local rc = self._socket:read({chunk = 1})
+                if not rc or rc == '' then
+                    return nil
+                else
+                    assert(#rc == 1)
+                    -- Make the char be unread.
+                    self._socket.rbuf.wpos = self._socket.rbuf.wpos - 1
+                end
+            end
+            return self._socket:write(text)
+        end,
+        --
+        -- Read a text from a socket until YAML terminator.
+        -- @retval not nil Well formatted YAML.
+        -- @retval     nil Error.
+        --
+        read = function(self)
+            local ret = self._socket:read(YAML_TERM)
+            if ret and ret ~= '' then
+                return ret
+            end
+        end,
+        --
+        -- Write + Read.
+        --
+        eval = function(self, text)
+            text = text..'$EOF$\n'
+            if self:write(text) then
+                local rc = self:read()
+                if rc then
+                    return rc
+                end
+            end
+            error(self:set_error())
+        end,
+        --
+        -- Make the connection be in error state, set error
+        -- message.
+        -- @retval Error message.
+        --
+        set_error = function(self)
+            self.state = 'error'
+            self.error = self._socket:error()
+            if not self.error then
+                self.error = 'Peer closed'
+            end
+            return self.error
+        end,
+    }
+}
+
+--
+-- Wrap an existing socket with text Read-Write API inside a
+-- netbox-like object.
+-- @param connection Socket to wrap.
+-- @param url Parsed destination URL.
+-- @retval nil, err Error, and err contains an error message.
+-- @retval  not nil Netbox-like object.
+--
+local function wrap_text_socket(connection, url)
+    local conn = setmetatable({
+        _socket = connection,
+        state = 'active',
+        host = url.host or 'localhost',
+        port = url.service,
+    }, text_connection_mt)
+    if not conn:write('require("console").delimiter("$EOF$")\n') or
+       not conn:read() then
+        conn:set_error()
+    end
+    return conn
+end
+
 --
 -- Evaluate command on remote instance
 --
 local function remote_eval(self, line)
-    if not line or self.remote.state ~= 'active' then
-        local err = self.remote.error
-        self.remote:close()
-        self.remote = nil
-        -- restore local REPL mode
-        self.eval = nil
-        self.prompt = nil
-        self.completion = nil
-        pcall(self.on_client_disconnect, self)
-        return (err and format(false, err)) or ''
+    if line and self.remote.state == 'active' then
+        local ok, res = pcall(self.remote.eval, self.remote, line)
+        if self.remote.state == 'active' then
+            return ok and res or format(false, res)
+        end
     end
-    --
-    -- execute line
-    --
-    local ok, res = pcall(self.remote.eval, self.remote, line)
-    return ok and res or format(false, res)
+    local err = self.remote.error
+    self.remote:close()
+    self.remote = nil
+    self.eval = nil
+    self.prompt = nil
+    self.completion = nil
+    pcall(self.on_client_disconnect, self)
+    return (err and format(false, err)) or ''
 end
 
 local function local_check_lua(buf)
@@ -379,12 +474,7 @@ end
 --
 -- Connect to remove instance
 --
-local netbox_connect
 local function connect(uri, opts)
-    if not netbox_connect then -- workaround the broken loader
-        netbox_connect = require('net.box').connect
-    end
-
     opts = opts or {}
 
     local self = fiber.self().storage.console
@@ -400,18 +490,29 @@ local function connect(uri, opts)
         error('Usage: console.connect("[login:password@][host:]port")')
     end
 
-    -- connect to remote host
+    local connection, greeting =
+        net_box.establish_connection(u.host, u.service, opts.timeout)
+    if not connection then
+        log.verbose(greeting)
+        box.error(box.error.NO_CONNECTION)
+    end
     local remote
-    remote = netbox_connect(u.host, u.service, {
-        user = u.login, password = u.password,
-        console = true, connect_timeout = opts.timeout
-    })
-    remote.host, remote.port = u.host or 'localhost', u.service
-
-    -- run disconnect trigger if connection failed
-    if not remote:is_connected() then
-        pcall(self.on_client_disconnect, self)
-        error('Connection is not established: '..remote.error)
+    if greeting.protocol == 'Lua console' then
+        remote = wrap_text_socket(connection, u)
+    else
+        opts = {
+            connect_timeout = opts.timeout,
+            user = u.login,
+            password = u.password,
+        }
+        remote = net_box.wrap(connection, greeting, u.host, u.service, opts)
+        if not remote.host then
+            remote.host = 'localhost'
+        end
+        local old_eval = remote.eval
+        remote.eval = function(con, line)
+            return old_eval(con, 'return require("console").eval(...)', {line})
+        end
     end
 
     -- check connection && permissions

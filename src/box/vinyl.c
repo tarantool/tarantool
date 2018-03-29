@@ -412,7 +412,14 @@ vinyl_index_info(struct index *index, struct info_handler *h)
 	info_append_int(h, "lookup", stat->lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->get);
 	vy_info_append_stmt_counter(h, "put", &stat->put);
-	info_append_double(h, "latency", latency_get(&stat->latency));
+
+	info_table_begin(h, "latency");
+	info_append_double(h, "p50", latency_get(&stat->latency, 50));
+	info_append_double(h, "p75", latency_get(&stat->latency, 75));
+	info_append_double(h, "p90", latency_get(&stat->latency, 90));
+	info_append_double(h, "p95", latency_get(&stat->latency, 95));
+	info_append_double(h, "p99", latency_get(&stat->latency, 99));
+	info_table_end(h);
 
 	info_table_begin(h, "upsert");
 	info_append_int(h, "squashed", stat->upsert.squashed);
