@@ -8,8 +8,8 @@ net_box = require('net.box')
 errinj = box.error.injection
 
 box.schema.user.grant('guest', 'replication')
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
-test_run:cmd("start server replica")
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica_timeout.lua'")
+test_run:cmd("start server replica with args='1'")
 test_run:cmd("switch replica")
 
 test_run:cmd("switch default")
@@ -29,11 +29,9 @@ for i=1,100 do s:insert{i, 'this is test message12345'} end
 -- sleep after every tuple
 errinj.set("ERRINJ_RELAY_TIMEOUT", 1000.0)
 
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='0.01'")
 test_run:cmd("switch replica")
 
-fiber = require('fiber')
-while box.space.test:count() < 1 do fiber.sleep(0.01) end
 -- Check that replica doesn't enter read-write mode before
 -- catching up with the master: to check that we inject sleep into
 -- the master relay_send function and attempt a data modifying
@@ -46,14 +44,15 @@ while box.space.test:count() < 1 do fiber.sleep(0.01) end
 --
 box.space.test ~= nil
 d = box.space.test:delete{1}
-box.space.test:get(1) == nil
+box.space.test:get(1) ~= nil
 
 -- case #2: delete tuple by net.box
 
 test_run:cmd("switch default")
 test_run:cmd("set variable r_uri to 'replica.listen'")
 c = net_box.connect(r_uri)
-c.space.test:get(1) == nil
+d = c.space.test:delete{1}
+c.space.test:get(1) ~= nil
 
 -- check sync
 errinj.set("ERRINJ_RELAY_TIMEOUT", 0)

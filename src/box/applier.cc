@@ -305,7 +305,7 @@ applier_join(struct applier *applier)
 				 * server is 1.6. Since we have
 				 * not initialized replication
 				 * vclock yet, do it now. In 1.7+
-				 * this vlcock is not used.
+				 * this vclock is not used.
 				 */
 				xrow_decode_vclock_xc(&row, &replicaset.vclock);
 			}
@@ -370,6 +370,7 @@ applier_subscribe(struct applier *applier)
 	struct ev_io *coio = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
+	struct vclock remote_vclock_at_subscribe;
 
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
 				 &replicaset.vclock);
@@ -411,9 +412,8 @@ applier_subscribe(struct applier *applier)
 		 * In case of successful subscribe, the server
 		 * responds with its current vclock.
 		 */
-		struct vclock vclock;
-		vclock_create(&vclock);
-		xrow_decode_vclock_xc(&row, &vclock);
+		vclock_create(&remote_vclock_at_subscribe);
+		xrow_decode_vclock_xc(&row, &remote_vclock_at_subscribe);
 	}
 	/**
 	 * Tarantool < 1.6.7:
@@ -452,8 +452,15 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
+		/*
+		 * Stay 'orphan' until appliers catch up with
+		 * the remote vclock at the time of SUBSCRIBE
+		 * and the lag is less than configured.
+		 */
 		if (applier->state == APPLIER_SYNC &&
-		    applier->lag <= replication_sync_lag) {
+		    applier->lag <= replication_sync_lag &&
+		    vclock_compare(&remote_vclock_at_subscribe,
+				   &replicaset.vclock) <= 0) {
 			/* Applier is synced, switch to "follow". */
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
