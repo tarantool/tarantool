@@ -1343,15 +1343,19 @@ c.space.test:select{}
 c.space.test.index.primary.parts
 ---
 - - type: unsigned
+    is_nullable: false
     fieldno: 1
 ...
 c.space.test.index.covering.parts
 ---
 - - type: unsigned
+    is_nullable: false
     fieldno: 1
   - type: string
+    is_nullable: false
     fieldno: 3
   - type: unsigned
+    is_nullable: false
     fieldno: 2
 ...
 box.space.test:drop()
@@ -2299,5 +2303,63 @@ c:close()
 ---
 ...
 c = nil
+---
+...
+--
+-- gh-3256 net.box is_nullable and collation options output
+--
+space = box.schema.create_space('test')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+_ = space:create_index('pk')
+---
+...
+_ = space:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
+---
+...
+c = net:connect(box.cfg.listen)
+---
+...
+c.space.test.index.sk.parts
+---
+- - type: unsigned
+    is_nullable: true
+    fieldno: 2
+...
+space:drop()
+---
+...
+space = box.schema.create_space('test')
+---
+...
+box.internal.collation.create('test', 'ICU', 'ru-RU')
+---
+...
+_ = space:create_index('sk', { type = 'tree', parts = {{1, 'str', collation = 'test'}}, unique = true })
+---
+...
+c:reload_schema()
+---
+...
+c.space.test.index.sk.parts
+---
+- - type: string
+    is_nullable: false
+    collation_id: 3
+    fieldno: 1
+...
+c:close()
+---
+...
+box.internal.collation.drop('test')
+---
+...
+space:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...
