@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(23)
+test:plan(24)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script
@@ -91,6 +91,11 @@ local line = file:read()
 message = json.decode(line)
 test:is(message.message, "this is \"", "check message with escaped character")
 
+-- gh-3248 trash in log file with logging large objects
+log.info(string.rep('a', 32000))
+line = file:read()
+test:ok(line:len() < 20000, "big line truncated")
+
 log.info("json")
 local line = file:read()
 message = json.decode(line)
@@ -100,7 +105,7 @@ log.info("hello")
 line = file:read()
 test:ok(not line:match("{"), "log change format")
 s, e = pcall(log.log_format, "non_format")
-test:ok(not s)
+test:ok(not s, "bad format")
 file:close()
 
 log.log_format("json")
