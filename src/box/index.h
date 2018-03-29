@@ -357,6 +357,11 @@ struct index_vtab {
 	 */
 	void (*commit_create)(struct index *index, int64_t signature);
 	/**
+	 * Called if index creation failed, either due to
+	 * WAL write error or build error.
+	 */
+	void (*abort_create)(struct index *index);
+	/**
 	 * Called after WAL write to commit index drop.
 	 * Must not fail.
 	 */
@@ -472,6 +477,12 @@ static inline void
 index_commit_create(struct index *index, int64_t signature)
 {
 	index->vtab->commit_create(index, signature);
+}
+
+static inline void
+index_abort_create(struct index *index)
+{
+	index->vtab->abort_create(index);
 }
 
 static inline void
@@ -593,6 +604,7 @@ index_end_build(struct index *index)
  * Virtual method stubs.
  */
 void generic_index_commit_create(struct index *, int64_t);
+void generic_index_abort_create(struct index *);
 void generic_index_commit_drop(struct index *);
 void generic_index_update_def(struct index *);
 ssize_t generic_index_size(struct index *);
