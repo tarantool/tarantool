@@ -262,7 +262,7 @@ slowpath:
 	key_def->key_hash = key_hash_slowpath;
 }
 
-static uint32_t
+uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 struct coll *coll)
 {
@@ -306,6 +306,17 @@ tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 	const char null = 0xc0;
 	PMurHash32_Process(ph1, pcarry, &null, 1);
 	return mp_sizeof_nil();
+}
+
+uint32_t
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry,
+		    const struct tuple *tuple,
+		    const struct key_part *part)
+{
+	const char *field = tuple_field(tuple, part->fieldno);
+	if (field == NULL)
+		return tuple_hash_null(ph1, pcarry);
+	return tuple_hash_field(ph1, pcarry, &field, part->coll);
 }
 
 template <bool has_optional_parts>

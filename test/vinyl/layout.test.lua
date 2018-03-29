@@ -42,6 +42,9 @@ for i, path in pairs(files) do
         local rows = {}
         local i = 1
         for lsn, row in xlog.pairs(path) do
+            if row.BODY.bloom_filter ~= nil then
+                row.BODY.bloom_filter = '<bloom_filter>'
+            end
             rows[i] = row
             i = i + 1
         end
@@ -55,6 +58,5 @@ box.backup.stop() -- resume the garbage collection process
 
 test_run:cmd("push filter 'timestamp: .*' to 'timestamp: <timestamp>'")
 test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
-test_run:cmd("push filter 'bloom_filter: .*' to 'bloom_filter: <bloom_filter>'")
 result
 test_run:cmd("clear filter")

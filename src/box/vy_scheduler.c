@@ -136,12 +136,6 @@ struct vy_task {
 	 */
 	struct stailq_entry link;
 	/**
-	 * An estimate of the maximal number of statements that
-	 * can be written by the task. Used to create a bloom
-	 * filter of the perfect size.
-	 */
-	size_t max_output_count;
-	/**
 	 * Index options may be modified while a task is in
 	 * progress so we save them here to safely access them
 	 * from another thread.
@@ -655,8 +649,7 @@ vy_task_write_run(struct vy_scheduler *scheduler, struct vy_task *task)
 	if (vy_run_writer_create(&writer, task->new_run, lsm->env->path,
 				 lsm->space_id, lsm->index_id,
 				 task->cmp_def, task->key_def,
-				 task->page_size, task->bloom_fpr,
-				 task->max_output_count) != 0)
+				 task->page_size, task->bloom_fpr) != 0)
 		goto fail;
 
 	if (wi->iface->start(wi) != 0)
@@ -966,7 +959,6 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 	 * eligible for dump are over.
 	 */
 	int64_t dump_lsn = -1;
-	size_t max_output_count = 0;
 	struct vy_mem *mem, *next_mem;
 	rlist_foreach_entry_safe(mem, &lsm->sealed, in_sealed, next_mem) {
 		if (mem->generation > scheduler->dump_generation)
@@ -981,10 +973,9 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 			continue;
 		}
 		dump_lsn = MAX(dump_lsn, mem->max_lsn);
-		max_output_count += mem->tree.size;
 	}
 
-	if (max_output_count == 0) {
+	if (dump_lsn < 0) {
 		/* Nothing to do, pick another LSM tree. */
 		vy_scheduler_update_lsm(scheduler, lsm);
 		vy_scheduler_complete_dump(scheduler);
@@ -1000,7 +991,6 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 	if (new_run == NULL)
 		goto err_run;
 
-	assert(dump_lsn >= 0);
 	new_run->dump_lsn = dump_lsn;
 
 	struct vy_stmt_stream *wi;
@@ -1019,7 +1009,6 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 
 	task->new_run = new_run;
 	task->wi = wi;
-	task->max_output_count = max_output_count;
 	task->bloom_fpr = lsm->opts.bloom_fpr;
 	task->page_size = lsm->opts.page_size;
 
@@ -1289,11 +1278,8 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 	rlist_foreach_entry(slice, &range->slices, in_range) {
 		if (vy_write_iterator_new_slice(wi, slice) != 0)
 			goto err_wi_sub;
-
-		task->max_output_count += slice->count.rows;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);
-
 		/* Remember the slices we are compacting. */
 		if (task->first_slice == NULL)
 			task->first_slice = slice;

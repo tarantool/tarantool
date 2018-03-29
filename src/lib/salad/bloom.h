@@ -57,8 +57,6 @@ extern "C" {
 enum {
 	/* Expected cache line of target processor */
 	BLOOM_CACHE_LINE = 64,
-	/* Number of different bloom filter in bloom spectrum */
-	BLOOM_SPECTRUM_SIZE = 10,
 };
 
 typedef uint32_t bloom_hash_t;
@@ -123,7 +121,16 @@ bloom_add(struct bloom *bloom, bloom_hash_t hash);
  *
  */
 static bool
-bloom_possible_has(const struct bloom *bloom, bloom_hash_t hash);
+bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash);
+
+/**
+ * Return the expected false positive rate of a bloom filter.
+ * @param bloom - the bloom filter
+ * @param number_of_values - number of values stored in the filter
+ * @return - expected false positive rate
+ */
+double
+bloom_fpr(const struct bloom *bloom, uint32_t number_of_values);
 
 /**
  * Calculate size of a buffer that is needed for storing bloom table
@@ -155,59 +162,6 @@ bloom_store(const struct bloom *bloom, char *table);
 int
 bloom_load_table(struct bloom *bloom, const char *table, struct quota *quota);
 
-/**
- * Bloom spectrum that allows to create and fill a bloom filter in case when
- * there is no enough knowledge about final number of elements.
- * It consists of several bloom filter (set of filters) of different sizes
- * and fills them all. After filling it allows to choose more efficient bloom
- * filter.
- */
-struct bloom_spectrum {
-	uint32_t count_expected;
-	uint32_t count_collected;
-	int chosen_one;
-	struct bloom vector[BLOOM_SPECTRUM_SIZE];
-};
-
-/**
- * Create a bloom spectrum
- * @param spectrum - spectrum to init
- * @param max_number_of_values - upper bound of estimation about
- *  number of elements
- * @param false_positive_rate - desired false positive rate
- * @param quota - quota for memory allocation
- * @return 0 - OK, -1 - memory error
- */
-int
-bloom_spectrum_create(struct bloom_spectrum *spectrum,
-		      uint32_t max_number_of_values, double false_positive_rate,
-		      struct quota *quota);
-
-/**
- * Add a value into the data set
- * @param spectrum - spectrum to add to
- * @param hash - a hash of a value
- */
-static void
-bloom_spectrum_add(struct bloom_spectrum *spectrum, bloom_hash_t hash);
-
-/**
- * Choose best bloom filter after filling the set.
- * Must be used only once.
- * @param spectrum - spectrum to choose from
- * @param bloom - target structure that will hold the best bloom filter
- */
-void
-bloom_spectrum_choose(struct bloom_spectrum *spectrum, struct bloom *bloom);
-
-/**
- * Destroy spectrum and free all data (except the chosen one)
- * @param spectrum - spectrum to destroy
- * @param quota - quota for memory deallocation
- */
-void
-bloom_spectrum_destroy(struct bloom_spectrum *spectrum, struct quota *quota);
-
 /* }}} API declaration */
 
 /* {{{ API definition */
@@ -233,7 +187,7 @@ bloom_add(struct bloom *bloom, bloom_hash_t hash)
 }
 
 static inline bool
-bloom_possible_has(const struct bloom *bloom, bloom_hash_t hash)
+bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash)
 {
 	/* Using lower part of the has for finding a block */
 	bloom_hash_t pos = hash % bloom->table_size;
@@ -252,14 +206,6 @@ bloom_possible_has(const struct bloom *bloom, bloom_hash_t hash)
 		hash += hash2 + i * i;
 	}
 	return true;
-}
-
-static inline void
-bloom_spectrum_add(struct bloom_spectrum *spectrum, bloom_hash_t hash)
-{
-	spectrum->count_collected++;
-	for (uint32_t i = 0; i < BLOOM_SPECTRUM_SIZE; i++)
-		bloom_add(&spectrum->vector[i], hash);
 }
 
 /* }}} API definition */

@@ -42,6 +42,18 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /**
+ * Return the length of the longest common prefix of two tuples.
+ * @param tuple_a first tuple
+ * @param tuple_b second tuple
+ * @param key_def key defintion
+ * @return number of key parts the two tuples have in common
+ */
+uint32_t
+tuple_common_key_parts(const struct tuple *tuple_a,
+		       const struct tuple *tuple_b,
+		       const struct key_def *key_def);
+
+/**
  * Create a comparison function for the key_def
  *
  * @param key_def key_definition

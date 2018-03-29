@@ -40,6 +40,7 @@ add_library(tuple STATIC
     tuple_compare.cc
     tuple_extract_key.cc
     tuple_hash.cc
+    tuple_bloom.c
     tuple_dictionary.c
     key_def.cc
     coll_def.c

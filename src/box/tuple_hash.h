@@ -45,6 +45,36 @@ void
 tuple_hash_func_set(struct key_def *def);
 
 /**
+ * Compute hash of a tuple field.
+ * @param ph1 - pointer to running hash
+ * @param pcarry - pointer to carry
+ * @param field - pointer to field data
+ * @param coll - collation to use for hashing strings or NULL
+ * @return size of processed data
+ *
+ * This function updates @ph1 and @pcarry and advances @field
+ * by the number of processed bytes.
+ */
+uint32_t
+tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
+		 struct coll *coll);
+
+/**
+ * Compute hash of a key part.
+ * @param ph1 - pointer to running hash
+ * @param pcarry - pointer to carry
+ * @param tuple - tuple to hash
+ * @param part - key part
+ * @return size of processed data
+ *
+ * This function updates @ph1 and @pcarry.
+ */
+uint32_t
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry,
+		    const struct tuple *tuple,
+		    const struct key_part *part);
+
+/**
  * Calculates a common hash value for a tuple
  * @param tuple - a tuple
  * @param key_def - key_def for field description

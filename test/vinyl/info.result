@@ -266,7 +266,7 @@ stat_diff(istat(), st)
         bytes: 26049
     index_size: 294
     rows: 25
-    bloom_size: 4096
+    bloom_size: 70
     pages: 7
     bytes: 26049
     bytes_compressed: <bytes_compressed>
@@ -982,7 +982,7 @@ istat()
         bytes: 0
     pages: 25
     bytes_compressed: <bytes_compressed>
-    bloom_size: 8192
+    bloom_size: 140
   txw:
     bytes: 0
     rows: 0
@@ -1120,8 +1120,8 @@ i1:len(), i2:len()
 ...
 i1:bsize(), i2:bsize()
 ---
-- 4390
-- 4946
+- 364
+- 920
 ...
 s:bsize() == st1.disk.bytes
 ---
@@ -1166,8 +1166,8 @@ i1:len(), i2:len()
 ...
 i1:bsize(), i2:bsize()
 ---
-- 53542
-- 54098
+- 49516
+- 50072
 ...
 s:bsize() == st1.memory.bytes + st1.disk.bytes
 ---
@@ -1216,8 +1216,8 @@ i1:len(), i2:len()
 ...
 i1:bsize(), i2:bsize()
 ---
-- 4390
-- 4946
+- 364
+- 920
 ...
 s:bsize() == st1.disk.bytes
 ---
