@@ -474,35 +474,29 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 	return SQLITE_OK;
 }
 
-static int insertOrReplace(BtCursor *pCur, int operationType)
+static inline int
+insertOrReplace(BtCursor *pCur, enum iproto_type type)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
-	assert(operationType == TARANTOOL_INDEX_INSERT ||
-	       operationType == TARANTOOL_INDEX_REPLACE);
-
 	struct request request;
 	memset(&request, 0, sizeof(request));
 	request.tuple = pCur->key;
 	request.tuple_end = pCur->key + pCur->nKey;
 	request.space_id = pCur->space->def->id;
+	request.type = type;
 	mp_tuple_assert(request.tuple, request.tuple_end);
-	if (operationType == TARANTOOL_INDEX_INSERT) {
-		request.type = IPROTO_INSERT;
-	} else {
-		request.type = IPROTO_REPLACE;
-	}
 	int rc = box_process_rw(&request, pCur->space, NULL);
-	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;;
+	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;
 }
 
 int tarantoolSqlite3Insert(BtCursor *pCur)
 {
-	return insertOrReplace(pCur, TARANTOOL_INDEX_INSERT);
+	return insertOrReplace(pCur, IPROTO_INSERT);
 }
 
 int tarantoolSqlite3Replace(BtCursor *pCur)
 {
-	return insertOrReplace(pCur, TARANTOOL_INDEX_REPLACE);
+	return insertOrReplace(pCur, IPROTO_REPLACE);
 }
 
 /*
