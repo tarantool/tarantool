@@ -924,12 +924,16 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
             end
         else
             for k = 1, #index[PARTS] do
+                local pknullable = index[PARTS][k].is_nullable or false
+                local pkcollationid = index[PARTS][k].collation
                 local pktype = index[PARTS][k][2] or index[PARTS][k].type
                 local pkfield = index[PARTS][k][1] or index[PARTS][k].field
 
                 local pk = {
                     type = pktype,
-                    fieldno = pkfield + 1
+                    fieldno = pkfield + 1,
+                    collation_id = pkcollationid,
+                    is_nullable = pknullable
                 }
                 idx.parts[k] = pk
             end
