@@ -36,7 +36,9 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <sys/types.h> /* pid_t */
+#include <tarantool_ev.h>
 #include "small/rlist.h"
+#include "fiber_cond.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -119,6 +121,17 @@ struct log {
 	pid_t pid;
 	/* Application identifier used to group syslog messages. */
 	char *syslog_ident;
+	/**
+	 * Used to wake up the main logger thread from a eio thread.
+	 */
+	ev_async log_async;
+	/**
+	 * Conditional variable securing variable below
+	 * from concurrent usage.
+	 */
+	struct fiber_cond rotate_cond;
+	/** Counter identifying number of threads executing log_rotate. */
+	int rotating_threads;
 	struct rlist in_log_list;
 };
 

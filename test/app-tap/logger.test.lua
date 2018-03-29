@@ -15,6 +15,7 @@ box.cfg{
 local log = require('log')
 local fio = require('fio')
 local json = require('json')
+local fiber = require('fiber')
 local file = io.open(filename)
 while file:read() do
 end
@@ -48,7 +49,6 @@ xpcall(help, function(err)
 end)
 
 file:close()
-log.rotate()
 
 test:ok(log.pid() >= 0, "pid()")
 
@@ -105,10 +105,12 @@ file:close()
 
 log.log_format("json")
 
-os.rename(filename, filename .. "2")
+fio.rename(filename, filename .. "2")
 log.rotate()
 file = fio.open(filename)
+while file == nil do file = fio.open(filename) fiber.sleep(0.0001) end
 line = file:read()
+while line == nil or line == ""  do line = file:read() fiber.sleep(0.0001) end
 index = line:find('\n')
 line = line:sub(1, index)
 message = json.decode(line)

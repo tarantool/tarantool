@@ -30,6 +30,7 @@
  */
 #include "say.h"
 #include "fiber.h"
+#include "errinj.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -239,9 +240,11 @@ write_to_syslog(struct log *log, int total);
 static int
 log_rotate(struct log *log)
 {
-	if (log->type != SAY_LOGGER_FILE) {
+	if (pm_atomic_load(&log->type) != SAY_LOGGER_FILE)
 		return 0;
-	}
+
+	ERROR_INJECT(ERRINJ_LOG_ROTATE, { usleep(10); });
+
 	int fd = open(log->path, O_WRONLY | O_APPEND | O_CREAT,
 		      S_IRUSR | S_IWUSR | S_IRGRP);
 	if (fd < 0) {
@@ -282,6 +285,7 @@ log_rotate(struct log *log)
 struct rotate_task {
 	struct coio_task base;
 	struct log *log;
+	struct ev_loop *loop;
 };
 
 static int
@@ -291,6 +295,7 @@ logrotate_cb(struct coio_task *ptr)
 	if (log_rotate(task->log) < 0) {
 		diag_log();
 	}
+	ev_async_send(task->loop, &task->log->log_async);
 	return 0;
 }
 
@@ -301,6 +306,16 @@ logrotate_cleanup_cb(struct coio_task *ptr)
 	coio_task_destroy(&task->base);
 	free(task);
 	return 0;
+}
+
+static void
+log_rotate_async_cb(struct ev_loop *loop, struct ev_async *watcher, int events)
+{
+	(void)loop;
+	(void)events;
+	struct log *log = container_of(watcher, struct log, log_async);
+	log->rotating_threads--;
+	fiber_cond_signal(&log->rotate_cond);
 }
 
 void
@@ -320,8 +335,11 @@ say_logrotate(struct ev_loop *loop, struct ev_signal *w, int revents)
 			diag_log();
 			continue;
 		}
+		ev_async_start(loop(), &log->log_async);
+		log->rotating_threads++;
 		coio_task_create(&task->base, logrotate_cb, logrotate_cleanup_cb);
 		task->log = log;
+		task->loop = loop();
 		coio_task_post(&task->base, 0);
 	}
 	errno = saved_errno;
@@ -502,6 +520,9 @@ log_create(struct log *log, const char *init_str, bool nonblock)
 	log->format_func = NULL;
 	log->level = S_INFO;
 	log->nonblock = nonblock;
+	log->rotating_threads = 0;
+	fiber_cond_create(&log->rotate_cond);
+	ev_async_init(&log->log_async, log_rotate_async_cb);
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	if (init_str != NULL) {
@@ -1016,10 +1037,16 @@ void
 log_destroy(struct log *log)
 {
 	assert(log != NULL);
+	while(log->rotating_threads > 0)
+		fiber_cond_wait(&log->rotate_cond);
+	pm_atomic_store(&log->type, SAY_LOGGER_BOOT);
+
 	if (log->fd != -1)
 		close(log->fd);
 	free(log->syslog_ident);
 	rlist_del_entry(log, in_log_list);
+	ev_async_stop(loop(), &log->log_async);
+	fiber_cond_destroy(&log->rotate_cond);
 }
 
 static inline int
