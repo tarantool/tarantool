@@ -138,7 +138,7 @@ sql_get()
  * are accurately positioned, hence both 0 and 1 are fine.
  */
 
-void
+int
 key_alloc(BtCursor *c, size_t key_size);
 
 static int
@@ -210,11 +210,8 @@ tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
  */
 int tarantoolSqlite3First(BtCursor *pCur, int *pRes)
 {
-	key_alloc(pCur, sizeof(nil_key));
-	if (pCur->key == NULL) {
-		*pRes = 1;
-		return SQLITE_NOMEM;
-	}
+	if (key_alloc(pCur, sizeof(nil_key)) != 0)
+		return SQL_TARANTOOL_ERROR;
 	memcpy(pCur->key, nil_key, sizeof(nil_key));
 	pCur->iter_type = ITER_GE;
 	return cursor_seek(pCur, pRes);
@@ -223,11 +220,8 @@ int tarantoolSqlite3First(BtCursor *pCur, int *pRes)
 /* Set cursor to the last tuple in given space. */
 int tarantoolSqlite3Last(BtCursor *pCur, int *pRes)
 {
-	key_alloc(pCur, sizeof(nil_key));
-	if (pCur->key == NULL) {
-		*pRes = 1;
-		return SQLITE_NOMEM;
-	}
+	if (key_alloc(pCur, sizeof(nil_key)) != 0)
+		return SQL_TARANTOOL_ERROR;
 	memcpy(pCur->key, nil_key, sizeof(nil_key));
 	pCur->iter_type = ITER_LE;
 	return cursor_seek(pCur, pRes);
@@ -272,9 +266,8 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 	size_t ks;
 
 	ks = sqlite3VdbeMsgpackRecordLen(pIdxKey->aMem, pIdxKey->nField);
-	key_alloc(pCur, ks);
-	if (pCur->key == NULL)
-		return SQLITE_NOMEM;
+	if (key_alloc(pCur, ks) != 0)
+		return SQL_TARANTOOL_ERROR;
 	sqlite3VdbeMsgpackRecordPut((u8 *)pCur->key, pIdxKey->aMem,
 				    pIdxKey->nField);
 
@@ -376,15 +369,9 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
 
-	struct space_def *ephemer_space_def =
-		space_def_new(0 /* space id */, 0 /* user id */, field_count,
-			      "ephemeral", strlen("ephemeral"),
-			      "memtx", strlen("memtx"),
-			      &space_opts_default, &field_def_default,
-			      0 /* length of field_def */);
-
 	struct key_def *ephemer_key_def = key_def_new(field_count);
-	assert(ephemer_key_def);
+	if (ephemer_key_def == NULL)
+		return SQL_TARANTOOL_ERROR;
 	for (uint32_t part = 0; part < field_count; ++part) {
 		key_def_set_part(ephemer_key_def, part /* part no */,
 				 part /* filed no */,
@@ -397,21 +384,34 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 		index_def_new(0 /*space id */, 0 /* index id */, "ephemer_idx",
 			      strlen("ephemer_idx"), TREE, &index_opts_default,
 			      ephemer_key_def, NULL /* pk def */);
+	key_def_delete(ephemer_key_def);
+	if (ephemer_index_def == NULL)
+		return SQL_TARANTOOL_ERROR;
 
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, ephemer_index_def, link);
 
-	struct space *ephemer_new_space = space_new_ephemeral(ephemer_space_def,
-							      &key_list);
-	if (ephemer_new_space == NULL) {
-		diag_log();
+	struct space_def *ephemer_space_def =
+		space_def_new(0 /* space id */, 0 /* user id */, field_count,
+			      "ephemeral", strlen("ephemeral"),
+			      "memtx", strlen("memtx"),
+			      &space_opts_default, &field_def_default,
+			      0 /* length of field_def */);
+	if (ephemer_space_def == NULL) {
+		index_def_delete(ephemer_index_def);
 		return SQL_TARANTOOL_ERROR;
 	}
-	key_alloc(pCur, field_count /* key size */);
-	if (pCur->key == NULL) {
+
+	struct space *ephemer_new_space = space_new_ephemeral(ephemer_space_def,
+							      &key_list);
+	index_def_delete(ephemer_index_def);
+	space_def_delete(ephemer_space_def);
+	if (ephemer_new_space == NULL)
+		return SQL_TARANTOOL_ERROR;
+	if (key_alloc(pCur, field_count) != 0) {
 		space_delete(ephemer_new_space);
-		return SQLITE_NOMEM;
+		return SQL_TARANTOOL_ERROR;
 	}
 	pCur->space = ephemer_new_space;
 	pCur->index = *ephemer_new_space->index;
@@ -647,27 +647,24 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	assert(new_table_name);
 
 	box_tuple_t *tuple;
-	int rc;
 	uint32_t trig_name_len = strlen(trig_name);
 	uint32_t old_table_name_len = strlen(old_table_name);
 	uint32_t new_table_name_len = strlen(new_table_name);
-	char *key_begin = (char*) region_alloc(&fiber()->gc,
-					       mp_sizeof_str(trig_name_len) +
-					       mp_sizeof_array(1));
-	char *key = mp_encode_array(key_begin, 1);
-	key = mp_encode_str(key, trig_name, trig_name_len);
-
-	box_iterator_t *iter = box_index_iterator(BOX_TRIGGER_ID, 0, ITER_EQ,
-						  key_begin, key);
-	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0) {
-		box_iterator_free(iter);
+	uint32_t key_len = mp_sizeof_str(trig_name_len) + mp_sizeof_array(1);
+	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
+	if (key_begin == NULL) {
+		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
 		return SQL_TARANTOOL_ERROR;
 	}
+	char *key = mp_encode_array(key_begin, 1);
+	key = mp_encode_str(key, trig_name, trig_name_len);
+	if (box_index_get(BOX_TRIGGER_ID, 0, key_begin, key, &tuple) != 0)
+		return SQL_TARANTOOL_ERROR;
+	assert(tuple != NULL);
 	assert(tuple_field_count(tuple) == 2);
 	const char *field = box_tuple_field(tuple, 1);
 	assert(mp_typeof(*field) == MP_MAP);
 	mp_decode_map(&field);
-	uint32_t key_len;
 	const char *sql_str = mp_decode_str(&field, &key_len);
 	if (sqlite3StrNICmp(sql_str, "sql", 3) != 0)
 		goto rename_fail;
@@ -675,7 +672,11 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	const char *trigger_stmt_old = mp_decode_str(&field, &trigger_stmt_len);
 	char *trigger_stmt = (char*)region_alloc(&fiber()->gc,
 						 trigger_stmt_len + 1);
-
+	if (trigger_stmt == NULL) {
+		diag_set(OutOfMemory, trigger_stmt_len + 1, "region_alloc",
+			 "trigger_stmt");
+		return SQL_TARANTOOL_ERROR;
+	}
 	memcpy(trigger_stmt, trigger_stmt_old, trigger_stmt_len);
 	trigger_stmt[trigger_stmt_len] = '\0';
 	bool is_quoted = false;
@@ -684,11 +685,14 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	uint32_t trigger_stmt_new_len = trigger_stmt_len + old_table_name_len -
 					new_table_name_len + 2 * (!is_quoted);
 	assert(trigger_stmt_new_len > 0);
-	char *new_tuple = (char*)region_alloc(&fiber()->gc, mp_sizeof_array(2) +
-					      mp_sizeof_str(trig_name_len) +
-					      mp_sizeof_map(1) +
-					      mp_sizeof_str(3) +
-					      mp_sizeof_str(trigger_stmt_new_len));
+	key_len = mp_sizeof_array(2) + mp_sizeof_str(trig_name_len) +
+		  mp_sizeof_map(1) + mp_sizeof_str(3) +
+		  mp_sizeof_str(trigger_stmt_new_len);
+	char *new_tuple = (char*)region_alloc(&fiber()->gc, key_len);
+	if (new_tuple == NULL) {
+		diag_set(OutOfMemory, key_len, "region_alloc", "new_tuple");
+		return SQL_TARANTOOL_ERROR;
+	}
 	char *new_tuple_end = mp_encode_array(new_tuple, 2);
 	new_tuple_end = mp_encode_str(new_tuple_end, trig_name, trig_name_len);
 	new_tuple_end = mp_encode_map(new_tuple_end, 1);
@@ -696,18 +700,14 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	new_tuple_end = mp_encode_str(new_tuple_end, trigger_stmt,
 				      trigger_stmt_new_len);
 
-	rc = box_replace(BOX_TRIGGER_ID, new_tuple, new_tuple_end, &tuple);
-
-	box_iterator_free(iter);
-	if (rc != 0 || tuple == NULL)
+	if (box_replace(BOX_TRIGGER_ID, new_tuple, new_tuple_end, NULL) != 0)
 		return SQL_TARANTOOL_ERROR;
-
-	return SQLITE_OK;
+	else
+		return SQLITE_OK;
 
 rename_fail:
 	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
 		"created not via SQL facilities");
-	box_iterator_free(iter);
 	return SQL_TARANTOOL_ERROR;
 }
 
@@ -734,21 +734,17 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 
 	int space_id = SQLITE_PAGENO_TO_SPACEID(iTab);
 	box_tuple_t *tuple;
-	int rc;
-
-	char *key_begin = (char*) region_alloc(&fiber()->gc,
-					       mp_sizeof_uint(space_id) +
-					       mp_sizeof_array(1));
-	char *key = mp_encode_array(key_begin, 1);
-	key = mp_encode_uint(key, space_id);
-
-	box_iterator_t *iter = box_index_iterator(BOX_SPACE_ID, 0, ITER_EQ,
-						  key_begin, key);
-
-	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0) {
-		box_iterator_free(iter);
+	uint32_t key_len = mp_sizeof_uint(space_id) + mp_sizeof_array(1);
+	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
+	if (key_begin == NULL) {
+		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
 		return SQL_TARANTOOL_ERROR;
 	}
+	char *key = mp_encode_array(key_begin, 1);
+	key = mp_encode_uint(key, space_id);
+	if (box_index_get(BOX_SPACE_ID, 0, key_begin, key, &tuple) != 0)
+		return SQL_TARANTOOL_ERROR;
+	assert(tuple != NULL);
 
 	/* Code below relies on format of _space. If number of fields or their
 	 * order will ever change, this code should be changed too.
@@ -761,7 +757,6 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 	uint32_t map_size = mp_decode_map(&sql_stmt_map);
 	if (map_size != 1)
 		goto rename_fail;
-	uint32_t key_len;
 	const char *sql_str = mp_decode_str(&sql_stmt_map, &key_len);
 
 	/* If this table hasn't been created via SQL facilities,
@@ -778,6 +773,11 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 	uint32_t new_name_len = strlen(new_name);
 
 	*sql_stmt = (char*)region_alloc(&fiber()->gc, sql_stmt_decoded_len + 1);
+	if (*sql_stmt == NULL) {
+		diag_set(OutOfMemory, sql_stmt_decoded_len + 1, "region_alloc",
+			 "sql_stmt");
+		return SQL_TARANTOOL_ERROR;
+	}
 	memcpy(*sql_stmt, sql_stmt_old, sql_stmt_decoded_len);
 	*(*sql_stmt + sql_stmt_decoded_len) = '\0';
 	bool is_quoted = false;
@@ -798,6 +798,14 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 	 */
 	char *new_tuple = (char*)region_alloc(&fiber()->gc, tuple->bsize +
 					      mp_sizeof_str(sql_stmt_len));
+	if (new_tuple == NULL) {
+		free(*sql_stmt);
+		*sql_stmt = NULL;
+		diag_set(OutOfMemory,
+			 tuple->bsize + mp_sizeof_str(sql_stmt_len),
+			 "region_alloc", "new_tuple");
+		return SQL_TARANTOOL_ERROR;
+	}
 
 	char *new_tuple_end = new_tuple;
 	const char *data_begin = tuple_data(tuple);
@@ -820,18 +828,14 @@ int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
 	memcpy(new_tuple_end, data_begin, data_size);
 	new_tuple_end += data_size;
 
-	rc = box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, &tuple);
-
-	box_iterator_free(iter);
-	if (rc != 0 || tuple == NULL)
+	if (box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, NULL) != 0)
 		return SQL_TARANTOOL_ERROR;
-
-	return SQLITE_OK;
+	else
+		return SQLITE_OK;
 
 rename_fail:
 	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
 		"created not via SQL facilities");
-	box_iterator_free(iter);
 	return SQL_TARANTOOL_ERROR;
 }
 
@@ -848,21 +852,18 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 
 	int space_id = SQLITE_PAGENO_TO_SPACEID(iTab);
 	box_tuple_t *tuple;
-	int rc;
+	uint32_t key_len = mp_sizeof_uint(space_id) + mp_sizeof_array(1);
 
-	char *key_begin = (char*) region_alloc(&fiber()->gc,
-					       mp_sizeof_uint(space_id) +
-					       mp_sizeof_array(1));
-	char *key = mp_encode_array(key_begin, 1);
-	key = mp_encode_uint(key, space_id);
-
-	box_iterator_t *iter = box_index_iterator(BOX_SPACE_ID, 0, ITER_EQ,
-						  key_begin, key);
-
-	if (box_iterator_next(iter, &tuple) != 0 || tuple == 0) {
-		box_iterator_free(iter);
+	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
+	if (key_begin == NULL) {
+		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
 		return SQL_TARANTOOL_ERROR;
 	}
+	char *key = mp_encode_array(key_begin, 1);
+	key = mp_encode_uint(key, space_id);
+	if (box_index_get(BOX_SPACE_ID, 0, key_begin, key, &tuple) != 0)
+		return SQL_TARANTOOL_ERROR;
+	assert(tuple != NULL);
 
 	assert(tuple_field_count(tuple) == 7);
 	const char *sql_stmt_map = box_tuple_field(tuple, 5);
@@ -872,7 +873,6 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 	uint32_t map_size = mp_decode_map(&sql_stmt_map);
 	if (map_size != 1)
 		goto rename_fail;
-	uint32_t key_len;
 	const char *sql_str = mp_decode_str(&sql_stmt_map, &key_len);
 	if (sqlite3StrNICmp(sql_str, "sql", 3) != 0)
 		goto rename_fail;
@@ -883,6 +883,11 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 	uint32_t new_name_len = strlen(new_parent_name);
 	char *create_stmt_new = (char*) region_alloc(&fiber()->gc,
 						     create_stmt_decoded_len + 1);
+	if (create_stmt_new == NULL) {
+		diag_set(OutOfMemory, create_stmt_decoded_len + 1,
+			 "region_alloc", "create_stmt_new");
+		return SQL_TARANTOOL_ERROR;
+	}
 	memcpy(create_stmt_new, create_stmt_old, create_stmt_decoded_len);
 	create_stmt_new[create_stmt_decoded_len] = '\0';
 	uint32_t numb_of_quotes = 0;
@@ -896,8 +901,13 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 				       2 * numb_of_quotes;
 	assert(create_stmt_new_len > 0);
 
-	char *new_tuple = (char*)region_alloc(&fiber()->gc, tuple->bsize +
-					      mp_sizeof_str(create_stmt_new_len));
+	key_len = tuple->bsize + mp_sizeof_str(create_stmt_new_len);
+	char *new_tuple = (char*)region_alloc(&fiber()->gc, key_len);
+	if (new_tuple == NULL) {
+		sqlite3DbFree(db, create_stmt_new);
+		diag_set(OutOfMemory, key_len, "region_alloc", "new_tuple");
+		return SQL_TARANTOOL_ERROR;
+	}
 
 	char *new_tuple_end = new_tuple;
 	const char *data_begin = tuple_data(tuple);
@@ -909,24 +919,21 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
 	new_tuple_end = mp_encode_str(new_tuple_end, "sql", 3);
 	new_tuple_end = mp_encode_str(new_tuple_end, create_stmt_new,
 				      create_stmt_new_len);
+	sqlite3DbFree(db, create_stmt_new);
 	data_begin = tuple_field(tuple, 6);
 	data_end = (char*) tuple + tuple_size(tuple);
 	data_size = data_end - data_begin;
 	memcpy(new_tuple_end, data_begin, data_size);
 	new_tuple_end += data_size;
 
-	rc = box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, &tuple);
-
-	box_iterator_free(iter);
-	if (rc != 0 || tuple == NULL)
+	if (box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, NULL) != 0)
 		return SQL_TARANTOOL_ERROR;
-
-	return SQLITE_OK;
+	else
+		return SQLITE_OK;
 
 rename_fail:
 	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
 		"created not via SQL facilities");
-	box_iterator_free(iter);
 	return SQL_TARANTOOL_ERROR;
 }
 
@@ -1061,17 +1068,27 @@ tarantoolSqlite3IncrementMaxid(uint64_t *space_max_id)
  * Allocate or grow memory for cursor's key.
  * Result->type value is unspecified.
  */
-void
+int
 key_alloc(BtCursor *cur, size_t key_size)
 {
 	if (cur->key == NULL) {
 		cur->key = malloc(key_size);
+		if (cur->key == NULL) {
+			diag_set(OutOfMemory, key_size, "malloc", "cur->key");
+			return -1;
+		}
 		cur->iter = NULL;
 		cur->last_tuple = NULL;
 	} else {
-		cur->key = realloc(cur->key, key_size);
+		char *new_key = realloc(cur->key, key_size);
+		if (new_key == NULL) {
+			diag_set(OutOfMemory, key_size, "realloc", "new_key");
+			return -1;
+		}
+		cur->key = new_key;
 	}
 	cur->nKey = key_size;
+	return 0;
 }
 
 /*
