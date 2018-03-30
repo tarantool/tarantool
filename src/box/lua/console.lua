@@ -191,21 +191,6 @@ local text_connection_mt = {
         -- @retval     nil Error.
         --
         write = function(self, text)
-            -- It is the hack to protect from SIGPIPE, which is
-            -- not ignored under debugger (gdb, lldb) on send in
-            -- a socket, that is actually closed. If a socket is
-            -- readable and read() returns nothing then the socket
-            -- is closed, and writing into it will raise SIGPIPE.
-            if self._socket:readable(0) then
-                local rc = self._socket:read({chunk = 1})
-                if not rc or rc == '' then
-                    return nil
-                else
-                    assert(#rc == 1)
-                    -- Make the char be unread.
-                    self._socket.rbuf.wpos = self._socket.rbuf.wpos - 1
-                end
-            end
             return self._socket:write(text)
         end,
         --
