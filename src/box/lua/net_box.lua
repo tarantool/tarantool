@@ -219,15 +219,24 @@ local function create_transport(host, port, user, password, callback,
 
     local function start()
         if state ~= 'initial' then return not is_final_state[state] end
-        if not connection then
+        if not connection and not callback('reconnect_timeout') then
             set_state('error', E_NO_CONNECTION)
             return
         end
         fiber.create(function()
+            local ok, err
             worker_fiber = fiber_self()
             fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
+            -- It is possible, if the first connection attempt had
+            -- been failed, but reconnect timeout is set. In such
+            -- a case the worker must be run, and immediately
+            -- start reconnecting.
+            if not connection then
+                set_state('error_reconnect', E_NO_CONNECTION, greeting)
+                goto do_reconnect
+            end
     ::handle_connection::
-            local ok, err = pcall(protocol_sm)
+            ok, err = pcall(protocol_sm)
             if not (ok or is_final_state[state]) then
                 set_state('error', E_UNKNOWN, err)
             end
@@ -235,6 +244,7 @@ local function create_transport(host, port, user, password, callback,
                 connection:close()
                 connection = nil
             end
+    ::do_reconnect::
             local timeout = callback('reconnect_timeout')
             while timeout and state == 'error_reconnect' do
                 fiber.sleep(timeout)
