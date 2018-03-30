@@ -682,7 +682,6 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
  * @param stmt_no       Statement position in the page.
  * @param cmp_def       Key definition, including primary key parts.
  * @param format        Format for REPLACE/DELETE tuples.
- * @param upsert_format Format for UPSERT tuples.
  * @param is_primary    True if the index is primary.
  *
  * @retval not NULL Statement read from page.
@@ -691,12 +690,12 @@ vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
 static struct tuple *
 vy_page_stmt(struct vy_page *page, uint32_t stmt_no,
 	     const struct key_def *cmp_def, struct tuple_format *format,
-	     struct tuple_format *upsert_format, bool is_primary)
+	     bool is_primary)
 {
 	struct xrow_header xrow;
 	if (vy_page_xrow(page, stmt_no, &xrow) != 0)
 		return NULL;
-	return vy_stmt_decode(&xrow, cmp_def, format, upsert_format, is_primary);
+	return vy_stmt_decode(&xrow, cmp_def, format, is_primary);
 }
 
 /**
@@ -993,7 +992,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 	if (rc != 0)
 		return rc;
 	*stmt = vy_page_stmt(page, pos.pos_in_page, itr->cmp_def,
-			     itr->format, itr->upsert_format, itr->is_primary);
+			     itr->format, itr->is_primary);
 	if (*stmt == NULL)
 		return -1;
 	return 0;
@@ -1020,7 +1019,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
 		struct tuple *fnd_key = vy_page_stmt(page, mid, itr->cmp_def,
-						     itr->format, itr->upsert_format,
+						     itr->format,
 						     itr->is_primary);
 		if (fnd_key == NULL)
 			return end;
@@ -1370,14 +1369,12 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
 		     struct tuple_format *format,
-		     struct tuple_format *upsert_format,
 		     bool is_primary)
 {
 	itr->stat = stat;
 	itr->cmp_def = cmp_def;
 	itr->key_def = key_def;
 	itr->format = format;
-	itr->upsert_format = upsert_format;
 	itr->is_primary = is_primary;
 	itr->slice = slice;
 
@@ -2205,7 +2202,6 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
 		     struct tuple_format *mem_format,
-		     struct tuple_format *upsert_format,
 		     const struct index_opts *opts)
 {
 	assert(run->info.bloom == NULL);
@@ -2259,7 +2255,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 			}
 			++page_row_count;
 			struct tuple *tuple = vy_stmt_decode(&xrow, cmp_def,
-					mem_format, upsert_format, iid == 0);
+							mem_format, iid == 0);
 			if (tuple == NULL)
 				goto close_err;
 			if (bloom_builder != NULL) {
@@ -2427,10 +2423,9 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 	uint32_t end = stream->page->row_count;
 	while (beg != end) {
 		uint32_t mid = beg + (end - beg) / 2;
-		struct tuple *fnd_key =
-			vy_page_stmt(stream->page, mid, stream->cmp_def,
-				     stream->format, stream->upsert_format,
-				     stream->is_primary);
+		struct tuple *fnd_key = vy_page_stmt(stream->page, mid,
+					stream->cmp_def, stream->format,
+					stream->is_primary);
 		if (fnd_key == NULL)
 			return -1;
 		int cmp = vy_tuple_compare_with_key(fnd_key,
@@ -2476,10 +2471,9 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 		return -1;
 
 	/* Read current tuple from the page */
-	struct tuple *tuple =
-		vy_page_stmt(stream->page, stream->pos_in_page,
-			     stream->cmp_def, stream->format,
-			     stream->upsert_format, stream->is_primary);
+	struct tuple *tuple = vy_page_stmt(stream->page, stream->pos_in_page,
+					   stream->cmp_def, stream->format,
+					   stream->is_primary);
 	if (tuple == NULL) /* Read or memory error */
 		return -1;
 
@@ -2543,8 +2537,8 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
 
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
-		   const struct key_def *cmp_def, struct tuple_format *format,
-		   struct tuple_format *upsert_format, bool is_primary)
+		     const struct key_def *cmp_def, struct tuple_format *format,
+		     bool is_primary)
 {
 	stream->base.iface = &vy_slice_stream_iface;
 
@@ -2556,6 +2550,5 @@ vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 	stream->slice = slice;
 	stream->cmp_def = cmp_def;
 	stream->format = format;
-	stream->upsert_format = upsert_format;
 	stream->is_primary = is_primary;
 }

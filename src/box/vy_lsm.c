@@ -59,7 +59,6 @@ vy_lsm_validate_formats(const struct vy_lsm *lsm)
 	assert(lsm->disk_format != NULL);
 	assert(lsm->mem_format != NULL);
 	assert(lsm->mem_format_with_colmask != NULL);
-	assert(lsm->upsert_format != NULL);
 	uint32_t index_field_count = lsm->mem_format->index_field_count;
 	(void) index_field_count;
 	if (lsm->index_id == 0) {
@@ -73,7 +72,6 @@ vy_lsm_validate_formats(const struct vy_lsm *lsm)
 		assert(lsm->disk_format->index_field_count <=
 		       index_field_count);
 	}
-	assert(lsm->upsert_format->index_field_count == index_field_count);
 	assert(lsm->mem_format_with_colmask->index_field_count ==
 	       index_field_count);
 }
@@ -189,12 +187,6 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	tuple_format_ref(lsm->disk_format);
 
 	if (index_def->iid == 0) {
-		lsm->upsert_format =
-			vy_tuple_format_new_upsert(format);
-		if (lsm->upsert_format == NULL)
-			goto fail_upsert_format;
-		tuple_format_ref(lsm->upsert_format);
-
 		lsm->mem_format_with_colmask =
 			vy_tuple_format_new_with_colmask(format);
 		if (lsm->mem_format_with_colmask == NULL)
@@ -202,9 +194,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		tuple_format_ref(lsm->mem_format_with_colmask);
 	} else {
 		lsm->mem_format_with_colmask = pk->mem_format_with_colmask;
-		lsm->upsert_format = pk->upsert_format;
 		tuple_format_ref(lsm->mem_format_with_colmask);
-		tuple_format_ref(lsm->upsert_format);
 	}
 
 	if (vy_lsm_stat_create(&lsm->stat) != 0)
@@ -216,7 +206,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 
 	lsm->mem = vy_mem_new(mem_env, *lsm->env->p_generation,
 			      cmp_def, format, lsm->mem_format_with_colmask,
-			      lsm->upsert_format, schema_version);
+			      schema_version);
 	if (lsm->mem == NULL)
 		goto fail_mem;
 
@@ -252,8 +242,6 @@ fail_run_hist:
 fail_stat:
 	tuple_format_unref(lsm->mem_format_with_colmask);
 fail_mem_format_with_colmask:
-	tuple_format_unref(lsm->upsert_format);
-fail_upsert_format:
 	tuple_format_unref(lsm->disk_format);
 fail_format:
 	key_def_delete(cmp_def);
@@ -306,7 +294,6 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	vy_range_heap_destroy(&lsm->range_heap);
 	tuple_format_unref(lsm->disk_format);
 	tuple_format_unref(lsm->mem_format_with_colmask);
-	tuple_format_unref(lsm->upsert_format);
 	key_def_delete(lsm->cmp_def);
 	key_def_delete(lsm->key_def);
 	histogram_delete(lsm->run_hist);
@@ -397,8 +384,7 @@ vy_lsm_recover_run(struct vy_lsm *lsm, struct vy_run_recovery_info *run_info,
 	     vy_run_rebuild_index(run, lsm->env->path,
 				  lsm->space_id, lsm->index_id,
 				  lsm->cmp_def, lsm->key_def,
-				  lsm->mem_format, lsm->upsert_format,
-				  &lsm->opts) != 0)) {
+				  lsm->mem_format, &lsm->opts) != 0)) {
 		vy_run_unref(run);
 		return NULL;
 	}
@@ -759,8 +745,7 @@ vy_lsm_rotate_mem(struct vy_lsm *lsm)
 	assert(lsm->mem != NULL);
 	mem = vy_mem_new(lsm->mem->env, *lsm->env->p_generation,
 			 lsm->cmp_def, lsm->mem_format,
-			 lsm->mem_format_with_colmask,
-			 lsm->upsert_format, schema_version);
+			 lsm->mem_format_with_colmask, schema_version);
 	if (mem == NULL)
 		return -1;
 
@@ -798,23 +783,17 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	/* We can't free region_stmt below, so let's add it to the stats */
 	lsm->stat.memory.count.bytes += tuple_size(stmt);
 
+	/* Abort transaction if format was changed by DDL */
 	uint32_t format_id = stmt->format_id;
-	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT) {
-		/* Abort transaction if format was changed by DDL */
-		if (format_id != tuple_format_id(mem->format_with_colmask) &&
-		    format_id != tuple_format_id(mem->format)) {
-			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-			return -1;
-		}
-		return vy_mem_insert(mem, *region_stmt);
-	} else {
-		/* Abort transaction if format was changed by DDL */
-		if (format_id != tuple_format_id(mem->upsert_format)) {
-			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-			return -1;
-		}
-		return vy_mem_insert_upsert(mem, *region_stmt);
+	if (format_id != tuple_format_id(mem->format_with_colmask) &&
+	    format_id != tuple_format_id(mem->format)) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
 	}
+	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
+		return vy_mem_insert(mem, *region_stmt);
+	else
+		return vy_mem_insert_upsert(mem, *region_stmt);
 }
 
 /**
@@ -875,7 +854,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 			return;
 		}
 
-		struct tuple *dup = vy_stmt_dup(stmt, lsm->upsert_format);
+		struct tuple *dup = vy_stmt_dup(stmt, lsm->mem_format);
 		if (dup != NULL) {
 			lsm->env->upsert_thresh_cb(lsm, dup,
 					lsm->env->upsert_thresh_arg);
@@ -899,8 +878,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
 			vy_apply_upsert(stmt, older, lsm->cmp_def,
-					lsm->mem_format,
-					lsm->upsert_format, false);
+					lsm->mem_format, false);
 		lsm->stat.upsert.applied++;
 
 		if (upserted == NULL) {

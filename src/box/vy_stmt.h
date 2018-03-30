@@ -104,14 +104,6 @@ struct vy_stmt {
 	int64_t lsn;
 	uint8_t  type; /* IPROTO_SELECT/REPLACE/UPSERT/DELETE */
 	/**
-	 * Number of UPSERT statements for the same key preceding
-	 * this statement. Used to trigger upsert squashing in the
-	 * background (see vy_range_set_upsert()). This member is
-	 * stored only for UPSERT statements in the extra memory
-	 * space before offsets table.
-	 *
-	 *     uint8_t n_upserts;
-	 *
 	 * Offsets array concatenated with MessagePack fields
 	 * array.
 	 * char raw[0];
@@ -532,8 +524,6 @@ static inline const char *
 vy_upsert_data_range(const struct tuple *tuple, uint32_t *p_size)
 {
 	assert(vy_stmt_type(tuple) == IPROTO_UPSERT);
-	/* UPSERT must have the n_upserts field. */
-	assert(tuple_format(tuple)->extra_size == sizeof(uint8_t));
 	const char *mp = tuple_data(tuple);
 	assert(mp_typeof(*mp) == MP_ARRAY);
 	const char *mp_end = mp;
@@ -639,9 +629,7 @@ vy_stmt_encode_secondary(const struct tuple *value,
  */
 struct tuple *
 vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format,
-	       struct tuple_format *upsert_format,
-	       bool is_primary);
+	       struct tuple_format *format, bool is_primary);
 
 /**
  * Format a statement into string.
@@ -668,18 +656,6 @@ vy_stmt_str(const struct tuple *stmt);
  */
 struct tuple_format *
 vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
-
-/**
- * Create a tuple format for UPSERT tuples. UPSERTs has an additional
- * extra byte before an offsets table, that stores the count
- * of squashed upserts @sa vy_squash.
- * @param mem_format A base tuple format.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory or format register error.
- */
-struct tuple_format *
-vy_tuple_format_new_upsert(struct tuple_format *mem_format);
 
 /**
  * Check if a key of @a tuple contains NULL.

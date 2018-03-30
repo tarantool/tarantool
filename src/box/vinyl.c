@@ -1023,14 +1023,6 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 	if (format == NULL)
 		goto fail;
 
-	/* Update the upsert format. */
-	struct tuple_format *upsert_format =
-		vy_tuple_format_new_upsert(new_format);
-	if (upsert_format == NULL) {
-		tuple_format_delete(format);
-		goto fail;
-	}
-
 	/* Set possibly changed opts. */
 	pk->opts = new_index_def->opts;
 	pk->check_is_unique = true;
@@ -1038,12 +1030,9 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 	/* Set new formats. */
 	tuple_format_unref(pk->disk_format);
 	tuple_format_unref(pk->mem_format);
-	tuple_format_unref(pk->upsert_format);
 	tuple_format_unref(pk->mem_format_with_colmask);
 	pk->disk_format = new_format;
 	tuple_format_ref(new_format);
-	pk->upsert_format = upsert_format;
-	tuple_format_ref(upsert_format);
 	pk->mem_format_with_colmask = format;
 	tuple_format_ref(format);
 	pk->mem_format = new_format;
@@ -1062,13 +1051,10 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		lsm->check_is_unique = lsm->opts.is_unique;
 		tuple_format_unref(lsm->mem_format_with_colmask);
 		tuple_format_unref(lsm->mem_format);
-		tuple_format_unref(lsm->upsert_format);
 		lsm->mem_format_with_colmask = pk->mem_format_with_colmask;
 		lsm->mem_format = pk->mem_format;
-		lsm->upsert_format = pk->upsert_format;
 		tuple_format_ref(lsm->mem_format_with_colmask);
 		tuple_format_ref(lsm->mem_format);
-		tuple_format_ref(lsm->upsert_format);
 		key_def_update_optionality(lsm->key_def,
 					   new_format->min_field_count);
 		key_def_update_optionality(lsm->cmp_def,
@@ -1919,7 +1905,7 @@ vy_lsm_upsert(struct vy_tx *tx, struct vy_lsm *lsm,
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
-	vystmt = vy_stmt_new_upsert(lsm->upsert_format, tuple, tuple_end,
+	vystmt = vy_stmt_new_upsert(lsm->mem_format, tuple, tuple_end,
 				    operations, 1);
 	if (vystmt == NULL)
 		return -1;
@@ -2906,8 +2892,6 @@ struct vy_join_ctx {
 	struct key_def *key_def;
 	/** LSM tree format used for REPLACE and DELETE statements. */
 	struct tuple_format *format;
-	/** LSM tree format used for UPSERT statements. */
-	struct tuple_format *upsert_format;
 	/**
 	 * Write iterator for merging runs before sending
 	 * them to the replica.
@@ -3024,8 +3008,7 @@ vy_send_range(struct vy_join_ctx *ctx,
 	/* Create a write iterator. */
 	struct rlist fake_read_views;
 	rlist_create(&fake_read_views);
-	ctx->wi = vy_write_iterator_new(ctx->key_def,
-					ctx->format, ctx->upsert_format,
+	ctx->wi = vy_write_iterator_new(ctx->key_def, ctx->format,
 					true, true, &fake_read_views);
 	if (ctx->wi == NULL) {
 		rc = -1;
@@ -3082,10 +3065,6 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 	if (ctx->format == NULL)
 		goto out_free_key_def;
 	tuple_format_ref(ctx->format);
-	ctx->upsert_format = vy_tuple_format_new_upsert(ctx->format);
-	if (ctx->upsert_format == NULL)
-		goto out_free_format;
-	tuple_format_ref(ctx->upsert_format);
 
 	/* Send ranges. */
 	struct vy_range_recovery_info *range_info;
@@ -3096,9 +3075,6 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 			break;
 	}
 
-	tuple_format_unref(ctx->upsert_format);
-	ctx->upsert_format = NULL;
-out_free_format:
 	tuple_format_unref(ctx->format);
 	ctx->format = NULL;
 out_free_key_def:
@@ -3553,9 +3529,8 @@ vy_squash_process(struct vy_squash *squash)
 			return 0;
 		}
 		assert(lsm->index_id == 0);
-		struct tuple *applied =
-			vy_apply_upsert(mem_stmt, result, def, mem->format,
-					mem->upsert_format, true);
+		struct tuple *applied = vy_apply_upsert(mem_stmt, result, def,
+							mem->format, true);
 		lsm->stat.upsert.applied++;
 		tuple_unref(result);
 		if (applied == NULL)

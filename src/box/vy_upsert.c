@@ -125,7 +125,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		const struct key_def *cmp_def, struct tuple_format *format,
-		struct tuple_format *upsert_format, bool suppress_error)
+		bool suppress_error)
 {
 	/*
 	 * old_stmt - previous (old) version of stmt
@@ -195,7 +195,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	if (vy_upsert_try_to_squash(upsert_format, region,
+	if (vy_upsert_try_to_squash(format, region,
 				    result_mp, result_mp_end,
 				    old_ops, old_ops_end,
 				    new_ops, new_ops_end,
@@ -226,8 +226,8 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	operations[0].iov_base = (void *)ops_buf;
 	operations[0].iov_len = header - ops_buf;
 
-	result_stmt = vy_stmt_new_upsert(upsert_format, result_mp,
-					 result_mp_end, operations, 3);
+	result_stmt = vy_stmt_new_upsert(format, result_mp, result_mp_end,
+					 operations, 3);
 	region_truncate(region, region_svp);
 	if (result_stmt == NULL)
 		return NULL;
@@ -244,8 +244,7 @@ check_key:
 		 * @retval the old stmt.
 		 */
 		tuple_unref(result_stmt);
-		result_stmt = vy_stmt_dup(old_stmt, old_type == IPROTO_UPSERT ?
-						    upsert_format : format);
+		result_stmt = vy_stmt_dup(old_stmt, format);
 	}
 	return result_stmt;
 }

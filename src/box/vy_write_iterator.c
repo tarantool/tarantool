@@ -171,8 +171,6 @@ struct vy_write_iterator {
 	const struct key_def *cmp_def;
 	/** Format to allocate new REPLACE and DELETE tuples from vy_run */
 	struct tuple_format *format;
-	/** Same as format, but for UPSERT tuples. */
-	struct tuple_format *upsert_format;
 	/* There is no LSM tree level older than the one we're writing to. */
 	bool is_last_level;
 	/**
@@ -330,9 +328,10 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface;
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(const struct key_def *cmp_def, struct tuple_format *format,
-		      struct tuple_format *upsert_format, bool is_primary,
-		      bool is_last_level, struct rlist *read_views)
+vy_write_iterator_new(const struct key_def *cmp_def,
+		      struct tuple_format *format,
+		      bool is_primary, bool is_last_level,
+		      struct rlist *read_views)
 {
 	/*
 	 * One is reserved for INT64_MAX - maximal read view.
@@ -365,8 +364,6 @@ vy_write_iterator_new(const struct key_def *cmp_def, struct tuple_format *format
 	stream->cmp_def = cmp_def;
 	stream->format = format;
 	tuple_format_ref(stream->format);
-	stream->upsert_format = upsert_format;
-	tuple_format_ref(stream->upsert_format);
 	stream->is_primary = is_primary;
 	stream->is_last_level = is_last_level;
 	return &stream->base;
@@ -415,7 +412,6 @@ vy_write_iterator_close(struct vy_stmt_stream *vstream)
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	vy_write_iterator_stop(vstream);
 	tuple_format_unref(stream->format);
-	tuple_format_unref(stream->upsert_format);
 	free(stream);
 }
 
@@ -447,8 +443,7 @@ vy_write_iterator_new_slice(struct vy_stmt_stream *vstream,
 	if (src == NULL)
 		return -1;
 	vy_slice_stream_open(&src->slice_stream, slice, stream->cmp_def,
-			     stream->format, stream->upsert_format,
-			     stream->is_primary);
+			     stream->format, stream->is_primary);
 	return 0;
 }
 
@@ -767,10 +762,8 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 	     vy_stmt_type(hint) != IPROTO_UPSERT))) {
 		assert(!stream->is_last_level || hint == NULL ||
 		       vy_stmt_type(hint) != IPROTO_UPSERT);
-		struct tuple *applied =
-			vy_apply_upsert(h->tuple, hint,
-					stream->cmp_def, stream->format,
-					stream->upsert_format, false);
+		struct tuple *applied = vy_apply_upsert(h->tuple, hint,
+				stream->cmp_def, stream->format, false);
 		if (applied == NULL)
 			return -1;
 		vy_stmt_unref_if_possible(h->tuple);
@@ -783,10 +776,8 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		assert(h->tuple != NULL &&
 		       vy_stmt_type(h->tuple) == IPROTO_UPSERT);
 		assert(result->tuple != NULL);
-		struct tuple *applied =
-			vy_apply_upsert(h->tuple, result->tuple,
-					stream->cmp_def, stream->format,
-					stream->upsert_format, false);
+		struct tuple *applied = vy_apply_upsert(h->tuple, result->tuple,
+					stream->cmp_def, stream->format, false);
 		if (applied == NULL)
 			return -1;
 		vy_stmt_unref_if_possible(result->tuple);

@@ -220,8 +220,6 @@ struct vy_run_iterator {
 	 * pages.
 	 */
 	struct tuple_format *format;
-	/** Same as format, but for UPSERT tuples. */
-	struct tuple_format *upsert_format;
 	/** Set if this iterator is for a primary index. */
 	bool is_primary;
 	/** The run slice to iterate. */
@@ -367,7 +365,6 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     const struct key_def *key_def,
 		     const struct key_def *user_key_def,
 		     struct tuple_format *mem_format,
-		     struct tuple_format *upsert_format,
 		     const struct index_opts *opts);
 
 enum vy_file_type {
@@ -491,9 +488,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
-		     struct tuple_format *format,
-		     struct tuple_format *upsert_format,
-		     bool is_primary);
+		     struct tuple_format *format, bool is_primary);
 
 /**
  * Advance a run iterator to the newest statement for the next key.
@@ -551,8 +546,6 @@ struct vy_slice_stream {
 	const struct key_def *cmp_def;
 	/** Format for allocating REPLACE and DELETE tuples read from pages. */
 	struct tuple_format *format;
-	/** Same as format, but for UPSERT tuples. */
-	struct tuple_format *upsert_format;
 	/** Set if this iterator is for a primary index. */
 	bool is_primary;
 };
@@ -563,7 +556,7 @@ struct vy_slice_stream {
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 		     const struct key_def *cmp_def, struct tuple_format *format,
-		     struct tuple_format *upsert_format, bool is_primary);
+		     bool is_primary);
 
 /**
  * Run_writer fills a created run with statements one by one,

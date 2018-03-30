@@ -16,8 +16,8 @@ test_basic()
 	struct tuple_format *format;
 	create_test_cache(fields, types, lengthof(fields), &cache, &key_def,
 			  &format);
-	struct tuple *select_all =
-		vy_new_simple_stmt(format, NULL, NULL, &key_template);
+	struct tuple *select_all = vy_new_simple_stmt(format, NULL,
+						      &key_template);
 
 	/*
 	 * Fill the cache with 3 chains.
@@ -87,7 +87,7 @@ test_basic()
 	bool unused;
 	for (int i = 0; i < 4; ++i)
 		vy_cache_iterator_next(&itr, &ret, &unused);
-	ok(vy_stmt_are_same(ret, &chain1[3], format, NULL, NULL),
+	ok(vy_stmt_are_same(ret, &chain1[3], format, NULL),
 	   "next_key * 4");
 
 	/*
@@ -106,11 +106,10 @@ test_basic()
 	 * the last_stmt. So restore on chain1[0], but the result
 	 * must be chain1[1].
 	 */
-	struct tuple *last_stmt =
-		vy_new_simple_stmt(format, NULL, NULL, &chain1[0]);
+	struct tuple *last_stmt = vy_new_simple_stmt(format, NULL, &chain1[0]);
 	ok(vy_cache_iterator_restore(&itr, last_stmt, &ret, &unused) >= 0,
 	   "restore");
-	ok(vy_stmt_are_same(ret, &chain1[1], format, NULL, NULL),
+	ok(vy_stmt_are_same(ret, &chain1[1], format, NULL),
 	   "restore on position after last");
 	tuple_unref(last_stmt);
 

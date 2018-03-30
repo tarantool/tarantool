@@ -193,11 +193,6 @@ struct vy_lsm {
 	 * tuples for vy_mem, and used only by primary key.
 	 */
 	struct tuple_format *mem_format_with_colmask;
-	/*
-	 * Format for UPSERT statements. Note, UPSERTs can only
-	 * appear in spaces with a single index.
-	 */
-	struct tuple_format *upsert_format;
 	/**
 	 * If this LSM tree is for a secondary index, the following
 	 * variable points to the LSM tree of the primary index of

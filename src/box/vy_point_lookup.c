@@ -265,8 +265,7 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 	struct vy_run_iterator run_itr;
 	vy_run_iterator_open(&run_itr, &lsm->stat.disk.iterator, slice,
 			     ITER_EQ, key, rv, lsm->cmp_def, lsm->key_def,
-			     lsm->disk_format, lsm->upsert_format,
-			     lsm->index_id == 0);
+			     lsm->disk_format, lsm->index_id == 0);
 	struct tuple *stmt;
 	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {
@@ -363,8 +362,7 @@ vy_point_lookup_apply_history(struct vy_lsm *lsm,
 		       vy_stmt_lsn(node->stmt) <= (*rv)->vlsn);
 
 		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
-					lsm->cmp_def, lsm->mem_format,
-					lsm->upsert_format, true);
+					lsm->cmp_def, lsm->mem_format, true);
 		lsm->stat.upsert.applied++;
 		if (stmt == NULL)
 			return -1;

@@ -42,7 +42,6 @@ vy_iterator_C_test_finish()
 
 struct tuple *
 vy_new_simple_stmt(struct tuple_format *format,
-		   struct tuple_format *upsert_format,
 		   struct tuple_format *format_with_colmask,
 		   const struct vy_stmt_template *templ)
 {
@@ -121,8 +120,7 @@ vy_new_simple_stmt(struct tuple_format *format,
 		operations[0].iov_base = tmp;
 		operations[0].iov_len = ops - tmp;
 		fail_if(templ->optimize_update);
-		ret = vy_stmt_new_upsert(upsert_format, buf, pos,
-					 operations, 1);
+		ret = vy_stmt_new_upsert(format, buf, pos, operations, 1);
 		fail_if(ret == NULL);
 		break;
 	}
@@ -146,9 +144,8 @@ vy_new_simple_stmt(struct tuple_format *format,
 const struct tuple *
 vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 {
-	struct tuple *stmt =
-		vy_new_simple_stmt(mem->format, mem->upsert_format,
-				   mem->format_with_colmask, templ);
+	struct tuple *stmt = vy_new_simple_stmt(mem->format,
+			mem->format_with_colmask, templ);
 	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
 			&mem->env->allocator, mem->generation);
 	assert(region_stmt != NULL);
@@ -168,13 +165,12 @@ vy_cache_insert_templates_chain(struct vy_cache *cache,
 				const struct vy_stmt_template *key_templ,
 				enum iterator_type order)
 {
-	struct tuple *key =
-		vy_new_simple_stmt(format, NULL, NULL, key_templ);
+	struct tuple *key = vy_new_simple_stmt(format, NULL, key_templ);
 	struct tuple *prev_stmt = NULL;
 	struct tuple *stmt = NULL;
 
 	for (uint i = 0; i < length; ++i) {
-		stmt = vy_new_simple_stmt(format, NULL, NULL, &chain[i]);
+		stmt = vy_new_simple_stmt(format, NULL, &chain[i]);
 		vy_cache_add(cache, stmt, prev_stmt, key, order);
 		if (i != 0)
 			tuple_unref(prev_stmt);
@@ -190,7 +186,7 @@ void
 vy_cache_on_write_template(struct vy_cache *cache, struct tuple_format *format,
 			   const struct vy_stmt_template *templ)
 {
-	struct tuple *written = vy_new_simple_stmt(format, NULL, NULL, templ);
+	struct tuple *written = vy_new_simple_stmt(format, NULL, templ);
 	vy_cache_on_write(cache, written, NULL);
 	tuple_unref(written);
 }
@@ -221,14 +217,9 @@ create_test_mem(struct key_def *def)
 		vy_tuple_format_new_with_colmask(format);
 	assert(format_with_colmask != NULL);
 
-	/* Create upsert format */
-	struct tuple_format *format_upsert =
-		vy_tuple_format_new_upsert(format);
-	assert(format_upsert != NULL);
-
 	/* Create mem */
 	struct vy_mem *mem = vy_mem_new(&mem_env, 1, def, format,
-					format_with_colmask, format_upsert, 0);
+					format_with_colmask, 0);
 	fail_if(mem == NULL);
 	return mem;
 }
@@ -259,13 +250,12 @@ bool
 vy_stmt_are_same(const struct tuple *actual,
 		 const struct vy_stmt_template *expected,
 		 struct tuple_format *format,
-		 struct tuple_format *upsert_format,
 		 struct tuple_format *format_with_colmask)
 {
 	if (vy_stmt_type(actual) != expected->type)
 		return false;
-	struct tuple *tmp = vy_new_simple_stmt(format, upsert_format,
-					       format_with_colmask, expected);
+	struct tuple *tmp = vy_new_simple_stmt(format, format_with_colmask,
+					       expected);
 	fail_if(tmp == NULL);
 	uint32_t a_len, b_len;
 	const char *a, *b;

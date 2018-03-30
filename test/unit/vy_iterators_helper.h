@@ -95,7 +95,6 @@ struct vy_stmt_template {
  * Create a new vinyl statement using the specified template.
  *
  * @param format
- * @param upsert_format Format for upsert statements.
  * @param format_with_colmask Format for statements with a
  *        colmask.
  * @param templ Statement template.
@@ -104,7 +103,6 @@ struct vy_stmt_template {
  */
 struct tuple *
 vy_new_simple_stmt(struct tuple_format *format,
-		   struct tuple_format *upsert_format,
 		   struct tuple_format *format_with_colmask,
 		   const struct vy_stmt_template *templ);
 
@@ -204,7 +202,6 @@ destroy_test_cache(struct vy_cache *cache, struct key_def *def,
  * @param stmt Actual value.
  * @param templ Expected value.
  * @param format Template statement format.
- * @param upsert_format Template upsert statement format.
  * @param format_with_colmask Template statement format with colmask.
  *
  * @retval stmt === template.
@@ -213,7 +210,6 @@ bool
 vy_stmt_are_same(const struct tuple *actual,
 		 const struct vy_stmt_template *expected,
 		 struct tuple_format *format,
-		 struct tuple_format *upsert_format,
 		 struct tuple_format *format_with_colmask);
 
 #if defined(__cplusplus)
