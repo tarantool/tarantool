@@ -134,13 +134,26 @@ struct tuple *
 vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_id)
 {
+	enum iproto_type type = vy_stmt_type(stmt);
 	size_t size = tuple_size(stmt);
+	size_t alloc_size = size;
 	struct tuple *mem_stmt;
-	mem_stmt = lsregion_alloc(lsregion, size, alloc_id);
+
+	/* Reserve one byte for UPSERT counter. */
+	if (type == IPROTO_UPSERT)
+		alloc_size++;
+
+	mem_stmt = lsregion_alloc(lsregion, alloc_size, alloc_id);
 	if (mem_stmt == NULL) {
 		diag_set(OutOfMemory, size, "lsregion_alloc", "mem_stmt");
 		return NULL;
 	}
+
+	if (type == IPROTO_UPSERT) {
+		*(uint8_t *)mem_stmt = 0;
+		mem_stmt = (struct tuple *)((uint8_t *)mem_stmt + 1);
+	}
+
 	memcpy(mem_stmt, stmt, size);
 	/*
 	 * Region allocated statements can't be referenced or unreferenced
@@ -269,13 +282,8 @@ vy_stmt_new_upsert(struct tuple_format *format, const char *tuple_begin,
 	 * memory.
 	 */
 	assert(format->extra_size == sizeof(uint8_t));
-	struct tuple *upsert =
-		vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
-				     operations, ops_cnt, IPROTO_UPSERT);
-	if (upsert == NULL)
-		return NULL;
-	vy_stmt_set_n_upserts(upsert, 0);
-	return upsert;
+	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				    operations, ops_cnt, IPROTO_UPSERT);
 }
 
 struct tuple *

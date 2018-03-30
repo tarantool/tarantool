@@ -146,23 +146,28 @@ vy_stmt_set_type(struct tuple *stmt, enum iproto_type type)
 	((struct vy_stmt *) stmt)->type = type;
 }
 
-/** Get upserts count of the vinyl statement. */
+/**
+ * Get upserts count of the vinyl statement.
+ * Only for UPSERT statements allocated on lsregion.
+ */
 static inline uint8_t
 vy_stmt_n_upserts(const struct tuple *stmt)
 {
-	assert(tuple_format(stmt)->extra_size == sizeof(uint8_t));
-	return *((const uint8_t *) tuple_extra(stmt));
+	assert(stmt->refs == 0);
+	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
+	return *((uint8_t *)stmt - 1);
 }
 
-/** Set upserts count of the vinyl statement. */
+/**
+ * Set upserts count of the vinyl statement.
+ * Only for UPSERT statements allocated on lsregion.
+ */
 static inline void
 vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 {
-	struct tuple_format *format = tuple_format(stmt);
-	assert(format->extra_size == sizeof(uint8_t));
-	char *extra = (char *) stmt + stmt->data_offset -
-		      tuple_format_meta_size(format);
-	*((uint8_t *) extra) = n;
+	assert(stmt->refs == 0);
+	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
+	*((uint8_t *)stmt - 1) = n;
 }
 
 /** Get the column mask of the specified tuple. */
