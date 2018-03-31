@@ -209,7 +209,7 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
  * @return new statement of the same type with the same data.
  */
 struct tuple *
-vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format);
+vy_stmt_dup(const struct tuple *stmt);
 
 struct lsregion;
 
@@ -504,14 +504,12 @@ vy_stmt_new_upsert(struct tuple_format *format,
 /**
  * Create REPLACE statement from UPSERT statement.
  *
- * @param replace_format Format for new REPLACE statement.
  * @param upsert         Upsert statement.
  * @retval not NULL Success.
  * @retval     NULL Memory error.
  */
 struct tuple *
-vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
-			    const struct tuple *upsert);
+vy_stmt_replace_from_upsert(const struct tuple *upsert);
 
 /**
  * Extract MessagePack data from the REPLACE/UPSERT statement.

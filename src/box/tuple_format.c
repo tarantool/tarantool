@@ -324,24 +324,6 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 	return true;
 }
 
-bool
-tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b)
-{
-	if (a->field_map_size != b->field_map_size ||
-	    a->field_count != b->field_count)
-		return false;
-	for (uint32_t i = 0; i < a->field_count; ++i) {
-		if (a->fields[i].type != b->fields[i].type ||
-		    a->fields[i].offset_slot != b->fields[i].offset_slot)
-			return false;
-		if (a->fields[i].is_key_part != b->fields[i].is_key_part)
-			return false;
-		if (a->fields[i].is_nullable != b->fields[i].is_nullable)
-			return false;
-	}
-	return true;
-}
-
 struct tuple_format *
 tuple_format_dup(struct tuple_format *src)
 {

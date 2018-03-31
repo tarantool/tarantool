@@ -140,7 +140,7 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		/*
 		 * INSERT case: return new stmt.
 		 */
-		return vy_stmt_replace_from_upsert(format, new_stmt);
+		return vy_stmt_replace_from_upsert(new_stmt);
 	}
 
 	/*
@@ -244,7 +244,7 @@ check_key:
 		 * @retval the old stmt.
 		 */
 		tuple_unref(result_stmt);
-		result_stmt = vy_stmt_dup(old_stmt, format);
+		result_stmt = vy_stmt_dup(old_stmt);
 	}
 	return result_stmt;
 }

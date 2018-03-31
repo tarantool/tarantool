@@ -215,14 +215,6 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 				       const struct tuple_format *format2);
 
 /**
- * Check that two tuple formats are identical.
- * @param a format a
- * @param b format b
- */
-bool
-tuple_format_eq(const struct tuple_format *a, const struct tuple_format *b);
-
-/**
  * Register the duplicate of the specified format.
  * @param src Original format.
  *

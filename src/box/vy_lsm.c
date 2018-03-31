@@ -822,7 +822,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 			return;
 		}
 
-		struct tuple *dup = vy_stmt_dup(stmt, lsm->mem_format);
+		struct tuple *dup = vy_stmt_dup(stmt);
 		if (dup != NULL) {
 			lsm->env->upsert_thresh_cb(lsm, dup,
 					lsm->env->upsert_thresh_arg);

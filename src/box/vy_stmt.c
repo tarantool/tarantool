@@ -109,22 +109,20 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 }
 
 struct tuple *
-vy_stmt_dup(const struct tuple *stmt, struct tuple_format *format)
+vy_stmt_dup(const struct tuple *stmt)
 {
 	/*
 	 * We don't use tuple_new() to avoid the initializing of
 	 * tuple field map. This map can be simple memcopied from
 	 * the original tuple.
 	 */
-	struct tuple *res = vy_stmt_alloc(format, stmt->bsize);
+	struct tuple *res = vy_stmt_alloc(tuple_format(stmt), stmt->bsize);
 	if (res == NULL)
 		return NULL;
 	assert(tuple_size(res) == tuple_size(stmt));
 	assert(res->data_offset == stmt->data_offset);
 	memcpy(res, stmt, tuple_size(stmt));
 	res->refs = 1;
-	res->format_id = tuple_format_id(format);
-	assert(tuple_size(res) == tuple_size(stmt));
 	return res;
 }
 
@@ -294,8 +292,7 @@ vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
 }
 
 struct tuple *
-vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
-			    const struct tuple *upsert)
+vy_stmt_replace_from_upsert(const struct tuple *upsert)
 {
 	assert(vy_stmt_type(upsert) == IPROTO_UPSERT);
 	/* Get statement size without UPSERT operations */
@@ -304,13 +301,8 @@ vy_stmt_replace_from_upsert(struct tuple_format *replace_format,
 	assert(bsize <= upsert->bsize);
 
 	/* Copy statement data excluding UPSERT operations */
-	struct tuple_format *format = tuple_format_by_id(upsert->format_id);
-	/*
-	 * In other fields the REPLACE tuple format must equal to
-	 * the UPSERT tuple format.
-	 */
-	assert(tuple_format_eq(format, replace_format));
-	struct tuple *replace = vy_stmt_alloc(replace_format, bsize);
+	struct tuple_format *format = tuple_format(upsert);
+	struct tuple *replace = vy_stmt_alloc(format, bsize);
 	if (replace == NULL)
 		return NULL;
 	/* Copy both data and field_map. */

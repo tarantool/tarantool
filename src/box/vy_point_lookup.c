@@ -347,8 +347,7 @@ vy_point_lookup_apply_history(struct vy_lsm *lsm,
 		if (vy_stmt_type(node->stmt) == IPROTO_DELETE) {
 			/* Ignore terminal delete */
 		} else if (node->src_type == ITER_SRC_MEM) {
-			curr_stmt = vy_stmt_dup(node->stmt,
-						tuple_format(node->stmt));
+			curr_stmt = vy_stmt_dup(node->stmt);
 		} else {
 			curr_stmt = node->stmt;
 			tuple_ref(curr_stmt);

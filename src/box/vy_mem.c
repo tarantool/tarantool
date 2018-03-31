@@ -279,7 +279,7 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 	assert(itr->curr_stmt != NULL);
 	if (itr->last_stmt)
 		tuple_unref(itr->last_stmt);
-	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, tuple_format(itr->curr_stmt));
+	itr->last_stmt = vy_stmt_dup(itr->curr_stmt);
 	*ret = itr->last_stmt;
 	if (itr->last_stmt != NULL) {
 		vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
