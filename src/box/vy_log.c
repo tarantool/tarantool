@@ -81,6 +81,7 @@ enum vy_log_key {
 	VY_LOG_KEY_GC_LSN		= 10,
 	VY_LOG_KEY_TRUNCATE_COUNT	= 11,
 	VY_LOG_KEY_CREATE_LSN		= 12,
+	VY_LOG_KEY_MODIFY_LSN		= 13,
 };
 
 /** vy_log_key -> human readable name. */
@@ -98,6 +99,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_GC_LSN]		= "gc_lsn",
 	[VY_LOG_KEY_TRUNCATE_COUNT]	= "truncate_count",
 	[VY_LOG_KEY_CREATE_LSN]		= "create_lsn",
+	[VY_LOG_KEY_MODIFY_LSN]		= "modify_lsn",
 };
 
 /** vy_log_type -> human readable name. */
@@ -115,6 +117,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_DUMP_LSM]		= "dump_lsm",
 	[VY_LOG_SNAPSHOT]		= "snapshot",
 	[VY_LOG_TRUNCATE_LSM]		= "truncate_lsm",
+	[VY_LOG_MODIFY_LSM]		= "modify_lsm",
 };
 
 /** Metadata log object. */
@@ -251,6 +254,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_CREATE_LSN],
 			record->create_lsn);
+	if (record->modify_lsn > 0)
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
+			vy_log_key_name[VY_LOG_KEY_MODIFY_LSN],
+			record->modify_lsn);
 	if (record->dump_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
@@ -360,6 +367,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->create_lsn);
 		n_keys++;
 	}
+	if (record->modify_lsn > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_MODIFY_LSN);
+		size += mp_sizeof_uint(record->modify_lsn);
+		n_keys++;
+	}
 	if (record->dump_lsn > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_DUMP_LSN);
 		size += mp_sizeof_uint(record->dump_lsn);
@@ -431,6 +443,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (record->create_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_CREATE_LSN);
 		pos = mp_encode_uint(pos, record->create_lsn);
+	}
+	if (record->modify_lsn > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_MODIFY_LSN);
+		pos = mp_encode_uint(pos, record->modify_lsn);
 	}
 	if (record->dump_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
@@ -552,6 +568,9 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_CREATE_LSN:
 			record->create_lsn = mp_decode_uint(&pos);
 			break;
+		case VY_LOG_KEY_MODIFY_LSN:
+			record->modify_lsn = mp_decode_uint(&pos);
+			break;
 		case VY_LOG_KEY_DUMP_LSN:
 			record->dump_lsn = mp_decode_uint(&pos);
 			break;
@@ -568,7 +587,7 @@ vy_log_record_decode(struct vy_log_record *record,
 			goto fail;
 		}
 	}
-	if (record->type == VY_LOG_CREATE_LSM && record->create_lsn == 0) {
+	if (record->type == VY_LOG_CREATE_LSM) {
 		/*
 		 * We used to use LSN as unique LSM tree identifier
 		 * and didn't store LSN separately so if there's
@@ -577,7 +596,14 @@ vy_log_record_decode(struct vy_log_record *record,
 		 * fact the LSN of the WAL record that committed
 		 * the LSM tree.
 		 */
-		record->create_lsn = record->lsm_id;
+		if (record->create_lsn == 0)
+			record->create_lsn = record->lsm_id;
+		/*
+		 * If the LSM tree has never been modified, initialize
+		 * 'modify_lsn' with 'create_lsn'.
+		 */
+		if (record->modify_lsn == 0)
+			record->modify_lsn = record->create_lsn;
 	}
 	return 0;
 fail:
@@ -1172,7 +1198,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 		       uint32_t space_id, uint32_t index_id,
 		       const struct key_part_def *key_parts,
 		       uint32_t key_part_count, int64_t create_lsn,
-		       int64_t dump_lsn)
+		       int64_t modify_lsn, int64_t dump_lsn)
 {
 	struct vy_lsm_recovery_info *lsm;
 	struct key_part_def *key_parts_copy;
@@ -1259,6 +1285,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->key_part_count = key_part_count;
 	lsm->is_dropped = false;
 	lsm->create_lsn = create_lsn;
+	lsm->modify_lsn = modify_lsn;
 	lsm->dump_lsn = dump_lsn;
 
 	/*
@@ -1282,6 +1309,43 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 	if (recovery->max_id < id)
 		recovery->max_id = id;
 
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_MODIFY_LSM log record.
+ * This function updates key definition of the LSM tree with ID @id.
+ * Return 0 on success, -1 on failure.
+ */
+static int
+vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
+		       const struct key_part_def *key_parts,
+		       uint32_t key_part_count, int64_t modify_lsn)
+{
+	struct vy_lsm_recovery_info *lsm;
+	lsm = vy_recovery_lookup_lsm(recovery, id);
+	if (lsm == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Update of unregistered LSM tree %lld",
+				    (long long)id));
+		return -1;
+	}
+	if (lsm->is_dropped) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Update of deleted LSM tree %lld",
+				    (long long)id));
+		return -1;
+	}
+	free(lsm->key_parts);
+	lsm->key_parts = malloc(sizeof(*key_parts) * key_part_count);
+	if (lsm->key_parts == NULL) {
+		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
+			 "malloc", "struct key_part_def");
+		return -1;
+	}
+	memcpy(lsm->key_parts, key_parts, sizeof(*key_parts) * key_part_count);
+	lsm->key_part_count = key_part_count;
+	lsm->modify_lsn = modify_lsn;
 	return 0;
 }
 
@@ -1757,7 +1821,13 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		rc = vy_recovery_create_lsm(recovery, record->lsm_id,
 				record->space_id, record->index_id,
 				record->key_parts, record->key_part_count,
-				record->create_lsn, record->dump_lsn);
+				record->create_lsn, record->modify_lsn,
+				record->dump_lsn);
+		break;
+	case VY_LOG_MODIFY_LSM:
+		rc = vy_recovery_modify_lsm(recovery, record->lsm_id,
+				record->key_parts, record->key_part_count,
+				record->modify_lsn);
 		break;
 	case VY_LOG_DROP_LSM:
 		rc = vy_recovery_drop_lsm(recovery, record->lsm_id);
@@ -2007,6 +2077,7 @@ vy_log_append_lsm(struct xlog *xlog, struct vy_lsm_recovery_info *lsm)
 	record.key_parts = lsm->key_parts;
 	record.key_part_count = lsm->key_part_count;
 	record.create_lsn = lsm->create_lsn;
+	record.modify_lsn = lsm->modify_lsn;
 	record.dump_lsn = lsm->dump_lsn;
 	if (vy_log_append_record(xlog, &record) != 0)
 		return -1;

@@ -803,7 +803,7 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (lsm->is_committed) {
+		if (lsm->commit_lsn >= 0) {
 			vy_scheduler_add_lsm(&env->scheduler, lsm);
 			return;
 		}
@@ -828,8 +828,8 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	if (lsm->opts.lsn != 0)
 		lsn = lsm->opts.lsn;
 
-	assert(!lsm->is_committed);
-	lsm->is_committed = true;
+	assert(lsm->commit_lsn < 0);
+	lsm->commit_lsn = lsn;
 
 	assert(lsm->range_count == 1);
 	struct vy_range *range = vy_range_tree_first(lsm->tree);
@@ -852,6 +852,34 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	 * a task for it.
 	 */
 	vy_scheduler_add_lsm(&env->scheduler, lsm);
+}
+
+static void
+vinyl_index_commit_modify(struct index *index, int64_t lsn)
+{
+	struct vy_env *env = vy_env(index->engine);
+	struct vy_lsm *lsm = vy_lsm(index);
+
+	(void)env;
+	assert(env->status == VINYL_ONLINE ||
+	       env->status == VINYL_FINAL_RECOVERY_LOCAL ||
+	       env->status == VINYL_FINAL_RECOVERY_REMOTE);
+
+	if (lsn <= lsm->commit_lsn) {
+		/*
+		 * This must be local recovery from WAL, when
+		 * the operation has already been committed to
+		 * vylog.
+		 */
+		assert(env->status == VINYL_FINAL_RECOVERY_LOCAL);
+		return;
+	}
+
+	lsm->commit_lsn = lsn;
+
+	vy_log_tx_begin();
+	vy_log_modify_lsm(lsm->id, lsm->key_def, lsn);
+	vy_log_tx_try_commit();
 }
 
 /*
@@ -945,11 +973,10 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	/*
-	 * Regardless of the space emptyness, key definition of an
-	 * existing index can not be changed, because key
-	 * definition is already in vylog. See #3169.
-	 */
+	/* The space is empty. Allow alter. */
+	if (pk->stat.disk.count.rows == 0 &&
+	    pk->stat.memory.count.rows == 0)
+		return 0;
 	if (old_space->index_count == new_space->index_count) {
 		/* Check index_defs to be unchanged. */
 		for (uint32_t i = 0; i < old_space->index_count; ++i) {
@@ -961,25 +988,14 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 			 * vinyl yet.
 			 */
 			if (index_def_change_requires_rebuild(old_def,
-							      new_def) ||
-			    key_part_cmp(old_def->key_def->parts,
-					 old_def->key_def->part_count,
-					 new_def->key_def->parts,
-					 new_def->key_def->part_count) != 0) {
+							      new_def)) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-					 "changing the definition of an index");
+					 "changing the definition of "
+					 "a non-empty index");
 				return -1;
 			}
 		}
 	}
-	if (pk->stat.disk.count.rows == 0 &&
-	    pk->stat.memory.count.rows == 0)
-		return 0;
-	/*
-	 * Since space format is not persisted in vylog, it can be
-	 * altered on non-empty space to some state, compatible
-	 * with the old one.
-	 */
 	if (space_def_check_compatibility(old_space->def, new_space->def,
 					  false) != 0)
 		return -1;
@@ -1083,6 +1099,8 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 	     new_lsm->mem_format_with_colmask);
 	SWAP(old_lsm->disk_format, new_lsm->disk_format);
 	SWAP(old_lsm->opts, new_lsm->opts);
+	key_def_swap(old_lsm->key_def, new_lsm->key_def);
+	key_def_swap(old_lsm->cmp_def, new_lsm->cmp_def);
 }
 
 static int
@@ -3941,7 +3959,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .destroy = */ vinyl_index_destroy,
 	/* .commit_create = */ vinyl_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
+	/* .commit_modify = */ vinyl_index_commit_modify,
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ vinyl_index_depends_on_pk,

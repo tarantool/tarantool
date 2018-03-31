@@ -255,11 +255,13 @@ struct vy_lsm {
 	 * been dumped yet.
 	 */
 	int64_t dump_lsn;
-	/*
-	 * This flag is set if the LSM tree creation was
-	 * committed to the metadata log.
+	/**
+	 * LSN of the WAL row that created or last modified
+	 * this LSM tree. We store it in vylog so that during
+	 * local recovery we can replay vylog records we failed
+	 * to log before restart.
 	 */
-	bool is_committed;
+	int64_t commit_lsn;
 	/**
 	 * This flag is set if the LSM tree was dropped.
 	 * It is also set on local recovery if the LSM tree

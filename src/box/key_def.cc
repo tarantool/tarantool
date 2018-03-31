@@ -107,6 +107,15 @@ key_def_dup(const struct key_def *src)
 }
 
 void
+key_def_swap(struct key_def *old_def, struct key_def *new_def)
+{
+	assert(old_def->part_count == new_def->part_count);
+	for (uint32_t i = 0; i < new_def->part_count; i++)
+		SWAP(old_def->parts[i], new_def->parts[i]);
+	SWAP(*old_def, *new_def);
+}
+
+void
 key_def_delete(struct key_def *def)
 {
 	free(def);

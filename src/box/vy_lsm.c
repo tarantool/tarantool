@@ -182,6 +182,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->id = -1;
 	lsm->refs = 1;
 	lsm->dump_lsn = -1;
+	lsm->commit_lsn = -1;
 	vy_cache_create(&lsm->cache, cache_env, cmp_def);
 	rlist_create(&lsm->sealed);
 	vy_range_tree_new(lsm->tree);
@@ -479,7 +480,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 		 bool is_checkpoint_recovery, bool force_recovery)
 {
 	assert(lsm->id < 0);
-	assert(!lsm->is_committed);
+	assert(lsm->commit_lsn < 0);
 	assert(lsm->range_count == 0);
 
 	/*
@@ -535,7 +536,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 	}
 
 	lsm->id = lsm_info->id;
-	lsm->is_committed = true;
+	lsm->commit_lsn = lsm_info->modify_lsn;
 
 	if (lsn < lsm_info->create_lsn || lsm_info->is_dropped) {
 		/*

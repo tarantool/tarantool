@@ -87,7 +87,7 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ...
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 #box.space._index:select({space.id})
 ---
@@ -116,7 +116,7 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ...
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 #box.space._index:select({space.id})
 ---
@@ -145,7 +145,7 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ...
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 #box.space._index:select({space.id})
 ---
@@ -165,7 +165,7 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ...
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 box.snapshot()
 ---
@@ -174,27 +174,33 @@ box.snapshot()
 while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 ---
 ...
--- After a dump REPLACE + DELETE = nothing, so the space is empty
--- but an index can not be altered.
+-- after a dump REPLACE + DELETE = nothing, so the space is empty now and
+-- can be altered.
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ---
 ...
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
 ...
--- Space format still can be altered.
-format = {}
+#box.space._index:select({space.id})
 ---
+- 2
 ...
-format[1] = {name = 'field1', type = 'unsigned'}
+box.space._index:get{space.id, 0}[6]
 ---
+- [[0, 'unsigned'], [1, 'unsigned']]
 ...
-format[2] = {name = 'field2', type = 'unsigned'}
+space:insert({1, 2})
 ---
+- [1, 2]
 ...
-space:format(format)
+index:select{}
 ---
+- - [1, 2]
+...
+index2:select{}
+---
+- - [1, 2]
 ...
 space:drop()
 ---
@@ -230,7 +236,7 @@ index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ...
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 -- After compaction the REPLACE + DELETE + DELETE = nothing, so
 -- the space is now empty and can be altered.
@@ -256,10 +262,8 @@ while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 ---
 ...
--- Can not alter an index even if it becames empty after dump.
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of an index
 ...
 space:drop()
 ---
@@ -287,7 +291,7 @@ space:auto_increment{3}
 ...
 box.space._index:replace{space.id, 0, 'pk', 'tree', {unique=true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 space:select{}
 ---
@@ -828,7 +832,7 @@ s.index.secondary.unique
 ...
 s.index.secondary:alter{unique = true} -- error
 ---
-- error: Vinyl does not support changing the definition of an index
+- error: Vinyl does not support changing the definition of a non-empty index
 ...
 s.index.secondary.unique
 ---
@@ -842,46 +846,6 @@ s.index.secondary:select(10)
 ---
 - - [1, 10]
   - [2, 10]
-...
-s:drop()
----
-...
---
--- gh-3169: vinyl index key definition can not be altered even if
--- the index is empty.
---
-s = box.schema.space.create('vinyl', {engine = 'vinyl'})
----
-...
-i = s:create_index('pk')
----
-...
-i:alter{parts = {1, 'integer'}}
----
-- error: Vinyl does not support changing the definition of an index
-...
-_ = s:replace{-1}
----
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
-...
-_ = s:replace{1}
----
-...
-_ = s:replace{-2}
----
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
-...
-_ = s:replace{3}
----
-...
-_ = s:replace{-3}
----
-- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
-...
-s:select{}
----
-- - [1]
-  - [3]
 ...
 s:drop()
 ---

@@ -164,6 +164,11 @@ enum vy_log_record_type {
 	 * WAL records written after truncation.
 	 */
 	VY_LOG_TRUNCATE_LSM		= 12,
+	/**
+	 * Modify key definition of an LSM tree.
+	 * Requires vy_log_record::lsm_id, key_def, modify_lsn.
+	 */
+	VY_LOG_MODIFY_LSM		= 13,
 
 	vy_log_record_type_MAX
 };
@@ -202,6 +207,8 @@ struct vy_log_record {
 	uint32_t key_part_count;
 	/** LSN of the WAL row that created the LSM tree. */
 	int64_t create_lsn;
+	/** LSN of the WAL row that last modified the LSM tree. */
+	int64_t modify_lsn;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -255,6 +262,8 @@ struct vy_lsm_recovery_info {
 	bool is_dropped;
 	/** LSN of the WAL row that created the LSM tree. */
 	int64_t create_lsn;
+	/** LSN of the WAL row that last modified the LSM tree. */
+	int64_t modify_lsn;
 	/** LSN of the last LSM tree dump. */
 	int64_t dump_lsn;
 	/**
@@ -513,6 +522,19 @@ vy_log_create_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
 	record.index_id = index_id;
 	record.key_def = key_def;
 	record.create_lsn = create_lsn;
+	vy_log_write(&record);
+}
+
+/** Helper to log a vinyl LSM tree modification. */
+static inline void
+vy_log_modify_lsm(int64_t id, const struct key_def *key_def, int64_t modify_lsn)
+{
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_MODIFY_LSM;
+	record.lsm_id = id;
+	record.key_def = key_def;
+	record.modify_lsn = modify_lsn;
 	vy_log_write(&record);
 }
 
