@@ -147,18 +147,12 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		 * definitions as well as space->format tuples.
 		 */
 		lsm->disk_format = format;
-		tuple_format_ref(format);
 	} else {
 		lsm->disk_format = tuple_format_new(&vy_tuple_format_vtab,
 						    &cmp_def, 1, 0, NULL, 0,
 						    NULL);
 		if (lsm->disk_format == NULL)
 			goto fail_format;
-		for (uint32_t i = 0; i < cmp_def->part_count; ++i) {
-			uint32_t fieldno = cmp_def->parts[i].fieldno;
-			lsm->disk_format->fields[fieldno].is_nullable =
-				format->fields[fieldno].is_nullable;
-		}
 	}
 	tuple_format_ref(lsm->disk_format);
 
@@ -167,11 +161,10 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 			vy_tuple_format_new_with_colmask(format);
 		if (lsm->mem_format_with_colmask == NULL)
 			goto fail_mem_format_with_colmask;
-		tuple_format_ref(lsm->mem_format_with_colmask);
 	} else {
 		lsm->mem_format_with_colmask = pk->mem_format_with_colmask;
-		tuple_format_ref(lsm->mem_format_with_colmask);
 	}
+	tuple_format_ref(lsm->mem_format_with_colmask);
 
 	if (vy_lsm_stat_create(&lsm->stat) != 0)
 		goto fail_stat;
