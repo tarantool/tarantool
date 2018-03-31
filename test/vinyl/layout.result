@@ -127,12 +127,8 @@ result
     - - HEADER:
           type: INSERT
         BODY:
-          tuple: [0, {7: [{'field': 0, 'collation': 1, 'type': 'string'}], 12: 3,
+          tuple: [0, {7: [{'field': 0, 'collation': 1, 'type': 'string'}], 9: 9, 12: 3,
               6: 512}]
-      - HEADER:
-          type: INSERT
-        BODY:
-          tuple: [10, {9: 9}]
       - HEADER:
           type: INSERT
         BODY:
@@ -157,11 +153,7 @@ result
           type: INSERT
         BODY:
           tuple: [0, {0: 2, 5: 1, 6: 512, 7: [{'field': 1, 'is_nullable': true, 'type': 'unsigned'}],
-              12: 4}]
-      - HEADER:
-          type: INSERT
-        BODY:
-          tuple: [10, {0: 2, 9: 9}]
+              9: 9, 12: 4}]
       - HEADER:
           type: INSERT
         BODY:

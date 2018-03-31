@@ -1171,7 +1171,8 @@ static int
 vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 		       uint32_t space_id, uint32_t index_id,
 		       const struct key_part_def *key_parts,
-		       uint32_t key_part_count, int64_t create_lsn)
+		       uint32_t key_part_count, int64_t create_lsn,
+		       int64_t dump_lsn)
 {
 	struct vy_lsm_recovery_info *lsm;
 	struct key_part_def *key_parts_copy;
@@ -1258,7 +1259,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->key_part_count = key_part_count;
 	lsm->is_dropped = false;
 	lsm->create_lsn = create_lsn;
-	lsm->dump_lsn = -1;
+	lsm->dump_lsn = dump_lsn;
 
 	/*
 	 * Add the LSM tree to the hash.
@@ -1756,7 +1757,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		rc = vy_recovery_create_lsm(recovery, record->lsm_id,
 				record->space_id, record->index_id,
 				record->key_parts, record->key_part_count,
-				record->create_lsn);
+				record->create_lsn, record->dump_lsn);
 		break;
 	case VY_LOG_DROP_LSM:
 		rc = vy_recovery_drop_lsm(recovery, record->lsm_id);
@@ -2006,17 +2007,9 @@ vy_log_append_lsm(struct xlog *xlog, struct vy_lsm_recovery_info *lsm)
 	record.key_parts = lsm->key_parts;
 	record.key_part_count = lsm->key_part_count;
 	record.create_lsn = lsm->create_lsn;
+	record.dump_lsn = lsm->dump_lsn;
 	if (vy_log_append_record(xlog, &record) != 0)
 		return -1;
-
-	if (lsm->dump_lsn >= 0) {
-		vy_log_record_init(&record);
-		record.type = VY_LOG_DUMP_LSM;
-		record.lsm_id = lsm->id;
-		record.dump_lsn = lsm->dump_lsn;
-		if (vy_log_append_record(xlog, &record) != 0)
-			return -1;
-	}
 
 	rlist_foreach_entry(run, &lsm->runs, in_lsm) {
 		vy_log_record_init(&record);
