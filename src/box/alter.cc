@@ -1432,7 +1432,13 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
 		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
-		(void) new RebuildIndex(alter, new_def, old_def);
+		if (key_part_check_compatibility(old_def->cmp_def->parts,
+						 old_def->cmp_def->part_count,
+						 new_def->cmp_def->parts,
+						 new_def->cmp_def->part_count))
+			(void) new ModifyIndex(alter, new_def, old_def);
+		else
+			(void) new RebuildIndex(alter, new_def, old_def);
 		guard.is_active = false;
 	}
 }
