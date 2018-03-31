@@ -316,6 +316,14 @@ memtx_tree_index_update_def(struct index *base)
 	index->tree.arg = memtx_tree_index_cmp_def(index);
 }
 
+static bool
+memtx_tree_index_depends_on_pk(struct index *base)
+{
+	struct index_def *def = base->def;
+	/* See comment to memtx_tree_index_cmp_def(). */
+	return !def->opts.is_unique || def->key_def->is_nullable;
+}
+
 static ssize_t
 memtx_tree_index_size(struct index *base)
 {
@@ -586,6 +594,7 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .commit_modify = */ generic_index_commit_modify,
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ memtx_tree_index_update_def,
+	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
 	/* .size = */ memtx_tree_index_size,
 	/* .bsize = */ memtx_tree_index_bsize,
 	/* .min = */ generic_index_min,

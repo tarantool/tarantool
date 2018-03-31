@@ -1100,7 +1100,7 @@ public:
 	                         old_index_def->key_def->part_count) != 0) {
 	                /*
 	                 * Primary parts have been changed -
-	                 * update non-unique secondary indexes.
+	                 * update secondary indexes.
 	                 */
 	                alter->pk_def = new_index_def->key_def;
 	        }
@@ -1411,9 +1411,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		struct index_def *old_def = old_index->def;
 		struct index_def *new_def;
 		uint32_t min_field_count = alter->new_min_field_count;
-		if ((old_def->opts.is_unique &&
-		     !old_def->key_def->is_nullable) ||
-		    old_def->type != TREE || alter->pk_def == NULL) {
+		if (alter->pk_def == NULL || !index_depends_on_pk(old_index)) {
 			if (is_min_field_count_changed) {
 				new_def = index_def_dup(old_def);
 				index_def_update_optionality(new_def,
@@ -1425,9 +1423,8 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 			continue;
 		}
 		/*
-		 * Rebuild non-unique secondary keys along with
-		 * the primary, since primary key parts have
-		 * changed.
+		 * Rebuild secondary indexes that depend on the
+		 * primary key since primary key parts have changed.
 		 */
 		new_def = index_def_new(old_def->space_id, old_def->iid,
 					old_def->name, strlen(old_def->name),

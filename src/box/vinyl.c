@@ -906,6 +906,17 @@ vinyl_index_commit_drop(struct index *index)
 	vy_log_tx_try_commit();
 }
 
+static bool
+vinyl_index_depends_on_pk(struct index *index)
+{
+	(void)index;
+	/*
+	 * All secondary Vinyl indexes are non-clustered and hence
+	 * have to be updated if the primary key is modified.
+	 */
+	return true;
+}
+
 static void
 vinyl_init_system_space(struct space *space)
 {
@@ -3948,6 +3959,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .commit_modify = */ generic_index_commit_modify,
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
+	/* .depends_on_pk = */ vinyl_index_depends_on_pk,
 	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
 	/* .min = */ generic_index_min,

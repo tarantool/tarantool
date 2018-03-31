@@ -560,6 +560,11 @@ generic_index_update_def(struct index *)
 {
 }
 
+bool generic_index_depends_on_pk(struct index *)
+{
+	return false;
+}
+
 ssize_t
 generic_index_size(struct index *index)
 {
