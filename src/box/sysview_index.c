@@ -162,6 +162,7 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .destroy = */ sysview_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ generic_index_commit_modify,
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .size = */ generic_index_size,

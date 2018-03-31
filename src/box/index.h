@@ -356,6 +356,14 @@ struct index_vtab {
 	 */
 	void (*abort_create)(struct index *index);
 	/**
+	 * Called after WAL write to comit index definition update.
+	 * Must not fail.
+	 *
+	 * @signature is the LSN that was assigned to the row
+	 * that modified the index.
+	 */
+	void (*commit_modify)(struct index *index, int64_t signature);
+	/**
 	 * Called after WAL write to commit index drop.
 	 * Must not fail.
 	 */
@@ -480,6 +488,12 @@ index_abort_create(struct index *index)
 }
 
 static inline void
+index_commit_modify(struct index *index, int64_t signature)
+{
+	index->vtab->commit_modify(index, signature);
+}
+
+static inline void
 index_commit_drop(struct index *index)
 {
 	index->vtab->commit_drop(index);
@@ -599,6 +613,7 @@ index_end_build(struct index *index)
  */
 void generic_index_commit_create(struct index *, int64_t);
 void generic_index_abort_create(struct index *);
+void generic_index_commit_modify(struct index *, int64_t);
 void generic_index_commit_drop(struct index *);
 void generic_index_update_def(struct index *);
 ssize_t generic_index_size(struct index *);

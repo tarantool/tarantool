@@ -382,6 +382,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .destroy = */ memtx_hash_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ generic_index_commit_modify,
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ memtx_hash_index_update_def,
 	/* .size = */ memtx_hash_index_size,

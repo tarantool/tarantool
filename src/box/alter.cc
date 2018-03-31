@@ -1109,6 +1109,7 @@ public:
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t lsn);
 	virtual void rollback(struct alter_space *alter);
 	virtual ~ModifyIndex();
 };
@@ -1139,6 +1140,14 @@ ModifyIndex::alter(struct alter_space *alter)
 	assert(new_index != NULL);
 	SWAP(old_index->def, new_index->def);
 	index_update_def(new_index);
+}
+
+void
+ModifyIndex::commit(struct alter_space *alter, int64_t signature)
+{
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
+	index_commit_modify(new_index, signature);
 }
 
 void
