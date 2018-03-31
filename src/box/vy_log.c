@@ -80,7 +80,7 @@ enum vy_log_key {
 	VY_LOG_KEY_DUMP_LSN		= 9,
 	VY_LOG_KEY_GC_LSN		= 10,
 	VY_LOG_KEY_TRUNCATE_COUNT	= 11,
-	VY_LOG_KEY_COMMIT_LSN		= 12,
+	VY_LOG_KEY_CREATE_LSN		= 12,
 };
 
 /** vy_log_key -> human readable name. */
@@ -97,7 +97,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_DUMP_LSN]		= "dump_lsn",
 	[VY_LOG_KEY_GC_LSN]		= "gc_lsn",
 	[VY_LOG_KEY_TRUNCATE_COUNT]	= "truncate_count",
-	[VY_LOG_KEY_COMMIT_LSN]		= "commit_lsn",
+	[VY_LOG_KEY_CREATE_LSN]		= "create_lsn",
 };
 
 /** vy_log_type -> human readable name. */
@@ -247,10 +247,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_SLICE_ID],
 			record->slice_id);
-	if (record->commit_lsn > 0)
+	if (record->create_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
-			vy_log_key_name[VY_LOG_KEY_COMMIT_LSN],
-			record->commit_lsn);
+			vy_log_key_name[VY_LOG_KEY_CREATE_LSN],
+			record->create_lsn);
 	if (record->dump_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
@@ -355,9 +355,9 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->slice_id);
 		n_keys++;
 	}
-	if (record->commit_lsn > 0) {
-		size += mp_sizeof_uint(VY_LOG_KEY_COMMIT_LSN);
-		size += mp_sizeof_uint(record->commit_lsn);
+	if (record->create_lsn > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_CREATE_LSN);
+		size += mp_sizeof_uint(record->create_lsn);
 		n_keys++;
 	}
 	if (record->dump_lsn > 0) {
@@ -428,9 +428,9 @@ vy_log_record_encode(const struct vy_log_record *record,
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SLICE_ID);
 		pos = mp_encode_uint(pos, record->slice_id);
 	}
-	if (record->commit_lsn > 0) {
-		pos = mp_encode_uint(pos, VY_LOG_KEY_COMMIT_LSN);
-		pos = mp_encode_uint(pos, record->commit_lsn);
+	if (record->create_lsn > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_CREATE_LSN);
+		pos = mp_encode_uint(pos, record->create_lsn);
 	}
 	if (record->dump_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
@@ -549,8 +549,8 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_SLICE_ID:
 			record->slice_id = mp_decode_uint(&pos);
 			break;
-		case VY_LOG_KEY_COMMIT_LSN:
-			record->commit_lsn = mp_decode_uint(&pos);
+		case VY_LOG_KEY_CREATE_LSN:
+			record->create_lsn = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_DUMP_LSN:
 			record->dump_lsn = mp_decode_uint(&pos);
@@ -568,16 +568,16 @@ vy_log_record_decode(struct vy_log_record *record,
 			goto fail;
 		}
 	}
-	if (record->type == VY_LOG_CREATE_LSM && record->commit_lsn == 0) {
+	if (record->type == VY_LOG_CREATE_LSM && record->create_lsn == 0) {
 		/*
 		 * We used to use LSN as unique LSM tree identifier
 		 * and didn't store LSN separately so if there's
-		 * no 'commit_lsn' field in the record, we are
+		 * no 'create_lsn' field in the record, we are
 		 * recovering from an old vylog and 'id' is in
 		 * fact the LSN of the WAL record that committed
 		 * the LSM tree.
 		 */
-		record->commit_lsn = record->lsm_id;
+		record->create_lsn = record->lsm_id;
 	}
 	return 0;
 fail:
@@ -1171,7 +1171,7 @@ static int
 vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 		       uint32_t space_id, uint32_t index_id,
 		       const struct key_part_def *key_parts,
-		       uint32_t key_part_count, int64_t commit_lsn)
+		       uint32_t key_part_count, int64_t create_lsn)
 {
 	struct vy_lsm_recovery_info *lsm;
 	struct key_part_def *key_parts_copy;
@@ -1257,7 +1257,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->key_parts = key_parts_copy;
 	lsm->key_part_count = key_part_count;
 	lsm->is_dropped = false;
-	lsm->commit_lsn = commit_lsn;
+	lsm->create_lsn = create_lsn;
 	lsm->dump_lsn = -1;
 
 	/*
@@ -1756,7 +1756,7 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		rc = vy_recovery_create_lsm(recovery, record->lsm_id,
 				record->space_id, record->index_id,
 				record->key_parts, record->key_part_count,
-				record->commit_lsn);
+				record->create_lsn);
 		break;
 	case VY_LOG_DROP_LSM:
 		rc = vy_recovery_drop_lsm(recovery, record->lsm_id);
@@ -2005,7 +2005,7 @@ vy_log_append_lsm(struct xlog *xlog, struct vy_lsm_recovery_info *lsm)
 	record.space_id = lsm->space_id;
 	record.key_parts = lsm->key_parts;
 	record.key_part_count = lsm->key_part_count;
-	record.commit_lsn = lsm->commit_lsn;
+	record.create_lsn = lsm->create_lsn;
 	if (vy_log_append_record(xlog, &record) != 0)
 		return -1;
 

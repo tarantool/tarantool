@@ -512,17 +512,17 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 					    (unsigned)lsm->index_id));
 			return -1;
 		}
-		if (lsn > lsm_info->commit_lsn) {
+		if (lsn > lsm_info->create_lsn) {
 			/*
 			 * The last incarnation of the LSM tree was
 			 * created before the last checkpoint, load
 			 * it now.
 			 */
-			lsn = lsm_info->commit_lsn;
+			lsn = lsm_info->create_lsn;
 		}
 	}
 
-	if (lsm_info == NULL || lsn > lsm_info->commit_lsn) {
+	if (lsm_info == NULL || lsn > lsm_info->create_lsn) {
 		/*
 		 * If we failed to log LSM tree creation before restart,
 		 * we won't find it in the log on recovery. This is OK as
@@ -537,7 +537,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 	lsm->id = lsm_info->id;
 	lsm->is_committed = true;
 
-	if (lsn < lsm_info->commit_lsn || lsm_info->is_dropped) {
+	if (lsn < lsm_info->create_lsn || lsm_info->is_dropped) {
 		/*
 		 * Loading a past incarnation of the LSM tree, i.e.
 		 * the LSM tree is going to dropped during final

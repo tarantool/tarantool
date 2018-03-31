@@ -66,7 +66,7 @@ enum vy_log_record_type {
 	/**
 	 * Create a new LSM tree.
 	 * Requires vy_log_record::lsm_id, index_id, space_id,
-	 * key_def (with primary key parts), commit_lsn.
+	 * key_def, create_lsn.
 	 */
 	VY_LOG_CREATE_LSM		= 0,
 	/**
@@ -200,8 +200,8 @@ struct vy_log_record {
 	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
-	/** LSN of the WAL row corresponding to this record. */
-	int64_t commit_lsn;
+	/** LSN of the WAL row that created the LSM tree. */
+	int64_t create_lsn;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -253,8 +253,8 @@ struct vy_lsm_recovery_info {
 	uint32_t key_part_count;
 	/** True if the LSM tree was dropped. */
 	bool is_dropped;
-	/** LSN of the WAL row that committed the LSM tree. */
-	int64_t commit_lsn;
+	/** LSN of the WAL row that created the LSM tree. */
+	int64_t create_lsn;
 	/** LSN of the last LSM tree dump. */
 	int64_t dump_lsn;
 	/**
@@ -503,7 +503,7 @@ vy_log_record_init(struct vy_log_record *record)
 /** Helper to log a vinyl LSM tree creation. */
 static inline void
 vy_log_create_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
-		  const struct key_def *key_def, int64_t commit_lsn)
+		  const struct key_def *key_def, int64_t create_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
@@ -512,7 +512,7 @@ vy_log_create_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
 	record.space_id = space_id;
 	record.index_id = index_id;
 	record.key_def = key_def;
-	record.commit_lsn = commit_lsn;
+	record.create_lsn = create_lsn;
 	vy_log_write(&record);
 }
 
