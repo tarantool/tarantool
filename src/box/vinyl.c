@@ -1024,30 +1024,9 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 
 	struct tuple_format *new_format = new_space->format;
 	struct vy_lsm *pk = vy_lsm(new_space->index[0]);
-	struct index_def *new_index_def = space_index_def(new_space, 0);
-
 	assert(pk->pk == NULL);
 
-	/* Update the format with column mask. */
-	struct tuple_format *format =
-		vy_tuple_format_new_with_colmask(new_format);
-	if (format == NULL)
-		goto fail;
-
-	/* Set possibly changed opts. */
-	pk->opts = new_index_def->opts;
 	pk->check_is_unique = true;
-
-	/* Set new formats. */
-	tuple_format_unref(pk->disk_format);
-	tuple_format_unref(pk->mem_format);
-	tuple_format_unref(pk->mem_format_with_colmask);
-	pk->disk_format = new_format;
-	tuple_format_ref(new_format);
-	pk->mem_format_with_colmask = format;
-	tuple_format_ref(format);
-	pk->mem_format = new_format;
-	tuple_format_ref(new_format);
 	vy_lsm_validate_formats(pk);
 	key_def_update_optionality(pk->key_def, new_format->min_field_count);
 	key_def_update_optionality(pk->cmp_def, new_format->min_field_count);
@@ -1057,15 +1036,7 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 		vy_lsm_unref(lsm->pk);
 		vy_lsm_ref(pk);
 		lsm->pk = pk;
-		new_index_def = space_index_def(new_space, i);
-		lsm->opts = new_index_def->opts;
 		lsm->check_is_unique = lsm->opts.is_unique;
-		tuple_format_unref(lsm->mem_format_with_colmask);
-		tuple_format_unref(lsm->mem_format);
-		lsm->mem_format_with_colmask = pk->mem_format_with_colmask;
-		lsm->mem_format = pk->mem_format;
-		tuple_format_ref(lsm->mem_format_with_colmask);
-		tuple_format_ref(lsm->mem_format);
 		key_def_update_optionality(lsm->key_def,
 					   new_format->min_field_count);
 		key_def_update_optionality(lsm->cmp_def,
@@ -1093,12 +1064,27 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 			}
 		}
 	}
-	return;
-fail:
-	/* FIXME: space_vtab::commit_alter() must not fail. */
-	diag_log();
-	unreachable();
-	panic("failed to alter space");
+}
+
+static void
+vinyl_space_swap_index(struct space *old_space, struct space *new_space,
+		       uint32_t old_index_id, uint32_t new_index_id)
+{
+	struct vy_lsm *old_lsm = vy_lsm(old_space->index_map[old_index_id]);
+	struct vy_lsm *new_lsm = vy_lsm(new_space->index_map[new_index_id]);
+
+	/*
+	 * Swap the two indexes between the two spaces,
+	 * but leave tuple formats.
+	 */
+	generic_space_swap_index(old_space, new_space,
+				 old_index_id, new_index_id);
+
+	SWAP(old_lsm->mem_format, new_lsm->mem_format);
+	SWAP(old_lsm->mem_format_with_colmask,
+	     new_lsm->mem_format_with_colmask);
+	SWAP(old_lsm->disk_format, new_lsm->disk_format);
+	SWAP(old_lsm->opts, new_lsm->opts);
 }
 
 static int
@@ -3948,7 +3934,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
 	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
-	/* .swap_index = */ generic_space_swap_index,
+	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
 	/* .commit_alter = */ vinyl_space_commit_alter,
 };
