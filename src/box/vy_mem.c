@@ -124,19 +124,6 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 }
 
 void
-vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
-		      struct tuple_format *new_format_with_colmask)
-{
-	assert(mem->count.rows == 0);
-	tuple_format_unref(mem->format);
-	tuple_format_unref(mem->format_with_colmask);
-	mem->format = new_format;
-	mem->format_with_colmask = new_format_with_colmask;
-	tuple_format_ref(mem->format);
-	tuple_format_ref(mem->format_with_colmask);
-}
-
-void
 vy_mem_delete(struct vy_mem *index)
 {
 	index->env->tree_extent_size -= index->tree_extent_size;
