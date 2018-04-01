@@ -227,12 +227,11 @@ space_index_key_def(struct space *space, uint32_t id)
 }
 
 void
-space_swap_index(struct space *lhs, struct space *rhs,
-		 uint32_t lhs_id, uint32_t rhs_id)
+generic_space_swap_index(struct space *old_space, struct space *new_space,
+			 uint32_t old_index_id, uint32_t new_index_id)
 {
-	struct index *tmp = lhs->index_map[lhs_id];
-	lhs->index_map[lhs_id] = rhs->index_map[rhs_id];
-	rhs->index_map[rhs_id] = tmp;
+	SWAP(old_space->index_map[old_index_id],
+	     new_space->index_map[new_index_id]);
 }
 
 void

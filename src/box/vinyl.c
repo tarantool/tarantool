@@ -3948,6 +3948,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
 	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
+	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
 	/* .commit_alter = */ vinyl_space_commit_alter,
 };

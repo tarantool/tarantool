@@ -185,6 +185,7 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .drop_primary_key = */ sysview_space_drop_primary_key,
 	/* .check_format = */ sysview_space_check_format,
 	/* .build_secondary_key = */ sysview_space_build_secondary_key,
+	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ sysview_space_prepare_alter,
 	/* .commit_alter = */ sysview_space_commit_alter,
 };

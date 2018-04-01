@@ -104,6 +104,13 @@ struct space_vtab {
 				   struct space *new_space,
 				   struct index *new_index);
 	/**
+	 * Exchange two index objects in two spaces. Used
+	 * to update a space with a newly built index, while
+	 * making sure the old index doesn't leak.
+	 */
+	void (*swap_index)(struct space *old_space, struct space *new_space,
+			   uint32_t old_index_id, uint32_t new_index_id);
+	/**
 	 * Notify the engine about the changed space,
 	 * before it's done, to prepare 'new_space' object.
 	 */
@@ -284,6 +291,14 @@ int
 space_execute_dml(struct space *space, struct txn *txn,
 		  struct request *request, struct tuple **result);
 
+/**
+ * Generic implementation of space_vtab::swap_index
+ * that simply swaps the two indexes in index maps.
+ */
+void
+generic_space_swap_index(struct space *old_space, struct space *new_space,
+			 uint32_t old_index_id, uint32_t new_index_id);
+
 static inline void
 init_system_space(struct space *space)
 {
@@ -330,6 +345,15 @@ space_build_secondary_key(struct space *old_space,
 						    new_space, new_index);
 }
 
+static inline void
+space_swap_index(struct space *old_space, struct space *new_space,
+		 uint32_t old_index_id, uint32_t new_index_id)
+{
+	assert(old_space->vtab == new_space->vtab);
+	return new_space->vtab->swap_index(old_space, new_space,
+					   old_index_id, new_index_id);
+}
+
 static inline int
 space_prepare_alter(struct space *old_space, struct space *new_space)
 {
@@ -373,15 +397,6 @@ space_delete(struct space *space);
  */
 void
 space_dump_def(const struct space *space, struct rlist *key_list);
-
-/**
- * Exchange two index objects in two spaces. Used
- * to update a space with a newly built index, while
- * making sure the old index doesn't leak.
- */
-void
-space_swap_index(struct space *lhs, struct space *rhs,
-		 uint32_t lhs_id, uint32_t rhs_id);
 
 /** Rebuild index map in a space after a series of swap index. */
 void
