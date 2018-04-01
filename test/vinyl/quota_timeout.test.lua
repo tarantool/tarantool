@@ -50,33 +50,41 @@ test_run:cmd("clear filter")
 
 box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
 
+s:truncate()
+box.snapshot()
+
+--
+-- Check that exceeding quota doesn't hang the scheduler
+-- in case there's nothing to dump.
+--
+-- The following operation should fail instantly irrespective
+-- of the value of 'vinyl_timeout' (gh-3291).
+--
+box.info.vinyl().quota.used == 0
+box.cfg{vinyl_timeout = 9000}
+pad = string.rep('x', box.cfg.vinyl_memory)
+_ = s:auto_increment{pad}
+
 s:drop()
 box.snapshot()
 
 --
 -- Check that exceeding quota triggers dump of all spaces.
 --
-box.cfg{vinyl_timeout=0.01}
-
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
 _ = s1:create_index('pk')
 s2 = box.schema.space.create('test2', {engine = 'vinyl'})
 _ = s2:create_index('pk')
 
-_ = s1:auto_increment{}
-box.info.vinyl().quota.used
+pad = string.rep('x', 64)
+_ = s1:auto_increment{pad}
+s1.index.pk:info().memory.bytes > 0
 
-pad = string.rep('x', box.cfg.vinyl_memory)
+pad = string.rep('x', box.cfg.vinyl_memory - string.len(pad))
 _ = s2:auto_increment{pad}
 
-while box.info.vinyl().quota.used > 0 do fiber.sleep(0.01) end
-box.info.vinyl().quota.used
-
---
--- Check that exceeding quota doesn't hang the scheduler
--- in case there's nothing to dump.
---
-s2:auto_increment{pad}
+while s1.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.01) end
+s1.index.pk:info().memory.bytes == 0
 
 test_run:cmd('switch default')
 test_run:cmd("stop server test")
