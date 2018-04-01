@@ -1027,7 +1027,6 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 	assert(pk->pk == NULL);
 
 	pk->check_is_unique = true;
-	vy_lsm_validate_formats(pk);
 	key_def_update_optionality(pk->key_def, new_format->min_field_count);
 	key_def_update_optionality(pk->cmp_def, new_format->min_field_count);
 
@@ -1041,7 +1040,6 @@ vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 					   new_format->min_field_count);
 		key_def_update_optionality(lsm->cmp_def,
 					   new_format->min_field_count);
-		vy_lsm_validate_formats(lsm);
 	}
 
 	/*

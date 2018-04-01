@@ -286,13 +286,6 @@ struct vy_lsm {
 	vy_lsm_read_set_t read_set;
 };
 
-/**
- * Assert if an LSM tree formats are inconsistent.
- * @param lsm LSM tree to validate.
- */
-void
-vy_lsm_validate_formats(const struct vy_lsm *lsm);
-
 /** Return LSM tree name. Used for logging. */
 const char *
 vy_lsm_name(struct vy_lsm *lsm);

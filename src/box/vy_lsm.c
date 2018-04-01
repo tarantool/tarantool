@@ -52,30 +52,6 @@
 #include "vy_upsert.h"
 #include "vy_read_set.h"
 
-void
-vy_lsm_validate_formats(const struct vy_lsm *lsm)
-{
-	(void) lsm;
-	assert(lsm->disk_format != NULL);
-	assert(lsm->mem_format != NULL);
-	assert(lsm->mem_format_with_colmask != NULL);
-	uint32_t index_field_count = lsm->mem_format->index_field_count;
-	(void) index_field_count;
-	if (lsm->index_id == 0) {
-		assert(lsm->disk_format == lsm->mem_format);
-		assert(lsm->disk_format->index_field_count ==
-		       index_field_count);
-		assert(lsm->mem_format_with_colmask->index_field_count ==
-		       index_field_count);
-	} else {
-		assert(lsm->disk_format != lsm->mem_format);
-		assert(lsm->disk_format->index_field_count <=
-		       index_field_count);
-	}
-	assert(lsm->mem_format_with_colmask->index_field_count ==
-	       index_field_count);
-}
-
 int
 vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  int64_t *p_generation,
@@ -232,7 +208,6 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	vy_lsm_read_set_new(&lsm->read_set);
 
 	lsm_env->lsm_count++;
-	vy_lsm_validate_formats(lsm);
 	return lsm;
 
 fail_mem:
