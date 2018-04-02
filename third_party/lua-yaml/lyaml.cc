@@ -401,7 +401,7 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       ? (YAML_FLOW_MAPPING_STYLE) : YAML_BLOCK_MAPPING_STYLE;
    if (!yaml_mapping_start_event_initialize(&ev, anchor, NULL, 0, yaml_style) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
-         luaL_error(dumper->L, OOM_ERRMSG);
+         return 0;
 
    lua_pushnil(dumper->L);
    while (lua_next(dumper->L, -2)) {
@@ -414,11 +414,8 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       lua_pop(dumper->L, 1);
    }
 
-   if (!yaml_mapping_end_event_initialize(&ev) ||
-       !yaml_emitter_emit(&dumper->emitter, &ev))
-      luaL_error(dumper->L, OOM_ERRMSG);
-
-   return 1;
+   return yaml_mapping_end_event_initialize(&ev) != 0 &&
+          yaml_emitter_emit(&dumper->emitter, &ev) != 0 ? 1 : 0;
 }
 
 static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
@@ -433,7 +430,7 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       ? (YAML_FLOW_SEQUENCE_STYLE) : YAML_BLOCK_SEQUENCE_STYLE;
    if (!yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0, yaml_style) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
-      luaL_error(dumper->L, OOM_ERRMSG);
+      return 0;
 
    for (i = 0; i < field->size; i++) {
       lua_rawgeti(dumper->L, -1, i + 1);
@@ -442,11 +439,8 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       lua_pop(dumper->L, 1);
    }
 
-   if (!yaml_sequence_end_event_initialize(&ev) ||
-       !yaml_emitter_emit(&dumper->emitter, &ev))
-      luaL_error(dumper->L, OOM_ERRMSG);
-
-   return 1;
+   return yaml_sequence_end_event_initialize(&ev) != 0 &&
+          yaml_emitter_emit(&dumper->emitter, &ev) != 0 ? 1 : 0;
 }
 
 static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
@@ -566,7 +560,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    if (!yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
                                      !is_binary, !is_binary, style) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
-      luaL_error(dumper->L, OOM_ERRMSG);
+      return 0;
 
    if (is_binary)
       lua_pop(dumper->L, 1);
@@ -579,14 +573,14 @@ static void dump_document(struct lua_yaml_dumper *dumper) {
 
    if (!yaml_document_start_event_initialize(&ev, NULL, NULL, NULL, 0) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
-      luaL_error(dumper->L, OOM_ERRMSG);
+      return;
 
    if (!dump_node(dumper) || dumper->error)
       return;
 
    if (!yaml_document_end_event_initialize(&ev, 0) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
-      luaL_error(dumper->L, OOM_ERRMSG);
+      return;
 }
 
 static int append_output(void *arg, unsigned char *buf, size_t len) {
@@ -637,7 +631,7 @@ static int l_dump(lua_State *L) {
    luaL_buffinit(dumper.outputL, &dumper.yamlbuf);
 
    if (!yaml_emitter_initialize(&dumper.emitter))
-      luaL_error(L, OOM_ERRMSG);
+      goto error;
 
    yaml_emitter_set_unicode(&dumper.emitter, 1);
    yaml_emitter_set_indent(&dumper.emitter, 2);
@@ -647,7 +641,7 @@ static int l_dump(lua_State *L) {
 
    if (!yaml_stream_start_event_initialize(&ev, YAML_UTF8_ENCODING) ||
        !yaml_emitter_emit(&dumper.emitter, &ev))
-      luaL_error(L, OOM_ERRMSG);
+      goto error;
 
    for (i = 0; i < argcount; i++) {
       lua_newtable(L);
@@ -657,26 +651,37 @@ static int l_dump(lua_State *L) {
       find_references(&dumper);
       dump_document(&dumper);
       if (dumper.error)
-         break;
+         goto error;
       lua_pop(L, 2); /* pop copied arg and anchor table */
    }
 
    if (!yaml_stream_end_event_initialize(&ev) ||
        !yaml_emitter_emit(&dumper.emitter, &ev) ||
        !yaml_emitter_flush(&dumper.emitter))
-      luaL_error(L, OOM_ERRMSG);
-
-   yaml_emitter_delete(&dumper.emitter);
+      goto error;
 
    /* finalize and push YAML buffer */
    luaL_pushresult(&dumper.yamlbuf);
 
    if (dumper.error)
-      lua_error(L);
+      goto error;
 
+   yaml_emitter_delete(&dumper.emitter);
    /* move buffer to original thread */
    lua_xmove(dumper.outputL, L, 1);
    return 1;
+
+error:
+   if (dumper.emitter.error == YAML_NO_ERROR ||
+       dumper.emitter.error == YAML_MEMORY_ERROR) {
+      yaml_emitter_delete(&dumper.emitter);
+      return luaL_error(L, OOM_ERRMSG);
+   } else {
+      lua_pushnil(L);
+      lua_pushstring(L, dumper.emitter.problem);
+      yaml_emitter_delete(&dumper.emitter);
+      return 2;
+   }
 }
 
 static int
