@@ -390,3 +390,20 @@ cn:close()
 s:drop()
 
 box.schema.user.revoke('guest', 'read,write,execute','universe')
+
+--
+-- gh-3289: drop/truncate leaves the space in inconsistent
+-- state if WAL write fails.
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+for i = 1, 10 do s:replace{i} end
+errinj.set('ERRINJ_WAL_IO', true)
+s:drop()
+s:truncate()
+s:drop()
+s:truncate()
+errinj.set('ERRINJ_WAL_IO', false)
+for i = 1, 10 do s:replace{i + 10} end
+s:select()
+s:drop()

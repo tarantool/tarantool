@@ -803,39 +803,15 @@ memtx_space_build_secondary_key(struct space *old_space,
 			break;
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
 		(void) old_tuple;
+		/*
+		 * All tuples stored in a memtx space must be
+		 * referenced by the primary index.
+		 */
+		if (new_index->def->iid == 0)
+			tuple_ref(tuple);
 	}
 	iterator_delete(it);
 	return rc;
-}
-
-static void
-memtx_space_prune(struct space *space)
-{
-	struct index *index = space_index(space, 0);
-	if (index == NULL)
-		return;
-
-	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
-	if (it == NULL)
-		goto fail;
-	int rc;
-	struct tuple *tuple;
-	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
-		tuple_unref(tuple);
-	iterator_delete(it);
-	if (rc == 0)
-		return;
-fail:
-	/*
-	 * This function is called from space_vtab::commit_alter()
-	 * or commit_truncate(), which do not tolerate failures,
-	 * so we have no other choice but panic here. Good news is
-	 * memtx iterators do not fail so we should not normally
-	 * get here.
-	 */
-	diag_log();
-	unreachable();
-	panic("failed to prune space");
 }
 
 static int
@@ -857,14 +833,7 @@ memtx_space_commit_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	bool is_empty = new_space->index_count == 0 ||
 			index_size(new_space->index[0]) == 0;
-
-	/*
-	 * Delete all tuples when the last index is dropped
-	 * or the space is truncated.
-	 */
-	if (is_empty)
-		memtx_space_prune(old_space);
-	else
+	if (!is_empty)
 		new_memtx_space->bsize = old_memtx_space->bsize;
 }
 

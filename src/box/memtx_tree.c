@@ -590,9 +590,9 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 static const struct index_vtab memtx_tree_index_vtab = {
 	/* .destroy = */ memtx_tree_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
+	/* .abort_create = */ memtx_index_abort_create,
 	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
+	/* .commit_drop = */ memtx_index_commit_drop,
 	/* .update_def = */ memtx_tree_index_update_def,
 	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
 	/* .size = */ memtx_tree_index_size,

@@ -1150,3 +1150,69 @@ s:drop()
 box.schema.user.revoke('guest', 'read,write,execute','universe')
 ---
 ...
+--
+-- gh-3289: drop/truncate leaves the space in inconsistent
+-- state if WAL write fails.
+--
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+for i = 1, 10 do s:replace{i} end
+---
+...
+errinj.set('ERRINJ_WAL_IO', true)
+---
+- ok
+...
+s:drop()
+---
+- error: Failed to write to disk
+...
+s:truncate()
+---
+- error: Failed to write to disk
+...
+s:drop()
+---
+- error: Failed to write to disk
+...
+s:truncate()
+---
+- error: Failed to write to disk
+...
+errinj.set('ERRINJ_WAL_IO', false)
+---
+- ok
+...
+for i = 1, 10 do s:replace{i + 10} end
+---
+...
+s:select()
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+  - [11]
+  - [12]
+  - [13]
+  - [14]
+  - [15]
+  - [16]
+  - [17]
+  - [18]
+  - [19]
+  - [20]
+...
+s:drop()
+---
+...
