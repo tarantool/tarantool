@@ -353,7 +353,7 @@ vy_lsm_recover_run(struct vy_lsm *lsm, struct vy_run_recovery_info *run_info,
 	     vy_run_rebuild_index(run, lsm->env->path,
 				  lsm->space_id, lsm->index_id,
 				  lsm->cmp_def, lsm->key_def,
-				  lsm->mem_format, &lsm->opts) != 0)) {
+				  lsm->disk_format, &lsm->opts) != 0)) {
 		vy_run_unref(run);
 		return NULL;
 	}

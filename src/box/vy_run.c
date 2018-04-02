@@ -2201,7 +2201,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     uint32_t space_id, uint32_t iid,
 		     const struct key_def *cmp_def,
 		     const struct key_def *key_def,
-		     struct tuple_format *mem_format,
+		     struct tuple_format *format,
 		     const struct index_opts *opts)
 {
 	assert(run->info.bloom == NULL);
@@ -2255,7 +2255,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 			}
 			++page_row_count;
 			struct tuple *tuple = vy_stmt_decode(&xrow, cmp_def,
-							mem_format, iid == 0);
+							     format, iid == 0);
 			if (tuple == NULL)
 				goto close_err;
 			if (bloom_builder != NULL) {
