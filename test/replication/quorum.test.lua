@@ -97,3 +97,25 @@ box.info.replication[4].upstream.status
 -- Cleanup.
 test_run:cmd('switch default')
 test_run:drop_cluster(SERVERS)
+
+--
+-- gh-3278: test different replication and replication_connect_quorum configs.
+--
+
+box.schema.user.grant('guest', 'replication')
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica_no_quorum.lua'")
+test_run:cmd("start server replica")
+test_run:cmd("switch replica")
+box.info.status -- running
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+listen = box.cfg.listen
+box.cfg{listen = ''}
+test_run:cmd("start server replica")
+test_run:cmd("switch replica")
+box.info.status -- running
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+box.schema.user.revoke('guest', 'replication')
+box.cfg{listen = listen}
