@@ -643,6 +643,27 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 
 	/* Format is now referenced by the space. */
 	tuple_format_unref(format);
+
+	/*
+	 * Check if there are unique indexes that are contained
+	 * by other unique indexes. For them, we can skip check
+	 * for duplicates on INSERT. Prefer indexes with higher
+	 * ids for uniqueness check optimization as they are
+	 * likelier to have a "colder" cache.
+	 */
+	for (int i = space->index_count - 1; i >= 0; i--) {
+		struct vy_lsm *lsm = vy_lsm(space->index[i]);
+		if (!lsm->check_is_unique)
+			continue;
+		for (int j = 0; j < (int)space->index_count; j++) {
+			struct vy_lsm *other = vy_lsm(space->index[j]);
+			if (other != lsm && other->check_is_unique &&
+			    key_def_contains(lsm->key_def, other->key_def)) {
+				lsm->check_is_unique = false;
+				break;
+			}
+		}
+	}
 	return space;
 }
 
@@ -1035,49 +1056,7 @@ static void
 vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 {
 	(void)old_space;
-	if (new_space == NULL || new_space->index_count == 0)
-		return; /* space drop */
-
-	struct tuple_format *new_format = new_space->format;
-	struct vy_lsm *pk = vy_lsm(new_space->index[0]);
-	assert(pk->pk == NULL);
-
-	pk->check_is_unique = true;
-	key_def_update_optionality(pk->key_def, new_format->min_field_count);
-	key_def_update_optionality(pk->cmp_def, new_format->min_field_count);
-
-	for (uint32_t i = 1; i < new_space->index_count; ++i) {
-		struct vy_lsm *lsm = vy_lsm(new_space->index[i]);
-		vy_lsm_unref(lsm->pk);
-		vy_lsm_ref(pk);
-		lsm->pk = pk;
-		lsm->check_is_unique = lsm->opts.is_unique;
-		key_def_update_optionality(lsm->key_def,
-					   new_format->min_field_count);
-		key_def_update_optionality(lsm->cmp_def,
-					   new_format->min_field_count);
-	}
-
-	/*
-	 * Check if there are unique indexes that are contained
-	 * by other unique indexes. For them, we can skip check
-	 * for duplicates on INSERT. Prefer indexes with higher
-	 * ids for uniqueness check optimization as they are
-	 * likelier to have a "colder" cache.
-	 */
-	for (int i = new_space->index_count - 1; i >= 0; i--) {
-		struct vy_lsm *lsm = vy_lsm(new_space->index[i]);
-		if (!lsm->check_is_unique)
-			continue;
-		for (int j = 0; j < (int)new_space->index_count; j++) {
-			struct vy_lsm *other = vy_lsm(new_space->index[j]);
-			if (other != lsm && other->check_is_unique &&
-			    key_def_contains(lsm->key_def, other->key_def)) {
-				lsm->check_is_unique = false;
-				break;
-			}
-		}
-	}
+	(void)new_space;
 }
 
 static void
@@ -1094,6 +1073,8 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 	generic_space_swap_index(old_space, new_space,
 				 old_index_id, new_index_id);
 
+	SWAP(old_lsm, new_lsm);
+	SWAP(old_lsm->check_is_unique, new_lsm->check_is_unique);
 	SWAP(old_lsm->mem_format, new_lsm->mem_format);
 	SWAP(old_lsm->mem_format_with_colmask,
 	     new_lsm->mem_format_with_colmask);
@@ -1101,6 +1082,10 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 	SWAP(old_lsm->opts, new_lsm->opts);
 	key_def_swap(old_lsm->key_def, new_lsm->key_def);
 	key_def_swap(old_lsm->cmp_def, new_lsm->cmp_def);
+
+	/* Update pointer to the primary key. */
+	vy_lsm_update_pk(old_lsm, vy_lsm(old_space->index_map[0]));
+	vy_lsm_update_pk(new_lsm, vy_lsm(new_space->index_map[0]));
 }
 
 static int
@@ -1121,7 +1106,6 @@ vinyl_space_build_secondary_key(struct space *old_space,
 				struct index *new_index)
 {
 	(void)old_space;
-	(void)new_space;
 	/*
 	 * Unlike Memtx, Vinyl does not need building of a secondary index.
 	 * This is true because of two things:
@@ -1142,7 +1126,12 @@ vinyl_space_build_secondary_key(struct space *old_space,
 	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
 	 *  but aware of three cases mentioned above.
 	 */
-	return vinyl_index_open(new_index);
+	if (vinyl_index_open(new_index) != 0)
+		return -1;
+
+	/* Set pointer to the primary key for the new index. */
+	vy_lsm_update_pk(vy_lsm(new_index), vy_lsm(space_index(new_space, 0)));
+	return 0;
 }
 
 static size_t

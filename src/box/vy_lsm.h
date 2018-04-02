@@ -332,6 +332,23 @@ vy_lsm_unref(struct vy_lsm *lsm)
 }
 
 /**
+ * Update pointer to the primary key for an LSM tree.
+ * If called for an LSM tree corresponding to a primary
+ * index, this function does nothing.
+ */
+static inline void
+vy_lsm_update_pk(struct vy_lsm *lsm, struct vy_lsm *pk)
+{
+	if (lsm->index_id == 0) {
+		assert(lsm->pk == NULL);
+		return;
+	}
+	vy_lsm_unref(lsm->pk);
+	vy_lsm_ref(pk);
+	lsm->pk = pk;
+}
+
+/**
  * Create a new LSM tree.
  *
  * This function is called when an LSM tree is created
