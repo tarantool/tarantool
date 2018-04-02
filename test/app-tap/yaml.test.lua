@@ -69,9 +69,28 @@ local function test_output(test, s)
         "--- |-\n  Tutorial -- Header\n  ====\n\n  Text\n...\n", "tutorial string");
 end
 
+local function test_tagged(test, s)
+    test:plan(7)
+    local prefix = 'tag:tarantool.io/push,2018'
+    local ok, err = pcall(s.encode_tagged)
+    test:isnt(err:find('Usage'), nil, "encode_tagged usage")
+    ok, err = pcall(s.encode_tagged, 100, {})
+    test:isnt(err:find('Usage'), nil, "encode_tagged usage")
+    ok, err = pcall(s.encode_tagged, 200, {handle = true, prefix = 100})
+    test:isnt(err:find('Usage'), nil, "encode_tagged usage")
+    local ret
+    ret, err = s.encode_tagged(300, {handle = '!push', prefix = prefix})
+    test:is(ret, nil, 'non-usage and non-oom errors do not raise')
+    test:is(err, "tag handle must end with '!'", "encode_tagged usage")
+    ret = s.encode_tagged(300, {handle = '!push!', prefix = prefix})
+    test:is(ret, "%TAG !push! "..prefix.."\n--- 300\n...\n", "encode_tagged usage")
+    ret = s.encode_tagged({a = 100, b = 200}, {handle = '!print!', prefix = prefix})
+    test:is(ret, "%TAG !print! tag:tarantool.io/push,2018\n---\na: 100\nb: 200\n...\n", 'encode_tagged usage')
+end
+
 tap.test("yaml", function(test)
     local serializer = require('yaml')
-    test:plan(10)
+    test:plan(11)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -82,4 +101,5 @@ tap.test("yaml", function(test)
     test:test("ucdata", common.test_ucdata, serializer)
     test:test("compact", test_compact, serializer)
     test:test("output", test_output, serializer)
+    test:test("tagged", test_tagged, serializer)
 end)
