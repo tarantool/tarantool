@@ -1074,9 +1074,32 @@ end
 
 internal.check_iterator_type = check_iterator_type -- export for net.box
 
-local index_mt = {}
+local function forbid_new_index(t, k, v)
+    return error('Attempt to modify a read-only table')
+end
+
+local base_index_mt = {}
+base_index_mt.__index = base_index_mt
+--
+-- Inherit engine specific index metatables from a base one.
+--
+local vinyl_index_mt = {}
+vinyl_index_mt.__index = vinyl_index_mt
+local memtx_index_mt = {}
+memtx_index_mt.__index = memtx_index_mt
+--
+-- When a new method is added below to base index mt, the same
+-- method is added both to vinyl and memtx index mt.
+--
+setmetatable(base_index_mt, {
+    __newindex = function(t, k, v)
+        vinyl_index_mt[k] = v
+        memtx_index_mt[k] = v
+        rawset(t, k, v)
+    end
+})
 -- __len and __index
-index_mt.len = function(index)
+base_index_mt.len = function(index)
     check_index_arg(index, 'len')
     local ret = builtin.box_index_len(index.space_id, index.id)
     if ret == -1 then
@@ -1085,7 +1108,7 @@ index_mt.len = function(index)
     return tonumber(ret)
 end
 -- index.bsize
-index_mt.bsize = function(index)
+base_index_mt.bsize = function(index)
     check_index_arg(index, 'bsize')
     local ret = builtin.box_index_bsize(index.space_id, index.id)
     if ret == -1 then
@@ -1093,13 +1116,11 @@ index_mt.bsize = function(index)
     end
     return tonumber(ret)
 end
-index_mt.__len = index_mt.len -- Lua 5.2 compatibility
-index_mt.__newindex = function(table, index)
-    return error('Attempt to modify a read-only table')
-end
-index_mt.__index = index_mt
+-- Lua 5.2 compatibility
+base_index_mt.__len = base_index_mt.len
+base_index_mt.__newindex = forbid_new_index
 -- min and max
-index_mt.min_ffi = function(index, key)
+base_index_mt.min_ffi = function(index, key)
     check_index_arg(index, 'min')
     local pkey, pkey_end = tuple_encode(key)
     if builtin.box_index_min(index.space_id, index.id,
@@ -1111,12 +1132,12 @@ index_mt.min_ffi = function(index, key)
         return
     end
 end
-index_mt.min_luac = function(index, key)
+base_index_mt.min_luac = function(index, key)
     check_index_arg(index, 'min')
     key = keify(key)
     return internal.min(index.space_id, index.id, key);
 end
-index_mt.max_ffi = function(index, key)
+base_index_mt.max_ffi = function(index, key)
     check_index_arg(index, 'max')
     local pkey, pkey_end = tuple_encode(key)
     if builtin.box_index_max(index.space_id, index.id,
@@ -1128,12 +1149,12 @@ index_mt.max_ffi = function(index, key)
         return
     end
 end
-index_mt.max_luac = function(index, key)
+base_index_mt.max_luac = function(index, key)
     check_index_arg(index, 'max')
     key = keify(key)
     return internal.max(index.space_id, index.id, key);
 end
-index_mt.random_ffi = function(index, rnd)
+base_index_mt.random_ffi = function(index, rnd)
     check_index_arg(index, 'random')
     rnd = rnd or math.random()
     if builtin.box_index_random(index.space_id, index.id, rnd,
@@ -1145,13 +1166,13 @@ index_mt.random_ffi = function(index, rnd)
         return
     end
 end
-index_mt.random_luac = function(index, rnd)
+base_index_mt.random_luac = function(index, rnd)
     check_index_arg(index, 'random')
     rnd = rnd or math.random()
     return internal.random(index.space_id, index.id, rnd);
 end
 -- iteration
-index_mt.pairs_ffi = function(index, key, opts)
+base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs')
     local pkey, pkey_end = tuple_encode(key)
     local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
@@ -1166,7 +1187,7 @@ index_mt.pairs_ffi = function(index, key, opts)
     return fun.wrap(iterator_gen, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
-index_mt.pairs_luac = function(index, key, opts)
+base_index_mt.pairs_luac = function(index, key, opts)
     check_index_arg(index, 'pairs')
     key = keify(key)
     local itype = check_iterator_type(opts, #key == 0);
@@ -1178,7 +1199,7 @@ index_mt.pairs_luac = function(index, key, opts)
 end
 
 -- index subtree size
-index_mt.count_ffi = function(index, key, opts)
+base_index_mt.count_ffi = function(index, key, opts)
     check_index_arg(index, 'count')
     local pkey, pkey_end = tuple_encode(key)
     local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
@@ -1189,14 +1210,14 @@ index_mt.count_ffi = function(index, key, opts)
     end
     return tonumber(count)
 end
-index_mt.count_luac = function(index, key, opts)
+base_index_mt.count_luac = function(index, key, opts)
     check_index_arg(index, 'count')
     key = keify(key)
     local itype = check_iterator_type(opts, #key == 0);
     return internal.count(index.space_id, index.id, itype, key);
 end
 
-index_mt.get_ffi = function(index, key)
+base_index_mt.get_ffi = function(index, key)
     check_index_arg(index, 'get')
     local key, key_end = tuple_encode(key)
     if builtin.box_index_get(index.space_id, index.id,
@@ -1208,7 +1229,7 @@ index_mt.get_ffi = function(index, key)
         return
     end
 end
-index_mt.get_luac = function(index, key)
+base_index_mt.get_luac = function(index, key)
     check_index_arg(index, 'get')
     key = keify(key)
     return internal.get(index.space_id, index.id, key)
@@ -1229,7 +1250,7 @@ local function check_select_opts(opts, key_is_nil)
     return iterator, offset, limit
 end
 
-index_mt.select_ffi = function(index, key, opts)
+base_index_mt.select_ffi = function(index, key, opts)
     check_index_arg(index, 'select')
     local key, key_end = tuple_encode(key)
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
@@ -1251,7 +1272,7 @@ index_mt.select_ffi = function(index, key, opts)
     return ret
 end
 
-index_mt.select_luac = function(index, key, opts)
+base_index_mt.select_luac = function(index, key, opts)
     check_index_arg(index, 'select')
     local key = keify(key)
     local iterator, offset, limit = check_select_opts(opts, #key == 0)
@@ -1259,34 +1280,45 @@ index_mt.select_luac = function(index, key, opts)
         offset, limit, key)
 end
 
-index_mt.update = function(index, key, ops)
+base_index_mt.update = function(index, key, ops)
     check_index_arg(index, 'update')
     return internal.update(index.space_id, index.id, keify(key), ops);
 end
-index_mt.delete = function(index, key)
+base_index_mt.delete = function(index, key)
     check_index_arg(index, 'delete')
     return internal.delete(index.space_id, index.id, keify(key));
 end
 
-index_mt.info = function(index)
+base_index_mt.info = function(index)
     return internal.info(index.space_id, index.id);
 end
 
-index_mt.drop = function(index)
+base_index_mt.drop = function(index)
     check_index_arg(index, 'drop')
     return box.schema.index.drop(index.space_id, index.id)
 end
-index_mt.rename = function(index, name)
+base_index_mt.rename = function(index, name)
     check_index_arg(index, 'rename')
     return box.schema.index.rename(index.space_id, index.id, name)
 end
-index_mt.alter = function(index, options)
+base_index_mt.alter = function(index, options)
     check_index_arg(index, 'alter')
     if index.id == nil or index.space_id == nil then
         box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
     end
     return box.schema.index.alter(index.space_id, index.id, options)
 end
+
+local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
+for _, op in ipairs(read_ops) do
+    vinyl_index_mt[op] = base_index_mt[op..'_luac']
+    memtx_index_mt[op] = base_index_mt[op..'_ffi']
+end
+-- Lua 5.2 compatibility
+vinyl_index_mt.__pairs = vinyl_index_mt.pairs
+vinyl_index_mt.__ipairs = vinyl_index_mt.pairs
+memtx_index_mt.__pairs = memtx_index_mt.pairs
+memtx_index_mt.__ipairs = memtx_index_mt.pairs
 
 local space_mt = {}
 space_mt.len = function(space)
@@ -1313,7 +1345,7 @@ space_mt.bsize = function(space)
     end
     return builtin.space_bsize(s)
 end
-space_mt.__newindex = index_mt.__newindex
+space_mt.__newindex = forbid_new_index
 
 space_mt.get = function(space, key)
     check_space_arg(space, 'get')
@@ -1410,22 +1442,13 @@ space_mt.frommap = box.internal.space.frommap
 space_mt.__index = space_mt
 
 function box.schema.space.bless(space)
-    local index_mt = table.deepcopy(index_mt)
     local space_mt = table.deepcopy(space_mt)
-    -- true if reading operations may yield
-    local read_yields = space.engine == 'vinyl'
-    local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
-    for _, op in ipairs(read_ops) do
-        if read_yields then
-            -- use Lua/C implmenetation
-            index_mt[op] = index_mt[op .. "_luac"]
-        else
-            -- use FFI implementation
-            index_mt[op] = index_mt[op .. "_ffi"]
-        end
+    local index_mt
+    if space.engine == 'vinyl' then
+        index_mt = table.deepcopy(vinyl_index_mt)
+    else
+        index_mt = table.deepcopy(memtx_index_mt)
     end
-    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
-    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
 
     setmetatable(space, space_mt)
     if type(space.index) == 'table' and space.enabled then
