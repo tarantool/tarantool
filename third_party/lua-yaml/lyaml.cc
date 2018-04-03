@@ -309,6 +309,53 @@ static int load_node(struct lua_yaml_loader *loader) {
    }
 }
 
+/**
+ * Decode YAML document global tag onto Lua stack.
+ * @param loader Initialized loader to load tag from.
+ * @retval 2 Tag handle and prefix are pushed. Both are not nil.
+ * @retval 2 If an error occurred during decoding. Nil and error
+ *         string are pushed.
+ */
+static int load_tag(struct lua_yaml_loader *loader) {
+   yaml_tag_directive_t *start, *end;
+   /* Initial parser step. Detect the documents start position. */
+   if (do_parse(loader) == 0)
+      goto parse_error;
+   if (loader->event.type != YAML_STREAM_START_EVENT) {
+      lua_pushnil(loader->L);
+      lua_pushstring(loader->L, "expected STREAM_START_EVENT");
+      return 2;
+   }
+   /* Parse a document start. */
+   if (do_parse(loader) == 0)
+      goto parse_error;
+   if (loader->event.type == YAML_STREAM_END_EVENT)
+      goto no_tags;
+   assert(loader->event.type == YAML_DOCUMENT_START_EVENT);
+   start = loader->event.data.document_start.tag_directives.start;
+   end = loader->event.data.document_start.tag_directives.end;
+   if (start == end)
+      goto no_tags;
+   if (end - start > 1) {
+      lua_pushnil(loader->L);
+      lua_pushstring(loader->L, "can not decode multiple tags");
+      return 2;
+   }
+   lua_pushstring(loader->L, (const char *) start->handle);
+   lua_pushstring(loader->L, (const char *) start->prefix);
+   return 2;
+
+parse_error:
+   lua_pushnil(loader->L);
+   /* Make nil be before an error message. */
+   lua_insert(loader->L, -2);
+   return 2;
+
+no_tags:
+   lua_pushnil(loader->L);
+   return 1;
+}
+
 static void load(struct lua_yaml_loader *loader) {
    if (!do_parse(loader))
       return;
@@ -340,34 +387,59 @@ static void load(struct lua_yaml_loader *loader) {
    }
 }
 
+/**
+ * Decode YAML documents onto Lua stack. First value on stack
+ * is string with YAML document. Second value is options:
+ * {tag_only = boolean}. Options are not required.
+ * @retval N Pushed document count, if tag_only option is not
+ *         specified, or equals to false.
+ * @retval 2 If tag_only option is true. Tag handle and prefix
+ *         are pushed.
+ * @retval 2 If an error occurred during decoding. Nil and error
+ *         string are pushed.
+ */
 static int l_load(lua_State *L) {
    struct lua_yaml_loader loader;
-
-   luaL_argcheck(L, lua_isstring(L, 1), 1, "must provide a string argument");
-
+   if (! lua_isstring(L, 1)) {
+usage_error:
+      return luaL_error(L, "Usage: yaml.decode(document, "\
+                        "[{tag_only = boolean}])");
+   }
+   size_t len;
+   const char *document = lua_tolstring(L, 1, &len);
    loader.L = L;
    loader.cfg = luaL_checkserializer(L);
    loader.validevent = 0;
    loader.error = 0;
    loader.document_count = 0;
-
-   /* create table used to track anchors */
-   lua_newtable(L);
-   loader.anchortable_index = lua_gettop(L);
-
    if (!yaml_parser_initialize(&loader.parser))
-      luaL_error(L, OOM_ERRMSG);
-   yaml_parser_set_input_string(&loader.parser,
-      (const unsigned char *)lua_tostring(L, 1), lua_strlen(L, 1));
-   load(&loader);
+      return luaL_error(L, OOM_ERRMSG);
+   yaml_parser_set_input_string(&loader.parser, (yaml_char_t *) document, len);
+   bool tag_only;
+   if (lua_gettop(L) > 1) {
+      if (! lua_istable(L, 2))
+         goto usage_error;
+      lua_getfield(L, 2, "tag_only");
+      tag_only = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+   } else {
+      tag_only = false;
+   }
 
+   int rc;
+   if (! tag_only) {
+      /* create table used to track anchors */
+      lua_newtable(L);
+      loader.anchortable_index = lua_gettop(L);
+      load(&loader);
+      if (loader.error)
+         lua_error(L);
+      rc = loader.document_count;
+   } else {
+      rc = load_tag(&loader);
+   }
    delete_event(&loader);
    yaml_parser_delete(&loader.parser);
-
-   if (loader.error)
-      lua_error(L);
-
-   return loader.document_count;
+   return rc;
 }
 
 static int dump_node(struct lua_yaml_dumper *dumper);

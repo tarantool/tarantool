@@ -70,7 +70,10 @@ local function test_output(test, s)
 end
 
 local function test_tagged(test, s)
-    test:plan(7)
+    test:plan(17)
+    --
+    -- Test encoding tags.
+    --
     local prefix = 'tag:tarantool.io/push,2018'
     local ok, err = pcall(s.encode, 200, {tag_handle = true, tag_prefix = 100})
     test:isnt(err:find('Usage'), nil, "encode usage")
@@ -86,6 +89,45 @@ local function test_tagged(test, s)
     test:is(ret, "%TAG !push! "..prefix.."\n--- 300\n...\n", "encode usage")
     ret = s.encode({a = 100, b = 200}, {tag_handle = '!print!', tag_prefix = prefix})
     test:is(ret, "%TAG !print! tag:tarantool.io/push,2018\n---\na: 100\nb: 200\n...\n", 'encode usage')
+    --
+    -- Test decoding tags.
+    --
+    ok, err = pcall(s.decode)
+    test:isnt(err:find('Usage'), nil, "decode usage")
+    ok, err = pcall(s.decode, false)
+    test:isnt(err:find('Usage'), nil, "decode usage")
+    local handle, prefix = s.decode(ret, {tag_only = true})
+    test:is(handle, "!print!", "handle is decoded ok")
+    test:is(prefix, "tag:tarantool.io/push,2018", "prefix is decoded ok")
+    local several_tags =
+[[%TAG !tag1! tag:tarantool.io/tag1,2018
+%TAG !tag2! tag:tarantool.io/tag2,2018
+---
+- 100
+...
+]]
+    ok, err = s.decode(several_tags, {tag_only = true})
+    test:is(ok, nil, "can not decode multiple tags")
+    test:is(err, "can not decode multiple tags", "same")
+    local no_tags = s.encode(100)
+    handle, prefix = s.decode(no_tags, {tag_only = true})
+    test:is(handle, nil, "no tag - no handle")
+    test:is(prefix, nil, "no tag - no prefix")
+    local several_documents =
+[[
+%TAG !tag1! tag:tarantool.io/tag1,2018
+--- 1
+...
+
+%TAG !tag2! tag:tarantool.io/tag2,2018
+--- 2
+...
+
+]]
+    handle, prefix = s.decode(several_documents, {tag_only = true})
+    test:is(handle, "!tag1!", "tag handle on multiple documents")
+    test:is(prefix, "tag:tarantool.io/tag1,2018",
+            "tag prefix on multiple documents")
 end
 
 tap.test("yaml", function(test)
