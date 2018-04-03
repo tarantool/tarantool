@@ -1074,10 +1074,6 @@ end
 
 internal.check_iterator_type = check_iterator_type -- export for net.box
 
-local function forbid_new_index(t, k, v)
-    return error('Attempt to modify a read-only table')
-end
-
 local base_index_mt = {}
 base_index_mt.__index = base_index_mt
 --
@@ -1118,7 +1114,6 @@ base_index_mt.bsize = function(index)
 end
 -- Lua 5.2 compatibility
 base_index_mt.__len = base_index_mt.len
-base_index_mt.__newindex = forbid_new_index
 -- min and max
 base_index_mt.min_ffi = function(index, key)
     check_index_arg(index, 'min')
@@ -1345,7 +1340,6 @@ space_mt.bsize = function(space)
     end
     return builtin.space_bsize(s)
 end
-space_mt.__newindex = forbid_new_index
 
 space_mt.get = function(space, key)
     check_space_arg(space, 'get')
@@ -1441,20 +1435,52 @@ end
 space_mt.frommap = box.internal.space.frommap
 space_mt.__index = space_mt
 
-function box.schema.space.bless(space)
-    local space_mt = table.deepcopy(space_mt)
-    local index_mt
-    if space.engine == 'vinyl' then
-        index_mt = table.deepcopy(vinyl_index_mt)
-    else
-        index_mt = table.deepcopy(memtx_index_mt)
+box.schema.index_mt = base_index_mt
+box.schema.memtx_index_mt = memtx_index_mt
+box.schema.vinyl_index_mt = vinyl_index_mt
+box.schema.space_mt = space_mt
+
+--
+-- Wrap a global space/index metatable into a space/index local
+-- one. Routinely this metatable just indexes the global one. When
+-- a user attempts to extend a space or index methods via local
+-- space/index metatable instead of from box.schema mt, the local
+-- metatable is transformed. Its __index metamethod starts looking
+-- up at first in self, and only then into the global mt.
+--
+local function wrap_schema_object_mt(name)
+    local global_mt = box.schema[name]
+    local mt = {
+        __index = global_mt,
+        __ipairs = global_mt.__ipairs,
+        __pairs = global_mt.__pairs
+    }
+    local mt_mt = {}
+    mt_mt.__newindex = function(t, k, v)
+        mt_mt.__newindex = nil
+        mt.__index = function(t, k)
+            return mt[k] or box.schema[name][k]
+        end
+        rawset(mt, k, v)
     end
+    setmetatable(mt, mt_mt)
+    return mt
+end
+
+function box.schema.space.bless(space)
+    local index_mt_name
+    if space.engine == 'vinyl' then
+        index_mt_name = 'vinyl_index_mt'
+    else
+        index_mt_name = 'memtx_index_mt'
+    end
+    local space_mt = wrap_schema_object_mt('space_mt')
 
     setmetatable(space, space_mt)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
-                setmetatable(index, index_mt)
+                setmetatable(index, wrap_schema_object_mt(index_mt_name))
             end
         end
     end
