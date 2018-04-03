@@ -110,6 +110,11 @@ struct relay {
 	struct vclock recv_vclock;
 	/** Replicatoin slave version. */
 	uint32_t version_id;
+	/**
+	 * Local vclock at the moment of subscribe, used to check
+	 * dataset on the other side and send missing data rows if any.
+	 */
+	struct vclock local_vclock_at_subscribe;
 
 	/** Relay endpoint */
 	struct cbus_endpoint endpoint;
@@ -541,6 +546,7 @@ relay_subscribe(int fd, uint64_t sync, struct replica *replica,
 	relay.version_id = replica_version_id;
 	relay.replica = replica;
 	replica_set_relay(replica, &relay);
+	vclock_copy(&relay.local_vclock_at_subscribe, &replicaset.vclock);
 
 	int rc = cord_costart(&relay.cord, tt_sprintf("relay_%p", &relay),
 			      relay_subscribe_f, &relay);
@@ -583,10 +589,16 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	/*
 	 * We're feeding a WAL, thus responding to SUBSCRIBE request.
 	 * In that case, only send a row if it is not from the same replica
-	 * (i.e. don't send replica's own rows back).
+	 * (i.e. don't send replica's own rows back) or if this row is
+	 * missing on the other side (i.e. in case of sudden power-loss,
+	 * data was not written to WAL, so remote master can't recover
+	 * it). In the latter case packet's LSN is less than or equal to
+	 * local master's LSN at the moment it received 'SUBSCRIBE' request.
 	 */
 	if (relay->replica == NULL ||
-	    packet->replica_id != relay->replica->id) {
+	    packet->replica_id != relay->replica->id ||
+	    packet->lsn <= vclock_get(&relay->local_vclock_at_subscribe,
+				      packet->replica_id)) {
 		relay_send(relay, packet);
 	}
 }

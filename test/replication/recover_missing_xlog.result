@@ -1,0 +1,113 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
+---
+...
+-- Start servers
+test_run:create_cluster(SERVERS)
+---
+...
+-- Wait for full mesh
+test_run:wait_fullmesh(SERVERS)
+---
+...
+test_run:cmd("switch autobootstrap1")
+---
+- true
+...
+for i = 0, 9 do box.space.test:insert{i, 'test' .. i} end
+---
+...
+box.space.test:count()
+---
+- 10
+...
+test_run:cmd('switch default')
+---
+- true
+...
+vclock1 = test_run:get_vclock('autobootstrap1')
+---
+...
+vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock1)
+---
+...
+test_run:cmd("switch autobootstrap2")
+---
+- true
+...
+box.space.test:count()
+---
+- 10
+...
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
+---
+- ok
+...
+test_run:cmd("stop server autobootstrap1")
+---
+- true
+...
+fio = require('fio')
+---
+...
+-- This test checks ability to recover missing local data
+-- from remote replica. See #3210.
+-- Delete data on first master and test that after restart,
+-- due to difference in vclock it will be able to recover
+-- all missing data from replica.
+-- Also check that there is no concurrency, i.e. master is
+-- in 'read-only' mode unless it receives all data.
+fio.unlink(fio.pathjoin(fio.abspath("."), string.format('autobootstrap1/%020d.xlog', 8)))
+---
+- true
+...
+test_run:cmd("start server autobootstrap1")
+---
+- true
+...
+test_run:cmd("switch autobootstrap1")
+---
+- true
+...
+for i = 10, 19 do box.space.test:insert{i, 'test' .. i} end
+---
+...
+fiber = require('fiber')
+---
+...
+box.space.test:select()
+---
+- - [0, 'test0']
+  - [1, 'test1']
+  - [2, 'test2']
+  - [3, 'test3']
+  - [4, 'test4']
+  - [5, 'test5']
+  - [6, 'test6']
+  - [7, 'test7']
+  - [8, 'test8']
+  - [9, 'test9']
+  - [10, 'test10']
+  - [11, 'test11']
+  - [12, 'test12']
+  - [13, 'test13']
+  - [14, 'test14']
+  - [15, 'test15']
+  - [16, 'test16']
+  - [17, 'test17']
+  - [18, 'test18']
+  - [19, 'test19']
+...
+-- Cleanup.
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:drop_cluster(SERVERS)
+---
+...

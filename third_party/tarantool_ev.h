@@ -48,6 +48,10 @@
 #define EV_FORK_ENABLE 1
 #define EV_CONFIG_H 0
 #define EV_USE_FLOOR 1
+#ifdef HAVE_CLOCK_GETTIME_DECL
+# define EV_USE_REALTIME 1
+# define EV_USE_MONOTONIC 1
+#endif
 #include "third_party/libev/ev.h"
 #else /* !defined(ENABLE_BUNDLED_LIBEV) */
 #include <ev.h>
