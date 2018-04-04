@@ -2359,6 +2359,16 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 		return -1;
 
 	/*
+	 * The configured memory limit will never allow us to commit
+	 * this transaction. Fail early.
+	 */
+	if (tx->write_size > env->quota.limit) {
+		diag_set(OutOfMemory, tx->write_size,
+			 "lsregion", "vinyl transaction");
+		return -1;
+	}
+
+	/*
 	 * Do not abort join/subscribe on quota timeout - replication
 	 * is asynchronous anyway and there's box.info.replication
 	 * available for the admin to track the lag so let the applier

@@ -26,6 +26,7 @@ env:
       - OS=el DIST=7
       - OS=fedora DIST=26
       - OS=fedora DIST=27
+      - OS=ubuntu DIST=artful
       - OS=ubuntu DIST=trusty
       - OS=ubuntu DIST=xenial
       - OS=ubuntu DIST=artful
@@ -40,6 +41,7 @@ matrix:
 #      - env: OS=el DIST=7
 #      - env: OS=fedora DIST=26
 #      - env: OS=fedora DIST=27
+#      - env: OS=ubuntu DIST=artful
 #      - env: OS=ubuntu DIST=trusty
 #      - env: OS=ubuntu DIST=xenial
 #      - env: OS=debian DIST=wheezy
@@ -53,6 +55,8 @@ matrix:
       - env: OS=fedora DIST=26
         os: osx
       - env: OS=fedora DIST=27
+        os: osx
+      - env: OS=ubuntu DIST=artful
         os: osx
       - env: OS=ubuntu DIST=trusty
         os: osx

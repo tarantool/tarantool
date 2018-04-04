@@ -19,11 +19,11 @@ errinj = box.error.injection
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica_timeout.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='1'")
 ---
 - true
 ...
@@ -69,19 +69,13 @@ errinj.set("ERRINJ_RELAY_TIMEOUT", 1000.0)
 ---
 - ok
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server replica with args='0.01'")
 ---
 - true
 ...
 test_run:cmd("switch replica")
 ---
 - true
-...
-fiber = require('fiber')
----
-...
-while box.space.test:count() < 1 do fiber.sleep(0.01) end
----
 ...
 -- Check that replica doesn't enter read-write mode before
 -- catching up with the master: to check that we inject sleep into
@@ -99,8 +93,9 @@ box.space.test ~= nil
 ...
 d = box.space.test:delete{1}
 ---
+- error: Can't modify data because this instance is in read-only mode.
 ...
-box.space.test:get(1) == nil
+box.space.test:get(1) ~= nil
 ---
 - true
 ...
@@ -116,7 +111,11 @@ test_run:cmd("set variable r_uri to 'replica.listen'")
 c = net_box.connect(r_uri)
 ---
 ...
-c.space.test:get(1) == nil
+d = c.space.test:delete{1}
+---
+- error: Can't modify data because this instance is in read-only mode.
+...
+c.space.test:get(1) ~= nil
 ---
 - true
 ...
