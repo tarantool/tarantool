@@ -803,6 +803,15 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 static void
 alter_space_do(struct txn *txn, struct alter_space *alter)
 {
+	/*
+	 * Prepare triggers while we may fail. Note, we don't have to
+	 * free them in case of failure, because they are allocated on
+	 * the region.
+	 */
+	struct trigger *on_commit, *on_rollback;
+	on_commit = txn_alter_trigger_new(alter_space_commit, alter);
+	on_rollback = txn_alter_trigger_new(alter_space_rollback, alter);
+
 	/* Create a definition of the new space. */
 	space_dump_def(alter->old_space, &alter->key_list);
 	class AlterSpaceOp *op;
@@ -853,6 +862,11 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 		throw;
 	}
 
+	/*
+	 * This function must not throw exceptions or yield after
+	 * this point.
+	 */
+
 	/* Rebuild index maps once for all indexes. */
 	space_fill_index_map(alter->old_space);
 	space_fill_index_map(alter->new_space);
@@ -873,11 +887,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * finish or rollback the DDL depending on the results of
 	 * writing to WAL.
 	 */
-	struct trigger *on_commit =
-		txn_alter_trigger_new(alter_space_commit, alter);
 	txn_on_commit(txn, on_commit);
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(alter_space_rollback, alter);
 	txn_on_rollback(txn, on_rollback);
 }
 
