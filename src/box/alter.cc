@@ -3109,7 +3109,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	txn_on_commit(txn, on_commit);
 
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
-		struct index *pk = index_find(space, 0);
+		struct index *pk = index_find_xc(space, 0);
 		index_def_check_sequence(pk->def, space_name(space));
 		if (seq->is_generated) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,
