@@ -1060,6 +1060,87 @@ box.tuple.bsize == t.bsize
 ---
 - true
 ...
+--
+-- gh-3282: space:frommap().
+--
+format = {}
+---
+...
+format[1] = {name = 'aaa', type = 'unsigned'}
+---
+...
+format[2] = {name = 'bbb', type = 'unsigned'}
+---
+...
+format[3] = {name = 'ccc', type = 'unsigned'}
+---
+...
+format[4] = {name = 'ddd', type = 'unsigned'}
+---
+...
+s = box.schema.create_space('test', {format = format})
+---
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+---
+- [2, 4, 3, 1]
+...
+s:frommap({ddd = 1, aaa = 2, bbb = 3})
+---
+- [2, 3, null, 1]
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, eee = 4})
+---
+- null
+- Unknown field 'eee'
+...
+s:frommap()
+---
+- error: 'Usage: space:frommap(map, opts)'
+...
+s:frommap({})
+---
+- []
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = true})
+---
+- - 2
+  - 4
+  - 3
+  - 1
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = false})
+---
+- [2, 4, 3, 1]
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = box.NULL})
+---
+- [2, null, 3, 1]
+...
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {dummy = true})
+---
+- [2, 4, 3, 1]
+...
+_ = s:create_index('primary', {parts = {'aaa'}})
+---
+...
+tuple = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+---
+...
+s:replace(tuple)
+---
+- [2, 4, 3, 1]
+...
+s:drop()
+---
+...
+_, err = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+---
+...
+assert(err ~= nil)
+---
+- true
+...
 test_run:cmd("clear filter")
 ---
 - true
