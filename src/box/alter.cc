@@ -1011,8 +1011,9 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter, int64_t /* signature */)
 {
-	struct index *index = index_find_xc(alter->old_space,
-					    old_index_def->iid);
+	struct index *index = space_index(alter->old_space,
+					  old_index_def->iid);
+	assert(index != NULL);
 	index_commit_drop(index);
 }
 
@@ -1110,6 +1111,7 @@ ModifyIndex::commit(struct alter_space *alter, int64_t signature)
 {
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
+	assert(new_index != NULL);
 	index_commit_modify(new_index, signature);
 }
 
@@ -1191,8 +1193,9 @@ CreateIndex::alter(struct alter_space *alter)
 	/**
 	 * Get the new index and build it.
 	 */
-	struct index *new_index = index_find_xc(alter->new_space,
-						new_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
+	assert(new_index != NULL);
 	space_build_secondary_key_xc(alter->new_space,
 				     alter->new_space, new_index);
 }
@@ -1200,16 +1203,18 @@ CreateIndex::alter(struct alter_space *alter)
 void
 CreateIndex::commit(struct alter_space *alter, int64_t signature)
 {
-	struct index *new_index = index_find_xc(alter->new_space,
-						new_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
+	assert(new_index != NULL);
 	index_commit_create(new_index, signature);
 }
 
 void
 CreateIndex::rollback(struct alter_space *alter)
 {
-	struct index *new_index = index_find_xc(alter->new_space,
-						new_index_def->iid);
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
+	assert(new_index != NULL);
 	index_abort_create(new_index);
 }
 
@@ -1274,8 +1279,10 @@ RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 {
 	struct index *old_index = space_index(alter->old_space,
 					      old_index_def->iid);
+	assert(old_index != NULL);
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
+	assert(new_index != NULL);
 	index_commit_drop(old_index);
 	index_commit_create(new_index, signature);
 }
@@ -1285,6 +1292,7 @@ RebuildIndex::rollback(struct alter_space *alter)
 {
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
+	assert(new_index != NULL);
 	index_abort_create(new_index);
 }
 
