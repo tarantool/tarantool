@@ -321,7 +321,6 @@ test_basic()
 int
 main()
 {
-	identifier_init();
 	plan(1);
 
 	vy_iterator_C_test_init(128 * 1024);
@@ -331,6 +330,5 @@ main()
 
 	vy_iterator_C_test_finish();
 
-	identifier_destroy();
 	return check_plan();
 }

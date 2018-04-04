@@ -47,20 +47,7 @@ extern "C" {
  * @retval -1 error, diagnostics area is set
  */
 int
-identifier_check(const char *str, size_t str_len);
-
-/**
- * Init identifier check mechanism.
- * This function allocates necessary for icu structures.
- */
-void
-identifier_init();
-
-/**
- * Clean icu structures.
- */
-void
-identifier_destroy();
+identifier_check(const char *str, int str_len);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -69,7 +56,7 @@ identifier_destroy();
  * Throw an error if identifier is not valid.
  */
 static inline void
-identifier_check_xc(const char *str, size_t str_len)
+identifier_check_xc(const char *str, int str_len)
 {
 	if (identifier_check(str, str_len))
 		diag_raise();
