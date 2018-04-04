@@ -916,24 +916,19 @@ CheckSpaceFormat::alter(struct alter_space *alter)
 class ModifySpace: public AlterSpaceOp
 {
 public:
-	ModifySpace(struct alter_space *alter, struct space_def *def_arg)
-		:AlterSpaceOp(alter), def(def_arg) {}
+	ModifySpace(struct alter_space *alter, struct space_def *def)
+		:AlterSpaceOp(alter), new_def(def), new_dict(NULL) {}
+	/* New space definition. */
+	struct space_def *new_def;
 	/**
 	 * Newely created field dictionary. When new space_def is
 	 * created, it allocates new dictionary. Alter moves new
 	 * names into an old dictionary and deletes new one.
 	 */
 	struct tuple_dictionary *new_dict;
-	/**
-	 * Old tuple dictionary stored to rollback in destructor,
-	 * if an exception had been raised after alter_def(), but
-	 * before alter().
-	 */
-	struct tuple_dictionary *old_dict;
-	/* New space definition. */
-	struct space_def *def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter, int64_t signature);
+	virtual void alter(struct alter_space *alter);
+	virtual void rollback(struct alter_space *alter);
 	virtual ~ModifySpace();
 };
 
@@ -942,40 +937,43 @@ void
 ModifySpace::alter_def(struct alter_space *alter)
 {
 	/*
+	 * Use the old dictionary for the new space, because
+	 * it is already referenced by existing tuple formats.
+	 * We will update it in place in ModifySpace::alter.
+	 */
+	new_dict = new_def->dict;
+	new_def->dict = alter->old_space->def->dict;
+	tuple_dictionary_ref(new_def->dict);
+
+	space_def_delete(alter->space_def);
+	alter->space_def = new_def;
+	/* Now alter owns the def. */
+	new_def = NULL;
+}
+
+void
+ModifySpace::alter(struct alter_space *alter)
+{
+	/*
 	 * Move new names into an old dictionary, which already is
 	 * referenced by existing tuple formats. New dictionary
 	 * object is deleted later, in destructor.
 	 */
-	new_dict = def->dict;
-	old_dict = alter->old_space->def->dict;
-	tuple_dictionary_swap(new_dict, old_dict);
-	def->dict = old_dict;
-	tuple_dictionary_ref(old_dict);
-
-	space_def_delete(alter->space_def);
-	alter->space_def = def;
-	/* Now alter owns the def. */
-	def = NULL;
+	tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
 }
 
 void
-ModifySpace::commit(struct alter_space *alter, int64_t signature)
+ModifySpace::rollback(struct alter_space *alter)
 {
-	(void) alter;
-	(void) signature;
-	old_dict = NULL;
+	tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
 }
 
 ModifySpace::~ModifySpace()
 {
-	if (new_dict != NULL) {
-		/* Return old names into the old dict. */
-		if (old_dict != NULL)
-			tuple_dictionary_swap(new_dict, old_dict);
+	if (new_dict != NULL)
 		tuple_dictionary_unref(new_dict);
-	}
-	if (def != NULL)
-		space_def_delete(def);
+	if (new_def != NULL)
+		space_def_delete(new_def);
 }
 
 /** DropIndex - remove an index from space. */
