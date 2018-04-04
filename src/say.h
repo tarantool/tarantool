@@ -123,14 +123,15 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
  * Format and print a message to Tarantool log file.
  *
  * \param level (int) - log level (see enum \link say_level \endlink)
+ * \param error (const char * ) - error description, may be NULL
  * \param format (const char * ) - printf()-like format string
  * \param ... - format arguments
  * \sa printf()
  * \sa enum say_level
  */
-#define say(level, format, ...) ({ \
+#define say(level, error, format, ...) ({ \
 	if (say_log_level_is_enabled(level)) \
-		_say(level, __FILE__, __LINE__, format, ##__VA_ARGS__); })
+		_say(level, __FILE__, __LINE__, error, format, ##__VA_ARGS__); })
 
 /**
  * Format and print a message to Tarantool log file.
