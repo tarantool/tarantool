@@ -349,3 +349,9 @@ luaJIT_setmode
 luaJIT_profile_start
 luaJIT_profile_stop
 luaJIT_profile_dumpstack
+
+# Temporary
+
+# Important! This function will be removed from exports soon (in the scope of
+# 1.9.1). Don't use it.
+key_def_new_with_parts
