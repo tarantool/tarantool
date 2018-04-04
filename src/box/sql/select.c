@@ -35,6 +35,8 @@
  */
 #include <box/coll.h>
 #include "sqliteInt.h"
+#include "tarantoolInt.h"
+#include "box/schema.h"
 #include "box/session.h"
 
 /*
@@ -4208,42 +4210,42 @@ minMaxQuery(AggInfo * pAggInfo, ExprList ** ppMinMax)
 	return eRet;
 }
 
-/*
- * The select statement passed as the first argument is an aggregate query.
- * The second argument is the associated aggregate-info object. This
- * function tests if the SELECT is of the form:
+/**
+ * The second argument is the associated aggregate-info object.
+ * This function tests if the SELECT is of the form:
  *
  *   SELECT count(*) FROM <tbl>
  *
- * where table is a database table, not a sub-select or view. If the query
- * does match this pattern, then a pointer to the Table object representing
- * <tbl> is returned. Otherwise, 0 is returned.
+ * where table is not a sub-select or view.
+ *
+ * @param select The select statement in form of aggregate query.
+ * @param agg_info The associated aggregate-info object.
+ * @retval Pointer to space representing the table,
+ *         if the query matches this pattern. NULL otherwise.
  */
-static Table *
-isSimpleCount(Select * p, AggInfo * pAggInfo)
+static struct space*
+is_simple_count(struct Select *select, struct AggInfo *agg_info)
 {
-	Table *pTab;
-	Expr *pExpr;
-
-	assert(!p->pGroupBy);
-
-	if (p->pWhere || p->pEList->nExpr != 1
-	    || p->pSrc->nSrc != 1 || p->pSrc->a[0].pSelect) {
-		return 0;
+	assert(select->pGroupBy == NULL);
+	if (select->pWhere != NULL || select->pEList->nExpr != 1 ||
+	    select->pSrc->nSrc != 1 || select->pSrc->a[0].pSelect != NULL) {
+		return NULL;
 	}
-	pTab = p->pSrc->a[0].pTab;
-	pExpr = p->pEList->a[0].pExpr;
-	assert(pTab && !space_is_view(pTab) && pExpr);
-	if (pExpr->op != TK_AGG_FUNCTION)
-		return 0;
-	if (NEVER(pAggInfo->nFunc == 0))
-		return 0;
-	if ((pAggInfo->aFunc[0].pFunc->funcFlags & SQLITE_FUNC_COUNT) == 0)
-		return 0;
-	if (pExpr->flags & EP_Distinct)
-		return 0;
-
-	return pTab;
+	uint32_t space_id =
+		SQLITE_PAGENO_TO_SPACEID(select->pSrc->a[0].pTab->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL && !space->def->opts.is_view);
+	struct Expr *expr = select->pEList->a[0].pExpr;
+	assert(expr != NULL);
+	if (expr->op != TK_AGG_FUNCTION)
+		return NULL;
+	if (NEVER(agg_info->nFunc == 0))
+		return NULL;
+	if ((agg_info->aFunc[0].pFunc->funcFlags & SQLITE_FUNC_COUNT) == 0)
+		return NULL;
+	if (expr->flags & EP_Distinct)
+		return NULL;
+	return space;
 }
 
 /*
@@ -5233,24 +5235,24 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 	}
 }
 
-/*
- * Add a single OP_Explain instruction to the VDBE to explain a simple
- * count(*) query ("SELECT count(*) FROM pTab").
+/**
+ * Add a single OP_Explain instruction to the VDBE to explain
+ * a simple count(*) query ("SELECT count(*) FROM <tab>").
+ * For memtx engine count is a simple operation,
+ * which takes O(1) complexity.
+ *
+ * @param parse_context Current parsing context.
+ * @param table_name Name of table being queried.
  */
 static void
-explainSimpleCount(Parse * pParse,	/* Parse context */
-		   Table * pTab,	/* Table being queried */
-		   Index * pIdx)	/* Index used to optimize scan, or NULL */
+explain_simple_count(struct Parse *parse_context, const char *table_name)
 {
-	if (pParse->explain == 2) {
-		int bCover = (pIdx != 0 && !IsPrimaryKeyIndex(pIdx));
-		char *zEqp = sqlite3MPrintf(pParse->db, "SCAN TABLE %s%s%s",
-					    pTab->zName,
-					    bCover ? " USING COVERING INDEX " :
-					    "",
-					    bCover ? pIdx->zName : "");
-		sqlite3VdbeAddOp4(pParse->pVdbe, OP_Explain, pParse->iSelectId,
-				  0, 0, zEqp, P4_DYNAMIC);
+	if (parse_context->explain == 2) {
+		char *zEqp = sqlite3MPrintf(parse_context->db, "B+tree count %s",
+					    table_name);
+		sqlite3VdbeAddOp4(parse_context->pVdbe, OP_Explain,
+				  parse_context->iSelectId, 0, 0, zEqp,
+				  P4_DYNAMIC);
 	}
 }
 
@@ -6052,71 +6054,32 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 
 		} /* endif pGroupBy.  Begin aggregate queries without GROUP BY: */
 		else {
-			ExprList *pDel = 0;
-#ifndef SQLITE_OMIT_BTREECOUNT
-			Table *pTab;
-			if ((pTab = isSimpleCount(p, &sAggInfo)) != 0) {
-				/* If isSimpleCount() returns a pointer to a Table structure, then
-				 * the SQL statement is of the form:
+			struct space *space = is_simple_count(p, &sAggInfo);
+			if (space != NULL) {
+				/*
+				 * If is_simple_count() returns a pointer to
+				 * space, then the SQL statement is of the form:
 				 *
 				 *   SELECT count(*) FROM <tbl>
 				 *
-				 * where the Table structure returned represents table <tbl>.
-				 *
-				 * This statement is so common that it is optimized specially. The
-				 * OP_Count instruction is executed either on the intkey table that
-				 * contains the data for table <tbl> or on one of its indexes. It
-				 * is better to execute the op on an index, as indexes are almost
-				 * always spread across less pages than their corresponding tables.
+				 * This statement is so common that it is
+				 * optimized specially. The OP_Count instruction
+				 * is executed on the primary key index,
+				 * since there is no difference which index
+				 * to choose (except for partial indexes).
 				 */
-				const int iCsr = pParse->nTab++;	/* Cursor to scan b-tree */
-				Index *pIdx;	/* Iterator variable */
-				struct key_def *def = NULL;
-				Index *pBest;	/* Best index found so far */
-				int iRoot = pTab->tnum;	/* Root page of scanned b-tree */
-
-				/* Search for the index that has the lowest scan cost.
-				 *
-				 * (2011-04-15) Do not do a full scan of an unordered index.
-				 *
-				 * (2013-10-03) Do not count the entries in a partial index.
-				 *
-				 * In practice the key_def structure will not be used. It is only
-				 * passed to keep OP_OpenRead happy.
+				const int cursor = pParse->nTab++;
+				/*
+				 * Open the cursor, execute the OP_Count,
+				 * close the cursor.
 				 */
-				pBest = sqlite3PrimaryKeyIndex(pTab);
-				for (pIdx = pTab->pIndex; pIdx;
-				     pIdx = pIdx->pNext) {
-					if (pIdx->bUnordered == 0
-					    && pIdx->szIdxRow < pTab->szTabRow
-					    && pIdx->pPartIdxWhere == 0
-					    && (!pBest
-						|| pIdx->szIdxRow <
-						pBest->szIdxRow)
-					    ) {
-						pBest = pIdx;
-					}
-				}
-				if (pBest != NULL) {
-					iRoot = pBest->tnum;
-					def = key_def_dup(sql_index_key_def(pBest));
-					if (def == NULL)
-						sqlite3OomFault(db);
-				}
-
-				/* Open a read-only cursor, execute the OP_Count, close the cursor. */
-				emit_open_cursor(pParse, iCsr, iRoot);
-				if (def != NULL) {
-					sqlite3VdbeChangeP4(v, -1,
-							    (char *)def,
-							    P4_KEYDEF);
-				}
-				sqlite3VdbeAddOp2(v, OP_Count, iCsr,
+				emit_open_cursor(pParse, cursor,
+						 space->def->id << 10);
+				sqlite3VdbeAddOp2(v, OP_Count, cursor,
 						  sAggInfo.aFunc[0].iMem);
-				sqlite3VdbeAddOp1(v, OP_Close, iCsr);
-				explainSimpleCount(pParse, pTab, pBest);
+				sqlite3VdbeAddOp1(v, OP_Close, cursor);
+				explain_simple_count(pParse, space->def->name);
 			} else
-#endif				/* SQLITE_OMIT_BTREECOUNT */
 			{
 				/* Check if the query is of one of the following forms:
 				 *
@@ -6145,6 +6108,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				 */
 				ExprList *pMinMax = 0;
 				u8 flag = WHERE_ORDERBY_NORMAL;
+				ExprList *pDel = 0;
 
 				assert(p->pGroupBy == 0);
 				assert(flag == 0);
@@ -6195,6 +6159,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				}
 				sqlite3WhereEnd(pWInfo);
 				finalizeAggFunctions(pParse, &sAggInfo);
+				sqlite3ExprListDelete(db, pDel);
 			}
 
 			sSort.pOrderBy = 0;
@@ -6202,7 +6167,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 					   SQLITE_JUMPIFNULL);
 			selectInnerLoop(pParse, p, p->pEList, -1, 0, 0, pDest,
 					addrEnd, addrEnd);
-			sqlite3ExprListDelete(db, pDel);
 		}
 		sqlite3VdbeResolveLabel(v, addrEnd);
 

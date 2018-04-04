@@ -733,10 +733,10 @@ test:do_execsql_test(
     ]])
 
 test:do_eqp_test(7.1, "SELECT count(*) FROM t1", {
-    {0, 0, 0, "SCAN TABLE T1"},
+    {0, 0, 0, "B+tree count T1"},
 })
 test:do_eqp_test(7.2, "SELECT count(*) FROM t2", {
-    {0, 0, 0, "SCAN TABLE T2 USING COVERING INDEX I1"},
+    {0, 0, 0, "B+tree count T2"},
 })
 -- MUST_WORK_TEST
 if (0 > 0)
@@ -781,7 +781,7 @@ test:do_eqp_test("8.1.1", "SELECT * FROM t2", {
 --     {0, 0, 0, "SEARCH TABLE T2 USING INTEGER PRIMARY KEY (rowid=?)"},
 -- }
 test:do_eqp_test("8.1.3", "SELECT count(*) FROM t2", {
-    {0, 0, 0, "SCAN TABLE T2"},
+    {0, 0, 0, "B+tree count T2"},
 })
 test:do_eqp_test("8.2.1", "SELECT * FROM t1", {
     {0, 0, 0, "SCAN TABLE T1"},
@@ -793,7 +793,7 @@ test:do_eqp_test("8.2.3", "SELECT * FROM t1 WHERE b=? AND c=?", {
     {0, 0, 0, "SEARCH TABLE T1 USING PRIMARY KEY (B=? AND C=?)"},
 })
 test:do_eqp_test("8.2.4", "SELECT count(*) FROM t1", {
-    {0, 0, 0, "SCAN TABLE T1"},
+    {0, 0, 0, "B+tree count T1"},
 })
 
 

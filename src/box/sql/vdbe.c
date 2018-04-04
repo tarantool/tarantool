@@ -2832,7 +2832,6 @@ case OP_MakeRecord: {
  * Store the number of entries (an integer value) in the table or index
  * opened by cursor P1 in register P2
  */
-#ifndef SQLITE_OMIT_BTREECOUNT
 case OP_Count: {         /* out2 */
 	i64 nEntry;
 	BtCursor *pCrsr;
@@ -2853,7 +2852,6 @@ case OP_Count: {         /* out2 */
 	pOut->u.i = nEntry;
 	break;
 }
-#endif
 
 /* Opcode: Savepoint P1 * * P4 *
  *
