@@ -886,74 +886,6 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 /* {{{ AlterSpaceOp descendants - alter operations, such as Add/Drop index */
 
 /**
- * The operation is executed on each space format change.
- * Now the single purpose is to update an old field names
- * dictionary, used by old space formats, and use it in a new
- * formats (vinyl creates many formats, not one).
- */
-class ModifySpaceFormat: public AlterSpaceOp
-{
-	/**
-	 * Newely created field dictionary. When new space_def is
-	 * created, it allocates new dictionary. Alter moves new
-	 * names into an old dictionary and deletes new one.
-	 */
-	struct tuple_dictionary *new_dict;
-	/**
-	 * Old tuple dictionary stored to rollback in destructor,
-	 * if an exception had been raised after alter_def(), but
-	 * before alter().
-	 */
-	struct tuple_dictionary *old_dict;
-	/**
-	 * New space definition. It can not be got from alter,
-	 * because alter_def() is called before
-	 * ModifySpace::alter_def().
-	 */
-	struct space_def *new_def;
-public:
-	ModifySpaceFormat(struct alter_space *alter, struct space_def *new_def)
-		: AlterSpaceOp(alter), new_dict(NULL), old_dict(NULL),
-		  new_def(new_def) {}
-	virtual void alter_def(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter, int64_t lsn);
-	virtual ~ModifySpaceFormat();
-};
-
-void
-ModifySpaceFormat::alter_def(struct alter_space *alter)
-{
-	/*
-	 * Move new names into an old dictionary, which already is
-	 * referenced by existing tuple formats. New dictionary
-	 * object is deleted later, in destructor.
-	 */
-	new_dict = new_def->dict;
-	old_dict = alter->old_space->def->dict;
-	tuple_dictionary_swap(new_dict, old_dict);
-	new_def->dict = old_dict;
-	tuple_dictionary_ref(old_dict);
-}
-
-void
-ModifySpaceFormat::commit(struct alter_space *alter, int64_t lsn)
-{
-	(void) alter;
-	(void) lsn;
-	old_dict = NULL;
-}
-
-ModifySpaceFormat::~ModifySpaceFormat()
-{
-	if (new_dict != NULL) {
-		/* Return old names into the old dict. */
-		if (old_dict != NULL)
-			tuple_dictionary_swap(new_dict, old_dict);
-		tuple_dictionary_unref(new_dict);
-	}
-}
-
-/**
  * This operation does not modify the space, it just checks that
  * tuples stored in it conform to the new format.
  */
@@ -986,9 +918,22 @@ class ModifySpace: public AlterSpaceOp
 public:
 	ModifySpace(struct alter_space *alter, struct space_def *def_arg)
 		:AlterSpaceOp(alter), def(def_arg) {}
+	/**
+	 * Newely created field dictionary. When new space_def is
+	 * created, it allocates new dictionary. Alter moves new
+	 * names into an old dictionary and deletes new one.
+	 */
+	struct tuple_dictionary *new_dict;
+	/**
+	 * Old tuple dictionary stored to rollback in destructor,
+	 * if an exception had been raised after alter_def(), but
+	 * before alter().
+	 */
+	struct tuple_dictionary *old_dict;
 	/* New space definition. */
 	struct space_def *def;
 	virtual void alter_def(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t signature);
 	virtual ~ModifySpace();
 };
 
@@ -996,13 +941,39 @@ public:
 void
 ModifySpace::alter_def(struct alter_space *alter)
 {
+	/*
+	 * Move new names into an old dictionary, which already is
+	 * referenced by existing tuple formats. New dictionary
+	 * object is deleted later, in destructor.
+	 */
+	new_dict = def->dict;
+	old_dict = alter->old_space->def->dict;
+	tuple_dictionary_swap(new_dict, old_dict);
+	def->dict = old_dict;
+	tuple_dictionary_ref(old_dict);
+
 	space_def_delete(alter->space_def);
 	alter->space_def = def;
 	/* Now alter owns the def. */
 	def = NULL;
 }
 
-ModifySpace::~ModifySpace() {
+void
+ModifySpace::commit(struct alter_space *alter, int64_t signature)
+{
+	(void) alter;
+	(void) signature;
+	old_dict = NULL;
+}
+
+ModifySpace::~ModifySpace()
+{
+	if (new_dict != NULL) {
+		/* Return old names into the old dict. */
+		if (old_dict != NULL)
+			tuple_dictionary_swap(new_dict, old_dict);
+		tuple_dictionary_unref(new_dict);
+	}
 	if (def != NULL)
 		space_def_delete(def);
 }
@@ -1622,7 +1593,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 						     def->fields,
 						     def->field_count);
 		(void) new CheckSpaceFormat(alter);
-		(void) new ModifySpaceFormat(alter, def);
 		(void) new ModifySpace(alter, def);
 		def_guard.is_active = false;
 		/* Create MoveIndex ops for all space indexes. */
