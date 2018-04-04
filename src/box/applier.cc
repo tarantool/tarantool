@@ -47,6 +47,7 @@
 #include "xrow_io.h"
 #include "error.h"
 #include "session.h"
+#include "cfg.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -506,7 +507,19 @@ applier_subscribe(struct applier *applier)
 			 */
 			vclock_follow(&replicaset.vclock, row.replica_id,
 				      row.lsn);
-			xstream_write_xc(applier->subscribe_stream, &row);
+			if (xstream_write(applier->subscribe_stream, &row) != 0) {
+				struct error *e = diag_last_error(diag_get());
+				/**
+				 * Silently skip ER_TUPLE_FOUND error if such
+				 * option is set in config.
+				 */
+				if (e->type == &type_ClientError &&
+				    box_error_code(e) == ER_TUPLE_FOUND &&
+				    cfg_geti("replication_skip_conflict"))
+					diag_clear(diag_get());
+				else
+					diag_raise();
+			}
 		}
 		if (applier->state == APPLIER_SYNC ||
 		    applier->state == APPLIER_FOLLOW)

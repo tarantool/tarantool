@@ -59,6 +59,7 @@ local default_cfg = {
     replication_sync_lag = 10,
     replication_connect_timeout = 4,
     replication_connect_quorum = nil, -- connect all
+    replication_skip_conflict = false,
     feedback_enabled      = true,
     feedback_host         = "https://feedback.tarantool.io",
     feedback_interval     = 3600,
@@ -118,6 +119,7 @@ local template_cfg = {
     replication_sync_lag = 'number',
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
+    replication_skip_conflict = 'boolean',
     feedback_enabled      = 'boolean',
     feedback_host         = 'string',
     feedback_interval     = 'number',
@@ -192,6 +194,7 @@ local dynamic_cfg = {
     force_recovery          = function() end,
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
+    replication_skip_conflict = function() end,
 }
 
 local dynamic_cfg_skip_at_load = {
