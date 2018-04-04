@@ -915,7 +915,6 @@ public:
 	ModifySpaceFormat(struct alter_space *alter, struct space_def *new_def)
 		: AlterSpaceOp(alter), new_dict(NULL), old_dict(NULL),
 		  new_def(new_def) {}
-	virtual void alter(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
 	virtual ~ModifySpaceFormat();
@@ -937,21 +936,6 @@ ModifySpaceFormat::alter_def(struct alter_space *alter)
 }
 
 void
-ModifySpaceFormat::alter(struct alter_space *alter)
-{
-	struct space *new_space = alter->new_space;
-	struct space *old_space = alter->old_space;
-	struct tuple_format *new_format = new_space->format;
-	struct tuple_format *old_format = old_space->format;
-	if (old_format != NULL) {
-		assert(new_format != NULL);
-		if (! tuple_format1_can_store_format2_tuples(new_format,
-							     old_format))
-		    space_check_format_xc(new_space, old_space);
-	}
-}
-
-void
 ModifySpaceFormat::commit(struct alter_space *alter, int64_t lsn)
 {
 	(void) alter;
@@ -966,6 +950,33 @@ ModifySpaceFormat::~ModifySpaceFormat()
 		if (old_dict != NULL)
 			tuple_dictionary_swap(new_dict, old_dict);
 		tuple_dictionary_unref(new_dict);
+	}
+}
+
+/**
+ * This operation does not modify the space, it just checks that
+ * tuples stored in it conform to the new format.
+ */
+class CheckSpaceFormat: public AlterSpaceOp
+{
+public:
+	CheckSpaceFormat(struct alter_space *alter)
+		:AlterSpaceOp(alter) {}
+	virtual void alter(struct alter_space *alter);
+};
+
+void
+CheckSpaceFormat::alter(struct alter_space *alter)
+{
+	struct space *new_space = alter->new_space;
+	struct space *old_space = alter->old_space;
+	struct tuple_format *new_format = new_space->format;
+	struct tuple_format *old_format = old_space->format;
+	if (old_format != NULL) {
+		assert(new_format != NULL);
+		if (!tuple_format1_can_store_format2_tuples(new_format,
+							    old_format))
+		    space_check_format_xc(new_space, old_space);
 	}
 }
 
@@ -1610,6 +1621,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 						     old_space->index_count,
 						     def->fields,
 						     def->field_count);
+		(void) new CheckSpaceFormat(alter);
 		(void) new ModifySpaceFormat(alter, def);
 		(void) new ModifySpace(alter, def);
 		def_guard.is_active = false;
@@ -1798,10 +1810,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 						old_index->def);
 			index_def_guard.is_active = false;
 		} else {
-			(void) new ModifySpaceFormat(alter, old_space->def);
 			/*
-			 * Operation can be done without index rebuild.
+			 * Operation can be done without index rebuild,
+			 * but we still need to check that tuples stored
+			 * in the space conform to the new format.
 			 */
+			(void) new CheckSpaceFormat(alter);
 			(void) new ModifyIndex(alter, index_def,
 					       old_index->def);
 			index_def_guard.is_active = false;
