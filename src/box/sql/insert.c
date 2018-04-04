@@ -1308,18 +1308,10 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					sqlite3VdbeResolveLabel(v, skip_if_null);
 				}
 			}
-			if (IsPrimaryKeyIndex(pIdx) || uniqueByteCodeNeeded) {
-				sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
-						  pTab->nCol, aRegIdx[ix]);
-				VdbeComment((v, "for %s", pIdx->zName));
-			}
-		} else {
-			/* kyukhin: for Tarantool, this should be evaluated to NOP.  */
-			if (IsPrimaryKeyIndex(pIdx) || uniqueByteCodeNeeded) {
-				sqlite3VdbeAddOp3(v, OP_MakeRecord, regIdx,
-						  nIdxCol, aRegIdx[ix]);
-				VdbeComment((v, "for %s", pIdx->zName));
-			}
+
+			sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
+					pTab->nCol, aRegIdx[ix]);
+			VdbeComment((v, "for %s", pIdx->zName));
 		}
 
 		/* In an UPDATE operation, if this index is the PRIMARY KEY
