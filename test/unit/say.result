@@ -1,4 +1,4 @@
-1..23
+1..33
 # type: file
 # next: 
 ok 1 - 
@@ -33,20 +33,35 @@ ok 10 - syslog:identity=
 ok 11 - unknown:
 # next: unknown:example.org
 ok 12 - unknown:example.org
+# facility: 24
 ok 13 - 
 # identity: tarantool
+# facility: 24
 ok 14 - identity=tarantool
-# facility: user
+# facility: 1
 ok 15 - facility=user
 # identity: xtarantoolx
-# facility: local1
+# facility: 17
 ok 16 - identity=xtarantoolx,facility=local1
+# identity: xtarantoolx
+ok 17 - identity=xtarantoolx,facility=kern
+# identity: xtarantoolx
+# facility: 8
+ok 18 - identity=xtarantoolx,facility=uucp
+ok 19 - identity=xtarantoolx,facility=foo
 # identity: bar
-# facility: foo
-ok 17 - facility=foo,identity=bar
-ok 18 - invalid=
-ok 19 - facility=local1,facility=local2
-ok 20 - identity=foo,identity=bar
-ok 21 - plain
-ok 22 - json
-ok 23 - custom
+# facility: 10
+ok 20 - facility=authpriv,identity=bar
+ok 21 - invalid=
+ok 22 - facility=local1,facility=local2
+ok 23 - identity=foo,identity=bar
+ok 24 - plain
+ok 25 - json
+ok 26 - custom
+ok 27 - freopen
+ok 28 - parsed identity
+ok 29 - parsed facility
+ok 30 - ftell
+ok 31 - log_say
+ok 32 - fseek
+ok 33 - syslog line
