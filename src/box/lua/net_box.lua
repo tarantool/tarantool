@@ -833,18 +833,6 @@ function remote_methods:wait_connected(timeout)
     return self._transport.wait_state('active', timeout)
 end
 
-function remote_methods:request_timeout(request_opts)
-    local timeout = request_opts and request_opts.timeout
-    if timeout == nil then
-        -- conn:timeout(timeout):ping()
-        -- @deprecated since 1.7.4
-        local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline - fiber_clock())
-                            or (request_opts and request_opts.timeout)
-    end
-    return timeout
-end
-
 function remote_methods:_request(method, opts, ...)
     local this_fiber = fiber_self()
     local transport = self._transport
@@ -890,7 +878,14 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    local timeout = self:request_timeout(opts)
+    local timeout = opts and opts.timeout
+    if timeout == nil then
+        -- conn:timeout(timeout):ping()
+        -- @deprecated since 1.7.4
+        local deadline = self._deadlines[fiber_self()]
+        timeout = deadline and max(0, deadline - fiber_clock())
+                  or (opts and opts.timeout)
+    end
     local err = self._transport.perform_request(timeout, nil, 'ping',
                                                 self.schema_version)
     return not err or err == E_WRONG_SCHEMA_VERSION
@@ -941,13 +936,14 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    local timeout = self:request_timeout(netbox_opts)
+    local timeout = netbox_opts and netbox_opts.timeout
     local buffer = netbox_opts and netbox_opts.buffer
     parameters = parameters or {}
     sql_opts = sql_opts or {}
-    local err, res, metadata, info = self._transport.perform_request(timeout,
-                                    buffer, 'execute', self.schema_version,
-                                    query, parameters, sql_opts)
+    local err, res, metadata, info =
+        self._transport.perform_request(timeout, buffer, 'execute',
+                                        self.schema_version, query, parameters,
+                                        sql_opts)
     if err then
         box.error({code = err, reason = res})
     end
