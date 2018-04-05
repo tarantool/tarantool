@@ -1576,12 +1576,14 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		access_check_ddl(def->name, def->uid, SC_SPACE, PRIV_A, true);
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
-		/*
-		 * Check basic options. Assume the space to be
-		 * empty, because we can not calculate here
-		 * a size of a vinyl space.
-		 */
-		space_def_check_compatibility_xc(old_space->def, def, true);
+		if (def->id != space_id(old_space))
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "space id is immutable");
+		if (strcmp(def->engine_name, old_space->def->engine_name) != 0)
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not change space engine");
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.

@@ -1017,9 +1017,6 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 			}
 		}
 	}
-	if (space_def_check_compatibility(old_space->def, new_space->def,
-					  false) != 0)
-		return -1;
 	if (old_space->index_count < new_space->index_count) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "adding an index to a non-empty space");

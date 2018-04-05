@@ -1244,8 +1244,7 @@ t[5] = 1
 ...
 box.space._space:replace(t)
 ---
-- error: 'Can''t modify space ''test'': can not change field count on a non-empty
-    space'
+- error: Vinyl does not support changing space format of a non-empty space
 ...
 s:drop()
 ---
@@ -1333,8 +1332,7 @@ ok_format_change(3, 'any')
 -- unsigned --X--> string
 fail_format_change(3, 'string')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from unsigned to string
-  on a not empty space'
+- 'Tuple field 3 type does not match one required by operation: expected string'
 ...
 -- unsigned -----> number
 ok_format_change(3, 'number')
@@ -1351,8 +1349,7 @@ ok_format_change(3, 'scalar')
 -- unsigned --X--> map
 fail_format_change(3, 'map')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from unsigned to map
-  on a not empty space'
+- 'Tuple field 3 type does not match one required by operation: expected map'
 ...
 -- string -----> any
 ok_format_change(4, 'any')
@@ -1365,8 +1362,7 @@ ok_format_change(4, 'scalar')
 -- string --X--> boolean
 fail_format_change(4, 'boolean')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from string to boolean
-  on a not empty space'
+- 'Tuple field 4 type does not match one required by operation: expected boolean'
 ...
 -- number -----> any
 ok_format_change(5, 'any')
@@ -1409,8 +1405,7 @@ ok_format_change(7, 'scalar')
 -- boolean --X--> string
 fail_format_change(7, 'string')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from boolean to string
-  on a not empty space'
+- 'Tuple field 7 type does not match one required by operation: expected string'
 ...
 -- scalar -----> any
 ok_format_change(8, 'any')
@@ -1428,8 +1423,7 @@ ok_format_change(9, 'any')
 -- array --X--> scalar
 fail_format_change(9, 'scalar')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from array to scalar
-  on a not empty space'
+- 'Tuple field 9 type does not match one required by operation: expected scalar'
 ...
 -- map -----> any
 ok_format_change(10, 'any')
@@ -1438,8 +1432,7 @@ ok_format_change(10, 'any')
 -- map --X--> scalar
 fail_format_change(10, 'scalar')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from map to scalar on
-  a not empty space'
+- 'Tuple field 10 type does not match one required by operation: expected scalar'
 ...
 s:drop()
 ---

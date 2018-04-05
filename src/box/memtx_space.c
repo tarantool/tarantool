@@ -826,12 +826,17 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+
+	if (old_memtx_space->bsize != 0 &&
+	    old_space->def->opts.temporary != new_space->def->opts.temporary) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_space->def->name,
+			 "can not switch temporary flag on a non-empty space");
+		return -1;
+	}
+
 	new_memtx_space->replace = old_memtx_space->replace;
 	new_memtx_space->bsize = old_memtx_space->bsize;
-	bool is_empty = old_space->index_count == 0 ||
-			index_size(old_space->index[0]) == 0;
-	return space_def_check_compatibility(old_space->def,
-					     new_space->def, is_empty);
+	return 0;
 }
 
 /* }}} DDL */
