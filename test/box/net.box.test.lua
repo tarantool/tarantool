@@ -8,8 +8,9 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 
 test_run:cmd("setopt delimiter ';'")
 function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
-    return cn:_request('select', opts, space_id, index_id, iterator,
-                       offset, limit, key)
+    local ret = cn:_request('select', opts, space_id, index_id, iterator,
+                            offset, limit, key)
+    return ret
 end
 function x_fatal(cn) cn._transport.perform_request(nil, nil, 'inject', nil, '\x80') end
 test_run:cmd("setopt delimiter ''");

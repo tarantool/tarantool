@@ -286,9 +286,6 @@ cn:execute('create table test2(id primary key, a, b, c)')
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 box.space.TEST2.name
 ---
 - TEST2
@@ -307,9 +304,6 @@ cn:execute('create index test2_a_b_index on test2(a, b)')
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 #box.space.TEST2.index
 ---
 - 1
@@ -317,9 +311,6 @@ cn:reload_schema()
 cn:execute('drop table test2')
 ---
 - rowcount: 1
-...
-cn:reload_schema()
----
 ...
 box.space.TEST2
 ---
@@ -333,9 +324,6 @@ cn:execute('create table test3(id primary key, a, b)')
 ...
 -- Rowcount = 1, although two tuples were created:
 -- for _space and for _index.
-cn:reload_schema()
----
-...
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 ---
 - rowcount: 3
@@ -350,9 +338,6 @@ cn:execute('create view test3_view(id) as select id from test3')
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 cn:execute('create view if not exists test3_view(id) as select id from test3')
 ---
 - rowcount: 0
@@ -360,9 +345,6 @@ cn:execute('create view if not exists test3_view(id) as select id from test3')
 cn:execute('drop view test3_view')
 ---
 - rowcount: 1
-...
-cn:reload_schema()
----
 ...
 cn:execute('drop view if exists test3_view')
 ---
@@ -374,9 +356,6 @@ cn:execute('create index test3_sec on test3(a, b)')
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 cn:execute('create index if not exists test3_sec on test3(a, b)')
 ---
 - rowcount: 0
@@ -384,9 +363,6 @@ cn:execute('create index if not exists test3_sec on test3(a, b)')
 cn:execute('drop index test3_sec on test3')
 ---
 - rowcount: 1
-...
-cn:reload_schema()
----
 ...
 cn:execute('drop index if exists test3_sec on test3')
 ---
@@ -398,9 +374,6 @@ cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;'
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 cn:execute('create trigger if not exists trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
 ---
 - rowcount: 0
@@ -408,9 +381,6 @@ cn:execute('create trigger if not exists trig INSERT ON test3 BEGIN SELECT * FRO
 cn:execute('drop trigger trig')
 ---
 - rowcount: 1
-...
-cn:reload_schema()
----
 ...
 cn:execute('drop trigger if exists trig')
 ---
@@ -422,28 +392,16 @@ cn:execute('create index idx1 on test3(a)')
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 cn:execute('create index idx2 on test3(b)')
 ---
 - rowcount: 1
 ...
-cn:reload_schema()
----
-...
 box.space.TEST3:truncate()
----
-...
-cn:reload_schema()
 ---
 ...
 cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
 ---
 - rowcount: 1
-...
-cn:reload_schema()
----
 ...
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 ---
@@ -452,9 +410,6 @@ cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 cn:execute('drop table test3')
 ---
 - rowcount: 1
-...
-cn:reload_schema()
----
 ...
 cn:execute('drop table if exists test3')
 ---

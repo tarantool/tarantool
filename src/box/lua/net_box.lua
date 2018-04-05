@@ -848,33 +848,41 @@ function remote_methods:_request(method, opts, ...)
         deadline = self._deadlines[this_fiber]
     end
     local buffer = opts and opts.buffer
-    local err, res
+    local err, res, metadata, info
     repeat
         local timeout = deadline and max(0, deadline - fiber_clock())
         if self.state ~= 'active' then
             wait_state('active', timeout)
             timeout = deadline and max(0, deadline - fiber_clock())
         end
-        err, res = perform_request(timeout, buffer, method,
-                                   self.schema_version, ...)
+        err, res, metadata, info =
+            perform_request(timeout, buffer, method, self.schema_version, ...)
         if not err and buffer ~= nil then
             return res -- the length of xrow.body
         elseif not err then
-            setmetatable(res, sequence_mt)
-            local postproc = method ~= 'eval' and method ~= 'call_17'
-            if postproc then
-                local tnew = box.tuple.new
-                for i, v in pairs(res) do
-                    res[i] = tnew(v)
+            -- SQL execute can return info with no data.
+            if res then
+                setmetatable(res, sequence_mt)
+                local postproc = method ~= 'eval' and method ~= 'call_17'
+                if postproc then
+                    local tnew = box.tuple.new
+                    for i, v in pairs(res) do
+                        res[i] = tnew(v)
+                    end
                 end
             end
-            return res
+            return res, metadata, info
         elseif err == E_WRONG_SCHEMA_VERSION then
             err = nil
         end
     until err
     box.error({code = err, reason = res})
 end
+--
+-- Get multiple values and return the first only. Use to ignore
+-- tail consisting of nils.
+--
+local function first_value(arg) return arg end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
@@ -900,7 +908,8 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     check_remote_arg(self, 'call')
-    return self:_request('call_16', nil, tostring(func_name), {...})
+    return first_value(self:_request('call_16', nil, tostring(func_name),
+                                     {...}))
 end
 
 function remote_methods:call(func_name, args, opts)
@@ -917,7 +926,7 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
     check_remote_arg(self, 'eval')
-    return unpack(self:_request('eval', nil, code, {...}))
+    return unpack(first_value(self:_request('eval', nil, code, {...})))
 end
 
 function remote_methods:eval(code, args, opts)
@@ -936,18 +945,10 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    local timeout = netbox_opts and netbox_opts.timeout
-    local buffer = netbox_opts and netbox_opts.buffer
-    parameters = parameters or {}
-    sql_opts = sql_opts or {}
-    local err, res, metadata, info =
-        self._transport.perform_request(timeout, buffer, 'execute',
-                                        self.schema_version, query, parameters,
-                                        sql_opts)
-    if err then
-        box.error({code = err, reason = res})
-    end
-    if buffer ~= nil then
+    local res, metadata, info =
+        self:_request('execute', netbox_opts, query, parameters or {},
+                      sql_opts or {})
+    if netbox_opts and netbox_opts.buffer then
         return res -- body length. Body is written to the buffer.
     end
     assert((info == nil and metadata ~= nil and res ~= nil) or
@@ -1180,8 +1181,9 @@ index_metatable = function(remote)
         local iterator = check_iterator_type(opts, key_is_nil)
         local offset = tonumber(opts and opts.offset) or 0
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
-        return remote:_request('select', opts, self.space.id, self.id,
-                               iterator, offset, limit, key)
+        return first_value(remote:_request('select', opts, self.space.id,
+                                           self.id, iterator, offset, limit,
+                                           key))
     end
 
     function methods:get(key, opts)
@@ -1222,7 +1224,8 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('call_16', opts, code, { key })[1][1]
+        return first_value(remote:_request('call_16', opts, code,
+                                           { key }))[1][1]
     end
 
     function methods:delete(key, opts)
