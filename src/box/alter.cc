@@ -1206,8 +1206,8 @@ CreateIndex::alter(struct alter_space *alter)
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
 	assert(new_index != NULL);
-	space_build_secondary_key_xc(alter->new_space,
-				     alter->new_space, new_index);
+	space_build_index_xc(alter->new_space, new_index,
+			     alter->new_space->format);
 }
 
 void
@@ -1279,9 +1279,9 @@ RebuildIndex::alter(struct alter_space *alter)
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
 	assert(new_index != NULL);
-	space_build_secondary_key_xc(new_index_def->iid != 0 ?
-				     alter->new_space : alter->old_space,
-				     alter->new_space, new_index);
+	space_build_index_xc(new_index_def->iid != 0 ?
+			     alter->new_space : alter->old_space,
+			     new_index, alter->new_space->format);
 }
 
 void

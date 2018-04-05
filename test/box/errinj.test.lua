@@ -311,7 +311,7 @@ i1:select{}
 i2:select{}
 i3:select{}
 
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', i2.id)
+box.error.injection.set('ERRINJ_BUILD_INDEX', i2.id)
 
 i1:alter{parts = {3, "unsigned"}}
 
@@ -320,7 +320,7 @@ i1:select{}
 i2:select{}
 i3:select{}
 
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', i3.id)
+box.error.injection.set('ERRINJ_BUILD_INDEX', i3.id)
 
 i1:alter{parts = {4, "unsigned"}}
 
@@ -329,7 +329,7 @@ i1:select{}
 i2:select{}
 i3:select{}
 
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
+box.error.injection.set('ERRINJ_BUILD_INDEX', -1)
 
 s:drop()
 
@@ -341,9 +341,9 @@ s = box.schema.space.create('test')
 pk = s:create_index('pk')
 sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 s:replace{1, 1}
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', sk.id)
+box.error.injection.set('ERRINJ_BUILD_INDEX', sk.id)
 sk:alter({parts = {2, 'number'}})
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
+box.error.injection.set('ERRINJ_BUILD_INDEX', -1)
 s:drop()
 
 --

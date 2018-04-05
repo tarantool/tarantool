@@ -1094,11 +1094,10 @@ vinyl_space_drop_primary_key(struct space *space)
 }
 
 static int
-vinyl_space_build_secondary_key(struct space *old_space,
-				struct space *new_space,
-				struct index *new_index)
+vinyl_space_build_index(struct space *src_space, struct index *new_index,
+			struct tuple_format *new_format)
 {
-	(void)old_space;
+	(void)new_format;
 	/*
 	 * Unlike Memtx, Vinyl does not need building of a secondary index.
 	 * This is true because of two things:
@@ -1113,17 +1112,12 @@ vinyl_space_build_secondary_key(struct space *old_space,
 	 * by itself during WAL recovery.
 	 * III. Vinyl is online. The space is definitely empty and there's
 	 * nothing to build.
-	 *
-	 * When we start to implement alter of non-empty vinyl spaces, it
-	 *  seems that we should call here:
-	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
-	 *  but aware of three cases mentioned above.
 	 */
 	if (vinyl_index_open(new_index) != 0)
 		return -1;
 
 	/* Set pointer to the primary key for the new index. */
-	vy_lsm_update_pk(vy_lsm(new_index), vy_lsm(space_index(new_space, 0)));
+	vy_lsm_update_pk(vy_lsm(new_index), vy_lsm(space_index(src_space, 0)));
 	return 0;
 }
 
@@ -3931,7 +3925,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .add_primary_key = */ vinyl_space_add_primary_key,
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
-	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
+	/* .build_index = */ vinyl_space_build_index,
 	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
 };

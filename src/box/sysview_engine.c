@@ -136,13 +136,12 @@ sysview_space_drop_primary_key(struct space *space)
 }
 
 static int
-sysview_space_build_secondary_key(struct space *old_space,
-				  struct space *new_space,
-				  struct index *new_index)
+sysview_space_build_index(struct space *src_space, struct index *new_index,
+			  struct tuple_format *new_format)
 {
-	(void)old_space;
-	(void)new_space;
+	(void)src_space;
 	(void)new_index;
+	(void)new_format;
 	return 0;
 }
 
@@ -177,7 +176,7 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .add_primary_key = */ sysview_space_add_primary_key,
 	/* .drop_primary_key = */ sysview_space_drop_primary_key,
 	/* .check_format = */ sysview_space_check_format,
-	/* .build_secondary_key = */ sysview_space_build_secondary_key,
+	/* .build_index = */ sysview_space_build_index,
 	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ sysview_space_prepare_alter,
 };

@@ -48,6 +48,7 @@ struct txn;
 struct request;
 struct port;
 struct tuple;
+struct tuple_format;
 
 struct space_vtab {
 	/** Free a space instance. */
@@ -96,13 +97,19 @@ struct space_vtab {
 	int (*check_format)(struct space *new_space,
 			    struct space *old_space);
 	/**
-	 * Called with the new empty secondary index.
-	 * Fill the new index with data from the primary
-	 * key of the space.
+	 * Build a new index, primary or secondary, and fill it
+	 * with tuples stored in the given space. The function is
+	 * supposed to assure that all tuples conform to the new
+	 * format.
+	 *
+	 * @param src_space   space to use as build source
+	 * @param new_index   index to build
+	 * @param new_format  format for validating tuples
+	 * @retval  0         success
+	 * @retval -1         build failed
 	 */
-	int (*build_secondary_key)(struct space *old_space,
-				   struct space *new_space,
-				   struct index *new_index);
+	int (*build_index)(struct space *src_space, struct index *new_index,
+			   struct tuple_format *new_format);
 	/**
 	 * Exchange two index objects in two spaces. Used
 	 * to update a space with a newly built index, while
@@ -329,12 +336,10 @@ space_drop_primary_key(struct space *space)
 }
 
 static inline int
-space_build_secondary_key(struct space *old_space,
-			  struct space *new_space, struct index *new_index)
+space_build_index(struct space *src_space, struct index *new_index,
+		  struct tuple_format *new_format)
 {
-	assert(old_space->vtab == new_space->vtab);
-	return new_space->vtab->build_secondary_key(old_space,
-						    new_space, new_index);
+	return src_space->vtab->build_index(src_space, new_index, new_format);
 }
 
 static inline void
@@ -480,10 +485,10 @@ space_check_format_xc(struct space *new_space, struct space *old_space)
 }
 
 static inline void
-space_build_secondary_key_xc(struct space *old_space,
-			     struct space *new_space, struct index *new_index)
+space_build_index_xc(struct space *src_space, struct index *new_index,
+		     struct tuple_format *new_format)
 {
-	if (space_build_secondary_key(old_space, new_space, new_index) != 0)
+	if (space_build_index(src_space, new_index, new_format) != 0)
 		diag_raise();
 }
 
