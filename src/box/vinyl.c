@@ -1035,14 +1035,14 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 }
 
 static int
-vinyl_space_check_format(struct space *new_space, struct space *old_space)
+vinyl_space_check_format(struct space *space, struct tuple_format *format)
 {
-	(void)new_space;
-	struct vy_env *env = vy_env(old_space->engine);
+	(void)format;
+	struct vy_env *env = vy_env(space->engine);
 	/* @sa vy_prepare_alter_space for checks below. */
-	if (old_space->index_count == 0)
+	if (space->index_count == 0)
 		return 0;
-	struct vy_lsm *pk = vy_lsm(old_space->index[0]);
+	struct vy_lsm *pk = vy_lsm(space->index[0]);
 	if (env->status != VINYL_ONLINE)
 		return 0;
 	if (pk->stat.disk.count.rows == 0 && pk->stat.memory.count.rows == 0)

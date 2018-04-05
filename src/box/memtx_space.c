@@ -704,11 +704,11 @@ memtx_space_add_primary_key(struct space *space)
 }
 
 static int
-memtx_space_check_format(struct space *new_space, struct space *old_space)
+memtx_space_check_format(struct space *space, struct tuple_format *format)
 {
-	if (old_space->index_count == 0)
+	if (space->index_count == 0)
 		return 0;
-	struct index *pk = old_space->index[0];
+	struct index *pk = space->index[0];
 	if (index_size(pk) == 0)
 		return 0;
 
@@ -723,7 +723,7 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		rc = tuple_validate(new_space->format, tuple);
+		rc = tuple_validate(format, tuple);
 		if (rc != 0)
 			break;
 	}

@@ -91,11 +91,10 @@ struct space_vtab {
 	 */
 	void (*drop_primary_key)(struct space *);
 	/**
-	 * Check that new fields of a space format are
-	 * compatible with existing tuples.
+	 * Check that all tuples stored in a space are compatible
+	 * with the new format.
 	 */
-	int (*check_format)(struct space *new_space,
-			    struct space *old_space);
+	int (*check_format)(struct space *space, struct tuple_format *format);
 	/**
 	 * Build a new index, primary or secondary, and fill it
 	 * with tuples stored in the given space. The function is
@@ -323,10 +322,9 @@ space_add_primary_key(struct space *space)
 }
 
 static inline int
-space_check_format(struct space *new_space, struct space *old_space)
+space_check_format(struct space *space, struct tuple_format *format)
 {
-	assert(old_space->vtab == new_space->vtab);
-	return new_space->vtab->check_format(new_space, old_space);
+	return space->vtab->check_format(space, format);
 }
 
 static inline void
@@ -478,9 +476,9 @@ space_add_primary_key_xc(struct space *space)
 }
 
 static inline void
-space_check_format_xc(struct space *new_space, struct space *old_space)
+space_check_format_xc(struct space *space, struct tuple_format *format)
 {
-	if (space_check_format(new_space, old_space) != 0)
+	if (space_check_format(space, format) != 0)
 		diag_raise();
 }
 

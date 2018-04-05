@@ -918,7 +918,7 @@ CheckSpaceFormat::alter(struct alter_space *alter)
 		assert(new_format != NULL);
 		if (!tuple_format1_can_store_format2_tuples(new_format,
 							    old_format))
-		    space_check_format_xc(new_space, old_space);
+		    space_check_format_xc(old_space, new_format);
 	}
 }
 

@@ -154,10 +154,10 @@ sysview_space_prepare_alter(struct space *old_space, struct space *new_space)
 }
 
 static int
-sysview_space_check_format(struct space *new_space, struct space *old_space)
+sysview_space_check_format(struct space *space, struct tuple_format *format)
 {
-	(void)old_space;
-	(void)new_space;
+	(void)space;
+	(void)format;
 	unreachable();
 	return 0;
 }
