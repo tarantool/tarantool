@@ -1244,7 +1244,7 @@ t[5] = 1
 ...
 box.space._space:replace(t)
 ---
-- error: Vinyl does not support changing space format of a non-empty space
+- error: Vinyl does not support changing format of a non-empty space
 ...
 s:drop()
 ---
@@ -1558,7 +1558,7 @@ format[2] = {name = 'field2', type = 'unsigned'}
 ...
 s:format(format)
 ---
-- error: Vinyl does not support changing space format of a non-empty space
+- error: Vinyl does not support changing format of a non-empty space
 ...
 s:drop()
 ---

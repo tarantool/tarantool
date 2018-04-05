@@ -144,7 +144,7 @@ s:insert{5, 5}
 ...
 s.index.primary:alter({parts={2,'unsigned'}})
 ---
-- error: Vinyl does not support changing the definition of a non-empty index
+- error: Vinyl does not support building an index for a non-empty space
 ...
 s:drop()
 ---
