@@ -34,6 +34,7 @@
 #include "lua/fiber.h"
 #include "fiber.h"
 #include "coio.h"
+#include "lua-yaml/lyaml.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -41,6 +42,8 @@
 #include <readline/history.h>
 #include <stdlib.h>
 #include <ctype.h>
+
+static struct luaL_serializer *luaL_yaml_default = NULL;
 
 /*
  * Completion engine (Mike Paul's).
@@ -329,6 +332,33 @@ lbox_console_add_history(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Encode Lua object into YAML documents. Gets variable count of
+ * parameters.
+ * @retval 1 Pushes string with YAML documents - one per
+ *         parameter.
+ */
+static int
+lbox_console_format(struct lua_State *L)
+{
+	int arg_count = lua_gettop(L);
+	if (arg_count == 0) {
+		lua_pushstring(L, "---\n...\n");
+		return 1;
+	}
+	lua_createtable(L, arg_count, 0);
+	for (int i = 0; i < arg_count; ++i) {
+		if (lua_isnil(L, i + 1))
+			luaL_pushnull(L);
+		else
+			lua_pushvalue(L, i + 1);
+		lua_rawseti(L, -2, i + 1);
+	}
+	lua_replace(L, 1);
+	lua_settop(L, 1);
+	return lua_yaml_encode(L, luaL_yaml_default, NULL, NULL);
+}
+
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
@@ -337,6 +367,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"save_history",       lbox_console_save_history},
 		{"add_history",        lbox_console_add_history},
 		{"completion_handler", lbox_console_completion_handler},
+		{"format",             lbox_console_format},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "console", consolelib);
@@ -345,6 +376,22 @@ tarantool_lua_console_init(struct lua_State *L)
 	lua_getfield(L, -1, "completion_handler");
 	lua_pushcclosure(L, lbox_console_readline, 1);
 	lua_setfield(L, -2, "readline");
+
+	luaL_yaml_default = lua_yaml_new_serializer(L);
+	luaL_yaml_default->encode_invalid_numbers = 1;
+	luaL_yaml_default->encode_load_metatables = 1;
+	luaL_yaml_default->encode_use_tostring = 1;
+	luaL_yaml_default->encode_invalid_as_nil = 1;
+	/*
+	 * Hold reference to the formatter in module local
+	 * variable.
+	 *
+	 * This member is not visible to a user, because
+	 * console.lua modifies itself, holding the formatter in
+	 * module local variable. Add_history, save_history,
+	 * load_history work the same way.
+	 */
+	lua_setfield(L, -2, "formatter");
 }
 
 /*

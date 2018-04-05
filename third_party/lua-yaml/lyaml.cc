@@ -702,27 +702,7 @@ static void find_references(struct lua_yaml_dumper *dumper) {
    }
 }
 
-/**
- * Encode an object on Lua stack into YAML stream.
- * @param L Lua stack to get an argument and push the result.
- * @param serializer Lua YAML serializer.
- * @param tag_handle NULL, or a global tag handle. For global tags
- *        details see the standard:
- *        http://yaml.org/spec/1.2/spec.html#tag/shorthand/.
- * @param tag_prefix NULL, or a global tag prefix, to which @a
- *        handle is expanded. Example of a tagged document:
- *              handle          prefix
- *               ____   ________________________
- *              /    \ /                        \
- *        '%TAG !push! tag:tarantool.io/push,2018
- *         --- value
- *         ...
- *
- * @retval 2 Pushes two values on error: nil, error description.
- * @retval 1 Pushes one value on success: string with dumped
- *         object.
- */
-static int
+int
 lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
                 const char *tag_handle, const char *tag_prefix)
 {
@@ -839,7 +819,11 @@ usage_error:
 }
 
 static int
-l_new(lua_State *L);
+l_new(lua_State *L)
+{
+   lua_yaml_new_serializer(L);
+   return 1;
+}
 
 static const luaL_Reg yamllib[] = {
    { "encode", l_dump },
@@ -848,12 +832,12 @@ static const luaL_Reg yamllib[] = {
    { NULL, NULL}
 };
 
-static int
-l_new(lua_State *L)
+struct luaL_serializer *
+lua_yaml_new_serializer(lua_State *L)
 {
    struct luaL_serializer *s = luaL_newserializer(L, NULL, yamllib);
    s->has_compact = 1;
-   return 1;
+   return s;
 }
 
 int
