@@ -1028,21 +1028,107 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+/** Argument passed to vy_check_format_on_replace(). */
+struct vy_check_format_ctx {
+	/** Format to check new tuples against. */
+	struct tuple_format *format;
+	/** Set if a new tuple doesn't conform to the format. */
+	bool is_failed;
+	/** Container for storing errors. */
+	struct diag diag;
+};
+
+/**
+ * This is an on_replace trigger callback that checks inserted
+ * tuples against a new format.
+ */
+static void
+vy_check_format_on_replace(struct trigger *trigger, void *event)
+{
+	struct txn *txn = event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct vy_check_format_ctx *ctx = trigger->data;
+
+	if (stmt->new_tuple == NULL)
+		return; /* DELETE, nothing to do */
+
+	if (ctx->is_failed)
+		return; /* already failed, nothing to do */
+
+	if (tuple_validate(ctx->format, stmt->new_tuple) != 0) {
+		ctx->is_failed = true;
+		diag_move(diag_get(), &ctx->diag);
+	}
+}
+
 static int
 vinyl_space_check_format(struct space *space, struct tuple_format *format)
 {
-	(void)format;
 	struct vy_env *env = vy_env(space->engine);
+
+	/*
+	 * If this is local recovery, the space was checked before
+	 * restart so there's nothing we need to do.
+	 */
+	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
+	    env->status == VINYL_FINAL_RECOVERY_LOCAL)
+		return 0;
+
 	if (space->index_count == 0)
-		return 0;
+		return 0; /* space is empty, nothing to do */
+
+	/*
+	 * Iterate over all tuples stored in the given space and
+	 * check each of them for conformity to the new format.
+	 * Since read iterator may yield, we install an on_replace
+	 * trigger to check tuples inserted after we started the
+	 * iteration.
+	 */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
-	if (env->status != VINYL_ONLINE)
-		return 0;
-	if (pk->stat.disk.count.rows == 0 && pk->stat.memory.count.rows == 0)
-		return 0;
-	diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-		 "changing format of a non-empty space");
-	return -1;
+
+	struct tuple *key = vy_stmt_new_select(pk->env->key_format, NULL, 0);
+	if (key == NULL)
+		return -1;
+
+	struct trigger on_replace;
+	struct vy_check_format_ctx ctx;
+	ctx.format = format;
+	ctx.is_failed = false;
+	diag_create(&ctx.diag);
+	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
+	trigger_add(&space->on_replace, &on_replace);
+
+	struct vy_read_iterator itr;
+	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
+			      &env->xm->p_global_read_view);
+	int rc;
+	int loops = 0;
+	struct tuple *tuple;
+	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
+		/*
+		 * Read iterator yields only when it reads runs.
+		 * Yield periodically in order not to stall the
+		 * tx thread in case there are a lot of tuples in
+		 * mems or cache.
+		 */
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
+		if (ctx.is_failed) {
+			diag_move(&ctx.diag, diag_get());
+			rc = -1;
+			break;
+		}
+		if (tuple == NULL)
+			break;
+		rc = tuple_validate(format, tuple);
+		if (rc != 0)
+			break;
+	}
+	vy_read_iterator_close(&itr);
+	diag_destroy(&ctx.diag);
+	trigger_clear(&on_replace);
+	tuple_unref(key);
+	return rc;
 }
 
 static void
