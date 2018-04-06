@@ -412,7 +412,7 @@ lbox_tuple_transform(struct lua_State *L)
 	/* Execute tuple_update */
 	struct tuple *new_tuple =
 		box_tuple_update(tuple, buf->buf, buf->buf + ibuf_used(buf));
-	if (tuple == NULL)
+	if (new_tuple == NULL)
 		luaT_error(L);
 	/* box_tuple_update() doesn't leak on exception, see public API doc */
 	luaT_pushtuple(L, new_tuple);
