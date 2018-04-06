@@ -369,6 +369,25 @@ tuple_field_raw_by_name(struct tuple_format *format, const char *tuple,
 	return tuple_field_raw(format, tuple, field_map, fieldno);
 }
 
+/**
+ * Get tuple field by its path.
+ * @param format Tuple format.
+ * @param tuple MessagePack tuple's body.
+ * @param field_map Tuple field map.
+ * @param path Field path.
+ * @param path_len Length of @a path.
+ * @param path_hash Hash of @a path.
+ * @param[out] field Found field, or NULL, if not found.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error in JSON path.
+ */
+int
+tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
+                        const uint32_t *field_map, const char *path,
+                        uint32_t path_len, uint32_t path_hash,
+                        const char **field);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

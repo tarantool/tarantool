@@ -221,5 +221,70 @@ t = s:replace{1,2,3,4,5,6,7}
 t:tomap({names_only = true})
 s:drop()
 
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'array'}
+format[3] = {name = 'field3', type = 'map'}
+format[4] = {name = 'field4', type = 'string' }
+format[5] = {name = "[2][6]['привет中国world']['中国a']", type = 'string'}
+s = box.schema.space.create('test', {format = format})
+pk = s:create_index('pk')
+field2 = {1, 2, 3, "4", {5,6,7}, {привет中国world={中国="привет"}, key="value1", value="key1"}}
+field3 = {[10] = 100, k1 = 100, k2 = {1,2,3}, k3 = { {a=1, b=2}, {c=3, d=4} }, [-1] = 200}
+t = s:replace{1, field2, field3, "123456", "yes, this"}
+t[1]
+t[2]
+t[3]
+t[4]
+t[2][1]
+t["[2][1]"]
+t[2][5]
+t["[2][5]"]
+t["[2][5][1]"]
+t["[2][5][2]"]
+t["[2][5][3]"]
+t["[2][6].key"]
+t["[2][6].value"]
+t["[2][6]['key']"]
+t["[2][6]['value']"]
+t[2][6].привет中国world.中国
+t["[2][6].привет中国world"].中国
+t["[2][6].привет中国world.中国"]
+t["[2][6]['привет中国world']"]["中国"]
+t["[2][6]['привет中国world']['中国']"]
+t["[2][6]['привет中国world']['中国a']"]
+t["[3].k3[2].c"]
+t["[4]"]
+t.field1
+t.field2[5]
+t[".field1"]
+t["field1"]
+t["[3][10]"]
+
+-- Not found.
+t[0]
+t["[0]"]
+t["[1000]"]
+t.field1000
+t["not_found"]
+t["[2][5][10]"]
+t["[2][6].key100"]
+t["[2][0]"] -- 0-based index in array.
+t["[4][3]"] -- Can not index string.
+t["[4]['key']"]
+-- Not found 'a'. Return 'null' despite of syntax error on a
+-- next position.
+t["a.b.c d.e.f"]
+
+-- Sytax errors.
+t["[2].[5]"]
+t["[-1]"]
+t[".."]
+t["[["]
+t["]]"]
+t["{"]
+
+s:drop()
+
 engine = nil
 test_run = nil
