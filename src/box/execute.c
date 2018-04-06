@@ -551,10 +551,10 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 }
 
 static inline int
-sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, int column_count,
-	    struct port *port, struct region *region)
+sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct port *port,
+	    struct region *region)
 {
-	int rc;
+	int rc, column_count = sqlite3_column_count(stmt);
 	if (column_count > 0) {
 		/* Either ROW or DONE or ERROR. */
 		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -575,83 +575,9 @@ sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, int column_count,
 	return 0;
 }
 
-/**
- * Execute the prepared statement and write to the @out obuf the
- * result. Result is either rows array in a case of not zero
- * column count (SELECT), or SQL info in other cases.
- * @param db SQLite engine.
- * @param stmt Prepared statement.
- * @param out Out buffer.
- * @param sync IProto request sync.
- * @param region Runtime allocator for temporary objects.
- *
- * @retval  0 Success.
- * @retval -1 Client or memory error.
- */
-static inline int
-sql_execute_and_encode(sqlite3 *db, struct sqlite3_stmt *stmt, struct obuf *out,
-		       uint64_t sync, struct region *region)
-{
-	struct port port;
-	struct port_tuple *port_tuple = (struct port_tuple *)&port;
-	port_tuple_create(&port);
-	int column_count = sqlite3_column_count(stmt);
-	if (sql_execute(db, stmt, column_count, &port, region) != 0)
-		goto err_execute;
-
-	/*
-	 * Encode response.
-	 */
-	struct obuf_svp header_svp;
-	/* Prepare memory for the iproto header. */
-	if (iproto_prepare_header(out, &header_svp, IPROTO_SQL_HEADER_LEN) != 0)
-		goto err_execute;
-	int keys;
-	if (column_count > 0) {
-		if (sql_get_description(stmt, out, column_count) != 0)
-			goto err_body;
-		keys = 2;
-		if (iproto_reply_array_key(out, port_tuple->size,
-					   IPROTO_DATA) != 0)
-			goto err_body;
-		/*
-		 * Just like SELECT, SQL uses output format compatible
-		 * with Tarantool 1.6
-		 */
-		if (port_dump_16(&port, out) < 0) {
-			/* Failed port dump destroyes the port. */
-			goto err_body;
-		}
-	} else {
-		keys = 1;
-		assert(port_tuple->size == 0);
-		if (iproto_reply_map_key(out, 1, IPROTO_SQL_INFO) != 0)
-			goto err_body;
-		int changes = sqlite3_changes(db);
-		int size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
-			   mp_sizeof_uint(changes);
-		char *buf = obuf_alloc(out, size);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
-			goto err_body;
-		}
-		buf = mp_encode_uint(buf, SQL_INFO_ROW_COUNT);
-		buf = mp_encode_uint(buf, changes);
-	}
-	port_destroy(&port);
-	iproto_reply_sql(out, &header_svp, sync, schema_version, keys);
-	return 0;
-
-err_body:
-	obuf_rollback_to_svp(out, &header_svp);
-err_execute:
-	port_destroy(&port);
-	return -1;
-}
-
 int
-sql_prepare_and_execute(const struct sql_request *request, struct obuf *out,
-			struct region *region)
+sql_prepare_and_execute(const struct sql_request *request,
+			struct sql_response *response, struct region *region)
 {
 	const char *sql = request->sql_text;
 	uint32_t len;
@@ -667,14 +593,67 @@ sql_prepare_and_execute(const struct sql_request *request, struct obuf *out,
 		return -1;
 	}
 	assert(stmt != NULL);
-	if (sql_bind(request, stmt) != 0)
-		goto err_stmt;
-	if (sql_execute_and_encode(db, stmt, out, request->sync,
-				   region) != 0)
-		goto err_stmt;
-	sqlite3_finalize(stmt);
-	return 0;
-err_stmt:
+	port_tuple_create(&response->port);
+	response->prep_stmt = stmt;
+	response->sync = request->sync;
+	if (sql_bind(request, stmt) == 0 &&
+	    sql_execute(db, stmt, &response->port, region) == 0)
+		return 0;
+	port_destroy(&response->port);
 	sqlite3_finalize(stmt);
 	return -1;
+}
+
+int
+sql_response_dump(struct sql_response *response, struct obuf *out)
+{
+	struct obuf_svp header_svp;
+	/* Prepare memory for the iproto header. */
+	if (iproto_prepare_header(out, &header_svp, IPROTO_SQL_HEADER_LEN) != 0)
+		return -1;
+	sqlite3 *db = sql_get();
+	struct sqlite3_stmt *stmt = (struct sqlite3_stmt *) response->prep_stmt;
+	struct port_tuple *port_tuple = (struct port_tuple *) &response->port;
+	int keys, rc = 0, column_count = sqlite3_column_count(stmt);
+	if (column_count > 0) {
+		if (sql_get_description(stmt, out, column_count) != 0) {
+err:
+			obuf_rollback_to_svp(out, &header_svp);
+			rc = -1;
+			goto finish;
+		}
+		keys = 2;
+		if (iproto_reply_array_key(out, port_tuple->size,
+					   IPROTO_DATA) != 0)
+			goto err;
+		/*
+		 * Just like SELECT, SQL uses output format compatible
+		 * with Tarantool 1.6
+		 */
+		if (port_dump_16(&response->port, out) < 0) {
+			/* Failed port dump destroyes the port. */
+			goto err;
+		}
+	} else {
+		keys = 1;
+		assert(port_tuple->size == 0);
+		if (iproto_reply_map_key(out, 1, IPROTO_SQL_INFO) != 0)
+			goto err;
+		int changes = sqlite3_changes(db);
+		int size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
+			   mp_sizeof_uint(changes);
+		char *buf = obuf_alloc(out, size);
+		if (buf == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
+			goto err;
+		}
+		buf = mp_encode_uint(buf, SQL_INFO_ROW_COUNT);
+		buf = mp_encode_uint(buf, changes);
+	}
+	iproto_reply_sql(out, &header_svp, response->sync, schema_version,
+			 keys);
+finish:
+	port_destroy(&response->port);
+	sqlite3_finalize(stmt);
+	return rc;
 }

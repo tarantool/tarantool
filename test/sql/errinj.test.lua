@@ -25,5 +25,22 @@ insert_res
 select_res
 
 cn:close()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.sql.execute('drop table test')
+
+--
+-- gh-3326: after the iproto start using new buffers rotation
+-- policy, SQL responses could be corrupted, when DDL/DML is mixed
+-- with DQL. Same as gh-3255.
+--
+box.sql.execute('CREATE TABLE test (id integer primary key)')
+cn = remote.connect(box.cfg.listen)
+
+ch = fiber.channel(200)
+errinj.set("ERRINJ_IPROTO_TX_DELAY", true)
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do cn:execute('REPLACE INTO test VALUES (1)') end ch:put(true) end) end
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do cn.space.TEST:get{1} end ch:put(true) end) end
+for i = 1, 200 do ch:get() end
+errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
+
+box.sql.execute('DROP TABLE test')
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

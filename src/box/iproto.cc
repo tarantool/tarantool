@@ -1398,14 +1398,23 @@ static void
 tx_process_sql(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	struct obuf *out = msg->connection->tx.p_obuf;
+	struct obuf *out;
+	struct sql_response response;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 	assert(msg->header.type == IPROTO_EXECUTE);
-	if (sql_prepare_and_execute(&msg->sql, out, &fiber()->gc) != 0)
+	tx_inject_delay();
+	if (sql_prepare_and_execute(&msg->sql, &response, &fiber()->gc) != 0)
+		goto error;
+	/*
+	 * Take an obuf only after execute(). Else the buffer can
+	 * become out of date during yield.
+	 */
+	out = msg->connection->tx.p_obuf;
+	if (sql_response_dump(&response, out) != 0)
 		goto error;
 	iproto_wpos_create(&msg->wpos, out);
 	return;
