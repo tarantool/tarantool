@@ -430,10 +430,12 @@ tuple_extra(const struct tuple *tuple)
  * \param end the end of \a data
  * \retval tuple on success
  * \retval NULL on out of memory
- * \sa \code box.tuple.new(data) \endcode
  */
-struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end);
+static inline struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	return format->vtab.tuple_new(format, data, end);
+}
 
 /**
  * Free the tuple of any engine.
@@ -445,7 +447,7 @@ tuple_delete(struct tuple *tuple)
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
 	struct tuple_format *format = tuple_format(tuple);
-	format->vtab.destroy(format, tuple);
+	format->vtab.tuple_delete(format, tuple);
 }
 
 /**

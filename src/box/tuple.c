@@ -61,15 +61,19 @@ struct tuple_format *tuple_format_runtime;
 static void
 runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple);
 
+static struct tuple *
+runtime_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
 /** A virtual method table for tuple_format_runtime */
 static struct tuple_format_vtab tuple_format_runtime_vtab = {
 	runtime_tuple_delete,
+	runtime_tuple_new,
 };
 
-struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end)
+static struct tuple *
+runtime_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	assert(format->vtab.destroy == tuple_format_runtime_vtab.destroy);
+	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 
 	mp_tuple_assert(data, end);
 	size_t data_len = end - data;
@@ -102,7 +106,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 static void
 runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
-	assert(format->vtab.destroy == tuple_format_runtime_vtab.destroy);
+	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
 	size_t total = sizeof(struct tuple) + tuple_format_meta_size(format) +
@@ -396,8 +400,6 @@ box_tuple_t *
 box_tuple_update(const box_tuple_t *tuple, const char *expr,
 		 const char *expr_end)
 {
-	struct tuple_format *format = tuple_format_runtime;
-
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
@@ -410,8 +412,8 @@ box_tuple_update(const box_tuple_t *tuple, const char *expr,
 		region_truncate(region, used);
 		return NULL;
 	}
-
-	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
+	struct tuple *ret = tuple_new(tuple_format(tuple), new_data,
+				      new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
 		return tuple_bless(ret);
@@ -422,8 +424,6 @@ box_tuple_t *
 box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
 		 const char *expr_end)
 {
-	struct tuple_format *format = tuple_format_runtime;
-
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
@@ -437,7 +437,8 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
 		return NULL;
 	}
 
-	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
+	struct tuple *ret = tuple_new(tuple_format(tuple),
+				      new_data, new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
 		return tuple_bless(ret);

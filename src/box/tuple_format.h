@@ -66,9 +66,19 @@ struct tuple_format;
 
 /** Engine-specific tuple format methods. */
 struct tuple_format_vtab {
-	/** Free allocated tuple using engine-specific memory allocator. */
+	/**
+	 * Free allocated tuple using engine-specific
+	 * memory allocator.
+	 */
 	void
-	(*destroy)(struct tuple_format *format, struct tuple *tuple);
+	(*tuple_delete)(struct tuple_format *format, struct tuple *tuple);
+	/**
+	 * Allocates a new tuple on the same allocator
+	 * and with the same format.
+	 */
+	struct tuple*
+	(*tuple_new)(struct tuple_format *format, const char *data,
+	             const char *end);
 };
 
 /** Tuple field meta information for tuple_format. */

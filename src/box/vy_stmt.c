@@ -45,8 +45,15 @@
 #include "xrow.h"
 #include "fiber.h"
 
+static struct tuple *
+vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	return vy_stmt_new_insert(format, data, end);
+}
+
 struct tuple_format_vtab vy_tuple_format_vtab = {
 	vy_tuple_delete,
+	vy_tuple_new,
 };
 
 size_t vy_max_tuple_size = 1024 * 1024;
