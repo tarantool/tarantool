@@ -365,4 +365,28 @@ for i = 1, 200 do ch:get() end
 errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
 
 s:drop()
+
+--
+-- gh-3325: do not cancel already sent requests, when a schema
+-- change is detected.
+--
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+s:replace{1, 1}
+cn = net_box.connect(box.cfg.listen)
+errinj.set("ERRINJ_WAL_DELAY", true)
+ok = nil
+err = nil
+test_run:cmd('setopt delimiter ";"')
+f = fiber.create(function()
+  local str = 'box.space.test:create_index("sk", {parts = {{2, "integer"}}})'
+  ok, err = pcall(cn.eval, cn, str)
+end)
+test_run:cmd('setopt delimiter ""');
+cn.space.test:get{1}
+errinj.set("ERRINJ_WAL_DELAY", false)
+ok, err
+cn:close()
+s:drop()
+
 box.schema.user.revoke('guest', 'read,write,execute','universe')
