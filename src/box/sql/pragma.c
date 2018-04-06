@@ -452,13 +452,20 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								     aCol[cnum].
 								     zName);
 						if (pPragma->iArg) {
+							const char *c_n;
+							struct coll *coll;
+							coll = sql_index_collation(pIdx, i);
+							if (coll != NULL)
+								c_n = coll->name;
+							else
+								c_n = "BINARY";
 							sqlite3VdbeMultiLoad(v,
 									     4,
 									     "isi",
 									     pIdx->
 									     aSortOrder
 									     [i],
-									     index_collation_name(pIdx, i),
+									     c_n,
 									     i <
 									     mx);
 						}

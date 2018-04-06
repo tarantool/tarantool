@@ -158,21 +158,12 @@ sqlite3ExprSkipCollate(Expr * pExpr)
 	return pExpr;
 }
 
-/*
- * Return the collation sequence for the expression pExpr. If
- * there is no defined collating sequence, return NULL.
- *
- * The collating sequence might be determined by a COLLATE operator
- * or by the presence of a column with a defined collating sequence.
- * COLLATE operators take first precedence.  Left operands take
- * precedence over right operands.
- */
 struct coll *
-sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
+sql_expr_coll(Parse *parse, Expr *p, bool *is_found)
 {
-	struct coll *pColl = 0;
-	Expr *p = pExpr;
-	while (p) {
+	struct coll *coll = NULL;
+	*is_found = false;
+	while (p != NULL) {
 		int op = p->op;
 		if (p->flags & EP_Generic)
 			break;
@@ -180,23 +171,22 @@ sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
 			p = p->pLeft;
 			continue;
 		}
-		if (op == TK_COLLATE
-		    || (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
-			pColl =
-			    sqlite3GetCollSeq(pParse, 0, p->u.zToken);
+		if (op == TK_COLLATE ||
+		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
+			coll = sqlite3GetCollSeq(parse, NULL, p->u.zToken);
+			*is_found = true;
 			break;
 		}
-		if ((op == TK_AGG_COLUMN || op == TK_COLUMN
-		     || op == TK_REGISTER || op == TK_TRIGGER)
-		    && p->pTab != 0) {
+		if ((op == TK_AGG_COLUMN || op == TK_COLUMN ||
+		     op == TK_REGISTER || op == TK_TRIGGER) &&
+		    p->pTab != 0) {
 			/* op==TK_REGISTER && p->pTab!=0 happens when pExpr was originally
 			 * a TK_COLUMN but was previously evaluated and cached in a register
 			 */
 			int j = p->iColumn;
 			if (j >= 0) {
-				const char *zColl =
-					column_collation_name(p->pTab, j);
-				pColl = sqlite3FindCollSeq(zColl);
+				coll = sql_column_collation(p->pTab, j);
+				*is_found = true;
 			}
 			break;
 		}
@@ -204,40 +194,39 @@ sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr)
 			if (p->pLeft && (p->pLeft->flags & EP_Collate) != 0) {
 				p = p->pLeft;
 			} else {
-				Expr *pNext = p->pRight;
+				Expr *next = p->pRight;
 				/* The Expr.x union is never used at the same time as Expr.pRight */
 				assert(p->x.pList == 0 || p->pRight == 0);
 				/* p->flags holds EP_Collate and p->pLeft->flags does not.  And
 				 * p->x.pSelect cannot.  So if p->x.pLeft exists, it must hold at
 				 * least one EP_Collate. Thus the following two ALWAYS.
 				 */
-				if (p->x.pList != 0
-				    &&
+				if (p->x.pList != NULL &&
 				    ALWAYS(!ExprHasProperty(p, EP_xIsSelect))) {
-					int i;
-					for (i = 0;
+					for (int i = 0;
 					     ALWAYS(i < p->x.pList->nExpr);
 					     i++) {
-						if (ExprHasProperty
-						    (p->x.pList->a[i].pExpr,
-						     EP_Collate)) {
-							pNext =
-							    p->x.pList->a[i].
-							    pExpr;
+						Expr *e =
+							p->x.pList->a[i].pExpr;
+						if (ExprHasProperty(e,
+								    EP_Collate)) {
+							next = e;
 							break;
 						}
 					}
 				}
-				p = pNext;
+				p = next;
 			}
 		} else {
 			break;
 		}
 	}
-	if (sqlite3CheckCollSeq(pParse, pColl)) {
-		pColl = 0;
+	if (sqlite3CheckCollSeq(parse, coll) != 0) {
+		*is_found = false;
+		return NULL;
+	} else {
+		return coll;
 	}
-	return pColl;
 }
 
 /*
@@ -344,19 +333,19 @@ binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
 struct coll *
 sqlite3BinaryCompareCollSeq(Parse * pParse, Expr * pLeft, Expr * pRight)
 {
-	struct coll *pColl;
+	struct coll *coll;
+	bool is_found;
 	assert(pLeft);
 	if (pLeft->flags & EP_Collate) {
-		pColl = sqlite3ExprCollSeq(pParse, pLeft);
+		coll = sql_expr_coll(pParse, pLeft, &is_found);
 	} else if (pRight && (pRight->flags & EP_Collate) != 0) {
-		pColl = sqlite3ExprCollSeq(pParse, pRight);
+		coll = sql_expr_coll(pParse, pRight, &is_found);
 	} else {
-		pColl = sqlite3ExprCollSeq(pParse, pLeft);
-		if (!pColl) {
-			pColl = sqlite3ExprCollSeq(pParse, pRight);
-		}
+		coll = sql_expr_coll(pParse, pLeft, &is_found);
+		if (!is_found)
+			coll = sql_expr_coll(pParse, pRight, &is_found);
 	}
-	return pColl;
+	return coll;
 }
 
 /*
@@ -2520,14 +2509,15 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 						    (pParse, pLhs, pRhs);
 					int j;
 
-					assert(pReq != 0 || pParse->nErr);
 					for (j = 0; j < nExpr; j++) {
-						if (pIdx->aiColumn[j]
-						    != pRhs->iColumn)
+						if (pIdx->aiColumn[j] !=
+						    pRhs->iColumn) {
 							continue;
-						if (pReq != 0 && strcmp
-						    (pReq->name,
-						     index_collation_name(pIdx, j)) != 0) {
+						}
+						struct coll *idx_coll;
+						idx_coll = sql_index_collation(pIdx, j);
+						if (pReq != NULL &&
+						    pReq != idx_coll) {
 							continue;
 						}
 						break;
@@ -2879,11 +2869,13 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					affinity = SQLITE_AFF_BLOB;
 				}
 				if (pKeyInfo) {
+					bool unused;
 					assert(sqlite3KeyInfoIsWriteable
 					       (pKeyInfo));
 					pKeyInfo->aColl[0] =
-					    sqlite3ExprCollSeq(pParse,
-							       pExpr->pLeft);
+						sql_expr_coll(pParse,
+							      pExpr->pLeft,
+							      &unused);
 				}
 
 				/* Loop through each expression in <exprlist>. */
@@ -3140,8 +3132,10 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 * This is step (1) in the in-operator.md optimized algorithm.
 	 */
 	if (eType == IN_INDEX_NOOP) {
+		bool unused;
 		ExprList *pList = pExpr->x.pList;
-		struct coll *pColl = sqlite3ExprCollSeq(pParse, pExpr->pLeft);
+		struct coll *coll = sql_expr_coll(pParse, pExpr->pLeft,
+						   &unused);
 		int labelOk = sqlite3VdbeMakeLabel(v);
 		int r2, regToFree;
 		int regCkNull = 0;
@@ -3161,14 +3155,14 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 			}
 			if (ii < pList->nExpr - 1 || destIfNull != destIfFalse) {
 				sqlite3VdbeAddOp4(v, OP_Eq, rLhs, labelOk, r2,
-						  (void *)pColl, P4_COLLSEQ);
+						  (void *)coll, P4_COLLSEQ);
 				VdbeCoverageIf(v, ii < pList->nExpr - 1);
 				VdbeCoverageIf(v, ii == pList->nExpr - 1);
 				sqlite3VdbeChangeP5(v, zAff[0]);
 			} else {
 				assert(destIfNull == destIfFalse);
 				sqlite3VdbeAddOp4(v, OP_Ne, rLhs, destIfFalse,
-						  r2, (void *)pColl,
+						  r2, (void *)coll,
 						  P4_COLLSEQ);
 				VdbeCoverage(v);
 				sqlite3VdbeChangeP5(v,
@@ -3277,9 +3271,10 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	for (i = 0; i < nVector; i++) {
 		Expr *p;
 		struct coll *pColl;
+		bool unused;
 		int r3 = sqlite3GetTempReg(pParse);
 		p = sqlite3VectorFieldSubexpr(pLeft, i);
-		pColl = sqlite3ExprCollSeq(pParse, p);
+		pColl = sql_expr_coll(pParse, p, &unused);
 		/* Tarantool: Replace i -> aiMap [i], since original order of columns
 		 * is preserved.
 		 */
@@ -4066,7 +4061,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			u32 constMask = 0;	/* Mask of function arguments that are constant */
 			int i;	/* Loop counter */
 			sqlite3 *db = pParse->db;	/* The database connection */
-			struct coll *pColl = 0;	/* A collating sequence */
+			struct coll *coll = NULL;
 
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			if (ExprHasProperty(pExpr, EP_TokenOnly)) {
@@ -4133,11 +4128,11 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					constMask |= MASKBIT32(i);
 				}
 				if ((pDef->funcFlags & SQLITE_FUNC_NEEDCOLL) !=
-				    0 && !pColl) {
-					pColl =
-					    sqlite3ExprCollSeq(pParse,
-							       pFarg->a[i].
-							       pExpr);
+				    0 && coll == NULL) {
+					bool unused;
+					coll = sql_expr_coll(pParse,
+							     pFarg->a[i].pExpr,
+							     &unused);
 				}
 			}
 			if (pFarg) {
@@ -4186,10 +4181,8 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				r1 = 0;
 			}
 			if (pDef->funcFlags & SQLITE_FUNC_NEEDCOLL) {
-				if (!pColl)
-					pColl = sql_default_coll();
 				sqlite3VdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
-						  (char *)pColl, P4_COLLSEQ);
+						  (char *)coll, P4_COLLSEQ);
 			}
 			sqlite3VdbeAddOp4(v, OP_Function0, constMask, r1,
 					  target, (char *)pDef, P4_FUNCDEF);

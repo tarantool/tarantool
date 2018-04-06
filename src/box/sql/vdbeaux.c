@@ -3840,6 +3840,13 @@ sqlite3MemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pCol
 		 */
 		if (pColl) {
 			return vdbeCompareMemString(pMem1, pMem2, pColl, 0);
+		} else {
+			size_t n = pMem1->n < pMem2->n ? pMem1->n : pMem2->n;
+			int res;
+			res = memcmp(pMem1->z, pMem2->z, n);
+			if (res == 0)
+				res = (int)pMem1->n - (int)pMem2->n;
+			return res;
 		}
 		/* If a NULL pointer was passed as the collate function, fall through
 		 * to the blob case and use memcmp().

@@ -977,18 +977,13 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 				VdbeCoverage(v);
 			}
 			for (i = 0; i < nColTest; i++) {
-				const char *zCollName =
-					index_collation_name(pIdx, i);
-				char *pColl =
-				    (char *)sqlite3LocateCollSeq(pParse,
-								 pParse->db,
-								 zCollName);
+				struct coll *coll = sql_index_collation(pIdx, i);
 				sqlite3VdbeAddOp2(v, OP_Integer, i, regChng);
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
 						  pIdx->aiColumn[i], regTemp);
 				aGotoChng[i] =
 				    sqlite3VdbeAddOp4(v, OP_Ne, regTemp, 0,
-						      regPrev + i, pColl,
+						      regPrev + i, (char *)coll,
 						      P4_COLLSEQ);
 				sqlite3VdbeChangeP5(v, SQLITE_NULLEQ);
 				VdbeCoverage(v);

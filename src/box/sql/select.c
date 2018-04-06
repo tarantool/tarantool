@@ -908,10 +908,12 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 
 				iJump = sqlite3VdbeCurrentAddr(v) + nResultCol;
 				for (i = 0; i < nResultCol; i++) {
-					struct coll *pColl =
-					    sqlite3ExprCollSeq(pParse,
-							       pEList->a[i].
-							       pExpr);
+					bool is_found;
+					struct coll *coll =
+					    sql_expr_coll(pParse,
+							  pEList->a[i].
+							  pExpr,
+							  &is_found);
 					if (i < nResultCol - 1) {
 						sqlite3VdbeAddOp3(v, OP_Ne,
 								  regResult + i,
@@ -925,9 +927,11 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 								  regPrev + i);
 						VdbeCoverage(v);
 					}
-					sqlite3VdbeChangeP4(v, -1,
-							    (const char *)pColl,
-							    P4_COLLSEQ);
+					if (is_found) {
+						sqlite3VdbeChangeP4(v, -1,
+								    (const char *)coll,
+								    P4_COLLSEQ);
+					}
 					sqlite3VdbeChangeP5(v, SQLITE_NULLEQ);
 				}
 				assert(sqlite3VdbeCurrentAddr(v) == iJump
@@ -1288,11 +1292,9 @@ keyInfoFromExprList(Parse * pParse,	/* Parsing context */
 		assert(sqlite3KeyInfoIsWriteable(pInfo));
 		for (i = iStart, pItem = pList->a + iStart; i < nExpr;
 		     i++, pItem++) {
-			struct coll *pColl;
-			pColl = sqlite3ExprCollSeq(pParse, pItem->pExpr);
-			if (!pColl)
-				pColl = sql_default_coll();
-			pInfo->aColl[i - iStart] = pColl;
+			bool unused;
+			pInfo->aColl[i - iStart] =
+				sql_expr_coll(pParse, pItem->pExpr, &unused);
 			pInfo->aSortOrder[i - iStart] = pItem->sortOrder;
 		}
 	}
@@ -1935,7 +1937,6 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	sqlite3 *db = pParse->db;
 	NameContext sNC;
 	Column *pCol;
-	struct coll *pColl;
 	int i;
 	Expr *p;
 	struct ExprList_item *a;
@@ -1959,10 +1960,10 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 
 		if (pCol->affinity == 0)
 			pCol->affinity = SQLITE_AFF_BLOB;
-		pColl = sqlite3ExprCollSeq(pParse, p);
-		if (pColl && pCol->zColl == 0) {
-			pCol->zColl = sqlite3DbStrDup(db, pColl->name);
-		}
+		bool unused;
+		struct coll *coll = sql_expr_coll(pParse, p, &unused);
+		if (coll != NULL && pCol->coll == NULL)
+			pCol->coll = coll;
 	}
 	pTab->szTabRow = sqlite3LogEst(szAll * 4);
 }
@@ -2123,23 +2124,24 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
  * left-most term of the select that has a collating sequence.
  */
 static struct coll *
-multiSelectCollSeq(Parse * pParse, Select * p, int iCol)
+multiSelectCollSeq(Parse * pParse, Select * p, int iCol, bool *is_found)
 {
-	struct coll *pRet;
-	if (p->pPrior) {
-		pRet = multiSelectCollSeq(pParse, p->pPrior, iCol);
-	} else {
-		pRet = 0;
-	}
+	struct coll *coll;
+	if (p->pPrior != NULL)
+		coll = multiSelectCollSeq(pParse, p->pPrior, iCol, is_found);
+	else
+		coll = NULL;
 	assert(iCol >= 0);
 	/* iCol must be less than p->pEList->nExpr.  Otherwise an error would
 	 * have been thrown during name resolution and we would not have gotten
 	 * this far
 	 */
-	if (pRet == 0 && ALWAYS(iCol < p->pEList->nExpr)) {
-		pRet = sqlite3ExprCollSeq(pParse, p->pEList->a[iCol].pExpr);
+	if (!(*is_found) && ALWAYS(iCol < p->pEList->nExpr)) {
+		coll = sql_expr_coll(pParse,
+				     p->pEList->a[iCol].pExpr,
+				     is_found);
 	}
-	return pRet;
+	return coll;
 }
 
 /*
@@ -2163,22 +2165,28 @@ multiSelectOrderByKeyInfo(Parse * pParse, Select * p, int nExtra)
 		for (i = 0; i < nOrderBy; i++) {
 			struct ExprList_item *pItem = &pOrderBy->a[i];
 			Expr *pTerm = pItem->pExpr;
-			struct coll *pColl;
+			struct coll *coll;
+			bool is_found = false;
 
 			if (pTerm->flags & EP_Collate) {
-				pColl = sqlite3ExprCollSeq(pParse, pTerm);
+				coll = sql_expr_coll(pParse, pTerm, &is_found);
 			} else {
-				pColl =
+				coll =
 				    multiSelectCollSeq(pParse, p,
-						       pItem->u.x.iOrderByCol - 1);
-				if (pColl == 0)
-					pColl = sql_default_coll();
-				pOrderBy->a[i].pExpr =
-				    sqlite3ExprAddCollateString(pParse, pTerm,
-								pColl->name);
+						       pItem->u.x.iOrderByCol - 1,
+						       &is_found);
+				if (coll != NULL) {
+					pOrderBy->a[i].pExpr =
+						sqlite3ExprAddCollateString(pParse, pTerm,
+									    coll->name);
+				} else {
+					pOrderBy->a[i].pExpr =
+						sqlite3ExprAddCollateString(pParse, pTerm,
+									    "BINARY");
+				}
 			}
 			assert(sqlite3KeyInfoIsWriteable(pRet));
-			pRet->aColl[i] = pColl;
+			pRet->aColl[i] = coll;
 			pRet->aSortOrder[i] = pOrderBy->a[i].sortOrder;
 		}
 	}
@@ -2827,10 +2835,8 @@ multiSelect(Parse * pParse,	/* Parsing context */
 			goto multi_select_end;
 		}
 		for (i = 0, apColl = pKeyInfo->aColl; i < nCol; i++, apColl++) {
-			*apColl = multiSelectCollSeq(pParse, p, i);
-			if (0 == *apColl) {
-				*apColl = sql_default_coll();
-			}
+			bool is_found = false;
+			*apColl = multiSelectCollSeq(pParse, p, i, &is_found);
 		}
 
 		for (pLoop = p; pLoop; pLoop = pLoop->pPrior) {
@@ -3260,8 +3266,10 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		if (pKeyDup) {
 			assert(sqlite3KeyInfoIsWriteable(pKeyDup));
 			for (i = 0; i < nExpr; i++) {
+				bool is_found = false;
 				pKeyDup->aColl[i] =
-				    multiSelectCollSeq(pParse, p, i);
+					multiSelectCollSeq(pParse, p, i,
+							   &is_found);
 				pKeyDup->aSortOrder[i] = 0;
 			}
 		}
@@ -5241,22 +5249,20 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 				     regAgg);
 		}
 		if (pF->pFunc->funcFlags & SQLITE_FUNC_NEEDCOLL) {
-			struct coll *pColl = 0;
+			struct coll *coll = NULL;
 			struct ExprList_item *pItem;
 			int j;
 			assert(pList != 0);	/* pList!=0 if pF->pFunc has NEEDCOLL */
-			for (j = 0, pItem = pList->a; !pColl && j < nArg;
+			bool is_found = false;
+			for (j = 0, pItem = pList->a; !is_found && j < nArg;
 			     j++, pItem++) {
-				pColl =
-				    sqlite3ExprCollSeq(pParse, pItem->pExpr);
-			}
-			if (!pColl) {
-				pColl = sql_default_coll();
+				coll = sql_expr_coll(pParse, pItem->pExpr,
+						     &is_found);
 			}
 			if (regHit == 0 && pAggInfo->nAccumulator)
 				regHit = ++pParse->nMem;
 			sqlite3VdbeAddOp4(v, OP_CollSeq, regHit, 0, 0,
-					  (char *)pColl, P4_COLLSEQ);
+					  (char *)coll, P4_COLLSEQ);
 		}
 		sqlite3VdbeAddOp3(v, OP_AggStep0, 0, regAgg, pF->iMem);
 		sqlite3VdbeAppendP4(v, pF->pFunc, P4_FUNCDEF);

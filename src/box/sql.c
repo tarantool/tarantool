@@ -1447,12 +1447,8 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	for (i = 0; i < n; i++) {
 		const char *t;
-		struct coll *coll = NULL;
+		struct coll *coll = aCol[i].coll;
 		struct Expr *def = aCol[i].pDflt;
-		if (aCol[i].zColl != NULL &&
-		    strcasecmp(aCol[i].zColl, "binary") != 0) {
-			coll = sqlite3FindCollSeq(aCol[i].zColl);
-		}
 		int base_len = 4;
 		if (coll != NULL)
 			base_len += 1;
@@ -1553,28 +1549,19 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	for (i = 0; i < n; i++) {
 		int col = pIndex->aiColumn[i];
 		const char *t;
-		struct coll * collation = NULL;
 		if (pk_forced_int == col)
 			t = "integer";
 		else
 			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
 		/* do not decode default collation */
-		if (sqlite3StrICmp(pIndex->azColl[i], "binary") != 0){
-			collation = sqlite3FindCollSeq(pIndex->azColl[i]);
-			/* 
-			 * At this point, the collation has already been found 
-			 * once and the assert should not fire.
-			 */
-			assert(collation);
-		}
-		p = enc->encode_map(p, collation == NULL ? 4 : 5);
+		p = enc->encode_map(p, pIndex->coll_array[i] == NULL ? 4 : 5);
 		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "field", sizeof("field")-1);
 		p = enc->encode_uint(p, col);
-		if (collation != NULL){
+		if (pIndex->coll_array[i] != NULL) {
 			p = enc->encode_str(p, "collation", sizeof("collation")-1);
-			p = enc->encode_uint(p, collation->id);
+			p = enc->encode_uint(p, pIndex->coll_array[i]->id);
 		}
 		p = enc->encode_str(p, "is_nullable", 11);
 		p = enc->encode_bool(p, aCol[col].notNull == ON_CONFLICT_ACTION_NONE);

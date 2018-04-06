@@ -300,7 +300,6 @@ sqlite3DeleteColumnNames(sqlite3 * db, Table * pTable)
 		for (i = 0; i < pTable->nCol; i++, pCol++) {
 			sqlite3DbFree(db, pCol->zName);
 			sql_expr_free(db, pCol->pDflt, false);
-			sqlite3DbFree(db, pCol->zColl);
 		}
 		sqlite3DbFree(db, pTable->aCol);
 	}
@@ -962,10 +961,10 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 	if (!zColl)
 		return;
 
-	if (sqlite3LocateCollSeq(pParse, db, zColl)) {
+	struct coll *coll = sqlite3LocateCollSeq(pParse, db, zColl);
+	if (coll != NULL) {
 		Index *pIdx;
-		sqlite3DbFree(db, p->aCol[i].zColl);
-		p->aCol[i].zColl = zColl;
+		p->aCol[i].coll = coll;
 
 		/* If the column is declared as "<name> PRIMARY KEY COLLATE <type>",
 		 * then an index may have been created on this column before the
@@ -973,9 +972,8 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 		 */
 		for (pIdx = p->pIndex; pIdx; pIdx = pIdx->pNext) {
 			assert(pIdx->nColumn == 1);
-			if (pIdx->aiColumn[0] == i) {
-				pIdx->azColl[0] = column_collation_name(p, i);
-			}
+			if (pIdx->aiColumn[0] == i)
+				pIdx->coll_array[0] = sql_column_collation(p, i);
 		}
 	} else {
 		sqlite3DbFree(db, zColl);
@@ -983,14 +981,14 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 }
 
 /**
- * Return name of given column collation from table.
+ * Return collation of given column from table.
  *
  * @param table Table which is used to fetch column.
  * @param column Number of column.
- * @retval Pointer to collation's name.
+ * @retval Pointer to collation.
  */
-const char *
-column_collation_name(Table *table, uint32_t column)
+struct coll *
+sql_column_collation(Table *table, uint32_t column)
 {
 	assert(table != NULL);
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
@@ -1007,15 +1005,12 @@ column_collation_name(Table *table, uint32_t column)
 	 * In cases mentioned above collation is fetched from
 	 * SQL specific structures.
 	 */
-	if (space == NULL || space_index(space, 0) == NULL)
-		return table->aCol[column].zColl;
-
-	/* "BINARY" is a name for default collation in SQL. */
-	char *coll_name = (char *)sqlite3StrBINARY;
-	if (space->format->fields[column].coll != NULL) {
-		coll_name = space->format->fields[column].coll->name;
+	if (space == NULL || space_index(space, 0) == NULL) {
+		assert(column < (uint32_t)table->nCol);
+		return table->aCol[column].coll;
 	}
-	return coll_name;
+
+	return space->format->fields[column].coll;
 }
 
 /**
@@ -1023,30 +1018,30 @@ column_collation_name(Table *table, uint32_t column)
  *
  * @param idx Index which is used to fetch column.
  * @param column Number of column.
- * @retval Pointer to collation's name.
+ * @retval Pointer to collation.
  */
-const char *
-index_collation_name(Index *idx, uint32_t column)
+struct coll *
+sql_index_collation(Index *idx, uint32_t column)
 {
 	assert(idx != NULL);
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->pTable->tnum);
 	struct space *space = space_by_id(space_id);
+
+	assert(column < idx->nColumn);
 	/*
 	 * If space is still under construction, or it is
 	 * an ephemeral space, then fetch collation from
 	 * SQL internal structure.
 	 */
-	if (space == NULL)
-		return (char *)idx->azColl[column];
+	if (space == NULL) {
+		assert(column < idx->nColumn);
+		return idx->coll_array[column];
+	}
 
 	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
 	struct index *index = space_index(space, index_id);
 	assert(index != NULL && index->def->key_def->part_count >= column);
-	struct coll *coll = index->def->key_def->parts[column].coll;
-	/* "BINARY" is a name for default collation in SQL. */
-	if (coll == NULL)
-		return (char *)sqlite3StrBINARY;
-	return index->def->key_def->parts[column].coll->name;
+	return index->def->key_def->parts[column].coll;
 }
 
 /**
@@ -1116,6 +1111,9 @@ sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName)
 	u8 initbusy;
 	struct coll *pColl;
 	initbusy = db->init.busy;
+
+	if (strcasecmp(zName, "binary") == 0)
+		return NULL;
 
 	pColl = sqlite3FindCollSeq(zName);
 	if (!initbusy && (!pColl)) {
@@ -2623,7 +2621,7 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 	p = sqlite3DbMallocZero(db, nByte + nExtra);
 	if (p) {
 		char *pExtra = ((char *)p) + ROUND8(sizeof(Index));
-		p->azColl = (const char **)pExtra;
+		p->coll_array = (struct coll **)pExtra;
 		pExtra += ROUND8(sizeof(char *) * nCol);
 		p->aiRowLogEst = (LogEst *) pExtra;
 		pExtra += sizeof(LogEst) * (nCol + 1);
@@ -2920,7 +2918,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		goto exit_create_index;
 	}
 	assert(EIGHT_BYTE_ALIGNMENT(pIndex->aiRowLogEst));
-	assert(EIGHT_BYTE_ALIGNMENT(pIndex->azColl));
+	assert(EIGHT_BYTE_ALIGNMENT(pIndex->coll_array));
 	pIndex->zName = zExtra;
 	zExtra += nName + 1;
 	memcpy(pIndex->zName, zName, nName + 1);
@@ -2959,7 +2957,6 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	for (i = 0, pListItem = pList->a; i < pList->nExpr; i++, pListItem++) {
 		Expr *pCExpr;	/* The i-th index expression */
 		int requestedSortOrder;	/* ASC or DESC on the i-th expression */
-		const char *zColl;	/* Collation sequence name */
 		sqlite3ResolveSelfReference(pParse, pTab, NC_IdxExpr,
 					    pListItem->pExpr, 0);
 		if (pParse->nErr)
@@ -2978,25 +2975,22 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			}
 			pIndex->aiColumn[i] = (i16) j;
 		}
-		zColl = 0;
+		struct coll *coll;
 		if (pListItem->pExpr->op == TK_COLLATE) {
-			int nColl;
-			zColl = pListItem->pExpr->u.zToken;
-			nColl = sqlite3Strlen30(zColl) + 1;
-			assert(nExtra >= nColl);
-			memcpy(zExtra, zColl, nColl);
-			zColl = zExtra;
-			zExtra += nColl;
-			nExtra -= nColl;
+			const char *coll_name = pListItem->pExpr->u.zToken;
+			coll = sqlite3GetCollSeq(pParse, 0, coll_name);
+
+			if (coll == NULL &&
+			    sqlite3StrICmp(coll_name, "binary") != 0) {
+				goto exit_create_index;
+			}
 		} else if (j >= 0) {
-			zColl = column_collation_name(pTab, j);
+			coll = sql_column_collation(pTab, j);
+		} else {
+			coll = NULL;
 		}
-		if (!zColl)
-			zColl = sqlite3StrBINARY;
-		if (!db->init.busy && !sqlite3LocateCollSeq(pParse, db, zColl)) {
-			goto exit_create_index;
-		}
-		pIndex->azColl[i] = zColl;
+		pIndex->coll_array[i] = coll;
+
 		/* Tarantool: DESC indexes are not supported so far.
 		 * See gh-3016.
 		 */
@@ -3040,14 +3034,13 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			if (pIdx->nColumn != pIndex->nColumn)
 				continue;
 			for (k = 0; k < pIdx->nColumn; k++) {
-				const char *z1;
-				const char *z2;
 				assert(pIdx->aiColumn[k] >= 0);
 				if (pIdx->aiColumn[k] != pIndex->aiColumn[k])
 					break;
-				z1 = index_collation_name(pIdx, k);
-				z2 = index_collation_name(pIndex, k);
-				if (strcmp(z1, z2))
+				struct coll *coll1, *coll2;
+				coll1 = sql_index_collation(pIdx, k);
+				coll2 = sql_index_collation(pIndex, k);
+				if (coll1 != coll2)
 					break;
 			}
 			if (k == pIdx->nColumn) {
@@ -3963,19 +3956,17 @@ sqlite3UniqueConstraint(Parse * pParse,	/* Parsing context */
  * true if it does and false if it does not.
  */
 #ifndef SQLITE_OMIT_REINDEX
-static int
-collationMatch(const char *zColl, Index * pIndex)
+static bool
+collationMatch(struct coll *coll, struct Index *index)
 {
-	int i;
-	assert(zColl != 0);
-	for (i = 0; i < pIndex->nColumn; i++) {
-		const char *z = index_collation_name(pIndex, i);
-		assert(z != 0 || pIndex->aiColumn[i] < 0);
-		if (pIndex->aiColumn[i] >= 0 && 0 == sqlite3StrICmp(z, zColl)) {
-			return 1;
-		}
+	assert(coll != NULL);
+	for (int i = 0; i < index->nColumn; i++) {
+		struct coll *idx_coll = sql_index_collation(index, i);
+		assert(idx_coll != 0 || index->aiColumn[i] < 0);
+		if (index->aiColumn[i] >= 0 && coll == idx_coll)
+			return true;
 	}
-	return 0;
+	return false;
 }
 #endif
 
@@ -3985,12 +3976,12 @@ collationMatch(const char *zColl, Index * pIndex)
  */
 #ifndef SQLITE_OMIT_REINDEX
 static void
-reindexTable(Parse * pParse, Table * pTab, char const *zColl)
+reindexTable(Parse * pParse, Table * pTab, struct coll *coll)
 {
 	Index *pIndex;		/* An index associated with pTab */
 
 	for (pIndex = pTab->pIndex; pIndex; pIndex = pIndex->pNext) {
-		if (zColl == 0 || collationMatch(zColl, pIndex)) {
+		if (coll == 0 || collationMatch(coll, pIndex)) {
 			sql_set_multi_write(pParse, false);
 			sqlite3RefillIndex(pParse, pIndex, -1);
 		}
@@ -4005,7 +3996,7 @@ reindexTable(Parse * pParse, Table * pTab, char const *zColl)
  */
 #ifndef SQLITE_OMIT_REINDEX
 static void
-reindexDatabases(Parse * pParse, char const *zColl)
+reindexDatabases(Parse * pParse, struct coll *coll)
 {
 	sqlite3 *db = pParse->db;	/* The database connection */
 	HashElem *k;		/* For looping over tables in pSchema */
@@ -4015,7 +4006,7 @@ reindexDatabases(Parse * pParse, char const *zColl)
 	for (k = sqliteHashFirst(&db->pSchema->tblHash); k;
 	     k = sqliteHashNext(k)) {
 		pTab = (Table *) sqliteHashData(k);
-		reindexTable(pParse, pTab, zColl);
+		reindexTable(pParse, pTab, coll);
 	}
 }
 #endif
@@ -4057,7 +4048,7 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 			return;
 		pColl = sqlite3FindCollSeq(zColl);
 		if (pColl) {
-			reindexDatabases(pParse, zColl);
+			reindexDatabases(pParse, pColl);
 			sqlite3DbFree(db, zColl);
 			return;
 		}
@@ -4126,9 +4117,7 @@ sqlite3KeyInfoOfIndex(Parse * pParse, sqlite3 * db, Index * pIdx)
 	if (pKey) {
 		assert(sqlite3KeyInfoIsWriteable(pKey));
 		for (i = 0; i < nCol; i++) {
-			const char *zColl = index_collation_name(pIdx, i);
-			pKey->aColl[i] = zColl == sqlite3StrBINARY ? 0 :
-			    sqlite3LocateCollSeq(pParse, db, zColl);
+			pKey->aColl[i] = sql_index_collation(pIdx, i);
 			pKey->aSortOrder[i] = pIdx->aSortOrder[i];
 		}
 		if (pParse && pParse->nErr) {

@@ -62,10 +62,9 @@ sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
 	struct coll *p;
 
 	p = pColl;
-	if (!p) {
+	if (p == NULL)
 		p = sqlite3FindCollSeq(zName);
-	}
-	if (p == 0) {
+	if (p == NULL && (strcasecmp(zName, "binary") != 0)) {
 		if (pParse)
 			sqlite3ErrorMsg(pParse,
 					"no such collation sequence: %s",
@@ -102,49 +101,6 @@ sqlite3CheckCollSeq(Parse * pParse, struct coll * pColl)
 	return SQLITE_OK;
 }
 
-/*
- * This is the default collating function named "BINARY" which is always
- * available.
- * It is hardcoded to support Tarantool's collation interface.
- */
-static int
-binCollFunc(const char *pKey1, size_t nKey1, const char *pKey2, size_t nKey2, const struct coll * collation)
-{
-	int rc;
-	size_t n;
-	(void) collation;
-	n = nKey1 < nKey2 ? nKey1 : nKey2;
-	/* EVIDENCE-OF: R-65033-28449 The built-in BINARY collation compares
-	 * strings byte by byte using the memcmp() function from the standard C
-	 * library.
-	 */
-	rc = memcmp(pKey1, pKey2, n);
-	if (rc == 0) {
-		rc = (int)nKey1 - (int)nKey2;
-	}
-	return rc;
-}
-
-/*
- * This hardcoded structure created just to be called the same way
- * as collations in Tarantool, to support binary collation easily.
- */
-
-struct coll_plus_name_struct{
-    struct coll collation;
-    char name[20]; /* max of possible name lengths */
-};
-static struct coll_plus_name_struct binary_coll_with_name =
-	{{0, 0, COLL_TYPE_ICU, {0}, binCollFunc, 0, sizeof("BINARY"), {}},
-		"BINARY"};
-static struct coll * binary_coll = (struct coll*)&binary_coll_with_name;
-
-struct coll *
-sql_default_coll()
-{
-	return binary_coll;
-}
-
 /**
  * Return the coll* pointer for the collation sequence named zName.
  *
@@ -158,9 +114,8 @@ sql_default_coll()
 struct coll *
 sqlite3FindCollSeq(const char *zName)
 {
-	if (zName == NULL || sqlite3StrICmp(zName, "binary")==0){
-		return binary_coll;
-	}
+	if (zName == NULL || strcasecmp(zName, "binary") == 0)
+		return 0;
 	return coll_by_name(zName, strlen(zName));
 }
 

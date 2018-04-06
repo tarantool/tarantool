@@ -165,12 +165,20 @@ exprCommute(Parse * pParse, Expr * pExpr)
 			 * used by clearing the EP_Collate flag from Y.
 			 */
 			pExpr->pRight->flags &= ~EP_Collate;
-		} else if (sqlite3ExprCollSeq(pParse, pExpr->pLeft) != 0) {
-			/* Neither X nor Y have COLLATE operators, but X has a non-default
-			 * collating sequence.  So add the EP_Collate marker on X to cause
-			 * it to be searched first.
-			 */
-			pExpr->pLeft->flags |= EP_Collate;
+		} else {
+			bool is_found;
+			sql_expr_coll(pParse, pExpr->pLeft, &is_found);
+			if (is_found) {
+				/*
+				 * Neither X nor Y have COLLATE
+				 * operators, but X has a
+				 * non-default collating sequence.
+				 * So add the EP_Collate marker on
+				 * X to cause it to be searched
+				 * first.
+				 */
+				pExpr->pLeft->flags |= EP_Collate;
+			}
 		}
 	}
 	SWAP(pExpr->pRight, pExpr->pLeft);
@@ -822,7 +830,6 @@ static int
 termIsEquivalence(Parse * pParse, Expr * pExpr)
 {
 	char aff1, aff2;
-	struct coll *pColl;
 	const char *zColl1, *zColl2;
 	if (!OptimizationEnabled(pParse->db, SQLITE_Transitive))
 		return 0;
@@ -838,14 +845,15 @@ termIsEquivalence(Parse * pParse, Expr * pExpr)
 	    ) {
 		return 0;
 	}
-	pColl =
+	struct coll *coll =
 	    sqlite3BinaryCompareCollSeq(pParse, pExpr->pLeft, pExpr->pRight);
-	if (pColl == 0 || sqlite3StrICmp(pColl->name, "BINARY") == 0)
+	if (coll == NULL || sqlite3StrICmp(coll->name, "BINARY") == 0)
 		return 1;
-	pColl = sqlite3ExprCollSeq(pParse, pExpr->pLeft);
-	zColl1 = pColl ? pColl->name : 0;
-	pColl = sqlite3ExprCollSeq(pParse, pExpr->pRight);
-	zColl2 = pColl ? pColl->name : 0;
+	bool unused;
+	coll = sql_expr_coll(pParse, pExpr->pLeft, &unused);
+	zColl1 = coll ? coll->name : NULL;
+	coll = sql_expr_coll(pParse, pExpr->pRight, &unused);
+	zColl2 = coll ? coll->name : NULL;
 	return sqlite3_stricmp(zColl1, zColl2) == 0;
 }
 

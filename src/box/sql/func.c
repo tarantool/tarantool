@@ -54,7 +54,7 @@ sqlite3GetFuncCollSeq(sqlite3_context * context)
 	assert(context->pVdbe != 0);
 	pOp = &context->pVdbe->aOp[context->iOp - 1];
 	assert(pOp->opcode == OP_CollSeq);
-	assert(pOp->p4type == P4_COLLSEQ);
+	assert(pOp->p4type == P4_COLLSEQ || pOp->p4.pColl == NULL);
 	return pOp->p4.pColl;
 }
 
@@ -82,7 +82,6 @@ minmaxFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	assert(argc > 1);
 	mask = sqlite3_user_data(context) == 0 ? 0 : -1;
 	pColl = sqlite3GetFuncCollSeq(context);
-	assert(pColl);
 	assert(mask == -1 || mask == 0);
 	iBest = 0;
 	if (sqlite3_value_type(argv[0]) == SQLITE_NULL)

@@ -1878,10 +1878,13 @@ struct Column {
 	char *zName;		/* Name of this column */
 	enum field_type type;	/* Column type. */
 	Expr *pDflt;		/* Default value of this column */
-	char *zColl;		/* Collating sequence.  If NULL, use the default */
-	enum on_conflict_action notNull;  /* An ON_CONFLICT_ACTION code for
-					   * handling a NOT NULL constraint
-					   */
+	/** Collating sequence. */
+	struct coll *coll;
+	/**
+	 * An ON_CONFLICT_ACTION code for handling a NOT NULL
+	 * constraint.
+	 */
+	enum on_conflict_action notNull;
 	char affinity;		/* One of the SQLITE_AFF_... values */
 	u8 szEst;		/* Estimated size of value in this column. sizeof(INT)==1 */
 	u8 is_primkey;		/* Boolean propertie for being PK */
@@ -2148,7 +2151,8 @@ struct Index {
 	Index *pNext;		/* The next index associated with the same table */
 	Schema *pSchema;	/* Schema containing this index */
 	u8 *aSortOrder;		/* for each column: True==DESC, False==ASC */
-	const char **azColl;	/* Array of collation sequence names for index */
+	/** Array of collation sequences for index. */
+	struct coll **coll_array;
 	Expr *pPartIdxWhere;	/* WHERE clause for partial indices */
 	ExprList *aColExpr;	/* Column expressions */
 	int tnum;		/* DB Page containing root of this index */
@@ -3548,14 +3552,20 @@ void sqlite3AddPrimaryKey(Parse *, ExprList *, int, int, int);
 void sqlite3AddCheckConstraint(Parse *, Expr *);
 void sqlite3AddDefaultValue(Parse *, ExprSpan *);
 void sqlite3AddCollateType(Parse *, Token *);
+
 const char *
 column_collation_name(Table *, uint32_t);
+struct coll *
+sql_column_collation(Table *, uint32_t);
 const char *
 index_collation_name(Index *, uint32_t);
+struct coll *
+sql_index_collation(Index *idx, uint32_t column);
 struct coll *
 sql_default_coll();
 bool
 space_is_view(Table *);
+
 void sqlite3EndTable(Parse *, Token *, Token *, Select *);
 int
 emit_open_cursor(Parse *, int, int);
@@ -3845,7 +3855,25 @@ const char *sqlite3ErrName(int);
 const char *sqlite3ErrStr(int);
 struct coll *sqlite3FindCollSeq(const char *);
 struct coll *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
-struct coll *sqlite3ExprCollSeq(Parse * pParse, Expr * pExpr);
+
+/**
+ * Return the collation sequence for the expression pExpr. If
+ * there is no defined collating sequence, return NULL.
+ *
+ * The collating sequence might be determined by a COLLATE operator
+ * or by the presence of a column with a defined collating sequence.
+ * COLLATE operators take first precedence.  Left operands take
+ * precedence over right operands.
+ *
+ * @param parse Parsing context.
+ * @param expr Expression to scan.
+ * @param[out] is_found Flag set if collation was found.
+ *
+ * @retval Pointer to collation.
+ */
+struct coll *
+sql_expr_coll(Parse * pParse, Expr * pExpr, bool *is_found);
+
 Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlite3ExprAddCollateString(Parse *, Expr *, const char *);
 Expr *sqlite3ExprSkipCollate(Expr *);

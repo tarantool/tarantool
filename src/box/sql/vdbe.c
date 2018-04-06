@@ -1660,7 +1660,7 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
  * publicly.  Only built-in functions have access to this feature.
  */
 case OP_CollSeq: {
-	assert(pOp->p4type==P4_COLLSEQ);
+	assert(pOp->p4type==P4_COLLSEQ || pOp->p4.pColl == NULL);
 	if (pOp->p1) {
 		sqlite3VdbeMemSetInt64(&aMem[pOp->p1], 0);
 	}

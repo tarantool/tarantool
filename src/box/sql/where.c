@@ -298,26 +298,20 @@ whereScanNext(WhereScan * pScan)
 					if ((pTerm->eOperator & pScan->
 					     opMask) != 0) {
 						/* Verify the affinity and collating sequence match */
-						if (pScan->zCollName
-						    && (pTerm->eOperator & WO_ISNULL) == 0) {
-							struct coll *pColl;
-							Parse *pParse =
-							    pWC->pWInfo->pParse;
+						if ((pTerm->eOperator & WO_ISNULL) == 0) {
 							pX = pTerm->pExpr;
-							if (!sqlite3IndexAffinityOk(pX, pScan->idxaff)) {
+							if (!sqlite3IndexAffinityOk(pX, pScan->idxaff))
 								continue;
-							}
-							assert(pX->pLeft);
-							pColl =
-							    sqlite3BinaryCompareCollSeq
-							    (pParse, pX->pLeft,
-							     pX->pRight);
-							if (pColl == 0)
-								pColl =
-									sql_default_coll();
-							if (strcmp(pColl->name,
-									   pScan->zCollName)) {
-								continue;
+							if (pScan->is_column_seen) {
+								Parse *pParse =
+									pWC->pWInfo->pParse;
+								struct coll *coll;
+								assert(pX->pLeft);
+								coll = sqlite3BinaryCompareCollSeq
+									(pParse, pX->pLeft,
+									 pX->pRight);
+								if (coll != pScan->coll)
+									continue;
 							}
 						}
 						if ((pTerm->eOperator & (WO_EQ | WO_IS)) != 0
@@ -376,7 +370,8 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 	pScan->pWC = pWC;
 	pScan->pIdxExpr = 0;
 	pScan->idxaff = 0;
-	pScan->zCollName = 0;
+	pScan->coll = NULL;
+	pScan->is_column_seen = false;
 	if (pIdx) {
 		int j = iColumn;
 		iColumn = pIdx->aiColumn[j];
@@ -384,7 +379,8 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 			pScan->pIdxExpr = pIdx->aColExpr->a[j].pExpr;
 		} else if (iColumn >= 0) {
 			pScan->idxaff = pIdx->pTable->aCol[iColumn].affinity;
-			pScan->zCollName = index_collation_name(pIdx, j);
+			pScan->coll = sql_index_collation(pIdx, j);
+			pScan->is_column_seen = true;
 		}
 	} else if (iColumn == XN_EXPR) {
 		return 0;
@@ -465,16 +461,17 @@ findIndexCol(Parse * pParse,	/* Parse context */
 	     Index * pIdx,	/* Index to match column of */
 	     int iCol)		/* Column of index to match */
 {
-	int i;
-	const char *zColl = index_collation_name(pIdx, iCol);
-
-	for (i = 0; i < pList->nExpr; i++) {
+	for (int i = 0; i < pList->nExpr; i++) {
 		Expr *p = sqlite3ExprSkipCollate(pList->a[i].pExpr);
-		if (p->op == TK_COLUMN && p->iColumn == pIdx->aiColumn[iCol]
-		    && p->iTable == iBase) {
-			struct coll *pColl =
-			    sqlite3ExprCollSeq(pParse, pList->a[i].pExpr);
-			if (pColl && 0 == strcmp(pColl->name, zColl)) {
+		if (p->op == TK_COLUMN &&
+		    p->iColumn == pIdx->aiColumn[iCol] &&
+		    p->iTable == iBase) {
+			bool is_found;
+			struct coll *coll = sql_expr_coll(pParse,
+							  pList->a[i].pExpr,
+							  &is_found);
+			if (is_found &&
+			    coll == sql_index_collation(pIdx, iCol)) {
 				return i;
 			}
 		}
@@ -1174,7 +1171,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	sqlite3_value *p2 = 0;	/* Value extracted from pUpper */
 	sqlite3_value *pVal = 0;	/* Value extracted from record */
 
-	pColl = sqlite3LocateCollSeq(pParse, db, index_collation_name(p, nEq));
+	pColl = sql_index_collation(p, nEq);
 	if (pLower) {
 		rc = sqlite3Stat4ValueFromExpr(pParse, pLower->pExpr->pRight,
 					       aff, &p1);
@@ -2246,8 +2243,7 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		pColl = sqlite3BinaryCompareCollSeq(pParse, pLhs, pRhs);
 		if (pColl == 0)
 			break;
-		const char *zCollName = index_collation_name(pIdx, i + nEq);
-		if (zCollName && strcmp(pColl->name, zCollName))
+	        if (sql_index_collation(pIdx, i + nEq) != pColl)
 			break;
 	}
 	return i;
@@ -3147,7 +3143,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	WhereLoop *pLoop = 0;	/* Current WhereLoop being processed. */
 	WhereTerm *pTerm;	/* A single term of the WHERE clause */
 	Expr *pOBExpr;		/* An expression from the ORDER BY clause */
-	struct coll *pColl;		/* COLLATE function from an ORDER BY clause term */
 	Index *pIndex;		/* The index associated with pLoop */
 	sqlite3 *db = pWInfo->pParse->db;	/* Database connection */
 	Bitmask obSat = 0;	/* Mask of ORDER BY terms satisfied so far */
@@ -3235,20 +3230,15 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 			}
 			if ((pTerm->eOperator & (WO_EQ | WO_IS)) != 0
 			    && pOBExpr->iColumn >= 0) {
-				const char *z1, *z2;
-				pColl =
-				    sqlite3ExprCollSeq(pWInfo->pParse,
-						       pOrderBy->a[i].pExpr);
-				if (!pColl)
-					pColl = sql_default_coll();
-				z1 = pColl->name;
-				pColl =
-				    sqlite3ExprCollSeq(pWInfo->pParse,
-						       pTerm->pExpr);
-				if (!pColl)
-					pColl = sql_default_coll();
-				z2 = pColl->name;
-				if (strcmp(z1, z2) != 0)
+				struct coll *coll1, *coll2;
+				bool unused;
+				coll1 = sql_expr_coll(pWInfo->pParse,
+						      pOrderBy->a[i].pExpr,
+						      &unused);
+				coll2 = sql_expr_coll(pWInfo->pParse,
+						      pTerm->pExpr,
+						      &unused);
+				if (coll1 != coll2)
 					continue;
 				testcase(pTerm->pExpr->op == TK_IS);
 			}
@@ -3372,15 +3362,16 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						}
 					}
 					if (iColumn >= 0) {
-						pColl =
-						    sqlite3ExprCollSeq(pWInfo->pParse,
-								       pOrderBy->a[i].pExpr);
-						if (!pColl)
-							pColl = sql_default_coll();
-						const char *zCollName =
-							index_collation_name(pIndex, j);
-						if (strcmp(pColl->name,
-							   zCollName) != 0)
+						bool is_found;
+						struct coll *coll =
+							sql_expr_coll(pWInfo->pParse,
+								      pOrderBy->a[i].pExpr,
+								      &is_found);
+						struct coll *idx_coll =
+							sql_index_collation(pIndex,
+									    j);
+						if (is_found &&
+						    coll != idx_coll)
 							continue;
 					}
 					isMatch = 1;

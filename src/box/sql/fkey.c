@@ -287,7 +287,6 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 				int i, j;
 				for (i = 0; i < nCol; i++) {
 					i16 iCol = pIdx->aiColumn[i];	/* Index of column in parent tbl */
-					const char *zDfltColl;	/* Def. collation for column */
 					char *zIdxCol;	/* Name of indexed column */
 
 					if (iCol < 0)
@@ -297,11 +296,12 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 					 * the default collation sequence for the column, this index is
 					 * unusable. Bail out early in this case.
 					 */
-					zDfltColl =
-						column_collation_name(pParent,
-								      iCol);
-					if (strcmp
-					    (index_collation_name(pIdx, i), zDfltColl))
+					struct coll *def_coll;
+					def_coll = sql_column_collation(pParent,
+									iCol);
+					struct coll *coll;
+					coll = sql_index_collation(pIdx, i);
+					if (def_coll != coll)
 						break;
 
 					zIdxCol = pParent->aCol[iCol].zName;
@@ -526,7 +526,6 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 {
 	Expr *pExpr;
 	Column *pCol;
-	const char *zColl;
 	sqlite3 *db = pParse->db;
 
 	pExpr = sqlite3Expr(db, TK_REGISTER, 0);
@@ -535,9 +534,13 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 			pCol = &pTab->aCol[iCol];
 			pExpr->iTable = regBase + iCol + 1;
 			pExpr->affinity = pCol->affinity;
-			zColl = column_collation_name(pTab, iCol);
-			pExpr =
-			    sqlite3ExprAddCollateString(pParse, pExpr, zColl);
+			const char *coll_name;
+			if (pCol->coll == NULL && pCol->coll != NULL)
+				coll_name = pCol->coll->name;
+			else
+				coll_name = "binary";
+			pExpr = sqlite3ExprAddCollateString(pParse, pExpr,
+							    coll_name);
 		} else {
 			pExpr->iTable = regBase;
 			pExpr->affinity = SQLITE_AFF_INTEGER;
