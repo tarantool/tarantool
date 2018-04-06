@@ -1053,13 +1053,6 @@ vinyl_space_check_format(struct space *new_space, struct space *old_space)
 }
 
 static void
-vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
-{
-	(void)old_space;
-	(void)new_space;
-}
-
-static void
 vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 		       uint32_t old_index_id, uint32_t new_index_id)
 {
@@ -3941,7 +3934,6 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
 	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
-	/* .commit_alter = */ vinyl_space_commit_alter,
 };
 
 static const struct index_vtab vinyl_index_vtab = {

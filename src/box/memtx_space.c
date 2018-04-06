@@ -735,7 +735,15 @@ static void
 memtx_space_drop_primary_key(struct space *space)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	/*
+	 * Reset 'replace' callback so that:
+	 * - DML returns proper errors rather than crashes the
+	 *   program.
+	 * - When a new primary key is finally added, the space
+	 *   can be put back online properly.
+	 */
 	memtx_space->replace = memtx_space_replace_no_keys;
+	memtx_space->bsize = 0;
 }
 
 static void
@@ -820,21 +828,11 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 	new_memtx_space->replace = old_memtx_space->replace;
+	new_memtx_space->bsize = old_memtx_space->bsize;
 	bool is_empty = old_space->index_count == 0 ||
 			index_size(old_space->index[0]) == 0;
 	return space_def_check_compatibility(old_space->def,
 					     new_space->def, is_empty);
-}
-
-static void
-memtx_space_commit_alter(struct space *old_space, struct space *new_space)
-{
-	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
-	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
-	bool is_empty = new_space->index_count == 0 ||
-			index_size(new_space->index[0]) == 0;
-	if (!is_empty)
-		new_memtx_space->bsize = old_memtx_space->bsize;
 }
 
 /* }}} DDL */
@@ -856,7 +854,6 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .build_secondary_key = */ memtx_space_build_secondary_key,
 	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
-	/* .commit_alter = */ memtx_space_commit_alter,
 };
 
 struct space *

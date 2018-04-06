@@ -116,14 +116,6 @@ struct space_vtab {
 	 */
 	int (*prepare_alter)(struct space *old_space,
 			     struct space *new_space);
-	/**
-	 * Notify the engine engine after altering a space and
-	 * replacing old_space with new_space in the space cache,
-	 * to, e.g., update all references to struct space
-	 * and replace old_space with new_space.
-	 */
-	void (*commit_alter)(struct space *old_space,
-			     struct space *new_space);
 };
 
 struct space {
@@ -359,13 +351,6 @@ space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	assert(old_space->vtab == new_space->vtab);
 	return new_space->vtab->prepare_alter(old_space, new_space);
-}
-
-static inline void
-space_commit_alter(struct space *old_space, struct space *new_space)
-{
-	assert(old_space->vtab == new_space->vtab);
-	new_space->vtab->commit_alter(old_space, new_space);
 }
 
 static inline bool

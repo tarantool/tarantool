@@ -154,13 +154,6 @@ sysview_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
-static void
-sysview_space_commit_alter(struct space *old_space, struct space *new_space)
-{
-	(void)old_space;
-	(void)new_space;
-}
-
 static int
 sysview_space_check_format(struct space *new_space, struct space *old_space)
 {
@@ -187,7 +180,6 @@ static const struct space_vtab sysview_space_vtab = {
 	/* .build_secondary_key = */ sysview_space_build_secondary_key,
 	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ sysview_space_prepare_alter,
-	/* .commit_alter = */ sysview_space_commit_alter,
 };
 
 static void
