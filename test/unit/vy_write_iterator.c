@@ -36,9 +36,8 @@ compare_write_iterator_results(struct key_def *key_def,
 	fail_if(rv_array == NULL);
 	init_read_views_list(&rv_list, rv_array, vlsns, vlsns_count);
 
-	struct vy_stmt_stream *wi =
-		vy_write_iterator_new(key_def, mem->format, mem->upsert_format,
-				      is_primary, is_last_level, &rv_list);
+	struct vy_stmt_stream *wi = vy_write_iterator_new(key_def, mem->format,
+					is_primary, is_last_level, &rv_list);
 	fail_if(wi == NULL);
 	fail_if(vy_write_iterator_new_mem(wi, mem) != 0);
 
@@ -51,7 +50,6 @@ compare_write_iterator_results(struct key_def *key_def,
 			break;
 		fail_if(i >= expected_count);
 		ok(vy_stmt_are_same(ret, &expected[i], mem->format,
-				    mem->upsert_format,
 				    mem->format_with_colmask),
 		   "stmt %d is correct", i);
 		++i;

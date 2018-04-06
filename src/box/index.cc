@@ -555,6 +555,11 @@ generic_index_abort_create(struct index *)
 }
 
 void
+generic_index_commit_modify(struct index *, int64_t)
+{
+}
+
+void
 generic_index_commit_drop(struct index *)
 {
 }
@@ -562,6 +567,11 @@ generic_index_commit_drop(struct index *)
 void
 generic_index_update_def(struct index *)
 {
+}
+
+bool generic_index_depends_on_pk(struct index *)
+{
+	return false;
 }
 
 ssize_t

@@ -1060,7 +1060,7 @@ public:
 	                         old_index_def->key_def->part_count) != 0) {
 	                /*
 	                 * Primary parts have been changed -
-	                 * update non-unique secondary indexes.
+	                 * update secondary indexes.
 	                 */
 	                alter->pk_def = new_index_def->key_def;
 	        }
@@ -1069,6 +1069,7 @@ public:
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t lsn);
 	virtual void rollback(struct alter_space *alter);
 	virtual ~ModifyIndex();
 };
@@ -1099,6 +1100,14 @@ ModifyIndex::alter(struct alter_space *alter)
 	assert(new_index != NULL);
 	SWAP(old_index->def, new_index->def);
 	index_update_def(new_index);
+}
+
+void
+ModifyIndex::commit(struct alter_space *alter, int64_t signature)
+{
+	struct index *new_index = space_index(alter->new_space,
+					      new_index_def->iid);
+	index_commit_modify(new_index, signature);
 }
 
 void
@@ -1362,9 +1371,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		struct index_def *old_def = old_index->def;
 		struct index_def *new_def;
 		uint32_t min_field_count = alter->new_min_field_count;
-		if ((old_def->opts.is_unique &&
-		     !old_def->key_def->is_nullable) ||
-		    old_def->type != TREE || alter->pk_def == NULL) {
+		if (alter->pk_def == NULL || !index_depends_on_pk(old_index)) {
 			if (is_min_field_count_changed) {
 				new_def = index_def_dup(old_def);
 				index_def_update_optionality(new_def,
@@ -1376,9 +1383,8 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 			continue;
 		}
 		/*
-		 * Rebuild non-unique secondary keys along with
-		 * the primary, since primary key parts have
-		 * changed.
+		 * Rebuild secondary indexes that depend on the
+		 * primary key since primary key parts have changed.
 		 */
 		new_def = index_def_new(old_def->space_id, old_def->iid,
 					old_def->name, strlen(old_def->name),
@@ -1386,7 +1392,13 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
 		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
-		(void) new RebuildIndex(alter, new_def, old_def);
+		if (key_part_check_compatibility(old_def->cmp_def->parts,
+						 old_def->cmp_def->part_count,
+						 new_def->cmp_def->parts,
+						 new_def->cmp_def->part_count))
+			(void) new ModifyIndex(alter, new_def, old_def);
+		else
+			(void) new RebuildIndex(alter, new_def, old_def);
 		guard.is_active = false;
 	}
 }

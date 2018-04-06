@@ -99,6 +99,34 @@ enum say_logger_type {
 	SAY_LOGGER_SYSLOG
 };
 
+enum syslog_facility {
+	SYSLOG_KERN = 0,
+	SYSLOG_USER,
+	SYSLOG_MAIL,
+	SYSLOG_DAEMON,
+	SYSLOG_AUTH,
+	SYSLOG_INTERN,
+	SYSLOG_LPR,
+	SYSLOG_NEWS,
+	SYSLOG_UUCP,
+	SYSLOG_CLOCK,
+	SYSLOG_AUTHPRIV,
+	SYSLOG_FTP,
+	SYSLOG_NTP,
+	SYSLOG_AUDIT,
+	SYSLOG_ALERT,
+	SYSLOG_CRON,
+	SYSLOG_LOCAL0,
+	SYSLOG_LOCAL1,
+	SYSLOG_LOCAL2,
+	SYSLOG_LOCAL3,
+	SYSLOG_LOCAL4,
+	SYSLOG_LOCAL5,
+	SYSLOG_LOCAL6,
+	SYSLOG_LOCAL7,
+	syslog_facility_MAX,
+};
+
 struct log;
 
 typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
@@ -132,6 +160,7 @@ struct log {
 	struct fiber_cond rotate_cond;
 	/** Counter identifying number of threads executing log_rotate. */
 	int rotating_threads;
+	enum syslog_facility syslog_facility;
 	struct rlist in_log_list;
 };
 
@@ -362,7 +391,7 @@ say_parse_logger_type(const char **str, enum say_logger_type *type);
 /** Syslog logger initialization params */
 struct say_syslog_opts {
 	const char *identity;
-	const char *facility;
+	enum syslog_facility facility;
 	/* Input copy (content unspecified). */
 	char *copy;
 };

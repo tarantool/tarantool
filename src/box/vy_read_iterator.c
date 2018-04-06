@@ -659,8 +659,7 @@ vy_read_iterator_squash_upsert(struct vy_read_iterator *itr,
 			return rc;
 		}
 		struct tuple *applied = vy_apply_upsert(t, next,
-				lsm->cmp_def, lsm->mem_format,
-				lsm->upsert_format, true);
+				lsm->cmp_def, lsm->mem_format, true);
 		lsm->stat.upsert.applied++;
 		tuple_unref(t);
 		if (applied == NULL)
@@ -753,7 +752,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     iterator_type, itr->key,
 				     itr->read_view, lsm->cmp_def,
 				     lsm->key_def, lsm->disk_format,
-				     lsm->upsert_format, lsm->index_id == 0);
+				     lsm->index_id == 0);
 	}
 }
 

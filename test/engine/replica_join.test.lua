@@ -72,6 +72,8 @@ _ = test_run:cmd("cleanup server replica")
 -- new data
 for k = 8, 1, -1 do box.space.test:update(k, {{'-', 2, 8}}) end
 for k = 9, 16 do box.space.test:delete(k) end
+box.space.test.index.primary:alter{parts = {1, 'integer'}}
+for k = -8, -1 do box.space.test:insert{k, 9 + k} end
 _ = box.space.test2:upsert({1, 'test1', 11}, {{'+', 3, 1}})
 _ = box.space.test2:update({2, 'test2'}, {{'+', 3, 2}})
 _ = box.space.test2:delete{3, 'test3'}

@@ -293,6 +293,12 @@ for k = 8, 1, -1 do box.space.test:update(k, {{'-', 2, 8}}) end
 for k = 9, 16 do box.space.test:delete(k) end
 ---
 ...
+box.space.test.index.primary:alter{parts = {1, 'integer'}}
+---
+...
+for k = -8, -1 do box.space.test:insert{k, 9 + k} end
+---
+...
 _ = box.space.test2:upsert({1, 'test1', 11}, {{'+', 3, 1}})
 ---
 ...
@@ -333,7 +339,15 @@ test_run:cmd('switch replica')
 ...
 box.space.test:select()
 ---
-- - [1, 8]
+- - [-8, 1]
+  - [-7, 2]
+  - [-6, 3]
+  - [-5, 4]
+  - [-4, 5]
+  - [-3, 6]
+  - [-2, 7]
+  - [-1, 8]
+  - [1, 8]
   - [2, 7]
   - [3, 6]
   - [4, 5]
@@ -344,13 +358,21 @@ box.space.test:select()
 ...
 box.space.test.index.secondary:select()
 ---
-- - [8, 1]
+- - [-8, 1]
+  - [8, 1]
+  - [-7, 2]
   - [7, 2]
+  - [-6, 3]
   - [6, 3]
+  - [-5, 4]
   - [5, 4]
+  - [-4, 5]
   - [4, 5]
+  - [-3, 6]
   - [3, 6]
+  - [-2, 7]
   - [2, 7]
+  - [-1, 8]
   - [1, 8]
 ...
 box.space.test2:select()

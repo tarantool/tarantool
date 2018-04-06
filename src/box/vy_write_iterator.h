@@ -224,16 +224,16 @@ struct vy_slice;
  * use vy_write_iterator_add_* functions.
  * @param cmp_def - key definition for tuple compare.
  * @param format - dormat to allocate new REPLACE and DELETE tuples from vy_run.
- * @param upsert_format - same as format, but for UPSERT tuples.
  * @param LSM tree is_primary - set if this iterator is for a primary index.
  * @param is_last_level - there is no older level than the one we're writing to.
  * @param read_views - Opened read views.
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(const struct key_def *cmp_def, struct tuple_format *format,
-		      struct tuple_format *upsert_format, bool is_primary,
-		      bool is_last_level, struct rlist *read_views);
+vy_write_iterator_new(const struct key_def *cmp_def,
+		      struct tuple_format *format,
+		      bool is_primary, bool is_last_level,
+		      struct rlist *read_views);
 
 /**
  * Add a mem as a source to the iterator.

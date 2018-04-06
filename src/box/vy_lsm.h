@@ -193,11 +193,6 @@ struct vy_lsm {
 	 * tuples for vy_mem, and used only by primary key.
 	 */
 	struct tuple_format *mem_format_with_colmask;
-	/*
-	 * Format for UPSERT statements. Note, UPSERTs can only
-	 * appear in spaces with a single index.
-	 */
-	struct tuple_format *upsert_format;
 	/**
 	 * If this LSM tree is for a secondary index, the following
 	 * variable points to the LSM tree of the primary index of
@@ -260,11 +255,13 @@ struct vy_lsm {
 	 * been dumped yet.
 	 */
 	int64_t dump_lsn;
-	/*
-	 * This flag is set if the LSM tree creation was
-	 * committed to the metadata log.
+	/**
+	 * LSN of the WAL row that created or last modified
+	 * this LSM tree. We store it in vylog so that during
+	 * local recovery we can replay vylog records we failed
+	 * to log before restart.
 	 */
-	bool is_committed;
+	int64_t commit_lsn;
 	/**
 	 * This flag is set if the LSM tree was dropped.
 	 * It is also set on local recovery if the LSM tree
@@ -290,13 +287,6 @@ struct vy_lsm {
 	 */
 	vy_lsm_read_set_t read_set;
 };
-
-/**
- * Assert if an LSM tree formats are inconsistent.
- * @param lsm LSM tree to validate.
- */
-void
-vy_lsm_validate_formats(const struct vy_lsm *lsm);
 
 /** Return LSM tree name. Used for logging. */
 const char *
@@ -339,6 +329,23 @@ vy_lsm_unref(struct vy_lsm *lsm)
 	assert(lsm->refs > 0);
 	if (--lsm->refs == 0)
 		vy_lsm_delete(lsm);
+}
+
+/**
+ * Update pointer to the primary key for an LSM tree.
+ * If called for an LSM tree corresponding to a primary
+ * index, this function does nothing.
+ */
+static inline void
+vy_lsm_update_pk(struct vy_lsm *lsm, struct vy_lsm *pk)
+{
+	if (lsm->index_id == 0) {
+		assert(lsm->pk == NULL);
+		return;
+	}
+	vy_lsm_unref(lsm->pk);
+	vy_lsm_ref(pk);
+	lsm->pk = pk;
 }
 
 /**

@@ -643,6 +643,27 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 
 	/* Format is now referenced by the space. */
 	tuple_format_unref(format);
+
+	/*
+	 * Check if there are unique indexes that are contained
+	 * by other unique indexes. For them, we can skip check
+	 * for duplicates on INSERT. Prefer indexes with higher
+	 * ids for uniqueness check optimization as they are
+	 * likelier to have a "colder" cache.
+	 */
+	for (int i = space->index_count - 1; i >= 0; i--) {
+		struct vy_lsm *lsm = vy_lsm(space->index[i]);
+		if (!lsm->check_is_unique)
+			continue;
+		for (int j = 0; j < (int)space->index_count; j++) {
+			struct vy_lsm *other = vy_lsm(space->index[j]);
+			if (other != lsm && other->check_is_unique &&
+			    key_def_contains(lsm->key_def, other->key_def)) {
+				lsm->check_is_unique = false;
+				break;
+			}
+		}
+	}
 	return space;
 }
 
@@ -803,7 +824,7 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (lsm->is_committed) {
+		if (lsm->commit_lsn >= 0) {
 			vy_scheduler_add_lsm(&env->scheduler, lsm);
 			return;
 		}
@@ -828,8 +849,8 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	if (lsm->opts.lsn != 0)
 		lsn = lsm->opts.lsn;
 
-	assert(!lsm->is_committed);
-	lsm->is_committed = true;
+	assert(lsm->commit_lsn < 0);
+	lsm->commit_lsn = lsn;
 
 	assert(lsm->range_count == 1);
 	struct vy_range *range = vy_range_tree_first(lsm->tree);
@@ -852,6 +873,34 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	 * a task for it.
 	 */
 	vy_scheduler_add_lsm(&env->scheduler, lsm);
+}
+
+static void
+vinyl_index_commit_modify(struct index *index, int64_t lsn)
+{
+	struct vy_env *env = vy_env(index->engine);
+	struct vy_lsm *lsm = vy_lsm(index);
+
+	(void)env;
+	assert(env->status == VINYL_ONLINE ||
+	       env->status == VINYL_FINAL_RECOVERY_LOCAL ||
+	       env->status == VINYL_FINAL_RECOVERY_REMOTE);
+
+	if (lsn <= lsm->commit_lsn) {
+		/*
+		 * This must be local recovery from WAL, when
+		 * the operation has already been committed to
+		 * vylog.
+		 */
+		assert(env->status == VINYL_FINAL_RECOVERY_LOCAL);
+		return;
+	}
+
+	lsm->commit_lsn = lsn;
+
+	vy_log_tx_begin();
+	vy_log_modify_lsm(lsm->id, lsm->key_def, lsn);
+	vy_log_tx_try_commit();
 }
 
 /*
@@ -906,6 +955,17 @@ vinyl_index_commit_drop(struct index *index)
 	vy_log_tx_try_commit();
 }
 
+static bool
+vinyl_index_depends_on_pk(struct index *index)
+{
+	(void)index;
+	/*
+	 * All secondary Vinyl indexes are non-clustered and hence
+	 * have to be updated if the primary key is modified.
+	 */
+	return true;
+}
+
 static void
 vinyl_init_system_space(struct space *space)
 {
@@ -941,11 +1001,10 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	/*
-	 * Regardless of the space emptyness, key definition of an
-	 * existing index can not be changed, because key
-	 * definition is already in vylog. See #3169.
-	 */
+	/* The space is empty. Allow alter. */
+	if (pk->stat.disk.count.rows == 0 &&
+	    pk->stat.memory.count.rows == 0)
+		return 0;
 	if (old_space->index_count == new_space->index_count) {
 		/* Check index_defs to be unchanged. */
 		for (uint32_t i = 0; i < old_space->index_count; ++i) {
@@ -957,25 +1016,14 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 			 * vinyl yet.
 			 */
 			if (index_def_change_requires_rebuild(old_def,
-							      new_def) ||
-			    key_part_cmp(old_def->key_def->parts,
-					 old_def->key_def->part_count,
-					 new_def->key_def->parts,
-					 new_def->key_def->part_count) != 0) {
+							      new_def)) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-					 "changing the definition of an index");
+					 "changing the definition of "
+					 "a non-empty index");
 				return -1;
 			}
 		}
 	}
-	if (pk->stat.disk.count.rows == 0 &&
-	    pk->stat.memory.count.rows == 0)
-		return 0;
-	/*
-	 * Since space format is not persisted in vylog, it can be
-	 * altered on non-empty space to some state, compatible
-	 * with the old one.
-	 */
 	if (space_def_check_compatibility(old_space->def, new_space->def,
 					  false) != 0)
 		return -1;
@@ -1015,100 +1063,36 @@ static void
 vinyl_space_commit_alter(struct space *old_space, struct space *new_space)
 {
 	(void)old_space;
-	if (new_space == NULL || new_space->index_count == 0)
-		return; /* space drop */
+	(void)new_space;
+}
 
-	struct tuple_format *new_format = new_space->format;
-	struct vy_lsm *pk = vy_lsm(new_space->index[0]);
-	struct index_def *new_index_def = space_index_def(new_space, 0);
-
-	assert(pk->pk == NULL);
-
-	/* Update the format with column mask. */
-	struct tuple_format *format =
-		vy_tuple_format_new_with_colmask(new_format);
-	if (format == NULL)
-		goto fail;
-
-	/* Update the upsert format. */
-	struct tuple_format *upsert_format =
-		vy_tuple_format_new_upsert(new_format);
-	if (upsert_format == NULL) {
-		tuple_format_delete(format);
-		goto fail;
-	}
-
-	/* Set possibly changed opts. */
-	pk->opts = new_index_def->opts;
-	pk->check_is_unique = true;
-
-	/* Set new formats. */
-	tuple_format_unref(pk->disk_format);
-	tuple_format_unref(pk->mem_format);
-	tuple_format_unref(pk->upsert_format);
-	tuple_format_unref(pk->mem_format_with_colmask);
-	pk->disk_format = new_format;
-	tuple_format_ref(new_format);
-	pk->upsert_format = upsert_format;
-	tuple_format_ref(upsert_format);
-	pk->mem_format_with_colmask = format;
-	tuple_format_ref(format);
-	pk->mem_format = new_format;
-	tuple_format_ref(new_format);
-	vy_lsm_validate_formats(pk);
-	key_def_update_optionality(pk->key_def, new_format->min_field_count);
-	key_def_update_optionality(pk->cmp_def, new_format->min_field_count);
-
-	for (uint32_t i = 1; i < new_space->index_count; ++i) {
-		struct vy_lsm *lsm = vy_lsm(new_space->index[i]);
-		vy_lsm_unref(lsm->pk);
-		vy_lsm_ref(pk);
-		lsm->pk = pk;
-		new_index_def = space_index_def(new_space, i);
-		lsm->opts = new_index_def->opts;
-		lsm->check_is_unique = lsm->opts.is_unique;
-		tuple_format_unref(lsm->mem_format_with_colmask);
-		tuple_format_unref(lsm->mem_format);
-		tuple_format_unref(lsm->upsert_format);
-		lsm->mem_format_with_colmask = pk->mem_format_with_colmask;
-		lsm->mem_format = pk->mem_format;
-		lsm->upsert_format = pk->upsert_format;
-		tuple_format_ref(lsm->mem_format_with_colmask);
-		tuple_format_ref(lsm->mem_format);
-		tuple_format_ref(lsm->upsert_format);
-		key_def_update_optionality(lsm->key_def,
-					   new_format->min_field_count);
-		key_def_update_optionality(lsm->cmp_def,
-					   new_format->min_field_count);
-		vy_lsm_validate_formats(lsm);
-	}
+static void
+vinyl_space_swap_index(struct space *old_space, struct space *new_space,
+		       uint32_t old_index_id, uint32_t new_index_id)
+{
+	struct vy_lsm *old_lsm = vy_lsm(old_space->index_map[old_index_id]);
+	struct vy_lsm *new_lsm = vy_lsm(new_space->index_map[new_index_id]);
 
 	/*
-	 * Check if there are unique indexes that are contained
-	 * by other unique indexes. For them, we can skip check
-	 * for duplicates on INSERT. Prefer indexes with higher
-	 * ids for uniqueness check optimization as they are
-	 * likelier to have a "colder" cache.
+	 * Swap the two indexes between the two spaces,
+	 * but leave tuple formats.
 	 */
-	for (int i = new_space->index_count - 1; i >= 0; i--) {
-		struct vy_lsm *lsm = vy_lsm(new_space->index[i]);
-		if (!lsm->check_is_unique)
-			continue;
-		for (int j = 0; j < (int)new_space->index_count; j++) {
-			struct vy_lsm *other = vy_lsm(new_space->index[j]);
-			if (other != lsm && other->check_is_unique &&
-			    key_def_contains(lsm->key_def, other->key_def)) {
-				lsm->check_is_unique = false;
-				break;
-			}
-		}
-	}
-	return;
-fail:
-	/* FIXME: space_vtab::commit_alter() must not fail. */
-	diag_log();
-	unreachable();
-	panic("failed to alter space");
+	generic_space_swap_index(old_space, new_space,
+				 old_index_id, new_index_id);
+
+	SWAP(old_lsm, new_lsm);
+	SWAP(old_lsm->check_is_unique, new_lsm->check_is_unique);
+	SWAP(old_lsm->mem_format, new_lsm->mem_format);
+	SWAP(old_lsm->mem_format_with_colmask,
+	     new_lsm->mem_format_with_colmask);
+	SWAP(old_lsm->disk_format, new_lsm->disk_format);
+	SWAP(old_lsm->opts, new_lsm->opts);
+	key_def_swap(old_lsm->key_def, new_lsm->key_def);
+	key_def_swap(old_lsm->cmp_def, new_lsm->cmp_def);
+
+	/* Update pointer to the primary key. */
+	vy_lsm_update_pk(old_lsm, vy_lsm(old_space->index_map[0]));
+	vy_lsm_update_pk(new_lsm, vy_lsm(new_space->index_map[0]));
 }
 
 static int
@@ -1129,7 +1113,6 @@ vinyl_space_build_secondary_key(struct space *old_space,
 				struct index *new_index)
 {
 	(void)old_space;
-	(void)new_space;
 	/*
 	 * Unlike Memtx, Vinyl does not need building of a secondary index.
 	 * This is true because of two things:
@@ -1150,7 +1133,12 @@ vinyl_space_build_secondary_key(struct space *old_space,
 	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
 	 *  but aware of three cases mentioned above.
 	 */
-	return vinyl_index_open(new_index);
+	if (vinyl_index_open(new_index) != 0)
+		return -1;
+
+	/* Set pointer to the primary key for the new index. */
+	vy_lsm_update_pk(vy_lsm(new_index), vy_lsm(space_index(new_space, 0)));
+	return 0;
 }
 
 static size_t
@@ -1926,7 +1914,7 @@ vy_lsm_upsert(struct vy_tx *tx, struct vy_lsm *lsm,
 	struct iovec operations[1];
 	operations[0].iov_base = (void *)expr;
 	operations[0].iov_len = expr_end - expr;
-	vystmt = vy_stmt_new_upsert(lsm->upsert_format, tuple, tuple_end,
+	vystmt = vy_stmt_new_upsert(lsm->mem_format, tuple, tuple_end,
 				    operations, 1);
 	if (vystmt == NULL)
 		return -1;
@@ -2940,8 +2928,6 @@ struct vy_join_ctx {
 	struct key_def *key_def;
 	/** LSM tree format used for REPLACE and DELETE statements. */
 	struct tuple_format *format;
-	/** LSM tree format used for UPSERT statements. */
-	struct tuple_format *upsert_format;
 	/**
 	 * Write iterator for merging runs before sending
 	 * them to the replica.
@@ -3058,8 +3044,7 @@ vy_send_range(struct vy_join_ctx *ctx,
 	/* Create a write iterator. */
 	struct rlist fake_read_views;
 	rlist_create(&fake_read_views);
-	ctx->wi = vy_write_iterator_new(ctx->key_def,
-					ctx->format, ctx->upsert_format,
+	ctx->wi = vy_write_iterator_new(ctx->key_def, ctx->format,
 					true, true, &fake_read_views);
 	if (ctx->wi == NULL) {
 		rc = -1;
@@ -3116,10 +3101,6 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 	if (ctx->format == NULL)
 		goto out_free_key_def;
 	tuple_format_ref(ctx->format);
-	ctx->upsert_format = vy_tuple_format_new_upsert(ctx->format);
-	if (ctx->upsert_format == NULL)
-		goto out_free_format;
-	tuple_format_ref(ctx->upsert_format);
 
 	/* Send ranges. */
 	struct vy_range_recovery_info *range_info;
@@ -3130,9 +3111,6 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 			break;
 	}
 
-	tuple_format_unref(ctx->upsert_format);
-	ctx->upsert_format = NULL;
-out_free_format:
 	tuple_format_unref(ctx->format);
 	ctx->format = NULL;
 out_free_key_def:
@@ -3587,9 +3565,8 @@ vy_squash_process(struct vy_squash *squash)
 			return 0;
 		}
 		assert(lsm->index_id == 0);
-		struct tuple *applied =
-			vy_apply_upsert(mem_stmt, result, def, mem->format,
-					mem->upsert_format, true);
+		struct tuple *applied = vy_apply_upsert(mem_stmt, result, def,
+							mem->format, true);
 		lsm->stat.upsert.applied++;
 		tuple_unref(result);
 		if (applied == NULL)
@@ -4000,6 +3977,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
 	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
+	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
 	/* .commit_alter = */ vinyl_space_commit_alter,
 };
@@ -4008,8 +3986,10 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .destroy = */ vinyl_index_destroy,
 	/* .commit_create = */ vinyl_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ vinyl_index_commit_modify,
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
+	/* .depends_on_pk = */ vinyl_index_depends_on_pk,
 	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
 	/* .min = */ generic_index_min,

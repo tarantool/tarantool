@@ -178,8 +178,7 @@ test_basic()
 	struct vy_mem *run_mem =
 		vy_mem_new(pk->mem->env, *pk->env->p_generation,
 			   pk->cmp_def, pk->mem_format,
-			   pk->mem_format_with_colmask,
-			   pk->upsert_format, 0);
+			   pk->mem_format_with_colmask, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
 		if (!in_run2[i])
@@ -192,8 +191,7 @@ test_basic()
 	}
 	struct vy_stmt_stream *write_stream
 		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					pk->upsert_format, true,
-					true, &read_views);
+					true, true, &read_views);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
@@ -213,8 +211,7 @@ test_basic()
 	run_mem =
 		vy_mem_new(pk->mem->env, *pk->env->p_generation,
 			   pk->cmp_def, pk->mem_format,
-			   pk->mem_format_with_colmask,
-			   pk->upsert_format, 0);
+			   pk->mem_format_with_colmask, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
 		if (!in_run1[i])
@@ -227,8 +224,7 @@ test_basic()
 	}
 	write_stream
 		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					pk->upsert_format, true,
-					true, &read_views);
+					true, true, &read_views);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");
@@ -274,10 +270,8 @@ test_basic()
 
 			struct vy_stmt_template tmpl_key =
 				STMT_TEMPLATE(0, SELECT, i);
-			struct tuple *key =
-				vy_new_simple_stmt(format, pk->upsert_format,
-						   pk->mem_format_with_colmask,
-						   &tmpl_key);
+			struct tuple *key = vy_new_simple_stmt(format,
+					pk->mem_format_with_colmask, &tmpl_key);
 			struct tuple *res;
 			rc = vy_point_lookup(pk, NULL, &prv, key, &res);
 			tuple_unref(key);

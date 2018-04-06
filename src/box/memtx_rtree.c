@@ -285,19 +285,14 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	return (struct iterator *)it;
 }
 
-static void
-memtx_rtree_index_begin_build(struct index *base)
-{
-	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
-	rtree_purge(&index->tree);
-}
-
 static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .destroy = */ memtx_rtree_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ generic_index_commit_modify,
 	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
+	/* .depends_on_pk = */ generic_index_depends_on_pk,
 	/* .size = */ memtx_rtree_index_size,
 	/* .bsize = */ memtx_rtree_index_bsize,
 	/* .min = */ generic_index_min,
@@ -311,7 +306,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 		generic_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,
 	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ memtx_rtree_index_begin_build,
+	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,
 	/* .build_next = */ generic_index_build_next,
 	/* .end_build = */ generic_index_end_build,

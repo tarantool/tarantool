@@ -766,12 +766,12 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
  * then the primary key is not built, otherwise it's created
  * right away.
  */
-static void
-memtx_space_do_add_primary_key(struct space *space,
-			       enum memtx_recovery_state state)
+static int
+memtx_space_add_primary_key(struct space *space)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	switch (state) {
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	switch (memtx->state) {
 	case MEMTX_INITIALIZED:
 		panic("can't create a new space before snapshot recovery");
 		break;
@@ -780,23 +780,12 @@ memtx_space_do_add_primary_key(struct space *space,
 		memtx_space->replace = memtx_space_replace_build_next;
 		break;
 	case MEMTX_FINAL_RECOVERY:
-		index_begin_build(space->index[0]);
-		index_end_build(space->index[0]);
 		memtx_space->replace = memtx_space_replace_primary_key;
 		break;
 	case MEMTX_OK:
-		index_begin_build(space->index[0]);
-		index_end_build(space->index[0]);
 		memtx_space->replace = memtx_space_replace_all_keys;
 		break;
 	}
-}
-
-static int
-memtx_space_add_primary_key(struct space *space)
-{
-	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
-	memtx_space_do_add_primary_key(space, memtx->state);
 	return 0;
 }
 
@@ -838,13 +827,14 @@ memtx_space_drop_primary_key(struct space *space)
 static void
 memtx_init_system_space(struct space *space)
 {
-	memtx_space_do_add_primary_key(space, MEMTX_OK);
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	memtx_space->replace = memtx_space_replace_all_keys;
 }
 
 static void
 memtx_init_ephemeral_space(struct space *space)
 {
-	memtx_space_do_add_primary_key(space, MEMTX_OK);
+	memtx_space_add_primary_key(space);
 }
 
 static int
@@ -997,6 +987,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .drop_primary_key = */ memtx_space_drop_primary_key,
 	/* .check_format  = */ memtx_space_check_format,
 	/* .build_secondary_key = */ memtx_space_build_secondary_key,
+	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 	/* .commit_alter = */ memtx_space_commit_alter,
 };

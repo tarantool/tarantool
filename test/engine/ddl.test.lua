@@ -141,7 +141,6 @@ s:drop()
 -- gh-3229: update optionality if a space format is changed too,
 -- not only when indexes are updated.
 --
-box.cfg{}
 s = box.schema.create_space('test', {engine = engine})
 format = {}
 format[1] = {'field1', 'unsigned'}
@@ -161,4 +160,38 @@ s:select({})
 pk:get({4})
 sk:select({box.NULL})
 sk:get({5})
+s:drop()
+
+--
+-- Modify key definition without index rebuild.
+--
+s = box.schema.create_space('test', {engine = engine})
+i1 = s:create_index('i1', {unique = true,  parts = {1, 'unsigned'}})
+i2 = s:create_index('i2', {unique = false, parts = {2, 'unsigned'}})
+i3 = s:create_index('i3', {unique = true,  parts = {3, 'unsigned'}})
+
+_ = s:insert{1, 2, 3}
+box.snapshot()
+_ = s:insert{3, 2, 1}
+
+i1:alter{parts = {1, 'integer'}}
+_ = s:insert{-1, 2, 2}
+i1:select()
+i2:select()
+i3:select()
+
+i2:alter{parts = {2, 'integer'}}
+i3:alter{parts = {3, 'integer'}}
+_ = s:replace{-1, -1, -1}
+i1:select()
+i2:select()
+i3:select()
+
+box.snapshot()
+_ = s:replace{-1, -2, -3}
+_ = s:replace{-3, -2, -1}
+i1:select()
+i2:select()
+i3:select()
+
 s:drop()

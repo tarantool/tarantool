@@ -188,8 +188,6 @@ struct vy_mem {
 	struct tuple_format *format;
 	/** Format of vy_mem tuples with column mask. */
 	struct tuple_format *format_with_colmask;
-	/** Same as format, but for UPSERT tuples. */
-	struct tuple_format *upsert_format;
 	/**
 	 * Number of active writers to this index.
 	 *
@@ -249,7 +247,6 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  * @param format Format for REPLACE and DELETE tuples.
  * @param format_with_colmask Format for tuples, which have
  *        column mask.
- * @param upsert_format Format for UPSERT tuples.
  * @param schema_version Schema version.
  * @retval new vy_mem instance on success.
  * @retval NULL on error, check diag.
@@ -257,8 +254,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
 struct vy_mem *
 vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
-	   struct tuple_format *format_with_colmask,
-	   struct tuple_format *upsert_format, uint32_t schema_version);
+	   struct tuple_format *format_with_colmask, uint32_t schema_version);
 
 /**
  * Delete in-memory level.

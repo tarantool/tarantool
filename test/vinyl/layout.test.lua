@@ -8,12 +8,14 @@ fun = require 'fun'
 
 space = box.schema.space.create('test', {engine='vinyl'})
 _ = space:create_index('pk', {parts = {{1, 'string', collation = 'unicode'}}, run_count_per_level=3})
-_ = space:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}, run_count_per_level=3})
+_ = space:create_index('sk', {parts = {{2, 'unsigned'}}, run_count_per_level=3})
 
 -- Empty run
 space:insert{'ЁЁЁ', 777}
 space:delete{'ЁЁЁ'}
 box.snapshot()
+
+space.index.sk:alter{parts = {{2, 'unsigned', is_nullable = true}}}
 
 space:replace{'ЭЭЭ', box.NULL}
 space:replace{'эээ', box.NULL}

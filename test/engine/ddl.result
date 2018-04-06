@@ -391,9 +391,6 @@ s:drop()
 -- gh-3229: update optionality if a space format is changed too,
 -- not only when indexes are updated.
 --
-box.cfg{}
----
-...
 s = box.schema.create_space('test', {engine = engine})
 ---
 ...
@@ -462,6 +459,116 @@ sk:select({box.NULL})
 sk:get({5})
 ---
 - [4, 5]
+...
+s:drop()
+---
+...
+--
+-- Modify key definition without index rebuild.
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+i1 = s:create_index('i1', {unique = true,  parts = {1, 'unsigned'}})
+---
+...
+i2 = s:create_index('i2', {unique = false, parts = {2, 'unsigned'}})
+---
+...
+i3 = s:create_index('i3', {unique = true,  parts = {3, 'unsigned'}})
+---
+...
+_ = s:insert{1, 2, 3}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:insert{3, 2, 1}
+---
+...
+i1:alter{parts = {1, 'integer'}}
+---
+...
+_ = s:insert{-1, 2, 2}
+---
+...
+i1:select()
+---
+- - [-1, 2, 2]
+  - [1, 2, 3]
+  - [3, 2, 1]
+...
+i2:select()
+---
+- - [-1, 2, 2]
+  - [1, 2, 3]
+  - [3, 2, 1]
+...
+i3:select()
+---
+- - [3, 2, 1]
+  - [-1, 2, 2]
+  - [1, 2, 3]
+...
+i2:alter{parts = {2, 'integer'}}
+---
+...
+i3:alter{parts = {3, 'integer'}}
+---
+...
+_ = s:replace{-1, -1, -1}
+---
+...
+i1:select()
+---
+- - [-1, -1, -1]
+  - [1, 2, 3]
+  - [3, 2, 1]
+...
+i2:select()
+---
+- - [-1, -1, -1]
+  - [1, 2, 3]
+  - [3, 2, 1]
+...
+i3:select()
+---
+- - [-1, -1, -1]
+  - [3, 2, 1]
+  - [1, 2, 3]
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:replace{-1, -2, -3}
+---
+...
+_ = s:replace{-3, -2, -1}
+---
+...
+i1:select()
+---
+- - [-3, -2, -1]
+  - [-1, -2, -3]
+  - [1, 2, 3]
+  - [3, 2, 1]
+...
+i2:select()
+---
+- - [-3, -2, -1]
+  - [-1, -2, -3]
+  - [1, 2, 3]
+  - [3, 2, 1]
+...
+i3:select()
+---
+- - [-1, -2, -3]
+  - [-3, -2, -1]
+  - [3, 2, 1]
+  - [1, 2, 3]
 ...
 s:drop()
 ---

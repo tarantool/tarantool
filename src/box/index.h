@@ -362,6 +362,14 @@ struct index_vtab {
 	 */
 	void (*abort_create)(struct index *index);
 	/**
+	 * Called after WAL write to comit index definition update.
+	 * Must not fail.
+	 *
+	 * @signature is the LSN that was assigned to the row
+	 * that modified the index.
+	 */
+	void (*commit_modify)(struct index *index, int64_t signature);
+	/**
 	 * Called after WAL write to commit index drop.
 	 * Must not fail.
 	 */
@@ -371,6 +379,12 @@ struct index_vtab {
 	 * require index rebuild.
 	 */
 	void (*update_def)(struct index *);
+	/**
+	 * Return true if the index depends on the primary
+	 * key definition and hence needs to be updated if
+	 * the primary key is modified.
+	 */
+	bool (*depends_on_pk)(struct index *);
 
 	ssize_t (*size)(struct index *);
 	ssize_t (*bsize)(struct index *);
@@ -486,6 +500,12 @@ index_abort_create(struct index *index)
 }
 
 static inline void
+index_commit_modify(struct index *index, int64_t signature)
+{
+	index->vtab->commit_modify(index, signature);
+}
+
+static inline void
 index_commit_drop(struct index *index)
 {
 	index->vtab->commit_drop(index);
@@ -495,6 +515,12 @@ static inline void
 index_update_def(struct index *index)
 {
 	index->vtab->update_def(index);
+}
+
+static inline bool
+index_depends_on_pk(struct index *index)
+{
+	return index->vtab->depends_on_pk(index);
 }
 
 static inline ssize_t
@@ -605,8 +631,10 @@ index_end_build(struct index *index)
  */
 void generic_index_commit_create(struct index *, int64_t);
 void generic_index_abort_create(struct index *);
+void generic_index_commit_modify(struct index *, int64_t);
 void generic_index_commit_drop(struct index *);
 void generic_index_update_def(struct index *);
+bool generic_index_depends_on_pk(struct index *);
 ssize_t generic_index_size(struct index *);
 int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);

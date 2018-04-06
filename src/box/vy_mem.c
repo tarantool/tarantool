@@ -97,8 +97,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 struct vy_mem *
 vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
-	   struct tuple_format *format_with_colmask,
-	   struct tuple_format *upsert_format, uint32_t schema_version)
+	   struct tuple_format *format_with_colmask, uint32_t schema_version)
 {
 	struct vy_mem *index = calloc(1, sizeof(*index));
 	if (!index) {
@@ -116,8 +115,6 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	tuple_format_ref(format);
 	index->format_with_colmask = format_with_colmask;
 	tuple_format_ref(format_with_colmask);
-	index->upsert_format = upsert_format;
-	tuple_format_ref(upsert_format);
 	vy_mem_tree_create(&index->tree, cmp_def,
 			   vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
@@ -127,29 +124,11 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 }
 
 void
-vy_mem_update_formats(struct vy_mem *mem, struct tuple_format *new_format,
-		      struct tuple_format *new_format_with_colmask,
-		      struct tuple_format *new_upsert_format)
-{
-	assert(mem->count.rows == 0);
-	tuple_format_unref(mem->format);
-	tuple_format_unref(mem->format_with_colmask);
-	tuple_format_unref(mem->upsert_format);
-	mem->format = new_format;
-	mem->format_with_colmask = new_format_with_colmask;
-	mem->upsert_format = new_upsert_format;
-	tuple_format_ref(mem->format);
-	tuple_format_ref(mem->format_with_colmask);
-	tuple_format_ref(mem->upsert_format);
-}
-
-void
 vy_mem_delete(struct vy_mem *index)
 {
 	index->env->tree_extent_size -= index->tree_extent_size;
 	tuple_format_unref(index->format);
 	tuple_format_unref(index->format_with_colmask);
-	tuple_format_unref(index->upsert_format);
 	fiber_cond_destroy(&index->pin_cond);
 	TRASH(index);
 	free(index);
@@ -180,7 +159,8 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
-	assert(stmt->format_id == tuple_format_id(mem->upsert_format));
+	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
+	       stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);
@@ -299,7 +279,7 @@ vy_mem_iterator_copy_to(struct vy_mem_iterator *itr, struct tuple **ret)
 	assert(itr->curr_stmt != NULL);
 	if (itr->last_stmt)
 		tuple_unref(itr->last_stmt);
-	itr->last_stmt = vy_stmt_dup(itr->curr_stmt, tuple_format(itr->curr_stmt));
+	itr->last_stmt = vy_stmt_dup(itr->curr_stmt);
 	*ret = itr->last_stmt;
 	if (itr->last_stmt != NULL) {
 		vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
