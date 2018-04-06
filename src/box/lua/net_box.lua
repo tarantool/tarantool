@@ -179,29 +179,18 @@ local function create_transport(host, port, user, password, callback,
     local recv_buf         = buffer.ibuf(buffer.READAHEAD)
 
     -- STATE SWITCHING --
-    local function set_state(new_state, new_errno, new_error, schema_version)
+    local function set_state(new_state, new_errno, new_error)
         state = new_state
         last_errno = new_errno
         last_error = new_error
         callback('state_changed', new_state, new_errno, new_error)
         state_cond:broadcast()
-        if state ~= 'active' then
-            -- cancel all requests but the ones bearing the particular
-            -- schema id; if schema id was omitted or we aren't fetching
-            -- schema, cancel everything
-            if not schema_version or state ~= 'fetch_schema' then
-                schema_version = -1
+        if state == 'error' or state == 'error_reconnect' then
+            for _, request in pairs(requests) do
+                request.errno = new_errno
+                request.response = new_error
             end
-            local next_id, next_request = next(requests)
-            while next_id do
-                local id, request = next_id, next_request
-                next_id, next_request = next(requests, id)
-                if request.schema_version ~= schema_version then
-                    requests[id] = nil -- this marks the request as completed
-                    request.errno  = new_errno
-                    request.response = new_error
-                end
-            end
+            requests = {}
         end
     end
 
@@ -543,8 +532,7 @@ local function create_transport(host, port, user, password, callback,
             local body
             body, body_end = decode(body_rpos)
             set_state('fetch_schema',
-                      E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY],
-                      response_schema_version)
+                      E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY])
             return iproto_schema_sm(schema_version)
         end
         return iproto_sm(schema_version)
