@@ -878,11 +878,6 @@ function remote_methods:_request(method, opts, ...)
     until err
     box.error({code = err, reason = res})
 end
---
--- Get multiple values and return the first only. Use to ignore
--- tail consisting of nils.
---
-local function first_value(arg) return arg end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
@@ -908,8 +903,7 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:call_16(func_name, ...)
     check_remote_arg(self, 'call')
-    return first_value(self:_request('call_16', nil, tostring(func_name),
-                                     {...}))
+    return (self:_request('call_16', nil, tostring(func_name), {...}))
 end
 
 function remote_methods:call(func_name, args, opts)
@@ -926,7 +920,7 @@ end
 -- @deprecated since 1.7.4
 function remote_methods:eval_16(code, ...)
     check_remote_arg(self, 'eval')
-    return unpack(first_value(self:_request('eval', nil, code, {...})))
+    return unpack((self:_request('eval', nil, code, {...})))
 end
 
 function remote_methods:eval(code, args, opts)
@@ -1181,9 +1175,8 @@ index_metatable = function(remote)
         local iterator = check_iterator_type(opts, key_is_nil)
         local offset = tonumber(opts and opts.offset) or 0
         local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
-        return first_value(remote:_request('select', opts, self.space.id,
-                                           self.id, iterator, offset, limit,
-                                           key))
+        return (remote:_request('select', opts, self.space.id, self.id,
+                                iterator, offset, limit, key))
     end
 
     function methods:get(key, opts)
@@ -1224,8 +1217,7 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return first_value(remote:_request('call_16', opts, code,
-                                           { key }))[1][1]
+        return (remote:_request('call_16', opts, code, { key }))[1][1]
     end
 
     function methods:delete(key, opts)
