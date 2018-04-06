@@ -304,3 +304,14 @@ s.index.secondary.unique
 s:insert{2, 10}
 s.index.secondary:select(10)
 s:drop()
+
+-- Narrowing indexed field type entails index rebuild.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1')
+_ = s:create_index('i2', {parts = {2, 'integer'}})
+_ = s:create_index('i3', {parts = {{3, 'string', is_nullable = true}}})
+_ = s:replace{1, 1, 'test'}
+-- Should fail with 'Vinyl does not support building an index for a non-empty space'.
+s.index.i2:alter{parts = {2, 'unsigned'}}
+s.index.i3:alter{parts = {{3, 'string', is_nullable = false}}}
+s:drop()

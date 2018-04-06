@@ -595,6 +595,8 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .commit_drop = */ memtx_index_commit_drop,
 	/* .update_def = */ memtx_tree_index_update_def,
 	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		memtx_index_def_change_requires_rebuild,
 	/* .size = */ memtx_tree_index_size,
 	/* .bsize = */ memtx_tree_index_bsize,
 	/* .min = */ generic_index_min,

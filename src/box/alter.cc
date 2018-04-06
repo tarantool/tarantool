@@ -1460,10 +1460,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
 		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
-		if (key_part_check_compatibility(old_def->cmp_def->parts,
-						 old_def->cmp_def->part_count,
-						 new_def->cmp_def->parts,
-						 new_def->cmp_def->part_count))
+		if (!index_def_change_requires_rebuild(old_index, new_def))
 			(void) new ModifyIndex(alter, new_def, old_def);
 		else
 			(void) new RebuildIndex(alter, new_def, old_def);
@@ -1836,7 +1833,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (index_def_cmp(index_def, old_index->def) == 0) {
 			/* Index is not changed so just move it. */
 			(void) new MoveIndex(alter, old_index->def->iid);
-		} else if (index_def_change_requires_rebuild(old_index->def,
+		} else if (index_def_change_requires_rebuild(old_index,
 							     index_def)) {
 			/*
 			 * Operation demands an index rebuild.

@@ -462,6 +462,8 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .commit_drop = */ memtx_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ generic_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		memtx_index_def_change_requires_rebuild,
 	/* .size = */ memtx_bitset_index_size,
 	/* .bsize = */ memtx_bitset_index_bsize,
 	/* .min = */ generic_index_min,

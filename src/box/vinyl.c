@@ -966,6 +966,49 @@ vinyl_index_depends_on_pk(struct index *index)
 	return true;
 }
 
+static bool
+vinyl_index_def_change_requires_rebuild(struct index *index,
+					const struct index_def *new_def)
+{
+	struct index_def *old_def = index->def;
+
+	assert(old_def->iid == new_def->iid);
+	assert(old_def->space_id == new_def->space_id);
+	assert(old_def->type == TREE && new_def->type == TREE);
+
+	if (!old_def->opts.is_unique && new_def->opts.is_unique)
+		return true;
+
+	assert(index_depends_on_pk(index));
+	const struct key_def *old_cmp_def = old_def->cmp_def;
+	const struct key_def *new_cmp_def = new_def->cmp_def;
+
+	/*
+	 * It is not enough to check only fieldno in case of Vinyl,
+	 * because the index may store some overwritten or deleted
+	 * statements conforming to the old format. CheckSpaceFormat
+	 * won't reveal such statements, but we may still need to
+	 * compare them to statements inserted after ALTER hence
+	 * we can't narrow field types without index rebuild.
+	 */
+	if (old_cmp_def->part_count != new_cmp_def->part_count)
+		return true;
+
+	for (uint32_t i = 0; i < new_cmp_def->part_count; i++) {
+		const struct key_part *old_part = &old_cmp_def->parts[i];
+		const struct key_part *new_part = &new_cmp_def->parts[i];
+		if (old_part->fieldno != new_part->fieldno)
+			return true;
+		if (old_part->coll != new_part->coll)
+			return true;
+		if (old_part->is_nullable && !new_part->is_nullable)
+			return true;
+		if (!field_type1_contains_type2(new_part->type, old_part->type))
+			return true;
+	}
+	return false;
+}
+
 static void
 vinyl_init_system_space(struct space *space)
 {
@@ -3906,6 +3949,8 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ vinyl_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		vinyl_index_def_change_requires_rebuild,
 	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
 	/* .min = */ generic_index_min,
