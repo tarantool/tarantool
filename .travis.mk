@@ -26,6 +26,7 @@ docker_%:
 		-e XDG_CACHE_HOME=/cache \
 		-e CCACHE_DIR=/cache/ccache \
 		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
+		-e TRAVIS_JOB_ID=${TRAVIS_JOB_ID} \
 		${DOCKER_IMAGE} \
 		make -f .travis.mk $(subst docker_,,$@)
 
