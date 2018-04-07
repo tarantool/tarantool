@@ -42,6 +42,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct index;
+
 /**
  * The state of memtx recovery process.
  * There is a global state of the entire engine state of each
@@ -148,6 +150,22 @@ memtx_index_extent_free(void *ctx, void *extent);
  */
 int
 memtx_index_extent_reserve(int num);
+
+/**
+ * Free all tuples referenced by the given index.
+ */
+void
+memtx_index_prune(struct index *index);
+
+/*
+ * The following two methods are used by all kinds of memtx indexes
+ * to delete tuples stored in the space when the primary index is
+ * destroyed.
+ */
+void
+memtx_index_abort_create(struct index *index);
+void
+memtx_index_commit_drop(struct index *index);
 
 #if defined(__cplusplus)
 } /* extern "C" */

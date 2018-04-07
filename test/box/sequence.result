@@ -711,6 +711,10 @@ sk:drop()
 pk:drop()
 ---
 ...
+box.space._space_sequence:insert{s.id, sq.id, false} -- error
+---
+- error: 'No index #0 is defined in space ''test'''
+...
 s:create_index('pk', {sequence = {}}) -- error
 ---
 - error: 'Illegal parameters, options parameter ''sequence'' should be one of types:

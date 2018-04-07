@@ -824,8 +824,6 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
-	space_commit_alter(alter->old_space, alter->new_space);
-
 	struct space *old_space = space_cache_replace(alter->new_space);
 	(void) old_space;
 	assert(old_space == alter->old_space);
@@ -986,23 +984,8 @@ DropIndex::alter_def(struct alter_space * /* alter */)
 void
 DropIndex::alter(struct alter_space *alter)
 {
-	/*
-	 * If it's not the primary key, nothing to do --
-	 * the dropped index didn't exist in the new space
-	 * definition, so does not exist in the created space.
-	 */
-	if (space_index(alter->new_space, 0) != NULL)
-		return;
-	/*
-	 * OK to drop the primary key. Inform the engine about it,
-	 * since it may have to reset handler->replace function,
-	 * so that:
-	 * - DML returns proper errors rather than crashes the
-	 *   program
-	 * - when a new primary key is finally added, the space
-	 *   can be put back online properly.
-	 */
-	space_drop_primary_key(alter->new_space);
+	if (old_index_def->iid == 0)
+		space_drop_primary_key(alter->new_space);
 }
 
 void
@@ -2979,7 +2962,7 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 	txn_on_commit(txn, on_commit);
 
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */
-		struct index *pk = index_find(space, 0);
+		struct index *pk = index_find_xc(space, 0);
 		index_def_check_sequence(pk->def, space_name(space));
 		if (seq->is_generated) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,

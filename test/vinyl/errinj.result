@@ -217,7 +217,7 @@ s:select()
   - [9, 'test str9']
   - [10, 'test str10']
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 ---
 - ok
 ...
@@ -234,7 +234,7 @@ fiber.cancel(f1)
 fiber.sleep(0.1)
 ---
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...
@@ -256,7 +256,7 @@ errinj.set("ERRINJ_VY_READ_PAGE", true)
 ---
 - ok
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 ---
 - ok
 ...
@@ -269,7 +269,7 @@ fiber.cancel(f1)
 fiber.sleep(0.1)
 ---
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...
@@ -290,8 +290,26 @@ s:select()
   - [9, 'test str9']
   - [10, 'test str10']
 ...
+-- index is dropped while a read task is in progress
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
+---
+- ok
+...
+f1 = fiber.create(test_cancel_read)
+---
+...
+fiber.cancel(f1)
+---
+...
 s:drop()
 ---
+...
+fiber.sleep(0.1)
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
+---
+- ok
 ...
 box.cfg{vinyl_cache = vinyl_cache}
 ---
@@ -316,7 +334,7 @@ too_long_threshold = box.cfg.too_long_threshold
 box.cfg{too_long_threshold = 0.01}
 ---
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 ---
 - ok
 ...
@@ -328,7 +346,7 @@ s:get(10) ~= nil
 ---
 - true
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...

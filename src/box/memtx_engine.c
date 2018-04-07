@@ -1062,3 +1062,50 @@ memtx_index_extent_reserve(int num)
 	}
 	return 0;
 }
+
+void
+memtx_index_prune(struct index *index)
+{
+	if (index->def->iid > 0)
+		return;
+
+	/*
+	 * Tuples stored in a memtx space are referenced by the
+	 * primary index so when the primary index is dropped we
+	 * should delete them.
+	 */
+	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		goto fail;
+	int rc;
+	struct tuple *tuple;
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
+		tuple_unref(tuple);
+	iterator_delete(it);
+	if (rc != 0)
+		goto fail;
+
+	return;
+fail:
+	/*
+	 * This function is called after WAL write so we have no
+	 * other choice but panic in case of any error. The good
+	 * news is memtx iterators do not fail so we should not
+	 * normally get here.
+	 */
+	diag_log();
+	unreachable();
+	panic("failed to drop index");
+}
+
+void
+memtx_index_abort_create(struct index *index)
+{
+	memtx_index_prune(index);
+}
+
+void
+memtx_index_commit_drop(struct index *index)
+{
+	memtx_index_prune(index);
+}

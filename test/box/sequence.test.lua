@@ -230,6 +230,7 @@ sk:alter{sequence = 'test'} -- error
 box.space._space_sequence:insert{s.id, sq.id, false} -- error
 sk:drop()
 pk:drop()
+box.space._space_sequence:insert{s.id, sq.id, false} -- error
 
 s:create_index('pk', {sequence = {}}) -- error
 s:create_index('pk', {sequence = 'abc'}) -- error
