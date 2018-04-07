@@ -1102,7 +1102,7 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 	}
 	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
 		run = slice->run;
-		if (run->compacted_slice_count == run->refs)
+		if (run->compacted_slice_count == run->slice_count)
 			rlist_add_entry(&unused_runs, run, in_unused);
 		slice->run->compacted_slice_count = 0;
 		if (slice == last_slice)

@@ -101,7 +101,14 @@ errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 errinj.set("ERRINJ_VY_READ_PAGE", false);
 s:select()
 
+-- index is dropped while a read task is in progress
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
+f1 = fiber.create(test_cancel_read)
+fiber.cancel(f1)
 s:drop()
+fiber.sleep(0.1)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
+
 box.cfg{vinyl_cache = vinyl_cache}
 
 -- gh-2871: check that long reads are logged

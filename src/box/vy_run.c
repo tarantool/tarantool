@@ -371,6 +371,7 @@ vy_slice_new(int64_t id, struct vy_run *run,
 	slice->id = id;
 	slice->run = run;
 	vy_run_ref(run);
+	run->slice_count++;
 	if (begin != NULL)
 		tuple_ref(begin);
 	slice->begin = begin;
@@ -424,6 +425,8 @@ void
 vy_slice_delete(struct vy_slice *slice)
 {
 	assert(slice->pin_count == 0);
+	assert(slice->run->slice_count > 0);
+	slice->run->slice_count--;
 	vy_run_unref(slice->run);
 	if (slice->begin != NULL)
 		tuple_unref(slice->begin);
@@ -910,8 +913,10 @@ static int
 vy_page_read_cb_free(struct cbus_call_msg *base)
 {
 	struct vy_page_read_task *task = (struct vy_page_read_task *)base;
+	struct vy_run_env *env = task->run->env;
 	vy_page_delete(task->page);
-	mempool_free(&task->run->env->read_task_pool, task);
+	vy_run_unref(task->run);
+	mempool_free(&env->read_task_pool, task);
 	return 0;
 }
 
@@ -970,6 +975,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		task->run = slice->run;
 		task->page_info = *page_info;
 		task->page = page;
+		vy_run_ref(task->run);
 
 		/* Post task to the reader thread. */
 		rc = cbus_call(&reader->reader_pipe, &reader->tx_pipe,
@@ -978,6 +984,7 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 		if (!task->base.complete)
 			return -1; /* timed out or cancelled */
 
+		vy_run_unref(task->run);
 		mempool_free(&env->read_task_pool, task);
 
 		if (rc != 0) {

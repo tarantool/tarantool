@@ -130,15 +130,18 @@ struct vy_run {
 	/**
 	 * Run reference counter, the run is deleted once it hits 0.
 	 * A new run is created with the reference counter set to 1.
-	 * A run is referenced by each slice created for it.
+	 * A run is referenced by each slice created for it and each
+	 * pending read or write task.
 	 */
 	int refs;
+	/** Number of slices created for this run. */
+	int slice_count;
 	/**
 	 * Counter used on completion of a compaction task to check if
 	 * all slices of the run have been compacted and so the run is
 	 * not used any more and should be deleted.
 	 */
-	int64_t compacted_slice_count;
+	int compacted_slice_count;
 	/**
 	 * Link in the list of runs that became unused
 	 * after compaction.

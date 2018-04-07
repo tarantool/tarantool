@@ -290,8 +290,26 @@ s:select()
   - [9, 'test str9']
   - [10, 'test str10']
 ...
+-- index is dropped while a read task is in progress
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
+---
+- ok
+...
+f1 = fiber.create(test_cancel_read)
+---
+...
+fiber.cancel(f1)
+---
+...
 s:drop()
 ---
+...
+fiber.sleep(0.1)
+---
+...
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
+---
+- ok
 ...
 box.cfg{vinyl_cache = vinyl_cache}
 ---
