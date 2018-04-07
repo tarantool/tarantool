@@ -82,22 +82,22 @@ s:select()
 errinj.set("ERRINJ_VY_READ_PAGE", false)
 s:select()
 
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 function test_cancel_read () k = s:select() return #k end
 f1 = fiber.create(test_cancel_read)
 fiber.cancel(f1)
 -- task should be done
 fiber.sleep(0.1)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 s:select()
 
 -- error after timeout for canceled fiber
 errinj.set("ERRINJ_VY_READ_PAGE", true)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 f1 = fiber.create(test_cancel_read)
 fiber.cancel(f1)
 fiber.sleep(0.1)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 errinj.set("ERRINJ_VY_READ_PAGE", false);
 s:select()
 
@@ -111,10 +111,10 @@ for i = 1, 10 do s:insert{i, i * 2} end
 box.snapshot()
 too_long_threshold = box.cfg.too_long_threshold
 box.cfg{too_long_threshold = 0.01}
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 s:get(10) ~= nil
 #s:select(5, {iterator = 'LE'}) == 5
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 test_run:cmd("push filter 'lsn=[0-9]+' to 'lsn=<lsn>'")
 test_run:grep_log('default', 'get.* took too long')
 test_run:grep_log('default', 'select.* took too long')

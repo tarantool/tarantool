@@ -217,7 +217,7 @@ s:select()
   - [9, 'test str9']
   - [10, 'test str10']
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 ---
 - ok
 ...
@@ -234,7 +234,7 @@ fiber.cancel(f1)
 fiber.sleep(0.1)
 ---
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...
@@ -256,7 +256,7 @@ errinj.set("ERRINJ_VY_READ_PAGE", true)
 ---
 - ok
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 ---
 - ok
 ...
@@ -269,7 +269,7 @@ fiber.cancel(f1)
 fiber.sleep(0.1)
 ---
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...
@@ -316,7 +316,7 @@ too_long_threshold = box.cfg.too_long_threshold
 box.cfg{too_long_threshold = 0.01}
 ---
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", true)
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 ---
 - ok
 ...
@@ -328,7 +328,7 @@ s:get(10) ~= nil
 ---
 - true
 ...
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", false);
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...

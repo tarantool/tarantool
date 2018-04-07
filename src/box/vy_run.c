@@ -830,7 +830,10 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
 			 "Unexpected end of file");
 		goto error;
 	}
-	ERROR_INJECT(ERRINJ_VY_READ_PAGE_TIMEOUT, {usleep(50000);});
+
+	struct errinj *inj = errinj(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		usleep(inj->dparam * 1000000);
 
 	/* decode xlog tx */
 	const char *data_pos = data;

@@ -47,7 +47,7 @@ errinj.info()
   ERRINJ_RELAY_REPORT_INTERVAL:
     state: 0
   ERRINJ_VY_READ_PAGE_TIMEOUT:
-    state: false
+    state: 0
   ERRINJ_XLOG_META:
     state: false
   ERRINJ_WAL_WRITE_DISK:
