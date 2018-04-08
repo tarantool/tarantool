@@ -33,21 +33,17 @@ if (CMAKE_CROSSCOMPILING)
         COMMAND ${CMAKE_HOST_C_COMPILER} bin2c.c
             -o "${CMAKE_CURRENT_BINARY_DIR}/bin2c"
         DEPENDS bin2c.c)
-    if (SQL_MAINTAINER_MODE)
-        add_custom_target(lemon
-            COMMAND ${CMAKE_HOST_C_COMPILER} lemon.c
-                -o "${CMAKE_CURRENT_BINARY_DIR}/lemon"
-            DEPENDS lemon.c)
-        add_custom_target(mkkeywordhash
-            COMMAND ${CMAKE_HOST_C_COMPILER} mkkeywordhash.c
-                -o "${CMAKE_CURRENT_BINARY_DIR}/mkkeywordhash"
-            DEPENDS mkkeywordhash.c)
-    endif()
+    add_custom_target(lemon
+        COMMAND ${CMAKE_HOST_C_COMPILER} lemon.c
+            -o "${CMAKE_CURRENT_BINARY_DIR}/lemon"
+        DEPENDS lemon.c)
+    add_custom_target(mkkeywordhash
+        COMMAND ${CMAKE_HOST_C_COMPILER} mkkeywordhash.c
+            -o "${CMAKE_CURRENT_BINARY_DIR}/mkkeywordhash"
+        DEPENDS mkkeywordhash.c)
 else()
     add_executable(txt2c txt2c.c)
     add_executable(bin2c bin2c.c)
-    if (SQL_MAINTAINER_MODE)
-        add_executable(lemon lemon.c)
-        add_executable(mkkeywordhash mkkeywordhash.c)
-    endif()
+    add_executable(lemon lemon.c)
+    add_executable(mkkeywordhash mkkeywordhash.c)
 endif()

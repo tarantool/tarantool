@@ -1,5 +1,3 @@
-option(SQL_MAINTAINER_MODE "Regenerate parser and opcodes for SQL compiler" OFF)
-
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DSQLITE_DEBUG=1)
   add_definitions(-DSQLITE_ENABLE_SELECTTRACE)
@@ -9,9 +7,13 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
 endif()
 
-set(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(EXT_SRC_DIR ${CMAKE_SOURCE_DIR}/extra)
+set(EXT_BIN_DIR ${CMAKE_BINARY_DIR}/extra)
+set(SQL_SRC_DIR ${CMAKE_SOURCE_DIR}/src/box/sql)
+set(SQL_BIN_DIR ${CMAKE_BINARY_DIR}/src/box/sql)
 
-include_directories(${SRCDIR})
+include_directories(${SQL_SRC_DIR})
+include_directories(${SQL_BIN_DIR})
 
 add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
 add_definitions(-DSQLITE_DEFAULT_FOREIGN_KEYS=1)
@@ -19,7 +21,6 @@ add_definitions(-DSQLITE_OMIT_AUTOMATIC_INDEX)
 
 set(TEST_DEFINITIONS
     SQLITE_NO_SYNC=1
-    TCLSH=1
     SQLITE_TEST=1
     SQLITE_PRIVATE=
     SQLITE_CORE=1
@@ -32,7 +33,7 @@ add_library(sql STATIC
     alter.c
     analyze.c
     attach.c
-        cursor.c
+    cursor.c
     build.c
     callback.c
     complete.c
@@ -78,44 +79,40 @@ add_library(sql STATIC
 set_target_properties(sql PROPERTIES COMPILE_DEFINITIONS
     "${TEST_DEFINITIONS}")
 
-if(SQL_MAINTAINER_MODE)
-    message(STATUS "SQL maintainer mode is enabled.")
-    find_program(TCLSH tclsh)
+add_custom_target(generate_sql_files DEPENDS
+    parse.h
+    keywordhash.h
+    parse.y
+    parse.c
+    opcodes.c)
 
-    add_custom_target(generate_sql_files DEPENDS
-        parse.h
-        keywordhash.h
-        parse.y
-        parse.c
-        opcodes.c)
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/keywordhash.h
+    COMMAND ${EXT_BIN_DIR}/mkkeywordhash > keywordhash.h.tmp
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different keywordhash.h.tmp keywordhash.h
+    COMMAND ${CMAKE_COMMAND} -E remove keywordhash.h.tmp
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS mkkeywordhash)
 
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/keywordhash.h
-        COMMAND ${CMAKE_BINARY_DIR}/extra/mkkeywordhash > keywordhash.h.tmp
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different keywordhash.h.tmp keywordhash.h
-        COMMAND ${CMAKE_COMMAND} -E remove keywordhash.h.tmp
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        DEPENDS mkkeywordhash)
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/parse.h ${SQL_BIN_DIR}/parse.c
+    COMMAND ${EXT_BIN_DIR}/lemon -T${EXT_SRC_DIR}/lempar.c ${SQL_SRC_DIR}/parse.y
+    COMMAND ${CMAKE_COMMAND} -E copy parse.h parse.h.tmp
+    COMMAND ${EXT_SRC_DIR}/addopcodes.sh parse.h.tmp > parse.h
+    COMMAND ${CMAKE_COMMAND} -E remove parse.h.tmp parse.out
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS lemon ${SQL_SRC_DIR}/parse.y)
 
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/parse.h ${CMAKE_CURRENT_SOURCE_DIR}/parse.c
-        COMMAND ${CMAKE_BINARY_DIR}/extra/lemon -T${CMAKE_SOURCE_DIR}/extra/lempar.c parse.y
-        COMMAND ${CMAKE_COMMAND} -E copy parse.h parse.h.tmp
-        COMMAND ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/addopcodes.tcl parse.h.tmp > parse.h
-        COMMAND ${CMAKE_COMMAND} -E remove parse.h.tmp parse.out
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        DEPENDS lemon parse.y)
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.h
+    COMMAND cat parse.h ${SQL_SRC_DIR}/vdbe.c | ${EXT_SRC_DIR}/mkopcodeh.sh > opcodes.h
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodeh.sh ${SQL_BIN_DIR}/parse.h)
 
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/opcodes.h
-        COMMAND cat parse.h vdbe.c | ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/mkopcodeh.tcl > opcodes.h
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        DEPENDS vdbe.c ${CMAKE_SOURCE_DIR}/extra/mkopcodeh.tcl parse.h)
+add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
+    COMMAND ${EXT_SRC_DIR}/mkopcodec.sh opcodes.h > opcodes.c
+    WORKING_DIRECTORY "${SQL_BIN_DIR}"
+    DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
+        ${SQL_BIN_DIR}/opcodes.h)
 
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/opcodes.c
-        COMMAND ${TCLSH} ${CMAKE_SOURCE_DIR}/extra/mkopcodec.tcl opcodes.h > opcodes.c
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        DEPENDS vdbe.c ${CMAKE_SOURCE_DIR}/extra/mkopcodec.tcl parse.h opcodes.h)
-
-    add_dependencies(sql generate_sql_files)
-endif()
+add_dependencies(sql generate_sql_files)
 
 if (APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined suppress -flat_namespace")

@@ -651,9 +651,9 @@ sqlite3VdbeAssertMayAbort(Vdbe * v, int mayAbort)
  *
  * (4) Reclaim the memory allocated for storing labels.
  *
- * This routine will only function correctly if the mkopcodeh.tcl generator
+ * This routine will only function correctly if the mkopcodeh.sh generator
  * script numbers the opcodes correctly.  Changes to this routine must be
- * coordinated with changes to mkopcodeh.tcl.
+ * coordinated with changes to mkopcodeh.sh.
  */
 static void
 resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
@@ -666,13 +666,13 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 	while (1) {
 
 		/* Only JUMP opcodes and the short list of special opcodes in the switch
-		 * below need to be considered.  The mkopcodeh.tcl generator script groups
+		 * below need to be considered.  The mkopcodeh.sh generator script groups
 		 * all these opcodes together near the front of the opcode list.  Skip
 		 * any opcode that does not need processing by virtual of the fact that
 		 * it is larger than SQLITE_MX_JUMP_OPCODE, as a performance optimization.
 		 */
 		if (pOp->opcode <= SQLITE_MX_JUMP_OPCODE) {
-			/* NOTE: Be sure to update mkopcodeh.tcl when adding or removing
+			/* NOTE: Be sure to update mkopcodeh.sh when adding or removing
 			 * cases from this switch!
 			 */
 			switch (pOp->opcode) {
