@@ -124,7 +124,8 @@ tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b)
 inline void
 tt_uuid_to_string(const struct tt_uuid *uu, char *out)
 {
-	sprintf(out, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+	snprintf(out, UUID_STR_LEN + 1,
+		"%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
 		uu->time_low, uu->time_mid, uu->time_hi_and_version,
 		uu->clock_seq_hi_and_reserved, uu->clock_seq_low, uu->node[0],
 		uu->node[1], uu->node[2], uu->node[3], uu->node[4], uu->node[5]);

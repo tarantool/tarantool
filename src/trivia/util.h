@@ -489,7 +489,7 @@ static inline char *
 tt_static_buf(void)
 {
 	enum { TT_STATIC_BUFS = 4 };
-	static __thread char bufs[TT_STATIC_BUFS][TT_STATIC_BUF_LEN + 1];
+	static __thread char bufs[TT_STATIC_BUFS][TT_STATIC_BUF_LEN];
 	static __thread int bufno = TT_STATIC_BUFS - 1;
 
 	bufno = (bufno + 1) % TT_STATIC_BUFS;
