@@ -689,6 +689,14 @@ replicaset_leader(void)
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
+		/**
+		 * While bootstrapping a new cluster,
+		 * read-only replicas shouldn't be considered
+		 * as a leader.
+		 */
+		if (replica->applier->remote_is_ro &&
+		    replica->applier->vclock.signature == 0)
+			continue;
 		if (leader == NULL) {
 			leader = replica;
 			continue;
