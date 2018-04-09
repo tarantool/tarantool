@@ -26,6 +26,7 @@ docker_%:
 		-e XDG_CACHE_HOME=/cache \
 		-e CCACHE_DIR=/cache/ccache \
 		-e COVERALLS_TOKEN=${COVERALLS_TOKEN} \
+		-e TRAVIS_JOB_ID=${TRAVIS_JOB_ID} \
 		${DOCKER_IMAGE} \
 		make -f .travis.mk $(subst docker_,,$@)
 
@@ -71,8 +72,8 @@ coverage_ubuntu: deps_ubuntu
 	@if [ -n "$(COVERALLS_TOKEN)" ]; then \
 		echo "Exporting code coverage information to coveralls.io"; \
 		gem install coveralls-lcov; \
-		echo coveralls-lcov --repo-token [FILTERED] coverage.info; \
-		coveralls-lcov --repo-token $(COVERALLS_TOKEN) coverage.info; \
+		echo coveralls-lcov --service-name travis-ci --service-job-id $(TRAVIS_JOB_ID) --repo-token [FILTERED] coverage.info; \
+		coveralls-lcov --service-name travis-ci --service-job-id $(TRAVIS_JOB_ID) --repo-token $(COVERALLS_TOKEN) coverage.info; \
 	fi;
 
 source:
