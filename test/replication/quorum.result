@@ -239,3 +239,69 @@ test_run:cmd('switch default')
 test_run:drop_cluster(SERVERS)
 ---
 ...
+--
+-- gh-3278: test different replication and replication_connect_quorum configs.
+--
+box.schema.user.grant('guest', 'replication')
+---
+...
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica_no_quorum.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.info.status -- running
+---
+- running
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+listen = box.cfg.listen
+---
+...
+box.cfg{listen = ''}
+---
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.info.status -- running
+---
+- running
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+box.cfg{listen = listen}
+---
+...
