@@ -1312,6 +1312,53 @@ RebuildIndex::~RebuildIndex()
 		index_def_delete(new_index_def);
 }
 
+/** TruncateIndex - truncate an index. */
+class TruncateIndex: public AlterSpaceOp
+{
+public:
+	TruncateIndex(struct alter_space *alter, uint32_t iid)
+		: AlterSpaceOp(alter), iid(iid) {}
+	/** id of the index to truncate. */
+	uint32_t iid;
+	virtual void alter(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t signature);
+};
+
+void
+TruncateIndex::alter(struct alter_space *alter)
+{
+	if (iid == 0) {
+		/*
+		 * Notify the engine that the primary index
+		 * was truncated.
+		 */
+		space_drop_primary_key(alter->new_space);
+		space_add_primary_key_xc(alter->new_space);
+		return;
+	}
+
+	/*
+	 * Although the new index is empty, we still need to call
+	 * space_build_index() to let the engine know that the
+	 * index was recreated. For example, Vinyl uses this
+	 * callback to load indexes during local recovery.
+	 */
+	struct index *new_index = space_index(alter->new_space, iid);
+	assert(new_index != NULL);
+	space_build_index_xc(alter->new_space, new_index,
+			     alter->new_space->format);
+}
+
+void
+TruncateIndex::commit(struct alter_space *alter, int64_t signature)
+{
+	struct index *old_index = space_index(alter->old_space, iid);
+	struct index *new_index = space_index(alter->new_space, iid);
+
+	index_commit_drop(old_index);
+	index_commit_create(new_index, signature);
+}
+
 /* }}} */
 
 /**
@@ -1877,9 +1924,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 */
 	for (uint32_t i = 0; i < old_space->index_count; i++) {
 		struct index *old_index = old_space->index[i];
-		(void) new DropIndex(alter, old_index->def);
-		auto create_index = new CreateIndex(alter);
-		create_index->new_index_def = index_def_dup_xc(old_index->def);
+		(void) new TruncateIndex(alter, old_index->def->iid);
 	}
 
 	alter_space_do(txn, alter);
