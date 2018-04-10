@@ -90,7 +90,7 @@ luaT_istuple(struct lua_State *L, int narg)
 	return *(struct tuple **) data;
 }
 
-static int
+int
 lbox_tuple_new(lua_State *L)
 {
 	int argc = lua_gettop(L);

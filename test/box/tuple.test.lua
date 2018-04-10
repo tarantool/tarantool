@@ -349,4 +349,29 @@ box.tuple.update == t.update
 box.tuple.upsert == t.upsert
 box.tuple.bsize == t.bsize
 
+--
+-- gh-3282: space:frommap().
+--
+format = {}
+format[1] = {name = 'aaa', type = 'unsigned'}
+format[2] = {name = 'bbb', type = 'unsigned'}
+format[3] = {name = 'ccc', type = 'unsigned'}
+format[4] = {name = 'ddd', type = 'unsigned'}
+s = box.schema.create_space('test', {format = format})
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+s:frommap({ddd = 1, aaa = 2, bbb = 3})
+s:frommap({ddd = 1, aaa = 2, ccc = 3, eee = 4})
+s:frommap()
+s:frommap({})
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = true})
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {table = false})
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = box.NULL})
+s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4}, {dummy = true})
+_ = s:create_index('primary', {parts = {'aaa'}})
+tuple = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+s:replace(tuple)
+s:drop()
+_, err = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
+assert(err ~= nil)
+
 test_run:cmd("clear filter")

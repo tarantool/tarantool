@@ -1434,6 +1434,7 @@ function box.schema.space.bless(space)
         end
         builtin.space_run_triggers(s, yesno)
     end
+    space_mt.frommap = box.internal.space.frommap
     space_mt.__index = space_mt
 
     setmetatable(space, space_mt)

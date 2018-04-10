@@ -600,8 +600,12 @@ error:
 void
 replicaset_follow(void)
 {
-	if (replicaset.applier.total == 0) {
-		/* Replication is not configured. */
+	if (replicaset.applier.total == 0 || replicaset_quorum() == 0) {
+		/*
+		 * Replication is not configured or quorum is set to
+		 * zero so in the latter case we have no need to wait
+		 * for others.
+		 */
 		box_clear_orphan();
 		return;
 	}

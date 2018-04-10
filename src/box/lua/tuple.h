@@ -66,6 +66,9 @@ luaT_istuple(struct lua_State *L, int idx);
 
 /** \endcond public */
 
+int
+lbox_tuple_new(struct lua_State *L);
+
 static inline int
 luaT_pushtupleornil(struct lua_State *L, struct tuple *tuple)
 {
