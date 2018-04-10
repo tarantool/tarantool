@@ -614,12 +614,42 @@ struct alter_space;
 class AlterSpaceOp {
 public:
 	AlterSpaceOp(struct alter_space *alter);
+
+	/** Link in alter_space::ops. */
 	struct rlist link;
+	/**
+	 * Called before creating the new space. Used to update
+	 * the space definition and/or key list that will be used
+	 * for creating the new space. Must not yield or fail.
+	 */
 	virtual void alter_def(struct alter_space * /* alter */) {}
+	/**
+	 * Called after creating a new space. Used for performing
+	 * long-lasting operations, such as index rebuild or format
+	 * check. May yield. May throw an exception. Must not modify
+	 * the old space.
+	 */
+	virtual void prepare(struct alter_space * /* alter */) {}
+	/**
+	 * Called after all registered operations have completed
+	 * the preparation phase. Used to propagate the old space
+	 * state to the new space (e.g. move unchanged indexes).
+	 * Must not yield or fail.
+	 */
 	virtual void alter(struct alter_space * /* alter */) {}
+	/**
+	 * Called after the change has been successfully written
+	 * to WAL. Must not fail.
+	 */
 	virtual void commit(struct alter_space * /* alter */,
 			    int64_t /* signature */) {}
+	/**
+	 * Called in case a WAL error occurred. It is supposed to undo
+	 * the effect of AlterSpaceOp::prepare and AlterSpaceOp::alter.
+	 * Must not fail.
+	 */
 	virtual void rollback(struct alter_space * /* alter */) {}
+
 	virtual ~AlterSpaceOp() {}
 
 	void *operator new(size_t size)
@@ -840,32 +870,20 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	       sizeof(alter->old_space->access));
 
 	/*
-	 * Change the new space: build the new index, rename,
-	 * change the fixed field count.
+	 * Build new indexes, check if tuples conform to
+	 * the new space format.
 	 */
-	try {
-		rlist_foreach_entry(op, &alter->ops, link)
-			op->alter(alter);
-	} catch (Exception *e) {
-		/*
-		 * Undo space changes from the last successful
-		 * operation back to the first. Skip the operation
-		 * which failed. An operation may fail during
-		 * alter if, e.g. if it adds a unique key and
-		 * there is a duplicate.
-		 */
-		while (op != rlist_first_entry(&alter->ops,
-					       class AlterSpaceOp, link)) {
-			op = rlist_prev_entry(op, link);
-			op->rollback(alter);
-		}
-		throw;
-	}
+	rlist_foreach_entry(op, &alter->ops, link)
+		op->prepare(alter);
 
 	/*
 	 * This function must not throw exceptions or yield after
 	 * this point.
 	 */
+
+	/* Move old indexes, update space format. */
+	rlist_foreach_entry(op, &alter->ops, link)
+		op->alter(alter);
 
 	/* Rebuild index maps once for all indexes. */
 	space_fill_index_map(alter->old_space);
@@ -904,11 +922,11 @@ class CheckSpaceFormat: public AlterSpaceOp
 public:
 	CheckSpaceFormat(struct alter_space *alter)
 		:AlterSpaceOp(alter) {}
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 };
 
 void
-CheckSpaceFormat::alter(struct alter_space *alter)
+CheckSpaceFormat::prepare(struct alter_space *alter)
 {
 	struct space *new_space = alter->new_space;
 	struct space *old_space = alter->old_space;
@@ -996,7 +1014,7 @@ public:
 	/** A reference to the definition of the dropped index. */
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
 };
 
@@ -1012,7 +1030,7 @@ DropIndex::alter_def(struct alter_space * /* alter */)
 
 /* Do the drop. */
 void
-DropIndex::alter(struct alter_space *alter)
+DropIndex::prepare(struct alter_space *alter)
 {
 	if (old_index_def->iid == 0)
 		space_drop_primary_key(alter->new_space);
@@ -1065,7 +1083,7 @@ public:
 	ModifyIndex(struct alter_space *alter,
 		    struct index_def *new_index_def_arg,
 		    struct index_def *old_index_def_arg)
-		: AlterSpaceOp(alter), new_index_def(new_index_def_arg),
+		: AlterSpaceOp(alter),new_index_def(new_index_def_arg),
 		  old_index_def(old_index_def_arg) {
 	        if (new_index_def->iid == 0 &&
 	            key_part_cmp(new_index_def->key_def->parts,
@@ -1154,15 +1172,15 @@ class CreateIndex: public AlterSpaceOp
 {
 public:
 	CreateIndex(struct alter_space *alter)
-		:AlterSpaceOp(alter),
-		 new_index_def(NULL)
+		:AlterSpaceOp(alter), new_index(NULL), new_index_def(NULL)
 	{}
+	/** New index. */
+	struct index *new_index;
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
-	virtual void rollback(struct alter_space *alter);
 	virtual ~CreateIndex();
 };
 
@@ -1184,8 +1202,12 @@ CreateIndex::alter_def(struct alter_space *alter)
  * they are fully enabled at all times.
  */
 void
-CreateIndex::alter(struct alter_space *alter)
+CreateIndex::prepare(struct alter_space *alter)
 {
+	/* Get the new index and build it.  */
+	new_index = space_index(alter->new_space, new_index_def->iid);
+	assert(new_index != NULL);
+
 	if (new_index_def->iid == 0) {
 		/*
 		 * Adding a primary key: bring the space
@@ -1200,37 +1222,24 @@ CreateIndex::alter(struct alter_space *alter)
 		space_add_primary_key_xc(alter->new_space);
 		return;
 	}
-	/**
-	 * Get the new index and build it.
-	 */
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
-	assert(new_index != NULL);
-	space_build_index_xc(alter->new_space, new_index,
+	space_build_index_xc(alter->old_space, new_index,
 			     alter->new_space->format);
 }
 
 void
 CreateIndex::commit(struct alter_space *alter, int64_t signature)
 {
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
+	(void) alter;
 	assert(new_index != NULL);
 	index_commit_create(new_index, signature);
-}
-
-void
-CreateIndex::rollback(struct alter_space *alter)
-{
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
-	assert(new_index != NULL);
-	index_abort_create(new_index);
+	new_index = NULL;
 }
 
 CreateIndex::~CreateIndex()
 {
-	if (new_index_def)
+	if (new_index != NULL)
+		index_abort_create(new_index);
+	if (new_index_def != NULL)
 		index_def_delete(new_index_def);
 }
 
@@ -1245,7 +1254,7 @@ public:
 	RebuildIndex(struct alter_space *alter,
 		     struct index_def *new_index_def_arg,
 		     struct index_def *old_index_def_arg)
-		:AlterSpaceOp(alter),
+		:AlterSpaceOp(alter), new_index(NULL),
 		new_index_def(new_index_def_arg),
 		old_index_def(old_index_def_arg)
 	{
@@ -1253,14 +1262,15 @@ public:
 		if (new_index_def->iid == 0)
 			alter->pk_def = new_index_def->key_def;
 	}
+	/** New index. */
+	struct index *new_index;
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	/** Old index index_def. */
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t signature);
-	virtual void rollback(struct alter_space *alter);
 	virtual ~RebuildIndex();
 };
 
@@ -1273,15 +1283,13 @@ RebuildIndex::alter_def(struct alter_space *alter)
 }
 
 void
-RebuildIndex::alter(struct alter_space *alter)
+RebuildIndex::prepare(struct alter_space *alter)
 {
 	/* Get the new index and build it.  */
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
+	new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	space_build_index_xc(new_index_def->iid != 0 ?
-			     alter->new_space : alter->old_space,
-			     new_index, alter->new_space->format);
+	space_build_index_xc(alter->old_space, new_index,
+			     alter->new_space->format);
 }
 
 void
@@ -1290,25 +1298,17 @@ RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 	struct index *old_index = space_index(alter->old_space,
 					      old_index_def->iid);
 	assert(old_index != NULL);
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
-	assert(new_index != NULL);
 	index_commit_drop(old_index);
-	index_commit_create(new_index, signature);
-}
-
-void
-RebuildIndex::rollback(struct alter_space *alter)
-{
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
 	assert(new_index != NULL);
-	index_abort_create(new_index);
+	index_commit_create(new_index, signature);
+	new_index = NULL;
 }
 
 RebuildIndex::~RebuildIndex()
 {
-	if (new_index_def)
+	if (new_index != NULL)
+		index_abort_create(new_index);
+	if (new_index_def != NULL)
 		index_def_delete(new_index_def);
 }
 
@@ -1320,12 +1320,12 @@ public:
 		: AlterSpaceOp(alter), iid(iid) {}
 	/** id of the index to truncate. */
 	uint32_t iid;
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t signature);
 };
 
 void
-TruncateIndex::alter(struct alter_space *alter)
+TruncateIndex::prepare(struct alter_space *alter)
 {
 	if (iid == 0) {
 		/*
