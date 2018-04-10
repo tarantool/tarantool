@@ -1518,7 +1518,6 @@ box_free(void)
 		gc_free();
 		engine_shutdown();
 		wal_thread_stop();
-		identifier_destroy();
 	}
 
 	fiber_cond_destroy(&ro_cond);
@@ -1724,7 +1723,6 @@ box_cfg_xc(void)
 	engine_init();
 	if (module_init() != 0)
 		diag_raise();
-	identifier_init();
 	schema_init();
 	replication_init();
 	port_init();
