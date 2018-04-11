@@ -371,21 +371,21 @@ backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 	coro_unwcontext(&unw_ctx, coro_ctx);
 	unw_init_local(&unw_cur, &unw_ctx);
 	int frame_no = 0;
-	unw_word_t sp, old_sp = 0, ip, offset;
+	unw_word_t sp = 0, old_sp = 0, ip, offset;
 	int unw_status, demangle_status;
 	char *demangle_buf = NULL;
 	size_t demangle_buf_len = 0;
 
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
 		const char *proc;
+		old_sp = sp;
 		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
+		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
 		if (sp == old_sp) {
 			say_debug("unwinding error: previous frame "
 				  "identical to this frame (corrupt stack?)");
 			goto out;
 		}
-		old_sp = sp;
-		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
 		proc = get_proc_name(&unw_cur, &offset, false);
 
 		char *cxxname = abi::__cxa_demangle(proc, demangle_buf,
