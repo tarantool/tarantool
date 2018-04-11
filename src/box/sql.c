@@ -114,8 +114,6 @@ sql_get()
 
 /*********************************************************************
  * SQLite cursor implementation on top of Tarantool storage API-s.
- * See the corresponding SQLite function in btree.c for documentation.
- * Ex: sqlite3BtreeCloseCursor -> tarantoolSqlite3CloseCursor
  *
  * NB: SQLite btree cursor emulation is less than perfect. The problem
  * is that btree cursors are more low-level compared to Tarantool
@@ -182,18 +180,6 @@ is_tarantool_error(int rc)
 		rc == SQL_TARANTOOL_ITERATOR_FAIL ||
 		rc == SQL_TARANTOOL_DELETE_FAIL ||
 		rc == SQL_TARANTOOL_INSERT_FAIL);
-}
-
-int tarantoolSqlite3CloseCursor(BtCursor *pCur)
-{
-	assert(pCur->curFlags & BTCF_TaCursor ||
-	       pCur->curFlags & BTCF_TEphemCursor);
-
-	if (pCur->iter)
-		box_iterator_free(pCur->iter);
-	if (pCur->last_tuple)
-		box_tuple_unref(pCur->last_tuple);
-	return SQLITE_OK;
 }
 
 const void *tarantoolSqlite3PayloadFetch(BtCursor *pCur, u32 *pAmt)
@@ -457,6 +443,7 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
 	space_delete_ephemeral(pCur->space);
+	pCur->space = NULL;
 	return SQLITE_OK;
 }
 

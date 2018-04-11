@@ -52,7 +52,6 @@ const char *tarantoolErrorMessage();
 int is_tarantool_error(int rc);
 
 /* Storage interface. */
-int tarantoolSqlite3CloseCursor(BtCursor * pCur);
 const void *tarantoolSqlite3PayloadFetch(BtCursor * pCur, u32 * pAmt);
 
 /**

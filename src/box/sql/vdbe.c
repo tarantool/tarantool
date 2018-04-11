@@ -4061,7 +4061,7 @@ case OP_NullRow: {
 	pC->cacheStatus = CACHE_STALE;
 	if (pC->eCurType==CURTYPE_TARANTOOL) {
 		assert(pC->uc.pCursor!=0);
-		sqlite3ClearCursor(pC->uc.pCursor);
+		sql_cursor_cleanup(pC->uc.pCursor);
 	}
 	break;
 }

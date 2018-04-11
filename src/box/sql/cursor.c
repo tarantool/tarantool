@@ -31,18 +31,20 @@
 
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
+#include "box/tuple.h"
 
-/*
- * Clear the current cursor position.
- */
 void
-sqlite3ClearCursor(BtCursor * pCur)
+sql_cursor_cleanup(struct BtCursor *cursor)
 {
-	free(pCur->key);
-	pCur->key = 0;
-	pCur->iter = NULL;
-	pCur->last_tuple = NULL;
-	pCur->eState = CURSOR_INVALID;
+	if (cursor->iter)
+		iterator_delete(cursor->iter);
+	if (cursor->last_tuple)
+		tuple_unref(cursor->last_tuple);
+	free(cursor->key);
+	cursor->key = NULL;
+	cursor->iter = NULL;
+	cursor->last_tuple = NULL;
+	cursor->eState = CURSOR_INVALID;
 }
 
 /*
@@ -64,23 +66,15 @@ sqlite3CursorZero(BtCursor * p)
 	memset(p, 0, sizeof(*p));
 }
 
-/*
- * Close a cursor and invalidate its state. In case of
- * ephemeral cursor, corresponding space should be dropped.
- */
-int
-sqlite3CloseCursor(BtCursor * pCur)
+void
+sql_cursor_close(struct BtCursor *cursor)
 {
-	assert((pCur->curFlags & BTCF_TaCursor) ||
-	       (pCur->curFlags & BTCF_TEphemCursor));
-
-	if (pCur->curFlags & BTCF_TEphemCursor) {
-		tarantoolSqlite3EphemeralDrop(pCur);
-	}
-	tarantoolSqlite3CloseCursor(pCur);
-	sqlite3ClearCursor(pCur);
-
-	return SQLITE_OK;
+	assert(cursor->space != NULL);
+	assert((cursor->curFlags & BTCF_TaCursor) ||
+	       (cursor->curFlags & BTCF_TEphemCursor));
+	if (cursor->curFlags & BTCF_TEphemCursor)
+		tarantoolSqlite3EphemeralDrop(cursor);
+	sql_cursor_cleanup(cursor);
 }
 
 #ifndef NDEBUG			/* The next routine used only within assert() statements */

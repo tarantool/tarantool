@@ -2217,7 +2217,7 @@ sqlite3VdbeFreeCursor(Vdbe * p, VdbeCursor * pCx)
 		}
 	case CURTYPE_TARANTOOL:{
 		assert(pCx->uc.pCursor != 0);
-		sqlite3CloseCursor(pCx->uc.pCursor);
+		sql_cursor_close(pCx->uc.pCursor);
 			break;
 		}
 	}

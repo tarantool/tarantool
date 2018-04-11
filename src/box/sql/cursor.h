@@ -72,14 +72,26 @@ struct BtCursor {
 void sqlite3CursorZero(BtCursor *);
 void sqlite3CursorHintFlags(BtCursor *, unsigned);
 
-int sqlite3CloseCursor(BtCursor *);
+/**
+ * Close a cursor and invalidate its state. In case of
+ * ephemeral cursor, corresponding space should be dropped.
+ */
+void
+sql_cursor_close(struct BtCursor *cursor);
 int sqlite3CursorMovetoUnpacked(BtCursor *, UnpackedRecord * pUnKey, int *pRes);
 
 int sqlite3CursorNext(BtCursor *, int *pRes);
 int sqlite3CursorPrevious(BtCursor *, int *pRes);
 int sqlite3CursorPayload(BtCursor *, u32 offset, u32 amt, void *);
 
-void sqlite3ClearCursor(BtCursor *);
+/**
+ * Release tuple, free iterator, invalidate cursor's state.
+ * Note that this routine doesn't nullify space and index:
+ * it is also used during OP_NullRow opcode to refresh given
+ * cursor.
+ */
+void
+sql_cursor_cleanup(struct BtCursor *cursor);
 int sqlite3CursorHasHint(BtCursor *, unsigned int mask);
 
 #ifndef NDEBUG
