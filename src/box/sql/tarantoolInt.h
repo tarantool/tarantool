@@ -74,8 +74,10 @@ int tarantoolSqlite3Previous(BtCursor * pCur, int *pRes);
 int tarantoolSqlite3MovetoUnpacked(BtCursor * pCur, UnpackedRecord * pIdxKey,
 				   int *pRes);
 int tarantoolSqlite3Count(BtCursor * pCur, i64 * pnEntry);
-int tarantoolSqlite3Insert(BtCursor * pCur);
-int tarantoolSqlite3Replace(BtCursor * pCur);
+int tarantoolSqlite3Insert(struct space *space, const char *tuple,
+			   const char *tuple_end);
+int tarantoolSqlite3Replace(struct space *space, const char *tuple,
+			    const char *tuple_end);
 int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
 int
 sql_delete_by_key(struct space *space, char *key, uint32_t key_size);
@@ -98,7 +100,19 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *zOldParentName,
 /* Interface for ephemeral tables. */
 int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count,
 				    struct coll *aColl);
-int tarantoolSqlite3EphemeralInsert(BtCursor * pCur);
+/**
+ * Insert tuple into ephemeral space.
+ * In contrast to ordinary spaces, there is no need to create and
+ * fill request or handle transaction routine.
+ *
+ * @param space Ephemeral space.
+ * @param tuple Tuple to be inserted.
+ * @param tuple_end End of tuple to be inserted.
+ *
+ * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
+ */
+int tarantoolSqlite3EphemeralInsert(struct space *space, const char *tuple,
+				    const char *tuple_end);
 int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
 int tarantoolSqlite3EphemeralCount(BtCursor * pCur, i64 * pnEntry);
 int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);

@@ -441,27 +441,13 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 	return tarantoolSqlite3First(pCur, &unused);
 }
 
-/*
- * Insert tuple which is contained in pX into ephemeral space. In contrast to
- * ordinary spaces, there is no need to create and fill request or handle
- * transaction routine.
- *
- * @param pCur Cursor pointing to ephemeral space.
- * @param pX Payload containing tuple to insert.
- *
- * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
- */
-int tarantoolSqlite3EphemeralInsert(BtCursor *pCur)
+int tarantoolSqlite3EphemeralInsert(struct space *space, const char *tuple,
+				    const char *tuple_end)
 {
-	assert(pCur);
-	assert(pCur->curFlags & BTCF_TEphemCursor);
-	mp_tuple_assert(pCur->key, pCur->key + pCur->nKey);
-
-	if (space_ephemeral_replace(pCur->space, pCur->key,
-				    pCur->key + pCur->nKey) != 0) {
-		diag_log();
+	assert(space != NULL);
+	mp_tuple_assert(tuple, tuple_end);
+	if (space_ephemeral_replace(space, tuple, tuple_end) != 0)
 		return SQL_TARANTOOL_INSERT_FAIL;
-	}
 	return SQLITE_OK;
 }
 
@@ -475,28 +461,31 @@ int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 }
 
 static inline int
-insertOrReplace(BtCursor *pCur, enum iproto_type type)
+insertOrReplace(struct space *space, const char *tuple, const char *tuple_end,
+		enum iproto_type type)
 {
-	assert(pCur->curFlags & BTCF_TaCursor);
+	assert(space != NULL);
 	struct request request;
 	memset(&request, 0, sizeof(request));
-	request.tuple = pCur->key;
-	request.tuple_end = pCur->key + pCur->nKey;
-	request.space_id = pCur->space->def->id;
+	request.tuple = tuple;
+	request.tuple_end = tuple_end;
+	request.space_id = space->def->id;
 	request.type = type;
 	mp_tuple_assert(request.tuple, request.tuple_end);
-	int rc = box_process_rw(&request, pCur->space, NULL);
+	int rc = box_process_rw(&request, space, NULL);
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_INSERT_FAIL;
 }
 
-int tarantoolSqlite3Insert(BtCursor *pCur)
+int tarantoolSqlite3Insert(struct space *space, const char *tuple,
+			   const char *tuple_end)
 {
-	return insertOrReplace(pCur, IPROTO_INSERT);
+	return insertOrReplace(space, tuple, tuple_end, IPROTO_INSERT);
 }
 
-int tarantoolSqlite3Replace(BtCursor *pCur)
+int tarantoolSqlite3Replace(struct space *space, const char *tuple,
+			    const char *tuple_end)
 {
-	return insertOrReplace(pCur, IPROTO_REPLACE);
+	return insertOrReplace(space, tuple, tuple_end, IPROTO_REPLACE);
 }
 
 /*
@@ -1092,8 +1081,14 @@ key_alloc(BtCursor *cur, size_t key_size)
 			diag_set(OutOfMemory, key_size, "malloc", "cur->key");
 			return -1;
 		}
-		cur->iter = NULL;
-		cur->last_tuple = NULL;
+		/*
+		 * Key can be NULL, only if it is a brand new
+		 * cursor. In this case, iterator and tuple must
+		 * also be NULLs, since memory for cursor is
+		 * filled with 0.
+		 */
+		assert(cur->iter == NULL);
+		assert(cur->last_tuple == NULL);
 	} else {
 		char *new_key = realloc(cur->key, key_size);
 		if (new_key == NULL) {
