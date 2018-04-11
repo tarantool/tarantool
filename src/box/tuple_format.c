@@ -299,8 +299,6 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		 const struct field_def *space_fields,
 		 uint32_t space_field_count, struct tuple_dictionary *dict)
 {
-	assert((dict == NULL && space_field_count == 0) ||
-	       (dict != NULL && space_field_count == dict->name_count));
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
 	if (format == NULL)

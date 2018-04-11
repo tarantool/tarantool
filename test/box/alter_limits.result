@@ -285,8 +285,7 @@ FIELD_COUNT = 4
 -- increase field_count -- error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 ---
-- error: 'Can''t modify space ''test'': can not change field count on a non-empty
-    space'
+- error: Tuple field count 2 does not match space field count 3
 ...
 s:select{}
 ---
@@ -295,8 +294,7 @@ s:select{}
 -- decrease field_count - error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 1}})
 ---
-- error: 'Can''t modify space ''test'': can not change field count on a non-empty
-    space'
+- error: Tuple field count 2 does not match space field count 1
 ...
 -- remove field_count - ok
 _ = box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 0}})
@@ -309,8 +307,7 @@ s:select{}
 -- increase field_count - error
 box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 ---
-- error: 'Can''t modify space ''test'': can not change field count on a non-empty
-    space'
+- error: Tuple field count 2 does not match space field count 3
 ...
 s:truncate()
 ---

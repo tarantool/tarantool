@@ -260,32 +260,6 @@ index = space:create_index('test', { type = 'tree', parts = { 2, 'array' }})
 index = space:create_index('test', { type = 'tree', parts = { 2, 'map' }})
 space:drop()
 
---
--- Allow compatible changes of a non-empty vinyl space.
---
-space = box.schema.create_space('test', { engine = 'vinyl' })
-pk = space:create_index('primary')
-space:replace{1}
-space:replace{2}
-format = {}
-format[1] = {name = 'field1'}
-format[2] = {name = 'field2', is_nullable = true}
-format[3] = {name = 'field3', is_nullable = true}
-space:format(format)
-t1 = space:replace{3,4,5}
-t2 = space:replace{4,5}
-t1.field1, t1.field2, t1.field3
-t2.field1, t2.field2, t2.field3
-t1 = pk:get{1}
-t1.field1, t1.field2, t1.field3
-box.snapshot()
-t1 = pk:get{2}
-t1.field1, t1.field2, t1.field3
--- Forbid incompatible change.
-format[2].is_nullable = false
-space:format(format)
-space:drop()
-
 -- gh-3019 default index options
 box.space._space:insert{512, 1, 'test', 'vinyl', 0, setmetatable({}, {__serialize = 'map'}), {}}
 box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
@@ -303,4 +277,15 @@ s.index.secondary:alter{unique = true} -- error
 s.index.secondary.unique
 s:insert{2, 10}
 s.index.secondary:select(10)
+s:drop()
+
+-- Narrowing indexed field type entails index rebuild.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1')
+_ = s:create_index('i2', {parts = {2, 'integer'}})
+_ = s:create_index('i3', {parts = {{3, 'string', is_nullable = true}}})
+_ = s:replace{1, 1, 'test'}
+-- Should fail with 'Vinyl does not support building an index for a non-empty space'.
+s.index.i2:alter{parts = {2, 'unsigned'}}
+s.index.i3:alter{parts = {{3, 'string', is_nullable = false}}}
 s:drop()

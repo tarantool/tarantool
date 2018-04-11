@@ -154,6 +154,19 @@ memtx_rtree_index_destroy(struct index *base)
 	free(index);
 }
 
+static bool
+memtx_rtree_index_def_change_requires_rebuild(struct index *index,
+					      const struct index_def *new_def)
+{
+	if (memtx_index_def_change_requires_rebuild(index, new_def))
+		return true;
+	if (index->def->opts.distance != new_def->opts.distance ||
+	    index->def->opts.dimension != new_def->opts.dimension)
+		return true;
+	return false;
+
+}
+
 static ssize_t
 memtx_rtree_index_size(struct index *base)
 {
@@ -293,6 +306,8 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .commit_drop = */ memtx_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ generic_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		memtx_rtree_index_def_change_requires_rebuild,
 	/* .size = */ memtx_rtree_index_size,
 	/* .bsize = */ memtx_rtree_index_bsize,
 	/* .min = */ generic_index_min,

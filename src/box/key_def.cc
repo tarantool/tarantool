@@ -249,25 +249,6 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	return part_count1 < part_count2 ? -1 : part_count1 > part_count2;
 }
 
-bool
-key_part_check_compatibility(const struct key_part *old_parts,
-			     uint32_t old_part_count,
-			     const struct key_part *new_parts,
-			     uint32_t new_part_count)
-{
-	if (new_part_count != old_part_count)
-		return false;
-	for (uint32_t i = 0; i < new_part_count; i++) {
-		const struct key_part *new_part = &new_parts[i];
-		const struct key_part *old_part = &old_parts[i];
-		if (old_part->fieldno != new_part->fieldno)
-			return false;
-		if (old_part->coll != new_part->coll)
-			return false;
-	}
-	return true;
-}
-
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, enum on_conflict_action nullable_action,

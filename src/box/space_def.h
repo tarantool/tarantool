@@ -157,22 +157,6 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      const struct space_opts *opts, const struct field_def *fields,
 	      uint32_t field_count);
 
-/**
- * Check that a space with @an old_def can be altered to have
- * @a new_def.
- * @param old_def Old space definition.
- * @param new_def New space definition.
- * @param is_space_empty True, if a space is empty.
- *
- * @retval  0 Space definition can be altered to @a new_def.
- * @retval -1 Client error.
- */
-int
-space_def_check_compatibility(const struct space_def *old_def,
-			      const struct space_def *new_def,
-			      bool is_space_empty);
-
-
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -200,16 +184,6 @@ space_def_new_xc(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	if (ret == NULL)
 		diag_raise();
 	return ret;
-}
-
-static inline void
-space_def_check_compatibility_xc(const struct space_def *old_def,
-				 const struct space_def *new_def,
-				 bool is_space_empty)
-{
-	if (space_def_check_compatibility(old_def, new_def,
-					  is_space_empty) != 0)
-		diag_raise();
 }
 
 #endif /* __cplusplus */

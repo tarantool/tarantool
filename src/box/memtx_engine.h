@@ -167,6 +167,14 @@ memtx_index_abort_create(struct index *index);
 void
 memtx_index_commit_drop(struct index *index);
 
+/**
+ * Generic implementation of index_vtab::def_change_requires_rebuild,
+ * common for all kinds of memtx indexes.
+ */
+bool
+memtx_index_def_change_requires_rebuild(struct index *index,
+					const struct index_def *new_def);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

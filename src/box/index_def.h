@@ -213,22 +213,6 @@ index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
 }
 
 /**
- * True, if the index change by alter requires an index rebuild.
- *
- * Some changes, such as a new page size or bloom_fpr do not
- * take effect immediately, so do not require a rebuild.
- *
- * Others, such as index name change, do not change the data, only
- * metadata, so do not require a rebuild either.
- *
- * Finally, changing index type or number of parts always requires
- * a rebuild.
- */
-bool
-index_def_change_requires_rebuild(const struct index_def *old_index_def,
-				  const struct index_def *new_index_def);
-
-/**
  * Create a new index definition definition.
  *
  * @param key_def  key definition, must be fully built

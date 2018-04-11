@@ -385,6 +385,12 @@ struct index_vtab {
 	 * the primary key is modified.
 	 */
 	bool (*depends_on_pk)(struct index *);
+	/**
+	 * Return true if the change of index definition
+	 * cannot be done without rebuild.
+	 */
+	bool (*def_change_requires_rebuild)(struct index *index,
+					    const struct index_def *new_def);
 
 	ssize_t (*size)(struct index *);
 	ssize_t (*bsize)(struct index *);
@@ -521,6 +527,13 @@ static inline bool
 index_depends_on_pk(struct index *index)
 {
 	return index->vtab->depends_on_pk(index);
+}
+
+static inline bool
+index_def_change_requires_rebuild(struct index *index,
+				  const struct index_def *new_def)
+{
+	return index->vtab->def_change_requires_rebuild(index, new_def);
 }
 
 static inline ssize_t

@@ -790,11 +790,11 @@ memtx_space_add_primary_key(struct space *space)
 }
 
 static int
-memtx_space_check_format(struct space *new_space, struct space *old_space)
+memtx_space_check_format(struct space *space, struct tuple_format *format)
 {
-	if (old_space->index_count == 0)
+	if (space->index_count == 0)
 		return 0;
-	struct index *pk = old_space->index[0];
+	struct index *pk = space->index[0];
 	if (index_size(pk) == 0)
 		return 0;
 
@@ -809,7 +809,7 @@ memtx_space_check_format(struct space *new_space, struct space *old_space)
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		rc = tuple_validate(new_space->format, tuple);
+		rc = tuple_validate(format, tuple);
 		if (rc != 0)
 			break;
 	}
@@ -846,9 +846,8 @@ memtx_init_ephemeral_space(struct space *space)
 }
 
 static int
-memtx_space_build_secondary_key(struct space *old_space,
-				struct space *new_space,
-				struct index *new_index)
+memtx_space_build_index(struct space *src_space, struct index *new_index,
+			struct tuple_format *new_format)
 {
 	/**
 	 * If it's a secondary key, and we're not building them
@@ -856,17 +855,17 @@ memtx_space_build_secondary_key(struct space *old_space,
 	 */
 	if (new_index->def->iid != 0) {
 		struct memtx_space *memtx_space;
-		memtx_space = (struct memtx_space *)new_space;
+		memtx_space = (struct memtx_space *)src_space;
 		if (!(memtx_space->replace == memtx_space_replace_all_keys))
 			return 0;
 	}
-	struct index *pk = index_find(old_space, 0);
+	struct index *pk = index_find(src_space, 0);
 	if (pk == NULL)
 		return -1;
 
-	struct errinj *inj = errinj(ERRINJ_BUILD_SECONDARY, ERRINJ_INT);
+	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
-		diag_set(ClientError, ER_INJECTION, "buildSecondaryKey");
+		diag_set(ClientError, ER_INJECTION, "build index");
 		return -1;
 	}
 
@@ -890,7 +889,7 @@ memtx_space_build_secondary_key(struct space *old_space,
 		 * Check that the tuple is OK according to the
 		 * new format.
 		 */
-		rc = tuple_validate(new_space->format, tuple);
+		rc = tuple_validate(new_format, tuple);
 		if (rc != 0)
 			break;
 		/*
@@ -925,12 +924,17 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	struct memtx_space *old_memtx_space = (struct memtx_space *)old_space;
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
+
+	if (old_memtx_space->bsize != 0 &&
+	    old_space->def->opts.temporary != new_space->def->opts.temporary) {
+		diag_set(ClientError, ER_ALTER_SPACE, old_space->def->name,
+			 "can not switch temporary flag on a non-empty space");
+		return -1;
+	}
+
 	new_memtx_space->replace = old_memtx_space->replace;
 	new_memtx_space->bsize = old_memtx_space->bsize;
-	bool is_empty = old_space->index_count == 0 ||
-			index_size(old_space->index[0]) == 0;
-	return space_def_check_compatibility(old_space->def,
-					     new_space->def, is_empty);
+	return 0;
 }
 
 /* }}} DDL */
@@ -953,7 +957,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .add_primary_key = */ memtx_space_add_primary_key,
 	/* .drop_primary_key = */ memtx_space_drop_primary_key,
 	/* .check_format  = */ memtx_space_check_format,
-	/* .build_secondary_key = */ memtx_space_build_secondary_key,
+	/* .build_index = */ memtx_space_build_index,
 	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 };

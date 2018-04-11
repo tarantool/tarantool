@@ -56,6 +56,8 @@ errinj.info()
     state: false
   ERRINJ_VY_RUN_WRITE:
     state: false
+  ERRINJ_BUILD_INDEX:
+    state: -1
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false
   ERRINJ_VY_RUN_DISCARD:
@@ -64,30 +66,28 @@ errinj.info()
     state: false
   ERRINJ_LOG_ROTATE:
     state: false
-  ERRINJ_VY_POINT_ITER_WAIT:
-    state: false
   ERRINJ_RELAY_EXIT_DELAY:
     state: 0
   ERRINJ_IPROTO_TX_DELAY:
     state: false
-  ERRINJ_TUPLE_FIELD:
+  ERRINJ_VY_POINT_ITER_WAIT:
     state: false
-  ERRINJ_INDEX_ALLOC:
+  ERRINJ_TUPLE_FIELD:
     state: false
   ERRINJ_XLOG_GARBAGE:
     state: false
-  ERRINJ_VY_RUN_WRITE_TIMEOUT:
-    state: 0
+  ERRINJ_INDEX_ALLOC:
+    state: false
   ERRINJ_RELAY_TIMEOUT:
     state: 0
   ERRINJ_TESTING:
     state: false
-  ERRINJ_VY_LOG_FLUSH:
-    state: false
+  ERRINJ_VY_RUN_WRITE_TIMEOUT:
+    state: 0
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0
-  ERRINJ_BUILD_SECONDARY:
-    state: -1
+  ERRINJ_VY_LOG_FLUSH:
+    state: false
   ERRINJ_VY_INDEX_DUMP:
     state: -1
 ...
@@ -949,13 +949,13 @@ i3:select{}
   - [2, 3, 1, 2, 10, 10]
   - [1, 4, 3, 4, 10, 10]
 ...
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', i2.id)
+box.error.injection.set('ERRINJ_BUILD_INDEX', i2.id)
 ---
 - ok
 ...
 i1:alter{parts = {3, "unsigned"}}
 ---
-- error: Error injection 'buildSecondaryKey'
+- error: Error injection 'build index'
 ...
 _ = collectgarbage('collect')
 ---
@@ -981,13 +981,13 @@ i3:select{}
   - [2, 3, 1, 2, 10, 10]
   - [1, 4, 3, 4, 10, 10]
 ...
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', i3.id)
+box.error.injection.set('ERRINJ_BUILD_INDEX', i3.id)
 ---
 - ok
 ...
 i1:alter{parts = {4, "unsigned"}}
 ---
-- error: Error injection 'buildSecondaryKey'
+- error: Error injection 'build index'
 ...
 _ = collectgarbage('collect')
 ---
@@ -1013,7 +1013,7 @@ i3:select{}
   - [2, 3, 1, 2, 10, 10]
   - [1, 4, 3, 4, 10, 10]
 ...
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
+box.error.injection.set('ERRINJ_BUILD_INDEX', -1)
 ---
 - ok
 ...
@@ -1037,14 +1037,14 @@ s:replace{1, 1}
 ---
 - [1, 1]
 ...
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', sk.id)
+box.error.injection.set('ERRINJ_BUILD_INDEX', sk.id)
 ---
 - ok
 ...
 sk:alter({parts = {2, 'number'}})
 ---
 ...
-box.error.injection.set('ERRINJ_BUILD_SECONDARY', -1)
+box.error.injection.set('ERRINJ_BUILD_INDEX', -1)
 ---
 - ok
 ...

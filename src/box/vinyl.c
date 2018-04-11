@@ -966,6 +966,50 @@ vinyl_index_depends_on_pk(struct index *index)
 	return true;
 }
 
+static bool
+vinyl_index_def_change_requires_rebuild(struct index *index,
+					const struct index_def *new_def)
+{
+	struct index_def *old_def = index->def;
+
+	assert(old_def->iid == new_def->iid);
+	assert(old_def->space_id == new_def->space_id);
+	assert(old_def->type == TREE && new_def->type == TREE);
+
+	if (!old_def->opts.is_unique && new_def->opts.is_unique)
+		return true;
+
+	assert(index_depends_on_pk(index));
+	const struct key_def *old_cmp_def = old_def->cmp_def;
+	const struct key_def *new_cmp_def = new_def->cmp_def;
+
+	/*
+	 * It is not enough to check only fieldno in case of Vinyl,
+	 * because the index may store some overwritten or deleted
+	 * statements conforming to the old format. CheckSpaceFormat
+	 * won't reveal such statements, but we may still need to
+	 * compare them to statements inserted after ALTER hence
+	 * we can't narrow field types without index rebuild.
+	 */
+	if (old_cmp_def->part_count != new_cmp_def->part_count)
+		return true;
+
+	for (uint32_t i = 0; i < new_cmp_def->part_count; i++) {
+		const struct key_part *old_part = &old_cmp_def->parts[i];
+		const struct key_part *new_part = &new_cmp_def->parts[i];
+		if (old_part->fieldno != new_part->fieldno)
+			return true;
+		if (old_part->coll != new_part->coll)
+			return true;
+		if (key_part_is_nullable(old_part) &&
+		    !key_part_is_nullable(new_part))
+			return true;
+		if (!field_type1_contains_type2(new_part->type, old_part->type))
+			return true;
+	}
+	return false;
+}
+
 static void
 vinyl_init_system_space(struct space *space)
 {
@@ -983,80 +1027,116 @@ vinyl_init_ephemeral_space(struct space *space)
 static int
 vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
+	(void)new_space;
 	struct vy_env *env = vy_env(old_space->engine);
 
 	if (vinyl_check_wal(env, "DDL") != 0)
 		return -1;
-	/*
-	 * The space with no indexes can contain no rows.
-	 * Allow alter.
-	 */
-	if (old_space->index_count == 0)
-		return 0;
-	struct vy_lsm *pk = vy_lsm(old_space->index[0]);
-	/*
-	 * During WAL recovery, the space may be not empty. But we
-	 * open existing indexes, not creating new ones. Allow
-	 * alter.
-	 */
-	if (env->status != VINYL_ONLINE)
-		return 0;
-	/* The space is empty. Allow alter. */
-	if (pk->stat.disk.count.rows == 0 &&
-	    pk->stat.memory.count.rows == 0)
-		return 0;
-	if (old_space->index_count == new_space->index_count) {
-		/* Check index_defs to be unchanged. */
-		for (uint32_t i = 0; i < old_space->index_count; ++i) {
-			struct index_def *old_def, *new_def;
-			old_def = space_index_def(old_space, i);
-			new_def = space_index_def(new_space, i);
-			/*
-			 * We do not support a full rebuild in
-			 * vinyl yet.
-			 */
-			if (index_def_change_requires_rebuild(old_def,
-							      new_def)) {
-				diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-					 "changing the definition of "
-					 "a non-empty index");
-				return -1;
-			}
-		}
-	}
-	if (space_def_check_compatibility(old_space->def, new_space->def,
-					  false) != 0)
-		return -1;
-	if (old_space->index_count < new_space->index_count) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-			 "adding an index to a non-empty space");
-		return -1;
-	}
-	if (! tuple_format1_can_store_format2_tuples(new_space->format,
-						     old_space->format)) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-			 "changing space format of a non-empty space");
-		return -1;
-	}
+
 	return 0;
 }
 
-static int
-vinyl_space_check_format(struct space *new_space, struct space *old_space)
+/** Argument passed to vy_check_format_on_replace(). */
+struct vy_check_format_ctx {
+	/** Format to check new tuples against. */
+	struct tuple_format *format;
+	/** Set if a new tuple doesn't conform to the format. */
+	bool is_failed;
+	/** Container for storing errors. */
+	struct diag diag;
+};
+
+/**
+ * This is an on_replace trigger callback that checks inserted
+ * tuples against a new format.
+ */
+static void
+vy_check_format_on_replace(struct trigger *trigger, void *event)
 {
-	(void)new_space;
-	struct vy_env *env = vy_env(old_space->engine);
-	/* @sa vy_prepare_alter_space for checks below. */
-	if (old_space->index_count == 0)
+	struct txn *txn = event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct vy_check_format_ctx *ctx = trigger->data;
+
+	if (stmt->new_tuple == NULL)
+		return; /* DELETE, nothing to do */
+
+	if (ctx->is_failed)
+		return; /* already failed, nothing to do */
+
+	if (tuple_validate(ctx->format, stmt->new_tuple) != 0) {
+		ctx->is_failed = true;
+		diag_move(diag_get(), &ctx->diag);
+	}
+}
+
+static int
+vinyl_space_check_format(struct space *space, struct tuple_format *format)
+{
+	struct vy_env *env = vy_env(space->engine);
+
+	/*
+	 * If this is local recovery, the space was checked before
+	 * restart so there's nothing we need to do.
+	 */
+	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
+	    env->status == VINYL_FINAL_RECOVERY_LOCAL)
 		return 0;
-	struct vy_lsm *pk = vy_lsm(old_space->index[0]);
-	if (env->status != VINYL_ONLINE)
-		return 0;
-	if (pk->stat.disk.count.rows == 0 && pk->stat.memory.count.rows == 0)
-		return 0;
-	diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-		 "adding new fields to a non-empty space");
-	return -1;
+
+	if (space->index_count == 0)
+		return 0; /* space is empty, nothing to do */
+
+	/*
+	 * Iterate over all tuples stored in the given space and
+	 * check each of them for conformity to the new format.
+	 * Since read iterator may yield, we install an on_replace
+	 * trigger to check tuples inserted after we started the
+	 * iteration.
+	 */
+	struct vy_lsm *pk = vy_lsm(space->index[0]);
+
+	struct tuple *key = vy_stmt_new_select(pk->env->key_format, NULL, 0);
+	if (key == NULL)
+		return -1;
+
+	struct trigger on_replace;
+	struct vy_check_format_ctx ctx;
+	ctx.format = format;
+	ctx.is_failed = false;
+	diag_create(&ctx.diag);
+	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
+	trigger_add(&space->on_replace, &on_replace);
+
+	struct vy_read_iterator itr;
+	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
+			      &env->xm->p_global_read_view);
+	int rc;
+	int loops = 0;
+	struct tuple *tuple;
+	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
+		/*
+		 * Read iterator yields only when it reads runs.
+		 * Yield periodically in order not to stall the
+		 * tx thread in case there are a lot of tuples in
+		 * mems or cache.
+		 */
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
+		if (ctx.is_failed) {
+			diag_move(&ctx.diag, diag_get());
+			rc = -1;
+			break;
+		}
+		if (tuple == NULL)
+			break;
+		rc = tuple_validate(format, tuple);
+		if (rc != 0)
+			break;
+	}
+	vy_read_iterator_close(&itr);
+	diag_destroy(&ctx.diag);
+	trigger_clear(&on_replace);
+	tuple_unref(key);
+	return rc;
 }
 
 static void
@@ -1101,11 +1181,28 @@ vinyl_space_drop_primary_key(struct space *space)
 }
 
 static int
-vinyl_space_build_secondary_key(struct space *old_space,
-				struct space *new_space,
-				struct index *new_index)
+vinyl_space_build_index(struct space *src_space, struct index *new_index,
+			struct tuple_format *new_format)
 {
-	(void)old_space;
+	(void)new_format;
+
+	struct vy_env *env = vy_env(src_space->engine);
+	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
+
+	/*
+	 * During local recovery we are loading existing indexes
+	 * from disk, not building new ones.
+	 */
+	if (env->status != VINYL_INITIAL_RECOVERY_LOCAL &&
+	    env->status != VINYL_FINAL_RECOVERY_LOCAL) {
+		if (pk->stat.disk.count.rows != 0 ||
+		    pk->stat.memory.count.rows != 0) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+				 "building an index for a non-empty space");
+			return -1;
+		}
+	}
+
 	/*
 	 * Unlike Memtx, Vinyl does not need building of a secondary index.
 	 * This is true because of two things:
@@ -1120,17 +1217,12 @@ vinyl_space_build_secondary_key(struct space *old_space,
 	 * by itself during WAL recovery.
 	 * III. Vinyl is online. The space is definitely empty and there's
 	 * nothing to build.
-	 *
-	 * When we start to implement alter of non-empty vinyl spaces, it
-	 *  seems that we should call here:
-	 *   Engine::buildSecondaryKey(old_space, new_space, new_index_arg);
-	 *  but aware of three cases mentioned above.
 	 */
 	if (vinyl_index_open(new_index) != 0)
 		return -1;
 
 	/* Set pointer to the primary key for the new index. */
-	vy_lsm_update_pk(vy_lsm(new_index), vy_lsm(space_index(new_space, 0)));
+	vy_lsm_update_pk(vy_lsm(new_index), pk);
 	return 0;
 }
 
@@ -3969,7 +4061,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .add_primary_key = */ vinyl_space_add_primary_key,
 	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
-	/* .build_secondary_key = */ vinyl_space_build_secondary_key,
+	/* .build_index = */ vinyl_space_build_index,
 	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
 };
@@ -3982,6 +4074,8 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ vinyl_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		vinyl_index_def_change_requires_rebuild,
 	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
 	/* .min = */ generic_index_min,

@@ -1109,3 +1109,45 @@ memtx_index_commit_drop(struct index *index)
 {
 	memtx_index_prune(index);
 }
+
+bool
+memtx_index_def_change_requires_rebuild(struct index *index,
+					const struct index_def *new_def)
+{
+	struct index_def *old_def = index->def;
+
+	assert(old_def->iid == new_def->iid);
+	assert(old_def->space_id == new_def->space_id);
+
+	if (old_def->type != new_def->type)
+		return true;
+	if (!old_def->opts.is_unique && new_def->opts.is_unique)
+		return true;
+
+	const struct key_def *old_cmp_def, *new_cmp_def;
+	if (index_depends_on_pk(index)) {
+		old_cmp_def = old_def->cmp_def;
+		new_cmp_def = new_def->cmp_def;
+	} else {
+		old_cmp_def = old_def->key_def;
+		new_cmp_def = new_def->key_def;
+	}
+
+	/*
+	 * Compatibility of field types is verified by CheckSpaceFormat
+	 * so it suffices to check that the new key definition indexes
+	 * the same set of fields in the same order.
+	 */
+	if (old_cmp_def->part_count != new_cmp_def->part_count)
+		return true;
+
+	for (uint32_t i = 0; i < new_cmp_def->part_count; i++) {
+		const struct key_part *old_part = &old_cmp_def->parts[i];
+		const struct key_part *new_part = &new_cmp_def->parts[i];
+		if (old_part->fieldno != new_part->fieldno)
+			return true;
+		if (old_part->coll != new_part->coll)
+			return true;
+	}
+	return false;
+}

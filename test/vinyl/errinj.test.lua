@@ -513,3 +513,38 @@ errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", false)
 while ret == nil do fiber.sleep(0.01) end
 ret
 s:drop()
+
+--
+-- Check that ALTER is abroted if a tuple inserted during space
+-- format change does not conform to the new format.
+--
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'string', is_nullable = true}
+s = box.schema.space.create('test', {engine = 'vinyl', format = format})
+_ = s:create_index('pk', {page_size = 16})
+
+pad = string.rep('x', 16)
+for i = 101, 200 do s:replace{i, pad} end
+box.snapshot()
+
+ch = fiber.channel(1)
+test_run:cmd("setopt delimiter ';'")
+_ = fiber.create(function()
+    fiber.sleep(0.01)
+    for i = 1, 100 do
+        s:replace{i, box.NULL}
+    end
+    ch:put(true)
+end);
+test_run:cmd("setopt delimiter ''");
+
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
+format[2].is_nullable = false
+s:format(format) -- must fail
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0)
+
+ch:get()
+
+s:count() -- 200
+s:drop()

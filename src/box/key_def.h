@@ -430,19 +430,6 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2);
 
 /**
- * Find out whether alteration of an index has changed it
- * substantially enough to warrant a rebuild or not. For example,
- * change of index id is not a substantial change, whereas change
- * of index type or incompatible change of key parts requires
- * a rebuild.
- */
-bool
-key_part_check_compatibility(const struct key_part *old_parts,
-			     uint32_t old_part_count,
-			     const struct key_part *new_parts,
-			     uint32_t new_part_count);
-
-/**
  * Extract key from tuple by given key definition and return
  * buffer allocated on box_txn_alloc with this key. This function
  * has O(n) complexity, where n is the number of key parts.

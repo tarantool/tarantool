@@ -574,12 +574,42 @@ struct alter_space;
 class AlterSpaceOp {
 public:
 	AlterSpaceOp(struct alter_space *alter);
+
+	/** Link in alter_space::ops. */
 	struct rlist link;
+	/**
+	 * Called before creating the new space. Used to update
+	 * the space definition and/or key list that will be used
+	 * for creating the new space. Must not yield or fail.
+	 */
 	virtual void alter_def(struct alter_space * /* alter */) {}
+	/**
+	 * Called after creating a new space. Used for performing
+	 * long-lasting operations, such as index rebuild or format
+	 * check. May yield. May throw an exception. Must not modify
+	 * the old space.
+	 */
+	virtual void prepare(struct alter_space * /* alter */) {}
+	/**
+	 * Called after all registered operations have completed
+	 * the preparation phase. Used to propagate the old space
+	 * state to the new space (e.g. move unchanged indexes).
+	 * Must not yield or fail.
+	 */
 	virtual void alter(struct alter_space * /* alter */) {}
+	/**
+	 * Called after the change has been successfully written
+	 * to WAL. Must not fail.
+	 */
 	virtual void commit(struct alter_space * /* alter */,
 			    int64_t /* signature */) {}
+	/**
+	 * Called in case a WAL error occurred. It is supposed to undo
+	 * the effect of AlterSpaceOp::prepare and AlterSpaceOp::alter.
+	 * Must not fail.
+	 */
 	virtual void rollback(struct alter_space * /* alter */) {}
+
 	virtual ~AlterSpaceOp() {}
 
 	void *operator new(size_t size)
@@ -763,6 +793,15 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 static void
 alter_space_do(struct txn *txn, struct alter_space *alter)
 {
+	/*
+	 * Prepare triggers while we may fail. Note, we don't have to
+	 * free them in case of failure, because they are allocated on
+	 * the region.
+	 */
+	struct trigger *on_commit, *on_rollback;
+	on_commit = txn_alter_trigger_new(alter_space_commit, alter);
+	on_rollback = txn_alter_trigger_new(alter_space_rollback, alter);
+
 	/* Create a definition of the new space. */
 	space_dump_def(alter->old_space, &alter->key_list);
 	class AlterSpaceOp *op;
@@ -791,27 +830,20 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	       sizeof(alter->old_space->access));
 
 	/*
-	 * Change the new space: build the new index, rename,
-	 * change the fixed field count.
+	 * Build new indexes, check if tuples conform to
+	 * the new space format.
 	 */
-	try {
-		rlist_foreach_entry(op, &alter->ops, link)
-			op->alter(alter);
-	} catch (Exception *e) {
-		/*
-		 * Undo space changes from the last successful
-		 * operation back to the first. Skip the operation
-		 * which failed. An operation may fail during
-		 * alter if, e.g. if it adds a unique key and
-		 * there is a duplicate.
-		 */
-		while (op != rlist_first_entry(&alter->ops,
-					       class AlterSpaceOp, link)) {
-			op = rlist_prev_entry(op, link);
-			op->rollback(alter);
-		}
-		throw;
-	}
+	rlist_foreach_entry(op, &alter->ops, link)
+		op->prepare(alter);
+
+	/*
+	 * This function must not throw exceptions or yield after
+	 * this point.
+	 */
+
+	/* Move old indexes, update space format. */
+	rlist_foreach_entry(op, &alter->ops, link)
+		op->alter(alter);
 
 	/* Rebuild index maps once for all indexes. */
 	space_fill_index_map(alter->old_space);
@@ -833,11 +865,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * finish or rollback the DDL depending on the results of
 	 * writing to WAL.
 	 */
-	struct trigger *on_commit =
-		txn_alter_trigger_new(alter_space_commit, alter);
 	txn_on_commit(txn, on_commit);
-	struct trigger *on_rollback =
-		txn_alter_trigger_new(alter_space_rollback, alter);
 	txn_on_rollback(txn, on_rollback);
 }
 
@@ -846,58 +874,19 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 /* {{{ AlterSpaceOp descendants - alter operations, such as Add/Drop index */
 
 /**
- * The operation is executed on each space format change.
- * Now the single purpose is to update an old field names
- * dictionary, used by old space formats, and use it in a new
- * formats (vinyl creates many formats, not one).
+ * This operation does not modify the space, it just checks that
+ * tuples stored in it conform to the new format.
  */
-class ModifySpaceFormat: public AlterSpaceOp
+class CheckSpaceFormat: public AlterSpaceOp
 {
-	/**
-	 * Newely created field dictionary. When new space_def is
-	 * created, it allocates new dictionary. Alter moves new
-	 * names into an old dictionary and deletes new one.
-	 */
-	struct tuple_dictionary *new_dict;
-	/**
-	 * Old tuple dictionary stored to rollback in destructor,
-	 * if an exception had been raised after alter_def(), but
-	 * before alter().
-	 */
-	struct tuple_dictionary *old_dict;
-	/**
-	 * New space definition. It can not be got from alter,
-	 * because alter_def() is called before
-	 * ModifySpace::alter_def().
-	 */
-	struct space_def *new_def;
 public:
-	ModifySpaceFormat(struct alter_space *alter, struct space_def *new_def)
-		: AlterSpaceOp(alter), new_dict(NULL), old_dict(NULL),
-		  new_def(new_def) {}
-	virtual void alter(struct alter_space *alter);
-	virtual void alter_def(struct alter_space *alter);
-	virtual void commit(struct alter_space *alter, int64_t lsn);
-	virtual ~ModifySpaceFormat();
+	CheckSpaceFormat(struct alter_space *alter)
+		:AlterSpaceOp(alter) {}
+	virtual void prepare(struct alter_space *alter);
 };
 
 void
-ModifySpaceFormat::alter_def(struct alter_space *alter)
-{
-	/*
-	 * Move new names into an old dictionary, which already is
-	 * referenced by existing tuple formats. New dictionary
-	 * object is deleted later, in destructor.
-	 */
-	new_dict = new_def->dict;
-	old_dict = alter->old_space->def->dict;
-	tuple_dictionary_swap(new_dict, old_dict);
-	new_def->dict = old_dict;
-	tuple_dictionary_ref(old_dict);
-}
-
-void
-ModifySpaceFormat::alter(struct alter_space *alter)
+CheckSpaceFormat::prepare(struct alter_space *alter)
 {
 	struct space *new_space = alter->new_space;
 	struct space *old_space = alter->old_space;
@@ -905,27 +894,9 @@ ModifySpaceFormat::alter(struct alter_space *alter)
 	struct tuple_format *old_format = old_space->format;
 	if (old_format != NULL) {
 		assert(new_format != NULL);
-		if (! tuple_format1_can_store_format2_tuples(new_format,
-							     old_format))
-		    space_check_format_xc(new_space, old_space);
-	}
-}
-
-void
-ModifySpaceFormat::commit(struct alter_space *alter, int64_t lsn)
-{
-	(void) alter;
-	(void) lsn;
-	old_dict = NULL;
-}
-
-ModifySpaceFormat::~ModifySpaceFormat()
-{
-	if (new_dict != NULL) {
-		/* Return old names into the old dict. */
-		if (old_dict != NULL)
-			tuple_dictionary_swap(new_dict, old_dict);
-		tuple_dictionary_unref(new_dict);
+		if (!tuple_format1_can_store_format2_tuples(new_format,
+							    old_format))
+		    space_check_format_xc(old_space, new_format);
 	}
 }
 
@@ -933,11 +904,19 @@ ModifySpaceFormat::~ModifySpaceFormat()
 class ModifySpace: public AlterSpaceOp
 {
 public:
-	ModifySpace(struct alter_space *alter, struct space_def *def_arg)
-		:AlterSpaceOp(alter), def(def_arg) {}
+	ModifySpace(struct alter_space *alter, struct space_def *def)
+		:AlterSpaceOp(alter), new_def(def), new_dict(NULL) {}
 	/* New space definition. */
-	struct space_def *def;
+	struct space_def *new_def;
+	/**
+	 * Newely created field dictionary. When new space_def is
+	 * created, it allocates new dictionary. Alter moves new
+	 * names into an old dictionary and deletes new one.
+	 */
+	struct tuple_dictionary *new_dict;
 	virtual void alter_def(struct alter_space *alter);
+	virtual void alter(struct alter_space *alter);
+	virtual void rollback(struct alter_space *alter);
 	virtual ~ModifySpace();
 };
 
@@ -945,15 +924,44 @@ public:
 void
 ModifySpace::alter_def(struct alter_space *alter)
 {
+	/*
+	 * Use the old dictionary for the new space, because
+	 * it is already referenced by existing tuple formats.
+	 * We will update it in place in ModifySpace::alter.
+	 */
+	new_dict = new_def->dict;
+	new_def->dict = alter->old_space->def->dict;
+	tuple_dictionary_ref(new_def->dict);
+
 	space_def_delete(alter->space_def);
-	alter->space_def = def;
+	alter->space_def = new_def;
 	/* Now alter owns the def. */
-	def = NULL;
+	new_def = NULL;
 }
 
-ModifySpace::~ModifySpace() {
-	if (def != NULL)
-		space_def_delete(def);
+void
+ModifySpace::alter(struct alter_space *alter)
+{
+	/*
+	 * Move new names into an old dictionary, which already is
+	 * referenced by existing tuple formats. New dictionary
+	 * object is deleted later, in destructor.
+	 */
+	tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
+}
+
+void
+ModifySpace::rollback(struct alter_space *alter)
+{
+	tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
+}
+
+ModifySpace::~ModifySpace()
+{
+	if (new_dict != NULL)
+		tuple_dictionary_unref(new_dict);
+	if (new_def != NULL)
+		space_def_delete(new_def);
 }
 
 /** DropIndex - remove an index from space. */
@@ -966,7 +974,7 @@ public:
 	/** A reference to the definition of the dropped index. */
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
 };
 
@@ -982,7 +990,7 @@ DropIndex::alter_def(struct alter_space * /* alter */)
 
 /* Do the drop. */
 void
-DropIndex::alter(struct alter_space *alter)
+DropIndex::prepare(struct alter_space *alter)
 {
 	if (old_index_def->iid == 0)
 		space_drop_primary_key(alter->new_space);
@@ -991,8 +999,9 @@ DropIndex::alter(struct alter_space *alter)
 void
 DropIndex::commit(struct alter_space *alter, int64_t /* signature */)
 {
-	struct index *index = index_find_xc(alter->old_space,
-					    old_index_def->iid);
+	struct index *index = space_index(alter->old_space,
+					  old_index_def->iid);
+	assert(index != NULL);
 	index_commit_drop(index);
 }
 
@@ -1034,7 +1043,7 @@ public:
 	ModifyIndex(struct alter_space *alter,
 		    struct index_def *new_index_def_arg,
 		    struct index_def *old_index_def_arg)
-		: AlterSpaceOp(alter), new_index_def(new_index_def_arg),
+		: AlterSpaceOp(alter),new_index_def(new_index_def_arg),
 		  old_index_def(old_index_def_arg) {
 	        if (new_index_def->iid == 0 &&
 	            key_part_cmp(new_index_def->key_def->parts,
@@ -1090,6 +1099,7 @@ ModifyIndex::commit(struct alter_space *alter, int64_t signature)
 {
 	struct index *new_index = space_index(alter->new_space,
 					      new_index_def->iid);
+	assert(new_index != NULL);
 	index_commit_modify(new_index, signature);
 }
 
@@ -1122,15 +1132,15 @@ class CreateIndex: public AlterSpaceOp
 {
 public:
 	CreateIndex(struct alter_space *alter)
-		:AlterSpaceOp(alter),
-		 new_index_def(NULL)
+		:AlterSpaceOp(alter), new_index(NULL), new_index_def(NULL)
 	{}
+	/** New index. */
+	struct index *new_index;
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t lsn);
-	virtual void rollback(struct alter_space *alter);
 	virtual ~CreateIndex();
 };
 
@@ -1152,8 +1162,12 @@ CreateIndex::alter_def(struct alter_space *alter)
  * they are fully enabled at all times.
  */
 void
-CreateIndex::alter(struct alter_space *alter)
+CreateIndex::prepare(struct alter_space *alter)
 {
+	/* Get the new index and build it.  */
+	new_index = space_index(alter->new_space, new_index_def->iid);
+	assert(new_index != NULL);
+
 	if (new_index_def->iid == 0) {
 		/*
 		 * Adding a primary key: bring the space
@@ -1168,34 +1182,24 @@ CreateIndex::alter(struct alter_space *alter)
 		space_add_primary_key_xc(alter->new_space);
 		return;
 	}
-	/**
-	 * Get the new index and build it.
-	 */
-	struct index *new_index = index_find_xc(alter->new_space,
-						new_index_def->iid);
-	space_build_secondary_key_xc(alter->new_space,
-				     alter->new_space, new_index);
+	space_build_index_xc(alter->old_space, new_index,
+			     alter->new_space->format);
 }
 
 void
 CreateIndex::commit(struct alter_space *alter, int64_t signature)
 {
-	struct index *new_index = index_find_xc(alter->new_space,
-						new_index_def->iid);
+	(void) alter;
+	assert(new_index != NULL);
 	index_commit_create(new_index, signature);
-}
-
-void
-CreateIndex::rollback(struct alter_space *alter)
-{
-	struct index *new_index = index_find_xc(alter->new_space,
-						new_index_def->iid);
-	index_abort_create(new_index);
+	new_index = NULL;
 }
 
 CreateIndex::~CreateIndex()
 {
-	if (new_index_def)
+	if (new_index != NULL)
+		index_abort_create(new_index);
+	if (new_index_def != NULL)
 		index_def_delete(new_index_def);
 }
 
@@ -1210,7 +1214,7 @@ public:
 	RebuildIndex(struct alter_space *alter,
 		     struct index_def *new_index_def_arg,
 		     struct index_def *old_index_def_arg)
-		:AlterSpaceOp(alter),
+		:AlterSpaceOp(alter), new_index(NULL),
 		new_index_def(new_index_def_arg),
 		old_index_def(old_index_def_arg)
 	{
@@ -1218,14 +1222,15 @@ public:
 		if (new_index_def->iid == 0)
 			alter->pk_def = new_index_def->key_def;
 	}
+	/** New index. */
+	struct index *new_index;
 	/** New index index_def. */
 	struct index_def *new_index_def;
 	/** Old index index_def. */
 	struct index_def *old_index_def;
 	virtual void alter_def(struct alter_space *alter);
-	virtual void alter(struct alter_space *alter);
+	virtual void prepare(struct alter_space *alter);
 	virtual void commit(struct alter_space *alter, int64_t signature);
-	virtual void rollback(struct alter_space *alter);
 	virtual ~RebuildIndex();
 };
 
@@ -1238,15 +1243,13 @@ RebuildIndex::alter_def(struct alter_space *alter)
 }
 
 void
-RebuildIndex::alter(struct alter_space *alter)
+RebuildIndex::prepare(struct alter_space *alter)
 {
 	/* Get the new index and build it.  */
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
+	new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
-	space_build_secondary_key_xc(new_index_def->iid != 0 ?
-				     alter->new_space : alter->old_space,
-				     alter->new_space, new_index);
+	space_build_index_xc(alter->old_space, new_index,
+			     alter->new_space->format);
 }
 
 void
@@ -1254,24 +1257,66 @@ RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 {
 	struct index *old_index = space_index(alter->old_space,
 					      old_index_def->iid);
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
+	assert(old_index != NULL);
 	index_commit_drop(old_index);
+	assert(new_index != NULL);
 	index_commit_create(new_index, signature);
-}
-
-void
-RebuildIndex::rollback(struct alter_space *alter)
-{
-	struct index *new_index = space_index(alter->new_space,
-					      new_index_def->iid);
-	index_abort_create(new_index);
+	new_index = NULL;
 }
 
 RebuildIndex::~RebuildIndex()
 {
-	if (new_index_def)
+	if (new_index != NULL)
+		index_abort_create(new_index);
+	if (new_index_def != NULL)
 		index_def_delete(new_index_def);
+}
+
+/** TruncateIndex - truncate an index. */
+class TruncateIndex: public AlterSpaceOp
+{
+public:
+	TruncateIndex(struct alter_space *alter, uint32_t iid)
+		: AlterSpaceOp(alter), iid(iid) {}
+	/** id of the index to truncate. */
+	uint32_t iid;
+	virtual void prepare(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t signature);
+};
+
+void
+TruncateIndex::prepare(struct alter_space *alter)
+{
+	if (iid == 0) {
+		/*
+		 * Notify the engine that the primary index
+		 * was truncated.
+		 */
+		space_drop_primary_key(alter->new_space);
+		space_add_primary_key_xc(alter->new_space);
+		return;
+	}
+
+	/*
+	 * Although the new index is empty, we still need to call
+	 * space_build_index() to let the engine know that the
+	 * index was recreated. For example, Vinyl uses this
+	 * callback to load indexes during local recovery.
+	 */
+	struct index *new_index = space_index(alter->new_space, iid);
+	assert(new_index != NULL);
+	space_build_index_xc(alter->new_space, new_index,
+			     alter->new_space->format);
+}
+
+void
+TruncateIndex::commit(struct alter_space *alter, int64_t signature)
+{
+	struct index *old_index = space_index(alter->old_space, iid);
+	struct index *new_index = space_index(alter->new_space, iid);
+
+	index_commit_drop(old_index);
+	index_commit_create(new_index, signature);
 }
 
 /* }}} */
@@ -1375,10 +1420,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
 		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
-		if (key_part_check_compatibility(old_def->cmp_def->parts,
-						 old_def->cmp_def->part_count,
-						 new_def->cmp_def->parts,
-						 new_def->cmp_def->part_count))
+		if (!index_def_change_requires_rebuild(old_index, new_def))
 			(void) new ModifyIndex(alter, new_def, old_def);
 		else
 			(void) new RebuildIndex(alter, new_def, old_def);
@@ -1532,12 +1574,19 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		auto def_guard =
 			make_scoped_guard([=] { space_def_delete(def); });
 		access_check_ddl(def->name, def->uid, SC_SPACE, PRIV_A, true);
-		/*
-		 * Check basic options. Assume the space to be
-		 * empty, because we can not calculate here
-		 * a size of a vinyl space.
-		 */
-		space_def_check_compatibility_xc(old_space->def, def, true);
+		if (def->id != space_id(old_space))
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "space id is immutable");
+		if (strcmp(def->engine_name, old_space->def->engine_name) != 0)
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not change space engine");
+		if (def->opts.is_view != old_space->def->opts.is_view)
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not convert a space to "
+				  "a view and vice versa");
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
@@ -1564,7 +1613,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 						     old_space->index_count,
 						     def->fields,
 						     def->field_count);
-		(void) new ModifySpaceFormat(alter, def);
+		(void) new CheckSpaceFormat(alter);
 		(void) new ModifySpace(alter, def);
 		def_guard.is_active = false;
 		/* Create MoveIndex ops for all space indexes. */
@@ -1747,7 +1796,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (index_def_cmp(index_def, old_index->def) == 0) {
 			/* Index is not changed so just move it. */
 			(void) new MoveIndex(alter, old_index->def->iid);
-		} else if (index_def_change_requires_rebuild(old_index->def,
+		} else if (index_def_change_requires_rebuild(old_index,
 							     index_def)) {
 			/*
 			 * Operation demands an index rebuild.
@@ -1756,10 +1805,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 						old_index->def);
 			index_def_guard.is_active = false;
 		} else {
-			(void) new ModifySpaceFormat(alter, old_space->def);
 			/*
-			 * Operation can be done without index rebuild.
+			 * Operation can be done without index rebuild,
+			 * but we still need to check that tuples stored
+			 * in the space conform to the new format.
 			 */
+			(void) new CheckSpaceFormat(alter);
 			(void) new ModifyIndex(alter, index_def,
 					       old_index->def);
 			index_def_guard.is_active = false;
@@ -1833,9 +1884,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 */
 	for (uint32_t i = 0; i < old_space->index_count; i++) {
 		struct index *old_index = old_space->index[i];
-		(void) new DropIndex(alter, old_index->def);
-		auto create_index = new CreateIndex(alter);
-		create_index->new_index_def = index_def_dup_xc(old_index->def);
+		(void) new TruncateIndex(alter, old_index->def->iid);
 	}
 
 	alter_space_do(txn, alter);
