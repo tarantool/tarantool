@@ -226,10 +226,6 @@ box_lua_error_init(struct lua_State *L) {
 			lua_pushcfunction(L, luaT_error_clear);
 			lua_setfield(L, -2, "clear");
 		}
-		{
-			lua_pushcfunction(L, luaT_error_raise);
-			lua_setfield(L, -2, "raise");
-		}
 		lua_setfield(L, -2, "__index");
 	}
 	lua_setmetatable(L, -2);

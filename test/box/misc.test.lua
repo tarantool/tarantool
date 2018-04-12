@@ -33,7 +33,6 @@ box.error.last()
 box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 box.error()
-box.error.raise()
 e = box.error.last()
 e
 e:unpack()
@@ -44,7 +43,6 @@ tostring(e)
 e = nil
 box.error.clear()
 box.error.last()
-box.error.raise()
 space = box.space.tweedledum
 --
 -- gh-2080: box.error() crashes with wrong parameters

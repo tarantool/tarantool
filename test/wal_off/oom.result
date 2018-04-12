@@ -200,7 +200,7 @@ function dup_key()
             error('Unexpected success when inserting a duplicate')
         end
         if box.error.last().code ~= box.error.TUPLE_FOUND then
-            box.error.raise()
+            box.error()
         end
         i = i + 1
     end

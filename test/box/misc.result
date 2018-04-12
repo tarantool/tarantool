@@ -110,10 +110,6 @@ box.error()
 ---
 - error: Illegal parameters, bla bla
 ...
-box.error.raise()
----
-- error: Illegal parameters, bla bla
-...
 e = box.error.last()
 ---
 ...
@@ -155,9 +151,6 @@ box.error.clear()
 box.error.last()
 ---
 - null
-...
-box.error.raise()
----
 ...
 space = box.space.tweedledum
 ---
