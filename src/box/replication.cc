@@ -87,11 +87,14 @@ replication_init(void)
 	rlist_create(&replicaset.anon);
 	vclock_create(&replicaset.vclock);
 	fiber_cond_create(&replicaset.applier.cond);
+	replicaset.replica_by_id = (struct replica **)calloc(VCLOCK_MAX, sizeof(struct replica *));
+	latch_create(&replicaset.applier.order_latch);
 }
 
 void
 replication_free(void)
 {
+	free(replicaset.replica_by_id);
 	mempool_destroy(&replicaset.pool);
 	fiber_cond_destroy(&replicaset.applier.cond);
 }
@@ -138,6 +141,7 @@ replica_new(void)
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
 	replica->state = REPLICA_DISCONNECTED;
+	latch_create(&replica->order_latch);
 	return replica;
 }
 
@@ -176,6 +180,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 	}
+	replicaset.replica_by_id[replica_id] = replica;
 }
 
 void
@@ -191,6 +196,7 @@ replica_clear_id(struct replica *replica)
 	 * Some records may arrive later on due to asynchronous nature of
 	 * replication.
 	 */
+	replicaset.replica_by_id[replica->id] = NULL;
 	replica->id = REPLICA_ID_NIL;
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
@@ -775,4 +781,10 @@ replica_by_uuid(const struct tt_uuid *uuid)
 	struct replica key;
 	key.uuid = *uuid;
 	return replica_hash_search(&replicaset.hash, &key);
+}
+
+struct replica *
+replica_by_id(uint32_t replica_id)
+{
+	return replicaset.replica_by_id[replica_id];
 }

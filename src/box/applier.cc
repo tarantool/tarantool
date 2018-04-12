@@ -506,7 +506,30 @@ applier_subscribe(struct applier *applier)
 			 */
 			vclock_follow(&replicaset.vclock, row.replica_id,
 				      row.lsn);
-			xstream_write_xc(applier->subscribe_stream, &row);
+			struct replica *replica = replica_by_id(row.replica_id);
+			/*
+			 * In a full mesh topology, the same set
+			 * of changes may arrive via two
+			 * concurrently running appliers. Thanks
+			 * to vclock_follow() above, the first row
+			 * in the set will be skipped - but the
+			 * remaining may execute out of order,
+			 * when the following xstream_write()
+			 * yields on WAL. Hence we need a latch to
+			 * strictly order all changes which belong
+			 * to the same server id.
+			 */
+			if (replica)
+				latch_lock(&replica->order_latch);
+			else
+				latch_lock(&replicaset.applier.order_latch);
+			int res = xstream_write(applier->subscribe_stream, &row);
+			if (replica)
+				latch_unlock(&replica->order_latch);
+			else
+				latch_unlock(&replicaset.applier.order_latch);
+			if (res != 0)
+				diag_raise();
 		}
 		if (applier->state == APPLIER_SYNC ||
 		    applier->state == APPLIER_FOLLOW)
