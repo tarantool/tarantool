@@ -215,18 +215,95 @@ local function create_transport(host, port, user, password, callback,
     local last_error
     local state_cond       = fiber.cond() -- signaled when the state changes
 
-    -- requests: requests currently 'in flight', keyed by a request id;
-    -- value refs are weak hence if a client dies unexpectedly,
-    -- GC cleans the mess. Client submits a request and waits on state_cond.
-    -- If the reponse arrives within the timeout, the worker wakes
-    -- client fiber explicitly. Otherwize, wait on state_cond completes and
-    -- the client reports E_TIMEOUT.
+    -- Async requests currently 'in flight', keyed by a request
+    -- id. Value refs are weak hence if a client dies
+    -- unexpectedly, GC cleans the mess.
+    -- Async request can not be timed out completely. Instead a
+    -- user must decide when he does not want to wait for
+    -- response anymore.
+    -- Sync requests are implemented as async call + immediate
+    -- wait for a result.
     local requests         = setmetatable({}, { __mode = 'v' })
     local next_request_id  = 1
 
     local worker_fiber
     local send_buf         = buffer.ibuf(buffer.READAHEAD)
     local recv_buf         = buffer.ibuf(buffer.READAHEAD)
+
+    --
+    -- Async request metamethods.
+    --
+    local request_index = {}
+    --
+    -- When an async request is finalized (with ok or error - no
+    -- matter), its 'id' field is nullified by a response
+    -- dispatcher.
+    --
+    function request_index:is_ready()
+        return self.id == nil or worker_fiber == nil
+    end
+    --
+    -- When a request is finished, a result can be got from a
+    -- future object anytime.
+    -- @retval result, nil Success, the response is returned.
+    -- @retval nil, error Error occured.
+    --
+    function request_index:result()
+        if self.errno then
+            return nil, box.error.new({code = self.errno,
+                                       reason = self.response})
+        elseif not self.id then
+            return self.response
+        elseif not worker_fiber then
+            return nil, box.error.new(E_NO_CONNECTION)
+        else
+            return nil, box.error.new(box.error.PROC_LUA,
+                                      'Response is not ready')
+        end
+    end
+    --
+    -- Wait for a response or error max timeout seconds.
+    -- @param timeout Max seconds to wait.
+    -- @retval result, nil Success, the response is returned.
+    -- @retval nil, error Error occured.
+    --
+    function request_index:wait_result(timeout)
+        if timeout then
+            if type(timeout) ~= 'number' or timeout < 0 then
+                error('Usage: future:wait_result(timeout)')
+            end
+        else
+            timeout = TIMEOUT_INFINITY
+        end
+        if not self:is_ready() then
+            -- When a response is ready before timeout, the
+            -- waiting client is waked up prematurely.
+            while timeout > 0 and not self:is_ready() do
+                local ts = fiber.clock()
+                self.cond:wait(timeout)
+                timeout = timeout - (fiber.clock() - ts)
+            end
+            if not self:is_ready() then
+                return nil, box.error.new(E_TIMEOUT)
+            end
+        end
+        return self:result()
+    end
+    --
+    -- Make a connection forget about the response. When it will
+    -- be received, it will be ignored. It reduces size of
+    -- requests table speeding up other requests.
+    --
+    function request_index:discard()
+        if self.id then
+            requests[self.id] = nil
+            self.id = nil
+            self.errno = box.error.PROC_LUA
+            self.response = 'Response is discarded'
+        end
+    end
+
+    local request_mt = { __index = request_index }
 
     -- STATE SWITCHING --
     local function set_state(new_state, new_errno, new_error)
@@ -237,8 +314,10 @@ local function create_transport(host, port, user, password, callback,
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' then
             for _, request in pairs(requests) do
+                request.id = nil
                 request.errno = new_errno
                 request.response = new_error
+                request.cond:broadcast()
             end
             requests = {}
         end
@@ -316,12 +395,16 @@ local function create_transport(host, port, user, password, callback,
         end
     end
 
-    -- REQUEST/RESPONSE --
-    local function perform_request(timeout, buffer, method, schema_version, ...)
+    --
+    -- Send a request and do not wait for response.
+    -- @retval nil, error Error occured.
+    -- @retval not nil Future object.
+    --
+    local function perform_async_request(buffer, method, schema_version, ...)
         if state ~= 'active' then
-            return last_errno or E_NO_CONNECTION, last_error
+            return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
+                                       reason = last_error})
         end
-        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
         -- alert worker to notify it of the queued outgoing data;
         -- if the buffer wasn't empty, assume the worker was already alerted
         if send_buf:size() == 0 then
@@ -330,26 +413,31 @@ local function create_transport(host, port, user, password, callback,
         local id = next_request_id
         method_encoder[method](send_buf, id, schema_version, ...)
         next_request_id = next_id(id)
-        local request = table_new(0, 6) -- reserve space for 6 keys
-        request.client = fiber_self()
+        -- Request has maximum 7 members:
+        -- method, schema_version, buffer, id, cond, errno,
+        -- response.
+        local request = setmetatable(table_new(0, 7), request_mt)
         request.method = method
         request.schema_version = schema_version
         request.buffer = buffer
+        request.id = id
+        request.cond = fiber.cond()
         requests[id] = request
-        repeat
-            local timeout = max(0, deadline - fiber_clock())
-            if not state_cond:wait(timeout) then
-                requests[id] = nil
-                return E_TIMEOUT, 'Timeout exceeded'
-            end
-        until requests[id] == nil -- i.e. completed (beware spurious wakeups)
-        return request.errno, request.response
+        return request
     end
 
-    local function wakeup_client(client)
-        if client:status() ~= 'dead' then
-            client:wakeup()
+    --
+    -- Send a request and wait for response.
+    -- @retval nil, error Error occured.
+    -- @retval not nil Response object.
+    --
+    local function perform_request(timeout, buffer, method, schema_version, ...)
+        local request, err =
+            perform_async_request(buffer, method, schema_version, ...)
+        if not request then
+            return nil, err
         end
+        return request:wait_result(timeout)
     end
 
     local function dispatch_response_iproto(hdr, body_rpos, body_end)
@@ -359,6 +447,7 @@ local function create_transport(host, port, user, password, callback,
             return
         end
         requests[id] = nil
+        request.id = nil
         local status = hdr[IPROTO_STATUS_KEY]
         local body, body_end_check
 
@@ -368,7 +457,7 @@ local function create_transport(host, port, user, password, callback,
             assert(body_end == body_end_check, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
             request.response = body[IPROTO_ERROR_KEY]
-            wakeup_client(request.client)
+            request.cond:broadcast()
             return
         end
 
@@ -379,7 +468,7 @@ local function create_transport(host, port, user, password, callback,
             local wpos = buffer:alloc(body_len)
             ffi.copy(wpos, body_rpos, body_len)
             request.response = tonumber(body_len)
-            wakeup_client(request.client)
+            request.cond:broadcast()
             return
         end
 
@@ -390,7 +479,7 @@ local function create_transport(host, port, user, password, callback,
             request.response, request.errno =
                 method_decoder[request.method](body[IPROTO_DATA_KEY])
         end
-        wakeup_client(request.client)
+        request.cond:broadcast()
     end
 
     local function new_request_id()
@@ -498,9 +587,10 @@ local function create_transport(host, port, user, password, callback,
             if request == nil then -- nobody is waiting for the response
                 return
             end
+            request.id = nil
             requests[rid] = nil
             request.response = response
-            wakeup_client(request.client)
+            request.cond:broadcast()
             return console_sm(next_id(rid))
         end
     end
@@ -608,7 +698,8 @@ local function create_transport(host, port, user, password, callback,
         stop            = stop,
         start           = start,
         wait_state      = wait_state,
-        perform_request = perform_request
+        perform_request = perform_request,
+        perform_async_request = perform_async_request,
     }
 end
 
@@ -865,8 +956,12 @@ function remote_methods:wait_connected(timeout)
 end
 
 function remote_methods:_request(method, opts, ...)
-    local this_fiber = fiber_self()
     local transport = self._transport
+    local buffer = opts and opts.buffer
+    if opts and opts.is_async then
+        return transport.perform_async_request(buffer, method, 0, ...)
+    end
+    local this_fiber = fiber_self()
     local perform_request = transport.perform_request
     local wait_state = transport.wait_state
     local deadline = nil
@@ -878,7 +973,6 @@ function remote_methods:_request(method, opts, ...)
         -- @deprecated since 1.7.4
         deadline = self._deadlines[this_fiber]
     end
-    local buffer = opts and opts.buffer
     local err, res
     repeat
         local timeout = deadline and max(0, deadline - fiber_clock())
@@ -886,15 +980,17 @@ function remote_methods:_request(method, opts, ...)
             wait_state('active', timeout)
             timeout = deadline and max(0, deadline - fiber_clock())
         end
-        err, res = perform_request(timeout, buffer, method,
+        res, err = perform_request(timeout, buffer, method,
                                    self.schema_version, ...)
-        if not err then
+        if err then
+            if err.code == E_WRONG_SCHEMA_VERSION then
+                err = nil
+            end
+        else
             return res
-        elseif err == E_WRONG_SCHEMA_VERSION then
-            err = nil
         end
     until err
-    box.error({code = err, reason = res})
+    box.error(err)
 end
 
 function remote_methods:ping(opts)
@@ -907,9 +1003,9 @@ function remote_methods:ping(opts)
         timeout = deadline and max(0, deadline - fiber_clock())
                             or (opts and opts.timeout)
     end
-    local err = self._transport.perform_request(timeout, nil, 'ping',
-                                                self.schema_version)
-    return not err or err == E_WRONG_SCHEMA_VERSION
+    local _, err = self._transport.perform_request(timeout, nil, 'ping',
+                                                   self.schema_version)
+    return not err or err.code == E_WRONG_SCHEMA_VERSION
 end
 
 function remote_methods:reload_schema()
@@ -929,7 +1025,7 @@ function remote_methods:call(func_name, args, opts)
     check_call_args(args)
     args = args or {}
     local res = self:_request('call_17', opts, tostring(func_name), args)
-    if type(res) ~= 'table' then
+    if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
     return unpack(res)
@@ -946,7 +1042,7 @@ function remote_methods:eval(code, args, opts)
     check_eval_args(args)
     args = args or {}
     local res = self:_request('eval', opts, code, args)
-    if type(res) ~= 'table' then
+    if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
     return unpack(res)
@@ -1088,13 +1184,13 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        err, res = pr(timeout, nil, 'eval', nil, loader, {line})
+        res, err = pr(timeout, nil, 'eval', nil, loader, {line})
     else
         assert(self.protocol == 'Lua console')
-        err, res = pr(timeout, nil, 'inject', nil, line..'$EOF$\n')
+        res, err = pr(timeout, nil, 'inject', nil, line..'$EOF$\n')
     end
     if err then
-        box.error({code = err, reason = res})
+        box.error(err)
     end
     return res[1] or res
 end
