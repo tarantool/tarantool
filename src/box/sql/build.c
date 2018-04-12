@@ -2129,18 +2129,36 @@ sqliteViewResetAll(sqlite3 * db)
  * Remove entries from the _sql_stat1 and _sql_stat4
  * system spaces after a DROP INDEX or DROP TABLE command.
  *
- * @param pParse Parsing context.
- * @param zType Type of entry to be deleted:
- * 		'idx' or 'tbl' string literal.
- * @param zName Name of index or table.
+ * @param parse      The parsing context.
+ * @param table_name The table to be dropped or
+ *                   the table that contains index to be dropped.
+ * @param idx_name   Index to be dropped.
  */
 static void
-sql_clear_stat_spaces(Parse * pParse, const char *zType, const char *zName)
+sql_clear_stat_spaces(Parse *parse, const char *table_name,
+		      const char *idx_name)
 {
-	sqlite3NestedParse(pParse, "DELETE FROM \"_sql_stat1\" WHERE \"%s\"=%Q",
-			   zType, zName);
-	sqlite3NestedParse(pParse, "DELETE FROM \"_sql_stat4\" WHERE \"%s\"=%Q",
-			   zType, zName);
+	if (idx_name != NULL) {
+		sqlite3NestedParse(parse,
+				   "DELETE FROM \"_sql_stat1\" "
+				   "WHERE (\"idx\"=%Q AND "
+				   "\"tbl\"=%Q)",
+				   idx_name, table_name);
+		sqlite3NestedParse(parse,
+				   "DELETE FROM \"_sql_stat4\" "
+				   "WHERE (\"idx\"=%Q AND "
+				   "\"tbl\"=%Q)",
+				   idx_name, table_name);
+	} else {
+		sqlite3NestedParse(parse,
+				   "DELETE FROM \"_sql_stat1\" "
+				   "WHERE \"tbl\"=%Q",
+				   table_name);
+		sqlite3NestedParse(parse,
+				   "DELETE FROM \"_sql_stat4\" "
+				   "WHERE \"tbl\"=%Q",
+				   table_name);
+	}
 }
 
 /**
@@ -2325,7 +2343,7 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	 *    tuple with corresponding space_id from _space.
 	 */
 
-	sql_clear_stat_spaces(parse_context, "tbl", space_name);
+	sql_clear_stat_spaces(parse_context, space_name, NULL);
 	struct Table *tab = sqlite3HashFind(&db->pSchema->tblHash, space_name);
 	sqlite3FkDropTable(parse_context, table_name_list, tab);
 	sql_code_drop_table(parse_context, space, is_view);
@@ -3328,7 +3346,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	 * But firstly, delete statistics since schema
 	 * changes after DDL.
 	 */
-	sql_clear_stat_spaces(parse_context, "idx", index->def->name);
+	sql_clear_stat_spaces(parse_context, table_name, index->def->name);
 	int record_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
 	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
