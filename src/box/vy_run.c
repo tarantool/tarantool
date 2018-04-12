@@ -1485,19 +1485,6 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 	if (itr->search_ended)
 		return 0;
 
-	/*
-	 * Check if the iterator is already positioned
-	 * at the statement following last_stmt.
-	 */
-	if (itr->search_started &&
-	    (itr->curr_stmt == NULL || last_stmt == NULL ||
-	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_stmt, last_stmt,
-			      itr->cmp_def) > 0)) {
-		*ret = itr->curr_stmt;
-		return 0;
-	}
-
 	const struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	if (last_stmt != NULL) {

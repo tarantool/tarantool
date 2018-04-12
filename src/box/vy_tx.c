@@ -979,20 +979,6 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr,
 	assert(!itr->search_started ||
 	       itr->version == itr->tx->write_set_version);
 
-	/*
-	 * Check if the iterator is already positioned
-	 * at the statement following last_stmt.
-	 */
-	if (itr->search_started &&
-	    (itr->curr_txv == NULL || last_stmt == NULL ||
-	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_txv->stmt, last_stmt,
-			      itr->lsm->cmp_def) > 0)) {
-		if (itr->curr_txv != NULL)
-			*ret = itr->curr_txv->stmt;
-		return;
-	}
-
 	const struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	if (last_stmt != NULL) {

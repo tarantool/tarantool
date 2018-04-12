@@ -703,25 +703,6 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 
 	assert(!itr->search_started || itr->version == itr->cache->version);
 
-	/*
-	 * Check if the iterator is already positioned
-	 * at the statement following last_stmt.
-	 */
-	if (itr->search_started &&
-	    (itr->curr_stmt == NULL || last_stmt == NULL ||
-	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_stmt, last_stmt,
-			      itr->cache->cmp_def) > 0)) {
-		if (itr->curr_stmt == NULL)
-			return;
-		struct vy_cache_tree *tree = &itr->cache->cache_tree;
-		struct vy_cache_entry *entry =
-			*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
-		*ret = itr->curr_stmt;
-		*stop = vy_cache_iterator_is_stop(itr, entry);
-		return;
-	}
-
 	itr->search_started = true;
 	itr->version = itr->cache->version;
 	if (itr->curr_stmt != NULL)
