@@ -1136,6 +1136,9 @@ errinj.set("ERRINJ_WAL_DELAY", false)
 ---
 - ok
 ...
+while ok == nil do fiber.sleep(0.01) end
+---
+...
 ok, err
 ---
 - true

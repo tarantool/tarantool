@@ -385,6 +385,7 @@ end)
 test_run:cmd('setopt delimiter ""');
 cn.space.test:get{1}
 errinj.set("ERRINJ_WAL_DELAY", false)
+while ok == nil do fiber.sleep(0.01) end
 ok, err
 cn:close()
 s:drop()
