@@ -50,7 +50,35 @@ local E_PROC_LUA             = box.error.PROC_LUA
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
-local method_codec           = {
+
+local function decode_nil(...) end
+local function decode_nop(...) return ... end
+local function decode_tuple(response)
+    if response[1] then
+        return box.tuple.new(response[1])
+    end
+end
+local function decode_get(response)
+    if response[2] then
+        return nil, box.error.MORE_THAN_ONE_TUPLE
+    end
+    if response[1] then
+        return box.tuple.new(response[1])
+    end
+end
+local function decode_select(response)
+    setmetatable(response, sequence_mt)
+    local tnew = box.tuple.new
+    for i, v in pairs(response) do
+        response[i] = tnew(v)
+    end
+    return response
+end
+local function decode_count(response)
+    return response[1]
+end
+
+local method_encoder = {
     ping    = internal.encode_ping,
     call_16 = internal.encode_call_16,
     call_17 = internal.encode_call,
@@ -61,12 +89,34 @@ local method_codec           = {
     update  = internal.encode_update,
     upsert  = internal.encode_upsert,
     select  = internal.encode_select,
+    get     = internal.encode_select,
+    min     = internal.encode_select,
+    max     = internal.encode_select,
+    count   = internal.encode_call,
     -- inject raw data into connection, used by console and tests
     inject = function(buf, id, schema_version, bytes)
         local ptr = buf:reserve(#bytes)
         ffi.copy(ptr, bytes, #bytes)
         buf.wpos = ptr + #bytes
     end
+}
+
+local method_decoder = {
+    ping    = decode_nil,
+    call_16 = decode_select,
+    call_17 = decode_nop,
+    eval    = decode_nop,
+    insert  = decode_tuple,
+    replace = decode_tuple,
+    delete  = decode_tuple,
+    update  = decode_tuple,
+    upsert  = decode_nil,
+    select  = decode_select,
+    get     = decode_get,
+    min     = decode_get,
+    max     = decode_get,
+    count   = decode_count,
+    inject  = decode_nop,
 }
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
@@ -278,7 +328,7 @@ local function create_transport(host, port, user, password, callback,
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_codec[method](send_buf, id, schema_version, ...)
+        method_encoder[method](send_buf, id, schema_version, ...)
         next_request_id = next_id(id)
         local request = table_new(0, 6) -- reserve space for 6 keys
         request.client = fiber_self()
@@ -336,7 +386,10 @@ local function create_transport(host, port, user, password, callback,
         -- Decode xrow.body[DATA] to Lua objects
         body, body_end_check = decode(body_rpos)
         assert(body_end == body_end_check, "invalid xrow length")
-        request.response = body[IPROTO_DATA_KEY]
+        if body and body[IPROTO_DATA_KEY] then
+            request.response, request.errno =
+                method_decoder[request.method](body[IPROTO_DATA_KEY])
+        end
         wakeup_client(request.client)
     end
 
@@ -417,7 +470,7 @@ local function create_transport(host, port, user, password, callback,
             log.warn("Netbox text protocol support is deprecated since 1.10, "..
                      "please use require('console').connect() instead")
             local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
-            method_codec.inject(send_buf, nil, nil, setup_delimiter)
+            method_encoder.inject(send_buf, nil, nil, setup_delimiter)
             local err, response = send_and_recv_console()
             if err then
                 return error_sm(err, response)
@@ -835,18 +888,8 @@ function remote_methods:_request(method, opts, ...)
         end
         err, res = perform_request(timeout, buffer, method,
                                    self.schema_version, ...)
-        if not err and buffer ~= nil then
-            return res -- the length of xrow.body
-        elseif not err then
-            setmetatable(res, sequence_mt)
-            local postproc = method ~= 'eval' and method ~= 'call_17'
-            if postproc then
-                local tnew = box.tuple.new
-                for i, v in pairs(res) do
-                    res[i] = tnew(v)
-                end
-            end
-            return res -- decoded xrow.body[DATA]
+        if not err then
+            return res
         elseif err == E_WRONG_SCHEMA_VERSION then
             err = nil
         end
@@ -1056,11 +1099,9 @@ function console_methods:eval(line, timeout)
     return res[1] or res
 end
 
-local function one_tuple(tab)
-    if type(tab) ~= 'table' then
-        return tab
-    elseif tab[1] ~= nil then
-        return tab[1]
+local function nothing_or_data(value)
+    if value ~= nil then
+        return value
     end
 end
 
@@ -1069,12 +1110,12 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        return one_tuple(remote:_request('insert', opts, self.id, tuple))
+        return remote:_request('insert', opts, self.id, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        return one_tuple(remote:_request('replace', opts, self.id, tuple))
+        return remote:_request('replace', opts, self.id, tuple)
     end
 
     function methods:select(key, opts)
@@ -1094,8 +1135,8 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
-        remote:_request('upsert', opts, self.id, key, oplist)
-        return
+        return nothing_or_data(remote:_request('upsert', opts, self.id, key,
+                                               oplist))
     end
 
     function methods:get(key, opts)
@@ -1133,10 +1174,8 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
-        local res = remote:_request('select', opts, self.space.id, self.id,
-                                    box.index.EQ, 0, 2, key)
-        if res[2] ~= nil then box.error(box.error.MORE_THAN_ONE_TUPLE) end
-        if res[1] ~= nil then return res[1] end
+        return nothing_or_data(remote:_request('get', opts, self.space.id,
+                               self.id, box.index.EQ, 0, 2, key))
     end
 
     function methods:min(key, opts)
@@ -1144,9 +1183,9 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
-        local res = remote:_request('select', opts, self.space.id, self.id,
-                                    box.index.GE, 0, 1, key)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('min', opts, self.space.id,
+                                               self.id, box.index.GE, 0, 1,
+                                               key))
     end
 
     function methods:max(key, opts)
@@ -1154,9 +1193,9 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
-        local res = remote:_request('select', opts, self.space.id, self.id,
-                                    box.index.LE, 0, 1, key)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('max', opts, self.space.id,
+                                               self.id, box.index.LE, 0, 1,
+                                               key))
     end
 
     function methods:count(key, opts)
@@ -1166,21 +1205,19 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('call_16', opts, code, { key })[1][1]
+        return remote:_request('count', opts, code, { key })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
-        local res = remote:_request('delete', opts, self.space.id, self.id,
-                                    key)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('delete', opts, self.space.id,
+                                               self.id, key))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
-        local res = remote:_request('update', opts, self.space.id, self.id,
-                                    key, oplist)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('update', opts, self.space.id,
+                                               self.id, key, oplist))
     end
 
     return { __index = methods, __metatable = false }

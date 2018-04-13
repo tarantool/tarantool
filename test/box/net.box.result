@@ -1481,6 +1481,7 @@ result
 -- upsert
 c.space.test:upsert({4}, {}, {buffer = ibuf})
 ---
+- 7
 ...
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
@@ -1492,6 +1493,7 @@ result
 -- delete
 c.space.test:upsert({4}, {}, {buffer = ibuf})
 ---
+- 7
 ...
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ---
