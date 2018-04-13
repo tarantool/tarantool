@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(44)
+test:plan(29)
 
 --!./tcltestrunner.lua
 -- 2013-11-05
@@ -353,281 +353,50 @@ test:do_execsql_test(
         -- </conflict-6.4>
     })
 
--- Change which column is the PRIMARY KEY
---
-test:do_execsql_test(
+test:do_catchsql_test(
     "conflict-7.1",
     [[
-        DROP TABLE t1;
-        CREATE TABLE t1(
-          a UNIQUE ON CONFLICT REPLACE, 
-          b INTEGER PRIMARY KEY ON CONFLICT IGNORE,
-          c UNIQUE ON CONFLICT FAIL
-        );
-        INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
-        SELECT a,b,c FROM t1 ORDER BY a;
+        CREATE TABLE t3(a PRIMARY KEY ON CONFLICT REPLACE,
+                        b UNIQUE ON CONFLICT REPLACE);
     ]], {
-        -- <conflict-7.1>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-7.1>
+        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
--- Insert a row that conflicts on column B.  The insert should be ignored.
---
-test:do_execsql_test(
+test:do_catchsql_test(
     "conflict-7.2",
     [[
-        INSERT INTO t1(a,b,c) VALUES(3,2,5);
-        SELECT a,b,c FROM t1 ORDER BY a;
+        CREATE TABLE t3(a PRIMARY KEY,
+                        b UNIQUE ON CONFLICT REPLACE);
     ]], {
-        -- <conflict-7.2>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-7.2>
+        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
--- Insert two rows where the second conflicts on C.  The first row show go
--- and and then there should be a constraint error.
---
 test:do_catchsql_test(
     "conflict-7.3",
     [[
-        INSERT INTO t1(a,b,c) VALUES(4,5,6), (5,6,4);
+        CREATE TABLE t3(a PRIMARY KEY,
+                        b UNIQUE ON CONFLICT REPLACE,
+                        c UNIQUE ON CONFLICT REPLACE);
     ]], {
-        -- <conflict-7.3>
-        1, "UNIQUE constraint failed: T1.C"
-        -- </conflict-7.3>
+        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "conflict-7.4",
     [[
-        SELECT a,b,c FROM t1 ORDER BY a;
+        CREATE TABLE t3(a PRIMARY KEY,
+                        b NOT NULL ON CONFLICT REPLACE DEFAULT 1488);
     ]], {
-        -- <conflict-7.4>
-        1, 2, 3, 2, 3, 4, 4, 5, 6
-        -- </conflict-7.4>
+        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
--- Change which column is the PRIMARY KEY
---
-test:do_execsql_test(
-    "conflict-8.1",
-    [[
-        DROP TABLE t1;
-        CREATE TABLE t1(
-          a UNIQUE ON CONFLICT REPLACE, 
-          b INT PRIMARY KEY ON CONFLICT IGNORE,
-          c UNIQUE ON CONFLICT FAIL
-        );
-        INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-8.1>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-8.1>
-    })
-
--- Insert a row that conflicts on column B.  The insert should be ignored.
---
-test:do_execsql_test(
-    "conflict-8.2",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(3,2,5);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-8.2>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-8.2>
-    })
-
--- Insert two rows where the second conflicts on C.  The first row show go
--- and and then there should be a constraint error.
---
 test:do_catchsql_test(
-    "conflict-8.3",
+    "conflict-7.5",
     [[
-        INSERT INTO t1(a,b,c) VALUES(4,5,6), (5,6,4);
+        CREATE TABLE t3(a PRIMARY KEY ON CONFLICT REPLACE,
+                        b NOT NULL ON CONFLICT REPLACE DEFAULT 1488);
     ]], {
-        -- <conflict-8.3>
-        1, "UNIQUE constraint failed: T1.C"
-        -- </conflict-8.3>
+        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
-
-test:do_execsql_test(
-    "conflict-8.4",
-    [[
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-8.4>
-        1, 2, 3, 2, 3, 4, 4, 5, 6
-        -- </conflict-8.4>
-    })
-
--- Change which column is the PRIMARY KEY
---
-test:do_execsql_test(
-    "conflict-9.1",
-    [[
-        DROP TABLE t1;
-        CREATE TABLE t1(
-          a UNIQUE ON CONFLICT REPLACE, 
-          b INT PRIMARY KEY ON CONFLICT IGNORE,
-          c UNIQUE ON CONFLICT FAIL
-        );
-        INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-9.1>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-9.1>
-   })
-
--- Insert a row that conflicts on column B.  The insert should be ignored.
---
-test:do_execsql_test(
-    "conflict-9.2",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(3,2,5);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-9.2>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-9.2>
-    })
-
--- Insert two rows where the second conflicts on C.  The first row show go
--- and and then there should be a constraint error.
---
-test:do_catchsql_test(
-    "conflict-9.3",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(4,5,6), (5,6,4);
-    ]], {
-        -- <conflict-9.3>
-        1, "UNIQUE constraint failed: T1.C"
-        -- </conflict-9.3>
-    })
-
-test:do_execsql_test(
-    "conflict-9.4",
-    [[
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-9.4>
-        1, 2, 3, 2, 3, 4, 4, 5, 6
-        -- </conflict-9.4>
-    })
-
--- Change which column is the PRIMARY KEY
---
-test:do_execsql_test(
-    "conflict-10.1",
-    [[
-        DROP TABLE t1;
-        CREATE TABLE t1(
-          a UNIQUE ON CONFLICT REPLACE, 
-          b UNIQUE ON CONFLICT IGNORE,
-          c INTEGER PRIMARY KEY ON CONFLICT FAIL
-        );
-        INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-10.1>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-10.1>
-    })
-
--- Insert a row that conflicts on column B.  The insert should be ignored.
---
-test:do_execsql_test(
-    "conflict-10.2",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(3,2,5);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-10.2>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-10.2>
-    })
-
--- Insert two rows where the second conflicts on C.  The first row show go
--- and and then there should be a constraint error.
---
-test:do_catchsql_test(
-    "conflict-10.3",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(4,5,6), (5,6,4);
-    ]], {
-    -- <conflict-10.3>
-        1, "UNIQUE constraint failed: T1.C"
-        -- </conflict-10.3>
-    })
-
-test:do_execsql_test(
-    "conflict-10.4",
-    [[
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-10.4>
-        1, 2, 3, 2, 3, 4, 4, 5, 6
-        -- </conflict-10.4>
-    })
-
--- Change which column is the PRIMARY KEY
---
-test:do_execsql_test(
-    "conflict-11.1",
-    [[
-        DROP TABLE t1;
-        CREATE TABLE t1(
-          a UNIQUE ON CONFLICT REPLACE, 
-          b UNIQUE ON CONFLICT IGNORE,
-          c PRIMARY KEY ON CONFLICT FAIL
-        );
-        INSERT INTO t1(a,b,c) VALUES(1,2,3), (2,3,4);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-11.1>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-11.1>
-    })
-
--- Insert a row that conflicts on column B.  The insert should be ignored.
---
-test:do_execsql_test(
-    "conflict-11.2",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(3,2,5);
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-11.2>
-        1, 2, 3, 2, 3, 4
-        -- </conflict-11.2>
-    })
-
--- Insert two rows where the second conflicts on C.  The first row show go
--- and and then there should be a constraint error.
---
-test:do_catchsql_test(
-    "conflict-11.3",
-    [[
-        INSERT INTO t1(a,b,c) VALUES(4,5,6), (5,6,4);
-    ]], {
-        -- <conflict-11.3>
-        1, "UNIQUE constraint failed: T1.C"
-        -- </conflict-11.3>
-    })
-
-test:do_execsql_test(
-    "conflict-11.4",
-    [[
-        SELECT a,b,c FROM t1 ORDER BY a;
-    ]], {
-        -- <conflict-11.4>
-        1, 2, 3, 2, 3, 4, 4, 5, 6
-        -- </conflict-11.4>
-    })
-
-
 
 test:finish_test()
