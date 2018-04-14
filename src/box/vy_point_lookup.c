@@ -110,17 +110,17 @@ vy_history_append_stmt(struct vy_history *history, struct tuple *stmt)
 }
 
 /**
- * Unref statement if necessary, remove node from history if it's there.
+ * Release all statements stored in the given history and
+ * reinitialize the history list.
  */
 static void
-vy_history_cleanup(struct vy_history *history, size_t region_svp)
+vy_history_cleanup(struct vy_history *history)
 {
 	struct vy_history_node *node;
 	rlist_foreach_entry(node, &history->stmts, link)
 		if (node->is_refable)
 			tuple_unref(node->stmt);
-
-	region_truncate(&fiber()->gc, region_svp);
+	rlist_create(&history->stmts);
 }
 
 /**
@@ -384,9 +384,8 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	lsm->stat.lookup++;
 	/* History list */
 	struct vy_history history;
-restart:
 	vy_history_create(&history);
-
+restart:
 	rc = vy_point_lookup_scan_txw(lsm, tx, key, &history);
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
@@ -421,7 +420,8 @@ restart:
 		 * This in unnecessary in case of rotation but since we
 		 * cannot distinguish these two cases we always restart.
 		 */
-		vy_history_cleanup(&history, region_svp);
+		vy_history_cleanup(&history);
+		region_truncate(&fiber()->gc, region_svp);
 		goto restart;
 	}
 
@@ -432,7 +432,8 @@ done:
 				      &upserts_applied, ret);
 		lsm->stat.upsert.applied += upserts_applied;
 	}
-	vy_history_cleanup(&history, region_svp);
+	vy_history_cleanup(&history);
+	region_truncate(&fiber()->gc, region_svp);
 
 	if (rc != 0)
 		return -1;
