@@ -328,15 +328,15 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 }
 
 /**
- * Get a resultant statement from collected history. Add to cache if possible.
+ * Get a resultant statement from collected history.
  */
 static int
-vy_point_lookup_apply_history(struct vy_lsm *lsm,
-			      const struct vy_read_view **rv,
-			      struct tuple *key, struct rlist *history,
-			      struct tuple **ret)
+vy_history_apply(struct rlist *history, const struct key_def *cmp_def,
+		 struct tuple_format *format, int *upserts_applied,
+		 struct tuple **ret)
 {
 	*ret = NULL;
+	*upserts_applied = 0;
 	if (rlist_empty(history))
 		return 0;
 
@@ -355,14 +355,9 @@ vy_point_lookup_apply_history(struct vy_lsm *lsm,
 		node = rlist_prev_entry_safe(node, history, link);
 	}
 	while (node != NULL) {
-		assert(vy_stmt_type(node->stmt) == IPROTO_UPSERT);
-		/* We could not read the data that is invisible now */
-		assert(node->src_type == ITER_SRC_TXW ||
-		       vy_stmt_lsn(node->stmt) <= (*rv)->vlsn);
-
 		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
-					lsm->cmp_def, lsm->mem_format, true);
-		lsm->stat.upsert.applied++;
+						     cmp_def, format, true);
+		++*upserts_applied;
 		if (stmt == NULL)
 			return -1;
 		if (curr_stmt != NULL)
@@ -370,15 +365,7 @@ vy_point_lookup_apply_history(struct vy_lsm *lsm,
 		curr_stmt = stmt;
 		node = rlist_prev_entry_safe(node, history, link);
 	}
-	if (curr_stmt != NULL) {
-		vy_stmt_counter_acct_tuple(&lsm->stat.get, curr_stmt);
-		*ret = curr_stmt;
-	}
-	/**
-	 * Add a statement to the cache
-	 */
-	if ((*rv)->vlsn == INT64_MAX) /* Do not store non-latest data */
-		vy_cache_add(&lsm->cache, curr_stmt, NULL, key, ITER_EQ);
+	*ret = curr_stmt;
 	return 0;
 }
 
@@ -440,13 +427,21 @@ restart:
 
 done:
 	if (rc == 0) {
-		rc = vy_point_lookup_apply_history(lsm, rv, key,
-						   &history, ret);
+		int upserts_applied;
+		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
+				      &upserts_applied, ret);
+		lsm->stat.upsert.applied += upserts_applied;
 	}
 	vy_history_cleanup(&history, region_svp);
 
 	if (rc != 0)
 		return -1;
+
+	if (*ret != NULL) {
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, *ret);
+		if ((*rv)->vlsn == INT64_MAX)
+			vy_cache_add(&lsm->cache, *ret, NULL, key, ITER_EQ);
+	}
 
 	double latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&lsm->stat.latency, latency);
