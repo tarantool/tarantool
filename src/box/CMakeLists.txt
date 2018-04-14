@@ -84,6 +84,7 @@ add_library(box STATIC
     vy_cache.c
     vy_log.c
     vy_upsert.c
+    vy_history.c
     vy_read_set.c
     vy_scheduler.c
     request.c

@@ -163,6 +163,7 @@ add_executable(vy_point_lookup.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_tx.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_read_set.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_history.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_lsm.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c
     ${PROJECT_SOURCE_DIR}/src/box/index_def.c
