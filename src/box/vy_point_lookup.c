@@ -48,27 +48,29 @@
 #include "vy_upsert.h"
 
 /**
- * ID of an iterator source type. Can be used in bitmaps.
- */
-enum iterator_src_type {
-	ITER_SRC_TXW = 1,
-	ITER_SRC_CACHE = 2,
-	ITER_SRC_MEM = 4,
-	ITER_SRC_RUN = 8,
-};
-
-/**
  * History of a key in vinyl is a continuous sequence of statements of the
  * same key in order of decreasing lsn. The history can be represented as a
  * list, the structure below describes one node of the list.
  */
 struct vy_history_node {
-	/* Type of source that the history statement came from */
-	enum iterator_src_type src_type;
-	/* The history statement. Referenced for runs. */
-	struct tuple *stmt;
-	/* Link in the history list */
+	/** Link in a history list. */
 	struct rlist link;
+	/** History statement. Referenced if @is_refable is set. */
+	struct tuple *stmt;
+	/**
+	 * Set if the statement stored in this node is refable,
+	 * i.e. has a reference counter that can be incremented
+	 * to pin the statement in memory. Refable statements are
+	 * referenced by the history. It is a responsibility of
+	 * the user of the history to track lifetime of unrefable
+	 * statements.
+	 *
+	 * Note, we need to store this flag here, because by the
+	 * time we clean up a history list, unrefable statements
+	 * stored in it might have been deleted, thus making
+	 * vy_stmt_is_refable() unusable.
+	 */
+	bool is_refable;
 };
 
 /**
@@ -76,8 +78,7 @@ struct vy_history_node {
  * Returns 0 on success, -1 on memory allocation error.
  */
 static int
-vy_history_append_stmt(struct rlist *history, struct tuple *stmt,
-		       enum iterator_src_type src_type)
+vy_history_append_stmt(struct rlist *history, struct tuple *stmt)
 {
 	struct region *region = &fiber()->gc;
 	struct vy_history_node *node = region_alloc(region, sizeof(*node));
@@ -86,8 +87,8 @@ vy_history_append_stmt(struct rlist *history, struct tuple *stmt,
 			 "struct vy_history_node");
 		return -1;
 	}
-	node->src_type = src_type;
-	if (node->src_type == ITER_SRC_RUN)
+	node->is_refable = vy_stmt_is_refable(stmt);
+	if (node->is_refable)
 		tuple_ref(stmt);
 	node->stmt = stmt;
 	rlist_add_tail_entry(history, node, link);
@@ -102,7 +103,7 @@ vy_history_cleanup(struct rlist *history, size_t region_svp)
 {
 	struct vy_history_node *node;
 	rlist_foreach_entry(node, history, link)
-		if (node->src_type == ITER_SRC_RUN)
+		if (node->is_refable)
 			tuple_unref(node->stmt);
 
 	region_truncate(&fiber()->gc, region_svp);
@@ -144,7 +145,7 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
 		return 0;
 	vy_stmt_counter_acct_tuple(&lsm->stat.txw.iterator.get,
 				   txv->stmt);
-	return vy_history_append_stmt(history, txv->stmt, ITER_SRC_TXW);
+	return vy_history_append_stmt(history, txv->stmt);
 }
 
 /**
@@ -163,7 +164,7 @@ vy_point_lookup_scan_cache(struct vy_lsm *lsm,
 		return 0;
 
 	vy_stmt_counter_acct_tuple(&lsm->cache.stat.get, stmt);
-	return vy_history_append_stmt(history, stmt, ITER_SRC_CACHE);
+	return vy_history_append_stmt(history, stmt);
 }
 
 /**
@@ -193,8 +194,7 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 		return 0;
 
 	while (true) {
-		if (vy_history_append_stmt(history, (struct tuple *)stmt,
-					   ITER_SRC_MEM) != 0)
+		if (vy_history_append_stmt(history, (struct tuple *)stmt) != 0)
 			return -1;
 
 		vy_stmt_counter_acct_tuple(&lsm->stat.memory.iterator.get,
@@ -261,7 +261,7 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 	struct tuple *stmt;
 	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {
-		if (vy_history_append_stmt(history, stmt, ITER_SRC_RUN) != 0) {
+		if (vy_history_append_stmt(history, stmt) != 0) {
 			rc = -1;
 			break;
 		}
@@ -333,7 +333,7 @@ vy_history_apply(struct rlist *history, const struct key_def *cmp_def,
 	if (vy_history_is_terminal(history)) {
 		if (vy_stmt_type(node->stmt) == IPROTO_DELETE) {
 			/* Ignore terminal delete */
-		} else if (node->src_type == ITER_SRC_MEM) {
+		} else if (!node->is_refable) {
 			curr_stmt = vy_stmt_dup(node->stmt);
 		} else {
 			curr_stmt = node->stmt;
