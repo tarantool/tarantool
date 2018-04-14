@@ -62,7 +62,7 @@ enum iterator_src_type {
  * same key in order of decreasing lsn. The history can be represented as a
  * list, the structure below describes one node of the list.
  */
-struct vy_stmt_history_node {
+struct vy_history_node {
 	/* Type of source that the history statement came from */
 	enum iterator_src_type src_type;
 	/* The history statement. Referenced for runs. */
@@ -75,14 +75,14 @@ struct vy_stmt_history_node {
  * Allocate (region) new history node.
  * @return new node or NULL on memory error (diag is set).
  */
-static struct vy_stmt_history_node *
-vy_stmt_history_node_new(void)
+static struct vy_history_node *
+vy_history_node_new(void)
 {
 	struct region *region = &fiber()->gc;
-	struct vy_stmt_history_node *node = region_alloc(region, sizeof(*node));
+	struct vy_history_node *node = region_alloc(region, sizeof(*node));
 	if (node == NULL)
 		diag_set(OutOfMemory, sizeof(*node), "region",
-			 "struct vy_stmt_history_node");
+			 "struct vy_history_node");
 	return node;
 }
 
@@ -90,9 +90,9 @@ vy_stmt_history_node_new(void)
  * Unref statement if necessary, remove node from history if it's there.
  */
 static void
-vy_stmt_history_cleanup(struct rlist *history, size_t region_svp)
+vy_history_cleanup(struct rlist *history, size_t region_svp)
 {
-	struct vy_stmt_history_node *node;
+	struct vy_history_node *node;
 	rlist_foreach_entry(node, history, link)
 		if (node->src_type == ITER_SRC_RUN)
 			tuple_unref(node->stmt);
@@ -105,12 +105,12 @@ vy_stmt_history_cleanup(struct rlist *history, size_t region_svp)
  * i.e. REPLACE of DELETE statement.
  */
 static bool
-vy_stmt_history_is_terminal(struct rlist *history)
+vy_history_is_terminal(struct rlist *history)
 {
 	if (rlist_empty(history))
 		return false;
-	struct vy_stmt_history_node *node =
-		rlist_last_entry(history, struct vy_stmt_history_node, link);
+	struct vy_history_node *node = rlist_last_entry(history,
+					struct vy_history_node, link);
 	assert(vy_stmt_type(node->stmt) == IPROTO_REPLACE ||
 	       vy_stmt_type(node->stmt) == IPROTO_DELETE ||
 	       vy_stmt_type(node->stmt) == IPROTO_INSERT ||
@@ -136,7 +136,7 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
 		return 0;
 	vy_stmt_counter_acct_tuple(&lsm->stat.txw.iterator.get,
 				   txv->stmt);
-	struct vy_stmt_history_node *node = vy_stmt_history_node_new();
+	struct vy_history_node *node = vy_history_node_new();
 	if (node == NULL)
 		return -1;
 	node->src_type = ITER_SRC_TXW;
@@ -161,7 +161,7 @@ vy_point_lookup_scan_cache(struct vy_lsm *lsm,
 		return 0;
 
 	vy_stmt_counter_acct_tuple(&lsm->cache.stat.get, stmt);
-	struct vy_stmt_history_node *node = vy_stmt_history_node_new();
+	struct vy_history_node *node = vy_history_node_new();
 	if (node == NULL)
 		return -1;
 
@@ -198,7 +198,7 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 		return 0;
 
 	while (true) {
-		struct vy_stmt_history_node *node = vy_stmt_history_node_new();
+		struct vy_history_node *node = vy_history_node_new();
 		if (node == NULL)
 			return -1;
 
@@ -208,7 +208,7 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 		node->src_type = ITER_SRC_MEM;
 		node->stmt = (struct tuple *)stmt;
 		rlist_add_tail(history, &node->link);
-		if (vy_stmt_history_is_terminal(history))
+		if (vy_history_is_terminal(history))
 			break;
 
 		if (!vy_mem_tree_iterator_next(&mem->tree, &mem_itr))
@@ -237,7 +237,7 @@ vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
 	int rc = vy_point_lookup_scan_mem(lsm, lsm->mem, rv, key, history);
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
-		if (rc != 0 || vy_stmt_history_is_terminal(history))
+		if (rc != 0 || vy_history_is_terminal(history))
 			return rc;
 
 		rc = vy_point_lookup_scan_mem(lsm, mem, rv, key, history);
@@ -269,7 +269,7 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 	struct tuple *stmt;
 	rc = vy_run_iterator_next_key(&run_itr, &stmt);
 	while (rc == 0 && stmt != NULL) {
-		struct vy_stmt_history_node *node = vy_stmt_history_node_new();
+		struct vy_history_node *node = vy_history_node_new();
 		if (node == NULL) {
 			rc = -1;
 			break;
@@ -341,9 +341,9 @@ vy_point_lookup_apply_history(struct vy_lsm *lsm,
 		return 0;
 
 	struct tuple *curr_stmt = NULL;
-	struct vy_stmt_history_node *node =
-		rlist_last_entry(history, struct vy_stmt_history_node, link);
-	if (vy_stmt_history_is_terminal(history)) {
+	struct vy_history_node *node = rlist_last_entry(history,
+					struct vy_history_node, link);
+	if (vy_history_is_terminal(history)) {
 		if (vy_stmt_type(node->stmt) == IPROTO_DELETE) {
 			/* Ignore terminal delete */
 		} else if (node->src_type == ITER_SRC_MEM) {
@@ -401,15 +401,15 @@ restart:
 	rlist_create(&history);
 
 	rc = vy_point_lookup_scan_txw(lsm, tx, key, &history);
-	if (rc != 0 || vy_stmt_history_is_terminal(&history))
+	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 	rc = vy_point_lookup_scan_cache(lsm, rv, key, &history);
-	if (rc != 0 || vy_stmt_history_is_terminal(&history))
+	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 	rc = vy_point_lookup_scan_mems(lsm, rv, key, &history);
-	if (rc != 0 || vy_stmt_history_is_terminal(&history))
+	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 	/* Save version before yield */
@@ -434,7 +434,7 @@ restart:
 		 * This in unnecessary in case of rotation but since we
 		 * cannot distinguish these two cases we always restart.
 		 */
-		vy_stmt_history_cleanup(&history, region_svp);
+		vy_history_cleanup(&history, region_svp);
 		goto restart;
 	}
 
@@ -443,7 +443,7 @@ done:
 		rc = vy_point_lookup_apply_history(lsm, rv, key,
 						   &history, ret);
 	}
-	vy_stmt_history_cleanup(&history, region_svp);
+	vy_history_cleanup(&history, region_svp);
 
 	if (rc != 0)
 		return -1;
