@@ -35,6 +35,7 @@
 #include <stddef.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <small/mempool.h>
 
 #include "diag.h"
 #include "errcode.h"
@@ -50,6 +51,7 @@
 #include "vy_stat.h"
 #include "vy_stmt.h"
 #include "vy_upsert.h"
+#include "vy_history.h"
 #include "vy_read_set.h"
 
 int
@@ -74,6 +76,8 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 	env->upsert_thresh_arg = upsert_thresh_arg;
 	env->too_long_threshold = TIMEOUT_INFINITY;
 	env->lsm_count = 0;
+	mempool_create(&env->history_node_pool, cord_slab_cache(),
+		       sizeof(struct vy_history_node));
 	return 0;
 }
 
@@ -82,6 +86,7 @@ vy_lsm_env_destroy(struct vy_lsm_env *env)
 {
 	tuple_unref(env->empty_key);
 	tuple_format_unref(env->key_format);
+	mempool_destroy(&env->history_node_pool);
 }
 
 const char *

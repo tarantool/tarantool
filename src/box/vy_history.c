@@ -30,13 +30,13 @@
  */
 #include "vy_history.h"
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <small/region.h>
+#include <small/mempool.h>
 #include <small/rlist.h>
 
 #include "diag.h"
-#include "fiber.h"
 #include "tuple.h"
 #include "iproto_constants.h"
 #include "vy_stmt.h"
@@ -45,10 +45,10 @@
 int
 vy_history_append_stmt(struct vy_history *history, struct tuple *stmt)
 {
-	struct region *region = &fiber()->gc;
-	struct vy_history_node *node = region_alloc(region, sizeof(*node));
+	assert(history->pool->objsize == sizeof(struct vy_history_node));
+	struct vy_history_node *node = mempool_alloc(history->pool);
 	if (node == NULL) {
-		diag_set(OutOfMemory, sizeof(*node), "region",
+		diag_set(OutOfMemory, sizeof(*node), "mempool",
 			 "struct vy_history_node");
 		return -1;
 	}
@@ -63,10 +63,11 @@ vy_history_append_stmt(struct vy_history *history, struct tuple *stmt)
 void
 vy_history_cleanup(struct vy_history *history)
 {
-	struct vy_history_node *node;
-	rlist_foreach_entry(node, &history->stmts, link) {
+	struct vy_history_node *node, *tmp;
+	rlist_foreach_entry_safe(node, &history->stmts, link, tmp) {
 		if (node->is_refable)
 			tuple_unref(node->stmt);
+		mempool_free(history->pool, node);
 	}
 	rlist_create(&history->stmts);
 }

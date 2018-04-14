@@ -42,6 +42,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct mempool;
 struct key_def;
 struct tuple;
 struct tuple_format;
@@ -53,6 +54,8 @@ struct vy_history {
 	 * Linked by vy_history_node::link.
 	 */
 	struct rlist stmts;
+	/** Memory pool for vy_history_node allocations. */
+	struct mempool *pool;
 };
 
 /** Key history node. */
@@ -78,11 +81,13 @@ struct vy_history_node {
 };
 
 /**
- * Initialize a history list.
+ * Initialize a history list. The 'pool' argument specifies
+ * the memory pool to use for node allocations.
  */
 static inline void
-vy_history_create(struct vy_history *history)
+vy_history_create(struct vy_history *history, struct mempool *pool)
 {
+	history->pool = pool;
 	rlist_create(&history->stmts);
 }
 

@@ -241,14 +241,13 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	assert(tuple_field_count(key) >= lsm->cmp_def->part_count);
 
 	*ret = NULL;
-	size_t region_svp = region_used(&fiber()->gc);
 	double start_time = ev_monotonic_now(loop());
 	int rc = 0;
 
 	lsm->stat.lookup++;
 	/* History list */
 	struct vy_history history;
-	vy_history_create(&history);
+	vy_history_create(&history, &lsm->env->history_node_pool);
 restart:
 	rc = vy_point_lookup_scan_txw(lsm, tx, key, &history);
 	if (rc != 0 || vy_history_is_terminal(&history))
@@ -285,7 +284,6 @@ restart:
 		 * cannot distinguish these two cases we always restart.
 		 */
 		vy_history_cleanup(&history);
-		region_truncate(&fiber()->gc, region_svp);
 		goto restart;
 	}
 
@@ -297,7 +295,6 @@ done:
 		lsm->stat.upsert.applied += upserts_applied;
 	}
 	vy_history_cleanup(&history);
-	region_truncate(&fiber()->gc, region_svp);
 
 	if (rc != 0)
 		return -1;
