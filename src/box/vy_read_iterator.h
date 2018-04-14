@@ -92,8 +92,6 @@ struct vy_read_iterator {
 	uint32_t src_count;
 	/** Maximal capacity of the src array. */
 	uint32_t src_capacity;
-	/** Offset of the current merge source. */
-	uint32_t curr_src;
 	/** Statement returned by the current merge source. */
 	struct tuple *curr_stmt;
 	/** Offset of the transaction write set source. */

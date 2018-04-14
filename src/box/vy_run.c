@@ -44,6 +44,7 @@
 #include "tuple_compare.h"
 #include "xlog.h"
 #include "xrow.h"
+#include "vy_history.h"
 
 static const uint64_t vy_page_info_key_map = (1 << VY_PAGE_INFO_OFFSET) |
 					     (1 << VY_PAGE_INFO_SIZE) |
@@ -1401,7 +1402,12 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 	itr->search_ended = false;
 }
 
-NODISCARD int
+/**
+ * Advance a run iterator to the newest statement for the next key.
+ * The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+static NODISCARD int
 vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
@@ -1441,7 +1447,12 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 	return vy_run_iterator_find_lsn(itr, itr->iterator_type, itr->key, ret);
 }
 
-NODISCARD int
+/**
+ * Advance a run iterator to the newest statement for the first key
+ * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on memory allocation or IO error.
+ */
+static NODISCARD int
 vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
@@ -1478,10 +1489,30 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 }
 
 NODISCARD int
-vy_run_iterator_skip(struct vy_run_iterator *itr,
-		     const struct tuple *last_stmt, struct tuple **ret)
+vy_run_iterator_next(struct vy_run_iterator *itr,
+		     struct vy_history *history)
 {
-	*ret = NULL;
+	vy_history_cleanup(history);
+	struct tuple *stmt;
+	if (vy_run_iterator_next_key(itr, &stmt) != 0)
+		return -1;
+	while (stmt != NULL) {
+		if (vy_history_append_stmt(history, stmt) != 0)
+			return -1;
+		if (vy_history_is_terminal(history))
+			break;
+		if (vy_run_iterator_next_lsn(itr, &stmt) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+NODISCARD int
+vy_run_iterator_skip(struct vy_run_iterator *itr,
+		     const struct tuple *last_stmt,
+		     struct vy_history *history)
+{
+	vy_history_cleanup(history);
 	if (itr->search_ended)
 		return 0;
 
@@ -1494,14 +1525,24 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 	}
 
 	itr->search_started = true;
-	if (vy_run_iterator_seek(itr, iterator_type, key, ret) != 0)
+	struct tuple *stmt;
+	if (vy_run_iterator_seek(itr, iterator_type, key, &stmt) != 0)
 		return -1;
 
 	if (itr->iterator_type == ITER_EQ && last_stmt != NULL &&
-	    *ret != NULL && vy_stmt_compare(itr->key, *ret,
+	    stmt != NULL && vy_stmt_compare(itr->key, stmt,
 					    itr->cmp_def) != 0) {
 		vy_run_iterator_stop(itr);
-		*ret = NULL;
+		return 0;
+	}
+
+	while (stmt != NULL) {
+		if (vy_history_append_stmt(history, stmt) != 0)
+			return -1;
+		if (vy_history_is_terminal(history))
+			break;
+		if (vy_run_iterator_next_lsn(itr, &stmt) != 0)
+			return -1;
 	}
 	return 0;
 }

@@ -50,6 +50,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct vy_history;
+
 /** Vinyl memory environment. */
 struct vy_mem_env {
 	struct lsregion allocator;
@@ -349,12 +351,6 @@ struct vy_mem_iterator {
 	 * valid statement.
 	 */
 	const struct tuple *curr_stmt;
-	/*
-	 * Copy of the statement returned from one of public methods
-	 * (restore/next_lsn/next_key). Need to store the copy, because can't
-	 * return region allocated curr_stmt.
-	 */
-	struct tuple *last_stmt;
 	/* data version from vy_mem */
 	uint32_t version;
 
@@ -371,29 +367,23 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *s
 		     const struct tuple *key, const struct vy_read_view **rv);
 
 /**
- * Advance a mem iterator to the newest statement for the next key.
- * The statement is returned in @ret (NULL if EOF).
+ * Advance a mem iterator to the next key.
+ * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation error.
  */
 NODISCARD int
-vy_mem_iterator_next_key(struct vy_mem_iterator *itr, struct tuple **ret);
+vy_mem_iterator_next(struct vy_mem_iterator *itr,
+		     struct vy_history *history);
 
 /**
- * Advance a mem iterator to the older statement for the same key.
- * The statement is returned in @ret (NULL if EOF).
- * Returns 0 on success, -1 on memory allocation error.
- */
-NODISCARD int
-vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr, struct tuple **ret);
-
-/**
- * Advance a mem iterator to the newest statement for the first key
- * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Advance a mem iterator to the key following @last_stmt.
+ * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation error.
  */
 NODISCARD int
 vy_mem_iterator_skip(struct vy_mem_iterator *itr,
-		     const struct tuple *last_stmt, struct tuple **ret);
+		     const struct tuple *last_stmt,
+		     struct vy_history *history);
 
 /**
  * Check if a mem iterator was invalidated and needs to be restored.
@@ -403,7 +393,8 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
  */
 NODISCARD int
 vy_mem_iterator_restore(struct vy_mem_iterator *itr,
-			const struct tuple *last_stmt, struct tuple **ret);
+			const struct tuple *last_stmt,
+			struct vy_history *history);
 
 /**
  * Close a mem iterator.

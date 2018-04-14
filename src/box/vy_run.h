@@ -49,6 +49,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct vy_history;
 struct vy_run_reader;
 
 /** Part of vinyl environment for run read/write */
@@ -496,29 +497,23 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct tuple_format *format, bool is_primary);
 
 /**
- * Advance a run iterator to the newest statement for the next key.
- * The statement is returned in @ret (NULL if EOF).
+ * Advance a run iterator to the next key.
+ * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation or IO error.
  */
 NODISCARD int
-vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret);
+vy_run_iterator_next(struct vy_run_iterator *itr,
+		     struct vy_history *history);
 
 /**
- * Advance a run iterator to the older statement for the same key.
- * The statement is returned in @ret (NULL if EOF).
- * Returns 0 on success, -1 on memory allocation or IO error.
- */
-NODISCARD int
-vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret);
-
-/**
- * Advance a run iterator to the newest statement for the first key
- * following @last_stmt. The statement is returned in @ret (NULL if EOF).
+ * Advance a run iterator to the key following @last_stmt.
+ * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation or IO error.
  */
 NODISCARD int
 vy_run_iterator_skip(struct vy_run_iterator *itr,
-		     const struct tuple *last_stmt, struct tuple **ret);
+		     const struct tuple *last_stmt,
+		     struct vy_history *history);
 
 /**
  * Close a run iterator.

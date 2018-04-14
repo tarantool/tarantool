@@ -159,15 +159,12 @@ vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
 /**
  * Scan one particular slice.
  * Add found statements to the history list up to terminal statement.
- * Set *terminal_found to true if the terminal statement (DELETE or REPLACE)
- * was found.
  */
 static int
 vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 			   const struct vy_read_view **rv, struct tuple *key,
-			   struct vy_history *history, bool *terminal_found)
+			   struct vy_history *history)
 {
-	int rc = 0;
 	/*
 	 * The format of the statement must be exactly the space
 	 * format with the same identifier to fully match the
@@ -177,19 +174,10 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 	vy_run_iterator_open(&run_itr, &lsm->stat.disk.iterator, slice,
 			     ITER_EQ, key, rv, lsm->cmp_def, lsm->key_def,
 			     lsm->disk_format, lsm->index_id == 0);
-	struct tuple *stmt;
-	rc = vy_run_iterator_next_key(&run_itr, &stmt);
-	while (rc == 0 && stmt != NULL) {
-		if (vy_history_append_stmt(history, stmt) != 0) {
-			rc = -1;
-			break;
-		}
-		if (vy_stmt_type(stmt) != IPROTO_UPSERT) {
-			*terminal_found = true;
-			break;
-		}
-		rc = vy_run_iterator_next_lsn(&run_itr, &stmt);
-	}
+	struct vy_history slice_history;
+	vy_history_create(&slice_history, &lsm->env->history_node_pool);
+	int rc = vy_run_iterator_next(&run_itr, &slice_history);
+	vy_history_splice(history, &slice_history);
 	vy_run_iterator_close(&run_itr);
 	return rc;
 }
@@ -223,11 +211,10 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 	}
 	assert(i == slice_count);
 	int rc = 0;
-	bool terminal_found = false;
 	for (i = 0; i < slice_count; i++) {
-		if (rc == 0 && !terminal_found)
+		if (rc == 0 && !vy_history_is_terminal(history))
 			rc = vy_point_lookup_scan_slice(lsm, slices[i],
-					rv, key, history, &terminal_found);
+							rv, key, history);
 		vy_slice_unpin(slices[i]);
 	}
 	return rc;
@@ -291,7 +278,7 @@ done:
 	if (rc == 0) {
 		int upserts_applied;
 		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
-				      &upserts_applied, ret);
+				      false, &upserts_applied, ret);
 		lsm->stat.upsert.applied += upserts_applied;
 	}
 	vy_history_cleanup(&history);

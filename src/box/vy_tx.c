@@ -55,6 +55,7 @@
 #include "vy_stat.h"
 #include "vy_stmt.h"
 #include "vy_upsert.h"
+#include "vy_history.h"
 #include "vy_read_set.h"
 #include "vy_read_view.h"
 
@@ -942,10 +943,11 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr,
 	itr->curr_txv = txv;
 }
 
-void
-vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret)
+NODISCARD int
+vy_txw_iterator_next(struct vy_txw_iterator *itr,
+		     struct vy_history *history)
 {
-	*ret = NULL;
+	vy_history_cleanup(history);
 	if (!itr->search_started) {
 		itr->search_started = true;
 		vy_txw_iterator_seek(itr, itr->iterator_type, itr->key);
@@ -953,7 +955,7 @@ vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret)
 	}
 	assert(itr->version == itr->tx->write_set_version);
 	if (itr->curr_txv == NULL)
-		return;
+		return 0;
 	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT)
 		itr->curr_txv = write_set_prev(&itr->tx->write_set, itr->curr_txv);
 	else
@@ -966,18 +968,22 @@ vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret)
 		itr->curr_txv = NULL;
 out:
 	if (itr->curr_txv != NULL) {
-		*ret = itr->curr_txv->stmt;
-		vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
+		vy_stmt_counter_acct_tuple(&itr->stat->get,
+					   itr->curr_txv->stmt);
+		return vy_history_append_stmt(history, itr->curr_txv->stmt);
 	}
+	return 0;
 }
 
-void
+NODISCARD int
 vy_txw_iterator_skip(struct vy_txw_iterator *itr,
-		     const struct tuple *last_stmt, struct tuple **ret)
+		     const struct tuple *last_stmt,
+		     struct vy_history *history)
 {
-	*ret = NULL;
 	assert(!itr->search_started ||
 	       itr->version == itr->tx->write_set_version);
+
+	vy_history_cleanup(history);
 
 	const struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
@@ -996,14 +1002,17 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr,
 		itr->curr_txv = NULL;
 
 	if (itr->curr_txv != NULL) {
-		*ret = itr->curr_txv->stmt;
-		vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
+		vy_stmt_counter_acct_tuple(&itr->stat->get,
+					   itr->curr_txv->stmt);
+		return vy_history_append_stmt(history, itr->curr_txv->stmt);
 	}
+	return 0;
 }
 
-int
+NODISCARD int
 vy_txw_iterator_restore(struct vy_txw_iterator *itr,
-			const struct tuple *last_stmt, struct tuple **ret)
+			const struct tuple *last_stmt,
+			struct vy_history *history)
 {
 	if (!itr->search_started || itr->version == itr->tx->write_set_version)
 		return 0;
@@ -1027,10 +1036,12 @@ vy_txw_iterator_restore(struct vy_txw_iterator *itr,
 	if (prev_txv == itr->curr_txv)
 		return 0;
 
-	*ret = NULL;
+	vy_history_cleanup(history);
 	if (itr->curr_txv != NULL) {
-		*ret = itr->curr_txv->stmt;
-		vy_stmt_counter_acct_tuple(&itr->stat->get, *ret);
+		vy_stmt_counter_acct_tuple(&itr->stat->get,
+					   itr->curr_txv->stmt);
+		if (vy_history_append_stmt(history, itr->curr_txv->stmt) != 0)
+			return -1;
 	}
 	return 1;
 }

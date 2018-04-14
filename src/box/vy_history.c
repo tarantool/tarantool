@@ -74,8 +74,8 @@ vy_history_cleanup(struct vy_history *history)
 
 int
 vy_history_apply(struct vy_history *history, const struct key_def *cmp_def,
-		 struct tuple_format *format, int *upserts_applied,
-		 struct tuple **ret)
+		 struct tuple_format *format, bool keep_delete,
+		 int *upserts_applied, struct tuple **ret)
 {
 	*ret = NULL;
 	*upserts_applied = 0;
@@ -86,8 +86,11 @@ vy_history_apply(struct vy_history *history, const struct key_def *cmp_def,
 	struct vy_history_node *node = rlist_last_entry(&history->stmts,
 					struct vy_history_node, link);
 	if (vy_history_is_terminal(history)) {
-		if (vy_stmt_type(node->stmt) == IPROTO_DELETE) {
-			/* Ignore terminal delete */
+		if (!keep_delete && vy_stmt_type(node->stmt) == IPROTO_DELETE) {
+			/*
+			 * Ignore terminal delete unless the caller
+			 * explicitly asked to keep it.
+			 */
 		} else if (!node->is_refable) {
 			curr_stmt = vy_stmt_dup(node->stmt);
 		} else {

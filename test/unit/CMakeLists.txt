@@ -143,6 +143,8 @@ target_link_libraries(say.test core unit)
 set(ITERATOR_TEST_SOURCES
     vy_iterators_helper.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
+    ${PROJECT_SOURCE_DIR}/src/box/vy_history.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c)
 set(ITERATOR_TEST_LIBS core tuple xrow unit)

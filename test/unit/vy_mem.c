@@ -1,6 +1,7 @@
 #include <trivia/config.h>
 #include "memory.h"
 #include "fiber.h"
+#include "vy_history.h"
 #include "vy_iterators_helper.h"
 
 static void
@@ -90,6 +91,10 @@ test_iterator_restore_after_insertion()
 	lsregion_create(&lsregion, slab_cache->arena);
 
 	struct tuple *select_key = vy_stmt_new_select(format, "", 0);
+
+	struct mempool history_node_pool;
+	mempool_create(&history_node_pool, cord_slab_cache(),
+		       sizeof(struct vy_history_node));
 
 	uint64_t restore_on_value = 20;
 	uint64_t restore_on_value_reverse = 60;
@@ -189,7 +194,10 @@ test_iterator_restore_after_insertion()
 				     direct ? ITER_GE : ITER_LE, select_key,
 				     &prv);
 		struct tuple *t;
-		int rc = vy_mem_iterator_next_key(&itr, &t);
+		struct vy_history history;
+		vy_history_create(&history, &history_node_pool);
+		int rc = vy_mem_iterator_next(&itr, &history);
+		t = vy_history_last_stmt(&history);
 		assert(rc == 0);
 		size_t j = 0;
 		while (t != NULL) {
@@ -209,7 +217,8 @@ test_iterator_restore_after_insertion()
 				break;
 			else if(!direct && val <= middle_value)
 				break;
-			int rc = vy_mem_iterator_next_key(&itr, &t);
+			int rc = vy_mem_iterator_next(&itr, &history);
+			t = vy_history_last_stmt(&history);
 			assert(rc == 0);
 		}
 		if (t == NULL && j != expected_count)
@@ -261,9 +270,10 @@ test_iterator_restore_after_insertion()
 		}
 
 		if (direct)
-			rc = vy_mem_iterator_restore(&itr, restore_on_key, &t);
+			rc = vy_mem_iterator_restore(&itr, restore_on_key, &history);
 		else
-			rc = vy_mem_iterator_restore(&itr, restore_on_key_reverse, &t);
+			rc = vy_mem_iterator_restore(&itr, restore_on_key_reverse, &history);
+		t = vy_history_last_stmt(&history);
 
 		j = 0;
 		while (t != NULL) {
@@ -279,7 +289,8 @@ test_iterator_restore_after_insertion()
 				break;
 			}
 			j++;
-			int rc = vy_mem_iterator_next_key(&itr, &t);
+			int rc = vy_mem_iterator_next(&itr, &history);
+			t = vy_history_last_stmt(&history);
 			assert(rc == 0);
 		}
 		if (j != expected_count)
@@ -289,6 +300,7 @@ test_iterator_restore_after_insertion()
 			break;
 		}
 
+		vy_history_cleanup(&history);
 		vy_mem_delete(mem);
 		lsregion_gc(&lsregion, 2);
 	}
@@ -296,6 +308,8 @@ test_iterator_restore_after_insertion()
 	ok(!wrong_output, "check wrong_output %d", i_fail);
 
 	/* Clean up */
+	mempool_destroy(&history_node_pool);
+
 	tuple_unref(select_key);
 	tuple_unref(restore_on_key);
 	tuple_unref(restore_on_key_reverse);

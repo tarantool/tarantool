@@ -1,5 +1,7 @@
 #include "trivia/util.h"
 #include "vy_iterators_helper.h"
+#include "vy_history.h"
+#include "fiber.h"
 #include "unit.h"
 
 const struct vy_stmt_template key_template = STMT_TEMPLATE(0, SELECT, vyend);
@@ -18,6 +20,10 @@ test_basic()
 			  &format);
 	struct tuple *select_all = vy_new_simple_stmt(format, NULL,
 						      &key_template);
+
+	struct mempool history_node_pool;
+	mempool_create(&history_node_pool, cord_slab_cache(),
+		       sizeof(struct vy_history_node));
 
 	/*
 	 * Fill the cache with 3 chains.
@@ -85,8 +91,11 @@ test_basic()
 	/* Start iterator and make several steps. */
 	struct tuple *ret;
 	bool unused;
+	struct vy_history history;
+	vy_history_create(&history, &history_node_pool);
 	for (int i = 0; i < 4; ++i)
-		vy_cache_iterator_next(&itr, &ret, &unused);
+		vy_cache_iterator_next(&itr, &history, &unused);
+	ret = vy_history_last_stmt(&history);
 	ok(vy_stmt_are_same(ret, &chain1[3], format, NULL),
 	   "next_key * 4");
 
@@ -107,14 +116,17 @@ test_basic()
 	 * must be chain1[1].
 	 */
 	struct tuple *last_stmt = vy_new_simple_stmt(format, NULL, &chain1[0]);
-	ok(vy_cache_iterator_restore(&itr, last_stmt, &ret, &unused) >= 0,
+	ok(vy_cache_iterator_restore(&itr, last_stmt, &history, &unused) >= 0,
 	   "restore");
+	ret = vy_history_last_stmt(&history);
 	ok(vy_stmt_are_same(ret, &chain1[1], format, NULL),
 	   "restore on position after last");
 	tuple_unref(last_stmt);
 
+	vy_history_cleanup(&history);
 	vy_cache_iterator_close(&itr);
 
+	mempool_destroy(&history_node_pool);
 	tuple_unref(select_all);
 	destroy_test_cache(&cache, key_def, format);
 	check_plan();

@@ -55,6 +55,7 @@ struct tuple;
 struct tx_manager;
 struct vy_mem;
 struct vy_tx;
+struct vy_history;
 
 /** Transaction state. */
 enum tx_state {
@@ -403,28 +404,34 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     const struct tuple *key);
 
 /**
- * Advance a txw iterator to the next statement.
- * The next statement is returned in @ret (NULL if EOF).
+ * Advance a txw iterator to the next key.
+ * The key history is returned in @history (empty if EOF).
+ * Returns 0 on success, -1 on memory allocation error.
  */
-void
-vy_txw_iterator_next(struct vy_txw_iterator *itr, struct tuple **ret);
+NODISCARD int
+vy_txw_iterator_next(struct vy_txw_iterator *itr,
+		     struct vy_history *history);
 
 /**
- * Advance a txw iterator to the statement following @last_stmt.
- * The statement is returned in @ret (NULL if EOF).
+ * Advance a txw iterator to the key following @last_stmt.
+ * The key history is returned in @history (empty if EOF).
+ * Returns 0 on success, -1 on memory allocation error.
  */
-void
+NODISCARD int
 vy_txw_iterator_skip(struct vy_txw_iterator *itr,
-		     const struct tuple *last_stmt, struct tuple **ret);
+		     const struct tuple *last_stmt,
+		     struct vy_history *history);
 
 /**
  * Check if a txw iterator was invalidated and needs to be restored.
- * If it does, set the iterator position to the statement following
- * @last_stmt and return 1, otherwise return 0.
+ * If it does, set the iterator position to the first key following
+ * @last_stmt and return 1, otherwise return 0. Returns -1 on memory
+ * allocation error.
  */
 int
 vy_txw_iterator_restore(struct vy_txw_iterator *itr,
-			const struct tuple *last_stmt, struct tuple **ret);
+			const struct tuple *last_stmt,
+			struct vy_history *history);
 
 /**
  * Close a txw iterator.

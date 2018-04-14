@@ -110,6 +110,31 @@ vy_history_is_terminal(struct vy_history *history)
 }
 
 /**
+ * Return the last (newest, having max LSN) statement of the given
+ * key history or NULL if the history is empty.
+ */
+static inline struct tuple *
+vy_history_last_stmt(struct vy_history *history)
+{
+	if (rlist_empty(&history->stmts))
+		return NULL;
+	/* Newest statement is at the head of the list. */
+	struct vy_history_node *node = rlist_first_entry(&history->stmts,
+					struct vy_history_node, link);
+	return node->stmt;
+}
+
+/**
+ * Append all statements of history @src to history @dst.
+ */
+static inline void
+vy_history_splice(struct vy_history *dst, struct vy_history *src)
+{
+	assert(dst->pool == src->pool);
+	rlist_splice_tail(&dst->stmts, &src->stmts);
+}
+
+/**
  * Append an (older) statement to a history list.
  * Returns 0 on success, -1 on memory allocation error.
  */
@@ -125,11 +150,13 @@ vy_history_cleanup(struct vy_history *history);
 
 /**
  * Get a resultant statement from collected history.
+ * If the resultant statement is a DELETE, the function
+ * will return NULL unless @keep_delete flag is set.
  */
 int
 vy_history_apply(struct vy_history *history, const struct key_def *cmp_def,
-		 struct tuple_format *format, int *upserts_applied,
-		 struct tuple **ret);
+		 struct tuple_format *format, bool keep_delete,
+		 int *upserts_applied, struct tuple **ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

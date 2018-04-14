@@ -32,6 +32,7 @@
 #include "diag.h"
 #include "fiber.h"
 #include "schema_def.h"
+#include "vy_history.h"
 
 #ifndef CT_ASSERT_G
 #define CT_ASSERT_G(e) typedef char CONCAT(__ct_assert_, __LINE__)[(e) ? 1 :-1]
@@ -658,12 +659,12 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	*entry = *vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 }
 
-void
+NODISCARD int
 vy_cache_iterator_next(struct vy_cache_iterator *itr,
-		       struct tuple **ret, bool *stop)
+		       struct vy_history *history, bool *stop)
 {
-	*ret = NULL;
 	*stop = false;
+	vy_history_cleanup(history);
 
 	if (!itr->search_started) {
 		assert(itr->curr_stmt == NULL);
@@ -673,33 +674,34 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
 		vy_cache_iterator_seek(itr, itr->iterator_type,
 				       itr->key, &entry);
 		if (entry == NULL)
-			return;
+			return 0;
 		itr->curr_stmt = entry->stmt;
 		*stop = vy_cache_iterator_is_stop(itr, entry);
 	} else {
 		assert(itr->version == itr->cache->version);
 		if (itr->curr_stmt == NULL)
-			return;
+			return 0;
 		tuple_unref(itr->curr_stmt);
 		*stop = vy_cache_iterator_step(itr, &itr->curr_stmt);
 	}
 
 	vy_cache_iterator_skip_to_read_view(itr, stop);
 	if (itr->curr_stmt != NULL) {
-		*ret = itr->curr_stmt;
 		tuple_ref(itr->curr_stmt);
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get,
 					   itr->curr_stmt);
+		return vy_history_append_stmt(history, itr->curr_stmt);
 	}
+	return 0;
 }
 
-void
+NODISCARD int
 vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 		       const struct tuple *last_stmt,
-		       struct tuple **ret, bool *stop)
+		       struct vy_history *history, bool *stop)
 {
-	*ret = NULL;
 	*stop = false;
+	vy_history_cleanup(history);
 
 	assert(!itr->search_started || itr->version == itr->cache->version);
 
@@ -732,17 +734,18 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 
 	vy_cache_iterator_skip_to_read_view(itr, stop);
 	if (itr->curr_stmt != NULL) {
-		*ret = itr->curr_stmt;
 		tuple_ref(itr->curr_stmt);
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get,
 					   itr->curr_stmt);
+		return vy_history_append_stmt(history, itr->curr_stmt);
 	}
+	return 0;
 }
 
-int
+NODISCARD int
 vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 			  const struct tuple *last_stmt,
-			  struct tuple **ret, bool *stop)
+			  struct vy_history *history, bool *stop)
 {
 	struct key_def *def = itr->cache->cmp_def;
 	int dir = iterator_direction(itr->iterator_type);
@@ -818,11 +821,14 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 				break;
 		}
 	}
-	*ret = itr->curr_stmt;
+
+	vy_history_cleanup(history);
 	if (itr->curr_stmt != NULL) {
 		tuple_ref(itr->curr_stmt);
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get,
 					   itr->curr_stmt);
+		if (vy_history_append_stmt(history, itr->curr_stmt) != 0)
+			return -1;
 		return prev_stmt != itr->curr_stmt;
 	}
 	return 0;
