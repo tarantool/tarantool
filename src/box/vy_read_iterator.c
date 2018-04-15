@@ -443,9 +443,6 @@ vy_read_iterator_restore(struct vy_read_iterator *itr);
 static void
 vy_read_iterator_next_range(struct vy_read_iterator *itr);
 
-static int
-vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt);
-
 /**
  * Iterate to the next key
  * @retval 0 success or EOF (*ret == NULL)
@@ -454,9 +451,6 @@ vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt);
 static NODISCARD int
 vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 {
-	uint32_t i;
-	bool stop = false;
-
 	if (itr->last_stmt != NULL && (itr->iterator_type == ITER_EQ ||
 				       itr->iterator_type == ITER_REQ) &&
 	    tuple_field_count(itr->key) >= itr->lsm->cmp_def->part_count) {
@@ -469,9 +463,10 @@ vy_read_iterator_next_key(struct vy_read_iterator *itr, struct tuple **ret)
 	}
 	/*
 	 * Restore the iterator position if the LSM tree has changed
-	 * since the last iteration.
+	 * since the last iteration or this is the first iteration.
 	 */
-	if (itr->mem_list_version != itr->lsm->mem_list_version ||
+	if (itr->last_stmt == NULL ||
+	    itr->mem_list_version != itr->lsm->mem_list_version ||
 	    itr->range_tree_version != itr->lsm->range_tree_version ||
 	    itr->range_version != itr->curr_range->version) {
 		vy_read_iterator_restore(itr);
@@ -487,6 +482,7 @@ restart:
 	 * Look up the next key in read sources starting
 	 * from the one that stores newest data.
 	 */
+	bool stop = false;
 	vy_read_iterator_scan_txw(itr, &stop);
 	if (stop)
 		goto done;
@@ -494,7 +490,7 @@ restart:
 	if (stop)
 		goto done;
 
-	for (i = itr->mem_src; i < itr->disk_src; i++) {
+	for (uint32_t i = itr->mem_src; i < itr->disk_src; i++) {
 		if (vy_read_iterator_scan_mem(itr, i, &stop) != 0)
 			return -1;
 		if (stop)
@@ -503,9 +499,11 @@ restart:
 rescan_disk:
 	/* The following code may yield as it needs to access disk. */
 	vy_read_iterator_pin_slices(itr);
-	for (i = itr->disk_src; i < itr->src_count; i++) {
-		if (vy_read_iterator_scan_disk(itr, i, &stop) != 0)
-			goto err_disk;
+	for (uint32_t i = itr->disk_src; i < itr->src_count; i++) {
+		if (vy_read_iterator_scan_disk(itr, i, &stop) != 0) {
+			vy_read_iterator_unpin_slices(itr);
+			return -1;
+		}
 		if (stop)
 			break;
 	}
@@ -539,24 +537,34 @@ rescan_disk:
 		goto rescan_disk;
 	}
 done:
-	if (itr->last_stmt != NULL && itr->curr_stmt != NULL)
+#ifndef NDEBUG
+	/* Check that the statement meets search criteria. */
+	if (itr->curr_stmt != NULL) {
+		int cmp = vy_stmt_compare(itr->curr_stmt, itr->key,
+					  itr->lsm->cmp_def);
+		cmp *= iterator_direction(itr->iterator_type);
+		if (itr->iterator_type == ITER_GT ||
+		    itr->iterator_type == ITER_LT)
+			assert(cmp > 0);
+		else
+			assert(cmp >= 0);
+	}
+	/*
+	 * Ensure the read iterator does not return duplicates
+	 * and respects statement order.
+	 */
+	if (itr->last_stmt != NULL && itr->curr_stmt != NULL) {
 	       assert(vy_read_iterator_cmp_stmt(itr, itr->curr_stmt,
 						itr->last_stmt) > 0);
-
+	}
+#endif
 	if (itr->need_check_eq && itr->curr_stmt != NULL &&
 	    vy_stmt_compare(itr->curr_stmt, itr->key,
 			    itr->lsm->cmp_def) != 0)
 		itr->curr_stmt = NULL;
 
-	if (vy_read_iterator_track_read(itr, itr->curr_stmt) != 0)
-		return -1;
-
 	*ret = itr->curr_stmt;
 	return 0;
-
-err_disk:
-	vy_read_iterator_unpin_slices(itr);
-	return -1;
 }
 
 /**
@@ -960,99 +968,70 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
 	ev_tstamp start_time = ev_monotonic_now(loop());
 
-	*result = NULL;
-
-	if (!itr->search_started) {
-		itr->search_started = true;
-		itr->lsm->stat.lookup++;
-		vy_read_iterator_restore(itr);
-	}
-
-	struct tuple *prev_key = itr->last_stmt;
-	if (prev_key != NULL)
-		tuple_ref(prev_key);
-	bool skipped_txw_delete = false;
-
-	struct tuple *t = NULL;
 	struct vy_lsm *lsm = itr->lsm;
-	int rc = 0;
-	while (true) {
-		rc = vy_read_iterator_next_key(itr, &t);
-		if (rc != 0)
-			goto clear;
-		if (t == NULL) {
-			if (itr->last_stmt != NULL)
-				tuple_unref(itr->last_stmt);
-			itr->last_stmt = NULL;
-			rc = 0; /* No more data. */
-			break;
-		}
-		rc = vy_read_iterator_squash_upsert(itr, &t);
-		if (rc != 0)
-			goto clear;
-		if (itr->last_stmt != NULL)
-			tuple_unref(itr->last_stmt);
-		itr->last_stmt = t;
-		if (vy_stmt_type(t) == IPROTO_INSERT ||
-		    vy_stmt_type(t) == IPROTO_REPLACE)
-			break;
-		assert(vy_stmt_type(t) == IPROTO_DELETE);
-		if (vy_stmt_lsn(t) == INT64_MAX) /* t is from write set */
-			skipped_txw_delete = true;
-	}
+	struct tuple *stmt, *prev_stmt;
 
-	*result = itr->last_stmt;
-	assert(*result == NULL ||
-	       vy_stmt_type(*result) == IPROTO_INSERT ||
-	       vy_stmt_type(*result) == IPROTO_REPLACE);
-	if (*result != NULL)
-		vy_stmt_counter_acct_tuple(&lsm->stat.get, *result);
-
-#ifndef NDEBUG
-	/* Check constraints. */
-	int dir = iterator_direction(itr->iterator_type);
 	/*
-	 * Each result statement with iterator type GE/GT must
-	 * be >= iterator key. And with LT/LE must
-	 * be <= iterator_key. @sa gh-2614.
+	 * Remember the statement returned by the last iteration.
+	 * We will need it to update the cache.
 	 */
-	if (itr->last_stmt != NULL && tuple_field_count(itr->key) > 0) {
-		int cmp = dir * vy_stmt_compare(*result, itr->key,
-						itr->lsm->cmp_def);
-		assert(cmp >= 0);
-	}
-	/*
-	 * Ensure the read iterator does not return duplicates
-	 * and respects statements order (lsm->cmp_def includes
-	 * primary parts, so prev_key != itr->last_stmt for any
-	 * LSM tree).
-	 */
-	if (prev_key != NULL && itr->last_stmt != NULL) {
-		assert(dir * vy_tuple_compare(prev_key, itr->last_stmt,
-					      lsm->cmp_def) < 0);
-	}
-#endif
+	prev_stmt = itr->last_stmt;
+	if (prev_stmt != NULL)
+		tuple_ref(prev_stmt);
+	else /* first iteration */
+		lsm->stat.lookup++;
+next_key:
+	if (vy_read_iterator_next_key(itr, &stmt) != 0)
+		goto err;
 
-	/**
-	 * Add a statement to the cache
+	/*
+	 * Fetching an older statement of the current key may yield
+	 * so we must track the read before applying UPSERTs.
 	 */
-	if ((**itr->read_view).vlsn == INT64_MAX) { /* Do not store non-latest data */
-		struct tuple *cache_prev = prev_key;
-		if (skipped_txw_delete) {
-			/*
-			 * If we skipped DELETE that was read from TX write
-			 * set, there is a chance that the database actually
-			 * has the deleted key and we must not consider
-			 * previous+current tuple as an unbroken chain.
-			 */
-			cache_prev = NULL;
+	if (vy_read_iterator_track_read(itr, stmt) != 0)
+		goto err;
+
+	if (stmt != NULL &&
+	    vy_read_iterator_squash_upsert(itr, &stmt) != 0)
+		goto err;
+
+	if (itr->last_stmt != NULL)
+		tuple_unref(itr->last_stmt);
+	itr->last_stmt = stmt;
+
+	if (stmt != NULL && vy_stmt_type(stmt) == IPROTO_DELETE) {
+		/*
+		 * We don't return DELETEs so skip to the next key.
+		 * If the DELETE was read from TX write set, there
+		 * is a good chance that the space actually has
+		 * the deleted key and hence we must not consider
+		 * previous + current tuple as an unbroken chain.
+		 */
+		if (vy_stmt_lsn(stmt) == INT64_MAX) {
+			if (prev_stmt != NULL)
+				tuple_unref(prev_stmt);
+			prev_stmt = NULL;
 		}
-		vy_cache_add(&itr->lsm->cache, *result, cache_prev,
+		goto next_key;
+	}
+	assert(stmt == NULL ||
+	       vy_stmt_type(stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(stmt) == IPROTO_REPLACE);
+
+	/*
+	 * Store the result in the cache provided we are reading
+	 * the latest data.
+	 */
+	if ((**itr->read_view).vlsn == INT64_MAX) {
+		vy_cache_add(&lsm->cache, stmt, prev_stmt,
 			     itr->key, itr->iterator_type);
 	}
-clear:
-	if (prev_key != NULL)
-		tuple_unref(prev_key);
+	if (prev_stmt != NULL)
+		tuple_unref(prev_stmt);
+
+	/* Update LSM tree stats. */
+	if (stmt != NULL)
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, stmt);
 
 	ev_tstamp latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&lsm->stat.latency, latency);
@@ -1061,9 +1040,15 @@ clear:
 		say_warn("%s: select(%s, %s) => %s took too long: %.3f sec",
 			 vy_lsm_name(lsm), tuple_str(itr->key),
 			 iterator_type_strs[itr->iterator_type],
-			 vy_stmt_str(itr->last_stmt), latency);
+			 vy_stmt_str(stmt), latency);
 	}
-	return rc;
+
+	*result = stmt;
+	return 0;
+err:
+	if (prev_stmt != NULL)
+		tuple_unref(prev_stmt);
+	return -1;
 }
 
 /**

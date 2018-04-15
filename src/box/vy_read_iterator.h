@@ -62,8 +62,6 @@ struct vy_read_iterator {
 	 * checked to match the search key.
 	 */
 	bool need_check_eq;
-	/** Set on the first call to vy_read_iterator_next(). */
-	bool search_started;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct tuple *last_stmt;
 	/**
