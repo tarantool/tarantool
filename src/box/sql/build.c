@@ -524,8 +524,6 @@ sql_table_new(Parse *parser, char *name)
 	table->pSchema = db->pSchema;
 	sqlite3HashInit(&table->idxHash);
 	table->nTabRef = 1;
-	table->nRowLogEst = 200;
-	assert(200 == sqlite3LogEst(1048576));
 	return table;
 }
 
@@ -3257,7 +3255,7 @@ sqlite3DefaultRowEst(Index * pIdx)
 	 * number of rows in the table, or half the number of rows in the table
 	 * for a partial index.   But do not let the estimate drop below 10.
 	 */
-	a[0] = pIdx->pTable->nRowLogEst;
+	a[0] = pIdx->pTable->tuple_log_count;
 	if (pIdx->pPartIdxWhere != 0)
 		a[0] -= 10;
 	assert(10 == sqlite3LogEst(2));

@@ -411,7 +411,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						     pTab->zName,
 						     0,
 						     avg_tuple_size_pk,
-						     pTab->nRowLogEst);
+						     sql_space_tuple_log_count(pTab));
 				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
 				for (pIdx = pTab->pIndex; pIdx;
 				     pIdx = pIdx->pNext) {

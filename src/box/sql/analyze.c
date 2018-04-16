@@ -1388,7 +1388,6 @@ initAvgEq(Index * pIdx)
 				    ((i64) 100 * pIdx->aiRowEst[0]) /
 				    pIdx->aiRowEst[iCol + 1];
 			}
-			pIdx->nRowEst0 = nRow;
 
 			/* Set nSum to the number of distinct (iCol+1) field prefixes that
 			 * occur in the stat4 table for this index. Set sumEq to the sum of
@@ -1628,6 +1627,20 @@ loadStat4(sqlite3 * db)
 			   " GROUP BY \"tbl\",\"idx\"",
 			   "SELECT \"tbl\",\"idx\",\"neq\",\"nlt\",\"ndlt\","
 			   "\"sample\" FROM \"_sql_stat4\"");
+}
+
+LogEst
+sql_space_tuple_log_count(struct Table *tab)
+{
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(tab->tnum));
+	if (space == NULL)
+		return tab->tuple_log_count;
+	struct index *pk = space_index(space, 0);
+	assert(sqlite3LogEst(DEFAULT_TUPLE_COUNT) == DEFAULT_TUPLE_LOG_COUNT);
+	/* If space represents VIEW, return default number. */
+	if (pk == NULL)
+		return DEFAULT_TUPLE_LOG_COUNT;
+	return sqlite3LogEst(pk->vtab->size(pk));
 }
 
 /*

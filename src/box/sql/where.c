@@ -1319,8 +1319,22 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 			}
 			/* Determine iLower and iUpper using ($P) only. */
 			if (nEq == 0) {
+				/*
+				 * In this simple case, there are no any
+				 * equality constraints, so initially all rows
+				 * are in range.
+				 */
 				iLower = 0;
-				iUpper = p->nRowEst0;
+				uint32_t space_id =
+					SQLITE_PAGENO_TO_SPACEID(p->tnum);
+				struct space *space = space_by_id(space_id);
+				assert(space != NULL);
+				uint32_t iid =
+					SQLITE_PAGENO_TO_INDEXID(p->tnum);
+				struct index *idx =
+					space_index(space, iid);
+				assert(idx != NULL);
+				iUpper = index_size(idx);
 			} else {
 				/* Note: this call could be optimized away - since the same values must
 				 * have been requested when testing key $P in whereEqualScanEst().
@@ -2781,7 +2795,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		sPk.aiRowLogEst = aiRowEstPk;
 		sPk.onError = ON_CONFLICT_ACTION_REPLACE;
 		sPk.pTable = pTab;
-		aiRowEstPk[0] = pTab->nRowLogEst;
+		aiRowEstPk[0] = sql_space_tuple_log_count(pTab);
 		aiRowEstPk[1] = 0;
 		pFirst = pSrc->pTab->pIndex;
 		if (pSrc->fg.notIndexed == 0) {

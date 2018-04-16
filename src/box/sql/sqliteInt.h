@@ -1940,7 +1940,13 @@ struct Table {
 	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
 				   column number here, -1 otherwise Tarantool specifics */
 	i16 nCol;		/* Number of columns in this table */
-	LogEst nRowLogEst;	/* Estimated rows in table - from _sql_stat1 table */
+	/**
+	 * Estimated number of entries in table.
+	 * Used only when table represents temporary objects,
+	 * such as nested SELECTs or VIEWs. Otherwise, this stat
+	 * can be fetched from space struct.
+	 */
+	LogEst tuple_log_count;
 	u8 tabFlags;		/* Mask of TF_* values */
 	u8 keyConf;		/* What to do in case of uniqueness conflict on iPKey */
 #ifndef SQLITE_OMIT_ALTERTABLE
@@ -1952,6 +1958,16 @@ struct Table {
 	/** Space definition with Tarantool metadata. */
 	struct space_def *def;
 };
+
+/**
+ * Return logarithm of tuple count in space.
+ *
+ * @param tab Table containing id of space to be examined.
+ * @retval Logarithm of tuple count in space, or default values,
+ *         if there is no corresponding space for given table.
+ */
+LogEst
+sql_space_tuple_log_count(struct Table *tab);
 
 /*
  * Allowed values for Table.tabFlags.
@@ -2130,7 +2146,6 @@ struct Index {
 	tRowcnt *aAvgEq;	/* Average nEq values for keys not in aSample */
 	IndexSample *aSample;	/* Samples of the left-most key */
 	tRowcnt *aiRowEst;	/* Non-logarithmic stat1 data for this index */
-	tRowcnt nRowEst0;	/* Non-logarithmic number of rows in the index */
 };
 
 /*
@@ -2164,6 +2179,10 @@ struct IndexSample {
 	tRowcnt *anLt;		/* Est. number of rows where key is less than this sample */
 	tRowcnt *anDLt;		/* Est. number of distinct keys less than this sample */
 };
+
+#define DEFAULT_TUPLE_COUNT 1048576
+/** [10*log_{2}(1048576)] == 200 */
+#define DEFAULT_TUPLE_LOG_COUNT 200
 
 /*
  * Each token coming out of the lexer is an instance of
