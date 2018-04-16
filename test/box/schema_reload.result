@@ -157,8 +157,10 @@ cn:ping()
 ---
 - true
 ...
--- Sic: net.box returns true on :ping() even on ER_WRONG_SCHEMA_VERSION
-while cn.schema_version == schema_version do fiber.sleep(0.0001) end
+function wait_new_schema() while cn.schema_version == schema_version do fiber.sleep(0.0001) end end
+---
+...
+wait_new_schema()
 ---
 ...
 cn.schema_version == schema_version + 1
@@ -179,6 +181,9 @@ cn:call('somefunc')
 ---
 - true
 ...
+wait_new_schema()
+---
+...
 cn.schema_version == schema_version + 1
 ---
 - true
@@ -197,6 +202,9 @@ cn:call('somefunc')
 ---
 - error: Procedure 'somefunc' is not defined
 ...
+wait_new_schema()
+---
+...
 cn.schema_version == schema_version + 1
 ---
 - true
@@ -209,6 +217,9 @@ bump_schema_version()
 ---
 ...
 cn:eval('return')
+---
+...
+wait_new_schema()
 ---
 ...
 cn.schema_version == schema_version + 1
@@ -228,6 +239,9 @@ bump_schema_version()
 cn:eval('error("xx")')
 ---
 - error: 'eval:1: xx'
+...
+wait_new_schema()
+---
 ...
 cn.schema_version == schema_version + 1
 ---

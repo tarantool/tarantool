@@ -45,7 +45,6 @@ local IPROTO_GREETING_SIZE = 128
 local E_UNKNOWN              = box.error.UNKNOWN
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_TIMEOUT              = box.error.TIMEOUT
-local E_WRONG_SCHEMA_VERSION = box.error.WRONG_SCHEMA_VERSION
 local E_PROC_LUA             = box.error.PROC_LUA
 
 -- utility tables
@@ -94,7 +93,7 @@ local method_encoder = {
     max     = internal.encode_select,
     count   = internal.encode_call,
     -- inject raw data into connection, used by console and tests
-    inject = function(buf, id, schema_version, bytes)
+    inject = function(buf, id, bytes)
         local ptr = buf:reserve(#bytes)
         ffi.copy(ptr, bytes, #bytes)
         buf.wpos = ptr + #bytes
@@ -159,7 +158,7 @@ end
 --  * implements protocols; concurrent perform_request()-s benefit from
 --    multiplexing support in the protocol;
 --  * schema-aware (optional) - snoops responses and initiates
---    schema reload when a request fails due to schema version mismatch;
+--    schema reload when a response has a new schema version;
 --  * delivers transport events via the callback.
 --
 -- Transport state machine:
@@ -400,7 +399,7 @@ local function create_transport(host, port, user, password, callback,
     -- @retval nil, error Error occured.
     -- @retval not nil Future object.
     --
-    local function perform_async_request(buffer, method, schema_version, ...)
+    local function perform_async_request(buffer, method, ...)
         if state ~= 'active' then
             return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
                                        reason = last_error})
@@ -411,14 +410,12 @@ local function create_transport(host, port, user, password, callback,
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_encoder[method](send_buf, id, schema_version, ...)
+        method_encoder[method](send_buf, id, ...)
         next_request_id = next_id(id)
-        -- Request has maximum 7 members:
-        -- method, schema_version, buffer, id, cond, errno,
-        -- response.
-        local request = setmetatable(table_new(0, 7), request_mt)
+        -- Request has maximum 6 members:
+        -- method, buffer, id, cond, errno, response.
+        local request = setmetatable(table_new(0, 6), request_mt)
         request.method = method
-        request.schema_version = schema_version
         request.buffer = buffer
         request.id = id
         request.cond = fiber.cond()
@@ -431,9 +428,9 @@ local function create_transport(host, port, user, password, callback,
     -- @retval nil, error Error occured.
     -- @retval not nil Response object.
     --
-    local function perform_request(timeout, buffer, method, schema_version, ...)
+    local function perform_request(timeout, buffer, method, ...)
         local request, err =
-            perform_async_request(buffer, method, schema_version, ...)
+            perform_async_request(buffer, method, ...)
         if not request then
             return nil, err
         end
@@ -559,7 +556,7 @@ local function create_transport(host, port, user, password, callback,
             log.warn("Netbox text protocol support is deprecated since 1.10, "..
                      "please use require('console').connect() instead")
             local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
-            method_encoder.inject(send_buf, nil, nil, setup_delimiter)
+            method_encoder.inject(send_buf, nil, setup_delimiter)
             local err, response = send_and_recv_console()
             if err then
                 return error_sm(err, response)
@@ -601,7 +598,7 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        encode_auth(send_buf, new_request_id(), nil, user, password, salt)
+        encode_auth(send_buf, new_request_id(), user, password, salt)
         local err, hdr, body_rpos, body_end = send_and_recv_iproto()
         if err then
             return error_sm(err, hdr)
@@ -624,11 +621,9 @@ local function create_transport(host, port, user, password, callback,
         local select2_id = new_request_id()
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
-        encode_select(send_buf, select1_id, nil, VSPACE_ID, 0, 2, 0,
-                      0xFFFFFFFF, nil)
+        encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
-        encode_select(send_buf, select2_id, nil, VINDEX_ID, 0, 2, 0,
-                      0xFFFFFFFF, nil)
+        encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         schema_version = nil -- any schema_version will do provided that
                              -- it is consistent across responses
         repeat
@@ -674,8 +669,7 @@ local function create_transport(host, port, user, password, callback,
             -- Sic: self.schema_version will be updated only after reload.
             local body
             body, body_end = decode(body_rpos)
-            set_state('fetch_schema',
-                      E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY])
+            set_state('fetch_schema')
             return iproto_schema_sm(schema_version)
         end
         return iproto_sm(schema_version)
@@ -959,59 +953,44 @@ function remote_methods:_request(method, opts, ...)
     local transport = self._transport
     local buffer = opts and opts.buffer
     if opts and opts.is_async then
-        return transport.perform_async_request(buffer, method, 0, ...)
+        return transport.perform_async_request(buffer, method, ...)
     end
-    local this_fiber = fiber_self()
-    local perform_request = transport.perform_request
-    local wait_state = transport.wait_state
-    local deadline = nil
+    local deadline
     if opts and opts.timeout then
         -- conn.space:request(, { timeout = timeout })
         deadline = fiber_clock() + opts.timeout
     else
         -- conn:timeout(timeout).space:request()
         -- @deprecated since 1.7.4
-        deadline = self._deadlines[this_fiber]
+        deadline = self._deadlines[fiber_self()]
     end
-    local err, res
-    repeat
-        local timeout = deadline and max(0, deadline - fiber_clock())
-        if self.state ~= 'active' then
-            wait_state('active', timeout)
-            timeout = deadline and max(0, deadline - fiber_clock())
-        end
-        res, err = perform_request(timeout, buffer, method,
-                                   self.schema_version, ...)
-        if err then
-            if err.code == E_WRONG_SCHEMA_VERSION then
-                err = nil
-            end
-        else
-            return res
-        end
-    until err
-    box.error(err)
+    local timeout = deadline and max(0, deadline - fiber_clock())
+    if self.state ~= 'active' then
+        transport.wait_state('active', timeout)
+        timeout = deadline and max(0, deadline - fiber_clock())
+    end
+    local res, err = transport.perform_request(timeout, buffer, method, ...)
+    if err then
+        box.error(err)
+    end
+    -- Try to wait until a schema is reloaded if needed.
+    -- Regardless of reloading result, the main response is
+    -- returned, since it does not depend on any schema things.
+    if self.state == 'fetch_schema' then
+        timeout = deadline and max(0, deadline - fiber_clock())
+        transport.wait_state('active', timeout)
+    end
+    return res
 end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    local timeout = opts and opts.timeout
-    if timeout == nil then
-        -- conn:timeout(timeout):ping()
-        -- @deprecated since 1.7.4
-        local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline - fiber_clock())
-                            or (opts and opts.timeout)
-    end
-    local _, err = self._transport.perform_request(timeout, nil, 'ping',
-                                                   self.schema_version)
-    return not err or err.code == E_WRONG_SCHEMA_VERSION
+    return (pcall(self._request, self, 'ping', opts))
 end
 
 function remote_methods:reload_schema()
     check_remote_arg(self, 'reload_schema')
-    self:_request('select', nil, VSPACE_ID, 0, box.index.GE, 0, 0xFFFFFFFF,
-                  nil)
+    self:ping()
 end
 
 -- @deprecated since 1.7.4
@@ -1184,10 +1163,10 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        res, err = pr(timeout, nil, 'eval', nil, loader, {line})
+        res, err = pr(timeout, nil, 'eval', loader, {line})
     else
         assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, 'inject', nil, line..'$EOF$\n')
+        res, err = pr(timeout, nil, 'inject', line..'$EOF$\n')
     end
     if err then
         box.error(err)

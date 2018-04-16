@@ -53,7 +53,6 @@ netbox_prepare_request(lua_State *L, struct mpstream *stream, uint32_t r_type)
 {
 	struct ibuf *ibuf = (struct ibuf *) lua_topointer(L, 1);
 	uint64_t sync = luaL_touint64(L, 2);
-	uint64_t schema_version = luaL_touint64(L, 3);
 
 	mpstream_init(stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
@@ -67,13 +66,10 @@ netbox_prepare_request(lua_State *L, struct mpstream *stream, uint32_t r_type)
 	mpstream_advance(stream, fixheader_size);
 
 	/* encode header */
-	luamp_encode_map(cfg, stream, 3);
+	luamp_encode_map(cfg, stream, 2);
 
 	luamp_encode_uint(cfg, stream, IPROTO_SYNC);
 	luamp_encode_uint(cfg, stream, sync);
-
-	luamp_encode_uint(cfg, stream, IPROTO_SCHEMA_VERSION);
-	luamp_encode_uint(cfg, stream, schema_version);
 
 	luamp_encode_uint(cfg, stream, IPROTO_REQUEST_TYPE);
 	luamp_encode_uint(cfg, stream, r_type);
@@ -111,9 +107,8 @@ netbox_encode_request(struct mpstream *stream, size_t initial_size)
 static int
 netbox_encode_ping(lua_State *L)
 {
-	if (lua_gettop(L) < 3)
-		return luaL_error(L, "Usage: netbox.encode_ping(ibuf, sync, "
-				"schema_version)");
+	if (lua_gettop(L) < 2)
+		return luaL_error(L, "Usage: netbox.encode_ping(ibuf, sync)");
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_PING);
@@ -124,19 +119,20 @@ netbox_encode_ping(lua_State *L)
 static int
 netbox_encode_auth(lua_State *L)
 {
-	if (lua_gettop(L) < 6)
+	if (lua_gettop(L) < 5) {
 		return luaL_error(L, "Usage: netbox.encode_update(ibuf, sync, "
-		       "schema_version, user, password, greeting)");
+				     "user, password, greeting)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_AUTH);
 
 	size_t user_len;
-	const char *user = lua_tolstring(L, 4, &user_len);
+	const char *user = lua_tolstring(L, 3, &user_len);
 	size_t password_len;
-	const char *password = lua_tolstring(L, 5, &password_len);
+	const char *password = lua_tolstring(L, 4, &password_len);
 	size_t salt_len;
-	const char *salt = lua_tolstring(L, 6, &salt_len);
+	const char *salt = lua_tolstring(L, 5, &salt_len);
 	if (salt_len < SCRAMBLE_SIZE)
 		return luaL_error(L, "Invalid salt");
 
@@ -160,9 +156,10 @@ netbox_encode_auth(lua_State *L)
 static int
 netbox_encode_call_impl(lua_State *L, enum iproto_type type)
 {
-	if (lua_gettop(L) < 5)
+	if (lua_gettop(L) < 4) {
 		return luaL_error(L, "Usage: netbox.encode_call(ibuf, sync, "
-		       "schema_version, function_name, args)");
+				     "function_name, args)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, type);
@@ -171,13 +168,13 @@ netbox_encode_call_impl(lua_State *L, enum iproto_type type)
 
 	/* encode proc name */
 	size_t name_len;
-	const char *name = lua_tolstring(L, 4, &name_len);
+	const char *name = lua_tolstring(L, 3, &name_len);
 	luamp_encode_uint(cfg, &stream, IPROTO_FUNCTION_NAME);
 	luamp_encode_str(cfg, &stream, name, name_len);
 
 	/* encode args */
 	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 5);
+	luamp_encode_tuple(L, cfg, &stream, 4);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -198,9 +195,10 @@ netbox_encode_call(lua_State *L)
 static int
 netbox_encode_eval(lua_State *L)
 {
-	if (lua_gettop(L) < 5)
+	if (lua_gettop(L) < 4) {
 		return luaL_error(L, "Usage: netbox.encode_eval(ibuf, sync, "
-		       "schema_version, expr, args)");
+				     "expr, args)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_EVAL);
@@ -209,13 +207,13 @@ netbox_encode_eval(lua_State *L)
 
 	/* encode expr */
 	size_t expr_len;
-	const char *expr = lua_tolstring(L, 4, &expr_len);
+	const char *expr = lua_tolstring(L, 3, &expr_len);
 	luamp_encode_uint(cfg, &stream, IPROTO_EXPR);
 	luamp_encode_str(cfg, &stream, expr, expr_len);
 
 	/* encode args */
 	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 5);
+	luamp_encode_tuple(L, cfg, &stream, 4);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -224,21 +222,22 @@ netbox_encode_eval(lua_State *L)
 static int
 netbox_encode_select(lua_State *L)
 {
-	if (lua_gettop(L) < 9)
+	if (lua_gettop(L) < 8) {
 		return luaL_error(L, "Usage netbox.encode_select(ibuf, sync, "
-				  "schema_version, space_id, index_id, iterator, "
-				  "offset, limit, key)");
+				     "space_id, index_id, iterator, offset, "
+				     "limit, key)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_SELECT);
 
 	luamp_encode_map(cfg, &stream, 6);
 
-	uint32_t space_id = lua_tonumber(L, 4);
-	uint32_t index_id = lua_tonumber(L, 5);
-	int iterator = lua_tointeger(L, 6);
-	uint32_t offset = lua_tonumber(L, 7);
-	uint32_t limit = lua_tonumber(L, 8);
+	uint32_t space_id = lua_tonumber(L, 3);
+	uint32_t index_id = lua_tonumber(L, 4);
+	int iterator = lua_tointeger(L, 5);
+	uint32_t offset = lua_tonumber(L, 6);
+	uint32_t limit = lua_tonumber(L, 7);
 
 	/* encode space_id */
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
@@ -262,7 +261,7 @@ netbox_encode_select(lua_State *L)
 
 	/* encode key */
 	luamp_encode_uint(cfg, &stream, IPROTO_KEY);
-	luamp_convert_key(L, cfg, &stream, 9);
+	luamp_convert_key(L, cfg, &stream, 8);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -271,24 +270,23 @@ netbox_encode_select(lua_State *L)
 static inline int
 netbox_encode_insert_or_replace(lua_State *L, uint32_t reqtype)
 {
-	if (lua_gettop(L) < 5)
+	if (lua_gettop(L) < 4) {
 		return luaL_error(L, "Usage: netbox.encode_insert(ibuf, sync, "
-		       "schema_version, space_id, tuple)");
-	lua_settop(L, 5);
-
+				     "space_id, tuple)");
+	}
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, reqtype);
 
 	luamp_encode_map(cfg, &stream, 2);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, 4);
+	uint32_t space_id = lua_tonumber(L, 3);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
 	/* encode args */
 	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 5);
+	luamp_encode_tuple(L, cfg, &stream, 4);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -309,9 +307,10 @@ netbox_encode_replace(lua_State *L)
 static int
 netbox_encode_delete(lua_State *L)
 {
-	if (lua_gettop(L) < 6)
+	if (lua_gettop(L) < 5) {
 		return luaL_error(L, "Usage: netbox.encode_delete(ibuf, sync, "
-		       "schema_version, space_id, index_id, key)");
+				     "space_id, index_id, key)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_DELETE);
@@ -319,18 +318,18 @@ netbox_encode_delete(lua_State *L)
 	luamp_encode_map(cfg, &stream, 3);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, 4);
+	uint32_t space_id = lua_tonumber(L, 3);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
 	/* encode space_id */
-	uint32_t index_id = lua_tonumber(L, 5);
+	uint32_t index_id = lua_tonumber(L, 4);
 	luamp_encode_uint(cfg, &stream, IPROTO_INDEX_ID);
 	luamp_encode_uint(cfg, &stream, index_id);
 
 	/* encode key */
 	luamp_encode_uint(cfg, &stream, IPROTO_KEY);
-	luamp_convert_key(L, cfg, &stream, 6);
+	luamp_convert_key(L, cfg, &stream, 5);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -339,9 +338,10 @@ netbox_encode_delete(lua_State *L)
 static int
 netbox_encode_update(lua_State *L)
 {
-	if (lua_gettop(L) < 7)
+	if (lua_gettop(L) < 6) {
 		return luaL_error(L, "Usage: netbox.encode_update(ibuf, sync, "
-		       "schema_version, space_id, index_id, key, ops)");
+				     "space_id, index_id, key, ops)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_UPDATE);
@@ -349,12 +349,12 @@ netbox_encode_update(lua_State *L)
 	luamp_encode_map(cfg, &stream, 5);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, 4);
+	uint32_t space_id = lua_tonumber(L, 3);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
 	/* encode index_id */
-	uint32_t index_id = lua_tonumber(L, 5);
+	uint32_t index_id = lua_tonumber(L, 4);
 	luamp_encode_uint(cfg, &stream, IPROTO_INDEX_ID);
 	luamp_encode_uint(cfg, &stream, index_id);
 
@@ -365,12 +365,12 @@ netbox_encode_update(lua_State *L)
 	/* encode in reverse order for speedup - see luamp_encode() code */
 	/* encode ops */
 	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 7);
+	luamp_encode_tuple(L, cfg, &stream, 6);
 	lua_pop(L, 1); /* ops */
 
 	/* encode key */
 	luamp_encode_uint(cfg, &stream, IPROTO_KEY);
-	luamp_convert_key(L, cfg, &stream, 6);
+	luamp_convert_key(L, cfg, &stream, 5);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
@@ -379,9 +379,10 @@ netbox_encode_update(lua_State *L)
 static int
 netbox_encode_upsert(lua_State *L)
 {
-	if (lua_gettop(L) != 6)
+	if (lua_gettop(L) != 5) {
 		return luaL_error(L, "Usage: netbox.encode_upsert(ibuf, sync, "
-			"schema_version, space_id, tuple, ops)");
+				     "space_id, tuple, ops)");
+	}
 
 	struct mpstream stream;
 	size_t svp = netbox_prepare_request(L, &stream, IPROTO_UPSERT);
@@ -389,7 +390,7 @@ netbox_encode_upsert(lua_State *L)
 	luamp_encode_map(cfg, &stream, 4);
 
 	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, 4);
+	uint32_t space_id = lua_tonumber(L, 3);
 	luamp_encode_uint(cfg, &stream, IPROTO_SPACE_ID);
 	luamp_encode_uint(cfg, &stream, space_id);
 
@@ -400,12 +401,12 @@ netbox_encode_upsert(lua_State *L)
 	/* encode in reverse order for speedup - see luamp_encode() code */
 	/* encode ops */
 	luamp_encode_uint(cfg, &stream, IPROTO_OPS);
-	luamp_encode_tuple(L, cfg, &stream, 6);
+	luamp_encode_tuple(L, cfg, &stream, 5);
 	lua_pop(L, 1); /* ops */
 
 	/* encode tuple */
 	luamp_encode_uint(cfg, &stream, IPROTO_TUPLE);
-	luamp_encode_tuple(L, cfg, &stream, 5);
+	luamp_encode_tuple(L, cfg, &stream, 4);
 
 	netbox_encode_request(&stream, svp);
 	return 0;
