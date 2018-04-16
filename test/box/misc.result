@@ -169,6 +169,27 @@ box.error(box.error.UNSUPPORTED)
 ---
 - error: 'box.error(): bad arguments'
 ...
+--
+-- gh-3031: allow to create an error object with no throwing it.
+--
+e = box.error.new(box.error.UNKNOWN)
+---
+...
+e
+---
+- Unknown error
+...
+e = box.error.new(box.error.CREATE_SPACE, "space", "error")
+---
+...
+e
+---
+- 'Failed to create space ''space'': error'
+...
+box.error.new()
+---
+- error: 'Usage: box.error.new(code, args)'
+...
 ----------------
 -- # box.stat
 ----------------

@@ -50,6 +50,15 @@ box.error(box.error.UNSUPPORTED, "x", "x%s")
 box.error(box.error.UNSUPPORTED, "x")
 box.error(box.error.UNSUPPORTED)
 
+--
+-- gh-3031: allow to create an error object with no throwing it.
+--
+e = box.error.new(box.error.UNKNOWN)
+e
+e = box.error.new(box.error.CREATE_SPACE, "space", "error")
+e
+box.error.new()
+
 ----------------
 -- # box.stat
 ----------------
