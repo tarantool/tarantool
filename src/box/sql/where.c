@@ -39,9 +39,11 @@
  */
 #include <box/coll.h>
 #include "sqliteInt.h"
+#include "tarantoolInt.h"
 #include "vdbeInt.h"
 #include "whereInt.h"
 #include "box/session.h"
+#include "box/schema.h"
 
 /* Forward declaration of methods */
 static int whereLoopResize(sqlite3 *, WhereLoop *, int);
@@ -2246,16 +2248,6 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 }
 
 /*
- * Adjust the cost C by the costMult facter T.  This only occurs if
- * compiled with -DSQLITE_ENABLE_COSTMULT
- */
-#ifdef SQLITE_ENABLE_COSTMULT
-#define ApplyCostMultiplier(C,T)  C += T
-#else
-#define ApplyCostMultiplier(C,T)
-#endif
-
-/*
  * We have so far matched pBuilder->pNew->nEq terms of the
  * index pIndex. Try to match one more.
  *
@@ -2537,15 +2529,34 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		 * seek only. Then, if this is a non-covering index, add the cost of
 		 * visiting the rows in the main table.
 		 */
-		rCostIdx =
-		    pNew->nOut + 1 +
-		    (15 * pProbe->szIdxRow) / pSrc->pTab->szTabRow;
+		struct space *space =
+			space_by_id(SQLITE_PAGENO_TO_SPACEID(pProbe->tnum));
+		assert(space != NULL);
+		struct index *idx =
+			space_index(space,
+				    SQLITE_PAGENO_TO_INDEXID(pProbe->tnum));
+		assert(idx != NULL);
+		/*
+		 * FIXME: currently, the procedure below makes no
+		 * sense, since there are no partial indexes, so
+		 * all indexes in the space feature the same
+		 * average tuple size. Moreover, secondary
+		 * indexes in Vinyl engine may contain different
+		 * tuple count of different sizes.
+		 */
+		ssize_t avg_tuple_size = sql_index_tuple_size(space, idx);
+		struct index *pk = space_index(space, 0);
+		assert(pProbe->pTable == pSrc->pTab);
+		ssize_t avg_tuple_size_pk = sql_index_tuple_size(space, pk);
+		uint32_t partial_index_cost =
+			avg_tuple_size_pk != 0 ?
+			(15 * avg_tuple_size) / avg_tuple_size_pk : 0;
+		rCostIdx = pNew->nOut + 1 + partial_index_cost;
 		pNew->rRun = sqlite3LogEstAdd(rLogSize, rCostIdx);
 		if ((pNew->wsFlags & (WHERE_IDX_ONLY | WHERE_IPK)) == 0) {
 			pNew->rRun =
 			    sqlite3LogEstAdd(pNew->rRun, pNew->nOut + 16);
 		}
-		ApplyCostMultiplier(pNew->rRun, pProbe->pTable->costMult);
 
 		nOutUnadjusted = pNew->nOut;
 		pNew->rRun += nInMul + nIn;
@@ -2770,7 +2781,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		sPk.aiRowLogEst = aiRowEstPk;
 		sPk.onError = ON_CONFLICT_ACTION_REPLACE;
 		sPk.pTable = pTab;
-		sPk.szIdxRow = pTab->szTabRow;
 		aiRowEstPk[0] = pTab->nRowLogEst;
 		aiRowEstPk[1] = 0;
 		pFirst = pSrc->pTab->pIndex;
@@ -2821,8 +2831,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 				    && (pTab->tabFlags & TF_Ephemeral) == 0) {
 					pNew->rSetup += 24;
 				}
-				ApplyCostMultiplier(pNew->rSetup,
-						    pTab->costMult);
 				if (pNew->rSetup < 0)
 					pNew->rSetup = 0;
 				/* TUNING: Each index lookup yields 20 rows in the table.  This
@@ -2874,7 +2882,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 			pNew->iSortIdx = b ? iSortIdx : 0;
 			/* TUNING: Cost of full table scan is (N*3.0). */
 			pNew->rRun = rSize + 16;
-			ApplyCostMultiplier(pNew->rRun, pTab->costMult);
 			whereLoopOutputAdjust(pWC, pNew, rSize);
 			rc = whereLoopInsert(pBuilder, pNew);
 			pNew->nOut = rSize;
@@ -2896,7 +2903,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 			 */
 			int notPkPenalty = IsPrimaryKeyIndex(pProbe) ? 0 : 4;
 			pNew->rRun = rSize + 16 + notPkPenalty;
-			ApplyCostMultiplier(pNew->rRun, pTab->costMult);
 			whereLoopOutputAdjust(pWC, pNew, rSize);
 			rc = whereLoopInsert(pBuilder, pNew);
 			pNew->nOut = rSize;

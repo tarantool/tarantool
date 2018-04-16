@@ -1874,7 +1874,6 @@ struct Column {
 	 */
 	enum on_conflict_action notNull;
 	char affinity;		/* One of the SQLITE_AFF_... values */
-	u8 szEst;		/* Estimated size of value in this column. sizeof(INT)==1 */
 	u8 is_primkey;		/* Boolean propertie for being PK */
 };
 
@@ -1942,10 +1941,6 @@ struct Table {
 				   column number here, -1 otherwise Tarantool specifics */
 	i16 nCol;		/* Number of columns in this table */
 	LogEst nRowLogEst;	/* Estimated rows in table - from _sql_stat1 table */
-	LogEst szTabRow;	/* Estimated size of each table row in bytes */
-#ifdef SQLITE_ENABLE_COSTMULT
-	LogEst costMult;	/* Cost multiplier for using this table */
-#endif
 	u8 tabFlags;		/* Mask of TF_* values */
 	u8 keyConf;		/* What to do in case of uniqueness conflict on iPKey */
 #ifndef SQLITE_OMIT_ALTERTABLE
@@ -2123,7 +2118,6 @@ struct Index {
 	Expr *pPartIdxWhere;	/* WHERE clause for partial indices */
 	ExprList *aColExpr;	/* Column expressions */
 	int tnum;		/* DB Page containing root of this index */
-	LogEst szIdxRow;	/* Estimated average row size in bytes */
 	u16 nColumn;		/* Number of columns stored in the index */
 	u8 onError;		/* ON_CONFLICT_ACTION_ABORT, _IGNORE, _REPLACE,
 				 * or _NONE
@@ -3983,6 +3977,19 @@ char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
 struct coll *sqlite3GetCollSeq(Parse *, struct coll *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
+
+/**
+ * This function returns average size of tuple in given index.
+ * Currently, all indexes from one space feature the same size,
+ * due to the absence of partial indexes.
+ *
+ * @param space Index belongs to this space.
+ * @param idx Index to be examined.
+ * @retval Average size of tuple in given index.
+ */
+ssize_t
+sql_index_tuple_size(struct space *space, struct index *idx);
+
 int sqlite3InvokeBusyHandler(BusyHandler *);
 int sqlite3AnalysisLoad(sqlite3 *);
 void sqlite3DeleteIndexSamples(sqlite3 *, Index *);

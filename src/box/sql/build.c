@@ -719,7 +719,6 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		 */
 		pCol->affinity = SQLITE_AFF_BLOB;
 		pCol->type = FIELD_TYPE_SCALAR;
-		pCol->szEst = 1;
 	} else {
 		/* TODO: convert string of type into runtime
 		 * FIELD_TYPE value for other types.
@@ -1398,40 +1397,6 @@ createTableStmt(sqlite3 * db, Table * p)
 	return zStmt;
 }
 
-/*
- * Estimate the total row width for a table.
- */
-static void
-estimateTableWidth(Table * pTab)
-{
-	unsigned wTable = 0;
-	const Column *pTabCol;
-	int i;
-	for (i = pTab->nCol, pTabCol = pTab->aCol; i > 0; i--, pTabCol++) {
-		wTable += pTabCol->szEst;
-	}
-	if (pTab->iPKey < 0)
-		wTable++;
-	pTab->szTabRow = sqlite3LogEst(wTable * 4);
-}
-
-/*
- * Estimate the average size of a row for an index.
- */
-static void
-estimateIndexWidth(Index * pIdx)
-{
-	unsigned wIndex = 0;
-	int i;
-	const Column *aCol = pIdx->pTable->aCol;
-	for (i = 0; i < pIdx->nColumn; i++) {
-		i16 x = pIdx->aiColumn[i];
-		assert(x < pIdx->pTable->nCol);
-		wIndex += x < 0 ? 1 : aCol[pIdx->aiColumn[i]].szEst;
-	}
-	pIdx->szIdxRow = sqlite3LogEst(wIndex * 4);
-}
-
 /* Return true if value x is found any of the first nCol entries of aiCol[]
  */
 static int
@@ -1877,7 +1842,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 {
 	Table *p;		/* The new table */
 	sqlite3 *db = pParse->db;	/* The database connection */
-	Index *pIdx;		/* An implied index of the table */
 
 	if (pEnd == 0 && pSelect == 0) {
 		return;
@@ -1915,12 +1879,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 					    p->pCheck);
 	}
 #endif				/* !defined(SQLITE_OMIT_CHECK) */
-
-	/* Estimate the average row size for the table and for all implied indices */
-	estimateTableWidth(p);
-	for (pIdx = p->pIndex; pIdx; pIdx = pIdx->pNext) {
-		estimateIndexWidth(pIdx);
-	}
 
 	/* If not initializing, then create new Tarantool space.
 	 *
@@ -3091,8 +3049,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	}
 
 	sqlite3DefaultRowEst(pIndex);
-	if (parse->pNewTable == 0)
-		estimateIndexWidth(pIndex);
 
 	if (pTab == parse->pNewTable) {
 		/* This routine has been called to create an automatic index as a

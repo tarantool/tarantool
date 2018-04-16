@@ -1191,6 +1191,19 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 		sqlite3VdbeAddOp0(v, OP_Expire);
 }
 
+ssize_t
+sql_index_tuple_size(struct space *space, struct index *idx)
+{
+	assert(space != NULL);
+	assert(idx != NULL);
+	assert(idx->def->space_id == space->def->id);
+	ssize_t tuple_count = index_size(idx);
+	ssize_t space_size = space_bsize(space);
+	ssize_t avg_tuple_size = tuple_count != 0 ?
+				 (space_size / tuple_count) : 0;
+	return avg_tuple_size;
+}
+
 /*
  * Used to pass information from the analyzer reader through to the
  * callback routine.
@@ -1241,18 +1254,9 @@ decodeIntArray(char *zIntArray,	/* String containing int array to decode */
 		while (z[0]) {
 			if (sqlite3_strglob("unordered*", z) == 0) {
 				pIndex->bUnordered = 1;
-			} else if (sqlite3_strglob("sz=[0-9]*", z) == 0) {
-				pIndex->szIdxRow =
-				    sqlite3LogEst(sqlite3Atoi(z + 3));
 			} else if (sqlite3_strglob("noskipscan*", z) == 0) {
 				pIndex->noSkipScan = 1;
 			}
-#ifdef SQLITE_ENABLE_COSTMULT
-			else if (sqlite3_strglob("costmult=[0-9]*", z) == 0) {
-				pIndex->pTable->costMult =
-				    sqlite3LogEst(sqlite3Atoi(z + 9));
-			}
-#endif
 			while (z[0] != 0 && z[0] != ' ')
 				z++;
 			while (z[0] == ' ')
@@ -1316,16 +1320,6 @@ analysisLoader(void *pData, int argc, char **argv, char **NotUsed)
 		pIndex->bUnordered = 0;
 		decodeIntArray((char *)z, nCol, aiRowEst, pIndex->aiRowLogEst,
 			       pIndex);
-		if (pIndex->pPartIdxWhere == 0)
-			pTable->nRowLogEst = pIndex->aiRowLogEst[0];
-	} else {
-		Index fakeIdx;
-		fakeIdx.szIdxRow = pTable->szTabRow;
-#ifdef SQLITE_ENABLE_COSTMULT
-		fakeIdx.pTable = pTable;
-#endif
-		decodeIntArray((char *)z, 1, 0, &pTable->nRowLogEst, &fakeIdx);
-		pTable->szTabRow = fakeIdx.szIdxRow;
 	}
 
 	return 0;

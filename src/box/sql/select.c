@@ -1506,20 +1506,19 @@ generateSortTail(Parse * pParse,	/* Parsing context */
  * the SQLITE_ENABLE_COLUMN_METADATA compile-time option is used.
  */
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
-#define columnType(A,B,C,D,E,F) columnTypeImpl(A,B,D,E,F)
+#define columnType(A,B,C,D) columnTypeImpl(A,B,C,D)
 #else				/* if !defined(SQLITE_ENABLE_COLUMN_METADATA) */
-#define columnType(A,B,C,D,E,F) columnTypeImpl(A,B,F)
+#define columnType(A,B,C,D) columnTypeImpl(A,B)
 #endif
 static enum field_type
-columnTypeImpl(NameContext * pNC, Expr * pExpr,
+columnTypeImpl(NameContext * pNC, Expr * pExpr
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
-	       const char **pzOrigTab, const char **pzOrigCol,
+	       , const char **pzOrigCol,
 #endif
-	       u8 * pEstWidth)
+)
 {
 	enum field_type column_type = FIELD_TYPE_SCALAR;
 	int j;
-	u8 estWidth = 1;
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
 	char const *zOrigTab = 0;
 	char const *zOrigCol = 0;
@@ -1593,9 +1592,8 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 					sNC.pNext = pNC;
 					sNC.pParse = pNC->pParse;
 					column_type =
-					    columnType(&sNC, p, 0,
-						       &zOrigTab, &zOrigCol,
-						       &estWidth);
+					    columnType(&sNC, p, &zOrigTab,
+						       &zOrigCol);
 				}
 			} else if (pTab->pSchema) {
 				/* A real table */
@@ -1604,11 +1602,9 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
 				zOrigCol = pTab->aCol[iCol].zName;
 				zType = sqlite3ColumnType(&pTab->aCol[iCol], 0);
-				estWidth = pTab->aCol[iCol].szEst;
 				zOrigTab = pTab->zName;
 #else
 				column_type = sqlite3ColumnType(&pTab->aCol[iCol]);
-				estWidth = pTab->aCol[iCol].szEst;
 #endif
 			}
 			break;
@@ -1626,8 +1622,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 			sNC.pNext = pNC;
 			sNC.pParse = pNC->pParse;
 			column_type =
-			    columnType(&sNC, p, 0, &zOrigTab, &zOrigCol,
-				       &estWidth);
+			    columnType(&sNC, p, &zOrigTab, &zOrigCol);
 			break;
 		}
 	}
@@ -1639,8 +1634,6 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 		*pzOrigCol = zOrigCol;
 	}
 #endif
-	if (pEstWidth)
-		*pEstWidth = estWidth;
 	return column_type;
 }
 
@@ -1853,7 +1846,6 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	int i;
 	Expr *p;
 	struct ExprList_item *a;
-	u64 szAll = 0;
 
 	assert(pSelect != 0);
 	assert((pSelect->selFlags & SF_Resolved) != 0);
@@ -1866,8 +1858,7 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	for (i = 0, pCol = pTab->aCol; i < pTab->nCol; i++, pCol++) {
 		enum field_type type;
 		p = a[i].pExpr;
-		type = columnType(&sNC, p, 0, 0, 0, &pCol->szEst);
-		szAll += pCol->szEst;
+		type = columnType(&sNC, p, 0, 0);
 		pCol->affinity = sqlite3ExprAffinity(p);
 		pCol->type = type;
 
@@ -1878,7 +1869,6 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 		if (coll != NULL && pCol->coll == NULL)
 			pCol->coll = coll;
 	}
-	pTab->szTabRow = sqlite3LogEst(szAll * 4);
 }
 
 /*
