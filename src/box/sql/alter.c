@@ -35,6 +35,7 @@
  */
 #include "sqliteInt.h"
 #include "src/box/session.h"
+#include "tarantoolInt.h"
 
 /*
  * The code in this file only exists if we are not omitting the
@@ -161,7 +162,9 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 
 	zTab = &pNew->zName[16];	/* Skip the "sqlite_altertab_" prefix on the name */
 	pCol = &pNew->aCol[pNew->nCol - 1];
-	pDflt = pCol->pDflt;
+	assert(pNew->def != NULL);
+	pDflt = space_column_default_expr(SQLITE_PAGENO_TO_SPACEID(pNew->tnum),
+					  pNew->nCol - 1);
 	pTab = sqlite3HashFind(&db->pSchema->tblHash, zTab);;
 	assert(pTab);
 
@@ -297,7 +300,6 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 		Column *pCol = &pNew->aCol[i];
 		pCol->zName = sqlite3DbStrDup(db, pCol->zName);
 		pCol->coll = NULL;
-		pCol->pDflt = 0;
 	}
 	pNew->pSchema = db->pSchema;
 	pNew->addColOffset = pTab->addColOffset;

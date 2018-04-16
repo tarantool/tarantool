@@ -36,6 +36,7 @@
 #include <box/coll.h>
 #include "sqliteInt.h"
 #include "box/session.h"
+#include "tarantoolInt.h"
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 #ifndef SQLITE_OMIT_TRIGGER
@@ -1349,8 +1350,12 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 									     &tToCol,
 									     0));
 				} else if (action == OE_SetDflt) {
+					uint32_t space_id =
+						SQLITE_PAGENO_TO_SPACEID(
+							pFKey->pFrom->tnum);
 					Expr *pDflt =
-					    pFKey->pFrom->aCol[iFromCol].pDflt;
+						space_column_default_expr(
+							space_id, (uint32_t)iFromCol);
 					if (pDflt) {
 						pNew =
 						    sqlite3ExprDup(db, pDflt,

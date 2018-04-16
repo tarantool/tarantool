@@ -36,6 +36,7 @@
 #include <box/index.h>
 #include <box/box.h>
 #include <box/tuple.h>
+#include "box/schema.h"
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "box/session.h"
@@ -64,6 +65,7 @@
  * ../tool/mkpragmatab.tcl.
  */
 #include "pragma.h"
+#include "tarantoolInt.h"
 
 /*
  * Interpret the given string as a safety level.  Return 0 for OFF,
@@ -370,19 +372,21 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						     i; k++) {
 						}
 					}
-					assert(pCol->pDflt == 0
-					       || pCol->pDflt->op == TK_SPAN);
 					bool nullable = table_column_is_nullable(pTab, i);
+					uint32_t space_id =
+						SQLITE_PAGENO_TO_SPACEID(
+							pTab->tnum);
+					struct space *space =
+						space_cache_find(space_id);
+					char *expr_str = space->
+						def->fields[i].default_value;
 					sqlite3VdbeMultiLoad(v, 1, "issisi",
 							     i, pCol->zName,
 							     field_type_strs[
 							     sqlite3ColumnType
 							     (pCol)],
 							     nullable == 0,
-							     pCol->
-							     pDflt ? pCol->
-							     pDflt->u.zToken
-							     : 0, k);
+							     expr_str, k);
 					sqlite3VdbeAddOp2(v, OP_ResultRow, 1,
 							  6);
 				}

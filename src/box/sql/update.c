@@ -35,6 +35,8 @@
  */
 #include "sqliteInt.h"
 #include "box/session.h"
+#include "tarantoolInt.h"
+#include "box/schema.h"
 
 /*
  * The most recently coded instruction was an OP_Column to retrieve the
@@ -75,7 +77,14 @@ sqlite3ColumnDefault(Vdbe * v, Table * pTab, int i, int iReg)
 		Column *pCol = &pTab->aCol[i];
 		VdbeComment((v, "%s.%s", pTab->zName, pCol->zName));
 		assert(i < pTab->nCol);
-		sqlite3ValueFromExpr(sqlite3VdbeDb(v), pCol->pDflt,
+
+		Expr *expr = NULL;
+		struct space *space =
+			space_cache_find(SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+		if (space != NULL && space->def->fields != NULL)
+			expr = space->def->fields[i].default_value_expr;
+		sqlite3ValueFromExpr(sqlite3VdbeDb(v),
+				     expr,
 				     pCol->affinity, &pValue);
 		if (pValue) {
 			sqlite3VdbeAppendP4(v, pValue, P4_MEM);

@@ -297,7 +297,6 @@ sqlite3DeleteColumnNames(sqlite3 * db, Table * pTable)
 	if ((pCol = pTable->aCol) != 0) {
 		for (i = 0; i < pTable->nCol; i++, pCol++) {
 			sqlite3DbFree(db, pCol->zName);
-			sql_expr_free(db, pCol->pDflt, false);
 		}
 		sqlite3DbFree(db, pTable->aCol);
 	}
@@ -394,6 +393,12 @@ deleteTable(sqlite3 * db, Table * pTable)
 	sqlite3DbFree(db, pTable->zColAff);
 	sqlite3SelectDelete(db, pTable->pSelect);
 	sqlite3ExprListDelete(db, pTable->pCheck);
+	if (pTable->def != NULL) {
+		/* Fields has been allocated independently. */
+		struct field_def *fields = pTable->def->fields;
+		space_def_delete(pTable->def);
+		sqlite3DbFree(db, fields);
+	}
 	sqlite3DbFree(db, pTable);
 
 	/* Verify that no lookaside memory was used by schema tables */
@@ -487,6 +492,43 @@ sqlite3PrimaryKeyIndex(Table * pTab)
 	return p;
 }
 
+/**
+ * Create and initialize a new SQL Table object.
+ * @param parser SQL Parser object.
+ * @param name Table to create name.
+ * @retval NULL on memory allocation error, Parser state is
+ *         changed.
+ * @retval not NULL on success.
+ */
+static Table *
+sql_table_new(Parse *parser, char *name)
+{
+	sqlite3 *db = parser->db;
+
+	Table *table = sqlite3DbMallocZero(db, sizeof(Table));
+	struct space_def *def = space_def_new(0, 0, 0, NULL, 0, NULL, 0,
+					      &space_opts_default, NULL, 0);
+	if (table == NULL || def == NULL) {
+		if (def != NULL)
+			space_def_delete(def);
+		sqlite3DbFree(db, table);
+		parser->rc = SQLITE_NOMEM_BKPT;
+		parser->nErr++;
+		return NULL;
+	}
+
+	table->def = def;
+	table->zName = name;
+	table->iPKey = -1;
+	table->iAutoIncPKey = -1;
+	table->pSchema = db->pSchema;
+	sqlite3HashInit(&table->idxHash);
+	table->nTabRef = 1;
+	table->nRowLogEst = 200;
+	assert(200 == sqlite3LogEst(1048576));
+	return table;
+}
+
 /*
  * Begin constructing a new table representation in memory.  This is
  * the first of several action routines that get called in response
@@ -544,21 +586,10 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 		goto begin_table_error;
 	}
 
-	pTable = sqlite3DbMallocZero(db, sizeof(Table));
-	if (pTable == 0) {
-		assert(db->mallocFailed);
-		pParse->rc = SQLITE_NOMEM_BKPT;
-		pParse->nErr++;
+	pTable = sql_table_new(pParse, zName);
+	if (pTable == NULL)
 		goto begin_table_error;
-	}
-	pTable->zName = zName;
-	pTable->iPKey = -1;
-	pTable->iAutoIncPKey = -1;
-	pTable->pSchema = db->pSchema;
-	sqlite3HashInit(&pTable->idxHash);
-	pTable->nTabRef = 1;
-	pTable->nRowLogEst = 200;
-	assert(200 == sqlite3LogEst(1048576));
+
 	assert(pParse->pNewTable == 0);
 	pParse->pNewTable = pTable;
 
@@ -580,6 +611,49 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
  begin_table_error:
 	sqlite3DbFree(db, zName);
 	return;
+}
+
+/**
+ * Get field by id. Allocate memory if needed.
+ * Useful in cases when initial field_count is unknown.
+ * Allocated memory should by manually released.
+ * @param parser SQL Parser object.
+ * @param table SQL Table object.
+ * @param id column identifier.
+ * @retval not NULL on success.
+ * @retval NULL on out of memory.
+ */
+static struct field_def *
+sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
+{
+	sqlite3 *db = parser->db;
+	struct field_def *field;
+	assert(table->def != NULL);
+	assert(table->def->exact_field_count >= (uint32_t)table->nCol);
+	assert(id < SQLITE_MAX_COLUMN);
+
+	if (id >= table->def->exact_field_count) {
+		uint32_t columns = table->def->exact_field_count;
+		columns = (columns > 0) ? 2 * columns : 1;
+		field = sqlite3DbRealloc(db, table->def->fields,
+					 columns * sizeof(table->def->fields[0]));
+		if (field == NULL) {
+			parser->rc = SQLITE_NOMEM_BKPT;
+			parser->nErr++;
+			return NULL;
+		}
+
+		for (uint32_t i = columns / 2; i < columns; i++) {
+			memcpy(&field[i], &field_def_default,
+			       sizeof(struct field_def));
+		}
+
+		table->def->fields = field;
+		table->def->exact_field_count = columns;
+	}
+
+	field = &table->def->fields[id];
+	return field;
 }
 
 /*
@@ -607,6 +681,8 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		return;
 	}
 #endif
+	if (sql_field_retrieve(pParse, p, (uint32_t) p->nCol) == NULL)
+		return;
 	z = sqlite3DbMallocRaw(db, pName->n + 1);
 	if (z == 0)
 		return;
@@ -665,6 +741,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		}
 	}
 	p->nCol++;
+	p->def->field_count++;
 	pParse->constraintName.n = 0;
 }
 
@@ -810,7 +887,11 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			 * is required by pragma table_info.
 			 */
 			Expr x;
-			sql_expr_free(db, pCol->pDflt, false);
+			assert(p->def != NULL);
+			struct field_def *field =
+				&p->def->fields[p->nCol - 1];
+			sql_expr_free(db, field->default_value_expr, false);
+
 			memset(&x, 0, sizeof(x));
 			x.op = TK_SPAN;
 			x.u.zToken = sqlite3DbStrNDup(db, (char *)pSpan->zStart,
@@ -818,7 +899,9 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 							    pSpan->zStart));
 			x.pLeft = pSpan->pExpr;
 			x.flags = EP_Skip;
-			pCol->pDflt = sqlite3ExprDup(db, &x, EXPRDUP_REDUCE);
+
+			field->default_value_expr =
+				sqlite3ExprDup(db, &x, EXPRDUP_REDUCE);
 			sqlite3DbFree(db, x.u.zToken);
 		}
 	}

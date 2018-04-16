@@ -1869,7 +1869,6 @@ struct Savepoint {
 struct Column {
 	char *zName;		/* Name of this column */
 	enum field_type type;	/* Column type. */
-	Expr *pDflt;		/* Default value of this column */
 	/** Collating sequence. */
 	struct coll *coll;
 	/**
@@ -1965,6 +1964,8 @@ struct Table {
 	Trigger *pTrigger;	/* List of triggers stored in pSchema */
 	Schema *pSchema;	/* Schema that contains this table */
 	Table *pNextZombie;	/* Next on the Parse.pZombieTab list */
+	/** Space definition with Tarantool metadata. */
+	struct space_def *def;
 };
 
 /*

@@ -1814,14 +1814,22 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		}
 		/* Default values for second and subsequent columns need to match. */
 		if (i > 0) {
-			assert(pDestCol->pDflt == 0
-			       || pDestCol->pDflt->op == TK_SPAN);
-			assert(pSrcCol->pDflt == 0
-			       || pSrcCol->pDflt->op == TK_SPAN);
-			if ((pDestCol->pDflt == 0) != (pSrcCol->pDflt == 0)
-			    || (pDestCol->pDflt
-				&& strcmp(pDestCol->pDflt->u.zToken,
-					  pSrcCol->pDflt->u.zToken) != 0)
+			uint32_t src_space_id =
+				SQLITE_PAGENO_TO_SPACEID(pSrc->tnum);
+			struct space *src_space =
+				space_cache_find(src_space_id);
+			uint32_t dest_space_id =
+				SQLITE_PAGENO_TO_SPACEID(pDest->tnum);
+			struct space *dest_space =
+				space_cache_find(dest_space_id);
+			assert(src_space != NULL && dest_space != NULL);
+			char *src_expr_str =
+				src_space->def->fields[i].default_value;
+			char *dest_expr_str =
+				dest_space->def->fields[i].default_value;
+			if ((dest_expr_str == NULL) != (src_expr_str == NULL) ||
+			    (dest_expr_str &&
+			     strcmp(src_expr_str, dest_expr_str) != 0)
 			    ) {
 				return 0;	/* Default values must be the same for all columns */
 			}

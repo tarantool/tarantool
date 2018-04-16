@@ -1448,7 +1448,8 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 	for (i = 0; i < n; i++) {
 		const char *t;
 		struct coll *coll = aCol[i].coll;
-		struct Expr *def = aCol[i].pDflt;
+		struct field_def *field = &pTable->def->fields[i];
+		struct Expr *def = field->default_value_expr;
 		int base_len = 4;
 		if (coll != NULL)
 			base_len += 1;
