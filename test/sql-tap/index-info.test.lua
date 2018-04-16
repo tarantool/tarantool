@@ -1,50 +1,68 @@
 #!/usr/bin/env tarantool
-test = require("sqltester")
-test:plan(4)
+
+local test = require("sqltester")
+test:plan(6)
 
 test:execsql([[
-	CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE, c INT);
-	INSERT INTO t1 VALUES (1, 1, 1), (2, 2, 2);
-	INSERT INTO t1 VALUES (3, 3, 3), (4, 4, 4);
-	CREATE INDEX t1ix1 ON t1(a);
-	CREATE INDEX t1ix2 ON t1(a, b);
-	CREATE INDEX t1ix3 ON t1(a, b, c);
+    CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE, c INT, d VARCHAR(100));
+    INSERT INTO t1 VALUES (1, 1, 1, 'abcd'), (2, 2, 2, 'abcde');
+    INSERT INTO t1 VALUES (3, 3, 3, 'abcdef'), (4, 4, 4, 'abcdefg');
+    CREATE INDEX a ON t1(a);
+    CREATE INDEX abc ON t1(a, b, c);
+    CREATE INDEX cba ON t1(c, b, a);
+    CREATE INDEX d ON t1(d);
 ]])
 
-test:do_execsql_test(
-	"index-info-1.1",
-	"PRAGMA index_info = t1.t1ix1;",
-	{
-	-- <index-info-1.1>
-	0, 0, 'A'
-	-- <index-info-1.1>
-	})
+-- Case: old index_xinfo pragma is banned.
+test:do_catchsql_test(
+    "index-info-1.1",
+    "PRAGMA index_xinfo (t1.a);",
+    {
+        1, "no such pragma: INDEX_XINFO",
+    })
 
-test:do_execsql_test(
-	"index-info-1.2",
-	"PRAGMA index_info = t1.t1ix2;",
-	{
-	-- <index-info-1.1>
-	0, 0, 'A', 1, 1, 'B',
-	-- <index-info-1.1>
-	})
+-- Case: old index_info syntax is banned.
+test:do_catchsql_test(
+    "index-info-1.2",
+    "PRAGMA index_info = t1.a;",
+    {
+        1, "near \".\": syntax error",
+    })
 
+-- Case: single column index with an integer column.
 test:do_execsql_test(
-	"index-info-1.3",
-	"PRAGMA index_info = t1.t1ix3;",
-	{
-	-- <index-info-1.1>
-	0, 0, 'A', 1, 1, 'B', 2, 2, 'C'
-	-- <index-info-1.1>
-	})
+    "index-info-1.3",
+    "PRAGMA index_info (t1.a);",
+    {
+        0, 0, 'A', 0, 'BINARY', 'integer',
+    })
 
+-- Case: multiple columns index with integer columns.
 test:do_execsql_test(
-	"index-info-1.1",
-	"PRAGMA index_xinfo = t1.t1ix1;",
-	{
-	-- <index-info-1.1>
-	0, 0, 'A', 0, 'BINARY', 1,
-	-- <index-info-1.1>
-	})
+    "index-info-1.4",
+    "PRAGMA index_info (t1.abc);",
+    {
+        0, 0, 'A', 0, 'BINARY', 'integer',
+        1, 1, 'B', 0, 'BINARY', 'integer',
+        2, 2, 'C', 0, 'BINARY', 'integer',
+    })
+
+-- Case: multiple columns, reverse columns order.
+test:do_execsql_test(
+    "index-info-1.5",
+    "PRAGMA index_info (t1.cba);",
+    {
+        0, 2, 'C', 0, 'BINARY', 'integer',
+        1, 1, 'B', 0, 'BINARY', 'integer',
+        2, 0, 'A', 0, 'BINARY', 'integer',
+    })
+
+-- Case: index with a string column.
+test:do_execsql_test(
+    "index-info-1.6",
+    "PRAGMA index_info (t1.d);",
+    {
+        0, 3, 'D', 0, 'BINARY', 'string',
+    })
 
 test:finish_test()

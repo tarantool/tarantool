@@ -32,61 +32,45 @@
  * result column is different from the name of the pragma
  */
 static const char *const pragCName[] = {
-				/*   0 */ "cid",
-				/* Used by: table_info */
+	/* Used by: table_info */
+	/*   0 */ "cid",
 	/*   1 */ "name",
 	/*   2 */ "type",
 	/*   3 */ "notnull",
 	/*   4 */ "dflt_value",
 	/*   5 */ "pk",
-				/*   6 */ "table",
-				/* Used by: stats */
+	/* Used by: stats */
+	/*   6 */ "table",
 	/*   7 */ "index",
 	/*   8 */ "width",
 	/*   9 */ "height",
-				/*  10 */ "seqno",
-				/* Used by: index_info */
+	/* Used by: index_info */
+	/*  10 */ "seqno",
 	/*  11 */ "cid",
 	/*  12 */ "name",
-				/*  13 */ "seqno",
-				/* Used by: index_xinfo */
-	/*  14 */ "cid",
-	/*  15 */ "name",
-	/*  16 */ "desc",
-	/*  17 */ "coll",
-	/*  18 */ "key",
-				/*  19 */ "seq",
-				/* Used by: index_list */
-	/*  20 */ "name",
-	/*  21 */ "unique",
-	/*  22 */ "origin",
-	/*  23 */ "partial",
-				/*  24 */ "seq",
-				/* Used by: database_list */
-	/*  25 */ "name",
-	/*  26 */ "file",
-				/*  27 */ "seq",
-				/* Used by: collation_list */
-	/*  28 */ "name",
-				/*  29 */ "id",
-				/* Used by: foreign_key_list */
-	/*  30 */ "seq",
-	/*  31 */ "table",
-	/*  32 */ "from",
-	/*  33 */ "to",
-	/*  34 */ "on_update",
-	/*  35 */ "on_delete",
-	/*  36 */ "match",
-	/*  37 */ "table",
-	/*  38 */ "rowid",
-	/*  39 */ "parent",
-	/*  40 */ "fkid",
-				/*  41 */ "busy",
-				/* Used by: wal_checkpoint */
-	/*  42 */ "log",
-	/*  43 */ "checkpointed",
-				/*  44 */ "timeout",
-				/* Used by: busy_timeout */
+	/*  13 */ "desc",
+	/*  14 */ "coll",
+	/*  15 */ "type",
+	/* Used by: index_list */
+	/*  16 */ "seq",
+	/*  17 */ "name",
+	/*  18 */ "unique",
+	/*  19 */ "origin",
+	/*  20 */ "partial",
+	/* Used by: collation_list */
+	/*  21 */ "seq",
+	/*  22 */ "name",
+	/* Used by: foreign_key_list */
+	/*  23 */ "id",
+	/*  24 */ "seq",
+	/*  25 */ "table",
+	/*  26 */ "from",
+	/*  27 */ "to",
+	/*  28 */ "on_update",
+	/*  29 */ "on_delete",
+	/*  30 */ "match",
+	/* Used by: busy_timeout */
+	/*  31 */ "timeout",
 };
 
 /* Definitions of all built-in pragmas */
@@ -98,11 +82,15 @@ typedef struct PragmaName {
 	u8 nPragCName;		/* Num of col names. 0 means use pragma name */
 	u32 iArg;		/* Extra argument */
 } PragmaName;
+/**
+ * The order of pragmas in this array is important: it has
+ * to be sorted. For more info see pragma_locate function.
+ */
 static const PragmaName aPragmaName[] = {
 	{ /* zName:     */ "busy_timeout",
 	 /* ePragTyp:  */ PragTyp_BUSY_TIMEOUT,
 	 /* ePragFlg:  */ PragFlg_Result0,
-	 /* ColNames:  */ 44, 1,
+	 /* ColNames:  */ 31, 1,
 	 /* iArg:      */ 0},
 	{ /* zName:     */ "case_sensitive_like",
 	 /* ePragTyp:  */ PragTyp_CASE_SENSITIVE_LIKE,
@@ -113,7 +101,7 @@ static const PragmaName aPragmaName[] = {
 	{ /* zName:     */ "collation_list",
 	 /* ePragTyp:  */ PragTyp_COLLATION_LIST,
 	 /* ePragFlg:  */ PragFlg_Result0,
-	 /* ColNames:  */ 27, 2,
+	 /* ColNames:  */ 21, 2,
 	 /* iArg:      */ 0},
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
@@ -134,7 +122,7 @@ static const PragmaName aPragmaName[] = {
 	 /* ePragTyp:  */ PragTyp_FOREIGN_KEY_LIST,
 	 /* ePragFlg:  */
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
-	 /* ColNames:  */ 29, 8,
+	 /* ColNames:  */ 23, 8,
 	 /* iArg:      */ 0},
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 	{ /* zName:     */ "full_column_names",
@@ -148,20 +136,14 @@ static const PragmaName aPragmaName[] = {
 	 /* ePragTyp:  */ PragTyp_INDEX_INFO,
 	 /* ePragFlg:  */
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
-	 /* ColNames:  */ 10, 3,
-	 /* iArg:      */ 0},
+	 /* ColNames:  */ 10, 6,
+	 /* iArg:      */ 1},
 	{ /* zName:     */ "index_list",
 	 /* ePragTyp:  */ PragTyp_INDEX_LIST,
 	 /* ePragFlg:  */
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
-	 /* ColNames:  */ 19, 5,
+	 /* ColNames:  */ 16, 5,
 	 /* iArg:      */ 0},
-	{ /* zName:     */ "index_xinfo",
-	 /* ePragTyp:  */ PragTyp_INDEX_INFO,
-	 /* ePragFlg:  */
-	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
-	 /* ColNames:  */ 13, 6,
-	 /* iArg:      */ 1},
 #endif
 #if defined(SQLITE_DEBUG) && !defined(SQLITE_OMIT_PARSER_TRACE)
 	{ /* zName:     */ "parser_trace",
