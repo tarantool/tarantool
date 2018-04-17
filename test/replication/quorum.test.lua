@@ -103,10 +103,15 @@ test_run:drop_cluster(SERVERS)
 --
 
 box.schema.user.grant('guest', 'replication')
+space = box.schema.space.create('test', {engine = test_run:get_cfg('engine')});
+index = box.space.test:create_index('primary')
+-- Insert something just to check that replica with quorum = 0 works as expected.
+space:insert{1}
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica_no_quorum.lua'")
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 box.info.status -- running
+box.space.test:select()
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 listen = box.cfg.listen
@@ -115,7 +120,33 @@ test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 box.info.status -- running
 test_run:cmd("switch default")
+-- Check that replica is able to reconnect, case was broken with earlier quorum "fix".
+box.cfg{listen = listen}
+space:insert{2}
+vclock = test_run:get_vclock("default")
+_ = test_run:wait_vclock("replica", vclock)
+test_run:cmd("switch replica")
+box.info.status -- running
+box.space.test:select()
+test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
+space:drop()
 box.schema.user.revoke('guest', 'replication')
-box.cfg{listen = listen}
+-- Second case, check that master-master works.
+SERVERS = {'master_quorum1', 'master_quorum2'}
+-- Deploy a cluster.
+test_run:create_cluster(SERVERS)
+test_run:wait_fullmesh(SERVERS)
+test_run:cmd("switch master_quorum1")
+repl = box.cfg.replication
+box.cfg{replication = ""}
+box.space.test:insert{1}
+box.cfg{replication = repl}
+vclock = test_run:get_vclock("master_quorum1")
+_ = test_run:wait_vclock("master_quorum2", vclock)
+test_run:cmd("switch master_quorum2")
+box.space.test:select()
+test_run:cmd("switch default")
+-- Cleanup.
+test_run:drop_cluster(SERVERS)

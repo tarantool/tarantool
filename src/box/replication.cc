@@ -600,11 +600,9 @@ error:
 void
 replicaset_follow(void)
 {
-	if (replicaset.applier.total == 0 || replicaset_quorum() == 0) {
+	if (replicaset.applier.total == 0) {
 		/*
-		 * Replication is not configured or quorum is set to
-		 * zero so in the latter case we have no need to wait
-		 * for others.
+		 * Replication is not configured.
 		 */
 		box_clear_orphan();
 		return;
@@ -618,6 +616,13 @@ replicaset_follow(void)
 	rlist_foreach_entry(replica, &replicaset.anon, in_anon) {
 		/* Restart appliers that failed to connect. */
 		applier_start(replica->applier);
+	}
+	if (replicaset_quorum() == 0) {
+		/*
+		 * Leaving orphan mode immediately since
+		 * replication_connect_quorum is set to 0.
+		 */
+		box_clear_orphan();
 	}
 }
 
