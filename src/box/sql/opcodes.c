@@ -1,9 +1,6 @@
 /* Automatically generated.  Do not edit */
 /* See the tool/mkopcodec.tcl script for details. */
 #include "sqliteInt.h"
-#if !defined(SQLITE_OMIT_EXPLAIN) \
- || defined(VDBE_PROFILE) \
- || defined(SQLITE_DEBUG)
 #if defined(SQLITE_ENABLE_EXPLAIN_COMMENTS) || defined(SQLITE_DEBUG)
 # define OpHelp(X) "\0" X
 #else
@@ -156,4 +153,3 @@ const char *sqlite3OpcodeName(int i){
   };
   return azName[i];
 }
-#endif

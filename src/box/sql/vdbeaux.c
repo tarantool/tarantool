@@ -1373,7 +1373,7 @@ displayComment(const Op * pOp,	/* The opcode to be commented */
 }
 #endif				/* SQLITE_DEBUG */
 
-#if VDBE_DISPLAY_P4 && defined(SQLITE_ENABLE_CURSOR_HINTS)
+#if defined(SQLITE_ENABLE_CURSOR_HINTS)
 /*
  * Translate the P4.pExpr value for an OP_CursorHint opcode into text
  * that can be displayed in the P4 column of EXPLAIN output.
@@ -1498,9 +1498,8 @@ displayP4Expr(StrAccum * p, Expr * pExpr)
 		sqlite3StrAccumAppend(p, ")", 1);
 	}
 }
-#endif				/* VDBE_DISPLAY_P4 && defined(SQLITE_ENABLE_CURSOR_HINTS) */
+#endif				/* defined(SQLITE_ENABLE_CURSOR_HINTS) */
 
-#if VDBE_DISPLAY_P4
 /*
  * Compute a string that describes the P4 parameter for an opcode.
  * Use zTemp for any required temporary buffer space.
@@ -1625,7 +1624,6 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 	assert(zP4 != 0);
 	return zP4;
 }
-#endif				/* VDBE_DISPLAY_P4 */
 
 
 #if defined(VDBE_PROFILE) || defined(SQLITE_DEBUG)
@@ -1742,7 +1740,6 @@ sqlite3VdbeFrameDelete(VdbeFrame * p)
 	sqlite3DbFree(p->v->db, p);
 }
 
-#ifndef SQLITE_OMIT_EXPLAIN
 /*
  * Give a listing of the program in the virtual machine.
  *
@@ -1939,7 +1936,6 @@ sqlite3VdbeList(Vdbe * p)
 	}
 	return rc;
 }
-#endif				/* SQLITE_OMIT_EXPLAIN */
 
 #ifdef SQLITE_DEBUG
 /*

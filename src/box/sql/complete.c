@@ -292,9 +292,7 @@ sqlite3_complete(const char *zSql)
 							    (zSql, "end",
 							     3) == 0) {
 								token = tkEND;
-							} else
-#ifndef SQLITE_OMIT_EXPLAIN
-							if (nId == 7
+							} else if (nId == 7
 								    &&
 								    sqlite3StrNICmp
 								    (zSql,
@@ -303,9 +301,7 @@ sqlite3_complete(const char *zSql)
 								    == 0) {
 								token =
 								    tkEXPLAIN;
-							} else
-#endif
-							{
+							} else {
 								token = tkOTHER;
 							}
 							break;

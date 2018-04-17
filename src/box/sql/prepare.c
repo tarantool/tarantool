@@ -299,7 +299,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	}
 	rc = sParse.rc;
 
-#ifndef SQLITE_OMIT_EXPLAIN
 	if (rc == SQLITE_OK && sParse.pVdbe && sParse.explain) {
 		static const char *const azColName[] = {
 			"addr", "opcode", "p1", "p2", "p3", "p4", "p5",
@@ -322,7 +321,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 					      SQLITE_STATIC);
 		}
 	}
-#endif
 
 	if (db->init.busy == 0) {
 		Vdbe *pVdbe = sParse.pVdbe;

@@ -116,10 +116,8 @@ ecmd ::= SEMI. {
   sqlite3ErrorMsg(pParse, "syntax error: empty request");
 }
 explain ::= .
-%ifndef SQLITE_OMIT_EXPLAIN
 explain ::= EXPLAIN.              { pParse->explain = 1; }
 explain ::= EXPLAIN QUERY PLAN.   { pParse->explain = 2; }
-%endif  SQLITE_OMIT_EXPLAIN
 cmdx ::= cmd.
 
 // Define operator precedence early so that this is the first occurrence

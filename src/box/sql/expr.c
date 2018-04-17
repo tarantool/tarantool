@@ -2540,14 +2540,12 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 					/* If we reach this point, that means the index pIdx is usable */
 					int iAddr = sqlite3VdbeAddOp0(v, OP_Once);
 					VdbeCoverage(v);
-#ifndef SQLITE_OMIT_EXPLAIN
 					sqlite3VdbeAddOp4(v, OP_Explain,
 							  0, 0, 0,
 							  sqlite3MPrintf(db,
 							  "USING INDEX %s FOR IN-OPERATOR",
 							  pIdx->zName),
 							  P4_DYNAMIC);
-#endif
 					emit_open_cursor(pParse, iTab,
 							 pIdx->tnum);
 					sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
@@ -2761,7 +2759,6 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 		jmpIfDynamic = sqlite3VdbeAddOp0(v, OP_Once);
 		VdbeCoverage(v);
 	}
-#ifndef SQLITE_OMIT_EXPLAIN
 	if (pParse->explain == 2) {
 		char *zMsg =
 		    sqlite3MPrintf(pParse->db, "EXECUTE %s%s SUBQUERY %d",
@@ -2771,7 +2768,6 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 		sqlite3VdbeAddOp4(v, OP_Explain, pParse->iSelectId, 0, 0, zMsg,
 				  P4_DYNAMIC);
 	}
-#endif
 
 	switch (pExpr->op) {
 	case TK_IN:{

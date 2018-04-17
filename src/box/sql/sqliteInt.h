@@ -309,13 +309,6 @@ void sqlite3Coverage(int);
 #endif
 
 /*
- * SQLITE_ENABLE_EXPLAIN_COMMENTS is incompatible with SQLITE_OMIT_EXPLAIN
- */
-#ifdef SQLITE_OMIT_EXPLAIN
-#undef SQLITE_ENABLE_EXPLAIN_COMMENTS
-#endif
-
-/*
  * Return true (non-zero) if the input is an integer that is too large
  * to fit in 32-bits.  This macro is used inside of various testcase()
  * macros to verify that we have tested SQLite for large-file support.
@@ -2584,9 +2577,7 @@ struct SrcList {
 			unsigned viaCoroutine:1;	/* Implemented as a co-routine */
 			unsigned isRecursive:1;	/* True for recursive reference in WITH */
 		} fg;
-#ifndef SQLITE_OMIT_EXPLAIN
 		u8 iSelectId;	/* If pSelect!=0, the id of the sub-select in EQP */
-#endif
 		int iCursor;	/* The VDBE cursor number used to access this table */
 		Expr *pOn;	/* The ON clause of a join */
 		IdList *pUsing;	/* The USING clause of a join */
@@ -2991,10 +2982,8 @@ struct Parse {
 	u8 iPkSortOrder;	/* ASC or DESC for INTEGER PRIMARY KEY */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
-#ifndef SQLITE_OMIT_EXPLAIN
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
-#endif
 	VList *pVList;		/* Mapping between variable names and numbers */
 	Vdbe *pReprepare;	/* VM being reprepared (sqlite3Reprepare()) */
 	const char *zTail;	/* All SQL text past the last semicolon parsed */

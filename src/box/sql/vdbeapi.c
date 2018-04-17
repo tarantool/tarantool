@@ -576,12 +576,9 @@ sqlite3Step(Vdbe * p)
 		db->nVdbeActive++;
 		p->pc = 0;
 	}
-#ifndef SQLITE_OMIT_EXPLAIN
 	if (p->explain) {
 		rc = sqlite3VdbeList(p);
-	} else
-#endif				/* SQLITE_OMIT_EXPLAIN */
-	{
+	} else {
 		db->nVdbeExec++;
 		rc = sqlite3VdbeExec(p);
 		db->nVdbeExec--;

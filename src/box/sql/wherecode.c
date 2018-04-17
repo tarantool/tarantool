@@ -41,8 +41,6 @@
 #include "sqliteInt.h"
 #include "whereInt.h"
 
-#ifndef SQLITE_OMIT_EXPLAIN
-
 /*
  * Return the name of the i-th column of the pIdx index.
  */
@@ -260,7 +258,6 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 	}
 	return ret;
 }
-#endif				/* SQLITE_OMIT_EXPLAIN */
 
 #ifdef SQLITE_ENABLE_STMT_SCANSTATUS
 /*

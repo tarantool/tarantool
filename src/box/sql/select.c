@@ -1325,7 +1325,6 @@ selectOpName(int id)
 	return z;
 }
 
-#ifndef SQLITE_OMIT_EXPLAIN
 /*
  * Unless an "EXPLAIN QUERY PLAN" command is being processed, this function
  * is a no-op. Otherwise, it adds a single row of output to the EQP result,
@@ -1349,22 +1348,7 @@ explainTempTable(Parse * pParse, const char *zUsage)
 	}
 }
 
-/*
- * Assign expression b to lvalue a. A second, no-op, version of this macro
- * is provided when SQLITE_OMIT_EXPLAIN is defined. This allows the code
- * in sqlite3Select() to assign values to structure member variables that
- * only exist if SQLITE_OMIT_EXPLAIN is not defined without polluting the
- * code with #ifndef directives.
- */
-#define explainSetInteger(a, b) a = b
-
-#else
-/* No-op versions of the explainXXX() functions and macros. */
-#define explainTempTable(y,z)
-#define explainSetInteger(y,z)
-#endif
-
-#if !defined(SQLITE_OMIT_EXPLAIN) && !defined(SQLITE_OMIT_COMPOUND_SELECT)
+#if !defined(SQLITE_OMIT_COMPOUND_SELECT)
 /*
  * Unless an "EXPLAIN QUERY PLAN" command is being processed, this function
  * is a no-op. Otherwise, it adds a single row of output to the EQP result,
@@ -1743,13 +1727,10 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 	sqlite3 *db = pParse->db;
 	int fullNames, shortNames;
 	struct session *user_session = current_session();
-
-#ifndef SQLITE_OMIT_EXPLAIN
 	/* If this is an EXPLAIN, skip this step */
 	if (pParse->explain) {
 		return;
 	}
-#endif
 
 	if (pParse->colNamesSet || db->mallocFailed)
 		return;
@@ -2466,10 +2447,8 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	SelectDest dest;	/* Alternative data destination */
 	Select *pDelete = 0;	/* Chain of simple selects to delete */
 	sqlite3 *db;		/* Database connection */
-#ifndef SQLITE_OMIT_EXPLAIN
 	int iSub1 = 0;		/* EQP id of left-hand query */
 	int iSub2 = 0;		/* EQP id of right-hand query */
-#endif
 
 	/* Make sure there is no ORDER BY or LIMIT clause on prior SELECTs.  Only
 	 * the last (right-most) SELECT in the series may have an ORDER BY or LIMIT.
@@ -2545,7 +2524,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				pPrior->iOffset = p->iOffset;
 				pPrior->pLimit = p->pLimit;
 				pPrior->pOffset = p->pOffset;
-				explainSetInteger(iSub1, pParse->iNextSelectId);
+				iSub1 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, pPrior, &dest);
 				p->pLimit = 0;
 				p->pOffset = 0;
@@ -2571,7 +2550,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 								  p->iOffset);
 					}
 				}
-				explainSetInteger(iSub2, pParse->iNextSelectId);
+				iSub2 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, p, &dest);
 				testcase(rc != SQLITE_OK);
 				pDelete = p->pPrior;
@@ -2634,7 +2613,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				assert(!pPrior->pOrderBy);
 				sqlite3SelectDestInit(&uniondest, priorOp,
 						      unionTab);
-				explainSetInteger(iSub1, pParse->iNextSelectId);
+				iSub1 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, pPrior, &uniondest);
 				if (rc) {
 					goto multi_select_end;
@@ -2654,7 +2633,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				pOffset = p->pOffset;
 				p->pOffset = 0;
 				uniondest.eDest = op;
-				explainSetInteger(iSub2, pParse->iNextSelectId);
+				iSub2 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, p, &uniondest);
 				testcase(rc != SQLITE_OK);
 				/* Query flattening in sqlite3Select() might refill p->pOrderBy.
@@ -2742,7 +2721,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				 */
 				sqlite3SelectDestInit(&intersectdest, SRT_Union,
 						      tab1);
-				explainSetInteger(iSub1, pParse->iNextSelectId);
+				iSub1 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, pPrior,
 						   &intersectdest);
 				if (rc) {
@@ -2762,7 +2741,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				pOffset = p->pOffset;
 				p->pOffset = 0;
 				intersectdest.iSDParm = tab2;
-				explainSetInteger(iSub2, pParse->iNextSelectId);
+				iSub2 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, p, &intersectdest);
 				testcase(rc != SQLITE_OK);
 				pDelete = p->pPrior;
@@ -3173,10 +3152,8 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	ExprList *pOrderBy;	/* The ORDER BY clause */
 	int nOrderBy;		/* Number of terms in the ORDER BY clause */
 	int *aPermute;		/* Mapping from ORDER BY terms to result set columns */
-#ifndef SQLITE_OMIT_EXPLAIN
 	int iSub1;		/* EQP id of left-hand query */
 	int iSub2;		/* EQP id of right-hand query */
-#endif
 
 	assert(p->pOrderBy != 0);
 	assert(pKeyDup == 0);	/* "Managed" code needs this.  Ticket #3382. */
@@ -3317,7 +3294,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	    sqlite3VdbeAddOp3(v, OP_InitCoroutine, regAddrA, 0, addrSelectA);
 	VdbeComment((v, "left SELECT"));
 	pPrior->iLimit = regLimitA;
-	explainSetInteger(iSub1, pParse->iNextSelectId);
+	iSub1 = pParse->iNextSelectId;
 	sqlite3Select(pParse, pPrior, &destA);
 	sqlite3VdbeEndCoroutine(v, regAddrA);
 	sqlite3VdbeJumpHere(v, addr1);
@@ -3333,7 +3310,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	savedOffset = p->iOffset;
 	p->iLimit = regLimitB;
 	p->iOffset = 0;
-	explainSetInteger(iSub2, pParse->iNextSelectId);
+	iSub2 = pParse->iNextSelectId;
 	sqlite3Select(pParse, p, &destB);
 	p->iLimit = savedLimit;
 	p->iOffset = savedOffset;
@@ -5304,7 +5281,6 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
  * Add a single OP_Explain instruction to the VDBE to explain a simple
  * count(*) query ("SELECT count(*) FROM pTab").
  */
-#ifndef SQLITE_OMIT_EXPLAIN
 static void
 explainSimpleCount(Parse * pParse,	/* Parse context */
 		   Table * pTab,	/* Table being queried */
@@ -5321,9 +5297,6 @@ explainSimpleCount(Parse * pParse,	/* Parse context */
 				  0, 0, zEqp, P4_DYNAMIC);
 	}
 }
-#else
-#define explainSimpleCount(a,b,c)
-#endif
 
 /*
  * Generate code for the SELECT statement given in the p argument.
@@ -5358,11 +5331,8 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	AggInfo sAggInfo;	/* Information used by aggregate queries */
 	int iEnd;		/* Address of the end of the query */
 	sqlite3 *db;		/* The database connection */
-
-#ifndef SQLITE_OMIT_EXPLAIN
 	int iRestoreSelectId = pParse->iSelectId;
 	pParse->iSelectId = pParse->iNextSelectId++;
-#endif
 
 	db = pParse->db;
 	if (p == 0 || db->mallocFailed || pParse->nErr) {
@@ -5465,7 +5435,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	 */
 	if (p->pPrior) {
 		rc = multiSelect(pParse, p, pDest);
-		explainSetInteger(pParse->iSelectId, iRestoreSelectId);
+		pParse->iSelectId = iRestoreSelectId;
 #ifdef SELECTTRACE_ENABLED
 		SELECTTRACE(1, pParse, p, ("end compound-select processing\n"));
 		pParse->nSelectIndent--;
@@ -5553,8 +5523,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			pItem->addrFillSub = addrTop;
 			sqlite3SelectDestInit(&dest, SRT_Coroutine,
 					      pItem->regReturn);
-			explainSetInteger(pItem->iSelectId,
-					  (u8) pParse->iNextSelectId);
+			pItem->iSelectId = pParse->iNextSelectId;
 			sqlite3Select(pParse, pSub, &dest);
 			pItem->pTab->nRowLogEst = pSub->nSelectRow;
 			pItem->fg.viaCoroutine = 1;
@@ -5592,8 +5561,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			}
 			sqlite3SelectDestInit(&dest, SRT_EphemTab,
 					      pItem->iCursor);
-			explainSetInteger(pItem->iSelectId,
-					  (u8) pParse->iNextSelectId);
+			pItem->iSelectId = pParse->iNextSelectId;
 			sqlite3Select(pParse, pSub, &dest);
 			pItem->pTab->nRowLogEst = pSub->nSelectRow;
 			if (onceAddr)
@@ -6313,7 +6281,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	 * successful coding of the SELECT.
 	 */
  select_end:
-	explainSetInteger(pParse->iSelectId, iRestoreSelectId);
+	pParse->iSelectId = iRestoreSelectId;
 
 	/* Identify column names if results of the SELECT are to be output.
 	 */

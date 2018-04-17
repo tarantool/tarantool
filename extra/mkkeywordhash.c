@@ -84,11 +84,7 @@ struct Keyword {
 #else
 #  define CONFLICT   0x00000080
 #endif
-#ifdef SQLITE_OMIT_EXPLAIN
-#  define EXPLAIN    0
-#else
-#  define EXPLAIN    0x00000100
-#endif
+#define EXPLAIN      0x00000100
 #ifdef SQLITE_OMIT_FOREIGN_KEY
 #  define FKEY       0
 #else
