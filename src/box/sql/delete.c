@@ -127,7 +127,7 @@ sqlite3MaterializeView(Parse * pParse,	/* Parsing context */
 }
 #endif				/* !defined(SQLITE_OMIT_VIEW) && !defined(SQLITE_OMIT_TRIGGER) */
 
-#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) && !defined(SQLITE_OMIT_SUBQUERY)
+#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT)
 /*
  * Generate an expression tree to implement the WHERE, ORDER BY,
  * and LIMIT/OFFSET portion of DELETE and UPDATE statements.
@@ -216,7 +216,6 @@ sqlite3LimitWhere(Parse * pParse,	/* The parser context */
 	return 0;
 }
 #endif				/* defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) */
-       /*      && !defined(SQLITE_OMIT_SUBQUERY) */
 
 /*
  * Generate code for a DELETE FROM statement.

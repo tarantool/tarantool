@@ -591,7 +591,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 #endif
 	switch (pExpr->op) {
 
-#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) && !defined(SQLITE_OMIT_SUBQUERY)
+#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT)
 		/* The special operator TK_ROW means use the rowid for the first
 		 * column in the FROM clause.  This is used by the LIMIT and ORDER BY
 		 * clause processing on UPDATE and DELETE statements.
@@ -608,8 +608,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			pExpr->affinity = SQLITE_AFF_INTEGER;
 			break;
 		}
-#endif				/* defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT)
-				   && !defined(SQLITE_OMIT_SUBQUERY) */
+#endif				/* defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) */
 
 		/* A lone identifier is the name of a column.
 		 */
@@ -772,11 +771,9 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			 */
 			return WRC_Prune;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case TK_SELECT:
 	case TK_EXISTS:
 		testcase(pExpr->op == TK_EXISTS);
-#endif
 	case TK_IN:{
 			testcase(pExpr->op == TK_IN);
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {

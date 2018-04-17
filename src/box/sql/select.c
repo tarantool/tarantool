@@ -1044,8 +1044,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			sqlite3ReleaseTempRange(pParse, r1, nPrefixReg + 1);
 			break;
 		}
-
-#ifndef SQLITE_OMIT_SUBQUERY
 		/* If we are creating a set for an "expr IN (SELECT ...)" construct,
 		 * then there should be a single item on the stack.  Write this
 		 * item into the set table with bogus data.
@@ -1099,7 +1097,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			}
 			break;
 		}
-#endif				/* #ifndef SQLITE_OMIT_SUBQUERY */
 
 	case SRT_Coroutine:	/* Send data to a co-routine */
 	case SRT_Output:{	/* Return the results */
@@ -1491,7 +1488,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			sqlite3ReleaseTempReg(pParse, regCopy);
 			break;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case SRT_Set:{
 			assert((unsigned int)nColumn ==
 			       sqlite3Strlen30(pDest->zAffSdst));
@@ -1505,7 +1501,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			/* The LIMIT clause will terminate the loop for us */
 			break;
 		}
-#endif
 	default: {
 			assert(eDest == SRT_Output || eDest == SRT_Coroutine);
 			testcase(eDest == SRT_Output);
@@ -1679,7 +1674,6 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 			}
 			break;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case TK_SELECT:{
 			/* The expression is a sub-select. Return the declaration type and
 			 * origin info for the single column in the result set of the SELECT
@@ -1697,7 +1691,6 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr,
 				       &estWidth);
 			break;
 		}
-#endif
 	}
 
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
@@ -2947,8 +2940,6 @@ generateOutputSubroutine(Parse * pParse,	/* Parsing context */
 			sqlite3ReleaseTempReg(pParse, regRec);
 			break;
 		}
-
-#ifndef SQLITE_OMIT_SUBQUERY
 		/* If we are creating a set for an "expr IN (SELECT ...)".
 		 */
 	case SRT_Set:{
@@ -2977,8 +2968,6 @@ generateOutputSubroutine(Parse * pParse,	/* Parsing context */
 			/* The LIMIT clause will jump out of the loop for us */
 			break;
 		}
-#endif				/* #ifndef SQLITE_OMIT_SUBQUERY */
-
 		/* The results are stored in a sequence of registers
 		 * starting at pDest->iSdst.  Then the co-routine yields.
 		 */
@@ -3448,7 +3437,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 }
 #endif
 
-#if !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW)
 /* Forward Declarations */
 static void substExprList(Parse *, ExprList *, int, ExprList *);
 static void substSelect(Parse *, Select *, int, ExprList *, int);
@@ -3553,9 +3541,7 @@ substSelect(Parse * pParse,	/* Report errors here */
 		}
 	} while (doPrior && (p = p->pPrior) != 0);
 }
-#endif				/* !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW) */
 
-#if !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW)
 /*
  * This routine attempts to flatten subqueries as a performance optimization.
  * This routine returns 1 if it makes changes and 0 if no flattening occurs.
@@ -4123,9 +4109,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 
 	return 1;
 }
-#endif				/* !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW) */
 
-#if !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW)
 /*
  * Make copies of relevant WHERE clause terms of the outer query into
  * the WHERE clause of subquery.  Example:
@@ -4202,7 +4186,6 @@ pushDownWhereTerms(Parse * pParse,	/* Parse context (for malloc() and error repo
 	}
 	return nChng;
 }
-#endif				/* !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW) */
 
 /*
  * Based on the contents of the AggInfo structure indicated by the first
@@ -4694,7 +4677,6 @@ selectExpander(Walker * pWalker, Select * p)
 		} else
 #endif
 		if (pFrom->zName == 0) {
-#ifndef SQLITE_OMIT_SUBQUERY
 			Select *pSel = pFrom->pSelect;
 			/* A sub-query in the FROM clause of a SELECT */
 			assert(pSel != 0);
@@ -4717,7 +4699,6 @@ selectExpander(Walker * pWalker, Select * p)
 			pTab->nRowLogEst = 200;
 			assert(200 == sqlite3LogEst(1048576));
 			pTab->tabFlags |= TF_Ephemeral;
-#endif
 		} else {
 			/* An ordinary table or view name in the FROM clause */
 			assert(pFrom->pTab == 0);
@@ -5016,7 +4997,6 @@ sqlite3SelectExpand(Parse * pParse, Select * pSelect)
 	sqlite3WalkSelect(&w, pSelect);
 }
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * This is a Walker.xSelectCallback callback for the sqlite3SelectTypeInfo()
  * interface.
@@ -5059,7 +5039,6 @@ selectAddSubqueryTypeInfo(Walker * pWalker, Select * p)
 		}
 	}
 }
-#endif
 
 /*
  * This routine adds datatype and collating sequence information to
@@ -5071,14 +5050,12 @@ selectAddSubqueryTypeInfo(Walker * pWalker, Select * p)
 static void
 sqlite3SelectAddTypeInfo(Parse * pParse, Select * pSelect)
 {
-#ifndef SQLITE_OMIT_SUBQUERY
 	Walker w;
 	memset(&w, 0, sizeof(w));
 	w.xSelectCallback2 = selectAddSubqueryTypeInfo;
 	w.xExprCallback = sqlite3ExprWalkNoop;
 	w.pParse = pParse;
 	sqlite3WalkSelect(&w, pSelect);
-#endif
 }
 
 /*
@@ -5384,7 +5361,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 
 	/* Try to flatten subqueries in the FROM clause up into the main query
 	 */
-#if !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW)
 	for (i = 0; !p->pPrior && i < pTabList->nSrc; i++) {
 		struct SrcList_item *pItem = &pTabList->a[i];
 		Select *pSub = pItem->pSelect;
@@ -5420,7 +5396,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			sSort.pOrderBy = p->pOrderBy;
 		}
 	}
-#endif
 
 	/* Get a pointer the VDBE under construction, allocating a new VDBE if one
 	 * does not already exist
@@ -5446,7 +5421,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 
 	/* Generate code for all sub-queries in the FROM clause
 	 */
-#if !defined(SQLITE_OMIT_SUBQUERY) || !defined(SQLITE_OMIT_VIEW)
 	for (i = 0; i < pTabList->nSrc; i++) {
 		struct SrcList_item *pItem = &pTabList->a[i];
 		SelectDest dest;
@@ -5576,7 +5550,6 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			goto select_end;
 		pParse->nHeight -= sqlite3SelectExprHeight(p);
 	}
-#endif
 
 	/* Various elements of the SELECT copied into local variables for
 	 * convenience

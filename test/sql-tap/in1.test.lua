@@ -107,9 +107,8 @@ test:do_execsql_test(
         -- </in-1.7>
     })
 
+--
 -- The rest of this file concentrates on testing the IN operator.
--- Skip this if the library is compiled with SQLITE_OMIT_SUBQUERY 
--- (because the IN operator is unavailable).
 --
 
 

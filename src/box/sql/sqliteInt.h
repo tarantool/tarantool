@@ -3610,7 +3610,7 @@ void sqlite3SelectDelete(sqlite3 *, Select *);
 Table *sqlite3SrcListLookup(Parse *, SrcList *);
 int sqlite3IsReadOnly(Parse *, Table *, int);
 void sqlite3OpenTable(Parse *, int iCur, Table *, int);
-#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) && !defined(SQLITE_OMIT_SUBQUERY)
+#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT)
 Expr *sqlite3LimitWhere(Parse *, SrcList *, Expr *, ExprList *, Expr *, Expr *,
 			char *);
 #endif
@@ -3962,11 +3962,7 @@ void sqlite3StrAccumReset(StrAccum *);
 void sqlite3SelectDestInit(SelectDest *, int, int);
 Expr *sqlite3CreateColumnExpr(sqlite3 *, SrcList *, int, int);
 
-#ifndef SQLITE_OMIT_SUBQUERY
 int sqlite3ExprCheckIN(Parse *, Expr *);
-#else
-#define sqlite3ExprCheckIN(x,y) SQLITE_OK
-#endif
 
 void sqlite3AnalyzeFunctions(void);
 int sqlite3Stat4ProbeSetValue(Parse *, Index *, UnpackedRecord **, Expr *, int,

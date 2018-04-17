@@ -409,7 +409,6 @@ sqlite3ExprVectorSize(Expr * pExpr)
 	}
 }
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Return a pointer to a subexpression of pVector that is the i-th
  * column of the vector (numbered starting with 0).  The caller must
@@ -439,9 +438,7 @@ sqlite3VectorFieldSubexpr(Expr * pVector, int i)
 	}
 	return pVector;
 }
-#endif				/* !defined(SQLITE_OMIT_SUBQUERY) */
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Compute and return a new Expr object which when passed to
  * sqlite3ExprCode() will generate all necessary code to compute
@@ -501,7 +498,6 @@ sqlite3ExprForVectorField(Parse * pParse,	/* Parsing context */
 	}
 	return pRet;
 }
-#endif				/* !define(SQLITE_OMIT_SUBQUERY) */
 
 /*
  * If expression pExpr is of type TK_SELECT, generate code to evaluate
@@ -514,13 +510,10 @@ sqlite3ExprForVectorField(Parse * pParse,	/* Parsing context */
 static int
 exprCodeSubselect(Parse * pParse, Expr * pExpr)
 {
-	int reg = 0;
-#ifndef SQLITE_OMIT_SUBQUERY
-	if (pExpr->op == TK_SELECT) {
-		reg = sqlite3CodeSubselect(pParse, pExpr, 0);
-	}
-#endif
-	return reg;
+	if (pExpr->op == TK_SELECT)
+		return sqlite3CodeSubselect(pParse, pExpr, 0);
+	else
+		return 0;
 }
 
 /*
@@ -1526,8 +1519,6 @@ sqlite3ExprListDup(sqlite3 * db, ExprList * p, int flags)
  * sqlite3SelectDup(), can be called. sqlite3SelectDup() is sometimes
  * called with a NULL argument.
  */
-#if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_TRIGGER) \
- || !defined(SQLITE_OMIT_SUBQUERY)
 SrcList *
 sqlite3SrcListDup(sqlite3 * db, SrcList * p, int flags)
 {
@@ -1640,14 +1631,6 @@ sqlite3SelectDup(sqlite3 * db, Select * p, int flags)
 	sqlite3SelectSetName(pNew, p->zSelName);
 	return pNew;
 }
-#else
-Select *
-sqlite3SelectDup(sqlite3 * db, Select * p, int flags)
-{
-	assert(p == 0);
-	return 0;
-}
-#endif
 
 /*
  * Add a new element to the end of an expression list.  If pList is
@@ -2214,7 +2197,6 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
  * or if the SELECT statement needs to be manifested into a transient
  * table, then return NULL.
  */
-#ifndef SQLITE_OMIT_SUBQUERY
 static Select *
 isCandidateForInOpt(Expr * pX)
 {
@@ -2263,9 +2245,7 @@ isCandidateForInOpt(Expr * pX)
 	}
 	return p;
 }
-#endif				/* SQLITE_OMIT_SUBQUERY */
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Generate code that checks the left-most column of index table iCur to see if
  * it contains any NULL entries.  Cause the register at regHasNull to be set
@@ -2288,9 +2268,7 @@ sqlite3SetHasNullFlag(Vdbe * v, int iCur, int iCol, int regHasNull)
 	VdbeComment((v, "first_entry_in(%d)", iCur));
 	sqlite3VdbeJumpHere(v, addr1);
 }
-#endif
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * The argument is an IN operator with a list (not a subquery) on the
  * right-hand side.  Return TRUE if that list is constant.
@@ -2307,7 +2285,6 @@ sqlite3InRhsIsConstant(Expr * pIn)
 	pIn->pLeft = pLHS;
 	return res;
 }
-#endif
 
 /*
  * This function is used by the implementation of the IN (...) operator.
@@ -2389,7 +2366,6 @@ sqlite3InRhsIsConstant(Expr * pIn)
  *
  * then aiMap[] is populated with {2, 0, 1}.
  */
-#ifndef SQLITE_OMIT_SUBQUERY
 int
 sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		   Expr * pX,	/* The right-hand side (RHS) of the IN operator */
@@ -2628,9 +2604,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 	}
 	return eType;
 }
-#endif
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Argument pExpr is an (?, ?...) IN(...) expression. This
  * function allocates and returns a nul-terminated string containing
@@ -2666,9 +2640,7 @@ exprINAffinity(Parse * pParse, Expr * pExpr)
 	}
 	return zRet;
 }
-#endif
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Load the Parse object passed as the first argument with an error
  * message of the form:
@@ -2681,7 +2653,6 @@ sqlite3SubselectError(Parse * pParse, int nActual, int nExpect)
 	const char *zFmt = "sub-select returns %d columns - expected %d";
 	sqlite3ErrorMsg(pParse, zFmt, nActual, nExpect);
 }
-#endif
 
 /*
  * Expression pExpr is a vector that has been used in a context where
@@ -2697,13 +2668,10 @@ sqlite3SubselectError(Parse * pParse, int nActual, int nExpect)
 void
 sqlite3VectorErrorMsg(Parse * pParse, Expr * pExpr)
 {
-#ifndef SQLITE_OMIT_SUBQUERY
 	if (pExpr->flags & EP_xIsSelect) {
 		sqlite3SubselectError(pParse, pExpr->x.pSelect->pEList->nExpr,
 				      1);
-	} else
-#endif
-	{
+	} else {
 		sqlite3ErrorMsg(pParse, "row value misused");
 	}
 }
@@ -2731,7 +2699,6 @@ sqlite3VectorErrorMsg(Parse * pParse, Expr * pExpr)
  * array of registers and the return value is the register of the left-most
  * result column.  Return 0 for IN operators or if an error occurs.
  */
-#ifndef SQLITE_OMIT_SUBQUERY
 int
 sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 		     Expr * pExpr,	/* The IN, SELECT, or EXISTS operator */
@@ -2978,9 +2945,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 
 	return rReg;
 }
-#endif				/* SQLITE_OMIT_SUBQUERY */
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Expr pIn is an IN(...) expression. This function checks that the
  * sub-select on the RHS of the IN() operator has the same number of
@@ -3004,9 +2969,7 @@ sqlite3ExprCheckIN(Parse * pParse, Expr * pIn)
 	}
 	return 0;
 }
-#endif
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
  * Generate code for an IN expression.
  *
@@ -3304,7 +3267,6 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	sqlite3DbFree(pParse->db, aiMap);
 	sqlite3DbFree(pParse->db, zAff);
 }
-#endif				/* SQLITE_OMIT_SUBQUERY */
 
 #ifndef SQLITE_OMIT_FLOATING_POINT
 /*
@@ -4188,7 +4150,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 			return target;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case TK_EXISTS:
 	case TK_SELECT:{
 			int nCol;
@@ -4233,7 +4194,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlite3VdbeResolveLabel(v, destIfNull);
 			return target;
 		}
-#endif				/* SQLITE_OMIT_SUBQUERY */
 
 		/*
 		 *    x BETWEEN y AND z
@@ -4885,7 +4845,6 @@ sqlite3ExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 					jumpIfNull);
 			break;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case TK_IN:{
 			int destIfFalse = sqlite3VdbeMakeLabel(v);
 			int destIfNull = jumpIfNull ? dest : destIfFalse;
@@ -4895,7 +4854,6 @@ sqlite3ExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			sqlite3VdbeResolveLabel(v, destIfFalse);
 			break;
 		}
-#endif
 	default:{
  default_expr:
 			if (exprAlwaysTrue(pExpr)) {
@@ -5070,7 +5028,6 @@ sqlite3ExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 					jumpIfNull);
 			break;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case TK_IN:{
 			if (jumpIfNull) {
 				sqlite3ExprCodeIN(pParse, pExpr, dest, dest);
@@ -5082,7 +5039,6 @@ sqlite3ExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			}
 			break;
 		}
-#endif
 	default:{
  default_expr:
 			if (exprAlwaysFalse(pExpr)) {

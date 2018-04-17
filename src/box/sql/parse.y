@@ -591,34 +591,32 @@ seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
   A = sqlite3SrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
   sqlite3SrcListFuncArgs(pParse, A, E);
 }
-%ifndef SQLITE_OMIT_SUBQUERY
-  seltablist(A) ::= stl_prefix(A) LP select(S) RP
-                    as(Z) on_opt(N) using_opt(U). {
-    A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,S,N,U);
-  }
-  seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
-                    as(Z) on_opt(N) using_opt(U). {
-    if( A==0 && Z.n==0 && N==0 && U==0 ){
-      A = F;
-    }else if( F->nSrc==1 ){
-      A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,0,N,U);
-      if( A ){
-        struct SrcList_item *pNew = &A->a[A->nSrc-1];
-        struct SrcList_item *pOld = F->a;
-        pNew->zName = pOld->zName;
-        pNew->pSelect = pOld->pSelect;
-        pOld->zName =  0;
-        pOld->pSelect = 0;
-      }
-      sqlite3SrcListDelete(pParse->db, F);
-    }else{
-      Select *pSubquery;
-      sqlite3SrcListShiftJoinType(F);
-      pSubquery = sqlite3SelectNew(pParse,0,F,0,0,0,0,SF_NestedFrom,0,0);
-      A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,pSubquery,N,U);
+seltablist(A) ::= stl_prefix(A) LP select(S) RP
+                  as(Z) on_opt(N) using_opt(U). {
+  A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,S,N,U);
+}
+seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
+                  as(Z) on_opt(N) using_opt(U). {
+  if( A==0 && Z.n==0 && N==0 && U==0 ){
+    A = F;
+  }else if( F->nSrc==1 ){
+    A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,0,N,U);
+    if( A ){
+      struct SrcList_item *pNew = &A->a[A->nSrc-1];
+      struct SrcList_item *pOld = F->a;
+      pNew->zName = pOld->zName;
+      pNew->pSelect = pOld->pSelect;
+      pOld->zName =  0;
+      pOld->pSelect = 0;
     }
+    sqlite3SrcListDelete(pParse->db, F);
+  }else{
+    Select *pSubquery;
+    sqlite3SrcListShiftJoinType(F);
+    pSubquery = sqlite3SelectNew(pParse,0,F,0,0,0,0,SF_NestedFrom,0,0);
+    A = sqlite3SrcListAppendFromTerm(pParse,A,0,&Z,pSubquery,N,U);
   }
-%endif  SQLITE_OMIT_SUBQUERY
+}
 
 %type fullname {SrcList*}
 %destructor fullname {sqlite3SrcListDelete(pParse->db, $$);}
@@ -1108,88 +1106,86 @@ expr(A) ::= expr(A) between_op(N) expr(X) AND expr(Y). [BETWEEN] {
   exprNot(pParse, N, &A);
   A.zEnd = Y.zEnd;
 }
-%ifndef SQLITE_OMIT_SUBQUERY
-  %type in_op {int}
-  in_op(A) ::= IN.      {A = 0;}
-  in_op(A) ::= NOT IN.  {A = 1;}
-  expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
-    if( Y==0 ){
-      /* Expressions of the form
-      **
-      **      expr1 IN ()
-      **      expr1 NOT IN ()
-      **
-      ** simplify to constants 0 (false) and 1 (true), respectively,
-      ** regardless of the value of expr1.
-      */
-	    sql_expr_free(pParse->db, A.pExpr, false);
-      A.pExpr = sqlite3ExprAlloc(pParse->db, TK_INTEGER,&sqlite3IntTokens[N],1);
-    }else if( Y->nExpr==1 ){
-      /* Expressions of the form:
-      **
-      **      expr1 IN (?1)
-      **      expr1 NOT IN (?2)
-      **
-      ** with exactly one value on the RHS can be simplified to something
-      ** like this:
-      **
-      **      expr1 == ?1
-      **      expr1 <> ?2
-      **
-      ** But, the RHS of the == or <> is marked with the EP_Generic flag
-      ** so that it may not contribute to the computation of comparison
-      ** affinity or the collating sequence to use for comparison.  Otherwise,
-      ** the semantics would be subtly different from IN or NOT IN.
-      */
-      Expr *pRHS = Y->a[0].pExpr;
-      Y->a[0].pExpr = 0;
-      sqlite3ExprListDelete(pParse->db, Y);
-      /* pRHS cannot be NULL because a malloc error would have been detected
-      ** before now and control would have never reached this point */
-      if( ALWAYS(pRHS) ){
-        pRHS->flags &= ~EP_Collate;
-        pRHS->flags |= EP_Generic;
-      }
-      A.pExpr = sqlite3PExpr(pParse, N ? TK_NE : TK_EQ, A.pExpr, pRHS);
-    }else{
-      A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
-      if( A.pExpr ){
-        A.pExpr->x.pList = Y;
-        sqlite3ExprSetHeightAndFlags(pParse, A.pExpr);
-      }else{
-        sqlite3ExprListDelete(pParse->db, Y);
-      }
-      exprNot(pParse, N, &A);
+%type in_op {int}
+in_op(A) ::= IN.      {A = 0;}
+in_op(A) ::= NOT IN.  {A = 1;}
+expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
+  if( Y==0 ){
+    /* Expressions of the form
+    **
+    **      expr1 IN ()
+    **      expr1 NOT IN ()
+    **
+    ** simplify to constants 0 (false) and 1 (true), respectively,
+    ** regardless of the value of expr1.
+    */
+    sql_expr_free(pParse->db, A.pExpr, false);
+    A.pExpr = sqlite3ExprAlloc(pParse->db, TK_INTEGER,&sqlite3IntTokens[N],1);
+  }else if( Y->nExpr==1 ){
+    /* Expressions of the form:
+    **
+    **      expr1 IN (?1)
+    **      expr1 NOT IN (?2)
+    **
+    ** with exactly one value on the RHS can be simplified to something
+    ** like this:
+    **
+    **      expr1 == ?1
+    **      expr1 <> ?2
+    **
+    ** But, the RHS of the == or <> is marked with the EP_Generic flag
+    ** so that it may not contribute to the computation of comparison
+    ** affinity or the collating sequence to use for comparison.  Otherwise,
+    ** the semantics would be subtly different from IN or NOT IN.
+    */
+    Expr *pRHS = Y->a[0].pExpr;
+    Y->a[0].pExpr = 0;
+    sqlite3ExprListDelete(pParse->db, Y);
+    /* pRHS cannot be NULL because a malloc error would have been detected
+    ** before now and control would have never reached this point */
+    if( ALWAYS(pRHS) ){
+      pRHS->flags &= ~EP_Collate;
+      pRHS->flags |= EP_Generic;
     }
-    A.zEnd = &E.z[E.n];
-  }
-  expr(A) ::= LP(B) select(X) RP(E). {
-    spanSet(&A,&B,&E); /*A-overwrites-B*/
-    A.pExpr = sqlite3PExpr(pParse, TK_SELECT, 0, 0);
-    sqlite3PExprAddSelect(pParse, A.pExpr, X);
-  }
-  expr(A) ::= expr(A) in_op(N) LP select(Y) RP(E).  [IN] {
+    A.pExpr = sqlite3PExpr(pParse, N ? TK_NE : TK_EQ, A.pExpr, pRHS);
+  }else{
     A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
-    sqlite3PExprAddSelect(pParse, A.pExpr, Y);
+    if( A.pExpr ){
+      A.pExpr->x.pList = Y;
+      sqlite3ExprSetHeightAndFlags(pParse, A.pExpr);
+    }else{
+      sqlite3ExprListDelete(pParse->db, Y);
+    }
     exprNot(pParse, N, &A);
-    A.zEnd = &E.z[E.n];
   }
-  expr(A) ::= expr(A) in_op(N) nm(Y) paren_exprlist(E). [IN] {
-    SrcList *pSrc = sqlite3SrcListAppend(pParse->db, 0,&Y);
-    Select *pSelect = sqlite3SelectNew(pParse, 0,pSrc,0,0,0,0,0,0,0);
-    if( E )  sqlite3SrcListFuncArgs(pParse, pSelect ? pSrc : 0, E);
-    A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
-    sqlite3PExprAddSelect(pParse, A.pExpr, pSelect);
-    exprNot(pParse, N, &A);
-    A.zEnd = &Y.z[Y.n];
-  }
-  expr(A) ::= EXISTS(B) LP select(Y) RP(E). {
-    Expr *p;
-    spanSet(&A,&B,&E); /*A-overwrites-B*/
-    p = A.pExpr = sqlite3PExpr(pParse, TK_EXISTS, 0, 0);
-    sqlite3PExprAddSelect(pParse, p, Y);
-  }
-%endif SQLITE_OMIT_SUBQUERY
+  A.zEnd = &E.z[E.n];
+}
+expr(A) ::= LP(B) select(X) RP(E). {
+  spanSet(&A,&B,&E); /*A-overwrites-B*/
+  A.pExpr = sqlite3PExpr(pParse, TK_SELECT, 0, 0);
+  sqlite3PExprAddSelect(pParse, A.pExpr, X);
+}
+expr(A) ::= expr(A) in_op(N) LP select(Y) RP(E).  [IN] {
+  A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
+  sqlite3PExprAddSelect(pParse, A.pExpr, Y);
+  exprNot(pParse, N, &A);
+  A.zEnd = &E.z[E.n];
+}
+expr(A) ::= expr(A) in_op(N) nm(Y) paren_exprlist(E). [IN] {
+  SrcList *pSrc = sqlite3SrcListAppend(pParse->db, 0,&Y);
+  Select *pSelect = sqlite3SelectNew(pParse, 0,pSrc,0,0,0,0,0,0,0);
+  if( E )  sqlite3SrcListFuncArgs(pParse, pSelect ? pSrc : 0, E);
+  A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);
+  sqlite3PExprAddSelect(pParse, A.pExpr, pSelect);
+  exprNot(pParse, N, &A);
+  A.zEnd = &Y.z[Y.n];
+}
+expr(A) ::= EXISTS(B) LP select(Y) RP(E). {
+  Expr *p;
+  spanSet(&A,&B,&E); /*A-overwrites-B*/
+  p = A.pExpr = sqlite3PExpr(pParse, TK_EXISTS, 0, 0);
+  sqlite3PExprAddSelect(pParse, p, Y);
+}
 
 /* CASE expressions */
 expr(A) ::= CASE(C) case_operand(X) case_exprlist(Y) case_else(Z) END(E). {
@@ -1234,14 +1230,12 @@ nexprlist(A) ::= nexprlist(A) COMMA expr(Y).
 nexprlist(A) ::= expr(Y).
     {A = sqlite3ExprListAppend(pParse,0,Y.pExpr); /*A-overwrites-Y*/}
 
-%ifndef SQLITE_OMIT_SUBQUERY
 /* A paren_exprlist is an optional expression list contained inside
 ** of parenthesis */
 %type paren_exprlist {ExprList*}
 %destructor paren_exprlist {sqlite3ExprListDelete(pParse->db, $$);}
 paren_exprlist(A) ::= .   {A = 0;}
 paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
-%endif SQLITE_OMIT_SUBQUERY
 
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////

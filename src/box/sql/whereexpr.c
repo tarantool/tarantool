@@ -436,7 +436,7 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
 	exprAnalyze(pSrc, pWC, idxNew);
 }
 
-#if !defined(SQLITE_OMIT_OR_OPTIMIZATION) && !defined(SQLITE_OMIT_SUBQUERY)
+#if !defined(SQLITE_OMIT_OR_OPTIMIZATION)
 /*
  * Analyze a term that consists of two or more OR-connected
  * subterms.  So in:
@@ -809,7 +809,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 		}
 	}
 }
-#endif				/* !SQLITE_OMIT_OR_OPTIMIZATION && !SQLITE_OMIT_SUBQUERY */
+#endif				/* !SQLITE_OMIT_OR_OPTIMIZATION */
 
 /*
  * We already know that pExpr is a binary operator where both operands are
@@ -1142,7 +1142,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	}
 #endif				/* SQLITE_OMIT_BETWEEN_OPTIMIZATION */
 
-#if !defined(SQLITE_OMIT_OR_OPTIMIZATION) && !defined(SQLITE_OMIT_SUBQUERY)
+#if !defined(SQLITE_OMIT_OR_OPTIMIZATION)
 	/* Analyze a term that is composed of two or more subterms connected by
 	 * an OR operator.
 	 */

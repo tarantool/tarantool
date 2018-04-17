@@ -453,7 +453,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 	} else if (pX->op == TK_ISNULL) {
 		iReg = iTarget;
 		sqlite3VdbeAddOp2(v, OP_Null, 0, iReg);
-#ifndef SQLITE_OMIT_SUBQUERY
 	} else {
 		int eType = IN_INDEX_NOOP;
 		int iTab;
@@ -617,7 +616,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 			pLevel->u.in.nIn = 0;
 		}
 		sqlite3DbFree(pParse->db, aiMap);
-#endif
 	}
 	disableTerm(pLevel, pTerm);
 	return iReg;
@@ -1070,14 +1068,11 @@ codeExprOrVector(Parse * pParse, Expr * p, int iReg, int nReg)
 {
 	assert(nReg > 0);
 	if (sqlite3ExprIsVector(p)) {
-#ifndef SQLITE_OMIT_SUBQUERY
 		if ((p->flags & EP_xIsSelect)) {
 			Vdbe *v = pParse->pVdbe;
 			int iSelect = sqlite3CodeSubselect(pParse, p, 0);
 			sqlite3VdbeAddOp3(v, OP_Copy, iSelect, iReg, nReg - 1);
-		} else
-#endif
-		{
+		} else {
 			int i;
 			ExprList *pList = p->x.pList;
 			assert(nReg <= pList->nExpr);

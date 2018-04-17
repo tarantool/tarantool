@@ -509,7 +509,6 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			}
 			break;
 		}
-#ifndef SQLITE_OMIT_SUBQUERY
 	case TK_EXISTS:{
 			sqlite3TreeViewLine(pView, "EXISTS-expr");
 			sqlite3TreeViewSelect(pView, pExpr->x.pSelect, 0);
@@ -532,8 +531,6 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			}
 			break;
 		}
-#endif				/* SQLITE_OMIT_SUBQUERY */
-
 		/*
 		 *    x BETWEEN y AND z
 		 *
