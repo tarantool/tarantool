@@ -932,7 +932,7 @@ codeRowTrigger(Parse * pParse,	/* Current parse context */
 		sqlite3VdbeDelete(v);
 	}
 
-	assert(!pSubParse->pAinc && !pSubParse->pZombieTab);
+	assert(!pSubParse->pZombieTab);
 	assert(!pSubParse->pTriggerPrg && !pSubParse->nMaxArg);
 	sqlite3ParserReset(pSubParse);
 	sqlite3StackFree(db, pSubParse);

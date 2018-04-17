@@ -1448,7 +1448,6 @@ void *sqlite3_wsd_find(void *K, int L);
  * Forward references to structures
  */
 typedef struct AggInfo AggInfo;
-typedef struct AutoincInfo AutoincInfo;
 typedef struct Bitvec Bitvec;
 typedef struct Column Column;
 typedef struct Schema Schema;
@@ -2850,20 +2849,6 @@ struct SelectDest {
 };
 
 /*
- * During code generation of statements that do inserts into AUTOINCREMENT
- * tables, the following information is attached to the Table.u.autoInc.p
- * pointer of each autoincrement table to record some side information that
- * the code generator needs.  We have to keep per-table autoincrement
- * information in case inserts are done within triggers.  Triggers do not
- * normally coordinate their activities, but we do need to coordinate the
- * loading and saving of autoincrement information.
- */
-struct AutoincInfo {
-	AutoincInfo *pNext;	/* Next info block in a list of them all */
-	Table *pTab;		/* Table this info block refers to */
-};
-
-/*
  * Size of the column cache
  */
 #ifndef SQLITE_N_COLCACHE
@@ -2942,7 +2927,6 @@ struct Parse {
 	int nSelect;		/* Number of SELECT statements seen */
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
 #endif
-	AutoincInfo *pAinc;	/* Information about AUTOINCREMENT counters */
 	Parse *pToplevel;	/* Parse structure for main program (or NULL) */
 	Table *pTriggerTab;	/* Table triggers are being coded for */
 	u32 nQueryLoop;		/* Est number of iterations of a query (10*log2(N)) */
