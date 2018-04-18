@@ -223,7 +223,8 @@ applier_connect(struct applier *applier)
 		if (row.type != IPROTO_OK)
 			xrow_decode_error_xc(&row);
 		vclock_create(&applier->vclock);
-		xrow_decode_vclock_xc(&row, &applier->vclock);
+		xrow_decode_request_vote_xc(&row, &applier->vclock,
+					    &applier->remote_is_ro);
 	}
 
 	applier_set_state(applier, APPLIER_CONNECTED);

@@ -40,10 +40,10 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 		/* 0x05 */	MP_UINT,   /* IPROTO_SCHEMA_VERSION */
 		/* 0x06 */	MP_UINT,   /* IPROTO_SERVER_VERSION */
+		/* 0x07 */	MP_UINT,   /* IPROTO_SERVER_IS_RO */
 	/* }}} */
 
 	/* {{{ unused */
-		/* 0x07 */	MP_UINT,
 		/* 0x08 */	MP_UINT,
 		/* 0x09 */	MP_UINT,
 		/* 0x0a */	MP_UINT,

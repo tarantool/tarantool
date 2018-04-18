@@ -60,6 +60,8 @@
 #include "iproto_constants.h"
 #include "rmean.h"
 #include "errinj.h"
+#include "applier.h"
+#include "cfg.h"
 
 /* The number of iproto messages in flight */
 enum { IPROTO_MSG_MAX = 768 };
@@ -1363,9 +1365,10 @@ tx_process_misc(struct cmsg *m)
 					   ::schema_version);
 			break;
 		case IPROTO_REQUEST_VOTE:
-			iproto_reply_vclock_xc(out, msg->header.sync,
-					       ::schema_version,
-					       &replicaset.vclock);
+			iproto_reply_request_vote_xc(out, msg->header.sync,
+						     ::schema_version,
+						     &replicaset.vclock,
+						     cfg_geti("read_only"));
 			break;
 		default:
 			unreachable();
