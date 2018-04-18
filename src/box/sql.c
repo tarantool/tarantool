@@ -1523,10 +1523,12 @@ sql_debug_info(struct info_handler *h)
 	extern int sql_search_count;
 	extern int sql_sort_count;
 	extern int sql_found_count;
+	extern int sql_xfer_count;
 	info_begin(h);
 	info_append_int(h, "sql_search_count", sql_search_count);
 	info_append_int(h, "sql_sort_count", sql_sort_count);
 	info_append_int(h, "sql_found_count", sql_found_count);
+	info_append_int(h, "sql_xfer_count", sql_xfer_count);
 	info_end(h);
 }
 

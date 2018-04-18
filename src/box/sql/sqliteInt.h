@@ -2912,6 +2912,10 @@ struct Parse {
 #define OPFLAG_SYSTEMSP      0x20	/* OP_Open**: set if space pointer
 					 * points to system space.
 					 */
+/* OP_RowData: xferOptimization started processing */
+#ifdef SQLITE_TEST
+#define OPFLAG_XFER_OPT      0x01
+#endif
 
 /*
  * Each trigger present in the database schema is stored as an

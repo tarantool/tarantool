@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(44)
+test:plan(59)
 
 --!./tcltestrunner.lua
 -- 2014 January 11
@@ -382,43 +382,125 @@ genstmt(255), {
 --     -- </4.7>
 -- })
 
------------------------------------------------------------------------------
--- Check that adding a WITH clause to an INSERT disables the xfer 
+-----------------------------------------------------------------
+-- Check that adding a WITH clause to an INSERT disables the xfer
 -- optimization.
---
--- Tarantool: `sqlite3_xferopt_count` is not exported
---   Need to understand if this optimization works at all and if we really need it.
---   Commented so far.
--- function do_xfer_test(tn, bXfer, sql, res)
---     res = res or ""
---     sqlite3_xferopt_count = 0
---     X(267, "X!cmd", [=[["uplevel",[["list","do_test",["tn"],["\n    set dres [db eval {",["sql"],"}]\n    list [set ::sqlite3_xferopt_count] [set dres]\n  "],[["list",["bXfer"],["res"]]]]]]]=])
--- end
 
--- test:do_execsql_test(
---     5.1,
---     [[
---         DROP TABLE IF EXISTS t1;
---         DROP TABLE IF EXISTS t2;
---         CREATE TABLE t1(a PRIMARY KEY, b);
---         CREATE TABLE t2(a PRIMARY KEY, b);
---     ]])
+local function do_xfer_test(test, test_func, test_name, func, exp, opts)
+    local opts = opts or {}
+    local exp_xfer_count = opts.exp_xfer_count
+    local before = box.sql.debug().sql_xfer_count
+    test_func(test, test_name, func, exp)
+    local after = box.sql.debug().sql_xfer_count
+    test:is(after - before, exp_xfer_count,
+                   test_name .. '-xfer-count')
+end
 
--- do_xfer_test(5.2, 1, " INSERT INTO t1 SELECT * FROM t2 ")
--- do_xfer_test(5.3, 0, " INSERT INTO t1 SELECT a, b FROM t2 ")
--- do_xfer_test(5.4, 0, " INSERT INTO t1 SELECT b, a FROM t2 ")
--- do_xfer_test(5.5, 0, [[ 
---   WITH x AS (SELECT a, b FROM t2) INSERT INTO t1 SELECT * FROM x 
--- ]])
--- do_xfer_test(5.6, 0, [[ 
---   WITH x AS (SELECT a, b FROM t2) INSERT INTO t1 SELECT * FROM t2 
--- ]])
--- do_xfer_test(5.7, 0, [[ 
---  INSERT INTO t1 WITH x AS ( SELECT * FROM t2 ) SELECT * FROM x
--- ]])
--- do_xfer_test(5.8, 0, [[ 
---  INSERT INTO t1 WITH x(a,b) AS ( SELECT * FROM t2 ) SELECT * FROM x
--- ]])
+test.do_execsql_xfer_test = function(test, test_name, func, exp, opts)
+    do_xfer_test(test, test.do_execsql_test, test_name, func, exp, opts)
+end
+
+test.do_catchsql_xfer_test = function(test, test_name, func, exp, opts)
+    do_xfer_test(test, test.do_catchsql_test, test_name, func, exp, opts)
+end
+
+test:do_execsql_test(
+    5.1,
+    [[
+        DROP TABLE IF EXISTS t1;
+        DROP TABLE IF EXISTS t2;
+        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t2(a PRIMARY KEY, b);
+        INSERT INTO t2 VALUES (1, 1), (2, 2);
+    ]], {
+        -- <5.1>
+        -- <5.1>
+    })
+
+test:do_execsql_xfer_test(
+    5.2,
+    [[
+        INSERT INTO t1 SELECT * FROM t2;
+        DELETE FROM t1;
+    ]], {
+        -- <5.2>
+        -- <5.2>
+    },  {
+        exp_xfer_count = 1
+    })
+
+test:do_execsql_xfer_test(
+    5.3,
+    [[
+        INSERT INTO t1 SELECT a, b FROM t2;
+        DELETE FROM t1;
+    ]], {
+        -- <5.3>
+        -- <5.3>
+    },  {
+        exp_xfer_count = 0
+    })
+
+test:do_execsql_xfer_test(
+    5.4,
+    [[
+        INSERT INTO t1 SELECT b, a FROM t2;
+        DELETE FROM t1;
+    ]], {
+        -- <5.4>
+        -- <5.4>
+    },  {
+        exp_xfer_count = 0
+    })
+
+test:do_execsql_xfer_test(
+    5.5,
+    [[
+        WITH x AS (SELECT a, b FROM t2) INSERT INTO t1 SELECT * FROM x;
+        DELETE FROM t1;
+    ]], {
+        -- <5.5>
+        -- <5.5>
+    },  {
+        exp_xfer_count = 0
+    })
+
+test:do_execsql_xfer_test(
+    5.6,
+    [[
+        WITH x AS (SELECT a, b FROM t2) INSERT INTO t1 SELECT * FROM t2;
+        DELETE FROM t1;
+    ]], {
+        -- <5.6>
+        -- <5.6>
+    },  {
+        exp_xfer_count = 0
+    })
+
+test:do_execsql_xfer_test(
+    5.7,
+    [[
+        INSERT INTO t1 WITH x AS (SELECT * FROM t2) SELECT * FROM x;
+        DELETE FROM t1;
+    ]], {
+        -- <5.7>
+        -- <5.7>
+    },  {
+        exp_xfer_count = 0
+    })
+
+test:do_execsql_xfer_test(
+    5.8,
+    [[
+        INSERT INTO t1 WITH x(a,b) AS (SELECT * FROM t2) SELECT * FROM x;
+        DELETE FROM t1;
+    ]], {
+        -- <5.8>
+        -- <5.8>
+    },  {
+        exp_xfer_count = 0
+    })
+
 -----------------------------------------------------------------------------
 -- Check that syntax (and other) errors in statements with WITH clauses
 -- attached to them do not cause problems (e.g. memory leaks).
