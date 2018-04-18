@@ -261,7 +261,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index7-6.2",
     [[
-        CREATE INDEX i4 ON t4(c) WHERE d='xyz';
+        CREATE INDEX i4 ON t4(c);
         SELECT a,b,c,d FROM (SELECT a,b FROM t5 WHERE a=1 AND b='xyz'), t4 WHERE c='abc';
     ]], {
         -- <index7-6.2>
@@ -291,14 +291,16 @@ test:do_eqp_test(
         -- </index7-6.4>
     })
 
+-- gh-2165 Currently, Tarantool lacks support of partial indexes,
+-- so temporary we removed processing of their syntax from parser.
+--
 test:do_catchsql_test(
-    "index7-6.5",
+    "index7-7.1",
     [[
-        CREATE INDEX t5a ON t5(a) WHERE a=#1;
+        CREATE TABLE t1 (a INTEGER PRIMARY KEY, b INTEGER);
+        CREATE UNIQUE INDEX i ON t1 (a) WHERE a = 3;
     ]], {
-        -- <index7-6.5>
-        1, [[near "#1": syntax error]]
-        -- </index7-6.5>
+        1, "keyword \"WHERE\" is reserved"
     })
 
 test:finish_test()

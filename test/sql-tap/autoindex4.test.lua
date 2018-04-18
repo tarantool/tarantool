@@ -111,7 +111,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoindex4-3.1",
     [[
-        CREATE INDEX Items_x1 ON Items(ItemName,Name) WHERE ItemName = 'dummy';
+        CREATE INDEX Items_x1 ON Items(ItemName,Name);
 
         SELECT Items.ItemName
           FROM Items

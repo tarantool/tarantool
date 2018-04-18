@@ -1112,7 +1112,7 @@ test:do_test(
         test:execsql([[
             DROP TABLE IF EXISTS t1;
             CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b, c, d);
-            CREATE INDEX i1 ON t1(a, b) WHERE d IS NOT NULL;
+            CREATE INDEX i1 ON t1(a, b);
             INSERT INTO t1 VALUES(null, -1, -1, -1, NULL);
             INSERT INTO t1 SELECT null, 2*a,2*b,2*c,d FROM t1;
             INSERT INTO t1 SELECT null, 2*a,2*b,2*c,d FROM t1;

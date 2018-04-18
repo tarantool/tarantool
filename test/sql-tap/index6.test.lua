@@ -225,7 +225,7 @@ test:do_execsql_test(
     "index6-6.0",
     [[
         CREATE TABLE t6(a,b, PRIMARY KEY (a,b));
-        CREATE INDEX t6b ON t6(b) WHERE b=1;
+        CREATE INDEX t6b ON t6(b);
         INSERT INTO t6(a,b) VALUES(123,456);
         SELECT * FROM t6;
     ]], {
@@ -262,7 +262,7 @@ test:do_execsql_test(
         CREATE TABLE t7a(id primary key, x);
         CREATE TABLE t7b(id primary key, y);
         INSERT INTO t7a VALUES(1, 1);
-        CREATE INDEX t7ax ON t7a(x) WHERE x=99;
+        CREATE INDEX t7ax ON t7a(x);
         SELECT x,y FROM t7a LEFT JOIN t7b ON (x=99) ORDER BY x;
     ]], {
         -- <index6-7.0>
@@ -318,7 +318,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t8a(id primary key, a,b);
         CREATE TABLE t8b(id primary key, x,y);
-        CREATE INDEX i8c ON t8b(y) WHERE x = 'value';
+        CREATE INDEX i8c ON t8b(y);
 
         INSERT INTO t8a VALUES(1, 1, 'one');
         INSERT INTO t8a VALUES(2, 2, 'two');
@@ -364,7 +364,7 @@ if (0 > 0)
         "index6-9.1",
         [[
             CREATE TABLE t9(a int, b int, c int);
-            CREATE INDEX t9ca ON t9(c,a) WHERE a in (10,12,20);
+            CREATE INDEX t9ca ON t9(c,a);
             INSERT INTO t9 VALUES(1,1,9),(10,2,35),(11,15,82),(20,19,5),(NULL,7,3);
             UPDATE t9 SET b=c WHERE a in (10,12,20);
             SELECT a,b,c,'|' FROM t9 ORDER BY a;
@@ -379,7 +379,7 @@ test:do_execsql_test(
     [[
         --DROP TABLE t9;
         CREATE TABLE t9(a int, b int, c int, PRIMARY KEY(a));
-        CREATE INDEX t9ca ON t9(c,a) WHERE a in (10,12,20);
+        CREATE INDEX t9ca ON t9(c,a);
         INSERT INTO t9 VALUES(1,1,9),(10,2,35),(11,15,82),(20,19,5);
         UPDATE t9 SET b=c WHERE a in (10,12,20);
         SELECT a,b,c,'|' FROM t9 ORDER BY a;
@@ -400,7 +400,7 @@ test:do_execsql_test(
           (2,3,4,5,6),
           (3,4,5,6,7),
           (1,2,3,8,9);
-        CREATE INDEX t10x ON t10(d) WHERE a=1 AND b=2 AND c=3;
+        CREATE INDEX t10x ON t10(d);
         SELECT e FROM t10 WHERE a=1 AND b=2 AND c=3 ORDER BY d;
     ]], {
         -- <index6-10.1>

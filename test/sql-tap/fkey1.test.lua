@@ -212,7 +212,7 @@ test:do_execsql_test(
     "fkey1-6.1",
     [[
         CREATE TABLE p1(id PRIMARY KEY, x, y);
-        CREATE UNIQUE INDEX p1x ON p1(x) WHERE y<2;
+        CREATE INDEX p1x ON p1(x);
         INSERT INTO p1 VALUES(1, 1, 1);
         CREATE TABLE c1(a PRIMARY KEY REFERENCES p1(x));
     ]], {
