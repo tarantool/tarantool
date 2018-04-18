@@ -95,6 +95,8 @@ struct applier {
 	uint32_t version_id;
 	/** Remote vclock at time of connect. */
 	struct vclock vclock;
+	/** Remote peer mode, true if read-only, default: false */
+	bool remote_is_ro;
 	/** Remote address */
 	union {
 		struct sockaddr addr;

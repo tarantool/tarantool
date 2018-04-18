@@ -1,0 +1,105 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+box.schema.user.grant('guest', 'replication')
+---
+...
+space = box.schema.space.create('test', {engine = engine});
+---
+...
+index = box.space.test:create_index('primary')
+---
+...
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.cfg{replication_skip_conflict = true}
+---
+...
+box.space.test:insert{1}
+---
+- [1]
+...
+test_run:cmd("switch default")
+---
+- true
+...
+space:insert{1, 1}
+---
+- [1, 1]
+...
+space:insert{2}
+---
+- [2]
+...
+box.info.status
+---
+- running
+...
+vclock = test_run:get_vclock('default')
+---
+...
+_ = test_run:wait_vclock("replica", vclock)
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.info.replication[1].upstream.message
+---
+- null
+...
+box.info.replication[1].upstream.status
+---
+- follow
+...
+box.space.test:select()
+---
+- - [1]
+  - [2]
+...
+test_run:cmd("switch default")
+---
+- true
+...
+box.info.status
+---
+- running
+...
+-- cleanup
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+box.space.test:drop()
+---
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...

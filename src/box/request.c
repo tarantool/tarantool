@@ -195,5 +195,14 @@ request_handle_sequence(struct request *request, struct space *space)
 		if (likely(mp_read_int64(&key, &value) == 0))
 			return sequence_update(seq, value);
 	}
+	/*
+	 * As the request body was changed, we have to update body in header.
+	 */
+	struct xrow_header *row = request->header;
+	if (row != NULL) {
+		row->bodycnt = xrow_encode_dml(request, row->body);
+		if (row->bodycnt < 0)
+			return -1;
+	}
 	return 0;
 }

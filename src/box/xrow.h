@@ -264,6 +264,8 @@ xrow_encode_subscribe(struct xrow_header *row,
  * @param[out] replicaset_uuid.
  * @param[out] instance_uuid.
  * @param[out] vclock.
+ * @param[out] version_id.
+ * @param[out] read_only.
  *
  * @retval  0 Success.
  * @retval -1 Memory or format error.
@@ -271,7 +273,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id);
+		      uint32_t *version_id, bool *read_only);
 
 /**
  * Encode JOIN command.
@@ -295,7 +297,8 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
 static inline int
 xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL);
+	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL,
+				     NULL);
 }
 
 /**
@@ -320,7 +323,23 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 static inline int
 xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL);
+	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, NULL);
+}
+
+/**
+ * Decode peer vclock and access rights (a response to VOTE command).
+ * @param row Row to decode.
+ * @param[out] vclock.
+ * @param[out] read_only.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory or format error.
+ */
+static inline int
+xrow_decode_request_vote(struct xrow_header *row, struct vclock *vclock,
+			 bool *read_only)
+{
+	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, read_only);
 }
 
 /**
@@ -419,13 +438,15 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
  * @param sync Request sync.
  * @param schema_version.
  * @param vclock.
+ * @param read_only.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-iproto_reply_vclock(struct obuf *out, uint64_t sync, uint32_t schema_version,
-		    const struct vclock *vclock);
+iproto_reply_request_vote(struct obuf *out, uint64_t sync,
+			 uint32_t schema_version, const struct vclock *vclock,
+			 bool read_only);
 
 /**
  * Write an error packet int output buffer. Doesn't throw if out
@@ -628,7 +649,7 @@ xrow_decode_subscribe_xc(struct xrow_header *row,
 			 uint32_t *replica_version_id)
 {
 	if (xrow_decode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock, replica_version_id) != 0)
+				  vclock, replica_version_id, NULL) != 0)
 		diag_raise();
 }
 
@@ -665,6 +686,15 @@ xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
 		diag_raise();
 }
 
+/** @copydoc xrow_decode_request_vote. */
+static inline void
+xrow_decode_request_vote_xc(struct xrow_header *row, struct vclock *vclock,
+			    bool *read_only)
+{
+	if (xrow_decode_request_vote(row, vclock, read_only) != 0)
+		diag_raise();
+}
+
 /** @copydoc iproto_reply_ok. */
 static inline void
 iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
@@ -673,12 +703,14 @@ iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
 		diag_raise();
 }
 
-/** @copydoc iproto_reply_vclock. */
+/** @copydoc iproto_reply_request_vote_xc. */
 static inline void
-iproto_reply_vclock_xc(struct obuf *out, uint64_t sync, uint32_t schema_version,
-		       const struct vclock *vclock)
+iproto_reply_request_vote_xc(struct obuf *out, uint64_t sync,
+			     uint32_t schema_version,
+			     const struct vclock *vclock, bool read_only)
 {
-	if (iproto_reply_vclock(out, sync, schema_version, vclock) != 0)
+	if (iproto_reply_request_vote(out, sync, schema_version,
+				      vclock, read_only) != 0)
 		diag_raise();
 }
 
