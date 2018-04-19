@@ -412,9 +412,17 @@ port_lua_destroy(struct port *base)
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, port->ref);
 }
 
+/**
+ * Dump port lua as a YAML document. It is extern since depends on
+ * lyaml module.
+ */
+extern const char *
+port_lua_dump_plain(struct port *port, uint32_t *size);
+
 static const struct port_vtab port_lua_vtab = {
 	.dump_msgpack = port_lua_dump,
 	.dump_msgpack_16 = port_lua_dump_16,
+	.dump_plain = port_lua_dump_plain,
 	.destroy = port_lua_destroy,
 };
 

@@ -219,6 +219,19 @@ coio_close(int fd);
 
 /** \endcond public */
 
+/**
+ * Write to a socket in at most @a timeout seconds.
+ * @param fd Socket descriptor.
+ * @param data Data to write.
+ * @param size Size of @a data.
+ * @param timeout Timeout on the operation.
+ *
+ * @retval 0 Success.
+ * @retval -1 Timeout or socket error.
+ */
+int
+coio_write_fd_timeout(int fd, const void *data, size_t size, ev_tstamp timeout);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

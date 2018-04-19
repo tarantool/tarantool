@@ -31,6 +31,8 @@
 
 #include "box/lua/console.h"
 #include "box/session.h"
+#include "box/port.h"
+#include "box/error.h"
 #include "lua/utils.h"
 #include "lua/fiber.h"
 #include "fiber.h"
@@ -366,6 +368,60 @@ console_session_fd(struct session *session)
 	return session->meta.fd;
 }
 
+/**
+ * Dump port lua data as a YAML document tagged with !push! global
+ * tag.
+ * @param port Port lua.
+ * @param[out] size Size of the result.
+ *
+ * @retval not NULL Tagged YAML document.
+ * @retval NULL Error.
+ */
+const char *
+port_lua_dump_plain(struct port *port, uint32_t *size)
+{
+	struct port_lua *port_lua = (struct port_lua *) port;
+	struct lua_State *L = port_lua->L;
+	int rc = lua_yaml_encode(L, luaL_yaml_default, "!push!",
+				 "tag:tarantool.io/push,2018");
+	if (rc == 2) {
+		/*
+		 * Nil and error object are pushed onto the stack.
+		 */
+		assert(lua_isnil(L, -2));
+		assert(lua_isstring(L, -1));
+		diag_set(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+		return NULL;
+	}
+	assert(rc == 1);
+	assert(lua_isstring(L, -1));
+	size_t len;
+	const char *result = lua_tolstring(L, -1, &len);
+	*size = (uint32_t) len;
+	return result;
+}
+
+/**
+ * Push a tagged YAML document into a console socket.
+ * @param session Console session.
+ * @param port Port with YAML to push.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+static int
+console_session_push(struct session *session, struct port *port)
+{
+	assert(session_vtab_registry[session->type].push ==
+	       console_session_push);
+	uint32_t text_len;
+	const char *text = port_dump_plain(port, &text_len);
+	if (text == NULL)
+		return -1;
+	return coio_write_fd_timeout(session_fd(session), text, text_len,
+				     TIMEOUT_INFINITY);
+}
+
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
@@ -400,7 +456,7 @@ tarantool_lua_console_init(struct lua_State *L)
 	 */
 	lua_setfield(L, -2, "formatter");
 	struct session_vtab console_session_vtab = {
-		/* .push = */ generic_session_push,
+		/* .push = */ console_session_push,
 		/* .fd = */ console_session_fd,
 		/* .sync = */ generic_session_sync,
 	};

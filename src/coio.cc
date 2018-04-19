@@ -731,3 +731,31 @@ int coio_close(int fd)
 	ev_io_closing(loop(), fd, EV_CUSTOM);
 	return close(fd);
 }
+
+int
+coio_write_fd_timeout(int fd, const void *data, size_t size, ev_tstamp timeout)
+{
+	ev_loop *loop = loop();
+	ev_tstamp start, delay;
+	evio_timeout_init(loop, &start, &delay, timeout);
+	while (size > 0) {
+		ssize_t rc = write(fd, data, size);
+		if (rc >= 0) {
+			size -= (size_t) rc;
+			data = (char *) data + rc;
+			continue;
+		}
+		if (delay <= 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			coio_wait(fd, COIO_WRITE, delay);
+			evio_timeout_update(loop, start, &delay);
+		} else if (errno != EINTR) {
+			diag_set(SocketError, sio_socketname(fd), "write");
+			return -1;
+		}
+	}
+	return 0;
+}

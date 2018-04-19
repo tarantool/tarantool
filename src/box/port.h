@@ -78,6 +78,11 @@ struct port_vtab {
 	 */
 	int (*dump_msgpack_16)(struct port *port, struct obuf *out);
 	/**
+	 * Dump a port content as a plain text into a buffer,
+	 * allocated inside.
+	 */
+	const char *(*dump_plain)(struct port *port, uint32_t *size);
+	/**
 	 * Destroy a port and release associated resources.
 	 */
 	void (*destroy)(struct port *port);
@@ -178,6 +183,18 @@ port_dump_msgpack(struct port *port, struct obuf *out);
  */
 int
 port_dump_msgpack_16(struct port *port, struct obuf *out);
+
+/**
+ * Dump a port content as a plain text into a buffer,
+ * allocated inside.
+ * @param port Port with data to dump.
+ * @param[out] size Length of a result plain text.
+ *
+ * @retval nil Error.
+ * @retval not nil Plain text.
+ */
+const char *
+port_dump_plain(struct port *port, uint32_t *size);
 
 void
 port_init(void);

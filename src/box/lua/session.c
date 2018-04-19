@@ -41,6 +41,7 @@
 #include "box/session.h"
 #include "box/user.h"
 #include "box/schema.h"
+#include "box/port.h"
 
 static const char *sessionlib_name = "box.session";
 
@@ -367,8 +368,9 @@ lbox_session_push(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		return luaL_error(L, "Usage: box.session.push(data)");
-
-	if (session_push(current_session(), NULL) != 0) {
+	struct port port;
+	port_lua_create(&port, L);
+	if (session_push(current_session(), &port) != 0) {
 		lua_pushnil(L);
 		luaT_pusherror(L, box_error_last());
 		return 2;
