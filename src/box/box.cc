@@ -1267,7 +1267,7 @@ box_on_join(const tt_uuid *instance_uuid)
 }
 
 void
-box_process_auth(struct auth_request *request)
+box_process_auth(struct auth_request *request, const char *salt)
 {
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 
@@ -1277,7 +1277,7 @@ box_process_auth(struct auth_request *request)
 
 	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
-	authenticate(user, len, request->scramble);
+	authenticate(user, len, salt, request->scramble);
 }
 
 void

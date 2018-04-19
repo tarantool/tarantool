@@ -47,8 +47,6 @@ session_init();
 void
 session_free();
 
-enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
-
 enum session_type {
 	SESSION_TYPE_BACKGROUND = 0,
 	SESSION_TYPE_BINARY,
@@ -86,8 +84,6 @@ struct session {
 	 */
 	uint64_t sync;
 	enum session_type type;
-	/** Authentication salt. */
-	char salt[SESSION_SEED_SIZE];
 	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */

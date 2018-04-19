@@ -48,6 +48,7 @@
 #include "coio.h"
 #include "scoped_guard.h"
 #include "memory.h"
+#include "random.h"
 
 #include "port.h"
 #include "box.h"
@@ -62,6 +63,8 @@
 #include "errinj.h"
 #include "applier.h"
 #include "cfg.h"
+
+enum { IPROTO_SALT_SIZE = 32 };
 
 /**
  * Network readahead. A signed integer to avoid
@@ -362,6 +365,8 @@ struct iproto_connection
 		/** Pointer to the current output buffer. */
 		struct obuf *p_obuf;
 	} tx;
+	/** Authentication salt. */
+	char salt[IPROTO_SALT_SIZE];
 };
 
 static struct mempool iproto_connection_pool;
@@ -1421,9 +1426,10 @@ static void
 tx_process_misc(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	struct obuf *out = msg->connection->tx.p_obuf;
+	struct iproto_connection *con = msg->connection;
+	struct obuf *out = con->tx.p_obuf;
 
-	tx_fiber_init(msg->connection->session, msg->header.sync);
+	tx_fiber_init(con->session, msg->header.sync);
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
@@ -1431,7 +1437,7 @@ tx_process_misc(struct cmsg *m)
 	try {
 		switch (msg->header.type) {
 		case IPROTO_AUTH:
-			box_process_auth(&msg->auth);
+			box_process_auth(&msg->auth, con->salt);
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
@@ -1584,8 +1590,9 @@ tx_process_connect(struct cmsg *m)
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
 		struct tt_uuid uuid = INSTANCE_UUID;
-		greeting_encode(greeting, tarantool_version_id(),
-				&uuid, con->session->salt, SESSION_SEED_SIZE);
+		random_bytes(con->salt, IPROTO_SALT_SIZE);
+		greeting_encode(greeting, tarantool_version_id(), &uuid,
+				con->salt, IPROTO_SALT_SIZE);
 		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);
 		if (! rlist_empty(&session_on_connect)) {
 			if (session_run_on_connect_triggers(con->session) != 0)

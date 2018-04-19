@@ -33,7 +33,6 @@
 #include "memory.h"
 #include "assoc.h"
 #include "trigger.h"
-#include "random.h"
 #include "user.h"
 #include "error.h"
 
@@ -96,8 +95,6 @@ session_create(int fd, enum session_type type)
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user->auth_token,
 			 guest_user->def->uid);
-	if (fd >= 0)
-		random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i64ptr_node_t node;
 	node.key = session->id;
 	node.val = session;
