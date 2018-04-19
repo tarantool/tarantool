@@ -70,12 +70,12 @@ struct port_vtab {
 	 * On success returns number of entries dumped.
 	 * On failure sets diag and returns -1.
 	 */
-	int (*dump)(struct port *port, struct obuf *out);
+	int (*dump_msgpack)(struct port *port, struct obuf *out);
 	/**
-	 * Same as dump(), but use the legacy Tarantool 1.6
-	 * format.
+	 * Same as dump_msgpack(), but use the legacy Tarantool
+	 * 1.6 format.
 	 */
-	int (*dump_16)(struct port *port, struct obuf *out);
+	int (*dump_msgpack_16)(struct port *port, struct obuf *out);
 	/**
 	 * Destroy a port and release associated resources.
 	 */
@@ -149,14 +149,14 @@ port_destroy(struct port *port);
  * Return number of entries dumped on success, -1 on error.
  */
 int
-port_dump(struct port *port, struct obuf *out);
+port_dump_msgpack(struct port *port, struct obuf *out);
 
 /**
  * Same as port_dump(), but use the legacy Tarantool 1.6
  * format.
  */
 int
-port_dump_16(struct port *port, struct obuf *out);
+port_dump_msgpack_16(struct port *port, struct obuf *out);
 
 void
 port_init(void);

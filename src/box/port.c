@@ -96,7 +96,7 @@ port_tuple_destroy(struct port *base)
 }
 
 static int
-port_tuple_dump_16(struct port *base, struct obuf *out)
+port_tuple_dump_msgpack_16(struct port *base, struct obuf *out)
 {
 	struct port_tuple *port = port_tuple(base);
 	struct port_tuple_entry *pe;
@@ -113,14 +113,14 @@ port_tuple_dump_16(struct port *base, struct obuf *out)
 }
 
 static int
-port_tuple_dump(struct port *base, struct obuf *out)
+port_tuple_dump_msgpack(struct port *base, struct obuf *out)
 {
 	struct port_tuple *port = port_tuple(base);
 	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
 	if (size_buf == NULL)
 		return -1;
 	mp_encode_array(size_buf, port->size);
-	if (port_tuple_dump_16(base, out) < 0)
+	if (port_tuple_dump_msgpack_16(base, out) < 0)
 		return -1;
 	return 1;
 }
@@ -132,15 +132,15 @@ port_destroy(struct port *port)
 }
 
 int
-port_dump(struct port *port, struct obuf *out)
+port_dump_msgpack(struct port *port, struct obuf *out)
 {
-	return port->vtab->dump(port, out);
+	return port->vtab->dump_msgpack(port, out);
 }
 
 int
-port_dump_16(struct port *port, struct obuf *out)
+port_dump_msgpack_16(struct port *port, struct obuf *out)
 {
-	return port->vtab->dump_16(port, out);
+	return port->vtab->dump_msgpack_16(port, out);
 }
 
 void
@@ -157,7 +157,7 @@ port_free(void)
 }
 
 const struct port_vtab port_tuple_vtab = {
-	.dump = port_tuple_dump,
-	.dump_16 = port_tuple_dump_16,
+	.dump_msgpack = port_tuple_dump_msgpack,
+	.dump_msgpack_16 = port_tuple_dump_msgpack_16,
 	.destroy = port_tuple_destroy,
 };
