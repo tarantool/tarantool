@@ -4833,7 +4833,7 @@ case OP_RenameTable: {
 	sqlite3DbFree(db, (void*)zSqlStmt);
 	break;
 }
-#if !defined(SQLITE_OMIT_ANALYZE)
+
 /* Opcode: LoadAnalysis P1 * * * *
  *
  * Read the sql_stat1 table for database P1 and load the content
@@ -4842,11 +4842,10 @@ case OP_RenameTable: {
  */
 case OP_LoadAnalysis: {
 	assert(pOp->p1==0 );
-	rc = sqlite3AnalysisLoad(db);
+	rc = sql_analysis_load(db);
 	if (rc) goto abort_due_to_error;
 	break;
 }
-#endif /* !defined(SQLITE_OMIT_ANALYZE) */
 
 /* Opcode: DropTable P1 * * P4 *
  *

@@ -1460,7 +1460,6 @@ typedef struct FuncDef FuncDef;
 typedef struct FuncDefHash FuncDefHash;
 typedef struct IdList IdList;
 typedef struct Index Index;
-typedef struct IndexSample IndexSample;
 typedef struct KeyClass KeyClass;
 typedef struct Lookaside Lookaside;
 typedef struct LookasideSlot LookasideSlot;
@@ -1681,7 +1680,6 @@ struct sqlite3 {
 #define SQLITE_SubqCoroutine  0x0100	/* Evaluate subqueries as coroutines */
 #define SQLITE_Transitive     0x0200	/* Transitive constraints */
 #define SQLITE_OmitNoopJoin   0x0400	/* Omit unused tables in joins */
-#define SQLITE_Stat4          0x0800	/* Use STAT4 data */
 #define SQLITE_CursorHints    0x2000	/* Add OP_CursorHint opcodes */
 #define SQLITE_AllOpts        0xffff	/* All optimizations */
 
@@ -2139,14 +2137,29 @@ struct Index {
 				 * or _NONE
 				 */
 	unsigned idxType:2;	/* 1==UNIQUE, 2==PRIMARY KEY, 0==CREATE INDEX */
-	unsigned bUnordered:1;	/* Use this index for == or IN queries only */
-	unsigned noSkipScan:1;	/* Do not try to use skip-scan if true */
-	int nSample;		/* Number of elements in aSample[] */
-	int nSampleCol;		/* Size of IndexSample.anEq[] and so on */
-	tRowcnt *aAvgEq;	/* Average nEq values for keys not in aSample */
-	IndexSample *aSample;	/* Samples of the left-most key */
-	tRowcnt *aiRowEst;	/* Non-logarithmic stat1 data for this index */
 };
+
+/**
+ * Fetch statistics concerning tuples to be selected:
+ * logarithm of number of tuples which has the same key as for
+ * the first key parts specified by second argument.
+ * Simple example (without logarithms):
+ * idx = {{1,2}, {1,2}, {2, 4}, {2, 3}, {3, 5}}
+ * stat[1] = (2 + 2 + 1) / 3 = 2 - two keys which start from 1,
+ * two - from 2, and one from 3.
+ * stat[2] = (2 + 1 + 1 + 1) / 4 = 1 - only one coincidence of
+ * keys: {1, 2}; the rest are different.
+ * Notice, that stat[0] is an average number of tuples in a whole
+ * index. By default it is DEFAULT_TUPLE_LOG_COUNT == 200.
+ * If there is no appropriate Tarantool's index,
+ * return one of default values.
+ *
+ * @param idx Index.
+ * @param field Number of field to be examined.
+ * @retval Estimate logarithm of tuples selected by given field.
+ */
+log_est_t
+index_field_tuple_est(struct Index *idx, uint32_t field);
 
 /*
  * Allowed values for Index.idxType
@@ -2167,19 +2180,9 @@ struct Index {
  */
 #define XN_EXPR      (-2)	/* Indexed column is an expression */
 
-/*
- * Each sample stored in the sql_stat4 table is represented in memory
- * using a structure of this type.  See documentation at the top of the
- * analyze.c source file for additional information.
- */
-struct IndexSample {
-	void *p;		/* Pointer to sampled record */
-	int n;			/* Size of record in bytes */
-	tRowcnt *anEq;		/* Est. number of rows where the key equals this sample */
-	tRowcnt *anLt;		/* Est. number of rows where key is less than this sample */
-	tRowcnt *anDLt;		/* Est. number of distinct keys less than this sample */
-};
-
+#ifdef DEFAULT_TUPLE_COUNT
+#undef DEFAULT_TUPLE_COUNT
+#endif
 #define DEFAULT_TUPLE_COUNT 1048576
 /** [10*log_{2}(1048576)] == 200 */
 #define DEFAULT_TUPLE_LOG_COUNT 200
@@ -4010,9 +4013,19 @@ ssize_t
 sql_index_tuple_size(struct space *space, struct index *idx);
 
 int sqlite3InvokeBusyHandler(BusyHandler *);
-int sqlite3AnalysisLoad(sqlite3 *);
-void sqlite3DeleteIndexSamples(sqlite3 *, Index *);
-void sqlite3DefaultRowEst(Index *);
+
+/**
+ * Load the content of the _sql_stat1 and sql_stat4 tables. The
+ * contents of _sql_stat1 are used to populate the tuple_stat1[]
+ * arrays. The contents of sql_stat4 are used to populate the
+ * samples[] arrays.
+ *
+ * @param db Database handler.
+ * @retval SQLITE_OK on success, smth else otherwise.
+ */
+int
+sql_analysis_load(struct sqlite3 *db);
+
 uint32_t
 index_column_count(const Index *);
 bool

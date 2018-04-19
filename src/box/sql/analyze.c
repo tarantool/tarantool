@@ -104,8 +104,8 @@
  * large nEq values.
  *
  */
-#ifndef SQLITE_OMIT_ANALYZE
 
+#include "box/box.h"
 #include "box/index.h"
 #include "box/key_def.h"
 #include "box/tuple_compare.h"
@@ -550,7 +550,7 @@ samplePushPrevious(Stat4Accum * p, int iChng)
 {
 	int i;
 	/* Check if any samples from the aBest[] array should be pushed
-	 * into IndexSample.a[] at this point.
+	 * into samples array at this point.
 	 */
 	for (i = (p->nCol - 1); i >= iChng; i--) {
 		Stat4Sample *pBest = &p->aBest[i];
@@ -1204,430 +1204,452 @@ sql_index_tuple_size(struct space *space, struct index *idx)
 	return avg_tuple_size;
 }
 
-/*
- * Used to pass information from the analyzer reader through to the
- * callback routine.
+/**
+ * Used to pass information from the analyzer reader through
+ * to the callback routine.
  */
-typedef struct analysisInfo analysisInfo;
-struct analysisInfo {
+struct analysis_index_info {
+	/** Database handler. */
 	sqlite3 *db;
+	/*** Array of statistics for each index. */
+	struct index_stat *stats;
+	/** Ordinal number of index to be processed. */
+	uint32_t index_count;
 };
 
-/*
- * The first argument points to a nul-terminated string containing a
- * list of space separated integers. Read the first nOut of these into
- * the array aOut[].
+/**
+ * The first argument points to a nul-terminated string
+ * containing a list of space separated integers. Load
+ * the first stat_size of these into the output arrays.
+ *
+ * @param stat_string String containing array of integers.
+ * @param stat_size Size of output arrays.
+ * @param[out] stat_exact Decoded array of statistics.
+ * @param[out] stat_log Decoded array of stat logariphms.
  */
 static void
-decodeIntArray(char *zIntArray,	/* String containing int array to decode */
-	       int nOut,	/* Number of slots in aOut[] */
-	       tRowcnt * aOut,	/* Store integers here */
-	       LogEst * aLog,	/* Or, if aOut==0, here */
-	       Index * pIndex	/* Handle extra flags for this index, if not NULL */
-    )
-{
-	char *z = zIntArray;
-	int c;
-	int i;
-	tRowcnt v;
-
-	if (z == 0)
+decode_stat_string(const char *stat_string, int stat_size, tRowcnt *stat_exact,
+		   LogEst *stat_log) {
+	const char *z = stat_string;
+	if (z == NULL)
 		z = "";
-
-	for (i = 0; *z && i < nOut; i++) {
-		v = 0;
+	for (int i = 0; *z && i < stat_size; i++) {
+		tRowcnt v = 0;
+		int c;
 		while ((c = z[0]) >= '0' && c <= '9') {
 			v = v * 10 + c - '0';
 			z++;
 		}
-		if (aOut)
-			aOut[i] = v;
-		if (aLog)
-			aLog[i] = sqlite3LogEst(v);
+		if (stat_exact != NULL)
+			stat_exact[i] = v;
+		if (stat_log != NULL)
+			stat_log[i] = sqlite3LogEst(v);
 		if (*z == ' ')
 			z++;
 	}
-
-	if (pIndex) {
-		pIndex->bUnordered = 0;
-		pIndex->noSkipScan = 0;
-		while (z[0]) {
-			if (sqlite3_strglob("unordered*", z) == 0) {
-				pIndex->bUnordered = 1;
-			} else if (sqlite3_strglob("noskipscan*", z) == 0) {
-				pIndex->noSkipScan = 1;
-			}
-			while (z[0] != 0 && z[0] != ' ')
-				z++;
-			while (z[0] == ' ')
-				z++;
-		}
-	}
 }
 
-/*
+/**
  * This callback is invoked once for each index when reading the
  * _sql_stat1 table.
  *
  *     argv[0] = name of the table
  *     argv[1] = name of the index (might be NULL)
- *     argv[2] = results of analysis - on integer for each column
+ *     argv[2] = results of analysis - array of integers
  *
- * Entries for which argv[1]==NULL simply record the number of rows in
- * the table.
+ * Entries for which argv[1]==NULL simply record the number
+ * of rows in the table. This routine also allocates memory
+ * for stat struct itself and statistics which are not related
+ * to stat4 samples.
+ *
+ * @param data Additional analysis info.
+ * @param argc Number of arguments.
+ * @param argv Callback arguments.
+ * @retval 0 on success, -1 otherwise.
  */
 static int
-analysisLoader(void *pData, int argc, char **argv, char **NotUsed)
+analysis_loader(void *data, int argc, char **argv, char **unused)
 {
-	analysisInfo *pInfo = (analysisInfo *) pData;
-	Index *pIndex;
-	Table *pTable;
-	const char *z;
-
 	assert(argc == 3);
-	UNUSED_PARAMETER2(NotUsed, argc);
-
-	if (argv == 0 || argv[0] == 0 || argv[2] == 0) {
+	UNUSED_PARAMETER2(unused, argc);
+	if (argv == 0 || argv[0] == 0 || argv[2] == 0)
 		return 0;
-	}
-	pTable = sqlite3HashFind(&pInfo->db->pSchema->tblHash, argv[0]);
-	if (pTable == NULL)
-		return 0;
-	if (argv[1] == 0) {
-		pIndex = 0;
-	} else if (sqlite3_stricmp(argv[0], argv[1]) == 0) {
-		pIndex = sqlite3PrimaryKeyIndex(pTable);
+	struct analysis_index_info *info = (struct analysis_index_info *) data;
+	assert(info->stats != NULL);
+	struct index_stat *stat = &info->stats[info->index_count++];
+	uint32_t space_id = box_space_id_by_name(argv[0], strlen(argv[0]));
+	if (space_id == BOX_ID_NIL)
+		return -1;
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	struct index *index;
+	uint32_t iid = box_index_id_by_name(space_id, argv[1], strlen(argv[1]));
+	/*
+	 * Convention is if index's name matches with space's
+	 * one, then it is primary index.
+	 */
+	if (iid != BOX_ID_NIL) {
+		index = space_index(space, iid);
 	} else {
-		pIndex = sqlite3HashFind(&pTable->idxHash, argv[1]);
+		if (sqlite3_stricmp(argv[0], argv[1]) != 0)
+			return -1;
+		index = space_index(space, 0);
 	}
-	z = argv[2];
-
-	if (pIndex) {
-		tRowcnt *aiRowEst = 0;
-		int nCol = index_column_count(pIndex) + 1;
-		/* Index.aiRowEst may already be set here if there are duplicate
-		 * _sql_stat1 entries for this index. In that case just clobber
-		 * the old data with the new instead of allocating a new array.
-		 */
-		if (pIndex->aiRowEst == 0) {
-			pIndex->aiRowEst =
-			    (tRowcnt *) sqlite3MallocZero(sizeof(tRowcnt) *
-							  nCol);
-			if (pIndex->aiRowEst == 0)
-				sqlite3OomFault(pInfo->db);
+	assert(index != NULL);
+	/*
+	 * Additional field is used to describe total
+	 * count of tuples in index. Although now all
+	 * indexes feature the same number of tuples,
+	 * partial indexes are going to be implemented
+	 * someday.
+	 */
+	uint32_t column_count = index->def->key_def->part_count + 1;
+	/*
+	 * Stat arrays may already be set here if there
+	 * are duplicate _sql_stat1 entries for this
+	 * index. In that case just clobber the old data
+	 * with the new instead of allocating a new array.
+	 */
+	uint32_t stat1_size = column_count * sizeof(uint32_t);
+	stat->tuple_stat1 = region_alloc(&fiber()->gc, stat1_size);
+	if (stat->tuple_stat1 == NULL) {
+		diag_set(OutOfMemory, stat1_size, "region", "tuple_stat1");
+		return -1;
+	}
+	stat->tuple_log_est = region_alloc(&fiber()->gc, stat1_size);
+	if (stat->tuple_log_est == NULL) {
+		diag_set(OutOfMemory, stat1_size, "region", "tuple_log_est");
+		return -1;
+	}
+	decode_stat_string(argv[2], column_count, stat->tuple_stat1,
+			   stat->tuple_log_est);
+	stat->is_unordered = false;
+	stat->skip_scan_enabled = true;
+	char *z = argv[2];
+	/* Position ptr at the end of stat string. */
+	for (; *z == ' ' || (*z >= '0' && *z <= '9'); ++z);
+	while (z[0]) {
+		if (sqlite3_strglob("unordered*", z) == 0) {
+			index->def->opts.stat->is_unordered = true;
+		} else if (sqlite3_strglob("noskipscan*", z) == 0) {
+			index->def->opts.stat->skip_scan_enabled = false;
 		}
-		aiRowEst = pIndex->aiRowEst;
-		pIndex->bUnordered = 0;
-		decodeIntArray((char *)z, nCol, aiRowEst, pIndex->aiRowLogEst,
-			       pIndex);
+		while (z[0] != 0 && z[0] != ' ')
+			z++;
+		while (z[0] == ' ')
+			z++;
 	}
-
 	return 0;
 }
 
-/*
- * If the Index.aSample variable is not NULL, delete the aSample[] array
- * and its contents.
- */
-void
-sqlite3DeleteIndexSamples(sqlite3 * db, Index * pIdx)
-{
-	if (pIdx->aSample) {
-		int j;
-		for (j = 0; j < pIdx->nSample; j++) {
-			IndexSample *p = &pIdx->aSample[j];
-			sqlite3DbFree(db, p->p);
-		}
-		sqlite3DbFree(db, pIdx->aSample);
-	}
-	if (db && db->pnBytesFreed == 0) {
-		pIdx->nSample = 0;
-		pIdx->aSample = 0;
-	}
-}
-
-/*
- * Populate the pIdx->aAvgEq[] array based on the samples currently
- * stored in pIdx->aSample[].
+/**
+ * Calculate avg_eq array based on the samples from index.
+ * Some *magic* calculations happen here.
  */
 static void
-initAvgEq(Index * pIdx)
+init_avg_eq(struct index *index, struct index_stat *stat)
 {
-	if (pIdx) {
-		IndexSample *aSample = pIdx->aSample;
-		IndexSample *pFinal = &aSample[pIdx->nSample - 1];
-		int iCol;
-		int nCol = 1;
-		if (pIdx->nSampleCol > 1) {
-			/* If this is stat4 data, then calculate aAvgEq[] values for all
-			 * sample columns except the last. The last is always set to 1, as
-			 * once the trailing PK fields are considered all index keys are
-			 * unique.
-			 */
-			nCol = pIdx->nSampleCol - 1;
-			pIdx->aAvgEq[nCol] = 1;
+	assert(stat != NULL);
+	struct index_sample *samples = stat->samples;
+	uint32_t sample_count = stat->sample_count;
+	uint32_t field_count = stat->sample_field_count;
+	struct index_sample *last_sample = &samples[sample_count - 1];
+	if (field_count > 1)
+		stat->avg_eq[--field_count] = 1;
+	for (uint32_t i = 0; i < field_count; ++i) {
+		uint32_t column_count = index->def->key_def->part_count;
+		tRowcnt eq_sum = 0;
+		tRowcnt eq_avg = 0;
+		uint32_t tuple_count = index->vtab->size(index);
+		uint64_t distinct_tuple_count;
+		uint64_t terms_sum = 0;
+		if (i >= column_count || stat->tuple_stat1[i + 1] == 0) {
+			distinct_tuple_count = 100 * last_sample->dlt[i];
+			sample_count--;
+		} else {
+			assert(stat->tuple_stat1 != NULL);
+			distinct_tuple_count = (100 * tuple_count) /
+				stat->tuple_stat1[i + 1];
 		}
-		for (iCol = 0; iCol < nCol; iCol++) {
-			int nSample = pIdx->nSample;
-			int i;	/* Used to iterate through samples */
-			tRowcnt sumEq = 0;	/* Sum of the nEq values */
-			tRowcnt avgEq = 0;
-			tRowcnt nRow;	/* Number of rows in index */
-			i64 nSum100 = 0;	/* Number of terms contributing to sumEq */
-			i64 nDist100;	/* Number of distinct values in index */
-			int nColumn = index_column_count(pIdx);
-
-			if (!pIdx->aiRowEst || iCol >= nColumn
-			    || pIdx->aiRowEst[iCol + 1] == 0) {
-				nRow = pFinal->anLt[iCol];
-				nDist100 = (i64) 100 *pFinal->anDLt[iCol];
-				nSample--;
-			} else {
-				nRow = pIdx->aiRowEst[0];
-				nDist100 =
-				    ((i64) 100 * pIdx->aiRowEst[0]) /
-				    pIdx->aiRowEst[iCol + 1];
+		for (uint32_t j = 0; j < sample_count; ++j) {
+			if (j == (stat->sample_count - 1) ||
+			    samples[j].dlt[i] != samples[j + 1].dlt[i]) {
+				eq_sum += samples[j].eq[i];
+				terms_sum += 100;
 			}
-
-			/* Set nSum to the number of distinct (iCol+1) field prefixes that
-			 * occur in the stat4 table for this index. Set sumEq to the sum of
-			 * the nEq values for column iCol for the same set (adding the value
-			 * only once where there exist duplicate prefixes).
-			 */
-			for (i = 0; i < nSample; i++) {
-				if (i == (pIdx->nSample - 1)
-				    || aSample[i].anDLt[iCol] !=
-				    aSample[i + 1].anDLt[iCol]
-				    ) {
-					sumEq += aSample[i].anEq[iCol];
-					nSum100 += 100;
-				}
-			}
-
-			if (nDist100 > nSum100) {
-				avgEq =
-				    ((i64) 100 * (nRow - sumEq)) / (nDist100 -
-								    nSum100);
-			}
-			if (avgEq == 0)
-				avgEq = 1;
-			pIdx->aAvgEq[iCol] = avgEq;
 		}
+		if (distinct_tuple_count > terms_sum) {
+			eq_avg = 100 * (tuple_count - eq_sum) /
+				(distinct_tuple_count - terms_sum);
+		}
+		if (eq_avg == 0)
+			eq_avg = 1;
+		stat->avg_eq[i] = eq_avg;
 	}
 }
 
-/*
- * Given two IndexSample arguments, compare there payloads
+/**
+ * Given two key arguments, compare there payloads.
+ * This is a simple wrapper around key_compare() to support
+ * qsort() interface.
  */
 static int
-sampleCompareMsgPack(const void *a, const void *b, void *arg)
+sample_compare(const void *a, const void *b, void *arg)
 {
 	struct key_def *def = (struct key_def *)arg;
-	return key_compare(((IndexSample *) a)->p, ((IndexSample *) b)->p, def);
+	return key_compare(((struct index_sample *) a)->sample_key,
+			   ((struct index_sample *) b)->sample_key, def);
 }
 
-/*
+/**
  * Load the content from the _sql_stat4 table
- * into the relevant Index.aSample[] arrays.
+ * into the relevant index->stat->samples[] arrays.
  *
- * Arguments zSql1 and zSql2 must point to SQL statements that return
- * data equivalent to the following (statements are different for stat4,
- * see the caller of this function for details):
+ * Arguments must point to SQL statements that return
+ * data equivalent to the following:
  *
- *    zSql1: SELECT tbl,idx,count(*) FROM _sql_stat4 GROUP BY tbl,idx
- *    zSql2: SELECT tbl,idx,neq,nlt,ndlt,sample FROM _sql_stat4
+ *    prepare: SELECT tbl,idx,count(*) FROM _sql_stat4 GROUP BY tbl,idx;
+ *    load: SELECT tbl,idx,neq,nlt,ndlt,sample FROM _sql_stat4;
  *
+ * 'prepare' statement is used to allocate enough memory for
+ * statistics (i.e. arrays lt, dt, dlt and avg_eq). 'load' query
+ * is needed for
+ *
+ * @param db Database handler.
+ * @param sql_select_prepare SELECT statement, see above.
+ * @param sql_select_load SELECT statement, see above.
+ * @param[out] stats Statistics is saved here.
+ * @retval 0 on success, -1 otherwise.
  */
 static int
-loadStatTbl(sqlite3 * db,	/* Database handle */
-	    Table * pStatTab,	/* Stat table to load to */
-	    const char *zSql1,	/* SQL statement 1 (see above) */
-	    const char *zSql2	/* SQL statement 2 (see above) */
-    )
+load_stat_from_space(struct sqlite3 *db, const char *sql_select_prepare,
+		     const char *sql_select_load, struct index_stat *stats)
 {
-	int rc;			/* Result codes from subroutines */
-	sqlite3_stmt *pStmt = 0;	/* An SQL statement being run */
-	Index *pPrevIdx = 0;	/* Previous index in the loop */
-	IndexSample *pSample;	/* A slot in pIdx->aSample[] */
-	int nIdxCnt = 0;	/* Number of different indexes visited */
-	int nIdx = 0;		/* Index loop iterator */
-	Index **aIndex = 0;	/* Array holding all visited indexes */
-
-	assert(db->lookaside.bDisable);
-
-	assert(pStatTab);
-	nIdxCnt = box_index_len(SQLITE_PAGENO_TO_SPACEID(pStatTab->tnum), 0);
-
-	if (nIdxCnt > 0) {
-		aIndex = sqlite3DbMallocZero(db, sizeof(Index *) * nIdxCnt);
-		if (aIndex == 0) {
-			return SQLITE_NOMEM_BKPT;
+	struct index **indexes = NULL;
+	uint32_t index_count = box_index_len(BOX_SQL_STAT4_ID, 0);
+	if (index_count > 0) {
+		size_t alloc_size = sizeof(struct index *) * index_count;
+		indexes = region_alloc(&fiber()->gc, alloc_size);
+		if (indexes == NULL) {
+			diag_set(OutOfMemory, alloc_size, "region", "indexes");
+			return -1;
 		}
 	}
-
-	rc = sqlite3_prepare(db, zSql1, -1, &pStmt, 0);
+	sqlite3_stmt *stmt = NULL;
+	int rc = sqlite3_prepare(db, sql_select_prepare, -1, &stmt, 0);
 	if (rc)
 		goto finalize;
-
-	while (sqlite3_step(pStmt) == SQLITE_ROW) {
-		int nIdxCol = 1;	/* Number of columns in stat4 records */
-
-		char *zTab;	/* Table name */
-		char *zIndex;	/* Index name */
-		Index *pIdx;	/* Pointer to the index object */
-		int nSample;	/* Number of samples */
-		int nByte;	/* Bytes of space required */
-		int i;		/* Bytes of space required */
-		tRowcnt *pSpace;
-
-		zTab = (char *)sqlite3_column_text(pStmt, 0);
-		if (zTab == 0)
+	uint32_t current_idx_count = 0;
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		const char *space_name = (char *)sqlite3_column_text(stmt, 0);
+		if (space_name == NULL)
 			continue;
-		zIndex = (char *)sqlite3_column_text(pStmt, 1);
-		if (zIndex == 0)
+		const char *index_name = (char *)sqlite3_column_text(stmt, 1);
+		if (index_name == NULL)
 			continue;
-		nSample = sqlite3_column_int(pStmt, 2);
-		pIdx = sqlite3LocateIndex(db, zIndex, zTab);
-		assert(pIdx == 0 || pIdx->nSample == 0);
-		/* Index.nSample is non-zero at this point if data has already been
-		 * loaded from the stat4 table.
+		uint32_t sample_count = sqlite3_column_int(stmt, 2);
+		uint32_t space_id = box_space_id_by_name(space_name,
+							 strlen(space_name));
+		assert(space_id != BOX_ID_NIL);
+		struct space *space = space_by_id(space_id);
+		assert(space != NULL);
+		struct index *index;
+		uint32_t iid = box_index_id_by_name(space_id, index_name,
+						    strlen(index_name));
+		if (sqlite3_stricmp(space_name, index_name) == 0 &&
+		    iid == BOX_ID_NIL)
+			index = space_index(space, 0);
+		else
+			index = space_index(space, iid);
+		assert(index != NULL);
+		uint32_t column_count = index->def->key_def->part_count;
+		struct index_stat *stat = &stats[current_idx_count];
+		stat->sample_field_count = column_count;
+		stat->sample_count = 0;
+		/* Space for sample structs. */
+		size_t alloc_size = sizeof(struct index_sample) * sample_count;
+		/* Space for eq, lt and dlt stats. */
+		alloc_size += sizeof(tRowcnt) * column_count * 3 * sample_count;
+		/* Space for avg_eq statistics. */
+		alloc_size += column_count * sizeof(tRowcnt);
+		/*
+		 * We are trying to fit into one chunk samples,
+		 * eq_avg and arrays of eq, lt and dlt stats.
+		 * Firstly comes memory for structs of samples,
+		 * than array of eq_avg and finally arrays of
+		 * eq, lt and dlt stats.
 		 */
-		if (pIdx == 0 || pIdx->nSample)
-			continue;
-
-		nIdxCol = index_column_count(pIdx);
-		pIdx->nSampleCol = nIdxCol;
-		nByte = sizeof(IndexSample) * nSample;
-		nByte += sizeof(tRowcnt) * nIdxCol * 3 * nSample;
-		nByte += nIdxCol * sizeof(tRowcnt);	/* Space for Index.aAvgEq[] */
-
-		pIdx->aSample = sqlite3DbMallocZero(db, nByte);
-		if (pIdx->aSample == 0) {
-			sqlite3_finalize(pStmt);
-			rc = SQLITE_NOMEM_BKPT;
+		stat->samples = region_alloc(&fiber()->gc, alloc_size);
+		if (stat->samples == NULL) {
+			diag_set(OutOfMemory, alloc_size, "region", "samples");
+			rc = -1;
 			goto finalize;
 		}
-		pSpace = (tRowcnt *) & pIdx->aSample[nSample];
-		pIdx->aAvgEq = pSpace;
-		pSpace += nIdxCol;
-		for (i = 0; i < nSample; i++) {
-			pIdx->aSample[i].anEq = pSpace;
-			pSpace += nIdxCol;
-			pIdx->aSample[i].anLt = pSpace;
-			pSpace += nIdxCol;
-			pIdx->aSample[i].anDLt = pSpace;
-			pSpace += nIdxCol;
+		memset(stat->samples, 0, alloc_size);
+		/* Marking memory manually. */
+		tRowcnt *pSpace = (tRowcnt *) & stat->samples[sample_count];
+		stat->avg_eq = pSpace;
+		pSpace += column_count;
+		for (uint32_t i = 0; i < sample_count; i++) {
+			stat->samples[i].eq = pSpace;
+			pSpace += column_count;
+			stat->samples[i].lt = pSpace;
+			pSpace += column_count;
+			stat->samples[i].dlt = pSpace;
+			pSpace += column_count;
 		}
-		assert(((u8 *) pSpace) - nByte == (u8 *) (pIdx->aSample));
+		assert(((u8 *) pSpace) - alloc_size == (u8 *) (stat->samples));
+		indexes[current_idx_count] = index;
+		assert(current_idx_count < index_count);
+		current_idx_count++;
 
-		aIndex[nIdx] = pIdx;
-		assert(nIdx < nIdxCnt);
-		++nIdx;
 	}
-	rc = sqlite3_finalize(pStmt);
+	rc = sqlite3_finalize(stmt);
 	if (rc)
 		goto finalize;
-
-	rc = sqlite3_prepare(db, zSql2, -1, &pStmt, 0);
+	rc = sqlite3_prepare(db, sql_select_load, -1, &stmt, 0);
 	if (rc)
 		goto finalize;
-
-	while (sqlite3_step(pStmt) == SQLITE_ROW) {
-		char *zTab;	/* Table name */
-		char *zIndex;	/* Index name */
-		Index *pIdx;	/* Pointer to the index object */
-		int nCol = 1;	/* Number of columns in index */
-
-		zTab = (char *)sqlite3_column_text(pStmt, 0);
-		if (zTab == 0)
+	struct index *prev_index = NULL;
+	current_idx_count = 0;
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		const char *space_name = (char *)sqlite3_column_text(stmt, 0);
+		if (space_name == NULL)
 			continue;
-		zIndex = (char *)sqlite3_column_text(pStmt, 1);
-		if (zIndex == 0)
+		const char *index_name = (char *)sqlite3_column_text(stmt, 1);
+		if (index_name == NULL)
 			continue;
-		pIdx = sqlite3LocateIndex(db, zIndex, zTab);
-		if (pIdx == 0)
-			continue;
-
-		nCol = pIdx->nSampleCol;
-		if (pIdx != pPrevIdx) {
-			initAvgEq(pPrevIdx);
-			pPrevIdx = pIdx;
+		uint32_t space_id = box_space_id_by_name(space_name,
+							 strlen(space_name));
+		assert(space_id != BOX_ID_NIL);
+		struct space *space = space_by_id(space_id);
+		assert(space != NULL);
+		struct index *index;
+		uint32_t iid = box_index_id_by_name(space_id, index_name,
+						    strlen(index_name));
+		if (iid != BOX_ID_NIL) {
+			index = space_index(space, iid);
+		} else {
+			if (sqlite3_stricmp(space_name, index_name) != 0)
+				return -1;
+			index = space_index(space, 0);
 		}
-		pSample = &pIdx->aSample[pIdx->nSample];
-		decodeIntArray((char *)sqlite3_column_text(pStmt, 2), nCol,
-			       pSample->anEq, 0, 0);
-		decodeIntArray((char *)sqlite3_column_text(pStmt, 3), nCol,
-			       pSample->anLt, 0, 0);
-		decodeIntArray((char *)sqlite3_column_text(pStmt, 4), nCol,
-			       pSample->anDLt, 0, 0);
-
-		/* Take a copy of the sample. Add two 0x00 bytes the end of the buffer.
-		 * This is in case the sample record is corrupted. In that case, the
-		 * sqlite3VdbeRecordCompare() may read up to two varints past the
-		 * end of the allocated buffer before it realizes it is dealing with
-		 * a corrupt record. Adding the two 0x00 bytes prevents this from causing
-		 * a buffer overread.
-		 */
-		pSample->n = sqlite3_column_bytes(pStmt, 5);
-		pSample->p = sqlite3DbMallocZero(db, pSample->n + 2);
-		if (pSample->p == 0) {
-			sqlite3_finalize(pStmt);
-			rc = SQLITE_NOMEM_BKPT;
+		assert(index != NULL);
+		uint32_t column_count = index->def->key_def->part_count;
+		if (index != prev_index) {
+			if (prev_index != NULL) {
+				init_avg_eq(prev_index,
+					    &stats[current_idx_count]);
+				current_idx_count++;
+			}
+			prev_index = index;
+		}
+		struct index_stat *stat = &stats[current_idx_count];
+		struct index_sample *sample =
+			&stat->samples[stats[current_idx_count].sample_count];
+		decode_stat_string((char *)sqlite3_column_text(stmt, 2),
+				   column_count, sample->eq, 0);
+		decode_stat_string((char *)sqlite3_column_text(stmt, 3),
+				   column_count, sample->lt, 0);
+		decode_stat_string((char *)sqlite3_column_text(stmt, 4),
+				   column_count, sample->dlt, 0);
+		/* Take a copy of the sample. */
+		sample->key_size = sqlite3_column_bytes(stmt, 5);
+		sample->sample_key = region_alloc(&fiber()->gc,
+						  sample->key_size);
+		if (sample->sample_key == NULL) {
+			sqlite3_finalize(stmt);
+			rc = -1;
+			diag_set(OutOfMemory, sample->key_size,
+				 "region", "sample_key");
 			goto finalize;
 		}
-		if (pSample->n) {
-			memcpy(pSample->p, sqlite3_column_blob(pStmt, 5),
-			       pSample->n);
+		if (sample->key_size > 0) {
+			memcpy(sample->sample_key,
+			       sqlite3_column_blob(stmt, 5),
+			       sample->key_size);
 		}
-		pIdx->nSample++;
+		stats[current_idx_count].sample_count++;
 	}
-	rc = sqlite3_finalize(pStmt);
-	if (rc == SQLITE_OK)
-		initAvgEq(pPrevIdx);
-
-	assert(nIdx <= nIdxCnt);
-	for (int i = 0; i < nIdx; ++i) {
-		Index *pIdx = aIndex[i];
-		assert(pIdx);
-		/*  - sid, iid
-		 *  - space_index_key_def
-		 *  - key_compare
-		 */
-		int sid = SQLITE_PAGENO_TO_SPACEID(pIdx->tnum);
-		int iid = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
-		struct space *s = space_by_id(sid);
-		assert(s);
-		struct key_def *def = space_index_key_def(s, iid);
-		assert(def);
-		qsort_arg(pIdx->aSample,
-			  pIdx->nSample,
-			  sizeof(pIdx->aSample[0]), sampleCompareMsgPack, def);
+	rc = sqlite3_finalize(stmt);
+	if (rc == SQLITE_OK && prev_index != NULL)
+		init_avg_eq(prev_index, &stats[current_idx_count]);
+	assert(current_idx_count <= index_count);
+	for (uint32_t i = 0; i < current_idx_count; ++i) {
+		struct index *index = indexes[i];
+		assert(index != NULL);
+		qsort_arg(stats[i].samples,
+			  stats[i].sample_count,
+			  sizeof(struct index_sample),
+			  sample_compare, index->def->key_def);
 	}
-
  finalize:
-	sqlite3DbFree(db, aIndex);
 	return rc;
 }
 
-/*
- * Load content from the _sql_stat4 table into
- * the Index.aSample[] arrays of all indices.
- */
 static int
-loadStat4(sqlite3 * db)
+load_stat_to_index(struct sqlite3 *db, const char *sql_select_load,
+		   struct index_stat **stats)
 {
-	Table *pTab = 0;	/* Pointer to stat table */
-
-	assert(db->lookaside.bDisable);
-	pTab = sqlite3HashFind(&db->pSchema->tblHash, "_sql_stat4");
-	/* _slq_stat4 is a system space, so it always exists. */
-	assert(pTab != NULL);
-	return loadStatTbl(db, pTab,
-			   "SELECT \"tbl\",\"idx\",count(*) FROM \"_sql_stat4\""
-			   " GROUP BY \"tbl\",\"idx\"",
-			   "SELECT \"tbl\",\"idx\",\"neq\",\"nlt\",\"ndlt\","
-			   "\"sample\" FROM \"_sql_stat4\"");
+	assert(stats != NULL && *stats != NULL);
+	struct sqlite3_stmt *stmt = NULL;
+	if (sqlite3_prepare(db, sql_select_load, -1, &stmt, 0) != 0)
+		return -1;
+	uint32_t current_idx_count = 0;
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		const char *space_name = (char *)sqlite3_column_text(stmt, 0);
+		if (space_name == NULL)
+			continue;
+		const char *index_name = (char *)sqlite3_column_text(stmt, 1);
+		if (index_name == NULL)
+			continue;
+		uint32_t space_id = box_space_id_by_name(space_name,
+							 strlen(space_name));
+		if (space_id == BOX_ID_NIL)
+			return -1;
+		struct space *space = space_by_id(space_id);
+		assert(space != NULL);
+		struct index *index;
+		uint32_t iid = box_index_id_by_name(space_id, index_name,
+						    strlen(index_name));
+		if (iid != BOX_ID_NIL) {
+			index = space_index(space, iid);
+		} else {
+			if (sqlite3_stricmp(space_name, index_name) != 0)
+				return -1;
+			index = space_index(space, 0);
+		}
+		assert(index != NULL);
+		free(index->def->opts.stat);
+		index->def->opts.stat = stats[current_idx_count++];
+	}
+	return 0;
 }
+
+/**
+ * default_tuple_est[] array contains default information
+ * which is used when we don't have real space, e.g. temporary
+ * objects representing result set of nested SELECT or VIEW.
+ *
+ * First number is supposed to contain the number of elements
+ * in the index. Since we do not know, guess 1 million.
+ * Second one is an estimate of the number of rows in the
+ * table that match any particular value of the first column of
+ * the index. Third one is an estimate of the number of
+ * rows that match any particular combination of the first 2
+ * columns of the index. And so on. It must always be true:
+ *
+ *           default_tuple_est[N] <= default_tuple_est[N-1]
+ *           default_tuple_est[N] >= 1
+ *
+ * Apart from that, we have little to go on besides intuition
+ * as to how default values should be initialized. The numbers
+ * generated here are based on typical values found in actual
+ * indices.
+ */
+const log_est_t default_tuple_est[] = {DEFAULT_TUPLE_LOG_COUNT,
+/**                  [10*log_{2}(x)]:  10, 9,  8,  7,  6,  5 */
+				       33, 32, 30, 28, 26, 23};
 
 LogEst
 sql_space_tuple_log_count(struct Table *tab)
@@ -1643,84 +1665,168 @@ sql_space_tuple_log_count(struct Table *tab)
 	return sqlite3LogEst(pk->vtab->size(pk));
 }
 
-/*
- * Load the content of the _sql_stat1 and sql_stat4 tables. The
- * contents of _sql_stat1 are used to populate the Index.aiRowEst[]
-*\* arrays. The contents of sql_stat4 are used to populate the
- * Index.aSample[] arrays.
- *
- * If the _sql_stat1 table is not present in the database, SQLITE_ERROR
- * is returned. In this case, even if the sql_stat4 table is present,
- * no data is read from it.
- *
- * If the _sql_stat4 table is not present in the database, SQLITE_ERROR
- * is returned. However, in this case, data is read from the _sql_stat1
- * table (if it is present) before returning.
- *
- * If an OOM error occurs, this function always sets db->mallocFailed.
- * This means if the caller does not care about other errors, the return
- * code may be ignored.
- */
-int
-sqlite3AnalysisLoad(sqlite3 * db)
+log_est_t
+index_field_tuple_est(struct Index *idx, uint32_t field)
 {
-	analysisInfo sInfo;
-	HashElem *i, *j;
-	char *zSql;
-	int rc = SQLITE_OK;
-
-	/* Clear any prior statistics */
-	for (j = sqliteHashFirst(&db->pSchema->tblHash); j;
-	     j = sqliteHashNext(j)) {
-		Table *pTab = sqliteHashData(j);
-		for (i = sqliteHashFirst(&pTab->idxHash); i;
-		     i = sqliteHashNext(i)) {
-			Index *pIdx = sqliteHashData(i);
-			pIdx->aiRowLogEst[0] = 0;
-			sqlite3DeleteIndexSamples(db, pIdx);
-			pIdx->aSample = 0;
-		}
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(idx->tnum));
+	if (space == NULL)
+		return idx->aiRowLogEst[field];
+	struct index *tnt_idx =
+		space_index(space, SQLITE_PAGENO_TO_INDEXID(idx->tnum));
+	assert(tnt_idx != NULL);
+	assert(field <= tnt_idx->def->key_def->part_count);
+	if (tnt_idx->def->opts.stat == NULL) {
+		/*
+		 * Last number for unique index is always 0:
+		 * only one tuple exists with given full key
+		 * in unique index and log(1) == 0.
+		 */
+		if (field == tnt_idx->def->key_def->part_count &&
+		    tnt_idx->def->opts.is_unique)
+			return 0;
+		return default_tuple_est[field + 1 >= 6 ? 6 : field];
 	}
-
-	/* Load new statistics out of the _sql_stat1 table */
-	sInfo.db = db;
-	zSql = "SELECT \"tbl\",\"idx\",\"stat\" FROM \"_sql_stat1\"";
-	rc = sqlite3_exec(db, zSql, analysisLoader, &sInfo, 0);
-
-	/* Set appropriate defaults on all indexes not in the _sql_stat1 table */
-	for (j = sqliteHashFirst(&db->pSchema->tblHash); j;
-	     j = sqliteHashNext(j)) {
-		Table *pTab = sqliteHashData(j);
-		for (i = sqliteHashFirst(&pTab->idxHash); i;
-		     i = sqliteHashNext(i)) {
-			Index *pIdx = sqliteHashData(i);
-			if (pIdx->aiRowLogEst[0] == 0)
-				sqlite3DefaultRowEst(pIdx);
-		}
-	}
-
-	/* Load the statistics from the _sql_stat4 table. */
-	if (rc == SQLITE_OK && OptimizationEnabled(db, SQLITE_Stat4)) {
-		db->lookaside.bDisable++;
-		rc = loadStat4(db);
-		db->lookaside.bDisable--;
-	}
-
-	for (j = sqliteHashFirst(&db->pSchema->tblHash); j;
-	     j = sqliteHashNext(j)) {
-		Table *pTab = sqliteHashData(j);
-		for (i = sqliteHashFirst(&pTab->idxHash); i;
-		     i = sqliteHashNext(i)) {
-			Index *pIdx = sqliteHashData(i);
-			sqlite3_free(pIdx->aiRowEst);
-			pIdx->aiRowEst = 0;
-		}
-	}
-
-	if (rc == SQLITE_NOMEM) {
-		sqlite3OomFault(db);
-	}
-	return rc;
+	return tnt_idx->def->opts.stat->tuple_log_est[field];
 }
 
-#endif				/* SQLITE_OMIT_ANALYZE */
+/**
+ * This function performs copy of statistics.
+ * In contrast to index_stat_dup(), there is no assumption
+ * that source statistics is allocated within chunk. But
+ * destination place is still one big chunk of heap memory.
+ * See also index_stat_sizeof() for understanding memory layout.
+ *
+ * @param dest One chunk of memory where statistics
+ *             will be placed.
+ * @param src Statistics to be copied.
+ */
+static void
+stat_copy(struct index_stat *dest, const struct index_stat *src)
+{
+	assert(dest != NULL);
+	assert(src != NULL);
+	dest->sample_count = src->sample_count;
+	dest->sample_field_count = src->sample_field_count;
+	dest->skip_scan_enabled = src->skip_scan_enabled;
+	dest->is_unordered = src->is_unordered;
+	uint32_t array_size = src->sample_field_count * sizeof(uint32_t);
+	uint32_t stat1_offset = sizeof(struct index_stat);
+	char *pos = (char *) dest + stat1_offset;
+	memcpy(pos, src->tuple_stat1, array_size + sizeof(uint32_t));
+	dest->tuple_stat1 = (uint32_t *) pos;
+	pos += array_size + sizeof(uint32_t);
+	memcpy(pos, src->tuple_log_est, array_size + sizeof(uint32_t));
+	dest->tuple_log_est = (log_est_t *) pos;
+	pos += array_size + sizeof(uint32_t);
+	memcpy(pos, src->avg_eq, array_size);
+	dest->avg_eq = (uint32_t *) pos;
+	pos += array_size;
+	dest->samples = (struct index_sample *) pos;
+	pos += dest->sample_count * sizeof(struct index_sample);
+	for (uint32_t i = 0; i < dest->sample_count; ++i) {
+		dest->samples[i].key_size = src->samples[i].key_size;
+		memcpy(pos, src->samples[i].eq, array_size);
+		dest->samples[i].eq = (uint32_t *) pos;
+		pos += array_size;
+		memcpy(pos, src->samples[i].lt, array_size);
+		dest->samples[i].lt = (uint32_t *) pos;
+		pos += array_size;
+		memcpy(pos, src->samples[i].dlt, array_size);
+		dest->samples[i].dlt = (uint32_t *) pos;
+		pos += array_size;
+		memcpy(pos, src->samples[i].sample_key,
+		       src->samples[i].key_size);
+		dest->samples[i].sample_key = pos;
+		pos += dest->samples[i].key_size;
+	}
+}
+
+int
+sql_analysis_load(struct sqlite3 *db)
+{
+	uint32_t index_count = box_index_len(BOX_SQL_STAT1_ID, 0);
+	if (box_txn_begin() != 0)
+		goto fail;
+	size_t stats_size = index_count * sizeof(struct index_stat);
+	struct index_stat *stats = region_alloc(&fiber()->gc, stats_size);
+	if (stats == NULL) {
+		diag_set(OutOfMemory, stats_size, "region", "stats");
+		goto fail;
+	}
+	memset(stats, 0, stats_size);
+	struct analysis_index_info info;
+	info.db = db;
+	info.stats = stats;
+	info.index_count = 0;
+	const char *load_stat1 =
+		"SELECT \"tbl\",\"idx\",\"stat\" FROM \"_sql_stat1\"";
+	/* Load new statistics out of the _sql_stat1 table. */
+	if (sqlite3_exec(db, load_stat1, analysis_loader, &info, 0) != 0)
+		goto fail;
+	if (info.index_count == 0) {
+		box_txn_commit();
+		return SQLITE_OK;
+	}
+	/*
+	 * This query is used to allocate enough memory for
+	 * statistics. Result rows are given in a form:
+	 * <table name>, <index name>, <count of samples>
+	 */
+	const char *init_query = "SELECT \"tbl\",\"idx\",count(*) FROM "
+				 "\"_sql_stat4\" GROUP BY \"tbl\",\"idx\"";
+	/* Query for loading statistics into in-memory structs. */
+	const char *load_query = "SELECT \"tbl\",\"idx\",\"neq\",\"nlt\","
+				 "\"ndlt\",\"sample\" FROM \"_sql_stat4\"";
+	/* Load the statistics from the _sql_stat4 table. */
+	if (load_stat_from_space(db, init_query, load_query, stats) != 0)
+		goto fail;
+	/*
+	 * Now we have complete statistics for each index
+	 * allocated on the region. Time to copy it on the heap.
+	 */
+	size_t heap_stats_size = info.index_count * sizeof(struct index_stat *);
+	struct index_stat **heap_stats = region_alloc(&fiber()->gc,
+						      heap_stats_size);
+	if (heap_stats == NULL) {
+		diag_set(OutOfMemory, heap_stats_size, "malloc", "heap_stats");
+		goto fail;
+	}
+	/*
+	 * We are using 'everything or nothing' policy:
+	 * if there is no enough memory for statistics even for
+	 * one index, then refresh it for no one.
+	 */
+	for (uint32_t i = 0; i < info.index_count; ++i) {
+		size_t size = index_stat_sizeof(stats[i].samples,
+						stats[i].sample_count,
+						stats[i].sample_field_count);
+		heap_stats[i] = malloc(size);
+		if (heap_stats[i] == NULL) {
+			diag_set(OutOfMemory, size, "malloc", "heap_stats");
+			for (uint32_t j = 0; j < i; ++j)
+				free(heap_stats[j]);
+			goto fail;
+		}
+	}
+	/*
+	 * We can't use stat_dup function since statistics on
+	 * region doesn't fit into one memory chunk. Lets
+	 * manually copy memory chunks and mark memory.
+	 */
+	for (uint32_t i = 0; i < info.index_count; ++i)
+		stat_copy(heap_stats[i], &stats[i]);
+	/*
+	 * Ordered query is needed to be sure that indexes come
+	 * in the same order as in previous SELECTs.
+	 */
+	const char *order_query = "SELECT \"tbl\",\"idx\" FROM "
+				  "\"_sql_stat4\" GROUP BY \"tbl\",\"idx\"";
+	if (load_stat_to_index(db, order_query, heap_stats) != 0)
+		goto fail;
+	if (box_txn_commit() != 0)
+		return SQL_TARANTOOL_ERROR;
+	return SQLITE_OK;
+fail:
+	box_txn_rollback();
+	return SQL_TARANTOOL_ERROR;
+}

@@ -186,11 +186,8 @@ sqlite3InitDatabase(sqlite3 * db)
 	assert(db->init.busy);
 	{
 		rc = initData.rc;
-#ifndef SQLITE_OMIT_ANALYZE
-		if (rc == SQLITE_OK) {
-			sqlite3AnalysisLoad(db);
-		}
-#endif
+		if (rc == SQLITE_OK)
+			sql_analysis_load(db);
 	}
 	if (db->mallocFailed) {
 		rc = SQLITE_NOMEM_BKPT;

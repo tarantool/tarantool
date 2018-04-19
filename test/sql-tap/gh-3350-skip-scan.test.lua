@@ -96,7 +96,7 @@ test:do_execsql_test(
             ANALYZE;
             DELETE FROM "_sql_stat1";
             DELETE FROM "_sql_stat4";
-            INSERT INTO "_sql_stat1" VALUES('t1','t1abc','10000 5000 2000 10');
+            INSERT INTO "_sql_stat1" VALUES('T1','T1ABC','10000 5000 2000 10');
             ANALYZE t2;
             SELECT a,b,c,d FROM t1 WHERE b=345;
         ]], {

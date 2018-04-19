@@ -58,6 +58,68 @@ enum rtree_index_distance_type {
 };
 extern const char *rtree_index_distance_type_strs[];
 
+/** Simple alias to represent logarithm metrics. */
+typedef int16_t log_est_t;
+
+/**
+ * One sample represents index key and three arrays with
+ * statistics concerning tuples distribution.
+ * Max number of samples for one index is adjusted by
+ * SQL_STAT4_SAMPLES macros. By default it is about 24 entities.
+ * Samples are chosen to be selective.
+ */
+struct index_sample {
+	/** Key of the sample. */
+	char *sample_key;
+	/** Size of sample key. */
+	size_t key_size;
+	/**
+	 * List of integers: first one is the approximate number
+	 * of entries in the index whose left-most field exactly
+	 * matches the left-most column of the sample;
+	 * second one - est. number of entries in the index where
+	 * the first two columns match the first two columns of
+	 * the sample; and so forth.
+	 */
+	uint32_t *eq;
+	/** The same as eq list, but key is less than sample. */
+	uint32_t *lt;
+	/** The same as lt list, but includes only distinct keys. */
+	uint32_t *dlt;
+};
+
+/**
+ * SQL statistics for index, which is used by query planer.
+ * This is general statistics, without any relation to used
+ * engine and data structures (e.g. B-tree or LSM tree).
+ * Statistics appear only after executing ANALYZE statement.
+ * It is loaded from _sql_stat1 and _sql_stat4 system spaces.
+ */
+struct index_stat {
+	/** An array of samples of them left-most key. */
+	struct index_sample *samples;
+	/** Number of samples. */
+	uint32_t sample_count;
+	/** Number of fields in sample arrays: eq, lt and dlt. */
+	uint32_t sample_field_count;
+	/**
+	 * List of integers: the first is the number of tuples
+	 * in the index; the second one is the average number of
+	 * tuples that have the same key part in the first field
+	 * of the index; the third - for the first two fields;
+	 * and so forth.
+	 */
+	uint32_t *tuple_stat1;
+	/** Logarithms of stat1 data. */
+	log_est_t *tuple_log_est;
+	/** Average eq values for keys not in samples. */
+	uint32_t *avg_eq;
+	/** Use this index for == or IN queries only. */
+	bool is_unordered;
+	/** Don't try to use skip-scan optimization if true. */
+	bool skip_scan_enabled;
+};
+
 /** Index options */
 struct index_opts {
 	/**
@@ -99,6 +161,12 @@ struct index_opts {
 	 * SQL statement that produced this index.
 	 */
 	char *sql;
+	/**
+	 * SQL specific statistics concerning tuples
+	 * distribution for query planer. It is automatically
+	 * filled after running ANALYZE command.
+	 */
+	struct index_stat *stat;
 };
 
 extern const struct index_opts index_opts_default;
@@ -120,6 +188,7 @@ static inline void
 index_opts_destroy(struct index_opts *opts)
 {
 	free(opts->sql);
+	free(opts->stat);
 	TRASH(opts);
 }
 
@@ -172,6 +241,50 @@ struct index_def {
 
 struct index_def *
 index_def_dup(const struct index_def *def);
+
+/**
+ * Calculate size of index's statistics.
+ * Statistics is located in memory according to following layout:
+ *
+ * +-------------------------+ <- Allocated memory starts here
+ * |    struct index_stat    |
+ * |-------------------------|
+ * |        stat1 array      | ^
+ * |-------------------------| |
+ * |      log_est array      | | 3 * array_size + 2 * uint_32
+ * |-------------------------| |
+ * |       avg_eq array      | v
+ * |-------------------------|
+ * |   samples struct array  |
+ * |-------------------------|
+ * | eq | lt | dlt |   key   | <- Content of one sample
+ * +-------------------------+
+ *            ...              <- Up to 24 samples
+ * | eq | lt | dlt |   key   |
+ * +-------------------------+
+ *
+ * array_size = field_count * sizeof(uint_32)
+ * offset of one sample = 3 * array_size + key_size
+ *
+ * @param samples Array of samples needed for calculating
+ *                size of keys.
+ * @param sample_count Count of samples in samples array.
+ * @param field_count Count of fields in statistics arrays.
+ * @retval Size needed for statistics allocation in bytes.
+ */
+size_t
+index_stat_sizeof(const struct index_sample *samples, uint32_t sample_count,
+		  uint32_t field_count);
+
+/**
+ * Duplicate index_stat object.
+ * To understand memory layout see index_stat_sizeof() function.
+ *
+ * @param src Stat to duplicate.
+ * @retval Copy of the @src or NULL on OOM.
+ */
+struct index_stat *
+index_stat_dup(const struct index_stat *src);
 
 /* Destroy and free an index_def. */
 void

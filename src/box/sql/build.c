@@ -214,13 +214,9 @@ sqlite3LocateIndex(sqlite3 * db, const char *zName, const char *zTable)
 static void
 freeIndex(sqlite3 * db, Index * p)
 {
-#ifndef SQLITE_OMIT_ANALYZE
-	sqlite3DeleteIndexSamples(db, p);
-#endif
 	sql_expr_free(db, p->pPartIdxWhere, false);
 	sqlite3ExprListDelete(db, p->aColExpr);
 	sqlite3DbFree(db, p->zColAff);
-	sqlite3_free(p->aiRowEst);
 	sqlite3DbFree(db, p);
 }
 
@@ -3045,9 +3041,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		 */
 		pIndex->sort_order[i] = SORT_ORDER_ASC;
 	}
-
-	sqlite3DefaultRowEst(pIndex);
-
 	if (pTab == parse->pNewTable) {
 		/* This routine has been called to create an automatic index as a
 		 * result of a PRIMARY KEY or UNIQUE clause on a column definition, or
@@ -3222,60 +3215,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	sqlite3ExprListDelete(db, col_list);
 	sqlite3SrcListDelete(db, tbl_name);
 	sqlite3DbFree(db, zName);
-}
-
-/*
- * Fill the Index.aiRowEst[] array with default information - information
- * to be used when we have not run the ANALYZE command.
- *
- * aiRowEst[0] is supposed to contain the number of elements in the index.
- * Since we do not know, guess 1 million.  aiRowEst[1] is an estimate of the
- * number of rows in the table that match any particular value of the
- * first column of the index.  aiRowEst[2] is an estimate of the number
- * of rows that match any particular combination of the first 2 columns
- * of the index.  And so forth.  It must always be the case that
-*
- *           aiRowEst[N]<=aiRowEst[N-1]
- *           aiRowEst[N]>=1
- *
- * Apart from that, we have little to go on besides intuition as to
- * how aiRowEst[] should be initialized.  The numbers generated here
- * are based on typical values found in actual indices.
- */
-void
-sqlite3DefaultRowEst(Index * pIdx)
-{
-	/*                10,  9,  8,  7,  6 */
-	LogEst aVal[] = { 33, 32, 30, 28, 26 };
-	LogEst *a = pIdx->aiRowLogEst;
-	int nCopy = MIN(ArraySize(aVal), pIdx->nColumn);
-	int i;
-
-	/* Set the first entry (number of rows in the index) to the estimated
-	 * number of rows in the table, or half the number of rows in the table
-	 * for a partial index.   But do not let the estimate drop below 10.
-	 */
-	a[0] = pIdx->pTable->tuple_log_count;
-	if (pIdx->pPartIdxWhere != 0)
-		a[0] -= 10;
-	assert(10 == sqlite3LogEst(2));
-	if (a[0] < 33)
-		a[0] = 33;
-	assert(33 == sqlite3LogEst(10));
-
-	/* Estimate that a[1] is 10, a[2] is 9, a[3] is 8, a[4] is 7, a[5] is
-	 * 6 and each subsequent value (if any) is 5.
-	 */
-	memcpy(&a[1], aVal, nCopy * sizeof(LogEst));
-	int col_count = index_column_count(pIdx);
-	for (i = nCopy + 1; i <= col_count; i++) {
-		a[i] = 23;
-		assert(23 == sqlite3LogEst(5));
-	}
-
-	assert(0 == sqlite3LogEst(1));
-	if (IsUniqueIndex(pIdx))
-		a[pIdx->nColumn] = 0;
 }
 
 /**

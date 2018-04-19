@@ -1485,10 +1485,8 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
 /* %endif  SQLITE_OMIT_REINDEX */
 
 /////////////////////////////////// ANALYZE ///////////////////////////////////
-%ifndef SQLITE_OMIT_ANALYZE
 cmd ::= ANALYZE.                {sqlite3Analyze(pParse, 0);}
 cmd ::= ANALYZE nm(X).          {sqlite3Analyze(pParse, &X);}
-%endif
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
 %ifndef SQLITE_OMIT_ALTERTABLE

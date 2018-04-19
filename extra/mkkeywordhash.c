@@ -59,11 +59,6 @@ struct Keyword {
 #  define ALTER      0x00000001
 #endif
 #define ALWAYS       0x00000002
-#ifdef SQLITE_OMIT_ANALYZE
-#  define ANALYZE    0
-#else
-#  define ANALYZE    0x00000004
-#endif
 #ifdef SQLITE_OMIT_AUTOINCREMENT
 #  define AUTOINCR   0
 #else
@@ -127,7 +122,7 @@ static Keyword aKeywordTable[] = {
   { "AFTER",                  "TK_AFTER",       TRIGGER,          false },
   { "ALL",                    "TK_ALL",         ALWAYS,           true  },
   { "ALTER",                  "TK_ALTER",       ALTER,            true  },
-  { "ANALYZE",                "TK_ANALYZE",     ANALYZE,          true  },
+  { "ANALYZE",                "TK_ANALYZE",     ALWAYS,           true  },
   { "AND",                    "TK_AND",         ALWAYS,           true  },
   { "AS",                     "TK_AS",          ALWAYS,           true  },
   { "ASC",                    "TK_ASC",         ALWAYS,           true  },

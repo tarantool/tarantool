@@ -888,7 +888,16 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	      int roundUp,	/* Round up if true.  Round down if false */
 	      tRowcnt * aStat)	/* OUT: stats written here */
 {
-	IndexSample *aSample = pIdx->aSample;
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pIdx->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	uint32_t iid = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
+	struct index *idx = space_index(space, iid);
+	assert(idx != NULL && idx->def->opts.stat != NULL);
+	struct index_sample *samples = idx->def->opts.stat->samples;
+	assert(idx->def->opts.stat->sample_count > 0);
+	assert(idx->def->opts.stat->samples != NULL);
+	assert(idx->def->opts.stat->sample_field_count >= pRec->nField);
 	int iCol;		/* Index of required stats in anEq[] etc. */
 	int i;			/* Index of first sample >= pRec */
 	int iSample;		/* Smallest sample larger than or equal to pRec */
@@ -902,8 +911,7 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	UNUSED_PARAMETER(pParse);
 #endif
 	assert(pRec != 0);
-	assert(pIdx->nSample > 0);
-	assert(pRec->nField > 0 && pRec->nField <= pIdx->nSampleCol);
+	assert(pRec->nField > 0);
 
 	/* Do a binary search to find the first sample greater than or equal
 	 * to pRec. If pRec contains a single field, the set of samples to search
@@ -951,7 +959,8 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	 */
 	nField = pRec->nField;
 	iCol = 0;
-	iSample = pIdx->nSample * nField;
+	uint32_t sample_count = idx->def->opts.stat->sample_count;
+	iSample = sample_count * nField;
 	do {
 		int iSamp;	/* Index in aSample[] of test sample */
 		int n;		/* Number of fields in test sample */
@@ -964,8 +973,8 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			 * fields that is greater than the previous effective sample.
 			 */
 			for (n = (iTest % nField) + 1; n < nField; n++) {
-				if (aSample[iSamp - 1].anLt[n - 1] !=
-				    aSample[iSamp].anLt[n - 1])
+				if (samples[iSamp - 1].lt[n - 1] !=
+				    samples[iSamp].lt[n - 1])
 					break;
 			}
 		} else {
@@ -973,14 +982,15 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 		}
 
 		pRec->nField = n;
-		res = sqlite3VdbeRecordCompareMsgpack(aSample[iSamp].p, pRec);
+		res =
+		    sqlite3VdbeRecordCompareMsgpack(samples[iSamp].sample_key,
+						    pRec);
 		if (res < 0) {
 			iLower =
-			    aSample[iSamp].anLt[n - 1] + aSample[iSamp].anEq[n -
-									     1];
+			    samples[iSamp].lt[n - 1] + samples[iSamp].eq[n - 1];
 			iMin = iTest + 1;
 		} else if (res == 0 && n < nField) {
-			iLower = aSample[iSamp].anLt[n - 1];
+			iLower = samples[iSamp].lt[n - 1];
 			iMin = iTest + 1;
 			res = -1;
 		} else {
@@ -998,11 +1008,11 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	if (pParse->db->mallocFailed == 0) {
 		if (res == 0) {
 			/* If (res==0) is true, then pRec must be equal to sample i. */
-			assert(i < pIdx->nSample);
+			assert(i < (int) sample_count);
 			assert(iCol == nField - 1);
 			pRec->nField = nField;
 			assert(0 ==
-			       sqlite3VdbeRecordCompareMsgpack(aSample[i].p,
+			       sqlite3VdbeRecordCompareMsgpack(samples[i].sample_key,
 							       pRec)
 			       || pParse->db->mallocFailed);
 		} else {
@@ -1010,11 +1020,11 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			 * all samples in the aSample[] array, pRec must be smaller than the
 			 * (iCol+1) field prefix of sample i.
 			 */
-			assert(i <= pIdx->nSample && i >= 0);
+			assert(i <= (int) sample_count && i >= 0);
 			pRec->nField = iCol + 1;
-			assert(i == pIdx->nSample
-			       || sqlite3VdbeRecordCompareMsgpack(aSample[i].p,
-								  pRec) > 0
+			assert(i == (int) sample_count ||
+			       sqlite3VdbeRecordCompareMsgpack(samples[i].sample_key,
+							       pRec) > 0
 			       || pParse->db->mallocFailed);
 
 			/* if i==0 and iCol==0, then record pRec is smaller than all samples
@@ -1025,13 +1035,13 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			if (iCol > 0) {
 				pRec->nField = iCol;
 				assert(sqlite3VdbeRecordCompareMsgpack
-				       (aSample[i].p, pRec) <= 0
+				       (samples[i].sample_key, pRec) <= 0
 				       || pParse->db->mallocFailed);
 			}
 			if (i > 0) {
 				pRec->nField = nField;
 				assert(sqlite3VdbeRecordCompareMsgpack
-				       (aSample[i - 1].p, pRec) < 0 ||
+				       (samples[i - 1].sample_key, pRec) < 0 ||
 				       pParse->db->mallocFailed);
 			}
 		}
@@ -1041,18 +1051,18 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	if (res == 0) {
 		/* Record pRec is equal to sample i */
 		assert(iCol == nField - 1);
-		aStat[0] = aSample[i].anLt[iCol];
-		aStat[1] = aSample[i].anEq[iCol];
+		aStat[0] = samples[i].lt[iCol];
+		aStat[1] = samples[i].eq[iCol];
 	} else {
 		/* At this point, the (iCol+1) field prefix of aSample[i] is the first
 		 * sample that is greater than pRec. Or, if i==pIdx->nSample then pRec
 		 * is larger than all samples in the array.
 		 */
 		tRowcnt iUpper, iGap;
-		if (i >= pIdx->nSample) {
-			iUpper = sqlite3LogEstToInt(pIdx->aiRowLogEst[0]);
+		if (i >= (int) sample_count) {
+			iUpper = sqlite3LogEstToInt(idx->def->opts.stat->tuple_log_est[0]);
 		} else {
-			iUpper = aSample[i].anLt[iCol];
+			iUpper = samples[i].lt[iCol];
 		}
 
 		if (iLower >= iUpper) {
@@ -1066,7 +1076,7 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			iGap = iGap / 3;
 		}
 		aStat[0] = iLower + iGap;
-		aStat[1] = pIdx->aAvgEq[iCol];
+		aStat[1] = idx->def->opts.stat->avg_eq[iCol];
 	}
 
 	/* Restore the pRec->nField value before returning.  */
@@ -1157,10 +1167,15 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 		      int *pbDone)		/* Set to true if at least one expr. value extracted */
 {
 	Index *p = pLoop->pIndex;
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(p->tnum));
+	assert(space != NULL);
+	struct index *index = space_index(space,
+					  SQLITE_PAGENO_TO_INDEXID(p->tnum));
+	assert(index != NULL && index->def->opts.stat != NULL);
 	int nEq = pLoop->nEq;
 	sqlite3 *db = pParse->db;
 	int nLower = -1;
-	int nUpper = p->nSample + 1;
+	int nUpper = index->def->opts.stat->sample_count + 1;
 	int rc = SQLITE_OK;
 	u8 aff = sqlite3IndexColumnAffinity(db, p, nEq);
 	struct coll *pColl;
@@ -1178,15 +1193,17 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	if (pUpper && rc == SQLITE_OK) {
 		rc = sqlite3Stat4ValueFromExpr(pParse, pUpper->pExpr->pRight,
 					       aff, &p2);
-		nUpper = p2 ? 0 : p->nSample;
+		nUpper = p2 ? 0 : index->def->opts.stat->sample_count;
 	}
 
 	if (p1 || p2) {
 		int i;
 		int nDiff;
-		for (i = 0; rc == SQLITE_OK && i < p->nSample; i++) {
-			rc = sqlite3Stat4Column(db, p->aSample[i].p,
-						p->aSample[i].n, nEq, &pVal);
+		struct index_sample *samples = index->def->opts.stat->samples;
+		uint32_t sample_count = index->def->opts.stat->sample_count;
+		for (i = 0; rc == SQLITE_OK && i < (int) sample_count; i++) {
+			rc = sqlite3Stat4Column(db, samples[i].sample_key,
+						samples[i].key_size, nEq, &pVal);
 			if (rc == SQLITE_OK && p1) {
 				int res = sqlite3MemCompare(p1, pVal, pColl);
 				if (res >= 0)
@@ -1210,7 +1227,8 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 		 */
 		if (nDiff != 1 || pUpper == 0 || pLower == 0) {
 			int nAdjust =
-			    (sqlite3LogEst(p->nSample) - sqlite3LogEst(nDiff));
+			    (sqlite3LogEst(sample_count) -
+			     sqlite3LogEst(nDiff));
 			pLoop->nOut -= nAdjust;
 			*pbDone = 1;
 			WHERETRACE(0x10,
@@ -1281,8 +1299,22 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 
 	Index *p = pLoop->pIndex;
 	int nEq = pLoop->nEq;
-
-	if (p->nSample > 0 && nEq < p->nSampleCol) {
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(p->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	uint32_t iid = SQLITE_PAGENO_TO_INDEXID(p->tnum);
+	struct index *idx = space_index(space, iid);
+	assert(idx != NULL);
+	struct index_stat *stat = idx->def->opts.stat;
+	/*
+	 * Create surrogate stat in case ANALYZE command hasn't
+	 * been ran. Simply fill it with zeros.
+	 */
+	struct index_stat surrogate_stat;
+	memset(&surrogate_stat, 0, sizeof(surrogate_stat));
+	if (stat == NULL)
+		stat = &surrogate_stat;
+	if (stat->sample_count > 0 && nEq < (int) stat->sample_field_count) {
 		if (nEq == pBuilder->nRecValid) {
 			UnpackedRecord *pRec = pBuilder->pRec;
 			tRowcnt a[2];
@@ -1499,8 +1531,6 @@ whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
 
 	assert(nEq >= 1);
 	assert(nEq <= (int)index_column_count(p));
-	assert(p->aSample != 0);
-	assert(p->nSample > 0);
 	assert(pBuilder->nRecValid < nEq);
 
 	/* If values are not available for all fields of the index to the left
@@ -1549,14 +1579,13 @@ whereInScanEst(Parse * pParse,	/* Parsing & code generating context */
 	       tRowcnt * pnRow)	/* Write the revised row estimate here */
 {
 	Index *p = pBuilder->pNew->pIndex;
-	i64 nRow0 = sqlite3LogEstToInt(p->aiRowLogEst[0]);
+	i64 nRow0 = sqlite3LogEstToInt(index_field_tuple_est(p, 0));
 	int nRecValid = pBuilder->nRecValid;
 	int rc = SQLITE_OK;	/* Subfunction return code */
 	tRowcnt nEst;		/* Number of rows for a single term */
 	tRowcnt nRowEst = 0;	/* New estimate of the number of rows */
 	int i;			/* Loop counter */
 
-	assert(p->aSample != 0);
 	for (i = 0; rc == SQLITE_OK && i < pList->nExpr; i++) {
 		nEst = nRow0;
 		rc = whereEqualScanEst(pParse, pBuilder, pList->a[i].pExpr,
@@ -2315,9 +2344,25 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		    WO_EQ | WO_IN | WO_GT | WO_GE | WO_LT | WO_LE | WO_ISNULL |
 		    WO_IS;
 	}
-	if (pProbe->bUnordered)
+	struct space *space =
+		space_by_id(SQLITE_PAGENO_TO_SPACEID(pProbe->tnum));
+	struct index *idx = NULL;
+	struct index_stat *stat = NULL;
+	if (space != NULL) {
+		idx = space_index(space, SQLITE_PAGENO_TO_INDEXID(pProbe->tnum));
+		assert(idx != NULL);
+		stat = idx->def->opts.stat;
+	}
+	/*
+	 * Create surrogate stat in case ANALYZE command hasn't
+	 * been ran. Simply fill it with zeros.
+	 */
+	struct index_stat surrogate_stat;
+	memset(&surrogate_stat, 0, sizeof(surrogate_stat));
+	if (stat == NULL)
+		stat = &surrogate_stat;
+	if (stat->is_unordered)
 		opMask &= ~(WO_GT | WO_GE | WO_LT | WO_LE);
-
 	assert(pNew->nEq < nProbeCol);
 
 	saved_nEq = pNew->nEq;
@@ -2331,7 +2376,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	pTerm = whereScanInit(&scan, pBuilder->pWC, pSrc->iCursor, saved_nEq,
 			      opMask, pProbe);
 	pNew->rSetup = 0;
-	rSize = pProbe->aiRowLogEst[0];
+	rSize = index_field_tuple_est(pProbe, 0);
 	rLogSize = estLog(rSize);
 	for (; rc == SQLITE_OK && pTerm != 0; pTerm = whereScanNext(&scan)) {
 		u16 eOp = pTerm->eOperator;	/* Shorthand for pTerm->eOperator */
@@ -2489,8 +2534,8 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			} else {
 				tRowcnt nOut = 0;
 				if (nInMul == 0
-				    && pProbe->nSample
-				    && pNew->nEq <= pProbe->nSampleCol
+				    && stat->sample_count
+				    && pNew->nEq <= stat->sample_field_count
 				    && ((eOp & WO_IN) == 0
 					|| !ExprHasProperty(pTerm->pExpr,
 							    EP_xIsSelect))
@@ -2525,8 +2570,8 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 				}
 				if (nOut == 0) {
 					pNew->nOut +=
-					    (pProbe->aiRowLogEst[nEq] -
-					     pProbe->aiRowLogEst[nEq - 1]);
+						(index_field_tuple_est(pProbe, nEq) -
+						 index_field_tuple_est(pProbe, nEq -1));
 					if (eOp & WO_ISNULL) {
 						/* TUNING: If there is no likelihood() value, assume that a
 						 * "col IS NULL" expression matches twice as many rows
@@ -2614,18 +2659,17 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	 */
 	assert(42 == sqlite3LogEst(18));
 	if (saved_nEq == saved_nSkip && saved_nEq + 1U < nProbeCol &&
-	    pProbe->noSkipScan == 0 &&
+	    stat->skip_scan_enabled == true &&
 	    /* TUNING: Minimum for skip-scan */
-	    pProbe->aiRowLogEst[saved_nEq + 1] >= 42 &&
+	    index_field_tuple_est(pProbe, saved_nEq + 1) >= 42 &&
 	    (rc = whereLoopResize(db, pNew, pNew->nLTerm + 1)) == SQLITE_OK) {
 		LogEst nIter;
 		pNew->nEq++;
 		pNew->nSkip++;
 		pNew->aLTerm[pNew->nLTerm++] = 0;
 		pNew->wsFlags |= WHERE_SKIPSCAN;
-		nIter =
-		    pProbe->aiRowLogEst[saved_nEq] -
-		    pProbe->aiRowLogEst[saved_nEq + 1];
+		nIter = index_field_tuple_est(pProbe, saved_nEq) -
+			index_field_tuple_est(pProbe, saved_nEq + 1);
 		pNew->nOut -= nIter;
 		/* TUNING:  Because uncertainties in the estimates for skip-scan queries,
 		 * add a 1.375 fudge factor to make skip-scan slightly less likely.
@@ -2641,6 +2685,31 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	WHERETRACE(0x800, ("END addBtreeIdx(%s), nEq=%d, rc=%d\n",
 			   pProbe->zName, saved_nEq, rc));
 	return rc;
+}
+
+/**
+ * Check if is_unordered flag is set for given index.
+ * Since now there may not be corresponding Tarantool's index
+ * (e.g. for temporary objects such as ephemeral tables),
+ * a few preliminary checks are made.
+ *
+ * @param idx Index to be tested.
+ * @retval True, if statistics exist and unordered flag is set.
+ */
+static bool
+index_is_unordered(struct Index *idx)
+{
+	assert(idx != NULL);
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(idx->tnum));
+	if (space == NULL)
+		return false;
+	uint32_t iid = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct index *tnt_idx = space_index(space, iid);
+	if (tnt_idx == NULL)
+		return false;
+	if (tnt_idx->def->opts.stat != NULL)
+		return tnt_idx->def->opts.stat->is_unordered;
+	return false;
 }
 
 /*
@@ -2659,8 +2728,7 @@ indexMightHelpWithOrderBy(WhereLoopBuilder * pBuilder,
 	ExprList *aColExpr;
 	int ii, jj;
 	int nIdxCol = index_column_count(pIndex);
-
-	if (pIndex->bUnordered)
+	if (index_is_unordered(pIndex))
 		return 0;
 	if ((pOB = pBuilder->pWInfo->pOrderBy) == 0)
 		return 0;
@@ -2873,7 +2941,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 			testcase(pNew->iTab != pSrc->iCursor);	/* See ticket [98d973b8f5] */
 			continue;	/* Partial index inappropriate for this query */
 		}
-		rSize = pProbe->aiRowLogEst[0];
+		rSize = index_field_tuple_est(pProbe, 0);
 		pNew->nEq = 0;
 		pNew->nBtm = 0;
 		pNew->nTop = 0;
@@ -3265,8 +3333,8 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 			if (pLoop->wsFlags & WHERE_IPK) {
 				pIndex = 0;
 				nColumn = 1;
-			} else if ((pIndex = pLoop->pIndex) == 0
-				   || pIndex->bUnordered) {
+			} else if ((pIndex = pLoop->pIndex) == NULL ||
+				   index_is_unordered(pIndex)) {
 				return 0;
 			} else {
 				nColumn = index_column_count(pIndex);

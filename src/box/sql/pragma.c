@@ -425,8 +425,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					sqlite3VdbeMultiLoad(v, 2, "sii",
 							     pIdx->zName,
 							     avg_tuple_size_idx,
-							     pIdx->
-							     aiRowLogEst[0]);
+							     index_field_tuple_est(pIdx, 0));
 					sqlite3VdbeAddOp2(v, OP_ResultRow, 1,
 							  4);
 				}
