@@ -74,6 +74,7 @@ local function set_delimiter(storage, value)
     if console ~= nil and console.delimiter == '$EOF$' then
         return error('Can not install delimiter for net box sessions')
     end
+    value = value or ''
     return delimiter(value)
 end
 
