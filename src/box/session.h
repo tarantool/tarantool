@@ -104,13 +104,15 @@ struct session_vtab {
 	 * Push a port data into a session data channel - socket,
 	 * console or something.
 	 * @param session Session to push into.
+	 * @param sync Request sync in scope of which to send the
+	 *        push.
 	 * @param port Port with data to push.
 	 *
 	 * @retval  0 Success.
 	 * @retval -1 Error.
 	 */
 	int
-	(*push)(struct session *session, struct port *port);
+	(*push)(struct session *session, uint64_t sync, struct port *port);
 	/**
 	 * Get session file descriptor if exists.
 	 * @param session Session to get descriptor from.
@@ -294,9 +296,9 @@ int
 access_check_universe(user_access_t access);
 
 static inline int
-session_push(struct session *session, struct port *port)
+session_push(struct session *session, uint64_t sync, struct port *port)
 {
-	return session_vtab_registry[session->type].push(session, port);
+	return session_vtab_registry[session->type].push(session, sync, port);
 }
 
 static inline int
@@ -316,7 +318,7 @@ session_sync(struct session *session)
  * function always returns -1 and sets ER_UNSUPPORTED error.
  */
 int
-generic_session_push(struct session *session, struct port *port);
+generic_session_push(struct session *session, uint64_t sync, struct port *port);
 
 /** Return -1 from any session. */
 int

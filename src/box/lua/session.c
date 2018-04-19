@@ -366,11 +366,26 @@ lbox_push_on_access_denied_event(struct lua_State *L, void *event)
 static int
 lbox_session_push(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
-		return luaL_error(L, "Usage: box.session.push(data)");
+	struct session *session = current_session();
+	int ok;
+	uint64_t sync;
+	switch(lua_gettop(L)) {
+	case 1:
+		sync = session_sync(session);
+		break;
+	case 2:
+		sync = lua_tointegerx(L, 2, &ok);
+		if (ok != 0) {
+			lua_pop(L, 1);
+			break;
+		}
+		FALLTHROUGH
+	default:
+		return luaL_error(L, "Usage: box.session.push(data, sync)");
+	}
 	struct port port;
 	port_lua_create(&port, L);
-	if (session_push(current_session(), &port) != 0) {
+	if (session_push(session, sync, &port) != 0) {
 		lua_pushnil(L);
 		luaT_pusherror(L, box_error_last());
 		return 2;

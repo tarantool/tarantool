@@ -164,6 +164,9 @@ enum iproto_type {
 	/** Vinyl row index stored in .run file */
 	VY_RUN_ROW_INDEX = 102,
 
+	/** Non-final response type. */
+	IPROTO_CHUNK = 128,
+
 	/**
 	 * Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h)
 	 */

@@ -293,9 +293,10 @@ access_check_universe(user_access_t access)
 }
 
 int
-generic_session_push(struct session *session, struct port *port)
+generic_session_push(struct session *session, uint64_t sync, struct port *port)
 {
 	(void) port;
+	(void) sync;
 	const char *name =
 		tt_sprintf("Session '%s'", session_type_strs[session->type]);
 	diag_set(ClientError, ER_UNSUPPORTED, name, "push()");
