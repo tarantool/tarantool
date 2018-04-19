@@ -45,6 +45,20 @@ const char *session_type_strs[] = {
 	"unknown",
 };
 
+static struct session_vtab generic_session_vtab = {
+	/* .push = */ generic_session_push,
+	/* .fd = */ generic_session_fd,
+	/* .sync = */ generic_session_sync,
+};
+
+struct session_vtab session_vtab_registry[] = {
+	/* BACKGROUND */ generic_session_vtab,
+	/* BINARY */ generic_session_vtab,
+	/* CONSOLE */ generic_session_vtab,
+	/* REPL */ generic_session_vtab,
+	/* APPLIER */ generic_session_vtab,
+};
+
 static struct mh_i64ptr_t *session_registry;
 
 struct mempool session_pool;
@@ -79,7 +93,7 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 }
 
 struct session *
-session_create(int fd, enum session_type type)
+session_create(enum session_type type)
 {
 	struct session *session =
 		(struct session *) mempool_alloc(&session_pool);
@@ -89,8 +103,7 @@ session_create(int fd, enum session_type type)
 		return NULL;
 	}
 	session->id = sid_max();
-	session->fd =  fd;
-	session->sync = 0;
+	memset(&session->meta, 0, sizeof(session->meta));
 	session->type = type;
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user->auth_token,
@@ -110,12 +123,12 @@ session_create(int fd, enum session_type type)
 }
 
 struct session *
-session_create_on_demand(int fd)
+session_create_on_demand()
 {
 	assert(fiber_get_session(fiber()) == NULL);
 
 	/* Create session on demand */
-	struct session *s = session_create(fd, SESSION_TYPE_BACKGROUND);
+	struct session *s = session_create(SESSION_TYPE_BACKGROUND);
 	if (s == NULL)
 		return NULL;
 	s->fiber_on_stop = {
@@ -276,5 +289,29 @@ access_check_universe(user_access_t access)
 		}
 		return -1;
 	}
+	return 0;
+}
+
+int
+generic_session_push(struct session *session, struct port *port)
+{
+	(void) port;
+	const char *name =
+		tt_sprintf("Session '%s'", session_type_strs[session->type]);
+	diag_set(ClientError, ER_UNSUPPORTED, name, "push()");
+	return -1;
+}
+
+int
+generic_session_fd(struct session *session)
+{
+	(void) session;
+	return -1;
+}
+
+int64_t
+generic_session_sync(struct session *session)
+{
+	(void) session;
 	return 0;
 }

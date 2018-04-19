@@ -26,7 +26,17 @@ _ = box.space.test:before_replace(function(old, new)
     end
 end);
 test_run:cmd("switch autobootstrap3");
+--
+-- gh-2677 - test that an applier can not push() messages. Applier
+-- session is available in Lua, so the test is here instead of
+-- box/push.test.lua.
+--
+push_ok = nil
+push_err = nil
 _ = box.space.test:before_replace(function(old, new)
+    if box.session.type() == 'applier' and not push_err then
+        push_ok, push_err = box.session.push(100)
+    end
     if old ~= nil and new ~= nil then
         return new[2] > old[2] and new or old
     end
@@ -62,6 +72,7 @@ test_run:cmd('restart server autobootstrap2')
 box.space.test:select()
 test_run:cmd("switch autobootstrap3")
 box.space.test:select()
+push_err
 test_run:cmd('restart server autobootstrap3')
 box.space.test:select()
 

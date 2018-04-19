@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(59)
+test:plan(60)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -30,6 +30,12 @@ local client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
 local handshake = client:read{chunk = 128}
 test:ok(string.match(handshake, '^Tarantool .*console') ~= nil, 'Handshake')
 test:ok(client ~= nil, "connect to console")
+
+--
+-- gh-2677: box.session.push, text protocol support.
+--
+client:write('box.session.push(200)\n')
+test:is(client:read(EOL), "---\n- null\n- Session 'console' does not support push()\n...\n", "push does not work")
 
 -- Execute some command
 client:write("1\n")

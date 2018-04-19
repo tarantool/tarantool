@@ -30,6 +30,7 @@
  */
 
 #include "box/lua/console.h"
+#include "box/session.h"
 #include "lua/utils.h"
 #include "lua/fiber.h"
 #include "fiber.h"
@@ -359,6 +360,12 @@ lbox_console_format(struct lua_State *L)
 	return lua_yaml_encode(L, luaL_yaml_default, NULL, NULL);
 }
 
+int
+console_session_fd(struct session *session)
+{
+	return session->meta.fd;
+}
+
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
@@ -392,6 +399,12 @@ tarantool_lua_console_init(struct lua_State *L)
 	 * load_history work the same way.
 	 */
 	lua_setfield(L, -2, "formatter");
+	struct session_vtab console_session_vtab = {
+		/* .push = */ generic_session_push,
+		/* .fd = */ console_session_fd,
+		/* .sync = */ generic_session_sync,
+	};
+	session_vtab_registry[SESSION_TYPE_CONSOLE] = console_session_vtab;
 }
 
 /*

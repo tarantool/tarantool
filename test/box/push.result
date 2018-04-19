@@ -1,0 +1,70 @@
+--
+-- gh-2677: box.session.push.
+--
+--
+-- Usage.
+--
+box.session.push()
+---
+- error: 'Usage: box.session.push(data)'
+...
+box.session.push(1, 2)
+---
+- error: 'Usage: box.session.push(data)'
+...
+ok = nil
+---
+...
+err = nil
+---
+...
+function do_push() ok, err = box.session.push(1) end
+---
+...
+--
+-- Test binary protocol.
+--
+netbox = require('net.box')
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+c = netbox.connect(box.cfg.listen)
+---
+...
+c:ping()
+---
+- true
+...
+c:call('do_push')
+---
+...
+ok, err
+---
+- null
+- Session 'binary' does not support push()
+...
+c:close()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
+--
+-- Ensure can not push in background.
+--
+fiber = require('fiber')
+---
+...
+f = fiber.create(do_push)
+---
+...
+while f:status() ~= 'dead' do fiber.sleep(0.01) end
+---
+...
+ok, err
+---
+- null
+- Session 'background' does not support push()
+...

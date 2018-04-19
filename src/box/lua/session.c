@@ -50,10 +50,10 @@ lbox_session_create(struct lua_State *L)
 {
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
-		int fd = luaL_optinteger(L, 1, -1);
-		session = session_create_on_demand(fd);
+		session = session_create_on_demand();
 		if (session == NULL)
 			return luaT_error(L);
+		session->meta.fd = luaL_optinteger(L, 1, -1);
 	}
 	/* If a session already exists, simply reset its type */
 	session->type = STR2ENUM(session_type, luaL_optstring(L, 2, "console"));
@@ -96,7 +96,7 @@ lbox_session_type(struct lua_State *L)
 static int
 lbox_session_sync(struct lua_State *L)
 {
-	lua_pushnumber(L, current_session()->sync);
+	lua_pushnumber(L, session_sync(current_session()));
 	return 1;
 }
 
@@ -231,7 +231,7 @@ lbox_session_fd(struct lua_State *L)
 	struct session *session = session_find(sid);
 	if (session == NULL)
 		luaL_error(L, "session.fd(): session does not exist");
-	lua_pushinteger(L, session->fd);
+	lua_pushinteger(L, session_fd(session));
 	return 1;
 }
 
@@ -253,7 +253,7 @@ lbox_session_peer(struct lua_State *L)
 		session = current_session();
 	if (session == NULL)
 		luaL_error(L, "session.peer(): session does not exist");
-	fd = session->fd;
+	fd = session_fd(session);
 	if (fd < 0) {
 		lua_pushnil(L); /* no associated peer */
 		return 1;
@@ -356,6 +356,29 @@ lbox_push_on_access_denied_event(struct lua_State *L, void *event)
 }
 
 /**
+ * Push a message using a protocol, depending on a session type.
+ * @param L Lua state. First argument on the stack is data to
+ *        push.
+ * @retval 1 Success, true is pushed.
+ * @retval 2 Error. Nil and error object are pushed.
+ */
+static int
+lbox_session_push(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		return luaL_error(L, "Usage: box.session.push(data)");
+
+	if (session_push(current_session(), NULL) != 0) {
+		lua_pushnil(L);
+		luaT_pusherror(L, box_error_last());
+		return 2;
+	} else {
+		lua_pushboolean(L, true);
+		return 1;
+	}
+}
+
+/**
  * Sets trigger on_access_denied.
  * For test purposes only.
  */
@@ -429,6 +452,7 @@ box_lua_session_init(struct lua_State *L)
 		{"on_disconnect", lbox_session_on_disconnect},
 		{"on_auth", lbox_session_on_auth},
 		{"on_access_denied", lbox_session_on_access_denied},
+		{"push", lbox_session_push},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, sessionlib_name, sessionlib);
