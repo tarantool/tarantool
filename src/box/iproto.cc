@@ -63,9 +63,6 @@
 #include "applier.h"
 #include "cfg.h"
 
-/* The number of iproto messages in flight */
-enum { IPROTO_MSG_MAX = 768 };
-
 /**
  * Network readahead. A signed integer to avoid
  * automatic type coercion to an unsigned type.
@@ -82,6 +79,9 @@ enum { IPROTO_MSG_MAX = 768 };
  * we get a slab of size 16384, not 32768.
  */
 unsigned iproto_readahead = 16320;
+
+/* The maximal number of iproto messages in fly. */
+static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 
 /**
  * How big is a buffer which needs to be shrunk before
@@ -375,7 +375,7 @@ static inline bool
 iproto_check_msg_max()
 {
 	size_t request_count = mempool_count(&iproto_msg_pool);
-	return request_count > IPROTO_MSG_MAX;
+	return request_count > (size_t) iproto_msg_max;
 }
 
 static struct iproto_msg *
@@ -1706,7 +1706,7 @@ net_cord_f(va_list /* ap */)
 	cbus_endpoint_create(&endpoint, "net", fiber_schedule_cb, fiber());
 	/* Create a pipe to "tx" thread. */
 	cpipe_create(&tx_pipe, "tx");
-	cpipe_set_max_input(&tx_pipe, IPROTO_MSG_MAX/2);
+	cpipe_set_max_input(&tx_pipe, iproto_msg_max / 2);
 	/* Process incomming messages. */
 	cbus_loop(&endpoint);
 
@@ -1734,66 +1734,99 @@ iproto_init()
 
 	/* Create a pipe to "net" thread. */
 	cpipe_create(&net_pipe, "net");
-	cpipe_set_max_input(&net_pipe, IPROTO_MSG_MAX/2);
+	cpipe_set_max_input(&net_pipe, iproto_msg_max / 2);
 }
+
+/** Available IProto configuration changes. */
+enum iproto_cfg_op {
+	IPROTO_CFG_BIND,
+	IPROTO_CFG_MSG_MAX,
+	IPROTO_CFG_LISTEN
+};
 
 /**
  * Since there is no way to "synchronously" change the
- * state of the io thread, to change the listen port
- * we need to bounce a couple of messages to and
- * from this thread.
+ * state of the io thread, to change the listen port or max
+ * message count in flight send a special message to IProto
+ * thread.
  */
-struct iproto_bind_msg: public cbus_call_msg
+struct iproto_cfg_msg: public cbus_call_msg
 {
-	const char *uri;
+	/** Operation to execute in IProto thread. */
+	enum iproto_cfg_op op;
+	union {
+		/** New URI to bind to. */
+		const char *uri;
+
+		/** New IProto max message count. */
+		int iproto_msg_max;
+	};
 };
 
-static int
-iproto_do_bind(struct cbus_call_msg *m)
+static inline void
+iproto_cfg_msg_create(struct iproto_cfg_msg *msg, enum iproto_cfg_op op)
 {
-	const char *uri  = ((struct iproto_bind_msg *) m)->uri;
+	memset(msg, 0, sizeof(*msg));
+	msg->op = op;
+}
+
+static int
+iproto_do_cfg_f(struct cbus_call_msg *m)
+{
+	struct iproto_cfg_msg *cfg_msg = (struct iproto_cfg_msg *) m;
+	int old;
 	try {
-		if (evio_service_is_active(&binary))
-			evio_service_stop(&binary);
-		if (uri != NULL)
-			evio_service_bind(&binary, uri);
+		switch (cfg_msg->op) {
+		case IPROTO_CFG_BIND:
+			if (evio_service_is_active(&binary))
+				evio_service_stop(&binary);
+			if (cfg_msg->uri != NULL)
+				evio_service_bind(&binary, cfg_msg->uri);
+			break;
+		case IPROTO_CFG_MSG_MAX:
+			cpipe_set_max_input(&tx_pipe,
+					    cfg_msg->iproto_msg_max / 2);
+			old = iproto_msg_max;
+			iproto_msg_max = cfg_msg->iproto_msg_max;
+			if (old < iproto_msg_max)
+				iproto_resume();
+			break;
+		case IPROTO_CFG_LISTEN:
+			if (evio_service_is_active(&binary))
+				evio_service_listen(&binary);
+			break;
+		default:
+			unreachable();
+		}
 	} catch (Exception *e) {
 		return -1;
 	}
 	return 0;
 }
 
-static int
-iproto_do_listen(struct cbus_call_msg *m)
+static inline void
+iproto_do_cfg(struct iproto_cfg_msg *msg)
 {
-	(void) m;
-	try {
-		if (evio_service_is_active(&binary))
-			evio_service_listen(&binary);
-	} catch (Exception *e) {
-		return -1;
-	}
-	return 0;
+	if (cbus_call(&net_pipe, &tx_pipe, msg, iproto_do_cfg_f,
+		      NULL, TIMEOUT_INFINITY) != 0)
+		diag_raise();
 }
 
 void
 iproto_bind(const char *uri)
 {
-	static struct iproto_bind_msg m;
-	m.uri = uri;
-	if (cbus_call(&net_pipe, &tx_pipe, &m, iproto_do_bind,
-		      NULL, TIMEOUT_INFINITY))
-		diag_raise();
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_BIND);
+	cfg_msg.uri = uri;
+	iproto_do_cfg(&cfg_msg);
 }
 
 void
 iproto_listen()
 {
-	/* Declare static to avoid stack corruption on fiber cancel. */
-	static struct cbus_call_msg m;
-	if (cbus_call(&net_pipe, &tx_pipe, &m, iproto_do_listen,
-		      NULL, TIMEOUT_INFINITY))
-		diag_raise();
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_LISTEN);
+	iproto_do_cfg(&cfg_msg);
 }
 
 size_t
@@ -1806,4 +1839,19 @@ void
 iproto_reset_stat(void)
 {
 	rmean_cleanup(rmean_net);
+}
+
+void
+iproto_set_msg_max(int new_iproto_msg_max)
+{
+	if (new_iproto_msg_max < IPROTO_MSG_MAX_MIN) {
+		tnt_raise(ClientError, ER_CFG, "iproto_msg_max",
+			  tt_sprintf("minimal value is %d",
+				     IPROTO_MSG_MAX_MIN));
+	}
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_MSG_MAX);
+	cfg_msg.iproto_msg_max = new_iproto_msg_max;
+	iproto_do_cfg(&cfg_msg);
+	cpipe_set_max_input(&net_pipe, new_iproto_msg_max / 2);
 }

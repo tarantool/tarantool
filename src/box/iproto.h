@@ -37,6 +37,23 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum {
+	/** The minimal value for net_msg_max. */
+	IPROTO_MSG_MAX_MIN = 2,
+	/**
+	 * The size of tx fiber pool for iproto requests is
+	 * limited by the number of concurrent iproto messages,
+	 * with the ratio defined in this constant.
+	 * The ratio is not 1:1 because of long-polling requests.
+	 * Ideally we should not account long polling requests in
+	 * the ratio, but currently we can not separate them from
+	 * short-living requests, all requests are handled by the
+	 * same pool. When the pool size is exhausted, message
+	 * processing stops until some new fibers are freed up.
+	 */
+	IPROTO_FIBER_POOL_SIZE_FACTOR = 5,
+};
+
 extern unsigned iproto_readahead;
 
 /**
@@ -62,6 +79,9 @@ iproto_bind(const char *uri);
 
 void
 iproto_listen();
+
+void
+iproto_set_msg_max(int iproto_msg_max);
 
 #endif /* defined(__cplusplus) */
 

@@ -765,6 +765,16 @@ box_set_vinyl_timeout(void)
 	vinyl_engine_set_timeout(vinyl,	cfg_getd("vinyl_timeout"));
 }
 
+void
+box_set_net_msg_max(void)
+{
+	int new_iproto_msg_max = cfg_geti("net_msg_max");
+	iproto_set_msg_max(new_iproto_msg_max);
+	fiber_pool_set_max_size(&tx_fiber_pool,
+				new_iproto_msg_max *
+				IPROTO_FIBER_POOL_SIZE_FACTOR);
+}
+
 /* }}} configuration bindings */
 
 /**
@@ -1717,7 +1727,8 @@ static inline void
 box_cfg_xc(void)
 {
 	/* Join the cord interconnect as "tx" endpoint. */
-	fiber_pool_create(&tx_fiber_pool, "tx", FIBER_POOL_SIZE,
+	fiber_pool_create(&tx_fiber_pool, "tx",
+			  IPROTO_MSG_MAX_MIN * IPROTO_FIBER_POOL_SIZE_FACTOR,
 			  FIBER_POOL_IDLE_TIMEOUT);
 	/* Add an extra endpoint for WAL wake up/rollback messages. */
 	cbus_endpoint_create(&tx_prio_endpoint, "tx_prio", tx_prio_cb, &tx_prio_endpoint);
@@ -1741,6 +1752,7 @@ box_cfg_xc(void)
 	box_check_instance_uuid(&instance_uuid);
 	box_check_replicaset_uuid(&replicaset_uuid);
 
+	box_set_net_msg_max();
 	box_set_checkpoint_count();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();

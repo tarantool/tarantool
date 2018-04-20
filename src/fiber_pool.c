@@ -137,6 +137,12 @@ fiber_pool_cb(ev_loop *loop, struct ev_watcher *watcher, int events)
 }
 
 void
+fiber_pool_set_max_size(struct fiber_pool *pool, int new_max_size)
+{
+	pool->max_size = new_max_size;
+}
+
+void
 fiber_pool_create(struct fiber_pool *pool, const char *name, int max_pool_size,
 		  float idle_timeout)
 {

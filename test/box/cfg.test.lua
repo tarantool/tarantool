@@ -81,4 +81,14 @@ test_run:cmd("switch default")
 test_run:cmd("stop server cfg_tester")
 test_run:cmd("cleanup server cfg_tester")
 
+--
+-- gh-3320: box.cfg{net_msg_max}.
+--
+box.cfg{net_msg_max = 'invalid'}
+box.cfg{net_msg_max = 0}
+old = box.cfg.net_msg_max
+box.cfg{net_msg_max = 2}
+box.cfg{net_msg_max = old + 1000}
+box.cfg{net_msg_max = old}
+
 test_run:cmd("clear filter")

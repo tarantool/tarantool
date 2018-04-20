@@ -63,6 +63,7 @@ local default_cfg = {
     feedback_enabled      = true,
     feedback_host         = "https://feedback.tarantool.io",
     feedback_interval     = 3600,
+    net_msg_max           = 768,
 }
 
 -- types of available options
@@ -123,6 +124,7 @@ local template_cfg = {
     feedback_enabled      = 'boolean',
     feedback_host         = 'string',
     feedback_interval     = 'number',
+    net_msg_max           = 'number',
 }
 
 local function normalize_uri(port)
@@ -195,6 +197,7 @@ local dynamic_cfg = {
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
+    net_msg_max             = private.cfg_set_net_msg_max,
 }
 
 local dynamic_cfg_skip_at_load = {
