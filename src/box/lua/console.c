@@ -461,6 +461,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		/* .sync = */ generic_session_sync,
 	};
 	session_vtab_registry[SESSION_TYPE_CONSOLE] = console_session_vtab;
+	session_vtab_registry[SESSION_TYPE_REPL] = console_session_vtab;
 }
 
 /*

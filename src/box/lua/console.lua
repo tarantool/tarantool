@@ -353,7 +353,7 @@ local function start()
         self.history_file = home_dir .. '/.tarantool_history'
         internal.load_history(self.history_file)
     end
-    session_internal.create(-1, "repl")
+    session_internal.create(1, "repl") -- stdin fileno
     repl(self)
     started = false
 end
