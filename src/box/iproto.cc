@@ -1084,10 +1084,11 @@ net_discard_input(struct cmsg *m)
 {
 	struct iproto_msg *msg = container_of(m, struct iproto_msg,
 					      discard_input);
+	struct iproto_connection *conn = msg->connection;
 	msg->p_ibuf->rpos += msg->len;
 	msg->len = 0;
-	msg->connection->long_poll_requests++;
-	iproto_resume();
+	conn->long_poll_requests++;
+	ev_feed_event(conn->loop, &conn->input, EV_READ);
 }
 
 static void
