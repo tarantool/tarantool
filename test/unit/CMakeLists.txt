@@ -129,6 +129,9 @@ add_executable(reflection_cxx.test reflection_cxx.cc unit.c
 add_executable(csv.test csv.c)
 target_link_libraries(csv.test csv)
 
+add_executable(json_path.test json_path.c)
+target_link_libraries(json_path.test json_path unit ${ICU_LIBRARIES})
+
 add_executable(rmean.test rmean.cc)
 target_link_libraries(rmean.test stat unit)
 add_executable(histogram.test histogram.c)

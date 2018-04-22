@@ -9,15 +9,8 @@ local internal = require('box.internal')
 
 ffi.cdef[[
 /** \cond public */
-typedef struct tuple_format box_tuple_format_t;
-
-box_tuple_format_t *
-box_tuple_format_default(void);
 
 typedef struct tuple box_tuple_t;
-
-box_tuple_t *
-box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
 
 int
 box_tuple_ref(box_tuple_t *tuple);
@@ -33,9 +26,6 @@ box_tuple_bsize(const box_tuple_t *tuple);
 
 ssize_t
 box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
-
-box_tuple_format_t *
-box_tuple_format(const box_tuple_t *tuple);
 
 const char *
 box_tuple_field(const box_tuple_t *tuple, uint32_t i);
@@ -278,9 +268,9 @@ end
 
 msgpackffi.on_encode(const_tuple_ref_t, tuple_to_msgpack)
 
-local function tuple_field_by_name(tuple, name)
+local function tuple_field_by_path(tuple, path)
     tuple_check(tuple, "tuple['field_name']");
-    return internal.tuple.tuple_field_by_name(tuple, name)
+    return internal.tuple.tuple_field_by_path(tuple, path)
 end
 
 local methods = {
@@ -315,7 +305,6 @@ local tuple_field = function(tuple, field_n)
     return (msgpackffi.decode_unchecked(field))
 end
 
-
 ffi.metatype(tuple_t, {
     __len = function(tuple)
         return builtin.box_tuple_field_count(tuple)
@@ -325,16 +314,17 @@ ffi.metatype(tuple_t, {
         if type(key) == "number" then
             return tuple_field(tuple, key)
         elseif type(key) == "string" then
-            -- Try to get a field with a name = key. If it was not
+            -- Try to get a field by JSON path. If it was not
             -- found (rc ~= 0) then return a method from the
             -- vtable. If a collision occurred, then fields have
             -- higher priority. For example, if a tuple T has a
-            -- field with name 'bsize', then T.bsize returns field
-            -- value, not tuple_bsize function. To access hidden
-            -- methods use 'box.tuple.<method_name>(T, [args...])'.
-            local rc, field = tuple_field_by_name(tuple, key)
-            if rc == 0 then
-                return field
+            -- field with name 'bsize', then T.bsize returns
+            -- field value, not tuple_bsize function. To access
+            -- hidden methods use
+            -- 'box.tuple.<method_name>(T, [args...])'.
+            local res = tuple_field_by_path(tuple, key)
+            if res ~= nil then
+                return res
             end
         end
         return methods[key]

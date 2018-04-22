@@ -41,6 +41,7 @@
 #include "box/tuple_convert.h"
 #include "box/errcode.h"
 #include "box/memtx_tuple.h"
+#include "json/path.h"
 
 /** {{{ box.tuple Lua library
  *
@@ -420,36 +421,37 @@ lbox_tuple_transform(struct lua_State *L)
 }
 
 /**
- * Find a tuple field using its name.
+ * Find a tuple field by JSON path. If a field was not found and a
+ * path contains JSON syntax errors, then an exception is raised.
  * @param L Lua state.
- * @param tuple 1-th argument on lua stack, tuple to get field
+ * @param tuple 1-th argument on a lua stack, tuple to get field
  *        from.
- * @param field_name 2-th argument on lua stack, field name to
- *        get.
+ * @param path 2-th argument on lua stack. Can be field name or a
+ *        JSON path to a field.
  *
- * @retval If a field was not found, return -1 and nil to lua else
- *         return 0 and decoded field.
+ * @retval not nil Found field value.
+ * @retval     nil A field is NULL or does not exist.
  */
 static int
-lbox_tuple_field_by_name(struct lua_State *L)
+lbox_tuple_field_by_path(struct lua_State *L)
 {
 	struct tuple *tuple = luaT_istuple(L, 1);
 	/* Is checked in Lua wrapper. */
 	assert(tuple != NULL);
 	assert(lua_isstring(L, 2));
-	size_t name_len;
-	const char *name = lua_tolstring(L, 2, &name_len);
-	uint32_t name_hash = lua_hashstring(L, 2);
-	const char *field =
-		tuple_field_by_name(tuple, name, name_len, name_hash);
-	if (field == NULL) {
-		lua_pushinteger(L, -1);
-		lua_pushnil(L);
-		return 2;
+	size_t len;
+	const char *field = NULL, *path = lua_tolstring(L, 2, &len);
+	if (len == 0)
+		return 0;
+	if (tuple_field_by_path(tuple, path, (uint32_t) len,
+				lua_hashstring(L, 2), &field) != 0) {
+		return luaT_error(L);
+	} else if (field == NULL) {
+		return 0;
 	}
-	lua_pushinteger(L, 0);
+	assert(field != NULL);
 	luamp_decode(L, luaL_msgpack_default, &field);
-	return 2;
+	return 1;
 }
 
 static int
@@ -488,8 +490,8 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"tostring", lbox_tuple_to_string},
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
-	{"tuple_field_by_name", lbox_tuple_field_by_name},
 	{"tuple_to_map", lbox_tuple_to_map},
+	{"tuple_field_by_path", lbox_tuple_field_by_path},
 	{NULL, NULL}
 };
 

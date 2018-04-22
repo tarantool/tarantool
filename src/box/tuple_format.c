@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "json/path.h"
 #include "tuple_format.h"
 
 /** Global table of tuple formats */
@@ -495,4 +496,167 @@ void
 box_tuple_format_unref(box_tuple_format_t *format)
 {
 	tuple_format_unref(format);
+}
+
+/**
+ * Propagate @a field to MessagePack(field)[index].
+ * @param[in][out] field Field to propagate.
+ * @param index 1-based index to propagate to.
+ *
+ * @retval  0 Success, the index was found.
+ * @retval -1 Not found.
+ */
+static inline int
+tuple_field_go_to_index(const char **field, uint64_t index)
+{
+	enum mp_type type = mp_typeof(**field);
+	if (type == MP_ARRAY) {
+		if (index == 0)
+			return -1;
+		/* Make index 0-based. */
+		index -= TUPLE_INDEX_BASE;
+		uint32_t count = mp_decode_array(field);
+		if (index >= count)
+			return -1;
+		for (; index > 0; --index)
+			mp_next(field);
+		return 0;
+	} else if (type == MP_MAP) {
+		uint64_t count = mp_decode_map(field);
+		for (; count > 0; --count) {
+			type = mp_typeof(**field);
+			if (type == MP_UINT) {
+				uint64_t value = mp_decode_uint(field);
+				if (value == index)
+					return 0;
+			} else if (type == MP_INT) {
+				int64_t value = mp_decode_int(field);
+				if (value >= 0 && (uint64_t)value == index)
+					return 0;
+			} else {
+				/* Skip key. */
+				mp_next(field);
+			}
+			/* Skip value. */
+			mp_next(field);
+		}
+	}
+	return -1;
+}
+
+/**
+ * Propagate @a field to MessagePack(field)[key].
+ * @param[in][out] field Field to propagate.
+ * @param key Key to propagate to.
+ * @param len Length of @a key.
+ *
+ * @retval  0 Success, the index was found.
+ * @retval -1 Not found.
+ */
+static inline int
+tuple_field_go_to_key(const char **field, const char *key, int len)
+{
+	enum mp_type type = mp_typeof(**field);
+	if (type != MP_MAP)
+		return -1;
+	uint64_t count = mp_decode_map(field);
+	for (; count > 0; --count) {
+		type = mp_typeof(**field);
+		if (type == MP_STR) {
+			uint32_t value_len;
+			const char *value = mp_decode_str(field, &value_len);
+			if (value_len == (uint)len &&
+			    memcmp(value, key, len) == 0)
+				return 0;
+		} else {
+			/* Skip key. */
+			mp_next(field);
+		}
+		/* Skip value. */
+		mp_next(field);
+	}
+	return -1;
+}
+
+int
+tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
+                        const uint32_t *field_map, const char *path,
+                        uint32_t path_len, uint32_t path_hash,
+                        const char **field)
+{
+	assert(path_len > 0);
+	struct json_path_parser parser;
+	struct json_path_node node;
+	json_path_parser_create(&parser, path, path_len);
+	int rc = json_path_next(&parser, &node);
+	if (rc != 0)
+		goto best_effort;
+	switch(node.type) {
+	case JSON_PATH_NUM: {
+		int index = node.num;
+		if (index == 0)
+			goto best_effort;
+		index -= TUPLE_INDEX_BASE;
+		*field = tuple_field_raw(format, tuple, field_map, index);
+		if (*field == NULL)
+			goto best_effort;
+		break;
+	}
+	case JSON_PATH_STR: {
+		/* First part of a path is a field name. */
+		uint32_t name_hash;
+		if (path_len == (uint32_t) node.len) {
+			name_hash = path_hash;
+		} else {
+			/*
+			 * If a string is "field....", then its
+			 * precalculated juajit hash can not be
+			 * used. A tuple dictionary hashes only
+			 * name, not path.
+			 */
+			name_hash = field_name_hash(node.str, node.len);
+		}
+		*field = tuple_field_raw_by_name(format, tuple, field_map,
+						 node.str, node.len, name_hash);
+		if (*field == NULL)
+			goto best_effort;
+		break;
+	}
+	default:
+		assert(node.type == JSON_PATH_END);
+		*field = NULL;
+		return 0;
+	}
+	while (rc == 0 && (rc = json_path_next(&parser, &node)) == 0) {
+		switch(node.type) {
+		case JSON_PATH_NUM:
+			rc = tuple_field_go_to_index(field, node.num);
+			break;
+		case JSON_PATH_STR:
+			rc = tuple_field_go_to_key(field, node.str, node.len);
+			break;
+		default:
+			assert(node.type == JSON_PATH_END);
+			return 0;
+		}
+	}
+	assert(rc != 0);
+	/*
+	 * It is possible, that a field has a name as
+	 * well-formatted JSON. For example 'a.b.c.d' can be field
+	 * name. If a data was not found by such path, then try
+	 * to interpret the whole path as a field name.
+	 * The same is true for field names, that are not valid
+	 * JSON.
+	 */
+best_effort:
+	*field = tuple_field_raw_by_name(format, tuple, field_map, path,
+					 path_len, path_hash);
+	if (rc > 0 && *field == NULL) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 tt_sprintf("error in path on position %d", rc));
+		return -1;
+	} else {
+		return 0;
+	}
 }

@@ -514,6 +514,27 @@ tuple_field(const struct tuple *tuple, uint32_t fieldno)
 }
 
 /**
+ * Get tuple field by its JSON path.
+ * @param tuple Tuple to get field from.
+ * @param path Field JSON path.
+ * @param path_len Length of @a path.
+ * @param path_hash Hash of @a path.
+ * @param[out] field Found field, or NULL, if not found.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error in JSON path.
+ */
+static inline int
+tuple_field_by_path(const struct tuple *tuple, const char *path,
+                    uint32_t path_len, uint32_t path_hash,
+                    const char **field)
+{
+	return tuple_field_raw_by_path(tuple_format(tuple), tuple_data(tuple),
+	                               tuple_field_map(tuple), path, path_len,
+	                               path_hash, field);
+}
+
+/**
  * Get tuple field by its name.
  * @param tuple Tuple to get field from.
  * @param name Field name.
