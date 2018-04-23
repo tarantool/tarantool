@@ -583,3 +583,58 @@ s:format(format)
 s:format()
 
 s:drop()
+
+--
+-- gh-3285: index Lua object is not updated on alter.
+--
+box.internal.collation.create('test', 'ICU', 'ru-RU')
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+sk1 = s:create_index('b', {unique = false})
+sk2 = s:create_index('c', {type = 'hash', parts = {{3, 'unsigned'}}})
+sk3 = s:create_index('d', {parts = {{4, 'string'}}})
+test_run:cmd("setopt delimiter ';'")
+function index_count()
+    local r = 0
+    for i, _ in pairs(s.index) do
+        r = r + 1
+    end
+    return r / 2
+end;
+function validate_indexes()
+    assert(s == box.space.test)
+    assert(sk1 == nil or sk1 == s.index[sk1.name])
+    assert(sk2 == nil or sk2 == s.index[sk2.name])
+    assert(sk3 == nil or sk3 == s.index[sk3.name])
+end;
+test_run:cmd("setopt delimiter ''");
+index_count()
+
+sk3:rename('dd')
+sk3.name == 'dd'
+index_count()
+validate_indexes()
+
+sk3:alter({parts = {{4, 'string', collation = 'test'}}})
+sk3.parts[1].collation == 'test'
+index_count()
+validate_indexes()
+
+sk3:drop()
+sk3 = nil
+index_count()
+validate_indexes()
+
+sk2:alter({parts = {{4, 'string'}}})
+sk2.parts[1].type == 'string'
+sk2.parts[1].fieldno == 4
+index_count()
+validate_indexes()
+
+sk1:alter({unique = true})
+sk1.unique
+index_count()
+validate_indexes()
+
+s:drop()
+box.internal.collation.drop('test')
