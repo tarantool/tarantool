@@ -559,37 +559,33 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 	case PragTyp_FOREIGN_KEY_LIST:{
-			if (zRight) {
-				FKey *pFK;
-				Table *pTab;
-				pTab = sqlite3HashFind(&db->pSchema->tblHash,
-						       zRight);
-				if (pTab != NULL) {
-					pFK = pTab->pFKey;
-					if (pFK) {
-						int i = 0;
-						pParse->nMem = 8;
-						while (pFK) {
-							int j;
-							for (j = 0;
-							     j < pFK->nCol;
-							     j++) {
-								sqlite3VdbeMultiLoad(v, 1, "iissssss", i, j, pFK->zTo, pTab->aCol[pFK->aCol[j].iFrom].zName, pFK->aCol[j].zCol, actionName(pFK->aAction[1]),	/* ON UPDATE */
-										     actionName(pFK->aAction[0]),	/* ON DELETE */
-										     "NONE");
-								sqlite3VdbeAddOp2
-								    (v,
-								     OP_ResultRow,
-								     1, 8);
-							}
-							++i;
-							pFK = pFK->pNextFrom;
-						}
-					}
-				}
-			}
+		if (zRight == NULL)
 			break;
+		Table *pTab = sqlite3HashFind(&db->pSchema->tblHash, zRight);
+		if (pTab == NULL)
+			break;
+		FKey *pFK = pTab->pFKey;
+		if (pFK == NULL)
+			break;
+		int i = 0;
+		pParse->nMem = 8;
+		while (pFK != NULL) {
+			for (int j = 0; j < pFK->nCol; j++) {
+				const char *name =
+					pTab->aCol[pFK->aCol[j].iFrom].zName;
+				sqlite3VdbeMultiLoad(v, 1, "iissssss", i, j,
+						     pFK->zTo, name,
+						     pFK->aCol[j].zCol,
+						     actionName(pFK->aAction[1]),
+						     actionName(pFK->aAction[0]),
+						     "NONE");
+				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 8);
+			}
+			++i;
+			pFK = pFK->pNextFrom;
 		}
+		break;
+	}
 #endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
