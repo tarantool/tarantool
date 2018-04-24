@@ -547,21 +547,35 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
                         const char **field)
 {
 	assert(path_len > 0);
+	uint32_t fieldno;
+	/*
+	 * It is possible, that a field has a name as
+	 * well-formatted JSON. For example 'a.b.c.d' or '[1]' can
+	 * be field name. To save compatibility at first try to
+	 * use the path as a field name.
+	 */
+	if (tuple_fieldno_by_name(format->dict, path, path_len, path_hash,
+				  &fieldno) == 0) {
+		*field = tuple_field_raw(format, tuple, field_map, fieldno);
+		return 0;
+	}
 	struct json_path_parser parser;
 	struct json_path_node node;
 	json_path_parser_create(&parser, path, path_len);
 	int rc = json_path_next(&parser, &node);
 	if (rc != 0)
-		goto best_effort;
+		goto error;
 	switch(node.type) {
 	case JSON_PATH_NUM: {
 		int index = node.num;
-		if (index == 0)
-			goto best_effort;
+		if (index == 0) {
+			*field = NULL;
+			return 0;
+		}
 		index -= TUPLE_INDEX_BASE;
 		*field = tuple_field_raw(format, tuple, field_map, index);
 		if (*field == NULL)
-			goto best_effort;
+			return 0;
 		break;
 	}
 	case JSON_PATH_STR: {
@@ -581,7 +595,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 		*field = tuple_field_raw_by_name(format, tuple, field_map,
 						 node.str, node.len, name_hash);
 		if (*field == NULL)
-			goto best_effort;
+			return 0;
 		break;
 	}
 	default:
@@ -589,7 +603,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 		*field = NULL;
 		return 0;
 	}
-	while (rc == 0 && (rc = json_path_next(&parser, &node)) == 0) {
+	while ((rc = json_path_next(&parser, &node)) == 0) {
 		switch(node.type) {
 		case JSON_PATH_NUM:
 			rc = tuple_field_go_to_index(field, node.num);
@@ -601,24 +615,14 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			assert(node.type == JSON_PATH_END);
 			return 0;
 		}
+		if (rc != 0) {
+			*field = NULL;
+			return 0;
+		}
 	}
-	assert(rc != 0);
-	/*
-	 * It is possible, that a field has a name as
-	 * well-formatted JSON. For example 'a.b.c.d' can be field
-	 * name. If a data was not found by such path, then try
-	 * to interpret the whole path as a field name.
-	 * The same is true for field names, that are not valid
-	 * JSON.
-	 */
-best_effort:
-	*field = tuple_field_raw_by_name(format, tuple, field_map, path,
-					 path_len, path_hash);
-	if (rc > 0 && *field == NULL) {
-		diag_set(ClientError, ER_ILLEGAL_PARAMS,
-			 tt_sprintf("error in path on position %d", rc));
-		return -1;
-	} else {
-		return 0;
-	}
+error:
+	assert(rc > 0);
+	diag_set(ClientError, ER_ILLEGAL_PARAMS,
+		 tt_sprintf("error in path on position %d", rc));
+	return -1;
 }
