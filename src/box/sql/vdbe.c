@@ -2867,7 +2867,12 @@ case OP_Savepoint: {
 	Savepoint *pTmp;
 	struct sql_txn *psql_txn = p->psql_txn;
 
-	assert(psql_txn);
+	if (psql_txn == NULL) {
+		assert(!box_txn());
+		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
 	p1 = pOp->p1;
 	zName = pOp->p4.z;
 
