@@ -716,8 +716,8 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 		VdbeCoverageIf(v, bRev != 0);
 		sqlite3VdbeJumpHere(v, j);
 		for (j = 0; j < nSkip; j++) {
-			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, j,
-					  regBase + j);
+			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
+					  pIdx->aiColumn[j], regBase + j);
 			testcase(pIdx->aiColumn[j] == XN_EXPR);
 			VdbeComment((v, "%s", explainIndexColumnName(pIdx, j)));
 		}
