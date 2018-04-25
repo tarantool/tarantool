@@ -127,6 +127,9 @@ box.internal.collation.create('test', 'ICU', 'ru_RU', {strength=2}) --ok
 box.internal.collation.drop('test') --ok
 box.internal.collation.create('test', 'ICU', 'ru_RU', {strength='primary'}) --ok
 box.internal.collation.drop('test') --ok
+c = box.space._collation:get{1}:totable()
+c[2] = 'unicode_test'
+box.space._collation:replace(c)
 
 box.begin() box.internal.collation.create('test2', 'ICU', 'ru_RU')
 box.rollback()
