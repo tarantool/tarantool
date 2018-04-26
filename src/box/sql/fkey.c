@@ -748,23 +748,19 @@ fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
 	}
 }
 
-/*
- * This function is called to generate code that runs when table pTab is
- * being dropped from the database. The SrcList passed as the second argument
- * to this function contains a single entry guaranteed to resolve to
- * table pTab.
+/**
+ * This function is called to generate code that runs when table
+ * pTab is being dropped from the database. The SrcList passed as
+ * the second argument to this function contains a single entry
+ * guaranteed to resolve to table pTab.
  *
- * Normally, no code is required. However, if either
- *
- *   (a) The table is the parent table of a FK constraint, or
- *   (b) The table is the child table of a deferred FK constraint and it is
- *       determined at runtime that there are outstanding deferred FK
- *       constraint violations in the database,
- *
- * then the equivalent of "DELETE FROM <tbl>" is executed in a single transaction
- * before dropping the table from the database. If any FK violations occur,
- * rollback transaction and halt VDBE. Triggers are disabled while running this
- * DELETE, but foreign key actions are not.
+ * Normally, no code is required. However, if the table is
+ * parent table of a FK constraint, then the equivalent
+ * of "DELETE FROM <tbl>" is executed in a single transaction
+ * before dropping the table from the database. If any FK
+ * violations occur, rollback transaction and halt VDBE. Triggers
+ * are disabled while running this DELETE, but foreign key
+ * actions are not.
  */
 void
 sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
@@ -774,31 +770,17 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
 
 	if ((user_session->sql_flags & SQLITE_ForeignKeys) &&
 	    !space_is_view(pTab)) {
-		int iSkip = 0;
 		Vdbe *v = sqlite3GetVdbe(pParse);
-
-		assert(v);	/* VDBE has already been allocated */
-		if (sqlite3FkReferences(pTab) == 0) {
-			/* Search for a deferred foreign key constraint for which this table
-			 * is the child table. If one cannot be found, return without
-			 * generating any VDBE code. If one can be found, then jump over
-			 * the entire DELETE if there are no outstanding deferred constraints
-			 * when this statement is run.
-			 */
-			FKey *p;
-			for (p = pTab->pFKey; p; p = p->pNextFrom) {
-				if (p->isDeferred
-				    || (user_session->
-					sql_flags & SQLITE_DeferFKs))
-					break;
-			}
-			if (!p)
+		assert(v != NULL);
+		/*
+		 * Search for a foreign key constraint for which
+		 * this table is the parent table. If one can't be
+		 * found, return without generating any VDBE code,
+		 * since it makes no sense starting transaction
+		 * to test FK violations.
+		 */
+		if (sqlite3FkReferences(pTab) == NULL)
 				return;
-			iSkip = sqlite3VdbeMakeLabel(v);
-			sqlite3VdbeAddOp2(v, OP_FkIfZero, 1, iSkip);
-			VdbeCoverage(v);
-		}
-
 		pParse->disableTriggers = 1;
 		/* Staring new transaction before DELETE FROM <tbl> */
 		sqlite3VdbeAddOp0(v, OP_TTransaction);
@@ -813,10 +795,6 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
 		 * commit changes.
 		 */
 		sqlite3VdbeAddOp0(v, OP_FkCheckCommit);
-
-		if (iSkip) {
-			sqlite3VdbeResolveLabel(v, iSkip);
-		}
 	}
 }
 

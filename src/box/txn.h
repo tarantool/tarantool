@@ -43,7 +43,7 @@ extern "C" {
 
 /** box statistics */
 extern struct rmean *rmean_box;
-struct sql_txn;
+struct Savepoint;
 
 struct engine;
 struct space;
@@ -95,9 +95,29 @@ struct txn_savepoint {
 	 * an empty transaction.
 	 */
 	struct stailq_entry *stmt;
+	/**
+	 * Each foreign key constraint is classified as either
+	 * immediate (by default) or deferred. In autocommit mode
+	 * they mean the same. Inside separate transaction,
+	 * deferred FK constraints are not checked until the
+	 * transaction tries to commit. For as long as
+	 * a transaction is open, it is allowed to exist in a
+	 * state violating any number of deferred FK constraints.
+	 */
+	uint32_t fk_deferred_count;
 };
 
 extern double too_long_threshold;
+
+struct sql_txn {
+	/** List of active SQL savepoints. */
+	struct Savepoint *pSavepoint;
+	/**
+	 * This variables transfer deferred constraints from one
+	 * VDBE to the next in the same transaction.
+	 */
+	uint32_t fk_deferred_count;
+};
 
 struct txn {
 	/**

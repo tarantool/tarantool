@@ -333,8 +333,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 				break;
 			}
 			const struct sql_txn *psql_txn = ptxn->psql_txn;
-			*pCurrent = psql_txn->nDeferredImmConsSave > 0 ||
-				    psql_txn->nDeferredConsSave > 0;
+			*pCurrent = psql_txn->fk_deferred_count > 0;
 			break;
 		}
 

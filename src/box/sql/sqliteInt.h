@@ -1849,8 +1849,6 @@ struct FuncDestructor {
 struct Savepoint {
 	box_txn_savepoint_t *tnt_savepoint; /* Tarantool's savepoint struct */
 	char *zName;		/* Savepoint name (nul-terminated) */
-	i64 nDeferredCons;	/* Number of deferred fk violations */
-	i64 nDeferredImmCons;	/* Number of deferred imm fk. */
 	Savepoint *pNext;	/* Parent savepoint (if any) */
 };
 

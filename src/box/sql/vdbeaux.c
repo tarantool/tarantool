@@ -65,22 +65,52 @@ sqlite3VdbeCreate(Parse * pParse)
 	db->pVdbe = p;
 	p->magic = VDBE_MAGIC_INIT;
 	p->pParse = pParse;
-	p->auto_commit = !box_txn();
 	p->schema_ver = box_schema_version();
-	if (!p->auto_commit) {
-		p->psql_txn = in_txn()->psql_txn;
-		p->nDeferredCons = p->psql_txn->nDeferredConsSave;
-		p->nDeferredImmCons = p->psql_txn->nDeferredImmConsSave;
-	} else{
-		p->psql_txn = NULL;
-		p->nDeferredCons = 0;
-		p->nDeferredImmCons = 0;
-	}
 	assert(pParse->aLabel == 0);
 	assert(pParse->nLabel == 0);
 	assert(pParse->nOpAlloc == 0);
 	assert(pParse->szOpAlloc == 0);
 	return p;
+}
+
+struct sql_txn *
+sql_alloc_txn()
+{
+	struct sql_txn *txn = region_alloc_object(&fiber()->gc,
+						  struct sql_txn);
+	if (txn == NULL) {
+		diag_set(OutOfMemory, sizeof(struct sql_txn), "region",
+			 "struct sql_txn");
+		return NULL;
+	}
+	txn->pSavepoint = NULL;
+	txn->fk_deferred_count = 0;
+	return txn;
+}
+
+int
+sql_vdbe_prepare(struct Vdbe *vdbe)
+{
+	assert(vdbe != NULL);
+	struct txn *txn = in_txn();
+	vdbe->auto_commit = txn == NULL;
+	if (txn != NULL) {
+		/*
+		 * If transaction has been started in Lua, then
+		 * sql_txn is NULL. On the other hand, it is not
+		 * critical, since in Lua it is impossible to
+		 * check FK violations, at least now.
+		 */
+		if (txn->psql_txn == NULL) {
+			txn->psql_txn = sql_alloc_txn();
+			if (txn->psql_txn == NULL)
+				return -1;
+		}
+		vdbe->psql_txn = txn->psql_txn;
+	} else {
+		vdbe->psql_txn = NULL;
+	}
+	return 0;
 }
 
 /*
@@ -2439,11 +2469,8 @@ sqlite3VdbeCloseStatement(Vdbe * p, int eOp)
 	/*
 	 * If we have an anonymous transaction opened -> perform eOp.
 	 */
-	if (savepoint && eOp == SAVEPOINT_ROLLBACK) {
+	if (savepoint && eOp == SAVEPOINT_ROLLBACK)
 		rc = box_txn_rollback_to_savepoint(savepoint->tnt_savepoint);
-		p->nDeferredCons = savepoint->nDeferredCons;
-		p->nDeferredImmCons = savepoint->nDeferredImmCons;
-	}
 	p->anonymous_savepoint = NULL;
 	return rc;
 }
@@ -2462,9 +2489,9 @@ sqlite3VdbeCloseStatement(Vdbe * p, int eOp)
 int
 sqlite3VdbeCheckFk(Vdbe * p, int deferred)
 {
-	if ((deferred && (p->nDeferredCons + p->nDeferredImmCons) > 0)
-	    || (!deferred && p->nFkConstraint > 0)
-	    ) {
+	if ((deferred && p->psql_txn != NULL &&
+	     p->psql_txn->fk_deferred_count > 0) ||
+	    (!deferred && p->nFkConstraint > 0)) {
 		p->rc = SQLITE_CONSTRAINT_FOREIGNKEY;
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;
 		sqlite3VdbeError(p, "FOREIGN KEY constraint failed");
@@ -2484,14 +2511,11 @@ sql_txn_begin(Vdbe *p)
 	struct txn *ptxn = txn_begin(false);
 	if (ptxn == NULL)
 		return -1;
-	ptxn->psql_txn = region_alloc_object(&fiber()->gc, struct sql_txn);
+	ptxn->psql_txn = sql_alloc_txn();
 	if (ptxn->psql_txn == NULL) {
 		box_txn_rollback();
-		diag_set(OutOfMemory, sizeof(struct sql_txn), "region",
-			 "struct sql_txn");
 		return -1;
 	}
-	memset(ptxn->psql_txn, 0, sizeof(struct sql_txn));
 	p->psql_txn = ptxn->psql_txn;
 	return 0;
 }
@@ -2518,9 +2542,7 @@ sql_savepoint(Vdbe *p, const char *zName)
 	if (zName) {
 		pNew->zName = (char *)&pNew[1];
 		memcpy(pNew->zName, zName, nName);
-	}
-	pNew->nDeferredCons = p->nDeferredCons;
-	pNew->nDeferredImmCons = p->nDeferredImmCons;
+	};
 	return pNew;
 }
 
@@ -2542,7 +2564,6 @@ sqlite3VdbeHalt(Vdbe * p)
 {
 	int rc;			/* Used to store transient return codes */
 	sqlite3 *db = p->db;
-	struct session *user_session = current_session();
 
 	/* This function contains the logic that determines if a statement or
 	 * transaction will be committed or rolled back as a result of the
@@ -2659,10 +2680,6 @@ sqlite3VdbeHalt(Vdbe * p)
 					sqlite3RollbackAll(p, SQLITE_OK);
 					p->nChange = 0;
 				} else {
-					p->nDeferredCons = 0;
-					p->nDeferredImmCons = 0;
-					user_session->sql_flags &=
-					    ~SQLITE_DeferFKs;
 					sqlite3CommitInternalChanges();
 				}
 			} else {
@@ -2741,7 +2758,7 @@ sqlite3VdbeHalt(Vdbe * p)
 		fiber_gc();
 
 	assert(db->nVdbeActive > 0 || box_txn() ||
-		       p->anonymous_savepoint == NULL);
+	       p->anonymous_savepoint == NULL);
 	return (p->rc == SQLITE_BUSY ? SQLITE_BUSY : SQLITE_OK);
 }
 

@@ -320,9 +320,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					user_session->sql_flags |= mask;
 				} else {
 					user_session->sql_flags &= ~mask;
-					if (mask == SQLITE_DeferFKs) {
-						v->nDeferredImmCons = 0;
-					}
 				}
 
 				/* Many of the flag-pragmas modify the code

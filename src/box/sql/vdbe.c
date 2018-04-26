@@ -1029,7 +1029,6 @@ case OP_Halt: {
 		p->rc = SQLITE_BUSY;
 	} else {
 		assert(rc==SQLITE_OK || (p->rc&0xff)==SQLITE_CONSTRAINT);
-		assert(rc==SQLITE_OK || p->nDeferredCons>0 || p->nDeferredImmCons>0);
 		rc = p->rc ? SQLITE_ERROR : SQLITE_DONE;
 	}
 	goto vdbe_return;
@@ -2950,8 +2949,8 @@ case OP_Savepoint: {
 				assert(pSavepoint == psql_txn->pSavepoint);
 				psql_txn->pSavepoint = pSavepoint->pNext;
 			} else {
-				p->nDeferredCons = pSavepoint->nDeferredCons;
-				p->nDeferredImmCons = pSavepoint->nDeferredImmCons;
+				p->psql_txn->fk_deferred_count =
+					pSavepoint->tnt_savepoint->fk_deferred_count;
 			}
 		}
 	}
@@ -5058,10 +5057,10 @@ case OP_Param: {           /* out2 */
  * statement counter is incremented (immediate foreign key constraints).
  */
 case OP_FkCounter: {
-	if (user_session->sql_flags & SQLITE_DeferFKs) {
-		p->nDeferredImmCons += pOp->p2;
-	} else if (pOp->p1) {
-		p->nDeferredCons += pOp->p2;
+	if ((user_session->sql_flags & SQLITE_DeferFKs || pOp->p1 != 0) &&
+	    !p->auto_commit) {
+		assert(p->psql_txn != NULL);
+		p->psql_txn->fk_deferred_count += pOp->p2;
 	} else {
 		p->nFkConstraint += pOp->p2;
 	}
@@ -5081,12 +5080,14 @@ case OP_FkCounter: {
  * (immediate foreign key constraint violations).
  */
 case OP_FkIfZero: {         /* jump */
-	if (pOp->p1) {
-		VdbeBranchTaken(db->nDeferredCons == 0 && db->nDeferredImmCons == 0, 2);
-		if (p->nDeferredCons==0 && p->nDeferredImmCons==0) goto jump_to_p2;
+	if ((user_session->sql_flags & SQLITE_DeferFKs || pOp->p1) &&
+	    !p->auto_commit) {
+		assert(p->psql_txn != NULL);
+		if (p->psql_txn->fk_deferred_count == 0)
+			goto jump_to_p2;
 	} else {
-		VdbeBranchTaken(p->nFkConstraint == 0 && db->nDeferredImmCons == 0, 2);
-		if (p->nFkConstraint==0 && p->nDeferredImmCons==0) goto jump_to_p2;
+		if (p->nFkConstraint == 0)
+			goto jump_to_p2;
 	}
 	break;
 }

@@ -214,6 +214,7 @@ struct errcode_record {
 	/*159 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
 	/*160 */_(ER_ACTION_MISMATCH,		"Field %d contains %s on conflict action, but %s in index parts") \
 	/*161 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \
+	/*162 */_(ER_FOREIGN_KEY_CONSTRAINT,	"Can not commit transaction: deferred foreign keys violations are not resolved") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

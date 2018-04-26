@@ -332,19 +332,6 @@ struct ScanStatus {
 	char *zName;		/* Name of table or index */
 };
 
-
-struct sql_txn {
-	Savepoint *pSavepoint;	/* List of active savepoints */
-	/*
-	 * This variables transfer deferred constraints from one
-	 * VDBE to the next in the same transaction.
-	 * We have to do it this way because some VDBE execute ddl and do not
-	 * have a transaction which disallows to always store this vars here.
-	 */
-	i64 nDeferredConsSave;
-	i64 nDeferredImmConsSave;
-};
-
 /*
  * An instance of the virtual machine.  This structure contains the complete
  * state of the virtual machine.
@@ -367,8 +354,6 @@ struct Vdbe {
 	int iStatement;		/* Statement number (or 0 if has not opened stmt) */
 	i64 iCurrentTime;	/* Value of julianday('now') for this statement */
 	i64 nFkConstraint;	/* Number of imm. FK constraints this VM */
-	i64 nStmtDefCons;	/* Number of def. constraints when stmt started */
-	i64 nStmtDefImmCons;	/* Number of def. imm constraints when stmt started */
 	uint32_t schema_ver;	/* Schema version at the moment of VDBE creation. */
 
 	/*
@@ -379,17 +364,10 @@ struct Vdbe {
 	 * ignoreRaised variable helps to track such situations
 	 */
 	u8 ignoreRaised;	/* Flag for ON CONFLICT IGNORE for triggers */
-
-	struct sql_txn *psql_txn; /* Data related to current transaction */
+	/** Data related to current transaction. */
+	struct sql_txn *psql_txn;
 	/** The auto-commit flag. */
 	bool auto_commit;
-	/*
-	 * `nDeferredCons` and `nDeferredImmCons` are stored in vdbe during
-	 * vdbe execution and moved to sql_txn when it needs to be saved until
-	 * execution of the next vdbe in the same transaction.
-	 */
-	i64 nDeferredCons;	/* Number of deferred fk violations */
-	i64 nDeferredImmCons;	/* Number of deferred imm fk. */
 
 	/* When allocating a new Vdbe object, all of the fields below should be
 	 * initialized to zero or NULL

@@ -191,6 +191,29 @@ typedef struct VdbeOpList VdbeOpList;
  * for a description of what each of these routines does.
  */
 Vdbe *sqlite3VdbeCreate(Parse *);
+
+/**
+ * Allocate and initialize SQL-specific struct which completes
+ * original Tarantool's txn struct using region allocator.
+ *
+ * @retval NULL on OOM, new psql_txn struct on success.
+ **/
+struct sql_txn *
+sql_alloc_txn();
+
+/**
+ * Prepare given VDBE to execution: initialize structs connected
+ * with transaction routine: autocommit mode, deferred foreign
+ * keys counter, struct representing SQL savepoint.
+ * If execution context is already within active transaction,
+ * just transfer transaction data to VDBE.
+ *
+ * @param vdbe VDBE to be prepared.
+ * @retval -1 on out of memory, 0 otherwise.
+ */
+int
+sql_vdbe_prepare(struct Vdbe *vdbe);
+
 int sqlite3VdbeAddOp0(Vdbe *, int);
 int sqlite3VdbeAddOp1(Vdbe *, int, int);
 int sqlite3VdbeAddOp2(Vdbe *, int, int, int);

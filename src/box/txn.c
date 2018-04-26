@@ -289,7 +289,18 @@ txn_commit(struct txn *txn)
 	assert(txn == in_txn());
 
 	assert(stailq_empty(&txn->stmts) || txn->engine);
-
+	/*
+	 * If transaction has been started in SQL, deferred
+	 * foreign key constraints must not be violated.
+	 * If not so, just rollback transaction.
+	 */
+	if (txn->psql_txn != NULL) {
+		struct sql_txn *sql_txn = txn->psql_txn;
+		if (sql_txn->fk_deferred_count != 0) {
+			diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
+			goto fail;
+		}
+	}
 	/* Do transaction conflict resolving */
 	if (txn->engine) {
 		if (engine_prepare(txn->engine, txn) != 0)
@@ -458,6 +469,8 @@ box_txn_savepoint()
 	}
 	svp->stmt = stailq_last(&txn->stmts);
 	svp->in_sub_stmt = txn->in_sub_stmt;
+	if (txn->psql_txn != NULL)
+		svp->fk_deferred_count = txn->psql_txn->fk_deferred_count;
 	return svp;
 }
 
@@ -484,5 +497,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		return -1;
 	}
 	txn_rollback_to_svp(txn, svp->stmt);
+	if (txn->psql_txn != NULL)
+		txn->psql_txn->fk_deferred_count = svp->fk_deferred_count;
 	return 0;
 }

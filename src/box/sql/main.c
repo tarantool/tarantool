@@ -770,11 +770,6 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 	assert((user_session->sql_flags & SQLITE_InternChanges) == 0
 	       || db->init.busy == 1);
 
-	/* Any deferred constraint violations have now been resolved. */
-	pVdbe->nDeferredCons = 0;
-	pVdbe->nDeferredImmCons = 0;
-	user_session->sql_flags &= ~SQLITE_DeferFKs;
-
 	/* If one has been configured, invoke the rollback-hook callback */
 	if (db->xRollbackCallback && (!pVdbe->auto_commit)) {
 		db->xRollbackCallback(db->pRollbackArg);
