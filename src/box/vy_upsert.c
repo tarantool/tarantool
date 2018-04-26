@@ -50,42 +50,6 @@ vy_update_alloc(void *arg, size_t size)
 }
 
 /**
- * vinyl wrapper of tuple_upsert_execute.
- * vibyl upsert opts are slightly different from tarantool ops,
- *  so they need some preparation before tuple_upsert_execute call.
- *  The function does this preparation.
- * On successfull upsert the result is placed into stmt and stmt_end args.
- * On fail the stmt and stmt_end args are not changed.
- * Possibly allocates new stmt via fiber region alloc,
- * so call fiber_gc() after usage
- */
-static void
-vy_apply_upsert_ops(struct region *region, const char **stmt,
-		    const char **stmt_end, const char *ops, const char *ops_end,
-		    bool suppress_error, uint64_t *column_mask)
-{
-	if (ops == ops_end)
-		return;
-
-#ifndef NDEBUG
-	const char *serie_end_must_be = ops;
-	mp_next(&serie_end_must_be);
-	assert(ops_end == serie_end_must_be);
-#endif
-	const char *result;
-	uint32_t size;
-	result = tuple_upsert_execute(vy_update_alloc, region,
-				      ops, ops_end,
-				      *stmt, *stmt_end,
-				      &size, 0, suppress_error, column_mask);
-	if (result != NULL) {
-		/* if failed, just skip it and leave stmt the same */
-		*stmt = result;
-		*stmt_end = result + size;
-	}
-}
-
-/**
  * Try to squash two upsert series (msgspacked index_base + ops)
  * Try to create a tuple with squahed operations
  *
@@ -165,8 +129,11 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 	size_t region_svp = region_used(region);
 	uint8_t old_type = vy_stmt_type(old_stmt);
 	uint64_t column_mask = COLUMN_MASK_FULL;
-	vy_apply_upsert_ops(region, &result_mp, &result_mp_end, new_ops,
-			    new_ops_end, suppress_error, &column_mask);
+	result_mp = tuple_upsert_execute(vy_update_alloc, region, new_ops,
+					 new_ops_end, result_mp, result_mp_end,
+					 &mp_size, 0, suppress_error,
+					 &column_mask);
+	result_mp_end = result_mp + mp_size;
 	if (old_type != IPROTO_UPSERT) {
 		assert(old_type == IPROTO_INSERT ||
 		       old_type == IPROTO_REPLACE);
