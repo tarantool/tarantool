@@ -506,6 +506,24 @@ digest.base64_decode(b)
 ---
 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ...
+--
+-- gh-3358: any option makes base64 work like urlsafe.
+--
+s = digest.base64_encode('?>>>', {nowrap = true})
+---
+...
+-- Check for '+' - it is not urlsafe.
+s:find('+') ~= nil
+---
+- true
+...
+s = digest.base64_encode('?>>>', {nopad = true})
+---
+...
+s:find('+') ~= nil
+---
+- true
+...
 digest.pbkdf2("password", "salt", 4096, 32)
 ---
 - !!binary xeR41ZKIyEGqUw22hFxMjZYok6ABzk4RpJY4c6qYE0o=
