@@ -279,13 +279,15 @@ schema_init()
 	auto key_def_guard = make_scoped_guard([&] { key_def_delete(key_def); });
 
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	sc_space_new(BOX_SCHEMA_ID, "_schema", key_def, &on_replace_schema,
 		     NULL);
 
 	/* _space - home for all spaces. */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 
 	/* _collation - collation description. */
 	sc_space_new(BOX_COLLATION_ID, "_collation", key_def,
@@ -329,7 +331,8 @@ schema_init()
 
 	/* _trigger - all existing SQL triggers. */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	sc_space_new(BOX_TRIGGER_ID, "_trigger", key_def, &on_replace_trigger, NULL);
 
 	key_def_delete(key_def);
@@ -338,19 +341,23 @@ schema_init()
 		diag_raise();
 	/* space no */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
-			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	sc_space_new(BOX_INDEX_ID, "_index", key_def,
 		     &alter_space_on_replace_index, &on_stmt_begin_index);
 
 	/* space name */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	/* index name */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
-			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	/* _sql_stat1 - a simpler statistics on space, seen in SQL. */
 	sc_space_new(BOX_SQL_STAT1_ID, "_sql_stat1", key_def, NULL, NULL);
 
@@ -361,13 +368,16 @@ schema_init()
 
 	/* space name */
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	/* index name */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
-			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	/* sample */
 	key_def_set_part(key_def, 2 /* part no */, 5 /* field no */,
-			 FIELD_TYPE_SCALAR, ON_CONFLICT_ACTION_ABORT, NULL);
+			 FIELD_TYPE_SCALAR, ON_CONFLICT_ACTION_ABORT, NULL,
+			 SORT_ORDER_ASC);
 	/* _sql_stat4 - extensive statistics on space, seen in SQL. */
 	sc_space_new(BOX_SQL_STAT4_ID, "_sql_stat4", key_def, NULL, NULL);
 }

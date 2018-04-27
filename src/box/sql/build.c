@@ -930,7 +930,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		     ExprList * pList,	/* List of field names to be indexed */
 		     int onError,	/* What to do with a uniqueness conflict */
 		     int autoInc,	/* True if the AUTOINCREMENT keyword is present */
-		     int sortOrder	/* SQLITE_SO_ASC or SQLITE_SO_DESC */
+		     enum sort_order sortOrder
     )
 {
 	Table *pTab = pParse->pNewTable;
@@ -976,7 +976,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	if (nTerm == 1
 	    && pCol
 	    && (sqlite3ColumnType(pCol) == FIELD_TYPE_INTEGER)
-	    && sortOrder != SQLITE_SO_DESC) {
+	    && sortOrder != SORT_ORDER_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
 		pTab->iPKey = iCol;
 		pTab->keyConf = (u8) onError;
@@ -1123,6 +1123,30 @@ sql_index_collation(Index *idx, uint32_t column)
 	struct index *index = space_index(space, index_id);
 	assert(index != NULL && index->def->key_def->part_count >= column);
 	return index->def->key_def->parts[column].coll;
+}
+
+enum sort_order
+sql_index_column_sort_order(Index *idx, uint32_t column)
+{
+	assert(idx != NULL);
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->pTable->tnum);
+	struct space *space = space_by_id(space_id);
+
+	assert(column < idx->nColumn);
+	/*
+	 * If space is still under construction, or it is
+	 * an ephemeral space, then fetch collation from
+	 * SQL internal structure.
+	 */
+	if (space == NULL) {
+		assert(column < idx->nColumn);
+		return idx->sort_order[column];
+	}
+
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct index *index = space_index(space, index_id);
+	assert(index != NULL && index->def->key_def->part_count >= column);
+	return index->def->key_def->parts[column].sort_order;
 }
 
 /**
@@ -2694,11 +2718,11 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 	Index *p;		/* Allocated index object */
 	int nByte;		/* Bytes of space for Index object + arrays */
 
-	nByte = ROUND8(sizeof(Index)) +	/* Index structure  */
-	    ROUND8(sizeof(char *) * nCol) +	/* Index.azColl     */
-	    ROUND8(sizeof(LogEst) * (nCol + 1) +	/* Index.aiRowLogEst   */
-		   sizeof(i16) * nCol +	/* Index.aiColumn   */
-		   sizeof(u8) * nCol);	/* Index.aSortOrder */
+	nByte = ROUND8(sizeof(Index)) +		    /* Index structure  */
+	    ROUND8(sizeof(char *) * nCol) +	    /* Index.azColl     */
+	    ROUND8(sizeof(LogEst) * (nCol + 1) +    /* Index.aiRowLogEst   */
+		   sizeof(i16) * nCol +		    /* Index.aiColumn   */
+		   sizeof(enum sort_order) * nCol); /* Index.sort_order */
 	p = sqlite3DbMallocZero(db, nByte + nExtra);
 	if (p) {
 		char *pExtra = ((char *)p) + ROUND8(sizeof(Index));
@@ -2708,7 +2732,7 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 		pExtra += sizeof(LogEst) * (nCol + 1);
 		p->aiColumn = (i16 *) pExtra;
 		pExtra += sizeof(i16) * nCol;
-		p->aSortOrder = (u8 *) pExtra;
+		p->sort_order = (enum sort_order *) pExtra;
 		p->nColumn = nCol;
 		*ppExtra = ((char *)p) + nByte;
 	}
@@ -3037,7 +3061,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 */
 	for (i = 0, pListItem = pList->a; i < pList->nExpr; i++, pListItem++) {
 		Expr *pCExpr;	/* The i-th index expression */
-		int requestedSortOrder;	/* ASC or DESC on the i-th expression */
+		enum sort_order requested_so;	/* ASC or DESC on the i-th expression */
 		sqlite3ResolveSelfReference(pParse, pTab, NC_IdxExpr,
 					    pListItem->pExpr, 0);
 		if (pParse->nErr)
@@ -3075,8 +3099,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		/* Tarantool: DESC indexes are not supported so far.
 		 * See gh-3016.
 		 */
-		requestedSortOrder = pListItem->sortOrder & 0;
-		pIndex->aSortOrder[i] = (u8) requestedSortOrder;
+		requested_so = pListItem->sortOrder & 0;
+		pIndex->sort_order[i] = requested_so;
 	}
 
 	sqlite3DefaultRowEst(pIndex);
@@ -4176,7 +4200,8 @@ sqlite3KeyInfoOfIndex(Parse * pParse, sqlite3 * db, Index * pIdx)
 		assert(sqlite3KeyInfoIsWriteable(pKey));
 		for (i = 0; i < nCol; i++) {
 			pKey->aColl[i] = sql_index_collation(pIdx, i);
-			pKey->aSortOrder[i] = pIdx->aSortOrder[i];
+			pKey->aSortOrder[i] = sql_index_column_sort_order(pIdx,
+									  i);
 		}
 		if (pParse && pParse->nErr) {
 			sqlite3KeyInfoUnref(pKey);

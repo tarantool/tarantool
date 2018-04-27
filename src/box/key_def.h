@@ -45,6 +45,16 @@ extern "C" {
 /* MsgPack type names */
 extern const char *mp_type_strs[];
 
+/* Sorting order of a part. */
+extern const char *sort_order_strs[];
+
+enum sort_order {
+	SORT_ORDER_ASC = 0,
+	SORT_ORDER_DESC,
+	SORT_ORDER_UNDEF,
+	sort_order_MAX
+};
+
 struct key_part_def {
 	/** Tuple field index for this part. */
 	uint32_t fieldno;
@@ -56,6 +66,8 @@ struct key_part_def {
 	bool is_nullable;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
+	/** Part sort order. */
+	enum sort_order sort_order;
 };
 
 /**
@@ -74,6 +86,8 @@ struct key_part {
 	struct coll *coll;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
+	/** Part sort order. */
+	enum sort_order sort_order;
 };
 
 struct key_def;
@@ -264,7 +278,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, enum on_conflict_action nullable_action,
-		 struct coll *coll);
+		 struct coll *coll, enum sort_order sort_order);
 
 /**
  * Update 'has_optional_parts' of @a key_def with correspondence

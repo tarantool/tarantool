@@ -681,9 +681,9 @@ sortlist(A) ::= expr(Y) sortorder(Z). {
 
 %type sortorder {int}
 
-sortorder(A) ::= ASC.           {A = SQLITE_SO_ASC;}
-sortorder(A) ::= DESC.          {A = SQLITE_SO_DESC;}
-sortorder(A) ::= .              {A = SQLITE_SO_UNDEFINED;}
+sortorder(A) ::= ASC.           {A = SORT_ORDER_ASC;}
+sortorder(A) ::= DESC.          {A = SORT_ORDER_DESC;}
+sortorder(A) ::= .              {A = SORT_ORDER_UNDEF;}
 
 %type groupby_opt {ExprList*}
 %destructor groupby_opt {sqlite3ExprListDelete(pParse->db, $$);}
@@ -1241,7 +1241,7 @@ cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP where_opt(W). {
   sqlite3CreateIndex(pParse, &X, 
                      sqlite3SrcListAppend(pParse->db,0,&Y), Z, U,
-                      &S, W, SQLITE_SO_ASC, NE, SQLITE_IDXTYPE_APPDEF);
+                      &S, W, SORT_ORDER_ASC, NE, SQLITE_IDXTYPE_APPDEF);
 }
 
 %type uniqueflag {int}
@@ -1276,7 +1276,7 @@ uniqueflag(A) ::= .        {A = ON_CONFLICT_ACTION_NONE;}
     int sortOrder
   ){
     ExprList *p = sqlite3ExprListAppend(pParse, pPrior, 0);
-    if( (hasCollate || sortOrder!=SQLITE_SO_UNDEFINED)
+    if( (hasCollate || sortOrder != SORT_ORDER_UNDEF)
         && pParse->db->init.busy==0
     ){
       sqlite3ErrorMsg(pParse, "syntax error after column name \"%.*s\"",

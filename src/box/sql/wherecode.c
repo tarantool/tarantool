@@ -462,7 +462,8 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 		int nEq = 0;
 		int *aiMap = 0;
 
-		if (pLoop->pIndex != 0 && pLoop->pIndex->aSortOrder[iEq]) {
+		if (pLoop->pIndex != 0 &&
+		    sql_index_column_sort_order(pLoop->pIndex, iEq)) {
 			testcase(iEq == 0);
 			testcase(bRev);
 			bRev = !bRev;
@@ -1296,12 +1297,12 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 				 */
 				testcase(bRev);
 				testcase(pIdx->aSortOrder[nEq] ==
-					 SQLITE_SO_DESC);
+					 SORT_ORDER_DESC);
 				assert((bRev & ~1) == 0);
 				pLevel->iLikeRepCntr <<= 1;
 				pLevel->iLikeRepCntr |=
-				    bRev ^ (pIdx->aSortOrder[nEq] ==
-					    SQLITE_SO_DESC);
+					bRev ^ (sql_index_column_sort_order(pIdx, nEq) ==
+						SORT_ORDER_DESC);
 			}
 #endif
 			if (pRangeStart == 0) {
@@ -1320,7 +1321,8 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 * start and end terms (pRangeStart and pRangeEnd).
 		 */
 		if ((nEq < nIdxCol &&
-		     bRev == (pIdx->aSortOrder[nEq] == SQLITE_SO_ASC)) ||
+		     bRev == (sql_index_column_sort_order(pIdx, nEq) ==
+			      SORT_ORDER_ASC)) ||
 		    (bRev && nIdxCol == nEq)) {
 			SWAP(pRangeEnd, pRangeStart);
 			SWAP(bSeekPastNull, bStopAtNull);

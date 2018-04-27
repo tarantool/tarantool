@@ -36,12 +36,15 @@
 #include "schema_def.h"
 #include "coll_cache.h"
 
+const char *sort_order_strs[] = { "asc", "desc", "undef" };
+
 static const struct key_part_def key_part_def_default = {
 	0,
 	field_type_MAX,
 	COLL_NONE,
 	false,
-	ON_CONFLICT_ACTION_ABORT
+	ON_CONFLICT_ACTION_ABORT,
+	SORT_ORDER_ASC
 };
 
 static int64_t
@@ -55,6 +58,7 @@ part_type_by_name_wrapper(const char *str, uint32_t len)
 #define PART_OPT_COLLATION	 "collation"
 #define PART_OPT_NULLABILITY	 "is_nullable"
 #define PART_OPT_NULLABLE_ACTION "nullable_action"
+#define PART_OPT_SORT_ORDER	 "sort_order"
 
 const struct opt_def part_def_reg[] = {
 	OPT_DEF_ENUM(PART_OPT_TYPE, field_type, struct key_part_def, type,
@@ -65,6 +69,8 @@ const struct opt_def part_def_reg[] = {
 		is_nullable),
 	OPT_DEF_ENUM(PART_OPT_NULLABLE_ACTION, on_conflict_action,
 		     struct key_part_def, nullable_action, NULL),
+	OPT_DEF_ENUM(PART_OPT_SORT_ORDER, sort_order, struct key_part_def,
+		     sort_order, NULL),
 	OPT_END,
 };
 
@@ -169,7 +175,7 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 			}
 		}
 		key_def_set_part(def, i, part->fieldno, part->type,
-				 part->nullable_action, coll);
+				 part->nullable_action, coll, part->sort_order);
 	}
 	return def;
 }
@@ -199,7 +205,8 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 	for (uint32_t item = 0; item < part_count; ++item) {
 		key_def_set_part(key_def, item, fields[item],
 				 (enum field_type)types[item],
-				 key_part_def_default.nullable_action, NULL);
+				 key_part_def_default.nullable_action,
+				 NULL, SORT_ORDER_ASC);
 	}
 	return key_def;
 }
@@ -252,7 +259,7 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, enum on_conflict_action nullable_action,
-		 struct coll *coll)
+		 struct coll *coll, enum sort_order sort_order)
 {
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
@@ -261,6 +268,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	def->parts[part_no].coll = coll;
+	def->parts[part_no].sort_order = sort_order;
 	column_mask_set_fieldno(&def->column_mask, fieldno);
 	/**
 	 * When all parts are set, initialize the tuple
@@ -510,6 +518,12 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 				 "nullable action properties");
 			return -1;
 		}
+		if (part->sort_order == sort_order_MAX) {
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+				 i + TUPLE_INDEX_BASE,
+				 "index part: unknown sort order");
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -572,7 +586,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	end = part + first->part_count;
 	for (; part != end; part++) {
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->nullable_action, part->coll);
+				 part->nullable_action, part->coll,
+				 part->sort_order);
 	}
 
 	/* Set-append second key def's part to the new key def. */
@@ -582,7 +597,8 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		if (key_def_find(first, part->fieldno))
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->nullable_action, part->coll);
+				 part->nullable_action, part->coll,
+				 part->sort_order);
 	}
 	return new_def;
 }

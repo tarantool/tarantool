@@ -1661,7 +1661,8 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 				return 0;	/* Different expressions in the index */
 			}
 		}
-		if (pSrc->aSortOrder[i] != pDest->aSortOrder[i]) {
+		if (sql_index_column_sort_order(pSrc, i) !=
+		    sql_index_column_sort_order(pDest, i)) {
 			return 0;	/* Different sort orders */
 		}
 		if (sql_index_collation(pSrc, i) !=

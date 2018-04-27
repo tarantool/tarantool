@@ -145,6 +145,7 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_FUNCCTX  (-16)	/* P4 is a pointer to an sqlite3_context object */
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
+#define P4_KEYDEF   (-19)       /* P4 is a pointer to key_def structure. */
 
 
 /* Error message codes for OP_Halt */

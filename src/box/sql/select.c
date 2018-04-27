@@ -5625,7 +5625,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		 * and plus one column for ID.
 		 */
 		int nCols = pEList->nExpr + sSort.pOrderBy->nExpr + 1;
-		if (pKeyInfo->aSortOrder[0] == SQLITE_SO_DESC) {
+		if (pKeyInfo->aSortOrder[0] == SORT_ORDER_DESC) {
 			sSort.sortFlags |= SORTFLAG_DESC;
 		}
 		sSort.addrSortIndex =

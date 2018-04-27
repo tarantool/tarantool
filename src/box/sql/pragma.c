@@ -460,12 +460,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								c_n = coll->name;
 							else
 								c_n = "BINARY";
+							enum sort_order sort_order;
+							sort_order = sql_index_column_sort_order(pIdx,
+												 i);
 							sqlite3VdbeMultiLoad(v,
 									     4,
 									     "isi",
-									     pIdx->
-									     aSortOrder
-									     [i],
+									     sort_order,
 									     c_n,
 									     i <
 									     mx);

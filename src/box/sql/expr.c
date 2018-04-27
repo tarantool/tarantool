@@ -1764,11 +1764,9 @@ sqlite3ExprListSetSortOrder(ExprList * p, int iSortOrder)
 {
 	if (p == 0)
 		return;
-	assert(SQLITE_SO_UNDEFINED < 0 && SQLITE_SO_ASC >= 0
-	       && SQLITE_SO_DESC > 0);
 	assert(p->nExpr > 0);
-	if (iSortOrder < 0) {
-		assert(p->a[p->nExpr - 1].sortOrder == SQLITE_SO_ASC);
+	if (iSortOrder == SORT_ORDER_UNDEF) {
+		assert(p->a[p->nExpr - 1].sortOrder == SORT_ORDER_ASC);
 		return;
 	}
 	p->a[p->nExpr - 1].sortOrder = (u8) iSortOrder;
@@ -2529,7 +2527,8 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 					assert(IN_INDEX_INDEX_DESC ==
 					       IN_INDEX_INDEX_ASC + 1);
 					eType = IN_INDEX_INDEX_ASC +
-						pIdx->aSortOrder[0];
+						sql_index_column_sort_order(pIdx,
+									    0);
 
 					if (prRhsHasNull) {
 #ifdef SQLITE_ENABLE_COLUMN_USED_MASK

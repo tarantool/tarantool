@@ -1336,8 +1336,8 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 			       || (pLower->eOperator & (WO_GT | WO_GE)) != 0);
 			assert(pUpper == 0
 			       || (pUpper->eOperator & (WO_LT | WO_LE)) != 0);
-			assert(p->aSortOrder != 0);
-			if (p->aSortOrder[nEq]) {
+			if (sql_index_column_sort_order(p, nEq) !=
+			    SORT_ORDER_ASC) {
 				/* The roles of pLower and pUpper are swapped for a DESC index */
 				SWAP(pLower, pUpper);
 				SWAP(nBtm, nTop);
@@ -2229,8 +2229,8 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		if (pLhs->op != TK_COLUMN
 		    || pLhs->iTable != iCur
 		    || pLhs->iColumn != pIdx->aiColumn[i + nEq]
-		    || pIdx->aSortOrder[i + nEq] != pIdx->aSortOrder[nEq]
-		    ) {
+		    || sql_index_column_sort_order(pIdx, i + nEq) !=
+		       sql_index_column_sort_order(pIdx, nEq)) {
 			break;
 		}
 
@@ -3316,7 +3316,8 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				 */
 				if (pIndex) {
 					iColumn = pIndex->aiColumn[j];
-					revIdx = pIndex->aSortOrder[j];
+					revIdx = sql_index_column_sort_order(pIndex,
+									     j);
 					if (iColumn == pIndex->pTable->iPKey)
 						iColumn = -1;
 				} else {

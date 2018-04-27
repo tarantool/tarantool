@@ -384,7 +384,8 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 				 part /* filed no */,
 				 FIELD_TYPE_SCALAR,
 				 ON_CONFLICT_ACTION_NONE /* nullable_action */,
-				 aColl /* coll */);
+				 aColl /* coll */,
+				 SORT_ORDER_ASC);
 	}
 
 	struct index_def *ephemer_index_def =
@@ -1555,7 +1556,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 		else
 			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
 		/* do not decode default collation */
-		p = enc->encode_map(p, pIndex->coll_array[i] == NULL ? 4 : 5);
+		p = enc->encode_map(p, pIndex->coll_array[i] == NULL ? 5 : 6);
 		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "field", sizeof("field")-1);
@@ -1569,6 +1570,12 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 		p = enc->encode_str(p, "nullable_action", 15);
 		const char *action_str = on_conflict_action_strs[aCol[col].notNull];
 		p = enc->encode_str(p, action_str, strlen(action_str));
+
+		p = enc->encode_str(p, "sort_order", 10);
+		enum sort_order sort_order = pIndex->sort_order[i];
+		assert(sort_order < sort_order_MAX);
+		const char *sort_order_str = sort_order_strs[sort_order];
+		p = enc->encode_str(p, sort_order_str, strlen(sort_order_str));
 	}
 	return (int)(p - base);
 }
