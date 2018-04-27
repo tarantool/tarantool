@@ -1,4 +1,3 @@
-#include "salad/rope.h"
 #include <time.h>
 #include "unit.h"
 #include "rope_common.h"
@@ -10,7 +9,7 @@ test_rope_stress_small()
 {
 	header();
 
-	struct rope *rope = rope_new(str_getn, NULL, mem_alloc, mem_free, NULL);
+	struct rope *rope = test_rope_new();
 	const int iterations = 500;
 	int i = 0;
 	for (i = 0; i < iterations; ++i) {
@@ -39,7 +38,7 @@ test_rope_stress_large()
 {
 	header();
 
-	struct rope *rope = rope_new(str_getn, NULL, mem_alloc, mem_free, NULL);
+	struct rope *rope = test_rope_new();
 	const int iterations = 50000;
 	int i = 0;
 	for (i = 0; i < iterations; ++i) {

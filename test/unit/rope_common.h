@@ -3,17 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-static inline void *
-str_getn(void *ctx, void *data, size_t size, size_t offset)
+static inline char *
+str_getn(void *ctx, char *data, size_t size, size_t offset)
 {
 	(void) ctx;
-	return (char *) data + offset;
+	return data + offset;
 }
 
 static inline void
-str_print(void *data, size_t n)
+str_print(char *data, size_t n)
 {
-	printf("%.*s", (int) n, (char *) data);
+	printf("%.*s", (int) n, data);
 }
 
 static inline void *
@@ -30,10 +30,39 @@ mem_free(void *data, void *ptr)
 	free(ptr);
 }
 
+#define ROPE_ALLOC_F mem_alloc
+#define ROPE_FREE_F mem_free
+#define ROPE_SPLIT_F str_getn
+#define rope_data_t char *
+#define rope_ctx_t void *
+
+#include "salad/rope.h"
+
+/**
+ * Define a second rope just to check if compilation of two
+ * ropes in one object file works.
+ */
+
+static inline int *
+str_getn2(int *ctx, int *data, size_t size, size_t offset)
+{
+	(void) ctx;
+	return data + offset;
+}
+
+#define rope_name second
+#define ROPE_ALLOC_F mem_alloc
+#define ROPE_FREE_F mem_free
+#define ROPE_SPLIT_F str_getn2
+#define rope_data_t int *
+#define rope_ctx_t int *
+
+#include "salad/rope.h"
+
 static inline struct rope *
 test_rope_new()
 {
-	return rope_new(str_getn, NULL, mem_alloc, mem_free, NULL);
+	return rope_new(NULL);
 }
 
 static inline void

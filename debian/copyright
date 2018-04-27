@@ -218,7 +218,7 @@ Files: third_party/lua-cjson/*
 Copyright: 2010-2012 Mark Pulford <mark@kyne.com.au>
 License: Expat
 
-Files: src/lib/salad/rope.c
+Files: src/lib/salad/rope.*
 Copyright: 1993-1994 by Xerox Corporation.
 License: BSD-2-Clause
 
