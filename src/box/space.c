@@ -330,7 +330,6 @@ static int
 space_before_replace(struct space *space, struct txn *txn,
 		     struct request *request)
 {
-	struct region *gc = &fiber()->gc;
 	enum iproto_type type = request->type;
 	struct index *pk = space_index(space, 0);
 
@@ -396,10 +395,10 @@ space_before_replace(struct space *space, struct txn *txn,
 		}
 		old_data = tuple_data_range(old_tuple, &old_size);
 		old_data_end = old_data + old_size;
-		new_data = tuple_update_execute(region_aligned_alloc_cb, gc,
-					request->tuple, request->tuple_end,
-					old_data, old_data_end, &new_size,
-					request->index_base, NULL);
+		new_data = tuple_update_execute(request->tuple,
+						request->tuple_end, old_data,
+						old_data_end, &new_size,
+						request->index_base, NULL);
 		if (new_data == NULL)
 			return -1;
 		new_data_end = new_data + new_size;
@@ -419,18 +418,18 @@ space_before_replace(struct space *space, struct txn *txn,
 			 */
 			new_data = request->tuple;
 			new_data_end = request->tuple_end;
-			if (tuple_update_check_ops(region_aligned_alloc_cb, gc,
-					request->ops, request->ops_end,
-					request->index_base) != 0)
+			if (tuple_update_check_ops(request->ops,
+						   request->ops_end,
+						   request->index_base) != 0)
 				return -1;
 			break;
 		}
 		old_data = tuple_data_range(old_tuple, &old_size);
 		old_data_end = old_data + old_size;
-		new_data = tuple_upsert_execute(region_aligned_alloc_cb, gc,
-					request->ops, request->ops_end,
-					old_data, old_data_end, &new_size,
-					request->index_base, false, NULL);
+		new_data = tuple_upsert_execute(request->ops, request->ops_end,
+						old_data, old_data_end,
+						&new_size, request->index_base,
+						false, NULL);
 		new_data_end = new_data + new_size;
 		break;
 	default:

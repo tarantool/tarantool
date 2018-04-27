@@ -38,17 +38,6 @@
 #include "fiber.h"
 #include "column_mask.h"
 
-static void *
-vy_update_alloc(void *arg, size_t size)
-{
-	/* TODO: rewrite tuple_upsert_execute() without exceptions */
-	struct region *region = (struct region *) arg;
-	void *data = region_aligned_alloc(region, size, sizeof(uint64_t));
-	if (data == NULL)
-		diag_set(OutOfMemory, size, "region", "upsert");
-	return data;
-}
-
 /**
  * Try to squash two upsert series (msgspacked index_base + ops)
  * Try to create a tuple with squahed operations
@@ -58,7 +47,7 @@ vy_update_alloc(void *arg, size_t size)
  * @retval -1 - memory error
  */
 static int
-vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
+vy_upsert_try_to_squash(struct tuple_format *format,
 			const char *key_mp, const char *key_mp_end,
 			const char *old_serie, const char *old_serie_end,
 			const char *new_serie, const char *new_serie_end,
@@ -68,8 +57,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 
 	size_t squashed_size;
 	const char *squashed =
-		tuple_upsert_squash(vy_update_alloc, region,
-				    old_serie, old_serie_end,
+		tuple_upsert_squash(old_serie, old_serie_end,
 				    new_serie, new_serie_end,
 				    &squashed_size, 0);
 	if (squashed == NULL)
@@ -130,10 +118,9 @@ vy_apply_upsert(struct tuple *new_stmt, struct tuple *old_stmt,
 	size_t region_svp = region_used(region);
 	uint8_t old_type = vy_stmt_type(old_stmt);
 	uint64_t column_mask = COLUMN_MASK_FULL;
-	result_mp = tuple_upsert_execute(vy_update_alloc, region, new_ops,
-					 new_ops_end, result_mp, result_mp_end,
-					 &mp_size, 0, suppress_error,
-					 &column_mask);
+	result_mp = tuple_upsert_execute(new_ops, new_ops_end, result_mp,
+					 result_mp_end, &mp_size, 0,
+					 suppress_error, &column_mask);
 	result_mp_end = result_mp + mp_size;
 	if (old_type != IPROTO_UPSERT) {
 		assert(old_type == IPROTO_INSERT ||
@@ -163,10 +150,8 @@ vy_apply_upsert(struct tuple *new_stmt, struct tuple *old_stmt,
 	 * UPSERT + UPSERT case: combine operations
 	 */
 	assert(old_ops_end - old_ops > 0);
-	if (vy_upsert_try_to_squash(format, region,
-				    result_mp, result_mp_end,
-				    old_ops, old_ops_end,
-				    new_ops, new_ops_end,
+	if (vy_upsert_try_to_squash(format, result_mp, result_mp_end,
+				    old_ops, old_ops_end, new_ops, new_ops_end,
 				    &result_stmt) != 0) {
 		region_truncate(region, region_svp);
 		return NULL;

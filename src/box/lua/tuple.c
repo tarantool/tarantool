@@ -447,11 +447,10 @@ lbox_tuple_transform(struct lua_State *L)
 	 * to use the default one with no restrictions on field
 	 * count or types.
 	 */
-	const char *new_data = tuple_update_execute(region_aligned_alloc_cb,
-						    region, buf->buf,
-						    buf->buf + ibuf_used(buf),
-						    old_data, old_data + bsize,
-						    &new_size, 1, NULL);
+	const char *new_data =
+		tuple_update_execute(buf->buf, buf->buf + ibuf_used(buf),
+				     old_data, old_data + bsize, &new_size, 1,
+				     NULL);
 	if (new_data != NULL)
 		new_tuple = tuple_new(box_tuple_format_default(),
 				      new_data, new_data + new_size);

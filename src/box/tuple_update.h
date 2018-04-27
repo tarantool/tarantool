@@ -44,22 +44,17 @@ enum {
 	BOX_UPDATE_OP_CNT_MAX = 4000,
 };
 
-typedef void *(*tuple_update_alloc_func)(void *, size_t);
-
 int
-tuple_update_check_ops(tuple_update_alloc_func alloc, void *alloc_ctx,
-		       const char *expr, const char *expr_end, int index_base);
+tuple_update_check_ops(const char *expr, const char *expr_end, int index_base);
 
 const char *
-tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
-		     const char *expr,const char *expr_end,
+tuple_update_execute(const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_new_size, int index_base,
 		     uint64_t *column_mask);
 
 const char *
-tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
-		     const char *expr, const char *expr_end,
+tuple_upsert_execute(const char *expr, const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_new_size, int index_base, bool suppress_error,
 		     uint64_t *column_mask);
@@ -75,8 +70,7 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
  * If it isn't possible to merge expressions NULL is returned.
  */
 const char *
-tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
-		    const char *expr1, const char *expr1_end,
+tuple_upsert_squash(const char *expr1, const char *expr1_end,
 		    const char *expr2, const char *expr2_end,
 		    size_t *result_size, int index_base);
 

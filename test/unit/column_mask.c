@@ -3,6 +3,9 @@
 #include "unit.h"
 #include "msgpuck.h"
 #include "trivia/util.h"
+#include "fiber.h"
+#include "memory.h"
+#include "tuple.h"
 
 #define MAX_OPS 20
 #define MAX_FIELDS 100
@@ -102,20 +105,6 @@ tuple_new_update(const struct tuple_update_template *update, char **end)
 	return ret;
 }
 
-static char buffer[2048];
-static size_t pos = 0;
-
-/** Allocator for the tuple_update function. */
-static void *
-tuple_update_alloc_f(void *unused, size_t size)
-{
-	(void) unused;
-	fail_if(pos + size > sizeof(buffer));
-	char *ret = &buffer[pos];
-	pos += size;
-	return ret;
-}
-
 /**
  * Execute an update operation from the template and compare it
  * with the expected tuple and expected column_mask.
@@ -138,20 +127,19 @@ check_update_result(const struct tuple_template *original,
 
 	uint32_t actual_len;
 	uint64_t column_mask;
+	struct region *region = &fiber()->gc;
 	const char *actual =
-		tuple_update_execute(tuple_update_alloc_f, NULL, ops, ops_end,
-				     old, old_end, &actual_len, 1,
+		tuple_update_execute(ops, ops_end, old, old_end, &actual_len, 1,
 				     &column_mask);
 	fail_if(actual == NULL);
 	is((int32_t)actual_len, new_end - new, "check result length");
 	is(memcmp(actual, new, actual_len), 0, "tuple update is correct");
 	is(column_mask, expected_mask, "column_mask is correct");
+	fiber_gc();
 
 	free(old);
 	free(new);
 	free(ops);
-	/* reset the global buffer. */
-	pos = 0;
 }
 
 static inline void
@@ -239,6 +227,9 @@ basic_test()
 int
 main()
 {
+	memory_init();
+	fiber_init(fiber_c_invoke);
+	tuple_init(NULL);
 	header();
 	plan(27);
 
@@ -246,4 +237,7 @@ main()
 
 	footer();
 	check_plan();
+	tuple_free();
+	fiber_free();
+	memory_free();
 }

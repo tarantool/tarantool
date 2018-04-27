@@ -45,7 +45,7 @@
 #include "column_mask.h"
 #include "mp_extension_types.h"
 #include "mp_decimal.h"
-
+#include "fiber.h"
 
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
@@ -98,10 +98,27 @@
  * deleted one.
  */
 
+static inline void *
+update_alloc(void *ctx, size_t size)
+{
+	void *ptr = region_aligned_alloc((struct region *) ctx, size,
+					 alignof(uint64_t));
+	if (ptr == NULL)
+		diag_set(OutOfMemory, size, "region_aligned_alloc",
+			 "update internals");
+	return ptr;
+}
+
+static void
+update_free(void *ctx, void *mem)
+{
+	(void) ctx;
+	(void) mem;
+}
+
 /** Update internal state */
 struct tuple_update
 {
-	tuple_update_alloc_func alloc;
 	void *alloc_ctx;
 	struct rope *rope;
 	struct update_op *ops;
@@ -583,7 +600,7 @@ do_op_insert(struct tuple_update *update, struct update_op *op)
 	if (op_adjust_field_no(update, op, rope_size(update->rope) + 1))
 		return -1;
 	struct update_field *field = (struct update_field *)
-		update->alloc(update->alloc_ctx, sizeof(*field));
+		update_alloc(update->alloc_ctx, sizeof(*field));
 	if (field == NULL)
 		return -1;
 	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
@@ -855,7 +872,7 @@ update_field_split(void *split_ctx, void *data, size_t size, size_t offset)
 	struct update_field *prev = (struct update_field *) data;
 
 	struct update_field *next = (struct update_field *)
-			update->alloc(update->alloc_ctx, sizeof(*next));
+			update_alloc(update->alloc_ctx, sizeof(*next));
 	if (next == NULL)
 		return NULL;
 	assert(offset > 0 && prev->tail_len > 0);
@@ -876,14 +893,6 @@ update_field_split(void *split_ctx, void *data, size_t size, size_t offset)
 	return next;
 }
 
-/** Free rope node - do nothing, since we use a pool allocator. */
-static void
-region_alloc_free_stub(void *ctx, void *mem)
-{
-	(void) ctx;
-	(void) mem;
-}
-
 /**
  * We found a tuple to do the update on. Prepare a rope
  * to perform operations on.
@@ -899,14 +908,14 @@ int
 update_create_rope(struct tuple_update *update, const char *tuple_data,
 		   const char *tuple_data_end, uint32_t field_count)
 {
-	update->rope = rope_new(update_field_split, update, update->alloc,
-				region_alloc_free_stub, update->alloc_ctx);
+	update->rope = rope_new(update_field_split, update, update_alloc,
+				update_free, update->alloc_ctx);
 	if (update->rope == NULL)
 		return -1;
 	/* Initialize the rope with the old tuple. */
 
 	struct update_field *first = (struct update_field *)
-			update->alloc(update->alloc_ctx, sizeof(*first));
+			update_alloc(update->alloc_ctx, sizeof(*first));
 	if (first == NULL)
 		return -1;
 	const char *field = tuple_data;
@@ -1047,7 +1056,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 	}
 
 	/* Read update operations.  */
-	update->ops = (struct update_op *) update->alloc(update->alloc_ctx,
+	update->ops = (struct update_op *) update_alloc(update->alloc_ctx,
 				update->op_count * sizeof(struct update_op));
 	if (update->ops == NULL)
 		return -1;
@@ -1237,13 +1246,10 @@ upsert_do_ops(struct tuple_update *update, const char *old_data,
 }
 
 static void
-update_init(struct tuple_update *update,
-	    tuple_update_alloc_func alloc, void *alloc_ctx,
-	    int index_base)
+update_init(struct tuple_update *update, int index_base)
 {
 	memset(update, 0, sizeof(*update));
-	update->alloc = alloc;
-	update->alloc_ctx = alloc_ctx;
+	update->alloc_ctx = &fiber()->gc;
 	/*
 	 * Base field offset, e.g. 0 for C and 1 for Lua. Used only for
 	 * error messages. All fields numbers must be zero-based!
@@ -1255,7 +1261,7 @@ const char *
 update_finish(struct tuple_update *update, uint32_t *p_tuple_len)
 {
 	uint32_t tuple_len = update_calc_tuple_length(update);
-	char *buffer = (char *) update->alloc(update->alloc_ctx, tuple_len);
+	char *buffer = (char *) update_alloc(update->alloc_ctx, tuple_len);
 	if (buffer == NULL)
 		return NULL;
 	*p_tuple_len = update_write_tuple(update, buffer, buffer + tuple_len);
@@ -1263,23 +1269,21 @@ update_finish(struct tuple_update *update, uint32_t *p_tuple_len)
 }
 
 int
-tuple_update_check_ops(tuple_update_alloc_func alloc, void *alloc_ctx,
-		       const char *expr, const char *expr_end, int index_base)
+tuple_update_check_ops(const char *expr, const char *expr_end, int index_base)
 {
 	struct tuple_update update;
-	update_init(&update, alloc, alloc_ctx, index_base);
+	update_init(&update, index_base);
 	return update_read_ops(&update, expr, expr_end, 0);
 }
 
 const char *
-tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
-		     const char *expr,const char *expr_end,
+tuple_update_execute(const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base,
 		     uint64_t *column_mask)
 {
 	struct tuple_update update;
-	update_init(&update, alloc, alloc_ctx, index_base);
+	update_init(&update, index_base);
 	uint32_t field_count = mp_decode_array(&old_data);
 
 	if (update_read_ops(&update, expr, expr_end, field_count) != 0)
@@ -1293,14 +1297,13 @@ tuple_update_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 }
 
 const char *
-tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
-		     const char *expr,const char *expr_end,
+tuple_upsert_execute(const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
 		     uint32_t *p_tuple_len, int index_base, bool suppress_error,
 		     uint64_t *column_mask)
 {
 	struct tuple_update update;
-	update_init(&update, alloc, alloc_ctx, index_base);
+	update_init(&update, index_base);
 	uint32_t field_count = mp_decode_array(&old_data);
 
 	if (update_read_ops(&update, expr, expr_end, field_count) != 0)
@@ -1315,8 +1318,7 @@ tuple_upsert_execute(tuple_update_alloc_func alloc, void *alloc_ctx,
 }
 
 const char *
-tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
-		    const char *expr1, const char *expr1_end,
+tuple_upsert_squash(const char *expr1, const char *expr1_end,
 		    const char *expr2, const char *expr2_end,
 		    size_t *result_size, int index_base)
 {
@@ -1324,7 +1326,7 @@ tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
 	const char *expr_end[2] = {expr1_end, expr2_end};
 	struct tuple_update update[2];
 	for (int j = 0; j < 2; j++) {
-		update_init(&update[j], alloc, alloc_ctx, index_base);
+		update_init(&update[j], index_base);
 		if (update_read_ops(&update[j], expr[j], expr_end[j], 0))
 			return NULL;
 		mp_decode_array(&expr[j]);
@@ -1341,8 +1343,8 @@ tuple_upsert_squash(tuple_update_alloc_func alloc, void *alloc_ctx,
 	}
 	size_t possible_size = expr1_end - expr1 + expr2_end - expr2;
 	const uint32_t space_for_arr_tag = 5;
-	char *buf = (char *)alloc(alloc_ctx,
-				  possible_size + space_for_arr_tag);
+	char *buf = (char *) update_alloc(&fiber()->gc,
+					  possible_size + space_for_arr_tag);
 	if (buf == NULL)
 		return NULL;
 	/* reserve some space for mp array header */

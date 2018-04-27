@@ -390,8 +390,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(old_tuple, &bsize);
 	const char *new_data =
-		tuple_update_execute(region_aligned_alloc_cb, &fiber()->gc,
-				     request->tuple, request->tuple_end,
+		tuple_update_execute(request->tuple, request->tuple_end,
 				     old_data, old_data + bsize,
 				     &new_size, request->index_base, NULL);
 	if (new_data == NULL)
@@ -460,9 +459,8 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 *   we get it here, it's also OK to throw it
 		 * @sa https://github.com/tarantool/tarantool/issues/1156
 		 */
-		if (tuple_update_check_ops(region_aligned_alloc_cb, &fiber()->gc,
-				       request->ops, request->ops_end,
-				       request->index_base)) {
+		if (tuple_update_check_ops(request->ops, request->ops_end,
+					   request->index_base) != 0) {
 			return -1;
 		}
 		stmt->new_tuple = memtx_tuple_new(space->format,
@@ -482,12 +480,10 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 */
 		uint64_t column_mask = COLUMN_MASK_FULL;
 		const char *new_data =
-			tuple_upsert_execute(region_aligned_alloc_cb,
-					     &fiber()->gc, request->ops,
-					     request->ops_end, old_data,
-					     old_data + bsize, &new_size,
-					     request->index_base, false,
-					     &column_mask);
+			tuple_upsert_execute(request->ops, request->ops_end,
+					     old_data, old_data + bsize,
+					     &new_size, request->index_base,
+					     false, &column_mask);
 		if (new_data == NULL)
 			return -1;
 
