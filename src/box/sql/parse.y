@@ -148,16 +148,13 @@ cmdx ::= cmd.
 ///////////////////// Begin and end transactions. ////////////////////////////
 //
 
-cmd ::= BEGIN transtype(Y) trans_opt.  {sqlite3BeginTransaction(pParse, Y);}
+cmd ::= BEGIN trans_opt.  {sql_transaction_begin(pParse);}
 trans_opt ::= .
 trans_opt ::= TRANSACTION.
 trans_opt ::= TRANSACTION nm.
-%type transtype {int}
-transtype(A) ::= .             {A = TK_DEFERRED;}
-transtype(A) ::= DEFERRED(X).  {A = @X; /*A-overwrites-X*/}
-cmd ::= COMMIT trans_opt.      {sqlite3CommitTransaction(pParse);}
-cmd ::= END trans_opt.         {sqlite3CommitTransaction(pParse);}
-cmd ::= ROLLBACK trans_opt.    {sqlite3RollbackTransaction(pParse);}
+cmd ::= COMMIT trans_opt.      {sql_transaction_commit(pParse);}
+cmd ::= END trans_opt.         {sql_transaction_commit(pParse);}
+cmd ::= ROLLBACK trans_opt.    {sql_transaction_rollback(pParse);}
 
 savepoint_opt ::= SAVEPOINT.
 savepoint_opt ::= .

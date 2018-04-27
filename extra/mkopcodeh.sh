@@ -146,7 +146,6 @@ while [ "$i" -lt "$nOp" ]; do
     eval "name=\$ARRAY_order_$i"
     case "$name" in
     # The following are the opcodes that are processed by resolveP2Values()
-    OP_AutoCommit  | \
     OP_Savepoint   | \
     OP_Checkpoint  | \
     OP_JournalMode | \

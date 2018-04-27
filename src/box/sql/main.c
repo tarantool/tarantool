@@ -763,7 +763,6 @@ void
 sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 {
 	sqlite3 *db = pVdbe->db;
-	int inTrans = 0;
 	(void)tripCode;
 	struct session *user_session = current_session();
 
@@ -777,7 +776,7 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 	user_session->sql_flags &= ~SQLITE_DeferFKs;
 
 	/* If one has been configured, invoke the rollback-hook callback */
-	if (db->xRollbackCallback && (inTrans || !pVdbe->autoCommit)) {
+	if (db->xRollbackCallback && (!pVdbe->auto_commit)) {
 		db->xRollbackCallback(db->pRollbackArg);
 	}
 }

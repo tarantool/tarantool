@@ -560,9 +560,8 @@ sqlite3Step(Vdbe * p)
 			db->u1.isInterrupted = 0;
 		}
 
-		assert(p->autoCommit == 0
-		       || (p->nDeferredCons == 0 && p->nDeferredImmCons == 0)
-		    );
+		assert(box_txn() ||
+		       (p->nDeferredCons == 0 && p->nDeferredImmCons == 0));
 
 #ifndef SQLITE_OMIT_TRACE
 		if ((db->xProfile || (db->mTrace & SQLITE_TRACE_PROFILE) != 0)

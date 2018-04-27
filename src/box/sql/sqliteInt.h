@@ -3662,9 +3662,34 @@ void sqlite3PrngSaveState(void);
 void sqlite3PrngRestoreState(void);
 #endif
 void sqlite3RollbackAll(Vdbe *, int);
-void sqlite3BeginTransaction(Parse *, int);
-void sqlite3CommitTransaction(Parse *);
-void sqlite3RollbackTransaction(Parse *);
+
+/**
+ * Generate opcodes which start new Tarantool transaction.
+ * Used from parser to process BEGIN statement.
+ *
+ * @param parse_context Current parsing context.
+ */
+void
+sql_transaction_begin(struct Parse *parse_context);
+
+/**
+ * Generate opcodes which commit Tarantool transaction.
+ * Used from parser to process COMMIT statement.
+ *
+ * @param parse_context Current parsing context.
+ */
+void
+sql_transaction_commit(struct Parse *parse_context);
+
+/**
+ * Generate opcodes which rollback Tarantool transaction.
+ * Used from parser to process ROLLBACK statement.
+ *
+ * @param parse_context Current parsing context.
+ */
+void
+sql_transaction_rollback(struct Parse *parse_context);
+
 void sqlite3Savepoint(Parse *, int, Token *);
 void sqlite3CloseSavepoints(Vdbe *);
 int sqlite3ExprIsConstant(Expr *);

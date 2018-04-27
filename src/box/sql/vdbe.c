@@ -2875,7 +2875,7 @@ case OP_Savepoint: {
 	/* Assert that the p1 parameter is valid. Also that if there is no open
 	 * transaction, then there cannot be any savepoints.
 	 */
-	assert(psql_txn->pSavepoint == 0 || p->autoCommit == 0);
+	assert(psql_txn->pSavepoint == NULL || box_txn());
 	assert(p1==SAVEPOINT_BEGIN||p1==SAVEPOINT_RELEASE||p1==SAVEPOINT_ROLLBACK);
 
 	if (p1==SAVEPOINT_BEGIN) {
@@ -2914,25 +2914,18 @@ case OP_Savepoint: {
 				if ((rc = sqlite3VdbeCheckFk(p, 1))!=SQLITE_OK) {
 					goto vdbe_return;
 				}
-				p->autoCommit = 1;
 				if (sqlite3VdbeHalt(p)==SQLITE_BUSY) {
 					p->pc = (int)(pOp - aOp);
-					p->autoCommit = 0;
 					p->rc = rc = SQLITE_BUSY;
 					goto vdbe_return;
 				}
 				rc = p->rc;
 			} else {
-				int isSchemaChange;
 				if (p1==SAVEPOINT_ROLLBACK) {
-					isSchemaChange = (user_session->sql_flags & SQLITE_InternChanges)!=0;
 					box_txn_rollback_to_savepoint(pSavepoint->tnt_savepoint);
-				} else {
-					isSchemaChange = 0;
-				}
-				if (isSchemaChange) {
-					sqlite3ExpirePreparedStatements(db);
-					user_session->sql_flags |= SQLITE_InternChanges;
+					if ((user_session->sql_flags &
+					     SQLITE_InternChanges) != 0)
+						sqlite3ExpirePreparedStatements(db);
 				}
 			}
 
@@ -2997,53 +2990,54 @@ case OP_FkCheckCommit: {
 	break;
 }
 
-/* Opcode: AutoCommit P1 P2 * * *
+/* Opcode: TransactionBegin * * * * *
  *
- * Set the database auto-commit flag to P1 (1 or 0). If P2 is true, roll
- * back any currently active transactions. If there are any active
- * VMs (apart from this one), then a ROLLBACK fails.  A COMMIT fails if
- * there are active writing VMs or active VMs that use shared cache.
- *
- * This instruction causes the VM to halt.
+ * Start Tarantool's transaction.
+ * Only do that if there is no other active transactions.
+ * Otherwise, raise an error with appropriate error message.
  */
-case OP_AutoCommit: {
-	int desiredAutoCommit;
-	int iRollback;
+case OP_TransactionBegin: {
+	if (sql_txn_begin(p) != 0) {
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+	p->auto_commit = false;
+	break;
+}
 
-	desiredAutoCommit = pOp->p1;
-	iRollback = pOp->p2;
-	assert(desiredAutoCommit==1 || desiredAutoCommit==0);
-	assert(desiredAutoCommit==1 || iRollback==0);
-	assert(db->nVdbeActive>0);  /* At least this one VM is active */
-
-	if (desiredAutoCommit!=p->autoCommit) {
-		if (iRollback) {
-			assert(desiredAutoCommit==1);
-			box_txn_rollback();
-			sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
-			p->autoCommit = 1;
-		} else if ((rc = sqlite3VdbeCheckFk(p, 1))!=SQLITE_OK) {
-			goto vdbe_return;
-		} else {
-			p->autoCommit = (u8)desiredAutoCommit;
-			if (p->autoCommit == 0) {
-				sql_txn_begin(p);
-			}
+/* Opcode: TransactionCommit * * * * *
+ *
+ * Commit Tarantool's transaction.
+ * If there is no active transaction, raise an error.
+ */
+case OP_TransactionCommit: {
+	if (box_txn()) {
+		if (box_txn_commit() != 0) {
+			rc = SQL_TARANTOOL_ERROR;
+			goto abort_due_to_error;
 		}
-		if (sqlite3VdbeHalt(p)==SQLITE_BUSY) {
-			p->pc = (int)(pOp - aOp);
-			p->autoCommit = (u8)(1-desiredAutoCommit);
-			p->rc = rc = SQLITE_BUSY;
-			goto vdbe_return;
-		}
-		rc = SQLITE_DONE;
-		goto vdbe_return;
 	} else {
-		sqlite3VdbeError(p,
-				 (!desiredAutoCommit)?"cannot start a transaction within a transaction":(
-					 (iRollback)?"cannot rollback - no transaction is active":
-					 "cannot commit - no transaction is active"));
+		sqlite3VdbeError(p, "cannot commit - no transaction is active");
+		rc = SQLITE_ERROR;
+		goto abort_due_to_error;
+	}
+	break;
+}
 
+/* Opcode: TransactionRollback * * * * *
+ *
+ * Rollback Tarantool's transaction.
+ * If there is no active transaction, raise an error.
+ */
+case OP_TransactionRollback: {
+	if (box_txn()) {
+		if (box_txn_rollback() != 0) {
+			rc = SQL_TARANTOOL_ERROR;
+			goto abort_due_to_error;
+		}
+	} else {
+		sqlite3VdbeError(p, "cannot rollback - no "
+				    "transaction is active");
 		rc = SQLITE_ERROR;
 		goto abort_due_to_error;
 	}
@@ -3052,18 +3046,26 @@ case OP_AutoCommit: {
 
 /* Opcode: TTransaction * * * * *
  *
- * Start Tarantool's transaction.
- * Only do that if auto commit mode is on. This should be no-op
- * if this opcode was emitted inside a transaction.
+ * Start Tarantool's transaction, if there is no active
+ * transactions. Otherwise, create anonymous savepoint,
+ * which is used to correctly process ABORT statement inside
+ * outer transaction.
+ *
+ * In contrast to OP_TransactionBegin, this is service opcode,
+ * generated automatically alongside with DML routine.
  */
 case OP_TTransaction: {
-	if (p->autoCommit) {
-		rc = box_txn_begin() == 0 ? SQLITE_OK : SQL_TARANTOOL_ERROR;
-	}
-	if (box_txn()
-	    && p->autoCommit == 0){
+	if (!box_txn()) {
+		if (box_txn_begin() != 0) {
+			rc = SQL_TARANTOOL_ERROR;
+			goto abort_due_to_error;
+		}
+	} else {
 		p->anonymous_savepoint = sql_savepoint(p, NULL);
-
+		if (p->anonymous_savepoint == NULL) {
+			rc = SQL_TARANTOOL_ERROR;
+			goto abort_due_to_error;
+		}
 	}
 	break;
 }

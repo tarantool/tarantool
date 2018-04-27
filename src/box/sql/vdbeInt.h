@@ -381,7 +381,8 @@ struct Vdbe {
 	u8 ignoreRaised;	/* Flag for ON CONFLICT IGNORE for triggers */
 
 	struct sql_txn *psql_txn; /* Data related to current transaction */
-	u8 autoCommit;		/* The auto-commit flag. */
+	/** The auto-commit flag. */
+	bool auto_commit;
 	/*
 	 * `nDeferredCons` and `nDeferredImmCons` are stored in vdbe during
 	 * vdbe execution and moved to sql_txn when it needs to be saved until

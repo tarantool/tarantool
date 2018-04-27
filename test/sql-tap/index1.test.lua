@@ -1091,7 +1091,7 @@ test:do_execsql_test(
             BEGIN;
         ]], {
             -- <index-19.3>
-            1, "cannot start a transaction within a transaction"
+            1, "Operation is not permitted when there is an active transaction "
             -- </index-19.3>
         })
 

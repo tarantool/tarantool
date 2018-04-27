@@ -3866,54 +3866,31 @@ sqlite3SrcListShiftJoinType(SrcList * p)
 	}
 }
 
-/*
- * Generate VDBE code for a BEGIN statement.
- */
 void
-sqlite3BeginTransaction(Parse * pParse, int MAYBE_UNUSED type)
+sql_transaction_begin(struct Parse *parse_context)
 {
-	sqlite3 MAYBE_UNUSED *db;
-	Vdbe *v;
-
-	assert(pParse != 0);
-	db = pParse->db;
-	assert(db != 0);
-	v = sqlite3GetVdbe(pParse);
-	if (!v)
-		return;
-	sqlite3VdbeAddOp0(v, OP_AutoCommit);
+	assert(parse_context != NULL);
+	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	if (v != NULL)
+		sqlite3VdbeAddOp0(v, OP_TransactionBegin);
 }
 
-/*
- * Generate VDBE code for a COMMIT statement.
- */
 void
-sqlite3CommitTransaction(Parse * pParse)
+sql_transaction_commit(struct Parse *parse_context)
 {
-	Vdbe *v;
-
-	assert(pParse != 0);
-	assert(pParse->db != 0);
-	v = sqlite3GetVdbe(pParse);
-	if (v) {
-		sqlite3VdbeAddOp1(v, OP_AutoCommit, 1);
-	}
+	assert(parse_context != NULL);
+	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	if (v != NULL)
+		sqlite3VdbeAddOp0(v, OP_TransactionCommit);
 }
 
-/*
- * Generate VDBE code for a ROLLBACK statement.
- */
 void
-sqlite3RollbackTransaction(Parse * pParse)
+sql_transaction_rollback(Parse *pParse)
 {
-	Vdbe *v;
-
 	assert(pParse != 0);
-	assert(pParse->db != 0);
-	v = sqlite3GetVdbe(pParse);
-	if (v) {
-		sqlite3VdbeAddOp2(v, OP_AutoCommit, 1, 1);
-	}
+	struct Vdbe *v = sqlite3GetVdbe(pParse);
+	if (v != NULL)
+		sqlite3VdbeAddOp0(v, OP_TransactionRollback);
 }
 
 /*

@@ -65,9 +65,9 @@ sqlite3VdbeCreate(Parse * pParse)
 	db->pVdbe = p;
 	p->magic = VDBE_MAGIC_INIT;
 	p->pParse = pParse;
-	p->autoCommit = (char)box_txn() == 0 ? 1 : 0;
+	p->auto_commit = !box_txn();
 	p->schema_ver = box_schema_version();
-	if (!p->autoCommit) {
+	if (!p->auto_commit) {
 		p->psql_txn = in_txn()->psql_txn;
 		p->nDeferredCons = p->psql_txn->nDeferredConsSave;
 		p->nDeferredImmCons = p->psql_txn->nDeferredImmConsSave;
@@ -2477,18 +2477,18 @@ sqlite3VdbeCheckFk(Vdbe * p, int deferred)
 int
 sql_txn_begin(Vdbe *p)
 {
-	struct txn *ptxn;
-
 	if (in_txn()) {
 		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
 		return -1;
 	}
-	ptxn = txn_begin(false);
+	struct txn *ptxn = txn_begin(false);
 	if (ptxn == NULL)
 		return -1;
 	ptxn->psql_txn = region_alloc_object(&fiber()->gc, struct sql_txn);
 	if (ptxn->psql_txn == NULL) {
 		box_txn_rollback();
+		diag_set(OutOfMemory, sizeof(struct sql_txn), "region",
+			 "struct sql_txn");
 		return -1;
 	}
 	memset(ptxn->psql_txn, 0, sizeof(struct sql_txn));
@@ -2497,11 +2497,9 @@ sql_txn_begin(Vdbe *p)
 }
 
 Savepoint *
-sql_savepoint(Vdbe *p,
-	      const char *zName)
+sql_savepoint(Vdbe *p, const char *zName)
 {
 	assert(p);
-	assert(p->psql_txn);
 	size_t nName = zName ? strlen(zName) + 1 : 0;
 	size_t savepoint_sz = sizeof(Savepoint) + nName;
 	Savepoint *pNew;
@@ -2509,8 +2507,11 @@ sql_savepoint(Vdbe *p,
 	pNew = (Savepoint *)region_aligned_alloc(&fiber()->gc,
 						 savepoint_sz,
 						 alignof(Savepoint));
-	if (!pNew)
+	if (pNew == NULL) {
+		diag_set(OutOfMemory, savepoint_sz, "region",
+			 "savepoint");
 		return NULL;
+	}
 	pNew->tnt_savepoint = box_txn_savepoint();
 	if (!pNew->tnt_savepoint)
 		return NULL;
@@ -2595,7 +2596,7 @@ sqlite3VdbeHalt(Vdbe * p)
 			 */
 			if (mrc != SQLITE_INTERRUPT) {
 				if ((mrc == SQLITE_NOMEM || mrc == SQLITE_FULL)
-				    && p->autoCommit == 0) {
+				    && box_txn()) {
 					eStatementOp = SAVEPOINT_ROLLBACK;
 				} else {
 					/* We are forced to roll back the active transaction. Before doing
@@ -2606,7 +2607,6 @@ sqlite3VdbeHalt(Vdbe * p)
 					sqlite3RollbackAll(p,
 							   SQLITE_ABORT_ROLLBACK);
 					sqlite3CloseSavepoints(p);
-					p->autoCommit = 1;
 					p->nChange = 0;
 				}
 			}
@@ -2623,7 +2623,7 @@ sqlite3VdbeHalt(Vdbe * p)
 		 * Note: This block also runs if one of the special errors handled
 		 * above has occurred.
 		 */
-		if (p->autoCommit) {
+		if (p->auto_commit) {
 			if (p->rc == SQLITE_OK
 			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL
 				&& !isSpecialError)) {
@@ -2682,7 +2682,6 @@ sqlite3VdbeHalt(Vdbe * p)
 				closeCursorsAndFree(p);
 				sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
 				sqlite3CloseSavepoints(p);
-				p->autoCommit = 1;
 				p->nChange = 0;
 			}
 		}
@@ -2706,7 +2705,6 @@ sqlite3VdbeHalt(Vdbe * p)
 				closeCursorsAndFree(p);
 				sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
 				sqlite3CloseSavepoints(p);
-				p->autoCommit = 1;
 				p->nChange = 0;
 			}
 		}
@@ -2742,7 +2740,7 @@ sqlite3VdbeHalt(Vdbe * p)
 	if (!box_txn())
 		fiber_gc();
 
-	assert(db->nVdbeActive > 0 || p->autoCommit == 0 ||
+	assert(db->nVdbeActive > 0 || box_txn() ||
 		       p->anonymous_savepoint == NULL);
 	return (p->rc == SQLITE_BUSY ? SQLITE_BUSY : SQLITE_OK);
 }
