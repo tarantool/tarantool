@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(56)
+test:plan(58)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -611,6 +611,29 @@ test:do_execsql2_test(
 --     SELECT * FROM [t4"abc];
 --   }
 -- } {cnt 1 max(b+c) 5}
+
+-- gh-2166 Tables with TEMP and TEMPORARY were removed before.
+
+test:do_catchsql_test(
+	"temp",
+	[[
+		CREATE TEMP TABLE t1(a INTEGER PRIMARY KEY, b VARCHAR(10));
+	]], {
+	-- <temp>
+	1, "near \"TEMP\": syntax error"
+	-- <temp>
+	})
+
+test:do_catchsql_test(
+	"temporary",
+	[[
+		CREATE TEMPORARY TABLE t1(a INTEGER PRIMARY KEY, b VARCHAR(10));
+	]], {
+	-- <temporary>
+	1, "near \"TEMPORARY\": syntax error"
+	-- <temporary>
+	})
+
 test:do_execsql2_test(
     "table-8.6",
     [[
