@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(9)
+test:plan(15)
 
 testprefix = "analyzeD"
 
@@ -139,5 +139,66 @@ test:do_execsql_test(
         -- </1.8>
    	})
 
+test:do_catchsql_test(
+	"analyzeD-1.9",
+	[[
+		CREATE TABLE table1(id INT PRIMARY KEY, a INT);
+		CREATE VIEW v AS SELECT * FROM table1;
+		ANALYZE;
+	]], {
+		-- <analyzeD-1.9>
+		0
+		-- <analyzeD-1.9>
+	})
+
+test:do_execsql_test(
+	"analyzeD-1.10",
+	[[
+		SELECT * FROM "_sql_stat4" WHERE "tbl" = 'v';
+	]], {
+		-- <analyzeD-1.10>
+		
+		-- <analyzeD-1.10>
+	})
+
+test:do_execsql_test(
+	"analyzeD-1.11",
+	[[
+		SELECT * FROM "_sql_stat1" WHERE "tbl" = 'v';
+	]], {
+		-- <analyzeD-1.11>
+		
+		-- <analyzeD-1.11>
+	})
+
+test:do_catchsql_test(
+	"analyzeD-1.12",
+	[[
+		ANALYZE v;
+	]], {
+		-- <analyzeD-1.12>
+		1, "VIEW isn't allowed to be analyzed"
+		-- <analyzeD-1.12>
+	})
+
+test:do_execsql_test(
+	"analyzeD-1.13",
+	[[
+		SELECT * FROM "_sql_stat4" WHERE "tbl" = 'v';
+	]], {
+		-- <analyzeD-1.13>
+		
+		-- <analyzeD-1.13>
+	})
+
+test:do_execsql_test(
+	"analyzeD-1.14",
+	[[
+		SELECT * FROM "_sql_stat1" WHERE "tbl" = 'v';
+	]], {
+		-- <analyzeD-1.14>
+		
+		-- <analyzeD-1.14>
+	})
 
 test:finish_test()

@@ -1123,6 +1123,8 @@ analyzeDatabase(Parse * pParse)
 	iTab = pParse->nTab;
 	for (k = sqliteHashFirst(&pSchema->tblHash); k; k = sqliteHashNext(k)) {
 		Table *pTab = (Table *) sqliteHashData(k);
+		if (space_is_view(pTab))
+			continue;
 		analyzeOneTable(pParse, pTab, 0, iStatCur, iMem, iTab);
 	}
 	loadAnalysis(pParse);
@@ -1179,8 +1181,12 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 		/* Form 2:  Analyze table named */
 		z = sqlite3NameFromToken(db, pName);
 		if (z) {
-			if ((pTab = sqlite3LocateTable(pParse, 0, z)) != 0) {
-				analyzeTable(pParse, pTab, 0);
+			if ((pTab = sqlite3LocateTable(pParse, 0, z)) != NULL) {
+				if (space_is_view(pTab))
+					sqlite3ErrorMsg(pParse, "VIEW isn't "
+					"allowed to be analyzed");
+				else
+					analyzeTable(pParse, pTab, 0);
 			}
 		}
 		sqlite3DbFree(db, z);
