@@ -20,7 +20,7 @@ test_run:cmd("setopt delimiter ';'")
 function do_long_f(...)
 	active = active + 1
 	while not continue do
-		fiber.sleep(0.1)
+		fiber.sleep(0.01)
 	end
 	active = active - 1
 	finished = finished + 1
@@ -40,11 +40,9 @@ end;
 
 -- Wait until 'active' stops growing - it means, that the input
 -- is blocked.
-function wait_block()
-	local old_val = -1
-	while old_val ~= active do
-		old_val = active
-		fiber.sleep(0.1)
+function wait_active(value)
+	while value ~= active do
+		fiber.sleep(0.01)
 	end
 end;
 
@@ -59,7 +57,7 @@ test_run:cmd("setopt delimiter ''");
 --
 run_workers(conn)
 run_workers(conn2)
-wait_block()
+wait_active(run_max * 2)
 active == run_max * 2 or active
 wait_finished(active)
 
