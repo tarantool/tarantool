@@ -186,7 +186,7 @@ base64_encode(const char *in_bin, int in_len,
 	      char *out_base64, int out_len, int options)
 {
 	const char *encoding;
-	if ((options & BASE64_URLSAFE) != 0)
+	if ((options & BASE64_URLSAFE) == BASE64_URLSAFE)
 		encoding = urlsafe_encoding;
 	else
 		encoding = default_encoding;
