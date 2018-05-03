@@ -190,13 +190,7 @@ struct iproto_msg
 static struct mempool iproto_msg_pool;
 
 static struct iproto_msg *
-iproto_msg_new(struct iproto_connection *con)
-{
-	struct iproto_msg *msg =
-		(struct iproto_msg *) mempool_alloc_xc(&iproto_msg_pool);
-	msg->connection = con;
-	return msg;
-}
+iproto_msg_new(struct iproto_connection *con);
 
 /**
  * Resume stopped connections, if any.
@@ -384,28 +378,23 @@ iproto_check_msg_max()
 	return request_count > IPROTO_MSG_MAX;
 }
 
-/**
- * Throttle the queue to the tx thread and ensure the fiber pool
- * in tx thread is not depleted by a flood of incoming requests:
- * resume a stopped connection only if there is a spare message
- * object in the message pool.
- */
-static void
-iproto_resume()
+static struct iproto_msg *
+iproto_msg_new(struct iproto_connection *con)
 {
-	/*
-	 * Most of the time we have nothing to do here: throttling
-	 * is not active.
-	 */
-	if (rlist_empty(&stopped_connections))
-		return;
-	if (iproto_check_msg_max())
-		return;
-
-	struct iproto_connection *con;
-	con = rlist_first_entry(&stopped_connections, struct iproto_connection,
-				in_stop_list);
-	ev_feed_event(con->loop, &con->input, EV_READ);
+	struct iproto_msg *msg =
+		(struct iproto_msg *) mempool_alloc(&iproto_msg_pool);
+	ERROR_INJECT(ERRINJ_TESTING, {
+		mempool_free(&iproto_msg_pool, msg);
+		msg = NULL;
+	});
+	if (msg == NULL) {
+		diag_set(OutOfMemory, sizeof(*msg), "mempool_alloc", "msg");
+		say_warn("can not allocate memory for a new message, "
+			 "connection %s", sio_socketname(con->input.fd));
+		return NULL;
+	}
+	msg->connection = con;
+	return msg;
 }
 
 /**
@@ -431,13 +420,32 @@ iproto_connection_is_idle(struct iproto_connection *con)
 	       ibuf_used(&con->ibuf[1]) == 0;
 }
 
+/**
+ * Stop input when readahead limit is reached. When
+ * we process some messages *on this connection*, the input can be
+ * resumed.
+ */
 static inline void
-iproto_connection_stop(struct iproto_connection *con)
+iproto_connection_stop_readahead_limit(struct iproto_connection *con)
 {
-	say_warn("net_msg_max limit reached, stopping input on connection %s",
+	say_warn("stopping input on connection %s, readahead limit is reached",
 		 sio_socketname(con->input.fd));
 	assert(rlist_empty(&con->in_stop_list));
 	ev_io_stop(con->loop, &con->input);
+}
+
+static inline void
+iproto_connection_stop_msg_max_limit(struct iproto_connection *con)
+{
+	assert(rlist_empty(&con->in_stop_list));
+
+	say_warn("stopping input on connection %s, net_msg_max limit is reached",
+		 sio_socketname(con->input.fd));
+	ev_io_stop(con->loop, &con->input);
+	/*
+	 * Important to add to tail and fetch from head to ensure
+	 * strict lifo order (fairness) for stopped connections.
+	 */
 	rlist_add_tail(&stopped_connections, &con->in_stop_list);
 }
 
@@ -575,20 +583,37 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 	return new_ibuf;
 }
 
-/** Enqueue all requests which were read up. */
-static inline void
+/**
+ * Enqueue all requests which were read up. If a request limit is
+ * reached - stop the connection input even if not the whole batch
+ * is enqueued. Else try to read more feeding read event to the
+ * event loop.
+ * @param con Connection to enqueue in.
+ * @param in Buffer to parse.
+ *
+ * @retval  0 Success.
+ * @retval -1 Invalid MessagePack error.
+ */
+static inline int
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
+	assert(rlist_empty(&con->in_stop_list));
 	int n_requests = 0;
 	bool stop_input = false;
-	while (con->parse_size && stop_input == false) {
+	while (con->parse_size != 0 && !stop_input) {
+		if (iproto_check_msg_max()) {
+			iproto_connection_stop_msg_max_limit(con);
+			cpipe_flush_input(&tx_pipe);
+			return 0;
+		}
 		const char *reqstart = in->wpos - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
 			cpipe_flush_input(&tx_pipe);
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "packet length");
+			diag_set(ClientError, ER_INVALID_MSGPACK,
+				 "packet length");
+			return -1;
 		}
 		if (mp_check_uint(pos, in->wpos) >= 0)
 			break;
@@ -597,6 +622,14 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		if (reqend > in->wpos)
 			break;
 		struct iproto_msg *msg = iproto_msg_new(con);
+		if (msg == NULL) {
+			/*
+			 * Do not treat it as an error - just wait
+			 * until some of requests are finished.
+			 */
+			iproto_connection_stop_msg_max_limit(con);
+			return 0;
+		}
 		msg->p_ibuf = con->p_ibuf;
 		msg->wpos = con->wpos;
 
@@ -626,7 +659,6 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		ev_io_stop(con->loop, &con->output);
 		ev_io_stop(con->loop, &con->input);
 	} else if (n_requests != 1 || con->parse_size != 0) {
-		assert(rlist_empty(&con->in_stop_list));
 		/*
 		 * Keep reading input, as long as the socket
 		 * supplies data, but don't waste CPU on an extra
@@ -647,6 +679,54 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		ev_feed_event(con->loop, &con->input, EV_READ);
 	}
 	cpipe_flush_input(&tx_pipe);
+	return 0;
+}
+
+/**
+ * Enqueue connection's pending requests. Completely resurrect the
+ * connection, if it has no more requests, and the limit still is
+ * not reached.
+ */
+static void
+iproto_connection_resume(struct iproto_connection *con)
+{
+	assert(! iproto_check_msg_max());
+	rlist_del(&con->in_stop_list);
+	/*
+	 * Enqueue_batch() stops the connection again, if the
+	 * limit is reached again.
+	 */
+	if (iproto_enqueue_batch(con, con->p_ibuf) != 0) {
+		struct error *e = box_error_last();
+		iproto_write_error(con->input.fd, e, ::schema_version, 0);
+		error_log(e);
+		iproto_connection_close(con);
+	}
+}
+
+/**
+ * Resume as many connections as possible until a request limit is
+ * reached. By design of iproto_enqueue_batch(), a paused
+ * connection almost always has a pending request fully read up,
+ * so resuming a connection will immediately enqueue the request
+ * as an iproto message and exhaust the limit. Thus we aren't
+ * really resuming all connections here: only as many as is
+ * necessary to use up the limit.
+ */
+static void
+iproto_resume()
+{
+	while (!iproto_check_msg_max() && !rlist_empty(&stopped_connections)) {
+		/*
+		 * Shift from list head to ensure strict FIFO
+		 * (fairness) for resumed connections.
+		 */
+		struct iproto_connection *con =
+			rlist_first_entry(&stopped_connections,
+					  struct iproto_connection,
+					  in_stop_list);
+		iproto_connection_resume(con);
+	}
 }
 
 static void
@@ -657,23 +737,15 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		(struct iproto_connection *) watcher->data;
 	int fd = con->input.fd;
 	assert(fd >= 0);
-	if (! rlist_empty(&con->in_stop_list)) {
-		/* Resumed stopped connection. */
-		rlist_del(&con->in_stop_list);
-		/*
-		 * This connection may have no input, so
-		 * resume one more connection which might have
-		 * input.
-		 */
-		iproto_resume();
-	}
+	assert(rlist_empty(&con->in_stop_list));
+	assert(loop == con->loop);
 	/*
 	 * Throttle if there are too many pending requests,
 	 * otherwise we might deplete the fiber pool in tx
 	 * thread and deadlock.
 	 */
 	if (iproto_check_msg_max()) {
-		iproto_connection_stop(con);
+		iproto_connection_stop_msg_max_limit(con);
 		return;
 	}
 
@@ -681,9 +753,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		/* Ensure we have sufficient space for the next round.  */
 		struct ibuf *in = iproto_connection_input_buffer(con);
 		if (in == NULL) {
-			say_warn("readahead limit reached, stopping input on connection %s",
-				 sio_socketname(con->input.fd));
-			ev_io_stop(loop, &con->input);
+			iproto_connection_stop_readahead_limit(con);
 			return;
 		}
 		/* Read input. */
@@ -703,7 +773,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		in->wpos += nrd;
 		con->parse_size += nrd;
 		/* Enqueue all requests which are fully read up. */
-		iproto_enqueue_batch(con, in);
+		if (iproto_enqueue_batch(con, in) != 0)
+			diag_raise();
 	} catch (Exception *e) {
 		/* Best effort at sending the error message to the client. */
 		iproto_write_error(fd, e, ::schema_version, 0);
@@ -801,7 +872,11 @@ static struct iproto_connection *
 iproto_connection_new(int fd)
 {
 	struct iproto_connection *con = (struct iproto_connection *)
-		mempool_alloc_xc(&iproto_connection_pool);
+		mempool_alloc(&iproto_connection_pool);
+	if (con == NULL) {
+		diag_set(OutOfMemory, sizeof(*con), "mempool_alloc", "con");
+		return NULL;
+	}
 	con->input.data = con->output.data = con;
 	con->loop = loop();
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
@@ -1471,7 +1546,8 @@ net_end_join(struct cmsg *m)
 	 * Enqueue any messages if they are in the readahead
 	 * queue. Will simply start input otherwise.
 	 */
-	iproto_enqueue_batch(con, msg->p_ibuf);
+	if (iproto_enqueue_batch(con, msg->p_ibuf) != 0)
+		iproto_connection_close(con);
 }
 
 static void
@@ -1574,20 +1650,29 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 {
 	(void) addr;
 	(void) addrlen;
-	struct iproto_connection *con;
-
-	con = iproto_connection_new(fd);
+	struct iproto_msg *msg;
+	struct iproto_connection *con = iproto_connection_new(fd);
+	if (con == NULL)
+		goto error_conn;
 	/*
 	 * Ignore msg allocation failure - the queue size is
 	 * fixed so there is a limited number of msgs in
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
-	struct iproto_msg *msg = iproto_msg_new(con);
+	msg = iproto_msg_new(con);
+	if (msg == NULL)
+		goto error_msg;
 	cmsg_init(&msg->base, connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
 	msg->close_connection = false;
 	cpipe_push(&tx_pipe, &msg->base);
+	return;
+error_msg:
+	mempool_free(&iproto_connection_pool, con);
+error_conn:
+	close(fd);
+	return;
 }
 
 static struct evio_service binary; /* iproto binary listener */

@@ -70,10 +70,13 @@ end;
 ...
 -- Wait until 'active' stops growing - it means, that the input
 -- is blocked.
+-- No more messages.
 function wait_active(value)
 	while value ~= active do
 		fiber.sleep(0.01)
 	end
+	fiber.sleep(0.01)
+	assert(value == active)
 end;
 ---
 ...
@@ -99,11 +102,23 @@ run_workers(conn2)
 wait_active(run_max * 2)
 ---
 ...
-active == run_max * 2 or active
----
-- true
-...
 wait_finished(active)
+---
+...
+--
+-- Test that each message in a batch is checked. When a limit is
+-- reached, other messages must be processed later.
+--
+run_max = limit * 5
+---
+...
+run_workers(conn)
+---
+...
+wait_active(limit + 1)
+---
+...
+wait_finished(run_max)
 ---
 ...
 conn2:close()
