@@ -2900,13 +2900,6 @@ case OP_Savepoint: {
 		if (!pSavepoint) {
 			sqlite3VdbeError(p, "no such savepoint: %s", zName);
 			rc = SQLITE_ERROR;
-		} else if (p1==SAVEPOINT_RELEASE) {
-			/* It is not possible to release (commit) a savepoint if there are
-			 * active write statements.
-			 */
-			sqlite3VdbeError(p, "cannot release savepoint - "
-					 "SQL statements in progress");
-			rc = SQLITE_BUSY;
 		} else {
 
 			/* Determine whether or not this is a transaction savepoint. If so,
