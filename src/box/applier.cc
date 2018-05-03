@@ -515,7 +515,7 @@ applier_subscribe(struct applier *applier)
 				 */
 				if (e->type == &type_ClientError &&
 				    box_error_code(e) == ER_TUPLE_FOUND &&
-				    cfg_geti("replication_skip_conflict"))
+				    replication_skip_conflict)
 					diag_clear(diag_get());
 				else
 					diag_raise();

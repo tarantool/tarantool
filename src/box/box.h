@@ -181,6 +181,7 @@ void box_set_vinyl_cache(void);
 void box_set_vinyl_timeout(void);
 void box_set_replication_timeout(void);
 void box_set_replication_connect_quorum(void);
+void box_set_replication_skip_conflict(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */

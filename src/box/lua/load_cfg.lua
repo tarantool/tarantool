@@ -194,7 +194,7 @@ local dynamic_cfg = {
     force_recovery          = function() end,
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
-    replication_skip_conflict = function() end,
+    replication_skip_conflict = private.cfg_set_replication_skip_conflict,
 }
 
 local dynamic_cfg_skip_at_load = {
