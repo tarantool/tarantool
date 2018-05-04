@@ -53,9 +53,10 @@ extern "C" {
 #include <lj_tab.h>
 #include <lj_meta.h>
 
+#include "lua/error.h"
+
 struct lua_State;
 struct ibuf;
-struct error;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -412,14 +413,6 @@ LUA_API int64_t
 luaL_toint64(struct lua_State *L, int idx);
 
 /**
- * Re-throws the last Tarantool error as a Lua object.
- * \sa lua_error()
- * \sa box_error_last()
- */
-LUA_API int
-luaT_error(lua_State *L);
-
-/**
  * Like lua_call(), but with the proper support of Tarantool errors.
  * \sa lua_call()
  */
@@ -446,12 +439,6 @@ LUA_API const char *
 luaT_tolstring(lua_State *L, int idx, size_t *ssize);
 
 /** \endcond public */
-
-void
-luaT_pusherror(struct lua_State *L, struct error *e);
-
-struct error *
-luaL_iserror(struct lua_State *L, int narg);
 
 /**
  * Convert the last value on the stack into Tarantool error and
