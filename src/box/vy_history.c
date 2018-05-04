@@ -103,10 +103,10 @@ vy_history_apply(struct vy_history *history, const struct key_def *cmp_def,
 		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
 						     cmp_def, format, true);
 		++*upserts_applied;
-		if (stmt == NULL)
-			return -1;
 		if (curr_stmt != NULL)
 			tuple_unref(curr_stmt);
+		if (stmt == NULL)
+			return -1;
 		curr_stmt = stmt;
 		node = rlist_prev_entry_safe(node, &history->stmts, link);
 	}
