@@ -386,10 +386,14 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			iPk = pParse->nMem + 1;
 			pParse->nMem += nPk;
 			iEphCur = pParse->nTab++;
-			KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nPk, 0);
+			struct key_def *def = key_def_new(nPk);
+			if (def == NULL) {
+				sqlite3OomFault(db);
+				goto delete_from_cleanup;
+			}
 			addrEphOpen =
 				sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iEphCur,
-						  nPk, 0, (char*) pKeyInfo, P4_KEYINFO);
+						  nPk, 0, (char*)def, P4_KEYDEF);
 		} else {
 			pPk = sqlite3PrimaryKeyIndex(pTab);
 			assert(pPk != 0);
@@ -400,7 +404,7 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			addrEphOpen =
 			    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEphCur,
 					      nPk);
-			sqlite3VdbeSetP4KeyInfo(pParse, pPk);
+			sql_vdbe_set_p4_key_def(pParse, pPk);
 		}
 
 		/* Construct a query to find the primary key for every row

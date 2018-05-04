@@ -1505,7 +1505,7 @@ sqlite3ExprListDup(sqlite3 * db, ExprList * p, int flags)
 		}
 		pItem->zName = sqlite3DbStrDup(db, pOldItem->zName);
 		pItem->zSpan = sqlite3DbStrDup(db, pOldItem->zSpan);
-		pItem->sortOrder = pOldItem->sortOrder;
+		pItem->sort_order = pOldItem->sort_order;
 		pItem->done = 0;
 		pItem->bSpanIsTab = pOldItem->bSpanIsTab;
 		pItem->u = pOldItem->u;
@@ -1756,20 +1756,17 @@ sqlite3ExprListAppendVector(Parse * pParse,	/* Parsing context */
 	return pList;
 }
 
-/*
- * Set the sort order for the last element on the given ExprList.
- */
 void
-sqlite3ExprListSetSortOrder(ExprList * p, int iSortOrder)
+sqlite3ExprListSetSortOrder(struct ExprList *p, enum sort_order sort_order)
 {
 	if (p == 0)
 		return;
 	assert(p->nExpr > 0);
-	if (iSortOrder == SORT_ORDER_UNDEF) {
-		assert(p->a[p->nExpr - 1].sortOrder == SORT_ORDER_ASC);
+	if (sort_order == SORT_ORDER_UNDEF) {
+		assert(p->a[p->nExpr - 1].sort_order == SORT_ORDER_ASC);
 		return;
 	}
-	p->a[p->nExpr - 1].sortOrder = (u8) iSortOrder;
+	p->a[p->nExpr - 1].sort_order = sort_order;
 }
 
 /*
@@ -2522,7 +2519,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  P4_DYNAMIC);
 					emit_open_cursor(pParse, iTab,
 							 pIdx->tnum);
-					sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+					sql_vdbe_set_p4_key_def(pParse, pIdx);
 					VdbeComment((v, "%s", pIdx->zName));
 					assert(IN_INDEX_INDEX_DESC ==
 					       IN_INDEX_INDEX_ASC + 1);
@@ -2739,7 +2736,6 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 	case TK_IN:{
 			int addr;	/* Address of OP_OpenEphemeral instruction */
 			Expr *pLeft = pExpr->pLeft;	/* the LHS of the IN operator */
-			KeyInfo *pKeyInfo = 0;	/* Key information */
 			int nVal;	/* Size of vector pLeft */
 
 			nVal = sqlite3ExprVectorSize(pLeft);
@@ -2761,7 +2757,11 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			pExpr->is_ephemeral = 1;
 			addr = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 						 pExpr->iTable, nVal);
-			pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nVal, 1);
+			struct key_def *key_def = key_def_new(nVal);
+			if (key_def == NULL) {
+				sqlite3OomFault(pParse->db);
+				return 0;
+			}
 
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				/* Case 1:     expr IN (SELECT ...)
@@ -2787,29 +2787,32 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					pSelect->iLimit = 0;
 					testcase(pSelect->
 						 selFlags & SF_Distinct);
-					testcase(pKeyInfo == 0);	/* Caused by OOM in sqlite3KeyInfoAlloc() */
 					if (sqlite3Select
 					    (pParse, pSelect, &dest)) {
 						sqlite3DbFree(pParse->db,
 							      dest.zAffSdst);
-						sqlite3KeyInfoUnref(pKeyInfo);
+						key_def_delete(key_def);
 						return 0;
 					}
 					sqlite3DbFree(pParse->db,
 						      dest.zAffSdst);
-					assert(pKeyInfo != 0);	/* OOM will cause exit after sqlite3Select() */
 					assert(pEList != 0);
 					assert(pEList->nExpr > 0);
-					assert(sqlite3KeyInfoIsWriteable
-					       (pKeyInfo));
 					for (i = 0; i < nVal; i++) {
 						Expr *p =
 						    sqlite3VectorFieldSubexpr
 						    (pLeft, i);
-						pKeyInfo->aColl[i] =
-						    sqlite3BinaryCompareCollSeq
-						    (pParse, p,
-						     pEList->a[i].pExpr);
+
+						struct coll *coll;
+						coll = sqlite3BinaryCompareCollSeq
+							(pParse, p,
+							 pEList->a[i].pExpr);
+
+						key_def_set_part(key_def, i, i,
+								 FIELD_TYPE_SCALAR,
+								 ON_CONFLICT_ACTION_ABORT,
+								 coll,
+								 SORT_ORDER_ASC);
 					}
 				}
 			} else if (ALWAYS(pExpr->x.pList != 0)) {
@@ -2830,15 +2833,15 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				if (!affinity) {
 					affinity = SQLITE_AFF_BLOB;
 				}
-				if (pKeyInfo) {
-					bool unused;
-					assert(sqlite3KeyInfoIsWriteable
-					       (pKeyInfo));
-					pKeyInfo->aColl[0] =
-						sql_expr_coll(pParse,
-							      pExpr->pLeft,
-							      &unused);
-				}
+				bool unused;
+				struct coll *coll;
+				coll = sql_expr_coll(pParse, pExpr->pLeft,
+						     &unused);
+
+				key_def_set_part(key_def, 0, 0,
+						 FIELD_TYPE_SCALAR,
+						 ON_CONFLICT_ACTION_ABORT, coll,
+						 SORT_ORDER_ASC);
 
 				/* Loop through each expression in <exprlist>. */
 				r1 = sqlite3GetTempReg(pParse);
@@ -2868,10 +2871,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				sqlite3ReleaseTempReg(pParse, r1);
 				sqlite3ReleaseTempReg(pParse, r2);
 			}
-			if (pKeyInfo) {
-				sqlite3VdbeChangeP4(v, addr, (void *)pKeyInfo,
-						    P4_KEYINFO);
-			}
+			sqlite3VdbeChangeP4(v, addr, (void *)key_def,
+					    P4_KEYDEF);
 			break;
 		}
 
@@ -5183,7 +5184,7 @@ sqlite3ExprListCompare(ExprList * pA, ExprList * pB, int iTab)
 	for (i = 0; i < pA->nExpr; i++) {
 		Expr *pExprA = pA->a[i].pExpr;
 		Expr *pExprB = pB->a[i].pExpr;
-		if (pA->a[i].sortOrder != pB->a[i].sortOrder)
+		if (pA->a[i].sort_order != pB->a[i].sort_order)
 			return 1;
 		if (sqlite3ExprCompare(pExprA, pExprB, iTab))
 			return 1;

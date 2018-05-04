@@ -312,8 +312,8 @@ struct MergeEngine {
  * after the thread has finished are not dire. So we don't worry about
  * memory barriers and such here.
  */
-typedef int (*SorterCompare) (SortSubtask *, int *, const void *, int,
-			      const void *, int);
+typedef int (*SorterCompare) (SortSubtask *, bool *, const void *,
+			      const void *);
 struct SortSubtask {
 	SQLiteThread *pThread;	/* Background thread, if any */
 	int bDone;		/* Set if thread is finished but not joined */
@@ -343,7 +343,7 @@ struct VdbeSorter {
 	PmaReader *pReader;	/* Readr data from here after Rewind() */
 	MergeEngine *pMerger;	/* Or here, if bUseThreads==0 */
 	sqlite3 *db;		/* Database connection */
-	KeyInfo *pKeyInfo;	/* How to compare records */
+	struct key_def *key_def;
 	UnpackedRecord *pUnpacked;	/* Used by VdbeSorterCompare() */
 	SorterList list;	/* List of in-memory records */
 	int iMemory;		/* Offset of free space in list.aMemory */
@@ -794,10 +794,10 @@ vdbePmaReaderInit(SortSubtask * pTask,	/* Task context */
 	return rc;
 }
 
-/*
- * Compare key1 (buffer pKey1, size nKey1 bytes) with key2 (buffer pKey2,
- * size nKey2 bytes). Use (pTask->pKeyInfo) for the collation sequences
- * used by the comparison. Return the result of the comparison.
+/**
+ * Compare key1 with key2. Use (pTask->key_def) for the collation
+ * sequences used by the comparison. Return the result of the
+ * comparison.
  *
  * If IN/OUT parameter *pbKey2Cached is true when this function is called,
  * it is assumed that (pTask->pUnpacked) contains the unpacked version
@@ -806,27 +806,31 @@ vdbePmaReaderInit(SortSubtask * pTask,	/* Task context */
  *
  * If an OOM error is encountered, (pTask->pUnpacked->error_rc) is set
  * to SQLITE_NOMEM.
+ *
+ * @param task Subtask context (for key_def).
+ * @param key2_cached True if pTask->pUnpacked is key2.
+ * @param key1 Left side of comparison.
+ * @param key2 Right side of comparison.
+ *
+ * @retval +1 if key1 > key2, -1 otherwise.
  */
 static int
-vdbeSorterCompare(SortSubtask * pTask,	/* Subtask context (for pKeyInfo) */
-		  int *pbKey2Cached,	/* True if pTask->pUnpacked is pKey2 */
-		  const void *pKey1, int nKey1,	/* Left side of comparison */
-		  const void *pKey2, int nKey2	/* Right side of comparison */
-    )
+vdbeSorterCompare(struct SortSubtask *task, bool *key2_cached,
+		  const void *key1, const void *key2)
 {
-	UnpackedRecord *r2 = pTask->pUnpacked;
-	if (!*pbKey2Cached) {
-		sqlite3VdbeRecordUnpackMsgpack(pTask->pSorter->pKeyInfo, nKey2,
-					       pKey2, r2);
-		*pbKey2Cached = 1;
+	struct UnpackedRecord *r2 = task->pUnpacked;
+	if (!*key2_cached) {
+		sqlite3VdbeRecordUnpackMsgpack(task->pSorter->key_def,
+					       key2, r2);
+		*key2_cached = 1;
 	}
-	return sqlite3VdbeRecordCompareMsgpack(nKey1, pKey1, r2);
+	return sqlite3VdbeRecordCompareMsgpack(key1, r2);
 }
 
 /*
  * Initialize the temporary index cursor just opened as a sorter cursor.
  *
- * Usually, the sorter module uses the value of (pCsr->pKeyInfo->nField)
+ * Usually, the sorter module uses the value of (pCsr->key_def->part_count)
  * to determine the number of fields that should be compared from the
  * records being sorted. However, if the value passed as argument nField
  * is non-zero and the sorter is able to guarantee a stable sort, nField
@@ -844,16 +848,12 @@ vdbeSorterCompare(SortSubtask * pTask,	/* Subtask context (for pKeyInfo) */
  */
 int
 sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
-		      int nField,	/* Number of key fields in each record */
 		      VdbeCursor * pCsr	/* Cursor that holds the new sorter */
     )
 {
 	int pgsz;		/* Page size of main database */
 	int i;			/* Used to iterate through aTask[] */
 	VdbeSorter *pSorter;	/* The new sorter */
-	KeyInfo *pKeyInfo;	/* Copy of pCsr->pKeyInfo with db==0 */
-	int szKeyInfo;		/* Size of pCsr->pKeyInfo in bytes */
-	int sz;			/* Size of pSorter in bytes */
 	int rc = SQLITE_OK;
 #if SQLITE_MAX_WORKER_THREADS==0
 #define nWorker 0
@@ -875,25 +875,15 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 	}
 #endif
 
-	assert(pCsr->pKeyInfo);
+	assert(pCsr->key_def != NULL);
 	assert(pCsr->eCurType == CURTYPE_SORTER);
-	szKeyInfo =
-	    sizeof(KeyInfo) + (pCsr->pKeyInfo->nField - 1) * sizeof(struct coll *);
-	sz = sizeof(VdbeSorter) + nWorker * sizeof(SortSubtask);
 
-	pSorter = (VdbeSorter *) sqlite3DbMallocZero(db, sz + szKeyInfo);
+	pSorter = (VdbeSorter *) sqlite3DbMallocZero(db, sizeof(VdbeSorter));
 	pCsr->uc.pSorter = pSorter;
 	if (pSorter == 0) {
 		rc = SQLITE_NOMEM_BKPT;
 	} else {
-		pSorter->pKeyInfo = pKeyInfo =
-		    (KeyInfo *) ((u8 *) pSorter + sz);
-		memcpy(pKeyInfo, pCsr->pKeyInfo, szKeyInfo);
-		pKeyInfo->db = 0;
-		if (nField && nWorker == 0) {
-			pKeyInfo->nXField += (pKeyInfo->nField - nField);
-			pKeyInfo->nField = nField;
-		}
+		pSorter->key_def = pCsr->key_def;
 		pSorter->pgsz = pgsz = 1024;
 		pSorter->nTask = nWorker + 1;
 		pSorter->iPrev = (u8) (nWorker - 1);
@@ -929,8 +919,8 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 			}
 		}
 
-		if ((pKeyInfo->nField + pKeyInfo->nXField) < 13
-		    && (pKeyInfo->aColl[0] == NULL)) {
+		if (pCsr->key_def->part_count < 13
+		    && (pCsr->key_def->parts[0].coll == NULL)) {
 			pSorter->typeMask =
 			    SORTER_TYPE_INTEGER | SORTER_TYPE_TEXT;
 		}
@@ -1280,10 +1270,11 @@ vdbeSortAllocUnpacked(SortSubtask * pTask)
 {
 	if (pTask->pUnpacked == 0) {
 		pTask->pUnpacked =
-		    sqlite3VdbeAllocUnpackedRecord(pTask->pSorter->pKeyInfo);
+			sqlite3VdbeAllocUnpackedRecord(pTask->pSorter->db,
+						       pTask->pSorter->key_def);
 		if (pTask->pUnpacked == 0)
 			return SQLITE_NOMEM_BKPT;
-		pTask->pUnpacked->nField = pTask->pSorter->pKeyInfo->nField;
+		pTask->pUnpacked->nField = pTask->pSorter->key_def->part_count;
 		pTask->pUnpacked->errCode = 0;
 	}
 	return SQLITE_OK;
@@ -1300,14 +1291,14 @@ vdbeSorterMerge(SortSubtask * pTask,	/* Calling thread context */
 {
 	SorterRecord *pFinal = 0;
 	SorterRecord **pp = &pFinal;
-	int bCached = 0;
+	bool bCached = false;
 
 	assert(p1 != 0 && p2 != 0);
 	for (;;) {
 		int res;
 		res =
-		    pTask->xCompare(pTask, &bCached, SRVAL(p1), p1->nVal,
-				    SRVAL(p2), p2->nVal);
+		    pTask->xCompare(pTask, &bCached, SRVAL(p1),
+				    SRVAL(p2));
 
 		if (res <= 0) {
 			*pp = p1;
@@ -1599,7 +1590,7 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 		int i;		/* Index of aTree[] to recalculate */
 		PmaReader *pReadr1;	/* First PmaReader to compare */
 		PmaReader *pReadr2;	/* Second PmaReader to compare */
-		int bCached = 0;
+		bool bCached = false;
 
 		/* Find the first two PmaReaders to compare. The one that was just
 		 * advanced (iPrev) and the one next to it in the array.
@@ -1617,9 +1608,7 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 			} else {
 				iRes = pTask->xCompare(pTask, &bCached,
 						       pReadr1->aKey,
-						       pReadr1->nKey,
-						       pReadr2->aKey,
-						       pReadr2->nKey);
+						       pReadr2->aKey);
 			}
 
 			/* If pReadr1 contained the smaller value, set aTree[i] to its index.
@@ -2075,12 +2064,11 @@ vdbeMergeEngineCompare(MergeEngine * pMerger,	/* Merge engine containing PmaRead
 		iRes = i1;
 	} else {
 		SortSubtask *pTask = pMerger->pTask;
-		int bCached = 0;
+		bool cached = false;
 		int res;
 		assert(pTask->pUnpacked != 0);	/* from vdbeSortSubtaskMain() */
 		res =
-		    pTask->xCompare(pTask, &bCached, p1->aKey, p1->nKey,
-				    p2->aKey, p2->nKey);
+		    pTask->xCompare(pTask, &cached, p1->aKey, p2->aKey);
 		if (res <= 0) {
 			iRes = i1;
 		} else {
@@ -2824,7 +2812,6 @@ sqlite3VdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 {
 	VdbeSorter *pSorter;
 	UnpackedRecord *r2;
-	KeyInfo *pKeyInfo;
 	int i;
 	void *pKey;
 	int nKey;		/* Sorter key to compare pVal with */
@@ -2832,10 +2819,9 @@ sqlite3VdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
 	r2 = pSorter->pUnpacked;
-	pKeyInfo = pCsr->pKeyInfo;
 	if (r2 == 0) {
 		r2 = pSorter->pUnpacked =
-		    sqlite3VdbeAllocUnpackedRecord(pKeyInfo);
+			sqlite3VdbeAllocUnpackedRecord(pSorter->db,  pCsr->key_def);
 		if (r2 == 0)
 			return SQLITE_NOMEM_BKPT;
 		r2->nField = nKeyCol;
@@ -2843,7 +2829,7 @@ sqlite3VdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 	assert(r2->nField == nKeyCol);
 
 	pKey = vdbeSorterRowkey(pSorter, &nKey);
-	sqlite3VdbeRecordUnpackMsgpack(pKeyInfo, nKey, pKey, r2);
+	sqlite3VdbeRecordUnpackMsgpack(pCsr->key_def, pKey, r2);
 	for (i = 0; i < nKeyCol; i++) {
 		if (r2->aMem[i].flags & MEM_Null) {
 			*pRes = -1;
@@ -2851,6 +2837,6 @@ sqlite3VdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 		}
 	}
 
-	*pRes = sqlite3VdbeRecordCompareMsgpack(pVal->n, pVal->z, r2);
+	*pRes = sqlite3VdbeRecordCompareMsgpack(pVal->z, r2);
 	return SQLITE_OK;
 }

@@ -437,7 +437,7 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			int regRec = sqlite3GetTempReg(pParse);
 
 			emit_open_cursor(pParse, iCur, pIdx->tnum);
-			sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+			sql_vdbe_set_p4_key_def(pParse, pIdx);
 			for (i = 0; i < nCol; i++) {
 				sqlite3VdbeAddOp2(v, OP_Copy,
 						  aiCol[i] + 1 + regData,

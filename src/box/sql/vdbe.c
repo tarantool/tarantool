@@ -2242,35 +2242,36 @@ case OP_Permutation: {
  * OPFLAG_PERMUTE bit is clear, then register are compared in sequential
  * order.
  *
- * P4 is a KeyInfo structure that defines collating sequences and sort
+ * P4 is a key_def structure that defines collating sequences and sort
  * orders for the comparison.  The permutation applies to registers
- * only.  The KeyInfo elements are used sequentially.
+ * only.  The key_def elements are used sequentially.
  *
  * The comparison is a sort comparison, so NULLs compare equal,
  * NULLs are less than numbers, numbers are less than strings,
  * and strings are less than blobs.
  */
 case OP_Compare: {
-	int n;
-	int i;
 	int p1;
 	int p2;
-	const KeyInfo *pKeyInfo;
 	int idx;
-	struct coll *pColl;    /* Collating sequence to use on this term */
-	int bRev;          /* True for DESCENDING sort order */
 
-	if ((pOp->p5 & OPFLAG_PERMUTE)==0) aPermute = 0;
-	n = pOp->p3;
-	pKeyInfo = pOp->p4.pKeyInfo;
+	if ((pOp->p5 & OPFLAG_PERMUTE) == 0)
+		aPermute = 0;
+
+	int n = pOp->p3;
+
+	assert(pOp->p4type == P4_KEYDEF);
 	assert(n>0);
-	assert(pKeyInfo!=0);
 	p1 = pOp->p1;
 	p2 = pOp->p2;
+
+	struct key_def *def = pOp->p4.key_def;
 #if SQLITE_DEBUG
 	if (aPermute) {
-		int k, mx = 0;
-		for(k=0; k<n; k++) if (aPermute[k]>mx) mx = aPermute[k];
+		int mx = 0;
+		for(uint32_t k = 0; k < (uint32_t)n; k++)
+			if (aPermute[k] > mx)
+				mx = aPermute[k];
 		assert(p1>0 && p1+mx<=(p->nMem+1 - p->nCursor)+1);
 		assert(p2>0 && p2+mx<=(p->nMem+1 - p->nCursor)+1);
 	} else {
@@ -2278,18 +2279,19 @@ case OP_Compare: {
 		assert(p2>0 && p2+n<=(p->nMem+1 - p->nCursor)+1);
 	}
 #endif /* SQLITE_DEBUG */
-	for(i=0; i<n; i++) {
+	for(int i = 0; i < n; i++) {
 		idx = aPermute ? aPermute[i] : i;
 		assert(memIsValid(&aMem[p1+idx]));
 		assert(memIsValid(&aMem[p2+idx]));
 		REGISTER_TRACE(p1+idx, &aMem[p1+idx]);
 		REGISTER_TRACE(p2+idx, &aMem[p2+idx]);
-		assert(i<pKeyInfo->nField);
-		pColl = pKeyInfo->aColl[i];
-		bRev = pKeyInfo->aSortOrder[i];
-		iCompare = sqlite3MemCompare(&aMem[p1+idx], &aMem[p2+idx], pColl);
+		assert(i < (int)def->part_count);
+		struct coll *coll = def->parts[i].coll;
+		bool is_rev = def->parts[i].sort_order == SORT_ORDER_DESC;
+		iCompare = sqlite3MemCompare(&aMem[p1+idx], &aMem[p2+idx], coll);
 		if (iCompare) {
-			if (bRev) iCompare = -iCompare;
+			if (is_rev)
+				iCompare = -iCompare;
 			break;
 		}
 	}
@@ -3118,8 +3120,8 @@ case OP_SetCookie: {
  * values need not be contiguous but all P1 values should be
  * small integers. It is an error for P1 to be negative.
  *
- * The P4 value may be a pointer to a KeyInfo structure.
- * If it is a pointer to a KeyInfo structure, then said structure
+ * The P4 value may be a pointer to a key_def structure.
+ * If it is a pointer to a key_def structure, then said structure
  * defines the content and collatining sequence of the index
  * being opened. Otherwise, P4 is NULL.
  *
@@ -3207,7 +3209,7 @@ case OP_OpenWrite:
 	pBtCur->index = index;
 	pBtCur->eState = CURSOR_INVALID;
 	/* Key info still contains sorter order and collation. */
-	pCur->pKeyInfo = pOp->p4.pKeyInfo;
+	pCur->key_def = index->def->key_def;
 
 open_cursor_set_hints:
 	assert(OPFLAG_BULKCSR==BTREE_BULKLOAD);
@@ -3222,8 +3224,12 @@ open_cursor_set_hints:
 	break;
 }
 
-/* Opcode: OpenTEphemeral P1 P2 * * *
- * Synopsis: nColumn = P2
+/**
+ * Opcode: OpenTEphemeral P1 P2 * P4 *
+ * Synopsis:
+ * @param P1 index of new cursor to be created
+ * @param P2 number of columns in a new table
+ * @param P4 key def for new table
  *
  * This opcode creates Tarantool's ephemeral table and sets cursor P1 to it.
  */
@@ -3232,21 +3238,21 @@ case OP_OpenTEphemeral: {
 	BtCursor *pBtCur;
 	assert(pOp->p1 >= 0);
 	assert(pOp->p2 > 0);
-	assert(pOp->p4.pKeyInfo != 0);
-	assert(pOp->p4type == P4_KEYINFO);
+	assert(pOp->p4.key_def != NULL);
+	assert(pOp->p4type == P4_KEYDEF);
 
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_TARANTOOL);
 	if (pCx == 0) goto no_mem;
 	pCx->nullRow = 1;
 
-	pCx->pKeyInfo  = pOp->p4.pKeyInfo;
+	pCx->key_def  = pOp->p4.key_def;
 	pBtCur = pCx->uc.pCursor;
 	/* Ephemeral spaces don't have space_id */
 	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags = BTCF_TEphemCursor;
 
 	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2,
-					     pOp->p4.pKeyInfo->aColl[0]);
+					     pCx->key_def);
 	if (rc) goto abort_due_to_error;
 	break;
 }
@@ -3268,9 +3274,8 @@ case OP_SorterOpen: {
 	assert(pOp->p2>=0);
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_SORTER);
 	if (pCx==0) goto no_mem;
-	pCx->pKeyInfo = pOp->p4.pKeyInfo;
-	assert(pCx->pKeyInfo->db==db);
-	rc = sqlite3VdbeSorterInit(db, pOp->p3, pCx);
+	pCx->key_def = pOp->p4.key_def;
+	rc = sqlite3VdbeSorterInit(db, pCx);
 	if (rc) goto abort_due_to_error;
 	break;
 }
@@ -3546,7 +3551,7 @@ case OP_SeekGT: {       /* jump, in3 */
 	nField = pOp->p4.i;
 	assert(pOp->p4type==P4_INT32);
 	assert(nField>0);
-	r.pKeyInfo = pC->pKeyInfo;
+	r.key_def = pC->key_def;
 	r.nField = (u16)nField;
 
 	if (reg_ipk > 0) {
@@ -3698,7 +3703,7 @@ case OP_Found: {        /* jump, in3 */
 	assert(pC->eCurType==CURTYPE_TARANTOOL);
 	assert(pC->uc.pCursor!=0);
 	if (pOp->p4.i>0) {
-		r.pKeyInfo = pC->pKeyInfo;
+		r.key_def = pC->key_def;
 		r.nField = (u16)pOp->p4.i;
 		r.aMem = pIn3;
 #ifdef SQLITE_DEBUG
@@ -3711,11 +3716,12 @@ case OP_Found: {        /* jump, in3 */
 		pIdxKey = &r;
 		pFree = 0;
 	} else {
-		pFree = pIdxKey = sqlite3VdbeAllocUnpackedRecord(pC->pKeyInfo);
+		pFree = pIdxKey = sqlite3VdbeAllocUnpackedRecord(db, pC->key_def);
 		if (pIdxKey==0) goto no_mem;
 		assert(pIn3->flags & MEM_Blob );
 		(void)ExpandBlob(pIn3);
-		sqlite3VdbeRecordUnpackMsgpack(pC->pKeyInfo, pIn3->n, pIn3->z, pIdxKey);
+		sqlite3VdbeRecordUnpackMsgpack(pC->key_def,
+					       pIn3->z, pIdxKey);
 	}
 	pIdxKey->default_rc = 0;
 	pIdxKey->opcode = pOp->opcode;
@@ -4491,7 +4497,7 @@ case OP_IdxDelete: {
 	pCrsr = pC->uc.pCursor;
 	assert(pCrsr!=0);
 	assert(pOp->p5==0);
-	r.pKeyInfo = pC->pKeyInfo;
+	r.key_def = pC->key_def;
 	r.nField = (u16)pOp->p3;
 	r.default_rc = 0;
 	r.aMem = &aMem[pOp->p2];
@@ -4564,7 +4570,6 @@ case OP_IdxGT:          /* jump */
 case OP_IdxLT:          /* jump */
 case OP_IdxGE:  {       /* jump */
 	VdbeCursor *pC;
-	int res;
 	UnpackedRecord r;
 
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
@@ -4575,7 +4580,7 @@ case OP_IdxGE:  {       /* jump */
 	assert(pC->deferredMoveto==0);
 	assert(pOp->p5==0 || pOp->p5==1);
 	assert(pOp->p4type==P4_INT32);
-	r.pKeyInfo = pC->pKeyInfo;
+	r.key_def = pC->key_def;
 	r.nField = (u16)pOp->p4.i;
 	if (pOp->opcode<OP_IdxLT) {
 		assert(pOp->opcode==OP_IdxLE || pOp->opcode==OP_IdxGT);
@@ -4588,8 +4593,7 @@ case OP_IdxGE:  {       /* jump */
 #ifdef SQLITE_DEBUG
 	{ int i; for(i=0; i<r.nField; i++) assert(memIsValid(&r.aMem[i])); }
 #endif
-	res = 0;  /* Not needed.  Only used to silence a warning. */
-	rc = sqlite3VdbeIdxKeyCompare(db, pC, &r, &res);
+	int res = sqlite3VdbeIdxKeyCompare(pC, &r);
 	assert((OP_IdxLE&1)==(OP_IdxLT&1) && (OP_IdxGE&1)==(OP_IdxGT&1));
 	if ((pOp->opcode&1)==(OP_IdxLT&1)) {
 		assert(pOp->opcode==OP_IdxLE || pOp->opcode==OP_IdxLT);
@@ -4599,7 +4603,6 @@ case OP_IdxGE:  {       /* jump */
 		res++;
 	}
 	VdbeBranchTaken(res>0,2);
-	if (rc) goto abort_due_to_error;
 	if (res>0) goto jump_to_p2;
 	break;
 }

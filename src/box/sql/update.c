@@ -358,12 +358,16 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
 
 	if (isView) {
-		KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, nKey, 0);
+		struct key_def *def = key_def_new(nKey);
+		if (def == NULL) {
+			sqlite3OomFault(db);
+			goto update_cleanup;
+		}
 		addrOpen = sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iEph,
-					     nKey, 0, (char*)pKeyInfo, P4_KEYINFO);
+					     nKey, 0, (char*)def, P4_KEYDEF);
 	} else {
 		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph, nPk);
-		sqlite3VdbeSetP4KeyInfo(pParse, pPk);
+		sql_vdbe_set_p4_key_def(pParse, pPk);
 	}
 
 	pWInfo = sqlite3WhereBegin(pParse, pTabList, pWhere, 0, 0,

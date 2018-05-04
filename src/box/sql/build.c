@@ -985,13 +985,13 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 			pTab->tabFlags |= TF_Autoincrement;
 		}
 		if (pList)
-			pParse->iPkSortOrder = pList->a[0].sortOrder;
+			pParse->iPkSortOrder = pList->a[0].sort_order;
 	} else if (autoInc) {
 		sqlite3ErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
 				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
 	} else {
-		sqlite3CreateIndex(pParse, 0, 0, pList, onError, 0,
-				   0, sortOrder, 0, SQLITE_IDXTYPE_PRIMARYKEY);
+		sql_create_index(pParse, 0, 0, pList, onError, 0,
+				 0, sortOrder, false, SQLITE_IDXTYPE_PRIMARYKEY);
 		pList = 0;
 	}
 
@@ -1094,6 +1094,18 @@ sql_column_collation(Table *table, uint32_t column)
 	return space->format->fields[column].coll;
 }
 
+struct key_def*
+sql_index_key_def(struct Index *idx)
+{
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->tnum);
+	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	struct index *index = space_index(space, index_id);
+	assert(index != NULL && index->def != NULL);
+	return index->def->key_def;
+}
+
 /**
  * Return name of given column collation from index.
  *
@@ -1119,10 +1131,9 @@ sql_index_collation(Index *idx, uint32_t column)
 		return idx->coll_array[column];
 	}
 
-	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
-	struct index *index = space_index(space, index_id);
-	assert(index != NULL && index->def->key_def->part_count >= column);
-	return index->def->key_def->parts[column].coll;
+	struct key_def *key_def = sql_index_key_def(idx);
+	assert(key_def != NULL && key_def->part_count >= column);
+	return key_def->parts[column].coll;
 }
 
 enum sort_order
@@ -1143,10 +1154,9 @@ sql_index_column_sort_order(Index *idx, uint32_t column)
 		return idx->sort_order[column];
 	}
 
-	uint32_t index_id = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
-	struct index *index = space_index(space, index_id);
-	assert(index != NULL && index->def->key_def->part_count >= column);
-	return index->def->key_def->parts[column].sort_order;
+	struct key_def *key_def = sql_index_key_def(idx);
+	assert(key_def != NULL && key_def->part_count >= column);
+	return key_def->parts[column].sort_order;
 }
 
 /**
@@ -1443,9 +1453,7 @@ hasColumn(const i16 * aiCol, int nCol, int x)
  *     (2)  Set the Index.tnum of the PRIMARY KEY Index object in the
  *          schema to the rootpage from the main table.
  *     (3)  Add all table columns to the PRIMARY KEY Index object
- *          so that the PRIMARY KEY is a covering index.  The surplus
- *          columns are part of KeyInfo.nXField and are not used for
- *          sorting or lookup or uniqueness checks.
+ *          so that the PRIMARY KEY is a covering index.
  */
 static void
 convertToWithoutRowidTable(Parse * pParse, Table * pTab)
@@ -1476,10 +1484,11 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 							       &ipkToken, 0));
 		if (pList == 0)
 			return;
-		pList->a[0].sortOrder = pParse->iPkSortOrder;
+		pList->a[0].sort_order = pParse->iPkSortOrder;
 		assert(pParse->pNewTable == pTab);
-		sqlite3CreateIndex(pParse, 0, 0, pList, pTab->keyConf, 0, 0, 0,
-				   0, SQLITE_IDXTYPE_PRIMARYKEY);
+		sql_create_index(pParse, 0, 0, pList, pTab->keyConf, 0, 0,
+				 SORT_ORDER_ASC, false,
+				 SQLITE_IDXTYPE_PRIMARYKEY);
 		if (db->mallocFailed)
 			return;
 		pPk = sqlite3PrimaryKeyIndex(pTab);
@@ -2632,7 +2641,6 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	int tnum;		/* Root page of index */
 	int iPartIdxLabel;	/* Jump to this label to skip a row */
 	Vdbe *v;		/* Generate code into this virtual machine */
-	KeyInfo *pKey;		/* KeyInfo for index */
 	int regRecord;		/* Register holding assembled index record */
 	sqlite3 *db = pParse->db;	/* The database connection */
 	v = sqlite3GetVdbe(pParse);
@@ -2643,14 +2651,15 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	} else {
 		tnum = pIndex->tnum;
 	}
-	pKey = sqlite3KeyInfoOfIndex(pParse, db, pIndex);
-	assert(pKey != 0 || db->mallocFailed || pParse->nErr);
-
+	struct key_def *def = key_def_dup(sql_index_key_def(pIndex));
+	if (def == NULL) {
+		sqlite3OomFault(db);
+		return;
+	}
 	/* Open the sorter cursor if we are to use one. */
 	iSorter = pParse->nTab++;
 	sqlite3VdbeAddOp4(v, OP_SorterOpen, iSorter, 0, pIndex->nColumn,
-			  (char *)
-			  sqlite3KeyInfoRef(pKey), P4_KEYINFO);
+			  (char *)def, P4_KEYDEF);
 
 	/* Open the table. Loop through all rows of the table, inserting index
 	 * records into the sorter.
@@ -2836,34 +2845,11 @@ index_is_unique(Index *idx)
 	return tnt_index->def->opts.is_unique;
 }
 
-/*
- * Create a new index for an SQL table.  pName1.pName2 is the name of the index
- * and pTblList is the name of the table that is to be indexed.  Both will
- * be NULL for a primary key or an index that is created to satisfy a
- * UNIQUE constraint.  If pTable and pIndex are NULL, use pParse->pNewTable
- * as the table to be indexed.  pParse->pNewTable is a table that is
- * currently being constructed by a CREATE TABLE statement.
- *
- * pList is a list of columns to be indexed.  pList will be NULL if this
- * is a primary key or unique-constraint on the most recent column added
- * to the table currently under construction.
- */
 void
-sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
-		   Token * pName,	/* Index name. May be NULL */
-		   SrcList * pTblName,	/* Table to index. Use pParse->pNewTable if 0 */
-		   ExprList * pList,	/* A list of columns to be indexed */
-		   int onError,	        /* ON_CONFLICT_ACTION_ABORT, _IGNORE,
-					 * _REPLACE, or _NONE.
-					 */
-		   Token MAYBE_UNUSED * pStart,	/* The CREATE token that begins
-						 * this statement
-						 */
-		   Expr * pPIWhere,	/* WHERE clause for partial indices */
-		   int sortOrder,	/* Sort order of primary key when pList==NULL */
-		   int ifNotExist,	/* Omit error if index already exists */
-		   u8 idxType	/* The index type */
-    )
+sql_create_index(struct Parse *parse, struct Token *token,
+		 struct SrcList *tbl_name, struct ExprList *col_list,
+		 int on_error, struct Token *start, struct Expr *where,
+		 enum sort_order sort_order, bool if_not_exist, u8 idx_type)
 {
 	Table *pTab = 0;	/* Table to be indexed */
 	Index *pIndex = 0;	/* The index to be created */
@@ -2871,13 +2857,13 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	int nName;		/* Number of characters in zName */
 	int i, j;
 	DbFixer sFix;		/* For assigning database names to pTable */
-	sqlite3 *db = pParse->db;
-	struct ExprList_item *pListItem;	/* For looping over pList */
+	sqlite3 *db = parse->db;
+	struct ExprList_item *col_listItem;	/* For looping over col_list */
 	int nExtra = 0;		/* Space allocated for zExtra[] */
 	char *zExtra = 0;	/* Extra space after the Index object */
 	struct session *user_session = current_session();
 
-	if (db->mallocFailed || pParse->nErr > 0) {
+	if (db->mallocFailed || parse->nErr > 0) {
 		goto exit_create_index;
 	}
 	/* Do not account nested operations: the count of such
@@ -2886,8 +2872,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * PRIMARY KEY and UNIQUE constraint - they had been accounted
 	 * in CREATE TABLE already.
 	 */
-	if (!pParse->nested && idxType == SQLITE_IDXTYPE_APPDEF) {
-		Vdbe *v = sqlite3GetVdbe(pParse);
+	if (!parse->nested && idx_type == SQLITE_IDXTYPE_APPDEF) {
+		Vdbe *v = sqlite3GetVdbe(parse);
 		if (v == NULL)
 			goto exit_create_index;
 		sqlite3VdbeCountChanges(v);
@@ -2897,72 +2883,73 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	/*
 	 * Find the table that is to be indexed.  Return early if not found.
 	 */
-	if (pTblName != 0) {
+	if (tbl_name != NULL) {
 
 		/* Use the two-part index name to determine the database
 		 * to search for the table. 'Fix' the table name to this db
 		 * before looking up the table.
 		 */
-		assert(pName && pName->z);
+		assert(token && token->z);
 
-		sqlite3FixInit(&sFix, pParse, "index", pName);
-		if (sqlite3FixSrcList(&sFix, pTblName)) {
-			/* Because the parser constructs pTblName from a single identifier,
+		sqlite3FixInit(&sFix, parse, "index", token);
+		if (sqlite3FixSrcList(&sFix, tbl_name)) {
+			/* Because the parser constructs tbl_name from a single identifier,
 			 * sqlite3FixSrcList can never fail.
 			 */
 			assert(0);
 		}
-		pTab = sqlite3LocateTable(pParse, 0, pTblName->a[0].zName);
+		pTab = sqlite3LocateTable(parse, 0, tbl_name->a[0].zName);
 		assert(db->mallocFailed == 0 || pTab == 0);
 		if (pTab == 0)
 			goto exit_create_index;
 		sqlite3PrimaryKeyIndex(pTab);
 	} else {
-		assert(pName == 0);
-		assert(pStart == 0);
-		pTab = pParse->pNewTable;
+		assert(token == NULL);
+		assert(start == NULL);
+		pTab = parse->pNewTable;
 		if (!pTab)
 			goto exit_create_index;
 	}
 
 	assert(pTab != 0);
-	assert(pParse->nErr == 0);
+	assert(parse->nErr == 0);
 #ifndef SQLITE_OMIT_VIEW
 	if (pTab->pSelect) {
-		sqlite3ErrorMsg(pParse, "views may not be indexed");
+		sqlite3ErrorMsg(parse, "views may not be indexed");
 		goto exit_create_index;
 	}
 #endif
 	/*
-	 * Find the name of the index.  Make sure there is not already another
-	 * index or table with the same name.
+	 * Find the name of the index.  Make sure there is not
+	 * already another index or table with the same name.
 	 *
-	 * Exception:  If we are reading the names of permanent indices from the
-	 * Tarantool schema (because some other process changed the schema) and
-	 * one of the index names collides with the name of a temporary table or
-	 * index, then we will continue to process this index.
+	 * Exception:  If we are reading the names of permanent
+	 * indices from the Tarantool schema (because some other
+	 * process changed the schema) and one of the index names
+	 * collides with the name of a temporary table or index,
+	 * then we will continue to process this index.
 	 *
-	 * If pName==0 it means that we are
-	 * dealing with a primary key or UNIQUE constraint.  We have to invent our
-	 * own name.
+	 * If token == NULL it means that we are dealing with a
+	 * primary key or UNIQUE constraint.  We have to invent
+	 * our own name.
 	 */
-	if (pName) {
-		zName = sqlite3NameFromToken(db, pName);
+	if (token) {
+		zName = sqlite3NameFromToken(db, token);
 		if (zName == 0)
 			goto exit_create_index;
-		assert(pName->z != 0);
+		assert(token->z != 0);
 		if (!db->init.busy) {
 			if (sqlite3HashFind(&db->pSchema->tblHash, zName) !=
 			    NULL) {
-				sqlite3ErrorMsg(pParse,
+				sqlite3ErrorMsg(parse,
 						"there is already a table named %s",
 						zName);
 				goto exit_create_index;
 			}
 		}
 		if (sqlite3HashFind(&pTab->idxHash, zName) != NULL) {
-			if (!ifNotExist) {
-				sqlite3ErrorMsg(pParse,
+			if (!if_not_exist) {
+				sqlite3ErrorMsg(parse,
 						"index %s.%s already exists",
 						pTab->zName, zName);
 			} else {
@@ -2984,29 +2971,31 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		}
 	}
 
-	/* If pList==0, it means this routine was called to make a primary
-	 * key out of the last column added to the table under construction.
-	 * So create a fake list to simulate this.
+	/*
+	 * If col_list == NULL, it means this routine was called
+	 * to make a primary key out of the last column added to
+	 * the table under construction. So create a fake list to
+	 * simulate this.
 	 */
-	if (pList == 0) {
+	if (col_list == NULL) {
 		Token prevCol;
 		sqlite3TokenInit(&prevCol, pTab->aCol[pTab->nCol - 1].zName);
-		pList = sqlite3ExprListAppend(pParse, 0,
-					      sqlite3ExprAlloc(db, TK_ID,
-							       &prevCol, 0));
-		if (pList == 0)
+		col_list = sqlite3ExprListAppend(parse, 0,
+						 sqlite3ExprAlloc(db, TK_ID,
+								  &prevCol, 0));
+		if (col_list == NULL)
 			goto exit_create_index;
-		assert(pList->nExpr == 1);
-		sqlite3ExprListSetSortOrder(pList, sortOrder);
+		assert(col_list->nExpr == 1);
+		sqlite3ExprListSetSortOrder(col_list, sort_order);
 	} else {
-		sqlite3ExprListCheckLength(pParse, pList, "index");
+		sqlite3ExprListCheckLength(parse, col_list, "index");
 	}
 
 	/* Figure out how many bytes of space are required to store explicitly
 	 * specified collation sequence names.
 	 */
-	for (i = 0; i < pList->nExpr; i++) {
-		Expr *pExpr = pList->a[i].pExpr;
+	for (i = 0; i < col_list->nExpr; i++) {
+		Expr *pExpr = col_list->a[i].pExpr;
 		assert(pExpr != 0);
 		if (pExpr->op == TK_COLLATE) {
 			nExtra += (1 + sqlite3Strlen30(pExpr->u.zToken));
@@ -3017,7 +3006,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * Allocate the index structure.
 	 */
 	nName = sqlite3Strlen30(zName);
-	pIndex = sqlite3AllocateIndexObject(db, pList->nExpr,
+	pIndex = sqlite3AllocateIndexObject(db, col_list->nExpr,
 					    nName + nExtra + 1, &zExtra);
 	if (db->mallocFailed) {
 		goto exit_create_index;
@@ -3028,26 +3017,25 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	zExtra += nName + 1;
 	memcpy(pIndex->zName, zName, nName + 1);
 	pIndex->pTable = pTab;
-	pIndex->onError = (u8) onError;
+	pIndex->onError = (u8) on_error;
 	/*
 	 * Don't make difference between UNIQUE indexes made by user
 	 * using CREATE INDEX statement and those created during
 	 * CREATE TABLE processing.
 	 */
-	if (idxType == SQLITE_IDXTYPE_APPDEF &&
-	    onError != ON_CONFLICT_ACTION_NONE) {
+	if (idx_type == SQLITE_IDXTYPE_APPDEF &&
+	    on_error != ON_CONFLICT_ACTION_NONE) {
 		pIndex->idxType = SQLITE_IDXTYPE_UNIQUE;
 	} else {
-		pIndex->idxType = idxType;
+		pIndex->idxType = idx_type;
 	}
 	pIndex->pSchema = db->pSchema;
-	pIndex->nColumn = pList->nExpr;
+	pIndex->nColumn = col_list->nExpr;
 	/* Tarantool have access to each column by any index */
-	if (pPIWhere) {
-		sqlite3ResolveSelfReference(pParse, pTab, NC_PartIdx, pPIWhere,
-					    0);
-		pIndex->pPartIdxWhere = pPIWhere;
-		pPIWhere = 0;
+	if (where) {
+		sqlite3ResolveSelfReference(parse, pTab, NC_PartIdx, where, 0);
+		pIndex->pPartIdxWhere = where;
+		where = NULL;
 	}
 
 	/* Analyze the list of expressions that form the terms of the index and
@@ -3059,16 +3047,16 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * TODO: Issue a warning if the table primary key is used as part of the
 	 * index key.
 	 */
-	for (i = 0, pListItem = pList->a; i < pList->nExpr; i++, pListItem++) {
+	for (i = 0, col_listItem = col_list->a; i < col_list->nExpr;
+	     i++, col_listItem++) {
 		Expr *pCExpr;	/* The i-th index expression */
-		enum sort_order requested_so;	/* ASC or DESC on the i-th expression */
-		sqlite3ResolveSelfReference(pParse, pTab, NC_IdxExpr,
-					    pListItem->pExpr, 0);
-		if (pParse->nErr)
+		sqlite3ResolveSelfReference(parse, pTab, NC_IdxExpr,
+					    col_listItem->pExpr, 0);
+		if (parse->nErr > 0)
 			goto exit_create_index;
-		pCExpr = sqlite3ExprSkipCollate(pListItem->pExpr);
+		pCExpr = sqlite3ExprSkipCollate(col_listItem->pExpr);
 		if (pCExpr->op != TK_COLUMN) {
-			sqlite3ErrorMsg(pParse,
+			sqlite3ErrorMsg(parse,
 					"functional indexes aren't supported "
 					"in the current version");
 			goto exit_create_index;
@@ -3081,9 +3069,9 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 			pIndex->aiColumn[i] = (i16) j;
 		}
 		struct coll *coll;
-		if (pListItem->pExpr->op == TK_COLLATE) {
-			const char *coll_name = pListItem->pExpr->u.zToken;
-			coll = sqlite3GetCollSeq(pParse, 0, coll_name);
+		if (col_listItem->pExpr->op == TK_COLLATE) {
+			const char *coll_name = col_listItem->pExpr->u.zToken;
+			coll = sqlite3GetCollSeq(parse, 0, coll_name);
 
 			if (coll == NULL &&
 			    sqlite3StrICmp(coll_name, "binary") != 0) {
@@ -3099,15 +3087,14 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		/* Tarantool: DESC indexes are not supported so far.
 		 * See gh-3016.
 		 */
-		requested_so = pListItem->sortOrder & 0;
-		pIndex->sort_order[i] = requested_so;
+		pIndex->sort_order[i] = SORT_ORDER_ASC;
 	}
 
 	sqlite3DefaultRowEst(pIndex);
-	if (pParse->pNewTable == 0)
+	if (parse->pNewTable == 0)
 		estimateIndexWidth(pIndex);
 
-	if (pTab == pParse->pNewTable) {
+	if (pTab == parse->pNewTable) {
 		/* This routine has been called to create an automatic index as a
 		 * result of a PRIMARY KEY or UNIQUE clause on a column definition, or
 		 * a PRIMARY KEY or UNIQUE clause following the column definitions.
@@ -3161,7 +3148,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 					    (pIdx->onError == ON_CONFLICT_ACTION_DEFAULT
 					     || pIndex->onError ==
 					     ON_CONFLICT_ACTION_DEFAULT)) {
-						sqlite3ErrorMsg(pParse,
+						sqlite3ErrorMsg(parse,
 								"conflicting ON CONFLICT clauses specified",
 								0);
 					}
@@ -3169,8 +3156,8 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 						pIdx->onError = pIndex->onError;
 					}
 				}
-				if (idxType == SQLITE_IDXTYPE_PRIMARYKEY)
-					pIdx->idxType = idxType;
+				if (idx_type == SQLITE_IDXTYPE_PRIMARYKEY)
+					pIdx->idxType = idx_type;
 				goto exit_create_index;
 			}
 		}
@@ -3179,7 +3166,7 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	/* Link the new Index structure to its table and to the other
 	 * in-memory database structures.
 	 */
-	assert(pParse->nErr == 0);
+	assert(parse->nErr == 0);
 	if (db->init.busy) {
 		Index *p;
 		p = sqlite3HashInsert(&pTab->idxHash, pIndex->zName, pIndex);
@@ -3192,29 +3179,32 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 		pIndex->tnum = db->init.newTnum;
 	}
 
-	/* If this is the initial CREATE INDEX statement (or CREATE TABLE if the
-	 * index is an implied index for a UNIQUE or PRIMARY KEY constraint) then
-	 * emit code to to insert new index into Tarantool.
-	 * But, do not do this if we are simply parsing the schema, or if this
-	 * index is the PRIMARY KEY index.
+	/*
+	 * If this is the initial CREATE INDEX statement (or
+	 * CREATE TABLE if the index is an implied index for a
+	 * UNIQUE or PRIMARY KEY constraint) then emit code to
+	 * insert new index into Tarantool. But, do not do this if
+	 * we are simply parsing the schema, or if this index is
+	 * the PRIMARY KEY index.
 	 *
-	 * If pTblName==0 it means this index is generated as an implied PRIMARY KEY
-	 * or UNIQUE index in a CREATE TABLE statement.  Since the table
-	 * has just been created, it contains no data and the index initialization
-	 * step can be skipped.
+	 * If tbl_name == NULL it means this index is generated as
+	 * an implied PRIMARY KEY or UNIQUE index in a CREATE
+	 * TABLE statement.  Since the table has just been
+	 * created, it contains no data and the index
+	 * initialization step can be skipped.
 	 */
-	else if (pTblName) {
+	else if (tbl_name != NULL) {
 		Vdbe *v;
 		char *zStmt;
-		int iCursor = pParse->nTab++;
-		int index_space_ptr_reg = pParse->nTab++;
+		int iCursor = parse->nTab++;
+		int index_space_ptr_reg = parse->nTab++;
 		int iSpaceId, iIndexId, iFirstSchemaCol;
 
-		v = sqlite3GetVdbe(pParse);
+		v = sqlite3GetVdbe(parse);
 		if (v == 0)
 			goto exit_create_index;
 
-		sql_set_multi_write(pParse, true);
+		sql_set_multi_write(parse, true);
 
 
 		sqlite3VdbeAddOp2(v, OP_SIDtoPtr, BOX_INDEX_ID,
@@ -3223,37 +3213,34 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 				     index_space_ptr_reg, 6);
 		sqlite3VdbeChangeP5(v, OPFLAG_SEEKEQ);
 
-		/* Gather the complete text of the CREATE INDEX statement into
-		 * the zStmt variable
+		/*
+		 * Gather the complete text of the CREATE INDEX
+		 * statement into the zStmt variable
 		 */
-		assert(pStart); {
-			int n =
-			    (int)(pParse->sLastToken.z - pName->z) +
-			    pParse->sLastToken.n;
-			if (pName->z[n - 1] == ';')
-				n--;
-			/* A named index with an explicit CREATE INDEX statement */
-			zStmt = sqlite3MPrintf(db, "CREATE%s INDEX %.*s",
-					       onError ==
-					       ON_CONFLICT_ACTION_NONE
-					       ? "" : " UNIQUE", n,
-					       pName->z);
-		}
+		assert(start != NULL);
+		int n = (int)(parse->sLastToken.z - token->z) +
+			parse->sLastToken.n;
+		if (token->z[n - 1] == ';')
+			n--;
+		/* A named index with an explicit CREATE INDEX statement */
+		zStmt = sqlite3MPrintf(db, "CREATE%s INDEX %.*s", on_error ==
+				       ON_CONFLICT_ACTION_NONE ? "" : " UNIQUE",
+				       n, token->z);
 
 		iSpaceId = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
-		iIndexId = getNewIid(pParse, iSpaceId, iCursor);
+		iIndexId = getNewIid(parse, iSpaceId, iCursor);
 		sqlite3VdbeAddOp1(v, OP_Close, iCursor);
-		createIndex(pParse, pIndex, iSpaceId, iIndexId, zStmt);
+		createIndex(parse, pIndex, iSpaceId, iIndexId, zStmt);
 
 		/* consumes zStmt */
 		iFirstSchemaCol =
-		    makeIndexSchemaRecord(pParse, pIndex, iSpaceId, iIndexId,
+		    makeIndexSchemaRecord(parse, pIndex, iSpaceId, iIndexId,
 					  zStmt);
 
 		/* Reparse the schema. Code an OP_Expire
 		 * to invalidate all pre-compiled statements.
 		 */
-		sqlite3ChangeCookie(pParse);
+		sqlite3ChangeCookie(parse);
 		sqlite3VdbeAddParseSchema2Op(v, iFirstSchemaCol, 4);
 		sqlite3VdbeAddOp0(v, OP_Expire);
 	}
@@ -3268,18 +3255,18 @@ sqlite3CreateIndex(Parse * pParse,	/* All information about this parse */
 	 * UPDATE and INSERT statements.
 	 */
 
-	if (!(db->init.busy || pTblName == 0))
+	if (!db->init.busy && tbl_name != NULL)
 		goto exit_create_index;
 	addIndexToTable(pIndex, pTab);
-	pIndex = 0;
+	pIndex = NULL;
 
 	/* Clean up before exiting */
  exit_create_index:
 	if (pIndex)
 		freeIndex(db, pIndex);
-	sql_expr_free(db, pPIWhere, false);
-	sqlite3ExprListDelete(db, pList);
-	sqlite3SrcListDelete(db, pTblName);
+	sql_expr_free(db, where, false);
+	sqlite3ExprListDelete(db, col_list);
+	sqlite3SrcListDelete(db, tbl_name);
 	sqlite3DbFree(db, zName);
 }
 
@@ -3374,15 +3361,6 @@ index_is_unique_not_null(const Index *idx)
 		!index->def->key_def->is_nullable);
 }
 
-/**
- * This routine will drop an existing named index.  This routine
- * implements the DROP INDEX statement.
- *
- * @param parse_context Current parsing context.
- * @param index_name_list List containing index name.
- * @param table_token Token representing table name.
- * @param if_exists True, if statement contains 'IF EXISTS' clause.
- */
 void
 sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	       struct Token *table_token, bool if_exists)
@@ -4170,46 +4148,6 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 	sqlite3DbFree(db, zTable);
 }
 #endif
-
-/*
- * Return a KeyInfo structure that is appropriate for the given Index.
- *
- * The caller should invoke sqlite3KeyInfoUnref() on the returned object
- * when it has finished using it.
- */
-KeyInfo *
-sqlite3KeyInfoOfIndex(Parse * pParse, sqlite3 * db, Index * pIdx)
-{
-	int i;
-	int nCol = pIdx->nColumn;
-	int nTableCol = pIdx->pTable->nCol;
-	KeyInfo *pKey;
-
-	if (pParse && pParse->nErr)
-		return 0;
-
-	/*
-	 * KeyInfo describes the index (i.e. the number of key columns,
-	 * comparator options, and the number of columns beyond the key).
-	 * Since Tarantool iterator yields the full tuple, we need a KeyInfo
-	 * as wide as the table itself.  Otherwize, not enough slots
-	 * for row parser cache are allocated in VdbeCursor object.
-	 */
-	pKey = sqlite3KeyInfoAlloc(db, nCol, nTableCol - nCol);
-	if (pKey) {
-		assert(sqlite3KeyInfoIsWriteable(pKey));
-		for (i = 0; i < nCol; i++) {
-			pKey->aColl[i] = sql_index_collation(pIdx, i);
-			pKey->aSortOrder[i] = sql_index_column_sort_order(pIdx,
-									  i);
-		}
-		if (pParse && pParse->nErr) {
-			sqlite3KeyInfoUnref(pKey);
-			pKey = 0;
-		}
-	}
-	return pKey;
-}
 
 #ifndef SQLITE_OMIT_CTE
 /*

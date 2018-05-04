@@ -55,7 +55,7 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	assert(pPk != 0);
 	assert(pPk->tnum == pTab->tnum);
 	emit_open_cursor(pParse, iCur, pPk->tnum);
-	sqlite3VdbeSetP4KeyInfo(pParse, pPk);
+	sql_vdbe_set_p4_key_def(pParse, pPk);
 	VdbeComment((v, "%s", pTab->zName));
 }
 
@@ -566,9 +566,13 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			regRec = sqlite3GetTempReg(pParse);
 			regCopy = sqlite3GetTempRange(pParse, nColumn);
 			regTempId = sqlite3GetTempReg(pParse);
-			KeyInfo *pKeyInfo = sqlite3KeyInfoAlloc(pParse->db, 1+nColumn, 0);
+			struct key_def *def = key_def_new(nColumn + 1);
+			if (def == NULL) {
+				sqlite3OomFault(db);
+				goto insert_cleanup;
+			}
 			sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, srcTab, nColumn+1,
-					  0, (char*)pKeyInfo, P4_KEYINFO);
+					  0, (char*)def, P4_KEYDEF);
 			/* Create counter for rowid */
 			sqlite3VdbeAddOp4Dup8(v, OP_Int64,
 					      0 /* unused */,
@@ -1602,7 +1606,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			if (aToOpen == 0 || aToOpen[i + 1]) {
 				sqlite3VdbeAddOp3(v, op, iIdxCur, pIdx->tnum,
 						  space_ptr_reg);
-				sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+				sql_vdbe_set_p4_key_def(pParse, pIdx);
 				sqlite3VdbeChangeP5(v, p5);
 				VdbeComment((v, "%s", pIdx->zName));
 			}
@@ -1916,10 +1920,10 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		}
 		assert(pSrcIdx);
 		emit_open_cursor(pParse, iSrc, pSrcIdx->tnum);
-		sqlite3VdbeSetP4KeyInfo(pParse, pSrcIdx);
+		sql_vdbe_set_p4_key_def(pParse, pSrcIdx);
 		VdbeComment((v, "%s", pSrcIdx->zName));
 		emit_open_cursor(pParse, iDest, pDestIdx->tnum);
-		sqlite3VdbeSetP4KeyInfo(pParse, pDestIdx);
+		sql_vdbe_set_p4_key_def(pParse, pDestIdx);
 		sqlite3VdbeChangeP5(v, OPFLAG_BULKCSR);
 		VdbeComment((v, "%s", pDestIdx->zName));
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);

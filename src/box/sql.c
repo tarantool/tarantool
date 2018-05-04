@@ -357,7 +357,7 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
 	return SQLITE_OK;
 }
 
-/*
+/**
  * Create ephemeral space and set cursor to the first entry. Features of
  * ephemeral spaces: id == 0, name == "ephemeral", memtx engine (in future it
  * can be changed, but now only memtx engine is supported), primary index
@@ -366,12 +366,12 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
  *
  * @param pCur Cursor which will point to the new ephemeral space.
  * @param field_count Number of fields in ephemeral space.
- * @param aColl Collation sequence of ephemeral space.
+ * @param def Keys description for new ephemeral space.
  *
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
 int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
-				    struct coll *aColl)
+				    struct key_def *def)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
@@ -380,18 +380,18 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 	if (ephemer_key_def == NULL)
 		return SQL_TARANTOOL_ERROR;
 	for (uint32_t part = 0; part < field_count; ++part) {
-		key_def_set_part(ephemer_key_def, part /* part no */,
-				 part /* filed no */,
-				 FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_NONE /* nullable_action */,
-				 aColl /* coll */,
-				 SORT_ORDER_ASC);
+		struct coll *coll;
+		if (part < def->part_count)
+			coll = def->parts[part].coll;
+		else
+			coll = NULL;
+		key_def_set_part(ephemer_key_def, part, part, FIELD_TYPE_SCALAR,
+				 ON_CONFLICT_ACTION_NONE, coll, SORT_ORDER_ASC);
 	}
 
 	struct index_def *ephemer_index_def =
-		index_def_new(0 /*space id */, 0 /* index id */, "ephemer_idx",
-			      strlen("ephemer_idx"), TREE, &index_opts_default,
-			      ephemer_key_def, NULL /* pk def */);
+		index_def_new(0, 0, "ephemer_idx", strlen("ephemer_idx"), TREE,
+			      &index_opts_default, ephemer_key_def, NULL);
 	key_def_delete(ephemer_key_def);
 	if (ephemer_index_def == NULL)
 		return SQL_TARANTOOL_ERROR;
@@ -929,16 +929,13 @@ rename_fail:
 	return SQL_TARANTOOL_ERROR;
 }
 
-/*
- * Performs exactly as extract_key + sqlite3VdbeCompareMsgpack,
- * only faster.
- */
-int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
-				  int *res)
+int
+tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
+			      struct UnpackedRecord *unpacked)
 {
-	assert(pCur->curFlags & BTCF_TaCursor);
-	assert(pCur->iter != NULL);
-	assert(pCur->last_tuple != NULL);
+	assert(cursor->curFlags & BTCF_TaCursor);
+	assert(cursor->iter != NULL);
+	assert(cursor->last_tuple != NULL);
 
 	const box_key_def_t *key_def;
 	const struct tuple *tuple;
@@ -955,9 +952,9 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 	uint32_t key_size;
 #endif
 
-	key_def = box_iterator_key_def(pCur->iter);
-	n = MIN(pUnpacked->nField, key_def->part_count);
-	tuple = pCur->last_tuple;
+	key_def = box_iterator_key_def(cursor->iter);
+	n = MIN(unpacked->nField, key_def->part_count);
+	tuple = cursor->last_tuple;
 	base = tuple_data(tuple);
 	format = tuple_format(tuple);
 	field_map = tuple_field_map(tuple);
@@ -991,33 +988,31 @@ int tarantoolSqlite3IdxKeyCompare(BtCursor *pCur, UnpackedRecord *pUnpacked,
 			} else {
 				p = base + field_map[
 					format->fields[fieldno].offset_slot
-];
+					];
 			}
 		}
 		next_fieldno = fieldno + 1;
-		rc = sqlite3VdbeCompareMsgpack(&p, pUnpacked, i);
+		rc = sqlite3VdbeCompareMsgpack(&p, unpacked, i);
 		if (rc != 0) {
-			if (pUnpacked->pKeyInfo->aSortOrder[i]) {
+			if (unpacked->key_def->parts[i].sort_order !=
+			    SORT_ORDER_ASC)
 				rc = -rc;
-			}
-			*res = rc;
 			goto out;
 		}
 	}
-	*res = pUnpacked->default_rc;
+	rc = unpacked->default_rc;
 out:
 #ifndef NDEBUG
 	/* Sanity check. */
 	original_size = region_used(&fiber()->gc);
 	key = tuple_extract_key(tuple, key_def, &key_size);
 	if (key != NULL) {
-		rc = sqlite3VdbeRecordCompareMsgpack((int)key_size, key,
-						     pUnpacked);
+		int new_rc = sqlite3VdbeRecordCompareMsgpack(key, unpacked);
 		region_truncate(&fiber()->gc, original_size);
-		assert(rc == *res);
+		assert(rc == new_rc);
 	}
 #endif
-	return SQLITE_OK;
+	return rc;
 }
 
 int

@@ -812,7 +812,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	assert(pLevel->iIdxCur >= 0);
 	pLevel->iIdxCur = pParse->nTab++;
 	sqlite3VdbeAddOp2(v, OP_OpenAutoindex, pLevel->iIdxCur, nKeyCol + 1);
-	sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+	sql_vdbe_set_p4_key_def(pParse, pIdx);
 	VdbeComment((v, "for %s", pTable->zName));
 
 	/* Fill the automatic index with content */
@@ -971,9 +971,7 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 		}
 
 		pRec->nField = n;
-		res =
-		    sqlite3VdbeRecordCompareMsgpack(aSample[iSamp].n,
-						    aSample[iSamp].p, pRec);
+		res = sqlite3VdbeRecordCompareMsgpack(aSample[iSamp].p, pRec);
 		if (res < 0) {
 			iLower =
 			    aSample[iSamp].anLt[n - 1] + aSample[iSamp].anEq[n -
@@ -1002,8 +1000,7 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			assert(iCol == nField - 1);
 			pRec->nField = nField;
 			assert(0 ==
-			       sqlite3VdbeRecordCompareMsgpack(aSample[i].n,
-							       aSample[i].p,
+			       sqlite3VdbeRecordCompareMsgpack(aSample[i].p,
 							       pRec)
 			       || pParse->db->mallocFailed);
 		} else {
@@ -1014,8 +1011,7 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			assert(i <= pIdx->nSample && i >= 0);
 			pRec->nField = iCol + 1;
 			assert(i == pIdx->nSample
-			       || sqlite3VdbeRecordCompareMsgpack(aSample[i].n,
-								  aSample[i].p,
+			       || sqlite3VdbeRecordCompareMsgpack(aSample[i].p,
 								  pRec) > 0
 			       || pParse->db->mallocFailed);
 
@@ -1027,14 +1023,14 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 			if (iCol > 0) {
 				pRec->nField = iCol;
 				assert(sqlite3VdbeRecordCompareMsgpack
-				       (aSample[i].n, aSample[i].p, pRec) <= 0
+				       (aSample[i].p, pRec) <= 0
 				       || pParse->db->mallocFailed);
 			}
 			if (i > 0) {
 				pRec->nField = nField;
 				assert(sqlite3VdbeRecordCompareMsgpack
-				       (aSample[i - 1].n, aSample[i - 1].p,
-					pRec) < 0 || pParse->db->mallocFailed);
+				       (aSample[i - 1].p, pRec) < 0 ||
+				       pParse->db->mallocFailed);
 			}
 		}
 	}
@@ -3385,12 +3381,12 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 					 */
 					if (revSet) {
 						if ((rev ^ revIdx) !=
-						    pOrderBy->a[i].sortOrder)
+						    pOrderBy->a[i].sort_order)
 							isMatch = 0;
 					} else {
 						rev =
 						    revIdx ^ pOrderBy->a[i].
-						    sortOrder;
+						    sort_order;
 						if (rev)
 							*pRevMask |=
 							    MASKBIT(iLoop);
@@ -4571,7 +4567,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			assert(iIndexCur >= 0);
 			if (op) {
 				emit_open_cursor(pParse, iIndexCur, pIx->tnum);
-				sqlite3VdbeSetP4KeyInfo(pParse, pIx);
+				sql_vdbe_set_p4_key_def(pParse, pIx);
 				if ((pLoop->wsFlags & WHERE_CONSTRAINT) != 0
 				    && (pLoop->
 					wsFlags & (WHERE_COLUMN_RANGE |

@@ -110,7 +110,8 @@ struct VdbeCursor {
 		int pseudoTableReg;	/* CURTYPE_PSEUDO. Reg holding content. */
 		VdbeSorter *pSorter;	/* CURTYPE_SORTER. Sorter object */
 	} uc;
-	KeyInfo *pKeyInfo;	/* Info about index keys needed by index cursors */
+	/** Info about keys needed by index cursors. */
+	struct key_def *key_def;
 	i16 nField;		/* Number of fields in the header */
 	u16 nHdrParsed;		/* Number of header fields parsed so far */
 	const u8 *aRow;		/* Data for the current row, if all on one page */
@@ -430,7 +431,6 @@ struct PreUpdate {
 	VdbeCursor *pCsr;	/* Cursor to read old values from */
 	int op;			/* One of SQLITE_INSERT, UPDATE, DELETE */
 	u8 *aRecord;		/* old.* database record */
-	KeyInfo keyinfo;
 	UnpackedRecord *pUnpacked;	/* Unpacked version of aRecord[] */
 	UnpackedRecord *pNewUnpacked;	/* Unpacked version of new.* record */
 	int iNewReg;		/* Register for new.* values */
@@ -458,7 +458,18 @@ u32 sqlite3VdbeSerialPut(unsigned char *, Mem *, u32);
 u32 sqlite3VdbeSerialGet(const unsigned char *, u32, Mem *);
 void sqlite3VdbeDeleteAuxData(sqlite3 *, AuxData **, int, int);
 
-int sqlite3VdbeIdxKeyCompare(sqlite3 *, VdbeCursor *, UnpackedRecord *, int *);
+/**
+ * Compare the key of the index entry that cursor vdbe_cursor is
+ * pointing to against the key string in unpacked.
+ * @param vdbe_cursor Cursor, which points to tuple to compare.
+ * @param unpacked Unpacked version of key.
+ *
+ * @retval Comparison result.
+ */
+int
+sqlite3VdbeIdxKeyCompare(struct VdbeCursor *vdbe_cursor,
+			 struct UnpackedRecord *unpacked);
+
 int sqlite3VdbeExec(Vdbe *);
 int sqlite3VdbeList(Vdbe *);
 int
@@ -500,13 +511,9 @@ int sqlite3VdbeMemClearAndResize(Mem * pMem, int n);
 int sqlite3VdbeCloseStatement(Vdbe *, int);
 void sqlite3VdbeFrameDelete(VdbeFrame *);
 int sqlite3VdbeFrameRestore(VdbeFrame *);
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-void sqlite3VdbePreUpdateHook(Vdbe *, VdbeCursor *, int, const char *, Table *,
-			      i64, int);
-#endif
 int sqlite3VdbeTransferError(Vdbe * p);
 
-int sqlite3VdbeSorterInit(sqlite3 *, int, VdbeCursor *);
+int sqlite3VdbeSorterInit(struct sqlite3 *db, struct VdbeCursor *cursor);
 void sqlite3VdbeSorterReset(sqlite3 *, VdbeSorter *);
 void sqlite3VdbeSorterClose(sqlite3 *, VdbeCursor *);
 int sqlite3VdbeSorterRowkey(const VdbeCursor *, Mem *);
@@ -543,10 +550,28 @@ int sqlite3VdbeMemExpandBlob(Mem *);
 
 i64 sqlite3VdbeMsgpackRecordLen(Mem * pMem, u32 n);
 u32 sqlite3VdbeMsgpackRecordPut(u8 * pBuf, Mem * pMem, u32 n);
-int sqlite3VdbeCompareMsgpack(const char **pKey1,
-			      UnpackedRecord * pUnpacked, int iKey2);
-int sqlite3VdbeRecordCompareMsgpack(int nKey1, const void *pKey1,
-				    UnpackedRecord * pPKey2);
+/**
+ * Perform comparison of two keys: one is packed and one is not.
+ *
+ * @param key1 Pointer to pointer to first key.
+ * @param unpacked Pointer to unpacked tuple.
+ * @param key2_idx index of key in umpacked record to compare.
+ *
+ * @retval +1 if key1 > pUnpacked[iKey2], -1 ptherwise.
+ */
+int sqlite3VdbeCompareMsgpack(const char **key1,
+			      struct UnpackedRecord *unpacked, int key2_idx);
+
+/**
+ * Perform comparison of two tuples: unpacked (key1) and packed (key2)
+ *
+ * @param key1 Packed key.
+ * @param unpacked Unpacked key.
+ *
+ * @retval +1 if key1 > unpacked, -1 otherwise.
+ */
+int sqlite3VdbeRecordCompareMsgpack(const void *key1,
+				    struct UnpackedRecord *key2);
 u32 sqlite3VdbeMsgpackGet(const unsigned char *buf, Mem * pMem);
 
 #endif				/* !defined(SQLITE_VDBEINT_H) */

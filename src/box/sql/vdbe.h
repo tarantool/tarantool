@@ -77,7 +77,6 @@ struct VdbeOp {
 		struct coll *pColl;	/* Used when p4type is P4_COLLSEQ */
 		Mem *pMem;	/* Used when p4type is P4_MEM */
 		bool b;         /* Used when p4type is P4_BOOL */
-		KeyInfo *pKeyInfo;	/* Used when p4type is P4_KEYINFO */
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
 		Index *pIndex;	/* Used when p4type is P4_INDEX */
@@ -85,6 +84,8 @@ struct VdbeOp {
 		Expr *pExpr;	/* Used when p4type is P4_EXPR */
 #endif
 		int (*xAdvance) (BtCursor *, int *);
+		/** Used when p4type is P4_KEYDEF. */
+		struct key_def *key_def;
 	} p4;
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
 	char *zComment;		/* Comment to improve readability */
@@ -131,7 +132,6 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_STATIC   (-2)	/* Pointer to a static string */
 #define P4_COLLSEQ  (-3)	/* P4 is a pointer to a CollSeq structure */
 #define P4_FUNCDEF  (-4)	/* P4 is a pointer to a FuncDef structure */
-#define P4_KEYINFO  (-5)	/* P4 is a pointer to a KeyInfo structure */
 #define P4_EXPR     (-6)	/* P4 is a pointer to an Expr tree */
 #define P4_MEM      (-7)	/* P4 is a pointer to a Mem*    structure */
 #define P4_TRANSIENT  0		/* P4 is a pointer to a transient string */
@@ -146,7 +146,6 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
 #define P4_KEYDEF   (-19)       /* P4 is a pointer to key_def structure. */
-
 
 /* Error message codes for OP_Halt */
 #define P5_ConstraintNotNull 1
@@ -249,7 +248,16 @@ int sqlite3VdbeChangeToNoop(Vdbe *, int addr);
 int sqlite3VdbeDeletePriorOpcode(Vdbe *, u8 op);
 void sqlite3VdbeChangeP4(Vdbe *, int addr, const char *zP4, int N);
 void sqlite3VdbeAppendP4(Vdbe *, void *pP4, int p4type);
-void sqlite3VdbeSetP4KeyInfo(Parse *, Index *);
+
+/**
+ * Set the P4 on the most recently added opcode to the key_def for the
+ * index given.
+ * @param Parse context, for error reporting.
+ * @param Index to get key_def from.
+ */
+void
+sql_vdbe_set_p4_key_def(struct Parse *parse, struct Index *index);
+
 VdbeOp *sqlite3VdbeGetOp(Vdbe *, int);
 int sqlite3VdbeMakeLabel(Vdbe *);
 void sqlite3VdbeRunOnlyOnce(Vdbe *);
@@ -280,14 +288,27 @@ char *sqlite3VdbeExpandSql(Vdbe *, const char *);
 #endif
 int sqlite3MemCompare(const Mem *, const Mem *, const struct coll *);
 
-void sqlite3VdbeRecordUnpackMsgpack(KeyInfo *, int, const void *,
-				    UnpackedRecord *);
-int sqlite3VdbeRecordCompare(int, const void *, UnpackedRecord *);
-int sqlite3VdbeRecordCompareWithSkip(int, const void *, UnpackedRecord *, int);
-UnpackedRecord *sqlite3VdbeAllocUnpackedRecord(KeyInfo *);
+/**
+ * Perform unpacking of provided message pack.
+ *
+ * @param key_def Information about the record format
+ * @param key The binary record
+ * @param dest Populate this structure before returning.
+ */
+void sqlite3VdbeRecordUnpackMsgpack(struct key_def *key_def,
+				    const void *msgpack,
+				    struct UnpackedRecord *dest);
+
+int sqlite3VdbeRecordCompare(struct sqlite3 *db, int key_count,
+			     const void *key1, UnpackedRecord *key2);
+int sqlite3VdbeRecordCompareWithSkip(struct sqlite3 *db,
+				     int key_count, const void *key1,
+				     struct UnpackedRecord *key2, bool is_skip);
+UnpackedRecord *sqlite3VdbeAllocUnpackedRecord(struct sqlite3 *,
+					       struct key_def *);
 int sql_vdbe_mem_alloc_region(Mem *, uint32_t);
 
-typedef int (*RecordCompare) (int, const void *, UnpackedRecord *);
+typedef int (*RecordCompare) (const void *, UnpackedRecord *);
 RecordCompare sqlite3VdbeFindCompare(UnpackedRecord *);
 
 #ifndef SQLITE_OMIT_TRIGGER

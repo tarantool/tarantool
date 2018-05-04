@@ -978,11 +978,9 @@ freeP4(sqlite3 * db, int p4type, void *p4)
 			sqlite3DbFree(db, p4);
 			break;
 		}
-	case P4_KEYINFO:{
-			if (db->pnBytesFreed == 0)
-				sqlite3KeyInfoUnref((KeyInfo *) p4);
-			break;
-		}
+	case P4_KEYDEF:
+		key_def_delete(p4);
+		break;
 #ifdef SQLITE_ENABLE_CURSOR_HINTS
 	case P4_EXPR:{
 			sqlite3ExprDelete(db, (Expr *) p4);
@@ -1170,20 +1168,17 @@ sqlite3VdbeAppendP4(Vdbe * p, void *pP4, int n)
 	}
 }
 
-/*
- * Set the P4 on the most recently added opcode to the KeyInfo for the
- * index given.
- */
 void
-sqlite3VdbeSetP4KeyInfo(Parse * pParse, Index * pIdx)
+sql_vdbe_set_p4_key_def(struct Parse *parse, struct Index *idx)
 {
-	Vdbe *v = pParse->pVdbe;
-	KeyInfo *pKeyInfo;
-	assert(v != 0);
-	assert(pIdx != 0);
-	pKeyInfo = sqlite3KeyInfoOfIndex(pParse, pParse->db, pIdx);
-	if (pKeyInfo)
-		sqlite3VdbeAppendP4(v, pKeyInfo, P4_KEYINFO);
+	struct Vdbe *v = parse->pVdbe;
+	assert(v != NULL);
+	assert(idx != NULL);
+	struct key_def *def = key_def_dup(sql_index_key_def(idx));
+	if (def == NULL)
+		sqlite3OomFault(parse->db);
+	else
+		sqlite3VdbeAppendP4(v, def, P4_KEYDEF);
 }
 
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
@@ -1542,26 +1537,27 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 	assert(nTemp >= 20);
 	sqlite3StrAccumInit(&x, 0, zTemp, nTemp, 0);
 	switch (pOp->p4type) {
-	case P4_KEYINFO:{
-			int j;
-			KeyInfo *pKeyInfo;
+	case P4_KEYDEF:{
 
-			if (pOp->p4.pKeyInfo == NULL) {
+			if (pOp->p4.key_def == NULL) {
 				sqlite3XPrintf(&x, "k[NULL]");
 			} else {
-				pKeyInfo = pOp->p4.pKeyInfo;
-				assert(pKeyInfo->aSortOrder != 0);
-				sqlite3XPrintf(&x, "k(%d", pKeyInfo->nField);
-				for (j = 0; j < pKeyInfo->nField; j++) {
-					struct coll *pColl = pKeyInfo->aColl[j];
-					const char *zColl =
-					    pColl ? pColl->name : "";
-					if (strcmp(zColl, "BINARY") == 0)
-						zColl = "B";
+				struct key_def *def = pOp->p4.key_def;
+				sqlite3XPrintf(&x, "k(%d", def->part_count);
+				for (int j = 0; j < (int)def->part_count; j++) {
+					struct coll *coll = def->parts[j].coll;
+					const char *coll_str =
+					    coll != NULL ? coll->name : "";
+					if (strcmp(coll_str, "BINARY") == 0)
+						coll_str = "B";
+					const char *sort_order = "";
+					if (def->parts[j].sort_order ==
+					    SORT_ORDER_DESC) {
+						sort_order = "-";
+					}
 					sqlite3XPrintf(&x, ",%s%s",
-						       pKeyInfo->
-						       aSortOrder[j] ? "-" : "",
-						       zColl);
+						       sort_order,
+						       coll_str);
 				}
 				sqlite3StrAccumAppend(&x, ")", 1);
 			}
@@ -3506,7 +3502,7 @@ sqlite3VdbeSerialGet(const unsigned char *buf,	/* Buffer to deserialize from */
 /*
  * This routine is used to allocate sufficient space for an UnpackedRecord
  * structure large enough to be used with sqlite3VdbeRecordUnpack() if
- * the first argument is a pointer to KeyInfo structure pKeyInfo.
+ * the first argument is a pointer to key_def structure.
  *
  * The space is either allocated using sqlite3DbMallocRaw() or from within
  * the unaligned buffer passed via the second and third arguments (presumably
@@ -3518,20 +3514,19 @@ sqlite3VdbeSerialGet(const unsigned char *buf,	/* Buffer to deserialize from */
  * If an OOM error occurs, NULL is returned.
  */
 UnpackedRecord *
-sqlite3VdbeAllocUnpackedRecord(KeyInfo * pKeyInfo)
+sqlite3VdbeAllocUnpackedRecord(struct sqlite3 *db, struct key_def *key_def)
 {
 	UnpackedRecord *p;	/* Unpacked record to return */
 	int nByte;		/* Number of bytes required for *p */
 	nByte =
-	    ROUND8(sizeof(UnpackedRecord)) + sizeof(Mem) * (pKeyInfo->nField +
+	    ROUND8(sizeof(UnpackedRecord)) + sizeof(Mem) * (key_def->part_count +
 							    1);
-	p = (UnpackedRecord *) sqlite3DbMallocRaw(pKeyInfo->db, nByte);
+	p = (UnpackedRecord *) sqlite3DbMallocRaw(db, nByte);
 	if (!p)
 		return 0;
 	p->aMem = (Mem *) & ((char *)p)[ROUND8(sizeof(UnpackedRecord))];
-	assert(pKeyInfo->aSortOrder != 0);
-	p->pKeyInfo = pKeyInfo;
-	p->nField = pKeyInfo->nField + 1;
+	p->key_def = key_def;
+	p->nField = key_def->part_count + 1;
 	return p;
 }
 
@@ -3560,7 +3555,8 @@ sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
  * Return false if there is a disagreement.
  */
 static int
-vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
+vdbeRecordCompareDebug(struct sqlite3 *db,
+		       int nKey1, const void *pKey1,	/* Left key */
 		       const UnpackedRecord * pPKey2,	/* Right key */
 		       int desiredResult)		/* Correct answer */
 {
@@ -3570,13 +3566,11 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
 	int i = 0;
 	int rc = 0;
 	const unsigned char *aKey1 = (const unsigned char *)pKey1;
-	KeyInfo *pKeyInfo;
+	struct key_def *key_def;
 	Mem mem1;
 
-	pKeyInfo = pPKey2->pKeyInfo;
-	if (pKeyInfo->db == 0)
-		return 1;
-	mem1.db = pKeyInfo->db;
+	key_def = pPKey2->key_def;
+	mem1.db = db;
 	/* mem1.flags = 0;  // Will be initialized by sqlite3VdbeSerialGet() */
 	VVA_ONLY(mem1.szMalloc = 0;
 	    )
@@ -3594,10 +3588,7 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
 	if (szHdr1 > 98307)
 		return SQLITE_CORRUPT;
 	d1 = szHdr1;
-	assert(pKeyInfo->nField + pKeyInfo->nXField >= pPKey2->nField
-	       || CORRUPT_DB);
-	assert(pKeyInfo->aSortOrder != 0);
-	assert(pKeyInfo->nField > 0);
+	assert(key_def->part_count > 0);
 	assert(idx1 <= szHdr1 || CORRUPT_DB);
 	do {
 		u32 serial_type1;
@@ -3624,10 +3615,10 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
 		/* Do the comparison
 		 */
 		rc = sqlite3MemCompare(&mem1, &pPKey2->aMem[i],
-				       pKeyInfo->aColl[i]);
+				       key_def->parts[i].coll);
 		if (rc != 0) {
 			assert(mem1.szMalloc == 0);	/* See comment below */
-			if (pKeyInfo->aSortOrder[i]) {
+			if (key_def->parts[i].sort_order != SORT_ORDER_ASC) {
 				rc = -rc;	/* Invert the result for DESC sort order. */
 			}
 			goto debugCompareEnd;
@@ -3656,7 +3647,7 @@ vdbeRecordCompareDebug(int nKey1, const void *pKey1,	/* Left key */
 		return 1;
 	if (CORRUPT_DB)
 		return 1;
-	if (pKeyInfo->db->mallocFailed)
+	if (db->mallocFailed)
 		return 1;
 	return 0;
 }
@@ -3932,12 +3923,13 @@ vdbeRecordDecodeInt(u32 serial_type, const u8 * aKey)
  * If database corruption is discovered, set pPKey2->errCode to
  * SQLITE_CORRUPT and return 0. If an OOM error is encountered,
  * pPKey2->errCode is set to SQLITE_NOMEM and, if it is not NULL, the
- * malloc-failed flag set on database handle (pPKey2->pKeyInfo->db).
+ * malloc-failed flag set on database handle.
  */
 int
-sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
+sqlite3VdbeRecordCompareWithSkip(struct sqlite3 *db,
+				 int nKey1, const void *pKey1,	/* Left key */
 				 UnpackedRecord * pPKey2,	/* Right key */
-				 int bSkip)			/* If true, skip the first field */
+				 bool bSkip)			/* If true, skip the first field */
 {
 	u32 d1;			/* Offset into aKey[] of next data element */
 	int i;			/* Index of next field to compare */
@@ -3945,7 +3937,7 @@ sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
 	u32 idx1;		/* Offset of first type in header */
 	int rc = 0;		/* Return value */
 	Mem *pRhs = pPKey2->aMem;	/* Next field of pPKey2 to compare */
-	KeyInfo *pKeyInfo = pPKey2->pKeyInfo;
+	struct key_def *key_def = pPKey2->key_def;
 	const unsigned char *aKey1 = (const unsigned char *)pKey1;
 	Mem mem1;
 
@@ -3972,10 +3964,7 @@ sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
 
 	VVA_ONLY(mem1.szMalloc = 0;
 	    )			/* Only needed by assert() statements */
-	    assert(pPKey2->pKeyInfo->nField + pPKey2->pKeyInfo->nXField >=
-		   pPKey2->nField || CORRUPT_DB);
-	assert(pPKey2->pKeyInfo->aSortOrder != 0);
-	assert(pPKey2->pKeyInfo->nField > 0);
+	assert(pPKey2->key_def->part_count > 0);
 	assert(idx1 <= szHdr1 || CORRUPT_DB);
 	do {
 		u32 serial_type;
@@ -4050,13 +4039,14 @@ sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
 					pPKey2->errCode =
 					    (u8) SQLITE_CORRUPT_BKPT;
 					return 0;	/* Corruption */
-				} else if (pKeyInfo->aColl[i]) {
-					mem1.db = pKeyInfo->db;
+				} else if (key_def->parts[i].coll !=NULL) {
+					mem1.db = db;
 					mem1.flags = MEM_Str;
 					mem1.z = (char *)&aKey1[d1];
+					struct coll* coll;
+					coll = key_def->parts[i].coll;
 					rc = vdbeCompareMemString(&mem1, pRhs,
-								  pKeyInfo->
-								  aColl[i],
+								  coll,
 								  &pPKey2->
 								  errCode);
 				} else {
@@ -4106,11 +4096,10 @@ sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
 		}
 
 		if (rc != 0) {
-			if (pKeyInfo->aSortOrder[i]) {
+			if (key_def->parts[i].sort_order != SORT_ORDER_ASC)
 				rc = -rc;
-			}
 			assert(vdbeRecordCompareDebug
-			       (nKey1, pKey1, pPKey2, rc));
+			       (db, nKey1, pKey1, pPKey2, rc));
 			assert(mem1.szMalloc == 0);	/* See comment below */
 			return rc;
 		}
@@ -4133,18 +4122,19 @@ sqlite3VdbeRecordCompareWithSkip(int nKey1, const void *pKey1,	/* Left key */
 	 * value.
 	 */
 	assert(CORRUPT_DB
-	       || vdbeRecordCompareDebug(nKey1, pKey1, pPKey2,
+	       || vdbeRecordCompareDebug(db, nKey1, pKey1, pPKey2,
 					 pPKey2->default_rc)
-	       || pKeyInfo->db->mallocFailed);
+	       || db->mallocFailed);
 	pPKey2->eqSeen = 1;
 	return pPKey2->default_rc;
 }
 
 int
-sqlite3VdbeRecordCompare(int nKey1, const void *pKey1,	/* Left key */
-			 UnpackedRecord * pPKey2)	/* Right key */
+sqlite3VdbeRecordCompare(struct sqlite3 *db,
+			 int key_count, const void *key1,	/* Left key */
+			 UnpackedRecord *key2)	/* Right key */
 {
-	return sqlite3VdbeRecordCompareWithSkip(nKey1, pKey1, pPKey2, 0);
+	return sqlite3VdbeRecordCompareWithSkip(db, key_count, key1, key2, false);
 }
 
 /*
@@ -4159,30 +4149,16 @@ sqlite3VdbeFindCompare(UnpackedRecord * p)
 	return sqlite3VdbeRecordCompareMsgpack;
 }
 
-/*
- * Compare the key of the index entry that cursor pC is pointing to against
- * the key string in pUnpacked.  Write into *pRes a number
- * that is negative, zero, or positive if pC is less than, equal to,
- * or greater than pUnpacked.  Return SQLITE_OK on success.
- */
 int
-sqlite3VdbeIdxKeyCompare(sqlite3 * db,			/* Database connection */
-			 VdbeCursor * pC,		/* The cursor to compare against */
-			 UnpackedRecord * pUnpacked,	/* Unpacked version of key */
-			 int *res)			/* Write the comparison result here */
+sqlite3VdbeIdxKeyCompare(struct VdbeCursor *vdbe_cursor,
+			 struct UnpackedRecord *unpacked)
 {
-	(void)db;
-	BtCursor *pCur;
-
-	assert(pC->eCurType == CURTYPE_TARANTOOL);
-	pCur = pC->uc.pCursor;
-	assert(sqlite3CursorIsValid(pCur));
-	if (pCur->curFlags & BTCF_TaCursor ||
-	    pCur->curFlags & BTCF_TEphemCursor) {
-		return tarantoolSqlite3IdxKeyCompare(pCur, pUnpacked, res);
-	}
-	unreachable();
-	return SQLITE_OK;
+	assert(vdbe_cursor->eCurType == CURTYPE_TARANTOOL);
+	struct BtCursor *cursor = vdbe_cursor->uc.pCursor;
+	assert(sqlite3CursorIsValid(cursor));
+	assert(cursor->curFlags & BTCF_TaCursor ||
+	       cursor->curFlags & BTCF_TEphemCursor);
+	return tarantoolSqlite3IdxKeyCompare(cursor, unpacked);
 }
 
 /*
@@ -4301,68 +4277,6 @@ vdbeFreeUnpacked(sqlite3 * db, UnpackedRecord * p)
 }
 #endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
 
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-/*
- * Invoke the pre-update hook. If this is an UPDATE or DELETE pre-update call,
- * then cursor passed as the second argument should point to the row about
- * to be update or deleted. If the application calls sqlite3_preupdate_old(),
- * the required value will be read from the row the cursor points to.
- */
-void
-sqlite3VdbePreUpdateHook(Vdbe * v,		/* Vdbe pre-update hook is invoked by */
-			 VdbeCursor * pCsr,	/* Cursor to grab old.* values from */
-			 int op,		/* SQLITE_INSERT, UPDATE or DELETE */
-			 Table * pTab,		/* Modified table */
-			 i64 iKey1,		/* Initial key value */
-			 int iReg)		/* Register for new.* record */
-{
-	sqlite3 *db = v->db;
-	i64 iKey2;
-	PreUpdate preupdate;
-	const char *zTbl = pTab->zName;
-	static const u8 fakeSortOrder = 0;
-
-	assert(db->pPreUpdate == 0);
-	memset(&preupdate, 0, sizeof(PreUpdate));
-	if (op == SQLITE_UPDATE) {
-		iKey2 = v->aMem[iReg].u.i;
-	} else {
-		iKey2 = iKey1;
-	}
-
-	assert(pCsr->nField == pTab->nCol
-	       || (pCsr->nField == pTab->nCol + 1 && op == SQLITE_DELETE
-		   && iReg == -1)
-	    );
-
-	preupdate.v = v;
-	preupdate.pCsr = pCsr;
-	preupdate.op = op;
-	preupdate.iNewReg = iReg;
-	preupdate.keyinfo.db = db;
-	preupdate.keyinfo.nField = pTab->nCol;
-	preupdate.keyinfo.aSortOrder = (u8 *) & fakeSortOrder;
-	preupdate.iKey1 = iKey1;
-	preupdate.iKey2 = iKey2;
-	preupdate.pTab = pTab;
-
-	db->pPreUpdate = &preupdate;
-	db->xPreUpdateCallback(db->pPreUpdateArg, db, op, zTbl, iKey1,
-			       iKey2);
-	db->pPreUpdate = 0;
-	sqlite3DbFree(db, preupdate.aRecord);
-	vdbeFreeUnpacked(db, preupdate.pUnpacked);
-	vdbeFreeUnpacked(db, preupdate.pNewUnpacked);
-	if (preupdate.aNew) {
-		int i;
-		for (i = 0; i < pCsr->nField; i++) {
-			sqlite3VdbeMemRelease(&preupdate.aNew[i]);
-		}
-		sqlite3DbFree(db, preupdate.aNew);
-	}
-}
-#endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
-
 i64
 sqlite3VdbeMsgpackRecordLen(Mem * pRec, u32 n)
 {
@@ -4435,11 +4349,11 @@ sqlite3VdbeMsgpackRecordPut(u8 * pBuf, Mem * pRec, u32 n)
 }
 
 int
-sqlite3VdbeCompareMsgpack(const char **pKey1,
-			  UnpackedRecord * pUnpacked, int iKey2)
+sqlite3VdbeCompareMsgpack(const char **key1,
+			  struct UnpackedRecord *unpacked, int key2_idx)
 {
-	const char *aKey1 = *pKey1;
-	Mem *pKey2 = pUnpacked->aMem + iKey2;
+	const char *aKey1 = *key1;
+	Mem *pKey2 = unpacked->aMem + key2_idx;
 	Mem mem1;
 	int rc = 0;
 	switch (mp_typeof(*aKey1)) {
@@ -4508,17 +4422,17 @@ sqlite3VdbeCompareMsgpack(const char **pKey1,
 		}
 	case MP_STR:{
 			if (pKey2->flags & MEM_Str) {
-				KeyInfo *pKeyInfo = pUnpacked->pKeyInfo;
+				struct key_def *key_def = unpacked->key_def;
 				mem1.n = mp_decode_strl(&aKey1);
 				mem1.z = (char *)aKey1;
 				aKey1 += mem1.n;
-				if (pKeyInfo->aColl[iKey2]) {
-					mem1.db = pKeyInfo->db;
+				struct coll *coll =
+					key_def->parts[key2_idx].coll;
+				if (coll != NULL) {
 					mem1.flags = MEM_Str;
 					rc = vdbeCompareMemString(&mem1, pKey2,
-								  pKeyInfo->
-								  aColl[iKey2],
-								  &pUnpacked->
+								  coll,
+								  &unpacked->
 								  errCode);
 				} else {
 					goto do_bin_cmp;
@@ -4563,34 +4477,32 @@ sqlite3VdbeCompareMsgpack(const char **pKey1,
 			goto do_blob;
 		}
 	}
-	*pKey1 = aKey1;
+	*key1 = aKey1;
 	return rc;
 }
 
 int
-sqlite3VdbeRecordCompareMsgpack(int nKey1, const void *pKey1,	/* Left key */
-				UnpackedRecord * pPKey2)	/* Right key */
+sqlite3VdbeRecordCompareMsgpack(const void *key1,
+				struct UnpackedRecord *key2)
 {
-	(void)nKey1;		/* assume valid data */
+	int rc = 0;
+	u32 i, n = mp_decode_array((const char**)&key1);
 
-	int rc = 0;		/* Return value */
-	const char *aKey1 = (const char *)pKey1;
-	u32 i, n = mp_decode_array(&aKey1);
-
-	n = MIN(n, pPKey2->nField);
+	n = MIN(n, key2->nField);
 
 	for (i = 0; i != n; i++) {
-		rc = sqlite3VdbeCompareMsgpack(&aKey1, pPKey2, i);
+		rc = sqlite3VdbeCompareMsgpack((const char**)&key1, key2, i);
 		if (rc != 0) {
-			if (pPKey2->pKeyInfo->aSortOrder[i]) {
+			if (key2->key_def->parts[i].sort_order !=
+			    SORT_ORDER_ASC) {
 				rc = -rc;
 			}
 			return rc;
 		}
 	}
 
-	pPKey2->eqSeen = 1;
-	return pPKey2->default_rc;
+	key2->eqSeen = 1;
+	return key2->default_rc;
 }
 
 u32
@@ -4669,21 +4581,18 @@ sqlite3VdbeMsgpackGet(const unsigned char *buf,	/* Buffer to deserialize from */
 }
 
 void
-sqlite3VdbeRecordUnpackMsgpack(KeyInfo * pKeyInfo,	/* Information about the record format */
-			       int nKey,		/* Size of the binary record */
+sqlite3VdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the record format */
 			       const void *pKey,	/* The binary record */
 			       UnpackedRecord * p)	/* Populate this structure before returning. */
 {
 	uint32_t n;
 	const char *zParse = pKey;
-	(void)nKey;
 	Mem *pMem = p->aMem;
 	n = mp_decode_array(&zParse);
-	n = p->nField = MIN(n, pKeyInfo->nField);
+	n = p->nField = MIN(n, key_def->part_count);
 	p->default_rc = 0;
+	p->key_def = key_def;
 	while (n--) {
-		pMem->db = pKeyInfo->db;
-		/* pMem->flags = 0; // sqlite3VdbeSerialGet() will set this for us */
 		pMem->szMalloc = 0;
 		pMem->z = 0;
 		u32 sz = sqlite3VdbeMsgpackGet((u8 *) zParse, pMem);

@@ -1462,7 +1462,6 @@ typedef struct IdList IdList;
 typedef struct Index Index;
 typedef struct IndexSample IndexSample;
 typedef struct KeyClass KeyClass;
-typedef struct KeyInfo KeyInfo;
 typedef struct Lookaside Lookaside;
 typedef struct LookasideSlot LookasideSlot;
 typedef struct NameContext NameContext;
@@ -2026,24 +2025,6 @@ struct FKey {
 #define OE_Cascade  9		/* Cascade the changes */
 
 /*
- * An instance of the following structure is passed as the first
- * argument to sqlite3VdbeKeyCompare and is used to control the
- * comparison of the two index keys.
- *
- * Note that aSortOrder[] and aColl[] have nField+1 slots.  There
- * are nField slots for the columns of an index.
- */
-struct KeyInfo {
-	u32 nRef;		/* Number of references to this KeyInfo object */
-	u8 enc;			/* Text encoding - one of the SQLITE_UTF* values */
-	u16 nField;		/* Number of key columns in the index */
-	u16 nXField;		/* Number of columns beyond the key columns */
-	sqlite3 *db;		/* The database connection */
-	u8 *aSortOrder;		/* Sort order for each column. */
-	struct coll *aColl[1];	/* Collating sequence for each term of the key */
-};
-
-/*
  * This object holds a record which has been parsed out into individual
  * fields, for the purposes of doing a comparison.
  *
@@ -2057,7 +2038,7 @@ struct KeyInfo {
  * an index b+tree. The goal of the search is to find the entry that
  * is closed to the key described by this object.  This object might hold
  * just a prefix of the key.  The number of fields is given by
- * pKeyInfo->nField.
+ * key_def->part_count.
  *
  * The r1 and r2 fields are the values to return if this key is less than
  * or greater than a key in the btree, respectively.  These are normally
@@ -2067,7 +2048,7 @@ struct KeyInfo {
  * The key comparison functions actually return default_rc when they find
  * an equals comparison.  default_rc can be -1, 0, or +1.  If there are
  * multiple entries in the b-tree with the same key (when only looking
- * at the first pKeyInfo->nFields,) then default_rc can be set to -1 to
+ * at the first key_def->part_count) then default_rc can be set to -1 to
  * cause the search to find the last match, or +1 to cause the search to
  * find the first match.
  *
@@ -2079,7 +2060,8 @@ struct KeyInfo {
  * b-tree.
  */
 struct UnpackedRecord {
-	KeyInfo *pKeyInfo;	/* Collation and sort-order information */
+	/** Collation and sort-order information. */
+	struct key_def *key_def;
 	Mem *aMem;		/* Values */
 	u16 nField;		/* Number of entries in apMem[] */
 	i8 default_rc;		/* Comparison result if keys are equal */
@@ -2456,7 +2438,7 @@ struct ExprList {
 		Expr *pExpr;	/* The list of expressions */
 		char *zName;	/* Token associated with this expression */
 		char *zSpan;	/* Original text of the expression */
-		u8 sortOrder;	/* 1 for DESC or 0 for ASC */
+		enum sort_order sort_order;
 		unsigned done:1;	/* A flag to indicate when processing is finished */
 		unsigned bSpanIsTab:1;	/* zSpan holds DB.TABLE.COLUMN */
 		unsigned reusable:1;	/* Constant expression is reusable */
@@ -2688,12 +2670,12 @@ struct NameContext {
  *
  * addrOpenEphm[] entries contain the address of OP_OpenEphemeral opcodes.
  * These addresses must be stored so that we can go back and fill in
- * the P4_KEYINFO and P2 parameters later.  Neither the KeyInfo nor
+ * the P4_KEYDEF and P2 parameters later.  Neither the key_def nor
  * the number of columns in P2 can be computed at the same time
  * as the OP_OpenEphm instruction is coded because not
  * enough information about the compound query is known at that point.
- * The KeyInfo for addrOpenTran[0] and [1] contains collating sequences
- * for the result set.  The KeyInfo for addrOpenEphm[2] contains collating
+ * The key_def for addrOpenTran[0] and [1] contains collating sequences
+ * for the result set.  The key_def for addrOpenEphm[2] contains collating
  * sequences for the ORDER BY clause.
  */
 struct Select {
@@ -3495,7 +3477,15 @@ Expr *sqlite3ExprFunction(Parse *, ExprList *, Token *);
 void sqlite3ExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlite3ExprListAppend(Parse *, ExprList *, Expr *);
 ExprList *sqlite3ExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
-void sqlite3ExprListSetSortOrder(ExprList *, int);
+
+/**
+ * Set the sort order for the last element on the given ExprList.
+ *
+ * @param p Expression list.
+ * @param sort_order Sort order to set.
+ */
+void sqlite3ExprListSetSortOrder(ExprList *, enum sort_order sort_order);
+
 void sqlite3ExprListSetName(Parse *, ExprList *, Token *, int);
 void sqlite3ExprListSetSpan(Parse *, ExprList *, ExprSpan *);
 void sqlite3ExprListDelete(sqlite3 *, ExprList *);
@@ -3527,10 +3517,16 @@ const char *
 index_collation_name(Index *, uint32_t);
 struct coll *
 sql_index_collation(Index *idx, uint32_t column);
-struct coll *
-sql_default_coll();
 bool
 space_is_view(Table *);
+
+/**
+ * Return key_def of provided struct Index.
+ * @param idx Pointer to `struct Index` object.
+ * @retval Pointer to `struct key_def`.
+ */
+struct key_def*
+sql_index_key_def(struct Index *idx);
 
 /**
  * Return sort order of given column from index.
@@ -3586,10 +3582,50 @@ void sqlite3SrcListDelete(sqlite3 *, SrcList *);
 Index *sqlite3AllocateIndexObject(sqlite3 *, i16, int, char **);
 bool
 index_is_unique(Index *);
-void sqlite3CreateIndex(Parse *, Token *, SrcList *, ExprList *, int, Token *,
-			Expr *, int, int, u8);
+
+/**
+ * Create a new index for an SQL table.  name is the name of the
+ * index and tbl_name is the name of the table that is to be
+ * indexed.  Both will be NULL for a primary key or an index that
+ * is created to satisfy a UNIQUE constraint.  If tbl_name and
+ * name are NULL, use parse->pNewTable as the table to be indexed.
+ * parse->pNewTable is a table that is currently being
+ * constructed by a CREATE TABLE statement.
+ *
+ * col_list is a list of columns to be indexed.  col_list will be
+ * NULL if this is a primary key or unique-constraint on the most
+ * recent column added to the table currently under construction.
+ *
+ * @param parse All information about this parse.
+ * @param token Index name. May be NULL.
+ * @param tbl_name Table to index. Use pParse->pNewTable ifNULL.
+ * @param col_list A list of columns to be indexed.
+ * @param on_error One of ON_CONFLICT_ACTION_ABORT, _IGNORE,
+ *        _REPLACE, or _NONE.
+ * @param start The CREATE token that begins this statement.
+ * @param pi_where WHERE clause for partial indices.
+ * @param sort_order Sort order of primary key when pList==NULL.
+ * @param if_not_exist Omit error if index already exists.
+ * @param idx_type The index type.
+ */
+void
+sql_create_index(struct Parse *parse, struct Token *token,
+		 struct SrcList *tbl_name, struct ExprList *col_list,
+		 int on_error, struct Token *start, struct Expr *pi_where,
+		 enum sort_order sort_order, bool if_not_exist, u8 idx_type);
+
+/**
+ * This routine will drop an existing named index.  This routine
+ * implements the DROP INDEX statement.
+ *
+ * @param parse_context Current parsing context.
+ * @param index_name_list List containing index name.
+ * @param table_token Token representing table name.
+ * @param if_exists True, if statement contains 'IF EXISTS' clause.
+ */
 void
 sql_drop_index(struct Parse *, struct SrcList *, struct Token *, bool);
+
 int sqlite3Select(Parse *, Select *, SelectDest *);
 Select *sqlite3SelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
 			 Expr *, ExprList *, u32, Expr *, Expr *);
@@ -3920,7 +3956,17 @@ void sqlite3NestedParse(Parse *, const char *, ...);
 void sqlite3ExpirePreparedStatements(sqlite3 *);
 int sqlite3CodeSubselect(Parse *, Expr *, int);
 void sqlite3SelectPrep(Parse *, Select *, NameContext *);
-void sqlite3SelectWrongNumTermsError(Parse * pParse, Select * p);
+
+/**
+ * Error message for when two or more terms of a compound select
+ * have different size result sets.
+ *
+ * @param parse Parsing context.
+ * @param p Select struct to analyze.
+ */
+void
+sqlite3SelectWrongNumTermsError(struct Parse *parse, struct Select *p);
+
 int sqlite3MatchSpanName(const char *, const char *, const char *);
 int sqlite3ResolveExprNames(NameContext *, Expr *);
 int sqlite3ResolveExprListNames(NameContext *, ExprList *);
@@ -3949,13 +3995,6 @@ void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
 void sqlite3SchemaClear(sqlite3 *);
 Schema *sqlite3SchemaCreate(sqlite3 *);
-KeyInfo *sqlite3KeyInfoAlloc(sqlite3 *, int, int);
-void sqlite3KeyInfoUnref(KeyInfo *);
-KeyInfo *sqlite3KeyInfoRef(KeyInfo *);
-KeyInfo *sqlite3KeyInfoOfIndex(Parse *, sqlite3 *, Index *);
-#ifdef SQLITE_DEBUG
-int sqlite3KeyInfoIsWriteable(KeyInfo *);
-#endif
 int sqlite3CreateFunc(sqlite3 *, const char *, int, int, void *,
 		      void (*)(sqlite3_context *, int, sqlite3_value **),
 		      void (*)(sqlite3_context *, int, sqlite3_value **),

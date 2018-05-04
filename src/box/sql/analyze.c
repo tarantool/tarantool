@@ -176,8 +176,8 @@ openStatTable(Parse * pParse,	/* Parsing context */
 	/* Open the sql_stat[134] tables for writing. */
 	for (i = 0; aTable[i]; i++) {
 		int addr = emit_open_cursor(pParse, iStatCur + i, aRoot[i]);
-		v->aOp[addr].p4.pKeyInfo = 0;
-		v->aOp[addr].p4type = P4_KEYINFO;
+		v->aOp[addr].p4.key_def = NULL;
+		v->aOp[addr].p4type = P4_KEYDEF;
 		sqlite3VdbeChangeP5(v, aCreateTbl[i]);
 		VdbeComment((v, aTable[i]));
 	}
@@ -914,7 +914,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 				     (void *) space);
 		sqlite3VdbeAddOp3(v, OP_OpenRead, iIdxCur, pIdx->tnum,
 				  space_ptr_reg);
-		sqlite3VdbeSetP4KeyInfo(pParse, pIdx);
+		sql_vdbe_set_p4_key_def(pParse, pIdx);
 		VdbeComment((v, "%s", pIdx->zName));
 
 		/* Invoke the stat_init() function. The arguments are:

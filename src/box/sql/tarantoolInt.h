@@ -98,7 +98,7 @@ int tarantoolSqlite3RenameParentTable(int iTab, const char *zOldParentName,
 
 /* Interface for ephemeral tables. */
 int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count,
-				    struct coll *aColl);
+				    struct key_def *def);
 /**
  * Insert tuple into ephemeral space.
  * In contrast to ordinary spaces, there is no need to create and
@@ -119,12 +119,18 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor * pCur);
 int tarantoolSqlite3EphemeralGetMaxId(BtCursor * pCur, uint32_t fieldno,
 				       uint64_t * max_id);
 
-/* Compare against the index key under a cursor -
- * the key may span non-adjacent fields in a random order,
- * ex: [4]-[1]-[2]
+/**
+ * Performs exactly as extract_key + sqlite3VdbeCompareMsgpack,
+ * only faster.
+ *
+ * @param pCur cursor which point to tuple to compare.
+ * @param pUnpacked Unpacked record to compare with.
+ *
+ * @retval Comparison result.
  */
-int tarantoolSqlite3IdxKeyCompare(BtCursor * pCur, UnpackedRecord * pUnpacked,
-				  int *res);
+int
+tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
+			      struct UnpackedRecord *unpacked);
 
 /**
  * The function assumes the cursor is open on _schema.

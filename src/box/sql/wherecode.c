@@ -1618,7 +1618,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			regRowset = pParse->nTab++;
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 					  regRowset, nPkCol);
-			sqlite3VdbeSetP4KeyInfo(pParse, pPk);
+			sql_vdbe_set_p4_key_def(pParse, pPk);
 			regPk = ++pParse->nMem;
 		}
 		iRetInit = sqlite3VdbeAddOp2(v, OP_Integer, 0, regReturn);

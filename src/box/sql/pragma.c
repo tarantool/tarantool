@@ -643,8 +643,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 									  pIdx->
 									  tnum,
 									  0);
-							sqlite3VdbeSetP4KeyInfo
-							    (pParse, pIdx);
+							sql_vdbe_set_p4_key_def(pParse,
+										pIdx);
 						}
 					} else {
 						k = 0;
