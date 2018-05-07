@@ -221,8 +221,9 @@ lbox_console_readline(struct lua_State *L)
 	 */
 	rl_callback_handler_install(prompt, console_push_line);
 	top = lua_gettop(L);
-	while (top == lua_gettop(L) &&
-	       coio_wait(STDIN_FILENO, COIO_READ, TIMEOUT_INFINITY)) {
+	while (top == lua_gettop(L)) {
+		while (coio_wait(STDIN_FILENO, COIO_READ,
+				 TIMEOUT_INFINITY) == 0);
 
 		rl_callback_read_char();
 	}
