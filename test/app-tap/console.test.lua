@@ -7,12 +7,12 @@ local yaml = require('yaml')
 local fiber = require('fiber')
 local ffi = require('ffi')
 local log = require('log')
+local fio = require('fio')
 
--- Supress console log messages
+-- Suppress console log messages
 log.level(4)
-
-local CONSOLE_SOCKET = '/tmp/tarantool-test-console.sock'
-local IPROTO_SOCKET = '/tmp/tarantool-test-iproto.sock'
+local CONSOLE_SOCKET = fio.pathjoin(fio.cwd(), 'tarantool-test-console.sock')
+local IPROTO_SOCKET = fio.pathjoin(fio.cwd(), 'tarantool-test-iproto.sock')
 os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
 
@@ -64,7 +64,6 @@ box.cfg{
     memtx_memory = 107374182,
     log="tarantool.log",
 }
-
 -- Connect to iproto console (CALL)
 client:write(string.format("require('console').connect('/')\n"))
 -- error: Connection is not established
@@ -242,8 +241,12 @@ server:close()
 box.session.on_connect(nil, console_on_connect)
 box.session.on_disconnect(nil, console_on_disconnect)
 box.session.on_auth(nil, console_on_auth)
+box.schema.user.drop('test')
+box.schema.user.drop('test2')
 session_id = nil
 triggers_ran = nil
+os.remove(CONSOLE_SOCKET)
+os.remove(IPROTO_SOCKET)
 
 test:check()
 
