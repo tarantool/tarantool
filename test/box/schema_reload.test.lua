@@ -87,8 +87,8 @@ cn = net_box.connect(box.cfg.listen)
 schema_version = cn.schema_version
 bump_schema_version()
 cn:ping()
--- Sic: net.box returns true on :ping() even on ER_WRONG_SCHEMA_VERSION
-while cn.schema_version == schema_version do fiber.sleep(0.0001) end
+function wait_new_schema() while cn.schema_version == schema_version do fiber.sleep(0.0001) end end
+wait_new_schema()
 cn.schema_version == schema_version + 1
 
 -- call
@@ -96,6 +96,7 @@ schema_version = cn.schema_version
 bump_schema_version()
 function somefunc() return true end
 cn:call('somefunc')
+wait_new_schema()
 cn.schema_version == schema_version + 1
 somefunc = nil
 
@@ -103,12 +104,14 @@ somefunc = nil
 schema_version = cn.schema_version
 bump_schema_version()
 cn:call('somefunc')
+wait_new_schema()
 cn.schema_version == schema_version + 1
 
 -- eval
 schema_version = cn.schema_version
 bump_schema_version()
 cn:eval('return')
+wait_new_schema()
 cn.schema_version == schema_version + 1
 somefunc = nil
 
@@ -116,6 +119,7 @@ somefunc = nil
 schema_version = cn.schema_version
 bump_schema_version()
 cn:eval('error("xx")')
+wait_new_schema()
 cn.schema_version == schema_version + 1
 somefunc = nil
 

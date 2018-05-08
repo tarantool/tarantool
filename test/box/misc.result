@@ -111,10 +111,6 @@ box.error()
 ---
 - error: Illegal parameters, bla bla
 ...
-box.error.raise()
----
-- error: Illegal parameters, bla bla
-...
 e = box.error.last()
 ---
 ...
@@ -157,9 +153,6 @@ box.error.last()
 ---
 - null
 ...
-box.error.raise()
----
-...
 space = box.space.tweedledum
 ---
 ...
@@ -176,6 +169,27 @@ box.error(box.error.UNSUPPORTED, "x")
 box.error(box.error.UNSUPPORTED)
 ---
 - error: 'box.error(): bad arguments'
+...
+--
+-- gh-3031: allow to create an error object with no throwing it.
+--
+e = box.error.new(box.error.UNKNOWN)
+---
+...
+e
+---
+- Unknown error
+...
+e = box.error.new(box.error.CREATE_SPACE, "space", "error")
+---
+...
+e
+---
+- 'Failed to create space ''space'': error'
+...
+box.error.new()
+---
+- error: 'Usage: box.error.new(code, args)'
 ...
 ----------------
 -- # box.stat

@@ -141,7 +141,7 @@ function dup_key()
     local status, _ = pcall(insert, {1})
     if not status then
         if box.error.last().code ~= box.error.TUPLE_FOUND then
-            box.error.raise()
+            box.error()
         end
         box.space.test:insert{2}
     end

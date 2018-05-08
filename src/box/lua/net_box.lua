@@ -49,12 +49,62 @@ local IPROTO_GREETING_SIZE = 128
 local E_UNKNOWN              = box.error.UNKNOWN
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_TIMEOUT              = box.error.TIMEOUT
-local E_WRONG_SCHEMA_VERSION = box.error.WRONG_SCHEMA_VERSION
 local E_PROC_LUA             = box.error.PROC_LUA
 
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
-local method_codec           = {
+
+local function decode_nil(...) end
+local function decode_data(response_body)
+    return response_body[IPROTO_DATA_KEY]
+end
+local function decode_tuple(response_body)
+    local data = response_body[IPROTO_DATA_KEY][1]
+    if data then
+        return box.tuple.new(data)
+    end
+end
+local function decode_get(response_body)
+    local data = response_body[IPROTO_DATA_KEY]
+    if data[2] then
+        return nil, box.error.MORE_THAN_ONE_TUPLE
+    end
+    if data[1] then
+        return box.tuple.new(data[1])
+    end
+end
+local function decode_select(response_body)
+    local data = response_body[IPROTO_DATA_KEY]
+    setmetatable(data, sequence_mt)
+    local tnew = box.tuple.new
+    for i, v in pairs(data) do
+        data[i] = tnew(v)
+    end
+    return data
+end
+local function decode_count(response_body)
+    return response_body[IPROTO_DATA_KEY][1]
+end
+local function decode_execute(response_body)
+    local rows = response_body[IPROTO_DATA_KEY]
+    local metadata = response_body[IPROTO_METADATA_KEY]
+    local info = response_body[IPROTO_SQL_INFO_KEY]
+    assert((info == nil and metadata ~= nil and rows ~= nil) or
+           (info ~= nil and metadata == nil and rows == nil))
+    if info ~= nil then
+        assert(info[SQL_INFO_ROW_COUNT_KEY] ~= nil)
+        return {rowcount = info[SQL_INFO_ROW_COUNT_KEY]}
+    end
+    -- Set readable names for the metadata fields.
+    for i, field_meta in pairs(metadata) do
+        field_meta["name"] = field_meta[IPROTO_FIELD_NAME_KEY]
+        field_meta[IPROTO_FIELD_NAME_KEY] = nil
+    end
+    setmetatable(rows, sequence_mt)
+    return {metadata = metadata, rows = rows}
+end
+
+local method_encoder = {
     ping    = internal.encode_ping,
     call_16 = internal.encode_call_16,
     call_17 = internal.encode_call,
@@ -66,12 +116,35 @@ local method_codec           = {
     upsert  = internal.encode_upsert,
     select  = internal.encode_select,
     execute = internal.encode_execute,
+    get     = internal.encode_select,
+    min     = internal.encode_select,
+    max     = internal.encode_select,
+    count   = internal.encode_call,
     -- inject raw data into connection, used by console and tests
-    inject = function(buf, id, schema_version, bytes)
+    inject = function(buf, id, bytes)
         local ptr = buf:reserve(#bytes)
         ffi.copy(ptr, bytes, #bytes)
         buf.wpos = ptr + #bytes
     end
+}
+
+local method_decoder = {
+    ping    = decode_nil,
+    call_16 = decode_select,
+    call_17 = decode_data,
+    eval    = decode_data,
+    insert  = decode_tuple,
+    replace = decode_tuple,
+    delete  = decode_tuple,
+    update  = decode_tuple,
+    upsert  = decode_nil,
+    select  = decode_select,
+    execute = decode_execute,
+    get     = decode_get,
+    min     = decode_get,
+    max     = decode_get,
+    count   = decode_count,
+    inject  = decode_data,
 }
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
@@ -114,7 +187,7 @@ end
 --  * implements protocols; concurrent perform_request()-s benefit from
 --    multiplexing support in the protocol;
 --  * schema-aware (optional) - snoops responses and initiates
---    schema reload when a request fails due to schema version mismatch;
+--    schema reload when a response has a new schema version;
 --  * delivers transport events via the callback.
 --
 -- Transport state machine:
@@ -170,18 +243,95 @@ local function create_transport(host, port, user, password, callback,
     local last_error
     local state_cond       = fiber.cond() -- signaled when the state changes
 
-    -- requests: requests currently 'in flight', keyed by a request id;
-    -- value refs are weak hence if a client dies unexpectedly,
-    -- GC cleans the mess. Client submits a request and waits on state_cond.
-    -- If the reponse arrives within the timeout, the worker wakes
-    -- client fiber explicitly. Otherwize, wait on state_cond completes and
-    -- the client reports E_TIMEOUT.
+    -- Async requests currently 'in flight', keyed by a request
+    -- id. Value refs are weak hence if a client dies
+    -- unexpectedly, GC cleans the mess.
+    -- Async request can not be timed out completely. Instead a
+    -- user must decide when he does not want to wait for
+    -- response anymore.
+    -- Sync requests are implemented as async call + immediate
+    -- wait for a result.
     local requests         = setmetatable({}, { __mode = 'v' })
     local next_request_id  = 1
 
     local worker_fiber
     local send_buf         = buffer.ibuf(buffer.READAHEAD)
     local recv_buf         = buffer.ibuf(buffer.READAHEAD)
+
+    --
+    -- Async request metamethods.
+    --
+    local request_index = {}
+    --
+    -- When an async request is finalized (with ok or error - no
+    -- matter), its 'id' field is nullified by a response
+    -- dispatcher.
+    --
+    function request_index:is_ready()
+        return self.id == nil or worker_fiber == nil
+    end
+    --
+    -- When a request is finished, a result can be got from a
+    -- future object anytime.
+    -- @retval result, nil Success, the response is returned.
+    -- @retval nil, error Error occured.
+    --
+    function request_index:result()
+        if self.errno then
+            return nil, box.error.new({code = self.errno,
+                                       reason = self.response})
+        elseif not self.id then
+            return self.response
+        elseif not worker_fiber then
+            return nil, box.error.new(E_NO_CONNECTION)
+        else
+            return nil, box.error.new(box.error.PROC_LUA,
+                                      'Response is not ready')
+        end
+    end
+    --
+    -- Wait for a response or error max timeout seconds.
+    -- @param timeout Max seconds to wait.
+    -- @retval result, nil Success, the response is returned.
+    -- @retval nil, error Error occured.
+    --
+    function request_index:wait_result(timeout)
+        if timeout then
+            if type(timeout) ~= 'number' or timeout < 0 then
+                error('Usage: future:wait_result(timeout)')
+            end
+        else
+            timeout = TIMEOUT_INFINITY
+        end
+        if not self:is_ready() then
+            -- When a response is ready before timeout, the
+            -- waiting client is waked up prematurely.
+            while timeout > 0 and not self:is_ready() do
+                local ts = fiber.clock()
+                self.cond:wait(timeout)
+                timeout = timeout - (fiber.clock() - ts)
+            end
+            if not self:is_ready() then
+                return nil, box.error.new(E_TIMEOUT)
+            end
+        end
+        return self:result()
+    end
+    --
+    -- Make a connection forget about the response. When it will
+    -- be received, it will be ignored. It reduces size of
+    -- requests table speeding up other requests.
+    --
+    function request_index:discard()
+        if self.id then
+            requests[self.id] = nil
+            self.id = nil
+            self.errno = box.error.PROC_LUA
+            self.response = 'Response is discarded'
+        end
+    end
+
+    local request_mt = { __index = request_index }
 
     -- STATE SWITCHING --
     local function set_state(new_state, new_errno, new_error)
@@ -192,8 +342,10 @@ local function create_transport(host, port, user, password, callback,
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' then
             for _, request in pairs(requests) do
+                request.id = nil
                 request.errno = new_errno
                 request.response = new_error
+                request.cond:broadcast()
             end
             requests = {}
         end
@@ -271,43 +423,47 @@ local function create_transport(host, port, user, password, callback,
         end
     end
 
-    -- REQUEST/RESPONSE --
-    local function perform_request(timeout, buffer, method, schema_version, ...)
-        if state ~= 'active' then
-            return last_errno or E_NO_CONNECTION, last_error
+    --
+    -- Send a request and do not wait for response.
+    -- @retval nil, error Error occured.
+    -- @retval not nil Future object.
+    --
+    local function perform_async_request(buffer, method, ...)
+        if state ~= 'active' and state ~= 'fetch_schema' then
+            return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
+                                       reason = last_error})
         end
-        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
         -- alert worker to notify it of the queued outgoing data;
         -- if the buffer wasn't empty, assume the worker was already alerted
         if send_buf:size() == 0 then
             worker_fiber:wakeup()
         end
         local id = next_request_id
-        method_codec[method](send_buf, id, schema_version, ...)
+        method_encoder[method](send_buf, id, ...)
         next_request_id = next_id(id)
-        -- reserve space for 8 keys: client, method,
-        -- schema_version, buffer, errno, response, metadata,
-        -- sql_info.
-        local request = table_new(0, 8)
-        request.client = fiber_self()
+        -- Request has maximum 6 members:
+        -- method, buffer, id, cond, errno, response.
+        local request = setmetatable(table_new(0, 6), request_mt)
         request.method = method
-        request.schema_version = schema_version
         request.buffer = buffer
+        request.id = id
+        request.cond = fiber.cond()
         requests[id] = request
-        repeat
-            local timeout = max(0, deadline - fiber_clock())
-            if not state_cond:wait(timeout) then
-                requests[id] = nil
-                return E_TIMEOUT, 'Timeout exceeded'
-            end
-        until requests[id] == nil -- i.e. completed (beware spurious wakeups)
-        return request.errno, request.response, request.metadata, request.info
+        return request
     end
 
-    local function wakeup_client(client)
-        if client:status() ~= 'dead' then
-            client:wakeup()
+    --
+    -- Send a request and wait for response.
+    -- @retval nil, error Error occured.
+    -- @retval not nil Response object.
+    --
+    local function perform_request(timeout, buffer, method, ...)
+        local request, err =
+            perform_async_request(buffer, method, ...)
+        if not request then
+            return nil, err
         end
+        return request:wait_result(timeout)
     end
 
     local function dispatch_response_iproto(hdr, body_rpos, body_end)
@@ -317,6 +473,7 @@ local function create_transport(host, port, user, password, callback,
             return
         end
         requests[id] = nil
+        request.id = nil
         local status = hdr[IPROTO_STATUS_KEY]
         local body, body_end_check
 
@@ -326,7 +483,7 @@ local function create_transport(host, port, user, password, callback,
             assert(body_end == body_end_check, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
             request.response = body[IPROTO_ERROR_KEY]
-            wakeup_client(request.client)
+            request.cond:broadcast()
             return
         end
 
@@ -337,17 +494,15 @@ local function create_transport(host, port, user, password, callback,
             local wpos = buffer:alloc(body_len)
             ffi.copy(wpos, body_rpos, body_len)
             request.response = tonumber(body_len)
-            wakeup_client(request.client)
+            request.cond:broadcast()
             return
         end
 
         -- Decode xrow.body[DATA] to Lua objects
         body, body_end_check = decode(body_rpos)
         assert(body_end == body_end_check, "invalid xrow length")
-        request.response = body[IPROTO_DATA_KEY]
-        request.metadata = body[IPROTO_METADATA_KEY]
-        request.info = body[IPROTO_SQL_INFO_KEY]
-        wakeup_client(request.client)
+        request.response, request.errno = method_decoder[request.method](body)
+        request.cond:broadcast()
     end
 
     local function new_request_id()
@@ -427,7 +582,7 @@ local function create_transport(host, port, user, password, callback,
             log.warn("Netbox text protocol support is deprecated since 1.10, "..
                      "please use require('console').connect() instead")
             local setup_delimiter = 'require("console").delimiter("$EOF$")\n'
-            method_codec.inject(send_buf, nil, nil, setup_delimiter)
+            method_encoder.inject(send_buf, nil, setup_delimiter)
             local err, response = send_and_recv_console()
             if err then
                 return error_sm(err, response)
@@ -455,9 +610,10 @@ local function create_transport(host, port, user, password, callback,
             if request == nil then -- nobody is waiting for the response
                 return
             end
+            request.id = nil
             requests[rid] = nil
             request.response = response
-            wakeup_client(request.client)
+            request.cond:broadcast()
             return console_sm(next_id(rid))
         end
     end
@@ -468,7 +624,7 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        encode_auth(send_buf, new_request_id(), nil, user, password, salt)
+        encode_auth(send_buf, new_request_id(), user, password, salt)
         local err, hdr, body_rpos, body_end = send_and_recv_iproto()
         if err then
             return error_sm(err, hdr)
@@ -491,11 +647,9 @@ local function create_transport(host, port, user, password, callback,
         local select2_id = new_request_id()
         local response = {}
         -- fetch everything from space _vspace, 2 = ITER_ALL
-        encode_select(send_buf, select1_id, nil, VSPACE_ID, 0, 2, 0,
-                      0xFFFFFFFF, nil)
+        encode_select(send_buf, select1_id, VSPACE_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         -- fetch everything from space _vindex, 2 = ITER_ALL
-        encode_select(send_buf, select2_id, nil, VINDEX_ID, 0, 2, 0,
-                      0xFFFFFFFF, nil)
+        encode_select(send_buf, select2_id, VINDEX_ID, 0, 2, 0, 0xFFFFFFFF, nil)
         schema_version = nil -- any schema_version will do provided that
                              -- it is consistent across responses
         repeat
@@ -541,8 +695,7 @@ local function create_transport(host, port, user, password, callback,
             -- Sic: self.schema_version will be updated only after reload.
             local body
             body, body_end = decode(body_rpos)
-            set_state('fetch_schema',
-                      E_WRONG_SCHEMA_VERSION, body[IPROTO_ERROR_KEY])
+            set_state('fetch_schema')
             return iproto_schema_sm(schema_version)
         end
         return iproto_sm(schema_version)
@@ -565,7 +718,8 @@ local function create_transport(host, port, user, password, callback,
         stop            = stop,
         start           = start,
         wait_state      = wait_state,
-        perform_request = perform_request
+        perform_request = perform_request,
+        perform_async_request = perform_async_request,
     }
 end
 
@@ -822,70 +976,47 @@ function remote_methods:wait_connected(timeout)
 end
 
 function remote_methods:_request(method, opts, ...)
-    local this_fiber = fiber_self()
     local transport = self._transport
-    local perform_request = transport.perform_request
-    local wait_state = transport.wait_state
-    local deadline = nil
+    local buffer = opts and opts.buffer
+    if opts and opts.is_async then
+        return transport.perform_async_request(buffer, method, ...)
+    end
+    local deadline
     if opts and opts.timeout then
         -- conn.space:request(, { timeout = timeout })
         deadline = fiber_clock() + opts.timeout
     else
         -- conn:timeout(timeout).space:request()
         -- @deprecated since 1.7.4
-        deadline = self._deadlines[this_fiber]
+        deadline = self._deadlines[fiber_self()]
     end
-    local buffer = opts and opts.buffer
-    local err, res, metadata, info
-    repeat
-        local timeout = deadline and max(0, deadline - fiber_clock())
-        if self.state ~= 'active' then
-            wait_state('active', timeout)
-            timeout = deadline and max(0, deadline - fiber_clock())
-        end
-        err, res, metadata, info =
-            perform_request(timeout, buffer, method, self.schema_version, ...)
-        if not err and buffer ~= nil then
-            return res -- the length of xrow.body
-        elseif not err then
-            -- SQL execute can return info with no data.
-            if res then
-                setmetatable(res, sequence_mt)
-                local postproc = method ~= 'eval' and method ~= 'call_17'
-                if postproc then
-                    local tnew = box.tuple.new
-                    for i, v in pairs(res) do
-                        res[i] = tnew(v)
-                    end
-                end
-            end
-            return res, metadata, info
-        elseif err == E_WRONG_SCHEMA_VERSION then
-            err = nil
-        end
-    until err
-    box.error({code = err, reason = res})
+    local timeout = deadline and max(0, deadline - fiber_clock())
+    if self.state ~= 'active' then
+        transport.wait_state('active', timeout)
+        timeout = deadline and max(0, deadline - fiber_clock())
+    end
+    local res, err = transport.perform_request(timeout, buffer, method, ...)
+    if err then
+        box.error(err)
+    end
+    -- Try to wait until a schema is reloaded if needed.
+    -- Regardless of reloading result, the main response is
+    -- returned, since it does not depend on any schema things.
+    if self.state == 'fetch_schema' then
+        timeout = deadline and max(0, deadline - fiber_clock())
+        transport.wait_state('active', timeout)
+    end
+    return res
 end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    local timeout = opts and opts.timeout
-    if timeout == nil then
-        -- conn:timeout(timeout):ping()
-        -- @deprecated since 1.7.4
-        local deadline = self._deadlines[fiber_self()]
-        timeout = deadline and max(0, deadline - fiber_clock())
-                  or (opts and opts.timeout)
-    end
-    local err = self._transport.perform_request(timeout, nil, 'ping',
-                                                self.schema_version)
-    return not err or err == E_WRONG_SCHEMA_VERSION
+    return (pcall(self._request, self, 'ping', opts))
 end
 
 function remote_methods:reload_schema()
     check_remote_arg(self, 'reload_schema')
-    self:_request('select', nil, VSPACE_ID, 0, box.index.GE, 0, 0xFFFFFFFF,
-                  nil)
+    self:ping()
 end
 
 -- @deprecated since 1.7.4
@@ -899,7 +1030,7 @@ function remote_methods:call(func_name, args, opts)
     check_call_args(args)
     args = args or {}
     local res = self:_request('call_17', opts, tostring(func_name), args)
-    if type(res) ~= 'table' then
+    if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
     return unpack(res)
@@ -916,7 +1047,7 @@ function remote_methods:eval(code, args, opts)
     check_eval_args(args)
     args = args or {}
     local res = self:_request('eval', opts, code, args)
-    if type(res) ~= 'table' then
+    if type(res) ~= 'table' or opts and opts.is_async then
         return res
     end
     return unpack(res)
@@ -927,25 +1058,8 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
-    local res, metadata, info =
-        self:_request('execute', netbox_opts, query, parameters or {},
-                      sql_opts or {})
-    if netbox_opts and netbox_opts.buffer then
-        return res -- body length. Body is written to the buffer.
-    end
-    assert((info == nil and metadata ~= nil and res ~= nil) or
-           (info ~= nil and metadata == nil and res == nil))
-    if info ~= nil then
-        assert(info[SQL_INFO_ROW_COUNT_KEY] ~= nil)
-        return {rowcount = info[SQL_INFO_ROW_COUNT_KEY]}
-    end
-    -- Set readable names for the metadata fields.
-    for i, field_meta in pairs(metadata) do
-        field_meta["name"] = field_meta[IPROTO_FIELD_NAME_KEY]
-        field_meta[IPROTO_FIELD_NAME_KEY] = nil
-    end
-    setmetatable(res, sequence_mt)
-    return {metadata = metadata, rows = res}
+    return self:_request('execute', netbox_opts, query, parameters or {},
+                         sql_opts or {})
 end
 
 function remote_methods:wait_state(state, timeout)
@@ -1084,22 +1198,20 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        err, res = pr(timeout, nil, 'eval', nil, loader, {line})
+        res, err = pr(timeout, nil, 'eval', loader, {line})
     else
         assert(self.protocol == 'Lua console')
-        err, res = pr(timeout, nil, 'inject', nil, line..'$EOF$\n')
+        res, err = pr(timeout, nil, 'inject', line..'$EOF$\n')
     end
     if err then
-        box.error({code = err, reason = res})
+        box.error(err)
     end
     return res[1] or res
 end
 
-local function one_tuple(tab)
-    if type(tab) ~= 'table' then
-        return tab
-    elseif tab[1] ~= nil then
-        return tab[1]
+local function nothing_or_data(value)
+    if value ~= nil then
+        return value
     end
 end
 
@@ -1108,12 +1220,12 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
-        return one_tuple(remote:_request('insert', opts, self.id, tuple))
+        return remote:_request('insert', opts, self.id, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
-        return one_tuple(remote:_request('replace', opts, self.id, tuple))
+        return remote:_request('replace', opts, self.id, tuple)
     end
 
     function methods:select(key, opts)
@@ -1133,8 +1245,8 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
-        remote:_request('upsert', opts, self.id, key, oplist)
-        return
+        return nothing_or_data(remote:_request('upsert', opts, self.id, key,
+                                               oplist))
     end
 
     function methods:get(key, opts)
@@ -1172,10 +1284,8 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
-        local res = remote:_request('select', opts, self.space.id, self.id,
-                                    box.index.EQ, 0, 2, key)
-        if res[2] ~= nil then box.error(box.error.MORE_THAN_ONE_TUPLE) end
-        if res[1] ~= nil then return res[1] end
+        return nothing_or_data(remote:_request('get', opts, self.space.id,
+                               self.id, box.index.EQ, 0, 2, key))
     end
 
     function methods:min(key, opts)
@@ -1183,9 +1293,9 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
-        local res = remote:_request('select', opts, self.space.id, self.id,
-                                    box.index.GE, 0, 1, key)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('min', opts, self.space.id,
+                                               self.id, box.index.GE, 0, 1,
+                                               key))
     end
 
     function methods:max(key, opts)
@@ -1193,9 +1303,9 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
-        local res = remote:_request('select', opts, self.space.id, self.id,
-                                    box.index.LE, 0, 1, key)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('max', opts, self.space.id,
+                                               self.id, box.index.LE, 0, 1,
+                                               key))
     end
 
     function methods:count(key, opts)
@@ -1205,21 +1315,19 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return (remote:_request('call_16', opts, code, { key }))[1][1]
+        return remote:_request('count', opts, code, { key })
     end
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
-        local res = remote:_request('delete', opts, self.space.id, self.id,
-                                    key)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('delete', opts, self.space.id,
+                                               self.id, key))
     end
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
-        local res = remote:_request('update', opts, self.space.id, self.id,
-                                    key, oplist)
-        return one_tuple(res)
+        return nothing_or_data(remote:_request('update', opts, self.space.id,
+                                               self.id, key, oplist))
     end
 
     return { __index = methods, __metatable = false }

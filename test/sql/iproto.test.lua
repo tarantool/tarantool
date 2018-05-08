@@ -163,10 +163,27 @@ cn:execute('drop table if exists test3')
 _ = space:replace{1, 1, string.rep('a', 4 * 1024 * 1024)}
 res = cn:execute('select * from test')
 res.metadata
-
-cn:close()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.sql.execute('drop table test')
+cn:close()
+
+--
+-- gh-3107: async netbox.
+--
+cn = remote.connect(box.cfg.listen)
+
+cn:execute('create table test (id integer primary key, a integer, b integer)')
+future1 = cn:execute('insert into test values (1, 1, 1)', nil, nil, {is_async = true})
+future2 = cn:execute('insert into test values (1, 2, 2)', nil, nil, {is_async = true})
+future3 = cn:execute('insert into test values (2, 2, 2), (3, 3, 3)', nil, nil, {is_async = true})
+future1:wait_result()
+future2:wait_result()
+future3:wait_result()
+future4 = cn:execute('select * from test', nil, nil, {is_async = true})
+future4:wait_result()
+cn:close()
+box.sql.execute('drop table test')
+
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 space = nil
 
 -- Cleanup xlog

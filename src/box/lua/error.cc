@@ -42,25 +42,19 @@ extern "C" {
 #include "lua/utils.h"
 #include "box/error.h"
 
-static int
-luaT_error_raise(lua_State *L)
+static void
+luaT_error_create(lua_State *L, int top_base)
 {
 	uint32_t code = 0;
 	const char *reason = NULL;
 	const char *file = "";
 	unsigned line = 0;
 	lua_Debug info;
-	/* lua_type(L, 1) == LUA_TTABLE - box.error table */
 	int top = lua_gettop(L);
-	if (top <= 1) {
-		/* re-throw saved exceptions (if any) */
-		if (box_error_last())
-			luaT_error(L);
-		return 0;
-	} else if (top >= 2 && lua_type(L, 2) == LUA_TNUMBER) {
-		code = lua_tonumber(L, 2);
+	if (top >= top_base && lua_type(L, top_base) == LUA_TNUMBER) {
+		code = lua_tonumber(L, top_base);
 		reason = tnt_errcode_desc(code);
-		if (top > 2) {
+		if (top > top_base) {
 			/* Call string.format(reason, ...) to format message */
 			lua_getglobal(L, "string");
 			if (lua_isnil(L, -1))
@@ -69,24 +63,29 @@ luaT_error_raise(lua_State *L)
 			if (lua_isnil(L, -1))
 				goto raise;
 			lua_pushstring(L, reason);
-			for (int i = 3; i <= top; i++)
+			for (int i = top_base + 1; i <= top; i++)
 				lua_pushvalue(L, i);
-			lua_call(L, top - 1, 1);
+			lua_call(L, top - top_base + 1, 1);
 			reason = lua_tostring(L, -1);
 		} else if (strchr(reason, '%') != NULL) {
 			/* Missing arguments to format string */
 			luaL_error(L, "box.error(): bad arguments");
 		}
-	} else if (top == 2 && lua_istable(L, 2)) {
-		/* A special case that rethrows raw error (used by net.box) */
-		lua_getfield(L, 2, "code");
-		code = lua_tonumber(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, 2, "reason");
-		reason = lua_tostring(L, -1);
-		if (reason == NULL)
-			reason = "";
-		lua_pop(L, 1);
+	} else if (top == top_base) {
+		if (lua_istable(L, top_base)) {
+			/* A special case that rethrows raw error (used by net.box) */
+			lua_getfield(L, top_base, "code");
+			code = lua_tonumber(L, -1);
+			lua_pop(L, 1);
+			lua_getfield(L, top_base, "reason");
+			reason = lua_tostring(L, -1);
+			if (reason == NULL)
+				reason = "";
+			lua_pop(L, 1);
+		} else if (luaL_iserror(L, top_base)) {
+			lua_error(L);
+			return;
+		}
 	} else {
 		luaL_error(L, "box.error(): bad arguments");
 	}
@@ -104,8 +103,19 @@ raise:
 	}
 	say_debug("box.error() at %s:%i", file, line);
 	box_error_set(file, line, code, "%s", reason);
-	luaT_error(L);
-	return 0;
+}
+
+static int
+luaT_error_call(lua_State *L)
+{
+	if (lua_gettop(L) <= 1) {
+		/* Re-throw saved exceptions if any. */
+		if (box_error_last())
+			luaT_error(L);
+		return 0;
+	}
+	luaT_error_create(L, 2);
+	return luaT_error(L);
 }
 
 static int
@@ -122,6 +132,16 @@ luaT_error_last(lua_State *L)
 
 	luaT_pusherror(L, e);
 	return 1;
+}
+
+static int
+luaT_error_new(lua_State *L)
+{
+	if (lua_gettop(L) == 0)
+		return luaL_error(L, "Usage: box.error.new(code, args)");
+	luaT_error_create(L, 1);
+	lua_settop(L, 0);
+	return luaT_error_last(L);
 }
 
 static int
@@ -214,7 +234,7 @@ box_lua_error_init(struct lua_State *L) {
 	}
 	lua_newtable(L);
 	{
-		lua_pushcfunction(L, luaT_error_raise);
+		lua_pushcfunction(L, luaT_error_call);
 		lua_setfield(L, -2, "__call");
 
 		lua_newtable(L);
@@ -227,8 +247,8 @@ box_lua_error_init(struct lua_State *L) {
 			lua_setfield(L, -2, "clear");
 		}
 		{
-			lua_pushcfunction(L, luaT_error_raise);
-			lua_setfield(L, -2, "raise");
+			lua_pushcfunction(L, luaT_error_new);
+			lua_setfield(L, -2, "new");
 		}
 		lua_setfield(L, -2, "__index");
 	}

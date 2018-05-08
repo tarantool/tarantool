@@ -33,7 +33,6 @@ box.error.last()
 box.error({code = 123, reason = 'test'})
 box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 box.error()
-box.error.raise()
 e = box.error.last()
 e
 e:unpack()
@@ -44,13 +43,21 @@ tostring(e)
 e = nil
 box.error.clear()
 box.error.last()
-box.error.raise()
 space = box.space.tweedledum
 --
 -- gh-2080: box.error() crashes with wrong parameters
 box.error(box.error.UNSUPPORTED, "x", "x%s")
 box.error(box.error.UNSUPPORTED, "x")
 box.error(box.error.UNSUPPORTED)
+
+--
+-- gh-3031: allow to create an error object with no throwing it.
+--
+e = box.error.new(box.error.UNKNOWN)
+e
+e = box.error.new(box.error.CREATE_SPACE, "space", "error")
+e
+box.error.new()
 
 ----------------
 -- # box.stat
