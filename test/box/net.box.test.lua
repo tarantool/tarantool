@@ -1190,7 +1190,21 @@ future:wait_result(100)
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+--
+-- Test async schema version change.
+--
+function change_schema(i) local tmp = box.schema.create_space('test'..i) return 'ok' end
+future1 = c:call('change_schema', {'1'}, {is_async = true})
+future2 = c:call('change_schema', {'2'}, {is_async = true})
+future3 = c:call('change_schema', {'3'}, {is_async = true})
+future1:wait_result()
+future2:wait_result()
+future3:wait_result()
+
 c:close()
 s:drop()
+box.space.test1:drop()
+box.space.test2:drop()
+box.space.test3:drop()
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
