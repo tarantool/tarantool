@@ -2927,6 +2927,9 @@ future:is_ready()
 ---
 - true
 ...
+finalize_long()
+---
+...
 --
 -- Test reconnect.
 --
@@ -2940,6 +2943,9 @@ _ = c._transport.perform_request(nil, nil, 'inject', '\x80')
 ---
 ...
 while not c:is_connected() do fiber.sleep(0.01) end
+---
+...
+finalize_long()
 ---
 ...
 future:wait_result(100)

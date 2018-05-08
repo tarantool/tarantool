@@ -1166,6 +1166,7 @@ future2:discard()
 future:wait_result(100)
 future:result()
 future:is_ready()
+finalize_long()
 
 --
 -- Test reconnect.
@@ -1174,6 +1175,7 @@ c = net:connect(box.cfg.listen, {reconnect_after = 0.01})
 future = c:call('long_function', {1, 2, 3}, {is_async = true})
 _ = c._transport.perform_request(nil, nil, 'inject', '\x80')
 while not c:is_connected() do fiber.sleep(0.01) end
+finalize_long()
 future:wait_result(100)
 future:result()
 future = c:call('long_function', {1, 2, 3}, {is_async = true})
