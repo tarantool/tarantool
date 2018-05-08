@@ -45,78 +45,7 @@
 #include "vy_mem.h"
 #include "vy_run.h"
 #include "vy_cache.h"
-#include "vy_upsert.h"
-
-/**
- * ID of an iterator source type. Can be used in bitmaps.
- */
-enum iterator_src_type {
-	ITER_SRC_TXW = 1,
-	ITER_SRC_CACHE = 2,
-	ITER_SRC_MEM = 4,
-	ITER_SRC_RUN = 8,
-};
-
-/**
- * History of a key in vinyl is a continuous sequence of statements of the
- * same key in order of decreasing lsn. The history can be represented as a
- * list, the structure below describes one node of the list.
- */
-struct vy_stmt_history_node {
-	/* Type of source that the history statement came from */
-	enum iterator_src_type src_type;
-	/* The history statement. Referenced for runs. */
-	struct tuple *stmt;
-	/* Link in the history list */
-	struct rlist link;
-};
-
-/**
- * Allocate (region) new history node.
- * @return new node or NULL on memory error (diag is set).
- */
-static struct vy_stmt_history_node *
-vy_stmt_history_node_new(void)
-{
-	struct region *region = &fiber()->gc;
-	struct vy_stmt_history_node *node = region_alloc(region, sizeof(*node));
-	if (node == NULL)
-		diag_set(OutOfMemory, sizeof(*node), "region",
-			 "struct vy_stmt_history_node");
-	return node;
-}
-
-/**
- * Unref statement if necessary, remove node from history if it's there.
- */
-static void
-vy_stmt_history_cleanup(struct rlist *history, size_t region_svp)
-{
-	struct vy_stmt_history_node *node;
-	rlist_foreach_entry(node, history, link)
-		if (node->src_type == ITER_SRC_RUN)
-			tuple_unref(node->stmt);
-
-	region_truncate(&fiber()->gc, region_svp);
-}
-
-/**
- * Return true if the history of a key contains terminal node in the end,
- * i.e. REPLACE of DELETE statement.
- */
-static bool
-vy_stmt_history_is_terminal(struct rlist *history)
-{
-	if (rlist_empty(history))
-		return false;
-	struct vy_stmt_history_node *node =
-		rlist_last_entry(history, struct vy_stmt_history_node, link);
-	assert(vy_stmt_type(node->stmt) == IPROTO_REPLACE ||
-	       vy_stmt_type(node->stmt) == IPROTO_DELETE ||
-	       vy_stmt_type(node->stmt) == IPROTO_INSERT ||
-	       vy_stmt_type(node->stmt) == IPROTO_UPSERT);
-       return vy_stmt_type(node->stmt) != IPROTO_UPSERT;
-}
+#include "vy_history.h"
 
 /**
  * Scan TX write set for given key.
@@ -124,7 +53,7 @@ vy_stmt_history_is_terminal(struct rlist *history)
  */
 static int
 vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
-			 struct tuple *key, struct rlist *history)
+			 struct tuple *key, struct vy_history *history)
 {
 	if (tx == NULL)
 		return 0;
@@ -136,13 +65,7 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
 		return 0;
 	vy_stmt_counter_acct_tuple(&lsm->stat.txw.iterator.get,
 				   txv->stmt);
-	struct vy_stmt_history_node *node = vy_stmt_history_node_new();
-	if (node == NULL)
-		return -1;
-	node->src_type = ITER_SRC_TXW;
-	node->stmt = txv->stmt;
-	rlist_add_tail(history, &node->link);
-	return 0;
+	return vy_history_append_stmt(history, txv->stmt);
 }
 
 /**
@@ -150,9 +73,8 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
  * Add one or no statement to the history list.
  */
 static int
-vy_point_lookup_scan_cache(struct vy_lsm *lsm,
-			   const struct vy_read_view **rv,
-			   struct tuple *key, struct rlist *history)
+vy_point_lookup_scan_cache(struct vy_lsm *lsm, const struct vy_read_view **rv,
+			   struct tuple *key, struct vy_history *history)
 {
 	lsm->cache.stat.lookup++;
 	struct tuple *stmt = vy_cache_get(&lsm->cache, key);
@@ -161,14 +83,7 @@ vy_point_lookup_scan_cache(struct vy_lsm *lsm,
 		return 0;
 
 	vy_stmt_counter_acct_tuple(&lsm->cache.stat.get, stmt);
-	struct vy_stmt_history_node *node = vy_stmt_history_node_new();
-	if (node == NULL)
-		return -1;
-
-	node->src_type = ITER_SRC_CACHE;
-	node->stmt = stmt;
-	rlist_add_tail(history, &node->link);
-	return 0;
+	return vy_history_append_stmt(history, stmt);
 }
 
 /**
@@ -178,7 +93,7 @@ vy_point_lookup_scan_cache(struct vy_lsm *lsm,
 static int
 vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 			 const struct vy_read_view **rv,
-			 struct tuple *key, struct rlist *history)
+			 struct tuple *key, struct vy_history *history)
 {
 	struct tree_mem_key tree_key;
 	tree_key.stmt = key;
@@ -198,17 +113,13 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 		return 0;
 
 	while (true) {
-		struct vy_stmt_history_node *node = vy_stmt_history_node_new();
-		if (node == NULL)
+		if (vy_history_append_stmt(history, (struct tuple *)stmt) != 0)
 			return -1;
 
 		vy_stmt_counter_acct_tuple(&lsm->stat.memory.iterator.get,
 					   stmt);
 
-		node->src_type = ITER_SRC_MEM;
-		node->stmt = (struct tuple *)stmt;
-		rlist_add_tail(history, &node->link);
-		if (vy_stmt_history_is_terminal(history))
+		if (vy_history_is_terminal(history))
 			break;
 
 		if (!vy_mem_tree_iterator_next(&mem->tree, &mem_itr))
@@ -231,13 +142,13 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
  */
 static int
 vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
-			  struct tuple *key, struct rlist *history)
+			  struct tuple *key, struct vy_history *history)
 {
 	assert(lsm->mem != NULL);
 	int rc = vy_point_lookup_scan_mem(lsm, lsm->mem, rv, key, history);
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
-		if (rc != 0 || vy_stmt_history_is_terminal(history))
+		if (rc != 0 || vy_history_is_terminal(history))
 			return rc;
 
 		rc = vy_point_lookup_scan_mem(lsm, mem, rv, key, history);
@@ -248,15 +159,12 @@ vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
 /**
  * Scan one particular slice.
  * Add found statements to the history list up to terminal statement.
- * Set *terminal_found to true if the terminal statement (DELETE or REPLACE)
- * was found.
  */
 static int
 vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 			   const struct vy_read_view **rv, struct tuple *key,
-			   struct rlist *history, bool *terminal_found)
+			   struct vy_history *history)
 {
-	int rc = 0;
 	/*
 	 * The format of the statement must be exactly the space
 	 * format with the same identifier to fully match the
@@ -266,24 +174,10 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 	vy_run_iterator_open(&run_itr, &lsm->stat.disk.iterator, slice,
 			     ITER_EQ, key, rv, lsm->cmp_def, lsm->key_def,
 			     lsm->disk_format, lsm->index_id == 0);
-	struct tuple *stmt;
-	rc = vy_run_iterator_next_key(&run_itr, &stmt);
-	while (rc == 0 && stmt != NULL) {
-		struct vy_stmt_history_node *node = vy_stmt_history_node_new();
-		if (node == NULL) {
-			rc = -1;
-			break;
-		}
-		node->src_type = ITER_SRC_RUN;
-		node->stmt = stmt;
-		tuple_ref(stmt);
-		rlist_add_tail(history, &node->link);
-		if (vy_stmt_type(stmt) != IPROTO_UPSERT) {
-			*terminal_found = true;
-			break;
-		}
-		rc = vy_run_iterator_next_lsn(&run_itr, &stmt);
-	}
+	struct vy_history slice_history;
+	vy_history_create(&slice_history, &lsm->env->history_node_pool);
+	int rc = vy_run_iterator_next(&run_itr, &slice_history);
+	vy_history_splice(history, &slice_history);
 	vy_run_iterator_close(&run_itr);
 	return rc;
 }
@@ -296,7 +190,7 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
  */
 static int
 vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
-			    struct tuple *key, struct rlist *history)
+			    struct tuple *key, struct vy_history *history)
 {
 	struct vy_range *range = vy_range_tree_find_by_key(lsm->tree,
 							   ITER_EQ, key);
@@ -317,69 +211,13 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 	}
 	assert(i == slice_count);
 	int rc = 0;
-	bool terminal_found = false;
 	for (i = 0; i < slice_count; i++) {
-		if (rc == 0 && !terminal_found)
+		if (rc == 0 && !vy_history_is_terminal(history))
 			rc = vy_point_lookup_scan_slice(lsm, slices[i],
-					rv, key, history, &terminal_found);
+							rv, key, history);
 		vy_slice_unpin(slices[i]);
 	}
 	return rc;
-}
-
-/**
- * Get a resultant statement from collected history. Add to cache if possible.
- */
-static int
-vy_point_lookup_apply_history(struct vy_lsm *lsm,
-			      const struct vy_read_view **rv,
-			      struct tuple *key, struct rlist *history,
-			      struct tuple **ret)
-{
-	*ret = NULL;
-	if (rlist_empty(history))
-		return 0;
-
-	struct tuple *curr_stmt = NULL;
-	struct vy_stmt_history_node *node =
-		rlist_last_entry(history, struct vy_stmt_history_node, link);
-	if (vy_stmt_history_is_terminal(history)) {
-		if (vy_stmt_type(node->stmt) == IPROTO_DELETE) {
-			/* Ignore terminal delete */
-		} else if (node->src_type == ITER_SRC_MEM) {
-			curr_stmt = vy_stmt_dup(node->stmt);
-		} else {
-			curr_stmt = node->stmt;
-			tuple_ref(curr_stmt);
-		}
-		node = rlist_prev_entry_safe(node, history, link);
-	}
-	while (node != NULL) {
-		assert(vy_stmt_type(node->stmt) == IPROTO_UPSERT);
-		/* We could not read the data that is invisible now */
-		assert(node->src_type == ITER_SRC_TXW ||
-		       vy_stmt_lsn(node->stmt) <= (*rv)->vlsn);
-
-		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
-					lsm->cmp_def, lsm->mem_format, true);
-		lsm->stat.upsert.applied++;
-		if (stmt == NULL)
-			return -1;
-		if (curr_stmt != NULL)
-			tuple_unref(curr_stmt);
-		curr_stmt = stmt;
-		node = rlist_prev_entry_safe(node, history, link);
-	}
-	if (curr_stmt != NULL) {
-		vy_stmt_counter_acct_tuple(&lsm->stat.get, curr_stmt);
-		*ret = curr_stmt;
-	}
-	/**
-	 * Add a statement to the cache
-	 */
-	if ((*rv)->vlsn == INT64_MAX) /* Do not store non-latest data */
-		vy_cache_add(&lsm->cache, curr_stmt, NULL, key, ITER_EQ);
-	return 0;
 }
 
 int
@@ -390,26 +228,24 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	assert(tuple_field_count(key) >= lsm->cmp_def->part_count);
 
 	*ret = NULL;
-	size_t region_svp = region_used(&fiber()->gc);
 	double start_time = ev_monotonic_now(loop());
 	int rc = 0;
 
 	lsm->stat.lookup++;
 	/* History list */
-	struct rlist history;
+	struct vy_history history;
+	vy_history_create(&history, &lsm->env->history_node_pool);
 restart:
-	rlist_create(&history);
-
 	rc = vy_point_lookup_scan_txw(lsm, tx, key, &history);
-	if (rc != 0 || vy_stmt_history_is_terminal(&history))
+	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 	rc = vy_point_lookup_scan_cache(lsm, rv, key, &history);
-	if (rc != 0 || vy_stmt_history_is_terminal(&history))
+	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 	rc = vy_point_lookup_scan_mems(lsm, rv, key, &history);
-	if (rc != 0 || vy_stmt_history_is_terminal(&history))
+	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 	/* Save version before yield */
@@ -434,19 +270,27 @@ restart:
 		 * This in unnecessary in case of rotation but since we
 		 * cannot distinguish these two cases we always restart.
 		 */
-		vy_stmt_history_cleanup(&history, region_svp);
+		vy_history_cleanup(&history);
 		goto restart;
 	}
 
 done:
 	if (rc == 0) {
-		rc = vy_point_lookup_apply_history(lsm, rv, key,
-						   &history, ret);
+		int upserts_applied;
+		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
+				      false, &upserts_applied, ret);
+		lsm->stat.upsert.applied += upserts_applied;
 	}
-	vy_stmt_history_cleanup(&history, region_svp);
+	vy_history_cleanup(&history);
 
 	if (rc != 0)
 		return -1;
+
+	if (*ret != NULL) {
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, *ret);
+		if ((*rv)->vlsn == INT64_MAX)
+			vy_cache_add(&lsm->cache, *ret, NULL, key, ITER_EQ);
+	}
 
 	double latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&lsm->stat.latency, latency);

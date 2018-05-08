@@ -34,7 +34,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
-
+#include <small/mempool.h>
 #include <small/rlist.h>
 
 #include "index_def.h"
@@ -90,6 +90,8 @@ struct vy_lsm_env {
 	size_t bloom_size;
 	/** Size of memory used for page index. */
 	size_t page_index_size;
+	/** Memory pool for vy_history_node allocations. */
+	struct mempool history_node_pool;
 };
 
 /** Create a common LSM tree environment. */

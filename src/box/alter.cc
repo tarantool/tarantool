@@ -3055,6 +3055,15 @@ lock_before_dd(struct trigger *trigger, void *event)
 	if (fiber() == latch_owner(&schema_lock))
 		return;
 	struct txn *txn = (struct txn *)event;
+	/*
+	 * This trigger is executed before any check and may yield
+	 * on the latch lock. But a yield in a non-autocommit
+	 * memtx transaction will roll it back silently, rather
+	 * than produce an error, which is very confusing.
+	 * So don't try to lock a latch if there is
+	 * a multistatement transaction.
+	 */
+	txn_check_singlestatement_xc(txn, "DDL");
 	latch_lock(&schema_lock);
 	struct trigger *on_commit =
 		txn_alter_trigger_new(unlock_after_dd, NULL);

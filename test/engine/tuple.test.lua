@@ -227,11 +227,12 @@ format[2] = {name = 'field2', type = 'array'}
 format[3] = {name = 'field3', type = 'map'}
 format[4] = {name = 'field4', type = 'string' }
 format[5] = {name = "[2][6]['привет中国world']['中国a']", type = 'string'}
+format[6] = {name = '[1]', type = 'any'}
 s = box.schema.space.create('test', {format = format})
 pk = s:create_index('pk')
 field2 = {1, 2, 3, "4", {5,6,7}, {привет中国world={中国="привет"}, key="value1", value="key1"}}
 field3 = {[10] = 100, k1 = 100, k2 = {1,2,3}, k3 = { {a=1, b=2}, {c=3, d=4} }, [-1] = 200}
-t = s:replace{1, field2, field3, "123456", "yes, this"}
+t = s:replace{1, field2, field3, "123456", "yes, this", {key = 100}}
 t[1]
 t[2]
 t[3]
@@ -260,6 +261,8 @@ t.field2[5]
 t[".field1"]
 t["field1"]
 t["[3][10]"]
+t["[1]"]
+t["['[1]'].key"]
 
 -- Not found.
 t[0]

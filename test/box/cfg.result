@@ -48,6 +48,8 @@ cfg_filter(box.cfg)
     - 107374182
   - - memtx_min_tuple_size
     - <hidden>
+  - - net_msg_max
+    - 768
   - - pid_file
     - <hidden>
   - - read_only
@@ -143,6 +145,8 @@ cfg_filter(box.cfg)
     - 107374182
   - - memtx_min_tuple_size
     - <hidden>
+  - - net_msg_max
+    - 768
   - - pid_file
     - <hidden>
   - - read_only
@@ -406,6 +410,29 @@ test_run:cmd("stop server cfg_tester")
 test_run:cmd("cleanup server cfg_tester")
 ---
 - true
+...
+--
+-- gh-3320: box.cfg{net_msg_max}.
+--
+box.cfg{net_msg_max = 'invalid'}
+---
+- error: 'Incorrect value for option ''net_msg_max'': should be of type number'
+...
+box.cfg{net_msg_max = 0}
+---
+- error: 'Incorrect value for option ''iproto_msg_max'': minimal value is 2'
+...
+old = box.cfg.net_msg_max
+---
+...
+box.cfg{net_msg_max = 2}
+---
+...
+box.cfg{net_msg_max = old + 1000}
+---
+...
+box.cfg{net_msg_max = old}
+---
 ...
 test_run:cmd("clear filter")
 ---

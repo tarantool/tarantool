@@ -221,6 +221,17 @@ lbox_cfg_set_vinyl_timeout(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_net_msg_max(struct lua_State *L)
+{
+	try {
+		box_set_net_msg_max();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
+static int
 lbox_cfg_set_worker_pool_threads(struct lua_State *L)
 {
 	(void) L;
@@ -251,6 +262,14 @@ lbox_cfg_set_replication_connect_quorum(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_cfg_set_replication_skip_conflict(struct lua_State *L)
+{
+	(void) L;
+	box_set_replication_skip_conflict();
+	return 0;
+}
+
 void
 box_lua_cfg_init(struct lua_State *L)
 {
@@ -275,6 +294,9 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
 		{"cfg_set_replication_connect_quorum",
 			lbox_cfg_set_replication_connect_quorum},
+		{"cfg_set_replication_skip_conflict",
+			lbox_cfg_set_replication_skip_conflict},
+		{"cfg_set_net_msg_max", lbox_cfg_set_net_msg_max},
 		{NULL, NULL}
 	};
 

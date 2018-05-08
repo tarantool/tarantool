@@ -62,8 +62,6 @@ struct vy_read_iterator {
 	 * checked to match the search key.
 	 */
 	bool need_check_eq;
-	/** Set on the first call to vy_read_iterator_next(). */
-	bool search_started;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct tuple *last_stmt;
 	/**
@@ -94,10 +92,6 @@ struct vy_read_iterator {
 	uint32_t src_count;
 	/** Maximal capacity of the src array. */
 	uint32_t src_capacity;
-	/** Offset of the current merge source. */
-	uint32_t curr_src;
-	/** Statement returned by the current merge source. */
-	struct tuple *curr_stmt;
 	/** Offset of the transaction write set source. */
 	uint32_t txw_src;
 	/** Offset of the cache source. */
@@ -109,8 +103,9 @@ struct vy_read_iterator {
 	/** Offset of the first skipped source. */
 	uint32_t skipped_src;
 	/**
-	 * front_id of the current source and all sources
-	 * that are on the same key.
+	 * vy_read_src::front_id <= front_id for any source.
+	 * vy_read_src::front_id == front_id iff the source
+	 * iterator is positioned at the next key.
 	 */
 	uint32_t front_id;
 	/**

@@ -125,6 +125,12 @@ extern int replication_connect_quorum;
 extern double replication_sync_lag;
 
 /**
+ * Allows automatic skip of conflicting rows in replication (e.g. applying
+ * the row throws ER_TUPLE_FOUND) based on box.cfg configuration option.
+ */
+extern bool replication_skip_conflict;
+
+/**
  * Wait for the given period of time before trying to reconnect
  * to a master.
  */
