@@ -73,6 +73,8 @@ struct coll {
 	/** String comparator. */
 	coll_cmp_f cmp;
 	coll_hash_f hash;
+	/** Reference counter. */
+	int refs;
 	/** Collation name. */
 	size_t name_len;
 	char name[0];
@@ -86,12 +88,16 @@ struct coll {
 struct coll *
 coll_new(const struct coll_def *def);
 
-/**
- * Delete a collation.
- * @param cool - collation to delete.
- */
+/** Increment reference counter. */
+static inline void
+coll_ref(struct coll *coll)
+{
+	++coll->refs;
+}
+
+/** Decrement reference counter. Delete when 0. */
 void
-coll_delete(struct coll *coll);
+coll_unref(struct coll *coll);
 
 #if defined(__cplusplus)
 } /* extern "C" */

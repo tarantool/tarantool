@@ -250,6 +250,7 @@ coll_new(const struct coll_def *def)
 		return NULL;
 	}
 
+	coll->refs = 1;
 	coll->id = def->id;
 	coll->owner_id = def->owner_id;
 	coll->type = def->type;
@@ -265,14 +266,14 @@ coll_new(const struct coll_def *def)
 	return coll;
 }
 
-/**
- * Delete a collation.
- * @param cool - collation to delete.
- */
 void
-coll_delete(struct coll *coll)
+coll_unref(struct coll *coll)
 {
-	assert(coll->type == COLL_TYPE_ICU); /* no more types are implemented yet */
-	coll_icu_destroy(coll);
-	free(coll);
+	/* No more types are implemented yet. */
+	assert(coll->type == COLL_TYPE_ICU);
+	assert(coll->refs > 0);
+	if (--coll->refs == 0) {
+		coll_icu_destroy(coll);
+		free(coll);
+	}
 }

@@ -2391,7 +2391,7 @@ coll_cache_rollback(struct trigger *trigger, void *event)
 		/* INSERT: remove and free the new collation */
 		assert(stmt->old_tuple == NULL);
 		coll_cache_delete(coll);
-		coll_delete(coll);
+		coll_unref(coll);
 	}
 }
 
