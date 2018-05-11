@@ -2395,6 +2395,16 @@ coll_cache_rollback(struct trigger *trigger, void *event)
 	}
 }
 
+
+/** Dereference a deleted collation on commit. */
+static void
+coll_cache_commit(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct coll *coll = (struct coll *) trigger->data;
+	coll_unref(coll);
+}
+
 /**
  * A trigger invoked on replace in a space containing
  * collations that a user defined.
@@ -2409,6 +2419,8 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 	txn_check_singlestatement_xc(txn, "Space _collation");
 	struct trigger *on_rollback =
 		txn_alter_trigger_new(coll_cache_rollback, NULL);
+	struct trigger *on_commit =
+		txn_alter_trigger_new(coll_cache_commit, NULL);
 	if (new_tuple == NULL && old_tuple != NULL) {
 		/* DELETE */
 		/* TODO: Check that no index uses the collation */
@@ -2425,7 +2437,9 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		 */
 		coll_cache_delete(old_coll);
 		on_rollback->data = old_coll;
+		on_commit->data = old_coll;
 		txn_on_rollback(txn, on_rollback);
+		txn_on_commit(txn, on_commit);
 	} else if (new_tuple != NULL && old_tuple == NULL) {
 		/* INSERT */
 		struct coll_def new_def;
