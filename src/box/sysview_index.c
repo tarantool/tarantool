@@ -202,9 +202,9 @@ vspace_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
-		return true; /* read access to unverse */
+		return true; /* read access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _space space */
 
 	uint32_t space_id;
 	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &space_id) != 0)
@@ -222,9 +222,9 @@ vuser_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
-		return true; /* read access to unverse */
+		return true; /* read access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _user space */
 
 	uint32_t uid;
 	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
@@ -240,9 +240,9 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
-		return true; /* read access to unverse */
+		return true; /* read access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _priv space */
 
 	uint32_t grantor_id;
 	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_ID, &grantor_id) != 0)
@@ -258,9 +258,9 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if ((PRIV_R | PRIV_X) & cr->universal_access)
-		return true; /* read or execute access to unverse */
+		return true; /* read or execute access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _func space */
 
 	const char *name = tuple_field_cstr(tuple, BOX_FUNC_FIELD_NAME);
 	if (name == NULL)
@@ -279,9 +279,9 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if ((PRIV_R | PRIV_X) & cr->universal_access)
-		return true; /* read or execute access to unverse */
+		return true; /* read or execute access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _sequence space */
 
 	uint32_t id;
 	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_ID, &id) != 0)
