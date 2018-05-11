@@ -3135,16 +3135,20 @@ lock_before_dd(struct trigger *trigger, void *event)
 	 * memtx transaction will roll it back silently, rather
 	 * than produce an error, which is very confusing.
 	 * So don't try to lock a latch if there is
-	 * a multistatement transaction.
+	 * a multi-statement transaction.
 	 */
 	txn_check_singlestatement_xc(txn, "DDL");
-	latch_lock(&schema_lock);
 	struct trigger *on_commit =
 		txn_alter_trigger_new(unlock_after_dd, NULL);
-	txn_on_commit(txn, on_commit);
 	struct trigger *on_rollback =
 		txn_alter_trigger_new(unlock_after_dd, NULL);
+	/*
+	 * Setting triggers doesn't fail. Lock the latch last
+	 * to avoid leaking the latch in case of exception.
+	 */
+	txn_on_commit(txn, on_commit);
 	txn_on_rollback(txn, on_rollback);
+	latch_lock(&schema_lock);
 }
 
 struct trigger alter_space_on_replace_space = {
