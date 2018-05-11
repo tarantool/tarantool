@@ -2451,7 +2451,7 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 			diag_raise();
 		struct coll *replaced;
 		if (coll_cache_replace(new_coll, &replaced) != 0) {
-			coll_delete(new_coll);
+			coll_unref(new_coll);
 			diag_raise();
 		}
 		assert(replaced == NULL);
