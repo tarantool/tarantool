@@ -212,7 +212,7 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)
 		return false;
-	uint8_t effective = space->access[cr->auth_token].effective;
+	user_access_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
 		space->def->uid == cr->uid);
 }
@@ -268,7 +268,7 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	uint32_t name_len = strlen(name);
 	struct func *func = func_by_name(name, name_len);
 	assert(func != NULL);
-	uint8_t effective = func->access[cr->auth_token].effective;
+	user_access_t effective = func->access[cr->auth_token].effective;
 	if (func->def->uid == cr->uid || (PRIV_X & effective))
 		return true;
 	return false;
@@ -289,7 +289,7 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 	struct sequence *sequence = sequence_by_id(id);
 	if (sequence == NULL)
 		return false;
-	uint8_t effective = sequence->access[cr->auth_token].effective;
+	user_access_t effective = sequence->access[cr->auth_token].effective;
 	if (sequence->def->uid == cr->uid || ((PRIV_W | PRIV_R) & effective))
 		return true;
 	return false;
