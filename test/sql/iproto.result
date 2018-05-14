@@ -39,13 +39,20 @@ cn:ping()
 -- Static queries, with no parameters.
 --
 -- Simple select.
-cn:execute('select * from test')
+ret = cn:execute('select * from test')
+---
+...
+ret
 ---
 - metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
   rows:
   - [1, 2, '3']
   - [4, 5, '6']
   - [7, 8.5, '9']
+...
+type(ret.rows[1])
+---
+- cdata
 ...
 -- Operation with rowcount result.
 cn:execute('insert into test values (10, 11, NULL)')

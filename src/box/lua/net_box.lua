@@ -100,6 +100,10 @@ local function decode_execute(response_body)
         field_meta["name"] = field_meta[IPROTO_FIELD_NAME_KEY]
         field_meta[IPROTO_FIELD_NAME_KEY] = nil
     end
+    local tnew = box.tuple.new
+    for i, v in pairs(rows) do
+        rows[i] = tnew(v)
+    end
     setmetatable(rows, sequence_mt)
     return {metadata = metadata, rows = rows}
 end

@@ -15,7 +15,9 @@ cn:ping()
 --
 
 -- Simple select.
-cn:execute('select * from test')
+ret = cn:execute('select * from test')
+ret
+type(ret.rows[1])
 
 -- Operation with rowcount result.
 cn:execute('insert into test values (10, 11, NULL)')
