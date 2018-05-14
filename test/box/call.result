@@ -632,7 +632,7 @@ conn:eval("return return_sparse1()")
 ...
 conn:call_16("return_sparse1")
 ---
-- - [{20: 1, 1: 1}]
+- - [{1: 1, 20: 1}]
 ...
 function return_sparse2() return { [1] = 1, [20] = 1} end
 ---

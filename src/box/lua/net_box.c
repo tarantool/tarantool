@@ -38,6 +38,7 @@
 #include "box/iproto_constants.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
 #include "box/xrow.h"
+#include "box/tuple.h"
 
 #include "lua/msgpack.h"
 #include "third_party/base64.h"
@@ -555,6 +556,43 @@ handle_error:
 	return 2;
 }
 
+/**
+ * Decode Tarantool response body.
+ * @param Lua stack[1] Raw MessagePack pointer.
+ * @retval Decoded body and position of the body end.
+ */
+static int
+netbox_decode_body(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
+	assert(mp_typeof(*data) == MP_MAP);
+	uint32_t map_size = mp_decode_map(&data);
+	/* Until 2.0 body has no keys except DATA. */
+	assert(map_size == 1);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint32_t key = mp_decode_uint(&data);
+		if (key == IPROTO_DATA) {
+			uint32_t count = mp_decode_array(&data);
+			lua_createtable(L, count, 0);
+			struct tuple_format *format =
+				box_tuple_format_default();
+			for (uint32_t j = 0; j < count; ++j) {
+				const char *begin = data;
+				mp_next(&data);
+				struct tuple *tuple =
+					box_tuple_new(format, begin, data);
+				if (tuple == NULL)
+					luaT_error(L);
+				luaT_pushtuple(L, tuple);
+				lua_rawseti(L, -2, j + 1);
+			}
+		}
+	}
+	*(const char **)luaL_pushcdata(L, ctypeid) = data;
+	return 2;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -572,6 +610,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_auth",    netbox_encode_auth },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "communicate",    netbox_communicate },
+		{ "decode_body",    netbox_decode_body },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */

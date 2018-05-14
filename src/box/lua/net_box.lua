@@ -27,7 +27,6 @@ local encode_auth     = internal.encode_auth
 local encode_select   = internal.encode_select
 local decode_greeting = internal.decode_greeting
 
-local sequence_mt      = { __serialize = 'sequence' }
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
 local VINDEX_ID        = 289
@@ -50,31 +49,30 @@ local E_PROC_LUA             = box.error.PROC_LUA
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
 
-local function decode_nil(...) end
-local function decode_nop(...) return ... end
-local function decode_tuple(response)
-    if response[1] then
-        return box.tuple.new(response[1])
-    end
+local function decode_nil(raw_data, raw_data_end)
+    return nil, raw_data_end
 end
-local function decode_get(response)
-    if response[2] then
-        return nil, box.error.MORE_THAN_ONE_TUPLE
-    end
-    if response[1] then
-        return box.tuple.new(response[1])
-    end
+local function decode_data(raw_data)
+    local response, raw_end = decode(raw_data)
+    return response[IPROTO_DATA_KEY], raw_end
 end
-local function decode_select(response)
-    setmetatable(response, sequence_mt)
-    local tnew = box.tuple.new
-    for i, v in pairs(response) do
-        response[i] = tnew(v)
-    end
-    return response
+local function decode_tuple(raw_data)
+    local response, raw_end = internal.decode_body(raw_data)
+    return response[1], raw_end
 end
-local function decode_count(response)
-    return response[1]
+local function decode_get(raw_data)
+    local body, raw_end = internal.decode_body(raw_data)
+    if body[2] then
+        return nil, raw_end, box.error.MORE_THAN_ONE_TUPLE
+    end
+    return body[1], raw_end
+end
+local function decode_select(raw_data)
+    return internal.decode_body(raw_data)
+end
+local function decode_count(raw_data)
+    local response, raw_end = decode(raw_data)
+    return response[IPROTO_DATA_KEY][1], raw_end
 end
 
 local method_encoder = {
@@ -103,8 +101,8 @@ local method_encoder = {
 local method_decoder = {
     ping    = decode_nil,
     call_16 = decode_select,
-    call_17 = decode_nop,
-    eval    = decode_nop,
+    call_17 = decode_data,
+    eval    = decode_data,
     insert  = decode_tuple,
     replace = decode_tuple,
     delete  = decode_tuple,
@@ -115,7 +113,7 @@ local method_decoder = {
     min     = decode_get,
     max     = decode_get,
     count   = decode_count,
-    inject  = decode_nop,
+    inject  = decode_data,
 }
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
@@ -470,12 +468,10 @@ local function create_transport(host, port, user, password, callback,
         end
 
         -- Decode xrow.body[DATA] to Lua objects
-        body, body_end_check = decode(body_rpos)
-        assert(body_end == body_end_check, "invalid xrow length")
-        if body and body[IPROTO_DATA_KEY] then
-            request.response, request.errno =
-                method_decoder[request.method](body[IPROTO_DATA_KEY])
-        end
+        local real_end
+        request.response, real_end, request.errno =
+            method_decoder[request.method](body_rpos, body_end)
+        assert(real_end == body_end, "invalid body length")
         request.cond:broadcast()
     end
 
