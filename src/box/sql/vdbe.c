@@ -2526,10 +2526,6 @@ case OP_Column: {
 	pC = p->apCsr[pOp->p1];
 	p2 = pOp->p2;
 
-	/* If the cursor cache is stale, bring it up-to-date */
-	rc = sqlite3VdbeCursorMoveto(&pC, &p2);
-	if (rc) goto abort_due_to_error;
-
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
 	pDest = &aMem[pOp->p3];
 	memAboutToChange(p, pDest);
@@ -3576,7 +3572,6 @@ case OP_SeekGT: {       /* jump, in3 */
 		assert(res!=0);
 		goto seek_not_found;
 	}
-	pC->deferredMoveto = 0;
 	pC->cacheStatus = CACHE_STALE;
 #ifdef SQLITE_TEST
 	sql_search_count++;
@@ -3743,7 +3738,6 @@ case OP_Found: {        /* jump, in3 */
 	pC->seekResult = res;
 	alreadyExists = (res==0);
 	pC->nullRow = 1-alreadyExists;
-	pC->deferredMoveto = 0;
 	pC->cacheStatus = CACHE_STALE;
 	if (pOp->opcode==OP_Found) {
 		VdbeBranchTaken(alreadyExists!=0,2);
@@ -3892,7 +3886,6 @@ case OP_Delete: {
 	assert(pC!=0);
 	assert(pC->eCurType==CURTYPE_TARANTOOL);
 	assert(pC->uc.pCursor!=0);
-	assert(pC->deferredMoveto==0);
 	assert(pBtCur->eState == CURSOR_VALID);
 
 	if (pBtCur->curFlags & BTCF_TaCursor) {
@@ -4020,13 +4013,9 @@ case OP_RowData: {
 	 * OP_Rewind/Op_Next with no intervening instructions
 	 * that might invalidate the cursor.
 	 * If this where not the case, on of the following assert()s
-	 * would fail.  Should this ever change (because of changes in the code
-	 * generator) then the fix would be to insert a call to
-	 * sqlite3VdbeCursorMoveto().
+	 * would fail.
 	 */
-	assert(pC->deferredMoveto==0);
 	assert(sqlite3CursorIsValid(pCrsr));
-
 	assert(pCrsr->eState == CURSOR_VALID);
 	assert(pCrsr->curFlags & BTCF_TaCursor ||
 	       pCrsr->curFlags & BTCF_TEphemCursor);
@@ -4106,7 +4095,6 @@ case OP_Last: {        /* jump */
 	if (pOp->p3==0 || !sqlite3CursorIsValidNN(pCrsr)) {
 		rc = tarantoolSqlite3Last(pCrsr, &res);
 		pC->nullRow = (u8)res;
-		pC->deferredMoveto = 0;
 		pC->cacheStatus = CACHE_STALE;
 		if (rc) goto abort_due_to_error;
 		if (pOp->p2>0) {
@@ -4183,7 +4171,6 @@ case OP_Rewind: {        /* jump */
 		pCrsr = pC->uc.pCursor;
 		assert(pCrsr);
 		rc = tarantoolSqlite3First(pCrsr, &res);
-		pC->deferredMoveto = 0;
 		pC->cacheStatus = CACHE_STALE;
 	}
 	if (rc) goto abort_due_to_error;
@@ -4282,7 +4269,6 @@ case OP_Next:          /* jump */
 	pC = p->apCsr[pOp->p1];
 	res = pOp->p3;
 	assert(pC!=0);
-	assert(pC->deferredMoveto==0);
 	assert(pC->eCurType==CURTYPE_TARANTOOL);
 	assert(res==0 || res==1);
 	testcase( res==1);
@@ -4378,7 +4364,6 @@ case OP_IdxInsert: {        /* in2 */
 		} else {
 			unreachable();
 		}
-		assert(pC->deferredMoveto==0);
 		pC->cacheStatus = CACHE_STALE;
 	}
 
@@ -4512,7 +4497,6 @@ case OP_IdxDelete: {
 		}
 		if (rc) goto abort_due_to_error;
 	}
-	assert(pC->deferredMoveto==0);
 	pC->cacheStatus = CACHE_STALE;
 	pC->seekResult = 0;
 	break;
@@ -4574,7 +4558,6 @@ case OP_IdxGE:  {       /* jump */
 	assert(pC!=0);
 	assert(pC->eCurType==CURTYPE_TARANTOOL);
 	assert(pC->uc.pCursor!=0);
-	assert(pC->deferredMoveto==0);
 	assert(pOp->p5==0 || pOp->p5==1);
 	assert(pOp->p4type==P4_INT32);
 	r.key_def = pC->key_def;
@@ -4590,7 +4573,7 @@ case OP_IdxGE:  {       /* jump */
 #ifdef SQLITE_DEBUG
 	{ int i; for(i=0; i<r.nField; i++) assert(memIsValid(&r.aMem[i])); }
 #endif
-	int res = sqlite3VdbeIdxKeyCompare(pC, &r);
+	int res =  tarantoolSqlite3IdxKeyCompare(pC->uc.pCursor, &r);
 	assert((OP_IdxLE&1)==(OP_IdxLT&1) && (OP_IdxGE&1)==(OP_IdxGT&1));
 	if ((pOp->opcode&1)==(OP_IdxLT&1)) {
 		assert(pOp->opcode==OP_IdxLE || pOp->opcode==OP_IdxLT);

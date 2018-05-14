@@ -82,7 +82,6 @@ typedef struct VdbeCursor VdbeCursor;
 struct VdbeCursor {
 	u8 eCurType;		/* One of the CURTYPE_* values above */
 	u8 nullRow;		/* True if pointing to a row with no data */
-	u8 deferredMoveto;	/* A call to sqlite3CursorMoveto() is needed */
 #ifdef SQLITE_DEBUG
 	u8 seekOp;		/* Most recent seek operation on this cursor */
 #endif
@@ -446,29 +445,15 @@ struct PreUpdate {
 void sqlite3VdbeError(Vdbe *, const char *, ...);
 void sqlite3VdbeFreeCursor(Vdbe *, VdbeCursor *);
 void sqliteVdbePopStack(Vdbe *, int);
-int sqlite3VdbeCursorMoveto(VdbeCursor **, int *);
 int sqlite3VdbeCursorRestore(VdbeCursor *);
 #if defined(SQLITE_DEBUG) || defined(VDBE_PROFILE)
 void sqlite3VdbePrintOp(FILE *, int, Op *);
 #endif
 u32 sqlite3VdbeSerialTypeLen(u32);
-u8 sqlite3VdbeOneByteSerialTypeLen(u8);
 u32 sqlite3VdbeSerialType(Mem *, int, u32 *);
 u32 sqlite3VdbeSerialPut(unsigned char *, Mem *, u32);
 u32 sqlite3VdbeSerialGet(const unsigned char *, u32, Mem *);
 void sqlite3VdbeDeleteAuxData(sqlite3 *, AuxData **, int, int);
-
-/**
- * Compare the key of the index entry that cursor vdbe_cursor is
- * pointing to against the key string in unpacked.
- * @param vdbe_cursor Cursor, which points to tuple to compare.
- * @param unpacked Unpacked version of key.
- *
- * @retval Comparison result.
- */
-int
-sqlite3VdbeIdxKeyCompare(struct VdbeCursor *vdbe_cursor,
-			 struct UnpackedRecord *unpacked);
 
 int sqlite3VdbeExec(Vdbe *);
 int sqlite3VdbeList(Vdbe *);
