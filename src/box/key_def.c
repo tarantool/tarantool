@@ -34,7 +34,7 @@
 #include "tuple_hash.h"
 #include "column_mask.h"
 #include "schema_def.h"
-#include "coll_cache.h"
+#include "coll_id_cache.h"
 
 static const struct key_part_def key_part_def_default = {
 	0,
@@ -156,16 +156,17 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 		struct key_part_def *part = &parts[i];
 		struct coll *coll = NULL;
 		if (part->coll_id != COLL_NONE) {
-			coll = coll_by_id(part->coll_id);
-			if (coll == NULL) {
+			struct coll_id *coll_id = coll_by_id(part->coll_id);
+			if (coll_id == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 					 i + 1, "collation was not found by ID");
 				key_def_delete(def);
 				return NULL;
 			}
+			coll = coll_id->coll;
 		}
 		key_def_set_part(def, i, part->fieldno, part->type,
-				 part->is_nullable, coll);
+				 part->is_nullable, coll, part->coll_id);
 	}
 	return def;
 }
@@ -179,8 +180,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts)
 		part_def->fieldno = part->fieldno;
 		part_def->type = part->type;
 		part_def->is_nullable = part->is_nullable;
-		part_def->coll_id = (part->coll != NULL ?
-				     part->coll->id : COLL_NONE);
+		part_def->coll_id = part->coll_id;
 	}
 }
 
@@ -194,7 +194,8 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 	for (uint32_t item = 0; item < part_count; ++item) {
 		key_def_set_part(key_def, item, fields[item],
 				 (enum field_type)types[item],
-				 key_part_def_default.is_nullable, NULL);
+				 key_part_def_default.is_nullable, NULL,
+				 COLL_NONE);
 	}
 	return key_def;
 }
@@ -246,7 +247,8 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, bool is_nullable, struct coll *coll)
+		 enum field_type type, bool is_nullable, struct coll *coll,
+		 uint32_t coll_id)
 {
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
@@ -255,6 +257,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	def->parts[part_no].coll = coll;
+	def->parts[part_no].coll_id = coll_id;
 	column_mask_set_fieldno(&def->column_mask, fieldno);
 	/**
 	 * When all parts are set, initialize the tuple
@@ -554,7 +557,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	end = part + first->part_count;
 	for (; part != end; part++) {
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->is_nullable, part->coll);
+				 part->is_nullable, part->coll, part->coll_id);
 	}
 
 	/* Set-append second key def's part to the new key def. */
@@ -564,7 +567,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 		if (key_def_find(first, part->fieldno))
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
-				 part->is_nullable, part->coll);
+				 part->is_nullable, part->coll, part->coll_id);
 	}
 	return new_def;
 }

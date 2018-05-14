@@ -41,9 +41,9 @@ add_library(tuple STATIC
     tuple_bloom.c
     tuple_dictionary.c
     key_def.c
-    coll_def.c
-    coll.c
-    coll_cache.c
+    coll_id_def.c
+    coll_id.c
+    coll_id_cache.c
     field_def.c
     opt_def.c
 )

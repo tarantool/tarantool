@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_BOX_COLL_CACHE_H_INCLUDED
-#define TARANTOOL_BOX_COLL_CACHE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,48 +28,63 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "coll_id_cache.h"
+#include "coll_id.h"
+#include "diag.h"
+#include "assoc.h"
 
-#include "coll.h"
+/** mhash table (id -> collation) */
+static struct mh_i32ptr_t *coll_id_cache = NULL;
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-/**
- * Create global hash tables.
- * @return - 0 on success, -1 on memory error.
- */
 int
-coll_cache_init();
+coll_id_cache_init()
+{
+	coll_id_cache = mh_i32ptr_new();
+	if (coll_id_cache == NULL) {
+		diag_set(OutOfMemory, sizeof(*coll_id_cache), "malloc",
+			 "coll_id_cache");
+		return -1;
+	}
+	return 0;
+}
 
-/** Delete global hash tables. */
 void
-coll_cache_destroy();
+coll_id_cache_destroy()
+{
+	mh_i32ptr_delete(coll_id_cache);
+}
 
-/**
- * Insert or replace a collation into collation cache.
- * @param coll - collation to insert/replace.
- * @param replaced - collation that was replaced.
- * @return - 0 on success, -1 on memory error.
- */
 int
-coll_cache_replace(struct coll *coll, struct coll **replaced);
+coll_id_cache_replace(struct coll_id *coll_id, struct coll_id **replaced_id)
+{
+	const struct mh_i32ptr_node_t id_node = {coll_id->id, coll_id};
+	struct mh_i32ptr_node_t repl_id_node = {0, NULL};
+	struct mh_i32ptr_node_t *prepl_id_node = &repl_id_node;
+	if (mh_i32ptr_put(coll_id_cache, &id_node, &prepl_id_node, NULL) ==
+	    mh_end(coll_id_cache)) {
+		diag_set(OutOfMemory, sizeof(id_node), "malloc",
+			 "coll_id_cache");
+		return -1;
+	}
+	assert(repl_id_node.val == NULL);
+	*replaced_id = repl_id_node.val;
+	return 0;
+}
 
-/**
- * Delete a collation from collation cache.
- * @param coll - collation to delete.
- */
 void
-coll_cache_delete(const struct coll *coll);
+coll_id_cache_delete(const struct coll_id *coll_id)
+{
+	mh_int_t i = mh_i32ptr_find(coll_id_cache, coll_id->id, NULL);
+	if (i == mh_end(coll_id_cache))
+		return;
+	mh_i32ptr_del(coll_id_cache, i, NULL);
+}
 
-/**
- * Find a collation object by its id.
- */
-struct coll *
-coll_by_id(uint32_t id);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_BOX_COLL_CACHE_H_INCLUDED */
+struct coll_id *
+coll_by_id(uint32_t id)
+{
+	mh_int_t pos = mh_i32ptr_find(coll_id_cache, id, NULL);
+	if (pos == mh_end(coll_id_cache))
+		return NULL;
+	return mh_i32ptr_node(coll_id_cache, pos)->val;
+}

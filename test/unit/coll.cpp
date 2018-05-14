@@ -1,14 +1,14 @@
-#include "box/coll.h"
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <string.h>
-#include <box/coll_def.h>
 #include <assert.h>
 #include <msgpuck.h>
 #include <diag.h>
 #include <fiber.h>
 #include <memory.h>
+#include "coll_def.h"
+#include "coll.h"
 #include "third_party/PMurHash.h"
 
 using namespace std;
@@ -51,8 +51,6 @@ manual_test()
 	def.locale = "ru_RU";
 	def.locale_len = strlen(def.locale);
 	def.type = COLL_TYPE_ICU;
-	def.name = "test";
-	def.name_len = strlen(def.name);
 	struct coll *coll;
 
 	cout << " -- default ru_RU -- " << endl;
@@ -136,8 +134,6 @@ hash_test()
 	def.locale = "ru_RU";
 	def.locale_len = strlen(def.locale);
 	def.type = COLL_TYPE_ICU;
-	def.name = "test";
-	def.name_len = strlen(def.name);
 	struct coll *coll;
 
 	/* Case sensitive */

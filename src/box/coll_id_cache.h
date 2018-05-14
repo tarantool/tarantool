@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_BOX_COLL_ID_CACHE_H_INCLUDED
+#define TARANTOOL_BOX_COLL_ID_CACHE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -28,75 +30,49 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "coll_cache.h"
-#include "diag.h"
-#include "assoc.h"
+#include <stdint.h>
 
-/** mhash table (id -> collation) */
-static struct mh_i32ptr_t *coll_cache_id = NULL;
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-/** Create global hash tables if necessary. */
+struct coll_id;
+
+/**
+ * Create global hash tables.
+ * @return - 0 on success, -1 on memory error.
+ */
 int
-coll_cache_init()
-{
-	coll_cache_id = mh_i32ptr_new();
-	if (coll_cache_id == NULL) {
-		diag_set(OutOfMemory, sizeof(*coll_cache_id), "malloc",
-			 "coll_cache_id");
-		return -1;
-	}
-	return 0;
-}
+coll_id_cache_init();
 
 /** Delete global hash tables. */
 void
-coll_cache_destroy()
-{
-	mh_i32ptr_delete(coll_cache_id);
-}
+coll_id_cache_destroy();
 
 /**
  * Insert or replace a collation into collation cache.
- * @param coll - collation to insert/replace.
- * @return - NULL if inserted, replaced collation if replaced.
+ * @param coll_id Collation to insert/replace.
+ * @param Replaced_id Collation that was replaced.
+ * @return - 0 on success, -1 on memory error.
  */
 int
-coll_cache_replace(struct coll *coll, struct coll **replaced)
-{
-	const struct mh_i32ptr_node_t id_node = {coll->id, coll};
-	struct mh_i32ptr_node_t repl_id_node = {0, NULL};
-	struct mh_i32ptr_node_t *prepl_id_node = &repl_id_node;
-	if (mh_i32ptr_put(coll_cache_id, &id_node, &prepl_id_node, NULL) ==
-	    mh_end(coll_cache_id)) {
-		diag_set(OutOfMemory, sizeof(id_node), "malloc", "coll_cache_id");
-		return -1;
-	}
-	assert(repl_id_node.val == NULL);
-	*replaced = repl_id_node.val;
-	return 0;
-}
+coll_id_cache_replace(struct coll_id *coll_id, struct coll_id **replaced_id);
 
 /**
  * Delete a collation from collation cache.
- * @param coll - collation to delete.
+ * @param coll_id Collation to delete.
  */
 void
-coll_cache_delete(const struct coll *coll)
-{
-	mh_int_t i = mh_i32ptr_find(coll_cache_id, coll->id, NULL);
-	if (i == mh_end(coll_cache_id))
-		return;
-	mh_i32ptr_del(coll_cache_id, i, NULL);
-}
+coll_id_cache_delete(const struct coll_id *coll_id);
 
 /**
  * Find a collation object by its id.
  */
-struct coll *
-coll_by_id(uint32_t id)
-{
-	mh_int_t pos = mh_i32ptr_find(coll_cache_id, id, NULL);
-	if (pos == mh_end(coll_cache_id))
-		return NULL;
-	return mh_i32ptr_node(coll_cache_id, pos)->val;
-}
+struct coll_id *
+coll_by_id(uint32_t id);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* TARANTOOL_BOX_COLL_ID_CACHE_H_INCLUDED */

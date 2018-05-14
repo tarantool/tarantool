@@ -36,7 +36,7 @@
 #include <msgpuck.h>
 #include <limits.h>
 #include "field_def.h"
-#include "coll.h"
+#include "coll_id.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -68,6 +68,8 @@ struct key_part {
 	uint32_t fieldno;
 	/** Type of the tuple field */
 	enum field_type type;
+	/** Collation ID for string comparison. */
+	uint32_t coll_id;
 	/** Collation definition for string comparison */
 	struct coll *coll;
 	/** True if a part can store NULLs. */
@@ -249,7 +251,8 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
  */
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, bool is_nullable, struct coll *coll);
+		 enum field_type type, bool is_nullable, struct coll *coll,
+		 uint32_t coll_id);
 
 /**
  * Update 'has_optional_parts' of @a key_def with correspondence

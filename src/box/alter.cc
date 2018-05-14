@@ -34,7 +34,8 @@
 #include "space.h"
 #include "index.h"
 #include "func.h"
-#include "coll_cache.h"
+#include "coll_id_cache.h"
+#include "coll_id_def.h"
 #include "txn.h"
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
@@ -2284,9 +2285,9 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	}
 }
 
-/** Create a collation definition from tuple. */
+/** Create a collation identifier definition from tuple. */
 void
-coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
+coll_id_def_new_from_tuple(const struct tuple *tuple, struct coll_id_def *def)
 {
 	memset(def, 0, sizeof(*def));
 	uint32_t name_len, locale_len, type_len;
@@ -2294,15 +2295,16 @@ coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
 	def->name = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_NAME, &name_len);
 	def->name_len = name_len;
 	def->owner_id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_UID);
+	struct coll_def *base = &def->base;
 	const char *type = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_TYPE,
 					      &type_len);
-	def->type = STRN2ENUM(coll_type, type, type_len);
-	if (def->type == coll_type_MAX)
+	base->type = STRN2ENUM(coll_type, type, type_len);
+	if (base->type == coll_type_MAX)
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "unknown collation type");
-	def->locale = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_LOCALE,
-					 &locale_len);
-	def->locale_len = locale_len;
+	base->locale = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_LOCALE,
+					  &locale_len);
+	base->locale_len = locale_len;
 	const char *options =
 		tuple_field_with_type_xc(tuple, BOX_COLLATION_FIELD_OPTIONS,
 					 MP_MAP);
@@ -2315,53 +2317,53 @@ coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
 			  "collation locale is too long");
 	/* Locale is an optional argument and can be NULL. */
 	if (locale_len > 0)
-		identifier_check_xc(def->locale, locale_len);
+		identifier_check_xc(base->locale, locale_len);
 	identifier_check_xc(def->name, name_len);
 
-	assert(def->type == COLL_TYPE_ICU); /* no more defined now */
-	if (opts_decode(&def->icu, coll_icu_opts_reg, &options,
+	assert(base->type == COLL_TYPE_ICU);
+	if (opts_decode(&base->icu, coll_icu_opts_reg, &options,
 			ER_WRONG_COLLATION_OPTIONS,
 			BOX_COLLATION_FIELD_OPTIONS, NULL) != 0)
 		diag_raise();
 
-	if (def->icu.french_collation == coll_icu_on_off_MAX) {
+	if (base->icu.french_collation == coll_icu_on_off_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong french_collation option setting, "
 				  "expected ON | OFF");
 	}
 
-	if (def->icu.alternate_handling == coll_icu_alternate_handling_MAX) {
+	if (base->icu.alternate_handling == coll_icu_alternate_handling_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong alternate_handling option setting, "
 				  "expected NON_IGNORABLE | SHIFTED");
 	}
 
-	if (def->icu.case_first == coll_icu_case_first_MAX) {
+	if (base->icu.case_first == coll_icu_case_first_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong case_first option setting, "
 				  "expected OFF | UPPER_FIRST | LOWER_FIRST");
 	}
 
-	if (def->icu.case_level == coll_icu_on_off_MAX) {
+	if (base->icu.case_level == coll_icu_on_off_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong case_level option setting, "
 				  "expected ON | OFF");
 	}
 
-	if (def->icu.normalization_mode == coll_icu_on_off_MAX) {
+	if (base->icu.normalization_mode == coll_icu_on_off_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong normalization_mode option setting, "
 				  "expected ON | OFF");
 	}
 
-	if (def->icu.strength == coll_icu_strength_MAX) {
+	if (base->icu.strength == coll_icu_strength_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong strength option setting, "
 				  "expected PRIMARY | SECONDARY | "
 				  "TERTIARY | QUATERNARY | IDENTICAL");
 	}
 
-	if (def->icu.numeric_collation == coll_icu_on_off_MAX) {
+	if (base->icu.numeric_collation == coll_icu_on_off_MAX) {
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "ICU wrong numeric_collation option setting, "
 				  "expected ON | OFF");
@@ -2373,36 +2375,36 @@ coll_def_new_from_tuple(const struct tuple *tuple, struct coll_def *def)
  * A change is only INSERT or DELETE, UPDATE is not supported.
  */
 static void
-coll_cache_rollback(struct trigger *trigger, void *event)
+coll_id_cache_rollback(struct trigger *trigger, void *event)
 {
-	struct coll *coll = (struct coll *) trigger->data;
+	struct coll_id *coll_id = (struct coll_id *) trigger->data;
 	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
 
 	if (stmt->new_tuple == NULL) {
-		/*  Rollback DELETE: put the collation back. */
+		/* DELETE: put the collation identifier back. */
 		assert(stmt->old_tuple != NULL);
-		struct coll *replaced;
-		if (coll_cache_replace(coll, &replaced) != 0) {
+		struct coll_id *replaced_id;
+		if (coll_id_cache_replace(coll_id, &replaced_id) != 0) {
 			panic("Out of memory on insertion into collation "\
 			      "cache");
 		}
-		assert(replaced == NULL);
+		assert(replaced_id == NULL);
 	} else {
-		/* INSERT: remove and free the new collation */
+		/* INSERT: delete the new collation identifier. */
 		assert(stmt->old_tuple == NULL);
-		coll_cache_delete(coll);
-		coll_unref(coll);
+		coll_id_cache_delete(coll_id);
+		coll_id_delete(coll_id);
 	}
 }
 
 
-/** Dereference a deleted collation on commit. */
+/** Free a deleted collation identifier on commit. */
 static void
-coll_cache_commit(struct trigger *trigger, void *event)
+coll_id_cache_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
-	struct coll *coll = (struct coll *) trigger->data;
-	coll_unref(coll);
+	struct coll_id *coll_id = (struct coll_id *) trigger->data;
+	coll_id_delete(coll_id);
 }
 
 /**
@@ -2418,44 +2420,47 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 	struct tuple *new_tuple = stmt->new_tuple;
 	txn_check_singlestatement_xc(txn, "Space _collation");
 	struct trigger *on_rollback =
-		txn_alter_trigger_new(coll_cache_rollback, NULL);
+		txn_alter_trigger_new(coll_id_cache_rollback, NULL);
 	struct trigger *on_commit =
-		txn_alter_trigger_new(coll_cache_commit, NULL);
+		txn_alter_trigger_new(coll_id_cache_commit, NULL);
 	if (new_tuple == NULL && old_tuple != NULL) {
 		/* DELETE */
-		/* TODO: Check that no index uses the collation */
+		/*
+		 * TODO: Check that no index uses the collation
+		 * identifier.
+		 */
 		int32_t old_id = tuple_field_u32_xc(old_tuple,
 						    BOX_COLLATION_FIELD_ID);
-		struct coll *old_coll = coll_by_id(old_id);
-		assert(old_coll != NULL);
-		access_check_ddl(old_coll->name, old_coll->owner_id,
+		struct coll_id *old_coll_id = coll_by_id(old_id);
+		assert(old_coll_id != NULL);
+		access_check_ddl(old_coll_id->name, old_coll_id->owner_id,
 				 SC_COLLATION, PRIV_D, false);
 		/*
 		 * Set on_commit/on_rollback triggers after
 		 * deletion from the cache to make trigger logic
-		 * simple..
+		 * simple.
 		 */
-		coll_cache_delete(old_coll);
-		on_rollback->data = old_coll;
-		on_commit->data = old_coll;
+		coll_id_cache_delete(old_coll_id);
+		on_rollback->data = old_coll_id;
+		on_commit->data = old_coll_id;
 		txn_on_rollback(txn, on_rollback);
 		txn_on_commit(txn, on_commit);
 	} else if (new_tuple != NULL && old_tuple == NULL) {
 		/* INSERT */
-		struct coll_def new_def;
-		coll_def_new_from_tuple(new_tuple, &new_def);
+		struct coll_id_def new_def;
+		coll_id_def_new_from_tuple(new_tuple, &new_def);
 		access_check_ddl(new_def.name, new_def.owner_id, SC_COLLATION,
 				 PRIV_C, false);
-		struct coll *new_coll = coll_new(&new_def);
-		if (new_coll == NULL)
+		struct coll_id *new_coll_id = coll_id_new(&new_def);
+		if (new_coll_id == NULL)
 			diag_raise();
-		struct coll *replaced;
-		if (coll_cache_replace(new_coll, &replaced) != 0) {
-			coll_unref(new_coll);
+		struct coll_id *replaced_id;
+		if (coll_id_cache_replace(new_coll_id, &replaced_id) != 0) {
+			coll_id_delete(new_coll_id);
 			diag_raise();
 		}
-		assert(replaced == NULL);
-		on_rollback->data = new_coll;
+		assert(replaced_id == NULL);
+		on_rollback->data = new_coll_id;
 		txn_on_rollback(txn, on_rollback);
 	} else {
 		/* UPDATE */

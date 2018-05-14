@@ -46,6 +46,7 @@ extern "C" {
 #include "box/txn.h"
 #include "box/vclock.h" /* VCLOCK_MAX */
 #include "box/sequence.h"
+#include "box/coll_id_cache.h"
 
 /**
  * Trigger function for all spaces
@@ -291,8 +292,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_pushboolean(L, part->is_nullable);
 			lua_setfield(L, -2, "is_nullable");
 
-			if (part->coll != NULL) {
-				lua_pushstring(L, part->coll->name);
+			if (part->coll_id != COLL_NONE) {
+				struct coll_id *coll_id =
+					coll_by_id(part->coll_id);
+				assert(coll_id != NULL);
+				lua_pushstring(L, coll_id->name);
 				lua_setfield(L, -2, "collation");
 			}
 

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_COLL_H_INCLUDED
-#define TARANTOOL_BOX_COLL_H_INCLUDED
+#ifndef TARANTOOL_BOX_COLL_ID_H_INCLUDED
+#define TARANTOOL_BOX_COLL_ID_H_INCLUDED
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,8 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "coll_def.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -39,68 +37,41 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct coll_id_def;
 struct coll;
 
-typedef int (*coll_cmp_f)(const char *s, size_t s_len,
-			  const char *t, size_t t_len,
-			  const struct coll *coll);
-
-typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len,
-				uint32_t *ph, uint32_t *pcarry,
-				struct coll *coll);
-
 /**
- * ICU collation specific data.
+ * A collation identifier. It gives a name, owner and unique
+ * identifier to a base collation. Multiple coll_id can reference
+ * the same collation if their functional parts match.
  */
-struct UCollator;
-
-struct coll_icu {
-	struct UCollator *collator;
-};
-
-/**
- * A collation.
- */
-struct coll {
+struct coll_id {
 	/** Personal ID */
 	uint32_t id;
 	/** Owner ID */
 	uint32_t owner_id;
-	/** Collation type. */
-	enum coll_type type;
-	/** Type specific data. */
-	struct coll_icu icu;
-	/** String comparator. */
-	coll_cmp_f cmp;
-	coll_hash_f hash;
-	/** Reference counter. */
-	int refs;
+	/** Collation object. */
+	struct coll *coll;
 	/** Collation name. */
 	size_t name_len;
 	char name[0];
 };
 
 /**
- * Create a collation by definition.
- * @param def - collation definition.
- * @return - the collation OR NULL on memory error (diag is set).
+ * Create a collation identifier by definition.
+ * @param def Collation definition.
+ * @retval NULL Illegal parameters or memory error.
+ * @retval not NULL Collation.
  */
-struct coll *
-coll_new(const struct coll_def *def);
+struct coll_id *
+coll_id_new(const struct coll_id_def *def);
 
-/** Increment reference counter. */
-static inline void
-coll_ref(struct coll *coll)
-{
-	++coll->refs;
-}
-
-/** Decrement reference counter. Delete when 0. */
+/** Delete collation identifier, unref the basic collation. */
 void
-coll_unref(struct coll *coll);
+coll_id_delete(struct coll_id *coll);
 
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BOX_COLL_H_INCLUDED */
+#endif /* TARANTOOL_BOX_COLL_ID_H_INCLUDED */

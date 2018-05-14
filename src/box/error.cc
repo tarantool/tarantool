@@ -155,6 +155,8 @@ ClientError::get_errcode(const struct error *e)
 		return ER_MEMORY_ISSUE;
 	if (type_cast(SystemError, e))
 		return ER_SYSTEM;
+	if (type_cast(CollationError, e))
+		return ER_CANT_CREATE_COLLATION;
 	return ER_PROC_LUA;
 }
 

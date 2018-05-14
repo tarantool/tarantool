@@ -29,39 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "coll_def.h"
-
-const char *coll_type_strs[] = {
-	"ICU"
-};
-
-const char *coll_icu_on_off_strs[] = {
-	"DEFAULT",
-	"ON",
-	"OFF"
-};
-
-const char *coll_icu_alternate_handling_strs[] = {
-	"DEFAULT",
-	"NON_IGNORABLE",
-	"SHIFTED"
-};
-
-const char *coll_icu_case_first_strs[] = {
-	"DEFAULT",
-	"OFF",
-	"UPPER_FIRST",
-	"LOWER_FIRST"
-};
-
-const char *coll_icu_strength_strs[] = {
-	"DEFAULT",
-	"PRIMARY",
-	"SECONDARY",
-	"TERTIARY",
-	"QUATERNARY",
-	"IDENTICAL"
-};
+#include "coll_id_def.h"
 
 static int64_t
 icu_on_off_from_str(const char *str, uint32_t len)

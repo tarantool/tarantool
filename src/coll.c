@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,19 +31,18 @@
 
 #include "coll.h"
 #include "third_party/PMurHash.h"
-#include "error.h"
 #include "diag.h"
 #include <unicode/ucol.h>
 #include <trivia/config.h>
 
 enum {
-	MAX_HASH_BUFFER = 1024,
 	MAX_LOCALE = 1024,
 };
 
-/**
- * Compare two string using ICU collation.
- */
+static_assert(MAX_LOCALE <= TT_STATIC_BUF_LEN,
+	      "static buf is used to 0-terminate locale name");
+
+/** Compare two string using ICU collation. */
 static int
 coll_icu_cmp(const char *s, size_t slen, const char *t, size_t tlen,
 	     const struct coll *coll)
@@ -66,9 +65,7 @@ coll_icu_cmp(const char *s, size_t slen, const char *t, size_t tlen,
 	return (int)result;
 }
 
-/**
- * Get a hash of a string using ICU collation.
- */
+/** Get a hash of a string using ICU collation. */
 static uint32_t
 coll_icu_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
 	      struct coll *coll)
@@ -76,115 +73,103 @@ coll_icu_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
 	uint32_t total_size = 0;
 	UCharIterator itr;
 	uiter_setUTF8(&itr, s, s_len);
-	uint8_t buf[MAX_HASH_BUFFER];
+	uint8_t *buf = (uint8_t *) tt_static_buf();
 	uint32_t state[2] = {0, 0};
 	UErrorCode status = U_ZERO_ERROR;
-	while (true) {
-		int32_t got = ucol_nextSortKeyPart(coll->icu.collator,
-						   &itr, state, buf,
-						   MAX_HASH_BUFFER, &status);
+	int32_t got;
+	do {
+		got = ucol_nextSortKeyPart(coll->icu.collator, &itr, state, buf,
+					   TT_STATIC_BUF_LEN, &status);
 		PMurHash32_Process(ph, pcarry, buf, got);
 		total_size += got;
-		if (got < MAX_HASH_BUFFER)
-			break;
-	}
+	} while (got == TT_STATIC_BUF_LEN);
 	return total_size;
 }
 
 /**
  * Set up ICU collator and init cmp and hash members of collation.
- * @param coll - collation to set up.
- * @param def - collation definition.
- * @return 0 on success, -1 on error.
+ * @param coll Collation to set up.
+ * @param def Collation definition.
+ * @retval  0 Success.
+ * @retval -1 Collation error.
  */
 static int
 coll_icu_init_cmp(struct coll *coll, const struct coll_def *def)
 {
-	if (coll->icu.collator != NULL) {
-		ucol_close(coll->icu.collator);
-		coll->icu.collator = NULL;
-	}
-
 	if (def->locale_len >= MAX_LOCALE) {
-		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-			 "too long locale");
+		diag_set(CollationError, "too long locale");
 		return -1;
 	}
-	char locale[MAX_LOCALE];
+	char *locale = tt_static_buf();
 	memcpy(locale, def->locale, def->locale_len);
 	locale[def->locale_len] = '\0';
 	UErrorCode status = U_ZERO_ERROR;
 	struct UCollator *collator = ucol_open(locale, &status);
 	if (U_FAILURE(status)) {
-		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-			 u_errorName(status));
+		diag_set(CollationError, u_errorName(status));
 		return -1;
 	}
 	coll->icu.collator = collator;
 
 	if (def->icu.french_collation != COLL_ICU_DEFAULT) {
 		enum coll_icu_on_off w = def->icu.french_collation;
-		UColAttributeValue v =
-			w == COLL_ICU_ON ? UCOL_ON :
-			w == COLL_ICU_OFF ? UCOL_OFF :
-			UCOL_DEFAULT;
+		UColAttributeValue v = w == COLL_ICU_ON ? UCOL_ON :
+				       w == COLL_ICU_OFF ? UCOL_OFF :
+				       UCOL_DEFAULT;
 		ucol_setAttribute(collator, UCOL_FRENCH_COLLATION, v, &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set french_collation");
+			diag_set(CollationError, "failed to set "\
+				 "french_collation: %s", u_errorName(status));
 			return -1;
 		}
 	}
 	if (def->icu.alternate_handling != COLL_ICU_AH_DEFAULT) {
-		enum coll_icu_alternate_handling w = def->icu.alternate_handling;
+		enum coll_icu_alternate_handling w =
+			def->icu.alternate_handling;
 		UColAttributeValue v =
 			w == COLL_ICU_AH_NON_IGNORABLE ? UCOL_NON_IGNORABLE :
-			w == COLL_ICU_AH_SHIFTED ? UCOL_SHIFTED :
-			UCOL_DEFAULT;
-		ucol_setAttribute(collator, UCOL_ALTERNATE_HANDLING, v, &status);
+			w == COLL_ICU_AH_SHIFTED ? UCOL_SHIFTED : UCOL_DEFAULT;
+		ucol_setAttribute(collator, UCOL_ALTERNATE_HANDLING, v,
+				  &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set alternate_handling");
+			diag_set(CollationError, "failed to set "\
+				 "alternate_handling: %s", u_errorName(status));
 			return -1;
 		}
 	}
 	if (def->icu.case_first != COLL_ICU_CF_DEFAULT) {
 		enum coll_icu_case_first w = def->icu.case_first;
-		UColAttributeValue v =
-			w == COLL_ICU_CF_OFF ? UCOL_OFF :
+		UColAttributeValue v = w == COLL_ICU_CF_OFF ? UCOL_OFF :
 			w == COLL_ICU_CF_UPPER_FIRST ? UCOL_UPPER_FIRST :
 			w == COLL_ICU_CF_LOWER_FIRST ? UCOL_LOWER_FIRST :
 			UCOL_DEFAULT;
 		ucol_setAttribute(collator, UCOL_CASE_FIRST, v, &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set case_first");
+			diag_set(CollationError, "failed to set case_first: "\
+				 "%s", u_errorName(status));
 			return -1;
 		}
 	}
 	if (def->icu.case_level != COLL_ICU_DEFAULT) {
 		enum coll_icu_on_off w = def->icu.case_level;
-		UColAttributeValue v =
-			w == COLL_ICU_ON ? UCOL_ON :
-			w == COLL_ICU_OFF ? UCOL_OFF :
-			UCOL_DEFAULT;
+		UColAttributeValue v = w == COLL_ICU_ON ? UCOL_ON :
+			w == COLL_ICU_OFF ? UCOL_OFF : UCOL_DEFAULT;
 		ucol_setAttribute(collator, UCOL_CASE_LEVEL , v, &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set case_level");
+			diag_set(CollationError, "failed to set case_level: "\
+				 "%s", u_errorName(status));
 			return -1;
 		}
 	}
 	if (def->icu.normalization_mode != COLL_ICU_DEFAULT) {
 		enum coll_icu_on_off w = def->icu.normalization_mode;
-		UColAttributeValue v =
-			w == COLL_ICU_ON ? UCOL_ON :
-			w == COLL_ICU_OFF ? UCOL_OFF :
-			UCOL_DEFAULT;
-		ucol_setAttribute(collator, UCOL_NORMALIZATION_MODE, v, &status);
+		UColAttributeValue v = w == COLL_ICU_ON ? UCOL_ON :
+			w == COLL_ICU_OFF ? UCOL_OFF : UCOL_DEFAULT;
+		ucol_setAttribute(collator, UCOL_NORMALIZATION_MODE, v,
+				  &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set normalization_mode");
+			diag_set(CollationError, "failed to set "\
+				 "normalization_mode: %s", u_errorName(status));
 			return -1;
 		}
 	}
@@ -199,81 +184,51 @@ coll_icu_init_cmp(struct coll *coll, const struct coll_def *def)
 			UCOL_DEFAULT;
 		ucol_setAttribute(collator, UCOL_STRENGTH, v, &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set strength");
+			diag_set(CollationError, "failed to set strength: %s",
+				 u_errorName(status));
 			return -1;
 		}
 	}
 	if (def->icu.numeric_collation != COLL_ICU_DEFAULT) {
 		enum coll_icu_on_off w = def->icu.numeric_collation;
-		UColAttributeValue v =
-			w == COLL_ICU_ON ? UCOL_ON :
-			w == COLL_ICU_OFF ? UCOL_OFF :
-			UCOL_DEFAULT;
+		UColAttributeValue v = w == COLL_ICU_ON ? UCOL_ON :
+			w == COLL_ICU_OFF ? UCOL_OFF : UCOL_DEFAULT;
 		ucol_setAttribute(collator, UCOL_NUMERIC_COLLATION, v, &status);
 		if (U_FAILURE(status)) {
-			diag_set(ClientError, ER_CANT_CREATE_COLLATION,
-				 "failed to set numeric_collation");
+			diag_set(CollationError, "failed to set "\
+				 "numeric_collation: %s", u_errorName(status));
 			return -1;
 		}
 	}
-
 	coll->cmp = coll_icu_cmp;
 	coll->hash = coll_icu_hash;
 	return 0;
 }
 
-/**
- * Destroy ICU collation.
- */
-static void
-coll_icu_destroy(struct coll *coll)
-{
-	if (coll->icu.collator != NULL)
-		ucol_close(coll->icu.collator);
-}
-
-/**
- * Create a collation by definition.
- * @param def - collation definition.
- * @return - the collation OR NULL on memory error (diag is set).
- */
 struct coll *
 coll_new(const struct coll_def *def)
 {
-	assert(def->type == COLL_TYPE_ICU); /* no more types are implemented yet */
-
-	size_t total_len = sizeof(struct coll) + def->name_len + 1;
-	struct coll *coll = (struct coll *)calloc(1, total_len);
+	assert(def->type == COLL_TYPE_ICU);
+	struct coll *coll = (struct coll *) malloc(sizeof(*coll));
 	if (coll == NULL) {
-		diag_set(OutOfMemory, total_len, "malloc", "struct coll");
+		diag_set(OutOfMemory, sizeof(*coll), "malloc", "coll");
 		return NULL;
 	}
-
 	coll->refs = 1;
-	coll->id = def->id;
-	coll->owner_id = def->owner_id;
 	coll->type = def->type;
-	coll->name_len = def->name_len;
-	memcpy(coll->name, def->name, def->name_len);
-	coll->name[coll->name_len] = 0;
-
 	if (coll_icu_init_cmp(coll, def) != 0) {
 		free(coll);
 		return NULL;
 	}
-
 	return coll;
 }
 
 void
 coll_unref(struct coll *coll)
 {
-	/* No more types are implemented yet. */
-	assert(coll->type == COLL_TYPE_ICU);
 	assert(coll->refs > 0);
 	if (--coll->refs == 0) {
-		coll_icu_destroy(coll);
+		ucol_close(coll->icu.collator);
 		free(coll);
 	}
 }
