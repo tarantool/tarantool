@@ -38,7 +38,6 @@
 
 #include "box.h"
 #include "gc.h"
-#include "applier.h"
 #include "error.h"
 #include "vclock.h" /* VCLOCK_MAX */
 
@@ -140,7 +139,7 @@ replica_new(void)
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
-	replica->state = REPLICA_DISCONNECTED;
+	replica->applier_sync_state = APPLIER_DISCONNECTED;
 	latch_create(&replica->order_latch);
 	return replica;
 }
@@ -224,9 +223,9 @@ replica_clear_applier(struct replica *replica)
 static void
 replica_on_applier_sync(struct replica *replica)
 {
-	assert(replica->state == REPLICA_CONNECTED);
+	assert(replica->applier_sync_state == APPLIER_CONNECTED);
 
-	replica->state = REPLICA_SYNCED;
+	replica->applier_sync_state = APPLIER_SYNC;
 	replicaset.applier.synced++;
 
 	replicaset_check_quorum();
@@ -239,7 +238,7 @@ replica_on_applier_connect(struct replica *replica)
 
 	assert(tt_uuid_is_nil(&replica->uuid));
 	assert(!tt_uuid_is_nil(&applier->uuid));
-	assert(replica->state == REPLICA_DISCONNECTED);
+	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
 
 	replica->uuid = applier->uuid;
 
@@ -270,7 +269,7 @@ replica_on_applier_connect(struct replica *replica)
 		replica_hash_insert(&replicaset.hash, replica);
 	}
 
-	replica->state = REPLICA_CONNECTED;
+	replica->applier_sync_state = APPLIER_CONNECTED;
 	replicaset.applier.connected++;
 }
 
@@ -281,7 +280,7 @@ replica_on_applier_reconnect(struct replica *replica)
 
 	assert(!tt_uuid_is_nil(&replica->uuid));
 	assert(!tt_uuid_is_nil(&applier->uuid));
-	assert(replica->state == REPLICA_DISCONNECTED);
+	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
 
 	if (!tt_uuid_is_equal(&replica->uuid, &applier->uuid)) {
 		/*
@@ -303,32 +302,32 @@ replica_on_applier_reconnect(struct replica *replica)
 
 		replica_set_applier(orig, applier);
 		replica_clear_applier(replica);
-		replica->state = REPLICA_DISCONNECTED;
+		replica->applier_sync_state = APPLIER_DISCONNECTED;
 		replica = orig;
 	}
 
-	replica->state = REPLICA_CONNECTED;
+	replica->applier_sync_state = APPLIER_CONNECTED;
 	replicaset.applier.connected++;
 }
 
 static void
 replica_on_applier_disconnect(struct replica *replica)
 {
-	switch (replica->state) {
-	case REPLICA_SYNCED:
+	switch (replica->applier_sync_state) {
+	case APPLIER_SYNC:
 		assert(replicaset.applier.synced > 0);
 		replicaset.applier.synced--;
 		FALLTHROUGH;
-	case REPLICA_CONNECTED:
+	case APPLIER_CONNECTED:
 		assert(replicaset.applier.connected > 0);
 		replicaset.applier.connected--;
 		break;
-	case REPLICA_DISCONNECTED:
+	case APPLIER_DISCONNECTED:
 		break;
 	default:
 		unreachable();
 	}
-	replica->state = REPLICA_DISCONNECTED;
+	replica->applier_sync_state = APPLIER_DISCONNECTED;
 }
 
 static void
@@ -429,7 +428,7 @@ replicaset_update(struct applier **appliers, int count)
 			continue;
 		applier = replica->applier;
 		replica_clear_applier(replica);
-		replica->state = REPLICA_DISCONNECTED;
+		replica->applier_sync_state = APPLIER_DISCONNECTED;
 		applier_stop(applier);
 		applier_delete(applier);
 	}
@@ -463,7 +462,7 @@ replicaset_update(struct applier **appliers, int count)
 			replica_hash_insert(&replicaset.hash, replica);
 		}
 
-		replica->state = REPLICA_CONNECTED;
+		replica->applier_sync_state = APPLIER_CONNECTED;
 		replicaset.applier.connected++;
 	}
 	rlist_swap(&replicaset.anon, &anon_replicas);

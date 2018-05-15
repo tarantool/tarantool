@@ -36,6 +36,7 @@
 #define RB_COMPACT 1
 #include <small/rb.h> /* replicaset_t */
 #include <small/rlist.h>
+#include "applier.h"
 #include <small/mempool.h>
 #include "fiber_cond.h"
 #include "vclock.h"
@@ -218,24 +219,6 @@ struct replicaset {
 };
 extern struct replicaset replicaset;
 
-enum replica_state {
-	/**
-	 * Applier has not connected to the master yet
-	 * or has disconnected.
-	 */
-	REPLICA_DISCONNECTED,
-	/**
-	 * Applier has connected to the master and
-	 * received UUID.
-	 */
-	REPLICA_CONNECTED,
-	/**
-	 * Applier has synchronized with the master
-	 * (left "sync" and entered "follow" state).
-	 */
-	REPLICA_SYNCED,
-};
-
 /**
  * Summary information about a replica in the replica set.
  */
@@ -264,8 +247,17 @@ struct replica {
 	 * Trigger invoked when the applier changes its state.
 	 */
 	struct trigger on_applier_state;
-	/** Replica sync state. */
-	enum replica_state state;
+	/**
+	 * During initial connect or reconnect we require applier
+	 * to sync with the master before the replica can leave
+	 * read-only mode. This enum reflects the state of the
+	 * state machine for applier sync. Technically it is a
+	 * subset of the applier state machine, but since it's
+	 * much simpler and is used for a different purpose
+	 * (achieving replication connect quorum), we keep it
+	 * separate from applier.
+	 */
+	enum applier_state applier_sync_state;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
 };
