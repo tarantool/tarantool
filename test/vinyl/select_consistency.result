@@ -10,13 +10,13 @@ math.randomseed(os.time())
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
-_ = s:create_index('pk', {parts = {1, 'unsigned'}})
+_ = s:create_index('pk', {parts = {1, 'unsigned'}, page_size = 64, range_size = 256})
 ---
 ...
-_ = s:create_index('i1', {unique = true, parts = {2, 'unsigned', 3, 'unsigned'}})
+_ = s:create_index('i1', {unique = true, parts = {2, 'unsigned', 3, 'unsigned'}, page_size = 64, range_size = 256})
 ---
 ...
-_ = s:create_index('i2', {unique = true, parts = {2, 'unsigned', 4, 'unsigned'}})
+_ = s:create_index('i2', {unique = true, parts = {2, 'unsigned', 4, 'unsigned'}, page_size = 64, range_size = 256})
 ---
 ...
 --
@@ -29,13 +29,16 @@ MAX_KEY = 100
 MAX_VAL = 10
 ---
 ...
+PADDING = string.rep('x', 100)
+---
+...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
 function gen_insert()
     pcall(s.insert, s, {math.random(MAX_KEY), math.random(MAX_VAL),
-                        math.random(MAX_VAL), math.random(MAX_VAL), 1})
+                        math.random(MAX_VAL), math.random(MAX_VAL), PADDING})
 end;
 ---
 ...
