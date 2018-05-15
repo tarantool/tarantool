@@ -32,8 +32,39 @@
 #include "coll.h"
 #include "third_party/PMurHash.h"
 #include "diag.h"
+#include "assoc.h"
 #include <unicode/ucol.h>
 #include <trivia/config.h>
+
+#define mh_name _coll
+struct mh_coll_key_t {
+	const char *str;
+	size_t len;
+	uint32_t hash;
+};
+#define mh_key_t struct mh_coll_key_t *
+
+struct mh_coll_node_t {
+	size_t len;
+	uint32_t hash;
+	struct coll *coll;
+};
+#define mh_node_t struct mh_coll_node_t
+
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) ((a)->hash)
+#define mh_cmp(a, b, arg) ((a)->len != (b)->len || \
+			    strncmp((a)->coll->fingerprint, \
+				    (b)->coll->fingerprint, (a)->len))
+#define mh_cmp_key(a, b, arg) ((a)->len != (b)->len || \
+			       strncmp((a)->str, (b)->coll->fingerprint, \
+				       (a)->len))
+#define MH_SOURCE
+#include "salad/mhash.h"
+
+/** Table fingerprint -> collation. */
+static struct mh_coll_t *coll_cache = NULL;
 
 enum {
 	MAX_LOCALE = 1024,
@@ -205,19 +236,86 @@ coll_icu_init_cmp(struct coll *coll, const struct coll_def *def)
 	return 0;
 }
 
+/**
+ * Print ICU definition into @a buffer limited with @a size bytes.
+ * If @a size bytes is not enough, then total needed byte count is
+ * returned.
+ * @param buffer Buffer to write to.
+ * @param size Size of @a buffer.
+ * @param def ICU definition.
+ *
+ * @retval Written or needed byte count.
+ */
+static int
+coll_icu_def_snfingerprint(char *buffer, int size,
+			   const struct coll_icu_def *def)
+{
+	return snprintf(buffer, size, "{french_coll: %d, alt_handling: %d, "\
+			"case_first: %d, case_level: %d, norm_mode: %d, "\
+			"strength: %d, numeric_coll: %d}",
+			(int) def->french_collation,
+			(int) def->alternate_handling, (int) def->case_first,
+			(int) def->case_level, (int) def->normalization_mode,
+			(int) def->strength, (int) def->numeric_collation);
+}
+
+/**
+ * Print collation definition into @a buffer limited with @a size
+ * bytes. If @a size bytes is not enough, then total needed byte
+ * count is returned.
+ * @param buffer Buffer to write to.
+ * @param size Size of @a buffer.
+ * @param def Collation definition.
+ *
+ * @retval Written or needed byte count.
+ */
+static int
+coll_def_snfingerprint(char *buffer, int size, const struct coll_def *def)
+{
+	int total = 0;
+	SNPRINT(total, snprintf, buffer, size, "{locale: %.*s, type = %d, "\
+	        "icu: ", (int) def->locale_len, def->locale, (int) def->type);
+	SNPRINT(total, coll_icu_def_snfingerprint, buffer, size, &def->icu);
+	SNPRINT(total, snprintf, buffer, size, "}");
+	return total;
+}
+
 struct coll *
 coll_new(const struct coll_def *def)
 {
 	assert(def->type == COLL_TYPE_ICU);
-	struct coll *coll = (struct coll *) malloc(sizeof(*coll));
+	int fingerprint_len = coll_def_snfingerprint(NULL, 0, def);
+	assert(fingerprint_len <= TT_STATIC_BUF_LEN);
+	char *fingerprint = tt_static_buf();
+	coll_def_snfingerprint(fingerprint, TT_STATIC_BUF_LEN, def);
+
+	uint32_t hash = mh_strn_hash(fingerprint, fingerprint_len);
+	struct mh_coll_key_t key = { fingerprint, fingerprint_len, hash };
+	mh_int_t i = mh_coll_find(coll_cache, &key, NULL);
+	if (i != mh_end(coll_cache)) {
+		struct coll *coll = mh_coll_node(coll_cache, i)->coll;
+		coll_ref(coll);
+		return coll;
+	}
+
+	int total_size = sizeof(struct coll) + fingerprint_len + 1;
+	struct coll *coll = (struct coll *) malloc(total_size);
 	if (coll == NULL) {
-		diag_set(OutOfMemory, sizeof(*coll), "malloc", "coll");
+		diag_set(OutOfMemory, total_size, "malloc", "coll");
 		return NULL;
 	}
+	memcpy((char *) coll->fingerprint, fingerprint, fingerprint_len + 1);
 	coll->refs = 1;
 	coll->type = def->type;
 	if (coll_icu_init_cmp(coll, def) != 0) {
 		free(coll);
+		return NULL;
+	}
+
+	struct mh_coll_node_t node = { fingerprint_len, hash, coll };
+	if (mh_coll_put(coll_cache, &node, NULL, NULL) == mh_end(coll_cache)) {
+		diag_set(OutOfMemory, sizeof(node), "malloc", "coll_cache");
+		coll_unref(coll);
 		return NULL;
 	}
 	return coll;
@@ -228,7 +326,26 @@ coll_unref(struct coll *coll)
 {
 	assert(coll->refs > 0);
 	if (--coll->refs == 0) {
+		int len = strlen(coll->fingerprint);
+		struct mh_coll_node_t node = {
+			len, mh_strn_hash(coll->fingerprint, len), coll
+		};
+		mh_coll_remove(coll_cache, &node, NULL);
 		ucol_close(coll->icu.collator);
 		free(coll);
 	}
+}
+
+void
+coll_init()
+{
+	coll_cache = mh_coll_new();
+	if (coll_cache == NULL)
+		panic("Can not create system collations cache");
+}
+
+void
+coll_free()
+{
+	mh_coll_delete(coll_cache);
 }

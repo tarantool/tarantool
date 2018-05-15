@@ -191,4 +191,4 @@ add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES})
 target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS})
 
 add_executable(coll.test coll.cpp)
-target_link_libraries(coll.test box)
+target_link_libraries(coll.test core unit ${ICU_LIBRARIES} misc)

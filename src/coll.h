@@ -68,10 +68,17 @@ struct coll {
 	coll_hash_f hash;
 	/** Reference counter. */
 	int refs;
+	/**
+	 * Formatted string with collation properties, that
+	 * completely describes how the collation works.
+	 */
+	const char fingerprint[0];
 };
 
 /**
- * Create a collation by definition.
+ * Create a collation by definition. Can return an existing
+ * collation object, if a one with the same fingerprint was
+ * created before.
  * @param def Collation definition.
  * @retval NULL Collation or memory error.
  * @retval not NULL Collation.
@@ -89,6 +96,14 @@ coll_ref(struct coll *coll)
 /** Decrement reference counter. Delete when 0. */
 void
 coll_unref(struct coll *coll);
+
+/** Initialize collations subsystem. */
+void
+coll_init();
+
+/** Destroy collations subsystem. */
+void
+coll_free();
 
 #if defined(__cplusplus)
 } /* extern "C" */
