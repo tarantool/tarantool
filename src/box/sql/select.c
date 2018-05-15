@@ -2760,7 +2760,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 			goto multi_select_end;
 		}
 		for (int i = 0; i < nCol; i++) {
-			bool unused;
+			bool unused = false;
 			key_def_set_part(key_def, i, i,
 					 FIELD_TYPE_SCALAR,
 					 ON_CONFLICT_ACTION_ABORT,
