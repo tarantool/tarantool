@@ -1,6 +1,7 @@
 test_run = require('test_run').new()
 test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
 
+fiber = require('fiber')
 digest = require('digest')
 type(digest)
 
@@ -184,3 +185,21 @@ s
 err:match("number")
 digest = nil
 test_run:cmd("clear filter")
+
+-- gh-3396: fiber-safe pbkdf2
+res = {}
+sentry = fiber.channel()
+_ = test_run:cmd("setopt delimiter ';'")
+function test_pbkdf2()
+    local digest = require('digest')
+    for i = 1, 10 do
+        table.insert(res, digest.pbkdf2('', 'salt', 100, 32):hex())
+    end
+    sentry:put(fiber.id())
+end;
+_ = test_run:cmd("setopt delimiter ''");
+_ = fiber.create(test_pbkdf2)
+_ = fiber.create(test_pbkdf2)
+_ = sentry:get()
+_ = sentry:get()
+res

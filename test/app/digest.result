@@ -5,6 +5,9 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua:<line>\"]: '")
 ---
 - true
 ...
+fiber = require('fiber')
+---
+...
 digest = require('digest')
 ---
 ...
@@ -575,4 +578,61 @@ digest = nil
 test_run:cmd("clear filter")
 ---
 - true
+...
+-- gh-3396: fiber-safe pbkdf2
+res = {}
+---
+...
+sentry = fiber.channel()
+---
+...
+_ = test_run:cmd("setopt delimiter ';'")
+---
+...
+function test_pbkdf2()
+    local digest = require('digest')
+    for i = 1, 10 do
+        table.insert(res, digest.pbkdf2('', 'salt', 100, 32):hex())
+    end
+    sentry:put(fiber.id())
+end;
+---
+...
+_ = test_run:cmd("setopt delimiter ''");
+---
+...
+_ = fiber.create(test_pbkdf2)
+---
+...
+_ = fiber.create(test_pbkdf2)
+---
+...
+_ = sentry:get()
+---
+...
+_ = sentry:get()
+---
+...
+res
+---
+- - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
+  - bafac115a0022b2894f2983b5b5102455bdd3ba7cfbeb09f219a9fde8f3ee6a9
 ...
