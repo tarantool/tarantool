@@ -751,7 +751,12 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		goto fail;
 	}
 	begin_range = vy_range_tree_psearch(index->tree, min_key);
-	end_range = vy_range_tree_nsearch(index->tree, max_key);
+	end_range = vy_range_tree_psearch(index->tree, max_key);
+	/*
+	 * If min_key == max_key, the slice has to span over at
+	 * least one range.
+	 */
+	end_range = vy_range_tree_next(index->tree, end_range);
 	tuple_unref(min_key);
 	tuple_unref(max_key);
 
