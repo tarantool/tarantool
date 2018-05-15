@@ -111,7 +111,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	if (sqlite3FixSrcList(&sFix, pTableName)) {
 		goto trigger_cleanup;
 	}
-	pTab = sqlite3SrcListLookup(pParse, pTableName);
+	pTab = sql_list_lookup_table(pParse, pTableName);
 	if (!pTab) {
 		goto trigger_cleanup;
 	}
@@ -744,11 +744,11 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 				break;
 			}
 		case TK_DELETE:{
-				sqlite3DeleteFrom(pParse,
-						  targetSrcList(pParse, pStep),
-						  sqlite3ExprDup(db,
-								 pStep->pWhere,
-								 0)
+				sql_table_delete_from(pParse,
+						      targetSrcList(pParse, pStep),
+						      sqlite3ExprDup(db,
+								     pStep->pWhere,
+								     0)
 				    );
 				break;
 			}

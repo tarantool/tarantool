@@ -2664,10 +2664,10 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	VdbeCoverage(v);
 	regRecord = sqlite3GetTempReg(pParse);
 
-	sqlite3GenerateIndexKey(pParse, pIndex, iTab, regRecord,
-				&iPartIdxLabel, 0, 0);
+	sql_generate_index_key(pParse, pIndex, iTab, regRecord,
+			       &iPartIdxLabel, NULL, 0);
 	sqlite3VdbeAddOp2(v, OP_SorterInsert, iSorter, regRecord);
-	sqlite3ResolvePartIdxLabel(pParse, iPartIdxLabel);
+	sql_resolve_part_idx_label(pParse, iPartIdxLabel);
 	sqlite3VdbeAddOp2(v, OP_Next, iTab, addr1 + 1);
 	VdbeCoverage(v);
 	sqlite3VdbeJumpHere(v, addr1);

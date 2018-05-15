@@ -1994,7 +1994,6 @@ sql_space_tuple_log_count(struct Table *tab);
 /*
  * Allowed values for Table.tabFlags.
  */
-#define TF_Readonly        0x01	/* Read-only system table */
 #define TF_Ephemeral       0x02	/* An ephemeral table */
 #define TF_HasPrimaryKey   0x04	/* Table has a primary key */
 #define TF_Autoincrement   0x08	/* Integer primary key is autoincrement */
@@ -3671,15 +3670,46 @@ int sqlite3Select(Parse *, Select *, SelectDest *);
 Select *sqlite3SelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
 			 Expr *, ExprList *, u32, Expr *, Expr *);
 void sqlite3SelectDelete(sqlite3 *, Select *);
-Table *sqlite3SrcListLookup(Parse *, SrcList *);
-int sqlite3IsReadOnly(Parse *, Table *, int);
+
+/**
+ * While a SrcList can in general represent multiple tables and
+ * subqueries (as in the FROM clause of a SELECT statement) in
+ * this case it contains the name of a single table, as one might
+ * find in an INSERT, DELETE, or UPDATE statement.  Look up that
+ * table in the symbol table and return a pointer.  Set an error
+ * message and return NULL if the table name is not found or if
+ * any other error occurs.
+ *
+ * The following fields are initialized appropriate in src_list:
+ *
+ *    src_list->a[0].pTab       Pointer to the Table object.
+ *    src_list->a[0].pIndex     Pointer to the INDEXED BY index,
+ *                              if there is one.
+ *
+ * @param parse Parsing context.
+ * @param src_list List containing single table element.
+ * @retval Table object if found, NULL oterwise.
+ */
+struct Table *
+sql_list_lookup_table(struct Parse *parse, struct SrcList *src_list);
+
 void sqlite3OpenTable(Parse *, int iCur, Table *, int);
-#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT)
-Expr *sqlite3LimitWhere(Parse *, SrcList *, Expr *, ExprList *, Expr *, Expr *,
-			char *);
-#endif
-void sqlite3DeleteFrom(Parse *, SrcList *, Expr *);
-void sqlite3DeleteByKey(Parse *, char *, const char **, Expr **, int);
+/**
+ * Generate code for a DELETE FROM statement.
+ *
+ *     DELETE FROM table_wxyz WHERE a<5 AND b NOT NULL;
+ *                 \________/       \________________/
+ *                  tab_list              where
+ *
+ * @param parse Parsing context.
+ * @param tab_list List of single element which table from which
+ * deletetion if performed.
+ * @param where The WHERE clause.  May be NULL.
+ */
+void
+sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
+		      struct Expr *where);
+
 void sqlite3Update(Parse *, SrcList *, ExprList *, Expr *,
 		   enum on_conflict_action);
 WhereInfo *sqlite3WhereBegin(Parse *, SrcList *, Expr *, ExprList *, ExprList *,
@@ -3782,11 +3812,117 @@ int sqlite3ExprContainsSubquery(Expr *);
 int sqlite3ExprIsInteger(Expr *, int *);
 int sqlite3ExprCanBeNull(const Expr *);
 int sqlite3ExprNeedsNoAffinityChange(const Expr *, char);
-void sqlite3GenerateRowDelete(Parse *, Table *, Trigger *, int, int, int, i16,
-			      u8, enum on_conflict_action, u8, int);
-void sqlite3GenerateRowIndexDelete(Parse *, Table *, int, int);
-int sqlite3GenerateIndexKey(Parse *, Index *, int, int, int *, Index *, int);
-void sqlite3ResolvePartIdxLabel(Parse *, int);
+
+/**
+ * This routine generates VDBE code that causes a single row of a
+ * single table to be deleted.  Both the original table entry and
+ * all indices are removed.
+ *
+ * Preconditions:
+ *
+ *   1.  cursor is an open cursor on the btree that is the
+ *       canonical data store for the table.  (This will be the
+ *       PRIMARY KEY index)
+ *
+ *   2.  The primary key for the row to be deleted must be stored
+ *       in a sequence of npk memory cells starting at reg_pk. If
+ *       npk==0 that means that a search record formed from
+ *       OP_MakeRecord is contained in the single memory location
+ *       reg_pk.
+ *
+ *   Parameter mode may be passed either ONEPASS_OFF (0),
+ *   ONEPASS_SINGLE, or ONEPASS_MULTI.  If mode is not
+ *   ONEPASS_OFF, then the cursor already points to the row to
+ *   delete. If mode is ONEPASS_OFF then this function must seek
+ *   cursor to the entry identified by reg_pk and npk before
+ *   reading from it.
+ *
+ *   If mode is ONEPASS_MULTI, then this call is being made as
+ *   part of a ONEPASS delete that affects multiple rows. In this
+ *   case, if idx_noseek is a valid cursor number (>=0), then its
+ *   position should be preserved following the delete operation.
+ *   Or, if idx_noseek is not a valid cursor number, the position
+ *   of cursor should be preserved instead.
+ *
+ * @param parse Parsing context.
+ * @param table Table containing the row to be deleted.
+ * @param trigger_list List of triggers to (potentially) fire.
+ * @param cursor Cursor from which column data is extracted/
+ * @param reg_pk First memory cell containing the PRIMARY KEY.
+ * @param npk umber of PRIMARY KEY memory cells.
+ * @param need_update_count. If non-zero, increment the row change
+ *        counter.
+ * @param onconf Default ON CONFLICT policy for triggers.
+ * @param mode ONEPASS_OFF, _SINGLE, or _MULTI.  See above.
+ * @param idx_noseek If it is a valid cursor number (>=0),
+ *        then it identifies an index cursor that already points
+ *        to the index entry to be deleted.
+ */
+void
+sql_generate_row_delete(struct Parse *parse, struct Table *table,
+			struct Trigger *trigger_list, int cursor, int reg_pk,
+			short npk, bool need_update_count,
+			enum on_conflict_action onconf, u8 mode,
+			int idx_noseek);
+
+/**
+ * Generate code that will assemble an index key and stores it in
+ * register reg_out. The key will be for index which is an
+ * index on table. cursor is the index of a cursor open on the
+ * table table and pointing to the entry that needs indexing.
+ * cursor must be the cursor of the PRIMARY KEY index.
+ *
+ * If part_idx_label is not NULL, fill it in with a label and
+ * jump to that label if index is a partial index that should be
+ * skipped. The label should be resolved using
+ * sql_resolve_part_idx_label(). A partial index should be skipped
+ * if its WHERE clause evaluates to false or null.  If index is
+ * not a partial index, *part_idx_label will be set to zero which
+ * is an empty label that is ignored by
+ * sql_resolve_part_idx_label().
+ *
+ * The prev and reg_prev parameters are used to implement a
+ * cache to avoid unnecessary register loads.  If prev is not
+ * NULL, then it is a pointer to a different index for which an
+ * index key has just been computed into register reg_prev. If the
+ * current index is generating its key into the same
+ * sequence of registers and if prev and index share a column in
+ * common, then the register corresponding to that column already
+ * holds the correct value and the loading of that register is
+ * skipped. This optimization is helpful when doing a DELETE or
+ * an INTEGRITY_CHECK on a table with multiple indices, and
+ * especially with the PRIMARY KEY columns of the index.
+ *
+ * @param parse Parsing context.
+ * @param index The index for which to generate a key.
+ * @param cursor Cursor number from which to take column data.
+ * @param reg_out Put the new key into this register if not NULL.
+ * @param[out] part_idx_label Jump to this label to skip partial
+ *        index.
+ * @param prev Previously generated index key
+ * @param reg_prev Register holding previous generated key.
+ *
+ * @retval Return a register number which is the first in a block
+ * of registers that holds the elements of the index key. The
+ * block of registers has already been deallocated by the time
+ * this routine returns.
+ */
+int
+sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
+		       int reg_out, int *part_idx_label, struct Index *prev,
+		       int reg_prev);
+
+/**
+ * If a prior call to sql_generate_index_key() generated a
+ * jump-over label because it was a partial index, then this
+ * routine should be called to resolve that label.
+ *
+ * @param parse Parsing context.
+ * @param label Label to resolve.
+ */
+void
+sql_resolve_part_idx_label(struct Parse *parse, int label);
+
 void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
 				     int, u8, struct on_conflict *, int, int *,
 				     int *);
@@ -3831,9 +3967,20 @@ int sqlite3SafetyCheckOk(sqlite3 *);
 int sqlite3SafetyCheckSickOrOk(sqlite3 *);
 void sqlite3ChangeCookie(Parse *);
 
-#if !defined(SQLITE_OMIT_VIEW) && !defined(SQLITE_OMIT_TRIGGER)
-void sqlite3MaterializeView(Parse *, Table *, Expr *, int);
-#endif
+/**
+ * Evaluate a view and store its result in an ephemeral table.
+ * The where argument is an optional WHERE clause that restricts
+ * the set of rows in the view that are to be added to the
+ * ephemeral table.
+ *
+ * @param parse Parsing context.
+ * @param name View name.
+ * @param where Option WHERE clause to be added.
+ * @param cursor Cursor number for ephemeral table.
+ */
+void
+sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
+		     int cursor);
 
 #ifndef SQLITE_OMIT_TRIGGER
 void sqlite3BeginTrigger(Parse *, Token *, int, int, IdList *, SrcList *,

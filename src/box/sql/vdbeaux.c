@@ -1124,7 +1124,7 @@ sqlite3VdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 	} if (n == P4_BOOL) {
 		pOp->p4.b = *(bool*)zP4;
 		pOp->p4type = P4_BOOL;
-	} else if (zP4 != 0) {
+	} else {
 		assert(n < 0);
 		pOp->p4.p = (void *)zP4;
 		pOp->p4type = (signed char)n;
@@ -1561,7 +1561,10 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 #endif
 	case P4_COLLSEQ:{
 			struct coll *pColl = pOp->p4.pColl;
-			sqlite3XPrintf(&x, "(%.20s)", pColl->name);
+			if (pColl != NULL)
+				sqlite3XPrintf(&x, "(%.20s)", pColl->name);
+			else
+				sqlite3XPrintf(&x, "(binary)");
 			break;
 		}
 	case P4_FUNCDEF:{

@@ -784,7 +784,8 @@ sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
 		pParse->disableTriggers = 1;
 		/* Staring new transaction before DELETE FROM <tbl> */
 		sqlite3VdbeAddOp0(v, OP_TTransaction);
-		sqlite3DeleteFrom(pParse, sqlite3SrcListDup(db, pName, 0), 0);
+		sql_table_delete_from(pParse, sqlite3SrcListDup(db, pName, 0),
+				      NULL);
 		pParse->disableTriggers = 0;
 
 		/* If the DELETE has generated immediate foreign key constraint

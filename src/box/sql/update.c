@@ -163,7 +163,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	/* Locate the table which we want to update.
 	 */
-	pTab = sqlite3SrcListLookup(pParse, pTabList);
+	pTab = sql_list_lookup_table(pParse, pTabList);
 	if (pTab == 0)
 		goto update_cleanup;
 
@@ -187,7 +187,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	if (sqlite3ViewGetColumnNames(pParse, pTab)) {
 		goto update_cleanup;
 	}
-	if (sqlite3IsReadOnly(pParse, pTab, tmask)) {
+	if (isView && tmask == 0) {
+		sqlite3ErrorMsg(pParse, "cannot modify %s because it is a view",
+				pTab->zName);
 		goto update_cleanup;
 	}
 
@@ -324,7 +326,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 #if !defined(SQLITE_OMIT_VIEW) && !defined(SQLITE_OMIT_TRIGGER)
 	if (isView) {
-		sqlite3MaterializeView(pParse, pTab, pWhere, iDataCur);
+		sql_materialize_view(pParse, pTab->zName, pWhere, iDataCur);
 		/* Number of columns from SELECT plus ID.*/
 		nKey = pTab->nCol + 1;
 	}
@@ -603,7 +605,6 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 						     nKey);
 			VdbeCoverageNeverTaken(v);
 		}
-		sqlite3GenerateRowIndexDelete(pParse, pTab, iDataCur, iIdxCur);
 
 		/* If changing the PK value, or if there are foreign key constraints
 		 * to process, delete the old record. Otherwise, add a noop OP_Delete

@@ -379,7 +379,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	zTab = pTabList->a[0].zName;
 	if (NEVER(zTab == 0))
 		goto insert_cleanup;
-	pTab = sqlite3SrcListLookup(pParse, pTabList);
+	pTab = sql_list_lookup_table(pParse, pTabList);
 	if (pTab == 0) {
 		goto insert_cleanup;
 	}
@@ -406,13 +406,13 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* If pTab is really a view, make sure it has been initialized.
 	 * ViewGetColumnNames() is a no-op if pTab is not a view.
 	 */
-	if (sqlite3ViewGetColumnNames(pParse, pTab)) {
+	if (sqlite3ViewGetColumnNames(pParse, pTab))
 		goto insert_cleanup;
-	}
 
-	/* Cannot insert into a read-only table.
-	 */
-	if (sqlite3IsReadOnly(pParse, pTab, tmask)) {
+	/* Cannot insert into a read-only table. */
+	if (isView && tmask == 0) {
+		sqlite3ErrorMsg(pParse, "cannot modify %s because it is a view",
+				pTab->zName);
 		goto insert_cleanup;
 	}
 
@@ -1488,38 +1488,31 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		assert(on_error != ON_CONFLICT_ACTION_NONE);
 		switch (on_error) {
 		case ON_CONFLICT_ACTION_FAIL:
-		case ON_CONFLICT_ACTION_ROLLBACK: {
-				sqlite3UniqueConstraint(pParse, on_error, pIdx);
-				break;
-			}
-		case ON_CONFLICT_ACTION_ABORT: {
-				break;
-			}
-		case ON_CONFLICT_ACTION_IGNORE: {
-				sqlite3VdbeGoto(v, ignoreDest);
-				break;
-			}
+		case ON_CONFLICT_ACTION_ROLLBACK:
+			sqlite3UniqueConstraint(pParse, on_error, pIdx);
+			break;
+		case ON_CONFLICT_ACTION_ABORT:
+			break;
+		case ON_CONFLICT_ACTION_IGNORE:
+			sqlite3VdbeGoto(v, ignoreDest);
+			break;
 		default: {
-				Trigger *pTrigger = 0;
-				assert(on_error == ON_CONFLICT_ACTION_REPLACE);
-				sql_set_multi_write(pParse, true);
-				if (user_session->
-				    sql_flags & SQLITE_RecTriggers) {
-					pTrigger =
-					    sqlite3TriggersExist(pTab,
-								 TK_DELETE, 0,
-								 0);
-				}
-				sqlite3GenerateRowDelete(pParse, pTab, pTrigger,
-							 iDataCur, iIdxCur,
-							 regR, nPkField, 0,
-							 ON_CONFLICT_ACTION_REPLACE,
-							 (pIdx ==
-							  pPk ? ONEPASS_SINGLE :
-							  ONEPASS_OFF), -1);
-				seenReplace = 1;
-				break;
+			Trigger *pTrigger = NULL;
+			assert(on_error == ON_CONFLICT_ACTION_REPLACE);
+			sql_set_multi_write(pParse, true);
+			if (user_session->
+			    sql_flags & SQLITE_RecTriggers) {
+				pTrigger = sqlite3TriggersExist(pTab, TK_DELETE,
+								NULL, NULL);
 			}
+			sql_generate_row_delete(pParse, pTab, pTrigger,
+						iDataCur, regR, nPkField, false,
+						ON_CONFLICT_ACTION_REPLACE,
+						pIdx == pPk ? ONEPASS_SINGLE :
+						ONEPASS_OFF, -1);
+			seenReplace = 1;
+			break;
+		}
 		}
 		sqlite3VdbeResolveLabel(v, addrUniqueOk);
 		if (regR != regIdx)

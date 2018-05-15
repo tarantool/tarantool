@@ -719,28 +719,14 @@ limit_opt(A) ::= LIMIT expr(X) COMMA expr(Y).
 
 /////////////////////////// The DELETE statement /////////////////////////////
 //
-%ifdef SQLITE_ENABLE_UPDATE_DELETE_LIMIT
-cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W) 
-        orderby_opt(O) limit_opt(L). {
-  sqlite3WithPush(pParse, C, 1);
-  sqlite3SrcListIndexedBy(pParse, X, &I);
-  W = sqlite3LimitWhere(pParse, X, W, O, L.pLimit, L.pOffset, "DELETE");
-  sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
-  /* Instruct SQL to initate Tarantool's transaction.  */
-  pParse->initiateTTrans = true;
-  sqlite3DeleteFrom(pParse,X,W);
-}
-%endif
-%ifndef SQLITE_ENABLE_UPDATE_DELETE_LIMIT
 cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
   sqlite3WithPush(pParse, C, 1);
   sqlite3SrcListIndexedBy(pParse, X, &I);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
   pParse->initiateTTrans = true;
-  sqlite3DeleteFrom(pParse,X,W);
+  sql_table_delete_from(pParse,X,W);
 }
-%endif
 
 %type where_opt {Expr*}
 %destructor where_opt {sql_expr_free(pParse->db, $$, false);}
@@ -750,19 +736,6 @@ where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
 
 ////////////////////////// The UPDATE command ////////////////////////////////
 //
-%ifdef SQLITE_ENABLE_UPDATE_DELETE_LIMIT
-cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
-        where_opt(W) orderby_opt(O) limit_opt(L).  {
-  sqlite3WithPush(pParse, C, 1);
-  sqlite3SrcListIndexedBy(pParse, X, &I);
-  sqlite3ExprListCheckLength(pParse,Y,"set list"); 
-  W = sqlite3LimitWhere(pParse, X, W, O, L.pLimit, L.pOffset, "UPDATE");
-  sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
-  /* Instruct SQL to initate Tarantool's transaction.  */
-  pParse->initiateTTrans = true;
-  sqlite3Update(pParse,X,Y,W,R);
-}
-%endif
 %ifndef SQLITE_ENABLE_UPDATE_DELETE_LIMIT
 cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
         where_opt(W).  {

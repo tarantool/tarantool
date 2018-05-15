@@ -839,12 +839,11 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 		pLoop->wsFlags |= WHERE_PARTIALIDX;
 	}
 	regRecord = sqlite3GetTempReg(pParse);
-	regBase =
-	    sqlite3GenerateIndexKey(pParse, pIdx, pLevel->iTabCur, regRecord, 0,
-				    0, 0);
+	regBase = sql_generate_index_key(pParse, pIdx, pLevel->iTabCur,
+					 regRecord, NULL, NULL, 0);
 	sqlite3VdbeAddOp2(v, OP_IdxInsert, pLevel->iIdxCur, regRecord);
 	if (pPartial)
-		sqlite3VdbeResolveLabel(v, iContinue);
+		sql_resolve_part_idx_label(v, iContinue);
 	if (pTabItem->fg.viaCoroutine) {
 		sqlite3VdbeChangeP2(v, addrCounter, regBase + n);
 		translateColumnToCopy(v, addrTop, pLevel->iTabCur,
