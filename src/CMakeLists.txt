@@ -166,6 +166,7 @@ set (server_sources
      lua/fio.c
      lua/crypto.c
      lua/httpc.c
+     lua/utf8.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
@@ -210,7 +211,7 @@ endif()
 
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
-target_link_libraries(server core bit uri uuid)
+target_link_libraries(server core bit uri uuid ${ICU_LIBRARIES})
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
