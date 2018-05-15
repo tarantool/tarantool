@@ -39,6 +39,7 @@
 #include "box.h"
 #include "gc.h"
 #include "error.h"
+#include "relay.h"
 #include "vclock.h" /* VCLOCK_MAX */
 
 uint32_t instance_id = REPLICA_ID_NIL;
@@ -81,8 +82,6 @@ void
 replication_init(void)
 {
 	memset(&replicaset, 0, sizeof(replicaset));
-	mempool_create(&replicaset.pool, &cord()->slabc,
-		       sizeof(struct replica));
 	replica_hash_new(&replicaset.hash);
 	rlist_create(&replicaset.anon);
 	vclock_create(&replicaset.vclock);
@@ -95,7 +94,6 @@ void
 replication_free(void)
 {
 	free(replicaset.replica_by_id);
-	mempool_destroy(&replicaset.pool);
 	fiber_cond_destroy(&replicaset.applier.cond);
 }
 
@@ -117,8 +115,9 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
+	assert(replica->relay != NULL);
 	return replica->id == REPLICA_ID_NIL && replica->applier == NULL &&
-	       replica->relay == NULL;
+	       relay_get_state(replica->relay) != RELAY_FOLLOW;
 }
 
 static void
@@ -128,14 +127,19 @@ static struct replica *
 replica_new(void)
 {
 	struct replica *replica = (struct replica *)
-			mempool_alloc(&replicaset.pool);
-	if (replica == NULL)
+			malloc(sizeof(struct replica));
+	if (replica == NULL) {
 		tnt_raise(OutOfMemory, sizeof(*replica), "malloc",
 			  "struct replica");
+	}
+	replica->relay = relay_new(replica);
+	if (replica->relay == NULL) {
+		free(replica);
+		diag_raise();
+	}
 	replica->id = 0;
 	replica->uuid = uuid_nil;
 	replica->applier = NULL;
-	replica->relay = NULL;
 	replica->gc = NULL;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_applier_state,
@@ -149,9 +153,12 @@ static void
 replica_delete(struct replica *replica)
 {
 	assert(replica_is_orphan(replica));
+	if (replica->relay != NULL)
+		relay_delete(replica->relay);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
-	mempool_free(&replicaset.pool, replica);
+	TRASH(replica);
+	free(replica);
 }
 
 struct replica *
@@ -691,18 +698,8 @@ replicaset_check_quorum(void)
 }
 
 void
-replica_set_relay(struct replica *replica, struct relay *relay)
+replica_on_relay_stop(struct replica *replica)
 {
-	assert(replica->id != REPLICA_ID_NIL);
-	assert(replica->relay == NULL);
-	replica->relay = relay;
-}
-
-void
-replica_clear_relay(struct replica *replica)
-{
-	assert(replica->relay != NULL);
-	replica->relay = NULL;
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);

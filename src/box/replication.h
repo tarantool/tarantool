@@ -37,7 +37,6 @@
 #include <small/rb.h> /* replicaset_t */
 #include <small/rlist.h>
 #include "applier.h"
-#include <small/mempool.h>
 #include "fiber_cond.h"
 #include "vclock.h"
 #include "latch.h"
@@ -174,8 +173,6 @@ typedef rb_tree(struct replica) replica_hash_t;
  * relays, usually connected in full mesh.
  */
 struct replicaset {
-	/** Memory pool for struct replica allocations. */
-	struct mempool pool;
 	/** Hash of replicas indexed by UUID. */
 	replica_hash_t hash;
 	/**
@@ -325,18 +322,10 @@ void
 replica_clear_id(struct replica *replica);
 
 /**
- * Register \a relay of a \a replica.
- * \pre a replica can have only one relay
- * \pre replica->id != REPLICA_ID_NIL
- */
-void
-replica_set_relay(struct replica *replica, struct relay *relay);
-
-/**
  * Unregister \a relay from the \a replica.
  */
 void
-replica_clear_relay(struct replica *replica);
+replica_on_relay_stop(struct replica *replica);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -1401,7 +1401,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * Final stage: feed replica with WALs in range
 	 * (start_vclock, stop_vclock).
 	 */
-	relay_final_join(io->fd, header->sync, &start_vclock, &stop_vclock);
+	relay_final_join(replica, io->fd, header->sync,
+			 &start_vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
@@ -1493,7 +1494,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(io->fd, header->sync, replica, &replica_clock,
+	relay_subscribe(replica, io->fd, header->sync, &replica_clock,
 			replica_version_id);
 }
 

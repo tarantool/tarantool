@@ -42,6 +42,33 @@ struct replica;
 struct tt_uuid;
 struct vclock;
 
+enum relay_state {
+	/**
+	 * Applier has not connected to the master or not expected.
+	 */
+	RELAY_OFF,
+	/**
+	 * Applier has connected to the master.
+	 */
+	RELAY_FOLLOW,
+	/**
+	 * Applier disconnected from the master.
+	 */
+	RELAY_STOPPED,
+};
+
+/** Create a relay which is not running. object. */
+struct relay *
+relay_new(struct replica *replica);
+
+/** Destroy and delete the relay */
+void
+relay_delete(struct relay *relay);
+
+/** Return the current state of relay. */
+enum relay_state
+relay_get_state(const struct relay *relay);
+
 /**
  * Returns relay's vclock
  * @param relay relay
@@ -71,8 +98,8 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock);
  * @param sync      sync from incoming JOIN request
  */
 void
-relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
-	         struct vclock *stop_vclock);
+relay_final_join(struct replica *replica, int fd, uint64_t sync,
+		 struct vclock *start_vclock, struct vclock *stop_vclock);
 
 /**
  * Subscribe a replica to updates.
@@ -80,7 +107,7 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
  * @return none.
  */
 void
-relay_subscribe(int fd, uint64_t sync, struct replica *replica,
+relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 		struct vclock *replica_vclock, uint32_t replica_version_id);
 
 #endif /* TARANTOOL_REPLICATION_RELAY_H_INCLUDED */

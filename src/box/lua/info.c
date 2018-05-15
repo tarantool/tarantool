@@ -145,7 +145,7 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 		lua_settable(L, -3);
 	}
 
-	if (relay != NULL) {
+	if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
 		lua_pushstring(L, "downstream");
 		lbox_pushrelay(L, relay);
 		lua_settable(L, -3);
