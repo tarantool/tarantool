@@ -418,6 +418,19 @@ local function load_cfg(cfg)
 end
 box.cfg = load_cfg
 
+--
+-- This makes possible do box.sql.execute without calling box.cfg
+-- manually. The load_cfg call overwrites following table and
+-- metatable.
+--
+box.sql = {}
+setmetatable(box.sql, {
+    __index = function(table, index)
+        load_cfg()
+        return box.sql[index]
+    end,
+})
+
 -- gh-810:
 -- hack luajit default cpath
 -- commented out because we fixed luajit to build properly, see
