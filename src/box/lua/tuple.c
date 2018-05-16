@@ -415,6 +415,13 @@ lbox_tuple_transform(struct lua_State *L)
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	struct tuple *new_tuple = NULL;
+	/*
+	 * Can't use box_tuple_update() since transform must reset
+	 * the tuple format to default. The new tuple most likely
+	 * won't coerce into the original space format, so we have
+	 * to use the default one with no restrictions on field
+	 * count or types.
+	 */
 	const char *new_data = tuple_update_execute(region_aligned_alloc_cb,
 						    region, buf->buf,
 						    buf->buf + ibuf_used(buf),
