@@ -44,7 +44,10 @@ ret = cn:execute('select * from test')
 ...
 ret
 ---
-- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
+- metadata:
+  - name: ID
+  - name: A
+  - name: B
   rows:
   - [1, 2, '3']
   - [4, 5, '6']
@@ -83,7 +86,8 @@ cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 -- Empty result.
 cn:execute('select id as identifier from test where a = 5;')
 ---
-- metadata: [{'name': IDENTIFIER}]
+- metadata:
+  - name: IDENTIFIER
   rows: []
 ...
 -- netbox API errors.
@@ -109,7 +113,10 @@ cn:execute('   ;')
 --
 cn:execute('select * from test where id = ?', {1})
 ---
-- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
+- metadata:
+  - name: ID
+  - name: A
+  - name: B
   rows:
   - [1, 2, '3']
 ...
@@ -124,13 +131,19 @@ parameters[1][':value'] = 1
 ...
 cn:execute('select * from test where id = :value', parameters)
 ---
-- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
+- metadata:
+  - name: ID
+  - name: A
+  - name: B
   rows:
   - [1, 2, '3']
 ...
 cn:execute('select ?, ?, ?', {1, 2, 3})
 ---
-- metadata: [{'name': '?'}, {'name': '?'}, {'name': '?'}]
+- metadata:
+  - name: '?'
+  - name: '?'
+  - name: '?'
   rows:
   - [1, 2, 3]
 ...
@@ -154,7 +167,10 @@ parameters[3][':value1'] = 11
 ...
 cn:execute('select ?, :value1, @value2', parameters)
 ---
-- metadata: [{'name': '?'}, {'name': ':value1'}, {'name': '@value2'}]
+- metadata:
+  - name: '?'
+  - name: :value1
+  - name: '@value2'
   rows:
   - [10, 11, 12]
 ...
@@ -190,8 +206,15 @@ parameters[6]['@value2'] = 6
 ...
 cn:execute('select $value3, ?, :value1, ?, ?, @value2, ?, $value3', parameters)
 ---
-- metadata: [{'name': $value3}, {'name': '?'}, {'name': ':value1'}, {'name': '?'},
-    {'name': '?'}, {'name': '@value2'}, {'name': '?'}, {'name': '$value3'}]
+- metadata:
+  - name: $value3
+  - name: '?'
+  - name: :value1
+  - name: '?'
+  - name: '?'
+  - name: '@value2'
+  - name: '?'
+  - name: $value3
   rows:
   - [1, 2, 3, 4, 5, 6, null, 1]
 ...
@@ -201,14 +224,21 @@ msgpack = require('msgpack')
 ...
 cn:execute('select ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
 ---
-- metadata: [{'name': '?'}, {'name': '?'}, {'name': '?'}, {'name': '?'}, {'name': '?'}]
+- metadata:
+  - name: '?'
+  - name: '?'
+  - name: '?'
+  - name: '?'
+  - name: '?'
   rows:
   - ['abc', -123.456, null, 1, 0]
 ...
 -- Try to replace '?' in meta with something meaningful.
 cn:execute('select ? as kek, ? as kek2', {1, 2})
 ---
-- metadata: [{'name': KEK}, {'name': 'KEK2'}]
+- metadata:
+  - name: KEK
+  - name: KEK2
   rows:
   - [1, 2]
 ...
@@ -303,7 +333,11 @@ cn:execute('insert into test2 values (1, 1, 1, 1)')
 ...
 cn:execute('select * from test2')
 ---
-- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}, {'name': 'C'}]
+- metadata:
+  - name: ID
+  - name: A
+  - name: B
+  - name: C
   rows:
   - [1, 1, 1, 1]
 ...
@@ -431,7 +465,9 @@ res = cn:execute('select * from test')
 ...
 res.metadata
 ---
-- [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
+- - name: ID
+  - name: A
+  - name: B
 ...
 box.sql.execute('drop table test')
 ---
@@ -477,7 +513,10 @@ future4 = cn:execute('select * from test', nil, nil, {is_async = true})
 ...
 future4:wait_result()
 ---
-- metadata: [{'name': ID}, {'name': 'A'}, {'name': 'B'}]
+- metadata:
+  - name: ID
+  - name: A
+  - name: B
   rows:
   - [1, 1, 1]
   - [2, 2, 2]

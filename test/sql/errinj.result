@@ -68,7 +68,8 @@ insert_res
 ...
 select_res
 ---
-- metadata: [{'name': '1'}]
+- metadata:
+  - name: '1'
   rows:
   - [1]
 ...

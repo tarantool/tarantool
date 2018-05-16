@@ -39,6 +39,7 @@
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
 #include "box/xrow.h"
 #include "box/tuple.h"
+#include "box/execute.h"
 
 #include "lua/msgpack.h"
 #include "third_party/base64.h"
@@ -583,12 +584,37 @@ netbox_encode_execute(lua_State *L)
 }
 
 /**
- * Decode Tarantool response body.
+ * Decode IPROTO_DATA into tuples array.
+ * @param L Lua stack to push result on.
+ * @param data MessagePack.
+ */
+static void
+netbox_decode_data(struct lua_State *L, const char **data)
+{
+	uint32_t count = mp_decode_array(data);
+	lua_createtable(L, count, 0);
+	struct tuple_format *format =
+		box_tuple_format_default();
+	for (uint32_t j = 0; j < count; ++j) {
+		const char *begin = *data;
+		mp_next(data);
+		struct tuple *tuple =
+			box_tuple_new(format, begin, *data);
+		if (tuple == NULL)
+			luaT_error(L);
+		luaT_pushtuple(L, tuple);
+		lua_rawseti(L, -2, j + 1);
+	}
+}
+
+/**
+ * Decode Tarantool response body consisting of single
+ * IPROTO_DATA key into array of tuples.
  * @param Lua stack[1] Raw MessagePack pointer.
- * @retval Decoded body and position of the body end.
+ * @retval Tuples array and position of the body end.
  */
 static int
-netbox_decode_body(struct lua_State *L)
+netbox_decode_select(struct lua_State *L)
 {
 	uint32_t ctypeid;
 	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
@@ -596,24 +622,100 @@ netbox_decode_body(struct lua_State *L)
 	uint32_t map_size = mp_decode_map(&data);
 	/* Until 2.0 body has no keys except DATA. */
 	assert(map_size == 1);
+	(void) map_size;
+	uint32_t key = mp_decode_uint(&data);
+	assert(key == IPROTO_DATA);
+	(void) key;
+	netbox_decode_data(L, &data);
+	*(const char **)luaL_pushcdata(L, ctypeid) = data;
+	return 2;
+}
+
+/**
+ * Decode IPROTO_METADATA into array of maps.
+ * @param L Lua stack to push result on.
+ * @param data MessagePack.
+ */
+static void
+netbox_decode_metadata(struct lua_State *L, const char **data)
+{
+	uint32_t count = mp_decode_array(data);
+	lua_createtable(L, count, 0);
+	for (uint32_t i = 0; i < count; ++i) {
+		uint32_t map_size = mp_decode_map(data);
+		/* Only IPROTO_FIELD_NAME is available. */
+		assert(map_size == 1);
+		(void) map_size;
+		uint32_t key = mp_decode_uint(data);
+		assert(key == IPROTO_FIELD_NAME);
+		(void) key;
+		lua_createtable(L, 0, 1);
+		uint32_t len;
+		const char *str = mp_decode_str(data, &len);
+		lua_pushlstring(L, str, len);
+		lua_setfield(L, -2, "name");
+		lua_rawseti(L, -2, i + 1);
+	}
+}
+
+/**
+ * Decode IPROTO_SQL_INFO into map.
+ * @param L Lua stack to push result on.
+ * @param data MessagePack.
+ */
+static void
+netbox_decode_sql_info(struct lua_State *L, const char **data)
+{
+	uint32_t map_size = mp_decode_map(data);
+	/* Only SQL_INFO_ROW_COUNT is available. */
+	assert(map_size == 1);
+	(void) map_size;
+	uint32_t key = mp_decode_uint(data);
+	assert(key == SQL_INFO_ROW_COUNT);
+	(void) key;
+	uint32_t row_count = mp_decode_uint(data);
+	lua_createtable(L, 0, 1);
+	lua_pushinteger(L, row_count);
+	lua_setfield(L, -2, "rowcount");
+}
+
+static int
+netbox_decode_execute(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	const char *data = *(const char **)luaL_checkcdata(L, 1, &ctypeid);
+	assert(mp_typeof(*data) == MP_MAP);
+	uint32_t map_size = mp_decode_map(&data);
+	int rows_index = 0, meta_index = 0, info_index = 0;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint32_t key = mp_decode_uint(&data);
-		if (key == IPROTO_DATA) {
-			uint32_t count = mp_decode_array(&data);
-			lua_createtable(L, count, 0);
-			struct tuple_format *format =
-				box_tuple_format_default();
-			for (uint32_t j = 0; j < count; ++j) {
-				const char *begin = data;
-				mp_next(&data);
-				struct tuple *tuple =
-					box_tuple_new(format, begin, data);
-				if (tuple == NULL)
-					luaT_error(L);
-				luaT_pushtuple(L, tuple);
-				lua_rawseti(L, -2, j + 1);
-			}
+		switch(key) {
+		case IPROTO_DATA:
+			netbox_decode_data(L, &data);
+			rows_index = i - map_size;
+			break;
+		case IPROTO_METADATA:
+			netbox_decode_metadata(L, &data);
+			meta_index = i - map_size;
+			break;
+		default:
+			assert(key == IPROTO_SQL_INFO);
+			netbox_decode_sql_info(L, &data);
+			info_index = i - map_size;
+			break;
 		}
+	}
+	if (info_index == 0) {
+		assert(meta_index != 0);
+		assert(rows_index != 0);
+		lua_createtable(L, 0, 2);
+		lua_pushvalue(L, meta_index - 1);
+		lua_setfield(L, -2, "metadata");
+		lua_pushvalue(L, rows_index - 1);
+		lua_setfield(L, -2, "rows");
+	} else {
+		assert(meta_index == 0);
+		assert(rows_index == 0);
 	}
 	*(const char **)luaL_pushcdata(L, ctypeid) = data;
 	return 2;
@@ -637,7 +739,8 @@ luaopen_net_box(struct lua_State *L)
 		{ "encode_auth",    netbox_encode_auth },
 		{ "decode_greeting",netbox_decode_greeting },
 		{ "communicate",    netbox_communicate },
-		{ "decode_body",    netbox_decode_body },
+		{ "decode_select",  netbox_decode_select },
+		{ "decode_execute", netbox_decode_execute },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */
